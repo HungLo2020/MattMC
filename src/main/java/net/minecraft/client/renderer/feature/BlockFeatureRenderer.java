@@ -207,9 +207,6 @@ public class BlockFeatureRenderer {
 			&& !WorldRenderRoutePolicy.currentPistonMovingBlockRoute().usesRustOpenGl()) {
 			return;
 		}
-		if (net.irisshaders.iris.Iris.isPackInUseQuick()) {
-			return;
-		}
 		Minecraft minecraft = Minecraft.getInstance();
 		int drawFramebuffer = VulkanicAPI.getDrawFramebufferBinding();
 		if (drawFramebuffer != 0) {

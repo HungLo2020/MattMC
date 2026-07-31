@@ -804,7 +804,21 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
         64 => layout!(
             64,
             FfiWorldMeshVertex,
-            [byte_size, color_argb, normal_packed, light, x, y, z, u, v]
+            [
+                byte_size,
+                color_argb,
+                normal_packed,
+                light,
+                x,
+                y,
+                z,
+                u,
+                v,
+                atlas_u,
+                atlas_v,
+                shader_block_id,
+                shader_material_type
+            ]
         ),
         65 => layout!(
             65,
@@ -843,7 +857,13 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
         68 => layout!(
             68,
             FfiWorldMeshAssetUpdateRequest,
-            [header, generation, meshes, textures, negotiated_feature_bits]
+            [
+                header,
+                generation,
+                meshes,
+                textures,
+                negotiated_feature_bits
+            ]
         ),
         69 => layout!(
             69,

@@ -265,6 +265,86 @@ fn ffi_abi_does_not_accumulate_producer_specific_schema_names() {
     );
 }
 
+#[test]
+fn opengl_backend_does_not_borrow_iris_renderer_internals() {
+    let rust_root = Path::new(RUST_ROOT);
+    let opengl_backend = rust_root.join("render/vulkanic/backends/opengl");
+    let forbidden = [
+        "borrowed_iris",
+        "uses_borrowed_iris",
+        "IrisVertexFormats",
+        "IrisRenderSystem",
+        "WorldRenderingPhase",
+        "GbufferPrograms",
+    ];
+    let mut violations = Vec::new();
+
+    for file in rust_files(&opengl_backend) {
+        let source = read_source(&file);
+        for (line_index, line) in source.lines().enumerate() {
+            for token in forbidden {
+                if line.contains(token) {
+                    violations.push(format!(
+                        "{}:{}: {}",
+                        relative(&file),
+                        line_index + 1,
+                        line.trim()
+                    ));
+                }
+            }
+        }
+    }
+
+    assert!(
+        violations.is_empty(),
+        "Rust OpenGL backend must lower explicit GAL state, not borrow Iris renderer internals:\n{}",
+        violations.join("\n")
+    );
+}
+
+#[test]
+fn shader_pack_policy_stays_out_of_ffi_and_backends() {
+    let rust_root = Path::new(RUST_ROOT);
+    let checked_roots = [
+        rust_root.join("render/vulkanic/ffi"),
+        rust_root.join("render/vulkanic/backends/opengl"),
+        rust_root.join("render/vulkanic/backends/vulkan"),
+    ];
+    let forbidden = [
+        "shader_pack::manifest",
+        "shader_pack::preprocess",
+        "shader_pack::pass_graph",
+        "ShaderPackManifest",
+        "ShaderPackSource",
+        "PassGraph",
+    ];
+    let mut violations = Vec::new();
+
+    for root in checked_roots {
+        for file in rust_files(&root) {
+            let source = read_source(&file);
+            for (line_index, line) in source.lines().enumerate() {
+                for token in forbidden {
+                    if line.contains(token) {
+                        violations.push(format!(
+                            "{}:{}: {}",
+                            relative(&file),
+                            line_index + 1,
+                            line.trim()
+                        ));
+                    }
+                }
+            }
+        }
+    }
+
+    assert!(
+        violations.is_empty(),
+        "Shader-pack policy must stay in the Rust shader_pack subsystem/frontends, not FFI/backends:\n{}",
+        violations.join("\n")
+    );
+}
+
 fn assert_no_public_backend_exposure(path: &Path, source: &str) {
     let mut violations = Vec::new();
 

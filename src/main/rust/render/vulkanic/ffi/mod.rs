@@ -36,10 +36,9 @@ use super::sync::SubmissionId;
 use super::world_primitive_frontend::{
     WorldBackgroundRequest, WorldBorderAssetPayload, WorldBorderQuadRequest,
     WorldCrackAssetPayload, WorldCrackQuadRequest, WorldLineSegmentRequest,
-    WorldMaterialAssetPayload, WorldMaterialQuadRequest, WorldMeshAsset,
-    WorldMeshInstanceRequest, WorldMeshSection, WorldMeshTextureAssetPayload, WorldMeshVertex,
-    WorldPrimitiveFrame, WorldPrimitiveFrontend, WorldPrimitiveSubmitStats,
-    WORLD_BACKGROUND_LOAD_CLEAR,
+    WorldMaterialAssetPayload, WorldMaterialQuadRequest, WorldMeshAsset, WorldMeshInstanceRequest,
+    WorldMeshSection, WorldMeshTextureAssetPayload, WorldMeshVertex, WorldPrimitiveFrame,
+    WorldPrimitiveFrontend, WorldPrimitiveSubmitStats, WORLD_BACKGROUND_LOAD_CLEAR,
     WORLD_BACKGROUND_SKY_CUSTOM, WORLD_BACKGROUND_SKY_END, WORLD_BACKGROUND_SKY_NETHER,
     WORLD_BACKGROUND_SKY_OVERWORLD, WORLD_BACKGROUND_STORE_STORE, WORLD_CULL_BACK,
     WORLD_CULL_FRONT, WORLD_CULL_NONE, WORLD_DEPTH_POLICY_DISABLED,

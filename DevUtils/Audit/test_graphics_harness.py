@@ -212,6 +212,21 @@ def write_block_display_probe_image(path: Path, *, scenario: str = "stone") -> N
     image.save(path)
 
 
+def write_desktop_sized_block_display_probe_image(path: Path, *, scenario: str = "stone") -> None:
+    from PIL import Image
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    image = Image.new("RGB", (2560, 720), (36, 48, 60))
+    left, top, right, bottom = 520, 250, 760, 490
+    color = (78, 142, 58) if scenario in {"oak-leaves", "cutout", "tinted"} else (124, 124, 124)
+    for x in range(left, right):
+        for y in range(top, bottom):
+            if scenario in {"oak-leaves", "cutout", "tinted"} and ((x - left) // 16 + (y - top) // 16) % 3 == 0:
+                continue
+            image.putpixel((x, y), color)
+    image.save(path)
+
+
 def write_falling_block_probe_image(path: Path, *, scenario: str = "sand") -> None:
     from PIL import Image
 
@@ -226,6 +241,23 @@ def write_falling_block_probe_image(path: Path, *, scenario: str = "sand") -> No
         color = (196, 174, 104)
     for x in range(left, right):
         for y in range(top, bottom):
+            image.putpixel((x, y), color)
+    image.save(path)
+
+
+def write_desktop_sized_falling_block_probe_image(path: Path, *, scenario: str = "sand") -> None:
+    from PIL import Image
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    image = Image.new("RGB", (2560, 720), (36, 48, 60))
+    if scenario == "gravel":
+        color = (118, 118, 118)
+    elif scenario in {"concrete-powder", "concrete_powder"}:
+        color = (198, 198, 190)
+    else:
+        color = (196, 174, 104)
+    for x in range(520, 700):
+        for y in range(80, 260):
             image.putpixel((x, y), color)
     image.save(path)
 
@@ -1163,16 +1195,42 @@ class GraphicsAuditHarnessTests(unittest.TestCase):
             target = fake_repo(temp, mode.target)
             capture = temp / "capture"
             write_capture(capture, backend=mode.backend, shaders=mode.shaders, world="Origin")
-            screenshot = capture / "falling_block_sand.png"
-            write_falling_block_probe_image(screenshot, scenario="sand")
+            screenshots = []
+            for frame in range(4):
+                screenshot = capture / f"falling_block_sand_{frame}.png"
+                write_falling_block_probe_image(screenshot, scenario="sand")
+                screenshots.append(screenshot)
             deterministic = {
                 "status": "complete",
                 "dimension": "minecraft:overworld",
+                "window": {"width": 1280, "height": 720},
                 "rustGalWorldFallingBlockScenario": "sand",
-                "captures": [{"poseName": "initial", "renderedFrameIndex": 8, "screenshot": str(screenshot)}],
+                "rustGalWorldFallingBlockSetup": {
+                    "status": "spawned",
+                    "blockId": "minecraft:sand",
+                    "spawnMethod": "FallingBlockEntity.fall",
+                    "entityCount": 1,
+                    "fallHeight": 64,
+                },
+                "rustGalWorldFallingBlockExtractionProbe": {
+                    "seen": 4,
+                    "shouldRender": 4,
+                    "compiledSection": 4,
+                    "extracted": 4,
+                },
+                "captures": [
+                    {
+                        "poseName": f"falling-{frame:02d}",
+                        "renderedFrameIndex": 8 + frame,
+                        "screenshot": str(screenshots[frame]),
+                        "window": {"width": 1280, "height": 720},
+                        "captureMethod": "internal-main-render-target",
+                    }
+                    for frame in range(4)
+                ],
                 "rustGalWorldFallingBlocks": [
                     {
-                        "frameIndex": 8,
+                        "frameIndex": 8 + frame,
                         "route": "rust-opengl",
                         "blockId": "minecraft:sand",
                         "meshKey": 42,
@@ -1188,6 +1246,18 @@ class GraphicsAuditHarnessTests(unittest.TestCase):
                         "projected": True,
                         "screenBounds": {"left": 520.0, "top": 80.0, "right": 700.0, "bottom": 260.0},
                     }
+                    for frame in range(4)
+                ],
+                "rustGalWorldFallingBlockRouteDecisions": [
+                    {
+                        "frameIndex": 8 + frame,
+                        "route": "rust-opengl",
+                        "blockId": "minecraft:sand",
+                        "rustSelected": True,
+                        "rustQueued": True,
+                        "javaDrawn": False,
+                    }
+                    for frame in range(4)
                 ],
             }
             next(capture.glob("deterministic_camera_capture_*.json")).write_text(json.dumps(deterministic), encoding="utf-8")
@@ -1222,6 +1292,187 @@ class GraphicsAuditHarnessTests(unittest.TestCase):
             self.assertEqual("passed", evidence["texture_status"])
             self.assertEqual("passed", evidence["material_status"])
             self.assertEqual("passed", evidence["orientation_status"])
+            self.assertEqual("passed", evidence["game_window_status"])
+            self.assertEqual("passed", evidence["producer_traversal_status"])
+            self.assertEqual("passed", evidence["setup_status"])
+            self.assertEqual("passed", evidence["capture_method_status"])
+            self.assertEqual("passed", evidence["frame_sequence_status"])
+            self.assertEqual(4, evidence["frames_validated"])
+
+    def test_falling_block_capture_rejects_desktop_screenshot(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            mode = harness.MATRIX_MODES[0]
+            target = fake_repo(temp, mode.target)
+            capture = temp / "capture"
+            write_capture(capture, backend=mode.backend, shaders=mode.shaders, world="Origin")
+            screenshots = []
+            for frame in range(4):
+                screenshot = capture / f"desktop_falling_block_sand_{frame}.png"
+                write_desktop_sized_falling_block_probe_image(screenshot, scenario="sand")
+                screenshots.append(screenshot)
+            deterministic = {
+                "status": "complete",
+                "dimension": "minecraft:overworld",
+                "window": {"width": 1280, "height": 720},
+                "rustGalWorldFallingBlockScenario": "sand",
+                "rustGalWorldFallingBlockSetup": {
+                    "status": "spawned",
+                    "blockId": "minecraft:sand",
+                    "spawnMethod": "FallingBlockEntity.fall",
+                    "entityCount": 1,
+                    "fallHeight": 64,
+                },
+                "rustGalWorldFallingBlockExtractionProbe": {
+                    "seen": 4,
+                    "shouldRender": 4,
+                    "compiledSection": 4,
+                    "extracted": 4,
+                },
+                "captures": [
+                    {
+                        "poseName": f"falling-{frame:02d}",
+                        "renderedFrameIndex": 8 + frame,
+                        "screenshot": str(screenshots[frame]),
+                        "window": {"width": 1280, "height": 720},
+                        "captureMethod": "internal-main-render-target",
+                    }
+                    for frame in range(4)
+                ],
+                "rustGalWorldFallingBlocks": [
+                    {
+                        "frameIndex": 8 + frame,
+                        "route": "rust-opengl",
+                        "blockId": "minecraft:sand",
+                        "meshKey": 42,
+                        "meshGeneration": 2,
+                        "vertexLayoutVersion": 1,
+                        "indexType": 1,
+                        "vertexCount": 24,
+                        "indexBytes": 72,
+                        "sectionCount": 6,
+                        "textureIds": "2269692870",
+                        "materialMode": 1,
+                        "viewport": {"width": 1280, "height": 720},
+                        "projected": True,
+                        "screenBounds": {"left": 520.0, "top": 80.0, "right": 700.0, "bottom": 260.0},
+                    }
+                    for frame in range(4)
+                ],
+            }
+            next(capture.glob("deterministic_camera_capture_*.json")).write_text(json.dumps(deterministic), encoding="utf-8")
+            (capture / "runClient_20260101_000000.log").write_text(
+                "-Dmattmc.dev.rustGalWorldMesh.fallingBlockScenario=sand\n"
+                "Rust OpenGL VulkanicGAL GUI frame executed producer=minecraft.entity.falling-block "
+                "rust_gal_world_mesh_instances_executed=1 "
+                "rust_gal_world_mesh_batches_executed=1 "
+                "rust_gal_world_mesh_draws_executed=1 "
+                "ffi_call_count=9 ffi_bytes=512\n",
+                encoding="utf-8",
+            )
+
+            artifact = harness.normalize_capture_artifact(
+                target,
+                mode,
+                capture,
+                "correctness",
+                True,
+                ["fake"],
+                0,
+                False,
+                tool_kind="capture",
+            )
+
+            self.assertFalse(artifact["validation"]["complete"])
+            evidence = artifact["metrics"]["rust_gal_slice"]["world_mesh_falling_block_pixel_evidence"]
+            self.assertEqual("not_game_window", evidence["status"])
+            self.assertEqual("failed", evidence["game_window_status"])
+            self.assertEqual(
+                {"captured_width": 2560, "captured_height": 720, "expected_width": 1280, "expected_height": 720, "status": "failed"},
+                evidence["game_window"],
+            )
+
+    def test_piston_capture_rejects_desktop_screenshot(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            mode = harness.MATRIX_MODES[0]
+            target = fake_repo(temp, mode.target)
+            capture = temp / "capture"
+            write_capture(capture, backend=mode.backend, shaders=mode.shaders, world="Origin")
+            screenshot = capture / "desktop_piston.png"
+            write_desktop_sized_block_display_probe_image(screenshot, scenario="stone")
+            deterministic = {
+                "status": "complete",
+                "dimension": "minecraft:overworld",
+                "window": {"width": 1280, "height": 720},
+                "rustGalWorldPistonScenario": "normal-extending",
+                "captures": [
+                    {
+                        "poseName": "initial",
+                        "renderedFrameIndex": 8,
+                        "screenshot": str(screenshot),
+                        "window": {"width": 1280, "height": 720},
+                    }
+                ],
+                "rustGalWorldMovingBlockRouteDecisions": [
+                    {
+                        "frameIndex": 8,
+                        "provenance": "piston",
+                        "route": "rust-opengl",
+                        "blockId": "minecraft:stone",
+                        "rustSelected": True,
+                        "rustQueued": True,
+                        "javaDrawn": False,
+                    }
+                ],
+                "rustGalWorldMovingBlocks": [
+                    {
+                        "frameIndex": 8,
+                        "route": "rust-opengl",
+                        "provenance": "piston",
+                        "blockId": "minecraft:stone",
+                        "meshKey": 77,
+                        "meshGeneration": 3,
+                        "vertexLayoutVersion": 1,
+                        "indexType": 1,
+                        "vertexCount": 24,
+                        "indexBytes": 72,
+                        "sectionCount": 6,
+                        "textureIds": "2269692870",
+                        "materialMode": 1,
+                        "viewport": {"width": 1280, "height": 720},
+                        "projected": True,
+                        "screenBounds": {"left": 520.0, "top": 250.0, "right": 760.0, "bottom": 490.0},
+                    }
+                ],
+            }
+            next(capture.glob("deterministic_camera_capture_*.json")).write_text(json.dumps(deterministic), encoding="utf-8")
+            (capture / "runClient_20260101_000000.log").write_text(
+                "-Dmattmc.dev.rustGalWorldMesh.pistonScenario=normal-extending\n"
+                "Rust OpenGL VulkanicGAL GUI frame executed producer=minecraft.block-entity.piston "
+                "rust_gal_world_mesh_instances_executed=1 "
+                "rust_gal_world_mesh_batches_executed=1 "
+                "rust_gal_world_mesh_draws_executed=1 "
+                "ffi_call_count=9 ffi_bytes=512\n",
+                encoding="utf-8",
+            )
+
+            artifact = harness.normalize_capture_artifact(
+                target,
+                mode,
+                capture,
+                "correctness",
+                True,
+                ["fake"],
+                0,
+                False,
+                tool_kind="capture",
+            )
+
+            self.assertFalse(artifact["validation"]["complete"])
+            evidence = artifact["metrics"]["rust_gal_slice"]["world_mesh_piston_pixel_evidence"]
+            self.assertEqual("not_game_window", evidence["status"])
+            self.assertEqual("failed", evidence["game_window_status"])
 
     def test_falling_block_crop_accepts_resource_pack_texture_signature(self) -> None:
         from PIL import Image
@@ -1265,11 +1516,25 @@ class GraphicsAuditHarnessTests(unittest.TestCase):
             deterministic = {
                 "status": "complete",
                 "dimension": "minecraft:overworld",
+                "window": {"width": 1280, "height": 720},
                 "rustGalWorldFallingBlockScenario": "sand",
-                "captures": [{"poseName": "initial", "renderedFrameIndex": 8}],
+                "rustGalWorldFallingBlockSetup": {
+                    "status": "spawned",
+                    "blockId": "minecraft:sand",
+                    "spawnMethod": "FallingBlockEntity.fall",
+                    "entityCount": 1,
+                    "fallHeight": 64,
+                },
+                "rustGalWorldFallingBlockExtractionProbe": {
+                    "seen": 4,
+                    "shouldRender": 4,
+                    "compiledSection": 4,
+                    "extracted": 4,
+                },
+                "captures": [{"poseName": f"falling-{frame:02d}", "renderedFrameIndex": 8 + frame} for frame in range(4)],
                 "rustGalWorldFallingBlocks": [
                     {
-                        "frameIndex": 8,
+                        "frameIndex": 8 + frame,
                         "route": "rust-opengl",
                         "blockId": "minecraft:sand",
                         "meshKey": 42,
@@ -1285,6 +1550,7 @@ class GraphicsAuditHarnessTests(unittest.TestCase):
                         "projected": True,
                         "screenBounds": {"left": 520.0, "top": 80.0, "right": 700.0, "bottom": 260.0},
                     }
+                    for frame in range(4)
                 ],
             }
             next(capture.glob("deterministic_camera_capture_*.json")).write_text(json.dumps(deterministic), encoding="utf-8")
@@ -1313,6 +1579,173 @@ class GraphicsAuditHarnessTests(unittest.TestCase):
             self.assertFalse(artifact["validation"]["complete"])
             self.assertTrue(
                 any("FallingBlock projected crop evidence" in message for message in artifact["validation"]["messages"])
+            )
+
+    def test_falling_block_capture_rejects_missing_real_producer_traversal(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            mode = harness.MATRIX_MODES[0]
+            target = fake_repo(temp, mode.target)
+            capture = temp / "capture"
+            write_capture(capture, backend=mode.backend, shaders=mode.shaders, world="Origin")
+            screenshots = []
+            for frame in range(4):
+                screenshot = capture / f"falling_block_no_probe_{frame}.png"
+                write_falling_block_probe_image(screenshot, scenario="sand")
+                screenshots.append(screenshot)
+            deterministic = {
+                "status": "complete",
+                "dimension": "minecraft:overworld",
+                "window": {"width": 1280, "height": 720},
+                "rustGalWorldFallingBlockScenario": "sand",
+                "rustGalWorldFallingBlockSetup": {
+                    "status": "spawned",
+                    "blockId": "minecraft:sand",
+                    "spawnMethod": "FallingBlockEntity.fall",
+                    "entityCount": 1,
+                    "fallHeight": 64,
+                },
+                "rustGalWorldFallingBlockExtractionProbe": {
+                    "seen": 0,
+                    "shouldRender": 0,
+                    "compiledSection": 0,
+                    "extracted": 0,
+                },
+                "captures": [
+                    {
+                        "poseName": f"falling-{frame:02d}",
+                        "renderedFrameIndex": 8 + frame,
+                        "screenshot": str(screenshots[frame]),
+                        "window": {"width": 1280, "height": 720},
+                        "captureMethod": "internal-main-render-target",
+                    }
+                    for frame in range(4)
+                ],
+                "rustGalWorldFallingBlocks": [],
+            }
+            next(capture.glob("deterministic_camera_capture_*.json")).write_text(json.dumps(deterministic), encoding="utf-8")
+            (capture / "runClient_20260101_000000.log").write_text(
+                "-Dmattmc.dev.rustGalWorldMesh.fallingBlockScenario=sand\n",
+                encoding="utf-8",
+            )
+
+            artifact = harness.normalize_capture_artifact(
+                target,
+                mode,
+                capture,
+                "correctness",
+                True,
+                ["fake"],
+                0,
+                False,
+                tool_kind="capture",
+            )
+
+            self.assertFalse(artifact["validation"]["complete"])
+            evidence = artifact["metrics"]["rust_gal_slice"]["world_mesh_falling_block_pixel_evidence"]
+            self.assertEqual("missing_producer_traversal", evidence["status"])
+            self.assertEqual("failed", evidence["producer_traversal_status"])
+
+    def test_falling_block_shaders_on_requires_configured_shaderpack(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            mode = next(spec for spec in harness.MATRIX_MODES if spec.name == "current-opengl-shaders-on")
+            target = fake_repo(temp, mode.target)
+            capture = temp / "capture"
+            write_capture(capture, backend=mode.backend, shaders=mode.shaders, world="Origin")
+            screenshots = []
+            for frame in range(4):
+                screenshot = capture / f"falling_block_wrong_shader_{frame}.png"
+                write_falling_block_probe_image(screenshot, scenario="sand")
+                screenshots.append(screenshot)
+            deterministic = {
+                "status": "complete",
+                "dimension": "minecraft:overworld",
+                "window": {"width": 1280, "height": 720},
+                "shaderEnabled": "true",
+                "shaderPack": "WrongShader.zip",
+                "rustGalWorldFallingBlockScenario": "sand",
+                "rustGalWorldFallingBlockSetup": {
+                    "status": "spawned",
+                    "blockId": "minecraft:sand",
+                    "spawnMethod": "FallingBlockEntity.fall",
+                    "entityCount": 1,
+                    "fallHeight": 64,
+                },
+                "rustGalWorldFallingBlockExtractionProbe": {
+                    "seen": 4,
+                    "shouldRender": 4,
+                    "compiledSection": 4,
+                    "extracted": 4,
+                },
+                "captures": [
+                    {
+                        "poseName": f"falling-{frame:02d}",
+                        "renderedFrameIndex": 8 + frame,
+                        "screenshot": str(screenshots[frame]),
+                        "window": {"width": 1280, "height": 720},
+                        "captureMethod": "internal-main-render-target",
+                    }
+                    for frame in range(4)
+                ],
+                "rustGalWorldFallingBlocks": [
+                    {
+                        "frameIndex": 8 + frame,
+                        "route": "rust-opengl",
+                        "blockId": "minecraft:sand",
+                        "meshKey": 42,
+                        "meshGeneration": 2,
+                        "vertexLayoutVersion": 1,
+                        "indexType": 1,
+                        "vertexCount": 24,
+                        "indexBytes": 72,
+                        "sectionCount": 6,
+                        "textureIds": "2269692870",
+                        "materialMode": 1,
+                        "viewport": {"width": 1280, "height": 720},
+                        "projected": True,
+                        "screenBounds": {"left": 520.0, "top": 80.0, "right": 700.0, "bottom": 260.0},
+                    }
+                    for frame in range(4)
+                ],
+                "rustGalWorldFallingBlockRouteDecisions": [
+                    {
+                        "frameIndex": 8 + frame,
+                        "route": "rust-opengl",
+                        "blockId": "minecraft:sand",
+                        "rustSelected": True,
+                        "rustQueued": True,
+                        "javaDrawn": False,
+                    }
+                    for frame in range(4)
+                ],
+            }
+            next(capture.glob("deterministic_camera_capture_*.json")).write_text(json.dumps(deterministic), encoding="utf-8")
+            (capture / "runClient_20260101_000000.log").write_text(
+                "-Dmattmc.dev.rustGalWorldMesh.fallingBlockScenario=sand\n"
+                "Rust OpenGL VulkanicGAL GUI frame executed producer=minecraft.entity.falling-block "
+                "rust_gal_world_mesh_instances_executed=1 "
+                "rust_gal_world_mesh_batches_executed=1 "
+                "rust_gal_world_mesh_draws_executed=1 "
+                "ffi_call_count=9 ffi_bytes=512\n",
+                encoding="utf-8",
+            )
+
+            artifact = harness.normalize_capture_artifact(
+                target,
+                mode,
+                capture,
+                "correctness",
+                True,
+                ["fake"],
+                0,
+                False,
+                tool_kind="capture",
+            )
+
+            self.assertFalse(artifact["validation"]["complete"])
+            self.assertTrue(
+                any("configured shader pack" in message for message in artifact["validation"]["messages"])
             )
 
     def test_falling_block_disabled_control_accepts_route_decision_without_rust_work(self) -> None:
@@ -3545,6 +3978,10 @@ else:
                 "normal-extending",
                 "--world-mesh-piston-count",
                 "8",
+                "--world-mesh-piston-direction",
+                "east",
+                "--world-mesh-piston-progress",
+                "0.125",
                 "--positive-control-delay-ms",
                 "3",
             ])
@@ -3553,11 +3990,41 @@ else:
             )
             options = env["JAVA_TOOL_OPTIONS"]
             self.assertIn("-Dmattmc.dev.rustGalWorldMesh.freezePistonProgress=true", options)
+            self.assertIn("-Dmattmc.dev.rustGalWorldMesh.pistonDirection=east", options)
+            self.assertIn("-Dmattmc.dev.rustGalWorldMesh.pistonProgress=0.125", options)
             self.assertIn("-Dmattmc.dev.graphicsFrameBenchmark.gcBeforeMeasurement=true", options)
             self.assertIn("-Dmattmc.dev.graphicsFrameBenchmark.positiveControlDelayNanos=3000000", options)
             self.assertIn("-Dmattmc.dev.rustGalWorldMesh.pistonScenario=normal-extending", options)
             self.assertIn("-Dmattmc.dev.graphicsFrameBenchmark.measureFrames=900", options)
             self.assertEqual(env["SCREENSHOT_MAX_COUNT"], "0")
+
+    def test_moving_mesh_capture_uses_unfrozen_frame_sequence(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            target = fake_repo(root, "current")
+            args = harness.parse_args([
+                "capture",
+                "--profile",
+                "standard",
+                "--mode",
+                "current-opengl-shaders-off",
+                "--world-mesh-piston-scenario",
+                "normal-extending",
+                "--world-mesh-piston-direction",
+                "east",
+                "--world-mesh-piston-progress",
+                "0.125",
+            ])
+            _, env = harness.build_capture_command(
+                target, harness.MATRIX_MODES[0], root / "capture", "capture", args, "capture"
+            )
+            options = env["JAVA_TOOL_OPTIONS"]
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.internalScreenshots=true", options)
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.poseCount=7", options)
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=1", options)
+            self.assertIn("-Dmattmc.dev.rustGalWorldMesh.pistonDirection=east", options)
+            self.assertNotIn("-Dmattmc.dev.rustGalWorldMesh.freezePistonProgress=true", options)
+            self.assertNotIn("-Dmattmc.dev.rustGalWorldMesh.pistonProgress=0.125", options)
 
     def test_rust_gal_gui_global_controls_do_not_only_toggle_armor(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

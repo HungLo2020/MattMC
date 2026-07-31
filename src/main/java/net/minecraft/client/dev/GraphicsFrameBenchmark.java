@@ -742,20 +742,33 @@ public final class GraphicsFrameBenchmark {
 		if (forward.lengthSqr() < 0.0001) {
 			forward = new Vec3(0.0, 0.0, 1.0);
 		}
-		BlockPos origin = BlockPos.containing(player.position().add(forward.normalize().scale(4.0)).add(0.0, 2.0, 0.0));
-			for (int i = 0; i < FALLING_BLOCK_COUNT; i++) {
-				BlockPos pos = origin.offset(i, 0, 0);
-				serverLevel.setBlock(pos, state, 2);
-				FallingBlockEntity entity = FallingBlockEntity.fall(serverLevel, pos, state);
-				entity.setNoGravity(true);
-				entity.setDeltaMovement(Vec3.ZERO);
-				entity.time = -12000;
-				entity.dropItem = false;
-			}
+		int fallHeight = Math.max(4, Integer.getInteger("mattmc.dev.rustGalWorldMesh.fallingBlockFallHeight", 6));
+		BlockPos origin = BlockPos.containing(player.getEyePosition().add(forward.normalize().scale(4.0)).add(0.0, 2.0, 0.0));
+		for (int i = 0; i < FALLING_BLOCK_COUNT; i++) {
+			BlockPos pos = origin.offset(i, 0, 0);
+			prepareFallingBlockColumn(serverLevel, minecraft.level, pos, fallHeight);
+			serverLevel.setBlock(pos, state, 2);
+			minecraft.level.setBlock(pos, state, 2);
+			FallingBlockEntity serverEntity = FallingBlockEntity.fall(serverLevel, pos, state);
+			serverEntity.setDeltaMovement(0.0, -0.02, 0.0);
+			serverEntity.dropItem = false;
+			minecraft.level.setBlock(pos, state.getFluidState().createLegacyBlock(), 3);
+		}
 		fallingBlockScenarioStatus = "spawned";
 		fallingBlockScenarioBlock = blockName(state);
 		fallingBlockScenarioPosition = origin.toShortString();
 		fallingBlockScenarioFingerprint = FALLING_BLOCK_SCENARIO + "|count=" + FALLING_BLOCK_COUNT + "|block=" + fallingBlockScenarioBlock;
+	}
+
+	private static void prepareFallingBlockColumn(ServerLevel serverLevel, net.minecraft.client.multiplayer.ClientLevel clientLevel, BlockPos top, int fallHeight) {
+		for (int y = 0; y < fallHeight; y++) {
+			BlockPos clear = top.below(y);
+			serverLevel.setBlock(clear, Blocks.AIR.defaultBlockState(), 3);
+			clientLevel.setBlock(clear, Blocks.AIR.defaultBlockState(), 3);
+		}
+		BlockPos landing = top.below(fallHeight);
+		serverLevel.setBlock(landing, Blocks.STONE.defaultBlockState(), 3);
+		clientLevel.setBlock(landing, Blocks.STONE.defaultBlockState(), 3);
 	}
 
 	private static BlockState fallingBlockBenchmarkState() {
@@ -789,14 +802,15 @@ public final class GraphicsFrameBenchmark {
 			return;
 		}
 		BlockState movedState = pistonMovedState();
-		Direction direction = Direction.NORTH;
+		Direction direction = pistonDirection();
 		Vec3 forward = player.getLookAngle();
 		if (forward.lengthSqr() < 0.0001) {
 			forward = new Vec3(0.0, 0.0, 1.0);
 		}
-		BlockPos origin = BlockPos.containing(player.position().add(forward.normalize().scale(4.0)));
+		BlockPos origin = BlockPos.containing(player.getEyePosition().add(forward.normalize().scale(4.0)).add(0.0, -0.25, 0.0));
 		for (int i = 0; i < PISTON_COUNT; i++) {
 			BlockPos pos = origin.offset(i, 0, 0);
+			clearPistonScenarioSpace(serverLevel, minecraft.level, pos);
 			seedMovingPiston(serverLevel, minecraft.level, pos, movedState, direction, pistonExtending(), pistonSourcePiston());
 		}
 		pistonScenarioStatus = "spawned";
@@ -808,12 +822,23 @@ public final class GraphicsFrameBenchmark {
 	private static BlockState pistonMovedState() {
 		return switch (PISTON_SCENARIO) {
 			case "sticky-extending", "sticky-retracting" -> Blocks.PISTON_HEAD.defaultBlockState()
-				.setValue(net.minecraft.world.level.block.piston.PistonHeadBlock.FACING, Direction.NORTH)
+				.setValue(net.minecraft.world.level.block.piston.PistonHeadBlock.FACING, pistonDirection())
 				.setValue(net.minecraft.world.level.block.piston.PistonHeadBlock.TYPE, net.minecraft.world.level.block.state.properties.PistonType.STICKY);
 			case "retracting-source", "normal-retracting" -> Blocks.PISTON.defaultBlockState()
-				.setValue(net.minecraft.world.level.block.piston.PistonBaseBlock.FACING, Direction.NORTH);
+				.setValue(net.minecraft.world.level.block.piston.PistonBaseBlock.FACING, pistonDirection());
 			case "cutout", "leaves" -> Blocks.OAK_LEAVES.defaultBlockState();
 			default -> Blocks.STONE.defaultBlockState();
+		};
+	}
+
+	private static Direction pistonDirection() {
+		return switch (System.getProperty("mattmc.dev.rustGalWorldMesh.pistonDirection", "north").trim().toLowerCase(Locale.ROOT)) {
+			case "down" -> Direction.DOWN;
+			case "up" -> Direction.UP;
+			case "south" -> Direction.SOUTH;
+			case "west" -> Direction.WEST;
+			case "east" -> Direction.EAST;
+			default -> Direction.NORTH;
 		};
 	}
 
@@ -829,10 +854,28 @@ public final class GraphicsFrameBenchmark {
 		BlockState movingState = Blocks.MOVING_PISTON.defaultBlockState()
 			.setValue(net.minecraft.world.level.block.piston.MovingPistonBlock.FACING, direction)
 			.setValue(net.minecraft.world.level.block.piston.MovingPistonBlock.TYPE, pistonTypeFor(movedState));
-		serverLevel.setBlock(pos, movingState, 2);
-		serverLevel.setBlockEntity(net.minecraft.world.level.block.piston.MovingPistonBlock.newMovingBlockEntity(pos, movingState, movedState, direction, extending, sourcePiston));
-		clientLevel.setBlock(pos, movingState, 2);
-		clientLevel.setBlockEntity(net.minecraft.world.level.block.piston.MovingPistonBlock.newMovingBlockEntity(pos, movingState, movedState, direction, extending, sourcePiston));
+		serverLevel.setBlock(pos, movingState, 3);
+		net.minecraft.world.level.block.piston.PistonMovingBlockEntity serverEntity =
+			(net.minecraft.world.level.block.piston.PistonMovingBlockEntity)net.minecraft.world.level.block.piston.MovingPistonBlock.newMovingBlockEntity(pos, movingState, movedState, direction, extending, sourcePiston);
+		serverLevel.setBlockEntity(serverEntity);
+		serverEntity.setChanged();
+		clientLevel.setBlock(pos, movingState, 3);
+		net.minecraft.world.level.block.piston.PistonMovingBlockEntity clientEntity =
+			(net.minecraft.world.level.block.piston.PistonMovingBlockEntity)net.minecraft.world.level.block.piston.MovingPistonBlock.newMovingBlockEntity(pos, movingState, movedState, direction, extending, sourcePiston);
+		clientLevel.setBlockEntity(clientEntity);
+		clientEntity.setChanged();
+	}
+
+	private static void clearPistonScenarioSpace(ServerLevel serverLevel, net.minecraft.client.multiplayer.ClientLevel clientLevel, BlockPos center) {
+		for (int dx = -1; dx <= 1; dx++) {
+			for (int dy = -1; dy <= 1; dy++) {
+				for (int dz = -1; dz <= 1; dz++) {
+					BlockPos pos = center.offset(dx, dy, dz);
+					serverLevel.setBlock(pos, Blocks.AIR.defaultBlockState(), 2);
+					clientLevel.setBlock(pos, Blocks.AIR.defaultBlockState(), 2);
+				}
+			}
+		}
 	}
 
 	private static net.minecraft.world.level.block.state.properties.PistonType pistonTypeFor(BlockState movedState) {

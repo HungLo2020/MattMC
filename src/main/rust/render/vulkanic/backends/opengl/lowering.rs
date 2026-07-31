@@ -1,5 +1,7 @@
 use std::collections::{BTreeMap, VecDeque};
 use std::rc::Rc;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::OnceLock;
 
 use glow::HasContext;
 
@@ -15,6 +17,9 @@ use crate::render::vulkanic::error::{GalError, GalResult};
 use crate::render::vulkanic::handles::Handle;
 use crate::render::vulkanic::resources::{BlendMode, CompareOp, CullMode, ResourceBindingKind};
 use crate::render::vulkanic::sync::SubmissionId;
+
+static GL_DRAW_TRACE_LIMIT: OnceLock<usize> = OnceLock::new();
+static GL_DRAW_TRACE_COUNT: AtomicUsize = AtomicUsize::new(0);
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(in crate::render::vulkanic) struct CompletedHostRead {
@@ -380,6 +385,7 @@ impl OpenGlLowerer {
             CommandOp::BindGraphicsPipeline(handle) => {
                 let _zone = trace::Zone::new("opengl.lowering.bind-graphics-pipeline");
                 let pipeline = objects.graphics_pipeline(*handle)?;
+                self.trace_draw_state("before-bind-graphics-pipeline", state);
                 self.bind_program(Some(pipeline.program));
                 self.bind_vao(Some(pipeline.vao));
                 self.apply_fixed_state(
@@ -391,6 +397,7 @@ impl OpenGlLowerer {
                 state.pipeline = Some(*handle);
                 state.pipeline_layout = Some(pipeline.layout);
                 state.topology = topology(pipeline.topology);
+                self.trace_draw_state("after-bind-graphics-pipeline", state);
                 Ok(())
             }
             CommandOp::BindResourceSet {
@@ -435,6 +442,7 @@ impl OpenGlLowerer {
                 let Some((_, offset, index_type)) = state.index_buffer else {
                     return Err(GalError::backend("indexed draw missing index buffer"));
                 };
+                self.trace_draw_state("before-draw-indexed", state);
                 unsafe {
                     self.gl.draw_elements_instanced(
                         state.topology,
@@ -447,6 +455,7 @@ impl OpenGlLowerer {
                             .map_err(|_| GalError::backend("instance count exceeds i32"))?,
                     );
                 }
+                self.trace_draw_state("after-draw-indexed", state);
                 Ok(())
             }
             CommandOp::Draw {
@@ -728,6 +737,12 @@ impl OpenGlLowerer {
         depth_write: bool,
     ) {
         unsafe {
+            if self.cache.front_face_ccw != Some(true) {
+                self.record_gl_call();
+                self.gl.front_face(glow::CCW);
+                self.cache.front_face_ccw = Some(true);
+                self.cache.state_changes += 1;
+            }
             if self.cache.cull != Some(cull_mode) {
                 match cull_mode {
                     CullMode::None => self.gl.disable(glow::CULL_FACE),
@@ -788,6 +803,51 @@ impl OpenGlLowerer {
         }
         self.cache.program = program;
         self.cache.program_binds += 1;
+    }
+
+    fn trace_draw_state(&self, phase: &str, state: &ExecutionState) {
+        let limit = *GL_DRAW_TRACE_LIMIT.get_or_init(|| {
+            std::env::var("MATTMC_RUST_GAL_TRACE_GL_DRAWS")
+                .ok()
+                .and_then(|value| value.parse::<usize>().ok())
+                .unwrap_or(0)
+        });
+        if limit == 0 {
+            return;
+        }
+        let index = GL_DRAW_TRACE_COUNT.fetch_add(1, Ordering::Relaxed);
+        if index >= limit {
+            return;
+        }
+        unsafe {
+            let current_program = self.gl.get_parameter_i32(glow::CURRENT_PROGRAM);
+            let program_label = if current_program > 0 {
+                self.gl
+                    .get_object_label(glow::PROGRAM, current_program as u32)
+            } else {
+                String::new()
+            };
+            eprintln!(
+                "MATTMC_RUST_GAL_GL_DRAW_STATE phase={} current_program={} program_label={} draw_fbo={} read_fbo={} draw_buffer0={} vertex_array={} array_buffer={} element_array_buffer={} active_texture={} depth_test={} depth_write={} blend={} cull_face={} scissor={} pipeline_bound={} index_buffer_bound={}",
+                phase,
+                current_program,
+                program_label,
+                self.gl.get_parameter_i32(glow::DRAW_FRAMEBUFFER_BINDING),
+                self.gl.get_parameter_i32(glow::READ_FRAMEBUFFER_BINDING),
+                self.gl.get_parameter_i32(glow::DRAW_BUFFER0),
+                self.gl.get_parameter_i32(glow::VERTEX_ARRAY_BINDING),
+                self.gl.get_parameter_i32(glow::ARRAY_BUFFER_BINDING),
+                self.gl.get_parameter_i32(glow::ELEMENT_ARRAY_BUFFER_BINDING),
+                self.gl.get_parameter_i32(glow::ACTIVE_TEXTURE),
+                self.gl.is_enabled(glow::DEPTH_TEST),
+                self.gl.get_parameter_bool(glow::DEPTH_WRITEMASK),
+                self.gl.is_enabled(glow::BLEND),
+                self.gl.is_enabled(glow::CULL_FACE),
+                self.gl.is_enabled(glow::SCISSOR_TEST),
+                state.pipeline.is_some(),
+                state.index_buffer.is_some(),
+            );
+        }
     }
 
     fn bind_vao(&mut self, vao: Option<glow::VertexArray>) {
@@ -886,6 +946,7 @@ struct StateCache {
     program: Option<glow::Program>,
     vao: Option<glow::VertexArray>,
     framebuffer: Option<glow::Framebuffer>,
+    front_face_ccw: Option<bool>,
     cull: Option<CullMode>,
     blend: Option<BlendMode>,
     depth_compare: Option<CompareOp>,

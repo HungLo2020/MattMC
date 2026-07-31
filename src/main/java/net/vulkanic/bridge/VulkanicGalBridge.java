@@ -1093,6 +1093,10 @@ public final class VulkanicGalBridge implements AutoCloseable {
 					Struct.WORLD_MESH_VERTEX.setFloat(vertexItem, 6, vertex.z());
 					Struct.WORLD_MESH_VERTEX.setFloat(vertexItem, 7, vertex.u());
 					Struct.WORLD_MESH_VERTEX.setFloat(vertexItem, 8, vertex.v());
+					Struct.WORLD_MESH_VERTEX.setFloat(vertexItem, 9, vertex.atlasU());
+					Struct.WORLD_MESH_VERTEX.setFloat(vertexItem, 10, vertex.atlasV());
+					Struct.WORLD_MESH_VERTEX.setInt(vertexItem, 11, vertex.shaderBlockId());
+					Struct.WORLD_MESH_VERTEX.setInt(vertexItem, 12, vertex.shaderMaterialType());
 				}
 				Abi.writeSlice(item, Struct.WORLD_MESH_ASSET_RECORD, 6, vertexArray, mesh.vertices().size());
 				Abi.writeBytes(updateArena, item, Struct.WORLD_MESH_ASSET_RECORD, 7, mesh.indexBytes());
@@ -1160,6 +1164,10 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		float z,
 		float u,
 		float v,
+		float atlasU,
+		float atlasV,
+		int shaderBlockId,
+		int shaderMaterialType,
 		int colorArgb,
 		int normalPacked,
 		int light

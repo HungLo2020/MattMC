@@ -115,6 +115,7 @@ import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fStack;
 import org.joml.Matrix4fc;
+import org.joml.Vector3f;
 import org.joml.Vector4f;
 import org.slf4j.Logger;
 
@@ -966,9 +967,15 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		}
 
 		for (Entity entity : entities) {
-			if (this.entityRenderDispatcher.shouldRender(entity, frustum, d, e, f) || entity.hasIndirectPassenger(this.minecraft.player)) {
+			boolean shouldRenderEntity = this.entityRenderDispatcher.shouldRender(entity, frustum, d, e, f) || entity.hasIndirectPassenger(this.minecraft.player);
+			boolean probeFallingBlock = entity instanceof net.minecraft.world.entity.item.FallingBlockEntity
+				&& net.minecraft.client.dev.DeterministicCameraCapture.isFallingBlockSequenceActive();
+			boolean compiledSection = false;
+			boolean extractedForProbe = false;
+			if (shouldRenderEntity) {
 				BlockPos blockPos = entity.blockPosition();
-				if ((this.level.isOutsideBuildHeight(blockPos.getY()) || this.isSectionCompiled(blockPos))
+				compiledSection = this.level.isOutsideBuildHeight(blockPos.getY()) || this.isSectionCompiled(blockPos);
+				if (compiledSection
 					&& (entity != camera.getEntity() || camera.isDetached() || camera.getEntity() instanceof LivingEntity && ((LivingEntity)camera.getEntity()).isSleeping())
 					&& (!(entity instanceof LocalPlayer) || camera.getEntity() == entity)) {
 					if (entity.tickCount == 0) {
@@ -980,10 +987,14 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 					float g = deltaTracker.getGameTimeDeltaPartialTick(!tickRateManager.isEntityFrozen(entity));
 					EntityRenderState entityRenderState = this.extractEntity(entity, g);
 					levelRenderState.entityRenderStates.add(entityRenderState);
+					extractedForProbe = true;
 					if (entityRenderState.appearsGlowing() && bl) {
 						levelRenderState.haveGlowingEntities = true;
 					}
 				}
+			}
+			if (probeFallingBlock) {
+				net.minecraft.client.dev.DeterministicCameraCapture.recordFallingBlockExtractionProbe(shouldRenderEntity, compiledSection, extractedForProbe);
 			}
 		}
 	}

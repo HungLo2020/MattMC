@@ -12,6 +12,7 @@ pub mod gui_frontend;
 pub mod handles;
 pub mod metrics;
 pub mod resources;
+pub mod shader_pack;
 pub mod sync;
 pub mod world_primitive_frontend;
 

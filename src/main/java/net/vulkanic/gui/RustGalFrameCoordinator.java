@@ -386,6 +386,13 @@ public final class RustGalFrameCoordinator {
 				METRICS.batchesCancelled += cancelled;
 				return;
 			}
+			if (wholeFrameVulkan && primitiveFrame != null) {
+				primitiveFrame = RustGalWorldPrimitiveRenderer.withViewport(
+					primitiveFrame,
+					Math.max(1, frame.width()),
+					Math.max(1, frame.height())
+				);
+			}
 
 			GraphicsFrameBenchmark.beginPhase("rust-gal.gui-frame.abi-packing");
 			long packingStarted = System.nanoTime();
@@ -397,6 +404,11 @@ public final class RustGalFrameCoordinator {
 				if (primitiveFrame == null) {
 					primitiveFrame = RustGalWorldPrimitiveRenderer.consumeFrame();
 				}
+				primitiveFrame = RustGalWorldPrimitiveRenderer.withViewport(
+					primitiveFrame,
+					Math.max(1, frame.width()),
+					Math.max(1, frame.height())
+				);
 				wholeFrameResult = bridge.submitWholeFrame(
 					generation,
 					frameId,

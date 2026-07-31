@@ -134,6 +134,9 @@ pub(crate) unsafe fn decode_world_mesh_asset_update(
             vertices.push(WorldMeshVertex {
                 position: [vertex.x, vertex.y, vertex.z],
                 uv: [vertex.u, vertex.v],
+                shader_atlas_uv: [vertex.atlas_u, vertex.atlas_v],
+                shader_block_id: vertex.shader_block_id,
+                shader_material_type: vertex.shader_material_type,
                 color_argb: vertex.color_argb,
                 normal_packed: vertex.normal_packed,
                 light: vertex.light,
@@ -254,12 +257,9 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_world_mesh_update_assets(
             .saturating_add(size_of::<FfiStatusResult>() as u64);
         let result = decode_world_mesh_asset_update(request, context.gal.capabilities()).and_then(
             |(generation, meshes, textures)| {
-                context.world_primitive_frontend.apply_world_mesh_asset_update(
-                    &mut context.gal,
-                    generation,
-                    meshes,
-                    textures,
-                )
+                context
+                    .world_primitive_frontend
+                    .apply_world_mesh_asset_update(&mut context.gal, generation, meshes, textures)
             },
         );
         match result {

@@ -93,7 +93,11 @@ public final class WorldRenderRoutePolicy {
 		if (Boolean.getBoolean("mattmc.dev.rustGalWorldFallingBlock.legacyControl")) {
 			return Route.JAVA_COMPATIBILITY;
 		}
-		return selectRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
+		Route selected = selectRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
+		if (selected.usesRustOpenGl() && net.irisshaders.iris.Iris.isPackInUseQuick()) {
+			return Route.JAVA_COMPATIBILITY;
+		}
+		return selected;
 	}
 
 	public static Route currentPistonMovingBlockRoute() {

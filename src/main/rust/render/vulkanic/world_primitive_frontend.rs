@@ -23,6 +23,9 @@ use super::resources::{
     SamplerFilter, ShaderCodeFormat, ShaderModuleDesc, ShaderStage, TextureDesc, TextureDimension,
     TextureFormat, TextureUsage, TextureViewDesc,
 };
+use super::shader_pack::programs::{
+    minimal_terrain_cutout_program, minimal_terrain_solid_program, TerrainMaterialProgram,
+};
 use super::{BufferImageCopyRegion, CommandList, CommandListDesc, CullMode};
 
 pub const WORLD_MAX_LINE_SEGMENTS: usize = 512;
@@ -33,7 +36,7 @@ pub const WORLD_MAX_MESH_VERTICES: usize = 65_536;
 pub const WORLD_MAX_MESH_INDEX_BYTES: usize = 393_216;
 pub const WORLD_MAX_MESH_SECTIONS: usize = 256;
 pub const WORLD_MAX_MESH_INSTANCES: usize = 512;
-pub const WORLD_MESH_VERTEX_LAYOUT_V1: u32 = 1;
+pub const WORLD_MESH_VERTEX_LAYOUT_V2: u32 = 2;
 pub const WORLD_MESH_SECTION_ALL: u32 = u32::MAX;
 pub const WORLD_DEPTH_POLICY_DISABLED: u32 = 0;
 pub const WORLD_DEPTH_POLICY_TEST_WRITE: u32 = 1;
@@ -105,7 +108,7 @@ const WORLD_MATERIAL_QUAD_BYTES: usize = 112;
 const WORLD_MATERIAL_UNIFORM_BYTES: u64 =
     (WORLD_MATERIAL_HEADER_BYTES + WORLD_MAX_MATERIAL_QUADS * WORLD_MATERIAL_QUAD_BYTES) as u64;
 const WORLD_MATERIAL_INDEX_BYTES: u64 = 6 * 4;
-const WORLD_MESH_GPU_VERTEX_BYTES: usize = 3 * 4 * 4;
+const WORLD_MESH_GPU_VERTEX_BYTES: usize = 5 * 4 * 4;
 const WORLD_MESH_BATCH_HEADER_BYTES: usize = 16 * 4 + 16 * 4;
 const WORLD_MESH_INSTANCE_BYTES: usize = 16 * 4 + 4 * 4 + 4 * 4;
 const WORLD_MESH_INSTANCE_BUFFER_BYTES: u64 =
@@ -345,58 +348,6 @@ void main() {
 }
 "#;
 
-const WORLD_MESH_VERTEX_SHADER_VULKAN: &[u8] = br#"#version 450
-struct MeshVertex {
-    vec4 position_uv;
-    vec4 color_uv;
-    vec4 normal_light;
-};
-layout(set = 0, binding = 0, std430) readonly buffer WorldMeshVertices {
-    MeshVertex vertices[];
-};
-struct MeshInstance {
-    mat4 model;
-    vec4 color;
-    vec4 material;
-};
-layout(set = 0, binding = 1, std430) readonly buffer WorldMeshInstances {
-    mat4 view;
-    mat4 projection;
-    MeshInstance instances[];
-};
-layout(location = 0) out vec2 v_uv;
-layout(location = 1) out vec4 v_color;
-layout(location = 2) flat out vec4 v_material;
-void main() {
-    MeshVertex vertex = vertices[gl_VertexIndex];
-    MeshInstance instance = instances[gl_InstanceIndex];
-    vec4 clip = projection * view * instance.model * vec4(vertex.position_uv.xyz, 1.0);
-#ifdef VULKANIC_GAL_ZERO_TO_ONE_CLIP_DEPTH
-    clip.z = clip.z * 0.5 + clip.w * 0.5;
-#endif
-    gl_Position = clip;
-    v_uv = vec2(vertex.position_uv.w, vertex.color_uv.w);
-    v_color = vec4(vertex.color_uv.rgb, vertex.normal_light.w) * instance.color;
-    v_material = vec4(instance.material.x, 0.0, 0.0, 0.0);
-}
-"#;
-
-const WORLD_MESH_FRAGMENT_SHADER_VULKAN: &[u8] = br#"#version 450
-layout(set = 0, binding = 2) uniform texture2D Tex0;
-layout(set = 0, binding = 3) uniform sampler Samp0;
-layout(location = 0) in vec2 v_uv;
-layout(location = 1) in vec4 v_color;
-layout(location = 2) flat in vec4 v_material;
-layout(location = 0) out vec4 out_color;
-void main() {
-    vec4 color = texture(sampler2D(Tex0, Samp0), v_uv) * v_color;
-    if (v_material.x > 0.0 && color.a < v_material.x) {
-        discard;
-    }
-    out_color = color;
-}
-"#;
-
 #[derive(Clone, Copy, Debug)]
 pub struct WorldLineSegmentRequest {
     pub stratum: u32,
@@ -471,6 +422,9 @@ pub struct WorldMaterialAssetPayload {
 pub struct WorldMeshVertex {
     pub position: [f32; 3],
     pub uv: [f32; 2],
+    pub shader_atlas_uv: [f32; 2],
+    pub shader_block_id: i32,
+    pub shader_material_type: i32,
     pub color_argb: u32,
     pub normal_packed: u32,
     pub light: u32,
@@ -741,6 +695,7 @@ struct MaterialDataSlot {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 struct MeshResourceKey {
+    stratum: u32,
     mesh_key: u64,
     mesh_generation: u64,
     section_index: u32,
@@ -1190,7 +1145,14 @@ impl WorldPrimitiveFrontend {
                 &payload.png_bytes,
                 &format!("world mesh texture {}", payload.texture_id),
             )?;
-            texture_assets.insert(payload.texture_id, WorldMaterialTextureAsset { rgba, width, height });
+            texture_assets.insert(
+                payload.texture_id,
+                WorldMaterialTextureAsset {
+                    rgba,
+                    width,
+                    height,
+                },
+            );
         }
         let mut mesh_assets = BTreeMap::new();
         for mesh in meshes {
@@ -1202,7 +1164,11 @@ impl WorldPrimitiveFrontend {
                 ));
             }
             payload_bytes = payload_bytes
-                .saturating_add(mesh.vertices.len().saturating_mul(WORLD_MESH_GPU_VERTEX_BYTES) as u64)
+                .saturating_add(
+                    mesh.vertices
+                        .len()
+                        .saturating_mul(WORLD_MESH_GPU_VERTEX_BYTES) as u64,
+                )
                 .saturating_add(mesh.index_bytes.len() as u64);
             mesh_assets.insert(
                 mesh.mesh_key,
@@ -1554,10 +1520,9 @@ impl WorldPrimitiveFrontend {
             let mut mesh_draws = Vec::new();
             for batch in &mesh_batches {
                 let slot_index = *mesh_slot_indices.entry(batch.key).or_insert(0usize);
-                let resources = self
-                    .mesh_resources
-                    .get(&batch.key)
-                    .ok_or_else(|| GalError::backend("world mesh resources vanished before submit"))?;
+                let resources = self.mesh_resources.get(&batch.key).ok_or_else(|| {
+                    GalError::backend("world mesh resources vanished before submit")
+                })?;
                 let asset = self
                     .mesh_assets
                     .get(&batch.key.mesh_key)
@@ -1605,7 +1570,17 @@ impl WorldPrimitiveFrontend {
                     clear_color: None,
                 }),
             });
-            for (pipeline, pipeline_layout, resource_set, index_buffer, index_offset, index_type, index_count, instance_count) in mesh_draws {
+            for (
+                pipeline,
+                pipeline_layout,
+                resource_set,
+                index_buffer,
+                index_offset,
+                index_type,
+                index_count,
+                instance_count,
+            ) in mesh_draws
+            {
                 ops.push(CommandOp::BindGraphicsPipeline(pipeline));
                 ops.push(CommandOp::BindResourceSet {
                     pipeline_layout,
@@ -2824,7 +2799,8 @@ impl WorldPrimitiveFrontend {
             .get(key.section_index as usize)
             .ok_or_else(|| GalError::invalid_argument("world mesh section is missing"))?;
         let label = format!(
-            "world-mesh-{}-gen{}-section{}-texture{}-mode{}-depth{}-cull{}",
+            "world-mesh-stratum{}-{}-gen{}-section{}-texture{}-mode{}-depth{}-cull{}",
+            key.stratum,
             key.mesh_key,
             key.mesh_generation,
             key.section_index,
@@ -2891,20 +2867,21 @@ impl WorldPrimitiveFrontend {
                 address_w: SamplerAddressMode::ClampToEdge,
             })?;
             created.push(sampler);
+            let terrain_program = terrain_program_for_mode(key.material_mode)?;
             let vertex_shader = gal.create_shader_module(ShaderModuleDesc {
                 label: format!("{label}.vertex"),
                 stage: ShaderStage::Vertex,
                 code_format: ShaderCodeFormat::Glsl,
-                code: world_vertex_shader_code(gal, WORLD_MESH_VERTEX_SHADER_VULKAN),
-                entry_point: "main".to_string(),
+                code: world_vertex_shader_code(gal, terrain_program.vertex.source.as_bytes()),
+                entry_point: terrain_program.vertex.entry_point.clone(),
             })?;
             created.push(vertex_shader);
             let fragment_shader = gal.create_shader_module(ShaderModuleDesc {
                 label: format!("{label}.fragment"),
                 stage: ShaderStage::Fragment,
                 code_format: ShaderCodeFormat::Glsl,
-                code: WORLD_MESH_FRAGMENT_SHADER_VULKAN.to_vec(),
-                entry_point: "main".to_string(),
+                code: terrain_program.fragment.source.as_bytes().to_vec(),
+                entry_point: terrain_program.fragment.entry_point.clone(),
             })?;
             created.push(fragment_shader);
             let texture_view = gal.create_texture_view(TextureViewDesc {
@@ -3036,9 +3013,10 @@ impl WorldPrimitiveFrontend {
         key: MeshResourceKey,
         required_slots: usize,
     ) -> GalResult<()> {
-        let resources = self.mesh_resources.get_mut(&key).ok_or_else(|| {
-            GalError::backend("world mesh resources missing during slot growth")
-        })?;
+        let resources = self
+            .mesh_resources
+            .get_mut(&key)
+            .ok_or_else(|| GalError::backend("world mesh resources missing during slot growth"))?;
         while resources.data_slots.len() < required_slots {
             let slot_index = resources.data_slots.len();
             let label = format!(
@@ -3351,7 +3329,9 @@ fn validate_mesh_instance(
         ));
     }
     if instance.transform.iter().any(|value| !value.is_finite()) {
-        return Err(GalError::invalid_argument("world mesh transform is not finite"));
+        return Err(GalError::invalid_argument(
+            "world mesh transform is not finite",
+        ));
     }
     Ok(())
 }
@@ -3370,7 +3350,7 @@ fn validate_mesh_asset(mesh: &WorldMeshAsset) -> GalResult<()> {
             "world mesh asset key and generation must be non-zero",
         ));
     }
-    if mesh.vertex_layout_version != WORLD_MESH_VERTEX_LAYOUT_V1 {
+    if mesh.vertex_layout_version != WORLD_MESH_VERTEX_LAYOUT_V2 {
         return Err(GalError::ffi(
             StatusCode::UnknownEnum,
             format!(
@@ -3423,6 +3403,10 @@ fn validate_mesh_asset(mesh: &WorldMeshAsset) -> GalResult<()> {
     for vertex in &mesh.vertices {
         if vertex.position.iter().any(|value| !value.is_finite())
             || vertex.uv.iter().any(|value| !value.is_finite())
+            || vertex
+                .shader_atlas_uv
+                .iter()
+                .any(|value| !value.is_finite())
         {
             return Err(GalError::invalid_argument(
                 "world mesh vertex position and UV values must be finite",
@@ -3486,12 +3470,29 @@ fn packed_mesh_vertices(vertices: &[WorldMeshVertex]) -> Vec<u8> {
         push_f32(&mut out, color[1]);
         push_f32(&mut out, color[2]);
         push_f32(&mut out, vertex.uv[1]);
-        push_f32(&mut out, 0.0);
+        push_f32(&mut out, baked_light_factor(vertex.light));
         push_f32(&mut out, 0.0);
         push_f32(&mut out, 0.0);
         push_f32(&mut out, color[3]);
+        push_u32(&mut out, vertex.normal_packed);
+        push_u32(&mut out, vertex.light);
+        push_u32(&mut out, vertex.color_argb);
+        push_u32(&mut out, 0);
+        push_f32(&mut out, vertex.shader_atlas_uv[0]);
+        push_f32(&mut out, vertex.shader_atlas_uv[1]);
+        push_u32(&mut out, vertex.shader_block_id as u32);
+        push_u32(&mut out, vertex.shader_material_type as u32);
     }
     out
+}
+
+fn baked_light_factor(packed_light: u32) -> f32 {
+    if packed_light == 0 {
+        return 1.0;
+    }
+    let block = ((packed_light >> 4) & 0xf) as f32 / 15.0;
+    let sky = ((packed_light >> 20) & 0xf) as f32 / 15.0;
+    (0.08 + block.max(sky) * 0.92).clamp(0.0, 1.0)
 }
 
 fn cull_mode_from_policy(policy: u32) -> GalResult<CullMode> {
@@ -3701,12 +3702,15 @@ fn mesh_batches(
     let mut batches: Vec<MeshBatch> = Vec::new();
     let mut key_to_batch = BTreeMap::<MeshResourceKey, usize>::new();
     for (index, instance) in frame.mesh_instances.iter().enumerate() {
-        let asset = frontend.mesh_assets.get(&instance.mesh_key).ok_or_else(|| {
-            GalError::invalid_argument(format!(
-                "world mesh instance references unknown mesh key {}",
-                instance.mesh_key
-            ))
-        })?;
+        let asset = frontend
+            .mesh_assets
+            .get(&instance.mesh_key)
+            .ok_or_else(|| {
+                GalError::invalid_argument(format!(
+                    "world mesh instance references unknown mesh key {}",
+                    instance.mesh_key
+                ))
+            })?;
         if instance.mesh_generation != asset_generation_for_key(instance.mesh_key, asset)? {
             return Err(GalError::invalid_argument(format!(
                 "world mesh instance generation {} does not match mesh {} generation",
@@ -3782,7 +3786,9 @@ fn compatible_mesh_section_ranges(
         if mesh_sections_can_coalesce(&current_key, &key, previous, section, asset.index_type)
             && current_count
                 .checked_add(section.index_count)
-                .ok_or_else(|| GalError::invalid_argument("world mesh range index count overflow"))?
+                .ok_or_else(|| {
+                    GalError::invalid_argument("world mesh range index count overflow")
+                })?
                 <= u32::MAX
         {
             current_count += section.index_count;
@@ -3824,7 +3830,9 @@ fn contiguous_index_range(
     next_section: &WorldMeshSection,
     index_type: IndexType,
 ) -> bool {
-    let Some(current_byte_len) = (current_section.index_count as u64).checked_mul(index_stride(index_type)) else {
+    let Some(current_byte_len) =
+        (current_section.index_count as u64).checked_mul(index_stride(index_type))
+    else {
         return false;
     };
     current_section.index_offset as u64 + current_byte_len == next_section.index_offset as u64
@@ -3874,6 +3882,7 @@ fn mesh_key_for_section(
     color_format: ColorFormat,
 ) -> MeshResourceKey {
     MeshResourceKey {
+        stratum: instance.stratum,
         mesh_key: instance.mesh_key,
         mesh_generation: instance.mesh_generation,
         section_index,
@@ -3907,7 +3916,9 @@ fn effective_cull_mode_for_winding(policy: u32, winding: u32) -> GalResult<CullM
 
 fn asset_generation_for_key(_mesh_key: u64, asset: &MeshAssetStore) -> GalResult<u64> {
     if asset.sections.is_empty() {
-        return Err(GalError::invalid_argument("world mesh asset has no sections"));
+        return Err(GalError::invalid_argument(
+            "world mesh asset has no sections",
+        ));
     }
     Ok(asset.mesh_generation)
 }
@@ -4197,9 +4208,14 @@ fn packed_mesh_uniforms_for_batch(
     batch: &MeshBatch,
 ) -> GalResult<Vec<u8>> {
     let required_bytes = WORLD_MESH_BATCH_HEADER_BYTES
-        .checked_add(batch.count().checked_mul(WORLD_MESH_INSTANCE_BYTES).ok_or_else(|| {
-            GalError::invalid_argument("world mesh batch instance byte count overflow")
-        })?)
+        .checked_add(
+            batch
+                .count()
+                .checked_mul(WORLD_MESH_INSTANCE_BYTES)
+                .ok_or_else(|| {
+                    GalError::invalid_argument("world mesh batch instance byte count overflow")
+                })?,
+        )
         .ok_or_else(|| GalError::invalid_argument("world mesh batch byte count overflow"))?;
     if required_bytes as u64 > WORLD_MESH_INSTANCE_BUFFER_BYTES {
         return Err(GalError::invalid_argument(format!(
@@ -4257,6 +4273,17 @@ fn world_vertex_shader_code(gal: &VulkanicGal, source: &[u8]) -> Vec<u8> {
         1,
     )
     .into_bytes()
+}
+
+fn terrain_program_for_mode(material_mode: u32) -> GalResult<TerrainMaterialProgram> {
+    match material_mode {
+        WORLD_MATERIAL_MODE_OPAQUE => Ok(minimal_terrain_solid_program()),
+        WORLD_MATERIAL_MODE_CUTOUT => Ok(minimal_terrain_cutout_program()),
+        _ => Err(GalError::ffi(
+            StatusCode::UnknownEnum,
+            format!("unknown world mesh material mode {material_mode}"),
+        )),
+    }
 }
 
 fn push_f32(out: &mut Vec<u8>, value: f32) {
@@ -4605,6 +4632,9 @@ mod tests {
             WorldMeshVertex {
                 position: [-0.5, -0.5, -1.0],
                 uv: [0.0, 0.0],
+                shader_atlas_uv: [0.25, 0.25],
+                shader_block_id: 10232,
+                shader_material_type: -1,
                 color_argb: 0xffff_ffff,
                 normal_packed: 0,
                 light: 0,
@@ -4612,6 +4642,9 @@ mod tests {
             WorldMeshVertex {
                 position: [0.5, -0.5, -1.0],
                 uv: [1.0, 0.0],
+                shader_atlas_uv: [0.5, 0.25],
+                shader_block_id: 10232,
+                shader_material_type: -1,
                 color_argb: 0xffff_ffff,
                 normal_packed: 0,
                 light: 0,
@@ -4619,6 +4652,9 @@ mod tests {
             WorldMeshVertex {
                 position: [0.5, 0.5, -1.0],
                 uv: [1.0, 1.0],
+                shader_atlas_uv: [0.5, 0.5],
+                shader_block_id: 10232,
+                shader_material_type: -1,
                 color_argb: 0xffff_ffff,
                 normal_packed: 0,
                 light: 0,
@@ -4626,6 +4662,9 @@ mod tests {
             WorldMeshVertex {
                 position: [-0.5, 0.5, -1.0],
                 uv: [0.0, 1.0],
+                shader_atlas_uv: [0.25, 0.5],
+                shader_block_id: 10232,
+                shader_material_type: -1,
                 color_argb: 0xffff_ffff,
                 normal_packed: 0,
                 light: 0,
@@ -4640,7 +4679,7 @@ mod tests {
         WorldMeshAsset {
             mesh_key,
             mesh_generation: generation,
-            vertex_layout_version: WORLD_MESH_VERTEX_LAYOUT_V1,
+            vertex_layout_version: WORLD_MESH_VERTEX_LAYOUT_V2,
             index_type,
             vertices,
             index_bytes,
@@ -4988,7 +5027,16 @@ mod tests {
         assert_eq!(32, stats.mesh_instance_count);
         assert_eq!(1, stats.mesh_batch_count);
         assert_eq!(1, stats.mesh_draw_count);
-        assert_eq!(1, frontend.mesh_resources.values().next().unwrap().data_slots.len());
+        assert_eq!(
+            1,
+            frontend
+                .mesh_resources
+                .values()
+                .next()
+                .unwrap()
+                .data_slots
+                .len()
+        );
         assert_eq!(
             1,
             ops.iter()
@@ -5006,6 +5054,41 @@ mod tests {
             CommandOp::HostWriteBuffer { data, .. }
                 if data.len() == WORLD_MESH_BATCH_HEADER_BYTES + 32 * WORLD_MESH_INSTANCE_BYTES
         )));
+    }
+
+    #[test]
+    fn world_mesh_vertex_packing_preserves_baked_light_factor() {
+        let dark = WorldMeshVertex {
+            position: [0.0, 0.0, 0.0],
+            uv: [0.0, 0.0],
+            shader_atlas_uv: [0.25, 0.5],
+            shader_block_id: 10232,
+            shader_material_type: -1,
+            color_argb: 0xffff_ffff,
+            normal_packed: 0,
+            light: 0,
+        };
+        let lit = WorldMeshVertex {
+            light: (15 << 4) | (15 << 20),
+            ..dark
+        };
+
+        let dark_bytes = packed_mesh_vertices(&[dark]);
+        let lit_bytes = packed_mesh_vertices(&[lit]);
+        let dark_factor = f32::from_le_bytes(dark_bytes[32..36].try_into().unwrap());
+        let lit_factor = f32::from_le_bytes(lit_bytes[32..36].try_into().unwrap());
+
+        assert_eq!(1.0, dark_factor);
+        assert_eq!(1.0, lit_factor);
+
+        let dim = WorldMeshVertex {
+            light: 1 << 4,
+            ..dark
+        };
+        let dim_bytes = packed_mesh_vertices(&[dim]);
+        let dim_factor = f32::from_le_bytes(dim_bytes[32..36].try_into().unwrap());
+        assert!(dim_factor > 0.08);
+        assert!(dim_factor < 0.2);
     }
 
     #[test]
@@ -5050,10 +5133,9 @@ mod tests {
                 .filter(|op| matches!(op, CommandOp::DrawIndexed { instances: 12, .. }))
                 .count()
         );
-        assert!(ops.iter().any(|op| matches!(
-            op,
-            CommandOp::SetIndexBuffer { offset: 12, .. }
-        )));
+        assert!(ops
+            .iter()
+            .any(|op| matches!(op, CommandOp::SetIndexBuffer { offset: 12, .. })));
     }
 
     #[test]
@@ -5190,7 +5272,9 @@ mod tests {
         let mut frame = frame(Vec::new());
         frame.mesh_instances.push(mesh_instance(82, 1));
 
-        let (ops, _stats) = frontend.append_frame_ops(&mut gal, 1, target, frame).unwrap();
+        let (ops, _stats) = frontend
+            .append_frame_ops(&mut gal, 1, target, frame)
+            .unwrap();
         assert!(ops.iter().any(|op| matches!(
             op,
             CommandOp::SetIndexBuffer {
@@ -5347,6 +5431,44 @@ mod tests {
         assert!(vulkan.resize_hash != 0);
         assert!(opengl.resize_hash != 0);
         write_material_comparison_report(&vulkan, &opengl).unwrap();
+    }
+
+    #[test]
+    fn rust_owned_shader_pack_mesh_scene_matches_opengl_and_vulkan_when_available() {
+        let vulkan = match run_runtime_shader_mesh_scene(RuntimeBackend::Vulkan, 192, 128) {
+            Ok(report) => report,
+            Err(error) => {
+                assert_environment_gap(&error, "Vulkan");
+                return;
+            }
+        };
+        let opengl = match run_runtime_shader_mesh_scene(RuntimeBackend::OpenGl, 192, 128) {
+            Ok(report) => report,
+            Err(error) => {
+                eprintln!("OpenGL shader-pack mesh conformance unavailable: {error}");
+                assert_environment_gap(&error, "OpenGL");
+                return;
+            }
+        };
+
+        assert_eq!(vulkan.semantic_hash, opengl.semantic_hash);
+        assert_eq!(5, vulkan.frame_hashes.len());
+        assert_eq!(5, opengl.frame_hashes.len());
+        assert_eq!(vulkan.rollback_hash, vulkan.frame_hashes[0]);
+        assert_eq!(opengl.rollback_hash, opengl.frame_hashes[0]);
+        assert!(vulkan.reload_hash != 0);
+        assert!(opengl.reload_hash != 0);
+        assert_shader_mesh_feature_parity(&vulkan, &opengl);
+        assert!(vulkan
+            .stats
+            .iter()
+            .all(|stats| stats.mesh_instance_count >= 3));
+        assert!(vulkan.stats.iter().all(|stats| stats.mesh_draw_count >= 3));
+        assert!(vulkan.stats[0].mesh_cache_misses >= 3);
+        assert!(vulkan.stats[1].mesh_cache_hits >= 3);
+        assert!(opengl.stats[0].mesh_cache_misses >= 3);
+        assert!(opengl.stats[1].mesh_cache_hits >= 3);
+        write_shader_mesh_comparison_report(&vulkan, &opengl).unwrap();
     }
 
     #[test]
@@ -5899,6 +6021,19 @@ mod tests {
         rollback_stats: WorldPrimitiveSubmitStats,
     }
 
+    #[derive(Clone)]
+    struct RuntimeShaderMeshReport {
+        width: u32,
+        height: u32,
+        semantic_hash: u32,
+        frame_hashes: Vec<u32>,
+        rollback_hash: u32,
+        reload_hash: u32,
+        frame_feature_non_clear: Vec<Vec<usize>>,
+        stats: Vec<WorldPrimitiveSubmitStats>,
+        first_pixels: Vec<u8>,
+    }
+
     fn assert_material_feature_parity(
         vulkan: &RuntimeMaterialReport,
         opengl: &RuntimeMaterialReport,
@@ -5928,6 +6063,110 @@ mod tests {
                 "material feature crop {index} diverged too far: Vulkan={vulkan_count}, OpenGL={opengl_count}, delta={delta:.3}"
             );
         }
+    }
+
+    fn assert_shader_mesh_feature_parity(
+        vulkan: &RuntimeShaderMeshReport,
+        opengl: &RuntimeShaderMeshReport,
+    ) {
+        assert_eq!(
+            vulkan.frame_feature_non_clear.len(),
+            opengl.frame_feature_non_clear.len()
+        );
+        for (frame_index, (vulkan_counts, opengl_counts)) in vulkan
+            .frame_feature_non_clear
+            .iter()
+            .zip(opengl.frame_feature_non_clear.iter())
+            .enumerate()
+        {
+            assert_eq!(vulkan_counts.len(), opengl_counts.len());
+            for (crop_index, (vulkan_count, opengl_count)) in
+                vulkan_counts.iter().zip(opengl_counts.iter()).enumerate()
+            {
+                if crop_index == 4 {
+                    assert!(
+                        *vulkan_count <= 8,
+                        "Vulkan shader-pack mesh frame {frame_index} cutout-discard crop was not mostly transparent: {vulkan_count}"
+                    );
+                    assert!(
+                        *opengl_count <= 8,
+                        "OpenGL shader-pack mesh frame {frame_index} cutout-discard crop was not mostly transparent: {opengl_count}"
+                    );
+                    continue;
+                }
+                assert!(
+                    *vulkan_count > 0,
+                    "Vulkan shader-pack mesh frame {frame_index} crop {crop_index} was blank"
+                );
+                assert!(
+                    *opengl_count > 0,
+                    "OpenGL shader-pack mesh frame {frame_index} crop {crop_index} was blank"
+                );
+                let max = (*vulkan_count).max(*opengl_count) as f32;
+                let delta = vulkan_count.abs_diff(*opengl_count) as f32 / max;
+                assert!(
+                    delta <= 0.18,
+                    "shader-pack mesh frame {frame_index} crop {crop_index} diverged too far: Vulkan={vulkan_count}, OpenGL={opengl_count}, delta={delta:.3}"
+                );
+            }
+        }
+    }
+
+    fn write_shader_mesh_comparison_report(
+        vulkan: &RuntimeShaderMeshReport,
+        opengl: &RuntimeShaderMeshReport,
+    ) -> GalResult<()> {
+        if vulkan.width != opengl.width || vulkan.height != opengl.height {
+            return Err(GalError::backend(
+                "shader-pack comparison reports use different dimensions",
+            ));
+        }
+        let root = repo_root().join("logs/rust-vulkanic/shader-pack-conformance");
+        std::fs::create_dir_all(&root).map_err(|error| {
+            GalError::backend(format!(
+                "failed to create shader-pack conformance comparison dir: {error}"
+            ))
+        })?;
+        let max_feature_delta = vulkan
+            .frame_feature_non_clear
+            .iter()
+            .zip(opengl.frame_feature_non_clear.iter())
+            .flat_map(|(left, right)| left.iter().zip(right.iter()))
+            .map(|(left, right)| {
+                let max = (*left).max(*right) as f32;
+                if max == 0.0 {
+                    0.0
+                } else {
+                    left.abs_diff(*right) as f32 / max
+                }
+            })
+            .fold(0.0_f32, f32::max);
+        let json = format!(
+            "{{\n  \"artifact_class\":\"rust_owned_shader_pack_mesh_comparison\",\n  \"semantic_requests_identical\":{},\n  \"semantic_request_hash\":\"{:08x}\",\n  \"comparison\":\"bounded_normalized_projected_crops\",\n  \"normalization_reason\":\"the OpenGL and Vulkan backends use the same Rust-owned shader/material contract, but rasterization edges may differ slightly\",\n  \"vulkan_frame_hashes\":{:?},\n  \"opengl_frame_hashes\":{:?},\n  \"max_feature_relative_delta\":{:.6},\n  \"vulkan_mesh_draws\":{},\n  \"opengl_mesh_draws\":{},\n  \"vulkan_mesh_cache_hits\":{},\n  \"opengl_mesh_cache_hits\":{},\n  \"vulkan_mesh_cache_misses\":{},\n  \"opengl_mesh_cache_misses\":{}\n}}\n",
+            vulkan.semantic_hash == opengl.semantic_hash,
+            vulkan.semantic_hash,
+            vulkan.frame_hashes,
+            opengl.frame_hashes,
+            max_feature_delta,
+            vulkan.stats.iter().map(|stats| stats.mesh_draw_count).sum::<u64>(),
+            opengl.stats.iter().map(|stats| stats.mesh_draw_count).sum::<u64>(),
+            vulkan.stats.iter().map(|stats| stats.mesh_cache_hits).sum::<u64>(),
+            opengl.stats.iter().map(|stats| stats.mesh_cache_hits).sum::<u64>(),
+            vulkan.stats.iter().map(|stats| stats.mesh_cache_misses).sum::<u64>(),
+            opengl.stats.iter().map(|stats| stats.mesh_cache_misses).sum::<u64>()
+        );
+        std::fs::write(root.join("comparison-latest.json"), json).map_err(|error| {
+            GalError::backend(format!(
+                "failed to write shader-pack mesh comparison report: {error}"
+            ))
+        })?;
+        write_side_by_side_png(
+            &root.join("side-by-side-frame-0.png"),
+            vulkan.width,
+            vulkan.height,
+            &vulkan.first_pixels,
+            &opengl.first_pixels,
+        )
     }
 
     fn write_material_comparison_report(
@@ -6078,6 +6317,108 @@ mod tests {
             feature_non_clear: initial.feature_non_clear,
             initial_stats: initial.stats,
             rollback_stats: rollback.stats,
+        })
+    }
+
+    fn run_runtime_shader_mesh_scene(
+        backend: RuntimeBackend,
+        width: u32,
+        height: u32,
+    ) -> GalResult<RuntimeShaderMeshReport> {
+        let backend_impl: Box<dyn crate::render::vulkanic::backends::Backend> = match backend {
+            RuntimeBackend::Vulkan => Box::new(VulkanBackend::new(
+                "MattMC Rust-owned shader-pack mesh conformance",
+            )?),
+            RuntimeBackend::OpenGl => Box::new(OpenGlBackend::new(
+                "MattMC Rust-owned shader-pack mesh conformance",
+            )?),
+        };
+        let mut gal = VulkanicGal::new_with_backend(backend_impl, false);
+        let mut frontend = WorldPrimitiveFrontend::default();
+        frontend.apply_world_mesh_asset_update(
+            &mut gal,
+            1,
+            shader_mesh_scene_assets(1),
+            shader_mesh_scene_textures(0),
+        )?;
+        let frames = (0..5)
+            .map(|index| shader_mesh_scene_frame(width, height, index))
+            .collect::<Vec<_>>();
+        let semantic_hash = shader_mesh_semantic_hash(&frames);
+
+        let malformed = frontend.apply_world_mesh_asset_update(
+            &mut gal,
+            2,
+            shader_mesh_scene_assets(2),
+            vec![WorldMeshTextureAssetPayload {
+                texture_id: WORLD_MATERIAL_TEXTURE_STONE,
+                png_bytes: b"not-a-png".to_vec(),
+            }],
+        );
+        assert!(malformed.is_err());
+
+        let mut renders = Vec::with_capacity(frames.len());
+        for (index, frame) in frames.iter().cloned().enumerate() {
+            renders.push(render_shader_mesh_scene(
+                &mut gal,
+                &mut frontend,
+                10 + index as u64,
+                width,
+                height,
+                frame,
+                &format!("{}-frame-{index}", backend.label()),
+            )?);
+        }
+
+        let rollback = render_shader_mesh_scene(
+            &mut gal,
+            &mut frontend,
+            32,
+            width,
+            height,
+            frames[0].clone(),
+            &format!("{}-rollback", backend.label()),
+        )?;
+
+        frontend.apply_world_mesh_asset_update(
+            &mut gal,
+            3,
+            shader_mesh_scene_assets(3),
+            shader_mesh_scene_textures(1),
+        )?;
+        let reloaded = render_shader_mesh_scene(
+            &mut gal,
+            &mut frontend,
+            33,
+            width,
+            height,
+            shader_mesh_scene_frame_for_generation(width, height, 0, 3),
+            &format!("{}-reloaded", backend.label()),
+        )?;
+
+        write_shader_mesh_report(
+            backend,
+            width,
+            height,
+            semantic_hash,
+            &renders,
+            &rollback,
+            &reloaded,
+        )?;
+
+        Ok(RuntimeShaderMeshReport {
+            width,
+            height,
+            semantic_hash,
+            frame_hashes: renders.iter().map(|result| result.hash).collect(),
+            rollback_hash: rollback.hash,
+            reload_hash: reloaded.hash,
+            frame_feature_non_clear: renders
+                .iter()
+                .map(|result| result.feature_non_clear.clone())
+                .collect(),
+            stats: renders.iter().map(|result| result.stats.clone()).collect(),
+            first_pixels: renders[0].pixels.clone(),
         })
     }
 
@@ -6248,6 +6589,371 @@ mod tests {
             feature_non_clear,
             stats,
         })
+    }
+
+    fn render_shader_mesh_scene(
+        gal: &mut VulkanicGal,
+        frontend: &mut WorldPrimitiveFrontend,
+        generation: u64,
+        width: u32,
+        height: u32,
+        frame: WorldPrimitiveFrame,
+        label: &str,
+    ) -> GalResult<RuntimeRenderResult> {
+        let extent = Extent3d {
+            width,
+            height,
+            depth: 1,
+        };
+        let color = gal.create_texture(TextureDesc {
+            label: format!("{label}.shader-color"),
+            dimension: TextureDimension::D2,
+            format: TextureFormat::Rgba8Unorm,
+            extent,
+            mip_levels: 1,
+            array_layers: 1,
+            usages: vec![TextureUsage::ColorAttachment, TextureUsage::TransferSrc],
+        })?;
+        let color_view = gal.create_texture_view(TextureViewDesc {
+            label: format!("{label}.shader-color.view"),
+            texture: color,
+            format: TextureFormat::Rgba8Unorm,
+            base_mip: 0,
+            mip_count: 1,
+            base_layer: 0,
+            layer_count: 1,
+        })?;
+        let depth = gal.create_texture(TextureDesc {
+            label: format!("{label}.shader-depth"),
+            dimension: TextureDimension::D2,
+            format: TextureFormat::Depth32Float,
+            extent,
+            mip_levels: 1,
+            array_layers: 1,
+            usages: vec![TextureUsage::DepthStencilAttachment],
+        })?;
+        let depth_view = gal.create_texture_view(TextureViewDesc {
+            label: format!("{label}.shader-depth.view"),
+            texture: depth,
+            format: TextureFormat::Depth32Float,
+            base_mip: 0,
+            mip_count: 1,
+            base_layer: 0,
+            layer_count: 1,
+        })?;
+        let target = gal.create_render_target(RenderTargetDesc {
+            label: format!("{label}.shader-target"),
+            color_views: vec![color_view],
+            depth_stencil_view: Some(depth_view),
+            extent,
+        })?;
+        let clear_pass = gal.create_render_pass(RenderPassDesc {
+            label: format!("{label}.shader-clear-pass"),
+            target,
+            color_formats: vec![TextureFormat::Rgba8Unorm],
+            depth_format: Some(TextureFormat::Depth32Float),
+        })?;
+        let readback = gal.create_buffer(BufferDesc {
+            label: format!("{label}.shader-readback"),
+            size: u64::from(width) * u64::from(height) * 4,
+            memory: MemoryDomain::Readback,
+            usages: vec![BufferUsage::TransferDst, BufferUsage::HostRead],
+        })?;
+        let mut ops = vec![
+            CommandOp::Barrier(texture_barrier(
+                color,
+                TextureUsageState::Undefined,
+                TextureUsageState::ColorAttachment,
+            )),
+            CommandOp::Barrier(texture_barrier(
+                depth,
+                TextureUsageState::Undefined,
+                TextureUsageState::DepthStencilAttachment,
+            )),
+            CommandOp::BeginPass {
+                pass: clear_pass,
+                target,
+                colors: vec![PassAttachment {
+                    view: color_view,
+                    load_op: AttachmentLoadOp::Clear,
+                    store_op: AttachmentStoreOp::Store,
+                    clear_color: Some(ClearColor {
+                        r: 0.02,
+                        g: 0.06,
+                        b: 0.09,
+                        a: 1.0,
+                    }),
+                }],
+                depth_stencil: Some(PassAttachment {
+                    view: depth_view,
+                    load_op: AttachmentLoadOp::Clear,
+                    store_op: AttachmentStoreOp::Store,
+                    clear_color: None,
+                }),
+            },
+            CommandOp::EndPass,
+        ];
+        let (mut mesh_ops, mut stats) =
+            frontend.append_frame_ops_inner(gal, generation, target, frame, false)?;
+        ops.append(&mut mesh_ops);
+        ops.push(CommandOp::Barrier(texture_barrier(
+            color,
+            TextureUsageState::ColorAttachment,
+            TextureUsageState::TransferSrc,
+        )));
+        ops.push(CommandOp::CopyTextureToBuffer(BufferImageCopyRegion {
+            buffer: readback,
+            buffer_offset: 0,
+            bytes_per_row: width * 4,
+            rows_per_image: height,
+            texture: color,
+            texture_mip: 0,
+            texture_layer: 0,
+            texture_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
+            extent,
+        }));
+        ops.push(CommandOp::Barrier(buffer_barrier(
+            readback,
+            TextureUsageState::TransferDst,
+            TextureUsageState::ShaderRead,
+        )));
+        ops.push(CommandOp::HostReadBuffer {
+            buffer: readback,
+            offset: 0,
+            size: u64::from(width) * u64::from(height) * 4,
+        });
+        stats.command_ops = ops.len() as u64;
+        let list = gal.create_command_list(CommandListDesc {
+            label: format!("{label}.shader-commands"),
+            operations: ops,
+        })?;
+        let token = gal.submit(SubmissionBatch {
+            label: format!("{label}.shader-submit"),
+            command_lists: vec![list],
+        })?;
+        gal.retire_through_for_test(token.submission)?;
+        let reads = gal.completed_host_reads();
+        let pixels = reads
+            .iter()
+            .rev()
+            .find(|read| read.buffer == readback)
+            .map(|read| read.bytes.clone())
+            .ok_or_else(|| GalError::backend("shader mesh scene readback produced no bytes"))?;
+        let hash = xxh32(&pixels, 0x53_48_44_52);
+        let feature_non_clear = shader_mesh_feature_crops(width, height)
+            .iter()
+            .map(|crop| non_clear_pixels_with_clear(&pixels, width, *crop, [5, 15, 23]))
+            .collect::<Vec<_>>();
+        Ok(RuntimeRenderResult {
+            hash,
+            pixels,
+            feature_non_clear,
+            stats,
+        })
+    }
+
+    fn shader_mesh_scene_assets(generation: u64) -> Vec<WorldMeshAsset> {
+        vec![
+            shader_mesh_quad_asset(
+                0x51_41_4e_44,
+                generation,
+                WORLD_MATERIAL_TEXTURE_STONE,
+                WORLD_MATERIAL_ID_DEFAULT_OPAQUE,
+                WORLD_MATERIAL_MODE_OPAQUE,
+                shader_mesh_falling_vertices(),
+            ),
+            shader_mesh_quad_asset(
+                0x42_4c_4f_43,
+                generation,
+                WORLD_MATERIAL_TEXTURE_DIRT,
+                WORLD_MATERIAL_ID_DEFAULT_OPAQUE,
+                WORLD_MATERIAL_MODE_OPAQUE,
+                vec![
+                    shader_mesh_vertex([-0.18, -0.18, 0.18], [0.0, 0.0], 0xffd0_d0ff, 0x00f0_00f0),
+                    shader_mesh_vertex([0.18, -0.18, 0.18], [1.0, 0.0], 0xffd0_d0ff, 0x00f0_00f0),
+                    shader_mesh_vertex([0.18, 0.18, 0.18], [1.0, 1.0], 0xffd0_d0ff, 0x00f0_00f0),
+                    shader_mesh_vertex([-0.18, 0.18, 0.18], [0.0, 1.0], 0xffd0_d0ff, 0x00f0_00f0),
+                ],
+            ),
+            shader_mesh_quad_asset(
+                0x4c_45_41_46,
+                generation,
+                WORLD_MATERIAL_TEXTURE_OAK_LEAVES,
+                WORLD_MATERIAL_ID_DEFAULT_CUTOUT,
+                WORLD_MATERIAL_MODE_CUTOUT,
+                vec![
+                    shader_mesh_vertex([-0.18, -0.18, 0.16], [0.0, 0.0], 0xffffffff, 0x00f0_00f0),
+                    shader_mesh_vertex([0.18, -0.18, 0.16], [1.0, 0.0], 0xffffffff, 0x00f0_00f0),
+                    shader_mesh_vertex([0.18, 0.18, 0.16], [1.0, 1.0], 0xffffffff, 0x00f0_00f0),
+                    shader_mesh_vertex([-0.18, 0.18, 0.16], [0.0, 1.0], 0xffffffff, 0x00f0_00f0),
+                ],
+            ),
+        ]
+    }
+
+    fn shader_mesh_quad_asset(
+        mesh_key: u64,
+        generation: u64,
+        texture_id: u32,
+        material_id: u32,
+        material_mode: u32,
+        vertices: Vec<WorldMeshVertex>,
+    ) -> WorldMeshAsset {
+        let quad_count = vertices.len() / 4;
+        let mut index_bytes = Vec::with_capacity(quad_count * 6 * 2);
+        for quad in 0..quad_count {
+            let base = (quad * 4) as u16;
+            for index in [base, base + 1, base + 2, base + 2, base + 3, base] {
+                index_bytes.extend_from_slice(&index.to_ne_bytes());
+            }
+        }
+        WorldMeshAsset {
+            mesh_key,
+            mesh_generation: generation,
+            vertex_layout_version: WORLD_MESH_VERTEX_LAYOUT_V2,
+            index_type: IndexType::U16,
+            vertices,
+            index_bytes,
+            sections: vec![WorldMeshSection {
+                material_id,
+                texture_id,
+                material_mode,
+                cull_policy: WORLD_CULL_BACK,
+                winding: WORLD_WINDING_CCW,
+                index_offset: 0,
+                index_count: (quad_count * 6) as u32,
+            }],
+        }
+    }
+
+    fn shader_mesh_falling_vertices() -> Vec<WorldMeshVertex> {
+        let mut vertices = Vec::new();
+        vertices.extend([
+            shader_mesh_vertex([-0.18, -0.18, 0.18], [0.0, 0.0], 0xffffffff, 0x00f0_00f0),
+            shader_mesh_vertex([0.18, -0.18, 0.18], [1.0, 0.0], 0xffffffff, 0x00f0_00f0),
+            shader_mesh_vertex([0.18, 0.18, 0.18], [1.0, 1.0], 0xffffffff, 0x00f0_00f0),
+            shader_mesh_vertex([-0.18, 0.18, 0.18], [0.0, 1.0], 0xffffffff, 0x00f0_00f0),
+        ]);
+        vertices.extend([
+            shader_mesh_vertex([0.18, -0.18, 0.20], [0.0, 0.0], 0xffb8_b8b8, 0x00b0_00b0),
+            shader_mesh_vertex([0.28, -0.12, 0.20], [1.0, 0.0], 0xffb8_b8b8, 0x00b0_00b0),
+            shader_mesh_vertex([0.28, 0.22, 0.20], [1.0, 1.0], 0xffb8_b8b8, 0x00b0_00b0),
+            shader_mesh_vertex([0.18, 0.18, 0.20], [0.0, 1.0], 0xffb8_b8b8, 0x00b0_00b0),
+        ]);
+        vertices.extend([
+            shader_mesh_vertex([-0.18, 0.18, 0.16], [0.0, 0.0], 0xff92_9292, 0x0070_0070),
+            shader_mesh_vertex([0.18, 0.18, 0.16], [1.0, 0.0], 0xff92_9292, 0x0070_0070),
+            shader_mesh_vertex([0.28, 0.28, 0.18], [1.0, 1.0], 0xff92_9292, 0x0070_0070),
+            shader_mesh_vertex([-0.08, 0.28, 0.18], [0.0, 1.0], 0xff92_9292, 0x0070_0070),
+        ]);
+        vertices
+    }
+
+    fn shader_mesh_vertex(
+        position: [f32; 3],
+        uv: [f32; 2],
+        color_argb: u32,
+        light: u32,
+    ) -> WorldMeshVertex {
+        WorldMeshVertex {
+            position,
+            uv,
+            shader_atlas_uv: uv,
+            shader_block_id: 12,
+            shader_material_type: 1,
+            color_argb,
+            normal_packed: 0,
+            light,
+        }
+    }
+
+    fn shader_mesh_scene_textures(variant: u8) -> Vec<WorldMeshTextureAssetPayload> {
+        vec![
+            WorldMeshTextureAssetPayload {
+                texture_id: WORLD_MATERIAL_TEXTURE_STONE,
+                png_bytes: shader_scene_texture_png(variant, false),
+            },
+            WorldMeshTextureAssetPayload {
+                texture_id: WORLD_MATERIAL_TEXTURE_DIRT,
+                png_bytes: shader_scene_texture_png(variant.saturating_add(1), false),
+            },
+            WorldMeshTextureAssetPayload {
+                texture_id: WORLD_MATERIAL_TEXTURE_OAK_LEAVES,
+                png_bytes: shader_scene_texture_png(variant, true),
+            },
+        ]
+    }
+
+    fn shader_mesh_scene_frame(width: u32, height: u32, frame_index: usize) -> WorldPrimitiveFrame {
+        shader_mesh_scene_frame_for_generation(width, height, frame_index, 1)
+    }
+
+    fn shader_mesh_scene_frame_for_generation(
+        width: u32,
+        height: u32,
+        frame_index: usize,
+        generation: u64,
+    ) -> WorldPrimitiveFrame {
+        let mut frame = frame(Vec::new());
+        frame.viewport_width = width;
+        frame.viewport_height = height;
+        frame.background.enabled = false;
+        frame.background.viewport_width = width;
+        frame.background.viewport_height = height;
+        let y = 0.48 - frame_index as f32 * 0.16;
+        frame.mesh_instances = vec![
+            shader_mesh_instance(0x51_41_4e_44, generation, 0.0, y, 0xffffffff, width, height),
+            shader_mesh_instance(
+                0x42_4c_4f_43,
+                generation,
+                -0.52,
+                -0.36,
+                0xfff0_f8ff,
+                width,
+                height,
+            ),
+            shader_mesh_instance(
+                0x4c_45_41_46,
+                generation,
+                0.52,
+                -0.34,
+                0xffffffff,
+                width,
+                height,
+            ),
+        ];
+        frame
+    }
+
+    fn shader_mesh_instance(
+        mesh_key: u64,
+        generation: u64,
+        x: f32,
+        y: f32,
+        color_argb: u32,
+        width: u32,
+        height: u32,
+    ) -> WorldMeshInstanceRequest {
+        let mut transform = [
+            1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, x, y, 0.0, 1.0,
+        ];
+        if mesh_key == 0x42_4c_4f_43 {
+            transform[0] = 1.15;
+            transform[5] = 1.15;
+        }
+        WorldMeshInstanceRequest {
+            stratum: WORLD_STRATUM_MOVING_MESH,
+            mesh_key,
+            mesh_generation: generation,
+            mesh_section_index: WORLD_MESH_SECTION_ALL,
+            depth_policy: WORLD_DEPTH_POLICY_TEST_WRITE,
+            cull_policy: WORLD_CULL_BACK,
+            winding: WORLD_WINDING_CCW,
+            color_argb,
+            transform,
+            viewport_width: width,
+            viewport_height: height,
+        }
     }
 
     fn material_runtime_frame(width: u32, height: u32) -> WorldPrimitiveFrame {
@@ -6448,6 +7154,44 @@ mod tests {
         encoded
     }
 
+    fn shader_scene_texture_png(variant: u8, cutout: bool) -> Vec<u8> {
+        let mut pixels = Vec::with_capacity(16 * 16 * 4);
+        for y in 0..16 {
+            for x in 0..16 {
+                let quadrant = (x >= 8, y >= 8);
+                let mut color = match quadrant {
+                    (false, false) => [222, 184u8.saturating_add(variant * 12), 86, 255],
+                    (true, false) => [172, 126u8.saturating_add(variant * 16), 44, 255],
+                    (false, true) => [236, 214u8.saturating_sub(variant * 18), 112, 255],
+                    (true, true) => [130, 88u8.saturating_add(variant * 14), 34, 255],
+                };
+                if (x + y) % 7 == 0 {
+                    color = [255, 245, 170, 255];
+                }
+                if cutout {
+                    color = [38, 156u8.saturating_add(variant * 20), 54, 255];
+                    let in_corner = (x < 6 || x > 9) && (y < 6 || y > 9);
+                    if in_corner {
+                        color[3] = 0;
+                    }
+                    if (7..=9).contains(&x) || (7..=9).contains(&y) {
+                        color = [104, 214, 91, 255];
+                    }
+                }
+                pixels.extend_from_slice(&color);
+            }
+        }
+        let mut encoded = Vec::new();
+        {
+            let mut encoder = png::Encoder::new(&mut encoded, 16, 16);
+            encoder.set_color(png::ColorType::Rgba);
+            encoder.set_depth(png::BitDepth::Eight);
+            let mut writer = encoder.write_header().unwrap();
+            writer.write_image_data(&pixels).unwrap();
+        }
+        encoded
+    }
+
     fn semantic_hash(frame: &WorldPrimitiveFrame) -> u32 {
         let mut bytes = Vec::new();
         push_u32(&mut bytes, frame.material_quads.len() as u32);
@@ -6471,6 +7215,29 @@ mod tests {
             }
         }
         xxh32(&bytes, 0x53_45_4d_51)
+    }
+
+    fn shader_mesh_semantic_hash(frames: &[WorldPrimitiveFrame]) -> u32 {
+        let mut bytes = Vec::new();
+        push_u32(&mut bytes, frames.len() as u32);
+        for frame in frames {
+            push_u32(&mut bytes, frame.viewport_width);
+            push_u32(&mut bytes, frame.viewport_height);
+            push_u32(&mut bytes, frame.mesh_instances.len() as u32);
+            for instance in &frame.mesh_instances {
+                bytes.extend_from_slice(&instance.mesh_key.to_ne_bytes());
+                bytes.extend_from_slice(&instance.mesh_generation.to_ne_bytes());
+                push_u32(&mut bytes, instance.mesh_section_index);
+                push_u32(&mut bytes, instance.depth_policy);
+                push_u32(&mut bytes, instance.cull_policy);
+                push_u32(&mut bytes, instance.winding);
+                push_u32(&mut bytes, instance.color_argb);
+                for value in instance.transform {
+                    push_f32(&mut bytes, value);
+                }
+            }
+        }
+        xxh32(&bytes, 0x53_48_4d_51)
     }
 
     #[derive(Clone, Copy)]
@@ -6502,6 +7269,56 @@ mod tests {
         ]
     }
 
+    fn shader_mesh_feature_crops(width: u32, height: u32) -> Vec<Crop> {
+        vec![
+            crop_from_ndc(
+                "falling_sand_front_face",
+                width,
+                height,
+                -0.16,
+                -0.36,
+                0.16,
+                0.66,
+            ),
+            crop_from_ndc(
+                "falling_sand_lit_side",
+                width,
+                height,
+                0.16,
+                -0.36,
+                0.30,
+                0.74,
+            ),
+            crop_from_ndc(
+                "blockdisplay_static",
+                width,
+                height,
+                -0.74,
+                -0.58,
+                -0.30,
+                -0.12,
+            ),
+            crop_from_ndc(
+                "oak_leaves_cutout_visible",
+                width,
+                height,
+                0.34,
+                -0.54,
+                0.70,
+                -0.16,
+            ),
+            crop_from_ndc(
+                "oak_leaves_cutout_discard",
+                width,
+                height,
+                0.34,
+                -0.54,
+                0.45,
+                -0.43,
+            ),
+        ]
+    }
+
     fn crop_from_ndc(
         name: &'static str,
         width: u32,
@@ -6527,12 +7344,24 @@ mod tests {
     }
 
     fn non_clear_pixels(pixels: &[u8], width: u32, crop: Crop) -> usize {
+        non_clear_pixels_with_clear(pixels, width, crop, [8, 10, 18])
+    }
+
+    fn non_clear_pixels_with_clear(
+        pixels: &[u8],
+        width: u32,
+        crop: Crop,
+        clear_rgb: [u8; 3],
+    ) -> usize {
         let mut count = 0;
         for y in crop.y..crop.y + crop.height {
             for x in crop.x..crop.x + crop.width {
                 let index = ((y * width + x) * 4) as usize;
                 let px = &pixels[index..index + 4];
-                if px[0].abs_diff(8) > 4 || px[1].abs_diff(10) > 4 || px[2].abs_diff(18) > 4 {
+                if px[0].abs_diff(clear_rgb[0]) > 4
+                    || px[1].abs_diff(clear_rgb[1]) > 4
+                    || px[2].abs_diff(clear_rgb[2]) > 4
+                {
                     count += 1;
                 }
             }
@@ -6620,6 +7449,101 @@ mod tests {
         })
     }
 
+    fn write_shader_mesh_report(
+        backend: RuntimeBackend,
+        width: u32,
+        height: u32,
+        semantic_hash: u32,
+        frames: &[RuntimeRenderResult],
+        rollback: &RuntimeRenderResult,
+        reloaded: &RuntimeRenderResult,
+    ) -> GalResult<()> {
+        let root = repo_root().join("logs/rust-vulkanic/shader-pack-conformance");
+        let dir = root.join(backend.label());
+        std::fs::create_dir_all(&dir).map_err(|error| {
+            GalError::backend(format!(
+                "failed to create shader-pack conformance dir: {error}"
+            ))
+        })?;
+        for (index, frame) in frames.iter().enumerate() {
+            write_png(
+                &dir.join(format!("full-airborne-frame-{index}.png")),
+                width,
+                height,
+                &frame.pixels,
+            )?;
+            for crop in shader_mesh_feature_crops(width, height) {
+                write_crop(
+                    &dir.join(format!("crop-frame-{index}-{}.png", crop.name)),
+                    width,
+                    &frame.pixels,
+                    crop,
+                )?;
+            }
+        }
+        write_png(
+            &dir.join("full-rollback.png"),
+            width,
+            height,
+            &rollback.pixels,
+        )?;
+        write_png(
+            &dir.join("full-reloaded.png"),
+            width,
+            height,
+            &reloaded.pixels,
+        )?;
+        let frame_hashes = frames
+            .iter()
+            .map(|frame| format!("\"{:08x}\"", frame.hash))
+            .collect::<Vec<_>>()
+            .join(",");
+        let crop_names = shader_mesh_feature_crops(width, height)
+            .iter()
+            .map(|crop| format!("\"{}\"", crop.name))
+            .collect::<Vec<_>>()
+            .join(",");
+        let first_counts = frames
+            .first()
+            .map(|frame| {
+                shader_mesh_feature_crops(width, height)
+                    .into_iter()
+                    .zip(frame.feature_non_clear.iter())
+                    .map(|(crop, count)| format!("\"{}\":{}", crop.name, count))
+                    .collect::<Vec<_>>()
+                    .join(",")
+            })
+            .unwrap_or_default();
+        let mesh_draws = frames
+            .iter()
+            .map(|frame| frame.stats.mesh_draw_count)
+            .sum::<u64>();
+        let json = format!(
+            "{{\n  \"artifact_class\":\"rust_owned_shader_pack_mesh_conformance\",\n  \"backend\":\"{}\",\n  \"semantic_request_hash\":\"{:08x}\",\n  \"pass_graph\":\"vulkanic:builtin/terrain_material_v1\",\n  \"passes\":[\"vulkanic:pass/terrain_opaque\",\"vulkanic:pass/terrain_cutout\",\"vulkanic:pass/final_composite_copy\"],\n  \"rust_owned_color_attachment\":true,\n  \"rust_owned_depth_attachment\":true,\n  \"java_iris_participation\":false,\n  \"width\":{},\n  \"height\":{},\n  \"airborne_frame_hashes\":[{}],\n  \"rollback_hash\":\"{:08x}\",\n  \"reloaded_hash\":\"{:08x}\",\n  \"rollback_preserved_last_valid_generation\":{},\n  \"crop_names\":[{}],\n  \"frame0_feature_non_clear\":{{{}}},\n  \"mesh_instance_count\":{},\n  \"mesh_batch_count\":{},\n  \"mesh_draw_count\":{},\n  \"mesh_cache_hits\":{},\n  \"mesh_cache_misses\":{},\n  \"mesh_asset_payload_bytes\":{},\n  \"screenshots\":[\"full-airborne-frame-0.png\",\"full-airborne-frame-1.png\",\"full-airborne-frame-2.png\",\"full-airborne-frame-3.png\",\"full-airborne-frame-4.png\",\"full-rollback.png\",\"full-reloaded.png\"]\n}}\n",
+            backend.name(),
+            semantic_hash,
+            width,
+            height,
+            frame_hashes,
+            rollback.hash,
+            reloaded.hash,
+            rollback.hash == frames[0].hash,
+            crop_names,
+            first_counts,
+            frames[0].stats.mesh_instance_count,
+            frames[0].stats.mesh_batch_count,
+            mesh_draws,
+            frames.iter().map(|frame| frame.stats.mesh_cache_hits).sum::<u64>(),
+            frames.iter().map(|frame| frame.stats.mesh_cache_misses).sum::<u64>(),
+            frames[0].stats.mesh_asset_payload_bytes
+        );
+        std::fs::write(dir.join("latest.json"), json).map_err(|error| {
+            GalError::backend(format!(
+                "failed to write shader-pack mesh conformance report: {error}"
+            ))
+        })
+    }
+
     fn write_png(path: &std::path::Path, width: u32, height: u32, pixels: &[u8]) -> GalResult<()> {
         let file = std::fs::File::create(path).map_err(|error| {
             GalError::backend(format!("failed to create PNG {}: {error}", path.display()))
@@ -6648,6 +7572,33 @@ mod tests {
             cropped.extend_from_slice(&pixels[start..end]);
         }
         write_png(path, crop.width, crop.height, &cropped)
+    }
+
+    fn write_side_by_side_png(
+        path: &std::path::Path,
+        width: u32,
+        height: u32,
+        left: &[u8],
+        right: &[u8],
+    ) -> GalResult<()> {
+        let expected = (width as usize)
+            .checked_mul(height as usize)
+            .and_then(|pixels| pixels.checked_mul(4))
+            .ok_or_else(|| GalError::backend("side-by-side image dimensions overflow"))?;
+        if left.len() != expected || right.len() != expected {
+            return Err(GalError::backend(
+                "side-by-side images do not match expected dimensions",
+            ));
+        }
+        let combined_width = width * 2;
+        let mut pixels = Vec::with_capacity((combined_width * height * 4) as usize);
+        for y in 0..height {
+            let row_start = (y * width * 4) as usize;
+            let row_end = row_start + (width * 4) as usize;
+            pixels.extend_from_slice(&left[row_start..row_end]);
+            pixels.extend_from_slice(&right[row_start..row_end]);
+        }
+        write_png(path, combined_width, height, &pixels)
     }
 
     fn repo_root() -> std::path::PathBuf {

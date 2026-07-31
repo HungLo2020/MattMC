@@ -34,6 +34,7 @@ public class PistonMovingBlockEntity extends BlockEntity {
 	private static final double PUSH_OFFSET = 0.01;
 	public static final double TICK_MOVEMENT = 0.51;
 	private static final boolean FREEZE_DIAGNOSTIC_PISTON_PROGRESS = Boolean.getBoolean("mattmc.dev.rustGalWorldMesh.freezePistonProgress");
+	private static final float DIAGNOSTIC_PISTON_PROGRESS = diagnosticPistonProgress();
 	private static final BlockState DEFAULT_BLOCK_STATE = Blocks.AIR.defaultBlockState();
 	private static final float DEFAULT_PROGRESS = 0.0F;
 	private static final boolean DEFAULT_EXTENDING = false;
@@ -217,6 +218,18 @@ public class PistonMovingBlockEntity extends BlockEntity {
 		return this.movedState.is(Blocks.HONEY_BLOCK);
 	}
 
+	private static float diagnosticPistonProgress() {
+		try {
+			return Mth.clamp(
+				Float.parseFloat(System.getProperty("mattmc.dev.rustGalWorldMesh.pistonProgress", "0.5")),
+				0.0F,
+				1.0F
+			);
+		} catch (NumberFormatException ignored) {
+			return 0.5F;
+		}
+	}
+
 	public Direction getMovementDirection() {
 		return this.extending ? this.direction : this.direction.getOpposite();
 	}
@@ -299,8 +312,8 @@ public class PistonMovingBlockEntity extends BlockEntity {
 	public static void tick(Level level, BlockPos blockPos, BlockState blockState, PistonMovingBlockEntity pistonMovingBlockEntity) {
 		pistonMovingBlockEntity.lastTicked = level.getGameTime();
 		if (FREEZE_DIAGNOSTIC_PISTON_PROGRESS) {
-			pistonMovingBlockEntity.progressO = 0.5F;
-			pistonMovingBlockEntity.progress = 0.5F;
+			pistonMovingBlockEntity.progressO = DIAGNOSTIC_PISTON_PROGRESS;
+			pistonMovingBlockEntity.progress = DIAGNOSTIC_PISTON_PROGRESS;
 			pistonMovingBlockEntity.deathTicks = 0;
 			return;
 		}

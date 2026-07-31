@@ -686,6 +686,10 @@ pub struct FfiWorldMeshVertex {
     pub z: f32,
     pub u: f32,
     pub v: f32,
+    pub atlas_u: f32,
+    pub atlas_v: f32,
+    pub shader_block_id: i32,
+    pub shader_material_type: i32,
 }
 
 #[repr(C)]

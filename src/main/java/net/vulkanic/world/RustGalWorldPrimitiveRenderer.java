@@ -9,6 +9,7 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.ItemBlockRenderTypes;
+import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.SubmitNodeStorage;
 import net.minecraft.client.renderer.block.BlockRenderDispatcher;
@@ -109,7 +110,7 @@ public final class RustGalWorldPrimitiveRenderer {
 	public static final int MATERIAL_ID_BLOCK_MARKER_CUTOUT = 0x224A8659;
 	public static final int MATERIAL_MODE_OPAQUE = 1;
 	public static final int MATERIAL_MODE_CUTOUT = 2;
-	public static final int MESH_VERTEX_LAYOUT_V1 = 1;
+	public static final int MESH_VERTEX_LAYOUT_V2 = 2;
 	public static final int MESH_SECTION_ALL = -1;
 	private static final ResourceLocation MISSING_TEXTURE_LOCATION = ResourceLocation.withDefaultNamespace("missingno");
 	private static byte[] missingTexturePayload;
@@ -206,6 +207,7 @@ public final class RustGalWorldPrimitiveRenderer {
 	private static final List<VulkanicGalBridge.WorldBorderQuadRecord> PENDING_BORDER_QUADS = new ArrayList<>();
 	private static final List<VulkanicGalBridge.WorldMaterialQuadRecord> PENDING_MATERIAL_QUADS = new ArrayList<>();
 	private static final List<VulkanicGalBridge.WorldMeshInstanceRecord> PENDING_MESH_INSTANCES = new ArrayList<>();
+	private static final List<PendingMeshProducer> PENDING_MESH_PRODUCERS = new ArrayList<>();
 	private static final Map<Long, VulkanicGalBridge.WorldMeshAssetRecord> WORLD_MESH_ASSETS = new LinkedHashMap<>();
 	private static final Map<Integer, VulkanicGalBridge.WorldMeshTextureAssetRecord> WORLD_MESH_TEXTURES = new LinkedHashMap<>();
 	private static long worldMeshAssetGeneration;
@@ -304,7 +306,8 @@ public final class RustGalWorldPrimitiveRenderer {
 
 	private static boolean shouldUseRustOpenGlMeshInstances() {
 		return WorldRenderRoutePolicy.currentBlockDisplayRoute().usesRustOpenGl()
-			|| WorldRenderRoutePolicy.currentFallingBlockRoute().usesRustOpenGl();
+			|| WorldRenderRoutePolicy.currentFallingBlockRoute().usesRustOpenGl()
+			|| WorldRenderRoutePolicy.currentPistonMovingBlockRoute().usesRustOpenGl();
 	}
 
 	public static boolean shouldRouteTerrainParticle(BlockState blockState) {
@@ -318,7 +321,8 @@ public final class RustGalWorldPrimitiveRenderer {
 			|| shouldUseRustOpenGlCrack()
 			|| WorldRenderRoutePolicy.currentMaterialRoute().usesRustOpenGl()
 			|| WorldRenderRoutePolicy.currentBlockDisplayRoute().usesRustOpenGl()
-			|| WorldRenderRoutePolicy.currentFallingBlockRoute().usesRustOpenGl();
+			|| WorldRenderRoutePolicy.currentFallingBlockRoute().usesRustOpenGl()
+			|| WorldRenderRoutePolicy.currentPistonMovingBlockRoute().usesRustOpenGl();
 	}
 
 	public static boolean crackDisabledForDiagnostics() {
@@ -420,9 +424,10 @@ public final class RustGalWorldPrimitiveRenderer {
 				);
 			}
 			worldMeshAssetGeneration++;
-			WORLD_MESH_ASSETS.clear();
-			WORLD_MESH_TEXTURES.clear();
-			PENDING_MESH_INSTANCES.clear();
+				WORLD_MESH_ASSETS.clear();
+				WORLD_MESH_TEXTURES.clear();
+				PENDING_MESH_INSTANCES.clear();
+				PENDING_MESH_PRODUCERS.clear();
 			attemptedWorldMeshAssetGeneration = Math.min(attemptedWorldMeshAssetGeneration, uploadedWorldMeshAssetGeneration);
 			lastWorldMeshAssetPayloadBytes = 0L;
 			lastWorldMeshAssetPayloadCount = 0L;
@@ -787,6 +792,7 @@ public final class RustGalWorldPrimitiveRenderer {
 			PENDING_BORDER_QUADS.clear();
 			PENDING_MATERIAL_QUADS.clear();
 			PENDING_MESH_INSTANCES.clear();
+			PENDING_MESH_PRODUCERS.clear();
 			pendingBackground = VulkanicGalBridge.WorldBackgroundRecord.diagnosticFallback();
 			seedFrameMatricesLocked(viewMatrix, projectionMatrix, viewportWidth, viewportHeight);
 		}
@@ -809,6 +815,7 @@ public final class RustGalWorldPrimitiveRenderer {
 			PENDING_BORDER_QUADS.clear();
 			PENDING_MATERIAL_QUADS.clear();
 			PENDING_MESH_INSTANCES.clear();
+			PENDING_MESH_PRODUCERS.clear();
 			pendingBackground = VulkanicGalBridge.WorldBackgroundRecord.diagnosticFallback();
 			pendingViewportWidth = 0;
 			pendingViewportHeight = 0;
@@ -825,6 +832,7 @@ public final class RustGalWorldPrimitiveRenderer {
 			PENDING_BORDER_QUADS.clear();
 			PENDING_MATERIAL_QUADS.clear();
 			PENDING_MESH_INSTANCES.clear();
+			PENDING_MESH_PRODUCERS.clear();
 			pendingBackground = VulkanicGalBridge.WorldBackgroundRecord.diagnosticFallback();
 			new Matrix4f().get(PENDING_VIEW);
 			new Matrix4f().get(PENDING_PROJECTION);
@@ -1066,6 +1074,7 @@ public final class RustGalWorldPrimitiveRenderer {
 					viewportWidth,
 					viewportHeight
 				));
+				PENDING_MESH_PRODUCERS.add(PendingMeshProducer.BLOCK_DISPLAY);
 				recordBlockDisplayDiagnostic(
 					route.usesRustWholeFrameVulkan() ? "rust-vulkan-whole-frame" : "rust-opengl",
 					blockState,
@@ -1190,11 +1199,18 @@ public final class RustGalWorldPrimitiveRenderer {
 					DEPTH_POLICY_TEST_WRITE,
 					CULL_BACK,
 					WORLD_WINDING_CCW,
-					0xffffffff,
+					movingBlockLightColor(movingBlockRenderState, blockState, movingBlockRenderState.blockPos),
 					transform,
 					viewportWidth,
 					viewportHeight
 				));
+				if (expectedSource == SubmitNodeStorage.MovingBlockSubmitSource.FALLING_BLOCK) {
+					PENDING_MESH_PRODUCERS.add(PendingMeshProducer.FALLING_BLOCK);
+				} else if (expectedSource == SubmitNodeStorage.MovingBlockSubmitSource.PISTON) {
+					PENDING_MESH_PRODUCERS.add(PendingMeshProducer.PISTON);
+				} else {
+						PENDING_MESH_PRODUCERS.add(PendingMeshProducer.UNKNOWN);
+					}
 				recordMovingBlockDiagnostic(
 					route.usesRustWholeFrameVulkan() ? "rust-vulkan-whole-frame" : "rust-opengl",
 					expectedSource.name().toLowerCase(java.util.Locale.ROOT).replace('_', '-'),
@@ -1246,11 +1262,11 @@ public final class RustGalWorldPrimitiveRenderer {
 		worldMeshAssetGeneration++;
 		attemptedWorldMeshAssetGeneration = Math.min(attemptedWorldMeshAssetGeneration, uploadedWorldMeshAssetGeneration);
 		lastWorldMeshAssetPayloadCount = WORLD_MESH_ASSETS.size() + WORLD_MESH_TEXTURES.size();
-		lastWorldMeshAssetPayloadBytes = 0L;
-		for (VulkanicGalBridge.WorldMeshAssetRecord mesh : WORLD_MESH_ASSETS.values()) {
-			lastWorldMeshAssetPayloadBytes += mesh.indexBytes().length;
-			lastWorldMeshAssetPayloadBytes += (long)mesh.vertices().size() * 48L;
-		}
+			lastWorldMeshAssetPayloadBytes = 0L;
+			for (VulkanicGalBridge.WorldMeshAssetRecord mesh : WORLD_MESH_ASSETS.values()) {
+				lastWorldMeshAssetPayloadBytes += mesh.indexBytes().length;
+				lastWorldMeshAssetPayloadBytes += (long)mesh.vertices().size() * VulkanicGalBridge.Struct.WORLD_MESH_VERTEX.byteSize();
+			}
 		for (VulkanicGalBridge.WorldMeshTextureAssetRecord texture : WORLD_MESH_TEXTURES.values()) {
 			lastWorldMeshAssetPayloadBytes += texture.pngBytes().length;
 		}
@@ -1287,21 +1303,23 @@ public final class RustGalWorldPrimitiveRenderer {
 		String diagnosticName
 	) {
 		try {
-			BlockStateModel model = blockRenderDispatcher.getBlockModel(blockState);
-			List<BlockModelPart> parts = model.collectParts(RandomSource.create(blockState.getSeed(randomSeedPos)));
+				BlockStateModel model = blockRenderDispatcher.getBlockModel(blockState);
+				int shaderBlockId = stableBlockStateSemanticId(blockState);
+				int shaderMaterialType = materialMode;
+				List<BlockModelPart> parts = model.collectParts(RandomSource.create(blockState.getSeed(randomSeedPos)));
 			if (parts.isEmpty()) {
 				return null;
 			}
 			List<VulkanicGalBridge.WorldMeshVertexRecord> vertices = new ArrayList<>();
 			List<VulkanicGalBridge.WorldMeshSectionRecord> sections = new ArrayList<>();
 			List<VulkanicGalBridge.WorldMeshTextureAssetRecord> textures = new ArrayList<>();
-			List<Integer> indices = new ArrayList<>();
-			for (BlockModelPart part : parts) {
-				for (Direction direction : Direction.values()) {
-					appendBlockModelQuads(part.getQuads(direction), blockState, tintGetter, tintPos, materialId, materialMode, vertices, indices, sections, textures);
+				List<Integer> indices = new ArrayList<>();
+				for (BlockModelPart part : parts) {
+					for (Direction direction : Direction.values()) {
+						appendBlockModelQuads(part.getQuads(direction), blockState, tintGetter, tintPos, materialId, materialMode, shaderBlockId, shaderMaterialType, vertices, indices, sections, textures);
+					}
+					appendBlockModelQuads(part.getQuads(null), blockState, tintGetter, tintPos, materialId, materialMode, shaderBlockId, shaderMaterialType, vertices, indices, sections, textures);
 				}
-				appendBlockModelQuads(part.getQuads(null), blockState, tintGetter, tintPos, materialId, materialMode, vertices, indices, sections, textures);
-			}
 			if (vertices.isEmpty() || indices.isEmpty() || sections.isEmpty()) {
 				return null;
 			}
@@ -1348,9 +1366,9 @@ public final class RustGalWorldPrimitiveRenderer {
 				meshKey,
 				meshGeneration,
 				new VulkanicGalBridge.WorldMeshAssetRecord(
-					meshKey,
-					meshGeneration,
-					MESH_VERTEX_LAYOUT_V1,
+						meshKey,
+						meshGeneration,
+						MESH_VERTEX_LAYOUT_V2,
 					indexType,
 					vertices,
 					indexBytes,
@@ -1370,6 +1388,8 @@ public final class RustGalWorldPrimitiveRenderer {
 		BlockPos tintPos,
 		int materialId,
 		int materialMode,
+		int shaderBlockId,
+		int shaderMaterialType,
 		List<VulkanicGalBridge.WorldMeshVertexRecord> vertices,
 		List<Integer> indices,
 		List<VulkanicGalBridge.WorldMeshSectionRecord> sections,
@@ -1393,17 +1413,23 @@ public final class RustGalWorldPrimitiveRenderer {
 			int tintColor = bakedQuad.isTinted()
 				? 0xff000000 | Minecraft.getInstance().getBlockColors().getColor(blockState, tintGetter, tintPos, bakedQuad.tintIndex())
 				: 0xffffffff;
+			float shade = tintGetter.getShade(bakedQuad.direction(), bakedQuad.shade());
 			int winding = blockDisplayQuadWinding(quad, bakedQuad.direction());
 			for (int i = 0; i < 4; i++) {
+				int colorArgb = shadedBakedVertexColor(quad.getColor(i), tintColor, shade);
 				vertices.add(new VulkanicGalBridge.WorldMeshVertexRecord(
 					quad.getX(i),
 					quad.getY(i),
-					quad.getZ(i),
-					spriteLocalU(sprite, quad.getTexU(i)),
-					spriteLocalV(sprite, quad.getTexV(i)),
-					tintColor,
+						quad.getZ(i),
+						spriteLocalU(sprite, quad.getTexU(i)),
+						spriteLocalV(sprite, quad.getTexV(i)),
+						quad.getTexU(i),
+						quad.getTexV(i),
+						shaderBlockId,
+						shaderMaterialType,
+						colorArgb,
 					quad.getVertexNormal(i),
-					quad.getLight(i)
+					LightTexture.lightCoordsWithEmission(quad.getLight(i), bakedQuad.lightEmission())
 				));
 			}
 			indices.add(base);
@@ -1422,6 +1448,34 @@ public final class RustGalWorldPrimitiveRenderer {
 				6
 			));
 		}
+	}
+
+	private static int movingBlockLightColor(BlockAndTintGetter level, BlockState blockState, BlockPos blockPos) {
+		int packedLight = LevelRenderer.getLightColor(LevelRenderer.BrightnessGetter.DEFAULT, level, blockState, blockPos);
+		float block = LightTexture.block(packedLight) / 15.0F;
+		float sky = LightTexture.sky(packedLight) / 15.0F;
+		float brightness = Mth.clamp(0.08F + Math.max(block, sky) * 0.92F, 0.0F, 1.0F);
+		int channel = Mth.clamp(Math.round(brightness * 255.0F), 0, 255);
+		return ARGB.color(255, channel, channel, channel);
+	}
+
+	private static int shadedBakedVertexColor(int bakedColor, int tintColor, float shade) {
+		int bakedRed = bakedColor & 0xff;
+		int bakedGreen = bakedColor >>> 8 & 0xff;
+		int bakedBlue = bakedColor >>> 16 & 0xff;
+		int bakedAlpha = bakedColor >>> 24 & 0xff;
+		int tintRed = ARGB.red(tintColor);
+		int tintGreen = ARGB.green(tintColor);
+		int tintBlue = ARGB.blue(tintColor);
+		int alpha = Mth.clamp(Math.round((bakedAlpha / 255.0F) * (ARGB.alpha(tintColor) / 255.0F) * 255.0F), 0, 255);
+		int red = shadedChannel(bakedRed, tintRed, shade);
+		int green = shadedChannel(bakedGreen, tintGreen, shade);
+		int blue = shadedChannel(bakedBlue, tintBlue, shade);
+		return ARGB.color(alpha, red, green, blue);
+	}
+
+	private static int shadedChannel(int baked, int tint, float shade) {
+		return Mth.clamp(Math.round((baked / 255.0F) * (tint / 255.0F) * shade * 255.0F), 0, 255);
 	}
 
 	private static int blockDisplayQuadWinding(BakedQuadView quad, Direction direction) {
@@ -1495,6 +1549,10 @@ public final class RustGalWorldPrimitiveRenderer {
 		return height == 0.0F ? 0.0F : Mth.clamp((atlasV - sprite.getV0()) / height, 0.0F, 1.0F);
 	}
 
+	private static int stableBlockStateSemanticId(BlockState blockState) {
+		return blockState.toString().hashCode();
+	}
+
 	private static int stableTextureId(ResourceLocation location) {
 		long hash = fnv64(location.toString());
 		int id = (int)(hash ^ (hash >>> 32));
@@ -1514,6 +1572,10 @@ public final class RustGalWorldPrimitiveRenderer {
 			hash = fnv64Float(hash, vertex.z());
 			hash = fnv64Float(hash, vertex.u());
 			hash = fnv64Float(hash, vertex.v());
+			hash = fnv64Float(hash, vertex.atlasU());
+			hash = fnv64Float(hash, vertex.atlasV());
+			hash = fnv64Int(hash, vertex.shaderBlockId());
+			hash = fnv64Int(hash, vertex.shaderMaterialType());
 			hash = fnv64Int(hash, vertex.colorArgb());
 			hash = fnv64Int(hash, vertex.normalPacked());
 			hash = fnv64Int(hash, vertex.light());
@@ -1892,7 +1954,10 @@ public final class RustGalWorldPrimitiveRenderer {
 			projectedBounds.left(),
 			projectedBounds.top(),
 			projectedBounds.right(),
-			projectedBounds.bottom()
+			projectedBounds.bottom(),
+			transform[12],
+			transform[13],
+			transform[14]
 		);
 		if (MOVING_BLOCK_DIAGNOSTICS.size() >= 512) {
 			MOVING_BLOCK_DIAGNOSTICS.remove(0);
@@ -2112,6 +2177,9 @@ public final class RustGalWorldPrimitiveRenderer {
 			if (viewportWidth <= 0 || viewportHeight <= 0) {
 				throw new IllegalStateException("Rust OpenGL world mesh instances require a seeded world primitive frame");
 			}
+			List<VulkanicGalBridge.WorldMeshInstanceRecord> instances = List.copyOf(PENDING_MESH_INSTANCES);
+			PENDING_MESH_INSTANCES.clear();
+			PENDING_MESH_PRODUCERS.clear();
 			frame = new PrimitiveFrame(
 				viewportWidth,
 				viewportHeight,
@@ -2122,15 +2190,14 @@ public final class RustGalWorldPrimitiveRenderer {
 				List.of(),
 				List.of(),
 				List.of(),
-				List.copyOf(PENDING_MESH_INSTANCES)
-			);
-			PENDING_MESH_INSTANCES.clear();
-		}
-		auditMessage("Rust VulkanicGAL world mesh request"
+				instances
+				);
+				}
+				auditMessage("Rust VulkanicGAL world mesh request"
 			+ " route=rust-opengl"
 			+ " producer=" + metricValue(producerLabel)
 			+ " mesh_instances=" + frame.meshInstances().size()
-			+ " result=queued");
+				+ " result=queued");
 		return RustGalFrameCoordinator.executeWorldPrimitiveFrame(minecraft, frame, producerLabel);
 	}
 
@@ -3059,7 +3126,10 @@ public final class RustGalWorldPrimitiveRenderer {
 		float screenLeft,
 		float screenTop,
 		float screenRight,
-		float screenBottom
+		float screenBottom,
+		float transformX,
+		float transformY,
+		float transformZ
 	) {
 	}
 
@@ -3489,12 +3559,147 @@ public final class RustGalWorldPrimitiveRenderer {
 			);
 			PENDING_SEGMENTS.clear();
 			PENDING_CRACK_QUADS.clear();
-			PENDING_BORDER_QUADS.clear();
-			PENDING_MATERIAL_QUADS.clear();
-			PENDING_MESH_INSTANCES.clear();
-			pendingBackground = VulkanicGalBridge.WorldBackgroundRecord.diagnosticFallback();
+					PENDING_BORDER_QUADS.clear();
+					PENDING_MATERIAL_QUADS.clear();
+					PENDING_MESH_INSTANCES.clear();
+					PENDING_MESH_PRODUCERS.clear();
+					pendingBackground = VulkanicGalBridge.WorldBackgroundRecord.diagnosticFallback();
+					return frame;
+			}
+		}
+
+	public static PrimitiveFrame withViewport(PrimitiveFrame frame, int viewportWidth, int viewportHeight) {
+		if (frame == null || frame.viewportWidth() == viewportWidth && frame.viewportHeight() == viewportHeight) {
 			return frame;
 		}
+		List<VulkanicGalBridge.WorldLineSegmentRecord> segments = new ArrayList<>(frame.segments().size());
+		for (VulkanicGalBridge.WorldLineSegmentRecord segment : frame.segments()) {
+			segments.add(new VulkanicGalBridge.WorldLineSegmentRecord(
+				segment.stratum(),
+				segment.style(),
+				segment.depthPolicy(),
+				segment.colorArgb(),
+				segment.lineWidth(),
+				segment.startX(),
+				segment.startY(),
+				segment.startZ(),
+				segment.endX(),
+				segment.endY(),
+				segment.endZ(),
+				viewportWidth,
+				viewportHeight
+			));
+		}
+		List<VulkanicGalBridge.WorldCrackQuadRecord> crackQuads = new ArrayList<>(frame.crackQuads().size());
+		for (VulkanicGalBridge.WorldCrackQuadRecord quad : frame.crackQuads()) {
+			crackQuads.add(new VulkanicGalBridge.WorldCrackQuadRecord(
+				quad.stratum(),
+				quad.stage(),
+				quad.depthPolicy(),
+				quad.blendPolicy(),
+				quad.cullPolicy(),
+				quad.colorArgb(),
+				quad.vertices(),
+				viewportWidth,
+				viewportHeight
+			));
+		}
+		List<VulkanicGalBridge.WorldBorderQuadRecord> borderQuads = new ArrayList<>(frame.borderQuads().size());
+		for (VulkanicGalBridge.WorldBorderQuadRecord quad : frame.borderQuads()) {
+			borderQuads.add(new VulkanicGalBridge.WorldBorderQuadRecord(
+				quad.stratum(),
+				quad.textureId(),
+				quad.depthPolicy(),
+				quad.blendPolicy(),
+				quad.cullPolicy(),
+				quad.colorArgb(),
+				quad.borderSize(),
+				quad.distanceToBorder(),
+				quad.scrollU(),
+				quad.scrollV(),
+				quad.uvU(),
+				quad.uvV(),
+				quad.uvWidth(),
+				quad.uvHeight(),
+				quad.vertices(),
+				viewportWidth,
+				viewportHeight
+			));
+		}
+		List<VulkanicGalBridge.WorldMaterialQuadRecord> materialQuads = new ArrayList<>(frame.materialQuads().size());
+		for (VulkanicGalBridge.WorldMaterialQuadRecord quad : frame.materialQuads()) {
+			materialQuads.add(new VulkanicGalBridge.WorldMaterialQuadRecord(
+				quad.stratum(),
+				quad.materialId(),
+				quad.textureId(),
+				quad.materialMode(),
+				quad.depthPolicy(),
+				quad.cullPolicy(),
+				quad.topology(),
+				quad.winding(),
+				quad.colorArgb(),
+				quad.p0X(),
+				quad.p0Y(),
+				quad.p0Z(),
+				quad.p1X(),
+				quad.p1Y(),
+				quad.p1Z(),
+				quad.p2X(),
+				quad.p2Y(),
+				quad.p2Z(),
+				quad.p3X(),
+				quad.p3Y(),
+				quad.p3Z(),
+				quad.uv0U(),
+				quad.uv0V(),
+				quad.uv1U(),
+				quad.uv1V(),
+				quad.uv2U(),
+				quad.uv2V(),
+				quad.uv3U(),
+				quad.uv3V(),
+				viewportWidth,
+				viewportHeight
+			));
+		}
+		List<VulkanicGalBridge.WorldMeshInstanceRecord> meshInstances = new ArrayList<>(frame.meshInstances().size());
+		for (VulkanicGalBridge.WorldMeshInstanceRecord instance : frame.meshInstances()) {
+			meshInstances.add(new VulkanicGalBridge.WorldMeshInstanceRecord(
+				instance.stratum(),
+				instance.meshKey(),
+				instance.meshGeneration(),
+				instance.meshSectionIndex(),
+				instance.depthPolicy(),
+				instance.cullPolicy(),
+				instance.winding(),
+				instance.colorArgb(),
+				instance.transform(),
+				viewportWidth,
+				viewportHeight
+			));
+		}
+		VulkanicGalBridge.WorldBackgroundRecord background = frame.background();
+		VulkanicGalBridge.WorldBackgroundRecord normalizedBackground = new VulkanicGalBridge.WorldBackgroundRecord(
+			background.enabled(),
+			background.skyType(),
+			background.loadIntent(),
+			background.storeIntent(),
+			background.colorArgb(),
+			viewportWidth,
+			viewportHeight
+		);
+		return new PrimitiveFrame(
+			viewportWidth,
+			viewportHeight,
+			frame.viewMatrix(),
+			frame.projectionMatrix(),
+			normalizedBackground,
+			List.copyOf(segments),
+			List.copyOf(crackQuads),
+			List.copyOf(borderQuads),
+			List.copyOf(materialQuads),
+			List.copyOf(meshInstances)
+		);
 	}
 
 	private static boolean mayRenderForPlayer(Minecraft minecraft, BlockPos blockPos, BlockState blockState) {
@@ -3522,6 +3727,13 @@ public final class RustGalWorldPrimitiveRenderer {
 		List<VulkanicGalBridge.WorldMaterialQuadRecord> materialQuads,
 		List<VulkanicGalBridge.WorldMeshInstanceRecord> meshInstances
 	) {
+	}
+
+	private enum PendingMeshProducer {
+		BLOCK_DISPLAY,
+		FALLING_BLOCK,
+		PISTON,
+		UNKNOWN
 	}
 
 	public record WorldBorderAssetMetrics(

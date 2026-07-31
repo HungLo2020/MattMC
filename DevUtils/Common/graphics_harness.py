@@ -68,6 +68,8 @@ WORLD_MATERIAL_CUTOUT_TEXTURED = 0x129B1B90
 WORLD_MATERIAL_BLOCK_MARKER_CUTOUT = 0x224A8659
 WORLD_PROFILE_NAMES = ("migration-gate", "stress-diagnostic")
 PISTON_SHELL_SCAN_BUDGET_NANOS = 5_000_000
+FALLING_BLOCK_MIN_CAPTURE_FRAMES = 4
+EXPECTED_SHADER_PACK = "ComplementaryHungLoIfied.zip"
 
 
 @dataclass(frozen=True)
@@ -1356,6 +1358,37 @@ def deterministic_camera_signature(doc: dict[str, object] | None) -> dict[str, o
     }
 
 
+def expected_capture_window_size(doc: dict[str, object] | None, capture: dict[str, object] | None) -> tuple[int, int]:
+    for source in (
+        capture.get("window") if isinstance(capture, dict) and isinstance(capture.get("window"), dict) else None,
+        doc.get("window") if isinstance(doc, dict) and isinstance(doc.get("window"), dict) else None,
+    ):
+        if not isinstance(source, dict):
+            continue
+        width = int(parse_number(source.get("width")) or 0)
+        height = int(parse_number(source.get("height")) or 0)
+        if width > 0 and height > 0:
+            return width, height
+    return 1280, 720
+
+
+def captured_game_window_evidence(
+    screenshot_size: tuple[int, int],
+    doc: dict[str, object] | None,
+    capture: dict[str, object] | None,
+) -> dict[str, object]:
+    expected_width, expected_height = expected_capture_window_size(doc, capture)
+    width, height = screenshot_size
+    matches = width == expected_width and height == expected_height
+    return {
+        "status": "passed" if matches else "failed",
+        "captured_width": width,
+        "captured_height": height,
+        "expected_width": expected_width,
+        "expected_height": expected_height,
+    }
+
+
 def deterministic_block_outline_pixel_evidence(doc: dict[str, object] | None, style: object) -> dict[str, object]:
     evidence: dict[str, object] = {
         "checked": False,
@@ -1938,7 +1971,10 @@ def deterministic_world_material_terrain_particle_pixel_evidence(
                 crops.append(best)
                 matching = int(best["matching_pixels"])
                 total_matching += matching
-                if matching >= int(evidence["threshold"]) and best.get("material_mode_matches") is True:
+                if (
+                    matching >= int(evidence["threshold"])
+                    and best.get("material_mode_matches") is True
+                ):
                     validated.append(texture_id)
             evidence.update(
                 {
@@ -2004,6 +2040,8 @@ def deterministic_world_mesh_block_display_pixel_evidence(
         "material_status": "not_checked",
         "orientation_status": "not_checked",
         "position_status": "not_checked",
+        "game_window_status": "not_checked",
+        "game_window": None,
         "threshold": 96,
     }
     if not scenario_name:
@@ -2074,6 +2112,7 @@ def deterministic_world_mesh_block_display_pixel_evidence(
             total_matching = 0
             material_ok = True
             orientation_ok = True
+            rejected_candidate_count = 0
             for display in candidates[:4]:
                 bounds = display["screenBounds"]
                 assert isinstance(bounds, dict)
@@ -2119,7 +2158,10 @@ def deterministic_world_mesh_block_display_pixel_evidence(
                 crops.append(best)
                 matching = int(best["matching_pixels"])
                 total_matching += matching
-                if matching >= int(evidence["threshold"]) and best.get("material_mode_matches") is True:
+                if (
+                    matching >= int(evidence["threshold"])
+                    and best.get("material_mode_matches") is True
+                ):
                     validated_mesh_keys.append(str(best["mesh_key"]))
                 if matching >= int(evidence["threshold"]) and best.get("material_mode_matches") is not True:
                     material_ok = False
@@ -2163,6 +2205,16 @@ def deterministic_world_mesh_falling_block_pixel_evidence(
         "material_status": "not_checked",
         "orientation_status": "not_checked",
         "position_status": "not_checked",
+        "game_window_status": "not_checked",
+        "game_window": None,
+        "frame_sequence_status": "not_checked",
+        "producer_traversal_status": "not_checked",
+        "setup_status": "not_checked",
+        "capture_method_status": "not_checked",
+        "frames_validated": 0,
+        "captures_reported": 0,
+        "setup": None,
+        "extraction_probe": None,
         "threshold": 96,
     }
     if not scenario_name:
@@ -2192,46 +2244,134 @@ def deterministic_world_mesh_falling_block_pixel_evidence(
     if not isinstance(captures, list) or not captures:
         evidence["status"] = "missing_capture"
         return evidence
-    first = captures[0]
-    if not isinstance(first, dict) or not first.get("screenshot"):
-        evidence["status"] = "missing_screenshot"
+    evidence["captures_reported"] = len(captures)
+    setup = doc.get("rustGalWorldFallingBlockSetup") if isinstance(doc, dict) else None
+    extraction_probe = doc.get("rustGalWorldFallingBlockExtractionProbe") if isinstance(doc, dict) else None
+    evidence["setup"] = setup if isinstance(setup, dict) else None
+    evidence["extraction_probe"] = extraction_probe if isinstance(extraction_probe, dict) else None
+    if not isinstance(setup, dict) or setup.get("status") != "spawned":
+        evidence.update({"checked": True, "status": "missing_real_setup", "setup_status": "failed"})
         return evidence
-    screenshot = Path(str(first["screenshot"]))
-    evidence["screenshot"] = str(screenshot)
-    if not screenshot.is_file():
-        evidence["status"] = "missing_screenshot_file"
+    if setup.get("blockId") != expected_block or setup.get("spawnMethod") != "FallingBlockEntity.fall":
+        evidence.update({"checked": True, "status": "invalid_real_setup", "setup_status": "failed"})
         return evidence
-    capture_frame = parse_number(first.get("renderedFrameIndex"))
+    evidence["setup_status"] = "passed"
+    if not isinstance(extraction_probe, dict):
+        evidence.update({"checked": True, "status": "missing_producer_traversal", "producer_traversal_status": "failed"})
+        return evidence
+    required_probe_counts = ("seen", "shouldRender", "compiledSection", "extracted")
+    missing_probe_counts = [
+        name for name in required_probe_counts
+        if int(parse_number(extraction_probe.get(name)) or 0) <= 0
+    ]
+    if missing_probe_counts:
+        evidence.update(
+            {
+                "checked": True,
+                "status": "missing_producer_traversal",
+                "producer_traversal_status": "failed",
+                "missing_probe_counts": missing_probe_counts,
+            }
+        )
+        return evidence
+    evidence["producer_traversal_status"] = "passed"
+    falling_captures = [
+        capture for capture in captures
+        if isinstance(capture, dict) and str(capture.get("poseName") or "").startswith("falling-")
+    ]
+    if len(falling_captures) < FALLING_BLOCK_MIN_CAPTURE_FRAMES:
+        evidence.update(
+            {
+                "checked": True,
+                "status": "incomplete_frame_sequence",
+                "frame_sequence_status": "failed",
+                "required_capture_frames": FALLING_BLOCK_MIN_CAPTURE_FRAMES,
+                "falling_capture_frames": len(falling_captures),
+            }
+        )
+        return evidence
     try:
         from PIL import Image
     except Exception as exc:  # pragma: no cover
         evidence["status"] = f"pillow_unavailable:{exc}"
         return evidence
+    crops: list[dict[str, object]] = []
+    validated_mesh_keys: list[str] = []
+    total_matching = 0
+    material_ok = True
+    rejected_candidate_count = 0
+    game_windows: list[dict[str, object]] = []
+    capture_methods: list[str] = []
     try:
-        with Image.open(screenshot) as image:
-            rgb = image.convert("RGB")
-            frame_filtered = falling_blocks
-            if capture_frame is not None:
-                exact_or_near = [
-                    block for block in falling_blocks
-                    if isinstance(block, dict)
-                    and block.get("frameIndex") is not None
-                    and abs(int(block.get("frameIndex") or -999999) - int(capture_frame)) <= 1
-                ]
-                if exact_or_near:
-                    frame_filtered = exact_or_near
+        for capture_index, first in enumerate(falling_captures):
+            if not isinstance(first, dict) or not first.get("screenshot"):
+                evidence["status"] = "missing_screenshot"
+                return evidence
+            screenshot = Path(str(first["screenshot"]))
+            evidence["screenshot"] = str(screenshot)
+            if not screenshot.is_file():
+                evidence["status"] = "missing_screenshot_file"
+                return evidence
+            capture_method = str(first.get("captureMethod") or "")
+            capture_methods.append(capture_method)
+            if capture_method != "internal-main-render-target":
+                evidence.update(
+                    {
+                        "checked": True,
+                        "status": "wrong_capture_method",
+                        "capture_method_status": "failed",
+                        "capture_methods": capture_methods,
+                    }
+                )
+                return evidence
+            capture_frame = parse_number(first.get("renderedFrameIndex"))
+            if capture_frame is None:
+                evidence.update({"checked": True, "status": "missing_capture_frame", "frame_sequence_status": "failed"})
+                return evidence
+            with Image.open(screenshot) as image:
+                rgb = image.convert("RGB")
+            game_window = captured_game_window_evidence(rgb.size, doc, first)
+            game_windows.append(game_window)
+            evidence["game_window"] = game_window
+            if game_window["status"] != "passed":
+                evidence.update(
+                    {
+                        "checked": True,
+                        "status": "not_game_window",
+                        "game_window_status": "failed",
+                        "texture_status": "failed",
+                        "material_status": "failed",
+                        "orientation_status": "failed",
+                        "position_status": "not_game_window",
+                        "game_windows": game_windows,
+                    }
+                )
+                return evidence
+            exact_or_near = [
+                block for block in falling_blocks
+                if isinstance(block, dict)
+                and block.get("frameIndex") is not None
+                and abs(int(block.get("frameIndex") or -999999) - int(capture_frame)) <= 1
+            ]
             candidates = [
-                block for block in frame_filtered
+                block for block in exact_or_near
                 if isinstance(block, dict)
                 and block.get("blockId") == expected_block
                 and block.get("projected") is True
                 and isinstance(block.get("screenBounds"), dict)
             ]
-            crops: list[dict[str, object]] = []
-            validated_mesh_keys: list[str] = []
-            total_matching = 0
-            material_ok = True
-            orientation_ok = True
+            frame_validated = False
+            if not candidates:
+                crops.append(
+                    {
+                        "status": "missing_frame_producer_work",
+                        "capture_index": capture_index,
+                        "pose_name": first.get("poseName"),
+                        "rendered_frame_index": capture_frame,
+                    }
+                )
+                rejected_candidate_count += 1
+                continue
             for block in candidates[:8]:
                 bounds = block["screenBounds"]
                 assert isinstance(bounds, dict)
@@ -2245,12 +2385,15 @@ def deterministic_world_mesh_falling_block_pixel_evidence(
                     if best is None or int(stats["matching_pixels"]) > int(best["matching_pixels"]):
                         mesh_key = str(block.get("meshKey") or "unknown")
                         crop_path = screenshot.with_name(
-                            f"world_mesh_falling_block_crop_{scenario_name}_{mesh_key}_{'mirrored' if mirrored else 'projected'}.png"
+                            f"world_mesh_falling_block_crop_{scenario_name}_{capture_index}_{mesh_key}_{'mirrored' if mirrored else 'projected'}.png"
                         )
                         crop.save(crop_path)
                         material_mode = int(parse_number(block.get("materialMode")) or -1)
                         best = {
                             **stats,
+                            "capture_index": capture_index,
+                            "pose_name": first.get("poseName"),
+                            "rendered_frame_index": capture_frame,
                             "mesh_key": mesh_key,
                             "mesh_generation": block.get("meshGeneration"),
                             "block_id": block.get("blockId"),
@@ -2269,34 +2412,64 @@ def deterministic_world_mesh_falling_block_pixel_evidence(
                                 "mirrored_y": mirrored,
                             },
                             "crop_path": str(crop_path),
+                            "full_frame_path": str(screenshot),
                         }
                 if best is None:
                     crops.append({"status": "missing_projected_falling_block_crop", "falling_block": block})
-                    orientation_ok = False
+                    rejected_candidate_count += 1
                     continue
                 crops.append(best)
                 matching = int(best["matching_pixels"])
                 total_matching += matching
-                if matching >= int(evidence["threshold"]) and best.get("material_mode_matches") is True:
+                if (
+                    matching >= int(evidence["threshold"])
+                    and best.get("material_mode_matches") is True
+                    and best.get("filled_coverage_ok") is True
+                ):
                     validated_mesh_keys.append(str(best["mesh_key"]))
+                    frame_validated = True
                 if best.get("material_mode_matches") is not True:
                     material_ok = False
                 if best.get("orientation_status") == "failed":
-                    orientation_ok = False
-            texture_ok = bool(validated_mesh_keys) and all(bool(crop.get("texture_ids")) for crop in crops if isinstance(crop, dict))
-            evidence.update(
-                {
-                    "checked": True,
-                    "status": "present" if validated_mesh_keys and material_ok and orientation_ok else "absent",
-                    "validated_mesh_keys": validated_mesh_keys,
-                    "crops": crops,
-                    "matching_pixels": total_matching,
-                    "texture_status": "passed" if texture_ok else "failed",
-                    "material_status": "passed" if material_ok and validated_mesh_keys else "failed",
-                    "orientation_status": "passed" if orientation_ok and validated_mesh_keys else "failed",
-                    "position_status": "projected_crop_hit" if validated_mesh_keys else "missing_projected_crop_hit",
-                }
-            )
+                    rejected_candidate_count += 1
+            if not frame_validated:
+                rejected_candidate_count += 1
+        frames_validated = len(
+            {
+                int(crop.get("capture_index") or -1)
+                for crop in crops
+                if isinstance(crop, dict)
+                and int(crop.get("matching_pixels") or 0) >= int(evidence["threshold"])
+                and crop.get("filled_coverage_ok") is True
+                and crop.get("material_mode_matches") is True
+            }
+        )
+        unique_validated = sorted(set(validated_mesh_keys))
+        texture_ok = bool(unique_validated) and all(
+            bool(crop.get("texture_ids")) for crop in crops if isinstance(crop, dict) and crop.get("mesh_key")
+        )
+        evidence.update(
+            {
+                "checked": True,
+                "status": "present" if frames_validated >= FALLING_BLOCK_MIN_CAPTURE_FRAMES and material_ok else "absent",
+                "validated_mesh_keys": unique_validated,
+                "crops": crops,
+                "rejected_candidate_count": rejected_candidate_count,
+                "matching_pixels": total_matching,
+                "texture_status": "passed" if texture_ok else "failed",
+                "material_status": "passed" if material_ok and frames_validated >= FALLING_BLOCK_MIN_CAPTURE_FRAMES else "failed",
+                "orientation_status": "passed" if frames_validated >= FALLING_BLOCK_MIN_CAPTURE_FRAMES else "failed",
+                "position_status": "projected_crop_hit" if frames_validated >= FALLING_BLOCK_MIN_CAPTURE_FRAMES else "missing_projected_crop_hit",
+                "game_window_status": "passed",
+                "game_windows": game_windows,
+                "capture_method_status": "passed",
+                "capture_methods": capture_methods,
+                "frame_sequence_status": "passed" if frames_validated >= FALLING_BLOCK_MIN_CAPTURE_FRAMES else "failed",
+                "frames_validated": frames_validated,
+                "required_capture_frames": FALLING_BLOCK_MIN_CAPTURE_FRAMES,
+                "falling_capture_frames": len(falling_captures),
+            }
+        )
     except Exception as exc:
         evidence["status"] = f"read_failed:{exc}"
     return evidence
@@ -2336,6 +2509,8 @@ def deterministic_world_mesh_piston_pixel_evidence(
         "material_status": "not_checked",
         "orientation_status": "not_checked",
         "position_status": "not_checked",
+        "game_window_status": "not_checked",
+        "game_window": None,
         "threshold": 96,
     }
     if not scenario_name:
@@ -2385,6 +2560,21 @@ def deterministic_world_mesh_piston_pixel_evidence(
     try:
         with Image.open(screenshot) as image:
             rgb = image.convert("RGB")
+            game_window = captured_game_window_evidence(rgb.size, doc, first)
+            evidence["game_window"] = game_window
+            if game_window["status"] != "passed":
+                evidence.update(
+                    {
+                        "checked": True,
+                        "status": "not_game_window",
+                        "game_window_status": "failed",
+                        "texture_status": "failed",
+                        "material_status": "failed",
+                        "orientation_status": "failed",
+                        "position_status": "not_game_window",
+                    }
+                )
+                return evidence
             frame_filtered = pistons
             if capture_frame is not None:
                 exact_or_near = [
@@ -2484,6 +2674,7 @@ def deterministic_world_mesh_piston_pixel_evidence(
                     "material_status": "passed" if material_ok and validated_mesh_keys else "failed",
                     "orientation_status": "passed" if orientation_ok and validated_mesh_keys else "failed",
                     "position_status": "projected_crop_hit" if validated_mesh_keys else "missing_projected_crop_hit",
+                    "game_window_status": "passed",
                 }
             )
     except Exception as exc:
@@ -2570,6 +2761,7 @@ def block_display_crop_stats(crop: Any, scenario_name: str) -> dict[str, object]
 def falling_block_crop_stats(crop: Any, scenario_name: str) -> dict[str, object]:
     width, height = crop.size
     sand = 0
+    sand_filled = 0
     gravel = 0
     concrete = 0
     dark_detail = 0
@@ -2579,20 +2771,46 @@ def falling_block_crop_stats(crop: Any, scenario_name: str) -> dict[str, object]
     pack_b_marker = 0
     missingno = 0
     colored = 0
+    filled_color = 0
+    inner_filled_color = 0
+    edge_filled_color = 0
+    filled_red = 0
+    filled_green = 0
+    filled_blue = 0
+    border_red = 0
+    border_green = 0
+    border_blue = 0
+    border_count = 0
     min_x = width
     min_y = height
     max_x = -1
     max_y = -1
+    edge_margin_x = max(2, int(width * 0.18))
+    edge_margin_y = max(2, int(height * 0.18))
     for y in range(height):
         for x in range(width):
             red, green_value, blue = crop.getpixel((x, y))
             avg = (red + green_value + blue) / 3.0
+            border_pixel = x < edge_margin_x or x >= width - edge_margin_x or y < edge_margin_y or y >= height - edge_margin_y
+            if border_pixel:
+                border_red += red
+                border_green += green_value
+                border_blue += blue
+                border_count += 1
             is_sand = (
                 red >= 120
                 and green_value >= 105
                 and blue >= 55
                 and blue <= max(red, green_value) - 12
                 and abs(red - green_value) <= 85
+            )
+            is_sand_filled = (
+                red >= 88
+                and green_value >= 76
+                and blue >= 32
+                and blue <= max(red, green_value) - 8
+                and abs(red - green_value) <= 95
+                and max(red, green_value) - min(red, green_value) <= 105
             )
             is_gravel = 55 <= avg <= 205 and max(red, green_value, blue) - min(red, green_value, blue) <= 70
             is_concrete = avg >= 140 and max(red, green_value, blue) - min(red, green_value, blue) <= 85
@@ -2621,6 +2839,8 @@ def falling_block_crop_stats(crop: Any, scenario_name: str) -> dict[str, object]
             )
             if is_sand:
                 sand += 1
+            if is_sand_filled:
+                sand_filled += 1
             if is_gravel:
                 gravel += 1
             if is_concrete:
@@ -2637,6 +2857,22 @@ def falling_block_crop_stats(crop: Any, scenario_name: str) -> dict[str, object]
                 pack_b_marker += 1
             if is_missingno:
                 missingno += 1
+            material_filled = is_pack_a or is_pack_b or (
+                scenario_name == "gravel" and is_gravel
+            ) or (
+                scenario_name in {"concrete-powder", "concrete_powder"} and is_concrete
+            ) or (
+                scenario_name not in {"gravel", "concrete-powder", "concrete_powder"} and is_sand_filled
+            )
+            if material_filled and not is_missingno:
+                filled_color += 1
+                filled_red += red
+                filled_green += green_value
+                filled_blue += blue
+                if border_pixel:
+                    edge_filled_color += 1
+                else:
+                    inner_filled_color += 1
             if is_visible:
                 colored += 1
                 min_x = min(min_x, x)
@@ -2667,10 +2903,39 @@ def falling_block_crop_stats(crop: Any, scenario_name: str) -> dict[str, object]
         and (max_x - min_x + 1) >= max(8, int(width * 0.25))
         and (max_y - min_y + 1) >= max(8, int(height * 0.25))
     )
+    area = max(1, width * height)
+    inner_area = max(1, (width - edge_margin_x * 2) * (height - edge_margin_y * 2))
+    filled_ratio = filled_color / area
+    inner_filled_ratio = inner_filled_color / inner_area
+    edge_only_ratio = edge_filled_color / max(1, filled_color)
+    if filled_color > 0:
+        mean_red = filled_red / filled_color
+        mean_green = filled_green / filled_color
+        mean_blue = filled_blue / filled_color
+    else:
+        mean_red = mean_green = mean_blue = 0.0
+    if border_count > 0:
+        border_mean_red = border_red / border_count
+        border_mean_green = border_green / border_count
+        border_mean_blue = border_blue / border_count
+    else:
+        border_mean_red = border_mean_green = border_mean_blue = 0.0
+    background_delta = (
+        abs(mean_red - border_mean_red)
+        + abs(mean_green - border_mean_green)
+        + abs(mean_blue - border_mean_blue)
+    ) / 3.0
+    filled_coverage_ok = (
+        filled_color >= max(96, int(area * 0.035))
+        and inner_filled_color >= max(48, int(inner_area * 0.018))
+        and edge_only_ratio <= 0.9
+        and background_delta >= 10.0
+    )
     return {
         "matching_pixels": matching,
         "texture_signature": signature,
         "sand_pixels": sand,
+        "sand_filled_pixels": sand_filled,
         "gravel_pixels": gravel,
         "concrete_pixels": concrete,
         "dark_detail_pixels": dark_detail,
@@ -2680,9 +2945,19 @@ def falling_block_crop_stats(crop: Any, scenario_name: str) -> dict[str, object]
         "pack_b_marker_pixels": pack_b_marker,
         "missingno_pixels": missingno,
         "colored_pixels": colored,
+        "filled_color_pixels": filled_color,
+        "inner_filled_color_pixels": inner_filled_color,
+        "edge_filled_color_pixels": edge_filled_color,
+        "filled_color_ratio": filled_ratio,
+        "inner_filled_color_ratio": inner_filled_ratio,
+        "edge_only_ratio": edge_only_ratio,
+        "filled_mean_rgb": [mean_red, mean_green, mean_blue],
+        "border_mean_rgb": [border_mean_red, border_mean_green, border_mean_blue],
+        "background_delta": background_delta,
+        "filled_coverage_ok": filled_coverage_ok,
         "coverage_ok": coverage_ok,
         "transparency_status": "not_applicable",
-        "orientation_status": "passed" if coverage_ok else "failed",
+        "orientation_status": "passed" if coverage_ok and filled_coverage_ok else "failed",
         "crop_width": width,
         "crop_height": height,
     }
@@ -5239,6 +5514,14 @@ def normalize_capture_artifact(
                     + " evidence was captured"
                 )
             if tool_kind == "capture":
+                shader_enabled = str(deterministic_doc.get("shaderEnabled") if isinstance(deterministic_doc, dict) else "").strip().lower()
+                shader_pack = str(deterministic_doc.get("shaderPack") if isinstance(deterministic_doc, dict) else "").strip()
+                if mode.shaders == "on" and (shader_enabled != "true" or shader_pack != EXPECTED_SHADER_PACK):
+                    world_mesh_falling_block_workload_complete = False
+                    validation_messages.append(
+                        "deterministic FallingBlock shaders-on row did not prove the configured shader pack "
+                        f"(shaderEnabled={shader_enabled!r}, shaderPack={shader_pack!r}, expected={EXPECTED_SHADER_PACK!r})"
+                    )
                 if world_mesh_falling_block_pixel_evidence.get("status") != "present":
                     world_mesh_falling_block_workload_complete = False
                     validation_messages.append(
@@ -7557,6 +7840,11 @@ def build_capture_command(
         java_options.append(
             f"-Dmattmc.dev.rustGalWorldMesh.fallingBlockScenario={args.world_mesh_falling_block_scenario}"
         )
+        if tool_kind == "capture":
+            java_options.append("-Dmattmc.dev.deterministicCameraCapture.internalScreenshots=true")
+            java_options.append("-Dmattmc.dev.deterministicCameraCapture.poseCount=5")
+            java_options.append("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=1")
+            java_options.append("-Dmattmc.dev.rustGalWorldMesh.fallingBlockFallHeight=64")
         if tool_kind == "gameplay":
             java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.yawDelta=0.0")
             java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.displayFpsCheckEnabled=false")
@@ -7575,8 +7863,19 @@ def build_capture_command(
         java_options.append(
             f"-Dmattmc.dev.rustGalWorldMesh.pistonScenario={args.world_mesh_piston_scenario}"
         )
+        if tool_kind == "capture":
+            java_options.append("-Dmattmc.dev.deterministicCameraCapture.internalScreenshots=true")
+            java_options.append("-Dmattmc.dev.deterministicCameraCapture.poseCount=7")
+            java_options.append("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=1")
+        java_options.append(
+            f"-Dmattmc.dev.rustGalWorldMesh.pistonDirection={args.world_mesh_piston_direction}"
+        )
         if tool_kind == "gameplay":
             java_options.append("-Dmattmc.dev.rustGalWorldMesh.freezePistonProgress=true")
+            java_options.append(
+                f"-Dmattmc.dev.rustGalWorldMesh.pistonProgress={max(0.0, min(1.0, args.world_mesh_piston_progress)):.3f}"
+            )
+        if tool_kind == "gameplay":
             java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.yawDelta=0.0")
             java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.displayFpsCheckEnabled=false")
             if getattr(args, "profile", "") == "performance":
@@ -8912,6 +9211,18 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
             type=int,
             default=int(os.environ.get("MATTMC_WORLD_MESH_PISTON_COUNT", "-1")),
             help="Override deterministic moving piston count for moving mesh probes.",
+        )
+        subparser.add_argument(
+            "--world-mesh-piston-direction",
+            choices=("down", "up", "north", "south", "west", "east"),
+            default=os.environ.get("MATTMC_WORLD_MESH_PISTON_DIRECTION", "north"),
+            help="Select deterministic piston movement direction for moving mesh probes.",
+        )
+        subparser.add_argument(
+            "--world-mesh-piston-progress",
+            type=float,
+            default=float(os.environ.get("MATTMC_WORLD_MESH_PISTON_PROGRESS", "0.5")),
+            help="Freeze deterministic piston progress at a specific 0..1 interpolation value.",
         )
         subparser.add_argument(
             "--world-mesh-piston-control",

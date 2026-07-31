@@ -135,8 +135,63 @@ class VulkanicGalBridgeAbiTest {
 		);
 		assertTrue(
 			Files.readString(Path.of("src/main/java/net/vulkanic/world/WorldRenderRoutePolicy.java"))
+				.contains("selected.usesRustOpenGl() && net.irisshaders.iris.Iris.isPackInUseQuick()"),
+			"Iris-active OpenGL falling blocks must be routed to Java compatibility before Rust selection"
+		);
+		assertTrue(
+			Files.readString(Path.of("src/main/java/net/vulkanic/world/WorldRenderRoutePolicy.java"))
 				.contains("currentPistonMovingBlockRoute()")
 		);
+	}
+
+	@Test
+	void indexedBakedMeshesUseExplicitCcWFrontFaceContract() throws Exception {
+		String worldRenderer = Files.readString(Path.of("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+		String rustMeshFrontend = Files.readString(Path.of("src/main/rust/render/vulkanic/world_primitive_frontend.rs"));
+		String rustOpenGlLowering = Files.readString(Path.of("src/main/rust/render/vulkanic/backends/opengl/lowering.rs"));
+		String rustVulkanResources = Files.readString(Path.of("src/main/rust/render/vulkanic/backends/vulkan/resources.rs"));
+
+		assertTrue(worldRenderer.contains("return dot >= 0.0F ? WORLD_WINDING_CCW : WORLD_WINDING_CW;"),
+			"baked quads whose emitted indices face the baked Direction must be tagged as CCW for GAL culling");
+		assertTrue(rustMeshFrontend.contains("(WORLD_CULL_BACK, WORLD_WINDING_CCW) => Ok(CullMode::Back)"));
+		assertTrue(rustMeshFrontend.contains("(WORLD_CULL_BACK, WORLD_WINDING_CW) => Ok(CullMode::Front)"));
+		assertTrue(rustOpenGlLowering.contains("self.gl.front_face(glow::CCW);"),
+			"OpenGL backend must seed the GAL CCW front-face convention instead of inheriting Java/Iris state");
+		assertTrue(rustVulkanResources.contains(".front_face(vk::FrontFace::COUNTER_CLOCKWISE)"));
+	}
+
+	@Test
+	void pistonMovingMeshParticipatesInOpenGlFrameSeedingAndFlush() throws Exception {
+		String worldRenderer = Files.readString(Path.of("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+		String blockFeatureRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/feature/BlockFeatureRenderer.java"));
+		String frameBenchmark = Files.readString(Path.of("src/main/java/net/minecraft/client/dev/GraphicsFrameBenchmark.java"));
+		String deterministicCapture = Files.readString(Path.of("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java"));
+		String pistonEntity = Files.readString(Path.of("src/main/java/net/minecraft/world/level/block/piston/PistonMovingBlockEntity.java"));
+		int meshHelperStart = worldRenderer.indexOf("private static boolean shouldUseRustOpenGlMeshInstances()");
+		int meshHelperEnd = worldRenderer.indexOf("public static boolean shouldRouteTerrainParticle", meshHelperStart);
+		String meshHelper = worldRenderer.substring(meshHelperStart, meshHelperEnd);
+		assertTrue(meshHelper.contains("currentBlockDisplayRoute().usesRustOpenGl()"));
+		assertTrue(meshHelper.contains("currentFallingBlockRoute().usesRustOpenGl()"));
+		assertTrue(meshHelper.contains("currentPistonMovingBlockRoute().usesRustOpenGl()"));
+
+		int frameHelperStart = worldRenderer.indexOf("public static boolean shouldUseRustOpenGlWorldPrimitives()");
+		int frameHelperEnd = worldRenderer.indexOf("public static boolean crackDisabledForDiagnostics()", frameHelperStart);
+		String frameHelper = worldRenderer.substring(frameHelperStart, frameHelperEnd);
+		assertTrue(frameHelper.contains("currentPistonMovingBlockRoute().usesRustOpenGl()"));
+		assertTrue(worldRenderer.contains("movingBlockLightColor(movingBlockRenderState, blockState, movingBlockRenderState.blockPos)"));
+		assertTrue(worldRenderer.contains("return dot >= 0.0F ? WORLD_WINDING_CCW : WORLD_WINDING_CW;"));
+		assertTrue(worldRenderer.contains("public static PrimitiveFrame withViewport(PrimitiveFrame frame, int viewportWidth, int viewportHeight)"));
+		assertFalse(worldRenderer.contains("currentFallingBlockRoute().usesRustOpenGl() && net.irisshaders.iris.Iris.isPackInUseQuick()"));
+		assertFalse(blockFeatureRenderer.contains("Iris.isPackInUseQuick()"));
+		String coordinator = Files.readString(Path.of("src/main/java/net/vulkanic/gui/RustGalFrameCoordinator.java"));
+		assertTrue(coordinator.contains("RustGalWorldPrimitiveRenderer.withViewport("));
+		assertTrue(frameBenchmark.contains("Direction direction = pistonDirection();"));
+		assertTrue(frameBenchmark.contains("PistonHeadBlock.FACING, pistonDirection()"));
+		assertTrue(frameBenchmark.contains("getEyePosition().add(forward.normalize().scale(4.0))"));
+		assertTrue(pistonEntity.contains("mattmc.dev.rustGalWorldMesh.pistonProgress"));
+		assertTrue(deterministicCapture.contains("Direction direction = pistonDirection();"));
+		assertTrue(deterministicCapture.contains("PistonHeadBlock.FACING, pistonDirection()"));
+		assertTrue(deterministicCapture.contains("getEyePosition().add(forward.normalize().scale(4.0))"));
 	}
 
 	@Test

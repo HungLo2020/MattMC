@@ -556,6 +556,10 @@ fn mesh_vertex() -> FfiWorldMeshVertex {
         z: -1.0,
         u: 0.0,
         v: 0.0,
+        atlas_u: 0.25,
+        atlas_v: 0.5,
+        shader_block_id: 10232,
+        shader_material_type: -1,
     }
 }
 
@@ -1127,6 +1131,9 @@ fn world_mesh_asset_ffi_copies_payload_memory() {
     assert_eq!(9, generation);
     assert_eq!(44, owned_meshes[0].mesh_key);
     assert_eq!(0.0, owned_meshes[0].vertices[0].position[0]);
+    assert_eq!([0.25, 0.5], owned_meshes[0].vertices[0].shader_atlas_uv);
+    assert_eq!(10232, owned_meshes[0].vertices[0].shader_block_id);
+    assert_eq!(-1, owned_meshes[0].vertices[0].shader_material_type);
     assert_eq!(vec![0u8, 0, 1, 0, 2, 0], owned_meshes[0].index_bytes);
     assert_eq!(123, owned_meshes[0].sections[0].texture_id);
     assert_eq!(vec![41u8, 42, 43, 44], owned_textures[0].png_bytes);
