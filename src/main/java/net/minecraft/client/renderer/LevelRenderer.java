@@ -49,6 +49,7 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderDispatcher;
 import net.minecraft.client.renderer.blockentity.state.BlockEntityRenderState;
+import net.minecraft.client.renderer.blockentity.state.PistonHeadRenderState;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayerGroup;
 import net.minecraft.client.renderer.chunk.ChunkSectionsToRender;
@@ -90,6 +91,10 @@ import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.piston.PistonMovingBlockEntity;
+import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.material.FogType;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
@@ -1010,7 +1015,8 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 	public void enqueueRustGalIndexedMeshFeaturesForWholeFrame(Camera camera, DeltaTracker deltaTracker, Matrix4f viewMatrix, Matrix4f projectionMatrix) {
 		boolean blockDisplays = net.vulkanic.world.WorldRenderRoutePolicy.currentBlockDisplayRoute().usesRustWholeFrameVulkan();
 		boolean fallingBlocks = net.vulkanic.world.WorldRenderRoutePolicy.currentFallingBlockRoute().usesRustWholeFrameVulkan();
-		if (!blockDisplays && !fallingBlocks) {
+		boolean pistons = net.vulkanic.world.WorldRenderRoutePolicy.currentPistonMovingBlockRoute().usesRustWholeFrameVulkan();
+		if (!blockDisplays && !fallingBlocks && !pistons) {
 			return;
 		}
 		if (this.level == null) {
@@ -1026,6 +1032,13 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		TickRateManager tickRateManager = this.minecraft.level.tickRateManager();
 		Entity.setViewScale(Mth.clamp(this.minecraft.options.getEffectiveRenderDistance() / 8.0, 1.0, 2.5) * this.minecraft.options.entityDistanceScaling().get());
 		PoseStack poseStack = new PoseStack();
+
+		if (pistons) {
+			this.levelRenderState.blockEntityRenderStates.clear();
+			this.blockEntityRenderDispatcher.prepare(camera);
+			float partialTick = deltaTracker.getGameTimeDeltaPartialTick(false);
+			this.extractPistonMovingBlocksForWholeFrame(camera, partialTick, this.levelRenderState);
+		}
 
 		for (Entity entity : this.level.entitiesForRendering()) {
 			boolean collectBlockDisplay = blockDisplays && entity instanceof net.minecraft.world.entity.Display.BlockDisplay;
@@ -1059,7 +1072,11 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 					entityRenderState.z - cameraZ,
 					poseStack,
 					this.submitNodeStorage
-				);
+			);
+		}
+
+		if (pistons) {
+			this.submitPistonMovingBlocksForWholeFrame(poseStack, this.levelRenderState, this.submitNodeStorage);
 		}
 
 		this.featureRenderDispatcher.renderBlockFeaturesOnly();
@@ -1088,6 +1105,92 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 			this.blockEntityRenderDispatcher.submit(blockEntityRenderState, poseStack, submitNodeStorage, levelRenderState.cameraRenderState);
 			poseStack.popPose();
 		}
+	}
+
+	private void submitPistonMovingBlocksForWholeFrame(PoseStack poseStack, LevelRenderState levelRenderState, SubmitNodeStorage submitNodeStorage) {
+		Vec3 vec3 = levelRenderState.cameraRenderState.pos;
+		double d = vec3.x();
+		double e = vec3.y();
+		double f = vec3.z();
+
+		for (BlockEntityRenderState blockEntityRenderState : levelRenderState.blockEntityRenderStates) {
+			if (!(blockEntityRenderState instanceof net.minecraft.client.renderer.blockentity.state.PistonHeadRenderState)) {
+				continue;
+			}
+			BlockPos blockPos = blockEntityRenderState.blockPos;
+			poseStack.pushPose();
+			poseStack.translate(blockPos.getX() - d, blockPos.getY() - e, blockPos.getZ() - f);
+			this.blockEntityRenderDispatcher.submit(blockEntityRenderState, poseStack, submitNodeStorage, levelRenderState.cameraRenderState);
+			poseStack.popPose();
+		}
+	}
+
+	private void extractPistonMovingBlocksForWholeFrame(Camera camera, float partialTick, LevelRenderState levelRenderState) {
+		long startedNanos = System.nanoTime();
+		this.extractVisibleBlockEntities(camera, partialTick, levelRenderState);
+		int visiblePistonStates = 0;
+		for (BlockEntityRenderState blockEntityRenderState : levelRenderState.blockEntityRenderStates) {
+			if (blockEntityRenderState instanceof PistonHeadRenderState) {
+				visiblePistonStates++;
+			}
+		}
+		if (visiblePistonStates > 0) {
+			net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordMovingBlockShellScan(
+				"rust-vulkan-whole-frame",
+				visiblePistonStates,
+				false,
+				0,
+				0,
+				visiblePistonStates,
+				visiblePistonStates,
+				System.nanoTime() - startedNanos
+			);
+			return;
+		}
+
+		Vec3 cameraPos = camera.getPosition();
+		int centerChunkX = SectionPos.blockToSectionCoord(Mth.floor(cameraPos.x()));
+		int centerChunkZ = SectionPos.blockToSectionCoord(Mth.floor(cameraPos.z()));
+		int radius = this.minecraft.options.getEffectiveRenderDistance() + 1;
+		int chunksScanned = 0;
+		int blockEntitiesInspected = 0;
+		int pistonEntitiesFound = 0;
+		int pistonStatesExtracted = 0;
+		for (int chunkZ = centerChunkZ - radius; chunkZ <= centerChunkZ + radius; chunkZ++) {
+			for (int chunkX = centerChunkX - radius; chunkX <= centerChunkX + radius; chunkX++) {
+				LevelChunk chunk = this.level.getChunkSource().getChunk(chunkX, chunkZ, ChunkStatus.FULL, false);
+				if (chunk == null) {
+					continue;
+				}
+				chunksScanned++;
+				for (BlockEntity blockEntity : chunk.getBlockEntities().values()) {
+					blockEntitiesInspected++;
+					if (!(blockEntity instanceof PistonMovingBlockEntity pistonMovingBlockEntity)) {
+						continue;
+					}
+					pistonEntitiesFound++;
+					PistonHeadRenderState renderState = this.blockEntityRenderDispatcher.tryExtractRenderState(
+						pistonMovingBlockEntity,
+						partialTick,
+						null
+					);
+					if (renderState != null) {
+						levelRenderState.blockEntityRenderStates.add(renderState);
+						pistonStatesExtracted++;
+					}
+				}
+			}
+		}
+		net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordMovingBlockShellScan(
+			"rust-vulkan-whole-frame",
+			visiblePistonStates,
+			true,
+			chunksScanned,
+			blockEntitiesInspected,
+			pistonEntitiesFound,
+			pistonStatesExtracted,
+			System.nanoTime() - startedNanos
+		);
 	}
 
 	private void extractBlockDestroyAnimation(Camera camera, LevelRenderState levelRenderState) {

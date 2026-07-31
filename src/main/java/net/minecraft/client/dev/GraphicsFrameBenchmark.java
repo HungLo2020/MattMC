@@ -58,6 +58,11 @@ public final class GraphicsFrameBenchmark {
 	private static final boolean DISPLAY_FPS_CHECK_ENABLED =
 		Boolean.parseBoolean(System.getProperty("mattmc.dev.graphicsFrameBenchmark.displayFpsCheckEnabled", "true"));
 	private static final long READINESS_TIMEOUT_NANOS = TimeUnit.SECONDS.toNanos(Math.max(1L, Long.getLong("mattmc.dev.graphicsFrameBenchmark.readinessTimeoutSeconds", 120L)));
+	private static final long POSITIVE_CONTROL_DELAY_NANOS = Math.max(0L, Long.getLong("mattmc.dev.graphicsFrameBenchmark.positiveControlDelayNanos", 0L));
+	private static final boolean GC_BEFORE_MEASUREMENT =
+		Boolean.parseBoolean(System.getProperty("mattmc.dev.graphicsFrameBenchmark.gcBeforeMeasurement", "false"));
+	private static final long GC_BEFORE_MEASUREMENT_OFFSET_FRAMES =
+		Math.max(0L, Long.getLong("mattmc.dev.graphicsFrameBenchmark.gcBeforeMeasurementOffsetFrames", 30L));
 	private static final boolean STOP_AFTER_COMPLETE = Boolean.parseBoolean(System.getProperty("mattmc.dev.graphicsFrameBenchmark.stopAfterComplete", "true"));
 	private static final int FORCED_ARMOR_VALUE = Integer.getInteger("mattmc.dev.graphicsFrameBenchmark.armorValue", -1);
 	private static final float FORCED_PLAYER_HEALTH =
@@ -90,6 +95,10 @@ public final class GraphicsFrameBenchmark {
 		System.getProperty("mattmc.dev.rustGalWorldMesh.fallingBlockScenario", "").trim().toLowerCase(Locale.ROOT);
 	private static final int FALLING_BLOCK_COUNT =
 		Math.max(1, Integer.getInteger("mattmc.dev.rustGalWorldMesh.fallingBlockCount", 1));
+	private static final String PISTON_SCENARIO =
+		System.getProperty("mattmc.dev.rustGalWorldMesh.pistonScenario", "").trim().toLowerCase(Locale.ROOT);
+	private static final int PISTON_COUNT =
+		Math.max(1, Integer.getInteger("mattmc.dev.rustGalWorldMesh.pistonCount", 1));
 	private static final int REAL_TERRAIN_PARTICLE_MATERIAL_COUNT = 5;
 	private static final int REAL_TERRAIN_PARTICLE_RESET_FRAMES =
 		Math.max(12, Integer.getInteger("mattmc.dev.rustGalWorldMaterial.terrainParticleRealGameplayResetFrames", 48));
@@ -104,6 +113,15 @@ public final class GraphicsFrameBenchmark {
 	private static final Map<String, Integer> SUBMITTED_WORK_COUNTS = new LinkedHashMap<>();
 	private static final Map<Long, Map<String, Set<String>>> SUBMITTED_WORK_BY_FRAME = new LinkedHashMap<>();
 	private static final Map<String, Integer> FALLING_BLOCK_ROUTE_COUNTS = new LinkedHashMap<>();
+	private static final Map<String, Integer> MOVING_BLOCK_ROUTE_COUNTS = new LinkedHashMap<>();
+	private static int movingBlockShellScanSamples;
+	private static int movingBlockShellScanFallbackSamples;
+	private static long movingBlockShellScanNanos;
+	private static long movingBlockShellScanMaxNanos;
+	private static int movingBlockShellScanChunks;
+	private static int movingBlockShellScanBlockEntities;
+	private static int movingBlockShellScanPistonsFound;
+	private static int movingBlockShellScanPistonStatesExtracted;
 	private static final List<Long> FRAME_NANOS = new ArrayList<>();
 	private static boolean initialized;
 	private static boolean complete;
@@ -111,11 +129,14 @@ public final class GraphicsFrameBenchmark {
 	private static boolean stopIssued;
 	private static boolean frameActive;
 	private static boolean measurementFrame;
+	private static boolean preMeasurementGcIssued;
 	private static long initializationWaitFrames;
 	private static long frameIndex;
 	private static long settledFrameIndex = -1L;
 	private static long measurementStartNanos = -1L;
 	private static long measurementEndNanos = -1L;
+	private static long firstSampleNanos = -1L;
+	private static long lastSampleNanos = -1L;
 	private static long readinessStartNanos = -1L;
 	private static long gcCountAtStart = -1L;
 	private static long gcTimeAtStart = -1L;
@@ -123,6 +144,8 @@ public final class GraphicsFrameBenchmark {
 	private static long gcTimeAtEnd = -1L;
 	private static long usedMemoryAtStart = -1L;
 	private static long usedMemoryAtEnd = -1L;
+	private static long threadAllocatedBytesAtStart = -1L;
+	private static long threadAllocatedBytesAtEnd = -1L;
 	private static int displayedFpsAtMeasurementStart = -1;
 	private static int displayedFpsAtMeasurementEnd = -1;
 	private static Vec3 initialPosition = Vec3.ZERO;
@@ -166,6 +189,11 @@ public final class GraphicsFrameBenchmark {
 	private static String fallingBlockScenarioBlock = "unset";
 	private static String fallingBlockScenarioPosition = "unset";
 	private static String fallingBlockScenarioFingerprint = "unset";
+	private static boolean pistonScenarioSetup;
+	private static String pistonScenarioStatus = "inactive";
+	private static String pistonScenarioBlock = "unset";
+	private static String pistonScenarioPosition = "unset";
+	private static String pistonScenarioFingerprint = "unset";
 	private static final Map<String, Integer> TERRAIN_PARTICLE_ROUTE_COUNTS = new LinkedHashMap<>();
 	private static final Map<String, Long> TERRAIN_PARTICLE_ROUTE_NANOS = new LinkedHashMap<>();
 
@@ -202,6 +230,15 @@ public final class GraphicsFrameBenchmark {
 			return;
 		}
 		long framesAfterSettle = frameIndex - settledFrameIndex;
+		if (
+			GC_BEFORE_MEASUREMENT
+				&& !preMeasurementGcIssued
+				&& framesAfterSettle >= Math.max(0L, WARMUP_FRAMES - GC_BEFORE_MEASUREMENT_OFFSET_FRAMES)
+				&& framesAfterSettle < WARMUP_FRAMES
+		) {
+			preMeasurementGcIssued = true;
+			System.gc();
+		}
 		measurementFrame = framesAfterSettle >= WARMUP_FRAMES && FRAME_NANOS.size() < MEASURE_FRAMES;
 		if (measurementFrame && FRAME_NANOS.isEmpty()) {
 			measurementStartNanos = System.nanoTime();
@@ -209,10 +246,12 @@ public final class GraphicsFrameBenchmark {
 			gcCountAtStart = totalGcCount();
 			gcTimeAtStart = totalGcTimeMillis();
 			usedMemoryAtStart = usedMemoryBytes();
+			threadAllocatedBytesAtStart = currentThreadAllocatedBytes();
 			if (tracyAvailable()) {
 				TracyCompat.message("MattMC graphics gameplay measurement start");
 			}
 		}
+		applyPositiveControlDelay();
 	}
 
 	public static void endFrame(Minecraft minecraft, long frameNanos) {
@@ -221,11 +260,17 @@ public final class GraphicsFrameBenchmark {
 		}
 		if (measurementFrame) {
 			FRAME_NANOS.add(frameNanos);
-			measurementEndNanos = System.nanoTime();
+			long sampleNanos = System.nanoTime();
+			if (firstSampleNanos < 0L) {
+				firstSampleNanos = sampleNanos;
+			}
+			lastSampleNanos = sampleNanos;
+			measurementEndNanos = sampleNanos;
 			displayedFpsAtMeasurementEnd = minecraft.getFps();
 			gcCountAtEnd = totalGcCount();
 			gcTimeAtEnd = totalGcTimeMillis();
 			usedMemoryAtEnd = usedMemoryBytes();
+			threadAllocatedBytesAtEnd = currentThreadAllocatedBytes();
 		}
 		endPhase("java.frame.render-production");
 		if (tracyAvailable()) {
@@ -297,17 +342,57 @@ public final class GraphicsFrameBenchmark {
 	}
 
 	public static void recordFallingBlockRouteDecision(String route, BlockState blockState) {
+		recordMovingBlockRouteDecision("falling-block", route, blockState);
+	}
+
+	public static void recordMovingBlockRouteDecision(String provenance, String route, BlockState blockState) {
 		if (!ENABLED || !initialized || complete || failed || route == null) {
 			return;
+		}
+		String normalizedProvenance = provenance == null ? "unknown" : provenance.trim();
+		if (normalizedProvenance.isEmpty()) {
+			normalizedProvenance = "unknown";
 		}
 		String normalizedRoute = route.trim();
 		if (normalizedRoute.isEmpty()) {
 			return;
 		}
-		FALLING_BLOCK_ROUTE_COUNTS.merge(normalizedRoute, 1, Integer::sum);
+		if ("falling-block".equals(normalizedProvenance)) {
+			FALLING_BLOCK_ROUTE_COUNTS.merge(normalizedRoute, 1, Integer::sum);
+		}
+		MOVING_BLOCK_ROUTE_COUNTS.merge(normalizedProvenance + ":" + normalizedRoute, 1, Integer::sum);
 		recordSubmittedWorkIdentity(
-			"falling-block-route",
-			normalizedRoute + ":" + blockName(blockState)
+			"moving-block-route",
+			normalizedProvenance + ":" + normalizedRoute + ":" + blockName(blockState)
+		);
+	}
+
+	public static void recordMovingBlockShellScan(
+		String route,
+		int visiblePistonStates,
+		boolean fallbackUsed,
+		int chunksScanned,
+		int blockEntitiesInspected,
+		int pistonEntitiesFound,
+		int pistonStatesExtracted,
+		long elapsedNanos
+	) {
+		if (!ENABLED || !initialized || complete || failed || route == null) {
+			return;
+		}
+		movingBlockShellScanSamples++;
+		if (fallbackUsed) {
+			movingBlockShellScanFallbackSamples++;
+		}
+		movingBlockShellScanNanos += Math.max(0L, elapsedNanos);
+		movingBlockShellScanMaxNanos = Math.max(movingBlockShellScanMaxNanos, Math.max(0L, elapsedNanos));
+		movingBlockShellScanChunks += Math.max(0, chunksScanned);
+		movingBlockShellScanBlockEntities += Math.max(0, blockEntitiesInspected);
+		movingBlockShellScanPistonsFound += Math.max(0, pistonEntitiesFound);
+		movingBlockShellScanPistonStatesExtracted += Math.max(0, pistonStatesExtracted);
+		recordSubmittedWorkIdentity(
+			"moving-block-shell-scan",
+			route.trim() + ":visible=" + Math.max(0, visiblePistonStates) + ":fallback=" + fallbackUsed
 		);
 	}
 
@@ -359,12 +444,13 @@ public final class GraphicsFrameBenchmark {
 		player.setPos(initialPosition);
 			player.setYRot(initialYaw);
 			player.setXRot(initialPitch);
-			setupRealTerrainParticleGameplayBlock(minecraft, player);
-			setupBlockDisplayScenario(minecraft, player);
-			setupFallingBlockScenario(minecraft, player);
-			dimension = minecraft.level.dimension().location().toString();
-			writeStatus(minecraft, "initialized");
-			return true;
+				setupRealTerrainParticleGameplayBlock(minecraft, player);
+				setupBlockDisplayScenario(minecraft, player);
+				setupFallingBlockScenario(minecraft, player);
+				setupPistonScenario(minecraft, player);
+				dimension = minecraft.level.dimension().location().toString();
+				writeStatus(minecraft, "initialized");
+				return true;
 		}
 
 	private static void dismissKnownGameplayScreen(Minecraft minecraft) {
@@ -447,6 +533,25 @@ public final class GraphicsFrameBenchmark {
 			+ ", overlay=" + overlay
 			+ ", loadedChunks=" + loadedChunks
 			+ ", staleStartupScreen=" + isStaleStartupScreen(minecraft);
+	}
+
+	private static void applyPositiveControlDelay() {
+		if (!measurementFrame || POSITIVE_CONTROL_DELAY_NANOS <= 0L) {
+			return;
+		}
+		long deadline = System.nanoTime() + POSITIVE_CONTROL_DELAY_NANOS;
+		while (true) {
+			long remaining = deadline - System.nanoTime();
+			if (remaining <= 0L) {
+				return;
+			}
+			try {
+				TimeUnit.NANOSECONDS.sleep(Math.min(remaining, TimeUnit.MILLISECONDS.toNanos(1L)));
+			} catch (InterruptedException interrupted) {
+				Thread.currentThread().interrupt();
+				return;
+			}
+		}
 	}
 
 	private static String screenTitle(Minecraft minecraft) {
@@ -661,6 +766,86 @@ public final class GraphicsFrameBenchmark {
 		};
 	}
 
+	private static void setupPistonScenario(Minecraft minecraft, LocalPlayer player) {
+		if (pistonScenarioSetup) {
+			return;
+		}
+		pistonScenarioSetup = true;
+		if (PISTON_SCENARIO.isEmpty()) {
+			pistonScenarioStatus = "inactive";
+			return;
+		}
+		if ("hidden".equals(PISTON_SCENARIO)) {
+			pistonScenarioStatus = "hidden";
+			return;
+		}
+		if (minecraft.level == null || minecraft.getSingleplayerServer() == null) {
+			pistonScenarioStatus = "missing-level";
+			return;
+		}
+		ServerLevel serverLevel = minecraft.getSingleplayerServer().getLevel(minecraft.level.dimension());
+		if (serverLevel == null) {
+			pistonScenarioStatus = "missing-server-level";
+			return;
+		}
+		BlockState movedState = pistonMovedState();
+		Direction direction = Direction.NORTH;
+		Vec3 forward = player.getLookAngle();
+		if (forward.lengthSqr() < 0.0001) {
+			forward = new Vec3(0.0, 0.0, 1.0);
+		}
+		BlockPos origin = BlockPos.containing(player.position().add(forward.normalize().scale(4.0)));
+		for (int i = 0; i < PISTON_COUNT; i++) {
+			BlockPos pos = origin.offset(i, 0, 0);
+			seedMovingPiston(serverLevel, minecraft.level, pos, movedState, direction, pistonExtending(), pistonSourcePiston());
+		}
+		pistonScenarioStatus = "spawned";
+		pistonScenarioBlock = blockName(movedState);
+		pistonScenarioPosition = origin.toShortString();
+		pistonScenarioFingerprint = PISTON_SCENARIO + "|count=" + PISTON_COUNT + "|block=" + pistonScenarioBlock;
+	}
+
+	private static BlockState pistonMovedState() {
+		return switch (PISTON_SCENARIO) {
+			case "sticky-extending", "sticky-retracting" -> Blocks.PISTON_HEAD.defaultBlockState()
+				.setValue(net.minecraft.world.level.block.piston.PistonHeadBlock.FACING, Direction.NORTH)
+				.setValue(net.minecraft.world.level.block.piston.PistonHeadBlock.TYPE, net.minecraft.world.level.block.state.properties.PistonType.STICKY);
+			case "retracting-source", "normal-retracting" -> Blocks.PISTON.defaultBlockState()
+				.setValue(net.minecraft.world.level.block.piston.PistonBaseBlock.FACING, Direction.NORTH);
+			case "cutout", "leaves" -> Blocks.OAK_LEAVES.defaultBlockState();
+			default -> Blocks.STONE.defaultBlockState();
+		};
+	}
+
+	private static boolean pistonExtending() {
+		return !PISTON_SCENARIO.contains("retracting");
+	}
+
+	private static boolean pistonSourcePiston() {
+		return PISTON_SCENARIO.contains("source");
+	}
+
+	private static void seedMovingPiston(ServerLevel serverLevel, net.minecraft.client.multiplayer.ClientLevel clientLevel, BlockPos pos, BlockState movedState, Direction direction, boolean extending, boolean sourcePiston) {
+		BlockState movingState = Blocks.MOVING_PISTON.defaultBlockState()
+			.setValue(net.minecraft.world.level.block.piston.MovingPistonBlock.FACING, direction)
+			.setValue(net.minecraft.world.level.block.piston.MovingPistonBlock.TYPE, pistonTypeFor(movedState));
+		serverLevel.setBlock(pos, movingState, 2);
+		serverLevel.setBlockEntity(net.minecraft.world.level.block.piston.MovingPistonBlock.newMovingBlockEntity(pos, movingState, movedState, direction, extending, sourcePiston));
+		clientLevel.setBlock(pos, movingState, 2);
+		clientLevel.setBlockEntity(net.minecraft.world.level.block.piston.MovingPistonBlock.newMovingBlockEntity(pos, movingState, movedState, direction, extending, sourcePiston));
+	}
+
+	private static net.minecraft.world.level.block.state.properties.PistonType pistonTypeFor(BlockState movedState) {
+		if (movedState.is(Blocks.STICKY_PISTON)) {
+			return net.minecraft.world.level.block.state.properties.PistonType.STICKY;
+		}
+		if (movedState.is(Blocks.PISTON_HEAD)
+			&& movedState.getValue(net.minecraft.world.level.block.piston.PistonHeadBlock.TYPE) == net.minecraft.world.level.block.state.properties.PistonType.STICKY) {
+			return net.minecraft.world.level.block.state.properties.PistonType.STICKY;
+		}
+		return net.minecraft.world.level.block.state.properties.PistonType.DEFAULT;
+	}
+
 	private static String blockDisplayRouteControl() {
 		if (Boolean.getBoolean("mattmc.dev.rustGalWorldBlockDisplay.disabled")) {
 			return "disabled";
@@ -676,6 +861,16 @@ public final class GraphicsFrameBenchmark {
 			return "disabled";
 		}
 		if (Boolean.getBoolean("mattmc.dev.rustGalWorldFallingBlock.legacyControl")) {
+			return "legacy";
+		}
+		return "rust";
+	}
+
+	private static String pistonRouteControl() {
+		if (Boolean.getBoolean("mattmc.dev.rustGalWorldPiston.disabled")) {
+			return "disabled";
+		}
+		if (Boolean.getBoolean("mattmc.dev.rustGalWorldPiston.legacyControl")) {
 			return "legacy";
 		}
 		return "rust";
@@ -835,6 +1030,10 @@ public final class GraphicsFrameBenchmark {
 		json.append("  \"warmupFramesRequested\": ").append(WARMUP_FRAMES).append(",\n");
 		json.append("  \"measureFramesRequested\": ").append(MEASURE_FRAMES).append(",\n");
 		json.append("  \"readinessTimeoutNanos\": ").append(READINESS_TIMEOUT_NANOS).append(",\n");
+		json.append("  \"positiveControlDelayNanos\": ").append(POSITIVE_CONTROL_DELAY_NANOS).append(",\n");
+		json.append("  \"gcBeforeMeasurement\": ").append(GC_BEFORE_MEASUREMENT).append(",\n");
+		json.append("  \"gcBeforeMeasurementOffsetFrames\": ").append(GC_BEFORE_MEASUREMENT_OFFSET_FRAMES).append(",\n");
+		json.append("  \"preMeasurementGcIssued\": ").append(preMeasurementGcIssued).append(",\n");
 		json.append("  \"initializationWaitFrames\": ").append(initializationWaitFrames).append(",\n");
 		field(json, "lastReadinessBlocker", lastReadinessBlocker, 2, true);
 		json.append("  \"framesSeenIncludingSettleWarmup\": ").append(frameIndex).append(",\n");
@@ -853,15 +1052,20 @@ public final class GraphicsFrameBenchmark {
 			json.append(",\n");
 			writeBlockDisplayScenario(json);
 			json.append(",\n");
-			writeFallingBlockScenario(json);
-			json.append(",\n");
-			writeValidity(json);
+				writeFallingBlockScenario(json);
+				json.append(",\n");
+				writePistonScenario(json);
+				json.append(",\n");
+				writeValidity(json);
 		json.append(",\n");
 		json.append("  \"java\": {\n");
 		json.append("    \"gcCountDelta\": ").append(delta(gcCountAtStart, gcCountAtEnd)).append(",\n");
 		json.append("    \"gcTimeMillisDelta\": ").append(delta(gcTimeAtStart, gcTimeAtEnd)).append(",\n");
 		json.append("    \"usedMemoryBytesAtStart\": ").append(usedMemoryAtStart).append(",\n");
-		json.append("    \"usedMemoryBytesAtEnd\": ").append(usedMemoryAtEnd).append("\n");
+		json.append("    \"usedMemoryBytesAtEnd\": ").append(usedMemoryAtEnd).append(",\n");
+		json.append("    \"currentThreadAllocatedBytesAtStart\": ").append(threadAllocatedBytesAtStart).append(",\n");
+		json.append("    \"currentThreadAllocatedBytesAtEnd\": ").append(threadAllocatedBytesAtEnd).append(",\n");
+		json.append("    \"currentThreadAllocatedBytesDelta\": ").append(delta(threadAllocatedBytesAtStart, threadAllocatedBytesAtEnd)).append("\n");
 		json.append("  },\n");
 		writeSamples(json);
 		json.append(",\n");
@@ -947,6 +1151,10 @@ public final class GraphicsFrameBenchmark {
 		json.append("  \"validity\": {\n");
 		json.append("    \"sampleSumNanos\": ").append(sampleSum).append(",\n");
 		json.append("    \"wallClockMeasurementNanos\": ").append(wallClock).append(",\n");
+		json.append("    \"measurementStartNanos\": ").append(measurementStartNanos).append(",\n");
+		json.append("    \"measurementEndNanos\": ").append(measurementEndNanos).append(",\n");
+		json.append("    \"firstSampleNanos\": ").append(firstSampleNanos).append(",\n");
+		json.append("    \"lastSampleNanos\": ").append(lastSampleNanos).append(",\n");
 		json.append("    \"wallClockRelativeError\": ").append(format(wallClockRatio)).append(",\n");
 		json.append("    \"wallClockCheckPassed\": ").append(wallClockOk).append(",\n");
 		json.append("    \"measuredAverageFps\": ").append(format(measuredFps)).append(",\n");
@@ -968,6 +1176,24 @@ public final class GraphicsFrameBenchmark {
 			json.append(FRAME_NANOS.get(i));
 		}
 		json.append("]");
+	}
+
+	private static long currentThreadAllocatedBytes() {
+		java.lang.management.ThreadMXBean baseBean = ManagementFactory.getThreadMXBean();
+		if (!(baseBean instanceof com.sun.management.ThreadMXBean threadBean)) {
+			return -1L;
+		}
+		if (!threadBean.isThreadAllocatedMemorySupported()) {
+			return -1L;
+		}
+		try {
+			if (!threadBean.isThreadAllocatedMemoryEnabled()) {
+				threadBean.setThreadAllocatedMemoryEnabled(true);
+			}
+			return threadBean.getThreadAllocatedBytes(Thread.currentThread().getId());
+		} catch (SecurityException | UnsupportedOperationException exception) {
+			return -1L;
+		}
 	}
 
 	private static void writeTerrainParticleRealGameplay(StringBuilder json) {
@@ -1018,8 +1244,40 @@ public final class GraphicsFrameBenchmark {
 		json.append("    \"entityCount\": ").append(FALLING_BLOCK_SCENARIO.isEmpty() ? 0 : FALLING_BLOCK_COUNT).append(",\n");
 		writeStringIntMap(json, "routeCounts", FALLING_BLOCK_ROUTE_COUNTS);
 		json.append(",\n");
+		writeStringIntMap(json, "movingRouteCounts", MOVING_BLOCK_ROUTE_COUNTS);
+		json.append(",\n");
 		field(json, "workloadFingerprint", fallingBlockScenarioFingerprint, 4, false);
 		json.append("  }");
+	}
+
+	private static void writePistonScenario(StringBuilder json) {
+		json.append("  \"pistonScenario\": {\n");
+		json.append("    \"enabled\": ").append(!PISTON_SCENARIO.isEmpty()).append(",\n");
+		field(json, "scenario", PISTON_SCENARIO, 4, true);
+		field(json, "routeControl", pistonRouteControl(), 4, true);
+		field(json, "status", pistonScenarioStatus, 4, true);
+		field(json, "block", pistonScenarioBlock, 4, true);
+		field(json, "position", pistonScenarioPosition, 4, true);
+		json.append("    \"entityCount\": ").append(PISTON_SCENARIO.isEmpty() ? 0 : PISTON_COUNT).append(",\n");
+		writeStringIntMap(json, "movingRouteCounts", MOVING_BLOCK_ROUTE_COUNTS);
+		json.append(",\n");
+		writeMovingBlockShellScan(json);
+		json.append(",\n");
+		field(json, "workloadFingerprint", pistonScenarioFingerprint, 4, false);
+		json.append("  }");
+	}
+
+	private static void writeMovingBlockShellScan(StringBuilder json) {
+		json.append("  \"shellScan\": {");
+		json.append(" \"samples\": ").append(movingBlockShellScanSamples).append(",");
+		json.append(" \"fallbackSamples\": ").append(movingBlockShellScanFallbackSamples).append(",");
+		json.append(" \"totalNanos\": ").append(movingBlockShellScanNanos).append(",");
+		json.append(" \"maxNanos\": ").append(movingBlockShellScanMaxNanos).append(",");
+		json.append(" \"chunksScanned\": ").append(movingBlockShellScanChunks).append(",");
+		json.append(" \"blockEntitiesInspected\": ").append(movingBlockShellScanBlockEntities).append(",");
+		json.append(" \"pistonEntitiesFound\": ").append(movingBlockShellScanPistonsFound).append(",");
+		json.append(" \"pistonStatesExtracted\": ").append(movingBlockShellScanPistonStatesExtracted);
+		json.append(" }");
 	}
 
 	private static void writeStringIntMap(StringBuilder json, String name, Map<String, Integer> values) {

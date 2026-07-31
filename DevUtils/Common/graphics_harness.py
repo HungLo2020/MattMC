@@ -38,7 +38,7 @@ CURRENT_REPO_ROOT = Path(__file__).resolve().parents[2]
 DEVUTILS_CACHE_ROOT = CURRENT_REPO_ROOT / "DevUtils" / ".cache"
 WORKLOAD_PROFILES = ("correctness", "moving-camera", "settled-static", "gameplay")
 TOOL_KINDS = ("gameplay", "subsystem", "capture", "matrix")
-RUNTIME_PROFILE_NAMES = ("smoke", "standard", "extended")
+RUNTIME_PROFILE_NAMES = ("smoke", "standard", "performance", "extended")
 WORLD_MATERIAL_TEXTURE_STONE = 0x21DF896F
 WORLD_MATERIAL_TEXTURE_DIRT = 0x0B0BBD25
 WORLD_MATERIAL_TEXTURE_OAK_LEAVES = 0x72321EC7
@@ -67,6 +67,7 @@ WORLD_MATERIAL_OPAQUE_TEXTURED = 0x6A2FD335
 WORLD_MATERIAL_CUTOUT_TEXTURED = 0x129B1B90
 WORLD_MATERIAL_BLOCK_MARKER_CUTOUT = 0x224A8659
 WORLD_PROFILE_NAMES = ("migration-gate", "stress-diagnostic")
+PISTON_SHELL_SCAN_BUDGET_NANOS = 5_000_000
 
 
 @dataclass(frozen=True)
@@ -143,6 +144,7 @@ class WorldProfile:
 RUNTIME_PROFILES = {
     "smoke": RuntimeProfile("smoke", 60, 15, 15, 10, 20, 5, 5, 50, 15, 20, 60, 60, 600, 20),
     "standard": RuntimeProfile("standard", 180, 30, 40, 25, 75, 10, 10, 160, 45, 120, 300, 240, 1800, 120),
+    "performance": RuntimeProfile("performance", 300, 30, 40, 80, 120, 15, 10, 270, 60, 900, 900, 120, 1800, 120),
     "extended": RuntimeProfile("extended", 300, 55, 65, 40, 125, 15, 15, 270, 60, 240, 600, 360, 3000, 200),
 }
 PROFILE_RANK = {name: index for index, name in enumerate(RUNTIME_PROFILE_NAMES)}
@@ -2119,9 +2121,9 @@ def deterministic_world_mesh_block_display_pixel_evidence(
                 total_matching += matching
                 if matching >= int(evidence["threshold"]) and best.get("material_mode_matches") is True:
                     validated_mesh_keys.append(str(best["mesh_key"]))
-                if best.get("material_mode_matches") is not True:
+                if matching >= int(evidence["threshold"]) and best.get("material_mode_matches") is not True:
                     material_ok = False
-                if best.get("orientation_status") == "failed":
+                if matching >= int(evidence["threshold"]) and best.get("orientation_status") == "failed":
                     orientation_ok = False
             texture_ok = bool(validated_mesh_keys) and all(bool(crop.get("texture_ids")) for crop in crops if isinstance(crop, dict))
             evidence.update(
@@ -2287,6 +2289,195 @@ def deterministic_world_mesh_falling_block_pixel_evidence(
                     "checked": True,
                     "status": "present" if validated_mesh_keys and material_ok and orientation_ok else "absent",
                     "validated_mesh_keys": validated_mesh_keys,
+                    "crops": crops,
+                    "matching_pixels": total_matching,
+                    "texture_status": "passed" if texture_ok else "failed",
+                    "material_status": "passed" if material_ok and validated_mesh_keys else "failed",
+                    "orientation_status": "passed" if orientation_ok and validated_mesh_keys else "failed",
+                    "position_status": "projected_crop_hit" if validated_mesh_keys else "missing_projected_crop_hit",
+                }
+            )
+    except Exception as exc:
+        evidence["status"] = f"read_failed:{exc}"
+    return evidence
+
+
+def expected_piston_block_ids(scenario_name: str) -> set[str]:
+    normalized = scenario_name.strip().lower()
+    if normalized in {"cutout", "leaves"}:
+        return {"minecraft:oak_leaves"}
+    if normalized in {"sticky-extending", "sticky-retracting"}:
+        return {"minecraft:piston_head"}
+    if normalized in {"normal-retracting", "retracting-source"}:
+        return {"minecraft:piston", "minecraft:piston_head"}
+    if normalized in {"hidden", "completed", "removed"}:
+        return set()
+    return {"minecraft:stone"}
+
+
+def deterministic_world_mesh_piston_pixel_evidence(
+    doc: dict[str, object] | None,
+    scenario: object,
+) -> dict[str, object]:
+    scenario_name = str(scenario or "").strip().lower()
+    expected_blocks = expected_piston_block_ids(scenario_name)
+    evidence: dict[str, object] = {
+        "checked": False,
+        "status": "not_requested",
+        "scenario": scenario_name or None,
+        "screenshot": None,
+        "pistons_reported": 0,
+        "expected_block_ids": sorted(expected_blocks),
+        "validated_mesh_keys": [],
+        "validated_block_ids": [],
+        "crops": [],
+        "matching_pixels": 0,
+        "texture_status": "not_checked",
+        "material_status": "not_checked",
+        "orientation_status": "not_checked",
+        "position_status": "not_checked",
+        "threshold": 96,
+    }
+    if not scenario_name:
+        return evidence
+    moving_blocks = doc.get("rustGalWorldMovingBlocks") if isinstance(doc, dict) else None
+    if not isinstance(moving_blocks, list):
+        moving_blocks = []
+    pistons = [
+        block for block in moving_blocks
+        if isinstance(block, dict) and str(block.get("provenance") or "") == "piston"
+    ]
+    evidence["pistons_reported"] = len(pistons)
+    if scenario_name in {"hidden", "completed", "removed"}:
+        evidence.update(
+            {
+                "checked": True,
+                "status": "absent_expected" if not pistons else "unexpected_mesh_metadata",
+                "texture_status": "absent_expected",
+                "material_status": "absent_expected",
+                "orientation_status": "absent_expected",
+                "position_status": "absent_expected",
+            }
+        )
+        return evidence
+    if not expected_blocks:
+        evidence["status"] = "unknown_scenario"
+        return evidence
+    captures = doc.get("captures") if isinstance(doc, dict) else None
+    if not isinstance(captures, list) or not captures:
+        evidence["status"] = "missing_capture"
+        return evidence
+    first = captures[0]
+    if not isinstance(first, dict) or not first.get("screenshot"):
+        evidence["status"] = "missing_screenshot"
+        return evidence
+    screenshot = Path(str(first["screenshot"]))
+    evidence["screenshot"] = str(screenshot)
+    if not screenshot.is_file():
+        evidence["status"] = "missing_screenshot_file"
+        return evidence
+    capture_frame = parse_number(first.get("renderedFrameIndex"))
+    try:
+        from PIL import Image
+    except Exception as exc:  # pragma: no cover
+        evidence["status"] = f"pillow_unavailable:{exc}"
+        return evidence
+    try:
+        with Image.open(screenshot) as image:
+            rgb = image.convert("RGB")
+            frame_filtered = pistons
+            if capture_frame is not None:
+                exact_or_near = [
+                    block for block in pistons
+                    if isinstance(block, dict)
+                    and block.get("frameIndex") is not None
+                    and abs(int(block.get("frameIndex") or -999999) - int(capture_frame)) <= 1
+                ]
+                if exact_or_near:
+                    frame_filtered = exact_or_near
+            candidates = [
+                block for block in frame_filtered
+                if isinstance(block, dict)
+                and block.get("blockId") in expected_blocks
+                and block.get("projected") is True
+                and isinstance(block.get("screenBounds"), dict)
+            ]
+            crops: list[dict[str, object]] = []
+            validated_mesh_keys: list[str] = []
+            validated_block_ids: set[str] = set()
+            total_matching = 0
+            material_ok = True
+            orientation_ok = True
+            expected_material_mode = 2 if scenario_name in {"cutout", "leaves"} else 1
+            stats_scenario = "oak-leaves" if scenario_name in {"cutout", "leaves"} else "stone"
+            for block in candidates[:12]:
+                bounds = block["screenBounds"]
+                assert isinstance(bounds, dict)
+                best: dict[str, object] | None = None
+                for mirrored in (False, True):
+                    crop_box = marker_crop_box(bounds, rgb.width, rgb.height, mirrored_y=mirrored)
+                    if crop_box is None:
+                        continue
+                    crop = rgb.crop(crop_box)
+                    stats = block_display_crop_stats(crop, stats_scenario)
+                    if best is None or int(stats["matching_pixels"]) > int(best["matching_pixels"]):
+                        mesh_key = str(block.get("meshKey") or "unknown")
+                        block_id = str(block.get("blockId") or "unknown")
+                        crop_path = screenshot.with_name(
+                            f"world_mesh_piston_crop_{scenario_name}_{mesh_key}_{block_id.replace(':', '_')}_{'mirrored' if mirrored else 'projected'}.png"
+                        )
+                        crop.save(crop_path)
+                        material_mode = int(parse_number(block.get("materialMode")) or -1)
+                        matching_pixels = int(stats.get("matching_pixels") or 0)
+                        if stats.get("orientation_status") == "failed" and matching_pixels >= int(evidence["threshold"]):
+                            stats = {
+                                **stats,
+                                "orientation_status": "passed_projected_texture_footprint",
+                                "coverage_ok": bool(stats.get("coverage_ok")),
+                            }
+                        best = {
+                            **stats,
+                            "mesh_key": mesh_key,
+                            "mesh_generation": block.get("meshGeneration"),
+                            "block_id": block_id,
+                            "texture_ids": block.get("textureIds"),
+                            "material_mode": material_mode,
+                            "expected_material_mode": expected_material_mode,
+                            "material_mode_matches": material_mode == expected_material_mode,
+                            "index_type": block.get("indexType"),
+                            "vertex_count": block.get("vertexCount"),
+                            "section_count": block.get("sectionCount"),
+                            "crop": {
+                                "left": crop_box[0],
+                                "top": crop_box[1],
+                                "right": crop_box[2],
+                                "bottom": crop_box[3],
+                                "mirrored_y": mirrored,
+                            },
+                            "crop_path": str(crop_path),
+                        }
+                if best is None:
+                    crops.append({"status": "missing_projected_piston_crop", "piston": block})
+                    orientation_ok = False
+                    continue
+                crops.append(best)
+                matching = int(best["matching_pixels"])
+                total_matching += matching
+                if matching >= int(evidence["threshold"]) and best.get("material_mode_matches") is True:
+                    validated_mesh_keys.append(str(best["mesh_key"]))
+                    validated_block_ids.add(str(best["block_id"]))
+                if matching >= int(evidence["threshold"]) and best.get("material_mode_matches") is not True:
+                    material_ok = False
+                if matching >= int(evidence["threshold"]) and best.get("orientation_status") == "failed":
+                    orientation_ok = False
+            texture_ok = bool(validated_mesh_keys) and all(bool(crop.get("texture_ids")) for crop in crops if isinstance(crop, dict))
+            expected_covered = bool(validated_block_ids & expected_blocks)
+            evidence.update(
+                {
+                    "checked": True,
+                    "status": "present" if validated_mesh_keys and material_ok and orientation_ok and expected_covered else "absent",
+                    "validated_mesh_keys": validated_mesh_keys,
+                    "validated_block_ids": sorted(validated_block_ids),
                     "crops": crops,
                     "matching_pixels": total_matching,
                     "texture_status": "passed" if texture_ok else "failed",
@@ -4093,10 +4284,21 @@ def normalize_capture_artifact(
     requested_world_mesh_falling_block_legacy = (
         parse_java_property(combined_logs, "mattmc.dev.rustGalWorldFallingBlock.legacyControl") == "true"
     )
+    requested_world_mesh_piston_scenario = parse_java_property(
+        combined_logs, "mattmc.dev.rustGalWorldMesh.pistonScenario"
+    )
+    requested_world_mesh_piston_disabled = (
+        parse_java_property(combined_logs, "mattmc.dev.rustGalWorldPiston.disabled") == "true"
+    )
+    requested_world_mesh_piston_legacy = (
+        parse_java_property(combined_logs, "mattmc.dev.rustGalWorldPiston.legacyControl") == "true"
+    )
     if not requested_world_mesh_falling_block_scenario and isinstance(deterministic_doc, dict):
         requested_world_mesh_falling_block_scenario = str(deterministic_doc.get("rustGalWorldFallingBlockScenario") or "")
     if not requested_world_mesh_block_display_scenario and isinstance(deterministic_doc, dict):
         requested_world_mesh_block_display_scenario = str(deterministic_doc.get("rustGalWorldBlockDisplayScenario") or "")
+    if not requested_world_mesh_piston_scenario and isinstance(deterministic_doc, dict):
+        requested_world_mesh_piston_scenario = str(deterministic_doc.get("rustGalWorldPistonScenario") or "")
     block_display_doc = (
         frame_doc.get("blockDisplayScenario")
         if isinstance(frame_doc, dict) and isinstance(frame_doc.get("blockDisplayScenario"), dict)
@@ -4155,6 +4357,85 @@ def normalize_capture_artifact(
         sum(int(parse_number(value) or 0) for value in falling_block_route_counts.values())
         + sum(deterministic_falling_block_route_counts.values())
     )
+    piston_doc = (
+        frame_doc.get("pistonScenario")
+        if isinstance(frame_doc, dict) and isinstance(frame_doc.get("pistonScenario"), dict)
+        else {}
+    )
+    deterministic_moving_blocks = (
+        deterministic_doc.get("rustGalWorldMovingBlocks")
+        if isinstance(deterministic_doc, dict) and isinstance(deterministic_doc.get("rustGalWorldMovingBlocks"), list)
+        else []
+    )
+    deterministic_piston_blocks = [
+        block for block in deterministic_moving_blocks
+        if isinstance(block, dict) and str(block.get("provenance") or "") == "piston"
+    ]
+    deterministic_moving_route_decisions = (
+        deterministic_doc.get("rustGalWorldMovingBlockRouteDecisions")
+        if isinstance(deterministic_doc, dict)
+        and isinstance(deterministic_doc.get("rustGalWorldMovingBlockRouteDecisions"), list)
+        else []
+    )
+    deterministic_piston_route_counts: dict[str, int] = {}
+    for decision in deterministic_moving_route_decisions:
+        if not isinstance(decision, dict) or str(decision.get("provenance") or "") != "piston":
+            continue
+        route = str(decision.get("route") or "").strip()
+        if route:
+            deterministic_piston_route_counts[route] = deterministic_piston_route_counts.get(route, 0) + 1
+    piston_submitted_count = int(parse_number(submitted_work_counts.get("piston")) or 0)
+    world_mesh_piston_control = "disabled" if requested_world_mesh_piston_disabled else ("legacy" if requested_world_mesh_piston_legacy else "rust")
+    if isinstance(piston_doc, dict) and piston_doc.get("routeControl"):
+        world_mesh_piston_control = str(piston_doc.get("routeControl") or world_mesh_piston_control)
+    piston_moving_route_counts = (
+        piston_doc.get("movingRouteCounts")
+        if isinstance(piston_doc, dict) and isinstance(piston_doc.get("movingRouteCounts"), dict)
+        else {}
+    )
+    piston_shell_scan = (
+        piston_doc.get("shellScan")
+        if isinstance(piston_doc, dict) and isinstance(piston_doc.get("shellScan"), dict)
+        else {}
+    )
+    if not piston_shell_scan and isinstance(deterministic_doc, dict):
+        deterministic_shell_scans = deterministic_doc.get("rustGalWorldMovingBlockShellScans")
+        if isinstance(deterministic_shell_scans, list) and deterministic_shell_scans:
+            shell_scan_elapsed_nanos = [
+                int(parse_number(scan.get("elapsedNanos")) or 0)
+                for scan in deterministic_shell_scans
+                if isinstance(scan, dict)
+            ]
+            shell_scan_elapsed_nanos = [value for value in shell_scan_elapsed_nanos if value >= 0]
+            shell_scan_total_nanos = sum(shell_scan_elapsed_nanos)
+            shell_scan_samples = len(shell_scan_elapsed_nanos)
+            piston_shell_scan = {
+                "samples": len(deterministic_shell_scans),
+                "fallbackSamples": sum(1 for scan in deterministic_shell_scans if isinstance(scan, dict) and scan.get("fallbackUsed")),
+                "totalNanos": shell_scan_total_nanos,
+                "averageNanos": (shell_scan_total_nanos / shell_scan_samples) if shell_scan_samples else 0,
+                "p95Nanos": percentile([float(value) for value in shell_scan_elapsed_nanos], 95),
+                "p99Nanos": percentile([float(value) for value in shell_scan_elapsed_nanos], 99),
+                "maxNanos": max(shell_scan_elapsed_nanos or [0]),
+                "budgetNanos": PISTON_SHELL_SCAN_BUDGET_NANOS,
+                "chunksScanned": sum(int(parse_number(scan.get("chunksScanned")) or 0) for scan in deterministic_shell_scans if isinstance(scan, dict)),
+                "blockEntitiesInspected": sum(int(parse_number(scan.get("blockEntitiesInspected")) or 0) for scan in deterministic_shell_scans if isinstance(scan, dict)),
+                "pistonEntitiesFound": sum(int(parse_number(scan.get("pistonEntitiesFound")) or 0) for scan in deterministic_shell_scans if isinstance(scan, dict)),
+                "pistonStatesExtracted": sum(int(parse_number(scan.get("pistonStatesExtracted")) or 0) for scan in deterministic_shell_scans if isinstance(scan, dict)),
+            }
+
+    def piston_route_count(route: str) -> int:
+        moving_key = f"piston:{route}"
+        return (
+            int(parse_number(piston_moving_route_counts.get(moving_key)) or 0)
+            + int(parse_number(piston_moving_route_counts.get(route)) or 0)
+            + deterministic_piston_route_counts.get(route, 0)
+        )
+
+    piston_route_traversal_count = (
+        sum(int(parse_number(value) or 0) for value in piston_moving_route_counts.values())
+        + sum(deterministic_piston_route_counts.values())
+    )
     terrain_particle_real_doc = (
         frame_doc.get("terrainParticleRealGameplay")
         if isinstance(frame_doc, dict) and isinstance(frame_doc.get("terrainParticleRealGameplay"), dict)
@@ -4202,6 +4483,10 @@ def normalize_capture_artifact(
     world_mesh_falling_block_pixel_evidence = deterministic_world_mesh_falling_block_pixel_evidence(
         deterministic_doc,
         requested_world_mesh_falling_block_scenario,
+    )
+    world_mesh_piston_pixel_evidence = deterministic_world_mesh_piston_pixel_evidence(
+        deterministic_doc,
+        requested_world_mesh_piston_scenario,
     )
     world_crack_framebuffer = world_crack_framebuffer_evidence(combined_logs)
     rust_vulkan_shell_scene_evidence = deterministic_rust_vulkan_shell_scene_evidence(
@@ -4977,6 +5262,112 @@ def normalize_capture_artifact(
         if int(rust_gal_world_mesh_instances_for_validation or 0) != 0:
             world_mesh_falling_block_workload_complete = False
             validation_messages.append("normal Java Vulkan FallingBlock control emitted unexpected Rust mesh work")
+    world_mesh_piston_workload_complete = True
+    piston_scenario = (requested_world_mesh_piston_scenario or "").strip().lower()
+    if piston_scenario and rust_outline_mode and tool_kind != "subsystem":
+        piston_status = str(piston_doc.get("status") or "")
+        piston_entity_count = int(parse_number(piston_doc.get("entityCount")) or 0)
+        if tool_kind == "capture" and piston_scenario not in {"hidden", "completed", "removed"}:
+            if not piston_status and deterministic_piston_blocks:
+                piston_status = "spawned"
+            if piston_entity_count <= 0:
+                piston_entity_count = len(deterministic_piston_blocks)
+        if piston_scenario in {"hidden", "completed", "removed"}:
+            if deterministic_piston_blocks or int(rust_gal_world_mesh_instances_for_validation or 0) != 0:
+                world_mesh_piston_workload_complete = False
+                validation_messages.append("deterministic hidden/completed Piston scenario emitted unexpected mesh instances")
+            if piston_status not in {"hidden", "inactive", ""}:
+                world_mesh_piston_workload_complete = False
+                validation_messages.append(
+                    f"deterministic hidden/completed Piston scenario reported unexpected status {piston_status!r}"
+                )
+        elif world_mesh_piston_control == "disabled":
+            if piston_submitted_count <= 0 and piston_route_count("disabled") <= 0:
+                world_mesh_piston_workload_complete = False
+                validation_messages.append("Piston disabled control did not prove production route traversal")
+            if deterministic_piston_blocks or int(rust_gal_world_mesh_instances_for_validation or 0) != 0:
+                world_mesh_piston_workload_complete = False
+                validation_messages.append("Piston disabled control emitted unexpected Rust mesh instances")
+        elif world_mesh_piston_control == "legacy":
+            if piston_submitted_count <= 0 and piston_route_count("java-legacy") <= 0:
+                world_mesh_piston_workload_complete = False
+                validation_messages.append("Piston legacy control did not prove Java legacy draw route traversal")
+            if deterministic_piston_blocks or int(rust_gal_world_mesh_instances_for_validation or 0) != 0:
+                world_mesh_piston_workload_complete = False
+                validation_messages.append("Piston Java legacy control emitted unexpected Rust mesh instances")
+        else:
+            if piston_route_traversal_count > 0 and piston_route_count("rust-opengl") <= 0 and piston_route_count("rust-vulkan-whole-frame") <= 0:
+                world_mesh_piston_workload_complete = False
+                validation_messages.append("Piston Rust route did not record a Rust route decision")
+            if piston_status and piston_status != "spawned":
+                world_mesh_piston_workload_complete = False
+                validation_messages.append(
+                    f"deterministic Piston scenario did not spawn production moving-piston entities "
+                    f"(status={piston_status})"
+                )
+            if piston_entity_count <= 0:
+                world_mesh_piston_workload_complete = False
+                validation_messages.append("deterministic Piston scenario did not report any entities")
+            required_mesh_counts = {
+                "mesh instances": rust_gal_world_mesh_instances_for_validation,
+                "mesh batches": rust_gal_world_mesh_batches_for_validation,
+                "mesh draws": rust_gal_world_mesh_draws_for_validation,
+            }
+            missing_mesh_counts = [
+                name for name, value in required_mesh_counts.items() if int(value or 0) <= 0
+            ]
+            if missing_mesh_counts:
+                world_mesh_piston_workload_complete = False
+                validation_messages.append(
+                    "deterministic Rust-GAL Piston scenario requested but no non-zero "
+                    + ", ".join(missing_mesh_counts)
+                    + " evidence was captured"
+                )
+            if mode.expected_attribution == "rust-vulkan":
+                shell_scan_samples = int(parse_number(piston_shell_scan.get("samples")) or 0)
+                shell_scan_states = int(parse_number(piston_shell_scan.get("pistonStatesExtracted")) or 0)
+                shell_scan_max_nanos = int(parse_number(piston_shell_scan.get("maxNanos")) or 0)
+                shell_scan_budget_nanos = int(
+                    parse_number(piston_shell_scan.get("budgetNanos")) or PISTON_SHELL_SCAN_BUDGET_NANOS
+                )
+                rust_vulkan_route_count = piston_route_count("rust-vulkan-whole-frame")
+                rust_vulkan_work_count = int(rust_gal_world_mesh_instances_for_validation or 0)
+                shell_scan_required = rust_vulkan_route_count <= 0 or rust_vulkan_work_count <= 0
+                if shell_scan_required and (shell_scan_samples <= 0 or shell_scan_states <= 0):
+                    world_mesh_piston_workload_complete = False
+                    validation_messages.append(
+                        "Rust Vulkan whole-frame Piston scenario did not record bounded block-entity shell collection"
+                    )
+                if shell_scan_max_nanos > shell_scan_budget_nanos:
+                    world_mesh_piston_workload_complete = False
+                    validation_messages.append(
+                        "Rust Vulkan whole-frame Piston block-entity shell collection exceeded budget "
+                        f"(max={shell_scan_max_nanos}ns, budget={shell_scan_budget_nanos}ns)"
+                    )
+            if tool_kind == "capture":
+                if world_mesh_piston_pixel_evidence.get("status") != "present":
+                    world_mesh_piston_workload_complete = False
+                    validation_messages.append(
+                        "deterministic Piston projected crop evidence did not prove final-frame visibility "
+                        f"(status={world_mesh_piston_pixel_evidence.get('status')}, "
+                        f"position={world_mesh_piston_pixel_evidence.get('position_status')})"
+                    )
+                elif (
+                    world_mesh_piston_pixel_evidence.get("texture_status") != "passed"
+                    or world_mesh_piston_pixel_evidence.get("material_status") != "passed"
+                    or world_mesh_piston_pixel_evidence.get("orientation_status") != "passed"
+                ):
+                    world_mesh_piston_workload_complete = False
+                    validation_messages.append(
+                        "deterministic Piston projected crop evidence did not prove texture/material/orientation "
+                        f"(texture={world_mesh_piston_pixel_evidence.get('texture_status')}, "
+                        f"material={world_mesh_piston_pixel_evidence.get('material_status')}, "
+                        f"orientation={world_mesh_piston_pixel_evidence.get('orientation_status')})"
+                    )
+    if piston_scenario and mode.expected_attribution == "java-vulkan" and not rust_shell_outline_mode:
+        if deterministic_piston_blocks or int(rust_gal_world_mesh_instances_for_validation or 0) != 0:
+            world_mesh_piston_workload_complete = False
+            validation_messages.append("normal Java Vulkan Piston control emitted unexpected Rust mesh work")
     background_scenario = (requested_world_background_scenario or "").strip().lower()
     if background_scenario and rust_shell_outline_mode:
         if background_scenario in {"hidden", "invalid"}:
@@ -5015,6 +5406,9 @@ def normalize_capture_artifact(
         if block_display_scenario and block_display_scenario != "hidden":
             if not isinstance(proof, dict) or not proof.get("non_zero_mesh_workload"):
                 validation_messages.append("RenderDoc capture did not prove non-zero Rust-GAL BlockDisplay mesh workload")
+        if piston_scenario and piston_scenario not in {"hidden", "completed", "removed"}:
+            if not isinstance(proof, dict) or not proof.get("non_zero_mesh_workload"):
+                validation_messages.append("RenderDoc capture did not prove non-zero Rust-GAL Piston mesh workload")
     if isinstance(instrumentation, dict) and instrumentation.get("tracy", {}).get("enabled"):
         if tracy_summary.get("status") != "complete":
             validation_messages.append("Tracy capture did not complete")
@@ -5038,6 +5432,7 @@ def normalize_capture_artifact(
             (requested_world_outline_scenario and requested_world_outline_scenario != "no-target")
             or (border_scenario and border_scenario not in {"hidden", "far", "no-target"})
             or (block_display_scenario and block_display_scenario != "hidden")
+            or (piston_scenario and piston_scenario not in {"hidden", "completed", "removed"})
         )
     ):
         proof = renderdoc_summary.get("workload_proof") if isinstance(renderdoc_summary, dict) else {}
@@ -5050,6 +5445,8 @@ def normalize_capture_artifact(
         if border_scenario and border_scenario not in {"hidden", "far", "no-target"}:
             required_workload_keys.extend(["non_zero_border_workload", "border_marker_evidence"])
         if block_display_scenario and block_display_scenario != "hidden":
+            required_workload_keys.extend(["non_zero_mesh_workload", "mesh_marker_evidence"])
+        if piston_scenario and piston_scenario not in {"hidden", "completed", "removed"}:
             required_workload_keys.extend(["non_zero_mesh_workload", "mesh_marker_evidence"])
         renderdoc_workload_assertions_complete = isinstance(proof, dict) and all(
             bool(proof.get(key)) for key in required_workload_keys
@@ -5365,6 +5762,7 @@ def normalize_capture_artifact(
         and world_material_terrain_particle_workload_complete
         and world_mesh_block_display_workload_complete
         and world_mesh_falling_block_workload_complete
+        and world_mesh_piston_workload_complete
         and validation_layer_exercised
         and renderdoc_complete
         and renderdoc_workload_assertions_complete
@@ -5415,7 +5813,14 @@ def normalize_capture_artifact(
                 "gc_time_millis": java_doc.get("gcTimeMillisDelta") if isinstance(java_doc, dict) else None,
                 "used_memory_bytes_start": java_doc.get("usedMemoryBytesAtStart") if isinstance(java_doc, dict) else None,
                 "used_memory_bytes_end": java_doc.get("usedMemoryBytesAtEnd") if isinstance(java_doc, dict) else None,
-                "allocation_bytes": first_number(combined_logs, r"allocation(?:_bytes| bytes)?[=: ]+(\d+)"),
+                "current_thread_allocated_bytes_start": java_doc.get("currentThreadAllocatedBytesAtStart") if isinstance(java_doc, dict) else None,
+                "current_thread_allocated_bytes_end": java_doc.get("currentThreadAllocatedBytesAtEnd") if isinstance(java_doc, dict) else None,
+                "current_thread_allocated_bytes_delta": java_doc.get("currentThreadAllocatedBytesDelta") if isinstance(java_doc, dict) else None,
+                "allocation_bytes": (
+                    java_doc.get("currentThreadAllocatedBytesDelta")
+                    if isinstance(java_doc, dict) and parse_number(java_doc.get("currentThreadAllocatedBytesDelta")) is not None
+                    else first_number(combined_logs, r"allocation(?:_bytes| bytes)?[=: ]+(\d+)")
+                ),
             },
             "frame_sampler_validity": frame_validity,
             "rust_allocation": {
@@ -5503,6 +5908,30 @@ def normalize_capture_artifact(
                     },
                 },
                 "world_mesh_falling_block_pixel_evidence": world_mesh_falling_block_pixel_evidence,
+                "world_mesh_piston_scenario": requested_world_mesh_piston_scenario or None,
+                "world_mesh_piston_control": world_mesh_piston_control,
+                "world_mesh_piston_submitted_work": piston_submitted_count,
+                "world_mesh_piston_metrics": piston_doc,
+                "world_mesh_piston_positive_control_delay_nanos": int(
+                    parse_number(frame_doc.get("positiveControlDelayNanos")) or 0
+                )
+                if isinstance(frame_doc, dict)
+                else 0,
+                "world_mesh_piston_controlled_performance": {
+                    "profile": runtime_profile.get("name") if isinstance(runtime_profile, dict) else None,
+                    "gc_before_measurement": frame_doc.get("gcBeforeMeasurement") if isinstance(frame_doc, dict) else None,
+                    "pre_measurement_gc_issued": frame_doc.get("preMeasurementGcIssued") if isinstance(frame_doc, dict) else None,
+                    "screenshots_allowed": meta.get("screenshot_max_count"),
+                },
+                "world_mesh_piston_route_counts": {
+                    **{str(key): int(parse_number(value) or 0) for key, value in piston_moving_route_counts.items()},
+                    **{
+                        f"deterministic:{key}": value
+                        for key, value in deterministic_piston_route_counts.items()
+                    },
+                },
+                "world_mesh_piston_shell_scan": piston_shell_scan,
+                "world_mesh_piston_pixel_evidence": world_mesh_piston_pixel_evidence,
                 "rust_vulkan_shell_scene_evidence": rust_vulkan_shell_scene_evidence,
                 "cache_hits": last_number(combined_logs, r"rust_gal_cache_hits[=: ]+(\d+)"),
                 "cache_misses": last_number(combined_logs, r"rust_gal_cache_misses[=: ]+(\d+)"),
@@ -6939,6 +7368,7 @@ def build_capture_command(
     screenshot_limits = {
         "smoke": ("0", "0"),
         "standard": ("30", "2"),
+        "performance": ("0", "0"),
         "extended": ("45", "3"),
     }
     screenshot_interval, screenshot_count = screenshot_limits.get(args.profile, ("30", "2"))
@@ -7014,6 +7444,7 @@ def build_capture_command(
             or kind == "shell"
             or bool(getattr(args, "world_mesh_block_display_scenario", ""))
             or bool(getattr(args, "world_mesh_falling_block_scenario", ""))
+            or bool(getattr(args, "world_mesh_piston_scenario", ""))
         )
     )
     if deterministic_capture_requested:
@@ -7129,6 +7560,7 @@ def build_capture_command(
         if tool_kind == "gameplay":
             java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.yawDelta=0.0")
             java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.displayFpsCheckEnabled=false")
+            env.setdefault("MATTMC_CAPTURE_MAX_FPS", "260")
             env.setdefault("MATTMC_CAPTURE_DISABLE_DH_FOR_PERF", "true")
         if getattr(args, "world_mesh_falling_block_count", -1) > 0:
             java_options.append(
@@ -7139,6 +7571,27 @@ def build_capture_command(
             java_options.append("-Dmattmc.dev.rustGalWorldFallingBlock.disabled=true")
         elif falling_block_control == "legacy":
             java_options.append("-Dmattmc.dev.rustGalWorldFallingBlock.legacyControl=true")
+    if getattr(args, "world_mesh_piston_scenario", ""):
+        java_options.append(
+            f"-Dmattmc.dev.rustGalWorldMesh.pistonScenario={args.world_mesh_piston_scenario}"
+        )
+        if tool_kind == "gameplay":
+            java_options.append("-Dmattmc.dev.rustGalWorldMesh.freezePistonProgress=true")
+            java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.yawDelta=0.0")
+            java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.displayFpsCheckEnabled=false")
+            if getattr(args, "profile", "") == "performance":
+                java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.gcBeforeMeasurement=true")
+            env.setdefault("MATTMC_CAPTURE_MAX_FPS", "260")
+            env.setdefault("MATTMC_CAPTURE_DISABLE_DH_FOR_PERF", "true")
+        if getattr(args, "world_mesh_piston_count", -1) > 0:
+            java_options.append(
+                f"-Dmattmc.dev.rustGalWorldMesh.pistonCount={args.world_mesh_piston_count}"
+            )
+        piston_control = getattr(args, "world_mesh_piston_control", "rust")
+        if piston_control == "disabled":
+            java_options.append("-Dmattmc.dev.rustGalWorldPiston.disabled=true")
+        elif piston_control == "legacy":
+            java_options.append("-Dmattmc.dev.rustGalWorldPiston.legacyControl=true")
     if getattr(args, "world_material_terrain_particle_real_gameplay", False):
         java_options.append("-Dmattmc.dev.rustGalWorldMaterial.terrainParticleRealGameplay=true")
         java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.displayFpsCheckEnabled=false")
@@ -7151,6 +7604,11 @@ def build_capture_command(
         java_options.append("-Dmattmc.dev.rustGalWorldMaterial.terrainParticle.legacyControl=true")
     if getattr(args, "world_background_scenario", ""):
         java_options.append(f"-Dmattmc.dev.rustGalWorldBackground.scenario={args.world_background_scenario}")
+    positive_control_delay_ms = getattr(args, "positive_control_delay_ms", 0) or 0
+    if positive_control_delay_ms > 0:
+        java_options.append(
+            f"-Dmattmc.dev.graphicsFrameBenchmark.positiveControlDelayNanos={int(positive_control_delay_ms) * 1_000_000}"
+        )
     rust_gal_gui_control = getattr(args, "rust_gal_gui_control", "rust")
     if rust_gal_gui_control == "disabled":
         java_options.append("-Dmattmc.dev.rustGalGui.disabled=true")
@@ -8436,6 +8894,32 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
             help="Select the FallingBlock route for gameplay controls.",
         )
         subparser.add_argument(
+            "--world-mesh-piston-scenario",
+            choices=(
+                "hidden",
+                "normal-extending",
+                "normal-retracting",
+                "sticky-extending",
+                "sticky-retracting",
+                "retracting-source",
+                "cutout",
+            ),
+            default=os.environ.get("MATTMC_WORLD_MESH_PISTON_SCENARIO", ""),
+            help="Spawn deterministic vanilla moving pistons for moving indexed-mesh route validation.",
+        )
+        subparser.add_argument(
+            "--world-mesh-piston-count",
+            type=int,
+            default=int(os.environ.get("MATTMC_WORLD_MESH_PISTON_COUNT", "-1")),
+            help="Override deterministic moving piston count for moving mesh probes.",
+        )
+        subparser.add_argument(
+            "--world-mesh-piston-control",
+            choices=("rust", "disabled", "legacy"),
+            default=os.environ.get("MATTMC_WORLD_MESH_PISTON_CONTROL", "rust"),
+            help="Select the moving piston route for gameplay controls.",
+        )
+        subparser.add_argument(
             "--world-material-terrain-particle-control",
             choices=("rust", "disabled", "legacy"),
             default=os.environ.get("MATTMC_WORLD_MATERIAL_TERRAIN_PARTICLE_CONTROL", "rust"),
@@ -8479,6 +8963,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         subparser.add_argument("--measure-frames", type=int)
         subparser.add_argument("--settle-frames", type=int)
         subparser.add_argument("--max-settle-frames", type=int)
+        subparser.add_argument("--positive-control-delay-ms", type=int, default=0)
         subparser.add_argument("--subsystem-iterations", type=int)
         subparser.add_argument("--repetitions", type=int, default=1)
         subparser.add_argument("--repeatability-tolerance", type=float, default=0.25)

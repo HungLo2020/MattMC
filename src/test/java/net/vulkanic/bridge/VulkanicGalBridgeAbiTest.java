@@ -133,6 +133,10 @@ class VulkanicGalBridgeAbiTest {
 			Files.readString(Path.of("src/main/java/net/vulkanic/world/WorldRenderRoutePolicy.java"))
 				.contains("currentFallingBlockRoute()")
 		);
+		assertTrue(
+			Files.readString(Path.of("src/main/java/net/vulkanic/world/WorldRenderRoutePolicy.java"))
+				.contains("currentPistonMovingBlockRoute()")
+		);
 	}
 
 	@Test
@@ -196,7 +200,10 @@ class VulkanicGalBridgeAbiTest {
 			assertTrue(worldRenderer.contains("currentBlockDisplayRoute()"));
 			assertTrue(worldRenderer.contains("enqueueFallingBlock"));
 			assertTrue(worldRenderer.contains("currentFallingBlockRoute()"));
+			assertTrue(worldRenderer.contains("enqueuePistonMovingBlock"));
+			assertTrue(worldRenderer.contains("currentPistonMovingBlockRoute()"));
 			assertTrue(worldRenderer.contains("MovingBlockSubmitSource.FALLING_BLOCK"));
+			assertTrue(worldRenderer.contains("MovingBlockSubmitSource.PISTON"));
 			assertTrue(worldRenderer.contains("SubmitNodeStorage.BlockSubmitSource.BLOCK_DISPLAY"));
 			assertTrue(worldRenderer.contains("RenderShape.MODEL"));
 			assertTrue(worldRenderer.contains("specialBlockModelRenderer().get().hasRenderer(blockState.getBlock())"));
@@ -788,6 +795,15 @@ class VulkanicGalBridgeAbiTest {
 		assertFalse(shellBlockDisplays.contains("isSectionCompiled"));
 		assertTrue(shellBlockDisplays.contains("Display.BlockDisplay"));
 		assertTrue(shellBlockDisplays.contains("FallingBlockEntity"));
+		assertTrue(shellBlockDisplays.contains("submitPistonMovingBlocksForWholeFrame"));
+		assertTrue(shellBlockDisplays.contains("extractPistonMovingBlocksForWholeFrame"));
+		assertTrue(shellBlockDisplays.contains("currentPistonMovingBlockRoute()"));
+		assertTrue(levelRenderer.contains("PistonHeadRenderState"));
+		assertTrue(levelRenderer.contains("this.extractVisibleBlockEntities(camera, partialTick, levelRenderState);"));
+		assertTrue(levelRenderer.contains("PistonMovingBlockEntity pistonMovingBlockEntity"));
+		assertTrue(levelRenderer.contains("this.blockEntityRenderDispatcher.tryExtractRenderState"));
+		assertTrue(levelRenderer.contains("this.level.getChunkSource().getChunk(chunkX, chunkZ, ChunkStatus.FULL, false)"));
+		assertTrue(levelRenderer.contains("RustGalWorldPrimitiveRenderer.recordMovingBlockShellScan"));
 		assertTrue(featureRenderDispatcher.contains("renderBlockFeaturesOnly"));
 		assertTrue(featureRenderDispatcher.contains("blockFeatureRenderer.render"));
 		assertTrue(gameRenderer.contains("RustGalFrameCoordinator.executeWholeFrameVulkan"));

@@ -101,6 +101,8 @@ public final class DeterministicCameraCapture {
 		System.getProperty("mattmc.dev.rustGalWorldMesh.blockDisplayScenario", "").trim().toLowerCase(Locale.ROOT);
 	private static final String FALLING_BLOCK_SCENARIO =
 		System.getProperty("mattmc.dev.rustGalWorldMesh.fallingBlockScenario", "").trim().toLowerCase(Locale.ROOT);
+	private static final String PISTON_SCENARIO =
+		System.getProperty("mattmc.dev.rustGalWorldMesh.pistonScenario", "").trim().toLowerCase(Locale.ROOT);
 	private static final int FORCED_ARMOR_VALUE =
 		Integer.getInteger("mattmc.dev.deterministicCameraCapture.armorValue", -1);
 	private static final float FORCED_PLAYER_HEALTH =
@@ -535,9 +537,10 @@ public final class DeterministicCameraCapture {
 				}
 					applyRuntimeOverrides(minecraft, player);
 					setupDeterministicSupportPlatform(minecraft, player);
-					setupRealSurvivalCrackBlock(minecraft, player);
-					setupBlockDisplayScenario(minecraft, player);
-					setupFallingBlockScenario(minecraft, player);
+						setupRealSurvivalCrackBlock(minecraft, player);
+						setupBlockDisplayScenario(minecraft, player);
+						setupFallingBlockScenario(minecraft, player);
+						setupPistonScenario(minecraft, player);
 		initialPose = new Pose("initial", player.getYRot(), player.getXRot());
 		if (forcedBlockOutlineTarget != null) {
 			initialPose = forcedBlockOutlineTarget.pose();
@@ -1274,6 +1277,76 @@ public final class DeterministicCameraCapture {
 		};
 	}
 
+	private static void setupPistonScenario(Minecraft minecraft, LocalPlayer player) {
+		if (PISTON_SCENARIO.isEmpty() || "hidden".equals(PISTON_SCENARIO) || minecraft.level == null || minecraft.getSingleplayerServer() == null) {
+			return;
+		}
+		ServerLevel serverLevel = minecraft.getSingleplayerServer().getLevel(minecraft.level.dimension());
+		if (serverLevel == null) {
+			return;
+		}
+		BlockState movedState = pistonMovedState();
+		Direction direction = Direction.NORTH;
+		Vec3 forward = player.getLookAngle();
+		if (forward.lengthSqr() < 0.0001) {
+			forward = new Vec3(0.0, 0.0, 1.0);
+		}
+		BlockPos origin = BlockPos.containing(player.position().add(forward.normalize().scale(4.0)));
+		int count = Math.max(1, Integer.getInteger("mattmc.dev.rustGalWorldMesh.pistonCount", 1));
+		for (int i = 0; i < count; i++) {
+			BlockPos pos = origin.offset(i, 0, 0);
+			seedMovingPiston(serverLevel, minecraft.level, pos, movedState, direction, pistonExtending(), pistonSourcePiston());
+		}
+		LOGGER.info(
+			"Deterministic piston setup spawned {} count={} scenario={} near {} for Rust-GAL moving mesh capture",
+			movedState.getBlock().builtInRegistryHolder().key().location(),
+			count,
+			PISTON_SCENARIO,
+			origin
+		);
+	}
+
+	private static BlockState pistonMovedState() {
+		return switch (PISTON_SCENARIO) {
+			case "sticky-extending", "sticky-retracting" -> Blocks.PISTON_HEAD.defaultBlockState()
+				.setValue(net.minecraft.world.level.block.piston.PistonHeadBlock.FACING, Direction.NORTH)
+				.setValue(net.minecraft.world.level.block.piston.PistonHeadBlock.TYPE, net.minecraft.world.level.block.state.properties.PistonType.STICKY);
+			case "retracting-source", "normal-retracting" -> Blocks.PISTON.defaultBlockState()
+				.setValue(net.minecraft.world.level.block.piston.PistonBaseBlock.FACING, Direction.NORTH);
+			case "cutout", "leaves" -> Blocks.OAK_LEAVES.defaultBlockState();
+			default -> Blocks.STONE.defaultBlockState();
+		};
+	}
+
+	private static boolean pistonExtending() {
+		return !PISTON_SCENARIO.contains("retracting");
+	}
+
+	private static boolean pistonSourcePiston() {
+		return PISTON_SCENARIO.contains("source");
+	}
+
+	private static void seedMovingPiston(ServerLevel serverLevel, ClientLevel clientLevel, BlockPos pos, BlockState movedState, Direction direction, boolean extending, boolean sourcePiston) {
+		BlockState movingState = Blocks.MOVING_PISTON.defaultBlockState()
+			.setValue(net.minecraft.world.level.block.piston.MovingPistonBlock.FACING, direction)
+			.setValue(net.minecraft.world.level.block.piston.MovingPistonBlock.TYPE, pistonTypeFor(movedState));
+		serverLevel.setBlock(pos, movingState, 2);
+		serverLevel.setBlockEntity(net.minecraft.world.level.block.piston.MovingPistonBlock.newMovingBlockEntity(pos, movingState, movedState, direction, extending, sourcePiston));
+		clientLevel.setBlock(pos, movingState, 2);
+		clientLevel.setBlockEntity(net.minecraft.world.level.block.piston.MovingPistonBlock.newMovingBlockEntity(pos, movingState, movedState, direction, extending, sourcePiston));
+	}
+
+	private static net.minecraft.world.level.block.state.properties.PistonType pistonTypeFor(BlockState movedState) {
+		if (movedState.is(Blocks.STICKY_PISTON)) {
+			return net.minecraft.world.level.block.state.properties.PistonType.STICKY;
+		}
+		if (movedState.is(Blocks.PISTON_HEAD)
+			&& movedState.getValue(net.minecraft.world.level.block.piston.PistonHeadBlock.TYPE) == net.minecraft.world.level.block.state.properties.PistonType.STICKY) {
+			return net.minecraft.world.level.block.state.properties.PistonType.STICKY;
+		}
+		return net.minecraft.world.level.block.state.properties.PistonType.DEFAULT;
+	}
+
 	private static void setupDeterministicSupportPlatform(Minecraft minecraft, LocalPlayer player) {
 		if (!FORCE_REAL_SURVIVAL_CRACK || !FORCE_REAL_SURVIVAL_CRACK_SETUP_BLOCK || minecraft.level == null || !"unset".equals(deterministicSupportBlock)) {
 			return;
@@ -1528,10 +1601,14 @@ public final class DeterministicCameraCapture {
 		appendTerrainParticleDiagnostics(json).append(",\n");
 		appendField(json, "rustGalWorldBlockDisplayScenario", System.getProperty("mattmc.dev.rustGalWorldMesh.blockDisplayScenario", "")).append(",\n");
 		appendBlockDisplayDiagnostics(json).append(",\n");
-		appendField(json, "rustGalWorldFallingBlockScenario", System.getProperty("mattmc.dev.rustGalWorldMesh.fallingBlockScenario", "")).append(",\n");
-		appendFallingBlockDiagnostics(json).append(",\n");
-		appendFallingBlockRouteDecisions(json).append(",\n");
-		json.append("  \"rustGalWorldOutlineDepthProbe\": ").append(Boolean.getBoolean("mattmc.dev.rustGalWorldOutline.depthProbe")).append(",\n");
+			appendField(json, "rustGalWorldFallingBlockScenario", System.getProperty("mattmc.dev.rustGalWorldMesh.fallingBlockScenario", "")).append(",\n");
+			appendField(json, "rustGalWorldPistonScenario", System.getProperty("mattmc.dev.rustGalWorldMesh.pistonScenario", "")).append(",\n");
+			appendFallingBlockDiagnostics(json).append(",\n");
+				appendFallingBlockRouteDecisions(json).append(",\n");
+				appendMovingBlockDiagnostics(json).append(",\n");
+				appendMovingBlockRouteDecisions(json).append(",\n");
+				appendMovingBlockShellScanDiagnostics(json).append(",\n");
+				json.append("  \"rustGalWorldOutlineDepthProbe\": ").append(Boolean.getBoolean("mattmc.dev.rustGalWorldOutline.depthProbe")).append(",\n");
 		json.append("  \"blockOutlineRealTargetForced\": ").append(FORCE_BLOCK_OUTLINE_TARGET).append(",\n");
 		json.append("  \"blockOutlineRealTargetAimed\": ").append(AIM_BLOCK_OUTLINE_TARGET).append(",\n");
 		json.append("  \"blockOutlinePauseParity\": ").append(BLOCK_OUTLINE_PAUSE_PARITY).append(",\n");
@@ -1910,6 +1987,99 @@ public final class DeterministicCameraCapture {
 			json.append(" }");
 		}
 		if (!decisions.isEmpty()) {
+			json.append("\n  ");
+		}
+		json.append("]");
+		return json;
+	}
+
+	private static StringBuilder appendMovingBlockDiagnostics(StringBuilder json) {
+		List<RustGalWorldPrimitiveRenderer.MovingBlockDiagnostic> diagnostics =
+			RustGalWorldPrimitiveRenderer.movingBlockDiagnostics();
+		json.append("  \"rustGalWorldMovingBlocks\": [");
+		for (int i = 0; i < diagnostics.size(); i++) {
+			RustGalWorldPrimitiveRenderer.MovingBlockDiagnostic block = diagnostics.get(i);
+			if (i > 0) {
+				json.append(",");
+			}
+			json.append("\n    { ");
+			json.append("\"frameIndex\": ").append(block.frameIndex()).append(", ");
+			appendField(json, "route", block.route(), 0).append(", ");
+			appendField(json, "provenance", block.provenance(), 0).append(", ");
+			appendField(json, "blockId", block.blockId(), 0).append(", ");
+			json.append("\"meshKey\": ").append(Long.toUnsignedString(block.meshKey())).append(", ");
+			json.append("\"meshGeneration\": ").append(block.meshGeneration()).append(", ");
+			json.append("\"vertexLayoutVersion\": ").append(block.vertexLayoutVersion()).append(", ");
+			json.append("\"indexType\": ").append(block.indexType()).append(", ");
+			json.append("\"vertexCount\": ").append(block.vertexCount()).append(", ");
+			json.append("\"indexBytes\": ").append(block.indexBytes()).append(", ");
+			json.append("\"sectionCount\": ").append(block.sectionCount()).append(", ");
+			appendField(json, "textureIds", block.textureIds(), 0).append(", ");
+			json.append("\"materialMode\": ").append(block.materialMode()).append(", ");
+			json.append("\"viewport\": { \"width\": ").append(block.viewportWidth())
+				.append(", \"height\": ").append(block.viewportHeight()).append(" }, ");
+			json.append("\"projected\": ").append(block.projected()).append(", ");
+			json.append("\"screenBounds\": { \"left\": ").append(format(block.screenLeft()))
+				.append(", \"top\": ").append(format(block.screenTop()))
+				.append(", \"right\": ").append(format(block.screenRight()))
+				.append(", \"bottom\": ").append(format(block.screenBottom())).append(" }");
+			json.append(" }");
+		}
+		if (!diagnostics.isEmpty()) {
+			json.append("\n  ");
+		}
+		json.append("]");
+		return json;
+	}
+
+	private static StringBuilder appendMovingBlockRouteDecisions(StringBuilder json) {
+		List<RustGalWorldPrimitiveRenderer.MovingBlockRouteDecision> decisions =
+			RustGalWorldPrimitiveRenderer.movingBlockRouteDecisions();
+		json.append("  \"rustGalWorldMovingBlockRouteDecisions\": [");
+		for (int i = 0; i < decisions.size(); i++) {
+			RustGalWorldPrimitiveRenderer.MovingBlockRouteDecision decision = decisions.get(i);
+			if (i > 0) {
+				json.append(",");
+			}
+			json.append("\n    { ");
+			json.append("\"frameIndex\": ").append(decision.frameIndex()).append(", ");
+			appendField(json, "provenance", decision.provenance(), 0).append(", ");
+			appendField(json, "route", decision.route(), 0).append(", ");
+			appendField(json, "blockId", decision.blockId(), 0).append(", ");
+			json.append("\"rustSelected\": ").append(decision.rustSelected()).append(", ");
+			json.append("\"rustQueued\": ").append(decision.rustQueued()).append(", ");
+			json.append("\"javaDrawn\": ").append(decision.javaDrawn());
+			json.append(" }");
+		}
+		if (!decisions.isEmpty()) {
+			json.append("\n  ");
+		}
+		json.append("]");
+		return json;
+	}
+
+	private static StringBuilder appendMovingBlockShellScanDiagnostics(StringBuilder json) {
+		List<RustGalWorldPrimitiveRenderer.MovingBlockShellScanDiagnostic> diagnostics =
+			RustGalWorldPrimitiveRenderer.movingBlockShellScanDiagnostics();
+		json.append("  \"rustGalWorldMovingBlockShellScans\": [");
+		for (int i = 0; i < diagnostics.size(); i++) {
+			RustGalWorldPrimitiveRenderer.MovingBlockShellScanDiagnostic scan = diagnostics.get(i);
+			if (i > 0) {
+				json.append(",");
+			}
+			json.append("\n    { ");
+			json.append("\"frameIndex\": ").append(scan.frameIndex()).append(", ");
+			appendField(json, "route", scan.route(), 0).append(", ");
+			json.append("\"visiblePistonStates\": ").append(scan.visiblePistonStates()).append(", ");
+			json.append("\"fallbackUsed\": ").append(scan.fallbackUsed()).append(", ");
+			json.append("\"chunksScanned\": ").append(scan.chunksScanned()).append(", ");
+			json.append("\"blockEntitiesInspected\": ").append(scan.blockEntitiesInspected()).append(", ");
+			json.append("\"pistonEntitiesFound\": ").append(scan.pistonEntitiesFound()).append(", ");
+			json.append("\"pistonStatesExtracted\": ").append(scan.pistonStatesExtracted()).append(", ");
+			json.append("\"elapsedNanos\": ").append(scan.elapsedNanos());
+			json.append(" }");
+		}
+		if (!diagnostics.isEmpty()) {
 			json.append("\n  ");
 		}
 		json.append("]");

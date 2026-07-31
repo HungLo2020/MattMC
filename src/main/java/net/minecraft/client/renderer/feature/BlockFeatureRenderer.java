@@ -41,36 +41,25 @@ public class BlockFeatureRenderer {
 			BlockState blockState = movingBlockRenderState.blockState;
 			WorldRenderRoutePolicy.Route fallingBlockRoute = WorldRenderRoutePolicy.currentFallingBlockRoute();
 			boolean fallingBlock = movingBlockSubmit.source() == SubmitNodeStorage.MovingBlockSubmitSource.FALLING_BLOCK;
-			if (fallingBlock) {
-				if (fallingBlockRoute == WorldRenderRoutePolicy.Route.DISABLED) {
-					RustGalWorldPrimitiveRenderer.recordFallingBlockRouteDecision(
-						"disabled",
-						blockState,
-						false,
-						false,
-						false
-					);
-					GraphicsFrameBenchmark.recordFallingBlockRouteDecision("disabled", blockState);
-					GraphicsFrameBenchmark.recordSubmittedWorkIdentity(
-						"falling-block",
-						"disabled:" + blockState.getBlockHolder().getRegisteredName()
-					);
-					continue;
-				}
-				if (RustGalWorldPrimitiveRenderer.enqueueFallingBlock(blockRenderDispatcher, movingBlockSubmit)) {
-					RustGalWorldPrimitiveRenderer.recordFallingBlockRouteDecision(
-						fallingBlockRoute.usesRustWholeFrameVulkan() ? "rust-vulkan-whole-frame" : "rust-opengl",
-						blockState,
-						true,
-						true,
-						false
-					);
-					GraphicsFrameBenchmark.recordFallingBlockRouteDecision(
-						fallingBlockRoute.usesRustWholeFrameVulkan() ? "rust-vulkan-whole-frame" : "rust-opengl",
-						blockState
-					);
-					continue;
-				}
+			boolean piston = movingBlockSubmit.source() == SubmitNodeStorage.MovingBlockSubmitSource.PISTON;
+			WorldRenderRoutePolicy.Route pistonRoute = WorldRenderRoutePolicy.currentPistonMovingBlockRoute();
+			if (fallingBlock && this.routeMovingBlock(
+				blockRenderDispatcher,
+				movingBlockSubmit,
+				blockState,
+				fallingBlockRoute,
+				"falling-block"
+			)) {
+				continue;
+			}
+			if (piston && this.routeMovingBlock(
+				blockRenderDispatcher,
+				movingBlockSubmit,
+				blockState,
+				pistonRoute,
+				"piston"
+			)) {
+				continue;
 			}
 			List<BlockModelPart> list = blockRenderDispatcher.getBlockModel(blockState)
 				.collectParts(RandomSource.create(blockState.getSeed(movingBlockRenderState.randomSeedPos)));
@@ -86,11 +75,11 @@ public class BlockFeatureRenderer {
 					bufferSource.getBuffer(ItemBlockRenderTypes.getMovingBlockRenderType(blockState)),
 					false,
 					OverlayTexture.NO_OVERLAY
-			);
-			if (fallingBlock) {
-				RustGalWorldPrimitiveRenderer.recordFallingBlockRouteDecision(
-					"java-legacy",
-					blockState,
+				);
+				if (fallingBlock) {
+					RustGalWorldPrimitiveRenderer.recordFallingBlockRouteDecision(
+						"java-legacy",
+						blockState,
 					false,
 					false,
 					true
@@ -98,11 +87,26 @@ public class BlockFeatureRenderer {
 				GraphicsFrameBenchmark.recordFallingBlockRouteDecision("java-legacy", blockState);
 				GraphicsFrameBenchmark.recordSubmittedWorkIdentity(
 					"falling-block",
-					"java-legacy:" + blockState.getBlockHolder().getRegisteredName()
-				);
+						"java-legacy:" + blockState.getBlockHolder().getRegisteredName()
+					);
+				}
+				if (piston) {
+					RustGalWorldPrimitiveRenderer.recordMovingBlockRouteDecision(
+						"piston",
+						"java-legacy",
+						blockState,
+						false,
+						false,
+						true
+					);
+					GraphicsFrameBenchmark.recordMovingBlockRouteDecision("piston", "java-legacy", blockState);
+					GraphicsFrameBenchmark.recordSubmittedWorkIdentity(
+						"piston",
+						"java-legacy:" + blockState.getBlockHolder().getRegisteredName()
+					);
+				}
 			}
-		}
-			this.renderOpenGlPendingMeshInstancesInCurrentScope("minecraft.entity.falling-block");
+				this.renderOpenGlPendingMeshInstancesInCurrentScope("minecraft.world.moving-block");
 
 		for (SubmitNodeStorage.BlockSubmit blockSubmit : submitNodeCollection.getBlockSubmits()) {
 			this.poseStack.pushPose();
@@ -150,9 +154,57 @@ public class BlockFeatureRenderer {
 		}
 	}
 
+	private boolean routeMovingBlock(
+		BlockRenderDispatcher blockRenderDispatcher,
+		SubmitNodeStorage.MovingBlockSubmit movingBlockSubmit,
+		BlockState blockState,
+		WorldRenderRoutePolicy.Route route,
+		String provenance
+	) {
+		if (route == WorldRenderRoutePolicy.Route.DISABLED) {
+			this.recordMovingBlockRoute(provenance, "disabled", blockState, false, false, false);
+			GraphicsFrameBenchmark.recordSubmittedWorkIdentity(
+				provenance,
+				"disabled:" + this.blockIdentity(blockState)
+			);
+			return true;
+		}
+		boolean queued = "falling-block".equals(provenance)
+			? RustGalWorldPrimitiveRenderer.enqueueFallingBlock(blockRenderDispatcher, movingBlockSubmit)
+			: RustGalWorldPrimitiveRenderer.enqueuePistonMovingBlock(blockRenderDispatcher, movingBlockSubmit);
+		if (!queued) {
+			return false;
+		}
+		String rustRoute = route.usesRustWholeFrameVulkan() ? "rust-vulkan-whole-frame" : "rust-opengl";
+		this.recordMovingBlockRoute(provenance, rustRoute, blockState, true, true, false);
+		return true;
+	}
+
+	private void recordMovingBlockRoute(
+		String provenance,
+		String route,
+		BlockState blockState,
+		boolean rustSelected,
+		boolean rustQueued,
+		boolean javaDrawn
+	) {
+		if ("falling-block".equals(provenance)) {
+			RustGalWorldPrimitiveRenderer.recordFallingBlockRouteDecision(route, blockState, rustSelected, rustQueued, javaDrawn);
+			GraphicsFrameBenchmark.recordFallingBlockRouteDecision(route, blockState);
+		} else {
+			RustGalWorldPrimitiveRenderer.recordMovingBlockRouteDecision(provenance, route, blockState, rustSelected, rustQueued, javaDrawn);
+			GraphicsFrameBenchmark.recordMovingBlockRouteDecision(provenance, route, blockState);
+		}
+	}
+
+	private String blockIdentity(BlockState blockState) {
+		return blockState == null ? "missing" : blockState.getBlockHolder().getRegisteredName();
+	}
+
 	private void renderOpenGlPendingMeshInstancesInCurrentScope(String producerLabel) {
 		if (!WorldRenderRoutePolicy.currentBlockDisplayRoute().usesRustOpenGl()
-			&& !WorldRenderRoutePolicy.currentFallingBlockRoute().usesRustOpenGl()) {
+			&& !WorldRenderRoutePolicy.currentFallingBlockRoute().usesRustOpenGl()
+			&& !WorldRenderRoutePolicy.currentPistonMovingBlockRoute().usesRustOpenGl()) {
 			return;
 		}
 		if (net.irisshaders.iris.Iris.isPackInUseQuick()) {

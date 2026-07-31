@@ -2247,6 +2247,10 @@ else:
         self.assertLessEqual(smoke.timeout_seconds, 60)
         standard = harness.parse_args(["gameplay", "--profile", "standard", "--dry-run"])
         self.assertEqual(standard.timeout_seconds, 180)
+        performance = harness.parse_args(["gameplay", "--profile", "performance", "--dry-run"])
+        self.assertEqual(performance.timeout_seconds, 300)
+        self.assertGreater(performance.warmup_frames, standard.warmup_frames)
+        self.assertGreater(performance.measure_frames, standard.measure_frames)
         extended = harness.parse_args(["gameplay", "--profile", "extended", "--dry-run"])
         self.assertEqual(extended.timeout_seconds, 300)
         self.assertLess(harness.child_process_timeout_seconds(smoke), harness.per_mode_timeout_seconds(smoke))
@@ -3526,6 +3530,34 @@ else:
             self.assertIn("-Dmattmc.dev.rustGalGui.legacyControl=true", env["JAVA_TOOL_OPTIONS"])
             self.assertIn("-Dmattmc.dev.graphicsFrameBenchmark.armorValue=19", env["JAVA_TOOL_OPTIONS"])
             self.assertIn("-Dmattmc.dev.graphicsFrameBenchmark.gameMode=survival", env["JAVA_TOOL_OPTIONS"])
+
+    def test_piston_gameplay_freezes_real_moving_pistons_and_forwards_positive_control_delay(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            target = fake_repo(root, "current")
+            args = harness.parse_args([
+                "gameplay",
+                "--profile",
+                "performance",
+                "--mode",
+                "current-opengl-shaders-off",
+                "--world-mesh-piston-scenario",
+                "normal-extending",
+                "--world-mesh-piston-count",
+                "8",
+                "--positive-control-delay-ms",
+                "3",
+            ])
+            _, env = harness.build_capture_command(
+                target, harness.MATRIX_MODES[0], root / "gameplay", "gameplay", args, "gameplay"
+            )
+            options = env["JAVA_TOOL_OPTIONS"]
+            self.assertIn("-Dmattmc.dev.rustGalWorldMesh.freezePistonProgress=true", options)
+            self.assertIn("-Dmattmc.dev.graphicsFrameBenchmark.gcBeforeMeasurement=true", options)
+            self.assertIn("-Dmattmc.dev.graphicsFrameBenchmark.positiveControlDelayNanos=3000000", options)
+            self.assertIn("-Dmattmc.dev.rustGalWorldMesh.pistonScenario=normal-extending", options)
+            self.assertIn("-Dmattmc.dev.graphicsFrameBenchmark.measureFrames=900", options)
+            self.assertEqual(env["SCREENSHOT_MAX_COUNT"], "0")
 
     def test_rust_gal_gui_global_controls_do_not_only_toggle_armor(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

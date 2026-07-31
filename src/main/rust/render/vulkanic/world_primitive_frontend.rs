@@ -1562,10 +1562,6 @@ impl WorldPrimitiveFrontend {
                     .mesh_assets
                     .get(&batch.key.mesh_key)
                     .ok_or_else(|| GalError::backend("world mesh asset vanished before submit"))?;
-                let section = asset
-                    .sections
-                    .get(batch.key.section_index as usize)
-                    .ok_or_else(|| GalError::backend("world mesh section vanished before submit"))?;
                 let slot = resources
                     .data_slots
                     .get(slot_index)
@@ -1591,9 +1587,9 @@ impl WorldPrimitiveFrontend {
                     resources.pipeline_layout,
                     slot.resource_set,
                     resources.index_buffer,
-                    section.index_offset as u64,
+                    batch.index_offset,
                     asset.index_type,
-                    section.index_count,
+                    batch.index_count,
                     batch.count() as u32,
                 ));
                 mesh_slot_indices.insert(batch.key, slot_index + 1);
@@ -3575,6 +3571,8 @@ impl MaterialBatch {
 
 struct MeshBatch {
     key: MeshResourceKey,
+    index_offset: u64,
+    index_count: u32,
     indices: Vec<usize>,
 }
 
@@ -3716,15 +3714,15 @@ fn mesh_batches(
             )));
         }
         if instance.mesh_section_index == WORLD_MESH_SECTION_ALL {
-            for (section_index, section) in asset.sections.iter().enumerate() {
-                let key = mesh_key_for_section(
-                    instance,
-                    section,
-                    section_index as u32,
-                    section.cull_policy,
-                    color_format,
-                );
-                push_mesh_batch(&mut batches, &mut key_to_batch, key, index);
+            for range in compatible_mesh_section_ranges(instance, asset, color_format)? {
+                push_mesh_batch(
+                    &mut batches,
+                    &mut key_to_batch,
+                    range.key,
+                    range.index_offset,
+                    range.index_count,
+                    index,
+                )?;
             }
         } else {
             let section = asset
@@ -3740,28 +3738,132 @@ fn mesh_batches(
                 instance.cull_policy,
                 color_format,
             );
-            push_mesh_batch(&mut batches, &mut key_to_batch, key, index);
+            push_mesh_batch(
+                &mut batches,
+                &mut key_to_batch,
+                key,
+                section.index_offset as u64,
+                section.index_count,
+                index,
+            )?;
         }
     }
     Ok(batches)
+}
+
+#[derive(Clone, Copy)]
+struct MeshSectionRange {
+    key: MeshResourceKey,
+    index_offset: u64,
+    index_count: u32,
+}
+
+fn compatible_mesh_section_ranges(
+    instance: &WorldMeshInstanceRequest,
+    asset: &MeshAssetStore,
+    color_format: ColorFormat,
+) -> GalResult<Vec<MeshSectionRange>> {
+    let mut ranges = Vec::new();
+    let Some(first) = asset.sections.first() else {
+        return Ok(ranges);
+    };
+    let mut current_key = mesh_key_for_section(instance, first, 0, first.cull_policy, color_format);
+    let mut current_offset = first.index_offset as u64;
+    let mut current_count = first.index_count;
+    let mut previous = first;
+    for (section_index, section) in asset.sections.iter().enumerate().skip(1) {
+        let key = mesh_key_for_section(
+            instance,
+            section,
+            section_index as u32,
+            section.cull_policy,
+            color_format,
+        );
+        if mesh_sections_can_coalesce(&current_key, &key, previous, section, asset.index_type)
+            && current_count
+                .checked_add(section.index_count)
+                .ok_or_else(|| GalError::invalid_argument("world mesh range index count overflow"))?
+                <= u32::MAX
+        {
+            current_count += section.index_count;
+        } else {
+            ranges.push(MeshSectionRange {
+                key: current_key,
+                index_offset: current_offset,
+                index_count: current_count,
+            });
+            current_key = key;
+            current_offset = section.index_offset as u64;
+            current_count = section.index_count;
+        }
+        previous = section;
+    }
+    ranges.push(MeshSectionRange {
+        key: current_key,
+        index_offset: current_offset,
+        index_count: current_count,
+    });
+    Ok(ranges)
+}
+
+fn mesh_sections_can_coalesce(
+    current_key: &MeshResourceKey,
+    next_key: &MeshResourceKey,
+    current_section: &WorldMeshSection,
+    next_section: &WorldMeshSection,
+    index_type: IndexType,
+) -> bool {
+    let mut compatible_next = *current_key;
+    compatible_next.section_index = next_key.section_index;
+    compatible_next == *next_key
+        && contiguous_index_range(current_section, next_section, index_type)
+}
+
+fn contiguous_index_range(
+    current_section: &WorldMeshSection,
+    next_section: &WorldMeshSection,
+    index_type: IndexType,
+) -> bool {
+    let Some(current_byte_len) = (current_section.index_count as u64).checked_mul(index_stride(index_type)) else {
+        return false;
+    };
+    current_section.index_offset as u64 + current_byte_len == next_section.index_offset as u64
+}
+
+fn index_stride(index_type: IndexType) -> u64 {
+    match index_type {
+        IndexType::U16 => 2,
+        IndexType::U32 => 4,
+    }
 }
 
 fn push_mesh_batch(
     batches: &mut Vec<MeshBatch>,
     key_to_batch: &mut BTreeMap<MeshResourceKey, usize>,
     key: MeshResourceKey,
+    index_offset: u64,
+    index_count: u32,
     instance_index: usize,
-) {
+) -> GalResult<()> {
     if let Some(batch_index) = key_to_batch.get(&key).copied() {
-        batches[batch_index].indices.push(instance_index);
+        let batch = &mut batches[batch_index];
+        if batch.index_offset != index_offset || batch.index_count != index_count {
+            return Err(GalError::invalid_argument(
+                "world mesh batch key maps to incompatible index range",
+            ));
+        }
+        batch.indices.push(instance_index);
     } else {
         let batch_index = batches.len();
         key_to_batch.insert(key, batch_index);
         batches.push(MeshBatch {
             key,
+            index_offset,
+            index_count,
             indices: vec![instance_index],
         });
     }
+    Ok(())
 }
 
 fn mesh_key_for_section(
@@ -4952,6 +5054,57 @@ mod tests {
             op,
             CommandOp::SetIndexBuffer { offset: 12, .. }
         )));
+    }
+
+    #[test]
+    fn world_mesh_coalesces_adjacent_compatible_sections_inside_rust() {
+        let mut asset = mesh_asset(185, 1, IndexType::U16);
+        asset.index_bytes.extend_from_slice(&[0, 0, 2, 0, 3, 0]);
+        asset.sections.push(WorldMeshSection {
+            material_id: WORLD_MATERIAL_ID_OPAQUE_TEXTURED,
+            texture_id: WORLD_MATERIAL_TEXTURE_STONE,
+            material_mode: WORLD_MATERIAL_MODE_OPAQUE,
+            cull_policy: WORLD_CULL_BACK,
+            winding: WORLD_WINDING_CCW,
+            index_offset: 12,
+            index_count: 3,
+        });
+        validate_mesh_asset(&asset).unwrap();
+
+        let mut gal = gal();
+        let target = frame_target(&mut gal, 1, 128, 128);
+        let mut frontend = WorldPrimitiveFrontend::default();
+        frontend
+            .apply_world_mesh_asset_update(&mut gal, 1, vec![asset], Vec::new())
+            .unwrap();
+        let mut frame = frame(Vec::new());
+        for index in 0..12 {
+            let mut instance = mesh_instance(185, 1);
+            instance.mesh_section_index = WORLD_MESH_SECTION_ALL;
+            instance.transform[12] = index as f32;
+            frame.mesh_instances.push(instance);
+        }
+
+        let (ops, stats) = frontend
+            .append_frame_ops(&mut gal, 1, target, frame)
+            .unwrap();
+
+        assert_eq!(12, stats.mesh_instance_count);
+        assert_eq!(1, stats.mesh_batch_count);
+        assert_eq!(1, stats.mesh_draw_count);
+        assert_eq!(1, frontend.mesh_resources.len());
+        assert_eq!(
+            1,
+            ops.iter()
+                .filter(|op| matches!(
+                    op,
+                    CommandOp::DrawIndexed {
+                        indices: 9,
+                        instances: 12
+                    }
+                ))
+                .count()
+        );
     }
 
     #[test]
