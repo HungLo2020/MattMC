@@ -10,6 +10,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.player.Input;
 import net.minecraft.world.entity.Display;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.item.FallingBlockEntity;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
@@ -85,6 +86,10 @@ public final class GraphicsFrameBenchmark {
 		System.getProperty("mattmc.dev.rustGalWorldMesh.blockDisplayWorkload", "single").trim().toLowerCase(Locale.ROOT);
 	private static final int BLOCK_DISPLAY_INSTANCE_COUNT =
 		Integer.getInteger("mattmc.dev.rustGalWorldMesh.blockDisplayInstanceCount", -1);
+	private static final String FALLING_BLOCK_SCENARIO =
+		System.getProperty("mattmc.dev.rustGalWorldMesh.fallingBlockScenario", "").trim().toLowerCase(Locale.ROOT);
+	private static final int FALLING_BLOCK_COUNT =
+		Math.max(1, Integer.getInteger("mattmc.dev.rustGalWorldMesh.fallingBlockCount", 1));
 	private static final int REAL_TERRAIN_PARTICLE_MATERIAL_COUNT = 5;
 	private static final int REAL_TERRAIN_PARTICLE_RESET_FRAMES =
 		Math.max(12, Integer.getInteger("mattmc.dev.rustGalWorldMaterial.terrainParticleRealGameplayResetFrames", 48));
@@ -98,6 +103,7 @@ public final class GraphicsFrameBenchmark {
 	private static final Map<String, PhaseStats> NESTED_PHASES = new LinkedHashMap<>();
 	private static final Map<String, Integer> SUBMITTED_WORK_COUNTS = new LinkedHashMap<>();
 	private static final Map<Long, Map<String, Set<String>>> SUBMITTED_WORK_BY_FRAME = new LinkedHashMap<>();
+	private static final Map<String, Integer> FALLING_BLOCK_ROUTE_COUNTS = new LinkedHashMap<>();
 	private static final List<Long> FRAME_NANOS = new ArrayList<>();
 	private static boolean initialized;
 	private static boolean complete;
@@ -155,6 +161,11 @@ public final class GraphicsFrameBenchmark {
 	private static int blockDisplayScenarioEntityCount;
 	private static int blockDisplayScenarioDistinctBlockCount;
 	private static String blockDisplayScenarioFingerprint = "unset";
+	private static boolean fallingBlockScenarioSetup;
+	private static String fallingBlockScenarioStatus = "inactive";
+	private static String fallingBlockScenarioBlock = "unset";
+	private static String fallingBlockScenarioPosition = "unset";
+	private static String fallingBlockScenarioFingerprint = "unset";
 	private static final Map<String, Integer> TERRAIN_PARTICLE_ROUTE_COUNTS = new LinkedHashMap<>();
 	private static final Map<String, Long> TERRAIN_PARTICLE_ROUTE_NANOS = new LinkedHashMap<>();
 
@@ -285,6 +296,21 @@ public final class GraphicsFrameBenchmark {
 		SUBMITTED_WORK_BY_FRAME.keySet().removeIf(frame -> frame < minimumFrame);
 	}
 
+	public static void recordFallingBlockRouteDecision(String route, BlockState blockState) {
+		if (!ENABLED || !initialized || complete || failed || route == null) {
+			return;
+		}
+		String normalizedRoute = route.trim();
+		if (normalizedRoute.isEmpty()) {
+			return;
+		}
+		FALLING_BLOCK_ROUTE_COUNTS.merge(normalizedRoute, 1, Integer::sum);
+		recordSubmittedWorkIdentity(
+			"falling-block-route",
+			normalizedRoute + ":" + blockName(blockState)
+		);
+	}
+
 	public static Zone beginTracyZone(String name) {
 		if (!tracyAvailable()) {
 			return null;
@@ -335,6 +361,7 @@ public final class GraphicsFrameBenchmark {
 			player.setXRot(initialPitch);
 			setupRealTerrainParticleGameplayBlock(minecraft, player);
 			setupBlockDisplayScenario(minecraft, player);
+			setupFallingBlockScenario(minecraft, player);
 			dimension = minecraft.level.dimension().location().toString();
 			writeStatus(minecraft, "initialized");
 			return true;
@@ -583,11 +610,72 @@ public final class GraphicsFrameBenchmark {
 		};
 	}
 
+	private static void setupFallingBlockScenario(Minecraft minecraft, LocalPlayer player) {
+		if (fallingBlockScenarioSetup) {
+			return;
+		}
+		fallingBlockScenarioSetup = true;
+		if (FALLING_BLOCK_SCENARIO.isEmpty()) {
+			fallingBlockScenarioStatus = "inactive";
+			return;
+		}
+		if ("hidden".equals(FALLING_BLOCK_SCENARIO)) {
+			fallingBlockScenarioStatus = "hidden";
+			return;
+		}
+		if (minecraft.level == null || minecraft.getSingleplayerServer() == null) {
+			fallingBlockScenarioStatus = "missing-level";
+			return;
+		}
+		ServerLevel serverLevel = minecraft.getSingleplayerServer().getLevel(minecraft.level.dimension());
+		if (serverLevel == null) {
+			fallingBlockScenarioStatus = "missing-server-level";
+			return;
+		}
+		BlockState state = fallingBlockBenchmarkState();
+		Vec3 forward = player.getLookAngle();
+		if (forward.lengthSqr() < 0.0001) {
+			forward = new Vec3(0.0, 0.0, 1.0);
+		}
+		BlockPos origin = BlockPos.containing(player.position().add(forward.normalize().scale(4.0)).add(0.0, 2.0, 0.0));
+			for (int i = 0; i < FALLING_BLOCK_COUNT; i++) {
+				BlockPos pos = origin.offset(i, 0, 0);
+				serverLevel.setBlock(pos, state, 2);
+				FallingBlockEntity entity = FallingBlockEntity.fall(serverLevel, pos, state);
+				entity.setNoGravity(true);
+				entity.setDeltaMovement(Vec3.ZERO);
+				entity.time = -12000;
+				entity.dropItem = false;
+			}
+		fallingBlockScenarioStatus = "spawned";
+		fallingBlockScenarioBlock = blockName(state);
+		fallingBlockScenarioPosition = origin.toShortString();
+		fallingBlockScenarioFingerprint = FALLING_BLOCK_SCENARIO + "|count=" + FALLING_BLOCK_COUNT + "|block=" + fallingBlockScenarioBlock;
+	}
+
+	private static BlockState fallingBlockBenchmarkState() {
+		return switch (FALLING_BLOCK_SCENARIO) {
+			case "gravel" -> Blocks.GRAVEL.defaultBlockState();
+			case "concrete-powder", "concrete_powder" -> Blocks.WHITE_CONCRETE_POWDER.defaultBlockState();
+			default -> Blocks.SAND.defaultBlockState();
+		};
+	}
+
 	private static String blockDisplayRouteControl() {
 		if (Boolean.getBoolean("mattmc.dev.rustGalWorldBlockDisplay.disabled")) {
 			return "disabled";
 		}
 		if (Boolean.getBoolean("mattmc.dev.rustGalWorldBlockDisplay.legacyControl")) {
+			return "legacy";
+		}
+		return "rust";
+	}
+
+	private static String fallingBlockRouteControl() {
+		if (Boolean.getBoolean("mattmc.dev.rustGalWorldFallingBlock.disabled")) {
+			return "disabled";
+		}
+		if (Boolean.getBoolean("mattmc.dev.rustGalWorldFallingBlock.legacyControl")) {
 			return "legacy";
 		}
 		return "rust";
@@ -765,6 +853,8 @@ public final class GraphicsFrameBenchmark {
 			json.append(",\n");
 			writeBlockDisplayScenario(json);
 			json.append(",\n");
+			writeFallingBlockScenario(json);
+			json.append(",\n");
 			writeValidity(json);
 		json.append(",\n");
 		json.append("  \"java\": {\n");
@@ -914,6 +1004,21 @@ public final class GraphicsFrameBenchmark {
 		json.append("    \"entityCount\": ").append(blockDisplayScenarioEntityCount).append(",\n");
 		json.append("    \"distinctBlockCount\": ").append(blockDisplayScenarioDistinctBlockCount).append(",\n");
 		field(json, "workloadFingerprint", blockDisplayScenarioFingerprint, 4, false);
+		json.append("  }");
+	}
+
+	private static void writeFallingBlockScenario(StringBuilder json) {
+		json.append("  \"fallingBlockScenario\": {\n");
+		json.append("    \"enabled\": ").append(!FALLING_BLOCK_SCENARIO.isEmpty()).append(",\n");
+		field(json, "scenario", FALLING_BLOCK_SCENARIO, 4, true);
+		field(json, "routeControl", fallingBlockRouteControl(), 4, true);
+		field(json, "status", fallingBlockScenarioStatus, 4, true);
+		field(json, "block", fallingBlockScenarioBlock, 4, true);
+		field(json, "position", fallingBlockScenarioPosition, 4, true);
+		json.append("    \"entityCount\": ").append(FALLING_BLOCK_SCENARIO.isEmpty() ? 0 : FALLING_BLOCK_COUNT).append(",\n");
+		writeStringIntMap(json, "routeCounts", FALLING_BLOCK_ROUTE_COUNTS);
+		json.append(",\n");
+		field(json, "workloadFingerprint", fallingBlockScenarioFingerprint, 4, false);
 		json.append("  }");
 	}
 

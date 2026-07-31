@@ -33,6 +33,7 @@ ARTIFACT_NAME = "graphics_audit_artifact.json"
 MANIFEST_NAME = "graphics_audit_manifest.json"
 BASELINE_INDEX_NAME = "graphics_audit_baselines.json"
 DEFAULT_TIMEOUT_SECONDS = 900
+NORMALIZED_LOG_TAIL_BYTES = 2_000_000
 CURRENT_REPO_ROOT = Path(__file__).resolve().parents[2]
 DEVUTILS_CACHE_ROOT = CURRENT_REPO_ROOT / "DevUtils" / ".cache"
 WORKLOAD_PROFILES = ("correctness", "moving-camera", "settled-static", "gameplay")
@@ -1207,9 +1208,19 @@ def load_capture_files(capture_dir: Path) -> dict[str, Path | None]:
     }
 
 
-def file_text(path: Path | None) -> str:
+def file_text(path: Path | None, max_tail_bytes: int = NORMALIZED_LOG_TAIL_BYTES) -> str:
     if path is None or not path.is_file():
         return ""
+    size = path.stat().st_size
+    if max_tail_bytes > 0 and size > max_tail_bytes:
+        with path.open("rb") as handle:
+            handle.seek(-max_tail_bytes, 2)
+            data = handle.read()
+        return (
+            f"[graphics-audit log truncated path={path.name} original_bytes={size} "
+            f"tail_bytes={max_tail_bytes}]\n"
+            + data.decode("utf-8", errors="replace")
+        )
     return path.read_text(encoding="utf-8", errors="replace")
 
 
@@ -1963,6 +1974,15 @@ def expected_block_display_material_mode(scenario_name: str) -> int | None:
     return None
 
 
+def expected_falling_block_id(scenario_name: str) -> str | None:
+    return {
+        "sand": "minecraft:sand",
+        "gravel": "minecraft:gravel",
+        "concrete-powder": "minecraft:white_concrete_powder",
+        "concrete_powder": "minecraft:white_concrete_powder",
+    }.get(scenario_name)
+
+
 def deterministic_world_mesh_block_display_pixel_evidence(
     doc: dict[str, object] | None,
     scenario: object,
@@ -2122,6 +2142,164 @@ def deterministic_world_mesh_block_display_pixel_evidence(
     return evidence
 
 
+def deterministic_world_mesh_falling_block_pixel_evidence(
+    doc: dict[str, object] | None,
+    scenario: object,
+) -> dict[str, object]:
+    scenario_name = str(scenario or "").strip().lower()
+    evidence: dict[str, object] = {
+        "checked": False,
+        "status": "not_requested",
+        "scenario": scenario_name or None,
+        "screenshot": None,
+        "falling_blocks_reported": 0,
+        "expected_block_id": None,
+        "validated_mesh_keys": [],
+        "crops": [],
+        "matching_pixels": 0,
+        "texture_status": "not_checked",
+        "material_status": "not_checked",
+        "orientation_status": "not_checked",
+        "position_status": "not_checked",
+        "threshold": 96,
+    }
+    if not scenario_name:
+        return evidence
+    falling_blocks = doc.get("rustGalWorldFallingBlocks") if isinstance(doc, dict) else None
+    if not isinstance(falling_blocks, list):
+        falling_blocks = []
+    evidence["falling_blocks_reported"] = len(falling_blocks)
+    if scenario_name == "hidden":
+        evidence.update(
+            {
+                "checked": True,
+                "status": "absent_expected" if not falling_blocks else "unexpected_mesh_metadata",
+                "texture_status": "absent_expected",
+                "material_status": "absent_expected",
+                "orientation_status": "absent_expected",
+                "position_status": "absent_expected",
+            }
+        )
+        return evidence
+    expected_block = expected_falling_block_id(scenario_name)
+    evidence["expected_block_id"] = expected_block
+    if not expected_block:
+        evidence["status"] = "unknown_scenario"
+        return evidence
+    captures = doc.get("captures") if isinstance(doc, dict) else None
+    if not isinstance(captures, list) or not captures:
+        evidence["status"] = "missing_capture"
+        return evidence
+    first = captures[0]
+    if not isinstance(first, dict) or not first.get("screenshot"):
+        evidence["status"] = "missing_screenshot"
+        return evidence
+    screenshot = Path(str(first["screenshot"]))
+    evidence["screenshot"] = str(screenshot)
+    if not screenshot.is_file():
+        evidence["status"] = "missing_screenshot_file"
+        return evidence
+    capture_frame = parse_number(first.get("renderedFrameIndex"))
+    try:
+        from PIL import Image
+    except Exception as exc:  # pragma: no cover
+        evidence["status"] = f"pillow_unavailable:{exc}"
+        return evidence
+    try:
+        with Image.open(screenshot) as image:
+            rgb = image.convert("RGB")
+            frame_filtered = falling_blocks
+            if capture_frame is not None:
+                exact_or_near = [
+                    block for block in falling_blocks
+                    if isinstance(block, dict)
+                    and block.get("frameIndex") is not None
+                    and abs(int(block.get("frameIndex") or -999999) - int(capture_frame)) <= 1
+                ]
+                if exact_or_near:
+                    frame_filtered = exact_or_near
+            candidates = [
+                block for block in frame_filtered
+                if isinstance(block, dict)
+                and block.get("blockId") == expected_block
+                and block.get("projected") is True
+                and isinstance(block.get("screenBounds"), dict)
+            ]
+            crops: list[dict[str, object]] = []
+            validated_mesh_keys: list[str] = []
+            total_matching = 0
+            material_ok = True
+            orientation_ok = True
+            for block in candidates[:8]:
+                bounds = block["screenBounds"]
+                assert isinstance(bounds, dict)
+                best: dict[str, object] | None = None
+                for mirrored in (False, True):
+                    crop_box = marker_crop_box(bounds, rgb.width, rgb.height, mirrored_y=mirrored)
+                    if crop_box is None:
+                        continue
+                    crop = rgb.crop(crop_box)
+                    stats = falling_block_crop_stats(crop, scenario_name)
+                    if best is None or int(stats["matching_pixels"]) > int(best["matching_pixels"]):
+                        mesh_key = str(block.get("meshKey") or "unknown")
+                        crop_path = screenshot.with_name(
+                            f"world_mesh_falling_block_crop_{scenario_name}_{mesh_key}_{'mirrored' if mirrored else 'projected'}.png"
+                        )
+                        crop.save(crop_path)
+                        material_mode = int(parse_number(block.get("materialMode")) or -1)
+                        best = {
+                            **stats,
+                            "mesh_key": mesh_key,
+                            "mesh_generation": block.get("meshGeneration"),
+                            "block_id": block.get("blockId"),
+                            "texture_ids": block.get("textureIds"),
+                            "material_mode": material_mode,
+                            "expected_material_mode": 1,
+                            "material_mode_matches": material_mode == 1,
+                            "index_type": block.get("indexType"),
+                            "vertex_count": block.get("vertexCount"),
+                            "section_count": block.get("sectionCount"),
+                            "crop": {
+                                "left": crop_box[0],
+                                "top": crop_box[1],
+                                "right": crop_box[2],
+                                "bottom": crop_box[3],
+                                "mirrored_y": mirrored,
+                            },
+                            "crop_path": str(crop_path),
+                        }
+                if best is None:
+                    crops.append({"status": "missing_projected_falling_block_crop", "falling_block": block})
+                    orientation_ok = False
+                    continue
+                crops.append(best)
+                matching = int(best["matching_pixels"])
+                total_matching += matching
+                if matching >= int(evidence["threshold"]) and best.get("material_mode_matches") is True:
+                    validated_mesh_keys.append(str(best["mesh_key"]))
+                if best.get("material_mode_matches") is not True:
+                    material_ok = False
+                if best.get("orientation_status") == "failed":
+                    orientation_ok = False
+            texture_ok = bool(validated_mesh_keys) and all(bool(crop.get("texture_ids")) for crop in crops if isinstance(crop, dict))
+            evidence.update(
+                {
+                    "checked": True,
+                    "status": "present" if validated_mesh_keys and material_ok and orientation_ok else "absent",
+                    "validated_mesh_keys": validated_mesh_keys,
+                    "crops": crops,
+                    "matching_pixels": total_matching,
+                    "texture_status": "passed" if texture_ok else "failed",
+                    "material_status": "passed" if material_ok and validated_mesh_keys else "failed",
+                    "orientation_status": "passed" if orientation_ok and validated_mesh_keys else "failed",
+                    "position_status": "projected_crop_hit" if validated_mesh_keys else "missing_projected_crop_hit",
+                }
+            )
+    except Exception as exc:
+        evidence["status"] = f"read_failed:{exc}"
+    return evidence
+
+
 def block_display_crop_stats(crop: Any, scenario_name: str) -> dict[str, object]:
     width, height = crop.size
     grey = 0
@@ -2193,6 +2371,127 @@ def block_display_crop_stats(crop: Any, scenario_name: str) -> dict[str, object]
         "coverage_ok": coverage_ok,
         "transparency_status": "passed" if transparency_ok else "failed",
         "orientation_status": "passed" if coverage_ok and transparency_ok else "failed",
+        "crop_width": width,
+        "crop_height": height,
+    }
+
+
+def falling_block_crop_stats(crop: Any, scenario_name: str) -> dict[str, object]:
+    width, height = crop.size
+    sand = 0
+    gravel = 0
+    concrete = 0
+    dark_detail = 0
+    pack_a = 0
+    pack_b = 0
+    pack_a_marker = 0
+    pack_b_marker = 0
+    missingno = 0
+    colored = 0
+    min_x = width
+    min_y = height
+    max_x = -1
+    max_y = -1
+    for y in range(height):
+        for x in range(width):
+            red, green_value, blue = crop.getpixel((x, y))
+            avg = (red + green_value + blue) / 3.0
+            is_sand = (
+                red >= 120
+                and green_value >= 105
+                and blue >= 55
+                and blue <= max(red, green_value) - 12
+                and abs(red - green_value) <= 85
+            )
+            is_gravel = 55 <= avg <= 205 and max(red, green_value, blue) - min(red, green_value, blue) <= 70
+            is_concrete = avg >= 140 and max(red, green_value, blue) - min(red, green_value, blue) <= 85
+            is_dark_detail = red <= 90 and green_value <= 90 and blue <= 95
+            is_pack_a = red >= 185 and green_value <= 95 and blue <= 125
+            is_pack_a_marker = red >= 230 and green_value >= 230 and blue >= 230
+            is_pack_a_edge = blue >= 180 and green_value <= 115 and red <= 100
+            is_pack_b = green_value >= 145 and red <= 95 and blue <= 130
+            is_pack_b_marker = red <= 35 and green_value <= 35 and blue <= 35
+            is_pack_b_edge = red >= 210 and green_value >= 165 and blue <= 90
+            is_missingno = (red >= 180 and blue >= 180 and green_value <= 90) or (
+                red <= 35 and green_value <= 35 and blue <= 35
+            )
+            is_visible = (
+                is_sand
+                or is_gravel
+                or is_concrete
+                or is_dark_detail
+                or is_pack_a
+                or is_pack_a_marker
+                or is_pack_a_edge
+                or is_pack_b
+                or is_pack_b_marker
+                or is_pack_b_edge
+                or is_missingno
+            )
+            if is_sand:
+                sand += 1
+            if is_gravel:
+                gravel += 1
+            if is_concrete:
+                concrete += 1
+            if is_dark_detail:
+                dark_detail += 1
+            if is_pack_a or is_pack_a_edge or is_pack_a_marker:
+                pack_a += 1
+            if is_pack_b or is_pack_b_edge or is_pack_b_marker:
+                pack_b += 1
+            if is_pack_a_marker:
+                pack_a_marker += 1
+            if is_pack_b_marker:
+                pack_b_marker += 1
+            if is_missingno:
+                missingno += 1
+            if is_visible:
+                colored += 1
+                min_x = min(min_x, x)
+                min_y = min(min_y, y)
+                max_x = max(max_x, x)
+                max_y = max(max_y, y)
+    if scenario_name == "gravel":
+        vanilla_matching = gravel
+        vanilla_signature = "gravel-like"
+    elif scenario_name in {"concrete-powder", "concrete_powder"}:
+        vanilla_matching = concrete
+        vanilla_signature = "white-concrete-powder-like"
+    else:
+        vanilla_matching = sand
+        vanilla_signature = "sand-like"
+    matching = max(vanilla_matching, pack_a, pack_b, missingno)
+    if missingno >= matching and matching > 0:
+        signature = "missingno"
+    elif pack_a >= matching and matching > 0:
+        signature = "pack-a"
+    elif pack_b >= matching and matching > 0:
+        signature = "pack-b"
+    else:
+        signature = vanilla_signature
+    coverage_ok = (
+        max_x > min_x
+        and max_y > min_y
+        and (max_x - min_x + 1) >= max(8, int(width * 0.25))
+        and (max_y - min_y + 1) >= max(8, int(height * 0.25))
+    )
+    return {
+        "matching_pixels": matching,
+        "texture_signature": signature,
+        "sand_pixels": sand,
+        "gravel_pixels": gravel,
+        "concrete_pixels": concrete,
+        "dark_detail_pixels": dark_detail,
+        "pack_a_pixels": pack_a,
+        "pack_b_pixels": pack_b,
+        "pack_a_marker_pixels": pack_a_marker,
+        "pack_b_marker_pixels": pack_b_marker,
+        "missingno_pixels": missingno,
+        "colored_pixels": colored,
+        "coverage_ok": coverage_ok,
+        "transparency_status": "not_applicable",
+        "orientation_status": "passed" if coverage_ok else "failed",
         "crop_width": width,
         "crop_height": height,
     }
@@ -3785,6 +4084,17 @@ def normalize_capture_artifact(
     requested_world_mesh_block_display_legacy = (
         parse_java_property(combined_logs, "mattmc.dev.rustGalWorldBlockDisplay.legacyControl") == "true"
     )
+    requested_world_mesh_falling_block_scenario = parse_java_property(
+        combined_logs, "mattmc.dev.rustGalWorldMesh.fallingBlockScenario"
+    )
+    requested_world_mesh_falling_block_disabled = (
+        parse_java_property(combined_logs, "mattmc.dev.rustGalWorldFallingBlock.disabled") == "true"
+    )
+    requested_world_mesh_falling_block_legacy = (
+        parse_java_property(combined_logs, "mattmc.dev.rustGalWorldFallingBlock.legacyControl") == "true"
+    )
+    if not requested_world_mesh_falling_block_scenario and isinstance(deterministic_doc, dict):
+        requested_world_mesh_falling_block_scenario = str(deterministic_doc.get("rustGalWorldFallingBlockScenario") or "")
     if not requested_world_mesh_block_display_scenario and isinstance(deterministic_doc, dict):
         requested_world_mesh_block_display_scenario = str(deterministic_doc.get("rustGalWorldBlockDisplayScenario") or "")
     block_display_doc = (
@@ -3805,6 +4115,46 @@ def normalize_capture_artifact(
     world_mesh_block_display_control = "disabled" if requested_world_mesh_block_display_disabled else ("legacy" if requested_world_mesh_block_display_legacy else "rust")
     if isinstance(block_display_doc, dict) and block_display_doc.get("routeControl"):
         world_mesh_block_display_control = str(block_display_doc.get("routeControl") or world_mesh_block_display_control)
+    falling_block_doc = (
+        frame_doc.get("fallingBlockScenario")
+        if isinstance(frame_doc, dict) and isinstance(frame_doc.get("fallingBlockScenario"), dict)
+        else {}
+    )
+    deterministic_falling_blocks = (
+        deterministic_doc.get("rustGalWorldFallingBlocks")
+        if isinstance(deterministic_doc, dict) and isinstance(deterministic_doc.get("rustGalWorldFallingBlocks"), list)
+        else []
+    )
+    deterministic_falling_block_route_decisions = (
+        deterministic_doc.get("rustGalWorldFallingBlockRouteDecisions")
+        if isinstance(deterministic_doc, dict)
+        and isinstance(deterministic_doc.get("rustGalWorldFallingBlockRouteDecisions"), list)
+        else []
+    )
+    falling_block_submitted_count = int(parse_number(submitted_work_counts.get("falling-block")) or 0)
+    world_mesh_falling_block_control = "disabled" if requested_world_mesh_falling_block_disabled else ("legacy" if requested_world_mesh_falling_block_legacy else "rust")
+    if isinstance(falling_block_doc, dict) and falling_block_doc.get("routeControl"):
+        world_mesh_falling_block_control = str(falling_block_doc.get("routeControl") or world_mesh_falling_block_control)
+    falling_block_route_counts = (
+        falling_block_doc.get("routeCounts")
+        if isinstance(falling_block_doc, dict) and isinstance(falling_block_doc.get("routeCounts"), dict)
+        else {}
+    )
+    deterministic_falling_block_route_counts: dict[str, int] = {}
+    for decision in deterministic_falling_block_route_decisions:
+        if not isinstance(decision, dict):
+            continue
+        route = str(decision.get("route") or "").strip()
+        if route:
+            deterministic_falling_block_route_counts[route] = deterministic_falling_block_route_counts.get(route, 0) + 1
+
+    def falling_block_route_count(route: str) -> int:
+        return int(parse_number(falling_block_route_counts.get(route)) or 0) + deterministic_falling_block_route_counts.get(route, 0)
+
+    falling_block_route_traversal_count = (
+        sum(int(parse_number(value) or 0) for value in falling_block_route_counts.values())
+        + sum(deterministic_falling_block_route_counts.values())
+    )
     terrain_particle_real_doc = (
         frame_doc.get("terrainParticleRealGameplay")
         if isinstance(frame_doc, dict) and isinstance(frame_doc.get("terrainParticleRealGameplay"), dict)
@@ -3848,6 +4198,10 @@ def normalize_capture_artifact(
     world_mesh_block_display_pixel_evidence = deterministic_world_mesh_block_display_pixel_evidence(
         deterministic_doc,
         requested_world_mesh_block_display_scenario,
+    )
+    world_mesh_falling_block_pixel_evidence = deterministic_world_mesh_falling_block_pixel_evidence(
+        deterministic_doc,
+        requested_world_mesh_falling_block_scenario,
     )
     world_crack_framebuffer = world_crack_framebuffer_evidence(combined_logs)
     rust_vulkan_shell_scene_evidence = deterministic_rust_vulkan_shell_scene_evidence(
@@ -4538,6 +4892,91 @@ def normalize_capture_artifact(
         if int(rust_gal_world_mesh_instances_for_validation or 0) != 0:
             world_mesh_block_display_workload_complete = False
             validation_messages.append("normal Java Vulkan BlockDisplay control emitted unexpected Rust mesh work")
+    world_mesh_falling_block_workload_complete = True
+    falling_block_scenario = (requested_world_mesh_falling_block_scenario or "").strip().lower()
+    if falling_block_scenario and rust_outline_mode and tool_kind != "subsystem":
+        falling_block_status = str(falling_block_doc.get("status") or "")
+        falling_block_entity_count = int(parse_number(falling_block_doc.get("entityCount")) or 0)
+        if tool_kind == "capture" and falling_block_scenario not in {"hidden"}:
+            if not falling_block_status and deterministic_falling_blocks:
+                falling_block_status = "spawned"
+            if falling_block_entity_count <= 0:
+                falling_block_entity_count = len(deterministic_falling_blocks)
+        if falling_block_scenario == "hidden":
+            if int(rust_gal_world_mesh_instances_for_validation or 0) != 0:
+                world_mesh_falling_block_workload_complete = False
+                validation_messages.append("deterministic hidden FallingBlock scenario emitted unexpected mesh instances")
+            if falling_block_status not in {"hidden", "inactive", ""}:
+                world_mesh_falling_block_workload_complete = False
+                validation_messages.append(
+                    f"deterministic hidden FallingBlock scenario reported unexpected status {falling_block_status!r}"
+                )
+        elif world_mesh_falling_block_control == "disabled":
+            if falling_block_submitted_count <= 0 and falling_block_route_count("disabled") <= 0:
+                world_mesh_falling_block_workload_complete = False
+                validation_messages.append("FallingBlock disabled control did not prove production route traversal")
+            if int(rust_gal_world_mesh_instances_for_validation or 0) != 0:
+                world_mesh_falling_block_workload_complete = False
+                validation_messages.append("FallingBlock disabled control emitted unexpected Rust mesh instances")
+        elif world_mesh_falling_block_control == "legacy":
+            if falling_block_submitted_count <= 0 and falling_block_route_count("java-legacy") <= 0:
+                world_mesh_falling_block_workload_complete = False
+                validation_messages.append("FallingBlock legacy control did not prove Java legacy draw route traversal")
+            if int(rust_gal_world_mesh_instances_for_validation or 0) != 0:
+                world_mesh_falling_block_workload_complete = False
+                validation_messages.append("FallingBlock Java legacy control emitted unexpected Rust mesh instances")
+        else:
+            if falling_block_route_traversal_count > 0 and falling_block_route_count("rust-opengl") <= 0 and falling_block_route_count("rust-vulkan-whole-frame") <= 0:
+                world_mesh_falling_block_workload_complete = False
+                validation_messages.append("FallingBlock Rust route did not record a Rust route decision")
+            if falling_block_status and falling_block_status != "spawned":
+                world_mesh_falling_block_workload_complete = False
+                validation_messages.append(
+                    f"deterministic FallingBlock scenario did not spawn production FallingBlock entities "
+                    f"(status={falling_block_status})"
+                )
+            if falling_block_entity_count <= 0:
+                world_mesh_falling_block_workload_complete = False
+                validation_messages.append("deterministic FallingBlock scenario did not report any entities")
+            required_mesh_counts = {
+                "mesh instances": rust_gal_world_mesh_instances_for_validation,
+                "mesh batches": rust_gal_world_mesh_batches_for_validation,
+                "mesh draws": rust_gal_world_mesh_draws_for_validation,
+            }
+            missing_mesh_counts = [
+                name for name, value in required_mesh_counts.items() if int(value or 0) <= 0
+            ]
+            if missing_mesh_counts:
+                world_mesh_falling_block_workload_complete = False
+                validation_messages.append(
+                    "deterministic Rust-GAL FallingBlock scenario requested but no non-zero "
+                    + ", ".join(missing_mesh_counts)
+                    + " evidence was captured"
+                )
+            if tool_kind == "capture":
+                if world_mesh_falling_block_pixel_evidence.get("status") != "present":
+                    world_mesh_falling_block_workload_complete = False
+                    validation_messages.append(
+                        "deterministic FallingBlock projected crop evidence did not prove final-frame visibility "
+                        f"(status={world_mesh_falling_block_pixel_evidence.get('status')}, "
+                        f"position={world_mesh_falling_block_pixel_evidence.get('position_status')})"
+                    )
+                elif (
+                    world_mesh_falling_block_pixel_evidence.get("texture_status") != "passed"
+                    or world_mesh_falling_block_pixel_evidence.get("material_status") != "passed"
+                    or world_mesh_falling_block_pixel_evidence.get("orientation_status") != "passed"
+                ):
+                    world_mesh_falling_block_workload_complete = False
+                    validation_messages.append(
+                        "deterministic FallingBlock projected crop evidence did not prove texture/material/orientation "
+                        f"(texture={world_mesh_falling_block_pixel_evidence.get('texture_status')}, "
+                        f"material={world_mesh_falling_block_pixel_evidence.get('material_status')}, "
+                        f"orientation={world_mesh_falling_block_pixel_evidence.get('orientation_status')})"
+                    )
+    if falling_block_scenario and mode.expected_attribution == "java-vulkan" and not rust_shell_outline_mode:
+        if int(rust_gal_world_mesh_instances_for_validation or 0) != 0:
+            world_mesh_falling_block_workload_complete = False
+            validation_messages.append("normal Java Vulkan FallingBlock control emitted unexpected Rust mesh work")
     background_scenario = (requested_world_background_scenario or "").strip().lower()
     if background_scenario and rust_shell_outline_mode:
         if background_scenario in {"hidden", "invalid"}:
@@ -4650,7 +5089,7 @@ def normalize_capture_artifact(
         creation_counts[key] = int(creation_counts.get(key) or 0) + value
     validation_categories = validation_category_counts(validation_findings)
     concrete_validation_count = concrete_validation_finding_count(validation_findings)
-    validation_run = run_type == "vulkan-validation"
+    validation_run = run_type == "vulkan-validation" and mode.backend in {"vulkan", "rust-vulkan"}
     proof = validation_proof(
         meta,
         combined_logs,
@@ -4712,6 +5151,13 @@ def normalize_capture_artifact(
     rust_gal_world_mesh_instances = last_number(combined_logs, r"rust_gal_world_mesh_instances_executed[=: ]+(\d+)")
     rust_gal_world_mesh_batches = last_number(combined_logs, r"rust_gal_world_mesh_batches_executed[=: ]+(\d+)")
     rust_gal_world_mesh_draws = last_number(combined_logs, r"rust_gal_world_mesh_draws_executed[=: ]+(\d+)")
+    if falling_block_route_traversal_count > 0:
+        if rust_gal_world_mesh_instances is None:
+            rust_gal_world_mesh_instances = 0
+        if rust_gal_world_mesh_batches is None:
+            rust_gal_world_mesh_batches = 0
+        if rust_gal_world_mesh_draws is None:
+            rust_gal_world_mesh_draws = 0
     rust_gal_world_mesh_cache_hits = last_number(combined_logs, r"rust_gal_world_mesh_cache_hits[=: ]+(\d+)")
     rust_gal_world_mesh_cache_misses = last_number(combined_logs, r"rust_gal_world_mesh_cache_misses[=: ]+(\d+)")
     rust_gal_world_background_clears = last_number(combined_logs, r"rust_gal_world_background_clears_executed[=: ]+(\d+)")
@@ -4918,6 +5364,7 @@ def normalize_capture_artifact(
         and world_material_marker_workload_complete
         and world_material_terrain_particle_workload_complete
         and world_mesh_block_display_workload_complete
+        and world_mesh_falling_block_workload_complete
         and validation_layer_exercised
         and renderdoc_complete
         and renderdoc_workload_assertions_complete
@@ -5044,6 +5491,18 @@ def normalize_capture_artifact(
                 "world_mesh_block_display_submitted_work": block_display_submitted_count,
                 "world_mesh_block_display_metrics": block_display_doc,
                 "world_mesh_block_display_pixel_evidence": world_mesh_block_display_pixel_evidence,
+                "world_mesh_falling_block_scenario": requested_world_mesh_falling_block_scenario or None,
+                "world_mesh_falling_block_control": world_mesh_falling_block_control,
+                "world_mesh_falling_block_submitted_work": falling_block_submitted_count,
+                "world_mesh_falling_block_metrics": falling_block_doc,
+                "world_mesh_falling_block_route_counts": {
+                    **{str(key): int(parse_number(value) or 0) for key, value in falling_block_route_counts.items()},
+                    **{
+                        f"deterministic:{key}": value
+                        for key, value in deterministic_falling_block_route_counts.items()
+                    },
+                },
+                "world_mesh_falling_block_pixel_evidence": world_mesh_falling_block_pixel_evidence,
                 "rust_vulkan_shell_scene_evidence": rust_vulkan_shell_scene_evidence,
                 "cache_hits": last_number(combined_logs, r"rust_gal_cache_hits[=: ]+(\d+)"),
                 "cache_misses": last_number(combined_logs, r"rust_gal_cache_misses[=: ]+(\d+)"),
@@ -5230,22 +5689,21 @@ def first_number(text: str, pattern: str) -> float | None:
 
 
 def last_number(text: str, pattern: str) -> float | None:
-    matches = list(re.finditer(pattern, text, re.IGNORECASE))
-    if not matches:
-        return None
-    return parse_number(matches[-1].group(1))
+    last: float | None = None
+    for match in re.finditer(pattern, text, re.IGNORECASE):
+        parsed = parse_number(match.group(1))
+        if parsed is not None:
+            last = parsed
+    return last
 
 
 def max_number(text: str, pattern: str) -> float | None:
-    values = [
-        parsed
-        for match in re.finditer(pattern, text, re.IGNORECASE)
-        for parsed in [parse_number(match.group(1))]
-        if parsed is not None
-    ]
-    if not values:
-        return None
-    return max(values)
+    maximum: float | None = None
+    for match in re.finditer(pattern, text, re.IGNORECASE):
+        parsed = parse_number(match.group(1))
+        if parsed is not None and (maximum is None or parsed > maximum):
+            maximum = parsed
+    return maximum
 
 
 def first_text(text: str, pattern: str) -> str | None:
@@ -5256,10 +5714,10 @@ def first_text(text: str, pattern: str) -> str | None:
 
 
 def last_text(text: str, pattern: str) -> str | None:
-    matches = list(re.finditer(pattern, text, re.IGNORECASE))
-    if not matches:
-        return None
-    return matches[-1].group(1)
+    last: str | None = None
+    for match in re.finditer(pattern, text, re.IGNORECASE):
+        last = match.group(1)
+    return last
 
 
 def incomplete_run_diagnosis(
@@ -6555,6 +7013,7 @@ def build_capture_command(
             mode.backend == "rust-vulkan"
             or kind == "shell"
             or bool(getattr(args, "world_mesh_block_display_scenario", ""))
+            or bool(getattr(args, "world_mesh_falling_block_scenario", ""))
         )
     )
     if deterministic_capture_requested:
@@ -6663,6 +7122,23 @@ def build_capture_command(
             java_options.append("-Dmattmc.dev.rustGalWorldBlockDisplay.disabled=true")
         elif block_display_control == "legacy":
             java_options.append("-Dmattmc.dev.rustGalWorldBlockDisplay.legacyControl=true")
+    if getattr(args, "world_mesh_falling_block_scenario", ""):
+        java_options.append(
+            f"-Dmattmc.dev.rustGalWorldMesh.fallingBlockScenario={args.world_mesh_falling_block_scenario}"
+        )
+        if tool_kind == "gameplay":
+            java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.yawDelta=0.0")
+            java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.displayFpsCheckEnabled=false")
+            env.setdefault("MATTMC_CAPTURE_DISABLE_DH_FOR_PERF", "true")
+        if getattr(args, "world_mesh_falling_block_count", -1) > 0:
+            java_options.append(
+                f"-Dmattmc.dev.rustGalWorldMesh.fallingBlockCount={args.world_mesh_falling_block_count}"
+            )
+        falling_block_control = getattr(args, "world_mesh_falling_block_control", "rust")
+        if falling_block_control == "disabled":
+            java_options.append("-Dmattmc.dev.rustGalWorldFallingBlock.disabled=true")
+        elif falling_block_control == "legacy":
+            java_options.append("-Dmattmc.dev.rustGalWorldFallingBlock.legacyControl=true")
     if getattr(args, "world_material_terrain_particle_real_gameplay", False):
         java_options.append("-Dmattmc.dev.rustGalWorldMaterial.terrainParticleRealGameplay=true")
         java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.displayFpsCheckEnabled=false")
@@ -7940,6 +8416,24 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
             choices=("rust", "disabled", "legacy"),
             default=os.environ.get("MATTMC_WORLD_MESH_BLOCK_DISPLAY_CONTROL", "rust"),
             help="Select the BlockDisplay route for gameplay controls.",
+        )
+        subparser.add_argument(
+            "--world-mesh-falling-block-scenario",
+            choices=("hidden", "sand", "gravel", "concrete-powder"),
+            default=os.environ.get("MATTMC_WORLD_MESH_FALLING_BLOCK_SCENARIO", ""),
+            help="Spawn deterministic vanilla FallingBlock entities for moving indexed-mesh route validation.",
+        )
+        subparser.add_argument(
+            "--world-mesh-falling-block-count",
+            type=int,
+            default=int(os.environ.get("MATTMC_WORLD_MESH_FALLING_BLOCK_COUNT", "-1")),
+            help="Override deterministic FallingBlock entity count for moving mesh probes.",
+        )
+        subparser.add_argument(
+            "--world-mesh-falling-block-control",
+            choices=("rust", "disabled", "legacy"),
+            default=os.environ.get("MATTMC_WORLD_MESH_FALLING_BLOCK_CONTROL", "rust"),
+            help="Select the FallingBlock route for gameplay controls.",
         )
         subparser.add_argument(
             "--world-material-terrain-particle-control",

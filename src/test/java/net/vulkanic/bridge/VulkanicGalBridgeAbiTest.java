@@ -129,6 +129,10 @@ class VulkanicGalBridgeAbiTest {
 			Files.readString(Path.of("src/main/java/net/vulkanic/world/WorldRenderRoutePolicy.java"))
 				.contains("currentBlockDisplayRoute()")
 		);
+		assertTrue(
+			Files.readString(Path.of("src/main/java/net/vulkanic/world/WorldRenderRoutePolicy.java"))
+				.contains("currentFallingBlockRoute()")
+		);
 	}
 
 	@Test
@@ -190,6 +194,9 @@ class VulkanicGalBridgeAbiTest {
 			assertTrue(worldRenderer.contains("reloadWorldAssets"));
 			assertTrue(worldRenderer.contains("enqueueBlockDisplay"));
 			assertTrue(worldRenderer.contains("currentBlockDisplayRoute()"));
+			assertTrue(worldRenderer.contains("enqueueFallingBlock"));
+			assertTrue(worldRenderer.contains("currentFallingBlockRoute()"));
+			assertTrue(worldRenderer.contains("MovingBlockSubmitSource.FALLING_BLOCK"));
 			assertTrue(worldRenderer.contains("SubmitNodeStorage.BlockSubmitSource.BLOCK_DISPLAY"));
 			assertTrue(worldRenderer.contains("RenderShape.MODEL"));
 			assertTrue(worldRenderer.contains("specialBlockModelRenderer().get().hasRenderer(blockState.getBlock())"));
@@ -254,6 +261,9 @@ class VulkanicGalBridgeAbiTest {
 
 		assertTrue(subsystem.contains("rust-vulkan") && subsystem.contains("rust-opengl"));
 		assertTrue(bridge.contains("Rust VulkanicGAL bridge"));
+		assertTrue(bridge.contains("awaitTracyCaptureGrace()"));
+		assertTrue(bridge.contains("Boolean.getBoolean(\"mattmc.dev.tracyCapture\")"));
+		assertTrue(bridge.contains("mattmc.dev.graphicsSubsystemBenchmark.tracyGraceMillis"));
 	}
 
 	@Test
@@ -265,6 +275,24 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(benchmark.indexOf("pollCompletion(bridge, submission)") < benchmark.indexOf("bridge.readback(submission"));
 		assertTrue(benchmark.contains("VulkanicGalBridge.Status retireStatus = bridge.retire(submission)"));
 		assertTrue(benchmark.contains("\\\"completionPolls\\\""));
+	}
+
+	@Test
+	void subsystemBridgeBarriersUseSemanticUsageStatesOnly() throws Exception {
+		String bridge = Files.readString(Path.of("src/main/java/net/vulkanic/bridge/VulkanicGalBridge.java"));
+		String benchmark = Files.readString(Path.of("src/main/java/net/minecraft/client/dev/RustGraphicsSubsystemBenchmark.java"));
+		String rustFfi = readRustFfiModules();
+
+		assertTrue(benchmark.contains(".barrier(handles.sampledTexture, VulkanicGalBridge.USAGE_TRANSFER_DST, VulkanicGalBridge.USAGE_SHADER_READ, true)"));
+		assertTrue(benchmark.contains("layout(std430, binding = 3) readonly buffer Storage3"));
+		assertTrue(benchmark.contains("layout(set = 0, binding = 3, std430) readonly buffer Storage3"));
+		assertTrue(bridge.contains("Struct.BARRIER.setInt(barrier, 4, before);"));
+		assertTrue(bridge.contains("Struct.BARRIER.setInt(barrier, 5, after);"));
+		assertTrue(bridge.contains("Struct.BARRIER.setInt(barrier, 6, 0);"));
+		assertTrue(bridge.contains("Struct.BARRIER.setInt(barrier, 7, 0);"));
+		assertFalse(bridge.contains("Struct.BARRIER.setInt(barrier, 6, STAGE"));
+		assertFalse(bridge.contains("Struct.BARRIER.setInt(barrier, 7, ACCESS"));
+		assertTrue(rustFfi.contains("resource barrier stage/access bits are deprecated"));
 	}
 
 	@Test
@@ -749,15 +777,17 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(minecraft.contains("renderRustVulkanWholeFrameShell"));
 		assertTrue(minecraft.contains("game.rendering.rust-vulkan-whole-frame"));
 		assertTrue(gameRenderer.contains("rustVulkanWholeFrameGuiExtraction"));
-		assertTrue(gameRenderer.contains("enqueueRustGalBlockDisplaysForWholeFrame"));
-		assertTrue(levelRenderer.contains("enqueueRustGalBlockDisplaysForWholeFrame"));
+		assertTrue(gameRenderer.contains("enqueueRustGalIndexedMeshFeaturesForWholeFrame"));
+		assertTrue(levelRenderer.contains("enqueueRustGalIndexedMeshFeaturesForWholeFrame"));
 		assertTrue(levelRenderer.contains("this.entityRenderDispatcher"));
 		assertTrue(levelRenderer.contains(".submit("));
 		assertTrue(queue.contains("primitiveFrame = RustGalWorldPrimitiveRenderer.consumeFrame();\n\t\t\t\tflushPendingWorldAssetsLocked();"));
-		int shellBlockDisplaysStart = levelRenderer.indexOf("enqueueRustGalBlockDisplaysForWholeFrame");
+		int shellBlockDisplaysStart = levelRenderer.indexOf("enqueueRustGalIndexedMeshFeaturesForWholeFrame");
 		int shellBlockDisplaysEnd = levelRenderer.indexOf("public void extractVisibleBlockEntities", shellBlockDisplaysStart);
 		String shellBlockDisplays = levelRenderer.substring(shellBlockDisplaysStart, shellBlockDisplaysEnd);
 		assertFalse(shellBlockDisplays.contains("isSectionCompiled"));
+		assertTrue(shellBlockDisplays.contains("Display.BlockDisplay"));
+		assertTrue(shellBlockDisplays.contains("FallingBlockEntity"));
 		assertTrue(featureRenderDispatcher.contains("renderBlockFeaturesOnly"));
 		assertTrue(featureRenderDispatcher.contains("blockFeatureRenderer.render"));
 		assertTrue(gameRenderer.contains("RustGalFrameCoordinator.executeWholeFrameVulkan"));

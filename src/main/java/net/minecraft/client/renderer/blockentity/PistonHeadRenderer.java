@@ -4,6 +4,7 @@ import net.blaze3d.vertex.PoseStack;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.SubmitNodeStorage;
 import net.minecraft.client.renderer.block.MovingBlockRenderState;
 import net.minecraft.client.renderer.blockentity.state.PistonHeadRenderState;
 import net.minecraft.client.renderer.feature.ModelFeatureRenderer;
@@ -70,10 +71,10 @@ public class PistonHeadRenderer implements BlockEntityRenderer<PistonMovingBlock
 		if (pistonHeadRenderState.block != null) {
 			poseStack.pushPose();
 			poseStack.translate(pistonHeadRenderState.xOffset, pistonHeadRenderState.yOffset, pistonHeadRenderState.zOffset);
-			submitNodeCollector.submitMovingBlock(poseStack, pistonHeadRenderState.block);
+				submitNodeCollector.submitMovingBlock(poseStack, pistonHeadRenderState.block, SubmitNodeStorage.MovingBlockSubmitSource.PISTON);
 			poseStack.popPose();
 			if (pistonHeadRenderState.base != null) {
-				submitNodeCollector.submitMovingBlock(poseStack, pistonHeadRenderState.base);
+					submitNodeCollector.submitMovingBlock(poseStack, pistonHeadRenderState.base, SubmitNodeStorage.MovingBlockSubmitSource.PISTON);
 			}
 		}
 	}

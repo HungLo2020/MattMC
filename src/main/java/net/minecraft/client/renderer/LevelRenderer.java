@@ -674,10 +674,11 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		if (net.irisshaders.iris.Iris.shouldActivateWireframe() && this.minecraft.isLocalServer()) {
 			net.irisshaders.iris.gl.IrisRenderSystem.setPolygonMode(net.vulkanic.VulkanicPolygonMode.FILL);
 		}
-			this.pipeline.finalizeLevelRendering();
-			this.renderPendingRustOpenGlPostIrisBlockOutline();
-			this.renderPendingRustOpenGlPostIrisBlockCracks();
-			this.renderPendingRustOpenGlPostIrisWorldMaterials();
+				this.pipeline.finalizeLevelRendering();
+				this.renderPendingRustOpenGlPostIrisWorldMeshes();
+				this.renderPendingRustOpenGlPostIrisBlockOutline();
+				this.renderPendingRustOpenGlPostIrisBlockCracks();
+				this.renderPendingRustOpenGlPostIrisWorldMaterials();
 			this.auditPendingBlockOutlineFramebufferProbe("after-iris-final");
 			this.auditPendingBlockCrackFramebufferProbe("after-iris-final");
 		
@@ -1006,8 +1007,10 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		}
 	}
 
-	public void enqueueRustGalBlockDisplaysForWholeFrame(Camera camera, DeltaTracker deltaTracker, Matrix4f viewMatrix, Matrix4f projectionMatrix) {
-		if (!net.vulkanic.world.WorldRenderRoutePolicy.currentBlockDisplayRoute().usesRustWholeFrameVulkan()) {
+	public void enqueueRustGalIndexedMeshFeaturesForWholeFrame(Camera camera, DeltaTracker deltaTracker, Matrix4f viewMatrix, Matrix4f projectionMatrix) {
+		boolean blockDisplays = net.vulkanic.world.WorldRenderRoutePolicy.currentBlockDisplayRoute().usesRustWholeFrameVulkan();
+		boolean fallingBlocks = net.vulkanic.world.WorldRenderRoutePolicy.currentFallingBlockRoute().usesRustWholeFrameVulkan();
+		if (!blockDisplays && !fallingBlocks) {
 			return;
 		}
 		if (this.level == null) {
@@ -1025,7 +1028,9 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		PoseStack poseStack = new PoseStack();
 
 		for (Entity entity : this.level.entitiesForRendering()) {
-			if (!(entity instanceof net.minecraft.world.entity.Display.BlockDisplay)) {
+			boolean collectBlockDisplay = blockDisplays && entity instanceof net.minecraft.world.entity.Display.BlockDisplay;
+			boolean collectFallingBlock = fallingBlocks && entity instanceof net.minecraft.world.entity.item.FallingBlockEntity;
+			if (!collectBlockDisplay && !collectFallingBlock) {
 				continue;
 			}
 			if (!this.entityRenderDispatcher.shouldRender(entity, frustum, cameraX, cameraY, cameraZ)
@@ -1058,6 +1063,10 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		}
 
 		this.featureRenderDispatcher.renderBlockFeaturesOnly();
+	}
+
+	public void enqueueRustGalBlockDisplaysForWholeFrame(Camera camera, DeltaTracker deltaTracker, Matrix4f viewMatrix, Matrix4f projectionMatrix) {
+		this.enqueueRustGalIndexedMeshFeaturesForWholeFrame(camera, deltaTracker, viewMatrix, projectionMatrix);
 	}
 
 	public void extractVisibleBlockEntities(Camera camera, float f, LevelRenderState levelRenderState) { // Made public for Iris shadow rendering
@@ -1456,6 +1465,29 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 			auditBlockOutline("world-material draw route=rust-opengl retained=false postIris=true rendered=" + rendered);
 			if (!rendered) {
 				throw new IllegalStateException("Rust OpenGL world material quads were selected post-Iris with valid semantic requests but submitted no work");
+			}
+		}
+	}
+
+	private void renderPendingRustOpenGlPostIrisWorldMeshes() {
+		if (!net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasPendingMeshInstances()) {
+			return;
+		}
+		RenderTarget finalTarget = this.minecraft.getMainRenderTarget();
+		try (RenderPass meshPass = VulkanicAPI.createRenderPass(
+			() -> "Rust GAL indexed world mesh after Iris final",
+			finalTarget.getColorTextureView(),
+			OptionalInt.empty(),
+			finalTarget.useDepth ? finalTarget.getDepthTextureView() : null,
+			OptionalDouble.empty()
+		)) {
+			boolean rendered = net.vulkanic.world.RustGalWorldPrimitiveRenderer.renderOpenGlPendingMeshInstances(
+				this.minecraft,
+				"minecraft.world-mesh.post-iris"
+			);
+			auditBlockOutline("world-mesh draw route=rust-opengl retained=false postIris=true rendered=" + rendered);
+			if (!rendered) {
+				throw new IllegalStateException("Rust OpenGL indexed world mesh was selected post-Iris with valid semantic requests but submitted no work");
 			}
 		}
 	}

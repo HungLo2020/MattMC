@@ -86,6 +86,16 @@ public final class WorldRenderRoutePolicy {
 		return selectRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
 	}
 
+	public static Route currentFallingBlockRoute() {
+		if (Boolean.getBoolean("mattmc.dev.rustGalWorldFallingBlock.disabled")) {
+			return Route.DISABLED;
+		}
+		if (Boolean.getBoolean("mattmc.dev.rustGalWorldFallingBlock.legacyControl")) {
+			return Route.JAVA_COMPATIBILITY;
+		}
+		return selectRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
+	}
+
 	public static Route selectRouteForTests(
 		boolean vulkanBackendSelected,
 		boolean wholeFrameVulkanEnabled,

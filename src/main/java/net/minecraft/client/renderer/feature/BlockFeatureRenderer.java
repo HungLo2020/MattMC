@@ -1,9 +1,14 @@
 package net.minecraft.client.renderer.feature;
 
+import net.blaze3d.pipeline.RenderTarget;
+import net.blaze3d.systems.RenderPass;
 import net.blaze3d.vertex.PoseStack;
 import java.util.List;
+import java.util.OptionalDouble;
+import java.util.OptionalInt;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.dev.GraphicsFrameBenchmark;
 import net.minecraft.client.renderer.ItemBlockRenderTypes;
 import net.minecraft.client.renderer.MultiBufferSource;
@@ -17,6 +22,7 @@ import net.minecraft.client.renderer.block.model.BlockModelPart;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.state.BlockState;
+import net.vulkanic.VulkanicAPI;
 import net.vulkanic.world.RustGalWorldPrimitiveRenderer;
 import net.vulkanic.world.WorldRenderRoutePolicy;
 
@@ -33,6 +39,39 @@ public class BlockFeatureRenderer {
 		for (SubmitNodeStorage.MovingBlockSubmit movingBlockSubmit : submitNodeCollection.getMovingBlockSubmits()) {
 			MovingBlockRenderState movingBlockRenderState = movingBlockSubmit.movingBlockRenderState();
 			BlockState blockState = movingBlockRenderState.blockState;
+			WorldRenderRoutePolicy.Route fallingBlockRoute = WorldRenderRoutePolicy.currentFallingBlockRoute();
+			boolean fallingBlock = movingBlockSubmit.source() == SubmitNodeStorage.MovingBlockSubmitSource.FALLING_BLOCK;
+			if (fallingBlock) {
+				if (fallingBlockRoute == WorldRenderRoutePolicy.Route.DISABLED) {
+					RustGalWorldPrimitiveRenderer.recordFallingBlockRouteDecision(
+						"disabled",
+						blockState,
+						false,
+						false,
+						false
+					);
+					GraphicsFrameBenchmark.recordFallingBlockRouteDecision("disabled", blockState);
+					GraphicsFrameBenchmark.recordSubmittedWorkIdentity(
+						"falling-block",
+						"disabled:" + blockState.getBlockHolder().getRegisteredName()
+					);
+					continue;
+				}
+				if (RustGalWorldPrimitiveRenderer.enqueueFallingBlock(blockRenderDispatcher, movingBlockSubmit)) {
+					RustGalWorldPrimitiveRenderer.recordFallingBlockRouteDecision(
+						fallingBlockRoute.usesRustWholeFrameVulkan() ? "rust-vulkan-whole-frame" : "rust-opengl",
+						blockState,
+						true,
+						true,
+						false
+					);
+					GraphicsFrameBenchmark.recordFallingBlockRouteDecision(
+						fallingBlockRoute.usesRustWholeFrameVulkan() ? "rust-vulkan-whole-frame" : "rust-opengl",
+						blockState
+					);
+					continue;
+				}
+			}
 			List<BlockModelPart> list = blockRenderDispatcher.getBlockModel(blockState)
 				.collectParts(RandomSource.create(blockState.getSeed(movingBlockRenderState.randomSeedPos)));
 			PoseStack poseStack = new PoseStack();
@@ -47,8 +86,23 @@ public class BlockFeatureRenderer {
 					bufferSource.getBuffer(ItemBlockRenderTypes.getMovingBlockRenderType(blockState)),
 					false,
 					OverlayTexture.NO_OVERLAY
+			);
+			if (fallingBlock) {
+				RustGalWorldPrimitiveRenderer.recordFallingBlockRouteDecision(
+					"java-legacy",
+					blockState,
+					false,
+					false,
+					true
 				);
+				GraphicsFrameBenchmark.recordFallingBlockRouteDecision("java-legacy", blockState);
+				GraphicsFrameBenchmark.recordSubmittedWorkIdentity(
+					"falling-block",
+					"java-legacy:" + blockState.getBlockHolder().getRegisteredName()
+				);
+			}
 		}
+			this.renderOpenGlPendingMeshInstancesInCurrentScope("minecraft.entity.falling-block");
 
 		for (SubmitNodeStorage.BlockSubmit blockSubmit : submitNodeCollection.getBlockSubmits()) {
 			this.poseStack.pushPose();
@@ -67,7 +121,7 @@ public class BlockFeatureRenderer {
 
 			this.poseStack.popPose();
 		}
-		RustGalWorldPrimitiveRenderer.renderOpenGlPendingMeshInstances(net.minecraft.client.Minecraft.getInstance(), "minecraft.entity.block-display");
+			this.renderOpenGlPendingMeshInstancesInCurrentScope("minecraft.entity.block-display");
 
 		for (SubmitNodeStorage.BlockModelSubmit blockModelSubmit : submitNodeCollection.getBlockModelSubmits()) {
 			ModelBlockRenderer.renderModel(
@@ -93,6 +147,38 @@ public class BlockFeatureRenderer {
 					blockModelSubmit.overlayCoords()
 				);
 			}
+		}
+	}
+
+	private void renderOpenGlPendingMeshInstancesInCurrentScope(String producerLabel) {
+		if (!WorldRenderRoutePolicy.currentBlockDisplayRoute().usesRustOpenGl()
+			&& !WorldRenderRoutePolicy.currentFallingBlockRoute().usesRustOpenGl()) {
+			return;
+		}
+		if (net.irisshaders.iris.Iris.isPackInUseQuick()) {
+			return;
+		}
+		Minecraft minecraft = Minecraft.getInstance();
+		int drawFramebuffer = VulkanicAPI.getDrawFramebufferBinding();
+		if (drawFramebuffer != 0) {
+			try (RenderPass ignored = VulkanicAPI.createRenderPass(
+				() -> "Rust GAL indexed world mesh",
+				drawFramebuffer,
+				minecraft.getMainRenderTarget().useDepth
+			)) {
+				RustGalWorldPrimitiveRenderer.renderOpenGlPendingMeshInstances(minecraft, producerLabel);
+			}
+			return;
+		}
+		RenderTarget target = minecraft.getMainRenderTarget();
+		try (RenderPass ignored = VulkanicAPI.createRenderPass(
+			() -> "Rust GAL indexed world mesh",
+			target.getColorTextureView(),
+			OptionalInt.empty(),
+			target.useDepth ? target.getDepthTextureView() : null,
+			OptionalDouble.empty()
+		)) {
+			RustGalWorldPrimitiveRenderer.renderOpenGlPendingMeshInstances(minecraft, producerLabel);
 		}
 	}
 }

@@ -21,6 +21,7 @@ import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Display;
+import net.minecraft.world.entity.item.FallingBlockEntity;
 import net.minecraft.world.entity.player.ChatVisiblity;
 import net.minecraft.world.entity.player.Input;
 import net.minecraft.world.level.GameType;
@@ -98,6 +99,8 @@ public final class DeterministicCameraCapture {
 		Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.realSurvivalCrackSetupBlock");
 	private static final String BLOCK_DISPLAY_SCENARIO =
 		System.getProperty("mattmc.dev.rustGalWorldMesh.blockDisplayScenario", "").trim().toLowerCase(Locale.ROOT);
+	private static final String FALLING_BLOCK_SCENARIO =
+		System.getProperty("mattmc.dev.rustGalWorldMesh.fallingBlockScenario", "").trim().toLowerCase(Locale.ROOT);
 	private static final int FORCED_ARMOR_VALUE =
 		Integer.getInteger("mattmc.dev.deterministicCameraCapture.armorValue", -1);
 	private static final float FORCED_PLAYER_HEALTH =
@@ -534,6 +537,7 @@ public final class DeterministicCameraCapture {
 					setupDeterministicSupportPlatform(minecraft, player);
 					setupRealSurvivalCrackBlock(minecraft, player);
 					setupBlockDisplayScenario(minecraft, player);
+					setupFallingBlockScenario(minecraft, player);
 		initialPose = new Pose("initial", player.getYRot(), player.getXRot());
 		if (forcedBlockOutlineTarget != null) {
 			initialPose = forcedBlockOutlineTarget.pose();
@@ -1231,6 +1235,45 @@ public final class DeterministicCameraCapture {
 		};
 	}
 
+	private static void setupFallingBlockScenario(Minecraft minecraft, LocalPlayer player) {
+		if (FALLING_BLOCK_SCENARIO.isEmpty() || "hidden".equals(FALLING_BLOCK_SCENARIO) || minecraft.level == null || minecraft.getSingleplayerServer() == null) {
+			return;
+		}
+		ServerLevel serverLevel = minecraft.getSingleplayerServer().getLevel(minecraft.level.dimension());
+		if (serverLevel == null) {
+			return;
+		}
+		BlockState state = fallingBlockBenchmarkState();
+		Vec3 forward = player.getLookAngle();
+		if (forward.lengthSqr() < 0.0001) {
+			forward = new Vec3(0.0, 0.0, 1.0);
+		}
+		BlockPos origin = BlockPos.containing(player.position().add(forward.normalize().scale(4.0)).add(0.0, 2.0, 0.0));
+			for (int i = 0; i < Math.max(1, Integer.getInteger("mattmc.dev.rustGalWorldMesh.fallingBlockCount", 1)); i++) {
+				BlockPos pos = origin.offset(i, 0, 0);
+				serverLevel.setBlock(pos, state, 2);
+				FallingBlockEntity entity = FallingBlockEntity.fall(serverLevel, pos, state);
+				entity.setNoGravity(true);
+				entity.setDeltaMovement(Vec3.ZERO);
+				entity.time = -12000;
+				entity.dropItem = false;
+			}
+		LOGGER.info(
+			"Deterministic FallingBlock setup spawned {} count={} near {} for Rust-GAL moving mesh capture",
+			state.getBlock().builtInRegistryHolder().key().location(),
+			Math.max(1, Integer.getInteger("mattmc.dev.rustGalWorldMesh.fallingBlockCount", 1)),
+			origin
+		);
+	}
+
+	private static BlockState fallingBlockBenchmarkState() {
+		return switch (FALLING_BLOCK_SCENARIO) {
+			case "gravel" -> Blocks.GRAVEL.defaultBlockState();
+			case "concrete-powder", "concrete_powder" -> Blocks.WHITE_CONCRETE_POWDER.defaultBlockState();
+			default -> Blocks.SAND.defaultBlockState();
+		};
+	}
+
 	private static void setupDeterministicSupportPlatform(Minecraft minecraft, LocalPlayer player) {
 		if (!FORCE_REAL_SURVIVAL_CRACK || !FORCE_REAL_SURVIVAL_CRACK_SETUP_BLOCK || minecraft.level == null || !"unset".equals(deterministicSupportBlock)) {
 			return;
@@ -1485,6 +1528,9 @@ public final class DeterministicCameraCapture {
 		appendTerrainParticleDiagnostics(json).append(",\n");
 		appendField(json, "rustGalWorldBlockDisplayScenario", System.getProperty("mattmc.dev.rustGalWorldMesh.blockDisplayScenario", "")).append(",\n");
 		appendBlockDisplayDiagnostics(json).append(",\n");
+		appendField(json, "rustGalWorldFallingBlockScenario", System.getProperty("mattmc.dev.rustGalWorldMesh.fallingBlockScenario", "")).append(",\n");
+		appendFallingBlockDiagnostics(json).append(",\n");
+		appendFallingBlockRouteDecisions(json).append(",\n");
 		json.append("  \"rustGalWorldOutlineDepthProbe\": ").append(Boolean.getBoolean("mattmc.dev.rustGalWorldOutline.depthProbe")).append(",\n");
 		json.append("  \"blockOutlineRealTargetForced\": ").append(FORCE_BLOCK_OUTLINE_TARGET).append(",\n");
 		json.append("  \"blockOutlineRealTargetAimed\": ").append(AIM_BLOCK_OUTLINE_TARGET).append(",\n");
@@ -1801,6 +1847,69 @@ public final class DeterministicCameraCapture {
 			json.append(" }");
 		}
 		if (!diagnostics.isEmpty()) {
+			json.append("\n  ");
+		}
+		json.append("]");
+		return json;
+	}
+
+	private static StringBuilder appendFallingBlockDiagnostics(StringBuilder json) {
+		List<RustGalWorldPrimitiveRenderer.FallingBlockDiagnostic> diagnostics =
+			RustGalWorldPrimitiveRenderer.fallingBlockDiagnostics();
+		json.append("  \"rustGalWorldFallingBlocks\": [");
+		for (int i = 0; i < diagnostics.size(); i++) {
+			RustGalWorldPrimitiveRenderer.FallingBlockDiagnostic block = diagnostics.get(i);
+			if (i > 0) {
+				json.append(",");
+			}
+			json.append("\n    { ");
+			json.append("\"frameIndex\": ").append(block.frameIndex()).append(", ");
+			appendField(json, "route", block.route(), 0).append(", ");
+			appendField(json, "blockId", block.blockId(), 0).append(", ");
+			json.append("\"meshKey\": ").append(Long.toUnsignedString(block.meshKey())).append(", ");
+			json.append("\"meshGeneration\": ").append(block.meshGeneration()).append(", ");
+			json.append("\"vertexLayoutVersion\": ").append(block.vertexLayoutVersion()).append(", ");
+			json.append("\"indexType\": ").append(block.indexType()).append(", ");
+			json.append("\"vertexCount\": ").append(block.vertexCount()).append(", ");
+			json.append("\"indexBytes\": ").append(block.indexBytes()).append(", ");
+			json.append("\"sectionCount\": ").append(block.sectionCount()).append(", ");
+			appendField(json, "textureIds", block.textureIds(), 0).append(", ");
+			json.append("\"materialMode\": ").append(block.materialMode()).append(", ");
+			json.append("\"viewport\": { \"width\": ").append(block.viewportWidth())
+				.append(", \"height\": ").append(block.viewportHeight()).append(" }, ");
+			json.append("\"projected\": ").append(block.projected()).append(", ");
+			json.append("\"screenBounds\": { \"left\": ").append(format(block.screenLeft()))
+				.append(", \"top\": ").append(format(block.screenTop()))
+				.append(", \"right\": ").append(format(block.screenRight()))
+				.append(", \"bottom\": ").append(format(block.screenBottom())).append(" }");
+			json.append(" }");
+		}
+		if (!diagnostics.isEmpty()) {
+			json.append("\n  ");
+		}
+		json.append("]");
+		return json;
+	}
+
+	private static StringBuilder appendFallingBlockRouteDecisions(StringBuilder json) {
+		List<RustGalWorldPrimitiveRenderer.FallingBlockRouteDecision> decisions =
+			RustGalWorldPrimitiveRenderer.fallingBlockRouteDecisions();
+		json.append("  \"rustGalWorldFallingBlockRouteDecisions\": [");
+		for (int i = 0; i < decisions.size(); i++) {
+			RustGalWorldPrimitiveRenderer.FallingBlockRouteDecision decision = decisions.get(i);
+			if (i > 0) {
+				json.append(",");
+			}
+			json.append("\n    { ");
+			json.append("\"frameIndex\": ").append(decision.frameIndex()).append(", ");
+			appendField(json, "route", decision.route(), 0).append(", ");
+			appendField(json, "blockId", decision.blockId(), 0).append(", ");
+			json.append("\"rustSelected\": ").append(decision.rustSelected()).append(", ");
+			json.append("\"rustQueued\": ").append(decision.rustQueued()).append(", ");
+			json.append("\"javaDrawn\": ").append(decision.javaDrawn());
+			json.append(" }");
+		}
+		if (!decisions.isEmpty()) {
 			json.append("\n  ");
 		}
 		json.append("]");

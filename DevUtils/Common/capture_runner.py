@@ -2053,6 +2053,9 @@ WORLD_MATERIAL_TERRAIN_PARTICLE_TEXTURES = (
     "assets/minecraft/textures/block/oak_leaves.png",
     "assets/minecraft/textures/block/deepslate.png",
     "assets/minecraft/textures/block/white_wool.png",
+    "assets/minecraft/textures/block/sand.png",
+    "assets/minecraft/textures/block/gravel.png",
+    "assets/minecraft/textures/block/white_concrete_powder.png",
 )
 
 
@@ -2109,6 +2112,7 @@ def gui_resource_pack_specs(scenario: str) -> list[dict[str, object]]:
                     "assets/minecraft/textures/block/destroy_stage_4.png",
                     "assets/minecraft/textures/item/barrier.png",
                     "assets/minecraft/textures/block/stone.png",
+                    "assets/minecraft/textures/block/sand.png",
                 ),
             }
         ]
@@ -2123,6 +2127,7 @@ def gui_resource_pack_specs(scenario: str) -> list[dict[str, object]]:
                     "assets/minecraft/textures/block/destroy_stage_4.png",
                     "assets/minecraft/textures/item/light_15.png",
                     "assets/minecraft/textures/block/oak_leaves.png",
+                    "assets/minecraft/textures/block/gravel.png",
                 ),
             }
         ]

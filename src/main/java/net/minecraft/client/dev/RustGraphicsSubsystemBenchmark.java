@@ -37,6 +37,26 @@ final class RustGraphicsSubsystemBenchmark {
 		}
 		BenchmarkResult finalResult = result[0] == null ? BenchmarkResult.failed("IllegalStateException: Rust VulkanicGAL subsystem worker produced no result") : result[0];
 		writeStatus(windowWidth, windowHeight, statusPath, backend, iterations, finalResult);
+		awaitTracyCaptureGrace();
+	}
+
+	private static void awaitTracyCaptureGrace() {
+		if (!Boolean.getBoolean("mattmc.dev.tracyCapture")) {
+			return;
+		}
+		long graceMillis = Math.max(0L, Math.min(10_000L, Long.getLong("mattmc.dev.graphicsSubsystemBenchmark.tracyGraceMillis", 3_000L)));
+		if (graceMillis <= 0L) {
+			return;
+		}
+		long deadline = System.nanoTime() + graceMillis * 1_000_000L;
+		while (System.nanoTime() < deadline) {
+			try {
+				Thread.sleep(Math.min(100L, Math.max(1L, (deadline - System.nanoTime()) / 1_000_000L)));
+			} catch (InterruptedException interrupted) {
+				Thread.currentThread().interrupt();
+				return;
+			}
+		}
 	}
 
 	private static BenchmarkResult runIsolated(int iterations, String backend) {
@@ -364,7 +384,7 @@ final class RustGraphicsSubsystemBenchmark {
 		layout(std140, binding = 2) uniform Uniforms2 {
 		    uint uboSalt;
 		};
-		layout(std430, binding = 3) buffer Storage3 {
+		layout(std430, binding = 3) readonly buffer Storage3 {
 		    uint ssboSalt;
 		};
 		uniform sampler2D tex0;
@@ -383,7 +403,7 @@ final class RustGraphicsSubsystemBenchmark {
 		layout(set = 0, binding = 2, std140) uniform Uniforms2 {
 		    uint uboSalt;
 		};
-		layout(set = 0, binding = 3, std430) buffer Storage3 {
+		layout(set = 0, binding = 3, std430) readonly buffer Storage3 {
 		    uint ssboSalt;
 		};
 		layout(location = 0) in vec2 v_uv;

@@ -9,8 +9,10 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.ItemBlockRenderTypes;
+import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.SubmitNodeStorage;
 import net.minecraft.client.renderer.block.BlockRenderDispatcher;
+import net.minecraft.client.renderer.block.MovingBlockRenderState;
 import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.client.renderer.block.model.BlockModelPart;
 import net.minecraft.client.renderer.block.model.BlockStateModel;
@@ -31,9 +33,11 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.BlockAndTintGetter;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.LightBlock;
+import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.pattern.BlockInWorld;
 import net.minecraft.world.phys.BlockHitResult;
@@ -50,6 +54,9 @@ import org.joml.Vector3f;
 import org.joml.Vector4f;
 import org.slf4j.Logger;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.MessageDigest;
@@ -66,6 +73,7 @@ public final class RustGalWorldPrimitiveRenderer {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	public static final int STRATUM_WORLD_BORDER = 80;
 	public static final int STRATUM_WORLD_MATERIAL = 70;
+	public static final int STRATUM_WORLD_MOVING_MESH = 68;
 	public static final int STRATUM_WORLD_BLOCK_BREAKING_CRACK = 90;
 	public static final int STRATUM_WORLD_BLOCK_OUTLINE = 100;
 	public static final int STYLE_NORMAL = 1;
@@ -103,6 +111,8 @@ public final class RustGalWorldPrimitiveRenderer {
 	public static final int MATERIAL_MODE_CUTOUT = 2;
 	public static final int MESH_VERTEX_LAYOUT_V1 = 1;
 	public static final int MESH_SECTION_ALL = -1;
+	private static final ResourceLocation MISSING_TEXTURE_LOCATION = ResourceLocation.withDefaultNamespace("missingno");
+	private static byte[] missingTexturePayload;
 	public static final int WORLD_TOPOLOGY_TRIANGLES = 1;
 	public static final int WORLD_WINDING_CCW = 1;
 	public static final int WORLD_WINDING_CW = 2;
@@ -210,6 +220,8 @@ public final class RustGalWorldPrimitiveRenderer {
 	private static final List<BlockMarkerDiagnostic> BLOCK_MARKER_DIAGNOSTICS = new ArrayList<>();
 	private static final List<TerrainParticleDiagnostic> TERRAIN_PARTICLE_DIAGNOSTICS = new ArrayList<>();
 	private static final List<BlockDisplayDiagnostic> BLOCK_DISPLAY_DIAGNOSTICS = new ArrayList<>();
+	private static final List<FallingBlockDiagnostic> FALLING_BLOCK_DIAGNOSTICS = new ArrayList<>();
+	private static final List<FallingBlockRouteDecision> FALLING_BLOCK_ROUTE_DECISIONS = new ArrayList<>();
 	private static final float[] PENDING_VIEW = new float[16];
 	private static final float[] PENDING_PROJECTION = new float[16];
 	private static VulkanicGalBridge.WorldBackgroundRecord pendingBackground = VulkanicGalBridge.WorldBackgroundRecord.diagnosticFallback();
@@ -249,6 +261,7 @@ public final class RustGalWorldPrimitiveRenderer {
 	private static int blockOutlineProjectionDiagnosticLogs;
 	private static int blockMarkerEnqueueDiagnosticLogs;
 	private static int terrainParticleEnqueueDiagnosticLogs;
+	private static int fallingBlockEnqueueDiagnosticLogs;
 
 	private RustGalWorldPrimitiveRenderer() {
 	}
@@ -285,6 +298,11 @@ public final class RustGalWorldPrimitiveRenderer {
 		return WorldRenderRoutePolicy.currentMaterialRoute().usesRustOpenGl();
 	}
 
+	private static boolean shouldUseRustOpenGlMeshInstances() {
+		return WorldRenderRoutePolicy.currentBlockDisplayRoute().usesRustOpenGl()
+			|| WorldRenderRoutePolicy.currentFallingBlockRoute().usesRustOpenGl();
+	}
+
 	public static boolean shouldRouteTerrainParticle(BlockState blockState) {
 		WorldRenderRoutePolicy.Route route = WorldRenderRoutePolicy.currentMaterialRoute();
 		return (route.usesRustOpenGl() || route.usesRustWholeFrameVulkan())
@@ -294,7 +312,9 @@ public final class RustGalWorldPrimitiveRenderer {
 	public static boolean shouldUseRustOpenGlWorldPrimitives() {
 		return shouldUseRustOpenGlOutline()
 			|| shouldUseRustOpenGlCrack()
-			|| WorldRenderRoutePolicy.currentMaterialRoute().usesRustOpenGl();
+			|| WorldRenderRoutePolicy.currentMaterialRoute().usesRustOpenGl()
+			|| WorldRenderRoutePolicy.currentBlockDisplayRoute().usesRustOpenGl()
+			|| WorldRenderRoutePolicy.currentFallingBlockRoute().usesRustOpenGl();
 	}
 
 	public static boolean crackDisabledForDiagnostics() {
@@ -993,21 +1013,23 @@ public final class RustGalWorldPrimitiveRenderer {
 			return false;
 		}
 		ChunkSectionLayer layer = ItemBlockRenderTypes.getChunkRenderType(blockState);
-		int materialMode;
-		int materialId;
-		if (layer == ChunkSectionLayer.SOLID) {
-			materialMode = MATERIAL_MODE_OPAQUE;
-			materialId = MATERIAL_ID_OPAQUE_TEXTURED;
-		} else if (layer == ChunkSectionLayer.CUTOUT || layer == ChunkSectionLayer.CUTOUT_MIPPED) {
-			materialMode = MATERIAL_MODE_CUTOUT;
-			materialId = MATERIAL_ID_CUTOUT_TEXTURED;
-		} else {
+		MeshMaterial material = meshMaterialForChunkLayer(layer);
+		if (material == null) {
 			return false;
 		}
 		GraphicsFrameBenchmark.beginPhase("world.block-display.java-extraction");
 		BlockMeshExtraction extraction;
 		try {
-			extraction = extractBlockDisplayMesh(blockRenderDispatcher, blockState, materialId, materialMode);
+			extraction = extractBlockModelMesh(
+				blockRenderDispatcher,
+				blockState,
+				BlockPos.ZERO,
+				null,
+				null,
+				material.materialId(),
+				material.materialMode(),
+				"BlockDisplay"
+			);
 		} finally {
 			GraphicsFrameBenchmark.endPhase("world.block-display.java-extraction");
 		}
@@ -1069,6 +1091,110 @@ public final class RustGalWorldPrimitiveRenderer {
 		return true;
 	}
 
+	public static boolean enqueueFallingBlock(
+		BlockRenderDispatcher blockRenderDispatcher,
+		SubmitNodeStorage.MovingBlockSubmit movingBlockSubmit
+	) {
+		WorldRenderRoutePolicy.Route route = WorldRenderRoutePolicy.currentFallingBlockRoute();
+		if (!route.usesRustOpenGl() && !route.usesRustWholeFrameVulkan()) {
+			return false;
+		}
+		if (movingBlockSubmit.source() != SubmitNodeStorage.MovingBlockSubmitSource.FALLING_BLOCK) {
+			return false;
+		}
+		MovingBlockRenderState movingBlockRenderState = movingBlockSubmit.movingBlockRenderState();
+		BlockState blockState = movingBlockRenderState.blockState;
+		if (blockState == null || blockState.isAir() || blockState.getRenderShape() != RenderShape.MODEL) {
+			return false;
+		}
+		if (Minecraft.getInstance().getModelManager().specialBlockModelRenderer().get().hasRenderer(blockState.getBlock())) {
+			return false;
+		}
+		RenderType renderType = ItemBlockRenderTypes.getMovingBlockRenderType(blockState);
+		MeshMaterial material = meshMaterialForMovingRenderType(renderType);
+		if (material == null) {
+			return false;
+		}
+		GraphicsFrameBenchmark.beginPhase("world.falling-block.java-extraction");
+		BlockMeshExtraction extraction;
+		try {
+			extraction = extractBlockModelMesh(
+				blockRenderDispatcher,
+				blockState,
+				movingBlockRenderState.randomSeedPos,
+				movingBlockRenderState,
+				movingBlockRenderState.blockPos,
+				material.materialId(),
+				material.materialMode(),
+				"FallingBlock"
+			);
+		} finally {
+			GraphicsFrameBenchmark.endPhase("world.falling-block.java-extraction");
+		}
+		if (extraction == null) {
+			return false;
+		}
+		GraphicsFrameBenchmark.beginPhase("world.falling-block.rust-enqueue");
+		try {
+			synchronized (LOCK) {
+				int viewportWidth = pendingViewportWidth;
+				int viewportHeight = pendingViewportHeight;
+				if (viewportWidth <= 0 || viewportHeight <= 0) {
+					throw new IllegalStateException("Rust VulkanicGAL FallingBlock requires a seeded world primitive frame");
+				}
+				ensureMeshAssetLocked(extraction);
+				VulkanicGalBridge.WorldMeshAssetRecord cachedAsset = WORLD_MESH_ASSETS.get(extraction.meshKey());
+				long meshGeneration = cachedAsset == null ? extraction.meshGeneration() : cachedAsset.meshGeneration();
+				float[] transform = new float[16];
+				movingBlockSubmit.pose().get(transform);
+				PENDING_MESH_INSTANCES.add(new VulkanicGalBridge.WorldMeshInstanceRecord(
+					STRATUM_WORLD_MOVING_MESH,
+					extraction.meshKey(),
+					meshGeneration,
+					MESH_SECTION_ALL,
+					DEPTH_POLICY_TEST_WRITE,
+					CULL_BACK,
+					WORLD_WINDING_CCW,
+					0xffffffff,
+					transform,
+					viewportWidth,
+					viewportHeight
+				));
+				recordFallingBlockDiagnostic(
+					route.usesRustWholeFrameVulkan() ? "rust-vulkan-whole-frame" : "rust-opengl",
+					blockState,
+					extraction.meshKey(),
+					meshGeneration,
+					extraction.asset(),
+					transform,
+					viewportWidth,
+					viewportHeight
+				);
+				GraphicsFrameBenchmark.recordSubmittedWorkIdentity(
+					"falling-block",
+					(route.usesRustWholeFrameVulkan() ? "rust-vulkan-whole-frame:" : "rust-opengl:") + blockState.getBlockHolder().getRegisteredName()
+				);
+				if (fallingBlockEnqueueDiagnosticLogs < 24) {
+					fallingBlockEnqueueDiagnosticLogs++;
+					auditMessage("Rust VulkanicGAL FallingBlock mesh request"
+						+ " route=" + (route.usesRustWholeFrameVulkan() ? "rust-vulkan-whole-frame" : "rust-opengl")
+						+ " provenance=falling-block"
+						+ " mesh_key=" + extraction.meshKey()
+						+ " mesh_generation=" + meshGeneration
+						+ " block=" + metricValue(blockState.getBlockHolder().getRegisteredName())
+						+ " vertices=" + extraction.asset().vertices().size()
+						+ " index_bytes=" + extraction.asset().indexBytes().length
+						+ " sections=" + extraction.asset().sections().size()
+						+ " viewport=" + viewportWidth + "x" + viewportHeight
+						+ " result=queued");
+				}
+			}
+		} finally {
+			GraphicsFrameBenchmark.endPhase("world.falling-block.rust-enqueue");
+		}
+		return true;
+	}
+
 	private static void ensureMeshAssetLocked(BlockMeshExtraction extraction) {
 		if (WORLD_MESH_ASSETS.containsKey(extraction.meshKey())) {
 			return;
@@ -1090,15 +1216,39 @@ public final class RustGalWorldPrimitiveRenderer {
 		}
 	}
 
-	private static BlockMeshExtraction extractBlockDisplayMesh(
+	private static MeshMaterial meshMaterialForChunkLayer(ChunkSectionLayer layer) {
+		if (layer == ChunkSectionLayer.SOLID) {
+			return new MeshMaterial(MATERIAL_ID_OPAQUE_TEXTURED, MATERIAL_MODE_OPAQUE);
+		}
+		if (layer == ChunkSectionLayer.CUTOUT || layer == ChunkSectionLayer.CUTOUT_MIPPED) {
+			return new MeshMaterial(MATERIAL_ID_CUTOUT_TEXTURED, MATERIAL_MODE_CUTOUT);
+		}
+		return null;
+	}
+
+	private static MeshMaterial meshMaterialForMovingRenderType(RenderType renderType) {
+		if (renderType == RenderType.solid()) {
+			return new MeshMaterial(MATERIAL_ID_OPAQUE_TEXTURED, MATERIAL_MODE_OPAQUE);
+		}
+		if (renderType == RenderType.cutout() || renderType == RenderType.cutoutMipped()) {
+			return new MeshMaterial(MATERIAL_ID_CUTOUT_TEXTURED, MATERIAL_MODE_CUTOUT);
+		}
+		return null;
+	}
+
+	private static BlockMeshExtraction extractBlockModelMesh(
 		BlockRenderDispatcher blockRenderDispatcher,
 		BlockState blockState,
+		BlockPos randomSeedPos,
+		BlockAndTintGetter tintGetter,
+		BlockPos tintPos,
 		int materialId,
-		int materialMode
+		int materialMode,
+		String diagnosticName
 	) {
 		try {
 			BlockStateModel model = blockRenderDispatcher.getBlockModel(blockState);
-			List<BlockModelPart> parts = model.collectParts(RandomSource.create(blockState.getSeed(BlockPos.ZERO)));
+			List<BlockModelPart> parts = model.collectParts(RandomSource.create(blockState.getSeed(randomSeedPos)));
 			if (parts.isEmpty()) {
 				return null;
 			}
@@ -1106,12 +1256,12 @@ public final class RustGalWorldPrimitiveRenderer {
 			List<VulkanicGalBridge.WorldMeshSectionRecord> sections = new ArrayList<>();
 			List<VulkanicGalBridge.WorldMeshTextureAssetRecord> textures = new ArrayList<>();
 			List<Integer> indices = new ArrayList<>();
-			long hash = fnv64("block-display:" + blockState.toString() + ":" + materialMode);
+			long hash = fnv64("block-model:" + blockState + ":" + randomSeedPos.asLong() + ":" + materialMode);
 			for (BlockModelPart part : parts) {
 				for (Direction direction : Direction.values()) {
-					appendBlockDisplayQuads(part.getQuads(direction), blockState, materialId, materialMode, vertices, indices, sections, textures);
+					appendBlockModelQuads(part.getQuads(direction), blockState, tintGetter, tintPos, materialId, materialMode, vertices, indices, sections, textures);
 				}
-				appendBlockDisplayQuads(part.getQuads(null), blockState, materialId, materialMode, vertices, indices, sections, textures);
+				appendBlockModelQuads(part.getQuads(null), blockState, tintGetter, tintPos, materialId, materialMode, vertices, indices, sections, textures);
 			}
 			if (vertices.isEmpty() || indices.isEmpty() || sections.isEmpty()) {
 				return null;
@@ -1169,13 +1319,15 @@ public final class RustGalWorldPrimitiveRenderer {
 				textures
 			);
 		} catch (RuntimeException error) {
-			throw new IllegalStateException("Rust VulkanicGAL BlockDisplay mesh extraction failed", error);
+			throw new IllegalStateException("Rust VulkanicGAL " + diagnosticName + " mesh extraction failed", error);
 		}
 	}
 
-	private static void appendBlockDisplayQuads(
+	private static void appendBlockModelQuads(
 		List<BakedQuad> quads,
 		BlockState blockState,
+		BlockAndTintGetter tintGetter,
+		BlockPos tintPos,
 		int materialId,
 		int materialMode,
 		List<VulkanicGalBridge.WorldMeshVertexRecord> vertices,
@@ -1193,13 +1345,13 @@ public final class RustGalWorldPrimitiveRenderer {
 			int textureId = stableTextureId(spriteName);
 			byte[] payload = readTexturePayload(spriteName);
 			if (payload == null) {
-				throw new IllegalStateException("unsupported BlockDisplay texture asset " + spriteName);
+				throw new IllegalStateException("unsupported block-model texture asset " + spriteName);
 			}
 			textures.add(new VulkanicGalBridge.WorldMeshTextureAssetRecord(textureId, payload));
 			int firstIndex = indices.size();
 			int base = vertices.size();
 			int tintColor = bakedQuad.isTinted()
-				? 0xff000000 | Minecraft.getInstance().getBlockColors().getColor(blockState, null, null, bakedQuad.tintIndex())
+				? 0xff000000 | Minecraft.getInstance().getBlockColors().getColor(blockState, tintGetter, tintPos, bakedQuad.tintIndex())
 				: 0xffffffff;
 			int winding = blockDisplayQuadWinding(quad, bakedQuad.direction());
 			for (int i = 0; i < 4; i++) {
@@ -1250,6 +1402,9 @@ public final class RustGalWorldPrimitiveRenderer {
 	}
 
 	private static byte[] readTexturePayload(ResourceLocation spriteName) {
+		if (MISSING_TEXTURE_LOCATION.equals(spriteName)) {
+			return missingTexturePayload();
+		}
 		ResourceLocation textureLocation = ResourceLocation.fromNamespaceAndPath(
 			spriteName.getNamespace(),
 			"textures/" + spriteName.getPath() + ".png"
@@ -1261,7 +1416,31 @@ public final class RustGalWorldPrimitiveRenderer {
 		try (InputStream input = resource.get().open()) {
 			return input.readAllBytes();
 		} catch (IOException error) {
-			LOGGER.warn("Failed to read Rust VulkanicGAL BlockDisplay texture {}", textureLocation, error);
+			LOGGER.warn("Failed to read Rust VulkanicGAL block-model texture {}", textureLocation, error);
+			return null;
+		}
+	}
+
+	private static byte[] missingTexturePayload() {
+		byte[] cached = missingTexturePayload;
+		if (cached != null) {
+			return cached;
+		}
+		try {
+			BufferedImage image = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
+			for (int y = 0; y < image.getHeight(); y++) {
+				for (int x = 0; x < image.getWidth(); x++) {
+					boolean dark = ((x / 8) + (y / 8)) % 2 == 0;
+					image.setRGB(x, y, dark ? 0xff000000 : 0xffff00ff);
+				}
+			}
+			ByteArrayOutputStream output = new ByteArrayOutputStream(256);
+			ImageIO.write(image, "png", output);
+			cached = output.toByteArray();
+			missingTexturePayload = cached;
+			return cached;
+		} catch (IOException error) {
+			LOGGER.warn("Failed to generate Rust VulkanicGAL missing block-model texture payload", error);
 			return null;
 		}
 	}
@@ -1300,6 +1479,9 @@ public final class RustGalWorldPrimitiveRenderer {
 		public BlockMeshExtraction {
 			textures = List.copyOf(textures);
 		}
+	}
+
+	private record MeshMaterial(int materialId, int materialMode) {
 	}
 
 	private static void recordBlockMarkerDiagnostic(
@@ -1567,9 +1749,96 @@ public final class RustGalWorldPrimitiveRenderer {
 		}
 	}
 
+	private static void recordFallingBlockDiagnostic(
+		String route,
+		BlockState blockState,
+		long meshKey,
+		long meshGeneration,
+		VulkanicGalBridge.WorldMeshAssetRecord asset,
+		float[] transform,
+		int viewportWidth,
+		int viewportHeight
+	) {
+		if (!Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")) {
+			return;
+		}
+		if (FALLING_BLOCK_DIAGNOSTICS.size() >= 512) {
+			FALLING_BLOCK_DIAGNOSTICS.remove(0);
+		}
+		ProjectedBounds projectedBounds = projectMeshBounds(asset.vertices(), transform, viewportWidth, viewportHeight);
+		String blockId = blockState.getBlock().builtInRegistryHolder().key().location().toString();
+		String textureIds = meshTextureIds(asset);
+		int materialMode = asset.sections().isEmpty() ? 0 : asset.sections().get(0).materialMode();
+		FALLING_BLOCK_DIAGNOSTICS.add(new FallingBlockDiagnostic(
+			DeterministicCameraCapture.currentRenderedFrameIndex(),
+			route,
+			blockId,
+			meshKey,
+			meshGeneration,
+			asset.vertexLayoutVersion(),
+			asset.indexType(),
+			asset.vertices().size(),
+			asset.indexBytes().length,
+			asset.sections().size(),
+			textureIds,
+			materialMode,
+			viewportWidth,
+			viewportHeight,
+			projectedBounds.valid(),
+			projectedBounds.left(),
+			projectedBounds.top(),
+			projectedBounds.right(),
+			projectedBounds.bottom()
+		));
+	}
+
+	public static List<FallingBlockDiagnostic> fallingBlockDiagnostics() {
+		synchronized (LOCK) {
+			return List.copyOf(FALLING_BLOCK_DIAGNOSTICS);
+		}
+	}
+
+	public static void recordFallingBlockRouteDecision(
+		String route,
+		BlockState blockState,
+		boolean rustSelected,
+		boolean rustQueued,
+		boolean javaDrawn
+	) {
+		if (!Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")) {
+			return;
+		}
+		String blockId = blockState == null ? "missing" : blockState.getBlock().builtInRegistryHolder().key().location().toString();
+		synchronized (LOCK) {
+			if (FALLING_BLOCK_ROUTE_DECISIONS.size() >= 512) {
+				FALLING_BLOCK_ROUTE_DECISIONS.remove(0);
+			}
+			FALLING_BLOCK_ROUTE_DECISIONS.add(new FallingBlockRouteDecision(
+				DeterministicCameraCapture.currentRenderedFrameIndex(),
+				route,
+				blockId,
+				rustSelected,
+				rustQueued,
+				javaDrawn
+			));
+		}
+	}
+
+	public static List<FallingBlockRouteDecision> fallingBlockRouteDecisions() {
+		synchronized (LOCK) {
+			return List.copyOf(FALLING_BLOCK_ROUTE_DECISIONS);
+		}
+	}
+
 	public static boolean hasPendingMaterialQuads() {
 		synchronized (LOCK) {
 			return !PENDING_MATERIAL_QUADS.isEmpty();
+		}
+	}
+
+	public static boolean hasPendingMeshInstances() {
+		synchronized (LOCK) {
+			return !PENDING_MESH_INSTANCES.isEmpty();
 		}
 	}
 
@@ -1611,7 +1880,7 @@ public final class RustGalWorldPrimitiveRenderer {
 	}
 
 	public static boolean renderOpenGlPendingMeshInstances(Minecraft minecraft, String producerLabel) {
-		if (!WorldRenderRoutePolicy.currentBlockDisplayRoute().usesRustOpenGl()) {
+		if (!shouldUseRustOpenGlMeshInstances()) {
 			return false;
 		}
 		PrimitiveFrame frame;
@@ -2525,6 +2794,39 @@ public final class RustGalWorldPrimitiveRenderer {
 		float screenTop,
 		float screenRight,
 		float screenBottom
+	) {
+	}
+
+	public record FallingBlockDiagnostic(
+		long frameIndex,
+		String route,
+		String blockId,
+		long meshKey,
+		long meshGeneration,
+		int vertexLayoutVersion,
+		int indexType,
+		int vertexCount,
+		int indexBytes,
+		int sectionCount,
+		String textureIds,
+		int materialMode,
+		int viewportWidth,
+		int viewportHeight,
+		boolean projected,
+		float screenLeft,
+		float screenTop,
+		float screenRight,
+		float screenBottom
+	) {
+	}
+
+	public record FallingBlockRouteDecision(
+		long frameIndex,
+		String route,
+		String blockId,
+		boolean rustSelected,
+		boolean rustQueued,
+		boolean javaDrawn
 	) {
 	}
 

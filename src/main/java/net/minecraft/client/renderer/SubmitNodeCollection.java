@@ -170,8 +170,13 @@ public class SubmitNodeCollection implements OrderedSubmitNodeCollector, Ordered
 
 	@Override
 	public void submitMovingBlock(PoseStack poseStack, MovingBlockRenderState movingBlockRenderState) {
+		this.submitMovingBlock(poseStack, movingBlockRenderState, SubmitNodeStorage.MovingBlockSubmitSource.UNKNOWN);
+	}
+
+	@Override
+	public void submitMovingBlock(PoseStack poseStack, MovingBlockRenderState movingBlockRenderState, SubmitNodeStorage.MovingBlockSubmitSource source) {
 		this.wasUsed = true;
-		this.movingBlockSubmits.add(new SubmitNodeStorage.MovingBlockSubmit(new Matrix4f(poseStack.last().pose()), movingBlockRenderState));
+		this.movingBlockSubmits.add(new SubmitNodeStorage.MovingBlockSubmit(new Matrix4f(poseStack.last().pose()), movingBlockRenderState, source));
 	}
 
 	@Override

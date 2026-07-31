@@ -1,6 +1,13 @@
 use super::*;
 use crate::render::vulkanic::world_primitive_frontend::material as world_material_semantics;
 
+fn is_world_mesh_stratum(stratum: u32) -> bool {
+    matches!(
+        stratum,
+        WORLD_STRATUM_OPAQUE_TEXTURED_GEOMETRY | WORLD_STRATUM_MOVING_MESH
+    )
+}
+
 pub(crate) unsafe fn decode_whole_frame_submit(
     request: *const FfiWholeFrameSubmitRequest,
     capabilities: BackendCapabilities,
@@ -651,7 +658,7 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
             instance.byte_size,
             "world primitive mesh instance",
         )?;
-        if instance.stratum != WORLD_STRATUM_OPAQUE_TEXTURED_GEOMETRY {
+        if !is_world_mesh_stratum(instance.stratum) {
             return Err(GalError::ffi(
                 StatusCode::UnknownEnum,
                 format!("unknown world mesh stratum {}", instance.stratum),

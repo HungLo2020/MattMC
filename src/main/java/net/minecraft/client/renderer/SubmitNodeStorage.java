@@ -127,7 +127,12 @@ public class SubmitNodeStorage implements SubmitNodeCollector, OrderedSubmitNode
 
 	@Override
 	public void submitMovingBlock(PoseStack poseStack, MovingBlockRenderState movingBlockRenderState) {
-		this.order(0).submitMovingBlock(poseStack, movingBlockRenderState);
+		this.submitMovingBlock(poseStack, movingBlockRenderState, MovingBlockSubmitSource.UNKNOWN);
+	}
+
+	@Override
+	public void submitMovingBlock(PoseStack poseStack, MovingBlockRenderState movingBlockRenderState, MovingBlockSubmitSource source) {
+		this.order(0).submitMovingBlock(poseStack, movingBlockRenderState, source);
 	}
 
 	@Override
@@ -383,7 +388,14 @@ public class SubmitNodeStorage implements SubmitNodeCollector, OrderedSubmitNode
 	}
 
 	@Environment(EnvType.CLIENT)
-	public record MovingBlockSubmit(Matrix4f pose, MovingBlockRenderState movingBlockRenderState) {
+	public enum MovingBlockSubmitSource {
+		UNKNOWN,
+		FALLING_BLOCK,
+		PISTON
+	}
+
+	@Environment(EnvType.CLIENT)
+	public record MovingBlockSubmit(Matrix4f pose, MovingBlockRenderState movingBlockRenderState, MovingBlockSubmitSource source) {
 	}
 
 	@Environment(EnvType.CLIENT)

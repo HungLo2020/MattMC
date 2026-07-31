@@ -2339,8 +2339,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			barrier.set(ValueLayout.JAVA_INT, sub + 12, 1);
 			Struct.BARRIER.setInt(barrier, 4, before);
 			Struct.BARRIER.setInt(barrier, 5, after);
-			Struct.BARRIER.setInt(barrier, 6, STAGE_DRAW | 4);
-			Struct.BARRIER.setInt(barrier, 7, ACCESS_TRANSFER);
+				Struct.BARRIER.setInt(barrier, 6, 0);
+				Struct.BARRIER.setInt(barrier, 7, 0);
 			Struct.BARRIER.setInt(barrier, 8, QUEUE_GRAPHICS);
 			Struct.BARRIER.setInt(barrier, 9, QUEUE_GRAPHICS);
 			barriers.add(barrier);

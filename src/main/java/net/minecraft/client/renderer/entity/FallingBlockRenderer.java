@@ -4,6 +4,7 @@ import net.blaze3d.vertex.PoseStack;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.SubmitNodeStorage;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.client.renderer.entity.state.FallingBlockRenderState;
 import net.minecraft.client.renderer.state.CameraRenderState;
@@ -32,7 +33,11 @@ public class FallingBlockRenderer extends EntityRenderer<FallingBlockEntity, Fal
 		if (blockState.getRenderShape() == RenderShape.MODEL) {
 			poseStack.pushPose();
 			poseStack.translate(-0.5, 0.0, -0.5);
-			submitNodeCollector.submitMovingBlock(poseStack, fallingBlockRenderState.movingBlockRenderState);
+				submitNodeCollector.submitMovingBlock(
+					poseStack,
+					fallingBlockRenderState.movingBlockRenderState,
+					SubmitNodeStorage.MovingBlockSubmitSource.FALLING_BLOCK
+				);
 			poseStack.popPose();
 			super.submit(fallingBlockRenderState, poseStack, submitNodeCollector, cameraRenderState);
 		}

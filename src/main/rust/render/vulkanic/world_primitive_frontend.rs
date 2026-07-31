@@ -50,6 +50,7 @@ pub const WORLD_STRATUM_WORLD_BORDER: u32 = 80;
 pub const WORLD_STRATUM_BLOCK_OUTLINE: u32 = 100;
 pub const WORLD_STRATUM_BLOCK_BREAKING_CRACK: u32 = 90;
 pub const WORLD_STRATUM_OPAQUE_TEXTURED_GEOMETRY: u32 = 70;
+pub const WORLD_STRATUM_MOVING_MESH: u32 = 68;
 pub const WORLD_BORDER_TEXTURE_FORCEFIELD: u32 = 1;
 pub const WORLD_MATERIAL_TEXTURE_STONE: u32 = 0x21df_896f;
 pub const WORLD_MATERIAL_TEXTURE_DIRT: u32 = 0x0b0b_bd25;
@@ -3327,7 +3328,7 @@ fn validate_mesh_instance(
     instance: &WorldMeshInstanceRequest,
     frame: &WorldPrimitiveFrame,
 ) -> GalResult<()> {
-    if instance.stratum != WORLD_STRATUM_OPAQUE_TEXTURED_GEOMETRY {
+    if !is_world_mesh_stratum(instance.stratum) {
         return Err(GalError::ffi(
             StatusCode::UnknownEnum,
             format!("unsupported world mesh stratum {}", instance.stratum),
@@ -3357,6 +3358,13 @@ fn validate_mesh_instance(
         return Err(GalError::invalid_argument("world mesh transform is not finite"));
     }
     Ok(())
+}
+
+fn is_world_mesh_stratum(stratum: u32) -> bool {
+    matches!(
+        stratum,
+        WORLD_STRATUM_OPAQUE_TEXTURED_GEOMETRY | WORLD_STRATUM_MOVING_MESH
+    )
 }
 
 fn validate_mesh_asset(mesh: &WorldMeshAsset) -> GalResult<()> {
@@ -4944,6 +4952,33 @@ mod tests {
             op,
             CommandOp::SetIndexBuffer { offset: 12, .. }
         )));
+    }
+
+    #[test]
+    fn world_mesh_accepts_moving_mesh_stratum() {
+        let mut gal = gal();
+        let target = frame_target(&mut gal, 1, 128, 128);
+        let mut frontend = WorldPrimitiveFrontend::default();
+        frontend
+            .apply_world_mesh_asset_update(
+                &mut gal,
+                1,
+                vec![mesh_asset(184, 1, IndexType::U16)],
+                Vec::new(),
+            )
+            .unwrap();
+        let mut frame = frame(Vec::new());
+        let mut instance = mesh_instance(184, 1);
+        instance.stratum = WORLD_STRATUM_MOVING_MESH;
+        frame.mesh_instances.push(instance);
+
+        let (_, stats) = frontend
+            .append_frame_ops(&mut gal, 1, target, frame)
+            .unwrap();
+
+        assert_eq!(1, stats.mesh_instance_count);
+        assert_eq!(1, stats.mesh_batch_count);
+        assert_eq!(1, stats.mesh_draw_count);
     }
 
     #[test]
