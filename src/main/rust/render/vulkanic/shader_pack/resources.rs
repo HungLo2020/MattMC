@@ -55,16 +55,20 @@ impl ShaderPackResourceManifest {
             programs: vec![
                 ProgramIdentity::new("vulkanic:builtin/terrain_opaque_v1"),
                 ProgramIdentity::new("vulkanic:builtin/terrain_cutout_v1"),
-                ProgramIdentity::new("vulkanic:builtin/final_copy_v1"),
+                ProgramIdentity::new("vulkanic:builtin/g_buffer_composite_v1"),
+                ProgramIdentity::new("vulkanic:builtin/final_output_v1"),
             ],
             passes: vec![
                 PassIdentity::new("vulkanic:pass/terrain_opaque"),
                 PassIdentity::new("vulkanic:pass/terrain_cutout"),
-                PassIdentity::new("vulkanic:pass/final_composite_copy"),
+                PassIdentity::new("vulkanic:pass/g_buffer_composite"),
+                PassIdentity::new("vulkanic:pass/final_output"),
             ],
             attachments: vec![
-                AttachmentIdentity::new("vulkanic:attachment/world_material_color"),
-                AttachmentIdentity::new("vulkanic:attachment/world_material_depth"),
+                AttachmentIdentity::new("vulkanic:attachment/g_buffer_albedo"),
+                AttachmentIdentity::new("vulkanic:attachment/g_buffer_normal"),
+                AttachmentIdentity::new("vulkanic:attachment/g_buffer_material_light"),
+                AttachmentIdentity::new("vulkanic:attachment/g_buffer_depth"),
                 AttachmentIdentity::new("vulkanic:attachment/final_color"),
             ],
             materials: vec![

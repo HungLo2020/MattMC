@@ -9,7 +9,7 @@ mod shared;
 mod world_border;
 
 use super::commands::{
-    AttachmentLoadOp, AttachmentStoreOp, CommandOp, PassAttachment, ResourceBarrier,
+    AttachmentLoadOp, AttachmentStoreOp, ClearColor, CommandOp, PassAttachment, ResourceBarrier,
     SubmissionBatch, TextureOrigin3d, TextureUsageState,
 };
 use super::error::{GalError, GalResult, StatusCode};
@@ -18,13 +18,15 @@ use super::handles::Handle;
 use super::resources::{
     AccessFlags, BackendApi, BlendMode, BufferDesc, BufferUsage, ColorFormat, CompareOp, Extent3d,
     GraphicsPipelineDesc, IndexType, MemoryDomain, PipelineLayoutDesc, PipelineStageFlags,
-    PrimitiveTopology, QueueClass, RenderPassDesc, ResourceBinding, ResourceBindingDesc,
-    ResourceBindingKind, ResourceLayoutDesc, ResourceSetDesc, SamplerAddressMode, SamplerDesc,
-    SamplerFilter, ShaderCodeFormat, ShaderModuleDesc, ShaderStage, TextureDesc, TextureDimension,
-    TextureFormat, TextureUsage, TextureViewDesc,
+    PrimitiveTopology, QueueClass, RenderPassDesc, RenderTargetDesc, ResourceBinding,
+    ResourceBindingDesc, ResourceBindingKind, ResourceLayoutDesc, ResourceSetDesc,
+    SamplerAddressMode, SamplerDesc, SamplerFilter, ShaderCodeFormat, ShaderModuleDesc,
+    ShaderStage, TextureDesc, TextureDimension, TextureFormat, TextureUsage, TextureViewDesc,
 };
 use super::shader_pack::programs::{
-    minimal_terrain_cutout_program, minimal_terrain_solid_program, TerrainMaterialProgram,
+    minimal_direct_terrain_cutout_program, minimal_direct_terrain_solid_program,
+    minimal_g_buffer_composite_program, minimal_terrain_cutout_program,
+    minimal_terrain_solid_program, shader_stage_code_for_backend, TerrainMaterialProgram,
 };
 use super::{BufferImageCopyRegion, CommandList, CommandListDesc, CullMode};
 
@@ -595,6 +597,31 @@ struct DepthAttachmentResources {
     extent: Extent3d,
 }
 
+struct GBufferResources {
+    albedo_texture: Handle,
+    normal_texture: Handle,
+    material_light_texture: Handle,
+    depth_texture: Handle,
+    albedo_view: Handle,
+    normal_view: Handle,
+    material_light_view: Handle,
+    depth_view: Handle,
+    sampler: Handle,
+    target: Handle,
+    g_buffer_pass: Handle,
+    composite_pass: Handle,
+    composite_vertex_shader: Handle,
+    composite_fragment_shader: Handle,
+    composite_resource_layout: Handle,
+    composite_resource_set: Handle,
+    composite_pipeline_layout: Handle,
+    composite_pipeline: Handle,
+    composite_depth_view: Option<Handle>,
+    extent: Extent3d,
+    frame_target: Handle,
+    frame_color_format: ColorFormat,
+}
+
 struct CrackResources {
     upload_buffer: Handle,
     uniform_buffer: Handle,
@@ -695,6 +722,7 @@ struct MaterialDataSlot {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 struct MeshResourceKey {
+    g_buffer: bool,
     stratum: u32,
     mesh_key: u64,
     mesh_generation: u64,
@@ -788,6 +816,31 @@ impl DepthAttachmentResources {
     }
 }
 
+impl GBufferResources {
+    fn handles_in_destroy_order(&self) -> Vec<Handle> {
+        vec![
+            self.composite_pipeline,
+            self.composite_pipeline_layout,
+            self.composite_resource_set,
+            self.composite_resource_layout,
+            self.composite_fragment_shader,
+            self.composite_vertex_shader,
+            self.composite_pass,
+            self.g_buffer_pass,
+            self.target,
+            self.sampler,
+            self.depth_view,
+            self.material_light_view,
+            self.normal_view,
+            self.albedo_view,
+            self.depth_texture,
+            self.material_light_texture,
+            self.normal_texture,
+            self.albedo_texture,
+        ]
+    }
+}
+
 #[derive(Clone, Copy)]
 struct CachedPass {
     frame_target: Handle,
@@ -824,6 +877,7 @@ pub struct WorldPrimitiveFrontend {
     material_resources: BTreeMap<MaterialResourceKey, MaterialResources>,
     mesh_resources: BTreeMap<MeshResourceKey, MeshResources>,
     depth_attachment: Option<DepthAttachmentResources>,
+    g_buffer_resources: Option<GBufferResources>,
     cached_pass: Option<CachedPass>,
     pending_depth_attachment_retires: u64,
 }
@@ -1197,11 +1251,27 @@ impl WorldPrimitiveFrontend {
 
     pub fn clear_frame_passes_for_targets(&mut self, gal: &mut VulkanicGal, targets: &[Handle]) {
         let Some(pass) = self.cached_pass else {
+            if self
+                .g_buffer_resources
+                .as_ref()
+                .map(|resources| targets.contains(&resources.frame_target))
+                .unwrap_or(false)
+            {
+                self.destroy_g_buffer_resources(gal);
+            }
             return;
         };
         if targets.contains(&pass.frame_target) {
             self.cached_pass = None;
             let _ = gal.destroy(pass.pass);
+        }
+        if self
+            .g_buffer_resources
+            .as_ref()
+            .map(|resources| targets.contains(&resources.frame_target))
+            .unwrap_or(false)
+        {
+            self.destroy_g_buffer_resources(gal);
         }
     }
 
@@ -1270,9 +1340,7 @@ impl WorldPrimitiveFrontend {
         clear_background: bool,
     ) -> GalResult<(Vec<CommandOp>, WorldPrimitiveSubmitStats)> {
         let vulkan_backend = gal.capabilities().api == BackendApi::Vulkan;
-        if !vulkan_backend
-            && (clear_background || frame.background.enabled || !frame.border_quads.is_empty())
-        {
+        if !vulkan_backend && (frame.background.enabled || !frame.border_quads.is_empty()) {
             return Err(GalError::unsupported_feature(
                 "OpenGL partial world primitive submit does not own background or world-border presentation",
             ));
@@ -1288,8 +1356,9 @@ impl WorldPrimitiveFrontend {
             self.crack_resources.is_some() && self.crack_resource_format == Some(color_format);
         let had_border_resources =
             self.border_resources.is_some() && self.border_resource_format == Some(color_format);
+        let use_g_buffer_mesh_path = clear_background && !frame.mesh_instances.is_empty();
         let material_batches = material_batches(&frame, color_format);
-        let mesh_batches = mesh_batches(&frame, self, color_format)?;
+        let mesh_batches = mesh_batches(&frame, self, color_format, use_g_buffer_mesh_path)?;
         let material_cache_hits = material_batches
             .iter()
             .filter(|batch| self.material_resources.contains_key(&batch.key))
@@ -1332,6 +1401,15 @@ impl WorldPrimitiveFrontend {
                 frame.viewport_width,
                 frame.viewport_height,
             )?;
+        if use_g_buffer_mesh_path {
+            self.ensure_g_buffer_resources(
+                gal,
+                frame_target,
+                frame.viewport_width,
+                frame.viewport_height,
+                color_format,
+            )?;
+        }
         let pending_depth_retires = std::mem::take(&mut self.pending_depth_attachment_retires);
         let pass = self.frame_pass(gal, frame_target, depth_view)?;
         let mut stats = WorldPrimitiveSubmitStats {
@@ -1556,48 +1634,199 @@ impl WorldPrimitiveFrontend {
                     asset.index_type,
                     batch.index_count,
                     batch.count() as u32,
+                    batch.key.material_mode,
                 ));
                 mesh_slot_indices.insert(batch.key, slot_index + 1);
             }
-            ops.push(CommandOp::BeginPass {
-                pass,
-                target: frame_target,
-                colors: vec![loaded_frame_color_attachment(color_attachment)],
-                depth_stencil: Some(PassAttachment {
-                    view: depth_view,
-                    load_op: AttachmentLoadOp::Load,
-                    store_op: AttachmentStoreOp::Store,
-                    clear_color: None,
-                }),
-            });
-            for (
-                pipeline,
-                pipeline_layout,
-                resource_set,
-                index_buffer,
-                index_offset,
-                index_type,
-                index_count,
-                instance_count,
-            ) in mesh_draws
-            {
-                ops.push(CommandOp::BindGraphicsPipeline(pipeline));
+            if use_g_buffer_mesh_path {
+                let g_buffer = self.g_buffer_resources.as_ref().ok_or_else(|| {
+                    GalError::backend("G-buffer resources missing before mesh submit")
+                })?;
+                ops.push(CommandOp::Barrier(texture_barrier(
+                    g_buffer.albedo_texture,
+                    TextureUsageState::Undefined,
+                    TextureUsageState::ColorAttachment,
+                )));
+                ops.push(CommandOp::Barrier(texture_barrier(
+                    g_buffer.normal_texture,
+                    TextureUsageState::Undefined,
+                    TextureUsageState::ColorAttachment,
+                )));
+                ops.push(CommandOp::Barrier(texture_barrier(
+                    g_buffer.material_light_texture,
+                    TextureUsageState::Undefined,
+                    TextureUsageState::ColorAttachment,
+                )));
+                ops.push(CommandOp::Barrier(texture_barrier(
+                    g_buffer.depth_texture,
+                    TextureUsageState::Undefined,
+                    TextureUsageState::DepthStencilAttachment,
+                )));
+                let mut wrote_g_buffer = false;
+                for material_mode in [WORLD_MATERIAL_MODE_OPAQUE, WORLD_MATERIAL_MODE_CUTOUT] {
+                    let mode_draws = mesh_draws
+                        .iter()
+                        .filter(|draw| draw.8 == material_mode)
+                        .copied()
+                        .collect::<Vec<_>>();
+                    if mode_draws.is_empty() {
+                        continue;
+                    }
+                    let load_op = if wrote_g_buffer {
+                        AttachmentLoadOp::Load
+                    } else {
+                        AttachmentLoadOp::Clear
+                    };
+                    ops.push(CommandOp::BeginPass {
+                        pass: g_buffer.g_buffer_pass,
+                        target: g_buffer.target,
+                        colors: vec![
+                            PassAttachment {
+                                view: g_buffer.albedo_view,
+                                load_op,
+                                store_op: AttachmentStoreOp::Store,
+                                clear_color: Some(background_color),
+                            },
+                            PassAttachment {
+                                view: g_buffer.normal_view,
+                                load_op,
+                                store_op: AttachmentStoreOp::Store,
+                                clear_color: Some(ClearColor {
+                                    r: 0.5,
+                                    g: 0.5,
+                                    b: 1.0,
+                                    a: 1.0,
+                                }),
+                            },
+                            PassAttachment {
+                                view: g_buffer.material_light_view,
+                                load_op,
+                                store_op: AttachmentStoreOp::Store,
+                                clear_color: Some(ClearColor {
+                                    r: 0.0,
+                                    g: 1.0,
+                                    b: 1.0,
+                                    a: 0.0,
+                                }),
+                            },
+                        ],
+                        depth_stencil: Some(PassAttachment {
+                            view: g_buffer.depth_view,
+                            load_op,
+                            store_op: AttachmentStoreOp::Store,
+                            clear_color: None,
+                        }),
+                    });
+                    for (
+                        pipeline,
+                        pipeline_layout,
+                        resource_set,
+                        index_buffer,
+                        index_offset,
+                        index_type,
+                        index_count,
+                        instance_count,
+                        _,
+                    ) in mode_draws
+                    {
+                        ops.push(CommandOp::BindGraphicsPipeline(pipeline));
+                        ops.push(CommandOp::BindResourceSet {
+                            pipeline_layout,
+                            set_index: 0,
+                            set: resource_set,
+                        });
+                        ops.push(CommandOp::SetIndexBuffer {
+                            buffer: index_buffer,
+                            offset: index_offset,
+                            index_type,
+                        });
+                        ops.push(CommandOp::DrawIndexed {
+                            indices: index_count,
+                            instances: instance_count,
+                        });
+                    }
+                    ops.push(CommandOp::EndPass);
+                    wrote_g_buffer = true;
+                }
+                ops.push(CommandOp::Barrier(texture_barrier(
+                    g_buffer.albedo_texture,
+                    TextureUsageState::ColorAttachment,
+                    TextureUsageState::ShaderRead,
+                )));
+                ops.push(CommandOp::Barrier(texture_barrier(
+                    g_buffer.normal_texture,
+                    TextureUsageState::ColorAttachment,
+                    TextureUsageState::ShaderRead,
+                )));
+                ops.push(CommandOp::Barrier(texture_barrier(
+                    g_buffer.material_light_texture,
+                    TextureUsageState::ColorAttachment,
+                    TextureUsageState::ShaderRead,
+                )));
+                ops.push(CommandOp::BeginPass {
+                    pass: g_buffer.composite_pass,
+                    target: frame_target,
+                    colors: vec![loaded_frame_color_attachment(color_attachment)],
+                    depth_stencil: g_buffer.composite_depth_view.map(|view| PassAttachment {
+                        view,
+                        load_op: AttachmentLoadOp::Load,
+                        store_op: AttachmentStoreOp::Store,
+                        clear_color: None,
+                    }),
+                });
+                ops.push(CommandOp::BindGraphicsPipeline(g_buffer.composite_pipeline));
                 ops.push(CommandOp::BindResourceSet {
-                    pipeline_layout,
+                    pipeline_layout: g_buffer.composite_pipeline_layout,
                     set_index: 0,
-                    set: resource_set,
+                    set: g_buffer.composite_resource_set,
                 });
-                ops.push(CommandOp::SetIndexBuffer {
-                    buffer: index_buffer,
-                    offset: index_offset,
+                ops.push(CommandOp::Draw {
+                    vertices: 3,
+                    instances: 1,
+                });
+                ops.push(CommandOp::EndPass);
+            } else {
+                ops.push(CommandOp::BeginPass {
+                    pass,
+                    target: frame_target,
+                    colors: vec![loaded_frame_color_attachment(color_attachment)],
+                    depth_stencil: Some(PassAttachment {
+                        view: depth_view,
+                        load_op: AttachmentLoadOp::Load,
+                        store_op: AttachmentStoreOp::Store,
+                        clear_color: None,
+                    }),
+                });
+                for (
+                    pipeline,
+                    pipeline_layout,
+                    resource_set,
+                    index_buffer,
+                    index_offset,
                     index_type,
-                });
-                ops.push(CommandOp::DrawIndexed {
-                    indices: index_count,
-                    instances: instance_count,
-                });
+                    index_count,
+                    instance_count,
+                    _,
+                ) in mesh_draws
+                {
+                    ops.push(CommandOp::BindGraphicsPipeline(pipeline));
+                    ops.push(CommandOp::BindResourceSet {
+                        pipeline_layout,
+                        set_index: 0,
+                        set: resource_set,
+                    });
+                    ops.push(CommandOp::SetIndexBuffer {
+                        buffer: index_buffer,
+                        offset: index_offset,
+                        index_type,
+                    });
+                    ops.push(CommandOp::DrawIndexed {
+                        indices: index_count,
+                        instances: instance_count,
+                    });
+                }
+                ops.push(CommandOp::EndPass);
             }
-            ops.push(CommandOp::EndPass);
         }
         let mut first_batch = false;
         if !border_batches.is_empty() {
@@ -1808,7 +2037,11 @@ impl WorldPrimitiveFrontend {
                 label: format!("{label}.vertex"),
                 stage: ShaderStage::Vertex,
                 code_format: ShaderCodeFormat::Glsl,
-                code: world_vertex_shader_code(gal, WORLD_LINE_VERTEX_SHADER_VULKAN),
+                code: shader_stage_code_for_backend(
+                    gal.capabilities().api,
+                    std::str::from_utf8(WORLD_LINE_VERTEX_SHADER_VULKAN)
+                        .expect("world line shader is UTF-8"),
+                ),
                 entry_point: "main".to_string(),
             })?;
             created.push(vertex_shader);
@@ -1978,7 +2211,11 @@ impl WorldPrimitiveFrontend {
                 label: format!("{label}.vertex"),
                 stage: ShaderStage::Vertex,
                 code_format: ShaderCodeFormat::Glsl,
-                code: world_vertex_shader_code(gal, WORLD_CRACK_VERTEX_SHADER_VULKAN),
+                code: shader_stage_code_for_backend(
+                    gal.capabilities().api,
+                    std::str::from_utf8(WORLD_CRACK_VERTEX_SHADER_VULKAN)
+                        .expect("world crack shader is UTF-8"),
+                ),
                 entry_point: "main".to_string(),
             })?;
             created.push(vertex_shader);
@@ -2236,7 +2473,11 @@ impl WorldPrimitiveFrontend {
                 label: format!("{label}.vertex"),
                 stage: ShaderStage::Vertex,
                 code_format: ShaderCodeFormat::Glsl,
-                code: world_vertex_shader_code(gal, WORLD_BORDER_VERTEX_SHADER_VULKAN),
+                code: shader_stage_code_for_backend(
+                    gal.capabilities().api,
+                    std::str::from_utf8(WORLD_BORDER_VERTEX_SHADER_VULKAN)
+                        .expect("world border shader is UTF-8"),
+                ),
                 entry_point: "main".to_string(),
             })?;
             created.push(vertex_shader);
@@ -2525,7 +2766,11 @@ impl WorldPrimitiveFrontend {
                 label: format!("{label}.vertex"),
                 stage: ShaderStage::Vertex,
                 code_format: ShaderCodeFormat::Glsl,
-                code: world_vertex_shader_code(gal, WORLD_MATERIAL_VERTEX_SHADER_VULKAN),
+                code: shader_stage_code_for_backend(
+                    gal.capabilities().api,
+                    std::str::from_utf8(WORLD_MATERIAL_VERTEX_SHADER_VULKAN)
+                        .expect("world material shader is UTF-8"),
+                ),
                 entry_point: "main".to_string(),
             })?;
             created.push(vertex_shader);
@@ -2799,7 +3044,8 @@ impl WorldPrimitiveFrontend {
             .get(key.section_index as usize)
             .ok_or_else(|| GalError::invalid_argument("world mesh section is missing"))?;
         let label = format!(
-            "world-mesh-stratum{}-{}-gen{}-section{}-texture{}-mode{}-depth{}-cull{}",
+            "world-mesh-{}-stratum{}-{}-gen{}-section{}-texture{}-mode{}-depth{}-cull{}",
+            if key.g_buffer { "gbuffer" } else { "direct" },
             key.stratum,
             key.mesh_key,
             key.mesh_generation,
@@ -2867,12 +3113,15 @@ impl WorldPrimitiveFrontend {
                 address_w: SamplerAddressMode::ClampToEdge,
             })?;
             created.push(sampler);
-            let terrain_program = terrain_program_for_mode(key.material_mode)?;
+            let terrain_program = terrain_program_for_mode(key.material_mode, key.g_buffer)?;
             let vertex_shader = gal.create_shader_module(ShaderModuleDesc {
                 label: format!("{label}.vertex"),
                 stage: ShaderStage::Vertex,
                 code_format: ShaderCodeFormat::Glsl,
-                code: world_vertex_shader_code(gal, terrain_program.vertex.source.as_bytes()),
+                code: shader_stage_code_for_backend(
+                    gal.capabilities().api,
+                    &terrain_program.vertex.source,
+                ),
                 entry_point: terrain_program.vertex.entry_point.clone(),
             })?;
             created.push(vertex_shader);
@@ -2968,7 +3217,11 @@ impl WorldPrimitiveFrontend {
                     }
                 },
                 depth_write: key.depth_policy == WORLD_DEPTH_POLICY_TEST_WRITE,
-                color_formats: vec![key.color_format],
+                color_formats: if key.g_buffer {
+                    vec![TextureFormat::Rgba8Unorm; 3]
+                } else {
+                    vec![key.color_format]
+                },
                 depth_format: Some(TextureFormat::Depth32Float),
             })?;
             created.push(pipeline);
@@ -3215,6 +3468,234 @@ impl WorldPrimitiveFrontend {
         Ok(pass)
     }
 
+    fn ensure_g_buffer_resources(
+        &mut self,
+        gal: &mut VulkanicGal,
+        frame_target: Handle,
+        width: u32,
+        height: u32,
+        frame_color_format: ColorFormat,
+    ) -> GalResult<()> {
+        let extent = Extent3d {
+            width,
+            height,
+            depth: 1,
+        };
+        if let Some(resources) = self.g_buffer_resources.as_ref() {
+            if resources.extent == extent
+                && resources.frame_target == frame_target
+                && resources.frame_color_format == frame_color_format
+            {
+                return Ok(());
+            }
+        }
+        self.destroy_g_buffer_resources(gal);
+        let label = format!("world-shader-g-buffer-gen{}", self.generation);
+        let mut created = Vec::new();
+        let result = (|| -> GalResult<GBufferResources> {
+            let albedo_texture =
+                create_g_buffer_color_texture(gal, &format!("{label}.albedo"), extent)?;
+            created.push(albedo_texture);
+            let normal_texture =
+                create_g_buffer_color_texture(gal, &format!("{label}.normal"), extent)?;
+            created.push(normal_texture);
+            let material_light_texture =
+                create_g_buffer_color_texture(gal, &format!("{label}.material-light"), extent)?;
+            created.push(material_light_texture);
+            let depth_texture = gal.create_texture(TextureDesc {
+                label: format!("{label}.depth.texture"),
+                dimension: TextureDimension::D2,
+                format: TextureFormat::Depth32Float,
+                extent,
+                mip_levels: 1,
+                array_layers: 1,
+                usages: vec![TextureUsage::DepthStencilAttachment],
+            })?;
+            created.push(depth_texture);
+            let albedo_view = create_texture_view(
+                gal,
+                &format!("{label}.albedo.view"),
+                albedo_texture,
+                TextureFormat::Rgba8Unorm,
+            )?;
+            created.push(albedo_view);
+            let normal_view = create_texture_view(
+                gal,
+                &format!("{label}.normal.view"),
+                normal_texture,
+                TextureFormat::Rgba8Unorm,
+            )?;
+            created.push(normal_view);
+            let material_light_view = create_texture_view(
+                gal,
+                &format!("{label}.material-light.view"),
+                material_light_texture,
+                TextureFormat::Rgba8Unorm,
+            )?;
+            created.push(material_light_view);
+            let depth_view = create_texture_view(
+                gal,
+                &format!("{label}.depth.view"),
+                depth_texture,
+                TextureFormat::Depth32Float,
+            )?;
+            created.push(depth_view);
+            let sampler = gal.create_sampler(SamplerDesc {
+                label: format!("{label}.sampler"),
+                min_filter: SamplerFilter::Nearest,
+                mag_filter: SamplerFilter::Nearest,
+                mip_filter: SamplerFilter::Nearest,
+                address_u: SamplerAddressMode::ClampToEdge,
+                address_v: SamplerAddressMode::ClampToEdge,
+                address_w: SamplerAddressMode::ClampToEdge,
+            })?;
+            created.push(sampler);
+            let target = gal.create_render_target(RenderTargetDesc {
+                label: format!("{label}.target"),
+                color_views: vec![albedo_view, normal_view, material_light_view],
+                depth_stencil_view: Some(depth_view),
+                extent,
+            })?;
+            created.push(target);
+            let g_buffer_pass = gal.create_render_pass(RenderPassDesc {
+                label: format!("{label}.terrain-pass"),
+                target,
+                color_formats: vec![TextureFormat::Rgba8Unorm; 3],
+                depth_format: Some(TextureFormat::Depth32Float),
+            })?;
+            created.push(g_buffer_pass);
+            let composite_depth_view = gal
+                .pass_target_depth_attachment(frame_target)?
+                .map(|(_, view)| view);
+            let composite_pass = gal.create_render_pass(RenderPassDesc {
+                label: format!("{label}.composite-pass"),
+                target: frame_target,
+                color_formats: vec![frame_color_format],
+                depth_format: composite_depth_view.map(|_| TextureFormat::Depth32Float),
+            })?;
+            created.push(composite_pass);
+            let composite_program = minimal_g_buffer_composite_program();
+            let composite_vertex_shader = gal.create_shader_module(ShaderModuleDesc {
+                label: format!("{label}.composite.vertex"),
+                stage: ShaderStage::Vertex,
+                code_format: ShaderCodeFormat::Glsl,
+                code: shader_stage_code_for_backend(
+                    gal.capabilities().api,
+                    &composite_program.vertex.source,
+                ),
+                entry_point: composite_program.vertex.entry_point.clone(),
+            })?;
+            created.push(composite_vertex_shader);
+            let composite_fragment_shader = gal.create_shader_module(ShaderModuleDesc {
+                label: format!("{label}.composite.fragment"),
+                stage: ShaderStage::Fragment,
+                code_format: ShaderCodeFormat::Glsl,
+                code: composite_program.fragment.source.as_bytes().to_vec(),
+                entry_point: composite_program.fragment.entry_point.clone(),
+            })?;
+            created.push(composite_fragment_shader);
+            let composite_resource_layout = gal.create_resource_layout(ResourceLayoutDesc {
+                label: format!("{label}.composite.resource-layout"),
+                bindings: vec![
+                    ResourceBindingDesc {
+                        binding: 0,
+                        kind: ResourceBindingKind::SampledTexture,
+                        stages: PipelineStageFlags::DRAW,
+                        array_count: 1,
+                        optional: false,
+                        dynamic_offset_count: 0,
+                    },
+                    ResourceBindingDesc {
+                        binding: 1,
+                        kind: ResourceBindingKind::SampledTexture,
+                        stages: PipelineStageFlags::DRAW,
+                        array_count: 1,
+                        optional: false,
+                        dynamic_offset_count: 0,
+                    },
+                    ResourceBindingDesc {
+                        binding: 2,
+                        kind: ResourceBindingKind::SampledTexture,
+                        stages: PipelineStageFlags::DRAW,
+                        array_count: 1,
+                        optional: false,
+                        dynamic_offset_count: 0,
+                    },
+                    ResourceBindingDesc {
+                        binding: 3,
+                        kind: ResourceBindingKind::Sampler,
+                        stages: PipelineStageFlags::DRAW,
+                        array_count: 1,
+                        optional: false,
+                        dynamic_offset_count: 0,
+                    },
+                ],
+            })?;
+            created.push(composite_resource_layout);
+            let composite_resource_set = gal.create_resource_set(ResourceSetDesc {
+                label: format!("{label}.composite.resource-set"),
+                layout: composite_resource_layout,
+                bindings: vec![
+                    sampled_binding(0, albedo_view),
+                    sampled_binding(1, normal_view),
+                    sampled_binding(2, material_light_view),
+                    sampler_binding(3, sampler),
+                ],
+            })?;
+            created.push(composite_resource_set);
+            let composite_pipeline_layout = gal.create_pipeline_layout(PipelineLayoutDesc {
+                label: format!("{label}.composite.pipeline-layout"),
+                resource_layouts: vec![composite_resource_layout],
+            })?;
+            created.push(composite_pipeline_layout);
+            let composite_pipeline = gal.create_graphics_pipeline(GraphicsPipelineDesc {
+                label: format!("{label}.composite.pipeline"),
+                layout: composite_pipeline_layout,
+                vertex_shader: composite_vertex_shader,
+                fragment_shader: composite_fragment_shader,
+                topology: PrimitiveTopology::Triangles,
+                cull_mode: CullMode::None,
+                blend: BlendMode::Disabled,
+                depth_compare: None,
+                depth_write: false,
+                color_formats: vec![frame_color_format],
+                depth_format: composite_depth_view.map(|_| TextureFormat::Depth32Float),
+            })?;
+            created.push(composite_pipeline);
+            Ok(GBufferResources {
+                albedo_texture,
+                normal_texture,
+                material_light_texture,
+                depth_texture,
+                albedo_view,
+                normal_view,
+                material_light_view,
+                depth_view,
+                sampler,
+                target,
+                g_buffer_pass,
+                composite_pass,
+                composite_vertex_shader,
+                composite_fragment_shader,
+                composite_resource_layout,
+                composite_resource_set,
+                composite_pipeline_layout,
+                composite_pipeline,
+                composite_depth_view,
+                extent,
+                frame_target,
+                frame_color_format,
+            })
+        })();
+        if result.is_err() {
+            for handle in created.into_iter().rev() {
+                let _ = gal.destroy(handle);
+            }
+        }
+        self.g_buffer_resources = Some(result?);
+        Ok(())
+    }
+
     fn destroy_resources(&mut self, gal: &mut VulkanicGal) {
         self.clear_frame_pass(gal);
         self.destroy_render_resources(gal);
@@ -3230,6 +3711,7 @@ impl WorldPrimitiveFrontend {
         self.destroy_border_resources(gal);
         self.destroy_material_resources(gal);
         self.destroy_mesh_resources(gal);
+        self.destroy_g_buffer_resources(gal);
         if let Some(depth) = self.depth_attachment.take() {
             for handle in depth.handles_in_destroy_order() {
                 let _ = gal.destroy(handle);
@@ -3270,6 +3752,14 @@ impl WorldPrimitiveFrontend {
     fn destroy_mesh_resources(&mut self, gal: &mut VulkanicGal) {
         let resources = std::mem::take(&mut self.mesh_resources);
         for (_, resources) in resources {
+            for handle in resources.handles_in_destroy_order() {
+                let _ = gal.destroy(handle);
+            }
+        }
+    }
+
+    fn destroy_g_buffer_resources(&mut self, gal: &mut VulkanicGal) {
+        if let Some(resources) = self.g_buffer_resources.take() {
             for handle in resources.handles_in_destroy_order() {
                 let _ = gal.destroy(handle);
             }
@@ -3698,6 +4188,7 @@ fn mesh_batches(
     frame: &WorldPrimitiveFrame,
     frontend: &WorldPrimitiveFrontend,
     color_format: ColorFormat,
+    g_buffer: bool,
 ) -> GalResult<Vec<MeshBatch>> {
     let mut batches: Vec<MeshBatch> = Vec::new();
     let mut key_to_batch = BTreeMap::<MeshResourceKey, usize>::new();
@@ -3718,7 +4209,7 @@ fn mesh_batches(
             )));
         }
         if instance.mesh_section_index == WORLD_MESH_SECTION_ALL {
-            for range in compatible_mesh_section_ranges(instance, asset, color_format)? {
+            for range in compatible_mesh_section_ranges(instance, asset, color_format, g_buffer)? {
                 push_mesh_batch(
                     &mut batches,
                     &mut key_to_batch,
@@ -3741,6 +4232,7 @@ fn mesh_batches(
                 instance.mesh_section_index,
                 instance.cull_policy,
                 color_format,
+                g_buffer,
             );
             push_mesh_batch(
                 &mut batches,
@@ -3766,12 +4258,20 @@ fn compatible_mesh_section_ranges(
     instance: &WorldMeshInstanceRequest,
     asset: &MeshAssetStore,
     color_format: ColorFormat,
+    g_buffer: bool,
 ) -> GalResult<Vec<MeshSectionRange>> {
     let mut ranges = Vec::new();
     let Some(first) = asset.sections.first() else {
         return Ok(ranges);
     };
-    let mut current_key = mesh_key_for_section(instance, first, 0, first.cull_policy, color_format);
+    let mut current_key = mesh_key_for_section(
+        instance,
+        first,
+        0,
+        first.cull_policy,
+        color_format,
+        g_buffer,
+    );
     let mut current_offset = first.index_offset as u64;
     let mut current_count = first.index_count;
     let mut previous = first;
@@ -3782,6 +4282,7 @@ fn compatible_mesh_section_ranges(
             section_index as u32,
             section.cull_policy,
             color_format,
+            g_buffer,
         );
         if mesh_sections_can_coalesce(&current_key, &key, previous, section, asset.index_type)
             && current_count
@@ -3880,8 +4381,10 @@ fn mesh_key_for_section(
     section_index: u32,
     cull_policy: u32,
     color_format: ColorFormat,
+    g_buffer: bool,
 ) -> MeshResourceKey {
     MeshResourceKey {
+        g_buffer,
         stratum: instance.stratum,
         mesh_key: instance.mesh_key,
         mesh_generation: instance.mesh_generation,
@@ -4048,6 +4551,61 @@ fn create_mesh_data_slot(
         instance_buffer,
         resource_set,
     })
+}
+
+fn create_g_buffer_color_texture(
+    gal: &mut VulkanicGal,
+    label: &str,
+    extent: Extent3d,
+) -> GalResult<Handle> {
+    gal.create_texture(TextureDesc {
+        label: format!("{label}.texture"),
+        dimension: TextureDimension::D2,
+        format: TextureFormat::Rgba8Unorm,
+        extent,
+        mip_levels: 1,
+        array_layers: 1,
+        usages: vec![TextureUsage::ColorAttachment, TextureUsage::Sampled],
+    })
+}
+
+fn create_texture_view(
+    gal: &mut VulkanicGal,
+    label: &str,
+    texture: Handle,
+    format: TextureFormat,
+) -> GalResult<Handle> {
+    gal.create_texture_view(TextureViewDesc {
+        label: label.to_string(),
+        texture,
+        format,
+        base_mip: 0,
+        mip_count: 1,
+        base_layer: 0,
+        layer_count: 1,
+    })
+}
+
+fn sampled_binding(binding: u32, resource: Handle) -> ResourceBinding {
+    ResourceBinding {
+        binding,
+        array_index: 0,
+        resource,
+        kind: ResourceBindingKind::SampledTexture,
+        access: AccessFlags::READ,
+        dynamic_offsets: Vec::new(),
+    }
+}
+
+fn sampler_binding(binding: u32, resource: Handle) -> ResourceBinding {
+    ResourceBinding {
+        binding,
+        array_index: 0,
+        resource,
+        kind: ResourceBindingKind::Sampler,
+        access: AccessFlags::READ,
+        dynamic_offsets: Vec::new(),
+    }
 }
 
 fn packed_line_uniforms_for_batch(
@@ -4262,23 +4820,15 @@ fn argb_to_rgba(argb: u32) -> [f32; 4] {
     [r, g, b, a]
 }
 
-fn world_vertex_shader_code(gal: &VulkanicGal, source: &[u8]) -> Vec<u8> {
-    if gal.capabilities().api != BackendApi::Vulkan {
-        return source.to_vec();
-    }
-    let text = String::from_utf8_lossy(source);
-    text.replacen(
-        "#version 450\n",
-        "#version 450\n#define VULKANIC_GAL_ZERO_TO_ONE_CLIP_DEPTH 1\n",
-        1,
-    )
-    .into_bytes()
-}
-
-fn terrain_program_for_mode(material_mode: u32) -> GalResult<TerrainMaterialProgram> {
-    match material_mode {
-        WORLD_MATERIAL_MODE_OPAQUE => Ok(minimal_terrain_solid_program()),
-        WORLD_MATERIAL_MODE_CUTOUT => Ok(minimal_terrain_cutout_program()),
+fn terrain_program_for_mode(
+    material_mode: u32,
+    g_buffer: bool,
+) -> GalResult<TerrainMaterialProgram> {
+    match (material_mode, g_buffer) {
+        (WORLD_MATERIAL_MODE_OPAQUE, true) => Ok(minimal_terrain_solid_program()),
+        (WORLD_MATERIAL_MODE_CUTOUT, true) => Ok(minimal_terrain_cutout_program()),
+        (WORLD_MATERIAL_MODE_OPAQUE, false) => Ok(minimal_direct_terrain_solid_program()),
+        (WORLD_MATERIAL_MODE_CUTOUT, false) => Ok(minimal_direct_terrain_cutout_program()),
         _ => Err(GalError::ffi(
             StatusCode::UnknownEnum,
             format!("unknown world mesh material mode {material_mode}"),
@@ -6694,7 +7244,7 @@ mod tests {
             CommandOp::EndPass,
         ];
         let (mut mesh_ops, mut stats) =
-            frontend.append_frame_ops_inner(gal, generation, target, frame, false)?;
+            frontend.append_frame_ops_inner(gal, generation, target, frame, true)?;
         ops.append(&mut mesh_ops);
         ops.push(CommandOp::Barrier(texture_barrier(
             color,
@@ -6733,16 +7283,19 @@ mod tests {
         })?;
         gal.retire_through_for_test(token.submission)?;
         let reads = gal.completed_host_reads();
-        let pixels = reads
+        let mut pixels = reads
             .iter()
             .rev()
             .find(|read| read.buffer == readback)
             .map(|read| read.bytes.clone())
             .ok_or_else(|| GalError::backend("shader mesh scene readback produced no bytes"))?;
+        if gal.capabilities().api == BackendApi::Vulkan {
+            flip_rgba_rows_in_place(&mut pixels, width, height);
+        }
         let hash = xxh32(&pixels, 0x53_48_44_52);
         let feature_non_clear = shader_mesh_feature_crops(width, height)
             .iter()
-            .map(|crop| non_clear_pixels_with_clear(&pixels, width, *crop, [5, 15, 23]))
+            .map(|crop| non_clear_pixels_with_clear(&pixels, width, *crop, [16, 40, 218]))
             .collect::<Vec<_>>();
         Ok(RuntimeRenderResult {
             hash,
@@ -7369,6 +7922,18 @@ mod tests {
         count
     }
 
+    fn flip_rgba_rows_in_place(pixels: &mut [u8], width: u32, height: u32) {
+        let row_bytes = width as usize * 4;
+        for y in 0..(height as usize / 2) {
+            let opposite = height as usize - 1 - y;
+            let top_start = y * row_bytes;
+            let bottom_start = opposite * row_bytes;
+            for offset in 0..row_bytes {
+                pixels.swap(top_start + offset, bottom_start + offset);
+            }
+        }
+    }
+
     fn write_material_report(
         backend: RuntimeBackend,
         width: u32,
@@ -7519,7 +8084,7 @@ mod tests {
             .map(|frame| frame.stats.mesh_draw_count)
             .sum::<u64>();
         let json = format!(
-            "{{\n  \"artifact_class\":\"rust_owned_shader_pack_mesh_conformance\",\n  \"backend\":\"{}\",\n  \"semantic_request_hash\":\"{:08x}\",\n  \"pass_graph\":\"vulkanic:builtin/terrain_material_v1\",\n  \"passes\":[\"vulkanic:pass/terrain_opaque\",\"vulkanic:pass/terrain_cutout\",\"vulkanic:pass/final_composite_copy\"],\n  \"rust_owned_color_attachment\":true,\n  \"rust_owned_depth_attachment\":true,\n  \"java_iris_participation\":false,\n  \"width\":{},\n  \"height\":{},\n  \"airborne_frame_hashes\":[{}],\n  \"rollback_hash\":\"{:08x}\",\n  \"reloaded_hash\":\"{:08x}\",\n  \"rollback_preserved_last_valid_generation\":{},\n  \"crop_names\":[{}],\n  \"frame0_feature_non_clear\":{{{}}},\n  \"mesh_instance_count\":{},\n  \"mesh_batch_count\":{},\n  \"mesh_draw_count\":{},\n  \"mesh_cache_hits\":{},\n  \"mesh_cache_misses\":{},\n  \"mesh_asset_payload_bytes\":{},\n  \"screenshots\":[\"full-airborne-frame-0.png\",\"full-airborne-frame-1.png\",\"full-airborne-frame-2.png\",\"full-airborne-frame-3.png\",\"full-airborne-frame-4.png\",\"full-rollback.png\",\"full-reloaded.png\"]\n}}\n",
+            "{{\n  \"artifact_class\":\"rust_owned_shader_pack_mesh_conformance\",\n  \"backend\":\"{}\",\n  \"semantic_request_hash\":\"{:08x}\",\n  \"pass_graph\":\"vulkanic:builtin/terrain_material_v1\",\n  \"passes\":[\"vulkanic:pass/terrain_opaque\",\"vulkanic:pass/terrain_cutout\",\"vulkanic:pass/g_buffer_composite\",\"vulkanic:pass/final_output\"],\n  \"g_buffer_attachments\":[\"albedo\",\"normal\",\"material_light\",\"depth\"],\n  \"rust_owned_color_attachment\":true,\n  \"rust_owned_depth_attachment\":true,\n  \"java_iris_participation\":false,\n  \"width\":{},\n  \"height\":{},\n  \"airborne_frame_hashes\":[{}],\n  \"rollback_hash\":\"{:08x}\",\n  \"reloaded_hash\":\"{:08x}\",\n  \"rollback_preserved_last_valid_generation\":{},\n  \"crop_names\":[{}],\n  \"frame0_feature_non_clear\":{{{}}},\n  \"mesh_instance_count\":{},\n  \"mesh_batch_count\":{},\n  \"mesh_draw_count\":{},\n  \"mesh_cache_hits\":{},\n  \"mesh_cache_misses\":{},\n  \"mesh_asset_payload_bytes\":{},\n  \"screenshots\":[\"full-airborne-frame-0.png\",\"full-airborne-frame-1.png\",\"full-airborne-frame-2.png\",\"full-airborne-frame-3.png\",\"full-airborne-frame-4.png\",\"full-rollback.png\",\"full-reloaded.png\"]\n}}\n",
             backend.name(),
             semantic_hash,
             width,

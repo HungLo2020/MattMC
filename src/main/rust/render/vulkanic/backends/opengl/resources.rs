@@ -880,12 +880,29 @@ fn opengl_shader_source(source: &str) -> String {
         .replace("layout(set=0,binding=", "layout(binding=")
         .replace("uniform texture2D Tex0;", "uniform sampler2D Tex0;")
         .replace("uniform texture2D tex0;", "uniform sampler2D tex0;")
+        .replace(
+            "uniform texture2D AlbedoTex;",
+            "uniform sampler2D AlbedoTex;",
+        )
+        .replace(
+            "uniform texture2D NormalTex;",
+            "uniform sampler2D NormalTex;",
+        )
+        .replace(
+            "uniform texture2D MaterialLightTex;",
+            "uniform sampler2D MaterialLightTex;",
+        )
         .replace("layout(binding = 2) uniform sampler Samp0;\n", "")
         .replace("layout(binding=2) uniform sampler Samp0;\n", "")
+        .replace("layout(binding = 3) uniform sampler Samp0;\n", "")
+        .replace("layout(binding=3) uniform sampler Samp0;\n", "")
         .replace("layout(binding = 1) uniform sampler samp0;\n", "")
         .replace("layout(binding=1) uniform sampler samp0;\n", "")
         .replace("sampler2D(Tex0, Samp0)", "Tex0")
         .replace("sampler2D(tex0, samp0)", "tex0")
+        .replace("sampler2D(AlbedoTex, Samp0)", "AlbedoTex")
+        .replace("sampler2D(NormalTex, Samp0)", "NormalTex")
+        .replace("sampler2D(MaterialLightTex, Samp0)", "MaterialLightTex")
         .replace("gl_VertexIndex", "gl_VertexID")
         .replace("gl_InstanceIndex", "gl_InstanceID")
 }
@@ -944,6 +961,7 @@ pub(super) fn sampler_uniform_names(binding: u32) -> Vec<String> {
             "Sampler0".to_string(),
             "tex0".to_string(),
             "Tex0".to_string(),
+            "AlbedoTex".to_string(),
         ],
         1 => vec![
             "Sampler0".to_string(),
@@ -951,11 +969,13 @@ pub(super) fn sampler_uniform_names(binding: u32) -> Vec<String> {
             "Tex0".to_string(),
             "Sampler1".to_string(),
             "tex1".to_string(),
+            "NormalTex".to_string(),
         ],
         2 => vec![
             "Samp0".to_string(),
             "Sampler2".to_string(),
             "tex2".to_string(),
+            "MaterialLightTex".to_string(),
         ],
         _ => vec![format!("Sampler{binding}"), format!("tex{binding}")],
     }

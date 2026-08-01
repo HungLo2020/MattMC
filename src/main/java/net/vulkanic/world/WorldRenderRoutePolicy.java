@@ -33,7 +33,7 @@ public final class WorldRenderRoutePolicy {
 		if (Boolean.getBoolean("mattmc.dev.rustGalWorldOutline.legacyControl")) {
 			return Route.JAVA_COMPATIBILITY;
 		}
-		return selectRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
+		return selectShaderAffectedRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
 	}
 
 	public static Route currentCrackRoute() {
@@ -43,7 +43,7 @@ public final class WorldRenderRoutePolicy {
 		if (Boolean.getBoolean("mattmc.dev.rustGalWorldCrack.legacyControl")) {
 			return Route.JAVA_COMPATIBILITY;
 		}
-		return selectRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
+		return selectShaderAffectedRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
 	}
 
 	public static Route currentWorldBorderRoute() {
@@ -73,7 +73,7 @@ public final class WorldRenderRoutePolicy {
 		if (Boolean.getBoolean("mattmc.dev.rustGalWorldMaterial.legacyControl")) {
 			return Route.JAVA_COMPATIBILITY;
 		}
-		return selectRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
+		return selectShaderAffectedRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
 	}
 
 	public static Route currentBlockDisplayRoute() {
@@ -83,7 +83,7 @@ public final class WorldRenderRoutePolicy {
 		if (Boolean.getBoolean("mattmc.dev.rustGalWorldBlockDisplay.legacyControl")) {
 			return Route.JAVA_COMPATIBILITY;
 		}
-		return selectRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
+		return selectShaderAffectedRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
 	}
 
 	public static Route currentFallingBlockRoute() {
@@ -93,11 +93,7 @@ public final class WorldRenderRoutePolicy {
 		if (Boolean.getBoolean("mattmc.dev.rustGalWorldFallingBlock.legacyControl")) {
 			return Route.JAVA_COMPATIBILITY;
 		}
-		Route selected = selectRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
-		if (selected.usesRustOpenGl() && net.irisshaders.iris.Iris.isPackInUseQuick()) {
-			return Route.JAVA_COMPATIBILITY;
-		}
-		return selected;
+		return selectShaderAffectedRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
 	}
 
 	public static Route currentPistonMovingBlockRoute() {
@@ -107,7 +103,7 @@ public final class WorldRenderRoutePolicy {
 		if (Boolean.getBoolean("mattmc.dev.rustGalWorldPiston.legacyControl")) {
 			return Route.JAVA_COMPATIBILITY;
 		}
-		return selectRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
+		return selectShaderAffectedRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
 	}
 
 	public static Route selectRouteForTests(
@@ -145,6 +141,14 @@ public final class WorldRenderRoutePolicy {
 			return wholeFrameVulkanEnabled ? Route.RUST_VULKAN_WHOLE_FRAME : Route.JAVA_COMPATIBILITY;
 		}
 		return Route.RUST_OPENGL_BORROWED_CONTEXT;
+	}
+
+	private static Route selectShaderAffectedRoute(boolean vulkanBackendSelected, boolean wholeFrameVulkanEnabled) {
+		Route selected = selectRoute(vulkanBackendSelected, wholeFrameVulkanEnabled);
+		if (selected.usesRustOpenGl() && net.irisshaders.iris.Iris.isPackInUseQuick()) {
+			return Route.JAVA_COMPATIBILITY;
+		}
+		return selected;
 	}
 
 	private static Route selectWholeFrameRoute(boolean vulkanBackendSelected, boolean wholeFrameVulkanEnabled) {

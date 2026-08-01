@@ -198,15 +198,6 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	private BlockOutlineFramebufferProbe pendingBlockOutlineFramebufferProbe;
 	@Nullable
 	private BlockCrackFramebufferProbe pendingBlockCrackFramebufferProbe;
-	@Nullable
-	private BlockOutlineRenderState pendingRustOpenGlPostIrisBlockOutline;
-	@Nullable
-	private Vec3 pendingRustOpenGlPostIrisBlockOutlineCamera;
-	private boolean pendingRustOpenGlPostIrisBlockOutlineTranslucentPass;
-	@Nullable
-	private List<BlockBreakingRenderState> pendingRustOpenGlPostIrisBlockCracks;
-	@Nullable
-	private Camera pendingRustOpenGlPostIrisBlockCracksCamera;
 	private final Matrix4f blockOutlineProbeProjection = new Matrix4f();
 	
 	// Sodium: From LevelRendererMixin - fields for Sodium world renderer integration
@@ -681,10 +672,6 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 			net.irisshaders.iris.gl.IrisRenderSystem.setPolygonMode(net.vulkanic.VulkanicPolygonMode.FILL);
 		}
 				this.pipeline.finalizeLevelRendering();
-				this.renderPendingRustOpenGlPostIrisWorldMeshes();
-				this.renderPendingRustOpenGlPostIrisBlockOutline();
-				this.renderPendingRustOpenGlPostIrisBlockCracks();
-				this.renderPendingRustOpenGlPostIrisWorldMaterials();
 			this.auditPendingBlockOutlineFramebufferProbe("after-iris-final");
 			this.auditPendingBlockCrackFramebufferProbe("after-iris-final");
 		
@@ -1267,13 +1254,6 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 					+ " selected=false reason=no-valid-destroy-progress");
 				return;
 			}
-			if (net.irisshaders.iris.Iris.isPackInUseQuick()) {
-				this.pendingRustOpenGlPostIrisBlockCracks = List.copyOf(levelRenderState.blockBreakingRenderStates);
-				this.pendingRustOpenGlPostIrisBlockCracksCamera = camera;
-				auditBlockOutline("crack queue route=rust-opengl retained=false postIris=true states="
-					+ levelRenderState.blockBreakingRenderStates.size());
-				return;
-			}
 			boolean rendered = this.renderRustOpenGlBlockBreakingCracks(levelRenderState);
 			if (!rendered) {
 				throw new IllegalStateException("Rust OpenGL block-breaking crack overlay was selected with valid semantic requests but submitted no work");
@@ -1389,15 +1369,6 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 							&& this.minecraft.isGameLoadFinished()
 							&& (this.minecraft.screen == null || this.minecraft.screen.isPauseScreen())
 							&& this.minecraft.getOverlay() == null) {
-							if (net.irisshaders.iris.Iris.isPackInUseQuick()) {
-								this.pendingRustOpenGlPostIrisBlockOutline = blockOutlineRenderState;
-								this.pendingRustOpenGlPostIrisBlockOutlineCamera = vec3;
-								this.pendingRustOpenGlPostIrisBlockOutlineTranslucentPass = bl;
-								auditBlockOutline("queue route=rust-opengl postIris=true translucentPass=" + bl
-									+ " pos=" + blockOutlineRenderState.pos().toShortString()
-									+ " highContrast=" + blockOutlineRenderState.highContrast());
-								return;
-							}
 							RenderTarget rustOutlineTarget = RenderType.lines().iris$getRenderTarget();
 							if (rustOutlineTarget == null) {
 								rustOutlineTarget = this.minecraft.getMainRenderTarget();
@@ -1502,108 +1473,6 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 			+ states.size()
 			+ " rendered=" + rendered);
 		return rendered;
-	}
-
-	private void renderPendingRustOpenGlPostIrisBlockOutline() {
-		BlockOutlineRenderState blockOutlineRenderState = this.pendingRustOpenGlPostIrisBlockOutline;
-		Vec3 cameraPos = this.pendingRustOpenGlPostIrisBlockOutlineCamera;
-		boolean translucentPass = this.pendingRustOpenGlPostIrisBlockOutlineTranslucentPass;
-		this.pendingRustOpenGlPostIrisBlockOutline = null;
-		this.pendingRustOpenGlPostIrisBlockOutlineCamera = null;
-		this.pendingRustOpenGlPostIrisBlockOutlineTranslucentPass = false;
-		if (blockOutlineRenderState == null || cameraPos == null) {
-			return;
-		}
-		RenderTarget finalTarget = this.minecraft.getMainRenderTarget();
-		try (RenderPass outlinePass = VulkanicAPI.createRenderPass(
-			() -> "Rust GAL block outline after Iris final",
-			finalTarget.getColorTextureView(),
-			OptionalInt.empty(),
-			finalTarget.useDepth ? finalTarget.getDepthTextureView() : null,
-			OptionalDouble.empty()
-		)) {
-			outlinePass.setPipeline(RenderType.lines().pipeline());
-			this.renderRustOpenGlBlockOutline(blockOutlineRenderState, new PoseStack(), cameraPos, translucentPass);
-		}
-		auditBlockOutline("draw route=rust-opengl retained=false postIris=true translucentPass=" + translucentPass
-			+ " pos=" + blockOutlineRenderState.pos().toShortString()
-			+ " highContrast=" + blockOutlineRenderState.highContrast());
-	}
-
-	private void renderPendingRustOpenGlPostIrisBlockCracks() {
-		List<BlockBreakingRenderState> states = this.pendingRustOpenGlPostIrisBlockCracks;
-		Camera camera = this.pendingRustOpenGlPostIrisBlockCracksCamera;
-		this.pendingRustOpenGlPostIrisBlockCracks = null;
-		this.pendingRustOpenGlPostIrisBlockCracksCamera = null;
-		if (states == null || states.isEmpty() || camera == null) {
-			return;
-		}
-		RenderTarget finalTarget = this.minecraft.getMainRenderTarget();
-		RenderType crumblingType = (RenderType)ModelBakery.DESTROY_TYPES.get(0);
-		boolean rendered;
-		try (RenderPass crackPass = VulkanicAPI.createRenderPass(
-			() -> "Rust GAL block-breaking crack overlay after Iris final",
-			finalTarget.getColorTextureView(),
-			OptionalInt.empty(),
-			finalTarget.useDepth ? finalTarget.getDepthTextureView() : null,
-			OptionalDouble.empty()
-		)) {
-			crackPass.setPipeline(crumblingType.pipeline());
-			rendered = this.renderRustOpenGlBlockBreakingCracksInCurrentScope(states, camera);
-		}
-		auditBlockOutline("crack draw route=rust-opengl retained=false postIris=true states="
-			+ states.size()
-			+ " rendered=" + rendered);
-		if (!rendered) {
-			throw new IllegalStateException("Rust OpenGL block-breaking crack overlay was selected post-Iris with valid semantic requests but submitted no work");
-		}
-	}
-
-	private void renderPendingRustOpenGlPostIrisWorldMaterials() {
-		if (!net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasPendingMaterialQuads()) {
-			return;
-		}
-		RenderTarget finalTarget = this.minecraft.getMainRenderTarget();
-		try (RenderPass materialPass = VulkanicAPI.createRenderPass(
-			() -> "Rust GAL world material quads after Iris final",
-			finalTarget.getColorTextureView(),
-			OptionalInt.empty(),
-			finalTarget.useDepth ? finalTarget.getDepthTextureView() : null,
-			OptionalDouble.empty()
-		)) {
-			materialPass.setPipeline(RenderPipelines.OPAQUE_PARTICLE);
-			boolean rendered = net.vulkanic.world.RustGalWorldPrimitiveRenderer.renderOpenGlPendingMaterialQuads(
-				this.minecraft,
-				"minecraft.particle.block-marker.post-iris"
-			);
-			auditBlockOutline("world-material draw route=rust-opengl retained=false postIris=true rendered=" + rendered);
-			if (!rendered) {
-				throw new IllegalStateException("Rust OpenGL world material quads were selected post-Iris with valid semantic requests but submitted no work");
-			}
-		}
-	}
-
-	private void renderPendingRustOpenGlPostIrisWorldMeshes() {
-		if (!net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasPendingMeshInstances()) {
-			return;
-		}
-		RenderTarget finalTarget = this.minecraft.getMainRenderTarget();
-		try (RenderPass meshPass = VulkanicAPI.createRenderPass(
-			() -> "Rust GAL indexed world mesh after Iris final",
-			finalTarget.getColorTextureView(),
-			OptionalInt.empty(),
-			finalTarget.useDepth ? finalTarget.getDepthTextureView() : null,
-			OptionalDouble.empty()
-		)) {
-			boolean rendered = net.vulkanic.world.RustGalWorldPrimitiveRenderer.renderOpenGlPendingMeshInstances(
-				this.minecraft,
-				"minecraft.world-mesh.post-iris"
-			);
-			auditBlockOutline("world-mesh draw route=rust-opengl retained=false postIris=true rendered=" + rendered);
-			if (!rendered) {
-				throw new IllegalStateException("Rust OpenGL indexed world mesh was selected post-Iris with valid semantic requests but submitted no work");
-			}
-		}
 	}
 
 	private void renderRustOpenGlBlockOutline(BlockOutlineRenderState blockOutlineRenderState, PoseStack poseStack, Vec3 cameraPos, boolean translucentPass) {

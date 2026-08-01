@@ -341,7 +341,8 @@ impl OpenGlLowerer {
                     );
                     self.gl.enable(glow::SCISSOR_TEST);
                     let mut mask = 0;
-                    for color in colors {
+                    let framebuffer_color_clear_supported = target_object.framebuffer.is_some();
+                    for (index, color) in colors.iter().enumerate() {
                         if color.load_op == AttachmentLoadOp::Clear {
                             let clear = color.clear_color.unwrap_or(
                                 crate::render::vulkanic::commands::ClearColor {
@@ -351,8 +352,18 @@ impl OpenGlLowerer {
                                     a: 0.0,
                                 },
                             );
-                            self.gl.clear_color(clear.r, clear.g, clear.b, clear.a);
-                            mask |= glow::COLOR_BUFFER_BIT;
+                            if framebuffer_color_clear_supported {
+                                self.gl.clear_buffer_f32_slice(
+                                    glow::COLOR,
+                                    u32::try_from(index).map_err(|_| {
+                                        GalError::backend("color attachment index exceeds u32")
+                                    })?,
+                                    &[clear.r, clear.g, clear.b, clear.a],
+                                );
+                            } else {
+                                self.gl.clear_color(clear.r, clear.g, clear.b, clear.a);
+                                mask |= glow::COLOR_BUFFER_BIT;
+                            }
                         }
                     }
                     if let Some(depth) = depth_stencil {

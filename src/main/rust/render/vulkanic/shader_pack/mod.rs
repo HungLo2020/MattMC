@@ -16,8 +16,8 @@ mod tests {
     };
     use super::preprocess::{preprocess, PreprocessInput};
     use super::programs::{
-        minimal_terrain_cutout_program, minimal_terrain_solid_program, ProgramIdentity,
-        ShaderStageKind,
+        minimal_g_buffer_composite_program, minimal_terrain_cutout_program,
+        minimal_terrain_solid_program, ProgramIdentity, ShaderStageKind,
     };
     use super::resources::{ShaderPackResourceManifest, ShaderPackResources};
     use super::source::{ShaderPackSource, ShaderSourceFile};
@@ -72,7 +72,7 @@ mod tests {
             identity: PassIdentity::new("vulkanic:pass/terrain-solid-test"),
             label: "terrain-solid".to_string(),
             program: ProgramIdentity::new("vulkanic:builtin/terrain_opaque_v1"),
-            color: AttachmentRole::GBufferColor(0),
+            colors: vec![AttachmentRole::GBufferAlbedo],
             depth: Some(AttachmentRole::Depth),
             load: LoadIntent::Load,
             store: StoreIntent::Store,
@@ -83,9 +83,9 @@ mod tests {
     }
 
     #[test]
-    fn builtin_material_pass_graph_declares_opaque_cutout_and_final_copy() {
+    fn builtin_material_pass_graph_declares_g_buffer_and_final_output() {
         let graph = builtin_terrain_material_pass_graph().unwrap();
-        assert_eq!(3, graph.passes().len());
+        assert_eq!(4, graph.passes().len());
         assert_eq!(
             "vulkanic:pass/terrain_opaque",
             graph.passes()[0].identity.as_str()
@@ -100,7 +100,26 @@ mod tests {
             graph.passes()[1].identity.as_str()
         );
         assert_eq!(LoadIntent::Load, graph.passes()[1].load);
-        assert_eq!(AttachmentRole::FinalColor, graph.passes()[2].color);
+        assert_eq!(
+            vec![
+                AttachmentRole::GBufferAlbedo,
+                AttachmentRole::GBufferNormal,
+                AttachmentRole::GBufferMaterialLight,
+            ],
+            graph.passes()[0].colors
+        );
+        assert_eq!(
+            "vulkanic:pass/g_buffer_composite",
+            graph.passes()[2].identity.as_str()
+        );
+        assert_eq!(vec![AttachmentRole::FinalColor], graph.passes()[2].colors);
+        assert_eq!(
+            "vulkanic:pass/final_output",
+            graph.passes()[3].identity.as_str()
+        );
+        let composite = minimal_g_buffer_composite_program();
+        assert!(composite.fragment.source.contains("AlbedoTex"));
+        assert!(composite.fragment.source.contains("NormalTex"));
     }
 
     #[test]
@@ -110,7 +129,14 @@ mod tests {
         assert!(resources
             .attachments
             .iter()
-            .any(|attachment| attachment.as_str() == "vulkanic:attachment/world_material_color"));
+            .any(|attachment| attachment.as_str() == "vulkanic:attachment/g_buffer_albedo"));
+        assert!(resources
+            .attachments
+            .iter()
+            .any(|attachment| attachment.as_str() == "vulkanic:attachment/g_buffer_normal"));
+        assert!(resources.attachments.iter().any(|attachment| {
+            attachment.as_str() == "vulkanic:attachment/g_buffer_material_light"
+        }));
         assert!(resources
             .materials
             .iter()

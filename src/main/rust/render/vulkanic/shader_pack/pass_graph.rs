@@ -30,7 +30,9 @@ impl AttachmentIdentity {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum AttachmentRole {
-    GBufferColor(u32),
+    GBufferAlbedo,
+    GBufferNormal,
+    GBufferMaterialLight,
     Depth,
     FinalColor,
 }
@@ -52,7 +54,7 @@ pub struct ShaderPassDesc {
     pub identity: PassIdentity,
     pub label: String,
     pub program: ProgramIdentity,
-    pub color: AttachmentRole,
+    pub colors: Vec<AttachmentRole>,
     pub depth: Option<AttachmentRole>,
     pub load: LoadIntent,
     pub store: StoreIntent,
@@ -75,6 +77,16 @@ impl PassGraph {
             if pass.label.trim().is_empty() {
                 return Err(GalError::invalid_argument("shader pass label is empty"));
             }
+            if pass.colors.is_empty() {
+                return Err(GalError::invalid_argument(
+                    "shader pass must declare at least one color attachment",
+                ));
+            }
+            if pass.colors.contains(&AttachmentRole::Depth) {
+                return Err(GalError::invalid_argument(
+                    "shader pass color attachment cannot be depth",
+                ));
+            }
             if pass.depth == Some(AttachmentRole::FinalColor) {
                 return Err(GalError::invalid_argument(
                     "shader pass depth attachment cannot be final color",
@@ -95,7 +107,11 @@ pub fn builtin_terrain_material_pass_graph() -> GalResult<PassGraph> {
             identity: PassIdentity::new("vulkanic:pass/terrain_opaque"),
             label: "terrain-style opaque".to_string(),
             program: ProgramIdentity::new("vulkanic:builtin/terrain_opaque_v1"),
-            color: AttachmentRole::GBufferColor(0),
+            colors: vec![
+                AttachmentRole::GBufferAlbedo,
+                AttachmentRole::GBufferNormal,
+                AttachmentRole::GBufferMaterialLight,
+            ],
             depth: Some(AttachmentRole::Depth),
             load: LoadIntent::Clear,
             store: StoreIntent::Store,
@@ -104,18 +120,31 @@ pub fn builtin_terrain_material_pass_graph() -> GalResult<PassGraph> {
             identity: PassIdentity::new("vulkanic:pass/terrain_cutout"),
             label: "terrain-style cutout".to_string(),
             program: ProgramIdentity::new("vulkanic:builtin/terrain_cutout_v1"),
-            color: AttachmentRole::GBufferColor(0),
+            colors: vec![
+                AttachmentRole::GBufferAlbedo,
+                AttachmentRole::GBufferNormal,
+                AttachmentRole::GBufferMaterialLight,
+            ],
             depth: Some(AttachmentRole::Depth),
             load: LoadIntent::Load,
             store: StoreIntent::Store,
         },
         ShaderPassDesc {
-            identity: PassIdentity::new("vulkanic:pass/final_composite_copy"),
-            label: "final composite copy".to_string(),
-            program: ProgramIdentity::new("vulkanic:builtin/final_copy_v1"),
-            color: AttachmentRole::FinalColor,
+            identity: PassIdentity::new("vulkanic:pass/g_buffer_composite"),
+            label: "G-buffer composite".to_string(),
+            program: ProgramIdentity::new("vulkanic:builtin/g_buffer_composite_v1"),
+            colors: vec![AttachmentRole::FinalColor],
             depth: None,
             load: LoadIntent::Clear,
+            store: StoreIntent::Store,
+        },
+        ShaderPassDesc {
+            identity: PassIdentity::new("vulkanic:pass/final_output"),
+            label: "final output".to_string(),
+            program: ProgramIdentity::new("vulkanic:builtin/final_output_v1"),
+            colors: vec![AttachmentRole::FinalColor],
+            depth: None,
+            load: LoadIntent::Load,
             store: StoreIntent::Store,
         },
     ])
