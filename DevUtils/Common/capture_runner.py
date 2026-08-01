@@ -2493,7 +2493,7 @@ def validate_deterministic_metadata(metadata_path: Path, screenshot_dir: Path, t
                     f"initial={initial_position} capture={position}"
                 )
         pose_name = capture.get("poseName")
-        expected_yaw, expected_pitch = expected_requested[pose_name]
+        expected_yaw, expected_pitch = expected_requested.get(pose_name, (initial_yaw, initial_pitch))
         requested_yaw = float(capture.get("requestedYaw", float("nan")))
         requested_pitch = float(capture.get("requestedPitch", float("nan")))
         observed_yaw = float(capture.get("observedYaw", float("nan")))

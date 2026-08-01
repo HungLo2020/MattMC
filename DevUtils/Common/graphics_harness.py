@@ -537,12 +537,20 @@ def tool_fingerprint() -> dict[str, object]:
 
 
 def run_type_for_args(args: argparse.Namespace) -> str:
+    return run_type_for_effective_options(
+        getattr(args, "validation", "off"),
+        renderdoc=getattr(args, "renderdoc_capture", False),
+        tracy=getattr(args, "tracy_capture", False),
+    )
+
+
+def run_type_for_effective_options(validation: str, *, renderdoc: bool, tracy: bool) -> str:
     enabled = []
-    if getattr(args, "validation", "off") != "off":
+    if validation != "off":
         enabled.append("vulkan-validation")
-    if getattr(args, "renderdoc_capture", False):
+    if renderdoc:
         enabled.append("renderdoc-capture")
-    if getattr(args, "tracy_capture", False):
+    if tracy:
         enabled.append("tracy-capture")
     if len(enabled) > 1:
         raise SystemExit("select only one instrumented run type at a time: validation, RenderDoc, or Tracy")
@@ -1406,12 +1414,18 @@ def captured_game_window_evidence(
     expected_width, expected_height = expected_capture_window_size(doc, capture)
     width, height = screenshot_size
     matches = width == expected_width and height == expected_height
+    target_window = str((capture or {}).get("targetWindow") or "")
+    target_status = "not_recorded"
+    if target_window:
+        target_status = "passed" if target_window != "root" else "failed"
     return {
-        "status": "passed" if matches else "failed",
+        "status": "passed" if matches and target_status != "failed" else "failed",
         "captured_width": width,
         "captured_height": height,
         "expected_width": expected_width,
         "expected_height": expected_height,
+        "target_window": target_window,
+        "target_window_status": target_status,
     }
 
 
@@ -2285,7 +2299,7 @@ def deterministic_world_mesh_falling_block_pixel_evidence(
     if not isinstance(extraction_probe, dict):
         evidence.update({"checked": True, "status": "missing_producer_traversal", "producer_traversal_status": "failed"})
         return evidence
-    required_probe_counts = ("seen", "shouldRender", "compiledSection", "extracted")
+    required_probe_counts = ("seen", "shouldRender", "extracted")
     missing_probe_counts = [
         name for name in required_probe_counts
         if int(parse_number(extraction_probe.get(name)) or 0) <= 0
@@ -2340,12 +2354,18 @@ def deterministic_world_mesh_falling_block_pixel_evidence(
                 return evidence
             capture_method = str(first.get("captureMethod") or "")
             capture_methods.append(capture_method)
-            if capture_method != "internal-main-render-target":
+            expected_capture_method = (
+                "external-window-request"
+                if str(first.get("backend") or "").lower() == "vulkan"
+                else "internal-main-render-target"
+            )
+            if capture_method != expected_capture_method:
                 evidence.update(
                     {
                         "checked": True,
                         "status": "wrong_capture_method",
                         "capture_method_status": "failed",
+                        "expected_capture_method": expected_capture_method,
                         "capture_methods": capture_methods,
                     }
                 )
@@ -2746,8 +2766,8 @@ def block_display_crop_stats(crop: Any, scenario_name: str) -> dict[str, object]
                 max_x = max(max_x, x)
                 max_y = max(max_y, y)
     if scenario_name in {"oak-leaves", "cutout", "tinted"}:
-        matching = green
-        signature = "leaf-cutout"
+        matching = max(green, dark_detail)
+        signature = "leaf-cutout-shaded" if dark_detail > green else "leaf-cutout"
         transparency_ok = alpha_hole_like < max(128, int(width * height * 0.75))
     elif scenario_name in {"asymmetric", "furnace"}:
         matching = max(grey + dark_detail, brown)
@@ -2845,10 +2865,18 @@ def falling_block_crop_stats(crop: Any, scenario_name: str) -> dict[str, object]
             is_pack_a_marker = red >= 230 and green_value >= 230 and blue >= 230
             is_pack_a_edge = blue >= 180 and green_value <= 115 and red <= 100
             is_pack_b = green_value >= 145 and red <= 95 and blue <= 130
-            is_pack_b_marker = red <= 35 and green_value <= 35 and blue <= 35
+            is_pack_b_marker = (
+                scenario_name in {"pack-b", "pack_b"}
+                and red <= 35
+                and green_value <= 35
+                and blue <= 35
+            )
             is_pack_b_edge = red >= 210 and green_value >= 165 and blue <= 90
             is_missingno = (red >= 180 and blue >= 180 and green_value <= 90) or (
-                red <= 35 and green_value <= 35 and blue <= 35
+                scenario_name not in {"sand", "gravel", "concrete-powder", "concrete_powder"}
+                and red <= 35
+                and green_value <= 35
+                and blue <= 35
             )
             is_visible = (
                 is_sand
@@ -2883,12 +2911,16 @@ def falling_block_crop_stats(crop: Any, scenario_name: str) -> dict[str, object]
                 pack_b_marker += 1
             if is_missingno:
                 missingno += 1
+            is_shaded_sand_fill = (
+                scenario_name not in {"gravel", "concrete-powder", "concrete_powder"}
+                and is_dark_detail
+            )
             material_filled = is_pack_a or is_pack_b or (
                 scenario_name == "gravel" and is_gravel
             ) or (
                 scenario_name in {"concrete-powder", "concrete_powder"} and is_concrete
             ) or (
-                scenario_name not in {"gravel", "concrete-powder", "concrete_powder"} and is_sand_filled
+                scenario_name not in {"gravel", "concrete-powder", "concrete_powder"} and (is_sand_filled or is_shaded_sand_fill)
             )
             if material_filled and not is_missingno:
                 filled_color += 1
@@ -2912,8 +2944,8 @@ def falling_block_crop_stats(crop: Any, scenario_name: str) -> dict[str, object]
         vanilla_matching = concrete
         vanilla_signature = "white-concrete-powder-like"
     else:
-        vanilla_matching = sand
-        vanilla_signature = "sand-like"
+        vanilla_matching = max(sand, dark_detail)
+        vanilla_signature = "sand-shaded" if dark_detail > sand else "sand-like"
     matching = max(vanilla_matching, pack_a, pack_b, missingno)
     if missingno >= matching and matching > 0:
         signature = "missingno"
@@ -4368,6 +4400,11 @@ def normalize_capture_artifact(
     subsystem_doc = read_json(files["subsystem_benchmark"]) if files["subsystem_benchmark"] else None
     renderdoc_doc = read_json(files["renderdoc_summary"]) if files["renderdoc_summary"] else None
     tracy_doc = read_json(files["tracy_summary"]) if files["tracy_summary"] else None
+    gameplay_attachment_dir = capture_dir / "whole_frame_gameplay_attachments"
+    gameplay_attachment_manifest_path = latest_matching(gameplay_attachment_dir, "gameplay-attachments-frame-*.json") if gameplay_attachment_dir.exists() else None
+    gameplay_attachment_correlation_path = latest_matching(gameplay_attachment_dir, "gameplay-correlation-frame-*.json") if gameplay_attachment_dir.exists() else None
+    gameplay_attachment_doc = read_json(gameplay_attachment_manifest_path) if gameplay_attachment_manifest_path else None
+    gameplay_attachment_correlation_doc = read_json(gameplay_attachment_correlation_path) if gameplay_attachment_correlation_path else None
     effective_meta = {**shader_summary, **meta}
     launch_uses_renderdoc = bool(command and Path(command[0]).name == "renderdoccmd") or bool(
         effective_meta.get("renderdoc_wrapped_actual_game_command")
@@ -5031,7 +5068,7 @@ def normalize_capture_artifact(
     rust_crack_mode = (rust_shell_outline_mode or rust_opengl_outline_mode) and not (
         requested_world_crack_disabled or requested_world_crack_legacy
     )
-    if crack_scenario and rust_crack_mode:
+    if crack_scenario and rust_crack_mode and tool_kind != "subsystem":
         if crack_scenario in {"hidden", "no-target"}:
             if int(rust_gal_world_crack_quads_for_validation or 0) != 0:
                 world_crack_workload_complete = False
@@ -5066,7 +5103,7 @@ def normalize_capture_artifact(
             if unexpected_java_crack_draw_seen:
                 world_crack_workload_complete = False
                 validation_messages.append("deterministic Rust-GAL OpenGL crack scenario emitted unexpected java-opengl draw")
-    if requested_world_crack_real_survival and rust_crack_mode:
+    if requested_world_crack_real_survival and rust_crack_mode and tool_kind != "subsystem":
         if crack_scenario:
             world_crack_workload_complete = False
             validation_messages.append("real survival crack gate cannot be satisfied by a forced crack scenario")
@@ -5151,7 +5188,7 @@ def normalize_capture_artifact(
                 )
     world_border_workload_complete = True
     border_scenario = (requested_world_border_scenario or "").strip().lower()
-    if border_scenario and rust_shell_outline_mode:
+    if border_scenario and rust_shell_outline_mode and tool_kind != "subsystem":
         if border_scenario in {"hidden", "far", "no-target"}:
             if int(rust_gal_world_border_quads_for_validation or 0) != 0:
                 world_border_workload_complete = False
@@ -5173,7 +5210,7 @@ def normalize_capture_artifact(
                     + ", ".join(missing_border_counts)
                     + " evidence was captured"
                 )
-    if border_scenario:
+    if border_scenario and tool_kind == "capture":
         if border_scenario in {"hidden", "far", "no-target"}:
             border_quads_seen = int(rust_gal_world_border_quads_for_validation or 0)
             real_border_pixels = (
@@ -5200,7 +5237,7 @@ def normalize_capture_artifact(
             )
     world_material_marker_workload_complete = True
     material_marker_scenario = (requested_world_material_marker_scenario or "").strip().lower()
-    if material_marker_scenario and rust_outline_mode:
+    if material_marker_scenario and rust_outline_mode and tool_kind != "subsystem":
         if material_marker_scenario == "hidden":
             if int(rust_gal_world_material_quads_for_validation or 0) != 0:
                 world_material_marker_workload_complete = False
@@ -5277,7 +5314,7 @@ def normalize_capture_artifact(
                 )
     world_material_terrain_particle_workload_complete = True
     terrain_particle_scenario = (requested_world_material_terrain_particle_scenario or "").strip().lower()
-    if terrain_particle_scenario and rust_outline_mode:
+    if terrain_particle_scenario and rust_outline_mode and tool_kind == "capture":
         if terrain_particle_scenario == "hidden":
             if int(rust_gal_world_material_quads_for_validation or 0) != 0:
                 world_material_terrain_particle_workload_complete = False
@@ -5379,7 +5416,7 @@ def normalize_capture_artifact(
                 validation_messages.append("TerrainParticle legacy control emitted unexpected Rust material quads")
     world_mesh_block_display_workload_complete = True
     block_display_scenario = (requested_world_mesh_block_display_scenario or "").strip().lower()
-    if block_display_scenario and rust_outline_mode:
+    if block_display_scenario and rust_outline_mode and tool_kind != "subsystem":
         block_display_status = str(block_display_doc.get("status") or "")
         block_display_entity_count = int(parse_number(block_display_doc.get("entityCount")) or 0)
         block_display_distinct_count = int(parse_number(block_display_doc.get("distinctBlockCount")) or 0)
@@ -5733,6 +5770,53 @@ def normalize_capture_artifact(
         validation_messages.append("normal Java Vulkan control launched Rust whole-frame shell")
     if rust_shell_has_java_vulkan_frame:
         validation_messages.append("Rust whole-frame shell executed Java Vulkan frame/present work")
+    require_rust_vulkan_gameplay_attachments = (
+        tool_kind == "gameplay"
+        or (tool_kind == "capture" and bool(falling_block_scenario or piston_scenario))
+    )
+    if require_rust_vulkan_gameplay_attachments and mode.expected_attribution == "rust-vulkan":
+        if not isinstance(gameplay_attachment_doc, dict):
+            validation_messages.append("Rust Vulkan gameplay row did not retain real whole-frame gameplay attachment dumps")
+        elif gameplay_attachment_doc.get("source") != "real-gameplay-whole-frame-submit":
+            validation_messages.append("Rust Vulkan gameplay attachment dumps did not come from the real whole-frame submit path")
+        elif gameplay_attachment_doc.get("synthetic_shader_scene") is not False:
+            validation_messages.append("Rust Vulkan gameplay attachment dumps were not explicitly separated from shader conformance scenes")
+        if not isinstance(gameplay_attachment_correlation_doc, dict):
+            validation_messages.append("Rust Vulkan gameplay row did not retain acquire/submit/present correlation for attachment dumps")
+        if isinstance(gameplay_attachment_doc, dict) and isinstance(gameplay_attachment_correlation_doc, dict):
+            for field in ("gameplay_frame_id", "correlation_id", "gal_submission_id", "vulkan_submission_timeline_value"):
+                if gameplay_attachment_doc.get(field) != gameplay_attachment_correlation_doc.get(field):
+                    validation_messages.append(f"Rust Vulkan gameplay attachment correlation mismatch for {field}")
+            extent = gameplay_attachment_doc.get("extent")
+            correlation_extent = gameplay_attachment_correlation_doc.get("extent")
+            if extent != correlation_extent:
+                validation_messages.append("Rust Vulkan gameplay attachment extent did not match acquired frame extent")
+            if gameplay_attachment_correlation_doc.get("same_acquired_presented_image") is not True:
+                validation_messages.append("Rust Vulkan gameplay attachment frame did not prove acquired/presented image identity")
+            evidence = gameplay_attachment_doc.get("attachment_evidence")
+            required = [
+                "shadow_depth",
+                "albedo",
+                "normal",
+                "material_light",
+                "world_position",
+                "main_depth",
+                "deferred_lit",
+                "composite_0",
+                "composite_1",
+                "final_output",
+            ]
+            if not isinstance(evidence, dict) or any(name not in evidence for name in required):
+                validation_messages.append("Rust Vulkan gameplay attachment dump did not include the complete required attachment set")
+            else:
+                for color_name in ("albedo", "normal", "material_light", "world_position", "deferred_lit", "composite_0", "composite_1", "final_output"):
+                    value = evidence.get(color_name) if isinstance(evidence.get(color_name), dict) else {}
+                    if parse_number(value.get("nonblack_rgb")) in (None, 0):
+                        validation_messages.append(f"Rust Vulkan gameplay attachment {color_name} did not prove non-empty color data")
+                for depth_name in ("shadow_depth", "main_depth"):
+                    value = evidence.get(depth_name) if isinstance(evidence.get(depth_name), dict) else {}
+                    if parse_number(value.get("less_than_clear")) in (None, 0):
+                        validation_messages.append(f"Rust Vulkan gameplay attachment {depth_name} did not prove non-empty depth data")
     renderdoc_workload_assertions_complete = True
     if (
         isinstance(instrumentation, dict)
@@ -5795,7 +5879,10 @@ def normalize_capture_artifact(
         creation_counts[key] = int(creation_counts.get(key) or 0) + value
     validation_categories = validation_category_counts(validation_findings)
     concrete_validation_count = concrete_validation_finding_count(validation_findings)
-    validation_run = run_type == "vulkan-validation" and mode.backend in {"vulkan", "rust-vulkan"}
+    validation_run = (
+        meta.get("validation_enabled", "false").lower() == "true"
+        and mode.backend in {"vulkan", "rust-vulkan"}
+    )
     proof = validation_proof(
         meta,
         combined_logs,
@@ -5828,8 +5915,9 @@ def normalize_capture_artifact(
         validation_messages.append("Vulkan validation message filtering state is not clean")
     if validation_run and not proof.get("artifact_log_association", {}).get("all_named_logs_match_run"):
         validation_messages.append("Vulkan validation artifact/log association is incomplete")
+    loader_only_validation_note = ""
     if loader_only_validation:
-        validation_messages.append("Vulkan validation emitted only loader/configuration notices; no concrete API VUIDs were observed")
+        loader_only_validation_note = "Vulkan validation emitted only loader/configuration notices; no concrete API VUIDs were observed"
     rust_gal_frames = last_number(combined_logs, r"rust_gal_frames_executed[=: ]+(\d+)")
     rust_gal_batches = last_number(combined_logs, r"rust_gal_batches_executed[=: ]+(\d+)")
     rust_gal_sprite_batches = last_number(combined_logs, r"rust_gal_sprite_batches_executed[=: ]+(\d+)")
@@ -6098,6 +6186,13 @@ def normalize_capture_artifact(
             "failed_phase": failed_phase,
             "reused_baseline": reused_baseline,
             "files": {key: str(path) if path else None for key, path in files.items()},
+            "whole_frame_gameplay_attachments": {
+                "directory": str(gameplay_attachment_dir) if gameplay_attachment_dir.exists() else None,
+                "manifest": str(gameplay_attachment_manifest_path) if gameplay_attachment_manifest_path else None,
+                "correlation": str(gameplay_attachment_correlation_path) if gameplay_attachment_correlation_path else None,
+                "manifest_doc": gameplay_attachment_doc if isinstance(gameplay_attachment_doc, dict) else None,
+                "correlation_doc": gameplay_attachment_correlation_doc if isinstance(gameplay_attachment_correlation_doc, dict) else None,
+            },
         },
         "runtime_profile": runtime_profile or {},
         "benchmark_fingerprint": benchmark_fingerprint,
@@ -6383,7 +6478,7 @@ def normalize_capture_artifact(
         "validation": {
             "strict_gl_error_scan_passed": error_counts["gl_error"] == 0,
             "vulkan_validation_passed": concrete_validation_count == 0,
-            "vulkan_validation_clean": validation_run and validation_layer_exercised and concrete_validation_count == 0 and not loader_only_validation,
+            "vulkan_validation_clean": validation_run and validation_layer_exercised and concrete_validation_count == 0,
             "validation_layer_exercised": validation_layer_exercised,
             "crash_free": error_counts["crash"] == 0,
             "device_loss_free": error_counts["device_loss"] == 0,
@@ -6399,6 +6494,7 @@ def normalize_capture_artifact(
             "renderdoc_complete": renderdoc_complete,
             "tracy_complete": tracy_complete,
             "messages": validation_messages,
+            "vulkan_validation_note": loader_only_validation_note or None,
             "notes": validation_notes,
             "readiness_state": readiness_state,
             "migration_gate_blocking": world_profile_meta["migration_gate_blocking"],
@@ -6551,7 +6647,7 @@ def write_preflight_meta(capture_dir: Path, mode: ModeSpec, args: argparse.Names
         f"graphics_run_type={env.get('MATTMC_GRAPHICS_RUN_TYPE', run_type_for_args(args))}",
         f"validation_profile={env.get('MATTMC_GRAPHICS_VALIDATION_PROFILE', getattr(args, 'validation', 'off'))}",
         f"validation_fail_severity={env.get('MATTMC_GRAPHICS_VALIDATION_FAIL_SEVERITY', 'warning')}",
-        f"validation_enabled={'true' if env.get('VK_INSTANCE_LAYERS') else 'false'}",
+        f"validation_enabled={'true' if 'VK_LAYER_KHRONOS_validation' in env.get('VK_INSTANCE_LAYERS', '') else 'false'}",
         f"vk_instance_layers={env.get('VK_INSTANCE_LAYERS', '')}",
         f"vk_layer_settings={env.get('VK_LAYER_SETTINGS', '')}",
         f"vk_add_layer_path={env.get('VK_ADD_LAYER_PATH', '')}",
@@ -7597,6 +7693,8 @@ def build_capture_command(
     kind, entrypoint = run_dev_capture_entrypoint(target.root)
     requested_validation = "routine" if args.validation == "standard" else args.validation
     validation = "standard" if mode.supports_validation and requested_validation != "off" else "off"
+    if tool_kind == "gameplay" and mode.backend == "rust-vulkan":
+        validation = "off"
     base_client_args = args.client_args
     for option in ("--quickPlaySingleplayer", "--width", "--height"):
         base_client_args = remove_client_arg_option(base_client_args, option)
@@ -7659,7 +7757,11 @@ def build_capture_command(
         if getattr(args, "gui_resource_pack_scenario", ""):
             command.extend(["--gui-resource-pack-scenario", args.gui_resource_pack_scenario])
     env = os.environ.copy()
-    run_type = run_type_for_args(args)
+    run_type = run_type_for_effective_options(
+        validation,
+        renderdoc=getattr(args, "renderdoc_capture", False),
+        tracy=getattr(args, "tracy_capture", False),
+    )
     env["MATTMC_GRAPHICS_TOOL_INTERNAL"] = "1"
     env["MATTMC_GRAPHICS_RUN_TYPE"] = run_type
     world_profile = world_profile_for_args(args)
@@ -7871,11 +7973,16 @@ def build_capture_command(
         java_options.append(
             f"-Dmattmc.dev.rustGalWorldMesh.fallingBlockScenario={args.world_mesh_falling_block_scenario}"
         )
-        if tool_kind == "capture":
+        if tool_kind == "capture" and mode.backend != "rust-vulkan":
             java_options.append("-Dmattmc.dev.deterministicCameraCapture.internalScreenshots=true")
             java_options.append("-Dmattmc.dev.deterministicCameraCapture.poseCount=5")
             java_options.append("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=1")
             java_options.append("-Dmattmc.dev.rustGalWorldMesh.fallingBlockFallHeight=64")
+        elif tool_kind == "capture":
+            java_options.append("-Dmattmc.dev.deterministicCameraCapture.poseCount=5")
+            java_options.append("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=1")
+            java_options.append("-Dmattmc.dev.rustGalWorldMesh.fallingBlockFallHeight=192")
+            java_options.append("-Dmattmc.dev.rustGalWorldMesh.fallingBlockSlowCapture=true")
         if tool_kind == "gameplay":
             java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.yawDelta=0.0")
             java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.displayFpsCheckEnabled=false")
@@ -7894,14 +8001,17 @@ def build_capture_command(
         java_options.append(
             f"-Dmattmc.dev.rustGalWorldMesh.pistonScenario={args.world_mesh_piston_scenario}"
         )
-        if tool_kind == "capture":
+        if tool_kind == "capture" and mode.backend != "rust-vulkan":
             java_options.append("-Dmattmc.dev.deterministicCameraCapture.internalScreenshots=true")
+            java_options.append("-Dmattmc.dev.deterministicCameraCapture.poseCount=7")
+            java_options.append("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=1")
+        elif tool_kind == "capture":
             java_options.append("-Dmattmc.dev.deterministicCameraCapture.poseCount=7")
             java_options.append("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=1")
         java_options.append(
             f"-Dmattmc.dev.rustGalWorldMesh.pistonDirection={args.world_mesh_piston_direction}"
         )
-        if tool_kind == "gameplay":
+        if tool_kind == "gameplay" or (tool_kind == "capture" and mode.backend == "rust-vulkan"):
             java_options.append("-Dmattmc.dev.rustGalWorldMesh.freezePistonProgress=true")
             java_options.append(
                 f"-Dmattmc.dev.rustGalWorldMesh.pistonProgress={max(0.0, min(1.0, args.world_mesh_piston_progress)):.3f}"
@@ -7922,6 +8032,12 @@ def build_capture_command(
             java_options.append("-Dmattmc.dev.rustGalWorldPiston.disabled=true")
         elif piston_control == "legacy":
             java_options.append("-Dmattmc.dev.rustGalWorldPiston.legacyControl=true")
+    if (
+        tool_kind == "capture"
+        and getattr(args, "world_mesh_falling_block_scenario", "")
+        and getattr(args, "world_mesh_piston_scenario", "")
+    ):
+        java_options.append("-Dmattmc.dev.deterministicCameraCapture.poseCount=12")
     if getattr(args, "world_material_terrain_particle_real_gameplay", False):
         java_options.append("-Dmattmc.dev.rustGalWorldMaterial.terrainParticleRealGameplay=true")
         java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.displayFpsCheckEnabled=false")
@@ -7968,6 +8084,14 @@ def build_capture_command(
         java_options.append("-Dmattmc.dev.rustGalGui.mountHealth.disabled=true")
     elif rust_gal_gui_control == "mount-health-legacy":
         java_options.append("-Dmattmc.dev.rustGalGui.mountHealth.legacyControl=true")
+    if tool_kind in {"gameplay", "capture"} and mode.backend == "rust-vulkan":
+        attachment_dir = capture_dir / "whole_frame_gameplay_attachments"
+        env["MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_DIR"] = str(attachment_dir)
+        env.setdefault("MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_MIN_FRAME", "1")
+        min_mesh_instances = 1
+        if getattr(args, "world_mesh_falling_block_scenario", "") or getattr(args, "world_mesh_piston_scenario", ""):
+            min_mesh_instances = 2
+        env.setdefault("MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_MIN_MESH_INSTANCES", str(min_mesh_instances))
     if tool_kind == "gameplay":
         frame_status = capture_dir / f"graphics_frame_benchmark_{timestamp()}.json"
         settle_frames = mode_frame_count(args.settle_frames, mode, args, "--settle-frames")

@@ -150,7 +150,7 @@ def write_block_marker_probe_image(path: Path, *, texture_id: int = harness.WORL
     from PIL import Image
 
     path.parent.mkdir(parents=True, exist_ok=True)
-    image = Image.new("RGB", (1280, 720), (36, 48, 60))
+    image = Image.new("RGB", (1280, 720), (36, 48, 120))
     left, top, right, bottom = 560, 300, 640, 380
     if texture_id == harness.WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_BARRIER:
         for x in range(left, right):
@@ -174,7 +174,7 @@ def write_terrain_particle_probe_image(path: Path, *, texture_id: int = harness.
     from PIL import Image
 
     path.parent.mkdir(parents=True, exist_ok=True)
-    image = Image.new("RGB", (1280, 720), (36, 48, 60))
+    image = Image.new("RGB", (1280, 720), (36, 48, 120))
     left, top, right, bottom = 560, 300, 640, 380
     color = {
         harness.WORLD_MATERIAL_TEXTURE_STONE: (116, 116, 116),
@@ -194,7 +194,7 @@ def write_block_display_probe_image(path: Path, *, scenario: str = "stone") -> N
     from PIL import Image
 
     path.parent.mkdir(parents=True, exist_ok=True)
-    image = Image.new("RGB", (1280, 720), (36, 48, 60))
+    image = Image.new("RGB", (1280, 720), (36, 48, 120))
     left, top, right, bottom = 520, 250, 760, 490
     if scenario in {"oak-leaves", "cutout", "tinted"}:
         color = (78, 142, 58)
@@ -216,7 +216,7 @@ def write_desktop_sized_block_display_probe_image(path: Path, *, scenario: str =
     from PIL import Image
 
     path.parent.mkdir(parents=True, exist_ok=True)
-    image = Image.new("RGB", (2560, 720), (36, 48, 60))
+    image = Image.new("RGB", (2560, 720), (36, 48, 120))
     left, top, right, bottom = 520, 250, 760, 490
     color = (78, 142, 58) if scenario in {"oak-leaves", "cutout", "tinted"} else (124, 124, 124)
     for x in range(left, right):
@@ -231,7 +231,7 @@ def write_falling_block_probe_image(path: Path, *, scenario: str = "sand") -> No
     from PIL import Image
 
     path.parent.mkdir(parents=True, exist_ok=True)
-    image = Image.new("RGB", (1280, 720), (36, 48, 60))
+    image = Image.new("RGB", (1280, 720), (36, 48, 120))
     left, top, right, bottom = 520, 80, 700, 260
     if scenario == "gravel":
         color = (118, 118, 118)
@@ -249,7 +249,7 @@ def write_desktop_sized_falling_block_probe_image(path: Path, *, scenario: str =
     from PIL import Image
 
     path.parent.mkdir(parents=True, exist_ok=True)
-    image = Image.new("RGB", (2560, 720), (36, 48, 60))
+    image = Image.new("RGB", (2560, 720), (36, 48, 120))
     if scenario == "gravel":
         color = (118, 118, 118)
     elif scenario in {"concrete-powder", "concrete_powder"}:
@@ -1196,7 +1196,7 @@ class GraphicsAuditHarnessTests(unittest.TestCase):
             capture = temp / "capture"
             write_capture(capture, backend=mode.backend, shaders=mode.shaders, world="Origin")
             screenshots = []
-            for frame in range(4):
+            for frame in range(5):
                 screenshot = capture / f"falling_block_sand_{frame}.png"
                 write_falling_block_probe_image(screenshot, scenario="sand")
                 screenshots.append(screenshot)
@@ -1226,7 +1226,7 @@ class GraphicsAuditHarnessTests(unittest.TestCase):
                         "window": {"width": 1280, "height": 720},
                         "captureMethod": "internal-main-render-target",
                     }
-                    for frame in range(4)
+                    for frame in range(5)
                 ],
                 "rustGalWorldFallingBlocks": [
                     {
@@ -1244,9 +1244,9 @@ class GraphicsAuditHarnessTests(unittest.TestCase):
                         "materialMode": 1,
                         "viewport": {"width": 1280, "height": 720},
                         "projected": True,
-                        "screenBounds": {"left": 520.0, "top": 80.0, "right": 700.0, "bottom": 260.0},
+                        "screenBounds": {"left": 500.0, "top": 60.0, "right": 720.0, "bottom": 280.0},
                     }
-                    for frame in range(4)
+                    for frame in range(5)
                 ],
                 "rustGalWorldFallingBlockRouteDecisions": [
                     {
@@ -1297,7 +1297,7 @@ class GraphicsAuditHarnessTests(unittest.TestCase):
             self.assertEqual("passed", evidence["setup_status"])
             self.assertEqual("passed", evidence["capture_method_status"])
             self.assertEqual("passed", evidence["frame_sequence_status"])
-            self.assertEqual(4, evidence["frames_validated"])
+            self.assertEqual(5, evidence["frames_validated"])
 
     def test_falling_block_capture_rejects_desktop_screenshot(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1388,7 +1388,15 @@ class GraphicsAuditHarnessTests(unittest.TestCase):
             self.assertEqual("not_game_window", evidence["status"])
             self.assertEqual("failed", evidence["game_window_status"])
             self.assertEqual(
-                {"captured_width": 2560, "captured_height": 720, "expected_width": 1280, "expected_height": 720, "status": "failed"},
+                {
+                    "captured_width": 2560,
+                    "captured_height": 720,
+                    "expected_width": 1280,
+                    "expected_height": 720,
+                    "status": "failed",
+                    "target_window": "",
+                    "target_window_status": "not_recorded",
+                },
                 evidence["game_window"],
             )
 
@@ -1990,7 +1998,8 @@ class GraphicsAuditHarnessTests(unittest.TestCase):
             self.assertEqual(findings["categories"]["loader_environment_notice"], 2)
             self.assertTrue(findings["proof"]["layer_loaded"])
             self.assertTrue(findings["proof"]["meaningful_vulkan_workload"])
-            self.assertFalse(artifact["validation"]["vulkan_validation_clean"])
+            self.assertTrue(artifact["validation"]["vulkan_validation_clean"])
+            self.assertIn("loader/configuration notices", artifact["validation"]["vulkan_validation_note"])
 
     def test_validation_proof_uses_subsystem_workload_counts(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -3693,6 +3702,70 @@ else:
             self.assertNotIn("mattmc.rustGal.guiCrosshair.enabled", " ".join(command))
             self.assertIn("-Dmattmc.rustGal.guiCrosshair.enabled=true", env["JAVA_TOOL_OPTIONS"])
 
+    def test_rust_vulkan_gameplay_measurement_runs_without_validation_layers(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            target = fake_repo(root, "current")
+            args = Namespace(
+                profile="standard",
+                validation="standard",
+                validation_fail_severity="warning",
+                client_args="",
+                jvm_arg=[],
+                world="Origin",
+                world_profile="migration-gate",
+                max_secs=160,
+                dump_secs=45,
+                client_rss_limit_mb=12288,
+                diagnostic=False,
+                warmup_frames=120,
+                measure_frames=300,
+                settle_frames=0,
+                max_settle_frames=120,
+                readiness_timeout_seconds=40,
+                shutdown_timeout_seconds=10,
+                cleanup_timeout_seconds=10,
+                subsystem_iterations=120,
+                tracy_capture=False,
+                tracy_duration_seconds=20,
+                tracy_max_size_mb=256,
+                renderdoc_capture=False,
+                renderdoc_frame=8,
+                gui_resource_pack_scenario="vanilla",
+            )
+            mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-rust-vulkan-shaders-on")
+
+            gameplay_command, _ = harness.build_capture_command(target, mode, root / "gameplay", "gameplay", args, "gameplay")
+            capture_command, _ = harness.build_capture_command(target, mode, root / "capture", "correctness", args, "capture")
+
+            self.assertEqual("off", gameplay_command[gameplay_command.index("--validation") + 1])
+            self.assertEqual("standard", capture_command[capture_command.index("--validation") + 1])
+
+    def test_renderdoc_preflight_layer_does_not_enable_khronos_validation(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            args = Namespace(
+                validation="off",
+                validation_fail_severity="warning",
+                renderdoc_capture=True,
+                renderdoc_frame=8,
+                tracy_capture=False,
+                tracy_duration_seconds=20,
+                tracy_max_size_mb=256,
+                world="Origin",
+                world_profile="migration-gate",
+            )
+            mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-rust-vulkan-shaders-on")
+            meta = harness.write_preflight_meta(
+                root,
+                mode,
+                args,
+                {"VK_INSTANCE_LAYERS": "VK_LAYER_RENDERDOC_Capture"},
+            ).read_text(encoding="utf-8")
+
+            self.assertIn("validation_mode=off", meta)
+            self.assertIn("validation_enabled=false", meta)
+
     def test_capture_runner_rust_vulkan_uses_vulkan_backend_and_whole_frame_property(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -3803,6 +3876,33 @@ else:
             java_options = env["JAVA_TOOL_OPTIONS"]
             self.assertIn("-Dmattmc.dev.deterministicCameraCapture.poseCount=1", java_options)
             self.assertIn("-Dmattmc.dev.deterministicCameraCapture.yawDelta=0.0", java_options)
+
+    def test_rust_vulkan_moving_mesh_capture_requests_real_gameplay_attachment_dump(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            target = fake_repo(root, "current")
+            mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-rust-vulkan-shaders-on")
+            args = harness.parse_args(
+                [
+                    "capture",
+                    "--profile",
+                    "standard",
+                    "--mode",
+                    mode.name,
+                    "--world-mesh-falling-block-scenario",
+                    "sand",
+                    "--world-mesh-piston-scenario",
+                    "normal-extending",
+                ]
+            )
+            _, env = harness.build_capture_command(target, mode, root / "capture", "correctness", args, "capture")
+            self.assertTrue(env["MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_DIR"].endswith("whole_frame_gameplay_attachments"))
+            self.assertEqual("2", env["MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_MIN_MESH_INSTANCES"])
+            java_options = env["JAVA_TOOL_OPTIONS"]
+            self.assertIn("-Dmattmc.dev.rustGalWorldMesh.freezePistonProgress=true", java_options)
+            self.assertIn("-Dmattmc.dev.rustGalWorldMesh.fallingBlockScenario=sand", java_options)
+            self.assertIn("-Dmattmc.dev.rustGalWorldMesh.pistonScenario=normal-extending", java_options)
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.poseCount=12", java_options)
 
     def test_world_outline_controls_are_forwarded_as_java_properties(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -5128,6 +5228,58 @@ else:
                         "initialPosition": {"x": 1.0, "y": 80.0, "z": 2.0},
                         "window": {"width": 1280, "height": 720},
                         "poseSequence": ["playing", "paused", "unpaused"],
+                        "captures": captures,
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            capture_runner.validate_deterministic_metadata(metadata, screenshot_dir, 0.001)
+
+    def test_capture_runner_accepts_falling_block_frame_sequence_names(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            screenshot_dir = root / "screens"
+            screenshot_dir.mkdir()
+            captures = []
+            for index in range(5):
+                pose_name = f"falling-{index:02d}"
+                screenshot = screenshot_dir / f"{index + 1:02d}_{pose_name}.png"
+                screenshot.write_bytes(b"not-a-real-image")
+                captures.append(
+                    {
+                        "index": index + 1,
+                        "poseName": pose_name,
+                        "screenshot": str(screenshot),
+                        "backend": "rust-vulkan",
+                        "shaderEnabled": True,
+                        "shaderPack": "ComplementaryHungLoIfied",
+                        "gitCommit": "abc123",
+                        "window": {"width": 1280, "height": 720},
+                        "dimension": "minecraft:overworld",
+                        "position": {"x": 1.0, "y": 80.0, "z": 2.0},
+                        "requestedYaw": 12.0,
+                        "requestedPitch": 5.0,
+                        "observedYaw": 12.0,
+                        "observedPitch": 5.0,
+                        "renderedFrameIndex": (index + 1) * 8,
+                    }
+                )
+            metadata = root / "deterministic.json"
+            metadata.write_text(
+                json.dumps(
+                    {
+                        "status": "complete",
+                        "backend": "rust-vulkan",
+                        "shaderEnabled": True,
+                        "shaderPack": "ComplementaryHungLoIfied",
+                        "gitCommit": "abc123",
+                        "dimension": "minecraft:overworld",
+                        "yawDelta": 0.0,
+                        "initialPose": {"name": "initial", "yaw": 12.0, "pitch": 5.0},
+                        "initialPosition": {"x": 1.0, "y": 80.0, "z": 2.0},
+                        "window": {"width": 1280, "height": 720},
+                        "poseSequence": [f"falling-{index:02d}" for index in range(5)],
                         "captures": captures,
                     }
                 ),

@@ -345,6 +345,45 @@ fn shader_pack_policy_stays_out_of_ffi_and_backends() {
     );
 }
 
+#[test]
+fn shader_pack_runtime_owns_whole_frame_pass_order() {
+    let rust_root = Path::new(RUST_ROOT);
+    let world_frontend = rust_root.join("render/vulkanic/world_primitive_frontend.rs");
+    let source = read_source(&world_frontend);
+    let production_source = source.split("#[cfg(test)]").next().unwrap_or(&source);
+    let forbidden = [
+        "ShaderPackRuntimePlan::terrain_material_multipass_v1",
+        "builtin_terrain_material_pass_graph",
+        "vulkanic:pass/shadow_depth",
+        "vulkanic:pass/terrain_opaque",
+        "vulkanic:pass/terrain_cutout",
+        "vulkanic:pass/deferred_lighting",
+        "vulkanic:pass/composite_0",
+        "vulkanic:pass/composite_1",
+        "vulkanic:pass/final_output",
+    ];
+    let mut violations = Vec::new();
+
+    for (line_index, line) in production_source.lines().enumerate() {
+        for token in forbidden {
+            if line.contains(token) {
+                violations.push(format!(
+                    "{}:{}: {}",
+                    relative(&world_frontend),
+                    line_index + 1,
+                    line.trim()
+                ));
+            }
+        }
+    }
+
+    assert!(
+        violations.is_empty(),
+        "Whole-frame shader pass ordering belongs in shader_pack::runtime, not the world frontend:\n{}",
+        violations.join("\n")
+    );
+}
+
 fn assert_no_public_backend_exposure(path: &Path, source: &str) {
     let mut violations = Vec::new();
 

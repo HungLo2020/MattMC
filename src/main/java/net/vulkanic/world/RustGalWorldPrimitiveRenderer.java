@@ -35,6 +35,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.BlockAndTintGetter;
+import net.minecraft.world.level.EmptyBlockAndTintGetter;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.LightBlock;
@@ -1036,8 +1037,8 @@ public final class RustGalWorldPrimitiveRenderer {
 				blockRenderDispatcher,
 				blockState,
 				BlockPos.ZERO,
-				null,
-				null,
+				EmptyBlockAndTintGetter.INSTANCE,
+				BlockPos.ZERO,
 				material.materialId(),
 				material.materialMode(),
 				"BlockDisplay"

@@ -15,6 +15,10 @@ import net.vulkanic.bridge.VulkanicGalBridge;
 import net.vulkanic.world.RustGalWorldPrimitiveRenderer;
 import org.slf4j.Logger;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -35,6 +39,7 @@ public final class RustGalFrameCoordinator {
 	private static long assetUpdateFailures;
 	private static long lastSubmitted;
 	private static long lastRetiredSubmission;
+	private static boolean wholeFrameAttachmentCorrelationWritten;
 	private static List<VulkanicGalBridge.GuiAssetRecord> pendingAssets = List.of();
 	private static final RustGalFrameScheduler<VulkanicGalBridge.GuiSpriteRecord> SCHEDULER =
 		new RustGalFrameScheduler<>("Rust VulkanicGAL deferred GUI");
@@ -453,13 +458,14 @@ public final class RustGalFrameCoordinator {
 			long presentStarted = System.nanoTime();
 			recordFixedOperation(Operation.FRAME_PRESENT, VulkanicGalBridge.Struct.FRAME_PRESENT.byteSize());
 			VulkanicGalBridge.PresentedFrame presented = bridge.presentFrame(frameId, correlationId, submissionId);
-			if (wholeFrameVulkan) {
-				auditMessage("gal.frame.present backend=vulkan correlation=" + correlationId
-					+ " frame=" + presented.frameId()
-					+ " image=" + presented.frameTargetIdentity()
-					+ " submission=" + submissionId
-					+ " status=" + presented.status());
-			}
+				if (wholeFrameVulkan) {
+					auditMessage("gal.frame.present backend=vulkan correlation=" + correlationId
+						+ " frame=" + presented.frameId()
+						+ " image=" + presented.frameTargetIdentity()
+						+ " submission=" + submissionId
+						+ " status=" + presented.status());
+					writeWholeFrameAttachmentCorrelation(frame, presented, wholeFrameResult, primitiveFrame);
+				}
 			METRICS.framePresentNanos += elapsedSince(presentStarted);
 			GraphicsFrameBenchmark.endPhase("rust-gal.gui-frame.ffi.present");
 			if (renderdocFrameCaptureStarted) {
@@ -531,6 +537,85 @@ public final class RustGalFrameCoordinator {
 			+ " " + clearExpectation);
 		auditMessage("gal.frame.target.present-ready backend=vulkan frame=" + frame.frameId()
 			+ " image=" + frame.frameTargetIdentity());
+	}
+
+	private static void writeWholeFrameAttachmentCorrelation(
+		VulkanicGalBridge.AcquiredFrame acquired,
+		VulkanicGalBridge.PresentedFrame presented,
+		VulkanicGalBridge.WholeFrameSubmitResult result,
+		RustGalWorldPrimitiveRenderer.PrimitiveFrame primitiveFrame
+	) {
+		String dir = System.getenv("MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_DIR");
+		if (dir == null || dir.isBlank() || wholeFrameAttachmentCorrelationWritten || result == null || primitiveFrame == null) {
+			return;
+		}
+		if (result.worldMeshInstanceCount() <= 0L) {
+			return;
+		}
+		long minFrame = parseLongEnv("MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_MIN_FRAME", 0L);
+		if (acquired.frameId() < minFrame) {
+			return;
+		}
+		wholeFrameAttachmentCorrelationWritten = true;
+		Path root = Path.of(dir);
+		String json = "{\n"
+			+ "  \"artifact_class\":\"rust_vulkan_whole_frame_gameplay_correlation\",\n"
+			+ "  \"source\":\"java-frame-coordinator-after-present\",\n"
+			+ "  \"gameplay_frame_id\":" + acquired.frameId() + ",\n"
+			+ "  \"correlation_id\":" + acquired.correlationId() + ",\n"
+			+ "  \"gal_submission_id\":" + result.submissionId() + ",\n"
+			+ "  \"vulkan_submission_timeline_value\":" + result.submissionId() + ",\n"
+			+ "  \"acquired_swapchain_image\":" + acquired.frameTargetIdentity() + ",\n"
+			+ "  \"presented_swapchain_image\":" + presented.frameTargetIdentity() + ",\n"
+			+ "  \"present_completed_submission_id\":" + presented.completedSubmissionId() + ",\n"
+			+ "  \"extent\":{\"width\":" + acquired.width() + ",\"height\":" + acquired.height() + "},\n"
+			+ "  \"same_acquired_presented_image\":" + (acquired.frameTargetIdentity() == presented.frameTargetIdentity()) + ",\n"
+			+ "  \"producer_workload_fingerprint\":\"" + escapeJson(primitiveFrameFingerprint(primitiveFrame)) + "\",\n"
+			+ "  \"gui_sprites\":" + result.spriteCount() + ",\n"
+			+ "  \"world_mesh_instances\":" + result.worldMeshInstanceCount() + ",\n"
+			+ "  \"world_mesh_batches\":" + result.worldMeshBatchCount() + ",\n"
+			+ "  \"world_mesh_draws\":" + result.worldMeshDrawCount() + ",\n"
+			+ "  \"world_material_quads\":" + result.worldMaterialQuadCount() + ",\n"
+			+ "  \"world_crack_quads\":" + result.worldCrackQuadCount() + ",\n"
+			+ "  \"world_border_quads\":" + result.worldBorderQuadCount() + ",\n"
+			+ "  \"java_vulkan_frame_execution\":false,\n"
+			+ "  \"rust_whole_frame_presenter\":true\n"
+			+ "}\n";
+		try {
+			Files.createDirectories(root);
+			Files.writeString(root.resolve("gameplay-correlation-frame-" + acquired.frameId() + ".json"), json, StandardCharsets.UTF_8);
+		} catch (IOException exception) {
+			LOGGER.warn("Unable to write Rust whole-frame gameplay attachment correlation sidecar", exception);
+		}
+	}
+
+	private static long parseLongEnv(String name, long fallback) {
+		String value = System.getenv(name);
+		if (value == null || value.isBlank()) {
+			return fallback;
+		}
+		try {
+			return Long.parseLong(value.trim());
+		} catch (NumberFormatException ignored) {
+			return fallback;
+		}
+	}
+
+	private static String primitiveFrameFingerprint(RustGalWorldPrimitiveRenderer.PrimitiveFrame frame) {
+		return "segments=" + frame.segments().size()
+			+ " crack_quads=" + frame.crackQuads().size()
+			+ " border_quads=" + frame.borderQuads().size()
+			+ " material_quads=" + frame.materialQuads().size()
+			+ " mesh_instances=" + frame.meshInstances().size()
+			+ " background_enabled=" + frame.background().enabled();
+	}
+
+	private static String escapeJson(String value) {
+		return value
+			.replace("\\", "\\\\")
+			.replace("\"", "\\\"")
+			.replace("\n", "\\n")
+			.replace("\r", "\\r");
 	}
 
 	private static void recordGuiMetrics(VulkanicGalBridge.GuiFrameSubmitResult result) {

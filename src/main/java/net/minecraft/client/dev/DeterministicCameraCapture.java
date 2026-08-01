@@ -203,6 +203,9 @@ public final class DeterministicCameraCapture {
 	private static int windowHeight;
 	private static boolean settledReadyGateSatisfied;
 	private static boolean movingMeshScenarioSetup;
+	private static String movingMeshSetupStage = "inactive";
+	private static String movingMeshSetupLastMissing = "";
+	private static int movingMeshSetupAttempts;
 	private static int framesWaitingForSettledReady;
 	private static int framesWaitingForMovingMeshProducer;
 	private static int fallingEntitySeenCount;
@@ -216,6 +219,18 @@ public final class DeterministicCameraCapture {
 	private static String fallingBlockSetupLanding = "";
 	private static int fallingBlockSetupEntityCount;
 	private static int fallingBlockSetupFallHeight;
+	private static String pistonSetupStatus = "inactive";
+	private static String pistonSetupBlockId = "";
+	private static String pistonSetupOrigin = "";
+	private static String pistonSetupBlockState = "";
+	private static boolean pistonSetupClientBlockEntityPresent;
+	private static int pistonSetupEntityCount;
+	private static BlockPos pistonSetupPos;
+	private static BlockState pistonSetupMovedState;
+	private static Direction pistonSetupDirection;
+	private static boolean pistonSetupExtending;
+	private static boolean pistonSetupSourcePiston;
+	private static int pistonSetupReseedCount;
 	private static CameraType originalCameraType;
 	private static GameType originalGameMode;
 	private static GameType originalPreviousGameMode;
@@ -346,6 +361,7 @@ public final class DeterministicCameraCapture {
 			renderedFramesAtPose = 0;
 			return;
 		}
+		maintainPistonScenario(minecraft);
 		if (awaitingScreenshotAck) {
 			if (checkScreenshotAck(minecraft)) {
 				return;
@@ -392,8 +408,12 @@ public final class DeterministicCameraCapture {
 			if (!movingMeshProducerReady()) {
 				renderedFramesAtPose = 0;
 				framesWaitingForMovingMeshProducer++;
-				if (framesWaitingForMovingMeshProducer > SETTLED_READY_MAX_WAIT_FRAMES) {
-					fail("timed out waiting for deterministic moving-mesh producer traversal: " + movingMeshProducerSummary());
+			if (framesWaitingForMovingMeshProducer > SETTLED_READY_MAX_WAIT_FRAMES) {
+						fail("timed out waiting for deterministic moving-mesh producer traversal: "
+							+ "setupStage=" + movingMeshSetupStage
+							+ " setupAttempts=" + movingMeshSetupAttempts
+							+ " setupMissing=" + movingMeshSetupLastMissing
+							+ " " + movingMeshProducerSummary());
 				} else if ((framesWaitingForMovingMeshProducer % 30) == 0) {
 					writeMetadata(minecraft, "waiting_for_moving_mesh_producer");
 				}
@@ -443,14 +463,49 @@ public final class DeterministicCameraCapture {
 			(FALLING_BLOCK_SCENARIO.isEmpty() || "hidden".equals(FALLING_BLOCK_SCENARIO))
 				&& (PISTON_SCENARIO.isEmpty() || "hidden".equals(PISTON_SCENARIO))
 		)) {
+			if (movingMeshScenarioSetup) {
+				movingMeshSetupStage = "setup-complete";
+			}
 			return true;
 		}
-		if (minecraft.player == null || minecraft.level == null || minecraft.getSingleplayerServer() == null) {
+		movingMeshSetupAttempts++;
+		movingMeshSetupStage = "waiting-for-world";
+		if (minecraft.player == null) {
+			movingMeshSetupLastMissing = "player";
+			if ((movingMeshSetupAttempts % 30) == 0) {
+				writeMetadata(minecraft, "waiting_for_moving_mesh_setup_player");
+			}
 			return false;
 		}
+		if (minecraft.level == null) {
+			movingMeshSetupLastMissing = "client-level";
+			if ((movingMeshSetupAttempts % 30) == 0) {
+				writeMetadata(minecraft, "waiting_for_moving_mesh_setup_client_level");
+			}
+			return false;
+		}
+		if (minecraft.getSingleplayerServer() == null) {
+			movingMeshSetupLastMissing = "singleplayer-server";
+			if ((movingMeshSetupAttempts % 30) == 0) {
+				writeMetadata(minecraft, "waiting_for_moving_mesh_setup_server");
+			}
+			return false;
+		}
+		ServerLevel serverLevel = minecraft.getSingleplayerServer().getLevel(minecraft.level.dimension());
+		if (serverLevel == null) {
+			movingMeshSetupLastMissing = "server-level:" + minecraft.level.dimension().location();
+			if ((movingMeshSetupAttempts % 30) == 0) {
+				writeMetadata(minecraft, "waiting_for_moving_mesh_setup_server_level");
+			}
+			return false;
+		}
+		movingMeshSetupStage = "scenario-setup-started";
+		movingMeshSetupLastMissing = "";
+		writeMetadata(minecraft, "moving_mesh_scenario_setup_started");
 		setupFallingBlockScenario(minecraft, minecraft.player);
 		setupPistonScenario(minecraft, minecraft.player);
 		movingMeshScenarioSetup = true;
+		movingMeshSetupStage = "setup-complete";
 		writeMetadata(minecraft, "moving_mesh_scenario_spawned_after_settled_ready");
 		return false;
 	}
@@ -632,6 +687,9 @@ public final class DeterministicCameraCapture {
 					new Pose("crack-middle", initialPose.yaw(), initialPose.pitch()),
 					new Pose("crack-late", initialPose.yaw(), initialPose.pitch())
 				};
+			} else if (!FALLING_BLOCK_SCENARIO.isEmpty() && !"hidden".equals(FALLING_BLOCK_SCENARIO)
+				&& !PISTON_SCENARIO.isEmpty() && !"hidden".equals(PISTON_SCENARIO)) {
+				fullSequence = combinedMovingMeshPoseSequence(initialPose);
 			} else if (!PISTON_SCENARIO.isEmpty() && !"hidden".equals(PISTON_SCENARIO)) {
 				fullSequence = movingMeshPoseSequence("piston", initialPose, 7);
 			} else if (!FALLING_BLOCK_SCENARIO.isEmpty() && !"hidden".equals(FALLING_BLOCK_SCENARIO)) {
@@ -967,6 +1025,7 @@ public final class DeterministicCameraCapture {
 		Pose pose = poses[poseIndex];
 		int captureIndex = poseIndex + 1;
 		LocalPlayer player = minecraft.player;
+		String targetWindow = readAckStringField("targetWindow");
 		CAPTURES.add(new PoseCapture(
 			captureIndex,
 			pose.name(),
@@ -979,7 +1038,8 @@ public final class DeterministicCameraCapture {
 			player == null ? 0.0F : player.getXRot(),
 			renderedFrameIndex,
 			minecraft.level == null ? -1L : minecraft.level.getGameTime(),
-			INTERNAL_SCREENSHOTS ? "internal-main-render-target" : "external-window-request"
+			INTERNAL_SCREENSHOTS ? "internal-main-render-target" : "external-window-request",
+			targetWindow
 		));
 		LOGGER.info(
 			"Deterministic camera capture acknowledged screenshot index={} pose={} path={} yaw={} pitch={}",
@@ -1262,8 +1322,9 @@ public final class DeterministicCameraCapture {
 	}
 
 	private static boolean hasCurrentFallingBlockRoute(long frameIndex) {
+		long frameTolerance = movingMeshFrameTolerance();
 		for (RustGalWorldPrimitiveRenderer.FallingBlockRouteDecision decision : RustGalWorldPrimitiveRenderer.fallingBlockRouteDecisions()) {
-			if (Math.abs(decision.frameIndex() - frameIndex) > 1) {
+			if (Math.abs(decision.frameIndex() - frameIndex) > frameTolerance) {
 				continue;
 			}
 			if ("legacy".equals(FALLING_BLOCK_ROUTE_CONTROL)) {
@@ -1275,28 +1336,33 @@ public final class DeterministicCameraCapture {
 					return true;
 				}
 			} else if (decision.rustSelected() && decision.rustQueued()) {
-				return hasCurrentMovingMeshDiagnostic("falling-block", frameIndex);
+				return hasCurrentMovingMeshDiagnostic("falling-block", frameIndex, frameTolerance);
 			}
 		}
 		return false;
 	}
 
 	private static boolean hasCurrentPistonRoute(long frameIndex) {
+		long frameTolerance = movingMeshFrameTolerance();
 		for (RustGalWorldPrimitiveRenderer.MovingBlockRouteDecision decision : RustGalWorldPrimitiveRenderer.movingBlockRouteDecisions()) {
 			if ("piston".equals(decision.provenance())
-				&& Math.abs(decision.frameIndex() - frameIndex) <= 1
+				&& Math.abs(decision.frameIndex() - frameIndex) <= frameTolerance
 				&& decision.rustSelected()
 				&& decision.rustQueued()) {
-				return hasCurrentMovingMeshDiagnostic("piston", frameIndex);
+				return hasCurrentMovingMeshDiagnostic("piston", frameIndex, frameTolerance);
 			}
 		}
 		return false;
 	}
 
-	private static boolean hasCurrentMovingMeshDiagnostic(String provenance, long frameIndex) {
+	private static long movingMeshFrameTolerance() {
+		return Math.max(16L, FRAMES_PER_POSE + 4L);
+	}
+
+	private static boolean hasCurrentMovingMeshDiagnostic(String provenance, long frameIndex, long frameTolerance) {
 		for (RustGalWorldPrimitiveRenderer.MovingBlockDiagnostic diagnostic : RustGalWorldPrimitiveRenderer.movingBlockDiagnostics()) {
 			if (provenance.equals(diagnostic.provenance())
-				&& Math.abs(diagnostic.frameIndex() - frameIndex) <= 1
+				&& Math.abs(diagnostic.frameIndex() - frameIndex) <= frameTolerance
 				&& diagnostic.projected()
 				&& diagnostic.sectionCount() > 0) {
 				return true;
@@ -1404,6 +1470,7 @@ public final class DeterministicCameraCapture {
 			forward = new Vec3(0.0, 0.0, 1.0);
 		}
 		int fallHeight = Math.max(4, Integer.getInteger("mattmc.dev.rustGalWorldMesh.fallingBlockFallHeight", 6));
+		boolean slowCapture = Boolean.getBoolean("mattmc.dev.rustGalWorldMesh.fallingBlockSlowCapture");
 		BlockPos origin = BlockPos.containing(player.getEyePosition().add(forward.normalize().scale(4.0)).add(0.0, 2.0, 0.0));
 		int entityCount = Math.max(1, Integer.getInteger("mattmc.dev.rustGalWorldMesh.fallingBlockCount", 1));
 		fallingBlockSetupStatus = "spawned";
@@ -1419,7 +1486,12 @@ public final class DeterministicCameraCapture {
 			serverLevel.setBlock(pos, state, 2);
 			minecraft.level.setBlock(pos, state, 2);
 			FallingBlockEntity serverEntity = FallingBlockEntity.fall(serverLevel, pos, state);
-			serverEntity.setDeltaMovement(0.0, -0.02, 0.0);
+			if (slowCapture) {
+				serverEntity.setNoGravity(true);
+				serverEntity.setDeltaMovement(0.0, -0.015, 0.0);
+			} else {
+				serverEntity.setDeltaMovement(0.0, -0.02, 0.0);
+			}
 			serverEntity.dropItem = false;
 			minecraft.level.setBlock(pos, state.getFluidState().createLegacyBlock(), 3);
 		}
@@ -1452,10 +1524,12 @@ public final class DeterministicCameraCapture {
 
 	private static void setupPistonScenario(Minecraft minecraft, LocalPlayer player) {
 		if (PISTON_SCENARIO.isEmpty() || "hidden".equals(PISTON_SCENARIO) || minecraft.level == null || minecraft.getSingleplayerServer() == null) {
+			pistonSetupStatus = PISTON_SCENARIO.isEmpty() ? "inactive" : "hidden-or-missing-level";
 			return;
 		}
 		ServerLevel serverLevel = minecraft.getSingleplayerServer().getLevel(minecraft.level.dimension());
 		if (serverLevel == null) {
+			pistonSetupStatus = "missing-server-level";
 			return;
 		}
 		BlockState movedState = pistonMovedState();
@@ -1471,6 +1545,17 @@ public final class DeterministicCameraCapture {
 			clearPistonScenarioSpace(serverLevel, minecraft.level, pos);
 			seedMovingPiston(serverLevel, minecraft.level, pos, movedState, direction, pistonExtending(), pistonSourcePiston());
 		}
+		pistonSetupPos = origin;
+		pistonSetupMovedState = movedState;
+		pistonSetupDirection = direction;
+		pistonSetupExtending = pistonExtending();
+		pistonSetupSourcePiston = pistonSourcePiston();
+		pistonSetupStatus = "spawned";
+		pistonSetupBlockId = movedState.getBlock().builtInRegistryHolder().key().location().toString();
+		pistonSetupOrigin = origin.toShortString();
+		pistonSetupBlockState = minecraft.level.getBlockState(origin).toString();
+		pistonSetupClientBlockEntityPresent = minecraft.level.getBlockEntity(origin) instanceof net.minecraft.world.level.block.piston.PistonMovingBlockEntity;
+		pistonSetupEntityCount = count;
 		LOGGER.info(
 			"Deterministic piston setup spawned {} count={} scenario={} direction={} near {} for Rust-GAL moving mesh capture",
 			movedState.getBlock().builtInRegistryHolder().key().location(),
@@ -1479,6 +1564,47 @@ public final class DeterministicCameraCapture {
 			direction,
 			origin
 		);
+	}
+
+	private static void maintainPistonScenario(Minecraft minecraft) {
+		if (PISTON_SCENARIO.isEmpty()
+			|| "hidden".equals(PISTON_SCENARIO)
+			|| !movingMeshScenarioSetup
+			|| complete
+			|| failed
+			|| pistonSetupPos == null
+			|| pistonSetupMovedState == null
+			|| pistonSetupDirection == null
+			|| minecraft.level == null
+			|| minecraft.getSingleplayerServer() == null) {
+			return;
+		}
+		ServerLevel serverLevel = minecraft.getSingleplayerServer().getLevel(minecraft.level.dimension());
+		if (serverLevel == null) {
+			pistonSetupStatus = "maintain-missing-server-level";
+			return;
+		}
+		boolean clientPresent = minecraft.level.getBlockEntity(pistonSetupPos) instanceof net.minecraft.world.level.block.piston.PistonMovingBlockEntity;
+		boolean serverPresent = serverLevel.getBlockEntity(pistonSetupPos) instanceof net.minecraft.world.level.block.piston.PistonMovingBlockEntity;
+		pistonSetupClientBlockEntityPresent = clientPresent;
+		pistonSetupBlockState = minecraft.level.getBlockState(pistonSetupPos).toString();
+		if (clientPresent && serverPresent && minecraft.level.getBlockState(pistonSetupPos).is(Blocks.MOVING_PISTON)) {
+			return;
+		}
+		clearPistonScenarioSpace(serverLevel, minecraft.level, pistonSetupPos);
+		seedMovingPiston(
+			serverLevel,
+			minecraft.level,
+			pistonSetupPos,
+			pistonSetupMovedState,
+			pistonSetupDirection,
+			pistonSetupExtending,
+			pistonSetupSourcePiston
+		);
+		pistonSetupReseedCount++;
+		pistonSetupStatus = "reseeded";
+		pistonSetupBlockState = minecraft.level.getBlockState(pistonSetupPos).toString();
+		pistonSetupClientBlockEntityPresent = minecraft.level.getBlockEntity(pistonSetupPos) instanceof net.minecraft.world.level.block.piston.PistonMovingBlockEntity;
 	}
 
 	private static BlockState pistonMovedState() {
@@ -1757,10 +1883,30 @@ public final class DeterministicCameraCapture {
 	}
 
 	private static void writeFailureMetadata(String reason) {
-		String json = "{\n"
-			+ "  \"status\": \"failed\",\n"
-			+ "  \"reason\": \"" + escape(reason) + "\"\n"
-			+ "}\n";
+		StringBuilder json = new StringBuilder(4096);
+		json.append("{\n");
+		appendField(json, "status", "failed").append(",\n");
+		appendField(json, "reason", reason).append(",\n");
+		json.append("  \"rustGalWorldMovingMeshSetup\": { ");
+		appendField(json, "stage", movingMeshSetupStage, 0).append(", ");
+		appendField(json, "lastMissing", movingMeshSetupLastMissing, 0).append(", ");
+		json.append("\"attempts\": ").append(movingMeshSetupAttempts)
+			.append(", \"complete\": ").append(movingMeshScenarioSetup)
+			.append(" },\n");
+		appendField(json, "rustGalWorldMovingMeshProducerSummary", movingMeshProducerSummary()).append(",\n");
+		json.append("  \"rustGalWorldPistonSetup\": { ");
+		appendField(json, "status", pistonSetupStatus, 0).append(", ");
+		appendField(json, "blockId", pistonSetupBlockId, 0).append(", ");
+		appendField(json, "origin", pistonSetupOrigin, 0).append(", ");
+		appendField(json, "blockState", pistonSetupBlockState, 0).append(", ");
+		json.append("\"clientBlockEntityPresent\": ").append(pistonSetupClientBlockEntityPresent)
+			.append(", \"entityCount\": ").append(pistonSetupEntityCount)
+			.append(", \"reseedCount\": ").append(pistonSetupReseedCount)
+			.append(" },\n");
+		appendMovingBlockDiagnostics(json).append(",\n");
+		appendMovingBlockRouteDecisions(json).append(",\n");
+		appendMovingBlockShellScanDiagnostics(json).append("\n");
+		json.append("}\n");
 		try {
 			Path parent = METADATA_PATH.getParent();
 			if (parent != null) {
@@ -1805,9 +1951,15 @@ public final class DeterministicCameraCapture {
 		appendTerrainParticleDiagnostics(json).append(",\n");
 		appendField(json, "rustGalWorldBlockDisplayScenario", System.getProperty("mattmc.dev.rustGalWorldMesh.blockDisplayScenario", "")).append(",\n");
 		appendBlockDisplayDiagnostics(json).append(",\n");
-			appendField(json, "rustGalWorldFallingBlockScenario", System.getProperty("mattmc.dev.rustGalWorldMesh.fallingBlockScenario", "")).append(",\n");
-			json.append("  \"rustGalWorldFallingBlockSetup\": { ");
-			appendField(json, "status", fallingBlockSetupStatus, 0).append(", ");
+				appendField(json, "rustGalWorldFallingBlockScenario", System.getProperty("mattmc.dev.rustGalWorldMesh.fallingBlockScenario", "")).append(",\n");
+				json.append("  \"rustGalWorldMovingMeshSetup\": { ");
+				appendField(json, "stage", movingMeshSetupStage, 0).append(", ");
+				appendField(json, "lastMissing", movingMeshSetupLastMissing, 0).append(", ");
+				json.append("\"attempts\": ").append(movingMeshSetupAttempts)
+					.append(", \"complete\": ").append(movingMeshScenarioSetup)
+					.append(" },\n");
+				json.append("  \"rustGalWorldFallingBlockSetup\": { ");
+				appendField(json, "status", fallingBlockSetupStatus, 0).append(", ");
 			appendField(json, "blockId", fallingBlockSetupBlockId, 0).append(", ");
 			appendField(json, "spawnMethod", fallingBlockSetupSpawnMethod, 0).append(", ");
 			appendField(json, "origin", fallingBlockSetupOrigin, 0).append(", ");
@@ -1821,6 +1973,15 @@ public final class DeterministicCameraCapture {
 				.append(", \"extracted\": ").append(fallingEntityExtractedCount)
 				.append(" },\n");
 			appendField(json, "rustGalWorldPistonScenario", System.getProperty("mattmc.dev.rustGalWorldMesh.pistonScenario", "")).append(",\n");
+		json.append("  \"rustGalWorldPistonSetup\": { ");
+		appendField(json, "status", pistonSetupStatus, 0).append(", ");
+		appendField(json, "blockId", pistonSetupBlockId, 0).append(", ");
+		appendField(json, "origin", pistonSetupOrigin, 0).append(", ");
+		appendField(json, "blockState", pistonSetupBlockState, 0).append(", ");
+		json.append("\"clientBlockEntityPresent\": ").append(pistonSetupClientBlockEntityPresent)
+			.append(", \"entityCount\": ").append(pistonSetupEntityCount)
+			.append(", \"reseedCount\": ").append(pistonSetupReseedCount)
+			.append(" },\n");
 			appendFallingBlockDiagnostics(json).append(",\n");
 				appendFallingBlockRouteDecisions(json).append(",\n");
 				appendMovingBlockDiagnostics(json).append(",\n");
@@ -1961,7 +2122,13 @@ public final class DeterministicCameraCapture {
 					.append(", \"worldTime\": ").append(SystemTimeUniforms.deterministicTemporalWorldTime())
 					.append(" },\n");
 				json.append("      \"gameTime\": ").append(capture.gameTime()).append(",\n");
-				appendField(json, "captureMethod", capture.captureMethod(), 6).append("\n");
+				appendField(json, "captureMethod", capture.captureMethod(), 6);
+				if (!capture.targetWindow().isEmpty()) {
+					json.append(",\n");
+					appendField(json, "targetWindow", capture.targetWindow(), 6).append("\n");
+				} else {
+					json.append("\n");
+				}
 			json.append("    }").append(i + 1 == CAPTURES.size() ? "\n" : ",\n");
 		}
 		json.append("  ]\n");
@@ -2335,8 +2502,57 @@ public final class DeterministicCameraCapture {
 		return sequence;
 	}
 
+	private static Pose[] combinedMovingMeshPoseSequence(Pose pose) {
+		Pose[] falling = movingMeshPoseSequence("falling", pose, 5);
+		Pose[] piston = movingMeshPoseSequence("piston", pose, 7);
+		Pose[] combined = new Pose[falling.length + piston.length];
+		System.arraycopy(falling, 0, combined, 0, falling.length);
+		System.arraycopy(piston, 0, combined, falling.length, piston.length);
+		return combined;
+	}
+
 	private static String formatVec(Vec3 value) {
 		return "(" + format(value.x) + "," + format(value.y) + "," + format(value.z) + ")";
+	}
+
+	private static String readAckStringField(String fieldName) {
+		if (currentAckPath == null || !Files.isRegularFile(currentAckPath)) {
+			return "";
+		}
+		try {
+			String json = Files.readString(currentAckPath, StandardCharsets.UTF_8);
+			String key = "\"" + fieldName + "\"";
+			int keyIndex = json.indexOf(key);
+			if (keyIndex < 0) {
+				return "";
+			}
+			int colonIndex = json.indexOf(':', keyIndex + key.length());
+			if (colonIndex < 0) {
+				return "";
+			}
+			int quoteIndex = json.indexOf('"', colonIndex + 1);
+			if (quoteIndex < 0) {
+				return "";
+			}
+			StringBuilder value = new StringBuilder();
+			boolean escaped = false;
+			for (int i = quoteIndex + 1; i < json.length(); i++) {
+				char c = json.charAt(i);
+				if (escaped) {
+					value.append(c);
+					escaped = false;
+				} else if (c == '\\') {
+					escaped = true;
+				} else if (c == '"') {
+					return value.toString();
+				} else {
+					value.append(c);
+				}
+			}
+		} catch (IOException ignored) {
+			return "";
+		}
+		return "";
 	}
 
 	private record Pose(String name, float yaw, float pitch) {
@@ -2363,7 +2579,8 @@ public final class DeterministicCameraCapture {
 		float observedPitch,
 		long renderedFrameIndex,
 		long gameTime,
-		String captureMethod
+		String captureMethod,
+		String targetWindow
 	) {
 	}
 }

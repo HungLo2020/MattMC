@@ -1044,12 +1044,19 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 			if (!collectBlockDisplay && !collectFallingBlock) {
 				continue;
 			}
-			if (!this.entityRenderDispatcher.shouldRender(entity, frustum, cameraX, cameraY, cameraZ)
-				&& !entity.hasIndirectPassenger(this.minecraft.player)) {
+			boolean shouldRenderEntity = this.entityRenderDispatcher.shouldRender(entity, frustum, cameraX, cameraY, cameraZ)
+				|| entity.hasIndirectPassenger(this.minecraft.player);
+			if (!shouldRenderEntity) {
+				if (collectFallingBlock) {
+					net.minecraft.client.dev.DeterministicCameraCapture.recordFallingBlockExtractionProbe(false, false, false);
+				}
 				continue;
 			}
 
 			if (entity == camera.getEntity() && !camera.isDetached()) {
+				if (collectFallingBlock) {
+					net.minecraft.client.dev.DeterministicCameraCapture.recordFallingBlockExtractionProbe(true, false, false);
+				}
 				continue;
 			}
 
@@ -1067,10 +1074,13 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 					this.levelRenderState.cameraRenderState,
 					entityRenderState.x - cameraX,
 					entityRenderState.y - cameraY,
-					entityRenderState.z - cameraZ,
-					poseStack,
-					this.submitNodeStorage
+				entityRenderState.z - cameraZ,
+				poseStack,
+				this.submitNodeStorage
 			);
+			if (collectFallingBlock) {
+				net.minecraft.client.dev.DeterministicCameraCapture.recordFallingBlockExtractionProbe(true, false, true);
+			}
 		}
 
 		if (pistons) {

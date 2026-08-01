@@ -1,4 +1,6 @@
 use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 mod background;
 mod crack;
@@ -9,9 +11,10 @@ mod shared;
 mod world_border;
 
 use super::commands::{
-    AttachmentLoadOp, AttachmentStoreOp, ClearColor, CommandOp, PassAttachment, ResourceBarrier,
+    AttachmentLoadOp, AttachmentStoreOp, CommandOp, PassAttachment, ResourceBarrier,
     SubmissionBatch, TextureOrigin3d, TextureUsageState,
 };
+use super::backends::CompletedHostRead;
 use super::error::{GalError, GalResult, StatusCode};
 use super::gal::VulkanicGal;
 use super::handles::Handle;
@@ -28,8 +31,12 @@ use super::shader_pack::programs::{
     minimal_shadow_depth_program, minimal_terrain_cutout_program, minimal_terrain_solid_program,
     shader_stage_code_for_backend, CompositeProgram, TerrainMaterialProgram,
 };
-use super::shader_pack::resources::ShaderPackRuntimePlan;
+use super::shader_pack::runtime::{
+    ShaderPackRuntimeExecutor, TerrainCompositeUniforms, TerrainMaterialPassMode, TerrainMeshDraw,
+    TerrainRuntimeFrame, TerrainRuntimeTargets, TERRAIN_RUNTIME_COMPOSITE_UNIFORM_BYTES,
+};
 use super::{BufferImageCopyRegion, CommandList, CommandListDesc, CullMode};
+use xxhash_rust::xxh32::xxh32;
 
 pub const WORLD_MAX_LINE_SEGMENTS: usize = 512;
 pub const WORLD_MAX_CRACK_QUADS: usize = 512;
@@ -116,9 +123,10 @@ const WORLD_MESH_BATCH_HEADER_BYTES: usize = 16 * 4 + 16 * 4 + 16 * 4 + 4 * 4;
 const WORLD_MESH_INSTANCE_BYTES: usize = 16 * 4 + 4 * 4 + 4 * 4;
 const WORLD_MESH_INSTANCE_BUFFER_BYTES: u64 =
     (WORLD_MESH_BATCH_HEADER_BYTES + WORLD_MAX_MESH_INSTANCES * WORLD_MESH_INSTANCE_BYTES) as u64;
-const WORLD_SHADER_COMPOSITE_UNIFORM_BYTES: u64 = 16 * 4 + 4 * 4 + 4 * 4 + 4 * 4;
+const WORLD_SHADER_COMPOSITE_UNIFORM_BYTES: u64 = TERRAIN_RUNTIME_COMPOSITE_UNIFORM_BYTES;
 const CRACK_STAGE_COUNT: u32 = 10;
 const CRACK_STAGE_SIZE: u32 = 16;
+static GAMEPLAY_ATTACHMENT_CAPTURE_WRITTEN: AtomicBool = AtomicBool::new(false);
 
 const WORLD_LINE_VERTEX_SHADER_VULKAN: &[u8] = br#"#version 450
 struct LineSegment {
@@ -1350,8 +1358,13 @@ impl WorldPrimitiveFrontend {
         frame: WorldPrimitiveFrame,
         gui_ops: Vec<CommandOp>,
     ) -> GalResult<WorldPrimitiveSubmitStats> {
+        let mut gameplay_attachment_capture =
+            GameplayAttachmentCapture::select(&frame, generation, self.mesh_asset_generation);
         let (mut ops, mut stats) =
             self.append_frame_ops_inner(gal, generation, frame_target, frame, true)?;
+        if let Some(capture) = gameplay_attachment_capture.as_mut() {
+            capture.append_ops(gal, &mut ops, self.g_buffer_resources.as_ref())?;
+        }
         ops.extend(gui_ops);
         stats.command_lists = 1;
         stats.command_ops = ops.len() as u64;
@@ -1363,6 +1376,10 @@ impl WorldPrimitiveFrontend {
             })],
         })?;
         stats.submission_id = token.submission.0;
+        if let Some(capture) = gameplay_attachment_capture {
+            gal.retire_through(token.submission)?;
+            capture.write_artifacts(gal.completed_host_reads(), token.submission.0, &stats)?;
+        }
         Ok(stats)
     }
 
@@ -1692,365 +1709,37 @@ impl WorldPrimitiveFrontend {
                     TextureUsageState::TransferDst,
                     TextureUsageState::ShaderRead,
                 )));
-                mesh_draws.push((
-                    resources.shadow_pipeline,
-                    resources.pipeline,
-                    resources.pipeline_layout,
-                    slot.resource_set,
-                    resources.index_buffer,
-                    batch.index_offset,
-                    asset.index_type,
-                    batch.index_count,
-                    batch.count() as u32,
-                    batch.key.material_mode,
-                ));
+                mesh_draws.push(TerrainMeshDraw {
+                    shadow_pipeline: resources.shadow_pipeline,
+                    pipeline: resources.pipeline,
+                    pipeline_layout: resources.pipeline_layout,
+                    resource_set: slot.resource_set,
+                    index_buffer: resources.index_buffer,
+                    index_offset: batch.index_offset,
+                    index_type: asset.index_type,
+                    index_count: batch.index_count,
+                    instance_count: batch.count() as u32,
+                    material_mode: terrain_material_pass_mode(batch.key.material_mode)?,
+                });
                 mesh_slot_indices.insert(batch.key, slot_index + 1);
             }
             if use_g_buffer_mesh_path {
                 let g_buffer = self.g_buffer_resources.as_ref().ok_or_else(|| {
                     GalError::backend("G-buffer resources missing before mesh submit")
                 })?;
-                ops.push(CommandOp::Barrier(texture_barrier(
-                    g_buffer.shadow_depth_texture,
-                    TextureUsageState::Undefined,
-                    TextureUsageState::DepthStencilAttachment,
-                )));
-                ops.push(CommandOp::BeginPass {
-                    pass: g_buffer.shadow_pass,
-                    target: g_buffer.shadow_target,
-                    colors: Vec::new(),
-                    depth_stencil: Some(PassAttachment {
-                        view: g_buffer.shadow_depth_view,
-                        load_op: AttachmentLoadOp::Clear,
-                        store_op: AttachmentStoreOp::Store,
-                        clear_color: None,
-                    }),
-                });
-                for (
-                    shadow_pipeline,
-                    _pipeline,
-                    pipeline_layout,
-                    resource_set,
-                    index_buffer,
-                    index_offset,
-                    index_type,
-                    index_count,
-                    instance_count,
-                    _,
-                ) in &mesh_draws
-                {
-                    let shadow_pipeline = shadow_pipeline.ok_or_else(|| {
-                        GalError::backend("G-buffer mesh draw missing shadow pipeline")
-                    })?;
-                    ops.push(CommandOp::BindGraphicsPipeline(shadow_pipeline));
-                    ops.push(CommandOp::BindResourceSet {
-                        pipeline_layout: *pipeline_layout,
-                        set_index: 0,
-                        set: *resource_set,
-                    });
-                    ops.push(CommandOp::SetIndexBuffer {
-                        buffer: *index_buffer,
-                        offset: *index_offset,
-                        index_type: *index_type,
-                    });
-                    ops.push(CommandOp::DrawIndexed {
-                        indices: *index_count,
-                        instances: *instance_count,
-                    });
-                }
-                ops.push(CommandOp::EndPass);
-                ops.push(CommandOp::Barrier(texture_barrier(
-                    g_buffer.shadow_depth_texture,
-                    TextureUsageState::DepthStencilAttachment,
-                    TextureUsageState::ShaderRead,
-                )));
-                ops.push(CommandOp::Barrier(texture_barrier(
-                    g_buffer.albedo_texture,
-                    TextureUsageState::Undefined,
-                    TextureUsageState::ColorAttachment,
-                )));
-                ops.push(CommandOp::Barrier(texture_barrier(
-                    g_buffer.normal_texture,
-                    TextureUsageState::Undefined,
-                    TextureUsageState::ColorAttachment,
-                )));
-                ops.push(CommandOp::Barrier(texture_barrier(
-                    g_buffer.material_light_texture,
-                    TextureUsageState::Undefined,
-                    TextureUsageState::ColorAttachment,
-                )));
-                ops.push(CommandOp::Barrier(texture_barrier(
-                    g_buffer.world_position_texture,
-                    TextureUsageState::Undefined,
-                    TextureUsageState::ColorAttachment,
-                )));
-                ops.push(CommandOp::Barrier(texture_barrier(
-                    g_buffer.depth_texture,
-                    TextureUsageState::Undefined,
-                    TextureUsageState::DepthStencilAttachment,
-                )));
-                let mut wrote_g_buffer = false;
-                for material_mode in [WORLD_MATERIAL_MODE_OPAQUE, WORLD_MATERIAL_MODE_CUTOUT] {
-                    let mode_draws = mesh_draws
-                        .iter()
-                        .filter(|draw| draw.9 == material_mode)
-                        .copied()
-                        .collect::<Vec<_>>();
-                    if mode_draws.is_empty() {
-                        continue;
-                    }
-                    let load_op = if wrote_g_buffer {
-                        AttachmentLoadOp::Load
-                    } else {
-                        AttachmentLoadOp::Clear
-                    };
-                    ops.push(CommandOp::BeginPass {
-                        pass: g_buffer.g_buffer_pass,
-                        target: g_buffer.target,
-                        colors: vec![
-                            PassAttachment {
-                                view: g_buffer.albedo_view,
-                                load_op,
-                                store_op: AttachmentStoreOp::Store,
-                                clear_color: Some(background_color),
-                            },
-                            PassAttachment {
-                                view: g_buffer.normal_view,
-                                load_op,
-                                store_op: AttachmentStoreOp::Store,
-                                clear_color: Some(ClearColor {
-                                    r: 0.5,
-                                    g: 0.5,
-                                    b: 1.0,
-                                    a: 1.0,
-                                }),
-                            },
-                            PassAttachment {
-                                view: g_buffer.material_light_view,
-                                load_op,
-                                store_op: AttachmentStoreOp::Store,
-                                clear_color: Some(ClearColor {
-                                    r: 0.0,
-                                    g: 1.0,
-                                    b: 1.0,
-                                    a: 0.0,
-                                }),
-                            },
-                            PassAttachment {
-                                view: g_buffer.world_position_view,
-                                load_op,
-                                store_op: AttachmentStoreOp::Store,
-                                clear_color: Some(ClearColor {
-                                    r: 0.5,
-                                    g: 0.5,
-                                    b: 0.5,
-                                    a: 0.0,
-                                }),
-                            },
-                        ],
-                        depth_stencil: Some(PassAttachment {
-                            view: g_buffer.depth_view,
-                            load_op,
-                            store_op: AttachmentStoreOp::Store,
-                            clear_color: None,
-                        }),
-                    });
-                    for (
-                        _shadow_pipeline,
-                        pipeline,
-                        pipeline_layout,
-                        resource_set,
-                        index_buffer,
-                        index_offset,
-                        index_type,
-                        index_count,
-                        instance_count,
-                        _,
-                    ) in mode_draws
-                    {
-                        ops.push(CommandOp::BindGraphicsPipeline(pipeline));
-                        ops.push(CommandOp::BindResourceSet {
-                            pipeline_layout,
-                            set_index: 0,
-                            set: resource_set,
-                        });
-                        ops.push(CommandOp::SetIndexBuffer {
-                            buffer: index_buffer,
-                            offset: index_offset,
-                            index_type,
-                        });
-                        ops.push(CommandOp::DrawIndexed {
-                            indices: index_count,
-                            instances: instance_count,
-                        });
-                    }
-                    ops.push(CommandOp::EndPass);
-                    wrote_g_buffer = true;
-                }
-                ops.push(CommandOp::Barrier(texture_barrier(
-                    g_buffer.albedo_texture,
-                    TextureUsageState::ColorAttachment,
-                    TextureUsageState::ShaderRead,
-                )));
-                ops.push(CommandOp::Barrier(texture_barrier(
-                    g_buffer.normal_texture,
-                    TextureUsageState::ColorAttachment,
-                    TextureUsageState::ShaderRead,
-                )));
-                ops.push(CommandOp::Barrier(texture_barrier(
-                    g_buffer.material_light_texture,
-                    TextureUsageState::ColorAttachment,
-                    TextureUsageState::ShaderRead,
-                )));
-                ops.push(CommandOp::Barrier(texture_barrier(
-                    g_buffer.world_position_texture,
-                    TextureUsageState::ColorAttachment,
-                    TextureUsageState::ShaderRead,
-                )));
-                ops.push(CommandOp::Barrier(texture_barrier(
-                    g_buffer.depth_texture,
-                    TextureUsageState::DepthStencilAttachment,
-                    TextureUsageState::ShaderRead,
-                )));
-                ops.push(CommandOp::Barrier(buffer_barrier(
-                    g_buffer.composite_uniform_buffer,
-                    TextureUsageState::ShaderRead,
-                    TextureUsageState::TransferDst,
-                )));
-                ops.push(CommandOp::HostWriteBuffer {
-                    buffer: g_buffer.composite_uniform_buffer,
-                    offset: 0,
-                    data: packed_shader_composite_uniforms(true),
-                });
-                ops.push(CommandOp::Barrier(buffer_barrier(
-                    g_buffer.composite_uniform_buffer,
-                    TextureUsageState::TransferDst,
-                    TextureUsageState::ShaderRead,
-                )));
-                ops.push(CommandOp::Barrier(texture_barrier(
-                    g_buffer.deferred_lit_texture,
-                    TextureUsageState::Undefined,
-                    TextureUsageState::ColorAttachment,
-                )));
-                ops.push(CommandOp::BeginPass {
-                    pass: g_buffer.deferred_lighting_pass,
-                    target: g_buffer.deferred_lit_target,
-                    colors: vec![PassAttachment {
-                        view: g_buffer.deferred_lit_view,
-                        load_op: AttachmentLoadOp::Clear,
-                        store_op: AttachmentStoreOp::Store,
-                        clear_color: Some(transparent_clear(background_color)),
-                    }],
-                    depth_stencil: None,
-                });
-                ops.push(CommandOp::BindGraphicsPipeline(
-                    g_buffer.deferred_lighting_pipeline,
-                ));
-                ops.push(CommandOp::BindResourceSet {
-                    pipeline_layout: g_buffer.screen_pipeline_layout,
-                    set_index: 0,
-                    set: g_buffer.deferred_lighting_resource_set,
-                });
-                ops.push(CommandOp::Draw {
-                    vertices: 3,
-                    instances: 1,
-                });
-                ops.push(CommandOp::EndPass);
-                ops.push(CommandOp::Barrier(texture_barrier(
-                    g_buffer.deferred_lit_texture,
-                    TextureUsageState::ColorAttachment,
-                    TextureUsageState::ShaderRead,
-                )));
-                ops.push(CommandOp::Barrier(texture_barrier(
-                    g_buffer.composite0_texture,
-                    TextureUsageState::Undefined,
-                    TextureUsageState::ColorAttachment,
-                )));
-                ops.push(CommandOp::BeginPass {
-                    pass: g_buffer.composite0_pass,
-                    target: g_buffer.composite0_target,
-                    colors: vec![PassAttachment {
-                        view: g_buffer.composite0_view,
-                        load_op: AttachmentLoadOp::Clear,
-                        store_op: AttachmentStoreOp::Store,
-                        clear_color: Some(transparent_clear(background_color)),
-                    }],
-                    depth_stencil: None,
-                });
-                ops.push(CommandOp::BindGraphicsPipeline(
-                    g_buffer.composite0_pipeline,
-                ));
-                ops.push(CommandOp::BindResourceSet {
-                    pipeline_layout: g_buffer.screen_pipeline_layout,
-                    set_index: 0,
-                    set: g_buffer.composite0_resource_set,
-                });
-                ops.push(CommandOp::Draw {
-                    vertices: 3,
-                    instances: 1,
-                });
-                ops.push(CommandOp::EndPass);
-                ops.push(CommandOp::Barrier(texture_barrier(
-                    g_buffer.composite0_texture,
-                    TextureUsageState::ColorAttachment,
-                    TextureUsageState::ShaderRead,
-                )));
-                ops.push(CommandOp::Barrier(texture_barrier(
-                    g_buffer.composite1_texture,
-                    TextureUsageState::Undefined,
-                    TextureUsageState::ColorAttachment,
-                )));
-                ops.push(CommandOp::BeginPass {
-                    pass: g_buffer.composite1_pass,
-                    target: g_buffer.composite1_target,
-                    colors: vec![PassAttachment {
-                        view: g_buffer.composite1_view,
-                        load_op: AttachmentLoadOp::Clear,
-                        store_op: AttachmentStoreOp::Store,
-                        clear_color: Some(transparent_clear(background_color)),
-                    }],
-                    depth_stencil: None,
-                });
-                ops.push(CommandOp::BindGraphicsPipeline(
-                    g_buffer.composite1_pipeline,
-                ));
-                ops.push(CommandOp::BindResourceSet {
-                    pipeline_layout: g_buffer.screen_pipeline_layout,
-                    set_index: 0,
-                    set: g_buffer.composite1_resource_set,
-                });
-                ops.push(CommandOp::Draw {
-                    vertices: 3,
-                    instances: 1,
-                });
-                ops.push(CommandOp::EndPass);
-                ops.push(CommandOp::Barrier(texture_barrier(
-                    g_buffer.composite1_texture,
-                    TextureUsageState::ColorAttachment,
-                    TextureUsageState::ShaderRead,
-                )));
-                ops.push(CommandOp::BeginPass {
-                    pass: g_buffer.final_pass,
-                    target: frame_target,
-                    colors: vec![loaded_frame_color_attachment(color_attachment)],
-                    depth_stencil: g_buffer.final_depth_view.map(|view| PassAttachment {
-                        view,
-                        load_op: AttachmentLoadOp::Load,
-                        store_op: AttachmentStoreOp::Store,
-                        clear_color: None,
-                    }),
-                });
-                ops.push(CommandOp::BindGraphicsPipeline(g_buffer.final_pipeline));
-                ops.push(CommandOp::BindResourceSet {
-                    pipeline_layout: g_buffer.screen_pipeline_layout,
-                    set_index: 0,
-                    set: g_buffer.final_resource_set,
-                });
-                ops.push(CommandOp::Draw {
-                    vertices: 3,
-                    instances: 1,
-                });
-                ops.push(CommandOp::EndPass);
+                ShaderPackRuntimeExecutor::terrain_material_multipass_v1(self.generation)?
+                    .append_terrain_material_graph(
+                        &mut ops,
+                        terrain_runtime_targets(g_buffer),
+                        TerrainRuntimeFrame {
+                            frame_target,
+                            color_attachment,
+                            background_color,
+                            final_depth_view: g_buffer.final_depth_view,
+                            uniforms: terrain_composite_uniforms(true),
+                        },
+                        &mesh_draws,
+                    )?;
             } else {
                 ops.push(CommandOp::BeginPass {
                     pass,
@@ -2063,33 +1752,21 @@ impl WorldPrimitiveFrontend {
                         clear_color: None,
                     }),
                 });
-                for (
-                    _shadow_pipeline,
-                    pipeline,
-                    pipeline_layout,
-                    resource_set,
-                    index_buffer,
-                    index_offset,
-                    index_type,
-                    index_count,
-                    instance_count,
-                    _,
-                ) in mesh_draws
-                {
-                    ops.push(CommandOp::BindGraphicsPipeline(pipeline));
+                for draw in mesh_draws {
+                    ops.push(CommandOp::BindGraphicsPipeline(draw.pipeline));
                     ops.push(CommandOp::BindResourceSet {
-                        pipeline_layout,
+                        pipeline_layout: draw.pipeline_layout,
                         set_index: 0,
-                        set: resource_set,
+                        set: draw.resource_set,
                     });
                     ops.push(CommandOp::SetIndexBuffer {
-                        buffer: index_buffer,
-                        offset: index_offset,
-                        index_type,
+                        buffer: draw.index_buffer,
+                        offset: draw.index_offset,
+                        index_type: draw.index_type,
                     });
                     ops.push(CommandOp::DrawIndexed {
-                        indices: index_count,
-                        instances: instance_count,
+                        indices: draw.index_count,
+                        instances: draw.instance_count,
                     });
                 }
                 ops.push(CommandOp::EndPass);
@@ -3811,7 +3488,9 @@ impl WorldPrimitiveFrontend {
         }
         self.destroy_g_buffer_resources(gal);
         let label = format!("world-shader-g-buffer-gen{}", self.generation);
-        let shader_plan = ShaderPackRuntimePlan::terrain_material_multipass_v1(self.generation)?;
+        let shader_executor =
+            ShaderPackRuntimeExecutor::terrain_material_multipass_v1(self.generation)?;
+        let shader_plan = shader_executor.plan();
         let mut created = Vec::new();
         let result = (|| -> GalResult<GBufferResources> {
             let shadow_depth_texture = gal.create_texture(TextureDesc {
@@ -4591,10 +4270,6 @@ fn loaded_frame_color_attachment(color_attachment: Handle) -> PassAttachment {
         store_op: AttachmentStoreOp::Store,
         clear_color: None,
     }
-}
-
-fn transparent_clear(color: ClearColor) -> ClearColor {
-    ClearColor { a: 0.0, ..color }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -5524,21 +5199,67 @@ fn packed_mesh_uniforms_for_batch(
     Ok(out)
 }
 
-fn packed_shader_composite_uniforms(enabled: bool) -> Vec<u8> {
-    let mut out = Vec::with_capacity(WORLD_SHADER_COMPOSITE_UNIFORM_BYTES as usize);
-    for value in shadow_light_view_projection_matrix() {
-        push_f32(&mut out, value);
+fn terrain_composite_uniforms(enabled: bool) -> TerrainCompositeUniforms {
+    TerrainCompositeUniforms {
+        light_view_projection: shadow_light_view_projection_matrix(),
+        shadow_params: shader_shadow_params(enabled),
+        color_grade_params: shader_color_grade_params(),
+        fog_params: shader_fog_params(),
     }
-    for value in shader_shadow_params(enabled) {
-        push_f32(&mut out, value);
+}
+
+fn terrain_material_pass_mode(material_mode: u32) -> GalResult<TerrainMaterialPassMode> {
+    match material_mode {
+        WORLD_MATERIAL_MODE_OPAQUE => Ok(TerrainMaterialPassMode::Opaque),
+        WORLD_MATERIAL_MODE_CUTOUT => Ok(TerrainMaterialPassMode::Cutout),
+        other => Err(GalError::invalid_argument(format!(
+            "unsupported terrain material pass mode {other}"
+        ))),
     }
-    for value in shader_color_grade_params() {
-        push_f32(&mut out, value);
+}
+
+fn terrain_runtime_targets(resources: &GBufferResources) -> TerrainRuntimeTargets {
+    TerrainRuntimeTargets {
+        shadow_depth_texture: resources.shadow_depth_texture,
+        shadow_depth_view: resources.shadow_depth_view,
+        shadow_target: resources.shadow_target,
+        shadow_pass: resources.shadow_pass,
+        albedo_texture: resources.albedo_texture,
+        albedo_view: resources.albedo_view,
+        normal_texture: resources.normal_texture,
+        normal_view: resources.normal_view,
+        material_light_texture: resources.material_light_texture,
+        material_light_view: resources.material_light_view,
+        world_position_texture: resources.world_position_texture,
+        world_position_view: resources.world_position_view,
+        depth_texture: resources.depth_texture,
+        depth_view: resources.depth_view,
+        target: resources.target,
+        g_buffer_pass: resources.g_buffer_pass,
+        deferred_lit_texture: resources.deferred_lit_texture,
+        deferred_lit_view: resources.deferred_lit_view,
+        deferred_lit_target: resources.deferred_lit_target,
+        deferred_lighting_pass: resources.deferred_lighting_pass,
+        deferred_lighting_pipeline: resources.deferred_lighting_pipeline,
+        deferred_lighting_resource_set: resources.deferred_lighting_resource_set,
+        composite0_texture: resources.composite0_texture,
+        composite0_view: resources.composite0_view,
+        composite0_target: resources.composite0_target,
+        composite0_pass: resources.composite0_pass,
+        composite0_pipeline: resources.composite0_pipeline,
+        composite0_resource_set: resources.composite0_resource_set,
+        composite1_texture: resources.composite1_texture,
+        composite1_view: resources.composite1_view,
+        composite1_target: resources.composite1_target,
+        composite1_pass: resources.composite1_pass,
+        composite1_pipeline: resources.composite1_pipeline,
+        composite1_resource_set: resources.composite1_resource_set,
+        final_pass: resources.final_pass,
+        final_pipeline: resources.final_pipeline,
+        final_resource_set: resources.final_resource_set,
+        screen_pipeline_layout: resources.screen_pipeline_layout,
+        composite_uniform_buffer: resources.composite_uniform_buffer,
     }
-    for value in shader_fog_params() {
-        push_f32(&mut out, value);
-    }
-    out
 }
 
 fn shader_shadow_params(enabled: bool) -> [f32; 4] {
@@ -5555,7 +5276,7 @@ fn shader_fog_params() -> [f32; 4] {
 
 fn shadow_light_view_projection_matrix() -> [f32; 16] {
     [
-        0.82, -0.18, 0.0, 0.0, 0.16, 0.76, -0.28, 0.0, 0.18, 0.34, 0.72, 0.0, -0.08, 0.06, 0.08,
+        0.22, 0.0, 0.0, 0.0, 0.0, 0.22, 0.0, 0.0, 0.0, 0.0, 0.18, 0.0, 0.0, 0.0, 0.0,
         1.0,
     ]
 }
@@ -5635,6 +5356,302 @@ fn sampled_texture_barrier(
         src_queue: QueueClass::Graphics,
         dst_queue: QueueClass::Graphics,
     }
+}
+
+struct GameplayAttachmentCapture {
+    dir: PathBuf,
+    frame_id: u64,
+    correlation_id: u64,
+    generation: u64,
+    resource_generation: u64,
+    extent: Extent3d,
+    workload_fingerprint: String,
+    readbacks: BTreeMap<String, Handle>,
+}
+
+impl GameplayAttachmentCapture {
+    fn select(
+        frame: &WorldPrimitiveFrame,
+        generation: u64,
+        resource_generation: u64,
+    ) -> Option<Self> {
+        let dir = std::env::var_os("MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_DIR")?;
+        let min_frame = std::env::var("MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_MIN_FRAME")
+            .ok()
+            .and_then(|value| value.parse::<u64>().ok())
+            .unwrap_or(0);
+        let min_mesh_instances = std::env::var("MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_MIN_MESH_INSTANCES")
+            .ok()
+            .and_then(|value| value.parse::<usize>().ok())
+            .unwrap_or(1);
+        if frame.frame_id < min_frame {
+            return None;
+        }
+        if frame.mesh_instances.len() < min_mesh_instances {
+            return None;
+        }
+        if GAMEPLAY_ATTACHMENT_CAPTURE_WRITTEN
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .is_err()
+        {
+            return None;
+        }
+        Some(Self {
+            dir: PathBuf::from(dir),
+            frame_id: frame.frame_id,
+            correlation_id: frame.correlation_id,
+            generation,
+            resource_generation,
+            extent: Extent3d {
+                width: frame.viewport_width.max(1),
+                height: frame.viewport_height.max(1),
+                depth: 1,
+            },
+            workload_fingerprint: format!(
+                "segments={} crack_quads={} border_quads={} material_quads={} mesh_instances={} background_enabled={}",
+                frame.segments.len(),
+                frame.crack_quads.len(),
+                frame.border_quads.len(),
+                frame.material_quads.len(),
+                frame.mesh_instances.len(),
+                frame.background.enabled
+            ),
+            readbacks: BTreeMap::new(),
+        })
+    }
+
+    fn append_ops(
+        &mut self,
+        gal: &mut VulkanicGal,
+        ops: &mut Vec<CommandOp>,
+        g_buffer: Option<&GBufferResources>,
+    ) -> GalResult<()> {
+        let Some(g_buffer) = g_buffer else {
+            return Err(GalError::invalid_argument(
+                "whole-frame gameplay attachment capture requested before G-buffer resources exist",
+            ));
+        };
+        for (name, texture) in [
+            ("shadow_depth", g_buffer.shadow_depth_texture),
+            ("albedo", g_buffer.albedo_texture),
+            ("normal", g_buffer.normal_texture),
+            ("material_light", g_buffer.material_light_texture),
+            ("world_position", g_buffer.world_position_texture),
+            ("main_depth", g_buffer.depth_texture),
+            ("deferred_lit", g_buffer.deferred_lit_texture),
+            ("composite_0", g_buffer.composite0_texture),
+            ("composite_1", g_buffer.composite1_texture),
+            ("final_output", g_buffer.composite1_texture),
+        ] {
+            let readback = gal.create_buffer(BufferDesc {
+                label: format!("gameplay-frame-{}.attachment-{name}.readback", self.frame_id),
+                size: u64::from(self.extent.width) * u64::from(self.extent.height) * 4,
+                memory: MemoryDomain::Readback,
+                usages: vec![BufferUsage::TransferDst, BufferUsage::HostRead],
+            })?;
+            self.readbacks.insert(name.to_string(), readback);
+            ops.push(CommandOp::Barrier(texture_barrier(
+                texture,
+                TextureUsageState::ShaderRead,
+                TextureUsageState::TransferSrc,
+            )));
+            ops.push(CommandOp::CopyTextureToBuffer(BufferImageCopyRegion {
+                buffer: readback,
+                buffer_offset: 0,
+                bytes_per_row: self.extent.width * 4,
+                rows_per_image: self.extent.height,
+                texture,
+                texture_mip: 0,
+                texture_layer: 0,
+                texture_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
+                extent: self.extent,
+            }));
+            ops.push(CommandOp::Barrier(buffer_barrier(
+                readback,
+                TextureUsageState::TransferDst,
+                TextureUsageState::ShaderRead,
+            )));
+            ops.push(CommandOp::HostReadBuffer {
+                buffer: readback,
+                offset: 0,
+                size: u64::from(self.extent.width) * u64::from(self.extent.height) * 4,
+            });
+            ops.push(CommandOp::Barrier(texture_barrier(
+                texture,
+                TextureUsageState::TransferSrc,
+                TextureUsageState::ShaderRead,
+            )));
+        }
+        Ok(())
+    }
+
+    fn write_artifacts(
+        self,
+        reads: Vec<CompletedHostRead>,
+        submission_id: u64,
+        stats: &WorldPrimitiveSubmitStats,
+    ) -> GalResult<()> {
+        std::fs::create_dir_all(&self.dir).map_err(|error| {
+            GalError::backend(format!(
+                "failed to create gameplay attachment dump dir {}: {error}",
+                self.dir.display()
+            ))
+        })?;
+        let mut hashes = Vec::new();
+        let mut evidence = Vec::new();
+        for (name, buffer) in self.readbacks {
+            let Some(read) = reads.iter().rev().find(|read| read.buffer == buffer) else {
+                return Err(GalError::backend(format!(
+                    "gameplay attachment dump missing readback bytes for {name}"
+                )));
+            };
+            let bytes = &read.bytes;
+            let hash = xxh32(bytes, 0x47_41_4d_45);
+            hashes.push(format!("\"{name}\":\"{hash:08x}\""));
+            evidence.push(format!(
+                "\"{name}\":{}",
+                attachment_evidence_json(self.extent.width, self.extent.height, &name, bytes)
+            ));
+            if name == "shadow_depth" || name == "main_depth" {
+                std::fs::write(self.dir.join(format!("attachment-{name}.raw")), bytes).map_err(
+                    |error| {
+                        GalError::backend(format!(
+                            "failed to write gameplay depth attachment {name}: {error}"
+                        ))
+                    },
+                )?;
+                let rgba = depth_attachment_to_grayscale_rgba(bytes);
+                write_rgba_png(
+                    &self.dir.join(format!("attachment-{name}.png")),
+                    self.extent.width,
+                    self.extent.height,
+                    &rgba,
+                )?;
+            } else {
+                write_rgba_png(
+                    &self.dir.join(format!("attachment-{name}.png")),
+                    self.extent.width,
+                    self.extent.height,
+                    bytes,
+                )?;
+            }
+        }
+        let manifest = format!(
+            "{{\n  \"artifact_class\":\"rust_vulkan_whole_frame_gameplay_attachments\",\n  \"source\":\"real-gameplay-whole-frame-submit\",\n  \"synthetic_shader_scene\":false,\n  \"java_iris_participation\":false,\n  \"gameplay_frame_id\":{},\n  \"correlation_id\":{},\n  \"gal_submission_id\":{},\n  \"vulkan_submission_timeline_value\":{},\n  \"pass_graph_generation\":3,\n  \"shader_resource_generation\":{},\n  \"frame_generation\":{},\n  \"extent\":{{\"width\":{},\"height\":{}}},\n  \"producer_workload_fingerprint\":\"{}\",\n  \"world_mesh_instances\":{},\n  \"world_mesh_batches\":{},\n  \"world_mesh_draws\":{},\n  \"world_material_quads\":{},\n  \"world_crack_quads\":{},\n  \"world_border_quads\":{},\n  \"final_output_source\":\"configured final_output pass writes composite_1 to swapchain; swapchain identity is recorded by Java correlation sidecar\",\n  \"attachment_hashes\":{{{}}},\n  \"attachment_evidence\":{{{}}},\n  \"attachment_files\":[\"attachment-shadow_depth.png\",\"attachment-shadow_depth.raw\",\"attachment-albedo.png\",\"attachment-normal.png\",\"attachment-material_light.png\",\"attachment-world_position.png\",\"attachment-main_depth.png\",\"attachment-main_depth.raw\",\"attachment-deferred_lit.png\",\"attachment-composite_0.png\",\"attachment-composite_1.png\",\"attachment-final_output.png\"]\n}}\n",
+            self.frame_id,
+            self.correlation_id,
+            submission_id,
+            submission_id,
+            self.resource_generation,
+            self.generation,
+            self.extent.width,
+            self.extent.height,
+            json_escape(&self.workload_fingerprint),
+            stats.mesh_instance_count,
+            stats.mesh_batch_count,
+            stats.mesh_draw_count,
+            stats.material_quad_count,
+            stats.crack_quad_count,
+            stats.border_quad_count,
+            hashes.join(","),
+            evidence.join(",")
+        );
+        std::fs::write(
+            self.dir
+                .join(format!("gameplay-attachments-frame-{}.json", self.frame_id)),
+            manifest,
+        )
+        .map_err(|error| {
+            GalError::backend(format!(
+                "failed to write gameplay attachment manifest {}: {error}",
+                self.dir.display()
+            ))
+        })
+    }
+}
+
+fn attachment_evidence_json(width: u32, height: u32, name: &str, bytes: &[u8]) -> String {
+    if name == "shadow_depth" || name == "main_depth" {
+        let mut finite = 0usize;
+        let mut less_than_clear = 0usize;
+        let mut min_value = 1.0f32;
+        let mut max_value = 0.0f32;
+        for chunk in bytes.chunks_exact(4) {
+            let value = f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
+            if value.is_finite() {
+                finite += 1;
+                min_value = min_value.min(value);
+                max_value = max_value.max(value);
+                if value < 0.999 {
+                    less_than_clear += 1;
+                }
+            }
+        }
+        return format!(
+            "{{\"kind\":\"depth\",\"width\":{},\"height\":{},\"finite_samples\":{},\"less_than_clear\":{},\"min\":{:.6},\"max\":{:.6}}}",
+            width, height, finite, less_than_clear, min_value, max_value
+        );
+    }
+    let mut nonzero_alpha = 0usize;
+    let mut nonblack_rgb = 0usize;
+    let mut unique = std::collections::BTreeSet::new();
+    for px in bytes.chunks_exact(4) {
+        if px[3] != 0 {
+            nonzero_alpha += 1;
+        }
+        if px[0] != 0 || px[1] != 0 || px[2] != 0 {
+            nonblack_rgb += 1;
+        }
+        if unique.len() < 512 {
+            unique.insert([px[0], px[1], px[2], px[3]]);
+        }
+    }
+    format!(
+        "{{\"kind\":\"color\",\"width\":{},\"height\":{},\"nonzero_alpha\":{},\"nonblack_rgb\":{},\"sampled_unique_rgba\":{}}}",
+        width,
+        height,
+        nonzero_alpha,
+        nonblack_rgb,
+        unique.len()
+    )
+}
+
+fn depth_attachment_to_grayscale_rgba(bytes: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(bytes.len());
+    for chunk in bytes.chunks_exact(4) {
+        let value = f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
+        let normalized = if value.is_finite() {
+            (1.0 - value.clamp(0.0, 1.0)) * 255.0
+        } else {
+            0.0
+        };
+        let gray = normalized.round().clamp(0.0, 255.0) as u8;
+        out.extend_from_slice(&[gray, gray, gray, 255]);
+    }
+    out
+}
+
+fn write_rgba_png(path: &Path, width: u32, height: u32, pixels: &[u8]) -> GalResult<()> {
+    let file = std::fs::File::create(path).map_err(|error| {
+        GalError::backend(format!("failed to create PNG {}: {error}", path.display()))
+    })?;
+    let mut encoder = png::Encoder::new(file, width, height);
+    encoder.set_color(png::ColorType::Rgba);
+    encoder.set_depth(png::BitDepth::Eight);
+    let mut writer = encoder
+        .write_header()
+        .map_err(|error| GalError::backend(format!("failed to write PNG header: {error}")))?;
+    writer
+        .write_image_data(pixels)
+        .map_err(|error| GalError::backend(format!("failed to write PNG pixels: {error}")))
+}
+
+fn json_escape(value: &str) -> String {
+    value
+        .replace('\\', "\\\\")
+        .replace('"', "\\\"")
+        .replace('\n', "\\n")
+        .replace('\r', "\\r")
 }
 
 fn crack_atlas_bytes(overrides: &BTreeMap<u32, WorldCrackTextureAsset>) -> GalResult<Vec<u8>> {

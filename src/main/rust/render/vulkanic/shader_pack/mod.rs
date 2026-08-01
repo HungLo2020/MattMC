@@ -4,6 +4,7 @@ pub mod pass_graph;
 pub mod preprocess;
 pub mod programs;
 pub mod resources;
+pub(crate) mod runtime;
 pub mod source;
 pub mod uniforms;
 
