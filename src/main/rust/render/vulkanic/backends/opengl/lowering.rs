@@ -15,7 +15,9 @@ use crate::render::vulkanic::commands::{
 };
 use crate::render::vulkanic::error::{GalError, GalResult};
 use crate::render::vulkanic::handles::Handle;
-use crate::render::vulkanic::resources::{BlendMode, CompareOp, CullMode, ResourceBindingKind};
+use crate::render::vulkanic::resources::{
+    BlendMode, CompareOp, CullMode, ResourceBindingKind, TextureFormat,
+};
 use crate::render::vulkanic::sync::SubmissionId;
 
 static GL_DRAW_TRACE_LIMIT: OnceLock<usize> = OnceLock::new();
@@ -614,15 +616,24 @@ impl OpenGlLowerer {
         unsafe {
             self.gl
                 .bind_framebuffer(glow::READ_FRAMEBUFFER, Some(read_fbo));
+            let attachment = if texture.format == TextureFormat::Depth32Float {
+                glow::DEPTH_ATTACHMENT
+            } else {
+                glow::COLOR_ATTACHMENT0
+            };
             self.gl.framebuffer_texture_2d(
                 glow::READ_FRAMEBUFFER,
-                glow::COLOR_ATTACHMENT0,
+                attachment,
                 glow::TEXTURE_2D,
                 Some(texture.texture),
                 i32::try_from(region.texture_mip)
                     .map_err(|_| GalError::backend("texture mip exceeds i32"))?,
             );
-            self.gl.read_buffer(glow::COLOR_ATTACHMENT0);
+            if texture.format == TextureFormat::Depth32Float {
+                self.gl.read_buffer(glow::NONE);
+            } else {
+                self.gl.read_buffer(glow::COLOR_ATTACHMENT0);
+            }
             self.gl.pixel_store_i32(glow::PACK_ALIGNMENT, 1);
             self.gl.pixel_store_i32(glow::PACK_ROW_LENGTH, 0);
             self.gl.pixel_store_i32(glow::PACK_SKIP_ROWS, 0);

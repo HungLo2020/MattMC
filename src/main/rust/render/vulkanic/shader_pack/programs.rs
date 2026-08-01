@@ -188,7 +188,7 @@ void main() {
     v_uv = vec2(vertex.position_uv.w, vertex.color_uv.w);
     v_color = vec4(vertex.color_uv.rgb * vertex.normal_light.x, vertex.normal_light.w) * instance.color;
     v_material = vec4(instance.material.x, 0.0, 0.0, 0.0);
-    v_normal = normalize(vertex.normal_light.yzw);
+    v_normal = normalize(vec3(vertex.normal_light.yz, vertex.extra_data.z));
     v_light = clamp(vertex.extra_data.xy, vec2(0.0), vec2(1.0));
 }
 "#;

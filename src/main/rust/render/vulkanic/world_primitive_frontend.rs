@@ -3509,7 +3509,10 @@ impl WorldPrimitiveFrontend {
                 extent,
                 mip_levels: 1,
                 array_layers: 1,
-                usages: vec![TextureUsage::DepthStencilAttachment],
+                usages: vec![
+                    TextureUsage::DepthStencilAttachment,
+                    TextureUsage::TransferSrc,
+                ],
             })?;
             created.push(depth_texture);
             let albedo_view = create_texture_view(
@@ -3951,6 +3954,8 @@ fn validate_mesh_asset(mesh: &WorldMeshAsset) -> GalResult<()> {
 fn packed_mesh_vertices(vertices: &[WorldMeshVertex]) -> Vec<u8> {
     let mut out = Vec::with_capacity(vertices.len() * WORLD_MESH_GPU_VERTEX_BYTES);
     for vertex in vertices {
+        let normal = unpack_normal_i8(vertex.normal_packed);
+        let [block_light, sky_light] = packed_light_channels(vertex.light);
         push_f32(&mut out, vertex.position[0]);
         push_f32(&mut out, vertex.position[1]);
         push_f32(&mut out, vertex.position[2]);
@@ -3961,19 +3966,32 @@ fn packed_mesh_vertices(vertices: &[WorldMeshVertex]) -> Vec<u8> {
         push_f32(&mut out, color[2]);
         push_f32(&mut out, vertex.uv[1]);
         push_f32(&mut out, baked_light_factor(vertex.light));
-        push_f32(&mut out, 0.0);
-        push_f32(&mut out, 0.0);
+        push_f32(&mut out, normal[0]);
+        push_f32(&mut out, normal[1]);
         push_f32(&mut out, color[3]);
-        push_u32(&mut out, vertex.normal_packed);
-        push_u32(&mut out, vertex.light);
-        push_u32(&mut out, vertex.color_argb);
-        push_u32(&mut out, 0);
+        push_f32(&mut out, block_light);
+        push_f32(&mut out, sky_light);
+        push_f32(&mut out, normal[2]);
+        push_f32(&mut out, 0.0);
         push_f32(&mut out, vertex.shader_atlas_uv[0]);
         push_f32(&mut out, vertex.shader_atlas_uv[1]);
         push_u32(&mut out, vertex.shader_block_id as u32);
         push_u32(&mut out, vertex.shader_material_type as u32);
     }
     out
+}
+
+fn unpack_normal_i8(packed: u32) -> [f32; 3] {
+    [
+        unpack_normal_i8_component(packed, 0),
+        unpack_normal_i8_component(packed, 8),
+        unpack_normal_i8_component(packed, 16),
+    ]
+}
+
+fn unpack_normal_i8_component(packed: u32, shift: u32) -> f32 {
+    let byte = ((packed >> shift) & 0xff) as u8 as i8;
+    (byte as f32 / 127.0).clamp(-1.0, 1.0)
 }
 
 fn baked_light_factor(packed_light: u32) -> f32 {
@@ -3983,6 +4001,16 @@ fn baked_light_factor(packed_light: u32) -> f32 {
     let block = ((packed_light >> 4) & 0xf) as f32 / 15.0;
     let sky = ((packed_light >> 20) & 0xf) as f32 / 15.0;
     (0.08 + block.max(sky) * 0.92).clamp(0.0, 1.0)
+}
+
+fn packed_light_channels(packed_light: u32) -> [f32; 2] {
+    if packed_light == 0 {
+        return [1.0, 1.0];
+    }
+    [
+        ((packed_light >> 4) & 0xf) as f32 / 15.0,
+        ((packed_light >> 20) & 0xf) as f32 / 15.0,
+    ]
 }
 
 fn cull_mode_from_policy(policy: u32) -> GalResult<CullMode> {
@@ -4565,7 +4593,11 @@ fn create_g_buffer_color_texture(
         extent,
         mip_levels: 1,
         array_layers: 1,
-        usages: vec![TextureUsage::ColorAttachment, TextureUsage::Sampled],
+        usages: vec![
+            TextureUsage::ColorAttachment,
+            TextureUsage::Sampled,
+            TextureUsage::TransferSrc,
+        ],
     })
 }
 
@@ -6019,6 +6051,18 @@ mod tests {
         assert!(opengl.stats[0].mesh_cache_misses >= 3);
         assert!(opengl.stats[1].mesh_cache_hits >= 3);
         write_shader_mesh_comparison_report(&vulkan, &opengl).unwrap();
+        if rust_tracy_enabled_for_test() {
+            std::thread::sleep(std::time::Duration::from_millis(750));
+            let _ = run_runtime_shader_mesh_scene(RuntimeBackend::Vulkan, 192, 128);
+            let _ = run_runtime_shader_mesh_scene(RuntimeBackend::OpenGl, 192, 128);
+            std::thread::sleep(std::time::Duration::from_millis(750));
+        }
+    }
+
+    fn rust_tracy_enabled_for_test() -> bool {
+        std::env::var("MATTMC_RUST_TRACY")
+            .map(|value| value == "1" || value.eq_ignore_ascii_case("true"))
+            .unwrap_or(false)
     }
 
     #[test]
@@ -6671,7 +6715,9 @@ mod tests {
                 "shader-pack comparison reports use different dimensions",
             ));
         }
-        let root = repo_root().join("logs/rust-vulkanic/shader-pack-conformance");
+        let root = std::env::var_os("MATTMC_SHADER_GBUFFER_ARTIFACT_DIR")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| repo_root().join("logs/rust-vulkanic/shader-pack-conformance"));
         std::fs::create_dir_all(&root).map_err(|error| {
             GalError::backend(format!(
                 "failed to create shader-pack conformance comparison dir: {error}"
@@ -6976,8 +7022,20 @@ mod tests {
     struct RuntimeRenderResult {
         hash: u32,
         pixels: Vec<u8>,
+        attachments: BTreeMap<String, Vec<u8>>,
+        attachment_hashes: BTreeMap<String, u32>,
         feature_non_clear: Vec<usize>,
         stats: WorldPrimitiveSubmitStats,
+    }
+
+    enum RuntimeRenderDocFrame {
+        Vulkan {
+            _guard: Option<crate::render::vulkanic::backends::vulkan::renderdoc::RenderDocFrame>,
+        },
+        OpenGl {
+            _guard: Option<crate::render::vulkanic::backends::opengl::renderdoc::RenderDocFrame>,
+        },
+        None,
     }
 
     fn render_material_scene(
@@ -7136,6 +7194,8 @@ mod tests {
         Ok(RuntimeRenderResult {
             hash,
             pixels,
+            attachments: BTreeMap::new(),
+            attachment_hashes: BTreeMap::new(),
             feature_non_clear,
             stats,
         })
@@ -7150,6 +7210,15 @@ mod tests {
         frame: WorldPrimitiveFrame,
         label: &str,
     ) -> GalResult<RuntimeRenderResult> {
+        let _renderdoc_frame = match gal.capabilities().api {
+            BackendApi::Vulkan => RuntimeRenderDocFrame::Vulkan {
+                _guard: crate::render::vulkanic::backends::vulkan::renderdoc::RenderDocFrame::start_if_requested(),
+            },
+            BackendApi::OpenGl => RuntimeRenderDocFrame::OpenGl {
+                _guard: crate::render::vulkanic::backends::opengl::renderdoc::RenderDocFrame::start_if_requested(),
+            },
+            BackendApi::Mock => RuntimeRenderDocFrame::None,
+        };
         let extent = Extent3d {
             width,
             height,
@@ -7246,6 +7315,67 @@ mod tests {
         let (mut mesh_ops, mut stats) =
             frontend.append_frame_ops_inner(gal, generation, target, frame, true)?;
         ops.append(&mut mesh_ops);
+        let mut readback_buffers = BTreeMap::new();
+        readback_buffers.insert("final_composite".to_string(), readback);
+        if let Some(g_buffer) = frontend.g_buffer_resources.as_ref() {
+            let attachment_specs = [
+                (
+                    "albedo",
+                    g_buffer.albedo_texture,
+                    TextureUsageState::ShaderRead,
+                ),
+                (
+                    "normal",
+                    g_buffer.normal_texture,
+                    TextureUsageState::ShaderRead,
+                ),
+                (
+                    "material_light",
+                    g_buffer.material_light_texture,
+                    TextureUsageState::ShaderRead,
+                ),
+                (
+                    "depth",
+                    g_buffer.depth_texture,
+                    TextureUsageState::DepthStencilAttachment,
+                ),
+            ];
+            for (name, texture, previous_usage) in attachment_specs {
+                let attachment_readback = gal.create_buffer(BufferDesc {
+                    label: format!("{label}.{name}.readback"),
+                    size: u64::from(width) * u64::from(height) * 4,
+                    memory: MemoryDomain::Readback,
+                    usages: vec![BufferUsage::TransferDst, BufferUsage::HostRead],
+                })?;
+                readback_buffers.insert(name.to_string(), attachment_readback);
+                ops.push(CommandOp::Barrier(texture_barrier(
+                    texture,
+                    previous_usage,
+                    TextureUsageState::TransferSrc,
+                )));
+                ops.push(CommandOp::CopyTextureToBuffer(BufferImageCopyRegion {
+                    buffer: attachment_readback,
+                    buffer_offset: 0,
+                    bytes_per_row: width * 4,
+                    rows_per_image: height,
+                    texture,
+                    texture_mip: 0,
+                    texture_layer: 0,
+                    texture_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
+                    extent,
+                }));
+                ops.push(CommandOp::Barrier(buffer_barrier(
+                    attachment_readback,
+                    TextureUsageState::TransferDst,
+                    TextureUsageState::ShaderRead,
+                )));
+                ops.push(CommandOp::HostReadBuffer {
+                    buffer: attachment_readback,
+                    offset: 0,
+                    size: u64::from(width) * u64::from(height) * 4,
+                });
+            }
+        }
         ops.push(CommandOp::Barrier(texture_barrier(
             color,
             TextureUsageState::ColorAttachment,
@@ -7292,6 +7422,19 @@ mod tests {
         if gal.capabilities().api == BackendApi::Vulkan {
             flip_rgba_rows_in_place(&mut pixels, width, height);
         }
+        let mut attachments = BTreeMap::new();
+        let mut attachment_hashes = BTreeMap::new();
+        for (name, buffer) in readback_buffers {
+            let Some(read) = reads.iter().rev().find(|read| read.buffer == buffer) else {
+                continue;
+            };
+            let mut bytes = read.bytes.clone();
+            if gal.capabilities().api == BackendApi::Vulkan {
+                flip_rgba_rows_in_place(&mut bytes, width, height);
+            }
+            attachment_hashes.insert(name.clone(), xxh32(&bytes, 0x47_42_55_46));
+            attachments.insert(name, bytes);
+        }
         let hash = xxh32(&pixels, 0x53_48_44_52);
         let feature_non_clear = shader_mesh_feature_crops(width, height)
             .iter()
@@ -7300,6 +7443,8 @@ mod tests {
         Ok(RuntimeRenderResult {
             hash,
             pixels,
+            attachments,
+            attachment_hashes,
             feature_non_clear,
             stats,
         })
@@ -7322,10 +7467,34 @@ mod tests {
                 WORLD_MATERIAL_ID_DEFAULT_OPAQUE,
                 WORLD_MATERIAL_MODE_OPAQUE,
                 vec![
-                    shader_mesh_vertex([-0.18, -0.18, 0.18], [0.0, 0.0], 0xffd0_d0ff, 0x00f0_00f0),
-                    shader_mesh_vertex([0.18, -0.18, 0.18], [1.0, 0.0], 0xffd0_d0ff, 0x00f0_00f0),
-                    shader_mesh_vertex([0.18, 0.18, 0.18], [1.0, 1.0], 0xffd0_d0ff, 0x00f0_00f0),
-                    shader_mesh_vertex([-0.18, 0.18, 0.18], [0.0, 1.0], 0xffd0_d0ff, 0x00f0_00f0),
+                    shader_mesh_vertex(
+                        [-0.18, -0.18, -0.14],
+                        [0.0, 0.0],
+                        0xffd0_d0ff,
+                        0x00f0_00f0,
+                        [0.0, 0.0, 1.0],
+                    ),
+                    shader_mesh_vertex(
+                        [0.18, -0.18, -0.14],
+                        [1.0, 0.0],
+                        0xffd0_d0ff,
+                        0x00f0_00f0,
+                        [0.0, 0.0, 1.0],
+                    ),
+                    shader_mesh_vertex(
+                        [0.18, 0.18, -0.14],
+                        [1.0, 1.0],
+                        0xffd0_d0ff,
+                        0x00f0_00f0,
+                        [0.0, 0.0, 1.0],
+                    ),
+                    shader_mesh_vertex(
+                        [-0.18, 0.18, -0.14],
+                        [0.0, 1.0],
+                        0xffd0_d0ff,
+                        0x00f0_00f0,
+                        [0.0, 0.0, 1.0],
+                    ),
                 ],
             ),
             shader_mesh_quad_asset(
@@ -7335,10 +7504,34 @@ mod tests {
                 WORLD_MATERIAL_ID_DEFAULT_CUTOUT,
                 WORLD_MATERIAL_MODE_CUTOUT,
                 vec![
-                    shader_mesh_vertex([-0.18, -0.18, 0.16], [0.0, 0.0], 0xffffffff, 0x00f0_00f0),
-                    shader_mesh_vertex([0.18, -0.18, 0.16], [1.0, 0.0], 0xffffffff, 0x00f0_00f0),
-                    shader_mesh_vertex([0.18, 0.18, 0.16], [1.0, 1.0], 0xffffffff, 0x00f0_00f0),
-                    shader_mesh_vertex([-0.18, 0.18, 0.16], [0.0, 1.0], 0xffffffff, 0x00f0_00f0),
+                    shader_mesh_vertex(
+                        [-0.18, -0.18, -0.12],
+                        [0.0, 0.0],
+                        0xffffffff,
+                        0x00f0_00f0,
+                        [0.0, 0.0, 1.0],
+                    ),
+                    shader_mesh_vertex(
+                        [0.18, -0.18, -0.12],
+                        [1.0, 0.0],
+                        0xffffffff,
+                        0x00f0_00f0,
+                        [0.0, 0.0, 1.0],
+                    ),
+                    shader_mesh_vertex(
+                        [0.18, 0.18, -0.12],
+                        [1.0, 1.0],
+                        0xffffffff,
+                        0x00f0_00f0,
+                        [0.0, 0.0, 1.0],
+                    ),
+                    shader_mesh_vertex(
+                        [-0.18, 0.18, -0.12],
+                        [0.0, 1.0],
+                        0xffffffff,
+                        0x00f0_00f0,
+                        [0.0, 0.0, 1.0],
+                    ),
                 ],
             ),
         ]
@@ -7382,22 +7575,94 @@ mod tests {
     fn shader_mesh_falling_vertices() -> Vec<WorldMeshVertex> {
         let mut vertices = Vec::new();
         vertices.extend([
-            shader_mesh_vertex([-0.18, -0.18, 0.18], [0.0, 0.0], 0xffffffff, 0x00f0_00f0),
-            shader_mesh_vertex([0.18, -0.18, 0.18], [1.0, 0.0], 0xffffffff, 0x00f0_00f0),
-            shader_mesh_vertex([0.18, 0.18, 0.18], [1.0, 1.0], 0xffffffff, 0x00f0_00f0),
-            shader_mesh_vertex([-0.18, 0.18, 0.18], [0.0, 1.0], 0xffffffff, 0x00f0_00f0),
+            shader_mesh_vertex(
+                [-0.18, -0.18, -0.10],
+                [0.0, 0.0],
+                0xffffffff,
+                0x00f0_00f0,
+                [0.0, 0.0, 1.0],
+            ),
+            shader_mesh_vertex(
+                [0.18, -0.18, -0.10],
+                [1.0, 0.0],
+                0xffffffff,
+                0x00f0_00f0,
+                [0.0, 0.0, 1.0],
+            ),
+            shader_mesh_vertex(
+                [0.18, 0.18, -0.10],
+                [1.0, 1.0],
+                0xffffffff,
+                0x00f0_00f0,
+                [0.0, 0.0, 1.0],
+            ),
+            shader_mesh_vertex(
+                [-0.18, 0.18, -0.10],
+                [0.0, 1.0],
+                0xffffffff,
+                0x00f0_00f0,
+                [0.0, 0.0, 1.0],
+            ),
         ]);
         vertices.extend([
-            shader_mesh_vertex([0.18, -0.18, 0.20], [0.0, 0.0], 0xffb8_b8b8, 0x00b0_00b0),
-            shader_mesh_vertex([0.28, -0.12, 0.20], [1.0, 0.0], 0xffb8_b8b8, 0x00b0_00b0),
-            shader_mesh_vertex([0.28, 0.22, 0.20], [1.0, 1.0], 0xffb8_b8b8, 0x00b0_00b0),
-            shader_mesh_vertex([0.18, 0.18, 0.20], [0.0, 1.0], 0xffb8_b8b8, 0x00b0_00b0),
+            shader_mesh_vertex(
+                [0.20, -0.14, -0.11],
+                [0.0, 0.0],
+                0xffb8_b8b8,
+                0x00b0_00b0,
+                [1.0, 0.0, 0.0],
+            ),
+            shader_mesh_vertex(
+                [0.34, -0.14, -0.11],
+                [1.0, 0.0],
+                0xffb8_b8b8,
+                0x00b0_00b0,
+                [1.0, 0.0, 0.0],
+            ),
+            shader_mesh_vertex(
+                [0.34, 0.20, -0.11],
+                [1.0, 1.0],
+                0xffb8_b8b8,
+                0x00b0_00b0,
+                [1.0, 0.0, 0.0],
+            ),
+            shader_mesh_vertex(
+                [0.20, 0.20, -0.11],
+                [0.0, 1.0],
+                0xffb8_b8b8,
+                0x00b0_00b0,
+                [1.0, 0.0, 0.0],
+            ),
         ]);
         vertices.extend([
-            shader_mesh_vertex([-0.18, 0.18, 0.16], [0.0, 0.0], 0xff92_9292, 0x0070_0070),
-            shader_mesh_vertex([0.18, 0.18, 0.16], [1.0, 0.0], 0xff92_9292, 0x0070_0070),
-            shader_mesh_vertex([0.28, 0.28, 0.18], [1.0, 1.0], 0xff92_9292, 0x0070_0070),
-            shader_mesh_vertex([-0.08, 0.28, 0.18], [0.0, 1.0], 0xff92_9292, 0x0070_0070),
+            shader_mesh_vertex(
+                [-0.14, 0.20, -0.12],
+                [0.0, 0.0],
+                0xff92_9292,
+                0x0070_0070,
+                [0.0, 1.0, 0.0],
+            ),
+            shader_mesh_vertex(
+                [0.20, 0.20, -0.12],
+                [1.0, 0.0],
+                0xff92_9292,
+                0x0070_0070,
+                [0.0, 1.0, 0.0],
+            ),
+            shader_mesh_vertex(
+                [0.20, 0.34, -0.12],
+                [1.0, 1.0],
+                0xff92_9292,
+                0x0070_0070,
+                [0.0, 1.0, 0.0],
+            ),
+            shader_mesh_vertex(
+                [-0.14, 0.34, -0.12],
+                [0.0, 1.0],
+                0xff92_9292,
+                0x0070_0070,
+                [0.0, 1.0, 0.0],
+            ),
         ]);
         vertices
     }
@@ -7407,6 +7672,7 @@ mod tests {
         uv: [f32; 2],
         color_argb: u32,
         light: u32,
+        normal: [f32; 3],
     ) -> WorldMeshVertex {
         WorldMeshVertex {
             position,
@@ -7415,9 +7681,20 @@ mod tests {
             shader_block_id: 12,
             shader_material_type: 1,
             color_argb,
-            normal_packed: 0,
+            normal_packed: pack_normal_i8(normal),
             light,
         }
+    }
+
+    fn pack_normal_i8(normal: [f32; 3]) -> u32 {
+        let x = pack_normal_i8_component(normal[0]);
+        let y = pack_normal_i8_component(normal[1]);
+        let z = pack_normal_i8_component(normal[2]);
+        u32::from(x) | (u32::from(y) << 8) | (u32::from(z) << 16)
+    }
+
+    fn pack_normal_i8_component(value: f32) -> u8 {
+        (value.clamp(-1.0, 1.0) * 127.0).round() as i8 as u8
     }
 
     fn shader_mesh_scene_textures(variant: u8) -> Vec<WorldMeshTextureAssetPayload> {
@@ -8023,7 +8300,9 @@ mod tests {
         rollback: &RuntimeRenderResult,
         reloaded: &RuntimeRenderResult,
     ) -> GalResult<()> {
-        let root = repo_root().join("logs/rust-vulkanic/shader-pack-conformance");
+        let root = std::env::var_os("MATTMC_SHADER_GBUFFER_ARTIFACT_DIR")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| repo_root().join("logs/rust-vulkanic/shader-pack-conformance"));
         let dir = root.join(backend.label());
         std::fs::create_dir_all(&dir).map_err(|error| {
             GalError::backend(format!(
@@ -8045,6 +8324,9 @@ mod tests {
                     crop,
                 )?;
             }
+        }
+        if let Some(first) = frames.first() {
+            write_shader_mesh_attachment_artifacts(&dir, width, height, first)?;
         }
         write_png(
             &dir.join("full-rollback.png"),
@@ -8079,14 +8361,38 @@ mod tests {
                     .join(",")
             })
             .unwrap_or_default();
+        let attachment_hashes = frames
+            .first()
+            .map(|frame| {
+                frame
+                    .attachment_hashes
+                    .iter()
+                    .map(|(name, hash)| format!("\"{}\":\"{:08x}\"", name, hash))
+                    .collect::<Vec<_>>()
+                    .join(",")
+            })
+            .unwrap_or_default();
+        let attachment_evidence = frames
+            .first()
+            .map(|frame| shader_mesh_attachment_evidence_json(width, height, frame))
+            .unwrap_or_else(|| "{}".to_string());
+        let perturbation_evidence = frames
+            .first()
+            .map(|frame| shader_mesh_perturbation_evidence_json(width, height, frame))
+            .unwrap_or_else(|| "{}".to_string());
         let mesh_draws = frames
             .iter()
             .map(|frame| frame.stats.mesh_draw_count)
             .sum::<u64>();
         let json = format!(
-            "{{\n  \"artifact_class\":\"rust_owned_shader_pack_mesh_conformance\",\n  \"backend\":\"{}\",\n  \"semantic_request_hash\":\"{:08x}\",\n  \"pass_graph\":\"vulkanic:builtin/terrain_material_v1\",\n  \"passes\":[\"vulkanic:pass/terrain_opaque\",\"vulkanic:pass/terrain_cutout\",\"vulkanic:pass/g_buffer_composite\",\"vulkanic:pass/final_output\"],\n  \"g_buffer_attachments\":[\"albedo\",\"normal\",\"material_light\",\"depth\"],\n  \"rust_owned_color_attachment\":true,\n  \"rust_owned_depth_attachment\":true,\n  \"java_iris_participation\":false,\n  \"width\":{},\n  \"height\":{},\n  \"airborne_frame_hashes\":[{}],\n  \"rollback_hash\":\"{:08x}\",\n  \"reloaded_hash\":\"{:08x}\",\n  \"rollback_preserved_last_valid_generation\":{},\n  \"crop_names\":[{}],\n  \"frame0_feature_non_clear\":{{{}}},\n  \"mesh_instance_count\":{},\n  \"mesh_batch_count\":{},\n  \"mesh_draw_count\":{},\n  \"mesh_cache_hits\":{},\n  \"mesh_cache_misses\":{},\n  \"mesh_asset_payload_bytes\":{},\n  \"screenshots\":[\"full-airborne-frame-0.png\",\"full-airborne-frame-1.png\",\"full-airborne-frame-2.png\",\"full-airborne-frame-3.png\",\"full-airborne-frame-4.png\",\"full-rollback.png\",\"full-reloaded.png\"]\n}}\n",
+            "{{\n  \"artifact_class\":\"rust_owned_shader_pack_mesh_conformance\",\n  \"backend\":\"{}\",\n  \"shader_pack_generation\":1,\n  \"pass_graph_generation\":1,\n  \"semantic_request_hash\":\"{:08x}\",\n  \"pass_graph\":\"vulkanic:builtin/terrain_material_v1\",\n  \"passes\":[\"vulkanic:pass/terrain_opaque\",\"vulkanic:pass/terrain_cutout\",\"vulkanic:pass/g_buffer_composite\",\"vulkanic:pass/final_output\"],\n  \"executed_pass_order\":[\"terrain_opaque\",\"terrain_cutout\",\"g_buffer_composite\",\"final_output\"],\n  \"g_buffer_attachments\":[\"albedo\",\"normal\",\"material_light\",\"depth\"],\n  \"attachment_formats\":{{\"albedo\":\"Rgba8Unorm\",\"normal\":\"Rgba8Unorm\",\"material_light\":\"Rgba8Unorm\",\"depth\":\"Depth32Float\",\"final_composite\":\"Rgba8Unorm\"}},\n  \"attachment_extents\":{{\"width\":{},\"height\":{}}},\n  \"attachment_hashes\":{{{}}},\n  \"attachment_semantic_evidence\":{},\n  \"composite_dependency_perturbations\":{},\n  \"final_presentation_owner\":\"rust-backend-owned-target\",\n  \"rust_owned_color_attachment\":true,\n  \"rust_owned_depth_attachment\":true,\n  \"java_iris_participation\":false,\n  \"width\":{},\n  \"height\":{},\n  \"airborne_frame_hashes\":[{}],\n  \"rollback_hash\":\"{:08x}\",\n  \"reloaded_hash\":\"{:08x}\",\n  \"rollback_preserved_last_valid_generation\":{},\n  \"crop_names\":[{}],\n  \"frame0_feature_non_clear\":{{{}}},\n  \"mesh_instance_count\":{},\n  \"mesh_batch_count\":{},\n  \"mesh_draw_count\":{},\n  \"mesh_cache_hits\":{},\n  \"mesh_cache_misses\":{},\n  \"mesh_asset_payload_bytes\":{},\n  \"screenshots\":[\"full-airborne-frame-0.png\",\"full-airborne-frame-1.png\",\"full-airborne-frame-2.png\",\"full-airborne-frame-3.png\",\"full-airborne-frame-4.png\",\"full-rollback.png\",\"full-reloaded.png\"],\n  \"attachment_dumps\":[\"attachment-albedo.png\",\"attachment-normal.png\",\"attachment-material_light.png\",\"attachment-depth.png\",\"attachment-depth.raw\",\"attachment-final_composite.png\"]\n}}\n",
             backend.name(),
             semantic_hash,
+            width,
+            height,
+            attachment_hashes,
+            attachment_evidence,
+            perturbation_evidence,
             width,
             height,
             frame_hashes,
@@ -8107,6 +8413,249 @@ mod tests {
                 "failed to write shader-pack mesh conformance report: {error}"
             ))
         })
+    }
+
+    fn write_shader_mesh_attachment_artifacts(
+        dir: &std::path::Path,
+        width: u32,
+        height: u32,
+        frame: &RuntimeRenderResult,
+    ) -> GalResult<()> {
+        for name in ["albedo", "normal", "material_light", "final_composite"] {
+            let Some(bytes) = frame.attachments.get(name) else {
+                continue;
+            };
+            write_png(
+                &dir.join(format!("attachment-{name}.png")),
+                width,
+                height,
+                bytes,
+            )?;
+        }
+        if let Some(depth) = frame.attachments.get("depth") {
+            std::fs::write(dir.join("attachment-depth.raw"), depth).map_err(|error| {
+                GalError::backend(format!("failed to write depth raw attachment: {error}"))
+            })?;
+            let depth_rgba = depth_attachment_to_grayscale_rgba(depth);
+            write_png(
+                &dir.join("attachment-depth.png"),
+                width,
+                height,
+                &depth_rgba,
+            )?;
+        }
+        Ok(())
+    }
+
+    fn shader_mesh_attachment_evidence_json(
+        width: u32,
+        height: u32,
+        frame: &RuntimeRenderResult,
+    ) -> String {
+        let mut entries = Vec::new();
+        for name in [
+            "albedo",
+            "normal",
+            "material_light",
+            "depth",
+            "final_composite",
+        ] {
+            let Some(bytes) = frame.attachments.get(name) else {
+                entries.push(format!("\"{name}\":{{\"present\":false}}"));
+                continue;
+            };
+            let evidence = if name == "depth" {
+                depth_attachment_evidence_json(bytes)
+            } else {
+                color_attachment_evidence_json(width, height, name, bytes)
+            };
+            entries.push(format!("\"{name}\":{evidence}"));
+        }
+        format!("{{{}}}", entries.join(","))
+    }
+
+    fn color_attachment_evidence_json(width: u32, height: u32, name: &str, bytes: &[u8]) -> String {
+        let mut alpha_pixels = 0usize;
+        let mut non_default = 0usize;
+        let mut distinct = BTreeMap::new();
+        let default = match name {
+            "normal" => [128, 128, 255, 255],
+            "material_light" => [0, 255, 255, 0],
+            "albedo" | "final_composite" => [16, 40, 218, 255],
+            _ => [0, 0, 0, 0],
+        };
+        for px in bytes.chunks_exact(4) {
+            if px[3] > 0 {
+                alpha_pixels += 1;
+            }
+            if px[0].abs_diff(default[0]) > 3
+                || px[1].abs_diff(default[1]) > 3
+                || px[2].abs_diff(default[2]) > 3
+                || px[3].abs_diff(default[3]) > 3
+            {
+                non_default += 1;
+            }
+            if distinct.len() < 64 {
+                distinct.insert([px[0], px[1], px[2], px[3]], ());
+            }
+        }
+        let crop_counts = shader_mesh_feature_crops(width, height)
+            .into_iter()
+            .map(|crop| {
+                format!(
+                    "\"{}\":{}",
+                    crop.name,
+                    non_clear_pixels_with_clear(
+                        bytes,
+                        width,
+                        crop,
+                        [default[0], default[1], default[2]]
+                    )
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(",");
+        format!(
+            "{{\"present\":true,\"hash\":\"{:08x}\",\"alpha_pixels\":{},\"non_default_pixels\":{},\"distinct_rgba_sample_count\":{},\"feature_non_default\":{{{}}}}}",
+            xxh32(bytes, 0x41_54_54_43),
+            alpha_pixels,
+            non_default,
+            distinct.len(),
+            crop_counts
+        )
+    }
+
+    fn depth_attachment_evidence_json(bytes: &[u8]) -> String {
+        let mut finite = 0usize;
+        let mut less_than_clear = 0usize;
+        let mut min_depth = f32::INFINITY;
+        let mut max_depth = f32::NEG_INFINITY;
+        for chunk in bytes.chunks_exact(4) {
+            let value = f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
+            if value.is_finite() {
+                finite += 1;
+                min_depth = min_depth.min(value);
+                max_depth = max_depth.max(value);
+                if value < 0.999 {
+                    less_than_clear += 1;
+                }
+            }
+        }
+        if finite == 0 {
+            min_depth = 0.0;
+            max_depth = 0.0;
+        }
+        format!(
+            "{{\"present\":true,\"hash\":\"{:08x}\",\"finite_pixels\":{},\"less_than_clear_pixels\":{},\"min_depth\":{:.6},\"max_depth\":{:.6}}}",
+            xxh32(bytes, 0x44_45_50_54),
+            finite,
+            less_than_clear,
+            min_depth,
+            max_depth
+        )
+    }
+
+    fn shader_mesh_perturbation_evidence_json(
+        _width: u32,
+        _height: u32,
+        frame: &RuntimeRenderResult,
+    ) -> String {
+        let Some(albedo) = frame.attachments.get("albedo") else {
+            return "{}".to_string();
+        };
+        let Some(normal) = frame.attachments.get("normal") else {
+            return "{}".to_string();
+        };
+        let Some(material_light) = frame.attachments.get("material_light") else {
+            return "{}".to_string();
+        };
+        let baseline = cpu_composite_g_buffer(albedo, normal, material_light);
+        let mut darker_albedo = albedo.clone();
+        for px in darker_albedo.chunks_exact_mut(4) {
+            px[0] /= 2;
+            px[1] /= 2;
+            px[2] /= 2;
+        }
+        let mut flat_normal = normal.clone();
+        for px in flat_normal.chunks_exact_mut(4) {
+            px[0] = 128;
+            px[1] = 128;
+            px[2] = 255;
+        }
+        let mut dim_light = material_light.clone();
+        for px in dim_light.chunks_exact_mut(4) {
+            px[1] = 0;
+            px[2] = 0;
+        }
+        let albedo_variant = cpu_composite_g_buffer(&darker_albedo, normal, material_light);
+        let normal_variant = cpu_composite_g_buffer(albedo, &flat_normal, material_light);
+        let light_variant = cpu_composite_g_buffer(albedo, normal, &dim_light);
+        format!(
+            "{{\"method\":\"bounded CPU replay of the same minimal composite equation\",\"baseline_hash\":\"{:08x}\",\"albedo_perturbation\":{},\"normal_perturbation\":{},\"material_light_perturbation\":{}}}",
+            xxh32(&baseline, 0x43_4f_4d_50),
+            perturbation_json(&baseline, &albedo_variant),
+            perturbation_json(&baseline, &normal_variant),
+            perturbation_json(&baseline, &light_variant)
+        )
+    }
+
+    fn perturbation_json(baseline: &[u8], variant: &[u8]) -> String {
+        let changed = baseline
+            .chunks_exact(4)
+            .zip(variant.chunks_exact(4))
+            .filter(|(a, b)| {
+                a[0].abs_diff(b[0]) > 2 || a[1].abs_diff(b[1]) > 2 || a[2].abs_diff(b[2]) > 2
+            })
+            .count();
+        format!(
+            "{{\"variant_hash\":\"{:08x}\",\"changed_pixels\":{},\"final_changes\":{}}}",
+            xxh32(variant, 0x50_45_52_54),
+            changed,
+            changed > 0
+        )
+    }
+
+    fn cpu_composite_g_buffer(albedo: &[u8], normal: &[u8], material_light: &[u8]) -> Vec<u8> {
+        let mut out = Vec::with_capacity(albedo.len());
+        for ((a, n), ml) in albedo
+            .chunks_exact(4)
+            .zip(normal.chunks_exact(4))
+            .zip(material_light.chunks_exact(4))
+        {
+            if ml[3] < 128 {
+                out.extend_from_slice(a);
+                continue;
+            }
+            let nx = f32::from(n[0]) / 127.5 - 1.0;
+            let ny = f32::from(n[1]) / 127.5 - 1.0;
+            let nz = f32::from(n[2]) / 127.5 - 1.0;
+            let normal_len = (nx * nx + ny * ny + nz * nz).sqrt().max(0.0001);
+            let dot =
+                ((nx / normal_len) * 0.35 + (ny / normal_len) * 0.65 + (nz / normal_len) * 0.68)
+                    / (0.35_f32 * 0.35 + 0.65 * 0.65 + 0.68 * 0.68).sqrt();
+            let face = dot.clamp(0.18, 1.0);
+            let light = ((f32::from(ml[1].max(ml[2])) / 255.0) * 0.75 + 0.25).clamp(0.2, 1.0);
+            out.push((f32::from(a[0]) * face * light).round().clamp(0.0, 255.0) as u8);
+            out.push((f32::from(a[1]) * face * light).round().clamp(0.0, 255.0) as u8);
+            out.push((f32::from(a[2]) * face * light).round().clamp(0.0, 255.0) as u8);
+            out.push(a[3]);
+        }
+        out
+    }
+
+    fn depth_attachment_to_grayscale_rgba(bytes: &[u8]) -> Vec<u8> {
+        let mut out = Vec::with_capacity(bytes.len());
+        for chunk in bytes.chunks_exact(4) {
+            let value = f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
+            let normalized = if value.is_finite() {
+                (1.0 - value.clamp(0.0, 1.0)) * 255.0
+            } else {
+                0.0
+            };
+            let gray = normalized.round().clamp(0.0, 255.0) as u8;
+            out.extend_from_slice(&[gray, gray, gray, 255]);
+        }
+        out
     }
 
     fn write_png(path: &std::path::Path, width: u32, height: u32, pixels: &[u8]) -> GalResult<()> {

@@ -1,7 +1,7 @@
 mod context;
 mod lowering;
 #[cfg(test)]
-mod renderdoc;
+pub(in crate::render::vulkanic) mod renderdoc;
 mod resources;
 mod trace;
 

@@ -1,7 +1,7 @@
 mod device;
 mod lowering;
 #[cfg(test)]
-mod renderdoc;
+pub(in crate::render::vulkanic) mod renderdoc;
 mod resources;
 pub mod shaderc_spirv_compiler;
 mod swapchain;

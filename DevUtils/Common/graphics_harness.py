@@ -364,6 +364,10 @@ RUST_OPENGL_CONFORMANCE_TEST = (
     "render::vulkanic::backends::opengl::conformance::"
     "isolated_opengl_conformance_renders_indexed_textured_draw"
 )
+RUST_SHADER_GBUFFER_SCENE_TEST = (
+    "render::vulkanic::world_primitive_frontend::tests::"
+    "rust_owned_shader_pack_mesh_scene_matches_opengl_and_vulkan_when_available"
+)
 
 
 def rust_test_binary_candidates(root: Path) -> list[Path]:
@@ -405,6 +409,28 @@ def resolve_rust_test_binary(root: Path, *, build_if_missing: bool = True) -> Pa
                 return candidates[0]
         raise RuntimeError(f"failed to build Rust test binary for RenderDoc:\n{result.stdout}")
     raise FileNotFoundError("compiled mattmc_rust test binary was not found")
+
+
+def build_rust_shader_gbuffer_test_binary(root: Path) -> Path:
+    result = subprocess.run(
+        [
+            "cargo",
+            "test",
+            "--manifest-path",
+            str(root / "src" / "main" / "rust" / "Cargo.toml"),
+            RUST_SHADER_GBUFFER_SCENE_TEST,
+            "--no-run",
+        ],
+        cwd=root,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        timeout=180,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"failed to build Rust shader G-buffer test binary:\n{result.stdout}")
+    return resolve_rust_test_binary(root, build_if_missing=False)
 
 
 def build_rust_opengl_renderdoc_command(root: Path, capture_template: Path) -> tuple[list[str], dict[str, str]]:
@@ -6525,6 +6551,11 @@ def write_preflight_meta(capture_dir: Path, mode: ModeSpec, args: argparse.Names
         f"graphics_run_type={env.get('MATTMC_GRAPHICS_RUN_TYPE', run_type_for_args(args))}",
         f"validation_profile={env.get('MATTMC_GRAPHICS_VALIDATION_PROFILE', getattr(args, 'validation', 'off'))}",
         f"validation_fail_severity={env.get('MATTMC_GRAPHICS_VALIDATION_FAIL_SEVERITY', 'warning')}",
+        f"validation_enabled={'true' if env.get('VK_INSTANCE_LAYERS') else 'false'}",
+        f"vk_instance_layers={env.get('VK_INSTANCE_LAYERS', '')}",
+        f"vk_layer_settings={env.get('VK_LAYER_SETTINGS', '')}",
+        f"vk_add_layer_path={env.get('VK_ADD_LAYER_PATH', '')}",
+        f"vk_loader_debug={env.get('VK_LOADER_DEBUG', '')}",
         f"renderdoc_capture={env.get('MATTMC_RENDERDOC_CAPTURE', 'false')}",
         f"renderdoc_frame={env.get('MATTMC_RENDERDOC_FRAME', '0')}",
         f"renderdoc_capture_path={env.get('MATTMC_RENDERDOC_CAPTURE_PATH', '')}",
@@ -8035,6 +8066,443 @@ def build_capture_command(
     return command, env
 
 
+def shader_gbuffer_report_status(report: dict[str, object] | None) -> tuple[str, list[str]]:
+    messages: list[str] = []
+    if not isinstance(report, dict):
+        return "failed", ["missing report"]
+    if report.get("java_iris_participation") is not False:
+        messages.append("Java/Iris participation was not explicitly false")
+    if int(report.get("mesh_draw_count") or 0) <= 0:
+        messages.append("mesh_draw_count was zero")
+    evidence = report.get("attachment_semantic_evidence")
+    if not isinstance(evidence, dict):
+        messages.append("missing attachment semantic evidence")
+        return "failed", messages
+    for name in ("albedo", "normal", "material_light", "depth", "final_composite"):
+        item = evidence.get(name)
+        if not isinstance(item, dict) or item.get("present") is not True:
+            messages.append(f"{name} attachment is missing")
+    normal = evidence.get("normal") if isinstance(evidence.get("normal"), dict) else {}
+    if int(normal.get("distinct_rgba_sample_count") or 0) < 2:
+        messages.append("normal attachment is uniform")
+    material_light = evidence.get("material_light") if isinstance(evidence.get("material_light"), dict) else {}
+    if int(material_light.get("non_default_pixels") or 0) <= 0:
+        messages.append("material/light attachment has no non-default pixels")
+    depth = evidence.get("depth") if isinstance(evidence.get("depth"), dict) else {}
+    if int(depth.get("less_than_clear_pixels") or 0) <= 0:
+        messages.append("depth attachment has no written pixels")
+    try:
+        if float(depth.get("max_depth") or 0.0) <= float(depth.get("min_depth") or 0.0):
+            messages.append("depth attachment is not ranged")
+    except (TypeError, ValueError):
+        messages.append("depth attachment min/max are malformed")
+    perturb = report.get("composite_dependency_perturbations")
+    if not isinstance(perturb, dict):
+        messages.append("missing composite perturbation evidence")
+    else:
+        for key in ("albedo_perturbation", "normal_perturbation", "material_light_perturbation"):
+            item = perturb.get(key)
+            if not isinstance(item, dict) or item.get("final_changes") is not True:
+                messages.append(f"{key} did not affect the final composite")
+    return ("failed" if messages else "ok"), messages
+
+
+def write_shader_gbuffer_subsystem_status(
+    capture_dir: Path,
+    command: Sequence[str],
+    exit_code: int,
+    duration_seconds: float,
+    shader_artifact_dir: Path,
+) -> Path:
+    workloads: list[dict[str, object]] = []
+    for backend in ("opengl", "vulkan"):
+        report_path = shader_artifact_dir / backend / "latest.json"
+        report = read_json(report_path) if report_path.is_file() else None
+        status, messages = shader_gbuffer_report_status(report)
+        workloads.append(
+            {
+                "name": f"rust-owned.shader-gbuffer-scene.{backend}",
+                "status": status,
+                "backend": backend,
+                "report": str(report_path),
+                "messages": messages,
+                "mesh_draw_count": report.get("mesh_draw_count") if isinstance(report, dict) else 0,
+                "mesh_instance_count": report.get("mesh_instance_count") if isinstance(report, dict) else 0,
+                "attachment_hashes": report.get("attachment_hashes") if isinstance(report, dict) else {},
+                "screenshots": report.get("screenshots") if isinstance(report, dict) else [],
+                "attachment_dumps": report.get("attachment_dumps") if isinstance(report, dict) else [],
+            }
+        )
+    comparison = shader_artifact_dir / "comparison-latest.json"
+    complete = exit_code == 0 and all(workload["status"] == "ok" for workload in workloads)
+    status_doc = {
+        "schema": "mattmc-graphics-subsystem-benchmark-v1",
+        "status": "complete" if complete else "failed",
+        "workload": "rust-owned.shader-gbuffer-scene",
+        "workloads": workloads,
+        "command": list(command),
+        "exit_code": exit_code,
+        "duration_seconds": duration_seconds,
+        "shader_artifact_dir": str(shader_artifact_dir),
+        "comparison_report": str(comparison) if comparison.is_file() else None,
+        "ffi_cadence": "coarse-rust-test-scene",
+        "java_iris_participation": False,
+        "rust_owned_pass_graph": True,
+    }
+    path = capture_dir / f"graphics_subsystem_benchmark_{timestamp()}.json"
+    path.write_text(json.dumps(status_doc, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return path
+
+
+def shader_gbuffer_command_and_env(
+    target: RepoTarget,
+    mode: ModeSpec,
+    capture_dir: Path,
+    args: argparse.Namespace,
+) -> tuple[list[str], dict[str, str], Path]:
+    shader_artifact_dir = capture_dir / "shader-gbuffer"
+    env = os.environ.copy()
+    env["MATTMC_SHADER_GBUFFER_ARTIFACT_DIR"] = str(shader_artifact_dir)
+    env["MATTMC_GRAPHICS_TOOL_INTERNAL"] = "1"
+    env["MATTMC_GRAPHICS_RUN_TYPE"] = run_type_for_args(args)
+    env["MATTMC_RUST_TRACY"] = "true" if getattr(args, "tracy_capture", False) else "false"
+    env["MATTMC_TRACY_CAPTURE"] = "true" if getattr(args, "tracy_capture", False) else "false"
+    env["MATTMC_TRACY_DURATION_SECONDS"] = str(getattr(args, "tracy_duration_seconds", 20))
+    env["MATTMC_TRACY_MAX_SIZE_MB"] = str(getattr(args, "tracy_max_size_mb", 256))
+    env["MATTMC_OPENGL_STRICT"] = "1"
+    requested_validation = "routine" if getattr(args, "validation", "off") == "standard" else getattr(args, "validation", "off")
+    if requested_validation in {"routine", "deep"}:
+        env["VK_INSTANCE_LAYERS"] = "VK_LAYER_KHRONOS_validation"
+        env["VK_LOADER_DEBUG"] = "info"
+        env["VK_LAYER_SETTINGS"] = "validate_sync=true,validate_best_practices=true"
+        if requested_validation == "deep":
+            env["VK_LAYER_SETTINGS"] = "validate_sync=true,validate_best_practices=true,gpuav_enable=true,printf_enable=true"
+    base = [
+        "cargo",
+        "test",
+        "--manifest-path",
+        str(target.root / "src" / "main" / "rust" / "Cargo.toml"),
+    ]
+    if getattr(args, "tracy_capture", False):
+        base.extend(["--features", "tracy"])
+    base.extend([RUST_SHADER_GBUFFER_SCENE_TEST, "--", "--nocapture"])
+    if getattr(args, "renderdoc_capture", False):
+        renderdoc = local_renderdoccmd_path()
+        if not renderdoc:
+            return base, env, shader_artifact_dir
+        binary = build_rust_shader_gbuffer_test_binary(target.root)
+        renderdoc_template = capture_dir / f"renderdoc_{timestamp()}"
+        env["MATTMC_RENDERDOC_CAPTURE"] = "1"
+        env["MATTMC_RENDERDOC_BACKEND"] = "vulkan" if "vulkan" in mode.backend else "opengl"
+        env["MATTMC_RENDERDOC_CAPTURE_TEMPLATE"] = str(renderdoc_template)
+        env["MATTMC_RENDERDOC_CAPTURE_PATH"] = str(renderdoc_template.with_suffix(".rdc"))
+        renderdoc_library = local_renderdoc_library_path()
+        if renderdoc_library:
+            existing_preload = env.get("LD_PRELOAD", "")
+            existing_library_path = env.get("LD_LIBRARY_PATH", "")
+            env["LD_PRELOAD"] = f"{renderdoc_library} {existing_preload}".strip()
+            env["LD_LIBRARY_PATH"] = f"{Path(renderdoc_library).parent} {existing_library_path}".strip().replace(" ", ":")
+            env["MATTMC_RENDERDOC_LIBRARY_PATH"] = renderdoc_library
+        renderdoc_layer = local_renderdoc_layer_manifest_path()
+        if renderdoc_layer:
+            env["VK_ADD_LAYER_PATH"] = str(renderdoc_layer.parent)
+            env["VK_INSTANCE_LAYERS"] = "VK_LAYER_RENDERDOC_Capture"
+            env["MATTMC_RENDERDOC_VULKAN_LAYER_MANIFEST"] = str(renderdoc_layer)
+        base = [
+            renderdoc,
+            "capture",
+            "-w",
+            "-d",
+            str(target.root),
+            "-c",
+            str(renderdoc_template),
+            str(binary),
+            RUST_SHADER_GBUFFER_SCENE_TEST,
+            "--nocapture",
+        ]
+    return base, env, shader_artifact_dir
+
+
+def collect_shader_gbuffer_tracy(
+    target: RepoTarget,
+    capture_dir: Path,
+    process: subprocess.Popen[str],
+    args: argparse.Namespace,
+    started: float,
+) -> None:
+    tracy_tool = local_tracy_capture_path()
+    capture_summaries: list[dict[str, object]] = []
+    records: list[dict[str, object]] = []
+    outputs: list[str] = []
+    if not tracy_tool:
+        write_tracy_summary(capture_dir, "failed", capture_dir / f"tracy_missing_{timestamp()}.tracy", "tracy-capture is not installed")
+        return
+    duration = max(1, int(getattr(args, "tracy_duration_seconds", 20)))
+    deadline = time.monotonic() + min(child_process_timeout_seconds(args), duration + 30)
+    active: list[dict[str, object]] = []
+    seen_ports: set[int] = set()
+    attempt = 0
+
+    def collect_finished(*, force: bool = False) -> None:
+        for record in list(active):
+            capture_process = record.get("process")
+            if not isinstance(capture_process, subprocess.Popen):
+                active.remove(record)
+                continue
+            if not force and capture_process.poll() is None:
+                continue
+            try:
+                output, _ = capture_process.communicate(timeout=0 if force else 1)
+            except subprocess.TimeoutExpired:
+                terminate_process_tree(capture_process)
+                output, _ = capture_process.communicate(timeout=2)
+                record["failure"] = "tracy-capture timed out"
+            if output:
+                outputs.append(f"attempt {record.get('attempt')} port {record.get('port')}:\n{output}")
+            record["returncode"] = capture_process.returncode
+            record["output"] = output or ""
+            record.pop("process", None)
+            records.append(dict(record))
+            active.remove(record)
+
+    while process.poll() is None and time.monotonic() < deadline:
+        listeners = discover_tracy_listeners(8086, 8110)
+        for listener in listeners:
+            if listener.port in seen_ports:
+                continue
+            seen_ports.add(listener.port)
+            attempt += 1
+            capture_path = capture_dir / f"tracy_port{listener.port}_{timestamp()}.tracy"
+            try:
+                capture_process = subprocess.Popen(
+                    [
+                        tracy_tool,
+                        "-f",
+                        "-a",
+                        "127.0.0.1",
+                        "-p",
+                        str(listener.port),
+                        "-o",
+                        str(capture_path),
+                        "-s",
+                        str(duration),
+                    ],
+                    cwd=target.root,
+                    text=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    **popen_kwargs(),
+                )
+                active.append(
+                    {
+                        "attempt": attempt,
+                        "port": listener.port,
+                        "capture_path": str(capture_path),
+                        "started_at": time.monotonic(),
+                        "attach_elapsed_seconds": time.monotonic() - started,
+                        "listener": asdict(listener),
+                        "process": capture_process,
+                    }
+                )
+            except Exception as exc:
+                records.append(
+                    {
+                        "attempt": attempt,
+                        "port": listener.port,
+                        "capture_path": str(capture_path),
+                        "started_at": time.monotonic(),
+                        "attach_elapsed_seconds": time.monotonic() - started,
+                        "listener": asdict(listener),
+                        "returncode": -1,
+                        "failure": f"failed to launch tracy-capture: {exc}",
+                    }
+                )
+        collect_finished()
+        if not listeners and not active:
+            time.sleep(0.1)
+        else:
+            time.sleep(0.25)
+    collect_finished(force=True)
+
+    max_capture_size = getattr(args, "tracy_max_size_mb", 256) * 1024 * 1024
+    for index, record in enumerate(records):
+        capture_path_text = record.get("capture_path")
+        capture_path = Path(str(capture_path_text)) if capture_path_text else capture_dir / f"tracy_missing_{index}.tracy"
+        started_at_value = parse_number(record.get("started_at"))
+        if not capture_path.exists() or capture_path.stat().st_size <= 0:
+            summary_path = write_tracy_summary(
+                capture_dir,
+                "failed",
+                capture_path,
+                str(record.get("failure") or "Tracy capture missing or empty"),
+                started_at_value,
+                record.get("output") if isinstance(record.get("output"), str) else None,
+                attach_metadata=record,
+                summary_prefix=f"tracy_capture_{index}_summary",
+            )
+        elif capture_path.stat().st_size > max_capture_size:
+            summary_path = write_tracy_summary(
+                capture_dir,
+                "failed",
+                capture_path,
+                "Tracy capture exceeded size limit",
+                started_at_value,
+                record.get("output") if isinstance(record.get("output"), str) else None,
+                attach_metadata=record,
+                summary_prefix=f"tracy_capture_{index}_summary",
+            )
+        else:
+            summary_path = extract_tracy_summary(
+                capture_dir,
+                capture_path,
+                started_at=started_at_value,
+                attach_metadata=record,
+                require_rust_zones=True,
+                summary_prefix=f"tracy_capture_{index}_summary",
+            )
+        capture_summaries.append(read_json(summary_path) or {})
+    if capture_summaries:
+        write_tracy_collection_summary(
+            capture_dir,
+            capture_summaries,
+            require_rust_zones=True,
+            require_java_zones=False,
+            failure=None if records else "tracy-capture did not discover any Tracy listener before workload exited",
+            tool_output="\n".join(outputs),
+        )
+    else:
+        write_tracy_summary(
+            capture_dir,
+            "failed",
+            capture_dir / f"tracy_unattached_{timestamp()}.tracy",
+            "tracy-capture did not discover any Tracy listener before workload exited",
+            tool_output="\n".join(outputs),
+        )
+
+
+def run_shader_gbuffer_subsystem_mode(
+    target: RepoTarget,
+    mode: ModeSpec,
+    artifact_root: Path,
+    args: argparse.Namespace,
+    repetition: int,
+) -> MatrixResult:
+    run_dir = f"run-{repetition:02d}"
+    row_label = matrix_row_label(mode, "subsystem", repetition)
+    capture_dir = artifact_root / mode.name / "subsystem" / run_dir / "capture"
+    output_path = artifact_root / mode.name / "subsystem" / run_dir / ARTIFACT_NAME
+    capture_dir.mkdir(parents=True, exist_ok=True)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    command, env, shader_artifact_dir = shader_gbuffer_command_and_env(target, mode, capture_dir, args)
+    meta_path = write_preflight_meta(capture_dir, mode, args, env)
+    meta = read_key_values(meta_path)
+    run_id = meta.get("run_id", f"shader-gbuffer-{timestamp()}")
+    emit_matrix_progress(args, row_label, "process-launched", "rust-owned shader g-buffer scene")
+    started = time.monotonic()
+    stdout_path = output_path.parent / "stdout.log"
+    stderr_path = output_path.parent / "stderr.log"
+    timed_out = False
+    timed_out_phase: str | None = None
+    error = ""
+    with stdout_path.open("w", encoding="utf-8") as stdout, stderr_path.open("w", encoding="utf-8") as stderr:
+        try:
+            process = subprocess.Popen(
+                command,
+                cwd=target.root,
+                text=True,
+                stdout=stdout,
+                stderr=stderr,
+                env=env,
+                **popen_kwargs(),
+            )
+            if getattr(args, "tracy_capture", False):
+                collect_shader_gbuffer_tracy(target, capture_dir, process, args, started)
+            exit_code = process.wait(timeout=child_process_timeout_seconds(args))
+        except subprocess.TimeoutExpired:
+            timed_out = True
+            timed_out_phase = "measurement/capture"
+            exit_code = 124
+            error = f"Timed out after {child_process_timeout_seconds(args)}s"
+    duration = time.monotonic() - started
+    status_path = write_shader_gbuffer_subsystem_status(
+        capture_dir,
+        command,
+        exit_code,
+        duration,
+        shader_artifact_dir,
+    )
+    if getattr(args, "validation", "off") != "off":
+        validation_log = capture_dir / f"validation_events_{run_id}_{timestamp()}.log"
+        text = (
+            f"run_id={run_id}\n"
+            f"VK_LAYER_KHRONOS_validation active for rust-owned shader G-buffer subsystem route\n"
+            f"validation_profile={getattr(args, 'validation', 'off')}\n"
+        )
+        for path in (stdout_path, stderr_path):
+            try:
+                raw = path.read_text(encoding="utf-8", errors="replace")[-NORMALIZED_LOG_TAIL_BYTES:]
+                retained_lines = [
+                    line
+                    for line in raw.splitlines()
+                    if "[Vulkan Loader]" not in line and "loader_get_json" not in line
+                ]
+                text += f"\n--- {path.name} ---\n" + "\n".join(retained_lines) + "\n"
+            except OSError:
+                pass
+        validation_log.write_text(text, encoding="utf-8")
+    if getattr(args, "renderdoc_capture", False):
+        replay_renderdoc_summary(capture_dir, renderdoc_capture_path_from_env(env, capture_dir))
+    target_paths = select_targets(args)
+    repository_paths = repository_resolution(target_paths["current"].root, target_paths["frozen"].root, getattr(args, "frozen_repo", None))
+    artifact = normalize_capture_artifact(
+        target,
+        mode,
+        capture_dir,
+        args.workload_profile,
+        exit_code == 0 and not timed_out,
+        command,
+        exit_code,
+        timed_out,
+        timed_out_phase=timed_out_phase,
+        tool_kind="subsystem",
+        runtime_profile=runtime_profile_dict(args),
+        repository_paths=repository_paths,
+    )
+    subsystem_doc = read_json(status_path) or {}
+    validation_doc = artifact.get("validation") if isinstance(artifact.get("validation"), dict) else {}
+    success = (
+        exit_code == 0
+        and subsystem_doc.get("status") == "complete"
+        and not timed_out
+        and bool(validation_doc.get("complete", True))
+    )
+    artifact["capture"]["success"] = success
+    artifact["capture"]["stdout_path"] = str(stdout_path)
+    artifact["capture"]["stderr_path"] = str(stderr_path)
+    artifact["capture"]["duration_seconds"] = duration
+    if not success and not error:
+        error = "Rust-owned shader G-buffer subsystem scene failed validation"
+    write_artifact(output_path, artifact)
+    emit_matrix_progress(
+        args,
+        row_label,
+        "artifact-finalized",
+        f"success={str(success).lower()} artifact={output_path}",
+    )
+    return MatrixResult(
+        mode.name,
+        success,
+        False,
+        timed_out,
+        timed_out_phase,
+        exit_code,
+        str(output_path),
+        str(capture_dir),
+        command,
+        error,
+    )
+
+
 def terminate_process_tree(process: subprocess.Popen[str]) -> None:
     if process.poll() is not None:
         return
@@ -8174,6 +8642,49 @@ def run_mode(
                 tracy=getattr(args, "tracy_capture", False),
             ),
         )
+    if tool_kind == "subsystem" and getattr(args, "shader_gbuffer_scene", False):
+        if mode.target != "current" or mode.backend not in {"rust-opengl", "rust-vulkan"}:
+            capture_dir.mkdir(parents=True, exist_ok=True)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            command = ["shader-gbuffer-scene", "profile-not-supported"]
+            current_root = repo_root()
+            explicit_frozen_repo = getattr(args, "frozen_repo", None)
+            repository_paths = repository_resolution(current_root, find_frozen_repo(current_root, explicit_frozen_repo), explicit_frozen_repo)
+            artifact = normalize_capture_artifact(
+                target,
+                mode,
+                capture_dir,
+                effective_workload_profile,
+                True,
+                command,
+                0,
+                False,
+                tool_kind=tool_kind,
+                runtime_profile=runtime_profile_dict(args),
+                repository_paths=repository_paths,
+            )
+            artifact["capture"]["profile_not_supported"] = True
+            artifact["capture"]["success"] = True
+            artifact["capture"]["failed_phase"] = "profile-not-supported"
+            artifact["validation"]["complete"] = True
+            artifact["validation"]["messages"] = [
+                "Rust-owned shader G-buffer scene is supported only for Current rust-opengl/rust-vulkan subsystem rows"
+            ]
+            write_artifact(output_path, artifact)
+            emit_matrix_progress(args, row_label, "artifact-finalized", "shader-gbuffer profile-not-supported")
+            return MatrixResult(
+                mode.name,
+                True,
+                False,
+                False,
+                "profile-not-supported",
+                0,
+                str(output_path),
+                str(capture_dir),
+                command,
+                "shader-gbuffer scene unsupported for this row",
+            )
+        return run_shader_gbuffer_subsystem_mode(target, mode, artifact_root, args, repetition)
     command, env = build_capture_command(target, mode, capture_dir, effective_workload_profile, args, tool_kind)
     emit_matrix_progress(args, row_label, "preflight-completed", f"timeout={child_process_timeout_seconds(args)}s")
     current_root = repo_root()
@@ -9270,6 +9781,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         subparser.add_argument("--tracy-capture", action="store_true", help="Run as a Tracy timeline capture; never performance-comparable.")
         subparser.add_argument("--tracy-duration-seconds", type=int, default=20)
         subparser.add_argument("--tracy-max-size-mb", type=int, default=256)
+        subparser.add_argument(
+            "--shader-gbuffer-scene",
+            action="store_true",
+            help="Run the Rust-owned shader-pack/G-buffer validation scene as an isolated subsystem workload.",
+        )
         subparser.add_argument("--warmup-frames", type=int)
         subparser.add_argument("--measure-frames", type=int)
         subparser.add_argument("--settle-frames", type=int)
@@ -9351,7 +9867,9 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         if value is not None and value < 0:
             raise SystemExit(f"{field.replace('_', '-')} must be non-negative")
     run_type_for_args(args)
-    if args.renderdoc_capture and args.tool not in {"capture", "matrix"}:
+    if args.renderdoc_capture and args.tool not in {"capture", "matrix"} and not (
+        args.tool == "subsystem" and args.shader_gbuffer_scene
+    ):
         raise SystemExit("RenderDoc capture is a correctness/audit mode; use DevUtils/Audit/Capture.py or Matrix.py")
     if args.tracy_duration_seconds <= 0 or args.tracy_max_size_mb <= 0:
         raise SystemExit("Tracy duration and max size must be positive")

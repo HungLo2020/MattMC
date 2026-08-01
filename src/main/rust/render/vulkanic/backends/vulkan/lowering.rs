@@ -567,7 +567,7 @@ impl SubmissionLowerer {
                     let _zone = trace::Zone::new("vulkan.lowering.copy-buffer-to-texture");
                     let buffer = objects.buffer(region.buffer)?;
                     let texture = objects.texture(region.texture)?;
-                    let copy = buffer_image_copy(region);
+                    let copy = buffer_image_copy(region, texture.aspect);
                     self.context.device.cmd_copy_buffer_to_image(
                         command_buffer,
                         buffer.buffer,
@@ -580,7 +580,7 @@ impl SubmissionLowerer {
                     let _zone = trace::Zone::new("vulkan.lowering.copy-texture-to-buffer");
                     let buffer = objects.buffer(region.buffer)?;
                     let texture = objects.texture(region.texture)?;
-                    let copy = buffer_image_copy(region);
+                    let copy = buffer_image_copy(region, texture.aspect);
                     self.context.device.cmd_copy_image_to_buffer(
                         command_buffer,
                         texture.image,
@@ -888,13 +888,16 @@ fn vk_index_type(index_type: crate::render::vulkanic::resources::IndexType) -> v
     }
 }
 
-fn buffer_image_copy(region: &BufferImageCopyRegion) -> vk::BufferImageCopy {
+fn buffer_image_copy(
+    region: &BufferImageCopyRegion,
+    aspect_mask: vk::ImageAspectFlags,
+) -> vk::BufferImageCopy {
     vk::BufferImageCopy::default()
         .buffer_offset(region.buffer_offset)
         .buffer_row_length(region.bytes_per_row / 4)
         .buffer_image_height(region.rows_per_image)
         .image_subresource(vk::ImageSubresourceLayers {
-            aspect_mask: vk::ImageAspectFlags::COLOR,
+            aspect_mask,
             mip_level: region.texture_mip,
             base_array_layer: region.texture_layer,
             layer_count: 1,
