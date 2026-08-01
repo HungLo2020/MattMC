@@ -25,9 +25,10 @@ use super::resources::{
 };
 use super::shader_pack::programs::{
     minimal_direct_terrain_cutout_program, minimal_direct_terrain_solid_program,
-    minimal_g_buffer_composite_program, minimal_terrain_cutout_program,
-    minimal_terrain_solid_program, shader_stage_code_for_backend, TerrainMaterialProgram,
+    minimal_shadow_depth_program, minimal_terrain_cutout_program, minimal_terrain_solid_program,
+    shader_stage_code_for_backend, CompositeProgram, TerrainMaterialProgram,
 };
+use super::shader_pack::resources::ShaderPackRuntimePlan;
 use super::{BufferImageCopyRegion, CommandList, CommandListDesc, CullMode};
 
 pub const WORLD_MAX_LINE_SEGMENTS: usize = 512;
@@ -111,10 +112,11 @@ const WORLD_MATERIAL_UNIFORM_BYTES: u64 =
     (WORLD_MATERIAL_HEADER_BYTES + WORLD_MAX_MATERIAL_QUADS * WORLD_MATERIAL_QUAD_BYTES) as u64;
 const WORLD_MATERIAL_INDEX_BYTES: u64 = 6 * 4;
 const WORLD_MESH_GPU_VERTEX_BYTES: usize = 5 * 4 * 4;
-const WORLD_MESH_BATCH_HEADER_BYTES: usize = 16 * 4 + 16 * 4;
+const WORLD_MESH_BATCH_HEADER_BYTES: usize = 16 * 4 + 16 * 4 + 16 * 4 + 4 * 4;
 const WORLD_MESH_INSTANCE_BYTES: usize = 16 * 4 + 4 * 4 + 4 * 4;
 const WORLD_MESH_INSTANCE_BUFFER_BYTES: u64 =
     (WORLD_MESH_BATCH_HEADER_BYTES + WORLD_MAX_MESH_INSTANCES * WORLD_MESH_INSTANCE_BYTES) as u64;
+const WORLD_SHADER_COMPOSITE_UNIFORM_BYTES: u64 = 16 * 4 + 4 * 4 + 4 * 4 + 4 * 4;
 const CRACK_STAGE_COUNT: u32 = 10;
 const CRACK_STAGE_SIZE: u32 = 16;
 
@@ -598,25 +600,53 @@ struct DepthAttachmentResources {
 }
 
 struct GBufferResources {
+    shadow_depth_texture: Handle,
     albedo_texture: Handle,
     normal_texture: Handle,
     material_light_texture: Handle,
+    world_position_texture: Handle,
+    deferred_lit_texture: Handle,
+    composite0_texture: Handle,
+    composite1_texture: Handle,
     depth_texture: Handle,
+    shadow_depth_view: Handle,
     albedo_view: Handle,
     normal_view: Handle,
     material_light_view: Handle,
+    world_position_view: Handle,
+    deferred_lit_view: Handle,
+    composite0_view: Handle,
+    composite1_view: Handle,
     depth_view: Handle,
     sampler: Handle,
+    shadow_target: Handle,
     target: Handle,
+    deferred_lit_target: Handle,
+    composite0_target: Handle,
+    composite1_target: Handle,
+    shadow_pass: Handle,
     g_buffer_pass: Handle,
-    composite_pass: Handle,
-    composite_vertex_shader: Handle,
-    composite_fragment_shader: Handle,
-    composite_resource_layout: Handle,
-    composite_resource_set: Handle,
-    composite_pipeline_layout: Handle,
-    composite_pipeline: Handle,
-    composite_depth_view: Option<Handle>,
+    deferred_lighting_pass: Handle,
+    composite0_pass: Handle,
+    composite1_pass: Handle,
+    final_pass: Handle,
+    composite_uniform_buffer: Handle,
+    screen_vertex_shader: Handle,
+    deferred_lighting_fragment_shader: Handle,
+    composite0_fragment_shader: Handle,
+    composite1_fragment_shader: Handle,
+    final_fragment_shader: Handle,
+    screen_resource_layout: Handle,
+    deferred_lighting_resource_set: Handle,
+    composite0_resource_set: Handle,
+    composite1_resource_set: Handle,
+    final_resource_set: Handle,
+    screen_pipeline_layout: Handle,
+    deferred_lighting_pipeline: Handle,
+    composite0_pipeline: Handle,
+    composite1_pipeline: Handle,
+    final_pipeline: Handle,
+    final_depth_view: Option<Handle>,
     extent: Extent3d,
     frame_target: Handle,
     frame_color_format: ColorFormat,
@@ -752,10 +782,13 @@ struct MeshResources {
     sampler: Handle,
     vertex_shader: Handle,
     fragment_shader: Handle,
+    shadow_vertex_shader: Option<Handle>,
+    shadow_fragment_shader: Option<Handle>,
     texture_view: Handle,
     resource_layout: Handle,
     pipeline_layout: Handle,
     pipeline: Handle,
+    shadow_pipeline: Option<Handle>,
     data_slots: Vec<MeshDataSlot>,
 }
 
@@ -767,18 +800,24 @@ struct MeshDataSlot {
 impl MeshResources {
     fn handles_in_destroy_order(&self) -> Vec<Handle> {
         let mut handles = vec![
-            self.pipeline,
-            self.pipeline_layout,
-            self.resource_layout,
-            self.texture_view,
-            self.fragment_shader,
-            self.vertex_shader,
-            self.sampler,
-            self.texture,
-            self.texture_upload_buffer,
-            self.index_buffer,
-            self.vertex_buffer,
-        ];
+            self.shadow_pipeline,
+            Some(self.pipeline),
+            Some(self.pipeline_layout),
+            Some(self.resource_layout),
+            Some(self.texture_view),
+            self.shadow_fragment_shader,
+            self.shadow_vertex_shader,
+            Some(self.fragment_shader),
+            Some(self.vertex_shader),
+            Some(self.sampler),
+            Some(self.texture),
+            Some(self.texture_upload_buffer),
+            Some(self.index_buffer),
+            Some(self.vertex_buffer),
+        ]
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>();
         for slot in self.data_slots.iter().rev() {
             handles.push(slot.resource_set);
             handles.push(slot.instance_buffer);
@@ -819,24 +858,52 @@ impl DepthAttachmentResources {
 impl GBufferResources {
     fn handles_in_destroy_order(&self) -> Vec<Handle> {
         vec![
-            self.composite_pipeline,
-            self.composite_pipeline_layout,
-            self.composite_resource_set,
-            self.composite_resource_layout,
-            self.composite_fragment_shader,
-            self.composite_vertex_shader,
-            self.composite_pass,
+            self.final_pipeline,
+            self.composite1_pipeline,
+            self.composite0_pipeline,
+            self.deferred_lighting_pipeline,
+            self.screen_pipeline_layout,
+            self.final_resource_set,
+            self.composite1_resource_set,
+            self.composite0_resource_set,
+            self.deferred_lighting_resource_set,
+            self.screen_resource_layout,
+            self.final_fragment_shader,
+            self.composite1_fragment_shader,
+            self.composite0_fragment_shader,
+            self.deferred_lighting_fragment_shader,
+            self.screen_vertex_shader,
+            self.composite_uniform_buffer,
+            self.final_pass,
+            self.composite1_pass,
+            self.composite0_pass,
+            self.deferred_lighting_pass,
             self.g_buffer_pass,
+            self.shadow_pass,
+            self.composite1_target,
+            self.composite0_target,
+            self.deferred_lit_target,
             self.target,
+            self.shadow_target,
             self.sampler,
             self.depth_view,
+            self.composite1_view,
+            self.composite0_view,
+            self.deferred_lit_view,
+            self.world_position_view,
             self.material_light_view,
             self.normal_view,
             self.albedo_view,
+            self.shadow_depth_view,
             self.depth_texture,
+            self.composite1_texture,
+            self.composite0_texture,
+            self.deferred_lit_texture,
+            self.world_position_texture,
             self.material_light_texture,
             self.normal_texture,
             self.albedo_texture,
+            self.shadow_depth_texture,
         ]
     }
 }
@@ -1626,6 +1693,7 @@ impl WorldPrimitiveFrontend {
                     TextureUsageState::ShaderRead,
                 )));
                 mesh_draws.push((
+                    resources.shadow_pipeline,
                     resources.pipeline,
                     resources.pipeline_layout,
                     slot.resource_set,
@@ -1643,6 +1711,60 @@ impl WorldPrimitiveFrontend {
                     GalError::backend("G-buffer resources missing before mesh submit")
                 })?;
                 ops.push(CommandOp::Barrier(texture_barrier(
+                    g_buffer.shadow_depth_texture,
+                    TextureUsageState::Undefined,
+                    TextureUsageState::DepthStencilAttachment,
+                )));
+                ops.push(CommandOp::BeginPass {
+                    pass: g_buffer.shadow_pass,
+                    target: g_buffer.shadow_target,
+                    colors: Vec::new(),
+                    depth_stencil: Some(PassAttachment {
+                        view: g_buffer.shadow_depth_view,
+                        load_op: AttachmentLoadOp::Clear,
+                        store_op: AttachmentStoreOp::Store,
+                        clear_color: None,
+                    }),
+                });
+                for (
+                    shadow_pipeline,
+                    _pipeline,
+                    pipeline_layout,
+                    resource_set,
+                    index_buffer,
+                    index_offset,
+                    index_type,
+                    index_count,
+                    instance_count,
+                    _,
+                ) in &mesh_draws
+                {
+                    let shadow_pipeline = shadow_pipeline.ok_or_else(|| {
+                        GalError::backend("G-buffer mesh draw missing shadow pipeline")
+                    })?;
+                    ops.push(CommandOp::BindGraphicsPipeline(shadow_pipeline));
+                    ops.push(CommandOp::BindResourceSet {
+                        pipeline_layout: *pipeline_layout,
+                        set_index: 0,
+                        set: *resource_set,
+                    });
+                    ops.push(CommandOp::SetIndexBuffer {
+                        buffer: *index_buffer,
+                        offset: *index_offset,
+                        index_type: *index_type,
+                    });
+                    ops.push(CommandOp::DrawIndexed {
+                        indices: *index_count,
+                        instances: *instance_count,
+                    });
+                }
+                ops.push(CommandOp::EndPass);
+                ops.push(CommandOp::Barrier(texture_barrier(
+                    g_buffer.shadow_depth_texture,
+                    TextureUsageState::DepthStencilAttachment,
+                    TextureUsageState::ShaderRead,
+                )));
+                ops.push(CommandOp::Barrier(texture_barrier(
                     g_buffer.albedo_texture,
                     TextureUsageState::Undefined,
                     TextureUsageState::ColorAttachment,
@@ -1658,6 +1780,11 @@ impl WorldPrimitiveFrontend {
                     TextureUsageState::ColorAttachment,
                 )));
                 ops.push(CommandOp::Barrier(texture_barrier(
+                    g_buffer.world_position_texture,
+                    TextureUsageState::Undefined,
+                    TextureUsageState::ColorAttachment,
+                )));
+                ops.push(CommandOp::Barrier(texture_barrier(
                     g_buffer.depth_texture,
                     TextureUsageState::Undefined,
                     TextureUsageState::DepthStencilAttachment,
@@ -1666,7 +1793,7 @@ impl WorldPrimitiveFrontend {
                 for material_mode in [WORLD_MATERIAL_MODE_OPAQUE, WORLD_MATERIAL_MODE_CUTOUT] {
                     let mode_draws = mesh_draws
                         .iter()
-                        .filter(|draw| draw.8 == material_mode)
+                        .filter(|draw| draw.9 == material_mode)
                         .copied()
                         .collect::<Vec<_>>();
                     if mode_draws.is_empty() {
@@ -1709,6 +1836,17 @@ impl WorldPrimitiveFrontend {
                                     a: 0.0,
                                 }),
                             },
+                            PassAttachment {
+                                view: g_buffer.world_position_view,
+                                load_op,
+                                store_op: AttachmentStoreOp::Store,
+                                clear_color: Some(ClearColor {
+                                    r: 0.5,
+                                    g: 0.5,
+                                    b: 0.5,
+                                    a: 0.0,
+                                }),
+                            },
                         ],
                         depth_stencil: Some(PassAttachment {
                             view: g_buffer.depth_view,
@@ -1718,6 +1856,7 @@ impl WorldPrimitiveFrontend {
                         }),
                     });
                     for (
+                        _shadow_pipeline,
                         pipeline,
                         pipeline_layout,
                         resource_set,
@@ -1763,22 +1902,149 @@ impl WorldPrimitiveFrontend {
                     TextureUsageState::ColorAttachment,
                     TextureUsageState::ShaderRead,
                 )));
+                ops.push(CommandOp::Barrier(texture_barrier(
+                    g_buffer.world_position_texture,
+                    TextureUsageState::ColorAttachment,
+                    TextureUsageState::ShaderRead,
+                )));
+                ops.push(CommandOp::Barrier(texture_barrier(
+                    g_buffer.depth_texture,
+                    TextureUsageState::DepthStencilAttachment,
+                    TextureUsageState::ShaderRead,
+                )));
+                ops.push(CommandOp::Barrier(buffer_barrier(
+                    g_buffer.composite_uniform_buffer,
+                    TextureUsageState::ShaderRead,
+                    TextureUsageState::TransferDst,
+                )));
+                ops.push(CommandOp::HostWriteBuffer {
+                    buffer: g_buffer.composite_uniform_buffer,
+                    offset: 0,
+                    data: packed_shader_composite_uniforms(true),
+                });
+                ops.push(CommandOp::Barrier(buffer_barrier(
+                    g_buffer.composite_uniform_buffer,
+                    TextureUsageState::TransferDst,
+                    TextureUsageState::ShaderRead,
+                )));
+                ops.push(CommandOp::Barrier(texture_barrier(
+                    g_buffer.deferred_lit_texture,
+                    TextureUsageState::Undefined,
+                    TextureUsageState::ColorAttachment,
+                )));
                 ops.push(CommandOp::BeginPass {
-                    pass: g_buffer.composite_pass,
+                    pass: g_buffer.deferred_lighting_pass,
+                    target: g_buffer.deferred_lit_target,
+                    colors: vec![PassAttachment {
+                        view: g_buffer.deferred_lit_view,
+                        load_op: AttachmentLoadOp::Clear,
+                        store_op: AttachmentStoreOp::Store,
+                        clear_color: Some(transparent_clear(background_color)),
+                    }],
+                    depth_stencil: None,
+                });
+                ops.push(CommandOp::BindGraphicsPipeline(
+                    g_buffer.deferred_lighting_pipeline,
+                ));
+                ops.push(CommandOp::BindResourceSet {
+                    pipeline_layout: g_buffer.screen_pipeline_layout,
+                    set_index: 0,
+                    set: g_buffer.deferred_lighting_resource_set,
+                });
+                ops.push(CommandOp::Draw {
+                    vertices: 3,
+                    instances: 1,
+                });
+                ops.push(CommandOp::EndPass);
+                ops.push(CommandOp::Barrier(texture_barrier(
+                    g_buffer.deferred_lit_texture,
+                    TextureUsageState::ColorAttachment,
+                    TextureUsageState::ShaderRead,
+                )));
+                ops.push(CommandOp::Barrier(texture_barrier(
+                    g_buffer.composite0_texture,
+                    TextureUsageState::Undefined,
+                    TextureUsageState::ColorAttachment,
+                )));
+                ops.push(CommandOp::BeginPass {
+                    pass: g_buffer.composite0_pass,
+                    target: g_buffer.composite0_target,
+                    colors: vec![PassAttachment {
+                        view: g_buffer.composite0_view,
+                        load_op: AttachmentLoadOp::Clear,
+                        store_op: AttachmentStoreOp::Store,
+                        clear_color: Some(transparent_clear(background_color)),
+                    }],
+                    depth_stencil: None,
+                });
+                ops.push(CommandOp::BindGraphicsPipeline(
+                    g_buffer.composite0_pipeline,
+                ));
+                ops.push(CommandOp::BindResourceSet {
+                    pipeline_layout: g_buffer.screen_pipeline_layout,
+                    set_index: 0,
+                    set: g_buffer.composite0_resource_set,
+                });
+                ops.push(CommandOp::Draw {
+                    vertices: 3,
+                    instances: 1,
+                });
+                ops.push(CommandOp::EndPass);
+                ops.push(CommandOp::Barrier(texture_barrier(
+                    g_buffer.composite0_texture,
+                    TextureUsageState::ColorAttachment,
+                    TextureUsageState::ShaderRead,
+                )));
+                ops.push(CommandOp::Barrier(texture_barrier(
+                    g_buffer.composite1_texture,
+                    TextureUsageState::Undefined,
+                    TextureUsageState::ColorAttachment,
+                )));
+                ops.push(CommandOp::BeginPass {
+                    pass: g_buffer.composite1_pass,
+                    target: g_buffer.composite1_target,
+                    colors: vec![PassAttachment {
+                        view: g_buffer.composite1_view,
+                        load_op: AttachmentLoadOp::Clear,
+                        store_op: AttachmentStoreOp::Store,
+                        clear_color: Some(transparent_clear(background_color)),
+                    }],
+                    depth_stencil: None,
+                });
+                ops.push(CommandOp::BindGraphicsPipeline(
+                    g_buffer.composite1_pipeline,
+                ));
+                ops.push(CommandOp::BindResourceSet {
+                    pipeline_layout: g_buffer.screen_pipeline_layout,
+                    set_index: 0,
+                    set: g_buffer.composite1_resource_set,
+                });
+                ops.push(CommandOp::Draw {
+                    vertices: 3,
+                    instances: 1,
+                });
+                ops.push(CommandOp::EndPass);
+                ops.push(CommandOp::Barrier(texture_barrier(
+                    g_buffer.composite1_texture,
+                    TextureUsageState::ColorAttachment,
+                    TextureUsageState::ShaderRead,
+                )));
+                ops.push(CommandOp::BeginPass {
+                    pass: g_buffer.final_pass,
                     target: frame_target,
                     colors: vec![loaded_frame_color_attachment(color_attachment)],
-                    depth_stencil: g_buffer.composite_depth_view.map(|view| PassAttachment {
+                    depth_stencil: g_buffer.final_depth_view.map(|view| PassAttachment {
                         view,
                         load_op: AttachmentLoadOp::Load,
                         store_op: AttachmentStoreOp::Store,
                         clear_color: None,
                     }),
                 });
-                ops.push(CommandOp::BindGraphicsPipeline(g_buffer.composite_pipeline));
+                ops.push(CommandOp::BindGraphicsPipeline(g_buffer.final_pipeline));
                 ops.push(CommandOp::BindResourceSet {
-                    pipeline_layout: g_buffer.composite_pipeline_layout,
+                    pipeline_layout: g_buffer.screen_pipeline_layout,
                     set_index: 0,
-                    set: g_buffer.composite_resource_set,
+                    set: g_buffer.final_resource_set,
                 });
                 ops.push(CommandOp::Draw {
                     vertices: 3,
@@ -1798,6 +2064,7 @@ impl WorldPrimitiveFrontend {
                     }),
                 });
                 for (
+                    _shadow_pipeline,
                     pipeline,
                     pipeline_layout,
                     resource_set,
@@ -3133,6 +3400,35 @@ impl WorldPrimitiveFrontend {
                 entry_point: terrain_program.fragment.entry_point.clone(),
             })?;
             created.push(fragment_shader);
+            let (shadow_vertex_shader, shadow_fragment_shader, shadow_pipeline) = if key.g_buffer {
+                let shadow_program = minimal_shadow_depth_program();
+                let shadow_vertex_shader = gal.create_shader_module(ShaderModuleDesc {
+                    label: format!("{label}.shadow.vertex"),
+                    stage: ShaderStage::Vertex,
+                    code_format: ShaderCodeFormat::Glsl,
+                    code: shader_stage_code_for_backend(
+                        gal.capabilities().api,
+                        &shadow_program.vertex.source,
+                    ),
+                    entry_point: shadow_program.vertex.entry_point.clone(),
+                })?;
+                created.push(shadow_vertex_shader);
+                let shadow_fragment_shader = gal.create_shader_module(ShaderModuleDesc {
+                    label: format!("{label}.shadow.fragment"),
+                    stage: ShaderStage::Fragment,
+                    code_format: ShaderCodeFormat::Glsl,
+                    code: shadow_program.fragment.source.as_bytes().to_vec(),
+                    entry_point: shadow_program.fragment.entry_point.clone(),
+                })?;
+                created.push(shadow_fragment_shader);
+                (
+                    Some(shadow_vertex_shader),
+                    Some(shadow_fragment_shader),
+                    None,
+                )
+            } else {
+                (None, None, None)
+            };
             let texture_view = gal.create_texture_view(TextureViewDesc {
                 label: format!("{label}.texture-view"),
                 texture,
@@ -3218,13 +3514,34 @@ impl WorldPrimitiveFrontend {
                 },
                 depth_write: key.depth_policy == WORLD_DEPTH_POLICY_TEST_WRITE,
                 color_formats: if key.g_buffer {
-                    vec![TextureFormat::Rgba8Unorm; 3]
+                    vec![TextureFormat::Rgba8Unorm; 4]
                 } else {
                     vec![key.color_format]
                 },
                 depth_format: Some(TextureFormat::Depth32Float),
             })?;
             created.push(pipeline);
+            let shadow_pipeline = if let (Some(vertex_shader), Some(fragment_shader)) =
+                (shadow_vertex_shader, shadow_fragment_shader)
+            {
+                let pipeline = gal.create_graphics_pipeline(GraphicsPipelineDesc {
+                    label: format!("{label}.shadow-pipeline"),
+                    layout: pipeline_layout,
+                    vertex_shader,
+                    fragment_shader,
+                    topology: PrimitiveTopology::Triangles,
+                    cull_mode: effective_cull_mode_for_winding(key.cull_policy, key.winding)?,
+                    blend: BlendMode::Disabled,
+                    depth_compare: Some(CompareOp::LessOrEqual),
+                    depth_write: true,
+                    color_formats: Vec::new(),
+                    depth_format: Some(TextureFormat::Depth32Float),
+                })?;
+                created.push(pipeline);
+                Some(pipeline)
+            } else {
+                shadow_pipeline
+            };
             let resources = MeshResources {
                 vertex_buffer,
                 index_buffer,
@@ -3233,10 +3550,13 @@ impl WorldPrimitiveFrontend {
                 sampler,
                 vertex_shader,
                 fragment_shader,
+                shadow_vertex_shader,
+                shadow_fragment_shader,
                 texture_view,
                 resource_layout,
                 pipeline_layout,
                 pipeline,
+                shadow_pipeline,
                 data_slots: vec![slot],
             };
             self.upload_mesh_resources(
@@ -3491,8 +3811,23 @@ impl WorldPrimitiveFrontend {
         }
         self.destroy_g_buffer_resources(gal);
         let label = format!("world-shader-g-buffer-gen{}", self.generation);
+        let shader_plan = ShaderPackRuntimePlan::terrain_material_multipass_v1(self.generation)?;
         let mut created = Vec::new();
         let result = (|| -> GalResult<GBufferResources> {
+            let shadow_depth_texture = gal.create_texture(TextureDesc {
+                label: format!("{label}.shadow-depth.texture"),
+                dimension: TextureDimension::D2,
+                format: TextureFormat::Depth32Float,
+                extent,
+                mip_levels: 1,
+                array_layers: 1,
+                usages: vec![
+                    TextureUsage::DepthStencilAttachment,
+                    TextureUsage::Sampled,
+                    TextureUsage::TransferSrc,
+                ],
+            })?;
+            created.push(shadow_depth_texture);
             let albedo_texture =
                 create_g_buffer_color_texture(gal, &format!("{label}.albedo"), extent)?;
             created.push(albedo_texture);
@@ -3502,6 +3837,18 @@ impl WorldPrimitiveFrontend {
             let material_light_texture =
                 create_g_buffer_color_texture(gal, &format!("{label}.material-light"), extent)?;
             created.push(material_light_texture);
+            let world_position_texture =
+                create_g_buffer_color_texture(gal, &format!("{label}.world-position"), extent)?;
+            created.push(world_position_texture);
+            let deferred_lit_texture =
+                create_g_buffer_color_texture(gal, &format!("{label}.deferred-lit"), extent)?;
+            created.push(deferred_lit_texture);
+            let composite0_texture =
+                create_g_buffer_color_texture(gal, &format!("{label}.composite-0"), extent)?;
+            created.push(composite0_texture);
+            let composite1_texture =
+                create_g_buffer_color_texture(gal, &format!("{label}.composite-1"), extent)?;
+            created.push(composite1_texture);
             let depth_texture = gal.create_texture(TextureDesc {
                 label: format!("{label}.depth.texture"),
                 dimension: TextureDimension::D2,
@@ -3511,10 +3858,18 @@ impl WorldPrimitiveFrontend {
                 array_layers: 1,
                 usages: vec![
                     TextureUsage::DepthStencilAttachment,
+                    TextureUsage::Sampled,
                     TextureUsage::TransferSrc,
                 ],
             })?;
             created.push(depth_texture);
+            let shadow_depth_view = create_texture_view(
+                gal,
+                &format!("{label}.shadow-depth.view"),
+                shadow_depth_texture,
+                TextureFormat::Depth32Float,
+            )?;
+            created.push(shadow_depth_view);
             let albedo_view = create_texture_view(
                 gal,
                 &format!("{label}.albedo.view"),
@@ -3536,6 +3891,34 @@ impl WorldPrimitiveFrontend {
                 TextureFormat::Rgba8Unorm,
             )?;
             created.push(material_light_view);
+            let world_position_view = create_texture_view(
+                gal,
+                &format!("{label}.world-position.view"),
+                world_position_texture,
+                TextureFormat::Rgba8Unorm,
+            )?;
+            created.push(world_position_view);
+            let deferred_lit_view = create_texture_view(
+                gal,
+                &format!("{label}.deferred-lit.view"),
+                deferred_lit_texture,
+                TextureFormat::Rgba8Unorm,
+            )?;
+            created.push(deferred_lit_view);
+            let composite0_view = create_texture_view(
+                gal,
+                &format!("{label}.composite-0.view"),
+                composite0_texture,
+                TextureFormat::Rgba8Unorm,
+            )?;
+            created.push(composite0_view);
+            let composite1_view = create_texture_view(
+                gal,
+                &format!("{label}.composite-1.view"),
+                composite1_texture,
+                TextureFormat::Rgba8Unorm,
+            )?;
+            created.push(composite1_view);
             let depth_view = create_texture_view(
                 gal,
                 &format!("{label}.depth.view"),
@@ -3553,138 +3936,293 @@ impl WorldPrimitiveFrontend {
                 address_w: SamplerAddressMode::ClampToEdge,
             })?;
             created.push(sampler);
+            let shadow_target = gal.create_render_target(RenderTargetDesc {
+                label: format!("{label}.shadow-target"),
+                color_views: Vec::new(),
+                depth_stencil_view: Some(shadow_depth_view),
+                extent,
+            })?;
+            created.push(shadow_target);
             let target = gal.create_render_target(RenderTargetDesc {
                 label: format!("{label}.target"),
-                color_views: vec![albedo_view, normal_view, material_light_view],
+                color_views: vec![
+                    albedo_view,
+                    normal_view,
+                    material_light_view,
+                    world_position_view,
+                ],
                 depth_stencil_view: Some(depth_view),
                 extent,
             })?;
             created.push(target);
+            let deferred_lit_target = gal.create_render_target(RenderTargetDesc {
+                label: format!("{label}.deferred-lit-target"),
+                color_views: vec![deferred_lit_view],
+                depth_stencil_view: None,
+                extent,
+            })?;
+            created.push(deferred_lit_target);
+            let composite0_target = gal.create_render_target(RenderTargetDesc {
+                label: format!("{label}.composite-0-target"),
+                color_views: vec![composite0_view],
+                depth_stencil_view: None,
+                extent,
+            })?;
+            created.push(composite0_target);
+            let composite1_target = gal.create_render_target(RenderTargetDesc {
+                label: format!("{label}.composite-1-target"),
+                color_views: vec![composite1_view],
+                depth_stencil_view: None,
+                extent,
+            })?;
+            created.push(composite1_target);
+            let shadow_pass = gal.create_render_pass(RenderPassDesc {
+                label: format!("{label}.shadow-pass"),
+                target: shadow_target,
+                color_formats: Vec::new(),
+                depth_format: Some(TextureFormat::Depth32Float),
+            })?;
+            created.push(shadow_pass);
             let g_buffer_pass = gal.create_render_pass(RenderPassDesc {
                 label: format!("{label}.terrain-pass"),
                 target,
-                color_formats: vec![TextureFormat::Rgba8Unorm; 3],
+                color_formats: vec![TextureFormat::Rgba8Unorm; 4],
                 depth_format: Some(TextureFormat::Depth32Float),
             })?;
             created.push(g_buffer_pass);
-            let composite_depth_view = gal
+            let deferred_lighting_pass = gal.create_render_pass(RenderPassDesc {
+                label: format!("{label}.deferred-lighting-pass"),
+                target: deferred_lit_target,
+                color_formats: vec![TextureFormat::Rgba8Unorm],
+                depth_format: None,
+            })?;
+            created.push(deferred_lighting_pass);
+            let composite0_pass = gal.create_render_pass(RenderPassDesc {
+                label: format!("{label}.composite-0-pass"),
+                target: composite0_target,
+                color_formats: vec![TextureFormat::Rgba8Unorm],
+                depth_format: None,
+            })?;
+            created.push(composite0_pass);
+            let composite1_pass = gal.create_render_pass(RenderPassDesc {
+                label: format!("{label}.composite-1-pass"),
+                target: composite1_target,
+                color_formats: vec![TextureFormat::Rgba8Unorm],
+                depth_format: None,
+            })?;
+            created.push(composite1_pass);
+            let final_depth_view = gal
                 .pass_target_depth_attachment(frame_target)?
                 .map(|(_, view)| view);
-            let composite_pass = gal.create_render_pass(RenderPassDesc {
-                label: format!("{label}.composite-pass"),
+            let final_pass = gal.create_render_pass(RenderPassDesc {
+                label: format!("{label}.final-output-pass"),
                 target: frame_target,
                 color_formats: vec![frame_color_format],
-                depth_format: composite_depth_view.map(|_| TextureFormat::Depth32Float),
+                depth_format: final_depth_view.map(|_| TextureFormat::Depth32Float),
             })?;
-            created.push(composite_pass);
-            let composite_program = minimal_g_buffer_composite_program();
-            let composite_vertex_shader = gal.create_shader_module(ShaderModuleDesc {
-                label: format!("{label}.composite.vertex"),
+            created.push(final_pass);
+            let composite_uniform_buffer = gal.create_buffer(BufferDesc {
+                label: format!("{label}.deferred-composite-uniforms"),
+                size: WORLD_SHADER_COMPOSITE_UNIFORM_BYTES,
+                memory: MemoryDomain::Upload,
+                usages: vec![
+                    BufferUsage::Storage,
+                    BufferUsage::TransferDst,
+                    BufferUsage::HostWrite,
+                ],
+            })?;
+            created.push(composite_uniform_buffer);
+            let screen_vertex_program = &shader_plan.programs.deferred_lighting;
+            let screen_vertex_shader = gal.create_shader_module(ShaderModuleDesc {
+                label: format!("{label}.screen.vertex"),
                 stage: ShaderStage::Vertex,
                 code_format: ShaderCodeFormat::Glsl,
                 code: shader_stage_code_for_backend(
                     gal.capabilities().api,
-                    &composite_program.vertex.source,
+                    &screen_vertex_program.vertex.source,
                 ),
-                entry_point: composite_program.vertex.entry_point.clone(),
+                entry_point: screen_vertex_program.vertex.entry_point.clone(),
             })?;
-            created.push(composite_vertex_shader);
-            let composite_fragment_shader = gal.create_shader_module(ShaderModuleDesc {
-                label: format!("{label}.composite.fragment"),
-                stage: ShaderStage::Fragment,
-                code_format: ShaderCodeFormat::Glsl,
-                code: composite_program.fragment.source.as_bytes().to_vec(),
-                entry_point: composite_program.fragment.entry_point.clone(),
-            })?;
-            created.push(composite_fragment_shader);
-            let composite_resource_layout = gal.create_resource_layout(ResourceLayoutDesc {
-                label: format!("{label}.composite.resource-layout"),
-                bindings: vec![
-                    ResourceBindingDesc {
-                        binding: 0,
-                        kind: ResourceBindingKind::SampledTexture,
-                        stages: PipelineStageFlags::DRAW,
-                        array_count: 1,
-                        optional: false,
-                        dynamic_offset_count: 0,
-                    },
-                    ResourceBindingDesc {
-                        binding: 1,
-                        kind: ResourceBindingKind::SampledTexture,
-                        stages: PipelineStageFlags::DRAW,
-                        array_count: 1,
-                        optional: false,
-                        dynamic_offset_count: 0,
-                    },
-                    ResourceBindingDesc {
-                        binding: 2,
-                        kind: ResourceBindingKind::SampledTexture,
-                        stages: PipelineStageFlags::DRAW,
-                        array_count: 1,
-                        optional: false,
-                        dynamic_offset_count: 0,
-                    },
-                    ResourceBindingDesc {
-                        binding: 3,
-                        kind: ResourceBindingKind::Sampler,
-                        stages: PipelineStageFlags::DRAW,
-                        array_count: 1,
-                        optional: false,
-                        dynamic_offset_count: 0,
-                    },
+            created.push(screen_vertex_shader);
+            let deferred_lighting_fragment_shader = create_shader_screen_fragment_shader(
+                gal,
+                &format!("{label}.deferred-lighting"),
+                &shader_plan.programs.deferred_lighting,
+            )?;
+            created.push(deferred_lighting_fragment_shader);
+            let composite0_fragment_shader = create_shader_screen_fragment_shader(
+                gal,
+                &format!("{label}.composite-0"),
+                &shader_plan.programs.composite_0,
+            )?;
+            created.push(composite0_fragment_shader);
+            let composite1_fragment_shader = create_shader_screen_fragment_shader(
+                gal,
+                &format!("{label}.composite-1"),
+                &shader_plan.programs.composite_1,
+            )?;
+            created.push(composite1_fragment_shader);
+            let final_fragment_shader = create_shader_screen_fragment_shader(
+                gal,
+                &format!("{label}.final-output"),
+                &shader_plan.programs.final_output,
+            )?;
+            created.push(final_fragment_shader);
+            let screen_resource_layout = create_shader_screen_resource_layout(gal, &label)?;
+            created.push(screen_resource_layout);
+            let deferred_lighting_resource_set = create_shader_screen_resource_set(
+                gal,
+                &format!("{label}.deferred-lighting"),
+                screen_resource_layout,
+                [
+                    albedo_view,
+                    normal_view,
+                    material_light_view,
+                    world_position_view,
+                    shadow_depth_view,
                 ],
-            })?;
-            created.push(composite_resource_layout);
-            let composite_resource_set = gal.create_resource_set(ResourceSetDesc {
-                label: format!("{label}.composite.resource-set"),
-                layout: composite_resource_layout,
-                bindings: vec![
-                    sampled_binding(0, albedo_view),
-                    sampled_binding(1, normal_view),
-                    sampled_binding(2, material_light_view),
-                    sampler_binding(3, sampler),
+                sampler,
+                composite_uniform_buffer,
+            )?;
+            created.push(deferred_lighting_resource_set);
+            let composite0_resource_set = create_shader_screen_resource_set(
+                gal,
+                &format!("{label}.composite-0"),
+                screen_resource_layout,
+                [
+                    deferred_lit_view,
+                    normal_view,
+                    material_light_view,
+                    world_position_view,
+                    shadow_depth_view,
                 ],
+                sampler,
+                composite_uniform_buffer,
+            )?;
+            created.push(composite0_resource_set);
+            let composite1_resource_set = create_shader_screen_resource_set(
+                gal,
+                &format!("{label}.composite-1"),
+                screen_resource_layout,
+                [
+                    composite0_view,
+                    normal_view,
+                    material_light_view,
+                    world_position_view,
+                    depth_view,
+                ],
+                sampler,
+                composite_uniform_buffer,
+            )?;
+            created.push(composite1_resource_set);
+            let final_resource_set = create_shader_screen_resource_set(
+                gal,
+                &format!("{label}.final-output"),
+                screen_resource_layout,
+                [
+                    composite1_view,
+                    normal_view,
+                    material_light_view,
+                    world_position_view,
+                    depth_view,
+                ],
+                sampler,
+                composite_uniform_buffer,
+            )?;
+            created.push(final_resource_set);
+            let screen_pipeline_layout = gal.create_pipeline_layout(PipelineLayoutDesc {
+                label: format!("{label}.screen.pipeline-layout"),
+                resource_layouts: vec![screen_resource_layout],
             })?;
-            created.push(composite_resource_set);
-            let composite_pipeline_layout = gal.create_pipeline_layout(PipelineLayoutDesc {
-                label: format!("{label}.composite.pipeline-layout"),
-                resource_layouts: vec![composite_resource_layout],
-            })?;
-            created.push(composite_pipeline_layout);
-            let composite_pipeline = gal.create_graphics_pipeline(GraphicsPipelineDesc {
-                label: format!("{label}.composite.pipeline"),
-                layout: composite_pipeline_layout,
-                vertex_shader: composite_vertex_shader,
-                fragment_shader: composite_fragment_shader,
-                topology: PrimitiveTopology::Triangles,
-                cull_mode: CullMode::None,
-                blend: BlendMode::Disabled,
-                depth_compare: None,
-                depth_write: false,
-                color_formats: vec![frame_color_format],
-                depth_format: composite_depth_view.map(|_| TextureFormat::Depth32Float),
-            })?;
-            created.push(composite_pipeline);
+            created.push(screen_pipeline_layout);
+            let deferred_lighting_pipeline = create_shader_screen_pipeline(
+                gal,
+                &format!("{label}.deferred-lighting"),
+                screen_pipeline_layout,
+                screen_vertex_shader,
+                deferred_lighting_fragment_shader,
+                TextureFormat::Rgba8Unorm,
+                None,
+            )?;
+            created.push(deferred_lighting_pipeline);
+            let composite0_pipeline = create_shader_screen_pipeline(
+                gal,
+                &format!("{label}.composite-0"),
+                screen_pipeline_layout,
+                screen_vertex_shader,
+                composite0_fragment_shader,
+                TextureFormat::Rgba8Unorm,
+                None,
+            )?;
+            created.push(composite0_pipeline);
+            let composite1_pipeline = create_shader_screen_pipeline(
+                gal,
+                &format!("{label}.composite-1"),
+                screen_pipeline_layout,
+                screen_vertex_shader,
+                composite1_fragment_shader,
+                TextureFormat::Rgba8Unorm,
+                None,
+            )?;
+            created.push(composite1_pipeline);
+            let final_pipeline = create_shader_screen_pipeline(
+                gal,
+                &format!("{label}.final-output"),
+                screen_pipeline_layout,
+                screen_vertex_shader,
+                final_fragment_shader,
+                frame_color_format,
+                final_depth_view.map(|_| TextureFormat::Depth32Float),
+            )?;
+            created.push(final_pipeline);
             Ok(GBufferResources {
+                shadow_depth_texture,
                 albedo_texture,
                 normal_texture,
                 material_light_texture,
+                world_position_texture,
+                deferred_lit_texture,
+                composite0_texture,
+                composite1_texture,
                 depth_texture,
+                shadow_depth_view,
                 albedo_view,
                 normal_view,
                 material_light_view,
+                world_position_view,
+                deferred_lit_view,
+                composite0_view,
+                composite1_view,
                 depth_view,
                 sampler,
+                shadow_target,
                 target,
+                deferred_lit_target,
+                composite0_target,
+                composite1_target,
+                shadow_pass,
                 g_buffer_pass,
-                composite_pass,
-                composite_vertex_shader,
-                composite_fragment_shader,
-                composite_resource_layout,
-                composite_resource_set,
-                composite_pipeline_layout,
-                composite_pipeline,
-                composite_depth_view,
+                deferred_lighting_pass,
+                composite0_pass,
+                composite1_pass,
+                final_pass,
+                composite_uniform_buffer,
+                screen_vertex_shader,
+                deferred_lighting_fragment_shader,
+                composite0_fragment_shader,
+                composite1_fragment_shader,
+                final_fragment_shader,
+                screen_resource_layout,
+                deferred_lighting_resource_set,
+                composite0_resource_set,
+                composite1_resource_set,
+                final_resource_set,
+                screen_pipeline_layout,
+                deferred_lighting_pipeline,
+                composite0_pipeline,
+                composite1_pipeline,
+                final_pipeline,
+                final_depth_view,
                 extent,
                 frame_target,
                 frame_color_format,
@@ -4053,6 +4591,10 @@ fn loaded_frame_color_attachment(color_attachment: Handle) -> PassAttachment {
         store_op: AttachmentStoreOp::Store,
         clear_color: None,
     }
+}
+
+fn transparent_clear(color: ClearColor) -> ClearColor {
+    ClearColor { a: 0.0, ..color }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -4601,6 +5143,138 @@ fn create_g_buffer_color_texture(
     })
 }
 
+fn create_shader_screen_resource_layout(gal: &mut VulkanicGal, label: &str) -> GalResult<Handle> {
+    gal.create_resource_layout(ResourceLayoutDesc {
+        label: format!("{label}.screen.resource-layout"),
+        bindings: vec![
+            ResourceBindingDesc {
+                binding: 0,
+                kind: ResourceBindingKind::SampledTexture,
+                stages: PipelineStageFlags::DRAW,
+                array_count: 1,
+                optional: false,
+                dynamic_offset_count: 0,
+            },
+            ResourceBindingDesc {
+                binding: 1,
+                kind: ResourceBindingKind::SampledTexture,
+                stages: PipelineStageFlags::DRAW,
+                array_count: 1,
+                optional: false,
+                dynamic_offset_count: 0,
+            },
+            ResourceBindingDesc {
+                binding: 2,
+                kind: ResourceBindingKind::SampledTexture,
+                stages: PipelineStageFlags::DRAW,
+                array_count: 1,
+                optional: false,
+                dynamic_offset_count: 0,
+            },
+            ResourceBindingDesc {
+                binding: 3,
+                kind: ResourceBindingKind::SampledTexture,
+                stages: PipelineStageFlags::DRAW,
+                array_count: 1,
+                optional: false,
+                dynamic_offset_count: 0,
+            },
+            ResourceBindingDesc {
+                binding: 4,
+                kind: ResourceBindingKind::SampledTexture,
+                stages: PipelineStageFlags::DRAW,
+                array_count: 1,
+                optional: false,
+                dynamic_offset_count: 0,
+            },
+            ResourceBindingDesc {
+                binding: 5,
+                kind: ResourceBindingKind::Sampler,
+                stages: PipelineStageFlags::DRAW,
+                array_count: 1,
+                optional: false,
+                dynamic_offset_count: 0,
+            },
+            ResourceBindingDesc {
+                binding: 6,
+                kind: ResourceBindingKind::StorageBuffer,
+                stages: PipelineStageFlags::DRAW,
+                array_count: 1,
+                optional: false,
+                dynamic_offset_count: 0,
+            },
+        ],
+    })
+}
+
+fn create_shader_screen_resource_set(
+    gal: &mut VulkanicGal,
+    label: &str,
+    layout: Handle,
+    sampled_views: [Handle; 5],
+    sampler: Handle,
+    uniform_buffer: Handle,
+) -> GalResult<Handle> {
+    gal.create_resource_set(ResourceSetDesc {
+        label: format!("{label}.resource-set"),
+        layout,
+        bindings: vec![
+            sampled_binding(0, sampled_views[0]),
+            sampled_binding(1, sampled_views[1]),
+            sampled_binding(2, sampled_views[2]),
+            sampled_binding(3, sampled_views[3]),
+            sampled_binding(4, sampled_views[4]),
+            sampler_binding(5, sampler),
+            ResourceBinding {
+                binding: 6,
+                array_index: 0,
+                resource: uniform_buffer,
+                kind: ResourceBindingKind::StorageBuffer,
+                access: AccessFlags::READ,
+                dynamic_offsets: Vec::new(),
+            },
+        ],
+    })
+}
+
+fn create_shader_screen_fragment_shader(
+    gal: &mut VulkanicGal,
+    label: &str,
+    program: &CompositeProgram,
+) -> GalResult<Handle> {
+    gal.create_shader_module(ShaderModuleDesc {
+        label: format!("{label}.fragment"),
+        stage: ShaderStage::Fragment,
+        code_format: ShaderCodeFormat::Glsl,
+        code: shader_stage_code_for_backend(gal.capabilities().api, &program.fragment.source),
+        entry_point: program.fragment.entry_point.clone(),
+    })
+}
+
+fn create_shader_screen_pipeline(
+    gal: &mut VulkanicGal,
+    label: &str,
+    layout: Handle,
+    vertex_shader: Handle,
+    fragment_shader: Handle,
+    color_format: ColorFormat,
+    depth_format: Option<TextureFormat>,
+) -> GalResult<Handle> {
+    gal.create_graphics_pipeline(GraphicsPipelineDesc {
+        label: format!("{label}.pipeline"),
+        layout,
+        vertex_shader,
+        fragment_shader,
+        topology: PrimitiveTopology::Triangles,
+        cull_mode: CullMode::None,
+        blend: BlendMode::Disabled,
+        depth_compare: None,
+        depth_write: false,
+        color_formats: vec![color_format],
+        depth_format,
+    })
+}
+
 fn create_texture_view(
     gal: &mut VulkanicGal,
     label: &str,
@@ -4821,6 +5495,12 @@ fn packed_mesh_uniforms_for_batch(
     for value in frame.projection_matrix {
         push_f32(&mut out, value);
     }
+    for value in shadow_light_view_projection_matrix() {
+        push_f32(&mut out, value);
+    }
+    for value in shader_shadow_params(true) {
+        push_f32(&mut out, value);
+    }
     for instance_index in &batch.indices {
         let instance = &frame.mesh_instances[*instance_index];
         for value in instance.transform {
@@ -4842,6 +5522,42 @@ fn packed_mesh_uniforms_for_batch(
         push_f32(&mut out, 0.0);
     }
     Ok(out)
+}
+
+fn packed_shader_composite_uniforms(enabled: bool) -> Vec<u8> {
+    let mut out = Vec::with_capacity(WORLD_SHADER_COMPOSITE_UNIFORM_BYTES as usize);
+    for value in shadow_light_view_projection_matrix() {
+        push_f32(&mut out, value);
+    }
+    for value in shader_shadow_params(enabled) {
+        push_f32(&mut out, value);
+    }
+    for value in shader_color_grade_params() {
+        push_f32(&mut out, value);
+    }
+    for value in shader_fog_params() {
+        push_f32(&mut out, value);
+    }
+    out
+}
+
+fn shader_shadow_params(enabled: bool) -> [f32; 4] {
+    [if enabled { 1.0 } else { 0.0 }, 0.006, 0.42, 1.0]
+}
+
+fn shader_color_grade_params() -> [f32; 4] {
+    [1.08, 0.018, 0.96, 1.0]
+}
+
+fn shader_fog_params() -> [f32; 4] {
+    [0.12, 0.18, 0.34, 0.62]
+}
+
+fn shadow_light_view_projection_matrix() -> [f32; 16] {
+    [
+        0.82, -0.18, 0.0, 0.0, 0.16, 0.76, -0.28, 0.0, 0.18, 0.34, 0.72, 0.0, -0.08, 0.06, 0.08,
+        1.0,
+    ]
 }
 
 fn argb_to_rgba(argb: u32) -> [f32; 4] {
@@ -5620,7 +6336,7 @@ mod tests {
                 .len()
         );
         assert_eq!(
-            1,
+            2,
             ops.iter()
                 .filter(|op| matches!(
                     op,
@@ -5710,7 +6426,7 @@ mod tests {
         assert_eq!(2, stats.mesh_batch_count);
         assert_eq!(2, stats.mesh_draw_count);
         assert_eq!(
-            2,
+            4,
             ops.iter()
                 .filter(|op| matches!(op, CommandOp::DrawIndexed { instances: 12, .. }))
                 .count()
@@ -5758,7 +6474,7 @@ mod tests {
         assert_eq!(1, stats.mesh_draw_count);
         assert_eq!(1, frontend.mesh_resources.len());
         assert_eq!(
-            1,
+            2,
             ops.iter()
                 .filter(|op| matches!(
                     op,
@@ -5825,7 +6541,7 @@ mod tests {
         assert_eq!(2, stats.mesh_batch_count);
         assert_eq!(2, stats.mesh_draw_count);
         assert_eq!(
-            2,
+            4,
             ops.iter()
                 .filter(|op| matches!(
                     op,
@@ -6581,7 +7297,7 @@ mod tests {
         assert_eq!(0, resized.depth_attachment_reuses);
     }
 
-    #[derive(Clone, Copy)]
+    #[derive(Clone, Copy, PartialEq, Eq)]
     enum RuntimeBackend {
         Vulkan,
         OpenGl,
@@ -7320,6 +8036,11 @@ mod tests {
         if let Some(g_buffer) = frontend.g_buffer_resources.as_ref() {
             let attachment_specs = [
                 (
+                    "shadow_depth",
+                    g_buffer.shadow_depth_texture,
+                    TextureUsageState::ShaderRead,
+                ),
+                (
                     "albedo",
                     g_buffer.albedo_texture,
                     TextureUsageState::ShaderRead,
@@ -7335,9 +8056,29 @@ mod tests {
                     TextureUsageState::ShaderRead,
                 ),
                 (
+                    "world_position",
+                    g_buffer.world_position_texture,
+                    TextureUsageState::ShaderRead,
+                ),
+                (
                     "depth",
                     g_buffer.depth_texture,
-                    TextureUsageState::DepthStencilAttachment,
+                    TextureUsageState::ShaderRead,
+                ),
+                (
+                    "deferred_lit",
+                    g_buffer.deferred_lit_texture,
+                    TextureUsageState::ShaderRead,
+                ),
+                (
+                    "composite_0",
+                    g_buffer.composite0_texture,
+                    TextureUsageState::ShaderRead,
+                ),
+                (
+                    "composite_1",
+                    g_buffer.composite1_texture,
+                    TextureUsageState::ShaderRead,
                 ),
             ];
             for (name, texture, previous_usage) in attachment_specs {
@@ -7413,25 +8154,19 @@ mod tests {
         })?;
         gal.retire_through_for_test(token.submission)?;
         let reads = gal.completed_host_reads();
-        let mut pixels = reads
+        let pixels = reads
             .iter()
             .rev()
             .find(|read| read.buffer == readback)
             .map(|read| read.bytes.clone())
             .ok_or_else(|| GalError::backend("shader mesh scene readback produced no bytes"))?;
-        if gal.capabilities().api == BackendApi::Vulkan {
-            flip_rgba_rows_in_place(&mut pixels, width, height);
-        }
         let mut attachments = BTreeMap::new();
         let mut attachment_hashes = BTreeMap::new();
         for (name, buffer) in readback_buffers {
             let Some(read) = reads.iter().rev().find(|read| read.buffer == buffer) else {
                 continue;
             };
-            let mut bytes = read.bytes.clone();
-            if gal.capabilities().api == BackendApi::Vulkan {
-                flip_rgba_rows_in_place(&mut bytes, width, height);
-            }
+            let bytes = read.bytes.clone();
             attachment_hashes.insert(name.clone(), xxh32(&bytes, 0x47_42_55_46));
             attachments.insert(name, bytes);
         }
@@ -8199,18 +8934,6 @@ mod tests {
         count
     }
 
-    fn flip_rgba_rows_in_place(pixels: &mut [u8], width: u32, height: u32) {
-        let row_bytes = width as usize * 4;
-        for y in 0..(height as usize / 2) {
-            let opposite = height as usize - 1 - y;
-            let top_start = y * row_bytes;
-            let bottom_start = opposite * row_bytes;
-            for offset in 0..row_bytes {
-                pixels.swap(top_start + offset, bottom_start + offset);
-            }
-        }
-    }
-
     fn write_material_report(
         backend: RuntimeBackend,
         width: u32,
@@ -8380,19 +9103,25 @@ mod tests {
             .first()
             .map(|frame| shader_mesh_perturbation_evidence_json(width, height, frame))
             .unwrap_or_else(|| "{}".to_string());
+        let chain_evidence = frames
+            .first()
+            .map(shader_mesh_composite_chain_evidence_json)
+            .unwrap_or_else(|| "{}".to_string());
         let mesh_draws = frames
             .iter()
             .map(|frame| frame.stats.mesh_draw_count)
             .sum::<u64>();
         let json = format!(
-            "{{\n  \"artifact_class\":\"rust_owned_shader_pack_mesh_conformance\",\n  \"backend\":\"{}\",\n  \"shader_pack_generation\":1,\n  \"pass_graph_generation\":1,\n  \"semantic_request_hash\":\"{:08x}\",\n  \"pass_graph\":\"vulkanic:builtin/terrain_material_v1\",\n  \"passes\":[\"vulkanic:pass/terrain_opaque\",\"vulkanic:pass/terrain_cutout\",\"vulkanic:pass/g_buffer_composite\",\"vulkanic:pass/final_output\"],\n  \"executed_pass_order\":[\"terrain_opaque\",\"terrain_cutout\",\"g_buffer_composite\",\"final_output\"],\n  \"g_buffer_attachments\":[\"albedo\",\"normal\",\"material_light\",\"depth\"],\n  \"attachment_formats\":{{\"albedo\":\"Rgba8Unorm\",\"normal\":\"Rgba8Unorm\",\"material_light\":\"Rgba8Unorm\",\"depth\":\"Depth32Float\",\"final_composite\":\"Rgba8Unorm\"}},\n  \"attachment_extents\":{{\"width\":{},\"height\":{}}},\n  \"attachment_hashes\":{{{}}},\n  \"attachment_semantic_evidence\":{},\n  \"composite_dependency_perturbations\":{},\n  \"final_presentation_owner\":\"rust-backend-owned-target\",\n  \"rust_owned_color_attachment\":true,\n  \"rust_owned_depth_attachment\":true,\n  \"java_iris_participation\":false,\n  \"width\":{},\n  \"height\":{},\n  \"airborne_frame_hashes\":[{}],\n  \"rollback_hash\":\"{:08x}\",\n  \"reloaded_hash\":\"{:08x}\",\n  \"rollback_preserved_last_valid_generation\":{},\n  \"crop_names\":[{}],\n  \"frame0_feature_non_clear\":{{{}}},\n  \"mesh_instance_count\":{},\n  \"mesh_batch_count\":{},\n  \"mesh_draw_count\":{},\n  \"mesh_cache_hits\":{},\n  \"mesh_cache_misses\":{},\n  \"mesh_asset_payload_bytes\":{},\n  \"screenshots\":[\"full-airborne-frame-0.png\",\"full-airborne-frame-1.png\",\"full-airborne-frame-2.png\",\"full-airborne-frame-3.png\",\"full-airborne-frame-4.png\",\"full-rollback.png\",\"full-reloaded.png\"],\n  \"attachment_dumps\":[\"attachment-albedo.png\",\"attachment-normal.png\",\"attachment-material_light.png\",\"attachment-depth.png\",\"attachment-depth.raw\",\"attachment-final_composite.png\"]\n}}\n",
+            "{{\n  \"artifact_class\":\"rust_owned_shader_pack_mesh_conformance\",\n  \"backend\":\"{}\",\n  \"shader_pack_generation\":1,\n  \"shader_config_schema\":1,\n  \"pass_graph_generation\":3,\n  \"semantic_request_hash\":\"{:08x}\",\n  \"pass_graph\":\"vulkanic:builtin/terrain_material_multipass_v1\",\n  \"passes\":[\"vulkanic:pass/shadow_depth\",\"vulkanic:pass/terrain_opaque\",\"vulkanic:pass/terrain_cutout\",\"vulkanic:pass/deferred_lighting\",\"vulkanic:pass/composite_0\",\"vulkanic:pass/composite_1\",\"vulkanic:pass/final_output\"],\n  \"executed_pass_order\":[\"shadow_depth\",\"terrain_opaque\",\"terrain_cutout\",\"deferred_lighting\",\"composite_0_color_grade\",\"composite_1_depth_fog\",\"final_output\"],\n  \"g_buffer_attachments\":[\"shadow_depth\",\"albedo\",\"normal\",\"material_light\",\"world_position\",\"depth\",\"deferred_lit\",\"composite_0\",\"composite_1\"],\n  \"attachment_formats\":{{\"shadow_depth\":\"Depth32Float\",\"albedo\":\"Rgba8Unorm\",\"normal\":\"Rgba8Unorm\",\"material_light\":\"Rgba8Unorm\",\"world_position\":\"Rgba8Unorm\",\"depth\":\"Depth32Float\",\"deferred_lit\":\"Rgba8Unorm\",\"composite_0\":\"Rgba8Unorm\",\"composite_1\":\"Rgba8Unorm\",\"final_composite\":\"Rgba8Unorm\"}},\n  \"attachment_extents\":{{\"width\":{},\"height\":{}}},\n  \"attachment_hashes\":{{{}}},\n  \"attachment_semantic_evidence\":{},\n  \"shadow_dependency_evidence\":{},\n  \"composite_dependency_perturbations\":{},\n  \"composite_chain_evidence\":{},\n  \"final_presentation_owner\":\"rust-backend-owned-target\",\n  \"rust_owned_color_attachment\":true,\n  \"rust_owned_depth_attachment\":true,\n  \"rust_owned_shadow_attachment\":true,\n  \"java_iris_participation\":false,\n  \"width\":{},\n  \"height\":{},\n  \"airborne_frame_hashes\":[{}],\n  \"rollback_hash\":\"{:08x}\",\n  \"reloaded_hash\":\"{:08x}\",\n  \"rollback_preserved_last_valid_generation\":{},\n  \"crop_names\":[{}],\n  \"frame0_feature_non_clear\":{{{}}},\n  \"mesh_instance_count\":{},\n  \"mesh_batch_count\":{},\n  \"mesh_draw_count\":{},\n  \"mesh_cache_hits\":{},\n  \"mesh_cache_misses\":{},\n  \"mesh_asset_payload_bytes\":{},\n  \"screenshots\":[\"full-airborne-frame-0.png\",\"full-airborne-frame-1.png\",\"full-airborne-frame-2.png\",\"full-airborne-frame-3.png\",\"full-airborne-frame-4.png\",\"full-rollback.png\",\"full-reloaded.png\"],\n  \"attachment_dumps\":[\"attachment-shadow_depth.png\",\"attachment-shadow_depth.raw\",\"attachment-albedo.png\",\"attachment-normal.png\",\"attachment-material_light.png\",\"attachment-world_position.png\",\"attachment-depth.png\",\"attachment-depth.raw\",\"attachment-deferred_lit.png\",\"attachment-composite_0.png\",\"attachment-composite_1.png\",\"attachment-final_composite.png\"]\n}}\n",
             backend.name(),
             semantic_hash,
             width,
             height,
             attachment_hashes,
             attachment_evidence,
+            shader_mesh_shadow_evidence_json(backend, width, height, frames),
             perturbation_evidence,
+            chain_evidence,
             width,
             height,
             frame_hashes,
@@ -8421,7 +9150,16 @@ mod tests {
         height: u32,
         frame: &RuntimeRenderResult,
     ) -> GalResult<()> {
-        for name in ["albedo", "normal", "material_light", "final_composite"] {
+        for name in [
+            "albedo",
+            "normal",
+            "material_light",
+            "world_position",
+            "deferred_lit",
+            "composite_0",
+            "composite_1",
+            "final_composite",
+        ] {
             let Some(bytes) = frame.attachments.get(name) else {
                 continue;
             };
@@ -8444,6 +9182,20 @@ mod tests {
                 &depth_rgba,
             )?;
         }
+        if let Some(depth) = frame.attachments.get("shadow_depth") {
+            std::fs::write(dir.join("attachment-shadow_depth.raw"), depth).map_err(|error| {
+                GalError::backend(format!(
+                    "failed to write shadow depth raw attachment: {error}"
+                ))
+            })?;
+            let depth_rgba = depth_attachment_to_grayscale_rgba(depth);
+            write_png(
+                &dir.join("attachment-shadow_depth.png"),
+                width,
+                height,
+                &depth_rgba,
+            )?;
+        }
         Ok(())
     }
 
@@ -8454,9 +9206,14 @@ mod tests {
     ) -> String {
         let mut entries = Vec::new();
         for name in [
+            "shadow_depth",
             "albedo",
             "normal",
             "material_light",
+            "world_position",
+            "deferred_lit",
+            "composite_0",
+            "composite_1",
             "depth",
             "final_composite",
         ] {
@@ -8464,7 +9221,7 @@ mod tests {
                 entries.push(format!("\"{name}\":{{\"present\":false}}"));
                 continue;
             };
-            let evidence = if name == "depth" {
+            let evidence = if name == "depth" || name == "shadow_depth" {
                 depth_attachment_evidence_json(bytes)
             } else {
                 color_attachment_evidence_json(width, height, name, bytes)
@@ -8481,7 +9238,9 @@ mod tests {
         let default = match name {
             "normal" => [128, 128, 255, 255],
             "material_light" => [0, 255, 255, 0],
-            "albedo" | "final_composite" => [16, 40, 218, 255],
+            "albedo" | "deferred_lit" | "composite_0" | "composite_1" | "final_composite" => {
+                [16, 40, 218, 255]
+            }
             _ => [0, 0, 0, 0],
         };
         for px in bytes.chunks_exact(4) {
@@ -8597,6 +9356,160 @@ mod tests {
             perturbation_json(&baseline, &normal_variant),
             perturbation_json(&baseline, &light_variant)
         )
+    }
+
+    fn shader_mesh_composite_chain_evidence_json(frame: &RuntimeRenderResult) -> String {
+        let hash = |name: &str, seed: u32| -> Option<u32> {
+            frame.attachments.get(name).map(|bytes| xxh32(bytes, seed))
+        };
+        let changed = |left: &str, right: &str| -> usize {
+            let Some(a) = frame.attachments.get(left) else {
+                return 0;
+            };
+            let Some(b) = frame.attachments.get(right) else {
+                return 0;
+            };
+            a.chunks_exact(4)
+                .zip(b.chunks_exact(4))
+                .filter(|(a, b)| {
+                    a[0].abs_diff(b[0]) > 2 || a[1].abs_diff(b[1]) > 2 || a[2].abs_diff(b[2]) > 2
+                })
+                .count()
+        };
+        let deferred_hash = hash("deferred_lit", 0x44_45_46_52).unwrap_or(0);
+        let composite0_hash = hash("composite_0", 0x43_4f_4d_30).unwrap_or(0);
+        let composite1_hash = hash("composite_1", 0x43_4f_4d_31).unwrap_or(0);
+        let final_hash = hash("final_composite", 0x46_49_4e_41).unwrap_or(0);
+        let deferred_to_composite0 = changed("deferred_lit", "composite_0");
+        let composite0_to_composite1 = changed("composite_0", "composite_1");
+        let composite1_to_final = changed("composite_1", "final_composite");
+        format!(
+            "{{\"deferred_lit_hash\":\"{:08x}\",\"composite_0_hash\":\"{:08x}\",\"composite_1_hash\":\"{:08x}\",\"final_hash\":\"{:08x}\",\"deferred_to_composite_0_changed_pixels\":{},\"composite_0_to_composite_1_changed_pixels\":{},\"composite_1_to_final_changed_pixels\":{},\"final_reads_last_configured_pass\":{}}}",
+            deferred_hash,
+            composite0_hash,
+            composite1_hash,
+            final_hash,
+            deferred_to_composite0,
+            composite0_to_composite1,
+            composite1_to_final,
+            composite1_to_final == 0 && composite1_hash != 0 && final_hash != 0
+        )
+    }
+
+    fn shader_mesh_shadow_evidence_json(
+        _backend: RuntimeBackend,
+        width: u32,
+        height: u32,
+        frames: &[RuntimeRenderResult],
+    ) -> String {
+        let mut shadow_depth_hashes = Vec::new();
+        let mut final_hashes = Vec::new();
+        let mut less_than_clear = Vec::new();
+        let mut final_delta_pixels = Vec::new();
+        let mut shadowed_material_pixels = Vec::new();
+        for frame in frames {
+            if let Some(shadow_depth) = frame.attachments.get("shadow_depth") {
+                shadow_depth_hashes.push(format!("\"{:08x}\"", xxh32(shadow_depth, 0x53_48_41_44)));
+                let mut count = 0usize;
+                for chunk in shadow_depth.chunks_exact(4) {
+                    let value = f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
+                    if value.is_finite() && value < 0.999 {
+                        count += 1;
+                    }
+                }
+                less_than_clear.push(count);
+            }
+            shadowed_material_pixels.push(shadowed_material_pixel_count(frame, width, height));
+            if let Some(final_composite) = frame.attachments.get("final_composite") {
+                final_hashes.push(format!("\"{:08x}\"", xxh32(final_composite, 0x46_49_4e_53)));
+                let mut count = 0usize;
+                for px in final_composite.chunks_exact(4) {
+                    if px[0] < 12 && px[1] < 35 && px[2] < 205 {
+                        count += 1;
+                    }
+                }
+                final_delta_pixels.push(count);
+            }
+        }
+        let unique_shadow_hashes = shadow_depth_hashes
+            .iter()
+            .collect::<std::collections::BTreeSet<_>>()
+            .len();
+        let unique_final_hashes = final_hashes
+            .iter()
+            .collect::<std::collections::BTreeSet<_>>()
+            .len();
+        format!(
+            "{{\"shadow_depth_hashes\":[{}],\"final_hashes\":[{}],\"shadow_depth_less_than_clear\":{:?},\"shadowed_material_pixels\":{:?},\"final_shadow_candidate_pixels\":{:?},\"moving_shadow_depth_hashes\":{},\"moving_final_hashes\":{},\"shadowing_enabled\":true,\"shadow_bias\":0.006,\"shadow_darkening_factor\":0.42}}",
+            shadow_depth_hashes.join(","),
+            final_hashes.join(","),
+            less_than_clear,
+            shadowed_material_pixels,
+            final_delta_pixels,
+            unique_shadow_hashes,
+            unique_final_hashes
+        )
+    }
+
+    fn shadowed_material_pixel_count(
+        frame: &RuntimeRenderResult,
+        width: u32,
+        height: u32,
+    ) -> usize {
+        let Some(world_position) = frame.attachments.get("world_position") else {
+            return 0;
+        };
+        let Some(material_light) = frame.attachments.get("material_light") else {
+            return 0;
+        };
+        let Some(shadow_depth) = frame.attachments.get("shadow_depth") else {
+            return 0;
+        };
+        let light = shadow_light_view_projection_matrix();
+        let shadow_params = shader_shadow_params(true);
+        let mut shadowed = 0usize;
+        for y in 0..height {
+            for x in 0..width {
+                let index = ((y * width + x) * 4) as usize;
+                if material_light.get(index + 3).copied().unwrap_or(0) < 128 {
+                    continue;
+                }
+                let wx = f32::from(world_position[index]) / 255.0 * 2.0 - 1.0;
+                let wy = f32::from(world_position[index + 1]) / 255.0 * 2.0 - 1.0;
+                let wz = f32::from(world_position[index + 2]) / 255.0 * 2.0 - 1.0;
+                let light_clip = [
+                    light[0] * wx + light[4] * wy + light[8] * wz + light[12],
+                    light[1] * wx + light[5] * wy + light[9] * wz + light[13],
+                    light[2] * wx + light[6] * wy + light[10] * wz + light[14],
+                    light[3] * wx + light[7] * wy + light[11] * wz + light[15],
+                ];
+                let inv_w = 1.0 / light_clip[3].abs().max(0.0001);
+                let light_ndc = [
+                    light_clip[0] * inv_w,
+                    light_clip[1] * inv_w,
+                    light_clip[2] * inv_w,
+                ];
+                let shadow_u = light_ndc[0] * 0.5 + 0.5;
+                let shadow_v = light_ndc[1] * 0.5 + 0.5;
+                if !(0.0..=1.0).contains(&shadow_u) || !(0.0..=1.0).contains(&shadow_v) {
+                    continue;
+                }
+                let sx = ((shadow_u * width as f32).floor() as u32).min(width - 1);
+                let sy = ((shadow_v * height as f32).floor() as u32).min(height - 1);
+                let depth_index = ((sy * width + sx) * 4) as usize;
+                let sampled_depth = f32::from_le_bytes([
+                    shadow_depth[depth_index],
+                    shadow_depth[depth_index + 1],
+                    shadow_depth[depth_index + 2],
+                    shadow_depth[depth_index + 3],
+                ]);
+                let compare_depth = light_ndc[2] * 0.5 + 0.5;
+                if sampled_depth.is_finite() && compare_depth - shadow_params[1] > sampled_depth {
+                    shadowed += 1;
+                }
+            }
+        }
+        shadowed
     }
 
     fn perturbation_json(baseline: &[u8], variant: &[u8]) -> String {

@@ -360,6 +360,7 @@ impl OpenGlObjects {
             token,
             shader,
             stage: desc.stage,
+            sampler_bindings: parse_sampler2d_layout_bindings(&source),
         })
     }
 
@@ -390,7 +391,9 @@ impl OpenGlObjects {
                     desc.label
                 )));
             }
-            self.bind_program_interfaces(program, desc.layout)?;
+            let mut sampler_bindings = vertex.sampler_bindings.clone();
+            sampler_bindings.extend(fragment.sampler_bindings.clone());
+            self.bind_program_interfaces(program, desc.layout, &sampler_bindings)?;
         }
         let vao = unsafe { self.gl.create_vertex_array() }.map_err(|error| {
             unsafe { self.gl.delete_program(program) };
@@ -490,7 +493,12 @@ impl OpenGlObjects {
         }
     }
 
-    fn bind_program_interfaces(&self, program: glow::Program, layout: Handle) -> GalResult<()> {
+    fn bind_program_interfaces(
+        &self,
+        program: glow::Program,
+        layout: Handle,
+        sampler_bindings: &BTreeMap<String, u32>,
+    ) -> GalResult<()> {
         let pipeline_layout = self.pipeline_layout(layout)?;
         for resource_layout in &pipeline_layout.resource_layouts {
             let resource_layout = self.resource_layout(*resource_layout)?;
@@ -536,7 +544,24 @@ impl OpenGlObjects {
                             }
                         }
                         ResourceBindingKind::SampledTexture => {
-                            for name in sampler_uniform_names(binding.binding) {
+                            let mut names = sampler_bindings
+                                .iter()
+                                .filter_map(|(name, declared_binding)| {
+                                    (*declared_binding == binding.binding).then(|| name.clone())
+                                })
+                                .collect::<Vec<_>>();
+                            if names.is_empty() {
+                                names = sampler_uniform_names(binding.binding)
+                                    .into_iter()
+                                    .filter(|name| {
+                                        sampler_bindings
+                                            .get(name)
+                                            .map(|declared| *declared == binding.binding)
+                                            .unwrap_or(true)
+                                    })
+                                    .collect();
+                            }
+                            for name in names {
                                 if let Some(location) = self.gl.get_uniform_location(program, &name)
                                 {
                                     self.gl.use_program(Some(program));
@@ -676,6 +701,7 @@ pub(super) struct ShaderModuleObject {
     pub(super) token: BackendToken,
     pub(super) shader: glow::Shader,
     pub(super) stage: ShaderStage,
+    pub(super) sampler_bindings: BTreeMap<String, u32>,
 }
 
 #[allow(dead_code)]
@@ -820,6 +846,43 @@ void main() { vec4 color = texture(sampler2D(Tex0, Samp0), vec2(0.5)); }";
     }
 
     #[test]
+    fn opengl_shader_source_maps_shadow_composite_texture_pairs() {
+        let source = "\
+layout(set = 0, binding = 3) uniform texture2D WorldPositionTex;
+layout(set = 0, binding = 4) uniform texture2D ShadowDepthTex;
+layout(set = 0, binding = 5) uniform sampler Samp0;
+void main() {
+    vec4 p = texture(sampler2D(WorldPositionTex, Samp0), vec2(0.5));
+    float d = texture(sampler2D(ShadowDepthTex, Samp0), vec2(0.5)).r;
+}";
+        let normalized = opengl_shader_source(source);
+        assert!(normalized.contains("uniform sampler2D WorldPositionTex;"));
+        assert!(normalized.contains("uniform sampler2D ShadowDepthTex;"));
+        assert!(!normalized.contains("uniform sampler Samp0"));
+        assert!(normalized.contains("texture(WorldPositionTex, vec2(0.5))"));
+        assert!(normalized.contains("texture(ShadowDepthTex, vec2(0.5)).r"));
+    }
+
+    #[test]
+    fn opengl_sampler_aliases_cover_existing_tex0_bindings() {
+        assert!(sampler_uniform_names(0).iter().any(|name| name == "Tex0"));
+        assert!(sampler_uniform_names(1).iter().any(|name| name == "Tex0"));
+    }
+
+    #[test]
+    fn opengl_sampler_layout_parser_tracks_declared_bindings() {
+        let source = "\
+layout(binding = 0) uniform sampler2D Tex0;
+layout(binding=1) uniform sampler2D NormalTex;
+layout(binding = 4) uniform sampler2D ShadowDepthTex;
+";
+        let bindings = parse_sampler2d_layout_bindings(source);
+        assert_eq!(bindings.get("Tex0"), Some(&0));
+        assert_eq!(bindings.get("NormalTex"), Some(&1));
+        assert_eq!(bindings.get("ShadowDepthTex"), Some(&4));
+    }
+
+    #[test]
     fn opengl_program_interface_aliases_include_world_mesh_blocks() {
         assert!(storage_block_names(0)
             .iter()
@@ -827,6 +890,9 @@ void main() { vec4 color = texture(sampler2D(Tex0, Samp0), vec2(0.5)); }";
         assert!(storage_block_names(1)
             .iter()
             .any(|name| name == "WorldMeshInstances"));
+        assert!(storage_block_names(6)
+            .iter()
+            .any(|name| name == "CompositeShadowUniforms"));
     }
 }
 
@@ -892,10 +958,20 @@ fn opengl_shader_source(source: &str) -> String {
             "uniform texture2D MaterialLightTex;",
             "uniform sampler2D MaterialLightTex;",
         )
+        .replace(
+            "uniform texture2D WorldPositionTex;",
+            "uniform sampler2D WorldPositionTex;",
+        )
+        .replace(
+            "uniform texture2D ShadowDepthTex;",
+            "uniform sampler2D ShadowDepthTex;",
+        )
         .replace("layout(binding = 2) uniform sampler Samp0;\n", "")
         .replace("layout(binding=2) uniform sampler Samp0;\n", "")
         .replace("layout(binding = 3) uniform sampler Samp0;\n", "")
         .replace("layout(binding=3) uniform sampler Samp0;\n", "")
+        .replace("layout(binding = 5) uniform sampler Samp0;\n", "")
+        .replace("layout(binding=5) uniform sampler Samp0;\n", "")
         .replace("layout(binding = 1) uniform sampler samp0;\n", "")
         .replace("layout(binding=1) uniform sampler samp0;\n", "")
         .replace("sampler2D(Tex0, Samp0)", "Tex0")
@@ -903,8 +979,49 @@ fn opengl_shader_source(source: &str) -> String {
         .replace("sampler2D(AlbedoTex, Samp0)", "AlbedoTex")
         .replace("sampler2D(NormalTex, Samp0)", "NormalTex")
         .replace("sampler2D(MaterialLightTex, Samp0)", "MaterialLightTex")
+        .replace("sampler2D(WorldPositionTex, Samp0)", "WorldPositionTex")
+        .replace("sampler2D(ShadowDepthTex, Samp0)", "ShadowDepthTex")
         .replace("gl_VertexIndex", "gl_VertexID")
         .replace("gl_InstanceIndex", "gl_InstanceID")
+}
+
+fn parse_sampler2d_layout_bindings(source: &str) -> BTreeMap<String, u32> {
+    let mut bindings = BTreeMap::new();
+    for line in source.lines() {
+        let line = line.trim();
+        if !line.starts_with("layout(") || !line.contains("uniform sampler2D ") {
+            continue;
+        }
+        let Some(binding_start) = line.find("binding") else {
+            continue;
+        };
+        let Some(eq) = line[binding_start..].find('=') else {
+            continue;
+        };
+        let number_start = binding_start + eq + 1;
+        let number = line[number_start..]
+            .trim_start()
+            .chars()
+            .take_while(|ch| ch.is_ascii_digit())
+            .collect::<String>();
+        let Ok(binding) = number.parse::<u32>() else {
+            continue;
+        };
+        let Some(name_start) = line.find("uniform sampler2D ") else {
+            continue;
+        };
+        let name = line[name_start + "uniform sampler2D ".len()..]
+            .trim()
+            .trim_end_matches(';')
+            .split(['[', ' ', '\t'])
+            .next()
+            .unwrap_or("")
+            .trim();
+        if !name.is_empty() {
+            bindings.insert(name.to_string(), binding);
+        }
+    }
+    bindings
 }
 
 pub(super) fn min_filter(desc: &SamplerDesc) -> i32 {
@@ -951,6 +1068,11 @@ fn storage_block_names(binding: u32) -> Vec<String> {
             "Storage0".to_string(),
         ],
         1 => vec!["WorldMeshInstances".to_string(), "Storage1".to_string()],
+        6 => vec![
+            "CompositeShadowUniforms".to_string(),
+            "ShaderCompositeUniforms".to_string(),
+            "Storage6".to_string(),
+        ],
         _ => vec![format!("Storage{binding}")],
     }
 }
@@ -976,6 +1098,19 @@ pub(super) fn sampler_uniform_names(binding: u32) -> Vec<String> {
             "Sampler2".to_string(),
             "tex2".to_string(),
             "MaterialLightTex".to_string(),
+        ],
+        3 => vec![
+            "Samp0".to_string(),
+            "Sampler3".to_string(),
+            "tex3".to_string(),
+            "WorldPositionTex".to_string(),
+        ],
+        4 => vec![
+            "Samp0".to_string(),
+            "Sampler4".to_string(),
+            "tex4".to_string(),
+            "ShadowDepthTex".to_string(),
+            "DepthTex".to_string(),
         ],
         _ => vec![format!("Sampler{binding}"), format!("tex{binding}")],
     }

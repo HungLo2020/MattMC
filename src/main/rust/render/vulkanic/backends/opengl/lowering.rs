@@ -5,9 +5,7 @@ use std::sync::OnceLock;
 
 use glow::HasContext;
 
-use super::resources::{
-    sampler_uniform_names, texture_format, topology, OpenGlObjects, ResourceSetObject,
-};
+use super::resources::{texture_format, topology, OpenGlObjects, ResourceSetObject};
 use super::trace;
 use crate::render::vulkanic::commands::{
     AttachmentLoadOp, BufferImageCopyRegion, CommandOp, ResourceBarrier, TextureUsageState,
@@ -694,17 +692,6 @@ impl OpenGlLowerer {
                     sampled_texture_units.push(unit);
                     self.bind_texture_unit(unit, Some(texture.texture));
                     self.bind_sampler_unit(unit, None);
-                    unsafe {
-                        if let Some(program) = self.cache.program {
-                            for sampler_name in sampler_uniform_names(binding.binding) {
-                                if let Some(location) =
-                                    self.gl.get_uniform_location(program, &sampler_name)
-                                {
-                                    self.gl.uniform_1_i32(Some(&location), unit as i32);
-                                }
-                            }
-                        }
-                    }
                 }
                 ResourceBindingKind::Sampler => {
                     sampler_bindings.push(binding.resource);

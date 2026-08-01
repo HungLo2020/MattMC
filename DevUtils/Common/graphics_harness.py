@@ -8072,13 +8072,38 @@ def shader_gbuffer_report_status(report: dict[str, object] | None) -> tuple[str,
         return "failed", ["missing report"]
     if report.get("java_iris_participation") is not False:
         messages.append("Java/Iris participation was not explicitly false")
+    if report.get("pass_graph") != "vulkanic:builtin/terrain_material_multipass_v1":
+        messages.append("shader G-buffer report did not use the multi-pass graph")
+    passes = report.get("passes")
+    required_passes = (
+        "vulkanic:pass/shadow_depth",
+        "vulkanic:pass/terrain_opaque",
+        "vulkanic:pass/terrain_cutout",
+        "vulkanic:pass/deferred_lighting",
+        "vulkanic:pass/composite_0",
+        "vulkanic:pass/composite_1",
+        "vulkanic:pass/final_output",
+    )
+    if not isinstance(passes, list) or any(pass_name not in passes for pass_name in required_passes):
+        messages.append("multi-pass shader graph is missing required passes")
     if int(report.get("mesh_draw_count") or 0) <= 0:
         messages.append("mesh_draw_count was zero")
     evidence = report.get("attachment_semantic_evidence")
     if not isinstance(evidence, dict):
         messages.append("missing attachment semantic evidence")
         return "failed", messages
-    for name in ("albedo", "normal", "material_light", "depth", "final_composite"):
+    for name in (
+        "shadow_depth",
+        "albedo",
+        "normal",
+        "material_light",
+        "world_position",
+        "depth",
+        "deferred_lit",
+        "composite_0",
+        "composite_1",
+        "final_composite",
+    ):
         item = evidence.get(name)
         if not isinstance(item, dict) or item.get("present") is not True:
             messages.append(f"{name} attachment is missing")
@@ -8091,6 +8116,9 @@ def shader_gbuffer_report_status(report: dict[str, object] | None) -> tuple[str,
     depth = evidence.get("depth") if isinstance(evidence.get("depth"), dict) else {}
     if int(depth.get("less_than_clear_pixels") or 0) <= 0:
         messages.append("depth attachment has no written pixels")
+    shadow_depth = evidence.get("shadow_depth") if isinstance(evidence.get("shadow_depth"), dict) else {}
+    if int(shadow_depth.get("less_than_clear_pixels") or 0) <= 0:
+        messages.append("shadow depth attachment has no written pixels")
     try:
         if float(depth.get("max_depth") or 0.0) <= float(depth.get("min_depth") or 0.0):
             messages.append("depth attachment is not ranged")
@@ -8104,6 +8132,30 @@ def shader_gbuffer_report_status(report: dict[str, object] | None) -> tuple[str,
             item = perturb.get(key)
             if not isinstance(item, dict) or item.get("final_changes") is not True:
                 messages.append(f"{key} did not affect the final composite")
+    shadow = report.get("shadow_dependency_evidence")
+    if not isinstance(shadow, dict):
+        messages.append("missing shadow dependency evidence")
+    else:
+        if int(shadow.get("moving_shadow_depth_hashes") or 0) < 2:
+            messages.append("shadow depth did not vary across moving frames")
+        if int(shadow.get("moving_final_hashes") or 0) < 2:
+            messages.append("final composite did not vary across moving shadow frames")
+        counts = shadow.get("shadow_depth_less_than_clear")
+        if not isinstance(counts, list) or not any(int(value or 0) > 0 for value in counts):
+            messages.append("shadow depth evidence has no written samples")
+        shadowed = shadow.get("shadowed_material_pixels")
+        if not isinstance(shadowed, list) or not any(int(value or 0) > 0 for value in shadowed):
+            messages.append("shadow map did not shadow any material receiver pixels")
+    chain = report.get("composite_chain_evidence")
+    if not isinstance(chain, dict):
+        messages.append("missing composite chain evidence")
+    else:
+        if int(chain.get("deferred_to_composite_0_changed_pixels") or 0) <= 0:
+            messages.append("composite_0 did not change deferred-lit color")
+        if int(chain.get("composite_0_to_composite_1_changed_pixels") or 0) <= 0:
+            messages.append("composite_1 did not change composite_0")
+        if chain.get("final_reads_last_configured_pass") is not True:
+            messages.append("final output was not copied from the last configured composite pass")
     return ("failed" if messages else "ok"), messages
 
 
@@ -8113,9 +8165,11 @@ def write_shader_gbuffer_subsystem_status(
     exit_code: int,
     duration_seconds: float,
     shader_artifact_dir: Path,
+    required_backend: str,
 ) -> Path:
     workloads: list[dict[str, object]] = []
-    for backend in ("opengl", "vulkan"):
+    expected_backends = (required_backend,)
+    for backend in expected_backends:
         report_path = shader_artifact_dir / backend / "latest.json"
         report = read_json(report_path) if report_path.is_file() else None
         status, messages = shader_gbuffer_report_status(report)
@@ -8139,6 +8193,7 @@ def write_shader_gbuffer_subsystem_status(
         "schema": "mattmc-graphics-subsystem-benchmark-v1",
         "status": "complete" if complete else "failed",
         "workload": "rust-owned.shader-gbuffer-scene",
+        "required_backend": required_backend,
         "workloads": workloads,
         "command": list(command),
         "exit_code": exit_code,
@@ -8430,6 +8485,7 @@ def run_shader_gbuffer_subsystem_mode(
         exit_code,
         duration,
         shader_artifact_dir,
+        "opengl" if mode.backend == "rust-opengl" else "vulkan",
     )
     if getattr(args, "validation", "off") != "off":
         validation_log = capture_dir / f"validation_events_{run_id}_{timestamp()}.log"
