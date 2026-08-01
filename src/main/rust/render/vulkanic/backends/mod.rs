@@ -53,6 +53,18 @@ pub(in crate::render::vulkanic) struct BackendRuntimeMetrics {
     pub(in crate::render::vulkanic) gl_fences_polled: u64,
     pub(in crate::render::vulkanic) gl_fences_waited: u64,
     pub(in crate::render::vulkanic) gl_fences_deleted: u64,
+    pub(in crate::render::vulkanic) vulkan_command_buffer_alloc_nanos: u64,
+    pub(in crate::render::vulkanic) vulkan_command_buffer_begin_nanos: u64,
+    pub(in crate::render::vulkanic) vulkan_command_recording_nanos: u64,
+    pub(in crate::render::vulkanic) vulkan_command_buffer_end_nanos: u64,
+    pub(in crate::render::vulkanic) vulkan_queue_submit_nanos: u64,
+    pub(in crate::render::vulkanic) vulkan_timeline_poll_nanos: u64,
+    pub(in crate::render::vulkanic) vulkan_timeline_wait_nanos: u64,
+    pub(in crate::render::vulkanic) vulkan_device_wait_idle_nanos: u64,
+    pub(in crate::render::vulkanic) vulkan_command_buffers_allocated: u64,
+    pub(in crate::render::vulkanic) vulkan_command_buffers_freed: u64,
+    pub(in crate::render::vulkanic) vulkan_wait_count: u64,
+    pub(in crate::render::vulkanic) vulkan_device_wait_idle_count: u64,
 }
 
 pub(super) fn graphics_backend_lock() -> &'static Mutex<()> {

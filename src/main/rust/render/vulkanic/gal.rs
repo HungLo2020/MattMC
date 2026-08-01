@@ -1,6 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use super::backends::{Backend, BackendCreateDesc, BackendToken, CompletedHostRead};
+use super::backends::{
+    Backend, BackendCreateDesc, BackendRuntimeMetrics, BackendToken, CompletedHostRead,
+};
 use super::commands::{
     AttachmentLoadOp, AttachmentStoreOp, BufferImageCopyRegion, CommandList, CommandListDesc,
     CommandOp, ResourceBarrier, SubmissionBatch, ValidatedSubmissionBatch,
@@ -11,7 +13,7 @@ use super::frame::{
     PresentFrameDesc, PresentedFrame,
 };
 use super::handles::{Handle, HandleKind, MAX_GENERATION};
-use super::metrics::Metrics;
+use super::metrics::{elapsed_nanos_u64, Metrics, WholeFrameProfile};
 use super::resources::*;
 use super::sync::{RetirementQueue, SubmissionId, SyncToken};
 
@@ -1224,6 +1226,26 @@ impl VulkanicGal {
     }
 
     pub fn submit(&mut self, batch: SubmissionBatch) -> GalResult<SyncToken> {
+        self.submit_inner(batch, None)
+    }
+
+    pub fn submit_profiled(
+        &mut self,
+        batch: SubmissionBatch,
+        profile: &mut WholeFrameProfile,
+    ) -> GalResult<SyncToken> {
+        self.submit_inner(batch, Some(profile))
+    }
+
+    fn submit_inner(
+        &mut self,
+        batch: SubmissionBatch,
+        mut profile: Option<&mut WholeFrameProfile>,
+    ) -> GalResult<SyncToken> {
+        let submit_started = std::time::Instant::now();
+        let creates_before = self.metrics.resource_creates;
+        let destroys_before = self.metrics.resource_destroys;
+        let backend_metrics_before = self.backend.runtime_metrics();
         if batch.command_lists.is_empty() {
             return self.validation_error(GalError::submission(
                 StatusCode::InvalidArgument,
@@ -1251,21 +1273,65 @@ impl VulkanicGal {
                     capabilities.limits.max_commands_per_list
                 ));
             }
+            let validate_ops_started = std::time::Instant::now();
             self.validate_command_ops(&list.operations)?;
+            if let Some(profile) = profile.as_deref_mut() {
+                profile.gal_validate_ops_nanos = profile
+                    .gal_validate_ops_nanos
+                    .saturating_add(elapsed_nanos_u64(validate_ops_started));
+            }
         }
         let referenced = referenced_handles(&batch);
+        let validate_handles_started = std::time::Instant::now();
         for handle in &referenced {
             self.validate_any_resource(*handle)?;
         }
+        if let Some(profile) = profile.as_deref_mut() {
+            profile.gal_validate_handles_nanos = profile
+                .gal_validate_handles_nanos
+                .saturating_add(elapsed_nanos_u64(validate_handles_started));
+        }
+        let hazards_started = std::time::Instant::now();
         self.validate_submission_hazards(&batch)?;
+        if let Some(profile) = profile.as_deref_mut() {
+            profile.gal_hazard_analysis_nanos = profile
+                .gal_hazard_analysis_nanos
+                .saturating_add(elapsed_nanos_u64(hazards_started));
+            add_command_profile(profile, &batch);
+        }
         let validated = ValidatedSubmissionBatch::from(batch);
         let id = SubmissionId(self.next_submission);
         self.next_submission += 1;
+        let backend_encode_started = std::time::Instant::now();
         self.backend.encode_passes(&validated)?;
+        if let Some(profile) = profile.as_deref_mut() {
+            profile.backend_encode_nanos = profile
+                .backend_encode_nanos
+                .saturating_add(elapsed_nanos_u64(backend_encode_started));
+        }
+        let backend_submit_started = std::time::Instant::now();
         self.backend.submit(id, &validated)?;
+        if let Some(profile) = profile.as_deref_mut() {
+            profile.backend_submit_nanos = profile
+                .backend_submit_nanos
+                .saturating_add(elapsed_nanos_u64(backend_submit_started));
+        }
         self.metrics.submissions += 1;
         for handle in referenced {
             self.mark_in_flight(handle, id)?;
+        }
+        if let Some(profile) = profile.as_deref_mut() {
+            profile.gal_submit_total_nanos = profile
+                .gal_submit_total_nanos
+                .saturating_add(elapsed_nanos_u64(submit_started));
+            profile.resource_creates_delta =
+                self.metrics.resource_creates.saturating_sub(creates_before);
+            profile.resource_destroys_delta = self
+                .metrics
+                .resource_destroys
+                .saturating_sub(destroys_before);
+            let backend_metrics_after = self.backend.runtime_metrics();
+            add_backend_metric_deltas(profile, backend_metrics_before, backend_metrics_after);
         }
         Ok(SyncToken { submission: id })
     }
@@ -2791,6 +2857,82 @@ fn referenced_handles(batch: &SubmissionBatch) -> BTreeSet<Handle> {
         }
     }
     handles
+}
+
+fn add_command_profile(profile: &mut WholeFrameProfile, batch: &SubmissionBatch) {
+    for list in &batch.command_lists {
+        for op in &list.operations {
+            match op {
+                CommandOp::BeginPass { .. } => profile.pass_count += 1,
+                CommandOp::BindGraphicsPipeline(_) | CommandOp::BindComputePipeline(_) => {
+                    profile.pipeline_binds += 1;
+                }
+                CommandOp::BindResourceSet { .. } => profile.resource_set_binds += 1,
+                CommandOp::Draw { .. } => profile.draw_ops += 1,
+                CommandOp::DrawIndexed { .. } => profile.draw_indexed_ops += 1,
+                CommandOp::HostWriteBuffer { data, .. } => {
+                    profile.host_write_ops += 1;
+                    profile.host_write_bytes =
+                        profile.host_write_bytes.saturating_add(data.len() as u64);
+                }
+                CommandOp::Barrier(_) => profile.barrier_ops += 1,
+                CommandOp::EndPass
+                | CommandOp::SetVertexBuffer { .. }
+                | CommandOp::SetIndexBuffer { .. }
+                | CommandOp::DrawIndirect { .. }
+                | CommandOp::Dispatch { .. }
+                | CommandOp::DispatchIndirect { .. }
+                | CommandOp::CopyBuffer { .. }
+                | CommandOp::CopyBufferToTexture(_)
+                | CommandOp::CopyTextureToBuffer(_)
+                | CommandOp::HostReadBuffer { .. }
+                | CommandOp::Present { .. } => {}
+            }
+        }
+    }
+}
+
+fn add_backend_metric_deltas(
+    profile: &mut WholeFrameProfile,
+    before: BackendRuntimeMetrics,
+    after: BackendRuntimeMetrics,
+) {
+    profile.vulkan_command_buffer_alloc_nanos = after
+        .vulkan_command_buffer_alloc_nanos
+        .saturating_sub(before.vulkan_command_buffer_alloc_nanos);
+    profile.vulkan_command_buffer_begin_nanos = after
+        .vulkan_command_buffer_begin_nanos
+        .saturating_sub(before.vulkan_command_buffer_begin_nanos);
+    profile.vulkan_command_recording_nanos = after
+        .vulkan_command_recording_nanos
+        .saturating_sub(before.vulkan_command_recording_nanos);
+    profile.vulkan_command_buffer_end_nanos = after
+        .vulkan_command_buffer_end_nanos
+        .saturating_sub(before.vulkan_command_buffer_end_nanos);
+    profile.vulkan_queue_submit_nanos = after
+        .vulkan_queue_submit_nanos
+        .saturating_sub(before.vulkan_queue_submit_nanos);
+    profile.vulkan_timeline_poll_nanos = after
+        .vulkan_timeline_poll_nanos
+        .saturating_sub(before.vulkan_timeline_poll_nanos);
+    profile.vulkan_timeline_wait_nanos = after
+        .vulkan_timeline_wait_nanos
+        .saturating_sub(before.vulkan_timeline_wait_nanos);
+    profile.vulkan_device_wait_idle_nanos = after
+        .vulkan_device_wait_idle_nanos
+        .saturating_sub(before.vulkan_device_wait_idle_nanos);
+    profile.vulkan_command_buffers_allocated = after
+        .vulkan_command_buffers_allocated
+        .saturating_sub(before.vulkan_command_buffers_allocated);
+    profile.vulkan_command_buffers_freed = after
+        .vulkan_command_buffers_freed
+        .saturating_sub(before.vulkan_command_buffers_freed);
+    profile.vulkan_wait_count = after
+        .vulkan_wait_count
+        .saturating_sub(before.vulkan_wait_count);
+    profile.vulkan_device_wait_idle_count = after
+        .vulkan_device_wait_idle_count
+        .saturating_sub(before.vulkan_device_wait_idle_count);
 }
 
 fn is_depth_stencil_format(format: TextureFormat) -> bool {

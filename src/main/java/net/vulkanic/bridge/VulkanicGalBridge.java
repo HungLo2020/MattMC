@@ -718,6 +718,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		if (viewMatrix.length != 16 || projectionMatrix.length != 16) {
 			throw new IllegalArgumentException("whole-frame matrices must contain 16 floats");
 		}
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("rust-gal.whole-frame.java-record-packing");
 		MemorySegment segmentArray = Struct.WORLD_LINE_SEGMENT_REQUEST.array(arena, worldSegments.size());
 		for (int i = 0; i < worldSegments.size(); i++) {
 			WorldLineSegmentRecord segment = worldSegments.get(i);
@@ -918,14 +919,17 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 19, spriteArray, guiSprites.size());
 		Struct.WHOLE_FRAME_SUBMIT.setLong(request, 20, negotiatedFeatures);
 		MemorySegment result = Struct.WHOLE_FRAME_SUBMIT_RESULT.allocate(arena);
-		checkStatus(
-			wholeFrame
-				? Native.wholeFrameSubmit(contextId, request, result)
-				: Native.worldPrimitivesSubmit(contextId, request, result),
-			wholeFrame ? "whole-frame submission" : "world primitive submission"
-		);
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("rust-gal.whole-frame.java-record-packing");
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("rust-gal.whole-frame.native-submit-return");
+		int status = wholeFrame
+			? Native.wholeFrameSubmit(contextId, request, result)
+			: Native.worldPrimitivesSubmit(contextId, request, result);
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("rust-gal.whole-frame.native-submit-return");
+		checkStatus(status, wholeFrame ? "whole-frame submission" : "world primitive submission");
 		long metricsOffset = Struct.WHOLE_FRAME_SUBMIT_RESULT.offset(44);
+		long profileOffset = Struct.WHOLE_FRAME_SUBMIT_RESULT.offset(45);
 		BackendMetrics metrics = backendMetricsAt(result, metricsOffset);
+		WholeFrameProfile profile = wholeFrameProfileAt(result, profileOffset);
 		long ffiCalls = result.get(ValueLayout.JAVA_LONG, metricsOffset + 64);
 		long ffiInputBytes = result.get(ValueLayout.JAVA_LONG, metricsOffset + 72);
 		return new WholeFrameSubmitResult(
@@ -972,7 +976,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			Struct.WHOLE_FRAME_SUBMIT_RESULT.getLong(result, 43),
 			ffiCalls,
 			ffiInputBytes,
-			metrics
+			metrics,
+			profile
 		);
 	}
 
@@ -1246,6 +1251,81 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			backendWaits,
 			0L
 		);
+	}
+
+	private static WholeFrameProfile wholeFrameProfileAt(MemorySegment segment, long offset) {
+		return new WholeFrameProfile(
+			profileLong(segment, offset, 0),
+			profileLong(segment, offset, 1),
+			profileLong(segment, offset, 2),
+			profileLong(segment, offset, 3),
+			profileLong(segment, offset, 4),
+			profileLong(segment, offset, 5),
+			profileLong(segment, offset, 6),
+			profileLong(segment, offset, 7),
+			profileLong(segment, offset, 8),
+			profileLong(segment, offset, 9),
+			profileLong(segment, offset, 10),
+			profileLong(segment, offset, 11),
+			profileLong(segment, offset, 12),
+			profileLong(segment, offset, 13),
+			profileLong(segment, offset, 14),
+			profileLong(segment, offset, 15),
+			profileLong(segment, offset, 16),
+			profileLong(segment, offset, 17),
+			profileLong(segment, offset, 18),
+			profileLong(segment, offset, 19),
+			profileLong(segment, offset, 20),
+			profileLong(segment, offset, 21),
+			profileLong(segment, offset, 22),
+			profileLong(segment, offset, 23),
+			profileLong(segment, offset, 24),
+			profileLong(segment, offset, 25),
+			profileLong(segment, offset, 26),
+			profileLong(segment, offset, 27),
+			profileLong(segment, offset, 28),
+			profileLong(segment, offset, 29),
+			profileLong(segment, offset, 30),
+			profileLong(segment, offset, 31),
+			profileLong(segment, offset, 32),
+			profileLong(segment, offset, 33),
+			profileLong(segment, offset, 34),
+			profileLong(segment, offset, 35),
+			profileLong(segment, offset, 36),
+			profileLong(segment, offset, 37),
+			profileLong(segment, offset, 38),
+			profileLong(segment, offset, 39),
+			profileLong(segment, offset, 40),
+			profileLong(segment, offset, 41),
+			profileLong(segment, offset, 42),
+			profileLong(segment, offset, 43),
+			profileLong(segment, offset, 44),
+			profileLong(segment, offset, 45),
+			profileLong(segment, offset, 46),
+			profileLong(segment, offset, 47),
+			profileLong(segment, offset, 48),
+			profileLong(segment, offset, 49),
+			profileLong(segment, offset, 50),
+			profileLong(segment, offset, 51),
+			profileLong(segment, offset, 52),
+			profileLong(segment, offset, 53),
+			profileLong(segment, offset, 54),
+			profileLong(segment, offset, 55),
+			profileLong(segment, offset, 56),
+			profileLong(segment, offset, 57),
+			profileLong(segment, offset, 58),
+			profileLong(segment, offset, 59),
+			profileLong(segment, offset, 60),
+			profileLong(segment, offset, 61),
+			profileLong(segment, offset, 62),
+			profileLong(segment, offset, 63),
+			profileLong(segment, offset, 64),
+			profileLong(segment, offset, 65)
+		);
+	}
+
+	private static long profileLong(MemorySegment segment, long offset, int index) {
+		return segment.get(ValueLayout.JAVA_LONG, offset + (long)index * Long.BYTES);
 	}
 
 	public ResourceBatchBuilder resourceBatchBuilder() {
@@ -1528,10 +1608,84 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		long commandOps,
 		long ffiCalls,
 		long ffiInputBytes,
-		BackendMetrics backendMetrics
+		BackendMetrics backendMetrics,
+		WholeFrameProfile profile
 	) {
 		public Status asStatus() {
 			return new Status(submissionId, ffiCalls, ffiInputBytes, backendMetrics);
+		}
+	}
+
+	public record WholeFrameProfile(
+		long ffiDecodeNanos,
+		long guiFrontendNanos,
+		long worldFrontendTotalNanos,
+		long worldValidateFrameNanos,
+		long worldBatchingNanos,
+		long worldResourcePrepareNanos,
+		long worldPrepareTargetQueryNanos,
+		long worldPrepareRenderResourcesNanos,
+		long worldPrepareDepthAttachmentNanos,
+		long worldPrepareGBufferResourcesNanos,
+		long worldPrepareGBufferCacheCheckNanos,
+		long worldPrepareGBufferDestroyNanos,
+		long worldPrepareGBufferPlanNanos,
+		long worldPrepareGBufferCreateNanos,
+		long worldPrepareFramePassNanos,
+		long worldMeshSectionExpandGroupNanos,
+		long shaderPlanLookupNanos,
+		long galCommandGenerationNanos,
+		long galSubmitTotalNanos,
+		long galValidateOpsNanos,
+		long galValidateHandlesNanos,
+		long galHazardAnalysisNanos,
+		long backendEncodeNanos,
+		long backendSubmitNanos,
+		long backendRetireNanos,
+		long vulkanCommandBufferAllocNanos,
+		long vulkanCommandBufferBeginNanos,
+		long vulkanCommandRecordingNanos,
+		long vulkanCommandBufferEndNanos,
+		long vulkanQueueSubmitNanos,
+		long vulkanTimelinePollNanos,
+		long vulkanTimelineWaitNanos,
+		long vulkanDeviceWaitIdleNanos,
+		long vulkanCommandBuffersAllocated,
+		long vulkanCommandBuffersFreed,
+		long vulkanWaitCount,
+		long vulkanDeviceWaitIdleCount,
+		long resourceCreatesDelta,
+		long resourceDestroysDelta,
+		long hostWriteOps,
+		long hostWriteBytes,
+		long barrierOps,
+		long passCount,
+		long drawOps,
+		long drawIndexedOps,
+		long pipelineBinds,
+		long resourceSetBinds,
+		long gpuTimestampStatus,
+		long gpuShadowDepthNanos,
+		long gpuTerrainOpaqueNanos,
+		long gpuTerrainCutoutNanos,
+		long gpuDeferredLightingNanos,
+		long gpuComposite0Nanos,
+		long gpuComposite1Nanos,
+		long gpuFinalOutputNanos,
+		long gpuFrameTotalNanos,
+		long gBufferPersistentCacheHits,
+		long gBufferPersistentCacheMisses,
+		long gBufferFinalBindingCacheHits,
+		long gBufferFinalBindingCacheMisses,
+		long gBufferAttachmentCreates,
+		long gBufferPipelineCreates,
+		long gBufferShaderModuleCreates,
+		long gBufferDescriptorCreates,
+		long gBufferRenderTargetCreates,
+		long gBufferResourcesRetired
+	) {
+		public static WholeFrameProfile empty() {
+			return new WholeFrameProfile(0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L);
 		}
 	}
 

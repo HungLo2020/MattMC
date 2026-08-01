@@ -11,7 +11,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use super::{
     graphics_backend_lock, presentation_capabilities, vulkan_capabilities, Backend,
-    BackendCreateDesc, BackendToken, CompletedHostRead,
+    BackendCreateDesc, BackendRuntimeMetrics, BackendToken, CompletedHostRead,
 };
 use crate::render::vulkanic::commands::ValidatedSubmissionBatch;
 use crate::render::vulkanic::error::GalResult;
@@ -278,6 +278,29 @@ impl Backend for VulkanBackend {
                 bytes: read.bytes,
             })
             .collect()
+    }
+
+    fn runtime_metrics(&self) -> BackendRuntimeMetrics {
+        let lowering = self
+            .lowerer
+            .lock()
+            .map(|lowerer| lowerer.metrics())
+            .unwrap_or_default();
+        BackendRuntimeMetrics {
+            vulkan_command_buffer_alloc_nanos: lowering.command_buffer_alloc_nanos,
+            vulkan_command_buffer_begin_nanos: lowering.command_buffer_begin_nanos,
+            vulkan_command_recording_nanos: lowering.command_recording_nanos,
+            vulkan_command_buffer_end_nanos: lowering.command_buffer_end_nanos,
+            vulkan_queue_submit_nanos: lowering.queue_submit_nanos,
+            vulkan_timeline_poll_nanos: lowering.timeline_poll_nanos,
+            vulkan_timeline_wait_nanos: lowering.timeline_wait_nanos,
+            vulkan_device_wait_idle_nanos: lowering.device_wait_idle_nanos,
+            vulkan_command_buffers_allocated: lowering.command_buffers_allocated,
+            vulkan_command_buffers_freed: lowering.command_buffers_freed,
+            vulkan_wait_count: lowering.wait_count,
+            vulkan_device_wait_idle_count: lowering.device_wait_idle_count,
+            ..BackendRuntimeMetrics::default()
+        }
     }
 
     fn configure_frame_surface(&mut self, desc: &FrameSurfaceDesc) -> GalResult<()> {

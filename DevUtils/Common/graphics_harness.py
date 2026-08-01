@@ -5645,7 +5645,7 @@ def normalize_capture_artifact(
             if piston_route_traversal_count > 0 and piston_route_count("rust-opengl") <= 0 and piston_route_count("rust-vulkan-whole-frame") <= 0:
                 world_mesh_piston_workload_complete = False
                 validation_messages.append("Piston Rust route did not record a Rust route decision")
-            if piston_status and piston_status != "spawned":
+            if piston_status and piston_status not in {"spawned", "reseeded"}:
                 world_mesh_piston_workload_complete = False
                 validation_messages.append(
                     f"deterministic Piston scenario did not spawn production moving-piston entities "
@@ -5770,10 +5770,7 @@ def normalize_capture_artifact(
         validation_messages.append("normal Java Vulkan control launched Rust whole-frame shell")
     if rust_shell_has_java_vulkan_frame:
         validation_messages.append("Rust whole-frame shell executed Java Vulkan frame/present work")
-    require_rust_vulkan_gameplay_attachments = (
-        tool_kind == "gameplay"
-        or (tool_kind == "capture" and bool(falling_block_scenario or piston_scenario))
-    )
+    require_rust_vulkan_gameplay_attachments = tool_kind == "capture" and bool(falling_block_scenario or piston_scenario)
     if require_rust_vulkan_gameplay_attachments and mode.expected_attribution == "rust-vulkan":
         if not isinstance(gameplay_attachment_doc, dict):
             validation_messages.append("Rust Vulkan gameplay row did not retain real whole-frame gameplay attachment dumps")
@@ -6129,6 +6126,16 @@ def normalize_capture_artifact(
             for name, value in rust_gal_timing_totals.items()
             if value is not None
         }
+    rust_gal_profile_totals = {
+        match.group(1): int(match.group(2))
+        for match in re.finditer(r"rust_gal_profile_([A-Za-z0-9_]+)[=: ]+(\d+)", combined_logs)
+    }
+    rust_gal_profile_per_frame = {}
+    if rust_gal_frames and rust_gal_frames > 0:
+        rust_gal_profile_per_frame = {
+            name: value / rust_gal_frames
+            for name, value in rust_gal_profile_totals.items()
+        }
     world_profile_name = meta.get("world_profile") or "migration-gate"
     world_profile_meta = {
         "name": world_profile_name,
@@ -6437,6 +6444,8 @@ def normalize_capture_artifact(
                 "ffi_bytes_per_executed_batch": rust_gal_bytes_per_batch,
                 "timing_totals_nanos": rust_gal_timing_totals,
                 "timing_per_executed_batch_nanos": rust_gal_timing_per_batch,
+                "profile_totals_nanos": rust_gal_profile_totals,
+                "profile_per_frame_nanos": rust_gal_profile_per_frame,
                 "backend_sync": rust_gal_backend_sync,
                 "submission": last_number(combined_logs, r"Rust (?:OpenGL )?VulkanicGAL GUI (?:batch|frame) executed.*?submission=(\d+)"),
             },
@@ -7693,8 +7702,6 @@ def build_capture_command(
     kind, entrypoint = run_dev_capture_entrypoint(target.root)
     requested_validation = "routine" if args.validation == "standard" else args.validation
     validation = "standard" if mode.supports_validation and requested_validation != "off" else "off"
-    if tool_kind == "gameplay" and mode.backend == "rust-vulkan":
-        validation = "off"
     base_client_args = args.client_args
     for option in ("--quickPlaySingleplayer", "--width", "--height"):
         base_client_args = remove_client_arg_option(base_client_args, option)
@@ -7770,12 +7777,20 @@ def build_capture_command(
     env["MATTMC_GRAPHICS_MIGRATION_GATE_BLOCKING"] = "true" if world_profile.migration_gate_blocking else "false"
     env["MATTMC_GRAPHICS_VALIDATION_PROFILE"] = requested_validation
     env["MATTMC_GRAPHICS_VALIDATION_FAIL_SEVERITY"] = getattr(args, "validation_fail_severity", "warning")
+    if requested_validation in {"routine", "deep"}:
+        env["VK_INSTANCE_LAYERS"] = "VK_LAYER_KHRONOS_validation"
+        env["VK_LOADER_DEBUG"] = "info"
+        env["VK_LAYER_SETTINGS"] = "validate_sync=true,validate_best_practices=true"
+        if requested_validation == "deep":
+            env["VK_LAYER_SETTINGS"] = "validate_sync=true,validate_best_practices=true,gpuav_enable=true,printf_enable=true"
     env["MATTMC_RENDERDOC_CAPTURE"] = "true" if getattr(args, "renderdoc_capture", False) else "false"
     env["MATTMC_RENDERDOC_FRAME"] = str(getattr(args, "renderdoc_frame", 8))
     env["MATTMC_TRACY_CAPTURE"] = "true" if getattr(args, "tracy_capture", False) else "false"
     env["MATTMC_RUST_TRACY"] = "true" if getattr(args, "tracy_capture", False) else "false"
     env["MATTMC_TRACY_DURATION_SECONDS"] = str(getattr(args, "tracy_duration_seconds", 20))
     env["MATTMC_TRACY_MAX_SIZE_MB"] = str(getattr(args, "tracy_max_size_mb", 256))
+    if getattr(args, "shader_graph_isolation", ""):
+        env["MATTMC_RUST_SHADER_GRAPH_ISOLATION"] = args.shader_graph_isolation
     env["MATTMC_DETERMINISTIC_SHUTDOWN_GRACE_SECS"] = str(max(5, phase_timeout_seconds(args, "shutdown")))
     env["MATTMC_CAPTURE_WORLD"] = args.world
     env["MATTMC_CAPTURE_RUN_SOURCE"] = str(CURRENT_REPO_ROOT / "run")
@@ -8084,7 +8099,7 @@ def build_capture_command(
         java_options.append("-Dmattmc.dev.rustGalGui.mountHealth.disabled=true")
     elif rust_gal_gui_control == "mount-health-legacy":
         java_options.append("-Dmattmc.dev.rustGalGui.mountHealth.legacyControl=true")
-    if tool_kind in {"gameplay", "capture"} and mode.backend == "rust-vulkan":
+    if tool_kind == "capture" and mode.backend == "rust-vulkan":
         attachment_dir = capture_dir / "whole_frame_gameplay_attachments"
         env["MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_DIR"] = str(attachment_dir)
         env.setdefault("MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_MIN_FRAME", "1")
@@ -8146,9 +8161,9 @@ def build_capture_command(
             ]
         )
         env["MATTMC_GRAPHICS_AUDIT"] = "true"
-    if requested_validation == "routine":
+    if validation == "routine":
         env["VK_LAYER_SETTINGS"] = "validate_sync=true,validate_best_practices=true"
-    elif requested_validation == "deep":
+    elif validation == "deep":
         env["VK_LAYER_SETTINGS"] = "validate_sync=true,validate_best_practices=true,gpuav_enable=true,printf_enable=true"
     if getattr(args, "tracy_capture", False):
         env["MATTMC_GRAPHICS_AUDIT"] = "true"
@@ -9961,6 +9976,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         subparser.add_argument("--tracy-capture", action="store_true", help="Run as a Tracy timeline capture; never performance-comparable.")
         subparser.add_argument("--tracy-duration-seconds", type=int, default=20)
         subparser.add_argument("--tracy-max-size-mb", type=int, default=256)
+        subparser.add_argument(
+            "--shader-graph-isolation",
+            choices=("terrain-only", "gbuffer-no-shadow", "terrain-plus-gbuffer-no-shadow", "terrain-plus-shadow", "full-draws-skipped"),
+            default="",
+            help="Diagnostic-only Rust shader graph isolation for whole-frame profiling rows.",
+        )
         subparser.add_argument(
             "--shader-gbuffer-scene",
             action="store_true",

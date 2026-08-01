@@ -1,4 +1,5 @@
 use super::*;
+use crate::render::vulkanic::metrics::WholeFrameProfile;
 
 pub fn status_result_from_error(error: &GalError) -> FfiStatusResult {
     FfiStatusResult {
@@ -216,7 +217,82 @@ pub(crate) fn whole_frame_result_ok(
         command_lists: world.command_lists.max(gui.command_lists),
         command_ops: world.command_ops,
         metrics: context_metrics(context),
+        profile: FfiWholeFrameProfileSnapshot::from(world.profile),
         ..FfiWholeFrameSubmitResult::default()
+    }
+}
+
+impl From<WholeFrameProfile> for FfiWholeFrameProfileSnapshot {
+    fn from(profile: WholeFrameProfile) -> Self {
+        Self {
+            ffi_decode_nanos: profile.ffi_decode_nanos,
+            gui_frontend_nanos: profile.gui_frontend_nanos,
+            world_frontend_total_nanos: profile.world_frontend_total_nanos,
+            world_validate_frame_nanos: profile.world_validate_frame_nanos,
+            world_batching_nanos: profile.world_batching_nanos,
+            world_resource_prepare_nanos: profile.world_resource_prepare_nanos,
+            world_prepare_target_query_nanos: profile.world_prepare_target_query_nanos,
+            world_prepare_render_resources_nanos: profile.world_prepare_render_resources_nanos,
+            world_prepare_depth_attachment_nanos: profile.world_prepare_depth_attachment_nanos,
+            world_prepare_g_buffer_resources_nanos: profile.world_prepare_g_buffer_resources_nanos,
+            world_prepare_g_buffer_cache_check_nanos: profile
+                .world_prepare_g_buffer_cache_check_nanos,
+            world_prepare_g_buffer_destroy_nanos: profile.world_prepare_g_buffer_destroy_nanos,
+            world_prepare_g_buffer_plan_nanos: profile.world_prepare_g_buffer_plan_nanos,
+            world_prepare_g_buffer_create_nanos: profile.world_prepare_g_buffer_create_nanos,
+            world_prepare_frame_pass_nanos: profile.world_prepare_frame_pass_nanos,
+            world_mesh_section_expand_group_nanos: profile.world_mesh_section_expand_group_nanos,
+            shader_plan_lookup_nanos: profile.shader_plan_lookup_nanos,
+            gal_command_generation_nanos: profile.gal_command_generation_nanos,
+            gal_submit_total_nanos: profile.gal_submit_total_nanos,
+            gal_validate_ops_nanos: profile.gal_validate_ops_nanos,
+            gal_validate_handles_nanos: profile.gal_validate_handles_nanos,
+            gal_hazard_analysis_nanos: profile.gal_hazard_analysis_nanos,
+            backend_encode_nanos: profile.backend_encode_nanos,
+            backend_submit_nanos: profile.backend_submit_nanos,
+            backend_retire_nanos: profile.backend_retire_nanos,
+            vulkan_command_buffer_alloc_nanos: profile.vulkan_command_buffer_alloc_nanos,
+            vulkan_command_buffer_begin_nanos: profile.vulkan_command_buffer_begin_nanos,
+            vulkan_command_recording_nanos: profile.vulkan_command_recording_nanos,
+            vulkan_command_buffer_end_nanos: profile.vulkan_command_buffer_end_nanos,
+            vulkan_queue_submit_nanos: profile.vulkan_queue_submit_nanos,
+            vulkan_timeline_poll_nanos: profile.vulkan_timeline_poll_nanos,
+            vulkan_timeline_wait_nanos: profile.vulkan_timeline_wait_nanos,
+            vulkan_device_wait_idle_nanos: profile.vulkan_device_wait_idle_nanos,
+            vulkan_command_buffers_allocated: profile.vulkan_command_buffers_allocated,
+            vulkan_command_buffers_freed: profile.vulkan_command_buffers_freed,
+            vulkan_wait_count: profile.vulkan_wait_count,
+            vulkan_device_wait_idle_count: profile.vulkan_device_wait_idle_count,
+            resource_creates_delta: profile.resource_creates_delta,
+            resource_destroys_delta: profile.resource_destroys_delta,
+            host_write_ops: profile.host_write_ops,
+            host_write_bytes: profile.host_write_bytes,
+            barrier_ops: profile.barrier_ops,
+            pass_count: profile.pass_count,
+            draw_ops: profile.draw_ops,
+            draw_indexed_ops: profile.draw_indexed_ops,
+            pipeline_binds: profile.pipeline_binds,
+            resource_set_binds: profile.resource_set_binds,
+            gpu_timestamp_status: profile.gpu_timestamp_status,
+            gpu_shadow_depth_nanos: profile.gpu_shadow_depth_nanos,
+            gpu_terrain_opaque_nanos: profile.gpu_terrain_opaque_nanos,
+            gpu_terrain_cutout_nanos: profile.gpu_terrain_cutout_nanos,
+            gpu_deferred_lighting_nanos: profile.gpu_deferred_lighting_nanos,
+            gpu_composite0_nanos: profile.gpu_composite0_nanos,
+            gpu_composite1_nanos: profile.gpu_composite1_nanos,
+            gpu_final_output_nanos: profile.gpu_final_output_nanos,
+            gpu_frame_total_nanos: profile.gpu_frame_total_nanos,
+            g_buffer_persistent_cache_hits: profile.g_buffer_persistent_cache_hits,
+            g_buffer_persistent_cache_misses: profile.g_buffer_persistent_cache_misses,
+            g_buffer_final_binding_cache_hits: profile.g_buffer_final_binding_cache_hits,
+            g_buffer_final_binding_cache_misses: profile.g_buffer_final_binding_cache_misses,
+            g_buffer_attachment_creates: profile.g_buffer_attachment_creates,
+            g_buffer_pipeline_creates: profile.g_buffer_pipeline_creates,
+            g_buffer_shader_module_creates: profile.g_buffer_shader_module_creates,
+            g_buffer_descriptor_creates: profile.g_buffer_descriptor_creates,
+            g_buffer_render_target_creates: profile.g_buffer_render_target_creates,
+            g_buffer_resources_retired: profile.g_buffer_resources_retired,
+        }
     }
 }
 

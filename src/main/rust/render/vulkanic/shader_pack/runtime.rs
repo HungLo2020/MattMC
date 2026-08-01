@@ -17,6 +17,30 @@ pub(crate) enum TerrainMaterialPassMode {
     Cutout,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum TerrainGraphIsolation {
+    Full,
+    TerrainOnly,
+    GBufferNoShadow,
+    TerrainPlusShadow,
+    FullDrawsSkipped,
+}
+
+impl TerrainGraphIsolation {
+    fn from_env() -> Self {
+        match std::env::var("MATTMC_RUST_SHADER_GRAPH_ISOLATION")
+            .unwrap_or_default()
+            .trim()
+        {
+            "terrain-only" => Self::TerrainOnly,
+            "terrain-plus-gbuffer-no-shadow" | "gbuffer-no-shadow" => Self::GBufferNoShadow,
+            "terrain-plus-shadow" => Self::TerrainPlusShadow,
+            "full-draws-skipped" => Self::FullDrawsSkipped,
+            _ => Self::Full,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct TerrainMeshDraw {
     pub shadow_pipeline: Option<Handle>,
@@ -118,10 +142,38 @@ impl ShaderPackRuntimeExecutor {
         if draws.is_empty() {
             return Ok(());
         }
+        let isolation = TerrainGraphIsolation::from_env();
+        let effective_draws_storage;
+        let effective_draws = if isolation == TerrainGraphIsolation::FullDrawsSkipped {
+            effective_draws_storage = Vec::new();
+            effective_draws_storage.as_slice()
+        } else {
+            draws
+        };
 
-        self.append_shadow_depth_pass(ops, targets, draws)?;
-        self.append_g_buffer_passes(ops, targets, frame.background_color, draws)?;
-        self.append_deferred_and_composites(ops, targets, frame)?;
+        if matches!(
+            isolation,
+            TerrainGraphIsolation::Full
+                | TerrainGraphIsolation::TerrainPlusShadow
+                | TerrainGraphIsolation::FullDrawsSkipped
+        ) {
+            self.append_shadow_depth_pass(ops, targets, effective_draws)?;
+        }
+        self.append_g_buffer_passes(
+            ops,
+            targets,
+            frame.background_color,
+            effective_draws,
+            isolation == TerrainGraphIsolation::FullDrawsSkipped,
+        )?;
+        if matches!(
+            isolation,
+            TerrainGraphIsolation::Full
+                | TerrainGraphIsolation::GBufferNoShadow
+                | TerrainGraphIsolation::FullDrawsSkipped
+        ) {
+            self.append_deferred_and_composites(ops, targets, frame)?;
+        }
         Ok(())
     }
 
@@ -208,6 +260,7 @@ impl ShaderPackRuntimeExecutor {
         targets: TerrainRuntimeTargets,
         background_color: ClearColor,
         draws: &[TerrainMeshDraw],
+        force_empty_clear: bool,
     ) -> GalResult<()> {
         for texture in [
             targets.albedo_texture,
@@ -237,7 +290,7 @@ impl ShaderPackRuntimeExecutor {
                 .copied()
                 .filter(|draw| draw.material_mode == mode)
                 .collect::<Vec<_>>();
-            if mode_draws.is_empty() {
+            if mode_draws.is_empty() && !force_empty_clear {
                 continue;
             }
             let load_op = if wrote_g_buffer {

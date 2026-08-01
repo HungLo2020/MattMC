@@ -975,14 +975,20 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_whole_frame_submit(
         context.ffi_output_bytes = context
             .ffi_output_bytes
             .saturating_add(size_of::<FfiWholeFrameSubmitResult>() as u64);
+        let decode_started = std::time::Instant::now();
         let result = decode_whole_frame_submit(request, context.gal.capabilities()).and_then(
             |(generation, frame_target, world_frame, gui_sprites)| {
+                let ffi_decode_nanos =
+                    crate::render::vulkanic::metrics::elapsed_nanos_u64(decode_started);
+                let gui_started = std::time::Instant::now();
                 let (gui_ops, gui_stats) = context.gui_frontend.append_frame_ops(
                     &mut context.gal,
                     generation,
                     frame_target,
                     gui_sprites,
                 )?;
+                let gui_frontend_nanos =
+                    crate::render::vulkanic::metrics::elapsed_nanos_u64(gui_started);
                 let mut world_stats = context.world_primitive_frontend.submit_whole_frame(
                     &mut context.gal,
                     generation,
@@ -990,6 +996,8 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_whole_frame_submit(
                     world_frame,
                     gui_ops,
                 )?;
+                world_stats.profile.ffi_decode_nanos = ffi_decode_nanos;
+                world_stats.profile.gui_frontend_nanos = gui_frontend_nanos;
                 destroy_stale_frame_targets(context)?;
                 world_stats.command_lists = 1;
                 Ok((world_stats, gui_stats))

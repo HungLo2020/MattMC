@@ -138,6 +138,8 @@ public final class GraphicsFrameBenchmark {
 	private static long firstSampleNanos = -1L;
 	private static long lastSampleNanos = -1L;
 	private static long readinessStartNanos = -1L;
+	private static long producerWorkloadStartNanos = -1L;
+	private static long producerWorkloadWaitFrames;
 	private static long gcCountAtStart = -1L;
 	private static long gcTimeAtStart = -1L;
 	private static long gcCountAtEnd = -1L;
@@ -154,6 +156,7 @@ public final class GraphicsFrameBenchmark {
 	private static String dimension = "missing";
 	private static String failureReason = "";
 	private static String lastReadinessBlocker = "not checked";
+	private static String lastProducerWorkloadBlocker = "not requested";
 	private static int originalArmorValueOverride = -1;
 	private static float originalHealthOverride = Float.NaN;
 	private static float originalMaxHealthOverride = Float.NaN;
@@ -194,6 +197,14 @@ public final class GraphicsFrameBenchmark {
 	private static String pistonScenarioBlock = "unset";
 	private static String pistonScenarioPosition = "unset";
 	private static String pistonScenarioFingerprint = "unset";
+	private static BlockPos pistonScenarioPos;
+	private static BlockState pistonScenarioMovedState;
+	private static Direction pistonScenarioDirection;
+	private static boolean pistonScenarioExtending;
+	private static boolean pistonScenarioSourcePiston;
+	private static boolean pistonScenarioClientBlockEntityPresent;
+	private static boolean pistonScenarioServerBlockEntityPresent;
+	private static int pistonScenarioReseedCount;
 	private static final Map<String, Integer> TERRAIN_PARTICLE_ROUTE_COUNTS = new LinkedHashMap<>();
 	private static final Map<String, Long> TERRAIN_PARTICLE_ROUTE_NANOS = new LinkedHashMap<>();
 
@@ -220,6 +231,9 @@ public final class GraphicsFrameBenchmark {
 		}
 		beginPhase("java.frame.render-production");
 		holdPlayerStillAndApplyCameraPath(minecraft);
+		if (!producerWorkloadReady(minecraft)) {
+			return;
+		}
 		if (settledFrameIndex < 0L) {
 			if (frameIndex >= SETTLE_FRAMES) {
 				settledFrameIndex = frameIndex;
@@ -321,6 +335,14 @@ public final class GraphicsFrameBenchmark {
 			NESTED_PHASES.computeIfAbsent(label, ignored -> new PhaseStats()).add(inclusive);
 			EXCLUSIVE_PHASES.computeIfAbsent(label, ignored -> new PhaseStats()).add(exclusive);
 		}
+	}
+
+	public static void recordPhaseSample(String name, long nanos) {
+		if (!ENABLED || !frameActive || !measurementFrame || name == null || nanos < 0L) {
+			return;
+		}
+		NESTED_PHASES.computeIfAbsent(name, ignored -> new PhaseStats()).add(nanos);
+		EXCLUSIVE_PHASES.computeIfAbsent(name, ignored -> new PhaseStats()).add(nanos);
 	}
 
 	public static void recordSubmittedWorkIdentity(String family, String identity) {
@@ -521,6 +543,83 @@ public final class GraphicsFrameBenchmark {
 		}
 	}
 
+	private static boolean producerWorkloadReady(Minecraft minecraft) {
+		List<String> missing = missingProducerWorkloads();
+		if (missing.isEmpty()) {
+			lastProducerWorkloadBlocker = "ready";
+			return true;
+		}
+		long now = System.nanoTime();
+		if (producerWorkloadStartNanos < 0L) {
+			producerWorkloadStartNanos = now;
+		}
+		producerWorkloadWaitFrames++;
+		lastProducerWorkloadBlocker = "missing=" + String.join(",", missing)
+			+ ", blockDisplayStatus=" + blockDisplayScenarioStatus
+			+ ", fallingBlockStatus=" + fallingBlockScenarioStatus
+			+ ", pistonStatus=" + pistonScenarioStatus
+			+ ", submitted=" + SUBMITTED_WORK_COUNTS
+			+ ", fallingRoutes=" + FALLING_BLOCK_ROUTE_COUNTS
+			+ ", movingRoutes=" + MOVING_BLOCK_ROUTE_COUNTS;
+		if (now - producerWorkloadStartNanos >= READINESS_TIMEOUT_NANOS) {
+			fail(minecraft, "timed out waiting for requested producer traversal: " + lastProducerWorkloadBlocker);
+		} else if ((producerWorkloadWaitFrames % 60L) == 0L || producerWorkloadWaitFrames == 1L) {
+			writeStatus(minecraft, "waiting_for_producer_workload");
+		}
+		return false;
+	}
+
+	private static List<String> missingProducerWorkloads() {
+		List<String> missing = new ArrayList<>();
+		if (scenarioRequiresProducerTraversal(BLOCK_DISPLAY_SCENARIO)
+			&& !submittedWorkObserved("block-display")) {
+			missing.add("block-display");
+		}
+		if (scenarioRequiresProducerTraversal(FALLING_BLOCK_SCENARIO)
+			&& !submittedWorkObserved("falling-block")
+			&& !routeObserved(FALLING_BLOCK_ROUTE_COUNTS)
+			&& !routeObservedForProvenance("falling-block")) {
+			missing.add("falling-block");
+		}
+		if (scenarioRequiresProducerTraversal(PISTON_SCENARIO)
+			&& !submittedWorkObserved("piston")
+			&& !routeObservedForProvenance("piston")) {
+			missing.add("piston");
+		}
+		return missing;
+	}
+
+	private static boolean scenarioRequiresProducerTraversal(String scenario) {
+		if (scenario == null || scenario.isBlank()) {
+			return false;
+		}
+		String normalized = scenario.trim().toLowerCase(Locale.ROOT);
+		return !normalized.equals("hidden") && !normalized.equals("completed") && !normalized.equals("removed");
+	}
+
+	private static boolean submittedWorkObserved(String family) {
+		return SUBMITTED_WORK_COUNTS.getOrDefault(family, 0) > 0;
+	}
+
+	private static boolean routeObserved(Map<String, Integer> routes) {
+		for (int count : routes.values()) {
+			if (count > 0) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private static boolean routeObservedForProvenance(String provenance) {
+		String prefix = provenance + ":";
+		for (Map.Entry<String, Integer> entry : MOVING_BLOCK_ROUTE_COUNTS.entrySet()) {
+			if (entry.getKey().startsWith(prefix) && entry.getValue() > 0) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	private static String readinessSummary(Minecraft minecraft) {
 		String screen = minecraft.screen == null ? "none" : minecraft.screen.getClass().getSimpleName();
 		String overlay = minecraft.getOverlay() == null ? "none" : minecraft.getOverlay().getClass().getSimpleName();
@@ -586,6 +685,7 @@ public final class GraphicsFrameBenchmark {
 			player.yBodyRot = yaw;
 			player.yBodyRotO = yaw;
 			driveRealTerrainParticleGameplay(minecraft, player);
+			maintainPistonScenario(minecraft);
 		}
 
 	private static void setupRealTerrainParticleGameplayBlock(Minecraft minecraft, LocalPlayer player) {
@@ -813,10 +913,58 @@ public final class GraphicsFrameBenchmark {
 			clearPistonScenarioSpace(serverLevel, minecraft.level, pos);
 			seedMovingPiston(serverLevel, minecraft.level, pos, movedState, direction, pistonExtending(), pistonSourcePiston());
 		}
+		pistonScenarioPos = origin;
+		pistonScenarioMovedState = movedState;
+		pistonScenarioDirection = direction;
+		pistonScenarioExtending = pistonExtending();
+		pistonScenarioSourcePiston = pistonSourcePiston();
+		pistonScenarioClientBlockEntityPresent = minecraft.level.getBlockEntity(origin) instanceof net.minecraft.world.level.block.piston.PistonMovingBlockEntity;
+		pistonScenarioServerBlockEntityPresent = serverLevel.getBlockEntity(origin) instanceof net.minecraft.world.level.block.piston.PistonMovingBlockEntity;
 		pistonScenarioStatus = "spawned";
 		pistonScenarioBlock = blockName(movedState);
 		pistonScenarioPosition = origin.toShortString();
 		pistonScenarioFingerprint = PISTON_SCENARIO + "|count=" + PISTON_COUNT + "|block=" + pistonScenarioBlock;
+	}
+
+	private static void maintainPistonScenario(Minecraft minecraft) {
+		if (PISTON_SCENARIO.isEmpty()
+			|| "hidden".equals(PISTON_SCENARIO)
+			|| !pistonScenarioSetup
+			|| complete
+			|| failed
+			|| pistonScenarioPos == null
+			|| pistonScenarioMovedState == null
+			|| pistonScenarioDirection == null
+			|| minecraft.level == null
+			|| minecraft.getSingleplayerServer() == null) {
+			return;
+		}
+		ServerLevel serverLevel = minecraft.getSingleplayerServer().getLevel(minecraft.level.dimension());
+		if (serverLevel == null) {
+			pistonScenarioStatus = "maintain-missing-server-level";
+			return;
+		}
+		boolean clientPresent = minecraft.level.getBlockEntity(pistonScenarioPos) instanceof net.minecraft.world.level.block.piston.PistonMovingBlockEntity;
+		boolean serverPresent = serverLevel.getBlockEntity(pistonScenarioPos) instanceof net.minecraft.world.level.block.piston.PistonMovingBlockEntity;
+		pistonScenarioClientBlockEntityPresent = clientPresent;
+		pistonScenarioServerBlockEntityPresent = serverPresent;
+		if (clientPresent) {
+			return;
+		}
+		clearPistonScenarioSpace(serverLevel, minecraft.level, pistonScenarioPos);
+		seedMovingPiston(
+			serverLevel,
+			minecraft.level,
+			pistonScenarioPos,
+			pistonScenarioMovedState,
+			pistonScenarioDirection,
+			pistonScenarioExtending,
+			pistonScenarioSourcePiston
+		);
+		pistonScenarioReseedCount++;
+		pistonScenarioStatus = "reseeded";
+		pistonScenarioClientBlockEntityPresent = minecraft.level.getBlockEntity(pistonScenarioPos) instanceof net.minecraft.world.level.block.piston.PistonMovingBlockEntity;
+		pistonScenarioServerBlockEntityPresent = serverLevel.getBlockEntity(pistonScenarioPos) instanceof net.minecraft.world.level.block.piston.PistonMovingBlockEntity;
 	}
 
 	private static BlockState pistonMovedState() {
@@ -1079,6 +1227,8 @@ public final class GraphicsFrameBenchmark {
 		json.append("  \"preMeasurementGcIssued\": ").append(preMeasurementGcIssued).append(",\n");
 		json.append("  \"initializationWaitFrames\": ").append(initializationWaitFrames).append(",\n");
 		field(json, "lastReadinessBlocker", lastReadinessBlocker, 2, true);
+		json.append("  \"producerWorkloadWaitFrames\": ").append(producerWorkloadWaitFrames).append(",\n");
+		field(json, "lastProducerWorkloadBlocker", lastProducerWorkloadBlocker, 2, true);
 		json.append("  \"framesSeenIncludingSettleWarmup\": ").append(frameIndex).append(",\n");
 		json.append("  \"settledFrameIndex\": ").append(settledFrameIndex).append(",\n");
 		json.append("  \"measuredFrameCount\": ").append(FRAME_NANOS.size()).append(",\n");
@@ -1302,6 +1452,9 @@ public final class GraphicsFrameBenchmark {
 		field(json, "block", pistonScenarioBlock, 4, true);
 		field(json, "position", pistonScenarioPosition, 4, true);
 		json.append("    \"entityCount\": ").append(PISTON_SCENARIO.isEmpty() ? 0 : PISTON_COUNT).append(",\n");
+		json.append("    \"reseedCount\": ").append(pistonScenarioReseedCount).append(",\n");
+		json.append("    \"clientBlockEntityPresent\": ").append(pistonScenarioClientBlockEntityPresent).append(",\n");
+		json.append("    \"serverBlockEntityPresent\": ").append(pistonScenarioServerBlockEntityPresent).append(",\n");
 		writeStringIntMap(json, "movingRouteCounts", MOVING_BLOCK_ROUTE_COUNTS);
 		json.append(",\n");
 		writeMovingBlockShellScan(json);

@@ -234,6 +234,7 @@ impl Backend for OpenGlBackend {
             gl_fences_polled: sync.fences_polled as u64,
             gl_fences_waited: sync.fences_waited as u64,
             gl_fences_deleted: sync.fences_deleted as u64,
+            ..BackendRuntimeMetrics::default()
         }
     }
 

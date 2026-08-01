@@ -2509,6 +2509,42 @@ else:
             finally:
                 harness.local_renderdoccmd_path = original  # type: ignore[assignment]
 
+    def test_rust_vulkan_gameplay_validation_enables_khronos_layer(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            target = fake_repo(root, "current")
+            args = harness.parse_args(
+                [
+                    "gameplay",
+                    "--profile",
+                    "standard",
+                    "--mode",
+                    "current-rust-vulkan-shaders-on",
+                    "--validation",
+                    "routine",
+                    "--world-mesh-falling-block-scenario",
+                    "sand",
+                    "--dry-run",
+                ]
+            )
+            mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-rust-vulkan-shaders-on")
+
+            command, env = harness.build_capture_command(
+                target,
+                mode,
+                root / "gameplay",
+                "gameplay",
+                args,
+                "gameplay",
+            )
+
+            self.assertIn("--validation", command)
+            self.assertIn("standard", command)
+            self.assertEqual("routine", env["MATTMC_GRAPHICS_VALIDATION_PROFILE"])
+            self.assertEqual("VK_LAYER_KHRONOS_validation", env["VK_INSTANCE_LAYERS"])
+            self.assertEqual("info", env["VK_LOADER_DEBUG"])
+            self.assertIn("validate_sync=true", env["VK_LAYER_SETTINGS"])
+
     def test_capture_runner_receives_profile_shutdown_budget(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -3702,7 +3738,7 @@ else:
             self.assertNotIn("mattmc.rustGal.guiCrosshair.enabled", " ".join(command))
             self.assertIn("-Dmattmc.rustGal.guiCrosshair.enabled=true", env["JAVA_TOOL_OPTIONS"])
 
-    def test_rust_vulkan_gameplay_measurement_runs_without_validation_layers(self) -> None:
+    def test_rust_vulkan_gameplay_measurement_honors_requested_validation(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             target = fake_repo(root, "current")
@@ -3738,8 +3774,15 @@ else:
             gameplay_command, _ = harness.build_capture_command(target, mode, root / "gameplay", "gameplay", args, "gameplay")
             capture_command, _ = harness.build_capture_command(target, mode, root / "capture", "correctness", args, "capture")
 
-            self.assertEqual("off", gameplay_command[gameplay_command.index("--validation") + 1])
+            self.assertEqual("standard", gameplay_command[gameplay_command.index("--validation") + 1])
             self.assertEqual("standard", capture_command[capture_command.index("--validation") + 1])
+
+            args.validation = "off"
+            clean_command, clean_env = harness.build_capture_command(
+                target, mode, root / "clean-gameplay", "gameplay", args, "gameplay"
+            )
+            self.assertEqual("off", clean_command[clean_command.index("--validation") + 1])
+            self.assertNotIn("VK_INSTANCE_LAYERS", clean_env)
 
     def test_renderdoc_preflight_layer_does_not_enable_khronos_validation(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -3903,6 +3946,153 @@ else:
             self.assertIn("-Dmattmc.dev.rustGalWorldMesh.fallingBlockScenario=sand", java_options)
             self.assertIn("-Dmattmc.dev.rustGalWorldMesh.pistonScenario=normal-extending", java_options)
             self.assertIn("-Dmattmc.dev.deterministicCameraCapture.poseCount=12", java_options)
+
+    def test_rust_vulkan_gameplay_timing_does_not_request_attachment_readback(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            target = fake_repo(root, "current")
+            mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-rust-vulkan-shaders-on")
+            args = harness.parse_args(
+                [
+                    "gameplay",
+                    "--profile",
+                    "performance",
+                    "--mode",
+                    mode.name,
+                    "--world-mesh-falling-block-scenario",
+                    "sand",
+                    "--world-mesh-piston-scenario",
+                    "normal-extending",
+                ]
+            )
+            _, env = harness.build_capture_command(target, mode, root / "capture", "gameplay", args, "gameplay")
+            self.assertNotIn("MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_DIR", env)
+            self.assertEqual("0", env["SCREENSHOT_MAX_COUNT"])
+
+    def test_rust_vulkan_shader_graph_isolation_is_explicit_env_only(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            target = fake_repo(root, "current")
+            mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-rust-vulkan-shaders-on")
+            args = harness.parse_args(
+                [
+                    "gameplay",
+                    "--profile",
+                    "performance",
+                    "--mode",
+                    mode.name,
+                    "--shader-graph-isolation",
+                    "terrain-plus-shadow",
+                ]
+            )
+            _, env = harness.build_capture_command(target, mode, root / "capture", "gameplay", args, "gameplay")
+            self.assertEqual("terrain-plus-shadow", env["MATTMC_RUST_SHADER_GRAPH_ISOLATION"])
+            self.assertNotIn("mattmc.dev.rustGalShaderGraphIsolation", env["JAVA_TOOL_OPTIONS"])
+
+    def test_rust_vulkan_gameplay_accepts_benchmark_producer_evidence_without_attachments(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-rust-vulkan-shaders-on")
+            target = fake_repo(temp, mode.target)
+            capture = temp / "capture"
+            write_capture(capture, backend=mode.backend, shaders=mode.shaders, world="Origin")
+            write_frame_benchmark(
+                capture,
+                [16_000_000, 17_000_000, 15_500_000],
+                rust_gal_line=(
+                    "Rust VulkanicGAL GUI frame executed producer=gui.frame "
+                    "rust_gal_world_mesh_instances_executed=3 "
+                    "rust_gal_world_mesh_batches_executed=2 "
+                    "rust_gal_world_mesh_draws_executed=2 "
+                    "rust_gal_world_mesh_cache_hits=9 "
+                    "rust_gal_world_mesh_cache_misses=2 "
+                    "rust_gal_ffi_world_mesh_asset_update_calls=1 "
+                    "rust_gal_ffi_world_mesh_asset_update_bytes=4096 "
+                    "rust_gal_ffi_frame_acquire_calls=3 "
+                    "rust_gal_ffi_frame_present_calls=3 "
+                    "rust_gal_ffi_submit_calls=3 "
+                    "ffi_call_count=9 ffi_bytes=2048"
+                ),
+                block_display={
+                    "enabled": True,
+                    "scenario": "oak-leaves",
+                    "workload": "single",
+                    "routeControl": "rust",
+                    "status": "spawned",
+                    "block": "minecraft:oak_leaves",
+                    "position": "1,2,3",
+                    "entityCount": 1,
+                    "distinctBlockCount": 1,
+                    "workloadFingerprint": "single|0:minecraft:oak_leaves",
+                },
+                block_display_work_count=3,
+            )
+            frame_path = next(capture.glob("graphics_frame_benchmark_*.json"))
+            frame_doc = json.loads(frame_path.read_text(encoding="utf-8"))
+            frame_doc["fallingBlockScenario"] = {
+                "enabled": True,
+                "scenario": "sand",
+                "routeControl": "rust",
+                "status": "spawned",
+                "block": "minecraft:sand",
+                "position": "1,2,3",
+                "entityCount": 1,
+                "routeCounts": {"rust-vulkan-whole-frame": 1},
+                "movingRouteCounts": {"falling-block:rust-vulkan-whole-frame": 1},
+                "workloadFingerprint": "sand|count=1|block=minecraft:sand",
+            }
+            frame_doc["pistonScenario"] = {
+                "enabled": True,
+                "scenario": "normal-extending",
+                "routeControl": "rust",
+                "status": "spawned",
+                "block": "minecraft:stone",
+                "position": "1,2,3",
+                "entityCount": 1,
+                "movingRouteCounts": {"piston:rust-vulkan-whole-frame": 1},
+                "shellScan": {
+                    "samples": 1,
+                    "fallbackSamples": 0,
+                    "totalNanos": 1000,
+                    "maxNanos": 1000,
+                    "chunksScanned": 0,
+                    "blockEntitiesInspected": 0,
+                    "pistonEntitiesFound": 1,
+                    "pistonStatesExtracted": 1,
+                },
+                "workloadFingerprint": "normal-extending|count=1|block=minecraft:stone",
+            }
+            frame_doc["submittedWorkCounts"] = {
+                "block-display": 3,
+                "falling-block": 1,
+                "piston": 1,
+                "moving-block-route": 2,
+            }
+            frame_path.write_text(json.dumps(frame_doc), encoding="utf-8")
+            (capture / "runClient_20260101_000000.log").write_text(
+                "-Dmattmc.dev.rustGalVulkanWholeFrame=true\n"
+                "-Dmattmc.dev.rustGalWorldMesh.blockDisplayScenario=oak-leaves\n"
+                "-Dmattmc.dev.rustGalWorldMesh.fallingBlockScenario=sand\n"
+                "-Dmattmc.dev.rustGalWorldMesh.pistonScenario=normal-extending\n",
+                encoding="utf-8",
+            )
+
+            artifact = harness.normalize_capture_artifact(
+                target,
+                mode,
+                capture,
+                "gameplay",
+                True,
+                ["fake"],
+                0,
+                False,
+                tool_kind="gameplay",
+            )
+
+            self.assertTrue(artifact["validation"]["complete"], artifact["validation"]["messages"])
+            self.assertIsNone(
+                artifact["capture"]["whole_frame_gameplay_attachments"]["manifest_doc"]
+            )
 
     def test_world_outline_controls_are_forwarded_as_java_properties(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

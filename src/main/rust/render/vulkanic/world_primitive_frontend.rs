@@ -10,14 +10,15 @@ mod outline;
 mod shared;
 mod world_border;
 
+use super::backends::CompletedHostRead;
 use super::commands::{
     AttachmentLoadOp, AttachmentStoreOp, CommandOp, PassAttachment, ResourceBarrier,
     SubmissionBatch, TextureOrigin3d, TextureUsageState,
 };
-use super::backends::CompletedHostRead;
 use super::error::{GalError, GalResult, StatusCode};
 use super::gal::VulkanicGal;
 use super::handles::Handle;
+use super::metrics::{elapsed_nanos_u64, WholeFrameProfile};
 use super::resources::{
     AccessFlags, BackendApi, BlendMode, BufferDesc, BufferUsage, ColorFormat, CompareOp, Extent3d,
     GraphicsPipelineDesc, IndexType, MemoryDomain, PipelineLayoutDesc, PipelineStageFlags,
@@ -571,6 +572,7 @@ pub struct WorldPrimitiveSubmitStats {
     pub background_diagnostic_fallback_count: u64,
     pub background_sky_type: u64,
     pub background_color_argb: u64,
+    pub profile: WholeFrameProfile,
 }
 
 struct WorldLineResources {
@@ -637,7 +639,6 @@ struct GBufferResources {
     deferred_lighting_pass: Handle,
     composite0_pass: Handle,
     composite1_pass: Handle,
-    final_pass: Handle,
     composite_uniform_buffer: Handle,
     screen_vertex_shader: Handle,
     deferred_lighting_fragment_shader: Handle,
@@ -648,16 +649,29 @@ struct GBufferResources {
     deferred_lighting_resource_set: Handle,
     composite0_resource_set: Handle,
     composite1_resource_set: Handle,
-    final_resource_set: Handle,
     screen_pipeline_layout: Handle,
     deferred_lighting_pipeline: Handle,
     composite0_pipeline: Handle,
     composite1_pipeline: Handle,
+    final_resource_set: Handle,
     final_pipeline: Handle,
-    final_depth_view: Option<Handle>,
     extent: Extent3d,
+    frame_color_format: ColorFormat,
+    final_depth_format: Option<TextureFormat>,
+    generation: u64,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+struct GBufferFinalBindingKey {
     frame_target: Handle,
     frame_color_format: ColorFormat,
+    final_depth_view: Option<Handle>,
+    graph_generation: u64,
+}
+
+struct GBufferFinalBindingResources {
+    final_depth_view: Option<Handle>,
+    final_pass: Handle,
 }
 
 struct CrackResources {
@@ -882,7 +896,6 @@ impl GBufferResources {
             self.deferred_lighting_fragment_shader,
             self.screen_vertex_shader,
             self.composite_uniform_buffer,
-            self.final_pass,
             self.composite1_pass,
             self.composite0_pass,
             self.deferred_lighting_pass,
@@ -913,6 +926,12 @@ impl GBufferResources {
             self.albedo_texture,
             self.shadow_depth_texture,
         ]
+    }
+}
+
+impl GBufferFinalBindingResources {
+    fn handles_in_destroy_order(&self) -> [Handle; 1] {
+        [self.final_pass]
     }
 }
 
@@ -953,6 +972,8 @@ pub struct WorldPrimitiveFrontend {
     mesh_resources: BTreeMap<MeshResourceKey, MeshResources>,
     depth_attachment: Option<DepthAttachmentResources>,
     g_buffer_resources: Option<GBufferResources>,
+    g_buffer_final_bindings: BTreeMap<GBufferFinalBindingKey, GBufferFinalBindingResources>,
+    pending_g_buffer_resources_retired: u64,
     cached_pass: Option<CachedPass>,
     pending_depth_attachment_retires: u64,
 }
@@ -1322,31 +1343,30 @@ impl WorldPrimitiveFrontend {
         if let Some(pass) = self.cached_pass.take() {
             let _ = gal.destroy(pass.pass);
         }
+        let retired = self.destroy_g_buffer_final_bindings(gal);
+        self.pending_g_buffer_resources_retired = self
+            .pending_g_buffer_resources_retired
+            .saturating_add(retired);
     }
 
     pub fn clear_frame_passes_for_targets(&mut self, gal: &mut VulkanicGal, targets: &[Handle]) {
-        let Some(pass) = self.cached_pass else {
-            if self
-                .g_buffer_resources
-                .as_ref()
-                .map(|resources| targets.contains(&resources.frame_target))
-                .unwrap_or(false)
-            {
-                self.destroy_g_buffer_resources(gal);
+        if let Some(pass) = self.cached_pass {
+            if targets.contains(&pass.frame_target) {
+                self.cached_pass = None;
+                let _ = gal.destroy(pass.pass);
             }
-            return;
-        };
-        if targets.contains(&pass.frame_target) {
-            self.cached_pass = None;
-            let _ = gal.destroy(pass.pass);
         }
-        if self
-            .g_buffer_resources
-            .as_ref()
-            .map(|resources| targets.contains(&resources.frame_target))
-            .unwrap_or(false)
-        {
-            self.destroy_g_buffer_resources(gal);
+        let keys = self
+            .g_buffer_final_bindings
+            .keys()
+            .copied()
+            .filter(|key| targets.contains(&key.frame_target))
+            .collect::<Vec<_>>();
+        for key in keys {
+            let retired = self.destroy_g_buffer_final_binding(gal, key);
+            self.pending_g_buffer_resources_retired = self
+                .pending_g_buffer_resources_retired
+                .saturating_add(retired);
         }
     }
 
@@ -1358,6 +1378,7 @@ impl WorldPrimitiveFrontend {
         frame: WorldPrimitiveFrame,
         gui_ops: Vec<CommandOp>,
     ) -> GalResult<WorldPrimitiveSubmitStats> {
+        let total_started = std::time::Instant::now();
         let mut gameplay_attachment_capture =
             GameplayAttachmentCapture::select(&frame, generation, self.mesh_asset_generation);
         let (mut ops, mut stats) =
@@ -1368,13 +1389,21 @@ impl WorldPrimitiveFrontend {
         ops.extend(gui_ops);
         stats.command_lists = 1;
         stats.command_ops = ops.len() as u64;
-        let token = gal.submit(SubmissionBatch {
-            label: "minecraft.world-and-gui.frame".to_string(),
-            command_lists: vec![CommandList::from(CommandListDesc {
-                label: "minecraft.world-and-gui.frame.commands".to_string(),
-                operations: ops,
-            })],
-        })?;
+        let frontend_done_nanos = elapsed_nanos_u64(total_started);
+        stats.profile.world_frontend_total_nanos = stats
+            .profile
+            .world_frontend_total_nanos
+            .saturating_add(frontend_done_nanos);
+        let token = gal.submit_profiled(
+            SubmissionBatch {
+                label: "minecraft.world-and-gui.frame".to_string(),
+                command_lists: vec![CommandList::from(CommandListDesc {
+                    label: "minecraft.world-and-gui.frame.commands".to_string(),
+                    operations: ops,
+                })],
+            },
+            &mut stats.profile,
+        )?;
         stats.submission_id = token.submission.0;
         if let Some(capture) = gameplay_attachment_capture {
             gal.retire_through(token.submission)?;
@@ -1432,17 +1461,30 @@ impl WorldPrimitiveFrontend {
         if self.generation == 0 {
             self.generation = generation;
         }
+        let validate_started = std::time::Instant::now();
         validate_frame(&frame)?;
+        let mut profile = WholeFrameProfile {
+            world_validate_frame_nanos: elapsed_nanos_u64(validate_started),
+            ..WholeFrameProfile::default()
+        };
+        profile.g_buffer_resources_retired =
+            std::mem::take(&mut self.pending_g_buffer_resources_retired);
+        let target_query_started = std::time::Instant::now();
         let color_format = gal.pass_target_color_format(frame_target)?;
         let color_attachment = gal.pass_target_color_attachment(frame_target)?;
+        profile.world_prepare_target_query_nanos = elapsed_nanos_u64(target_query_started);
         let had_resources = self.resources.is_some() && self.resource_format == Some(color_format);
         let had_crack_resources =
             self.crack_resources.is_some() && self.crack_resource_format == Some(color_format);
         let had_border_resources =
             self.border_resources.is_some() && self.border_resource_format == Some(color_format);
         let use_g_buffer_mesh_path = clear_background && !frame.mesh_instances.is_empty();
+        let batching_started = std::time::Instant::now();
         let material_batches = material_batches(&frame, color_format);
+        let mesh_group_started = std::time::Instant::now();
         let mesh_batches = mesh_batches(&frame, self, color_format, use_g_buffer_mesh_path)?;
+        profile.world_mesh_section_expand_group_nanos = elapsed_nanos_u64(mesh_group_started);
+        profile.world_batching_nanos = elapsed_nanos_u64(batching_started);
         let material_cache_hits = material_batches
             .iter()
             .filter(|batch| self.material_resources.contains_key(&batch.key))
@@ -1451,6 +1493,10 @@ impl WorldPrimitiveFrontend {
             .iter()
             .filter(|batch| self.mesh_resources.contains_key(&batch.key))
             .count() as u64;
+        let resource_creates_before = gal.metrics().resource_creates;
+        let resource_destroys_before = gal.metrics().resource_destroys;
+        let resource_started = std::time::Instant::now();
+        let render_resources_started = std::time::Instant::now();
         if !frame.segments.is_empty() {
             self.ensure_resources(gal, color_format)?;
         }
@@ -1478,6 +1524,8 @@ impl WorldPrimitiveFrontend {
             *count += 1;
             self.ensure_mesh_resource_slots(gal, batch.key, *count)?;
         }
+        profile.world_prepare_render_resources_nanos = elapsed_nanos_u64(render_resources_started);
+        let depth_started = std::time::Instant::now();
         let (depth_texture, depth_view, created_depth, retired_depth) = self
             .ensure_depth_attachment(
                 gal,
@@ -1485,17 +1533,47 @@ impl WorldPrimitiveFrontend {
                 frame.viewport_width,
                 frame.viewport_height,
             )?;
+        profile.world_prepare_depth_attachment_nanos = elapsed_nanos_u64(depth_started);
+        let mut g_buffer_final_binding_key = None;
         if use_g_buffer_mesh_path {
+            let g_buffer_started = std::time::Instant::now();
+            let final_depth_view = gal
+                .pass_target_depth_attachment(frame_target)?
+                .map(|(_, view)| view);
+            let final_depth_format = final_depth_view.map(|_| TextureFormat::Depth32Float);
             self.ensure_g_buffer_resources(
                 gal,
-                frame_target,
                 frame.viewport_width,
                 frame.viewport_height,
                 color_format,
+                final_depth_format,
+                &mut profile,
             )?;
+            g_buffer_final_binding_key = Some(self.ensure_g_buffer_final_binding(
+                gal,
+                frame_target,
+                color_format,
+                final_depth_view,
+                &mut profile,
+            )?);
+            profile.world_prepare_g_buffer_resources_nanos = elapsed_nanos_u64(g_buffer_started);
         }
+        profile.world_resource_prepare_nanos = elapsed_nanos_u64(resource_started);
         let pending_depth_retires = std::mem::take(&mut self.pending_depth_attachment_retires);
+        let frame_pass_started = std::time::Instant::now();
         let pass = self.frame_pass(gal, frame_target, depth_view)?;
+        profile.world_prepare_frame_pass_nanos = elapsed_nanos_u64(frame_pass_started);
+        let resource_metrics_after = gal.metrics();
+        profile.resource_creates_delta = profile.resource_creates_delta.saturating_add(
+            resource_metrics_after
+                .resource_creates
+                .saturating_sub(resource_creates_before),
+        );
+        profile.resource_destroys_delta = profile.resource_destroys_delta.saturating_add(
+            resource_metrics_after
+                .resource_destroys
+                .saturating_sub(resource_destroys_before),
+        );
         let mut stats = WorldPrimitiveSubmitStats {
             segment_count: frame.segments.len() as u64,
             vertex_count: (frame.segments.len() * 6) as u64,
@@ -1527,6 +1605,7 @@ impl WorldPrimitiveFrontend {
             background_diagnostic_fallback_count: u64::from(!frame.background.enabled),
             background_sky_type: frame.background.sky_type as u64,
             background_color_argb: frame.background.color_argb as u64,
+            profile,
             ..WorldPrimitiveSubmitStats::default()
         };
         if !frame.segments.is_empty() && had_resources {
@@ -1573,6 +1652,7 @@ impl WorldPrimitiveFrontend {
                 .resource_creates
                 .saturating_add(stats.mesh_cache_misses.saturating_mul(12));
         }
+        let command_generation_started = std::time::Instant::now();
         let background_color = background_clear_color(&frame.background);
         let batches = line_batches(&frame);
         let crack_batches = crack_batches(&frame);
@@ -1727,19 +1807,34 @@ impl WorldPrimitiveFrontend {
                 let g_buffer = self.g_buffer_resources.as_ref().ok_or_else(|| {
                     GalError::backend("G-buffer resources missing before mesh submit")
                 })?;
-                ShaderPackRuntimeExecutor::terrain_material_multipass_v1(self.generation)?
-                    .append_terrain_material_graph(
-                        &mut ops,
-                        terrain_runtime_targets(g_buffer),
-                        TerrainRuntimeFrame {
-                            frame_target,
-                            color_attachment,
-                            background_color,
-                            final_depth_view: g_buffer.final_depth_view,
-                            uniforms: terrain_composite_uniforms(true),
-                        },
-                        &mesh_draws,
-                    )?;
+                let final_binding_key = g_buffer_final_binding_key.ok_or_else(|| {
+                    GalError::backend("G-buffer final binding missing before mesh submit")
+                })?;
+                let final_binding = self
+                    .g_buffer_final_bindings
+                    .get(&final_binding_key)
+                    .ok_or_else(|| {
+                        GalError::backend("G-buffer final binding vanished before mesh submit")
+                    })?;
+                let shader_plan_started = std::time::Instant::now();
+                let executor =
+                    ShaderPackRuntimeExecutor::terrain_material_multipass_v1(self.generation)?;
+                stats.profile.shader_plan_lookup_nanos = stats
+                    .profile
+                    .shader_plan_lookup_nanos
+                    .saturating_add(elapsed_nanos_u64(shader_plan_started));
+                executor.append_terrain_material_graph(
+                    &mut ops,
+                    terrain_runtime_targets(g_buffer, final_binding),
+                    TerrainRuntimeFrame {
+                        frame_target,
+                        color_attachment,
+                        background_color,
+                        final_depth_view: final_binding.final_depth_view,
+                        uniforms: terrain_composite_uniforms(true),
+                    },
+                    &mesh_draws,
+                )?;
             } else {
                 ops.push(CommandOp::BeginPass {
                     pass,
@@ -1951,6 +2046,10 @@ impl WorldPrimitiveFrontend {
             .saturating_add(stats.material_draw_count)
             .saturating_add(stats.mesh_draw_count);
         stats.command_ops = ops.len() as u64;
+        stats.profile.gal_command_generation_nanos = stats
+            .profile
+            .gal_command_generation_nanos
+            .saturating_add(elapsed_nanos_u64(command_generation_started));
         Ok((ops, stats))
     }
 
@@ -3468,30 +3567,54 @@ impl WorldPrimitiveFrontend {
     fn ensure_g_buffer_resources(
         &mut self,
         gal: &mut VulkanicGal,
-        frame_target: Handle,
         width: u32,
         height: u32,
         frame_color_format: ColorFormat,
+        final_depth_format: Option<TextureFormat>,
+        profile: &mut WholeFrameProfile,
     ) -> GalResult<()> {
         let extent = Extent3d {
             width,
             height,
             depth: 1,
         };
+        let cache_check_started = std::time::Instant::now();
         if let Some(resources) = self.g_buffer_resources.as_ref() {
             if resources.extent == extent
-                && resources.frame_target == frame_target
                 && resources.frame_color_format == frame_color_format
+                && resources.final_depth_format == final_depth_format
+                && resources.generation == self.generation
             {
+                profile.g_buffer_persistent_cache_hits =
+                    profile.g_buffer_persistent_cache_hits.saturating_add(1);
+                profile.world_prepare_g_buffer_cache_check_nanos = profile
+                    .world_prepare_g_buffer_cache_check_nanos
+                    .saturating_add(elapsed_nanos_u64(cache_check_started));
                 return Ok(());
             }
         }
-        self.destroy_g_buffer_resources(gal);
+        profile.g_buffer_persistent_cache_misses =
+            profile.g_buffer_persistent_cache_misses.saturating_add(1);
+        profile.world_prepare_g_buffer_cache_check_nanos = profile
+            .world_prepare_g_buffer_cache_check_nanos
+            .saturating_add(elapsed_nanos_u64(cache_check_started));
+        let destroy_started = std::time::Instant::now();
+        let retired = self.destroy_g_buffer_resources(gal);
+        profile.g_buffer_resources_retired =
+            profile.g_buffer_resources_retired.saturating_add(retired);
+        profile.world_prepare_g_buffer_destroy_nanos = profile
+            .world_prepare_g_buffer_destroy_nanos
+            .saturating_add(elapsed_nanos_u64(destroy_started));
         let label = format!("world-shader-g-buffer-gen{}", self.generation);
+        let plan_started = std::time::Instant::now();
         let shader_executor =
             ShaderPackRuntimeExecutor::terrain_material_multipass_v1(self.generation)?;
         let shader_plan = shader_executor.plan();
+        profile.world_prepare_g_buffer_plan_nanos = profile
+            .world_prepare_g_buffer_plan_nanos
+            .saturating_add(elapsed_nanos_u64(plan_started));
         let mut created = Vec::new();
+        let create_started = std::time::Instant::now();
         let result = (|| -> GalResult<GBufferResources> {
             let shadow_depth_texture = gal.create_texture(TextureDesc {
                 label: format!("{label}.shadow-depth.texture"),
@@ -3690,16 +3813,6 @@ impl WorldPrimitiveFrontend {
                 depth_format: None,
             })?;
             created.push(composite1_pass);
-            let final_depth_view = gal
-                .pass_target_depth_attachment(frame_target)?
-                .map(|(_, view)| view);
-            let final_pass = gal.create_render_pass(RenderPassDesc {
-                label: format!("{label}.final-output-pass"),
-                target: frame_target,
-                color_formats: vec![frame_color_format],
-                depth_format: final_depth_view.map(|_| TextureFormat::Depth32Float),
-            })?;
-            created.push(final_pass);
             let composite_uniform_buffer = gal.create_buffer(BufferDesc {
                 label: format!("{label}.deferred-composite-uniforms"),
                 size: WORLD_SHADER_COMPOSITE_UNIFORM_BYTES,
@@ -3851,7 +3964,7 @@ impl WorldPrimitiveFrontend {
                 screen_vertex_shader,
                 final_fragment_shader,
                 frame_color_format,
-                final_depth_view.map(|_| TextureFormat::Depth32Float),
+                final_depth_format,
             )?;
             created.push(final_pipeline);
             Ok(GBufferResources {
@@ -3884,7 +3997,6 @@ impl WorldPrimitiveFrontend {
                 deferred_lighting_pass,
                 composite0_pass,
                 composite1_pass,
-                final_pass,
                 composite_uniform_buffer,
                 screen_vertex_shader,
                 deferred_lighting_fragment_shader,
@@ -3895,16 +4007,16 @@ impl WorldPrimitiveFrontend {
                 deferred_lighting_resource_set,
                 composite0_resource_set,
                 composite1_resource_set,
-                final_resource_set,
                 screen_pipeline_layout,
                 deferred_lighting_pipeline,
                 composite0_pipeline,
                 composite1_pipeline,
+                final_resource_set,
                 final_pipeline,
-                final_depth_view,
                 extent,
-                frame_target,
                 frame_color_format,
+                final_depth_format,
+                generation: self.generation,
             })
         })();
         if result.is_err() {
@@ -3913,7 +4025,67 @@ impl WorldPrimitiveFrontend {
             }
         }
         self.g_buffer_resources = Some(result?);
+        profile.g_buffer_attachment_creates = profile.g_buffer_attachment_creates.saturating_add(9);
+        profile.g_buffer_shader_module_creates =
+            profile.g_buffer_shader_module_creates.saturating_add(5);
+        profile.g_buffer_descriptor_creates = profile.g_buffer_descriptor_creates.saturating_add(6);
+        profile.g_buffer_render_target_creates =
+            profile.g_buffer_render_target_creates.saturating_add(5);
+        profile.g_buffer_pipeline_creates = profile.g_buffer_pipeline_creates.saturating_add(4);
+        profile.world_prepare_g_buffer_create_nanos = profile
+            .world_prepare_g_buffer_create_nanos
+            .saturating_add(elapsed_nanos_u64(create_started));
         Ok(())
+    }
+
+    fn ensure_g_buffer_final_binding(
+        &mut self,
+        gal: &mut VulkanicGal,
+        frame_target: Handle,
+        frame_color_format: ColorFormat,
+        final_depth_view: Option<Handle>,
+        profile: &mut WholeFrameProfile,
+    ) -> GalResult<GBufferFinalBindingKey> {
+        let resources = self
+            .g_buffer_resources
+            .as_ref()
+            .ok_or_else(|| GalError::backend("G-buffer resources missing before final binding"))?;
+        let key = GBufferFinalBindingKey {
+            frame_target,
+            frame_color_format,
+            final_depth_view,
+            graph_generation: resources.generation,
+        };
+        if self.g_buffer_final_bindings.contains_key(&key) {
+            profile.g_buffer_final_binding_cache_hits =
+                profile.g_buffer_final_binding_cache_hits.saturating_add(1);
+            return Ok(key);
+        }
+        profile.g_buffer_final_binding_cache_misses = profile
+            .g_buffer_final_binding_cache_misses
+            .saturating_add(1);
+        let label = format!("world-shader-g-buffer-gen{}", resources.generation);
+        let mut created = Vec::new();
+        let result = (|| -> GalResult<GBufferFinalBindingResources> {
+            let final_pass = gal.create_render_pass(RenderPassDesc {
+                label: format!("{label}.final-output-pass"),
+                target: frame_target,
+                color_formats: vec![frame_color_format],
+                depth_format: final_depth_view.map(|_| TextureFormat::Depth32Float),
+            })?;
+            created.push(final_pass);
+            Ok(GBufferFinalBindingResources {
+                final_depth_view,
+                final_pass,
+            })
+        })();
+        if result.is_err() {
+            for handle in created.into_iter().rev() {
+                let _ = gal.destroy(handle);
+            }
+        }
+        self.g_buffer_final_bindings.insert(key, result?);
+        Ok(key)
     }
 
     fn destroy_resources(&mut self, gal: &mut VulkanicGal) {
@@ -3931,7 +4103,10 @@ impl WorldPrimitiveFrontend {
         self.destroy_border_resources(gal);
         self.destroy_material_resources(gal);
         self.destroy_mesh_resources(gal);
-        self.destroy_g_buffer_resources(gal);
+        let retired = self.destroy_g_buffer_resources(gal);
+        self.pending_g_buffer_resources_retired = self
+            .pending_g_buffer_resources_retired
+            .saturating_add(retired);
         if let Some(depth) = self.depth_attachment.take() {
             for handle in depth.handles_in_destroy_order() {
                 let _ = gal.destroy(handle);
@@ -3978,12 +4153,46 @@ impl WorldPrimitiveFrontend {
         }
     }
 
-    fn destroy_g_buffer_resources(&mut self, gal: &mut VulkanicGal) {
+    fn destroy_g_buffer_resources(&mut self, gal: &mut VulkanicGal) -> u64 {
+        let mut retired = self.destroy_g_buffer_final_bindings(gal);
         if let Some(resources) = self.g_buffer_resources.take() {
+            retired = retired.saturating_add(1);
             for handle in resources.handles_in_destroy_order() {
                 let _ = gal.destroy(handle);
             }
         }
+        retired
+    }
+
+    fn destroy_g_buffer_final_bindings(&mut self, gal: &mut VulkanicGal) -> u64 {
+        let bindings = std::mem::take(&mut self.g_buffer_final_bindings);
+        let retired = bindings.len() as u64;
+        for (_, binding) in bindings {
+            destroy_g_buffer_final_binding_handles(gal, binding);
+        }
+        retired
+    }
+
+    fn destroy_g_buffer_final_binding(
+        &mut self,
+        gal: &mut VulkanicGal,
+        key: GBufferFinalBindingKey,
+    ) -> u64 {
+        if let Some(binding) = self.g_buffer_final_bindings.remove(&key) {
+            destroy_g_buffer_final_binding_handles(gal, binding);
+            1
+        } else {
+            0
+        }
+    }
+}
+
+fn destroy_g_buffer_final_binding_handles(
+    gal: &mut VulkanicGal,
+    binding: GBufferFinalBindingResources,
+) {
+    for handle in binding.handles_in_destroy_order() {
+        let _ = gal.destroy(handle);
     }
 }
 
@@ -5218,7 +5427,10 @@ fn terrain_material_pass_mode(material_mode: u32) -> GalResult<TerrainMaterialPa
     }
 }
 
-fn terrain_runtime_targets(resources: &GBufferResources) -> TerrainRuntimeTargets {
+fn terrain_runtime_targets(
+    resources: &GBufferResources,
+    final_binding: &GBufferFinalBindingResources,
+) -> TerrainRuntimeTargets {
     TerrainRuntimeTargets {
         shadow_depth_texture: resources.shadow_depth_texture,
         shadow_depth_view: resources.shadow_depth_view,
@@ -5254,7 +5466,7 @@ fn terrain_runtime_targets(resources: &GBufferResources) -> TerrainRuntimeTarget
         composite1_pass: resources.composite1_pass,
         composite1_pipeline: resources.composite1_pipeline,
         composite1_resource_set: resources.composite1_resource_set,
-        final_pass: resources.final_pass,
+        final_pass: final_binding.final_pass,
         final_pipeline: resources.final_pipeline,
         final_resource_set: resources.final_resource_set,
         screen_pipeline_layout: resources.screen_pipeline_layout,
@@ -5276,8 +5488,7 @@ fn shader_fog_params() -> [f32; 4] {
 
 fn shadow_light_view_projection_matrix() -> [f32; 16] {
     [
-        0.22, 0.0, 0.0, 0.0, 0.0, 0.22, 0.0, 0.0, 0.0, 0.0, 0.18, 0.0, 0.0, 0.0, 0.0,
-        1.0,
+        0.22, 0.0, 0.0, 0.0, 0.0, 0.22, 0.0, 0.0, 0.0, 0.0, 0.18, 0.0, 0.0, 0.0, 0.0, 1.0,
     ]
 }
 
@@ -5380,10 +5591,11 @@ impl GameplayAttachmentCapture {
             .ok()
             .and_then(|value| value.parse::<u64>().ok())
             .unwrap_or(0);
-        let min_mesh_instances = std::env::var("MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_MIN_MESH_INSTANCES")
-            .ok()
-            .and_then(|value| value.parse::<usize>().ok())
-            .unwrap_or(1);
+        let min_mesh_instances =
+            std::env::var("MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_MIN_MESH_INSTANCES")
+                .ok()
+                .and_then(|value| value.parse::<usize>().ok())
+                .unwrap_or(1);
         if frame.frame_id < min_frame {
             return None;
         }
@@ -5444,7 +5656,10 @@ impl GameplayAttachmentCapture {
             ("final_output", g_buffer.composite1_texture),
         ] {
             let readback = gal.create_buffer(BufferDesc {
-                label: format!("gameplay-frame-{}.attachment-{name}.readback", self.frame_id),
+                label: format!(
+                    "gameplay-frame-{}.attachment-{name}.readback",
+                    self.frame_id
+                ),
                 size: u64::from(self.extent.width) * u64::from(self.extent.height) * 4,
                 memory: MemoryDomain::Readback,
                 usages: vec![BufferUsage::TransferDst, BufferUsage::HostRead],
@@ -7292,6 +7507,65 @@ mod tests {
         assert_eq!(0, second.crack_cache_misses);
         assert_eq!(0, second.depth_attachment_retires);
         assert_eq!(1, second.depth_attachment_reuses);
+    }
+
+    #[test]
+    fn shader_graph_reuses_persistent_resources_across_transient_frame_targets() {
+        let mut gal = gal();
+        let mut frontend = WorldPrimitiveFrontend::default();
+        frontend
+            .apply_world_mesh_asset_update(
+                &mut gal,
+                1,
+                shader_mesh_scene_assets(1),
+                shader_mesh_scene_textures(1),
+            )
+            .unwrap();
+        let first_target = frame_target(&mut gal, 1, 128, 128);
+        let second_target = frame_target(&mut gal, 2, 128, 128);
+        let (_, first) = frontend
+            .append_frame_ops_inner(
+                &mut gal,
+                1,
+                first_target,
+                shader_mesh_scene_frame(128, 128, 0),
+                true,
+            )
+            .unwrap();
+        let persistent_texture = frontend
+            .g_buffer_resources
+            .as_ref()
+            .map(|resources| resources.albedo_texture)
+            .unwrap();
+        let (_, second) = frontend
+            .append_frame_ops_inner(
+                &mut gal,
+                1,
+                second_target,
+                shader_mesh_scene_frame(128, 128, 1),
+                true,
+            )
+            .unwrap();
+        let reused_texture = frontend
+            .g_buffer_resources
+            .as_ref()
+            .map(|resources| resources.albedo_texture)
+            .unwrap();
+
+        assert_eq!(persistent_texture, reused_texture);
+        assert_eq!(1, first.profile.g_buffer_persistent_cache_misses);
+        assert_eq!(0, first.profile.g_buffer_persistent_cache_hits);
+        assert_eq!(9, first.profile.g_buffer_attachment_creates);
+        assert_eq!(5, first.profile.g_buffer_shader_module_creates);
+        assert_eq!(6, first.profile.g_buffer_descriptor_creates);
+        assert_eq!(4, first.profile.g_buffer_pipeline_creates);
+        assert_eq!(1, second.profile.g_buffer_persistent_cache_hits);
+        assert_eq!(0, second.profile.g_buffer_persistent_cache_misses);
+        assert_eq!(0, second.profile.g_buffer_attachment_creates);
+        assert_eq!(0, second.profile.g_buffer_shader_module_creates);
+        assert_eq!(0, second.profile.g_buffer_descriptor_creates);
+        assert_eq!(1, second.profile.g_buffer_final_binding_cache_misses);
+        assert_eq!(0, second.profile.g_buffer_pipeline_creates);
     }
 
     #[test]

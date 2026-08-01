@@ -672,7 +672,8 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 resource_creates,
                 command_lists,
                 command_ops,
-                metrics
+                metrics,
+                profile
             ]
         ),
         55 => layout!(

@@ -13,7 +13,24 @@ use crate::render::vulkanic::commands::{
 };
 use crate::render::vulkanic::error::{GalError, GalResult};
 use crate::render::vulkanic::handles::{Handle, HandleKind};
+use crate::render::vulkanic::metrics::elapsed_nanos_u64;
 use crate::render::vulkanic::sync::SubmissionId;
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(super) struct VulkanLoweringMetrics {
+    pub(super) command_buffer_alloc_nanos: u64,
+    pub(super) command_buffer_begin_nanos: u64,
+    pub(super) command_recording_nanos: u64,
+    pub(super) command_buffer_end_nanos: u64,
+    pub(super) queue_submit_nanos: u64,
+    pub(super) timeline_poll_nanos: u64,
+    pub(super) timeline_wait_nanos: u64,
+    pub(super) device_wait_idle_nanos: u64,
+    pub(super) command_buffers_allocated: u64,
+    pub(super) command_buffers_freed: u64,
+    pub(super) wait_count: u64,
+    pub(super) device_wait_idle_count: u64,
+}
 
 pub(super) struct SubmissionLowerer {
     context: Arc<VulkanContext>,
@@ -21,6 +38,7 @@ pub(super) struct SubmissionLowerer {
     in_flight: VecDeque<InFlightSubmission>,
     completed: SubmissionId,
     completed_host_reads: Vec<CompletedHostRead>,
+    metrics: VulkanLoweringMetrics,
 }
 
 impl SubmissionLowerer {
@@ -31,6 +49,7 @@ impl SubmissionLowerer {
             in_flight: VecDeque::new(),
             completed: SubmissionId(0),
             completed_host_reads: Vec::new(),
+            metrics: VulkanLoweringMetrics::default(),
         }
     }
 
@@ -39,10 +58,17 @@ impl SubmissionLowerer {
         objects: &VulkanObjects,
         batch: &ValidatedSubmissionBatch,
     ) -> GalResult<()> {
+        let alloc_started = std::time::Instant::now();
         let command_buffer = self.allocate_command_buffer()?;
+        self.metrics.command_buffer_alloc_nanos = self
+            .metrics
+            .command_buffer_alloc_nanos
+            .saturating_add(elapsed_nanos_u64(alloc_started));
+        self.metrics.command_buffers_allocated += 1;
         let _zone = trace::Zone::new("vulkan.lowering.command-recording");
         let begin_info = vk::CommandBufferBeginInfo::default()
             .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
+        let begin_started = std::time::Instant::now();
         unsafe {
             self.context
                 .device
@@ -51,7 +77,12 @@ impl SubmissionLowerer {
         .map_err(|error| {
             GalError::backend(format!("failed to begin Vulkan command buffer: {error:?}"))
         })?;
+        self.metrics.command_buffer_begin_nanos = self
+            .metrics
+            .command_buffer_begin_nanos
+            .saturating_add(elapsed_nanos_u64(begin_started));
 
+        let recording_started = std::time::Instant::now();
         unsafe {
             self.context.begin_label(
                 command_buffer,
@@ -73,9 +104,18 @@ impl SubmissionLowerer {
         }
         self.transition_pending_frame_targets_to_present(command_buffer, &mut state);
         unsafe { self.context.end_label(command_buffer) };
+        self.metrics.command_recording_nanos = self
+            .metrics
+            .command_recording_nanos
+            .saturating_add(elapsed_nanos_u64(recording_started));
+        let end_started = std::time::Instant::now();
         unsafe { self.context.device.end_command_buffer(command_buffer) }.map_err(|error| {
             GalError::backend(format!("failed to end Vulkan command buffer: {error:?}"))
         })?;
+        self.metrics.command_buffer_end_nanos = self
+            .metrics
+            .command_buffer_end_nanos
+            .saturating_add(elapsed_nanos_u64(end_started));
         self.pending.push_back(EncodedSubmission {
             command_buffer,
             host_reads: state.host_reads,
@@ -99,12 +139,17 @@ impl SubmissionLowerer {
         let submit = vk::SubmitInfo2::default()
             .command_buffer_infos(&command_buffer_info)
             .signal_semaphore_infos(&signal_info);
+        let queue_submit_started = std::time::Instant::now();
         unsafe {
             self.context
                 .device
                 .queue_submit2(self.context.queue, &[submit], vk::Fence::null())
         }
         .map_err(|error| GalError::backend(format!("Vulkan queue submit failed: {error:?}")))?;
+        self.metrics.queue_submit_nanos = self
+            .metrics
+            .queue_submit_nanos
+            .saturating_add(elapsed_nanos_u64(queue_submit_started));
         self.in_flight.push_back(InFlightSubmission {
             id,
             command_buffer: encoded.command_buffer,
@@ -114,6 +159,7 @@ impl SubmissionLowerer {
     }
 
     pub(super) fn completed_submission(&mut self) -> SubmissionId {
+        let poll_started = std::time::Instant::now();
         if let Ok(value) = unsafe {
             self.context
                 .device
@@ -121,6 +167,10 @@ impl SubmissionLowerer {
         } {
             self.completed = SubmissionId(value);
         }
+        self.metrics.timeline_poll_nanos = self
+            .metrics
+            .timeline_poll_nanos
+            .saturating_add(elapsed_nanos_u64(poll_started));
         while let Some(front) = self.in_flight.front() {
             if front.id > self.completed {
                 break;
@@ -132,6 +182,7 @@ impl SubmissionLowerer {
                     .device
                     .free_command_buffers(self.context.command_pool, &[complete.command_buffer]);
             }
+            self.metrics.command_buffers_freed += 1;
         }
         self.completed
     }
@@ -143,12 +194,19 @@ impl SubmissionLowerer {
             }
             let complete = self.in_flight.pop_front().expect("front existed");
             let _zone = trace::Zone::new("vulkan.backend.wait-timeline");
+            let wait_started = std::time::Instant::now();
             wait_timeline(&self.context, complete.id)?;
+            self.metrics.timeline_wait_nanos = self
+                .metrics
+                .timeline_wait_nanos
+                .saturating_add(elapsed_nanos_u64(wait_started));
+            self.metrics.wait_count += 1;
             unsafe {
                 self.context
                     .device
                     .free_command_buffers(self.context.command_pool, &[complete.command_buffer]);
             }
+            self.metrics.command_buffers_freed += 1;
             self.complete_host_reads(&complete);
             self.completed = complete.id;
         }
@@ -159,14 +217,25 @@ impl SubmissionLowerer {
         &self.completed_host_reads
     }
 
+    pub(super) fn metrics(&self) -> VulkanLoweringMetrics {
+        self.metrics
+    }
+
     pub(super) fn wait_idle_and_clear(&mut self) {
+        let wait_started = std::time::Instant::now();
         let _ = self.context.wait_idle();
+        self.metrics.device_wait_idle_nanos = self
+            .metrics
+            .device_wait_idle_nanos
+            .saturating_add(elapsed_nanos_u64(wait_started));
+        self.metrics.device_wait_idle_count += 1;
         for encoded in self.pending.drain(..) {
             unsafe {
                 self.context
                     .device
                     .free_command_buffers(self.context.command_pool, &[encoded.command_buffer]);
             }
+            self.metrics.command_buffers_freed += 1;
         }
         for complete in self.in_flight.drain(..) {
             unsafe {
@@ -174,6 +243,7 @@ impl SubmissionLowerer {
                     .device
                     .free_command_buffers(self.context.command_pool, &[complete.command_buffer]);
             }
+            self.metrics.command_buffers_freed += 1;
         }
     }
 
