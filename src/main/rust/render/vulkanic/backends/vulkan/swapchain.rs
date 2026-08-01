@@ -17,6 +17,18 @@ use crate::render::vulkanic::frame::{
 use crate::render::vulkanic::resources::{Extent3d, TextureFormat};
 use crate::render::vulkanic::sync::SubmissionId;
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(super) struct SwapchainRuntimeMetrics {
+    pub(super) acquire_nanos: u64,
+    pub(super) present_nanos: u64,
+    pub(super) present_wait_nanos: u64,
+    pub(super) present_mode: u64,
+    pub(super) acquired_image_index: u64,
+    pub(super) swapchain_generation: u64,
+    pub(super) images_in_flight: u64,
+    pub(super) available_frame_slots: u64,
+}
+
 pub(in crate::render::vulkanic) trait SurfaceOwner {
     fn required_instance_extensions(&self) -> Vec<&'static CStr>;
     fn create_surface(
@@ -42,12 +54,15 @@ pub(super) struct VulkanSwapchain {
     next_frame: u64,
     stable_window_id: u64,
     recreate_count: u64,
+    present_mode: vk::PresentModeKHR,
+    metrics: SwapchainRuntimeMetrics,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct AcquiredImage {
     frame: FrameId,
     image_index: u32,
+    render_target: FrameRenderTargetId,
     suboptimal: bool,
 }
 
@@ -79,6 +94,8 @@ impl VulkanSwapchain {
             next_frame: 0,
             stable_window_id,
             recreate_count: 0,
+            present_mode: vk::PresentModeKHR::FIFO,
+            metrics: SwapchainRuntimeMetrics::default(),
         };
         owner.recreate(vk::SwapchainKHR::null())?;
         Ok(owner)
@@ -91,9 +108,16 @@ impl VulkanSwapchain {
 
     pub(super) fn acquire(&mut self, desc: &FrameAcquireDesc) -> GalResult<AcquiredFrame> {
         let _zone = trace::Zone::new("vulkan.swapchain.acquire");
+        let acquire_started = std::time::Instant::now();
         self.next_frame += 1;
         let frame = FrameId(self.next_frame);
         if desc.expected_extent.width == 0 || desc.expected_extent.height == 0 {
+            self.metrics.acquire_nanos = self
+                .metrics
+                .acquire_nanos
+                .saturating_add(crate::render::vulkanic::metrics::elapsed_nanos_u64(
+                    acquire_started,
+                ));
             return Ok(AcquiredFrame {
                 frame,
                 correlation_id: desc.correlation_id,
@@ -143,14 +167,34 @@ impl VulkanSwapchain {
             }
         };
         unsafe { self.context.device.destroy_fence(acquire_fence, None) };
+        let render_target = self.render_target_for_image(image_index);
         self.acquired.push(AcquiredImage {
             frame,
             image_index,
+            render_target,
             suboptimal,
         });
+        self.metrics.acquire_nanos = self
+            .metrics
+            .acquire_nanos
+            .saturating_add(crate::render::vulkanic::metrics::elapsed_nanos_u64(
+                acquire_started,
+            ));
+        self.metrics.acquired_image_index = u64::from(image_index);
+        self.metrics.swapchain_generation = self.recreate_count;
+        self.metrics.images_in_flight = self.acquired.len() as u64;
+        self.metrics.available_frame_slots = self
+            .images
+            .len()
+            .saturating_sub(self.acquired.len()) as u64;
         trace::message(&format!(
-            "gal.frame.acquire backend=vulkan correlation={} frame={} image={} window={}",
-            desc.correlation_id.0, frame.0, image_index, self.stable_window_id
+            "gal.frame.acquire backend=vulkan correlation={} frame={} image={} target={} generation={} window={}",
+            desc.correlation_id.0,
+            frame.0,
+            image_index,
+            render_target.0,
+            self.recreate_count,
+            self.stable_window_id
         ));
         Ok(AcquiredFrame {
             frame,
@@ -160,7 +204,7 @@ impl VulkanSwapchain {
             } else {
                 FrameAcquireStatus::Ready
             },
-            render_target: FrameRenderTargetId(u64::from(image_index) + 1),
+            render_target,
             extent: Extent3d {
                 width: self.extent.width,
                 height: self.extent.height,
@@ -187,6 +231,7 @@ impl VulkanSwapchain {
 
     pub(super) fn present(&mut self, desc: &PresentFrameDesc) -> GalResult<PresentedFrame> {
         let _zone = trace::Zone::new("vulkan.swapchain.present");
+        let present_started = std::time::Instant::now();
         let Some(position) = self
             .acquired
             .iter()
@@ -198,7 +243,14 @@ impl VulkanSwapchain {
             ));
         };
         let acquired = self.acquired.remove(position);
+        let wait_started = std::time::Instant::now();
         wait_timeline(&self.context, desc.wait_for)?;
+        self.metrics.present_wait_nanos = self
+            .metrics
+            .present_wait_nanos
+            .saturating_add(crate::render::vulkanic::metrics::elapsed_nanos_u64(
+                wait_started,
+            ));
         let swapchains = [self.swapchain];
         let image_indices = [acquired.image_index];
         let present_info = vk::PresentInfoKHR::default()
@@ -222,6 +274,17 @@ impl VulkanSwapchain {
         if let Some(layout) = self.image_layouts.get_mut(acquired.image_index as usize) {
             *layout = vk::ImageLayout::PRESENT_SRC_KHR;
         }
+        self.metrics.present_nanos = self
+            .metrics
+            .present_nanos
+            .saturating_add(crate::render::vulkanic::metrics::elapsed_nanos_u64(
+                present_started,
+            ));
+        self.metrics.images_in_flight = self.acquired.len() as u64;
+        self.metrics.available_frame_slots = self
+            .images
+            .len()
+            .saturating_sub(self.acquired.len()) as u64;
         trace::message(&format!(
             "gal.frame.present backend=vulkan correlation={} frame={} image={} submission={} status={:?} window={}",
             desc.correlation_id.0,
@@ -234,7 +297,7 @@ impl VulkanSwapchain {
         Ok(PresentedFrame {
             frame: desc.frame,
             correlation_id: desc.correlation_id,
-            render_target: FrameRenderTargetId(u64::from(acquired.image_index) + 1),
+            render_target: acquired.render_target,
             status,
             completed_submission: desc.wait_for,
         })
@@ -248,17 +311,38 @@ impl VulkanSwapchain {
         self.stable_window_id
     }
 
+    pub(super) fn metrics(&self) -> SwapchainRuntimeMetrics {
+        self.metrics
+    }
+
     pub(super) fn frame_target_object(
         &self,
         desc: &crate::render::vulkanic::resources::FrameTargetDesc,
         token: BackendToken,
     ) -> GalResult<FrameTargetObject> {
+        self.frame_target_object_for_render_target(
+            desc.render_target,
+            desc.extent,
+            desc.color_format,
+            token,
+        )
+    }
+
+    pub(super) fn frame_target_object_for_render_target(
+        &self,
+        render_target: FrameRenderTargetId,
+        extent: Extent3d,
+        color_format: TextureFormat,
+        token: BackendToken,
+    ) -> GalResult<FrameTargetObject> {
         let acquired = self
             .acquired
             .iter()
-            .find(|acquired| acquired.frame.0 == desc.frame_id)
+            .find(|acquired| acquired.render_target == render_target)
             .ok_or_else(|| {
-                GalError::backend("frame target was created for a non-acquired frame")
+                GalError::backend(
+                    "frame target was used without the matching acquired swapchain image",
+                )
             })?;
         let index = acquired.image_index as usize;
         let image = *self
@@ -273,14 +357,19 @@ impl VulkanSwapchain {
         })?;
         Ok(FrameTargetObject {
             token,
-            frame_id: desc.frame_id,
-            extent: desc.extent,
-            color_format: desc.color_format,
+            frame_id: acquired.frame.0,
+            render_target,
+            extent,
+            color_format,
             image_index: acquired.image_index,
             image,
             image_view,
             image_layout,
         })
+    }
+
+    fn render_target_for_image(&self, image_index: u32) -> FrameRenderTargetId {
+        FrameRenderTargetId((self.recreate_count << 32) | (u64::from(image_index) + 1))
     }
 
     fn recreate(&mut self, old_swapchain: vk::SwapchainKHR) -> GalResult<()> {
@@ -362,11 +451,16 @@ impl VulkanSwapchain {
         self.format = format.format;
         self.color_format = color_format;
         self.extent = extent;
+        self.present_mode = present_mode;
         self.images = images;
         self.image_layouts = vec![vk::ImageLayout::UNDEFINED; self.images.len()];
         self.image_views = image_views;
         self.acquired.clear();
         self.recreate_count += 1;
+        self.metrics.present_mode = present_mode.as_raw() as u64;
+        self.metrics.swapchain_generation = self.recreate_count;
+        self.metrics.images_in_flight = 0;
+        self.metrics.available_frame_slots = self.images.len() as u64;
         trace::message(&format!(
             "gal.swapchain.recreate backend=vulkan count={} extent={}x{} images={} format={} window={}",
             self.recreate_count,

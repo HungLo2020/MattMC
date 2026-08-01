@@ -18,6 +18,8 @@ pub(super) struct VulkanContext {
     pub(super) queue_family_index: u32,
     pub(super) queue: vk::Queue,
     pub(super) memory_properties: vk::PhysicalDeviceMemoryProperties,
+    pub(super) timestamp_period: f32,
+    pub(super) timestamp_valid_bits: u32,
     pub(super) command_pool: vk::CommandPool,
     pub(super) timeline: vk::Semaphore,
     pub(super) surface_loader: Option<ash::khr::surface::Instance>,
@@ -128,6 +130,8 @@ impl VulkanContext {
         )?;
         let memory_properties =
             unsafe { instance.get_physical_device_memory_properties(physical_device) };
+        let physical_properties =
+            unsafe { instance.get_physical_device_properties(physical_device) };
 
         let priority = [1.0_f32];
         let queue_info = vk::DeviceQueueCreateInfo::default()
@@ -182,6 +186,8 @@ impl VulkanContext {
             unsafe { device.create_semaphore(&semaphore_info, None) }.map_err(|error| {
                 GalError::backend(format!("failed to create timeline semaphore: {error:?}"))
             })?;
+        let timestamp_valid_bits =
+            queue_timestamp_valid_bits(&instance, physical_device, queue_family_index);
 
         let context = Arc::new(Self {
             entry,
@@ -192,6 +198,8 @@ impl VulkanContext {
             queue_family_index,
             queue,
             memory_properties,
+            timestamp_period: physical_properties.limits.timestamp_period,
+            timestamp_valid_bits,
             command_pool,
             timeline,
             surface_loader,
@@ -315,6 +323,17 @@ impl VulkanContext {
             unsafe { debug_utils.cmd_end_debug_utils_label(command_buffer) };
         }
     }
+}
+
+fn queue_timestamp_valid_bits(
+    instance: &ash::Instance,
+    physical_device: vk::PhysicalDevice,
+    queue_family_index: u32,
+) -> u32 {
+    unsafe { instance.get_physical_device_queue_family_properties(physical_device) }
+        .get(queue_family_index as usize)
+        .map(|family| family.timestamp_valid_bits)
+        .unwrap_or(0)
 }
 
 impl Drop for VulkanContext {

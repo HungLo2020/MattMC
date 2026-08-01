@@ -1,3 +1,4 @@
+use super::frame::FrameRenderTargetId;
 use super::handles::Handle;
 
 #[repr(u32)]
@@ -471,6 +472,7 @@ pub struct RenderTargetDesc {
 pub struct FrameTargetDesc {
     pub label: String,
     pub frame_id: u64,
+    pub render_target: FrameRenderTargetId,
     pub extent: Extent3d,
     pub color_format: TextureFormat,
 }

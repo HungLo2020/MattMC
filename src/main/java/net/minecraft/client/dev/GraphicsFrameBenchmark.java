@@ -106,10 +106,13 @@ public final class GraphicsFrameBenchmark {
 		Math.max(1, Math.min(REAL_TERRAIN_PARTICLE_MATERIAL_COUNT, Integer.getInteger("mattmc.dev.rustGalWorldMaterial.terrainParticleRealGameplayEffectsPerFrame", REAL_TERRAIN_PARTICLE_MATERIAL_COUNT)));
 	private static final Path STATUS_PATH = Path.of(System.getProperty("mattmc.dev.graphicsFrameBenchmark.status", "run/graphics_frame_benchmark.json"));
 	private static final String WORKLOAD_COUNTER_DEFINITION_VERSION = "phase-family-v2";
+	private static final int MAX_FRAME_TIMELINE_EVENTS =
+		Math.max(1, Integer.getInteger("mattmc.dev.graphicsFrameBenchmark.maxTimelineEvents", 128));
 
 	private static final ArrayDeque<OpenPhase> PHASE_STACK = new ArrayDeque<>();
 	private static final Map<String, PhaseStats> EXCLUSIVE_PHASES = new LinkedHashMap<>();
 	private static final Map<String, PhaseStats> NESTED_PHASES = new LinkedHashMap<>();
+	private static final List<FrameTimelineEvent> FRAME_TIMELINE_EVENTS = new ArrayList<>();
 	private static final Map<String, Integer> SUBMITTED_WORK_COUNTS = new LinkedHashMap<>();
 	private static final Map<Long, Map<String, Set<String>>> SUBMITTED_WORK_BY_FRAME = new LinkedHashMap<>();
 	private static final Map<String, Integer> FALLING_BLOCK_ROUTE_COUNTS = new LinkedHashMap<>();
@@ -137,6 +140,8 @@ public final class GraphicsFrameBenchmark {
 	private static long measurementEndNanos = -1L;
 	private static long firstSampleNanos = -1L;
 	private static long lastSampleNanos = -1L;
+	private static long currentFrameStartNanos = -1L;
+	private static long lastMeasurementFrameStartNanos = -1L;
 	private static long readinessStartNanos = -1L;
 	private static long producerWorkloadStartNanos = -1L;
 	private static long producerWorkloadWaitFrames;
@@ -215,6 +220,7 @@ public final class GraphicsFrameBenchmark {
 		if (!ENABLED) {
 			return;
 		}
+		currentFrameStartNanos = System.nanoTime();
 		if ((complete || failed) && STOP_AFTER_COMPLETE && !stopIssued) {
 			stopIssued = true;
 			minecraft.stop();
@@ -264,6 +270,12 @@ public final class GraphicsFrameBenchmark {
 			if (tracyAvailable()) {
 				TracyCompat.message("MattMC graphics gameplay measurement start");
 			}
+		}
+		if (measurementFrame) {
+			if (lastMeasurementFrameStartNanos > 0L) {
+				recordPhaseSample("benchmark.frame-start-interval", currentFrameStartNanos - lastMeasurementFrameStartNanos);
+			}
+			lastMeasurementFrameStartNanos = currentFrameStartNanos;
 		}
 		applyPositiveControlDelay();
 	}
@@ -343,6 +355,58 @@ public final class GraphicsFrameBenchmark {
 		}
 		NESTED_PHASES.computeIfAbsent(name, ignored -> new PhaseStats()).add(nanos);
 		EXCLUSIVE_PHASES.computeIfAbsent(name, ignored -> new PhaseStats()).add(nanos);
+	}
+
+	public static void recordRustWholeFrameTimeline(
+		long correlationId,
+		long rustFrameId,
+		long submissionId,
+		long acquiredImage,
+		long presentedImage,
+		long executeStartNanos,
+		long acquireStartNanos,
+		long acquireEndNanos,
+		long submitStartNanos,
+		long submitEndNanos,
+		long presentStartNanos,
+		long presentEndNanos,
+		long guiSprites,
+		long meshInstances,
+		long meshDraws,
+		long gpuFrameTotalNanos,
+		long presentMode,
+		long imagesInFlight,
+		long availableFrameSlots
+	) {
+		if (!ENABLED || !frameActive || !measurementFrame || FRAME_TIMELINE_EVENTS.size() >= MAX_FRAME_TIMELINE_EVENTS) {
+			return;
+		}
+		long frameStart = currentFrameStartNanos > 0L ? currentFrameStartNanos : executeStartNanos;
+		FRAME_TIMELINE_EVENTS.add(new FrameTimelineEvent(
+			frameIndex,
+			correlationId,
+			rustFrameId,
+			submissionId,
+			acquiredImage,
+			presentedImage,
+			relativeNanos(frameStart, executeStartNanos),
+			relativeNanos(frameStart, acquireStartNanos),
+			relativeNanos(frameStart, acquireEndNanos),
+			relativeNanos(frameStart, submitStartNanos),
+			relativeNanos(frameStart, submitEndNanos),
+			relativeNanos(frameStart, presentStartNanos),
+			relativeNanos(frameStart, presentEndNanos),
+			Math.max(0L, acquireEndNanos - acquireStartNanos),
+			Math.max(0L, submitEndNanos - submitStartNanos),
+			Math.max(0L, presentEndNanos - presentStartNanos),
+			guiSprites,
+			meshInstances,
+			meshDraws,
+			gpuFrameTotalNanos,
+			presentMode,
+			imagesInFlight,
+			availableFrameSlots
+		));
 	}
 
 	public static void recordSubmittedWorkIdentity(String family, String identity) {
@@ -1262,6 +1326,8 @@ public final class GraphicsFrameBenchmark {
 		json.append("  },\n");
 		writeSamples(json);
 		json.append(",\n");
+		writeFrameTimeline(json);
+		json.append(",\n");
 		field(json, "rustGalSliceMetricsLine", RustGalFrameCoordinator.currentAuditMetricsLine(), 2, true);
 		writeStringIntMap(json, "submittedWorkCounts", SUBMITTED_WORK_COUNTS);
 		json.append(",\n");
@@ -1367,6 +1433,45 @@ public final class GraphicsFrameBenchmark {
 				json.append(", ");
 			}
 			json.append(FRAME_NANOS.get(i));
+		}
+		json.append("]");
+	}
+
+	private static void writeFrameTimeline(StringBuilder json) {
+		json.append("  \"rustWholeFrameTimeline\": [");
+		for (int i = 0; i < FRAME_TIMELINE_EVENTS.size(); i++) {
+			FrameTimelineEvent event = FRAME_TIMELINE_EVENTS.get(i);
+			if (i > 0) {
+				json.append(",");
+			}
+			json.append("\n    {");
+			json.append(" \"frameIndex\": ").append(event.frameIndex());
+			json.append(", \"correlationId\": ").append(event.correlationId());
+			json.append(", \"rustFrameId\": ").append(event.rustFrameId());
+			json.append(", \"submissionId\": ").append(event.submissionId());
+			json.append(", \"acquiredImage\": ").append(event.acquiredImage());
+			json.append(", \"presentedImage\": ").append(event.presentedImage());
+			json.append(", \"executeStartNanos\": ").append(event.executeStartNanos());
+			json.append(", \"acquireStartNanos\": ").append(event.acquireStartNanos());
+			json.append(", \"acquireEndNanos\": ").append(event.acquireEndNanos());
+			json.append(", \"submitStartNanos\": ").append(event.submitStartNanos());
+			json.append(", \"submitEndNanos\": ").append(event.submitEndNanos());
+			json.append(", \"presentStartNanos\": ").append(event.presentStartNanos());
+			json.append(", \"presentEndNanos\": ").append(event.presentEndNanos());
+			json.append(", \"acquireDurationNanos\": ").append(event.acquireDurationNanos());
+			json.append(", \"submitDurationNanos\": ").append(event.submitDurationNanos());
+			json.append(", \"presentDurationNanos\": ").append(event.presentDurationNanos());
+			json.append(", \"guiSprites\": ").append(event.guiSprites());
+			json.append(", \"meshInstances\": ").append(event.meshInstances());
+			json.append(", \"meshDraws\": ").append(event.meshDraws());
+			json.append(", \"gpuFrameTotalNanos\": ").append(event.gpuFrameTotalNanos());
+			json.append(", \"presentMode\": ").append(event.presentMode());
+			json.append(", \"imagesInFlight\": ").append(event.imagesInFlight());
+			json.append(", \"availableFrameSlots\": ").append(event.availableFrameSlots());
+			json.append(" }");
+		}
+		if (!FRAME_TIMELINE_EVENTS.isEmpty()) {
+			json.append("\n  ");
 		}
 		json.append("]");
 	}
@@ -1514,6 +1619,9 @@ public final class GraphicsFrameBenchmark {
 			json.append("    \"").append(escape(entry.getKey())).append("\": { ");
 			json.append("\"count\": ").append(stats.count).append(", ");
 			json.append("\"total\": ").append(stats.totalNanos).append(", ");
+			json.append("\"median\": ").append(stats.percentile(0.50)).append(", ");
+			json.append("\"p95\": ").append(stats.percentile(0.95)).append(", ");
+			json.append("\"p99\": ").append(stats.percentile(0.99)).append(", ");
 			json.append("\"worst\": ").append(stats.worstNanos).append(" }");
 			index++;
 		}
@@ -1571,6 +1679,13 @@ public final class GraphicsFrameBenchmark {
 
 	private static String format(double value) {
 		return String.format(Locale.ROOT, "%.6f", value);
+	}
+
+	private static long relativeNanos(long originNanos, long timestampNanos) {
+		if (originNanos <= 0L || timestampNanos <= 0L) {
+			return -1L;
+		}
+		return timestampNanos - originNanos;
 	}
 
 	private static void applyArmorOverride(LocalPlayer player) {
@@ -1704,15 +1819,54 @@ public final class GraphicsFrameBenchmark {
 		}
 	}
 
+	private record FrameTimelineEvent(
+		long frameIndex,
+		long correlationId,
+		long rustFrameId,
+		long submissionId,
+		long acquiredImage,
+		long presentedImage,
+		long executeStartNanos,
+		long acquireStartNanos,
+		long acquireEndNanos,
+		long submitStartNanos,
+		long submitEndNanos,
+		long presentStartNanos,
+		long presentEndNanos,
+		long acquireDurationNanos,
+		long submitDurationNanos,
+		long presentDurationNanos,
+		long guiSprites,
+		long meshInstances,
+		long meshDraws,
+		long gpuFrameTotalNanos,
+		long presentMode,
+		long imagesInFlight,
+		long availableFrameSlots
+	) {
+	}
+
 	private static final class PhaseStats {
 		private long count;
 		private long totalNanos;
 		private long worstNanos;
+		private final ArrayList<Long> samples = new ArrayList<>();
 
 		private void add(long nanos) {
 			this.count++;
 			this.totalNanos += nanos;
 			this.worstNanos = Math.max(this.worstNanos, nanos);
+			this.samples.add(nanos);
+		}
+
+		private long percentile(double percentile) {
+			if (this.samples.isEmpty()) {
+				return 0L;
+			}
+			ArrayList<Long> sorted = new ArrayList<>(this.samples);
+			sorted.sort(Long::compare);
+			int index = (int)Math.floor((sorted.size() - 1) * percentile);
+			return sorted.get(Math.max(0, Math.min(sorted.size() - 1, index)));
 		}
 	}
 }

@@ -79,19 +79,19 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_frame_acquire(
             })?;
             let frame_target = if acquired.status == FrameAcquireStatus::Minimized {
                 Handle::NULL
+            } else if let Some(cached) = context.frame_targets.get(&acquired.render_target) {
+                cached.handle
             } else {
                 let handle = context.gal.create_frame_target(FrameTargetDesc {
                     label: format!("ffi.frame-target.{}", acquired.frame.0),
                     frame_id: acquired.frame.0,
+                    render_target: acquired.render_target,
                     extent: acquired.extent,
                     color_format: acquired.color_format,
                 })?;
-                if let Some(previous) = context
-                    .cached_frame_target
-                    .replace(CachedFrameTarget { handle })
-                {
-                    context.stale_frame_targets.push(previous.handle);
-                }
+                context
+                    .frame_targets
+                    .insert(acquired.render_target, CachedFrameTarget { handle });
                 handle
             };
             Ok(FfiFrameAcquireResult {

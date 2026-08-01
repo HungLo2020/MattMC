@@ -597,12 +597,9 @@ pub(crate) fn execute_resource_batch(
         context.gal.retire_completed()?;
     }
     for (handle, _kind) in batch.destroys {
-        if context
-            .cached_frame_target
-            .is_some_and(|cached| cached.handle == handle)
-        {
-            context.cached_frame_target = None;
-        }
+        context
+            .frame_targets
+            .retain(|_identity, cached| cached.handle != handle);
         context.stale_frame_targets.retain(|stale| *stale != handle);
         context.gal.destroy(handle)?;
     }

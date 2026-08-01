@@ -233,6 +233,37 @@ impl Backend for VulkanBackend {
 
     fn encode_passes(&mut self, batch: &ValidatedSubmissionBatch) -> GalResult<()> {
         let _zone = trace::Zone::new("vulkan.backend.lowering.encode");
+        if let Some(swapchain) = &self.swapchain {
+            let mut frame_targets = Vec::new();
+            for list in &batch.command_lists {
+                for op in &list.operations {
+                    if let crate::render::vulkanic::commands::CommandOp::BeginPass {
+                        target, ..
+                    } = op
+                    {
+                        if target.kind()
+                            == Some(crate::render::vulkanic::handles::HandleKind::FrameTarget)
+                            && !frame_targets.contains(target)
+                        {
+                            frame_targets.push(*target);
+                        }
+                    }
+                }
+            }
+            for target in frame_targets {
+                self.objects.refresh_frame_target_from_swapchain(
+                    target,
+                    |token, render_target, extent, color_format| {
+                        swapchain.frame_target_object_for_render_target(
+                            render_target,
+                            extent,
+                            color_format,
+                            token,
+                        )
+                    },
+                )?;
+            }
+        }
         self.lowerer
             .lock()
             .map_err(|_| {
@@ -286,6 +317,11 @@ impl Backend for VulkanBackend {
             .lock()
             .map(|lowerer| lowerer.metrics())
             .unwrap_or_default();
+        let swapchain = self
+            .swapchain
+            .as_ref()
+            .map(|swapchain| swapchain.metrics())
+            .unwrap_or_default();
         BackendRuntimeMetrics {
             vulkan_command_buffer_alloc_nanos: lowering.command_buffer_alloc_nanos,
             vulkan_command_buffer_begin_nanos: lowering.command_buffer_begin_nanos,
@@ -295,10 +331,27 @@ impl Backend for VulkanBackend {
             vulkan_timeline_poll_nanos: lowering.timeline_poll_nanos,
             vulkan_timeline_wait_nanos: lowering.timeline_wait_nanos,
             vulkan_device_wait_idle_nanos: lowering.device_wait_idle_nanos,
+            vulkan_acquire_nanos: swapchain.acquire_nanos,
+            vulkan_present_nanos: swapchain.present_nanos,
+            vulkan_present_wait_nanos: swapchain.present_wait_nanos,
             vulkan_command_buffers_allocated: lowering.command_buffers_allocated,
             vulkan_command_buffers_freed: lowering.command_buffers_freed,
             vulkan_wait_count: lowering.wait_count,
             vulkan_device_wait_idle_count: lowering.device_wait_idle_count,
+            vulkan_present_mode: swapchain.present_mode,
+            vulkan_acquired_image_index: swapchain.acquired_image_index,
+            vulkan_swapchain_generation: swapchain.swapchain_generation,
+            vulkan_images_in_flight: swapchain.images_in_flight,
+            vulkan_available_frame_slots: swapchain.available_frame_slots,
+            gpu_timestamp_status: lowering.gpu_timestamp_status,
+            gpu_shadow_depth_nanos: lowering.gpu_shadow_depth_nanos,
+            gpu_terrain_opaque_nanos: lowering.gpu_terrain_opaque_nanos,
+            gpu_terrain_cutout_nanos: lowering.gpu_terrain_cutout_nanos,
+            gpu_deferred_lighting_nanos: lowering.gpu_deferred_lighting_nanos,
+            gpu_composite0_nanos: lowering.gpu_composite0_nanos,
+            gpu_composite1_nanos: lowering.gpu_composite1_nanos,
+            gpu_final_output_nanos: lowering.gpu_final_output_nanos,
+            gpu_frame_total_nanos: lowering.gpu_frame_total_nanos,
             ..BackendRuntimeMetrics::default()
         }
     }
@@ -344,7 +397,11 @@ impl Backend for VulkanBackend {
                 ),
             );
         };
-        swapchain.present(desc)
+        let presented = swapchain.present(desc)?;
+        if let Ok(mut lowerer) = self.lowerer.lock() {
+            let _ = lowerer.completed_submission();
+        }
+        Ok(presented)
     }
 
     fn shutdown_frame_surface(&mut self) -> GalResult<()> {

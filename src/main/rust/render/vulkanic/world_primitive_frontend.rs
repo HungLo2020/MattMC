@@ -1506,6 +1506,7 @@ impl WorldPrimitiveFrontend {
         if !frame.border_quads.is_empty() {
             self.ensure_border_resources(gal, color_format)?;
         }
+        let mesh_material_asset_started = std::time::Instant::now();
         for batch in &material_batches {
             self.ensure_material_resources(gal, batch.key)?;
         }
@@ -1524,6 +1525,8 @@ impl WorldPrimitiveFrontend {
             *count += 1;
             self.ensure_mesh_resource_slots(gal, batch.key, *count)?;
         }
+        profile.world_prepare_mesh_material_asset_nanos =
+            elapsed_nanos_u64(mesh_material_asset_started);
         profile.world_prepare_render_resources_nanos = elapsed_nanos_u64(render_resources_started);
         let depth_started = std::time::Instant::now();
         let (depth_texture, depth_view, created_depth, retired_depth) = self
@@ -1537,9 +1540,12 @@ impl WorldPrimitiveFrontend {
         let mut g_buffer_final_binding_key = None;
         if use_g_buffer_mesh_path {
             let g_buffer_started = std::time::Instant::now();
+            let final_target_query_started = std::time::Instant::now();
             let final_depth_view = gal
                 .pass_target_depth_attachment(frame_target)?
                 .map(|(_, view)| view);
+            profile.world_prepare_frame_target_attachment_query_nanos =
+                elapsed_nanos_u64(final_target_query_started);
             let final_depth_format = final_depth_view.map(|_| TextureFormat::Depth32Float);
             self.ensure_g_buffer_resources(
                 gal,
@@ -1563,6 +1569,7 @@ impl WorldPrimitiveFrontend {
         let frame_pass_started = std::time::Instant::now();
         let pass = self.frame_pass(gal, frame_target, depth_view)?;
         profile.world_prepare_frame_pass_nanos = elapsed_nanos_u64(frame_pass_started);
+        let metrics_started = std::time::Instant::now();
         let resource_metrics_after = gal.metrics();
         profile.resource_creates_delta = profile.resource_creates_delta.saturating_add(
             resource_metrics_after
@@ -1574,6 +1581,7 @@ impl WorldPrimitiveFrontend {
                 .resource_destroys
                 .saturating_sub(resource_destroys_before),
         );
+        profile.world_prepare_metrics_accounting_nanos = elapsed_nanos_u64(metrics_started);
         let mut stats = WorldPrimitiveSubmitStats {
             segment_count: frame.segments.len() as u64,
             vertex_count: (frame.segments.len() * 6) as u64,
@@ -3578,25 +3586,36 @@ impl WorldPrimitiveFrontend {
             height,
             depth: 1,
         };
+        let persistent_key_started = std::time::Instant::now();
+        let has_compatible_persistent_resources =
+            self.g_buffer_resources.as_ref().is_some_and(|resources| {
+                resources.extent == extent
+                    && resources.frame_color_format == frame_color_format
+                    && resources.final_depth_format == final_depth_format
+                    && resources.generation == self.generation
+            });
+        profile.world_prepare_g_buffer_persistent_key_nanos = profile
+            .world_prepare_g_buffer_persistent_key_nanos
+            .saturating_add(elapsed_nanos_u64(persistent_key_started));
         let cache_check_started = std::time::Instant::now();
-        if let Some(resources) = self.g_buffer_resources.as_ref() {
-            if resources.extent == extent
-                && resources.frame_color_format == frame_color_format
-                && resources.final_depth_format == final_depth_format
-                && resources.generation == self.generation
-            {
-                profile.g_buffer_persistent_cache_hits =
-                    profile.g_buffer_persistent_cache_hits.saturating_add(1);
-                profile.world_prepare_g_buffer_cache_check_nanos = profile
-                    .world_prepare_g_buffer_cache_check_nanos
-                    .saturating_add(elapsed_nanos_u64(cache_check_started));
-                return Ok(());
-            }
+        if has_compatible_persistent_resources {
+            profile.g_buffer_persistent_cache_hits =
+                profile.g_buffer_persistent_cache_hits.saturating_add(1);
+            profile.world_prepare_g_buffer_cache_check_nanos = profile
+                .world_prepare_g_buffer_cache_check_nanos
+                .saturating_add(elapsed_nanos_u64(cache_check_started));
+            profile.world_prepare_g_buffer_persistent_lookup_nanos = profile
+                .world_prepare_g_buffer_persistent_lookup_nanos
+                .saturating_add(elapsed_nanos_u64(cache_check_started));
+            return Ok(());
         }
         profile.g_buffer_persistent_cache_misses =
             profile.g_buffer_persistent_cache_misses.saturating_add(1);
         profile.world_prepare_g_buffer_cache_check_nanos = profile
             .world_prepare_g_buffer_cache_check_nanos
+            .saturating_add(elapsed_nanos_u64(cache_check_started));
+        profile.world_prepare_g_buffer_persistent_lookup_nanos = profile
+            .world_prepare_g_buffer_persistent_lookup_nanos
             .saturating_add(elapsed_nanos_u64(cache_check_started));
         let destroy_started = std::time::Instant::now();
         let retired = self.destroy_g_buffer_resources(gal);
@@ -4050,22 +4069,34 @@ impl WorldPrimitiveFrontend {
             .g_buffer_resources
             .as_ref()
             .ok_or_else(|| GalError::backend("G-buffer resources missing before final binding"))?;
+        let final_key_started = std::time::Instant::now();
         let key = GBufferFinalBindingKey {
             frame_target,
             frame_color_format,
             final_depth_view,
             graph_generation: resources.generation,
         };
+        profile.world_prepare_g_buffer_final_key_nanos = profile
+            .world_prepare_g_buffer_final_key_nanos
+            .saturating_add(elapsed_nanos_u64(final_key_started));
+        let final_lookup_started = std::time::Instant::now();
         if self.g_buffer_final_bindings.contains_key(&key) {
             profile.g_buffer_final_binding_cache_hits =
                 profile.g_buffer_final_binding_cache_hits.saturating_add(1);
+            profile.world_prepare_g_buffer_final_lookup_nanos = profile
+                .world_prepare_g_buffer_final_lookup_nanos
+                .saturating_add(elapsed_nanos_u64(final_lookup_started));
             return Ok(key);
         }
         profile.g_buffer_final_binding_cache_misses = profile
             .g_buffer_final_binding_cache_misses
             .saturating_add(1);
+        profile.world_prepare_g_buffer_final_lookup_nanos = profile
+            .world_prepare_g_buffer_final_lookup_nanos
+            .saturating_add(elapsed_nanos_u64(final_lookup_started));
         let label = format!("world-shader-g-buffer-gen{}", resources.generation);
         let mut created = Vec::new();
+        let final_create_started = std::time::Instant::now();
         let result = (|| -> GalResult<GBufferFinalBindingResources> {
             let final_pass = gal.create_render_pass(RenderPassDesc {
                 label: format!("{label}.final-output-pass"),
@@ -4085,6 +4116,10 @@ impl WorldPrimitiveFrontend {
             }
         }
         self.g_buffer_final_bindings.insert(key, result?);
+        profile.g_buffer_final_pass_creates = profile.g_buffer_final_pass_creates.saturating_add(1);
+        profile.world_prepare_g_buffer_final_create_nanos = profile
+            .world_prepare_g_buffer_final_create_nanos
+            .saturating_add(elapsed_nanos_u64(final_create_started));
         Ok(key)
     }
 
@@ -6037,6 +6072,7 @@ mod tests {
         gal.create_frame_target(FrameTargetDesc {
             label: format!("test-frame-target-{frame_id}"),
             frame_id,
+            render_target: crate::render::vulkanic::frame::FrameRenderTargetId(frame_id),
             extent: Extent3d {
                 width,
                 height,

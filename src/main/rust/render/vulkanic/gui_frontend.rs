@@ -2099,6 +2099,7 @@ mod tests {
         gal.create_frame_target(FrameTargetDesc {
             label: "test-gui-frame-target".to_owned(),
             frame_id: 1,
+            render_target: crate::render::vulkanic::frame::FrameRenderTargetId(1),
             extent: Extent3d {
                 width: 320,
                 height: 180,

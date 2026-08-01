@@ -30,6 +30,15 @@ pub(super) struct VulkanLoweringMetrics {
     pub(super) command_buffers_freed: u64,
     pub(super) wait_count: u64,
     pub(super) device_wait_idle_count: u64,
+    pub(super) gpu_timestamp_status: u64,
+    pub(super) gpu_shadow_depth_nanos: u64,
+    pub(super) gpu_terrain_opaque_nanos: u64,
+    pub(super) gpu_terrain_cutout_nanos: u64,
+    pub(super) gpu_deferred_lighting_nanos: u64,
+    pub(super) gpu_composite0_nanos: u64,
+    pub(super) gpu_composite1_nanos: u64,
+    pub(super) gpu_final_output_nanos: u64,
+    pub(super) gpu_frame_total_nanos: u64,
 }
 
 pub(super) struct SubmissionLowerer {
@@ -39,10 +48,96 @@ pub(super) struct SubmissionLowerer {
     completed: SubmissionId,
     completed_host_reads: Vec<CompletedHostRead>,
     metrics: VulkanLoweringMetrics,
+    timestamp_pool: Option<vk::QueryPool>,
+    next_timestamp_set: u32,
+}
+
+const GPU_TIMESTAMP_SET_COUNT: u32 = 4;
+const GPU_TIMESTAMP_QUERIES_PER_SET: u32 = 16;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum GpuTimestampQuery {
+    FrameStart = 0,
+    ShadowDepthStart = 1,
+    ShadowDepthEnd = 2,
+    TerrainOpaqueStart = 3,
+    TerrainOpaqueEnd = 4,
+    TerrainCutoutStart = 5,
+    TerrainCutoutEnd = 6,
+    DeferredLightingStart = 7,
+    DeferredLightingEnd = 8,
+    Composite0Start = 9,
+    Composite0End = 10,
+    Composite1Start = 11,
+    Composite1End = 12,
+    FinalOutputStart = 13,
+    FinalOutputEnd = 14,
+    FrameEnd = 15,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+struct GpuTimestampSet {
+    base_query: u32,
+    active: bool,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+struct GpuTimestampResult {
+    status: u64,
+    shadow_depth_nanos: u64,
+    terrain_opaque_nanos: u64,
+    terrain_cutout_nanos: u64,
+    deferred_lighting_nanos: u64,
+    composite0_nanos: u64,
+    composite1_nanos: u64,
+    final_output_nanos: u64,
+    frame_total_nanos: u64,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum TimestampPassKind {
+    ShadowDepth,
+    TerrainOpaque,
+    TerrainCutout,
+    DeferredLighting,
+    Composite0,
+    Composite1,
+    FinalOutput,
+}
+
+impl TimestampPassKind {
+    fn start_query(self) -> GpuTimestampQuery {
+        match self {
+            Self::ShadowDepth => GpuTimestampQuery::ShadowDepthStart,
+            Self::TerrainOpaque => GpuTimestampQuery::TerrainOpaqueStart,
+            Self::TerrainCutout => GpuTimestampQuery::TerrainCutoutStart,
+            Self::DeferredLighting => GpuTimestampQuery::DeferredLightingStart,
+            Self::Composite0 => GpuTimestampQuery::Composite0Start,
+            Self::Composite1 => GpuTimestampQuery::Composite1Start,
+            Self::FinalOutput => GpuTimestampQuery::FinalOutputStart,
+        }
+    }
+
+    fn end_query(self) -> GpuTimestampQuery {
+        match self {
+            Self::ShadowDepth => GpuTimestampQuery::ShadowDepthEnd,
+            Self::TerrainOpaque => GpuTimestampQuery::TerrainOpaqueEnd,
+            Self::TerrainCutout => GpuTimestampQuery::TerrainCutoutEnd,
+            Self::DeferredLighting => GpuTimestampQuery::DeferredLightingEnd,
+            Self::Composite0 => GpuTimestampQuery::Composite0End,
+            Self::Composite1 => GpuTimestampQuery::Composite1End,
+            Self::FinalOutput => GpuTimestampQuery::FinalOutputEnd,
+        }
+    }
 }
 
 impl SubmissionLowerer {
     pub(super) fn new(context: Arc<VulkanContext>) -> Self {
+        let timestamp_pool = if gpu_timestamps_enabled() {
+            create_timestamp_pool(&context).ok()
+        } else {
+            None
+        };
         Self {
             context,
             pending: VecDeque::new(),
@@ -50,6 +145,8 @@ impl SubmissionLowerer {
             completed: SubmissionId(0),
             completed_host_reads: Vec::new(),
             metrics: VulkanLoweringMetrics::default(),
+            timestamp_pool,
+            next_timestamp_set: 0,
         }
     }
 
@@ -60,6 +157,7 @@ impl SubmissionLowerer {
     ) -> GalResult<()> {
         let alloc_started = std::time::Instant::now();
         let command_buffer = self.allocate_command_buffer()?;
+        let timestamp_set = self.allocate_timestamp_set();
         self.metrics.command_buffer_alloc_nanos = self
             .metrics
             .command_buffer_alloc_nanos
@@ -89,7 +187,26 @@ impl SubmissionLowerer {
                 &format!("gal.batch.{}", sanitize_label(&batch.label)),
             );
         }
-        let mut state = EncodingState::default();
+        let mut state = EncodingState {
+            timestamp_set,
+            ..EncodingState::default()
+        };
+        if let (Some(pool), true) = (self.timestamp_pool, timestamp_set.active) {
+            unsafe {
+                self.context.device.cmd_reset_query_pool(
+                    command_buffer,
+                    pool,
+                    timestamp_set.base_query,
+                    GPU_TIMESTAMP_QUERIES_PER_SET,
+                );
+                self.write_timestamp(
+                    command_buffer,
+                    &state,
+                    GpuTimestampQuery::FrameStart,
+                    vk::PipelineStageFlags::TOP_OF_PIPE,
+                );
+            }
+        }
         for list in &batch.command_lists {
             unsafe {
                 self.context.begin_label(
@@ -103,6 +220,16 @@ impl SubmissionLowerer {
             unsafe { self.context.end_label(command_buffer) };
         }
         self.transition_pending_frame_targets_to_present(command_buffer, &mut state);
+        if timestamp_set.active {
+            unsafe {
+                self.write_timestamp(
+                    command_buffer,
+                    &state,
+                    GpuTimestampQuery::FrameEnd,
+                    vk::PipelineStageFlags::BOTTOM_OF_PIPE,
+                );
+            }
+        }
         unsafe { self.context.end_label(command_buffer) };
         self.metrics.command_recording_nanos = self
             .metrics
@@ -119,6 +246,7 @@ impl SubmissionLowerer {
         self.pending.push_back(EncodedSubmission {
             command_buffer,
             host_reads: state.host_reads,
+            timestamp_set,
         });
         Ok(())
     }
@@ -154,6 +282,7 @@ impl SubmissionLowerer {
             id,
             command_buffer: encoded.command_buffer,
             host_reads: encoded.host_reads,
+            timestamp_set: encoded.timestamp_set,
         });
         Ok(())
     }
@@ -177,6 +306,7 @@ impl SubmissionLowerer {
             }
             let complete = self.in_flight.pop_front().expect("front existed");
             self.complete_host_reads(&complete);
+            self.complete_gpu_timestamps(&complete);
             unsafe {
                 self.context
                     .device
@@ -208,6 +338,7 @@ impl SubmissionLowerer {
             }
             self.metrics.command_buffers_freed += 1;
             self.complete_host_reads(&complete);
+            self.complete_gpu_timestamps(&complete);
             self.completed = complete.id;
         }
         Ok(())
@@ -247,6 +378,44 @@ impl SubmissionLowerer {
         }
     }
 
+    fn allocate_timestamp_set(&mut self) -> GpuTimestampSet {
+        if self.timestamp_pool.is_none()
+            || self.context.timestamp_valid_bits == 0
+            || self.context.timestamp_period <= 0.0
+        {
+            return GpuTimestampSet::default();
+        }
+        let set_index = self.next_timestamp_set % GPU_TIMESTAMP_SET_COUNT;
+        self.next_timestamp_set = self.next_timestamp_set.wrapping_add(1);
+        GpuTimestampSet {
+            base_query: set_index * GPU_TIMESTAMP_QUERIES_PER_SET,
+            active: true,
+        }
+    }
+
+    unsafe fn write_timestamp(
+        &self,
+        command_buffer: vk::CommandBuffer,
+        state: &EncodingState,
+        query: GpuTimestampQuery,
+        stage: vk::PipelineStageFlags,
+    ) {
+        let Some(pool) = self.timestamp_pool else {
+            return;
+        };
+        if !state.timestamp_set.active {
+            return;
+        }
+        unsafe {
+            self.context.device.cmd_write_timestamp(
+                command_buffer,
+                stage,
+                pool,
+                state.timestamp_set.base_query + query as u32,
+            );
+        }
+    }
+
     fn allocate_command_buffer(&self) -> GalResult<vk::CommandBuffer> {
         let allocate_info = vk::CommandBufferAllocateInfo::default()
             .command_pool(self.context.command_pool)
@@ -279,6 +448,16 @@ impl SubmissionLowerer {
                     depth_stencil,
                 } => {
                     let pass_object = objects.render_pass(*pass)?;
+                    let timestamp_pass = timestamp_pass_kind(&pass_object.label);
+                    if let Some(pass_kind) = timestamp_pass {
+                        self.write_timestamp(
+                            command_buffer,
+                            state,
+                            pass_kind.start_query(),
+                            vk::PipelineStageFlags::TOP_OF_PIPE,
+                        );
+                    }
+                    state.current_timestamp_pass = timestamp_pass;
                     self.context
                         .begin_label(command_buffer, &format!("gal.pass.0x{:016x}", pass.raw()));
                     if pass_object.target != *target {
@@ -487,6 +666,14 @@ impl SubmissionLowerer {
                 }
                 CommandOp::EndPass => {
                     self.context.device.cmd_end_rendering(command_buffer);
+                    if let Some(pass_kind) = state.current_timestamp_pass {
+                        self.write_timestamp(
+                            command_buffer,
+                            state,
+                            pass_kind.end_query(),
+                            vk::PipelineStageFlags::BOTTOM_OF_PIPE,
+                        );
+                    }
                     if let Some(present) = state.frame_present.take() {
                         state.pending_frame_presents.insert(present.target, present);
                     }
@@ -495,6 +682,7 @@ impl SubmissionLowerer {
                     state.graphics_pipeline = None;
                     state.compute_pipeline = None;
                     state.pipeline_layout = None;
+                    state.current_timestamp_pass = None;
                 }
                 CommandOp::BindGraphicsPipeline(handle) => {
                     let pipeline = objects.graphics_pipeline(*handle)?;
@@ -816,6 +1004,45 @@ impl SubmissionLowerer {
             }
         }
     }
+
+    fn complete_gpu_timestamps(&mut self, complete: &InFlightSubmission) {
+        let Some(pool) = self.timestamp_pool else {
+            self.apply_gpu_timestamp_result(GpuTimestampResult::default());
+            return;
+        };
+        if !complete.timestamp_set.active {
+            self.apply_gpu_timestamp_result(GpuTimestampResult::default());
+            return;
+        }
+        let mut values = [0_u64; GPU_TIMESTAMP_QUERIES_PER_SET as usize];
+        let result = unsafe {
+            self.context.device.get_query_pool_results(
+                pool,
+                complete.timestamp_set.base_query,
+                &mut values,
+                vk::QueryResultFlags::TYPE_64 | vk::QueryResultFlags::WAIT,
+            )
+        };
+        match result {
+            Ok(()) => self.apply_gpu_timestamp_result(decode_gpu_timestamp_result(
+                &values,
+                self.context.timestamp_period,
+            )),
+            Err(_) => self.apply_gpu_timestamp_result(GpuTimestampResult::default()),
+        }
+    }
+
+    fn apply_gpu_timestamp_result(&mut self, result: GpuTimestampResult) {
+        self.metrics.gpu_timestamp_status = result.status;
+        self.metrics.gpu_shadow_depth_nanos = result.shadow_depth_nanos;
+        self.metrics.gpu_terrain_opaque_nanos = result.terrain_opaque_nanos;
+        self.metrics.gpu_terrain_cutout_nanos = result.terrain_cutout_nanos;
+        self.metrics.gpu_deferred_lighting_nanos = result.deferred_lighting_nanos;
+        self.metrics.gpu_composite0_nanos = result.composite0_nanos;
+        self.metrics.gpu_composite1_nanos = result.composite1_nanos;
+        self.metrics.gpu_final_output_nanos = result.final_output_nanos;
+        self.metrics.gpu_frame_total_nanos = result.frame_total_nanos;
+    }
 }
 
 fn sanitize_label(label: &str) -> String {
@@ -834,6 +1061,158 @@ fn sanitize_label(label: &str) -> String {
 impl Drop for SubmissionLowerer {
     fn drop(&mut self) {
         self.wait_idle_and_clear();
+        if let Some(pool) = self.timestamp_pool.take() {
+            unsafe { self.context.device.destroy_query_pool(pool, None) };
+        }
+    }
+}
+
+fn create_timestamp_pool(context: &Arc<VulkanContext>) -> GalResult<vk::QueryPool> {
+    if context.timestamp_valid_bits == 0 || context.timestamp_period <= 0.0 {
+        return Err(GalError::backend(
+            "Vulkan queue family does not expose timestamp queries",
+        ));
+    }
+    let info = vk::QueryPoolCreateInfo::default()
+        .query_type(vk::QueryType::TIMESTAMP)
+        .query_count(GPU_TIMESTAMP_SET_COUNT * GPU_TIMESTAMP_QUERIES_PER_SET);
+    unsafe { context.device.create_query_pool(&info, None) }.map_err(|error| {
+        GalError::backend(format!("failed to create Vulkan timestamp query pool: {error:?}"))
+    })
+}
+
+fn gpu_timestamps_enabled() -> bool {
+    matches!(
+        std::env::var("MATTMC_RUST_VULKAN_GPU_TIMESTAMPS")
+            .ok()
+            .as_deref(),
+        Some("1" | "true" | "TRUE" | "yes" | "on")
+    )
+}
+
+fn timestamp_pass_kind(label: &str) -> Option<TimestampPassKind> {
+    let label = label.trim();
+    if label.contains("shadow_depth") {
+        Some(TimestampPassKind::ShadowDepth)
+    } else if label.contains("terrain_opaque") {
+        Some(TimestampPassKind::TerrainOpaque)
+    } else if label.contains("terrain_cutout") {
+        Some(TimestampPassKind::TerrainCutout)
+    } else if label.contains("deferred_lighting") {
+        Some(TimestampPassKind::DeferredLighting)
+    } else if label.contains("composite_0") {
+        Some(TimestampPassKind::Composite0)
+    } else if label.contains("composite_1") {
+        Some(TimestampPassKind::Composite1)
+    } else if label.contains("final_output") {
+        Some(TimestampPassKind::FinalOutput)
+    } else {
+        None
+    }
+}
+
+fn decode_gpu_timestamp_result(values: &[u64], timestamp_period: f32) -> GpuTimestampResult {
+    fn delta(values: &[u64], start: GpuTimestampQuery, end: GpuTimestampQuery, period: f32) -> u64 {
+        let Some(start) = values.get(start as usize).copied() else {
+            return 0;
+        };
+        let Some(end) = values.get(end as usize).copied() else {
+            return 0;
+        };
+        if end <= start {
+            return 0;
+        }
+        ((end - start) as f64 * f64::from(period)).min(u64::MAX as f64) as u64
+    }
+
+    let frame_total = delta(
+        values,
+        GpuTimestampQuery::FrameStart,
+        GpuTimestampQuery::FrameEnd,
+        timestamp_period,
+    );
+    let result = GpuTimestampResult {
+        status: u64::from(frame_total > 0),
+        shadow_depth_nanos: delta(
+            values,
+            GpuTimestampQuery::ShadowDepthStart,
+            GpuTimestampQuery::ShadowDepthEnd,
+            timestamp_period,
+        ),
+        terrain_opaque_nanos: delta(
+            values,
+            GpuTimestampQuery::TerrainOpaqueStart,
+            GpuTimestampQuery::TerrainOpaqueEnd,
+            timestamp_period,
+        ),
+        terrain_cutout_nanos: delta(
+            values,
+            GpuTimestampQuery::TerrainCutoutStart,
+            GpuTimestampQuery::TerrainCutoutEnd,
+            timestamp_period,
+        ),
+        deferred_lighting_nanos: delta(
+            values,
+            GpuTimestampQuery::DeferredLightingStart,
+            GpuTimestampQuery::DeferredLightingEnd,
+            timestamp_period,
+        ),
+        composite0_nanos: delta(
+            values,
+            GpuTimestampQuery::Composite0Start,
+            GpuTimestampQuery::Composite0End,
+            timestamp_period,
+        ),
+        composite1_nanos: delta(
+            values,
+            GpuTimestampQuery::Composite1Start,
+            GpuTimestampQuery::Composite1End,
+            timestamp_period,
+        ),
+        final_output_nanos: delta(
+            values,
+            GpuTimestampQuery::FinalOutputStart,
+            GpuTimestampQuery::FinalOutputEnd,
+            timestamp_period,
+        ),
+        frame_total_nanos: frame_total,
+    };
+    result
+}
+
+#[cfg(test)]
+mod timestamp_tests {
+    use super::*;
+
+    #[test]
+    fn timestamp_pass_labels_classify_shader_graph_passes() {
+        assert_eq!(
+            Some(TimestampPassKind::ShadowDepth),
+            timestamp_pass_kind("vulkanic:pass/shadow_depth")
+        );
+        assert_eq!(
+            Some(TimestampPassKind::TerrainOpaque),
+            timestamp_pass_kind("vulkanic:pass/terrain_opaque")
+        );
+        assert_eq!(
+            Some(TimestampPassKind::FinalOutput),
+            timestamp_pass_kind("vulkanic:pass/final_output")
+        );
+        assert_eq!(None, timestamp_pass_kind("minecraft.world.clear"));
+    }
+
+    #[test]
+    fn gpu_timestamp_decoder_reports_nanos_without_waiting_policy() {
+        let mut values = [0_u64; GPU_TIMESTAMP_QUERIES_PER_SET as usize];
+        values[GpuTimestampQuery::FrameStart as usize] = 10;
+        values[GpuTimestampQuery::ShadowDepthStart as usize] = 12;
+        values[GpuTimestampQuery::ShadowDepthEnd as usize] = 18;
+        values[GpuTimestampQuery::FrameEnd as usize] = 30;
+        let result = decode_gpu_timestamp_result(&values, 2.0);
+        assert_eq!(1, result.status);
+        assert_eq!(12, result.shadow_depth_nanos);
+        assert_eq!(40, result.frame_total_nanos);
+        assert_eq!(0, result.terrain_opaque_nanos);
     }
 }
 
@@ -848,6 +1227,8 @@ struct EncodingState {
     frame_target_layouts: BTreeMap<Handle, vk::ImageLayout>,
     pending_frame_presents: BTreeMap<Handle, FramePresentTransition>,
     host_reads: Vec<HostReadRequest>,
+    timestamp_set: GpuTimestampSet,
+    current_timestamp_pass: Option<TimestampPassKind>,
 }
 
 struct FramePresentTransition {
@@ -861,12 +1242,14 @@ struct FramePresentTransition {
 struct EncodedSubmission {
     command_buffer: vk::CommandBuffer,
     host_reads: Vec<HostReadRequest>,
+    timestamp_set: GpuTimestampSet,
 }
 
 struct InFlightSubmission {
     id: SubmissionId,
     command_buffer: vk::CommandBuffer,
     host_reads: Vec<HostReadRequest>,
+    timestamp_set: GpuTimestampSet,
 }
 
 #[derive(Clone, Debug)]

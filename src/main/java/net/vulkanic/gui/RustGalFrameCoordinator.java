@@ -355,6 +355,12 @@ public final class RustGalFrameCoordinator {
 		RustGalWorldPrimitiveRenderer.PrimitiveFrame primitiveFrame = null;
 		boolean wholeFrameVulkan = allowEmpty && RustGalGuiRenderer.isWholeFrameVulkanActive();
 		boolean renderdocFrameCaptureStarted = false;
+		long acquireStarted = 0L;
+		long acquireEnded = 0L;
+		long submitStarted = 0L;
+		long submitEnded = 0L;
+		long presentStarted = 0L;
+		long presentEnded = 0L;
 		try {
 			if (wholeFrameVulkan) {
 				primitiveFrame = RustGalWorldPrimitiveRenderer.consumeFrame();
@@ -376,10 +382,11 @@ public final class RustGalFrameCoordinator {
 				}
 			}
 			GraphicsFrameBenchmark.beginPhase("rust-gal.gui-frame.ffi.acquire");
-			long acquireStarted = System.nanoTime();
+			acquireStarted = System.nanoTime();
 			recordFixedOperation(Operation.FRAME_ACQUIRE, VulkanicGalBridge.Struct.FRAME_ACQUIRE.byteSize());
 			VulkanicGalBridge.AcquiredFrame frame = bridge.acquireFrame(correlationId, window.getWidth(), window.getHeight());
-			METRICS.frameAcquireNanos += elapsedSince(acquireStarted);
+			acquireEnded = System.nanoTime();
+			METRICS.frameAcquireNanos += Math.max(0L, acquireEnded - acquireStarted);
 			GraphicsFrameBenchmark.endPhase("rust-gal.gui-frame.ffi.acquire");
 			frameId = frame.frameId();
 			if (wholeFrameVulkan) {
@@ -400,7 +407,8 @@ public final class RustGalFrameCoordinator {
 			}
 
 			GraphicsFrameBenchmark.beginPhase("rust-gal.frame.submit-call");
-			long packingStarted = System.nanoTime();
+			submitStarted = System.nanoTime();
+			long packingStarted = submitStarted;
 			int frameGuiWidth = requests.isEmpty() ? guiWidth : requests.get(0).guiWidth();
 			int frameGuiHeight = requests.isEmpty() ? guiHeight : requests.get(0).guiHeight();
 			VulkanicGalBridge.WholeFrameSubmitResult wholeFrameResult = null;
@@ -443,7 +451,8 @@ public final class RustGalFrameCoordinator {
 					requests
 				);
 			}
-			METRICS.abiPackingNanos += elapsedSince(packingStarted);
+			submitEnded = System.nanoTime();
+			METRICS.abiPackingNanos += Math.max(0L, submitEnded - packingStarted);
 			GraphicsFrameBenchmark.endPhase("rust-gal.frame.submit-call");
 			recordStatus(Operation.SUBMIT, wholeFrameResult != null ? wholeFrameResult.asStatus() : guiResult.asStatus());
 			submissionId = wholeFrameResult != null ? wholeFrameResult.submissionId() : guiResult.submissionId();
@@ -455,7 +464,7 @@ public final class RustGalFrameCoordinator {
 				+ " frame=" + frameId + " submission=" + submissionId + " batches=" + requests.size());
 
 			GraphicsFrameBenchmark.beginPhase("rust-gal.gui-frame.ffi.present");
-			long presentStarted = System.nanoTime();
+			presentStarted = System.nanoTime();
 			recordFixedOperation(Operation.FRAME_PRESENT, VulkanicGalBridge.Struct.FRAME_PRESENT.byteSize());
 			VulkanicGalBridge.PresentedFrame presented = bridge.presentFrame(frameId, correlationId, submissionId);
 				if (wholeFrameVulkan) {
@@ -466,7 +475,8 @@ public final class RustGalFrameCoordinator {
 						+ " status=" + presented.status());
 					writeWholeFrameAttachmentCorrelation(frame, presented, wholeFrameResult, primitiveFrame);
 				}
-			METRICS.framePresentNanos += elapsedSince(presentStarted);
+			presentEnded = System.nanoTime();
+			METRICS.framePresentNanos += Math.max(0L, presentEnded - presentStarted);
 			GraphicsFrameBenchmark.endPhase("rust-gal.gui-frame.ffi.present");
 			if (renderdocFrameCaptureStarted) {
 				RenderDocCaptureHook.endFrameCaptureOnce(window, "rust-vulkan-whole-frame-world#" + frameId + "-submission=" + submissionId);
@@ -478,6 +488,27 @@ public final class RustGalFrameCoordinator {
 			METRICS.batchesExecuted += requests.size();
 			if (wholeFrameResult != null) {
 				recordWholeFrameMetrics(wholeFrameResult);
+				GraphicsFrameBenchmark.recordRustWholeFrameTimeline(
+					correlationId,
+					frameId,
+					submissionId,
+					frame.frameTargetIdentity(),
+					presented.frameTargetIdentity(),
+					executeStarted,
+					acquireStarted,
+					acquireEnded,
+					submitStarted,
+					submitEnded,
+					presentStarted,
+					presentEnded,
+					wholeFrameResult.spriteCount(),
+					wholeFrameResult.worldMeshInstanceCount(),
+					wholeFrameResult.worldMeshDrawCount(),
+					wholeFrameResult.profile().gpuFrameTotalNanos(),
+					wholeFrameResult.profile().vulkanPresentMode(),
+					wholeFrameResult.profile().vulkanImagesInFlight(),
+					wholeFrameResult.profile().vulkanAvailableFrameSlots()
+				);
 			} else {
 				recordGuiMetrics(guiResult);
 			}
@@ -665,10 +696,18 @@ public final class RustGalFrameCoordinator {
 		METRICS.profileVulkanTimelinePollNanos += profile.vulkanTimelinePollNanos();
 		METRICS.profileVulkanTimelineWaitNanos += profile.vulkanTimelineWaitNanos();
 		METRICS.profileVulkanDeviceWaitIdleNanos += profile.vulkanDeviceWaitIdleNanos();
+		METRICS.profileVulkanAcquireNanos += profile.vulkanAcquireNanos();
+		METRICS.profileVulkanPresentNanos += profile.vulkanPresentNanos();
+		METRICS.profileVulkanPresentWaitNanos += profile.vulkanPresentWaitNanos();
 		METRICS.profileVulkanCommandBuffersAllocated += profile.vulkanCommandBuffersAllocated();
 		METRICS.profileVulkanCommandBuffersFreed += profile.vulkanCommandBuffersFreed();
 		METRICS.profileVulkanWaitCount += profile.vulkanWaitCount();
 		METRICS.profileVulkanDeviceWaitIdleCount += profile.vulkanDeviceWaitIdleCount();
+		METRICS.profileVulkanPresentMode = profile.vulkanPresentMode();
+		METRICS.profileVulkanLastAcquiredImageIndex = profile.vulkanAcquiredImageIndex();
+		METRICS.profileVulkanLastSwapchainGeneration = profile.vulkanSwapchainGeneration();
+		METRICS.profileVulkanLastImagesInFlight = profile.vulkanImagesInFlight();
+		METRICS.profileVulkanLastAvailableFrameSlots = profile.vulkanAvailableFrameSlots();
 		METRICS.profileResourceCreatesDelta += profile.resourceCreatesDelta();
 		METRICS.profileResourceDestroysDelta += profile.resourceDestroysDelta();
 		METRICS.profileHostWriteOps += profile.hostWriteOps();
@@ -690,6 +729,7 @@ public final class RustGalFrameCoordinator {
 		METRICS.profileGBufferDescriptorCreates += profile.gBufferDescriptorCreates();
 		METRICS.profileGBufferRenderTargetCreates += profile.gBufferRenderTargetCreates();
 		METRICS.profileGBufferResourcesRetired += profile.gBufferResourcesRetired();
+		METRICS.profileGBufferFinalPassCreates += profile.gBufferFinalPassCreates();
 	}
 
 	private static void recordWholeFrameProfilePhaseSamples(VulkanicGalBridge.WholeFrameProfile profile) {
@@ -707,6 +747,14 @@ public final class RustGalFrameCoordinator {
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.world-prepare-g-buffer-destroy", profile.worldPrepareGBufferDestroyNanos());
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.world-prepare-g-buffer-plan", profile.worldPrepareGBufferPlanNanos());
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.world-prepare-g-buffer-create", profile.worldPrepareGBufferCreateNanos());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.world-prepare-g-buffer-persistent-key", profile.worldPrepareGBufferPersistentKeyNanos());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.world-prepare-g-buffer-persistent-lookup", profile.worldPrepareGBufferPersistentLookupNanos());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.world-prepare-g-buffer-final-key", profile.worldPrepareGBufferFinalKeyNanos());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.world-prepare-g-buffer-final-lookup", profile.worldPrepareGBufferFinalLookupNanos());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.world-prepare-g-buffer-final-create", profile.worldPrepareGBufferFinalCreateNanos());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.world-prepare-frame-target-attachment-query", profile.worldPrepareFrameTargetAttachmentQueryNanos());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.world-prepare-mesh-material-asset", profile.worldPrepareMeshMaterialAssetNanos());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.world-prepare-metrics-accounting", profile.worldPrepareMetricsAccountingNanos());
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.g-buffer-persistent-cache-hits", profile.gBufferPersistentCacheHits());
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.g-buffer-persistent-cache-misses", profile.gBufferPersistentCacheMisses());
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.g-buffer-final-binding-cache-hits", profile.gBufferFinalBindingCacheHits());
@@ -717,6 +765,7 @@ public final class RustGalFrameCoordinator {
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.g-buffer-descriptor-creates", profile.gBufferDescriptorCreates());
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.g-buffer-render-target-creates", profile.gBufferRenderTargetCreates());
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.g-buffer-resources-retired", profile.gBufferResourcesRetired());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.g-buffer-final-pass-creates", profile.gBufferFinalPassCreates());
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.world-prepare-frame-pass", profile.worldPrepareFramePassNanos());
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.world-mesh-expand-group", profile.worldMeshSectionExpandGroupNanos());
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.shader-plan-lookup", profile.shaderPlanLookupNanos());
@@ -736,6 +785,22 @@ public final class RustGalFrameCoordinator {
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.vulkan-timeline-poll", profile.vulkanTimelinePollNanos());
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.vulkan-timeline-wait", profile.vulkanTimelineWaitNanos());
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.vulkan-device-wait-idle", profile.vulkanDeviceWaitIdleNanos());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.vulkan-acquire", profile.vulkanAcquireNanos());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.vulkan-present", profile.vulkanPresentNanos());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.vulkan-present-wait", profile.vulkanPresentWaitNanos());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.vulkan-present-mode", profile.vulkanPresentMode());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.vulkan-acquired-image-index", profile.vulkanAcquiredImageIndex());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.vulkan-swapchain-generation", profile.vulkanSwapchainGeneration());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.vulkan-images-in-flight", profile.vulkanImagesInFlight());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.vulkan-available-frame-slots", profile.vulkanAvailableFrameSlots());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gpu-shadow-depth", profile.gpuShadowDepthNanos());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gpu-terrain-opaque", profile.gpuTerrainOpaqueNanos());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gpu-terrain-cutout", profile.gpuTerrainCutoutNanos());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gpu-deferred-lighting", profile.gpuDeferredLightingNanos());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gpu-composite-0", profile.gpuComposite0Nanos());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gpu-composite-1", profile.gpuComposite1Nanos());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gpu-final-output", profile.gpuFinalOutputNanos());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gpu-frame-total", profile.gpuFrameTotalNanos());
 	}
 
 	private static void recordWorldMetrics(VulkanicGalBridge.WholeFrameSubmitResult result) {
@@ -1158,6 +1223,14 @@ public final class RustGalFrameCoordinator {
 			+ " rust_gal_profile_vulkan_timeline_poll_nanos=" + METRICS.profileVulkanTimelinePollNanos
 			+ " rust_gal_profile_vulkan_timeline_wait_nanos=" + METRICS.profileVulkanTimelineWaitNanos
 			+ " rust_gal_profile_vulkan_device_wait_idle_nanos=" + METRICS.profileVulkanDeviceWaitIdleNanos
+			+ " rust_gal_profile_vulkan_acquire_nanos=" + METRICS.profileVulkanAcquireNanos
+			+ " rust_gal_profile_vulkan_present_nanos=" + METRICS.profileVulkanPresentNanos
+			+ " rust_gal_profile_vulkan_present_wait_nanos=" + METRICS.profileVulkanPresentWaitNanos
+			+ " rust_gal_profile_vulkan_present_mode=" + METRICS.profileVulkanPresentMode
+			+ " rust_gal_profile_vulkan_last_acquired_image_index=" + METRICS.profileVulkanLastAcquiredImageIndex
+			+ " rust_gal_profile_vulkan_last_swapchain_generation=" + METRICS.profileVulkanLastSwapchainGeneration
+			+ " rust_gal_profile_vulkan_last_images_in_flight=" + METRICS.profileVulkanLastImagesInFlight
+			+ " rust_gal_profile_vulkan_last_available_frame_slots=" + METRICS.profileVulkanLastAvailableFrameSlots
 			+ " rust_gal_profile_vulkan_command_buffers_allocated=" + METRICS.profileVulkanCommandBuffersAllocated
 			+ " rust_gal_profile_vulkan_command_buffers_freed=" + METRICS.profileVulkanCommandBuffersFreed
 			+ " rust_gal_profile_vulkan_wait_count=" + METRICS.profileVulkanWaitCount
@@ -1183,6 +1256,7 @@ public final class RustGalFrameCoordinator {
 				+ " rust_gal_profile_g_buffer_descriptor_creates=" + METRICS.profileGBufferDescriptorCreates
 				+ " rust_gal_profile_g_buffer_render_target_creates=" + METRICS.profileGBufferRenderTargetCreates
 				+ " rust_gal_profile_g_buffer_resources_retired=" + METRICS.profileGBufferResourcesRetired
+				+ " rust_gal_profile_g_buffer_final_pass_creates=" + METRICS.profileGBufferFinalPassCreates
 				+ " rust_gal_frame_acquire_nanos=" + METRICS.frameAcquireNanos
 				+ " rust_gal_submit_nanos=" + METRICS.submitNanos
 				+ " rust_gal_frame_present_nanos=" + METRICS.framePresentNanos
@@ -1358,6 +1432,14 @@ public final class RustGalFrameCoordinator {
 		long profileVulkanTimelinePollNanos;
 		long profileVulkanTimelineWaitNanos;
 		long profileVulkanDeviceWaitIdleNanos;
+		long profileVulkanAcquireNanos;
+		long profileVulkanPresentNanos;
+		long profileVulkanPresentWaitNanos;
+		long profileVulkanPresentMode;
+		long profileVulkanLastAcquiredImageIndex;
+		long profileVulkanLastSwapchainGeneration;
+		long profileVulkanLastImagesInFlight;
+		long profileVulkanLastAvailableFrameSlots;
 		long profileVulkanCommandBuffersAllocated;
 		long profileVulkanCommandBuffersFreed;
 		long profileVulkanWaitCount;
@@ -1383,6 +1465,7 @@ public final class RustGalFrameCoordinator {
 		long profileGBufferDescriptorCreates;
 		long profileGBufferRenderTargetCreates;
 		long profileGBufferResourcesRetired;
+		long profileGBufferFinalPassCreates;
 		long frameAcquireNanos;
 		long submitNanos;
 		long framePresentNanos;

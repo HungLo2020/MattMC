@@ -292,6 +292,29 @@ impl From<WholeFrameProfile> for FfiWholeFrameProfileSnapshot {
             g_buffer_descriptor_creates: profile.g_buffer_descriptor_creates,
             g_buffer_render_target_creates: profile.g_buffer_render_target_creates,
             g_buffer_resources_retired: profile.g_buffer_resources_retired,
+            world_prepare_g_buffer_persistent_key_nanos: profile
+                .world_prepare_g_buffer_persistent_key_nanos,
+            world_prepare_g_buffer_persistent_lookup_nanos: profile
+                .world_prepare_g_buffer_persistent_lookup_nanos,
+            world_prepare_g_buffer_final_key_nanos: profile.world_prepare_g_buffer_final_key_nanos,
+            world_prepare_g_buffer_final_lookup_nanos: profile
+                .world_prepare_g_buffer_final_lookup_nanos,
+            world_prepare_g_buffer_final_create_nanos: profile
+                .world_prepare_g_buffer_final_create_nanos,
+            world_prepare_frame_target_attachment_query_nanos: profile
+                .world_prepare_frame_target_attachment_query_nanos,
+            world_prepare_mesh_material_asset_nanos: profile
+                .world_prepare_mesh_material_asset_nanos,
+            world_prepare_metrics_accounting_nanos: profile.world_prepare_metrics_accounting_nanos,
+            g_buffer_final_pass_creates: profile.g_buffer_final_pass_creates,
+            vulkan_acquire_nanos: profile.vulkan_acquire_nanos,
+            vulkan_present_nanos: profile.vulkan_present_nanos,
+            vulkan_present_wait_nanos: profile.vulkan_present_wait_nanos,
+            vulkan_present_mode: profile.vulkan_present_mode,
+            vulkan_acquired_image_index: profile.vulkan_acquired_image_index,
+            vulkan_swapchain_generation: profile.vulkan_swapchain_generation,
+            vulkan_images_in_flight: profile.vulkan_images_in_flight,
+            vulkan_available_frame_slots: profile.vulkan_available_frame_slots,
         }
     }
 }

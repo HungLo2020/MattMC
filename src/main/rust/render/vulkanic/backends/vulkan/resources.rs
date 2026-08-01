@@ -78,6 +78,7 @@ impl VulkanObjects {
             BackendCreateDesc::FrameTarget(desc) => VulkanObject::FrameTarget(FrameTargetObject {
                 token,
                 frame_id: desc.frame_id,
+                render_target: desc.render_target,
                 extent: desc.extent,
                 color_format: desc.color_format,
                 image_index: u32::MAX,
@@ -87,6 +88,7 @@ impl VulkanObjects {
             }),
             BackendCreateDesc::RenderPass(desc) => VulkanObject::RenderPass(RenderPassObject {
                 token,
+                label: desc.label.clone(),
                 target: desc.target,
                 color_formats: desc.color_formats.clone(),
                 depth_format: desc.depth_format,
@@ -106,7 +108,7 @@ impl VulkanObjects {
         let token = BackendToken(self.next_token);
         self.next_token += 1;
         let object = make_object(token)?;
-        if object.frame_id != desc.frame_id
+        if object.render_target != desc.render_target
             || object.extent != desc.extent
             || object.color_format != desc.color_format
         {
@@ -117,6 +119,40 @@ impl VulkanObjects {
         self.objects
             .insert(handle, VulkanObject::FrameTarget(object));
         Ok(token)
+    }
+
+    pub(super) fn refresh_frame_target_from_swapchain(
+        &mut self,
+        handle: Handle,
+        make_object: impl FnOnce(
+            BackendToken,
+            crate::render::vulkanic::frame::FrameRenderTargetId,
+            Extent3d,
+            TextureFormat,
+        ) -> GalResult<FrameTargetObject>,
+    ) -> GalResult<()> {
+        let Some(VulkanObject::FrameTarget(existing)) = self.objects.get(&handle) else {
+            return Err(GalError::backend(
+                "Vulkan frame target refresh for unknown frame target handle",
+            ));
+        };
+        let token = existing.token;
+        let render_target = existing.render_target;
+        let extent = existing.extent;
+        let color_format = existing.color_format;
+        let object = make_object(token, render_target, extent, color_format)?;
+        if object.token != token
+            || object.render_target != render_target
+            || object.extent != extent
+            || object.color_format != color_format
+        {
+            return Err(GalError::backend(
+                "refreshed swapchain frame target metadata does not match GAL frame target",
+            ));
+        }
+        self.objects
+            .insert(handle, VulkanObject::FrameTarget(object));
+        Ok(())
     }
 
     pub(super) fn destroy(
@@ -1068,6 +1104,7 @@ pub(super) struct RenderTargetObject {
 pub(super) struct FrameTargetObject {
     pub(super) token: BackendToken,
     pub(super) frame_id: u64,
+    pub(super) render_target: crate::render::vulkanic::frame::FrameRenderTargetId,
     pub(super) extent: Extent3d,
     pub(super) color_format: TextureFormat,
     pub(super) image_index: u32,
@@ -1079,6 +1116,7 @@ pub(super) struct FrameTargetObject {
 #[allow(dead_code)]
 pub(super) struct RenderPassObject {
     pub(super) token: BackendToken,
+    pub(super) label: String,
     pub(super) target: Handle,
     pub(super) color_formats: Vec<ColorFormat>,
     pub(super) depth_format: Option<TextureFormat>,

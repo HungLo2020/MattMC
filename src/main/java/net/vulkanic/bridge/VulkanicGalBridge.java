@@ -1320,7 +1320,24 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			profileLong(segment, offset, 62),
 			profileLong(segment, offset, 63),
 			profileLong(segment, offset, 64),
-			profileLong(segment, offset, 65)
+			profileLong(segment, offset, 65),
+			profileLong(segment, offset, 66),
+			profileLong(segment, offset, 67),
+			profileLong(segment, offset, 68),
+			profileLong(segment, offset, 69),
+			profileLong(segment, offset, 70),
+			profileLong(segment, offset, 71),
+			profileLong(segment, offset, 72),
+			profileLong(segment, offset, 73),
+			profileLong(segment, offset, 74),
+			profileLong(segment, offset, 75),
+			profileLong(segment, offset, 76),
+			profileLong(segment, offset, 77),
+			profileLong(segment, offset, 78),
+			profileLong(segment, offset, 79),
+			profileLong(segment, offset, 80),
+			profileLong(segment, offset, 81),
+			profileLong(segment, offset, 82)
 		);
 	}
 
@@ -1682,10 +1699,27 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		long gBufferShaderModuleCreates,
 		long gBufferDescriptorCreates,
 		long gBufferRenderTargetCreates,
-		long gBufferResourcesRetired
+		long gBufferResourcesRetired,
+		long worldPrepareGBufferPersistentKeyNanos,
+		long worldPrepareGBufferPersistentLookupNanos,
+		long worldPrepareGBufferFinalKeyNanos,
+		long worldPrepareGBufferFinalLookupNanos,
+		long worldPrepareGBufferFinalCreateNanos,
+		long worldPrepareFrameTargetAttachmentQueryNanos,
+		long worldPrepareMeshMaterialAssetNanos,
+		long worldPrepareMetricsAccountingNanos,
+		long gBufferFinalPassCreates,
+		long vulkanAcquireNanos,
+		long vulkanPresentNanos,
+		long vulkanPresentWaitNanos,
+		long vulkanPresentMode,
+		long vulkanAcquiredImageIndex,
+		long vulkanSwapchainGeneration,
+		long vulkanImagesInFlight,
+		long vulkanAvailableFrameSlots
 	) {
 		public static WholeFrameProfile empty() {
-			return new WholeFrameProfile(0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L);
+			return new WholeFrameProfile(0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L);
 		}
 	}
 

@@ -535,6 +535,7 @@ fn acquired_frame_targets_are_normal_pass_targets_without_attachment_borrows() {
         .create_frame_target(FrameTargetDesc {
             label: "minecraft-default-framebuffer".to_owned(),
             frame_id: acquired.frame.0,
+            render_target: acquired.render_target,
             extent: acquired.extent,
             color_format: TextureFormat::Rgba8Unorm,
         })

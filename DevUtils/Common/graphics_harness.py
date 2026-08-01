@@ -1157,11 +1157,14 @@ def phase_stats_to_distribution(stats: dict[str, object]) -> dict[str, object]:
     if count <= 0.0 or total is None:
         return {"count": int(count), "median": None, "p95": None, "p99": None, "worst": None, "total": None}
     average_ms = (total / count) / 1_000_000.0
+    median = parse_number(stats.get("median"))
+    p95 = parse_number(stats.get("p95"))
+    p99 = parse_number(stats.get("p99"))
     return {
         "count": int(count),
-        "median": average_ms,
-        "p95": None,
-        "p99": None,
+        "median": (median / 1_000_000.0) if median is not None else average_ms,
+        "p95": (p95 / 1_000_000.0) if p95 is not None else None,
+        "p99": (p99 / 1_000_000.0) if p99 is not None else None,
         "worst": (worst / 1_000_000.0) if worst is not None else None,
         "total": total / 1_000_000.0,
     }

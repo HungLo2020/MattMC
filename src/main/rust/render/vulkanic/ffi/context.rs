@@ -8,7 +8,7 @@ pub(crate) struct BridgeContext {
     pub(crate) ffi_input_bytes: u64,
     pub(crate) ffi_output_bytes: u64,
     pub(crate) last_error: String,
-    pub(crate) cached_frame_target: Option<CachedFrameTarget>,
+    pub(crate) frame_targets: BTreeMap<FrameRenderTargetId, CachedFrameTarget>,
     pub(crate) stale_frame_targets: Vec<Handle>,
 }
 
@@ -38,7 +38,7 @@ pub(crate) fn destroy_all_frame_targets(context: &mut BridgeContext) -> GalResul
         .world_primitive_frontend
         .clear_frame_pass(&mut context.gal);
     destroy_stale_frame_targets(context)?;
-    if let Some(cached) = context.cached_frame_target.take() {
+    for (_identity, cached) in std::mem::take(&mut context.frame_targets) {
         context.gal.destroy(cached.handle)?;
     }
     Ok(())
@@ -112,7 +112,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_context_create(
                     ffi_input_bytes: size_of::<FfiContextCreateRequest>() as u64,
                     ffi_output_bytes: size_of::<FfiContextResult>() as u64,
                     last_error: String::new(),
-                    cached_frame_target: None,
+                    frame_targets: BTreeMap::new(),
                     stale_frame_targets: Vec::new(),
                 },
             );
@@ -193,7 +193,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_context_create_borrowed_opengl(
                     ffi_input_bytes: size_of::<FfiBorrowedOpenGlContextCreateRequest>() as u64,
                     ffi_output_bytes: size_of::<FfiContextResult>() as u64,
                     last_error: String::new(),
-                    cached_frame_target: None,
+                    frame_targets: BTreeMap::new(),
                     stale_frame_targets: Vec::new(),
                 },
             );
@@ -289,7 +289,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_context_create_windowed_vulkan(
                     ffi_input_bytes: size_of::<FfiWindowedVulkanContextCreateRequest>() as u64,
                     ffi_output_bytes: size_of::<FfiContextResult>() as u64,
                     last_error: String::new(),
-                    cached_frame_target: None,
+                    frame_targets: BTreeMap::new(),
                     stale_frame_targets: Vec::new(),
                 },
             );

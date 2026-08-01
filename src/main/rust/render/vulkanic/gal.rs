@@ -2933,6 +2933,29 @@ fn add_backend_metric_deltas(
     profile.vulkan_device_wait_idle_count = after
         .vulkan_device_wait_idle_count
         .saturating_sub(before.vulkan_device_wait_idle_count);
+    profile.vulkan_acquire_nanos = after
+        .vulkan_acquire_nanos
+        .saturating_sub(before.vulkan_acquire_nanos);
+    profile.vulkan_present_nanos = after
+        .vulkan_present_nanos
+        .saturating_sub(before.vulkan_present_nanos);
+    profile.vulkan_present_wait_nanos = after
+        .vulkan_present_wait_nanos
+        .saturating_sub(before.vulkan_present_wait_nanos);
+    profile.vulkan_present_mode = after.vulkan_present_mode;
+    profile.vulkan_acquired_image_index = after.vulkan_acquired_image_index;
+    profile.vulkan_swapchain_generation = after.vulkan_swapchain_generation;
+    profile.vulkan_images_in_flight = after.vulkan_images_in_flight;
+    profile.vulkan_available_frame_slots = after.vulkan_available_frame_slots;
+    profile.gpu_timestamp_status = after.gpu_timestamp_status;
+    profile.gpu_shadow_depth_nanos = after.gpu_shadow_depth_nanos;
+    profile.gpu_terrain_opaque_nanos = after.gpu_terrain_opaque_nanos;
+    profile.gpu_terrain_cutout_nanos = after.gpu_terrain_cutout_nanos;
+    profile.gpu_deferred_lighting_nanos = after.gpu_deferred_lighting_nanos;
+    profile.gpu_composite0_nanos = after.gpu_composite0_nanos;
+    profile.gpu_composite1_nanos = after.gpu_composite1_nanos;
+    profile.gpu_final_output_nanos = after.gpu_final_output_nanos;
+    profile.gpu_frame_total_nanos = after.gpu_frame_total_nanos;
 }
 
 fn is_depth_stencil_format(format: TextureFormat) -> bool {

@@ -771,6 +771,7 @@ mod tests {
         FrameTargetDesc {
             label: format!("test-frame-target-{frame_id}"),
             frame_id,
+            render_target: crate::render::vulkanic::frame::FrameRenderTargetId(frame_id),
             extent: Extent3d {
                 width: 64,
                 height: 48,

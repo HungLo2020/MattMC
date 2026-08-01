@@ -16,7 +16,8 @@ use super::commands::{
 use super::error::{ErrorDomain, GalError, GalResult, StatusCode};
 use super::frame::{
     FrameAcquireDesc, FrameAcquireStatus, FrameCorrelationId, FrameId as VulkanicFrameId,
-    FramePresentStatus, FrameResizeDesc, FrameSurfaceDesc, PresentFrameDesc, PresentMode,
+    FramePresentStatus, FrameRenderTargetId, FrameResizeDesc, FrameSurfaceDesc, PresentFrameDesc,
+    PresentMode,
 };
 use super::gal::VulkanicGal;
 use super::gui_frontend::{GuiAssetPayload, GuiFrontend, GuiSpriteRequest, GuiSubmitStats};

@@ -69,6 +69,23 @@ pub struct WholeFrameProfile {
     pub g_buffer_descriptor_creates: u64,
     pub g_buffer_render_target_creates: u64,
     pub g_buffer_resources_retired: u64,
+    pub world_prepare_g_buffer_persistent_key_nanos: u64,
+    pub world_prepare_g_buffer_persistent_lookup_nanos: u64,
+    pub world_prepare_g_buffer_final_key_nanos: u64,
+    pub world_prepare_g_buffer_final_lookup_nanos: u64,
+    pub world_prepare_g_buffer_final_create_nanos: u64,
+    pub world_prepare_frame_target_attachment_query_nanos: u64,
+    pub world_prepare_mesh_material_asset_nanos: u64,
+    pub world_prepare_metrics_accounting_nanos: u64,
+    pub g_buffer_final_pass_creates: u64,
+    pub vulkan_acquire_nanos: u64,
+    pub vulkan_present_nanos: u64,
+    pub vulkan_present_wait_nanos: u64,
+    pub vulkan_present_mode: u64,
+    pub vulkan_acquired_image_index: u64,
+    pub vulkan_swapchain_generation: u64,
+    pub vulkan_images_in_flight: u64,
+    pub vulkan_available_frame_slots: u64,
 }
 
 #[inline]
