@@ -4,7 +4,7 @@ use crate::render::vulkanic::world_primitive_frontend::material as world_materia
 fn is_world_mesh_stratum(stratum: u32) -> bool {
     matches!(
         stratum,
-        WORLD_STRATUM_OPAQUE_TEXTURED_GEOMETRY | WORLD_STRATUM_MOVING_MESH
+        WORLD_STRATUM_TERRAIN | WORLD_STRATUM_OPAQUE_TEXTURED_GEOMETRY | WORLD_STRATUM_MOVING_MESH
     )
 }
 

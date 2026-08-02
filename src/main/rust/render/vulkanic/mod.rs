@@ -14,6 +14,7 @@ pub mod metrics;
 pub mod resources;
 pub mod shader_pack;
 pub mod sync;
+pub mod terrain;
 pub mod world_primitive_frontend;
 
 pub use commands::{

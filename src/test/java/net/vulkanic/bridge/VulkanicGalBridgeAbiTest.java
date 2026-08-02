@@ -142,6 +142,18 @@ class VulkanicGalBridgeAbiTest {
 			Files.readString(Path.of("src/main/java/net/vulkanic/world/WorldRenderRoutePolicy.java"))
 				.contains("currentPistonMovingBlockRoute()")
 		);
+		assertEquals(
+			WorldRenderRoutePolicy.Route.JAVA_COMPATIBILITY,
+			WorldRenderRoutePolicy.selectWholeFrameRouteForTests(false, false, false, false),
+			"static terrain must stay compatibility-owned unless Rust Vulkan whole-frame is active"
+		);
+		assertEquals(
+			WorldRenderRoutePolicy.Route.RUST_VULKAN_WHOLE_FRAME,
+			WorldRenderRoutePolicy.selectWholeFrameRouteForTests(true, true, false, false)
+		);
+		String worldRoutePolicy = Files.readString(Path.of("src/main/java/net/vulkanic/world/WorldRenderRoutePolicy.java"));
+		assertTrue(worldRoutePolicy.contains("currentStaticTerrainRoute()"));
+		assertTrue(worldRoutePolicy.contains("mattmc.dev.rustGalStaticTerrain.disabled"));
 	}
 
 	@Test
@@ -203,8 +215,14 @@ class VulkanicGalBridgeAbiTest {
 		String worldRoutePolicy = Files.readString(Path.of("src/main/java/net/vulkanic/world/WorldRenderRoutePolicy.java"));
 		String gameRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/GameRenderer.java"));
 		String levelRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/LevelRenderer.java"));
+		String sodiumWorldRenderer = Files.readString(Path.of("src/main/java/net/sodium/client/render/SodiumWorldRenderer.java"));
+		String renderSectionManager = Files.readString(Path.of("src/main/java/net/sodium/client/render/chunk/RenderSectionManager.java"));
+		String terrainRenderer = Files.readString(Path.of("src/main/java/net/vulkanic/world/RustGalTerrainRenderer.java"));
+		String deterministicCapture = Files.readString(Path.of("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java"));
+		String graphicsHarness = Files.readString(Path.of("DevUtils/Common/graphics_harness.py"));
 		String rustFfi = readRustFfiModules();
 		String rustWorldFrontend = Files.readString(Path.of("src/main/rust/render/vulkanic/world_primitive_frontend.rs"));
+		String rustTerrainFrontend = Files.readString(Path.of("src/main/rust/render/vulkanic/terrain/mod.rs"));
 
 		assertTrue(bridge.contains("mattmc_vulkanic_gal_whole_frame_submit"));
 		assertTrue(bridge.contains("mattmc_vulkanic_gal_world_border_update_asset"));
@@ -279,6 +297,33 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(worldRoutePolicy.contains("RUST_VULKAN_WHOLE_FRAME"));
 		assertTrue(worldRenderer.contains("WorldRenderRoutePolicy.currentBackgroundRoute()"));
 		assertTrue(worldRenderer.contains("WorldRenderRoutePolicy.currentWorldBorderRoute()"));
+		assertTrue(worldRoutePolicy.contains("currentStaticTerrainRoute()"));
+		assertTrue(gameRenderer.contains("enqueueRustGalStaticTerrainForWholeFrame"));
+		assertTrue(levelRenderer.contains("this.cullTerrain(camera, frustum, this.minecraft.player.isSpectator())"));
+		assertTrue(sodiumWorldRenderer.contains("enqueueRustGalStaticTerrain"));
+		assertTrue(renderSectionManager.contains("RustGalTerrainRenderer.acceptChunkBuildOutput(chunkBuildOutput)"));
+		assertTrue(terrainRenderer.contains("WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan()"));
+		assertTrue(terrainRenderer.contains("DefaultTerrainRenderPasses.SOLID"));
+		assertTrue(terrainRenderer.contains("DefaultTerrainRenderPasses.CUTOUT"));
+		assertTrue(terrainRenderer.contains("registeredAtlasGeneration"));
+		assertTrue(terrainRenderer.contains("atlasTextureUpdatePayload()"));
+		assertTrue(terrainRenderer.contains("vertex.colorArgb()"));
+		assertTrue(terrainRenderer.contains("vertex.light()"));
+		assertTrue(terrainRenderer.contains("WorldMeshSectionRecord section"));
+		assertTrue(terrainRenderer.contains("removeSection(int x, int y, int z, String reason)"));
+		assertTrue(terrainRenderer.contains("TerrainDiagnostics"));
+		assertTrue(terrainRenderer.contains("DeterministicCameraCapture.recordSubmittedWorkIdentity(\"static-terrain\""));
+		assertTrue(deterministicCapture.contains("rustGalStaticTerrainDiagnostics"));
+		assertTrue(graphicsHarness.contains("--world-static-terrain-scenario"));
+		assertTrue(graphicsHarness.contains("static_terrain_workload_complete"));
+		assertTrue(renderSectionManager.contains("RustGalTerrainRenderer.removeSection(x, y, z, \"section-removed\")"));
+		assertTrue(worldRenderer.contains("DIRTY_WORLD_MESH_TEXTURES"));
+		assertTrue(worldRenderer.contains("dirtyWorldMeshTextureAssetsLocked()"));
+		assertTrue(worldRenderer.contains("removeStaticTerrainMeshAsset"));
+			assertTrue(rustWorldFrontend.contains("self.mesh_texture_assets.insert(texture_id, texture);")
+					&& rustWorldFrontend.contains("destroy_mesh_texture_resources_for_ids(gal, &incoming_texture_ids);"),
+				"incremental mesh updates must preserve previously uploaded semantic texture assets");
+		assertTrue(rustTerrainFrontend.contains("Static chunk-terrain frontend boundary"));
 		assertFalse(worldRenderer.contains("CRACK_DISABLED_CONTROL ||"));
 		assertTrue(worldRenderer.contains("shape.forAllEdges"));
 		assertFalse(worldRenderer.contains("CommandOp"));

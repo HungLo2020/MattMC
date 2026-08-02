@@ -16,6 +16,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 import net.vulkanic.gui.RustGalFrameCoordinator;
+import net.vulkanic.world.RustGalTerrainRenderer;
 
 import java.io.IOException;
 import java.lang.management.GarbageCollectorMXBean;
@@ -97,6 +98,8 @@ public final class GraphicsFrameBenchmark {
 		Math.max(1, Integer.getInteger("mattmc.dev.rustGalWorldMesh.fallingBlockCount", 1));
 	private static final String PISTON_SCENARIO =
 		System.getProperty("mattmc.dev.rustGalWorldMesh.pistonScenario", "").trim().toLowerCase(Locale.ROOT);
+	private static final String STATIC_TERRAIN_SCENARIO =
+		System.getProperty("mattmc.dev.rustGalStaticTerrain.scenario", "").trim().toLowerCase(Locale.ROOT);
 	private static final int PISTON_COUNT =
 		Math.max(1, Integer.getInteger("mattmc.dev.rustGalWorldMesh.pistonCount", 1));
 	private static final int REAL_TERRAIN_PARTICLE_MATERIAL_COUNT = 5;
@@ -114,7 +117,6 @@ public final class GraphicsFrameBenchmark {
 	private static final Map<String, PhaseStats> NESTED_PHASES = new LinkedHashMap<>();
 	private static final List<FrameTimelineEvent> FRAME_TIMELINE_EVENTS = new ArrayList<>();
 	private static final Map<String, Integer> SUBMITTED_WORK_COUNTS = new LinkedHashMap<>();
-	private static final Map<Long, Map<String, Set<String>>> SUBMITTED_WORK_BY_FRAME = new LinkedHashMap<>();
 	private static final Map<String, Integer> FALLING_BLOCK_ROUTE_COUNTS = new LinkedHashMap<>();
 	private static final Map<String, Integer> MOVING_BLOCK_ROUTE_COUNTS = new LinkedHashMap<>();
 	private static int movingBlockShellScanSamples;
@@ -142,6 +144,9 @@ public final class GraphicsFrameBenchmark {
 	private static long lastSampleNanos = -1L;
 	private static long currentFrameStartNanos = -1L;
 	private static long lastMeasurementFrameStartNanos = -1L;
+	private static long frameAllocatedBytesAtStart = -1L;
+	private static long frameGcCountAtStart = -1L;
+	private static long frameGcTimeAtStart = -1L;
 	private static long readinessStartNanos = -1L;
 	private static long producerWorkloadStartNanos = -1L;
 	private static long producerWorkloadWaitFrames;
@@ -216,6 +221,10 @@ public final class GraphicsFrameBenchmark {
 	private GraphicsFrameBenchmark() {
 	}
 
+	public static long currentFrameIndex() {
+		return frameIndex;
+	}
+
 	public static void beginFrame(Minecraft minecraft) {
 		if (!ENABLED) {
 			return;
@@ -235,6 +244,9 @@ public final class GraphicsFrameBenchmark {
 		if (!frameActive) {
 			return;
 		}
+		frameAllocatedBytesAtStart = currentThreadAllocatedBytes();
+		frameGcCountAtStart = totalGcCount();
+		frameGcTimeAtStart = totalGcTimeMillis();
 		beginPhase("java.frame.render-production");
 		holdPlayerStillAndApplyCameraPath(minecraft);
 		if (!producerWorkloadReady(minecraft)) {
@@ -286,6 +298,7 @@ public final class GraphicsFrameBenchmark {
 		}
 		if (measurementFrame) {
 			FRAME_NANOS.add(frameNanos);
+			recordFrameAllocationAndGcSamples();
 			long sampleNanos = System.nanoTime();
 			if (firstSampleNanos < 0L) {
 				firstSampleNanos = sampleNanos;
@@ -319,7 +332,25 @@ public final class GraphicsFrameBenchmark {
 		}
 		frameActive = false;
 		measurementFrame = false;
+		frameAllocatedBytesAtStart = -1L;
+		frameGcCountAtStart = -1L;
+		frameGcTimeAtStart = -1L;
 		PHASE_STACK.clear();
+	}
+
+	private static void recordFrameAllocationAndGcSamples() {
+		long allocatedBytesAtEnd = currentThreadAllocatedBytes();
+		if (frameAllocatedBytesAtStart >= 0L && allocatedBytesAtEnd >= frameAllocatedBytesAtStart) {
+			recordPhaseSample("java.alloc.render-thread-bytes", allocatedBytesAtEnd - frameAllocatedBytesAtStart);
+		}
+		long gcCountAtFrameEnd = totalGcCount();
+		if (frameGcCountAtStart >= 0L && gcCountAtFrameEnd >= frameGcCountAtStart) {
+			recordPhaseSample("java.gc.count", gcCountAtFrameEnd - frameGcCountAtStart);
+		}
+		long gcTimeAtFrameEnd = totalGcTimeMillis();
+		if (frameGcTimeAtStart >= 0L && gcTimeAtFrameEnd >= frameGcTimeAtStart) {
+			recordPhaseSample("java.gc.time-nanos", (gcTimeAtFrameEnd - frameGcTimeAtStart) * 1_000_000L);
+		}
 	}
 
 	public static void beginPhase(String name) {
@@ -419,12 +450,6 @@ public final class GraphicsFrameBenchmark {
 			return;
 		}
 		SUBMITTED_WORK_COUNTS.merge(normalizedFamily, 1, Integer::sum);
-		SUBMITTED_WORK_BY_FRAME
-			.computeIfAbsent(frameIndex, ignored -> new LinkedHashMap<>())
-			.computeIfAbsent(normalizedFamily, ignored -> new LinkedHashSet<>())
-			.add(normalizedIdentity);
-		long minimumFrame = Math.max(0L, frameIndex - 512L);
-		SUBMITTED_WORK_BY_FRAME.keySet().removeIf(frame -> frame < minimumFrame);
 	}
 
 	public static void recordFallingBlockRouteDecision(String route, BlockState blockState) {
@@ -649,6 +674,10 @@ public final class GraphicsFrameBenchmark {
 			&& !submittedWorkObserved("piston")
 			&& !routeObservedForProvenance("piston")) {
 			missing.add("piston");
+		}
+		if (scenarioRequiresProducerTraversal(STATIC_TERRAIN_SCENARIO)
+			&& !submittedWorkObserved("static-terrain")) {
+			missing.add("static-terrain");
 		}
 		return missing;
 	}
@@ -1309,6 +1338,8 @@ public final class GraphicsFrameBenchmark {
 			json.append(",\n");
 			writeBlockDisplayScenario(json);
 			json.append(",\n");
+			writeStaticTerrainScenario(json);
+			json.append(",\n");
 				writeFallingBlockScenario(json);
 				json.append(",\n");
 				writePistonScenario(json);
@@ -1531,6 +1562,26 @@ public final class GraphicsFrameBenchmark {
 		json.append("  }");
 	}
 
+	private static void writeStaticTerrainScenario(StringBuilder json) {
+		RustGalTerrainRenderer.TerrainDiagnostics diagnostics = RustGalTerrainRenderer.diagnosticsSnapshot();
+		json.append("  \"staticTerrainScenario\": {\n");
+		json.append("    \"enabled\": ").append(!STATIC_TERRAIN_SCENARIO.isEmpty()).append(",\n");
+		field(json, "scenario", STATIC_TERRAIN_SCENARIO, 4, true);
+		json.append("    \"cachedLayerAssets\": ").append(diagnostics.cachedLayerAssets()).append(",\n");
+		json.append("    \"atlasGeneration\": ").append(diagnostics.atlasGeneration()).append(",\n");
+		json.append("    \"registeredAtlasGeneration\": ").append(diagnostics.registeredAtlasGeneration()).append(",\n");
+		json.append("    \"acceptedBuildOutputs\": ").append(diagnostics.acceptedBuildOutputs()).append(",\n");
+		json.append("    \"registeredMeshes\": ").append(diagnostics.registeredMeshes()).append(",\n");
+		json.append("    \"texturePayloadUpdates\": ").append(diagnostics.texturePayloadUpdates()).append(",\n");
+		json.append("    \"visibleLayerProbes\": ").append(diagnostics.visibleLayerProbes()).append(",\n");
+		json.append("    \"visibleLayerSubmissions\": ").append(diagnostics.visibleLayerSubmissions()).append(",\n");
+		json.append("    \"failedLayerSubmissions\": ").append(diagnostics.failedLayerSubmissions()).append(",\n");
+		json.append("    \"removedLayers\": ").append(diagnostics.removedLayers()).append(",\n");
+		json.append("    \"invalidations\": ").append(diagnostics.invalidations()).append(",\n");
+		json.append("    \"unsupportedAnimatedSections\": ").append(diagnostics.skippedUnsupportedAnimatedSections()).append("\n");
+		json.append("  }");
+	}
+
 	private static void writeFallingBlockScenario(StringBuilder json) {
 		json.append("  \"fallingBlockScenario\": {\n");
 		json.append("    \"enabled\": ").append(!FALLING_BLOCK_SCENARIO.isEmpty()).append(",\n");
@@ -1622,6 +1673,7 @@ public final class GraphicsFrameBenchmark {
 			json.append("\"median\": ").append(stats.percentile(0.50)).append(", ");
 			json.append("\"p95\": ").append(stats.percentile(0.95)).append(", ");
 			json.append("\"p99\": ").append(stats.percentile(0.99)).append(", ");
+			json.append("\"max\": ").append(stats.worstNanos).append(", ");
 			json.append("\"worst\": ").append(stats.worstNanos).append(" }");
 			index++;
 		}

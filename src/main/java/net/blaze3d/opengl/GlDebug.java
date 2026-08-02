@@ -8,6 +8,7 @@ import net.vulkanic.VulkanicAPI;
 import java.util.List;
 import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import org.jetbrains.annotations.Nullable;
@@ -22,6 +23,7 @@ public class GlDebug {
 	private volatile GlDebug.LogEntry lastEntry;
 	private static final List<Integer> DEBUG_LEVELS = ImmutableList.of(37190, 37191, 37192, 33387);
 	private static final List<Integer> DEBUG_LEVELS_ARB = ImmutableList.of(37190, 37191, 37192);
+	private static final AtomicInteger PROVENANCE_MESSAGES = new AtomicInteger();
 
 	private static String printUnknownToken(int i) {
 		return "Unknown (0x" + Integer.toHexString(i).toUpperCase() + ")";
@@ -92,6 +94,22 @@ public class GlDebug {
 		}
 
 		LOGGER.info("OpenGL debug message: {}", message);
+		if (Boolean.getBoolean("mattmc.dev.glDebugProvenance")
+			&& PROVENANCE_MESSAGES.getAndIncrement() < Integer.getInteger("mattmc.dev.glDebugProvenanceLimit", 8)) {
+			StringBuilder stack = new StringBuilder();
+			for (StackTraceElement element : Thread.currentThread().getStackTrace()) {
+				String className = element.getClassName();
+				if (className.equals(Thread.class.getName()) || className.equals(GlDebug.class.getName())) {
+					continue;
+				}
+				stack.append("\n  at ").append(element);
+				if (stack.length() > 4096) {
+					stack.append("\n  ...");
+					break;
+				}
+			}
+			LOGGER.info("OpenGL debug provenance thread={} message={} stack={}", Thread.currentThread().getName(), message, stack);
+		}
 	}
 
 	public List<String> getLastOpenGlDebugMessages() {
@@ -113,6 +131,9 @@ public class GlDebug {
 		}
 		
 		GlDebug debugSystem = new GlDebug();
+		if (Boolean.getBoolean("mattmc.dev.glDebugProvenance")) {
+			sync = true;
+		}
 		
 		// Try KHR_debug first
 		if (VulkanicAPI.supportsKhrDebug() && GlDevice.USE_GL_KHR_debug) {

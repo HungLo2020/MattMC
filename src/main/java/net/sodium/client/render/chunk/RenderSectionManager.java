@@ -53,6 +53,7 @@ import net.minecraft.core.SectionPos;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.LevelChunkSection;
+import net.vulkanic.world.RustGalTerrainRenderer;
 import org.apache.commons.lang3.ArrayUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -622,6 +623,7 @@ public class RenderSectionManager {
     public void onSectionRemoved(int x, int y, int z) {
         // Iris: Notify shadow render list needs update
         this.shadowNeedsRenderListUpdate = true;
+        RustGalTerrainRenderer.removeSection(x, y, z, "section-removed");
         
         long sectionPos = SectionPos.asLong(x, y, z);
         RenderSection section = this.sectionByPosition.remove(sectionPos);
@@ -775,6 +777,7 @@ public class RenderSectionManager {
 
             TranslucentData oldData = result.render.getTranslucentData();
             if (result instanceof ChunkBuildOutput chunkBuildOutput) {
+                RustGalTerrainRenderer.acceptChunkBuildOutput(chunkBuildOutput);
                 var prevFlags = result.render.getFlags();
 
                 touchedSectionInfo |= this.updateSectionInfo(result.render, chunkBuildOutput.info);
@@ -1079,6 +1082,7 @@ public class RenderSectionManager {
         }
 
         for (var section : this.sectionByPosition.values()) {
+            RustGalTerrainRenderer.removeSection(section.getPosition().x(), section.getPosition().y(), section.getPosition().z(), "section-manager-destroy");
             section.delete();
         }
 
@@ -1302,6 +1306,10 @@ public class RenderSectionManager {
     public boolean isSectionBuilt(int x, int y, int z) {
         var section = this.getRenderSection(x, y, z);
         return section != null && section.isBuilt();
+    }
+
+    public int getTrackedSectionCount() {
+        return this.sectionByPosition.size();
     }
 
     public void onChunkAdded(int x, int z) {

@@ -1282,28 +1282,38 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	private void runTick(boolean bl) {
 		long frameStart = Util.getNanos();
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginFrame(this);
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.dev-before-tick");
 		net.minecraft.client.dev.GraphicsSubsystemBenchmark.runIfRequested(this);
 		net.minecraft.client.dev.DeterministicCameraCapture.beforeTick(this);
 		net.minecraft.client.dev.StoragePerfRunController.beforeTick(this);
 		net.minecraft.client.dev.PoiStorageValidationController.beforeTick(this);
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.dev-before-tick");
 
 		// HOOK: Call registered hooks at beginning of tick
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.before-run-hooks");
 		for (GameHooks hook : HookRegistry.getGameHooks()) {
 			hook.beforeRunTick(this, bl);
 		}
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.before-run-hooks");
 
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.window-pre-render");
 		this.window.setErrorSection("Pre render");
 		if (this.window.shouldClose()) {
 			this.stop();
 		}
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.window-pre-render");
 
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.pending-reload-check");
 		if (this.pendingReload != null && !(this.overlay instanceof LoadingOverlay)) {
 			CompletableFuture<Void> completableFuture = this.pendingReload;
 			this.pendingReload = null;
 			this.reloadResourcePacks().thenRun(() -> completableFuture.complete(null));
 		}
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.pending-reload-check");
 
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.delta-tracker");
 		int i = this.deltaTracker.advanceTime(Util.getMillis(), bl);
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.delta-tracker");
 		ProfilerFiller profilerFiller = Profiler.get();
 		long startTime;
 		
@@ -1337,14 +1347,21 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 			VulkanicAPI.executePendingFenceTasks();
 			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("sync.retirement");
 			profilerFiller.popPush("sound");
+			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.sound-update");
 			this.soundManager.updateSource(this.gameRenderer.getMainCamera());
+			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.sound-update");
 		profilerFiller.popPush("toasts");
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.toast-update");
 		this.toastManager.update();
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.toast-update");
 		profilerFiller.popPush("mouse");
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.mouse-movement");
 		this.mouseHandler.handleAccumulatedMovement();
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.mouse-movement");
 		profilerFiller.popPush("render");
 		long l = Util.getNanos();
 		boolean bl2;
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.gpu-profile-setup");
 		if (!this.debugEntries.isCurrentlyEnabled(DebugScreenEntries.GPU_UTILIZATION) && !this.metricsRecorder.isRecording()) {
 			bl2 = false;
 			this.gpuUtilization = 0.0;
@@ -1354,6 +1371,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 				TimerQuery.getInstance().beginProfile();
 			}
 		}
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.gpu-profile-setup");
 
 			RenderTarget renderTarget = this.getMainRenderTarget();
 			boolean rustWholeFrameShell = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabledForBackend(VulkanicAPI.isVulkanBackendSelected());
@@ -1400,10 +1418,12 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		}
 
 		profilerFiller.popPush("updateDisplay");
-		if (this.tracyFrameCapture != null) {
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.tracy-frame-capture");
+		if (this.tracyFrameCapture != null && !net.vulkanic.gui.RustGalGuiRenderer.isWholeFrameVulkanActive()) {
 			this.tracyFrameCapture.upload();
 			this.tracyFrameCapture.capture(renderTarget);
 		}
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.tracy-frame-capture");
 
 			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("api.present.update-display");
 			this.window.updateDisplay(this.tracyFrameCapture);
@@ -1436,18 +1456,24 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 
 		profilerFiller.pop();
 		profilerFiller.popPush("yield");
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.thread-yield");
 		Thread.yield();
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.thread-yield");
 		profilerFiller.pop();
+			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.post-render-bookkeeping");
 			this.window.setErrorSection("Post render");
 			this.frames++;
+			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.post-render-bookkeeping");
 			net.minecraft.client.dev.GraphicsFrameBenchmark.endFrame(this, Util.getNanos() - frameStart);
 		boolean bl3 = this.pause;
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.pause-update");
 		this.pause = this.hasSingleplayerServer()
 			&& (this.screen != null && this.screen.isPauseScreen() || this.overlay != null && this.overlay.isPauseScreen())
 			&& !this.singleplayerServer.isPublished();
 		if (!bl3 && this.pause) {
 			this.soundManager.pauseAllExcept(SoundSource.MUSIC, SoundSource.UI);
 		}
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.pause-update");
 
 		this.deltaTracker.updatePauseState(this.pause);
 		this.deltaTracker.updateFrozenState(!this.isLevelRunningNormally());

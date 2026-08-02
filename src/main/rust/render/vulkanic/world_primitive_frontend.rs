@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -63,6 +63,7 @@ pub const WORLD_WINDING_CW: u32 = 2;
 pub const WORLD_STRATUM_WORLD_BORDER: u32 = 80;
 pub const WORLD_STRATUM_BLOCK_OUTLINE: u32 = 100;
 pub const WORLD_STRATUM_BLOCK_BREAKING_CRACK: u32 = 90;
+pub const WORLD_STRATUM_TERRAIN: u32 = 60;
 pub const WORLD_STRATUM_OPAQUE_TEXTURED_GEOMETRY: u32 = 70;
 pub const WORLD_STRATUM_MOVING_MESH: u32 = 68;
 pub const WORLD_BORDER_TEXTURE_FORCEFIELD: u32 = 1;
@@ -799,14 +800,10 @@ struct MeshAssetStore {
 struct MeshResources {
     vertex_buffer: Handle,
     index_buffer: Handle,
-    texture_upload_buffer: Handle,
-    texture: Handle,
-    sampler: Handle,
     vertex_shader: Handle,
     fragment_shader: Handle,
     shadow_vertex_shader: Option<Handle>,
     shadow_fragment_shader: Option<Handle>,
-    texture_view: Handle,
     resource_layout: Handle,
     pipeline_layout: Handle,
     pipeline: Handle,
@@ -826,14 +823,10 @@ impl MeshResources {
             Some(self.pipeline),
             Some(self.pipeline_layout),
             Some(self.resource_layout),
-            Some(self.texture_view),
             self.shadow_fragment_shader,
             self.shadow_vertex_shader,
             Some(self.fragment_shader),
             Some(self.vertex_shader),
-            Some(self.sampler),
-            Some(self.texture),
-            Some(self.texture_upload_buffer),
             Some(self.index_buffer),
             Some(self.vertex_buffer),
         ]
@@ -845,6 +838,19 @@ impl MeshResources {
             handles.push(slot.instance_buffer);
         }
         handles
+    }
+}
+
+struct MeshTextureResources {
+    upload_buffer: Handle,
+    texture: Handle,
+    sampler: Handle,
+    view: Handle,
+}
+
+impl MeshTextureResources {
+    fn handles_in_destroy_order(&self) -> [Handle; 4] {
+        [self.view, self.sampler, self.texture, self.upload_buffer]
     }
 }
 
@@ -970,6 +976,7 @@ pub struct WorldPrimitiveFrontend {
     border_resource_format: Option<ColorFormat>,
     material_resources: BTreeMap<MaterialResourceKey, MaterialResources>,
     mesh_resources: BTreeMap<MeshResourceKey, MeshResources>,
+    mesh_texture_resources: BTreeMap<u32, MeshTextureResources>,
     depth_attachment: Option<DepthAttachmentResources>,
     g_buffer_resources: Option<GBufferResources>,
     g_buffer_final_bindings: BTreeMap<GBufferFinalBindingKey, GBufferFinalBindingResources>,
@@ -1272,7 +1279,8 @@ impl WorldPrimitiveFrontend {
                 ),
             ));
         }
-        let mut texture_assets = BTreeMap::new();
+        let mut incoming_texture_ids = BTreeSet::new();
+        let mut decoded_textures = Vec::with_capacity(textures.len());
         let mut payload_bytes = 0u64;
         for payload in textures {
             if payload.texture_id == 0 {
@@ -1281,7 +1289,7 @@ impl WorldPrimitiveFrontend {
                     "world mesh texture id must be non-zero",
                 ));
             }
-            if texture_assets.contains_key(&payload.texture_id) {
+            if !incoming_texture_ids.insert(payload.texture_id) {
                 return Err(GalError::ffi(
                     StatusCode::InvalidArgument,
                     format!("duplicate world mesh texture {}", payload.texture_id),
@@ -1295,19 +1303,20 @@ impl WorldPrimitiveFrontend {
                 &payload.png_bytes,
                 &format!("world mesh texture {}", payload.texture_id),
             )?;
-            texture_assets.insert(
+            decoded_textures.push((
                 payload.texture_id,
                 WorldMaterialTextureAsset {
                     rgba,
                     width,
                     height,
                 },
-            );
+            ));
         }
-        let mut mesh_assets = BTreeMap::new();
+        let mut incoming_mesh_keys = BTreeSet::new();
+        let mut decoded_meshes = Vec::with_capacity(meshes.len());
         for mesh in meshes {
             validate_mesh_asset(&mesh)?;
-            if mesh_assets.contains_key(&mesh.mesh_key) {
+            if !incoming_mesh_keys.insert(mesh.mesh_key) {
                 return Err(GalError::ffi(
                     StatusCode::InvalidArgument,
                     format!("duplicate world mesh asset key {}", mesh.mesh_key),
@@ -1320,7 +1329,7 @@ impl WorldPrimitiveFrontend {
                         .saturating_mul(WORLD_MESH_GPU_VERTEX_BYTES) as u64,
                 )
                 .saturating_add(mesh.index_bytes.len() as u64);
-            mesh_assets.insert(
+            decoded_meshes.push((
                 mesh.mesh_key,
                 MeshAssetStore {
                     mesh_generation: mesh.mesh_generation,
@@ -1329,13 +1338,36 @@ impl WorldPrimitiveFrontend {
                     index_type: mesh.index_type,
                     sections: mesh.sections,
                 },
-            );
+            ));
         }
+        let stale_resource_keys: Vec<MeshResourceKey> = self
+            .mesh_resources
+            .keys()
+            .copied()
+            .filter(|key| {
+                incoming_texture_ids.contains(&key.texture_id)
+                    || (incoming_mesh_keys.contains(&key.mesh_key)
+                        && decoded_meshes
+                            .iter()
+                            .find(|(mesh_key, _)| *mesh_key == key.mesh_key)
+                            .map(|(_, asset)| asset.mesh_generation != key.mesh_generation)
+                            .unwrap_or_else(|| {
+                                self.mesh_assets
+                                    .get(&key.mesh_key)
+                                    .is_none_or(|asset| asset.mesh_generation != key.mesh_generation)
+                            }))
+            })
+            .collect();
         self.mesh_asset_generation = generation;
         self.mesh_asset_payload_bytes = payload_bytes;
-        self.mesh_assets = mesh_assets;
-        self.mesh_texture_assets = texture_assets;
-        self.destroy_mesh_resources(gal);
+        self.destroy_mesh_resources_for_keys(gal, stale_resource_keys);
+        self.destroy_mesh_texture_resources_for_ids(gal, &incoming_texture_ids);
+        for (texture_id, texture) in decoded_textures {
+            self.mesh_texture_assets.insert(texture_id, texture);
+        }
+        for (mesh_key, asset) in decoded_meshes {
+            self.mesh_assets.insert(mesh_key, asset);
+        }
         Ok(())
     }
 
@@ -3111,8 +3143,13 @@ impl WorldPrimitiveFrontend {
         let index_type = asset.index_type;
         let index_offset = section.index_offset;
         let index_count = section.index_count;
-        let (texture_bytes, texture_width, texture_height) =
-            self.world_mesh_texture_bytes(key.texture_id)?;
+        self.ensure_mesh_texture_resources(gal, key.texture_id, &label)?;
+        let texture_resources = self
+            .mesh_texture_resources
+            .get(&key.texture_id)
+            .ok_or_else(|| GalError::backend("world mesh texture resources missing"))?;
+        let texture_view = texture_resources.view;
+        let sampler = texture_resources.sampler;
         let mut created = Vec::new();
         let result = (|| -> GalResult<MeshResources> {
             let vertex_buffer = gal.create_buffer(BufferDesc {
@@ -3129,41 +3166,6 @@ impl WorldPrimitiveFrontend {
                 usages: vec![BufferUsage::Index, BufferUsage::HostWrite],
             })?;
             created.push(index_buffer);
-            let texture_upload_buffer = gal.create_buffer(BufferDesc {
-                label: format!("{label}.texture-upload"),
-                size: texture_bytes.len() as u64,
-                memory: MemoryDomain::Upload,
-                usages: vec![
-                    BufferUsage::TransferSrc,
-                    BufferUsage::TransferDst,
-                    BufferUsage::HostWrite,
-                ],
-            })?;
-            created.push(texture_upload_buffer);
-            let texture = gal.create_texture(TextureDesc {
-                label: format!("{label}.texture"),
-                dimension: TextureDimension::D2,
-                format: TextureFormat::Rgba8Unorm,
-                extent: Extent3d {
-                    width: texture_width,
-                    height: texture_height,
-                    depth: 1,
-                },
-                mip_levels: 1,
-                array_layers: 1,
-                usages: vec![TextureUsage::Sampled, TextureUsage::TransferDst],
-            })?;
-            created.push(texture);
-            let sampler = gal.create_sampler(SamplerDesc {
-                label: format!("{label}.sampler"),
-                min_filter: SamplerFilter::Nearest,
-                mag_filter: SamplerFilter::Nearest,
-                mip_filter: SamplerFilter::Nearest,
-                address_u: SamplerAddressMode::ClampToEdge,
-                address_v: SamplerAddressMode::ClampToEdge,
-                address_w: SamplerAddressMode::ClampToEdge,
-            })?;
-            created.push(sampler);
             let terrain_program = terrain_program_for_mode(key.material_mode, key.g_buffer)?;
             let vertex_shader = gal.create_shader_module(ShaderModuleDesc {
                 label: format!("{label}.vertex"),
@@ -3213,16 +3215,6 @@ impl WorldPrimitiveFrontend {
             } else {
                 (None, None, None)
             };
-            let texture_view = gal.create_texture_view(TextureViewDesc {
-                label: format!("{label}.texture-view"),
-                texture,
-                format: TextureFormat::Rgba8Unorm,
-                base_mip: 0,
-                mip_count: 1,
-                base_layer: 0,
-                layer_count: 1,
-            })?;
-            created.push(texture_view);
             let resource_layout = gal.create_resource_layout(ResourceLayoutDesc {
                 label: format!("{label}.resource-layout"),
                 bindings: vec![
@@ -3329,29 +3321,17 @@ impl WorldPrimitiveFrontend {
             let resources = MeshResources {
                 vertex_buffer,
                 index_buffer,
-                texture_upload_buffer,
-                texture,
-                sampler,
                 vertex_shader,
                 fragment_shader,
                 shadow_vertex_shader,
                 shadow_fragment_shader,
-                texture_view,
                 resource_layout,
                 pipeline_layout,
                 pipeline,
                 shadow_pipeline,
                 data_slots: vec![slot],
             };
-            self.upload_mesh_resources(
-                gal,
-                &resources,
-                vertex_bytes,
-                index_bytes,
-                texture_bytes,
-                texture_width,
-                texture_height,
-            )?;
+            self.upload_mesh_resources(gal, &resources, vertex_bytes, index_bytes)?;
             let _ = (index_offset, index_count, index_type);
             Ok(resources)
         })();
@@ -3374,6 +3354,10 @@ impl WorldPrimitiveFrontend {
             .mesh_resources
             .get_mut(&key)
             .ok_or_else(|| GalError::backend("world mesh resources missing during slot growth"))?;
+        let texture_resources = self
+            .mesh_texture_resources
+            .get(&key.texture_id)
+            .ok_or_else(|| GalError::backend("world mesh texture resources missing during slot growth"))?;
         while resources.data_slots.len() < required_slots {
             let slot_index = resources.data_slots.len();
             let label = format!(
@@ -3385,8 +3369,8 @@ impl WorldPrimitiveFrontend {
                 &label,
                 resources.resource_layout,
                 resources.vertex_buffer,
-                resources.texture_view,
-                resources.sampler,
+                texture_resources.view,
+                texture_resources.sampler,
             )?;
             resources.data_slots.push(slot);
         }
@@ -3400,15 +3384,95 @@ impl WorldPrimitiveFrontend {
         self.world_material_texture_bytes(texture_id)
     }
 
+    fn ensure_mesh_texture_resources(
+        &mut self,
+        gal: &mut VulkanicGal,
+        texture_id: u32,
+        label_prefix: &str,
+    ) -> GalResult<()> {
+        if self.mesh_texture_resources.contains_key(&texture_id) {
+            return Ok(());
+        }
+        let (texture_bytes, texture_width, texture_height) =
+            self.world_mesh_texture_bytes(texture_id)?;
+        let label = format!("{label_prefix}.texture{texture_id}");
+        let mut created = Vec::new();
+        let result = (|| -> GalResult<MeshTextureResources> {
+            let upload_buffer = gal.create_buffer(BufferDesc {
+                label: format!("{label}.upload"),
+                size: texture_bytes.len() as u64,
+                memory: MemoryDomain::Upload,
+                usages: vec![
+                    BufferUsage::TransferSrc,
+                    BufferUsage::TransferDst,
+                    BufferUsage::HostWrite,
+                ],
+            })?;
+            created.push(upload_buffer);
+            let texture = gal.create_texture(TextureDesc {
+                label: format!("{label}.texture"),
+                dimension: TextureDimension::D2,
+                format: TextureFormat::Rgba8Unorm,
+                extent: Extent3d {
+                    width: texture_width,
+                    height: texture_height,
+                    depth: 1,
+                },
+                mip_levels: 1,
+                array_layers: 1,
+                usages: vec![TextureUsage::Sampled, TextureUsage::TransferDst],
+            })?;
+            created.push(texture);
+            let sampler = gal.create_sampler(SamplerDesc {
+                label: format!("{label}.sampler"),
+                min_filter: SamplerFilter::Nearest,
+                mag_filter: SamplerFilter::Nearest,
+                mip_filter: SamplerFilter::Nearest,
+                address_u: SamplerAddressMode::ClampToEdge,
+                address_v: SamplerAddressMode::ClampToEdge,
+                address_w: SamplerAddressMode::ClampToEdge,
+            })?;
+            created.push(sampler);
+            let view = gal.create_texture_view(TextureViewDesc {
+                label: format!("{label}.view"),
+                texture,
+                format: TextureFormat::Rgba8Unorm,
+                base_mip: 0,
+                mip_count: 1,
+                base_layer: 0,
+                layer_count: 1,
+            })?;
+            created.push(view);
+            let resources = MeshTextureResources {
+                upload_buffer,
+                texture,
+                sampler,
+                view,
+            };
+            self.upload_mesh_texture_resources(
+                gal,
+                &resources,
+                texture_bytes,
+                texture_width,
+                texture_height,
+            )?;
+            Ok(resources)
+        })();
+        if result.is_err() {
+            for handle in created.into_iter().rev() {
+                let _ = gal.destroy(handle);
+            }
+        }
+        self.mesh_texture_resources.insert(texture_id, result?);
+        Ok(())
+    }
+
     fn upload_mesh_resources(
         &mut self,
         gal: &mut VulkanicGal,
         resources: &MeshResources,
         vertex_bytes: Vec<u8>,
         index_bytes: Vec<u8>,
-        texture_bytes: Vec<u8>,
-        texture_width: u32,
-        texture_height: u32,
     ) -> GalResult<()> {
         gal.submit(SubmissionBatch {
             label: "world-mesh.upload".to_string(),
@@ -3435,13 +3499,32 @@ impl WorldPrimitiveFrontend {
                         TextureUsageState::TransferDst,
                         TextureUsageState::IndexRead,
                     )),
+                ],
+            })],
+        })?;
+        Ok(())
+    }
+
+    fn upload_mesh_texture_resources(
+        &mut self,
+        gal: &mut VulkanicGal,
+        resources: &MeshTextureResources,
+        texture_bytes: Vec<u8>,
+        texture_width: u32,
+        texture_height: u32,
+    ) -> GalResult<()> {
+        gal.submit(SubmissionBatch {
+            label: "world-mesh.texture-upload".to_string(),
+            command_lists: vec![CommandList::from(CommandListDesc {
+                label: "world-mesh.texture-upload.commands".to_string(),
+                operations: vec![
                     CommandOp::HostWriteBuffer {
-                        buffer: resources.texture_upload_buffer,
+                        buffer: resources.upload_buffer,
                         offset: 0,
                         data: texture_bytes,
                     },
                     CommandOp::Barrier(buffer_barrier(
-                        resources.texture_upload_buffer,
+                        resources.upload_buffer,
                         TextureUsageState::TransferDst,
                         TextureUsageState::TransferSrc,
                     )),
@@ -3451,7 +3534,7 @@ impl WorldPrimitiveFrontend {
                         TextureUsageState::TransferDst,
                     )),
                     CommandOp::CopyBufferToTexture(BufferImageCopyRegion {
-                        buffer: resources.texture_upload_buffer,
+                        buffer: resources.upload_buffer,
                         buffer_offset: 0,
                         bytes_per_row: texture_width * 4,
                         rows_per_image: texture_height,
@@ -4138,6 +4221,7 @@ impl WorldPrimitiveFrontend {
         self.destroy_border_resources(gal);
         self.destroy_material_resources(gal);
         self.destroy_mesh_resources(gal);
+        self.destroy_mesh_texture_resources(gal);
         let retired = self.destroy_g_buffer_resources(gal);
         self.pending_g_buffer_resources_retired = self
             .pending_g_buffer_resources_retired
@@ -4184,6 +4268,35 @@ impl WorldPrimitiveFrontend {
         for (_, resources) in resources {
             for handle in resources.handles_in_destroy_order() {
                 let _ = gal.destroy(handle);
+            }
+        }
+    }
+
+    fn destroy_mesh_texture_resources(&mut self, gal: &mut VulkanicGal) {
+        let resources = std::mem::take(&mut self.mesh_texture_resources);
+        for (_, resources) in resources {
+            for handle in resources.handles_in_destroy_order() {
+                let _ = gal.destroy(handle);
+            }
+        }
+    }
+
+    fn destroy_mesh_texture_resources_for_ids(&mut self, gal: &mut VulkanicGal, ids: &BTreeSet<u32>) {
+        for texture_id in ids {
+            if let Some(resources) = self.mesh_texture_resources.remove(texture_id) {
+                for handle in resources.handles_in_destroy_order() {
+                    let _ = gal.destroy(handle);
+                }
+            }
+        }
+    }
+
+    fn destroy_mesh_resources_for_keys(&mut self, gal: &mut VulkanicGal, keys: Vec<MeshResourceKey>) {
+        for key in keys {
+            if let Some(resources) = self.mesh_resources.remove(&key) {
+                for handle in resources.handles_in_destroy_order() {
+                    let _ = gal.destroy(handle);
+                }
             }
         }
     }
@@ -4293,7 +4406,7 @@ fn validate_mesh_instance(
 fn is_world_mesh_stratum(stratum: u32) -> bool {
     matches!(
         stratum,
-        WORLD_STRATUM_OPAQUE_TEXTURED_GEOMETRY | WORLD_STRATUM_MOVING_MESH
+        WORLD_STRATUM_TERRAIN | WORLD_STRATUM_OPAQUE_TEXTURED_GEOMETRY | WORLD_STRATUM_MOVING_MESH
     )
 }
 
@@ -4408,8 +4521,43 @@ fn validate_mesh_asset(mesh: &WorldMeshAsset) -> GalResult<()> {
                 "world mesh section index range exceeds index payload",
             ));
         }
+        for index in start..end {
+            let vertex_index = mesh_index_value(&mesh.index_bytes, mesh.index_type, index)?;
+            if vertex_index >= mesh.vertices.len() as u32 {
+                return Err(GalError::ffi(
+                    StatusCode::InvalidArgument,
+                    format!(
+                        "world mesh section references vertex {vertex_index} but mesh has {} vertices",
+                        mesh.vertices.len()
+                    ),
+                ));
+            }
+        }
     }
     Ok(())
+}
+
+fn mesh_index_value(index_bytes: &[u8], index_type: IndexType, index: usize) -> GalResult<u32> {
+    match index_type {
+        IndexType::U16 => {
+            let offset = index
+                .checked_mul(2)
+                .ok_or_else(|| GalError::invalid_argument("world mesh u16 index offset overflow"))?;
+            let bytes = index_bytes.get(offset..offset + 2).ok_or_else(|| {
+                GalError::invalid_argument("world mesh u16 index offset exceeds payload")
+            })?;
+            Ok(u16::from_le_bytes([bytes[0], bytes[1]]) as u32)
+        }
+        IndexType::U32 => {
+            let offset = index
+                .checked_mul(4)
+                .ok_or_else(|| GalError::invalid_argument("world mesh u32 index offset overflow"))?;
+            let bytes = index_bytes.get(offset..offset + 4).ok_or_else(|| {
+                GalError::invalid_argument("world mesh u32 index offset exceeds payload")
+            })?;
+            Ok(u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
+        }
+    }
 }
 
 fn packed_mesh_vertices(vertices: &[WorldMeshVertex]) -> Vec<u8> {
@@ -5510,7 +5658,7 @@ fn terrain_runtime_targets(
 }
 
 fn shader_shadow_params(enabled: bool) -> [f32; 4] {
-    [if enabled { 1.0 } else { 0.0 }, 0.006, 0.42, 1.0]
+    [if enabled { 1.0 } else { 0.0 }, 0.006, 0.42, 96.0]
 }
 
 fn shader_color_grade_params() -> [f32; 4] {
@@ -5522,8 +5670,10 @@ fn shader_fog_params() -> [f32; 4] {
 }
 
 fn shadow_light_view_projection_matrix() -> [f32; 16] {
+    let scale = 1.0 / 96.0;
     [
-        0.22, 0.0, 0.0, 0.0, 0.0, 0.22, 0.0, 0.0, 0.0, 0.0, 0.18, 0.0, 0.0, 0.0, 0.0, 1.0,
+        scale, 0.0, 0.0, 0.0, 0.0, scale, 0.0, 0.0, 0.0, 0.0, scale, 0.0, 0.0,
+        0.0, 0.0, 1.0,
     ]
 }
 
@@ -6567,6 +6717,130 @@ mod tests {
     }
 
     #[test]
+    fn world_mesh_asset_updates_retire_only_changed_mesh_resources() {
+        let mut gal = gal();
+        let target = frame_target(&mut gal, 1, 128, 128);
+        let mut frontend = WorldPrimitiveFrontend::default();
+        frontend
+            .apply_world_mesh_asset_update(
+                &mut gal,
+                1,
+                vec![mesh_asset(81, 1, IndexType::U16)],
+                Vec::new(),
+            )
+            .unwrap();
+        let mut frame = frame(Vec::new());
+        frame.mesh_instances.push(mesh_instance(81, 1));
+        frontend
+            .append_frame_ops(&mut gal, 1, target, frame.clone())
+            .unwrap();
+        let original_key = *frontend.mesh_resources.keys().next().unwrap();
+        let original_vertex_buffer = frontend
+            .mesh_resources
+            .get(&original_key)
+            .unwrap()
+            .vertex_buffer;
+
+        frontend
+            .apply_world_mesh_asset_update(
+                &mut gal,
+                2,
+                vec![
+                    mesh_asset(81, 1, IndexType::U16),
+                    mesh_asset(82, 1, IndexType::U16),
+                ],
+                Vec::new(),
+            )
+            .unwrap();
+        assert_eq!(
+            Some(original_vertex_buffer),
+            frontend
+                .mesh_resources
+                .get(&original_key)
+                .map(|resources| resources.vertex_buffer)
+        );
+        let (_ops, stats) = frontend
+            .append_frame_ops(&mut gal, 2, target, frame.clone())
+            .unwrap();
+        assert_eq!(1, stats.mesh_cache_hits);
+        assert_eq!(0, stats.mesh_cache_misses);
+
+        frontend
+            .apply_world_mesh_asset_update(
+                &mut gal,
+                3,
+                vec![mesh_asset(81, 2, IndexType::U16)],
+                Vec::new(),
+            )
+            .unwrap();
+        assert!(!frontend.mesh_resources.contains_key(&original_key));
+    }
+
+    #[test]
+    fn world_mesh_asset_updates_preserve_textures_when_no_dirty_payloads_are_sent() {
+        let mut gal = gal();
+        let mut frontend = WorldPrimitiveFrontend::default();
+        frontend
+            .apply_world_mesh_asset_update(
+                &mut gal,
+                1,
+                vec![mesh_asset(91, 1, IndexType::U16)],
+                vec![WorldMeshTextureAssetPayload {
+                    texture_id: WORLD_MATERIAL_TEXTURE_STONE,
+                    png_bytes: material_scene_png(0),
+                }],
+            )
+            .unwrap();
+        assert!(frontend
+            .mesh_texture_assets
+            .contains_key(&WORLD_MATERIAL_TEXTURE_STONE));
+
+        frontend
+            .apply_world_mesh_asset_update(
+                &mut gal,
+                2,
+                vec![mesh_asset(92, 2, IndexType::U16)],
+                Vec::new(),
+            )
+            .unwrap();
+        assert!(frontend
+            .mesh_texture_assets
+            .contains_key(&WORLD_MATERIAL_TEXTURE_STONE));
+
+        let duplicate = frontend.apply_world_mesh_asset_update(
+            &mut gal,
+            3,
+            vec![mesh_asset(93, 3, IndexType::U16)],
+            vec![
+                WorldMeshTextureAssetPayload {
+                    texture_id: WORLD_MATERIAL_TEXTURE_STONE,
+                    png_bytes: material_scene_png(0),
+                },
+                WorldMeshTextureAssetPayload {
+                    texture_id: WORLD_MATERIAL_TEXTURE_STONE,
+                    png_bytes: material_scene_png(1),
+                },
+            ],
+        );
+        assert!(duplicate.is_err());
+
+        frontend
+            .apply_world_mesh_asset_update(
+                &mut gal,
+                4,
+                vec![mesh_asset(94, 4, IndexType::U16)],
+                vec![WorldMeshTextureAssetPayload {
+                    texture_id: WORLD_MATERIAL_TEXTURE_STONE,
+                    png_bytes: material_scene_png(1),
+                }],
+            )
+            .unwrap();
+        assert!(frontend
+            .mesh_texture_assets
+            .contains_key(&WORLD_MATERIAL_TEXTURE_STONE));
+    }
+
+    #[test]
     fn world_mesh_groups_compatible_instances_into_one_instanced_draw() {
         let mut gal = gal();
         let target = frame_target(&mut gal, 1, 128, 128);
@@ -6655,6 +6929,21 @@ mod tests {
         let dim_factor = f32::from_le_bytes(dim_bytes[32..36].try_into().unwrap());
         assert!(dim_factor > 0.08);
         assert!(dim_factor < 0.2);
+    }
+
+    #[test]
+    fn world_mesh_asset_validation_rejects_indices_outside_vertex_payload() {
+        let mut asset = mesh_asset(187, 1, IndexType::U16);
+        asset.index_bytes = vec![0, 0, 1, 0, 4, 0];
+        asset.sections[0].index_count = 3;
+
+        let error = validate_mesh_asset(&asset).unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("references vertex 4 but mesh has 4 vertices"),
+            "{error}"
+        );
     }
 
     #[test]

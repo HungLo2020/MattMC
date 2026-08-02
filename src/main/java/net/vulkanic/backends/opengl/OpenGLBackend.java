@@ -1826,7 +1826,15 @@ public class OpenGLBackend implements GraphicsBackend {
         org.lwjgl.opengl.GLDebugMessageCallback callback = org.lwjgl.opengl.GLDebugMessageCallback.create(
             (source, type, id, severity, length, message, userParam) -> {
                 String msg = org.lwjgl.opengl.GLDebugMessageCallback.getMessage(length, message);
-                messageHandler.accept(msg);
+                messageHandler.accept(
+                    "source=" + source
+                        + " type=" + type
+                        + " id=" + id
+                        + " severity=" + severity
+                        + " thread=" + Thread.currentThread().getName()
+                        + " backend=opengl"
+                        + " message=" + msg
+                );
             }
         );
         org.lwjgl.opengl.KHRDebug.glDebugMessageCallback(
@@ -1852,7 +1860,15 @@ public class OpenGLBackend implements GraphicsBackend {
         org.lwjgl.opengl.GLDebugMessageARBCallback callback = org.lwjgl.opengl.GLDebugMessageARBCallback.create(
             (source, type, id, severity, length, message, userParam) -> {
                 String msg = org.lwjgl.opengl.GLDebugMessageCallback.getMessage(length, message);
-                messageHandler.accept(msg);
+                messageHandler.accept(
+                    "source=" + source
+                        + " type=" + type
+                        + " id=" + id
+                        + " severity=" + severity
+                        + " thread=" + Thread.currentThread().getName()
+                        + " backend=opengl"
+                        + " message=" + msg
+                );
             }
         );
         org.lwjgl.opengl.ARBDebugOutput.glDebugMessageCallbackARB(

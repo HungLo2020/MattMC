@@ -1083,6 +1083,17 @@ fn whole_frame_world_mesh_ffi_copies_and_rejects_malformed_payloads() {
     assert_eq!(9, frame.mesh_instances[0].mesh_generation);
     assert_eq!(0.0, frame.mesh_instances[0].transform[12]);
 
+    instances[0] = mesh_instance();
+    instances[0].stratum = WORLD_STRATUM_TERRAIN;
+    let (_generation, _target, frame, _gui) = unsafe {
+        decode_whole_frame_submit(
+            &whole_frame_request_with_mesh_instances(&instances),
+            test_vulkan_capabilities(),
+        )
+        .unwrap()
+    };
+    assert_eq!(WORLD_STRATUM_TERRAIN, frame.mesh_instances[0].stratum);
+
     instances[0].stratum = 77;
     let error = unsafe {
         decode_whole_frame_submit(

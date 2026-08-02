@@ -877,8 +877,10 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 		}
 		ProfilerFiller profilerFiller = Profiler.get();
 		boolean gameLoadFinished = this.minecraft.isGameLoadFinished();
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.rust-vulkan.frame-reset");
 		this.guiRenderState.reset();
 		net.vulkanic.world.RustGalWorldPrimitiveRenderer.clearFrame();
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.rust-vulkan.frame-reset");
 		float f = SystemTimeUniforms.isDeterministicTemporalParityEnabled()
 			? SystemTimeUniforms.deterministicTemporalPartialTick()
 			: deltaTracker.getGameTimeDeltaPartialTick(true);
@@ -887,16 +889,21 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 			if (this.minecraft.getCameraEntity() == null) {
 				this.minecraft.setCameraEntity(localPlayer);
 			}
+			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.rust-vulkan.camera-pick");
 			this.pick(f);
 			DeterministicCameraCapture.forceBlockOutlineTargetForDiagnostics(this.minecraft);
+			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.rust-vulkan.camera-pick");
 			Entity entity = (Entity)(this.minecraft.getCameraEntity() == null ? localPlayer : this.minecraft.getCameraEntity());
 			float g = this.minecraft.level.tickRateManager().isEntityFrozen(entity) ? 1.0F : f;
+			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.rust-vulkan.camera-setup");
 			TaczCameraRecoil.apply(this.minecraft);
 			this.mainCamera
 				.setup(this.minecraft.level, entity, !this.minecraft.options.getCameraType().isFirstPerson(), this.minecraft.options.getCameraType().isMirrored(), g);
 			this.extractCamera(f);
 			float h = this.getFov(this.mainCamera, f, true);
 			Matrix4f projection = this.getProjectionMatrix(h);
+			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.rust-vulkan.camera-setup");
+			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.rust-vulkan.matrix-build");
 			PoseStack poseStack = new PoseStack();
 			areShadersOn = net.irisshaders.iris.Iris.isPackInUseQuick();
 			if (areShadersOn) {
@@ -925,28 +932,54 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 			} else {
 				view.rotation(cameraRotation);
 			}
+				net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.rust-vulkan.matrix-build");
 				net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.rust-vulkan.semantic-world-extraction");
+				net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.frame-begin");
 				net.vulkanic.world.RustGalWorldPrimitiveRenderer.beginFrame(
 					view,
 					projection,
 					this.minecraft.getWindow().getWidth(),
 					this.minecraft.getWindow().getHeight()
 				);
+				net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.frame-begin");
+				net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.background.enqueue");
 				net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueWorldBackground(this.minecraft.level, this.mainCamera, f);
+				net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.background.enqueue");
+				net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.enqueue");
+				this.minecraft.levelRenderer.enqueueRustGalStaticTerrainForWholeFrame(this.mainCamera, view, projection);
+				net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.enqueue");
+				net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.block-outline.enqueue");
 				net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueBlockOutline(this.minecraft, this, this.mainCamera);
+				net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.block-outline.enqueue");
+				net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.block-marker.enqueue");
 				this.minecraft.particleEngine.enqueueRustGalBlockMarkers(this.mainCamera, f);
+				net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.block-marker.enqueue");
+				net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.terrain-particles.enqueue");
 				this.minecraft.particleEngine.enqueueRustGalTerrainParticles(this.mainCamera, f);
+				net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.terrain-particles.enqueue");
+			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.block-crack.enqueue");
 			this.minecraft.levelRenderer.enqueueRustGalBlockBreakingCracks(this.mainCamera);
+			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.block-crack.enqueue");
+			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.border.enqueue");
 			this.minecraft.levelRenderer.enqueueRustGalWorldBorder(this.mainCamera);
+			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.border.enqueue");
+				net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.indexed-mesh.enqueue");
 				this.minecraft.levelRenderer.enqueueRustGalIndexedMeshFeaturesForWholeFrame(this.mainCamera, deltaTracker, view, projection);
+				net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.indexed-mesh.enqueue");
 				net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.rust-vulkan.semantic-world-extraction");
 		}
 		profilerFiller.push("rustVulkanWholeFrameGuiExtraction");
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.rust-vulkan.semantic-gui-extraction");
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("gui.state-create");
 		GuiGraphics guiGraphics = new GuiGraphics(this.minecraft, this.guiRenderState);
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("gui.state-create");
 		if (gameLoadFinished && bl && this.minecraft.level != null) {
+			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("gui.hud-render");
 			this.minecraft.gui.render(guiGraphics, deltaTracker);
+			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("gui.hud-render");
+			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("gui.saving-indicator");
 			this.minecraft.gui.renderSavingIndicator(guiGraphics, deltaTracker);
+			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("gui.saving-indicator");
 		}
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.rust-vulkan.semantic-gui-extraction");
 		profilerFiller.popPush("rustVulkanWholeFramePresent");
@@ -954,10 +987,14 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 		net.vulkanic.gui.RustGalFrameCoordinator.executeWholeFrameVulkan(this.minecraft, this.guiRenderState);
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.rust-vulkan.frame-coordinator");
 		profilerFiller.pop();
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("gui.cursor-apply");
 		guiGraphics.applyCursor(this.minecraft.getWindow());
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("gui.cursor-apply");
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.rust-vulkan.frame-cleanup");
 		this.submitNodeStorage.endFrame();
 		this.featureRenderDispatcher.endFrame();
 		this.resourcePool.endFrame();
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.rust-vulkan.frame-cleanup");
 		return true;
 	}
 

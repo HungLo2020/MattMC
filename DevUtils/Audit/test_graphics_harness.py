@@ -5892,6 +5892,129 @@ else:
         self.assertTrue(signature["diagnostic_hooks"])
         self.assertFalse(signature["performance_comparable"])
 
+    def static_terrain_doc(self, **overrides: object) -> dict[str, object]:
+        event: dict[str, object] = {
+            "reason": "visible-submit",
+            "gameplayFrameId": 7,
+            "terrainExtractionFrameId": 3,
+            "rustEnqueueFrameId": 5,
+            "executionFrameId": 0,
+            "executionSubmissionId": 0,
+            "sectionPos": 123456789,
+            "layer": "SOLID",
+            "meshKey": 11,
+            "contentHash": 101,
+            "meshGeneration": 101,
+            "visibleGeneration": 101,
+            "vertexCount": 24,
+            "bufferVertexCapacity": 24,
+            "vertexStride": 40,
+            "indexCount": 36,
+            "maxIndex": 23,
+            "indexType": 1,
+            "sectionCount": 1,
+            "sectionOrigin": {"x": 16, "y": 64, "z": 32},
+            "transformTranslation": {"x": 1.0, "y": 2.0, "z": 3.0},
+            "localBounds": {"minX": 0.0, "minY": 0.0, "minZ": 0.0, "maxX": 16.0, "maxY": 16.0, "maxZ": 16.0},
+            "uvBounds": {"minU": 0.1, "minV": 0.2, "maxU": 0.8, "maxV": 0.9},
+            "vertexPositionsFinite": True,
+            "localBoundsValid": True,
+            "uvBoundsValid": True,
+            "indexRangeValid": True,
+            "segmentLayoutValid": True,
+            "sectionOriginValid": True,
+            "indexOffsetAlignmentValid": True,
+            "cameraBoundsFinite": True,
+        }
+        event.update(overrides)
+        return {"activeNativeVertexStride": 40, "recentEvents": [event]}
+
+    def assert_static_terrain_failure(self, expected: str, **overrides: object) -> None:
+        evidence = harness.static_terrain_geometry_evidence(self.static_terrain_doc(**overrides))
+        self.assertEqual(evidence["status"], "fail")
+        self.assertIn(expected, evidence["failures"])
+
+    def test_static_terrain_geometry_truth_accepts_valid_event(self) -> None:
+        evidence = harness.static_terrain_geometry_evidence(self.static_terrain_doc())
+        self.assertEqual(evidence["status"], "pass")
+        self.assertIsNone(evidence["failure"])
+        self.assertEqual(evidence["checked_events"], 1)
+        self.assertEqual(evidence["visible_submit_events"], 1)
+
+    def test_static_terrain_geometry_truth_rejects_faults(self) -> None:
+        cases = {
+            "vertex_stride_invalid": {"vertexStride": 20},
+            "vertex_count_exceeds_capacity": {"vertexCount": 25},
+            "index_range_invalid": {"maxIndex": 24, "indexRangeValid": False},
+            "index_type_invalid": {"indexType": 99},
+            "index_alignment_invalid": {"indexOffsetAlignmentValid": False},
+            "non_finite_vertex_position": {"vertexPositionsFinite": False},
+            "section_origin_mismatch": {"sectionOriginValid": False},
+            "stale_generation_visible": {"reason": "stale-or-unregistered-submit", "visibleGeneration": 202},
+            "geometry_out_of_bounds": {
+                "localBounds": {"minX": 0.0, "minY": 0.0, "minZ": 0.0, "maxX": 4096.0, "maxY": 16.0, "maxZ": 16.0},
+                "localBoundsValid": False,
+            },
+        }
+        for expected, overrides in cases.items():
+            with self.subTest(expected=expected):
+                self.assert_static_terrain_failure(expected, **overrides)
+
+    def test_static_terrain_geometry_truth_rejects_duplicate_visible_section(self) -> None:
+        doc = self.static_terrain_doc()
+        doc["recentEvents"] = [dict(doc["recentEvents"][0]), dict(doc["recentEvents"][0])]
+        evidence = harness.static_terrain_geometry_evidence(doc)
+        self.assertEqual(evidence["status"], "fail")
+        self.assertIn("duplicate_section_visible", evidence["failures"])
+
+    def test_static_terrain_geometry_truth_allows_repeated_visibility_across_frames(self) -> None:
+        first = self.static_terrain_doc()["recentEvents"][0]
+        second = dict(first)
+        second["gameplayFrameId"] = int(first["gameplayFrameId"]) + 1
+        second["rustEnqueueFrameId"] = int(first["rustEnqueueFrameId"]) + 1
+        doc = {"activeNativeVertexStride": 40, "recentEvents": [first, second]}
+        evidence = harness.static_terrain_geometry_evidence(doc)
+        self.assertEqual(evidence["status"], "pass")
+        self.assertNotIn("duplicate_section_visible", evidence["failures"])
+
+    def test_static_terrain_geometry_truth_rejects_same_frame_old_new_overlap(self) -> None:
+        first = self.static_terrain_doc()["recentEvents"][0]
+        second = dict(first)
+        second["meshGeneration"] = 202
+        second["visibleGeneration"] = 202
+        doc = {"activeNativeVertexStride": 40, "recentEvents": [first, second]}
+        evidence = harness.static_terrain_geometry_evidence(doc)
+        self.assertEqual(evidence["status"], "fail")
+        self.assertIn("stale_generation_overlap", evidence["failures"])
+
+    def test_static_terrain_geometry_truth_rejects_duplicate_execution_in_one_submission(self) -> None:
+        base = self.static_terrain_doc(reason="executed-submit", executionFrameId=9, executionSubmissionId=10, rustEnqueueFrameId=0)["recentEvents"][0]
+        doc = {"activeNativeVertexStride": 40, "recentEvents": [base, dict(base)]}
+        evidence = harness.static_terrain_geometry_evidence(doc)
+        self.assertEqual(evidence["status"], "fail")
+        self.assertIn("duplicate_section_execution", evidence["failures"])
+
+    def test_static_terrain_geometry_truth_allows_delayed_execution_next_frame(self) -> None:
+        visible = self.static_terrain_doc(gameplayFrameId=7, rustEnqueueFrameId=5)["recentEvents"][0]
+        executed = dict(visible)
+        executed["reason"] = "executed-submit"
+        executed["executionFrameId"] = 8
+        executed["executionSubmissionId"] = 11
+        executed["rustEnqueueFrameId"] = 0
+        doc = {"activeNativeVertexStride": 40, "recentEvents": [visible, executed]}
+        evidence = harness.static_terrain_geometry_evidence(doc)
+        self.assertEqual(evidence["status"], "pass")
+
+    def test_static_terrain_geometry_truth_rejects_mesh_key_collision(self) -> None:
+        doc = self.static_terrain_doc()
+        second = dict(doc["recentEvents"][0])
+        second["sectionPos"] = 987654321
+        second["contentHash"] = 202
+        doc["recentEvents"] = [doc["recentEvents"][0], second]
+        evidence = harness.static_terrain_geometry_evidence(doc)
+        self.assertEqual(evidence["status"], "fail")
+        self.assertIn("mesh_key_collision", evidence["failures"])
+
     def test_incomplete_vulkan_run_diagnosis(self) -> None:
         diagnosis = harness.incomplete_run_diagnosis(
             "gameplay",

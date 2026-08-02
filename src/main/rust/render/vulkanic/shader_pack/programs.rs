@@ -270,7 +270,8 @@ void main() {
     v_material = vec4(instance.material.x, 0.0, 0.0, 0.0);
     v_normal = normalize(vec3(vertex.normal_light.yz, vertex.extra_data.z));
     v_light = clamp(vertex.extra_data.xy, vec2(0.0), vec2(1.0));
-    v_world_position = world.xyz;
+    float shadow_range = max(shadow_params.w, 1.0);
+    v_world_position = world.xyz / shadow_range * 0.5 + 0.5;
 }
 "#;
 
@@ -296,7 +297,7 @@ void main() {
     out_albedo = color;
     out_normal = vec4(n, color.a);
     out_material_light = vec4(v_material.x, v_light.x, v_light.y, color.a);
-    out_world_position = vec4(v_world_position * 0.5 + 0.5, color.a);
+    out_world_position = vec4(v_world_position, color.a);
 }
 "#;
 
@@ -367,7 +368,8 @@ void main() {
     float face = clamp(dot(normal, normalize(vec3(0.35, 0.65, 0.68))), 0.18, 1.0);
     float light = clamp(max(material_light.y, material_light.z) * 0.75 + 0.25, 0.2, 1.0);
     vec4 packed_world = texture(sampler2D(WorldPositionTex, Samp0), v_uv);
-    vec3 world_position = packed_world.xyz * 2.0 - 1.0;
+    float shadow_range = max(shadow_params.w, 1.0);
+    vec3 world_position = (packed_world.xyz * 2.0 - 1.0) * shadow_range;
     vec4 light_clip = light_view_projection * vec4(world_position, 1.0);
     vec3 light_ndc = light_clip.xyz / max(abs(light_clip.w), 0.0001);
     vec2 shadow_uv = light_ndc.xy * 0.5 + 0.5;

@@ -1011,9 +1011,11 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 	}
 
 	public void enqueueRustGalIndexedMeshFeaturesForWholeFrame(Camera camera, DeltaTracker deltaTracker, Matrix4f viewMatrix, Matrix4f projectionMatrix) {
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.indexed-mesh.route-policy");
 		boolean blockDisplays = net.vulkanic.world.WorldRenderRoutePolicy.currentBlockDisplayRoute().usesRustWholeFrameVulkan();
 		boolean fallingBlocks = net.vulkanic.world.WorldRenderRoutePolicy.currentFallingBlockRoute().usesRustWholeFrameVulkan();
 		boolean pistons = net.vulkanic.world.WorldRenderRoutePolicy.currentPistonMovingBlockRoute().usesRustWholeFrameVulkan();
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.indexed-mesh.route-policy");
 		if (!blockDisplays && !fallingBlocks && !pistons) {
 			return;
 		}
@@ -1021,23 +1023,30 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 			return;
 		}
 
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.indexed-mesh.dispatcher-prepare");
 		this.entityRenderDispatcher.prepare(camera, this.minecraft.crosshairPickEntity);
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.indexed-mesh.dispatcher-prepare");
 		Vec3 cameraPos = camera.getPosition();
 		double cameraX = cameraPos.x();
 		double cameraY = cameraPos.y();
 		double cameraZ = cameraPos.z();
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.indexed-mesh.frustum-prepare");
 		Frustum frustum = this.prepareCullFrustum(viewMatrix, projectionMatrix, cameraPos);
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.indexed-mesh.frustum-prepare");
 		TickRateManager tickRateManager = this.minecraft.level.tickRateManager();
 		Entity.setViewScale(Mth.clamp(this.minecraft.options.getEffectiveRenderDistance() / 8.0, 1.0, 2.5) * this.minecraft.options.entityDistanceScaling().get());
 		PoseStack poseStack = new PoseStack();
 
 		if (pistons) {
+			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.indexed-mesh.piston-extract");
 			this.levelRenderState.blockEntityRenderStates.clear();
 			this.blockEntityRenderDispatcher.prepare(camera);
 			float partialTick = deltaTracker.getGameTimeDeltaPartialTick(false);
 			this.extractPistonMovingBlocksForWholeFrame(camera, partialTick, this.levelRenderState);
+			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.indexed-mesh.piston-extract");
 		}
 
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.indexed-mesh.entity-traversal");
 		for (Entity entity : this.level.entitiesForRendering()) {
 			boolean collectBlockDisplay = blockDisplays && entity instanceof net.minecraft.world.entity.Display.BlockDisplay;
 			boolean collectFallingBlock = fallingBlocks && entity instanceof net.minecraft.world.entity.item.FallingBlockEntity;
@@ -1082,12 +1091,35 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 				net.minecraft.client.dev.DeterministicCameraCapture.recordFallingBlockExtractionProbe(true, false, true);
 			}
 		}
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.indexed-mesh.entity-traversal");
 
 		if (pistons) {
+			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.indexed-mesh.piston-submit");
 			this.submitPistonMovingBlocksForWholeFrame(poseStack, this.levelRenderState, this.submitNodeStorage);
+			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.indexed-mesh.piston-submit");
 		}
 
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.indexed-mesh.block-feature-dispatch");
 		this.featureRenderDispatcher.renderBlockFeaturesOnly();
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.indexed-mesh.block-feature-dispatch");
+	}
+
+	public void enqueueRustGalStaticTerrainForWholeFrame(Camera camera, Matrix4f viewMatrix, Matrix4f projectionMatrix) {
+		if (!net.vulkanic.world.WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan()) {
+			return;
+		}
+		if (this.level == null || this.renderer == null || this.minecraft.player == null) {
+			return;
+		}
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.cull");
+		Vec3 cameraPos = camera.getPosition();
+		Frustum frustum = this.prepareCullFrustum(viewMatrix, projectionMatrix, cameraPos);
+		this.matrices = new ChunkRenderMatrices(projectionMatrix, viewMatrix);
+		this.cullTerrain(camera, frustum, this.minecraft.player.isSpectator());
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.cull");
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.visible-submit");
+		this.renderer.enqueueRustGalStaticTerrain(camera);
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.visible-submit");
 	}
 
 	public void enqueueRustGalBlockDisplaysForWholeFrame(Camera camera, DeltaTracker deltaTracker, Matrix4f viewMatrix, Matrix4f projectionMatrix) {

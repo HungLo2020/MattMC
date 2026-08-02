@@ -1121,6 +1121,266 @@ def parse_number(value: object) -> float | None:
     return None
 
 
+def static_terrain_geometry_evidence(doc: dict[str, object] | None) -> dict[str, object]:
+    if not isinstance(doc, dict):
+        return {"status": "fail", "failure": "geometry_truth_missing", "checked_events": 0}
+    events = doc.get("recentEvents")
+    if not isinstance(events, list) or not events:
+        return {"status": "fail", "failure": "geometry_truth_missing", "checked_events": 0}
+    checked = 0
+    visible_checked = 0
+    failures: list[str] = []
+    landmark_events: list[dict[str, object]] = []
+    expected_stride = int(parse_number(doc.get("activeNativeVertexStride")) or 0)
+    previous_visible_key: tuple[object, object] | None = None
+    visible_by_frame: dict[tuple[object, object, object, object], object] = {}
+    visible_generation_by_frame: dict[tuple[object, object, object], set[int]] = {}
+    executed_by_submission: set[tuple[object, object, object, object]] = set()
+    mesh_content: dict[int, tuple[object, object, int]] = {}
+
+    def number(event: dict[str, object], name: str) -> float | None:
+        return parse_number(event.get(name))
+
+    def nested_number(event: dict[str, object], parent: str, name: str) -> float | None:
+        child = event.get(parent)
+        if not isinstance(child, dict):
+            return None
+        return parse_number(child.get(name))
+
+    for raw_event in events:
+        if not isinstance(raw_event, dict):
+            continue
+        reason = str(raw_event.get("reason") or "")
+        if reason not in {"mesh-registered", "visible-submit", "stale-or-unregistered-submit", "executed-submit"}:
+            continue
+        gameplay_frame_id = int(parse_number(raw_event.get("gameplayFrameId")) or 0)
+        extraction_frame_id = int(parse_number(raw_event.get("terrainExtractionFrameId")) or 0)
+        enqueue_frame_id = int(parse_number(raw_event.get("rustEnqueueFrameId")) or 0)
+        execution_frame_id = int(parse_number(raw_event.get("executionFrameId")) or 0)
+        execution_submission_id = int(parse_number(raw_event.get("executionSubmissionId")) or 0)
+        mesh_key = int(parse_number(raw_event.get("meshKey")) or 0)
+        content_hash = int(parse_number(raw_event.get("contentHash")) or 0)
+        vertex_count = int(parse_number(raw_event.get("vertexCount")) or 0)
+        buffer_vertex_capacity = int(parse_number(raw_event.get("bufferVertexCapacity")) or 0)
+        vertex_stride = int(parse_number(raw_event.get("vertexStride")) or 0)
+        index_count = int(parse_number(raw_event.get("indexCount")) or 0)
+        max_index = int(parse_number(raw_event.get("maxIndex")) or -1)
+        index_type = int(parse_number(raw_event.get("indexType")) or 0)
+        section_count = int(parse_number(raw_event.get("sectionCount")) or 0)
+        if mesh_key == 0 or vertex_count <= 0 or vertex_stride < 20 or index_count <= 0 or section_count <= 0:
+            failures.append("geometry_truth_missing")
+            continue
+        checked += 1
+        if reason == "visible-submit":
+            visible_checked += 1
+            visible_key = (raw_event.get("sectionPos"), raw_event.get("layer"))
+            generation_key = (
+                gameplay_frame_id if gameplay_frame_id > 0 else enqueue_frame_id,
+                raw_event.get("sectionPos"),
+                raw_event.get("layer"),
+            )
+            frame_visible_key = (
+                generation_key[0],
+                raw_event.get("sectionPos"),
+                raw_event.get("layer"),
+                int(parse_number(raw_event.get("visibleGeneration")) or 0),
+            )
+            if frame_visible_key in visible_by_frame:
+                failures.append("duplicate_section_visible")
+            visible_by_frame[frame_visible_key] = raw_event.get("meshKey")
+            generation_set = visible_generation_by_frame.setdefault(generation_key, set())
+            generation_set.add(int(parse_number(raw_event.get("visibleGeneration")) or 0))
+            if len(generation_set) > 1:
+                failures.append("stale_generation_overlap")
+            if visible_key == previous_visible_key and generation_key[0] <= 0:
+                failures.append("duplicate_section_visible")
+            previous_visible_key = visible_key
+        if reason == "executed-submit":
+            executed_key = (
+                execution_submission_id,
+                raw_event.get("sectionPos"),
+                raw_event.get("layer"),
+                int(parse_number(raw_event.get("visibleGeneration")) or 0),
+            )
+            if execution_submission_id <= 0 or execution_frame_id <= 0:
+                failures.append("execution_identity_missing")
+            elif executed_key in executed_by_submission:
+                failures.append("duplicate_section_execution")
+            executed_by_submission.add(executed_key)
+        if reason == "stale-or-unregistered-submit" or int(parse_number(raw_event.get("visibleGeneration")) or 0) not in {
+            0,
+            int(parse_number(raw_event.get("meshGeneration")) or 0),
+        }:
+            failures.append("stale_generation_visible")
+        mesh_identity = (raw_event.get("sectionPos"), raw_event.get("layer"))
+        previous_mesh = mesh_content.get(mesh_key)
+        if previous_mesh is not None and previous_mesh[:2] != mesh_identity and previous_mesh[2] != content_hash:
+            failures.append("mesh_key_collision")
+        else:
+            mesh_content[mesh_key] = (mesh_identity[0], mesh_identity[1], content_hash)
+        if expected_stride > 0 and vertex_stride != expected_stride:
+            failures.append("vertex_stride_invalid")
+        if buffer_vertex_capacity > 0 and vertex_count > buffer_vertex_capacity:
+            failures.append("vertex_count_exceeds_capacity")
+        if index_type not in {1, 2}:
+            failures.append("index_type_invalid")
+        if max_index < 0 or max_index >= vertex_count:
+            failures.append("index_range_invalid")
+        if raw_event.get("vertexPositionsFinite") is not True:
+            failures.append("non_finite_vertex_position")
+        if raw_event.get("sectionOriginValid") is not True:
+            failures.append("section_origin_mismatch")
+        if raw_event.get("indexOffsetAlignmentValid") is not True:
+            failures.append("index_alignment_invalid")
+        flag_failures = {
+            "localBoundsValid": "geometry_out_of_bounds",
+            "uvBoundsValid": "uv_bounds_invalid",
+            "indexRangeValid": "index_range_invalid",
+            "segmentLayoutValid": "segment_layout_invalid",
+            "cameraBoundsFinite": "camera_bounds_invalid",
+        }
+        for flag_name, failure_name in flag_failures.items():
+            if raw_event.get(flag_name) is not True:
+                failures.append(failure_name)
+        local_min_x = nested_number(raw_event, "localBounds", "minX")
+        local_min_y = nested_number(raw_event, "localBounds", "minY")
+        local_min_z = nested_number(raw_event, "localBounds", "minZ")
+        local_max_x = nested_number(raw_event, "localBounds", "maxX")
+        local_max_y = nested_number(raw_event, "localBounds", "maxY")
+        local_max_z = nested_number(raw_event, "localBounds", "maxZ")
+        bounds = [local_min_x, local_min_y, local_min_z, local_max_x, local_max_y, local_max_z]
+        if any(value is None or not math.isfinite(value) for value in bounds):
+            failures.append("geometry_out_of_bounds")
+        elif (
+            local_min_x < -8.01
+            or local_min_y < -8.01
+            or local_min_z < -8.01
+            or local_max_x > 24.01
+            or local_max_y > 24.01
+            or local_max_z > 24.01
+            or local_min_x > local_max_x
+            or local_min_y > local_max_y
+            or local_min_z > local_max_z
+        ):
+            failures.append("geometry_out_of_bounds")
+        if len(landmark_events) < 8:
+            landmark_events.append(
+                {
+                    "reason": reason,
+                    "gameplayFrameId": gameplay_frame_id,
+                    "terrainExtractionFrameId": extraction_frame_id,
+                    "rustEnqueueFrameId": enqueue_frame_id,
+                    "executionFrameId": execution_frame_id,
+                    "executionSubmissionId": execution_submission_id,
+                    "sectionPos": raw_event.get("sectionPos"),
+                    "layer": raw_event.get("layer"),
+                    "meshKey": mesh_key,
+                    "contentHash": content_hash,
+                    "vertexCount": vertex_count,
+                    "bufferVertexCapacity": buffer_vertex_capacity,
+                    "vertexStride": vertex_stride,
+                    "indexCount": index_count,
+                    "maxIndex": max_index,
+                    "indexType": index_type,
+                    "sectionCount": section_count,
+                    "sectionOrigin": raw_event.get("sectionOrigin"),
+                    "transformTranslation": raw_event.get("transformTranslation"),
+                    "localBounds": raw_event.get("localBounds"),
+                    "uvBounds": raw_event.get("uvBounds"),
+                }
+            )
+    if checked <= 0:
+        return {
+            "status": "fail",
+            "failure": "geometry_truth_missing",
+            "checked_events": checked,
+            "visible_submit_events": visible_checked,
+            "landmark_events": landmark_events,
+        }
+    if visible_checked <= 0:
+        failures.append("projected_landmark_missing")
+    unique_failures = sorted(set(failures))
+    return {
+        "status": "pass" if not unique_failures else "fail",
+        "failure": unique_failures[0] if unique_failures else None,
+        "failures": unique_failures,
+        "checked_events": checked,
+        "visible_submit_events": visible_checked,
+        "landmark_events": landmark_events,
+    }
+
+
+def static_terrain_lifecycle_evidence(
+    diagnostics_doc: dict[str, object] | None,
+    lifecycle_doc: dict[str, object] | None,
+    scenario: str,
+) -> dict[str, object]:
+    scenario = (scenario or "").strip().lower()
+    if scenario not in {"interior-edit", "boundary-x-edit", "boundary-y-edit", "boundary-z-edit", "section-reentry"}:
+        return {"status": "skip", "failure": None}
+    failures: list[str] = []
+    events: list[object] = []
+    if isinstance(diagnostics_doc, dict):
+        lifecycle_events = diagnostics_doc.get("lifecycleEvents")
+        recent_events = diagnostics_doc.get("recentEvents")
+        if isinstance(lifecycle_events, list):
+            events.extend(lifecycle_events)
+        if isinstance(recent_events, list):
+            events.extend(recent_events)
+    event_reasons: list[str] = []
+    if events:
+        for event in events:
+            if isinstance(event, dict):
+                event_reasons.append(str(event.get("reason") or ""))
+    else:
+        failures.append("lifecycle_events_missing")
+    stage = str(lifecycle_doc.get("stage") or "") if isinstance(lifecycle_doc, dict) else ""
+    setup = bool(lifecycle_doc.get("setup")) if isinstance(lifecycle_doc, dict) else False
+    after_recorded = bool(lifecycle_doc.get("afterRecorded")) if isinstance(lifecycle_doc, dict) else False
+    before_generation = int(parse_number(lifecycle_doc.get("beforeGeneration")) or 0) if isinstance(lifecycle_doc, dict) else 0
+    after_generation = int(parse_number(lifecycle_doc.get("afterGeneration")) or 0) if isinstance(lifecycle_doc, dict) else 0
+    edit_block = str(lifecycle_doc.get("editBlock") or "") if isinstance(lifecycle_doc, dict) else ""
+    if not setup:
+        failures.append("lifecycle_setup_missing")
+    if not after_recorded or stage != "replacement-visible":
+        failures.append("lifecycle_replacement_missing")
+    if before_generation == 0 or after_generation == 0:
+        failures.append("lifecycle_generation_missing")
+    elif before_generation == after_generation:
+        failures.append("lifecycle_generation_unchanged")
+    if not edit_block:
+        failures.append("lifecycle_edit_block_missing")
+    required_reason_prefixes = [
+        "lifecycle-edit-before",
+        "lifecycle-edit-applied",
+        "lifecycle-edit-after",
+    ]
+    if scenario == "section-reentry":
+        required_reason_prefixes.extend(["lifecycle-section-removed", "lifecycle-section-reentry-requested"])
+    lifecycle_fault_prefixes = {
+        "lifecycle-fault-old-generation-after-edit": "lifecycle_old_generation_after_edit",
+        "lifecycle-fault-old-new-overlap": "lifecycle_old_new_overlap",
+        "lifecycle-fault-removed-section-resubmitted": "lifecycle_removed_section_resubmitted",
+        "lifecycle-fault-wrong-neighbor-invalidated": "lifecycle_wrong_neighbor_invalidated",
+    }
+    for prefix, classification in lifecycle_fault_prefixes.items():
+        if any(reason.startswith(prefix) for reason in event_reasons):
+            failures.append(classification)
+    for prefix in required_reason_prefixes:
+        if not any(reason.startswith(prefix) for reason in event_reasons):
+            failures.append(prefix.replace("-", "_") + "_missing")
+    return {
+        "status": "pass" if not failures else "fail",
+        "failure": sorted(set(failures))[0] if failures else None,
+        "failures": sorted(set(failures)),
+        "stage": stage,
+        "edit_block": edit_block,
+        "before_generation": before_generation,
+        "after_generation": after_generation,
+        "reason_counts": {reason: event_reasons.count(reason) for reason in sorted(set(event_reasons)) if reason.startswith("lifecycle-")},
+    }
+
+
 def percentile(values: list[float], pct: float) -> float | None:
     if not values:
         return None
@@ -4628,6 +4888,12 @@ def normalize_capture_artifact(
     requested_world_mesh_piston_scenario = parse_java_property(
         combined_logs, "mattmc.dev.rustGalWorldMesh.pistonScenario"
     )
+    requested_world_static_terrain_scenario = parse_java_property(
+        combined_logs, "mattmc.dev.rustGalStaticTerrain.scenario"
+    )
+    requested_world_static_terrain_fault = parse_java_property(
+        combined_logs, "mattmc.dev.rustGalStaticTerrain.fault"
+    )
     requested_world_mesh_piston_disabled = (
         parse_java_property(combined_logs, "mattmc.dev.rustGalWorldPiston.disabled") == "true"
     )
@@ -4640,6 +4906,8 @@ def normalize_capture_artifact(
         requested_world_mesh_block_display_scenario = str(deterministic_doc.get("rustGalWorldBlockDisplayScenario") or "")
     if not requested_world_mesh_piston_scenario and isinstance(deterministic_doc, dict):
         requested_world_mesh_piston_scenario = str(deterministic_doc.get("rustGalWorldPistonScenario") or "")
+    if not requested_world_static_terrain_scenario and isinstance(deterministic_doc, dict):
+        requested_world_static_terrain_scenario = str(deterministic_doc.get("rustGalStaticTerrainScenario") or "")
     block_display_doc = (
         frame_doc.get("blockDisplayScenario")
         if isinstance(frame_doc, dict) and isinstance(frame_doc.get("blockDisplayScenario"), dict)
@@ -4649,6 +4917,58 @@ def normalize_capture_artifact(
         frame_doc.get("submittedWorkCounts")
         if isinstance(frame_doc, dict) and isinstance(frame_doc.get("submittedWorkCounts"), dict)
         else {}
+    )
+    static_terrain_doc = (
+        deterministic_doc.get("rustGalStaticTerrainDiagnostics")
+        if isinstance(deterministic_doc, dict) and isinstance(deterministic_doc.get("rustGalStaticTerrainDiagnostics"), dict)
+        else {}
+    )
+    static_terrain_lifecycle_doc = (
+        deterministic_doc.get("rustGalStaticTerrainLifecycle")
+        if isinstance(deterministic_doc, dict) and isinstance(deterministic_doc.get("rustGalStaticTerrainLifecycle"), dict)
+        else {}
+    )
+    static_terrain_frame_doc = (
+        frame_doc.get("staticTerrainScenario")
+        if isinstance(frame_doc, dict) and isinstance(frame_doc.get("staticTerrainScenario"), dict)
+        else {}
+    )
+    static_terrain_submitted_count = int(parse_number(submitted_work_counts.get("static-terrain")) or 0)
+    if static_terrain_submitted_count <= 0:
+        static_source_doc = static_terrain_doc if static_terrain_doc else static_terrain_frame_doc
+        if isinstance(static_source_doc, dict):
+            static_terrain_submitted_count = int(parse_number(static_source_doc.get("visibleLayerSubmissions")) or 0)
+    static_terrain_geometry = static_terrain_geometry_evidence(
+        static_terrain_doc if static_terrain_doc else static_terrain_frame_doc
+    )
+    static_terrain_lifecycle = static_terrain_lifecycle_evidence(
+        static_terrain_doc if static_terrain_doc else static_terrain_frame_doc,
+        static_terrain_lifecycle_doc,
+        requested_world_static_terrain_scenario or "",
+    )
+    static_terrain_fault_expectations = {
+        "old-stride": "vertex_stride_invalid",
+        "incorrect-vertex-stride": "vertex_stride_invalid",
+        "vertex-count-exceeds-capacity": "vertex_count_exceeds_capacity",
+        "out-of-range-index": "index_range_invalid",
+        "index-type-invalid": "index_type_invalid",
+        "incorrect-index-type": "index_type_invalid",
+        "index-alignment-invalid": "index_alignment_invalid",
+        "incorrect-index-alignment": "index_alignment_invalid",
+        "non-finite-position": "non_finite_vertex_position",
+        "section-origin-offset": "section_origin_mismatch",
+        "stale-generation": "stale_generation_visible",
+        "duplicate-visible-section": "duplicate_section_visible",
+        "mesh-key-collision": "mesh_key_collision",
+        "bounds-out-of-range": "geometry_out_of_bounds",
+        "old-generation-after-edit": "lifecycle_old_generation_after_edit",
+        "old-new-together": "lifecycle_old_new_overlap",
+        "removed-section-resubmitted": "lifecycle_removed_section_resubmitted",
+        "wrong-neighbor-invalidated": "lifecycle_wrong_neighbor_invalidated",
+        "replacement-previous-origin": "section_origin_mismatch",
+    }
+    static_terrain_expected_fault = static_terrain_fault_expectations.get(
+        (requested_world_static_terrain_fault or "").strip().lower()
     )
     block_display_submitted_count = int(parse_number(submitted_work_counts.get("block-display")) or 0)
     if isinstance(block_display_doc, dict):
@@ -5417,6 +5737,84 @@ def normalize_capture_artifact(
             if int(rust_gal_world_material_quads_for_validation or 0) != 0:
                 world_material_terrain_particle_workload_complete = False
                 validation_messages.append("TerrainParticle legacy control emitted unexpected Rust material quads")
+    static_terrain_workload_complete = True
+    static_terrain_scenario = (requested_world_static_terrain_scenario or "").strip().lower()
+    if static_terrain_scenario and rust_outline_mode and tool_kind != "subsystem":
+        static_doc = static_terrain_doc if static_terrain_doc else static_terrain_frame_doc
+
+        def static_metric(name: str) -> int:
+            value = static_doc.get(name) if isinstance(static_doc, dict) else None
+            return int(parse_number(value) or 0)
+
+        accepted_builds = static_metric("acceptedBuildOutputs")
+        cached_layers = static_metric("cachedLayerAssets")
+        registered_meshes = static_metric("registeredMeshes")
+        texture_updates = static_metric("texturePayloadUpdates")
+        visible_probes = static_metric("visibleLayerProbes")
+        visible_submissions = static_metric("visibleLayerSubmissions")
+        failed_submissions = static_metric("failedLayerSubmissions")
+        if static_terrain_scenario == "hidden":
+            if visible_submissions > 0 or static_terrain_submitted_count > 0:
+                static_terrain_workload_complete = False
+                validation_messages.append("deterministic hidden static-terrain scenario emitted unexpected visible Rust terrain work")
+        else:
+            if accepted_builds <= 0:
+                static_terrain_workload_complete = False
+                validation_messages.append("deterministic static-terrain scenario did not prove real Sodium section build ingestion")
+            if cached_layers <= 0 or registered_meshes <= 0:
+                static_terrain_workload_complete = False
+                validation_messages.append(
+                    "deterministic static-terrain scenario did not prove Rust terrain mesh asset registration "
+                    f"(cached={cached_layers}, registered={registered_meshes})"
+                )
+            if texture_updates <= 0:
+                static_terrain_workload_complete = False
+                validation_messages.append("deterministic static-terrain scenario did not prove block-atlas texture ownership/update")
+            if visible_probes <= 0 or visible_submissions <= 0 or static_terrain_submitted_count <= 0:
+                static_terrain_workload_complete = False
+                validation_messages.append(
+                    "deterministic static-terrain scenario did not prove Sodium visible-list terrain submission "
+                    f"(probes={visible_probes}, submissions={visible_submissions}, submittedWork={static_terrain_submitted_count})"
+                )
+            if failed_submissions > 0:
+                static_terrain_workload_complete = False
+                validation_messages.append(
+                    f"deterministic static-terrain scenario recorded stale/unregistered visible terrain submissions ({failed_submissions})"
+                )
+            if int(rust_gal_world_mesh_instances_for_validation or 0) <= 0:
+                static_terrain_workload_complete = False
+                validation_messages.append("deterministic static-terrain scenario did not execute any Rust indexed-mesh terrain instances")
+            if static_terrain_geometry.get("status") != "pass":
+                static_terrain_workload_complete = False
+                validation_messages.append(
+                    "deterministic static-terrain geometry truth gate failed: "
+                    f"{static_terrain_geometry.get('failure') or 'unknown'}"
+                )
+            if static_terrain_lifecycle.get("status") == "fail":
+                static_terrain_workload_complete = False
+                validation_messages.append(
+                    "deterministic static-terrain lifecycle gate failed: "
+                    f"{static_terrain_lifecycle.get('failure') or 'unknown'}"
+                )
+            if requested_world_static_terrain_fault:
+                failures_for_fault = set(static_terrain_geometry.get("failures") or [])
+                failures_for_fault.update(static_terrain_lifecycle.get("failures") or [])
+                if static_terrain_expected_fault not in failures_for_fault:
+                    static_terrain_workload_complete = False
+                    validation_messages.append(
+                        "deterministic static-terrain fault injection produced wrong classification "
+                        f"(fault={requested_world_static_terrain_fault}, expected={static_terrain_expected_fault}, "
+                        f"actual={sorted(failures_for_fault)})"
+                    )
+                else:
+                    validation_messages.append(
+                        "deterministic static-terrain fault injection rejected as expected "
+                        f"(fault={requested_world_static_terrain_fault}, classification={static_terrain_expected_fault})"
+                    )
+    if static_terrain_scenario and mode.expected_attribution == "java-vulkan" and not rust_shell_outline_mode:
+        if static_terrain_submitted_count > 0 or int(rust_gal_world_mesh_instances_for_validation or 0) != 0:
+            static_terrain_workload_complete = False
+            validation_messages.append("normal Java Vulkan static-terrain control emitted unexpected Rust terrain mesh work")
     world_mesh_block_display_workload_complete = True
     block_display_scenario = (requested_world_mesh_block_display_scenario or "").strip().lower()
     if block_display_scenario and rust_outline_mode and tool_kind != "subsystem":
@@ -5758,6 +6156,9 @@ def normalize_capture_artifact(
         if piston_scenario and piston_scenario not in {"hidden", "completed", "removed"}:
             if not isinstance(proof, dict) or not proof.get("non_zero_mesh_workload"):
                 validation_messages.append("RenderDoc capture did not prove non-zero Rust-GAL Piston mesh workload")
+        if static_terrain_scenario and static_terrain_scenario != "hidden":
+            if not isinstance(proof, dict) or not proof.get("non_zero_mesh_workload"):
+                validation_messages.append("RenderDoc capture did not prove non-zero Rust-GAL static-terrain mesh workload")
     if isinstance(instrumentation, dict) and instrumentation.get("tracy", {}).get("enabled"):
         if tracy_summary.get("status") != "complete":
             validation_messages.append("Tracy capture did not complete")
@@ -5773,7 +6174,9 @@ def normalize_capture_artifact(
         validation_messages.append("normal Java Vulkan control launched Rust whole-frame shell")
     if rust_shell_has_java_vulkan_frame:
         validation_messages.append("Rust whole-frame shell executed Java Vulkan frame/present work")
-    require_rust_vulkan_gameplay_attachments = tool_kind == "capture" and bool(falling_block_scenario or piston_scenario)
+    require_rust_vulkan_gameplay_attachments = tool_kind == "capture" and bool(
+        falling_block_scenario or piston_scenario or static_terrain_scenario
+    )
     if require_rust_vulkan_gameplay_attachments and mode.expected_attribution == "rust-vulkan":
         if not isinstance(gameplay_attachment_doc, dict):
             validation_messages.append("Rust Vulkan gameplay row did not retain real whole-frame gameplay attachment dumps")
@@ -5826,6 +6229,7 @@ def normalize_capture_artifact(
             or (border_scenario and border_scenario not in {"hidden", "far", "no-target"})
             or (block_display_scenario and block_display_scenario != "hidden")
             or (piston_scenario and piston_scenario not in {"hidden", "completed", "removed"})
+            or (static_terrain_scenario and static_terrain_scenario != "hidden")
         )
     ):
         proof = renderdoc_summary.get("workload_proof") if isinstance(renderdoc_summary, dict) else {}
@@ -5840,6 +6244,8 @@ def normalize_capture_artifact(
         if block_display_scenario and block_display_scenario != "hidden":
             required_workload_keys.extend(["non_zero_mesh_workload", "mesh_marker_evidence"])
         if piston_scenario and piston_scenario not in {"hidden", "completed", "removed"}:
+            required_workload_keys.extend(["non_zero_mesh_workload", "mesh_marker_evidence"])
+        if static_terrain_scenario and static_terrain_scenario != "hidden":
             required_workload_keys.extend(["non_zero_mesh_workload", "mesh_marker_evidence"])
         renderdoc_workload_assertions_complete = isinstance(proof, dict) and all(
             bool(proof.get(key)) for key in required_workload_keys
@@ -6167,6 +6573,7 @@ def normalize_capture_artifact(
         and world_border_workload_complete
         and world_material_marker_workload_complete
         and world_material_terrain_particle_workload_complete
+        and static_terrain_workload_complete
         and world_mesh_block_display_workload_complete
         and world_mesh_falling_block_workload_complete
         and world_mesh_piston_workload_complete
@@ -6304,6 +6711,14 @@ def normalize_capture_artifact(
                     else (rust_gal_world_material_quads if requested_world_material_terrain_particle_real_gameplay else None)
                 ),
                 "world_material_terrain_particle_texture_mask": rust_gal_world_material_terrain_particle_texture_mask,
+                "world_static_terrain_scenario": requested_world_static_terrain_scenario or None,
+                "world_static_terrain_fault": requested_world_static_terrain_fault or None,
+                "world_static_terrain_expected_fault": static_terrain_expected_fault,
+                "world_static_terrain_submitted_work": static_terrain_submitted_count,
+                "world_static_terrain_diagnostics": static_terrain_doc if static_terrain_doc else static_terrain_frame_doc,
+                "world_static_terrain_geometry_evidence": static_terrain_geometry,
+                "world_static_terrain_lifecycle": static_terrain_lifecycle_doc,
+                "world_static_terrain_lifecycle_evidence": static_terrain_lifecycle,
                 "world_mesh_block_display_scenario": requested_world_mesh_block_display_scenario or None,
                 "world_mesh_block_display_workload": requested_world_mesh_block_display_workload or None,
                 "world_mesh_block_display_control": world_mesh_block_display_control,
@@ -7879,6 +8294,7 @@ def build_capture_command(
             or bool(getattr(args, "world_mesh_block_display_scenario", ""))
             or bool(getattr(args, "world_mesh_falling_block_scenario", ""))
             or bool(getattr(args, "world_mesh_piston_scenario", ""))
+            or bool(getattr(args, "world_static_terrain_scenario", ""))
         )
     )
     if deterministic_capture_requested:
@@ -8068,6 +8484,16 @@ def build_capture_command(
         java_options.append("-Dmattmc.dev.rustGalWorldMaterial.terrainParticle.legacyControl=true")
     if getattr(args, "world_background_scenario", ""):
         java_options.append(f"-Dmattmc.dev.rustGalWorldBackground.scenario={args.world_background_scenario}")
+    if getattr(args, "world_static_terrain_scenario", ""):
+        java_options.append(f"-Dmattmc.dev.rustGalStaticTerrain.scenario={args.world_static_terrain_scenario}")
+        if getattr(args, "world_static_terrain_fault", ""):
+            java_options.append(f"-Dmattmc.dev.rustGalStaticTerrain.fault={args.world_static_terrain_fault}")
+        if tool_kind == "capture":
+            java_options.append("-Dmattmc.dev.deterministicCameraCapture.settledReadyFamilies=static-terrain")
+            java_options.append("-Dmattmc.dev.deterministicCameraCapture.settledReadyFrames=3")
+            java_options.append("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=1")
+            java_options.append("-Dmattmc.dev.deterministicCameraCapture.poseCount=1")
+            java_options.append("-Dmattmc.dev.deterministicCameraCapture.yawDelta=18.0")
     positive_control_delay_ms = getattr(args, "positive_control_delay_ms", 0) or 0
     if positive_control_delay_ms > 0:
         java_options.append(
@@ -9955,6 +10381,47 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
             choices=("auto", "hidden", "overworld-day", "overworld-night", "nether", "end", "custom"),
             default=os.environ.get("MATTMC_WORLD_BACKGROUND_SCENARIO", ""),
             help="Force a deterministic Rust-GAL world-background clear scenario for whole-frame Vulkan captures.",
+        )
+        subparser.add_argument(
+            "--world-static-terrain-scenario",
+            choices=(
+                "real-world",
+                "hidden",
+                "interior-edit",
+                "boundary-x-edit",
+                "boundary-y-edit",
+                "boundary-z-edit",
+                "section-reentry",
+            ),
+            default=os.environ.get("MATTMC_WORLD_STATIC_TERRAIN_SCENARIO", ""),
+            help="Require deterministic real Sodium static chunk-terrain evidence for Rust whole-frame Vulkan captures.",
+        )
+        subparser.add_argument(
+            "--world-static-terrain-fault",
+            choices=(
+                "",
+                "old-stride",
+                "incorrect-vertex-stride",
+                "vertex-count-exceeds-capacity",
+                "out-of-range-index",
+                "index-type-invalid",
+                "incorrect-index-type",
+                "index-alignment-invalid",
+                "incorrect-index-alignment",
+                "non-finite-position",
+                "section-origin-offset",
+                "stale-generation",
+                "duplicate-visible-section",
+                "mesh-key-collision",
+                "bounds-out-of-range",
+                "old-generation-after-edit",
+                "old-new-together",
+                "removed-section-resubmitted",
+                "wrong-neighbor-invalidated",
+                "replacement-previous-origin",
+            ),
+            default=os.environ.get("MATTMC_WORLD_STATIC_TERRAIN_FAULT", ""),
+            help="Diagnostic-only static-terrain geometry fault injection for harness anvil tests.",
         )
         subparser.add_argument(
             "--gui-resource-pack-scenario",

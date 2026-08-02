@@ -12,6 +12,7 @@ import net.vulkanic.VulkanicAPI;
 import net.vulkanic.bridge.RustGalFrameScheduler;
 import net.vulkanic.bridge.RustGalVulkanWholeFrameMode;
 import net.vulkanic.bridge.VulkanicGalBridge;
+import net.vulkanic.world.RustGalTerrainRenderer;
 import net.vulkanic.world.RustGalWorldPrimitiveRenderer;
 import org.slf4j.Logger;
 
@@ -363,8 +364,10 @@ public final class RustGalFrameCoordinator {
 		long presentEnded = 0L;
 		try {
 			if (wholeFrameVulkan) {
+				GraphicsFrameBenchmark.beginPhase("rust-gal.frame.consume-and-flush-world");
 				primitiveFrame = RustGalWorldPrimitiveRenderer.consumeFrame();
 				flushPendingWorldAssetsLocked();
+				GraphicsFrameBenchmark.endPhase("rust-gal.frame.consume-and-flush-world");
 				if (!primitiveFrame.segments().isEmpty()
 					|| !primitiveFrame.crackQuads().isEmpty()
 					|| !primitiveFrame.borderQuads().isEmpty()
@@ -399,11 +402,13 @@ public final class RustGalFrameCoordinator {
 				return;
 			}
 			if (wholeFrameVulkan && primitiveFrame != null) {
+				GraphicsFrameBenchmark.beginPhase("rust-gal.frame.viewport-seed");
 				primitiveFrame = RustGalWorldPrimitiveRenderer.withViewport(
 					primitiveFrame,
 					Math.max(1, frame.width()),
 					Math.max(1, frame.height())
 				);
+				GraphicsFrameBenchmark.endPhase("rust-gal.frame.viewport-seed");
 			}
 
 			GraphicsFrameBenchmark.beginPhase("rust-gal.frame.submit-call");
@@ -415,13 +420,17 @@ public final class RustGalFrameCoordinator {
 			VulkanicGalBridge.GuiFrameSubmitResult guiResult = null;
 			if (wholeFrameVulkan) {
 				if (primitiveFrame == null) {
+					GraphicsFrameBenchmark.beginPhase("rust-gal.frame.consume-world-frame");
 					primitiveFrame = RustGalWorldPrimitiveRenderer.consumeFrame();
+					GraphicsFrameBenchmark.endPhase("rust-gal.frame.consume-world-frame");
 				}
+				GraphicsFrameBenchmark.beginPhase("rust-gal.frame.viewport-seed");
 				primitiveFrame = RustGalWorldPrimitiveRenderer.withViewport(
 					primitiveFrame,
 					Math.max(1, frame.width()),
 					Math.max(1, frame.height())
 				);
+				GraphicsFrameBenchmark.endPhase("rust-gal.frame.viewport-seed");
 				wholeFrameResult = bridge.submitWholeFrame(
 					generation,
 					frameId,
@@ -487,6 +496,12 @@ public final class RustGalFrameCoordinator {
 			METRICS.submissions++;
 			METRICS.batchesExecuted += requests.size();
 			if (wholeFrameResult != null) {
+				GraphicsFrameBenchmark.beginPhase("rust-gal.frame.post-submit-metrics");
+				RustGalTerrainRenderer.recordExecutedStaticTerrainInstances(
+					primitiveFrame.meshInstances(),
+					frameId,
+					submissionId
+				);
 				recordWholeFrameMetrics(wholeFrameResult);
 				GraphicsFrameBenchmark.recordRustWholeFrameTimeline(
 					correlationId,
@@ -509,10 +524,13 @@ public final class RustGalFrameCoordinator {
 					wholeFrameResult.profile().vulkanImagesInFlight(),
 					wholeFrameResult.profile().vulkanAvailableFrameSlots()
 				);
+				GraphicsFrameBenchmark.endPhase("rust-gal.frame.post-submit-metrics");
 			} else {
 				recordGuiMetrics(guiResult);
 			}
+			GraphicsFrameBenchmark.beginPhase("rust-gal.frame.retire-outstanding");
 			retireOutstanding(false);
+			GraphicsFrameBenchmark.endPhase("rust-gal.frame.retire-outstanding");
 			auditMessage(metricsAuditLine(requests.size(), frameId, submissionId, wholeFrameResult != null));
 			METRICS.executeNanos += elapsedSince(executeStarted);
 			executeCounted = true;
