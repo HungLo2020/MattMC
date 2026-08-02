@@ -632,6 +632,21 @@ public final class RustGalFrameCoordinator {
 		}
 	}
 
+	private static int wholeFramePresentMode(Minecraft minecraft) {
+		String override = System.getProperty("mattmc.dev.rustVulkan.presentMode", "").trim().toLowerCase();
+		return switch (override) {
+			case "immediate" -> VulkanicGalBridge.PRESENT_IMMEDIATE;
+			case "mailbox" -> VulkanicGalBridge.PRESENT_MAILBOX;
+			case "fifo" -> VulkanicGalBridge.PRESENT_FIFO;
+			case "fifo-relaxed", "fifo_relaxed" -> VulkanicGalBridge.PRESENT_FIFO_RELAXED;
+			case "auto-vsync", "auto_vsync" -> VulkanicGalBridge.PRESENT_AUTO_VSYNC;
+			case "auto-no-vsync", "auto_no_vsync" -> VulkanicGalBridge.PRESENT_AUTO_NO_VSYNC;
+			default -> minecraft.options.enableVsync().get()
+				? VulkanicGalBridge.PRESENT_AUTO_VSYNC
+				: VulkanicGalBridge.PRESENT_AUTO_NO_VSYNC;
+		};
+	}
+
 	private static String primitiveFrameFingerprint(RustGalWorldPrimitiveRenderer.PrimitiveFrame frame) {
 		return "segments=" + frame.segments().size()
 			+ " crack_quads=" + frame.crackQuads().size()
@@ -789,8 +804,15 @@ public final class RustGalFrameCoordinator {
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.vulkan-present", profile.vulkanPresentNanos());
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.vulkan-present-wait", profile.vulkanPresentWaitNanos());
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.vulkan-present-mode", profile.vulkanPresentMode());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.vulkan-requested-present-mode", profile.vulkanRequestedPresentMode());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.vulkan-supported-present-modes", profile.vulkanSupportedPresentModes());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.vulkan-present-mode-fallback-reason", profile.vulkanPresentModeFallbackReason());
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.vulkan-acquired-image-index", profile.vulkanAcquiredImageIndex());
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.vulkan-swapchain-generation", profile.vulkanSwapchainGeneration());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.vulkan-swapchain-image-count", profile.vulkanSwapchainImageCount());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.vulkan-surface-min-image-count", profile.vulkanSurfaceMinImageCount());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.vulkan-surface-max-image-count", profile.vulkanSurfaceMaxImageCount());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.vulkan-configured-frames-in-flight", profile.vulkanConfiguredFramesInFlight());
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.vulkan-images-in-flight", profile.vulkanImagesInFlight());
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.vulkan-available-frame-slots", profile.vulkanAvailableFrameSlots());
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gpu-shadow-depth", profile.gpuShadowDepthNanos());
@@ -885,7 +907,8 @@ public final class RustGalFrameCoordinator {
 			bridge = VulkanicGalBridge.createWindowedVulkan(
 				window,
 				Math.max(1, window.getWidth()),
-				Math.max(1, window.getHeight())
+				Math.max(1, window.getHeight()),
+				wholeFramePresentMode(minecraft)
 			);
 			recordFixedOperation(Operation.CONTEXT_CREATE, VulkanicGalBridge.Struct.WINDOWED_VULKAN_CONTEXT_CREATE.byteSize());
 			recordFixedOperation(Operation.CAPABILITY_QUERY, VulkanicGalBridge.Struct.CAPABILITY_QUERY.byteSize());
@@ -906,7 +929,16 @@ public final class RustGalFrameCoordinator {
 			String label = RustGalGuiRenderer.isWholeFrameVulkanEnabled() && VulkanicAPI.isVulkanBackendSelected()
 				? "minecraft.rust-vulkan.swapchain"
 				: "minecraft.borrowed.opengl.default";
-			recordStatus(Operation.FRAME_CONFIGURE, bridge.configureFrame(label, width, height, VulkanicGalBridge.FORMAT_RGBA8));
+			int presentMode = RustGalGuiRenderer.isWholeFrameVulkanEnabled() && VulkanicAPI.isVulkanBackendSelected()
+				? wholeFramePresentMode(Minecraft.getInstance())
+				: VulkanicGalBridge.PRESENT_FIFO;
+			recordStatus(Operation.FRAME_CONFIGURE, bridge.configureFrame(
+				label,
+				width,
+				height,
+				VulkanicGalBridge.FORMAT_RGBA8,
+				presentMode
+			));
 		} else {
 			recordFixedOperation(Operation.FRAME_RESIZE, VulkanicGalBridge.Struct.FRAME_RESIZE.byteSize());
 			bridge.resizeFrame(nextCorrelationId++, width, height);

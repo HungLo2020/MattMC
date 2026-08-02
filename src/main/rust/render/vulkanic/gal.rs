@@ -2943,8 +2943,15 @@ fn add_backend_metric_deltas(
         .vulkan_present_wait_nanos
         .saturating_sub(before.vulkan_present_wait_nanos);
     profile.vulkan_present_mode = after.vulkan_present_mode;
+    profile.vulkan_requested_present_mode = after.vulkan_requested_present_mode;
+    profile.vulkan_supported_present_modes = after.vulkan_supported_present_modes;
+    profile.vulkan_present_mode_fallback_reason = after.vulkan_present_mode_fallback_reason;
     profile.vulkan_acquired_image_index = after.vulkan_acquired_image_index;
     profile.vulkan_swapchain_generation = after.vulkan_swapchain_generation;
+    profile.vulkan_swapchain_image_count = after.vulkan_swapchain_image_count;
+    profile.vulkan_surface_min_image_count = after.vulkan_surface_min_image_count;
+    profile.vulkan_surface_max_image_count = after.vulkan_surface_max_image_count;
+    profile.vulkan_configured_frames_in_flight = after.vulkan_configured_frames_in_flight;
     profile.vulkan_images_in_flight = after.vulkan_images_in_flight;
     profile.vulkan_available_frame_slots = after.vulkan_available_frame_slots;
     profile.gpu_timestamp_status = after.gpu_timestamp_status;

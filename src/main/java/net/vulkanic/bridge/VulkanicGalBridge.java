@@ -84,6 +84,12 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	public static final int COMPARE_LEQUAL = 3;
 	public static final int INDEX_U16 = 1;
 	public static final int INDEX_U32 = 2;
+	public static final int PRESENT_IMMEDIATE = 1;
+	public static final int PRESENT_MAILBOX = 2;
+	public static final int PRESENT_FIFO = 3;
+	public static final int PRESENT_AUTO_VSYNC = 4;
+	public static final int PRESENT_AUTO_NO_VSYNC = 5;
+	public static final int PRESENT_FIFO_RELAXED = 6;
 	public static final int LOAD_CLEAR = 2;
 	public static final int STORE_STORE = 1;
 	public static final int STORE_DONT_CARE = 2;
@@ -155,6 +161,10 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	}
 
 	public static VulkanicGalBridge createWindowedVulkan(Window window, int width, int height) {
+		return createWindowedVulkan(window, width, height, PRESENT_AUTO_NO_VSYNC);
+	}
+
+	public static VulkanicGalBridge createWindowedVulkan(Window window, int width, int height, int presentMode) {
 		NativeWindowInfo windowInfo = nativeWindowInfo(window);
 		return createWindowedVulkan(
 			window.handle(),
@@ -162,7 +172,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			windowInfo.nativeDisplay,
 			windowInfo.nativeWindow,
 			width,
-			height
+			height,
+			presentMode
 		);
 	}
 
@@ -172,7 +183,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		long nativeDisplay,
 		long nativeWindow,
 		int width,
-		int height
+		int height,
+		int presentMode
 	) {
 		if (stableWindowId == 0L || nativeDisplay == 0L || nativeWindow == 0L) {
 			throw new IllegalArgumentException("windowed Vulkan context requires non-zero window handles");
@@ -194,7 +206,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			request.set(ValueLayout.JAVA_INT, extent + 4, height);
 			request.set(ValueLayout.JAVA_INT, extent + 8, 1);
 			Struct.WINDOWED_VULKAN_CONTEXT_CREATE.setInt(request, 9, FORMAT_RGBA8);
-			Struct.WINDOWED_VULKAN_CONTEXT_CREATE.setInt(request, 10, 3);
+			Struct.WINDOWED_VULKAN_CONTEXT_CREATE.setInt(request, 10, presentMode);
 			Struct.WINDOWED_VULKAN_CONTEXT_CREATE.setInt(request, 11, 2);
 			MemorySegment result = Struct.CONTEXT_RESULT.allocate(arena);
 			int status = Native.contextCreateWindowedVulkan(request, result);
@@ -339,6 +351,10 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	}
 
 	public Status configureFrame(String label, int width, int height, int colorFormat) {
+		return configureFrame(label, width, height, colorFormat, PRESENT_FIFO);
+	}
+
+	public Status configureFrame(String label, int width, int height, int colorFormat, int presentMode) {
 		MemorySegment request = Struct.FRAME_SURFACE_CONFIG.allocate(arena);
 		Abi.writeHeader(request, Struct.FRAME_SURFACE_CONFIG);
 		Abi.writeBytes(arena, request, Struct.FRAME_SURFACE_CONFIG, 1, label);
@@ -347,8 +363,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		request.set(ValueLayout.JAVA_INT, extent + 4, height);
 		request.set(ValueLayout.JAVA_INT, extent + 8, 1);
 		Struct.FRAME_SURFACE_CONFIG.setInt(request, 3, colorFormat);
-		Struct.FRAME_SURFACE_CONFIG.setInt(request, 4, 3);
-		Struct.FRAME_SURFACE_CONFIG.setInt(request, 5, 1);
+		Struct.FRAME_SURFACE_CONFIG.setInt(request, 4, presentMode);
+		Struct.FRAME_SURFACE_CONFIG.setInt(request, 5, 2);
 		MemorySegment status = Struct.STATUS.allocate(arena);
 		checkStatus(Native.frameConfigure(contextId, request, status), "frame configure");
 		return new Status(Struct.STATUS.getLong(status, 5), Struct.STATUS.metricsFfiCalls(status), Struct.STATUS.metricsFfiInputBytes(status), Struct.STATUS.backendMetrics(status));
@@ -1337,7 +1353,14 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			profileLong(segment, offset, 79),
 			profileLong(segment, offset, 80),
 			profileLong(segment, offset, 81),
-			profileLong(segment, offset, 82)
+			profileLong(segment, offset, 82),
+			profileLong(segment, offset, 83),
+			profileLong(segment, offset, 84),
+			profileLong(segment, offset, 85),
+			profileLong(segment, offset, 86),
+			profileLong(segment, offset, 87),
+			profileLong(segment, offset, 88),
+			profileLong(segment, offset, 89)
 		);
 	}
 
@@ -1713,13 +1736,21 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		long vulkanPresentNanos,
 		long vulkanPresentWaitNanos,
 		long vulkanPresentMode,
+		long vulkanRequestedPresentMode,
+		long vulkanSupportedPresentModes,
+		long vulkanPresentModeFallbackReason,
 		long vulkanAcquiredImageIndex,
 		long vulkanSwapchainGeneration,
+		long vulkanSwapchainImageCount,
+		long vulkanSurfaceMinImageCount,
+		long vulkanSurfaceMaxImageCount,
+		long vulkanConfiguredFramesInFlight,
 		long vulkanImagesInFlight,
 		long vulkanAvailableFrameSlots
 	) {
 		public static WholeFrameProfile empty() {
-			return new WholeFrameProfile(0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L);
+			return new WholeFrameProfile(0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L
+			);
 		}
 	}
 

@@ -19,6 +19,9 @@ pub enum PresentMode {
     Immediate = 1,
     Mailbox = 2,
     Fifo = 3,
+    AutoVsync = 4,
+    AutoNoVsync = 5,
+    FifoRelaxed = 6,
 }
 
 #[repr(u32)]

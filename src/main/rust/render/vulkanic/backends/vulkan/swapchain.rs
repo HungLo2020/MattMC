@@ -23,8 +23,15 @@ pub(super) struct SwapchainRuntimeMetrics {
     pub(super) present_nanos: u64,
     pub(super) present_wait_nanos: u64,
     pub(super) present_mode: u64,
+    pub(super) requested_present_mode: u64,
+    pub(super) supported_present_modes: u64,
+    pub(super) present_mode_fallback_reason: u64,
     pub(super) acquired_image_index: u64,
     pub(super) swapchain_generation: u64,
+    pub(super) swapchain_image_count: u64,
+    pub(super) surface_min_image_count: u64,
+    pub(super) surface_max_image_count: u64,
+    pub(super) configured_frames_in_flight: u64,
     pub(super) images_in_flight: u64,
     pub(super) available_frame_slots: u64,
 }
@@ -411,7 +418,8 @@ impl VulkanSwapchain {
         })?;
         let (format, color_format) = choose_format(&formats, self.desc.color_format);
         let extent = choose_extent(capabilities, self.desc.extent);
-        let present_mode = choose_present_mode(&present_modes, self.desc.present_mode);
+        let present_policy = choose_present_mode(&present_modes, self.desc.present_mode);
+        let present_mode = present_policy.selected;
         let image_count = choose_image_count(capabilities, self.desc.max_frames_in_flight);
         let create = vk::SwapchainCreateInfoKHR::default()
             .surface(surface)
@@ -458,15 +466,28 @@ impl VulkanSwapchain {
         self.acquired.clear();
         self.recreate_count += 1;
         self.metrics.present_mode = present_mode.as_raw() as u64;
+        self.metrics.requested_present_mode = self.desc.present_mode as u64;
+        self.metrics.supported_present_modes = present_modes_mask(&present_modes);
+        self.metrics.present_mode_fallback_reason = present_policy.reason as u64;
         self.metrics.swapchain_generation = self.recreate_count;
+        self.metrics.swapchain_image_count = self.images.len() as u64;
+        self.metrics.surface_min_image_count = u64::from(capabilities.min_image_count);
+        self.metrics.surface_max_image_count = u64::from(capabilities.max_image_count);
+        self.metrics.configured_frames_in_flight = u64::from(self.desc.max_frames_in_flight);
         self.metrics.images_in_flight = 0;
         self.metrics.available_frame_slots = self.images.len() as u64;
         trace::message(&format!(
-            "gal.swapchain.recreate backend=vulkan count={} extent={}x{} images={} format={} window={}",
+            "gal.swapchain.recreate backend=vulkan count={} extent={}x{} images={} min_images={} max_images={} requested_present={} supported_present_mask=0x{:x} selected_present={} fallback_reason={} format={} window={}",
             self.recreate_count,
             self.extent.width,
             self.extent.height,
             self.images.len(),
+            capabilities.min_image_count,
+            capabilities.max_image_count,
+            self.desc.present_mode as u32,
+            self.metrics.supported_present_modes,
+            self.present_mode.as_raw(),
+            present_policy.reason as u32,
             self.format.as_raw(),
             self.stable_window_id
         ));
@@ -717,20 +738,116 @@ fn choose_extent(capabilities: vk::SurfaceCapabilitiesKHR, requested: Extent3d) 
     }
 }
 
-fn choose_present_mode(
-    available: &[vk::PresentModeKHR],
-    requested: PresentMode,
-) -> vk::PresentModeKHR {
-    let wanted = match requested {
-        PresentMode::Immediate => vk::PresentModeKHR::IMMEDIATE,
-        PresentMode::Mailbox => vk::PresentModeKHR::MAILBOX,
-        PresentMode::Fifo => vk::PresentModeKHR::FIFO,
-    };
-    if available.contains(&wanted) {
-        wanted
-    } else {
-        vk::PresentModeKHR::FIFO
+#[derive(Clone, Copy, Eq, PartialEq)]
+struct PresentModeSelection {
+    selected: vk::PresentModeKHR,
+    reason: PresentModeFallbackReason,
+}
+
+impl std::fmt::Debug for PresentModeSelection {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("PresentModeSelection")
+            .field("selected_raw", &self.selected.as_raw())
+            .field("reason", &self.reason)
+            .finish()
     }
+}
+
+#[repr(u64)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum PresentModeFallbackReason {
+    RequestedSupported = 1,
+    AutoVsyncFifo = 2,
+    AutoNoVsyncMailbox = 3,
+    AutoNoVsyncImmediate = 4,
+    FallbackFifo = 5,
+    FallbackImmediate = 6,
+    FallbackFifoRelaxed = 7,
+}
+
+fn choose_present_mode(available: &[vk::PresentModeKHR], requested: PresentMode) -> PresentModeSelection {
+    let explicit = match requested {
+        PresentMode::Immediate => Some(vk::PresentModeKHR::IMMEDIATE),
+        PresentMode::Mailbox => Some(vk::PresentModeKHR::MAILBOX),
+        PresentMode::Fifo => Some(vk::PresentModeKHR::FIFO),
+        PresentMode::FifoRelaxed => Some(vk::PresentModeKHR::FIFO_RELAXED),
+        PresentMode::AutoVsync | PresentMode::AutoNoVsync => None,
+    };
+    if let Some(wanted) = explicit {
+        if available.contains(&wanted) {
+            return PresentModeSelection {
+                selected: wanted,
+                reason: PresentModeFallbackReason::RequestedSupported,
+            };
+        }
+        return fallback_present_mode(available);
+    }
+    match requested {
+        PresentMode::AutoVsync => {
+            if available.contains(&vk::PresentModeKHR::FIFO) {
+                PresentModeSelection {
+                    selected: vk::PresentModeKHR::FIFO,
+                    reason: PresentModeFallbackReason::AutoVsyncFifo,
+                }
+            } else {
+                fallback_present_mode(available)
+            }
+        }
+        PresentMode::AutoNoVsync => {
+            if available.contains(&vk::PresentModeKHR::MAILBOX) {
+                PresentModeSelection {
+                    selected: vk::PresentModeKHR::MAILBOX,
+                    reason: PresentModeFallbackReason::AutoNoVsyncMailbox,
+                }
+            } else if available.contains(&vk::PresentModeKHR::IMMEDIATE) {
+                PresentModeSelection {
+                    selected: vk::PresentModeKHR::IMMEDIATE,
+                    reason: PresentModeFallbackReason::AutoNoVsyncImmediate,
+                }
+            } else {
+                fallback_present_mode(available)
+            }
+        }
+        _ => fallback_present_mode(available),
+    }
+}
+
+fn fallback_present_mode(available: &[vk::PresentModeKHR]) -> PresentModeSelection {
+    if available.contains(&vk::PresentModeKHR::FIFO) {
+        PresentModeSelection {
+            selected: vk::PresentModeKHR::FIFO,
+            reason: PresentModeFallbackReason::FallbackFifo,
+        }
+    } else if available.contains(&vk::PresentModeKHR::IMMEDIATE) {
+        PresentModeSelection {
+            selected: vk::PresentModeKHR::IMMEDIATE,
+            reason: PresentModeFallbackReason::FallbackImmediate,
+        }
+    } else if available.contains(&vk::PresentModeKHR::FIFO_RELAXED) {
+        PresentModeSelection {
+            selected: vk::PresentModeKHR::FIFO_RELAXED,
+            reason: PresentModeFallbackReason::FallbackFifoRelaxed,
+        }
+    } else {
+        PresentModeSelection {
+            selected: vk::PresentModeKHR::FIFO,
+            reason: PresentModeFallbackReason::FallbackFifo,
+        }
+    }
+}
+
+fn present_modes_mask(available: &[vk::PresentModeKHR]) -> u64 {
+    available.iter().fold(0_u64, |mask, mode| {
+        let bit = match *mode {
+            vk::PresentModeKHR::IMMEDIATE => 1_u64 << 0,
+            vk::PresentModeKHR::MAILBOX => 1_u64 << 1,
+            vk::PresentModeKHR::FIFO => 1_u64 << 2,
+            vk::PresentModeKHR::FIFO_RELAXED => 1_u64 << 3,
+            _ => 1_u64 << 60,
+        };
+        mask | bit
+    })
 }
 
 fn choose_image_count(capabilities: vk::SurfaceCapabilitiesKHR, requested: u32) -> u32 {
@@ -770,13 +887,50 @@ mod tests {
 
     #[test]
     fn swapchain_present_mode_falls_back_to_fifo() {
-        assert!(
-            choose_present_mode(&[vk::PresentModeKHR::FIFO], PresentMode::Mailbox)
-                == vk::PresentModeKHR::FIFO
+        assert_eq!(
+            choose_present_mode(&[vk::PresentModeKHR::FIFO], PresentMode::Mailbox),
+            PresentModeSelection {
+                selected: vk::PresentModeKHR::FIFO,
+                reason: PresentModeFallbackReason::FallbackFifo,
+            }
         );
-        assert!(
-            choose_present_mode(&[vk::PresentModeKHR::MAILBOX], PresentMode::Mailbox)
-                == vk::PresentModeKHR::MAILBOX
+        assert_eq!(
+            choose_present_mode(&[vk::PresentModeKHR::MAILBOX], PresentMode::Mailbox),
+            PresentModeSelection {
+                selected: vk::PresentModeKHR::MAILBOX,
+                reason: PresentModeFallbackReason::RequestedSupported,
+            }
+        );
+    }
+
+    #[test]
+    fn swapchain_auto_no_vsync_prefers_mailbox_then_immediate_then_fifo() {
+        assert_eq!(
+            choose_present_mode(
+                &[vk::PresentModeKHR::FIFO, vk::PresentModeKHR::MAILBOX],
+                PresentMode::AutoNoVsync
+            ),
+            PresentModeSelection {
+                selected: vk::PresentModeKHR::MAILBOX,
+                reason: PresentModeFallbackReason::AutoNoVsyncMailbox,
+            }
+        );
+        assert_eq!(
+            choose_present_mode(
+                &[vk::PresentModeKHR::FIFO, vk::PresentModeKHR::IMMEDIATE],
+                PresentMode::AutoNoVsync
+            ),
+            PresentModeSelection {
+                selected: vk::PresentModeKHR::IMMEDIATE,
+                reason: PresentModeFallbackReason::AutoNoVsyncImmediate,
+            }
+        );
+        assert_eq!(
+            choose_present_mode(&[vk::PresentModeKHR::FIFO], PresentMode::AutoNoVsync),
+            PresentModeSelection {
+                selected: vk::PresentModeKHR::FIFO,
+                reason: PresentModeFallbackReason::FallbackFifo,
+            }
         );
     }
 }

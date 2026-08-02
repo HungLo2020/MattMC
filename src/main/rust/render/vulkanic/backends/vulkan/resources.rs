@@ -857,6 +857,7 @@ impl VulkanObjects {
         );
         Ok(GraphicsPipelineObject {
             token,
+            label: desc.label.clone(),
             pipeline,
             layout: desc.layout,
         })
@@ -1082,6 +1083,7 @@ pub(super) struct PipelineLayoutObject {
 
 pub(super) struct GraphicsPipelineObject {
     pub(super) token: BackendToken,
+    pub(super) label: String,
     pub(super) pipeline: vk::Pipeline,
     pub(super) layout: Handle,
 }

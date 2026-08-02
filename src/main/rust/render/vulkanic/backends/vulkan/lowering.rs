@@ -52,7 +52,7 @@ pub(super) struct SubmissionLowerer {
     next_timestamp_set: u32,
 }
 
-const GPU_TIMESTAMP_SET_COUNT: u32 = 4;
+const GPU_TIMESTAMP_SET_COUNT: u32 = 8;
 const GPU_TIMESTAMP_QUERIES_PER_SET: u32 = 16;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -385,12 +385,27 @@ impl SubmissionLowerer {
         {
             return GpuTimestampSet::default();
         }
-        let set_index = self.next_timestamp_set % GPU_TIMESTAMP_SET_COUNT;
-        self.next_timestamp_set = self.next_timestamp_set.wrapping_add(1);
-        GpuTimestampSet {
-            base_query: set_index * GPU_TIMESTAMP_QUERIES_PER_SET,
-            active: true,
+        for _ in 0..GPU_TIMESTAMP_SET_COUNT {
+            let set_index = self.next_timestamp_set % GPU_TIMESTAMP_SET_COUNT;
+            self.next_timestamp_set = self.next_timestamp_set.wrapping_add(1);
+            let base_query = set_index * GPU_TIMESTAMP_QUERIES_PER_SET;
+            if !self.timestamp_set_in_use(base_query) {
+                return GpuTimestampSet {
+                    base_query,
+                    active: true,
+                };
+            }
         }
+        GpuTimestampSet::default()
+    }
+
+    fn timestamp_set_in_use(&self, base_query: u32) -> bool {
+        self.pending
+            .iter()
+            .any(|pending| pending.timestamp_set.active && pending.timestamp_set.base_query == base_query)
+            || self.in_flight.iter().any(|in_flight| {
+                in_flight.timestamp_set.active && in_flight.timestamp_set.base_query == base_query
+            })
     }
 
     unsafe fn write_timestamp(
@@ -413,6 +428,38 @@ impl SubmissionLowerer {
                 pool,
                 state.timestamp_set.base_query + query as u32,
             );
+        }
+    }
+
+    unsafe fn switch_timestamp_pass(
+        &self,
+        command_buffer: vk::CommandBuffer,
+        state: &mut EncodingState,
+        next: Option<TimestampPassKind>,
+    ) {
+        if state.current_timestamp_pass == next {
+            return;
+        }
+        if let Some(current) = state.current_timestamp_pass {
+            unsafe {
+                self.write_timestamp(
+                    command_buffer,
+                    state,
+                    current.end_query(),
+                    vk::PipelineStageFlags::BOTTOM_OF_PIPE,
+                );
+            }
+        }
+        state.current_timestamp_pass = next;
+        if let Some(next) = state.current_timestamp_pass {
+            unsafe {
+                self.write_timestamp(
+                    command_buffer,
+                    state,
+                    next.start_query(),
+                    vk::PipelineStageFlags::TOP_OF_PIPE,
+                );
+            }
         }
     }
 
@@ -691,6 +738,15 @@ impl SubmissionLowerer {
                         vk::PipelineBindPoint::GRAPHICS,
                         pipeline.pipeline,
                     );
+                    if let Some(pipeline_timestamp_pass) =
+                        timestamp_pipeline_kind(&pipeline.label)
+                    {
+                        self.switch_timestamp_pass(
+                            command_buffer,
+                            state,
+                            Some(pipeline_timestamp_pass),
+                        );
+                    }
                     state.graphics_pipeline = Some(*handle);
                     state.compute_pipeline = None;
                     state.pipeline_layout = Some(pipeline.layout);
@@ -1015,21 +1071,34 @@ impl SubmissionLowerer {
             return;
         }
         let mut values = [0_u64; GPU_TIMESTAMP_QUERIES_PER_SET as usize];
-        let result = unsafe {
-            self.context.device.get_query_pool_results(
-                pool,
-                complete.timestamp_set.base_query,
-                &mut values,
-                vk::QueryResultFlags::TYPE_64 | vk::QueryResultFlags::WAIT,
-            )
-        };
-        match result {
-            Ok(()) => self.apply_gpu_timestamp_result(decode_gpu_timestamp_result(
-                &values,
-                self.context.timestamp_period,
-            )),
-            Err(_) => self.apply_gpu_timestamp_result(GpuTimestampResult::default()),
+        let mut ready = [false; GPU_TIMESTAMP_QUERIES_PER_SET as usize];
+        for query in 0..GPU_TIMESTAMP_QUERIES_PER_SET {
+            let mut value = [0_u64; 1];
+            let result = unsafe {
+                self.context.device.get_query_pool_results(
+                    pool,
+                    complete.timestamp_set.base_query + query,
+                    &mut value,
+                    vk::QueryResultFlags::TYPE_64,
+                )
+            };
+            match result {
+                Ok(()) => {
+                    values[query as usize] = value[0];
+                    ready[query as usize] = true;
+                }
+                Err(vk::Result::NOT_READY) => {}
+                Err(_) => {
+                    self.apply_gpu_timestamp_result(GpuTimestampResult::default());
+                    return;
+                }
+            }
         }
+        self.apply_gpu_timestamp_result(decode_gpu_timestamp_result(
+            &values,
+            &ready,
+            self.context.timestamp_period,
+        ));
     }
 
     fn apply_gpu_timestamp_result(&mut self, result: GpuTimestampResult) {
@@ -1092,26 +1161,55 @@ fn gpu_timestamps_enabled() -> bool {
 
 fn timestamp_pass_kind(label: &str) -> Option<TimestampPassKind> {
     let label = label.trim();
-    if label.contains("shadow_depth") {
+    if label.contains("shadow_depth") || label.contains("shadow-pass") {
         Some(TimestampPassKind::ShadowDepth)
     } else if label.contains("terrain_opaque") {
         Some(TimestampPassKind::TerrainOpaque)
     } else if label.contains("terrain_cutout") {
         Some(TimestampPassKind::TerrainCutout)
-    } else if label.contains("deferred_lighting") {
+    } else if label.contains("deferred_lighting") || label.contains("deferred-lighting-pass") {
         Some(TimestampPassKind::DeferredLighting)
-    } else if label.contains("composite_0") {
+    } else if label.contains("composite_0") || label.contains("composite-0-pass") {
         Some(TimestampPassKind::Composite0)
-    } else if label.contains("composite_1") {
+    } else if label.contains("composite_1") || label.contains("composite-1-pass") {
         Some(TimestampPassKind::Composite1)
-    } else if label.contains("final_output") {
+    } else if label.contains("final_output") || label.contains("final-output-pass") {
         Some(TimestampPassKind::FinalOutput)
     } else {
         None
     }
 }
 
-fn decode_gpu_timestamp_result(values: &[u64], timestamp_period: f32) -> GpuTimestampResult {
+fn timestamp_pipeline_kind(label: &str) -> Option<TimestampPassKind> {
+    let label = label.trim();
+    if label.contains("shadow_depth") || label.contains("shadow-pipeline") {
+        Some(TimestampPassKind::ShadowDepth)
+    } else if label.contains("terrain_opaque")
+        || (label.contains("world-mesh-gbuffer") && label.contains("-mode1-"))
+    {
+        Some(TimestampPassKind::TerrainOpaque)
+    } else if label.contains("terrain_cutout")
+        || (label.contains("world-mesh-gbuffer") && label.contains("-mode2-"))
+    {
+        Some(TimestampPassKind::TerrainCutout)
+    } else if label.contains("deferred_lighting") || label.contains("deferred-lighting.pipeline") {
+        Some(TimestampPassKind::DeferredLighting)
+    } else if label.contains("composite_0") || label.contains("composite-0.pipeline") {
+        Some(TimestampPassKind::Composite0)
+    } else if label.contains("composite_1") || label.contains("composite-1.pipeline") {
+        Some(TimestampPassKind::Composite1)
+    } else if label.contains("final_output") || label.contains("final-output.pipeline") {
+        Some(TimestampPassKind::FinalOutput)
+    } else {
+        None
+    }
+}
+
+fn decode_gpu_timestamp_result(
+    values: &[u64],
+    ready: &[bool],
+    timestamp_period: f32,
+) -> GpuTimestampResult {
     fn delta(values: &[u64], start: GpuTimestampQuery, end: GpuTimestampQuery, period: f32) -> u64 {
         let Some(start) = values.get(start as usize).copied() else {
             return 0;
@@ -1124,53 +1222,78 @@ fn decode_gpu_timestamp_result(values: &[u64], timestamp_period: f32) -> GpuTime
         }
         ((end - start) as f64 * f64::from(period)).min(u64::MAX as f64) as u64
     }
+    fn pair_ready(ready: &[bool], start: GpuTimestampQuery, end: GpuTimestampQuery) -> bool {
+        ready.get(start as usize).copied().unwrap_or(false)
+            && ready.get(end as usize).copied().unwrap_or(false)
+    }
+    fn ready_delta(
+        values: &[u64],
+        ready: &[bool],
+        start: GpuTimestampQuery,
+        end: GpuTimestampQuery,
+        period: f32,
+    ) -> u64 {
+        if pair_ready(ready, start, end) {
+            delta(values, start, end, period)
+        } else {
+            0
+        }
+    }
 
-    let frame_total = delta(
+    let frame_total = ready_delta(
         values,
+        ready,
         GpuTimestampQuery::FrameStart,
         GpuTimestampQuery::FrameEnd,
         timestamp_period,
     );
     let result = GpuTimestampResult {
         status: u64::from(frame_total > 0),
-        shadow_depth_nanos: delta(
+        shadow_depth_nanos: ready_delta(
             values,
+            ready,
             GpuTimestampQuery::ShadowDepthStart,
             GpuTimestampQuery::ShadowDepthEnd,
             timestamp_period,
         ),
-        terrain_opaque_nanos: delta(
+        terrain_opaque_nanos: ready_delta(
             values,
+            ready,
             GpuTimestampQuery::TerrainOpaqueStart,
             GpuTimestampQuery::TerrainOpaqueEnd,
             timestamp_period,
         ),
-        terrain_cutout_nanos: delta(
+        terrain_cutout_nanos: ready_delta(
             values,
+            ready,
             GpuTimestampQuery::TerrainCutoutStart,
             GpuTimestampQuery::TerrainCutoutEnd,
             timestamp_period,
         ),
-        deferred_lighting_nanos: delta(
+        deferred_lighting_nanos: ready_delta(
             values,
+            ready,
             GpuTimestampQuery::DeferredLightingStart,
             GpuTimestampQuery::DeferredLightingEnd,
             timestamp_period,
         ),
-        composite0_nanos: delta(
+        composite0_nanos: ready_delta(
             values,
+            ready,
             GpuTimestampQuery::Composite0Start,
             GpuTimestampQuery::Composite0End,
             timestamp_period,
         ),
-        composite1_nanos: delta(
+        composite1_nanos: ready_delta(
             values,
+            ready,
             GpuTimestampQuery::Composite1Start,
             GpuTimestampQuery::Composite1End,
             timestamp_period,
         ),
-        final_output_nanos: delta(
+        final_output_nanos: ready_delta(
             values,
+            ready,
             GpuTimestampQuery::FinalOutputStart,
             GpuTimestampQuery::FinalOutputEnd,
             timestamp_period,
@@ -1202,17 +1325,95 @@ mod timestamp_tests {
     }
 
     #[test]
+    fn timestamp_labels_classify_actual_runtime_resource_names() {
+        assert_eq!(
+            Some(TimestampPassKind::ShadowDepth),
+            timestamp_pass_kind("world-gbuffer.shadow-pass")
+        );
+        assert_eq!(
+            Some(TimestampPassKind::DeferredLighting),
+            timestamp_pass_kind("world-gbuffer.deferred-lighting-pass")
+        );
+        assert_eq!(
+            Some(TimestampPassKind::Composite0),
+            timestamp_pipeline_kind("world-gbuffer.composite-0.pipeline")
+        );
+        assert_eq!(
+            Some(TimestampPassKind::TerrainOpaque),
+            timestamp_pipeline_kind("world-mesh-gbuffer-stratum4-sand-gen7-section0-texture3-mode1-depth2-cull1.pipeline")
+        );
+        assert_eq!(
+            Some(TimestampPassKind::TerrainCutout),
+            timestamp_pipeline_kind("world-mesh-gbuffer-stratum4-leaves-gen7-section0-texture9-mode2-depth2-cull1.pipeline")
+        );
+    }
+
+    #[test]
     fn gpu_timestamp_decoder_reports_nanos_without_waiting_policy() {
         let mut values = [0_u64; GPU_TIMESTAMP_QUERIES_PER_SET as usize];
+        let mut ready = [false; GPU_TIMESTAMP_QUERIES_PER_SET as usize];
         values[GpuTimestampQuery::FrameStart as usize] = 10;
         values[GpuTimestampQuery::ShadowDepthStart as usize] = 12;
         values[GpuTimestampQuery::ShadowDepthEnd as usize] = 18;
         values[GpuTimestampQuery::FrameEnd as usize] = 30;
-        let result = decode_gpu_timestamp_result(&values, 2.0);
+        ready[GpuTimestampQuery::FrameStart as usize] = true;
+        ready[GpuTimestampQuery::ShadowDepthStart as usize] = true;
+        ready[GpuTimestampQuery::ShadowDepthEnd as usize] = true;
+        ready[GpuTimestampQuery::FrameEnd as usize] = true;
+        let result = decode_gpu_timestamp_result(&values, &ready, 2.0);
         assert_eq!(1, result.status);
         assert_eq!(12, result.shadow_depth_nanos);
         assert_eq!(40, result.frame_total_nanos);
         assert_eq!(0, result.terrain_opaque_nanos);
+    }
+
+    #[test]
+    fn gpu_timestamp_decoder_reports_unavailable_for_unwritten_first_frame() {
+        let values = [0_u64; GPU_TIMESTAMP_QUERIES_PER_SET as usize];
+        let ready = [false; GPU_TIMESTAMP_QUERIES_PER_SET as usize];
+        let result = decode_gpu_timestamp_result(&values, &ready, 1.0);
+        assert_eq!(0, result.status);
+        assert_eq!(0, result.frame_total_nanos);
+    }
+
+    #[test]
+    fn gpu_timestamp_decoder_keeps_written_pass_when_other_queries_are_unavailable() {
+        let mut values = [0_u64; GPU_TIMESTAMP_QUERIES_PER_SET as usize];
+        let mut ready = [false; GPU_TIMESTAMP_QUERIES_PER_SET as usize];
+        for query in [
+            GpuTimestampQuery::FrameStart,
+            GpuTimestampQuery::FrameEnd,
+            GpuTimestampQuery::TerrainOpaqueStart,
+            GpuTimestampQuery::TerrainOpaqueEnd,
+        ] {
+            ready[query as usize] = true;
+        }
+        values[GpuTimestampQuery::FrameStart as usize] = 100;
+        values[GpuTimestampQuery::TerrainOpaqueStart as usize] = 110;
+        values[GpuTimestampQuery::TerrainOpaqueEnd as usize] = 160;
+        values[GpuTimestampQuery::FrameEnd as usize] = 200;
+        let result = decode_gpu_timestamp_result(&values, &ready, 1.5);
+        assert_eq!(1, result.status);
+        assert_eq!(150, result.frame_total_nanos);
+        assert_eq!(75, result.terrain_opaque_nanos);
+        assert_eq!(0, result.terrain_cutout_nanos);
+    }
+
+    #[test]
+    fn gpu_timestamp_decoder_requires_both_pass_endpoints() {
+        let mut values = [0_u64; GPU_TIMESTAMP_QUERIES_PER_SET as usize];
+        let mut ready = [false; GPU_TIMESTAMP_QUERIES_PER_SET as usize];
+        ready[GpuTimestampQuery::FrameStart as usize] = true;
+        ready[GpuTimestampQuery::FrameEnd as usize] = true;
+        ready[GpuTimestampQuery::TerrainCutoutStart as usize] = true;
+        values[GpuTimestampQuery::FrameStart as usize] = 3;
+        values[GpuTimestampQuery::FrameEnd as usize] = 9;
+        values[GpuTimestampQuery::TerrainCutoutStart as usize] = 4;
+        values[GpuTimestampQuery::TerrainCutoutEnd as usize] = 8;
+        let result = decode_gpu_timestamp_result(&values, &ready, 10.0);
+        assert_eq!(1, result.status);
+        assert_eq!(60, result.frame_total_nanos);
+        assert_eq!(0, result.terrain_cutout_nanos);
     }
 }
 
