@@ -3094,6 +3094,14 @@ public final class DeterministicCameraCapture {
 					json.append("\"sectionOriginValid\": ").append(event.sectionOriginValid()).append(", ");
 					json.append("\"indexOffsetAlignmentValid\": ").append(event.indexOffsetAlignmentValid()).append(", ");
 					json.append("\"cameraBoundsFinite\": ").append(event.cameraBoundsFinite()).append(", ");
+					json.append("\"normalContractValid\": ").append(event.normalContractValid()).append(", ");
+					json.append("\"aoContractValid\": ").append(event.aoContractValid()).append(", ");
+					json.append("\"blockSkyLightContractValid\": ").append(event.blockSkyLightContractValid()).append(", ");
+					json.append("\"topFaceShadeContractValid\": ").append(event.topFaceShadeContractValid()).append(", ");
+					json.append("\"separateAoActive\": ").append(event.separateAoActive()).append(", ");
+					json.append("\"separateAoVertexCount\": ").append(event.separateAoVertexCount()).append(", ");
+					json.append("\"aoRange\": { \"min\": ").append(format(event.minAo())).append(", \"max\": ").append(format(event.maxAo())).append(" }, ");
+					json.append("\"normalSectionCounts\": { \"posY\": ").append(event.positiveYNormalSections()).append(", \"negY\": ").append(event.negativeYNormalSections()).append(", \"horizontal\": ").append(event.horizontalNormalSections()).append(" }, ");
 				appendField(json, "reason", event.reason(), 0);
 				json.append(" }");
 			}

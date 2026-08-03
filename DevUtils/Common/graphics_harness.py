@@ -1243,6 +1243,27 @@ def static_terrain_geometry_evidence(doc: dict[str, object] | None) -> dict[str,
             failures.append("section_origin_mismatch")
         if raw_event.get("indexOffsetAlignmentValid") is not True:
             failures.append("index_alignment_invalid")
+        lighting_flag_failures = {
+            "normalContractValid": "terrain_lighting_normal_invalid",
+            "aoContractValid": "terrain_lighting_ao_invalid",
+            "blockSkyLightContractValid": "terrain_lighting_block_sky_invalid",
+            "topFaceShadeContractValid": "terrain_lighting_top_shade_invalid",
+        }
+        for flag_name, failure_name in lighting_flag_failures.items():
+            if raw_event.get(flag_name) is not True:
+                failures.append(failure_name)
+        if raw_event.get("separateAoActive") is True:
+            separate_ao_vertices = int(parse_number(raw_event.get("separateAoVertexCount")) or 0)
+            if separate_ao_vertices <= 0:
+                failures.append("terrain_lighting_ao_missing")
+            ao_range = raw_event.get("aoRange")
+            if isinstance(ao_range, dict):
+                min_ao = parse_number(ao_range.get("min"))
+                max_ao = parse_number(ao_range.get("max"))
+                if min_ao is None or max_ao is None or not (0.0 <= min_ao <= max_ao <= 1.0):
+                    failures.append("terrain_lighting_ao_range_invalid")
+            else:
+                failures.append("terrain_lighting_ao_range_invalid")
         flag_failures = {
             "localBoundsValid": "geometry_out_of_bounds",
             "uvBoundsValid": "uv_bounds_invalid",
@@ -5124,6 +5145,11 @@ def normalize_capture_artifact(
         "cross-world-stale-submission": "cross_world_stale_submission",
         "mesh-key-collision": "mesh_key_collision",
         "bounds-out-of-range": "geometry_out_of_bounds",
+        "inverted-normal": "terrain_lighting_normal_invalid",
+        "swapped-block-sky-light": "terrain_lighting_block_sky_invalid",
+        "inverted-ao": "terrain_lighting_ao_invalid",
+        "doubled-face-shade": "terrain_lighting_ao_invalid",
+        "wrong-top-face-shade": "terrain_lighting_top_shade_invalid",
         "old-generation-after-edit": "lifecycle_old_generation_after_edit",
         "old-new-together": "lifecycle_old_new_overlap",
         "removed-section-resubmitted": "lifecycle_removed_section_resubmitted",
@@ -10669,6 +10695,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
                 "cross-world-stale-submission",
                 "mesh-key-collision",
                 "bounds-out-of-range",
+                "inverted-normal",
+                "swapped-block-sky-light",
+                "inverted-ao",
+                "doubled-face-shade",
+                "wrong-top-face-shade",
                 "old-generation-after-edit",
                 "old-new-together",
                 "removed-section-resubmitted",

@@ -6087,6 +6087,14 @@ else:
             "sectionOriginValid": True,
             "indexOffsetAlignmentValid": True,
             "cameraBoundsFinite": True,
+            "normalContractValid": True,
+            "aoContractValid": True,
+            "blockSkyLightContractValid": True,
+            "topFaceShadeContractValid": True,
+            "separateAoActive": True,
+            "separateAoVertexCount": 24,
+            "aoRange": {"min": 0.35, "max": 1.0},
+            "normalSectionCounts": {"posY": 1, "negY": 1, "horizontal": 4},
         }
         event.update(overrides)
         return {"activeNativeVertexStride": 40, "recentEvents": [event]}
@@ -6117,6 +6125,11 @@ else:
                 "localBounds": {"minX": 0.0, "minY": 0.0, "minZ": 0.0, "maxX": 4096.0, "maxY": 16.0, "maxZ": 16.0},
                 "localBoundsValid": False,
             },
+            "terrain_lighting_normal_invalid": {"normalContractValid": False},
+            "terrain_lighting_ao_invalid": {"aoContractValid": False},
+            "terrain_lighting_block_sky_invalid": {"blockSkyLightContractValid": False},
+            "terrain_lighting_top_shade_invalid": {"topFaceShadeContractValid": False},
+            "terrain_lighting_ao_missing": {"separateAoVertexCount": 0},
         }
         for expected, overrides in cases.items():
             with self.subTest(expected=expected):

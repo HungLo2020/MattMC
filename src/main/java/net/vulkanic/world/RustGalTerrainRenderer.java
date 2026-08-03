@@ -437,6 +437,8 @@ public final class RustGalTerrainRenderer {
 	private static TerrainSectionAsset decodeMesh(ChunkBuildOutput output, BuiltSectionMeshParts mesh, ChunkSectionLayer layer) {
 		ByteBuffer buffer = mesh.getVertexData().getDirectBuffer().duplicate().order(ByteOrder.nativeOrder());
 		int vertexStride = activeTerrainVertexStride();
+		boolean separateAo = WorldRenderingSettings.INSTANCE.shouldUseSeparateAo();
+		String fault = activeFault();
 		if (vertexStride < COMPACT_PREFIX_STRIDE) {
 			throw new IllegalArgumentException("static terrain vertex stride " + vertexStride + " is smaller than compact prefix " + COMPACT_PREFIX_STRIDE);
 		}
@@ -476,13 +478,37 @@ public final class RustGalTerrainRenderer {
 		float minV = Float.POSITIVE_INFINITY;
 		float maxU = Float.NEGATIVE_INFINITY;
 		float maxV = Float.NEGATIVE_INFINITY;
+		int separateAoVertexCount = 0;
+		float minAo = 1.0F;
+		float maxAo = 0.0F;
+		boolean aoContractValid = true;
+		boolean blockSkyLightContractValid = true;
 		for (int vertexIndex = 0; vertexIndex < vertexCount; vertexIndex++) {
 			int offset = vertexIndex * vertexStride;
 			int positionHi = buffer.getInt(offset + POSITION_OFFSET);
 			int positionLo = buffer.getInt(offset + POSITION_OFFSET + 4);
-			int color = buffer.getInt(offset + COLOR_OFFSET);
+			int compactColor = buffer.getInt(offset + COLOR_OFFSET);
+			int color = decodeCompactTerrainColorForRust(compactColor, separateAo, "inverted-ao".equals(fault), "doubled-face-shade".equals(fault));
 			int texture = buffer.getInt(offset + TEXTURE_OFFSET);
 			int lightMaterial = buffer.getInt(offset + LIGHT_MATERIAL_OFFSET);
+			float ao = separateAo ? ((compactColor >>> 24) & 0xff) / 255.0F : 1.0F;
+			if ("inverted-ao".equals(fault)) {
+				ao = 1.0F - ao;
+			}
+			if (separateAo) {
+				separateAoVertexCount++;
+				minAo = Math.min(minAo, ao);
+				maxAo = Math.max(maxAo, ao);
+				if (((color >>> 24) & 0xff) != 0xff) {
+					aoContractValid = false;
+				}
+			}
+			if ("inverted-ao".equals(fault) || "doubled-face-shade".equals(fault)) {
+				aoContractValid = false;
+			}
+			if ("swapped-block-sky-light".equals(fault)) {
+				blockSkyLightContractValid = false;
+			}
 			float x = decodePosition(positionHi, positionLo, 0);
 			float y = decodePosition(positionHi, positionLo, 1);
 			float z = decodePosition(positionHi, positionLo, 2);
@@ -510,13 +536,18 @@ public final class RustGalTerrainRenderer {
 				(lightMaterial >>> 16) & 0xff,
 				color,
 				0,
-				decodeLight(lightMaterial)
+				decodeLight(lightMaterial, "swapped-block-sky-light".equals(fault))
 			));
 		}
 		List<Integer> indices = new ArrayList<>(Math.max(6, vertexCount / 4 * 6));
 		List<VulkanicGalBridge.WorldMeshSectionRecord> sections = new ArrayList<>();
 		int cursor = 0;
 		int maxIndex = -1;
+		int positiveYNormalSections = 0;
+		int negativeYNormalSections = 0;
+		int horizontalNormalSections = 0;
+		boolean normalContractValid = true;
+		boolean topFaceShadeContractValid = true;
 		for (int i = 0; i < vertexSegments.length; i += 2) {
 			int segmentVertexCount = vertexSegments[i];
 			if (segmentVertexCount <= 0) {
@@ -526,12 +557,31 @@ public final class RustGalTerrainRenderer {
 				throw new IllegalArgumentException("static terrain vertex segments exceed vertex payload");
 			}
 			int firstIndex = indices.size();
-			int normalPacked = normalForSegment(vertices, cursor, segmentVertexCount, vertexSegments[i + 1]);
+			int facing = vertexSegments[i + 1];
+			int normalPacked = normalForSegment(vertices, cursor, segmentVertexCount, facing);
+			if ("inverted-normal".equals(fault)) {
+				normalPacked = invertPackedNormal(normalPacked);
+				normalContractValid = false;
+			}
+			switch (facing) {
+				case 1 -> positiveYNormalSections++;
+				case 4 -> negativeYNormalSections++;
+				case 0, 2, 3, 5 -> horizontalNormalSections++;
+				default -> {
+				}
+			}
+			if ("wrong-top-face-shade".equals(fault) && facing == 1) {
+				topFaceShadeContractValid = false;
+			}
 			for (int vertex = cursor; vertex < cursor + segmentVertexCount; vertex++) {
 				VulkanicGalBridge.WorldMeshVertexRecord original = vertices.get(vertex);
+				int color = original.colorArgb();
+				if ("wrong-top-face-shade".equals(fault) && facing == 1) {
+					color = multiplyArgbRgb(color, 0x80);
+				}
 				vertices.set(vertex, new VulkanicGalBridge.WorldMeshVertexRecord(
 					original.x(), original.y(), original.z(), original.u(), original.v(), original.atlasU(), original.atlasV(),
-					original.shaderBlockId(), original.shaderMaterialType(), original.colorArgb(), normalPacked, original.light()
+					original.shaderBlockId(), original.shaderMaterialType(), color, normalPacked, original.light()
 				));
 			}
 			for (int quadBase = cursor; quadBase + 3 < cursor + segmentVertexCount; quadBase += 4) {
@@ -624,6 +674,17 @@ public final class RustGalTerrainRenderer {
 			true,
 			sectionOriginValid,
 			indexOffsetAlignmentValid,
+			normalContractValid,
+			aoContractValid,
+			blockSkyLightContractValid,
+			topFaceShadeContractValid,
+			separateAo,
+			separateAoVertexCount,
+			minAo,
+			maxAo,
+			positiveYNormalSections,
+			negativeYNormalSections,
+			horizontalNormalSections,
 			output.render.getOriginX(),
 			output.render.getOriginY(),
 			output.render.getOriginZ(),
@@ -817,10 +878,65 @@ public final class RustGalTerrainRenderer {
 		return (value & 0x7fff) / (float)TEXTURE_MAX_VALUE;
 	}
 
-	private static int decodeLight(int lightMaterial) {
+	private static int decodeLight(int lightMaterial, boolean swapBlockAndSky) {
 		int block = Math.max(0, Math.min(15, (lightMaterial & 0xff) >>> 4));
 		int sky = Math.max(0, Math.min(15, ((lightMaterial >>> 8) & 0xff) >>> 4));
+		if (swapBlockAndSky) {
+			int swapped = block;
+			block = sky;
+			sky = swapped;
+		}
 		return (block << 4) | (sky << 20);
+	}
+
+	static int decodeCompactTerrainColorForRust(int compactAbgr, boolean separateAo) {
+		return decodeCompactTerrainColorForRust(compactAbgr, separateAo, false, false);
+	}
+
+	private static int decodeCompactTerrainColorForRust(int compactAbgr, boolean separateAo, boolean invertAo, boolean doubleShade) {
+		int alphaOrAo = (compactAbgr >>> 24) & 0xff;
+		int blue = (compactAbgr >>> 16) & 0xff;
+		int green = (compactAbgr >>> 8) & 0xff;
+		int red = compactAbgr & 0xff;
+		int alpha = alphaOrAo;
+		if (separateAo) {
+			if (invertAo) {
+				alphaOrAo = 255 - alphaOrAo;
+			}
+			red = multiplyColorByte(red, alphaOrAo);
+			green = multiplyColorByte(green, alphaOrAo);
+			blue = multiplyColorByte(blue, alphaOrAo);
+			if (doubleShade) {
+				red = multiplyColorByte(red, alphaOrAo);
+				green = multiplyColorByte(green, alphaOrAo);
+				blue = multiplyColorByte(blue, alphaOrAo);
+			}
+			alpha = 0xff;
+		}
+		return (alpha << 24) | (red << 16) | (green << 8) | blue;
+	}
+
+	private static int multiplyColorByte(int color, int factor) {
+		return Math.max(0, Math.min(255, (color * factor + 255) >>> 8));
+	}
+
+	private static int multiplyArgbRgb(int argb, int factor) {
+		int alpha = argb & 0xff000000;
+		int red = multiplyColorByte((argb >>> 16) & 0xff, factor);
+		int green = multiplyColorByte((argb >>> 8) & 0xff, factor);
+		int blue = multiplyColorByte(argb & 0xff, factor);
+		return alpha | (red << 16) | (green << 8) | blue;
+	}
+
+	private static int invertPackedNormal(int normalPacked) {
+		float x = -unpackPackedNormalComponent(normalPacked, 0);
+		float y = -unpackPackedNormalComponent(normalPacked, 8);
+		float z = -unpackPackedNormalComponent(normalPacked, 16);
+		return packNormal(x, y, z);
+	}
+
+	private static float unpackPackedNormalComponent(int normalPacked, int shift) {
+		return (byte)((normalPacked >>> shift) & 0xff) / 127.0F;
 	}
 
 	private static int normalForSegment(List<VulkanicGalBridge.WorldMeshVertexRecord> vertices, int start, int count, int facing) {
@@ -1124,6 +1240,17 @@ public final class RustGalTerrainRenderer {
 					(asset == null ? 0.0F : asset.localMaxY()) + transformY,
 					(asset == null ? 0.0F : asset.localMaxZ()) + transformZ
 				),
+				asset == null || asset.normalContractValid(),
+				asset == null || asset.aoContractValid(),
+				asset == null || asset.blockSkyLightContractValid(),
+				asset == null || asset.topFaceShadeContractValid(),
+				asset != null && asset.separateAoActive(),
+				asset == null ? 0 : asset.separateAoVertexCount(),
+				asset == null ? 1.0F : asset.minAo(),
+				asset == null ? 1.0F : asset.maxAo(),
+				asset == null ? 0 : asset.positiveYNormalSections(),
+				asset == null ? 0 : asset.negativeYNormalSections(),
+				asset == null ? 0 : asset.horizontalNormalSections(),
 				reason
 			);
 			if (RECENT_EVENTS.size() >= MAX_RECENT_EVENTS) {
@@ -1177,6 +1304,17 @@ public final class RustGalTerrainRenderer {
 		boolean segmentLayoutValid,
 		boolean sectionOriginValid,
 		boolean indexOffsetAlignmentValid,
+		boolean normalContractValid,
+		boolean aoContractValid,
+		boolean blockSkyLightContractValid,
+		boolean topFaceShadeContractValid,
+		boolean separateAoActive,
+		int separateAoVertexCount,
+		float minAo,
+		float maxAo,
+		int positiveYNormalSections,
+		int negativeYNormalSections,
+		int horizontalNormalSections,
 		int sectionOriginX,
 		int sectionOriginY,
 		int sectionOriginZ,
@@ -1229,6 +1367,17 @@ public final class RustGalTerrainRenderer {
 		boolean sectionOriginValid,
 		boolean indexOffsetAlignmentValid,
 		boolean cameraBoundsFinite,
+		boolean normalContractValid,
+		boolean aoContractValid,
+		boolean blockSkyLightContractValid,
+		boolean topFaceShadeContractValid,
+		boolean separateAoActive,
+		int separateAoVertexCount,
+		float minAo,
+		float maxAo,
+		int positiveYNormalSections,
+		int negativeYNormalSections,
+		int horizontalNormalSections,
 		String reason
 	) {
 	}
