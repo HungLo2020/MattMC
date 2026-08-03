@@ -77,7 +77,10 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_frame_acquire(
                 correlation_id: FrameCorrelationId(request.correlation_id),
                 expected_extent: request.expected_extent.into(),
             })?;
-            let frame_target = if acquired.status == FrameAcquireStatus::Minimized {
+            let frame_target = if matches!(
+                acquired.status,
+                FrameAcquireStatus::Minimized | FrameAcquireStatus::Resized
+            ) {
                 Handle::NULL
             } else if let Some(cached) = context.frame_targets.get(&acquired.render_target) {
                 cached.handle

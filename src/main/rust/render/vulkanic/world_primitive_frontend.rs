@@ -789,6 +789,16 @@ struct MeshResourceKey {
     color_format: ColorFormat,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
+struct MeshPipelineResourceKey {
+    g_buffer: bool,
+    material_mode: u32,
+    winding: u32,
+    depth_policy: u32,
+    cull_policy: u32,
+    color_format: ColorFormat,
+}
+
 struct MeshAssetStore {
     mesh_generation: u64,
     vertex_bytes: Vec<u8>,
@@ -797,13 +807,20 @@ struct MeshAssetStore {
     sections: Vec<WorldMeshSection>,
 }
 
-struct MeshResources {
-    vertex_buffer: Handle,
-    index_buffer: Handle,
+struct MeshPipelineResources {
     vertex_shader: Handle,
     fragment_shader: Handle,
     shadow_vertex_shader: Option<Handle>,
     shadow_fragment_shader: Option<Handle>,
+    resource_layout: Handle,
+    pipeline_layout: Handle,
+    pipeline: Handle,
+    shadow_pipeline: Option<Handle>,
+}
+
+struct MeshResources {
+    vertex_buffer: Handle,
+    index_buffer: Handle,
     resource_layout: Handle,
     pipeline_layout: Handle,
     pipeline: Handle,
@@ -816,9 +833,9 @@ struct MeshDataSlot {
     resource_set: Handle,
 }
 
-impl MeshResources {
+impl MeshPipelineResources {
     fn handles_in_destroy_order(&self) -> Vec<Handle> {
-        let mut handles = vec![
+        [
             self.shadow_pipeline,
             Some(self.pipeline),
             Some(self.pipeline_layout),
@@ -827,16 +844,22 @@ impl MeshResources {
             self.shadow_vertex_shader,
             Some(self.fragment_shader),
             Some(self.vertex_shader),
-            Some(self.index_buffer),
-            Some(self.vertex_buffer),
         ]
         .into_iter()
         .flatten()
-        .collect::<Vec<_>>();
+        .collect()
+    }
+}
+
+impl MeshResources {
+    fn handles_in_destroy_order(&self) -> Vec<Handle> {
+        let mut handles = Vec::new();
         for slot in self.data_slots.iter().rev() {
             handles.push(slot.resource_set);
             handles.push(slot.instance_buffer);
         }
+        handles.push(self.index_buffer);
+        handles.push(self.vertex_buffer);
         handles
     }
 }
@@ -975,6 +998,7 @@ pub struct WorldPrimitiveFrontend {
     border_resources: Option<BorderResources>,
     border_resource_format: Option<ColorFormat>,
     material_resources: BTreeMap<MaterialResourceKey, MaterialResources>,
+    mesh_pipeline_resources: BTreeMap<MeshPipelineResourceKey, MeshPipelineResources>,
     mesh_resources: BTreeMap<MeshResourceKey, MeshResources>,
     mesh_texture_resources: BTreeMap<u32, MeshTextureResources>,
     depth_attachment: Option<DepthAttachmentResources>,
@@ -1352,9 +1376,9 @@ impl WorldPrimitiveFrontend {
                             .find(|(mesh_key, _)| *mesh_key == key.mesh_key)
                             .map(|(_, asset)| asset.mesh_generation != key.mesh_generation)
                             .unwrap_or_else(|| {
-                                self.mesh_assets
-                                    .get(&key.mesh_key)
-                                    .is_none_or(|asset| asset.mesh_generation != key.mesh_generation)
+                                self.mesh_assets.get(&key.mesh_key).is_none_or(|asset| {
+                                    asset.mesh_generation != key.mesh_generation
+                                })
                             }))
             })
             .collect();
@@ -3111,61 +3135,25 @@ impl WorldPrimitiveFrontend {
         Ok(())
     }
 
-    fn ensure_mesh_resources(
+    fn ensure_mesh_pipeline_resources(
         &mut self,
         gal: &mut VulkanicGal,
-        key: MeshResourceKey,
+        key: MeshPipelineResourceKey,
     ) -> GalResult<()> {
-        if self.mesh_resources.contains_key(&key) {
+        if self.mesh_pipeline_resources.contains_key(&key) {
             return Ok(());
         }
-        let asset = self.mesh_assets.get(&key.mesh_key).ok_or_else(|| {
-            GalError::invalid_argument(format!("world mesh asset {} is missing", key.mesh_key))
-        })?;
-        let section = asset
-            .sections
-            .get(key.section_index as usize)
-            .ok_or_else(|| GalError::invalid_argument("world mesh section is missing"))?;
         let label = format!(
-            "world-mesh-{}-stratum{}-{}-gen{}-section{}-texture{}-mode{}-depth{}-cull{}",
+            "world-mesh-pipeline-{}-mode{}-depth{}-cull{}-winding{}-gen{}",
             if key.g_buffer { "gbuffer" } else { "direct" },
-            key.stratum,
-            key.mesh_key,
-            key.mesh_generation,
-            key.section_index,
-            key.texture_id,
             key.material_mode,
             key.depth_policy,
-            key.cull_policy
+            key.cull_policy,
+            key.winding,
+            self.generation
         );
-        let vertex_bytes = asset.vertex_bytes.clone();
-        let index_bytes = asset.index_bytes.clone();
-        let index_type = asset.index_type;
-        let index_offset = section.index_offset;
-        let index_count = section.index_count;
-        self.ensure_mesh_texture_resources(gal, key.texture_id, &label)?;
-        let texture_resources = self
-            .mesh_texture_resources
-            .get(&key.texture_id)
-            .ok_or_else(|| GalError::backend("world mesh texture resources missing"))?;
-        let texture_view = texture_resources.view;
-        let sampler = texture_resources.sampler;
         let mut created = Vec::new();
-        let result = (|| -> GalResult<MeshResources> {
-            let vertex_buffer = gal.create_buffer(BufferDesc {
-                label: format!("{label}.vertices"),
-                size: vertex_bytes.len() as u64,
-                memory: MemoryDomain::Upload,
-                usages: vec![BufferUsage::Storage, BufferUsage::HostWrite],
-            })?;
-            created.push(vertex_buffer);
-            let index_buffer = gal.create_buffer(BufferDesc {
-                label: format!("{label}.indices"),
-                size: index_bytes.len() as u64,
-                memory: MemoryDomain::Upload,
-                usages: vec![BufferUsage::Index, BufferUsage::HostWrite],
-            })?;
-            created.push(index_buffer);
+        let result = (|| -> GalResult<MeshPipelineResources> {
             let terrain_program = terrain_program_for_mode(key.material_mode, key.g_buffer)?;
             let vertex_shader = gal.create_shader_module(ShaderModuleDesc {
                 label: format!("{label}.vertex"),
@@ -3186,7 +3174,7 @@ impl WorldPrimitiveFrontend {
                 entry_point: terrain_program.fragment.entry_point.clone(),
             })?;
             created.push(fragment_shader);
-            let (shadow_vertex_shader, shadow_fragment_shader, shadow_pipeline) = if key.g_buffer {
+            let (shadow_vertex_shader, shadow_fragment_shader) = if key.g_buffer {
                 let shadow_program = minimal_shadow_depth_program();
                 let shadow_vertex_shader = gal.create_shader_module(ShaderModuleDesc {
                     label: format!("{label}.shadow.vertex"),
@@ -3207,13 +3195,9 @@ impl WorldPrimitiveFrontend {
                     entry_point: shadow_program.fragment.entry_point.clone(),
                 })?;
                 created.push(shadow_fragment_shader);
-                (
-                    Some(shadow_vertex_shader),
-                    Some(shadow_fragment_shader),
-                    None,
-                )
+                (Some(shadow_vertex_shader), Some(shadow_fragment_shader))
             } else {
-                (None, None, None)
+                (None, None)
             };
             let resource_layout = gal.create_resource_layout(ResourceLayoutDesc {
                 label: format!("{label}.resource-layout"),
@@ -3253,16 +3237,6 @@ impl WorldPrimitiveFrontend {
                 ],
             })?;
             created.push(resource_layout);
-            let slot = create_mesh_data_slot(
-                gal,
-                &format!("{label}.slot0"),
-                resource_layout,
-                vertex_buffer,
-                texture_view,
-                sampler,
-            )?;
-            created.push(slot.instance_buffer);
-            created.push(slot.resource_set);
             let pipeline_layout = gal.create_pipeline_layout(PipelineLayoutDesc {
                 label: format!("{label}.pipeline-layout"),
                 resource_layouts: vec![resource_layout],
@@ -3276,18 +3250,7 @@ impl WorldPrimitiveFrontend {
                 topology: PrimitiveTopology::Triangles,
                 cull_mode: effective_cull_mode_for_winding(key.cull_policy, key.winding)?,
                 blend: BlendMode::Disabled,
-                depth_compare: match key.depth_policy {
-                    WORLD_DEPTH_POLICY_DISABLED => None,
-                    WORLD_DEPTH_POLICY_TEST_WRITE | WORLD_DEPTH_POLICY_TEST_NO_WRITE => {
-                        Some(CompareOp::LessOrEqual)
-                    }
-                    _ => {
-                        return Err(GalError::ffi(
-                            StatusCode::UnknownEnum,
-                            format!("unknown world mesh depth policy {}", key.depth_policy),
-                        ))
-                    }
-                },
+                depth_compare: depth_compare_for_policy(key.depth_policy)?,
                 depth_write: key.depth_policy == WORLD_DEPTH_POLICY_TEST_WRITE,
                 color_formats: if key.g_buffer {
                     vec![TextureFormat::Rgba8Unorm; 4]
@@ -3316,15 +3279,106 @@ impl WorldPrimitiveFrontend {
                 created.push(pipeline);
                 Some(pipeline)
             } else {
-                shadow_pipeline
+                None
             };
-            let resources = MeshResources {
-                vertex_buffer,
-                index_buffer,
+            Ok(MeshPipelineResources {
                 vertex_shader,
                 fragment_shader,
                 shadow_vertex_shader,
                 shadow_fragment_shader,
+                resource_layout,
+                pipeline_layout,
+                pipeline,
+                shadow_pipeline,
+            })
+        })();
+        if result.is_err() {
+            for handle in created.into_iter().rev() {
+                let _ = gal.destroy(handle);
+            }
+        }
+        self.mesh_pipeline_resources.insert(key, result?);
+        Ok(())
+    }
+
+    fn ensure_mesh_resources(
+        &mut self,
+        gal: &mut VulkanicGal,
+        key: MeshResourceKey,
+    ) -> GalResult<()> {
+        if self.mesh_resources.contains_key(&key) {
+            return Ok(());
+        }
+        let asset = self.mesh_assets.get(&key.mesh_key).ok_or_else(|| {
+            GalError::invalid_argument(format!("world mesh asset {} is missing", key.mesh_key))
+        })?;
+        let section = asset
+            .sections
+            .get(key.section_index as usize)
+            .ok_or_else(|| GalError::invalid_argument("world mesh section is missing"))?;
+        let label = format!(
+            "world-mesh-{}-stratum{}-{}-gen{}-section{}-texture{}-mode{}-depth{}-cull{}",
+            if key.g_buffer { "gbuffer" } else { "direct" },
+            key.stratum,
+            key.mesh_key,
+            key.mesh_generation,
+            key.section_index,
+            key.texture_id,
+            key.material_mode,
+            key.depth_policy,
+            key.cull_policy
+        );
+        let vertex_bytes = asset.vertex_bytes.clone();
+        let index_bytes = asset.index_bytes.clone();
+        let index_type = asset.index_type;
+        let index_offset = section.index_offset;
+        let index_count = section.index_count;
+        self.ensure_mesh_texture_resources(gal, key.texture_id, &label)?;
+        let texture_resources = self
+            .mesh_texture_resources
+            .get(&key.texture_id)
+            .ok_or_else(|| GalError::backend("world mesh texture resources missing"))?;
+        let texture_view = texture_resources.view;
+        let sampler = texture_resources.sampler;
+        let pipeline_key = mesh_pipeline_key(key);
+        self.ensure_mesh_pipeline_resources(gal, pipeline_key)?;
+        let pipeline_resources = self
+            .mesh_pipeline_resources
+            .get(&pipeline_key)
+            .ok_or_else(|| GalError::backend("world mesh pipeline resources missing"))?;
+        let resource_layout = pipeline_resources.resource_layout;
+        let pipeline_layout = pipeline_resources.pipeline_layout;
+        let pipeline = pipeline_resources.pipeline;
+        let shadow_pipeline = pipeline_resources.shadow_pipeline;
+        let mut created = Vec::new();
+        let result = (|| -> GalResult<MeshResources> {
+            let vertex_buffer = gal.create_buffer(BufferDesc {
+                label: format!("{label}.vertices"),
+                size: vertex_bytes.len() as u64,
+                memory: MemoryDomain::Upload,
+                usages: vec![BufferUsage::Storage, BufferUsage::HostWrite],
+            })?;
+            created.push(vertex_buffer);
+            let index_buffer = gal.create_buffer(BufferDesc {
+                label: format!("{label}.indices"),
+                size: index_bytes.len() as u64,
+                memory: MemoryDomain::Upload,
+                usages: vec![BufferUsage::Index, BufferUsage::HostWrite],
+            })?;
+            created.push(index_buffer);
+            let slot = create_mesh_data_slot(
+                gal,
+                &format!("{label}.slot0"),
+                resource_layout,
+                vertex_buffer,
+                texture_view,
+                sampler,
+            )?;
+            created.push(slot.instance_buffer);
+            created.push(slot.resource_set);
+            let resources = MeshResources {
+                vertex_buffer,
+                index_buffer,
                 resource_layout,
                 pipeline_layout,
                 pipeline,
@@ -3357,7 +3411,9 @@ impl WorldPrimitiveFrontend {
         let texture_resources = self
             .mesh_texture_resources
             .get(&key.texture_id)
-            .ok_or_else(|| GalError::backend("world mesh texture resources missing during slot growth"))?;
+            .ok_or_else(|| {
+                GalError::backend("world mesh texture resources missing during slot growth")
+            })?;
         while resources.data_slots.len() < required_slots {
             let slot_index = resources.data_slots.len();
             let label = format!(
@@ -4222,6 +4278,7 @@ impl WorldPrimitiveFrontend {
         self.destroy_material_resources(gal);
         self.destroy_mesh_resources(gal);
         self.destroy_mesh_texture_resources(gal);
+        self.destroy_mesh_pipeline_resources(gal);
         let retired = self.destroy_g_buffer_resources(gal);
         self.pending_g_buffer_resources_retired = self
             .pending_g_buffer_resources_retired
@@ -4272,6 +4329,15 @@ impl WorldPrimitiveFrontend {
         }
     }
 
+    fn destroy_mesh_pipeline_resources(&mut self, gal: &mut VulkanicGal) {
+        let resources = std::mem::take(&mut self.mesh_pipeline_resources);
+        for (_, resources) in resources {
+            for handle in resources.handles_in_destroy_order() {
+                let _ = gal.destroy(handle);
+            }
+        }
+    }
+
     fn destroy_mesh_texture_resources(&mut self, gal: &mut VulkanicGal) {
         let resources = std::mem::take(&mut self.mesh_texture_resources);
         for (_, resources) in resources {
@@ -4281,7 +4347,11 @@ impl WorldPrimitiveFrontend {
         }
     }
 
-    fn destroy_mesh_texture_resources_for_ids(&mut self, gal: &mut VulkanicGal, ids: &BTreeSet<u32>) {
+    fn destroy_mesh_texture_resources_for_ids(
+        &mut self,
+        gal: &mut VulkanicGal,
+        ids: &BTreeSet<u32>,
+    ) {
         for texture_id in ids {
             if let Some(resources) = self.mesh_texture_resources.remove(texture_id) {
                 for handle in resources.handles_in_destroy_order() {
@@ -4291,7 +4361,11 @@ impl WorldPrimitiveFrontend {
         }
     }
 
-    fn destroy_mesh_resources_for_keys(&mut self, gal: &mut VulkanicGal, keys: Vec<MeshResourceKey>) {
+    fn destroy_mesh_resources_for_keys(
+        &mut self,
+        gal: &mut VulkanicGal,
+        keys: Vec<MeshResourceKey>,
+    ) {
         for key in keys {
             if let Some(resources) = self.mesh_resources.remove(&key) {
                 for handle in resources.handles_in_destroy_order() {
@@ -4540,18 +4614,18 @@ fn validate_mesh_asset(mesh: &WorldMeshAsset) -> GalResult<()> {
 fn mesh_index_value(index_bytes: &[u8], index_type: IndexType, index: usize) -> GalResult<u32> {
     match index_type {
         IndexType::U16 => {
-            let offset = index
-                .checked_mul(2)
-                .ok_or_else(|| GalError::invalid_argument("world mesh u16 index offset overflow"))?;
+            let offset = index.checked_mul(2).ok_or_else(|| {
+                GalError::invalid_argument("world mesh u16 index offset overflow")
+            })?;
             let bytes = index_bytes.get(offset..offset + 2).ok_or_else(|| {
                 GalError::invalid_argument("world mesh u16 index offset exceeds payload")
             })?;
             Ok(u16::from_le_bytes([bytes[0], bytes[1]]) as u32)
         }
         IndexType::U32 => {
-            let offset = index
-                .checked_mul(4)
-                .ok_or_else(|| GalError::invalid_argument("world mesh u32 index offset overflow"))?;
+            let offset = index.checked_mul(4).ok_or_else(|| {
+                GalError::invalid_argument("world mesh u32 index offset overflow")
+            })?;
             let bytes = index_bytes.get(offset..offset + 4).ok_or_else(|| {
                 GalError::invalid_argument("world mesh u32 index offset exceeds payload")
             })?;
@@ -5033,6 +5107,30 @@ fn mesh_key_for_section(
         depth_policy: instance.depth_policy,
         cull_policy,
         color_format,
+    }
+}
+
+fn mesh_pipeline_key(key: MeshResourceKey) -> MeshPipelineResourceKey {
+    MeshPipelineResourceKey {
+        g_buffer: key.g_buffer,
+        material_mode: key.material_mode,
+        winding: key.winding,
+        depth_policy: key.depth_policy,
+        cull_policy: key.cull_policy,
+        color_format: key.color_format,
+    }
+}
+
+fn depth_compare_for_policy(depth_policy: u32) -> GalResult<Option<CompareOp>> {
+    match depth_policy {
+        WORLD_DEPTH_POLICY_DISABLED => Ok(None),
+        WORLD_DEPTH_POLICY_TEST_WRITE | WORLD_DEPTH_POLICY_TEST_NO_WRITE => {
+            Ok(Some(CompareOp::LessOrEqual))
+        }
+        _ => Err(GalError::ffi(
+            StatusCode::UnknownEnum,
+            format!("unknown world mesh depth policy {depth_policy}"),
+        )),
     }
 }
 
@@ -5672,8 +5770,7 @@ fn shader_fog_params() -> [f32; 4] {
 fn shadow_light_view_projection_matrix() -> [f32; 16] {
     let scale = 1.0 / 96.0;
     [
-        scale, 0.0, 0.0, 0.0, 0.0, scale, 0.0, 0.0, 0.0, 0.0, scale, 0.0, 0.0,
-        0.0, 0.0, 1.0,
+        scale, 0.0, 0.0, 0.0, 0.0, scale, 0.0, 0.0, 0.0, 0.0, scale, 0.0, 0.0, 0.0, 0.0, 1.0,
     ]
 }
 

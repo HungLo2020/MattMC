@@ -400,12 +400,11 @@ impl SubmissionLowerer {
     }
 
     fn timestamp_set_in_use(&self, base_query: u32) -> bool {
-        self.pending
-            .iter()
-            .any(|pending| pending.timestamp_set.active && pending.timestamp_set.base_query == base_query)
-            || self.in_flight.iter().any(|in_flight| {
-                in_flight.timestamp_set.active && in_flight.timestamp_set.base_query == base_query
-            })
+        self.pending.iter().any(|pending| {
+            pending.timestamp_set.active && pending.timestamp_set.base_query == base_query
+        }) || self.in_flight.iter().any(|in_flight| {
+            in_flight.timestamp_set.active && in_flight.timestamp_set.base_query == base_query
+        })
     }
 
     unsafe fn write_timestamp(
@@ -738,8 +737,7 @@ impl SubmissionLowerer {
                         vk::PipelineBindPoint::GRAPHICS,
                         pipeline.pipeline,
                     );
-                    if let Some(pipeline_timestamp_pass) =
-                        timestamp_pipeline_kind(&pipeline.label)
+                    if let Some(pipeline_timestamp_pass) = timestamp_pipeline_kind(&pipeline.label)
                     {
                         self.switch_timestamp_pass(
                             command_buffer,
@@ -1146,7 +1144,9 @@ fn create_timestamp_pool(context: &Arc<VulkanContext>) -> GalResult<vk::QueryPoo
         .query_type(vk::QueryType::TIMESTAMP)
         .query_count(GPU_TIMESTAMP_SET_COUNT * GPU_TIMESTAMP_QUERIES_PER_SET);
     unsafe { context.device.create_query_pool(&info, None) }.map_err(|error| {
-        GalError::backend(format!("failed to create Vulkan timestamp query pool: {error:?}"))
+        GalError::backend(format!(
+            "failed to create Vulkan timestamp query pool: {error:?}"
+        ))
     })
 }
 

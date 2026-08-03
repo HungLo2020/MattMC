@@ -657,6 +657,23 @@ public final class RustGalWorldPrimitiveRenderer {
 		}
 	}
 
+	public static WorldMeshAssetMetrics worldMeshAssetMetrics() {
+		synchronized (LOCK) {
+			return new WorldMeshAssetMetrics(
+				worldMeshAssetGeneration,
+				uploadedWorldMeshAssetGeneration,
+				lastWorldMeshAssetPayloadCount,
+				lastWorldMeshAssetPayloadBytes,
+				worldMeshAssetUpdateFailures,
+				WORLD_MESH_ASSETS.size(),
+				WORLD_MESH_TEXTURES.size(),
+				DIRTY_WORLD_MESH_ASSETS.size(),
+				DIRTY_WORLD_MESH_TEXTURES.size(),
+				PENDING_MESH_INSTANCES.size()
+			);
+		}
+	}
+
 	private static WorldBorderAssetResolution resolveWorldBorderAsset(ResourceManager resourceManager) {
 		if (resourceManager == null) {
 			return WorldBorderAssetResolution.fallback("missing-resource-manager");
@@ -1314,6 +1331,23 @@ public final class RustGalWorldPrimitiveRenderer {
 					+ " index_bytes=" + asset.indexBytes().length
 					+ " sections=" + asset.sections().size()
 					+ " textures=" + textures.size()
+					+ " route=rust-vulkan-whole-frame"
+			);
+		}
+	}
+
+	public static void registerStaticTerrainAtlasTexture(VulkanicGalBridge.WorldMeshTextureAssetRecord texture) {
+		if (!WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan() || texture == null) {
+			return;
+		}
+		synchronized (LOCK) {
+			WORLD_MESH_TEXTURES.put(texture.textureId(), texture);
+			DIRTY_WORLD_MESH_TEXTURES.add(texture.textureId());
+			markWorldMeshAssetsChangedLocked();
+			auditMessage(
+				"Rust VulkanicGAL static terrain atlas texture registered"
+					+ " texture_id=" + texture.textureId()
+					+ " payload_bytes=" + texture.pngBytes().length
 					+ " route=rust-vulkan-whole-frame"
 			);
 		}
@@ -3919,6 +3953,20 @@ public final class RustGalWorldPrimitiveRenderer {
 		String sourcePack,
 		String sha256,
 		boolean fallback
+	) {
+	}
+
+	public record WorldMeshAssetMetrics(
+		long generation,
+		long uploadedGeneration,
+		long payloadCount,
+		long payloadBytes,
+		long failures,
+		int cachedMeshes,
+		int cachedTextures,
+		int dirtyMeshes,
+		int dirtyTextures,
+		int pendingInstances
 	) {
 	}
 

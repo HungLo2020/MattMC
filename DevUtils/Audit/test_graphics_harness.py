@@ -12,6 +12,7 @@ import tempfile
 import unittest
 from argparse import Namespace
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "Common"))
 
@@ -33,6 +34,46 @@ def fake_repo(root: Path, name: str) -> harness.RepoTarget:
 
 def fake_repo_path(root: Path, name: str) -> Path:
     return fake_repo(root, name).root
+
+
+def isolated_capture_config(root: Path, *, world: str = "Origin", second_world: str = "") -> capture_runner.CaptureConfig:
+    return capture_runner.CaptureConfig(
+        backend="rust-vulkan",
+        shaders="on",
+        max_secs=1,
+        dump_secs=1,
+        client_rss_limit_mb=128,
+        screenshot_interval_secs=0,
+        screenshot_max_count=0,
+        screenshot_start_delay_secs=0,
+        validation_mode="off",
+        shader_input_parity="off",
+        shader_input_parity_max_logs=0,
+        lightmap_info_parity_max_logs=0,
+        skip_tests=True,
+        client_args="",
+        deterministic_camera_capture=True,
+        deterministic_static_camera_capture=False,
+        deterministic_pose_tolerance=0.001,
+        audio_validation=False,
+        capture_meshing_corpus=False,
+        meshing_corpus_output="",
+        meshing_corpus_fixture="all",
+        meshing_corpus_warmup=0,
+        meshing_corpus_measure=0,
+        artifact_dir=str(root / "artifacts"),
+        platform_name="linux",
+        world=world,
+        game_dir="",
+        jvm_args=[],
+        gui_resource_pack_scenario="",
+        world_static_terrain_scenario="world-different-reload",
+        world_static_terrain_second_world=second_world,
+        world_static_terrain_resource_pack_scenario="",
+        region_validation=False,
+        region_validation_copy_world=False,
+        poi_validation=False,
+    )
 
 
 def write_capture(capture_dir: Path, *, backend: str = "opengl", shaders: str = "off", world: str = "Origin") -> None:
@@ -2581,6 +2622,124 @@ else:
             _, env = harness.build_capture_command(target, harness.MATRIX_MODES[0], root / "capture", "correctness", args, "capture")
             self.assertEqual("37", env["MATTMC_DETERMINISTIC_SHUTDOWN_GRACE_SECS"])
 
+    def test_static_terrain_second_world_is_forwarded_to_child_and_java(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            target = fake_repo(root, "current")
+            args = harness.parse_args(
+                [
+                    "capture",
+                    "--profile",
+                    "performance",
+                    "--mode",
+                    "current-rust-vulkan-shaders-on",
+                    "--world",
+                    "Origin",
+                    "--world-static-terrain-scenario",
+                    "world-different-reload",
+                    "--world-static-terrain-second-world",
+                    "SecondTerrainWorld",
+                    "--dry-run",
+                ]
+            )
+            mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-rust-vulkan-shaders-on")
+            command, env = harness.build_capture_command(
+                target,
+                mode,
+                root / "capture",
+                "correctness",
+                args,
+                "capture",
+            )
+
+            self.assertIn("--world-static-terrain-second-world", command)
+            self.assertIn("SecondTerrainWorld", command)
+            self.assertEqual("SecondTerrainWorld", env["MATTMC_CAPTURE_SECOND_WORLD"])
+            self.assertIn(
+                "-Dmattmc.dev.rustGalStaticTerrain.worldB=SecondTerrainWorld",
+                env["JAVA_TOOL_OPTIONS"],
+            )
+
+    def test_capture_runner_copies_primary_and_secondary_static_terrain_worlds(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source_run = root / "source-run"
+            source_world = source_run / "saves" / "Origin"
+            source_world.mkdir(parents=True)
+            (source_run / "options.txt").write_text("enableShaders:false\n", encoding="utf-8")
+            (source_world / "level.dat").write_bytes(b"primary world")
+            (source_world / "region").mkdir()
+            (source_world / "region" / "r.0.0.mca").write_bytes(b"terrain")
+            config = isolated_capture_config(root, second_world="SecondTerrainWorld")
+            runner = capture_runner.CaptureRunner(config)
+
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "MATTMC_CAPTURE_RUN_SOURCE": str(source_run),
+                    "MATTMC_CAPTURE_WORLD_SOURCE": str(source_world),
+                },
+                clear=False,
+            ):
+                runner.prepare_isolated_game_dir()
+
+            saves = runner.run_dir / "saves"
+            self.assertTrue((saves / "Origin" / "level.dat").is_file())
+            self.assertTrue((saves / "SecondTerrainWorld" / "level.dat").is_file())
+            runner.write_initial_meta()
+            meta = runner.meta_log.read_text(encoding="utf-8")
+            self.assertIn(f"isolated_primary_world_source={source_world}", meta)
+            self.assertIn("isolated_primary_world_name=Origin", meta)
+            self.assertIn("isolated_primary_world_status=ok", meta)
+            self.assertIn("isolated_secondary_world_name=SecondTerrainWorld", meta)
+            self.assertIn("isolated_secondary_world_status=ok", meta)
+            self.assertIn('isolated_saves_listing=["Origin","SecondTerrainWorld"]', meta)
+
+    def test_capture_runner_rejects_missing_secondary_static_terrain_source(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source_run = root / "source-run"
+            source_world = source_run / "saves" / "Origin"
+            source_world.mkdir(parents=True)
+            (source_world / "level.dat").write_bytes(b"primary world")
+            config = isolated_capture_config(root, second_world="SecondTerrainWorld")
+            runner = capture_runner.CaptureRunner(config)
+
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "MATTMC_CAPTURE_RUN_SOURCE": str(source_run),
+                    "MATTMC_CAPTURE_WORLD_SOURCE": str(source_world),
+                    "MATTMC_CAPTURE_SECOND_WORLD_SOURCE": str(root / "missing-world"),
+                },
+                clear=False,
+            ):
+                with self.assertRaises(SystemExit) as raised:
+                    runner.prepare_isolated_game_dir()
+            self.assertIn("Cannot copy missing secondary benchmark world", str(raised.exception))
+
+    def test_capture_runner_rejects_static_terrain_world_name_collision(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source_run = root / "source-run"
+            source_world = source_run / "saves" / "Origin"
+            source_world.mkdir(parents=True)
+            (source_world / "level.dat").write_bytes(b"primary world")
+            config = isolated_capture_config(root, second_world="Origin")
+            runner = capture_runner.CaptureRunner(config)
+
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "MATTMC_CAPTURE_RUN_SOURCE": str(source_run),
+                    "MATTMC_CAPTURE_WORLD_SOURCE": str(source_world),
+                },
+                clear=False,
+            ):
+                with self.assertRaises(SystemExit) as raised:
+                    runner.prepare_isolated_game_dir()
+            self.assertIn("must differ from primary world", str(raised.exception))
+
     def test_shell_capture_runner_receives_deterministic_capture_paths(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -3845,6 +4004,9 @@ else:
                 game_dir=str(game_dir),
                 jvm_args=[],
                 gui_resource_pack_scenario="vanilla",
+                world_static_terrain_scenario="",
+                world_static_terrain_second_world="",
+                world_static_terrain_resource_pack_scenario="",
                 region_validation=False,
                 region_validation_copy_world=False,
                 poi_validation=False,

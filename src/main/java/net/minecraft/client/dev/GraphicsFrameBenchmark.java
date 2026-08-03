@@ -17,6 +17,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 import net.vulkanic.gui.RustGalFrameCoordinator;
 import net.vulkanic.world.RustGalTerrainRenderer;
+import net.vulkanic.world.RustGalWorldPrimitiveRenderer;
 
 import java.io.IOException;
 import java.lang.management.GarbageCollectorMXBean;
@@ -100,6 +101,8 @@ public final class GraphicsFrameBenchmark {
 		System.getProperty("mattmc.dev.rustGalWorldMesh.pistonScenario", "").trim().toLowerCase(Locale.ROOT);
 	private static final String STATIC_TERRAIN_SCENARIO =
 		System.getProperty("mattmc.dev.rustGalStaticTerrain.scenario", "").trim().toLowerCase(Locale.ROOT);
+	private static final int STATIC_TERRAIN_STEADY_FRAMES =
+		Math.max(1, Integer.getInteger("mattmc.dev.rustGalStaticTerrain.steadyFrames", 120));
 	private static final int PISTON_COUNT =
 		Math.max(1, Integer.getInteger("mattmc.dev.rustGalWorldMesh.pistonCount", 1));
 	private static final int REAL_TERRAIN_PARTICLE_MATERIAL_COUNT = 5;
@@ -150,6 +153,30 @@ public final class GraphicsFrameBenchmark {
 	private static long readinessStartNanos = -1L;
 	private static long producerWorkloadStartNanos = -1L;
 	private static long producerWorkloadWaitFrames;
+	private static long staticTerrainSteadyFrames;
+	private static long staticTerrainLastActiveLayers = Long.MIN_VALUE;
+	private static long staticTerrainLastActiveSectionAssets = Long.MIN_VALUE;
+	private static long staticTerrainLastCachedLayers = Long.MIN_VALUE;
+	private static long staticTerrainLastRegisteredMeshes = Long.MIN_VALUE;
+	private static long staticTerrainLastAcceptedBuildOutputs = Long.MIN_VALUE;
+	private static long staticTerrainLastAtlasGeneration = Long.MIN_VALUE;
+	private static long staticTerrainLastTextureUpdates = Long.MIN_VALUE;
+	private static long staticTerrainLastInvalidations = Long.MIN_VALUE;
+	private static long staticTerrainLastFailedSubmissions = Long.MIN_VALUE;
+	private static long staticTerrainWorldReadyNanos = -1L;
+	private static long staticTerrainFirstBuildNanos = -1L;
+	private static long staticTerrainFirstRegistrationNanos = -1L;
+	private static long staticTerrainFirstUploadNanos = -1L;
+	private static long staticTerrainFirstVisibleNanos = -1L;
+	private static long staticTerrainLastMutationNanos = -1L;
+	private static long staticTerrainQuiescenceStartNanos = -1L;
+	private static long staticTerrainQuiescenceEndNanos = -1L;
+	private static TerrainPerfSnapshot staticTerrainLastSnapshot;
+	private static TerrainPerfSnapshot staticTerrainQuiescenceStartSnapshot;
+	private static TerrainPerfSnapshot staticTerrainQuiescenceEndSnapshot;
+	private static String staticTerrainLastChangingCounters = "not-sampled";
+	private static String staticTerrainLastMutationSections = "";
+	private static String staticTerrainQuiescenceClassification = "";
 	private static long gcCountAtStart = -1L;
 	private static long gcTimeAtStart = -1L;
 	private static long gcCountAtEnd = -1L;
@@ -546,6 +573,7 @@ public final class GraphicsFrameBenchmark {
 			return false;
 		}
 		initialized = true;
+		staticTerrainWorldReadyNanos = System.nanoTime();
 		applyGameModeOverride(minecraft);
 		applyArmorOverride(player);
 		applyHealthOverride(player);
@@ -679,7 +707,227 @@ public final class GraphicsFrameBenchmark {
 			&& !submittedWorkObserved("static-terrain")) {
 			missing.add("static-terrain");
 		}
+		if ("steady-state-performance".equals(STATIC_TERRAIN_SCENARIO)
+			&& !staticTerrainSteadyStateReady()) {
+			missing.add("static-terrain-steady-cache");
+		}
 		return missing;
+	}
+
+	private static boolean staticTerrainSteadyStateReady() {
+		TerrainPerfSnapshot snapshot = terrainPerfSnapshot();
+		updateStaticTerrainLoadMarkers(snapshot);
+		String fault = System.getProperty("mattmc.dev.rustGalStaticTerrain.fault", "").trim().toLowerCase(Locale.ROOT);
+		if ("steady-state-upload-detected".equals(fault)
+			|| "visibility-fingerprint-unstable".equals(fault)
+			|| "rebuild-loop-detected".equals(fault)
+			|| "cache-eviction-loop".equals(fault)
+			|| "atlas-generation-churn".equals(fault)
+			|| "identical-mesh-reregistered".equals(fault)
+			|| "terrain-generation-never-quiesced".equals(fault)) {
+			staticTerrainQuiescenceClassification = fault;
+			staticTerrainLastChangingCounters = "fault-injection=" + fault;
+			staticTerrainLastMutationSections = latestTerrainMutationSections(snapshot.diagnostics().recentEvents());
+			staticTerrainLastSnapshot = snapshot;
+			staticTerrainSteadyFrames = 0L;
+			return false;
+		}
+		boolean unchanged = staticTerrainLastSnapshot != null && snapshot.quiescenceKeyEquals(staticTerrainLastSnapshot);
+		String changed = staticTerrainLastSnapshot == null ? "initial-snapshot" : snapshot.changedCounters(staticTerrainLastSnapshot);
+		staticTerrainLastSnapshot = snapshot;
+		staticTerrainLastActiveLayers = snapshot.activeTerrainLayers();
+		staticTerrainLastActiveSectionAssets = snapshot.activeSectionAssets();
+		staticTerrainLastCachedLayers = snapshot.cachedLayerAssets();
+		staticTerrainLastRegisteredMeshes = snapshot.registeredMeshes();
+		staticTerrainLastAcceptedBuildOutputs = snapshot.acceptedBuildOutputs();
+		staticTerrainLastAtlasGeneration = snapshot.atlasGeneration();
+		staticTerrainLastTextureUpdates = snapshot.texturePayloadUpdates();
+		staticTerrainLastInvalidations = snapshot.invalidations();
+		staticTerrainLastFailedSubmissions = snapshot.failedLayerSubmissions();
+		if (snapshot.mutationCountersNonZero() && !unchanged) {
+			staticTerrainLastMutationNanos = System.nanoTime();
+			staticTerrainLastChangingCounters = changed;
+			staticTerrainLastMutationSections = latestTerrainMutationSections(snapshot.diagnostics().recentEvents());
+			staticTerrainQuiescenceClassification = classifyTerrainChurn(changed);
+		}
+		if (unchanged && snapshot.readyForSteadyState()) {
+			if (staticTerrainSteadyFrames == 0L) {
+				staticTerrainQuiescenceStartNanos = System.nanoTime();
+				staticTerrainQuiescenceStartSnapshot = snapshot;
+			}
+			staticTerrainSteadyFrames++;
+			if (staticTerrainSteadyFrames >= STATIC_TERRAIN_STEADY_FRAMES) {
+				if (staticTerrainQuiescenceEndNanos < 0L) {
+					staticTerrainQuiescenceEndNanos = System.nanoTime();
+					staticTerrainQuiescenceEndSnapshot = snapshot;
+				}
+				staticTerrainQuiescenceClassification = "quiescent";
+				staticTerrainLastChangingCounters = "";
+			} else {
+				staticTerrainQuiescenceEndNanos = System.nanoTime();
+				staticTerrainQuiescenceEndSnapshot = snapshot;
+			}
+		} else {
+			staticTerrainSteadyFrames = 0L;
+			staticTerrainQuiescenceStartNanos = -1L;
+			staticTerrainQuiescenceEndNanos = -1L;
+			staticTerrainQuiescenceStartSnapshot = null;
+			staticTerrainQuiescenceEndSnapshot = null;
+			if (!snapshot.readyForSteadyState()) {
+				staticTerrainQuiescenceClassification = classifyTerrainNotReady(snapshot);
+				staticTerrainLastChangingCounters = changed + ";notReady=" + staticTerrainQuiescenceClassification;
+				staticTerrainLastMutationSections = latestTerrainMutationSections(snapshot.diagnostics().recentEvents());
+			}
+		}
+		return staticTerrainSteadyFrames >= STATIC_TERRAIN_STEADY_FRAMES;
+	}
+
+	private static boolean staticTerrainScenarioEnabled() {
+		return STATIC_TERRAIN_SCENARIO != null && !STATIC_TERRAIN_SCENARIO.isBlank();
+	}
+
+	private static TerrainPerfSnapshot terrainPerfSnapshot() {
+		RustGalTerrainRenderer.TerrainDiagnostics diagnostics = RustGalTerrainRenderer.diagnosticsSnapshot();
+		RustGalWorldPrimitiveRenderer.WorldMeshAssetMetrics meshMetrics = RustGalWorldPrimitiveRenderer.worldMeshAssetMetrics();
+		Minecraft minecraft = Minecraft.getInstance();
+		int loadedChunks = minecraft.level == null ? -1 : minecraft.level.getChunkSource().getLoadedChunksCount();
+		int renderDistance = minecraft.options == null ? -1 : minecraft.options.getEffectiveRenderDistance();
+		long cameraSignature = 0L;
+		if (minecraft.player != null) {
+			cameraSignature = 31L * Float.floatToIntBits(minecraft.player.getYRot()) + Float.floatToIntBits(minecraft.player.getXRot());
+			cameraSignature = 31L * cameraSignature + Double.doubleToLongBits(minecraft.player.getX());
+			cameraSignature = 31L * cameraSignature + Double.doubleToLongBits(minecraft.player.getY());
+			cameraSignature = 31L * cameraSignature + Double.doubleToLongBits(minecraft.player.getZ());
+		}
+		return new TerrainPerfSnapshot(
+			diagnostics,
+			meshMetrics,
+			latestVisibleFingerprint(diagnostics.recentEvents()),
+			loadedChunks,
+			renderDistance,
+			cameraSignature
+		);
+	}
+
+	private static long latestVisibleFingerprint(List<RustGalTerrainRenderer.TerrainDiagnosticEvent> events) {
+		long latestFrame = Long.MIN_VALUE;
+		for (RustGalTerrainRenderer.TerrainDiagnosticEvent event : events) {
+			if ("visible-submit".equals(event.reason())) {
+				latestFrame = Math.max(latestFrame, event.gameplayFrameId());
+			}
+		}
+		if (latestFrame == Long.MIN_VALUE) {
+			return 0L;
+		}
+		long hash = 0xcbf29ce484222325L;
+		int count = 0;
+		for (RustGalTerrainRenderer.TerrainDiagnosticEvent event : events) {
+			if ("visible-submit".equals(event.reason()) && event.gameplayFrameId() == latestFrame) {
+				hash = fnv64Long(hash, event.sectionPos());
+				hash = fnv64Long(hash, event.meshKey());
+				hash = fnv64Long(hash, event.meshGeneration());
+				hash = fnv64Long(hash, event.contentHash());
+				hash = fnv64String(hash, event.layer());
+				count++;
+			}
+		}
+		return count == 0 ? 0L : fnv64Long(hash, count);
+	}
+
+	private static void updateStaticTerrainLoadMarkers(TerrainPerfSnapshot snapshot) {
+		long now = System.nanoTime();
+		if (staticTerrainWorldReadyNanos < 0L) {
+			staticTerrainWorldReadyNanos = now;
+		}
+		if (staticTerrainFirstBuildNanos < 0L && snapshot.acceptedBuildOutputs() > 0L) {
+			staticTerrainFirstBuildNanos = now;
+		}
+		if (staticTerrainFirstRegistrationNanos < 0L && snapshot.registeredMeshes() > 0L) {
+			staticTerrainFirstRegistrationNanos = now;
+		}
+		if (
+			staticTerrainFirstUploadNanos < 0L
+				&& snapshot.registeredMeshes() > 0L
+				&& snapshot.meshMetrics().payloadCount() > 0L
+				&& snapshot.meshMetrics().uploadedGeneration() >= snapshot.meshMetrics().generation()
+		) {
+			staticTerrainFirstUploadNanos = now;
+		}
+		if (staticTerrainFirstVisibleNanos < 0L && snapshot.visibleFingerprint() != 0L) {
+			staticTerrainFirstVisibleNanos = now;
+		}
+	}
+
+	private static String classifyTerrainChurn(String changedCounters) {
+		if (changedCounters.contains("atlasGeneration") || changedCounters.contains("texturePayloadUpdates")) {
+			return "atlas_generation_churn";
+		}
+		if (changedCounters.contains("worldMeshGeneration") || changedCounters.contains("payloadCount") || changedCounters.contains("payloadBytes")) {
+			return "steady_state_upload_detected";
+		}
+		if (changedCounters.contains("acceptedBuildOutputs") || changedCounters.contains("registeredMeshes")) {
+			return "rebuild_loop_detected";
+		}
+		if (changedCounters.contains("cachedLayerAssets") || changedCounters.contains("activeTerrainLayers") || changedCounters.contains("removedLayers")) {
+			return "cache_eviction_loop";
+		}
+		if (changedCounters.contains("visibleFingerprint")) {
+			return "visibility_fingerprint_unstable";
+		}
+		return "terrain_generation_never_quiesced";
+	}
+
+	private static String classifyTerrainNotReady(TerrainPerfSnapshot snapshot) {
+		if (snapshot.failedLayerSubmissions() > 0L) {
+			return "stale_terrain_submission";
+		}
+		if (snapshot.meshMetrics().dirtyMeshes() > 0 || snapshot.meshMetrics().dirtyTextures() > 0 || snapshot.meshMetrics().pendingInstances() > 0) {
+			return "pending_rust_asset_updates";
+		}
+		if (snapshot.activeTerrainLayers() <= 0 || snapshot.activeSectionAssets() <= 0 || snapshot.visibleFingerprint() == 0L) {
+			return "terrain_visibility_not_ready";
+		}
+		return "terrain_generation_never_quiesced";
+	}
+
+	private static String latestTerrainMutationSections(List<RustGalTerrainRenderer.TerrainDiagnosticEvent> events) {
+		StringBuilder builder = new StringBuilder();
+		int count = 0;
+		for (int i = events.size() - 1; i >= 0 && count < 8; i--) {
+			RustGalTerrainRenderer.TerrainDiagnosticEvent event = events.get(i);
+			String reason = event.reason();
+			if ("visible-submit".equals(reason) || "executed-submit".equals(reason)) {
+				continue;
+			}
+			if (count++ > 0) {
+				builder.append(';');
+			}
+			builder.append(reason)
+				.append("@section=").append(event.sectionPos())
+				.append(":layer=").append(event.layer())
+				.append(":mesh=").append(event.meshGeneration())
+				.append(":content=").append(event.contentHash());
+		}
+		return builder.toString();
+	}
+
+	private static long fnv64String(long hash, String value) {
+		if (value == null) {
+			return fnv64Long(hash, 0L);
+		}
+		for (int i = 0; i < value.length(); i++) {
+			hash ^= value.charAt(i);
+			hash *= 0x100000001b3L;
+		}
+		return hash;
+	}
+
+	private static long fnv64Long(long hash, long value) {
+		for (int shift = 0; shift < 64; shift += 8) {
+			hash ^= (value >>> shift) & 0xffL;
+			hash *= 0x100000001b3L;
+		}
+		return hash;
 	}
 
 	private static boolean scenarioRequiresProducerTraversal(String scenario) {
@@ -766,7 +1014,7 @@ public final class GraphicsFrameBenchmark {
 			player.setDeltaMovement(Vec3.ZERO);
 			player.setPos(initialPosition);
 			double period = Math.max(1.0, WARMUP_FRAMES + MEASURE_FRAMES);
-			float yaw = REAL_TERRAIN_PARTICLE_GAMEPLAY
+			float yaw = REAL_TERRAIN_PARTICLE_GAMEPLAY || staticTerrainScenarioEnabled()
 				? initialYaw
 				: initialYaw + (float)Math.sin((frameIndex / period) * Math.PI * 2.0) * YAW_DELTA;
 			player.setYRot(yaw);
@@ -1328,7 +1576,8 @@ public final class GraphicsFrameBenchmark {
 		json.append("  \"window\": { \"width\": ").append(minecraft.getWindow().getWidth()).append(", \"height\": ").append(minecraft.getWindow().getHeight()).append(" },\n");
 		writeRuntimeState(json, minecraft);
 		json.append(",\n");
-			json.append("  \"cameraPath\": { \"type\": \"settled-sine-yaw\", \"yawDelta\": ").append(format(YAW_DELTA))
+			json.append("  \"cameraPath\": { \"type\": \"").append(staticTerrainScenarioEnabled() ? "fixed-static-terrain" : "settled-sine-yaw")
+				.append("\", \"yawDelta\": ").append(format(staticTerrainScenarioEnabled() ? 0.0F : YAW_DELTA))
 				.append(", \"initialYaw\": ").append(format(initialYaw))
 				.append(", \"initialPitch\": ").append(format(initialPitch))
 				.append(", \"initialPosition\": { \"x\": ").append(format(initialPosition.x))
@@ -1339,6 +1588,8 @@ public final class GraphicsFrameBenchmark {
 			writeBlockDisplayScenario(json);
 			json.append(",\n");
 			writeStaticTerrainScenario(json);
+			json.append(",\n");
+			writeStaticTerrainPerformance(json);
 			json.append(",\n");
 				writeFallingBlockScenario(json);
 				json.append(",\n");
@@ -1568,11 +1819,19 @@ public final class GraphicsFrameBenchmark {
 		json.append("    \"enabled\": ").append(!STATIC_TERRAIN_SCENARIO.isEmpty()).append(",\n");
 		field(json, "scenario", STATIC_TERRAIN_SCENARIO, 4, true);
 		json.append("    \"cachedLayerAssets\": ").append(diagnostics.cachedLayerAssets()).append(",\n");
+		json.append("    \"activeTerrainLayers\": ").append(diagnostics.activeTerrainLayers()).append(",\n");
+		json.append("    \"activeSectionAssets\": ").append(diagnostics.activeSectionAssets()).append(",\n");
+		json.append("    \"currentFrameVisibleLayerSubmissions\": ").append(diagnostics.currentFrameVisibleLayerSubmissions()).append(",\n");
 		json.append("    \"atlasGeneration\": ").append(diagnostics.atlasGeneration()).append(",\n");
 		json.append("    \"registeredAtlasGeneration\": ").append(diagnostics.registeredAtlasGeneration()).append(",\n");
 		json.append("    \"acceptedBuildOutputs\": ").append(diagnostics.acceptedBuildOutputs()).append(",\n");
 		json.append("    \"registeredMeshes\": ").append(diagnostics.registeredMeshes()).append(",\n");
 		json.append("    \"texturePayloadUpdates\": ").append(diagnostics.texturePayloadUpdates()).append(",\n");
+		json.append("    \"texturePayloadUpdateBytes\": ").append(diagnostics.texturePayloadUpdateBytes()).append(",\n");
+		json.append("    \"atlasTextureOnlyUpdates\": ").append(diagnostics.atlasTextureOnlyUpdates()).append(",\n");
+		json.append("    \"atlasMissingPayloadUpdates\": ").append(diagnostics.atlasMissingPayloadUpdates()).append(",\n");
+		json.append("    \"atlasMalformedPayloadUpdates\": ").append(diagnostics.atlasMalformedPayloadUpdates()).append(",\n");
+		json.append("    \"atlasPartialPayloadUpdates\": ").append(diagnostics.atlasPartialPayloadUpdates()).append(",\n");
 		json.append("    \"visibleLayerProbes\": ").append(diagnostics.visibleLayerProbes()).append(",\n");
 		json.append("    \"visibleLayerSubmissions\": ").append(diagnostics.visibleLayerSubmissions()).append(",\n");
 		json.append("    \"failedLayerSubmissions\": ").append(diagnostics.failedLayerSubmissions()).append(",\n");
@@ -1580,6 +1839,84 @@ public final class GraphicsFrameBenchmark {
 		json.append("    \"invalidations\": ").append(diagnostics.invalidations()).append(",\n");
 		json.append("    \"unsupportedAnimatedSections\": ").append(diagnostics.skippedUnsupportedAnimatedSections()).append("\n");
 		json.append("  }");
+	}
+
+	private static void writeStaticTerrainPerformance(StringBuilder json) {
+		TerrainPerfSnapshot current = terrainPerfSnapshot();
+		json.append("  \"staticTerrainPerformance\": {\n");
+		json.append("    \"quiescenceWindowFrames\": ").append(STATIC_TERRAIN_STEADY_FRAMES).append(",\n");
+		json.append("    \"steadyFramesObserved\": ").append(staticTerrainSteadyFrames).append(",\n");
+		field(json, "classification", staticTerrainQuiescenceClassification, 4, true);
+		field(json, "changingCounters", staticTerrainLastChangingCounters, 4, true);
+		field(json, "topMutationSections", staticTerrainLastMutationSections, 4, true);
+		json.append("    \"timelineNanos\": {");
+		json.append(" \"worldReady\": ").append(staticTerrainWorldReadyNanos).append(",");
+		json.append(" \"firstBuild\": ").append(staticTerrainFirstBuildNanos).append(",");
+		json.append(" \"firstRegistration\": ").append(staticTerrainFirstRegistrationNanos).append(",");
+		json.append(" \"firstUpload\": ").append(staticTerrainFirstUploadNanos).append(",");
+		json.append(" \"firstVisible\": ").append(staticTerrainFirstVisibleNanos).append(",");
+		json.append(" \"lastMutation\": ").append(staticTerrainLastMutationNanos).append(",");
+		json.append(" \"quiescenceStart\": ").append(staticTerrainQuiescenceStartNanos).append(",");
+		json.append(" \"quiescenceEnd\": ").append(staticTerrainQuiescenceEndNanos).append(",");
+		json.append(" \"measurementStart\": ").append(measurementStartNanos).append(",");
+		json.append(" \"measurementEnd\": ").append(measurementEndNanos);
+		json.append(" },\n");
+		json.append("    \"phaseDurationsNanos\": {");
+		json.append(" \"worldOpenToFirstBuild\": ").append(duration(staticTerrainWorldReadyNanos, staticTerrainFirstBuildNanos)).append(",");
+		json.append(" \"firstBuildToFirstRegistration\": ").append(duration(staticTerrainFirstBuildNanos, staticTerrainFirstRegistrationNanos)).append(",");
+		json.append(" \"firstRegistrationToFirstUpload\": ").append(duration(staticTerrainFirstRegistrationNanos, staticTerrainFirstUploadNanos)).append(",");
+		json.append(" \"firstUploadToFirstVisible\": ").append(duration(staticTerrainFirstUploadNanos, staticTerrainFirstVisibleNanos)).append(",");
+		json.append(" \"firstVisibleToQuiescenceStart\": ").append(duration(staticTerrainFirstVisibleNanos, staticTerrainQuiescenceStartNanos)).append(",");
+		json.append(" \"quiescenceWindow\": ").append(duration(staticTerrainQuiescenceStartNanos, staticTerrainQuiescenceEndNanos)).append(",");
+		json.append(" \"quiescenceToMeasurementStart\": ").append(duration(staticTerrainQuiescenceEndNanos, measurementStartNanos));
+		json.append(" },\n");
+		appendTerrainPerfSnapshot(json, "current", current, 4, true);
+		appendTerrainPerfSnapshot(json, "quiescenceStart", staticTerrainQuiescenceStartSnapshot, 4, true);
+		appendTerrainPerfSnapshot(json, "quiescenceEnd", staticTerrainQuiescenceEndSnapshot, 4, false);
+		json.append("\n  }");
+	}
+
+	private static void appendTerrainPerfSnapshot(StringBuilder json, String name, TerrainPerfSnapshot snapshot, int indent, boolean comma) {
+		json.append(" ".repeat(indent)).append('"').append(name).append("\": ");
+		if (snapshot == null) {
+			json.append("null");
+			if (comma) {
+				json.append(',');
+			}
+			json.append('\n');
+			return;
+		}
+		json.append("{ ");
+		json.append("\"acceptedBuildOutputs\": ").append(snapshot.acceptedBuildOutputs()).append(", ");
+		json.append("\"registeredMeshes\": ").append(snapshot.registeredMeshes()).append(", ");
+		json.append("\"terrainExtractionFrames\": ").append(snapshot.diagnostics().terrainExtractionFrames()).append(", ");
+		json.append("\"cachedLayerAssets\": ").append(snapshot.cachedLayerAssets()).append(", ");
+		json.append("\"activeTerrainLayers\": ").append(snapshot.activeTerrainLayers()).append(", ");
+		json.append("\"activeSectionAssets\": ").append(snapshot.activeSectionAssets()).append(", ");
+		json.append("\"atlasGeneration\": ").append(snapshot.atlasGeneration()).append(", ");
+		json.append("\"texturePayloadUpdates\": ").append(snapshot.texturePayloadUpdates()).append(", ");
+		json.append("\"texturePayloadUpdateBytes\": ").append(snapshot.diagnostics().texturePayloadUpdateBytes()).append(", ");
+		json.append("\"removedLayers\": ").append(snapshot.diagnostics().removedLayers()).append(", ");
+		json.append("\"invalidations\": ").append(snapshot.invalidations()).append(", ");
+		json.append("\"failedLayerSubmissions\": ").append(snapshot.failedLayerSubmissions()).append(", ");
+		json.append("\"visibleFingerprint\": ").append(snapshot.visibleFingerprint()).append(", ");
+		json.append("\"loadedChunks\": ").append(snapshot.loadedChunks()).append(", ");
+		json.append("\"renderDistance\": ").append(snapshot.renderDistance()).append(", ");
+		json.append("\"worldMeshGeneration\": ").append(snapshot.meshMetrics().generation()).append(", ");
+		json.append("\"worldMeshUploadedGeneration\": ").append(snapshot.meshMetrics().uploadedGeneration()).append(", ");
+		json.append("\"worldMeshPayloadCount\": ").append(snapshot.meshMetrics().payloadCount()).append(", ");
+		json.append("\"worldMeshPayloadBytes\": ").append(snapshot.meshMetrics().payloadBytes()).append(", ");
+		json.append("\"worldMeshFailures\": ").append(snapshot.meshMetrics().failures()).append(", ");
+		json.append("\"cachedMeshes\": ").append(snapshot.meshMetrics().cachedMeshes()).append(", ");
+		json.append("\"cachedTextures\": ").append(snapshot.meshMetrics().cachedTextures()).append(", ");
+		json.append("\"dirtyMeshes\": ").append(snapshot.meshMetrics().dirtyMeshes()).append(", ");
+		json.append("\"dirtyTextures\": ").append(snapshot.meshMetrics().dirtyTextures()).append(", ");
+		json.append("\"pendingInstances\": ").append(snapshot.meshMetrics().pendingInstances());
+		json.append(" }");
+		if (comma) {
+			json.append(',');
+		}
+		json.append('\n');
 	}
 
 	private static void writeFallingBlockScenario(StringBuilder json) {
@@ -1696,6 +2033,13 @@ public final class GraphicsFrameBenchmark {
 			return -1L;
 		}
 		return Math.max(0L, end - start);
+	}
+
+	private static long duration(long start, long end) {
+		if (start < 0L || end < 0L || end < start) {
+			return -1L;
+		}
+		return end - start;
 	}
 
 	private static long usedMemoryBytes() {
@@ -1896,6 +2240,148 @@ public final class GraphicsFrameBenchmark {
 		long imagesInFlight,
 		long availableFrameSlots
 	) {
+	}
+
+	private record TerrainPerfSnapshot(
+		RustGalTerrainRenderer.TerrainDiagnostics diagnostics,
+		RustGalWorldPrimitiveRenderer.WorldMeshAssetMetrics meshMetrics,
+		long visibleFingerprint,
+		int loadedChunks,
+		int renderDistance,
+		long cameraSignature
+	) {
+		long acceptedBuildOutputs() {
+			return this.diagnostics.acceptedBuildOutputs();
+		}
+
+		long registeredMeshes() {
+			return this.diagnostics.registeredMeshes();
+		}
+
+		long atlasGeneration() {
+			return this.diagnostics.atlasGeneration();
+		}
+
+		long texturePayloadUpdates() {
+			return this.diagnostics.texturePayloadUpdates();
+		}
+
+		long invalidations() {
+			return this.diagnostics.invalidations();
+		}
+
+		long failedLayerSubmissions() {
+			return this.diagnostics.failedLayerSubmissions();
+		}
+
+		int activeTerrainLayers() {
+			return this.diagnostics.activeTerrainLayers();
+		}
+
+		int activeSectionAssets() {
+			return this.diagnostics.activeSectionAssets();
+		}
+
+		int cachedLayerAssets() {
+			return this.diagnostics.cachedLayerAssets();
+		}
+
+		boolean readyForSteadyState() {
+			return this.activeTerrainLayers() > 0
+				&& this.activeSectionAssets() > 0
+				&& this.cachedLayerAssets() > 0
+				&& this.visibleFingerprint != 0L
+				&& this.failedLayerSubmissions() == 0L
+				&& this.meshMetrics.dirtyMeshes() == 0
+				&& this.meshMetrics.dirtyTextures() == 0
+				&& this.meshMetrics.pendingInstances() == 0
+				&& this.meshMetrics.cachedMeshes() > 0
+				&& this.meshMetrics.uploadedGeneration() >= this.meshMetrics.generation();
+		}
+
+		boolean mutationCountersNonZero() {
+			return this.acceptedBuildOutputs() > 0L
+				|| this.registeredMeshes() > 0L
+				|| this.meshMetrics.generation() > 0L
+				|| this.meshMetrics.payloadCount() > 0L
+				|| this.visibleFingerprint != 0L;
+		}
+
+		boolean quiescenceKeyEquals(TerrainPerfSnapshot other) {
+			return other != null
+				&& this.acceptedBuildOutputs() == other.acceptedBuildOutputs()
+				&& this.registeredMeshes() == other.registeredMeshes()
+				&& this.diagnostics.terrainExtractionFrames() == other.diagnostics.terrainExtractionFrames()
+				&& this.diagnostics.skippedUnsupportedAnimatedSections() == other.diagnostics.skippedUnsupportedAnimatedSections()
+				&& this.diagnostics.skippedEmptyLayers() == other.diagnostics.skippedEmptyLayers()
+				&& this.diagnostics.removedLayers() == other.diagnostics.removedLayers()
+				&& this.atlasGeneration() == other.atlasGeneration()
+				&& this.texturePayloadUpdates() == other.texturePayloadUpdates()
+				&& this.invalidations() == other.invalidations()
+				&& this.failedLayerSubmissions() == other.failedLayerSubmissions()
+				&& this.cachedLayerAssets() == other.cachedLayerAssets()
+				&& this.activeTerrainLayers() == other.activeTerrainLayers()
+				&& this.activeSectionAssets() == other.activeSectionAssets()
+				&& this.meshMetrics.generation() == other.meshMetrics.generation()
+				&& this.meshMetrics.uploadedGeneration() == other.meshMetrics.uploadedGeneration()
+				&& this.meshMetrics.payloadCount() == other.meshMetrics.payloadCount()
+				&& this.meshMetrics.payloadBytes() == other.meshMetrics.payloadBytes()
+				&& this.meshMetrics.failures() == other.meshMetrics.failures()
+				&& this.meshMetrics.cachedMeshes() == other.meshMetrics.cachedMeshes()
+				&& this.meshMetrics.cachedTextures() == other.meshMetrics.cachedTextures()
+				&& this.meshMetrics.dirtyMeshes() == other.meshMetrics.dirtyMeshes()
+				&& this.meshMetrics.dirtyTextures() == other.meshMetrics.dirtyTextures()
+				&& this.meshMetrics.pendingInstances() == other.meshMetrics.pendingInstances()
+				&& this.visibleFingerprint == other.visibleFingerprint
+				&& this.loadedChunks == other.loadedChunks
+				&& this.renderDistance == other.renderDistance
+				&& this.cameraSignature == other.cameraSignature;
+		}
+
+		String changedCounters(TerrainPerfSnapshot other) {
+			if (other == null) {
+				return "initial-snapshot";
+			}
+			StringBuilder builder = new StringBuilder();
+			appendChange(builder, "acceptedBuildOutputs", other.acceptedBuildOutputs(), this.acceptedBuildOutputs());
+			appendChange(builder, "registeredMeshes", other.registeredMeshes(), this.registeredMeshes());
+			appendChange(builder, "terrainExtractionFrames", other.diagnostics.terrainExtractionFrames(), this.diagnostics.terrainExtractionFrames());
+			appendChange(builder, "skippedUnsupportedAnimatedSections", other.diagnostics.skippedUnsupportedAnimatedSections(), this.diagnostics.skippedUnsupportedAnimatedSections());
+			appendChange(builder, "skippedEmptyLayers", other.diagnostics.skippedEmptyLayers(), this.diagnostics.skippedEmptyLayers());
+			appendChange(builder, "removedLayers", other.diagnostics.removedLayers(), this.diagnostics.removedLayers());
+			appendChange(builder, "atlasGeneration", other.atlasGeneration(), this.atlasGeneration());
+			appendChange(builder, "texturePayloadUpdates", other.texturePayloadUpdates(), this.texturePayloadUpdates());
+			appendChange(builder, "invalidations", other.invalidations(), this.invalidations());
+			appendChange(builder, "failedLayerSubmissions", other.failedLayerSubmissions(), this.failedLayerSubmissions());
+			appendChange(builder, "cachedLayerAssets", other.cachedLayerAssets(), this.cachedLayerAssets());
+			appendChange(builder, "activeTerrainLayers", other.activeTerrainLayers(), this.activeTerrainLayers());
+			appendChange(builder, "activeSectionAssets", other.activeSectionAssets(), this.activeSectionAssets());
+			appendChange(builder, "worldMeshGeneration", other.meshMetrics.generation(), this.meshMetrics.generation());
+			appendChange(builder, "worldMeshUploadedGeneration", other.meshMetrics.uploadedGeneration(), this.meshMetrics.uploadedGeneration());
+			appendChange(builder, "payloadCount", other.meshMetrics.payloadCount(), this.meshMetrics.payloadCount());
+			appendChange(builder, "payloadBytes", other.meshMetrics.payloadBytes(), this.meshMetrics.payloadBytes());
+			appendChange(builder, "meshFailures", other.meshMetrics.failures(), this.meshMetrics.failures());
+			appendChange(builder, "cachedMeshes", other.meshMetrics.cachedMeshes(), this.meshMetrics.cachedMeshes());
+			appendChange(builder, "cachedTextures", other.meshMetrics.cachedTextures(), this.meshMetrics.cachedTextures());
+			appendChange(builder, "dirtyMeshes", other.meshMetrics.dirtyMeshes(), this.meshMetrics.dirtyMeshes());
+			appendChange(builder, "dirtyTextures", other.meshMetrics.dirtyTextures(), this.meshMetrics.dirtyTextures());
+			appendChange(builder, "pendingInstances", other.meshMetrics.pendingInstances(), this.meshMetrics.pendingInstances());
+			appendChange(builder, "visibleFingerprint", other.visibleFingerprint, this.visibleFingerprint);
+			appendChange(builder, "loadedChunks", other.loadedChunks, this.loadedChunks);
+			appendChange(builder, "renderDistance", other.renderDistance, this.renderDistance);
+			appendChange(builder, "cameraSignature", other.cameraSignature, this.cameraSignature);
+			return builder.isEmpty() ? "none" : builder.toString();
+		}
+
+		private static void appendChange(StringBuilder builder, String name, long before, long after) {
+			if (before == after) {
+				return;
+			}
+			if (!builder.isEmpty()) {
+				builder.append(';');
+			}
+			builder.append(name).append('=').append(before).append("->").append(after);
+		}
 	}
 
 	private static final class PhaseStats {

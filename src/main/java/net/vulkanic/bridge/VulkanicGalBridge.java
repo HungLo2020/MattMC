@@ -1360,7 +1360,20 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			profileLong(segment, offset, 86),
 			profileLong(segment, offset, 87),
 			profileLong(segment, offset, 88),
-			profileLong(segment, offset, 89)
+			profileLong(segment, offset, 89),
+			profileLong(segment, offset, 90),
+			profileLong(segment, offset, 91),
+			profileLong(segment, offset, 92),
+			profileLong(segment, offset, 93),
+			profileLong(segment, offset, 94),
+			profileLong(segment, offset, 95),
+			profileLong(segment, offset, 96),
+			profileLong(segment, offset, 97),
+			profileLong(segment, offset, 98),
+			profileLong(segment, offset, 99),
+			profileLong(segment, offset, 100),
+			profileLong(segment, offset, 101),
+			profileLong(segment, offset, 102)
 		);
 	}
 
@@ -1746,10 +1759,23 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		long vulkanSurfaceMaxImageCount,
 		long vulkanConfiguredFramesInFlight,
 		long vulkanImagesInFlight,
-		long vulkanAvailableFrameSlots
+		long vulkanAvailableFrameSlots,
+		long galHazardReadEvents,
+		long galHazardWriteEvents,
+		long galHazardCandidatesExamined,
+		long galHazardConflicts,
+		long galHazardBarriersApplied,
+		long galHazardActiveReadEntries,
+		long galHazardActiveWriteEntries,
+		long galCommandOpsBeforeNormalize,
+		long galCommandOpsAfterNormalize,
+		long galRedundantPipelineBindsRemoved,
+		long galRedundantResourceSetBindsRemoved,
+		long galRedundantVertexBufferBindsRemoved,
+		long galRedundantIndexBufferBindsRemoved
 	) {
 		public static WholeFrameProfile empty() {
-			return new WholeFrameProfile(0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L
+			return new WholeFrameProfile(0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L
 			);
 		}
 	}

@@ -226,6 +226,7 @@ impl ShaderPackRuntimeExecutor {
                 clear_color: None,
             }),
         });
+        let mut draw_state = IndexedDrawState::default();
         for draw in draws {
             let shadow_pipeline = draw.shadow_pipeline.ok_or_else(|| {
                 GalError::backend(format!(
@@ -235,6 +236,7 @@ impl ShaderPackRuntimeExecutor {
             })?;
             append_indexed_draw(
                 ops,
+                &mut draw_state,
                 shadow_pipeline,
                 draw.pipeline_layout,
                 draw.resource_set,
@@ -285,12 +287,8 @@ impl ShaderPackRuntimeExecutor {
             TerrainMaterialPassMode::Opaque,
             TerrainMaterialPassMode::Cutout,
         ] {
-            let mode_draws = draws
-                .iter()
-                .copied()
-                .filter(|draw| draw.material_mode == mode)
-                .collect::<Vec<_>>();
-            if mode_draws.is_empty() && !force_empty_clear {
+            let has_mode_draws = draws.iter().any(|draw| draw.material_mode == mode);
+            if !has_mode_draws && !force_empty_clear {
                 continue;
             }
             let load_op = if wrote_g_buffer {
@@ -349,9 +347,11 @@ impl ShaderPackRuntimeExecutor {
                     clear_color: None,
                 }),
             });
-            for draw in mode_draws {
+            let mut draw_state = IndexedDrawState::default();
+            for draw in draws.iter().filter(|draw| draw.material_mode == mode) {
                 append_indexed_draw(
                     ops,
+                    &mut draw_state,
                     draw.pipeline,
                     draw.pipeline_layout,
                     draw.resource_set,
@@ -551,9 +551,17 @@ impl TerrainCompositeUniforms {
     }
 }
 
+#[derive(Default)]
+struct IndexedDrawState {
+    pipeline: Option<Handle>,
+    resource_set: Option<(Handle, u32, Handle)>,
+    index_buffer: Option<(Handle, u64, IndexType)>,
+}
+
 #[allow(clippy::too_many_arguments)]
 fn append_indexed_draw(
     ops: &mut Vec<CommandOp>,
+    state: &mut IndexedDrawState,
     pipeline: Handle,
     pipeline_layout: Handle,
     resource_set: Handle,
@@ -563,17 +571,29 @@ fn append_indexed_draw(
     index_count: u32,
     instance_count: u32,
 ) {
-    ops.push(CommandOp::BindGraphicsPipeline(pipeline));
-    ops.push(CommandOp::BindResourceSet {
-        pipeline_layout,
-        set_index: 0,
-        set: resource_set,
-    });
-    ops.push(CommandOp::SetIndexBuffer {
-        buffer: index_buffer,
-        offset: index_offset,
-        index_type,
-    });
+    if state.pipeline != Some(pipeline) {
+        ops.push(CommandOp::BindGraphicsPipeline(pipeline));
+        state.pipeline = Some(pipeline);
+        state.resource_set = None;
+    }
+    let resource_set_binding = (pipeline_layout, 0, resource_set);
+    if state.resource_set != Some(resource_set_binding) {
+        ops.push(CommandOp::BindResourceSet {
+            pipeline_layout,
+            set_index: 0,
+            set: resource_set,
+        });
+        state.resource_set = Some(resource_set_binding);
+    }
+    let index_binding = (index_buffer, index_offset, index_type);
+    if state.index_buffer != Some(index_binding) {
+        ops.push(CommandOp::SetIndexBuffer {
+            buffer: index_buffer,
+            offset: index_offset,
+            index_type,
+        });
+        state.index_buffer = Some(index_binding);
+    }
     ops.push(CommandOp::DrawIndexed {
         indices: index_count,
         instances: instance_count,
@@ -626,6 +646,7 @@ fn push_f32(out: &mut Vec<u8>, value: f32) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::render::vulkanic::handles::HandleKind;
 
     #[test]
     fn runtime_executor_owns_expected_gameplay_pass_order() {
@@ -664,5 +685,104 @@ mod tests {
             TERRAIN_RUNTIME_COMPOSITE_UNIFORM_BYTES as usize,
             uniforms.pack().len()
         );
+    }
+
+    #[test]
+    fn indexed_draw_emission_skips_redundant_state_binds_inside_pass() {
+        let pipeline = test_handle(HandleKind::GraphicsPipeline, 1);
+        let other_pipeline = test_handle(HandleKind::GraphicsPipeline, 2);
+        let layout = test_handle(HandleKind::PipelineLayout, 3);
+        let set = test_handle(HandleKind::ResourceSet, 4);
+        let other_set = test_handle(HandleKind::ResourceSet, 5);
+        let index_buffer = test_handle(HandleKind::Buffer, 6);
+        let mut ops = Vec::new();
+        let mut state = IndexedDrawState::default();
+
+        append_indexed_draw(
+            &mut ops,
+            &mut state,
+            pipeline,
+            layout,
+            set,
+            index_buffer,
+            0,
+            IndexType::U32,
+            6,
+            1,
+        );
+        append_indexed_draw(
+            &mut ops,
+            &mut state,
+            pipeline,
+            layout,
+            set,
+            index_buffer,
+            0,
+            IndexType::U32,
+            6,
+            2,
+        );
+        append_indexed_draw(
+            &mut ops,
+            &mut state,
+            pipeline,
+            layout,
+            other_set,
+            index_buffer,
+            0,
+            IndexType::U32,
+            6,
+            3,
+        );
+        append_indexed_draw(
+            &mut ops,
+            &mut state,
+            pipeline,
+            layout,
+            other_set,
+            index_buffer,
+            12,
+            IndexType::U32,
+            6,
+            4,
+        );
+        append_indexed_draw(
+            &mut ops,
+            &mut state,
+            other_pipeline,
+            layout,
+            other_set,
+            index_buffer,
+            12,
+            IndexType::U32,
+            6,
+            5,
+        );
+
+        let pipeline_binds = ops
+            .iter()
+            .filter(|op| matches!(op, CommandOp::BindGraphicsPipeline(_)))
+            .count();
+        let resource_set_binds = ops
+            .iter()
+            .filter(|op| matches!(op, CommandOp::BindResourceSet { .. }))
+            .count();
+        let index_binds = ops
+            .iter()
+            .filter(|op| matches!(op, CommandOp::SetIndexBuffer { .. }))
+            .count();
+        let draws = ops
+            .iter()
+            .filter(|op| matches!(op, CommandOp::DrawIndexed { .. }))
+            .count();
+
+        assert_eq!(2, pipeline_binds);
+        assert_eq!(3, resource_set_binds);
+        assert_eq!(2, index_binds);
+        assert_eq!(5, draws);
+    }
+
+    fn test_handle(kind: HandleKind, index: u32) -> Handle {
+        Handle::new(kind, index, 1).unwrap()
     }
 }

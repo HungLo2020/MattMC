@@ -8,9 +8,9 @@ use super::commands::*;
 use super::error::{ErrorDomain, GalError};
 use super::ffi::*;
 use super::frame::*;
-use super::gal::VulkanicGal;
+use super::gal::{normalize_submission_batch, CommandNormalizationStats, VulkanicGal};
 use super::handles::{Handle, HandleKind, MAX_GENERATION};
-use super::metrics::Metrics;
+use super::metrics::{Metrics, WholeFrameProfile};
 use super::resources::*;
 use super::sync::SubmissionId;
 
@@ -2583,6 +2583,302 @@ fn empty_ffi_slice<T>() -> FfiSlice<T> {
 
 fn ffi_handle(kind: HandleKind, index: u32) -> FfiHandle {
     Handle::new(kind, index, 1).unwrap().into()
+}
+
+fn test_handle(kind: HandleKind, index: u32) -> Handle {
+    Handle::new(kind, index, 1).unwrap()
+}
+
+fn minimal_begin_pass() -> CommandOp {
+    CommandOp::BeginPass {
+        pass: test_handle(HandleKind::RenderPass, 1),
+        target: test_handle(HandleKind::RenderTarget, 1),
+        colors: vec![PassAttachment {
+            view: test_handle(HandleKind::TextureView, 1),
+            load_op: AttachmentLoadOp::Load,
+            store_op: AttachmentStoreOp::Store,
+            clear_color: None,
+        }],
+        depth_stencil: None,
+    }
+}
+
+fn normalize_ops_for_test(
+    operations: Vec<CommandOp>,
+) -> (CommandNormalizationStats, Vec<CommandOp>) {
+    let mut batch = SubmissionBatch {
+        label: "normalizer-test".to_owned(),
+        command_lists: vec![CommandList {
+            label: "main".to_owned(),
+            operations,
+        }],
+    };
+    let stats = normalize_submission_batch(&mut batch);
+    let list = batch.command_lists.pop().unwrap();
+    (stats, list.operations)
+}
+
+#[test]
+fn command_normalization_removes_redundant_state_binds() {
+    let pipeline = test_handle(HandleKind::GraphicsPipeline, 1);
+    let layout = test_handle(HandleKind::PipelineLayout, 1);
+    let set = test_handle(HandleKind::ResourceSet, 1);
+    let vertex = test_handle(HandleKind::Buffer, 1);
+    let index = test_handle(HandleKind::Buffer, 2);
+
+    let (stats, operations) = normalize_ops_for_test(vec![
+        minimal_begin_pass(),
+        CommandOp::BindGraphicsPipeline(pipeline),
+        CommandOp::BindGraphicsPipeline(pipeline),
+        CommandOp::BindResourceSet {
+            pipeline_layout: layout,
+            set_index: 0,
+            set,
+        },
+        CommandOp::BindResourceSet {
+            pipeline_layout: layout,
+            set_index: 0,
+            set,
+        },
+        CommandOp::SetVertexBuffer {
+            slot: 0,
+            buffer: vertex,
+            offset: 64,
+        },
+        CommandOp::SetVertexBuffer {
+            slot: 0,
+            buffer: vertex,
+            offset: 64,
+        },
+        CommandOp::SetIndexBuffer {
+            buffer: index,
+            offset: 0,
+            index_type: IndexType::U16,
+        },
+        CommandOp::SetIndexBuffer {
+            buffer: index,
+            offset: 0,
+            index_type: IndexType::U16,
+        },
+        CommandOp::DrawIndexed {
+            indices: 6,
+            instances: 1,
+        },
+        CommandOp::EndPass,
+    ]);
+
+    assert_eq!(stats.ops_before, 11);
+    assert_eq!(stats.ops_after, 7);
+    assert_eq!(stats.pipeline_binds_removed, 1);
+    assert_eq!(stats.resource_set_binds_removed, 1);
+    assert_eq!(stats.vertex_buffer_binds_removed, 1);
+    assert_eq!(stats.index_buffer_binds_removed, 1);
+    assert!(matches!(operations[1], CommandOp::BindGraphicsPipeline(_)));
+    assert!(matches!(operations[2], CommandOp::BindResourceSet { .. }));
+    assert!(matches!(operations[3], CommandOp::SetVertexBuffer { .. }));
+    assert!(matches!(operations[4], CommandOp::SetIndexBuffer { .. }));
+    assert!(matches!(operations[5], CommandOp::DrawIndexed { .. }));
+}
+
+#[test]
+fn command_normalization_respects_pass_and_barrier_boundaries() {
+    let pipeline = test_handle(HandleKind::GraphicsPipeline, 1);
+    let texture = test_handle(HandleKind::Texture, 1);
+    let barrier = CommandOp::Barrier(ResourceBarrier {
+        resource: texture,
+        subresources: None,
+        before: TextureUsageState::TransferDst,
+        after: TextureUsageState::ShaderRead,
+        src_queue: QueueClass::Graphics,
+        dst_queue: QueueClass::Graphics,
+    });
+
+    let (stats, operations) = normalize_ops_for_test(vec![
+        minimal_begin_pass(),
+        CommandOp::BindGraphicsPipeline(pipeline),
+        CommandOp::BindGraphicsPipeline(pipeline),
+        barrier,
+        CommandOp::BindGraphicsPipeline(pipeline),
+        CommandOp::EndPass,
+        minimal_begin_pass(),
+        CommandOp::BindGraphicsPipeline(pipeline),
+        CommandOp::EndPass,
+    ]);
+
+    assert_eq!(stats.ops_before, 9);
+    assert_eq!(stats.ops_after, 8);
+    assert_eq!(stats.pipeline_binds_removed, 1);
+    let kept_pipeline_binds = operations
+        .iter()
+        .filter(|op| matches!(op, CommandOp::BindGraphicsPipeline(_)))
+        .count();
+    assert_eq!(kept_pipeline_binds, 3);
+}
+
+#[test]
+fn command_normalization_keeps_distinct_state_changes() {
+    let pipeline_a = test_handle(HandleKind::GraphicsPipeline, 1);
+    let pipeline_b = test_handle(HandleKind::GraphicsPipeline, 2);
+    let layout = test_handle(HandleKind::PipelineLayout, 1);
+    let set_a = test_handle(HandleKind::ResourceSet, 1);
+    let set_b = test_handle(HandleKind::ResourceSet, 2);
+    let index = test_handle(HandleKind::Buffer, 1);
+
+    let (stats, operations) = normalize_ops_for_test(vec![
+        minimal_begin_pass(),
+        CommandOp::BindGraphicsPipeline(pipeline_a),
+        CommandOp::BindGraphicsPipeline(pipeline_b),
+        CommandOp::BindResourceSet {
+            pipeline_layout: layout,
+            set_index: 0,
+            set: set_a,
+        },
+        CommandOp::BindResourceSet {
+            pipeline_layout: layout,
+            set_index: 0,
+            set: set_b,
+        },
+        CommandOp::SetIndexBuffer {
+            buffer: index,
+            offset: 0,
+            index_type: IndexType::U16,
+        },
+        CommandOp::SetIndexBuffer {
+            buffer: index,
+            offset: 2,
+            index_type: IndexType::U16,
+        },
+        CommandOp::SetIndexBuffer {
+            buffer: index,
+            offset: 2,
+            index_type: IndexType::U32,
+        },
+        CommandOp::EndPass,
+    ]);
+
+    assert_eq!(stats.ops_before, 9);
+    assert_eq!(stats.ops_after, 9);
+    assert_eq!(stats.pipeline_binds_removed, 0);
+    assert_eq!(stats.resource_set_binds_removed, 0);
+    assert_eq!(stats.index_buffer_binds_removed, 0);
+    assert_eq!(operations.len(), 9);
+}
+
+#[test]
+fn hazard_tracking_ignores_unrelated_resources() {
+    let mut gal = gal();
+    let mut operations = Vec::new();
+    for index in 0..64 {
+        let handle = gal
+            .create_buffer(BufferDesc {
+                label: format!("unrelated-write-{index}"),
+                size: 16,
+                memory: MemoryDomain::Upload,
+                usages: vec![BufferUsage::HostWrite],
+            })
+            .unwrap();
+        operations.push(CommandOp::HostWriteBuffer {
+            buffer: handle,
+            offset: 0,
+            data: vec![index as u8; 4],
+        });
+    }
+    let list = gal
+        .create_command_list(CommandListDesc {
+            label: "unrelated-writes".to_owned(),
+            operations,
+        })
+        .unwrap();
+    let mut profile = WholeFrameProfile::default();
+    gal.submit_profiled(
+        SubmissionBatch {
+            label: "unrelated-write-submit".to_owned(),
+            command_lists: vec![list],
+        },
+        &mut profile,
+    )
+    .unwrap();
+
+    assert_eq!(profile.gal_hazard_write_events, 64);
+    assert_eq!(profile.gal_hazard_candidates_examined, 0);
+    assert_eq!(profile.gal_hazard_active_write_entries, 64);
+}
+
+#[test]
+fn hazard_tracking_still_checks_same_resource_ranges() {
+    let mut gal = gal();
+    let buffer = gal
+        .create_buffer(BufferDesc {
+            label: "same-buffer".to_owned(),
+            size: 64,
+            memory: MemoryDomain::Upload,
+            usages: vec![BufferUsage::HostWrite],
+        })
+        .unwrap();
+    let list = gal
+        .create_command_list(CommandListDesc {
+            label: "disjoint-same-buffer-writes".to_owned(),
+            operations: vec![
+                CommandOp::HostWriteBuffer {
+                    buffer,
+                    offset: 0,
+                    data: vec![1; 4],
+                },
+                CommandOp::HostWriteBuffer {
+                    buffer,
+                    offset: 8,
+                    data: vec![2; 4],
+                },
+                CommandOp::HostWriteBuffer {
+                    buffer,
+                    offset: 16,
+                    data: vec![3; 4],
+                },
+                CommandOp::HostWriteBuffer {
+                    buffer,
+                    offset: 32,
+                    data: vec![4; 4],
+                },
+            ],
+        })
+        .unwrap();
+    let mut profile = WholeFrameProfile::default();
+    gal.submit_profiled(
+        SubmissionBatch {
+            label: "disjoint-same-buffer-submit".to_owned(),
+            command_lists: vec![list],
+        },
+        &mut profile,
+    )
+    .unwrap();
+    assert_eq!(profile.gal_hazard_write_events, 4);
+    assert_eq!(profile.gal_hazard_read_events, 0);
+    assert_eq!(profile.gal_hazard_candidates_examined, 6);
+
+    let overlapping = gal
+        .create_command_list(CommandListDesc {
+            label: "overlapping-same-buffer-write-read".to_owned(),
+            operations: vec![
+                CommandOp::HostWriteBuffer {
+                    buffer,
+                    offset: 0,
+                    data: vec![1; 8],
+                },
+                CommandOp::HostWriteBuffer {
+                    buffer,
+                    offset: 4,
+                    data: vec![2; 4],
+                },
+            ],
+        })
+        .unwrap();
+    assert_code(
+        gal.submit(SubmissionBatch {
+            label: "overlapping-same-buffer-submit".to_owned(),
+            command_lists: vec![overlapping],
+        }),
+        super::StatusCode::InvalidArgument,
+    );
 }
 
 fn empty_resource_batch() -> FfiResourceBatch {

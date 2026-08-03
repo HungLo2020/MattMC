@@ -207,6 +207,13 @@ enum AccessTarget {
     },
 }
 
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+enum AccessResourceKey {
+    Buffer(Handle),
+    Texture(Handle),
+    FrameTarget(Handle),
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct AccessEvent {
     target: AccessTarget,
@@ -214,6 +221,99 @@ struct AccessEvent {
     family: AccessFamily,
     attachment_load_op: Option<AttachmentLoadOp>,
     attachment_store_op: Option<AttachmentStoreOp>,
+}
+
+#[derive(Default)]
+struct AccessTracker {
+    resources: BTreeMap<AccessResourceKey, AccessBucket>,
+}
+
+#[derive(Default)]
+struct AccessBucket {
+    reads: Vec<AccessEvent>,
+    writes: Vec<AccessEvent>,
+}
+
+impl AccessTracker {
+    fn push_read(&mut self, event: AccessEvent) {
+        let bucket = self
+            .resources
+            .entry(event.target.resource_key())
+            .or_default();
+        if !bucket.reads.contains(&event) {
+            bucket.reads.push(event);
+        }
+    }
+
+    fn push_write(&mut self, event: AccessEvent) {
+        self.resources
+            .entry(event.target.resource_key())
+            .or_default()
+            .writes
+            .push(event);
+    }
+
+    fn bucket(&self, target: AccessTarget) -> Option<&AccessBucket> {
+        self.resources.get(&target.resource_key())
+    }
+
+    fn retain_non_overlapping(&mut self, target: AccessTarget) {
+        let key = target.resource_key();
+        if let Some(bucket) = self.resources.get_mut(&key) {
+            bucket
+                .reads
+                .retain(|access| !targets_overlap(access.target, target));
+            bucket
+                .writes
+                .retain(|access| !targets_overlap(access.target, target));
+            if bucket.reads.is_empty() && bucket.writes.is_empty() {
+                self.resources.remove(&key);
+            }
+        }
+    }
+
+    fn active_read_entries(&self) -> usize {
+        self.resources
+            .values()
+            .map(|bucket| bucket.reads.len())
+            .sum()
+    }
+
+    fn active_write_entries(&self) -> usize {
+        self.resources
+            .values()
+            .map(|bucket| bucket.writes.len())
+            .sum()
+    }
+}
+
+#[derive(Default)]
+pub(super) struct CommandNormalizationStats {
+    pub(super) ops_before: u64,
+    pub(super) ops_after: u64,
+    pub(super) pipeline_binds_removed: u64,
+    pub(super) resource_set_binds_removed: u64,
+    pub(super) vertex_buffer_binds_removed: u64,
+    pub(super) index_buffer_binds_removed: u64,
+}
+
+#[derive(Default)]
+struct CommandStateTracker {
+    graphics_pipeline: Option<Handle>,
+    compute_pipeline: Option<Handle>,
+    resource_sets: BTreeMap<(Handle, u32), Handle>,
+    vertex_buffers: BTreeMap<u32, (Handle, u64)>,
+    index_buffer: Option<(Handle, u64, IndexType)>,
+}
+
+impl CommandStateTracker {
+    fn invalidate(&mut self) {
+        self.graphics_pipeline = None;
+        self.compute_pipeline = None;
+        self.resource_sets.clear();
+        self.vertex_buffers.clear();
+        self.index_buffer = None;
+    }
 }
 
 pub struct VulkanicGal {
@@ -1239,7 +1339,7 @@ impl VulkanicGal {
 
     fn submit_inner(
         &mut self,
-        batch: SubmissionBatch,
+        mut batch: SubmissionBatch,
         mut profile: Option<&mut WholeFrameProfile>,
     ) -> GalResult<SyncToken> {
         let submit_started = std::time::Instant::now();
@@ -1281,6 +1381,27 @@ impl VulkanicGal {
                     .saturating_add(elapsed_nanos_u64(validate_ops_started));
             }
         }
+        let normalization = normalize_submission_batch(&mut batch);
+        if let Some(profile) = profile.as_deref_mut() {
+            profile.gal_command_ops_before_normalize = profile
+                .gal_command_ops_before_normalize
+                .saturating_add(normalization.ops_before);
+            profile.gal_command_ops_after_normalize = profile
+                .gal_command_ops_after_normalize
+                .saturating_add(normalization.ops_after);
+            profile.gal_redundant_pipeline_binds_removed = profile
+                .gal_redundant_pipeline_binds_removed
+                .saturating_add(normalization.pipeline_binds_removed);
+            profile.gal_redundant_resource_set_binds_removed = profile
+                .gal_redundant_resource_set_binds_removed
+                .saturating_add(normalization.resource_set_binds_removed);
+            profile.gal_redundant_vertex_buffer_binds_removed = profile
+                .gal_redundant_vertex_buffer_binds_removed
+                .saturating_add(normalization.vertex_buffer_binds_removed);
+            profile.gal_redundant_index_buffer_binds_removed = profile
+                .gal_redundant_index_buffer_binds_removed
+                .saturating_add(normalization.index_buffer_binds_removed);
+        }
         let referenced = referenced_handles(&batch);
         let validate_handles_started = std::time::Instant::now();
         for handle in &referenced {
@@ -1292,7 +1413,7 @@ impl VulkanicGal {
                 .saturating_add(elapsed_nanos_u64(validate_handles_started));
         }
         let hazards_started = std::time::Instant::now();
-        self.validate_submission_hazards(&batch)?;
+        self.validate_submission_hazards(&batch, profile.as_deref_mut())?;
         if let Some(profile) = profile.as_deref_mut() {
             profile.gal_hazard_analysis_nanos = profile
                 .gal_hazard_analysis_nanos
@@ -2026,8 +2147,12 @@ impl VulkanicGal {
         self.render_passes.get(pass).map(|record| &record.desc)
     }
 
-    fn validate_submission_hazards(&mut self, batch: &SubmissionBatch) -> GalResult<()> {
-        let mut accesses = Vec::new();
+    fn validate_submission_hazards(
+        &mut self,
+        batch: &SubmissionBatch,
+        mut profile: Option<&mut WholeFrameProfile>,
+    ) -> GalResult<()> {
+        let mut accesses = AccessTracker::default();
         for list in &batch.command_lists {
             for op in &list.operations {
                 match op {
@@ -2045,11 +2170,7 @@ impl VulkanicGal {
                                         AccessTarget::FrameTarget { handle: color.view }
                                     }
                                     Some(HandleKind::TextureView) => {
-                                        let info = self.texture_view_info(color.view)?;
-                                        AccessTarget::Texture {
-                                            texture: info.texture,
-                                            range: info.range,
-                                        }
+                                        self.texture_view_access_target(color.view)?
                                     }
                                     _ => return self.validation_error(GalError::submission(
                                         StatusCode::WrongHandleType,
@@ -2073,14 +2194,10 @@ impl VulkanicGal {
                                 attachment_load_op: Some(color.load_op),
                                 attachment_store_op: Some(color.store_op),
                             };
-                            self.record_access(&mut accesses, event)?;
+                            self.record_access(&mut accesses, event, profile.as_deref_mut())?;
                         }
                         if let Some(depth) = depth_stencil {
-                            let info = self.texture_view_info(depth.view)?;
-                            let target = AccessTarget::Texture {
-                                texture: info.texture,
-                                range: info.range,
-                            };
+                            let target = self.texture_view_access_target(depth.view)?;
                             if pass_attachment_targets
                                 .iter()
                                 .any(|previous| targets_overlap(*previous, target))
@@ -2097,14 +2214,17 @@ impl VulkanicGal {
                                 attachment_load_op: Some(depth.load_op),
                                 attachment_store_op: Some(depth.store_op),
                             };
-                            self.record_access(&mut accesses, event)?;
+                            self.record_access(&mut accesses, event, profile.as_deref_mut())?;
                         }
                     }
                     CommandOp::BindResourceSet { set, .. } => {
-                        let bindings = self.resource_sets.get(*set)?.desc.bindings.clone();
-                        for binding in &bindings {
-                            let event = self.resource_binding_access(binding)?;
-                            self.record_access(&mut accesses, event)?;
+                        let binding_count = self.resource_sets.get(*set)?.desc.bindings.len();
+                        for index in 0..binding_count {
+                            let event = {
+                                let binding = &self.resource_sets.get(*set)?.desc.bindings[index];
+                                self.resource_binding_access(binding)?
+                            };
+                            self.record_access(&mut accesses, event, profile.as_deref_mut())?;
                         }
                     }
                     CommandOp::SetVertexBuffer { buffer, offset, .. } => {
@@ -2118,6 +2238,7 @@ impl VulkanicGal {
                                 attachment_load_op: None,
                                 attachment_store_op: None,
                             },
+                            profile.as_deref_mut(),
                         )?;
                     }
                     CommandOp::SetIndexBuffer { buffer, offset, .. } => {
@@ -2131,6 +2252,7 @@ impl VulkanicGal {
                                 attachment_load_op: None,
                                 attachment_store_op: None,
                             },
+                            profile.as_deref_mut(),
                         )?;
                     }
                     CommandOp::DrawIndirect {
@@ -2149,6 +2271,7 @@ impl VulkanicGal {
                                 attachment_load_op: None,
                                 attachment_store_op: None,
                             },
+                            profile.as_deref_mut(),
                         )?;
                     }
                     CommandOp::CopyBuffer { src, dst, size } => {
@@ -2163,6 +2286,7 @@ impl VulkanicGal {
                                 attachment_load_op: None,
                                 attachment_store_op: None,
                             },
+                            profile.as_deref_mut(),
                         )?;
                         self.record_access(
                             &mut accesses,
@@ -2173,6 +2297,7 @@ impl VulkanicGal {
                                 attachment_load_op: None,
                                 attachment_store_op: None,
                             },
+                            profile.as_deref_mut(),
                         )?;
                     }
                     CommandOp::CopyBufferToTexture(region) => {
@@ -2190,6 +2315,7 @@ impl VulkanicGal {
                                 attachment_load_op: None,
                                 attachment_store_op: None,
                             },
+                            profile.as_deref_mut(),
                         )?;
                         self.record_access(
                             &mut accesses,
@@ -2200,6 +2326,7 @@ impl VulkanicGal {
                                 attachment_load_op: None,
                                 attachment_store_op: None,
                             },
+                            profile.as_deref_mut(),
                         )?;
                     }
                     CommandOp::CopyTextureToBuffer(region) => {
@@ -2212,6 +2339,7 @@ impl VulkanicGal {
                                 attachment_load_op: None,
                                 attachment_store_op: None,
                             },
+                            profile.as_deref_mut(),
                         )?;
                         let buffer_target = self.buffer_access_target(
                             region.buffer,
@@ -2227,6 +2355,7 @@ impl VulkanicGal {
                                 attachment_load_op: None,
                                 attachment_store_op: None,
                             },
+                            profile.as_deref_mut(),
                         )?;
                     }
                     CommandOp::HostWriteBuffer {
@@ -2245,6 +2374,7 @@ impl VulkanicGal {
                                 attachment_load_op: None,
                                 attachment_store_op: None,
                             },
+                            profile.as_deref_mut(),
                         )?;
                     }
                     CommandOp::HostReadBuffer {
@@ -2262,6 +2392,7 @@ impl VulkanicGal {
                                 attachment_load_op: None,
                                 attachment_store_op: None,
                             },
+                            profile.as_deref_mut(),
                         )?;
                     }
                     CommandOp::Present {
@@ -2280,11 +2411,16 @@ impl VulkanicGal {
                                 attachment_load_op: None,
                                 attachment_store_op: None,
                             },
+                            profile.as_deref_mut(),
                         )?;
                     }
                     CommandOp::Barrier(barrier) => {
                         let barrier_target = self.barrier_target(barrier)?;
-                        accesses.retain(|access| !targets_overlap(access.target, barrier_target));
+                        accesses.retain_non_overlapping(barrier_target);
+                        if let Some(profile) = profile.as_deref_mut() {
+                            profile.gal_hazard_barriers_applied =
+                                profile.gal_hazard_barriers_applied.saturating_add(1);
+                        }
                     }
                     CommandOp::BindGraphicsPipeline(_)
                     | CommandOp::BindComputePipeline(_)
@@ -2294,6 +2430,14 @@ impl VulkanicGal {
                     | CommandOp::EndPass => {}
                 }
             }
+        }
+        if let Some(profile) = profile.as_deref_mut() {
+            profile.gal_hazard_active_read_entries = profile
+                .gal_hazard_active_read_entries
+                .saturating_add(accesses.active_read_entries() as u64);
+            profile.gal_hazard_active_write_entries = profile
+                .gal_hazard_active_write_entries
+                .saturating_add(accesses.active_write_entries() as u64);
         }
         Ok(())
     }
@@ -2319,32 +2463,20 @@ impl VulkanicGal {
                 attachment_load_op: None,
                 attachment_store_op: None,
             }),
-            ResourceBindingKind::SampledTexture => {
-                let info = self.texture_view_info(binding.resource)?;
-                Ok(AccessEvent {
-                    target: AccessTarget::Texture {
-                        texture: info.texture,
-                        range: info.range,
-                    },
-                    mode: AccessMode::Read,
-                    family: AccessFamily::Sampled,
-                    attachment_load_op: None,
-                    attachment_store_op: None,
-                })
-            }
-            ResourceBindingKind::StorageTexture => {
-                let info = self.texture_view_info(binding.resource)?;
-                Ok(AccessEvent {
-                    target: AccessTarget::Texture {
-                        texture: info.texture,
-                        range: info.range,
-                    },
-                    mode,
-                    family: AccessFamily::Storage,
-                    attachment_load_op: None,
-                    attachment_store_op: None,
-                })
-            }
+            ResourceBindingKind::SampledTexture => Ok(AccessEvent {
+                target: self.texture_view_access_target(binding.resource)?,
+                mode: AccessMode::Read,
+                family: AccessFamily::Sampled,
+                attachment_load_op: None,
+                attachment_store_op: None,
+            }),
+            ResourceBindingKind::StorageTexture => Ok(AccessEvent {
+                target: self.texture_view_access_target(binding.resource)?,
+                mode,
+                family: AccessFamily::Storage,
+                attachment_load_op: None,
+                attachment_store_op: None,
+            }),
             ResourceBindingKind::Sampler => Ok(AccessEvent {
                 target: AccessTarget::Buffer {
                     handle: binding.resource,
@@ -2361,41 +2493,112 @@ impl VulkanicGal {
 
     fn record_access(
         &mut self,
-        accesses: &mut Vec<AccessEvent>,
+        accesses: &mut AccessTracker,
         event: AccessEvent,
+        mut profile: Option<&mut WholeFrameProfile>,
     ) -> GalResult<()> {
         if event.target.is_zero_sized_sampler_marker() {
             return Ok(());
         }
-        for previous in accesses.iter().copied() {
-            if targets_overlap(previous.target, event.target)
-                && (previous.mode == AccessMode::Write || event.mode == AccessMode::Write)
-            {
-                if previous.family == AccessFamily::Attachment
-                    && event.family == AccessFamily::Attachment
-                    && previous.mode == AccessMode::Write
-                    && event.mode == AccessMode::Write
-                {
-                    if event.attachment_load_op == Some(AttachmentLoadOp::Load)
-                        && previous.attachment_store_op != Some(AttachmentStoreOp::Store)
-                    {
-                        return self.validation_error(GalError::submission(
-                            StatusCode::InvalidArgument,
-                            "attachment load depends on a prior pass that did not store",
-                        ));
-                    }
-                    continue;
+        if let Some(profile) = profile.as_deref_mut() {
+            match event.mode {
+                AccessMode::Read => {
+                    profile.gal_hazard_read_events =
+                        profile.gal_hazard_read_events.saturating_add(1);
                 }
-                return self.validation_error(GalError::submission(
-                    StatusCode::InvalidArgument,
-                    format!(
-                        "overlapping {:?} {:?} access conflicts with prior {:?} {:?} access",
-                        event.family, event.mode, previous.family, previous.mode
-                    ),
-                ));
+                AccessMode::Write => {
+                    profile.gal_hazard_write_events =
+                        profile.gal_hazard_write_events.saturating_add(1);
+                }
             }
         }
-        accesses.push(event);
+        match event.mode {
+            AccessMode::Read => {
+                if let Some(bucket) = accesses.bucket(event.target) {
+                    for previous in bucket.writes.iter().copied() {
+                        if let Some(profile) = profile.as_deref_mut() {
+                            profile.gal_hazard_candidates_examined =
+                                profile.gal_hazard_candidates_examined.saturating_add(1);
+                        }
+                        if targets_overlap(previous.target, event.target) {
+                            if let Some(profile) = profile.as_deref_mut() {
+                                profile.gal_hazard_conflicts =
+                                    profile.gal_hazard_conflicts.saturating_add(1);
+                            }
+                            return self.validation_error(GalError::submission(
+                                StatusCode::InvalidArgument,
+                                format!(
+                                    "overlapping {:?} {:?} access conflicts with prior {:?} {:?} access",
+                                    event.family, event.mode, previous.family, previous.mode
+                                ),
+                            ));
+                        }
+                    }
+                }
+                accesses.push_read(event);
+            }
+            AccessMode::Write => {
+                if let Some(bucket) = accesses.bucket(event.target) {
+                    for previous in bucket.writes.iter().copied() {
+                        if let Some(profile) = profile.as_deref_mut() {
+                            profile.gal_hazard_candidates_examined =
+                                profile.gal_hazard_candidates_examined.saturating_add(1);
+                        }
+                        if targets_overlap(previous.target, event.target) {
+                            if previous.family == AccessFamily::Attachment
+                                && event.family == AccessFamily::Attachment
+                            {
+                                if event.attachment_load_op == Some(AttachmentLoadOp::Load)
+                                    && previous.attachment_store_op
+                                        != Some(AttachmentStoreOp::Store)
+                                {
+                                    if let Some(profile) = profile.as_deref_mut() {
+                                        profile.gal_hazard_conflicts =
+                                            profile.gal_hazard_conflicts.saturating_add(1);
+                                    }
+                                    return self.validation_error(GalError::submission(
+                                        StatusCode::InvalidArgument,
+                                        "attachment load depends on a prior pass that did not store",
+                                    ));
+                                }
+                                continue;
+                            }
+                            if let Some(profile) = profile.as_deref_mut() {
+                                profile.gal_hazard_conflicts =
+                                    profile.gal_hazard_conflicts.saturating_add(1);
+                            }
+                            return self.validation_error(GalError::submission(
+                                StatusCode::InvalidArgument,
+                                format!(
+                                    "overlapping {:?} {:?} access conflicts with prior {:?} {:?} access",
+                                    event.family, event.mode, previous.family, previous.mode
+                                ),
+                            ));
+                        }
+                    }
+                    for previous in bucket.reads.iter().copied() {
+                        if let Some(profile) = profile.as_deref_mut() {
+                            profile.gal_hazard_candidates_examined =
+                                profile.gal_hazard_candidates_examined.saturating_add(1);
+                        }
+                        if targets_overlap(previous.target, event.target) {
+                            if let Some(profile) = profile.as_deref_mut() {
+                                profile.gal_hazard_conflicts =
+                                    profile.gal_hazard_conflicts.saturating_add(1);
+                            }
+                            return self.validation_error(GalError::submission(
+                                StatusCode::InvalidArgument,
+                                format!(
+                                    "overlapping {:?} {:?} access conflicts with prior {:?} {:?} access",
+                                    event.family, event.mode, previous.family, previous.mode
+                                ),
+                            ));
+                        }
+                    }
+                }
+                accesses.push_write(event);
+            }
+        }
         Ok(())
     }
 
@@ -2430,10 +2633,14 @@ impl VulkanicGal {
                 })
             }
             Some(HandleKind::TextureView) => {
-                let info = self.texture_view_info(barrier.resource)?;
+                let AccessTarget::Texture { texture, range } =
+                    self.texture_view_access_target(barrier.resource)?
+                else {
+                    unreachable!("texture view access target is always a texture")
+                };
                 Ok(AccessTarget::Texture {
-                    texture: info.texture,
-                    range: barrier.subresources.unwrap_or(info.range),
+                    texture,
+                    range: barrier.subresources.unwrap_or(range),
                 })
             }
             _ => Err(GalError::command(
@@ -2457,6 +2664,19 @@ impl VulkanicGal {
                 layer_count: view_record.desc.layer_count,
             },
             usages: texture_record.desc.usages.clone(),
+        })
+    }
+
+    fn texture_view_access_target(&self, view: Handle) -> GalResult<AccessTarget> {
+        let view_record = self.texture_views.get(view)?;
+        Ok(AccessTarget::Texture {
+            texture: view_record.desc.texture,
+            range: TextureSubresourceRange {
+                base_mip: view_record.desc.base_mip,
+                mip_count: view_record.desc.mip_count,
+                base_layer: view_record.desc.base_layer,
+                layer_count: view_record.desc.layer_count,
+            },
         })
     }
 
@@ -2859,6 +3079,113 @@ fn referenced_handles(batch: &SubmissionBatch) -> BTreeSet<Handle> {
     handles
 }
 
+pub(super) fn normalize_submission_batch(batch: &mut SubmissionBatch) -> CommandNormalizationStats {
+    let mut stats = CommandNormalizationStats::default();
+    for list in &mut batch.command_lists {
+        stats.ops_before = stats
+            .ops_before
+            .saturating_add(list.operations.len() as u64);
+        let original = std::mem::take(&mut list.operations);
+        let mut normalized = Vec::with_capacity(original.len());
+        let mut state = CommandStateTracker::default();
+        for op in original {
+            let keep = match &op {
+                CommandOp::BeginPass { .. } | CommandOp::EndPass | CommandOp::Barrier(_) => {
+                    state.invalidate();
+                    true
+                }
+                CommandOp::BindGraphicsPipeline(handle) => {
+                    if state.graphics_pipeline == Some(*handle) {
+                        stats.pipeline_binds_removed =
+                            stats.pipeline_binds_removed.saturating_add(1);
+                        false
+                    } else {
+                        state.graphics_pipeline = Some(*handle);
+                        state.compute_pipeline = None;
+                        true
+                    }
+                }
+                CommandOp::BindComputePipeline(handle) => {
+                    if state.compute_pipeline == Some(*handle) {
+                        stats.pipeline_binds_removed =
+                            stats.pipeline_binds_removed.saturating_add(1);
+                        false
+                    } else {
+                        state.compute_pipeline = Some(*handle);
+                        state.graphics_pipeline = None;
+                        true
+                    }
+                }
+                CommandOp::BindResourceSet {
+                    pipeline_layout,
+                    set_index,
+                    set,
+                } => {
+                    let key = (*pipeline_layout, *set_index);
+                    if state.resource_sets.get(&key).copied() == Some(*set) {
+                        stats.resource_set_binds_removed =
+                            stats.resource_set_binds_removed.saturating_add(1);
+                        false
+                    } else {
+                        state.resource_sets.insert(key, *set);
+                        true
+                    }
+                }
+                CommandOp::SetVertexBuffer {
+                    slot,
+                    buffer,
+                    offset,
+                } => {
+                    let value = (*buffer, *offset);
+                    if state.vertex_buffers.get(slot).copied() == Some(value) {
+                        stats.vertex_buffer_binds_removed =
+                            stats.vertex_buffer_binds_removed.saturating_add(1);
+                        false
+                    } else {
+                        state.vertex_buffers.insert(*slot, value);
+                        true
+                    }
+                }
+                CommandOp::SetIndexBuffer {
+                    buffer,
+                    offset,
+                    index_type,
+                } => {
+                    let value = (*buffer, *offset, *index_type);
+                    if state.index_buffer == Some(value) {
+                        stats.index_buffer_binds_removed =
+                            stats.index_buffer_binds_removed.saturating_add(1);
+                        false
+                    } else {
+                        state.index_buffer = Some(value);
+                        true
+                    }
+                }
+                CommandOp::CopyBuffer { .. }
+                | CommandOp::CopyBufferToTexture(_)
+                | CommandOp::CopyTextureToBuffer(_)
+                | CommandOp::HostWriteBuffer { .. }
+                | CommandOp::HostReadBuffer { .. }
+                | CommandOp::Present { .. } => {
+                    state.invalidate();
+                    true
+                }
+                CommandOp::Draw { .. }
+                | CommandOp::DrawIndexed { .. }
+                | CommandOp::DrawIndirect { .. }
+                | CommandOp::Dispatch { .. }
+                | CommandOp::DispatchIndirect { .. } => true,
+            };
+            if keep {
+                normalized.push(op);
+            }
+        }
+        stats.ops_after = stats.ops_after.saturating_add(normalized.len() as u64);
+        list.operations = normalized;
+    }
+    stats
+}
+
 fn add_command_profile(profile: &mut WholeFrameProfile, batch: &SubmissionBatch) {
     for list in &batch.command_lists {
         for op in &list.operations {
@@ -2975,6 +3302,14 @@ fn is_depth_stencil_format(format: TextureFormat) -> bool {
 impl AccessTarget {
     fn is_zero_sized_sampler_marker(self) -> bool {
         matches!(self, AccessTarget::Buffer { size: 0, .. })
+    }
+
+    fn resource_key(self) -> AccessResourceKey {
+        match self {
+            AccessTarget::Buffer { handle, .. } => AccessResourceKey::Buffer(handle),
+            AccessTarget::Texture { texture, .. } => AccessResourceKey::Texture(texture),
+            AccessTarget::FrameTarget { handle } => AccessResourceKey::FrameTarget(handle),
+        }
     }
 }
 

@@ -2282,6 +2282,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 
 	public void disconnect(Screen screen, boolean bl) {
 		net.vulkanic.gui.RustGalFrameCoordinator.cancelPending("world-disconnect");
+		net.vulkanic.world.RustGalTerrainRenderer.invalidateForWorldUnload();
 		ClientPacketListener clientPacketListener = this.getConnection();
 		if (clientPacketListener != null) {
 			this.dropAllTasks();
@@ -2336,6 +2337,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 
 	public void clearClientLevel(Screen screen) {
 		net.vulkanic.gui.RustGalFrameCoordinator.cancelPending("world-unload");
+		net.vulkanic.world.RustGalTerrainRenderer.invalidateForWorldUnload();
 		// Iris: From MixinMinecraft_PipelineManagement - track last dimension on leave
 		net.irisshaders.iris.Iris.lastDimension = net.irisshaders.iris.Iris.getCurrentDimension();
 		

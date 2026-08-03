@@ -65,13 +65,23 @@ public final class RustGalTerrainRenderer {
 	private static final AtomicLong skippedEmptyLayers = new AtomicLong();
 	private static final AtomicLong registeredMeshes = new AtomicLong();
 	private static final AtomicLong texturePayloadUpdates = new AtomicLong();
+	private static final AtomicLong texturePayloadUpdateBytes = new AtomicLong();
+	private static final AtomicLong atlasTextureOnlyUpdates = new AtomicLong();
+	private static final AtomicLong atlasMissingPayloadUpdates = new AtomicLong();
+	private static final AtomicLong atlasMalformedPayloadUpdates = new AtomicLong();
+	private static final AtomicLong atlasPartialPayloadUpdates = new AtomicLong();
 	private static final AtomicLong removedLayers = new AtomicLong();
 	private static final AtomicLong visibleLayerProbes = new AtomicLong();
 	private static final AtomicLong visibleLayerSubmissions = new AtomicLong();
 	private static final AtomicLong failedLayerSubmissions = new AtomicLong();
+	private static final AtomicLong lastVisibleSubmissionFrameId = new AtomicLong(-1L);
+	private static final AtomicLong currentFrameVisibleLayerSubmissions = new AtomicLong();
 	private static final AtomicLong invalidations = new AtomicLong();
 	private static final AtomicLong terrainExtractionFrames = new AtomicLong();
 	private static final AtomicLong rustEnqueueFrames = new AtomicLong();
+	private static volatile TerrainSectionAsset lastWorldUnloadAsset;
+	private static volatile long lastWorldUnloadSectionPos;
+	private static volatile ChunkSectionLayer lastWorldUnloadLayer = ChunkSectionLayer.SOLID;
 
 	private RustGalTerrainRenderer() {
 	}
@@ -140,7 +150,9 @@ public final class RustGalTerrainRenderer {
 	}
 
 	public static void invalidateForWorldUnload() {
-		SECTION_ASSETS.clear();
+		for (LayerKey key : List.copyOf(SECTION_ASSETS.keySet())) {
+			removeLayer(key.sectionPos(), key.layer(), "world-unload");
+		}
 		invalidations.incrementAndGet();
 			recordEvent(0L, ChunkSectionLayer.SOLID, 0L, 0L, 0L, atlasGeneration, null, 0, 0, 0, 0.0F, 0.0F, 0.0F, "world-unload");
 	}
@@ -153,8 +165,14 @@ public final class RustGalTerrainRenderer {
 
 	public static TerrainDiagnostics diagnosticsSnapshot() {
 		synchronized (RECENT_EVENTS) {
+			long currentFrameId = currentGameplayFrameId();
+			long currentVisibleSubmissions =
+				lastVisibleSubmissionFrameId.get() == currentFrameId ? currentFrameVisibleLayerSubmissions.get() : 0L;
 			return new TerrainDiagnostics(
 				SECTION_ASSETS.size(),
+				SECTION_ASSETS.size(),
+				SECTION_ASSETS.size(),
+				currentVisibleSubmissions,
 				atlasGeneration,
 				registeredAtlasGeneration,
 				activeTerrainVertexStride(),
@@ -164,6 +182,11 @@ public final class RustGalTerrainRenderer {
 				skippedEmptyLayers.get(),
 				registeredMeshes.get(),
 				texturePayloadUpdates.get(),
+				texturePayloadUpdateBytes.get(),
+				atlasTextureOnlyUpdates.get(),
+				atlasMissingPayloadUpdates.get(),
+				atlasMalformedPayloadUpdates.get(),
+				atlasPartialPayloadUpdates.get(),
 				removedLayers.get(),
 				visibleLayerProbes.get(),
 				visibleLayerSubmissions.get(),
@@ -279,6 +302,52 @@ public final class RustGalTerrainRenderer {
 			0.0F,
 			0.0F,
 			(detail == null || detail.isBlank()) ? reason : reason + ":" + detail
+		);
+	}
+
+	public static void injectAtlasTexturePayloadForDiagnostics(byte[] payload, String reason) {
+		if (!WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan()) {
+			return;
+		}
+		byte[] copied = payload == null ? new byte[0] : payload.clone();
+		long generation;
+		synchronized (RustGalTerrainRenderer.class) {
+			atlasPayload = copied;
+			atlasGeneration++;
+			registeredAtlasGeneration = atlasGeneration;
+			generation = atlasGeneration;
+		}
+		atlasTextureOnlyUpdates.incrementAndGet();
+		if (copied.length == 0) {
+			atlasMissingPayloadUpdates.incrementAndGet();
+		} else if (!isPngPayload(copied)) {
+			atlasMalformedPayloadUpdates.incrementAndGet();
+		} else if (copied.length < 256) {
+			atlasPartialPayloadUpdates.incrementAndGet();
+		}
+		texturePayloadUpdates.incrementAndGet();
+		texturePayloadUpdateBytes.addAndGet(copied.length);
+		RustGalWorldPrimitiveRenderer.registerStaticTerrainAtlasTexture(
+			new VulkanicGalBridge.WorldMeshTextureAssetRecord(
+				RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_TERRAIN_BLOCK_ATLAS,
+				copied
+			)
+		);
+		recordEvent(
+			0L,
+			ChunkSectionLayer.SOLID,
+			0L,
+			0L,
+			0L,
+			generation,
+			null,
+			0,
+			0,
+			0,
+			0.0F,
+			0.0F,
+			0.0F,
+			(reason == null || reason.isBlank()) ? "atlas-texture-only-update" : reason
 		);
 	}
 
@@ -588,6 +657,7 @@ public final class RustGalTerrainRenderer {
 		long enqueueFrameId = rustEnqueueFrames.incrementAndGet();
 		if (submitted) {
 			visibleLayerSubmissions.incrementAndGet();
+			recordCurrentFrameVisibleSubmission(enqueueFrameId);
 			recordEvent(
 				section.getPosition().asLong(),
 				layer,
@@ -635,6 +705,84 @@ public final class RustGalTerrainRenderer {
 			recordEvent(section.getPosition().asLong(), layer, 0L, asset.meshGeneration(), visibleGeneration, atlasGeneration, asset, section.getOriginX(), section.getOriginY(), section.getOriginZ(), 0.0F, 0.0F, 0.0F, "stale-or-unregistered-submit", 0L, enqueueFrameId, 0L, 0L);
 		}
 		return submitted;
+	}
+
+	public static boolean injectCrossWorldStaleSubmissionForDiagnostics(int viewportWidth, int viewportHeight) {
+		if (!"cross-world-stale-submission".equals(activeFault())) {
+			return false;
+		}
+		TerrainSectionAsset stale = lastWorldUnloadAsset;
+		if (stale == null) {
+			return false;
+		}
+		long enqueueFrameId = rustEnqueueFrames.incrementAndGet();
+		boolean submitted = RustGalWorldPrimitiveRenderer.enqueueStaticTerrainMeshInstance(
+			stale.meshKey(),
+			stale.meshGeneration(),
+			new Matrix4f().identity().get(new float[16]),
+			viewportWidth,
+			viewportHeight
+		);
+		if (submitted) {
+			visibleLayerSubmissions.incrementAndGet();
+			recordCurrentFrameVisibleSubmission(enqueueFrameId);
+			recordEvent(
+				lastWorldUnloadSectionPos,
+				lastWorldUnloadLayer,
+				0L,
+				stale.meshGeneration(),
+				stale.meshGeneration(),
+				atlasGeneration,
+				stale,
+				stale.sectionOriginX(),
+				stale.sectionOriginY(),
+				stale.sectionOriginZ(),
+				0.0F,
+				0.0F,
+				0.0F,
+				"cross_world_stale_submission_unexpected_success",
+				0L,
+				enqueueFrameId,
+				0L,
+				0L
+			);
+			return true;
+		}
+		failedLayerSubmissions.incrementAndGet();
+		recordEvent(
+			lastWorldUnloadSectionPos,
+			lastWorldUnloadLayer,
+			0L,
+			stale.meshGeneration(),
+			stale.meshGeneration(),
+			atlasGeneration,
+			stale,
+			stale.sectionOriginX(),
+			stale.sectionOriginY(),
+			stale.sectionOriginZ(),
+			0.0F,
+			0.0F,
+			0.0F,
+			"cross_world_stale_submission",
+			0L,
+			enqueueFrameId,
+			0L,
+			0L
+		);
+		return false;
+	}
+
+	private static void recordCurrentFrameVisibleSubmission(long fallbackFrameId) {
+		long frameId = currentGameplayFrameId();
+		if (frameId <= 0L) {
+			frameId = fallbackFrameId;
+		}
+		long previousFrameId = lastVisibleSubmissionFrameId.getAndSet(frameId);
+		if (previousFrameId == frameId) {
+			currentFrameVisibleLayerSubmissions.incrementAndGet();
+		} else {
+			currentFrameVisibleLayerSubmissions.set(1L);
+		}
 	}
 
 	private static boolean finiteBounds(float minX, float minY, float minZ, float maxX, float maxY, float maxZ) {
@@ -783,13 +931,32 @@ public final class RustGalTerrainRenderer {
 			}
 			registeredAtlasGeneration = atlasGeneration;
 			texturePayloadUpdates.incrementAndGet();
+			texturePayloadUpdateBytes.addAndGet(atlasPayload.length);
 			return List.of(new VulkanicGalBridge.WorldMeshTextureAssetRecord(RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_TERRAIN_BLOCK_ATLAS, atlasPayload));
 		}
+	}
+
+	private static boolean isPngPayload(byte[] payload) {
+		return payload != null
+			&& payload.length >= 8
+			&& (payload[0] & 0xff) == 0x89
+			&& payload[1] == 0x50
+			&& payload[2] == 0x4e
+			&& payload[3] == 0x47
+			&& payload[4] == 0x0d
+			&& payload[5] == 0x0a
+			&& payload[6] == 0x1a
+			&& payload[7] == 0x0a;
 	}
 
 	private static void removeLayer(long sectionPos, ChunkSectionLayer layer, String reason) {
 		TerrainSectionAsset removed = SECTION_ASSETS.remove(new LayerKey(sectionPos, layer));
 		if (removed != null) {
+			if ("world-unload".equals(reason)) {
+				lastWorldUnloadAsset = removed;
+				lastWorldUnloadSectionPos = sectionPos;
+				lastWorldUnloadLayer = layer;
+			}
 			removedLayers.incrementAndGet();
 			RustGalWorldPrimitiveRenderer.removeStaticTerrainMeshAsset(removed.meshKey());
 				recordEvent(sectionPos, layer, 0L, removed.meshGeneration(), 0L, atlasGeneration, removed, 0, 0, 0, 0.0F, 0.0F, 0.0F, reason);
@@ -1068,6 +1235,9 @@ public final class RustGalTerrainRenderer {
 
 	public record TerrainDiagnostics(
 		int cachedLayerAssets,
+		int activeTerrainLayers,
+		int activeSectionAssets,
+		long currentFrameVisibleLayerSubmissions,
 		long atlasGeneration,
 		long registeredAtlasGeneration,
 		int activeNativeVertexStride,
@@ -1077,6 +1247,11 @@ public final class RustGalTerrainRenderer {
 		long skippedEmptyLayers,
 		long registeredMeshes,
 		long texturePayloadUpdates,
+		long texturePayloadUpdateBytes,
+		long atlasTextureOnlyUpdates,
+		long atlasMissingPayloadUpdates,
+		long atlasMalformedPayloadUpdates,
+		long atlasPartialPayloadUpdates,
 		long removedLayers,
 		long visibleLayerProbes,
 		long visibleLayerSubmissions,

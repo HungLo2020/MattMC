@@ -322,6 +322,22 @@ impl From<WholeFrameProfile> for FfiWholeFrameProfileSnapshot {
             vulkan_configured_frames_in_flight: profile.vulkan_configured_frames_in_flight,
             vulkan_images_in_flight: profile.vulkan_images_in_flight,
             vulkan_available_frame_slots: profile.vulkan_available_frame_slots,
+            gal_hazard_read_events: profile.gal_hazard_read_events,
+            gal_hazard_write_events: profile.gal_hazard_write_events,
+            gal_hazard_candidates_examined: profile.gal_hazard_candidates_examined,
+            gal_hazard_conflicts: profile.gal_hazard_conflicts,
+            gal_hazard_barriers_applied: profile.gal_hazard_barriers_applied,
+            gal_hazard_active_read_entries: profile.gal_hazard_active_read_entries,
+            gal_hazard_active_write_entries: profile.gal_hazard_active_write_entries,
+            gal_command_ops_before_normalize: profile.gal_command_ops_before_normalize,
+            gal_command_ops_after_normalize: profile.gal_command_ops_after_normalize,
+            gal_redundant_pipeline_binds_removed: profile.gal_redundant_pipeline_binds_removed,
+            gal_redundant_resource_set_binds_removed: profile
+                .gal_redundant_resource_set_binds_removed,
+            gal_redundant_vertex_buffer_binds_removed: profile
+                .gal_redundant_vertex_buffer_binds_removed,
+            gal_redundant_index_buffer_binds_removed: profile
+                .gal_redundant_index_buffer_binds_removed,
         }
     }
 }

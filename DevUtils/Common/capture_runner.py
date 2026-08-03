@@ -79,6 +79,9 @@ class CaptureConfig:
     game_dir: str
     jvm_args: list[str]
     gui_resource_pack_scenario: str
+    world_static_terrain_scenario: str
+    world_static_terrain_second_world: str
+    world_static_terrain_resource_pack_scenario: str
     region_validation: bool
     region_validation_copy_world: bool
     poi_validation: bool
@@ -176,6 +179,7 @@ class CaptureRunner:
         self.env = os.environ.copy()
         self.isolated_game_source: Path | None = None
         self.isolated_game_dir: Path | None = None
+        self.isolated_world_copy_meta: list[str] = []
         self.region_validation_game_dir: Path | None = None
         self.generated_gui_resource_packs: list[str] = []
 
@@ -356,11 +360,16 @@ class CaptureRunner:
                     f"isolated_world_copy={self.isolated_game_dir / 'saves' / self.config.world}",
                 ]
             )
+            lines.extend(self.isolated_world_copy_meta)
         self.meta_log.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     def append_meta(self, text: str) -> None:
         with self.meta_log.open("a", encoding="utf-8") as handle:
             handle.write(text.rstrip("\n") + "\n")
+
+    def append_isolated_world_copy_meta(self, text: str) -> None:
+        self.isolated_world_copy_meta.append(text.rstrip("\n"))
+        self.append_meta(text)
 
     def generated_game_temp_root(self) -> Path:
         marker_root = artifact_retention.nearest_marked_root(self.artifact_dir)
@@ -369,6 +378,58 @@ class CaptureRunner:
         temp_root = marker_root / ".tmp" / self.run_id
         temp_root.mkdir(parents=True, exist_ok=True)
         return temp_root
+
+    def static_terrain_second_world_name(self) -> str:
+        configured = (self.config.world_static_terrain_second_world or "").strip()
+        if not configured:
+            configured = os.environ.get("MATTMC_CAPTURE_SECOND_WORLD", "").strip()
+        scenario = (self.config.world_static_terrain_scenario or "").strip().lower()
+        if not configured and scenario == "world-different-reload":
+            configured = f"{self.config.world}-different"
+        return configured
+
+    @staticmethod
+    def validate_world_copy_name(name: str, label: str) -> None:
+        if not name or Path(name).name != name or name in {".", ".."}:
+            raise SystemExit(f"Invalid {label} copied-world destination name: {name!r}")
+
+    @staticmethod
+    def tree_file_count_and_bytes(path: Path) -> tuple[int, int]:
+        file_count = 0
+        total_bytes = 0
+        for entry in path.rglob("*"):
+            if entry.is_file():
+                file_count += 1
+                total_bytes += entry.stat().st_size
+        return file_count, total_bytes
+
+    def copy_isolated_world(self, source: Path, saves_dir: Path, destination_name: str, label: str) -> tuple[Path, int, int]:
+        self.validate_world_copy_name(destination_name, label)
+        if not source.is_dir():
+            raise SystemExit(f"Cannot copy missing {label} benchmark world: {source}")
+        destination = saves_dir / destination_name
+        if destination.exists():
+            raise SystemExit(f"Refusing to overwrite existing {label} copied world: {destination}")
+        max_copy_bytes = int(os.environ.get("MATTMC_CAPTURE_WORLD_COPY_MAX_BYTES", str(8 * 1024 * 1024 * 1024)))
+        source_file_count, source_bytes = self.tree_file_count_and_bytes(source)
+        if source_bytes > max_copy_bytes:
+            raise SystemExit(
+                f"Refusing to copy oversized {label} world: {source_bytes} bytes exceeds {max_copy_bytes} byte limit"
+            )
+        shutil.copytree(source, destination)
+        copied_file_count, copied_bytes = self.tree_file_count_and_bytes(destination)
+        if copied_file_count != source_file_count or copied_bytes != source_bytes:
+            raise SystemExit(
+                f"Incomplete {label} world copy: source files/bytes={source_file_count}/{source_bytes} "
+                f"copied files/bytes={copied_file_count}/{copied_bytes}"
+            )
+        self.append_isolated_world_copy_meta(f"isolated_{label}_world_source={source}")
+        self.append_isolated_world_copy_meta(f"isolated_{label}_world_name={destination_name}")
+        self.append_isolated_world_copy_meta(f"isolated_{label}_world_copy={destination}")
+        self.append_isolated_world_copy_meta(f"isolated_{label}_world_status=ok")
+        self.append_isolated_world_copy_meta(f"isolated_{label}_world_files={copied_file_count}")
+        self.append_isolated_world_copy_meta(f"isolated_{label}_world_bytes={copied_bytes}")
+        return destination, copied_file_count, copied_bytes
 
     def prepare_isolated_game_dir(self) -> None:
         if self.config.game_dir or self.config.region_validation_copy_world:
@@ -391,8 +452,23 @@ class CaptureRunner:
             "voxelmap",
         ):
             self.copy_optional_path(source_run / name, isolated_game_dir / name)
-        (isolated_game_dir / "saves").mkdir(parents=True)
-        shutil.copytree(source_world, isolated_game_dir / "saves" / self.config.world)
+        saves_dir = isolated_game_dir / "saves"
+        saves_dir.mkdir(parents=True)
+        self.copy_isolated_world(source_world, saves_dir, self.config.world, "primary")
+        second_world = self.static_terrain_second_world_name()
+        if second_world:
+            if second_world == self.config.world:
+                raise SystemExit(
+                    f"Secondary copied-world destination must differ from primary world: {second_world}"
+                )
+            second_source = Path(os.environ["MATTMC_CAPTURE_SECOND_WORLD_SOURCE"]) if os.environ.get("MATTMC_CAPTURE_SECOND_WORLD_SOURCE") else source_world
+            self.copy_isolated_world(second_source, saves_dir, second_world, "secondary")
+            if not (saves_dir / second_world).is_dir():
+                raise SystemExit(f"Secondary copied world was requested but is absent before launch: {saves_dir / second_world}")
+        elif (self.config.world_static_terrain_scenario or "").strip().lower() == "world-different-reload":
+            raise SystemExit("--world-static-terrain-scenario world-different-reload requires a secondary copied world")
+        saves_listing = sorted(path.name for path in saves_dir.iterdir() if path.is_dir())
+        self.append_isolated_world_copy_meta(f"isolated_saves_listing={json.dumps(saves_listing, separators=(',', ':'))}")
 
         self.run_dir = isolated_game_dir
         self.options_file = self.run_dir / "options.txt"
@@ -428,7 +504,14 @@ class CaptureRunner:
         self.append_meta(f"validation_world_copy={self.run_dir / 'saves' / self.config.world}")
 
     def configure_gui_resource_pack_scenario(self) -> None:
-        scenario = (self.config.gui_resource_pack_scenario or "").strip().lower()
+        gui_scenario = (self.config.gui_resource_pack_scenario or "").strip().lower()
+        terrain_scenario = (self.config.world_static_terrain_resource_pack_scenario or "").strip().lower()
+        if gui_scenario and terrain_scenario and gui_scenario != terrain_scenario:
+            raise SystemExit(
+                "--gui-resource-pack-scenario and --world-static-terrain-resource-pack-scenario "
+                "must match when both are provided; static terrain uses the same generated block-texture packs"
+            )
+        scenario = terrain_scenario or gui_scenario
         if not scenario:
             return
         if self.config.game_dir:
@@ -437,6 +520,7 @@ class CaptureRunner:
             upsert_option(self.options_file, "resourcePacks", "[]")
             upsert_option(self.options_file, "incompatibleResourcePacks", "[]")
             self.append_meta(f"gui_resource_pack_scenario={scenario}")
+            self.append_meta(f"world_static_terrain_resource_pack_scenario={terrain_scenario or ''}")
             self.append_meta("gui_resource_pack_selected=[]")
             return
 
@@ -455,6 +539,7 @@ class CaptureRunner:
         upsert_option(self.options_file, "resourcePacks", json.dumps(selected, separators=(",", ":")))
         upsert_option(self.options_file, "incompatibleResourcePacks", "[]")
         self.append_meta(f"gui_resource_pack_scenario={scenario}")
+        self.append_meta(f"world_static_terrain_resource_pack_scenario={terrain_scenario or ''}")
         self.append_meta(f"gui_resource_pack_selected={json.dumps(selected, separators=(',', ':'))}")
 
     def copy_optional_path(self, source: Path, target: Path) -> None:
@@ -516,9 +601,15 @@ class CaptureRunner:
         max_fps = os.environ.get("MATTMC_CAPTURE_MAX_FPS", "120")
         if not max_fps.isdigit() or int(max_fps) <= 0:
             raise SystemExit(f"MATTMC_CAPTURE_MAX_FPS must be a positive integer, got {max_fps!r}")
+        render_distance = os.environ.get("MATTMC_CAPTURE_RENDER_DISTANCE", "10")
+        simulation_distance = os.environ.get("MATTMC_CAPTURE_SIMULATION_DISTANCE", "12")
+        if not render_distance.isdigit() or int(render_distance) <= 0:
+            raise SystemExit(f"MATTMC_CAPTURE_RENDER_DISTANCE must be a positive integer, got {render_distance!r}")
+        if not simulation_distance.isdigit() or int(simulation_distance) <= 0:
+            raise SystemExit(f"MATTMC_CAPTURE_SIMULATION_DISTANCE must be a positive integer, got {simulation_distance!r}")
         forced_options = {
-            "renderDistance": "10",
-            "simulationDistance": "12",
+            "renderDistance": render_distance,
+            "simulationDistance": simulation_distance,
             "guiScale": gui_scale,
             "fullscreen": "false",
             "hideGui": "false",
@@ -2591,6 +2682,24 @@ def parse_args() -> CaptureConfig:
             "Supported: vanilla, pack-a, pack-b, priority-a-b, priority-b-a, missing, malformed, unsupported."
         ),
     )
+    parser.add_argument(
+        "--world-static-terrain-resource-pack-scenario",
+        default=os.environ.get("MATTMC_WORLD_STATIC_TERRAIN_RESOURCE_PACK_SCENARIO", ""),
+        help=(
+            "Generate and select diagnostic block-texture resource packs for Rust static-terrain atlas coverage. "
+            "Supported: vanilla, pack-a, pack-b, priority-a-b, priority-b-a, missing, malformed, unsupported."
+        ),
+    )
+    parser.add_argument(
+        "--world-static-terrain-scenario",
+        default=os.environ.get("MATTMC_WORLD_STATIC_TERRAIN_SCENARIO", ""),
+        help="Deterministic static-terrain lifecycle scenario name carried for isolated-world setup.",
+    )
+    parser.add_argument(
+        "--world-static-terrain-second-world",
+        default=os.environ.get("MATTMC_WORLD_STATIC_TERRAIN_SECOND_WORLD", ""),
+        help="Explicit destination save name for the optional second static-terrain lifecycle world.",
+    )
     parser.add_argument("--region-validation", action="store_true")
     parser.add_argument("--region-validation-copy-world", action="store_true")
     parser.add_argument("--poi-validation", action="store_true")
@@ -2638,6 +2747,9 @@ def parse_args() -> CaptureConfig:
         game_dir=args.game_dir,
         jvm_args=args.jvm_arg,
         gui_resource_pack_scenario=args.gui_resource_pack_scenario,
+        world_static_terrain_scenario=args.world_static_terrain_scenario,
+        world_static_terrain_second_world=args.world_static_terrain_second_world,
+        world_static_terrain_resource_pack_scenario=args.world_static_terrain_resource_pack_scenario,
         region_validation=bool(args.region_validation),
         region_validation_copy_world=bool(args.region_validation_copy_world),
         poi_validation=bool(args.poi_validation),

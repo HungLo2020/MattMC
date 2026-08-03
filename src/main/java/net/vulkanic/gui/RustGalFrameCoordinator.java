@@ -718,6 +718,19 @@ public final class RustGalFrameCoordinator {
 		METRICS.profileGalValidateOpsNanos += profile.galValidateOpsNanos();
 		METRICS.profileGalValidateHandlesNanos += profile.galValidateHandlesNanos();
 		METRICS.profileGalHazardAnalysisNanos += profile.galHazardAnalysisNanos();
+		METRICS.profileGalHazardReadEvents += profile.galHazardReadEvents();
+		METRICS.profileGalHazardWriteEvents += profile.galHazardWriteEvents();
+		METRICS.profileGalHazardCandidatesExamined += profile.galHazardCandidatesExamined();
+		METRICS.profileGalHazardConflicts += profile.galHazardConflicts();
+		METRICS.profileGalHazardBarriersApplied += profile.galHazardBarriersApplied();
+		METRICS.profileGalHazardActiveReadEntries += profile.galHazardActiveReadEntries();
+		METRICS.profileGalHazardActiveWriteEntries += profile.galHazardActiveWriteEntries();
+		METRICS.profileGalCommandOpsBeforeNormalize += profile.galCommandOpsBeforeNormalize();
+		METRICS.profileGalCommandOpsAfterNormalize += profile.galCommandOpsAfterNormalize();
+		METRICS.profileGalRedundantPipelineBindsRemoved += profile.galRedundantPipelineBindsRemoved();
+		METRICS.profileGalRedundantResourceSetBindsRemoved += profile.galRedundantResourceSetBindsRemoved();
+		METRICS.profileGalRedundantVertexBufferBindsRemoved += profile.galRedundantVertexBufferBindsRemoved();
+		METRICS.profileGalRedundantIndexBufferBindsRemoved += profile.galRedundantIndexBufferBindsRemoved();
 		METRICS.profileBackendEncodeNanos += profile.backendEncodeNanos();
 		METRICS.profileBackendSubmitNanos += profile.backendSubmitNanos();
 		METRICS.profileBackendRetireNanos += profile.backendRetireNanos();
@@ -807,6 +820,19 @@ public final class RustGalFrameCoordinator {
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gal-validate-ops", profile.galValidateOpsNanos());
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gal-validate-handles", profile.galValidateHandlesNanos());
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gal-hazard-analysis", profile.galHazardAnalysisNanos());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gal-hazard-read-events", profile.galHazardReadEvents());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gal-hazard-write-events", profile.galHazardWriteEvents());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gal-hazard-candidates-examined", profile.galHazardCandidatesExamined());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gal-hazard-conflicts", profile.galHazardConflicts());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gal-hazard-barriers-applied", profile.galHazardBarriersApplied());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gal-hazard-active-read-entries", profile.galHazardActiveReadEntries());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gal-hazard-active-write-entries", profile.galHazardActiveWriteEntries());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gal-command-ops-before-normalize", profile.galCommandOpsBeforeNormalize());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gal-command-ops-after-normalize", profile.galCommandOpsAfterNormalize());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gal-redundant-pipeline-binds-removed", profile.galRedundantPipelineBindsRemoved());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gal-redundant-resource-set-binds-removed", profile.galRedundantResourceSetBindsRemoved());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gal-redundant-vertex-buffer-binds-removed", profile.galRedundantVertexBufferBindsRemoved());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gal-redundant-index-buffer-binds-removed", profile.galRedundantIndexBufferBindsRemoved());
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.backend-encode", profile.backendEncodeNanos());
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.backend-submit", profile.backendSubmitNanos());
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.backend-retire", profile.backendRetireNanos());
@@ -1262,6 +1288,19 @@ public final class RustGalFrameCoordinator {
 			+ " rust_gal_profile_gal_validate_ops_nanos=" + METRICS.profileGalValidateOpsNanos
 			+ " rust_gal_profile_gal_validate_handles_nanos=" + METRICS.profileGalValidateHandlesNanos
 			+ " rust_gal_profile_gal_hazard_analysis_nanos=" + METRICS.profileGalHazardAnalysisNanos
+			+ " rust_gal_profile_gal_hazard_read_events=" + METRICS.profileGalHazardReadEvents
+			+ " rust_gal_profile_gal_hazard_write_events=" + METRICS.profileGalHazardWriteEvents
+			+ " rust_gal_profile_gal_hazard_candidates_examined=" + METRICS.profileGalHazardCandidatesExamined
+			+ " rust_gal_profile_gal_hazard_conflicts=" + METRICS.profileGalHazardConflicts
+			+ " rust_gal_profile_gal_hazard_barriers_applied=" + METRICS.profileGalHazardBarriersApplied
+			+ " rust_gal_profile_gal_hazard_active_read_entries=" + METRICS.profileGalHazardActiveReadEntries
+			+ " rust_gal_profile_gal_hazard_active_write_entries=" + METRICS.profileGalHazardActiveWriteEntries
+			+ " rust_gal_profile_gal_command_ops_before_normalize=" + METRICS.profileGalCommandOpsBeforeNormalize
+			+ " rust_gal_profile_gal_command_ops_after_normalize=" + METRICS.profileGalCommandOpsAfterNormalize
+			+ " rust_gal_profile_gal_redundant_pipeline_binds_removed=" + METRICS.profileGalRedundantPipelineBindsRemoved
+			+ " rust_gal_profile_gal_redundant_resource_set_binds_removed=" + METRICS.profileGalRedundantResourceSetBindsRemoved
+			+ " rust_gal_profile_gal_redundant_vertex_buffer_binds_removed=" + METRICS.profileGalRedundantVertexBufferBindsRemoved
+			+ " rust_gal_profile_gal_redundant_index_buffer_binds_removed=" + METRICS.profileGalRedundantIndexBufferBindsRemoved
 			+ " rust_gal_profile_backend_encode_nanos=" + METRICS.profileBackendEncodeNanos
 			+ " rust_gal_profile_backend_submit_nanos=" + METRICS.profileBackendSubmitNanos
 			+ " rust_gal_profile_backend_retire_nanos=" + METRICS.profileBackendRetireNanos
@@ -1471,6 +1510,19 @@ public final class RustGalFrameCoordinator {
 		long profileGalValidateOpsNanos;
 		long profileGalValidateHandlesNanos;
 		long profileGalHazardAnalysisNanos;
+		long profileGalHazardReadEvents;
+		long profileGalHazardWriteEvents;
+		long profileGalHazardCandidatesExamined;
+		long profileGalHazardConflicts;
+		long profileGalHazardBarriersApplied;
+		long profileGalHazardActiveReadEntries;
+		long profileGalHazardActiveWriteEntries;
+		long profileGalCommandOpsBeforeNormalize;
+		long profileGalCommandOpsAfterNormalize;
+		long profileGalRedundantPipelineBindsRemoved;
+		long profileGalRedundantResourceSetBindsRemoved;
+		long profileGalRedundantVertexBufferBindsRemoved;
+		long profileGalRedundantIndexBufferBindsRemoved;
 		long profileBackendEncodeNanos;
 		long profileBackendSubmitNanos;
 		long profileBackendRetireNanos;

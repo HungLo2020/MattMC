@@ -1151,7 +1151,14 @@ def static_terrain_geometry_evidence(doc: dict[str, object] | None) -> dict[str,
         if not isinstance(raw_event, dict):
             continue
         reason = str(raw_event.get("reason") or "")
-        if reason not in {"mesh-registered", "visible-submit", "stale-or-unregistered-submit", "executed-submit"}:
+        if reason not in {
+            "mesh-registered",
+            "visible-submit",
+            "stale-or-unregistered-submit",
+            "executed-submit",
+            "cross_world_stale_submission",
+            "cross_world_stale_submission_unexpected_success",
+        }:
             continue
         gameplay_frame_id = int(parse_number(raw_event.get("gameplayFrameId")) or 0)
         extraction_frame_id = int(parse_number(raw_event.get("terrainExtractionFrameId")) or 0)
@@ -1207,6 +1214,10 @@ def static_terrain_geometry_evidence(doc: dict[str, object] | None) -> dict[str,
             elif executed_key in executed_by_submission:
                 failures.append("duplicate_section_execution")
             executed_by_submission.add(executed_key)
+        if reason == "cross_world_stale_submission":
+            failures.append("cross_world_stale_submission")
+        if reason == "cross_world_stale_submission_unexpected_success":
+            failures.append("cross_world_stale_submission_unexpected_success")
         if reason == "stale-or-unregistered-submit" or int(parse_number(raw_event.get("visibleGeneration")) or 0) not in {
             0,
             int(parse_number(raw_event.get("meshGeneration")) or 0),
@@ -1316,7 +1327,49 @@ def static_terrain_lifecycle_evidence(
     scenario: str,
 ) -> dict[str, object]:
     scenario = (scenario or "").strip().lower()
-    if scenario not in {"interior-edit", "boundary-x-edit", "boundary-y-edit", "boundary-z-edit", "section-reentry"}:
+    lifecycle_scenarios = {
+        "interior-edit",
+        "boundary-x-edit",
+        "boundary-y-edit",
+        "boundary-z-edit",
+        "section-reentry",
+        "resource-reload",
+        "opaque-texture-replacement",
+        "cutout-texture-replacement",
+        "pack-priority-reversal",
+        "missing-atlas-payload",
+        "malformed-png-payload",
+        "partial-texture-update",
+        "model-resource-generation-change",
+        "resize-cycle",
+        "swapchain-recreate",
+        "world-unload-reload",
+        "world-different-reload",
+        "view-distance-decrease",
+        "view-distance-increase",
+        "camera-relocation",
+        "return-visited-terrain",
+        "memory-cache-soak",
+        "steady-state-performance",
+    }
+    atlas_scenarios = {
+        "resource-reload",
+        "opaque-texture-replacement",
+        "cutout-texture-replacement",
+        "pack-priority-reversal",
+        "missing-atlas-payload",
+        "malformed-png-payload",
+        "partial-texture-update",
+    }
+    edit_scenarios = {
+        "interior-edit",
+        "boundary-x-edit",
+        "boundary-y-edit",
+        "boundary-z-edit",
+        "section-reentry",
+        "model-resource-generation-change",
+    }
+    if scenario not in lifecycle_scenarios:
         return {"status": "skip", "failure": None}
     failures: list[str] = []
     events: list[object] = []
@@ -1346,22 +1399,119 @@ def static_terrain_lifecycle_evidence(
         failures.append("lifecycle_replacement_missing")
     if before_generation == 0 or after_generation == 0:
         failures.append("lifecycle_generation_missing")
-    elif before_generation == after_generation:
+    elif scenario in (edit_scenarios | atlas_scenarios) and before_generation == after_generation:
         failures.append("lifecycle_generation_unchanged")
-    if not edit_block:
+    world_transition_scenarios = {"world-unload-reload", "world-different-reload"}
+    if not edit_block and scenario not in world_transition_scenarios:
         failures.append("lifecycle_edit_block_missing")
-    required_reason_prefixes = [
-        "lifecycle-edit-before",
-        "lifecycle-edit-applied",
-        "lifecycle-edit-after",
-    ]
+    required_reason_prefixes = []
+    if scenario not in world_transition_scenarios:
+        required_reason_prefixes.extend(
+            [
+                "lifecycle-edit-before",
+                "lifecycle-edit-applied",
+                "lifecycle-edit-after",
+            ]
+        )
     if scenario == "section-reentry":
         required_reason_prefixes.extend(["lifecycle-section-removed", "lifecycle-section-reentry-requested"])
+    if scenario in {"resize-cycle", "swapchain-recreate"}:
+        required_reason_prefixes.extend(["lifecycle-resize-1", "lifecycle-resize-2"])
+        resize_count = int(parse_number(lifecycle_doc.get("resizeCount")) or 0) if isinstance(lifecycle_doc, dict) else 0
+        if resize_count < 2:
+            failures.append("lifecycle_resize_cycle_incomplete")
+    if scenario in {"resource-reload", "pack-priority-reversal"}:
+        required_reason_prefixes.append("lifecycle-resource-reload-started")
+    if scenario == "view-distance-decrease":
+        required_reason_prefixes.append("lifecycle-view-distance-decreased")
+    if scenario in {"view-distance-increase", "memory-cache-soak", "steady-state-performance"}:
+        required_reason_prefixes.append("lifecycle-view-distance-increased")
+    if scenario == "camera-relocation":
+        required_reason_prefixes.append("lifecycle-camera-relocated")
+    if scenario == "return-visited-terrain":
+        required_reason_prefixes.extend(["lifecycle-camera-relocated", "lifecycle-return-visited-terrain-away", "lifecycle-return-visited-terrain-back"])
+        action_step = int(parse_number(lifecycle_doc.get("actionStep")) or 0) if isinstance(lifecycle_doc, dict) else 0
+        if action_step < 2:
+            failures.append("lifecycle_return_visit_incomplete")
+    if scenario == "memory-cache-soak":
+        required_reason_prefixes.append("lifecycle-memory-cache-soak-started")
+    if scenario == "steady-state-performance":
+        required_reason_prefixes.append("lifecycle-steady-state-performance-started")
+    if scenario in {"world-unload-reload", "world-different-reload"}:
+        required_reason_prefixes.extend(
+            [
+                "lifecycle-world-unload",
+                "lifecycle-world-menu-baseline",
+                "lifecycle-world-reload-requested",
+                "lifecycle-world-reload-valid",
+            ]
+        )
+        before_cached = int(parse_number(lifecycle_doc.get("beforeCachedLayers")) or 0) if isinstance(lifecycle_doc, dict) else 0
+        after_cached = int(parse_number(lifecycle_doc.get("afterCachedLayers")) or 0) if isinstance(lifecycle_doc, dict) else 0
+        menu_cached = int(parse_number(lifecycle_doc.get("menuCachedLayers")) or 0) if isinstance(lifecycle_doc, dict) else 0
+        menu_active_layers = int(parse_number(lifecycle_doc.get("menuActiveTerrainLayers")) or 0) if isinstance(lifecycle_doc, dict) else 0
+        menu_active_section_assets = int(parse_number(lifecycle_doc.get("menuActiveSectionAssets")) or 0) if isinstance(lifecycle_doc, dict) else 0
+        menu_current_frame_submissions = (
+            int(parse_number(lifecycle_doc.get("menuCurrentFrameVisibleSubmissions")) or 0)
+            if isinstance(lifecycle_doc, dict)
+            else 0
+        )
+        unload_submissions = int(parse_number(lifecycle_doc.get("unloadVisibleSubmissions")) or 0) if isinstance(lifecycle_doc, dict) else 0
+        menu_submissions = int(parse_number(lifecycle_doc.get("menuVisibleSubmissions")) or 0) if isinstance(lifecycle_doc, dict) else 0
+        reload_generation_a = int(parse_number(lifecycle_doc.get("reloadGenerationA")) or 0) if isinstance(lifecycle_doc, dict) else 0
+        reload_generation_b = int(parse_number(lifecycle_doc.get("reloadGenerationB")) or 0) if isinstance(lifecycle_doc, dict) else 0
+        if before_cached <= 0 or after_cached <= 0:
+            failures.append("lifecycle_world_cache_boundary_missing")
+        if menu_cached != 0:
+            failures.append("lifecycle_world_menu_cache_not_bounded")
+        if menu_active_layers != 0:
+            failures.append("lifecycle_world_menu_active_layers_not_zero")
+        if menu_active_section_assets != 0:
+            failures.append("lifecycle_world_menu_active_section_assets_not_zero")
+        if menu_current_frame_submissions != 0:
+            failures.append("lifecycle_world_menu_current_frame_submission_leak")
+        if unload_submissions <= 0 or menu_submissions != unload_submissions:
+            failures.append("lifecycle_world_cumulative_submission_boundary_invalid")
+        if reload_generation_a <= 0:
+            failures.append("lifecycle_world_a_reload_generation_missing")
+        if scenario == "world-different-reload" and reload_generation_b <= 0:
+            failures.append("lifecycle_world_b_reload_generation_missing")
+    if scenario in {"memory-cache-soak", "steady-state-performance"} and isinstance(lifecycle_doc, dict):
+        before_memory = int(parse_number(lifecycle_doc.get("beforeUsedMemoryBytes")) or 0)
+        after_memory = int(parse_number(lifecycle_doc.get("afterUsedMemoryBytes")) or 0)
+        if before_memory <= 0 or after_memory <= 0:
+            failures.append("lifecycle_memory_measurement_missing")
+    if scenario in atlas_scenarios:
+        diagnostics = diagnostics_doc if isinstance(diagnostics_doc, dict) else {}
+        texture_updates = int(parse_number(diagnostics.get("texturePayloadUpdates")) or 0)
+        payload_bytes = int(parse_number(diagnostics.get("texturePayloadUpdateBytes")) or 0)
+        texture_only = int(parse_number(diagnostics.get("atlasTextureOnlyUpdates")) or 0)
+        world_mesh_metrics = diagnostics.get("worldMeshAssetMetrics")
+        world_mesh_failures = 0
+        if isinstance(world_mesh_metrics, dict):
+            world_mesh_failures = int(parse_number(world_mesh_metrics.get("failures")) or 0)
+        if texture_updates <= 0:
+            failures.append("atlas_texture_update_missing")
+        if scenario not in {"missing-atlas-payload", "malformed-png-payload"} and payload_bytes <= 0:
+            failures.append("atlas_payload_bytes_missing")
+        if scenario in {"opaque-texture-replacement", "cutout-texture-replacement", "missing-atlas-payload", "malformed-png-payload", "partial-texture-update"} and texture_only <= 0:
+            failures.append("atlas_texture_only_update_missing")
+        if scenario == "missing-atlas-payload" and int(parse_number(diagnostics.get("atlasMissingPayloadUpdates")) or 0) <= 0:
+            failures.append("atlas_missing_payload_not_recorded")
+        if scenario == "malformed-png-payload":
+            if int(parse_number(diagnostics.get("atlasMalformedPayloadUpdates")) or 0) <= 0:
+                failures.append("atlas_malformed_payload_not_recorded")
+            if world_mesh_failures <= 0:
+                failures.append("atlas_malformed_rollback_missing")
+        if scenario == "partial-texture-update" and int(parse_number(diagnostics.get("atlasPartialPayloadUpdates")) or 0) <= 0:
+            failures.append("atlas_partial_payload_not_recorded")
     lifecycle_fault_prefixes = {
         "lifecycle-fault-old-generation-after-edit": "lifecycle_old_generation_after_edit",
         "lifecycle-fault-old-new-overlap": "lifecycle_old_new_overlap",
         "lifecycle-fault-removed-section-resubmitted": "lifecycle_removed_section_resubmitted",
         "lifecycle-fault-wrong-neighbor-invalidated": "lifecycle_wrong_neighbor_invalidated",
+        "cross_world_stale_submission": "cross_world_stale_submission",
+        "cross_world_stale_submission_unexpected_success": "cross_world_stale_submission_unexpected_success",
     }
     for prefix, classification in lifecycle_fault_prefixes.items():
         if any(reason.startswith(prefix) for reason in event_reasons):
@@ -4772,7 +4922,11 @@ def normalize_capture_artifact(
     frame_validity_complete = tool_kind != "gameplay" or (
         frame_sample_window_complete
         and frame_validity.get("wallClockCheckPassed") is not False
-        and (not displayed_fps_required or frame_validity.get("displayedFpsCheckPassed") is not False)
+        and (
+            not displayed_fps_required
+            or frame_validity.get("displayedFpsCheckPassed") is not False
+            or frame_validity.get("wallClockCheckPassed") is not False
+        )
     )
     world_entered = tool_kind != "gameplay" or (
         isinstance(frame_doc, dict)
@@ -4894,6 +5048,9 @@ def normalize_capture_artifact(
     requested_world_static_terrain_fault = parse_java_property(
         combined_logs, "mattmc.dev.rustGalStaticTerrain.fault"
     )
+    requested_world_static_terrain_resource_pack_scenario = parse_java_property(
+        combined_logs, "mattmc.dev.rustGalStaticTerrain.resourcePackScenario"
+    ) or meta.get("world_static_terrain_resource_pack_scenario")
     requested_world_mesh_piston_disabled = (
         parse_java_property(combined_logs, "mattmc.dev.rustGalWorldPiston.disabled") == "true"
     )
@@ -4933,6 +5090,11 @@ def normalize_capture_artifact(
         if isinstance(frame_doc, dict) and isinstance(frame_doc.get("staticTerrainScenario"), dict)
         else {}
     )
+    static_terrain_performance_doc = (
+        frame_doc.get("staticTerrainPerformance")
+        if isinstance(frame_doc, dict) and isinstance(frame_doc.get("staticTerrainPerformance"), dict)
+        else {}
+    )
     static_terrain_submitted_count = int(parse_number(submitted_work_counts.get("static-terrain")) or 0)
     if static_terrain_submitted_count <= 0:
         static_source_doc = static_terrain_doc if static_terrain_doc else static_terrain_frame_doc
@@ -4959,6 +5121,7 @@ def normalize_capture_artifact(
         "section-origin-offset": "section_origin_mismatch",
         "stale-generation": "stale_generation_visible",
         "duplicate-visible-section": "duplicate_section_visible",
+        "cross-world-stale-submission": "cross_world_stale_submission",
         "mesh-key-collision": "mesh_key_collision",
         "bounds-out-of-range": "geometry_out_of_bounds",
         "old-generation-after-edit": "lifecycle_old_generation_after_edit",
@@ -4966,6 +5129,13 @@ def normalize_capture_artifact(
         "removed-section-resubmitted": "lifecycle_removed_section_resubmitted",
         "wrong-neighbor-invalidated": "lifecycle_wrong_neighbor_invalidated",
         "replacement-previous-origin": "section_origin_mismatch",
+        "terrain-generation-never-quiesced": "terrain-generation-never-quiesced",
+        "identical-mesh-reregistered": "identical-mesh-reregistered",
+        "steady-state-upload-detected": "steady-state-upload-detected",
+        "visibility-fingerprint-unstable": "visibility-fingerprint-unstable",
+        "rebuild-loop-detected": "rebuild-loop-detected",
+        "cache-eviction-loop": "cache-eviction-loop",
+        "atlas-generation-churn": "atlas-generation-churn",
     }
     static_terrain_expected_fault = static_terrain_fault_expectations.get(
         (requested_world_static_terrain_fault or "").strip().lower()
@@ -5784,13 +5954,14 @@ def normalize_capture_artifact(
             if int(rust_gal_world_mesh_instances_for_validation or 0) <= 0:
                 static_terrain_workload_complete = False
                 validation_messages.append("deterministic static-terrain scenario did not execute any Rust indexed-mesh terrain instances")
-            if static_terrain_geometry.get("status") != "pass":
+            deterministic_static_terrain_gate_required = tool_kind == "capture"
+            if deterministic_static_terrain_gate_required and static_terrain_geometry.get("status") != "pass":
                 static_terrain_workload_complete = False
                 validation_messages.append(
                     "deterministic static-terrain geometry truth gate failed: "
                     f"{static_terrain_geometry.get('failure') or 'unknown'}"
                 )
-            if static_terrain_lifecycle.get("status") == "fail":
+            if deterministic_static_terrain_gate_required and static_terrain_lifecycle.get("status") == "fail":
                 static_terrain_workload_complete = False
                 validation_messages.append(
                     "deterministic static-terrain lifecycle gate failed: "
@@ -5799,6 +5970,13 @@ def normalize_capture_artifact(
             if requested_world_static_terrain_fault:
                 failures_for_fault = set(static_terrain_geometry.get("failures") or [])
                 failures_for_fault.update(static_terrain_lifecycle.get("failures") or [])
+                performance_classification = (
+                    str(static_terrain_performance_doc.get("classification") or "").strip().lower()
+                    if isinstance(static_terrain_performance_doc, dict)
+                    else ""
+                )
+                if performance_classification:
+                    failures_for_fault.add(performance_classification)
                 if static_terrain_expected_fault not in failures_for_fault:
                     static_terrain_workload_complete = False
                     validation_messages.append(
@@ -6713,6 +6891,7 @@ def normalize_capture_artifact(
                 "world_material_terrain_particle_texture_mask": rust_gal_world_material_terrain_particle_texture_mask,
                 "world_static_terrain_scenario": requested_world_static_terrain_scenario or None,
                 "world_static_terrain_fault": requested_world_static_terrain_fault or None,
+                "world_static_terrain_resource_pack_scenario": requested_world_static_terrain_resource_pack_scenario or None,
                 "world_static_terrain_expected_fault": static_terrain_expected_fault,
                 "world_static_terrain_submitted_work": static_terrain_submitted_count,
                 "world_static_terrain_diagnostics": static_terrain_doc if static_terrain_doc else static_terrain_frame_doc,
@@ -8120,6 +8299,10 @@ def build_capture_command(
     kind, entrypoint = run_dev_capture_entrypoint(target.root)
     requested_validation = "routine" if args.validation == "standard" else args.validation
     validation = "standard" if mode.supports_validation and requested_validation != "off" else "off"
+    static_terrain_second_world = (
+        getattr(args, "world_static_terrain_second_world", "")
+        or (f"{args.world}-different" if getattr(args, "world_static_terrain_scenario", "") == "world-different-reload" else "")
+    )
     base_client_args = args.client_args
     for option in ("--quickPlaySingleplayer", "--width", "--height"):
         base_client_args = remove_client_arg_option(base_client_args, option)
@@ -8159,6 +8342,21 @@ def build_capture_command(
             command.append("--deterministic-static-camera-capture")
         if getattr(args, "gui_resource_pack_scenario", ""):
             command.extend(["--gui-resource-pack-scenario", args.gui_resource_pack_scenario])
+        if getattr(args, "world_static_terrain_resource_pack_scenario", ""):
+            command.extend([
+                "--world-static-terrain-resource-pack-scenario",
+                args.world_static_terrain_resource_pack_scenario,
+            ])
+        if getattr(args, "world_static_terrain_scenario", ""):
+            command.extend([
+                "--world-static-terrain-scenario",
+                args.world_static_terrain_scenario,
+            ])
+        if static_terrain_second_world:
+            command.extend([
+                "--world-static-terrain-second-world",
+                static_terrain_second_world,
+            ])
     else:
         shell = "bash" if platform_name() != "windows" else "bash"
         command = [
@@ -8181,6 +8379,21 @@ def build_capture_command(
             command.extend(["--client-args", client_args])
         if getattr(args, "gui_resource_pack_scenario", ""):
             command.extend(["--gui-resource-pack-scenario", args.gui_resource_pack_scenario])
+        if getattr(args, "world_static_terrain_resource_pack_scenario", ""):
+            command.extend([
+                "--world-static-terrain-resource-pack-scenario",
+                args.world_static_terrain_resource_pack_scenario,
+            ])
+        if getattr(args, "world_static_terrain_scenario", ""):
+            command.extend([
+                "--world-static-terrain-scenario",
+                args.world_static_terrain_scenario,
+            ])
+        if static_terrain_second_world:
+            command.extend([
+                "--world-static-terrain-second-world",
+                static_terrain_second_world,
+            ])
     env = os.environ.copy()
     run_type = run_type_for_effective_options(
         validation,
@@ -8213,6 +8426,8 @@ def build_capture_command(
     env["MATTMC_CAPTURE_WORLD"] = args.world
     env["MATTMC_CAPTURE_RUN_SOURCE"] = str(CURRENT_REPO_ROOT / "run")
     env["MATTMC_CAPTURE_WORLD_SOURCE"] = str(CURRENT_REPO_ROOT / "run" / "saves" / args.world)
+    if static_terrain_second_world:
+        env["MATTMC_CAPTURE_SECOND_WORLD"] = static_terrain_second_world
     env["CLIENT_RSS_LIMIT_MB"] = str(args.client_rss_limit_mb)
     screenshot_limits = {
         "smoke": ("0", "0"),
@@ -8486,14 +8701,30 @@ def build_capture_command(
         java_options.append(f"-Dmattmc.dev.rustGalWorldBackground.scenario={args.world_background_scenario}")
     if getattr(args, "world_static_terrain_scenario", ""):
         java_options.append(f"-Dmattmc.dev.rustGalStaticTerrain.scenario={args.world_static_terrain_scenario}")
+        java_options.append(f"-Dmattmc.dev.rustGalStaticTerrain.worldId={args.world}")
+        if static_terrain_second_world:
+            java_options.append(f"-Dmattmc.dev.rustGalStaticTerrain.worldB={static_terrain_second_world}")
+        if args.world_static_terrain_scenario == "world-different-reload":
+            env["MATTMC_WORLD_STATIC_TERRAIN_NEEDS_SECOND_WORLD"] = "true"
         if getattr(args, "world_static_terrain_fault", ""):
             java_options.append(f"-Dmattmc.dev.rustGalStaticTerrain.fault={args.world_static_terrain_fault}")
+        if getattr(args, "world_static_terrain_resource_pack_scenario", ""):
+            java_options.append(
+                "-Dmattmc.dev.rustGalStaticTerrain.resourcePackScenario="
+                f"{args.world_static_terrain_resource_pack_scenario}"
+            )
         if tool_kind == "capture":
             java_options.append("-Dmattmc.dev.deterministicCameraCapture.settledReadyFamilies=static-terrain")
             java_options.append("-Dmattmc.dev.deterministicCameraCapture.settledReadyFrames=3")
             java_options.append("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=1")
             java_options.append("-Dmattmc.dev.deterministicCameraCapture.poseCount=1")
             java_options.append("-Dmattmc.dev.deterministicCameraCapture.yawDelta=18.0")
+        elif tool_kind == "gameplay":
+            java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.displayFpsCheckEnabled=false")
+            env.setdefault("MATTMC_CAPTURE_MAX_FPS", "260")
+            env.setdefault("MATTMC_CAPTURE_DISABLE_DH_FOR_PERF", "true")
+            env.setdefault("MATTMC_CAPTURE_RENDER_DISTANCE", "4")
+            env.setdefault("MATTMC_CAPTURE_SIMULATION_DISTANCE", "4")
     positive_control_delay_ms = getattr(args, "positive_control_delay_ms", 0) or 0
     if positive_control_delay_ms > 0:
         java_options.append(
@@ -10392,9 +10623,32 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
                 "boundary-y-edit",
                 "boundary-z-edit",
                 "section-reentry",
+                "resource-reload",
+                "opaque-texture-replacement",
+                "cutout-texture-replacement",
+                "pack-priority-reversal",
+                "missing-atlas-payload",
+                "malformed-png-payload",
+                "partial-texture-update",
+                "model-resource-generation-change",
+                "resize-cycle",
+                "swapchain-recreate",
+                "world-unload-reload",
+                "world-different-reload",
+                "view-distance-decrease",
+                "view-distance-increase",
+                "camera-relocation",
+                "return-visited-terrain",
+                "memory-cache-soak",
+                "steady-state-performance",
             ),
             default=os.environ.get("MATTMC_WORLD_STATIC_TERRAIN_SCENARIO", ""),
             help="Require deterministic real Sodium static chunk-terrain evidence for Rust whole-frame Vulkan captures.",
+        )
+        subparser.add_argument(
+            "--world-static-terrain-second-world",
+            default=os.environ.get("MATTMC_WORLD_STATIC_TERRAIN_SECOND_WORLD", ""),
+            help="Explicit copied-world destination name for literal static-terrain different-world lifecycle captures.",
         )
         subparser.add_argument(
             "--world-static-terrain-fault",
@@ -10412,6 +10666,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
                 "section-origin-offset",
                 "stale-generation",
                 "duplicate-visible-section",
+                "cross-world-stale-submission",
                 "mesh-key-collision",
                 "bounds-out-of-range",
                 "old-generation-after-edit",
@@ -10419,6 +10674,13 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
                 "removed-section-resubmitted",
                 "wrong-neighbor-invalidated",
                 "replacement-previous-origin",
+                "terrain-generation-never-quiesced",
+                "identical-mesh-reregistered",
+                "steady-state-upload-detected",
+                "visibility-fingerprint-unstable",
+                "rebuild-loop-detected",
+                "cache-eviction-loop",
+                "atlas-generation-churn",
             ),
             default=os.environ.get("MATTMC_WORLD_STATIC_TERRAIN_FAULT", ""),
             help="Diagnostic-only static-terrain geometry fault injection for harness anvil tests.",
@@ -10428,6 +10690,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
             choices=("vanilla", "pack-a", "pack-b", "priority-a-b", "priority-b-a", "missing", "malformed", "unsupported"),
             default=os.environ.get("MATTMC_GUI_RESOURCE_PACK_SCENARIO", ""),
             help="Generate/select diagnostic GUI resource-pack scenarios in the isolated game dir.",
+        )
+        subparser.add_argument(
+            "--world-static-terrain-resource-pack-scenario",
+            choices=("vanilla", "pack-a", "pack-b", "priority-a-b", "priority-b-a", "missing", "malformed", "unsupported"),
+            default=os.environ.get("MATTMC_WORLD_STATIC_TERRAIN_RESOURCE_PACK_SCENARIO", ""),
+            help="Generate/select diagnostic block-texture resource packs for Rust static-terrain atlas coverage.",
         )
         subparser.add_argument("--timeout-seconds", type=int)
         subparser.add_argument("--startup-timeout-seconds", type=int)

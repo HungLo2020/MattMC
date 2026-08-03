@@ -937,6 +937,19 @@ pub struct FfiWholeFrameProfileSnapshot {
     pub vulkan_configured_frames_in_flight: u64,
     pub vulkan_images_in_flight: u64,
     pub vulkan_available_frame_slots: u64,
+    pub gal_hazard_read_events: u64,
+    pub gal_hazard_write_events: u64,
+    pub gal_hazard_candidates_examined: u64,
+    pub gal_hazard_conflicts: u64,
+    pub gal_hazard_barriers_applied: u64,
+    pub gal_hazard_active_read_entries: u64,
+    pub gal_hazard_active_write_entries: u64,
+    pub gal_command_ops_before_normalize: u64,
+    pub gal_command_ops_after_normalize: u64,
+    pub gal_redundant_pipeline_binds_removed: u64,
+    pub gal_redundant_resource_set_binds_removed: u64,
+    pub gal_redundant_vertex_buffer_binds_removed: u64,
+    pub gal_redundant_index_buffer_binds_removed: u64,
 }
 
 impl Default for FfiGuiFrameSubmitResult {

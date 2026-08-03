@@ -119,12 +119,9 @@ impl VulkanSwapchain {
         self.next_frame += 1;
         let frame = FrameId(self.next_frame);
         if desc.expected_extent.width == 0 || desc.expected_extent.height == 0 {
-            self.metrics.acquire_nanos = self
-                .metrics
-                .acquire_nanos
-                .saturating_add(crate::render::vulkanic::metrics::elapsed_nanos_u64(
-                    acquire_started,
-                ));
+            self.metrics.acquire_nanos = self.metrics.acquire_nanos.saturating_add(
+                crate::render::vulkanic::metrics::elapsed_nanos_u64(acquire_started),
+            );
             return Ok(AcquiredFrame {
                 frame,
                 correlation_id: desc.correlation_id,
@@ -163,14 +160,25 @@ impl VulkanSwapchain {
             }
             Err(error) => {
                 unsafe { self.context.device.destroy_fence(acquire_fence, None) };
-                return Err(match error {
-                    vk::Result::ERROR_OUT_OF_DATE_KHR => GalError::backend(
-                        "Vulkan swapchain was out-of-date during acquire; resize is required",
-                    ),
-                    other => {
-                        GalError::backend(format!("Vulkan swapchain acquire failed: {other:?}"))
-                    }
-                });
+                if error == vk::Result::ERROR_OUT_OF_DATE_KHR {
+                    self.desc.extent = desc.expected_extent;
+                    self.recreate(self.swapchain)?;
+                    self.metrics.acquire_nanos = self.metrics.acquire_nanos.saturating_add(
+                        crate::render::vulkanic::metrics::elapsed_nanos_u64(acquire_started),
+                    );
+                    self.metrics.swapchain_generation = self.recreate_count;
+                    return Ok(AcquiredFrame {
+                        frame,
+                        correlation_id: desc.correlation_id,
+                        status: FrameAcquireStatus::Resized,
+                        render_target: FrameRenderTargetId(0),
+                        extent: self.desc.extent,
+                        color_format: self.color_format,
+                    });
+                }
+                return Err(GalError::backend(format!(
+                    "Vulkan swapchain acquire failed: {error:?}"
+                )));
             }
         };
         unsafe { self.context.device.destroy_fence(acquire_fence, None) };
@@ -181,19 +189,14 @@ impl VulkanSwapchain {
             render_target,
             suboptimal,
         });
-        self.metrics.acquire_nanos = self
-            .metrics
-            .acquire_nanos
-            .saturating_add(crate::render::vulkanic::metrics::elapsed_nanos_u64(
-                acquire_started,
-            ));
+        self.metrics.acquire_nanos = self.metrics.acquire_nanos.saturating_add(
+            crate::render::vulkanic::metrics::elapsed_nanos_u64(acquire_started),
+        );
         self.metrics.acquired_image_index = u64::from(image_index);
         self.metrics.swapchain_generation = self.recreate_count;
         self.metrics.images_in_flight = self.acquired.len() as u64;
-        self.metrics.available_frame_slots = self
-            .images
-            .len()
-            .saturating_sub(self.acquired.len()) as u64;
+        self.metrics.available_frame_slots =
+            self.images.len().saturating_sub(self.acquired.len()) as u64;
         trace::message(&format!(
             "gal.frame.acquire backend=vulkan correlation={} frame={} image={} target={} generation={} window={}",
             desc.correlation_id.0,
@@ -252,12 +255,9 @@ impl VulkanSwapchain {
         let acquired = self.acquired.remove(position);
         let wait_started = std::time::Instant::now();
         wait_timeline(&self.context, desc.wait_for)?;
-        self.metrics.present_wait_nanos = self
-            .metrics
-            .present_wait_nanos
-            .saturating_add(crate::render::vulkanic::metrics::elapsed_nanos_u64(
-                wait_started,
-            ));
+        self.metrics.present_wait_nanos = self.metrics.present_wait_nanos.saturating_add(
+            crate::render::vulkanic::metrics::elapsed_nanos_u64(wait_started),
+        );
         let swapchains = [self.swapchain];
         let image_indices = [acquired.image_index];
         let present_info = vk::PresentInfoKHR::default()
@@ -281,17 +281,12 @@ impl VulkanSwapchain {
         if let Some(layout) = self.image_layouts.get_mut(acquired.image_index as usize) {
             *layout = vk::ImageLayout::PRESENT_SRC_KHR;
         }
-        self.metrics.present_nanos = self
-            .metrics
-            .present_nanos
-            .saturating_add(crate::render::vulkanic::metrics::elapsed_nanos_u64(
-                present_started,
-            ));
+        self.metrics.present_nanos = self.metrics.present_nanos.saturating_add(
+            crate::render::vulkanic::metrics::elapsed_nanos_u64(present_started),
+        );
         self.metrics.images_in_flight = self.acquired.len() as u64;
-        self.metrics.available_frame_slots = self
-            .images
-            .len()
-            .saturating_sub(self.acquired.len()) as u64;
+        self.metrics.available_frame_slots =
+            self.images.len().saturating_sub(self.acquired.len()) as u64;
         trace::message(&format!(
             "gal.frame.present backend=vulkan correlation={} frame={} image={} submission={} status={:?} window={}",
             desc.correlation_id.0,
@@ -766,7 +761,10 @@ enum PresentModeFallbackReason {
     FallbackFifoRelaxed = 7,
 }
 
-fn choose_present_mode(available: &[vk::PresentModeKHR], requested: PresentMode) -> PresentModeSelection {
+fn choose_present_mode(
+    available: &[vk::PresentModeKHR],
+    requested: PresentMode,
+) -> PresentModeSelection {
     let explicit = match requested {
         PresentMode::Immediate => Some(vk::PresentModeKHR::IMMEDIATE),
         PresentMode::Mailbox => Some(vk::PresentModeKHR::MAILBOX),

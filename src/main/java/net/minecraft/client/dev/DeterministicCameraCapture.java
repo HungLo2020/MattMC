@@ -6,6 +6,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
 import net.minecraft.client.gui.components.BossHealthOverlay;
 import net.minecraft.client.gui.screens.PauseScreen;
+import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
@@ -33,12 +34,16 @@ import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.CollisionContext;
+import net.minecraft.network.chat.Component;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.world.RustGalTerrainRenderer;
 import net.vulkanic.world.RustGalWorldPrimitiveRenderer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -51,6 +56,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Development-only deterministic camera capture hook.
@@ -113,6 +119,12 @@ public final class DeterministicCameraCapture {
 		System.getProperty("mattmc.dev.rustGalStaticTerrain.scenario", "").trim().toLowerCase(Locale.ROOT);
 	private static final String STATIC_TERRAIN_FAULT =
 		System.getProperty("mattmc.dev.rustGalStaticTerrain.fault", "").trim().toLowerCase(Locale.ROOT);
+	private static final String STATIC_TERRAIN_RESOURCE_PACK_SCENARIO =
+		System.getProperty("mattmc.dev.rustGalStaticTerrain.resourcePackScenario", "").trim().toLowerCase(Locale.ROOT);
+	private static final String STATIC_TERRAIN_WORLD_ID =
+		System.getProperty("mattmc.dev.rustGalStaticTerrain.worldId", "").trim();
+	private static final String STATIC_TERRAIN_WORLD_B_ID =
+		System.getProperty("mattmc.dev.rustGalStaticTerrain.worldB", "").trim();
 	private static final int FORCED_ARMOR_VALUE =
 		Integer.getInteger("mattmc.dev.deterministicCameraCapture.armorValue", -1);
 	private static final float FORCED_PLAYER_HEALTH =
@@ -219,6 +231,29 @@ public final class DeterministicCameraCapture {
 	private static long staticTerrainLifecycleAfterGeneration;
 	private static String staticTerrainLifecycleStage = "inactive";
 	private static String staticTerrainLifecycleBlockType = "";
+	private static int staticTerrainLifecycleActionStep;
+	private static int staticTerrainLifecycleResizeCount;
+	private static int staticTerrainOriginalRenderDistance;
+	private static int staticTerrainOriginalSimulationDistance;
+	private static Vec3 staticTerrainOriginalPosition;
+	private static int staticTerrainLifecycleBeforeCachedLayers;
+	private static int staticTerrainLifecycleAfterCachedLayers;
+	private static long staticTerrainLifecycleBeforeRssBytes;
+	private static long staticTerrainLifecycleAfterRssBytes;
+	private static int staticTerrainMenuCachedLayers;
+	private static long staticTerrainMenuUsedMemoryBytes;
+	private static long staticTerrainUnloadSubmissionSnapshot;
+	private static long staticTerrainMenuSubmissionSnapshot;
+	private static long staticTerrainMenuCurrentFrameSubmissionSnapshot;
+	private static int staticTerrainMenuActiveLayerSnapshot;
+	private static int staticTerrainMenuActiveSectionAssetSnapshot;
+	private static boolean staticTerrainCrossWorldStaleFaultInjected;
+	private static long staticTerrainReloadGenerationA;
+	private static long staticTerrainReloadGenerationB;
+	private static String staticTerrainLifecycleWorldA = "";
+	private static String staticTerrainLifecycleWorldB = "";
+	private static boolean staticTerrainLifecycleTransitionInProgress;
+	private static CompletableFuture<Void> staticTerrainReloadFuture;
 	private static String movingMeshSetupStage = "inactive";
 	private static String movingMeshSetupLastMissing = "";
 	private static int movingMeshSetupAttempts;
@@ -535,6 +570,9 @@ public final class DeterministicCameraCapture {
 			staticTerrainLifecycleStage = "inactive";
 			return true;
 		}
+		if (staticTerrainLiteralWorldTransitionScenario()) {
+			return setupStaticTerrainLiteralWorldTransition(minecraft);
+		}
 		if (minecraft.player == null || minecraft.level == null || minecraft.getSingleplayerServer() == null) {
 			staticTerrainLifecycleStage = "waiting-for-world";
 			return false;
@@ -556,17 +594,22 @@ public final class DeterministicCameraCapture {
 				staticTerrainLifecycleStage = "waiting-for-source-generation";
 				return false;
 			}
+			RustGalTerrainRenderer.TerrainDiagnostics beforeDiagnostics = RustGalTerrainRenderer.diagnosticsSnapshot();
 			staticTerrainLifecycleEditBlock = target;
-			staticTerrainLifecycleBeforeGeneration = before.meshGeneration();
-			BlockState replacement = Blocks.AIR.defaultBlockState();
+			staticTerrainLifecycleBeforeGeneration = staticTerrainUsesAtlasGeneration()
+				? beforeDiagnostics.atlasGeneration()
+				: before.meshGeneration();
+			staticTerrainLifecycleBeforeCachedLayers = beforeDiagnostics.cachedLayerAssets();
+			staticTerrainLifecycleBeforeRssBytes = currentUsedMemoryBytes();
+			BlockState replacement = staticTerrainReplacementState();
 			staticTerrainLifecycleBlockType = replacement.getBlock().builtInRegistryHolder().key().location().toString();
 			RustGalTerrainRenderer.recordLifecycleMarker(
 				"lifecycle-edit-before",
 				target,
 				ChunkSectionLayer.SOLID,
-				STATIC_TERRAIN_SCENARIO + ":block=" + target.toShortString() + ":generation=" + before.meshGeneration()
+				STATIC_TERRAIN_SCENARIO + ":block=" + target.toShortString() + ":generation=" + staticTerrainLifecycleBeforeGeneration
 			);
-			applyStaticTerrainLifecycleEdit(serverLevel, minecraft.level, target, replacement);
+			applyStaticTerrainLifecycleAction(minecraft, serverLevel, target, replacement);
 			RustGalTerrainRenderer.recordLifecycleMarker(
 				"lifecycle-edit-applied",
 				target,
@@ -594,13 +637,17 @@ public final class DeterministicCameraCapture {
 			return false;
 		}
 		framesWaitingForStaticTerrainLifecycle++;
-		RustGalTerrainRenderer.TerrainLayerSnapshot after =
-			RustGalTerrainRenderer.snapshotLayer(staticTerrainLifecycleEditBlock, ChunkSectionLayer.SOLID);
-		if (after != null
-			&& after.meshGeneration() != 0L
-			&& after.meshGeneration() != staticTerrainLifecycleBeforeGeneration) {
-			staticTerrainLifecycleAfterGeneration = after.meshGeneration();
+		if (continueStaticTerrainLifecycleAction(minecraft)) {
+			return false;
+		}
+		long observedGeneration = observedStaticTerrainGeneration();
+		boolean replacementReady = staticTerrainReplacementReady(observedGeneration);
+		if (replacementReady) {
+			staticTerrainLifecycleAfterGeneration = observedGeneration;
 			if (!staticTerrainLifecycleAfterRecorded) {
+				RustGalTerrainRenderer.TerrainDiagnostics afterDiagnostics = RustGalTerrainRenderer.diagnosticsSnapshot();
+				staticTerrainLifecycleAfterCachedLayers = afterDiagnostics.cachedLayerAssets();
+				staticTerrainLifecycleAfterRssBytes = currentUsedMemoryBytes();
 				RustGalTerrainRenderer.recordLifecycleMarker(
 					"lifecycle-edit-after",
 					staticTerrainLifecycleEditBlock,
@@ -625,7 +672,7 @@ public final class DeterministicCameraCapture {
 				+ " beforeGeneration="
 				+ staticTerrainLifecycleBeforeGeneration
 				+ " afterGeneration="
-				+ (after == null ? 0L : after.meshGeneration())
+				+ observedGeneration
 				+ " stage="
 				+ staticTerrainLifecycleStage);
 		} else if ((framesWaitingForStaticTerrainLifecycle % 30) == 0) {
@@ -636,9 +683,464 @@ public final class DeterministicCameraCapture {
 
 	private static boolean staticTerrainLifecycleScenario() {
 		return switch (STATIC_TERRAIN_SCENARIO) {
-			case "interior-edit", "boundary-x-edit", "boundary-y-edit", "boundary-z-edit", "section-reentry" -> true;
+			case "interior-edit", "boundary-x-edit", "boundary-y-edit", "boundary-z-edit", "section-reentry",
+				"resource-reload", "opaque-texture-replacement", "cutout-texture-replacement",
+				"pack-priority-reversal", "missing-atlas-payload", "malformed-png-payload",
+				"partial-texture-update", "model-resource-generation-change", "resize-cycle",
+				"swapchain-recreate", "world-unload-reload", "world-different-reload",
+				"view-distance-decrease", "view-distance-increase", "camera-relocation",
+				"return-visited-terrain", "memory-cache-soak", "steady-state-performance" -> true;
 			default -> false;
 		};
+	}
+
+	private static boolean staticTerrainLiteralWorldTransitionScenario() {
+		return "world-unload-reload".equals(STATIC_TERRAIN_SCENARIO)
+			|| "world-different-reload".equals(STATIC_TERRAIN_SCENARIO);
+	}
+
+	private static boolean staticTerrainEditScenario() {
+		return switch (STATIC_TERRAIN_SCENARIO) {
+			case "interior-edit", "boundary-x-edit", "boundary-y-edit", "boundary-z-edit", "section-reentry",
+				"model-resource-generation-change" -> true;
+			default -> false;
+		};
+	}
+
+	private static boolean staticTerrainUsesAtlasGeneration() {
+		return switch (STATIC_TERRAIN_SCENARIO) {
+			case "resource-reload", "opaque-texture-replacement", "cutout-texture-replacement",
+				"pack-priority-reversal", "missing-atlas-payload", "malformed-png-payload",
+				"partial-texture-update" -> true;
+			default -> false;
+		};
+	}
+
+	private static BlockState staticTerrainReplacementState() {
+		return staticTerrainEditScenario() ? Blocks.AIR.defaultBlockState() : Blocks.STONE.defaultBlockState();
+	}
+
+	private static void applyStaticTerrainLifecycleAction(
+		Minecraft minecraft,
+		ServerLevel serverLevel,
+		BlockPos target,
+		BlockState replacement
+	) {
+		if (staticTerrainEditScenario()) {
+			applyStaticTerrainLifecycleEdit(serverLevel, minecraft.level, target, replacement);
+			return;
+		}
+		switch (STATIC_TERRAIN_SCENARIO) {
+			case "resource-reload", "pack-priority-reversal" -> {
+				RustGalTerrainRenderer.invalidateForResourceReload();
+				minecraft.levelRenderer.allChanged();
+				staticTerrainLifecycleStage = "resource-reload-started";
+				RustGalTerrainRenderer.recordLifecycleMarker(
+					"lifecycle-resource-reload-started",
+					target,
+					ChunkSectionLayer.SOLID,
+					STATIC_TERRAIN_SCENARIO + ":pack=" + STATIC_TERRAIN_RESOURCE_PACK_SCENARIO + ":mode=bounded-terrain-rebuild"
+				);
+			}
+			case "opaque-texture-replacement" ->
+				RustGalTerrainRenderer.injectAtlasTexturePayloadForDiagnostics(staticTerrainValidTinyPngPayload(), "lifecycle-atlas-opaque-texture-replacement");
+			case "cutout-texture-replacement" ->
+				RustGalTerrainRenderer.injectAtlasTexturePayloadForDiagnostics(staticTerrainValidTinyPngPayload(), "lifecycle-atlas-cutout-texture-replacement");
+			case "missing-atlas-payload" ->
+				RustGalTerrainRenderer.injectAtlasTexturePayloadForDiagnostics(new byte[0], "lifecycle-atlas-missing-payload");
+			case "malformed-png-payload" ->
+				RustGalTerrainRenderer.injectAtlasTexturePayloadForDiagnostics("not a png".getBytes(StandardCharsets.UTF_8), "lifecycle-atlas-malformed-payload");
+			case "partial-texture-update" ->
+				RustGalTerrainRenderer.injectAtlasTexturePayloadForDiagnostics(staticTerrainValidTinyPngPayload(), "lifecycle-atlas-partial-texture-update");
+			case "resize-cycle", "swapchain-recreate" -> {
+				staticTerrainOriginalRenderDistance = minecraft.options.renderDistance().get();
+				staticTerrainOriginalSimulationDistance = minecraft.options.simulationDistance().get();
+				minecraft.getWindow().setWindowed(960, 540);
+				minecraft.resizeDisplay();
+				staticTerrainLifecycleResizeCount = 1;
+				staticTerrainLifecycleStage = "resize-1";
+				RustGalTerrainRenderer.recordLifecycleMarker("lifecycle-resize-1", target, ChunkSectionLayer.SOLID, "extent=960x540");
+			}
+			case "view-distance-decrease" -> {
+				staticTerrainOriginalRenderDistance = minecraft.options.renderDistance().get();
+				staticTerrainOriginalSimulationDistance = minecraft.options.simulationDistance().get();
+				minecraft.options.renderDistance().set(Math.max(2, Math.min(staticTerrainOriginalRenderDistance, 4)));
+				minecraft.options.simulationDistance().set(Math.max(2, Math.min(staticTerrainOriginalSimulationDistance, 4)));
+				staticTerrainLifecycleStage = "view-distance-decreased";
+				RustGalTerrainRenderer.recordLifecycleMarker(
+					"lifecycle-view-distance-decreased",
+					target,
+					ChunkSectionLayer.SOLID,
+					"renderDistance=" + minecraft.options.renderDistance().get()
+						+ ":simulationDistance=" + minecraft.options.simulationDistance().get()
+				);
+			}
+			case "view-distance-increase", "memory-cache-soak", "steady-state-performance" -> {
+				staticTerrainOriginalRenderDistance = minecraft.options.renderDistance().get();
+				staticTerrainOriginalSimulationDistance = minecraft.options.simulationDistance().get();
+				minecraft.options.renderDistance().set(Math.max(staticTerrainOriginalRenderDistance, 12));
+				minecraft.options.simulationDistance().set(Math.max(staticTerrainOriginalSimulationDistance, 12));
+				staticTerrainLifecycleStage = "visibility-expanded";
+				RustGalTerrainRenderer.recordLifecycleMarker(
+					"lifecycle-view-distance-increased",
+					target,
+					ChunkSectionLayer.SOLID,
+					"renderDistance=" + minecraft.options.renderDistance().get()
+						+ ":simulationDistance=" + minecraft.options.simulationDistance().get()
+				);
+				if ("memory-cache-soak".equals(STATIC_TERRAIN_SCENARIO)) {
+					RustGalTerrainRenderer.recordLifecycleMarker(
+						"lifecycle-memory-cache-soak-started",
+						target,
+						ChunkSectionLayer.SOLID,
+						"usedMemoryBytes=" + currentUsedMemoryBytes()
+					);
+				}
+				if ("steady-state-performance".equals(STATIC_TERRAIN_SCENARIO)) {
+					RustGalTerrainRenderer.recordLifecycleMarker(
+						"lifecycle-steady-state-performance-started",
+						target,
+						ChunkSectionLayer.SOLID,
+						"cachedLayers=" + RustGalTerrainRenderer.diagnosticsSnapshot().cachedLayerAssets()
+					);
+				}
+			}
+			case "camera-relocation", "return-visited-terrain" -> {
+				staticTerrainOriginalRenderDistance = minecraft.options.renderDistance().get();
+				staticTerrainOriginalSimulationDistance = minecraft.options.simulationDistance().get();
+				minecraft.options.renderDistance().set(Math.max(staticTerrainOriginalRenderDistance, 12));
+				minecraft.options.simulationDistance().set(Math.max(staticTerrainOriginalSimulationDistance, 12));
+				staticTerrainOriginalPosition = initialPosition;
+				Vec3 relocated = initialPosition.add(64.0, 0.0, 64.0);
+				initialPosition = relocated;
+				if (minecraft.player != null) {
+					minecraft.player.setPos(relocated);
+					minecraft.player.setOldPosAndRot(relocated, initialPose.yaw(), initialPose.pitch());
+				}
+				staticTerrainLifecycleStage = "camera-relocated";
+				RustGalTerrainRenderer.recordLifecycleMarker(
+					"lifecycle-camera-relocated",
+					target,
+					ChunkSectionLayer.SOLID,
+					"position=" + formatVec(relocated)
+				);
+				if ("return-visited-terrain".equals(STATIC_TERRAIN_SCENARIO)) {
+					staticTerrainLifecycleActionStep = 1;
+					RustGalTerrainRenderer.recordLifecycleMarker(
+						"lifecycle-return-visited-terrain-away",
+						target,
+						ChunkSectionLayer.SOLID,
+						"position=" + formatVec(relocated)
+					);
+				}
+			}
+			default -> staticTerrainLifecycleStage = "action-applied";
+		}
+	}
+
+	private static boolean setupStaticTerrainLiteralWorldTransition(Minecraft minecraft) {
+		framesWaitingForStaticTerrainLifecycle++;
+		if (framesWaitingForStaticTerrainLifecycle > SETTLED_READY_MAX_WAIT_FRAMES) {
+			fail("timed out waiting for literal static terrain world transition: scenario="
+				+ STATIC_TERRAIN_SCENARIO
+				+ " stage="
+				+ staticTerrainLifecycleStage
+				+ " actionStep="
+				+ staticTerrainLifecycleActionStep);
+		}
+		if (staticTerrainLifecycleTransitionInProgress) {
+			return false;
+		}
+		staticTerrainLifecycleWorldA = STATIC_TERRAIN_WORLD_ID.isEmpty() ? "Origin" : STATIC_TERRAIN_WORLD_ID;
+		staticTerrainLifecycleWorldB = STATIC_TERRAIN_WORLD_B_ID.isEmpty()
+			? staticTerrainLifecycleWorldA + "-different"
+			: STATIC_TERRAIN_WORLD_B_ID;
+		RustGalTerrainRenderer.TerrainDiagnostics diagnostics = RustGalTerrainRenderer.diagnosticsSnapshot();
+		switch (staticTerrainLifecycleActionStep) {
+			case 0 -> {
+				if (!staticTerrainInPlayableWorld(minecraft)
+					|| diagnostics.visibleLayerSubmissions() <= 0
+					|| diagnostics.cachedLayerAssets() <= 0) {
+					staticTerrainLifecycleStage = "waiting-for-initial-world-a-terrain";
+					return false;
+				}
+				staticTerrainLifecycleBeforeGeneration = Math.max(1L, diagnostics.atlasGeneration());
+				staticTerrainLifecycleBeforeCachedLayers = diagnostics.cachedLayerAssets();
+				staticTerrainLifecycleBeforeRssBytes = currentUsedMemoryBytes();
+				staticTerrainUnloadSubmissionSnapshot = diagnostics.visibleLayerSubmissions();
+				staticTerrainLifecycleSetup = true;
+				staticTerrainLifecycleStage = "leaving-world-a";
+				RustGalTerrainRenderer.recordLifecycleMarker(
+					"lifecycle-world-unload",
+					BlockPos.ZERO,
+					ChunkSectionLayer.SOLID,
+					"world=" + staticTerrainLifecycleWorldA + ":dimension=" + initialDimension
+				);
+				staticTerrainLifecycleTransitionInProgress = true;
+				staticTerrainLifecycleActionStep = 1;
+				framesWaitingForStaticTerrainLifecycle = 0;
+				try {
+					minecraft.disconnectFromWorld(Component.literal("static terrain lifecycle transition"));
+				} finally {
+					staticTerrainLifecycleTransitionInProgress = false;
+				}
+				return false;
+			}
+			case 1 -> {
+				if (staticTerrainInPlayableWorld(minecraft)) {
+					staticTerrainLifecycleStage = "waiting-for-menu-after-world-a";
+					return false;
+				}
+				diagnostics = RustGalTerrainRenderer.diagnosticsSnapshot();
+				staticTerrainMenuCachedLayers = diagnostics.cachedLayerAssets();
+				staticTerrainMenuActiveLayerSnapshot = diagnostics.activeTerrainLayers();
+				staticTerrainMenuActiveSectionAssetSnapshot = diagnostics.activeSectionAssets();
+				staticTerrainMenuCurrentFrameSubmissionSnapshot = diagnostics.currentFrameVisibleLayerSubmissions();
+				staticTerrainMenuUsedMemoryBytes = currentUsedMemoryBytes();
+				staticTerrainMenuSubmissionSnapshot = diagnostics.visibleLayerSubmissions();
+				if (staticTerrainMenuSubmissionSnapshot != staticTerrainUnloadSubmissionSnapshot
+					|| staticTerrainMenuCachedLayers != 0
+					|| staticTerrainMenuActiveLayerSnapshot != 0
+					|| staticTerrainMenuActiveSectionAssetSnapshot != 0
+					|| staticTerrainMenuCurrentFrameSubmissionSnapshot != 0) {
+					staticTerrainLifecycleStage = "menu-baseline-invalid";
+					return false;
+				}
+				RustGalTerrainRenderer.recordLifecycleMarker(
+					"lifecycle-world-menu-baseline",
+					BlockPos.ZERO,
+					ChunkSectionLayer.SOLID,
+					"world=" + staticTerrainLifecycleWorldA
+						+ ":cachedLayers=" + staticTerrainMenuCachedLayers
+						+ ":activeLayers=" + staticTerrainMenuActiveLayerSnapshot
+						+ ":activeSectionAssets=" + staticTerrainMenuActiveSectionAssetSnapshot
+						+ ":currentFrameVisibleSubmissions=" + staticTerrainMenuCurrentFrameSubmissionSnapshot
+						+ ":visibleSubmissions=" + staticTerrainMenuSubmissionSnapshot
+				);
+				RustGalTerrainRenderer.recordLifecycleMarker(
+					"lifecycle-world-reload-requested",
+					BlockPos.ZERO,
+					ChunkSectionLayer.SOLID,
+					"world=" + staticTerrainLifecycleWorldA
+				);
+				staticTerrainLifecycleStage = "reloading-world-a";
+				staticTerrainLifecycleTransitionInProgress = true;
+				staticTerrainLifecycleActionStep = 2;
+				framesWaitingForStaticTerrainLifecycle = 0;
+				try {
+					minecraft.createWorldOpenFlows().openWorld(staticTerrainLifecycleWorldA, () -> minecraft.setScreen(new TitleScreen()));
+				} finally {
+					staticTerrainLifecycleTransitionInProgress = false;
+				}
+				return false;
+			}
+			case 2 -> {
+				if (!staticTerrainInPlayableWorld(minecraft)
+					|| diagnostics.visibleLayerSubmissions() <= staticTerrainMenuSubmissionSnapshot
+					|| diagnostics.cachedLayerAssets() <= 0) {
+					staticTerrainLifecycleStage = "waiting-for-world-a-reload-terrain";
+					return false;
+				}
+				staticTerrainReloadGenerationA = Math.max(1L, diagnostics.atlasGeneration());
+				staticTerrainLifecycleAfterGeneration = staticTerrainReloadGenerationA;
+				staticTerrainLifecycleAfterCachedLayers = diagnostics.cachedLayerAssets();
+				staticTerrainLifecycleAfterRssBytes = currentUsedMemoryBytes();
+				RustGalTerrainRenderer.recordLifecycleMarker(
+					"lifecycle-world-reload-valid",
+					BlockPos.ZERO,
+					ChunkSectionLayer.SOLID,
+					"world=" + staticTerrainLifecycleWorldA
+						+ ":generation=" + staticTerrainReloadGenerationA
+						+ ":cachedLayers=" + diagnostics.cachedLayerAssets()
+				);
+				if (!"world-different-reload".equals(STATIC_TERRAIN_SCENARIO)) {
+					staticTerrainLifecycleAfterRecorded = true;
+					staticTerrainLifecycleStage = "replacement-visible";
+					framesWaitingForStaticTerrainLifecycle++;
+					return framesWaitingForStaticTerrainLifecycle >= Math.max(8, FRAMES_PER_POSE);
+				}
+				staticTerrainUnloadSubmissionSnapshot = diagnostics.visibleLayerSubmissions();
+				RustGalTerrainRenderer.recordLifecycleMarker(
+					"lifecycle-world-unload",
+					BlockPos.ZERO,
+					ChunkSectionLayer.SOLID,
+					"world=" + staticTerrainLifecycleWorldA + ":phase=second"
+				);
+				staticTerrainLifecycleStage = "leaving-world-a-second";
+				staticTerrainLifecycleTransitionInProgress = true;
+				staticTerrainLifecycleActionStep = 3;
+				framesWaitingForStaticTerrainLifecycle = 0;
+				try {
+					minecraft.disconnectFromWorld(Component.literal("static terrain lifecycle transition to second world"));
+				} finally {
+					staticTerrainLifecycleTransitionInProgress = false;
+				}
+				return false;
+			}
+			case 3 -> {
+				if (staticTerrainInPlayableWorld(minecraft)) {
+					staticTerrainLifecycleStage = "waiting-for-menu-before-world-b";
+					return false;
+				}
+				diagnostics = RustGalTerrainRenderer.diagnosticsSnapshot();
+				if (diagnostics.visibleLayerSubmissions() != staticTerrainUnloadSubmissionSnapshot
+					|| diagnostics.cachedLayerAssets() != 0
+					|| diagnostics.activeTerrainLayers() != 0
+					|| diagnostics.activeSectionAssets() != 0
+					|| diagnostics.currentFrameVisibleLayerSubmissions() != 0) {
+					staticTerrainLifecycleStage = "menu-before-world-b-baseline-invalid";
+					return false;
+				}
+				staticTerrainMenuSubmissionSnapshot = diagnostics.visibleLayerSubmissions();
+				staticTerrainMenuCachedLayers = diagnostics.cachedLayerAssets();
+				staticTerrainMenuActiveLayerSnapshot = diagnostics.activeTerrainLayers();
+				staticTerrainMenuActiveSectionAssetSnapshot = diagnostics.activeSectionAssets();
+				staticTerrainMenuCurrentFrameSubmissionSnapshot = diagnostics.currentFrameVisibleLayerSubmissions();
+				RustGalTerrainRenderer.recordLifecycleMarker(
+					"lifecycle-world-menu-baseline",
+					BlockPos.ZERO,
+					ChunkSectionLayer.SOLID,
+					"world=" + staticTerrainLifecycleWorldB
+						+ ":cachedLayers=" + diagnostics.cachedLayerAssets()
+						+ ":activeLayers=" + diagnostics.activeTerrainLayers()
+						+ ":activeSectionAssets=" + diagnostics.activeSectionAssets()
+						+ ":currentFrameVisibleSubmissions=" + diagnostics.currentFrameVisibleLayerSubmissions()
+						+ ":visibleSubmissions=" + diagnostics.visibleLayerSubmissions()
+				);
+				RustGalTerrainRenderer.recordLifecycleMarker(
+					"lifecycle-world-reload-requested",
+					BlockPos.ZERO,
+					ChunkSectionLayer.SOLID,
+					"world=" + staticTerrainLifecycleWorldB
+				);
+				staticTerrainLifecycleStage = "loading-world-b";
+				staticTerrainLifecycleTransitionInProgress = true;
+				staticTerrainLifecycleActionStep = 4;
+				framesWaitingForStaticTerrainLifecycle = 0;
+				try {
+					minecraft.createWorldOpenFlows().openWorld(staticTerrainLifecycleWorldB, () -> minecraft.setScreen(new TitleScreen()));
+				} finally {
+					staticTerrainLifecycleTransitionInProgress = false;
+				}
+				return false;
+			}
+			case 4 -> {
+				if (!staticTerrainInPlayableWorld(minecraft)
+					|| diagnostics.visibleLayerSubmissions() <= staticTerrainUnloadSubmissionSnapshot
+					|| diagnostics.cachedLayerAssets() <= 0) {
+					staticTerrainLifecycleStage = "waiting-for-world-b-terrain";
+					return false;
+				}
+				staticTerrainReloadGenerationB = Math.max(1L, diagnostics.atlasGeneration());
+				staticTerrainLifecycleAfterGeneration = staticTerrainReloadGenerationB;
+				staticTerrainLifecycleAfterCachedLayers = diagnostics.cachedLayerAssets();
+				staticTerrainLifecycleAfterRssBytes = currentUsedMemoryBytes();
+				if ("cross-world-stale-submission".equals(STATIC_TERRAIN_FAULT)
+					&& !staticTerrainCrossWorldStaleFaultInjected) {
+					staticTerrainCrossWorldStaleFaultInjected = true;
+					RustGalTerrainRenderer.injectCrossWorldStaleSubmissionForDiagnostics(
+						minecraft.getWindow().getWidth(),
+						minecraft.getWindow().getHeight()
+					);
+				}
+				staticTerrainLifecycleAfterRecorded = true;
+				staticTerrainLifecycleStage = "replacement-visible";
+				RustGalTerrainRenderer.recordLifecycleMarker(
+					"lifecycle-world-reload-valid",
+					BlockPos.ZERO,
+					ChunkSectionLayer.SOLID,
+					"world=" + staticTerrainLifecycleWorldB
+						+ ":generation=" + staticTerrainReloadGenerationB
+						+ ":cachedLayers=" + diagnostics.cachedLayerAssets()
+				);
+				framesWaitingForStaticTerrainLifecycle++;
+				return framesWaitingForStaticTerrainLifecycle >= Math.max(8, FRAMES_PER_POSE);
+			}
+			default -> {
+				staticTerrainLifecycleStage = "replacement-visible";
+				return true;
+			}
+		}
+	}
+
+	private static boolean staticTerrainInPlayableWorld(Minecraft minecraft) {
+		return minecraft.player != null && minecraft.level != null && minecraft.getSingleplayerServer() != null;
+	}
+
+	private static boolean continueStaticTerrainLifecycleAction(Minecraft minecraft) {
+		if (staticTerrainReloadFuture != null && !staticTerrainReloadFuture.isDone()) {
+			staticTerrainLifecycleStage = "waiting-for-resource-reload";
+			return true;
+		}
+		if (("resize-cycle".equals(STATIC_TERRAIN_SCENARIO) || "swapchain-recreate".equals(STATIC_TERRAIN_SCENARIO))
+			&& staticTerrainLifecycleResizeCount == 1
+			&& framesWaitingForStaticTerrainLifecycle >= Math.max(2, FRAMES_PER_POSE / 2)) {
+			minecraft.getWindow().setWindowed(1280, 720);
+			minecraft.resizeDisplay();
+			staticTerrainLifecycleResizeCount = 2;
+			staticTerrainLifecycleStage = "resize-2";
+			RustGalTerrainRenderer.recordLifecycleMarker("lifecycle-resize-2", staticTerrainLifecycleEditBlock, ChunkSectionLayer.SOLID, "extent=1280x720");
+			return true;
+		}
+		if ("return-visited-terrain".equals(STATIC_TERRAIN_SCENARIO)
+			&& staticTerrainLifecycleActionStep == 1
+			&& staticTerrainOriginalPosition != null
+			&& framesWaitingForStaticTerrainLifecycle >= Math.max(2, FRAMES_PER_POSE / 2)) {
+			initialPosition = staticTerrainOriginalPosition;
+			if (minecraft.player != null && initialPose != null) {
+				minecraft.player.setPos(initialPosition);
+				minecraft.player.setOldPosAndRot(initialPosition, initialPose.yaw(), initialPose.pitch());
+			}
+			staticTerrainLifecycleActionStep = 2;
+			staticTerrainLifecycleStage = "returned-to-visited-terrain";
+			RustGalTerrainRenderer.recordLifecycleMarker(
+				"lifecycle-return-visited-terrain-back",
+				staticTerrainLifecycleEditBlock,
+				ChunkSectionLayer.SOLID,
+				"position=" + formatVec(initialPosition)
+			);
+			return true;
+		}
+		return false;
+	}
+
+	private static long observedStaticTerrainGeneration() {
+		if (staticTerrainUsesAtlasGeneration()) {
+			return RustGalTerrainRenderer.diagnosticsSnapshot().atlasGeneration();
+		}
+		if (!staticTerrainEditScenario()) {
+			return Math.max(1L, RustGalTerrainRenderer.diagnosticsSnapshot().atlasGeneration());
+		}
+		RustGalTerrainRenderer.TerrainLayerSnapshot after =
+			RustGalTerrainRenderer.snapshotLayer(staticTerrainLifecycleEditBlock, ChunkSectionLayer.SOLID);
+		return after == null ? 0L : after.meshGeneration();
+	}
+
+	private static boolean staticTerrainReplacementReady(long observedGeneration) {
+		if (observedGeneration == 0L) {
+			return false;
+		}
+		if (staticTerrainEditScenario() || staticTerrainUsesAtlasGeneration()) {
+			return observedGeneration != staticTerrainLifecycleBeforeGeneration;
+		}
+		return RustGalTerrainRenderer.diagnosticsSnapshot().visibleLayerSubmissions() > 0
+			&& framesWaitingForStaticTerrainLifecycle >= Math.max(4, FRAMES_PER_POSE / 2);
+	}
+
+	private static byte[] staticTerrainValidTinyPngPayload() {
+		BufferedImage image = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
+		image.setRGB(0, 0, 0xffff3355);
+		try (ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+			ImageIO.write(image, "png", output);
+			return output.toByteArray();
+		} catch (IOException error) {
+			throw new IllegalStateException("Failed to create diagnostic static-terrain atlas PNG", error);
+		}
+	}
+
+	private static long currentUsedMemoryBytes() {
+		Runtime runtime = Runtime.getRuntime();
+		return Math.max(0L, runtime.totalMemory() - runtime.freeMemory());
 	}
 
 	private static void applyStaticTerrainLifecycleEdit(ServerLevel serverLevel, ClientLevel clientLevel, BlockPos target, BlockState replacement) {
@@ -1363,6 +1865,9 @@ public final class DeterministicCameraCapture {
 		GameType gameType = forcedGameMode();
 		if (gameType != null && minecraft.gameMode != null && minecraft.gameMode.getPlayerMode() != gameType) {
 			minecraft.gameMode.setLocalMode(gameType, minecraft.gameMode.getPreviousPlayerMode());
+		}
+		if (player == null) {
+			return;
 		}
 		if (gameType != null && minecraft.getSingleplayerServer() != null) {
 			ServerPlayer serverPlayer = minecraft.getSingleplayerServer().getPlayerList().getPlayer(player.getUUID());
@@ -2499,6 +3004,9 @@ public final class DeterministicCameraCapture {
 		RustGalTerrainRenderer.TerrainDiagnostics diagnostics = RustGalTerrainRenderer.diagnosticsSnapshot();
 		json.append("  \"rustGalStaticTerrainDiagnostics\": {\n");
 		json.append("    \"cachedLayerAssets\": ").append(diagnostics.cachedLayerAssets()).append(",\n");
+		json.append("    \"activeTerrainLayers\": ").append(diagnostics.activeTerrainLayers()).append(",\n");
+		json.append("    \"activeSectionAssets\": ").append(diagnostics.activeSectionAssets()).append(",\n");
+		json.append("    \"currentFrameVisibleLayerSubmissions\": ").append(diagnostics.currentFrameVisibleLayerSubmissions()).append(",\n");
 		json.append("    \"atlasGeneration\": ").append(diagnostics.atlasGeneration()).append(",\n");
 		json.append("    \"registeredAtlasGeneration\": ").append(diagnostics.registeredAtlasGeneration()).append(",\n");
 		json.append("    \"activeNativeVertexStride\": ").append(diagnostics.activeNativeVertexStride()).append(",\n");
@@ -2508,6 +3016,11 @@ public final class DeterministicCameraCapture {
 		json.append("    \"skippedEmptyLayers\": ").append(diagnostics.skippedEmptyLayers()).append(",\n");
 		json.append("    \"registeredMeshes\": ").append(diagnostics.registeredMeshes()).append(",\n");
 		json.append("    \"texturePayloadUpdates\": ").append(diagnostics.texturePayloadUpdates()).append(",\n");
+		json.append("    \"texturePayloadUpdateBytes\": ").append(diagnostics.texturePayloadUpdateBytes()).append(",\n");
+		json.append("    \"atlasTextureOnlyUpdates\": ").append(diagnostics.atlasTextureOnlyUpdates()).append(",\n");
+		json.append("    \"atlasMissingPayloadUpdates\": ").append(diagnostics.atlasMissingPayloadUpdates()).append(",\n");
+		json.append("    \"atlasMalformedPayloadUpdates\": ").append(diagnostics.atlasMalformedPayloadUpdates()).append(",\n");
+		json.append("    \"atlasPartialPayloadUpdates\": ").append(diagnostics.atlasPartialPayloadUpdates()).append(",\n");
 		json.append("    \"removedLayers\": ").append(diagnostics.removedLayers()).append(",\n");
 		json.append("    \"visibleLayerProbes\": ").append(diagnostics.visibleLayerProbes()).append(",\n");
 		json.append("    \"visibleLayerSubmissions\": ").append(diagnostics.visibleLayerSubmissions()).append(",\n");
@@ -2515,12 +3028,30 @@ public final class DeterministicCameraCapture {
 		json.append("    \"invalidations\": ").append(diagnostics.invalidations()).append(",\n");
 		json.append("    \"terrainExtractionFrames\": ").append(diagnostics.terrainExtractionFrames()).append(",\n");
 		json.append("    \"rustEnqueueFrames\": ").append(diagnostics.rustEnqueueFrames()).append(",\n");
+		appendWorldMeshAssetMetrics(json).append(",\n");
 		json.append("    \"lifecycleEvents\": [");
 		appendTerrainDiagnosticEvents(json, diagnostics.lifecycleEvents());
 		json.append("    ],\n");
 		json.append("    \"recentEvents\": [");
 		appendTerrainDiagnosticEvents(json, diagnostics.recentEvents());
 		json.append("]\n  }");
+		return json;
+	}
+
+	private static StringBuilder appendWorldMeshAssetMetrics(StringBuilder json) {
+		RustGalWorldPrimitiveRenderer.WorldMeshAssetMetrics metrics = RustGalWorldPrimitiveRenderer.worldMeshAssetMetrics();
+		json.append("    \"worldMeshAssetMetrics\": { ");
+		json.append("\"generation\": ").append(metrics.generation()).append(", ");
+		json.append("\"uploadedGeneration\": ").append(metrics.uploadedGeneration()).append(", ");
+		json.append("\"payloadCount\": ").append(metrics.payloadCount()).append(", ");
+		json.append("\"payloadBytes\": ").append(metrics.payloadBytes()).append(", ");
+		json.append("\"failures\": ").append(metrics.failures()).append(", ");
+		json.append("\"cachedMeshes\": ").append(metrics.cachedMeshes()).append(", ");
+		json.append("\"cachedTextures\": ").append(metrics.cachedTextures()).append(", ");
+		json.append("\"dirtyMeshes\": ").append(metrics.dirtyMeshes()).append(", ");
+		json.append("\"dirtyTextures\": ").append(metrics.dirtyTextures()).append(", ");
+		json.append("\"pendingInstances\": ").append(metrics.pendingInstances());
+		json.append(" }");
 		return json;
 	}
 
@@ -2582,10 +3113,32 @@ public final class DeterministicCameraCapture {
 			0
 		).append(", ");
 		appendField(json, "replacementBlock", staticTerrainLifecycleBlockType, 0).append(", ");
+		appendField(json, "resourcePackScenario", STATIC_TERRAIN_RESOURCE_PACK_SCENARIO, 0).append(", ");
+		appendField(json, "worldId", STATIC_TERRAIN_WORLD_ID, 0).append(", ");
 		json.append("\"setup\": ").append(staticTerrainLifecycleSetup).append(", ");
 		json.append("\"afterRecorded\": ").append(staticTerrainLifecycleAfterRecorded).append(", ");
 		json.append("\"beforeGeneration\": ").append(staticTerrainLifecycleBeforeGeneration).append(", ");
 		json.append("\"afterGeneration\": ").append(staticTerrainLifecycleAfterGeneration).append(", ");
+		json.append("\"actionStep\": ").append(staticTerrainLifecycleActionStep).append(", ");
+		json.append("\"resizeCount\": ").append(staticTerrainLifecycleResizeCount).append(", ");
+		json.append("\"originalRenderDistance\": ").append(staticTerrainOriginalRenderDistance).append(", ");
+		json.append("\"originalSimulationDistance\": ").append(staticTerrainOriginalSimulationDistance).append(", ");
+		json.append("\"beforeCachedLayers\": ").append(staticTerrainLifecycleBeforeCachedLayers).append(", ");
+		json.append("\"afterCachedLayers\": ").append(staticTerrainLifecycleAfterCachedLayers).append(", ");
+		json.append("\"beforeUsedMemoryBytes\": ").append(staticTerrainLifecycleBeforeRssBytes).append(", ");
+		json.append("\"afterUsedMemoryBytes\": ").append(staticTerrainLifecycleAfterRssBytes).append(", ");
+		json.append("\"menuCachedLayers\": ").append(staticTerrainMenuCachedLayers).append(", ");
+		json.append("\"menuActiveTerrainLayers\": ").append(staticTerrainMenuActiveLayerSnapshot).append(", ");
+		json.append("\"menuActiveSectionAssets\": ").append(staticTerrainMenuActiveSectionAssetSnapshot).append(", ");
+		json.append("\"menuCurrentFrameVisibleSubmissions\": ").append(staticTerrainMenuCurrentFrameSubmissionSnapshot).append(", ");
+		json.append("\"menuUsedMemoryBytes\": ").append(staticTerrainMenuUsedMemoryBytes).append(", ");
+		json.append("\"unloadVisibleSubmissions\": ").append(staticTerrainUnloadSubmissionSnapshot).append(", ");
+		json.append("\"menuVisibleSubmissions\": ").append(staticTerrainMenuSubmissionSnapshot).append(", ");
+		json.append("\"reloadGenerationA\": ").append(staticTerrainReloadGenerationA).append(", ");
+		json.append("\"reloadGenerationB\": ").append(staticTerrainReloadGenerationB).append(", ");
+		appendField(json, "worldA", staticTerrainLifecycleWorldA, 0).append(", ");
+		appendField(json, "worldB", staticTerrainLifecycleWorldB, 0).append(", ");
+		json.append("\"currentUsedMemoryBytes\": ").append(currentUsedMemoryBytes()).append(", ");
 		json.append("\"waitFrames\": ").append(framesWaitingForStaticTerrainLifecycle);
 		json.append(" }");
 		return json;
