@@ -373,6 +373,14 @@ public final class RustGalFrameCoordinator {
 					|| !primitiveFrame.borderQuads().isEmpty()
 					|| !primitiveFrame.materialQuads().isEmpty()
 					|| !primitiveFrame.meshInstances().isEmpty()) {
+					RenderDocCaptureHook.triggerNextFrameOnce(
+						"rust-vulkan-whole-frame-world#" + correlationId
+							+ "-segments=" + primitiveFrame.segments().size()
+							+ "-crackQuads=" + primitiveFrame.crackQuads().size()
+							+ "-borderQuads=" + primitiveFrame.borderQuads().size()
+							+ "-materialQuads=" + primitiveFrame.materialQuads().size()
+							+ "-meshInstances=" + primitiveFrame.meshInstances().size()
+					);
 					renderdocFrameCaptureStarted = RenderDocCaptureHook.beginFrameCaptureOnce(
 						window,
 						"rust-vulkan-whole-frame-world#" + correlationId
@@ -814,6 +822,22 @@ public final class RustGalFrameCoordinator {
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.g-buffer-final-pass-creates", profile.gBufferFinalPassCreates());
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.world-prepare-frame-pass", profile.worldPrepareFramePassNanos());
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.world-mesh-expand-group", profile.worldMeshSectionExpandGroupNanos());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.world-prepare-mesh-cache-scan", profile.worldPrepareMeshCacheScanNanos());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.world-prepare-material-resource", profile.worldPrepareMaterialResourceNanos());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.world-prepare-mesh-stream-capacity", profile.worldPrepareMeshStreamCapacityNanos());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.world-prepare-mesh-stream-lookup", profile.worldPrepareMeshStreamLookupNanos());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.world-prepare-mesh-stream-grow", profile.worldPrepareMeshStreamGrowNanos());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.world-prepare-mesh-resource", profile.worldPrepareMeshResourceNanos());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.world-prepare-material-slot-check", profile.worldPrepareMaterialSlotCheckNanos());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.world-prepare-mesh-slot-check", profile.worldPrepareMeshSlotCheckNanos());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.world-prepare-mesh-batch-count", profile.worldPrepareMeshBatchCount());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.world-prepare-mesh-stream-required-bytes", profile.worldPrepareMeshStreamRequiredBytes());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.world-prepare-mesh-stream-capacity-bytes", profile.worldPrepareMeshStreamCapacityBytes());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.world-prepare-mesh-stream-grows", profile.worldPrepareMeshStreamGrows());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.world-mesh-stream-payload-pack", profile.worldMeshStreamPayloadPackNanos());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.world-mesh-draw-record", profile.worldMeshDrawRecordNanos());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.world-mesh-stream-payload-bytes", profile.worldMeshStreamPayloadBytes());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.world-mesh-dynamic-offset-count", profile.worldMeshDynamicOffsetCount());
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.shader-plan-lookup", profile.shaderPlanLookupNanos());
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gal-command-generation", profile.galCommandGenerationNanos());
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gal-submit-total", profile.galSubmitTotalNanos());

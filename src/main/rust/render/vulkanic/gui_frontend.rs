@@ -535,6 +535,7 @@ impl GuiFrontend {
                 pipeline_layout: resources.pipeline_layout,
                 set_index: 0,
                 set: resources.resource_set,
+                dynamic_offsets: Vec::new(),
             });
             ops.push(CommandOp::SetIndexBuffer {
                 buffer: resources.index_buffer,
@@ -715,6 +716,7 @@ impl GuiFrontend {
                         kind: ResourceBindingKind::UniformBuffer,
                         access: AccessFlags::READ,
                         dynamic_offsets: Vec::new(),
+                        buffer_range: None,
                     },
                     ResourceBinding {
                         binding: 1,
@@ -723,6 +725,7 @@ impl GuiFrontend {
                         kind: ResourceBindingKind::SampledTexture,
                         access: AccessFlags::READ,
                         dynamic_offsets: Vec::new(),
+                        buffer_range: None,
                     },
                     ResourceBinding {
                         binding: 2,
@@ -731,6 +734,7 @@ impl GuiFrontend {
                         kind: ResourceBindingKind::Sampler,
                         access: AccessFlags::READ,
                         dynamic_offsets: Vec::new(),
+                        buffer_range: None,
                     },
                 ],
             })?;

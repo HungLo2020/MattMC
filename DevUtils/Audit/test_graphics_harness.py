@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import gzip
 import os
 import shlex
 import subprocess
@@ -2400,6 +2401,46 @@ else:
             self.assertTrue(diagnosis["frame_capture_triggered"])
             self.assertIn("no .rdc was persisted", diagnosis["likely_cause"])
 
+    def test_renderdoc_diagnosis_reads_compressed_game_log(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            capture = Path(temp_dir)
+            log = capture / "runClient_20260101_000000.log.gz"
+            with gzip.open(log, "wt", encoding="utf-8") as handle:
+                handle.write(
+                    "RenderDoc API initialized pathTemplate=/tmp/capture\n"
+                    "Triggered RenderDoc capture for next deterministic frame (terrain#12)\n"
+                    "Started RenderDoc frame capture (terrain#12) backend=vulkan windowPointer=123\n"
+                    "Ended RenderDoc frame capture (terrain#12) backend=vulkan windowPointer=123 result=0\n"
+                )
+            diagnosis = harness.diagnose_renderdoc_capture_failure(capture, capture / "missing.rdc")
+            self.assertTrue(diagnosis["renderdoc_api_initialized"])
+            self.assertTrue(diagnosis["frame_capture_triggered"])
+            self.assertTrue(diagnosis["frame_capture_started"])
+            self.assertEqual(diagnosis["end_results"][0]["result"], "0")
+            self.assertIn("EndFrameCapture returned 0", diagnosis["likely_cause"])
+
+    def test_renderdoc_diagnosis_reports_preload_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            capture = Path(temp_dir)
+            (capture / "meta_preflight_20260101.txt").write_text(
+                "renderdoc_preload_library=/does/not/exist/librenderdoc.so\n",
+                encoding="utf-8",
+            )
+            diagnosis = harness.diagnose_renderdoc_capture_failure(capture, capture / "missing.rdc")
+            self.assertFalse(diagnosis["renderdoc_stages"]["library_preloaded"])
+            self.assertIn("preload library path is missing", diagnosis["likely_cause"])
+
+    def test_renderdoc_diagnosis_reports_api_unavailable(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            capture = Path(temp_dir)
+            (capture / "runClient_20260101_000000.log").write_text(
+                "RenderDoc API was not available from renderdoc result=0\n",
+                encoding="utf-8",
+            )
+            diagnosis = harness.diagnose_renderdoc_capture_failure(capture, capture / "missing.rdc")
+            self.assertTrue(diagnosis["renderdoc_api_unavailable"])
+            self.assertIn("reported unavailable", diagnosis["likely_cause"])
+
     def test_renderdoc_end_result_parser_accepts_backend_and_window_fields(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             capture = Path(temp_dir)
@@ -2414,6 +2455,31 @@ else:
             self.assertTrue(diagnosis["frame_capture_started"])
             self.assertTrue(diagnosis["frame_capture_ended"])
             self.assertEqual(diagnosis["end_results"][0]["result"], "0")
+
+    def test_renderdoc_summary_preserves_successful_capture_path(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            capture = Path(temp_dir)
+            capture_path = capture / "terrain_capture.rdc"
+            capture_path.write_bytes(b"rdc")
+            renderdoccmd = capture / "renderdoccmd"
+            renderdoccmd.write_text(
+                "#!/usr/bin/env sh\n"
+                "if [ \"$1\" = vulkanlayer ]; then printf '%s\\n' 'RenderDoc layer correctly registered.'; exit 0; fi\n"
+                "printf '%s\\n' 'EID 1 BeginPass'\n"
+                "printf '%s\\n' 'EID 2 DrawIndexed'\n",
+                encoding="utf-8",
+            )
+            renderdoccmd.chmod(0o755)
+            original_cmd = harness.local_renderdoccmd_path
+            try:
+                harness.local_renderdoccmd_path = lambda: str(renderdoccmd)  # type: ignore[assignment]
+                summary_path = harness.replay_renderdoc_summary(capture, capture_path)
+                summary = json.loads(summary_path.read_text(encoding="utf-8"))
+                self.assertEqual(summary["status"], "complete")
+                self.assertEqual(summary["capture_path"], str(capture_path))
+                self.assertEqual(summary["draw_count"], 1)
+            finally:
+                harness.local_renderdoccmd_path = original_cmd  # type: ignore[assignment]
 
     def test_renderdoc_cli_replay_does_not_require_qrenderdoc(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -6097,7 +6163,7 @@ else:
             "normalSectionCounts": {"posY": 1, "negY": 1, "horizontal": 4},
         }
         event.update(overrides)
-        return {"activeNativeVertexStride": 40, "recentEvents": [event]}
+        return {"activeNativeVertexStride": 40, "expectedNativeVertexStride": 40, "recentEvents": [event]}
 
     def assert_static_terrain_failure(self, expected: str, **overrides: object) -> None:
         evidence = harness.static_terrain_geometry_evidence(self.static_terrain_doc(**overrides))
@@ -6134,6 +6200,37 @@ else:
         for expected, overrides in cases.items():
             with self.subTest(expected=expected):
                 self.assert_static_terrain_failure(expected, **overrides)
+
+    def test_static_terrain_geometry_truth_prioritizes_old_stride_fault(self) -> None:
+        evidence = harness.static_terrain_geometry_evidence(
+            self.static_terrain_doc(vertexStride=20)
+        )
+        self.assertEqual(evidence["status"], "fail")
+        self.assertEqual(evidence["failure"], "vertex_stride_invalid")
+        self.assertIn("vertex_stride_invalid", evidence["failures"])
+
+    def test_static_terrain_geometry_truth_keeps_count_capacity_classification(self) -> None:
+        evidence = harness.static_terrain_geometry_evidence(
+            self.static_terrain_doc(vertexCount=25)
+        )
+        self.assertEqual(evidence["status"], "fail")
+        self.assertEqual(evidence["failure"], "vertex_count_exceeds_capacity")
+        self.assertIn("vertex_count_exceeds_capacity", evidence["failures"])
+
+    def test_static_terrain_geometry_truth_uses_deterministic_failure_priority(self) -> None:
+        evidence = harness.static_terrain_geometry_evidence(
+            self.static_terrain_doc(vertexStride=20, vertexCount=25)
+        )
+        self.assertEqual(evidence["status"], "fail")
+        self.assertEqual(evidence["failure"], "vertex_stride_invalid")
+        self.assertIn("vertex_count_exceeds_capacity", evidence["failures"])
+
+    def test_static_terrain_geometry_truth_missing_without_fault_stays_missing(self) -> None:
+        evidence = harness.static_terrain_geometry_evidence(
+            {"activeNativeVertexStride": 40, "expectedNativeVertexStride": 40, "recentEvents": []}
+        )
+        self.assertEqual(evidence["status"], "fail")
+        self.assertEqual(evidence["failure"], "geometry_truth_missing")
 
     def test_static_terrain_geometry_truth_rejects_duplicate_visible_section(self) -> None:
         doc = self.static_terrain_doc()

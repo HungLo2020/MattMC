@@ -1373,7 +1373,23 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			profileLong(segment, offset, 99),
 			profileLong(segment, offset, 100),
 			profileLong(segment, offset, 101),
-			profileLong(segment, offset, 102)
+			profileLong(segment, offset, 102),
+			profileLong(segment, offset, 103),
+			profileLong(segment, offset, 104),
+			profileLong(segment, offset, 105),
+			profileLong(segment, offset, 106),
+			profileLong(segment, offset, 107),
+			profileLong(segment, offset, 108),
+			profileLong(segment, offset, 109),
+			profileLong(segment, offset, 110),
+			profileLong(segment, offset, 111),
+			profileLong(segment, offset, 112),
+			profileLong(segment, offset, 113),
+			profileLong(segment, offset, 114),
+			profileLong(segment, offset, 115),
+			profileLong(segment, offset, 116),
+			profileLong(segment, offset, 117),
+			profileLong(segment, offset, 118)
 		);
 	}
 
@@ -1772,10 +1788,26 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		long galRedundantPipelineBindsRemoved,
 		long galRedundantResourceSetBindsRemoved,
 		long galRedundantVertexBufferBindsRemoved,
-		long galRedundantIndexBufferBindsRemoved
+		long galRedundantIndexBufferBindsRemoved,
+		long worldPrepareMeshCacheScanNanos,
+		long worldPrepareMaterialResourceNanos,
+		long worldPrepareMeshStreamCapacityNanos,
+		long worldPrepareMeshStreamLookupNanos,
+		long worldPrepareMeshStreamGrowNanos,
+		long worldPrepareMeshResourceNanos,
+		long worldPrepareMaterialSlotCheckNanos,
+		long worldPrepareMeshSlotCheckNanos,
+		long worldPrepareMeshBatchCount,
+		long worldPrepareMeshStreamRequiredBytes,
+		long worldPrepareMeshStreamCapacityBytes,
+		long worldPrepareMeshStreamGrows,
+		long worldMeshStreamPayloadPackNanos,
+		long worldMeshDrawRecordNanos,
+		long worldMeshStreamPayloadBytes,
+		long worldMeshDynamicOffsetCount
 	) {
 		public static WholeFrameProfile empty() {
-			return new WholeFrameProfile(0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L
+			return new WholeFrameProfile(0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L
 			);
 		}
 	}

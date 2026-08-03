@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import gzip
 import hashlib
 import io
 import json
@@ -1131,7 +1132,11 @@ def static_terrain_geometry_evidence(doc: dict[str, object] | None) -> dict[str,
     visible_checked = 0
     failures: list[str] = []
     landmark_events: list[dict[str, object]] = []
-    expected_stride = int(parse_number(doc.get("activeNativeVertexStride")) or 0)
+    expected_stride = int(
+        parse_number(doc.get("expectedNativeVertexStride"))
+        or parse_number(doc.get("activeNativeVertexStride"))
+        or 0
+    )
     previous_visible_key: tuple[object, object] | None = None
     visible_by_frame: dict[tuple[object, object, object, object], object] = {}
     visible_generation_by_frame: dict[tuple[object, object, object], set[int]] = {}
@@ -1174,7 +1179,7 @@ def static_terrain_geometry_evidence(doc: dict[str, object] | None) -> dict[str,
         max_index = int(parse_number(raw_event.get("maxIndex")) or -1)
         index_type = int(parse_number(raw_event.get("indexType")) or 0)
         section_count = int(parse_number(raw_event.get("sectionCount")) or 0)
-        if mesh_key == 0 or vertex_count <= 0 or vertex_stride < 20 or index_count <= 0 or section_count <= 0:
+        if mesh_key == 0 or vertex_count <= 0 or index_count <= 0 or section_count <= 0:
             failures.append("geometry_truth_missing")
             continue
         checked += 1
@@ -1331,7 +1336,7 @@ def static_terrain_geometry_evidence(doc: dict[str, object] | None) -> dict[str,
         }
     if visible_checked <= 0:
         failures.append("projected_landmark_missing")
-    unique_failures = sorted(set(failures))
+    unique_failures = sorted(set(failures), key=static_terrain_failure_priority)
     return {
         "status": "pass" if not unique_failures else "fail",
         "failure": unique_failures[0] if unique_failures else None,
@@ -1340,6 +1345,32 @@ def static_terrain_geometry_evidence(doc: dict[str, object] | None) -> dict[str,
         "visible_submit_events": visible_checked,
         "landmark_events": landmark_events,
     }
+
+
+def static_terrain_failure_priority(failure: str) -> tuple[int, str]:
+    priority = {
+        "vertex_stride_invalid": 0,
+        "vertex_count_exceeds_capacity": 1,
+        "index_type_invalid": 2,
+        "index_alignment_invalid": 3,
+        "index_range_invalid": 4,
+        "non_finite_vertex_position": 5,
+        "section_origin_mismatch": 6,
+        "mesh_key_collision": 7,
+        "stale_generation_visible": 8,
+        "duplicate_section_visible": 9,
+        "duplicate_section_execution": 10,
+        "stale_generation_overlap": 11,
+        "geometry_out_of_bounds": 12,
+        "terrain_lighting_normal_invalid": 20,
+        "terrain_lighting_block_sky_invalid": 21,
+        "terrain_lighting_ao_invalid": 22,
+        "terrain_lighting_top_shade_invalid": 23,
+        "terrain_lighting_ao_missing": 24,
+        "geometry_truth_missing": 90,
+        "projected_landmark_missing": 91,
+    }
+    return (priority.get(failure, 50), failure)
 
 
 def static_terrain_lifecycle_evidence(
@@ -6011,6 +6042,7 @@ def normalize_capture_artifact(
                         f"actual={sorted(failures_for_fault)})"
                     )
                 else:
+                    static_terrain_workload_complete = False
                     validation_messages.append(
                         "deterministic static-terrain fault injection rejected as expected "
                         f"(fault={requested_world_static_terrain_fault}, classification={static_terrain_expected_fault})"
@@ -7287,6 +7319,7 @@ def write_preflight_meta(capture_dir: Path, mode: ModeSpec, args: argparse.Names
         f"renderdoc_capture={env.get('MATTMC_RENDERDOC_CAPTURE', 'false')}",
         f"renderdoc_frame={env.get('MATTMC_RENDERDOC_FRAME', '0')}",
         f"renderdoc_capture_path={env.get('MATTMC_RENDERDOC_CAPTURE_PATH', '')}",
+        f"renderdoc_preload_library={env.get('MATTMC_RENDERDOC_PRELOAD_LIBRARY', '')}",
         f"renderdoc_vulkan_layer_manifest={env.get('MATTMC_RENDERDOC_VULKAN_LAYER_MANIFEST', '')}",
         f"tracy_capture={env.get('MATTMC_TRACY_CAPTURE', 'false')}",
         f"tracy_duration_seconds={env.get('MATTMC_TRACY_DURATION_SECONDS', '0')}",
@@ -7299,41 +7332,94 @@ def write_preflight_meta(capture_dir: Path, mode: ModeSpec, args: argparse.Names
     return path
 
 
+def read_diagnostic_log_tail(path: Path, limit: int = 2_000_000) -> str:
+    try:
+        if path.suffix == ".gz":
+            with gzip.open(path, "rt", encoding="utf-8", errors="replace") as handle:
+                data = handle.read()
+        else:
+            data = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
+    return data[-limit:]
+
+
+def collect_capture_log_text(capture_dir: Path, limit: int = 2_000_000) -> str:
+    parts: list[str] = []
+    for pattern in ("latest_tail_*.log", "latest_*.log", "runClient_*.log", "runClient_*.log.gz"):
+        for path in sorted(capture_dir.glob(pattern), key=lambda item: item.stat().st_mtime if item.exists() else 0)[-2:]:
+            text = read_diagnostic_log_tail(path, limit)
+            if text:
+                parts.append(text)
+    return "\n".join(parts)
+
+
 def diagnose_renderdoc_capture_failure(capture_dir: Path, capture_path: Path | None = None) -> dict[str, Any]:
     log_text = ""
+    meta_path = latest_capture_meta_path(capture_dir)
     for _ in range(100):
-        for pattern in ("latest_tail_*.log", "latest_*.log", "runClient_*.log"):
-            for path in sorted(capture_dir.glob(pattern))[-2:]:
-                try:
-                    log_text += "\n" + path.read_text(encoding="utf-8", errors="replace")[-2_000_000:]
-                except OSError:
-                    pass
+        log_text = collect_capture_log_text(capture_dir)
         if log_text:
             break
+        if meta_path:
+            break
         time.sleep(0.2)
+    meta = read_key_values(meta_path or (capture_dir / "missing-meta.txt"))
     end_results = re.findall(r"Ended RenderDoc frame capture \(([^)]+)\).*?result=([0-9-]+)", log_text)
-    triggered = re.findall(r"Triggered RenderDoc capture for next deterministic frame \(([^)]+)\)", log_text)
+    triggered = re.findall(r"Triggered RenderDoc capture for next (?:deterministic )?frame \(([^)]+)\)", log_text)
     started = re.findall(r"Started RenderDoc frame capture \(([^)]+)\)", log_text)
     initialized = "RenderDoc API initialized" in log_text
+    unavailable = bool(
+        re.search(
+            r"Unable to initialize RenderDoc API|RenderDoc API was not available|RenderDoc API .* unavailable",
+            log_text,
+        )
+    )
+    library = re.search(r"-Dmattmc\.dev\.renderdocCapture\.library=([^ ]+)", meta.get("java_tool_options", ""))
+    configured_preload = meta.get("renderdoc_preload_library", "").strip()
+    library_path = Path(library.group(1)) if library else None
+    preload_path = Path(configured_preload) if configured_preload else library_path
+    preload_missing = bool(preload_path and not preload_path.exists())
     present = bool(capture_path and capture_path.exists())
+    any_started_result_zero = any(result == "0" for _, result in end_results)
+    vulkan_layer = renderdoc_vulkan_layer_diagnosis()
     likely_cause = None
-    if initialized and (triggered or started or end_results) and not present:
+    if preload_missing:
+        likely_cause = "RenderDoc preload library path is missing."
+    elif unavailable:
+        likely_cause = "RenderDoc API was reached but reported unavailable."
+    elif initialized and any_started_result_zero and not present:
+        likely_cause = "RenderDoc frame capture started, but EndFrameCapture returned 0 and no .rdc was persisted."
+    elif initialized and (triggered or started or end_results) and not present:
         likely_cause = "RenderDoc API was reached and the deterministic workload ran, but no .rdc was persisted."
     elif not initialized:
         likely_cause = "RenderDoc API did not initialize before the run ended."
     elif not started:
         likely_cause = "RenderDoc API initialized, but no frame capture start was observed."
+    stages = {
+        "library_preloaded": bool(preload_path and preload_path.exists()),
+        "vulkan_layer_discovered": bool(vulkan_layer.get("available")),
+        "renderdoc_api_acquired": initialized and not unavailable,
+        "capture_requested": bool(triggered or started),
+        "capture_started": bool(started),
+        "target_frame_submitted": "gal.frame.present backend=vulkan" in log_text or "gal.frame.target.present-ready backend=vulkan" in log_text,
+        "capture_ended": bool(end_results),
+        "rdc_path_reported": bool(capture_path),
+        "rdc_file_retained": present,
+    }
     return {
         "capture_file_present": present,
         "renderdoc_api_initialized": initialized,
+        "renderdoc_api_unavailable": unavailable,
         "frame_capture_started": bool(started),
         "frame_capture_triggered": bool(triggered),
         "frame_capture_ended": bool(end_results),
+        "renderdoc_stages": stages,
         "capture_labels_started": started[:8],
         "capture_labels_triggered": triggered[:8],
         "end_results": [{"label": label, "result": result} for label, result in end_results[:8]],
         "likely_cause": likely_cause,
-        "vulkan_layer": renderdoc_vulkan_layer_diagnosis(),
+        "vulkan_layer": vulkan_layer,
     }
 
 
@@ -8872,6 +8958,7 @@ def build_capture_command(
             java_options.append(f"-Dmattmc.dev.renderdocCapture.library={renderdoc_library}")
             existing_preload = env.get("LD_PRELOAD", "").strip()
             env["LD_PRELOAD"] = f"{renderdoc_library} {existing_preload}".strip()
+            env["MATTMC_RENDERDOC_PRELOAD_LIBRARY"] = renderdoc_library
             existing_library_path = env.get("LD_LIBRARY_PATH", "").strip()
             env["LD_LIBRARY_PATH"] = f"{Path(renderdoc_library).parent} {existing_library_path}".strip().replace(" ", ":")
         renderdoc_layer = local_renderdoc_layer_manifest_path()

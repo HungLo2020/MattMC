@@ -338,6 +338,26 @@ impl From<WholeFrameProfile> for FfiWholeFrameProfileSnapshot {
                 .gal_redundant_vertex_buffer_binds_removed,
             gal_redundant_index_buffer_binds_removed: profile
                 .gal_redundant_index_buffer_binds_removed,
+            world_prepare_mesh_cache_scan_nanos: profile.world_prepare_mesh_cache_scan_nanos,
+            world_prepare_material_resource_nanos: profile.world_prepare_material_resource_nanos,
+            world_prepare_mesh_stream_capacity_nanos: profile
+                .world_prepare_mesh_stream_capacity_nanos,
+            world_prepare_mesh_stream_lookup_nanos: profile.world_prepare_mesh_stream_lookup_nanos,
+            world_prepare_mesh_stream_grow_nanos: profile.world_prepare_mesh_stream_grow_nanos,
+            world_prepare_mesh_resource_nanos: profile.world_prepare_mesh_resource_nanos,
+            world_prepare_material_slot_check_nanos: profile
+                .world_prepare_material_slot_check_nanos,
+            world_prepare_mesh_slot_check_nanos: profile.world_prepare_mesh_slot_check_nanos,
+            world_prepare_mesh_batch_count: profile.world_prepare_mesh_batch_count,
+            world_prepare_mesh_stream_required_bytes: profile
+                .world_prepare_mesh_stream_required_bytes,
+            world_prepare_mesh_stream_capacity_bytes: profile
+                .world_prepare_mesh_stream_capacity_bytes,
+            world_prepare_mesh_stream_grows: profile.world_prepare_mesh_stream_grows,
+            world_mesh_stream_payload_pack_nanos: profile.world_mesh_stream_payload_pack_nanos,
+            world_mesh_draw_record_nanos: profile.world_mesh_draw_record_nanos,
+            world_mesh_stream_payload_bytes: profile.world_mesh_stream_payload_bytes,
+            world_mesh_dynamic_offset_count: profile.world_mesh_dynamic_offset_count,
         }
     }
 }

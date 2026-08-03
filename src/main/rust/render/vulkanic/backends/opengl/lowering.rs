@@ -415,6 +415,7 @@ impl OpenGlLowerer {
                 pipeline_layout,
                 set_index,
                 set,
+                dynamic_offsets,
             } => {
                 let _zone = trace::Zone::new("opengl.lowering.bind-resource-set");
                 let pipeline_layout_object = objects.pipeline_layout(*pipeline_layout)?;
@@ -431,7 +432,7 @@ impl OpenGlLowerer {
                     ));
                 }
                 state.bound_sets.insert(*set_index, *set);
-                self.bind_resource_set(objects, set_object)?;
+                self.bind_resource_set(objects, set_object, dynamic_offsets)?;
                 Ok(())
             }
             CommandOp::SetIndexBuffer {
@@ -680,9 +681,11 @@ impl OpenGlLowerer {
         &mut self,
         objects: &OpenGlObjects,
         set: &ResourceSetObject,
+        dynamic_offsets: &[u64],
     ) -> GalResult<()> {
         let mut sampled_texture_units = Vec::new();
         let mut sampler_bindings = Vec::new();
+        let mut dynamic_offset_index = 0usize;
         for binding in &set.bindings {
             match binding.kind {
                 ResourceBindingKind::SampledTexture => {
@@ -703,15 +706,31 @@ impl OpenGlLowerer {
                     } else {
                         glow::SHADER_STORAGE_BUFFER
                     };
-                    let offset = binding.dynamic_offsets.first().copied().unwrap_or(0);
+                    let offset = if binding.dynamic_offsets.is_empty() {
+                        0
+                    } else if dynamic_offsets.is_empty() {
+                        binding.dynamic_offsets[0]
+                    } else {
+                        let Some(offset) = dynamic_offsets.get(dynamic_offset_index).copied()
+                        else {
+                            return Err(GalError::backend(
+                                "missing dynamic offset for OpenGL resource binding",
+                            ));
+                        };
+                        dynamic_offset_index += binding.dynamic_offsets.len();
+                        offset
+                    };
                     unsafe {
+                        let range = binding
+                            .buffer_range
+                            .unwrap_or_else(|| buffer.size.saturating_sub(offset));
                         self.gl.bind_buffer_range(
                             target,
                             binding.binding,
                             Some(buffer.buffer),
                             i32::try_from(offset)
                                 .map_err(|_| GalError::backend("dynamic offset exceeds i32"))?,
-                            i32::try_from(buffer.size.saturating_sub(offset))
+                            i32::try_from(range)
                                 .map_err(|_| GalError::backend("dynamic range exceeds i32"))?,
                         );
                     }

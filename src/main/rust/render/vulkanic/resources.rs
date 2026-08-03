@@ -231,6 +231,7 @@ pub struct ResourceBinding {
     pub kind: ResourceBindingKind,
     pub access: AccessFlags,
     pub dynamic_offsets: Vec<u64>,
+    pub buffer_range: Option<u64>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

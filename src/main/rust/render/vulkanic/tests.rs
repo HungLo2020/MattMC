@@ -142,6 +142,7 @@ fn resource_binding(
         kind,
         access,
         dynamic_offsets: vec![],
+        buffer_range: None,
     }
 }
 
@@ -1037,6 +1038,7 @@ fn resource_sets_require_complete_arrays_and_explicit_optionality() {
                 kind: ResourceBindingKind::UniformBuffer,
                 access: AccessFlags::READ,
                 dynamic_offsets: vec![],
+                buffer_range: None,
             },
         ],
     })
@@ -1098,6 +1100,7 @@ fn resource_sets_require_complete_arrays_and_explicit_optionality() {
             kind: ResourceBindingKind::UniformBuffer,
             access: AccessFlags::READ,
             dynamic_offsets: vec![64],
+            buffer_range: None,
         }],
     })
     .unwrap();
@@ -2013,6 +2016,7 @@ fn storage_and_subresource_hazards_are_conservative() {
                     pipeline_layout,
                     set_index: 0,
                     set,
+                    dynamic_offsets: Vec::new(),
                 },
                 CommandOp::Dispatch {
                     groups_x: 1,
@@ -2139,6 +2143,7 @@ fn texture_subresource_hazards_respect_non_overlapping_ranges() {
                     pipeline_layout,
                     set_index: 0,
                     set: disjoint,
+                    dynamic_offsets: Vec::new(),
                 },
                 CommandOp::Dispatch {
                     groups_x: 1,
@@ -2183,6 +2188,7 @@ fn texture_subresource_hazards_respect_non_overlapping_ranges() {
                     pipeline_layout,
                     set_index: 0,
                     set: overlapping,
+                    dynamic_offsets: Vec::new(),
                 },
                 CommandOp::Dispatch {
                     groups_x: 1,
@@ -2252,6 +2258,7 @@ fn resource_set_binding_requires_the_active_pipeline_layout() {
                     pipeline_layout,
                     set_index: 0,
                     set,
+                    dynamic_offsets: Vec::new(),
                 },
                 CommandOp::EndPass,
             ],
@@ -2634,11 +2641,13 @@ fn command_normalization_removes_redundant_state_binds() {
             pipeline_layout: layout,
             set_index: 0,
             set,
+            dynamic_offsets: Vec::new(),
         },
         CommandOp::BindResourceSet {
             pipeline_layout: layout,
             set_index: 0,
             set,
+            dynamic_offsets: Vec::new(),
         },
         CommandOp::SetVertexBuffer {
             slot: 0,
@@ -2678,6 +2687,44 @@ fn command_normalization_removes_redundant_state_binds() {
     assert!(matches!(operations[3], CommandOp::SetVertexBuffer { .. }));
     assert!(matches!(operations[4], CommandOp::SetIndexBuffer { .. }));
     assert!(matches!(operations[5], CommandOp::DrawIndexed { .. }));
+}
+
+#[test]
+fn command_normalization_keeps_resource_binds_with_distinct_dynamic_offsets() {
+    let layout = test_handle(HandleKind::PipelineLayout, 1);
+    let set = test_handle(HandleKind::ResourceSet, 1);
+
+    let (stats, operations) = normalize_ops_for_test(vec![
+        minimal_begin_pass(),
+        CommandOp::BindResourceSet {
+            pipeline_layout: layout,
+            set_index: 0,
+            set,
+            dynamic_offsets: vec![0],
+        },
+        CommandOp::BindResourceSet {
+            pipeline_layout: layout,
+            set_index: 0,
+            set,
+            dynamic_offsets: vec![256],
+        },
+        CommandOp::BindResourceSet {
+            pipeline_layout: layout,
+            set_index: 0,
+            set,
+            dynamic_offsets: vec![256],
+        },
+        CommandOp::EndPass,
+    ]);
+
+    assert_eq!(stats.resource_set_binds_removed, 1);
+    assert_eq!(
+        2,
+        operations
+            .iter()
+            .filter(|op| matches!(op, CommandOp::BindResourceSet { .. }))
+            .count()
+    );
 }
 
 #[test]
@@ -2732,11 +2779,13 @@ fn command_normalization_keeps_distinct_state_changes() {
             pipeline_layout: layout,
             set_index: 0,
             set: set_a,
+            dynamic_offsets: Vec::new(),
         },
         CommandOp::BindResourceSet {
             pipeline_layout: layout,
             set_index: 0,
             set: set_b,
+            dynamic_offsets: Vec::new(),
         },
         CommandOp::SetIndexBuffer {
             buffer: index,

@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::{BTreeMap, VecDeque};
 use std::sync::Arc;
 
@@ -763,10 +764,26 @@ impl SubmissionLowerer {
                 CommandOp::BindResourceSet {
                     pipeline_layout,
                     set,
+                    dynamic_offsets,
                     ..
                 } => {
                     let layout = objects.pipeline_layout(*pipeline_layout)?;
                     let set = objects.resource_set(*set)?;
+                    let bind_dynamic_offsets = if dynamic_offsets.is_empty() {
+                        Cow::Borrowed(set.dynamic_offsets.as_slice())
+                    } else {
+                        Cow::Owned(
+                            dynamic_offsets
+                                .iter()
+                                .copied()
+                                .map(|offset| {
+                                    u32::try_from(offset).map_err(|_| {
+                                        GalError::backend("dynamic descriptor offset exceeds u32")
+                                    })
+                                })
+                                .collect::<GalResult<Vec<_>>>()?,
+                        )
+                    };
                     let bind_point = if state.graphics_pipeline.is_some() {
                         vk::PipelineBindPoint::GRAPHICS
                     } else {
@@ -778,7 +795,7 @@ impl SubmissionLowerer {
                         layout.layout,
                         0,
                         &[set.set],
-                        &set.dynamic_offsets,
+                        bind_dynamic_offsets.as_ref(),
                     );
                 }
                 CommandOp::SetVertexBuffer {

@@ -90,6 +90,7 @@ pub enum CommandOp {
         pipeline_layout: Handle,
         set_index: u32,
         set: Handle,
+        dynamic_offsets: Vec<u64>,
     },
     SetVertexBuffer {
         slot: u32,

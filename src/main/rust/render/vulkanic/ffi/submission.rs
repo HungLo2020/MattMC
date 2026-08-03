@@ -458,6 +458,7 @@ pub(crate) fn decode_command_op(
             )?,
             set_index: op.set_index,
             set: require_handle(op.secondary, HandleKind::ResourceSet, "resource set")?,
+            dynamic_offsets: Vec::new(),
         }),
         5 => Ok(CommandOp::SetVertexBuffer {
             slot: op.slot,
@@ -751,6 +752,7 @@ pub(crate) fn serialize_command_op(out: &mut Vec<u8>, op: &CommandOp) {
             pipeline_layout,
             set_index,
             set,
+            ..
         } => {
             push_u32(out, FfiCommandOpKind::BindResourceSet as u32);
             push_u64(out, pipeline_layout.raw());

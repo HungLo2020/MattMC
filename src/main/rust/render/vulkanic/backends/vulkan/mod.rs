@@ -757,6 +757,7 @@ mod tests {
                     kind: ResourceBindingKind::UniformBuffer,
                     access: AccessFlags::READ,
                     dynamic_offsets: vec![64],
+                    buffer_range: None,
                 }],
             })
             .expect("dynamic resource set should allow optional sampler omission");

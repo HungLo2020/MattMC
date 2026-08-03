@@ -950,6 +950,22 @@ pub struct FfiWholeFrameProfileSnapshot {
     pub gal_redundant_resource_set_binds_removed: u64,
     pub gal_redundant_vertex_buffer_binds_removed: u64,
     pub gal_redundant_index_buffer_binds_removed: u64,
+    pub world_prepare_mesh_cache_scan_nanos: u64,
+    pub world_prepare_material_resource_nanos: u64,
+    pub world_prepare_mesh_stream_capacity_nanos: u64,
+    pub world_prepare_mesh_stream_lookup_nanos: u64,
+    pub world_prepare_mesh_stream_grow_nanos: u64,
+    pub world_prepare_mesh_resource_nanos: u64,
+    pub world_prepare_material_slot_check_nanos: u64,
+    pub world_prepare_mesh_slot_check_nanos: u64,
+    pub world_prepare_mesh_batch_count: u64,
+    pub world_prepare_mesh_stream_required_bytes: u64,
+    pub world_prepare_mesh_stream_capacity_bytes: u64,
+    pub world_prepare_mesh_stream_grows: u64,
+    pub world_mesh_stream_payload_pack_nanos: u64,
+    pub world_mesh_draw_record_nanos: u64,
+    pub world_mesh_stream_payload_bytes: u64,
+    pub world_mesh_dynamic_offset_count: u64,
 }
 
 impl Default for FfiGuiFrameSubmitResult {

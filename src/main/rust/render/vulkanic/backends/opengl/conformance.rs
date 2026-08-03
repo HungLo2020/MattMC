@@ -325,6 +325,7 @@ pub(in crate::render::vulkanic::backends) fn run_conformance(
                 kind: ResourceBindingKind::SampledTexture,
                 access: AccessFlags::READ,
                 dynamic_offsets: Vec::new(),
+                buffer_range: None,
             },
             ResourceBinding {
                 binding: 2,
@@ -333,6 +334,7 @@ pub(in crate::render::vulkanic::backends) fn run_conformance(
                 kind: ResourceBindingKind::Sampler,
                 access: AccessFlags::READ,
                 dynamic_offsets: Vec::new(),
+                buffer_range: None,
             },
             ResourceBinding {
                 binding: 3,
@@ -341,6 +343,7 @@ pub(in crate::render::vulkanic::backends) fn run_conformance(
                 kind: ResourceBindingKind::UniformBuffer,
                 access: AccessFlags::READ,
                 dynamic_offsets: Vec::new(),
+                buffer_range: None,
             },
             ResourceBinding {
                 binding: 3,
@@ -349,6 +352,7 @@ pub(in crate::render::vulkanic::backends) fn run_conformance(
                 kind: ResourceBindingKind::UniformBuffer,
                 access: AccessFlags::READ,
                 dynamic_offsets: Vec::new(),
+                buffer_range: None,
             },
             ResourceBinding {
                 binding: 4,
@@ -357,6 +361,7 @@ pub(in crate::render::vulkanic::backends) fn run_conformance(
                 kind: ResourceBindingKind::StorageBuffer,
                 access: AccessFlags::READ,
                 dynamic_offsets: Vec::new(),
+                buffer_range: None,
             },
         ],
     })?;
@@ -577,6 +582,7 @@ fn conformance_ops(
             pipeline_layout,
             set_index: 0,
             set: resource_set,
+            dynamic_offsets: Vec::new(),
         },
         CommandOp::SetIndexBuffer {
             buffer: index,

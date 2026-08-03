@@ -47,6 +47,7 @@ pub(crate) struct TerrainMeshDraw {
     pub pipeline: Handle,
     pub pipeline_layout: Handle,
     pub resource_set: Handle,
+    pub resource_set_dynamic_offsets: [u64; 1],
     pub index_buffer: Handle,
     pub index_offset: u64,
     pub index_type: IndexType,
@@ -240,6 +241,7 @@ impl ShaderPackRuntimeExecutor {
                 shadow_pipeline,
                 draw.pipeline_layout,
                 draw.resource_set,
+                draw.resource_set_dynamic_offsets,
                 draw.index_buffer,
                 draw.index_offset,
                 draw.index_type,
@@ -355,6 +357,7 @@ impl ShaderPackRuntimeExecutor {
                     draw.pipeline,
                     draw.pipeline_layout,
                     draw.resource_set,
+                    draw.resource_set_dynamic_offsets,
                     draw.index_buffer,
                     draw.index_offset,
                     draw.index_type,
@@ -463,6 +466,7 @@ impl ShaderPackRuntimeExecutor {
             pipeline_layout: targets.screen_pipeline_layout,
             set_index: 0,
             set: targets.final_resource_set,
+            dynamic_offsets: Vec::new(),
         });
         ops.push(CommandOp::Draw {
             vertices: 3,
@@ -506,6 +510,7 @@ impl ShaderPackRuntimeExecutor {
             pipeline_layout,
             set_index: 0,
             set: resource_set,
+            dynamic_offsets: Vec::new(),
         });
         ops.push(CommandOp::Draw {
             vertices: 3,
@@ -554,7 +559,7 @@ impl TerrainCompositeUniforms {
 #[derive(Default)]
 struct IndexedDrawState {
     pipeline: Option<Handle>,
-    resource_set: Option<(Handle, u32, Handle)>,
+    resource_set: Option<(Handle, u32, Handle, [u64; 1])>,
     index_buffer: Option<(Handle, u64, IndexType)>,
 }
 
@@ -565,6 +570,7 @@ fn append_indexed_draw(
     pipeline: Handle,
     pipeline_layout: Handle,
     resource_set: Handle,
+    resource_set_dynamic_offsets: [u64; 1],
     index_buffer: Handle,
     index_offset: u64,
     index_type: IndexType,
@@ -576,12 +582,18 @@ fn append_indexed_draw(
         state.pipeline = Some(pipeline);
         state.resource_set = None;
     }
-    let resource_set_binding = (pipeline_layout, 0, resource_set);
+    let resource_set_binding = (
+        pipeline_layout,
+        0,
+        resource_set,
+        resource_set_dynamic_offsets,
+    );
     if state.resource_set != Some(resource_set_binding) {
         ops.push(CommandOp::BindResourceSet {
             pipeline_layout,
             set_index: 0,
             set: resource_set,
+            dynamic_offsets: resource_set_dynamic_offsets.to_vec(),
         });
         state.resource_set = Some(resource_set_binding);
     }
@@ -704,6 +716,7 @@ mod tests {
             pipeline,
             layout,
             set,
+            [0],
             index_buffer,
             0,
             IndexType::U32,
@@ -716,6 +729,7 @@ mod tests {
             pipeline,
             layout,
             set,
+            [0],
             index_buffer,
             0,
             IndexType::U32,
@@ -728,6 +742,7 @@ mod tests {
             pipeline,
             layout,
             other_set,
+            [0],
             index_buffer,
             0,
             IndexType::U32,
@@ -740,6 +755,7 @@ mod tests {
             pipeline,
             layout,
             other_set,
+            [0],
             index_buffer,
             12,
             IndexType::U32,
@@ -752,6 +768,7 @@ mod tests {
             other_pipeline,
             layout,
             other_set,
+            [0],
             index_buffer,
             12,
             IndexType::U32,

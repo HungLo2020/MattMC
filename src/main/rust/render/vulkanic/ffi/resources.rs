@@ -245,6 +245,7 @@ pub unsafe fn decode_resource_batch(
                 kind: resource_binding_kind(binding.kind)?,
                 access: access_flags(binding.access_bits)?,
                 dynamic_offsets,
+                buffer_range: None,
             });
         }
         owned.resource_sets.push(FfiOwnedCreate {

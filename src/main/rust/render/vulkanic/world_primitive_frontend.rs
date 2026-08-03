@@ -125,6 +125,8 @@ const WORLD_MESH_BATCH_HEADER_BYTES: usize = 16 * 4 + 16 * 4 + 16 * 4 + 4 * 4;
 const WORLD_MESH_INSTANCE_BYTES: usize = 16 * 4 + 4 * 4 + 4 * 4;
 const WORLD_MESH_INSTANCE_BUFFER_BYTES: u64 =
     (WORLD_MESH_BATCH_HEADER_BYTES + WORLD_MAX_MESH_INSTANCES * WORLD_MESH_INSTANCE_BYTES) as u64;
+const WORLD_MESH_INSTANCE_STREAM_ALIGNMENT: usize = 256;
+const WORLD_MESH_INSTANCE_STREAM_BINDING_RANGE_BYTES: u64 = WORLD_MESH_INSTANCE_BUFFER_BYTES;
 const WORLD_SHADER_COMPOSITE_UNIFORM_BYTES: u64 = TERRAIN_RUNTIME_COMPOSITE_UNIFORM_BYTES;
 const CRACK_STAGE_COUNT: u32 = 10;
 const CRACK_STAGE_SIZE: u32 = 16;
@@ -821,16 +823,24 @@ struct MeshPipelineResources {
 struct MeshResources {
     vertex_buffer: Handle,
     index_buffer: Handle,
-    resource_layout: Handle,
     pipeline_layout: Handle,
     pipeline: Handle,
     shadow_pipeline: Option<Handle>,
-    data_slots: Vec<MeshDataSlot>,
+    resource_set: Handle,
 }
 
-struct MeshDataSlot {
-    instance_buffer: Handle,
-    resource_set: Handle,
+#[derive(Clone, Copy, Debug)]
+struct MeshInstanceStreamSlot {
+    buffer: Handle,
+    capacity: u64,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct MeshInstanceStreamBinding {
+    buffer: Handle,
+    offset: u64,
+    capacity: u64,
+    grew: bool,
 }
 
 impl MeshPipelineResources {
@@ -854,10 +864,7 @@ impl MeshPipelineResources {
 impl MeshResources {
     fn handles_in_destroy_order(&self) -> Vec<Handle> {
         let mut handles = Vec::new();
-        for slot in self.data_slots.iter().rev() {
-            handles.push(slot.resource_set);
-            handles.push(slot.instance_buffer);
-        }
+        handles.push(self.resource_set);
         handles.push(self.index_buffer);
         handles.push(self.vertex_buffer);
         handles
@@ -1001,6 +1008,7 @@ pub struct WorldPrimitiveFrontend {
     mesh_pipeline_resources: BTreeMap<MeshPipelineResourceKey, MeshPipelineResources>,
     mesh_resources: BTreeMap<MeshResourceKey, MeshResources>,
     mesh_texture_resources: BTreeMap<u32, MeshTextureResources>,
+    mesh_instance_stream_slots: Vec<MeshInstanceStreamSlot>,
     depth_attachment: Option<DepthAttachmentResources>,
     g_buffer_resources: Option<GBufferResources>,
     g_buffer_final_bindings: BTreeMap<GBufferFinalBindingKey, GBufferFinalBindingResources>,
@@ -1545,10 +1553,9 @@ impl WorldPrimitiveFrontend {
             .iter()
             .filter(|batch| self.material_resources.contains_key(&batch.key))
             .count() as u64;
-        let mesh_cache_hits = mesh_batches
-            .iter()
-            .filter(|batch| self.mesh_resources.contains_key(&batch.key))
-            .count() as u64;
+        let mut mesh_cache_hits = 0u64;
+        profile.world_prepare_mesh_cache_scan_nanos = 0;
+        profile.world_prepare_mesh_batch_count = mesh_batches.len() as u64;
         let resource_creates_before = gal.metrics().resource_creates;
         let resource_destroys_before = gal.metrics().resource_destroys;
         let resource_started = std::time::Instant::now();
@@ -1563,24 +1570,47 @@ impl WorldPrimitiveFrontend {
             self.ensure_border_resources(gal, color_format)?;
         }
         let mesh_material_asset_started = std::time::Instant::now();
+        let material_resource_started = std::time::Instant::now();
         for batch in &material_batches {
             self.ensure_material_resources(gal, batch.key)?;
         }
-        for batch in &mesh_batches {
-            self.ensure_mesh_resources(gal, batch.key)?;
+        profile.world_prepare_material_resource_nanos =
+            elapsed_nanos_u64(material_resource_started);
+        if !mesh_batches.is_empty() {
+            let stream_capacity_started = std::time::Instant::now();
+            let required_stream_bytes = required_mesh_instance_stream_bytes(&mesh_batches)?;
+            profile.world_prepare_mesh_stream_capacity_nanos =
+                elapsed_nanos_u64(stream_capacity_started);
+            profile.world_prepare_mesh_stream_required_bytes = required_stream_bytes;
+            let stream_lookup_started = std::time::Instant::now();
+            let stream_binding = self.ensure_mesh_instance_stream(gal, required_stream_bytes)?;
+            profile.world_prepare_mesh_stream_lookup_nanos =
+                elapsed_nanos_u64(stream_lookup_started);
+            profile.world_prepare_mesh_stream_capacity_bytes = stream_binding.capacity;
+            if stream_binding.grew {
+                profile.world_prepare_mesh_stream_grows = 1;
+                profile.world_prepare_mesh_stream_grow_nanos =
+                    profile.world_prepare_mesh_stream_lookup_nanos;
+            }
         }
+        let mesh_resource_started = std::time::Instant::now();
+        for batch in &mesh_batches {
+            let had_resources = self.mesh_resources.contains_key(&batch.key);
+            self.ensure_mesh_resources(gal, batch.key)?;
+            if had_resources {
+                mesh_cache_hits = mesh_cache_hits.saturating_add(1);
+            }
+        }
+        profile.world_prepare_mesh_resource_nanos = elapsed_nanos_u64(mesh_resource_started);
         let mut material_slot_counts = BTreeMap::new();
+        let material_slot_started = std::time::Instant::now();
         for batch in &material_batches {
             let count = material_slot_counts.entry(batch.key).or_insert(0usize);
             *count += 1;
             self.ensure_material_resource_slots(gal, batch.key, *count)?;
         }
-        let mut mesh_slot_counts = BTreeMap::new();
-        for batch in &mesh_batches {
-            let count = mesh_slot_counts.entry(batch.key).or_insert(0usize);
-            *count += 1;
-            self.ensure_mesh_resource_slots(gal, batch.key, *count)?;
-        }
+        profile.world_prepare_material_slot_check_nanos = elapsed_nanos_u64(material_slot_started);
+        profile.world_prepare_mesh_slot_check_nanos = 0;
         profile.world_prepare_mesh_material_asset_nanos =
             elapsed_nanos_u64(mesh_material_asset_started);
         profile.world_prepare_render_resources_nanos = elapsed_nanos_u64(render_resources_started);
@@ -1808,6 +1838,7 @@ impl WorldPrimitiveFrontend {
                     pipeline_layout,
                     set_index: 0,
                     set: resource_set,
+                    dynamic_offsets: Vec::new(),
                 });
                 ops.push(CommandOp::SetIndexBuffer {
                     buffer: index_buffer,
@@ -1822,10 +1853,36 @@ impl WorldPrimitiveFrontend {
             ops.push(CommandOp::EndPass);
         }
         if !mesh_batches.is_empty() {
-            let mut mesh_slot_indices = BTreeMap::new();
+            let mesh_pack_started = std::time::Instant::now();
+            let (mesh_stream_payload, mesh_stream_offsets) = packed_mesh_uniforms_for_batches(
+                &frame,
+                &mesh_batches,
+                stats.profile.world_prepare_mesh_stream_required_bytes,
+            )?;
+            stats.profile.world_mesh_stream_payload_pack_nanos =
+                elapsed_nanos_u64(mesh_pack_started);
+            stats.profile.world_mesh_stream_payload_bytes = mesh_stream_payload.len() as u64;
+            stats.profile.world_mesh_dynamic_offset_count = mesh_stream_offsets.len() as u64;
+            let mesh_stream_binding =
+                self.ensure_mesh_instance_stream(gal, mesh_stream_payload.len() as u64)?;
+            ops.push(CommandOp::Barrier(buffer_barrier(
+                mesh_stream_binding.buffer,
+                TextureUsageState::ShaderRead,
+                TextureUsageState::TransferDst,
+            )));
+            ops.push(CommandOp::HostWriteBuffer {
+                buffer: mesh_stream_binding.buffer,
+                offset: mesh_stream_binding.offset,
+                data: mesh_stream_payload,
+            });
+            ops.push(CommandOp::Barrier(buffer_barrier(
+                mesh_stream_binding.buffer,
+                TextureUsageState::TransferDst,
+                TextureUsageState::ShaderRead,
+            )));
             let mut mesh_draws = Vec::new();
-            for batch in &mesh_batches {
-                let slot_index = *mesh_slot_indices.entry(batch.key).or_insert(0usize);
+            let mesh_draw_record_started = std::time::Instant::now();
+            for (batch_index, batch) in mesh_batches.iter().enumerate() {
                 let resources = self.mesh_resources.get(&batch.key).ok_or_else(|| {
                     GalError::backend("world mesh resources vanished before submit")
                 })?;
@@ -1833,31 +1890,12 @@ impl WorldPrimitiveFrontend {
                     .mesh_assets
                     .get(&batch.key.mesh_key)
                     .ok_or_else(|| GalError::backend("world mesh asset vanished before submit"))?;
-                let slot = resources
-                    .data_slots
-                    .get(slot_index)
-                    .ok_or_else(|| GalError::backend("world mesh data slot missing"))?;
-                let uniforms = packed_mesh_uniforms_for_batch(&frame, batch)?;
-                ops.push(CommandOp::Barrier(buffer_barrier(
-                    slot.instance_buffer,
-                    TextureUsageState::ShaderRead,
-                    TextureUsageState::TransferDst,
-                )));
-                ops.push(CommandOp::HostWriteBuffer {
-                    buffer: slot.instance_buffer,
-                    offset: 0,
-                    data: uniforms,
-                });
-                ops.push(CommandOp::Barrier(buffer_barrier(
-                    slot.instance_buffer,
-                    TextureUsageState::TransferDst,
-                    TextureUsageState::ShaderRead,
-                )));
                 mesh_draws.push(TerrainMeshDraw {
                     shadow_pipeline: resources.shadow_pipeline,
                     pipeline: resources.pipeline,
                     pipeline_layout: resources.pipeline_layout,
-                    resource_set: slot.resource_set,
+                    resource_set: resources.resource_set,
+                    resource_set_dynamic_offsets: [mesh_stream_offsets[batch_index]],
                     index_buffer: resources.index_buffer,
                     index_offset: batch.index_offset,
                     index_type: asset.index_type,
@@ -1865,8 +1903,9 @@ impl WorldPrimitiveFrontend {
                     instance_count: batch.count() as u32,
                     material_mode: terrain_material_pass_mode(batch.key.material_mode)?,
                 });
-                mesh_slot_indices.insert(batch.key, slot_index + 1);
             }
+            stats.profile.world_mesh_draw_record_nanos =
+                elapsed_nanos_u64(mesh_draw_record_started);
             if use_g_buffer_mesh_path {
                 let g_buffer = self.g_buffer_resources.as_ref().ok_or_else(|| {
                     GalError::backend("G-buffer resources missing before mesh submit")
@@ -1917,6 +1956,7 @@ impl WorldPrimitiveFrontend {
                         pipeline_layout: draw.pipeline_layout,
                         set_index: 0,
                         set: draw.resource_set,
+                        dynamic_offsets: draw.resource_set_dynamic_offsets.to_vec(),
                     });
                     ops.push(CommandOp::SetIndexBuffer {
                         buffer: draw.index_buffer,
@@ -1979,6 +2019,7 @@ impl WorldPrimitiveFrontend {
                     pipeline_layout: resources.pipeline_layout,
                     set_index: 0,
                     set: resources.resource_set,
+                    dynamic_offsets: Vec::new(),
                 });
                 ops.push(CommandOp::Draw {
                     vertices: 6,
@@ -2036,6 +2077,7 @@ impl WorldPrimitiveFrontend {
                     pipeline_layout: resources.pipeline_layout,
                     set_index: 0,
                     set: resources.resource_set,
+                    dynamic_offsets: Vec::new(),
                 });
                 ops.push(CommandOp::Draw {
                     vertices: 6,
@@ -2090,6 +2132,7 @@ impl WorldPrimitiveFrontend {
                 pipeline_layout: resources.pipeline_layout,
                 set_index: 0,
                 set: resources.resource_set,
+                dynamic_offsets: Vec::new(),
             });
             ops.push(CommandOp::Draw {
                 vertices: (batch.count * 6) as u32,
@@ -2182,6 +2225,7 @@ impl WorldPrimitiveFrontend {
                     kind: ResourceBindingKind::UniformBuffer,
                     access: AccessFlags::READ,
                     dynamic_offsets: Vec::new(),
+                    buffer_range: None,
                 }],
             })?;
             created.push(resource_set);
@@ -2385,6 +2429,7 @@ impl WorldPrimitiveFrontend {
                         kind: ResourceBindingKind::UniformBuffer,
                         access: AccessFlags::READ,
                         dynamic_offsets: Vec::new(),
+                        buffer_range: None,
                     },
                     ResourceBinding {
                         binding: 1,
@@ -2393,6 +2438,7 @@ impl WorldPrimitiveFrontend {
                         kind: ResourceBindingKind::SampledTexture,
                         access: AccessFlags::READ,
                         dynamic_offsets: Vec::new(),
+                        buffer_range: None,
                     },
                     ResourceBinding {
                         binding: 2,
@@ -2401,6 +2447,7 @@ impl WorldPrimitiveFrontend {
                         kind: ResourceBindingKind::Sampler,
                         access: AccessFlags::READ,
                         dynamic_offsets: Vec::new(),
+                        buffer_range: None,
                     },
                 ],
             })?;
@@ -2647,6 +2694,7 @@ impl WorldPrimitiveFrontend {
                         kind: ResourceBindingKind::UniformBuffer,
                         access: AccessFlags::READ,
                         dynamic_offsets: Vec::new(),
+                        buffer_range: None,
                     },
                     ResourceBinding {
                         binding: 1,
@@ -2655,6 +2703,7 @@ impl WorldPrimitiveFrontend {
                         kind: ResourceBindingKind::SampledTexture,
                         access: AccessFlags::READ,
                         dynamic_offsets: Vec::new(),
+                        buffer_range: None,
                     },
                     ResourceBinding {
                         binding: 2,
@@ -2663,6 +2712,7 @@ impl WorldPrimitiveFrontend {
                         kind: ResourceBindingKind::Sampler,
                         access: AccessFlags::READ,
                         dynamic_offsets: Vec::new(),
+                        buffer_range: None,
                     },
                 ],
             })?;
@@ -3216,7 +3266,7 @@ impl WorldPrimitiveFrontend {
                         stages: PipelineStageFlags::DRAW,
                         array_count: 1,
                         optional: false,
-                        dynamic_offset_count: 0,
+                        dynamic_offset_count: 1,
                     },
                     ResourceBindingDesc {
                         binding: 2,
@@ -3366,24 +3416,24 @@ impl WorldPrimitiveFrontend {
                 usages: vec![BufferUsage::Index, BufferUsage::HostWrite],
             })?;
             created.push(index_buffer);
-            let slot = create_mesh_data_slot(
+            let stream_binding = self.ensure_mesh_instance_stream(gal, 1)?;
+            let resource_set = create_mesh_resource_set(
                 gal,
-                &format!("{label}.slot0"),
+                &label,
                 resource_layout,
                 vertex_buffer,
+                stream_binding.buffer,
                 texture_view,
                 sampler,
             )?;
-            created.push(slot.instance_buffer);
-            created.push(slot.resource_set);
+            created.push(resource_set);
             let resources = MeshResources {
                 vertex_buffer,
                 index_buffer,
-                resource_layout,
                 pipeline_layout,
                 pipeline,
                 shadow_pipeline,
-                data_slots: vec![slot],
+                resource_set,
             };
             self.upload_mesh_resources(gal, &resources, vertex_bytes, index_bytes)?;
             let _ = (index_offset, index_count, index_type);
@@ -3398,39 +3448,52 @@ impl WorldPrimitiveFrontend {
         Ok(())
     }
 
-    fn ensure_mesh_resource_slots(
+    fn ensure_mesh_instance_stream(
         &mut self,
         gal: &mut VulkanicGal,
-        key: MeshResourceKey,
-        required_slots: usize,
-    ) -> GalResult<()> {
-        let resources = self
-            .mesh_resources
-            .get_mut(&key)
-            .ok_or_else(|| GalError::backend("world mesh resources missing during slot growth"))?;
-        let texture_resources = self
-            .mesh_texture_resources
-            .get(&key.texture_id)
-            .ok_or_else(|| {
-                GalError::backend("world mesh texture resources missing during slot growth")
-            })?;
-        while resources.data_slots.len() < required_slots {
-            let slot_index = resources.data_slots.len();
-            let label = format!(
-                "world-mesh-{}-section{}-slot{}-gen{}",
-                key.mesh_key, key.section_index, slot_index, self.generation
-            );
-            let slot = create_mesh_data_slot(
-                gal,
-                &label,
-                resources.resource_layout,
-                resources.vertex_buffer,
-                texture_resources.view,
-                texture_resources.sampler,
-            )?;
-            resources.data_slots.push(slot);
+        required_bytes: u64,
+    ) -> GalResult<MeshInstanceStreamBinding> {
+        let required_capacity = required_bytes
+            .checked_add(WORLD_MESH_INSTANCE_STREAM_BINDING_RANGE_BYTES)
+            .ok_or_else(|| GalError::invalid_argument("world mesh stream capacity overflow"))?
+            .max(WORLD_MESH_INSTANCE_BUFFER_BYTES);
+        if let Some(slot) = self.mesh_instance_stream_slots.first().copied() {
+            if slot.capacity >= required_capacity {
+                return Ok(MeshInstanceStreamBinding {
+                    buffer: slot.buffer,
+                    offset: 0,
+                    capacity: slot.capacity,
+                    grew: false,
+                });
+            }
+            self.destroy_mesh_resources(gal);
+            self.destroy_mesh_instance_streams(gal);
         }
-        Ok(())
+        let aligned_capacity = align_up_u64(
+            required_capacity,
+            WORLD_MESH_INSTANCE_STREAM_ALIGNMENT as u64,
+        )?;
+        let buffer = gal.create_buffer(BufferDesc {
+            label: "world-mesh.shared-instance-stream".to_string(),
+            size: aligned_capacity,
+            memory: MemoryDomain::Upload,
+            usages: vec![
+                BufferUsage::Storage,
+                BufferUsage::TransferDst,
+                BufferUsage::HostWrite,
+            ],
+        })?;
+        self.mesh_instance_stream_slots
+            .push(MeshInstanceStreamSlot {
+                buffer,
+                capacity: aligned_capacity,
+            });
+        Ok(MeshInstanceStreamBinding {
+            buffer,
+            offset: 0,
+            capacity: aligned_capacity,
+            grew: true,
+        })
     }
 
     fn world_mesh_texture_bytes(&self, texture_id: u32) -> GalResult<(Vec<u8>, u32, u32)> {
@@ -4277,6 +4340,7 @@ impl WorldPrimitiveFrontend {
         self.destroy_border_resources(gal);
         self.destroy_material_resources(gal);
         self.destroy_mesh_resources(gal);
+        self.destroy_mesh_instance_streams(gal);
         self.destroy_mesh_texture_resources(gal);
         self.destroy_mesh_pipeline_resources(gal);
         let retired = self.destroy_g_buffer_resources(gal);
@@ -4326,6 +4390,13 @@ impl WorldPrimitiveFrontend {
             for handle in resources.handles_in_destroy_order() {
                 let _ = gal.destroy(handle);
             }
+        }
+    }
+
+    fn destroy_mesh_instance_streams(&mut self, gal: &mut VulkanicGal) {
+        let slots = std::mem::take(&mut self.mesh_instance_stream_slots);
+        for slot in slots.into_iter().rev() {
+            let _ = gal.destroy(slot.buffer);
         }
     }
 
@@ -5189,6 +5260,7 @@ fn create_material_data_slot(
                 kind: ResourceBindingKind::StorageBuffer,
                 access: AccessFlags::READ,
                 dynamic_offsets: Vec::new(),
+                buffer_range: None,
             },
             ResourceBinding {
                 binding: 1,
@@ -5197,6 +5269,7 @@ fn create_material_data_slot(
                 kind: ResourceBindingKind::SampledTexture,
                 access: AccessFlags::READ,
                 dynamic_offsets: Vec::new(),
+                buffer_range: None,
             },
             ResourceBinding {
                 binding: 2,
@@ -5205,6 +5278,7 @@ fn create_material_data_slot(
                 kind: ResourceBindingKind::Sampler,
                 access: AccessFlags::READ,
                 dynamic_offsets: Vec::new(),
+                buffer_range: None,
             },
         ],
     }) {
@@ -5220,25 +5294,16 @@ fn create_material_data_slot(
     })
 }
 
-fn create_mesh_data_slot(
+fn create_mesh_resource_set(
     gal: &mut VulkanicGal,
     label: &str,
     resource_layout: Handle,
     vertex_buffer: Handle,
+    instance_buffer: Handle,
     texture_view: Handle,
     sampler: Handle,
-) -> GalResult<MeshDataSlot> {
-    let instance_buffer = gal.create_buffer(BufferDesc {
-        label: format!("{label}.instance-data"),
-        size: WORLD_MESH_INSTANCE_BUFFER_BYTES,
-        memory: MemoryDomain::Upload,
-        usages: vec![
-            BufferUsage::Storage,
-            BufferUsage::TransferDst,
-            BufferUsage::HostWrite,
-        ],
-    })?;
-    let resource_set = match gal.create_resource_set(ResourceSetDesc {
+) -> GalResult<Handle> {
+    gal.create_resource_set(ResourceSetDesc {
         label: format!("{label}.resource-set"),
         layout: resource_layout,
         bindings: vec![
@@ -5249,6 +5314,7 @@ fn create_mesh_data_slot(
                 kind: ResourceBindingKind::StorageBuffer,
                 access: AccessFlags::READ,
                 dynamic_offsets: Vec::new(),
+                buffer_range: None,
             },
             ResourceBinding {
                 binding: 1,
@@ -5256,7 +5322,8 @@ fn create_mesh_data_slot(
                 resource: instance_buffer,
                 kind: ResourceBindingKind::StorageBuffer,
                 access: AccessFlags::READ,
-                dynamic_offsets: Vec::new(),
+                dynamic_offsets: vec![0],
+                buffer_range: Some(WORLD_MESH_INSTANCE_STREAM_BINDING_RANGE_BYTES),
             },
             ResourceBinding {
                 binding: 2,
@@ -5265,6 +5332,7 @@ fn create_mesh_data_slot(
                 kind: ResourceBindingKind::SampledTexture,
                 access: AccessFlags::READ,
                 dynamic_offsets: Vec::new(),
+                buffer_range: None,
             },
             ResourceBinding {
                 binding: 3,
@@ -5273,18 +5341,9 @@ fn create_mesh_data_slot(
                 kind: ResourceBindingKind::Sampler,
                 access: AccessFlags::READ,
                 dynamic_offsets: Vec::new(),
+                buffer_range: None,
             },
         ],
-    }) {
-        Ok(resource_set) => resource_set,
-        Err(error) => {
-            let _ = gal.destroy(instance_buffer);
-            return Err(error);
-        }
-    };
-    Ok(MeshDataSlot {
-        instance_buffer,
-        resource_set,
     })
 }
 
@@ -5397,6 +5456,7 @@ fn create_shader_screen_resource_set(
                 kind: ResourceBindingKind::StorageBuffer,
                 access: AccessFlags::READ,
                 dynamic_offsets: Vec::new(),
+                buffer_range: None,
             },
         ],
     })
@@ -5465,6 +5525,7 @@ fn sampled_binding(binding: u32, resource: Handle) -> ResourceBinding {
         kind: ResourceBindingKind::SampledTexture,
         access: AccessFlags::READ,
         dynamic_offsets: Vec::new(),
+        buffer_range: None,
     }
 }
 
@@ -5476,6 +5537,7 @@ fn sampler_binding(binding: u32, resource: Handle) -> ResourceBinding {
         kind: ResourceBindingKind::Sampler,
         access: AccessFlags::READ,
         dynamic_offsets: Vec::new(),
+        buffer_range: None,
     }
 }
 
@@ -5632,28 +5694,52 @@ fn packed_material_uniforms_for_batch(
     Ok(out)
 }
 
-fn packed_mesh_uniforms_for_batch(
-    frame: &WorldPrimitiveFrame,
-    batch: &MeshBatch,
-) -> GalResult<Vec<u8>> {
-    let required_bytes = WORLD_MESH_BATCH_HEADER_BYTES
-        .checked_add(
-            batch
-                .count()
-                .checked_mul(WORLD_MESH_INSTANCE_BYTES)
-                .ok_or_else(|| {
-                    GalError::invalid_argument("world mesh batch instance byte count overflow")
-                })?,
-        )
-        .ok_or_else(|| GalError::invalid_argument("world mesh batch byte count overflow"))?;
-    if required_bytes as u64 > WORLD_MESH_INSTANCE_BUFFER_BYTES {
-        return Err(GalError::invalid_argument(format!(
-            "world mesh batch has {} instances; maximum is {}",
-            batch.count(),
-            WORLD_MAX_MESH_INSTANCES
-        )));
+fn required_mesh_instance_stream_bytes(mesh_batches: &[MeshBatch]) -> GalResult<u64> {
+    let mut cursor = 0u64;
+    for batch in mesh_batches {
+        cursor = align_up_u64(cursor, WORLD_MESH_INSTANCE_STREAM_ALIGNMENT as u64)?;
+        let batch_bytes = WORLD_MESH_BATCH_HEADER_BYTES
+            .checked_add(
+                batch
+                    .count()
+                    .checked_mul(WORLD_MESH_INSTANCE_BYTES)
+                    .ok_or_else(|| {
+                        GalError::invalid_argument("world mesh stream instance byte count overflow")
+                    })?,
+            )
+            .ok_or_else(|| GalError::invalid_argument("world mesh stream byte count overflow"))?;
+        cursor = cursor
+            .checked_add(batch_bytes as u64)
+            .ok_or_else(|| GalError::invalid_argument("world mesh stream cursor overflow"))?;
     }
-    let mut out = Vec::with_capacity(required_bytes);
+    Ok(cursor)
+}
+
+fn packed_mesh_uniforms_for_batches(
+    frame: &WorldPrimitiveFrame,
+    mesh_batches: &[MeshBatch],
+    required_bytes: u64,
+) -> GalResult<(Vec<u8>, Vec<u64>)> {
+    let mut out = Vec::with_capacity(required_bytes as usize);
+    let mut offsets = Vec::with_capacity(mesh_batches.len());
+    let header = packed_mesh_uniform_header(frame);
+    for batch in mesh_batches {
+        let aligned = align_up_u64(
+            out.len() as u64,
+            WORLD_MESH_INSTANCE_STREAM_ALIGNMENT as u64,
+        )?;
+        if aligned > out.len() as u64 {
+            out.resize(aligned as usize, 0);
+        }
+        offsets.push(aligned);
+        out.extend_from_slice(&header);
+        append_mesh_instances(frame, batch, &mut out)?;
+    }
+    Ok((out, offsets))
+}
+
+fn packed_mesh_uniform_header(frame: &WorldPrimitiveFrame) -> Vec<u8> {
+    let mut out = Vec::with_capacity(WORLD_MESH_BATCH_HEADER_BYTES);
     for value in frame.view_matrix {
         push_f32(&mut out, value);
     }
@@ -5666,27 +5752,35 @@ fn packed_mesh_uniforms_for_batch(
     for value in shader_shadow_params(true) {
         push_f32(&mut out, value);
     }
+    out
+}
+
+fn append_mesh_instances(
+    frame: &WorldPrimitiveFrame,
+    batch: &MeshBatch,
+    out: &mut Vec<u8>,
+) -> GalResult<()> {
     for instance_index in &batch.indices {
         let instance = &frame.mesh_instances[*instance_index];
         for value in instance.transform {
-            push_f32(&mut out, value);
+            push_f32(out, value);
         }
         for value in argb_to_rgba(instance.color_argb) {
-            push_f32(&mut out, value);
+            push_f32(out, value);
         }
         if batch.key.material_mode == WORLD_MATERIAL_MODE_CUTOUT {
             push_f32(
-                &mut out,
+                out,
                 material_registry::cutout_threshold(batch.key.material_id),
             );
         } else {
-            push_f32(&mut out, 0.0);
+            push_f32(out, 0.0);
         }
-        push_f32(&mut out, 0.0);
-        push_f32(&mut out, 0.0);
-        push_f32(&mut out, 0.0);
+        push_f32(out, 0.0);
+        push_f32(out, 0.0);
+        push_f32(out, 0.0);
     }
-    Ok(out)
+    Ok(())
 }
 
 fn terrain_composite_uniforms(enabled: bool) -> TerrainCompositeUniforms {
@@ -5804,6 +5898,22 @@ fn push_f32(out: &mut Vec<u8>, value: f32) {
 
 fn push_u32(out: &mut Vec<u8>, value: u32) {
     out.extend_from_slice(&value.to_ne_bytes());
+}
+
+fn align_up_u64(value: u64, alignment: u64) -> GalResult<u64> {
+    if alignment == 0 {
+        return Err(GalError::invalid_argument("alignment must be non-zero"));
+    }
+    let mask = alignment - 1;
+    if alignment & mask != 0 {
+        return Err(GalError::invalid_argument(
+            "alignment must be a power of two",
+        ));
+    }
+    value
+        .checked_add(mask)
+        .map(|value| value & !mask)
+        .ok_or_else(|| GalError::invalid_argument("aligned byte count overflow"))
 }
 
 fn buffer_barrier(
@@ -6300,6 +6410,7 @@ mod tests {
         mock::MockBackend, presentation_capabilities, vulkan_capabilities,
     };
     use crate::render::vulkanic::commands::ClearColor;
+    use crate::render::vulkanic::handles::HandleKind;
     use crate::render::vulkanic::resources::{
         BufferDesc, BufferUsage, FrameTargetDesc, MemoryDomain, RenderTargetDesc, TextureDesc,
         TextureDimension, TextureUsage, TextureViewDesc,
@@ -6965,15 +7076,16 @@ mod tests {
         assert_eq!(1, stats.mesh_batch_count);
         assert_eq!(1, stats.mesh_draw_count);
         assert_eq!(
-            1,
+            Some(HandleKind::ResourceSet),
             frontend
                 .mesh_resources
                 .values()
                 .next()
                 .unwrap()
-                .data_slots
-                .len()
+                .resource_set
+                .kind()
         );
+        assert_eq!(1, frontend.mesh_instance_stream_slots.len());
         assert_eq!(
             2,
             ops.iter()

@@ -301,7 +301,7 @@ pub(super) struct CommandNormalizationStats {
 struct CommandStateTracker {
     graphics_pipeline: Option<Handle>,
     compute_pipeline: Option<Handle>,
-    resource_sets: BTreeMap<(Handle, u32), Handle>,
+    resource_sets: BTreeMap<(Handle, u32), (Handle, Vec<u64>)>,
     vertex_buffers: BTreeMap<u32, (Handle, u64)>,
     index_buffer: Option<(Handle, u64, IndexType)>,
 }
@@ -953,6 +953,7 @@ impl VulkanicGal {
                 ));
             }
             self.validate_binding_resource(binding)?;
+            self.validate_resource_binding_buffer_range(binding, &binding.dynamic_offsets)?;
             if !binding.access.reads() && !binding.access.writes() {
                 return self.validation_error(GalError::resource(
                     StatusCode::InvalidArgument,
@@ -1616,6 +1617,62 @@ impl VulkanicGal {
         Ok(())
     }
 
+    fn validate_resource_binding_buffer_range(
+        &mut self,
+        binding: &ResourceBinding,
+        offsets: &[u64],
+    ) -> GalResult<()> {
+        if binding.buffer_range.is_some()
+            && !matches!(
+                binding.kind,
+                ResourceBindingKind::UniformBuffer | ResourceBindingKind::StorageBuffer
+            )
+        {
+            return self.validation_error(GalError::resource(
+                StatusCode::InvalidArgument,
+                format!(
+                    "binding {} buffer range is only valid for buffer bindings",
+                    binding.binding
+                ),
+            ));
+        }
+        if !matches!(
+            binding.kind,
+            ResourceBindingKind::UniformBuffer | ResourceBindingKind::StorageBuffer
+        ) {
+            return Ok(());
+        }
+        let record = self.buffers.get(binding.resource)?;
+        let range = binding.buffer_range.unwrap_or_else(|| {
+            let max_default_offset = binding.dynamic_offsets.iter().copied().max().unwrap_or(0);
+            record.desc.size.saturating_sub(max_default_offset)
+        });
+        if range == 0 {
+            return self.validation_error(GalError::resource(
+                StatusCode::InvalidArgument,
+                format!("binding {} buffer range must be non-zero", binding.binding),
+            ));
+        }
+        for offset in offsets {
+            let Some(end) = offset.checked_add(range) else {
+                return self.validation_error(GalError::resource(
+                    StatusCode::InvalidArgument,
+                    format!("binding {} dynamic buffer range overflows", binding.binding),
+                ));
+            };
+            if end > record.desc.size {
+                return self.validation_error(GalError::resource(
+                    StatusCode::InvalidArgument,
+                    format!(
+                        "binding {} dynamic buffer range is outside the buffer",
+                        binding.binding
+                    ),
+                ));
+            }
+        }
+        Ok(())
+    }
+
     fn require_shader_stage(&self, handle: Handle, stage: ShaderStage) -> GalResult<()> {
         let shader = self.shaders.get(handle)?;
         if shader.desc.stage != stage {
@@ -1761,6 +1818,7 @@ impl VulkanicGal {
                     pipeline_layout,
                     set_index,
                     set,
+                    dynamic_offsets,
                 } => {
                     if active_pipeline_layout != Some(*pipeline_layout) {
                         return self.validation_error(GalError::command(
@@ -1783,6 +1841,39 @@ impl VulkanicGal {
                             StatusCode::InvalidArgument,
                             "resource set layout is not compatible with pipeline layout",
                         ));
+                    }
+                    let set_bindings = set_record.desc.bindings.clone();
+                    let expected_dynamic_offsets: usize = set_bindings
+                        .iter()
+                        .map(|binding| binding.dynamic_offsets.len())
+                        .sum();
+                    if !dynamic_offsets.is_empty()
+                        && dynamic_offsets.len() != expected_dynamic_offsets
+                    {
+                        return self.validation_error(GalError::command(
+                            StatusCode::InvalidArgument,
+                            format!(
+                                "resource set bind dynamic offset count {} does not match expected {}",
+                                dynamic_offsets.len(),
+                                expected_dynamic_offsets
+                            ),
+                        ));
+                    }
+                    let mut offset_index = 0usize;
+                    for binding in &set_bindings {
+                        let count = binding.dynamic_offsets.len();
+                        if count == 0 {
+                            continue;
+                        }
+                        let offsets = if dynamic_offsets.is_empty() {
+                            binding.dynamic_offsets.as_slice()
+                        } else {
+                            let end = offset_index + count;
+                            let slice = &dynamic_offsets[offset_index..end];
+                            offset_index = end;
+                            slice
+                        };
+                        self.validate_resource_binding_buffer_range(binding, offsets)?;
                     }
                 }
                 CommandOp::SetVertexBuffer { buffer, .. } => {
@@ -3120,14 +3211,16 @@ pub(super) fn normalize_submission_batch(batch: &mut SubmissionBatch) -> Command
                     pipeline_layout,
                     set_index,
                     set,
+                    dynamic_offsets,
                 } => {
                     let key = (*pipeline_layout, *set_index);
-                    if state.resource_sets.get(&key).copied() == Some(*set) {
+                    let value = (*set, dynamic_offsets.clone());
+                    if state.resource_sets.get(&key) == Some(&value) {
                         stats.resource_set_binds_removed =
                             stats.resource_set_binds_removed.saturating_add(1);
                         false
                     } else {
-                        state.resource_sets.insert(key, *set);
+                        state.resource_sets.insert(key, value);
                         true
                     }
                 }

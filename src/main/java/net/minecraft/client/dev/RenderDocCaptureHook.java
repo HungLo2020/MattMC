@@ -53,7 +53,7 @@ public final class RenderDocCaptureHook {
 		try {
 			triggerCapture.invokeVoid(new Object[0]);
 			triggered = true;
-			LOGGER.info("Triggered RenderDoc capture for next deterministic frame ({})", context);
+			LOGGER.info("Triggered RenderDoc capture for next frame ({})", context);
 			return true;
 		} catch (Throwable throwable) {
 			unavailable = true;

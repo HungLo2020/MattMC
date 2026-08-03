@@ -1824,6 +1824,8 @@ public final class GraphicsFrameBenchmark {
 		json.append("    \"currentFrameVisibleLayerSubmissions\": ").append(diagnostics.currentFrameVisibleLayerSubmissions()).append(",\n");
 		json.append("    \"atlasGeneration\": ").append(diagnostics.atlasGeneration()).append(",\n");
 		json.append("    \"registeredAtlasGeneration\": ").append(diagnostics.registeredAtlasGeneration()).append(",\n");
+		json.append("    \"activeNativeVertexStride\": ").append(diagnostics.activeNativeVertexStride()).append(",\n");
+		json.append("    \"expectedNativeVertexStride\": ").append(diagnostics.expectedNativeVertexStride()).append(",\n");
 		json.append("    \"acceptedBuildOutputs\": ").append(diagnostics.acceptedBuildOutputs()).append(",\n");
 		json.append("    \"registeredMeshes\": ").append(diagnostics.registeredMeshes()).append(",\n");
 		json.append("    \"texturePayloadUpdates\": ").append(diagnostics.texturePayloadUpdates()).append(",\n");
@@ -1837,7 +1839,16 @@ public final class GraphicsFrameBenchmark {
 		json.append("    \"failedLayerSubmissions\": ").append(diagnostics.failedLayerSubmissions()).append(",\n");
 		json.append("    \"removedLayers\": ").append(diagnostics.removedLayers()).append(",\n");
 		json.append("    \"invalidations\": ").append(diagnostics.invalidations()).append(",\n");
-		json.append("    \"unsupportedAnimatedSections\": ").append(diagnostics.skippedUnsupportedAnimatedSections()).append("\n");
+		json.append("    \"unsupportedAnimatedSections\": ").append(diagnostics.skippedUnsupportedAnimatedSections());
+		String fault = System.getProperty("mattmc.dev.rustGalStaticTerrain.fault", "").trim();
+		if (!fault.isBlank()) {
+			json.append(",\n");
+			json.append("    \"recentEvents\": [");
+			appendTerrainDiagnosticEvents(json, diagnostics.recentEvents(), 6, 16, diagnostics.expectedNativeVertexStride());
+			json.append("\n    ]\n");
+		} else {
+			json.append("\n");
+		}
 		json.append("  }");
 	}
 
@@ -1991,6 +2002,68 @@ public final class GraphicsFrameBenchmark {
 			json.append('"').append(escape(entry.getKey())).append("\": ").append(entry.getValue());
 		}
 		json.append("}");
+	}
+
+	private static void appendTerrainDiagnosticEvents(
+		StringBuilder json,
+		List<RustGalTerrainRenderer.TerrainDiagnosticEvent> events,
+		int indent,
+		int maxEvents,
+		int expectedNativeVertexStride
+	) {
+		int start = Math.max(0, events.size() - Math.max(0, maxEvents));
+		for (int i = start; i < events.size(); i++) {
+			RustGalTerrainRenderer.TerrainDiagnosticEvent event = events.get(i);
+			if (i > start) {
+				json.append(",");
+			}
+			json.append("\n").append(" ".repeat(indent)).append("{ ");
+			json.append("\"frame\": ").append(event.gameplayFrameId()).append(", ");
+			json.append("\"sectionKey\": ").append(event.sectionPos()).append(", ");
+			json.append("\"gameplayFrameId\": ").append(event.gameplayFrameId()).append(", ");
+			json.append("\"terrainExtractionFrameId\": ").append(event.terrainExtractionFrameId()).append(", ");
+			json.append("\"rustEnqueueFrameId\": ").append(event.rustEnqueueFrameId()).append(", ");
+			json.append("\"executionFrameId\": ").append(event.executionFrameId()).append(", ");
+			json.append("\"executionSubmissionId\": ").append(event.executionSubmissionId()).append(", ");
+			json.append("\"sectionPos\": ").append(event.sectionPos()).append(", ");
+			json.append("\"layer\": \"").append(escape(event.layer())).append("\", ");
+			json.append("\"sourceGeneration\": ").append(event.sourceGeneration()).append(", ");
+			json.append("\"meshGeneration\": ").append(event.meshGeneration()).append(", ");
+			json.append("\"visibleGeneration\": ").append(event.visibleGeneration()).append(", ");
+			json.append("\"uploadGeneration\": ").append(event.uploadGeneration()).append(", ");
+			json.append("\"meshKey\": ").append(event.meshKey()).append(", ");
+			json.append("\"contentHash\": ").append(event.contentHash()).append(", ");
+			json.append("\"vertexCount\": ").append(event.vertexCount()).append(", ");
+			json.append("\"bufferVertexCapacity\": ").append(event.bufferVertexCapacity()).append(", ");
+			json.append("\"vertexStride\": ").append(event.vertexStride()).append(", ");
+			json.append("\"expectedNativeVertexStride\": ").append(expectedNativeVertexStride).append(", ");
+			json.append("\"indexCount\": ").append(event.indexCount()).append(", ");
+			json.append("\"maxIndex\": ").append(event.maxIndex()).append(", ");
+			json.append("\"indexType\": ").append(event.indexType()).append(", ");
+			json.append("\"sectionCount\": ").append(event.sectionCount()).append(", ");
+			json.append("\"sectionOrigin\": { \"x\": ").append(event.sectionOriginX()).append(", \"y\": ").append(event.sectionOriginY()).append(", \"z\": ").append(event.sectionOriginZ()).append(" }, ");
+			json.append("\"transformTranslation\": { \"x\": ").append(format(event.transformX())).append(", \"y\": ").append(format(event.transformY())).append(", \"z\": ").append(format(event.transformZ())).append(" }, ");
+			json.append("\"localBounds\": { \"minX\": ").append(format(event.localMinX())).append(", \"minY\": ").append(format(event.localMinY())).append(", \"minZ\": ").append(format(event.localMinZ())).append(", \"maxX\": ").append(format(event.localMaxX())).append(", \"maxY\": ").append(format(event.localMaxY())).append(", \"maxZ\": ").append(format(event.localMaxZ())).append(" }, ");
+			json.append("\"uvBounds\": { \"minU\": ").append(format(event.uvMinU())).append(", \"minV\": ").append(format(event.uvMinV())).append(", \"maxU\": ").append(format(event.uvMaxU())).append(", \"maxV\": ").append(format(event.uvMaxV())).append(" }, ");
+			json.append("\"vertexPositionsFinite\": ").append(event.vertexPositionsFinite()).append(", ");
+			json.append("\"localBoundsValid\": ").append(event.localBoundsValid()).append(", ");
+			json.append("\"uvBoundsValid\": ").append(event.uvBoundsValid()).append(", ");
+			json.append("\"indexRangeValid\": ").append(event.indexRangeValid()).append(", ");
+			json.append("\"segmentLayoutValid\": ").append(event.segmentLayoutValid()).append(", ");
+			json.append("\"sectionOriginValid\": ").append(event.sectionOriginValid()).append(", ");
+			json.append("\"indexOffsetAlignmentValid\": ").append(event.indexOffsetAlignmentValid()).append(", ");
+			json.append("\"cameraBoundsFinite\": ").append(event.cameraBoundsFinite()).append(", ");
+			json.append("\"normalContractValid\": ").append(event.normalContractValid()).append(", ");
+			json.append("\"aoContractValid\": ").append(event.aoContractValid()).append(", ");
+			json.append("\"blockSkyLightContractValid\": ").append(event.blockSkyLightContractValid()).append(", ");
+			json.append("\"topFaceShadeContractValid\": ").append(event.topFaceShadeContractValid()).append(", ");
+			json.append("\"separateAoActive\": ").append(event.separateAoActive()).append(", ");
+			json.append("\"separateAoVertexCount\": ").append(event.separateAoVertexCount()).append(", ");
+			json.append("\"aoRange\": { \"min\": ").append(format(event.minAo())).append(", \"max\": ").append(format(event.maxAo())).append(" }, ");
+			json.append("\"normalSectionCounts\": { \"posY\": ").append(event.positiveYNormalSections()).append(", \"negY\": ").append(event.negativeYNormalSections()).append(", \"horizontal\": ").append(event.horizontalNormalSections()).append(" }, ");
+			json.append("\"reason\": \"").append(escape(event.reason())).append("\"");
+			json.append(" }");
+		}
 	}
 
 	private static void writePhaseMap(StringBuilder json, String name, Map<String, PhaseStats> phases) {

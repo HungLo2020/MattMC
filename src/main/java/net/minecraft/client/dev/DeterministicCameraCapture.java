@@ -3010,6 +3010,7 @@ public final class DeterministicCameraCapture {
 		json.append("    \"atlasGeneration\": ").append(diagnostics.atlasGeneration()).append(",\n");
 		json.append("    \"registeredAtlasGeneration\": ").append(diagnostics.registeredAtlasGeneration()).append(",\n");
 		json.append("    \"activeNativeVertexStride\": ").append(diagnostics.activeNativeVertexStride()).append(",\n");
+		json.append("    \"expectedNativeVertexStride\": ").append(diagnostics.expectedNativeVertexStride()).append(",\n");
 		json.append("    \"acceptedBuildOutputs\": ").append(diagnostics.acceptedBuildOutputs()).append(",\n");
 		json.append("    \"skippedRouteBuildOutputs\": ").append(diagnostics.skippedRouteBuildOutputs()).append(",\n");
 		json.append("    \"skippedUnsupportedAnimatedSections\": ").append(diagnostics.skippedUnsupportedAnimatedSections()).append(",\n");
@@ -3030,10 +3031,10 @@ public final class DeterministicCameraCapture {
 		json.append("    \"rustEnqueueFrames\": ").append(diagnostics.rustEnqueueFrames()).append(",\n");
 		appendWorldMeshAssetMetrics(json).append(",\n");
 		json.append("    \"lifecycleEvents\": [");
-		appendTerrainDiagnosticEvents(json, diagnostics.lifecycleEvents());
+		appendTerrainDiagnosticEvents(json, diagnostics.lifecycleEvents(), diagnostics.expectedNativeVertexStride());
 		json.append("    ],\n");
 		json.append("    \"recentEvents\": [");
-		appendTerrainDiagnosticEvents(json, diagnostics.recentEvents());
+		appendTerrainDiagnosticEvents(json, diagnostics.recentEvents(), diagnostics.expectedNativeVertexStride());
 		json.append("]\n  }");
 		return json;
 	}
@@ -3055,13 +3056,19 @@ public final class DeterministicCameraCapture {
 		return json;
 	}
 
-	private static void appendTerrainDiagnosticEvents(StringBuilder json, List<RustGalTerrainRenderer.TerrainDiagnosticEvent> events) {
+	private static void appendTerrainDiagnosticEvents(
+		StringBuilder json,
+		List<RustGalTerrainRenderer.TerrainDiagnosticEvent> events,
+		int expectedNativeVertexStride
+	) {
 		for (int i = 0; i < events.size(); i++) {
 			RustGalTerrainRenderer.TerrainDiagnosticEvent event = events.get(i);
 			if (i > 0) {
 				json.append(",");
 			}
 			json.append("\n      { ");
+			json.append("\"frame\": ").append(event.gameplayFrameId()).append(", ");
+			json.append("\"sectionKey\": ").append(event.sectionPos()).append(", ");
 			json.append("\"gameplayFrameId\": ").append(event.gameplayFrameId()).append(", ");
 			json.append("\"terrainExtractionFrameId\": ").append(event.terrainExtractionFrameId()).append(", ");
 			json.append("\"rustEnqueueFrameId\": ").append(event.rustEnqueueFrameId()).append(", ");
@@ -3078,6 +3085,7 @@ public final class DeterministicCameraCapture {
 					json.append("\"vertexCount\": ").append(event.vertexCount()).append(", ");
 					json.append("\"bufferVertexCapacity\": ").append(event.bufferVertexCapacity()).append(", ");
 					json.append("\"vertexStride\": ").append(event.vertexStride()).append(", ");
+					json.append("\"expectedNativeVertexStride\": ").append(expectedNativeVertexStride).append(", ");
 					json.append("\"indexCount\": ").append(event.indexCount()).append(", ");
 					json.append("\"maxIndex\": ").append(event.maxIndex()).append(", ");
 					json.append("\"indexType\": ").append(event.indexType()).append(", ");

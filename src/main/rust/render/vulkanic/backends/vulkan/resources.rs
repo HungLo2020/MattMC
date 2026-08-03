@@ -636,10 +636,19 @@ impl VulkanObjects {
                 ResourceBindingKind::UniformBuffer | ResourceBindingKind::StorageBuffer => {
                     let buffer = self.buffer(binding.resource)?;
                     let info_index = buffer_infos.len();
+                    let range = if let Some(range) = binding.buffer_range {
+                        range
+                    } else if binding.dynamic_offsets.is_empty() {
+                        buffer.size
+                    } else {
+                        let max_default_offset =
+                            binding.dynamic_offsets.iter().copied().max().unwrap_or(0);
+                        buffer.size.saturating_sub(max_default_offset)
+                    };
                     buffer_infos.push(vk::DescriptorBufferInfo {
                         buffer: buffer.buffer,
                         offset: 0,
-                        range: buffer.size,
+                        range,
                     });
                     plans.push(WritePlan::Buffer {
                         binding: binding.binding,
