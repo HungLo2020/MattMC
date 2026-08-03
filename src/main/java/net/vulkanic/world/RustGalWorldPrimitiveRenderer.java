@@ -111,9 +111,11 @@ public final class RustGalWorldPrimitiveRenderer {
 	public static final int MATERIAL_TEXTURE_TERRAIN_BLOCK_ATLAS = 0x54A17A1A;
 	public static final int MATERIAL_ID_OPAQUE_TEXTURED = 0x6A2FD335;
 	public static final int MATERIAL_ID_CUTOUT_TEXTURED = 0x129B1B90;
+	public static final int MATERIAL_ID_TRANSLUCENT_TEXTURED = 0x4D21A7C3;
 	public static final int MATERIAL_ID_BLOCK_MARKER_CUTOUT = 0x224A8659;
 	public static final int MATERIAL_MODE_OPAQUE = 1;
 	public static final int MATERIAL_MODE_CUTOUT = 2;
+	public static final int MATERIAL_MODE_TRANSLUCENT = 3;
 	public static final int MESH_VERTEX_LAYOUT_V2 = 2;
 	public static final int MESH_SECTION_ALL = -1;
 	public static final int STRATUM_WORLD_TERRAIN = 60;
@@ -215,6 +217,8 @@ public final class RustGalWorldPrimitiveRenderer {
 	private static final List<PendingMeshProducer> PENDING_MESH_PRODUCERS = new ArrayList<>();
 	private static final Map<Long, VulkanicGalBridge.WorldMeshAssetRecord> WORLD_MESH_ASSETS = new LinkedHashMap<>();
 	private static final Set<Long> DIRTY_WORLD_MESH_ASSETS = new LinkedHashSet<>();
+	private static final Map<Long, VulkanicGalBridge.WorldMeshSortedIndexRecord> WORLD_MESH_SORTED_INDICES = new LinkedHashMap<>();
+	private static final Set<Long> DIRTY_WORLD_MESH_SORTED_INDICES = new LinkedHashSet<>();
 	private static final Map<Integer, VulkanicGalBridge.WorldMeshTextureAssetRecord> WORLD_MESH_TEXTURES = new LinkedHashMap<>();
 	private static final Set<Integer> DIRTY_WORLD_MESH_TEXTURES = new LinkedHashSet<>();
 	private static long worldMeshAssetGeneration;
@@ -571,23 +575,27 @@ public final class RustGalWorldPrimitiveRenderer {
 				return null;
 			}
 			attemptedWorldMeshAssetGeneration = worldMeshAssetGeneration;
-			try {
-				List<VulkanicGalBridge.WorldMeshAssetRecord> dirtyMeshes = dirtyWorldMeshAssetsLocked();
-				List<VulkanicGalBridge.WorldMeshTextureAssetRecord> dirtyTextures = dirtyWorldMeshTextureAssetsLocked();
-				VulkanicGalBridge.Status status = bridge.updateWorldMeshAssets(
-					worldMeshAssetGeneration,
-					dirtyMeshes,
-					dirtyTextures
-				);
-				uploadedWorldMeshAssetGeneration = worldMeshAssetGeneration;
-				DIRTY_WORLD_MESH_ASSETS.clear();
-				DIRTY_WORLD_MESH_TEXTURES.clear();
+				try {
+					List<VulkanicGalBridge.WorldMeshAssetRecord> dirtyMeshes = dirtyWorldMeshAssetsLocked();
+					List<VulkanicGalBridge.WorldMeshTextureAssetRecord> dirtyTextures = dirtyWorldMeshTextureAssetsLocked();
+					List<VulkanicGalBridge.WorldMeshSortedIndexRecord> dirtySortedIndices = dirtyWorldMeshSortedIndicesLocked();
+					VulkanicGalBridge.Status status = bridge.updateWorldMeshAssets(
+						worldMeshAssetGeneration,
+						dirtyMeshes,
+						dirtyTextures,
+						dirtySortedIndices
+					);
+					uploadedWorldMeshAssetGeneration = worldMeshAssetGeneration;
+					DIRTY_WORLD_MESH_ASSETS.clear();
+					DIRTY_WORLD_MESH_SORTED_INDICES.clear();
+					DIRTY_WORLD_MESH_TEXTURES.clear();
 				auditMessage(
 					"Rust VulkanicGAL world mesh asset update accepted"
 						+ " generation=" + worldMeshAssetGeneration
-						+ " meshes=" + WORLD_MESH_ASSETS.size()
-						+ " dirty_meshes=" + dirtyMeshes.size()
-						+ " textures=" + WORLD_MESH_TEXTURES.size()
+							+ " meshes=" + WORLD_MESH_ASSETS.size()
+							+ " dirty_meshes=" + dirtyMeshes.size()
+							+ " dirty_sorted_indices=" + dirtySortedIndices.size()
+							+ " textures=" + WORLD_MESH_TEXTURES.size()
 						+ " dirty_textures=" + dirtyTextures.size()
 						+ " payload_bytes=" + lastWorldMeshAssetPayloadBytes
 						+ " uploaded_generation=" + uploadedWorldMeshAssetGeneration
@@ -1319,9 +1327,11 @@ public final class RustGalWorldPrimitiveRenderer {
 					markWorldMeshAssetsChangedLocked();
 				}
 				return;
-			}
-			WORLD_MESH_ASSETS.put(asset.meshKey(), asset);
-			DIRTY_WORLD_MESH_ASSETS.add(asset.meshKey());
+				}
+				WORLD_MESH_ASSETS.put(asset.meshKey(), asset);
+				WORLD_MESH_SORTED_INDICES.remove(asset.meshKey());
+				DIRTY_WORLD_MESH_SORTED_INDICES.remove(asset.meshKey());
+				DIRTY_WORLD_MESH_ASSETS.add(asset.meshKey());
 			markWorldMeshAssetsChangedLocked();
 			auditMessage(
 				"Rust VulkanicGAL static terrain mesh asset registered"
@@ -1353,16 +1363,64 @@ public final class RustGalWorldPrimitiveRenderer {
 		}
 	}
 
+	public static void registerStaticTerrainSortedIndex(VulkanicGalBridge.WorldMeshSortedIndexRecord sortedIndex) {
+		if (!WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan() || sortedIndex == null) {
+			return;
+		}
+		synchronized (LOCK) {
+			VulkanicGalBridge.WorldMeshAssetRecord asset = WORLD_MESH_ASSETS.get(sortedIndex.meshKey());
+			if (asset == null || asset.meshGeneration() != sortedIndex.meshGeneration()) {
+				return;
+			}
+			VulkanicGalBridge.WorldMeshSortedIndexRecord previous = WORLD_MESH_SORTED_INDICES.get(sortedIndex.meshKey());
+			if (previous != null && previous.indexGeneration() >= sortedIndex.indexGeneration()) {
+				return;
+			}
+			WORLD_MESH_SORTED_INDICES.put(sortedIndex.meshKey(), sortedIndex);
+			DIRTY_WORLD_MESH_SORTED_INDICES.add(sortedIndex.meshKey());
+			RustGalTerrainRenderer.recordTranslucentSortCopyRegistered(sortedIndex);
+			markWorldMeshAssetsChangedLocked();
+			auditMessage(
+				"Rust VulkanicGAL static terrain sorted index registered"
+					+ " mesh_key=" + sortedIndex.meshKey()
+					+ " mesh_generation=" + sortedIndex.meshGeneration()
+					+ " index_generation=" + sortedIndex.indexGeneration()
+					+ " index_bytes=" + sortedIndex.indexBytes().length
+					+ " route=rust-vulkan-whole-frame"
+			);
+		}
+	}
+
+	public static StaticTerrainSortedIndexSnapshot staticTerrainSortedIndexSnapshot(long meshKey) {
+		synchronized (LOCK) {
+			VulkanicGalBridge.WorldMeshSortedIndexRecord sortedIndex = WORLD_MESH_SORTED_INDICES.get(meshKey);
+			if (sortedIndex == null) {
+				return null;
+			}
+			byte[] indexBytes = sortedIndex.indexBytes().clone();
+			return new StaticTerrainSortedIndexSnapshot(
+				sortedIndex.meshKey(),
+				sortedIndex.meshGeneration(),
+				sortedIndex.indexGeneration(),
+				sortedIndex.indexType(),
+				indexBytes.length,
+				RustGalTerrainRenderer.sortedIndexHash(indexBytes)
+			);
+		}
+	}
+
 	public static void removeStaticTerrainMeshAsset(long meshKey) {
 		if (!WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan()) {
 			return;
 		}
 		synchronized (LOCK) {
-			if (WORLD_MESH_ASSETS.remove(meshKey) == null) {
-				return;
-			}
-			DIRTY_WORLD_MESH_ASSETS.remove(meshKey);
-			PENDING_MESH_INSTANCES.removeIf(instance -> instance.meshKey() == meshKey);
+				if (WORLD_MESH_ASSETS.remove(meshKey) == null) {
+					return;
+				}
+				DIRTY_WORLD_MESH_ASSETS.remove(meshKey);
+				WORLD_MESH_SORTED_INDICES.remove(meshKey);
+				DIRTY_WORLD_MESH_SORTED_INDICES.remove(meshKey);
+				PENDING_MESH_INSTANCES.removeIf(instance -> instance.meshKey() == meshKey);
 			markWorldMeshAssetsChangedLocked();
 			auditMessage(
 				"Rust VulkanicGAL static terrain mesh asset removed"
@@ -1379,6 +1437,17 @@ public final class RustGalWorldPrimitiveRenderer {
 		int viewportWidth,
 		int viewportHeight
 	) {
+		return enqueueStaticTerrainMeshInstance(meshKey, meshGeneration, transform, viewportWidth, viewportHeight, DEPTH_POLICY_TEST_WRITE);
+	}
+
+	public static boolean enqueueStaticTerrainMeshInstance(
+		long meshKey,
+		long meshGeneration,
+		float[] transform,
+		int viewportWidth,
+		int viewportHeight,
+		int depthPolicy
+	) {
 		if (!WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan()) {
 			return false;
 		}
@@ -1392,7 +1461,7 @@ public final class RustGalWorldPrimitiveRenderer {
 				meshKey,
 				meshGeneration,
 				MESH_SECTION_ALL,
-				DEPTH_POLICY_TEST_WRITE,
+				depthPolicy,
 				CULL_BACK,
 				WORLD_WINDING_CCW,
 				0xFFFFFFFF,
@@ -1408,7 +1477,7 @@ public final class RustGalWorldPrimitiveRenderer {
 	private static void markWorldMeshAssetsChangedLocked() {
 		worldMeshAssetGeneration++;
 		attemptedWorldMeshAssetGeneration = Math.min(attemptedWorldMeshAssetGeneration, uploadedWorldMeshAssetGeneration);
-		lastWorldMeshAssetPayloadCount = DIRTY_WORLD_MESH_ASSETS.size() + DIRTY_WORLD_MESH_TEXTURES.size();
+		lastWorldMeshAssetPayloadCount = DIRTY_WORLD_MESH_ASSETS.size() + DIRTY_WORLD_MESH_TEXTURES.size() + DIRTY_WORLD_MESH_SORTED_INDICES.size();
 		lastWorldMeshAssetPayloadBytes = 0L;
 		for (long meshKey : DIRTY_WORLD_MESH_ASSETS) {
 			VulkanicGalBridge.WorldMeshAssetRecord mesh = WORLD_MESH_ASSETS.get(meshKey);
@@ -1417,6 +1486,13 @@ public final class RustGalWorldPrimitiveRenderer {
 			}
 			lastWorldMeshAssetPayloadBytes += mesh.indexBytes().length;
 			lastWorldMeshAssetPayloadBytes += (long)mesh.vertices().size() * VulkanicGalBridge.Struct.WORLD_MESH_VERTEX.byteSize();
+		}
+		for (long meshKey : DIRTY_WORLD_MESH_SORTED_INDICES) {
+			VulkanicGalBridge.WorldMeshSortedIndexRecord sortedIndex = WORLD_MESH_SORTED_INDICES.get(meshKey);
+			if (sortedIndex == null) {
+				continue;
+			}
+			lastWorldMeshAssetPayloadBytes += sortedIndex.indexBytes().length;
 		}
 		for (int textureId : DIRTY_WORLD_MESH_TEXTURES) {
 			VulkanicGalBridge.WorldMeshTextureAssetRecord texture = WORLD_MESH_TEXTURES.get(textureId);
@@ -1453,6 +1529,20 @@ public final class RustGalWorldPrimitiveRenderer {
 			}
 		}
 		return textures;
+	}
+
+	private static List<VulkanicGalBridge.WorldMeshSortedIndexRecord> dirtyWorldMeshSortedIndicesLocked() {
+		if (DIRTY_WORLD_MESH_SORTED_INDICES.isEmpty()) {
+			return List.of();
+		}
+		List<VulkanicGalBridge.WorldMeshSortedIndexRecord> sortedIndices = new ArrayList<>(DIRTY_WORLD_MESH_SORTED_INDICES.size());
+		for (long meshKey : DIRTY_WORLD_MESH_SORTED_INDICES) {
+			VulkanicGalBridge.WorldMeshSortedIndexRecord sortedIndex = WORLD_MESH_SORTED_INDICES.get(meshKey);
+			if (sortedIndex != null) {
+				sortedIndices.add(sortedIndex);
+			}
+		}
+		return sortedIndices;
 	}
 
 	private static MeshMaterial meshMaterialForChunkLayer(ChunkSectionLayer layer) {
@@ -3967,6 +4057,16 @@ public final class RustGalWorldPrimitiveRenderer {
 		int dirtyMeshes,
 		int dirtyTextures,
 		int pendingInstances
+	) {
+	}
+
+	public record StaticTerrainSortedIndexSnapshot(
+		long meshKey,
+		long meshGeneration,
+		long indexGeneration,
+		int indexType,
+		int indexBytes,
+		long indexHash
 	) {
 	}
 

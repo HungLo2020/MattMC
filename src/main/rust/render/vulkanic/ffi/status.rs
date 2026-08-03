@@ -652,9 +652,23 @@ pub(crate) fn input_bytes_for_world_mesh_asset_update(
         .textures
         .count
         .saturating_mul(size_of::<FfiWorldMeshTextureAssetPayload>() as u64);
+    let sorted_index_headers = request
+        .sorted_indices
+        .count
+        .saturating_mul(size_of::<FfiWorldMeshSortedIndexRecord>() as u64);
+    let sorted_index_payload_bytes =
+        unsafe { read_slice(request.sorted_indices, true, "world mesh sorted index updates") }
+            .map(|items| {
+                items
+                    .iter()
+                    .fold(0u64, |sum, item| sum.saturating_add(item.index_bytes.len))
+            })
+            .unwrap_or(0);
     (size_of::<FfiWorldMeshAssetUpdateRequest>() as u64)
         .saturating_add(mesh_headers)
         .saturating_add(texture_headers)
+        .saturating_add(sorted_index_headers)
+        .saturating_add(sorted_index_payload_bytes)
 }
 
 pub(crate) fn set_feature(bits: &mut u64, feature: u64, enabled: bool) {

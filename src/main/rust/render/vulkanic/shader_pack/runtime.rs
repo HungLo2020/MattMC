@@ -15,6 +15,7 @@ pub(crate) const TERRAIN_RUNTIME_COMPOSITE_UNIFORM_BYTES: u64 = 16 * 4 + 4 * 4 +
 pub(crate) enum TerrainMaterialPassMode {
     Opaque,
     Cutout,
+    Translucent,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -80,6 +81,8 @@ pub(crate) struct TerrainRuntimeTargets {
     pub deferred_lighting_pass: Handle,
     pub deferred_lighting_pipeline: Handle,
     pub deferred_lighting_resource_set: Handle,
+    pub translucent_target: Handle,
+    pub translucent_pass: Handle,
     pub composite0_texture: Handle,
     pub composite0_view: Handle,
     pub composite0_target: Handle,
@@ -173,7 +176,7 @@ impl ShaderPackRuntimeExecutor {
                 | TerrainGraphIsolation::GBufferNoShadow
                 | TerrainGraphIsolation::FullDrawsSkipped
         ) {
-            self.append_deferred_and_composites(ops, targets, frame)?;
+            self.append_deferred_and_composites(ops, targets, frame, effective_draws)?;
         }
         Ok(())
     }
@@ -191,6 +194,7 @@ impl ShaderPackRuntimeExecutor {
             "vulkanic:pass/terrain_opaque",
             "vulkanic:pass/terrain_cutout",
             "vulkanic:pass/deferred_lighting",
+            "vulkanic:pass/terrain_translucent",
             "vulkanic:pass/composite_0",
             "vulkanic:pass/composite_1",
             "vulkanic:pass/final_output",
@@ -228,7 +232,10 @@ impl ShaderPackRuntimeExecutor {
             }),
         });
         let mut draw_state = IndexedDrawState::default();
-        for draw in draws {
+        for draw in draws
+            .iter()
+            .filter(|draw| draw.material_mode != TerrainMaterialPassMode::Translucent)
+        {
             let shadow_pipeline = draw.shadow_pipeline.ok_or_else(|| {
                 GalError::backend(format!(
                     "{} mesh draw missing shadow pipeline",
@@ -394,6 +401,7 @@ impl ShaderPackRuntimeExecutor {
         ops: &mut Vec<CommandOp>,
         targets: TerrainRuntimeTargets,
         frame: TerrainRuntimeFrame,
+        draws: &[TerrainMeshDraw],
     ) -> GalResult<()> {
         ops.push(CommandOp::Barrier(buffer_barrier(
             targets.composite_uniform_buffer,
@@ -422,6 +430,7 @@ impl ShaderPackRuntimeExecutor {
             targets.screen_pipeline_layout,
             transparent_clear(frame.background_color),
         );
+        self.append_translucent_pass(ops, targets, draws)?;
         self.append_screen_pass(
             ops,
             targets.composite0_texture,
@@ -473,6 +482,77 @@ impl ShaderPackRuntimeExecutor {
             instances: 1,
         });
         ops.push(CommandOp::EndPass);
+        Ok(())
+    }
+
+    fn append_translucent_pass(
+        &self,
+        ops: &mut Vec<CommandOp>,
+        targets: TerrainRuntimeTargets,
+        draws: &[TerrainMeshDraw],
+    ) -> GalResult<()> {
+        if !draws
+            .iter()
+            .any(|draw| draw.material_mode == TerrainMaterialPassMode::Translucent)
+        {
+            return Ok(());
+        }
+        ops.push(CommandOp::Barrier(texture_barrier(
+            targets.deferred_lit_texture,
+            TextureUsageState::ShaderRead,
+            TextureUsageState::ColorAttachment,
+        )));
+        ops.push(CommandOp::Barrier(texture_barrier(
+            targets.depth_texture,
+            TextureUsageState::ShaderRead,
+            TextureUsageState::DepthStencilAttachment,
+        )));
+        ops.push(CommandOp::BeginPass {
+            pass: targets.translucent_pass,
+            target: targets.translucent_target,
+            colors: vec![PassAttachment {
+                view: targets.deferred_lit_view,
+                load_op: AttachmentLoadOp::Load,
+                store_op: AttachmentStoreOp::Store,
+                clear_color: None,
+            }],
+            depth_stencil: Some(PassAttachment {
+                view: targets.depth_view,
+                load_op: AttachmentLoadOp::Load,
+                store_op: AttachmentStoreOp::Store,
+                clear_color: None,
+            }),
+        });
+        let mut draw_state = IndexedDrawState::default();
+        for draw in draws
+            .iter()
+            .filter(|draw| draw.material_mode == TerrainMaterialPassMode::Translucent)
+        {
+            append_indexed_draw(
+                ops,
+                &mut draw_state,
+                draw.pipeline,
+                draw.pipeline_layout,
+                draw.resource_set,
+                draw.resource_set_dynamic_offsets,
+                draw.index_buffer,
+                draw.index_offset,
+                draw.index_type,
+                draw.index_count,
+                draw.instance_count,
+            );
+        }
+        ops.push(CommandOp::EndPass);
+        ops.push(CommandOp::Barrier(texture_barrier(
+            targets.deferred_lit_texture,
+            TextureUsageState::ColorAttachment,
+            TextureUsageState::ShaderRead,
+        )));
+        ops.push(CommandOp::Barrier(texture_barrier(
+            targets.depth_texture,
+            TextureUsageState::DepthStencilAttachment,
+            TextureUsageState::ShaderRead,
+        )));
         Ok(())
     }
 
@@ -677,6 +757,7 @@ mod tests {
                 "vulkanic:pass/terrain_opaque",
                 "vulkanic:pass/terrain_cutout",
                 "vulkanic:pass/deferred_lighting",
+                "vulkanic:pass/terrain_translucent",
                 "vulkanic:pass/composite_0",
                 "vulkanic:pass/composite_1",
                 "vulkanic:pass/final_output",

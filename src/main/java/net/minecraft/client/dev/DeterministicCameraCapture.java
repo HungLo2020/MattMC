@@ -11,6 +11,7 @@ import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
+import net.minecraft.client.renderer.ItemBlockRenderTypes;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Holder;
@@ -62,9 +63,9 @@ import java.util.concurrent.CompletableFuture;
  * Development-only deterministic camera capture hook.
  *
  * <p>This is inert unless {@code -Dmattmc.dev.deterministicCameraCapture=true} is set.
- * It does not move the player or mutate world data; it only suppresses local movement
- * input, applies a short yaw-only camera sequence, captures screenshots after a few
- * rendered frames at each pose, and writes metadata for capture harnesses.</p>
+ * It suppresses local movement input, applies a short deterministic camera sequence,
+ * captures screenshots after a few rendered frames at each pose, and writes metadata
+ * for capture harnesses.</p>
  */
 public final class DeterministicCameraCapture {
 	private static final Logger LOGGER = LoggerFactory.getLogger("MattMC-DeterministicCapture");
@@ -225,6 +226,8 @@ public final class DeterministicCameraCapture {
 	private static boolean movingMeshScenarioSetup;
 	private static boolean staticTerrainLifecycleSetup;
 	private static boolean staticTerrainLifecycleAfterRecorded;
+	private static boolean staticTerrainTranslucentFixtureApplied;
+	private static boolean staticTerrainTranslucentWorldBFixtureApplied;
 	private static int framesWaitingForStaticTerrainLifecycle;
 	private static BlockPos staticTerrainLifecycleEditBlock;
 	private static long staticTerrainLifecycleBeforeGeneration;
@@ -344,9 +347,14 @@ public final class DeterministicCameraCapture {
 		player.setSprinting(false);
 		player.setShiftKeyDown(false);
 		recordPlayerSafetyState(player);
-		if (initialized && initialPosition != null && player.position().distanceToSqr(initialPosition) > 0.0004) {
+		Vec3 targetPosition = targetPositionForCurrentPose();
+		if (initialized && targetPosition != null
+			&& player.position().distanceToSqr(targetPosition) > 0.0004
+			&& !isKnownDeterministicPosePosition(player.position())) {
 			fail("deterministic player moved unexpectedly before stabilization: initial="
 				+ formatVec(initialPosition)
+				+ " target="
+				+ formatVec(targetPosition)
 				+ " current="
 				+ formatVec(player.position()));
 			return;
@@ -354,9 +362,9 @@ public final class DeterministicCameraCapture {
 		player.setDeltaMovement(Vec3.ZERO);
 		player.fallDistance = 0.0F;
 		applyRuntimeOverrides(minecraft, player);
-		if (initialized && initialPosition != null && initialPose != null) {
-			player.setPos(initialPosition);
-			player.setOldPosAndRot(initialPosition, initialPose.yaw(), initialPose.pitch());
+		if (initialized && targetPosition != null && initialPose != null) {
+			player.setPos(targetPosition);
+			player.setOldPosAndRot(targetPosition, initialPose.yaw(), initialPose.pitch());
 		}
 	}
 
@@ -583,14 +591,15 @@ public final class DeterministicCameraCapture {
 			return false;
 		}
 		if (!staticTerrainLifecycleSetup) {
-			BlockPos target = RustGalTerrainRenderer.chooseLifecycleEditTarget(STATIC_TERRAIN_SCENARIO);
+			BlockPos target = chooseStaticTerrainLifecycleTarget(minecraft, serverLevel);
 			if (target == null) {
 				staticTerrainLifecycleStage = "waiting-for-visible-section";
 				return false;
 			}
+			ChunkSectionLayer lifecycleLayer = staticTerrainLifecycleLayer();
 			RustGalTerrainRenderer.TerrainLayerSnapshot before =
-				RustGalTerrainRenderer.snapshotLayer(target, ChunkSectionLayer.SOLID);
-			if (before == null || before.meshGeneration() == 0L) {
+				RustGalTerrainRenderer.snapshotLayer(target, lifecycleLayer);
+			if (!staticTerrainAllowsAirSource() && (before == null || before.meshGeneration() == 0L)) {
 				staticTerrainLifecycleStage = "waiting-for-source-generation";
 				return false;
 			}
@@ -598,7 +607,7 @@ public final class DeterministicCameraCapture {
 			staticTerrainLifecycleEditBlock = target;
 			staticTerrainLifecycleBeforeGeneration = staticTerrainUsesAtlasGeneration()
 				? beforeDiagnostics.atlasGeneration()
-				: before.meshGeneration();
+				: before == null ? 0L : before.meshGeneration();
 			staticTerrainLifecycleBeforeCachedLayers = beforeDiagnostics.cachedLayerAssets();
 			staticTerrainLifecycleBeforeRssBytes = currentUsedMemoryBytes();
 			BlockState replacement = staticTerrainReplacementState();
@@ -606,17 +615,17 @@ public final class DeterministicCameraCapture {
 			RustGalTerrainRenderer.recordLifecycleMarker(
 				"lifecycle-edit-before",
 				target,
-				ChunkSectionLayer.SOLID,
+				lifecycleLayer,
 				STATIC_TERRAIN_SCENARIO + ":block=" + target.toShortString() + ":generation=" + staticTerrainLifecycleBeforeGeneration
 			);
 			applyStaticTerrainLifecycleAction(minecraft, serverLevel, target, replacement);
 			RustGalTerrainRenderer.recordLifecycleMarker(
 				"lifecycle-edit-applied",
 				target,
-				ChunkSectionLayer.SOLID,
+				lifecycleLayer,
 				STATIC_TERRAIN_SCENARIO + ":block=" + target.toShortString() + ":state=" + staticTerrainLifecycleBlockType
 			);
-			if ("section-reentry".equals(STATIC_TERRAIN_SCENARIO)) {
+			if ("section-reentry".equals(staticTerrainBaseScenario())) {
 				RustGalTerrainRenderer.removeSection(
 					net.minecraft.core.SectionPos.blockToSectionCoord(target.getX()),
 					net.minecraft.core.SectionPos.blockToSectionCoord(target.getY()),
@@ -624,9 +633,15 @@ public final class DeterministicCameraCapture {
 					"lifecycle-section-removed"
 				);
 				RustGalTerrainRenderer.recordLifecycleMarker(
+					"lifecycle-section-removed",
+					target,
+					lifecycleLayer,
+					STATIC_TERRAIN_SCENARIO + ":block=" + target.toShortString()
+				);
+				RustGalTerrainRenderer.recordLifecycleMarker(
 					"lifecycle-section-reentry-requested",
 					target,
-					ChunkSectionLayer.SOLID,
+					lifecycleLayer,
 					STATIC_TERRAIN_SCENARIO + ":block=" + target.toShortString()
 				);
 			}
@@ -651,7 +666,7 @@ public final class DeterministicCameraCapture {
 				RustGalTerrainRenderer.recordLifecycleMarker(
 					"lifecycle-edit-after",
 					staticTerrainLifecycleEditBlock,
-					ChunkSectionLayer.SOLID,
+					staticTerrainLifecycleLayer(),
 					STATIC_TERRAIN_SCENARIO
 						+ ":block=" + staticTerrainLifecycleEditBlock.toShortString()
 						+ ":before=" + staticTerrainLifecycleBeforeGeneration
@@ -681,11 +696,61 @@ public final class DeterministicCameraCapture {
 		return false;
 	}
 
+	private static BlockPos chooseStaticTerrainLifecycleTarget(Minecraft minecraft, ServerLevel serverLevel) {
+		if (!staticTerrainTranslucentScenario()) {
+			return RustGalTerrainRenderer.chooseLifecycleEditTarget(STATIC_TERRAIN_SCENARIO);
+		}
+		BlockPos target = chooseStaticTerrainTranslucentPlacementTarget(minecraft, serverLevel);
+		return target == null ? RustGalTerrainRenderer.chooseLifecycleEditTarget(STATIC_TERRAIN_SCENARIO) : target;
+	}
+
+	private static BlockPos chooseStaticTerrainTranslucentPlacementTarget(Minecraft minecraft, ServerLevel serverLevel) {
+		if (minecraft.player == null || minecraft.level == null) {
+			return null;
+		}
+		Direction forward = minecraft.player.getDirection();
+		Direction right = forward.getClockWise();
+		BlockPos eye = BlockPos.containing(minecraft.player.getEyePosition());
+		BlockPos fallback = null;
+		for (int distance = 4; distance <= 10; distance++) {
+			for (int vertical = -2; vertical <= 2; vertical++) {
+				for (int lateral = -2; lateral <= 2; lateral++) {
+					BlockPos candidate = eye.relative(forward, distance).relative(right, lateral).above(vertical);
+					if (!isLoadedAirBlock(minecraft.level, serverLevel, candidate)) {
+						continue;
+					}
+					if (fallback == null) {
+						fallback = candidate;
+					}
+					RustGalTerrainRenderer.TerrainLayerSnapshot solid =
+						RustGalTerrainRenderer.snapshotLayer(candidate, ChunkSectionLayer.SOLID);
+					if (solid != null && solid.meshGeneration() != 0L) {
+						return candidate;
+					}
+				}
+			}
+		}
+		return fallback;
+	}
+
+	private static boolean isLoadedAirBlock(ClientLevel clientLevel, ServerLevel serverLevel, BlockPos candidate) {
+		if (!serverLevel.isLoaded(candidate) || !clientLevel.isLoaded(candidate)) {
+			return false;
+		}
+		BlockState serverState = serverLevel.getBlockState(candidate);
+		BlockState clientState = clientLevel.getBlockState(candidate);
+		return serverState.isAir()
+			&& clientState.isAir()
+			&& serverState.getFluidState().isEmpty()
+			&& clientState.getFluidState().isEmpty();
+	}
+
 	private static boolean staticTerrainLifecycleScenario() {
-		return switch (STATIC_TERRAIN_SCENARIO) {
+		return switch (staticTerrainBaseScenario()) {
 			case "interior-edit", "boundary-x-edit", "boundary-y-edit", "boundary-z-edit", "section-reentry",
 				"resource-reload", "opaque-texture-replacement", "cutout-texture-replacement",
-				"pack-priority-reversal", "missing-atlas-payload", "malformed-png-payload",
+				"pack-priority-reversal", "missing-atlas-payload", "malformed-png-payload", "translucent-glass",
+				"translucent-overlap",
 				"partial-texture-update", "model-resource-generation-change", "resize-cycle",
 				"swapchain-recreate", "world-unload-reload", "world-different-reload",
 				"view-distance-decrease", "view-distance-increase", "camera-relocation",
@@ -695,12 +760,13 @@ public final class DeterministicCameraCapture {
 	}
 
 	private static boolean staticTerrainLiteralWorldTransitionScenario() {
-		return "world-unload-reload".equals(STATIC_TERRAIN_SCENARIO)
-			|| "world-different-reload".equals(STATIC_TERRAIN_SCENARIO);
+		String scenario = staticTerrainBaseScenario();
+		return "world-unload-reload".equals(scenario)
+			|| "world-different-reload".equals(scenario);
 	}
 
 	private static boolean staticTerrainEditScenario() {
-		return switch (STATIC_TERRAIN_SCENARIO) {
+		return switch (staticTerrainBaseScenario()) {
 			case "interior-edit", "boundary-x-edit", "boundary-y-edit", "boundary-z-edit", "section-reentry",
 				"model-resource-generation-change" -> true;
 			default -> false;
@@ -708,7 +774,7 @@ public final class DeterministicCameraCapture {
 	}
 
 	private static boolean staticTerrainUsesAtlasGeneration() {
-		return switch (STATIC_TERRAIN_SCENARIO) {
+		return switch (staticTerrainBaseScenario()) {
 			case "resource-reload", "opaque-texture-replacement", "cutout-texture-replacement",
 				"pack-priority-reversal", "missing-atlas-payload", "malformed-png-payload",
 				"partial-texture-update" -> true;
@@ -716,8 +782,66 @@ public final class DeterministicCameraCapture {
 		};
 	}
 
+	private static boolean staticTerrainAllowsAirSource() {
+		return staticTerrainTranslucentScenario();
+	}
+
 	private static BlockState staticTerrainReplacementState() {
+		if (staticTerrainTranslucentScenario()) {
+			return staticTerrainTranslucentReplacementState();
+		}
 		return staticTerrainEditScenario() ? Blocks.AIR.defaultBlockState() : Blocks.STONE.defaultBlockState();
+	}
+
+	private static String staticTerrainBaseScenario() {
+		if (!STATIC_TERRAIN_SCENARIO.startsWith("translucent-")) {
+			return STATIC_TERRAIN_SCENARIO;
+		}
+		String suffix = STATIC_TERRAIN_SCENARIO.substring("translucent-".length());
+		return switch (suffix) {
+			case "interior-edit", "boundary-x-edit", "boundary-y-edit", "boundary-z-edit", "section-reentry",
+				"resource-reload", "opaque-texture-replacement", "cutout-texture-replacement",
+				"pack-priority-reversal", "missing-atlas-payload", "malformed-png-payload",
+				"partial-texture-update", "model-resource-generation-change", "resize-cycle",
+				"swapchain-recreate", "world-unload-reload", "world-different-reload",
+				"view-distance-decrease", "view-distance-increase", "camera-relocation",
+				"return-visited-terrain", "memory-cache-soak", "steady-state-performance" -> suffix;
+			case "rapid-edit" -> "interior-edit";
+			case "quiescence-stationary-performance", "moving-camera-performance" -> "steady-state-performance";
+			default -> STATIC_TERRAIN_SCENARIO;
+		};
+	}
+
+	private static boolean staticTerrainTranslucentScenario() {
+		if ("translucent-glass".equals(STATIC_TERRAIN_SCENARIO) || "translucent-overlap".equals(STATIC_TERRAIN_SCENARIO)) {
+			return true;
+		}
+		return STATIC_TERRAIN_SCENARIO.startsWith("translucent-")
+			&& !staticTerrainBaseScenario().equals(STATIC_TERRAIN_SCENARIO);
+	}
+
+	private static boolean staticTerrainRequiresTranslucentCameraSequence() {
+		return "translucent-overlap".equals(STATIC_TERRAIN_SCENARIO)
+			|| "translucent-moving-camera-performance".equals(STATIC_TERRAIN_SCENARIO);
+	}
+
+	private static ChunkSectionLayer staticTerrainLifecycleLayer() {
+		return staticTerrainTranslucentScenario() ? ChunkSectionLayer.TRANSLUCENT : ChunkSectionLayer.SOLID;
+	}
+
+	private static BlockState staticTerrainTranslucentReplacementState() {
+		for (BlockState candidate : List.of(
+			Blocks.BLUE_STAINED_GLASS.defaultBlockState(),
+			Blocks.TINTED_GLASS.defaultBlockState(),
+			Blocks.ICE.defaultBlockState(),
+			Blocks.SLIME_BLOCK.defaultBlockState(),
+			Blocks.HONEY_BLOCK.defaultBlockState()
+		)) {
+			if (ItemBlockRenderTypes.getChunkRenderType(candidate) == ChunkSectionLayer.TRANSLUCENT) {
+				return candidate;
+			}
+		}
+		return Blocks.BLUE_STAINED_GLASS.defaultBlockState();
 	}
 
 	private static void applyStaticTerrainLifecycleAction(
@@ -726,21 +850,54 @@ public final class DeterministicCameraCapture {
 		BlockPos target,
 		BlockState replacement
 	) {
+		String scenario = staticTerrainBaseScenario();
+		if (staticTerrainTranslucentScenario() && !"translucent-glass".equals(STATIC_TERRAIN_SCENARIO) && !staticTerrainTranslucentFixtureApplied) {
+			applyStaticTerrainTranslucentOverlap(minecraft, serverLevel, target);
+			staticTerrainTranslucentFixtureApplied = true;
+			staticTerrainLifecycleStage = "translucent-fixture-placed";
+			RustGalTerrainRenderer.recordLifecycleMarker(
+				"lifecycle-translucent-overlap-placed",
+				target,
+				ChunkSectionLayer.TRANSLUCENT,
+				STATIC_TERRAIN_SCENARIO + ":baseScenario=" + scenario + ":block=" + target.toShortString()
+			);
+		}
 		if (staticTerrainEditScenario()) {
 			applyStaticTerrainLifecycleEdit(serverLevel, minecraft.level, target, replacement);
 			return;
 		}
-		switch (STATIC_TERRAIN_SCENARIO) {
+		switch (scenario) {
+			case "translucent-glass" -> {
+				applyStaticTerrainLifecycleEdit(serverLevel, minecraft.level, target, replacement);
+				staticTerrainLifecycleStage = "translucent-glass-placed";
+				RustGalTerrainRenderer.recordLifecycleMarker(
+					"lifecycle-translucent-glass-placed",
+					target,
+					ChunkSectionLayer.TRANSLUCENT,
+					STATIC_TERRAIN_SCENARIO + ":block=" + target.toShortString()
+				);
+			}
+			case "translucent-overlap" -> {
+				applyStaticTerrainTranslucentOverlap(minecraft, serverLevel, target);
+				staticTerrainTranslucentFixtureApplied = true;
+				staticTerrainLifecycleStage = "translucent-overlap-placed";
+				RustGalTerrainRenderer.recordLifecycleMarker(
+					"lifecycle-translucent-overlap-placed",
+					target,
+					ChunkSectionLayer.TRANSLUCENT,
+					STATIC_TERRAIN_SCENARIO + ":block=" + target.toShortString()
+				);
+			}
 			case "resource-reload", "pack-priority-reversal" -> {
 				RustGalTerrainRenderer.invalidateForResourceReload();
 				minecraft.levelRenderer.allChanged();
 				staticTerrainLifecycleStage = "resource-reload-started";
 				RustGalTerrainRenderer.recordLifecycleMarker(
-					"lifecycle-resource-reload-started",
-					target,
-					ChunkSectionLayer.SOLID,
-					STATIC_TERRAIN_SCENARIO + ":pack=" + STATIC_TERRAIN_RESOURCE_PACK_SCENARIO + ":mode=bounded-terrain-rebuild"
-				);
+						"lifecycle-resource-reload-started",
+						target,
+						staticTerrainLifecycleLayer(),
+						STATIC_TERRAIN_SCENARIO + ":pack=" + STATIC_TERRAIN_RESOURCE_PACK_SCENARIO + ":mode=bounded-terrain-rebuild"
+					);
 			}
 			case "opaque-texture-replacement" ->
 				RustGalTerrainRenderer.injectAtlasTexturePayloadForDiagnostics(staticTerrainValidTinyPngPayload(), "lifecycle-atlas-opaque-texture-replacement");
@@ -759,7 +916,7 @@ public final class DeterministicCameraCapture {
 				minecraft.resizeDisplay();
 				staticTerrainLifecycleResizeCount = 1;
 				staticTerrainLifecycleStage = "resize-1";
-				RustGalTerrainRenderer.recordLifecycleMarker("lifecycle-resize-1", target, ChunkSectionLayer.SOLID, "extent=960x540");
+				RustGalTerrainRenderer.recordLifecycleMarker("lifecycle-resize-1", target, staticTerrainLifecycleLayer(), "extent=960x540");
 			}
 			case "view-distance-decrease" -> {
 				staticTerrainOriginalRenderDistance = minecraft.options.renderDistance().get();
@@ -768,10 +925,10 @@ public final class DeterministicCameraCapture {
 				minecraft.options.simulationDistance().set(Math.max(2, Math.min(staticTerrainOriginalSimulationDistance, 4)));
 				staticTerrainLifecycleStage = "view-distance-decreased";
 				RustGalTerrainRenderer.recordLifecycleMarker(
-					"lifecycle-view-distance-decreased",
-					target,
-					ChunkSectionLayer.SOLID,
-					"renderDistance=" + minecraft.options.renderDistance().get()
+						"lifecycle-view-distance-decreased",
+						target,
+						staticTerrainLifecycleLayer(),
+						"renderDistance=" + minecraft.options.renderDistance().get()
 						+ ":simulationDistance=" + minecraft.options.simulationDistance().get()
 				);
 			}
@@ -782,26 +939,26 @@ public final class DeterministicCameraCapture {
 				minecraft.options.simulationDistance().set(Math.max(staticTerrainOriginalSimulationDistance, 12));
 				staticTerrainLifecycleStage = "visibility-expanded";
 				RustGalTerrainRenderer.recordLifecycleMarker(
-					"lifecycle-view-distance-increased",
-					target,
-					ChunkSectionLayer.SOLID,
-					"renderDistance=" + minecraft.options.renderDistance().get()
+						"lifecycle-view-distance-increased",
+						target,
+						staticTerrainLifecycleLayer(),
+						"renderDistance=" + minecraft.options.renderDistance().get()
 						+ ":simulationDistance=" + minecraft.options.simulationDistance().get()
 				);
-				if ("memory-cache-soak".equals(STATIC_TERRAIN_SCENARIO)) {
+				if ("memory-cache-soak".equals(scenario)) {
 					RustGalTerrainRenderer.recordLifecycleMarker(
-						"lifecycle-memory-cache-soak-started",
-						target,
-						ChunkSectionLayer.SOLID,
-						"usedMemoryBytes=" + currentUsedMemoryBytes()
+							"lifecycle-memory-cache-soak-started",
+							target,
+							staticTerrainLifecycleLayer(),
+							"usedMemoryBytes=" + currentUsedMemoryBytes()
 					);
 				}
-				if ("steady-state-performance".equals(STATIC_TERRAIN_SCENARIO)) {
+				if ("steady-state-performance".equals(scenario) || "quiescence-stationary-performance".equals(scenario)) {
 					RustGalTerrainRenderer.recordLifecycleMarker(
-						"lifecycle-steady-state-performance-started",
-						target,
-						ChunkSectionLayer.SOLID,
-						"cachedLayers=" + RustGalTerrainRenderer.diagnosticsSnapshot().cachedLayerAssets()
+							"lifecycle-steady-state-performance-started",
+							target,
+							staticTerrainLifecycleLayer(),
+							"cachedLayers=" + RustGalTerrainRenderer.diagnosticsSnapshot().cachedLayerAssets()
 					);
 				}
 			}
@@ -819,18 +976,18 @@ public final class DeterministicCameraCapture {
 				}
 				staticTerrainLifecycleStage = "camera-relocated";
 				RustGalTerrainRenderer.recordLifecycleMarker(
-					"lifecycle-camera-relocated",
-					target,
-					ChunkSectionLayer.SOLID,
-					"position=" + formatVec(relocated)
+						"lifecycle-camera-relocated",
+						target,
+						staticTerrainLifecycleLayer(),
+						"position=" + formatVec(relocated)
 				);
-				if ("return-visited-terrain".equals(STATIC_TERRAIN_SCENARIO)) {
+				if ("return-visited-terrain".equals(scenario)) {
 					staticTerrainLifecycleActionStep = 1;
 					RustGalTerrainRenderer.recordLifecycleMarker(
-						"lifecycle-return-visited-terrain-away",
-						target,
-						ChunkSectionLayer.SOLID,
-						"position=" + formatVec(relocated)
+							"lifecycle-return-visited-terrain-away",
+							target,
+							staticTerrainLifecycleLayer(),
+							"position=" + formatVec(relocated)
 					);
 				}
 			}
@@ -840,6 +997,7 @@ public final class DeterministicCameraCapture {
 
 	private static boolean setupStaticTerrainLiteralWorldTransition(Minecraft minecraft) {
 		framesWaitingForStaticTerrainLifecycle++;
+		String scenario = staticTerrainBaseScenario();
 		if (framesWaitingForStaticTerrainLifecycle > SETTLED_READY_MAX_WAIT_FRAMES) {
 			fail("timed out waiting for literal static terrain world transition: scenario="
 				+ STATIC_TERRAIN_SCENARIO
@@ -858,6 +1016,28 @@ public final class DeterministicCameraCapture {
 		RustGalTerrainRenderer.TerrainDiagnostics diagnostics = RustGalTerrainRenderer.diagnosticsSnapshot();
 		switch (staticTerrainLifecycleActionStep) {
 			case 0 -> {
+				if (staticTerrainTranslucentScenario() && !staticTerrainTranslucentFixtureApplied) {
+					if (minecraft.player == null || minecraft.level == null || minecraft.getSingleplayerServer() == null) {
+						staticTerrainLifecycleStage = "waiting-for-translucent-world-a-fixture-world";
+						return false;
+					}
+					ServerLevel serverLevel = minecraft.getSingleplayerServer().getLevel(minecraft.level.dimension());
+					BlockPos target = serverLevel == null ? null : chooseStaticTerrainTranslucentPlacementTarget(minecraft, serverLevel);
+					if (serverLevel == null || target == null) {
+						staticTerrainLifecycleStage = "waiting-for-translucent-world-a-fixture-target";
+						return false;
+					}
+					applyStaticTerrainTranslucentOverlap(minecraft, serverLevel, target);
+					staticTerrainTranslucentFixtureApplied = true;
+					RustGalTerrainRenderer.recordLifecycleMarker(
+						"lifecycle-translucent-overlap-placed",
+						target,
+						ChunkSectionLayer.TRANSLUCENT,
+						STATIC_TERRAIN_SCENARIO + ":phase=world-a-transition-fixture:block=" + target.toShortString()
+					);
+					staticTerrainLifecycleStage = "translucent-world-a-fixture-placed";
+					return false;
+				}
 				if (!staticTerrainInPlayableWorld(minecraft)
 					|| diagnostics.visibleLayerSubmissions() <= 0
 					|| diagnostics.cachedLayerAssets() <= 0) {
@@ -953,7 +1133,7 @@ public final class DeterministicCameraCapture {
 						+ ":generation=" + staticTerrainReloadGenerationA
 						+ ":cachedLayers=" + diagnostics.cachedLayerAssets()
 				);
-				if (!"world-different-reload".equals(STATIC_TERRAIN_SCENARIO)) {
+				if (!"world-different-reload".equals(scenario)) {
 					staticTerrainLifecycleAfterRecorded = true;
 					staticTerrainLifecycleStage = "replacement-visible";
 					framesWaitingForStaticTerrainLifecycle++;
@@ -1025,6 +1205,31 @@ public final class DeterministicCameraCapture {
 				return false;
 			}
 			case 4 -> {
+				if (staticTerrainTranslucentScenario() && !staticTerrainTranslucentWorldBFixtureApplied) {
+					if (minecraft.player == null || minecraft.level == null || minecraft.getSingleplayerServer() == null) {
+						staticTerrainLifecycleStage = "waiting-for-translucent-world-b-fixture-world";
+						return false;
+					}
+					ServerLevel serverLevel = minecraft.getSingleplayerServer().getLevel(minecraft.level.dimension());
+					BlockPos target = serverLevel == null ? null : chooseStaticTerrainTranslucentPlacementTarget(minecraft, serverLevel);
+					if (serverLevel == null || target == null) {
+						staticTerrainLifecycleStage = "waiting-for-translucent-world-b-fixture-target";
+						return false;
+					}
+					applyStaticTerrainTranslucentOverlap(minecraft, serverLevel, target);
+					staticTerrainTranslucentWorldBFixtureApplied = true;
+					RustGalTerrainRenderer.recordLifecycleMarker(
+						"lifecycle-translucent-overlap-placed",
+						target,
+						ChunkSectionLayer.TRANSLUCENT,
+						STATIC_TERRAIN_SCENARIO + ":phase=world-b-transition-fixture:block=" + target.toShortString()
+					);
+					if (STATIC_TERRAIN_FAULT.startsWith("translucent-")) {
+						recordStaticTerrainLifecycleFaultMarker(target);
+					}
+					staticTerrainLifecycleStage = "translucent-world-b-fixture-placed";
+					return false;
+				}
 				if (!staticTerrainInPlayableWorld(minecraft)
 					|| diagnostics.visibleLayerSubmissions() <= staticTerrainUnloadSubmissionSnapshot
 					|| diagnostics.cachedLayerAssets() <= 0) {
@@ -1068,21 +1273,22 @@ public final class DeterministicCameraCapture {
 	}
 
 	private static boolean continueStaticTerrainLifecycleAction(Minecraft minecraft) {
+		String scenario = staticTerrainBaseScenario();
 		if (staticTerrainReloadFuture != null && !staticTerrainReloadFuture.isDone()) {
 			staticTerrainLifecycleStage = "waiting-for-resource-reload";
 			return true;
 		}
-		if (("resize-cycle".equals(STATIC_TERRAIN_SCENARIO) || "swapchain-recreate".equals(STATIC_TERRAIN_SCENARIO))
+		if (("resize-cycle".equals(scenario) || "swapchain-recreate".equals(scenario))
 			&& staticTerrainLifecycleResizeCount == 1
 			&& framesWaitingForStaticTerrainLifecycle >= Math.max(2, FRAMES_PER_POSE / 2)) {
 			minecraft.getWindow().setWindowed(1280, 720);
 			minecraft.resizeDisplay();
 			staticTerrainLifecycleResizeCount = 2;
 			staticTerrainLifecycleStage = "resize-2";
-			RustGalTerrainRenderer.recordLifecycleMarker("lifecycle-resize-2", staticTerrainLifecycleEditBlock, ChunkSectionLayer.SOLID, "extent=1280x720");
+			RustGalTerrainRenderer.recordLifecycleMarker("lifecycle-resize-2", staticTerrainLifecycleEditBlock, staticTerrainLifecycleLayer(), "extent=1280x720");
 			return true;
 		}
-		if ("return-visited-terrain".equals(STATIC_TERRAIN_SCENARIO)
+		if ("return-visited-terrain".equals(scenario)
 			&& staticTerrainLifecycleActionStep == 1
 			&& staticTerrainOriginalPosition != null
 			&& framesWaitingForStaticTerrainLifecycle >= Math.max(2, FRAMES_PER_POSE / 2)) {
@@ -1096,7 +1302,7 @@ public final class DeterministicCameraCapture {
 			RustGalTerrainRenderer.recordLifecycleMarker(
 				"lifecycle-return-visited-terrain-back",
 				staticTerrainLifecycleEditBlock,
-				ChunkSectionLayer.SOLID,
+				staticTerrainLifecycleLayer(),
 				"position=" + formatVec(initialPosition)
 			);
 			return true;
@@ -1107,6 +1313,11 @@ public final class DeterministicCameraCapture {
 	private static long observedStaticTerrainGeneration() {
 		if (staticTerrainUsesAtlasGeneration()) {
 			return RustGalTerrainRenderer.diagnosticsSnapshot().atlasGeneration();
+		}
+		if (staticTerrainAllowsAirSource()) {
+			RustGalTerrainRenderer.TerrainLayerSnapshot after =
+				RustGalTerrainRenderer.snapshotLayer(staticTerrainLifecycleEditBlock, ChunkSectionLayer.TRANSLUCENT);
+			return after == null ? 0L : after.meshGeneration();
 		}
 		if (!staticTerrainEditScenario()) {
 			return Math.max(1L, RustGalTerrainRenderer.diagnosticsSnapshot().atlasGeneration());
@@ -1119,6 +1330,10 @@ public final class DeterministicCameraCapture {
 	private static boolean staticTerrainReplacementReady(long observedGeneration) {
 		if (observedGeneration == 0L) {
 			return false;
+		}
+		if (staticTerrainAllowsAirSource()) {
+			return RustGalTerrainRenderer.diagnosticsSnapshot().visibleLayerSubmissions() > 0
+				&& framesWaitingForStaticTerrainLifecycle >= Math.max(4, FRAMES_PER_POSE / 2);
 		}
 		if (staticTerrainEditScenario() || staticTerrainUsesAtlasGeneration()) {
 			return observedGeneration != staticTerrainLifecycleBeforeGeneration;
@@ -1148,6 +1363,40 @@ public final class DeterministicCameraCapture {
 		clientLevel.setBlock(target, replacement, 3);
 	}
 
+	private static void applyStaticTerrainTranslucentOverlap(Minecraft minecraft, ServerLevel serverLevel, BlockPos target) {
+		if (minecraft.player == null || minecraft.level == null) {
+			return;
+		}
+		Direction forward = minecraft.player.getDirection();
+		Direction right = forward.getClockWise();
+		BlockState[] layers = {
+			Blocks.RED_STAINED_GLASS.defaultBlockState(),
+			Blocks.GREEN_STAINED_GLASS.defaultBlockState(),
+			Blocks.BLUE_STAINED_GLASS.defaultBlockState()
+		};
+		for (int depth = 0; depth < layers.length; depth++) {
+			BlockPos planeBase = target.relative(forward, depth * 2);
+			for (int lateral = -1; lateral <= 1; lateral++) {
+				for (int vertical = 0; vertical <= 2; vertical++) {
+					BlockPos pos = planeBase.relative(right, lateral).above(vertical);
+					if (serverLevel.isLoaded(pos) && minecraft.level.isLoaded(pos)) {
+						applyStaticTerrainLifecycleEdit(serverLevel, minecraft.level, pos, layers[depth]);
+					}
+				}
+			}
+		}
+		BlockState crossing = Blocks.ORANGE_STAINED_GLASS.defaultBlockState();
+		BlockPos crossingBase = target.relative(forward, 1).relative(right, 2);
+		for (int depth = 0; depth <= 4; depth++) {
+			for (int vertical = 0; vertical <= 2; vertical++) {
+				BlockPos pos = crossingBase.relative(forward, depth).above(vertical);
+				if (serverLevel.isLoaded(pos) && minecraft.level.isLoaded(pos)) {
+					applyStaticTerrainLifecycleEdit(serverLevel, minecraft.level, pos, crossing);
+				}
+			}
+		}
+	}
+
 	private static void recordStaticTerrainLifecycleFaultMarker(BlockPos target) {
 		switch (STATIC_TERRAIN_FAULT) {
 			case "old-generation-after-edit" -> RustGalTerrainRenderer.recordLifecycleMarker(
@@ -1172,6 +1421,81 @@ public final class DeterministicCameraCapture {
 				"lifecycle-fault-wrong-neighbor-invalidated",
 				target,
 				ChunkSectionLayer.SOLID,
+				STATIC_TERRAIN_SCENARIO + ":block=" + target.toShortString()
+			);
+			case "translucent-sort-reversed" -> RustGalTerrainRenderer.recordTranslucentFaultMarker(
+				"sort-reversed",
+				target,
+				STATIC_TERRAIN_SCENARIO + ":block=" + target.toShortString()
+			);
+			case "translucent-sort-stale" -> RustGalTerrainRenderer.recordTranslucentFaultMarker(
+				"sort-stale",
+				target,
+				STATIC_TERRAIN_SCENARIO + ":block=" + target.toShortString()
+			);
+			case "translucent-sort-missing" -> RustGalTerrainRenderer.recordTranslucentFaultMarker(
+				"sort-missing",
+				target,
+				STATIC_TERRAIN_SCENARIO + ":block=" + target.toShortString()
+			);
+			case "translucent-duplicate-primitive" -> RustGalTerrainRenderer.recordTranslucentFaultMarker(
+				"duplicate-primitive",
+				target,
+				STATIC_TERRAIN_SCENARIO + ":block=" + target.toShortString()
+			);
+			case "translucent-index-out-of-range" -> RustGalTerrainRenderer.recordTranslucentFaultMarker(
+				"index-out-of-range",
+				target,
+				STATIC_TERRAIN_SCENARIO + ":block=" + target.toShortString()
+			);
+			case "translucent-index-type-invalid" -> RustGalTerrainRenderer.recordTranslucentFaultMarker(
+				"index-type-invalid",
+				target,
+				STATIC_TERRAIN_SCENARIO + ":block=" + target.toShortString()
+			);
+			case "translucent-index-alignment-invalid" -> RustGalTerrainRenderer.recordTranslucentFaultMarker(
+				"index-alignment-invalid",
+				target,
+				STATIC_TERRAIN_SCENARIO + ":block=" + target.toShortString()
+			);
+			case "translucent-sort-section-mismatch" -> RustGalTerrainRenderer.recordTranslucentFaultMarker(
+				"sort-section-mismatch",
+				target,
+				STATIC_TERRAIN_SCENARIO + ":block=" + target.toShortString()
+			);
+			case "translucent-old-new-overlap" -> RustGalTerrainRenderer.recordTranslucentFaultMarker(
+				"old-new-overlap",
+				target,
+				STATIC_TERRAIN_SCENARIO + ":block=" + target.toShortString()
+			);
+			case "translucent-section-order-reversed" -> RustGalTerrainRenderer.recordTranslucentFaultMarker(
+				"section-order-reversed",
+				target,
+				STATIC_TERRAIN_SCENARIO + ":block=" + target.toShortString()
+			);
+			case "translucent-depth-write-enabled" -> RustGalTerrainRenderer.recordTranslucentFaultMarker(
+				"depth-write-enabled",
+				target,
+				STATIC_TERRAIN_SCENARIO + ":block=" + target.toShortString()
+			);
+			case "translucent-opaque-blend" -> RustGalTerrainRenderer.recordTranslucentFaultMarker(
+				"opaque-blend",
+				target,
+				STATIC_TERRAIN_SCENARIO + ":block=" + target.toShortString()
+			);
+			case "translucent-cross-world-sort" -> RustGalTerrainRenderer.recordTranslucentFaultMarker(
+				"cross-world-sort",
+				target,
+				STATIC_TERRAIN_SCENARIO + ":block=" + target.toShortString()
+			);
+			case "translucent-source-sort-mismatch" -> RustGalTerrainRenderer.recordTranslucentFaultMarker(
+				"source-sort-mismatch",
+				target,
+				STATIC_TERRAIN_SCENARIO + ":block=" + target.toShortString()
+			);
+			case "translucent-sort-payload-corrupt" -> RustGalTerrainRenderer.recordTranslucentFaultMarker(
+				"sort-payload-corrupt",
+				target,
 				STATIC_TERRAIN_SCENARIO + ":block=" + target.toShortString()
 			);
 			default -> {
@@ -1356,6 +1680,8 @@ public final class DeterministicCameraCapture {
 					new Pose("crack-middle", initialPose.yaw(), initialPose.pitch()),
 					new Pose("crack-late", initialPose.yaw(), initialPose.pitch())
 				};
+				} else if (staticTerrainRequiresTranslucentCameraSequence()) {
+					fullSequence = translucentTerrainPoseSequence(initialPose);
 			} else if (!FALLING_BLOCK_SCENARIO.isEmpty() && !"hidden".equals(FALLING_BLOCK_SCENARIO)
 				&& !PISTON_SCENARIO.isEmpty() && !"hidden".equals(PISTON_SCENARIO)) {
 				fullSequence = combinedMovingMeshPoseSequence(initialPose);
@@ -1642,6 +1968,7 @@ public final class DeterministicCameraCapture {
 		appendField(json, "ack", currentAckPath.toAbsolutePath().toString()).append(",\n");
 		appendField(json, "dimension", minecraft.level == null ? "missing" : minecraft.level.dimension().location().toString()).append(",\n");
 		appendVec3(json, "position", minecraft.player == null ? Vec3.ZERO : minecraft.player.position()).append(",\n");
+		appendVec3(json, "requestedPosition", targetPositionForPose(pose)).append(",\n");
 		json.append("  \"requestedYaw\": ").append(format(pose.yaw())).append(",\n");
 		json.append("  \"requestedPitch\": ").append(format(pose.pitch())).append(",\n");
 		json.append("  \"observedYaw\": ").append(format(minecraft.player == null ? 0.0F : minecraft.player.getYRot())).append(",\n");
@@ -1714,6 +2041,7 @@ public final class DeterministicCameraCapture {
 		appendField(json, "ack", currentAckPath.toAbsolutePath().toString()).append(",\n");
 		appendField(json, "dimension", minecraft.level == null ? "missing" : minecraft.level.dimension().location().toString()).append(",\n");
 		appendVec3(json, "position", minecraft.player == null ? Vec3.ZERO : minecraft.player.position()).append(",\n");
+		appendVec3(json, "requestedPosition", targetPositionForPose(pose)).append(",\n");
 		json.append("  \"requestedYaw\": ").append(format(pose.yaw())).append(",\n");
 		json.append("  \"requestedPitch\": ").append(format(pose.pitch())).append(",\n");
 		json.append("  \"observedYaw\": ").append(format(minecraft.player == null ? 0.0F : minecraft.player.getYRot())).append(",\n");
@@ -1745,6 +2073,7 @@ public final class DeterministicCameraCapture {
 			currentScreenshotPath.toAbsolutePath().toString(),
 			minecraft.level == null ? "missing" : minecraft.level.dimension().location().toString(),
 			player == null ? Vec3.ZERO : player.position(),
+			targetPositionForPose(pose),
 			pose.yaw(),
 			pose.pitch(),
 			player == null ? 0.0F : player.getYRot(),
@@ -1799,6 +2128,11 @@ public final class DeterministicCameraCapture {
 	private static void applyPose(LocalPlayer player, Pose pose) {
 		if (player == null) {
 			return;
+		}
+		Vec3 targetPosition = targetPositionForPose(pose);
+		if (targetPosition != null) {
+			player.setPos(targetPosition);
+			player.setOldPosAndRot(targetPosition, pose.yaw(), pose.pitch());
 		}
 		player.setYRot(pose.yaw());
 		player.setXRot(pose.pitch());
@@ -2828,6 +3162,7 @@ public final class DeterministicCameraCapture {
 			json.append("      \"distantHorizonsActive\": ").append(isDistantHorizonsActive()).append(",\n");
 			appendField(json, "dimension", capture.dimension(), 6).append(",\n");
 			appendVec3(json, "position", capture.position(), 6).append(",\n");
+			appendVec3(json, "requestedPosition", capture.requestedPosition(), 6).append(",\n");
 			json.append("      \"requestedYaw\": ").append(format(capture.requestedYaw())).append(",\n");
 			json.append("      \"requestedPitch\": ").append(format(capture.requestedPitch())).append(",\n");
 				json.append("      \"observedYaw\": ").append(format(capture.observedYaw())).append(",\n");
@@ -3014,8 +3349,12 @@ public final class DeterministicCameraCapture {
 		json.append("    \"acceptedBuildOutputs\": ").append(diagnostics.acceptedBuildOutputs()).append(",\n");
 		json.append("    \"skippedRouteBuildOutputs\": ").append(diagnostics.skippedRouteBuildOutputs()).append(",\n");
 		json.append("    \"skippedUnsupportedAnimatedSections\": ").append(diagnostics.skippedUnsupportedAnimatedSections()).append(",\n");
+		json.append("    \"skippedUnsupportedFluidTranslucentSections\": ").append(diagnostics.skippedUnsupportedFluidTranslucentSections()).append(",\n");
 		json.append("    \"skippedEmptyLayers\": ").append(diagnostics.skippedEmptyLayers()).append(",\n");
 		json.append("    \"registeredMeshes\": ").append(diagnostics.registeredMeshes()).append(",\n");
+		json.append("    \"registeredTranslucentSorts\": ").append(diagnostics.registeredTranslucentSorts()).append(",\n");
+		json.append("    \"registeredTranslucentSortBytes\": ").append(diagnostics.registeredTranslucentSortBytes()).append(",\n");
+		json.append("    \"translucentSortGenerations\": ").append(diagnostics.translucentSortGenerations()).append(",\n");
 		json.append("    \"texturePayloadUpdates\": ").append(diagnostics.texturePayloadUpdates()).append(",\n");
 		json.append("    \"texturePayloadUpdateBytes\": ").append(diagnostics.texturePayloadUpdateBytes()).append(",\n");
 		json.append("    \"atlasTextureOnlyUpdates\": ").append(diagnostics.atlasTextureOnlyUpdates()).append(",\n");
@@ -3032,6 +3371,9 @@ public final class DeterministicCameraCapture {
 		appendWorldMeshAssetMetrics(json).append(",\n");
 		json.append("    \"lifecycleEvents\": [");
 		appendTerrainDiagnosticEvents(json, diagnostics.lifecycleEvents(), diagnostics.expectedNativeVertexStride());
+		json.append("    ],\n");
+		json.append("    \"translucentEvents\": [");
+		appendTerrainDiagnosticEvents(json, diagnostics.translucentEvents(), diagnostics.expectedNativeVertexStride());
 		json.append("    ],\n");
 		json.append("    \"recentEvents\": [");
 		appendTerrainDiagnosticEvents(json, diagnostics.recentEvents(), diagnostics.expectedNativeVertexStride());
@@ -3110,6 +3452,19 @@ public final class DeterministicCameraCapture {
 					json.append("\"separateAoVertexCount\": ").append(event.separateAoVertexCount()).append(", ");
 					json.append("\"aoRange\": { \"min\": ").append(format(event.minAo())).append(", \"max\": ").append(format(event.maxAo())).append(" }, ");
 					json.append("\"normalSectionCounts\": { \"posY\": ").append(event.positiveYNormalSections()).append(", \"negY\": ").append(event.negativeYNormalSections()).append(", \"horizontal\": ").append(event.horizontalNormalSections()).append(" }, ");
+					json.append("\"sortGeneration\": ").append(event.sortGeneration()).append(", ");
+					json.append("\"cameraPosition\": { \"x\": ").append(format(event.cameraX())).append(", \"y\": ").append(format(event.cameraY())).append(", \"z\": ").append(format(event.cameraZ())).append(" }, ");
+					json.append("\"sortOrigin\": { \"x\": ").append(format(event.sortOriginX())).append(", \"y\": ").append(format(event.sortOriginY())).append(", \"z\": ").append(format(event.sortOriginZ())).append(" }, ");
+					json.append("\"primitiveCount\": ").append(event.primitiveCount()).append(", ");
+					json.append("\"sortedIndexHash\": ").append(event.sortedIndexHash()).append(", ");
+					json.append("\"indexUploadGeneration\": ").append(event.indexUploadGeneration()).append(", ");
+					json.append("\"translucentDrawOrder\": ").append(event.translucentDrawOrder()).append(", ");
+					appendField(json, "sorterType", event.sorterType(), 0).append(", ");
+					json.append("\"sourceSortedIndexHash\": ").append(event.sourceSortedIndexHash()).append(", ");
+					json.append("\"rustCopiedSortedIndexHash\": ").append(event.rustCopiedSortedIndexHash()).append(", ");
+					json.append("\"sourceSortedIndexSampleHash\": ").append(event.sourceSortedIndexSampleHash()).append(", ");
+					json.append("\"rustCopiedSortedIndexSampleHash\": ").append(event.rustCopiedSortedIndexSampleHash()).append(", ");
+					appendField(json, "sortedIndexSample", event.sortedIndexSample(), 0).append(", ");
 				appendField(json, "reason", event.reason(), 0);
 				json.append(" }");
 			}
@@ -3360,7 +3715,10 @@ public final class DeterministicCameraCapture {
 	private static StringBuilder appendPoseObject(StringBuilder json, String key, Pose pose) {
 		json.append("  \"").append(key).append("\": { \"yaw\": ")
 			.append(format(pose.yaw())).append(", \"pitch\": ")
-			.append(format(pose.pitch())).append(" }");
+			.append(format(pose.pitch())).append(", \"offset\": { \"x\": ")
+			.append(format(pose.offsetX())).append(", \"y\": ")
+			.append(format(pose.offsetY())).append(", \"z\": ")
+			.append(format(pose.offsetZ())).append(" } }");
 		return json;
 	}
 
@@ -3382,6 +3740,61 @@ public final class DeterministicCameraCapture {
 			sequence[i] = new Pose(String.format(Locale.ROOT, "%s-%02d", prefix, i), pose.yaw(), pose.pitch());
 		}
 		return sequence;
+	}
+
+	private static Pose[] translucentTerrainPoseSequence(Pose pose) {
+		Direction forward = Direction.fromYRot(pose.yaw());
+		Direction right = forward.getClockWise();
+		return new Pose[] {
+			pose.withName("translucent-front"),
+			offsetPose("translucent-lateral", pose, right, 4.0, forward, 0.0, 0.0),
+			new Pose("translucent-orbit-left", pose.yaw() - 55.0F, pose.pitch(), 0.0, 0.0, 0.0),
+			new Pose("translucent-cross-opposite", pose.yaw() + 180.0F, pose.pitch(), forward.getStepX() * 10.0, 0.0, forward.getStepZ() * 10.0),
+			offsetPose("translucent-above", pose, forward, 4.0, right, 0.0, 5.0),
+			offsetPose("translucent-below", pose, forward, 4.0, right, 0.0, -4.0),
+			pose.withName("translucent-return")
+		};
+	}
+
+	private static Pose offsetPose(String name, Pose pose, Direction primary, double primaryDistance, Direction secondary, double secondaryDistance, double yOffset) {
+		double offsetX = primary.getStepX() * primaryDistance + secondary.getStepX() * secondaryDistance;
+		double offsetZ = primary.getStepZ() * primaryDistance + secondary.getStepZ() * secondaryDistance;
+		return new Pose(name, pose.yaw(), pose.pitch(), offsetX, yOffset, offsetZ);
+	}
+
+	private static Vec3 targetPositionForCurrentPose() {
+		if (!initialized || initialPosition == null) {
+			return null;
+		}
+		if (poses == null || poseIndex < 0 || poseIndex >= poses.length) {
+			return initialPosition;
+		}
+		return targetPositionForPose(poses[poseIndex]);
+	}
+
+	private static Vec3 targetPositionForPose(Pose pose) {
+		if (initialPosition == null) {
+			return Vec3.ZERO;
+		}
+		return initialPosition.add(pose.offsetX(), pose.offsetY(), pose.offsetZ());
+	}
+
+	private static boolean isKnownDeterministicPosePosition(Vec3 position) {
+		if (initialPosition == null) {
+			return false;
+		}
+		if (position.distanceToSqr(initialPosition) <= 0.0004) {
+			return true;
+		}
+		if (poses == null) {
+			return false;
+		}
+		for (Pose pose : poses) {
+			if (position.distanceToSqr(targetPositionForPose(pose)) <= 0.0004) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	private static Pose[] combinedMovingMeshPoseSequence(Pose pose) {
@@ -3437,7 +3850,14 @@ public final class DeterministicCameraCapture {
 		return "";
 	}
 
-	private record Pose(String name, float yaw, float pitch) {
+	private record Pose(String name, float yaw, float pitch, double offsetX, double offsetY, double offsetZ) {
+		private Pose(String name, float yaw, float pitch) {
+			this(name, yaw, pitch, 0.0, 0.0, 0.0);
+		}
+
+		private Pose withName(String name) {
+			return new Pose(name, this.yaw, this.pitch, this.offsetX, this.offsetY, this.offsetZ);
+		}
 	}
 
 	private record ForcedBlockOutlineTarget(
@@ -3455,6 +3875,7 @@ public final class DeterministicCameraCapture {
 		String screenshot,
 		String dimension,
 		Vec3 position,
+		Vec3 requestedPosition,
 		float requestedYaw,
 		float requestedPitch,
 		float observedYaw,

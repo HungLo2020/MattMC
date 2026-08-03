@@ -534,6 +534,10 @@ fn world_mesh_asset_update_request(
             ptr: textures.as_ptr(),
             count: textures.len() as u64,
         },
+        sorted_indices: FfiSlice {
+            ptr: std::ptr::null(),
+            count: 0,
+        },
         negotiated_feature_bits: FfiFeatureBits::GRAPHICS
             | FfiFeatureBits::DESCRIPTOR_ARRAYS
             | FfiFeatureBits::OPTIONAL_BINDINGS
@@ -1132,7 +1136,7 @@ fn world_mesh_asset_ffi_copies_payload_memory() {
         },
     }];
     let request = world_mesh_asset_update_request(&meshes, &textures);
-    let (generation, owned_meshes, owned_textures) =
+    let (generation, owned_meshes, owned_textures, owned_sorted_indices) =
         unsafe { decode_world_mesh_asset_update(&request, test_capabilities()).unwrap() };
 
     vertices[0].x = 99.0;
@@ -1140,6 +1144,7 @@ fn world_mesh_asset_ffi_copies_payload_memory() {
     png.fill(0);
 
     assert_eq!(9, generation);
+    assert!(owned_sorted_indices.is_empty());
     assert_eq!(44, owned_meshes[0].mesh_key);
     assert_eq!(0.0, owned_meshes[0].vertices[0].position[0]);
     assert_eq!([0.25, 0.5], owned_meshes[0].vertices[0].shader_atlas_uv);

@@ -863,6 +863,7 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 generation,
                 meshes,
                 textures,
+                sorted_indices,
                 negotiated_feature_bits
             ]
         ),
@@ -882,6 +883,19 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 mesh_key,
                 mesh_generation,
                 transform
+            ]
+        ),
+        70 => layout!(
+            70,
+            FfiWorldMeshSortedIndexRecord,
+            [
+                byte_size,
+                index_type,
+                reserved0,
+                mesh_key,
+                mesh_generation,
+                index_generation,
+                index_bytes
             ]
         ),
         _ => {

@@ -37,7 +37,13 @@ def fake_repo_path(root: Path, name: str) -> Path:
     return fake_repo(root, name).root
 
 
-def isolated_capture_config(root: Path, *, world: str = "Origin", second_world: str = "") -> capture_runner.CaptureConfig:
+def isolated_capture_config(
+    root: Path,
+    *,
+    world: str = "Origin",
+    second_world: str = "",
+    scenario: str = "world-different-reload",
+) -> capture_runner.CaptureConfig:
     return capture_runner.CaptureConfig(
         backend="rust-vulkan",
         shaders="on",
@@ -68,7 +74,7 @@ def isolated_capture_config(root: Path, *, world: str = "Origin", second_world: 
         game_dir="",
         jvm_args=[],
         gui_resource_pack_scenario="",
-        world_static_terrain_scenario="world-different-reload",
+        world_static_terrain_scenario=scenario,
         world_static_terrain_second_world=second_world,
         world_static_terrain_resource_pack_scenario="",
         region_validation=False,
@@ -2726,6 +2732,43 @@ else:
                 env["JAVA_TOOL_OPTIONS"],
             )
 
+    def test_static_terrain_translucent_second_world_alias_defaults_are_forwarded(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            target = fake_repo(root, "current")
+            args = harness.parse_args(
+                [
+                    "capture",
+                    "--profile",
+                    "performance",
+                    "--mode",
+                    "current-rust-vulkan-shaders-on",
+                    "--world",
+                    "Origin",
+                    "--world-static-terrain-scenario",
+                    "translucent-world-different-reload",
+                    "--dry-run",
+                ]
+            )
+            mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-rust-vulkan-shaders-on")
+            command, env = harness.build_capture_command(
+                target,
+                mode,
+                root / "capture",
+                "correctness",
+                args,
+                "capture",
+            )
+
+            self.assertIn("--world-static-terrain-second-world", command)
+            self.assertIn("Origin-different", command)
+            self.assertEqual("Origin-different", env["MATTMC_CAPTURE_SECOND_WORLD"])
+            self.assertIn(
+                "-Dmattmc.dev.rustGalStaticTerrain.worldB=Origin-different",
+                env["JAVA_TOOL_OPTIONS"],
+            )
+            self.assertEqual("true", env["MATTMC_WORLD_STATIC_TERRAIN_NEEDS_SECOND_WORLD"])
+
     def test_capture_runner_copies_primary_and_secondary_static_terrain_worlds(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -2760,6 +2803,38 @@ else:
             self.assertIn("isolated_secondary_world_name=SecondTerrainWorld", meta)
             self.assertIn("isolated_secondary_world_status=ok", meta)
             self.assertIn('isolated_saves_listing=["Origin","SecondTerrainWorld"]', meta)
+
+    def test_capture_runner_copies_translucent_alias_secondary_world_by_default(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source_run = root / "source-run"
+            source_world = source_run / "saves" / "Origin"
+            source_world.mkdir(parents=True)
+            (source_run / "options.txt").write_text("enableShaders:false\n", encoding="utf-8")
+            (source_world / "level.dat").write_bytes(b"primary world")
+            (source_world / "region").mkdir()
+            (source_world / "region" / "r.0.0.mca").write_bytes(b"terrain")
+            config = isolated_capture_config(root, scenario="translucent-world-different-reload")
+            runner = capture_runner.CaptureRunner(config)
+
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "MATTMC_CAPTURE_RUN_SOURCE": str(source_run),
+                    "MATTMC_CAPTURE_WORLD_SOURCE": str(source_world),
+                },
+                clear=False,
+            ):
+                runner.prepare_isolated_game_dir()
+
+            saves = runner.run_dir / "saves"
+            self.assertTrue((saves / "Origin" / "level.dat").is_file())
+            self.assertTrue((saves / "Origin-different" / "level.dat").is_file())
+            runner.write_initial_meta()
+            meta = runner.meta_log.read_text(encoding="utf-8")
+            self.assertIn("isolated_secondary_world_name=Origin-different", meta)
+            self.assertIn("isolated_secondary_world_status=ok", meta)
+            self.assertIn('isolated_saves_listing=["Origin","Origin-different"]', meta)
 
     def test_capture_runner_rejects_missing_secondary_static_terrain_source(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -6170,6 +6245,71 @@ else:
         self.assertEqual(evidence["status"], "fail")
         self.assertIn(expected, evidence["failures"])
 
+    def static_terrain_translucent_doc(self, *events: dict[str, object]) -> dict[str, object]:
+        base: dict[str, object] = {
+            "gameplayFrameId": 7,
+            "terrainExtractionFrameId": 3,
+            "rustEnqueueFrameId": 5,
+            "executionFrameId": 0,
+            "executionSubmissionId": 0,
+            "sectionPos": 123456789,
+            "layer": "TRANSLUCENT",
+            "meshKey": 11,
+            "contentHash": 101,
+            "meshGeneration": 101,
+            "visibleGeneration": 101,
+            "vertexCount": 24,
+            "bufferVertexCapacity": 24,
+            "vertexStride": 40,
+            "indexCount": 36,
+            "maxIndex": 23,
+            "indexType": 2,
+            "sectionCount": 1,
+            "primitiveCount": 6,
+            "sortGeneration": 101,
+            "sortedIndexHash": 0x12345678,
+            "indexUploadGeneration": 101,
+            "translucentDrawOrder": 0,
+            "sorterType": "net.sodium.client.render.chunk.translucent_sorting.data.DynamicTopoData$DynamicTopoSorter",
+            "sourceSortedIndexHash": 0,
+            "rustCopiedSortedIndexHash": 0,
+            "sourceSortedIndexSampleHash": 0,
+            "rustCopiedSortedIndexSampleHash": 0,
+            "sortedIndexSample": "",
+            "cameraPosition": {"x": 0.0, "y": 70.0, "z": 0.0},
+            "sortOrigin": {"x": 24.0, "y": 72.0, "z": 40.0},
+        }
+        if not events:
+            events = (
+                {"reason": "mesh-registered"},
+                {
+                    "reason": "translucent-source-sort",
+                    "sortGeneration": 102,
+                    "visibleGeneration": 102,
+                    "indexUploadGeneration": 102,
+                    "sourceSortedIndexHash": 0x12345678,
+                    "sourceSortedIndexSampleHash": 0x44,
+                    "sortedIndexSample": "0,1,2,2,3,0",
+                },
+                {
+                    "reason": "translucent-rust-sort-copy",
+                    "sortGeneration": 102,
+                    "visibleGeneration": 102,
+                    "indexUploadGeneration": 102,
+                    "rustCopiedSortedIndexHash": 0x12345678,
+                    "rustCopiedSortedIndexSampleHash": 0x44,
+                    "sortedIndexSample": "0,1,2,2,3,0",
+                },
+                {"reason": "visible-submit", "sortGeneration": 102, "visibleGeneration": 102, "indexUploadGeneration": 102},
+                {"reason": "executed-submit", "sortGeneration": 102, "visibleGeneration": 102, "indexUploadGeneration": 102, "executionFrameId": 8, "executionSubmissionId": 9},
+            )
+        merged_events = []
+        for event in events:
+            merged = dict(base)
+            merged.update(event)
+            merged_events.append(merged)
+        return {"translucentEvents": merged_events}
+
     def test_static_terrain_geometry_truth_accepts_valid_event(self) -> None:
         evidence = harness.static_terrain_geometry_evidence(self.static_terrain_doc())
         self.assertEqual(evidence["status"], "pass")
@@ -6249,6 +6389,17 @@ else:
         self.assertEqual(evidence["status"], "pass")
         self.assertNotIn("duplicate_section_visible", evidence["failures"])
 
+    def test_static_terrain_geometry_truth_preserves_frame_zero_identity(self) -> None:
+        first = self.static_terrain_doc(gameplayFrameId=0, rustEnqueueFrameId=1, frame=0)["recentEvents"][0]
+        second = dict(first)
+        second["frame"] = 1
+        second["gameplayFrameId"] = 1
+        second["rustEnqueueFrameId"] = 36
+        doc = {"activeNativeVertexStride": 40, "recentEvents": [first, second]}
+        evidence = harness.static_terrain_geometry_evidence(doc)
+        self.assertEqual(evidence["status"], "pass")
+        self.assertNotIn("duplicate_section_visible", evidence["failures"])
+
     def test_static_terrain_geometry_truth_rejects_same_frame_old_new_overlap(self) -> None:
         first = self.static_terrain_doc()["recentEvents"][0]
         second = dict(first)
@@ -6286,6 +6437,347 @@ else:
         evidence = harness.static_terrain_geometry_evidence(doc)
         self.assertEqual(evidence["status"], "fail")
         self.assertIn("mesh_key_collision", evidence["failures"])
+
+    def test_static_terrain_translucent_truth_accepts_valid_events(self) -> None:
+        evidence = harness.static_terrain_translucent_evidence(self.static_terrain_translucent_doc())
+        self.assertEqual(evidence["status"], "pass")
+        self.assertIsNone(evidence["failure"])
+        self.assertEqual(evidence["visible_events"], 1)
+        self.assertEqual(
+            {
+                "net.sodium.client.render.chunk.translucent_sorting.data.DynamicTopoData$DynamicTopoSorter": 5,
+            },
+            evidence["sorter_type_counts"],
+        )
+
+    def test_static_terrain_translucent_truth_accepts_negative_generation_hash(self) -> None:
+        evidence = harness.static_terrain_translucent_evidence(
+            self.static_terrain_translucent_doc(
+                {"reason": "mesh-registered", "meshGeneration": -3414063591750951357},
+                {
+                    "reason": "translucent-source-sort",
+                    "meshGeneration": -3414063591750951357,
+                    "sortGeneration": 102,
+                    "visibleGeneration": 102,
+                    "indexUploadGeneration": 102,
+                    "sourceSortedIndexHash": 0x12345678,
+                    "sourceSortedIndexSampleHash": 0x44,
+                    "sortedIndexSample": "0,1,2,2,3,0",
+                },
+                {
+                    "reason": "translucent-rust-sort-copy",
+                    "meshGeneration": -3414063591750951357,
+                    "sortGeneration": 102,
+                    "visibleGeneration": 102,
+                    "indexUploadGeneration": 102,
+                    "rustCopiedSortedIndexHash": 0x12345678,
+                    "rustCopiedSortedIndexSampleHash": 0x44,
+                    "sortedIndexSample": "0,1,2,2,3,0",
+                },
+                {
+                    "reason": "visible-submit",
+                    "meshGeneration": -3414063591750951357,
+                    "sortGeneration": 102,
+                    "visibleGeneration": 102,
+                    "indexUploadGeneration": 102,
+                },
+                {
+                    "reason": "executed-submit",
+                    "meshGeneration": -3414063591750951357,
+                    "sortGeneration": 102,
+                    "visibleGeneration": 102,
+                    "indexUploadGeneration": 102,
+                    "executionFrameId": 8,
+                    "executionSubmissionId": 9,
+                },
+            )
+        )
+        self.assertEqual(evidence["status"], "pass")
+        self.assertIsNone(evidence["failure"])
+
+    def test_static_terrain_translucent_truth_rejects_missing_sort(self) -> None:
+        evidence = harness.static_terrain_translucent_evidence(
+            self.static_terrain_translucent_doc({"reason": "translucent-sort-missing"})
+        )
+        self.assertEqual(evidence["status"], "fail")
+        self.assertIn("terrain_translucent_sort_missing", evidence["failures"])
+
+    def test_static_terrain_translucent_truth_rejects_cross_world_fault_marker(self) -> None:
+        evidence = harness.static_terrain_translucent_evidence(
+            self.static_terrain_translucent_doc(
+                {"reason": "translucent-fault-cross-world-sort:translucent-world-different-reload:block=1, 2, 3"}
+            )
+        )
+        self.assertEqual(evidence["status"], "fail")
+        self.assertIn("terrain_translucent_cross_world_sort", evidence["failures"])
+
+    def test_static_terrain_translucent_crossing_requires_camera_sort_hash_change(self) -> None:
+        evidence = harness.static_terrain_translucent_evidence(
+            self.static_terrain_translucent_doc(
+                {"reason": "mesh-registered"},
+                {"reason": "visible-submit"},
+                {"reason": "executed-submit", "executionFrameId": 8, "executionSubmissionId": 9},
+            ),
+            require_camera_sort=True,
+        )
+        self.assertEqual(evidence["status"], "fail")
+        self.assertIn("terrain_translucent_sort_missing", evidence["failures"])
+
+        accepted = harness.static_terrain_translucent_evidence(
+            self.static_terrain_translucent_doc(
+                {"reason": "mesh-registered"},
+                {
+                    "reason": "translucent-source-sort",
+                    "sortGeneration": 102,
+                    "visibleGeneration": 102,
+                    "indexUploadGeneration": 102,
+                    "sortedIndexHash": 0x12345678,
+                    "sourceSortedIndexHash": 0x12345678,
+                    "sourceSortedIndexSampleHash": 0x44,
+                    "sortedIndexSample": "0,1,2,2,3,0",
+                },
+                {
+                    "reason": "translucent-rust-sort-copy",
+                    "sortGeneration": 102,
+                    "visibleGeneration": 102,
+                    "indexUploadGeneration": 102,
+                    "sortedIndexHash": 0x12345678,
+                    "rustCopiedSortedIndexHash": 0x12345678,
+                    "rustCopiedSortedIndexSampleHash": 0x44,
+                    "sortedIndexSample": "0,1,2,2,3,0",
+                },
+                {
+                    "reason": "translucent-source-sort",
+                    "sortGeneration": 103,
+                    "visibleGeneration": 103,
+                    "indexUploadGeneration": 103,
+                    "sortedIndexHash": 0x87654321,
+                    "sourceSortedIndexHash": 0x87654321,
+                    "sourceSortedIndexSampleHash": 0x55,
+                    "sortedIndexSample": "4,5,6,6,7,4",
+                },
+                {
+                    "reason": "translucent-rust-sort-copy",
+                    "sortGeneration": 103,
+                    "visibleGeneration": 103,
+                    "indexUploadGeneration": 103,
+                    "sortedIndexHash": 0x87654321,
+                    "rustCopiedSortedIndexHash": 0x87654321,
+                    "rustCopiedSortedIndexSampleHash": 0x55,
+                    "sortedIndexSample": "4,5,6,6,7,4",
+                },
+                {
+                    "reason": "visible-submit",
+                    "sortGeneration": 103,
+                    "visibleGeneration": 103,
+                    "indexUploadGeneration": 103,
+                    "sortedIndexHash": 0x87654321,
+                },
+                {
+                    "reason": "executed-submit",
+                    "sortGeneration": 103,
+                    "visibleGeneration": 103,
+                    "indexUploadGeneration": 103,
+                    "sortedIndexHash": 0x87654321,
+                    "executionFrameId": 8,
+                    "executionSubmissionId": 9,
+                },
+            ),
+            require_camera_sort=True,
+        )
+        self.assertEqual(accepted["status"], "pass")
+
+    def test_static_terrain_translucent_truth_rejects_payload_corruption(self) -> None:
+        evidence = harness.static_terrain_translucent_evidence(
+            self.static_terrain_translucent_doc(
+                {"reason": "mesh-registered"},
+                {
+                    "reason": "translucent-source-sort",
+                    "sortGeneration": 102,
+                    "visibleGeneration": 102,
+                    "indexUploadGeneration": 102,
+                    "sourceSortedIndexHash": 11,
+                    "sourceSortedIndexSampleHash": 44,
+                    "sortedIndexSample": "0,1,2,2,3,0",
+                },
+                {
+                    "reason": "translucent-rust-sort-copy",
+                    "sortGeneration": 102,
+                    "visibleGeneration": 102,
+                    "indexUploadGeneration": 102,
+                    "rustCopiedSortedIndexHash": 22,
+                    "rustCopiedSortedIndexSampleHash": 55,
+                    "sortedIndexSample": "3,2,1,1,0,3",
+                },
+                {"reason": "visible-submit", "sortGeneration": 102, "visibleGeneration": 102, "indexUploadGeneration": 102},
+                {
+                    "reason": "executed-submit",
+                    "sortGeneration": 102,
+                    "visibleGeneration": 102,
+                    "indexUploadGeneration": 102,
+                    "executionFrameId": 8,
+                    "executionSubmissionId": 9,
+                },
+            )
+        )
+        self.assertEqual(evidence["status"], "fail")
+        self.assertIn("terrain_translucent_source_sort_mismatch", evidence["failures"])
+        self.assertIn("terrain_translucent_sort_payload_corrupt", evidence["failures"])
+
+    def test_static_terrain_translucent_truth_rejects_bad_index_type(self) -> None:
+        evidence = harness.static_terrain_translucent_evidence(
+            self.static_terrain_translucent_doc({"reason": "visible-submit", "indexType": 1})
+        )
+        self.assertEqual(evidence["status"], "fail")
+        self.assertIn("terrain_translucent_index_invalid", evidence["failures"])
+
+    def test_static_terrain_translucent_truth_rejects_duplicate_draw_order(self) -> None:
+        baseline = self.static_terrain_translucent_doc()
+        first = dict(baseline["translucentEvents"][2])
+        second = dict(first)
+        second["sectionPos"] = 987654321
+        second["meshKey"] = 22
+        second["meshGeneration"] = 202
+        second["visibleGeneration"] = 202
+        second["sortGeneration"] = 202
+        doc = {"translucentEvents": [baseline["translucentEvents"][0], baseline["translucentEvents"][1], first, second]}
+        evidence = harness.static_terrain_translucent_evidence(doc)
+        self.assertEqual(evidence["status"], "fail")
+        self.assertIn("terrain_translucent_section_order_invalid", evidence["failures"])
+
+    def test_static_terrain_translucent_truth_rejects_old_new_overlap(self) -> None:
+        doc = self.static_terrain_translucent_doc()
+        stale_execute = dict(doc["translucentEvents"][-1])
+        stale_execute["sortGeneration"] = 101
+        stale_execute["sortedIndexHash"] = 0x99999999
+        doc["translucentEvents"].append(stale_execute)
+        evidence = harness.static_terrain_translucent_evidence(doc)
+        self.assertEqual(evidence["status"], "fail")
+        self.assertIn("terrain_translucent_old_new_overlap", evidence["failures"])
+
+    def test_static_terrain_translucent_truth_maps_fault_markers(self) -> None:
+        cases = {
+            "sort-reversed": "terrain_translucent_sort_reversed",
+            "sort-stale": "terrain_translucent_sort_stale",
+            "sort-missing": "terrain_translucent_sort_missing",
+            "duplicate-primitive": "terrain_translucent_duplicate_primitive",
+            "index-out-of-range": "terrain_translucent_index_invalid",
+            "index-type-invalid": "terrain_translucent_index_invalid",
+            "index-alignment-invalid": "terrain_translucent_index_invalid",
+            "sort-section-mismatch": "terrain_translucent_sort_section_mismatch",
+            "old-new-overlap": "terrain_translucent_old_new_overlap",
+            "section-order-reversed": "terrain_translucent_section_order_invalid",
+            "depth-write-enabled": "terrain_translucent_depth_policy_invalid",
+            "opaque-blend": "terrain_translucent_blend_policy_invalid",
+            "cross-world-sort": "terrain_translucent_cross_world_sort",
+            "source-sort-mismatch": "terrain_translucent_source_sort_mismatch",
+            "sort-payload-corrupt": "terrain_translucent_sort_payload_corrupt",
+        }
+        for fault, expected in cases.items():
+            with self.subTest(fault=fault):
+                evidence = harness.static_terrain_translucent_evidence(
+                    self.static_terrain_translucent_doc({"reason": "translucent-fault-" + fault + ":diagnostic"})
+                )
+                self.assertEqual(evidence["status"], "fail")
+                self.assertIn(expected, evidence["failures"])
+
+    def test_static_terrain_translucent_camera_sequence_accepts_crossing(self) -> None:
+        names = [
+            "translucent-front",
+            "translucent-lateral",
+            "translucent-orbit-left",
+            "translucent-cross-opposite",
+            "translucent-above",
+            "translucent-below",
+            "translucent-return",
+        ]
+        positions = [
+            (0.0, 70.0, 0.0),
+            (4.0, 70.0, 0.0),
+            (0.0, 70.0, 0.0),
+            (10.0, 70.0, 0.0),
+            (4.0, 75.0, 0.0),
+            (4.0, 66.0, 0.0),
+            (0.0, 70.0, 0.0),
+        ]
+        captures = [
+            {"poseName": name, "position": {"x": x, "y": y, "z": z}}
+            for name, (x, y, z) in zip(names, positions, strict=True)
+        ]
+        evidence = harness.static_terrain_translucent_camera_sequence_evidence(
+            {"poseSequence": names, "captures": captures}
+        )
+        self.assertEqual(evidence["status"], "pass")
+        self.assertGreaterEqual(evidence["horizontal_span"], 8.0)
+        self.assertGreaterEqual(evidence["vertical_span"], 8.0)
+
+    def test_static_terrain_translucent_camera_sequence_rejects_single_static_pose(self) -> None:
+        evidence = harness.static_terrain_translucent_camera_sequence_evidence(
+            {
+                "poseSequence": ["initial"],
+                "captures": [
+                    {
+                        "poseName": "initial",
+                        "position": {"x": 0.0, "y": 70.0, "z": 0.0},
+                    }
+                ],
+            }
+        )
+        self.assertEqual(evidence["status"], "fail")
+        self.assertIn("terrain_translucent_camera_sequence_missing", evidence["failures"])
+        self.assertIn("terrain_translucent_camera_sequence_no_crossing", evidence["failures"])
+
+    def test_static_terrain_lifecycle_allows_translucent_air_placement(self) -> None:
+        diagnostics = {
+            "lifecycleEvents": [
+                {"reason": "lifecycle-edit-before:translucent-glass:block=1, 2, 3:generation=0"},
+                {"reason": "lifecycle-edit-applied:translucent-glass:block=1, 2, 3:state=minecraft:blue_stained_glass"},
+                {"reason": "lifecycle-edit-after:translucent-glass:block=1, 2, 3:before=0:after=44:waitFrames=4"},
+            ],
+            "recentEvents": [],
+        }
+        lifecycle = {
+            "stage": "replacement-visible",
+            "setup": True,
+            "afterRecorded": True,
+            "beforeGeneration": 0,
+            "afterGeneration": 44,
+            "editBlock": "1, 2, 3",
+        }
+        evidence = harness.static_terrain_lifecycle_evidence(diagnostics, lifecycle, "translucent-glass")
+        self.assertEqual(evidence["status"], "pass")
+        self.assertIsNone(evidence["failure"])
+
+    def test_static_terrain_lifecycle_accepts_translucent_prefixed_section_reentry(self) -> None:
+        diagnostics = {
+            "lifecycleEvents": [
+                {"reason": "lifecycle-edit-before:translucent-section-reentry:block=1, 2, 3:generation=0"},
+                {"reason": "lifecycle-translucent-overlap-placed:translucent-section-reentry:block=1, 2, 3"},
+                {"reason": "lifecycle-edit-applied:translucent-section-reentry:block=1, 2, 3:state=minecraft:blue_stained_glass"},
+                {"reason": "lifecycle-section-removed:translucent-section-reentry:block=1, 2, 3"},
+                {"reason": "lifecycle-section-reentry-requested:translucent-section-reentry:block=1, 2, 3"},
+                {"reason": "lifecycle-edit-after:translucent-section-reentry:block=1, 2, 3:before=0:after=55:waitFrames=4"},
+            ],
+            "recentEvents": [],
+        }
+        lifecycle = {
+            "stage": "replacement-visible",
+            "setup": True,
+            "afterRecorded": True,
+            "beforeGeneration": 0,
+            "afterGeneration": 55,
+            "editBlock": "1, 2, 3",
+        }
+        evidence = harness.static_terrain_lifecycle_evidence(diagnostics, lifecycle, "translucent-section-reentry")
+        self.assertEqual(evidence["status"], "pass")
+        self.assertIsNone(evidence["failure"])
+
+    def test_static_terrain_translucent_scenario_alias_policy(self) -> None:
+        self.assertEqual("world-different-reload", harness.static_terrain_base_scenario("translucent-world-different-reload"))
+        self.assertEqual("steady-state-performance", harness.static_terrain_base_scenario("translucent-moving-camera-performance"))
+        self.assertTrue(harness.static_terrain_is_translucent_scenario("translucent-boundary-x-edit"))
+        self.assertTrue(harness.static_terrain_requires_translucent_camera_sort("translucent-moving-camera-performance"))
+        self.assertFalse(harness.static_terrain_requires_translucent_camera_sort("translucent-section-reentry"))
 
     def test_incomplete_vulkan_run_diagnosis(self) -> None:
         diagnosis = harness.incomplete_run_diagnosis(

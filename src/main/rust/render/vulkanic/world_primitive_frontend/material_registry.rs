@@ -65,6 +65,18 @@ const MATERIALS: &[SemanticMaterial] = &[
         legacy_keys: &[2],
     },
     SemanticMaterial {
+        key: WORLD_MATERIAL_ID_TRANSLUCENT_TEXTURED,
+        resource_location: "minecraft:material/translucent_textured",
+        mode: WORLD_MATERIAL_MODE_TRANSLUCENT,
+        cutout_threshold: 0.0,
+        sampler: MaterialSamplerPolicy::NearestClamp,
+        mip: MaterialMipPolicy::SingleMip,
+        tint: MaterialTintChannel::VertexColor,
+        emissive: false,
+        fullbright: false,
+        legacy_keys: &[3],
+    },
+    SemanticMaterial {
         key: WORLD_MATERIAL_ID_BLOCK_MARKER_CUTOUT,
         resource_location: "minecraft:material/block_marker_cutout",
         mode: WORLD_MATERIAL_MODE_CUTOUT,

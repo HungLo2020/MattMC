@@ -1410,8 +1410,8 @@ public class Phase3DrawPathTest {
         Path regionManagerFile = SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/region/RenderRegionManager.java");
         String regionManagerSource = readSource(regionManagerFile);
 
-        assertTrue(worldRendererSource.contains("if (VulkanicAPI.isVulkanBackendSelected()) {\n            sortBehavior = SortBehavior.OFF;"),
-            "Vulkan should avoid Sodium's sorted local translucent index path until that path is correct on Vulkan");
+        assertTrue(worldRendererSource.contains("if (VulkanicAPI.isVulkanBackendSelected()\n                && !WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan()) {\n            sortBehavior = SortBehavior.OFF;"),
+            "Java Vulkan compatibility should avoid Sodium's sorted local translucent index path, while Rust whole-frame terrain keeps semantic sort data enabled");
         assertTrue(worldRendererSource.contains("} else if (PlatformRuntimeInformation.getInstance().isDevelopmentEnvironment()"),
             "OpenGL should keep the existing development-only terrain sorting debug override behavior");
         assertFalse(regionManagerSource.contains("reverseSortedQuadUploadOrder"),

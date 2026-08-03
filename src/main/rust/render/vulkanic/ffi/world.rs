@@ -378,6 +378,7 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
             })?;
         if quad.material_mode != WORLD_MATERIAL_MODE_OPAQUE
             && quad.material_mode != WORLD_MATERIAL_MODE_CUTOUT
+            && quad.material_mode != WORLD_MATERIAL_MODE_TRANSLUCENT
         {
             return Err(GalError::ffi(
                 StatusCode::UnknownEnum,
@@ -523,6 +524,7 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
                 })?;
             if record.material_mode != WORLD_MATERIAL_MODE_OPAQUE
                 && record.material_mode != WORLD_MATERIAL_MODE_CUTOUT
+                && record.material_mode != WORLD_MATERIAL_MODE_TRANSLUCENT
             {
                 return Err(GalError::ffi(
                     StatusCode::UnknownEnum,

@@ -43,6 +43,7 @@ pub struct CompositeProgram {
 pub enum TerrainMaterialProgramKind {
     Opaque,
     Cutout,
+    Translucent,
 }
 
 impl TerrainMaterialProgramKind {
@@ -50,6 +51,7 @@ impl TerrainMaterialProgramKind {
         match self {
             Self::Opaque => ProgramIdentity::new("vulkanic:builtin/terrain_opaque_v1"),
             Self::Cutout => ProgramIdentity::new("vulkanic:builtin/terrain_cutout_v1"),
+            Self::Translucent => ProgramIdentity::new("vulkanic:builtin/terrain_translucent_v1"),
         }
     }
 
@@ -57,6 +59,7 @@ impl TerrainMaterialProgramKind {
         match self {
             Self::Opaque => "opaque",
             Self::Cutout => "cutout",
+            Self::Translucent => "translucent",
         }
     }
 }
@@ -67,6 +70,10 @@ pub fn minimal_terrain_solid_program() -> TerrainMaterialProgram {
 
 pub fn minimal_terrain_cutout_program() -> TerrainMaterialProgram {
     minimal_terrain_material_program(TerrainMaterialProgramKind::Cutout)
+}
+
+pub fn minimal_terrain_translucent_program() -> TerrainMaterialProgram {
+    minimal_direct_terrain_material_program(TerrainMaterialProgramKind::Translucent)
 }
 
 pub fn minimal_direct_terrain_solid_program() -> TerrainMaterialProgram {
@@ -104,6 +111,7 @@ pub fn minimal_direct_terrain_material_program(
         identity: ProgramIdentity::new(match kind {
             TerrainMaterialProgramKind::Opaque => "vulkanic:builtin/direct_terrain_opaque_v1",
             TerrainMaterialProgramKind::Cutout => "vulkanic:builtin/direct_terrain_cutout_v1",
+            TerrainMaterialProgramKind::Translucent => "vulkanic:builtin/terrain_translucent_v1",
         }),
         vertex: ShaderStageSource {
             stage: ShaderStageKind::Vertex,

@@ -48,6 +48,46 @@ KEY_SUMMARY_PATTERN = (
 CLIENT_PROCESS_PATTERN = re.compile(r"KnotClient|devlaunchinjector|MattMC-1\.21", re.IGNORECASE)
 
 
+def static_terrain_base_scenario(scenario: str) -> str:
+    scenario = (scenario or "").strip().lower()
+    if not scenario.startswith("translucent-"):
+        return scenario
+    suffix = scenario.removeprefix("translucent-")
+    aliases = {
+        "rapid-edit": "interior-edit",
+        "quiescence-stationary-performance": "steady-state-performance",
+        "moving-camera-performance": "steady-state-performance",
+    }
+    base_scenarios = {
+        "interior-edit",
+        "boundary-x-edit",
+        "boundary-y-edit",
+        "boundary-z-edit",
+        "section-reentry",
+        "resource-reload",
+        "opaque-texture-replacement",
+        "cutout-texture-replacement",
+        "pack-priority-reversal",
+        "missing-atlas-payload",
+        "malformed-png-payload",
+        "partial-texture-update",
+        "model-resource-generation-change",
+        "resize-cycle",
+        "swapchain-recreate",
+        "world-unload-reload",
+        "world-different-reload",
+        "view-distance-decrease",
+        "view-distance-increase",
+        "camera-relocation",
+        "return-visited-terrain",
+        "memory-cache-soak",
+        "steady-state-performance",
+    }
+    if suffix in aliases:
+        return aliases[suffix]
+    return suffix if suffix in base_scenarios else scenario
+
+
 @dataclass
 class CaptureConfig:
     backend: str
@@ -383,7 +423,7 @@ class CaptureRunner:
         configured = (self.config.world_static_terrain_second_world or "").strip()
         if not configured:
             configured = os.environ.get("MATTMC_CAPTURE_SECOND_WORLD", "").strip()
-        scenario = (self.config.world_static_terrain_scenario or "").strip().lower()
+        scenario = static_terrain_base_scenario(self.config.world_static_terrain_scenario)
         if not configured and scenario == "world-different-reload":
             configured = f"{self.config.world}-different"
         return configured
@@ -465,7 +505,7 @@ class CaptureRunner:
             self.copy_isolated_world(second_source, saves_dir, second_world, "secondary")
             if not (saves_dir / second_world).is_dir():
                 raise SystemExit(f"Secondary copied world was requested but is absent before launch: {saves_dir / second_world}")
-        elif (self.config.world_static_terrain_scenario or "").strip().lower() == "world-different-reload":
+        elif static_terrain_base_scenario(self.config.world_static_terrain_scenario) == "world-different-reload":
             raise SystemExit("--world-static-terrain-scenario world-different-reload requires a secondary copied world")
         saves_listing = sorted(path.name for path in saves_dir.iterdir() if path.is_dir())
         self.append_isolated_world_copy_meta(f"isolated_saves_listing={json.dumps(saves_listing, separators=(',', ':'))}")
@@ -2572,33 +2612,35 @@ def validate_deterministic_metadata(metadata_path: Path, screenshot_dir: Path, t
             if capture.get(key) != expected:
                 raise RuntimeError(f"deterministic capture {key} mismatch: {capture}")
         position = capture.get("position") or {}
+        expected_position = capture.get("requestedPosition") if isinstance(capture.get("requestedPosition"), dict) else initial_position
         for axis in ("x", "y", "z"):
             if not math.isclose(
                 float(position.get(axis, float("nan"))),
-                float(initial_position.get(axis, float("nan"))),
+                float(expected_position.get(axis, float("nan"))),
                 rel_tol=0.0,
                 abs_tol=0.0001,
             ):
                 raise RuntimeError(
                     f"deterministic player position changed on {capture.get('poseName')} axis {axis}: "
-                    f"initial={initial_position} capture={position}"
+                    f"expected={expected_position} capture={position}"
                 )
         pose_name = capture.get("poseName")
-        expected_yaw, expected_pitch = expected_requested.get(pose_name, (initial_yaw, initial_pitch))
         requested_yaw = float(capture.get("requestedYaw", float("nan")))
         requested_pitch = float(capture.get("requestedPitch", float("nan")))
         observed_yaw = float(capture.get("observedYaw", float("nan")))
         observed_pitch = float(capture.get("observedPitch", float("nan")))
-        if not math.isclose(requested_yaw, expected_yaw, rel_tol=0.0, abs_tol=tolerance):
-            raise RuntimeError(
-                f"deterministic requested yaw mismatch for {pose_name}: "
-                f"expected={expected_yaw} actual={requested_yaw} tolerance={tolerance}"
-            )
-        if not math.isclose(requested_pitch, expected_pitch, rel_tol=0.0, abs_tol=tolerance):
-            raise RuntimeError(
-                f"deterministic requested pitch mismatch for {pose_name}: "
-                f"expected={expected_pitch} actual={requested_pitch} tolerance={tolerance}"
-            )
+        if pose_name in expected_requested:
+            expected_yaw, expected_pitch = expected_requested[pose_name]
+            if not math.isclose(requested_yaw, expected_yaw, rel_tol=0.0, abs_tol=tolerance):
+                raise RuntimeError(
+                    f"deterministic requested yaw mismatch for {pose_name}: "
+                    f"expected={expected_yaw} actual={requested_yaw} tolerance={tolerance}"
+                )
+            if not math.isclose(requested_pitch, expected_pitch, rel_tol=0.0, abs_tol=tolerance):
+                raise RuntimeError(
+                    f"deterministic requested pitch mismatch for {pose_name}: "
+                    f"expected={expected_pitch} actual={requested_pitch} tolerance={tolerance}"
+                )
         if not math.isclose(observed_yaw, requested_yaw, rel_tol=0.0, abs_tol=tolerance):
             raise RuntimeError(
                 f"deterministic observed yaw mismatch for {pose_name}: "

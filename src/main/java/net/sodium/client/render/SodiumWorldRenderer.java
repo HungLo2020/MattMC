@@ -379,7 +379,8 @@ public class SodiumWorldRenderer {
         // translucency sorting can be disabled in development environments by setting the debug option in the config file
         var sortBehavior = SortBehavior.DYNAMIC_DEFER_NEARBY_ZERO_FRAMES;
 
-        if (VulkanicAPI.isVulkanBackendSelected()) {
+        if (VulkanicAPI.isVulkanBackendSelected()
+                && !WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan()) {
             sortBehavior = SortBehavior.OFF;
         } else if (PlatformRuntimeInformation.getInstance().isDevelopmentEnvironment()
                 && !SodiumClientMod.options().debug.terrainSortingEnabled) {

@@ -2061,6 +2061,17 @@ public final class GraphicsFrameBenchmark {
 			json.append("\"separateAoVertexCount\": ").append(event.separateAoVertexCount()).append(", ");
 			json.append("\"aoRange\": { \"min\": ").append(format(event.minAo())).append(", \"max\": ").append(format(event.maxAo())).append(" }, ");
 			json.append("\"normalSectionCounts\": { \"posY\": ").append(event.positiveYNormalSections()).append(", \"negY\": ").append(event.negativeYNormalSections()).append(", \"horizontal\": ").append(event.horizontalNormalSections()).append(" }, ");
+			json.append("\"sortGeneration\": ").append(event.sortGeneration()).append(", ");
+			json.append("\"primitiveCount\": ").append(event.primitiveCount()).append(", ");
+			json.append("\"sortedIndexHash\": ").append(event.sortedIndexHash()).append(", ");
+			json.append("\"indexUploadGeneration\": ").append(event.indexUploadGeneration()).append(", ");
+			json.append("\"translucentDrawOrder\": ").append(event.translucentDrawOrder()).append(", ");
+			json.append("\"sorterType\": \"").append(escape(event.sorterType())).append("\", ");
+			json.append("\"sourceSortedIndexHash\": ").append(event.sourceSortedIndexHash()).append(", ");
+			json.append("\"rustCopiedSortedIndexHash\": ").append(event.rustCopiedSortedIndexHash()).append(", ");
+			json.append("\"sourceSortedIndexSampleHash\": ").append(event.sourceSortedIndexSampleHash()).append(", ");
+			json.append("\"rustCopiedSortedIndexSampleHash\": ").append(event.rustCopiedSortedIndexSampleHash()).append(", ");
+			json.append("\"sortedIndexSample\": \"").append(escape(event.sortedIndexSample())).append("\", ");
 			json.append("\"reason\": \"").append(escape(event.reason())).append("\"");
 			json.append(" }");
 		}

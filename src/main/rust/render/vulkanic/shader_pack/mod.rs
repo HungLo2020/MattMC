@@ -91,7 +91,7 @@ mod tests {
     #[test]
     fn builtin_material_pass_graph_declares_g_buffer_and_final_output() {
         let graph = builtin_terrain_material_pass_graph().unwrap();
-        assert_eq!(7, graph.passes().len());
+        assert_eq!(8, graph.passes().len());
         assert_eq!(
             "vulkanic:pass/shadow_depth",
             graph.passes()[0].identity.as_str()
@@ -130,18 +130,26 @@ mod tests {
             graph.passes()[3].colors
         );
         assert_eq!(
-            "vulkanic:pass/composite_0",
+            "vulkanic:pass/terrain_translucent",
             graph.passes()[4].identity.as_str()
         );
-        assert_eq!(vec![AttachmentRole::Composite0], graph.passes()[4].colors);
         assert_eq!(
-            "vulkanic:pass/composite_1",
+            vec![AttachmentRole::DeferredLitColor],
+            graph.passes()[4].colors
+        );
+        assert_eq!(
+            "vulkanic:pass/composite_0",
             graph.passes()[5].identity.as_str()
         );
-        assert_eq!(vec![AttachmentRole::Composite1], graph.passes()[5].colors);
+        assert_eq!(vec![AttachmentRole::Composite0], graph.passes()[5].colors);
+        assert_eq!(
+            "vulkanic:pass/composite_1",
+            graph.passes()[6].identity.as_str()
+        );
+        assert_eq!(vec![AttachmentRole::Composite1], graph.passes()[6].colors);
         assert_eq!(
             "vulkanic:pass/final_output",
-            graph.passes()[6].identity.as_str()
+            graph.passes()[7].identity.as_str()
         );
         let deferred = minimal_deferred_lighting_program();
         assert!(deferred.fragment.source.contains("AlbedoTex"));
@@ -221,6 +229,7 @@ mod tests {
                 "vulkanic:pass/terrain_opaque",
                 "vulkanic:pass/terrain_cutout",
                 "vulkanic:pass/deferred_lighting",
+                "vulkanic:pass/terrain_translucent",
                 "vulkanic:pass/composite_0",
                 "vulkanic:pass/composite_1",
                 "vulkanic:pass/final_output",
@@ -237,7 +246,7 @@ mod tests {
     fn runtime_plan_owns_composite_chain_program_and_resource_selection() {
         let plan = ShaderPackRuntimePlan::terrain_material_multipass_v1(8).unwrap();
         assert_eq!(8, plan.generation);
-        assert_eq!(7, plan.graph.passes().len());
+        assert_eq!(8, plan.graph.passes().len());
         assert_eq!(
             "vulkanic:builtin/deferred_lighting_v1",
             plan.programs.deferred_lighting.identity.as_str()
@@ -268,7 +277,7 @@ mod tests {
         assert!(error.to_string().contains("before"));
 
         let mut duplicate_writer = ShaderPackConfig::internal_shadow_composite_fixture(6).unwrap();
-        duplicate_writer.passes[4].colors = vec![AttachmentRole::DeferredLitColor];
+        duplicate_writer.passes[5].colors = vec![AttachmentRole::DeferredLitColor];
         let error = duplicate_writer.validate().unwrap_err();
         assert!(error.to_string().contains("multiple"));
     }

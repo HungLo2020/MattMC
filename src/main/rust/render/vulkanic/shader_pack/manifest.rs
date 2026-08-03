@@ -147,6 +147,7 @@ impl ShaderPackConfig {
                 program("vulkanic:builtin/shadow_depth_v1"),
                 program("vulkanic:builtin/terrain_opaque_v1"),
                 program("vulkanic:builtin/terrain_cutout_v1"),
+                program("vulkanic:builtin/terrain_translucent_v1"),
                 program("vulkanic:builtin/deferred_lighting_v1"),
                 program("vulkanic:builtin/composite_color_grade_v1"),
                 program("vulkanic:builtin/composite_depth_fog_v1"),
@@ -208,6 +209,19 @@ impl ShaderPackConfig {
                     vec![AttachmentRole::DeferredLitColor],
                     None,
                     LoadIntent::Clear,
+                    StoreIntent::Store,
+                ),
+                pass(
+                    "vulkanic:pass/terrain_translucent",
+                    "vulkanic:builtin/terrain_translucent_v1",
+                    true,
+                    vec![
+                        AttachmentRole::DeferredLitColor,
+                        AttachmentRole::Depth,
+                    ],
+                    vec![AttachmentRole::DeferredLitColor],
+                    Some(AttachmentRole::Depth),
+                    LoadIntent::Load,
                     StoreIntent::Store,
                 ),
                 pass(

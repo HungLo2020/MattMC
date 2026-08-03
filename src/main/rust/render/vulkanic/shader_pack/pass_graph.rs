@@ -167,6 +167,15 @@ pub fn builtin_terrain_material_pass_graph() -> GalResult<PassGraph> {
             store: StoreIntent::Store,
         },
         ShaderPassDesc {
+            identity: PassIdentity::new("vulkanic:pass/terrain_translucent"),
+            label: "terrain-style translucent".to_string(),
+            program: ProgramIdentity::new("vulkanic:builtin/terrain_translucent_v1"),
+            colors: vec![AttachmentRole::DeferredLitColor],
+            depth: Some(AttachmentRole::Depth),
+            load: LoadIntent::Load,
+            store: StoreIntent::Store,
+        },
+        ShaderPassDesc {
             identity: PassIdentity::new("vulkanic:pass/composite_0"),
             label: "composite 0 color grade".to_string(),
             program: ProgramIdentity::new("vulkanic:builtin/composite_color_grade_v1"),

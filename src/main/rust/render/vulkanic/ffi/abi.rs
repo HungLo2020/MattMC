@@ -729,11 +729,24 @@ pub struct FfiWorldMeshTextureAssetPayload {
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FfiWorldMeshSortedIndexRecord {
+    pub byte_size: u32,
+    pub index_type: u32,
+    pub reserved0: u32,
+    pub mesh_key: u64,
+    pub mesh_generation: u64,
+    pub index_generation: u64,
+    pub index_bytes: FfiBytes,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct FfiWorldMeshAssetUpdateRequest {
     pub header: FfiHeader,
     pub generation: u64,
     pub meshes: FfiSlice<FfiWorldMeshAssetRecord>,
     pub textures: FfiSlice<FfiWorldMeshTextureAssetPayload>,
+    pub sorted_indices: FfiSlice<FfiWorldMeshSortedIndexRecord>,
     pub negotiated_feature_bits: u64,
 }
 

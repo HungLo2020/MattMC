@@ -305,6 +305,13 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(terrainRenderer.contains("WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan()"));
 		assertTrue(terrainRenderer.contains("DefaultTerrainRenderPasses.SOLID"));
 		assertTrue(terrainRenderer.contains("DefaultTerrainRenderPasses.CUTOUT"));
+		assertTrue(terrainRenderer.contains("DefaultTerrainRenderPasses.TRANSLUCENT"));
+		assertTrue(terrainRenderer.contains("ChunkSectionLayer.TRANSLUCENT"));
+		assertTrue(terrainRenderer.contains("nativeMeshingFluidBlocks > 0"));
+		assertTrue(terrainRenderer.contains("unsupported-fluid-translucent"),
+			"static translucent terrain v1 must explicitly reject fluid/water sections before Rust routing");
+		assertTrue(terrainRenderer.contains("acceptChunkSortOutput"));
+		assertTrue(renderSectionManager.contains("RustGalTerrainRenderer.acceptChunkSortOutput(sortOutput)"));
 		assertTrue(terrainRenderer.contains("registeredAtlasGeneration"));
 		assertTrue(terrainRenderer.contains("atlasTextureUpdatePayload()"));
 		assertTrue(terrainRenderer.contains("vertex.colorArgb()"));
@@ -318,7 +325,11 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(graphicsHarness.contains("static_terrain_workload_complete"));
 		assertTrue(renderSectionManager.contains("RustGalTerrainRenderer.removeSection(x, y, z, \"section-removed\")"));
 		assertTrue(worldRenderer.contains("DIRTY_WORLD_MESH_TEXTURES"));
+		assertTrue(worldRenderer.contains("DIRTY_WORLD_MESH_SORTED_INDICES"));
+		assertTrue(worldRenderer.contains("registerStaticTerrainSortedIndex"));
+		assertTrue(bridge.contains("record WorldMeshSortedIndexRecord"));
 		assertTrue(worldRenderer.contains("dirtyWorldMeshTextureAssetsLocked()"));
+		assertTrue(worldRenderer.contains("dirtyWorldMeshSortedIndicesLocked()"));
 		assertTrue(worldRenderer.contains("removeStaticTerrainMeshAsset"));
 			assertTrue(rustWorldFrontend.contains("self.mesh_texture_assets.insert(texture_id, texture);")
 					&& rustWorldFrontend.contains("destroy_mesh_texture_resources_for_ids(gal, &incoming_texture_ids);"),

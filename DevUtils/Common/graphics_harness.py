@@ -1152,6 +1152,14 @@ def static_terrain_geometry_evidence(doc: dict[str, object] | None) -> dict[str,
             return None
         return parse_number(child.get(name))
 
+    def visible_event_frame_key(event: dict[str, object], gameplay_frame_id: int, enqueue_frame_id: int) -> int:
+        frame_id = parse_number(event.get("frame"))
+        if frame_id is not None:
+            return int(frame_id)
+        if event.get("gameplayFrameId") is not None:
+            return gameplay_frame_id
+        return enqueue_frame_id
+
     for raw_event in events:
         if not isinstance(raw_event, dict):
             continue
@@ -1186,8 +1194,9 @@ def static_terrain_geometry_evidence(doc: dict[str, object] | None) -> dict[str,
         if reason == "visible-submit":
             visible_checked += 1
             visible_key = (raw_event.get("sectionPos"), raw_event.get("layer"))
+            visible_frame_key = visible_event_frame_key(raw_event, gameplay_frame_id, enqueue_frame_id)
             generation_key = (
-                gameplay_frame_id if gameplay_frame_id > 0 else enqueue_frame_id,
+                visible_frame_key,
                 raw_event.get("sectionPos"),
                 raw_event.get("layer"),
             )
@@ -1204,7 +1213,7 @@ def static_terrain_geometry_evidence(doc: dict[str, object] | None) -> dict[str,
             generation_set.add(int(parse_number(raw_event.get("visibleGeneration")) or 0))
             if len(generation_set) > 1:
                 failures.append("stale_generation_overlap")
-            if visible_key == previous_visible_key and generation_key[0] <= 0:
+            if visible_key == previous_visible_key and raw_event.get("frame") is None and raw_event.get("gameplayFrameId") is None:
                 failures.append("duplicate_section_visible")
             previous_visible_key = visible_key
         if reason == "executed-submit":
@@ -1347,6 +1356,563 @@ def static_terrain_geometry_evidence(doc: dict[str, object] | None) -> dict[str,
     }
 
 
+def static_terrain_translucent_evidence(
+    doc: dict[str, object] | None,
+    *,
+    require_camera_sort: bool = False,
+) -> dict[str, object]:
+    if not isinstance(doc, dict):
+        return {"status": "skip", "failure": None, "checked_events": 0}
+    events = doc.get("translucentEvents")
+    if not isinstance(events, list):
+        events = []
+    if not events:
+        return {"status": "fail", "failure": "terrain_translucent_events_missing", "checked_events": 0}
+
+    failures: list[str] = []
+    checked = 0
+    mesh_events = 0
+    sort_events = 0
+    visible_events = 0
+    executed_events = 0
+    visible_by_frame: dict[int, list[int]] = {}
+    latest_sort_by_mesh: dict[int, int] = {}
+    executed_sort_by_mesh_frame: dict[tuple[int, int], set[int]] = {}
+    section_identity_by_mesh: dict[int, object] = {}
+    sorted_hashes_by_mesh: dict[int, set[int]] = {}
+    source_sort_by_key: dict[tuple[int, int], dict[str, object]] = {}
+    copied_sort_by_key: dict[tuple[int, int], dict[str, object]] = {}
+    source_sort_events = 0
+    rust_copy_events = 0
+    sort_payload_diagnostics: list[dict[str, object]] = []
+    landmark_events: list[dict[str, object]] = []
+    sorter_type_counts: dict[str, int] = {}
+
+    for raw_event in events:
+        if not isinstance(raw_event, dict):
+            continue
+        if str(raw_event.get("layer") or "") != "TRANSLUCENT":
+            continue
+        reason = str(raw_event.get("reason") or "")
+        if reason.startswith("translucent-fault-"):
+            checked += 1
+            fault = reason.removeprefix("translucent-fault-").split(":", 1)[0]
+            fault_classification = {
+                "sort-reversed": "terrain_translucent_sort_reversed",
+                "sort-stale": "terrain_translucent_sort_stale",
+                "sort-missing": "terrain_translucent_sort_missing",
+                "duplicate-primitive": "terrain_translucent_duplicate_primitive",
+                "index-out-of-range": "terrain_translucent_index_invalid",
+                "index-type-invalid": "terrain_translucent_index_invalid",
+                "index-alignment-invalid": "terrain_translucent_index_invalid",
+                "sort-section-mismatch": "terrain_translucent_sort_section_mismatch",
+                "old-new-overlap": "terrain_translucent_old_new_overlap",
+                "section-order-reversed": "terrain_translucent_section_order_invalid",
+                "depth-write-enabled": "terrain_translucent_depth_policy_invalid",
+                "opaque-blend": "terrain_translucent_blend_policy_invalid",
+                "cross-world-sort": "terrain_translucent_cross_world_sort",
+                "source-sort-mismatch": "terrain_translucent_source_sort_mismatch",
+                "sort-payload-corrupt": "terrain_translucent_sort_payload_corrupt",
+            }.get(fault)
+            if fault_classification:
+                failures.append(fault_classification)
+            else:
+                failures.append("terrain_translucent_events_missing")
+            continue
+        reason_base = reason.split(":", 1)[0]
+        if reason_base not in {
+            "mesh-registered",
+            "translucent-source-sort",
+            "translucent-rust-sort-copy",
+            "translucent-sort-registered",
+            "translucent-sort-missing",
+            "visible-submit",
+            "executed-submit",
+            "stale-or-unregistered-submit",
+        }:
+            continue
+        checked += 1
+        frame_id = int(parse_number(raw_event.get("gameplayFrameId")) or parse_number(raw_event.get("frame")) or 0)
+        mesh_key = int(parse_number(raw_event.get("meshKey")) or 0)
+        mesh_generation = int(parse_number(raw_event.get("meshGeneration")) or 0)
+        sort_generation = int(parse_number(raw_event.get("sortGeneration")) or 0)
+        visible_generation = int(parse_number(raw_event.get("visibleGeneration")) or 0)
+        index_upload_generation = int(parse_number(raw_event.get("indexUploadGeneration")) or 0)
+        primitive_count = int(parse_number(raw_event.get("primitiveCount")) or 0)
+        index_count = int(parse_number(raw_event.get("indexCount")) or 0)
+        index_type = int(parse_number(raw_event.get("indexType")) or 0)
+        sorted_index_hash = int(parse_number(raw_event.get("sortedIndexHash")) or 0)
+        draw_order = int(parse_number(raw_event.get("translucentDrawOrder")) or 0)
+        section_pos = raw_event.get("sectionPos")
+        source_hash = int(parse_number(raw_event.get("sourceSortedIndexHash")) or 0)
+        copied_hash = int(parse_number(raw_event.get("rustCopiedSortedIndexHash")) or 0)
+        source_sample_hash = int(parse_number(raw_event.get("sourceSortedIndexSampleHash")) or 0)
+        copied_sample_hash = int(parse_number(raw_event.get("rustCopiedSortedIndexSampleHash")) or 0)
+        sorter_type = str(raw_event.get("sorterType") or "")
+        sorted_index_sample = str(raw_event.get("sortedIndexSample") or "")
+        detail = parse_colon_key_values(reason)
+        if source_hash == 0:
+            source_hash = int(parse_number(detail.get("sourceHash")) or 0)
+        if copied_hash == 0:
+            copied_hash = int(parse_number(detail.get("copiedHash")) or 0)
+        if source_sample_hash == 0:
+            source_sample_hash = int(parse_number(detail.get("sourceSampleHash")) or 0)
+        if copied_sample_hash == 0:
+            copied_sample_hash = int(parse_number(detail.get("copiedSampleHash")) or 0)
+        if not sorter_type:
+            sorter_type = str(detail.get("sorterType") or "")
+        if sorter_type:
+            sorter_type_counts[sorter_type] = sorter_type_counts.get(sorter_type, 0) + 1
+        if not sorted_index_sample:
+            sorted_index_sample = str(detail.get("sample") or "")
+        if mesh_key == 0 or mesh_generation == 0 or index_count <= 0 or primitive_count <= 0:
+            failures.append("terrain_translucent_sort_missing")
+        if index_type != 2:
+            failures.append("terrain_translucent_index_invalid")
+        if reason_base == "mesh-registered":
+            mesh_events += 1
+            section_identity_by_mesh.setdefault(mesh_key, section_pos)
+        elif reason_base == "translucent-source-sort":
+            source_sort_events += 1
+            sort_events += 1
+            if sort_generation <= 0 or index_upload_generation <= 0 or sorted_index_hash == 0 or source_hash == 0:
+                failures.append("terrain_translucent_sort_missing")
+            if source_hash and sorted_index_hash and source_hash != sorted_index_hash:
+                failures.append("terrain_translucent_source_sort_mismatch")
+            previous_sort = latest_sort_by_mesh.get(mesh_key)
+            if previous_sort is not None and sort_generation <= previous_sort:
+                failures.append("terrain_translucent_sort_stale")
+            latest_sort_by_mesh[mesh_key] = max(sort_generation, previous_sort or 0)
+            sorted_hashes_by_mesh.setdefault(mesh_key, set()).add(sorted_index_hash)
+            source_sort_by_key[(mesh_key, sort_generation)] = {
+                "frame": frame_id,
+                "meshKey": mesh_key,
+                "meshGeneration": mesh_generation,
+                "sectionPos": section_pos,
+                "sortGeneration": sort_generation,
+                "hash": source_hash or sorted_index_hash,
+                "sampleHash": source_sample_hash,
+                "sample": sorted_index_sample,
+                "sorterType": sorter_type,
+                "cameraPosition": raw_event.get("cameraPosition"),
+                "sortOrigin": raw_event.get("sortOrigin"),
+                "primitiveCount": primitive_count,
+                "indexCount": index_count,
+                "indexType": index_type,
+            }
+            if source_sample_hash == 0 or not sorted_index_sample:
+                failures.append("terrain_translucent_sort_payload_corrupt")
+            if len(sort_payload_diagnostics) < 16:
+                sort_payload_diagnostics.append({"kind": "source", **source_sort_by_key[(mesh_key, sort_generation)]})
+        elif reason_base == "translucent-rust-sort-copy":
+            rust_copy_events += 1
+            if sort_generation <= 0 or index_upload_generation <= 0 or sorted_index_hash == 0 or copied_hash == 0:
+                failures.append("terrain_translucent_sort_payload_corrupt")
+            copied = {
+                "frame": frame_id,
+                "meshKey": mesh_key,
+                "meshGeneration": mesh_generation,
+                "sectionPos": section_pos,
+                "sortGeneration": sort_generation,
+                "hash": copied_hash or sorted_index_hash,
+                "sampleHash": copied_sample_hash,
+                "sample": sorted_index_sample,
+                "sorterType": sorter_type,
+                "cameraPosition": raw_event.get("cameraPosition"),
+                "sortOrigin": raw_event.get("sortOrigin"),
+                "primitiveCount": primitive_count,
+                "indexCount": index_count,
+                "indexType": index_type,
+            }
+            copied_sort_by_key[(mesh_key, sort_generation)] = copied
+            source = source_sort_by_key.get((mesh_key, sort_generation))
+            if source is not None:
+                if source.get("meshGeneration") != mesh_generation:
+                    failures.append("terrain_translucent_sort_generation_mismatch")
+                if source.get("sectionPos") != section_pos:
+                    failures.append("terrain_translucent_sort_section_mismatch")
+                if source.get("hash") != copied["hash"] or source.get("sampleHash") != copied["sampleHash"]:
+                    failures.append("terrain_translucent_source_sort_mismatch")
+            if copied_sample_hash == 0 or not sorted_index_sample:
+                failures.append("terrain_translucent_sort_payload_corrupt")
+            if len(sort_payload_diagnostics) < 16:
+                sort_payload_diagnostics.append({"kind": "rust-copy", **copied})
+        elif reason_base == "translucent-sort-registered":
+            sort_events += 1
+            if sort_generation <= 0 or index_upload_generation <= 0 or sorted_index_hash == 0:
+                failures.append("terrain_translucent_sort_missing")
+            if source_hash and copied_hash and source_hash != copied_hash:
+                failures.append("terrain_translucent_source_sort_mismatch")
+            if source_sample_hash and copied_sample_hash and source_sample_hash != copied_sample_hash:
+                failures.append("terrain_translucent_sort_payload_corrupt")
+            sample_count = len([part for part in sorted_index_sample.split(",") if part.strip()])
+            order_record = {
+                "frame": frame_id,
+                "meshKey": mesh_key,
+                "sortGeneration": sort_generation,
+                "sourceHash": source_hash,
+                "copiedHash": copied_hash,
+                "sourceSampleHash": source_sample_hash,
+                "copiedSampleHash": copied_sample_hash,
+                "sampleText": sorted_index_sample,
+                "sample": sample_count,
+                "sorterType": sorter_type,
+                "cameraPosition": raw_event.get("cameraPosition"),
+            }
+            if len(sort_payload_diagnostics) < 16:
+                sort_payload_diagnostics.append({"kind": "registered", **order_record})
+            if sample_count <= 0:
+                failures.append("terrain_translucent_sort_payload_corrupt")
+        elif reason_base == "translucent-sort-missing":
+            failures.append("terrain_translucent_sort_missing")
+        elif reason_base == "visible-submit":
+            visible_events += 1
+            latest_sort = latest_sort_by_mesh.get(mesh_key)
+            latest_copy = copied_sort_by_key.get((mesh_key, latest_sort or 0))
+            if sort_generation <= 0 or latest_sort is None:
+                failures.append("terrain_translucent_sort_missing")
+            elif sort_generation != latest_sort:
+                failures.append("terrain_translucent_sort_execution_stale")
+            if latest_copy is not None and sorted_index_hash and latest_copy.get("hash") != sorted_index_hash:
+                failures.append("terrain_translucent_sort_payload_corrupt")
+            visible_by_frame.setdefault(frame_id, []).append(draw_order)
+        elif reason_base == "executed-submit":
+            executed_events += 1
+            latest_sort = latest_sort_by_mesh.get(mesh_key)
+            latest_copy = copied_sort_by_key.get((mesh_key, latest_sort or 0))
+            if sort_generation <= 0 or latest_sort is None:
+                failures.append("terrain_translucent_sort_missing")
+            elif sort_generation != latest_sort:
+                failures.append("terrain_translucent_sort_execution_stale")
+            if latest_copy is not None and sorted_index_hash and latest_copy.get("hash") != sorted_index_hash:
+                failures.append("terrain_translucent_sort_payload_corrupt")
+            executed_sort_by_mesh_frame.setdefault((frame_id, mesh_key), set()).add(sort_generation)
+        elif reason_base == "stale-or-unregistered-submit":
+            failures.append("terrain_translucent_sort_stale")
+        previous_section = section_identity_by_mesh.get(mesh_key)
+        if previous_section is not None and previous_section != section_pos:
+            failures.append("terrain_translucent_sort_section_mismatch")
+        if len(landmark_events) < 8:
+            landmark_events.append(
+                {
+                    "reason": reason,
+                    "frame": frame_id,
+                    "sectionPos": section_pos,
+                    "meshKey": mesh_key,
+                    "meshGeneration": mesh_generation,
+                    "sortGeneration": sort_generation,
+                    "visibleGeneration": visible_generation,
+                    "primitiveCount": primitive_count,
+                    "indexCount": index_count,
+                    "indexType": index_type,
+                    "sortedIndexHash": sorted_index_hash,
+                    "indexUploadGeneration": index_upload_generation,
+                    "drawOrder": draw_order,
+                    "cameraPosition": raw_event.get("cameraPosition"),
+                    "sortOrigin": raw_event.get("sortOrigin"),
+                }
+            )
+
+    for orders in visible_by_frame.values():
+        if len(orders) != len(set(orders)):
+            failures.append("terrain_translucent_section_order_invalid")
+    for (_frame_id, _mesh_key), executed_generations in executed_sort_by_mesh_frame.items():
+        if len(executed_generations) > 1:
+            failures.append("terrain_translucent_old_new_overlap")
+    for key, source in source_sort_by_key.items():
+        copied = copied_sort_by_key.get(key)
+        if copied is None:
+            failures.append("terrain_translucent_sort_payload_corrupt")
+            continue
+        if source.get("hash") != copied.get("hash"):
+            failures.append("terrain_translucent_source_sort_mismatch")
+        if source.get("sampleHash") != copied.get("sampleHash"):
+            failures.append("terrain_translucent_sort_payload_corrupt")
+        if source.get("meshGeneration") != copied.get("meshGeneration"):
+            failures.append("terrain_translucent_sort_generation_mismatch")
+        if source.get("sectionPos") != copied.get("sectionPos"):
+            failures.append("terrain_translucent_sort_section_mismatch")
+
+    if checked <= 0:
+        failures.append("terrain_translucent_events_missing")
+    if mesh_events <= 0:
+        failures.append("terrain_translucent_sort_missing")
+    if visible_events <= 0:
+        failures.append("terrain_translucent_section_order_invalid")
+    if executed_events <= 0:
+        failures.append("terrain_translucent_sort_missing")
+    if require_camera_sort:
+        if sort_events <= 0 or source_sort_events <= 0 or rust_copy_events <= 0:
+            failures.append("terrain_translucent_sort_missing")
+        if not any(len(hashes) >= 2 for hashes in sorted_hashes_by_mesh.values()):
+            failures.append("terrain_translucent_sort_stale")
+    unique_failures = sorted(set(failures), key=static_terrain_translucent_failure_priority)
+    return {
+        "status": "pass" if not unique_failures else "fail",
+        "failure": unique_failures[0] if unique_failures else None,
+        "failures": unique_failures,
+        "checked_events": checked,
+        "mesh_events": mesh_events,
+        "sort_events": sort_events,
+        "source_sort_events": source_sort_events,
+        "rust_copy_events": rust_copy_events,
+        "visible_events": visible_events,
+        "executed_events": executed_events,
+        "camera_sort_required": require_camera_sort,
+        "sorted_hashes_by_mesh": {str(mesh): len(hashes) for mesh, hashes in sorted_hashes_by_mesh.items()},
+        "sorter_type_counts": dict(sorted(sorter_type_counts.items())),
+        "sort_payload_diagnostics": sort_payload_diagnostics,
+        "landmark_events": landmark_events,
+    }
+
+
+def parse_colon_key_values(text: str) -> dict[str, str]:
+    values: dict[str, str] = {}
+    for part in str(text or "").split(":")[1:]:
+        if "=" not in part:
+            continue
+        key, value = part.split("=", 1)
+        values[key] = value
+    return values
+
+
+def static_terrain_translucent_final_order_evidence(doc: dict[str, object] | None) -> dict[str, object]:
+    if not isinstance(doc, dict):
+        return {"status": "skip", "failure": None, "captures": 0}
+    if not static_terrain_requires_translucent_camera_sort(str(doc.get("rustGalStaticTerrainScenario") or "")):
+        return {"status": "skip", "failure": None, "captures": 0}
+    captures = doc.get("captures")
+    if not isinstance(captures, list):
+        captures = []
+    by_name = {str(item.get("poseName") or ""): item for item in captures if isinstance(item, dict)}
+    required = ["translucent-front", "translucent-cross-opposite", "translucent-return"]
+    if not all(name in by_name for name in required):
+        return {
+            "status": "fail",
+            "failure": "terrain_translucent_final_order_invalid",
+            "failures": ["terrain_translucent_final_order_invalid"],
+            "captures": len(captures),
+            "reason": "missing front/rear/return translucent overlap captures",
+        }
+    try:
+        from PIL import Image
+    except ImportError:
+        return {
+            "status": "fail",
+            "failure": "terrain_translucent_final_order_invalid",
+            "failures": ["terrain_translucent_final_order_invalid"],
+            "captures": len(captures),
+            "reason": "Pillow unavailable for final translucent crop classification",
+        }
+
+    stats: dict[str, dict[str, object]] = {}
+    failures: list[str] = []
+    for pose_name in required:
+        screenshot_value = by_name[pose_name].get("screenshot")
+        screenshot = Path(str(screenshot_value or ""))
+        if not screenshot.exists():
+            failures.append("terrain_translucent_final_order_invalid")
+            stats[pose_name] = {"status": "missing_screenshot", "screenshot": str(screenshot)}
+            continue
+        with Image.open(screenshot) as image:
+            rgb = image.convert("RGB")
+            pose_stats = translucent_overlap_crop_stats(rgb)
+            if pose_stats.get("status") == "present":
+                crop = pose_stats.get("crop")
+                if isinstance(crop, tuple):
+                    crop_path = screenshot.with_name(f"static_terrain_translucent_overlap_crop_{pose_name}.png")
+                    rgb.crop(crop).save(crop_path)
+                    pose_stats["crop_path"] = str(crop_path)
+                    pose_stats["crop"] = {
+                        "left": crop[0],
+                        "top": crop[1],
+                        "right": crop[2],
+                        "bottom": crop[3],
+                    }
+            else:
+                failures.append("terrain_translucent_final_order_invalid")
+            stats[pose_name] = pose_stats
+
+    front = stats.get("translucent-front", {})
+    rear = stats.get("translucent-cross-opposite", {})
+    returned = stats.get("translucent-return", {})
+    if all(isinstance(item, dict) and item.get("status") == "present" for item in (front, rear, returned)):
+        front_vector = color_ratio_vector(front)
+        rear_vector = color_ratio_vector(rear)
+        return_vector = color_ratio_vector(returned)
+        front_rear_distance = sum(abs(front_vector[index] - rear_vector[index]) for index in range(3))
+        front_return_distance = sum(abs(front_vector[index] - return_vector[index]) for index in range(3))
+        if front_rear_distance < 0.08:
+            failures.append("terrain_translucent_final_order_invalid")
+        if front_return_distance > 0.12:
+            failures.append("terrain_translucent_final_order_invalid")
+        if int(front.get("filled_pixels") or 0) < 900 or int(rear.get("filled_pixels") or 0) < 900:
+            failures.append("terrain_translucent_final_order_invalid")
+        if float(front.get("edge_ratio") or 1.0) > 0.55 or float(rear.get("edge_ratio") or 1.0) > 0.55:
+            failures.append("terrain_translucent_final_order_invalid")
+        stats["comparison"] = {
+            "frontRearColorDistance": front_rear_distance,
+            "frontReturnColorDistance": front_return_distance,
+            "expected": "front and rear camera positions must produce different filled overlap colors; return must match front",
+        }
+    unique_failures = sorted(set(failures), key=static_terrain_translucent_failure_priority)
+    return {
+        "status": "pass" if not unique_failures else "fail",
+        "failure": unique_failures[0] if unique_failures else None,
+        "failures": unique_failures,
+        "captures": len(captures),
+        "poses": stats,
+    }
+
+
+def color_ratio_vector(stats: dict[str, object]) -> tuple[float, float, float]:
+    total = max(1.0, float(stats.get("red_sum") or 0) + float(stats.get("green_sum") or 0) + float(stats.get("blue_sum") or 0))
+    return (
+        float(stats.get("red_sum") or 0) / total,
+        float(stats.get("green_sum") or 0) / total,
+        float(stats.get("blue_sum") or 0) / total,
+    )
+
+
+def translucent_overlap_crop_stats(rgb: Any) -> dict[str, object]:
+    width, height = rgb.size
+    candidates: list[tuple[int, int, int, int, int, int]] = []
+    red_sum = 0
+    green_sum = 0
+    blue_sum = 0
+    edge_like = 0
+    for y in range(0, int(height * 0.82)):
+        for x in range(0, width):
+            red, green, blue = rgb.getpixel((x, y))
+            if blue > 145 and green > 95 and red < 170:
+                continue
+            chroma = max(red, green, blue) - min(red, green, blue)
+            filled = (
+                chroma >= 14
+                and (
+                    red > green + 7
+                    or green > red + 7
+                    or blue > red + 7
+                )
+                and not (green > red + 18 and green > blue + 18 and y > height * 0.45)
+            )
+            if not filled:
+                continue
+            candidates.append((x, y, red, green, blue, chroma))
+            red_sum += red
+            green_sum += green
+            blue_sum += blue
+            if chroma > 80:
+                edge_like += 1
+    if len(candidates) < 900:
+        return {"status": "missing_filled_overlap", "filled_pixels": len(candidates)}
+    xs = [item[0] for item in candidates]
+    ys = [item[1] for item in candidates]
+    left = max(0, min(xs) - 4)
+    top = max(0, min(ys) - 4)
+    right = min(width, max(xs) + 5)
+    bottom = min(height, max(ys) + 5)
+    if right - left < 24 or bottom - top < 24:
+        return {"status": "edge_only_overlap", "filled_pixels": len(candidates)}
+    return {
+        "status": "present",
+        "filled_pixels": len(candidates),
+        "red_sum": red_sum,
+        "green_sum": green_sum,
+        "blue_sum": blue_sum,
+        "edge_ratio": edge_like / max(1, len(candidates)),
+        "crop": (left, top, right, bottom),
+    }
+
+
+def static_terrain_translucent_camera_sequence_evidence(doc: dict[str, object] | None) -> dict[str, object]:
+    if not isinstance(doc, dict):
+        return {"status": "skip", "failure": None, "capture_count": 0}
+    captures = doc.get("captures")
+    if not isinstance(captures, list):
+        captures = []
+    pose_sequence = doc.get("poseSequence")
+    if not isinstance(pose_sequence, list):
+        pose_sequence = []
+    expected = [
+        "translucent-front",
+        "translucent-lateral",
+        "translucent-orbit-left",
+        "translucent-cross-opposite",
+        "translucent-above",
+        "translucent-below",
+        "translucent-return",
+    ]
+    failures: list[str] = []
+    names = [str(item.get("poseName") or "") for item in captures if isinstance(item, dict)]
+    if len(captures) < len(expected):
+        failures.append("terrain_translucent_camera_sequence_missing")
+    if names[: len(expected)] != expected:
+        failures.append("terrain_translucent_camera_sequence_wrong_order")
+    positions: list[tuple[float, float, float]] = []
+    for item in captures:
+        if not isinstance(item, dict):
+            continue
+        position = item.get("position")
+        if not isinstance(position, dict):
+            continue
+        x = parse_number(position.get("x"))
+        y = parse_number(position.get("y"))
+        z = parse_number(position.get("z"))
+        if x is None or y is None or z is None:
+            continue
+        positions.append((float(x), float(y), float(z)))
+    unique_positions = {
+        (round(x, 3), round(y, 3), round(z, 3))
+        for x, y, z in positions
+    }
+    horizontal_span = 0.0
+    vertical_span = 0.0
+    if positions:
+        xs = [x for x, _, _ in positions]
+        ys = [y for _, y, _ in positions]
+        zs = [z for _, _, z in positions]
+        horizontal_span = math.hypot(max(xs) - min(xs), max(zs) - min(zs))
+        vertical_span = max(ys) - min(ys)
+    if len(unique_positions) < 5 or horizontal_span < 8.0 or vertical_span < 8.0:
+        failures.append("terrain_translucent_camera_sequence_no_crossing")
+    unique_failures = sorted(set(failures))
+    return {
+        "status": "pass" if not unique_failures else "fail",
+        "failure": unique_failures[0] if unique_failures else None,
+        "failures": unique_failures,
+        "capture_count": len(captures),
+        "pose_sequence": [str(item) for item in pose_sequence],
+        "captured_pose_names": names,
+        "unique_positions": len(unique_positions),
+        "horizontal_span": horizontal_span,
+        "vertical_span": vertical_span,
+    }
+
+
+def static_terrain_translucent_failure_priority(failure: str) -> tuple[int, str]:
+    priority = {
+        "terrain_translucent_sort_reversed": 0,
+        "terrain_translucent_source_sort_mismatch": 1,
+        "terrain_translucent_sort_payload_corrupt": 2,
+        "terrain_translucent_sort_generation_mismatch": 3,
+        "terrain_translucent_sort_section_mismatch": 4,
+        "terrain_translucent_sort_execution_stale": 5,
+        "terrain_translucent_sort_stale": 6,
+        "terrain_translucent_sort_missing": 7,
+        "terrain_translucent_index_invalid": 8,
+        "terrain_translucent_duplicate_primitive": 9,
+        "terrain_translucent_final_order_invalid": 10,
+        "terrain_translucent_section_order_invalid": 11,
+        "terrain_translucent_old_new_overlap": 12,
+        "terrain_translucent_depth_policy_invalid": 13,
+        "terrain_translucent_blend_policy_invalid": 14,
+        "terrain_translucent_cross_world_sort": 15,
+        "terrain_translucent_events_missing": 16,
+    }
+    return (priority.get(failure, 50), failure)
+
+
 def static_terrain_failure_priority(failure: str) -> tuple[int, str]:
     priority = {
         "vertex_stride_invalid": 0,
@@ -1373,13 +1939,17 @@ def static_terrain_failure_priority(failure: str) -> tuple[int, str]:
     return (priority.get(failure, 50), failure)
 
 
-def static_terrain_lifecycle_evidence(
-    diagnostics_doc: dict[str, object] | None,
-    lifecycle_doc: dict[str, object] | None,
-    scenario: str,
-) -> dict[str, object]:
+def static_terrain_base_scenario(scenario: str) -> str:
     scenario = (scenario or "").strip().lower()
-    lifecycle_scenarios = {
+    if not scenario.startswith("translucent-"):
+        return scenario
+    suffix = scenario.removeprefix("translucent-")
+    aliases = {
+        "rapid-edit": "interior-edit",
+        "quiescence-stationary-performance": "steady-state-performance",
+        "moving-camera-performance": "steady-state-performance",
+    }
+    base_scenarios = {
         "interior-edit",
         "boundary-x-edit",
         "boundary-y-edit",
@@ -1404,6 +1974,57 @@ def static_terrain_lifecycle_evidence(
         "memory-cache-soak",
         "steady-state-performance",
     }
+    if suffix in aliases:
+        return aliases[suffix]
+    return suffix if suffix in base_scenarios else scenario
+
+
+def static_terrain_is_translucent_scenario(scenario: str) -> bool:
+    scenario = (scenario or "").strip().lower()
+    return scenario in {"translucent-glass", "translucent-overlap"} or (
+        scenario.startswith("translucent-") and static_terrain_base_scenario(scenario) != scenario
+    )
+
+
+def static_terrain_requires_translucent_camera_sort(scenario: str) -> bool:
+    scenario = (scenario or "").strip().lower()
+    return scenario in {"translucent-overlap", "translucent-moving-camera-performance"}
+
+
+def static_terrain_lifecycle_evidence(
+    diagnostics_doc: dict[str, object] | None,
+    lifecycle_doc: dict[str, object] | None,
+    scenario: str,
+) -> dict[str, object]:
+    scenario = (scenario or "").strip().lower()
+    base_scenario = static_terrain_base_scenario(scenario)
+    lifecycle_scenarios = {
+        "interior-edit",
+        "boundary-x-edit",
+        "boundary-y-edit",
+        "boundary-z-edit",
+        "section-reentry",
+        "resource-reload",
+        "opaque-texture-replacement",
+        "cutout-texture-replacement",
+        "pack-priority-reversal",
+        "missing-atlas-payload",
+        "malformed-png-payload",
+        "partial-texture-update",
+        "translucent-glass",
+        "translucent-overlap",
+        "model-resource-generation-change",
+        "resize-cycle",
+        "swapchain-recreate",
+        "world-unload-reload",
+        "world-different-reload",
+        "view-distance-decrease",
+        "view-distance-increase",
+        "camera-relocation",
+        "return-visited-terrain",
+        "memory-cache-soak",
+        "steady-state-performance",
+    }
     atlas_scenarios = {
         "resource-reload",
         "opaque-texture-replacement",
@@ -1413,6 +2034,10 @@ def static_terrain_lifecycle_evidence(
         "malformed-png-payload",
         "partial-texture-update",
     }
+    zero_before_generation_scenarios = {
+        "translucent-glass",
+        "translucent-overlap",
+    }
     edit_scenarios = {
         "interior-edit",
         "boundary-x-edit",
@@ -1421,7 +2046,7 @@ def static_terrain_lifecycle_evidence(
         "section-reentry",
         "model-resource-generation-change",
     }
-    if scenario not in lifecycle_scenarios:
+    if base_scenario not in lifecycle_scenarios:
         return {"status": "skip", "failure": None}
     failures: list[str] = []
     events: list[object] = []
@@ -1449,15 +2074,16 @@ def static_terrain_lifecycle_evidence(
         failures.append("lifecycle_setup_missing")
     if not after_recorded or stage != "replacement-visible":
         failures.append("lifecycle_replacement_missing")
-    if before_generation == 0 or after_generation == 0:
+    zero_before_allowed = scenario in zero_before_generation_scenarios or static_terrain_is_translucent_scenario(scenario)
+    if after_generation == 0 or (before_generation == 0 and not zero_before_allowed):
         failures.append("lifecycle_generation_missing")
-    elif scenario in (edit_scenarios | atlas_scenarios) and before_generation == after_generation:
+    elif base_scenario in (edit_scenarios | atlas_scenarios) and before_generation == after_generation:
         failures.append("lifecycle_generation_unchanged")
     world_transition_scenarios = {"world-unload-reload", "world-different-reload"}
-    if not edit_block and scenario not in world_transition_scenarios:
+    if not edit_block and base_scenario not in world_transition_scenarios:
         failures.append("lifecycle_edit_block_missing")
     required_reason_prefixes = []
-    if scenario not in world_transition_scenarios:
+    if base_scenario not in world_transition_scenarios:
         required_reason_prefixes.extend(
             [
                 "lifecycle-edit-before",
@@ -1465,31 +2091,31 @@ def static_terrain_lifecycle_evidence(
                 "lifecycle-edit-after",
             ]
         )
-    if scenario == "section-reentry":
+    if base_scenario == "section-reentry":
         required_reason_prefixes.extend(["lifecycle-section-removed", "lifecycle-section-reentry-requested"])
-    if scenario in {"resize-cycle", "swapchain-recreate"}:
+    if base_scenario in {"resize-cycle", "swapchain-recreate"}:
         required_reason_prefixes.extend(["lifecycle-resize-1", "lifecycle-resize-2"])
         resize_count = int(parse_number(lifecycle_doc.get("resizeCount")) or 0) if isinstance(lifecycle_doc, dict) else 0
         if resize_count < 2:
             failures.append("lifecycle_resize_cycle_incomplete")
-    if scenario in {"resource-reload", "pack-priority-reversal"}:
+    if base_scenario in {"resource-reload", "pack-priority-reversal"}:
         required_reason_prefixes.append("lifecycle-resource-reload-started")
-    if scenario == "view-distance-decrease":
+    if base_scenario == "view-distance-decrease":
         required_reason_prefixes.append("lifecycle-view-distance-decreased")
-    if scenario in {"view-distance-increase", "memory-cache-soak", "steady-state-performance"}:
+    if base_scenario in {"view-distance-increase", "memory-cache-soak", "steady-state-performance"}:
         required_reason_prefixes.append("lifecycle-view-distance-increased")
-    if scenario == "camera-relocation":
+    if base_scenario == "camera-relocation":
         required_reason_prefixes.append("lifecycle-camera-relocated")
-    if scenario == "return-visited-terrain":
+    if base_scenario == "return-visited-terrain":
         required_reason_prefixes.extend(["lifecycle-camera-relocated", "lifecycle-return-visited-terrain-away", "lifecycle-return-visited-terrain-back"])
         action_step = int(parse_number(lifecycle_doc.get("actionStep")) or 0) if isinstance(lifecycle_doc, dict) else 0
         if action_step < 2:
             failures.append("lifecycle_return_visit_incomplete")
-    if scenario == "memory-cache-soak":
+    if base_scenario == "memory-cache-soak":
         required_reason_prefixes.append("lifecycle-memory-cache-soak-started")
-    if scenario == "steady-state-performance":
+    if base_scenario == "steady-state-performance":
         required_reason_prefixes.append("lifecycle-steady-state-performance-started")
-    if scenario in {"world-unload-reload", "world-different-reload"}:
+    if base_scenario in {"world-unload-reload", "world-different-reload"}:
         required_reason_prefixes.extend(
             [
                 "lifecycle-world-unload",
@@ -1526,14 +2152,14 @@ def static_terrain_lifecycle_evidence(
             failures.append("lifecycle_world_cumulative_submission_boundary_invalid")
         if reload_generation_a <= 0:
             failures.append("lifecycle_world_a_reload_generation_missing")
-        if scenario == "world-different-reload" and reload_generation_b <= 0:
+        if base_scenario == "world-different-reload" and reload_generation_b <= 0:
             failures.append("lifecycle_world_b_reload_generation_missing")
-    if scenario in {"memory-cache-soak", "steady-state-performance"} and isinstance(lifecycle_doc, dict):
+    if base_scenario in {"memory-cache-soak", "steady-state-performance"} and isinstance(lifecycle_doc, dict):
         before_memory = int(parse_number(lifecycle_doc.get("beforeUsedMemoryBytes")) or 0)
         after_memory = int(parse_number(lifecycle_doc.get("afterUsedMemoryBytes")) or 0)
         if before_memory <= 0 or after_memory <= 0:
             failures.append("lifecycle_memory_measurement_missing")
-    if scenario in atlas_scenarios:
+    if base_scenario in atlas_scenarios:
         diagnostics = diagnostics_doc if isinstance(diagnostics_doc, dict) else {}
         texture_updates = int(parse_number(diagnostics.get("texturePayloadUpdates")) or 0)
         payload_bytes = int(parse_number(diagnostics.get("texturePayloadUpdateBytes")) or 0)
@@ -1544,18 +2170,18 @@ def static_terrain_lifecycle_evidence(
             world_mesh_failures = int(parse_number(world_mesh_metrics.get("failures")) or 0)
         if texture_updates <= 0:
             failures.append("atlas_texture_update_missing")
-        if scenario not in {"missing-atlas-payload", "malformed-png-payload"} and payload_bytes <= 0:
+        if base_scenario not in {"missing-atlas-payload", "malformed-png-payload"} and payload_bytes <= 0:
             failures.append("atlas_payload_bytes_missing")
-        if scenario in {"opaque-texture-replacement", "cutout-texture-replacement", "missing-atlas-payload", "malformed-png-payload", "partial-texture-update"} and texture_only <= 0:
+        if base_scenario in {"opaque-texture-replacement", "cutout-texture-replacement", "missing-atlas-payload", "malformed-png-payload", "partial-texture-update"} and texture_only <= 0:
             failures.append("atlas_texture_only_update_missing")
-        if scenario == "missing-atlas-payload" and int(parse_number(diagnostics.get("atlasMissingPayloadUpdates")) or 0) <= 0:
+        if base_scenario == "missing-atlas-payload" and int(parse_number(diagnostics.get("atlasMissingPayloadUpdates")) or 0) <= 0:
             failures.append("atlas_missing_payload_not_recorded")
-        if scenario == "malformed-png-payload":
+        if base_scenario == "malformed-png-payload":
             if int(parse_number(diagnostics.get("atlasMalformedPayloadUpdates")) or 0) <= 0:
                 failures.append("atlas_malformed_payload_not_recorded")
             if world_mesh_failures <= 0:
                 failures.append("atlas_malformed_rollback_missing")
-        if scenario == "partial-texture-update" and int(parse_number(diagnostics.get("atlasPartialPayloadUpdates")) or 0) <= 0:
+        if base_scenario == "partial-texture-update" and int(parse_number(diagnostics.get("atlasPartialPayloadUpdates")) or 0) <= 0:
             failures.append("atlas_partial_payload_not_recorded")
     lifecycle_fault_prefixes = {
         "lifecycle-fault-old-generation-after-edit": "lifecycle_old_generation_after_edit",
@@ -5155,6 +5781,17 @@ def normalize_capture_artifact(
     static_terrain_geometry = static_terrain_geometry_evidence(
         static_terrain_doc if static_terrain_doc else static_terrain_frame_doc
     )
+    static_terrain_translucent = static_terrain_translucent_evidence(
+        static_terrain_doc if static_terrain_doc else static_terrain_frame_doc,
+        require_camera_sort=static_terrain_requires_translucent_camera_sort(requested_world_static_terrain_scenario)
+        and not requested_world_static_terrain_fault,
+    )
+    static_terrain_translucent_final_order = static_terrain_translucent_final_order_evidence(
+        deterministic_doc
+    )
+    static_terrain_translucent_camera_sequence = static_terrain_translucent_camera_sequence_evidence(
+        deterministic_doc
+    )
     static_terrain_lifecycle = static_terrain_lifecycle_evidence(
         static_terrain_doc if static_terrain_doc else static_terrain_frame_doc,
         static_terrain_lifecycle_doc,
@@ -5193,6 +5830,21 @@ def normalize_capture_artifact(
         "rebuild-loop-detected": "rebuild-loop-detected",
         "cache-eviction-loop": "cache-eviction-loop",
         "atlas-generation-churn": "atlas-generation-churn",
+        "translucent-sort-reversed": "terrain_translucent_sort_reversed",
+        "translucent-sort-stale": "terrain_translucent_sort_stale",
+        "translucent-sort-missing": "terrain_translucent_sort_missing",
+        "translucent-duplicate-primitive": "terrain_translucent_duplicate_primitive",
+        "translucent-index-out-of-range": "terrain_translucent_index_invalid",
+        "translucent-index-type-invalid": "terrain_translucent_index_invalid",
+        "translucent-index-alignment-invalid": "terrain_translucent_index_invalid",
+        "translucent-sort-section-mismatch": "terrain_translucent_sort_section_mismatch",
+        "translucent-old-new-overlap": "terrain_translucent_old_new_overlap",
+        "translucent-section-order-reversed": "terrain_translucent_section_order_invalid",
+        "translucent-depth-write-enabled": "terrain_translucent_depth_policy_invalid",
+        "translucent-opaque-blend": "terrain_translucent_blend_policy_invalid",
+        "translucent-cross-world-sort": "terrain_translucent_cross_world_sort",
+        "translucent-source-sort-mismatch": "terrain_translucent_source_sort_mismatch",
+        "translucent-sort-payload-corrupt": "terrain_translucent_sort_payload_corrupt",
     }
     static_terrain_expected_fault = static_terrain_fault_expectations.get(
         (requested_world_static_terrain_fault or "").strip().lower()
@@ -6024,9 +6676,42 @@ def normalize_capture_artifact(
                     "deterministic static-terrain lifecycle gate failed: "
                     f"{static_terrain_lifecycle.get('failure') or 'unknown'}"
                 )
+            if (
+                deterministic_static_terrain_gate_required
+                and static_terrain_scenario.startswith("translucent")
+                and static_terrain_translucent.get("status") != "pass"
+            ):
+                static_terrain_workload_complete = False
+                validation_messages.append(
+                    "deterministic static-terrain translucent gate failed: "
+                    f"{static_terrain_translucent.get('failure') or 'unknown'}"
+                )
+            if (
+                deterministic_static_terrain_gate_required
+                and static_terrain_requires_translucent_camera_sort(static_terrain_scenario)
+                and not requested_world_static_terrain_fault
+                and static_terrain_translucent_camera_sequence.get("status") != "pass"
+            ):
+                static_terrain_workload_complete = False
+                validation_messages.append(
+                    "deterministic static-terrain translucent camera-crossing gate failed: "
+                    f"{static_terrain_translucent_camera_sequence.get('failure') or 'unknown'}"
+                )
+            if (
+                deterministic_static_terrain_gate_required
+                and static_terrain_requires_translucent_camera_sort(static_terrain_scenario)
+                and not requested_world_static_terrain_fault
+                and static_terrain_translucent_final_order.get("status") != "pass"
+            ):
+                static_terrain_workload_complete = False
+                validation_messages.append(
+                    "deterministic static-terrain translucent final-order gate failed: "
+                    f"{static_terrain_translucent_final_order.get('failure') or 'unknown'}"
+                )
             if requested_world_static_terrain_fault:
                 failures_for_fault = set(static_terrain_geometry.get("failures") or [])
                 failures_for_fault.update(static_terrain_lifecycle.get("failures") or [])
+                failures_for_fault.update(static_terrain_translucent.get("failures") or [])
                 performance_classification = (
                     str(static_terrain_performance_doc.get("classification") or "").strip().lower()
                     if isinstance(static_terrain_performance_doc, dict)
@@ -6954,6 +7639,9 @@ def normalize_capture_artifact(
                 "world_static_terrain_submitted_work": static_terrain_submitted_count,
                 "world_static_terrain_diagnostics": static_terrain_doc if static_terrain_doc else static_terrain_frame_doc,
                 "world_static_terrain_geometry_evidence": static_terrain_geometry,
+                "world_static_terrain_translucent_evidence": static_terrain_translucent,
+                "world_static_terrain_translucent_final_order": static_terrain_translucent_final_order,
+                "world_static_terrain_translucent_camera_sequence": static_terrain_translucent_camera_sequence,
                 "world_static_terrain_lifecycle": static_terrain_lifecycle_doc,
                 "world_static_terrain_lifecycle_evidence": static_terrain_lifecycle,
                 "world_mesh_block_display_scenario": requested_world_mesh_block_display_scenario or None,
@@ -8413,7 +9101,11 @@ def build_capture_command(
     validation = "standard" if mode.supports_validation and requested_validation != "off" else "off"
     static_terrain_second_world = (
         getattr(args, "world_static_terrain_second_world", "")
-        or (f"{args.world}-different" if getattr(args, "world_static_terrain_scenario", "") == "world-different-reload" else "")
+        or (
+            f"{args.world}-different"
+            if static_terrain_base_scenario(getattr(args, "world_static_terrain_scenario", "")) == "world-different-reload"
+            else ""
+        )
     )
     base_client_args = args.client_args
     for option in ("--quickPlaySingleplayer", "--width", "--height"):
@@ -8816,7 +9508,7 @@ def build_capture_command(
         java_options.append(f"-Dmattmc.dev.rustGalStaticTerrain.worldId={args.world}")
         if static_terrain_second_world:
             java_options.append(f"-Dmattmc.dev.rustGalStaticTerrain.worldB={static_terrain_second_world}")
-        if args.world_static_terrain_scenario == "world-different-reload":
+        if static_terrain_base_scenario(args.world_static_terrain_scenario) == "world-different-reload":
             env["MATTMC_WORLD_STATIC_TERRAIN_NEEDS_SECOND_WORLD"] = "true"
         if getattr(args, "world_static_terrain_fault", ""):
             java_options.append(f"-Dmattmc.dev.rustGalStaticTerrain.fault={args.world_static_terrain_fault}")
@@ -8829,7 +9521,10 @@ def build_capture_command(
             java_options.append("-Dmattmc.dev.deterministicCameraCapture.settledReadyFamilies=static-terrain")
             java_options.append("-Dmattmc.dev.deterministicCameraCapture.settledReadyFrames=3")
             java_options.append("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=1")
-            java_options.append("-Dmattmc.dev.deterministicCameraCapture.poseCount=1")
+            if static_terrain_requires_translucent_camera_sort(args.world_static_terrain_scenario):
+                java_options.append("-Dmattmc.dev.deterministicCameraCapture.poseCount=7")
+            else:
+                java_options.append("-Dmattmc.dev.deterministicCameraCapture.poseCount=1")
             java_options.append("-Dmattmc.dev.deterministicCameraCapture.yawDelta=18.0")
         elif tool_kind == "gameplay":
             java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.displayFpsCheckEnabled=false")
@@ -8992,6 +9687,7 @@ def shader_gbuffer_report_status(report: dict[str, object] | None) -> tuple[str,
         "vulkanic:pass/terrain_opaque",
         "vulkanic:pass/terrain_cutout",
         "vulkanic:pass/deferred_lighting",
+        "vulkanic:pass/terrain_translucent",
         "vulkanic:pass/composite_0",
         "vulkanic:pass/composite_1",
         "vulkanic:pass/final_output",
@@ -10743,6 +11439,22 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
                 "missing-atlas-payload",
                 "malformed-png-payload",
                 "partial-texture-update",
+                "translucent-glass",
+                "translucent-overlap",
+                "translucent-interior-edit",
+                "translucent-boundary-x-edit",
+                "translucent-boundary-y-edit",
+                "translucent-boundary-z-edit",
+                "translucent-rapid-edit",
+                "translucent-section-reentry",
+                "translucent-resize-cycle",
+                "translucent-swapchain-recreate",
+                "translucent-world-unload-reload",
+                "translucent-world-different-reload",
+                "translucent-view-distance-decrease",
+                "translucent-view-distance-increase",
+                "translucent-quiescence-stationary-performance",
+                "translucent-moving-camera-performance",
                 "model-resource-generation-change",
                 "resize-cycle",
                 "swapchain-recreate",
@@ -10799,6 +11511,21 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
                 "rebuild-loop-detected",
                 "cache-eviction-loop",
                 "atlas-generation-churn",
+                "translucent-sort-reversed",
+                "translucent-sort-stale",
+                "translucent-sort-missing",
+                "translucent-duplicate-primitive",
+                "translucent-index-out-of-range",
+                "translucent-index-type-invalid",
+                "translucent-index-alignment-invalid",
+                "translucent-sort-section-mismatch",
+                "translucent-old-new-overlap",
+                "translucent-section-order-reversed",
+                "translucent-depth-write-enabled",
+                "translucent-opaque-blend",
+                "translucent-cross-world-sort",
+                "translucent-source-sort-mismatch",
+                "translucent-sort-payload-corrupt",
             ),
             default=os.environ.get("MATTMC_WORLD_STATIC_TERRAIN_FAULT", ""),
             help="Diagnostic-only static-terrain geometry fault injection for harness anvil tests.",

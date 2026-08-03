@@ -30,7 +30,8 @@ use super::resources::{
 use super::shader_pack::programs::{
     minimal_direct_terrain_cutout_program, minimal_direct_terrain_solid_program,
     minimal_shadow_depth_program, minimal_terrain_cutout_program, minimal_terrain_solid_program,
-    shader_stage_code_for_backend, CompositeProgram, TerrainMaterialProgram,
+    minimal_terrain_translucent_program, shader_stage_code_for_backend, CompositeProgram,
+    TerrainMaterialProgram,
 };
 use super::shader_pack::runtime::{
     ShaderPackRuntimeExecutor, TerrainCompositeUniforms, TerrainMaterialPassMode, TerrainMeshDraw,
@@ -54,6 +55,7 @@ pub const WORLD_DEPTH_POLICY_TEST_WRITE: u32 = 1;
 pub const WORLD_DEPTH_POLICY_TEST_NO_WRITE: u32 = 2;
 pub const WORLD_MATERIAL_MODE_OPAQUE: u32 = 1;
 pub const WORLD_MATERIAL_MODE_CUTOUT: u32 = 2;
+pub const WORLD_MATERIAL_MODE_TRANSLUCENT: u32 = 3;
 pub const WORLD_TOPOLOGY_TRIANGLES: u32 = 1;
 pub const WORLD_CULL_NONE: u32 = 0;
 pub const WORLD_CULL_BACK: u32 = 1;
@@ -92,6 +94,7 @@ pub const WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_15: u32 = 0x0194_76c0;
 pub const WORLD_MATERIAL_TEXTURE_DEFAULT: u32 = WORLD_MATERIAL_TEXTURE_STONE;
 pub const WORLD_MATERIAL_ID_OPAQUE_TEXTURED: u32 = 0x6a2f_d335;
 pub const WORLD_MATERIAL_ID_CUTOUT_TEXTURED: u32 = 0x129b_1b90;
+pub const WORLD_MATERIAL_ID_TRANSLUCENT_TEXTURED: u32 = 0x4d21_a7c3;
 pub const WORLD_MATERIAL_ID_BLOCK_MARKER_CUTOUT: u32 = 0x224a_8659;
 pub const WORLD_MATERIAL_ID_DEFAULT_OPAQUE: u32 = WORLD_MATERIAL_ID_OPAQUE_TEXTURED;
 pub const WORLD_MATERIAL_ID_DEFAULT_CUTOUT: u32 = WORLD_MATERIAL_ID_CUTOUT_TEXTURED;
@@ -469,6 +472,15 @@ pub struct WorldMeshAsset {
 }
 
 #[derive(Clone, Debug)]
+pub struct WorldMeshSortedIndexUpdate {
+    pub mesh_key: u64,
+    pub mesh_generation: u64,
+    pub index_generation: u64,
+    pub index_type: IndexType,
+    pub index_bytes: Vec<u8>,
+}
+
+#[derive(Clone, Debug)]
 pub struct WorldMeshTextureAssetPayload {
     pub texture_id: u32,
     pub png_bytes: Vec<u8>,
@@ -635,11 +647,13 @@ struct GBufferResources {
     shadow_target: Handle,
     target: Handle,
     deferred_lit_target: Handle,
+    translucent_target: Handle,
     composite0_target: Handle,
     composite1_target: Handle,
     shadow_pass: Handle,
     g_buffer_pass: Handle,
     deferred_lighting_pass: Handle,
+    translucent_pass: Handle,
     composite0_pass: Handle,
     composite1_pass: Handle,
     composite_uniform_buffer: Handle,
@@ -803,6 +817,7 @@ struct MeshPipelineResourceKey {
 
 struct MeshAssetStore {
     mesh_generation: u64,
+    index_generation: u64,
     vertex_bytes: Vec<u8>,
     index_bytes: Vec<u8>,
     index_type: IndexType,
@@ -934,11 +949,13 @@ impl GBufferResources {
             self.composite_uniform_buffer,
             self.composite1_pass,
             self.composite0_pass,
+            self.translucent_pass,
             self.deferred_lighting_pass,
             self.g_buffer_pass,
             self.shadow_pass,
             self.composite1_target,
             self.composite0_target,
+            self.translucent_target,
             self.deferred_lit_target,
             self.target,
             self.shadow_target,
@@ -1282,7 +1299,25 @@ impl WorldPrimitiveFrontend {
         meshes: Vec<WorldMeshAsset>,
         textures: Vec<WorldMeshTextureAssetPayload>,
     ) -> GalResult<()> {
-        let result = self.apply_world_mesh_asset_update_inner(gal, generation, meshes, textures);
+        self.apply_world_mesh_asset_update_with_sorted(
+            gal,
+            generation,
+            meshes,
+            textures,
+            Vec::new(),
+        )
+    }
+
+    pub fn apply_world_mesh_asset_update_with_sorted(
+        &mut self,
+        gal: &mut VulkanicGal,
+        generation: u64,
+        meshes: Vec<WorldMeshAsset>,
+        textures: Vec<WorldMeshTextureAssetPayload>,
+        sorted_indices: Vec<WorldMeshSortedIndexUpdate>,
+    ) -> GalResult<()> {
+        let result =
+            self.apply_world_mesh_asset_update_inner(gal, generation, meshes, textures, sorted_indices);
         if result.is_err() {
             self.mesh_asset_update_failures = self.mesh_asset_update_failures.saturating_add(1);
         }
@@ -1295,6 +1330,7 @@ impl WorldPrimitiveFrontend {
         generation: u64,
         meshes: Vec<WorldMeshAsset>,
         textures: Vec<WorldMeshTextureAssetPayload>,
+        sorted_indices: Vec<WorldMeshSortedIndexUpdate>,
     ) -> GalResult<()> {
         if generation == 0 {
             return Err(GalError::ffi(
@@ -1365,6 +1401,7 @@ impl WorldPrimitiveFrontend {
                 mesh.mesh_key,
                 MeshAssetStore {
                     mesh_generation: mesh.mesh_generation,
+                    index_generation: 0,
                     vertex_bytes: packed_mesh_vertices(&mesh.vertices),
                     index_bytes: mesh.index_bytes,
                     index_type: mesh.index_type,
@@ -1372,6 +1409,10 @@ impl WorldPrimitiveFrontend {
                 },
             ));
         }
+        let decoded_sorted_indices = sorted_indices
+            .into_iter()
+            .map(|update| validate_mesh_sorted_index_update(&update).map(|_| update))
+            .collect::<GalResult<Vec<_>>>()?;
         let stale_resource_keys: Vec<MeshResourceKey> = self
             .mesh_resources
             .keys()
@@ -1399,6 +1440,9 @@ impl WorldPrimitiveFrontend {
         }
         for (mesh_key, asset) in decoded_meshes {
             self.mesh_assets.insert(mesh_key, asset);
+        }
+        for update in decoded_sorted_indices {
+            self.apply_mesh_sorted_index_update(gal, update)?;
         }
         Ok(())
     }
@@ -3204,6 +3248,7 @@ impl WorldPrimitiveFrontend {
         );
         let mut created = Vec::new();
         let result = (|| -> GalResult<MeshPipelineResources> {
+            let is_translucent = key.material_mode == WORLD_MATERIAL_MODE_TRANSLUCENT;
             let terrain_program = terrain_program_for_mode(key.material_mode, key.g_buffer)?;
             let vertex_shader = gal.create_shader_module(ShaderModuleDesc {
                 label: format!("{label}.vertex"),
@@ -3224,7 +3269,7 @@ impl WorldPrimitiveFrontend {
                 entry_point: terrain_program.fragment.entry_point.clone(),
             })?;
             created.push(fragment_shader);
-            let (shadow_vertex_shader, shadow_fragment_shader) = if key.g_buffer {
+            let (shadow_vertex_shader, shadow_fragment_shader) = if key.g_buffer && !is_translucent {
                 let shadow_program = minimal_shadow_depth_program();
                 let shadow_vertex_shader = gal.create_shader_module(ShaderModuleDesc {
                     label: format!("{label}.shadow.vertex"),
@@ -3299,13 +3344,21 @@ impl WorldPrimitiveFrontend {
                 fragment_shader,
                 topology: PrimitiveTopology::Triangles,
                 cull_mode: effective_cull_mode_for_winding(key.cull_policy, key.winding)?,
-                blend: BlendMode::Disabled,
+                blend: if is_translucent {
+                    BlendMode::Alpha
+                } else {
+                    BlendMode::Disabled
+                },
                 depth_compare: depth_compare_for_policy(key.depth_policy)?,
-                depth_write: key.depth_policy == WORLD_DEPTH_POLICY_TEST_WRITE,
-                color_formats: if key.g_buffer {
+                depth_write: key.depth_policy == WORLD_DEPTH_POLICY_TEST_WRITE && !is_translucent,
+                color_formats: if key.g_buffer && !is_translucent {
                     vec![TextureFormat::Rgba8Unorm; 4]
                 } else {
-                    vec![key.color_format]
+                    vec![if key.g_buffer {
+                        TextureFormat::Rgba8Unorm
+                    } else {
+                        key.color_format
+                    }]
                 },
                 depth_format: Some(TextureFormat::Depth32Float),
             })?;
@@ -3621,6 +3674,69 @@ impl WorldPrimitiveFrontend {
                 ],
             })],
         })?;
+        Ok(())
+    }
+
+    fn apply_mesh_sorted_index_update(
+        &mut self,
+        gal: &mut VulkanicGal,
+        update: WorldMeshSortedIndexUpdate,
+    ) -> GalResult<()> {
+        let asset = self.mesh_assets.get_mut(&update.mesh_key).ok_or_else(|| {
+            GalError::invalid_argument(format!(
+                "world mesh sorted index update references unknown mesh key {}",
+                update.mesh_key
+            ))
+        })?;
+        if asset.mesh_generation != update.mesh_generation {
+            return Err(GalError::invalid_argument(format!(
+                "world mesh sorted index update generation {} does not match mesh {} generation {}",
+                update.mesh_generation, update.mesh_key, asset.mesh_generation
+            )));
+        }
+        if update.index_generation <= asset.index_generation {
+            return Err(GalError::invalid_argument(format!(
+                "stale world mesh sorted index generation {} for mesh {}; current is {}",
+                update.index_generation, update.mesh_key, asset.index_generation
+            )));
+        }
+        validate_mesh_sorted_index_payload(asset, &update)?;
+        let old_index_len = asset.index_bytes.len();
+        asset.index_generation = update.index_generation;
+        asset.index_type = update.index_type;
+        asset.index_bytes = update.index_bytes.clone();
+        let matching_keys = self
+            .mesh_resources
+            .keys()
+            .copied()
+            .filter(|key| key.mesh_key == update.mesh_key)
+            .collect::<Vec<_>>();
+        if old_index_len != update.index_bytes.len() {
+            self.destroy_mesh_resources_for_keys(gal, matching_keys);
+            return Ok(());
+        }
+        for key in matching_keys {
+            if let Some(resources) = self.mesh_resources.get(&key) {
+                gal.submit(SubmissionBatch {
+                    label: "world-mesh.sorted-index-update".to_string(),
+                    command_lists: vec![CommandList::from(CommandListDesc {
+                        label: "world-mesh.sorted-index-update.commands".to_string(),
+                        operations: vec![
+                            CommandOp::HostWriteBuffer {
+                                buffer: resources.index_buffer,
+                                offset: 0,
+                                data: update.index_bytes.clone(),
+                            },
+                            CommandOp::Barrier(buffer_barrier(
+                                resources.index_buffer,
+                                TextureUsageState::TransferDst,
+                                TextureUsageState::IndexRead,
+                            )),
+                        ],
+                    })],
+                })?;
+            }
+        }
         Ok(())
     }
 
@@ -3985,6 +4101,13 @@ impl WorldPrimitiveFrontend {
                 extent,
             })?;
             created.push(deferred_lit_target);
+            let translucent_target = gal.create_render_target(RenderTargetDesc {
+                label: format!("{label}.translucent-target"),
+                color_views: vec![deferred_lit_view],
+                depth_stencil_view: Some(depth_view),
+                extent,
+            })?;
+            created.push(translucent_target);
             let composite0_target = gal.create_render_target(RenderTargetDesc {
                 label: format!("{label}.composite-0-target"),
                 color_views: vec![composite0_view],
@@ -4020,6 +4143,13 @@ impl WorldPrimitiveFrontend {
                 depth_format: None,
             })?;
             created.push(deferred_lighting_pass);
+            let translucent_pass = gal.create_render_pass(RenderPassDesc {
+                label: format!("{label}.translucent-pass"),
+                target: translucent_target,
+                color_formats: vec![TextureFormat::Rgba8Unorm],
+                depth_format: Some(TextureFormat::Depth32Float),
+            })?;
+            created.push(translucent_pass);
             let composite0_pass = gal.create_render_pass(RenderPassDesc {
                 label: format!("{label}.composite-0-pass"),
                 target: composite0_target,
@@ -4211,11 +4341,13 @@ impl WorldPrimitiveFrontend {
                 shadow_target,
                 target,
                 deferred_lit_target,
+                translucent_target,
                 composite0_target,
                 composite1_target,
                 shadow_pass,
                 g_buffer_pass,
                 deferred_lighting_pass,
+                translucent_pass,
                 composite0_pass,
                 composite1_pass,
                 composite_uniform_buffer,
@@ -4682,6 +4814,76 @@ fn validate_mesh_asset(mesh: &WorldMeshAsset) -> GalResult<()> {
     Ok(())
 }
 
+fn validate_mesh_sorted_index_update(update: &WorldMeshSortedIndexUpdate) -> GalResult<()> {
+    if update.mesh_key == 0 || update.mesh_generation == 0 || update.index_generation == 0 {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            "world mesh sorted index update key and generations must be non-zero",
+        ));
+    }
+    if update.index_bytes.is_empty() || update.index_bytes.len() > WORLD_MAX_MESH_INDEX_BYTES {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            format!(
+                "world mesh sorted index bytes {} must be 1..={}",
+                update.index_bytes.len(),
+                WORLD_MAX_MESH_INDEX_BYTES
+            ),
+        ));
+    }
+    let index_size = index_stride(update.index_type) as usize;
+    if update.index_bytes.len() % index_size != 0 {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            "world mesh sorted index bytes are not aligned to index type",
+        ));
+    }
+    Ok(())
+}
+
+fn validate_mesh_sorted_index_payload(
+    asset: &MeshAssetStore,
+    update: &WorldMeshSortedIndexUpdate,
+) -> GalResult<()> {
+    let index_size = index_stride(update.index_type) as usize;
+    let index_count = update.index_bytes.len() / index_size;
+    let vertex_count = asset.vertex_bytes.len() / WORLD_MESH_GPU_VERTEX_BYTES;
+    for section in &asset.sections {
+        if section.index_offset as usize % index_size != 0 {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                "world mesh sorted section index offset is not aligned",
+            ));
+        }
+        let start = (section.index_offset as usize)
+            .checked_div(index_size)
+            .ok_or_else(|| GalError::invalid_argument("invalid world mesh sorted index offset"))?;
+        let end = start
+            .checked_add(section.index_count as usize)
+            .ok_or_else(|| {
+                GalError::invalid_argument("world mesh sorted section index range overflow")
+            })?;
+        if end > index_count {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                "world mesh sorted section index range exceeds index payload",
+            ));
+        }
+        for index in start..end {
+            let vertex_index = mesh_index_value(&update.index_bytes, update.index_type, index)?;
+            if vertex_index >= vertex_count as u32 {
+                return Err(GalError::ffi(
+                    StatusCode::InvalidArgument,
+                    format!(
+                        "world mesh sorted index references vertex {vertex_index} but mesh has {vertex_count} vertices",
+                    ),
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
 fn mesh_index_value(index_bytes: &[u8], index_type: IndexType, index: usize) -> GalResult<u32> {
     match index_type {
         IndexType::U16 => {
@@ -5013,6 +5215,7 @@ fn mesh_batches(
                 section,
                 instance.mesh_section_index,
                 instance.cull_policy,
+                asset.mesh_generation,
                 color_format,
                 g_buffer,
             );
@@ -5051,6 +5254,7 @@ fn compatible_mesh_section_ranges(
         first,
         0,
         first.cull_policy,
+        asset.mesh_generation,
         color_format,
         g_buffer,
     );
@@ -5063,6 +5267,7 @@ fn compatible_mesh_section_ranges(
             section,
             section_index as u32,
             section.cull_policy,
+            asset.mesh_generation,
             color_format,
             g_buffer,
         );
@@ -5162,6 +5367,7 @@ fn mesh_key_for_section(
     section: &WorldMeshSection,
     section_index: u32,
     cull_policy: u32,
+    resource_generation: u64,
     color_format: ColorFormat,
     g_buffer: bool,
 ) -> MeshResourceKey {
@@ -5169,7 +5375,7 @@ fn mesh_key_for_section(
         g_buffer,
         stratum: instance.stratum,
         mesh_key: instance.mesh_key,
-        mesh_generation: instance.mesh_generation,
+        mesh_generation: resource_generation,
         section_index,
         material_id: section.material_id,
         texture_id: section.texture_id,
@@ -5796,6 +6002,7 @@ fn terrain_material_pass_mode(material_mode: u32) -> GalResult<TerrainMaterialPa
     match material_mode {
         WORLD_MATERIAL_MODE_OPAQUE => Ok(TerrainMaterialPassMode::Opaque),
         WORLD_MATERIAL_MODE_CUTOUT => Ok(TerrainMaterialPassMode::Cutout),
+        WORLD_MATERIAL_MODE_TRANSLUCENT => Ok(TerrainMaterialPassMode::Translucent),
         other => Err(GalError::invalid_argument(format!(
             "unsupported terrain material pass mode {other}"
         ))),
@@ -5829,6 +6036,8 @@ fn terrain_runtime_targets(
         deferred_lighting_pass: resources.deferred_lighting_pass,
         deferred_lighting_pipeline: resources.deferred_lighting_pipeline,
         deferred_lighting_resource_set: resources.deferred_lighting_resource_set,
+        translucent_target: resources.translucent_target,
+        translucent_pass: resources.translucent_pass,
         composite0_texture: resources.composite0_texture,
         composite0_view: resources.composite0_view,
         composite0_target: resources.composite0_target,
@@ -5883,8 +6092,10 @@ fn terrain_program_for_mode(
     match (material_mode, g_buffer) {
         (WORLD_MATERIAL_MODE_OPAQUE, true) => Ok(minimal_terrain_solid_program()),
         (WORLD_MATERIAL_MODE_CUTOUT, true) => Ok(minimal_terrain_cutout_program()),
+        (WORLD_MATERIAL_MODE_TRANSLUCENT, true) => Ok(minimal_terrain_translucent_program()),
         (WORLD_MATERIAL_MODE_OPAQUE, false) => Ok(minimal_direct_terrain_solid_program()),
         (WORLD_MATERIAL_MODE_CUTOUT, false) => Ok(minimal_direct_terrain_cutout_program()),
+        (WORLD_MATERIAL_MODE_TRANSLUCENT, false) => Ok(minimal_terrain_translucent_program()),
         _ => Err(GalError::ffi(
             StatusCode::UnknownEnum,
             format!("unknown world mesh material mode {material_mode}"),
@@ -6922,6 +7133,84 @@ mod tests {
             .unwrap();
         assert_eq!(1, stats.mesh_cache_hits);
         assert_eq!(0, stats.mesh_cache_misses);
+    }
+
+    #[test]
+    fn world_mesh_sorted_index_updates_replace_index_payload_without_changing_instance_generation() {
+        let mut gal = gal();
+        let target = frame_target(&mut gal, 1, 128, 128);
+        let mut frontend = WorldPrimitiveFrontend::default();
+        frontend
+            .apply_world_mesh_asset_update(
+                &mut gal,
+                1,
+                vec![mesh_asset(81, 1, IndexType::U16)],
+                Vec::new(),
+            )
+            .unwrap();
+        let malformed = frontend.apply_world_mesh_asset_update_with_sorted(
+            &mut gal,
+            2,
+            Vec::new(),
+            Vec::new(),
+            vec![WorldMeshSortedIndexUpdate {
+                mesh_key: 81,
+                mesh_generation: 1,
+                index_generation: 1,
+                index_type: IndexType::U16,
+                index_bytes: vec![0, 0, 1],
+            }],
+        );
+        assert!(malformed.is_err());
+        let out_of_range = frontend.apply_world_mesh_asset_update_with_sorted(
+            &mut gal,
+            3,
+            Vec::new(),
+            Vec::new(),
+            vec![WorldMeshSortedIndexUpdate {
+                mesh_key: 81,
+                mesh_generation: 1,
+                index_generation: 1,
+                index_type: IndexType::U16,
+                index_bytes: vec![0, 0, 99, 0, 1, 0, 2, 0, 3, 0, 0, 0],
+            }],
+        );
+        assert!(out_of_range.is_err());
+        frontend
+            .apply_world_mesh_asset_update_with_sorted(
+                &mut gal,
+                4,
+                Vec::new(),
+                Vec::new(),
+                vec![WorldMeshSortedIndexUpdate {
+                    mesh_key: 81,
+                    mesh_generation: 1,
+                    index_generation: 2,
+                    index_type: IndexType::U16,
+                    index_bytes: vec![0, 0, 2, 0, 1, 0, 2, 0, 3, 0, 0, 0],
+                }],
+            )
+            .unwrap();
+        let stale = frontend.apply_world_mesh_asset_update_with_sorted(
+            &mut gal,
+            5,
+            Vec::new(),
+            Vec::new(),
+            vec![WorldMeshSortedIndexUpdate {
+                mesh_key: 81,
+                mesh_generation: 1,
+                index_generation: 2,
+                index_type: IndexType::U16,
+                index_bytes: vec![0, 0, 1, 0, 2, 0],
+            }],
+        );
+        assert!(stale.is_err());
+
+        let mut frame = frame(Vec::new());
+        frame.mesh_instances.push(mesh_instance(81, 1));
+        let (_ops, stats) = frontend.append_frame_ops(&mut gal, 1, target, frame).unwrap();
+        assert_eq!(1, stats.mesh_instance_count);
+        assert_eq!(1, stats.mesh_draw_count);
     }
 
     #[test]
@@ -9937,7 +10226,7 @@ mod tests {
             .map(|frame| frame.stats.mesh_draw_count)
             .sum::<u64>();
         let json = format!(
-            "{{\n  \"artifact_class\":\"rust_owned_shader_pack_mesh_conformance\",\n  \"backend\":\"{}\",\n  \"shader_pack_generation\":1,\n  \"shader_config_schema\":1,\n  \"pass_graph_generation\":3,\n  \"semantic_request_hash\":\"{:08x}\",\n  \"pass_graph\":\"vulkanic:builtin/terrain_material_multipass_v1\",\n  \"passes\":[\"vulkanic:pass/shadow_depth\",\"vulkanic:pass/terrain_opaque\",\"vulkanic:pass/terrain_cutout\",\"vulkanic:pass/deferred_lighting\",\"vulkanic:pass/composite_0\",\"vulkanic:pass/composite_1\",\"vulkanic:pass/final_output\"],\n  \"executed_pass_order\":[\"shadow_depth\",\"terrain_opaque\",\"terrain_cutout\",\"deferred_lighting\",\"composite_0_color_grade\",\"composite_1_depth_fog\",\"final_output\"],\n  \"g_buffer_attachments\":[\"shadow_depth\",\"albedo\",\"normal\",\"material_light\",\"world_position\",\"depth\",\"deferred_lit\",\"composite_0\",\"composite_1\"],\n  \"attachment_formats\":{{\"shadow_depth\":\"Depth32Float\",\"albedo\":\"Rgba8Unorm\",\"normal\":\"Rgba8Unorm\",\"material_light\":\"Rgba8Unorm\",\"world_position\":\"Rgba8Unorm\",\"depth\":\"Depth32Float\",\"deferred_lit\":\"Rgba8Unorm\",\"composite_0\":\"Rgba8Unorm\",\"composite_1\":\"Rgba8Unorm\",\"final_composite\":\"Rgba8Unorm\"}},\n  \"attachment_extents\":{{\"width\":{},\"height\":{}}},\n  \"attachment_hashes\":{{{}}},\n  \"attachment_semantic_evidence\":{},\n  \"shadow_dependency_evidence\":{},\n  \"composite_dependency_perturbations\":{},\n  \"composite_chain_evidence\":{},\n  \"final_presentation_owner\":\"rust-backend-owned-target\",\n  \"rust_owned_color_attachment\":true,\n  \"rust_owned_depth_attachment\":true,\n  \"rust_owned_shadow_attachment\":true,\n  \"java_iris_participation\":false,\n  \"width\":{},\n  \"height\":{},\n  \"airborne_frame_hashes\":[{}],\n  \"rollback_hash\":\"{:08x}\",\n  \"reloaded_hash\":\"{:08x}\",\n  \"rollback_preserved_last_valid_generation\":{},\n  \"crop_names\":[{}],\n  \"frame0_feature_non_clear\":{{{}}},\n  \"mesh_instance_count\":{},\n  \"mesh_batch_count\":{},\n  \"mesh_draw_count\":{},\n  \"mesh_cache_hits\":{},\n  \"mesh_cache_misses\":{},\n  \"mesh_asset_payload_bytes\":{},\n  \"screenshots\":[\"full-airborne-frame-0.png\",\"full-airborne-frame-1.png\",\"full-airborne-frame-2.png\",\"full-airborne-frame-3.png\",\"full-airborne-frame-4.png\",\"full-rollback.png\",\"full-reloaded.png\"],\n  \"attachment_dumps\":[\"attachment-shadow_depth.png\",\"attachment-shadow_depth.raw\",\"attachment-albedo.png\",\"attachment-normal.png\",\"attachment-material_light.png\",\"attachment-world_position.png\",\"attachment-depth.png\",\"attachment-depth.raw\",\"attachment-deferred_lit.png\",\"attachment-composite_0.png\",\"attachment-composite_1.png\",\"attachment-final_composite.png\"]\n}}\n",
+            "{{\n  \"artifact_class\":\"rust_owned_shader_pack_mesh_conformance\",\n  \"backend\":\"{}\",\n  \"shader_pack_generation\":1,\n  \"shader_config_schema\":1,\n  \"pass_graph_generation\":3,\n  \"semantic_request_hash\":\"{:08x}\",\n  \"pass_graph\":\"vulkanic:builtin/terrain_material_multipass_v1\",\n  \"passes\":[\"vulkanic:pass/shadow_depth\",\"vulkanic:pass/terrain_opaque\",\"vulkanic:pass/terrain_cutout\",\"vulkanic:pass/deferred_lighting\",\"vulkanic:pass/terrain_translucent\",\"vulkanic:pass/composite_0\",\"vulkanic:pass/composite_1\",\"vulkanic:pass/final_output\"],\n  \"executed_pass_order\":[\"shadow_depth\",\"terrain_opaque\",\"terrain_cutout\",\"deferred_lighting\",\"terrain_translucent\",\"composite_0_color_grade\",\"composite_1_depth_fog\",\"final_output\"],\n  \"g_buffer_attachments\":[\"shadow_depth\",\"albedo\",\"normal\",\"material_light\",\"world_position\",\"depth\",\"deferred_lit\",\"composite_0\",\"composite_1\"],\n  \"attachment_formats\":{{\"shadow_depth\":\"Depth32Float\",\"albedo\":\"Rgba8Unorm\",\"normal\":\"Rgba8Unorm\",\"material_light\":\"Rgba8Unorm\",\"world_position\":\"Rgba8Unorm\",\"depth\":\"Depth32Float\",\"deferred_lit\":\"Rgba8Unorm\",\"composite_0\":\"Rgba8Unorm\",\"composite_1\":\"Rgba8Unorm\",\"final_composite\":\"Rgba8Unorm\"}},\n  \"attachment_extents\":{{\"width\":{},\"height\":{}}},\n  \"attachment_hashes\":{{{}}},\n  \"attachment_semantic_evidence\":{},\n  \"shadow_dependency_evidence\":{},\n  \"composite_dependency_perturbations\":{},\n  \"composite_chain_evidence\":{},\n  \"final_presentation_owner\":\"rust-backend-owned-target\",\n  \"rust_owned_color_attachment\":true,\n  \"rust_owned_depth_attachment\":true,\n  \"rust_owned_shadow_attachment\":true,\n  \"java_iris_participation\":false,\n  \"width\":{},\n  \"height\":{},\n  \"airborne_frame_hashes\":[{}],\n  \"rollback_hash\":\"{:08x}\",\n  \"reloaded_hash\":\"{:08x}\",\n  \"rollback_preserved_last_valid_generation\":{},\n  \"crop_names\":[{}],\n  \"frame0_feature_non_clear\":{{{}}},\n  \"mesh_instance_count\":{},\n  \"mesh_batch_count\":{},\n  \"mesh_draw_count\":{},\n  \"mesh_cache_hits\":{},\n  \"mesh_cache_misses\":{},\n  \"mesh_asset_payload_bytes\":{},\n  \"screenshots\":[\"full-airborne-frame-0.png\",\"full-airborne-frame-1.png\",\"full-airborne-frame-2.png\",\"full-airborne-frame-3.png\",\"full-airborne-frame-4.png\",\"full-rollback.png\",\"full-reloaded.png\"],\n  \"attachment_dumps\":[\"attachment-shadow_depth.png\",\"attachment-shadow_depth.raw\",\"attachment-albedo.png\",\"attachment-normal.png\",\"attachment-material_light.png\",\"attachment-world_position.png\",\"attachment-depth.png\",\"attachment-depth.raw\",\"attachment-deferred_lit.png\",\"attachment-composite_0.png\",\"attachment-composite_1.png\",\"attachment-final_composite.png\"]\n}}\n",
             backend.name(),
             semantic_hash,
             width,

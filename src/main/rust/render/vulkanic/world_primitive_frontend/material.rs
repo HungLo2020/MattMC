@@ -24,7 +24,7 @@ pub(super) fn validate_quad(
     }
     if !matches!(
         quad.material_mode,
-        WORLD_MATERIAL_MODE_OPAQUE | WORLD_MATERIAL_MODE_CUTOUT
+        WORLD_MATERIAL_MODE_OPAQUE | WORLD_MATERIAL_MODE_CUTOUT | WORLD_MATERIAL_MODE_TRANSLUCENT
     ) {
         return Err(GalError::ffi(
             StatusCode::UnknownEnum,

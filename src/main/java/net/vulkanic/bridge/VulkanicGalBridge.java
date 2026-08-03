@@ -1079,9 +1079,15 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		}
 	}
 
-	public Status updateWorldMeshAssets(long generation, List<WorldMeshAssetRecord> meshes, List<WorldMeshTextureAssetRecord> textures) {
+	public Status updateWorldMeshAssets(
+		long generation,
+		List<WorldMeshAssetRecord> meshes,
+		List<WorldMeshTextureAssetRecord> textures,
+		List<WorldMeshSortedIndexRecord> sortedIndices
+	) {
 		Objects.requireNonNull(meshes, "meshes");
 		Objects.requireNonNull(textures, "textures");
+		Objects.requireNonNull(sortedIndices, "sortedIndices");
 		try (Arena updateArena = Arena.ofConfined()) {
 			MemorySegment textureArray = Struct.WORLD_MESH_TEXTURE_ASSET_PAYLOAD.array(updateArena, textures.size());
 			for (int i = 0; i < textures.size(); i++) {
@@ -1136,12 +1142,25 @@ public final class VulkanicGalBridge implements AutoCloseable {
 				}
 				Abi.writeSlice(item, Struct.WORLD_MESH_ASSET_RECORD, 8, sectionArray, mesh.sections().size());
 			}
+			MemorySegment sortedIndexArray = Struct.WORLD_MESH_SORTED_INDEX_RECORD.array(updateArena, sortedIndices.size());
+			for (int i = 0; i < sortedIndices.size(); i++) {
+				WorldMeshSortedIndexRecord sortedIndex = sortedIndices.get(i);
+				MemorySegment item = Abi.item(sortedIndexArray, Struct.WORLD_MESH_SORTED_INDEX_RECORD, i);
+				item.set(ValueLayout.JAVA_INT, Struct.WORLD_MESH_SORTED_INDEX_RECORD.offset(0), Struct.WORLD_MESH_SORTED_INDEX_RECORD.byteSize());
+				Struct.WORLD_MESH_SORTED_INDEX_RECORD.setInt(item, 1, sortedIndex.indexType());
+				Struct.WORLD_MESH_SORTED_INDEX_RECORD.setInt(item, 2, 0);
+				Struct.WORLD_MESH_SORTED_INDEX_RECORD.setLong(item, 3, sortedIndex.meshKey());
+				Struct.WORLD_MESH_SORTED_INDEX_RECORD.setLong(item, 4, sortedIndex.meshGeneration());
+				Struct.WORLD_MESH_SORTED_INDEX_RECORD.setLong(item, 5, sortedIndex.indexGeneration());
+				Abi.writeBytes(updateArena, item, Struct.WORLD_MESH_SORTED_INDEX_RECORD, 6, sortedIndex.indexBytes());
+			}
 			MemorySegment request = Struct.WORLD_MESH_ASSET_UPDATE.allocate(updateArena);
 			Abi.writeHeader(request, Struct.WORLD_MESH_ASSET_UPDATE);
 			Struct.WORLD_MESH_ASSET_UPDATE.setLong(request, 1, generation);
 			Abi.writeSlice(request, Struct.WORLD_MESH_ASSET_UPDATE, 2, meshArray, meshes.size());
 			Abi.writeSlice(request, Struct.WORLD_MESH_ASSET_UPDATE, 3, textureArray, textures.size());
-			Struct.WORLD_MESH_ASSET_UPDATE.setLong(request, 4, negotiatedFeatures);
+			Abi.writeSlice(request, Struct.WORLD_MESH_ASSET_UPDATE, 4, sortedIndexArray, sortedIndices.size());
+			Struct.WORLD_MESH_ASSET_UPDATE.setLong(request, 5, negotiatedFeatures);
 			MemorySegment status = Struct.STATUS.allocate(updateArena);
 			checkStatus(Native.worldMeshUpdateAssets(contextId, request, status), "world mesh asset update");
 			return new Status(Struct.STATUS.getLong(status, 5), Struct.STATUS.metricsFfiCalls(status), Struct.STATUS.metricsFfiInputBytes(status), Struct.STATUS.backendMetrics(status));
@@ -1176,6 +1195,19 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		public WorldMeshTextureAssetRecord {
 			Objects.requireNonNull(pngBytes, "pngBytes");
 			pngBytes = pngBytes.clone();
+		}
+	}
+
+	public record WorldMeshSortedIndexRecord(
+		long meshKey,
+		long meshGeneration,
+		long indexGeneration,
+		int indexType,
+		byte[] indexBytes
+	) {
+		public WorldMeshSortedIndexRecord {
+			Objects.requireNonNull(indexBytes, "indexBytes");
+			indexBytes = indexBytes.clone();
 		}
 	}
 
@@ -2122,7 +2154,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 				WORLD_MESH_ASSET_RECORD(66),
 				WORLD_MESH_TEXTURE_ASSET_PAYLOAD(67),
 				WORLD_MESH_ASSET_UPDATE(68),
-				WORLD_MESH_INSTANCE_RECORD(69);
+					WORLD_MESH_INSTANCE_RECORD(69),
+					WORLD_MESH_SORTED_INDEX_RECORD(70);
 
 		private final int id;
 		private final int byteSize;

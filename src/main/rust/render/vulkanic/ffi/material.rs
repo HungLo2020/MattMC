@@ -62,7 +62,12 @@ pub(crate) unsafe fn decode_world_material_asset_update(
 pub(crate) unsafe fn decode_world_mesh_asset_update(
     request: *const FfiWorldMeshAssetUpdateRequest,
     capabilities: BackendCapabilities,
-) -> GalResult<(u64, Vec<WorldMeshAsset>, Vec<WorldMeshTextureAssetPayload>)> {
+) -> GalResult<(
+    u64,
+    Vec<WorldMeshAsset>,
+    Vec<WorldMeshTextureAssetPayload>,
+    Vec<WorldMeshSortedIndexUpdate>,
+)> {
     let request = read_struct(request, "world mesh asset update request")?;
     validate_header::<FfiWorldMeshAssetUpdateRequest>(request.header)?;
     reject_unknown_feature_bits(request.negotiated_feature_bits)?;
@@ -182,7 +187,34 @@ pub(crate) unsafe fn decode_world_mesh_asset_update(
             sections,
         });
     }
-    Ok((request.generation, meshes, textures))
+    let raw_sorted_indices =
+        read_limited_slice(request.sorted_indices, true, "world mesh sorted index updates")?;
+    let mut sorted_indices = Vec::with_capacity(raw_sorted_indices.len());
+    for update in raw_sorted_indices {
+        validate_item_size::<FfiWorldMeshSortedIndexRecord>(
+            update.byte_size,
+            "world mesh sorted index update",
+        )?;
+        if update.mesh_key == 0 || update.mesh_generation == 0 || update.index_generation == 0 {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                "world mesh sorted index update key and generations must be non-zero",
+            ));
+        }
+        sorted_indices.push(WorldMeshSortedIndexUpdate {
+            mesh_key: update.mesh_key,
+            mesh_generation: update.mesh_generation,
+            index_generation: update.index_generation,
+            index_type: ffi_index_type(update.index_type)?,
+            index_bytes: read_bounded_bytes(
+                update.index_bytes,
+                false,
+                FFI_MAX_WORLD_MESH_INDEX_BYTES,
+                "world mesh sorted index bytes",
+            )?,
+        });
+    }
+    Ok((request.generation, meshes, textures, sorted_indices))
 }
 
 #[no_mangle]
@@ -256,10 +288,16 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_world_mesh_update_assets(
             .ffi_output_bytes
             .saturating_add(size_of::<FfiStatusResult>() as u64);
         let result = decode_world_mesh_asset_update(request, context.gal.capabilities()).and_then(
-            |(generation, meshes, textures)| {
+            |(generation, meshes, textures, sorted_indices)| {
                 context
                     .world_primitive_frontend
-                    .apply_world_mesh_asset_update(&mut context.gal, generation, meshes, textures)
+                    .apply_world_mesh_asset_update_with_sorted(
+                        &mut context.gal,
+                        generation,
+                        meshes,
+                        textures,
+                        sorted_indices,
+                    )
             },
         );
         match result {

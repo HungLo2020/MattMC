@@ -104,6 +104,7 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
         boolean forceJavaModels = NativeMeshingDiagnostics.forceJavaModels();
         boolean forceJavaFluids = NativeMeshingDiagnostics.forceJavaFluids();
         int fallbackBlockCount = 0;
+        int fluidBlockCount = 0;
         int fallbackQuadStart = blockRenderer.getEmittedQuadCount();
 
         profiler.push("render blocks");
@@ -130,6 +131,9 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
                         int localBlockIndex = (localY << 8) | (localZ << 4) | localX;
 
                         FluidState fluidState = blockState.getFluidState();
+                        if (!fluidState.isEmpty()) {
+                            fluidBlockCount++;
+                        }
                         boolean nativeFluidSupported = !fluidState.isEmpty()
                                 && NativeSectionSnapshot.isNativeFluidSupported(fluidState);
                         boolean useJavaFluid = !fluidState.isEmpty()
@@ -197,6 +201,9 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
                 + buffers.getFallbackConsumerEmittedQuadCount();
         if (fallbackBlockCount != 0 || fallbackQuadCount != 0) {
             renderData.setNativeMeshingFallbackCounts(fallbackBlockCount, fallbackQuadCount);
+        }
+        if (fluidBlockCount != 0) {
+            renderData.setNativeMeshingFluidBlocks(fluidBlockCount);
         }
         fallbackStats.report(this.render.getSectionIndex(), new BlockPos(minX, minY, minZ));
 

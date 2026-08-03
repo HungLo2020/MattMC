@@ -5,8 +5,9 @@ use super::pass_graph::{AttachmentIdentity, AttachmentRole, PassGraph, PassIdent
 use super::programs::{
     minimal_composite_color_grade_program, minimal_composite_depth_fog_program,
     minimal_deferred_lighting_program, minimal_final_copy_program, minimal_shadow_depth_program,
-    minimal_terrain_cutout_program, minimal_terrain_solid_program, CompositeProgram,
-    ProgramIdentity, TerrainMaterialProgram,
+    minimal_terrain_cutout_program, minimal_terrain_solid_program,
+    minimal_terrain_translucent_program, CompositeProgram, ProgramIdentity,
+    TerrainMaterialProgram,
 };
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -53,6 +54,7 @@ pub struct ShaderPackProgramSet {
     pub shadow_depth: TerrainMaterialProgram,
     pub terrain_opaque: TerrainMaterialProgram,
     pub terrain_cutout: TerrainMaterialProgram,
+    pub terrain_translucent: TerrainMaterialProgram,
     pub deferred_lighting: CompositeProgram,
     pub composite_0: CompositeProgram,
     pub composite_1: CompositeProgram,
@@ -65,6 +67,7 @@ impl ShaderPackProgramSet {
             shadow_depth: minimal_shadow_depth_program(),
             terrain_opaque: minimal_terrain_solid_program(),
             terrain_cutout: minimal_terrain_cutout_program(),
+            terrain_translucent: minimal_terrain_translucent_program(),
             deferred_lighting: minimal_deferred_lighting_program(),
             composite_0: minimal_composite_color_grade_program(),
             composite_1: minimal_composite_depth_fog_program(),
@@ -117,6 +120,7 @@ impl ShaderPackResourceManifest {
                 ProgramIdentity::new("vulkanic:builtin/shadow_depth_v1"),
                 ProgramIdentity::new("vulkanic:builtin/terrain_opaque_v1"),
                 ProgramIdentity::new("vulkanic:builtin/terrain_cutout_v1"),
+                ProgramIdentity::new("vulkanic:builtin/terrain_translucent_v1"),
                 ProgramIdentity::new("vulkanic:builtin/deferred_lighting_v1"),
                 ProgramIdentity::new("vulkanic:builtin/composite_color_grade_v1"),
                 ProgramIdentity::new("vulkanic:builtin/composite_depth_fog_v1"),
@@ -127,6 +131,7 @@ impl ShaderPackResourceManifest {
                 PassIdentity::new("vulkanic:pass/terrain_opaque"),
                 PassIdentity::new("vulkanic:pass/terrain_cutout"),
                 PassIdentity::new("vulkanic:pass/deferred_lighting"),
+                PassIdentity::new("vulkanic:pass/terrain_translucent"),
                 PassIdentity::new("vulkanic:pass/composite_0"),
                 PassIdentity::new("vulkanic:pass/composite_1"),
                 PassIdentity::new("vulkanic:pass/final_output"),
@@ -146,6 +151,7 @@ impl ShaderPackResourceManifest {
             materials: vec![
                 MaterialIdentity::new("minecraft:material/opaque_textured"),
                 MaterialIdentity::new("minecraft:material/cutout_textured"),
+                MaterialIdentity::new("minecraft:material/translucent_textured"),
             ],
             samplers: vec![SamplerIdentity::new("vulkanic:sampler/nearest_clamp")],
         })

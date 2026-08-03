@@ -805,10 +805,12 @@ public class RenderSectionManager {
                     // a rebuild always generates new translucent data which means applyTriggerChanges isn't necessary
                     result.render.setTranslucentData(chunkBuildOutput.translucentData);
                 }
-            } else if (result instanceof ChunkSortOutput sortOutput
-                    && sortOutput.getDynamicSorter() != null
-                    && result.render.getTranslucentData() instanceof DynamicTopoData data) {
-                this.sortTriggering.applyTriggerChanges(data, sortOutput.getDynamicSorter(), result.render.getPosition(), this.cameraPosition);
+            } else if (result instanceof ChunkSortOutput sortOutput && sortOutput.getSorter() != null) {
+                RustGalTerrainRenderer.acceptChunkSortOutput(sortOutput);
+                if (sortOutput.getDynamicSorter() != null
+                        && result.render.getTranslucentData() instanceof DynamicTopoData data) {
+                    this.sortTriggering.applyTriggerChanges(data, sortOutput.getDynamicSorter(), result.render.getPosition(), this.cameraPosition);
+                }
             }
 
             // clear the running job if this job is the most recent submitted job for this section
