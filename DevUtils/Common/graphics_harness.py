@@ -1360,6 +1360,7 @@ def static_terrain_translucent_evidence(
     doc: dict[str, object] | None,
     *,
     require_camera_sort: bool = False,
+    require_unsupported_fluid: bool = False,
 ) -> dict[str, object]:
     if not isinstance(doc, dict):
         return {"status": "skip", "failure": None, "checked_events": 0}
@@ -1384,7 +1385,12 @@ def static_terrain_translucent_evidence(
     copied_sort_by_key: dict[tuple[int, int], dict[str, object]] = {}
     source_sort_events = 0
     rust_copy_events = 0
+    primitive_accounting_events = 0
+    unsupported_omitted_events = 0
+    accounted_unsupported_primitives = 0
+    accounted_omitted_primitives = 0
     sort_payload_diagnostics: list[dict[str, object]] = []
+    primitive_accounting_diagnostics: list[dict[str, object]] = []
     landmark_events: list[dict[str, object]] = []
     sorter_type_counts: dict[str, int] = {}
 
@@ -1413,6 +1419,52 @@ def static_terrain_translucent_evidence(
                 "cross-world-sort": "terrain_translucent_cross_world_sort",
                 "source-sort-mismatch": "terrain_translucent_source_sort_mismatch",
                 "sort-payload-corrupt": "terrain_translucent_sort_payload_corrupt",
+                "primitive-metadata-missing": "terrain_translucent_primitive_metadata_missing",
+                "primitive-kind-unknown": "terrain_translucent_primitive_unknown",
+                "primitive-range-overlap": "terrain_translucent_primitive_range_overlap",
+                "primitive-range-out-of-bounds": "terrain_translucent_primitive_range_out_of_bounds",
+                "primitive-classification-swapped": "terrain_translucent_primitive_classification_swapped",
+                "supported-primitive-omitted": "terrain_translucent_supported_primitive_omitted",
+                "unsupported-primitive-executed": "terrain_translucent_unsupported_primitive_executed",
+                "source-index-unknown-primitive": "terrain_translucent_source_index_unknown_primitive",
+                "retained-index-duplicated": "terrain_translucent_retained_index_duplicated",
+                "filtered-order-changed": "terrain_translucent_filtered_order_changed",
+                "ordered-range-material-mismatch": "terrain_translucent_ordered_range_material_mismatch",
+                "ordered-range-overlap": "terrain_translucent_ordered_range_overlap",
+                "execution-order-hash-mismatch": "terrain_translucent_execution_order_hash_mismatch",
+                "cross-generation-metadata": "terrain_translucent_cross_generation_metadata",
+                "cross-world-primitive-range-reuse": "terrain_translucent_cross_world_primitive_range_reuse",
+                "water-still-flow-texture-swapped": "terrain_water_still_flow_texture_swapped",
+                "water-overlay-identity-invalid": "terrain_water_overlay_identity_invalid",
+                "water-animation-entry-mismatch": "terrain_animation_frame_order_invalid",
+                "water-animation-invalid-frame": "terrain_animation_frame_order_invalid",
+                "water-animation-duplicate-frame": "terrain_animation_frame_order_invalid",
+                "water-animation-missing-frame": "terrain_animation_frame_missing",
+                "water-animation-zero-duration": "terrain_animation_frame_duration_invalid",
+                "water-animation-duration-overflow": "terrain_animation_frame_duration_invalid",
+                "water-animation-region-out-of-bounds": "terrain_animation_presented_frame_mismatch",
+                "water-animation-missing-pixels": "terrain_animation_presented_frame_mismatch",
+                "water-animation-incompatible-dimensions": "terrain_animation_presented_frame_mismatch",
+                "water-animation-generation-mismatch": "terrain_animation_unexpected_resource_update",
+                "water-animation-stale-generation": "terrain_animation_unexpected_resource_update",
+                "water-animation-region-mismatch": "terrain_animation_presented_frame_mismatch",
+                "water-animation-invalid-interp": "terrain_animation_interpolation_invalid",
+                "water-animation-section-divergence": "terrain_animation_section_desynchronized",
+                "water-animation-cross-world-state": "terrain_animation_unexpected_resource_update",
+                "water-animation-per-frame-recreation": "terrain_animation_unexpected_resource_update",
+                "water-corner-height-invalid": "terrain_water_geometry_invalid",
+                "water-flow-reversed": "terrain_water_geometry_invalid",
+                "water-uv-invalid": "terrain_water_geometry_invalid",
+                "water-tint-invalid": "terrain_water_geometry_invalid",
+                "water-light-swapped": "terrain_water_geometry_invalid",
+                "water-normal-invalid": "terrain_water_geometry_invalid",
+                "water-duplicate-face": "terrain_water_geometry_invalid",
+                "water-missing-face": "terrain_water_geometry_invalid",
+                "water-boundary-crack": "terrain_water_geometry_invalid",
+                "water-depth-write-enabled": "terrain_water_depth_policy_invalid",
+                "water-opaque-blend": "terrain_water_blend_policy_invalid",
+                "water-stale-mesh-generation": "terrain_water_geometry_invalid",
+                "water-glass-range-mismatch": "terrain_water_sort_range_invalid",
             }.get(fault)
             if fault_classification:
                 failures.append(fault_classification)
@@ -1425,13 +1477,19 @@ def static_terrain_translucent_evidence(
             "translucent-source-sort",
             "translucent-rust-sort-copy",
             "translucent-sort-registered",
+            "translucent-primitive-accounting",
             "translucent-sort-missing",
+            "unsupported-fluid-omitted",
             "visible-submit",
             "executed-submit",
             "stale-or-unregistered-submit",
         }:
             continue
         checked += 1
+        reason_base = reason.split(":", 1)[0]
+        if reason_base == "unsupported-fluid-omitted":
+            unsupported_omitted_events += 1
+            continue
         frame_id = int(parse_number(raw_event.get("gameplayFrameId")) or parse_number(raw_event.get("frame")) or 0)
         mesh_key = int(parse_number(raw_event.get("meshKey")) or 0)
         mesh_generation = int(parse_number(raw_event.get("meshGeneration")) or 0)
@@ -1472,6 +1530,94 @@ def static_terrain_translucent_evidence(
         if reason_base == "mesh-registered":
             mesh_events += 1
             section_identity_by_mesh.setdefault(mesh_key, section_pos)
+        elif reason_base == "translucent-primitive-accounting":
+            mesh_events += 1
+            primitive_accounting_events += 1
+            section_identity_by_mesh.setdefault(mesh_key, section_pos)
+            source_primitives = int(parse_number(detail.get("sourcePrimitives")) or 0)
+            non_fluid_primitives = int(parse_number(detail.get("nonFluidPrimitives")) or 0)
+            water_primitives = int(parse_number(detail.get("waterPrimitives")) or 0)
+            unsupported_primitives = int(parse_number(detail.get("unsupportedPrimitives")) or 0)
+            retained_primitives = int(parse_number(detail.get("retainedPrimitives")) or 0)
+            omitted_primitives = int(parse_number(detail.get("omittedPrimitives")) or 0)
+            accounted_unsupported_primitives += unsupported_primitives
+            accounted_omitted_primitives += omitted_primitives
+            executed_primitives = int(parse_number(detail.get("executedPrimitives")) or 0)
+            source_indices = int(parse_number(detail.get("sourceIndices")) or 0)
+            retained_indices = int(parse_number(detail.get("retainedIndices")) or 0)
+            omitted_indices = int(parse_number(detail.get("omittedIndices")) or 0)
+            range_count = int(parse_number(detail.get("rangeCount")) or 0)
+            source_hash_detail = str(detail.get("sourceHash") or "")
+            retained_hash_detail = str(detail.get("retainedHash") or "")
+            water_still_primitives = int(parse_number(detail.get("waterStillPrimitives")) or 0)
+            water_flow_primitives = int(parse_number(detail.get("waterFlowPrimitives")) or 0)
+            water_overlay_primitives = int(parse_number(detail.get("waterOverlayPrimitives")) or 0)
+            water_texture_switches = int(parse_number(detail.get("waterTextureSwitches")) or 0)
+            water_animation_hash = int(parse_number(detail.get("waterAnimationHash")) or 0)
+            water_animation_entries = str(detail.get("waterAnimationEntries") or "")
+            sample = str(detail.get("sample") or "")
+            if source_primitives <= 0:
+                failures.append("terrain_translucent_primitive_accounting_invalid")
+            if source_primitives != non_fluid_primitives + water_primitives + unsupported_primitives:
+                failures.append("terrain_translucent_primitive_accounting_invalid")
+            if retained_primitives != non_fluid_primitives + water_primitives:
+                failures.append("terrain_translucent_supported_primitive_omitted")
+            if omitted_primitives != unsupported_primitives:
+                failures.append("terrain_translucent_unsupported_primitive_executed")
+            if executed_primitives != retained_primitives:
+                failures.append("terrain_translucent_execution_order_hash_mismatch")
+            if source_indices != source_primitives * 6:
+                failures.append("terrain_translucent_source_index_unknown_primitive")
+            if retained_indices != retained_primitives * 6:
+                failures.append("terrain_translucent_retained_index_duplicated")
+            if omitted_indices != omitted_primitives * 6:
+                failures.append("terrain_translucent_primitive_accounting_invalid")
+            if source_indices != retained_indices + omitted_indices:
+                failures.append("terrain_translucent_filtered_order_changed")
+            if range_count <= 0 or retained_indices <= 0:
+                failures.append("terrain_translucent_ordered_range_material_mismatch")
+            if not source_hash_detail or source_hash_detail == "0" or not retained_hash_detail or retained_hash_detail == "0":
+                failures.append("terrain_translucent_sort_payload_corrupt")
+            if not sample:
+                failures.append("terrain_translucent_primitive_accounting_invalid")
+            if water_primitives > 0:
+                water_identity_total = water_still_primitives + water_flow_primitives + water_overlay_primitives
+                if water_identity_total != water_primitives:
+                    failures.append("terrain_water_animation_entry_mismatch")
+                if water_still_primitives <= 0 and water_flow_primitives <= 0:
+                    failures.append("terrain_water_still_flow_texture_swapped")
+                if water_animation_hash == 0 or not water_animation_entries or water_animation_entries == "missing":
+                    failures.append("terrain_water_animation_entry_mismatch")
+                if water_texture_switches < 0:
+                    failures.append("terrain_water_animation_entry_mismatch")
+            if len(primitive_accounting_diagnostics) < 16:
+                primitive_accounting_diagnostics.append(
+                    {
+                        "frame": frame_id,
+                        "sectionPos": section_pos,
+                        "meshKey": mesh_key,
+                        "meshGeneration": mesh_generation,
+                        "sourcePrimitives": source_primitives,
+                        "nonFluidPrimitives": non_fluid_primitives,
+                        "waterPrimitives": water_primitives,
+                        "unsupportedPrimitives": unsupported_primitives,
+                        "retainedPrimitives": retained_primitives,
+                        "omittedPrimitives": omitted_primitives,
+                        "executedPrimitives": executed_primitives,
+                        "sourceIndices": source_indices,
+                        "retainedIndices": retained_indices,
+                        "omittedIndices": omitted_indices,
+                        "rangeCount": range_count,
+                        "ranges": detail.get("ranges") or "",
+                        "waterStillPrimitives": water_still_primitives,
+                        "waterFlowPrimitives": water_flow_primitives,
+                        "waterOverlayPrimitives": water_overlay_primitives,
+                        "waterTextureSwitches": water_texture_switches,
+                        "waterAnimationHash": water_animation_hash,
+                        "waterAnimationEntries": water_animation_entries,
+                        "sample": sample,
+                    }
+                )
         elif reason_base == "translucent-source-sort":
             source_sort_events += 1
             sort_events += 1
@@ -1569,9 +1715,9 @@ def static_terrain_translucent_evidence(
             visible_events += 1
             latest_sort = latest_sort_by_mesh.get(mesh_key)
             latest_copy = copied_sort_by_key.get((mesh_key, latest_sort or 0))
-            if sort_generation <= 0 or latest_sort is None:
+            if sort_generation <= 0 or sorted_index_hash == 0 or index_upload_generation <= 0:
                 failures.append("terrain_translucent_sort_missing")
-            elif sort_generation != latest_sort:
+            elif latest_sort is not None and sort_generation != latest_sort:
                 failures.append("terrain_translucent_sort_execution_stale")
             if latest_copy is not None and sorted_index_hash and latest_copy.get("hash") != sorted_index_hash:
                 failures.append("terrain_translucent_sort_payload_corrupt")
@@ -1580,9 +1726,9 @@ def static_terrain_translucent_evidence(
             executed_events += 1
             latest_sort = latest_sort_by_mesh.get(mesh_key)
             latest_copy = copied_sort_by_key.get((mesh_key, latest_sort or 0))
-            if sort_generation <= 0 or latest_sort is None:
+            if sort_generation <= 0 or sorted_index_hash == 0 or index_upload_generation <= 0:
                 failures.append("terrain_translucent_sort_missing")
-            elif sort_generation != latest_sort:
+            elif latest_sort is not None and sort_generation != latest_sort:
                 failures.append("terrain_translucent_sort_execution_stale")
             if latest_copy is not None and sorted_index_hash and latest_copy.get("hash") != sorted_index_hash:
                 failures.append("terrain_translucent_sort_payload_corrupt")
@@ -1637,6 +1783,15 @@ def static_terrain_translucent_evidence(
         failures.append("terrain_translucent_events_missing")
     if mesh_events <= 0:
         failures.append("terrain_translucent_sort_missing")
+    if (source_sort_events > 0 or rust_copy_events > 0) and primitive_accounting_events <= 0:
+        failures.append("terrain_translucent_primitive_accounting_invalid")
+    if unsupported_omitted_events > 0 and (accounted_unsupported_primitives <= 0 or accounted_omitted_primitives <= 0):
+        failures.append("terrain_translucent_unsupported_primitive_executed")
+    if require_unsupported_fluid:
+        if unsupported_omitted_events <= 0:
+            failures.append("terrain_translucent_unsupported_metadata_missing")
+        if accounted_unsupported_primitives <= 0 or accounted_omitted_primitives <= 0:
+            failures.append("terrain_translucent_unsupported_metadata_missing")
     if visible_events <= 0:
         failures.append("terrain_translucent_section_order_invalid")
     if executed_events <= 0:
@@ -1656,12 +1811,18 @@ def static_terrain_translucent_evidence(
         "sort_events": sort_events,
         "source_sort_events": source_sort_events,
         "rust_copy_events": rust_copy_events,
+        "primitive_accounting_events": primitive_accounting_events,
+        "unsupported_omitted_events": unsupported_omitted_events,
+        "accounted_unsupported_primitives": accounted_unsupported_primitives,
+        "accounted_omitted_primitives": accounted_omitted_primitives,
+        "unsupported_fluid_required": require_unsupported_fluid,
         "visible_events": visible_events,
         "executed_events": executed_events,
         "camera_sort_required": require_camera_sort,
         "sorted_hashes_by_mesh": {str(mesh): len(hashes) for mesh, hashes in sorted_hashes_by_mesh.items()},
         "sorter_type_counts": dict(sorted(sorter_type_counts.items())),
         "sort_payload_diagnostics": sort_payload_diagnostics,
+        "primitive_accounting_diagnostics": primitive_accounting_diagnostics,
         "landmark_events": landmark_events,
     }
 
@@ -1674,6 +1835,294 @@ def parse_colon_key_values(text: str) -> dict[str, str]:
         key, value = part.split("=", 1)
         values[key] = value
     return values
+
+
+def parse_water_animation_state(text: str) -> dict[str, dict[str, str]]:
+    states: dict[str, dict[str, str]] = {}
+    for part in str(text or "").split("|"):
+        if "=" not in part:
+            continue
+        name, payload = part.split("=", 1)
+        fields: dict[str, str] = {}
+        for item in payload.split(","):
+            if ":" not in item:
+                continue
+            key, value = item.split(":", 1)
+            fields[key] = value
+        states[name] = fields
+    return states
+
+
+def parse_water_animation_summary(text: str) -> dict[str, dict[str, object]]:
+    summaries: dict[str, dict[str, object]] = {}
+    for part in str(text or "").split("|"):
+        tokens = part.split("/")
+        width_token_index = next(
+            (index for index, token in enumerate(tokens) if re.fullmatch(r"\d+x\d+", token or "")),
+            -1,
+        )
+        if width_token_index < 2 or len(tokens) <= width_token_index + 5:
+            continue
+        location = "/".join(tokens[1:width_token_index])
+        if location.endswith("water_still"):
+            name = "still"
+        elif location.endswith("water_flow"):
+            name = "flow"
+        elif location.endswith("water_overlay"):
+            name = "overlay"
+        else:
+            continue
+        entries: list[tuple[int, int]] = []
+        for item in tokens[width_token_index + 5].split(","):
+            if "@" not in item:
+                continue
+            frame_text, duration_text = item.split("@", 1)
+            frame_index = parse_number(frame_text)
+            duration = parse_number(duration_text)
+            if frame_index is None or duration is None:
+                continue
+            entries.append((int(frame_index), max(1, int(duration))))
+        summaries[name] = {
+            "texture": int(parse_number(tokens[0]) or 0),
+            "location": location,
+            "frame_count": int(parse_number(tokens[width_token_index + 1]) or 0),
+            "frame_ticks": int(parse_number(tokens[width_token_index + 2]) or 0),
+            "frame_row_size": int(parse_number(tokens[width_token_index + 3]) or 0),
+            "interpolation": int(parse_number(tokens[width_token_index + 4]) or 0),
+            "entries": entries,
+        }
+    return summaries
+
+
+def expected_water_animation_state(summary: Mapping[str, object], frame_tick: int) -> dict[str, int] | None:
+    raw_entries = summary.get("entries")
+    if not isinstance(raw_entries, list):
+        return None
+    if not raw_entries:
+        if int(summary.get("frame_count") or 0) <= 1:
+            return {
+                "current": 0,
+                "next": 0,
+                "elapsed": 0,
+                "duration": max(1, int(summary.get("frame_ticks") or 1)),
+                "interpolation": int(summary.get("interpolation") or 0),
+            }
+        return None
+    entries: list[tuple[int, int]] = []
+    for raw in raw_entries:
+        if not isinstance(raw, tuple) or len(raw) != 2:
+            return None
+        entries.append((int(raw[0]), max(1, int(raw[1]))))
+    total_duration = sum(duration for _, duration in entries)
+    if total_duration <= 0:
+        return None
+    cursor = frame_tick % total_duration
+    elapsed = 0
+    entry_index = 0
+    for index, (_, duration) in enumerate(entries):
+        if cursor < elapsed + duration:
+            entry_index = index
+            break
+        elapsed += duration
+    current, duration = entries[entry_index]
+    next_frame, _ = entries[(entry_index + 1) % len(entries)]
+    return {
+        "current": current,
+        "next": next_frame,
+        "elapsed": cursor - elapsed,
+        "duration": duration,
+        "interpolation": int(summary.get("interpolation") or 0),
+    }
+
+
+def static_terrain_water_animation_dense_evidence(doc: dict[str, object] | None) -> dict[str, object]:
+    if not isinstance(doc, dict):
+        return {"status": "skip", "failure": None, "checked_frames": 0}
+    dense = doc.get("rustGalStaticTerrainWaterAnimationDenseCapture")
+    if not isinstance(dense, dict) or not dense.get("enabled"):
+        return {"status": "skip", "failure": None, "checked_frames": 0}
+    frames = dense.get("frames")
+    if not isinstance(frames, list):
+        frames = []
+    requested = int(parse_number(dense.get("requestedFrames")) or 0)
+    captured = int(parse_number(dense.get("capturedFrames")) or len(frames))
+    failures: list[str] = []
+    diagnostics: list[dict[str, object]] = []
+    if not dense.get("complete"):
+        failures.append("terrain_animation_frame_missing")
+    if requested <= 0 or captured < requested or len(frames) < requested:
+        failures.append("terrain_animation_frame_missing")
+
+    previous_rendered_frame: int | None = None
+    previous_atlas_generation: int | None = None
+    previous_visible_submissions: int | None = None
+    hashes: set[int] = set()
+    still_states: list[str] = []
+    flow_states: list[str] = []
+    overlay_states: list[str] = []
+    distinct_frame_keys: set[tuple[str, str]] = set()
+    visual_hashes: set[str] = set()
+    interpolation_progress: dict[str, list[float]] = {"still": [], "flow": [], "overlay": []}
+    summary_by_name: dict[str, dict[str, object]] = {}
+    checked = 0
+    for expected_index, raw in enumerate(frames):
+        if not isinstance(raw, dict):
+            failures.append("terrain_animation_frame_missing")
+            continue
+        checked += 1
+        index_value = parse_number(raw.get("index"))
+        rendered_frame_value = parse_number(raw.get("renderedFrameIndex"))
+        game_time_value = parse_number(raw.get("gameTime"))
+        animation_hash_value = parse_number(raw.get("animationHash"))
+        visible_submissions_value = parse_number(raw.get("visibleLayerSubmissions"))
+        current_frame_submissions_value = parse_number(raw.get("currentFrameVisibleLayerSubmissions"))
+        atlas_generation_value = parse_number(raw.get("atlasGeneration"))
+        index = int(index_value) if index_value is not None else -1
+        screenshot = str(raw.get("screenshot") or "")
+        rendered_frame = int(rendered_frame_value) if rendered_frame_value is not None else -1
+        game_time = int(game_time_value) if game_time_value is not None else -1
+        animation_hash = int(animation_hash_value) if animation_hash_value is not None else 0
+        animation_summary = str(raw.get("animationSummary") or "")
+        animation_state = str(raw.get("animationState") or "")
+        visible_submissions = int(visible_submissions_value) if visible_submissions_value is not None else 0
+        current_frame_submissions = int(current_frame_submissions_value) if current_frame_submissions_value is not None else 0
+        atlas_generation = int(atlas_generation_value) if atlas_generation_value is not None else 0
+        if index != expected_index:
+            failures.append("terrain_animation_frame_order_invalid")
+        if not screenshot or not Path(screenshot).is_file():
+            failures.append("terrain_animation_frame_missing")
+        else:
+            try:
+                from PIL import Image
+
+                with Image.open(screenshot) as image:
+                    image = image.convert("RGB")
+                    visual_hashes.add(hashlib.sha256(image.tobytes()).hexdigest()[:16])
+                    image.thumbnail((64, 36))
+                    pixels = list(image.getdata())
+                    visible_pixels = sum(1 for red, green, blue in pixels if max(red, green, blue) > 24)
+                    if not pixels or visible_pixels / max(1, len(pixels)) < 0.05:
+                        failures.append("terrain_animation_presented_frame_mismatch")
+            except Exception:
+                failures.append("terrain_animation_frame_missing")
+        if rendered_frame < 0 or (previous_rendered_frame is not None and rendered_frame <= previous_rendered_frame):
+            failures.append("terrain_animation_frame_order_invalid")
+        if game_time < 0:
+            failures.append("terrain_animation_frame_order_invalid")
+        if animation_hash == 0 or animation_summary == "missing" or not animation_summary:
+            failures.append("terrain_animation_frame_order_invalid")
+        elif not summary_by_name:
+            summary_by_name = parse_water_animation_summary(animation_summary)
+        if visible_submissions <= 0:
+            failures.append("terrain_animation_presented_frame_mismatch")
+        if previous_visible_submissions is not None and visible_submissions <= previous_visible_submissions:
+            failures.append("terrain_animation_presented_frame_mismatch")
+        if atlas_generation <= 0:
+            failures.append("terrain_animation_unexpected_resource_update")
+        if previous_atlas_generation is not None and atlas_generation != previous_atlas_generation:
+            failures.append("terrain_animation_unexpected_resource_update")
+        states = parse_water_animation_state(animation_state)
+        for name, collector in (("still", still_states), ("flow", flow_states), ("overlay", overlay_states)):
+            state = states.get(name)
+            if not state or state.get("current") is None or state.get("next") is None:
+                failures.append("terrain_animation_frame_missing")
+            else:
+                collector.append(f"{state.get('current')}->{state.get('next')}@{state.get('elapsed')}/{state.get('duration')}")
+                distinct_frame_keys.add((name, str(state.get("current"))))
+                interpolation = state.get("interpolation")
+                if interpolation not in {"0", "1"}:
+                    failures.append("terrain_animation_interpolation_invalid")
+                summary = summary_by_name.get(name)
+                expected = expected_water_animation_state(summary, rendered_frame) if summary else None
+                if expected is None:
+                    failures.append("terrain_animation_frame_order_invalid")
+                else:
+                    current = parse_number(state.get("current"))
+                    next_frame = parse_number(state.get("next"))
+                    elapsed = parse_number(state.get("elapsed"))
+                    duration = parse_number(state.get("duration"))
+                    if current is None or int(current) != expected["current"] or next_frame is None or int(next_frame) != expected["next"]:
+                        failures.append("terrain_animation_frame_order_invalid")
+                    if elapsed is None or int(elapsed) != expected["elapsed"] or duration is None or int(duration) != expected["duration"]:
+                        failures.append("terrain_animation_frame_duration_invalid")
+                    if int(expected["interpolation"]) != int(interpolation):
+                        failures.append("terrain_animation_interpolation_invalid")
+                    fraction = parse_number(state.get("fraction"))
+                    if int(interpolation) == 1 and fraction is not None:
+                        interpolation_progress[name].append(float(fraction))
+        hashes.add(animation_hash)
+        previous_rendered_frame = rendered_frame
+        previous_atlas_generation = atlas_generation
+        previous_visible_submissions = visible_submissions
+        if len(diagnostics) < 8:
+            diagnostics.append(
+                {
+                    "index": index,
+                    "screenshot": screenshot,
+                    "renderedFrameIndex": rendered_frame,
+                    "gameTime": game_time,
+                    "animationHash": animation_hash,
+                    "atlasGeneration": atlas_generation,
+                    "animationState": animation_state,
+                    "visibleLayerSubmissions": visible_submissions,
+                    "currentFrameVisibleLayerSubmissions": current_frame_submissions,
+                }
+            )
+
+    if checked <= 0:
+        failures.append("terrain_animation_frame_missing")
+    if len(hashes) != 1:
+        failures.append("terrain_animation_unexpected_resource_update")
+    if len(set(still_states)) < 2 or len(set(flow_states)) < 2:
+        failures.append("terrain_animation_frame_order_invalid")
+    if not overlay_states:
+        failures.append("terrain_animation_frame_missing")
+    for name, progress in interpolation_progress.items():
+        entries = summary_by_name.get(name, {}).get("entries")
+        has_intermediate_interval = (
+            isinstance(entries, list)
+            and any(isinstance(entry, tuple) and len(entry) == 2 and int(entry[1]) > 1 for entry in entries)
+        )
+        if (
+            summary_by_name.get(name, {}).get("interpolation") == 1
+            and has_intermediate_interval
+            and not any(0.0 < value < 1.0 for value in progress)
+        ):
+            failures.append("terrain_animation_interpolation_missing")
+    if checked > 1 and len(visual_hashes) < 2:
+        failures.append("terrain_animation_presented_frame_mismatch")
+    unique_failures = sorted(set(failures), key=static_terrain_water_animation_failure_priority)
+    return {
+        "status": "pass" if not unique_failures else "fail",
+        "failure": unique_failures[0] if unique_failures else None,
+        "failures": unique_failures,
+        "requested_frames": requested,
+        "captured_frames": captured,
+        "checked_frames": checked,
+        "animation_hashes": sorted(hashes),
+        "distinct_frame_keys": len(distinct_frame_keys),
+        "visual_hashes": sorted(visual_hashes)[:16],
+        "still_states": still_states[:16],
+        "flow_states": flow_states[:16],
+        "overlay_states": overlay_states[:16],
+        "summary": summary_by_name,
+        "diagnostics": diagnostics,
+    }
+
+
+def static_terrain_water_animation_failure_priority(failure: str) -> tuple[int, str]:
+    priority = {
+        "terrain_animation_frame_missing": 0,
+        "terrain_animation_presented_frame_mismatch": 1,
+        "terrain_animation_frame_order_invalid": 2,
+        "terrain_animation_frame_duration_invalid": 3,
+        "terrain_animation_wrap_invalid": 4,
+        "terrain_animation_interpolation_missing": 5,
+        "terrain_animation_interpolation_invalid": 6,
+        "terrain_animation_section_desynchronized": 7,
+        "terrain_animation_unexpected_resource_update": 8,
+    }
+    return (priority.get(failure, 50), failure)
 
 
 def static_terrain_translucent_final_order_evidence(doc: dict[str, object] | None) -> dict[str, object]:
@@ -1908,7 +2357,39 @@ def static_terrain_translucent_failure_priority(failure: str) -> tuple[int, str]
         "terrain_translucent_depth_policy_invalid": 13,
         "terrain_translucent_blend_policy_invalid": 14,
         "terrain_translucent_cross_world_sort": 15,
-        "terrain_translucent_events_missing": 16,
+        "terrain_translucent_unsupported_metadata_missing": 16,
+        "terrain_translucent_primitive_metadata_missing": 17,
+        "terrain_translucent_primitive_unknown": 18,
+        "terrain_translucent_primitive_range_overlap": 19,
+        "terrain_translucent_primitive_range_out_of_bounds": 20,
+        "terrain_translucent_primitive_classification_swapped": 21,
+        "terrain_translucent_supported_primitive_omitted": 22,
+        "terrain_translucent_unsupported_primitive_executed": 23,
+        "terrain_translucent_source_index_unknown_primitive": 24,
+        "terrain_translucent_retained_index_duplicated": 25,
+        "terrain_translucent_filtered_order_changed": 26,
+        "terrain_translucent_ordered_range_material_mismatch": 27,
+        "terrain_translucent_ordered_range_overlap": 28,
+        "terrain_translucent_execution_order_hash_mismatch": 29,
+        "terrain_translucent_cross_generation_metadata": 30,
+        "terrain_translucent_cross_world_primitive_range_reuse": 31,
+        "terrain_water_still_flow_texture_swapped": 32,
+        "terrain_water_overlay_identity_invalid": 33,
+        "terrain_animation_frame_order_invalid": 34,
+        "terrain_animation_frame_duration_invalid": 35,
+        "terrain_animation_frame_missing": 36,
+        "terrain_animation_wrap_invalid": 37,
+        "terrain_animation_interpolation_missing": 38,
+        "terrain_animation_interpolation_invalid": 39,
+        "terrain_animation_section_desynchronized": 40,
+        "terrain_animation_presented_frame_mismatch": 41,
+        "terrain_animation_unexpected_resource_update": 42,
+        "terrain_water_geometry_invalid": 35,
+        "terrain_water_depth_policy_invalid": 36,
+        "terrain_water_blend_policy_invalid": 37,
+        "terrain_water_sort_range_invalid": 38,
+        "terrain_translucent_primitive_accounting_invalid": 39,
+        "terrain_translucent_events_missing": 40,
     }
     return (priority.get(failure, 50), failure)
 
@@ -1981,7 +2462,13 @@ def static_terrain_base_scenario(scenario: str) -> str:
 
 def static_terrain_is_translucent_scenario(scenario: str) -> bool:
     scenario = (scenario or "").strip().lower()
-    return scenario in {"translucent-glass", "translucent-overlap"} or (
+    return scenario in {
+        "translucent-glass",
+        "translucent-overlap",
+        "translucent-water",
+        "translucent-mixed",
+        "translucent-mixed-unsupported",
+    } or (
         scenario.startswith("translucent-") and static_terrain_base_scenario(scenario) != scenario
     )
 
@@ -2011,8 +2498,6 @@ def static_terrain_lifecycle_evidence(
         "missing-atlas-payload",
         "malformed-png-payload",
         "partial-texture-update",
-        "translucent-glass",
-        "translucent-overlap",
         "model-resource-generation-change",
         "resize-cycle",
         "swapchain-recreate",
@@ -2037,6 +2522,9 @@ def static_terrain_lifecycle_evidence(
     zero_before_generation_scenarios = {
         "translucent-glass",
         "translucent-overlap",
+        "translucent-water",
+        "translucent-mixed",
+        "translucent-mixed-unsupported",
     }
     edit_scenarios = {
         "interior-edit",
@@ -5725,10 +6213,14 @@ def normalize_capture_artifact(
     )
     requested_world_static_terrain_fault = parse_java_property(
         combined_logs, "mattmc.dev.rustGalStaticTerrain.fault"
-    )
+    ) or meta.get("world_static_terrain_fault")
     requested_world_static_terrain_resource_pack_scenario = parse_java_property(
         combined_logs, "mattmc.dev.rustGalStaticTerrain.resourcePackScenario"
     ) or meta.get("world_static_terrain_resource_pack_scenario")
+    requested_world_static_terrain_water_animation_capture = (
+        parse_java_property(combined_logs, "mattmc.dev.rustGalStaticTerrain.waterAnimationDenseCapture") == "true"
+        or str(meta.get("world_static_terrain_water_animation_capture") or "").strip().lower() == "true"
+    )
     requested_world_mesh_piston_disabled = (
         parse_java_property(combined_logs, "mattmc.dev.rustGalWorldPiston.disabled") == "true"
     )
@@ -5785,6 +6277,8 @@ def normalize_capture_artifact(
         static_terrain_doc if static_terrain_doc else static_terrain_frame_doc,
         require_camera_sort=static_terrain_requires_translucent_camera_sort(requested_world_static_terrain_scenario)
         and not requested_world_static_terrain_fault,
+        require_unsupported_fluid=(requested_world_static_terrain_scenario == "translucent-mixed-unsupported")
+        and not requested_world_static_terrain_fault,
     )
     static_terrain_translucent_final_order = static_terrain_translucent_final_order_evidence(
         deterministic_doc
@@ -5792,6 +6286,7 @@ def normalize_capture_artifact(
     static_terrain_translucent_camera_sequence = static_terrain_translucent_camera_sequence_evidence(
         deterministic_doc
     )
+    static_terrain_water_animation_dense = static_terrain_water_animation_dense_evidence(deterministic_doc)
     static_terrain_lifecycle = static_terrain_lifecycle_evidence(
         static_terrain_doc if static_terrain_doc else static_terrain_frame_doc,
         static_terrain_lifecycle_doc,
@@ -5845,6 +6340,52 @@ def normalize_capture_artifact(
         "translucent-cross-world-sort": "terrain_translucent_cross_world_sort",
         "translucent-source-sort-mismatch": "terrain_translucent_source_sort_mismatch",
         "translucent-sort-payload-corrupt": "terrain_translucent_sort_payload_corrupt",
+        "translucent-primitive-metadata-missing": "terrain_translucent_primitive_metadata_missing",
+        "translucent-primitive-kind-unknown": "terrain_translucent_primitive_unknown",
+        "translucent-primitive-range-overlap": "terrain_translucent_primitive_range_overlap",
+        "translucent-primitive-range-out-of-bounds": "terrain_translucent_primitive_range_out_of_bounds",
+        "translucent-primitive-classification-swapped": "terrain_translucent_primitive_classification_swapped",
+        "translucent-supported-primitive-omitted": "terrain_translucent_supported_primitive_omitted",
+        "translucent-unsupported-primitive-executed": "terrain_translucent_unsupported_primitive_executed",
+        "translucent-source-index-unknown-primitive": "terrain_translucent_source_index_unknown_primitive",
+        "translucent-retained-index-duplicated": "terrain_translucent_retained_index_duplicated",
+        "translucent-filtered-order-changed": "terrain_translucent_filtered_order_changed",
+        "translucent-ordered-range-material-mismatch": "terrain_translucent_ordered_range_material_mismatch",
+        "translucent-ordered-range-overlap": "terrain_translucent_ordered_range_overlap",
+        "translucent-execution-order-hash-mismatch": "terrain_translucent_execution_order_hash_mismatch",
+        "translucent-cross-generation-metadata": "terrain_translucent_cross_generation_metadata",
+        "translucent-cross-world-primitive-range-reuse": "terrain_translucent_cross_world_primitive_range_reuse",
+        "water-still-flow-texture-swapped": "terrain_water_still_flow_texture_swapped",
+        "water-overlay-identity-invalid": "terrain_water_overlay_identity_invalid",
+        "water-animation-entry-mismatch": "terrain_animation_frame_order_invalid",
+        "water-animation-invalid-frame": "terrain_animation_frame_order_invalid",
+        "water-animation-duplicate-frame": "terrain_animation_frame_order_invalid",
+        "water-animation-missing-frame": "terrain_animation_frame_missing",
+        "water-animation-zero-duration": "terrain_animation_frame_duration_invalid",
+        "water-animation-duration-overflow": "terrain_animation_frame_duration_invalid",
+        "water-animation-region-out-of-bounds": "terrain_animation_presented_frame_mismatch",
+        "water-animation-missing-pixels": "terrain_animation_presented_frame_mismatch",
+        "water-animation-incompatible-dimensions": "terrain_animation_presented_frame_mismatch",
+        "water-animation-generation-mismatch": "terrain_animation_unexpected_resource_update",
+        "water-animation-stale-generation": "terrain_animation_unexpected_resource_update",
+        "water-animation-region-mismatch": "terrain_animation_presented_frame_mismatch",
+        "water-animation-invalid-interp": "terrain_animation_interpolation_invalid",
+        "water-animation-section-divergence": "terrain_animation_section_desynchronized",
+        "water-animation-cross-world-state": "terrain_animation_unexpected_resource_update",
+        "water-animation-per-frame-recreation": "terrain_animation_unexpected_resource_update",
+        "water-corner-height-invalid": "terrain_water_geometry_invalid",
+        "water-flow-reversed": "terrain_water_geometry_invalid",
+        "water-uv-invalid": "terrain_water_geometry_invalid",
+        "water-tint-invalid": "terrain_water_geometry_invalid",
+        "water-light-swapped": "terrain_water_geometry_invalid",
+        "water-normal-invalid": "terrain_water_geometry_invalid",
+        "water-duplicate-face": "terrain_water_geometry_invalid",
+        "water-missing-face": "terrain_water_geometry_invalid",
+        "water-boundary-crack": "terrain_water_geometry_invalid",
+        "water-depth-write-enabled": "terrain_water_depth_policy_invalid",
+        "water-opaque-blend": "terrain_water_blend_policy_invalid",
+        "water-stale-mesh-generation": "terrain_water_geometry_invalid",
+        "water-glass-range-mismatch": "terrain_water_sort_range_invalid",
     }
     static_terrain_expected_fault = static_terrain_fault_expectations.get(
         (requested_world_static_terrain_fault or "").strip().lower()
@@ -6617,6 +7158,7 @@ def normalize_capture_artifact(
                 world_material_terrain_particle_workload_complete = False
                 validation_messages.append("TerrainParticle legacy control emitted unexpected Rust material quads")
     static_terrain_workload_complete = True
+    static_terrain_expected_fault_rejected = False
     static_terrain_scenario = (requested_world_static_terrain_scenario or "").strip().lower()
     if static_terrain_scenario and rust_outline_mode and tool_kind != "subsystem":
         static_doc = static_terrain_doc if static_terrain_doc else static_terrain_frame_doc
@@ -6679,6 +7221,7 @@ def normalize_capture_artifact(
             if (
                 deterministic_static_terrain_gate_required
                 and static_terrain_scenario.startswith("translucent")
+                and not requested_world_static_terrain_water_animation_capture
                 and static_terrain_translucent.get("status") != "pass"
             ):
                 static_terrain_workload_complete = False
@@ -6689,6 +7232,7 @@ def normalize_capture_artifact(
             if (
                 deterministic_static_terrain_gate_required
                 and static_terrain_requires_translucent_camera_sort(static_terrain_scenario)
+                and not requested_world_static_terrain_water_animation_capture
                 and not requested_world_static_terrain_fault
                 and static_terrain_translucent_camera_sequence.get("status") != "pass"
             ):
@@ -6700,6 +7244,7 @@ def normalize_capture_artifact(
             if (
                 deterministic_static_terrain_gate_required
                 and static_terrain_requires_translucent_camera_sort(static_terrain_scenario)
+                and not requested_world_static_terrain_water_animation_capture
                 and not requested_world_static_terrain_fault
                 and static_terrain_translucent_final_order.get("status") != "pass"
             ):
@@ -6708,10 +7253,22 @@ def normalize_capture_artifact(
                     "deterministic static-terrain translucent final-order gate failed: "
                     f"{static_terrain_translucent_final_order.get('failure') or 'unknown'}"
                 )
+            if (
+                deterministic_static_terrain_gate_required
+                and requested_world_static_terrain_water_animation_capture
+                and not requested_world_static_terrain_fault
+                and static_terrain_water_animation_dense.get("status") != "pass"
+            ):
+                static_terrain_workload_complete = False
+                validation_messages.append(
+                    "deterministic static-terrain water-animation dense gate failed: "
+                    f"{static_terrain_water_animation_dense.get('failure') or 'unknown'}"
+                )
             if requested_world_static_terrain_fault:
                 failures_for_fault = set(static_terrain_geometry.get("failures") or [])
                 failures_for_fault.update(static_terrain_lifecycle.get("failures") or [])
                 failures_for_fault.update(static_terrain_translucent.get("failures") or [])
+                failures_for_fault.update(static_terrain_water_animation_dense.get("failures") or [])
                 performance_classification = (
                     str(static_terrain_performance_doc.get("classification") or "").strip().lower()
                     if isinstance(static_terrain_performance_doc, dict)
@@ -6727,7 +7284,8 @@ def normalize_capture_artifact(
                         f"actual={sorted(failures_for_fault)})"
                     )
                 else:
-                    static_terrain_workload_complete = False
+                    static_terrain_expected_fault_rejected = True
+                    static_terrain_workload_complete = True
                     validation_messages.append(
                         "deterministic static-terrain fault injection rejected as expected "
                         f"(fault={requested_world_static_terrain_fault}, classification={static_terrain_expected_fault})"
@@ -7642,6 +8200,8 @@ def normalize_capture_artifact(
                 "world_static_terrain_translucent_evidence": static_terrain_translucent,
                 "world_static_terrain_translucent_final_order": static_terrain_translucent_final_order,
                 "world_static_terrain_translucent_camera_sequence": static_terrain_translucent_camera_sequence,
+                "world_static_terrain_water_animation_dense_capture": requested_world_static_terrain_water_animation_capture,
+                "world_static_terrain_water_animation_dense_evidence": static_terrain_water_animation_dense,
                 "world_static_terrain_lifecycle": static_terrain_lifecycle_doc,
                 "world_static_terrain_lifecycle_evidence": static_terrain_lifecycle,
                 "world_mesh_block_display_scenario": requested_world_mesh_block_display_scenario or None,
@@ -7843,6 +8403,7 @@ def normalize_capture_artifact(
             "subsystem_complete": subsystem_complete,
             "deterministic_capture_complete": deterministic_complete,
             "performance_publishable": run_type == "clean-performance" and complete,
+            "expected_static_terrain_fault_rejected": static_terrain_expected_fault_rejected,
             "renderdoc_complete": renderdoc_complete,
             "tracy_complete": tracy_complete,
             "messages": validation_messages,
@@ -9140,9 +9701,16 @@ def build_capture_command(
         ]
         if client_args:
             command.extend(["--client-args", client_args])
-        if tool_kind == "capture" and workload_profile in {"correctness", "moving-camera"}:
+        static_terrain_capture_requested = tool_kind == "capture" and bool(
+            getattr(args, "world_static_terrain_scenario", "")
+        )
+        if tool_kind == "capture" and (
+            workload_profile in {"correctness", "moving-camera"} or static_terrain_capture_requested
+        ):
             command.append("--deterministic-camera-capture")
-        if tool_kind == "capture" and workload_profile == "settled-static":
+        if tool_kind == "capture" and (
+            workload_profile == "settled-static" or static_terrain_capture_requested
+        ):
             command.append("--deterministic-static-camera-capture")
         if getattr(args, "gui_resource_pack_scenario", ""):
             command.extend(["--gui-resource-pack-scenario", args.gui_resource_pack_scenario])
@@ -9151,10 +9719,17 @@ def build_capture_command(
                 "--world-static-terrain-resource-pack-scenario",
                 args.world_static_terrain_resource_pack_scenario,
             ])
+        if getattr(args, "world_static_terrain_water_animation_capture", False):
+            command.append("--world-static-terrain-water-animation-capture")
         if getattr(args, "world_static_terrain_scenario", ""):
             command.extend([
                 "--world-static-terrain-scenario",
                 args.world_static_terrain_scenario,
+            ])
+        if getattr(args, "world_static_terrain_fault", ""):
+            command.extend([
+                "--world-static-terrain-fault",
+                args.world_static_terrain_fault,
             ])
         if static_terrain_second_world:
             command.extend([
@@ -9188,10 +9763,17 @@ def build_capture_command(
                 "--world-static-terrain-resource-pack-scenario",
                 args.world_static_terrain_resource_pack_scenario,
             ])
+        if getattr(args, "world_static_terrain_water_animation_capture", False):
+            command.append("--world-static-terrain-water-animation-capture")
         if getattr(args, "world_static_terrain_scenario", ""):
             command.extend([
                 "--world-static-terrain-scenario",
                 args.world_static_terrain_scenario,
+            ])
+        if getattr(args, "world_static_terrain_fault", ""):
+            command.extend([
+                "--world-static-terrain-fault",
+                args.world_static_terrain_fault,
             ])
         if static_terrain_second_world:
             command.extend([
@@ -9306,7 +9888,10 @@ def build_capture_command(
         java_options.append(f"-Dmattmc.dev.deterministicCameraCapture.mountHealthRows={args.mount_health_rows}")
     deterministic_capture_requested = (
         tool_kind == "capture"
-        and workload_profile in {"correctness", "moving-camera", "settled-static"}
+        and (
+            workload_profile in {"correctness", "moving-camera", "settled-static"}
+            or bool(getattr(args, "world_static_terrain_scenario", ""))
+        )
         and (
             mode.backend == "rust-vulkan"
             or kind == "shell"
@@ -9517,6 +10102,9 @@ def build_capture_command(
                 "-Dmattmc.dev.rustGalStaticTerrain.resourcePackScenario="
                 f"{args.world_static_terrain_resource_pack_scenario}"
             )
+        if getattr(args, "world_static_terrain_water_animation_capture", False):
+            java_options.append("-Dmattmc.dev.rustGalStaticTerrain.waterAnimationDenseCapture=true")
+            java_options.append("-Dmattmc.dev.rustGalStaticTerrain.waterAnimationDenseFrames=24")
         if tool_kind == "capture":
             java_options.append("-Dmattmc.dev.deterministicCameraCapture.settledReadyFamilies=static-terrain")
             java_options.append("-Dmattmc.dev.deterministicCameraCapture.settledReadyFrames=3")
@@ -11441,6 +12029,9 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
                 "partial-texture-update",
                 "translucent-glass",
                 "translucent-overlap",
+                "translucent-water",
+                "translucent-mixed",
+                "translucent-mixed-unsupported",
                 "translucent-interior-edit",
                 "translucent-boundary-x-edit",
                 "translucent-boundary-y-edit",
@@ -11526,6 +12117,52 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
                 "translucent-cross-world-sort",
                 "translucent-source-sort-mismatch",
                 "translucent-sort-payload-corrupt",
+                "translucent-primitive-metadata-missing",
+                "translucent-primitive-kind-unknown",
+                "translucent-primitive-range-overlap",
+                "translucent-primitive-range-out-of-bounds",
+                "translucent-primitive-classification-swapped",
+                "translucent-supported-primitive-omitted",
+                "translucent-unsupported-primitive-executed",
+                "translucent-source-index-unknown-primitive",
+                "translucent-retained-index-duplicated",
+                "translucent-filtered-order-changed",
+                "translucent-ordered-range-material-mismatch",
+                "translucent-ordered-range-overlap",
+                "translucent-execution-order-hash-mismatch",
+                "translucent-cross-generation-metadata",
+                "translucent-cross-world-primitive-range-reuse",
+                "water-still-flow-texture-swapped",
+                "water-overlay-identity-invalid",
+                "water-animation-entry-mismatch",
+                "water-animation-invalid-frame",
+                "water-animation-duplicate-frame",
+                "water-animation-missing-frame",
+                "water-animation-zero-duration",
+                "water-animation-duration-overflow",
+                "water-animation-region-out-of-bounds",
+                "water-animation-missing-pixels",
+                "water-animation-incompatible-dimensions",
+                "water-animation-generation-mismatch",
+                "water-animation-stale-generation",
+                "water-animation-region-mismatch",
+                "water-animation-invalid-interp",
+                "water-animation-section-divergence",
+                "water-animation-cross-world-state",
+                "water-animation-per-frame-recreation",
+                "water-corner-height-invalid",
+                "water-flow-reversed",
+                "water-uv-invalid",
+                "water-tint-invalid",
+                "water-light-swapped",
+                "water-normal-invalid",
+                "water-duplicate-face",
+                "water-missing-face",
+                "water-boundary-crack",
+                "water-depth-write-enabled",
+                "water-opaque-blend",
+                "water-stale-mesh-generation",
+                "water-glass-range-mismatch",
             ),
             default=os.environ.get("MATTMC_WORLD_STATIC_TERRAIN_FAULT", ""),
             help="Diagnostic-only static-terrain geometry fault injection for harness anvil tests.",
@@ -11538,9 +12175,29 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         )
         subparser.add_argument(
             "--world-static-terrain-resource-pack-scenario",
-            choices=("vanilla", "pack-a", "pack-b", "priority-a-b", "priority-b-a", "missing", "malformed", "unsupported"),
+            choices=(
+                "vanilla",
+                "pack-a",
+                "pack-b",
+                "priority-a-b",
+                "priority-b-a",
+                "missing",
+                "malformed",
+                "unsupported",
+                "water-non-sequential",
+                "water-unequal-duration",
+                "water-interpolation-off",
+                "water-interpolation-on",
+                "water-pixel-replacement",
+            ),
             default=os.environ.get("MATTMC_WORLD_STATIC_TERRAIN_RESOURCE_PACK_SCENARIO", ""),
             help="Generate/select diagnostic block-texture resource packs for Rust static-terrain atlas coverage.",
+        )
+        subparser.add_argument(
+            "--world-static-terrain-water-animation-capture",
+            action="store_true",
+            default=os.environ.get("MATTMC_WORLD_STATIC_TERRAIN_WATER_ANIMATION_CAPTURE", "").lower() in {"1", "true", "yes"},
+            help="Retain a dense deterministic frame sequence for built-in water animation validation.",
         )
         subparser.add_argument("--timeout-seconds", type=int)
         subparser.add_argument("--startup-timeout-seconds", type=int)

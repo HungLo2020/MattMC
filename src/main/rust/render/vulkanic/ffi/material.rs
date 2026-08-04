@@ -1,5 +1,8 @@
 use super::*;
-use crate::render::vulkanic::world_primitive_frontend::material as world_material_semantics;
+use crate::render::vulkanic::world_primitive_frontend::{
+    material as world_material_semantics, WorldMeshAnimationFrame,
+    WORLD_MAX_MESH_ANIMATION_FRAMES,
+};
 
 pub(crate) unsafe fn decode_world_material_asset_update(
     request: *const FfiWorldMaterialAssetUpdateRequest,
@@ -104,14 +107,46 @@ pub(crate) unsafe fn decode_world_mesh_asset_update(
                 format!("duplicate world mesh texture {}", texture.texture_id),
             ));
         }
+        let png_bytes = read_bounded_bytes(
+            texture.png_bytes,
+            true,
+            FFI_MAX_WORLD_MESH_TEXTURE_ASSET_BYTES,
+            "world mesh texture PNG bytes",
+        )?;
+        let raw_frames =
+            read_limited_slice(texture.animation_frames, true, "world mesh animation frames")?;
+        if raw_frames.len() > WORLD_MAX_MESH_ANIMATION_FRAMES {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                format!(
+                    "world mesh animation frame table length {} exceeds {}",
+                    raw_frames.len(),
+                    WORLD_MAX_MESH_ANIMATION_FRAMES
+                ),
+            ));
+        }
+        let mut animation_frames = Vec::with_capacity(raw_frames.len());
+        for frame in raw_frames {
+            validate_item_size::<FfiWorldMeshAnimationFrameRecord>(
+                frame.byte_size,
+                "world mesh animation frame",
+            )?;
+            animation_frames.push(WorldMeshAnimationFrame {
+                frame_index: frame.frame_index,
+                duration_ticks: frame.duration_ticks,
+            });
+        }
         textures.push(WorldMeshTextureAssetPayload {
             texture_id: texture.texture_id,
-            png_bytes: read_bounded_bytes(
-                texture.png_bytes,
-                true,
-                FFI_MAX_WORLD_MESH_TEXTURE_ASSET_BYTES,
-                "world mesh texture PNG bytes",
-            )?,
+            png_bytes,
+            frame_width: texture.frame_width,
+            frame_height: texture.frame_height,
+            frame_count: texture.frame_count,
+            frame_ticks: texture.frame_ticks,
+            animation_flags: texture.animation_flags,
+            frame_row_size: texture.frame_row_size,
+            interpolation_policy: texture.interpolation_policy,
+            animation_frames,
         });
     }
     let raw_meshes = read_limited_slice(request.meshes, true, "world mesh assets")?;

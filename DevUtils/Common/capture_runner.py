@@ -46,6 +46,18 @@ KEY_SUMMARY_PATTERN = (
     r"Validation Warning|VUID-|UNASSIGNED-"
 )
 CLIENT_PROCESS_PATTERN = re.compile(r"KnotClient|devlaunchinjector|MattMC-1\.21", re.IGNORECASE)
+WATER_TERRAIN_TEXTURES = (
+    "assets/minecraft/textures/block/water_still.png",
+    "assets/minecraft/textures/block/water_flow.png",
+    "assets/minecraft/textures/block/water_overlay.png",
+)
+WATER_ANIMATION_SCENARIOS = {
+    "water-non-sequential",
+    "water-unequal-duration",
+    "water-interpolation-off",
+    "water-interpolation-on",
+    "water-pixel-replacement",
+}
 
 
 def static_terrain_base_scenario(scenario: str) -> str:
@@ -88,6 +100,11 @@ def static_terrain_base_scenario(scenario: str) -> str:
     return suffix if suffix in base_scenarios else scenario
 
 
+def static_terrain_requires_translucent_camera_sort(scenario: str) -> bool:
+    scenario = (scenario or "").strip().lower()
+    return scenario in {"translucent-overlap", "translucent-moving-camera-performance"}
+
+
 @dataclass
 class CaptureConfig:
     backend: str
@@ -121,7 +138,9 @@ class CaptureConfig:
     gui_resource_pack_scenario: str
     world_static_terrain_scenario: str
     world_static_terrain_second_world: str
+    world_static_terrain_fault: str
     world_static_terrain_resource_pack_scenario: str
+    world_static_terrain_water_animation_capture: bool
     region_validation: bool
     region_validation_copy_world: bool
     poi_validation: bool
@@ -356,6 +375,7 @@ class CaptureRunner:
             f"world_save_state_total_bytes={save_fingerprint['total_bytes']}",
             f"world_save_state_truncated={str(save_fingerprint['truncated']).lower()}",
             f"game_dir_initial={self.run_dir}",
+            f"world_static_terrain_water_animation_capture={str(self.config.world_static_terrain_water_animation_capture).lower()}",
             f"region_validation={str(self.config.region_validation).lower()}",
             f"region_validation_copy_world={str(self.config.region_validation_copy_world).lower()}",
             f"poi_validation={str(self.config.poi_validation).lower()}",
@@ -708,11 +728,30 @@ class CaptureRunner:
         if not self.config.deterministic_camera_capture:
             return
         if self.config.deterministic_static_camera_capture:
-            self.append_java_tool_options([
-                "-Dmattmc.dev.deterministicCameraCapture.poseCount=1",
-                "-Dmattmc.dev.deterministicCameraCapture.yawDelta=0.0",
-            ])
-            self.append_meta("deterministic_static_camera_capture=true")
+            if self.config.world_static_terrain_fault:
+                self.append_java_tool_options([
+                    f"-Dmattmc.dev.rustGalStaticTerrain.fault={self.config.world_static_terrain_fault}",
+                ])
+                self.append_meta(f"world_static_terrain_fault={self.config.world_static_terrain_fault}")
+            if self.config.world_static_terrain_water_animation_capture:
+                self.append_java_tool_options([
+                    "-Dmattmc.dev.rustGalStaticTerrain.waterAnimationDenseCapture=true",
+                    "-Dmattmc.dev.rustGalStaticTerrain.waterAnimationDenseFrames=24",
+                ])
+                self.append_meta("static_terrain_water_animation_dense_capture=true")
+            if static_terrain_requires_translucent_camera_sort(self.config.world_static_terrain_scenario):
+                self.append_java_tool_options([
+                    "-Dmattmc.dev.deterministicCameraCapture.poseCount=7",
+                    "-Dmattmc.dev.deterministicCameraCapture.framesPerPose=1",
+                    "-Dmattmc.dev.deterministicCameraCapture.yawDelta=18.0",
+                ])
+                self.append_meta("deterministic_static_camera_capture=translucent_camera_sequence")
+            else:
+                self.append_java_tool_options([
+                    "-Dmattmc.dev.deterministicCameraCapture.poseCount=1",
+                    "-Dmattmc.dev.deterministicCameraCapture.yawDelta=0.0",
+                ])
+                self.append_meta("deterministic_static_camera_capture=true")
         configured_shader_pack = extract_property_value(self.run_dir / "config" / "iris.properties", "shaderPack")
         if not client_args_contains_assignment(self.config.client_args, "shaderPack"):
             if self.config.shaders == "on" and not configured_shader_pack:
@@ -2202,6 +2241,8 @@ def gui_resource_pack_specs(scenario: str) -> list[dict[str, object]]:
         "world_border_texture": WORLD_BORDER_RESOURCE_PACK_TEXTURE,
         "world_crack_textures": WORLD_CRACK_RESOURCE_PACK_TEXTURES,
         "world_material_textures": WORLD_MATERIAL_BLOCK_MARKER_TEXTURES + WORLD_MATERIAL_TERRAIN_PARTICLE_TEXTURES,
+        "water_textures": WATER_TERRAIN_TEXTURES,
+        "water_animation": "default",
         "malformed": (),
         "wrong_size": (),
     }
@@ -2229,6 +2270,7 @@ def gui_resource_pack_specs(scenario: str) -> list[dict[str, object]]:
                 "world_border_texture": "",
                 "world_crack_textures": (),
                 "world_material_textures": (),
+                "water_textures": (),
             }
         ]
     if scenario == "malformed":
@@ -2244,6 +2286,7 @@ def gui_resource_pack_specs(scenario: str) -> list[dict[str, object]]:
                     "assets/minecraft/textures/item/barrier.png",
                     "assets/minecraft/textures/block/stone.png",
                     "assets/minecraft/textures/block/sand.png",
+                    "assets/minecraft/textures/block/water_still.png",
                 ),
             }
         ]
@@ -2259,12 +2302,23 @@ def gui_resource_pack_specs(scenario: str) -> list[dict[str, object]]:
                     "assets/minecraft/textures/item/light_15.png",
                     "assets/minecraft/textures/block/oak_leaves.png",
                     "assets/minecraft/textures/block/gravel.png",
+                    "assets/minecraft/textures/block/water_flow.png",
                 ),
+            }
+        ]
+    if scenario in WATER_ANIMATION_SCENARIOS:
+        return [
+            {
+                **base,
+                "name": f"mattmc-rust-terrain-{scenario}",
+                "variant": "a",
+                "water_animation": scenario.removeprefix("water-"),
             }
         ]
     raise SystemExit(
         "--gui-resource-pack-scenario must be one of: vanilla, pack-a, pack-b, "
-        "priority-a-b, priority-b-a, missing, malformed, unsupported"
+        "priority-a-b, priority-b-a, missing, malformed, unsupported, "
+        + ", ".join(sorted(WATER_ANIMATION_SCENARIOS))
     )
 
 
@@ -2322,6 +2376,19 @@ def write_gui_resource_pack(pack_dir: Path, spec: dict[str, object]) -> None:
             continue
         actual_width = 17 if resource_path in wrong_size else 16
         target.write_bytes(asymmetric_png(actual_width, 16, GUI_PACK_COLORS[variant], variant))
+    water_animation = str(spec.get("water_animation", "default"))
+    for water_texture in spec.get("water_textures", ()):  # type: ignore[assignment]
+        resource_path = str(water_texture)
+        target = pack_dir / resource_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if resource_path in malformed:
+            target.write_bytes(b"not a png")
+            continue
+        actual_width = 17 if resource_path in wrong_size else 16
+        frames, frame_meta, interpolate = water_animation_fixture(water_animation, resource_path, variant)
+        target.write_bytes(animated_water_png(actual_width, 16, frames, variant, resource_path))
+        mcmeta = {"animation": {"frames": frame_meta, "interpolate": interpolate}}
+        (target.parent / f"{target.name}.mcmeta").write_text(json.dumps(mcmeta, separators=(",", ":")), encoding="utf-8")
 
 
 def asymmetric_png(width: int, height: int, base: tuple[int, int, int, int], variant: str) -> bytes:
@@ -2338,6 +2405,66 @@ def asymmetric_png(width: int, height: int, base: tuple[int, int, int, int], var
                 pixel = edge
             elif x == width - 1 or y == height - 1:
                 pixel = (base[0] // 2, base[1] // 2, base[2] // 2, base[3])
+            rows.extend(pixel)
+    raw = zlib.compress(bytes(rows))
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + png_chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0))
+        + png_chunk(b"IDAT", raw)
+        + png_chunk(b"IEND", b"")
+    )
+
+
+def water_animation_fixture(
+    scenario: str,
+    resource_path: str,
+    variant: str,
+) -> tuple[list[int], list[object], bool]:
+    if "water_overlay" in resource_path:
+        return [0, 1], [{"index": 0, "time": 2}, {"index": 1, "time": 2}], False
+    if scenario == "non-sequential":
+        return [0, 1, 2, 3], [{"index": 0, "time": 1}, {"index": 2, "time": 1}, {"index": 1, "time": 1}, {"index": 3, "time": 1}], False
+    if scenario == "unequal-duration":
+        return [0, 1, 2, 3], [{"index": 0, "time": 1}, {"index": 1, "time": 3}, {"index": 2, "time": 2}, {"index": 3, "time": 4}], False
+    if scenario == "interpolation-on":
+        return [0, 1, 2, 3], [{"index": 0, "time": 2}, {"index": 1, "time": 2}, {"index": 2, "time": 2}, {"index": 3, "time": 2}], True
+    if scenario == "pixel-replacement":
+        return [0, 1, 2, 3], [{"index": 3, "time": 1}, {"index": 1, "time": 1}, {"index": 2, "time": 1}, {"index": 0, "time": 1}], True
+    # default and interpolation-off
+    return [0, 1, 2, 3], [{"index": 0, "time": 2}, {"index": 1, "time": 2}, {"index": 2, "time": 2}, {"index": 3, "time": 2}], False
+
+
+def animated_water_png(width: int, frame_height: int, frames: list[int], variant: str, resource_path: str) -> bytes:
+    palette_a = [
+        (24, 80, 230, 170),
+        (30, 150, 255, 170),
+        (15, 210, 190, 170),
+        (90, 60, 240, 170),
+    ]
+    palette_b = [
+        (200, 44, 220, 170),
+        (255, 110, 55, 170),
+        (240, 210, 40, 170),
+        (95, 230, 100, 170),
+    ]
+    palette = palette_a if variant == "a" else palette_b
+    rows = bytearray()
+    height = frame_height * max(1, len(frames))
+    for y in range(height):
+        rows.append(0)
+        frame_row = min(len(frames) - 1, y // frame_height)
+        frame_index = frames[frame_row] % len(palette)
+        base = palette[frame_index]
+        if "water_overlay" in resource_path:
+            base = (base[0], base[1], base[2], 96)
+        for x in range(width):
+            pixel = base
+            if x == 0 or y % frame_height == 0:
+                pixel = (255, 255, 255, base[3])
+            elif x == width - 1 or y % frame_height == frame_height - 1:
+                pixel = (base[0] // 2, base[1] // 2, base[2] // 2, base[3])
+            elif x == (frame_index + 3) % max(1, width):
+                pixel = (255 - base[0], 255 - base[1], 255 - base[2], base[3])
             rows.extend(pixel)
     raw = zlib.compress(bytes(rows))
     return (
@@ -2729,8 +2856,16 @@ def parse_args() -> CaptureConfig:
         default=os.environ.get("MATTMC_WORLD_STATIC_TERRAIN_RESOURCE_PACK_SCENARIO", ""),
         help=(
             "Generate and select diagnostic block-texture resource packs for Rust static-terrain atlas coverage. "
-            "Supported: vanilla, pack-a, pack-b, priority-a-b, priority-b-a, missing, malformed, unsupported."
+            "Supported: vanilla, pack-a, pack-b, priority-a-b, priority-b-a, missing, malformed, unsupported, "
+            "water-non-sequential, water-unequal-duration, water-interpolation-off, water-interpolation-on, "
+            "water-pixel-replacement."
         ),
+    )
+    parser.add_argument(
+        "--world-static-terrain-water-animation-capture",
+        action="store_true",
+        default=os.environ.get("MATTMC_WORLD_STATIC_TERRAIN_WATER_ANIMATION_CAPTURE", "").lower() in {"1", "true", "yes"},
+        help="Retain a dense deterministic frame sequence for built-in water animation validation.",
     )
     parser.add_argument(
         "--world-static-terrain-scenario",
@@ -2741,6 +2876,11 @@ def parse_args() -> CaptureConfig:
         "--world-static-terrain-second-world",
         default=os.environ.get("MATTMC_WORLD_STATIC_TERRAIN_SECOND_WORLD", ""),
         help="Explicit destination save name for the optional second static-terrain lifecycle world.",
+    )
+    parser.add_argument(
+        "--world-static-terrain-fault",
+        default=os.environ.get("MATTMC_WORLD_STATIC_TERRAIN_FAULT", ""),
+        help="Static-terrain diagnostic fault injection to forward into copied deterministic runs.",
     )
     parser.add_argument("--region-validation", action="store_true")
     parser.add_argument("--region-validation-copy-world", action="store_true")
@@ -2791,7 +2931,9 @@ def parse_args() -> CaptureConfig:
         gui_resource_pack_scenario=args.gui_resource_pack_scenario,
         world_static_terrain_scenario=args.world_static_terrain_scenario,
         world_static_terrain_second_world=args.world_static_terrain_second_world,
+        world_static_terrain_fault=args.world_static_terrain_fault,
         world_static_terrain_resource_pack_scenario=args.world_static_terrain_resource_pack_scenario,
+        world_static_terrain_water_animation_capture=bool(args.world_static_terrain_water_animation_capture),
         region_validation=bool(args.region_validation),
         region_validation_copy_world=bool(args.region_validation_copy_world),
         poi_validation=bool(args.poi_validation),

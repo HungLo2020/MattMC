@@ -13,9 +13,11 @@ pub(super) fn create_section_mesh_builder(capacity: usize) -> NativeSectionMeshB
             quads: vec![NativeQuad::default(); capacity],
             encoded: Vec::new(),
             encoded_format: None,
+            primitive_metadata: vec![NativeTerrainPrimitiveMetadata::default(); capacity],
         }),
         pending: std::array::from_fn(|_| NativePendingQuadBuffer {
             quads: vec![NativeQuad::default(); PENDING_BATCH_QUAD_CAPACITY],
+            primitive_kinds: vec![TERRAIN_PRIMITIVE_UNKNOWN; PENDING_BATCH_QUAD_CAPACITY],
             flat_quad_records: vec![FlatQuadRecord::default(); PENDING_BATCH_QUAD_CAPACITY],
             light_block_records: vec![LightBlockRecord::default(); PENDING_BATCH_QUAD_CAPACITY],
             fluid_face_records: vec![FluidFaceRecord::default(); PENDING_BATCH_QUAD_CAPACITY],
@@ -33,6 +35,46 @@ pub(super) fn create_section_mesh_builder(capacity: usize) -> NativeSectionMeshB
         section_pass_cache_mask: 0,
         section_pass_cache_valid: false,
         fluid_sprite_mask: 0,
+    }
+}
+
+#[inline(always)]
+pub(super) fn primitive_kind_for_quad(quad: &NativeQuad) -> i32 {
+    if quad.render_type == TERRAIN_RENDER_TYPE_TRANSLUCENT {
+        TERRAIN_PRIMITIVE_NON_FLUID_TRANSLUCENT
+    } else {
+        TERRAIN_PRIMITIVE_UNKNOWN
+    }
+}
+
+#[inline(always)]
+pub(super) fn primitive_metadata_from_quad(
+    quad: &NativeQuad,
+    primitive_kind: i32,
+    facing: usize,
+    face_kind: i32,
+) -> NativeTerrainPrimitiveMetadata {
+    NativeTerrainPrimitiveMetadata {
+        primitive_kind,
+        material_bits: quad.material_bits,
+        block_id: quad.block_id,
+        local_x: quad.local_x,
+        local_y: quad.local_y,
+        local_z: quad.local_z,
+        render_type: quad.render_type as i32,
+        face_kind,
+        facing: facing as i32,
+        reserved0: 0,
+    }
+}
+
+#[inline(always)]
+pub(super) fn ensure_metadata_len(
+    metadata: &mut Vec<NativeTerrainPrimitiveMetadata>,
+    required_len: usize,
+) {
+    if metadata.len() < required_len {
+        metadata.resize(required_len, NativeTerrainPrimitiveMetadata::default());
     }
 }
 
@@ -68,6 +110,9 @@ pub(super) fn section_builder_prepare_quad(
         builder.buffers[facing]
             .quads
             .resize(next_capacity, NativeQuad::default());
+        builder.buffers[facing]
+            .primitive_metadata
+            .resize(next_capacity, NativeTerrainPrimitiveMetadata::default());
     }
 
     Ok(unsafe { builder.buffers[facing].quads.as_mut_ptr().add(index) as u64 })
@@ -79,6 +124,17 @@ pub(super) unsafe fn section_builder_append_batch(
     batch_address: u64,
     quad_count: usize,
     validity: Option<&[u8]>,
+) -> Result<i32, i32> {
+    section_builder_append_batch_with_kind(builder, facing, batch_address, quad_count, validity, None)
+}
+
+pub(super) unsafe fn section_builder_append_batch_with_kind(
+    builder: &mut NativeSectionMeshBuilder,
+    facing: usize,
+    batch_address: u64,
+    quad_count: usize,
+    validity: Option<&[u8]>,
+    primitive_kind_override: Option<i32>,
 ) -> Result<i32, i32> {
     if facing >= MODEL_QUAD_FACING_COUNT {
         return Err(ERR_INVALID_ARGUMENT);
@@ -112,8 +168,13 @@ pub(super) unsafe fn section_builder_append_batch(
             .quads
             .resize(required_len, NativeQuad::default());
     }
+    ensure_metadata_len(
+        &mut builder.buffers[facing].primitive_metadata,
+        required_len,
+    );
 
     let output = &mut builder.buffers[facing].quads[start..required_len];
+    let output_metadata = &mut builder.buffers[facing].primitive_metadata[start..required_len];
     let mut output_index = 0usize;
 
     for index in 0..quad_count {
@@ -123,7 +184,14 @@ pub(super) unsafe fn section_builder_append_batch(
         };
 
         if is_valid {
-            output[output_index] = input[index];
+            let quad = input[index];
+            output[output_index] = quad;
+            output_metadata[output_index] = primitive_metadata_from_quad(
+                &quad,
+                primitive_kind_override.unwrap_or_else(|| primitive_kind_for_quad(&quad)),
+                facing,
+                -1,
+            );
             output_index += 1;
         }
     }
@@ -140,6 +208,30 @@ pub(super) unsafe fn section_builder_append_batch_encoded(
     validity: Option<&[u8]>,
     format: NativeFormat,
     store_raw_quads: bool,
+) -> Result<i32, i32> {
+    section_builder_append_batch_encoded_with_kind(
+        builder,
+        facing,
+        batch_address,
+        quad_count,
+        validity,
+        format,
+        store_raw_quads,
+        None,
+        None,
+    )
+}
+
+pub(super) unsafe fn section_builder_append_batch_encoded_with_kind(
+    builder: &mut NativeSectionMeshBuilder,
+    facing: usize,
+    batch_address: u64,
+    quad_count: usize,
+    validity: Option<&[u8]>,
+    format: NativeFormat,
+    store_raw_quads: bool,
+    primitive_kind_override: Option<i32>,
+    primitive_kind_overrides: Option<&[i32]>,
 ) -> Result<i32, i32> {
     let stage_started = Instant::now();
     if facing >= MODEL_QUAD_FACING_COUNT {
@@ -179,6 +271,7 @@ pub(super) unsafe fn section_builder_append_batch_encoded(
             .checked_mul(encoded_quad_len)
             .ok_or(ERR_INVALID_ARGUMENT)?;
         ensure_encoded_len(&mut buffer.encoded, required_encoded_len, format);
+        ensure_metadata_len(&mut buffer.primitive_metadata, required_len);
 
         for (index, quad) in input.iter().enumerate() {
             let encoded_start = (start + index) * encoded_quad_len;
@@ -192,6 +285,12 @@ pub(super) unsafe fn section_builder_append_batch_encoded(
             builder
                 .profile
                 .add_optional_stage(PROFILE_STAGING_VERTEX_ENCODING, encode_started);
+            buffer.primitive_metadata[start + index] = primitive_metadata_from_quad(
+                quad,
+                primitive_kind_for_index(quad, index, primitive_kind_override, primitive_kind_overrides),
+                facing,
+                -1,
+            );
         }
 
         builder.counts[facing] = required_len;
@@ -220,6 +319,7 @@ pub(super) unsafe fn section_builder_append_batch_encoded(
     if store_raw_quads && buffer.quads.len() < required_len {
         buffer.quads.resize(required_len, NativeQuad::default());
     }
+    ensure_metadata_len(&mut buffer.primitive_metadata, required_len);
     if store_raw_quads {
         builder.profile.add_count(
             PROFILE_COUNT_TRANSLUCENT_RETAINED_BYTES,
@@ -257,6 +357,12 @@ pub(super) unsafe fn section_builder_append_batch_encoded(
             if store_raw_quads {
                 buffer.quads[start + output_index] = quad;
             }
+            buffer.primitive_metadata[start + output_index] = primitive_metadata_from_quad(
+                &quad,
+                primitive_kind_for_index(&quad, index, primitive_kind_override, primitive_kind_overrides),
+                facing,
+                -1,
+            );
             let encoded_start = (start + output_index) * encoded_quad_len;
             let encoded_end = encoded_start + encoded_quad_len;
             encode_quad(
@@ -278,6 +384,22 @@ pub(super) unsafe fn section_builder_append_batch_encoded(
     Ok(valid_count as i32)
 }
 
+#[inline(always)]
+fn primitive_kind_for_index(
+    quad: &NativeQuad,
+    index: usize,
+    fallback_override: Option<i32>,
+    primitive_kind_overrides: Option<&[i32]>,
+) -> i32 {
+    if let Some(primitive_kind) = primitive_kind_overrides
+        .and_then(|values| values.get(index).copied())
+        .filter(|value| *value != TERRAIN_PRIMITIVE_UNKNOWN)
+    {
+        return primitive_kind;
+    }
+    fallback_override.unwrap_or_else(|| primitive_kind_for_quad(quad))
+}
+
 pub(super) unsafe fn section_builder_append_flat_quad_records_encoded(
     builder: &mut NativeSectionMeshBuilder,
     facing: usize,
@@ -287,6 +409,7 @@ pub(super) unsafe fn section_builder_append_flat_quad_records_encoded(
     analyzer: Option<(u64, i32)>,
     format: NativeFormat,
     store_raw_quads: bool,
+    primitive_kind_override: Option<i32>,
 ) -> Result<(i32, i32), i32> {
     if facing >= MODEL_QUAD_FACING_COUNT {
         return Err(ERR_INVALID_ARGUMENT);
@@ -340,7 +463,9 @@ pub(super) unsafe fn section_builder_append_flat_quad_records_encoded(
             None
         };
 
-        let chunk_committed = section_builder_append_batch_encoded(
+        let primitive_kinds =
+            builder.pending[facing].primitive_kinds[processed..processed + chunk_count].to_vec();
+        let chunk_committed = section_builder_append_batch_encoded_with_kind(
             builder,
             facing,
             builder.pending[facing].quads.as_ptr() as u64,
@@ -348,6 +473,8 @@ pub(super) unsafe fn section_builder_append_flat_quad_records_encoded(
             validity,
             format,
             store_raw_quads,
+            primitive_kind_override,
+            Some(&primitive_kinds),
         )?;
 
         total_valid = total_valid.checked_add(chunk_valid).ok_or(ERR_CAPACITY)?;
@@ -358,6 +485,24 @@ pub(super) unsafe fn section_builder_append_flat_quad_records_encoded(
     }
 
     Ok((total_valid, total_committed))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn primitive_kind_uses_translucent_pass_not_cutout_pass() {
+        let mut quad = NativeQuad::default();
+        quad.render_type = 1;
+        assert_eq!(TERRAIN_PRIMITIVE_UNKNOWN, primitive_kind_for_quad(&quad));
+
+        quad.render_type = TERRAIN_RENDER_TYPE_TRANSLUCENT;
+        assert_eq!(
+            TERRAIN_PRIMITIVE_NON_FLUID_TRANSLUCENT,
+            primitive_kind_for_quad(&quad)
+        );
+    }
 }
 
 pub(super) unsafe fn section_builder_append_light_block_records_encoded(
@@ -459,6 +604,7 @@ pub(super) unsafe fn section_builder_append_static_model_records_encoded(
                     local_y: record.local_y,
                     local_z: record.local_z,
                 });
+                pending.primitive_kinds[slot] = TERRAIN_PRIMITIVE_UNKNOWN;
             }
             pending_counts[facing] += 1;
 
@@ -495,6 +641,7 @@ pub(super) unsafe fn section_builder_append_static_model_records_encoded(
             {
                 let pending = &mut builder.pending[facing];
                 pending.quads[slot] = quad;
+                pending.primitive_kinds[slot] = TERRAIN_PRIMITIVE_UNKNOWN;
             }
             pending_counts[facing] += 1;
 
@@ -584,7 +731,9 @@ pub(super) unsafe fn flush_static_model_pending_face(
         None
     };
     let staging_started = Instant::now();
-    let committed = section_builder_append_batch_encoded(
+    let primitive_kind_override = analyzer.map(|_| TERRAIN_PRIMITIVE_NON_FLUID_TRANSLUCENT);
+    let primitive_kinds = builder.pending[facing].primitive_kinds[..count].to_vec();
+    let committed = section_builder_append_batch_encoded_with_kind(
         builder,
         facing,
         pending_address,
@@ -592,6 +741,8 @@ pub(super) unsafe fn flush_static_model_pending_face(
         validity,
         format,
         store_raw_quads,
+        primitive_kind_override,
+        Some(&primitive_kinds),
     )?;
     builder
         .profile

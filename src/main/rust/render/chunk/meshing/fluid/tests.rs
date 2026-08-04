@@ -24,6 +24,7 @@ fn fluid_face_record_expands_semantic_side_face_to_quad() {
         colors: [1, 2, 3, 4],
         aos: [0.1, 0.2, 0.3, 0.4],
         lights: [11, 12, 13, 14],
+        primitive_kind: TERRAIN_PRIMITIVE_BUILTIN_WATER,
     };
 
     let quad = fluid_face_record_to_quad(record).unwrap();

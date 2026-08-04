@@ -39,6 +39,8 @@ import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.FluidState;
+import net.minecraft.world.level.material.Fluids;
+import net.vulkanic.world.WorldRenderRoutePolicy;
 import org.joml.Vector3dc;
 
 import java.util.Map;
@@ -75,6 +77,7 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
         cache.init(this.renderContext);
 
         LevelSlice slice = cache.getWorldSlice();
+        boolean rustStaticTerrainRoute = WorldRenderRoutePolicy.staticTerrainBuildRequiresRustWholeFrameMetadata();
 
         int minX = this.render.getOriginX();
         int minY = this.render.getOriginY();
@@ -105,6 +108,8 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
         boolean forceJavaFluids = NativeMeshingDiagnostics.forceJavaFluids();
         int fallbackBlockCount = 0;
         int fluidBlockCount = 0;
+        int nativeWaterBlockCount = 0;
+        int unsupportedFluidBlockCount = 0;
         int fallbackQuadStart = blockRenderer.getEmittedQuadCount();
 
         profiler.push("render blocks");
@@ -134,14 +139,21 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
                         if (!fluidState.isEmpty()) {
                             fluidBlockCount++;
                         }
+                        boolean builtInWater = isBuiltInWater(fluidState);
                         boolean nativeFluidSupported = !fluidState.isEmpty()
                                 && NativeSectionSnapshot.isNativeFluidSupported(fluidState);
+                        boolean rustWaterSupported = nativeFluidSupported && builtInWater;
+                        boolean nativeUnsupportedFluidForRustTerrain = rustStaticTerrainRoute
+                                && !fluidState.isEmpty()
+                                && nativeFluidSupported
+                                && !rustWaterSupported;
                         boolean useJavaFluid = !fluidState.isEmpty()
                                 && (forceJavaFluids || !nativeFluidSupported);
+                        boolean skipNativeFluid = useJavaFluid || nativeUnsupportedFluidForRustTerrain;
 
                         if (!forceJavaProducers) {
                             nativeSectionSnapshot.appendBlock(localBlockIndex, slice, blockState, blockPos, localX,
-                                    localY, localZ, useJavaFluid);
+                                    localY, localZ, skipNativeFluid);
                         }
 
                         if (blockState.getRenderShape() == RenderShape.MODEL) {
@@ -161,7 +173,12 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
                             NativeMeshingCompatibilityFallback.renderFluid(cache, buffers, slice, blockState,
                                     fluidState, blockPos, modelOffset, collector, fallbackStats);
                             fallbackBlockCount++;
-                        } else if (!fluidState.isEmpty()) {
+                        } else if (nativeUnsupportedFluidForRustTerrain) {
+                            NativeMeshingCompatibilityFallback.renderUnsupportedFluidTranslucentMetadata(cache,
+                                    buffers, slice, blockState, fluidState, blockPos, modelOffset, collector);
+                            unsupportedFluidBlockCount++;
+                        } else if (rustWaterSupported) {
+                            nativeWaterBlockCount++;
                             fallbackStats.recordNativeFluidBlock(fluidState);
                         }
 
@@ -203,7 +220,7 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
             renderData.setNativeMeshingFallbackCounts(fallbackBlockCount, fallbackQuadCount);
         }
         if (fluidBlockCount != 0) {
-            renderData.setNativeMeshingFluidBlocks(fluidBlockCount);
+            renderData.setNativeMeshingFluidCounts(fluidBlockCount, nativeWaterBlockCount, unsupportedFluidBlockCount);
         }
         fallbackStats.report(this.render.getSectionIndex(), new BlockPos(minX, minY, minZ));
 
@@ -306,6 +323,10 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
     @Override
     public long estimateTaskSizeWith(MeshTaskSizeEstimator estimator) {
         return estimator.estimateSize(this.render);
+    }
+
+    private static boolean isBuiltInWater(FluidState fluidState) {
+        return fluidState.is(Fluids.WATER) || fluidState.is(Fluids.FLOWING_WATER);
     }
 
 }

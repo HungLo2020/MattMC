@@ -88,6 +88,8 @@ pub(in crate::render::chunk::meshing) fn fluid_semantic_native_face(
         material_bits: state.fluid_material_bits,
         packed_normal,
         facing,
+        fluid_type: state.fluid_type,
+        face_kind,
     }
 }
 
@@ -208,6 +210,11 @@ pub(in crate::render::chunk::meshing) fn fluid_semantic_record(
         colors: [color; 4],
         aos: [ao; 4],
         lights: [light; 4],
+        primitive_kind: if state.fluid_type == FLUID_WATER {
+            TERRAIN_PRIMITIVE_BUILTIN_WATER
+        } else {
+            TERRAIN_PRIMITIVE_UNSUPPORTED_FLUID
+        },
     }
 }
 

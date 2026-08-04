@@ -140,6 +140,7 @@ pub unsafe extern "C" fn mattmc_sodium_chunk_quad_buffer_create(
         quads: vec![NativeQuad::default(); capacity],
         encoded: Vec::new(),
         encoded_format: None,
+        primitive_metadata: vec![NativeTerrainPrimitiveMetadata::default(); capacity],
     });
 
     *output_address = if buffer.quads.is_empty() {

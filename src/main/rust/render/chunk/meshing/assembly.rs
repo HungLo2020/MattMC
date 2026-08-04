@@ -346,6 +346,104 @@ pub(super) unsafe fn assemble_section_builder(
     OK
 }
 
+pub(super) unsafe fn copy_section_builder_primitive_metadata(
+    builder: &NativeSectionMeshBuilder,
+    output_address: u64,
+    output_capacity_records: i32,
+    visible_slices: i32,
+    force_unassigned: i32,
+    slice_reordering: i32,
+) -> i32 {
+    if output_capacity_records < 0 {
+        return ERR_INVALID_ARGUMENT;
+    }
+    let total_quads = match builder
+        .counts
+        .iter()
+        .try_fold(0usize, |acc, count| acc.checked_add(*count))
+    {
+        Some(value) => value,
+        None => return ERR_INVALID_ARGUMENT,
+    };
+    if total_quads == 0 {
+        return OK;
+    }
+    if output_address == 0 {
+        return ERR_NULL_POINTER;
+    }
+    let output_capacity = match usize::try_from(output_capacity_records) {
+        Ok(value) => value,
+        Err(_) => return ERR_INVALID_ARGUMENT,
+    };
+    if output_capacity < total_quads {
+        return ERR_CAPACITY;
+    }
+    let output =
+        slice::from_raw_parts_mut(output_address as *mut NativeTerrainPrimitiveMetadata, total_quads);
+    let mut cursor = 0usize;
+    if slice_reordering != 0 {
+        if let Err(status) = copy_metadata_segment(
+            builder,
+            MODEL_QUAD_FACING_UNASSIGNED,
+            output,
+            &mut cursor,
+        ) {
+            return status;
+        }
+        for step in 0..2 {
+            for facing in 0..MODEL_QUAD_FACING_COUNT {
+                if facing == MODEL_QUAD_FACING_UNASSIGNED
+                    || ((visible_slices >> facing) & 1) == step
+                {
+                    continue;
+                }
+                if let Err(status) = copy_metadata_segment(builder, facing, output, &mut cursor) {
+                    return status;
+                }
+            }
+        }
+    } else if force_unassigned != 0 {
+        for facing in 0..MODEL_QUAD_FACING_COUNT {
+            if let Err(status) = copy_metadata_segment(builder, facing, output, &mut cursor) {
+                return status;
+            }
+        }
+    } else {
+        for facing in 0..MODEL_QUAD_FACING_COUNT {
+            if let Err(status) = copy_metadata_segment(builder, facing, output, &mut cursor) {
+                return status;
+            }
+        }
+    }
+    if cursor != total_quads {
+        return ERR_INVALID_ARGUMENT;
+    }
+    OK
+}
+
+fn copy_metadata_segment(
+    builder: &NativeSectionMeshBuilder,
+    facing: usize,
+    output: &mut [NativeTerrainPrimitiveMetadata],
+    cursor: &mut usize,
+) -> Result<(), i32> {
+    let count = builder.counts[facing];
+    if count == 0 {
+        return Ok(());
+    }
+    let metadata = builder.buffers[facing]
+        .primitive_metadata
+        .get(..count)
+        .ok_or(ERR_INVALID_ARGUMENT)?;
+    let end = cursor.checked_add(count).ok_or(ERR_INVALID_ARGUMENT)?;
+    output
+        .get_mut(*cursor..end)
+        .ok_or(ERR_CAPACITY)?
+        .copy_from_slice(metadata);
+    *cursor = end;
+    Ok(())
+}
+
 pub(super) fn append_builder_segment(
     builder: &NativeSectionMeshBuilder,
     facing: usize,

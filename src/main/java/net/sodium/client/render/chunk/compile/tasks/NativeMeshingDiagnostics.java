@@ -91,7 +91,7 @@ final class NativeMeshingDiagnostics {
         void recordNativeFluidBlock(FluidState fluidState) {
             if (this.enabled) {
                 this.nativeFluidBlocks++;
-                if (fluidState.is(Fluids.WATER)) {
+                if (isBuiltInWater(fluidState)) {
                     this.nativeWaterBlocks++;
                 }
             }
@@ -111,11 +111,15 @@ final class NativeMeshingDiagnostics {
                 return;
             }
             this.fluidFallbackBlocks++;
-            if (fluidState.is(Fluids.WATER)) {
+            if (isBuiltInWater(fluidState)) {
                 this.waterFallbackBlocks++;
             }
             this.fluidFallbackQuads += Math.max(quadCount, 0);
             incrementBounded(this.fluidFallbackStates, blockState + " fluid=" + fluidState);
+        }
+
+        private static boolean isBuiltInWater(FluidState fluidState) {
+            return fluidState.is(Fluids.WATER) || fluidState.is(Fluids.FLOWING_WATER);
         }
 
         void recordAppenderFallbackQuads(int quadCount) {

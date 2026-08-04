@@ -6,7 +6,7 @@ fn native_quad_layout_matches_java_stride() {
     assert_eq!(152, std::mem::size_of::<NativeQuad>());
     assert_eq!(156, std::mem::size_of::<FlatQuadRecord>());
     assert_eq!(24, std::mem::size_of::<LightBlockRecord>());
-    assert_eq!(172, std::mem::size_of::<FluidFaceRecord>());
+    assert_eq!(176, std::mem::size_of::<FluidFaceRecord>());
 }
 
 #[test]

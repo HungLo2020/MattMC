@@ -1,6 +1,12 @@
 use super::*;
 use crate::render::chunk::meshing::section::CompactSectionSnapshot;
 use std::mem;
+use std::sync::{Mutex, MutexGuard, OnceLock};
+
+fn native_cache_test_lock() -> MutexGuard<'static, ()> {
+    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+    LOCK.get_or_init(|| Mutex::new(())).lock().unwrap()
+}
 
 struct CompactSnapshotStorage {
     active_indices: Vec<u16>,
@@ -277,6 +283,7 @@ fn ffi_rejects_malformed_handles_lengths_and_formats() {
 
 #[test]
 fn cache_registration_ffi_rejects_bad_ids_pointers_and_strides() {
+    let _guard = native_cache_test_lock();
     unsafe {
         assert_eq!(OK, mattmc_sodium_static_model_cache_clear());
         assert_eq!(
@@ -373,6 +380,29 @@ fn staging_and_assembly_ffi_reject_bad_handles_and_formats() {
                 0,
             )
         );
+        let mut metadata = [NativeTerrainPrimitiveMetadata::default(); 1];
+        assert_eq!(
+            ERR_NULL_POINTER,
+            mattmc_sodium_section_mesh_builder_copy_primitive_metadata(
+                0,
+                metadata.as_mut_ptr() as u64,
+                metadata.len() as i32,
+                0,
+                0,
+                0,
+            )
+        );
+        assert_eq!(
+            ERR_INVALID_ARGUMENT,
+            mattmc_sodium_section_mesh_builder_copy_primitive_metadata(
+                builders.solid,
+                metadata.as_mut_ptr() as u64,
+                -1,
+                0,
+                0,
+                0,
+            )
+        );
     }
 }
 
@@ -427,6 +457,172 @@ fn translucent_append_ffi_rejects_bad_counts_and_analyzer_handles() {
 }
 
 #[test]
+fn translucent_encoded_append_stamps_non_fluid_primitive_metadata() {
+    unsafe {
+        let builders = BuilderHandles::new();
+        let mut analyzer = 0u64;
+        assert_eq!(
+            OK,
+            crate::render::chunk::translucent::mattmc_sodium_translucent_analyzer_create(
+                &mut analyzer,
+            )
+        );
+
+        let mut quad = NativeQuad::default();
+        quad.render_type = 0;
+        quad.vertices[0].x = 0.0;
+        quad.vertices[0].y = 0.0;
+        quad.vertices[0].z = 0.0;
+        quad.vertices[1].x = 1.0;
+        quad.vertices[1].y = 0.0;
+        quad.vertices[1].z = 0.0;
+        quad.vertices[2].x = 1.0;
+        quad.vertices[2].y = 1.0;
+        quad.vertices[2].z = 0.0;
+        quad.vertices[3].x = 0.0;
+        quad.vertices[3].y = 1.0;
+        quad.vertices[3].z = 0.0;
+        let normals = [0i32; 1];
+        let mut counts = [0; 2];
+        let (quad_stride, vertex_stride, block_id, normal, tangent, mid_uv, mid_block) =
+            compact_format_args();
+        assert_eq!(
+            OK,
+            mattmc_sodium_section_mesh_builder_append_translucent_batch_encoded(
+                builders.translucent,
+                MODEL_QUAD_FACING_UNASSIGNED as i32,
+                &quad as *const NativeQuad as u64,
+                1,
+                analyzer,
+                MODEL_QUAD_FACING_UNASSIGNED as i32,
+                normals.as_ptr() as u64,
+                quad_stride,
+                vertex_stride,
+                block_id,
+                normal,
+                tangent,
+                mid_uv,
+                mid_block,
+                0,
+                0,
+                0,
+                counts.as_mut_ptr(),
+                counts.len() as i32,
+            )
+        );
+        assert_eq!([1, 1], counts);
+
+        let mut metadata = [NativeTerrainPrimitiveMetadata::default(); 1];
+        assert_eq!(
+            OK,
+            mattmc_sodium_section_mesh_builder_copy_primitive_metadata(
+                builders.translucent,
+                metadata.as_mut_ptr() as u64,
+                metadata.len() as i32,
+                0,
+                1,
+                0,
+            )
+        );
+        assert_eq!(
+            TERRAIN_PRIMITIVE_NON_FLUID_TRANSLUCENT,
+            metadata[0].primitive_kind
+        );
+
+        assert_eq!(
+            OK,
+            crate::render::chunk::translucent::mattmc_sodium_translucent_analyzer_destroy(
+                analyzer,
+            )
+        );
+    }
+}
+
+#[test]
+fn compact_native_lava_fluid_stamps_unsupported_primitive_metadata() {
+    let _guard = native_cache_test_lock();
+    unsafe {
+        assert_eq!(OK, mattmc_sodium_static_model_cache_clear());
+        assert_eq!(
+            OK,
+            mattmc_sodium_native_meshing_state_register(
+                42,
+                -1,
+                STATE_FLAG_FLUID,
+                0,
+                2,
+                0,
+                1,
+                99,
+                2,
+                2,
+                77,
+                0,
+                0,
+                FLUID_LAVA,
+                1.0,
+                0,
+                0,
+                0.0,
+                0.0,
+                TINT_NONE,
+                0.0,
+                1.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                1.0,
+                0.0,
+                0,
+            )
+        );
+
+        let builders = BuilderHandles::new();
+        let mut storage = CompactSnapshotStorage::new();
+        storage.set_center_state(42);
+        storage.fluid_block_ids[0] = 77;
+        let header = storage.header(1);
+        let mut counts = [0; 3];
+        assert_eq!(
+            OK,
+            append_compact(&builders, &header as *const CompactSectionSnapshotHeader as u64, &mut counts)
+        );
+        assert!(counts[2] > 0, "lava should emit translucent native fluid quads");
+
+        let mut metadata = vec![NativeTerrainPrimitiveMetadata::default(); counts[2] as usize];
+        assert_eq!(
+            OK,
+            mattmc_sodium_section_mesh_builder_copy_primitive_metadata(
+                builders.translucent,
+                metadata.as_mut_ptr() as u64,
+                metadata.len() as i32,
+                0,
+                1,
+                0,
+            )
+        );
+        assert!(
+            metadata
+                .iter()
+                .all(|record| record.primitive_kind == TERRAIN_PRIMITIVE_UNSUPPORTED_FLUID),
+            "compact lava fluid metadata should be unsupported: {:?}",
+            metadata
+                .iter()
+                .map(|record| record.primitive_kind)
+                .collect::<Vec<_>>()
+        );
+    }
+}
+
+#[test]
 fn update_buffer_ffi_rejects_bad_handles_counts_and_output_pointers() {
     unsafe {
         let mut handle = 0;
@@ -473,6 +669,7 @@ fn compact_ffi_rejects_malformed_snapshot_header() {
 
 #[test]
 fn cleared_native_cache_ids_do_not_resolve_after_reload() {
+    let _guard = native_cache_test_lock();
     unsafe {
         assert_eq!(OK, mattmc_sodium_static_model_cache_clear());
 

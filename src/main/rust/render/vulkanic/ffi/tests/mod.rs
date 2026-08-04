@@ -1134,6 +1134,18 @@ fn world_mesh_asset_ffi_copies_payload_memory() {
             ptr: png.as_ptr(),
             len: png.len() as u64,
         },
+        frame_width: 0,
+        frame_height: 0,
+        frame_count: 1,
+        frame_ticks: 1,
+        animation_flags: 0,
+        frame_row_size: 0,
+        interpolation_policy: 0,
+        reserved0: 0,
+        animation_frames: FfiSlice {
+            ptr: std::ptr::null(),
+            count: 0,
+        },
     }];
     let request = world_mesh_asset_update_request(&meshes, &textures);
     let (generation, owned_meshes, owned_textures, owned_sorted_indices) =

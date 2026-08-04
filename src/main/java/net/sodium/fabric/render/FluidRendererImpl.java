@@ -38,7 +38,19 @@ public class FluidRendererImpl extends FluidRenderer implements net.irisshaders.
     }
 
     public void render(LevelSlice level, BlockState blockState, FluidState fluidState, BlockPos blockPos, BlockPos offset, TranslucentGeometryCollector collector, ChunkBuildBuffers buffers) {
-        var material = DefaultMaterials.forFluidState(fluidState);
+        this.renderWithMaterial(level, blockState, fluidState, blockPos, offset, collector, buffers,
+                DefaultMaterials.forFluidState(fluidState));
+    }
+
+    @Override
+    public void renderUnsupportedTranslucentMetadata(LevelSlice level, BlockState blockState, FluidState fluidState,
+            BlockPos blockPos, BlockPos offset, TranslucentGeometryCollector collector, ChunkBuildBuffers buffers) {
+        this.renderWithMaterial(level, blockState, fluidState, blockPos, offset, collector, buffers,
+                DefaultMaterials.TRANSLUCENT);
+    }
+
+    private void renderWithMaterial(LevelSlice level, BlockState blockState, FluidState fluidState, BlockPos blockPos,
+            BlockPos offset, TranslucentGeometryCollector collector, ChunkBuildBuffers buffers, Material material) {
         var meshBuilder = buffers.get(material);
 
         FluidRenderHandler handler = FluidRenderHandlerRegistry.INSTANCE.get(fluidState.getType());

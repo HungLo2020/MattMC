@@ -109,9 +109,13 @@ public final class RustGalWorldPrimitiveRenderer {
 	public static final int MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_14 = 0x0B2BDBBD;
 	public static final int MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_15 = 0x019476C0;
 	public static final int MATERIAL_TEXTURE_TERRAIN_BLOCK_ATLAS = 0x54A17A1A;
+	public static final int MATERIAL_TEXTURE_WATER_STILL = 0x5A71A501;
+	public static final int MATERIAL_TEXTURE_WATER_FLOW = 0x5A71A502;
+	public static final int MATERIAL_TEXTURE_WATER_OVERLAY = 0x5A71A503;
 	public static final int MATERIAL_ID_OPAQUE_TEXTURED = 0x6A2FD335;
 	public static final int MATERIAL_ID_CUTOUT_TEXTURED = 0x129B1B90;
 	public static final int MATERIAL_ID_TRANSLUCENT_TEXTURED = 0x4D21A7C3;
+	public static final int MATERIAL_ID_WATER_TRANSLUCENT = 0x39E0A7E4;
 	public static final int MATERIAL_ID_BLOCK_MARKER_CUTOUT = 0x224A8659;
 	public static final int MATERIAL_MODE_OPAQUE = 1;
 	public static final int MATERIAL_MODE_CUTOUT = 2;

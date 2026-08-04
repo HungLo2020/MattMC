@@ -7,6 +7,17 @@
 
 use super::*;
 
+fn mark_renderable_fluid_sprite<S: NativeFluidFaceSink>(
+    sink: &mut S,
+    state: NativeMeshingState,
+    still: bool,
+    overlay: bool,
+) {
+    if state.fluid_type == FLUID_WATER {
+        sink.mark_fluid_sprite(fluid_sprite_mask(state.fluid_type, still, overlay));
+    }
+}
+
 pub(in crate::render::chunk::meshing) unsafe fn emit_native_section_fluid_faces(
     block: &NativeSectionBlockRecord,
     state: NativeMeshingState,
@@ -385,7 +396,7 @@ pub(in crate::render::chunk::meshing) fn native_section_fluid_faces_to_sink<
             render_heights[3]
         );
         sink.emit(top_face)?;
-        sink.mark_fluid_sprite(fluid_sprite_mask(state.fluid_type, top_uses_still, false));
+        mark_renderable_fluid_sprite(sink, state, top_uses_still, false);
         fluid_log!(
             "emit-top-done pos={},{},{}",
             block.absolute_x,
@@ -446,7 +457,7 @@ pub(in crate::render::chunk::meshing) fn native_section_fluid_faces_to_sink<
                 top_face_kind
             );
             sink.emit(backward_face)?;
-            sink.mark_fluid_sprite(fluid_sprite_mask(state.fluid_type, top_uses_still, false));
+            mark_renderable_fluid_sprite(sink, state, top_uses_still, false);
             emitted += 1;
             sink.profile()
                 .add_optional_stage(PROFILE_FLUID_NATIVE_QUAD_APPEND, append_started);
@@ -510,7 +521,7 @@ pub(in crate::render::chunk::meshing) fn native_section_fluid_faces_to_sink<
             bottom_face.facing
         );
         sink.emit(bottom_face)?;
-        sink.mark_fluid_sprite(fluid_sprite_mask(state.fluid_type, true, false));
+        mark_renderable_fluid_sprite(sink, state, true, false);
         emitted += 1;
         sink.profile()
             .add_optional_stage(PROFILE_FLUID_NATIVE_QUAD_APPEND, append_started);
@@ -594,7 +605,7 @@ pub(in crate::render::chunk::meshing) fn native_section_fluid_faces_to_sink<
                 h2
             );
             sink.emit(side_face)?;
-            sink.mark_fluid_sprite(fluid_sprite_mask(state.fluid_type, false, is_overlay));
+            mark_renderable_fluid_sprite(sink, state, false, is_overlay);
             emitted += 1;
             sink.profile()
                 .add_optional_stage(PROFILE_FLUID_NATIVE_QUAD_APPEND, append_started);
@@ -631,7 +642,7 @@ pub(in crate::render::chunk::meshing) fn native_section_fluid_faces_to_sink<
                     h2
                 );
                 sink.emit(back_face)?;
-                sink.mark_fluid_sprite(fluid_sprite_mask(state.fluid_type, false, false));
+                mark_renderable_fluid_sprite(sink, state, false, false);
                 emitted += 1;
                 sink.profile()
                     .add_optional_stage(PROFILE_FLUID_NATIVE_QUAD_APPEND, append_started);

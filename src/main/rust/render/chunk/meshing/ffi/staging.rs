@@ -220,6 +220,29 @@ pub unsafe extern "C" fn mattmc_sodium_section_mesh_builder_assemble(
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_section_mesh_builder_copy_primitive_metadata(
+    handle: u64,
+    output_address: u64,
+    output_capacity_records: i32,
+    visible_slices: i32,
+    force_unassigned: i32,
+    slice_reordering: i32,
+) -> i32 {
+    if handle == 0 {
+        return ERR_NULL_POINTER;
+    }
+    let builder = &*(handle as *const NativeSectionMeshBuilder);
+    copy_section_builder_primitive_metadata(
+        builder,
+        output_address,
+        output_capacity_records,
+        visible_slices,
+        force_unassigned,
+        slice_reordering,
+    )
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn mattmc_sodium_section_mesh_builder_encode_scattered_unassigned(
     handle: u64,
     output_vertex_offsets: *const i32,

@@ -76,7 +76,9 @@ def isolated_capture_config(
         gui_resource_pack_scenario="",
         world_static_terrain_scenario=scenario,
         world_static_terrain_second_world=second_world,
+        world_static_terrain_fault="",
         world_static_terrain_resource_pack_scenario="",
+        world_static_terrain_water_animation_capture=False,
         region_validation=False,
         region_validation_copy_world=False,
         poi_validation=False,
@@ -4147,7 +4149,9 @@ else:
                 gui_resource_pack_scenario="vanilla",
                 world_static_terrain_scenario="",
                 world_static_terrain_second_world="",
+                world_static_terrain_fault="",
                 world_static_terrain_resource_pack_scenario="",
+                world_static_terrain_water_animation_capture=False,
                 region_validation=False,
                 region_validation_copy_world=False,
                 poi_validation=False,
@@ -4223,6 +4227,33 @@ else:
             self.assertIn("-Dmattmc.dev.deterministicCameraCapture.poseCount=1", java_options)
             self.assertIn("-Dmattmc.dev.deterministicCameraCapture.yawDelta=0.0", java_options)
 
+    def test_static_translucent_overlap_capture_keeps_full_camera_sequence(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            target = fake_repo(root, "current")
+            mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-rust-vulkan-shaders-on")
+            args = harness.parse_args(
+                [
+                    "capture",
+                    "--profile",
+                    "standard",
+                    "--mode",
+                    mode.name,
+                    "--workload-profile",
+                    "gameplay",
+                    "--world-static-terrain-scenario",
+                    "translucent-overlap",
+                ]
+            )
+            _, env = harness.build_capture_command(target, mode, root / "capture", "correctness", args, "capture")
+            java_options = env["JAVA_TOOL_OPTIONS"]
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.poseCount=7", java_options)
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=1", java_options)
+            self.assertGreater(
+                java_options.rfind("-Dmattmc.dev.deterministicCameraCapture.poseCount=7"),
+                java_options.rfind("-Dmattmc.dev.deterministicCameraCapture.poseCount=1"),
+            )
+
     def test_rust_vulkan_moving_mesh_capture_requests_real_gameplay_attachment_dump(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -4249,6 +4280,36 @@ else:
             self.assertIn("-Dmattmc.dev.rustGalWorldMesh.fallingBlockScenario=sand", java_options)
             self.assertIn("-Dmattmc.dev.rustGalWorldMesh.pistonScenario=normal-extending", java_options)
             self.assertIn("-Dmattmc.dev.deterministicCameraCapture.poseCount=12", java_options)
+
+    def test_static_terrain_capture_requests_deterministic_capture_for_gameplay_profile(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            target = fake_repo(root, "current")
+            mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-rust-vulkan-shaders-on")
+            args = harness.parse_args(
+                [
+                    "capture",
+                    "--profile",
+                    "standard",
+                    "--mode",
+                    mode.name,
+                    "--workload-profile",
+                    "gameplay",
+                    "--world-static-terrain-scenario",
+                    "translucent-mixed-unsupported",
+                ]
+            )
+
+            command, env = harness.build_capture_command(target, mode, root / "capture", "gameplay", args, "capture")
+
+            self.assertIn("--deterministic-camera-capture", command)
+            self.assertIn("--deterministic-static-camera-capture", command)
+            self.assertIn("MATTMC_DETERMINISTIC_METADATA", env)
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture=true", env["JAVA_TOOL_OPTIONS"])
+            self.assertIn(
+                "-Dmattmc.dev.rustGalStaticTerrain.scenario=translucent-mixed-unsupported",
+                env["JAVA_TOOL_OPTIONS"],
+            )
 
     def test_rust_vulkan_gameplay_timing_does_not_request_attachment_readback(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -6281,7 +6342,17 @@ else:
         }
         if not events:
             events = (
-                {"reason": "mesh-registered"},
+                {
+                    "reason": (
+                        "translucent-primitive-accounting"
+                        ":sourcePrimitives=6:nonFluidPrimitives=4:waterPrimitives=2:unsupportedPrimitives=0"
+                        ":retainedPrimitives=6:omittedPrimitives=0:executedPrimitives=6"
+                        ":sourceIndices=36:retainedIndices=36:omittedIndices=0"
+                        ":sourceHash=111:retainedHash=111:omittedHash=222"
+                        ":rangeCount=2:materialSwitches=1:ranges=9001@0+12,9002@48+24"
+                        ":sample=0/1/retained/9001/0,1/2/retained/9002/6"
+                    )
+                },
                 {
                     "reason": "translucent-source-sort",
                     "sortGeneration": 102,
@@ -6307,6 +6378,23 @@ else:
         for event in events:
             merged = dict(base)
             merged.update(event)
+            reason = str(merged.get("reason") or "")
+            if reason.startswith("translucent-primitive-accounting") and "waterStillPrimitives=" not in reason:
+                detail = harness.parse_colon_key_values(reason)
+                water = int(harness.parse_number(detail.get("waterPrimitives")) or 0)
+                still = 1 if water > 0 else 0
+                flow = max(0, water - still)
+                reason += (
+                    f":waterStillPrimitives={still}"
+                    f":waterFlowPrimitives={flow}"
+                    ":waterOverlayPrimitives=0"
+                    f":waterTextureSwitches={1 if water > 1 else 0}"
+                    ":waterAnimationHash=12345"
+                    ":waterAnimationEntries=9002/minecraft~block/water_still/16x16/32/2/1/0/0@2|"
+                    "9003/minecraft~block/water_flow/16x16/32/2/1/0/0@2|"
+                    "9004/minecraft~block/water_overlay/16x16/1/1/0/0/"
+                )
+                merged["reason"] = reason
             merged_events.append(merged)
         return {"translucentEvents": merged_events}
 
@@ -6443,6 +6531,7 @@ else:
         self.assertEqual(evidence["status"], "pass")
         self.assertIsNone(evidence["failure"])
         self.assertEqual(evidence["visible_events"], 1)
+        self.assertEqual(evidence["primitive_accounting_events"], 1)
         self.assertEqual(
             {
                 "net.sodium.client.render.chunk.translucent_sorting.data.DynamicTopoData$DynamicTopoSorter": 5,
@@ -6450,10 +6539,118 @@ else:
             evidence["sorter_type_counts"],
         )
 
+    def static_terrain_water_animation_dense_doc(self, directory: Path, **overrides: object) -> dict[str, object]:
+        from PIL import Image
+
+        frames = []
+        for index in range(6):
+            screenshot = directory / f"water_animation_frame_{index:03d}.png"
+            Image.new("RGB", (8, 8), (64 + index * 10, 96, 160)).save(screenshot)
+            frames.append(
+                {
+                    "index": index,
+                    "screenshot": str(screenshot),
+                    "renderedFrameIndex": 100 + index,
+                    "gameTime": 200 + index,
+                    "animationHash": 12345,
+                    "animationSummary": (
+                        "9002/minecraft~block/water_still/16x16/4/2/1/0/0@1,1@1,2@1,3@1|"
+                        "9003/minecraft~block/water_flow/16x16/4/2/1/0/0@1,1@1,2@1,3@1|"
+                        "9004/minecraft~block/water_overlay/16x16/2/2/1/0/0@2,1@2"
+                    ),
+                    "animationState": (
+                        f"still=tex:9002,loc:minecraft~block/water_still,generation:7,current:{index % 4},next:{(index + 1) % 4},elapsed:0,duration:1,fraction:0.000000,interpolation:0|"
+                        f"flow=tex:9003,loc:minecraft~block/water_flow,generation:7,current:{index % 4},next:{(index + 1) % 4},elapsed:0,duration:1,fraction:0.000000,interpolation:0|"
+                        f"overlay=tex:9004,loc:minecraft~block/water_overlay,generation:7,current:{(index // 2) % 2},next:{((index // 2) + 1) % 2},elapsed:{index % 2},duration:2,fraction:{(index % 2) / 2.0:.6f},interpolation:0"
+                    ),
+                    "visibleLayerSubmissions": 10 + index,
+                    "currentFrameVisibleLayerSubmissions": 1,
+                    "atlasGeneration": 7,
+                }
+            )
+        dense: dict[str, object] = {
+            "enabled": True,
+            "requestedFrames": 6,
+            "capturedFrames": 6,
+            "complete": True,
+            "frames": frames,
+        }
+        dense.update(overrides)
+        return {"rustGalStaticTerrainWaterAnimationDenseCapture": dense}
+
+    def test_static_terrain_water_animation_dense_accepts_valid_sequence(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            evidence = harness.static_terrain_water_animation_dense_evidence(
+                self.static_terrain_water_animation_dense_doc(Path(temp))
+            )
+        self.assertEqual(evidence["status"], "pass")
+        self.assertEqual(evidence["checked_frames"], 6)
+        self.assertGreaterEqual(evidence["distinct_frame_keys"], 4)
+
+    def test_static_terrain_water_animation_dense_rejects_missing_frame_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            doc = self.static_terrain_water_animation_dense_doc(Path(temp))
+            Path(doc["rustGalStaticTerrainWaterAnimationDenseCapture"]["frames"][2]["screenshot"]).unlink()
+            evidence = harness.static_terrain_water_animation_dense_evidence(doc)
+        self.assertEqual(evidence["status"], "fail")
+        self.assertEqual(evidence["failure"], "terrain_animation_frame_missing")
+
+    def test_static_terrain_water_animation_dense_rejects_black_frames(self) -> None:
+        from PIL import Image
+
+        with tempfile.TemporaryDirectory() as temp:
+            doc = self.static_terrain_water_animation_dense_doc(Path(temp))
+            for frame in doc["rustGalStaticTerrainWaterAnimationDenseCapture"]["frames"]:
+                Image.new("RGB", (8, 8), (0, 0, 0)).save(frame["screenshot"])
+            evidence = harness.static_terrain_water_animation_dense_evidence(doc)
+        self.assertEqual(evidence["status"], "fail")
+        self.assertEqual(evidence["failure"], "terrain_animation_presented_frame_mismatch")
+
+    def test_static_terrain_water_animation_dense_rejects_zero_work(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            doc = self.static_terrain_water_animation_dense_doc(Path(temp))
+            for frame in doc["rustGalStaticTerrainWaterAnimationDenseCapture"]["frames"]:
+                frame["visibleLayerSubmissions"] = 10
+            evidence = harness.static_terrain_water_animation_dense_evidence(doc)
+        self.assertEqual(evidence["status"], "fail")
+        self.assertEqual(evidence["failure"], "terrain_animation_presented_frame_mismatch")
+
+    def test_static_terrain_water_animation_dense_rejects_non_advancing_states(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            doc = self.static_terrain_water_animation_dense_doc(Path(temp))
+            for frame in doc["rustGalStaticTerrainWaterAnimationDenseCapture"]["frames"]:
+                frame["animationState"] = (
+                    "still=tex:9002,loc:minecraft~block/water_still,generation:7,current:0,next:1,elapsed:0,duration:1,fraction:0.000000,interpolation:0|"
+                    "flow=tex:9003,loc:minecraft~block/water_flow,generation:7,current:0,next:1,elapsed:0,duration:1,fraction:0.000000,interpolation:0|"
+                    "overlay=tex:9004,loc:minecraft~block/water_overlay,generation:7,current:0,next:1,elapsed:0,duration:2,fraction:0.000000,interpolation:0"
+                )
+            evidence = harness.static_terrain_water_animation_dense_evidence(doc)
+        self.assertEqual(evidence["status"], "fail")
+        self.assertIn("terrain_animation_frame_order_invalid", evidence["failures"])
+
+    def test_static_terrain_translucent_truth_requires_declared_unsupported_fluid(self) -> None:
+        evidence = harness.static_terrain_translucent_evidence(
+            self.static_terrain_translucent_doc(),
+            require_unsupported_fluid=True,
+        )
+        self.assertEqual(evidence["status"], "fail")
+        self.assertIn("terrain_translucent_unsupported_metadata_missing", evidence["failures"])
+        self.assertTrue(evidence["unsupported_fluid_required"])
+
     def test_static_terrain_translucent_truth_accepts_negative_generation_hash(self) -> None:
         evidence = harness.static_terrain_translucent_evidence(
             self.static_terrain_translucent_doc(
-                {"reason": "mesh-registered", "meshGeneration": -3414063591750951357},
+                {
+                    "reason": (
+                        "translucent-primitive-accounting"
+                        ":sourcePrimitives=6:nonFluidPrimitives=4:waterPrimitives=2:unsupportedPrimitives=0"
+                        ":retainedPrimitives=6:omittedPrimitives=0:executedPrimitives=6"
+                        ":sourceIndices=36:retainedIndices=36:omittedIndices=0"
+                        ":sourceHash=111:retainedHash=111:omittedHash=222"
+                        ":rangeCount=2:sample=0/1/retained/9001/0"
+                    ),
+                    "meshGeneration": -3414063591750951357,
+                },
                 {
                     "reason": "translucent-source-sort",
                     "meshGeneration": -3414063591750951357,
@@ -6495,6 +6692,68 @@ else:
         self.assertEqual(evidence["status"], "pass")
         self.assertIsNone(evidence["failure"])
 
+    def test_static_terrain_translucent_truth_accepts_repeated_submit_with_embedded_sort_identity(self) -> None:
+        evidence = harness.static_terrain_translucent_evidence(
+            self.static_terrain_translucent_doc(
+                {
+                    "reason": (
+                        "translucent-primitive-accounting"
+                        ":sourcePrimitives=6:nonFluidPrimitives=4:waterPrimitives=2:unsupportedPrimitives=0"
+                        ":retainedPrimitives=6:omittedPrimitives=0:executedPrimitives=6"
+                        ":sourceIndices=36:retainedIndices=36:omittedIndices=0"
+                        ":sourceHash=111:retainedHash=111:omittedHash=222"
+                        ":rangeCount=2:sample=0/1/retained/9001/0"
+                    )
+                },
+                {"reason": "visible-submit", "sortGeneration": 102, "visibleGeneration": 102, "indexUploadGeneration": 102, "sortedIndexHash": 0x12345678},
+                {
+                    "reason": "executed-submit",
+                    "sortGeneration": 102,
+                    "visibleGeneration": 102,
+                    "indexUploadGeneration": 102,
+                    "sortedIndexHash": 0x12345678,
+                    "executionFrameId": 8,
+                    "executionSubmissionId": 9,
+                },
+            )
+        )
+        self.assertEqual(evidence["status"], "pass")
+        self.assertIsNone(evidence["failure"])
+
+    def test_static_terrain_translucent_truth_rejects_bad_primitive_accounting(self) -> None:
+        evidence = harness.static_terrain_translucent_evidence(
+            self.static_terrain_translucent_doc(
+                {
+                    "reason": (
+                        "translucent-primitive-accounting"
+                        ":sourcePrimitives=3:nonFluidPrimitives=1:waterPrimitives=1:unsupportedPrimitives=1"
+                        ":retainedPrimitives=3:omittedPrimitives=0:executedPrimitives=3"
+                        ":sourceIndices=18:retainedIndices=18:omittedIndices=0"
+                        ":sourceHash=111:retainedHash=111:omittedHash=222"
+                        ":rangeCount=1:sample=0/1/retained/9001/0"
+                    )
+                },
+                {
+                    "reason": "visible-submit",
+                    "sortGeneration": 102,
+                    "visibleGeneration": 102,
+                    "indexUploadGeneration": 102,
+                    "sortedIndexHash": 0x12345678,
+                },
+                {
+                    "reason": "executed-submit",
+                    "sortGeneration": 102,
+                    "visibleGeneration": 102,
+                    "indexUploadGeneration": 102,
+                    "sortedIndexHash": 0x12345678,
+                    "executionFrameId": 8,
+                    "executionSubmissionId": 9,
+                },
+            )
+        )
+        self.assertEqual(evidence["status"], "fail")
+        self.assertIn("terrain_translucent_unsupported_primitive_executed", evidence["failures"])
+
     def test_static_terrain_translucent_truth_rejects_missing_sort(self) -> None:
         evidence = harness.static_terrain_translucent_evidence(
             self.static_terrain_translucent_doc({"reason": "translucent-sort-missing"})
@@ -6525,7 +6784,16 @@ else:
 
         accepted = harness.static_terrain_translucent_evidence(
             self.static_terrain_translucent_doc(
-                {"reason": "mesh-registered"},
+                {
+                    "reason": (
+                        "translucent-primitive-accounting"
+                        ":sourcePrimitives=6:nonFluidPrimitives=4:waterPrimitives=2:unsupportedPrimitives=0"
+                        ":retainedPrimitives=6:omittedPrimitives=0:executedPrimitives=6"
+                        ":sourceIndices=36:retainedIndices=36:omittedIndices=0"
+                        ":sourceHash=111:retainedHash=111:omittedHash=222"
+                        ":rangeCount=2:sample=0/1/retained/9001/0"
+                    )
+                },
                 {
                     "reason": "translucent-source-sort",
                     "sortGeneration": 102,
@@ -6672,6 +6940,29 @@ else:
             "cross-world-sort": "terrain_translucent_cross_world_sort",
             "source-sort-mismatch": "terrain_translucent_source_sort_mismatch",
             "sort-payload-corrupt": "terrain_translucent_sort_payload_corrupt",
+            "primitive-metadata-missing": "terrain_translucent_primitive_metadata_missing",
+            "primitive-kind-unknown": "terrain_translucent_primitive_unknown",
+            "primitive-range-overlap": "terrain_translucent_primitive_range_overlap",
+            "primitive-range-out-of-bounds": "terrain_translucent_primitive_range_out_of_bounds",
+            "primitive-classification-swapped": "terrain_translucent_primitive_classification_swapped",
+            "supported-primitive-omitted": "terrain_translucent_supported_primitive_omitted",
+            "unsupported-primitive-executed": "terrain_translucent_unsupported_primitive_executed",
+            "source-index-unknown-primitive": "terrain_translucent_source_index_unknown_primitive",
+            "retained-index-duplicated": "terrain_translucent_retained_index_duplicated",
+            "filtered-order-changed": "terrain_translucent_filtered_order_changed",
+            "ordered-range-material-mismatch": "terrain_translucent_ordered_range_material_mismatch",
+            "ordered-range-overlap": "terrain_translucent_ordered_range_overlap",
+            "execution-order-hash-mismatch": "terrain_translucent_execution_order_hash_mismatch",
+            "cross-generation-metadata": "terrain_translucent_cross_generation_metadata",
+            "cross-world-primitive-range-reuse": "terrain_translucent_cross_world_primitive_range_reuse",
+            "water-still-flow-texture-swapped": "terrain_water_still_flow_texture_swapped",
+            "water-overlay-identity-invalid": "terrain_water_overlay_identity_invalid",
+            "water-animation-entry-mismatch": "terrain_animation_frame_order_invalid",
+            "water-animation-invalid-frame": "terrain_animation_frame_order_invalid",
+            "water-corner-height-invalid": "terrain_water_geometry_invalid",
+            "water-depth-write-enabled": "terrain_water_depth_policy_invalid",
+            "water-opaque-blend": "terrain_water_blend_policy_invalid",
+            "water-glass-range-mismatch": "terrain_water_sort_range_invalid",
         }
         for fault, expected in cases.items():
             with self.subTest(fault=fault):
@@ -6680,6 +6971,37 @@ else:
                 )
                 self.assertEqual(evidence["status"], "fail")
                 self.assertIn(expected, evidence["failures"])
+
+    def test_static_terrain_translucent_truth_requires_water_identity_metadata(self) -> None:
+        evidence = harness.static_terrain_translucent_evidence(
+            {
+                "translucentEvents": [
+                    {
+                        **self.static_terrain_translucent_doc()["translucentEvents"][0],
+                        "reason": (
+                            "translucent-primitive-accounting"
+                            ":sourcePrimitives=2:nonFluidPrimitives=0:waterPrimitives=2:unsupportedPrimitives=0"
+                            ":retainedPrimitives=2:omittedPrimitives=0:executedPrimitives=2"
+                            ":sourceIndices=12:retainedIndices=12:omittedIndices=0"
+                            ":sourceHash=111:retainedHash=111:omittedHash=222"
+                            ":rangeCount=1:sample=0/2/retained/9002/0"
+                        ),
+                    },
+                    *self.static_terrain_translucent_doc()["translucentEvents"][1:],
+                ]
+            }
+        )
+        self.assertEqual(evidence["status"], "fail")
+        self.assertIn("terrain_water_animation_entry_mismatch", evidence["failures"])
+
+    def test_static_terrain_translucent_truth_records_water_identity_diagnostics(self) -> None:
+        evidence = harness.static_terrain_translucent_evidence(self.static_terrain_translucent_doc())
+        self.assertEqual(evidence["status"], "pass")
+        diagnostics = evidence["primitive_accounting_diagnostics"]
+        self.assertGreaterEqual(diagnostics[0]["waterStillPrimitives"], 1)
+        self.assertGreaterEqual(diagnostics[0]["waterFlowPrimitives"], 1)
+        self.assertGreater(diagnostics[0]["waterAnimationHash"], 0)
+        self.assertIn("water_still", diagnostics[0]["waterAnimationEntries"])
 
     def test_static_terrain_translucent_camera_sequence_accepts_crossing(self) -> None:
         names = [
@@ -6727,12 +7049,17 @@ else:
         self.assertIn("terrain_translucent_camera_sequence_missing", evidence["failures"])
         self.assertIn("terrain_translucent_camera_sequence_no_crossing", evidence["failures"])
 
-    def test_static_terrain_lifecycle_allows_translucent_air_placement(self) -> None:
+    def test_static_terrain_lifecycle_skips_base_translucent_fixture(self) -> None:
+        evidence = harness.static_terrain_lifecycle_evidence({}, {}, "translucent-glass")
+        self.assertEqual(evidence["status"], "skip")
+        self.assertIsNone(evidence["failure"])
+
+    def test_static_terrain_lifecycle_allows_translucent_prefixed_air_placement(self) -> None:
         diagnostics = {
             "lifecycleEvents": [
-                {"reason": "lifecycle-edit-before:translucent-glass:block=1, 2, 3:generation=0"},
-                {"reason": "lifecycle-edit-applied:translucent-glass:block=1, 2, 3:state=minecraft:blue_stained_glass"},
-                {"reason": "lifecycle-edit-after:translucent-glass:block=1, 2, 3:before=0:after=44:waitFrames=4"},
+                {"reason": "lifecycle-edit-before:translucent-interior-edit:block=1, 2, 3:generation=0"},
+                {"reason": "lifecycle-edit-applied:translucent-interior-edit:block=1, 2, 3:state=minecraft:blue_stained_glass"},
+                {"reason": "lifecycle-edit-after:translucent-interior-edit:block=1, 2, 3:before=0:after=44:waitFrames=4"},
             ],
             "recentEvents": [],
         }
@@ -6744,7 +7071,7 @@ else:
             "afterGeneration": 44,
             "editBlock": "1, 2, 3",
         }
-        evidence = harness.static_terrain_lifecycle_evidence(diagnostics, lifecycle, "translucent-glass")
+        evidence = harness.static_terrain_lifecycle_evidence(diagnostics, lifecycle, "translucent-interior-edit")
         self.assertEqual(evidence["status"], "pass")
         self.assertIsNone(evidence["failure"])
 

@@ -44,6 +44,16 @@ final class NativeMeshingCompatibilityFallback {
         return emittedQuads;
     }
 
+    static int renderUnsupportedFluidTranslucentMetadata(BlockRenderCache cache, ChunkBuildBuffers buffers,
+            LevelSlice slice, BlockState blockState, FluidState fluidState, BlockPos blockPos, BlockPos modelOffset,
+            TranslucentGeometryCollector collector) {
+        int quadStart = cache.getFluidRenderer().getEmittedQuadCount();
+        beginIrisFluid(cache, blockState, fluidState, blockPos);
+        cache.getFluidRenderer().renderUnsupportedTranslucentMetadata(slice, blockState, fluidState, blockPos,
+                modelOffset, collector, buffers);
+        return cache.getFluidRenderer().getEmittedQuadCount() - quadStart;
+    }
+
     static int runMeshAppenders(ChunkRenderContext renderContext, ChunkBuildBuffers buffers, LevelSlice slice,
             TranslucentGeometryCollector collector, NativeMeshingDiagnostics.FallbackStats fallbackStats) {
         int quadStart = buffers.getFallbackConsumerEmittedQuadCount();

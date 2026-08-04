@@ -223,7 +223,8 @@ class NativeChunkMeshEncoderTest {
                     0.0F, 0.2F, 0.5F, 0.6F, 1.0F, 0.6F, 1.0F, 0.1F,
                     0xff806040, 0xff806040, 0xff806040, 0xff806040,
                     0.5F, 0.5F, 0.5F, 0.5F,
-                    0x00f000f0, 0x00f000f0, 0x00f000f0, 0x00f000f0);
+                    0x00f000f0, 0x00f000f0, 0x00f000f0, 0x00f000f0,
+                    NativeSectionMeshBuilder.PRIMITIVE_KIND_BUILTIN_WATER);
             posZ.flushPending();
 
             int[] segments = new int[ModelQuadFacing.COUNT << 1];

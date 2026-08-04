@@ -75,7 +75,7 @@ pub unsafe extern "C" fn mattmc_sodium_section_mesh_builder_append_translucent_b
         return status;
     }
 
-    match section_builder_append_batch_encoded(
+    match section_builder_append_batch_encoded_with_kind(
         builder,
         facing,
         batch_address,
@@ -86,6 +86,8 @@ pub unsafe extern "C" fn mattmc_sodium_section_mesh_builder_append_translucent_b
         )),
         format,
         store_raw_quads != 0,
+        Some(TERRAIN_PRIMITIVE_NON_FLUID_TRANSLUCENT),
+        None,
     ) {
         Ok(committed_count) => {
             *output_counts = valid_count;
@@ -161,6 +163,7 @@ pub unsafe extern "C" fn mattmc_sodium_section_mesh_builder_append_translucent_f
         Some((analyzer_handle, translucent_facing)),
         format,
         store_raw_quads != 0,
+        Some(TERRAIN_PRIMITIVE_NON_FLUID_TRANSLUCENT),
     ) {
         Ok((valid_count, committed_count)) => {
             *output_counts = valid_count;
@@ -294,7 +297,7 @@ pub unsafe extern "C" fn mattmc_sodium_section_mesh_builder_append_translucent_b
         return status;
     }
 
-    match section_builder_append_batch(
+    match section_builder_append_batch_with_kind(
         builder,
         facing,
         batch_address,
@@ -303,6 +306,7 @@ pub unsafe extern "C" fn mattmc_sodium_section_mesh_builder_append_translucent_b
             validity_address as *const u8,
             quad_count as usize,
         )),
+        Some(TERRAIN_PRIMITIVE_NON_FLUID_TRANSLUCENT),
     ) {
         Ok(committed_count) => {
             *output_counts = valid_count;

@@ -4,12 +4,15 @@ import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
+import net.minecraft.client.renderer.texture.SpriteContents;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.data.AtlasIds;
+import net.minecraft.resources.ResourceLocation;
 import net.sodium.client.render.chunk.RenderSection;
 import net.sodium.client.render.chunk.compile.ChunkBuildOutput;
 import net.sodium.client.render.chunk.compile.ChunkSortOutput;
+import net.sodium.client.render.chunk.data.BuiltSectionInfo;
 import net.sodium.client.render.chunk.data.BuiltSectionMeshParts;
 import net.sodium.client.render.chunk.lists.ChunkRenderList;
 import net.sodium.client.render.chunk.lists.SortedRenderLists;
@@ -17,6 +20,7 @@ import net.sodium.client.render.chunk.terrain.DefaultTerrainRenderPasses;
 import net.sodium.client.render.chunk.terrain.TerrainRenderPass;
 import net.sodium.client.render.chunk.translucent_sorting.data.SharedIndexSorter;
 import net.sodium.client.render.chunk.translucent_sorting.data.Sorter;
+import net.sodium.client.render.chunk.vertex.format.NativeSectionMeshBuilder;
 import net.sodium.client.util.iterator.ByteIterator;
 import net.sodium.client.util.NativeBuffer;
 import net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings;
@@ -34,10 +38,12 @@ import java.nio.ByteOrder;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -66,10 +72,15 @@ public final class RustGalTerrainRenderer {
 	private static volatile long atlasGeneration;
 	private static volatile long registeredAtlasGeneration;
 	private static volatile byte[] atlasPayload;
+	private static volatile FluidSpriteAsset waterStillAsset;
+	private static volatile FluidSpriteAsset waterFlowAsset;
+	private static volatile FluidSpriteAsset waterOverlayAsset;
 	private static final AtomicLong acceptedBuildOutputs = new AtomicLong();
 	private static final AtomicLong skippedRouteBuildOutputs = new AtomicLong();
 	private static final AtomicLong skippedUnsupportedAnimatedSections = new AtomicLong();
 	private static final AtomicLong skippedUnsupportedFluidTranslucentSections = new AtomicLong();
+	private static final AtomicLong acceptedWaterAnimatedSections = new AtomicLong();
+	private static final AtomicLong unsupportedFluidOmittedSections = new AtomicLong();
 	private static final AtomicLong skippedEmptyLayers = new AtomicLong();
 	private static final AtomicLong registeredMeshes = new AtomicLong();
 	private static final AtomicLong registeredTranslucentSorts = new AtomicLong();
@@ -94,6 +105,157 @@ public final class RustGalTerrainRenderer {
 	private static volatile long lastWorldUnloadSectionPos;
 	private static volatile ChunkSectionLayer lastWorldUnloadLayer = ChunkSectionLayer.SOLID;
 
+	private record FluidSpriteAsset(
+		int textureId,
+		ResourceLocation location,
+		float u0,
+		float u1,
+		float v0,
+		float v1,
+		int frameWidth,
+		int frameHeight,
+		int frameCount,
+		int frameTicks,
+		int animationFlags,
+		int frameRowSize,
+		int interpolationPolicy,
+		List<VulkanicGalBridge.WorldMeshAnimationFrameRecord> animationFrames,
+		byte[] pngBytes
+	) {
+		long animationHash() {
+			long hash = 0xcbf29ce484222325L;
+			hash = fnv64Int(hash, textureId);
+			hash = fnv64Int(hash, frameWidth);
+			hash = fnv64Int(hash, frameHeight);
+			hash = fnv64Int(hash, frameCount);
+			hash = fnv64Int(hash, frameTicks);
+			hash = fnv64Int(hash, frameRowSize);
+			hash = fnv64Int(hash, interpolationPolicy);
+			for (VulkanicGalBridge.WorldMeshAnimationFrameRecord frame : animationFrames) {
+				hash = fnv64Int(hash, frame.frameIndex());
+				hash = fnv64Int(hash, frame.durationTicks());
+			}
+			return hash;
+		}
+
+		String animationSummary() {
+			StringBuilder summary = new StringBuilder();
+			summary.append(textureId)
+				.append('/')
+				.append(location.toString().replace(':', '~'))
+				.append('/')
+				.append(frameWidth)
+				.append('x')
+				.append(frameHeight)
+				.append('/')
+				.append(frameCount)
+				.append('/')
+				.append(frameTicks)
+				.append('/')
+				.append(frameRowSize)
+				.append('/')
+				.append(interpolationPolicy)
+				.append('/');
+			int limit = Math.min(animationFrames.size(), 64);
+			for (int index = 0; index < limit; index++) {
+				if (index > 0) {
+					summary.append(',');
+				}
+				VulkanicGalBridge.WorldMeshAnimationFrameRecord frame = animationFrames.get(index);
+				summary.append(frame.frameIndex()).append('@').append(frame.durationTicks());
+			}
+			if (animationFrames.size() > limit) {
+				summary.append(",...");
+			}
+			return summary.toString();
+		}
+
+		VulkanicGalBridge.WorldMeshTextureAssetRecord textureRecord() {
+			return new VulkanicGalBridge.WorldMeshTextureAssetRecord(
+				textureId,
+				pngBytes,
+				frameWidth,
+				frameHeight,
+				frameCount,
+				frameTicks,
+				animationFlags,
+				frameRowSize,
+				interpolationPolicy,
+				animationFrames
+			);
+		}
+
+		boolean contains(float u, float v) {
+			float minU = Math.min(u0, u1) - 0.00001F;
+			float maxU = Math.max(u0, u1) + 0.00001F;
+			float minV = Math.min(v0, v1) - 0.00001F;
+			float maxV = Math.max(v0, v1) + 0.00001F;
+			return u >= minU && u <= maxU && v >= minV && v <= maxV;
+		}
+
+		float localU(float u) {
+			return (u - u0) / (u1 - u0);
+		}
+
+		float localV(float v) {
+			return (v - v0) / (v1 - v0);
+		}
+	}
+
+	static void installTestingFluidSpriteAssetsForUnitTests() {
+		waterStillAsset = new FluidSpriteAsset(
+			RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_WATER_STILL,
+			ResourceLocation.fromNamespaceAndPath("minecraft", "block/water_still"),
+			0.0F,
+			0.25F,
+			0.0F,
+			0.25F,
+			16,
+			16,
+			1,
+			1,
+			0,
+			0,
+			0,
+			List.of(),
+			new byte[] { 1 }
+		);
+		waterFlowAsset = new FluidSpriteAsset(
+			RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_WATER_FLOW,
+			ResourceLocation.fromNamespaceAndPath("minecraft", "block/water_flow"),
+			0.25F,
+			0.5F,
+			0.0F,
+			0.25F,
+			16,
+			16,
+			1,
+			1,
+			0,
+			0,
+			0,
+			List.of(),
+			new byte[] { 2 }
+		);
+		waterOverlayAsset = new FluidSpriteAsset(
+			RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_WATER_OVERLAY,
+			ResourceLocation.fromNamespaceAndPath("minecraft", "block/water_overlay"),
+			0.5F,
+			0.75F,
+			0.0F,
+			0.25F,
+			16,
+			16,
+			1,
+			1,
+			0,
+			0,
+			0,
+			List.of(),
+			new byte[] { 3 }
+		);
+	}
+
 	private RustGalTerrainRenderer() {
 	}
 
@@ -105,12 +267,15 @@ public final class RustGalTerrainRenderer {
 		if (output == null || output.info == null) {
 			return;
 		}
-		if (output.info.animatedSprites != null) {
+		if (output.info.animatedSprites != null && !hasOnlySupportedWaterAnimatedSprites(output.info)) {
 			skippedUnsupportedAnimatedSections.incrementAndGet();
 			recordEvent(output.render.getPosition().asLong(), ChunkSectionLayer.SOLID, output.submitTime, 0L, 0L, atlasGeneration, null, output.render.getOriginX(), output.render.getOriginY(), output.render.getOriginZ(), 0.0F, 0.0F, 0.0F, "unsupported-animated-sprite");
 			recordEvent(output.render.getPosition().asLong(), ChunkSectionLayer.CUTOUT_MIPPED, output.submitTime, 0L, 0L, atlasGeneration, null, output.render.getOriginX(), output.render.getOriginY(), output.render.getOriginZ(), 0.0F, 0.0F, 0.0F, "unsupported-animated-sprite");
 			recordEvent(output.render.getPosition().asLong(), ChunkSectionLayer.TRANSLUCENT, output.submitTime, 0L, 0L, atlasGeneration, null, output.render.getOriginX(), output.render.getOriginY(), output.render.getOriginZ(), 0.0F, 0.0F, 0.0F, "unsupported-animated-sprite");
 			return;
+		}
+		if (output.info.animatedSprites != null) {
+			acceptedWaterAnimatedSections.incrementAndGet();
 		}
 		acceptedBuildOutputs.incrementAndGet();
 		long extractionFrameId = terrainExtractionFrames.incrementAndGet();
@@ -119,6 +284,35 @@ public final class RustGalTerrainRenderer {
 		acceptLayer(output, DefaultTerrainRenderPasses.CUTOUT, ChunkSectionLayer.CUTOUT_MIPPED, extractionFrameId);
 		acceptLayer(output, DefaultTerrainRenderPasses.TRANSLUCENT, ChunkSectionLayer.TRANSLUCENT, extractionFrameId);
 		recordTranslucentSortData(output);
+	}
+
+	private static boolean hasOnlySupportedWaterAnimatedSprites(BuiltSectionInfo info) {
+		if (info.animatedSprites == null) {
+			return true;
+		}
+		if (info.nativeMeshingWaterBlocks <= 0) {
+			return false;
+		}
+		for (TextureAtlasSprite sprite : info.animatedSprites) {
+			if (!isVanillaWaterSprite(sprite)) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	private static boolean isVanillaWaterSprite(TextureAtlasSprite sprite) {
+		if (sprite == null || sprite.contents() == null) {
+			return false;
+		}
+		ResourceLocation name = sprite.contents().name();
+		if (name == null || !"minecraft".equals(name.getNamespace())) {
+			return false;
+		}
+		String path = name.getPath();
+		return "block/water_still".equals(path)
+			|| "block/water_flow".equals(path)
+			|| "block/water_overlay".equals(path);
 	}
 
 	private static void recordTranslucentSortData(ChunkBuildOutput output) {
@@ -506,6 +700,7 @@ public final class RustGalTerrainRenderer {
 		if (!WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan() || renderLists == null || camera == null) {
 			return;
 		}
+		Set<VisibleSubmitKey> visibleSubmissions = new HashSet<>();
 		int submitted = 0;
 		Iterator<ChunkRenderList> iterator = renderLists.iterator();
 		while (iterator.hasNext()) {
@@ -519,10 +714,10 @@ public final class RustGalTerrainRenderer {
 				if (section == null) {
 					continue;
 				}
-				if (enqueueSectionLayer(section, ChunkSectionLayer.SOLID, camera, viewportWidth, viewportHeight, 0)) {
+				if (enqueueSectionLayer(section, ChunkSectionLayer.SOLID, camera, viewportWidth, viewportHeight, 0, visibleSubmissions)) {
 					submitted++;
 				}
-				if (enqueueSectionLayer(section, ChunkSectionLayer.CUTOUT_MIPPED, camera, viewportWidth, viewportHeight, 0)) {
+				if (enqueueSectionLayer(section, ChunkSectionLayer.CUTOUT_MIPPED, camera, viewportWidth, viewportHeight, 0, visibleSubmissions)) {
 					submitted++;
 				}
 			}
@@ -540,7 +735,7 @@ public final class RustGalTerrainRenderer {
 				if (section == null) {
 					continue;
 				}
-				if (enqueueSectionLayer(section, ChunkSectionLayer.TRANSLUCENT, camera, viewportWidth, viewportHeight, translucentDrawOrder++)) {
+				if (enqueueSectionLayer(section, ChunkSectionLayer.TRANSLUCENT, camera, viewportWidth, viewportHeight, translucentDrawOrder++, visibleSubmissions)) {
 					submitted++;
 				}
 			}
@@ -595,6 +790,8 @@ public final class RustGalTerrainRenderer {
 				skippedRouteBuildOutputs.get(),
 				skippedUnsupportedAnimatedSections.get(),
 				skippedUnsupportedFluidTranslucentSections.get(),
+				acceptedWaterAnimatedSections.get(),
+				unsupportedFluidOmittedSections.get(),
 				skippedEmptyLayers.get(),
 				registeredMeshes.get(),
 				registeredTranslucentSorts.get(),
@@ -882,31 +1079,6 @@ public final class RustGalTerrainRenderer {
 	}
 
 	private static void acceptLayer(ChunkBuildOutput output, TerrainRenderPass pass, ChunkSectionLayer layer, long extractionFrameId) {
-		if (layer == ChunkSectionLayer.TRANSLUCENT && output.info.nativeMeshingFluidBlocks > 0) {
-			skippedUnsupportedFluidTranslucentSections.incrementAndGet();
-			removeLayer(output.render.getPosition().asLong(), layer, "unsupported-fluid-translucent");
-					recordEvent(
-				output.render.getPosition().asLong(),
-				layer,
-				output.submitTime,
-				0L,
-				0L,
-				atlasGeneration,
-				null,
-				output.render.getOriginX(),
-				output.render.getOriginY(),
-				output.render.getOriginZ(),
-				0.0F,
-				0.0F,
-				0.0F,
-				"unsupported-fluid-translucent",
-				extractionFrameId,
-				0L,
-				0L,
-				0L
-			);
-			return;
-		}
 		BuiltSectionMeshParts mesh = output.getMesh(pass);
 		if (mesh == null || mesh.getVertexData().getLength() == 0) {
 			skippedEmptyLayers.incrementAndGet();
@@ -915,6 +1087,29 @@ public final class RustGalTerrainRenderer {
 		}
 			try {
 				TerrainSectionAsset asset = decodeMesh(output, mesh, layer);
+				if (layer == ChunkSectionLayer.TRANSLUCENT && asset.unsupportedPrimitiveCount() > 0) {
+					unsupportedFluidOmittedSections.incrementAndGet();
+					recordEvent(
+						output.render.getPosition().asLong(),
+						layer,
+						output.submitTime,
+						asset.meshGeneration(),
+						0L,
+						atlasGeneration,
+						asset,
+						output.render.getOriginX(),
+						output.render.getOriginY(),
+						output.render.getOriginZ(),
+						0.0F,
+						0.0F,
+						0.0F,
+						"unsupported-fluid-omitted",
+						extractionFrameId,
+						0L,
+						0L,
+						0L
+					);
+				}
 				SECTION_ASSETS.put(new LayerKey(output.render.getPosition().asLong(), layer), asset);
 				RustGalWorldPrimitiveRenderer.registerStaticTerrainMeshAsset(asset.asset(), atlasTextureUpdatePayload());
 				registeredMeshes.incrementAndGet();
@@ -1130,26 +1325,29 @@ public final class RustGalTerrainRenderer {
 				}
 				cursor += segmentVertexCount;
 			}
-		if (layer == ChunkSectionLayer.TRANSLUCENT) {
-			sections.add(new VulkanicGalBridge.WorldMeshSectionRecord(
-				RustGalWorldPrimitiveRenderer.MATERIAL_ID_TRANSLUCENT_TEXTURED,
-				RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_TERRAIN_BLOCK_ATLAS,
-				RustGalWorldPrimitiveRenderer.MATERIAL_MODE_TRANSLUCENT,
-				RustGalWorldPrimitiveRenderer.CULL_BACK,
-				RustGalWorldPrimitiveRenderer.WORLD_WINDING_CCW,
-				0,
-				indices.size()
-			));
-		}
 		if (cursor != vertexCount) {
 			throw new IllegalArgumentException("static terrain vertex segments cover " + cursor + " of " + vertexCount + " vertices");
 		}
+		byte[] indexBytes;
+		OrderedTranslucentMesh orderedTranslucentMesh = null;
+		if (layer == ChunkSectionLayer.TRANSLUCENT) {
+			byte[] sourceSortedIndexBytes = copySorterIndexBytes(output.getSorter());
+			if (sourceSortedIndexBytes.length == 0) {
+				sourceSortedIndexBytes = packU32(indices);
+			}
+			orderedTranslucentMesh = buildOrderedTranslucentMesh(
+				sourceSortedIndexBytes,
+				mesh.getPrimitiveMetadata(),
+				vertices,
+				vertexCount
+			);
+			indexBytes = orderedTranslucentMesh.indexBytes();
+			sections.addAll(orderedTranslucentMesh.sections());
+		} else {
+			indexBytes = packU16(indices);
+		}
 		if (sections.isEmpty()) {
 			throw new IllegalArgumentException("static terrain mesh has no drawable sections");
-		}
-		byte[] indexBytes = layer == ChunkSectionLayer.TRANSLUCENT ? copySorterIndexBytes(output.getSorter()) : packU16(indices);
-		if (layer == ChunkSectionLayer.TRANSLUCENT && indexBytes.length == 0) {
-			indexBytes = packU32(indices);
 		}
 		long sectionPos = output.render.getPosition().asLong();
 		long meshKey = meshKey(sectionPos, layer);
@@ -1195,7 +1393,7 @@ public final class RustGalTerrainRenderer {
 				diagnosticVertexCount,
 			bufferVertexCapacity,
 			diagnosticVertexStride,
-			indices.size(),
+			layer == ChunkSectionLayer.TRANSLUCENT ? indexBytes.length / Integer.BYTES : indices.size(),
 			diagnosticMaxIndex,
 			diagnosticIndexType,
 			sections.size(),
@@ -1230,6 +1428,8 @@ public final class RustGalTerrainRenderer {
 			output.render.getOriginX(),
 			output.render.getOriginY(),
 			output.render.getOriginZ(),
+			orderedTranslucentMesh == null ? "" : orderedTranslucentMesh.accountingReason(),
+			orderedTranslucentMesh == null ? 0 : orderedTranslucentMesh.unsupportedPrimitiveCount(),
 			new VulkanicGalBridge.WorldMeshAssetRecord(
 				meshKey,
 				generation,
@@ -1242,7 +1442,439 @@ public final class RustGalTerrainRenderer {
 		);
 	}
 
-	private static boolean enqueueSectionLayer(RenderSection section, ChunkSectionLayer layer, Camera camera, int viewportWidth, int viewportHeight, int drawOrder) {
+	record OrderedTranslucentMesh(
+		byte[] indexBytes,
+		List<VulkanicGalBridge.WorldMeshSectionRecord> sections,
+		int sourcePrimitiveCount,
+		int nonFluidPrimitiveCount,
+		int waterPrimitiveCount,
+		int unsupportedPrimitiveCount,
+		int retainedPrimitiveCount,
+		int omittedPrimitiveCount,
+		int sourceIndexCount,
+		int retainedIndexCount,
+		int omittedIndexCount,
+		long sourceIndexHash,
+		long retainedIndexHash,
+		long omittedIndexHash,
+		int materialSwitchCount,
+		int waterStillPrimitiveCount,
+		int waterFlowPrimitiveCount,
+		int waterOverlayPrimitiveCount,
+		int waterTextureSwitchCount,
+		long waterAnimationHash,
+		String waterAnimationSummary,
+		String rangeSummary,
+		String primitiveSample
+	) {
+		String accountingReason() {
+			return "translucent-primitive-accounting"
+				+ ":sourcePrimitives=" + sourcePrimitiveCount
+				+ ":nonFluidPrimitives=" + nonFluidPrimitiveCount
+				+ ":waterPrimitives=" + waterPrimitiveCount
+				+ ":unsupportedPrimitives=" + unsupportedPrimitiveCount
+				+ ":retainedPrimitives=" + retainedPrimitiveCount
+				+ ":omittedPrimitives=" + omittedPrimitiveCount
+				+ ":executedPrimitives=" + retainedPrimitiveCount
+				+ ":sourceIndices=" + sourceIndexCount
+				+ ":retainedIndices=" + retainedIndexCount
+				+ ":omittedIndices=" + omittedIndexCount
+				+ ":sourceHash=" + Long.toUnsignedString(sourceIndexHash)
+				+ ":retainedHash=" + Long.toUnsignedString(retainedIndexHash)
+				+ ":omittedHash=" + Long.toUnsignedString(omittedIndexHash)
+				+ ":rangeCount=" + sections.size()
+				+ ":materialSwitches=" + materialSwitchCount
+				+ ":waterStillPrimitives=" + waterStillPrimitiveCount
+				+ ":waterFlowPrimitives=" + waterFlowPrimitiveCount
+				+ ":waterOverlayPrimitives=" + waterOverlayPrimitiveCount
+				+ ":waterTextureSwitches=" + waterTextureSwitchCount
+				+ ":waterAnimationHash=" + Long.toUnsignedString(waterAnimationHash)
+				+ ":waterAnimationEntries=" + waterAnimationSummary
+				+ ":ranges=" + rangeSummary
+				+ ":sample=" + primitiveSample;
+		}
+	}
+
+	static OrderedTranslucentMesh buildOrderedTranslucentMesh(byte[] sourceSortedIndexBytes,
+			int[] primitiveMetadata, List<VulkanicGalBridge.WorldMeshVertexRecord> vertices, int vertexCount) {
+		if (sourceSortedIndexBytes.length == 0 || sourceSortedIndexBytes.length % (Integer.BYTES * 6) != 0) {
+			throw new IllegalArgumentException("translucent sorted index payload must contain whole u32 quads");
+		}
+		int primitiveCount = vertexCount / 4;
+		int metadataStride = NativeSectionMeshBuilder.PRIMITIVE_METADATA_RECORD_INTS;
+		if (primitiveMetadata.length != primitiveCount * metadataStride) {
+			throw new IllegalArgumentException("translucent primitive metadata count " + primitiveMetadata.length
+				+ " does not match primitive count " + primitiveCount);
+		}
+		ByteArrayOutputStream retainedIndices = new ByteArrayOutputStream(sourceSortedIndexBytes.length);
+		ByteArrayOutputStream omittedIndices = new ByteArrayOutputStream(sourceSortedIndexBytes.length);
+		List<VulkanicGalBridge.WorldMeshSectionRecord> sections = new ArrayList<>();
+		int openMaterialId = 0;
+		int openTextureId = 0;
+		int openIndexStart = 0;
+		int retainedIndexCount = 0;
+		int retainedPrimitiveCount = 0;
+		int omittedPrimitiveCount = 0;
+		int nonFluidPrimitiveCount = 0;
+		int waterPrimitiveCount = 0;
+		int unsupportedPrimitiveCount = 0;
+		int previousRetainedMaterialId = 0;
+		int previousRetainedTextureId = 0;
+		int materialSwitchCount = 0;
+		int waterStillPrimitiveCount = 0;
+		int waterFlowPrimitiveCount = 0;
+		int waterOverlayPrimitiveCount = 0;
+		int waterTextureSwitchCount = 0;
+		StringBuilder primitiveSample = new StringBuilder();
+		boolean[] seen = new boolean[primitiveCount];
+		for (int sourceOffset = 0; sourceOffset < sourceSortedIndexBytes.length; sourceOffset += Integer.BYTES * 6) {
+			int primitiveId = primitiveIdFromSortedQuad(sourceSortedIndexBytes, sourceOffset, vertexCount);
+			if (primitiveId < 0 || primitiveId >= primitiveCount) {
+				throw new IllegalArgumentException("translucent sorted payload references primitive " + primitiveId
+					+ " outside 0.." + (primitiveCount - 1));
+			}
+			if (seen[primitiveId]) {
+				throw new IllegalArgumentException("translucent sorted payload references primitive " + primitiveId + " more than once");
+			}
+			seen[primitiveId] = true;
+			int metadataOffset = primitiveId * metadataStride;
+			int primitiveKind = primitiveMetadata[metadataOffset];
+			switch (primitiveKind) {
+				case NativeSectionMeshBuilder.PRIMITIVE_KIND_NON_FLUID_TRANSLUCENT -> nonFluidPrimitiveCount++;
+				case NativeSectionMeshBuilder.PRIMITIVE_KIND_BUILTIN_WATER -> waterPrimitiveCount++;
+				case NativeSectionMeshBuilder.PRIMITIVE_KIND_UNSUPPORTED_FLUID -> unsupportedPrimitiveCount++;
+				default -> {
+				}
+			}
+			int materialId = translucentMaterialForPrimitiveKind(primitiveKind);
+			if (materialId == 0) {
+				closeTranslucentRange(sections, openMaterialId, openTextureId, openIndexStart, retainedIndexCount);
+				openMaterialId = 0;
+				openTextureId = 0;
+				openIndexStart = retainedIndexCount;
+				omittedIndices.write(sourceSortedIndexBytes, sourceOffset, Integer.BYTES * 6);
+				omittedPrimitiveCount++;
+				appendPrimitiveSample(primitiveSample, primitiveId, primitiveKind, "omitted", 0, 0, retainedIndexCount);
+				continue;
+			}
+			int textureId = translucentTextureForPrimitive(primitiveKind, primitiveId, vertices);
+			if (primitiveKind == NativeSectionMeshBuilder.PRIMITIVE_KIND_BUILTIN_WATER) {
+				if (textureId == RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_WATER_STILL) {
+					waterStillPrimitiveCount++;
+				} else if (textureId == RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_WATER_FLOW) {
+					waterFlowPrimitiveCount++;
+				} else if (textureId == RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_WATER_OVERLAY) {
+					waterOverlayPrimitiveCount++;
+				}
+				if (previousRetainedTextureId != 0 && previousRetainedTextureId != textureId) {
+					waterTextureSwitchCount++;
+				}
+			}
+			if (openMaterialId != materialId || openTextureId != textureId) {
+				closeTranslucentRange(sections, openMaterialId, openTextureId, openIndexStart, retainedIndexCount);
+				if (previousRetainedMaterialId != 0 && previousRetainedMaterialId != materialId) {
+					materialSwitchCount++;
+				}
+				previousRetainedMaterialId = materialId;
+				previousRetainedTextureId = textureId;
+				openMaterialId = materialId;
+				openTextureId = textureId;
+				openIndexStart = retainedIndexCount;
+			}
+			retainedIndices.write(sourceSortedIndexBytes, sourceOffset, Integer.BYTES * 6);
+			retainedIndexCount += 6;
+			retainedPrimitiveCount++;
+			appendPrimitiveSample(primitiveSample, primitiveId, primitiveKind, "retained", materialId, textureId, retainedIndexCount - 6);
+		}
+		closeTranslucentRange(sections, openMaterialId, openTextureId, openIndexStart, retainedIndexCount);
+		for (int primitiveId = 0; primitiveId < primitiveCount; primitiveId++) {
+			if (!seen[primitiveId]) {
+				throw new IllegalArgumentException("translucent sorted payload omitted primitive " + primitiveId);
+			}
+		}
+		if (retainedIndexCount == 0) {
+			throw new IllegalArgumentException("translucent sorted payload retained no supported primitives");
+		}
+		byte[] retainedIndexBytes = retainedIndices.toByteArray();
+		byte[] omittedIndexBytes = omittedIndices.toByteArray();
+		return new OrderedTranslucentMesh(
+			retainedIndexBytes,
+			sections,
+			primitiveCount,
+			nonFluidPrimitiveCount,
+			waterPrimitiveCount,
+			unsupportedPrimitiveCount,
+			retainedPrimitiveCount,
+			omittedPrimitiveCount,
+			sourceSortedIndexBytes.length / Integer.BYTES,
+			retainedIndexCount,
+			omittedIndexBytes.length / Integer.BYTES,
+			sortedIndexHash(sourceSortedIndexBytes),
+			sortedIndexHash(retainedIndexBytes),
+			sortedIndexHash(omittedIndexBytes),
+			materialSwitchCount,
+			waterStillPrimitiveCount,
+			waterFlowPrimitiveCount,
+			waterOverlayPrimitiveCount,
+			waterTextureSwitchCount,
+			waterAnimationHash(),
+			waterAnimationSummary(),
+			translucentRangeSummary(sections),
+			primitiveSample.toString()
+		);
+	}
+
+	private static void appendPrimitiveSample(StringBuilder sample, int primitiveId, int primitiveKind, String fate,
+			int materialId, int textureId, int retainedIndexStart) {
+		if (sample.length() > 512) {
+			return;
+		}
+		if (sample.length() > 0) {
+			sample.append(',');
+		}
+		sample.append(primitiveId)
+			.append('/')
+			.append(primitiveKind)
+			.append('/')
+			.append(fate)
+			.append('/')
+			.append(materialId)
+			.append('/')
+			.append(textureId)
+			.append('/')
+			.append(retainedIndexStart);
+	}
+
+	private static long waterAnimationHash() {
+		long hash = 0xcbf29ce484222325L;
+		FluidSpriteAsset still = waterStillAsset;
+		FluidSpriteAsset flow = waterFlowAsset;
+		FluidSpriteAsset overlay = waterOverlayAsset;
+		if (still != null) {
+			hash = fnv64Long(hash, still.animationHash());
+		}
+		if (flow != null) {
+			hash = fnv64Long(hash, flow.animationHash());
+		}
+		if (overlay != null) {
+			hash = fnv64Long(hash, overlay.animationHash());
+		}
+		return hash;
+	}
+
+	public static long waterAnimationHashForDiagnostics() {
+		return waterAnimationHash();
+	}
+
+	private static String waterAnimationSummary() {
+		FluidSpriteAsset still = waterStillAsset;
+		FluidSpriteAsset flow = waterFlowAsset;
+		FluidSpriteAsset overlay = waterOverlayAsset;
+		if (still == null || flow == null || overlay == null) {
+			return "missing";
+		}
+		return still.animationSummary() + "|" + flow.animationSummary() + "|" + overlay.animationSummary();
+	}
+
+	public static String waterAnimationSummaryForDiagnostics() {
+		return waterAnimationSummary();
+	}
+
+	public static String waterAnimationFrameStateForDiagnostics(long frameTick) {
+		return waterAnimationState("still", waterStillAsset, frameTick)
+			+ "|" + waterAnimationState("flow", waterFlowAsset, frameTick)
+			+ "|" + waterAnimationState("overlay", waterOverlayAsset, frameTick);
+	}
+
+	private static String waterAnimationState(String name, FluidSpriteAsset asset, long frameTick) {
+		if (asset == null) {
+			return name + "=missing";
+		}
+		List<VulkanicGalBridge.WorldMeshAnimationFrameRecord> frames = asset.animationFrames();
+		if (frames.isEmpty()) {
+			return name
+				+ "=tex:" + asset.textureId()
+				+ ",loc:" + asset.location().toString().replace(':', '~')
+				+ ",generation:" + atlasGeneration
+				+ ",current:0,next:0,elapsed:0,duration:1,fraction:0.000000,interpolation:" + asset.interpolationPolicy();
+		}
+		long totalDuration = 0L;
+		for (VulkanicGalBridge.WorldMeshAnimationFrameRecord frame : frames) {
+			totalDuration += Math.max(1, frame.durationTicks());
+		}
+		long cursor = Math.floorMod(frameTick, Math.max(1L, totalDuration));
+		long elapsed = 0L;
+		int frameListIndex = 0;
+		for (int index = 0; index < frames.size(); index++) {
+			long duration = Math.max(1, frames.get(index).durationTicks());
+			if (cursor < elapsed + duration) {
+				frameListIndex = index;
+				break;
+			}
+			elapsed += duration;
+		}
+		VulkanicGalBridge.WorldMeshAnimationFrameRecord current = frames.get(frameListIndex);
+		VulkanicGalBridge.WorldMeshAnimationFrameRecord next = frames.get((frameListIndex + 1) % frames.size());
+		long duration = Math.max(1L, current.durationTicks());
+		double fraction = (double)(cursor - elapsed) / (double)duration;
+		return name
+			+ "=tex:" + asset.textureId()
+			+ ",loc:" + asset.location().toString().replace(':', '~')
+			+ ",generation:" + atlasGeneration
+			+ ",current:" + current.frameIndex()
+			+ ",next:" + next.frameIndex()
+			+ ",elapsed:" + (cursor - elapsed)
+			+ ",duration:" + duration
+			+ ",fraction:" + String.format(Locale.ROOT, "%.6f", fraction)
+			+ ",interpolation:" + asset.interpolationPolicy();
+	}
+
+	private static String translucentRangeSummary(List<VulkanicGalBridge.WorldMeshSectionRecord> sections) {
+		StringBuilder summary = new StringBuilder();
+		for (int i = 0; i < sections.size() && i < 16; i++) {
+			if (i > 0) {
+				summary.append(',');
+			}
+			VulkanicGalBridge.WorldMeshSectionRecord section = sections.get(i);
+			summary.append(section.materialId())
+				.append('@')
+				.append(section.indexOffset())
+				.append('+')
+				.append(section.indexCount());
+		}
+		if (sections.size() > 16) {
+			summary.append(",...");
+		}
+		return summary.toString();
+	}
+
+	private static void closeTranslucentRange(List<VulkanicGalBridge.WorldMeshSectionRecord> sections,
+			int materialId, int textureId, int startIndex, int currentIndexCount) {
+		if (materialId == 0 || currentIndexCount <= startIndex) {
+			return;
+		}
+		sections.add(new VulkanicGalBridge.WorldMeshSectionRecord(
+			materialId,
+			textureId == 0 ? RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_TERRAIN_BLOCK_ATLAS : textureId,
+			RustGalWorldPrimitiveRenderer.MATERIAL_MODE_TRANSLUCENT,
+			RustGalWorldPrimitiveRenderer.CULL_BACK,
+			RustGalWorldPrimitiveRenderer.WORLD_WINDING_CCW,
+			startIndex * Integer.BYTES,
+			currentIndexCount - startIndex
+		));
+	}
+
+	private static int translucentMaterialForPrimitiveKind(int primitiveKind) {
+		return switch (primitiveKind) {
+			case NativeSectionMeshBuilder.PRIMITIVE_KIND_NON_FLUID_TRANSLUCENT ->
+				RustGalWorldPrimitiveRenderer.MATERIAL_ID_TRANSLUCENT_TEXTURED;
+			case NativeSectionMeshBuilder.PRIMITIVE_KIND_BUILTIN_WATER ->
+				RustGalWorldPrimitiveRenderer.MATERIAL_ID_WATER_TRANSLUCENT;
+			case NativeSectionMeshBuilder.PRIMITIVE_KIND_UNSUPPORTED_FLUID -> 0;
+			default -> throw new IllegalArgumentException("unsupported translucent primitive kind " + primitiveKind);
+		};
+	}
+
+	private static int translucentTextureForPrimitive(int primitiveKind, int primitiveId,
+			List<VulkanicGalBridge.WorldMeshVertexRecord> vertices) {
+		if (primitiveKind != NativeSectionMeshBuilder.PRIMITIVE_KIND_BUILTIN_WATER) {
+			return RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_TERRAIN_BLOCK_ATLAS;
+		}
+		int base = primitiveId * 4;
+		if (base < 0 || base + 3 >= vertices.size()) {
+			throw new IllegalArgumentException("water primitive " + primitiveId + " exceeds vertex payload");
+		}
+		FluidSpriteAsset asset = waterTextureForPrimitive(vertices.subList(base, base + 4));
+		for (int index = base; index < base + 4; index++) {
+			VulkanicGalBridge.WorldMeshVertexRecord original = vertices.get(index);
+			vertices.set(index, new VulkanicGalBridge.WorldMeshVertexRecord(
+				original.x(),
+				original.y(),
+				original.z(),
+				clamp01(asset.localU(original.u())),
+				clamp01(asset.localV(original.v())),
+				original.atlasU(),
+				original.atlasV(),
+				original.shaderBlockId(),
+				waterShaderMaterialType(asset.textureId()),
+				original.colorArgb(),
+				original.normalPacked(),
+				original.light()
+			));
+		}
+		return asset.textureId();
+	}
+
+	private static FluidSpriteAsset waterTextureForPrimitive(List<VulkanicGalBridge.WorldMeshVertexRecord> vertices) {
+		FluidSpriteAsset still = waterStillAsset;
+		FluidSpriteAsset flow = waterFlowAsset;
+		FluidSpriteAsset overlay = waterOverlayAsset;
+		if (still == null || flow == null || overlay == null) {
+			throw new IllegalStateException("water animation texture assets have not been initialized");
+		}
+		if (allVerticesWithin(vertices, still)) {
+			return still;
+		}
+		if (allVerticesWithin(vertices, overlay)) {
+			return overlay;
+		}
+		if (allVerticesWithin(vertices, flow)) {
+			return flow;
+		}
+		throw new IllegalArgumentException("built-in water primitive UVs do not match still, flow, or overlay sprites");
+	}
+
+	private static boolean allVerticesWithin(List<VulkanicGalBridge.WorldMeshVertexRecord> vertices, FluidSpriteAsset asset) {
+		for (VulkanicGalBridge.WorldMeshVertexRecord vertex : vertices) {
+			if (!asset.contains(vertex.u(), vertex.v())) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	private static float clamp01(float value) {
+		return Math.max(0.0F, Math.min(1.0F, value));
+	}
+
+	private static int waterShaderMaterialType(int textureId) {
+		if (textureId == RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_WATER_STILL) {
+			return 1;
+		}
+		if (textureId == RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_WATER_FLOW) {
+			return 2;
+		}
+		if (textureId == RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_WATER_OVERLAY) {
+			return 3;
+		}
+		return 0;
+	}
+
+	private static int primitiveIdFromSortedQuad(byte[] bytes, int offset, int vertexCount) {
+		int i0 = readU32Index(bytes, offset);
+		int i1 = readU32Index(bytes, offset + 4);
+		int i2 = readU32Index(bytes, offset + 8);
+		int i3 = readU32Index(bytes, offset + 12);
+		int i4 = readU32Index(bytes, offset + 16);
+		int i5 = readU32Index(bytes, offset + 20);
+		if ((i0 & 3) != 0 || i1 != i0 + 1 || i2 != i0 + 2 || i3 != i0 + 2 || i4 != i0 + 3 || i5 != i0) {
+			throw new IllegalArgumentException("translucent sorted payload contains an interleaved or malformed primitive at byte " + offset);
+		}
+		if (i4 < 0 || i4 >= vertexCount) {
+			throw new IllegalArgumentException("translucent sorted payload references vertex " + i4 + " but vertex count is " + vertexCount);
+		}
+		return i0 / 4;
+	}
+
+	private static int readU32Index(byte[] bytes, int offset) {
+		return (bytes[offset] & 0xff)
+			| ((bytes[offset + 1] & 0xff) << 8)
+			| ((bytes[offset + 2] & 0xff) << 16)
+			| ((bytes[offset + 3] & 0xff) << 24);
+	}
+
+	private static boolean enqueueSectionLayer(RenderSection section, ChunkSectionLayer layer, Camera camera, int viewportWidth, int viewportHeight, int drawOrder,
+			Set<VisibleSubmitKey> visibleSubmissions) {
 		visibleLayerProbes.incrementAndGet();
 		TerrainSectionAsset asset = SECTION_ASSETS.get(new LayerKey(section.getPosition().asLong(), layer));
 		if (asset == null) {
@@ -1260,6 +1892,43 @@ public final class RustGalTerrainRenderer {
 				layer == ChunkSectionLayer.TRANSLUCENT ? currentTranslucentSortSnapshot(asset) : null;
 			long sortGeneration = sortedIndex == null ? 0L : sortedIndex.sortGeneration();
 			long sortedIndexHash = sortedIndex == null ? 0L : sortedIndex.indexHash();
+		if (visibleSubmissions != null && !"duplicate-visible-section".equals(activeFault())) {
+			VisibleSubmitKey submitKey = new VisibleSubmitKey(section.getPosition().asLong(), layer, visibleGeneration);
+			if (!visibleSubmissions.add(submitKey)) {
+				recordEvent(
+					section.getPosition().asLong(),
+					layer,
+					0L,
+					asset.meshGeneration(),
+					visibleGeneration,
+					atlasGeneration,
+					asset,
+					section.getOriginX(),
+					section.getOriginY(),
+					section.getOriginZ(),
+					(float)(section.getOriginX() - camera.getPosition().x()),
+					(float)(section.getOriginY() - camera.getPosition().y()),
+					(float)(section.getOriginZ() - camera.getPosition().z()),
+					"duplicate-visible-suppressed",
+					0L,
+					0L,
+					0L,
+					0L,
+					sortGeneration,
+					camera.getPosition().x(),
+					camera.getPosition().y(),
+					camera.getPosition().z(),
+					section.getOriginX() + 8.0D,
+					section.getOriginY() + 8.0D,
+					section.getOriginZ() + 8.0D,
+					Math.max(0, asset.indexCount() / 6),
+					sortedIndexHash,
+					sortGeneration,
+					drawOrder
+				);
+				return false;
+			}
+		}
 		boolean submitted = RustGalWorldPrimitiveRenderer.enqueueStaticTerrainMeshInstance(
 			asset.meshKey(),
 			visibleGeneration,
@@ -1743,7 +2412,18 @@ public final class RustGalTerrainRenderer {
 			registeredAtlasGeneration = atlasGeneration;
 			texturePayloadUpdates.incrementAndGet();
 			texturePayloadUpdateBytes.addAndGet(atlasPayload.length);
-			return List.of(new VulkanicGalBridge.WorldMeshTextureAssetRecord(RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_TERRAIN_BLOCK_ATLAS, atlasPayload));
+			ArrayList<VulkanicGalBridge.WorldMeshTextureAssetRecord> records = new ArrayList<>(4);
+			records.add(new VulkanicGalBridge.WorldMeshTextureAssetRecord(RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_TERRAIN_BLOCK_ATLAS, atlasPayload));
+			if (waterStillAsset != null) {
+				records.add(waterStillAsset.textureRecord());
+			}
+			if (waterFlowAsset != null) {
+				records.add(waterFlowAsset.textureRecord());
+			}
+			if (waterOverlayAsset != null) {
+				records.add(waterOverlayAsset.textureRecord());
+			}
+			return records;
 		}
 	}
 
@@ -1782,20 +2462,95 @@ public final class RustGalTerrainRenderer {
 			if (atlasPayload != null) {
 				return;
 			}
-			try {
-				TextureAtlas atlas = Minecraft.getInstance().getAtlasManager().getAtlasOrThrow(AtlasIds.BLOCKS);
-				BufferedImage image = new BufferedImage(atlas.width, atlas.height, BufferedImage.TYPE_INT_ARGB);
-				for (TextureAtlasSprite sprite : atlas.texturesByName.values()) {
-					copySprite(image, sprite);
-				}
-				try (ByteArrayOutputStream output = new ByteArrayOutputStream()) {
-					ImageIO.write(image, "png", output);
-					atlasPayload = output.toByteArray();
-					atlasGeneration++;
-				}
+				try {
+					TextureAtlas atlas = Minecraft.getInstance().getAtlasManager().getAtlasOrThrow(AtlasIds.BLOCKS);
+					BufferedImage image = new BufferedImage(atlas.width, atlas.height, BufferedImage.TYPE_INT_ARGB);
+					for (TextureAtlasSprite sprite : atlas.texturesByName.values()) {
+						copySprite(image, sprite);
+					}
+					FluidSpriteAsset nextWaterStillAsset = buildFluidSpriteAsset(
+						atlas,
+						"block/water_still",
+						RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_WATER_STILL
+					);
+					FluidSpriteAsset nextWaterFlowAsset = buildFluidSpriteAsset(
+						atlas,
+						"block/water_flow",
+						RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_WATER_FLOW
+					);
+					FluidSpriteAsset nextWaterOverlayAsset = buildFluidSpriteAsset(
+						atlas,
+						"block/water_overlay",
+						RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_WATER_OVERLAY
+					);
+					try (ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+						ImageIO.write(image, "png", output);
+						atlasPayload = output.toByteArray();
+						waterStillAsset = nextWaterStillAsset;
+						waterFlowAsset = nextWaterFlowAsset;
+						waterOverlayAsset = nextWaterOverlayAsset;
+						atlasGeneration++;
+					}
 			} catch (RuntimeException | IOException error) {
 				throw new IllegalStateException("Failed to build Rust-owned block atlas payload for static terrain", error);
 			}
+		}
+	}
+
+	private static FluidSpriteAsset buildFluidSpriteAsset(TextureAtlas atlas, String spritePath, int textureId) throws IOException {
+		TextureAtlasSprite sprite = atlas.getSprite(ResourceLocation.fromNamespaceAndPath("minecraft", spritePath));
+		if (sprite == null || sprite.contents() == null) {
+			throw new IllegalStateException("Missing built-in water sprite " + spritePath);
+		}
+		SpriteContents contents = sprite.contents();
+		SpriteContents.AnimatedTexture animation = contents.animatedTexture;
+		int frameCount = 1;
+		int frameTicks = 1;
+		int animationFlags = 0;
+		int frameRowSize = 0;
+		int interpolationPolicy = 0;
+		List<VulkanicGalBridge.WorldMeshAnimationFrameRecord> animationFrames = List.of();
+		if (animation != null && !animation.frames.isEmpty()) {
+			frameCount = animation.frames.size();
+			frameTicks = animation.frames.get(0).time();
+			frameRowSize = animation.frameRowSize;
+			interpolationPolicy = animation.interpolateFrames() ? 1 : 0;
+			ArrayList<VulkanicGalBridge.WorldMeshAnimationFrameRecord> frames = new ArrayList<>(animation.frames.size());
+			for (SpriteContents.FrameInfo frame : animation.frames) {
+				frames.add(new VulkanicGalBridge.WorldMeshAnimationFrameRecord(frame.index(), frame.time()));
+			}
+			animationFrames = List.copyOf(frames);
+		}
+		byte[] png = encodeNativeSpriteImage(contents.originalImage);
+		return new FluidSpriteAsset(
+			textureId,
+			contents.name(),
+			sprite.getU0(),
+			sprite.getU1(),
+			sprite.getV0(),
+			sprite.getV1(),
+			contents.width(),
+			contents.height(),
+			Math.max(1, frameCount),
+			Math.max(1, frameTicks),
+			animationFlags,
+			Math.max(0, frameRowSize),
+			interpolationPolicy,
+			animationFrames,
+			png
+		);
+	}
+
+	private static byte[] encodeNativeSpriteImage(net.blaze3d.platform.NativeImage image) throws IOException {
+		BufferedImage copy = new BufferedImage(image.getWidth(), image.getHeight(), BufferedImage.TYPE_INT_ARGB);
+		for (int y = 0; y < image.getHeight(); y++) {
+			for (int x = 0; x < image.getWidth(); x++) {
+				copy.setRGB(x, y, image.getPixel(x, y));
+			}
+		}
+		try (ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+			ImageIO.write(copy, "png", output);
+			return output.toByteArray();
 		}
 	}
 
@@ -1995,6 +2750,12 @@ public final class RustGalTerrainRenderer {
 		long rustCopiedSortedIndexSampleHash,
 		String sortedIndexSample
 	) {
+		if (layer == ChunkSectionLayer.TRANSLUCENT
+				&& "mesh-registered".equals(reason)
+				&& asset != null
+				&& !asset.translucentPrimitiveAccountingReason().isEmpty()) {
+			reason = asset.translucentPrimitiveAccountingReason();
+		}
 		synchronized (RECENT_EVENTS) {
 			TerrainDiagnosticEvent event = new TerrainDiagnosticEvent(
 				currentGameplayFrameId(),
@@ -2131,6 +2892,9 @@ public final class RustGalTerrainRenderer {
 	private record LayerKey(long sectionPos, ChunkSectionLayer layer) {
 	}
 
+	private record VisibleSubmitKey(long sectionPos, ChunkSectionLayer layer, long generation) {
+	}
+
 		private record TerrainSectionAsset(
 			long meshKey,
 			long meshGeneration,
@@ -2174,6 +2938,8 @@ public final class RustGalTerrainRenderer {
 		int sectionOriginX,
 		int sectionOriginY,
 		int sectionOriginZ,
+		String translucentPrimitiveAccountingReason,
+		int unsupportedPrimitiveCount,
 			VulkanicGalBridge.WorldMeshAssetRecord asset
 		) {
 		}
@@ -2277,6 +3043,8 @@ public final class RustGalTerrainRenderer {
 		long skippedRouteBuildOutputs,
 		long skippedUnsupportedAnimatedSections,
 		long skippedUnsupportedFluidTranslucentSections,
+		long acceptedWaterAnimatedSections,
+		long unsupportedFluidOmittedSections,
 		long skippedEmptyLayers,
 		long registeredMeshes,
 		long registeredTranslucentSorts,

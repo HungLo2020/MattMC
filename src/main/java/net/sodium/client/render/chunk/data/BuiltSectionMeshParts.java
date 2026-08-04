@@ -13,10 +13,16 @@ import net.sodium.client.util.NativeBuffer;
  */
 public class BuiltSectionMeshParts {
     private final int[] vertexSegments;
+    private final int[] primitiveMetadata;
     private final NativeBuffer buffer;
 
     public BuiltSectionMeshParts(NativeBuffer buffer, int[] vertexSegments) {
+        this(buffer, vertexSegments, new int[0]);
+    }
+
+    public BuiltSectionMeshParts(NativeBuffer buffer, int[] vertexSegments, int[] primitiveMetadata) {
         this.vertexSegments = vertexSegments;
+        this.primitiveMetadata = primitiveMetadata;
         this.buffer = buffer;
     }
 
@@ -26,6 +32,10 @@ public class BuiltSectionMeshParts {
 
     public int[] getVertexSegments() {
         return this.vertexSegments;
+    }
+
+    public int[] getPrimitiveMetadata() {
+        return this.primitiveMetadata;
     }
 
     public int[] computeVertexCounts() {

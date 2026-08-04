@@ -42,6 +42,7 @@ impl AllPassEmitTarget {
             builder,
             quad,
             packed_normal,
+            TERRAIN_PRIMITIVE_UNKNOWN,
             facing,
             &mut self.pending_counts,
             self.analyzer,

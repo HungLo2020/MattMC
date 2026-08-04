@@ -853,7 +853,30 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
         67 => layout!(
             67,
             FfiWorldMeshTextureAssetPayload,
-            [byte_size, texture_id, png_bytes]
+            [
+                byte_size,
+                texture_id,
+                png_bytes,
+                frame_width,
+                frame_height,
+                frame_count,
+                frame_ticks,
+                animation_flags,
+                frame_row_size,
+                interpolation_policy,
+                reserved0,
+                animation_frames
+            ]
+        ),
+        71 => layout!(
+            71,
+            FfiWorldMeshAnimationFrameRecord,
+            [
+                byte_size,
+                frame_index,
+                duration_ticks,
+                reserved0
+            ]
         ),
         68 => layout!(
             68,

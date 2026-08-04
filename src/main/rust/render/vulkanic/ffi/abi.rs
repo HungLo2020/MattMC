@@ -721,10 +721,28 @@ pub struct FfiWorldMeshAssetRecord {
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FfiWorldMeshAnimationFrameRecord {
+    pub byte_size: u32,
+    pub frame_index: u32,
+    pub duration_ticks: u32,
+    pub reserved0: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct FfiWorldMeshTextureAssetPayload {
     pub byte_size: u32,
     pub texture_id: u32,
     pub png_bytes: FfiBytes,
+    pub frame_width: u32,
+    pub frame_height: u32,
+    pub frame_count: u32,
+    pub frame_ticks: u32,
+    pub animation_flags: u32,
+    pub frame_row_size: u32,
+    pub interpolation_policy: u32,
+    pub reserved0: u32,
+    pub animation_frames: FfiSlice<FfiWorldMeshAnimationFrameRecord>,
 }
 
 #[repr(C)]

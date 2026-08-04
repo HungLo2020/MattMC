@@ -1096,6 +1096,24 @@ public final class VulkanicGalBridge implements AutoCloseable {
 				item.set(ValueLayout.JAVA_INT, Struct.WORLD_MESH_TEXTURE_ASSET_PAYLOAD.offset(0), Struct.WORLD_MESH_TEXTURE_ASSET_PAYLOAD.byteSize());
 				Struct.WORLD_MESH_TEXTURE_ASSET_PAYLOAD.setInt(item, 1, texture.textureId());
 				Abi.writeBytes(updateArena, item, Struct.WORLD_MESH_TEXTURE_ASSET_PAYLOAD, 2, texture.pngBytes());
+				Struct.WORLD_MESH_TEXTURE_ASSET_PAYLOAD.setInt(item, 3, texture.frameWidth());
+				Struct.WORLD_MESH_TEXTURE_ASSET_PAYLOAD.setInt(item, 4, texture.frameHeight());
+				Struct.WORLD_MESH_TEXTURE_ASSET_PAYLOAD.setInt(item, 5, texture.frameCount());
+				Struct.WORLD_MESH_TEXTURE_ASSET_PAYLOAD.setInt(item, 6, texture.frameTicks());
+				Struct.WORLD_MESH_TEXTURE_ASSET_PAYLOAD.setInt(item, 7, texture.animationFlags());
+				Struct.WORLD_MESH_TEXTURE_ASSET_PAYLOAD.setInt(item, 8, texture.frameRowSize());
+				Struct.WORLD_MESH_TEXTURE_ASSET_PAYLOAD.setInt(item, 9, texture.interpolationPolicy());
+				Struct.WORLD_MESH_TEXTURE_ASSET_PAYLOAD.setInt(item, 10, 0);
+				MemorySegment animationFrameArray = Struct.WORLD_MESH_ANIMATION_FRAME_RECORD.array(updateArena, texture.animationFrames().size());
+				for (int frameIndex = 0; frameIndex < texture.animationFrames().size(); frameIndex++) {
+					WorldMeshAnimationFrameRecord frame = texture.animationFrames().get(frameIndex);
+					MemorySegment frameItem = Abi.item(animationFrameArray, Struct.WORLD_MESH_ANIMATION_FRAME_RECORD, frameIndex);
+					frameItem.set(ValueLayout.JAVA_INT, Struct.WORLD_MESH_ANIMATION_FRAME_RECORD.offset(0), Struct.WORLD_MESH_ANIMATION_FRAME_RECORD.byteSize());
+					Struct.WORLD_MESH_ANIMATION_FRAME_RECORD.setInt(frameItem, 1, frame.frameIndex());
+					Struct.WORLD_MESH_ANIMATION_FRAME_RECORD.setInt(frameItem, 2, frame.durationTicks());
+					Struct.WORLD_MESH_ANIMATION_FRAME_RECORD.setInt(frameItem, 3, 0);
+				}
+				Abi.writeSlice(item, Struct.WORLD_MESH_TEXTURE_ASSET_PAYLOAD, 11, animationFrameArray, texture.animationFrames().size());
 			}
 			MemorySegment meshArray = Struct.WORLD_MESH_ASSET_RECORD.array(updateArena, meshes.size());
 			for (int i = 0; i < meshes.size(); i++) {
@@ -1191,10 +1209,50 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		}
 	}
 
-	public record WorldMeshTextureAssetRecord(int textureId, byte[] pngBytes) {
+	public record WorldMeshTextureAssetRecord(
+		int textureId,
+		byte[] pngBytes,
+		int frameWidth,
+		int frameHeight,
+		int frameCount,
+		int frameTicks,
+		int animationFlags,
+		int frameRowSize,
+		int interpolationPolicy,
+		List<WorldMeshAnimationFrameRecord> animationFrames
+	) {
+		public WorldMeshTextureAssetRecord(int textureId, byte[] pngBytes) {
+			this(textureId, pngBytes, 0, 0, 1, 1, 0, 0, 0, List.of());
+		}
+
+		public WorldMeshTextureAssetRecord(
+			int textureId,
+			byte[] pngBytes,
+			int frameWidth,
+			int frameHeight,
+			int frameCount,
+			int frameTicks,
+			int animationFlags
+		) {
+			this(textureId, pngBytes, frameWidth, frameHeight, frameCount, frameTicks, animationFlags, 0, 0, List.of());
+		}
+
 		public WorldMeshTextureAssetRecord {
 			Objects.requireNonNull(pngBytes, "pngBytes");
+			Objects.requireNonNull(animationFrames, "animationFrames");
 			pngBytes = pngBytes.clone();
+			animationFrames = List.copyOf(animationFrames);
+			if (frameWidth < 0 || frameHeight < 0 || frameCount < 0 || frameTicks < 0 || frameRowSize < 0 || interpolationPolicy < 0) {
+				throw new IllegalArgumentException("negative world mesh texture animation metadata");
+			}
+		}
+	}
+
+	public record WorldMeshAnimationFrameRecord(int frameIndex, int durationTicks) {
+		public WorldMeshAnimationFrameRecord {
+			if (frameIndex < 0 || durationTicks < 0) {
+				throw new IllegalArgumentException("negative world mesh animation frame metadata");
+			}
 		}
 	}
 
@@ -2155,7 +2213,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 				WORLD_MESH_TEXTURE_ASSET_PAYLOAD(67),
 				WORLD_MESH_ASSET_UPDATE(68),
 					WORLD_MESH_INSTANCE_RECORD(69),
-					WORLD_MESH_SORTED_INDEX_RECORD(70);
+					WORLD_MESH_SORTED_INDEX_RECORD(70),
+					WORLD_MESH_ANIMATION_FRAME_RECORD(71);
 
 		private final int id;
 		private final int byteSize;

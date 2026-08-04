@@ -20,6 +20,8 @@ pub(in crate::render::chunk::meshing) struct NativeFluidFace {
     pub material_bits: i32,
     pub packed_normal: i32,
     pub facing: usize,
+    pub fluid_type: i32,
+    pub face_kind: i32,
 }
 
 impl NativeFluidFace {
@@ -88,6 +90,11 @@ impl NativeFluidFaceSink for BuilderFluidFaceSink<'_, '_> {
                     self.builder,
                     face.to_native_quad(),
                     face.packed_normal,
+                    if face.fluid_type == FLUID_WATER {
+                        TERRAIN_PRIMITIVE_BUILTIN_WATER
+                    } else {
+                        TERRAIN_PRIMITIVE_UNSUPPORTED_FLUID
+                    },
                     face.facing,
                     self.pending_counts,
                     self.analyzer,
@@ -162,6 +169,18 @@ pub(in crate::render::chunk::meshing) unsafe fn append_direct_compact_fluid_face
         .checked_mul(encoded_quad_len)
         .ok_or(ERR_INVALID_ARGUMENT)?;
     ensure_encoded_len(&mut buffer.encoded, required_encoded_len, format);
+    ensure_metadata_len(&mut buffer.primitive_metadata, required_len);
+    let primitive_kind = if face.fluid_type == FLUID_WATER {
+        TERRAIN_PRIMITIVE_BUILTIN_WATER
+    } else {
+        TERRAIN_PRIMITIVE_UNSUPPORTED_FLUID
+    };
+    buffer.primitive_metadata[start] = primitive_metadata_from_quad(
+        &face.to_native_quad(),
+        primitive_kind,
+        face.facing,
+        face.face_kind,
+    );
 
     let encoded_start = start * encoded_quad_len;
     let encoded_end = encoded_start + encoded_quad_len;
@@ -235,6 +254,12 @@ pub(in crate::render::chunk::meshing) unsafe fn section_builder_append_fluid_fac
                 let record = records[processed + index];
                 pending.quads[index] = fluid_face_record_to_quad(record)?;
                 pending.packed_normals[index] = record.packed_normal;
+                pending.primitive_kinds[index] = match record.primitive_kind {
+                    TERRAIN_PRIMITIVE_BUILTIN_WATER | TERRAIN_PRIMITIVE_UNSUPPORTED_FLUID => {
+                        record.primitive_kind
+                    }
+                    _ => return Err(ERR_INVALID_ARGUMENT),
+                };
             }
             builder
                 .profile
@@ -272,7 +297,8 @@ pub(in crate::render::chunk::meshing) unsafe fn section_builder_append_fluid_fac
         };
 
         let staging_started = Instant::now();
-        let chunk_committed = section_builder_append_batch_encoded(
+        let primitive_kinds = builder.pending[facing].primitive_kinds[..chunk_count].to_vec();
+        let chunk_committed = section_builder_append_batch_encoded_with_kind(
             builder,
             facing,
             builder.pending[facing].quads.as_ptr() as u64,
@@ -280,6 +306,8 @@ pub(in crate::render::chunk::meshing) unsafe fn section_builder_append_fluid_fac
             validity,
             format,
             store_raw_quads,
+            None,
+            Some(&primitive_kinds),
         )?;
         builder
             .profile

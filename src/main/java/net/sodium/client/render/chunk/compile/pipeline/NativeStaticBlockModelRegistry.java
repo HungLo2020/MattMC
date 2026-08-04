@@ -175,6 +175,10 @@ public final class NativeStaticBlockModelRegistry {
     }
 
     public static List<TextureAtlasSprite> getNativeFluidSprites(int emittedSpriteMask) {
+        return getNativeFluidSprites(emittedSpriteMask, true);
+    }
+
+    public static List<TextureAtlasSprite> getNativeFluidSprites(int emittedSpriteMask, boolean includeUnsupportedFluids) {
         if (emittedSpriteMask == 0) {
             return List.of();
         }
@@ -183,8 +187,10 @@ public final class NativeStaticBlockModelRegistry {
         addFluidSprite(tracked, emittedSpriteMask, FLUID_SPRITE_WATER_STILL, "minecraft:block/water_still");
         addFluidSprite(tracked, emittedSpriteMask, FLUID_SPRITE_WATER_FLOW, "minecraft:block/water_flow");
         addFluidSprite(tracked, emittedSpriteMask, FLUID_SPRITE_WATER_OVERLAY, "minecraft:block/water_overlay");
-        addFluidSprite(tracked, emittedSpriteMask, FLUID_SPRITE_LAVA_STILL, "minecraft:block/lava_still");
-        addFluidSprite(tracked, emittedSpriteMask, FLUID_SPRITE_LAVA_FLOW, "minecraft:block/lava_flow");
+        if (includeUnsupportedFluids) {
+            addFluidSprite(tracked, emittedSpriteMask, FLUID_SPRITE_LAVA_STILL, "minecraft:block/lava_still");
+            addFluidSprite(tracked, emittedSpriteMask, FLUID_SPRITE_LAVA_FLOW, "minecraft:block/lava_flow");
+        }
         return tracked;
     }
 

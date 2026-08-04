@@ -286,6 +286,10 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable, SpriteCont
 			return SpriteContents.this.new Ticker(this, this.interpolateFrames ? SpriteContents.this.new InterpolationData() : null);
 		}
 
+		public boolean interpolateFrames() {
+			return this.interpolateFrames;
+		}
+
 		public void uploadFirstFrame(int i, int j, GpuTexture gpuTexture) {
 			this.uploadFrame(i, j, ((SpriteContents.FrameInfo)this.frames.get(0)).index, gpuTexture);
 		}

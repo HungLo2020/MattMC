@@ -31,6 +31,8 @@ public class BuiltSectionInfo {
     public final int nativeMeshingFallbackBlocks;
     public final int nativeMeshingFallbackQuads;
     public final int nativeMeshingFluidBlocks;
+    public final int nativeMeshingWaterBlocks;
+    public final int nativeMeshingUnsupportedFluidBlocks;
     public final long @Nullable[] nativeMeshingProfile;
 
     private BuiltSectionInfo(@NotNull Collection<TerrainRenderPass> blockRenderPasses,
@@ -41,6 +43,8 @@ public class BuiltSectionInfo {
                              int nativeMeshingFallbackBlocks,
                              int nativeMeshingFallbackQuads,
                              int nativeMeshingFluidBlocks,
+                             int nativeMeshingWaterBlocks,
+                             int nativeMeshingUnsupportedFluidBlocks,
                              long @Nullable[] nativeMeshingProfile) {
         this.globalBlockEntities = toArray(globalBlockEntities, BlockEntity[]::new);
         this.culledBlockEntities = toArray(culledBlockEntities, BlockEntity[]::new);
@@ -48,6 +52,8 @@ public class BuiltSectionInfo {
         this.nativeMeshingFallbackBlocks = nativeMeshingFallbackBlocks;
         this.nativeMeshingFallbackQuads = nativeMeshingFallbackQuads;
         this.nativeMeshingFluidBlocks = nativeMeshingFluidBlocks;
+        this.nativeMeshingWaterBlocks = nativeMeshingWaterBlocks;
+        this.nativeMeshingUnsupportedFluidBlocks = nativeMeshingUnsupportedFluidBlocks;
         this.nativeMeshingProfile = nativeMeshingProfile == null ? null : nativeMeshingProfile.clone();
 
         int flags = 0;
@@ -79,6 +85,8 @@ public class BuiltSectionInfo {
         private int nativeMeshingFallbackBlocks;
         private int nativeMeshingFallbackQuads;
         private int nativeMeshingFluidBlocks;
+        private int nativeMeshingWaterBlocks;
+        private int nativeMeshingUnsupportedFluidBlocks;
         private long @Nullable[] nativeMeshingProfile;
 
         public void addRenderPass(TerrainRenderPass pass) {
@@ -116,6 +124,14 @@ public class BuiltSectionInfo {
 
         public void setNativeMeshingFluidBlocks(int blocks) {
             this.nativeMeshingFluidBlocks = blocks;
+            this.nativeMeshingWaterBlocks = 0;
+            this.nativeMeshingUnsupportedFluidBlocks = 0;
+        }
+
+        public void setNativeMeshingFluidCounts(int blocks, int waterBlocks, int unsupportedBlocks) {
+            this.nativeMeshingFluidBlocks = blocks;
+            this.nativeMeshingWaterBlocks = waterBlocks;
+            this.nativeMeshingUnsupportedFluidBlocks = unsupportedBlocks;
         }
 
         public void setNativeMeshingProfile(long[] profile) {
@@ -125,7 +141,8 @@ public class BuiltSectionInfo {
         public BuiltSectionInfo build() {
             return new BuiltSectionInfo(this.blockRenderPasses, this.globalBlockEntities, this.culledBlockEntities,
                     this.animatedSprites, this.occlusionData, this.nativeMeshingFallbackBlocks,
-                    this.nativeMeshingFallbackQuads, this.nativeMeshingFluidBlocks, this.nativeMeshingProfile);
+                    this.nativeMeshingFallbackQuads, this.nativeMeshingFluidBlocks, this.nativeMeshingWaterBlocks,
+                    this.nativeMeshingUnsupportedFluidBlocks, this.nativeMeshingProfile);
         }
     }
 

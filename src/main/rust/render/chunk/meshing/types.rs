@@ -78,6 +78,7 @@ pub(super) struct FluidFaceRecord {
     pub(super) colors: [i32; 4],
     pub(super) aos: [f32; 4],
     pub(super) lights: [i32; 4],
+    pub(super) primitive_kind: i32,
 }
 
 #[repr(C)]
@@ -245,10 +246,27 @@ pub(super) struct NativeQuadBuffer {
     pub(super) quads: Vec<NativeQuad>,
     pub(super) encoded: Vec<u8>,
     pub(super) encoded_format: Option<NativeFormat>,
+    pub(super) primitive_metadata: Vec<NativeTerrainPrimitiveMetadata>,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub(super) struct NativeTerrainPrimitiveMetadata {
+    pub(super) primitive_kind: i32,
+    pub(super) material_bits: i32,
+    pub(super) block_id: i32,
+    pub(super) local_x: i32,
+    pub(super) local_y: i32,
+    pub(super) local_z: i32,
+    pub(super) render_type: i32,
+    pub(super) face_kind: i32,
+    pub(super) facing: i32,
+    pub(super) reserved0: i32,
 }
 
 pub(super) struct NativePendingQuadBuffer {
     pub(super) quads: Vec<NativeQuad>,
+    pub(super) primitive_kinds: Vec<i32>,
     pub(super) flat_quad_records: Vec<FlatQuadRecord>,
     pub(super) light_block_records: Vec<LightBlockRecord>,
     pub(super) fluid_face_records: Vec<FluidFaceRecord>,

@@ -250,6 +250,8 @@ struct MeshInstance {
     mat4 model;
     vec4 color;
     vec4 material;
+    vec4 animation_region;
+    vec4 animation_next_region;
 };
 layout(set = 0, binding = 1, std430) readonly buffer WorldMeshInstances {
     mat4 view;
@@ -264,6 +266,8 @@ layout(location = 2) flat out vec4 v_material;
 layout(location = 3) out vec3 v_normal;
 layout(location = 4) out vec2 v_light;
 layout(location = 5) out vec3 v_world_position;
+layout(location = 6) flat out vec4 v_animation_region;
+layout(location = 7) flat out vec4 v_animation_next_region;
 void main() {
     MeshVertex vertex = vertices[gl_VertexIndex];
     MeshInstance instance = instances[gl_InstanceIndex];
@@ -275,7 +279,9 @@ void main() {
     gl_Position = clip;
     v_uv = vec2(vertex.position_uv.w, vertex.color_uv.w);
     v_color = vec4(vertex.color_uv.rgb * vertex.normal_light.x, vertex.normal_light.w) * instance.color;
-    v_material = vec4(instance.material.x, 0.0, 0.0, 0.0);
+    v_material = instance.material;
+    v_animation_region = instance.animation_region;
+    v_animation_next_region = instance.animation_next_region;
     v_normal = normalize(vec3(vertex.normal_light.yz, vertex.extra_data.z));
     v_light = clamp(vertex.extra_data.xy, vec2(0.0), vec2(1.0));
     float shadow_range = max(shadow_params.w, 1.0);
@@ -292,12 +298,21 @@ layout(location = 2) flat in vec4 v_material;
 layout(location = 3) in vec3 v_normal;
 layout(location = 4) in vec2 v_light;
 layout(location = 5) in vec3 v_world_position;
+layout(location = 6) flat in vec4 v_animation_region;
+layout(location = 7) flat in vec4 v_animation_next_region;
 layout(location = 0) out vec4 out_albedo;
 layout(location = 1) out vec4 out_normal;
 layout(location = 2) out vec4 out_material_light;
 layout(location = 3) out vec4 out_world_position;
 void main() {
-    vec4 color = texture(sampler2D(Tex0, Samp0), v_uv) * v_color;
+    vec2 sample_uv = v_animation_region.xy + v_uv * v_animation_region.zw;
+    vec4 color = texture(sampler2D(Tex0, Samp0), sample_uv);
+    if (v_material.y > 0.5) {
+        vec2 next_uv = v_animation_next_region.xy + v_uv * v_animation_next_region.zw;
+        vec4 next_color = texture(sampler2D(Tex0, Samp0), next_uv);
+        color = mix(color, next_color, clamp(v_material.z, 0.0, 1.0));
+    }
+    color *= v_color;
     if (v_material.x > 0.0 && color.a < v_material.x) {
         discard;
     }
@@ -315,9 +330,18 @@ layout(set = 0, binding = 3) uniform sampler Samp0;
 layout(location = 0) in vec2 v_uv;
 layout(location = 1) in vec4 v_color;
 layout(location = 2) flat in vec4 v_material;
+layout(location = 6) flat in vec4 v_animation_region;
+layout(location = 7) flat in vec4 v_animation_next_region;
 layout(location = 0) out vec4 out_color;
 void main() {
-    vec4 color = texture(sampler2D(Tex0, Samp0), v_uv) * v_color;
+    vec2 sample_uv = v_animation_region.xy + v_uv * v_animation_region.zw;
+    vec4 color = texture(sampler2D(Tex0, Samp0), sample_uv);
+    if (v_material.y > 0.5) {
+        vec2 next_uv = v_animation_next_region.xy + v_uv * v_animation_next_region.zw;
+        vec4 next_color = texture(sampler2D(Tex0, Samp0), next_uv);
+        color = mix(color, next_color, clamp(v_material.z, 0.0, 1.0));
+    }
+    color *= v_color;
     if (v_material.x > 0.0 && color.a < v_material.x) {
         discard;
     }
@@ -471,6 +495,8 @@ struct MeshInstance {
     mat4 model;
     vec4 color;
     vec4 material;
+    vec4 animation_region;
+    vec4 animation_next_region;
 };
 layout(set = 0, binding = 1, std430) readonly buffer WorldMeshInstances {
     mat4 view;
@@ -482,6 +508,8 @@ layout(set = 0, binding = 1, std430) readonly buffer WorldMeshInstances {
 layout(location = 0) out vec2 v_uv;
 layout(location = 1) out vec4 v_color;
 layout(location = 2) flat out vec4 v_material;
+layout(location = 6) flat out vec4 v_animation_region;
+layout(location = 7) flat out vec4 v_animation_next_region;
 void main() {
     MeshVertex vertex = vertices[gl_VertexIndex];
     MeshInstance instance = instances[gl_InstanceIndex];
@@ -492,7 +520,9 @@ void main() {
     gl_Position = clip;
     v_uv = vec2(vertex.position_uv.w, vertex.color_uv.w);
     v_color = vec4(vertex.color_uv.rgb * vertex.normal_light.x, vertex.normal_light.w) * instance.color;
-    v_material = vec4(instance.material.x, 0.0, 0.0, 0.0);
+    v_material = instance.material;
+    v_animation_region = instance.animation_region;
+    v_animation_next_region = instance.animation_next_region;
 }
 "#;
 
@@ -502,8 +532,17 @@ layout(set = 0, binding = 3) uniform sampler Samp0;
 layout(location = 0) in vec2 v_uv;
 layout(location = 1) in vec4 v_color;
 layout(location = 2) flat in vec4 v_material;
+layout(location = 6) flat in vec4 v_animation_region;
+layout(location = 7) flat in vec4 v_animation_next_region;
 void main() {
-    vec4 color = texture(sampler2D(Tex0, Samp0), v_uv) * v_color;
+    vec2 sample_uv = v_animation_region.xy + v_uv * v_animation_region.zw;
+    vec4 color = texture(sampler2D(Tex0, Samp0), sample_uv);
+    if (v_material.y > 0.5) {
+        vec2 next_uv = v_animation_next_region.xy + v_uv * v_animation_next_region.zw;
+        vec4 next_color = texture(sampler2D(Tex0, Samp0), next_uv);
+        color = mix(color, next_color, clamp(v_material.z, 0.0, 1.0));
+    }
+    color *= v_color;
     if (v_material.x > 0.0 && color.a < v_material.x) {
         discard;
     }

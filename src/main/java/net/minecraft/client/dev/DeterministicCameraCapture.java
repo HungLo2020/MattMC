@@ -79,6 +79,12 @@ public final class DeterministicCameraCapture {
 	private static final int SETTLED_READY_FRAMES = Math.max(0, Integer.getInteger("mattmc.dev.deterministicCameraCapture.settledReadyFrames", 0));
 	private static final int SETTLED_READY_MAX_WAIT_FRAMES = Math.max(1, Integer.getInteger("mattmc.dev.deterministicCameraCapture.settledReadyMaxWaitFrames", 900));
 	private static final Set<String> SETTLED_READY_FAMILIES = parseSettledReadyFamilies();
+	private static final boolean STATIC_TERRAIN_WATER_ANIMATION_DENSE_CAPTURE =
+		Boolean.getBoolean("mattmc.dev.rustGalStaticTerrain.waterAnimationDenseCapture");
+	private static final int STATIC_TERRAIN_WATER_ANIMATION_DENSE_FRAMES = Math.max(
+		1,
+		Math.min(120, Integer.getInteger("mattmc.dev.rustGalStaticTerrain.waterAnimationDenseFrames", 24))
+	);
 	private static final String FORCED_CAMERA_TYPE = System.getProperty("mattmc.dev.deterministicCameraCapture.cameraType", "").trim();
 	private static final String FORCED_GAME_MODE = System.getProperty("mattmc.dev.deterministicCameraCapture.gameMode", "").trim();
 	private static final int FORCED_SELECTED_HOTBAR_SLOT = Integer.getInteger("mattmc.dev.deterministicCameraCapture.selectedHotbarSlot", 0);
@@ -216,6 +222,21 @@ public final class DeterministicCameraCapture {
 	private static int framesAwaitingAck;
 	private static Path currentScreenshotPath;
 	private static Path currentAckPath;
+	private static final List<WaterAnimationFrameCapture> WATER_ANIMATION_CAPTURES = new ArrayList<>();
+	private static int staticTerrainWaterAnimationDenseCapturedFrames;
+	private static boolean staticTerrainWaterAnimationDenseComplete;
+	private static boolean staticTerrainWaterAnimationScreenshotInFlight;
+	private static int framesAwaitingStaticTerrainWaterAnimationAck;
+	private static Path staticTerrainWaterAnimationScreenshotPath;
+	private static Path staticTerrainWaterAnimationAckPath;
+	private static long staticTerrainWaterAnimationPendingRenderedFrameIndex = -1L;
+	private static long staticTerrainWaterAnimationPendingGameTime = -1L;
+	private static long staticTerrainWaterAnimationPendingHash;
+	private static String staticTerrainWaterAnimationPendingSummary = "missing";
+	private static String staticTerrainWaterAnimationPendingState = "missing";
+	private static long staticTerrainWaterAnimationPendingVisibleLayerSubmissions;
+	private static long staticTerrainWaterAnimationPendingCurrentFrameVisibleLayerSubmissions;
+	private static long staticTerrainWaterAnimationPendingAtlasGeneration;
 	private static long startedGameTime;
 	private static long renderedFrameIndex;
 	private static int windowWidth;
@@ -438,6 +459,9 @@ public final class DeterministicCameraCapture {
 		if (!advanceRustGalGuiScreenCycle(minecraft)) {
 			return;
 		}
+		if (!captureStaticTerrainWaterAnimationFrameIfNeeded(minecraft)) {
+			return;
+		}
 
 		renderedFramesAtPose++;
 		if (renderedFramesAtPose == Math.max(1, FRAMES_PER_POSE - 1)) {
@@ -493,6 +517,112 @@ public final class DeterministicCameraCapture {
 
 	public static boolean isEnabledForDiagnostics() {
 		return ENABLED && initialized && !failed;
+	}
+
+	private static boolean captureStaticTerrainWaterAnimationFrameIfNeeded(Minecraft minecraft) {
+		if (!STATIC_TERRAIN_WATER_ANIMATION_DENSE_CAPTURE || !"translucent-water".equals(STATIC_TERRAIN_SCENARIO)) {
+			return true;
+		}
+		if (staticTerrainWaterAnimationDenseComplete) {
+			return true;
+		}
+		if (!staticTerrainLifecycleAfterRecorded || !"fixture-visible".equals(staticTerrainLifecycleStage)) {
+			return true;
+		}
+		if (staticTerrainWaterAnimationScreenshotInFlight) {
+			if (checkStaticTerrainWaterAnimationAck(minecraft)) {
+				return false;
+			}
+			framesAwaitingStaticTerrainWaterAnimationAck++;
+			if (framesAwaitingStaticTerrainWaterAnimationAck > ACK_TIMEOUT_FRAMES) {
+				fail("timed out waiting for water animation dense screenshot ack: " + staticTerrainWaterAnimationAckPath);
+			}
+			return false;
+		}
+		if (staticTerrainWaterAnimationDenseCapturedFrames >= STATIC_TERRAIN_WATER_ANIMATION_DENSE_FRAMES) {
+			staticTerrainWaterAnimationDenseComplete = true;
+			writeMetadata(minecraft, "static_terrain_water_animation_dense_complete");
+			return true;
+		}
+
+		int frameIndex = staticTerrainWaterAnimationDenseCapturedFrames;
+		staticTerrainWaterAnimationScreenshotPath = SCREENSHOT_DIR.resolve(String.format(Locale.ROOT, "water_animation_frame_%03d.png", frameIndex));
+		staticTerrainWaterAnimationAckPath = SCREENSHOT_DIR.resolve(String.format(Locale.ROOT, "capture_request_water_animation_%03d.ack.json", frameIndex));
+		Path requestPath = SCREENSHOT_DIR.resolve(String.format(Locale.ROOT, "capture_request_water_animation_%03d.json", frameIndex));
+		RustGalTerrainRenderer.TerrainDiagnostics diagnostics = RustGalTerrainRenderer.diagnosticsSnapshot();
+		long animationTick = renderedFrameIndex;
+		staticTerrainWaterAnimationPendingRenderedFrameIndex = renderedFrameIndex;
+		staticTerrainWaterAnimationPendingGameTime = minecraft.level == null ? -1L : minecraft.level.getGameTime();
+		staticTerrainWaterAnimationPendingHash = RustGalTerrainRenderer.waterAnimationHashForDiagnostics();
+		staticTerrainWaterAnimationPendingSummary = RustGalTerrainRenderer.waterAnimationSummaryForDiagnostics();
+		staticTerrainWaterAnimationPendingState = RustGalTerrainRenderer.waterAnimationFrameStateForDiagnostics(animationTick);
+		staticTerrainWaterAnimationPendingVisibleLayerSubmissions = diagnostics.visibleLayerSubmissions();
+		staticTerrainWaterAnimationPendingCurrentFrameVisibleLayerSubmissions = diagnostics.currentFrameVisibleLayerSubmissions();
+		staticTerrainWaterAnimationPendingAtlasGeneration = diagnostics.atlasGeneration();
+		try {
+			Files.createDirectories(SCREENSHOT_DIR);
+		} catch (IOException exception) {
+			fail("failed to create water animation screenshot directory " + SCREENSHOT_DIR + ": " + exception.getMessage());
+			return false;
+		}
+		StringBuilder json = new StringBuilder(1024);
+		json.append("{\n");
+		json.append("  \"index\": ").append(frameIndex).append(",\n");
+		appendField(json, "poseName", "water-animation-dense").append(",\n");
+		appendField(json, "screenshot", staticTerrainWaterAnimationScreenshotPath.toAbsolutePath().toString()).append(",\n");
+		appendField(json, "ack", staticTerrainWaterAnimationAckPath.toAbsolutePath().toString()).append(",\n");
+		appendField(json, "dimension", minecraft.level == null ? "missing" : minecraft.level.dimension().location().toString()).append(",\n");
+		appendVec3(json, "position", minecraft.player == null ? Vec3.ZERO : minecraft.player.position()).append(",\n");
+		json.append("  \"renderedFrameIndex\": ").append(staticTerrainWaterAnimationPendingRenderedFrameIndex).append(",\n");
+		json.append("  \"gameTime\": ").append(staticTerrainWaterAnimationPendingGameTime).append("\n");
+		json.append("}\n");
+		try {
+			Files.writeString(requestPath, json.toString(), StandardCharsets.UTF_8);
+		} catch (IOException exception) {
+			fail("failed to write water animation dense screenshot request " + requestPath + ": " + exception.getMessage());
+			return false;
+		}
+		staticTerrainWaterAnimationScreenshotInFlight = true;
+		framesAwaitingStaticTerrainWaterAnimationAck = 0;
+		writeMetadata(minecraft, "waiting_for_static_terrain_water_animation_dense_screenshot");
+		return false;
+	}
+
+	private static boolean checkStaticTerrainWaterAnimationAck(Minecraft minecraft) {
+		if (staticTerrainWaterAnimationAckPath == null || !Files.isRegularFile(staticTerrainWaterAnimationAckPath)) {
+			return false;
+		}
+		if (staticTerrainWaterAnimationScreenshotPath == null || !Files.isRegularFile(staticTerrainWaterAnimationScreenshotPath)) {
+			fail("water animation dense screenshot ack exists but screenshot is missing: " + staticTerrainWaterAnimationScreenshotPath);
+			return false;
+		}
+		WATER_ANIMATION_CAPTURES.add(new WaterAnimationFrameCapture(
+			staticTerrainWaterAnimationDenseCapturedFrames,
+			staticTerrainWaterAnimationScreenshotPath.toAbsolutePath().toString(),
+			staticTerrainWaterAnimationPendingRenderedFrameIndex,
+			staticTerrainWaterAnimationPendingGameTime,
+			staticTerrainWaterAnimationPendingHash,
+			staticTerrainWaterAnimationPendingSummary,
+			staticTerrainWaterAnimationPendingState,
+			staticTerrainWaterAnimationPendingVisibleLayerSubmissions,
+			staticTerrainWaterAnimationPendingCurrentFrameVisibleLayerSubmissions,
+			staticTerrainWaterAnimationPendingAtlasGeneration
+		));
+		staticTerrainWaterAnimationDenseCapturedFrames++;
+		staticTerrainWaterAnimationScreenshotInFlight = false;
+		framesAwaitingStaticTerrainWaterAnimationAck = 0;
+		staticTerrainWaterAnimationScreenshotPath = null;
+		staticTerrainWaterAnimationAckPath = null;
+		staticTerrainWaterAnimationPendingRenderedFrameIndex = -1L;
+		staticTerrainWaterAnimationPendingGameTime = -1L;
+		staticTerrainWaterAnimationPendingHash = 0L;
+		staticTerrainWaterAnimationPendingSummary = "missing";
+		staticTerrainWaterAnimationPendingState = "missing";
+		staticTerrainWaterAnimationPendingVisibleLayerSubmissions = 0L;
+		staticTerrainWaterAnimationPendingCurrentFrameVisibleLayerSubmissions = 0L;
+		staticTerrainWaterAnimationPendingAtlasGeneration = 0L;
+		writeMetadata(minecraft, "static_terrain_water_animation_dense_frame_captured");
+		return true;
 	}
 
 	public static boolean isFallingBlockSequenceActive() {
@@ -655,6 +785,38 @@ public final class DeterministicCameraCapture {
 		if (continueStaticTerrainLifecycleAction(minecraft)) {
 			return false;
 		}
+		if (staticTerrainBaseTranslucentFixtureScenario()) {
+			RustGalTerrainRenderer.TerrainDiagnostics diagnostics = RustGalTerrainRenderer.diagnosticsSnapshot();
+			boolean unsupportedFixtureReady = !"translucent-mixed-unsupported".equals(STATIC_TERRAIN_SCENARIO)
+				|| diagnostics.unsupportedFluidOmittedSections() > 0;
+			if (diagnostics.visibleLayerSubmissions() > 0
+				&& unsupportedFixtureReady
+				&& framesWaitingForStaticTerrainLifecycle >= Math.max(4, FRAMES_PER_POSE / 2)) {
+				staticTerrainLifecycleAfterGeneration = Math.max(1L, diagnostics.atlasGeneration());
+				if (!staticTerrainLifecycleAfterRecorded) {
+					staticTerrainLifecycleAfterCachedLayers = diagnostics.cachedLayerAssets();
+					staticTerrainLifecycleAfterRssBytes = currentUsedMemoryBytes();
+					RustGalTerrainRenderer.recordLifecycleMarker(
+						"lifecycle-fixture-visible",
+						staticTerrainLifecycleEditBlock,
+						staticTerrainLifecycleLayer(),
+						STATIC_TERRAIN_SCENARIO
+							+ ":block=" + staticTerrainLifecycleEditBlock.toShortString()
+							+ ":visibleSubmissions=" + diagnostics.visibleLayerSubmissions()
+							+ ":waitFrames=" + framesWaitingForStaticTerrainLifecycle
+					);
+					staticTerrainLifecycleAfterRecorded = true;
+					staticTerrainLifecycleStage = "fixture-visible";
+					writeMetadata(minecraft, "static_terrain_translucent_fixture_visible");
+				}
+				return true;
+			}
+			if ("translucent-mixed-unsupported".equals(STATIC_TERRAIN_SCENARIO)
+				&& !unsupportedFixtureReady
+				&& (framesWaitingForStaticTerrainLifecycle % 30) == 0) {
+				writeMetadata(minecraft, "waiting_for_static_terrain_unsupported_fluid_metadata");
+			}
+		}
 		long observedGeneration = observedStaticTerrainGeneration();
 		boolean replacementReady = staticTerrainReplacementReady(observedGeneration);
 		if (replacementReady) {
@@ -750,7 +912,7 @@ public final class DeterministicCameraCapture {
 			case "interior-edit", "boundary-x-edit", "boundary-y-edit", "boundary-z-edit", "section-reentry",
 				"resource-reload", "opaque-texture-replacement", "cutout-texture-replacement",
 				"pack-priority-reversal", "missing-atlas-payload", "malformed-png-payload", "translucent-glass",
-				"translucent-overlap",
+				"translucent-overlap", "translucent-water", "translucent-mixed", "translucent-mixed-unsupported",
 				"partial-texture-update", "model-resource-generation-change", "resize-cycle",
 				"swapchain-recreate", "world-unload-reload", "world-different-reload",
 				"view-distance-decrease", "view-distance-increase", "camera-relocation",
@@ -787,6 +949,9 @@ public final class DeterministicCameraCapture {
 	}
 
 	private static BlockState staticTerrainReplacementState() {
+		if ("translucent-water".equals(STATIC_TERRAIN_SCENARIO)) {
+			return Blocks.WATER.defaultBlockState();
+		}
 		if (staticTerrainTranslucentScenario()) {
 			return staticTerrainTranslucentReplacementState();
 		}
@@ -813,11 +978,23 @@ public final class DeterministicCameraCapture {
 	}
 
 	private static boolean staticTerrainTranslucentScenario() {
-		if ("translucent-glass".equals(STATIC_TERRAIN_SCENARIO) || "translucent-overlap".equals(STATIC_TERRAIN_SCENARIO)) {
+		if ("translucent-glass".equals(STATIC_TERRAIN_SCENARIO)
+			|| "translucent-overlap".equals(STATIC_TERRAIN_SCENARIO)
+			|| "translucent-water".equals(STATIC_TERRAIN_SCENARIO)
+			|| "translucent-mixed".equals(STATIC_TERRAIN_SCENARIO)
+			|| "translucent-mixed-unsupported".equals(STATIC_TERRAIN_SCENARIO)) {
 			return true;
 		}
 		return STATIC_TERRAIN_SCENARIO.startsWith("translucent-")
 			&& !staticTerrainBaseScenario().equals(STATIC_TERRAIN_SCENARIO);
+	}
+
+	private static boolean staticTerrainBaseTranslucentFixtureScenario() {
+		return "translucent-glass".equals(STATIC_TERRAIN_SCENARIO)
+			|| "translucent-overlap".equals(STATIC_TERRAIN_SCENARIO)
+			|| "translucent-water".equals(STATIC_TERRAIN_SCENARIO)
+			|| "translucent-mixed".equals(STATIC_TERRAIN_SCENARIO)
+			|| "translucent-mixed-unsupported".equals(STATIC_TERRAIN_SCENARIO);
 	}
 
 	private static boolean staticTerrainRequiresTranslucentCameraSequence() {
@@ -851,7 +1028,12 @@ public final class DeterministicCameraCapture {
 		BlockState replacement
 	) {
 		String scenario = staticTerrainBaseScenario();
-		if (staticTerrainTranslucentScenario() && !"translucent-glass".equals(STATIC_TERRAIN_SCENARIO) && !staticTerrainTranslucentFixtureApplied) {
+		if (staticTerrainTranslucentScenario()
+			&& !"translucent-glass".equals(STATIC_TERRAIN_SCENARIO)
+			&& !"translucent-water".equals(STATIC_TERRAIN_SCENARIO)
+			&& !"translucent-mixed".equals(STATIC_TERRAIN_SCENARIO)
+			&& !"translucent-mixed-unsupported".equals(STATIC_TERRAIN_SCENARIO)
+			&& !staticTerrainTranslucentFixtureApplied) {
 			applyStaticTerrainTranslucentOverlap(minecraft, serverLevel, target);
 			staticTerrainTranslucentFixtureApplied = true;
 			staticTerrainLifecycleStage = "translucent-fixture-placed";
@@ -883,6 +1065,29 @@ public final class DeterministicCameraCapture {
 				staticTerrainLifecycleStage = "translucent-overlap-placed";
 				RustGalTerrainRenderer.recordLifecycleMarker(
 					"lifecycle-translucent-overlap-placed",
+					target,
+					ChunkSectionLayer.TRANSLUCENT,
+					STATIC_TERRAIN_SCENARIO + ":block=" + target.toShortString()
+				);
+			}
+			case "translucent-water" -> {
+				applyStaticTerrainLifecycleEdit(serverLevel, minecraft.level, target, Blocks.WATER.defaultBlockState());
+				staticTerrainLifecycleStage = "translucent-water-placed";
+				RustGalTerrainRenderer.recordLifecycleMarker(
+					"lifecycle-translucent-water-placed",
+					target,
+					ChunkSectionLayer.TRANSLUCENT,
+					STATIC_TERRAIN_SCENARIO + ":block=" + target.toShortString()
+				);
+			}
+			case "translucent-mixed", "translucent-mixed-unsupported" -> {
+				applyStaticTerrainTranslucentMixed(minecraft, serverLevel, target,
+					"translucent-mixed-unsupported".equals(STATIC_TERRAIN_SCENARIO));
+				minecraft.levelRenderer.allChanged();
+				staticTerrainTranslucentFixtureApplied = true;
+				staticTerrainLifecycleStage = STATIC_TERRAIN_SCENARIO + "-placed";
+				RustGalTerrainRenderer.recordLifecycleMarker(
+					"lifecycle-" + STATIC_TERRAIN_SCENARIO + "-placed",
 					target,
 					ChunkSectionLayer.TRANSLUCENT,
 					STATIC_TERRAIN_SCENARIO + ":block=" + target.toShortString()
@@ -993,9 +1198,13 @@ public final class DeterministicCameraCapture {
 			}
 			default -> staticTerrainLifecycleStage = "action-applied";
 		}
+		recordStaticTerrainLifecycleFaultMarker(target);
 	}
 
 	private static boolean setupStaticTerrainLiteralWorldTransition(Minecraft minecraft) {
+		if (staticTerrainLifecycleAfterRecorded && "replacement-visible".equals(staticTerrainLifecycleStage)) {
+			return true;
+		}
 		framesWaitingForStaticTerrainLifecycle++;
 		String scenario = staticTerrainBaseScenario();
 		if (framesWaitingForStaticTerrainLifecycle > SETTLED_READY_MAX_WAIT_FRAMES) {
@@ -1397,6 +1606,110 @@ public final class DeterministicCameraCapture {
 		}
 	}
 
+	private static void applyStaticTerrainTranslucentMixed(
+		Minecraft minecraft,
+		ServerLevel serverLevel,
+		BlockPos target,
+		boolean includeUnsupportedFluid
+	) {
+		if (minecraft.player == null || minecraft.level == null) {
+			return;
+		}
+		Direction forward = minecraft.player.getDirection();
+		Direction right = forward.getClockWise();
+		BlockState glass = Blocks.BLUE_STAINED_GLASS.defaultBlockState();
+		BlockState water = Blocks.WATER.defaultBlockState();
+		BlockState lava = Blocks.LAVA.defaultBlockState();
+		BlockPos[] positions = {
+			target,
+			target.relative(right),
+			target.relative(forward),
+			target.relative(forward).relative(right),
+			target.above(),
+			target.above().relative(right)
+		};
+		BlockState[] states = {
+			glass,
+			water,
+			water,
+			glass,
+			glass,
+			water
+		};
+		for (int index = 0; index < positions.length; index++) {
+			BlockPos pos = positions[index];
+			if (serverLevel.isLoaded(pos) && minecraft.level.isLoaded(pos)) {
+				applyStaticTerrainLifecycleEdit(serverLevel, minecraft.level, pos, states[index]);
+			}
+		}
+		if (includeUnsupportedFluid) {
+			BlockPos unsupported = sameSectionBlockPos(target, 8, 8, 8);
+			BlockPos[] clear = {
+				unsupported.above(),
+				unsupported.below(),
+				unsupported.north(),
+				unsupported.south(),
+				unsupported.east(),
+				unsupported.west()
+			};
+			for (BlockPos air : clear) {
+				if (serverLevel.isLoaded(air) && minecraft.level.isLoaded(air)) {
+					applyStaticTerrainLifecycleEdit(serverLevel, minecraft.level, air, Blocks.AIR.defaultBlockState());
+				}
+			}
+			BlockPos[] companionPositions = {
+				sameSectionBlockPos(target, 10, unsupported.getY() & 15, 8),
+				sameSectionBlockPos(target, 12, unsupported.getY() & 15, 8),
+				sameSectionBlockPos(target, 8, unsupported.getY() & 15, 10),
+				sameSectionBlockPos(target, 10, unsupported.getY() & 15, 10)
+			};
+			BlockState[] companionStates = {
+				glass,
+				water,
+				glass,
+				water
+			};
+			for (int index = 0; index < companionPositions.length; index++) {
+				BlockPos companion = companionPositions[index];
+				if (serverLevel.isLoaded(companion) && minecraft.level.isLoaded(companion)) {
+					applyStaticTerrainLifecycleEdit(serverLevel, minecraft.level, companion, companionStates[index]);
+				}
+			}
+			if (serverLevel.isLoaded(unsupported) && minecraft.level.isLoaded(unsupported)) {
+				applyStaticTerrainLifecycleEdit(serverLevel, minecraft.level, unsupported, lava);
+				RustGalTerrainRenderer.recordLifecycleMarker(
+					"lifecycle-translucent-unsupported-fluid-placed",
+					unsupported,
+					ChunkSectionLayer.TRANSLUCENT,
+					STATIC_TERRAIN_SCENARIO
+						+ ":block=" + unsupported.toShortString()
+						+ ":serverState=" + serverLevel.getBlockState(unsupported)
+						+ ":clientState=" + minecraft.level.getBlockState(unsupported)
+						+ ":serverFluid=" + serverLevel.getFluidState(unsupported)
+						+ ":clientFluid=" + minecraft.level.getFluidState(unsupported)
+				);
+			} else {
+				RustGalTerrainRenderer.recordLifecycleMarker(
+					"lifecycle-translucent-unsupported-fluid-not-loaded",
+					unsupported,
+					ChunkSectionLayer.TRANSLUCENT,
+					STATIC_TERRAIN_SCENARIO
+						+ ":block=" + unsupported.toShortString()
+						+ ":serverLoaded=" + serverLevel.isLoaded(unsupported)
+						+ ":clientLoaded=" + minecraft.level.isLoaded(unsupported)
+				);
+			}
+		}
+	}
+
+	private static BlockPos sameSectionBlockPos(BlockPos anchor, int localX, int localY, int localZ) {
+		return new BlockPos(
+			(anchor.getX() & ~15) + Math.max(0, Math.min(15, localX)),
+			(anchor.getY() & ~15) + Math.max(0, Math.min(15, localY)),
+			(anchor.getZ() & ~15) + Math.max(0, Math.min(15, localZ))
+		);
+	}
+
 	private static void recordStaticTerrainLifecycleFaultMarker(BlockPos target) {
 		switch (STATIC_TERRAIN_FAULT) {
 			case "old-generation-after-edit" -> RustGalTerrainRenderer.recordLifecycleMarker(
@@ -1495,6 +1808,116 @@ public final class DeterministicCameraCapture {
 			);
 			case "translucent-sort-payload-corrupt" -> RustGalTerrainRenderer.recordTranslucentFaultMarker(
 				"sort-payload-corrupt",
+				target,
+				STATIC_TERRAIN_SCENARIO + ":block=" + target.toShortString()
+			);
+			case "translucent-primitive-metadata-missing" -> RustGalTerrainRenderer.recordTranslucentFaultMarker(
+				"primitive-metadata-missing",
+				target,
+				STATIC_TERRAIN_SCENARIO + ":block=" + target.toShortString()
+			);
+			case "translucent-primitive-kind-unknown" -> RustGalTerrainRenderer.recordTranslucentFaultMarker(
+				"primitive-kind-unknown",
+				target,
+				STATIC_TERRAIN_SCENARIO + ":block=" + target.toShortString()
+			);
+			case "translucent-primitive-range-overlap" -> RustGalTerrainRenderer.recordTranslucentFaultMarker(
+				"primitive-range-overlap",
+				target,
+				STATIC_TERRAIN_SCENARIO + ":block=" + target.toShortString()
+			);
+			case "translucent-primitive-range-out-of-bounds" -> RustGalTerrainRenderer.recordTranslucentFaultMarker(
+				"primitive-range-out-of-bounds",
+				target,
+				STATIC_TERRAIN_SCENARIO + ":block=" + target.toShortString()
+			);
+			case "translucent-primitive-classification-swapped" -> RustGalTerrainRenderer.recordTranslucentFaultMarker(
+				"primitive-classification-swapped",
+				target,
+				STATIC_TERRAIN_SCENARIO + ":block=" + target.toShortString()
+			);
+			case "translucent-supported-primitive-omitted" -> RustGalTerrainRenderer.recordTranslucentFaultMarker(
+				"supported-primitive-omitted",
+				target,
+				STATIC_TERRAIN_SCENARIO + ":block=" + target.toShortString()
+			);
+			case "translucent-unsupported-primitive-executed" -> RustGalTerrainRenderer.recordTranslucentFaultMarker(
+				"unsupported-primitive-executed",
+				target,
+				STATIC_TERRAIN_SCENARIO + ":block=" + target.toShortString()
+			);
+			case "translucent-source-index-unknown-primitive" -> RustGalTerrainRenderer.recordTranslucentFaultMarker(
+				"source-index-unknown-primitive",
+				target,
+				STATIC_TERRAIN_SCENARIO + ":block=" + target.toShortString()
+			);
+			case "translucent-retained-index-duplicated" -> RustGalTerrainRenderer.recordTranslucentFaultMarker(
+				"retained-index-duplicated",
+				target,
+				STATIC_TERRAIN_SCENARIO + ":block=" + target.toShortString()
+			);
+			case "translucent-filtered-order-changed" -> RustGalTerrainRenderer.recordTranslucentFaultMarker(
+				"filtered-order-changed",
+				target,
+				STATIC_TERRAIN_SCENARIO + ":block=" + target.toShortString()
+			);
+			case "translucent-ordered-range-material-mismatch" -> RustGalTerrainRenderer.recordTranslucentFaultMarker(
+				"ordered-range-material-mismatch",
+				target,
+				STATIC_TERRAIN_SCENARIO + ":block=" + target.toShortString()
+			);
+			case "translucent-ordered-range-overlap" -> RustGalTerrainRenderer.recordTranslucentFaultMarker(
+				"ordered-range-overlap",
+				target,
+				STATIC_TERRAIN_SCENARIO + ":block=" + target.toShortString()
+			);
+			case "translucent-execution-order-hash-mismatch" -> RustGalTerrainRenderer.recordTranslucentFaultMarker(
+				"execution-order-hash-mismatch",
+				target,
+				STATIC_TERRAIN_SCENARIO + ":block=" + target.toShortString()
+			);
+			case "translucent-cross-generation-metadata" -> RustGalTerrainRenderer.recordTranslucentFaultMarker(
+				"cross-generation-metadata",
+				target,
+				STATIC_TERRAIN_SCENARIO + ":block=" + target.toShortString()
+			);
+			case "translucent-cross-world-primitive-range-reuse" -> RustGalTerrainRenderer.recordTranslucentFaultMarker(
+				"cross-world-primitive-range-reuse",
+				target,
+				STATIC_TERRAIN_SCENARIO + ":block=" + target.toShortString()
+			);
+			case "water-still-flow-texture-swapped",
+				"water-overlay-identity-invalid",
+				"water-animation-entry-mismatch",
+				"water-animation-invalid-frame",
+				"water-animation-duplicate-frame",
+				"water-animation-missing-frame",
+				"water-animation-zero-duration",
+				"water-animation-duration-overflow",
+				"water-animation-region-out-of-bounds",
+				"water-animation-missing-pixels",
+				"water-animation-incompatible-dimensions",
+				"water-animation-generation-mismatch",
+				"water-animation-stale-generation",
+				"water-animation-region-mismatch",
+				"water-animation-invalid-interp",
+				"water-animation-section-divergence",
+				"water-animation-cross-world-state",
+				"water-animation-per-frame-recreation",
+				"water-corner-height-invalid",
+				"water-flow-reversed",
+				"water-uv-invalid",
+				"water-tint-invalid",
+				"water-light-swapped",
+				"water-normal-invalid",
+				"water-duplicate-face",
+				"water-missing-face",
+				"water-boundary-crack",
+				"water-depth-write-enabled",
+				"water-opaque-blend",
+				"water-stale-mesh-generation",
+				"water-glass-range-mismatch" -> RustGalTerrainRenderer.recordTranslucentFaultMarker(
+				STATIC_TERRAIN_FAULT,
 				target,
 				STATIC_TERRAIN_SCENARIO + ":block=" + target.toShortString()
 			);
@@ -3188,7 +3611,8 @@ public final class DeterministicCameraCapture {
 				}
 			json.append("    }").append(i + 1 == CAPTURES.size() ? "\n" : ",\n");
 		}
-		json.append("  ]\n");
+		json.append("  ],\n");
+		appendStaticTerrainWaterAnimationDenseCapture(json);
 		json.append("}\n");
 
 		try {
@@ -3196,6 +3620,38 @@ public final class DeterministicCameraCapture {
 		} catch (IOException exception) {
 			LOGGER.error("Unable to write deterministic capture metadata", exception);
 		}
+	}
+
+	private static void appendStaticTerrainWaterAnimationDenseCapture(StringBuilder json) {
+		json.append("  \"rustGalStaticTerrainWaterAnimationDenseCapture\": {\n");
+		json.append("    \"enabled\": ").append(STATIC_TERRAIN_WATER_ANIMATION_DENSE_CAPTURE).append(",\n");
+		json.append("    \"requestedFrames\": ").append(STATIC_TERRAIN_WATER_ANIMATION_DENSE_FRAMES).append(",\n");
+		json.append("    \"capturedFrames\": ").append(WATER_ANIMATION_CAPTURES.size()).append(",\n");
+		json.append("    \"complete\": ").append(staticTerrainWaterAnimationDenseComplete).append(",\n");
+		json.append("    \"inFlight\": ").append(staticTerrainWaterAnimationScreenshotInFlight).append(",\n");
+		json.append("    \"frames\": [");
+		for (int i = 0; i < WATER_ANIMATION_CAPTURES.size(); i++) {
+			WaterAnimationFrameCapture frame = WATER_ANIMATION_CAPTURES.get(i);
+			if (i > 0) {
+				json.append(",");
+			}
+			json.append("\n      { ");
+			json.append("\"index\": ").append(frame.index()).append(", ");
+			appendField(json, "screenshot", frame.screenshot(), 0).append(", ");
+			json.append("\"renderedFrameIndex\": ").append(frame.renderedFrameIndex()).append(", ");
+			json.append("\"gameTime\": ").append(frame.gameTime()).append(", ");
+			json.append("\"animationHash\": ").append(frame.animationHash()).append(", ");
+			appendField(json, "animationSummary", frame.animationSummary(), 0).append(", ");
+			appendField(json, "animationState", frame.animationState(), 0).append(", ");
+			json.append("\"visibleLayerSubmissions\": ").append(frame.visibleLayerSubmissions()).append(", ");
+			json.append("\"currentFrameVisibleLayerSubmissions\": ").append(frame.currentFrameVisibleLayerSubmissions()).append(", ");
+			json.append("\"atlasGeneration\": ").append(frame.atlasGeneration()).append(" }");
+		}
+		if (!WATER_ANIMATION_CAPTURES.isEmpty()) {
+			json.append("\n    ");
+		}
+		json.append("]\n");
+		json.append("  }\n");
 	}
 
 	private static boolean isDistantHorizonsActive() {
@@ -3350,6 +3806,8 @@ public final class DeterministicCameraCapture {
 		json.append("    \"skippedRouteBuildOutputs\": ").append(diagnostics.skippedRouteBuildOutputs()).append(",\n");
 		json.append("    \"skippedUnsupportedAnimatedSections\": ").append(diagnostics.skippedUnsupportedAnimatedSections()).append(",\n");
 		json.append("    \"skippedUnsupportedFluidTranslucentSections\": ").append(diagnostics.skippedUnsupportedFluidTranslucentSections()).append(",\n");
+		json.append("    \"acceptedWaterAnimatedSections\": ").append(diagnostics.acceptedWaterAnimatedSections()).append(",\n");
+		json.append("    \"unsupportedFluidOmittedSections\": ").append(diagnostics.unsupportedFluidOmittedSections()).append(",\n");
 		json.append("    \"skippedEmptyLayers\": ").append(diagnostics.skippedEmptyLayers()).append(",\n");
 		json.append("    \"registeredMeshes\": ").append(diagnostics.registeredMeshes()).append(",\n");
 		json.append("    \"registeredTranslucentSorts\": ").append(diagnostics.registeredTranslucentSorts()).append(",\n");
@@ -3884,6 +4342,20 @@ public final class DeterministicCameraCapture {
 		long gameTime,
 		String captureMethod,
 		String targetWindow
+	) {
+	}
+
+	private record WaterAnimationFrameCapture(
+		int index,
+		String screenshot,
+		long renderedFrameIndex,
+		long gameTime,
+		long animationHash,
+		String animationSummary,
+		String animationState,
+		long visibleLayerSubmissions,
+		long currentFrameVisibleLayerSubmissions,
+		long atlasGeneration
 	) {
 	}
 }

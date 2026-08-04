@@ -77,6 +77,18 @@ const MATERIALS: &[SemanticMaterial] = &[
         legacy_keys: &[3],
     },
     SemanticMaterial {
+        key: WORLD_MATERIAL_ID_WATER_TRANSLUCENT,
+        resource_location: "minecraft:material/water_translucent",
+        mode: WORLD_MATERIAL_MODE_TRANSLUCENT,
+        cutout_threshold: 0.0,
+        sampler: MaterialSamplerPolicy::NearestClamp,
+        mip: MaterialMipPolicy::SingleMip,
+        tint: MaterialTintChannel::VertexColor,
+        emissive: false,
+        fullbright: false,
+        legacy_keys: &[],
+    },
+    SemanticMaterial {
         key: WORLD_MATERIAL_ID_BLOCK_MARKER_CUTOUT,
         resource_location: "minecraft:material/block_marker_cutout",
         mode: WORLD_MATERIAL_MODE_CUTOUT,
@@ -266,6 +278,30 @@ const TEXTURES: &[SemanticTexture] = &[
             "../../../../resources/assets/minecraft/textures/item/light_15.png"
         ),
         legacy_keys: &[215],
+    },
+    SemanticTexture {
+        key: WORLD_MATERIAL_TEXTURE_WATER_STILL,
+        resource_location: "minecraft:textures/block/water_still.png",
+        default_png: include_bytes!(
+            "../../../../resources/assets/minecraft/textures/block/water_still.png"
+        ),
+        legacy_keys: &[],
+    },
+    SemanticTexture {
+        key: WORLD_MATERIAL_TEXTURE_WATER_FLOW,
+        resource_location: "minecraft:textures/block/water_flow.png",
+        default_png: include_bytes!(
+            "../../../../resources/assets/minecraft/textures/block/water_flow.png"
+        ),
+        legacy_keys: &[],
+    },
+    SemanticTexture {
+        key: WORLD_MATERIAL_TEXTURE_WATER_OVERLAY,
+        resource_location: "minecraft:textures/block/water_overlay.png",
+        default_png: include_bytes!(
+            "../../../../resources/assets/minecraft/textures/block/water_overlay.png"
+        ),
+        legacy_keys: &[],
     },
 ];
 

@@ -339,6 +339,15 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
                     ValueLayout.JAVA_INT,
                     ValueLayout.JAVA_INT,
                     ValueLayout.JAVA_INT));
+    private static final MethodHandle COPY_PRIMITIVE_METADATA = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_section_mesh_builder_copy_primitive_metadata",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT));
     private static final MethodHandle ENCODE_SCATTERED_UNASSIGNED = NativeLibraryLoader.downcallHandle("mattmc_rust",
             "mattmc_sodium_section_mesh_builder_encode_scattered_unassigned",
             FunctionDescriptor.of(ValueLayout.JAVA_INT,
@@ -360,6 +369,11 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
     private final State state;
     private final Cleaner.Cleanable cleanable;
     private int sectionIndex;
+    public static final int PRIMITIVE_METADATA_RECORD_INTS = 10;
+    public static final int PRIMITIVE_KIND_UNKNOWN = 0;
+    public static final int PRIMITIVE_KIND_NON_FLUID_TRANSLUCENT = 1;
+    public static final int PRIMITIVE_KIND_BUILTIN_WATER = 2;
+    public static final int PRIMITIVE_KIND_UNSUPPORTED_FLUID = 3;
 
     private NativeSectionMeshBuilder(long handle) {
         this.state = new State(handle);
@@ -793,6 +807,28 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
         }
     }
 
+    public int[] copyPrimitiveMetadata(int primitiveCount, int visibleSlices, boolean forceUnassigned,
+            boolean sliceReordering) {
+        if (primitiveCount < 0) {
+            throw new IllegalArgumentException("Invalid primitive metadata count: " + primitiveCount);
+        }
+        if (primitiveCount == 0) {
+            return new int[0];
+        }
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment metadataSegment = arena.allocate(ValueLayout.JAVA_INT,
+                    (long) primitiveCount * PRIMITIVE_METADATA_RECORD_INTS);
+            check(invokeCopyPrimitiveMetadata(this.state.getHandle(), metadataSegment.address(), primitiveCount,
+                    visibleSlices, forceUnassigned ? 1 : 0, sliceReordering ? 1 : 0),
+                    "native section mesh builder primitive metadata copy");
+            int[] metadata = new int[primitiveCount * PRIMITIVE_METADATA_RECORD_INTS];
+            for (int index = 0; index < metadata.length; index++) {
+                metadata[index] = metadataSegment.getAtIndex(ValueLayout.JAVA_INT, index);
+            }
+            return metadata;
+        }
+    }
+
     public BuiltSectionMeshParts finishMesh(NativeChunkVertexFormat format, int visibleSlices,
             boolean forceUnassigned, boolean sliceReordering, boolean separateAo) {
         int vertexTotal = this.totalVertexCount();
@@ -804,7 +840,9 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
         NativeBuffer mergedBuffer = new NativeBuffer(vertexTotal * format.stride());
         this.assemble(mergedBuffer.getDirectBuffer(), vertexSegments, format, visibleSlices, forceUnassigned,
                 sliceReordering, separateAo);
-        return new BuiltSectionMeshParts(mergedBuffer, vertexSegments);
+        int[] primitiveMetadata = this.copyPrimitiveMetadata(vertexTotal / 4, visibleSlices, forceUnassigned,
+                sliceReordering);
+        return new BuiltSectionMeshParts(mergedBuffer, vertexSegments, primitiveMetadata);
     }
 
     public BuiltSectionMeshParts finishModifiedTranslucentMesh(NativeUpdatedQuads updatedQuads,
@@ -814,6 +852,7 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
         ByteBuffer mergedBufferBuilder = mergedBuffer.getDirectBuffer();
 
         this.assemble(mergedBufferBuilder, createVertexSegments(), format, 0, true, false, separateAo);
+        int[] primitiveMetadata = this.copyPrimitiveMetadata(vertexTotal / 4, 0, true, false);
         updatedQuads.applyBufferUpdates(format, this.sectionIndex, mergedBufferBuilder);
 
         int[] vertexSegments = createVertexSegments();
@@ -821,7 +860,16 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
         vertexSegments[unassignedSegmentIndex] = vertexTotal;
         vertexSegments[unassignedSegmentIndex + 1] = ModelQuadFacing.UNASSIGNED.ordinal();
 
-        return new BuiltSectionMeshParts(mergedBuffer, vertexSegments);
+        fillMissingTranslucentPrimitiveMetadata(primitiveMetadata);
+        return new BuiltSectionMeshParts(mergedBuffer, vertexSegments, primitiveMetadata);
+    }
+
+    private static void fillMissingTranslucentPrimitiveMetadata(int[] metadata) {
+        for (int offset = 0; offset < metadata.length; offset += PRIMITIVE_METADATA_RECORD_INTS) {
+            if (metadata[offset] == PRIMITIVE_KIND_UNKNOWN) {
+                metadata[offset] = PRIMITIVE_KIND_NON_FLUID_TRANSLUCENT;
+            }
+        }
     }
 
     public void encodeScatteredUnassigned(int[] outputVertexOffsets, int updateCount, ByteBuffer output,
@@ -1260,6 +1308,16 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
         }
     }
 
+    private static int invokeCopyPrimitiveMetadata(long handle, long outputAddress, int outputCapacityRecords,
+            int visibleSlices, int forceUnassigned, int sliceReordering) {
+        try {
+            return (int) COPY_PRIMITIVE_METADATA.invokeExact(handle, outputAddress, outputCapacityRecords,
+                    visibleSlices, forceUnassigned, sliceReordering);
+        } catch (Throwable throwable) {
+            throw new RuntimeException("Failed to invoke native primitive metadata copy", throwable);
+        }
+    }
+
     private static int invokeEncodeScatteredUnassigned(long handle, MemorySegment outputVertexOffsets,
             int updateCount, long outputAddress, int outputCapacity, int quadStride, int vertexStride,
             int blockIdOffset, int normalOffset, int tangentOffset, int midUvOffset, int midBlockOffset,
@@ -1467,14 +1525,14 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
                 float u0, float v0, float u1, float v1, float u2, float v2, float u3, float v3,
                 int color0, int color1, int color2, int color3,
                 float ao0, float ao1, float ao2, float ao3,
-                int light0, int light1, int light2, int light3) {
+                int light0, int light1, int light2, int light3, int primitiveKind) {
             this.prepareFluidFaceRecord(null, null);
             this.writePendingFluidFaceRecord(materialBits, blockEmission, renderType, ignoreMidBlock, blockId,
                     localX, localY, localZ, faceKind, flip, packedNormal, originX, originY, originZ, yOffset,
                     height0, height1, height2, height3, sideX1, sideZ1, sideX2, sideZ2,
                     u0, v0, u1, v1, u2, v2, u3, v3,
                     color0, color1, color2, color3, ao0, ao1, ao2, ao3,
-                    light0, light1, light2, light3);
+                    light0, light1, light2, light3, primitiveKind);
             this.pendingQuadCount++;
         }
 
@@ -1498,7 +1556,7 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
                 float u0, float v0, float u1, float v1, float u2, float v2, float u3, float v3,
                 int color0, int color1, int color2, int color3,
                 float ao0, float ao1, float ao2, float ao3,
-                int light0, int light1, int light2, int light3) {
+                int light0, int light1, int light2, int light3, int primitiveKind) {
             if (!collector.supportsNativeBatching()) {
                 return this.appendFlatTranslucentQuad(materialBits, collector, collectorFacing, packedNormal,
                         blockEmission, renderType, ignoreMidBlock, blockId, localX, localY, localZ,
@@ -1514,7 +1572,7 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
                     height0, height1, height2, height3, sideX1, sideZ1, sideX2, sideZ2,
                     u0, v0, u1, v1, u2, v2, u3, v3,
                     color0, color1, color2, color3, ao0, ao1, ao2, ao3,
-                    light0, light1, light2, light3);
+                    light0, light1, light2, light3, primitiveKind);
             this.pendingQuadCount++;
             return false;
         }
@@ -1727,14 +1785,15 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
                 float u0, float v0, float u1, float v1, float u2, float v2, float u3, float v3,
                 int color0, int color1, int color2, int color3,
                 float ao0, float ao1, float ao2, float ao3,
-                int light0, int light1, int light2, int light3) {
+                int light0, int light1, int light2, int light3, int primitiveKind) {
             long recordAddress = this.recordStagingBuffers.fluidFaceRecordAddress()
                     + (long) this.pendingQuadCount * NativeChunkMeshEncoder.FLUID_FACE_RECORD_STRIDE;
             NativeChunkMeshEncoder.writeFluidFaceRecord(recordAddress, packedNormal, materialBits, blockEmission,
                     renderType, ignoreMidBlock, blockId, localX, localY, localZ, faceKind, flip,
                     originX, originY, originZ, yOffset, height0, height1, height2, height3,
                     sideX1, sideZ1, sideX2, sideZ2, u0, v0, u1, v1, u2, v2, u3, v3,
-                    color0, color1, color2, color3, ao0, ao1, ao2, ao3, light0, light1, light2, light3);
+                    color0, color1, color2, color3, ao0, ao1, ao2, ao3, light0, light1, light2, light3,
+                    primitiveKind);
         }
 
         private boolean matchesPendingMode(int pendingKind, TranslucentGeometryCollector collector,

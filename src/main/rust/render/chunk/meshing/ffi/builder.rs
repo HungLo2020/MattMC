@@ -296,6 +296,7 @@ pub unsafe extern "C" fn mattmc_sodium_section_mesh_builder_append_flat_quad_bat
         None,
         format,
         store_raw_quads != 0,
+        None,
     ) {
         Ok((_, committed_count)) => {
             *output_committed_count = committed_count;

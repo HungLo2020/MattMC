@@ -16,7 +16,7 @@ public final class NativeChunkMeshEncoder {
     public static final int NATIVE_QUAD_STRIDE = 152;
     public static final int FLAT_QUAD_RECORD_STRIDE = 156;
     public static final int LIGHT_BLOCK_RECORD_STRIDE = 24;
-    public static final int FLUID_FACE_RECORD_STRIDE = 172;
+    public static final int FLUID_FACE_RECORD_STRIDE = 176;
     public static final int STATIC_MODEL_VERTEX_RECORD_STRIDE = 28;
     public static final int STATIC_MODEL_QUAD_RECORD_STRIDE = 160;
     public static final int STATIC_MODEL_BLOCK_RECORD_STRIDE = 52;
@@ -82,6 +82,7 @@ public final class NativeChunkMeshEncoder {
     private static final int FLUID_FACE_COLORS_OFFSET = 124;
     private static final int FLUID_FACE_AO_OFFSET = 140;
     private static final int FLUID_FACE_LIGHTS_OFFSET = 156;
+    private static final int FLUID_FACE_PRIMITIVE_KIND_OFFSET = 172;
     private static final int STATIC_MODEL_QUAD_VERTICES_OFFSET = 0;
     private static final int STATIC_MODEL_QUAD_MATERIAL_BITS_OFFSET = 112;
     private static final int STATIC_MODEL_QUAD_CULL_FACE_OFFSET = 116;
@@ -489,7 +490,7 @@ public final class NativeChunkMeshEncoder {
             float u0, float v0, float u1, float v1, float u2, float v2, float u3, float v3,
             int color0, int color1, int color2, int color3,
             float ao0, float ao1, float ao2, float ao3,
-            int light0, int light1, int light2, int light3) {
+            int light0, int light1, int light2, int light3, int primitiveKind) {
         MemoryUtil.memPutInt(ptr + FLUID_FACE_PACKED_NORMAL_OFFSET, packedNormal);
         MemoryUtil.memPutInt(ptr + FLUID_FACE_MATERIAL_BITS_OFFSET, materialBits);
         MemoryUtil.memPutInt(ptr + FLUID_FACE_BLOCK_EMISSION_OFFSET, blockEmission & 0xff);
@@ -533,6 +534,7 @@ public final class NativeChunkMeshEncoder {
         MemoryUtil.memPutInt(ptr + FLUID_FACE_LIGHTS_OFFSET + 4, light1);
         MemoryUtil.memPutInt(ptr + FLUID_FACE_LIGHTS_OFFSET + 8, light2);
         MemoryUtil.memPutInt(ptr + FLUID_FACE_LIGHTS_OFFSET + 12, light3);
+        MemoryUtil.memPutInt(ptr + FLUID_FACE_PRIMITIVE_KIND_OFFSET, primitiveKind);
     }
 
     public static void writeStaticModelQuadRecord(long ptr, int materialBits, int cullFace, int normalFace,

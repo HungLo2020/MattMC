@@ -158,15 +158,18 @@ final class NativeSectionSnapshot implements AutoCloseable {
         MemoryUtil.memPutInt(this.address + HEADER_ACTIVE_COUNT_OFFSET, this.activeRecordCount);
         int[] nativeQuads = this.buffers.appendCompactNativeSectionSnapshotAllPasses(this.address,
                 this.sectionIndex, collector);
-        this.addNativeFluidSprites(DefaultTerrainRenderPasses.SOLID);
-        this.addNativeFluidSprites(DefaultTerrainRenderPasses.CUTOUT);
-        this.addNativeFluidSprites(DefaultTerrainRenderPasses.TRANSLUCENT);
+        boolean rustStaticTerrainRoute = net.vulkanic.world.WorldRenderRoutePolicy
+                .staticTerrainBuildRequiresRustWholeFrameMetadata();
+        this.addNativeFluidSprites(DefaultTerrainRenderPasses.SOLID, rustStaticTerrainRoute);
+        this.addNativeFluidSprites(DefaultTerrainRenderPasses.CUTOUT, rustStaticTerrainRoute);
+        this.addNativeFluidSprites(DefaultTerrainRenderPasses.TRANSLUCENT, rustStaticTerrainRoute);
         return nativeQuads;
     }
 
-    private void addNativeFluidSprites(TerrainRenderPass pass) {
+    private void addNativeFluidSprites(TerrainRenderPass pass, boolean rustStaticTerrainRoute) {
         int emittedSpriteMask = this.buffers.nativeFluidSpriteMask(pass);
-        for (var sprite : NativeStaticBlockModelRegistry.getNativeFluidSprites(emittedSpriteMask)) {
+        for (var sprite : NativeStaticBlockModelRegistry.getNativeFluidSprites(
+                emittedSpriteMask, !rustStaticTerrainRoute)) {
             this.buffers.get(pass).addSprite(sprite);
         }
     }

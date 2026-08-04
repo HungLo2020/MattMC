@@ -84,6 +84,7 @@ pub(super) unsafe fn push_native_section_quad(
     builder: &mut NativeSectionMeshBuilder,
     quad: NativeQuad,
     packed_normal: i32,
+    primitive_kind: i32,
     facing: usize,
     pending_counts: &mut [usize; MODEL_QUAD_FACING_COUNT],
     analyzer: Option<u64>,
@@ -96,6 +97,7 @@ pub(super) unsafe fn push_native_section_quad(
     let pending_started = profile_start(profile_staging_substages);
     let slot = pending_counts[facing];
     builder.pending[facing].quads[slot] = quad;
+    builder.pending[facing].primitive_kinds[slot] = primitive_kind;
     builder.pending[facing].packed_normals[slot] = packed_normal;
     pending_counts[facing] += 1;
     builder
@@ -201,6 +203,28 @@ pub(super) unsafe fn append_direct_compact_static_model_quad(
         .checked_mul(encoded_quad_len)
         .ok_or(ERR_INVALID_ARGUMENT)?;
     ensure_encoded_len(&mut buffer.encoded, required_encoded_len, format);
+    ensure_metadata_len(&mut buffer.primitive_metadata, required_len);
+    buffer.primitive_metadata[start] = primitive_metadata_from_quad(
+        &NativeQuad {
+            vertices: [QuadVertex::default(); 4],
+            block_emission: state.block_emission.clamp(0, 255) as u8,
+            render_type: state.render_type.clamp(0, 255) as u8,
+            ignore_mid_block: 0,
+            _padding: 0,
+            block_id: choose_block_id(block.block_id, state.block_id),
+            local_x: block.local_x,
+            local_y: block.local_y,
+            local_z: block.local_z,
+            material_bits: if quad_record.material_bits != 0 {
+                quad_record.material_bits
+            } else {
+                state.material_bits
+            },
+        },
+        TERRAIN_PRIMITIVE_NON_FLUID_TRANSLUCENT,
+        facing,
+        -1,
+    );
 
     let encoded_start = start * encoded_quad_len;
     let encoded_end = encoded_start + encoded_quad_len;

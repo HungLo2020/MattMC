@@ -154,6 +154,44 @@ class VulkanicGalBridgeAbiTest {
 		String worldRoutePolicy = Files.readString(Path.of("src/main/java/net/vulkanic/world/WorldRenderRoutePolicy.java"));
 		assertTrue(worldRoutePolicy.contains("currentStaticTerrainRoute()"));
 		assertTrue(worldRoutePolicy.contains("mattmc.dev.rustGalStaticTerrain.disabled"));
+		assertTrue(worldRoutePolicy.contains("staticTerrainBuildRequiresRustWholeFrameMetadata()"));
+		assertTrue(
+			Files.readString(Path.of("src/main/java/net/sodium/client/render/chunk/compile/tasks/ChunkBuilderMeshingTask.java"))
+				.contains("WorldRenderRoutePolicy.staticTerrainBuildRequiresRustWholeFrameMetadata()"),
+			"chunk builds must prepare Rust terrain metadata before backend-selected state is stable"
+		);
+	}
+
+	@Test
+	void staticTerrainBuildMetadataRouteDoesNotDependOnBackendSelectionTiming() {
+		String previousWholeFrame = System.getProperty("mattmc.dev.rustGalVulkanWholeFrame");
+		String previousDisabled = System.getProperty("mattmc.dev.rustGalStaticTerrain.disabled");
+		String previousLegacy = System.getProperty("mattmc.dev.rustGalStaticTerrain.legacyControl");
+		try {
+			System.setProperty("mattmc.dev.rustGalVulkanWholeFrame", "true");
+			System.clearProperty("mattmc.dev.rustGalStaticTerrain.disabled");
+			System.clearProperty("mattmc.dev.rustGalStaticTerrain.legacyControl");
+			assertTrue(WorldRenderRoutePolicy.staticTerrainBuildRequiresRustWholeFrameMetadata());
+
+			System.setProperty("mattmc.dev.rustGalStaticTerrain.disabled", "true");
+			assertFalse(WorldRenderRoutePolicy.staticTerrainBuildRequiresRustWholeFrameMetadata());
+			System.clearProperty("mattmc.dev.rustGalStaticTerrain.disabled");
+
+			System.setProperty("mattmc.dev.rustGalStaticTerrain.legacyControl", "true");
+			assertFalse(WorldRenderRoutePolicy.staticTerrainBuildRequiresRustWholeFrameMetadata());
+		} finally {
+			restoreProperty("mattmc.dev.rustGalVulkanWholeFrame", previousWholeFrame);
+			restoreProperty("mattmc.dev.rustGalStaticTerrain.disabled", previousDisabled);
+			restoreProperty("mattmc.dev.rustGalStaticTerrain.legacyControl", previousLegacy);
+		}
+	}
+
+	private static void restoreProperty(String key, String value) {
+		if (value == null) {
+			System.clearProperty(key);
+		} else {
+			System.setProperty(key, value);
+		}
 	}
 
 	@Test
@@ -305,11 +343,13 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(terrainRenderer.contains("WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan()"));
 		assertTrue(terrainRenderer.contains("DefaultTerrainRenderPasses.SOLID"));
 		assertTrue(terrainRenderer.contains("DefaultTerrainRenderPasses.CUTOUT"));
-		assertTrue(terrainRenderer.contains("DefaultTerrainRenderPasses.TRANSLUCENT"));
-		assertTrue(terrainRenderer.contains("ChunkSectionLayer.TRANSLUCENT"));
-		assertTrue(terrainRenderer.contains("nativeMeshingFluidBlocks > 0"));
-		assertTrue(terrainRenderer.contains("unsupported-fluid-translucent"),
-			"static translucent terrain v1 must explicitly reject fluid/water sections before Rust routing");
+			assertTrue(terrainRenderer.contains("DefaultTerrainRenderPasses.TRANSLUCENT"));
+			assertTrue(terrainRenderer.contains("ChunkSectionLayer.TRANSLUCENT"));
+				assertTrue(terrainRenderer.contains("asset.unsupportedPrimitiveCount() > 0"));
+			assertTrue(terrainRenderer.contains("unsupported-fluid-omitted"),
+				"water terrain v1 must omit unsupported fluids without discarding supported mixed translucent sections");
+			assertTrue(terrainRenderer.contains("MATERIAL_ID_WATER_TRANSLUCENT"),
+				"built-in water must carry an explicit semantic material identity");
 		assertTrue(terrainRenderer.contains("acceptChunkSortOutput"));
 		assertTrue(renderSectionManager.contains("RustGalTerrainRenderer.acceptChunkSortOutput(sortOutput)"));
 		assertTrue(terrainRenderer.contains("registeredAtlasGeneration"));

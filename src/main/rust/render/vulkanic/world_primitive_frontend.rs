@@ -48,6 +48,7 @@ pub const WORLD_MAX_MESH_VERTICES: usize = 65_536;
 pub const WORLD_MAX_MESH_INDEX_BYTES: usize = 393_216;
 pub const WORLD_MAX_MESH_SECTIONS: usize = 256;
 pub const WORLD_MAX_MESH_INSTANCES: usize = 512;
+pub const WORLD_MAX_MESH_ANIMATION_FRAMES: usize = 512;
 pub const WORLD_MESH_VERTEX_LAYOUT_V2: u32 = 2;
 pub const WORLD_MESH_SECTION_ALL: u32 = u32::MAX;
 pub const WORLD_DEPTH_POLICY_DISABLED: u32 = 0;
@@ -56,6 +57,8 @@ pub const WORLD_DEPTH_POLICY_TEST_NO_WRITE: u32 = 2;
 pub const WORLD_MATERIAL_MODE_OPAQUE: u32 = 1;
 pub const WORLD_MATERIAL_MODE_CUTOUT: u32 = 2;
 pub const WORLD_MATERIAL_MODE_TRANSLUCENT: u32 = 3;
+pub const WORLD_MESH_ANIMATION_INTERPOLATE_NONE: u32 = 0;
+pub const WORLD_MESH_ANIMATION_INTERPOLATE_LINEAR: u32 = 1;
 pub const WORLD_TOPOLOGY_TRIANGLES: u32 = 1;
 pub const WORLD_CULL_NONE: u32 = 0;
 pub const WORLD_CULL_BACK: u32 = 1;
@@ -91,10 +94,14 @@ pub const WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_12: u32 = 0x4bab_8f5f;
 pub const WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_13: u32 = 0x4316_88fa;
 pub const WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_14: u32 = 0x0b2b_dbbd;
 pub const WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_15: u32 = 0x0194_76c0;
+pub const WORLD_MATERIAL_TEXTURE_WATER_STILL: u32 = 0x5a71_a501;
+pub const WORLD_MATERIAL_TEXTURE_WATER_FLOW: u32 = 0x5a71_a502;
+pub const WORLD_MATERIAL_TEXTURE_WATER_OVERLAY: u32 = 0x5a71_a503;
 pub const WORLD_MATERIAL_TEXTURE_DEFAULT: u32 = WORLD_MATERIAL_TEXTURE_STONE;
 pub const WORLD_MATERIAL_ID_OPAQUE_TEXTURED: u32 = 0x6a2f_d335;
 pub const WORLD_MATERIAL_ID_CUTOUT_TEXTURED: u32 = 0x129b_1b90;
 pub const WORLD_MATERIAL_ID_TRANSLUCENT_TEXTURED: u32 = 0x4d21_a7c3;
+pub const WORLD_MATERIAL_ID_WATER_TRANSLUCENT: u32 = 0x39e0_a7e4;
 pub const WORLD_MATERIAL_ID_BLOCK_MARKER_CUTOUT: u32 = 0x224a_8659;
 pub const WORLD_MATERIAL_ID_DEFAULT_OPAQUE: u32 = WORLD_MATERIAL_ID_OPAQUE_TEXTURED;
 pub const WORLD_MATERIAL_ID_DEFAULT_CUTOUT: u32 = WORLD_MATERIAL_ID_CUTOUT_TEXTURED;
@@ -125,7 +132,7 @@ const WORLD_MATERIAL_UNIFORM_BYTES: u64 =
 const WORLD_MATERIAL_INDEX_BYTES: u64 = 6 * 4;
 const WORLD_MESH_GPU_VERTEX_BYTES: usize = 5 * 4 * 4;
 const WORLD_MESH_BATCH_HEADER_BYTES: usize = 16 * 4 + 16 * 4 + 16 * 4 + 4 * 4;
-const WORLD_MESH_INSTANCE_BYTES: usize = 16 * 4 + 4 * 4 + 4 * 4;
+const WORLD_MESH_INSTANCE_BYTES: usize = 16 * 4 + 4 * 4 + 4 * 4 + 4 * 4 + 4 * 4;
 const WORLD_MESH_INSTANCE_BUFFER_BYTES: u64 =
     (WORLD_MESH_BATCH_HEADER_BYTES + WORLD_MAX_MESH_INSTANCES * WORLD_MESH_INSTANCE_BYTES) as u64;
 const WORLD_MESH_INSTANCE_STREAM_ALIGNMENT: usize = 256;
@@ -481,9 +488,23 @@ pub struct WorldMeshSortedIndexUpdate {
 }
 
 #[derive(Clone, Debug)]
+pub struct WorldMeshAnimationFrame {
+    pub frame_index: u32,
+    pub duration_ticks: u32,
+}
+
+#[derive(Clone, Debug)]
 pub struct WorldMeshTextureAssetPayload {
     pub texture_id: u32,
     pub png_bytes: Vec<u8>,
+    pub frame_width: u32,
+    pub frame_height: u32,
+    pub frame_count: u32,
+    pub frame_ticks: u32,
+    pub animation_flags: u32,
+    pub frame_row_size: u32,
+    pub interpolation_policy: u32,
+    pub animation_frames: Vec<WorldMeshAnimationFrame>,
 }
 
 #[derive(Clone, Debug)]
@@ -1051,6 +1072,113 @@ struct WorldMaterialTextureAsset {
     rgba: Vec<u8>,
     width: u32,
     height: u32,
+    frame_width: u32,
+    frame_height: u32,
+    frame_count: u32,
+    frame_ticks: u32,
+    animation_flags: u32,
+    frame_row_size: u32,
+    interpolation_policy: u32,
+    animation_frames: Vec<MeshTextureAnimationFrame>,
+    animation_total_ticks: u32,
+    animation_generation: u64,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct MeshTextureAnimationFrame {
+    frame_index: u32,
+    duration_ticks: u32,
+    region: [f32; 4],
+}
+
+#[derive(Clone, Debug)]
+struct MeshTextureAnimation {
+    frames: Vec<MeshTextureAnimationFrame>,
+    total_ticks: u32,
+    interpolation_policy: u32,
+    generation: u64,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct MeshTextureAnimationSample {
+    animated: bool,
+    current_region: [f32; 4],
+    next_region: [f32; 4],
+    interpolation: f32,
+    generation: u64,
+}
+
+impl Default for MeshTextureAnimationSample {
+    fn default() -> Self {
+        Self {
+            animated: false,
+            current_region: [0.0, 0.0, 1.0, 1.0],
+            next_region: [0.0, 0.0, 1.0, 1.0],
+            interpolation: 0.0,
+            generation: 0,
+        }
+    }
+}
+
+impl Default for MeshTextureAnimation {
+    fn default() -> Self {
+        Self {
+            frames: vec![MeshTextureAnimationFrame {
+                frame_index: 0,
+                duration_ticks: 1,
+                region: [0.0, 0.0, 1.0, 1.0],
+            }],
+            total_ticks: 1,
+            interpolation_policy: 0,
+            generation: 0,
+        }
+    }
+}
+
+impl MeshTextureAnimation {
+    fn from_asset(asset: &WorldMaterialTextureAsset) -> Self {
+        Self {
+            frames: asset.animation_frames.clone(),
+            total_ticks: asset.animation_total_ticks.max(1),
+            interpolation_policy: asset.interpolation_policy,
+            generation: asset.animation_generation,
+        }
+    }
+
+    fn sample(&self, frame_id: u64) -> MeshTextureAnimationSample {
+        if self.frames.len() <= 1 {
+            return MeshTextureAnimationSample {
+                generation: self.generation,
+                ..MeshTextureAnimationSample::default()
+            };
+        }
+        let tick = (frame_id % u64::from(self.total_ticks.max(1))) as u32;
+        let mut cursor = 0u32;
+        let mut selected = 0usize;
+        for (index, frame) in self.frames.iter().enumerate() {
+            let end = cursor.saturating_add(frame.duration_ticks.max(1));
+            if tick < end {
+                selected = index;
+                break;
+            }
+            cursor = end;
+        }
+        let current = self.frames[selected];
+        let next = self.frames[(selected + 1) % self.frames.len()];
+        let elapsed = tick.saturating_sub(cursor);
+        let interpolation = if self.interpolation_policy == WORLD_MESH_ANIMATION_INTERPOLATE_LINEAR {
+            elapsed as f32 / current.duration_ticks.max(1) as f32
+        } else {
+            0.0
+        };
+        MeshTextureAnimationSample {
+            animated: true,
+            current_region: current.region,
+            next_region: next.region,
+            interpolation,
+            generation: self.generation,
+        }
+    }
 }
 
 impl WorldPrimitiveFrontend {
@@ -1282,6 +1410,20 @@ impl WorldPrimitiveFrontend {
                     rgba,
                     width,
                     height,
+                    frame_width: width,
+                    frame_height: height,
+                    frame_count: 1,
+                    frame_ticks: 1,
+                    animation_flags: 0,
+                    frame_row_size: 1,
+                    interpolation_policy: WORLD_MESH_ANIMATION_INTERPOLATE_NONE,
+                    animation_frames: vec![MeshTextureAnimationFrame {
+                        frame_index: 0,
+                        duration_ticks: 1,
+                        region: [0.0, 0.0, 1.0, 1.0],
+                    }],
+                    animation_total_ticks: 1,
+                    animation_generation: generation,
                 },
             );
         }
@@ -1371,12 +1513,49 @@ impl WorldPrimitiveFrontend {
                 &payload.png_bytes,
                 &format!("world mesh texture {}", payload.texture_id),
             )?;
+            let frame_width = normalized_frame_extent(payload.frame_width, width)?;
+            let frame_height = normalized_frame_extent(payload.frame_height, height)?;
+            let frame_ticks = normalized_frame_ticks(payload.frame_ticks)?;
+            if payload.animation_flags != 0 {
+                return Err(GalError::ffi(
+                    StatusCode::InvalidArgument,
+                    format!(
+                        "world mesh texture {} uses unsupported animation flags {}",
+                        payload.texture_id, payload.animation_flags
+                    ),
+                ));
+            }
+            let frame_row_size =
+                normalized_frame_row_size(width, frame_width, payload.frame_row_size)?;
+            let (animation_frames, animation_total_ticks) = decoded_animation_frames(
+                width,
+                height,
+                frame_width,
+                frame_height,
+                frame_row_size,
+                payload.frame_count,
+                frame_ticks,
+                &payload.animation_frames,
+                payload.interpolation_policy,
+                payload.texture_id,
+            )?;
+            let frame_count = animation_frames.len() as u32;
             decoded_textures.push((
                 payload.texture_id,
                 WorldMaterialTextureAsset {
                     rgba,
                     width,
                     height,
+                    frame_width,
+                    frame_height,
+                    frame_count,
+                    frame_ticks,
+                    animation_flags: payload.animation_flags,
+                    frame_row_size,
+                    interpolation_policy: payload.interpolation_policy,
+                    animation_frames,
+                    animation_total_ticks,
+                    animation_generation: generation,
                 },
             ));
         }
@@ -1900,6 +2079,7 @@ impl WorldPrimitiveFrontend {
             let mesh_pack_started = std::time::Instant::now();
             let (mesh_stream_payload, mesh_stream_offsets) = packed_mesh_uniforms_for_batches(
                 &frame,
+                self,
                 &mesh_batches,
                 stats.profile.world_prepare_mesh_stream_required_bytes,
             )?;
@@ -3556,6 +3736,13 @@ impl WorldPrimitiveFrontend {
         self.world_material_texture_bytes(texture_id)
     }
 
+    fn world_mesh_texture_animation(&self, texture_id: u32) -> MeshTextureAnimation {
+        self.mesh_texture_assets
+            .get(&texture_id)
+            .map(MeshTextureAnimation::from_asset)
+            .unwrap_or_default()
+    }
+
     fn ensure_mesh_texture_resources(
         &mut self,
         gal: &mut VulkanicGal,
@@ -4937,6 +5124,174 @@ fn packed_mesh_vertices(vertices: &[WorldMeshVertex]) -> Vec<u8> {
     out
 }
 
+fn normalized_frame_extent(value: u32, fallback: u32) -> GalResult<u32> {
+    let extent = if value == 0 { fallback } else { value };
+    if extent == 0 {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            "world mesh texture animation frame extent must be non-zero",
+        ));
+    }
+    Ok(extent)
+}
+
+fn normalized_frame_count(value: u32) -> GalResult<u32> {
+    let count = if value == 0 { 1 } else { value };
+    if count > 512 {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            format!("world mesh texture animation frame count {count} exceeds 512"),
+        ));
+    }
+    Ok(count)
+}
+
+fn normalized_frame_ticks(value: u32) -> GalResult<u32> {
+    let ticks = if value == 0 { 1 } else { value };
+    if ticks > 60_000 {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            format!("world mesh texture animation frame duration {ticks} exceeds 60000"),
+        ));
+    }
+    Ok(ticks)
+}
+
+fn normalized_frame_row_size(width: u32, frame_width: u32, value: u32) -> GalResult<u32> {
+    let frames_per_row = width / frame_width.max(1);
+    if frames_per_row == 0 || width % frame_width != 0 {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            "world mesh texture animation frame width must tile the payload width",
+        ));
+    }
+    let row_size = if value == 0 { frames_per_row } else { value };
+    if row_size == 0 || row_size > frames_per_row {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            format!("world mesh texture animation frame row size {row_size} is out of bounds"),
+        ));
+    }
+    Ok(row_size)
+}
+
+fn decoded_animation_frames(
+    width: u32,
+    height: u32,
+    frame_width: u32,
+    frame_height: u32,
+    frame_row_size: u32,
+    frame_count_hint: u32,
+    frame_ticks: u32,
+    explicit_frames: &[WorldMeshAnimationFrame],
+    interpolation_policy: u32,
+    texture_id: u32,
+) -> GalResult<(Vec<MeshTextureAnimationFrame>, u32)> {
+    if frame_width > width || frame_height > height {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            format!(
+                "world mesh texture {texture_id} animation frame exceeds sheet extent"
+            ),
+        ));
+    }
+    if height % frame_height != 0 {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            format!("world mesh texture {texture_id} animation frame height must tile sheet"),
+        ));
+    }
+    let rows = height / frame_height;
+    let capacity = frame_row_size.saturating_mul(rows);
+    if rows == 0 || capacity == 0 {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            format!("world mesh texture {texture_id} animation sheet has no frames"),
+        ));
+    }
+    if interpolation_policy != WORLD_MESH_ANIMATION_INTERPOLATE_NONE
+        && interpolation_policy != WORLD_MESH_ANIMATION_INTERPOLATE_LINEAR
+    {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            format!(
+                "world mesh texture {texture_id} uses unsupported interpolation policy {interpolation_policy}"
+            ),
+        ));
+    }
+    let raw_frames: Vec<WorldMeshAnimationFrame> = if explicit_frames.is_empty() {
+        let count = normalized_frame_count(frame_count_hint)?;
+        (0..count)
+            .map(|frame_index| WorldMeshAnimationFrame {
+                frame_index,
+                duration_ticks: frame_ticks,
+            })
+            .collect()
+    } else {
+        if frame_count_hint != 0 && frame_count_hint as usize != explicit_frames.len() {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                format!(
+                    "world mesh texture {texture_id} animation frame count does not match frame table"
+                ),
+            ));
+        }
+        explicit_frames.to_vec()
+    };
+    if raw_frames.is_empty() || raw_frames.len() > WORLD_MAX_MESH_ANIMATION_FRAMES {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            format!(
+                "world mesh texture {texture_id} animation frame table size is out of bounds"
+            ),
+        ));
+    }
+    let mut decoded = Vec::with_capacity(raw_frames.len());
+    let mut total_ticks = 0u32;
+    for frame in raw_frames {
+        let duration = normalized_frame_ticks(frame.duration_ticks)?;
+        if frame.frame_index >= capacity {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                format!(
+                    "world mesh texture {texture_id} animation frame {} is out of bounds",
+                    frame.frame_index
+                ),
+            ));
+        }
+        let col = frame.frame_index % frame_row_size;
+        let row = frame.frame_index / frame_row_size;
+        let x0 = col.saturating_mul(frame_width);
+        let y0 = row.saturating_mul(frame_height);
+        if x0.saturating_add(frame_width) > width || y0.saturating_add(frame_height) > height {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                format!(
+                    "world mesh texture {texture_id} animation frame {} exceeds sheet bounds",
+                    frame.frame_index
+                ),
+            ));
+        }
+        total_ticks = total_ticks.checked_add(duration).ok_or_else(|| {
+            GalError::ffi(
+                StatusCode::InvalidArgument,
+                format!("world mesh texture {texture_id} animation duration overflow"),
+            )
+        })?;
+        decoded.push(MeshTextureAnimationFrame {
+            frame_index: frame.frame_index,
+            duration_ticks: duration,
+            region: [
+                x0 as f32 / width as f32,
+                y0 as f32 / height as f32,
+                frame_width as f32 / width as f32,
+                frame_height as f32 / height as f32,
+            ],
+        });
+    }
+    Ok((decoded, total_ticks.max(1)))
+}
+
 fn unpack_normal_i8(packed: u32) -> [f32; 3] {
     [
         unpack_normal_i8_component(packed, 0),
@@ -5923,6 +6278,7 @@ fn required_mesh_instance_stream_bytes(mesh_batches: &[MeshBatch]) -> GalResult<
 
 fn packed_mesh_uniforms_for_batches(
     frame: &WorldPrimitiveFrame,
+    frontend: &WorldPrimitiveFrontend,
     mesh_batches: &[MeshBatch],
     required_bytes: u64,
 ) -> GalResult<(Vec<u8>, Vec<u64>)> {
@@ -5939,7 +6295,7 @@ fn packed_mesh_uniforms_for_batches(
         }
         offsets.push(aligned);
         out.extend_from_slice(&header);
-        append_mesh_instances(frame, batch, &mut out)?;
+        append_mesh_instances(frame, frontend, batch, &mut out)?;
     }
     Ok((out, offsets))
 }
@@ -5963,9 +6319,12 @@ fn packed_mesh_uniform_header(frame: &WorldPrimitiveFrame) -> Vec<u8> {
 
 fn append_mesh_instances(
     frame: &WorldPrimitiveFrame,
+    frontend: &WorldPrimitiveFrontend,
     batch: &MeshBatch,
     out: &mut Vec<u8>,
 ) -> GalResult<()> {
+    let animation = frontend.world_mesh_texture_animation(batch.key.texture_id);
+    let animation_sample = animation.sample(frame.frame_id);
     for instance_index in &batch.indices {
         let instance = &frame.mesh_instances[*instance_index];
         for value in instance.transform {
@@ -5982,9 +6341,15 @@ fn append_mesh_instances(
         } else {
             push_f32(out, 0.0);
         }
-        push_f32(out, 0.0);
-        push_f32(out, 0.0);
-        push_f32(out, 0.0);
+        push_f32(out, if animation_sample.animated { 1.0 } else { 0.0 });
+        push_f32(out, animation_sample.interpolation);
+        push_f32(out, animation_sample.generation as f32);
+        for value in animation_sample.current_region {
+            push_f32(out, value);
+        }
+        for value in animation_sample.next_region {
+            push_f32(out, value);
+        }
     }
     Ok(())
 }
@@ -6978,6 +7343,18 @@ mod tests {
             0.5,
             material_registry::cutout_threshold(WORLD_MATERIAL_ID_CUTOUT_TEXTURED)
         );
+        assert_eq!(
+            Some(WORLD_MATERIAL_ID_WATER_TRANSLUCENT),
+            material::canonical_material_id(WORLD_MATERIAL_ID_WATER_TRANSLUCENT)
+        );
+        assert!(material::material_matches_mode(
+            WORLD_MATERIAL_ID_WATER_TRANSLUCENT,
+            WORLD_MATERIAL_MODE_TRANSLUCENT
+        ));
+        assert!(!material::material_matches_mode(
+            WORLD_MATERIAL_ID_WATER_TRANSLUCENT,
+            WORLD_MATERIAL_MODE_CUTOUT
+        ));
     }
 
     #[test]
@@ -7285,6 +7662,14 @@ mod tests {
                 vec![WorldMeshTextureAssetPayload {
                     texture_id: WORLD_MATERIAL_TEXTURE_STONE,
                     png_bytes: material_scene_png(0),
+                    frame_width: 0,
+                    frame_height: 0,
+                    frame_count: 1,
+                    frame_ticks: 1,
+                    animation_flags: 0,
+                    frame_row_size: 0,
+                    interpolation_policy: 0,
+                    animation_frames: Vec::new(),
                 }],
             )
             .unwrap();
@@ -7312,10 +7697,26 @@ mod tests {
                 WorldMeshTextureAssetPayload {
                     texture_id: WORLD_MATERIAL_TEXTURE_STONE,
                     png_bytes: material_scene_png(0),
+                    frame_width: 0,
+                    frame_height: 0,
+                    frame_count: 1,
+                    frame_ticks: 1,
+                    animation_flags: 0,
+                    frame_row_size: 0,
+                    interpolation_policy: 0,
+                    animation_frames: Vec::new(),
                 },
                 WorldMeshTextureAssetPayload {
                     texture_id: WORLD_MATERIAL_TEXTURE_STONE,
                     png_bytes: material_scene_png(1),
+                    frame_width: 0,
+                    frame_height: 0,
+                    frame_count: 1,
+                    frame_ticks: 1,
+                    animation_flags: 0,
+                    frame_row_size: 0,
+                    interpolation_policy: 0,
+                    animation_frames: Vec::new(),
                 },
             ],
         );
@@ -7329,12 +7730,235 @@ mod tests {
                 vec![WorldMeshTextureAssetPayload {
                     texture_id: WORLD_MATERIAL_TEXTURE_STONE,
                     png_bytes: material_scene_png(1),
+                    frame_width: 0,
+                    frame_height: 0,
+                    frame_count: 1,
+                    frame_ticks: 1,
+                    animation_flags: 0,
+                    frame_row_size: 0,
+                    interpolation_policy: 0,
+                    animation_frames: Vec::new(),
                 }],
             )
             .unwrap();
         assert!(frontend
             .mesh_texture_assets
             .contains_key(&WORLD_MATERIAL_TEXTURE_STONE));
+    }
+
+    #[test]
+    fn world_mesh_texture_animation_metadata_is_validated_and_preserved_on_failure() {
+        let mut gal = gal();
+        let mut frontend = WorldPrimitiveFrontend::default();
+        frontend
+            .apply_world_mesh_asset_update(
+                &mut gal,
+                1,
+                vec![mesh_asset(95, 1, IndexType::U16)],
+                vec![WorldMeshTextureAssetPayload {
+                    texture_id: WORLD_MATERIAL_TEXTURE_WATER_STILL,
+                    png_bytes: material_scene_png(0),
+                    frame_width: 8,
+                    frame_height: 2,
+                    frame_count: 4,
+                    frame_ticks: 2,
+                    animation_flags: 0,
+                    frame_row_size: 0,
+                    interpolation_policy: 0,
+                    animation_frames: Vec::new(),
+                }],
+            )
+            .unwrap();
+        assert_eq!(
+            4,
+            frontend
+                .mesh_texture_assets
+                .get(&WORLD_MATERIAL_TEXTURE_WATER_STILL)
+                .unwrap()
+                .frame_count
+        );
+
+        let malformed = frontend.apply_world_mesh_asset_update(
+            &mut gal,
+            2,
+            vec![mesh_asset(96, 2, IndexType::U16)],
+            vec![WorldMeshTextureAssetPayload {
+                texture_id: WORLD_MATERIAL_TEXTURE_WATER_STILL,
+                png_bytes: material_scene_png(1),
+                frame_width: 8,
+                frame_height: 8,
+                frame_count: 2,
+                frame_ticks: 1,
+                animation_flags: 0,
+                frame_row_size: 0,
+                interpolation_policy: 0,
+                animation_frames: Vec::new(),
+            }],
+        );
+        assert!(malformed.is_err());
+        assert_eq!(
+            4,
+            frontend
+                .mesh_texture_assets
+                .get(&WORLD_MATERIAL_TEXTURE_WATER_STILL)
+                .unwrap()
+                .frame_count,
+            "malformed animation metadata must preserve the last valid texture generation"
+        );
+
+        let unsupported_flags = frontend.apply_world_mesh_asset_update(
+            &mut gal,
+            3,
+            Vec::new(),
+            vec![WorldMeshTextureAssetPayload {
+                texture_id: WORLD_MATERIAL_TEXTURE_WATER_STILL,
+                png_bytes: material_scene_png(2),
+                frame_width: 8,
+                frame_height: 2,
+                frame_count: 4,
+                frame_ticks: 1,
+                animation_flags: 1,
+                frame_row_size: 0,
+                interpolation_policy: 0,
+                animation_frames: Vec::new(),
+            }],
+        );
+        assert!(unsupported_flags.is_err());
+        assert_eq!(
+            4,
+            frontend
+                .mesh_texture_assets
+                .get(&WORLD_MATERIAL_TEXTURE_WATER_STILL)
+                .unwrap()
+                .frame_count,
+            "unsupported animation flags must preserve the last valid texture generation"
+        );
+    }
+
+    #[test]
+    fn world_mesh_batches_pack_shared_animation_phase_per_texture() {
+        let mut gal = gal();
+        let target = frame_target(&mut gal, 1, 128, 128);
+        let mut frontend = WorldPrimitiveFrontend::default();
+        let mut asset = mesh_asset(97, 1, IndexType::U16);
+        asset.sections[0].texture_id = WORLD_MATERIAL_TEXTURE_WATER_FLOW;
+        frontend
+            .apply_world_mesh_asset_update(
+                &mut gal,
+                1,
+                vec![asset],
+                vec![WorldMeshTextureAssetPayload {
+                    texture_id: WORLD_MATERIAL_TEXTURE_WATER_FLOW,
+                    png_bytes: material_scene_png(0),
+                    frame_width: 8,
+                    frame_height: 2,
+                    frame_count: 4,
+                    frame_ticks: 2,
+                    animation_flags: 0,
+                    frame_row_size: 0,
+                    interpolation_policy: 0,
+                    animation_frames: Vec::new(),
+                }],
+            )
+            .unwrap();
+        let mut frame = frame(Vec::new());
+        frame.frame_id = 5;
+        frame.mesh_instances.push(mesh_instance(97, 1));
+
+        let (ops, stats) = frontend.append_frame_ops(&mut gal, 5, target, frame).unwrap();
+        assert_eq!(1, stats.mesh_instance_count);
+        let mesh_write = ops
+            .iter()
+            .find_map(|op| match op {
+                CommandOp::HostWriteBuffer { data, .. }
+                    if data.len() == WORLD_MESH_BATCH_HEADER_BYTES + WORLD_MESH_INSTANCE_BYTES =>
+                {
+                    Some(data)
+                }
+                _ => None,
+            })
+            .expect("mesh instance stream upload");
+        let instance_f32 = WORLD_MESH_BATCH_HEADER_BYTES / 4;
+        assert_eq!(0.0, read_f32(mesh_write, instance_f32 + 20));
+        assert_eq!(1.0, read_f32(mesh_write, instance_f32 + 21));
+        assert_eq!(0.0, read_f32(mesh_write, instance_f32 + 22));
+        assert_eq!(1.0, read_f32(mesh_write, instance_f32 + 23));
+        assert_eq!(0.0, read_f32(mesh_write, instance_f32 + 24));
+        assert_eq!(0.5, read_f32(mesh_write, instance_f32 + 25));
+        assert_eq!(1.0, read_f32(mesh_write, instance_f32 + 26));
+        assert_eq!(0.25, read_f32(mesh_write, instance_f32 + 27));
+        assert_eq!(0.0, read_f32(mesh_write, instance_f32 + 28));
+        assert_eq!(0.75, read_f32(mesh_write, instance_f32 + 29));
+        assert_eq!(1.0, read_f32(mesh_write, instance_f32 + 30));
+        assert_eq!(0.25, read_f32(mesh_write, instance_f32 + 31));
+    }
+
+    #[test]
+    fn world_mesh_texture_animation_frame_table_supports_nonsequential_variable_frames() {
+        let mut gal = gal();
+        let target = frame_target(&mut gal, 1, 128, 128);
+        let mut frontend = WorldPrimitiveFrontend::default();
+        let mut asset = mesh_asset(98, 1, IndexType::U16);
+        asset.sections[0].texture_id = WORLD_MATERIAL_TEXTURE_WATER_STILL;
+        frontend
+            .apply_world_mesh_asset_update(
+                &mut gal,
+                1,
+                vec![asset],
+                vec![WorldMeshTextureAssetPayload {
+                    texture_id: WORLD_MATERIAL_TEXTURE_WATER_STILL,
+                    png_bytes: material_scene_png(0),
+                    frame_width: 4,
+                    frame_height: 4,
+                    frame_count: 3,
+                    frame_ticks: 1,
+                    animation_flags: 0,
+                    frame_row_size: 2,
+                    interpolation_policy: WORLD_MESH_ANIMATION_INTERPOLATE_LINEAR,
+                    animation_frames: vec![
+                        WorldMeshAnimationFrame {
+                            frame_index: 3,
+                            duration_ticks: 1,
+                        },
+                        WorldMeshAnimationFrame {
+                            frame_index: 1,
+                            duration_ticks: 3,
+                        },
+                        WorldMeshAnimationFrame {
+                            frame_index: 2,
+                            duration_ticks: 2,
+                        },
+                    ],
+                }],
+            )
+            .unwrap();
+
+        let mut frame = frame(Vec::new());
+        frame.frame_id = 2;
+        frame.mesh_instances.push(mesh_instance(98, 1));
+        let (ops, _stats) = frontend.append_frame_ops(&mut gal, 2, target, frame).unwrap();
+        let mesh_write = ops
+            .iter()
+            .find_map(|op| match op {
+                CommandOp::HostWriteBuffer { data, .. }
+                    if data.len() == WORLD_MESH_BATCH_HEADER_BYTES + WORLD_MESH_INSTANCE_BYTES =>
+                {
+                    Some(data)
+                }
+                _ => None,
+            })
+            .expect("mesh instance stream upload");
+        let instance_f32 = WORLD_MESH_BATCH_HEADER_BYTES / 4;
+        assert_eq!(1.0, read_f32(mesh_write, instance_f32 + 21));
+        assert!((read_f32(mesh_write, instance_f32 + 22) - (1.0 / 3.0)).abs() < 0.0001);
+        assert_eq!(0.5, read_f32(mesh_write, instance_f32 + 24));
+        assert_eq!(0.0, read_f32(mesh_write, instance_f32 + 25));
+        assert_eq!(0.5, read_f32(mesh_write, instance_f32 + 26));
+        assert_eq!(0.5, read_f32(mesh_write, instance_f32 + 27));
+        assert_eq!(0.0, read_f32(mesh_write, instance_f32 + 28));
+        assert_eq!(0.5, read_f32(mesh_write, instance_f32 + 29));
+        assert_eq!(0.5, read_f32(mesh_write, instance_f32 + 30));
+        assert_eq!(0.5, read_f32(mesh_write, instance_f32 + 31));
     }
 
     #[test]
@@ -8779,6 +9403,14 @@ mod tests {
             vec![WorldMeshTextureAssetPayload {
                 texture_id: WORLD_MATERIAL_TEXTURE_STONE,
                 png_bytes: b"not-a-png".to_vec(),
+                frame_width: 0,
+                frame_height: 0,
+                frame_count: 1,
+                frame_ticks: 1,
+                animation_flags: 0,
+                frame_row_size: 0,
+                interpolation_policy: 0,
+                animation_frames: Vec::new(),
             }],
         );
         assert!(malformed.is_err());
@@ -9551,14 +10183,38 @@ mod tests {
             WorldMeshTextureAssetPayload {
                 texture_id: WORLD_MATERIAL_TEXTURE_STONE,
                 png_bytes: shader_scene_texture_png(variant, false),
+                frame_width: 0,
+                frame_height: 0,
+                frame_count: 1,
+                frame_ticks: 1,
+                animation_flags: 0,
+                frame_row_size: 0,
+                interpolation_policy: 0,
+                animation_frames: Vec::new(),
             },
             WorldMeshTextureAssetPayload {
                 texture_id: WORLD_MATERIAL_TEXTURE_DIRT,
                 png_bytes: shader_scene_texture_png(variant.saturating_add(1), false),
+                frame_width: 0,
+                frame_height: 0,
+                frame_count: 1,
+                frame_ticks: 1,
+                animation_flags: 0,
+                frame_row_size: 0,
+                interpolation_policy: 0,
+                animation_frames: Vec::new(),
             },
             WorldMeshTextureAssetPayload {
                 texture_id: WORLD_MATERIAL_TEXTURE_OAK_LEAVES,
                 png_bytes: shader_scene_texture_png(variant, true),
+                frame_width: 0,
+                frame_height: 0,
+                frame_count: 1,
+                frame_ticks: 1,
+                animation_flags: 0,
+                frame_row_size: 0,
+                interpolation_policy: 0,
+                animation_frames: Vec::new(),
             },
         ]
     }

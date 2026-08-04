@@ -67,6 +67,7 @@ public class DefaultFluidRenderer implements net.irisshaders.iris.vertices.sodiu
     private byte iris$isFluid;
     private byte iris$lightEmission;
     private int iris$localX, iris$localY, iris$localZ;
+    private int rustGalPrimitiveKind;
     private int emittedQuadCount;
 
     public DefaultFluidRenderer(LightPipelineProvider lighters) {
@@ -115,6 +116,9 @@ public class DefaultFluidRenderer implements net.irisshaders.iris.vertices.sodiu
         int posZ = blockPos.getZ();
 
         Fluid fluid = fluidState.getType();
+        this.rustGalPrimitiveKind = fluidState.is(FluidTags.WATER)
+                ? NativeSectionMeshBuilder.PRIMITIVE_KIND_BUILTIN_WATER
+                : NativeSectionMeshBuilder.PRIMITIVE_KIND_UNSUPPORTED_FLUID;
 
         boolean cullUp = this.isFullBlockFluidOccluded(level, blockPos, Direction.UP, blockState, fluidState);
         boolean cullDown = this.isFullBlockFluidOccluded(level, blockPos, Direction.DOWN, blockState, fluidState) ||
@@ -424,7 +428,7 @@ public class DefaultFluidRenderer implements net.irisshaders.iris.vertices.sodiu
                            ModelQuadFacing facing, boolean flip) {
         TextureAtlasSprite sprite = quad.getSprite();
 
-        if (sprite != null) {
+        if (sprite != null && this.rustGalPrimitiveKind != NativeSectionMeshBuilder.PRIMITIVE_KIND_UNSUPPORTED_FLUID) {
             builder.addSprite(sprite);
         }
 
@@ -469,7 +473,7 @@ public class DefaultFluidRenderer implements net.irisshaders.iris.vertices.sodiu
         }
         TextureAtlasSprite sprite = quad.getSprite();
 
-        if (sprite != null) {
+        if (sprite != null && this.rustGalPrimitiveKind != NativeSectionMeshBuilder.PRIMITIVE_KIND_UNSUPPORTED_FLUID) {
             builder.addSprite(sprite);
         }
 
@@ -501,7 +505,7 @@ public class DefaultFluidRenderer implements net.irisshaders.iris.vertices.sodiu
                     this.quadColors[0], this.quadColors[1], this.quadColors[2], this.quadColors[3],
                     this.brightness[0], this.brightness[1], this.brightness[2], this.brightness[3],
                     this.quadLightData.lm[0], this.quadLightData.lm[1], this.quadLightData.lm[2],
-                    this.quadLightData.lm[3]);
+                    this.quadLightData.lm[3], this.rustGalPrimitiveKind);
             return;
         }
 
@@ -514,7 +518,7 @@ public class DefaultFluidRenderer implements net.irisshaders.iris.vertices.sodiu
                 this.quadColors[0], this.quadColors[1], this.quadColors[2], this.quadColors[3],
                 this.brightness[0], this.brightness[1], this.brightness[2], this.brightness[3],
                 this.quadLightData.lm[0], this.quadLightData.lm[1], this.quadLightData.lm[2],
-                this.quadLightData.lm[3]);
+                this.quadLightData.lm[3], this.rustGalPrimitiveKind);
     }
 
     private static boolean shouldLogFluidDiag(int x, int y, int z) {

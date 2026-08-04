@@ -67,7 +67,7 @@ pub fn verify() -> i32 {
         && std::mem::size_of::<NativeQuad>() == 152
         && std::mem::size_of::<FlatQuadRecord>() == 156
         && std::mem::size_of::<LightBlockRecord>() == 24
-        && std::mem::size_of::<FluidFaceRecord>() == 172
+        && std::mem::size_of::<FluidFaceRecord>() == 176
         && std::mem::size_of::<StaticModelVertexRecord>() == 28
         && std::mem::size_of::<StaticModelQuadRecord>() == 160
         && std::mem::size_of::<StaticModelBlockRecord>() == 52
