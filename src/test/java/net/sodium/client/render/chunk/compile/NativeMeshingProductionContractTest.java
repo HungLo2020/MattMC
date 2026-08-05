@@ -38,8 +38,10 @@ class NativeMeshingProductionContractTest {
         assertTrue(task.contains("boolean forceJavaFluids = NativeMeshingDiagnostics.forceJavaFluids()"));
         assertTrue(task.contains("if (!forceJavaProducers)"));
         assertTrue(task.contains("forceJavaProducers ? new int[] { 0, 0, 0 } : nativeSectionSnapshot.flushAll"));
-        assertTrue(task.contains("if (forceJavaModels || !NativeStaticBlockModelRegistry.hasNativeModel(blockState))"));
-        assertTrue(task.contains("&& (forceJavaFluids || !nativeFluidSupported)"));
+        assertTrue(task.contains("boolean nativeModel = modelState && !forceJavaProducers && !forceJavaModels"));
+        assertTrue(task.contains("&& NativeStaticBlockModelRegistry.hasNativeModel(blockState)"));
+        assertTrue(task.contains("if (!nativeModel)"));
+        assertTrue(task.contains("&& (forceJavaProducers || forceJavaFluids || !nativeFluidSupported)"));
         assertTrue(task.contains("NativeMeshingCompatibilityFallback.renderModel"));
         assertTrue(task.contains("NativeMeshingCompatibilityFallback.renderFluid"));
     }
@@ -53,7 +55,8 @@ class NativeMeshingProductionContractTest {
         assertTrue(registry.contains("SELECTOR_IDS.remove(key)"));
         assertTrue(registry.contains("return MISSING_ID"));
         assertTrue(registry.contains("FluidRenderHandlerRegistry.INSTANCE.getOverride(fluidState.getType()) == null"));
-        assertTrue(task.contains("!NativeStaticBlockModelRegistry.hasNativeModel(blockState)"));
+        assertTrue(task.contains("NativeStaticBlockModelRegistry.hasNativeModel(blockState)"));
+        assertTrue(task.contains("if (!nativeModel)"));
         assertTrue(task.contains("!nativeFluidSupported"));
         assertTrue(task.contains("if (blockState.hasBlockEntity())"));
         assertTrue(task.contains("renderData.addBlockEntity"));

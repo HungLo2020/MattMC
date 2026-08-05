@@ -2,6 +2,7 @@ package net.sodium.fabric;
 
 import net.sodium.client.render.chunk.map.ChunkStatus;
 import net.sodium.client.render.chunk.map.ChunkTrackerHolder;
+import net.sodium.client.render.StaticTerrainParityDiagnostics;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.hooks.ClientPacketListenerHooks;
 import net.minecraft.network.protocol.game.ClientboundForgetLevelChunkPacket;
@@ -17,6 +18,8 @@ public class SodiumClientPacketListenerHook implements ClientPacketListenerHooks
         // Mark chunk as having light data for Sodium's chunk tracker
         ChunkTrackerHolder.get(level)
                 .onChunkStatusAdded(x, z, ChunkStatus.FLAG_HAS_LIGHT_DATA);
+        StaticTerrainParityDiagnostics.recordAppearanceLightLifecycle(
+                level, "client-light-applied", x, z, ChunkStatus.FLAG_HAS_LIGHT_DATA);
     }
 
     @Override

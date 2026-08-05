@@ -1116,6 +1116,30 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		Frustum frustum = this.prepareCullFrustum(viewMatrix, projectionMatrix, cameraPos);
 		this.matrices = new ChunkRenderMatrices(projectionMatrix, viewMatrix);
 		this.cullTerrain(camera, frustum, this.minecraft.player.isSpectator());
+		net.sodium.client.render.StaticTerrainParityDiagnostics.recordTransformProbe(
+			"rust-vulkan-whole-frame-enqueue",
+			"solid",
+			cameraPos.x(), cameraPos.y(), cameraPos.z(),
+			camera.getYRot(), camera.getXRot(),
+			viewMatrix, projectionMatrix,
+			this.minecraft.getWindow().getWidth(), this.minecraft.getWindow().getHeight(),
+			true
+		);
+		net.sodium.client.render.StaticTerrainParityDiagnostics.recordTransformProbe(
+			"rust-vulkan-whole-frame-enqueue",
+			"cutout",
+			cameraPos.x(), cameraPos.y(), cameraPos.z(),
+			camera.getYRot(), camera.getXRot(),
+			viewMatrix, projectionMatrix,
+			this.minecraft.getWindow().getWidth(), this.minecraft.getWindow().getHeight(),
+			true
+		);
+		net.sodium.client.render.StaticTerrainParityDiagnostics.recordAppearanceSourceProbe(
+			"rust-vulkan-whole-frame-enqueue", "solid"
+		);
+		net.sodium.client.render.StaticTerrainParityDiagnostics.recordAppearanceSourceProbe(
+			"rust-vulkan-whole-frame-enqueue", "cutout"
+		);
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.cull");
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.visible-submit");
 		this.renderer.enqueueRustGalStaticTerrain(camera);

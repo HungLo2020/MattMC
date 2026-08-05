@@ -267,13 +267,10 @@ public final class RustGalTerrainRenderer {
 		if (output == null || output.info == null) {
 			return;
 		}
-		if (output.info.animatedSprites != null && !hasOnlySupportedWaterAnimatedSprites(output.info)) {
-			skippedUnsupportedAnimatedSections.incrementAndGet();
-			recordEvent(output.render.getPosition().asLong(), ChunkSectionLayer.SOLID, output.submitTime, 0L, 0L, atlasGeneration, null, output.render.getOriginX(), output.render.getOriginY(), output.render.getOriginZ(), 0.0F, 0.0F, 0.0F, "unsupported-animated-sprite");
-			recordEvent(output.render.getPosition().asLong(), ChunkSectionLayer.CUTOUT_MIPPED, output.submitTime, 0L, 0L, atlasGeneration, null, output.render.getOriginX(), output.render.getOriginY(), output.render.getOriginZ(), 0.0F, 0.0F, 0.0F, "unsupported-animated-sprite");
-			recordEvent(output.render.getPosition().asLong(), ChunkSectionLayer.TRANSLUCENT, output.submitTime, 0L, 0L, atlasGeneration, null, output.render.getOriginX(), output.render.getOriginY(), output.render.getOriginZ(), 0.0F, 0.0F, 0.0F, "unsupported-animated-sprite");
-			return;
-		}
+		net.sodium.client.render.StaticTerrainParityDiagnostics.recordRustStaticTerrainAdmission(
+			output,
+			"accepted"
+		);
 		if (output.info.animatedSprites != null) {
 			acceptedWaterAnimatedSections.incrementAndGet();
 		}
@@ -284,35 +281,6 @@ public final class RustGalTerrainRenderer {
 		acceptLayer(output, DefaultTerrainRenderPasses.CUTOUT, ChunkSectionLayer.CUTOUT_MIPPED, extractionFrameId);
 		acceptLayer(output, DefaultTerrainRenderPasses.TRANSLUCENT, ChunkSectionLayer.TRANSLUCENT, extractionFrameId);
 		recordTranslucentSortData(output);
-	}
-
-	private static boolean hasOnlySupportedWaterAnimatedSprites(BuiltSectionInfo info) {
-		if (info.animatedSprites == null) {
-			return true;
-		}
-		if (info.nativeMeshingWaterBlocks <= 0) {
-			return false;
-		}
-		for (TextureAtlasSprite sprite : info.animatedSprites) {
-			if (!isVanillaWaterSprite(sprite)) {
-				return false;
-			}
-		}
-		return true;
-	}
-
-	private static boolean isVanillaWaterSprite(TextureAtlasSprite sprite) {
-		if (sprite == null || sprite.contents() == null) {
-			return false;
-		}
-		ResourceLocation name = sprite.contents().name();
-		if (name == null || !"minecraft".equals(name.getNamespace())) {
-			return false;
-		}
-		String path = name.getPath();
-		return "block/water_still".equals(path)
-			|| "block/water_flow".equals(path)
-			|| "block/water_overlay".equals(path);
 	}
 
 	private static void recordTranslucentSortData(ChunkBuildOutput output) {
@@ -1044,6 +1012,35 @@ public final class RustGalTerrainRenderer {
 				layerKey.layer() == ChunkSectionLayer.TRANSLUCENT ? currentTranslucentSortSnapshot(asset) : null;
 			long sortGeneration = sortedIndex == null ? 0L : sortedIndex.sortGeneration();
 			long sortedIndexHash = sortedIndex == null ? 0L : sortedIndex.indexHash();
+			net.sodium.client.render.StaticTerrainParityDiagnostics.recordRustStaticTerrainExecution(
+				"rust-vulkan-executed",
+				layerKey.sectionPos(),
+				layerKey.layer().name(),
+				asset.meshKey(),
+				asset.meshGeneration(),
+				instance.meshGeneration(),
+				asset.contentHash(),
+				asset.vertexCount(),
+				asset.indexCount(),
+				asset.indexType(),
+				Math.max(0, asset.indexCount() / 6),
+				asset.sectionCount(),
+				asset.sectionOriginX(),
+				asset.sectionOriginY(),
+				asset.sectionOriginZ(),
+				asset.localMinX(),
+				asset.localMinY(),
+				asset.localMinZ(),
+				asset.localMaxX(),
+				asset.localMaxY(),
+				asset.localMaxZ(),
+				asset.uvMinU(),
+				asset.uvMinV(),
+				asset.uvMaxU(),
+				asset.uvMaxV(),
+				frameId,
+				0L
+			);
 			recordEvent(
 				layerKey.sectionPos(),
 				layerKey.layer(),
@@ -1082,11 +1079,21 @@ public final class RustGalTerrainRenderer {
 		BuiltSectionMeshParts mesh = output.getMesh(pass);
 		if (mesh == null || mesh.getVertexData().getLength() == 0) {
 			skippedEmptyLayers.incrementAndGet();
+			net.sodium.client.render.StaticTerrainParityDiagnostics.recordRustStaticTerrainAdmission(
+				output, layer.name(), "source-layer-empty"
+			);
 			removeLayer(output.render.getPosition().asLong(), layer, "empty-layer");
 			return;
 		}
 			try {
 				TerrainSectionAsset asset = decodeMesh(output, mesh, layer);
+				net.sodium.client.render.StaticTerrainParityDiagnostics.recordRustStaticTerrainAppearanceCopy(
+					output,
+					layer.name(),
+					asset.meshKey(),
+					asset.meshGeneration(),
+					asset.asset().vertices()
+				);
 				if (layer == ChunkSectionLayer.TRANSLUCENT && asset.unsupportedPrimitiveCount() > 0) {
 					unsupportedFluidOmittedSections.incrementAndGet();
 					recordEvent(
@@ -1111,6 +1118,9 @@ public final class RustGalTerrainRenderer {
 					);
 				}
 				SECTION_ASSETS.put(new LayerKey(output.render.getPosition().asLong(), layer), asset);
+				net.sodium.client.render.StaticTerrainParityDiagnostics.recordRustStaticTerrainAdmission(
+					output, layer.name(), "asset-registered"
+				);
 				RustGalWorldPrimitiveRenderer.registerStaticTerrainMeshAsset(asset.asset(), atlasTextureUpdatePayload());
 				registeredMeshes.incrementAndGet();
 				recordEvent(
@@ -1147,8 +1157,11 @@ public final class RustGalTerrainRenderer {
 					if (layer == ChunkSectionLayer.TRANSLUCENT) {
 						recordInitialTranslucentSort(output, asset);
 					}
-				} catch (RuntimeException error) {
+			} catch (RuntimeException error) {
 				LOGGER.warn("Failed to copy Rust static terrain section {} layer {}", output.render.getPosition(), layer, error);
+				net.sodium.client.render.StaticTerrainParityDiagnostics.recordRustStaticTerrainAdmission(
+					output, layer.name(), "asset-decode-failed"
+				);
 				removeLayer(output.render.getPosition().asLong(), layer, "decode-failed");
 		}
 	}
@@ -1878,6 +1891,14 @@ public final class RustGalTerrainRenderer {
 		visibleLayerProbes.incrementAndGet();
 		TerrainSectionAsset asset = SECTION_ASSETS.get(new LayerKey(section.getPosition().asLong(), layer));
 		if (asset == null) {
+			net.sodium.client.render.StaticTerrainParityDiagnostics.recordRustStaticTerrainNonExecution(
+				section.getPosition().asLong(),
+				layer.name(),
+				"asset-missing:" + net.sodium.client.render.StaticTerrainParityDiagnostics
+					.rustStaticTerrainAdmissionReason(section.getPosition().asLong(), layer.name()),
+				0L,
+				0L
+			);
 			return false;
 		}
 		float[] transform = new Matrix4f()
@@ -1895,6 +1916,9 @@ public final class RustGalTerrainRenderer {
 		if (visibleSubmissions != null && !"duplicate-visible-section".equals(activeFault())) {
 			VisibleSubmitKey submitKey = new VisibleSubmitKey(section.getPosition().asLong(), layer, visibleGeneration);
 			if (!visibleSubmissions.add(submitKey)) {
+				net.sodium.client.render.StaticTerrainParityDiagnostics.recordRustStaticTerrainNonExecution(
+					section.getPosition().asLong(), layer.name(), "duplicate-visible-suppressed", visibleGeneration, 0L
+				);
 				recordEvent(
 					section.getPosition().asLong(),
 					layer,
@@ -1941,6 +1965,35 @@ public final class RustGalTerrainRenderer {
 		if (submitted) {
 			visibleLayerSubmissions.incrementAndGet();
 			recordCurrentFrameVisibleSubmission(enqueueFrameId);
+			net.sodium.client.render.StaticTerrainParityDiagnostics.recordRustStaticTerrainExecution(
+				"rust-vulkan-enqueued",
+				section.getPosition().asLong(),
+				layer.name(),
+				asset.meshKey(),
+				asset.meshGeneration(),
+				visibleGeneration,
+				asset.contentHash(),
+				asset.vertexCount(),
+				asset.indexCount(),
+				asset.indexType(),
+				Math.max(0, asset.indexCount() / 6),
+				asset.sectionCount(),
+				asset.sectionOriginX(),
+				asset.sectionOriginY(),
+				asset.sectionOriginZ(),
+				asset.localMinX(),
+				asset.localMinY(),
+				asset.localMinZ(),
+				asset.localMaxX(),
+				asset.localMaxY(),
+				asset.localMaxZ(),
+				asset.uvMinU(),
+				asset.uvMinV(),
+				asset.uvMaxU(),
+				asset.uvMaxV(),
+				currentGameplayFrameId(),
+				enqueueFrameId
+			);
 			recordEvent(
 				section.getPosition().asLong(),
 				layer,
@@ -1996,6 +2049,9 @@ public final class RustGalTerrainRenderer {
 			}
 		} else {
 			failedLayerSubmissions.incrementAndGet();
+			net.sodium.client.render.StaticTerrainParityDiagnostics.recordRustStaticTerrainNonExecution(
+				section.getPosition().asLong(), layer.name(), "stale-or-unregistered-submit", visibleGeneration, enqueueFrameId
+			);
 			recordEvent(section.getPosition().asLong(), layer, 0L, asset.meshGeneration(), visibleGeneration, atlasGeneration, asset, section.getOriginX(), section.getOriginY(), section.getOriginZ(), 0.0F, 0.0F, 0.0F, "stale-or-unregistered-submit", 0L, enqueueFrameId, 0L, 0L);
 		}
 		return submitted;

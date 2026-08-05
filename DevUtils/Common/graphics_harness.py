@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import csv
 import gzip
+from collections import Counter
 import hashlib
 import io
 import json
@@ -2641,6 +2642,31 @@ def static_terrain_is_translucent_scenario(scenario: str) -> bool:
 def static_terrain_requires_translucent_camera_sort(scenario: str) -> bool:
     scenario = (scenario or "").strip().lower()
     return scenario in {"translucent-overlap", "translucent-moving-camera-performance"}
+
+
+def static_terrain_readiness_failure(
+    *,
+    expected: bool,
+    mesh_instances: int,
+    accepted_builds: int,
+    registered_meshes: int,
+    visible_probes: int,
+    visible_submissions: int,
+    combined_logs: str,
+) -> str | None:
+    """Classify a terrain row that rendered mesh work but missed readiness."""
+    if not expected or mesh_instances <= 0:
+        return None
+    if re.search(r"world mesh instance count \d+ exceeds maximum \d+", combined_logs):
+        return "terrain-submission-capacity-rejected"
+    if (
+        accepted_builds <= 0
+        or registered_meshes <= 0
+        or visible_probes <= 0
+        or visible_submissions <= 0
+    ):
+        return "terrain-readiness-events-missing"
+    return None
 
 
 def static_terrain_lifecycle_evidence(
@@ -6097,6 +6123,369 @@ def write_cross_repo_visual_pairs(artifact_root: Path, cross_repo_parity: Mappin
     return report
 
 
+def static_terrain_parity_sidecars(artifact_path: Path) -> list[Path]:
+    capture_root = artifact_path.parent / "capture"
+    if not capture_root.is_dir():
+        return []
+    return sorted(capture_root.rglob("static_terrain_parity*.jsonl"))
+
+
+def read_static_terrain_coverage_events(artifact_path: Path) -> list[dict[str, object]]:
+    events: list[dict[str, object]] = []
+    for sidecar in static_terrain_parity_sidecars(artifact_path):
+        try:
+            for line_number, line in enumerate(sidecar.read_text(encoding="utf-8", errors="replace").splitlines(), start=1):
+                if "mattmc-static-terrain-draw-coverage-v1" not in line:
+                    continue
+                try:
+                    event = json.loads(line)
+                except json.JSONDecodeError as exc:
+                    events.append(
+                        {
+                            "schema": "mattmc-static-terrain-draw-coverage-v1",
+                            "stage": "coverage-parse-error",
+                            "_sidecar": str(sidecar),
+                            "_line": line_number,
+                            "_error": str(exc),
+                        }
+                    )
+                    continue
+                if isinstance(event, dict) and event.get("schema") == "mattmc-static-terrain-draw-coverage-v1":
+                    event["_sidecar"] = str(sidecar)
+                    events.append(event)
+        except OSError:
+            continue
+    return events
+
+
+def latest_static_terrain_coverage_event(
+    events: Sequence[Mapping[str, object]],
+    stage: str,
+    layer: str,
+    preferred_game_time: int | None = None,
+) -> dict[str, object] | None:
+    candidates = [
+        event
+        for event in events
+        if event.get("stage") == stage and event.get("layer") == layer
+    ]
+    if preferred_game_time is not None:
+        synchronized = [
+            event for event in candidates
+            if int(parse_number(event.get("gameTime")) or -1) == preferred_game_time
+        ]
+        if synchronized:
+            candidates = synchronized
+    if not candidates:
+        return None
+    return dict(max(candidates, key=lambda event: (
+        int(parse_number((event.get("aggregate") or {}).get("records")) or 0)
+        if isinstance(event.get("aggregate"), Mapping)
+        else 0,
+        int(parse_number(event.get("frameId")) or -1),
+        int(parse_number(event.get("eventIndex")) or -1),
+    )))
+
+
+def static_terrain_records_from_event(event: Mapping[str, object] | None) -> dict[tuple[str, str], dict[str, object]]:
+    records: dict[tuple[str, str], dict[str, object]] = {}
+    if not isinstance(event, Mapping):
+        return records
+    layer = str(event.get("layer") or "")
+    for record in event.get("records") or []:
+        if not isinstance(record, dict):
+            continue
+        section_key = str(record.get("sectionKey") or "")
+        if not section_key:
+            continue
+        records[(section_key, layer)] = record
+    return records
+
+
+def static_terrain_nonempty_records(
+    records: Mapping[tuple[str, str], Mapping[str, object]],
+) -> dict[tuple[str, str], Mapping[str, object]]:
+    """Keep execution reconciliation scoped to source layers with actual geometry."""
+    return {
+        key: record
+        for key, record in records.items()
+        if int(parse_number(record.get("primitiveCount")) or 0) > 0
+    }
+
+
+def latest_static_terrain_execution_records(events: Sequence[Mapping[str, object]]) -> dict[tuple[str, str], dict[str, object]]:
+    executed = [
+        event for event in events
+        if event.get("stage") == "rust-vulkan-executed"
+        and isinstance(event.get("records"), list)
+        and event.get("records")
+    ]
+    if not executed:
+        return {}
+    max_frame = max(int(parse_number(event.get("frameId")) or -1) for event in executed)
+    latest = [
+        event for event in executed
+        if int(parse_number(event.get("frameId")) or -1) == max_frame
+    ]
+    records: dict[tuple[str, str], dict[str, object]] = {}
+    for event in latest:
+        records.update(static_terrain_records_from_event(event))
+    return records
+
+
+def latest_static_terrain_execution_game_time(events: Sequence[Mapping[str, object]]) -> int | None:
+    executed = [
+        event for event in events
+        if event.get("stage") == "rust-vulkan-executed"
+        and isinstance(event.get("records"), list)
+        and event.get("records")
+    ]
+    if not executed:
+        return None
+    max_frame = max(int(parse_number(event.get("frameId")) or -1) for event in executed)
+    latest = [
+        event for event in executed
+        if int(parse_number(event.get("frameId")) or -1) == max_frame
+    ]
+    selected = max(latest, key=lambda event: int(parse_number(event.get("eventIndex")) or -1))
+    game_time = parse_number(selected.get("gameTime"))
+    return int(game_time) if game_time is not None else None
+
+
+def latest_static_terrain_non_execution_reasons(events: Sequence[Mapping[str, object]]) -> dict[tuple[str, str], str]:
+    reasons: dict[tuple[str, str], tuple[int, str]] = {}
+    for event in events:
+        if event.get("stage") != "rust-vulkan-non-executed":
+            continue
+        event_index = int(parse_number(event.get("eventIndex")) or -1)
+        for key, record in static_terrain_records_from_event(event).items():
+            reason = str(record.get("executionKind") or "missing-reason")
+            previous = reasons.get(key)
+            if previous is None or event_index >= previous[0]:
+                reasons[key] = (event_index, reason)
+    return {key: reason for key, (_, reason) in reasons.items()}
+
+
+def static_terrain_record_signature(record: Mapping[str, object]) -> dict[str, object]:
+    bounds = record.get("bounds") if isinstance(record.get("bounds"), Mapping) else {}
+    uv_bounds = record.get("uvBounds") if isinstance(record.get("uvBounds"), Mapping) else {}
+    return {
+        "vertexCount": int(parse_number(record.get("vertexCount")) or 0),
+        "indexCount": int(parse_number(record.get("indexCount")) or 0),
+        "primitiveCount": int(parse_number(record.get("primitiveCount")) or 0),
+        "indexType": int(parse_number(record.get("indexType")) or 0),
+        "materialIdentity": str(record.get("materialIdentity") or ""),
+        "textureIdentity": str(record.get("textureIdentity") or ""),
+        "bounds": {
+            key: round(float(parse_number(bounds.get(key)) or 0.0), 4)
+            for key in ("minX", "minY", "minZ", "maxX", "maxY", "maxZ")
+        },
+        "uvBounds": {
+            key: round(float(parse_number(uv_bounds.get(key)) or 0.0), 4)
+            for key in ("minU", "minV", "maxU", "maxV")
+        },
+        "coveragePresent": int(parse_number(record.get("coveragePresent")) or 0),
+        "boundsValid": int(parse_number(record.get("boundsValid")) or 0),
+    }
+
+
+def static_terrain_record_diagnostic_summary(record: Mapping[str, object]) -> dict[str, object]:
+    summary = static_terrain_record_signature(record)
+    summary.update({
+        "vertexStride": int(parse_number(record.get("vertexStride")) or 0),
+        "bufferBytes": int(parse_number(record.get("bufferBytes")) or 0),
+        "bufferVertexCapacity": int(parse_number(record.get("bufferVertexCapacity")) or 0),
+        "animatedSprites": int(parse_number(record.get("animatedSprites")) or 0),
+        "sectionAnimatedSpriteIdentities": str(
+            record.get("sectionAnimatedSpriteIdentities") or record.get("animatedSpriteIdentities") or ""
+        ),
+        "layerAnimatedMaterialClassification": str(record.get("layerAnimatedMaterialClassification") or ""),
+        "primitiveMetadataRecords": int(parse_number(record.get("primitiveMetadataRecords")) or 0),
+        "builtinWaterPrimitiveCount": int(parse_number(record.get("builtinWaterPrimitiveCount")) or 0),
+        "unsupportedFluidPrimitiveCount": int(parse_number(record.get("unsupportedFluidPrimitiveCount")) or 0),
+        "source": str(record.get("source") or ""),
+    })
+    return summary
+
+
+def cross_repository_static_terrain_draw_coverage_report(cross_repo_parity: Mapping[str, object]) -> dict[str, object]:
+    pairs = cross_repo_parity.get("pairs")
+    if not isinstance(pairs, list):
+        return {"schema": "mattmc-cross-repo-static-terrain-draw-coverage-v1", "pair_count": 0, "passed": True, "pairs": []}
+    report_pairs: list[dict[str, object]] = []
+    for pair in pairs:
+        baseline_artifact = Path(str(pair.get("baseline_artifact", "")))
+        current_artifact = Path(str(pair.get("current_artifact", "")))
+        baseline_events = read_static_terrain_coverage_events(baseline_artifact)
+        current_events = read_static_terrain_coverage_events(current_artifact)
+        failures: list[str] = []
+        layer_reports: dict[str, object] = {}
+        first_divergence: dict[str, object] | None = None
+        if not baseline_events:
+            failures.append("frozen_static_terrain_coverage_missing")
+        if not current_events:
+            failures.append("current_static_terrain_coverage_missing")
+        baseline_parse_errors = [event for event in baseline_events if event.get("stage") == "coverage-parse-error"]
+        current_parse_errors = [event for event in current_events if event.get("stage") == "coverage-parse-error"]
+        if baseline_parse_errors:
+            failures.append("frozen_static_terrain_coverage_parse_error")
+        if current_parse_errors:
+            failures.append("current_static_terrain_coverage_parse_error")
+        current_executed_records = latest_static_terrain_execution_records(current_events)
+        current_execution_game_time = latest_static_terrain_execution_game_time(current_events)
+        current_non_execution_reasons = latest_static_terrain_non_execution_reasons(current_events)
+        for layer in ("solid", "cutout"):
+            baseline_event = latest_static_terrain_coverage_event(baseline_events, "java-opengl-draw-coverage", layer)
+            current_event = latest_static_terrain_coverage_event(
+                current_events,
+                "rust-vulkan-enqueue-source-coverage",
+                layer,
+                current_execution_game_time,
+            )
+            baseline_records = static_terrain_records_from_event(baseline_event)
+            current_records = static_terrain_records_from_event(current_event)
+            baseline_keys = set(baseline_records)
+            current_keys = set(current_records)
+            missing = sorted(baseline_keys - current_keys)
+            extra = sorted(current_keys - baseline_keys)
+            mismatches: list[dict[str, object]] = []
+            for key in sorted(baseline_keys & current_keys):
+                left = static_terrain_record_signature(baseline_records[key])
+                right = static_terrain_record_signature(current_records[key])
+                if left != right:
+                    mismatch = {
+                        "sectionKey": key[0],
+                        "layer": key[1],
+                        "frozen": static_terrain_record_diagnostic_summary(baseline_records[key]),
+                        "current": static_terrain_record_diagnostic_summary(current_records[key]),
+                    }
+                    mismatches.append(mismatch)
+                    if first_divergence is None:
+                        first_divergence = {"type": "coverage-mismatch", **mismatch}
+                    break
+            current_nonempty_records = static_terrain_nonempty_records(current_records)
+            executed_missing = sorted(set(current_nonempty_records) - set(current_executed_records))
+            executed_missing_animated = [
+                key for key in executed_missing
+                if int(parse_number(current_records.get(key, {}).get("animatedSprites")) or 0) != 0
+            ]
+            executed_missing_static = [
+                key for key in executed_missing
+                if int(parse_number(current_records.get(key, {}).get("animatedSprites")) or 0) == 0
+            ]
+            executed_missing_without_reason = [
+                key for key in executed_missing if key not in current_non_execution_reasons
+            ]
+            executed_missing_sprite_samples = [
+                {
+                    "sectionKey": key[0],
+                    "layer": key[1],
+                    "animatedSprites": int(parse_number(current_records[key].get("animatedSprites")) or 0),
+                    "flags": int(parse_number(current_records[key].get("flags")) or 0),
+                    "sectionAnimatedSpriteIdentities": str(
+                        current_records[key].get("sectionAnimatedSpriteIdentities")
+                        or current_records[key].get("animatedSpriteIdentities")
+                        or ""
+                    ),
+                    "nonExecutionReason": current_non_execution_reasons.get(key, "missing-reason"),
+                }
+                for key in executed_missing[:16]
+                if key in current_records
+            ]
+            animated_differences: list[dict[str, object]] = []
+            for key in sorted(baseline_keys & current_keys):
+                left_animated = int(parse_number(baseline_records[key].get("animatedSprites")) or 0)
+                right_animated = int(parse_number(current_records[key].get("animatedSprites")) or 0)
+                if left_animated != right_animated:
+                    animated_differences.append(
+                        {
+                            "sectionKey": key[0],
+                            "layer": key[1],
+                            "frozenAnimated": left_animated,
+                            "currentAnimated": right_animated,
+                            "frozenSectionAnimatedSpriteIdentities": str(
+                                baseline_records[key].get("sectionAnimatedSpriteIdentities")
+                                or baseline_records[key].get("animatedSpriteIdentities")
+                                or ""
+                            ),
+                            "currentSectionAnimatedSpriteIdentities": str(
+                                current_records[key].get("sectionAnimatedSpriteIdentities")
+                                or current_records[key].get("animatedSpriteIdentities")
+                                or ""
+                            ),
+                        }
+                    )
+            if missing:
+                failures.append(f"{layer}_coverage_missing_sections")
+                if first_divergence is None:
+                    first_divergence = {"type": "missing-section", "layer": layer, "sectionKey": missing[0][0]}
+            if extra:
+                failures.append(f"{layer}_coverage_extra_sections")
+                if first_divergence is None:
+                    first_divergence = {"type": "extra-section", "layer": layer, "sectionKey": extra[0][0]}
+            if mismatches:
+                failures.append(f"{layer}_coverage_semantic_mismatch")
+            if executed_missing:
+                failures.append(f"{layer}_rust_execution_missing_sections")
+                if first_divergence is None:
+                    first_divergence = {"type": "rust-execution-missing", "layer": layer, "sectionKey": executed_missing[0][0]}
+            if executed_missing_without_reason:
+                failures.append(f"{layer}_rust_execution_missing_reason")
+            layer_reports[layer] = {
+                "frozen_event": {
+                    "eventIndex": baseline_event.get("eventIndex") if baseline_event else None,
+                    "frameId": baseline_event.get("frameId") if baseline_event else None,
+                    "aggregate": baseline_event.get("aggregate") if baseline_event else None,
+                    "sidecar": baseline_event.get("_sidecar") if baseline_event else None,
+                },
+                "current_event": {
+                    "eventIndex": current_event.get("eventIndex") if current_event else None,
+                    "frameId": current_event.get("frameId") if current_event else None,
+                    "gameTime": current_event.get("gameTime") if current_event else None,
+                    "executionGameTime": current_execution_game_time,
+                    "aggregate": current_event.get("aggregate") if current_event else None,
+                    "sidecar": current_event.get("_sidecar") if current_event else None,
+                },
+                "frozen_sections": len(baseline_records),
+                "current_sections": len(current_records),
+                "current_executed_sections": len([key for key in current_executed_records if key[1] == layer]),
+                "missing_sections": [key[0] for key in missing[:8]],
+                "extra_sections": [key[0] for key in extra[:8]],
+                "semantic_mismatches": mismatches[:1],
+                "rust_execution_missing_sections": [key[0] for key in executed_missing[:8]],
+                "rust_execution_missing_animated_sections": len(executed_missing_animated),
+                "rust_execution_missing_static_sections": len(executed_missing_static),
+                "rust_execution_missing_without_reason": [key[0] for key in executed_missing_without_reason[:8]],
+                "rust_execution_missing_reason_counts": dict(sorted(
+                    Counter(current_non_execution_reasons.get(key, "missing-reason") for key in executed_missing).items()
+                )),
+                "rust_execution_missing_sprite_samples": executed_missing_sprite_samples,
+                "animated_sprite_differences": animated_differences[:16],
+                "animated_sprite_difference_count": len(animated_differences),
+            }
+        report_pairs.append(
+            {
+                "schema": "mattmc-cross-repo-static-terrain-draw-coverage-pair-v1",
+                "baseline_artifact": str(baseline_artifact),
+                "current_artifact": str(current_artifact),
+                "passed": not failures,
+                "failures": sorted(set(failures)),
+                "first_divergence": first_divergence,
+                "parse_errors": {
+                    "frozen": baseline_parse_errors[:3],
+                    "current": current_parse_errors[:3],
+                },
+                "layers": layer_reports,
+            }
+        )
+    return {
+        "schema": "mattmc-cross-repo-static-terrain-draw-coverage-v1",
+        "pair_count": len(report_pairs),
+        "passed": all(bool(pair.get("passed")) for pair in report_pairs) if report_pairs else True,
+        "pairs": report_pairs,
+    }
+
+
 def parity_evidence_failures(baseline: dict[str, object], current: dict[str, object]) -> list[str]:
     failures: list[str] = []
     for label, artifact in (("baseline", baseline), ("current", current)):
@@ -7578,6 +7967,7 @@ def normalize_capture_artifact(
                 validation_messages.append("TerrainParticle legacy control emitted unexpected Rust material quads")
     static_terrain_workload_complete = True
     static_terrain_expected_fault_rejected = False
+    static_terrain_readiness_failure_stage: str | None = None
     static_terrain_scenario = (requested_world_static_terrain_scenario or "").strip().lower()
     if static_terrain_scenario and rust_outline_mode and tool_kind != "subsystem":
         static_doc = static_terrain_doc if static_terrain_doc else static_terrain_frame_doc
@@ -7593,11 +7983,26 @@ def normalize_capture_artifact(
         visible_probes = static_metric("visibleLayerProbes")
         visible_submissions = static_metric("visibleLayerSubmissions")
         failed_submissions = static_metric("failedLayerSubmissions")
+        static_terrain_readiness_failure_stage = static_terrain_readiness_failure(
+            expected=static_terrain_scenario != "hidden",
+            mesh_instances=int(rust_gal_world_mesh_instances_for_validation or 0),
+            accepted_builds=accepted_builds,
+            registered_meshes=registered_meshes,
+            visible_probes=visible_probes,
+            visible_submissions=visible_submissions,
+            combined_logs=combined_logs,
+        )
         if static_terrain_scenario == "hidden":
             if visible_submissions > 0 or static_terrain_submitted_count > 0:
                 static_terrain_workload_complete = False
                 validation_messages.append("deterministic hidden static-terrain scenario emitted unexpected visible Rust terrain work")
         else:
+            if static_terrain_readiness_failure_stage:
+                static_terrain_workload_complete = False
+                validation_messages.append(
+                    "deterministic static-terrain readiness failed at "
+                    f"{static_terrain_readiness_failure_stage}"
+                )
             if accepted_builds <= 0:
                 static_terrain_workload_complete = False
                 validation_messages.append("deterministic static-terrain scenario did not prove real Sodium section build ingestion")
@@ -8614,6 +9019,7 @@ def normalize_capture_artifact(
                 "world_static_terrain_resource_pack_scenario": requested_world_static_terrain_resource_pack_scenario or None,
                 "world_static_terrain_expected_fault": static_terrain_expected_fault,
                 "world_static_terrain_submitted_work": static_terrain_submitted_count,
+                "world_static_terrain_readiness_failure_stage": static_terrain_readiness_failure_stage,
                 "world_static_terrain_diagnostics": static_terrain_doc if static_terrain_doc else static_terrain_frame_doc,
                 "world_static_terrain_geometry_evidence": static_terrain_geometry,
                 "world_static_terrain_translucent_evidence": static_terrain_translucent,
@@ -10513,6 +10919,16 @@ def build_capture_command(
     if getattr(args, "world_static_terrain_scenario", ""):
         java_options.append(f"-Dmattmc.dev.rustGalStaticTerrain.scenario={args.world_static_terrain_scenario}")
         java_options.append(f"-Dmattmc.dev.rustGalStaticTerrain.worldId={args.world}")
+        if tool_kind == "capture":
+            static_terrain_parity_path = capture_dir / "static_terrain_parity_diagnostics.jsonl"
+            java_options.append("-Dmattmc.dev.staticTerrainParityDiagnostics=true")
+            java_options.append(f"-Dmattmc.dev.staticTerrainParityDiagnostics.path={static_terrain_parity_path}")
+            java_options.append("-Dmattmc.dev.staticTerrainParityDiagnostics.waitForStable=true")
+            java_options.append("-Dmattmc.dev.staticTerrainParityDiagnostics.readyFrames=3")
+            java_options.append("-Dmattmc.dev.staticTerrainParityDiagnostics.maxSamples=512")
+            java_options.append("-Dmattmc.dev.staticTerrainParityDiagnostics.maxCoverageSamples=1024")
+            java_options.append("-Dmattmc.dev.staticTerrainParityDiagnostics.maxCoverageEvents=16384")
+            java_options.append("-Dmattmc.dev.staticTerrainParityDiagnostics.maxFaceCullTraceEvents=16384")
         if static_terrain_second_world:
             java_options.append(f"-Dmattmc.dev.rustGalStaticTerrain.worldB={static_terrain_second_world}")
         if static_terrain_base_scenario(args.world_static_terrain_scenario) == "world-different-reload":
@@ -12848,6 +13264,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     repeatability = repeatability_report(artifact_paths, args.repeatability_tolerance)
     cross_repo_parity = cross_repository_parity_report(artifact_paths)
     cross_repo_visual_parity = write_cross_repo_visual_pairs(artifact_root, cross_repo_parity)
+    cross_repo_static_terrain_draw_coverage = cross_repository_static_terrain_draw_coverage_report(cross_repo_parity)
     aggregate_path = artifact_root / "graphics_audit_matrix.json"
     if aggregate:
         aggregate_path.write_text(json.dumps(aggregate, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -12878,8 +13295,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         },
         "cross_repository_parity": cross_repo_parity,
         "cross_repository_visual_parity": cross_repo_visual_parity,
+        "cross_repository_static_terrain_draw_coverage": cross_repo_static_terrain_draw_coverage,
         "repeatability": repeatability,
-        "success": all(result.success for result in results) and repeatability["passed"] and cross_repo_parity["passed"],
+        "success": all(result.success for result in results)
+        and repeatability["passed"]
+        and cross_repo_parity["passed"]
+        and cross_repo_static_terrain_draw_coverage["passed"],
         "aggregate": str(aggregate_path) if aggregate else None,
         "results": [asdict(result) for result in results],
     }

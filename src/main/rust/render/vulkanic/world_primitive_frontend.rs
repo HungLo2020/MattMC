@@ -47,7 +47,10 @@ pub const WORLD_MAX_MATERIAL_QUADS: usize = 512;
 pub const WORLD_MAX_MESH_VERTICES: usize = 65_536;
 pub const WORLD_MAX_MESH_INDEX_BYTES: usize = 393_216;
 pub const WORLD_MAX_MESH_SECTIONS: usize = 256;
-pub const WORLD_MAX_MESH_INSTANCES: usize = 512;
+// Static terrain submits one semantic mesh instance per visible section/layer. The
+// whole-frame stream remains bounded, but must accommodate a fully admitted
+// terrain frame rather than the earlier diagnostic-only subset.
+pub const WORLD_MAX_MESH_INSTANCES: usize = 4_096;
 pub const WORLD_MAX_MESH_ANIMATION_FRAMES: usize = 512;
 pub const WORLD_MESH_VERTEX_LAYOUT_V2: u32 = 2;
 pub const WORLD_MESH_SECTION_ALL: u32 = u32::MAX;
@@ -141,6 +144,7 @@ const WORLD_SHADER_COMPOSITE_UNIFORM_BYTES: u64 = TERRAIN_RUNTIME_COMPOSITE_UNIF
 const CRACK_STAGE_COUNT: u32 = 10;
 const CRACK_STAGE_SIZE: u32 = 16;
 static GAMEPLAY_ATTACHMENT_CAPTURE_WRITTEN: AtomicBool = AtomicBool::new(false);
+static STATIC_TERRAIN_APPEARANCE_TRACE_WRITTEN: AtomicBool = AtomicBool::new(false);
 
 const WORLD_LINE_VERTEX_SHADER_VULKAN: &[u8] = br#"#version 450
 struct LineSegment {
@@ -1563,6 +1567,7 @@ impl WorldPrimitiveFrontend {
         let mut decoded_meshes = Vec::with_capacity(meshes.len());
         for mesh in meshes {
             validate_mesh_asset(&mesh)?;
+            trace_static_terrain_appearance(&mesh);
             if !incoming_mesh_keys.insert(mesh.mesh_key) {
                 return Err(GalError::ffi(
                     StatusCode::InvalidArgument,
@@ -5124,6 +5129,95 @@ fn packed_mesh_vertices(vertices: &[WorldMeshVertex]) -> Vec<u8> {
     out
 }
 
+// Test-only, opt-in trace of one semantic mesh asset after FFI decode and before GPU upload.
+// It is intentionally keyed by a semantic mesh key rather than backend resources or handles.
+fn trace_static_terrain_appearance(mesh: &WorldMeshAsset) {
+    let Some(root) = std::env::var_os("MATTMC_STATIC_TERRAIN_APPEARANCE_TRACE_DIR") else {
+        return;
+    };
+    let Some(expected_key) = std::env::var("MATTMC_STATIC_TERRAIN_APPEARANCE_TRACE_MESH_KEY")
+        .ok()
+        .and_then(|value| u64::from_str_radix(value.trim_start_matches("0x"), 16).ok())
+    else {
+        return;
+    };
+    if mesh.mesh_key != expected_key
+        || STATIC_TERRAIN_APPEARANCE_TRACE_WRITTEN
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .is_err()
+    {
+        return;
+    }
+    let mut samples = String::new();
+    for (index, vertex) in mesh.vertices.iter().take(8).enumerate() {
+        if index != 0 {
+            samples.push(',');
+        }
+        let color = argb_to_rgba(vertex.color_argb);
+        let normal = unpack_normal_i8(vertex.normal_packed);
+        let [block_light, sky_light] = packed_light_channels(vertex.light);
+        samples.push_str(&format!(
+            concat!(
+                "{{\"vertexIndex\":{index},\"primitiveIndex\":{primitive},",
+                "\"position\":[{px:.6},{py:.6},{pz:.6}],",
+                "\"uv\":[{u:.6},{v:.6}],\"atlasUv\":[{au:.6},{av:.6}],",
+                "\"colorRgba\":[{cr:.6},{cg:.6},{cb:.6},{ca:.6}],",
+                "\"normal\":[{nx:.6},{ny:.6},{nz:.6}],",
+                "\"packedLight\":\"{light:08x}\",\"blockLight\":{block:.6},\"skyLight\":{sky:.6},",
+                "\"bakedLightFactor\":{baked:.6},\"shaderBlockId\":{block_id},",
+                "\"shaderMaterialType\":{material_type}}}"
+            ),
+            index = index,
+            primitive = index / 4,
+            px = vertex.position[0], py = vertex.position[1], pz = vertex.position[2],
+            u = vertex.uv[0], v = vertex.uv[1], au = vertex.shader_atlas_uv[0], av = vertex.shader_atlas_uv[1],
+            cr = color[0], cg = color[1], cb = color[2], ca = color[3],
+            nx = normal[0], ny = normal[1], nz = normal[2], light = vertex.light,
+            block = block_light, sky = sky_light, baked = baked_light_factor(vertex.light),
+            block_id = vertex.shader_block_id, material_type = vertex.shader_material_type,
+        ));
+    }
+    let sections = mesh
+        .sections
+        .iter()
+        .map(|section| {
+            format!(
+                "{{\"materialId\":{},\"textureId\":{},\"materialMode\":{},\"cullPolicy\":{},\"winding\":{},\"indexOffset\":{},\"indexCount\":{}}}",
+                section.material_id,
+                section.texture_id,
+                section.material_mode,
+                section.cull_policy,
+                section.winding,
+                section.index_offset,
+                section.index_count
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+    let payload = format!(
+        concat!(
+            "{{\"schema\":\"mattmc-static-terrain-appearance-rust-frontend-v1\",",
+            "\"stage\":\"ffi-decoded-to-shader-packed\",\"meshKey\":\"{:016x}\",",
+            "\"meshGeneration\":{},\"vertexLayoutVersion\":{},\"indexType\":\"{:?}\",",
+            "\"vertexCount\":{},\"shaderUniformContract\":{{",
+            "\"perVertex\":\"color_rgb_times_bakedLightFactor; normal_i8; block_sky_light; atlas_uv; shader_ids\",",
+            "\"perPass\":\"view;projection;light_view_projection;shadow_params;fog;color_grade\"}},",
+            "\"sections\":[{}],\"samples\":[{}]}}\n"
+        ),
+        mesh.mesh_key,
+        mesh.mesh_generation,
+        mesh.vertex_layout_version,
+        mesh.index_type,
+        mesh.vertices.len(),
+        sections,
+        samples
+    );
+    let root = PathBuf::from(root);
+    if std::fs::create_dir_all(&root).is_ok() {
+        let _ = std::fs::write(root.join("static_terrain_appearance_rust_frontend.json"), payload);
+    }
+}
+
 fn normalized_frame_extent(value: u32, fallback: u32) -> GalResult<u32> {
     let extent = if value == 0 { fallback } else { value };
     if extent == 0 {
@@ -8113,6 +8207,37 @@ mod tests {
         assert!(ops
             .iter()
             .any(|op| matches!(op, CommandOp::SetIndexBuffer { offset: 12, .. })));
+    }
+
+    #[test]
+    fn world_mesh_frame_accepts_visible_terrain_scale_instances() {
+        let mut frame = frame(Vec::new());
+        frame.mesh_instances = (0..518)
+            .map(|index| {
+                let mut instance = mesh_instance(183, 1);
+                instance.transform[12] = index as f32;
+                instance
+            })
+            .collect();
+
+        shared::validate_frame_header(&frame).unwrap();
+    }
+
+    #[test]
+    fn world_mesh_frame_rejects_instances_beyond_bounded_stream_capacity() {
+        let mut frame = frame(Vec::new());
+        frame.mesh_instances = (0..=WORLD_MAX_MESH_INSTANCES)
+            .map(|index| {
+                let mut instance = mesh_instance(183, 1);
+                instance.transform[12] = index as f32;
+                instance
+            })
+            .collect();
+
+        let error = shared::validate_frame_header(&frame).unwrap_err();
+        assert!(error
+            .to_string()
+            .contains("world mesh instance count 4097 exceeds maximum 4096"));
     }
 
     #[test]

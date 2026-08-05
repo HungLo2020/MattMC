@@ -1,4 +1,9 @@
 use super::*;
+use std::fs::OpenOptions;
+use std::io::Write;
+use std::sync::atomic::{AtomicU8, Ordering};
+
+static STATIC_TERRAIN_NATIVE_LIGHT_TRACE_COUNT: AtomicU8 = AtomicU8::new(0);
 
 pub(super) fn light_block_record_to_quad(record: LightBlockRecord) -> NativeQuad {
     let emission = record.block_emission.clamp(0, 255);
@@ -160,7 +165,7 @@ pub(super) unsafe fn append_direct_compact_static_model_quad(
 
     let lighting_started = profile_start(profile_static_substages);
     let scan_lighting_started = profile_start(profile_scan_substages);
-    let light = native_quad_lighting(&block, &quad_record, state);
+    let light = native_quad_lighting_for_vertex_format(&block, &quad_record, state, format.separate_ao);
     builder
         .profile
         .add_optional_stage(PROFILE_STATIC_LIGHTING_AO, lighting_started);
@@ -376,6 +381,7 @@ pub(super) fn static_model_quad_to_native_section(
     block: NativeSectionBlockRecord,
     state: NativeMeshingState,
     quad_record: StaticModelQuadRecord,
+    separate_ao: bool,
     profile: &mut NativeMeshingProfile,
     profile_static_substages: bool,
     profile_scan_substages: bool,
@@ -394,7 +400,7 @@ pub(super) fn static_model_quad_to_native_section(
 
     let lighting_started = profile_start(profile_static_substages);
     let scan_lighting_started = profile_start(profile_scan_substages);
-    let light = native_quad_lighting(&block, &quad_record, state);
+    let light = native_quad_lighting_for_vertex_format(&block, &quad_record, state, separate_ao);
     profile.add_optional_stage(PROFILE_STATIC_LIGHTING_AO, lighting_started);
     profile.add_optional_stage(PROFILE_SCAN_LIGHTING_AO, scan_lighting_started);
 
@@ -446,8 +452,92 @@ pub(super) fn static_model_quad_to_native_section(
         local_z: block.absolute_z,
         material_bits,
     };
+    trace_static_terrain_native_lighting(block, quad_record, quad);
     profile.add_optional_stage(PROFILE_STATIC_NATIVE_QUAD_CREATION, creation_started);
     quad
+}
+
+// Test-only diagnostic. The explicit block filter and eight-event cap keep this
+// independent from normal terrain work and useful only for parity investigation.
+fn trace_static_terrain_native_lighting(
+    block: NativeSectionBlockRecord,
+    source: StaticModelQuadRecord,
+    output: NativeQuad,
+) {
+    let Some(root) = std::env::var_os("MATTMC_STATIC_TERRAIN_NATIVE_LIGHT_TRACE_DIR") else {
+        return;
+    };
+    let Some(target) = std::env::var("MATTMC_STATIC_TERRAIN_NATIVE_LIGHT_TRACE_BLOCK").ok() else {
+        return;
+    };
+    let expected = target
+        .split(',')
+        .map(str::trim)
+        .map(str::parse::<i32>)
+        .collect::<Result<Vec<_>, _>>();
+    let Ok(expected) = expected else {
+        return;
+    };
+    if expected.as_slice() != [block.absolute_x, block.absolute_y, block.absolute_z]
+        || STATIC_TERRAIN_NATIVE_LIGHT_TRACE_COUNT.fetch_add(1, Ordering::Relaxed) >= 8
+    {
+        return;
+    }
+
+    let words = block
+        .light_words
+        .iter()
+        .map(|word| format!("\"{word:08x}\""))
+        .collect::<Vec<_>>()
+        .join(",");
+    let source_light = source
+        .vertices
+        .iter()
+        .map(|vertex| format!("\"{:08x}\"", vertex.light))
+        .collect::<Vec<_>>()
+        .join(",");
+    let output_light = output
+        .vertices
+        .iter()
+        .map(|vertex| format!("\"{:08x}\"", vertex.light))
+        .collect::<Vec<_>>()
+        .join(",");
+    let output_ao = output
+        .vertices
+        .iter()
+        .map(|vertex| format!("{:.6}", vertex.ao))
+        .collect::<Vec<_>>()
+        .join(",");
+    let payload = format!(
+        concat!(
+            "{{\"schema\":\"mattmc-static-terrain-native-light-v1\",",
+            "\"block\":[{},{},{}],\"blockId\":{},\"lightFace\":{},",
+            "\"cullFace\":{},\"shade\":{},\"hasAo\":{},\"flags\":{},",
+            "\"snapshotLightWords\":[{}],\"sourceVertexLight\":[{}],",
+            "\"nativeAo\":[{}],\"nativeLight\":[{}]}}\n"
+        ),
+        block.absolute_x,
+        block.absolute_y,
+        block.absolute_z,
+        block.block_id,
+        source.light_face,
+        source.cull_face,
+        source.shade,
+        source.has_ao,
+        source.flags,
+        words,
+        source_light,
+        output_ao,
+        output_light,
+    );
+    let _ = std::fs::create_dir_all(&root);
+    if let Ok(mut file) = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(std::path::Path::new(&root).join("native-light.jsonl"))
+    {
+        let _ = file.write_all(payload.as_bytes());
+    }
 }
 
 #[inline(always)]

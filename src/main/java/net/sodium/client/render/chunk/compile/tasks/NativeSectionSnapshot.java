@@ -2,6 +2,8 @@ package net.sodium.client.render.chunk.compile.tasks;
 
 import net.sodium.client.render.chunk.compile.ChunkBuildBuffers;
 import net.sodium.client.render.chunk.compile.pipeline.NativeStaticBlockModelRegistry;
+import net.sodium.client.render.chunk.compile.pipeline.BlockOcclusionCache;
+import net.sodium.client.render.StaticTerrainParityDiagnostics;
 import net.sodium.client.render.chunk.terrain.DefaultTerrainRenderPasses;
 import net.sodium.client.render.chunk.terrain.TerrainRenderPass;
 import net.sodium.client.render.chunk.translucent_sorting.TranslucentGeometryCollector;
@@ -13,6 +15,8 @@ import net.minecraft.client.renderer.BiomeColors;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
@@ -44,6 +48,7 @@ final class NativeSectionSnapshot implements AutoCloseable {
     private static final int HEADER_FLUID_FLOW_Z_ADDRESS_OFFSET = 96;
     private static final int HEADER_FLUID_BLOCK_IDS_ADDRESS_OFFSET = 104;
     private static final int HEADER_FLAGS_ADDRESS_OFFSET = 112;
+    private static final int SEMANTIC_CULL_MASK_SHIFT = 8;
 
     private final ChunkBuildBuffers buffers;
     private final int sectionIndex;
@@ -51,6 +56,7 @@ final class NativeSectionSnapshot implements AutoCloseable {
     private final int minY;
     private final int minZ;
     private final int modelReloadGeneration;
+    private final BlockOcclusionCache modelOcclusionCache = new BlockOcclusionCache();
     private final long totalBytes;
     private long address;
     private long activeIndicesAddress;
@@ -143,10 +149,14 @@ final class NativeSectionSnapshot implements AutoCloseable {
             MemoryUtil.memPutInt(this.fluidBlockIdsAddress + (long) localBlockIndex * Integer.BYTES,
                     irisFluidBlockId(fluidState));
         }
-        if (suppressNativeFluid) {
-            MemoryUtil.memPutInt(this.flagsAddress + (long) localBlockIndex * Integer.BYTES,
-                    NativeChunkMeshEncoder.NATIVE_SECTION_BLOCK_FLAG_SUPPRESS_FLUID);
+        int flags = suppressNativeFluid
+                ? NativeChunkMeshEncoder.NATIVE_SECTION_BLOCK_FLAG_SUPPRESS_FLUID
+                : 0;
+        if (blockState.getRenderShape() == RenderShape.MODEL
+                && NativeStaticBlockModelRegistry.hasNativeModel(blockState)) {
+            flags |= this.modelCullMask(slice, blockState, blockPos) << SEMANTIC_CULL_MASK_SHIFT;
         }
+        MemoryUtil.memPutInt(this.flagsAddress + (long) localBlockIndex * Integer.BYTES, flags);
     }
 
     int[] flushAll(TranslucentGeometryCollector collector) {
@@ -233,6 +243,16 @@ final class NativeSectionSnapshot implements AutoCloseable {
         return (y * PADDED_LENGTH + z) * PADDED_LENGTH + x;
     }
 
+    private int modelCullMask(LevelSlice slice, BlockState state, BlockPos position) {
+        int mask = 0;
+        for (Direction direction : Direction.values()) {
+            if (!this.modelOcclusionCache.shouldDrawSide(state, slice, position, direction)) {
+                mask |= 1 << direction.get3DDataValue();
+            }
+        }
+        return mask;
+    }
+
     private static long align(long offset, int alignment) {
         return (offset + alignment - 1L) & -alignment;
     }
@@ -273,7 +293,7 @@ final class NativeSectionSnapshot implements AutoCloseable {
         }
         float ao = luminance == 0 ? state.getShadeBrightness(slice, pos) : 1.0F;
         int aoi = (int) (ao * 4096.0F);
-        return (blockLight & 0xF)
+        int lightWord = (blockLight & 0xF)
                 | ((skyLight & 0xF) << 4)
                 | ((luminance & 0xF) << 8)
                 | ((aoi & 0xFFFF) << 12)
@@ -281,6 +301,15 @@ final class NativeSectionSnapshot implements AutoCloseable {
                 | ((opaque ? 1 : 0) << 29)
                 | ((fullOpaque ? 1 : 0) << 30)
                 | ((fullCube ? 1 : 0) << 31);
+        StaticTerrainParityDiagnostics.recordAppearanceLightInput(
+                "native-section-snapshot",
+                x,
+                y,
+                z,
+                String.valueOf(state.getBlock()),
+                lightWord
+        );
+        return lightWord;
     }
 
     private static int blockTint(LevelSlice slice, BlockState state, BlockPos pos) {

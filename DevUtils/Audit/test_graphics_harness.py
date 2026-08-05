@@ -6661,6 +6661,88 @@ else:
         self.assertEqual(evidence["status"], "fail")
         self.assertEqual(evidence["failure"], "geometry_truth_missing")
 
+    def test_static_terrain_readiness_classifies_rendered_mesh_without_terrain_events(self) -> None:
+        failure = harness.static_terrain_readiness_failure(
+            expected=True,
+            mesh_instances=28,
+            accepted_builds=0,
+            registered_meshes=0,
+            visible_probes=0,
+            visible_submissions=0,
+            combined_logs="",
+        )
+        self.assertEqual("terrain-readiness-events-missing", failure)
+
+    def test_static_terrain_readiness_preserves_submission_capacity_failure(self) -> None:
+        failure = harness.static_terrain_readiness_failure(
+            expected=True,
+            mesh_instances=518,
+            accepted_builds=0,
+            registered_meshes=0,
+            visible_probes=0,
+            visible_submissions=0,
+            combined_logs="world mesh instance count 518 exceeds maximum 512",
+        )
+        self.assertEqual("terrain-submission-capacity-rejected", failure)
+
+    def test_static_terrain_readiness_does_not_replace_valid_events(self) -> None:
+        failure = harness.static_terrain_readiness_failure(
+            expected=True,
+            mesh_instances=28,
+            accepted_builds=1,
+            registered_meshes=1,
+            visible_probes=1,
+            visible_submissions=1,
+            combined_logs="",
+        )
+        self.assertIsNone(failure)
+
+    def test_static_terrain_execution_reconciliation_ignores_empty_source_layer(self) -> None:
+        records = {
+            ("empty", "solid"): {"primitiveCount": 0},
+            ("visible", "solid"): {"primitiveCount": 12},
+        }
+        self.assertEqual(
+            harness.static_terrain_nonempty_records(records),
+            {("visible", "solid"): {"primitiveCount": 12}},
+        )
+
+    def test_static_terrain_coverage_prefers_execution_game_time(self) -> None:
+        events = [
+            {
+                "stage": "rust-vulkan-enqueue-source-coverage",
+                "layer": "solid",
+                "gameTime": 20,
+                "frameId": 20,
+                "eventIndex": 1,
+                "aggregate": {"records": 2},
+            },
+            {
+                "stage": "rust-vulkan-enqueue-source-coverage",
+                "layer": "solid",
+                "gameTime": 21,
+                "frameId": 21,
+                "eventIndex": 2,
+                "aggregate": {"records": 3},
+            },
+            {
+                "stage": "rust-vulkan-executed",
+                "layer": "solid",
+                "gameTime": 20,
+                "frameId": 9,
+                "eventIndex": 3,
+                "records": [{"sectionKey": 1}],
+            },
+        ]
+        self.assertEqual(20, harness.latest_static_terrain_execution_game_time(events))
+        selected = harness.latest_static_terrain_coverage_event(
+            events,
+            "rust-vulkan-enqueue-source-coverage",
+            "solid",
+            20,
+        )
+        self.assertEqual(20, selected["gameTime"])
+
     def test_static_terrain_geometry_truth_rejects_duplicate_visible_section(self) -> None:
         doc = self.static_terrain_doc()
         doc["recentEvents"] = [dict(doc["recentEvents"][0]), dict(doc["recentEvents"][0])]

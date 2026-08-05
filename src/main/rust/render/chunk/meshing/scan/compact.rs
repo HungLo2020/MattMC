@@ -513,6 +513,7 @@ pub(in crate::render::chunk::meshing) unsafe fn section_builders_append_native_s
                             model_record,
                             state,
                             quad_record,
+                            format.separate_ao,
                             target.profile(),
                             profile_static_substages,
                             profile_scan_substages,

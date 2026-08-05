@@ -304,6 +304,7 @@ pub(in crate::render::chunk::meshing) unsafe fn section_builder_append_native_se
                         *record,
                         state,
                         quad_record,
+                        format.separate_ao,
                         &mut builder.profile,
                         profile_static_substages,
                         profile_scan_substages,

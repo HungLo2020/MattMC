@@ -18,7 +18,7 @@ fn static_model_native_quads_use_block_iris_render_type() {
     let mut profile = NativeMeshingProfile::default();
 
     let native =
-        static_model_quad_to_native_section(block, state, quad, &mut profile, false, false);
+        static_model_quad_to_native_section(block, state, quad, false, &mut profile, false, false);
 
     assert_eq!(0, native.render_type);
     assert_eq!(145, native.local_x);
@@ -38,7 +38,7 @@ fn static_model_state_tint_does_not_apply_without_quad_tint_index() {
     let mut profile = NativeMeshingProfile::default();
 
     let native =
-        static_model_quad_to_native_section(block, state, quad, &mut profile, false, false);
+        static_model_quad_to_native_section(block, state, quad, false, &mut profile, false, false);
 
     assert_eq!(0xffff_ffffu32 as i32, native.vertices[0].color);
 }
@@ -55,7 +55,7 @@ fn static_model_force_grass_tint_applies_with_quad_tint_index() {
     let mut profile = NativeMeshingProfile::default();
 
     let native =
-        static_model_quad_to_native_section(block, state, quad, &mut profile, false, false);
+        static_model_quad_to_native_section(block, state, quad, false, &mut profile, false, false);
 
     assert_eq!(0xff6f_9935u32 as i32, native.vertices[0].color);
 }
@@ -72,7 +72,7 @@ fn static_model_constant_tint_applies_lily_pad_color_with_quad_tint_index() {
     let mut profile = NativeMeshingProfile::default();
 
     let native =
-        static_model_quad_to_native_section(block, state, quad, &mut profile, false, false);
+        static_model_quad_to_native_section(block, state, quad, false, &mut profile, false, false);
 
     assert_eq!(0xff30_8020u32 as i32, native.vertices[0].color);
 }

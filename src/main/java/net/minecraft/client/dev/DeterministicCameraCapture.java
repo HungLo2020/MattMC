@@ -2213,6 +2213,9 @@ public final class DeterministicCameraCapture {
 		if (!staticTerrainAssetsSettled()) {
 			return false;
 		}
+		if (!net.sodium.client.render.StaticTerrainParityDiagnostics.isAppearanceLightReady()) {
+			return false;
+		}
 
 		settledReadyGateSatisfied = true;
 		writeMetadata(minecraft, "settled_ready_work");
@@ -2266,6 +2269,10 @@ public final class DeterministicCameraCapture {
 				.append(SETTLED_READY_FRAMES)
 				.append(" signature=")
 				.append(staticTerrainSettledSignature);
+		}
+		String appearanceLightReadiness = net.sodium.client.render.StaticTerrainParityDiagnostics.appearanceLightReadinessSummary();
+		if (!appearanceLightReadiness.endsWith("ready=true")) {
+			summary.append(";static-terrain-light=").append(appearanceLightReadiness);
 		}
 		return summary.toString();
 	}

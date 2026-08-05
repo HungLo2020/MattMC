@@ -40,7 +40,6 @@ import net.minecraft.util.profiling.ProfilerFiller;
 import net.minecraft.world.entity.Entity;
 import net.vulkanic.VulkanicAPI;
 import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.vulkanic.world.RustGalTerrainRenderer;
@@ -177,8 +176,15 @@ public class SodiumWorldRenderer {
 	        try {
 	        NativeBuffer.reclaim(false);
 
+	        // The whole-frame route consumes Sodium's copied section snapshots in this
+	        // setup phase. Drain already-queued client light packets first so tracker
+	        // admission cannot build from ClonedChunkSection's documented defaults.
+	        // LevelRenderer performs the usual later poll; it is a no-op once drained.
+	        if (WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan()) {
+	            this.level.pollLightUpdates();
+	            this.level.getChunkSource().getLightEngine().runLightUpdates();
+	        }
 	        this.processChunkEvents();
-	        this.refreshReadyChunksForRustGalStaticTerrainIfStarved(camera);
 
 	        this.useEntityCulling = SodiumClientMod.options().performance.useEntityCulling;
 
@@ -299,32 +305,6 @@ public class SodiumWorldRenderer {
         tracker.forEachEvent(this.renderSectionManager::onChunkAdded, this.renderSectionManager::onChunkRemoved);
     }
 
-    private void refreshReadyChunksForRustGalStaticTerrainIfStarved(Camera camera) {
-        if (!WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan()) {
-            return;
-        }
-        if (this.renderSectionManager == null || this.renderSectionManager.getTrackedSectionCount() > 0) {
-            return;
-        }
-        var tracker = ChunkTrackerHolder.get(this.level);
-        ChunkTracker.forEachChunk(tracker.getReadyChunks(), this.renderSectionManager::onChunkAdded);
-        if (this.renderSectionManager.getTrackedSectionCount() > 0) {
-            return;
-        }
-
-        Vec3 cameraPosition = camera.getPosition();
-        int centerX = SectionPos.posToSectionCoord(cameraPosition.x());
-        int centerZ = SectionPos.posToSectionCoord(cameraPosition.z());
-        int radius = Math.max(1, this.client.options.getEffectiveRenderDistance());
-        for (int z = centerZ - radius; z <= centerZ + radius; z++) {
-            for (int x = centerX - radius; x <= centerX + radius; x++) {
-                if (this.level.getChunkSource().getChunk(x, z, ChunkStatus.FULL, false) != null) {
-                    this.renderSectionManager.onChunkAdded(x, z);
-                }
-            }
-        }
-    }
-
     /**
      * Performs a render pass for the given {@link RenderType} and draws all visible chunks for it.
      */
@@ -332,7 +312,27 @@ public class SodiumWorldRenderer {
 	        net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("sodium.terrain.draw");
 	        try {
 	        if (group == ChunkSectionLayerGroup.OPAQUE) {
+	            StaticTerrainParityDiagnostics.recordVisibleLists(
+	                    "java-opengl-draw",
+	                    "solid",
+	                    this.renderSectionManager.getRenderLists(),
+	                    x,
+	                    y,
+	                    z,
+	                    this.client.getWindow().getWidth(),
+	                    this.client.getWindow().getHeight()
+	            );
 	            this.renderSectionManager.renderLayer(matrices, DefaultTerrainRenderPasses.SOLID, x, y, z, this.lastFogParameters);
+	            StaticTerrainParityDiagnostics.recordVisibleLists(
+	                    "java-opengl-draw",
+	                    "cutout",
+	                    this.renderSectionManager.getRenderLists(),
+	                    x,
+	                    y,
+	                    z,
+	                    this.client.getWindow().getWidth(),
+	                    this.client.getWindow().getHeight()
+	            );
 	            this.renderSectionManager.renderLayer(matrices, DefaultTerrainRenderPasses.CUTOUT, x, y, z, this.lastFogParameters);
 	        } else if (group == ChunkSectionLayerGroup.TRANSLUCENT) {
 	            this.renderSectionManager.renderLayer(matrices, DefaultTerrainRenderPasses.TRANSLUCENT, x, y, z, this.lastFogParameters);
@@ -346,6 +346,27 @@ public class SodiumWorldRenderer {
         if (this.renderSectionManager == null) {
             return;
         }
+        Vec3 cameraPosition = camera.getPosition();
+        StaticTerrainParityDiagnostics.recordVisibleLists(
+                "rust-vulkan-enqueue-source",
+                "solid",
+                this.renderSectionManager.getRenderLists(),
+                cameraPosition.x(),
+                cameraPosition.y(),
+                cameraPosition.z(),
+                this.client.getWindow().getWidth(),
+                this.client.getWindow().getHeight()
+        );
+        StaticTerrainParityDiagnostics.recordVisibleLists(
+                "rust-vulkan-enqueue-source",
+                "cutout",
+                this.renderSectionManager.getRenderLists(),
+                cameraPosition.x(),
+                cameraPosition.y(),
+                cameraPosition.z(),
+                this.client.getWindow().getWidth(),
+                this.client.getWindow().getHeight()
+        );
         RustGalTerrainRenderer.enqueueVisibleTerrain(
                 this.renderSectionManager.getRenderLists(),
                 camera,

@@ -742,6 +742,18 @@ class CaptureRunner:
         if not self.config.deterministic_camera_capture:
             return
         if self.config.deterministic_static_camera_capture:
+            parity_diagnostics_path = self.artifact_dir / f"static_terrain_parity_diagnostics_{self.run_id}.jsonl"
+            self.append_java_tool_options([
+                "-Dmattmc.dev.staticTerrainParityDiagnostics=true",
+                f"-Dmattmc.dev.staticTerrainParityDiagnostics.path={parity_diagnostics_path}",
+                "-Dmattmc.dev.staticTerrainParityDiagnostics.waitForStable=true",
+                "-Dmattmc.dev.staticTerrainParityDiagnostics.readyFrames=3",
+                "-Dmattmc.dev.staticTerrainParityDiagnostics.maxSamples=512",
+                "-Dmattmc.dev.staticTerrainParityDiagnostics.maxCoverageSamples=1024",
+                "-Dmattmc.dev.staticTerrainParityDiagnostics.maxCoverageEvents=16384",
+                "-Dmattmc.dev.staticTerrainParityDiagnostics.maxFaceCullTraceEvents=16384",
+            ])
+            self.append_meta(f"static_terrain_parity_diagnostics={parity_diagnostics_path}")
             if self.config.world_static_terrain_fault:
                 self.append_java_tool_options([
                     f"-Dmattmc.dev.rustGalStaticTerrain.fault={self.config.world_static_terrain_fault}",

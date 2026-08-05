@@ -777,6 +777,7 @@ public class RenderSectionManager {
 
             TranslucentData oldData = result.render.getTranslucentData();
             if (result instanceof ChunkBuildOutput chunkBuildOutput) {
+                net.sodium.client.render.StaticTerrainParityDiagnostics.recordChunkBuildOutput(chunkBuildOutput);
                 RustGalTerrainRenderer.acceptChunkBuildOutput(chunkBuildOutput);
                 var prevFlags = result.render.getFlags();
 

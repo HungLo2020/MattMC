@@ -1,6 +1,7 @@
 package net.sodium.client.render.chunk.compile.tasks;
 
 import it.unimi.dsi.fastutil.objects.Reference2ReferenceOpenHashMap;
+import net.sodium.client.render.StaticTerrainParityDiagnostics;
 import net.sodium.client.render.chunk.ExtendedBlockEntityType;
 import net.sodium.client.render.chunk.RenderSection;
 import net.sodium.client.render.chunk.compile.ChunkBuildBuffers;
@@ -33,6 +34,7 @@ import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
 import net.minecraft.client.renderer.blockentity.state.BlockEntityRenderState;
 import net.minecraft.client.renderer.chunk.VisGraph;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.util.profiling.Profiler;
 import net.minecraft.util.profiling.ProfilerFiller;
 import net.minecraft.world.level.block.RenderShape;
@@ -106,6 +108,8 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
         boolean forceJavaProducers = NativeMeshingDiagnostics.forceJavaProducers();
         boolean forceJavaModels = NativeMeshingDiagnostics.forceJavaModels();
         boolean forceJavaFluids = NativeMeshingDiagnostics.forceJavaFluids();
+        StaticTerrainParityDiagnostics.SourceBlockClassification sourceBlockClassification =
+                StaticTerrainParityDiagnostics.beginSourceBlockClassification();
         int fallbackBlockCount = 0;
         int fluidBlockCount = 0;
         int nativeWaterBlockCount = 0;
@@ -148,16 +152,29 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
                                 && nativeFluidSupported
                                 && !rustWaterSupported;
                         boolean useJavaFluid = !fluidState.isEmpty()
-                                && (forceJavaFluids || !nativeFluidSupported);
+                                && (forceJavaProducers || forceJavaFluids || !nativeFluidSupported);
                         boolean skipNativeFluid = useJavaFluid || nativeUnsupportedFluidForRustTerrain;
+                        boolean modelState = blockState.getRenderShape() == RenderShape.MODEL;
+                        boolean nativeModel = modelState && !forceJavaProducers && !forceJavaModels
+                                && NativeStaticBlockModelRegistry.hasNativeModel(blockState);
+                        StaticTerrainParityDiagnostics.recordSourceBlockVisit(
+                                sourceBlockClassification,
+                                String.valueOf(BuiltInRegistries.BLOCK.getKey(blockState.getBlock())),
+                                localY,
+                                modelState,
+                                nativeModel,
+                                !fluidState.isEmpty(),
+                                nativeFluidSupported && !useJavaFluid,
+                                builtInWater
+                        );
 
                         if (!forceJavaProducers) {
                             nativeSectionSnapshot.appendBlock(localBlockIndex, slice, blockState, blockPos, localX,
                                     localY, localZ, skipNativeFluid);
                         }
 
-                        if (blockState.getRenderShape() == RenderShape.MODEL) {
-                            if (forceJavaModels || !NativeStaticBlockModelRegistry.hasNativeModel(blockState)) {
+                        if (modelState) {
+                            if (!nativeModel) {
                                 NativeMeshingCompatibilityFallback.renderModel(cache, blockRenderer, blockState,
                                         blockPos, modelOffset, fallbackStats);
                                 fallbackBlockCount++;
@@ -287,6 +304,7 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
         renderData.setOcclusionData(occluder.resolve());
         renderData.setNativeMeshingProfile(buffers.copyNativeMeshingProfile());
         var output = new ChunkBuildOutput(this.render, this.submitTime, translucentData, renderData.build(), meshes);
+        StaticTerrainParityDiagnostics.recordSourceBlockClassification(output, sourceBlockClassification);
 
         if (sortEnabled) {
             if (reuseUploadedData) {

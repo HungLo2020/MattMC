@@ -28,6 +28,10 @@ pub(super) trait NativeSectionRecordSource {
         Ok(false)
     }
 
+    unsafe fn model_cull_mask_at(&self, _index: usize) -> Result<i32, i32> {
+        Ok(0)
+    }
+
     fn supports_direct_static_model_emission(&self) -> bool {
         false
     }
@@ -196,6 +200,9 @@ impl NativeSectionRecordSource for CompactSectionSnapshot<'_> {
         state: NativeMeshingState,
         states: &[Option<NativeMeshingState>],
     ) -> Result<bool, i32> {
+        if self.model_cull_mask_at(index)? == 0b11_1111 {
+            return Ok(true);
+        }
         let local_index = self.active_local_index(index)?;
         let local_x = local_index & 15;
         let local_z = (local_index >> 4) & 15;
@@ -222,6 +229,15 @@ impl NativeSectionRecordSource for CompactSectionSnapshot<'_> {
         }
 
         Ok(true)
+    }
+
+    #[inline(always)]
+    unsafe fn model_cull_mask_at(&self, index: usize) -> Result<i32, i32> {
+        const SEMANTIC_CULL_MASK_SHIFT: i32 = 8;
+        const SEMANTIC_CULL_MASK: i32 = 0b11_1111;
+        let local_index = self.active_local_index(index)?;
+        Ok(((*self.flags.get_unchecked(local_index)) >> SEMANTIC_CULL_MASK_SHIFT)
+            & SEMANTIC_CULL_MASK)
     }
 
     #[inline(always)]
