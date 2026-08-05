@@ -178,6 +178,22 @@ public final class DeterministicCameraCapture {
 		System.getProperty("mattmc.dev.deterministicCameraCapture.bossOverlay", "").trim();
 	private static final float FIXED_VIGNETTE_BRIGHTNESS =
 		Float.parseFloat(System.getProperty("mattmc.dev.deterministicCameraCapture.vignetteBrightness", "1.0"));
+	private static final double FIXED_CAMERA_X =
+		Double.parseDouble(System.getProperty("mattmc.dev.deterministicCameraCapture.fixedX", "NaN"));
+	private static final double FIXED_CAMERA_Y =
+		Double.parseDouble(System.getProperty("mattmc.dev.deterministicCameraCapture.fixedY", "NaN"));
+	private static final double FIXED_CAMERA_Z =
+		Double.parseDouble(System.getProperty("mattmc.dev.deterministicCameraCapture.fixedZ", "NaN"));
+	private static final float FIXED_CAMERA_YAW =
+		Float.parseFloat(System.getProperty("mattmc.dev.deterministicCameraCapture.fixedYaw", "NaN"));
+	private static final float FIXED_CAMERA_PITCH =
+		Float.parseFloat(System.getProperty("mattmc.dev.deterministicCameraCapture.fixedPitch", "NaN"));
+	private static final boolean HAS_FIXED_CAMERA_POSE =
+		Double.isFinite(FIXED_CAMERA_X)
+			&& Double.isFinite(FIXED_CAMERA_Y)
+			&& Double.isFinite(FIXED_CAMERA_Z)
+			&& Float.isFinite(FIXED_CAMERA_YAW)
+			&& Float.isFinite(FIXED_CAMERA_PITCH);
 	private static final boolean RUST_GAL_GUI_SCREEN_CYCLE =
 		Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.rustGalGuiScreenCycle");
 	private static final int RUST_GAL_GUI_SCREEN_CYCLE_REPEATS =
@@ -2075,13 +2091,23 @@ public final class DeterministicCameraCapture {
 					}
 					initialPosition = forcedBlockOutlineTarget.playerPosition();
 				}
+				if (HAS_FIXED_CAMERA_POSE && forcedBlockOutlineTarget == null) {
+					initialPosition = new Vec3(FIXED_CAMERA_X, FIXED_CAMERA_Y, FIXED_CAMERA_Z);
+					player.setPos(initialPosition);
+					player.setDeltaMovement(Vec3.ZERO);
+					player.setOldPosAndRot(initialPosition, FIXED_CAMERA_YAW, FIXED_CAMERA_PITCH);
+				}
 					applyRuntimeOverrides(minecraft, player);
 					setupDeterministicSupportPlatform(minecraft, player);
 						setupRealSurvivalCrackBlock(minecraft, player);
 						setupBlockDisplayScenario(minecraft, player);
-		initialPose = new Pose("initial", player.getYRot(), player.getXRot());
+		initialPose = HAS_FIXED_CAMERA_POSE && forcedBlockOutlineTarget == null
+			? new Pose("initial", FIXED_CAMERA_YAW, FIXED_CAMERA_PITCH)
+			: new Pose("initial", player.getYRot(), player.getXRot());
 		if (forcedBlockOutlineTarget != null) {
 			initialPose = forcedBlockOutlineTarget.pose();
+			applyPose(player, initialPose);
+		} else if (HAS_FIXED_CAMERA_POSE) {
 			applyPose(player, initialPose);
 		}
 		stabilizeGuiState(minecraft);

@@ -24,7 +24,7 @@ import time
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any, Iterable, Mapping, MutableMapping, Sequence
 
 import artifact_retention
 
@@ -72,6 +72,16 @@ WORLD_PROFILE_NAMES = ("migration-gate", "stress-diagnostic")
 PISTON_SHELL_SCAN_BUDGET_NANOS = 5_000_000
 FALLING_BLOCK_MIN_CAPTURE_FRAMES = 4
 EXPECTED_SHADER_PACK = "ComplementaryHungLoIfied.zip"
+PARITY_FIXTURE_SCHEMA = "mattmc-cross-repo-fixture-v1"
+PARITY_CONFIG_SCHEMA = "mattmc-cross-repo-parity-config-v1"
+DEFAULT_PARITY_CAMERA = {
+    "x": 150.5,
+    "y": 100.0,
+    "z": 530.5,
+    "yaw": 105.0,
+    "pitch": 10.0,
+    "pose_sequence": "single-static-v1",
+}
 
 
 @dataclass(frozen=True)
@@ -1095,6 +1105,150 @@ def append_client_arg(client_args: str, arg: str) -> str:
 def stable_json_hash(value: object) -> str:
     payload = json.dumps(value, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(payload).hexdigest()
+
+
+def directory_file_hash(path: Path, *, suffixes: set[str] | None = None, limit: int = 10000) -> dict[str, object]:
+    if not path.is_dir():
+        return {"status": "missing", "hash": None, "file_count": 0, "total_bytes": 0, "truncated": False}
+    digest = hashlib.sha256()
+    file_count = 0
+    total_bytes = 0
+    truncated = False
+    for child in sorted(candidate for candidate in path.rglob("*") if candidate.is_file()):
+        if suffixes is not None and child.suffix not in suffixes:
+            continue
+        rel = child.relative_to(path).as_posix()
+        if rel == "session.lock":
+            continue
+        file_count += 1
+        if file_count > limit:
+            truncated = True
+            break
+        try:
+            payload = child.read_bytes()
+        except OSError:
+            payload = b""
+        total_bytes += len(payload)
+        digest.update(rel.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(str(len(payload)).encode("ascii"))
+        digest.update(b"\0")
+        digest.update(hashlib.sha256(payload).hexdigest().encode("ascii"))
+        digest.update(b"\n")
+    return {
+        "status": "ok",
+        "hash": digest.hexdigest(),
+        "file_count": file_count,
+        "total_bytes": total_bytes,
+        "truncated": truncated,
+    }
+
+
+def copy_optional_tree(source: Path, target: Path) -> None:
+    if not source.exists():
+        return
+    if source.is_dir():
+        if target.exists():
+            shutil.rmtree(target)
+        shutil.copytree(source, target)
+    else:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, target)
+
+
+def canonical_fixture_id(args: argparse.Namespace) -> str:
+    scenario = getattr(args, "world_static_terrain_scenario", "") or "real-world"
+    world = getattr(args, "world", "") or WORLD_PROFILES[getattr(args, "world_profile", "migration-gate")].world
+    resource_pack = getattr(args, "world_static_terrain_resource_pack_scenario", "") or "vanilla"
+    return f"{world}-{scenario}-{resource_pack}-{PARITY_FIXTURE_SCHEMA}".replace("/", "_").replace(" ", "_")
+
+
+def materialize_canonical_fixture(args: argparse.Namespace, targets: Mapping[str, RepoTarget], artifact_root: Path) -> Path:
+    existing = getattr(args, "_canonical_fixture_run_source", None)
+    if existing:
+        return Path(existing)
+    source_run = targets["current"].root / "run"
+    world = getattr(args, "world", "") or WORLD_PROFILES[getattr(args, "world_profile", "migration-gate")].world
+    source_world = source_run / "saves" / world
+    if not source_world.is_dir():
+        raise SystemExit(f"Canonical fixture source world is missing: {source_world}")
+    fixture_root = artifact_root / ".canonical-fixtures" / canonical_fixture_id(args)
+    run_root = fixture_root / "run"
+    if not run_root.exists():
+        run_root.mkdir(parents=True, exist_ok=True)
+        for name in ("options.txt", "config", "resourcepacks", "shaderpacks", "Distant_Horizons_server_data", "voxelmap"):
+            copy_optional_tree(source_run / name, run_root / name)
+        (run_root / "saves").mkdir(parents=True, exist_ok=True)
+        copy_optional_tree(source_world, run_root / "saves" / world)
+    manifest = {
+        "schema": PARITY_FIXTURE_SCHEMA,
+        "fixture_id": canonical_fixture_id(args),
+        "created_at": utc_now(),
+        "source_repository": str(targets["current"].root),
+        "source_run": str(source_run),
+        "source_world": str(source_world),
+        "run_root": str(run_root),
+        "world": world,
+        "world_static_terrain_scenario": getattr(args, "world_static_terrain_scenario", "") or "",
+        "resource_pack_scenario": getattr(args, "world_static_terrain_resource_pack_scenario", "") or "",
+        "shader_pack": EXPECTED_SHADER_PACK,
+        "camera": DEFAULT_PARITY_CAMERA,
+        "source_save_hash": directory_file_hash(source_world, suffixes={".mca"}),
+        "canonical_save_hash": directory_file_hash(run_root / "saves" / world, suffixes={".mca"}),
+        "canonical_config_hash": directory_file_hash(run_root / "config"),
+    }
+    manifest_path = fixture_root / "fixture_manifest.json"
+    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    setattr(args, "_canonical_fixture_run_source", str(run_root))
+    setattr(args, "_canonical_fixture_manifest", str(manifest_path))
+    setattr(args, "_canonical_fixture_id", manifest["fixture_id"])
+    setattr(args, "_canonical_fixture_source_save_hash", manifest["source_save_hash"]["hash"])
+    return run_root
+
+
+def canonical_parity_requested(modes: Sequence[ModeSpec]) -> bool:
+    has_frozen_opengl = any(mode.target == "frozen" and mode.backend == "opengl" for mode in modes)
+    has_current_rust_vulkan = any(mode.target == "current" and mode.backend == "rust-vulkan" for mode in modes)
+    return has_frozen_opengl and has_current_rust_vulkan
+
+
+def canonical_camera_options(args: argparse.Namespace) -> dict[str, float | str]:
+    return dict(DEFAULT_PARITY_CAMERA)
+
+
+def append_fixed_camera_jvm_options(args: argparse.Namespace, java_options: list[str]) -> None:
+    if not getattr(args, "_canonical_fixture_run_source", None):
+        return
+    camera = canonical_camera_options(args)
+    java_options.extend(
+        [
+            f"-Dmattmc.dev.deterministicCameraCapture.fixedX={camera['x']}",
+            f"-Dmattmc.dev.deterministicCameraCapture.fixedY={camera['y']}",
+            f"-Dmattmc.dev.deterministicCameraCapture.fixedZ={camera['z']}",
+            f"-Dmattmc.dev.deterministicCameraCapture.fixedYaw={camera['yaw']}",
+            f"-Dmattmc.dev.deterministicCameraCapture.fixedPitch={camera['pitch']}",
+            f"-Dmattmc.dev.deterministicCameraCapture.cameraPathId={camera['pose_sequence']}",
+        ]
+    )
+
+
+def add_parity_fixture_environment(args: argparse.Namespace, env: MutableMapping[str, str]) -> None:
+    run_source = getattr(args, "_canonical_fixture_run_source", None)
+    if not run_source:
+        return
+    camera = canonical_camera_options(args)
+    env["MATTMC_CAPTURE_RUN_SOURCE"] = str(run_source)
+    env["MATTMC_CAPTURE_WORLD_SOURCE"] = str(Path(run_source) / "saves" / args.world)
+    env["MATTMC_PARITY_FIXTURE_SCHEMA"] = PARITY_FIXTURE_SCHEMA
+    env["MATTMC_PARITY_FIXTURE_ID"] = str(getattr(args, "_canonical_fixture_id", canonical_fixture_id(args)))
+    env["MATTMC_PARITY_FIXTURE_MANIFEST"] = str(getattr(args, "_canonical_fixture_manifest", ""))
+    env["MATTMC_PARITY_FIXTURE_SOURCE_SAVE_HASH"] = str(getattr(args, "_canonical_fixture_source_save_hash", ""))
+    env["MATTMC_PARITY_CAMERA_X"] = str(camera["x"])
+    env["MATTMC_PARITY_CAMERA_Y"] = str(camera["y"])
+    env["MATTMC_PARITY_CAMERA_Z"] = str(camera["z"])
+    env["MATTMC_PARITY_CAMERA_YAW"] = str(camera["yaw"])
+    env["MATTMC_PARITY_CAMERA_PITCH"] = str(camera["pitch"])
+    env["MATTMC_PARITY_CAMERA_POSE_SEQUENCE"] = str(camera["pose_sequence"])
 
 
 def read_json(path: Path) -> dict[str, object] | None:
@@ -5553,6 +5707,7 @@ def workload_signature(
             "name": meta.get("effective_shader_pack") or "unset",
             "sha256": shaderpack_sha256(shaderpack_text, meta),
         },
+        "parity_config": normalized_parity_config(mode, meta),
         "dh": dh_state_from_text(combined_logs, meta),
         "config_before": config_snapshot_hash(capture_dir, "config_before"),
         "workload_counter_definitions": workload_counter_definitions(),
@@ -5563,6 +5718,59 @@ def workload_signature(
         "workload_families": stable_workload_family_summary(frame_doc, combined_logs),
         "backend_work_counters": backend_work_counter_summary(frame_doc),
     }
+
+
+def normalized_parity_config(mode: ModeSpec, meta: Mapping[str, str]) -> dict[str, object]:
+    manifest = {
+        "schema": PARITY_CONFIG_SCHEMA,
+        "viewport": {
+            "width": parse_number(meta.get("forced_window_width")),
+            "height": parse_number(meta.get("forced_window_height")),
+        },
+        "gui_scale": parse_number(meta.get("forced_option_guiScale")),
+        "render_distance": parse_number(meta.get("forced_option_renderDistance")),
+        "simulation_distance": parse_number(meta.get("forced_option_simulationDistance")),
+        "fullscreen": meta.get("forced_option_fullscreen"),
+        "hide_gui": meta.get("forced_option_hideGui"),
+        "max_fps": parse_number(meta.get("forced_option_maxFps")),
+        "vsync": meta.get("forced_option_enableVsync"),
+        "shader_pack": meta.get("effective_shader_pack") or EXPECTED_SHADER_PACK,
+        "enable_shaders": meta.get("effective_enable_shaders") or ("true" if mode.shaders == "on" else "false"),
+        "resource_pack_scenario": meta.get("world_static_terrain_resource_pack_scenario") or meta.get("gui_resource_pack_scenario") or "vanilla",
+        "selected_resource_packs": meta.get("gui_resource_pack_selected") or "[]",
+        "fixture": {
+            "schema": meta.get("parity_fixture_schema") or PARITY_FIXTURE_SCHEMA,
+            "id": meta.get("parity_fixture_id") or "",
+            "source_save_hash": meta.get("parity_fixture_source_save_hash") or meta.get("world_save_state_hash"),
+            "scenario": meta.get("world_static_terrain_scenario") or "",
+        },
+        "camera": {
+            "x": parse_number(meta.get("parity_camera_x")),
+            "y": parse_number(meta.get("parity_camera_y")),
+            "z": parse_number(meta.get("parity_camera_z")),
+            "yaw": parse_number(meta.get("parity_camera_yaw")),
+            "pitch": parse_number(meta.get("parity_camera_pitch")),
+            "pose_sequence": meta.get("parity_camera_pose_sequence") or "",
+        },
+    }
+    missing = [
+        key
+        for key, value in {
+            "viewport.width": manifest["viewport"]["width"],
+            "viewport.height": manifest["viewport"]["height"],
+            "render_distance": manifest["render_distance"],
+            "simulation_distance": manifest["simulation_distance"],
+            "gui_scale": manifest["gui_scale"],
+            "fixture.id": manifest["fixture"]["id"],
+            "fixture.source_save_hash": manifest["fixture"]["source_save_hash"],
+            "camera.yaw": manifest["camera"]["yaw"],
+            "camera.pitch": manifest["camera"]["pitch"],
+        }.items()
+        if value in {None, ""}
+    ]
+    manifest["missing_parity_critical_values"] = missing
+    manifest["hash"] = stable_json_hash({key: value for key, value in manifest.items() if key != "hash"})
+    return manifest
 
 
 def instrumentation_signature(meta: dict[str, str], command: Sequence[str]) -> dict[str, object]:
@@ -5634,7 +5842,16 @@ def comparability_key(artifact: dict[str, object]) -> dict[str, object]:
     if isinstance(settings, dict):
         settings.pop("backend", None)
         settings.pop("validation_mode", None)
+    camera = normalized.get("camera")
+    if isinstance(camera, dict):
+        camera.pop("frame_count", None)
+        poses = camera.get("poses")
+        if isinstance(poses, list):
+            for pose in poses:
+                if isinstance(pose, dict):
+                    pose.pop("frame", None)
     normalized.pop("backend_work_counters", None)
+    normalized.pop("config_before", None)
     families = normalized.get("workload_families")
     if isinstance(families, dict):
         for family in families.values():
@@ -5769,6 +5986,117 @@ def cross_repository_parity_report(artifact_paths: Sequence[Path]) -> dict[str, 
     }
 
 
+def deterministic_initial_frame_path(artifact_path: Path) -> Path | None:
+    capture_dir = artifact_path.parent / "capture"
+    matches = sorted(capture_dir.glob("deterministic_camera_capture_*/*01_initial.png"))
+    return matches[0] if matches else None
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def write_cross_repo_visual_pairs(artifact_root: Path, cross_repo_parity: Mapping[str, object]) -> dict[str, object]:
+    pairs = cross_repo_parity.get("pairs")
+    if not isinstance(pairs, list):
+        return {"schema": "mattmc-cross-repo-visual-parity-report-v1", "pair_count": 0, "pairs": []}
+    output_root = artifact_root / "paired_visual_static_terrain"
+    report_pairs: list[dict[str, object]] = []
+    try:
+        from PIL import Image, ImageChops, ImageStat
+    except Exception as exc:
+        return {
+            "schema": "mattmc-cross-repo-visual-parity-report-v1",
+            "pair_count": 0,
+            "error": f"pillow-unavailable: {exc}",
+            "pairs": [],
+        }
+    for index, pair in enumerate(pairs, start=1):
+        baseline_path = Path(str(pair.get("baseline_artifact", "")))
+        current_path = Path(str(pair.get("current_artifact", "")))
+        baseline_image = deterministic_initial_frame_path(baseline_path)
+        current_image = deterministic_initial_frame_path(current_path)
+        entry: dict[str, object] = {
+            "schema": "mattmc-cross-repo-static-terrain-visual-pair-v1",
+            "baseline_artifact": str(baseline_path),
+            "current_artifact": str(current_path),
+            "baseline_image": str(baseline_image) if baseline_image else "",
+            "current_image": str(current_image) if current_image else "",
+        }
+        if baseline_image is None or current_image is None:
+            entry["status"] = "missing-image"
+            report_pairs.append(entry)
+            continue
+        pair_root = output_root / f"pair-{index:02d}"
+        pair_root.mkdir(parents=True, exist_ok=True)
+        left = Image.open(baseline_image).convert("RGB")
+        right = Image.open(current_image).convert("RGB")
+        if left.size != right.size:
+            right = right.resize(left.size)
+        diff = ImageChops.difference(left, right)
+        stat = ImageStat.Stat(diff)
+        nonzero_pixels = sum(1 for pixel in diff.getdata() if pixel != (0, 0, 0))
+        total_pixels = left.size[0] * left.size[1]
+        amplified = diff.point(lambda value: min(255, value * 4))
+        side_by_side = Image.new("RGB", (left.width * 3, left.height), (0, 0, 0))
+        side_by_side.paste(left, (0, 0))
+        side_by_side.paste(right, (left.width, 0))
+        side_by_side.paste(amplified, (left.width * 2, 0))
+        baseline_copy = pair_root / "frozen_java_opengl_01_initial.png"
+        current_copy = pair_root / "current_rust_vulkan_01_initial.png"
+        diff_path = pair_root / "amplified_diff_01_initial.png"
+        side_by_side_path = pair_root / "side_by_side_frozen_current_diff_01_initial.png"
+        left.save(baseline_copy)
+        right.save(current_copy)
+        amplified.save(diff_path)
+        side_by_side.save(side_by_side_path)
+        entry.update(
+            {
+                "status": "complete",
+                "image_size": {"width": left.width, "height": left.height},
+                "outputs": {
+                    "baseline_copy": str(baseline_copy),
+                    "current_copy": str(current_copy),
+                    "amplified_diff": str(diff_path),
+                    "side_by_side": str(side_by_side_path),
+                },
+                "sha256": {
+                    "baseline": sha256_file(baseline_copy),
+                    "current": sha256_file(current_copy),
+                    "amplified_diff": sha256_file(diff_path),
+                    "side_by_side": sha256_file(side_by_side_path),
+                },
+                "diff": {
+                    "mean_rgb_abs": [round(value, 3) for value in stat.mean],
+                    "rms_rgb_abs": [round(value, 3) for value in stat.rms],
+                    "max_channel_abs": max(max(pixel) for pixel in diff.getdata()),
+                    "nonzero_pixels": nonzero_pixels,
+                    "nonzero_fraction": nonzero_pixels / total_pixels if total_pixels else 0.0,
+                },
+            }
+        )
+        (pair_root / "visual_pair_metrics.json").write_text(
+            json.dumps(entry, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        report_pairs.append(entry)
+    report = {
+        "schema": "mattmc-cross-repo-visual-parity-report-v1",
+        "pair_count": len(report_pairs),
+        "pairs": report_pairs,
+    }
+    output_root.mkdir(parents=True, exist_ok=True)
+    (output_root / "visual_parity_report.json").write_text(
+        json.dumps(report, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return report
+
+
 def parity_evidence_failures(baseline: dict[str, object], current: dict[str, object]) -> list[str]:
     failures: list[str] = []
     for label, artifact in (("baseline", baseline), ("current", current)):
@@ -5776,12 +6104,21 @@ def parity_evidence_failures(baseline: dict[str, object], current: dict[str, obj
         camera = signature.get("camera") if isinstance(signature, dict) else {}
         world = signature.get("world_save_state") if isinstance(signature, dict) else {}
         shaderpack = signature.get("shaderpack") if isinstance(signature, dict) else {}
+        parity_config = signature.get("parity_config") if isinstance(signature, dict) else {}
         if not isinstance(camera, dict) or camera.get("status") != "complete" or not camera.get("poses"):
             failures.append(f"{label}_camera_evidence_missing")
         if not isinstance(world, dict) or not world.get("hash"):
             failures.append(f"{label}_world_save_hash_missing")
         if not isinstance(shaderpack, dict) or not shaderpack.get("sha256") or shaderpack.get("name") in {None, "", "unset"}:
             failures.append(f"{label}_shaderpack_evidence_missing")
+        if not isinstance(parity_config, dict):
+            failures.append(f"{label}_parity_config_missing")
+        else:
+            missing = parity_config.get("missing_parity_critical_values")
+            if isinstance(missing, list) and missing:
+                failures.append(f"{label}_parity_config_missing_values={missing}")
+            if not parity_config.get("hash"):
+                failures.append(f"{label}_parity_config_hash_missing")
     return failures
 
 
@@ -9894,6 +10231,7 @@ def build_capture_command(
     env["MATTMC_CAPTURE_WORLD"] = args.world
     env["MATTMC_CAPTURE_RUN_SOURCE"] = str(target.root / "run")
     env["MATTMC_CAPTURE_WORLD_SOURCE"] = str(target.root / "run" / "saves" / args.world)
+    add_parity_fixture_environment(args, env)
     if static_terrain_second_world:
         env["MATTMC_CAPTURE_SECOND_WORLD"] = static_terrain_second_world
     env["CLIENT_RSS_LIMIT_MB"] = str(args.client_rss_limit_mb)
@@ -9914,6 +10252,7 @@ def build_capture_command(
     java_options = shlex.split(env.get("JAVA_TOOL_OPTIONS", ""))
     java_options.extend(getattr(args, "jvm_arg", []) or [])
     java_options.extend(world_profile.diagnostic_jvm_args)
+    append_fixed_camera_jvm_options(args, java_options)
     java_options.extend(
         [
             f"-Dmattmc.dev.graphicsWorldProfile={world_profile.name}",
@@ -12482,9 +12821,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     artifact_root.mkdir(parents=True, exist_ok=True)
     if args.artifact_preserve_current_run and not args.dry_run:
         (artifact_root / ".preserve").write_text("current validation evidence\n", encoding="utf-8")
+    modes_to_run = selected_modes(args)
+    if canonical_parity_requested(modes_to_run) and not args.dry_run:
+        materialize_canonical_fixture(args, targets, artifact_root)
     results: list[MatrixResult] = []
     tools_to_run = ("gameplay", "capture", "subsystem") if args.tool == "matrix" else (args.tool,)
-    for mode in selected_modes(args):
+    for mode in modes_to_run:
         for tool_kind in tools_to_run:
             for repetition in range(1, args.repetitions + 1):
                 if matrix_progress_enabled(args):
@@ -12505,6 +12847,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     aggregate = aggregate_matrix(artifact_paths) if artifact_paths else None
     repeatability = repeatability_report(artifact_paths, args.repeatability_tolerance)
     cross_repo_parity = cross_repository_parity_report(artifact_paths)
+    cross_repo_visual_parity = write_cross_repo_visual_pairs(artifact_root, cross_repo_parity)
     aggregate_path = artifact_root / "graphics_audit_matrix.json"
     if aggregate:
         aggregate_path.write_text(json.dumps(aggregate, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -12534,6 +12877,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             "pre_run_cleanup": preflight_cleanup,
         },
         "cross_repository_parity": cross_repo_parity,
+        "cross_repository_visual_parity": cross_repo_visual_parity,
         "repeatability": repeatability,
         "success": all(result.success for result in results) and repeatability["passed"] and cross_repo_parity["passed"],
         "aggregate": str(aggregate_path) if aggregate else None,

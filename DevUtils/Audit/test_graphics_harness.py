@@ -85,7 +85,14 @@ def isolated_capture_config(
     )
 
 
-def write_capture(capture_dir: Path, *, backend: str = "opengl", shaders: str = "off", world: str = "Origin") -> None:
+def write_capture(
+    capture_dir: Path,
+    *,
+    backend: str = "opengl",
+    shaders: str = "off",
+    world: str = "Origin",
+    parity_yaw: float = 105.0,
+) -> None:
     capture_dir.mkdir(parents=True, exist_ok=True)
     (capture_dir / "meta_20260101_000000.txt").write_text(
         "\n".join(
@@ -97,8 +104,19 @@ def write_capture(capture_dir: Path, *, backend: str = "opengl", shaders: str = 
                 "world_save_state_file_count=4",
                 "world_save_state_total_bytes=1024",
                 "world_save_state_truncated=false",
+                "parity_fixture_schema=mattmc-cross-repo-fixture-v1",
+                "parity_fixture_id=Origin-real-world-vanilla-mattmc-cross-repo-fixture-v1",
+                "parity_fixture_manifest=/tmp/fixture_manifest.json",
+                "parity_fixture_source_save_hash=abc123",
+                "parity_camera_x=150.5",
+                "parity_camera_y=100.0",
+                "parity_camera_z=530.5",
+                f"parity_camera_yaw={parity_yaw}",
+                "parity_camera_pitch=10.0",
+                "parity_camera_pose_sequence=single-static-v1",
                 f"effective_enable_shaders={'true' if shaders == 'on' else 'false'}",
-                "effective_shader_pack=unset",
+                "effective_shader_pack=ComplementaryHungLoIfied.zip",
+                "shader_pack_sha256=" + ("a" * 64),
                 "validation_mode=off",
                 "graphics_run_type=clean-performance",
                 "validation_profile=off",
@@ -123,7 +141,9 @@ def write_capture(capture_dir: Path, *, backend: str = "opengl", shaders: str = 
         encoding="utf-8",
     )
     (capture_dir / "shader_summary_20260101_000000.txt").write_text(
-        f"effective_enable_shaders={'true' if shaders == 'on' else 'false'}\neffective_shader_pack=unset\n",
+        f"effective_enable_shaders={'true' if shaders == 'on' else 'false'}\neffective_shader_pack=ComplementaryHungLoIfied.zip\n"
+        + ("a" * 64)
+        + "  ComplementaryHungLoIfied.zip\n",
         encoding="utf-8",
     )
     (capture_dir / "runClient_20260101_000000.log").write_text("Creating shared Sodium chunk pipeline\nFPS 10\n", encoding="utf-8")
@@ -526,10 +546,10 @@ def make_validation_capture(capture_dir: Path, *, workload: bool = True, run_id:
     )
 
 
-def artifact_for(temp: Path, mode: harness.ModeSpec, *, world: str = "Origin") -> dict[str, object]:
+def artifact_for(temp: Path, mode: harness.ModeSpec, *, world: str = "Origin", parity_yaw: float = 105.0) -> dict[str, object]:
     target = fake_repo(temp, mode.target)
     capture = temp / f"capture-{mode.name}"
-    write_capture(capture, backend=mode.backend, shaders=mode.shaders, world=world)
+    write_capture(capture, backend=mode.backend, shaders=mode.shaders, world=world, parity_yaw=parity_yaw)
     return harness.normalize_capture_artifact(
         target,
         mode,
@@ -3604,6 +3624,26 @@ else:
             self.assertIn("baseline_camera_evidence_missing", report["pairs"][0]["evidence_failures"])
             self.assertIn("current_shaderpack_evidence_missing", report["pairs"][0]["evidence_failures"])
 
+    def test_cross_repository_parity_report_rejects_camera_contract_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            frozen_mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "frozen-opengl-shaders-on")
+            current_mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-rust-vulkan-shaders-on")
+            frozen = artifact_for(root / "frozen", frozen_mode, parity_yaw=150.0)
+            current = artifact_for(root / "current", current_mode, parity_yaw=105.0)
+            frozen_path = root / "frozen.json"
+            current_path = root / "current.json"
+            harness.write_artifact(frozen_path, frozen)
+            harness.write_artifact(current_path, current)
+            report = harness.cross_repository_parity_report([frozen_path, current_path])
+            self.assertFalse(report["passed"])
+            self.assertTrue(
+                any(
+                    diff["path"] == "parity_config.camera.yaw"
+                    for diff in report["pairs"][0]["comparison"]["differences"]
+                )
+            )
+
     def test_fingerprint_parity_accepts_materially_equivalent_runtime_counts(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -3729,6 +3769,72 @@ else:
             self.assertEqual(env["MATTMC_CAPTURE_WORLD_SOURCE"], str(frozen.root / "run" / "saves" / "Origin"))
             self.assertEqual(env["MATTMC_GRAPHICS_CORRECTNESS_CAPTURE"], "true")
             self.assertEqual(command[0], "bash")
+
+    def test_canonical_fixture_materializes_from_current_run(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            current = fake_repo(root, "current")
+            frozen = fake_repo(root, "frozen")
+            source_world = current.root / "run" / "saves" / "Origin" / "region"
+            source_world.mkdir(parents=True)
+            (source_world / "r.0.0.mca").write_bytes(b"canonical-region")
+            (current.root / "run" / "options.txt").parent.mkdir(parents=True, exist_ok=True)
+            (current.root / "run" / "options.txt").write_text("renderDistance:10\n", encoding="utf-8")
+            (current.root / "run" / "config").mkdir(parents=True)
+            (current.root / "run" / "config" / "iris.properties").write_text(
+                "enableShaders=true\nshaderPack=ComplementaryHungLoIfied.zip\n",
+                encoding="utf-8",
+            )
+            args = Namespace(
+                world="Origin",
+                world_profile="migration-gate",
+                world_static_terrain_scenario="real-world",
+                world_static_terrain_resource_pack_scenario="vanilla",
+            )
+            run_root = harness.materialize_canonical_fixture(
+                args,
+                {"current": current, "frozen": frozen},
+                root / "artifacts",
+            )
+            manifest = json.loads(Path(args._canonical_fixture_manifest).read_text(encoding="utf-8"))
+            self.assertEqual(run_root, Path(args._canonical_fixture_run_source))
+            self.assertTrue((run_root / "saves" / "Origin" / "region" / "r.0.0.mca").is_file())
+            self.assertEqual(manifest["source_save_hash"]["hash"], manifest["canonical_save_hash"]["hash"])
+            self.assertEqual(manifest["camera"]["yaw"], harness.DEFAULT_PARITY_CAMERA["yaw"])
+
+    def test_capture_command_uses_canonical_fixture_run_source_when_present(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            current = fake_repo(root, "current")
+            args = harness.parse_args(
+                [
+                    "capture",
+                    "--repo-root",
+                    str(current.root),
+                    "--mode",
+                    "current-rust-vulkan-shaders-on",
+                    "--world",
+                    "Origin",
+                    "--dry-run",
+                ]
+            )
+            canonical_run = root / "canonical" / "run"
+            setattr(args, "_canonical_fixture_run_source", str(canonical_run))
+            setattr(args, "_canonical_fixture_id", "fixture-a")
+            setattr(args, "_canonical_fixture_manifest", str(root / "fixture_manifest.json"))
+            setattr(args, "_canonical_fixture_source_save_hash", "abc123")
+            mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-rust-vulkan-shaders-on")
+            _command, env = harness.build_capture_command(
+                current,
+                mode,
+                root / "capture",
+                "correctness",
+                args,
+                "capture",
+            )
+            self.assertEqual(env["MATTMC_CAPTURE_RUN_SOURCE"], str(canonical_run))
+            self.assertEqual(env["MATTMC_CAPTURE_WORLD_SOURCE"], str(canonical_run / "saves" / "Origin"))
+            self.assertEqual(env["MATTMC_PARITY_CAMERA_YAW"], str(harness.DEFAULT_PARITY_CAMERA["yaw"]))
 
     def test_implementation_attribution(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
