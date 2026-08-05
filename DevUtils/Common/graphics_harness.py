@@ -35,8 +35,9 @@ MANIFEST_NAME = "graphics_audit_manifest.json"
 BASELINE_INDEX_NAME = "graphics_audit_baselines.json"
 DEFAULT_TIMEOUT_SECONDS = 900
 NORMALIZED_LOG_TAIL_BYTES = 2_000_000
-CURRENT_REPO_ROOT = Path(__file__).resolve().parents[2]
-DEVUTILS_CACHE_ROOT = CURRENT_REPO_ROOT / "DevUtils" / ".cache"
+HARNESS_REPO_ROOT = Path(__file__).resolve().parents[2]
+CURRENT_REPO_ROOT = HARNESS_REPO_ROOT
+DEVUTILS_CACHE_ROOT = HARNESS_REPO_ROOT / "DevUtils" / ".cache"
 WORKLOAD_PROFILES = ("correctness", "moving-camera", "settled-static", "gameplay")
 TOOL_KINDS = ("gameplay", "subsystem", "capture", "matrix")
 RUNTIME_PROFILE_NAMES = ("smoke", "standard", "performance", "extended")
@@ -1008,13 +1009,23 @@ def repository_resolution(current: Path, frozen: Path, explicit: str | None = No
     }
 
 
-def select_targets(args: argparse.Namespace) -> dict[str, RepoTarget]:
+def selected_current_root(args: argparse.Namespace) -> Path:
+    explicit = getattr(args, "repo_root", None)
+    if explicit:
+        current = Path(explicit).expanduser().resolve()
+        validate_repository_root(current, "Current", "--repo-root")
+        return current
     current = repo_root()
     validate_repository_root(current, "Current", "repository root")
+    return current
+
+
+def select_targets(args: argparse.Namespace) -> dict[str, RepoTarget]:
+    current = selected_current_root(args)
     frozen = find_frozen_repo(current, args.frozen_repo)
     return {
-        "current": RepoTarget("current", current, "current"),
-        "frozen": RepoTarget("frozen", frozen, "frozen-java-reference"),
+        "current": RepoTarget("current", current, "current-under-test"),
+        "frozen": RepoTarget("frozen", frozen, "frozen-baseline"),
     }
 
 
@@ -5703,6 +5714,77 @@ def reject_mismatched_workloads(left: dict[str, object], right: dict[str, object
         )
 
 
+def cross_repository_parity_report(artifact_paths: Sequence[Path]) -> dict[str, object]:
+    artifacts: list[dict[str, object]] = []
+    for path in artifact_paths:
+        artifact = read_json(path)
+        if isinstance(artifact, dict):
+            artifact["_artifact_path"] = str(path)
+            artifacts.append(artifact)
+    frozen = [
+        artifact
+        for artifact in artifacts
+        if isinstance(artifact.get("repository"), dict)
+        and artifact["repository"].get("target") == "frozen"
+        and isinstance(artifact.get("mode"), dict)
+        and artifact["mode"].get("backend") == "opengl"
+    ]
+    current = [
+        artifact
+        for artifact in artifacts
+        if isinstance(artifact.get("repository"), dict)
+        and artifact["repository"].get("target") == "current"
+        and isinstance(artifact.get("mode"), dict)
+        and artifact["mode"].get("backend") == "rust-vulkan"
+    ]
+    pairs: list[dict[str, object]] = []
+    for baseline in frozen:
+        baseline_mode = baseline.get("mode") if isinstance(baseline.get("mode"), dict) else {}
+        for candidate in current:
+            candidate_mode = candidate.get("mode") if isinstance(candidate.get("mode"), dict) else {}
+            if baseline_mode.get("shaders") != candidate_mode.get("shaders"):
+                continue
+            comparison = compare_workloads(baseline, candidate)
+            evidence_failures = parity_evidence_failures(baseline, candidate)
+            comparable = bool(comparison["comparable"]) and not evidence_failures
+            pairs.append(
+                {
+                    "schema": "mattmc-current-frozen-parity-pair-v1",
+                    "baseline_artifact": baseline.get("_artifact_path"),
+                    "current_artifact": candidate.get("_artifact_path"),
+                    "baseline_mode": baseline_mode.get("name"),
+                    "current_mode": candidate_mode.get("name"),
+                    "shader_mode": baseline_mode.get("shaders"),
+                    "comparable": comparable,
+                    "evidence_failures": evidence_failures,
+                    "comparison": comparison,
+                }
+            )
+    return {
+        "schema": "mattmc-current-frozen-parity-report-v1",
+        "required_when_paired": True,
+        "pair_count": len(pairs),
+        "passed": all(bool(pair.get("comparable")) for pair in pairs) if pairs else True,
+        "pairs": pairs,
+    }
+
+
+def parity_evidence_failures(baseline: dict[str, object], current: dict[str, object]) -> list[str]:
+    failures: list[str] = []
+    for label, artifact in (("baseline", baseline), ("current", current)):
+        signature = artifact.get("benchmark_fingerprint", {}).get("workload_signature", {}) if isinstance(artifact.get("benchmark_fingerprint"), dict) else {}
+        camera = signature.get("camera") if isinstance(signature, dict) else {}
+        world = signature.get("world_save_state") if isinstance(signature, dict) else {}
+        shaderpack = signature.get("shaderpack") if isinstance(signature, dict) else {}
+        if not isinstance(camera, dict) or camera.get("status") != "complete" or not camera.get("poses"):
+            failures.append(f"{label}_camera_evidence_missing")
+        if not isinstance(world, dict) or not world.get("hash"):
+            failures.append(f"{label}_world_save_hash_missing")
+        if not isinstance(shaderpack, dict) or not shaderpack.get("sha256") or shaderpack.get("name") in {None, "", "unset"}:
+            failures.append(f"{label}_shaderpack_evidence_missing")
+    return failures
+
+
 def baseline_reusable(baseline: dict[str, object], requested_fingerprint: dict[str, object]) -> bool:
     if baseline.get("schema") != SCHEMA:
         return False
@@ -6692,7 +6774,7 @@ def normalize_capture_artifact(
     world_outline_workload_complete = True
     rust_shell_outline_mode = mode.backend == "rust-vulkan"
     rust_opengl_outline_mode = (
-        target.role == "current"
+        target.name == "current"
         and mode.backend in {"opengl", "rust-opengl"}
         and not requested_world_outline_legacy
     )
@@ -9810,8 +9892,8 @@ def build_capture_command(
         env["MATTMC_RUST_SHADER_GRAPH_ISOLATION"] = args.shader_graph_isolation
     env["MATTMC_DETERMINISTIC_SHUTDOWN_GRACE_SECS"] = str(max(5, phase_timeout_seconds(args, "shutdown")))
     env["MATTMC_CAPTURE_WORLD"] = args.world
-    env["MATTMC_CAPTURE_RUN_SOURCE"] = str(CURRENT_REPO_ROOT / "run")
-    env["MATTMC_CAPTURE_WORLD_SOURCE"] = str(CURRENT_REPO_ROOT / "run" / "saves" / args.world)
+    env["MATTMC_CAPTURE_RUN_SOURCE"] = str(target.root / "run")
+    env["MATTMC_CAPTURE_WORLD_SOURCE"] = str(target.root / "run" / "saves" / args.world)
     if static_terrain_second_world:
         env["MATTMC_CAPTURE_SECOND_WORLD"] = static_terrain_second_world
     env["CLIENT_RSS_LIMIT_MB"] = str(args.client_rss_limit_mb)
@@ -9906,6 +9988,7 @@ def build_capture_command(
         deterministic_metadata = capture_dir / f"deterministic_camera_capture_{deterministic_stamp}.json"
         deterministic_screenshot_dir = capture_dir / f"deterministic_camera_capture_{deterministic_stamp}"
         target_git_commit = command_text(["git", "rev-parse", "HEAD"], cwd=target.root).strip() or "unknown"
+        env["MATTMC_GRAPHICS_CORRECTNESS_CAPTURE"] = "true"
         env["MATTMC_DETERMINISTIC_METADATA"] = str(deterministic_metadata)
         env["MATTMC_DETERMINISTIC_SCREENSHOT_DIR"] = str(deterministic_screenshot_dir)
         java_options.extend(
@@ -10899,7 +10982,7 @@ def run_mode(
             capture_dir.mkdir(parents=True, exist_ok=True)
             output_path.parent.mkdir(parents=True, exist_ok=True)
             command = ["shader-gbuffer-scene", "profile-not-supported"]
-            current_root = repo_root()
+            current_root = selected_current_root(args)
             explicit_frozen_repo = getattr(args, "frozen_repo", None)
             repository_paths = repository_resolution(current_root, find_frozen_repo(current_root, explicit_frozen_repo), explicit_frozen_repo)
             artifact = normalize_capture_artifact(
@@ -10939,7 +11022,7 @@ def run_mode(
         return run_shader_gbuffer_subsystem_mode(target, mode, artifact_root, args, repetition)
     command, env = build_capture_command(target, mode, capture_dir, effective_workload_profile, args, tool_kind)
     emit_matrix_progress(args, row_label, "preflight-completed", f"timeout={child_process_timeout_seconds(args)}s")
-    current_root = repo_root()
+    current_root = selected_current_root(args)
     explicit_frozen_repo = getattr(args, "frozen_repo", None)
     repository_paths = repository_resolution(current_root, find_frozen_repo(current_root, explicit_frozen_repo), explicit_frozen_repo)
     unsupported_profile_reason = profile_not_supported_reason(args.profile, mode, tool_kind)
@@ -11721,6 +11804,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
     def add_common(subparser: argparse.ArgumentParser) -> None:
         subparser.add_argument("--profile", choices=RUNTIME_PROFILE_NAMES, default="smoke")
+        subparser.add_argument(
+            "--repo-root",
+            type=Path,
+            help="Current repository root under test; defaults to the repository containing this shared harness.",
+        )
         subparser.add_argument("--frozen-repo")
         subparser.add_argument("--artifact-root", type=Path, help="Managed root for generated graphics-audit artifacts.")
         subparser.add_argument("--artifact-dir", type=Path)
@@ -12347,7 +12435,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     retention_root = (
         args.artifact_dir.resolve()
         if args.artifact_dir
-        else (args.artifact_root.resolve() if args.artifact_root else artifact_retention.default_artifact_base(repo_root()))
+        else (
+            args.artifact_root.resolve()
+            if args.artifact_root
+            else artifact_retention.default_artifact_base(targets["current"].root)
+        )
     )
     retention_policy = artifact_retention.policy_for(
         args.profile,
@@ -12412,6 +12504,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     artifact_paths = [Path(result.artifact_path) for result in results if Path(result.artifact_path).is_file()]
     aggregate = aggregate_matrix(artifact_paths) if artifact_paths else None
     repeatability = repeatability_report(artifact_paths, args.repeatability_tolerance)
+    cross_repo_parity = cross_repository_parity_report(artifact_paths)
     aggregate_path = artifact_root / "graphics_audit_matrix.json"
     if aggregate:
         aggregate_path.write_text(json.dumps(aggregate, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -12440,8 +12533,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             "preflight": disk_preflight,
             "pre_run_cleanup": preflight_cleanup,
         },
+        "cross_repository_parity": cross_repo_parity,
         "repeatability": repeatability,
-        "success": all(result.success for result in results) and repeatability["passed"],
+        "success": all(result.success for result in results) and repeatability["passed"] and cross_repo_parity["passed"],
         "aggregate": str(aggregate_path) if aggregate else None,
         "results": [asdict(result) for result in results],
     }

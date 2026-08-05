@@ -30,7 +30,7 @@ def fake_repo(root: Path, name: str) -> harness.RepoTarget:
     script_dir.mkdir(parents=True, exist_ok=True)
     (script_dir / "capture_runner.py").write_text("raise SystemExit(0)\n", encoding="utf-8")
     (repo / "gradlew").write_text("#!/usr/bin/env sh\nexit 0\n", encoding="utf-8")
-    return harness.RepoTarget(name, repo, "current" if name == "current" else "frozen-java-reference")
+    return harness.RepoTarget(name, repo, "current-under-test" if name == "current" else "frozen-baseline")
 
 
 def fake_repo_path(root: Path, name: str) -> Path:
@@ -3565,6 +3565,45 @@ else:
             with self.assertRaises(ValueError):
                 harness.reject_mismatched_workloads(left, right)
 
+    def test_cross_repository_parity_report_rejects_mismatched_pair(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            frozen_mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "frozen-opengl-shaders-on")
+            current_mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-rust-vulkan-shaders-on")
+            frozen = artifact_for(root / "frozen", frozen_mode, world="Origin")
+            current = artifact_for(root / "current", current_mode, world="OtherWorld")
+            frozen_path = root / "frozen.json"
+            current_path = root / "current.json"
+            harness.write_artifact(frozen_path, frozen)
+            harness.write_artifact(current_path, current)
+            report = harness.cross_repository_parity_report([frozen_path, current_path])
+            self.assertEqual(report["pair_count"], 1)
+            self.assertFalse(report["passed"])
+            pair = report["pairs"][0]
+            self.assertFalse(pair["comparable"])
+            self.assertTrue(pair["comparison"]["differences"])
+
+    def test_cross_repository_parity_report_rejects_missing_pair_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            frozen_mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "frozen-opengl-shaders-on")
+            current_mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-rust-vulkan-shaders-on")
+            frozen = artifact_for(root / "frozen", frozen_mode)
+            current = artifact_for(root / "current", current_mode)
+            for artifact in (frozen, current):
+                signature = artifact["benchmark_fingerprint"]["workload_signature"]
+                signature["camera"] = {"status": "unavailable", "poses": []}
+                signature["world_save_state"] = {"hash": None}
+                signature["shaderpack"] = {"name": "unset", "sha256": None}
+            frozen_path = root / "frozen.json"
+            current_path = root / "current.json"
+            harness.write_artifact(frozen_path, frozen)
+            harness.write_artifact(current_path, current)
+            report = harness.cross_repository_parity_report([frozen_path, current_path])
+            self.assertFalse(report["passed"])
+            self.assertIn("baseline_camera_evidence_missing", report["pairs"][0]["evidence_failures"])
+            self.assertIn("current_shaderpack_evidence_missing", report["pairs"][0]["evidence_failures"])
+
     def test_fingerprint_parity_accepts_materially_equivalent_runtime_counts(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -3634,6 +3673,62 @@ else:
                 harness.repo_root = original_repo_root  # type: ignore[assignment]
             self.assertEqual(targets["current"].root, current.root)
             self.assertEqual(targets["frozen"].root, frozen.root)
+            self.assertEqual(targets["current"].role, "current-under-test")
+            self.assertEqual(targets["frozen"].role, "frozen-baseline")
+
+    def test_explicit_repo_root_selects_current_under_test(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            harness_repo = fake_repo(root, "harness")
+            selected_current = fake_repo(root, "selected-current")
+            frozen = fake_repo(root, "frozen")
+            args = Namespace(repo_root=selected_current.root, frozen_repo=str(frozen.root))
+            original_repo_root = harness.repo_root
+            try:
+                harness.repo_root = lambda start=None: harness_repo.root  # type: ignore[assignment]
+                targets = harness.select_targets(args)
+            finally:
+                harness.repo_root = original_repo_root  # type: ignore[assignment]
+            self.assertEqual(targets["current"].root, selected_current.root)
+            self.assertEqual(targets["frozen"].root, frozen.root)
+
+    def test_capture_command_uses_target_repo_run_source(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            current = fake_repo(root, "current")
+            frozen = fake_repo(root, "frozen")
+            python_runner = frozen.root / "DevUtils" / "Common" / "capture_runner.py"
+            python_runner.unlink()
+            shell_runner = frozen.root / "DevUtils" / "Common" / "capture_runner.sh"
+            shell_runner.write_text("#!/usr/bin/env sh\nexit 0\n", encoding="utf-8")
+            shell_runner.chmod(0o755)
+            args = harness.parse_args(
+                [
+                    "capture",
+                    "--repo-root",
+                    str(current.root),
+                    "--frozen-repo",
+                    str(frozen.root),
+                    "--mode",
+                    "frozen-opengl-shaders-off",
+                    "--world",
+                    "Origin",
+                    "--dry-run",
+                ]
+            )
+            mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "frozen-opengl-shaders-off")
+            command, env = harness.build_capture_command(
+                frozen,
+                mode,
+                root / "capture",
+                "correctness",
+                args,
+                "capture",
+            )
+            self.assertEqual(env["MATTMC_CAPTURE_RUN_SOURCE"], str(frozen.root / "run"))
+            self.assertEqual(env["MATTMC_CAPTURE_WORLD_SOURCE"], str(frozen.root / "run" / "saves" / "Origin"))
+            self.assertEqual(env["MATTMC_GRAPHICS_CORRECTNESS_CAPTURE"], "true")
+            self.assertEqual(command[0], "bash")
 
     def test_implementation_attribution(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
