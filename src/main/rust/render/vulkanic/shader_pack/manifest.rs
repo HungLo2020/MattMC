@@ -215,10 +215,7 @@ impl ShaderPackConfig {
                     "vulkanic:pass/terrain_translucent",
                     "vulkanic:builtin/terrain_translucent_v1",
                     true,
-                    vec![
-                        AttachmentRole::DeferredLitColor,
-                        AttachmentRole::Depth,
-                    ],
+                    vec![AttachmentRole::DeferredLitColor, AttachmentRole::Depth],
                     vec![AttachmentRole::DeferredLitColor],
                     Some(AttachmentRole::Depth),
                     LoadIntent::Load,

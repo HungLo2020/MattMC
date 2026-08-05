@@ -240,10 +240,13 @@ fn backend_capabilities_are_queryable_and_fingerprinted_without_api_tokens() {
     assert!(capabilities.supports(BackendFeature::DescriptorArrays));
     assert!(!capabilities.supports(BackendFeature::Compute));
     assert!(!capabilities.supports(BackendFeature::StorageTextures));
+    assert!(capabilities.supports(BackendFeature::Texture3d));
     let fingerprint = capabilities.fingerprint_json();
     assert!(fingerprint.contains("\"name\":\"Rust OpenGL\""));
     assert!(fingerprint.contains("\"compute\":false"));
     assert!(fingerprint.contains("\"max_color_attachments\":4"));
+    assert!(fingerprint.contains("\"texture_3d\":true"));
+    assert!(fingerprint.contains("\"max_texture_extent_3d\":2048"));
     for forbidden in [
         concat!("glow", "::"),
         concat!("ash", "::"),
@@ -1805,6 +1808,178 @@ fn buffer_texture_copy_commands_validate_usage_ranges_and_hazards() {
                 texture_origin: TextureOrigin3d { x: 127, y: 0, z: 0 },
                 ..region
             })],
+        }),
+        super::StatusCode::InvalidArgument,
+    );
+}
+
+#[test]
+fn d3_texture_validation_enforces_dimension_layers_mips_and_copy_boxes() {
+    let mut gal = gal_with_capabilities(vulkan_capabilities());
+    let upload = gal
+        .create_buffer(buffer("d3-upload", vec![BufferUsage::TransferSrc]))
+        .unwrap();
+    let texture = gal
+        .create_texture(TextureDesc {
+            label: "d3-r8".to_owned(),
+            dimension: TextureDimension::D3,
+            format: TextureFormat::R8Uint,
+            extent: Extent3d {
+                width: 4,
+                height: 4,
+                depth: 2,
+            },
+            mip_levels: 1,
+            array_layers: 1,
+            usages: vec![TextureUsage::TransferDst, TextureUsage::TransferSrc, TextureUsage::Sampled],
+        })
+        .unwrap();
+    let region = BufferImageCopyRegion {
+        buffer: upload,
+        buffer_offset: 0,
+        bytes_per_row: 4,
+        rows_per_image: 4,
+        texture,
+        texture_mip: 0,
+        texture_layer: 0,
+        texture_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
+        extent: Extent3d {
+            width: 4,
+            height: 4,
+            depth: 2,
+        },
+    };
+    gal.create_command_list(CommandListDesc {
+        label: "d3-full-upload".to_owned(),
+        operations: vec![CommandOp::CopyBufferToTexture(region.clone())],
+    })
+    .unwrap();
+
+    assert_code(
+        gal.create_texture_view(TextureViewDesc {
+            label: "d3-invalid-layer-view".to_owned(),
+            texture,
+            format: TextureFormat::R8Uint,
+            base_mip: 0,
+            mip_count: 1,
+            base_layer: 1,
+            layer_count: 1,
+        }),
+        super::StatusCode::InvalidArgument,
+    );
+    assert_code(
+        gal.create_command_list(CommandListDesc {
+            label: "d3-invalid-array-layer-copy".to_owned(),
+            operations: vec![CommandOp::CopyBufferToTexture(BufferImageCopyRegion {
+                texture_layer: 1,
+                ..region.clone()
+            })],
+        }),
+        super::StatusCode::InvalidArgument,
+    );
+    assert_code(
+        gal.create_command_list(CommandListDesc {
+            label: "d3-invalid-partial-row".to_owned(),
+            operations: vec![CommandOp::CopyBufferToTexture(BufferImageCopyRegion {
+                bytes_per_row: 3,
+                ..region.clone()
+            })],
+        }),
+        super::StatusCode::InvalidArgument,
+    );
+    assert_code(
+        gal.create_command_list(CommandListDesc {
+            label: "d3-invalid-depth-box".to_owned(),
+            operations: vec![CommandOp::CopyBufferToTexture(BufferImageCopyRegion {
+                texture_origin: TextureOrigin3d { x: 0, y: 0, z: 1 },
+                ..region
+            })],
+        }),
+        super::StatusCode::InvalidArgument,
+    );
+}
+
+#[test]
+fn d3_texture_lifecycle_validates_mips_storage_transitions_and_retirement() {
+    let mut gal = gal_with_capabilities(vulkan_capabilities());
+    let texture = gal
+        .create_texture(TextureDesc {
+            label: "d3-rgba16-storage".to_owned(),
+            dimension: TextureDimension::D3,
+            format: TextureFormat::Rgba16Float,
+            extent: Extent3d {
+                width: 8,
+                height: 4,
+                depth: 2,
+            },
+            mip_levels: 2,
+            array_layers: 1,
+            usages: vec![TextureUsage::Sampled, TextureUsage::Storage, TextureUsage::TransferDst],
+        })
+        .unwrap();
+    let full_range = TextureSubresourceRange {
+        base_mip: 0,
+        mip_count: 2,
+        base_layer: 0,
+        layer_count: 1,
+    };
+    let list = gal
+        .create_command_list(CommandListDesc {
+            label: "d3-storage-transition".to_owned(),
+            operations: vec![
+                CommandOp::Barrier(ResourceBarrier {
+                    resource: texture,
+                    subresources: Some(full_range),
+                    before: TextureUsageState::Undefined,
+                    after: TextureUsageState::ShaderWrite,
+                    src_queue: QueueClass::Graphics,
+                    dst_queue: QueueClass::Graphics,
+                }),
+                CommandOp::Barrier(ResourceBarrier {
+                    resource: texture,
+                    subresources: Some(full_range),
+                    before: TextureUsageState::ShaderWrite,
+                    after: TextureUsageState::ShaderRead,
+                    src_queue: QueueClass::Graphics,
+                    dst_queue: QueueClass::Graphics,
+                }),
+            ],
+        })
+        .unwrap();
+    let submission = gal
+        .submit(SubmissionBatch {
+            label: "d3-storage-transition-submit".to_owned(),
+            command_lists: vec![list],
+        })
+        .unwrap();
+    gal.destroy(texture).unwrap();
+    assert!(gal.retire_through_for_test(submission.submission).unwrap().contains(&texture));
+    assert_code(
+        gal.create_texture_view(TextureViewDesc {
+            label: "stale-d3-view".to_owned(),
+            texture,
+            format: TextureFormat::Rgba16Float,
+            base_mip: 0,
+            mip_count: 1,
+            base_layer: 0,
+            layer_count: 1,
+        }),
+        super::StatusCode::StaleHandle,
+    );
+
+    assert_code(
+        gal.create_texture(TextureDesc {
+            label: "d3-too-many-mips".to_owned(),
+            dimension: TextureDimension::D3,
+            format: TextureFormat::R8Uint,
+            extent: Extent3d {
+                width: 4,
+                height: 4,
+                depth: 4,
+            },
+            mip_levels: 4,
+            array_layers: 1,
+            usages: vec![TextureUsage::Sampled],
         }),
         super::StatusCode::InvalidArgument,
     );

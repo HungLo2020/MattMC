@@ -257,48 +257,62 @@ impl OpenGlObjects {
     }
 
     fn create_texture(&self, desc: &TextureDesc, token: BackendToken) -> GalResult<TextureObject> {
-        if desc.dimension != TextureDimension::D2 || desc.mip_levels != 1 || desc.array_layers != 1
+        if !matches!(desc.dimension, TextureDimension::D2 | TextureDimension::D3)
+            || desc.mip_levels != 1
+            || desc.array_layers != 1
         {
             return Err(GalError::backend(
-                "OpenGL backend currently supports single-layer D2 textures in the isolated path",
+                "OpenGL backend requires a single-mip, single-layer D2 or D3 texture",
             ));
         }
         let format = texture_format(desc.format)?;
+        let target = texture_target(desc.dimension);
         let texture = unsafe { self.gl.create_texture() }.map_err(|error| {
             GalError::backend(format!("failed to create OpenGL texture: {error}"))
         })?;
         unsafe {
-            self.gl.bind_texture(glow::TEXTURE_2D, Some(texture));
-            self.gl.tex_parameter_i32(
-                glow::TEXTURE_2D,
-                glow::TEXTURE_MIN_FILTER,
-                glow::LINEAR as i32,
-            );
-            self.gl.tex_parameter_i32(
-                glow::TEXTURE_2D,
-                glow::TEXTURE_MAG_FILTER,
-                glow::LINEAR as i32,
-            );
-            self.gl.tex_image_2d(
-                glow::TEXTURE_2D,
-                0,
-                format.internal,
-                i32::try_from(desc.extent.width)
-                    .map_err(|_| GalError::backend("texture width exceeds i32"))?,
-                i32::try_from(desc.extent.height)
-                    .map_err(|_| GalError::backend("texture height exceeds i32"))?,
-                0,
-                format.external,
-                format.ty,
-                glow::PixelUnpackData::Slice(None),
-            );
-            self.gl.bind_texture(glow::TEXTURE_2D, None);
+            self.gl.bind_texture(target, Some(texture));
+            self.gl.tex_parameter_i32(target, glow::TEXTURE_MIN_FILTER, glow::LINEAR as i32);
+            self.gl.tex_parameter_i32(target, glow::TEXTURE_MAG_FILTER, glow::LINEAR as i32);
+            match desc.dimension {
+                TextureDimension::D2 => self.gl.tex_image_2d(
+                    target,
+                    0,
+                    format.internal,
+                    i32::try_from(desc.extent.width)
+                        .map_err(|_| GalError::backend("texture width exceeds i32"))?,
+                    i32::try_from(desc.extent.height)
+                        .map_err(|_| GalError::backend("texture height exceeds i32"))?,
+                    0,
+                    format.external,
+                    format.ty,
+                    glow::PixelUnpackData::Slice(None),
+                ),
+                TextureDimension::D3 => self.gl.tex_image_3d(
+                    target,
+                    0,
+                    format.internal,
+                    i32::try_from(desc.extent.width)
+                        .map_err(|_| GalError::backend("texture width exceeds i32"))?,
+                    i32::try_from(desc.extent.height)
+                        .map_err(|_| GalError::backend("texture height exceeds i32"))?,
+                    i32::try_from(desc.extent.depth)
+                        .map_err(|_| GalError::backend("texture depth exceeds i32"))?,
+                    0,
+                    format.external,
+                    format.ty,
+                    glow::PixelUnpackData::Slice(None),
+                ),
+                _ => unreachable!("GAL validated texture dimension"),
+            }
+            self.gl.bind_texture(target, None);
         }
         Ok(TextureObject {
             token,
             texture,
             format: desc.format,
             extent: desc.extent,
+            dimension: desc.dimension,
         })
     }
 
@@ -680,6 +694,15 @@ pub(super) struct TextureObject {
     pub(super) texture: glow::Texture,
     pub(super) format: TextureFormat,
     pub(super) extent: Extent3d,
+    pub(super) dimension: TextureDimension,
+}
+
+pub(super) fn texture_target(dimension: TextureDimension) -> u32 {
+    match dimension {
+        TextureDimension::D2 => glow::TEXTURE_2D,
+        TextureDimension::D3 => glow::TEXTURE_3D,
+        _ => unreachable!("GAL validated texture dimension"),
+    }
 }
 
 #[allow(dead_code)]
@@ -779,6 +802,17 @@ mod tests {
             },
             color_format: TextureFormat::Rgba8Unorm,
         }
+    }
+
+    #[test]
+    fn r8uint_and_rgba16float_have_explicit_native_copy_formats() {
+        let r8 = texture_format(TextureFormat::R8Uint).unwrap();
+        assert_eq!(glow::R8UI as i32, r8.internal);
+        assert_eq!(1, r8.bytes_per_pixel);
+        let rgba16 = texture_format(TextureFormat::Rgba16Float).unwrap();
+        assert_eq!(glow::RGBA16F as i32, rgba16.internal);
+        assert_eq!(glow::HALF_FLOAT, rgba16.ty);
+        assert_eq!(8, rgba16.bytes_per_pixel);
     }
 
     #[test]
@@ -920,13 +954,25 @@ pub(super) fn texture_format(format: TextureFormat) -> GalResult<GlTextureFormat
             ty: glow::UNSIGNED_BYTE,
             bytes_per_pixel: 4,
         }),
+        TextureFormat::Rgba16Float => Ok(GlTextureFormat {
+            internal: glow::RGBA16F as i32,
+            external: glow::RGBA,
+            ty: glow::HALF_FLOAT,
+            bytes_per_pixel: 8,
+        }),
         TextureFormat::Depth32Float => Ok(GlTextureFormat {
             internal: glow::DEPTH_COMPONENT32F as i32,
             external: glow::DEPTH_COMPONENT,
             ty: glow::FLOAT,
             bytes_per_pixel: 4,
         }),
-        TextureFormat::Bgra8Unorm | TextureFormat::Rgba16Float | TextureFormat::Depth24Stencil8 => {
+        TextureFormat::R8Uint => Ok(GlTextureFormat {
+            internal: glow::R8UI as i32,
+            external: glow::RED_INTEGER,
+            ty: glow::UNSIGNED_BYTE,
+            bytes_per_pixel: 1,
+        }),
+        TextureFormat::Bgra8Unorm | TextureFormat::Depth24Stencil8 => {
             Err(GalError::backend(format!(
                 "OpenGL texture format {format:?} is not supported in the isolated path"
             )))

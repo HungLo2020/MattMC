@@ -5,7 +5,7 @@ use std::sync::OnceLock;
 
 use glow::HasContext;
 
-use super::resources::{texture_format, topology, OpenGlObjects, ResourceSetObject};
+use super::resources::{texture_format, texture_target, topology, OpenGlObjects, ResourceSetObject};
 use super::trace;
 use crate::render::vulkanic::commands::{
     AttachmentLoadOp, BufferImageCopyRegion, CommandOp, ResourceBarrier, TextureUsageState,
@@ -539,6 +539,10 @@ impl OpenGlLowerer {
             .map_err(|_| GalError::backend("bytes_per_row exceeds usize"))?;
         let rows = usize::try_from(region.extent.height)
             .map_err(|_| GalError::backend("copy row count exceeds usize"))?;
+        let depth = usize::try_from(region.extent.depth)
+            .map_err(|_| GalError::backend("copy depth exceeds usize"))?;
+        let rows_per_image = usize::try_from(region.rows_per_image)
+            .map_err(|_| GalError::backend("rows_per_image exceeds usize"))?;
         let row_bytes = usize::try_from(region.extent.width)
             .map_err(|_| GalError::backend("copy width exceeds usize"))?
             .checked_mul(format.bytes_per_pixel as usize)
@@ -548,16 +552,35 @@ impl OpenGlLowerer {
         let src_end = src_start
             .checked_add(
                 bytes_per_row
-                    .checked_mul(rows)
+                    .checked_mul(
+                        rows_per_image
+                            .checked_mul(depth.saturating_sub(1))
+                            .and_then(|before_last| before_last.checked_add(rows))
+                            .ok_or_else(|| GalError::backend("buffer texture copy rows overflow"))?,
+                    )
                     .ok_or_else(|| GalError::backend("buffer texture copy byte count overflows"))?,
             )
             .ok_or_else(|| GalError::backend("buffer texture copy range overflows"))?;
         let bytes = &source.shadow[src_start..src_end];
-        let mut upload = vec![0; row_bytes * rows];
-        for row in 0..rows {
-            let src = (rows - 1 - row) * bytes_per_row;
-            let dst = row * row_bytes;
-            upload[dst..dst + row_bytes].copy_from_slice(&bytes[src..src + row_bytes]);
+        let upload_len = row_bytes
+            .checked_mul(rows)
+            .and_then(|slice_bytes| slice_bytes.checked_mul(depth))
+            .ok_or_else(|| GalError::backend("buffer texture upload size overflows"))?;
+        let mut upload = vec![0; upload_len];
+        for z in 0..depth {
+            for row in 0..rows {
+                let src = z
+                    .checked_mul(rows_per_image)
+                    .and_then(|slice_start| slice_start.checked_add(rows - 1 - row))
+                    .and_then(|source_row| source_row.checked_mul(bytes_per_row))
+                    .ok_or_else(|| GalError::backend("buffer texture source row overflows"))?;
+                let dst = z
+                    .checked_mul(rows)
+                    .and_then(|slice_start| slice_start.checked_add(row))
+                    .and_then(|output_row| output_row.checked_mul(row_bytes))
+                    .ok_or_else(|| GalError::backend("buffer texture destination row overflows"))?;
+                upload[dst..dst + row_bytes].copy_from_slice(&bytes[src..src + row_bytes]);
+            }
         }
         let gl_y = gl_y_for_top_left_region(texture, region)?;
         unsafe {
@@ -566,23 +589,45 @@ impl OpenGlLowerer {
             self.gl.pixel_store_i32(glow::UNPACK_SKIP_ROWS, 0);
             self.gl.pixel_store_i32(glow::UNPACK_SKIP_PIXELS, 0);
             self.gl.pixel_store_i32(glow::UNPACK_IMAGE_HEIGHT, 0);
-            self.gl
-                .bind_texture(glow::TEXTURE_2D, Some(texture.texture));
-            self.gl.tex_sub_image_2d(
-                glow::TEXTURE_2D,
-                i32::try_from(region.texture_mip)
-                    .map_err(|_| GalError::backend("texture mip exceeds i32"))?,
-                i32::try_from(region.texture_origin.x)
-                    .map_err(|_| GalError::backend("texture origin x exceeds i32"))?,
-                gl_y,
-                i32::try_from(region.extent.width)
-                    .map_err(|_| GalError::backend("texture width exceeds i32"))?,
-                i32::try_from(region.extent.height)
-                    .map_err(|_| GalError::backend("texture height exceeds i32"))?,
-                format.external,
-                format.ty,
-                glow::PixelUnpackData::Slice(Some(&upload)),
-            );
+            let target = texture_target(texture.dimension);
+            self.gl.bind_texture(target, Some(texture.texture));
+            match texture.dimension {
+                crate::render::vulkanic::resources::TextureDimension::D2 => self.gl.tex_sub_image_2d(
+                    target,
+                    i32::try_from(region.texture_mip)
+                        .map_err(|_| GalError::backend("texture mip exceeds i32"))?,
+                    i32::try_from(region.texture_origin.x)
+                        .map_err(|_| GalError::backend("texture origin x exceeds i32"))?,
+                    gl_y,
+                    i32::try_from(region.extent.width)
+                        .map_err(|_| GalError::backend("texture width exceeds i32"))?,
+                    i32::try_from(region.extent.height)
+                        .map_err(|_| GalError::backend("texture height exceeds i32"))?,
+                    format.external,
+                    format.ty,
+                    glow::PixelUnpackData::Slice(Some(&upload)),
+                ),
+                crate::render::vulkanic::resources::TextureDimension::D3 => self.gl.tex_sub_image_3d(
+                    target,
+                    i32::try_from(region.texture_mip)
+                        .map_err(|_| GalError::backend("texture mip exceeds i32"))?,
+                    i32::try_from(region.texture_origin.x)
+                        .map_err(|_| GalError::backend("texture origin x exceeds i32"))?,
+                    gl_y,
+                    i32::try_from(region.texture_origin.z)
+                        .map_err(|_| GalError::backend("texture origin z exceeds i32"))?,
+                    i32::try_from(region.extent.width)
+                        .map_err(|_| GalError::backend("texture width exceeds i32"))?,
+                    i32::try_from(region.extent.height)
+                        .map_err(|_| GalError::backend("texture height exceeds i32"))?,
+                    i32::try_from(region.extent.depth)
+                        .map_err(|_| GalError::backend("texture depth exceeds i32"))?,
+                    format.external,
+                    format.ty,
+                    glow::PixelUnpackData::Slice(Some(&upload)),
+                ),
+                _ => unreachable!("GAL validated texture dimension"),
+            }
         }
         Ok(())
     }
@@ -595,19 +640,19 @@ impl OpenGlLowerer {
         let _zone = trace::Zone::new("opengl.lowering.copy-texture-to-buffer");
         let texture = objects.texture(region.texture)?;
         let format = texture_format(texture.format)?;
-        if texture.extent.depth != 1 || region.extent.depth != 1 {
-            return Err(GalError::backend(
-                "OpenGL readback only supports D2 texture regions",
-            ));
-        }
         let width = usize::try_from(region.extent.width)
             .map_err(|_| GalError::backend("readback width exceeds usize"))?;
         let height = usize::try_from(region.extent.height)
             .map_err(|_| GalError::backend("readback height exceeds usize"))?;
+        let depth = usize::try_from(region.extent.depth)
+            .map_err(|_| GalError::backend("readback depth exceeds usize"))?;
         let row_bytes = width
             .checked_mul(format.bytes_per_pixel as usize)
             .ok_or_else(|| GalError::backend("readback row size overflows"))?;
-        let mut pixels = vec![0; row_bytes * height];
+        let slice_bytes = row_bytes
+            .checked_mul(height)
+            .ok_or_else(|| GalError::backend("readback slice size overflows"))?;
+        let mut pixels = vec![0; slice_bytes * depth];
         let read_fbo = unsafe { self.gl.create_framebuffer() }.map_err(|error| {
             GalError::backend(format!("failed to create readback FBO: {error}"))
         })?;
@@ -620,14 +665,6 @@ impl OpenGlLowerer {
             } else {
                 glow::COLOR_ATTACHMENT0
             };
-            self.gl.framebuffer_texture_2d(
-                glow::READ_FRAMEBUFFER,
-                attachment,
-                glow::TEXTURE_2D,
-                Some(texture.texture),
-                i32::try_from(region.texture_mip)
-                    .map_err(|_| GalError::backend("texture mip exceeds i32"))?,
-            );
             if texture.format == TextureFormat::Depth32Float {
                 self.gl.read_buffer(glow::NONE);
             } else {
@@ -638,31 +675,70 @@ impl OpenGlLowerer {
             self.gl.pixel_store_i32(glow::PACK_SKIP_ROWS, 0);
             self.gl.pixel_store_i32(glow::PACK_SKIP_PIXELS, 0);
             self.gl.pixel_store_i32(glow::PACK_IMAGE_HEIGHT, 0);
-            self.gl.read_pixels(
-                i32::try_from(region.texture_origin.x)
-                    .map_err(|_| GalError::backend("texture origin x exceeds i32"))?,
-                gl_y,
-                i32::try_from(region.extent.width)
-                    .map_err(|_| GalError::backend("texture width exceeds i32"))?,
-                i32::try_from(region.extent.height)
-                    .map_err(|_| GalError::backend("texture height exceeds i32"))?,
-                format.external,
-                format.ty,
-                glow::PixelPackData::Slice(Some(&mut pixels)),
-            );
+            for slice in 0..depth {
+                match texture.dimension {
+                    crate::render::vulkanic::resources::TextureDimension::D2 => {
+                        self.gl.framebuffer_texture_2d(
+                            glow::READ_FRAMEBUFFER,
+                            attachment,
+                            glow::TEXTURE_2D,
+                            Some(texture.texture),
+                            i32::try_from(region.texture_mip)
+                                .map_err(|_| GalError::backend("texture mip exceeds i32"))?,
+                        );
+                    }
+                    crate::render::vulkanic::resources::TextureDimension::D3 => {
+                        self.gl.framebuffer_texture_3d(
+                            glow::READ_FRAMEBUFFER,
+                            attachment,
+                            glow::TEXTURE_3D,
+                            Some(texture.texture),
+                            i32::try_from(region.texture_mip)
+                                .map_err(|_| GalError::backend("texture mip exceeds i32"))?,
+                            i32::try_from(region.texture_origin.z)
+                                .and_then(|origin| i32::try_from(slice).map(|value| origin + value))
+                                .map_err(|_| GalError::backend("texture depth layer exceeds i32"))?,
+                        );
+                    }
+                    _ => unreachable!("GAL validated texture dimension"),
+                }
+                let start = slice * slice_bytes;
+                self.gl.read_pixels(
+                    i32::try_from(region.texture_origin.x)
+                        .map_err(|_| GalError::backend("texture origin x exceeds i32"))?,
+                    gl_y,
+                    i32::try_from(region.extent.width)
+                        .map_err(|_| GalError::backend("texture width exceeds i32"))?,
+                    i32::try_from(region.extent.height)
+                        .map_err(|_| GalError::backend("texture height exceeds i32"))?,
+                    format.external,
+                    format.ty,
+                    glow::PixelPackData::Slice(Some(&mut pixels[start..start + slice_bytes])),
+                );
+            }
             self.gl.bind_framebuffer(glow::READ_FRAMEBUFFER, None);
             self.gl.delete_framebuffer(read_fbo);
         }
-        flip_rows_in_place(&mut pixels, row_bytes, height);
+        for slice in 0..depth {
+            flip_rows_in_place(
+                &mut pixels[slice * slice_bytes..(slice + 1) * slice_bytes],
+                row_bytes,
+                height,
+            );
+        }
         let target = objects.buffer_mut(region.buffer)?;
         let dst_start = usize::try_from(region.buffer_offset)
             .map_err(|_| GalError::backend("readback buffer offset exceeds usize"))?;
         let bytes_per_row = usize::try_from(region.bytes_per_row)
             .map_err(|_| GalError::backend("readback bytes_per_row exceeds usize"))?;
-        for row in 0..height {
-            let src = row * row_bytes;
-            let dst = dst_start + row * bytes_per_row;
-            target.shadow[dst..dst + row_bytes].copy_from_slice(&pixels[src..src + row_bytes]);
+        let rows_per_image = usize::try_from(region.rows_per_image)
+            .map_err(|_| GalError::backend("readback rows_per_image exceeds usize"))?;
+        for slice in 0..depth {
+            for row in 0..height {
+                let src = slice * slice_bytes + row * row_bytes;
+                let dst = dst_start + (slice * rows_per_image + row) * bytes_per_row;
+                target.shadow[dst..dst + row_bytes].copy_from_slice(&pixels[src..src + row_bytes]);
+            }
         }
         unsafe {
             self.gl
@@ -671,7 +747,7 @@ impl OpenGlLowerer {
                 glow::COPY_WRITE_BUFFER,
                 i32::try_from(region.buffer_offset)
                     .map_err(|_| GalError::backend("readback buffer offset exceeds i32"))?,
-                &target.shadow[dst_start..dst_start + bytes_per_row * height],
+                &target.shadow[dst_start..dst_start + bytes_per_row * (rows_per_image * (depth - 1) + height)],
             );
         }
         Ok(())
@@ -693,7 +769,11 @@ impl OpenGlLowerer {
                     let texture = objects.texture(view.texture)?;
                     let unit = binding.binding;
                     sampled_texture_units.push(unit);
-                    self.bind_texture_unit(unit, Some(texture.texture));
+                    self.bind_texture_unit(
+                        unit,
+                        texture_target(texture.dimension),
+                        Some(texture.texture),
+                    );
                     self.bind_sampler_unit(unit, None);
                 }
                 ResourceBindingKind::Sampler => {
@@ -900,15 +980,15 @@ impl OpenGlLowerer {
         self.cache.framebuffer_binds += 1;
     }
 
-    fn bind_texture_unit(&mut self, unit: u32, texture: Option<glow::Texture>) {
-        if self.cache.textures.get(&unit).copied().flatten() == texture {
+    fn bind_texture_unit(&mut self, unit: u32, target: u32, texture: Option<glow::Texture>) {
+        if self.cache.textures.get(&unit).copied() == Some((target, texture)) {
             return;
         }
         unsafe {
             self.gl.active_texture(glow::TEXTURE0 + unit);
-            self.gl.bind_texture(glow::TEXTURE_2D, texture);
+            self.gl.bind_texture(target, texture);
         }
-        self.cache.textures.insert(unit, texture);
+        self.cache.textures.insert(unit, (target, texture));
         self.cache.texture_binds += 1;
     }
 
@@ -979,7 +1059,7 @@ struct StateCache {
     blend: Option<BlendMode>,
     depth_compare: Option<CompareOp>,
     depth_write: bool,
-    textures: BTreeMap<u32, Option<glow::Texture>>,
+    textures: BTreeMap<u32, (u32, Option<glow::Texture>)>,
     samplers: BTreeMap<u32, Option<glow::Sampler>>,
     program_binds: usize,
     vao_binds: usize,

@@ -60,7 +60,10 @@ fn parse_include(line: &str) -> Option<&str> {
     let rest = trimmed.strip_prefix("#include")?.trim();
     rest.strip_prefix('"')
         .and_then(|include| include.strip_suffix('"'))
-        .or_else(|| rest.strip_prefix('<').and_then(|include| include.strip_suffix('>')))
+        .or_else(|| {
+            rest.strip_prefix('<')
+                .and_then(|include| include.strip_suffix('>'))
+        })
 }
 
 fn normalize_path(path: &str) -> String {

@@ -48,6 +48,177 @@ fn isolated_opengl_conformance_renders_indexed_textured_draw() {
 }
 
 #[test]
+fn isolated_opengl_conformance_round_trips_a_partial_r8uint_d3_box() {
+    let backend = match OpenGlBackend::new("MattMC VulkanicGAL OpenGL D3 conformance") {
+        Ok(backend) => backend,
+        Err(error) => {
+            let text = error.to_string();
+            assert!(
+                text.contains("OpenGL") || text.contains("EGL") || text.contains("GL"),
+                "unexpected OpenGL D3 setup failure: {text}"
+            );
+            return;
+        }
+    };
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    assert!(gal.capabilities().supports(BackendFeature::Texture3d));
+    let pattern = (0_u8..32).collect::<Vec<_>>();
+    let upload = gal
+        .create_buffer(BufferDesc {
+            label: "d3.upload".to_owned(),
+            size: pattern.len() as u64,
+            memory: MemoryDomain::Upload,
+            usages: vec![BufferUsage::HostWrite, BufferUsage::TransferSrc],
+        })
+        .unwrap();
+    let readback = gal
+        .create_buffer(BufferDesc {
+            label: "d3.readback".to_owned(),
+            size: pattern.len() as u64,
+            memory: MemoryDomain::Readback,
+            usages: vec![BufferUsage::TransferDst, BufferUsage::HostRead],
+        })
+        .unwrap();
+    let texture = gal
+        .create_texture(TextureDesc {
+            label: "d3.r8uint".to_owned(),
+            dimension: TextureDimension::D3,
+            format: TextureFormat::R8Uint,
+            extent: Extent3d {
+                width: 4,
+                height: 4,
+                depth: 2,
+            },
+            mip_levels: 1,
+            array_layers: 1,
+            usages: vec![TextureUsage::TransferDst, TextureUsage::TransferSrc, TextureUsage::Sampled],
+        })
+        .unwrap();
+    let region = BufferImageCopyRegion {
+        buffer: upload,
+        buffer_offset: 0,
+        bytes_per_row: 4,
+        rows_per_image: 4,
+        texture,
+        texture_mip: 0,
+        texture_layer: 0,
+        texture_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
+        extent: Extent3d {
+            width: 4,
+            height: 4,
+            depth: 2,
+        },
+    };
+    let commands = gal
+        .create_command_list(CommandListDesc {
+            label: "d3.round-trip".to_owned(),
+            operations: vec![
+                CommandOp::HostWriteBuffer {
+                    buffer: upload,
+                    offset: 0,
+                    data: pattern.clone(),
+                },
+                buffer_barrier(upload, TextureUsageState::TransferDst, TextureUsageState::TransferSrc),
+                texture_barrier(texture, TextureUsageState::Undefined, TextureUsageState::TransferDst),
+                CommandOp::CopyBufferToTexture(region.clone()),
+                texture_barrier(texture, TextureUsageState::TransferDst, TextureUsageState::TransferSrc),
+                CommandOp::CopyTextureToBuffer(BufferImageCopyRegion {
+                    buffer: readback,
+                    ..region
+                }),
+                buffer_barrier(readback, TextureUsageState::TransferDst, TextureUsageState::ShaderRead),
+                CommandOp::HostReadBuffer {
+                    buffer: readback,
+                    offset: 0,
+                    size: pattern.len() as u64,
+                },
+            ],
+        })
+        .unwrap();
+    let token = gal
+        .submit(SubmissionBatch {
+            label: "d3.round-trip.submit".to_owned(),
+            command_lists: vec![commands],
+        })
+        .unwrap();
+    gal.retire_through_for_test(token.submission).unwrap();
+    let read = gal
+        .completed_host_reads()
+        .into_iter()
+        .find(|read| read.buffer == readback)
+        .expect("D3 readback should complete");
+    assert_eq!(pattern, read.bytes);
+
+    let rgba16_pattern = (0_u8..64).collect::<Vec<_>>();
+    let rgba16_upload = gal
+        .create_buffer(BufferDesc {
+            label: "d3.rgba16.upload".to_owned(),
+            size: rgba16_pattern.len() as u64,
+            memory: MemoryDomain::Upload,
+            usages: vec![BufferUsage::HostWrite, BufferUsage::TransferSrc],
+        })
+        .unwrap();
+    let rgba16_readback = gal
+        .create_buffer(BufferDesc {
+            label: "d3.rgba16.readback".to_owned(),
+            size: rgba16_pattern.len() as u64,
+            memory: MemoryDomain::Readback,
+            usages: vec![BufferUsage::TransferDst, BufferUsage::HostRead],
+        })
+        .unwrap();
+    let rgba16_texture = gal
+        .create_texture(TextureDesc {
+            label: "d3.rgba16float".to_owned(),
+            dimension: TextureDimension::D3,
+            format: TextureFormat::Rgba16Float,
+            extent: Extent3d { width: 2, height: 2, depth: 2 },
+            mip_levels: 1,
+            array_layers: 1,
+            usages: vec![TextureUsage::TransferDst, TextureUsage::TransferSrc, TextureUsage::Sampled],
+        })
+        .unwrap();
+    let rgba16_region = BufferImageCopyRegion {
+        buffer: rgba16_upload,
+        buffer_offset: 0,
+        bytes_per_row: 16,
+        rows_per_image: 2,
+        texture: rgba16_texture,
+        texture_mip: 0,
+        texture_layer: 0,
+        texture_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
+        extent: Extent3d { width: 2, height: 2, depth: 2 },
+    };
+    let rgba16_commands = gal
+        .create_command_list(CommandListDesc {
+            label: "d3.rgba16.round-trip".to_owned(),
+            operations: vec![
+                CommandOp::HostWriteBuffer { buffer: rgba16_upload, offset: 0, data: rgba16_pattern.clone() },
+                buffer_barrier(rgba16_upload, TextureUsageState::TransferDst, TextureUsageState::TransferSrc),
+                texture_barrier(rgba16_texture, TextureUsageState::Undefined, TextureUsageState::TransferDst),
+                CommandOp::CopyBufferToTexture(rgba16_region.clone()),
+                texture_barrier(rgba16_texture, TextureUsageState::TransferDst, TextureUsageState::TransferSrc),
+                CommandOp::CopyTextureToBuffer(BufferImageCopyRegion { buffer: rgba16_readback, ..rgba16_region }),
+                buffer_barrier(rgba16_readback, TextureUsageState::TransferDst, TextureUsageState::ShaderRead),
+                CommandOp::HostReadBuffer { buffer: rgba16_readback, offset: 0, size: rgba16_pattern.len() as u64 },
+            ],
+        })
+        .unwrap();
+    let rgba16_submission = gal
+        .submit(SubmissionBatch {
+            label: "d3.rgba16.round-trip.submit".to_owned(),
+            command_lists: vec![rgba16_commands],
+        })
+        .unwrap();
+    gal.retire_through_for_test(rgba16_submission.submission).unwrap();
+    let rgba16_read = gal
+        .completed_host_reads()
+        .into_iter()
+        .find(|read| read.buffer == rgba16_readback)
+        .expect("Rgba16Float D3 readback should complete");
+    assert_eq!(rgba16_pattern, rgba16_read.bytes);
+}
+
+#[test]
 fn isolated_opengl_conformance_pins_gal_coordinate_and_state_conventions() {
     match run_conformance(
         "conventions",

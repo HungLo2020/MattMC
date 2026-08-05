@@ -623,14 +623,78 @@ impl VulkanicGal {
             ));
         }
         let capabilities = self.capabilities();
-        if desc.dimension != TextureDimension::D2 {
-            return self.unsupported(format!(
-                "backend '{}' currently supports D2 textures only",
-                capabilities.name
+        match desc.dimension {
+            TextureDimension::D2 => {
+                if desc.extent.depth != 1 {
+                    return self.validation_error(GalError::resource(
+                        StatusCode::InvalidArgument,
+                        "D2 textures require depth 1",
+                    ));
+                }
+            }
+            TextureDimension::D3 => {
+                if desc.array_layers != 1 {
+                    return self.validation_error(GalError::resource(
+                        StatusCode::InvalidArgument,
+                        "D3 textures cannot have array layers",
+                    ));
+                }
+                if !capabilities.supports(BackendFeature::Texture3d) {
+                    return self.unsupported(format!(
+                        "backend '{}' does not support D3 textures",
+                        capabilities.name
+                    ));
+                }
+                if desc.extent.width > capabilities.limits.max_texture_extent_3d
+                    || desc.extent.height > capabilities.limits.max_texture_extent_3d
+                    || desc.extent.depth > capabilities.limits.max_texture_extent_3d
+                {
+                    return self.unsupported(format!(
+                        "texture '{}' extent {}x{}x{} exceeds backend '{}' 3D extent limit {}",
+                        desc.label, desc.extent.width, desc.extent.height, desc.extent.depth,
+                        capabilities.name, capabilities.limits.max_texture_extent_3d
+                    ));
+                }
+            }
+            _ => return self.unsupported("only D2 and D3 texture dimensions are modeled"),
+        }
+        let max_mips_for_extent = max_texture_mip_levels(desc.extent);
+        if desc.mip_levels > max_mips_for_extent {
+            return self.validation_error(GalError::resource(
+                StatusCode::InvalidArgument,
+                format!(
+                    "texture '{}' requests {} mips for {}x{}x{} extent (maximum {})",
+                    desc.label,
+                    desc.mip_levels,
+                    desc.extent.width,
+                    desc.extent.height,
+                    desc.extent.depth,
+                    max_mips_for_extent
+                ),
             ));
         }
-        if desc.extent.width > capabilities.limits.max_texture_extent_2d
-            || desc.extent.height > capabilities.limits.max_texture_extent_2d
+        if desc.format == TextureFormat::R8Uint
+            && (desc.usages.contains(&TextureUsage::ColorAttachment)
+                || desc.usages.contains(&TextureUsage::DepthStencilAttachment)
+                || desc.usages.contains(&TextureUsage::Present))
+        {
+            return self.validation_error(GalError::resource(
+                StatusCode::InvalidArgument,
+                "R8Uint is a sampled/storage/transfer format, not a render target format",
+            ));
+        }
+        if is_depth_format(desc.format)
+            && (desc.usages.contains(&TextureUsage::ColorAttachment)
+                || desc.usages.contains(&TextureUsage::Storage)
+                || desc.usages.contains(&TextureUsage::Present))
+        {
+            return self.validation_error(GalError::resource(
+                StatusCode::InvalidArgument,
+                "depth formats cannot be used as color, storage, or present textures",
+            ));
+        }
+        if desc.dimension == TextureDimension::D2 && (desc.extent.width > capabilities.limits.max_texture_extent_2d
+            || desc.extent.height > capabilities.limits.max_texture_extent_2d)
         {
             return self.unsupported(format!(
                 "texture '{}' extent {}x{} exceeds backend '{}' 2D extent limit {}",
@@ -687,6 +751,15 @@ impl VulkanicGal {
                 capabilities.name
             ));
         }
+        if desc.dimension == TextureDimension::D3
+            && (desc.usages.contains(&TextureUsage::ColorAttachment)
+                || desc.usages.contains(&TextureUsage::DepthStencilAttachment)
+                || desc.usages.contains(&TextureUsage::Present))
+        {
+            return self.unsupported(
+                "D3 textures are modeled for sampled, storage, and transfer use, not render targets",
+            );
+        }
         let handle = self.textures.next_handle()?;
         let token = self
             .backend
@@ -703,9 +776,10 @@ impl VulkanicGal {
     }
 
     pub fn create_texture_view(&mut self, desc: TextureViewDesc) -> GalResult<Handle> {
-        let (texture_mip_levels, texture_array_layers, texture_format) = {
+        let (texture_dimension, texture_mip_levels, texture_array_layers, texture_format) = {
             let texture = self.textures.get(desc.texture)?;
             (
+                texture.desc.dimension,
                 texture.desc.mip_levels,
                 texture.desc.array_layers,
                 texture.desc.format,
@@ -737,6 +811,14 @@ impl VulkanicGal {
             return self.validation_error(GalError::resource(
                 StatusCode::InvalidArgument,
                 "texture view format reinterpretation is not modeled",
+            ));
+        }
+        if texture_dimension == TextureDimension::D3
+            && (desc.base_layer != 0 || desc.layer_count != 1)
+        {
+            return self.validation_error(GalError::resource(
+                StatusCode::InvalidArgument,
+                "D3 texture views must address the single 3D image layer",
             ));
         }
         let handle = self.texture_views.next_handle()?;
@@ -2816,9 +2898,14 @@ impl VulkanicGal {
     ) -> GalResult<()> {
         let size = self.buffer_texture_copy_size(region)?;
         self.validate_buffer_range(region.buffer, region.buffer_offset, size, buffer_usage)?;
-        let (texture_usages, texture_extent) = {
+        let (texture_dimension, texture_format, texture_usages, texture_extent) = {
             let texture = self.textures.get(region.texture)?;
-            (texture.desc.usages.clone(), texture.desc.extent)
+            (
+                texture.desc.dimension,
+                texture.desc.format,
+                texture.desc.usages.clone(),
+                texture.desc.extent,
+            )
         };
         if !texture_usages.contains(&texture_usage) {
             return self.validation_error(GalError::command(
@@ -2832,7 +2919,21 @@ impl VulkanicGal {
                 "texture copy extent must be non-zero",
             ));
         }
-        if region.bytes_per_row == 0 || region.rows_per_image == 0 || region.bytes_per_row % 4 != 0
+        let Some(bytes_per_texel) = texture_format.copy_bytes_per_texel() else {
+            return self.unsupported(format!(
+                "texture format {texture_format:?} does not support buffer texture copies"
+            ));
+        };
+        let Some(minimum_row_bytes) = region.extent.width.checked_mul(bytes_per_texel) else {
+            return self.validation_error(GalError::command(
+                StatusCode::InvalidArgument,
+                "texture copy row byte count overflows",
+            ));
+        };
+        if region.buffer_offset % 4 != 0
+            || region.bytes_per_row < minimum_row_bytes
+            || region.rows_per_image < region.extent.height
+            || region.bytes_per_row % bytes_per_texel != 0
         {
             return self.validation_error(GalError::command(
                 StatusCode::InvalidArgument,
@@ -2848,6 +2949,21 @@ impl VulkanicGal {
                 layer_count: 1,
             },
         )?;
+        if texture_dimension == TextureDimension::D3 && region.texture_layer != 0 {
+            return self.validation_error(GalError::command(
+                StatusCode::InvalidArgument,
+                "D3 texture copies must use texture layer 0",
+            ));
+        }
+        if texture_dimension == TextureDimension::D2
+            && (region.texture_origin.z != 0 || region.extent.depth != 1)
+        {
+            return self.validation_error(GalError::command(
+                StatusCode::InvalidArgument,
+                "D2 texture copies must address one depth slice at z 0",
+            ));
+        }
+        let mip_extent = texture_mip_extent(texture_extent, region.texture_mip);
         let Some(x_end) = region.texture_origin.x.checked_add(region.extent.width) else {
             return self.validation_error(GalError::command(
                 StatusCode::InvalidArgument,
@@ -2866,9 +2982,9 @@ impl VulkanicGal {
                 "texture copy z range overflows",
             ));
         };
-        if x_end > texture_extent.width
-            || y_end > texture_extent.height
-            || z_end > texture_extent.depth
+        if x_end > mip_extent.width
+            || y_end > mip_extent.height
+            || z_end > mip_extent.depth
         {
             return self.validation_error(GalError::command(
                 StatusCode::InvalidArgument,
@@ -2921,6 +3037,7 @@ impl VulkanicGal {
         range: TextureSubresourceRange,
     ) -> GalResult<()> {
         let record = self.textures.get(texture)?;
+        let dimension = record.desc.dimension;
         let mip_levels = record.desc.mip_levels;
         let array_layers = record.desc.array_layers;
         let Some(mip_end) = range.base_mip.checked_add(range.mip_count) else {
@@ -2943,6 +3060,12 @@ impl VulkanicGal {
             return self.validation_error(GalError::command(
                 StatusCode::InvalidArgument,
                 "texture subresource range is outside the texture",
+            ));
+        }
+        if dimension == TextureDimension::D3 && (range.base_layer != 0 || range.layer_count != 1) {
+            return self.validation_error(GalError::command(
+                StatusCode::InvalidArgument,
+                "D3 texture subresources have exactly one image layer",
             ));
         }
         Ok(())
@@ -3411,6 +3534,23 @@ fn index_type_size(index_type: super::resources::IndexType) -> u64 {
         super::resources::IndexType::U16 => 2,
         super::resources::IndexType::U32 => 4,
     }
+}
+
+fn texture_mip_extent(base: Extent3d, mip: u32) -> Extent3d {
+    Extent3d {
+        width: (base.width >> mip).max(1),
+        height: (base.height >> mip).max(1),
+        depth: (base.depth >> mip).max(1),
+    }
+}
+
+fn max_texture_mip_levels(extent: Extent3d) -> u32 {
+    let largest_dimension = extent.width.max(extent.height).max(extent.depth);
+    u32::BITS - largest_dimension.leading_zeros()
+}
+
+fn is_depth_format(format: TextureFormat) -> bool {
+    matches!(format, TextureFormat::Depth24Stencil8 | TextureFormat::Depth32Float)
 }
 
 fn targets_overlap(left: AccessTarget, right: AccessTarget) -> bool {

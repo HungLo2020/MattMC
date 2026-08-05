@@ -20,6 +20,7 @@ fn test_capabilities() -> BackendCapabilities {
         limits: BackendLimits {
             max_buffer_size: 1024 * 1024,
             max_texture_extent_2d: 4096,
+            max_texture_extent_3d: 0,
             max_texture_mip_levels: 1,
             max_texture_array_layers: 1,
             max_resource_layout_bindings: 16,

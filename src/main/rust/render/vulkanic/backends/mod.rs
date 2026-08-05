@@ -221,10 +221,12 @@ pub(super) fn vulkan_capabilities() -> BackendCapabilities {
             presentation: false,
             renderdoc_capture: true,
             tracy_zones: true,
+            texture_3d: true,
         },
         limits: BackendLimits {
             max_buffer_size: 256 * 1024 * 1024,
             max_texture_extent_2d: 8192,
+            max_texture_extent_3d: 2048,
             max_texture_mip_levels: 13,
             max_texture_array_layers: 64,
             max_resource_layout_bindings: 32,
@@ -271,10 +273,14 @@ pub(super) fn opengl_capabilities() -> BackendCapabilities {
             presentation: false,
             renderdoc_capture: true,
             tracy_zones: true,
+            texture_3d: true,
         },
         limits: BackendLimits {
             max_buffer_size: 64 * 1024 * 1024,
             max_texture_extent_2d: 4096,
+            // The isolated GL path supports D3 allocation, box upload/readback,
+            // and sampled binding. Storage images remain independently false.
+            max_texture_extent_3d: 2048,
             max_texture_mip_levels: 1,
             max_texture_array_layers: 1,
             max_resource_layout_bindings: 16,

@@ -896,7 +896,11 @@ impl SubmissionLowerer {
                     let _zone = trace::Zone::new("vulkan.lowering.copy-buffer-to-texture");
                     let buffer = objects.buffer(region.buffer)?;
                     let texture = objects.texture(region.texture)?;
-                    let copy = buffer_image_copy(region, texture.aspect);
+                    let copy = buffer_image_copy(
+                        region,
+                        texture.aspect,
+                        texture.copy_bytes_per_texel,
+                    );
                     self.context.device.cmd_copy_buffer_to_image(
                         command_buffer,
                         buffer.buffer,
@@ -909,7 +913,11 @@ impl SubmissionLowerer {
                     let _zone = trace::Zone::new("vulkan.lowering.copy-texture-to-buffer");
                     let buffer = objects.buffer(region.buffer)?;
                     let texture = objects.texture(region.texture)?;
-                    let copy = buffer_image_copy(region, texture.aspect);
+                    let copy = buffer_image_copy(
+                        region,
+                        texture.aspect,
+                        texture.copy_bytes_per_texel,
+                    );
                     self.context.device.cmd_copy_image_to_buffer(
                         command_buffer,
                         texture.image,
@@ -1325,6 +1333,47 @@ mod timestamp_tests {
     use super::*;
 
     #[test]
+    fn buffer_image_copy_preserves_texel_row_length_for_r8_and_depth_extent() {
+        let copy = buffer_image_copy(
+            &BufferImageCopyRegion {
+                buffer: crate::render::vulkanic::handles::Handle::new(
+                    crate::render::vulkanic::handles::HandleKind::Buffer,
+                    1,
+                    1,
+                )
+                .unwrap(),
+                buffer_offset: 12,
+                bytes_per_row: 7,
+                rows_per_image: 5,
+                texture: crate::render::vulkanic::handles::Handle::new(
+                    crate::render::vulkanic::handles::HandleKind::Texture,
+                    1,
+                    1,
+                )
+                .unwrap(),
+                texture_mip: 0,
+                texture_layer: 0,
+                texture_origin: crate::render::vulkanic::commands::TextureOrigin3d {
+                    x: 1,
+                    y: 2,
+                    z: 3,
+                },
+                extent: crate::render::vulkanic::resources::Extent3d {
+                    width: 7,
+                    height: 4,
+                    depth: 2,
+                },
+            },
+            vk::ImageAspectFlags::COLOR,
+            1,
+        );
+        assert_eq!(7, copy.buffer_row_length);
+        assert_eq!(5, copy.buffer_image_height);
+        assert_eq!(3, copy.image_offset.z);
+        assert_eq!(2, copy.image_extent.depth);
+    }
+
+    #[test]
     fn timestamp_pass_labels_classify_shader_graph_passes() {
         assert_eq!(
             Some(TimestampPassKind::ShadowDepth),
@@ -1562,10 +1611,11 @@ fn vk_index_type(index_type: crate::render::vulkanic::resources::IndexType) -> v
 fn buffer_image_copy(
     region: &BufferImageCopyRegion,
     aspect_mask: vk::ImageAspectFlags,
+    bytes_per_texel: u32,
 ) -> vk::BufferImageCopy {
     vk::BufferImageCopy::default()
         .buffer_offset(region.buffer_offset)
-        .buffer_row_length(region.bytes_per_row / 4)
+        .buffer_row_length(region.bytes_per_row / bytes_per_texel)
         .buffer_image_height(region.rows_per_image)
         .image_subresource(vk::ImageSubresourceLayers {
             aspect_mask,

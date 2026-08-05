@@ -48,6 +48,23 @@ pub enum TextureFormat {
     Rgba16Float = 3,
     Depth24Stencil8 = 4,
     Depth32Float = 5,
+    /// Single-channel unsigned normalized-integer resource data. This is not
+    /// a color attachment format; it is valid for sampled/storage textures.
+    R8Uint = 6,
+}
+
+impl TextureFormat {
+    /// The tightly packed byte width used by buffer-to-texture copy validation.
+    /// Depth/stencil formats deliberately remain unsupported for host copies until
+    /// their aspect-specific copy contract is modeled.
+    pub const fn copy_bytes_per_texel(self) -> Option<u32> {
+        match self {
+            Self::Rgba8Unorm | Self::Bgra8Unorm | Self::Depth32Float => Some(4),
+            Self::Rgba16Float => Some(8),
+            Self::R8Uint => Some(1),
+            Self::Depth24Stencil8 => None,
+        }
+    }
 }
 
 #[repr(u32)]
@@ -308,6 +325,7 @@ pub enum BackendFeature {
     Presentation = 18,
     RenderDocCapture = 19,
     TracyZones = 20,
+    Texture3d = 21,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -332,6 +350,7 @@ pub struct BackendFeatureFlags {
     pub presentation: bool,
     pub renderdoc_capture: bool,
     pub tracy_zones: bool,
+    pub texture_3d: bool,
 }
 
 impl BackendFeatureFlags {
@@ -357,6 +376,7 @@ impl BackendFeatureFlags {
             BackendFeature::Presentation => self.presentation,
             BackendFeature::RenderDocCapture => self.renderdoc_capture,
             BackendFeature::TracyZones => self.tracy_zones,
+            BackendFeature::Texture3d => self.texture_3d,
         }
     }
 }
@@ -365,6 +385,7 @@ impl BackendFeatureFlags {
 pub struct BackendLimits {
     pub max_buffer_size: u64,
     pub max_texture_extent_2d: u32,
+    pub max_texture_extent_3d: u32,
     pub max_texture_mip_levels: u32,
     pub max_texture_array_layers: u32,
     pub max_resource_layout_bindings: u32,
@@ -399,7 +420,7 @@ impl BackendCapabilities {
 
     pub fn fingerprint_json(self) -> String {
         format!(
-            "{{\"name\":\"{}\",\"features\":{{\"graphics\":{},\"compute\":{},\"descriptor_arrays\":{},\"optional_bindings\":{},\"dynamic_buffer_offsets\":{},\"uniform_buffers\":{},\"storage_buffers\":{},\"storage_textures\":{},\"indirect_draw\":{},\"indirect_dispatch\":{},\"multiple_color_attachments\":{},\"depth_only_pass\":{},\"blended_pass\":{},\"texture_subresource_copies\":{},\"texture_mip_levels\":{},\"texture_array_layers\":{},\"host_buffer_access\":{},\"presentation\":{},\"renderdoc_capture\":{},\"tracy_zones\":{}}},\"limits\":{{\"max_buffer_size\":{},\"max_texture_extent_2d\":{},\"max_texture_mip_levels\":{},\"max_texture_array_layers\":{},\"max_resource_layout_bindings\":{},\"max_binding_array_count\":{},\"max_color_attachments\":{},\"max_dynamic_offsets_per_binding\":{},\"max_command_lists_per_submission\":{},\"max_commands_per_list\":{},\"max_draw_count\":{},\"max_dispatch_groups_per_axis\":{}}}}}",
+            "{{\"name\":\"{}\",\"features\":{{\"graphics\":{},\"compute\":{},\"descriptor_arrays\":{},\"optional_bindings\":{},\"dynamic_buffer_offsets\":{},\"uniform_buffers\":{},\"storage_buffers\":{},\"storage_textures\":{},\"indirect_draw\":{},\"indirect_dispatch\":{},\"multiple_color_attachments\":{},\"depth_only_pass\":{},\"blended_pass\":{},\"texture_subresource_copies\":{},\"texture_mip_levels\":{},\"texture_array_layers\":{},\"host_buffer_access\":{},\"presentation\":{},\"renderdoc_capture\":{},\"tracy_zones\":{},\"texture_3d\":{}}},\"limits\":{{\"max_buffer_size\":{},\"max_texture_extent_2d\":{},\"max_texture_extent_3d\":{},\"max_texture_mip_levels\":{},\"max_texture_array_layers\":{},\"max_resource_layout_bindings\":{},\"max_binding_array_count\":{},\"max_color_attachments\":{},\"max_dynamic_offsets_per_binding\":{},\"max_command_lists_per_submission\":{},\"max_draw_count\":{},\"max_dispatch_groups_per_axis\":{}}}}}",
             self.name,
             self.features.graphics,
             self.features.compute,
@@ -421,8 +442,10 @@ impl BackendCapabilities {
             self.features.presentation,
             self.features.renderdoc_capture,
             self.features.tracy_zones,
+            self.features.texture_3d,
             self.limits.max_buffer_size,
             self.limits.max_texture_extent_2d,
+            self.limits.max_texture_extent_3d,
             self.limits.max_texture_mip_levels,
             self.limits.max_texture_array_layers,
             self.limits.max_resource_layout_bindings,
@@ -431,8 +454,7 @@ impl BackendCapabilities {
             self.limits.max_dynamic_offsets_per_binding,
             self.limits.max_command_lists_per_submission,
             self.limits.max_commands_per_list,
-            self.limits.max_draw_count,
-            self.limits.max_dispatch_groups_per_axis
+            self.limits.max_draw_count
         )
     }
 }

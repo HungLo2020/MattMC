@@ -8,6 +8,7 @@ pub(crate) mod runtime;
 pub mod source;
 pub mod terrain_contract;
 pub mod uniforms;
+pub mod voxel_light_volume;
 
 #[cfg(test)]
 mod tests {
@@ -19,11 +20,11 @@ mod tests {
     };
     use super::preprocess::{preprocess, PreprocessInput};
     use super::programs::{
-        minimal_composite_color_grade_program, minimal_composite_depth_fog_program,
-        complementary_terrain_subset_program,
-        minimal_deferred_lighting_program, minimal_final_copy_program,
-        minimal_shadow_depth_program, minimal_terrain_cutout_program,
-        minimal_terrain_solid_program, ProgramIdentity, ShaderStageKind, TerrainMaterialProgramKind,
+        complementary_terrain_subset_program, minimal_composite_color_grade_program,
+        minimal_composite_depth_fog_program, minimal_deferred_lighting_program,
+        minimal_final_copy_program, minimal_shadow_depth_program, minimal_terrain_cutout_program,
+        minimal_terrain_solid_program, ProgramIdentity, ShaderStageKind,
+        TerrainMaterialProgramKind,
     };
     use super::resources::{
         ShaderPackResourceManifest, ShaderPackResources, ShaderPackRuntimePlan,
@@ -31,7 +32,12 @@ mod tests {
     use super::source::{ShaderPackSource, ShaderSourceFile};
     use super::terrain_contract::{
         bundled_complementary_hung_loified_source, derive_complementary_terrain_contract,
-        TerrainPassOutput,
+        TerrainPassOutput, TerrainPassRequiredResource,
+    };
+    use super::voxel_light_volume::{
+        VoxelLightVolumeCache, VoxelLightVolumeDescriptor, VoxelLightVolumeExtent,
+        VoxelLightVolumeIdentity, VoxelLightVolumeKind, VoxelLightVolumeMapping,
+        VoxelLightVolumeRegion, VoxelLightVolumeRequirements, VoxelLightVolumeUpdate,
     };
 
     #[test]
@@ -46,7 +52,10 @@ mod tests {
         assert!(program.vertex.source.contains("WorldMeshVertices"));
         assert!(program.fragment.source.contains("sampler2D"));
         assert!(program.fragment.source.contains("out_terrain_lit_color"));
-        assert!(program.fragment.source.contains("out_terrain_material_auxiliary"));
+        assert!(program
+            .fragment
+            .source
+            .contains("out_terrain_material_auxiliary"));
         assert!(!program.vertex.source.contains("IrisRenderSystem"));
         assert!(!program.fragment.source.contains("IrisRenderSystem"));
 
@@ -281,9 +290,15 @@ mod tests {
     fn complementary_terrain_contract_is_source_derived_and_never_uses_draw_buffer_slots() {
         let source = bundled_complementary_hung_loified_source(9).unwrap();
         let contract = derive_complementary_terrain_contract(&source).unwrap();
-        assert!(contract.outputs.contains(&TerrainPassOutput::LitTerrainColor));
-        assert!(contract.outputs.contains(&TerrainPassOutput::MaterialAuxiliary));
-        assert!(contract.outputs.contains(&TerrainPassOutput::ViewSpaceNormal));
+        assert!(contract
+            .outputs
+            .contains(&TerrainPassOutput::LitTerrainColor));
+        assert!(contract
+            .outputs
+            .contains(&TerrainPassOutput::MaterialAuxiliary));
+        assert!(contract
+            .outputs
+            .contains(&TerrainPassOutput::ViewSpaceNormal));
         assert!(contract.material_ids.contains_key(&10009));
         let diagnostic_plan = ShaderPackRuntimePlan::terrain_material_multipass_v1(9).unwrap();
         let mut diagnostic_plan = diagnostic_plan;
@@ -315,16 +330,94 @@ mod tests {
                 ShaderSourceFile::new("block.properties", "block.1=minecraft:stone\n"),
             ],
         ).unwrap()).unwrap();
-        let program = complementary_terrain_subset_program(&supported, TerrainMaterialProgramKind::Opaque).unwrap();
+        let program =
+            complementary_terrain_subset_program(&supported, TerrainMaterialProgramKind::Opaque)
+                .unwrap();
         assert!(program.fragment.source.contains("sampled_atlas_color"));
-        assert!(program.fragment.source.contains("out_terrain_material_auxiliary"));
+        assert!(program
+            .fragment
+            .source
+            .contains("out_terrain_material_auxiliary"));
 
         let selected = derive_complementary_terrain_contract(
             &bundled_complementary_hung_loified_source(5).unwrap(),
         )
         .unwrap();
-        assert!(complementary_terrain_subset_program(&selected, TerrainMaterialProgramKind::Cutout).is_err());
+        assert!(selected
+            .required_resources
+            .contains(&TerrainPassRequiredResource::ColoredVoxelLightVolume));
+        assert!(complementary_terrain_subset_program(
+            &selected,
+            TerrainMaterialProgramKind::Cutout
+        )
+        .is_err());
         assert!(ShaderPackRuntimePlan::complementary_terrain_contract_v1(5).is_err());
+    }
+
+    #[test]
+    fn selected_source_plan_requires_an_owned_complete_voxel_volume() {
+        let source = ShaderPackSource::new(
+            "selected-volume",
+            17,
+            vec![
+                ShaderSourceFile::new(
+                    "program/gbuffers_terrain.glsl",
+                    "void DoLighting() {}\n/* DRAWBUFFERS:06 */\nvoid main() { vec4 color = texture2D(tex, texCoord); if (color.a <= 0.00001) discard; color.rgb *= glColor.rgb; DoLighting(); gl_FragData[0] = color; gl_FragData[1] = vec4(smoothnessD, materialMask, skyLightFactor, 1.0); }",
+                ),
+                ShaderSourceFile::new("lib/common.glsl", "#define COLORED_LIGHTING 128\n#define RP_MODE 0\n#define BLOCK_REFLECT_QUALITY 0\n"),
+                ShaderSourceFile::new("shaders.properties", "profile.MATTMC=COLORED_LIGHTING=128 RP_MODE=0 BLOCK_REFLECT_QUALITY=0\nimage.voxel_img = voxel_sampler red_integer r8ui unsigned_int true false 128 64 128\nimage.floodfill_img = floodfill_sampler rgba rgba16f half_float false false 128 64 128\nimage.floodfill_img_copy = floodfill_sampler_copy rgba rgba16f half_float false false 128 64 128\n"),
+                ShaderSourceFile::new("block.properties", "block.1=minecraft:stone\n"),
+            ],
+        )
+        .unwrap();
+        let extent = VoxelLightVolumeExtent {
+            width: 128,
+            height: 64,
+            depth: 128,
+        };
+        let descriptor = VoxelLightVolumeDescriptor {
+            identity: VoxelLightVolumeIdentity::new("shader-pack:selected-volume/light").unwrap(),
+            shader_pack_generation: 17,
+            world_generation: 4,
+            resource_generation: 9,
+            extent,
+            requirements: VoxelLightVolumeRequirements::complementary(128).unwrap(),
+            mapping: VoxelLightVolumeMapping::complementary(extent, [0, 64, 0], [0.0; 3]).unwrap(),
+        };
+        let mut volume = VoxelLightVolumeCache::new();
+        volume.replace_descriptor(descriptor.clone()).unwrap();
+        assert!(
+            ShaderPackRuntimePlan::terrain_material_from_source_with_voxel_light_volume(
+                17, &source, &volume, 0
+            )
+            .is_err()
+        );
+        for kind in [
+            VoxelLightVolumeKind::Occupancy,
+            VoxelLightVolumeKind::FloodFillEven,
+            VoxelLightVolumeKind::FloodFillOdd,
+        ] {
+            let region = VoxelLightVolumeRegion::whole(extent);
+            volume
+                .apply_update(VoxelLightVolumeUpdate {
+                    identity: descriptor.identity.clone(),
+                    shader_pack_generation: descriptor.shader_pack_generation,
+                    world_generation: descriptor.world_generation,
+                    resource_generation: descriptor.resource_generation,
+                    kind,
+                    region,
+                    texels: vec![0; region.extent.byte_len(kind.format()) as usize],
+                })
+                .unwrap();
+        }
+        let plan = ShaderPackRuntimePlan::terrain_material_from_source_with_voxel_light_volume(
+            17, &source, &volume, 0,
+        )
+        .unwrap();
+        assert_eq!(Some(descriptor), plan.voxel_light_volume);
+        assert!(plan
+            .terrain_contract_diagnostic_json()
+            .contains("selected_source_plan_admitted"));
     }
 
     #[test]

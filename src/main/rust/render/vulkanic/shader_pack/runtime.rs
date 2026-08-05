@@ -133,7 +133,8 @@ impl ShaderPackRuntimeExecutor {
         // source. The fixture must never masquerade as a partially supported
         // Complementary program.
         let source = bundled_complementary_hung_loified_source(generation)?;
-        let mut discovered_contract = ShaderPackRuntimePlan::terrain_material_multipass_v1(generation)?;
+        let mut discovered_contract =
+            ShaderPackRuntimePlan::terrain_material_multipass_v1(generation)?;
         discovered_contract.terrain_contract = Some(
             ShaderPackRuntimePlan::discover_terrain_contract_from_source(generation, &source)?,
         );
@@ -637,7 +638,10 @@ fn write_contract_diagnostic(plan: &ShaderPackRuntimePlan) {
         return;
     }
     let _ = fs::write(
-        dir.join(format!("terrain-pass-contract-generation-{}.json", plan.generation)),
+        dir.join(format!(
+            "terrain-pass-contract-generation-{}.json",
+            plan.generation
+        )),
         format!("{}\n", plan.terrain_contract_diagnostic_json()),
     );
 }

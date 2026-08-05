@@ -335,7 +335,7 @@ impl VulkanObjects {
         desc: &TextureDesc,
         token: BackendToken,
     ) -> GalResult<TextureObject> {
-        if desc.dimension != TextureDimension::D2 {
+        if !matches!(desc.dimension, TextureDimension::D2 | TextureDimension::D3) {
             return Err(GalError::backend(
                 "Vulkan backend currently supports D2 textures in the isolated path",
             ));
@@ -343,7 +343,11 @@ impl VulkanObjects {
         let format = texture_format(desc.format);
         let usage = texture_usage_flags(&desc.usages);
         let create_info = vk::ImageCreateInfo::default()
-            .image_type(vk::ImageType::TYPE_2D)
+            .image_type(match desc.dimension {
+                TextureDimension::D2 => vk::ImageType::TYPE_2D,
+                TextureDimension::D3 => vk::ImageType::TYPE_3D,
+                _ => unreachable!("GAL validated supported texture dimension"),
+            })
             .format(format)
             .extent(vk::Extent3D {
                 width: desc.extent.width,
@@ -392,7 +396,12 @@ impl VulkanObjects {
             image,
             memory,
             format,
+            copy_bytes_per_texel: desc
+                .format
+                .copy_bytes_per_texel()
+                .unwrap_or(0),
             extent: desc.extent,
+            dimension: desc.dimension,
             mip_levels: desc.mip_levels,
             array_layers: desc.array_layers,
             aspect: aspect_for_format(desc.format),
@@ -408,7 +417,11 @@ impl VulkanObjects {
         let texture = self.texture(desc.texture)?;
         let create_info = vk::ImageViewCreateInfo::default()
             .image(texture.image)
-            .view_type(vk::ImageViewType::TYPE_2D)
+            .view_type(match texture.dimension {
+                TextureDimension::D2 => vk::ImageViewType::TYPE_2D,
+                TextureDimension::D3 => vk::ImageViewType::TYPE_3D,
+                _ => unreachable!("GAL validated supported texture dimension"),
+            })
             .format(texture_format(desc.format))
             .subresource_range(vk::ImageSubresourceRange {
                 aspect_mask: texture.aspect,
@@ -1045,7 +1058,9 @@ pub(super) struct TextureObject {
     pub(super) image: vk::Image,
     pub(super) memory: vk::DeviceMemory,
     pub(super) format: vk::Format,
+    pub(super) copy_bytes_per_texel: u32,
     pub(super) extent: Extent3d,
+    pub(super) dimension: TextureDimension,
     pub(super) mip_levels: u32,
     pub(super) array_layers: u32,
     pub(super) aspect: vk::ImageAspectFlags,
@@ -1140,6 +1155,7 @@ pub(super) fn texture_format(format: TextureFormat) -> vk::Format {
         TextureFormat::Rgba16Float => vk::Format::R16G16B16A16_SFLOAT,
         TextureFormat::Depth24Stencil8 => vk::Format::D24_UNORM_S8_UINT,
         TextureFormat::Depth32Float => vk::Format::D32_SFLOAT,
+        TextureFormat::R8Uint => vk::Format::R8_UINT,
     }
 }
 

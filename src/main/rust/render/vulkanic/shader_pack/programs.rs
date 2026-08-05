@@ -111,11 +111,27 @@ pub fn complementary_terrain_subset_program(
     contract: &TerrainPassContract,
     kind: TerrainMaterialProgramKind,
 ) -> GalResult<TerrainMaterialProgram> {
-    contract.require_selected_subset()?;
-    if !matches!(kind, TerrainMaterialProgramKind::Opaque | TerrainMaterialProgramKind::Cutout) {
-        return Err(crate::render::vulkanic::error::GalError::unsupported_feature(
-            "Complementary terrain subset only supports opaque and cutout materials",
-        ));
+    complementary_terrain_subset_program_with_resources(contract, kind, None, 0)
+}
+
+/// Selects the source-derived lowering only after every semantic resource
+/// required by the selected profile has a complete, matching generation.
+pub fn complementary_terrain_subset_program_with_resources(
+    contract: &TerrainPassContract,
+    kind: TerrainMaterialProgramKind,
+    voxel_light_volume: Option<&VoxelLightVolumeCache>,
+    frame_counter: u64,
+) -> GalResult<TerrainMaterialProgram> {
+    contract.require_selected_subset_with_resources(voxel_light_volume, frame_counter)?;
+    if !matches!(
+        kind,
+        TerrainMaterialProgramKind::Opaque | TerrainMaterialProgramKind::Cutout
+    ) {
+        return Err(
+            crate::render::vulkanic::error::GalError::unsupported_feature(
+                "Complementary terrain subset only supports opaque and cutout materials",
+            ),
+        );
     }
     Ok(TerrainMaterialProgram {
         identity: ProgramIdentity::new(format!(
@@ -651,7 +667,8 @@ void main() {
     }
 }
 "#;
-use crate::render::vulkanic::resources::BackendApi;
 use crate::render::vulkanic::error::GalResult;
+use crate::render::vulkanic::resources::BackendApi;
 
 use super::terrain_contract::TerrainPassContract;
+use super::voxel_light_volume::VoxelLightVolumeCache;
