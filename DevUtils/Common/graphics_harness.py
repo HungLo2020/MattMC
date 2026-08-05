@@ -10995,6 +10995,9 @@ def build_capture_command(
     if tool_kind == "capture" and mode.backend == "rust-vulkan":
         attachment_dir = capture_dir / "whole_frame_gameplay_attachments"
         env["MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_DIR"] = str(attachment_dir)
+        env["MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR"] = str(
+            capture_dir / "terrain_pass_contract"
+        )
         env.setdefault("MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_MIN_FRAME", "1")
         min_mesh_instances = 1
         if getattr(args, "world_mesh_falling_block_scenario", "") or getattr(args, "world_mesh_piston_scenario", ""):

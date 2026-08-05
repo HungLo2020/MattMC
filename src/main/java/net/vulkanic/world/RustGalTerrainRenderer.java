@@ -1178,6 +1178,7 @@ public final class RustGalTerrainRenderer {
 			throw new IllegalArgumentException("static terrain vertex buffer length is not aligned to stride " + vertexStride);
 		}
 		int bufferVertexCapacity = buffer.remaining() / vertexStride;
+		int shaderBlockIdOffset = activeTerrainShaderBlockIdOffset(vertexStride);
 		int[] vertexSegments = mesh.getVertexSegments();
 		if (vertexSegments.length % 2 != 0) {
 			throw new IllegalArgumentException("static terrain vertex segment array length is odd");
@@ -1256,6 +1257,9 @@ public final class RustGalTerrainRenderer {
 			minV = Math.min(minV, v);
 			maxU = Math.max(maxU, u);
 			maxV = Math.max(maxV, v);
+			int packedShaderBlock = shaderBlockIdOffset == 0 ? 0 : buffer.getInt(offset + shaderBlockIdOffset);
+			int shaderBlockId = shaderBlockIdOffset == 0 ? -1 : decodeIrisShaderBlockId(packedShaderBlock);
+			int shaderMaterialType = shaderBlockIdOffset == 0 ? -1 : decodeIrisShaderRenderType(packedShaderBlock);
 			vertices.add(new VulkanicGalBridge.WorldMeshVertexRecord(
 				x,
 				y,
@@ -1264,8 +1268,8 @@ public final class RustGalTerrainRenderer {
 				v,
 				u,
 				v,
-				(lightMaterial >>> 16) & 0xff,
-				(lightMaterial >>> 16) & 0xff,
+				shaderBlockId,
+				shaderMaterialType,
 				color,
 				0,
 				decodeLight(lightMaterial, "swapped-block-sky-light".equals(fault))
@@ -2147,6 +2151,27 @@ public final class RustGalTerrainRenderer {
 		} catch (RuntimeException error) {
 			return COMPACT_PREFIX_STRIDE;
 		}
+	}
+
+	private static int activeTerrainShaderBlockIdOffset(int vertexStride) {
+		try {
+			int offset = WorldRenderingSettings.INSTANCE.getVertexFormat().getNativeFormat().blockIdOffset();
+			if (offset <= 0 || offset + Integer.BYTES > vertexStride) {
+				return 0;
+			}
+			return offset;
+		} catch (RuntimeException error) {
+			return 0;
+		}
+	}
+
+	// Iris stores (blockId + 1) << 1 with the low bit reserved for render type.
+	static int decodeIrisShaderBlockId(int packedBlockId) {
+		return (packedBlockId >>> 1) - 1;
+	}
+
+	static int decodeIrisShaderRenderType(int packedBlockId) {
+		return packedBlockId & 1;
 	}
 
 	private static String activeFault() {

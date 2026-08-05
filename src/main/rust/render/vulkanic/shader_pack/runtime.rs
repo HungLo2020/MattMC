@@ -5,9 +5,12 @@ use crate::render::vulkanic::commands::{
 use crate::render::vulkanic::error::{GalError, GalResult};
 use crate::render::vulkanic::handles::Handle;
 use crate::render::vulkanic::resources::{IndexType, QueueClass};
+use std::fs;
+use std::path::Path;
 
 use super::pass_graph::{AttachmentRole, PassIdentity};
 use super::resources::ShaderPackRuntimePlan;
+use super::terrain_contract::bundled_complementary_hung_loified_source;
 
 pub(crate) const TERRAIN_RUNTIME_COMPOSITE_UNIFORM_BYTES: u64 = 16 * 4 + 4 * 4 + 4 * 4 + 4 * 4;
 
@@ -126,9 +129,17 @@ pub(crate) struct ShaderPackRuntimeExecutor {
 
 impl ShaderPackRuntimeExecutor {
     pub(crate) fn terrain_material_multipass_v1(generation: u64) -> GalResult<Self> {
-        Ok(Self {
-            plan: ShaderPackRuntimePlan::terrain_material_multipass_v1(generation)?,
-        })
+        // Discovery is intentionally independent from selecting executable
+        // source. The fixture must never masquerade as a partially supported
+        // Complementary program.
+        let source = bundled_complementary_hung_loified_source(generation)?;
+        let mut discovered_contract = ShaderPackRuntimePlan::terrain_material_multipass_v1(generation)?;
+        discovered_contract.terrain_contract = Some(
+            ShaderPackRuntimePlan::discover_terrain_contract_from_source(generation, &source)?,
+        );
+        write_contract_diagnostic(&discovered_contract);
+        let plan = ShaderPackRuntimePlan::terrain_material_multipass_v1(generation)?;
+        Ok(Self { plan })
     }
 
     pub(crate) fn plan(&self) -> &ShaderPackRuntimePlan {
@@ -615,6 +626,20 @@ impl ShaderPackRuntimeExecutor {
                 GalError::invalid_argument(format!("shader runtime graph is missing {role:?} pass"))
             })
     }
+}
+
+fn write_contract_diagnostic(plan: &ShaderPackRuntimePlan) {
+    let Some(dir) = std::env::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
+        return;
+    };
+    let dir = Path::new(&dir);
+    if fs::create_dir_all(dir).is_err() {
+        return;
+    }
+    let _ = fs::write(
+        dir.join(format!("terrain-pass-contract-generation-{}.json", plan.generation)),
+        format!("{}\n", plan.terrain_contract_diagnostic_json()),
+    );
 }
 
 impl TerrainCompositeUniforms {

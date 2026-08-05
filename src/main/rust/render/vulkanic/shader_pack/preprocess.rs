@@ -1,4 +1,5 @@
 use std::collections::BTreeSet;
+use std::path::Path;
 
 use crate::render::vulkanic::error::{GalError, GalResult};
 
@@ -32,30 +33,51 @@ fn expand_file(
     stack: &mut BTreeSet<String>,
     out: &mut String,
 ) -> GalResult<()> {
-    if !stack.insert(path.to_string()) {
+    let path = normalize_path(path);
+    if !stack.insert(path.clone()) {
         return Err(GalError::invalid_argument(format!(
             "cyclic shader include {path}"
         )));
     }
     let contents = source
-        .get(path)
+        .get(&path)
         .ok_or_else(|| GalError::invalid_argument(format!("missing shader source {path}")))?;
     for line in contents.lines() {
         if let Some(include) = parse_include(line) {
-            expand_file(source, include, stack, out)?;
+            let include = resolve_include(&path, include);
+            expand_file(source, &include, stack, out)?;
         } else {
             out.push_str(line);
             out.push('\n');
         }
     }
-    stack.remove(path);
+    stack.remove(&path);
     Ok(())
 }
 
 fn parse_include(line: &str) -> Option<&str> {
     let trimmed = line.trim();
     let rest = trimmed.strip_prefix("#include")?.trim();
-    rest.strip_prefix('"')?.strip_suffix('"')
+    rest.strip_prefix('"')
+        .and_then(|include| include.strip_suffix('"'))
+        .or_else(|| rest.strip_prefix('<').and_then(|include| include.strip_suffix('>')))
+}
+
+fn normalize_path(path: &str) -> String {
+    path.trim_start_matches('/').replace('\\', "/")
+}
+
+fn resolve_include(parent: &str, include: &str) -> String {
+    if include.starts_with('/') {
+        return normalize_path(include);
+    }
+    let parent = Path::new(parent);
+    parent
+        .parent()
+        .unwrap_or_else(|| Path::new(""))
+        .join(include)
+        .to_string_lossy()
+        .replace('\\', "/")
 }
 
 fn validate_define(key: &str, value: &str) -> GalResult<()> {

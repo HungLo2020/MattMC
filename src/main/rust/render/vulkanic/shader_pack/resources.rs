@@ -3,11 +3,16 @@ use crate::render::vulkanic::error::{GalError, GalResult};
 use super::manifest::{ShaderPackConfig, ShaderPackManifest};
 use super::pass_graph::{AttachmentIdentity, AttachmentRole, PassGraph, PassIdentity};
 use super::programs::{
+    complementary_terrain_subset_program,
     minimal_composite_color_grade_program, minimal_composite_depth_fog_program,
     minimal_deferred_lighting_program, minimal_final_copy_program, minimal_shadow_depth_program,
     minimal_terrain_cutout_program, minimal_terrain_solid_program,
     minimal_terrain_translucent_program, CompositeProgram, ProgramIdentity,
-    TerrainMaterialProgram,
+    TerrainMaterialProgram, TerrainMaterialProgramKind,
+};
+use super::terrain_contract::{
+    bundled_complementary_hung_loified_source, derive_complementary_terrain_contract,
+    TerrainPassContract,
 };
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -83,6 +88,10 @@ pub struct ShaderPackRuntimePlan {
     pub graph: PassGraph,
     pub resources: ShaderPackResourceManifest,
     pub programs: ShaderPackProgramSet,
+    /// Source-derived semantics for the terrain material pass. This carries no
+    /// Java, Iris, GL, or Vulkan objects; executable program selection remains
+    /// a Rust shader-pack-runtime decision.
+    pub terrain_contract: Option<TerrainPassContract>,
 }
 
 impl ShaderPackRuntimePlan {
@@ -95,7 +104,104 @@ impl ShaderPackRuntimePlan {
             graph,
             resources: ShaderPackResourceManifest::terrain_material_v1(generation)?,
             programs: ShaderPackProgramSet::terrain_material_multipass_v1(),
+            terrain_contract: None,
         })
+    }
+
+    pub fn complementary_terrain_contract_v1(generation: u64) -> GalResult<Self> {
+        let source = bundled_complementary_hung_loified_source(generation)?;
+        Self::terrain_material_from_source(generation, &source)
+    }
+
+    pub fn discover_terrain_contract_from_source(
+        generation: u64,
+        source: &super::source::ShaderPackSource,
+    ) -> GalResult<TerrainPassContract> {
+        if source.generation() != generation {
+            return Err(crate::render::vulkanic::error::GalError::invalid_argument(
+                "shader-pack source generation must match runtime generation",
+            ));
+        }
+        derive_complementary_terrain_contract(source)
+    }
+
+    pub fn terrain_material_from_source(
+        generation: u64,
+        source: &super::source::ShaderPackSource,
+    ) -> GalResult<Self> {
+        let contract = Self::discover_terrain_contract_from_source(generation, source)?;
+        let terrain_opaque = complementary_terrain_subset_program(
+            &contract,
+            TerrainMaterialProgramKind::Opaque,
+        )?;
+        let terrain_cutout = complementary_terrain_subset_program(
+            &contract,
+            TerrainMaterialProgramKind::Cutout,
+        )?;
+        let mut plan = Self::terrain_material_multipass_v1(generation)?;
+        plan.resources.programs[1] = terrain_opaque.identity.clone();
+        plan.resources.programs[2] = terrain_cutout.identity.clone();
+        plan.programs.terrain_opaque = terrain_opaque;
+        plan.programs.terrain_cutout = terrain_cutout;
+        plan.terrain_contract = Some(contract);
+        Ok(plan)
+    }
+
+    pub fn terrain_contract_diagnostic_json(&self) -> String {
+        let Some(contract) = &self.terrain_contract else {
+            return "{\"source_contract_discovered\":false,\"execution\":\"internal-terrain-fixture\"}".to_string();
+        };
+        let inputs = contract
+            .inputs
+            .iter()
+            .map(|input| format!("\"{input:?}\""))
+            .collect::<Vec<_>>()
+            .join(",");
+        let outputs = contract
+            .outputs
+            .iter()
+            .map(|output| format!("\"{}\"", output.semantic_name()))
+            .collect::<Vec<_>>()
+            .join(",");
+        let operations = contract
+            .operations
+            .iter()
+            .map(|operation| format!("\"{operation:?}\""))
+            .collect::<Vec<_>>()
+            .join(",");
+        let unsupported = contract
+            .unsupported
+            .iter()
+            .map(|feature| format!("\"{feature:?}\""))
+            .collect::<Vec<_>>()
+            .join(",");
+        format!(
+            concat!(
+                "{{\"source_contract_discovered\":true,\"pack\":\"{}\",\"generation\":{},",
+                "\"program\":\"{}\",\"operations\":[{}],\"outputs\":[{}],\"inputs\":[{}],",
+                "\"input_bindings\":{{\"AtlasColor\":\"semantic material atlas texture\",",
+                "\"AtlasUv\":\"WorldMeshVertex.shader_atlas_uv\",",
+                "\"Tint\":\"WorldMeshVertex.color_argb.rgb\",",
+                "\"AmbientOcclusion\":\"WorldMeshVertex.color_argb.alpha when separate AO\",",
+                "\"PackedBlockLight\":\"WorldMeshVertex.light[0..3]\",",
+                "\"PackedSkyLight\":\"WorldMeshVertex.light[20..23]\",",
+                "\"GeometricNormal\":\"WorldMeshVertex.normal_packed\",",
+                "\"MaterialIdentity\":\"WorldMeshVertex.shader_block_id\",",
+                "\"WorldPosition\":\"WorldMeshVertex.position plus semantic instance model\"}},",
+                "\"output_bindings\":{{\"terrain_lit_color\":\"terrain color attachment location 0\",",
+                "\"terrain_material_auxiliary\":\"terrain auxiliary attachment location 2\",",
+                "\"terrain_view_space_normal\":\"terrain normal attachment location 1 when declared\"}},",
+                "\"unsupported\":[{}],\"selected_source_execution_admitted\":{},\"execution\":\"internal-terrain-fixture; selected-source execution is explicitly unsupported until this contract is lowered\"}}"
+            ),
+            json_escape(&contract.pack_name),
+            contract.generation,
+            json_escape(&contract.program_path),
+            operations,
+            outputs,
+            inputs,
+            unsupported,
+            contract.supports_selected_subset(),
+        )
     }
 
     pub fn declared_attachment_roles(&self) -> Vec<AttachmentRole> {
@@ -105,6 +211,10 @@ impl ShaderPackRuntimePlan {
             .map(|attachment| attachment.role)
             .collect()
     }
+}
+
+fn json_escape(value: &str) -> String {
+    value.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
 impl ShaderPackResourceManifest {

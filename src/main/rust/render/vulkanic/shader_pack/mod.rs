@@ -6,6 +6,7 @@ pub mod programs;
 pub mod resources;
 pub(crate) mod runtime;
 pub mod source;
+pub mod terrain_contract;
 pub mod uniforms;
 
 #[cfg(test)]
@@ -19,14 +20,19 @@ mod tests {
     use super::preprocess::{preprocess, PreprocessInput};
     use super::programs::{
         minimal_composite_color_grade_program, minimal_composite_depth_fog_program,
+        complementary_terrain_subset_program,
         minimal_deferred_lighting_program, minimal_final_copy_program,
         minimal_shadow_depth_program, minimal_terrain_cutout_program,
-        minimal_terrain_solid_program, ProgramIdentity, ShaderStageKind,
+        minimal_terrain_solid_program, ProgramIdentity, ShaderStageKind, TerrainMaterialProgramKind,
     };
     use super::resources::{
         ShaderPackResourceManifest, ShaderPackResources, ShaderPackRuntimePlan,
     };
     use super::source::{ShaderPackSource, ShaderSourceFile};
+    use super::terrain_contract::{
+        bundled_complementary_hung_loified_source, derive_complementary_terrain_contract,
+        TerrainPassOutput,
+    };
 
     #[test]
     fn minimal_terrain_solid_program_is_rust_owned_and_backend_neutral() {
@@ -39,6 +45,8 @@ mod tests {
         assert_eq!(ShaderStageKind::Fragment, program.fragment.stage);
         assert!(program.vertex.source.contains("WorldMeshVertices"));
         assert!(program.fragment.source.contains("sampler2D"));
+        assert!(program.fragment.source.contains("out_terrain_lit_color"));
+        assert!(program.fragment.source.contains("out_terrain_material_auxiliary"));
         assert!(!program.vertex.source.contains("IrisRenderSystem"));
         assert!(!program.fragment.source.contains("IrisRenderSystem"));
 
@@ -267,6 +275,56 @@ mod tests {
             .programs
             .iter()
             .any(|program| { program.as_str() == plan.programs.final_output.identity.as_str() }));
+    }
+
+    #[test]
+    fn complementary_terrain_contract_is_source_derived_and_never_uses_draw_buffer_slots() {
+        let source = bundled_complementary_hung_loified_source(9).unwrap();
+        let contract = derive_complementary_terrain_contract(&source).unwrap();
+        assert!(contract.outputs.contains(&TerrainPassOutput::LitTerrainColor));
+        assert!(contract.outputs.contains(&TerrainPassOutput::MaterialAuxiliary));
+        assert!(contract.outputs.contains(&TerrainPassOutput::ViewSpaceNormal));
+        assert!(contract.material_ids.contains_key(&10009));
+        let diagnostic_plan = ShaderPackRuntimePlan::terrain_material_multipass_v1(9).unwrap();
+        let mut diagnostic_plan = diagnostic_plan;
+        diagnostic_plan.terrain_contract = Some(contract);
+        let diagnostic = diagnostic_plan.terrain_contract_diagnostic_json();
+        assert!(diagnostic.contains("source_contract_discovered"));
+        assert!(diagnostic.contains("terrain_lit_color"));
+        assert!(diagnostic.contains("WorldMeshVertex.shader_block_id"));
+    }
+
+    #[test]
+    fn runtime_plan_rejects_source_generation_mismatch() {
+        let source = bundled_complementary_hung_loified_source(3).unwrap();
+        assert!(ShaderPackRuntimePlan::terrain_material_from_source(4, &source).is_err());
+    }
+
+    #[test]
+    fn complementary_subset_program_is_source_admitted_and_rejects_current_profile() {
+        let supported = derive_complementary_terrain_contract(&ShaderPackSource::new(
+            "supported",
+            5,
+            vec![
+                ShaderSourceFile::new(
+                    "program/gbuffers_terrain.glsl",
+                    "void DoLighting() {}\n/* DRAWBUFFERS:06 */\nvoid main() { vec4 color = texture2D(tex, texCoord); if (color.a <= 0.00001) discard; color.rgb *= glColor.rgb; DoLighting(); gl_FragData[0] = color; gl_FragData[1] = vec4(smoothnessD, materialMask, skyLightFactor, 1.0); }",
+                ),
+                ShaderSourceFile::new("lib/common.glsl", "#define COLORED_LIGHTING 0\n#define RP_MODE 0\n#define BLOCK_REFLECT_QUALITY 0\n"),
+                ShaderSourceFile::new("shaders.properties", "profile.MATTMC=COLORED_LIGHTING=0 RP_MODE=0 BLOCK_REFLECT_QUALITY=0\n"),
+                ShaderSourceFile::new("block.properties", "block.1=minecraft:stone\n"),
+            ],
+        ).unwrap()).unwrap();
+        let program = complementary_terrain_subset_program(&supported, TerrainMaterialProgramKind::Opaque).unwrap();
+        assert!(program.fragment.source.contains("sampled_atlas_color"));
+        assert!(program.fragment.source.contains("out_terrain_material_auxiliary"));
+
+        let selected = derive_complementary_terrain_contract(
+            &bundled_complementary_hung_loified_source(5).unwrap(),
+        )
+        .unwrap();
+        assert!(complementary_terrain_subset_program(&selected, TerrainMaterialProgramKind::Cutout).is_err());
+        assert!(ShaderPackRuntimePlan::complementary_terrain_contract_v1(5).is_err());
     }
 
     #[test]

@@ -12,6 +12,13 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class RustGalTerrainRendererLightingContractTest {
 	@Test
+	void preservesIrisPackedBlockMaterialSemantics() {
+		int packed = (10200 + 1 << 1) | 1;
+		assertEquals(10200, RustGalTerrainRenderer.decodeIrisShaderBlockId(packed));
+		assertEquals(1, RustGalTerrainRenderer.decodeIrisShaderRenderType(packed));
+	}
+
+	@Test
 	public void compactTerrainColorConvertsSodiumAbgrToSemanticArgb() {
 		int compactAbgr = 0x80402010;
 
