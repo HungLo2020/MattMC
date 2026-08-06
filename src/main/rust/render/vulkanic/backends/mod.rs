@@ -18,6 +18,7 @@ use super::frame::{
 use super::handles::{Handle, HandleKind};
 use super::resources::{
     BackendApi, BackendCapabilities, BackendFeatureFlags, BackendLimits, BufferDesc,
+    CombinedTextureSamplerDesc,
     ComputePipelineDesc, FrameTargetDesc, GraphicsPipelineDesc, PipelineLayoutDesc, RenderPassDesc,
     RenderTargetDesc, ResourceLayoutDesc, ResourceSetDesc, SamplerDesc, ShaderModuleDesc,
     TextureDesc, TextureViewDesc,
@@ -140,6 +141,7 @@ pub(super) enum BackendCreateDesc<'a> {
     Texture(&'a TextureDesc),
     TextureView(&'a TextureViewDesc),
     Sampler(&'a SamplerDesc),
+    CombinedTextureSampler(&'a CombinedTextureSamplerDesc),
     ShaderModule(&'a ShaderModuleDesc),
     ResourceLayout(&'a ResourceLayoutDesc),
     ResourceSet(&'a ResourceSetDesc),
@@ -267,7 +269,7 @@ pub(super) fn opengl_capabilities() -> BackendCapabilities {
             depth_only_pass: true,
             blended_pass: true,
             texture_subresource_copies: true,
-            texture_mip_levels: false,
+            texture_mip_levels: true,
             texture_array_layers: false,
             host_buffer_access: true,
             presentation: false,
@@ -278,10 +280,11 @@ pub(super) fn opengl_capabilities() -> BackendCapabilities {
         limits: BackendLimits {
             max_buffer_size: 64 * 1024 * 1024,
             max_texture_extent_2d: 4096,
-            // The isolated GL path supports D3 allocation, box upload/readback,
-            // and sampled binding. Storage images remain independently false.
+            // The isolated GL path supports D3 allocation, explicit mips, box
+            // upload/readback, and sampled binding. Storage images remain
+            // independently capability-gated by the current context.
             max_texture_extent_3d: 2048,
-            max_texture_mip_levels: 1,
+            max_texture_mip_levels: 13,
             max_texture_array_layers: 1,
             max_resource_layout_bindings: 16,
             max_binding_array_count: 8,
@@ -313,6 +316,7 @@ pub(super) mod mock {
         pub(in crate::render::vulkanic) encoded_batches: usize,
         pub(in crate::render::vulkanic) completed: SubmissionId,
         pub(in crate::render::vulkanic) fail_next_create: bool,
+        pub(in crate::render::vulkanic) fail_next_submit: bool,
         pub(in crate::render::vulkanic) capabilities: Option<BackendCapabilities>,
         pub(in crate::render::vulkanic) live: BTreeMap<Handle, BackendToken>,
         next_token: u64,
@@ -327,6 +331,11 @@ pub(super) mod mock {
     impl MockBackend {
         pub(in crate::render::vulkanic) fn fail_next_create(&mut self) {
             self.fail_next_create = true;
+        }
+
+        #[cfg(test)]
+        pub(in crate::render::vulkanic) fn fail_next_submit(&mut self) {
+            self.fail_next_submit = true;
         }
 
         pub(in crate::render::vulkanic) fn complete_through(&mut self, id: SubmissionId) {
@@ -362,6 +371,7 @@ pub(super) mod mock {
                 BackendCreateDesc::Texture(_) => HandleKind::Texture,
                 BackendCreateDesc::TextureView(_) => HandleKind::TextureView,
                 BackendCreateDesc::Sampler(_) => HandleKind::Sampler,
+                BackendCreateDesc::CombinedTextureSampler(_) => HandleKind::CombinedTextureSampler,
                 BackendCreateDesc::ShaderModule(_) => HandleKind::ShaderModule,
                 BackendCreateDesc::ResourceLayout(_) => HandleKind::ResourceLayout,
                 BackendCreateDesc::ResourceSet(_) => HandleKind::ResourceSet,
@@ -398,6 +408,10 @@ pub(super) mod mock {
         }
 
         fn submit(&mut self, id: SubmissionId, batch: &ValidatedSubmissionBatch) -> GalResult<()> {
+            if self.fail_next_submit {
+                self.fail_next_submit = false;
+                return Err(GalError::backend("mock submit failure"));
+            }
             self.submissions.push(id);
             self.submitted_labels.push_back(batch.label.clone());
             Ok(())

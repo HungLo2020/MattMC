@@ -315,7 +315,6 @@ fn shader_pack_policy_stays_out_of_ffi_and_backends() {
         "shader_pack::preprocess",
         "shader_pack::pass_graph",
         "ShaderPackManifest",
-        "ShaderPackSource",
         "PassGraph",
     ];
     let mut violations = Vec::new();
@@ -340,7 +339,7 @@ fn shader_pack_policy_stays_out_of_ffi_and_backends() {
 
     assert!(
         violations.is_empty(),
-        "Shader-pack policy must stay in the Rust shader_pack subsystem/frontends, not FFI/backends:\n{}",
+        "Shader-pack policy must stay in the Rust shader_pack subsystem/frontends, not FFI/backends. Versioned source-file transport is allowed in FFI, but parsing and pass policy are not:\n{}",
         violations.join("\n")
     );
 }
@@ -382,6 +381,51 @@ fn shader_pack_runtime_owns_whole_frame_pass_order() {
         "Whole-frame shader pass ordering belongs in shader_pack::runtime, not the world frontend:\n{}",
         violations.join("\n")
     );
+}
+
+#[test]
+fn shader_pack_runtime_owns_private_terrain_volume_resources() {
+    let rust_root = Path::new(RUST_ROOT);
+    let world_frontend = rust_root.join("render/vulkanic/world_primitive_frontend.rs");
+    let runtime = rust_root.join("render/vulkanic/shader_pack/runtime.rs");
+    let world_source = read_source(&world_frontend);
+    let production_world_source = world_source.split("#[cfg(test)]").next().unwrap_or(&world_source);
+    let runtime_source = read_source(&runtime);
+
+    assert!(
+        !production_world_source.contains("TerrainOccupancyRuntime"),
+        "World frontend must not own shader-pack volume resources; use the shader runtime instead"
+    );
+    assert!(
+        runtime_source.contains("terrain_occupancy: Option<TerrainOccupancyRuntime>"),
+        "Private terrain volume residency must remain owned by shader_pack::runtime"
+    );
+}
+
+#[test]
+fn source_terrain_execution_remains_compile_time_test_only() {
+    let rust_root = Path::new(RUST_ROOT);
+    let world_frontend = rust_root.join("render/vulkanic/world_primitive_frontend.rs");
+    let ffi_dir = rust_root.join("render/vulkanic/ffi");
+    let source = read_source(&world_frontend);
+
+    assert!(
+        source.contains("#[cfg(test)]\n    candidate_subset_execution_enabled: bool,"),
+        "the source terrain selector must not exist in production builds"
+    );
+    assert!(
+        source.contains("#[cfg(not(test))]\n    fn candidate_subset_programs_for_frame")
+            && source.contains("Lowered shader-pack source execution is intentionally unavailable")
+            && source.contains("Ok(None)"),
+        "production lowered-source selection must remain an explicit unavailable route"
+    );
+    for file in rust_files(&ffi_dir) {
+        assert!(
+            !read_source(&file).contains("source_terrain_execution"),
+            "FFI must not expose the private source terrain selector: {}",
+            relative(&file)
+        );
+    }
 }
 
 fn assert_no_public_backend_exposure(path: &Path, source: &str) {

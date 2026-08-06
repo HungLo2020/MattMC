@@ -1,6 +1,8 @@
 use super::*;
 use crate::render::vulkanic::resources::{BackendApi, BackendFeatureFlags, BackendLimits};
-use crate::render::vulkanic::world_primitive_frontend::WORLD_MATERIAL_TEXTURE_STONE;
+use crate::render::vulkanic::world_primitive_frontend::{
+    WORLD_MATERIAL_TEXTURE_STONE, WorldShaderEnvironmentFrame, WorldVoxelVolumeFrame,
+};
 
 fn test_capabilities() -> BackendCapabilities {
     BackendCapabilities {
@@ -357,6 +359,62 @@ fn whole_frame_request(
             | FfiFeatureBits::TEXTURE_SUBRESOURCE_COPIES
             | FfiFeatureBits::HOST_BUFFER_ACCESS
             | FfiFeatureBits::PRESENTATION,
+        voxel_volume_frame: FfiWorldVoxelVolumeFrame {
+            byte_size: size_of::<FfiWorldVoxelVolumeFrame>() as u32,
+            enabled: 0,
+            reserved0: 0,
+            reserved1: 0,
+            world_generation: 0,
+            resource_generation: 0,
+            camera_x: 0.0,
+            camera_y: 0.0,
+            camera_z: 0.0,
+            reserved2: 0,
+        },
+        shader_environment_frame: FfiWorldShaderEnvironmentFrame {
+            byte_size: size_of::<FfiWorldShaderEnvironmentFrame>() as u32,
+            enabled: 0,
+            frame_counter: 0,
+            world_day: 0,
+            world_generation: 0,
+            world_time: 0,
+            frame_time_seconds: 0.0,
+            frame_time_counter: 0.0,
+            time_of_day: 0.0,
+            rain_strength: 0.0,
+            thunder_strength: 0.0,
+            sky_darken: 0.0,
+            moon_phase: 0,
+            eye_submersion: 0,
+            screen_brightness: 0.0,
+            far_plane: 0.0,
+            relative_eye_x: 0.0,
+            relative_eye_y: 0.0,
+            relative_eye_z: 0.0,
+            sky_color_r: 0.0,
+            sky_color_g: 0.0,
+            sky_color_b: 0.0,
+            darkness_light_factor: 0.0,
+            night_vision: 0.0,
+            fog_color_r: 0.0,
+            fog_color_g: 0.0,
+            fog_color_b: 0.0,
+            biome_precipitation: 0,
+            biome_resource_location_utf8: FfiBytes {
+                ptr: core::ptr::null(),
+                len: 0,
+            },
+            main_hand_item_model_resource_location_utf8: FfiBytes {
+                ptr: core::ptr::null(),
+                len: 0,
+            },
+            off_hand_item_model_resource_location_utf8: FfiBytes {
+                ptr: core::ptr::null(),
+                len: 0,
+            },
+            main_hand_item_light_emission: 0,
+            off_hand_item_light_emission: 0,
+        },
     }
 }
 
@@ -517,6 +575,27 @@ fn world_material_asset_update_request(
     }
 }
 
+fn shader_pack_source_update_request(
+    pack_name: &[u8],
+    files: &[FfiShaderPackSourceFile],
+) -> FfiShaderPackSourceUpdateRequest {
+    FfiShaderPackSourceUpdateRequest {
+        header: FfiHeader {
+            version: FFI_ABI_VERSION,
+            byte_size: size_of::<FfiShaderPackSourceUpdateRequest>() as u32,
+        },
+        generation: 9,
+        pack_name_utf8: FfiBytes {
+            ptr: pack_name.as_ptr(),
+            len: pack_name.len() as u64,
+        },
+        files: FfiSlice {
+            ptr: files.as_ptr(),
+            count: files.len() as u64,
+        },
+    }
+}
+
 fn world_mesh_asset_update_request(
     meshes: &[FfiWorldMeshAssetRecord],
     textures: &[FfiWorldMeshTextureAssetPayload],
@@ -565,6 +644,7 @@ fn mesh_vertex() -> FfiWorldMeshVertex {
         atlas_v: 0.5,
         shader_block_id: 10232,
         shader_material_type: -1,
+        mid_block_packed: 0x0020_2020,
     }
 }
 
@@ -677,6 +757,253 @@ fn whole_frame_world_primitive_ffi_decode_copies_caller_memory() {
     assert_eq!(frame.segments[0].start[0], 1.0);
     assert_eq!(frame.segments[0].end[2], 6.0);
     assert_eq!(gui.len(), 1);
+}
+
+#[test]
+fn whole_frame_voxel_volume_semantics_decode_and_reject_malformed_state() {
+    let mut request = whole_frame_request(&[], &[]);
+    request.voxel_volume_frame = FfiWorldVoxelVolumeFrame {
+        byte_size: size_of::<FfiWorldVoxelVolumeFrame>() as u32,
+        enabled: 1,
+        reserved0: 0,
+        reserved1: 0,
+        world_generation: 17,
+        resource_generation: 23,
+        camera_x: 12.5,
+        camera_y: 64.0,
+        camera_z: -3.25,
+        reserved2: 0,
+    };
+    let (_generation, _target, frame, _gui) =
+        unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()).unwrap() };
+    assert_eq!(
+        frame.voxel_volume,
+        WorldVoxelVolumeFrame {
+            enabled: true,
+            world_generation: 17,
+            resource_generation: 23,
+            camera_world_position: [12.5, 64.0, -3.25],
+        }
+    );
+
+    request.voxel_volume_frame.world_generation = 0;
+    let error = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }
+        .expect_err("enabled voxel volume must have a world generation");
+    assert_eq!(error.code, StatusCode::InvalidArgument);
+
+    request = whole_frame_request(&[], &[]);
+    request.voxel_volume_frame.camera_x = 1.0;
+    let error = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }
+        .expect_err("disabled voxel volume must be zeroed");
+    assert_eq!(error.code, StatusCode::InvalidArgument);
+
+    request = whole_frame_request(&[], &[]);
+    request.voxel_volume_frame.enabled = 1;
+    request.voxel_volume_frame.world_generation = 17;
+    request.voxel_volume_frame.resource_generation = 23;
+    request.voxel_volume_frame.camera_x = f32::NAN;
+    let error = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }
+        .expect_err("voxel volume camera coordinates must be finite");
+    assert_eq!(error.code, StatusCode::InvalidArgument);
+}
+
+#[test]
+fn whole_frame_shader_environment_semantics_decode_and_reject_malformed_state() {
+    let biome_resource_location = b"minecraft:snowy_plains";
+    let main_hand_item_model_resource_location = b"minecraft:lava_bucket";
+    let off_hand_item_model_resource_location = b"minecraft:totem_of_undying";
+    let mut request = whole_frame_request(&[], &[]);
+    request.shader_environment_frame = FfiWorldShaderEnvironmentFrame {
+        byte_size: size_of::<FfiWorldShaderEnvironmentFrame>() as u32,
+        enabled: 1,
+        frame_counter: 42,
+        world_day: 17,
+        world_generation: 17,
+        world_time: 24_013,
+        frame_time_seconds: 0.016,
+        frame_time_counter: 12.5,
+        time_of_day: 0.25,
+        rain_strength: 0.2,
+        thunder_strength: 0.1,
+        sky_darken: 0.75,
+        moon_phase: 3,
+        eye_submersion: 1,
+        screen_brightness: 0.5,
+        far_plane: 192.0,
+        relative_eye_x: 0.25,
+        relative_eye_y: -0.5,
+        relative_eye_z: 0.75,
+        sky_color_r: 0.2,
+        sky_color_g: 0.4,
+        sky_color_b: 0.6,
+        darkness_light_factor: 0.125,
+        night_vision: 0.875,
+        fog_color_r: 0.3,
+        fog_color_g: 0.5,
+        fog_color_b: 0.7,
+        biome_precipitation: 2,
+        biome_resource_location_utf8: FfiBytes {
+            ptr: biome_resource_location.as_ptr(),
+            len: biome_resource_location.len() as u64,
+        },
+        main_hand_item_model_resource_location_utf8: FfiBytes {
+            ptr: main_hand_item_model_resource_location.as_ptr(),
+            len: main_hand_item_model_resource_location.len() as u64,
+        },
+        off_hand_item_model_resource_location_utf8: FfiBytes {
+            ptr: off_hand_item_model_resource_location.as_ptr(),
+            len: off_hand_item_model_resource_location.len() as u64,
+        },
+        main_hand_item_light_emission: 13,
+        off_hand_item_light_emission: 7,
+    };
+    let (_generation, _target, frame, _gui) =
+        unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()).unwrap() };
+    assert_eq!(
+        frame.shader_environment,
+        WorldShaderEnvironmentFrame {
+            enabled: true,
+            world_generation: 17,
+            world_time: 24_013,
+            frame_counter: 42,
+            frame_time_seconds: 0.016,
+            frame_time_counter: 12.5,
+            world_day: 17,
+            moon_phase: 3,
+            time_of_day: 0.25,
+            rain_strength: 0.2,
+            thunder_strength: 0.1,
+            sky_darken: 0.75,
+            eye_submersion: 1,
+            screen_brightness: 0.5,
+            far_plane: 192.0,
+            relative_eye_position: [0.25, -0.5, 0.75],
+            sky_color: [0.2, 0.4, 0.6],
+            darkness_light_factor: 0.125,
+            night_vision: 0.875,
+            fog_color: [0.3, 0.5, 0.7],
+            biome_precipitation: 2,
+            biome_resource_location: "minecraft:snowy_plains".to_string(),
+            main_hand_item_model_resource_location: "minecraft:lava_bucket".to_string(),
+            off_hand_item_model_resource_location: "minecraft:totem_of_undying".to_string(),
+            main_hand_item_light_emission: 13,
+            off_hand_item_light_emission: 7,
+        }
+    );
+
+    request.shader_environment_frame.time_of_day = f32::NAN;
+    let error = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }
+        .expect_err("shader environment must reject non-finite values");
+    assert_eq!(error.code, StatusCode::InvalidArgument);
+
+    request.shader_environment_frame.time_of_day = 0.25;
+    request
+        .shader_environment_frame
+        .main_hand_item_light_emission = 16;
+    let error = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }
+        .expect_err("shader environment must reject out-of-range held-item emission");
+    assert_eq!(error.code, StatusCode::InvalidArgument);
+
+    request.shader_environment_frame.time_of_day = 0.25;
+    let malformed_biome_resource_location = b"Minecraft:Snowy Plains";
+    request
+        .shader_environment_frame
+        .biome_resource_location_utf8 = FfiBytes {
+        ptr: malformed_biome_resource_location.as_ptr(),
+        len: malformed_biome_resource_location.len() as u64,
+    };
+    let error = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }
+        .expect_err("shader environment must reject a non-canonical biome identity");
+    assert_eq!(error.code, StatusCode::InvalidArgument);
+    request
+        .shader_environment_frame
+        .biome_resource_location_utf8 = FfiBytes {
+        ptr: biome_resource_location.as_ptr(),
+        len: biome_resource_location.len() as u64,
+    };
+    let malformed_main_hand_item_model_resource_location = b"Minecraft:Lava Bucket";
+    request
+        .shader_environment_frame
+        .main_hand_item_model_resource_location_utf8 = FfiBytes {
+        ptr: malformed_main_hand_item_model_resource_location.as_ptr(),
+        len: malformed_main_hand_item_model_resource_location.len() as u64,
+    };
+    let error = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }
+        .expect_err("shader environment must reject a non-canonical held-item identity");
+    assert_eq!(error.code, StatusCode::InvalidArgument);
+    request
+        .shader_environment_frame
+        .main_hand_item_model_resource_location_utf8 = FfiBytes {
+        ptr: main_hand_item_model_resource_location.as_ptr(),
+        len: main_hand_item_model_resource_location.len() as u64,
+    };
+    request.shader_environment_frame.night_vision = f32::NAN;
+    let error = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }
+        .expect_err("shader environment must reject non-finite night vision");
+    assert_eq!(error.code, StatusCode::InvalidArgument);
+    request.shader_environment_frame.night_vision = 0.875;
+    request.shader_environment_frame.fog_color_g = f32::NAN;
+    let error = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }
+        .expect_err("shader environment must reject non-finite fog color");
+    assert_eq!(error.code, StatusCode::InvalidArgument);
+    request.shader_environment_frame.fog_color_g = 0.5;
+    request.shader_environment_frame.biome_precipitation = 3;
+    let error = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }
+        .expect_err("shader environment must reject unknown biome precipitation");
+    assert_eq!(error.code, StatusCode::InvalidArgument);
+    request.shader_environment_frame.biome_precipitation = 2;
+    request.shader_environment_frame.frame_counter = 720_720;
+    let error = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }
+        .expect_err("shader environment must reject an unwrapped frame counter");
+    assert_eq!(error.code, StatusCode::InvalidArgument);
+
+    request.shader_environment_frame.frame_counter = 42;
+    request.shader_environment_frame.eye_submersion = 4;
+    let error = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }
+        .expect_err("shader environment must reject unknown camera submersion");
+    assert_eq!(error.code, StatusCode::InvalidArgument);
+
+    request.shader_environment_frame.eye_submersion = 1;
+    request.shader_environment_frame.sky_color_b = f32::NAN;
+    let error = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }
+        .expect_err("shader environment must reject non-finite sky color");
+    assert_eq!(error.code, StatusCode::InvalidArgument);
+
+    request.shader_environment_frame.sky_color_b = 0.6;
+    request.shader_environment_frame.far_plane = 0.0;
+    let error = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }
+        .expect_err("shader environment must reject a non-positive far plane");
+    assert_eq!(error.code, StatusCode::InvalidArgument);
+
+    request.shader_environment_frame.far_plane = 192.0;
+    request.shader_environment_frame.frame_time_seconds = f32::NAN;
+    let error = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }
+        .expect_err("shader environment must reject a non-finite frame time");
+    assert_eq!(error.code, StatusCode::InvalidArgument);
+
+    request.shader_environment_frame.frame_time_seconds = 0.016;
+    request.shader_environment_frame.relative_eye_z = f32::NAN;
+    let error = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }
+        .expect_err("shader environment must reject a non-finite relative eye position");
+    assert_eq!(error.code, StatusCode::InvalidArgument);
+
+    request.shader_environment_frame.frame_counter = 42;
+    request.shader_environment_frame.frame_time_counter = 3600.0;
+    let error = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }
+        .expect_err("shader environment must reject an unreset frame timer");
+    assert_eq!(error.code, StatusCode::InvalidArgument);
+
+    request.shader_environment_frame.frame_time_counter = 12.5;
+    request.shader_environment_frame.moon_phase = 8;
+    let error = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }
+        .expect_err("shader environment must reject an invalid moon phase");
+    assert_eq!(error.code, StatusCode::InvalidArgument);
+
+    request = whole_frame_request(&[], &[]);
+    request.shader_environment_frame.world_time = 1;
+    let error = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }
+        .expect_err("disabled shader environment must be zeroed");
+    assert_eq!(error.code, StatusCode::InvalidArgument);
 }
 
 #[test]
@@ -1207,4 +1534,76 @@ fn world_mesh_asset_ffi_rejects_duplicate_bad_index_and_bad_item_size() {
     }
     .unwrap_err();
     assert_eq!(StatusCode::InvalidArgument, malformed.code);
+}
+
+#[test]
+fn shader_pack_source_ffi_copies_owned_utf8_files() {
+    let mut pack_name = b"complementary-test".to_vec();
+    let mut path = b"program/gbuffers_terrain.glsl".to_vec();
+    let mut contents = b"#version 150\nvoid main() {}\n".to_vec();
+    let files = [FfiShaderPackSourceFile {
+        byte_size: size_of::<FfiShaderPackSourceFile>() as u32,
+        reserved0: 0,
+        path_utf8: FfiBytes {
+            ptr: path.as_ptr(),
+            len: path.len() as u64,
+        },
+        contents_utf8: FfiBytes {
+            ptr: contents.as_ptr(),
+            len: contents.len() as u64,
+        },
+    }];
+    let request = shader_pack_source_update_request(&pack_name, &files);
+    let decoded = unsafe { super::shader_pack::decode_shader_pack_source_update(&request) }
+        .expect("valid source update");
+
+    pack_name.fill(b'x');
+    path.fill(b'x');
+    contents.fill(b'x');
+
+    assert_eq!("complementary-test", decoded.pack_name);
+    assert_eq!(9, decoded.generation);
+    assert_eq!("program/gbuffers_terrain.glsl", decoded.files[0].path);
+    assert_eq!("#version 150\nvoid main() {}\n", decoded.files[0].contents);
+}
+
+#[test]
+fn shader_pack_source_ffi_rejects_malformed_file_records() {
+    let pack_name = b"test";
+    let path = b"program/gbuffers_terrain.glsl";
+    let contents = b"void main() {}";
+    let mut files = [FfiShaderPackSourceFile {
+        byte_size: size_of::<FfiShaderPackSourceFile>() as u32,
+        reserved0: 1,
+        path_utf8: FfiBytes {
+            ptr: path.as_ptr(),
+            len: path.len() as u64,
+        },
+        contents_utf8: FfiBytes {
+            ptr: contents.as_ptr(),
+            len: contents.len() as u64,
+        },
+    }];
+    let request = shader_pack_source_update_request(pack_name, &files);
+    let reserved = unsafe { super::shader_pack::decode_shader_pack_source_update(&request) }
+        .expect_err("reserved field must be rejected");
+    assert_eq!(StatusCode::InvalidArgument, reserved.code);
+
+    files[0].reserved0 = 0;
+    files[0].byte_size -= 4;
+    let malformed_request = shader_pack_source_update_request(pack_name, &files);
+    let malformed =
+        unsafe { super::shader_pack::decode_shader_pack_source_update(&malformed_request) }
+            .expect_err("truncated item must be rejected");
+    assert_eq!(StatusCode::InvalidArgument, malformed.code);
+}
+
+#[test]
+fn shader_pack_source_ffi_accepts_an_explicit_empty_generation() {
+    let pack_name = b"disabled";
+    let request = shader_pack_source_update_request(pack_name, &[]);
+    let decoded = unsafe { super::shader_pack::decode_shader_pack_source_update(&request) }
+        .expect("empty source generation clears a prior pack without stale reuse");
+    assert_eq!("disabled", decoded.pack_name);
+    assert!(decoded.files.is_empty());
 }

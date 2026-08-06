@@ -12,6 +12,7 @@ import net.vulkanic.VulkanicAPI;
 import net.vulkanic.bridge.RustGalFrameScheduler;
 import net.vulkanic.bridge.RustGalVulkanWholeFrameMode;
 import net.vulkanic.bridge.VulkanicGalBridge;
+import net.vulkanic.shaderpack.RustShaderPackSourceCollector;
 import net.vulkanic.world.RustGalTerrainRenderer;
 import net.vulkanic.world.RustGalWorldPrimitiveRenderer;
 import org.slf4j.Logger;
@@ -38,6 +39,11 @@ public final class RustGalFrameCoordinator {
 	private static long lastAssetPayloadCount;
 	private static long lastAssetPayloadBytes;
 	private static long assetUpdateFailures;
+	private static long nextShaderPackSourceGeneration = 1L;
+	private static long uploadedShaderPackSourceGeneration;
+	private static long attemptedShaderPackSourceGeneration;
+	private static long shaderPackSourceUpdateFailures;
+	private static RustShaderPackSourceCollector.SourceGeneration pendingShaderPackSources;
 	private static long lastSubmitted;
 	private static long lastRetiredSubmission;
 	private static boolean wholeFrameAttachmentCorrelationWritten;
@@ -219,10 +225,29 @@ public final class RustGalFrameCoordinator {
 		}
 		List<VulkanicGalBridge.GuiAssetRecord> assets = RustGalGuiRenderer.collectResolvedAssets(resourceManager);
 		RustGalWorldPrimitiveRenderer.reloadWorldAssets(resourceManager);
+		long shaderPackSourceGeneration;
+		synchronized (LOCK) {
+			shaderPackSourceGeneration = nextShaderPackSourceGeneration++;
+		}
+		RustShaderPackSourceCollector.SourceGeneration shaderPackSources = null;
+		try {
+			shaderPackSources = RustShaderPackSourceCollector.collectConfiguredPack(shaderPackSourceGeneration);
+		} catch (IOException | RuntimeException error) {
+			LOGGER.error("Rust VulkanicGAL shader-pack source collection failed; preserving the prior complete source generation", error);
+			auditMessage("Rust VulkanicGAL shader-pack source collection failed generation=" + shaderPackSourceGeneration
+				+ " preserve_last_valid=true");
+		}
 		synchronized (LOCK) {
 			generation++;
 			assetGeneration++;
 			pendingAssets = assets;
+			if (shaderPackSources != null) {
+				pendingShaderPackSources = shaderPackSources;
+				attemptedShaderPackSourceGeneration = Math.min(
+					attemptedShaderPackSourceGeneration,
+					uploadedShaderPackSourceGeneration
+				);
+			}
 			attemptedAssetGeneration = Math.min(attemptedAssetGeneration, uploadedAssetGeneration);
 			int cancelled = SCHEDULER.cancelAll("resource-reload");
 			METRICS.reloadInvalidations++;
@@ -252,6 +277,8 @@ public final class RustGalFrameCoordinator {
 			renderThread = null;
 			lastSubmitted = 0L;
 			lastRetiredSubmission = 0L;
+			uploadedShaderPackSourceGeneration = 0L;
+			attemptedShaderPackSourceGeneration = 0L;
 			configuredWidth = 0;
 			configuredHeight = 0;
 			METRICS.cancellations++;
@@ -456,6 +483,8 @@ public final class RustGalFrameCoordinator {
 					primitiveFrame.borderQuads(),
 					primitiveFrame.materialQuads(),
 					primitiveFrame.meshInstances(),
+					primitiveFrame.voxelVolumeFrame(),
+					primitiveFrame.shaderEnvironmentFrame(),
 					requests
 				);
 			} else {
@@ -1050,6 +1079,7 @@ public final class RustGalFrameCoordinator {
 	}
 
 	private static void flushPendingWorldAssetsLocked() {
+		flushPendingShaderPackSourcesLocked();
 		VulkanicGalBridge.Status status = RustGalWorldPrimitiveRenderer.flushPendingWorldBorderAssets(bridge);
 		if (status != null) {
 			recordStatus(Operation.WORLD_BORDER_ASSET_UPDATE, status);
@@ -1065,6 +1095,41 @@ public final class RustGalFrameCoordinator {
 		status = RustGalWorldPrimitiveRenderer.flushPendingWorldMeshAssets(bridge);
 		if (status != null) {
 			recordStatus(Operation.WORLD_MESH_ASSET_UPDATE, status);
+		}
+	}
+
+	private static void flushPendingShaderPackSourcesLocked() {
+		if (!RustGalGuiRenderer.isWholeFrameVulkanActive()
+			|| bridge == null
+			|| pendingShaderPackSources == null
+			|| uploadedShaderPackSourceGeneration >= pendingShaderPackSources.generation()
+			|| attemptedShaderPackSourceGeneration >= pendingShaderPackSources.generation()) {
+			return;
+		}
+		attemptedShaderPackSourceGeneration = pendingShaderPackSources.generation();
+		try {
+			recordStatus(
+				Operation.SHADER_PACK_SOURCE_UPDATE,
+				bridge.updateShaderPackSources(
+					pendingShaderPackSources.generation(),
+					pendingShaderPackSources.packName(),
+					pendingShaderPackSources.files()
+				)
+			);
+			uploadedShaderPackSourceGeneration = pendingShaderPackSources.generation();
+			auditMessage("Rust VulkanicGAL shader-pack source update accepted generation="
+				+ uploadedShaderPackSourceGeneration
+				+ " pack=" + pendingShaderPackSources.packName()
+				+ " files=" + pendingShaderPackSources.files().size()
+				+ " source_bytes=" + pendingShaderPackSources.totalBytes()
+				+ " source_execution_selected=false");
+		} catch (RuntimeException error) {
+			shaderPackSourceUpdateFailures++;
+			LOGGER.error("Rust VulkanicGAL shader-pack source update failed for generation {}; preserving the last valid source", pendingShaderPackSources.generation(), error);
+			auditMessage("Rust VulkanicGAL shader-pack source update failed generation="
+				+ pendingShaderPackSources.generation()
+				+ " failures=" + shaderPackSourceUpdateFailures
+				+ " preserve_last_valid=true");
 		}
 	}
 
@@ -1173,6 +1238,8 @@ public final class RustGalFrameCoordinator {
 			case WORLD_MESH_ASSET_UPDATE -> {
 				METRICS.worldMeshAssetUpdateCalls += calls;
 				METRICS.worldMeshAssetUpdateBytes += bytes;
+			}
+			case SHADER_PACK_SOURCE_UPDATE -> {
 			}
 		}
 	}
@@ -1428,7 +1495,8 @@ public final class RustGalFrameCoordinator {
 		WORLD_BORDER_ASSET_UPDATE,
 		WORLD_CRACK_ASSET_UPDATE,
 		WORLD_MATERIAL_ASSET_UPDATE,
-		WORLD_MESH_ASSET_UPDATE
+		WORLD_MESH_ASSET_UPDATE,
+		SHADER_PACK_SOURCE_UPDATE
 	}
 
 	private static final class Metrics {

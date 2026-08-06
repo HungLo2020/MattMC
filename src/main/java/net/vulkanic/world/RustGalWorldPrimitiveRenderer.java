@@ -1,6 +1,7 @@
 package net.vulkanic.world;
 
 import net.minecraft.Util;
+import net.iris.api.v0.item.IrisItemLightProvider;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.dev.DeterministicCameraCapture;
@@ -22,6 +23,8 @@ import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.renderer.state.BlockOutlineRenderState;
 import net.minecraft.client.renderer.state.WorldBorderRenderState;
 import net.minecraft.client.renderer.state.BlockBreakingRenderState;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.vulkanic.gui.RustGalFrameCoordinator;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -32,10 +35,12 @@ import net.minecraft.util.ARGB;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.BlockAndTintGetter;
 import net.minecraft.world.level.EmptyBlockAndTintGetter;
+import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.LightBlock;
@@ -121,8 +126,21 @@ public final class RustGalWorldPrimitiveRenderer {
 	public static final int MATERIAL_MODE_CUTOUT = 2;
 	public static final int MATERIAL_MODE_TRANSLUCENT = 3;
 	public static final int MESH_VERTEX_LAYOUT_V2 = 2;
+	public static final int MESH_VERTEX_LAYOUT_V3 = 3;
 	public static final int MESH_SECTION_ALL = -1;
 	public static final int STRATUM_WORLD_TERRAIN = 60;
+	private static final boolean DETERMINISTIC_TEMPORAL_PARITY =
+		Boolean.getBoolean("mattmc.vulkan.deterministicTemporalParity");
+	private static final long DETERMINISTIC_TEMPORAL_WORLD_TIME =
+		Long.getLong("mattmc.vulkan.deterministicTemporalParity.worldTime", 6000L);
+	private static final int DETERMINISTIC_TEMPORAL_FRAME_COUNTER =
+		Integer.getInteger("mattmc.vulkan.deterministicTemporalParity.frameCounter", 0);
+	private static final float DETERMINISTIC_TEMPORAL_FRAME_TIME_COUNTER = Float.parseFloat(
+		System.getProperty("mattmc.vulkan.deterministicTemporalParity.frameTimeCounter", "0.0")
+	);
+	private static final float DETERMINISTIC_TEMPORAL_FRAME_TIME = Float.parseFloat(
+		System.getProperty("mattmc.vulkan.deterministicTemporalParity.frameTime", "0.016666668")
+	);
 	private static final ResourceLocation MISSING_TEXTURE_LOCATION = ResourceLocation.withDefaultNamespace("missingno");
 	private static byte[] missingTexturePayload;
 	public static final int WORLD_TOPOLOGY_TRIANGLES = 1;
@@ -244,6 +262,17 @@ public final class RustGalWorldPrimitiveRenderer {
 	private static final List<MovingBlockShellScanDiagnostic> MOVING_BLOCK_SHELL_SCAN_DIAGNOSTICS = new ArrayList<>();
 	private static final float[] PENDING_VIEW = new float[16];
 	private static final float[] PENDING_PROJECTION = new float[16];
+	private static ClientLevel voxelVolumeLevel;
+	private static long voxelVolumeWorldGeneration = 1L;
+	private static VulkanicGalBridge.WorldVoxelVolumeFrameRecord pendingVoxelVolumeFrame =
+		VulkanicGalBridge.WorldVoxelVolumeFrameRecord.disabled();
+	private static VulkanicGalBridge.WorldShaderEnvironmentFrameRecord pendingShaderEnvironmentFrame =
+		VulkanicGalBridge.WorldShaderEnvironmentFrameRecord.disabled();
+	private static int shaderPackFrameCounter;
+	private static float shaderPackFrameTimeSeconds;
+	private static float shaderPackFrameTimeCounter;
+	private static long shaderPackPreviousFrameStartNanos = Long.MIN_VALUE;
+	private static float shaderPackFramePartialTick;
 	private static VulkanicGalBridge.WorldBackgroundRecord pendingBackground = VulkanicGalBridge.WorldBackgroundRecord.diagnosticFallback();
 	private static VulkanicGalBridge.WorldBorderAssetRecord pendingWorldBorderAsset =
 		new VulkanicGalBridge.WorldBorderAssetRecord(BORDER_TEXTURE_FORCEFIELD, new byte[0]);
@@ -831,6 +860,55 @@ public final class RustGalWorldPrimitiveRenderer {
 	}
 
 	public static void beginFrame(Matrix4f viewMatrix, Matrix4f projectionMatrix, int viewportWidth, int viewportHeight) {
+		beginFrame(viewMatrix, projectionMatrix, viewportWidth, viewportHeight, null, null);
+	}
+
+	/**
+	 * Advances explicit frame-time semantics once at the start of a client
+	 * render frame. This deliberately duplicates no Iris renderer state: the
+	 * record contains only clock values copied from the game loop.
+	 */
+	public static void beginShaderPackFrame(long frameStartNanos, float partialTick) {
+		if (frameStartNanos < 0L) {
+			throw new IllegalArgumentException("shader-pack frame start must be non-negative");
+		}
+		if (!Float.isFinite(partialTick) || partialTick < 0.0F || partialTick > 1.0F) {
+			throw new IllegalArgumentException("shader-pack partial tick must be finite and within [0, 1]");
+		}
+		synchronized (LOCK) {
+			shaderPackFramePartialTick = partialTick;
+			if (DETERMINISTIC_TEMPORAL_PARITY) {
+				shaderPackFrameCounter = Math.floorMod(DETERMINISTIC_TEMPORAL_FRAME_COUNTER, 720720);
+				shaderPackFrameTimeSeconds = DETERMINISTIC_TEMPORAL_FRAME_TIME;
+				shaderPackFrameTimeCounter = DETERMINISTIC_TEMPORAL_FRAME_TIME_COUNTER;
+				shaderPackPreviousFrameStartNanos = frameStartNanos;
+				return;
+			}
+			shaderPackFrameCounter = (shaderPackFrameCounter + 1) % 720720;
+			long previous = shaderPackPreviousFrameStartNanos;
+			long elapsedMillis = previous == Long.MIN_VALUE ? 0L : Math.max(0L, (frameStartNanos - previous) / 1_000_000L);
+			shaderPackFrameTimeSeconds = elapsedMillis / 1000.0F;
+			shaderPackFrameTimeCounter += shaderPackFrameTimeSeconds;
+			if (shaderPackFrameTimeCounter >= 3600.0F) {
+				shaderPackFrameTimeCounter = 0.0F;
+			}
+			shaderPackPreviousFrameStartNanos = frameStartNanos;
+		}
+	}
+
+	/**
+	 * Captures copied camera/world semantics for private Rust-owned volume
+	 * preparation. This does not select a shader program or pass any renderer
+	 * object through the semantic frame.
+	 */
+	public static void beginFrame(
+		Matrix4f viewMatrix,
+		Matrix4f projectionMatrix,
+		int viewportWidth,
+		int viewportHeight,
+		ClientLevel level,
+		Camera camera
+	) {
 		synchronized (LOCK) {
 			PENDING_SEGMENTS.clear();
 			PENDING_CRACK_QUADS.clear();
@@ -839,8 +917,269 @@ public final class RustGalWorldPrimitiveRenderer {
 			PENDING_MESH_INSTANCES.clear();
 			PENDING_MESH_PRODUCERS.clear();
 			pendingBackground = VulkanicGalBridge.WorldBackgroundRecord.diagnosticFallback();
+			pendingVoxelVolumeFrame = VulkanicGalBridge.WorldVoxelVolumeFrameRecord.disabled();
+			pendingShaderEnvironmentFrame = VulkanicGalBridge.WorldShaderEnvironmentFrameRecord.disabled();
 			seedFrameMatricesLocked(viewMatrix, projectionMatrix, viewportWidth, viewportHeight);
+			seedVoxelVolumeFrameLocked(level, camera);
+			seedShaderEnvironmentFrameLocked(level, camera);
 		}
+	}
+
+	private static void seedVoxelVolumeFrameLocked(ClientLevel level, Camera camera) {
+		if (level == null || camera == null) {
+			return;
+		}
+		if (voxelVolumeLevel != level) {
+			voxelVolumeLevel = level;
+			voxelVolumeWorldGeneration++;
+		}
+		Vec3 position = camera.getPosition();
+		if (!Double.isFinite(position.x) || !Double.isFinite(position.y) || !Double.isFinite(position.z)) {
+			return;
+		}
+		pendingVoxelVolumeFrame = new VulkanicGalBridge.WorldVoxelVolumeFrameRecord(
+			true,
+			voxelVolumeWorldGeneration,
+			Math.max(1L, worldMeshAssetGeneration),
+			(float)position.x,
+			(float)position.y,
+			(float)position.z
+		);
+	}
+
+	private static void seedShaderEnvironmentFrameLocked(ClientLevel level, Camera camera) {
+		if (level == null) {
+			return;
+		}
+		int skyColor = camera == null
+			? 0
+			: level.getSkyColor(camera.getPosition(), shaderPackFramePartialTick);
+		Vector3f fogColor = shaderPackFogColor(level, camera);
+		int biomePrecipitation = shaderPackBiomePrecipitation(level, camera);
+		String biomeResourceLocation = shaderPackBiomeResourceLocation(level, camera);
+		String mainHandItemModelResourceLocation = shaderPackHeldItemModelResourceLocation(
+			Minecraft.getInstance().player == null ? ItemStack.EMPTY : Minecraft.getInstance().player.getMainHandItem()
+		);
+		String offHandItemModelResourceLocation = shaderPackHeldItemModelResourceLocation(
+			Minecraft.getInstance().player == null ? ItemStack.EMPTY : Minecraft.getInstance().player.getOffhandItem()
+		);
+		int mainHandItemLightEmission = shaderPackHeldItemLightEmission(
+			Minecraft.getInstance().player == null ? ItemStack.EMPTY : Minecraft.getInstance().player.getMainHandItem()
+		);
+		int offHandItemLightEmission = shaderPackHeldItemLightEmission(
+			Minecraft.getInstance().player == null ? ItemStack.EMPTY : Minecraft.getInstance().player.getOffhandItem()
+		);
+		Vec3 relativeEyePosition = shaderPackRelativeEyePosition(camera);
+		pendingShaderEnvironmentFrame = new VulkanicGalBridge.WorldShaderEnvironmentFrameRecord(
+			true,
+			Math.max(1L, voxelVolumeWorldGeneration),
+			shaderPackWorldTime(level),
+			shaderPackFrameCounter,
+			shaderPackFrameTimeSeconds,
+			shaderPackFrameTimeCounter,
+			shaderPackWorldDay(level),
+			shaderPackMoonPhase(level),
+			clampUnit(level.getTimeOfDay(1.0F)),
+			clampUnit(level.getRainLevel(1.0F)),
+			clampUnit(level.getThunderLevel(1.0F)),
+			clampUnit(level.getSkyDarken(1.0F)),
+			shaderPackEyeSubmersion(camera),
+			(float)Math.max(0.0, Minecraft.getInstance().options.gamma().get()),
+			Minecraft.getInstance().options.getEffectiveRenderDistance() * 16.0F,
+			(float)relativeEyePosition.x,
+			(float)relativeEyePosition.y,
+			(float)relativeEyePosition.z,
+			ARGB.redFloat(skyColor),
+			ARGB.greenFloat(skyColor),
+			ARGB.blueFloat(skyColor),
+			shaderPackDarknessLightFactor(),
+			shaderPackNightVision(),
+			fogColor.x,
+			fogColor.y,
+			fogColor.z,
+			biomePrecipitation,
+			biomeResourceLocation,
+			mainHandItemModelResourceLocation,
+			offHandItemModelResourceLocation,
+			mainHandItemLightEmission,
+			offHandItemLightEmission
+		);
+	}
+
+	/**
+	 * Copies only vanilla item-model identity. Rust resolves the selected
+	 * shader pack's integer ID table; no Iris map, item renderer, or backend
+	 * object crosses the semantic frame boundary.
+	 */
+	private static String shaderPackHeldItemModelResourceLocation(ItemStack stack) {
+		if (stack == null || stack.isEmpty()) {
+			return "";
+		}
+		ResourceLocation itemModel = stack.get(DataComponents.ITEM_MODEL);
+		if (itemModel == null) {
+			itemModel = BuiltInRegistries.ITEM.getKey(stack.getItem());
+		}
+		return itemModel == null ? "" : itemModel.toString();
+	}
+
+	/**
+	 * Copies one bounded vanilla gameplay scalar. Rust applies the selected
+	 * pack's legacy main/off-hand composition rule, so Java never resolves a
+	 * pack map or exposes an Iris renderer object across FFI.
+	 */
+	private static int shaderPackHeldItemLightEmission(ItemStack stack) {
+		if (stack == null || stack.isEmpty() || Minecraft.getInstance().player == null) {
+			return 0;
+		}
+		int emission = ((IrisItemLightProvider) stack.getItem()).getLightEmission(
+			Minecraft.getInstance().player,
+			stack
+		);
+		return Mth.clamp(emission, 0, 15);
+	}
+
+	/**
+	 * Copies vanilla's camera-biome precipitation classification. Rust owns the
+	 * shader-source smoothing and interpretation of this raw semantic.
+	 */
+	private static int shaderPackBiomePrecipitation(ClientLevel level, Camera camera) {
+		if (camera == null) {
+			return 0;
+		}
+		Biome.Precipitation precipitation = level.getBiome(camera.getBlockPosition()).value().getPrecipitationAt(
+			camera.getBlockPosition(),
+			level.getSeaLevel()
+		);
+		return switch (precipitation) {
+			case NONE -> 0;
+			case RAIN -> 1;
+			case SNOW -> 2;
+		};
+	}
+
+	/**
+	 * Copies only the canonical camera-biome identity. Rust interprets selected
+	 * shader-pack biome mappings and temporal behavior; no Iris registry object
+	 * or integer mapping crosses the semantic boundary.
+	 */
+	private static String shaderPackBiomeResourceLocation(ClientLevel level, Camera camera) {
+		if (camera == null) {
+			return "";
+		}
+		return level.getBiome(camera.getBlockPosition())
+			.unwrapKey()
+			.map(key -> key.location().toString())
+			.orElse("");
+	}
+
+	/**
+	 * Evaluates GameRenderer's vanilla fog-color semantic before Iris merely
+	 * captures it. The copied RGB value has no Iris renderer or GPU-state
+	 * dependency.
+	 */
+	private static Vector3f shaderPackFogColor(ClientLevel level, Camera camera) {
+		if (camera == null) {
+			return new Vector3f();
+		}
+		Minecraft minecraft = Minecraft.getInstance();
+		boolean worldFog = level.effects().isFoggyAt(
+			camera.getBlockPosition().getX(),
+			camera.getBlockPosition().getZ()
+		) || minecraft.gui.getBossOverlay().shouldCreateWorldFog();
+		Vector4f color = minecraft.gameRenderer.fogRenderer.computeFogColor(
+			camera,
+			shaderPackFramePartialTick,
+			level,
+			minecraft.options.getEffectiveRenderDistance(),
+			minecraft.gameRenderer.getDarkenWorldAmount(shaderPackFramePartialTick),
+			worldFog
+		);
+		return new Vector3f(color.x, color.y, color.z);
+	}
+
+	/**
+	 * Copies the vanilla light-texture darkness calculation as a gameplay
+	 * semantic. This deliberately does not read Iris's captured state: Iris
+	 * records this exact value after the same calculation.
+	 */
+	private static float shaderPackDarknessLightFactor() {
+		Minecraft minecraft = Minecraft.getInstance();
+		if (minecraft.player == null) {
+			return 0.0F;
+		}
+		float effectScale = minecraft.options.darknessEffectScale().get().floatValue();
+		float blend = minecraft.player.getEffectBlendFactor(MobEffects.DARKNESS, shaderPackFramePartialTick) * effectScale;
+		float pulse = Math.max(0.0F, Mth.cos((minecraft.player.tickCount - shaderPackFramePartialTick) * (float)Math.PI * 0.025F) * 0.45F * blend);
+		return pulse * effectScale;
+	}
+
+	/**
+	 * Mirrors Iris's documented night-vision semantic from vanilla gameplay
+	 * state. The camera entity is queried directly; no captured Iris tick or
+	 * renderer state participates in the Rust-owned path.
+	 */
+	private static float shaderPackNightVision() {
+		Minecraft minecraft = Minecraft.getInstance();
+		if (minecraft.getCameraEntity() instanceof net.minecraft.world.entity.LivingEntity livingEntity) {
+			float strength = GameRenderer.getNightVisionScale(livingEntity, shaderPackFramePartialTick);
+			if (strength > 0.0F) {
+				return Mth.clamp(strength, 0.0F, 1.0F);
+			}
+		}
+		if (minecraft.player != null && minecraft.player.hasEffect(MobEffects.CONDUIT_POWER)) {
+			return Mth.clamp(minecraft.player.getWaterVision(), 0.0F, 1.0F);
+		}
+		return 0.0F;
+	}
+
+	private static int shaderPackEyeSubmersion(Camera camera) {
+		if (camera == null) {
+			return 0;
+		}
+		return switch (camera.getFluidInCamera()) {
+			case WATER -> 1;
+			case LAVA -> 2;
+			case POWDER_SNOW -> 3;
+			default -> 0;
+		};
+	}
+
+	private static Vec3 shaderPackRelativeEyePosition(Camera camera) {
+		if (camera == null || camera.getEntity() == null) {
+			return Vec3.ZERO;
+		}
+		return camera.getPosition().subtract(camera.getEntity().getEyePosition(shaderPackFramePartialTick));
+	}
+
+	/**
+	 * Copies the semantic {@code worldTime} convention used by shader packs:
+	 * the dimension's fixed time when one exists, otherwise the vanilla day
+	 * cycle. This is game state, not an Iris uniform, program, or renderer
+	 * dependency.
+	 */
+	private static long shaderPackWorldTime(ClientLevel level) {
+		long sourceTime = DETERMINISTIC_TEMPORAL_PARITY
+			? DETERMINISTIC_TEMPORAL_WORLD_TIME
+			: level.getDayTime();
+		return level.dimensionType().fixedTime().orElse(Math.floorMod(sourceTime, 24000L));
+	}
+
+	private static int shaderPackWorldDay(ClientLevel level) {
+		long sourceTime = DETERMINISTIC_TEMPORAL_PARITY
+			? DETERMINISTIC_TEMPORAL_WORLD_TIME
+			: level.getDayTime();
+		return (int)Math.floorDiv(sourceTime, 24000L);
+	}
+
+	private static int shaderPackMoonPhase(ClientLevel level) {
+		long sourceTime = DETERMINISTIC_TEMPORAL_PARITY
+			? DETERMINISTIC_TEMPORAL_WORLD_TIME
+			: level.getDayTime();
+		return level.dimensionType().moonPhase(sourceTime);
+	}
+
+	private static float clampUnit(float value) {
+		return Float.isFinite(value) ? Math.clamp(value, 0.0F, 1.0F) : 0.0F;
 	}
 
 	public static void reseedFrameMatrices(Matrix4f viewMatrix, Matrix4f projectionMatrix, int viewportWidth, int viewportHeight) {
@@ -862,6 +1201,8 @@ public final class RustGalWorldPrimitiveRenderer {
 			PENDING_MESH_INSTANCES.clear();
 			PENDING_MESH_PRODUCERS.clear();
 			pendingBackground = VulkanicGalBridge.WorldBackgroundRecord.diagnosticFallback();
+			pendingVoxelVolumeFrame = VulkanicGalBridge.WorldVoxelVolumeFrameRecord.disabled();
+			pendingShaderEnvironmentFrame = VulkanicGalBridge.WorldShaderEnvironmentFrameRecord.disabled();
 			pendingViewportWidth = 0;
 			pendingViewportHeight = 0;
 			return;
@@ -879,6 +1220,8 @@ public final class RustGalWorldPrimitiveRenderer {
 			PENDING_MESH_INSTANCES.clear();
 			PENDING_MESH_PRODUCERS.clear();
 			pendingBackground = VulkanicGalBridge.WorldBackgroundRecord.diagnosticFallback();
+			pendingVoxelVolumeFrame = VulkanicGalBridge.WorldVoxelVolumeFrameRecord.disabled();
+			pendingShaderEnvironmentFrame = VulkanicGalBridge.WorldShaderEnvironmentFrameRecord.disabled();
 			new Matrix4f().get(PENDING_VIEW);
 			new Matrix4f().get(PENDING_PROJECTION);
 			pendingViewportWidth = 0;
@@ -1706,7 +2049,8 @@ public final class RustGalWorldPrimitiveRenderer {
 						shaderMaterialType,
 						colorArgb,
 					quad.getVertexNormal(i),
-					LightTexture.lightCoordsWithEmission(quad.getLight(i), bakedQuad.lightEmission())
+						LightTexture.lightCoordsWithEmission(quad.getLight(i), bakedQuad.lightEmission()),
+						0
 				));
 			}
 			indices.add(base);
@@ -3832,7 +4176,9 @@ public final class RustGalWorldPrimitiveRenderer {
 				List.copyOf(PENDING_CRACK_QUADS),
 				List.copyOf(PENDING_BORDER_QUADS),
 				List.copyOf(PENDING_MATERIAL_QUADS),
-				List.copyOf(PENDING_MESH_INSTANCES)
+				List.copyOf(PENDING_MESH_INSTANCES),
+				pendingVoxelVolumeFrame,
+				pendingShaderEnvironmentFrame
 			);
 			PENDING_SEGMENTS.clear();
 			PENDING_CRACK_QUADS.clear();
@@ -3841,6 +4187,8 @@ public final class RustGalWorldPrimitiveRenderer {
 					PENDING_MESH_INSTANCES.clear();
 					PENDING_MESH_PRODUCERS.clear();
 					pendingBackground = VulkanicGalBridge.WorldBackgroundRecord.diagnosticFallback();
+					pendingVoxelVolumeFrame = VulkanicGalBridge.WorldVoxelVolumeFrameRecord.disabled();
+					pendingShaderEnvironmentFrame = VulkanicGalBridge.WorldShaderEnvironmentFrameRecord.disabled();
 					return frame;
 			}
 		}
@@ -3975,7 +4323,9 @@ public final class RustGalWorldPrimitiveRenderer {
 			List.copyOf(crackQuads),
 			List.copyOf(borderQuads),
 			List.copyOf(materialQuads),
-			List.copyOf(meshInstances)
+			List.copyOf(meshInstances),
+			frame.voxelVolumeFrame(),
+			frame.shaderEnvironmentFrame()
 		);
 	}
 
@@ -4002,8 +4352,37 @@ public final class RustGalWorldPrimitiveRenderer {
 		List<VulkanicGalBridge.WorldCrackQuadRecord> crackQuads,
 		List<VulkanicGalBridge.WorldBorderQuadRecord> borderQuads,
 		List<VulkanicGalBridge.WorldMaterialQuadRecord> materialQuads,
-		List<VulkanicGalBridge.WorldMeshInstanceRecord> meshInstances
+		List<VulkanicGalBridge.WorldMeshInstanceRecord> meshInstances,
+		VulkanicGalBridge.WorldVoxelVolumeFrameRecord voxelVolumeFrame,
+		VulkanicGalBridge.WorldShaderEnvironmentFrameRecord shaderEnvironmentFrame
 	) {
+		public PrimitiveFrame(
+			int viewportWidth,
+			int viewportHeight,
+			float[] viewMatrix,
+			float[] projectionMatrix,
+			VulkanicGalBridge.WorldBackgroundRecord background,
+			List<VulkanicGalBridge.WorldLineSegmentRecord> segments,
+			List<VulkanicGalBridge.WorldCrackQuadRecord> crackQuads,
+			List<VulkanicGalBridge.WorldBorderQuadRecord> borderQuads,
+			List<VulkanicGalBridge.WorldMaterialQuadRecord> materialQuads,
+			List<VulkanicGalBridge.WorldMeshInstanceRecord> meshInstances
+		) {
+			this(
+				viewportWidth,
+				viewportHeight,
+				viewMatrix,
+				projectionMatrix,
+				background,
+				segments,
+				crackQuads,
+				borderQuads,
+				materialQuads,
+				meshInstances,
+				VulkanicGalBridge.WorldVoxelVolumeFrameRecord.disabled(),
+				VulkanicGalBridge.WorldShaderEnvironmentFrameRecord.disabled()
+			);
+		}
 	}
 
 	private enum PendingMeshProducer {

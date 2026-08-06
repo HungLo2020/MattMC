@@ -7,6 +7,9 @@ mod trace;
 
 use std::sync::{Mutex, MutexGuard};
 
+#[cfg(test)]
+use glow::HasContext;
+
 use super::{
     graphics_backend_lock, opengl_capabilities, presentation_capabilities, Backend,
     BackendCreateDesc, BackendRuntimeMetrics, BackendToken, CompletedHostRead,
@@ -140,14 +143,55 @@ impl OpenGlBackend {
             .map(|lowerer| lowerer.sync_stats_for_test())
             .unwrap_or_default()
     }
+
+    #[cfg(test)]
+    pub(super) fn texture_mip_range_for_test(&self, handle: Handle) -> GalResult<(i32, i32)> {
+        self.context.make_current()?;
+        let _state_guard = self.context.borrowed_state_guard();
+        let texture = self.objects.texture(handle)?;
+        let target = self::resources::texture_target(texture.dimension);
+        unsafe {
+            self.context
+                .gl()
+                .bind_texture(target, Some(texture.texture));
+            Ok((
+                self.context
+                    .gl()
+                    .get_tex_parameter_i32(target, glow::TEXTURE_BASE_LEVEL),
+                self.context
+                    .gl()
+                    .get_tex_parameter_i32(target, glow::TEXTURE_MAX_LEVEL),
+            ))
+        }
+    }
 }
 
 impl Backend for OpenGlBackend {
     fn capabilities(&self) -> BackendCapabilities {
+        let mut capabilities = opengl_capabilities();
+        let (max_texture_extent_2d, max_texture_extent_3d) = self.context.texture_extent_limits();
+        capabilities.limits.max_texture_extent_2d = capabilities
+            .limits
+            .max_texture_extent_2d
+            .min(max_texture_extent_2d);
+        capabilities.limits.max_texture_extent_3d = capabilities
+            .limits
+            .max_texture_extent_3d
+            .min(max_texture_extent_3d);
+        capabilities.features.texture_3d &= max_texture_extent_3d != 0;
+        capabilities.features.storage_textures = self.context.supports_storage_textures();
+        capabilities.features.compute =
+            self.context.supports_compute_shaders() && capabilities.features.storage_textures;
+        if capabilities.features.compute {
+            // OpenGL 4.3 / GLES 3.1 guarantee this minimum dispatch extent.
+            // Per-axis device queries can remain backend-private if a future
+            // semantic workload needs to approach that bound.
+            capabilities.limits.max_dispatch_groups_per_axis = 65_535;
+        }
         if self.presentation.is_some() {
-            presentation_capabilities(opengl_capabilities())
+            presentation_capabilities(capabilities)
         } else {
-            opengl_capabilities()
+            capabilities
         }
     }
 
@@ -179,7 +223,9 @@ impl Backend for OpenGlBackend {
         let _zone = trace::Zone::new("opengl.backend.submit");
         trace::message(&format!("gal.submission backend=opengl id={}", id.0));
         self.context.make_current()?;
-        let _state_guard = self.context.borrowed_state_guard();
+        let _state_guard = self.context.borrowed_state_guard_with_images(
+            self.objects.submission_uses_storage_textures(_batch),
+        );
         let mut lowerer = self
             .lowerer
             .lock()
@@ -388,7 +434,21 @@ mod tests {
     #[test]
     fn opengl_backend_can_bootstrap_or_reports_environment_gap() {
         match OpenGlBackend::new("MattMC OpenGL bootstrap") {
-            Ok(mut backend) => backend.retire(SubmissionId(0)).unwrap(),
+            Ok(mut backend) => {
+                let capabilities = backend.capabilities();
+                let (max_texture_extent_2d, max_texture_extent_3d) =
+                    backend.context.texture_extent_limits();
+                assert!(
+                    capabilities.limits.max_texture_extent_2d <= max_texture_extent_2d,
+                    "OpenGL capability report exceeded the active context's 2D limit"
+                );
+                assert!(
+                    capabilities.limits.max_texture_extent_3d <= max_texture_extent_3d
+                        || !capabilities.features.texture_3d,
+                    "OpenGL capability report exceeded the active context's 3D limit"
+                );
+                backend.retire(SubmissionId(0)).unwrap();
+            }
             Err(error) => {
                 let text = error.to_string();
                 assert!(

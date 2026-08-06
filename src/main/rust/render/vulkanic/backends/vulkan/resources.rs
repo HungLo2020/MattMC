@@ -49,6 +49,13 @@ impl VulkanObjects {
             BackendCreateDesc::Sampler(desc) => {
                 VulkanObject::Sampler(self.create_sampler(handle, desc, token)?)
             }
+            BackendCreateDesc::CombinedTextureSampler(desc) => {
+                VulkanObject::CombinedTextureSampler(CombinedTextureSamplerObject {
+                    token,
+                    texture_view: desc.texture_view,
+                    sampler: desc.sampler,
+                })
+            }
             BackendCreateDesc::ShaderModule(desc) => {
                 VulkanObject::ShaderModule(self.create_shader_module(handle, desc, token)?)
             }
@@ -337,11 +344,39 @@ impl VulkanObjects {
     ) -> GalResult<TextureObject> {
         if !matches!(desc.dimension, TextureDimension::D2 | TextureDimension::D3) {
             return Err(GalError::backend(
-                "Vulkan backend currently supports D2 textures in the isolated path",
+                "Vulkan backend currently supports D2 and D3 textures in the isolated path",
             ));
         }
         let format = texture_format(desc.format);
         let usage = texture_usage_flags(&desc.usages);
+        if desc.dimension == TextureDimension::D3 {
+            let properties = unsafe {
+                self.context
+                    .instance
+                    .get_physical_device_image_format_properties(
+                        self.context.physical_device,
+                        format,
+                        vk::ImageType::TYPE_3D,
+                        vk::ImageTiling::OPTIMAL,
+                        usage,
+                        vk::ImageCreateFlags::empty(),
+                    )
+            }
+            .map_err(|error| {
+                if error == vk::Result::ERROR_FORMAT_NOT_SUPPORTED {
+                    GalError::unsupported_feature(format!(
+                        "Vulkan device does not support D3 format {:?} with requested usages {:?}",
+                        desc.format, desc.usages
+                    ))
+                } else {
+                    GalError::backend(format!(
+                        "failed to query Vulkan D3 image format support for '{}': {error:?}",
+                        desc.label
+                    ))
+                }
+            })?;
+            validate_d3_image_format_properties(desc, properties)?;
+        }
         let create_info = vk::ImageCreateInfo::default()
             .image_type(match desc.dimension {
                 TextureDimension::D2 => vk::ImageType::TYPE_2D,
@@ -711,6 +746,37 @@ impl VulkanObjects {
                         info_index,
                     });
                 }
+                ResourceBindingKind::CombinedTextureSampler => {
+                    let combined = match self.objects.get(&binding.resource) {
+                        Some(VulkanObject::CombinedTextureSampler(combined)) => combined,
+                        _ => {
+                            return Err(GalError::backend(
+                                "combined texture-sampler binding references missing pair",
+                            ))
+                        }
+                    };
+                    let view = self.texture_view(combined.texture_view)?;
+                    let sampler = match self.objects.get(&combined.sampler) {
+                        Some(VulkanObject::Sampler(sampler)) => sampler.sampler,
+                        _ => {
+                            return Err(GalError::backend(
+                                "combined texture-sampler binding references missing sampler",
+                            ))
+                        }
+                    };
+                    let info_index = image_infos.len();
+                    image_infos.push(vk::DescriptorImageInfo {
+                        sampler,
+                        image_view: view.view,
+                        image_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                    });
+                    plans.push(WritePlan::Image {
+                        binding: binding.binding,
+                        array_index: binding.array_index,
+                        ty: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+                        info_index,
+                    });
+                }
             }
         }
         let writes = plans
@@ -949,6 +1015,9 @@ impl VulkanObjects {
                 VulkanObject::Sampler(object) => {
                     self.context.device.destroy_sampler(object.sampler, None);
                 }
+                // Vulkan combines the two native objects in descriptor writes;
+                // the logical GAL pair does not own another Vulkan object.
+                VulkanObject::CombinedTextureSampler(_) => {}
                 VulkanObject::ShaderModule(object) => {
                     self.context
                         .device
@@ -983,6 +1052,28 @@ impl VulkanObjects {
     }
 }
 
+fn validate_d3_image_format_properties(
+    desc: &TextureDesc,
+    properties: vk::ImageFormatProperties,
+) -> GalResult<()> {
+    let max_extent = properties.max_extent;
+    if desc.extent.width > max_extent.width
+        || desc.extent.height > max_extent.height
+        || desc.extent.depth > max_extent.depth
+        || desc.mip_levels > properties.max_mip_levels
+        || desc.array_layers > properties.max_array_layers
+        || !properties
+            .sample_counts
+            .contains(vk::SampleCountFlags::TYPE_1)
+    {
+        return Err(GalError::unsupported_feature(format!(
+            "Vulkan D3 image '{}' exceeds device format limits for {:?}",
+            desc.label, desc.format
+        )));
+    }
+    Ok(())
+}
+
 impl Drop for VulkanObjects {
     fn drop(&mut self) {
         self.destroy_all();
@@ -994,6 +1085,7 @@ pub(super) enum VulkanObject {
     Texture(TextureObject),
     TextureView(TextureViewObject),
     Sampler(SamplerObject),
+    CombinedTextureSampler(CombinedTextureSamplerObject),
     ShaderModule(ShaderModuleObject),
     ResourceLayout(ResourceLayoutObject),
     ResourceSet(ResourceSetObject),
@@ -1012,6 +1104,7 @@ impl VulkanObject {
             Self::Texture(object) => object.token,
             Self::TextureView(object) => object.token,
             Self::Sampler(object) => object.token,
+            Self::CombinedTextureSampler(object) => object.token,
             Self::ShaderModule(object) => object.token,
             Self::ResourceLayout(object) => object.token,
             Self::ResourceSet(object) => object.token,
@@ -1030,6 +1123,7 @@ impl VulkanObject {
             Self::Texture(_) => HandleKind::Texture,
             Self::TextureView(_) => HandleKind::TextureView,
             Self::Sampler(_) => HandleKind::Sampler,
+            Self::CombinedTextureSampler(_) => HandleKind::CombinedTextureSampler,
             Self::ShaderModule(_) => HandleKind::ShaderModule,
             Self::ResourceLayout(_) => HandleKind::ResourceLayout,
             Self::ResourceSet(_) => HandleKind::ResourceSet,
@@ -1078,6 +1172,12 @@ pub(super) struct TextureViewObject {
 pub(super) struct SamplerObject {
     pub(super) token: BackendToken,
     pub(super) sampler: vk::Sampler,
+}
+
+pub(super) struct CombinedTextureSamplerObject {
+    pub(super) token: BackendToken,
+    pub(super) texture_view: Handle,
+    pub(super) sampler: Handle,
 }
 
 pub(super) struct ShaderModuleObject {
@@ -1274,6 +1374,7 @@ pub(super) fn descriptor_type(kind: ResourceBindingKind) -> vk::DescriptorType {
         ResourceBindingKind::SampledTexture => vk::DescriptorType::SAMPLED_IMAGE,
         ResourceBindingKind::StorageTexture => vk::DescriptorType::STORAGE_IMAGE,
         ResourceBindingKind::Sampler => vk::DescriptorType::SAMPLER,
+        ResourceBindingKind::CombinedTextureSampler => vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
     }
 }
 
@@ -1389,6 +1490,55 @@ fn debug_name(kind: &str, handle: Handle, label: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn d3_texture_desc() -> TextureDesc {
+        TextureDesc {
+            label: "d3-format-properties".to_owned(),
+            dimension: TextureDimension::D3,
+            format: TextureFormat::R8Uint,
+            extent: Extent3d {
+                width: 8,
+                height: 4,
+                depth: 2,
+            },
+            mip_levels: 2,
+            array_layers: 1,
+            usages: vec![TextureUsage::Sampled, TextureUsage::Storage],
+        }
+    }
+
+    fn d3_format_properties() -> vk::ImageFormatProperties {
+        vk::ImageFormatProperties {
+            max_extent: vk::Extent3D {
+                width: 16,
+                height: 16,
+                depth: 16,
+            },
+            max_mip_levels: 4,
+            max_array_layers: 1,
+            sample_counts: vk::SampleCountFlags::TYPE_1,
+            max_resource_size: u64::MAX,
+        }
+    }
+
+    #[test]
+    fn d3_format_properties_reject_unsupported_extent_mips_and_samples() {
+        let properties = d3_format_properties();
+        validate_d3_image_format_properties(&d3_texture_desc(), properties)
+            .expect("bounded D3 image should fit device format properties");
+
+        let mut oversized = d3_texture_desc();
+        oversized.extent.depth = 17;
+        assert!(validate_d3_image_format_properties(&oversized, properties).is_err());
+
+        let mut too_many_mips = d3_texture_desc();
+        too_many_mips.mip_levels = 5;
+        assert!(validate_d3_image_format_properties(&too_many_mips, properties).is_err());
+
+        let mut no_single_sample = properties;
+        no_single_sample.sample_counts = vk::SampleCountFlags::TYPE_2;
+        assert!(validate_d3_image_format_properties(&d3_texture_desc(), no_single_sample).is_err());
+    }
 
     #[test]
     fn overlay_blend_lowers_to_source_alpha_additive_equation() {

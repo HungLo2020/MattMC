@@ -48,7 +48,7 @@ pub enum TextureFormat {
     Rgba16Float = 3,
     Depth24Stencil8 = 4,
     Depth32Float = 5,
-    /// Single-channel unsigned normalized-integer resource data. This is not
+    /// Single-channel unsigned-integer resource data. This is not
     /// a color attachment format; it is valid for sampled/storage textures.
     R8Uint = 6,
 }
@@ -144,6 +144,17 @@ pub struct SamplerDesc {
     pub address_w: SamplerAddressMode,
 }
 
+/// One explicit sampled image and sampler pairing. It is backend-neutral:
+/// frontends never receive descriptor, texture-unit, or native-handle state.
+/// Backends may lower this as a combined descriptor or a private texture-unit
+/// pairing.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CombinedTextureSamplerDesc {
+    pub label: String,
+    pub texture_view: Handle,
+    pub sampler: Handle,
+}
+
 #[repr(u32)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ShaderStage {
@@ -215,6 +226,7 @@ pub enum ResourceBindingKind {
     SampledTexture = 3,
     StorageTexture = 4,
     Sampler = 5,
+    CombinedTextureSampler = 6,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -418,6 +430,45 @@ impl BackendCapabilities {
         self.features.supports(feature)
     }
 
+    /// Reports whether this backend can create a three-dimensional texture for
+    /// one semantic format/use pair. This keeps format support explicit for
+    /// frontends without exposing a native image, texture target, or descriptor.
+    pub fn supports_texture_3d_usage(self, format: TextureFormat, usage: TextureUsage) -> bool {
+        if !self.supports(BackendFeature::Texture3d) {
+            return false;
+        }
+
+        let format_supported = match self.api {
+            // These two formats are not implemented by the private OpenGL
+            // isolated-resource path; do not advertise them just because the
+            // driver might support a related native format.
+            BackendApi::OpenGl => !matches!(
+                format,
+                TextureFormat::Bgra8Unorm | TextureFormat::Depth24Stencil8
+            ),
+            BackendApi::Vulkan | BackendApi::Mock => true,
+        };
+        if !format_supported {
+            return false;
+        }
+
+        match usage {
+            TextureUsage::Sampled => true,
+            TextureUsage::Storage => {
+                self.supports(BackendFeature::StorageTextures) && !is_depth_format(format)
+            }
+            TextureUsage::TransferSrc | TextureUsage::TransferDst => {
+                self.supports(BackendFeature::TextureSubresourceCopies)
+                    && format.copy_bytes_per_texel().is_some()
+            }
+            TextureUsage::ColorAttachment
+            | TextureUsage::DepthStencilAttachment
+            | TextureUsage::Present
+            | TextureUsage::HostRead
+            | TextureUsage::HostWrite => false,
+        }
+    }
+
     pub fn fingerprint_json(self) -> String {
         format!(
             "{{\"name\":\"{}\",\"features\":{{\"graphics\":{},\"compute\":{},\"descriptor_arrays\":{},\"optional_bindings\":{},\"dynamic_buffer_offsets\":{},\"uniform_buffers\":{},\"storage_buffers\":{},\"storage_textures\":{},\"indirect_draw\":{},\"indirect_dispatch\":{},\"multiple_color_attachments\":{},\"depth_only_pass\":{},\"blended_pass\":{},\"texture_subresource_copies\":{},\"texture_mip_levels\":{},\"texture_array_layers\":{},\"host_buffer_access\":{},\"presentation\":{},\"renderdoc_capture\":{},\"tracy_zones\":{},\"texture_3d\":{}}},\"limits\":{{\"max_buffer_size\":{},\"max_texture_extent_2d\":{},\"max_texture_extent_3d\":{},\"max_texture_mip_levels\":{},\"max_texture_array_layers\":{},\"max_resource_layout_bindings\":{},\"max_binding_array_count\":{},\"max_color_attachments\":{},\"max_dynamic_offsets_per_binding\":{},\"max_command_lists_per_submission\":{},\"max_draw_count\":{},\"max_dispatch_groups_per_axis\":{}}}}}",
@@ -457,6 +508,13 @@ impl BackendCapabilities {
             self.limits.max_draw_count
         )
     }
+}
+
+const fn is_depth_format(format: TextureFormat) -> bool {
+    matches!(
+        format,
+        TextureFormat::Depth24Stencil8 | TextureFormat::Depth32Float
+    )
 }
 
 pub type ColorFormat = TextureFormat;

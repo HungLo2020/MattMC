@@ -621,7 +621,9 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 world_material_compact_quads,
                 world_mesh_instances,
                 gui_sprites,
-                negotiated_feature_bits
+                negotiated_feature_bits,
+                voxel_volume_frame,
+                shader_environment_frame
             ]
         ),
         54 => layout!(
@@ -818,7 +820,8 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 atlas_u,
                 atlas_v,
                 shader_block_id,
-                shader_material_type
+                shader_material_type,
+                mid_block_packed
             ]
         ),
         65 => layout!(
@@ -871,12 +874,7 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
         71 => layout!(
             71,
             FfiWorldMeshAnimationFrameRecord,
-            [
-                byte_size,
-                frame_index,
-                duration_ticks,
-                reserved0
-            ]
+            [byte_size, frame_index, duration_ticks, reserved0]
         ),
         68 => layout!(
             68,
@@ -921,15 +919,79 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 index_bytes
             ]
         ),
+        72 => layout!(
+            72,
+            FfiWorldVoxelVolumeFrame,
+            [
+                byte_size,
+                enabled,
+                reserved0,
+                reserved1,
+                world_generation,
+                resource_generation,
+                camera_x,
+                camera_y,
+                camera_z,
+                reserved2
+            ]
+        ),
+        74 => layout!(
+            74,
+            FfiShaderPackSourceFile,
+            [byte_size, reserved0, path_utf8, contents_utf8]
+        ),
+        75 => layout!(
+            75,
+            FfiShaderPackSourceUpdateRequest,
+            [header, generation, pack_name_utf8, files]
+        ),
+        73 => layout!(
+            73,
+            FfiWorldShaderEnvironmentFrame,
+            [
+                byte_size,
+                enabled,
+                frame_counter,
+                world_day,
+                world_generation,
+                world_time,
+                frame_time_seconds,
+                frame_time_counter,
+                time_of_day,
+                rain_strength,
+                thunder_strength,
+                sky_darken,
+                moon_phase,
+                eye_submersion,
+                screen_brightness,
+                far_plane,
+                relative_eye_x,
+                relative_eye_y,
+                relative_eye_z,
+                sky_color_r,
+                sky_color_g,
+                sky_color_b,
+                darkness_light_factor,
+                night_vision,
+                fog_color_r,
+                fog_color_g,
+                fog_color_b,
+                biome_precipitation,
+                biome_resource_location_utf8,
+                main_hand_item_model_resource_location_utf8,
+                off_hand_item_model_resource_location_utf8,
+                main_hand_item_light_emission,
+                off_hand_item_light_emission
+            ]
+        ),
         _ => {
             return Err(GalError::ffi(
                 StatusCode::UnknownEnum,
                 format!("unknown ABI struct id {struct_id}"),
-            ))
+            ));
         }
     })
 }
-
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_vulkanic_gal_abi_struct_layout(
     struct_id: u32,

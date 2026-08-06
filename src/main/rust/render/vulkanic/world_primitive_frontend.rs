@@ -1,6 +1,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
 
 mod background;
 mod crack;
@@ -18,25 +21,45 @@ use super::commands::{
 use super::error::{GalError, GalResult, StatusCode};
 use super::gal::VulkanicGal;
 use super::handles::Handle;
-use super::metrics::{elapsed_nanos_u64, WholeFrameProfile};
+use super::metrics::{WholeFrameProfile, elapsed_nanos_u64};
 use super::resources::{
-    AccessFlags, BackendApi, BlendMode, BufferDesc, BufferUsage, ColorFormat, CompareOp, Extent3d,
-    GraphicsPipelineDesc, IndexType, MemoryDomain, PipelineLayoutDesc, PipelineStageFlags,
-    PrimitiveTopology, QueueClass, RenderPassDesc, RenderTargetDesc, ResourceBinding,
-    ResourceBindingDesc, ResourceBindingKind, ResourceLayoutDesc, ResourceSetDesc,
+    AccessFlags, BackendApi, BackendFeature, BlendMode, BufferDesc, BufferUsage, ColorFormat,
+    CompareOp, Extent3d, GraphicsPipelineDesc, IndexType, MemoryDomain, PipelineLayoutDesc,
+    PipelineStageFlags, PrimitiveTopology, QueueClass, RenderPassDesc, RenderTargetDesc,
+    ResourceBinding, ResourceBindingDesc, ResourceBindingKind, ResourceLayoutDesc, ResourceSetDesc,
     SamplerAddressMode, SamplerDesc, SamplerFilter, ShaderCodeFormat, ShaderModuleDesc,
     ShaderStage, TextureDesc, TextureDimension, TextureFormat, TextureUsage, TextureViewDesc,
 };
+use super::shader_pack::item_id_map::canonical_resource_location;
+#[cfg(test)]
+use super::shader_pack::programs::TerrainMaterialProgramKind;
 use super::shader_pack::programs::{
+    CompositeProgram, ProgramIdentity, TerrainMaterialProgram,
     minimal_direct_terrain_cutout_program, minimal_direct_terrain_solid_program,
     minimal_shadow_depth_program, minimal_terrain_cutout_program, minimal_terrain_solid_program,
-    minimal_terrain_translucent_program, shader_stage_code_for_backend, CompositeProgram,
-    TerrainMaterialProgram,
+    minimal_terrain_translucent_program, shader_stage_code_for_backend,
 };
+#[cfg(test)]
+use super::shader_pack::runtime::TerrainSourceCandidateState;
 use super::shader_pack::runtime::{
-    ShaderPackRuntimeExecutor, TerrainCompositeUniforms, TerrainMaterialPassMode, TerrainMeshDraw,
-    TerrainRuntimeFrame, TerrainRuntimeTargets, TERRAIN_RUNTIME_COMPOSITE_UNIFORM_BYTES,
+    ShaderPackRuntimeExecutor, TERRAIN_RUNTIME_COMPOSITE_UNIFORM_BYTES, TerrainCompositeUniforms,
+    TerrainMaterialPassMode, TerrainMeshDraw, TerrainRuntimeFrame, TerrainRuntimeTargets,
+    TerrainSourceProgramCandidate,
 };
+use super::shader_pack::source::{ShaderPackSourceStore, ShaderPackSourceUpdate};
+use super::shader_pack::source_temporal::{
+    TerrainSourceTemporalKey, TerrainSourceTemporalUniforms,
+};
+use super::shader_pack::source_uniforms::TerrainSourceUniformFrame;
+use super::shader_pack::terrain_contract::TerrainProgramScope;
+#[cfg(test)]
+use super::shader_pack::voxel_emission_table::VoxelEmissionTable;
+use super::shader_pack::voxel_light_volume::{
+    VoxelLightVolumeDescriptor, VoxelLightVolumeMapping, VoxelLightVolumeViewDirection,
+    invert_column_major_mat4,
+};
+#[cfg(test)]
+use super::shader_pack::voxel_material_map::VoxelMaterialMap;
 use super::{BufferImageCopyRegion, CommandList, CommandListDesc, CullMode};
 use xxhash_rust::xxh32::xxh32;
 
@@ -53,6 +76,8 @@ pub const WORLD_MAX_MESH_SECTIONS: usize = 256;
 pub const WORLD_MAX_MESH_INSTANCES: usize = 4_096;
 pub const WORLD_MAX_MESH_ANIMATION_FRAMES: usize = 512;
 pub const WORLD_MESH_VERTEX_LAYOUT_V2: u32 = 2;
+/// Adds source-model midpoint bytes used only by private voxelization.
+pub const WORLD_MESH_VERTEX_LAYOUT_V3: u32 = 3;
 pub const WORLD_MESH_SECTION_ALL: u32 = u32::MAX;
 pub const WORLD_DEPTH_POLICY_DISABLED: u32 = 0;
 pub const WORLD_DEPTH_POLICY_TEST_WRITE: u32 = 1;
@@ -100,6 +125,10 @@ pub const WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_15: u32 = 0x0194_76c0;
 pub const WORLD_MATERIAL_TEXTURE_WATER_STILL: u32 = 0x5a71_a501;
 pub const WORLD_MATERIAL_TEXTURE_WATER_FLOW: u32 = 0x5a71_a502;
 pub const WORLD_MATERIAL_TEXTURE_WATER_OVERLAY: u32 = 0x5a71_a503;
+/// Stable semantic identity of Minecraft's terrain atlas. It is copied as an
+/// owned mesh texture asset; this is neither a Java atlas object nor a native
+/// backend texture handle.
+pub const WORLD_MESH_TEXTURE_TERRAIN_BLOCK_ATLAS: u32 = 0x54a1_7a1a;
 pub const WORLD_MATERIAL_TEXTURE_DEFAULT: u32 = WORLD_MATERIAL_TEXTURE_STONE;
 pub const WORLD_MATERIAL_ID_OPAQUE_TEXTURED: u32 = 0x6a2f_d335;
 pub const WORLD_MATERIAL_ID_CUTOUT_TEXTURED: u32 = 0x129b_1b90;
@@ -455,6 +484,7 @@ pub struct WorldMeshVertex {
     pub shader_atlas_uv: [f32; 2],
     pub shader_block_id: i32,
     pub shader_material_type: i32,
+    pub mid_block_packed: u32,
     pub color_argb: u32,
     pub normal_packed: u32,
     pub light: u32,
@@ -480,6 +510,60 @@ pub struct WorldMeshAsset {
     pub vertices: Vec<WorldMeshVertex>,
     pub index_bytes: Vec<u8>,
     pub sections: Vec<WorldMeshSection>,
+}
+
+/// Rust-owned semantic vertex expansion for a future source-derived terrain
+/// program. The current asset ABI stores atlas UVs and indexed quad geometry,
+/// but Complementary additionally requires the sprite midpoint and tangent.
+/// They are derived here from copied semantic mesh data, never from an Iris
+/// vertex buffer, GL attribute stream, or Java rendering object.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct SourceTerrainVertex {
+    pub position: [f32; 3],
+    pub atlas_uv: [f32; 2],
+    pub color_argb: u32,
+    pub normal_packed: u32,
+    pub light: u32,
+    pub shader_block_id: i32,
+    pub shader_material_type: i32,
+    pub sprite_midpoint: [f32; 2],
+    /// xyz is the normalized tangent and w is its handedness.
+    pub tangent: [f32; 4],
+}
+
+/// Expanded triangle stream retaining the original indexed-quad winding. It
+/// is source-lowering preparation only and intentionally owns no GAL or
+/// backend resource.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SourceTerrainMesh {
+    pub vertices: Vec<SourceTerrainVertex>,
+    pub indices: Vec<u32>,
+}
+
+/// Compact, backend-neutral source data retained only for a future Rust-owned
+/// terrain voxelization pass. This is deliberately smaller than a render
+/// vertex and contains no atlas, pipeline, or native resource information.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct TerrainVoxelSourceVertex {
+    pub position: [f32; 3],
+    pub mid_block_packed: u32,
+    pub shader_material_id: i32,
+}
+
+/// One visible static-terrain mesh in a frame. This owns the compact source
+/// copy so a private shader runtime can stage it after ordinary frontend work
+/// without borrowing the frontend's mutable asset cache across submission.
+#[derive(Clone, Debug)]
+pub(crate) struct TerrainVoxelSourceMesh {
+    pub mesh_key: u64,
+    pub mesh_generation: u64,
+    /// Shared immutable data copied when the Rust-owned mesh asset was
+    /// registered. Per-frame source preparation may retain this without
+    /// copying vertex payloads or borrowing Java/native renderer buffers.
+    pub vertices: Arc<Vec<TerrainVoxelSourceVertex>>,
+    /// Decoded semantic triangle indices retained after asset validation.
+    pub indices: Arc<Vec<u32>>,
+    pub transform: [f32; 16],
 }
 
 #[derive(Clone, Debug)]
@@ -543,6 +627,57 @@ pub struct WorldBackgroundRequest {
     pub viewport_height: u32,
 }
 
+/// Explicit world/camera mapping input for a future private shader-pack
+/// volume. It is semantic frame data and does not select or bind a shader
+/// resource by itself.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct WorldVoxelVolumeFrame {
+    pub enabled: bool,
+    pub world_generation: u64,
+    pub resource_generation: u64,
+    pub camera_world_position: [f32; 3],
+}
+
+/// Explicit copied vanilla environment inputs. These remain separate from
+/// voxel-volume mapping because shader-pack execution will validate each
+/// resource contract independently.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct WorldShaderEnvironmentFrame {
+    pub enabled: bool,
+    pub world_generation: u64,
+    pub world_time: u64,
+    pub frame_counter: i32,
+    pub frame_time_seconds: f32,
+    pub frame_time_counter: f32,
+    pub world_day: i32,
+    pub moon_phase: i32,
+    pub time_of_day: f32,
+    pub rain_strength: f32,
+    pub thunder_strength: f32,
+    pub sky_darken: f32,
+    pub eye_submersion: i32,
+    pub screen_brightness: f32,
+    pub far_plane: f32,
+    pub relative_eye_position: [f32; 3],
+    pub sky_color: [f32; 3],
+    pub darkness_light_factor: f32,
+    pub night_vision: f32,
+    pub fog_color: [f32; 3],
+    /// Vanilla precipitation at the camera block: 0 none, 1 rain, 2 snow.
+    pub biome_precipitation: i32,
+    /// Canonical resource location for the camera biome. This is copied
+    /// gameplay identity, never an Iris registry object or integer mapping.
+    pub biome_resource_location: String,
+    /// Vanilla item-model identities copied from the player inventory. Rust
+    /// resolves pack-specific item IDs from its source generation.
+    pub main_hand_item_model_resource_location: String,
+    pub off_hand_item_model_resource_location: String,
+    /// Raw vanilla emission for each held item. The selected shader-pack's
+    /// legacy hand-composition rule remains Rust-owned source semantics.
+    pub main_hand_item_light_emission: i32,
+    pub off_hand_item_light_emission: i32,
+}
+
 #[derive(Clone, Debug)]
 pub struct WorldPrimitiveFrame {
     pub frame_id: u64,
@@ -551,12 +686,116 @@ pub struct WorldPrimitiveFrame {
     pub viewport_height: u32,
     pub view_matrix: [f32; 16],
     pub projection_matrix: [f32; 16],
+    pub voxel_volume: WorldVoxelVolumeFrame,
+    pub shader_environment: WorldShaderEnvironmentFrame,
     pub background: WorldBackgroundRequest,
     pub segments: Vec<WorldLineSegmentRequest>,
     pub crack_quads: Vec<WorldCrackQuadRequest>,
     pub border_quads: Vec<WorldBorderQuadRequest>,
     pub material_quads: Vec<WorldMaterialQuadRequest>,
     pub mesh_instances: Vec<WorldMeshInstanceRequest>,
+}
+
+impl WorldPrimitiveFrame {
+    /// Copies only source-uniform values with an already proven semantic
+    /// equivalent in the ordinary world frame. Ambiguous legacy shader-pack
+    /// values intentionally remain absent: this helper must not invent a
+    /// frame counter. `world_time` is already normalized at Java's explicit
+    /// dimension-semantic boundary, and `sun_angle` is the source-defined
+    /// transformation of the copied sky angle.
+    pub(crate) fn source_uniform_frame(&self) -> GalResult<TerrainSourceUniformFrame> {
+        validate_shader_environment(&self.shader_environment)?;
+        if self
+            .view_matrix
+            .iter()
+            .chain(self.projection_matrix.iter())
+            .any(|value| !value.is_finite())
+        {
+            return Err(GalError::invalid_argument(
+                "world-frame matrices must be finite for source uniform preparation",
+            ));
+        }
+        let environment = &self.shader_environment;
+        let (camera_world_position, camera_world_position_fract) = if self.voxel_volume.enabled {
+            if self
+                .voxel_volume
+                .camera_world_position
+                .iter()
+                .any(|value| !value.is_finite())
+            {
+                return Err(GalError::invalid_argument(
+                    "world voxel-volume camera position must be finite for source uniform preparation",
+                ));
+            }
+            let position = self.voxel_volume.camera_world_position;
+            let fraction = position.map(|coordinate| coordinate - coordinate.floor());
+            (Some(position), Some(fraction))
+        } else {
+            (None, None)
+        };
+        let view_matrix_inverse = invert_column_major_mat4(self.view_matrix, "source view")?;
+        let projection_matrix_inverse =
+            invert_column_major_mat4(self.projection_matrix, "source projection")?;
+        Ok(TerrainSourceUniformFrame {
+            frame_counter: environment.enabled.then_some(environment.frame_counter),
+            frame_modulo_eight: environment
+                .enabled
+                .then_some((environment.frame_counter % 8) as f32),
+            world_time: environment.enabled.then_some(environment.world_time as i32),
+            frame_time_seconds: environment
+                .enabled
+                .then_some(environment.frame_time_seconds),
+            frame_time_counter: environment
+                .enabled
+                .then_some(environment.frame_time_counter),
+            world_day: environment.enabled.then_some(environment.world_day),
+            moon_phase: environment.enabled.then_some(environment.moon_phase),
+            sun_angle: environment
+                .enabled
+                .then_some(source_sun_angle(environment.time_of_day)),
+            rain_strength: environment.enabled.then_some(environment.rain_strength),
+            thunder_strength: environment.enabled.then_some(environment.thunder_strength),
+            sky_darken: environment.enabled.then_some(environment.sky_darken),
+            eye_submersion: environment.enabled.then_some(environment.eye_submersion),
+            screen_brightness: environment.enabled.then_some(environment.screen_brightness),
+            darkness_light_factor: environment
+                .enabled
+                .then_some(environment.darkness_light_factor),
+            night_vision: environment.enabled.then_some(environment.night_vision),
+            far_plane: environment.enabled.then_some(environment.far_plane),
+            relative_eye_position: environment
+                .enabled
+                .then_some(environment.relative_eye_position),
+            sky_color: environment.enabled.then_some(environment.sky_color),
+            fog_color: environment.enabled.then_some(environment.fog_color),
+            biome_precipitation: environment
+                .enabled
+                .then_some(environment.biome_precipitation),
+            biome_resource_location: environment
+                .enabled
+                .then(|| environment.biome_resource_location.clone()),
+            camera_world_position,
+            camera_world_position_fract,
+            view_matrix: Some(self.view_matrix),
+            view_matrix_inverse: Some(view_matrix_inverse),
+            projection_matrix: Some(self.projection_matrix),
+            projection_matrix_inverse: Some(projection_matrix_inverse),
+            viewport_width: Some(self.viewport_width as f32),
+            viewport_height: Some(self.viewport_height as f32),
+            ..TerrainSourceUniformFrame::default()
+        })
+    }
+}
+
+/// The selected source uses Iris's documented solar-angle convention. This
+/// transforms only the copied vanilla sky angle, without reading an Iris
+/// camera, program, or renderer object.
+fn source_sun_angle(sky_angle: f32) -> f32 {
+    if sky_angle < 0.75 {
+        sky_angle + 0.25
+    } else {
+        sky_angle - 0.75
+    }
 }
 
 #[derive(Clone, Debug, Default)]
@@ -830,7 +1069,7 @@ struct MeshResourceKey {
     color_format: ColorFormat,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 struct MeshPipelineResourceKey {
     g_buffer: bool,
     material_mode: u32,
@@ -838,12 +1077,34 @@ struct MeshPipelineResourceKey {
     depth_policy: u32,
     cull_policy: u32,
     color_format: ColorFormat,
+    /// The source-derived program identity is part of the persistent pipeline
+    /// key. Two compatible resource layouts must not accidentally share a
+    /// pipeline when their shader source differs.
+    shader_program_identity: ProgramIdentity,
+    /// Optional shader-pack semantic resources are always assigned after the
+    /// mesh/material layout. This is a GAL layout handle, never a backend
+    /// descriptor or native binding.
+    shader_resource_layout: Option<Handle>,
+}
+
+/// One source-derived shader variant shares the owned mesh geometry but has
+/// its own layout-compatible set-0 resource set and pipeline. This keeps
+/// source program selection entirely inside Rust and prevents a set created
+/// for the builtin layout from being rebound against a distinct pipeline.
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
+struct SourceMeshResourceKey {
+    mesh: MeshResourceKey,
+    shader_program_identity: ProgramIdentity,
+    shader_resource_layout: Option<Handle>,
+    shader_resource_generation: u64,
 }
 
 struct MeshAssetStore {
     mesh_generation: u64,
     index_generation: u64,
     vertex_bytes: Vec<u8>,
+    terrain_voxel_vertices: Option<Arc<Vec<TerrainVoxelSourceVertex>>>,
+    terrain_voxel_indices: Option<Arc<Vec<u32>>>,
     index_bytes: Vec<u8>,
     index_type: IndexType,
     sections: Vec<WorldMeshSection>,
@@ -867,6 +1128,37 @@ struct MeshResources {
     pipeline: Handle,
     shadow_pipeline: Option<Handle>,
     resource_set: Handle,
+}
+
+struct SourceMeshResources {
+    pipeline_layout: Handle,
+    pipeline: Handle,
+    shadow_pipeline: Option<Handle>,
+    resource_set: Handle,
+}
+
+impl SourceMeshResources {
+    fn handles_in_destroy_order(&self) -> [Handle; 1] {
+        [self.resource_set]
+    }
+}
+
+#[derive(Clone)]
+struct SourceTerrainPrograms {
+    opaque: TerrainSourceProgramCandidate,
+    cutout: TerrainSourceProgramCandidate,
+}
+
+impl SourceTerrainPrograms {
+    fn for_material_mode(&self, material_mode: u32) -> GalResult<&TerrainSourceProgramCandidate> {
+        match material_mode {
+            WORLD_MATERIAL_MODE_OPAQUE => Ok(&self.opaque),
+            WORLD_MATERIAL_MODE_CUTOUT => Ok(&self.cutout),
+            _ => Err(GalError::unsupported_feature(
+                "selected source terrain execution supports only opaque and cutout mesh materials",
+            )),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -1049,14 +1341,312 @@ pub struct WorldPrimitiveFrontend {
     material_resources: BTreeMap<MaterialResourceKey, MaterialResources>,
     mesh_pipeline_resources: BTreeMap<MeshPipelineResourceKey, MeshPipelineResources>,
     mesh_resources: BTreeMap<MeshResourceKey, MeshResources>,
+    source_mesh_resources: BTreeMap<SourceMeshResourceKey, SourceMeshResources>,
     mesh_texture_resources: BTreeMap<u32, MeshTextureResources>,
     mesh_instance_stream_slots: Vec<MeshInstanceStreamSlot>,
+    /// Shader-pack resources belong to the runtime. This frontend supplies
+    /// only copied semantic world data and render work.
+    shader_runtime: Option<ShaderPackRuntimeExecutor>,
+    /// Complete source generations are owned and validated by Rust. Loading
+    /// them alone cannot select source-derived shader execution.
+    shader_pack_sources: ShaderPackSourceStore,
+    /// Temporal scalar semantics belong to the Rust-owned source contract,
+    /// never to Java/Iris state or a backend upload path.
+    source_temporal_uniforms: TerrainSourceTemporalUniforms,
+    /// Private test-only selector for the built-in candidate terrain subset.
+    /// This must never be mistaken for execution of lowered shader-pack
+    /// source, which still lacks its source vertex and semantic resource
+    /// interface.
+    #[cfg(test)]
+    candidate_subset_execution_enabled: bool,
+    /// True only when the current runtime was installed from the discovered
+    /// source candidate. This lets source/world changes retire preparation
+    /// data without affecting diagnostic runtimes installed by focused tests.
+    candidate_colored_light_runtime: bool,
     depth_attachment: Option<DepthAttachmentResources>,
     g_buffer_resources: Option<GBufferResources>,
     g_buffer_final_bindings: BTreeMap<GBufferFinalBindingKey, GBufferFinalBindingResources>,
     pending_g_buffer_resources_retired: u64,
     cached_pass: Option<CachedPass>,
     pending_depth_attachment_retires: u64,
+}
+
+impl WorldPrimitiveFrontend {
+    /// Combines copied gameplay semantics with resource metadata owned by the
+    /// frontend. The source contract sees only the atlas extent; it never sees
+    /// the Java asset record or a backend texture identity.
+    pub(crate) fn source_uniform_frame_for_owned_resources(
+        &mut self,
+        frame: &WorldPrimitiveFrame,
+    ) -> GalResult<TerrainSourceUniformFrame> {
+        let atlas = self
+            .mesh_texture_assets
+            .get(&WORLD_MESH_TEXTURE_TERRAIN_BLOCK_ATLAS)
+            .ok_or_else(|| {
+                GalError::unsupported_feature(
+                    "selected terrain source requires a Rust-owned terrain material atlas",
+                )
+            })?;
+        if atlas.width == 0 || atlas.height == 0 {
+            return Err(GalError::invalid_argument(
+                "Rust-owned terrain material atlas has zero extent",
+            ));
+        }
+        let mut uniforms = frame.source_uniform_frame()?;
+        let width = i32::try_from(atlas.width).map_err(|_| {
+            GalError::invalid_argument(
+                "Rust-owned terrain material atlas width exceeds source ivec2",
+            )
+        })?;
+        let height = i32::try_from(atlas.height).map_err(|_| {
+            GalError::invalid_argument(
+                "Rust-owned terrain material atlas height exceeds source ivec2",
+            )
+        })?;
+        uniforms.material_atlas_size = Some([width, height]);
+        if frame.shader_environment.enabled {
+            let shader_pack_generation = self
+                .shader_pack_sources
+                .active()
+                .map_or(0, |source| source.generation());
+            uniforms.rain_factor = Some(self.source_temporal_uniforms.rain_factor(
+                TerrainSourceTemporalKey {
+                    world_generation: frame.shader_environment.world_generation,
+                    shader_pack_generation,
+                },
+                frame.frame_id,
+                frame.shader_environment.frame_time_seconds,
+                frame.shader_environment.rain_strength,
+            )?);
+            let (biome_dry, biome_snowy) = self.source_temporal_uniforms.biome_climate(
+                TerrainSourceTemporalKey {
+                    world_generation: frame.shader_environment.world_generation,
+                    shader_pack_generation,
+                },
+                frame.frame_id,
+                frame.shader_environment.frame_time_seconds,
+                frame.shader_environment.biome_precipitation,
+            )?;
+            uniforms.biome_dry = Some(biome_dry);
+            uniforms.biome_snowy = Some(biome_snowy);
+            let nether_biomes = self.source_temporal_uniforms.nether_biomes(
+                TerrainSourceTemporalKey {
+                    world_generation: frame.shader_environment.world_generation,
+                    shader_pack_generation,
+                },
+                frame.frame_id,
+                frame.shader_environment.frame_time_seconds,
+                &frame.shader_environment.biome_resource_location,
+            )?;
+            uniforms.biome_nether_wastes = Some(nether_biomes[0]);
+            uniforms.biome_crimson_forest = Some(nether_biomes[1]);
+            uniforms.biome_warped_forest = Some(nether_biomes[2]);
+            uniforms.biome_basalt_deltas = Some(nether_biomes[3]);
+            uniforms.biome_soul_valley = Some(nether_biomes[4]);
+            let item_id_map = self
+                .shader_pack_sources
+                .active_item_id_map()
+                .ok_or_else(|| {
+                    GalError::invalid_argument(
+                    "enabled shader environment requires a generation-matched item identity map",
+                )
+                })?;
+            if item_id_map.generation() != shader_pack_generation {
+                return Err(GalError::invalid_argument(
+                    "shader-pack source and item identity map generations differ",
+                ));
+            }
+            let held_light_policy = self
+                .shader_pack_sources
+                .active_held_light_policy()
+                .ok_or_else(|| {
+                    GalError::invalid_argument(
+                        "enabled shader environment requires a generation-matched held-light policy",
+                    )
+                })?;
+            if held_light_policy.generation() != shader_pack_generation {
+                return Err(GalError::invalid_argument(
+                    "shader-pack source and held-light policy generations differ",
+                ));
+            }
+            uniforms.held_item_id_main = Some(
+                item_id_map.resolve_optional(
+                    &frame
+                        .shader_environment
+                        .main_hand_item_model_resource_location,
+                )?,
+            );
+            uniforms.held_item_id_off_hand = Some(
+                item_id_map.resolve_optional(
+                    &frame
+                        .shader_environment
+                        .off_hand_item_model_resource_location,
+                )?,
+            );
+            let [main_hand_light, off_hand_light] = held_light_policy.compose(
+                frame.shader_environment.main_hand_item_light_emission,
+                frame.shader_environment.off_hand_item_light_emission,
+            )?;
+            uniforms.held_block_light_main = Some(main_hand_light);
+            uniforms.held_block_light_off_hand = Some(off_hand_light);
+        }
+        Ok(uniforms)
+    }
+
+    pub fn apply_shader_pack_source_update(
+        &mut self,
+        update: ShaderPackSourceUpdate,
+    ) -> GalResult<()> {
+        self.shader_pack_sources.apply_update(update)?;
+        self.observe_shader_pack_source_candidate();
+        Ok(())
+    }
+
+    fn observe_shader_pack_source_candidate(&mut self) {
+        self.observe_shader_pack_source_candidate_for_scope(TerrainProgramScope::Default);
+    }
+
+    fn observe_shader_pack_source_candidate_for_scope(&mut self, scope: TerrainProgramScope) {
+        let Some(source) = self.shader_pack_sources.active() else {
+            return;
+        };
+        if let Some(runtime) = self.shader_runtime.as_mut() {
+            runtime.observe_source_candidate_for_scope(source, scope);
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn shader_pack_source_generation(&self) -> Option<u64> {
+        self.shader_pack_sources.active_generation()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn shader_pack_source_candidate(&self) -> Option<&TerrainSourceCandidateState> {
+        self.shader_runtime
+            .as_ref()
+            .map(ShaderPackRuntimeExecutor::source_candidate)
+    }
+
+    #[cfg(test)]
+    fn enable_candidate_subset_execution_for_test(&mut self) {
+        self.candidate_subset_execution_enabled = true;
+    }
+
+    #[cfg(test)]
+    fn prepare_source_colored_light_for_test(
+        &mut self,
+        gal: &mut VulkanicGal,
+        runtime_generation: u64,
+        frame: &WorldPrimitiveFrame,
+    ) -> GalResult<bool> {
+        self.ensure_shader_runtime(gal, runtime_generation)?;
+        let preparation = self
+            .shader_runtime
+            .as_ref()
+            .ok_or_else(|| GalError::backend("shader runtime vanished before source preparation"))?
+            .candidate_colored_light_preparation(
+                frame.voxel_volume.world_generation,
+                frame.voxel_volume.resource_generation,
+                frame.voxel_volume.camera_world_position,
+            )?
+            .ok_or_else(|| {
+                GalError::unsupported_feature(
+                    "source test requested colored-light preparation without a source volume requirement",
+                )
+            })?;
+        self.shader_runtime
+            .as_mut()
+            .expect("shader runtime checked before source preparation")
+            .ensure_candidate_colored_light_runtime(gal, preparation)
+    }
+
+    /// Source discovery prepares only Rust-owned semantic volume resources.
+    /// It deliberately does not enable source-derived terrain execution: the
+    /// internal terrain plan remains the production route until a complete
+    /// source plan is explicitly admitted.
+    fn ensure_candidate_colored_light_for_frame(
+        &mut self,
+        gal: &mut VulkanicGal,
+        runtime_generation: u64,
+        frame: &WorldPrimitiveFrame,
+    ) -> GalResult<bool> {
+        self.ensure_shader_runtime(gal, runtime_generation)?;
+        let Some(scope) = terrain_program_scope_for_sky_type(frame.background.sky_type)? else {
+            self.clear_candidate_colored_light_runtime(gal)?;
+            return Ok(false);
+        };
+        self.observe_shader_pack_source_candidate_for_scope(scope);
+        if !frame.voxel_volume.enabled {
+            self.clear_candidate_colored_light_runtime(gal)?;
+            return Ok(false);
+        }
+        // A discovered source candidate is not a selected production route.
+        // Keep normal whole-frame execution independent of a private feature
+        // that a particular backend cannot yet provide.
+        if !supports_private_colored_light_volume(gal) {
+            self.clear_candidate_colored_light_runtime(gal)?;
+            return Ok(false);
+        }
+        let preparation = self
+            .shader_runtime
+            .as_ref()
+            .expect("shader runtime is installed before source preparation")
+            .candidate_colored_light_preparation(
+                frame.voxel_volume.world_generation,
+                frame.voxel_volume.resource_generation,
+                frame.voxel_volume.camera_world_position,
+            )?;
+        let Some(preparation) = preparation else {
+            self.clear_candidate_colored_light_runtime(gal)?;
+            return Ok(false);
+        };
+        let replaced = self
+            .shader_runtime
+            .as_mut()
+            .expect("shader runtime is installed before colored-light replacement")
+            .ensure_candidate_colored_light_runtime(gal, preparation)?;
+        self.candidate_colored_light_runtime = true;
+        Ok(replaced)
+    }
+
+    fn clear_candidate_colored_light_runtime(&mut self, gal: &mut VulkanicGal) -> GalResult<()> {
+        if !self.candidate_colored_light_runtime {
+            return Ok(());
+        }
+        if let Some(runtime) = self.shader_runtime.as_mut() {
+            runtime.clear_candidate_colored_light_runtime(gal)?;
+        }
+        self.candidate_colored_light_runtime = false;
+        Ok(())
+    }
+}
+
+fn terrain_program_scope_for_sky_type(sky_type: u32) -> GalResult<Option<TerrainProgramScope>> {
+    match sky_type {
+        WORLD_BACKGROUND_SKY_OVERWORLD => Ok(Some(TerrainProgramScope::Overworld)),
+        WORLD_BACKGROUND_SKY_NETHER => Ok(Some(TerrainProgramScope::Nether)),
+        WORLD_BACKGROUND_SKY_END => Ok(Some(TerrainProgramScope::End)),
+        // A custom dimension requires an explicit semantic pack-to-dimension
+        // mapping. Do not guess from an active Java/Iris program.
+        WORLD_BACKGROUND_SKY_CUSTOM => Ok(None),
+        value => Err(GalError::invalid_argument(format!(
+            "unknown world sky type {value} for shader-pack terrain selection"
+        ))),
+    }
+}
+
+fn supports_private_colored_light_volume(gal: &VulkanicGal) -> bool {
+    let capabilities = gal.capabilities();
+    capabilities.supports(BackendFeature::Compute)
+        && [
+            (TextureFormat::R8Uint, TextureUsage::Sampled),
+            (TextureFormat::R8Uint, TextureUsage::Storage),
+            (TextureFormat::R8Uint, TextureUsage::TransferDst),
+            (TextureFormat::Rgba16Float, TextureUsage::Sampled),
+            (TextureFormat::Rgba16Float, TextureUsage::Storage),
+        ]
+        .into_iter()
+        .all(|(format, usage)| capabilities.supports_texture_3d_usage(format, usage))
 }
 
 #[derive(Clone, Debug)]
@@ -1170,7 +1760,8 @@ impl MeshTextureAnimation {
         let current = self.frames[selected];
         let next = self.frames[(selected + 1) % self.frames.len()];
         let elapsed = tick.saturating_sub(cursor);
-        let interpolation = if self.interpolation_policy == WORLD_MESH_ANIMATION_INTERPOLATE_LINEAR {
+        let interpolation = if self.interpolation_policy == WORLD_MESH_ANIMATION_INTERPOLATE_LINEAR
+        {
             elapsed as f32 / current.duration_ticks.max(1) as f32
         } else {
             0.0
@@ -1462,8 +2053,13 @@ impl WorldPrimitiveFrontend {
         textures: Vec<WorldMeshTextureAssetPayload>,
         sorted_indices: Vec<WorldMeshSortedIndexUpdate>,
     ) -> GalResult<()> {
-        let result =
-            self.apply_world_mesh_asset_update_inner(gal, generation, meshes, textures, sorted_indices);
+        let result = self.apply_world_mesh_asset_update_inner(
+            gal,
+            generation,
+            meshes,
+            textures,
+            sorted_indices,
+        );
         if result.is_err() {
             self.mesh_asset_update_failures = self.mesh_asset_update_failures.saturating_add(1);
         }
@@ -1581,12 +2177,36 @@ impl WorldPrimitiveFrontend {
                         .saturating_mul(WORLD_MESH_GPU_VERTEX_BYTES) as u64,
                 )
                 .saturating_add(mesh.index_bytes.len() as u64);
+            let terrain_voxel_vertices =
+                (mesh.vertex_layout_version == WORLD_MESH_VERTEX_LAYOUT_V3).then(|| {
+                    Arc::new(
+                        mesh.vertices
+                            .iter()
+                            .map(|vertex| TerrainVoxelSourceVertex {
+                                position: vertex.position,
+                                mid_block_packed: vertex.mid_block_packed,
+                                shader_material_id: vertex.shader_block_id,
+                            })
+                            .collect(),
+                    )
+                });
+            let terrain_voxel_indices = if mesh.vertex_layout_version == WORLD_MESH_VERTEX_LAYOUT_V3
+            {
+                Some(Arc::new(decoded_terrain_voxel_indices(
+                    &mesh.index_bytes,
+                    mesh.index_type,
+                )?))
+            } else {
+                None
+            };
             decoded_meshes.push((
                 mesh.mesh_key,
                 MeshAssetStore {
                     mesh_generation: mesh.mesh_generation,
                     index_generation: 0,
                     vertex_bytes: packed_mesh_vertices(&mesh.vertices),
+                    terrain_voxel_vertices,
+                    terrain_voxel_indices,
                     index_bytes: mesh.index_bytes,
                     index_type: mesh.index_type,
                     sections: mesh.sections,
@@ -1631,6 +2251,228 @@ impl WorldPrimitiveFrontend {
         Ok(())
     }
 
+    /// Returns the currently visible static-terrain source meshes with the
+    /// exact model transforms used by the frame. This is intentionally a
+    /// semantic cache query: it does not allocate GPU resources, record
+    /// commands, or select a shader path.
+    pub(crate) fn terrain_voxel_source_meshes(
+        &self,
+        frame: &WorldPrimitiveFrame,
+    ) -> GalResult<Vec<TerrainVoxelSourceMesh>> {
+        let mut seen_meshes = BTreeSet::new();
+        let mut result = Vec::new();
+        for instance in frame
+            .mesh_instances
+            .iter()
+            .filter(|instance| instance.stratum == WORLD_STRATUM_TERRAIN)
+        {
+            validate_mesh_instance(instance, frame)?;
+            if !seen_meshes.insert(instance.mesh_key) {
+                return Err(GalError::invalid_argument(format!(
+                    "terrain voxel source frame has duplicate visible mesh {}",
+                    instance.mesh_key
+                )));
+            }
+            let asset = self.mesh_assets.get(&instance.mesh_key).ok_or_else(|| {
+                GalError::invalid_argument(format!(
+                    "terrain voxel source mesh {} is missing from the asset cache",
+                    instance.mesh_key
+                ))
+            })?;
+            if asset.mesh_generation != instance.mesh_generation {
+                return Err(GalError::invalid_argument(format!(
+                    "terrain voxel source mesh {} generation {} does not match cached generation {}",
+                    instance.mesh_key, instance.mesh_generation, asset.mesh_generation
+                )));
+            }
+            let vertices = asset.terrain_voxel_vertices.as_ref().ok_or_else(|| {
+                GalError::invalid_argument(format!(
+                    "terrain voxel source mesh {} lacks v3 midpoint semantics",
+                    instance.mesh_key
+                ))
+            })?;
+            let indices = asset.terrain_voxel_indices.as_ref().ok_or_else(|| {
+                GalError::invalid_argument(format!(
+                    "terrain voxel source mesh {} lacks decoded triangle indices",
+                    instance.mesh_key
+                ))
+            })?;
+            result.push(TerrainVoxelSourceMesh {
+                mesh_key: instance.mesh_key,
+                mesh_generation: instance.mesh_generation,
+                vertices: Arc::clone(vertices),
+                indices: Arc::clone(indices),
+                transform: instance.transform,
+            });
+        }
+        Ok(result)
+    }
+
+    /// Installs a private Rust-owned occupancy transaction for an already
+    /// validated shader-pack generation. This accepts semantic descriptors
+    /// only; no Java state, native resource, or selected shader execution is
+    /// exposed here.
+    #[cfg(test)]
+    pub(crate) fn install_private_terrain_occupancy(
+        &mut self,
+        gal: &mut VulkanicGal,
+        descriptor: VoxelLightVolumeDescriptor,
+        materials: VoxelMaterialMap,
+    ) -> GalResult<()> {
+        self.shader_runtime_mut(gal, descriptor.shader_pack_generation)?
+            .install_private_terrain_occupancy(gal, descriptor, materials)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn install_private_terrain_colored_light(
+        &mut self,
+        gal: &mut VulkanicGal,
+        descriptor: VoxelLightVolumeDescriptor,
+        materials: VoxelMaterialMap,
+        emission: VoxelEmissionTable,
+    ) -> GalResult<()> {
+        self.shader_runtime_mut(gal, descriptor.shader_pack_generation)?
+            .install_private_terrain_colored_light(gal, descriptor, materials, emission)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn private_terrain_occupancy_mesh_count(&self) -> Option<usize> {
+        self.shader_runtime
+            .as_ref()
+            .and_then(ShaderPackRuntimeExecutor::private_terrain_occupancy_mesh_count)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn private_terrain_occupancy_mapping(&self) -> Option<VoxelLightVolumeMapping> {
+        self.shader_runtime
+            .as_ref()
+            .and_then(ShaderPackRuntimeExecutor::private_terrain_occupancy_mapping)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn private_terrain_colored_light_ready(&self, frame_counter: u64) -> Option<bool> {
+        self.shader_runtime
+            .as_ref()
+            .and_then(|runtime| runtime.private_terrain_colored_light_ready(frame_counter))
+    }
+
+    /// Converts the coarse frame-owned camera/world identity into the
+    /// camera-relative mapping consumed by the private occupancy runtime.
+    /// This is deliberately a semantic conversion: no texture, shader, or
+    /// backend identity is available here.
+    fn voxel_volume_mapping_from_frame(
+        frame: WorldVoxelVolumeFrame,
+        descriptor: &VoxelLightVolumeDescriptor,
+    ) -> GalResult<VoxelLightVolumeMapping> {
+        if !frame.enabled {
+            return Err(GalError::invalid_argument(
+                "private terrain occupancy requires an enabled voxel-volume frame record",
+            ));
+        }
+        if frame.world_generation != descriptor.world_generation
+            || frame.resource_generation != descriptor.resource_generation
+        {
+            return Err(GalError::invalid_argument(
+                "voxel-volume frame record does not match the private occupancy generation",
+            ));
+        }
+
+        let camera = frame.camera_world_position;
+        let mut cell = [0_i32; 3];
+        let mut fraction = [0.0_f32; 3];
+        for axis in 0..3 {
+            let coordinate = camera[axis];
+            if !coordinate.is_finite() {
+                return Err(GalError::invalid_argument(
+                    "voxel-volume camera position must be finite",
+                ));
+            }
+            let floored = coordinate.floor();
+            if floored < i32::MIN as f32 || floored > i32::MAX as f32 {
+                return Err(GalError::invalid_argument(
+                    "voxel-volume camera cell is outside the supported i32 range",
+                ));
+            }
+            cell[axis] = floored as i32;
+            fraction[axis] = coordinate - floored;
+        }
+        VoxelLightVolumeMapping::complementary(descriptor.extent, cell, fraction)
+    }
+
+    fn ensure_shader_runtime(&mut self, gal: &mut VulkanicGal, generation: u64) -> GalResult<()> {
+        if self
+            .shader_runtime
+            .as_ref()
+            .is_some_and(|runtime| runtime.generation() == generation)
+        {
+            self.observe_shader_pack_source_candidate();
+            return Ok(());
+        }
+        if let Some(previous) = self.shader_runtime.take() {
+            previous.destroy(gal)?;
+        }
+        self.candidate_colored_light_runtime = false;
+        self.shader_runtime = Some(ShaderPackRuntimeExecutor::terrain_material_multipass_v1(
+            generation,
+        )?);
+        self.observe_shader_pack_source_candidate();
+        Ok(())
+    }
+
+    #[cfg(not(test))]
+    fn candidate_subset_programs_for_frame(
+        &self,
+        _frame_id: u64,
+    ) -> GalResult<Option<SourceTerrainPrograms>> {
+        // Lowered shader-pack source execution is intentionally unavailable
+        // in production until its full vertex and semantic resource interface
+        // can be bound through explicit GAL layouts.
+        Ok(None)
+    }
+
+    #[cfg(test)]
+    fn candidate_subset_programs_for_frame(
+        &self,
+        frame_id: u64,
+    ) -> GalResult<Option<SourceTerrainPrograms>> {
+        if !self.candidate_subset_execution_enabled {
+            return Ok(None);
+        }
+        let runtime = self.shader_runtime.as_ref().ok_or_else(|| {
+            GalError::invalid_argument(
+                "candidate terrain subset execution requires an initialized shader runtime",
+            )
+        })?;
+        let opaque = runtime
+            .candidate_fixture_terrain_program(TerrainMaterialProgramKind::Opaque, frame_id)?
+            .ok_or_else(|| {
+                GalError::unsupported_feature(
+                    "candidate terrain subset execution has no admitted opaque program",
+                )
+            })?;
+        let cutout = runtime
+            .candidate_fixture_terrain_program(TerrainMaterialProgramKind::Cutout, frame_id)?
+            .ok_or_else(|| {
+                GalError::unsupported_feature(
+                    "candidate terrain subset execution has no admitted cutout program",
+                )
+            })?;
+        Ok(Some(SourceTerrainPrograms { opaque, cutout }))
+    }
+
+    #[cfg(test)]
+    fn shader_runtime_mut(
+        &mut self,
+        gal: &mut VulkanicGal,
+        generation: u64,
+    ) -> GalResult<&mut ShaderPackRuntimeExecutor> {
+        self.ensure_shader_runtime(gal, generation)?;
+        Ok(self
+            .shader_runtime
+            .as_mut()
+            .expect("shader runtime is installed after successful initialization"))
+    }
+
     pub fn clear_frame_pass(&mut self, gal: &mut VulkanicGal) {
         if let Some(pass) = self.cached_pass.take() {
             let _ = gal.destroy(pass.pass);
@@ -1671,10 +2513,79 @@ impl WorldPrimitiveFrontend {
         gui_ops: Vec<CommandOp>,
     ) -> GalResult<WorldPrimitiveSubmitStats> {
         let total_started = std::time::Instant::now();
+        self.ensure_candidate_colored_light_for_frame(gal, generation, &frame)?;
+        // Keep a bounded semantic snapshot only when the private runtime is
+        // installed. Normal submissions retain their existing allocation and
+        // routing cadence.
+        let occupancy_frame = self
+            .shader_runtime
+            .as_ref()
+            .filter(|runtime| runtime.has_private_terrain_occupancy())
+            .map(|_| frame.clone());
+        let mut pre_graph_ops = Vec::new();
+        if let Some(occupancy_frame) = occupancy_frame.as_ref() {
+            let source_meshes = self.terrain_voxel_source_meshes(occupancy_frame)?;
+            let runtime = self
+                .shader_runtime
+                .as_mut()
+                .expect("private terrain occupancy checked before frame submission");
+            let mapping_result = runtime
+                .private_terrain_occupancy_descriptor()
+                .ok_or_else(|| {
+                    GalError::invalid_argument(
+                        "private terrain occupancy disappeared before mapping preparation",
+                    )
+                })
+                .and_then(|descriptor| {
+                    let mapping = Self::voxel_volume_mapping_from_frame(
+                        occupancy_frame.voxel_volume,
+                        descriptor,
+                    )?;
+                    let view_direction = descriptor
+                        .requirements
+                        .update_policy
+                        .preserve_behind_view
+                        .then(|| {
+                            VoxelLightVolumeViewDirection::from_camera_matrices(
+                                occupancy_frame.view_matrix,
+                                occupancy_frame.projection_matrix,
+                            )
+                        })
+                        .transpose()?;
+                    Ok((mapping, view_direction))
+                });
+            let (mapping, view_direction) = match mapping_result {
+                Ok(mapping) => mapping,
+                Err(error) => {
+                    runtime.discard_private_terrain_occupancy_submission();
+                    return Err(error);
+                }
+            };
+            if let Err(error) = runtime.append_private_terrain_occupancy(
+                occupancy_frame.frame_id,
+                mapping,
+                view_direction,
+                source_meshes,
+                &mut pre_graph_ops,
+            ) {
+                runtime.discard_private_terrain_occupancy_submission();
+                return Err(error);
+            }
+        }
         let mut gameplay_attachment_capture =
             GameplayAttachmentCapture::select(&frame, generation, self.mesh_asset_generation);
-        let (mut ops, mut stats) =
-            self.append_frame_ops_inner(gal, generation, frame_target, frame, true)?;
+        let (graph_ops, mut stats) =
+            match self.append_frame_ops_inner(gal, generation, frame_target, frame, true) {
+                Ok(result) => result,
+                Err(error) => {
+                    if let Some(runtime) = self.shader_runtime.as_mut() {
+                        runtime.discard_private_terrain_occupancy_submission();
+                    }
+                    return Err(error);
+                }
+            };
+        let mut ops = pre_graph_ops;
+        ops.extend(graph_ops);
         if let Some(capture) = gameplay_attachment_capture.as_mut() {
             capture.append_ops(gal, &mut ops, self.g_buffer_resources.as_ref())?;
         }
@@ -1686,7 +2597,7 @@ impl WorldPrimitiveFrontend {
             .profile
             .world_frontend_total_nanos
             .saturating_add(frontend_done_nanos);
-        let token = gal.submit_profiled(
+        let token = match gal.submit_profiled(
             SubmissionBatch {
                 label: "minecraft.world-and-gui.frame".to_string(),
                 command_lists: vec![CommandList::from(CommandListDesc {
@@ -1695,7 +2606,21 @@ impl WorldPrimitiveFrontend {
                 })],
             },
             &mut stats.profile,
-        )?;
+        ) {
+            Ok(token) => token,
+            Err(error) => {
+                if let Some(runtime) = self.shader_runtime.as_mut() {
+                    runtime.discard_private_terrain_occupancy_submission();
+                }
+                return Err(error);
+            }
+        };
+        if let Some(runtime) = self.shader_runtime.as_mut() {
+            if let Err(error) = runtime.confirm_private_terrain_occupancy_submission() {
+                runtime.discard_private_terrain_occupancy_submission();
+                return Err(error);
+            }
+        }
         stats.submission_id = token.submission.0;
         if let Some(capture) = gameplay_attachment_capture {
             gal.retire_through(token.submission)?;
@@ -1781,6 +2706,14 @@ impl WorldPrimitiveFrontend {
             .iter()
             .filter(|batch| self.material_resources.contains_key(&batch.key))
             .count() as u64;
+        if use_g_buffer_mesh_path {
+            self.ensure_shader_runtime(gal, self.generation)?;
+        }
+        let source_terrain_programs = if use_g_buffer_mesh_path {
+            self.candidate_subset_programs_for_frame(frame.frame_id)?
+        } else {
+            None
+        };
         let mut mesh_cache_hits = 0u64;
         profile.world_prepare_mesh_cache_scan_nanos = 0;
         profile.world_prepare_mesh_batch_count = mesh_batches.len() as u64;
@@ -1825,6 +2758,13 @@ impl WorldPrimitiveFrontend {
         for batch in &mesh_batches {
             let had_resources = self.mesh_resources.contains_key(&batch.key);
             self.ensure_mesh_resources(gal, batch.key)?;
+            if let Some(programs) = source_terrain_programs.as_ref() {
+                self.ensure_source_mesh_resources(
+                    gal,
+                    batch.key,
+                    programs.for_material_mode(batch.key.material_mode)?,
+                )?;
+            }
             if had_resources {
                 mesh_cache_hits = mesh_cache_hits.saturating_add(1);
             }
@@ -2112,20 +3052,52 @@ impl WorldPrimitiveFrontend {
             let mut mesh_draws = Vec::new();
             let mesh_draw_record_started = std::time::Instant::now();
             for (batch_index, batch) in mesh_batches.iter().enumerate() {
-                let resources = self.mesh_resources.get(&batch.key).ok_or_else(|| {
-                    GalError::backend("world mesh resources vanished before submit")
-                })?;
+                let index_buffer = self
+                    .mesh_resources
+                    .get(&batch.key)
+                    .map(|resources| resources.index_buffer)
+                    .ok_or_else(|| {
+                        GalError::backend("world mesh index buffer vanished before submit")
+                    })?;
                 let asset = self
                     .mesh_assets
                     .get(&batch.key.mesh_key)
                     .ok_or_else(|| GalError::backend("world mesh asset vanished before submit"))?;
+                let (shadow_pipeline, pipeline, pipeline_layout, resource_set, shader_resource_set) =
+                    if let Some(programs) = source_terrain_programs.as_ref() {
+                        let candidate = programs.for_material_mode(batch.key.material_mode)?;
+                        let source_key = source_mesh_resource_key(batch.key, candidate);
+                        let resources =
+                            self.source_mesh_resources.get(&source_key).ok_or_else(|| {
+                                GalError::backend("source mesh resources vanished before submit")
+                            })?;
+                        (
+                            resources.shadow_pipeline,
+                            resources.pipeline,
+                            resources.pipeline_layout,
+                            resources.resource_set,
+                            candidate.binding.map(|binding| binding.resource_set),
+                        )
+                    } else {
+                        let resources = self.mesh_resources.get(&batch.key).ok_or_else(|| {
+                            GalError::backend("world mesh resources vanished before submit")
+                        })?;
+                        (
+                            resources.shadow_pipeline,
+                            resources.pipeline,
+                            resources.pipeline_layout,
+                            resources.resource_set,
+                            None,
+                        )
+                    };
                 mesh_draws.push(TerrainMeshDraw {
-                    shadow_pipeline: resources.shadow_pipeline,
-                    pipeline: resources.pipeline,
-                    pipeline_layout: resources.pipeline_layout,
-                    resource_set: resources.resource_set,
+                    shadow_pipeline,
+                    pipeline,
+                    pipeline_layout,
+                    resource_set,
                     resource_set_dynamic_offsets: [mesh_stream_offsets[batch_index]],
-                    index_buffer: resources.index_buffer,
+                    shader_resource_set,
+                    index_buffer,
                     index_offset: batch.index_offset,
                     index_type: asset.index_type,
                     index_count: batch.index_count,
@@ -2136,6 +3108,7 @@ impl WorldPrimitiveFrontend {
             stats.profile.world_mesh_draw_record_nanos =
                 elapsed_nanos_u64(mesh_draw_record_started);
             if use_g_buffer_mesh_path {
+                let shader_plan_started = std::time::Instant::now();
                 let g_buffer = self.g_buffer_resources.as_ref().ok_or_else(|| {
                     GalError::backend("G-buffer resources missing before mesh submit")
                 })?;
@@ -2148,9 +3121,10 @@ impl WorldPrimitiveFrontend {
                     .ok_or_else(|| {
                         GalError::backend("G-buffer final binding vanished before mesh submit")
                     })?;
-                let shader_plan_started = std::time::Instant::now();
-                let executor =
-                    ShaderPackRuntimeExecutor::terrain_material_multipass_v1(self.generation)?;
+                let executor = self
+                    .shader_runtime
+                    .as_ref()
+                    .expect("shader runtime installed before terrain graph submit");
                 stats.profile.shader_plan_lookup_nanos = stats
                     .profile
                     .shader_plan_lookup_nanos
@@ -3239,7 +4213,7 @@ impl WorldPrimitiveFrontend {
                         return Err(GalError::ffi(
                             StatusCode::UnknownEnum,
                             format!("unknown world material depth policy {}", key.depth_policy),
-                        ))
+                        ));
                     }
                 },
                 depth_write: key.depth_policy == WORLD_DEPTH_POLICY_TEST_WRITE,
@@ -3419,12 +4393,38 @@ impl WorldPrimitiveFrontend {
         gal: &mut VulkanicGal,
         key: MeshPipelineResourceKey,
     ) -> GalResult<()> {
+        let terrain_program = terrain_program_for_mode(key.material_mode, key.g_buffer)?;
+        if key.shader_program_identity != terrain_program.identity {
+            return Err(GalError::invalid_argument(
+                "builtin mesh pipeline key does not match its terrain program identity",
+            ));
+        }
+        self.ensure_mesh_pipeline_resources_for_program(gal, key, &terrain_program)
+    }
+
+    /// Creates one mesh pipeline from an explicit Rust-owned terrain program.
+    /// Normal routes use `ensure_mesh_pipeline_resources`, which supplies the
+    /// builtin program above. Source-derived candidates can later use this
+    /// same path with their matching semantic resource layout; no backend
+    /// state or Java renderer object is involved.
+    fn ensure_mesh_pipeline_resources_for_program(
+        &mut self,
+        gal: &mut VulkanicGal,
+        key: MeshPipelineResourceKey,
+        terrain_program: &TerrainMaterialProgram,
+    ) -> GalResult<()> {
+        if key.shader_program_identity != terrain_program.identity {
+            return Err(GalError::invalid_argument(
+                "mesh pipeline key does not match the supplied terrain program identity",
+            ));
+        }
         if self.mesh_pipeline_resources.contains_key(&key) {
             return Ok(());
         }
         let label = format!(
-            "world-mesh-pipeline-{}-mode{}-depth{}-cull{}-winding{}-gen{}",
+            "world-mesh-pipeline-{}-{}-mode{}-depth{}-cull{}-winding{}-gen{}",
             if key.g_buffer { "gbuffer" } else { "direct" },
+            key.shader_program_identity.as_str(),
             key.material_mode,
             key.depth_policy,
             key.cull_policy,
@@ -3434,7 +4434,6 @@ impl WorldPrimitiveFrontend {
         let mut created = Vec::new();
         let result = (|| -> GalResult<MeshPipelineResources> {
             let is_translucent = key.material_mode == WORLD_MATERIAL_MODE_TRANSLUCENT;
-            let terrain_program = terrain_program_for_mode(key.material_mode, key.g_buffer)?;
             let vertex_shader = gal.create_shader_module(ShaderModuleDesc {
                 label: format!("{label}.vertex"),
                 stage: ShaderStage::Vertex,
@@ -3454,7 +4453,8 @@ impl WorldPrimitiveFrontend {
                 entry_point: terrain_program.fragment.entry_point.clone(),
             })?;
             created.push(fragment_shader);
-            let (shadow_vertex_shader, shadow_fragment_shader) = if key.g_buffer && !is_translucent {
+            let (shadow_vertex_shader, shadow_fragment_shader) = if key.g_buffer && !is_translucent
+            {
                 let shadow_program = minimal_shadow_depth_program();
                 let shadow_vertex_shader = gal.create_shader_module(ShaderModuleDesc {
                     label: format!("{label}.shadow.vertex"),
@@ -3519,7 +4519,10 @@ impl WorldPrimitiveFrontend {
             created.push(resource_layout);
             let pipeline_layout = gal.create_pipeline_layout(PipelineLayoutDesc {
                 label: format!("{label}.pipeline-layout"),
-                resource_layouts: vec![resource_layout],
+                resource_layouts: mesh_pipeline_layouts(
+                    resource_layout,
+                    key.shader_resource_layout,
+                )?,
             })?;
             created.push(pipeline_layout);
             let pipeline = gal.create_graphics_pipeline(GraphicsPipelineDesc {
@@ -3628,8 +4631,8 @@ impl WorldPrimitiveFrontend {
             .ok_or_else(|| GalError::backend("world mesh texture resources missing"))?;
         let texture_view = texture_resources.view;
         let sampler = texture_resources.sampler;
-        let pipeline_key = mesh_pipeline_key(key);
-        self.ensure_mesh_pipeline_resources(gal, pipeline_key)?;
+        let pipeline_key = mesh_pipeline_key(key)?;
+        self.ensure_mesh_pipeline_resources(gal, pipeline_key.clone())?;
         let pipeline_resources = self
             .mesh_pipeline_resources
             .get(&pipeline_key)
@@ -3684,6 +4687,84 @@ impl WorldPrimitiveFrontend {
         }
         self.mesh_resources.insert(key, result?);
         Ok(())
+    }
+
+    fn ensure_source_mesh_resources(
+        &mut self,
+        gal: &mut VulkanicGal,
+        mesh_key: MeshResourceKey,
+        candidate: &TerrainSourceProgramCandidate,
+    ) -> GalResult<SourceMeshResourceKey> {
+        let binding = candidate.binding;
+        let source_key = source_mesh_resource_key(mesh_key, candidate);
+        if self.source_mesh_resources.contains_key(&source_key) {
+            return Ok(source_key);
+        }
+        self.ensure_mesh_resources(gal, mesh_key)?;
+        let (vertex_buffer, texture_id) = self
+            .mesh_resources
+            .get(&mesh_key)
+            .map(|resources| (resources.vertex_buffer, mesh_key.texture_id))
+            .ok_or_else(|| {
+                GalError::backend("base mesh resources vanished before source variant")
+            })?;
+        let (texture_view, sampler) = self
+            .mesh_texture_resources
+            .get(&texture_id)
+            .map(|resources| (resources.view, resources.sampler))
+            .ok_or_else(|| GalError::backend("source mesh texture resources vanished"))?;
+        let pipeline_key = MeshPipelineResourceKey {
+            g_buffer: mesh_key.g_buffer,
+            material_mode: mesh_key.material_mode,
+            winding: mesh_key.winding,
+            depth_policy: mesh_key.depth_policy,
+            cull_policy: mesh_key.cull_policy,
+            color_format: mesh_key.color_format,
+            shader_program_identity: candidate.program.identity.clone(),
+            shader_resource_layout: binding.map(|binding| binding.resource_layout),
+        };
+        self.ensure_mesh_pipeline_resources_for_program(
+            gal,
+            pipeline_key.clone(),
+            &candidate.program,
+        )?;
+        let (resource_layout, pipeline_layout, pipeline, shadow_pipeline) = self
+            .mesh_pipeline_resources
+            .get(&pipeline_key)
+            .map(|resources| {
+                (
+                    resources.resource_layout,
+                    resources.pipeline_layout,
+                    resources.pipeline,
+                    resources.shadow_pipeline,
+                )
+            })
+            .ok_or_else(|| GalError::backend("source mesh pipeline resources vanished"))?;
+        let stream_binding = self.ensure_mesh_instance_stream(gal, 1)?;
+        let resource_set = create_mesh_resource_set(
+            gal,
+            &format!(
+                "world-mesh-source-{}-mesh{}-section{}",
+                candidate.program.identity.as_str(),
+                mesh_key.mesh_key,
+                mesh_key.section_index
+            ),
+            resource_layout,
+            vertex_buffer,
+            stream_binding.buffer,
+            texture_view,
+            sampler,
+        )?;
+        self.source_mesh_resources.insert(
+            source_key.clone(),
+            SourceMeshResources {
+                pipeline_layout,
+                pipeline,
+                shadow_pipeline,
+                resource_set,
+            },
+        );
+        Ok(source_key)
     }
 
     fn ensure_mesh_instance_stream(
@@ -4136,8 +5217,11 @@ impl WorldPrimitiveFrontend {
             .saturating_add(elapsed_nanos_u64(destroy_started));
         let label = format!("world-shader-g-buffer-gen{}", self.generation);
         let plan_started = std::time::Instant::now();
-        let shader_executor =
-            ShaderPackRuntimeExecutor::terrain_material_multipass_v1(self.generation)?;
+        self.ensure_shader_runtime(gal, self.generation)?;
+        let shader_executor = self
+            .shader_runtime
+            .as_ref()
+            .expect("shader runtime installed before G-buffer resource preparation");
         let shader_plan = shader_executor.plan();
         profile.world_prepare_g_buffer_plan_nanos = profile
             .world_prepare_g_buffer_plan_nanos
@@ -4650,6 +5734,10 @@ impl WorldPrimitiveFrontend {
     }
 
     fn destroy_resources(&mut self, gal: &mut VulkanicGal) {
+        if let Some(runtime) = self.shader_runtime.take() {
+            let _ = runtime.destroy(gal);
+        }
+        self.candidate_colored_light_runtime = false;
         self.clear_frame_pass(gal);
         self.destroy_render_resources(gal);
     }
@@ -4709,7 +5797,17 @@ impl WorldPrimitiveFrontend {
     }
 
     fn destroy_mesh_resources(&mut self, gal: &mut VulkanicGal) {
+        self.destroy_source_mesh_resources(gal);
         let resources = std::mem::take(&mut self.mesh_resources);
+        for (_, resources) in resources {
+            for handle in resources.handles_in_destroy_order() {
+                let _ = gal.destroy(handle);
+            }
+        }
+    }
+
+    fn destroy_source_mesh_resources(&mut self, gal: &mut VulkanicGal) {
+        let resources = std::mem::take(&mut self.source_mesh_resources);
         for (_, resources) in resources {
             for handle in resources.handles_in_destroy_order() {
                 let _ = gal.destroy(handle);
@@ -4747,6 +5845,19 @@ impl WorldPrimitiveFrontend {
         gal: &mut VulkanicGal,
         ids: &BTreeSet<u32>,
     ) {
+        let source_keys = self
+            .source_mesh_resources
+            .keys()
+            .filter(|source_key| ids.contains(&source_key.mesh.texture_id))
+            .cloned()
+            .collect::<Vec<_>>();
+        for source_key in source_keys {
+            if let Some(resources) = self.source_mesh_resources.remove(&source_key) {
+                for handle in resources.handles_in_destroy_order() {
+                    let _ = gal.destroy(handle);
+                }
+            }
+        }
         for texture_id in ids {
             if let Some(resources) = self.mesh_texture_resources.remove(texture_id) {
                 for handle in resources.handles_in_destroy_order() {
@@ -4762,6 +5873,19 @@ impl WorldPrimitiveFrontend {
         keys: Vec<MeshResourceKey>,
     ) {
         for key in keys {
+            let source_keys = self
+                .source_mesh_resources
+                .keys()
+                .filter(|source_key| source_key.mesh == key)
+                .cloned()
+                .collect::<Vec<_>>();
+            for source_key in source_keys {
+                if let Some(resources) = self.source_mesh_resources.remove(&source_key) {
+                    for handle in resources.handles_in_destroy_order() {
+                        let _ = gal.destroy(handle);
+                    }
+                }
+            }
             if let Some(resources) = self.mesh_resources.remove(&key) {
                 for handle in resources.handles_in_destroy_order() {
                     let _ = gal.destroy(handle);
@@ -4815,6 +5939,7 @@ fn destroy_g_buffer_final_binding_handles(
 
 fn validate_frame(frame: &WorldPrimitiveFrame) -> GalResult<()> {
     shared::validate_frame_header(frame)?;
+    validate_shader_environment(&frame.shader_environment)?;
     background::validate_background(frame)?;
     for segment in &frame.segments {
         outline::validate_segment(segment, frame)?;
@@ -4830,6 +5955,150 @@ fn validate_frame(frame: &WorldPrimitiveFrame) -> GalResult<()> {
     }
     for instance in &frame.mesh_instances {
         validate_mesh_instance(instance, frame)?;
+    }
+    Ok(())
+}
+
+fn validate_shader_environment(environment: &WorldShaderEnvironmentFrame) -> GalResult<()> {
+    if !environment.enabled {
+        if *environment != WorldShaderEnvironmentFrame::default() {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                "disabled shader environment frame must be zeroed",
+            ));
+        }
+        return Ok(());
+    }
+    if environment.world_generation == 0 {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            "enabled shader environment frame requires a world generation",
+        ));
+    }
+    for (label, value) in [
+        ("time of day", environment.time_of_day),
+        ("rain strength", environment.rain_strength),
+        ("thunder strength", environment.thunder_strength),
+        ("sky darken", environment.sky_darken),
+    ] {
+        if !value.is_finite() || !(0.0..=1.0).contains(&value) {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                format!("shader environment {label} must be finite and within [0, 1]"),
+            ));
+        }
+    }
+    if !(0..720_720).contains(&environment.frame_counter) {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            "shader environment frame counter must be within [0, 720720)",
+        ));
+    }
+    if !(0.0..3600.0).contains(&environment.frame_time_counter) {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            "shader environment frame time counter must be within [0, 3600)",
+        ));
+    }
+    if !environment.frame_time_seconds.is_finite()
+        || !(0.0..3600.0).contains(&environment.frame_time_seconds)
+    {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            "shader environment frame time must be finite and within [0, 3600)",
+        ));
+    }
+    if !(0..=7).contains(&environment.moon_phase) {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            "shader environment moon phase must be within [0, 7]",
+        ));
+    }
+    if !(0..=3).contains(&environment.eye_submersion) {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            "shader environment eye submersion must be within [0, 3]",
+        ));
+    }
+    if !environment.screen_brightness.is_finite() || environment.screen_brightness < 0.0 {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            "shader environment screen brightness must be finite and non-negative",
+        ));
+    }
+    if !environment.darkness_light_factor.is_finite() || environment.darkness_light_factor < 0.0 {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            "shader environment darkness light factor must be finite and non-negative",
+        ));
+    }
+    if !environment.night_vision.is_finite() || !(0.0..=1.0).contains(&environment.night_vision) {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            "shader environment night vision must be finite and within [0, 1]",
+        ));
+    }
+    if !environment.far_plane.is_finite() || environment.far_plane <= 0.0 {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            "shader environment far plane must be finite and positive",
+        ));
+    }
+    if environment
+        .relative_eye_position
+        .iter()
+        .any(|value| !value.is_finite())
+    {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            "shader environment relative eye position must be finite",
+        ));
+    }
+    if environment
+        .sky_color
+        .iter()
+        .any(|value| !value.is_finite() || !(0.0..=1.0).contains(value))
+    {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            "shader environment sky color must be finite and within [0, 1]",
+        ));
+    }
+    for (label, value) in [
+        (
+            "main-hand item-model resource location",
+            &environment.main_hand_item_model_resource_location,
+        ),
+        (
+            "off-hand item-model resource location",
+            &environment.off_hand_item_model_resource_location,
+        ),
+    ] {
+        if !value.is_empty() && canonical_resource_location(value).is_err() {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                format!(
+                    "shader environment {label} must be empty or canonical namespace:path text"
+                ),
+            ));
+        }
+    }
+    for (label, emission) in [
+        (
+            "main-hand item light emission",
+            environment.main_hand_item_light_emission,
+        ),
+        (
+            "off-hand item light emission",
+            environment.off_hand_item_light_emission,
+        ),
+    ] {
+        if !(0..=15).contains(&emission) {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                format!("shader environment {label} must be within [0, 15]"),
+            ));
+        }
     }
     Ok(())
 }
@@ -4886,7 +6155,10 @@ fn validate_mesh_asset(mesh: &WorldMeshAsset) -> GalResult<()> {
             "world mesh asset key and generation must be non-zero",
         ));
     }
-    if mesh.vertex_layout_version != WORLD_MESH_VERTEX_LAYOUT_V2 {
+    if !matches!(
+        mesh.vertex_layout_version,
+        WORLD_MESH_VERTEX_LAYOUT_V2 | WORLD_MESH_VERTEX_LAYOUT_V3
+    ) {
         return Err(GalError::ffi(
             StatusCode::UnknownEnum,
             format!(
@@ -5099,6 +6371,217 @@ fn mesh_index_value(index_bytes: &[u8], index_type: IndexType, index: usize) -> 
     }
 }
 
+fn decoded_terrain_voxel_indices(index_bytes: &[u8], index_type: IndexType) -> GalResult<Vec<u32>> {
+    let index_size = match index_type {
+        IndexType::U16 => 2,
+        IndexType::U32 => 4,
+    };
+    if index_bytes.len() % index_size != 0 {
+        return Err(GalError::invalid_argument(
+            "terrain voxel source index bytes are not aligned to their index type",
+        ));
+    }
+    let count = index_bytes.len() / index_size;
+    if count == 0 || count % 3 != 0 {
+        return Err(GalError::invalid_argument(
+            "terrain voxel source requires a non-empty triangle index stream",
+        ));
+    }
+    (0..count)
+        .map(|index| mesh_index_value(index_bytes, index_type, index))
+        .collect()
+}
+
+/// Derives the source-level terrain vertex semantics required by legacy pack
+/// source from the existing copied indexed mesh. The present asset transport
+/// has a deliberate, stable quad grammar: `[a,b,c, c,d,a]` per quad. Refusing
+/// other index arrangements is safer than guessing an atlas sprite midpoint
+/// or tangent from arbitrary triangles.
+pub(crate) fn derive_source_terrain_mesh(mesh: &WorldMeshAsset) -> GalResult<SourceTerrainMesh> {
+    let indices = decoded_terrain_voxel_indices(&mesh.index_bytes, mesh.index_type)?;
+    if indices.len() % 6 != 0 {
+        return Err(GalError::invalid_argument(format!(
+            "world mesh {} cannot derive source terrain semantics from non-quad index count {}",
+            mesh.mesh_key,
+            indices.len()
+        )));
+    }
+    let mut vertices = Vec::with_capacity(indices.len() / 6 * 4);
+    let mut expanded_indices = Vec::with_capacity(indices.len());
+    for (quad_index, quad) in indices.chunks_exact(6).enumerate() {
+        let [a, b, c, c_again, d, a_again] = quad else {
+            unreachable!("chunks_exact(6) always yields six indices")
+        };
+        if c != c_again || a != a_again {
+            return Err(GalError::invalid_argument(format!(
+                "world mesh {} quad {} does not use the required [a,b,c,c,d,a] topology",
+                mesh.mesh_key, quad_index
+            )));
+        }
+        let source_indices = [*a, *b, *c, *d];
+        let source = source_indices.map(|index| {
+            mesh.vertices.get(index as usize).copied().ok_or_else(|| {
+                GalError::invalid_argument(format!(
+                    "world mesh {} quad {} references vertex {} outside {} vertices",
+                    mesh.mesh_key,
+                    quad_index,
+                    index,
+                    mesh.vertices.len()
+                ))
+            })
+        });
+        let [a, b, c, d] = source;
+        let (a, b, c, d) = (a?, b?, c?, d?);
+        let sprite_midpoint = source_sprite_midpoint(mesh.mesh_key, quad_index, [a, b, c, d])?;
+        let tangent = source_quad_tangent(mesh.mesh_key, quad_index, [a, b, c])?;
+        let base = u32::try_from(vertices.len()).map_err(|_| {
+            GalError::invalid_argument("source terrain vertex stream exceeds u32 index range")
+        })?;
+        for vertex in [a, b, c, d] {
+            vertices.push(SourceTerrainVertex {
+                position: vertex.position,
+                atlas_uv: vertex.shader_atlas_uv,
+                color_argb: vertex.color_argb,
+                normal_packed: vertex.normal_packed,
+                light: vertex.light,
+                shader_block_id: vertex.shader_block_id,
+                shader_material_type: vertex.shader_material_type,
+                sprite_midpoint,
+                tangent,
+            });
+        }
+        expanded_indices.extend_from_slice(&[base, base + 1, base + 2, base + 2, base + 3, base]);
+    }
+    Ok(SourceTerrainMesh {
+        vertices,
+        indices: expanded_indices,
+    })
+}
+
+fn source_sprite_midpoint(
+    mesh_key: u64,
+    quad_index: usize,
+    vertices: [WorldMeshVertex; 4],
+) -> GalResult<[f32; 2]> {
+    let mut midpoint = [0.0f32; 2];
+    for vertex in vertices {
+        for (axis, value) in vertex.shader_atlas_uv.into_iter().enumerate() {
+            if !value.is_finite() {
+                return Err(GalError::invalid_argument(format!(
+                    "world mesh {mesh_key} quad {quad_index} has non-finite atlas UV"
+                )));
+            }
+            midpoint[axis] += value * 0.25;
+        }
+    }
+    Ok(midpoint)
+}
+
+fn source_quad_tangent(
+    mesh_key: u64,
+    quad_index: usize,
+    vertices: [WorldMeshVertex; 3],
+) -> GalResult<[f32; 4]> {
+    let edge_ab = subtract3(vertices[1].position, vertices[0].position);
+    let edge_ac = subtract3(vertices[2].position, vertices[0].position);
+    if !edge_ab.into_iter().chain(edge_ac).all(f32::is_finite) {
+        return Err(GalError::invalid_argument(format!(
+            "world mesh {mesh_key} quad {quad_index} has non-finite source position"
+        )));
+    }
+    let uv_ab = subtract2(vertices[1].shader_atlas_uv, vertices[0].shader_atlas_uv);
+    let uv_ac = subtract2(vertices[2].shader_atlas_uv, vertices[0].shader_atlas_uv);
+    let determinant = uv_ab[0] * uv_ac[1] - uv_ac[0] * uv_ab[1];
+    if !determinant.is_finite() || determinant.abs() <= f32::EPSILON {
+        return Err(GalError::invalid_argument(format!(
+            "world mesh {mesh_key} quad {quad_index} has degenerate atlas UV tangent basis"
+        )));
+    }
+    let inverse = determinant.recip();
+    let tangent = normalize3(
+        subtract3(
+            scale3(edge_ab, uv_ac[1] * inverse),
+            scale3(edge_ac, uv_ab[1] * inverse),
+        ),
+        "tangent",
+        mesh_key,
+        quad_index,
+    )?;
+    let bitangent = normalize3(
+        subtract3(
+            scale3(edge_ac, uv_ab[0] * inverse),
+            scale3(edge_ab, uv_ac[0] * inverse),
+        ),
+        "bitangent",
+        mesh_key,
+        quad_index,
+    )?;
+    let supplied_normal = unpack_normal_i8(vertices[0].normal_packed);
+    let normal = normalize3_or_else(
+        supplied_normal,
+        || cross3(edge_ab, edge_ac),
+        mesh_key,
+        quad_index,
+    )?;
+    let handedness = if dot3(cross3(normal, tangent), bitangent) < 0.0 {
+        -1.0
+    } else {
+        1.0
+    };
+    Ok([tangent[0], tangent[1], tangent[2], handedness])
+}
+
+fn subtract2(left: [f32; 2], right: [f32; 2]) -> [f32; 2] {
+    [left[0] - right[0], left[1] - right[1]]
+}
+
+fn subtract3(left: [f32; 3], right: [f32; 3]) -> [f32; 3] {
+    [left[0] - right[0], left[1] - right[1], left[2] - right[2]]
+}
+
+fn scale3(value: [f32; 3], factor: f32) -> [f32; 3] {
+    [value[0] * factor, value[1] * factor, value[2] * factor]
+}
+
+fn cross3(left: [f32; 3], right: [f32; 3]) -> [f32; 3] {
+    [
+        left[1] * right[2] - left[2] * right[1],
+        left[2] * right[0] - left[0] * right[2],
+        left[0] * right[1] - left[1] * right[0],
+    ]
+}
+
+fn dot3(left: [f32; 3], right: [f32; 3]) -> f32 {
+    left[0] * right[0] + left[1] * right[1] + left[2] * right[2]
+}
+
+fn normalize3(
+    value: [f32; 3],
+    semantic: &str,
+    mesh_key: u64,
+    quad_index: usize,
+) -> GalResult<[f32; 3]> {
+    let length_squared = dot3(value, value);
+    if !length_squared.is_finite() || length_squared <= f32::EPSILON {
+        return Err(GalError::invalid_argument(format!(
+            "world mesh {mesh_key} quad {quad_index} has degenerate {semantic} basis"
+        )));
+    }
+    Ok(scale3(value, length_squared.sqrt().recip()))
+}
+
+fn normalize3_or_else(
+    primary: [f32; 3],
+    fallback: impl FnOnce() -> [f32; 3],
+    mesh_key: u64,
+    quad_index: usize,
+) -> GalResult<[f32; 3]> {
+    match normalize3(primary, "normal", mesh_key, quad_index) {
+        Ok(normal) => Ok(normal),
+        Err(_) => normalize3(fallback(), "geometric normal", mesh_key, quad_index),
+    }
+}
+
 fn packed_mesh_vertices(vertices: &[WorldMeshVertex]) -> Vec<u8> {
     let mut out = Vec::with_capacity(vertices.len() * WORLD_MESH_GPU_VERTEX_BYTES);
     for vertex in vertices {
@@ -5169,12 +6652,26 @@ fn trace_static_terrain_appearance(mesh: &WorldMeshAsset) {
             ),
             index = index,
             primitive = index / 4,
-            px = vertex.position[0], py = vertex.position[1], pz = vertex.position[2],
-            u = vertex.uv[0], v = vertex.uv[1], au = vertex.shader_atlas_uv[0], av = vertex.shader_atlas_uv[1],
-            cr = color[0], cg = color[1], cb = color[2], ca = color[3],
-            nx = normal[0], ny = normal[1], nz = normal[2], light = vertex.light,
-            block = block_light, sky = sky_light, baked = baked_light_factor(vertex.light),
-            block_id = vertex.shader_block_id, material_type = vertex.shader_material_type,
+            px = vertex.position[0],
+            py = vertex.position[1],
+            pz = vertex.position[2],
+            u = vertex.uv[0],
+            v = vertex.uv[1],
+            au = vertex.shader_atlas_uv[0],
+            av = vertex.shader_atlas_uv[1],
+            cr = color[0],
+            cg = color[1],
+            cb = color[2],
+            ca = color[3],
+            nx = normal[0],
+            ny = normal[1],
+            nz = normal[2],
+            light = vertex.light,
+            block = block_light,
+            sky = sky_light,
+            baked = baked_light_factor(vertex.light),
+            block_id = vertex.shader_block_id,
+            material_type = vertex.shader_material_type,
         ));
     }
     let sections = mesh
@@ -5214,7 +6711,10 @@ fn trace_static_terrain_appearance(mesh: &WorldMeshAsset) {
     );
     let root = PathBuf::from(root);
     if std::fs::create_dir_all(&root).is_ok() {
-        let _ = std::fs::write(root.join("static_terrain_appearance_rust_frontend.json"), payload);
+        let _ = std::fs::write(
+            root.join("static_terrain_appearance_rust_frontend.json"),
+            payload,
+        );
     }
 }
 
@@ -5284,9 +6784,7 @@ fn decoded_animation_frames(
     if frame_width > width || frame_height > height {
         return Err(GalError::ffi(
             StatusCode::InvalidArgument,
-            format!(
-                "world mesh texture {texture_id} animation frame exceeds sheet extent"
-            ),
+            format!("world mesh texture {texture_id} animation frame exceeds sheet extent"),
         ));
     }
     if height % frame_height != 0 {
@@ -5335,9 +6833,7 @@ fn decoded_animation_frames(
     if raw_frames.is_empty() || raw_frames.len() > WORLD_MAX_MESH_ANIMATION_FRAMES {
         return Err(GalError::ffi(
             StatusCode::InvalidArgument,
-            format!(
-                "world mesh texture {texture_id} animation frame table size is out of bounds"
-            ),
+            format!("world mesh texture {texture_id} animation frame table size is out of bounds"),
         ));
     }
     let mut decoded = Vec::with_capacity(raw_frames.len());
@@ -5836,15 +7332,49 @@ fn mesh_key_for_section(
     }
 }
 
-fn mesh_pipeline_key(key: MeshResourceKey) -> MeshPipelineResourceKey {
-    MeshPipelineResourceKey {
+fn mesh_pipeline_key(key: MeshResourceKey) -> GalResult<MeshPipelineResourceKey> {
+    let terrain_program = terrain_program_for_mode(key.material_mode, key.g_buffer)?;
+    Ok(MeshPipelineResourceKey {
         g_buffer: key.g_buffer,
         material_mode: key.material_mode,
         winding: key.winding,
         depth_policy: key.depth_policy,
         cull_policy: key.cull_policy,
         color_format: key.color_format,
+        shader_program_identity: terrain_program.identity,
+        shader_resource_layout: None,
+    })
+}
+
+fn source_mesh_resource_key(
+    mesh: MeshResourceKey,
+    candidate: &TerrainSourceProgramCandidate,
+) -> SourceMeshResourceKey {
+    SourceMeshResourceKey {
+        mesh,
+        shader_program_identity: candidate.program.identity.clone(),
+        shader_resource_layout: candidate.binding.map(|binding| binding.resource_layout),
+        shader_resource_generation: candidate
+            .binding
+            .map(|binding| binding.resource_generation)
+            .unwrap_or(0),
     }
+}
+
+fn mesh_pipeline_layouts(
+    mesh_material_layout: Handle,
+    shader_resource_layout: Option<Handle>,
+) -> GalResult<Vec<Handle>> {
+    let mut layouts = vec![mesh_material_layout];
+    if let Some(shader_layout) = shader_resource_layout {
+        if shader_layout == mesh_material_layout {
+            return Err(GalError::invalid_argument(
+                "shader-pack resource layout must be distinct from the mesh/material layout",
+            ));
+        }
+        layouts.push(shader_layout);
+    }
+    Ok(layouts)
 }
 
 fn depth_compare_for_policy(depth_policy: u32) -> GalResult<Option<CompareOp>> {
@@ -7085,6 +8615,18 @@ mod tests {
         BufferDesc, BufferUsage, FrameTargetDesc, MemoryDomain, RenderTargetDesc, TextureDesc,
         TextureDimension, TextureUsage, TextureViewDesc,
     };
+    use crate::render::vulkanic::shader_pack::source::{ShaderPackSource, ShaderSourceFile};
+    use crate::render::vulkanic::shader_pack::terrain_contract::{
+        TerrainPassContract, TerrainPassInput, TerrainPassOperation, TerrainPassOutput,
+        bundled_complementary_hung_loified_source, derive_complementary_terrain_contract,
+    };
+    use crate::render::vulkanic::shader_pack::terrain_source_resources::TERRAIN_RESOURCE_BINDINGS_PATH;
+    use crate::render::vulkanic::shader_pack::voxel_emission_table::VoxelEmissionTable;
+    use crate::render::vulkanic::shader_pack::voxel_light_volume::{
+        VoxelLightVolumeDescriptor, VoxelLightVolumeExtent, VoxelLightVolumeIdentity,
+        VoxelLightVolumeMapping, VoxelLightVolumeRequirements,
+    };
+    use crate::render::vulkanic::shader_pack::voxel_material_map::VoxelMaterialMap;
     use xxhash_rust::xxh32::xxh32;
 
     fn gal() -> VulkanicGal {
@@ -7094,6 +8636,466 @@ mod tests {
             ))),
             false,
         )
+    }
+
+    fn private_occupancy_descriptor() -> VoxelLightVolumeDescriptor {
+        let extent = VoxelLightVolumeExtent {
+            width: 128,
+            height: 64,
+            depth: 128,
+        };
+        VoxelLightVolumeDescriptor {
+            identity: VoxelLightVolumeIdentity::new("shader-pack:test/frontend-occupancy").unwrap(),
+            shader_pack_generation: 1,
+            world_generation: 1,
+            resource_generation: 1,
+            extent,
+            requirements: VoxelLightVolumeRequirements::complementary(128).unwrap(),
+            mapping: VoxelLightVolumeMapping::complementary(extent, [0, 0, 0], [0.0; 3]).unwrap(),
+        }
+    }
+
+    fn private_occupancy_materials() -> VoxelMaterialMap {
+        let source = ShaderPackSource::new(
+            "frontend-occupancy",
+            1,
+            vec![ShaderSourceFile::new(
+                "lib/misc/voxelization.glsl",
+                "int GetVoxelIDs(int mat) { if (mat == 30008) return 2; if (mat == 30012) return 3; return 1; }\nvoid UpdateVoxelMap(int mat) { if (mat == 32000 || mat < 30000 && mat % 4 == 1) return; }",
+            )],
+        )
+        .unwrap();
+        let contract = TerrainPassContract {
+            pack_name: "frontend-occupancy".to_string(),
+            generation: 1,
+            program_path: "unused".to_string(),
+            material_classes: Default::default(),
+            inputs: std::collections::BTreeSet::from([TerrainPassInput::ColoredVoxelLightVolume]),
+            outputs: std::collections::BTreeSet::from([TerrainPassOutput::LitTerrainColor]),
+            property_defines: Default::default(),
+            material_ids: Default::default(),
+            operations: vec![TerrainPassOperation::ColoredVoxelLighting],
+            required_resources: Default::default(),
+            voxel_light_volume_requirements: None,
+            unsupported: Default::default(),
+        };
+        VoxelMaterialMap::derive(&source, &contract).unwrap()
+    }
+
+    fn private_colored_light_emission() -> VoxelEmissionTable {
+        let source = bundled_complementary_hung_loified_source(1).unwrap();
+        let contract = derive_complementary_terrain_contract(&source).unwrap();
+        VoxelEmissionTable::derive(&source, &contract).unwrap()
+    }
+
+    #[test]
+    fn source_updates_observe_candidates_without_replacing_the_runtime_fixture() {
+        let mut frontend = WorldPrimitiveFrontend::default();
+        frontend
+            .apply_shader_pack_source_update(ShaderPackSourceUpdate {
+                pack_name: "candidate-pack".to_string(),
+                generation: 21,
+                files: vec![
+                    ShaderSourceFile::new(
+                        "program/gbuffers_terrain.glsl",
+                        "#version 130\nuniform sampler2D tex;\nvoid DoLighting() {}\n/* DRAWBUFFERS:06 */\nvoid main() { vec4 color = texture2D(tex, texCoord); if (color.a <= 0.00001) discard; color.rgb *= glColor.rgb; DoLighting(); gl_FragData[0] = color; gl_FragData[1] = vec4(smoothnessD, materialMask, skyLightFactor, 1.0); }",
+                    ),
+                    ShaderSourceFile::new(TERRAIN_RESOURCE_BINDINGS_PATH, "tex=material_atlas\n"),
+                    ShaderSourceFile::new("lib/common.glsl", "#define TEST 1\n"),
+                    ShaderSourceFile::new("shaders.properties", ""),
+                    ShaderSourceFile::new("block.properties", ""),
+                ],
+            })
+            .unwrap();
+        let mut gal = gal();
+        frontend.ensure_shader_runtime(&mut gal, 7).unwrap();
+
+        assert_eq!(Some(21), frontend.shader_pack_source_generation());
+        assert!(matches!(
+            frontend.shader_pack_source_candidate(),
+            Some(TerrainSourceCandidateState::Discovered {
+                generation: 21,
+                pack_name,
+                requires_colored_voxel_light: false,
+                ..
+            }) if pack_name == "candidate-pack"
+        ));
+        assert_eq!(
+            "vulkanic:builtin/terrain_opaque_v1",
+            frontend
+                .shader_runtime
+                .as_ref()
+                .unwrap()
+                .plan()
+                .programs
+                .terrain_opaque
+                .identity
+                .as_str()
+        );
+    }
+
+    #[test]
+    fn private_source_selector_uses_a_distinct_pipeline_and_resource_set() {
+        let mut gal = gal();
+        let target = frame_target(&mut gal, 1, 128, 128);
+        let mut frontend = WorldPrimitiveFrontend::default();
+        frontend
+            .apply_shader_pack_source_update(ShaderPackSourceUpdate {
+                pack_name: "private-source-route".to_string(),
+                generation: 31,
+                files: vec![
+                    ShaderSourceFile::new(
+                        "program/gbuffers_terrain.glsl",
+                        "#version 130\nuniform sampler2D tex;\nvoid DoLighting() {}\n/* DRAWBUFFERS:06 */\nvoid main() { vec4 color = texture2D(tex, texCoord); if (color.a <= 0.00001) discard; color.rgb *= glColor.rgb; DoLighting(); gl_FragData[0] = color; gl_FragData[1] = vec4(smoothnessD, materialMask, skyLightFactor, 1.0); }",
+                    ),
+                    ShaderSourceFile::new(TERRAIN_RESOURCE_BINDINGS_PATH, "tex=material_atlas\n"),
+                    ShaderSourceFile::new("lib/common.glsl", "#define TEST 1\n"),
+                    ShaderSourceFile::new("shaders.properties", ""),
+                    ShaderSourceFile::new("block.properties", ""),
+                ],
+            })
+            .unwrap();
+        frontend.enable_candidate_subset_execution_for_test();
+        frontend
+            .apply_world_mesh_asset_update(
+                &mut gal,
+                1,
+                shader_mesh_scene_assets(1),
+                shader_mesh_scene_textures(1),
+            )
+            .unwrap();
+
+        frontend
+            .append_frame_ops_inner(
+                &mut gal,
+                1,
+                target,
+                shader_mesh_scene_frame(128, 128, 0),
+                true,
+            )
+            .unwrap();
+
+        assert!(!frontend.source_mesh_resources.is_empty());
+        assert!(frontend.mesh_pipeline_resources.len() >= 2);
+        assert!(frontend.source_mesh_resources.keys().all(|key| {
+            key.shader_program_identity
+                .as_str()
+                .contains("private-source-route/terrain_")
+        }));
+    }
+
+    #[test]
+    fn private_source_selector_rejects_incomplete_bundled_source_snapshot() {
+        let source = bundled_complementary_hung_loified_source(1).unwrap();
+        let mut gal = gal();
+        let target = frame_target(&mut gal, 1, 128, 128);
+        let mut frontend = WorldPrimitiveFrontend::default();
+        frontend
+            .apply_shader_pack_source_update(ShaderPackSourceUpdate {
+                pack_name: source.name().to_string(),
+                generation: source.generation(),
+                files: source.files(),
+            })
+            .unwrap();
+        let mut assets = shader_mesh_scene_assets(1);
+        for asset in &mut assets {
+            asset.vertex_layout_version = WORLD_MESH_VERTEX_LAYOUT_V3;
+            for vertex in &mut asset.vertices {
+                vertex.shader_block_id = 30_008;
+            }
+        }
+        frontend
+            .apply_world_mesh_asset_update(&mut gal, 1, assets, shader_mesh_scene_textures(1))
+            .unwrap();
+        let mut frame = shader_mesh_scene_frame(128, 128, 0);
+        frame.voxel_volume = WorldVoxelVolumeFrame {
+            enabled: true,
+            world_generation: 1,
+            resource_generation: 1,
+            camera_world_position: [0.25, 0.5, 0.75],
+        };
+        for instance in &mut frame.mesh_instances {
+            instance.stratum = WORLD_STRATUM_TERRAIN;
+        }
+        assert!(
+            frontend
+                .prepare_source_colored_light_for_test(&mut gal, 1, &frame)
+                .unwrap()
+        );
+
+        for frame_id in [2, 3, 2] {
+            frame.frame_id = frame_id;
+            frontend
+                .submit_whole_frame(&mut gal, 1, target, frame.clone(), Vec::new())
+                .unwrap();
+        }
+        assert_eq!(Some(true), frontend.private_terrain_colored_light_ready(2));
+        frontend.enable_candidate_subset_execution_for_test();
+        let error = frontend
+            .append_frame_ops_inner(&mut gal, 1, target, frame, true)
+            .unwrap_err();
+        assert_eq!(StatusCode::UnsupportedFeature, error.code);
+        assert!(
+            error
+                .to_string()
+                .contains("missing shader source lib/antialiasing/jitter.glsl"),
+            "unexpected selected-source rejection: {error}"
+        );
+        assert!(frontend.source_mesh_resources.is_empty());
+    }
+
+    #[test]
+    fn source_candidate_prepares_and_retires_owned_colored_light_without_selecting_execution() {
+        let source = bundled_complementary_hung_loified_source(1).unwrap();
+        let mut gal = gal();
+        let mut frontend = WorldPrimitiveFrontend::default();
+        frontend
+            .apply_shader_pack_source_update(ShaderPackSourceUpdate {
+                pack_name: source.name().to_string(),
+                generation: source.generation(),
+                files: source.files(),
+            })
+            .unwrap();
+        let mut frame = shader_mesh_scene_frame(128, 128, 0);
+        frame.voxel_volume = private_voxel_volume_frame([0.25, 0.5, 0.75]);
+
+        assert!(
+            frontend
+                .ensure_candidate_colored_light_for_frame(&mut gal, 1, &frame)
+                .unwrap()
+        );
+        assert!(
+            !frontend
+                .ensure_candidate_colored_light_for_frame(&mut gal, 1, &frame)
+                .unwrap()
+        );
+        // Fractional camera motion changes the semantic mapping consumed by
+        // the next frame, not the owned D3 allocation identity.
+        frame.voxel_volume.camera_world_position = [0.75, 0.5, 0.25];
+        assert!(
+            !frontend
+                .ensure_candidate_colored_light_for_frame(&mut gal, 1, &frame)
+                .unwrap()
+        );
+        assert_eq!(Some(false), frontend.private_terrain_colored_light_ready(0));
+        assert!(!frontend.candidate_subset_execution_enabled);
+
+        frontend.reset(&mut gal);
+        assert!(!frontend.candidate_colored_light_runtime);
+        assert!(frontend.shader_runtime.is_none());
+
+        frame.voxel_volume.enabled = false;
+        assert!(
+            !frontend
+                .ensure_candidate_colored_light_for_frame(&mut gal, 1, &frame)
+                .unwrap()
+        );
+        assert_eq!(None, frontend.private_terrain_colored_light_ready(0));
+        assert!(!frontend.candidate_subset_execution_enabled);
+    }
+
+    #[test]
+    fn source_candidate_d3_preparation_stays_unavailable_without_affecting_the_frame_route() {
+        let source = bundled_complementary_hung_loified_source(1).unwrap();
+        let mut capabilities = presentation_capabilities(vulkan_capabilities());
+        capabilities.features.texture_3d = false;
+        capabilities.limits.max_texture_extent_3d = 0;
+        let mut gal = VulkanicGal::new_with_backend(
+            Box::new(MockBackend::with_capabilities(capabilities)),
+            false,
+        );
+        let mut frontend = WorldPrimitiveFrontend::default();
+        frontend
+            .apply_shader_pack_source_update(ShaderPackSourceUpdate {
+                pack_name: source.name().to_string(),
+                generation: source.generation(),
+                files: source.files(),
+            })
+            .unwrap();
+        let mut frame = shader_mesh_scene_frame(128, 128, 0);
+        frame.voxel_volume = private_voxel_volume_frame([0.25, 0.5, 0.75]);
+
+        assert!(
+            !frontend
+                .ensure_candidate_colored_light_for_frame(&mut gal, 1, &frame)
+                .unwrap()
+        );
+        assert!(frontend.shader_runtime.is_some());
+        assert_eq!(None, frontend.private_terrain_colored_light_ready(0));
+        assert!(!frontend.candidate_colored_light_runtime);
+        assert!(!frontend.candidate_subset_execution_enabled);
+    }
+
+    #[test]
+    fn source_candidate_preparation_uses_combined_frame_without_creating_source_draws() {
+        let source = bundled_complementary_hung_loified_source(1).unwrap();
+        let mut gal = gal();
+        let target = frame_target(&mut gal, 1, 128, 128);
+        let mut frontend = WorldPrimitiveFrontend::default();
+        frontend
+            .apply_shader_pack_source_update(ShaderPackSourceUpdate {
+                pack_name: source.name().to_string(),
+                generation: source.generation(),
+                files: source.files(),
+            })
+            .unwrap();
+        let mut assets = shader_mesh_scene_assets(1);
+        for asset in &mut assets {
+            asset.vertex_layout_version = WORLD_MESH_VERTEX_LAYOUT_V3;
+            for vertex in &mut asset.vertices {
+                vertex.shader_block_id = 30_008;
+            }
+        }
+        frontend
+            .apply_world_mesh_asset_update(&mut gal, 1, assets, shader_mesh_scene_textures(1))
+            .unwrap();
+        let mut frame = shader_mesh_scene_frame(128, 128, 0);
+        frame.voxel_volume = private_voxel_volume_frame([0.25, 0.5, 0.75]);
+        for instance in &mut frame.mesh_instances {
+            instance.stratum = WORLD_STRATUM_TERRAIN;
+        }
+
+        for frame_id in [2, 3, 2] {
+            frame.frame_id = frame_id;
+            frontend
+                .submit_whole_frame(&mut gal, 1, target, frame.clone(), Vec::new())
+                .unwrap();
+        }
+
+        assert_eq!(Some(3), frontend.private_terrain_occupancy_mesh_count());
+        assert_eq!(Some(true), frontend.private_terrain_colored_light_ready(2));
+        assert!(frontend.source_mesh_resources.is_empty());
+        assert!(!frontend.candidate_subset_execution_enabled);
+
+        assert!(
+            frontend
+                .apply_shader_pack_source_update(ShaderPackSourceUpdate {
+                    pack_name: "malformed-candidate".to_string(),
+                    generation: 2,
+                    files: vec![ShaderSourceFile::new("../../outside.glsl", "bad")],
+                })
+                .is_err()
+        );
+        assert_eq!(Some(1), frontend.shader_pack_source_generation());
+        frame.frame_id = 4;
+        frontend
+            .submit_whole_frame(&mut gal, 1, target, frame.clone(), Vec::new())
+            .unwrap();
+        assert_eq!(Some(3), frontend.private_terrain_occupancy_mesh_count());
+        assert!(frontend.source_mesh_resources.is_empty());
+
+        frontend
+            .apply_shader_pack_source_update(ShaderPackSourceUpdate {
+                pack_name: "candidate-without-voxel-light".to_string(),
+                generation: 3,
+                files: vec![
+                    ShaderSourceFile::new(
+                        "program/gbuffers_terrain.glsl",
+                        "#version 130\nuniform sampler2D tex;\nvoid DoLighting() {}\n/* DRAWBUFFERS:06 */\nvoid main() { vec4 color = texture2D(tex, texCoord); if (color.a <= 0.00001) discard; color.rgb *= glColor.rgb; DoLighting(); gl_FragData[0] = color; gl_FragData[1] = vec4(smoothnessD, materialMask, skyLightFactor, 1.0); }",
+                    ),
+                    ShaderSourceFile::new(TERRAIN_RESOURCE_BINDINGS_PATH, "tex=material_atlas\n"),
+                    ShaderSourceFile::new("lib/common.glsl", "#define TEST 1\n"),
+                    ShaderSourceFile::new("shaders.properties", ""),
+                    ShaderSourceFile::new("block.properties", ""),
+                ],
+            })
+            .unwrap();
+        frame.frame_id = 5;
+        frontend
+            .submit_whole_frame(&mut gal, 1, target, frame, Vec::new())
+            .unwrap();
+        assert_eq!(None, frontend.private_terrain_colored_light_ready(5));
+        assert!(frontend.source_mesh_resources.is_empty());
+        assert!(!frontend.candidate_subset_execution_enabled);
+    }
+
+    #[test]
+    fn private_source_mesh_variants_retire_before_their_pipelines() {
+        let mut gal = gal();
+        let target = frame_target(&mut gal, 1, 128, 128);
+        let mut frontend = WorldPrimitiveFrontend::default();
+        frontend
+            .apply_shader_pack_source_update(ShaderPackSourceUpdate {
+                pack_name: "retirement-source".to_string(),
+                generation: 41,
+                files: vec![
+                    ShaderSourceFile::new(
+                        "program/gbuffers_terrain.glsl",
+                        "#version 130\nuniform sampler2D tex;\nvoid DoLighting() {}\n/* DRAWBUFFERS:06 */\nvoid main() { vec4 color = texture2D(tex, texCoord); if (color.a <= 0.00001) discard; color.rgb *= glColor.rgb; DoLighting(); gl_FragData[0] = color; gl_FragData[1] = vec4(smoothnessD, materialMask, skyLightFactor, 1.0); }",
+                    ),
+                    ShaderSourceFile::new(TERRAIN_RESOURCE_BINDINGS_PATH, "tex=material_atlas\n"),
+                    ShaderSourceFile::new("lib/common.glsl", "#define TEST 1\n"),
+                    ShaderSourceFile::new("shaders.properties", ""),
+                    ShaderSourceFile::new("block.properties", ""),
+                ],
+            })
+            .unwrap();
+        frontend.enable_candidate_subset_execution_for_test();
+        frontend
+            .apply_world_mesh_asset_update(
+                &mut gal,
+                1,
+                shader_mesh_scene_assets(1),
+                shader_mesh_scene_textures(1),
+            )
+            .unwrap();
+        frontend
+            .append_frame_ops_inner(
+                &mut gal,
+                1,
+                target,
+                shader_mesh_scene_frame(128, 128, 0),
+                true,
+            )
+            .unwrap();
+        assert!(!frontend.source_mesh_resources.is_empty());
+
+        frontend.reset(&mut gal);
+
+        assert!(frontend.source_mesh_resources.is_empty());
+        assert!(frontend.mesh_resources.is_empty());
+        assert!(frontend.mesh_pipeline_resources.is_empty());
+    }
+
+    #[test]
+    fn mesh_pipeline_cache_keeps_distinct_source_program_identities() {
+        let mut gal = gal();
+        let mut frontend = WorldPrimitiveFrontend::default();
+        let builtin = minimal_terrain_solid_program();
+        let mut source_derived = builtin.clone();
+        source_derived.identity = ProgramIdentity::new("shader-pack:test/terrain_opaque");
+        let builtin_key = MeshPipelineResourceKey {
+            g_buffer: true,
+            material_mode: WORLD_MATERIAL_MODE_OPAQUE,
+            winding: WORLD_WINDING_CCW,
+            depth_policy: WORLD_DEPTH_POLICY_TEST_WRITE,
+            cull_policy: WORLD_CULL_BACK,
+            color_format: ColorFormat::Bgra8Unorm,
+            shader_program_identity: builtin.identity.clone(),
+            shader_resource_layout: None,
+        };
+        let source_key = MeshPipelineResourceKey {
+            shader_program_identity: source_derived.identity.clone(),
+            ..builtin_key.clone()
+        };
+
+        frontend
+            .ensure_mesh_pipeline_resources_for_program(&mut gal, builtin_key, &builtin)
+            .unwrap();
+        frontend
+            .ensure_mesh_pipeline_resources_for_program(&mut gal, source_key, &source_derived)
+            .unwrap();
+
+        assert_eq!(2, frontend.mesh_pipeline_resources.len());
+    }
+
+    fn private_voxel_volume_frame(camera_world_position: [f32; 3]) -> WorldVoxelVolumeFrame {
+        WorldVoxelVolumeFrame {
+            enabled: true,
+            world_generation: 1,
+            resource_generation: 1,
+            camera_world_position,
+        }
     }
 
     fn frame_target(gal: &mut VulkanicGal, frame_id: u64, width: u32, height: u32) -> Handle {
@@ -7137,6 +9139,8 @@ mod tests {
             projection_matrix: [
                 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
             ],
+            voxel_volume: WorldVoxelVolumeFrame::default(),
+            shader_environment: WorldShaderEnvironmentFrame::default(),
             background: WorldBackgroundRequest {
                 enabled: true,
                 sky_type: WORLD_BACKGROUND_SKY_OVERWORLD,
@@ -7152,6 +9156,259 @@ mod tests {
             material_quads: Vec::new(),
             mesh_instances: Vec::new(),
         }
+    }
+
+    #[test]
+    fn source_uniform_frame_copies_only_proven_world_semantics() {
+        let mut source = frame(Vec::new());
+        source.shader_environment = WorldShaderEnvironmentFrame {
+            enabled: true,
+            world_generation: 5,
+            world_time: 12_345,
+            frame_counter: 42,
+            frame_time_seconds: 0.016,
+            frame_time_counter: 12.5,
+            world_day: 17,
+            moon_phase: 3,
+            time_of_day: 0.75,
+            rain_strength: 0.25,
+            thunder_strength: 0.5,
+            sky_darken: 0.125,
+            eye_submersion: 1,
+            screen_brightness: 0.75,
+            far_plane: 192.0,
+            relative_eye_position: [0.25, -0.5, 0.75],
+            sky_color: [0.2, 0.4, 0.6],
+            darkness_light_factor: 0.125,
+            night_vision: 0.875,
+            fog_color: [0.3, 0.5, 0.7],
+            biome_precipitation: 2,
+            biome_resource_location: "minecraft:snowy_plains".to_string(),
+            main_hand_item_model_resource_location: "minecraft:lava_bucket".to_string(),
+            off_hand_item_model_resource_location: "minecraft:totem_of_undying".to_string(),
+            main_hand_item_light_emission: 13,
+            off_hand_item_light_emission: 7,
+        };
+        source.voxel_volume = WorldVoxelVolumeFrame {
+            enabled: true,
+            world_generation: 5,
+            resource_generation: 9,
+            camera_world_position: [12.5, 64.0, -3.25],
+        };
+
+        let uniforms = source.source_uniform_frame().unwrap();
+        assert_eq!(Some(0.25), uniforms.rain_strength);
+        assert_eq!(Some(0.5), uniforms.thunder_strength);
+        assert_eq!(Some(0.125), uniforms.sky_darken);
+        assert_eq!(Some(42), uniforms.frame_counter);
+        assert_eq!(Some(0.016), uniforms.frame_time_seconds);
+        assert_eq!(Some(1), uniforms.eye_submersion);
+        assert_eq!(Some(0.75), uniforms.screen_brightness);
+        assert_eq!(Some(0.125), uniforms.darkness_light_factor);
+        assert_eq!(Some(0.875), uniforms.night_vision);
+        assert_eq!(Some(192.0), uniforms.far_plane);
+        assert_eq!(Some([0.25, -0.5, 0.75]), uniforms.relative_eye_position);
+        assert_eq!(Some([0.2, 0.4, 0.6]), uniforms.sky_color);
+        assert_eq!(Some([0.3, 0.5, 0.7]), uniforms.fog_color);
+        assert_eq!(Some(2), uniforms.biome_precipitation);
+        assert_eq!(
+            Some("minecraft:snowy_plains".to_string()),
+            uniforms.biome_resource_location
+        );
+        assert_eq!(Some(2.0), uniforms.frame_modulo_eight);
+        assert_eq!(Some(12.5), uniforms.frame_time_counter);
+        assert_eq!(Some(12_345), uniforms.world_time);
+        assert_eq!(Some(17), uniforms.world_day);
+        assert_eq!(Some(3), uniforms.moon_phase);
+        assert_eq!(Some(0.0), uniforms.sun_angle);
+        assert_eq!(Some([12.5, 64.0, -3.25]), uniforms.camera_world_position);
+        assert_eq!(Some([0.5, 0.0, 0.75]), uniforms.camera_world_position_fract);
+        assert_eq!(Some(source.view_matrix), uniforms.view_matrix);
+        assert_eq!(Some(source.view_matrix), uniforms.view_matrix_inverse);
+        assert_eq!(Some(source.projection_matrix), uniforms.projection_matrix);
+        assert_eq!(
+            Some(source.projection_matrix),
+            uniforms.projection_matrix_inverse
+        );
+        assert_eq!(Some(128.0), uniforms.viewport_width);
+        assert_eq!(Some(128.0), uniforms.viewport_height);
+        assert_eq!(Some(0.016), uniforms.frame_time_seconds);
+
+        source.projection_matrix[0] = f32::NAN;
+        assert!(source.source_uniform_frame().is_err());
+
+        source.projection_matrix[0] = 0.0;
+        source.projection_matrix[5] = 0.0;
+        source.projection_matrix[10] = 0.0;
+        source.projection_matrix[15] = 0.0;
+        assert!(source.source_uniform_frame().is_err());
+    }
+
+    #[test]
+    fn source_uniform_resource_preparation_requires_and_uses_owned_terrain_atlas_metadata() {
+        let mut gal = gal();
+        let mut frontend = WorldPrimitiveFrontend::default();
+        let source = frame(Vec::new());
+        assert!(
+            frontend
+                .source_uniform_frame_for_owned_resources(&source)
+                .unwrap_err()
+                .to_string()
+                .contains("Rust-owned terrain material atlas")
+        );
+
+        frontend
+            .apply_world_mesh_asset_update(
+                &mut gal,
+                1,
+                Vec::new(),
+                vec![WorldMeshTextureAssetPayload {
+                    texture_id: WORLD_MESH_TEXTURE_TERRAIN_BLOCK_ATLAS,
+                    png_bytes: material_scene_png(0),
+                    frame_width: 0,
+                    frame_height: 0,
+                    frame_count: 1,
+                    frame_ticks: 1,
+                    animation_flags: 0,
+                    frame_row_size: 0,
+                    interpolation_policy: 0,
+                    animation_frames: Vec::new(),
+                }],
+            )
+            .unwrap();
+        let uniforms = frontend
+            .source_uniform_frame_for_owned_resources(&source)
+            .unwrap();
+        assert_eq!(Some([8, 8]), uniforms.material_atlas_size);
+    }
+
+    #[test]
+    fn owned_source_uniform_preparation_derives_rain_factor_once_per_frame() {
+        let mut gal = gal();
+        let mut frontend = WorldPrimitiveFrontend::default();
+        frontend
+            .apply_world_mesh_asset_update(
+                &mut gal,
+                1,
+                Vec::new(),
+                vec![WorldMeshTextureAssetPayload {
+                    texture_id: WORLD_MESH_TEXTURE_TERRAIN_BLOCK_ATLAS,
+                    png_bytes: material_scene_png(0),
+                    frame_width: 0,
+                    frame_height: 0,
+                    frame_count: 1,
+                    frame_ticks: 1,
+                    animation_flags: 0,
+                    frame_row_size: 0,
+                    interpolation_policy: 0,
+                    animation_frames: Vec::new(),
+                }],
+            )
+            .unwrap();
+        frontend
+            .apply_shader_pack_source_update(ShaderPackSourceUpdate {
+                pack_name: "held-item-identities".to_string(),
+                generation: 7,
+                files: vec![ShaderSourceFile::new(
+                    "item.properties",
+                    "item.45032=minecraft:lava_bucket\nitem.45108=minecraft:totem_of_undying\n",
+                )],
+            })
+            .unwrap();
+        let mut source = frame(Vec::new());
+        source.shader_environment = WorldShaderEnvironmentFrame {
+            enabled: true,
+            world_generation: 5,
+            frame_time_seconds: 1.5,
+            rain_strength: 0.0,
+            biome_precipitation: 0,
+            biome_resource_location: "minecraft:nether_wastes".to_string(),
+            main_hand_item_model_resource_location: "minecraft:lava_bucket".to_string(),
+            off_hand_item_model_resource_location: "minecraft:totem_of_undying".to_string(),
+            main_hand_item_light_emission: 3,
+            off_hand_item_light_emission: 12,
+            far_plane: 128.0,
+            ..WorldShaderEnvironmentFrame::default()
+        };
+        source.frame_id = 10;
+        assert_eq!(
+            Some(0.0),
+            frontend
+                .source_uniform_frame_for_owned_resources(&source)
+                .unwrap()
+                .rain_factor
+        );
+        assert_eq!(
+            Some(1.0),
+            frontend
+                .source_uniform_frame_for_owned_resources(&source)
+                .unwrap()
+                .biome_dry
+        );
+        let uniforms = frontend
+            .source_uniform_frame_for_owned_resources(&source)
+            .unwrap();
+        assert_eq!(Some(45_032), uniforms.held_item_id_main);
+        assert_eq!(Some(45_108), uniforms.held_item_id_off_hand);
+        assert_eq!(Some(12), uniforms.held_block_light_main);
+        assert_eq!(Some(12), uniforms.held_block_light_off_hand);
+        assert_eq!(
+            Some(1.0),
+            frontend
+                .source_uniform_frame_for_owned_resources(&source)
+                .unwrap()
+                .biome_nether_wastes
+        );
+
+        source.frame_id = 11;
+        source.shader_environment.rain_strength = 1.0;
+        source.shader_environment.biome_precipitation = 2;
+        source.shader_environment.biome_resource_location = "minecraft:warped_forest".to_string();
+        let smoothed = frontend
+            .source_uniform_frame_for_owned_resources(&source)
+            .unwrap()
+            .rain_factor
+            .unwrap();
+        assert!((smoothed - 0.5).abs() < 0.000_001);
+        let climate = frontend
+            .source_uniform_frame_for_owned_resources(&source)
+            .unwrap();
+        assert!((climate.biome_dry.unwrap() - 0.353_553_38).abs() < 0.000_001);
+        assert!((climate.biome_snowy.unwrap() - 0.405_396_46).abs() < 0.000_001);
+        assert!((climate.biome_nether_wastes.unwrap() - 0.5).abs() < 0.000_001);
+        assert!((climate.biome_warped_forest.unwrap() - 0.5).abs() < 0.000_001);
+        assert_eq!(
+            Some(smoothed),
+            frontend
+                .source_uniform_frame_for_owned_resources(&source)
+                .unwrap()
+                .rain_factor
+        );
+
+        source.shader_environment.world_generation = 6;
+        source.frame_id = 12;
+        source.shader_environment.rain_strength = 0.25;
+        source.shader_environment.biome_precipitation = 1;
+        assert_eq!(
+            Some(0.25),
+            frontend
+                .source_uniform_frame_for_owned_resources(&source)
+                .unwrap()
+                .rain_factor
+        );
+        let reset_climate = frontend
+            .source_uniform_frame_for_owned_resources(&source)
+            .unwrap();
+        assert_eq!(Some(0.0), reset_climate.biome_dry);
+        assert_eq!(Some(0.0), reset_climate.biome_snowy);
+    }
+
+    #[test]
+    fn source_sun_angle_matches_the_selected_source_sky_angle_boundary() {
+        assert_eq!(0.25, source_sun_angle(0.0));
+        assert_eq!(0.999_999, source_sun_angle(0.749_999));
+        assert_eq!(0.0, source_sun_angle(0.75));
+        assert_eq!(0.25, source_sun_angle(1.0));
     }
 
     fn crack_quad(stage: u32, depth_policy: u32) -> WorldCrackQuadRequest {
@@ -7229,6 +9486,7 @@ mod tests {
                 shader_atlas_uv: [0.25, 0.25],
                 shader_block_id: 10232,
                 shader_material_type: -1,
+                mid_block_packed: 0,
                 color_argb: 0xffff_ffff,
                 normal_packed: 0,
                 light: 0,
@@ -7239,6 +9497,7 @@ mod tests {
                 shader_atlas_uv: [0.5, 0.25],
                 shader_block_id: 10232,
                 shader_material_type: -1,
+                mid_block_packed: 0,
                 color_argb: 0xffff_ffff,
                 normal_packed: 0,
                 light: 0,
@@ -7249,6 +9508,7 @@ mod tests {
                 shader_atlas_uv: [0.5, 0.5],
                 shader_block_id: 10232,
                 shader_material_type: -1,
+                mid_block_packed: 0,
                 color_argb: 0xffff_ffff,
                 normal_packed: 0,
                 light: 0,
@@ -7259,6 +9519,7 @@ mod tests {
                 shader_atlas_uv: [0.25, 0.5],
                 shader_block_id: 10232,
                 shader_material_type: -1,
+                mid_block_packed: 0,
                 color_argb: 0xffff_ffff,
                 normal_packed: 0,
                 light: 0,
@@ -7541,9 +9802,10 @@ mod tests {
         assert_eq!(1, stats.material_batch_count);
         assert_eq!(1, stats.material_draw_count);
         assert_eq!(1, stats.material_cache_misses);
-        assert!(ops
-            .iter()
-            .any(|op| matches!(op, CommandOp::SetIndexBuffer { .. })));
+        assert!(
+            ops.iter()
+                .any(|op| matches!(op, CommandOp::SetIndexBuffer { .. }))
+        );
         assert!(ops.iter().any(|op| matches!(
             op,
             CommandOp::DrawIndexed {
@@ -7607,7 +9869,8 @@ mod tests {
     }
 
     #[test]
-    fn world_mesh_sorted_index_updates_replace_index_payload_without_changing_instance_generation() {
+    fn world_mesh_sorted_index_updates_replace_index_payload_without_changing_instance_generation()
+    {
         let mut gal = gal();
         let target = frame_target(&mut gal, 1, 128, 128);
         let mut frontend = WorldPrimitiveFrontend::default();
@@ -7679,9 +9942,339 @@ mod tests {
 
         let mut frame = frame(Vec::new());
         frame.mesh_instances.push(mesh_instance(81, 1));
-        let (_ops, stats) = frontend.append_frame_ops(&mut gal, 1, target, frame).unwrap();
+        let (_ops, stats) = frontend
+            .append_frame_ops(&mut gal, 1, target, frame)
+            .unwrap();
         assert_eq!(1, stats.mesh_instance_count);
         assert_eq!(1, stats.mesh_draw_count);
+    }
+
+    #[test]
+    fn terrain_voxel_source_cache_tracks_only_visible_v3_terrain_assets() {
+        let mut gal = gal();
+        let mut frontend = WorldPrimitiveFrontend::default();
+        let mut terrain = mesh_asset(0x701, 1, IndexType::U16);
+        terrain.vertex_layout_version = WORLD_MESH_VERTEX_LAYOUT_V3;
+        terrain.vertices[0].mid_block_packed = 0x00_01_fe;
+        terrain.vertices[0].shader_block_id = 30_008;
+        frontend
+            .apply_world_mesh_asset_update(&mut gal, 1, vec![terrain], Vec::new())
+            .unwrap();
+
+        let mut terrain_frame = frame(Vec::new());
+        let mut instance = mesh_instance(0x701, 1);
+        instance.stratum = WORLD_STRATUM_TERRAIN;
+        terrain_frame.mesh_instances.push(instance.clone());
+        let source = frontend
+            .terrain_voxel_source_meshes(&terrain_frame)
+            .unwrap();
+        assert_eq!(1, source.len());
+        assert_eq!(0x701, source[0].mesh_key);
+        assert_eq!(1, source[0].mesh_generation);
+        assert_eq!(instance.transform, source[0].transform);
+        assert_eq!(0x00_01_fe, source[0].vertices[0].mid_block_packed);
+        assert_eq!(30_008, source[0].vertices[0].shader_material_id);
+        assert_eq!(vec![0, 1, 2, 2, 3, 0], *source[0].indices);
+
+        terrain_frame.mesh_instances.push(instance.clone());
+        assert!(
+            frontend
+                .terrain_voxel_source_meshes(&terrain_frame)
+                .is_err()
+        );
+        terrain_frame.mesh_instances.pop();
+        terrain_frame.mesh_instances[0].mesh_generation = 2;
+        assert!(
+            frontend
+                .terrain_voxel_source_meshes(&terrain_frame)
+                .is_err()
+        );
+
+        let mut replacement = mesh_asset(0x701, 2, IndexType::U16);
+        replacement.vertex_layout_version = WORLD_MESH_VERTEX_LAYOUT_V3;
+        replacement.vertices[0].mid_block_packed = 0x00_02_fd;
+        replacement.vertices[0].shader_block_id = 30_012;
+        frontend
+            .apply_world_mesh_asset_update(&mut gal, 2, vec![replacement], Vec::new())
+            .unwrap();
+        let replacement_source = frontend
+            .terrain_voxel_source_meshes(&terrain_frame)
+            .unwrap();
+        assert_eq!(2, replacement_source[0].mesh_generation);
+        assert_eq!(
+            0x00_02_fd,
+            replacement_source[0].vertices[0].mid_block_packed
+        );
+        assert_eq!(30_012, replacement_source[0].vertices[0].shader_material_id);
+
+        let v2 = mesh_asset(0x702, 1, IndexType::U16);
+        frontend
+            .apply_world_mesh_asset_update(&mut gal, 3, vec![v2], Vec::new())
+            .unwrap();
+        terrain_frame.mesh_instances[0] = mesh_instance(0x702, 1);
+        terrain_frame.mesh_instances[0].stratum = WORLD_STRATUM_TERRAIN;
+        assert!(
+            frontend
+                .terrain_voxel_source_meshes(&terrain_frame)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn terrain_voxel_source_cache_decodes_u32_triangles_without_render_buffer_borrows() {
+        let mut gal = gal();
+        let mut frontend = WorldPrimitiveFrontend::default();
+        let mut terrain = mesh_asset(0x703, 1, IndexType::U32);
+        terrain.vertex_layout_version = WORLD_MESH_VERTEX_LAYOUT_V3;
+        frontend
+            .apply_world_mesh_asset_update(&mut gal, 1, vec![terrain], Vec::new())
+            .unwrap();
+
+        let mut terrain_frame = frame(Vec::new());
+        let mut instance = mesh_instance(0x703, 1);
+        instance.stratum = WORLD_STRATUM_TERRAIN;
+        terrain_frame.mesh_instances.push(instance);
+        let source = frontend
+            .terrain_voxel_source_meshes(&terrain_frame)
+            .unwrap();
+        assert_eq!(vec![0, 1, 2, 2, 3, 0], *source[0].indices);
+    }
+
+    #[test]
+    fn voxel_volume_frame_mapping_is_generation_checked_and_preserves_camera_fraction() {
+        let descriptor = private_occupancy_descriptor();
+        let mapping = WorldPrimitiveFrontend::voxel_volume_mapping_from_frame(
+            private_voxel_volume_frame([-1.25, 3.5, 7.0]),
+            &descriptor,
+        )
+        .unwrap();
+        assert_eq!([-2, 3, 7], mapping.camera_cell);
+        assert_eq!([0.75, 0.5, 0.0], mapping.camera_fraction);
+
+        let mut stale = private_voxel_volume_frame([0.0; 3]);
+        stale.resource_generation += 1;
+        assert!(
+            WorldPrimitiveFrontend::voxel_volume_mapping_from_frame(stale, &descriptor).is_err()
+        );
+
+        assert!(
+            WorldPrimitiveFrontend::voxel_volume_mapping_from_frame(
+                WorldVoxelVolumeFrame::default(),
+                &descriptor,
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn mesh_pipeline_layouts_keep_semantic_shader_resources_after_mesh_materials() {
+        let mesh_layout = Handle::new(HandleKind::ResourceLayout, 1, 1).unwrap();
+        let shader_layout = Handle::new(HandleKind::ResourceLayout, 2, 1).unwrap();
+
+        assert_eq!(
+            vec![mesh_layout],
+            mesh_pipeline_layouts(mesh_layout, None).unwrap()
+        );
+        assert_eq!(
+            vec![mesh_layout, shader_layout],
+            mesh_pipeline_layouts(mesh_layout, Some(shader_layout)).unwrap()
+        );
+        assert!(mesh_pipeline_layouts(mesh_layout, Some(mesh_layout)).is_err());
+    }
+
+    #[test]
+    fn private_terrain_occupancy_commits_only_with_the_combined_whole_frame_submission() {
+        let mut gal = gal();
+        let target = frame_target(&mut gal, 1, 128, 128);
+        let mut frontend = WorldPrimitiveFrontend::default();
+        let mut terrain = mesh_asset(0x70_cca, 1, IndexType::U16);
+        terrain.vertex_layout_version = WORLD_MESH_VERTEX_LAYOUT_V3;
+        for vertex in &mut terrain.vertices {
+            vertex.shader_block_id = 30_008;
+            vertex.mid_block_packed = 0;
+        }
+        frontend
+            .apply_world_mesh_asset_update(&mut gal, 1, vec![terrain], Vec::new())
+            .unwrap();
+        frontend
+            .install_private_terrain_occupancy(
+                &mut gal,
+                private_occupancy_descriptor(),
+                private_occupancy_materials(),
+            )
+            .unwrap();
+
+        let mut whole_frame = frame(Vec::new());
+        whole_frame.voxel_volume = private_voxel_volume_frame([0.25, 0.5, 0.75]);
+        let mut instance = mesh_instance(0x70_cca, 1);
+        instance.stratum = WORLD_STRATUM_TERRAIN;
+        whole_frame.mesh_instances.push(instance);
+
+        assert_eq!(Some(0), frontend.private_terrain_occupancy_mesh_count());
+        let stats = frontend
+            .submit_whole_frame(&mut gal, 1, target, whole_frame, Vec::new())
+            .unwrap();
+        assert_ne!(0, stats.submission_id);
+        assert_eq!(Some(1), frontend.private_terrain_occupancy_mesh_count());
+    }
+
+    #[test]
+    fn private_terrain_occupancy_uses_frame_mapping_without_recreating_its_semantic_generation() {
+        let mut gal = gal();
+        let target = frame_target(&mut gal, 1, 128, 128);
+        let mut frontend = WorldPrimitiveFrontend::default();
+        let mut terrain = mesh_asset(0x70_ccd, 1, IndexType::U16);
+        terrain.vertex_layout_version = WORLD_MESH_VERTEX_LAYOUT_V3;
+        for vertex in &mut terrain.vertices {
+            vertex.shader_block_id = 30_008;
+        }
+        frontend
+            .apply_world_mesh_asset_update(&mut gal, 1, vec![terrain], Vec::new())
+            .unwrap();
+        frontend
+            .install_private_terrain_occupancy(
+                &mut gal,
+                private_occupancy_descriptor(),
+                private_occupancy_materials(),
+            )
+            .unwrap();
+
+        let mut whole_frame = frame(Vec::new());
+        whole_frame.voxel_volume = private_voxel_volume_frame([0.25, 0.5, 0.75]);
+        let mut instance = mesh_instance(0x70_ccd, 1);
+        instance.stratum = WORLD_STRATUM_TERRAIN;
+        whole_frame.mesh_instances.push(instance);
+        frontend
+            .submit_whole_frame(&mut gal, 1, target, whole_frame.clone(), Vec::new())
+            .unwrap();
+        let first = frontend.private_terrain_occupancy_mapping().unwrap();
+        assert_eq!([0, 0, 0], first.camera_cell);
+        assert_eq!([0.25, 0.5, 0.75], first.camera_fraction);
+
+        whole_frame.voxel_volume = private_voxel_volume_frame([0.75, 0.5, 0.25]);
+        frontend
+            .submit_whole_frame(&mut gal, 1, target, whole_frame.clone(), Vec::new())
+            .unwrap();
+        let fractional = frontend.private_terrain_occupancy_mapping().unwrap();
+        assert_eq!([0, 0, 0], fractional.camera_cell);
+        assert_eq!([0.75, 0.5, 0.25], fractional.camera_fraction);
+
+        whole_frame.voxel_volume = private_voxel_volume_frame([1.25, 0.5, 0.25]);
+        frontend
+            .submit_whole_frame(&mut gal, 1, target, whole_frame, Vec::new())
+            .unwrap();
+        let moved = frontend.private_terrain_occupancy_mapping().unwrap();
+        assert_eq!([1, 0, 0], moved.camera_cell);
+        assert_eq!([0.25, 0.5, 0.25], moved.camera_fraction);
+    }
+
+    #[test]
+    fn private_colored_light_runtime_uses_the_real_combined_world_frame_transaction() {
+        let mut gal = gal();
+        let target = frame_target(&mut gal, 1, 128, 128);
+        let mut frontend = WorldPrimitiveFrontend::default();
+        let mut terrain = mesh_asset(0x70_cce, 1, IndexType::U16);
+        terrain.vertex_layout_version = WORLD_MESH_VERTEX_LAYOUT_V3;
+        for vertex in &mut terrain.vertices {
+            vertex.shader_block_id = 30_008;
+        }
+        frontend
+            .apply_world_mesh_asset_update(&mut gal, 1, vec![terrain], Vec::new())
+            .unwrap();
+        frontend
+            .install_private_terrain_colored_light(
+                &mut gal,
+                private_occupancy_descriptor(),
+                private_occupancy_materials(),
+                private_colored_light_emission(),
+            )
+            .unwrap();
+
+        let mut whole_frame = frame(Vec::new());
+        whole_frame.voxel_volume = private_voxel_volume_frame([0.25, 0.5, 0.75]);
+        let mut instance = mesh_instance(0x70_cce, 1);
+        instance.stratum = WORLD_STRATUM_TERRAIN;
+        whole_frame.mesh_instances.push(instance);
+
+        whole_frame.frame_id = 2;
+        frontend
+            .submit_whole_frame(&mut gal, 1, target, whole_frame.clone(), Vec::new())
+            .unwrap();
+        assert_eq!(Some(false), frontend.private_terrain_colored_light_ready(0));
+
+        whole_frame.frame_id = 3;
+        frontend
+            .submit_whole_frame(&mut gal, 1, target, whole_frame.clone(), Vec::new())
+            .unwrap();
+        assert_eq!(Some(false), frontend.private_terrain_colored_light_ready(0));
+        assert_eq!(Some(true), frontend.private_terrain_colored_light_ready(1));
+
+        whole_frame.frame_id = 2;
+        frontend
+            .submit_whole_frame(&mut gal, 1, target, whole_frame, Vec::new())
+            .unwrap();
+        assert_eq!(Some(true), frontend.private_terrain_colored_light_ready(0));
+        assert_eq!(Some(true), frontend.private_terrain_colored_light_ready(1));
+        assert_eq!(Some(1), frontend.private_terrain_occupancy_mesh_count());
+    }
+
+    #[test]
+    fn private_terrain_occupancy_discards_a_rejected_whole_frame_submission() {
+        let mut gal = gal();
+        let target = frame_target(&mut gal, 1, 128, 128);
+        let mut frontend = WorldPrimitiveFrontend::default();
+        let mut terrain = mesh_asset(0x70_ccb, 1, IndexType::U16);
+        terrain.vertex_layout_version = WORLD_MESH_VERTEX_LAYOUT_V3;
+        for vertex in &mut terrain.vertices {
+            vertex.shader_block_id = 30_008;
+        }
+        frontend
+            .apply_world_mesh_asset_update(&mut gal, 1, vec![terrain], Vec::new())
+            .unwrap();
+        frontend
+            .install_private_terrain_occupancy(
+                &mut gal,
+                private_occupancy_descriptor(),
+                private_occupancy_materials(),
+            )
+            .unwrap();
+
+        let mut whole_frame = frame(Vec::new());
+        whole_frame.voxel_volume = private_voxel_volume_frame([0.25, 0.5, 0.75]);
+        let mut instance = mesh_instance(0x70_ccb, 1);
+        instance.stratum = WORLD_STRATUM_TERRAIN;
+        whole_frame.mesh_instances.push(instance);
+
+        gal.mock_backend_mut().unwrap().fail_next_submit();
+        assert!(
+            frontend
+                .submit_whole_frame(&mut gal, 1, target, whole_frame.clone(), Vec::new())
+                .is_err()
+        );
+        assert_eq!(Some(0), frontend.private_terrain_occupancy_mesh_count());
+
+        frontend
+            .submit_whole_frame(&mut gal, 1, target, whole_frame, Vec::new())
+            .unwrap();
+        assert_eq!(Some(1), frontend.private_terrain_occupancy_mesh_count());
+    }
+
+    #[test]
+    fn private_terrain_occupancy_is_retired_with_world_frontend_reset() {
+        let mut gal = gal();
+        let mut frontend = WorldPrimitiveFrontend::default();
+        frontend
+            .install_private_terrain_occupancy(
+                &mut gal,
+                private_occupancy_descriptor(),
+                private_occupancy_materials(),
+            )
+            .unwrap();
+        assert_eq!(Some(0), frontend.private_terrain_occupancy_mesh_count());
+
+        frontend.reset(&mut gal);
+
+        assert_eq!(None, frontend.private_terrain_occupancy_mesh_count());
     }
 
     #[test]
@@ -7767,9 +10360,11 @@ mod tests {
                 }],
             )
             .unwrap();
-        assert!(frontend
-            .mesh_texture_assets
-            .contains_key(&WORLD_MATERIAL_TEXTURE_STONE));
+        assert!(
+            frontend
+                .mesh_texture_assets
+                .contains_key(&WORLD_MATERIAL_TEXTURE_STONE)
+        );
 
         frontend
             .apply_world_mesh_asset_update(
@@ -7779,9 +10374,11 @@ mod tests {
                 Vec::new(),
             )
             .unwrap();
-        assert!(frontend
-            .mesh_texture_assets
-            .contains_key(&WORLD_MATERIAL_TEXTURE_STONE));
+        assert!(
+            frontend
+                .mesh_texture_assets
+                .contains_key(&WORLD_MATERIAL_TEXTURE_STONE)
+        );
 
         let duplicate = frontend.apply_world_mesh_asset_update(
             &mut gal,
@@ -7835,9 +10432,11 @@ mod tests {
                 }],
             )
             .unwrap();
-        assert!(frontend
-            .mesh_texture_assets
-            .contains_key(&WORLD_MATERIAL_TEXTURE_STONE));
+        assert!(
+            frontend
+                .mesh_texture_assets
+                .contains_key(&WORLD_MATERIAL_TEXTURE_STONE)
+        );
     }
 
     #[test]
@@ -7959,7 +10558,9 @@ mod tests {
         frame.frame_id = 5;
         frame.mesh_instances.push(mesh_instance(97, 1));
 
-        let (ops, stats) = frontend.append_frame_ops(&mut gal, 5, target, frame).unwrap();
+        let (ops, stats) = frontend
+            .append_frame_ops(&mut gal, 5, target, frame)
+            .unwrap();
         assert_eq!(1, stats.mesh_instance_count);
         let mesh_write = ops
             .iter()
@@ -8030,7 +10631,9 @@ mod tests {
         let mut frame = frame(Vec::new());
         frame.frame_id = 2;
         frame.mesh_instances.push(mesh_instance(98, 1));
-        let (ops, _stats) = frontend.append_frame_ops(&mut gal, 2, target, frame).unwrap();
+        let (ops, _stats) = frontend
+            .append_frame_ops(&mut gal, 2, target, frame)
+            .unwrap();
         let mesh_write = ops
             .iter()
             .find_map(|op| match op {
@@ -8120,6 +10723,7 @@ mod tests {
             shader_atlas_uv: [0.25, 0.5],
             shader_block_id: 10232,
             shader_material_type: -1,
+            mid_block_packed: 0,
             color_argb: 0xffff_ffff,
             normal_packed: 0,
             light: 0,
@@ -8145,6 +10749,42 @@ mod tests {
         let dim_factor = f32::from_le_bytes(dim_bytes[32..36].try_into().unwrap());
         assert!(dim_factor > 0.08);
         assert!(dim_factor < 0.2);
+    }
+
+    #[test]
+    fn source_terrain_expansion_derives_sprite_midpoint_and_tangent_from_quad_semantics() {
+        let mesh = mesh_asset(0x7a11, 4, IndexType::U16);
+        let source = derive_source_terrain_mesh(&mesh).unwrap();
+
+        assert_eq!(4, source.vertices.len());
+        assert_eq!(vec![0, 1, 2, 2, 3, 0], source.indices);
+        for vertex in &source.vertices {
+            assert_eq!([0.375, 0.375], vertex.sprite_midpoint);
+            assert!((vertex.tangent[0] - 1.0).abs() < 0.0001);
+            assert!(vertex.tangent[1].abs() < 0.0001);
+            assert!(vertex.tangent[2].abs() < 0.0001);
+            assert_eq!(1.0, vertex.tangent[3]);
+            assert_eq!(10232, vertex.shader_block_id);
+        }
+    }
+
+    #[test]
+    fn source_terrain_expansion_rejects_noncanonical_or_degenerate_quads() {
+        let mut noncanonical = mesh_asset(0x7a12, 1, IndexType::U16);
+        noncanonical.index_bytes = vec![0, 0, 1, 0, 2, 0, 0, 0, 2, 0, 3, 0];
+        let topology_error = derive_source_terrain_mesh(&noncanonical).unwrap_err();
+        assert!(topology_error.to_string().contains("[a,b,c,c,d,a]"));
+
+        let mut degenerate = mesh_asset(0x7a13, 1, IndexType::U16);
+        for vertex in &mut degenerate.vertices {
+            vertex.shader_atlas_uv = [0.25, 0.25];
+        }
+        let tangent_error = derive_source_terrain_mesh(&degenerate).unwrap_err();
+        assert!(
+            tangent_error
+                .to_string()
+                .contains("degenerate atlas UV tangent basis")
+        );
     }
 
     #[test]
@@ -8204,9 +10844,10 @@ mod tests {
                 .filter(|op| matches!(op, CommandOp::DrawIndexed { instances: 12, .. }))
                 .count()
         );
-        assert!(ops
-            .iter()
-            .any(|op| matches!(op, CommandOp::SetIndexBuffer { offset: 12, .. })));
+        assert!(
+            ops.iter()
+                .any(|op| matches!(op, CommandOp::SetIndexBuffer { offset: 12, .. }))
+        );
     }
 
     #[test]
@@ -8235,9 +10876,11 @@ mod tests {
             .collect();
 
         let error = shared::validate_frame_header(&frame).unwrap_err();
-        assert!(error
-            .to_string()
-            .contains("world mesh instance count 4097 exceeds maximum 4096"));
+        assert!(
+            error
+                .to_string()
+                .contains("world mesh instance count 4097 exceeds maximum 4096")
+        );
     }
 
     #[test]
@@ -8561,10 +11204,12 @@ mod tests {
         assert!(vulkan.reload_hash != 0);
         assert!(opengl.reload_hash != 0);
         assert_shader_mesh_feature_parity(&vulkan, &opengl);
-        assert!(vulkan
-            .stats
-            .iter()
-            .all(|stats| stats.mesh_instance_count >= 3));
+        assert!(
+            vulkan
+                .stats
+                .iter()
+                .all(|stats| stats.mesh_instance_count >= 3)
+        );
         assert!(vulkan.stats.iter().all(|stats| stats.mesh_draw_count >= 3));
         assert!(vulkan.stats[0].mesh_cache_misses >= 3);
         assert!(vulkan.stats[1].mesh_cache_hits >= 3);
@@ -8610,6 +11255,27 @@ mod tests {
         assert!((clear.r - (0x10 as f32 / 255.0)).abs() < 0.001);
         assert!((clear.g - (0x28 as f32 / 255.0)).abs() < 0.001);
         assert!((clear.b - (0x44 as f32 / 255.0)).abs() < 0.001);
+    }
+
+    #[test]
+    fn terrain_source_scope_uses_explicit_world_semantics() {
+        assert_eq!(
+            Some(TerrainProgramScope::Overworld),
+            terrain_program_scope_for_sky_type(WORLD_BACKGROUND_SKY_OVERWORLD).unwrap()
+        );
+        assert_eq!(
+            Some(TerrainProgramScope::Nether),
+            terrain_program_scope_for_sky_type(WORLD_BACKGROUND_SKY_NETHER).unwrap()
+        );
+        assert_eq!(
+            Some(TerrainProgramScope::End),
+            terrain_program_scope_for_sky_type(WORLD_BACKGROUND_SKY_END).unwrap()
+        );
+        assert_eq!(
+            None,
+            terrain_program_scope_for_sky_type(WORLD_BACKGROUND_SKY_CUSTOM).unwrap()
+        );
+        assert!(terrain_program_scope_for_sky_type(99).is_err());
     }
 
     #[test]
@@ -8984,9 +11650,11 @@ mod tests {
                 },
             )
             .unwrap_err();
-        assert!(error
-            .message
-            .contains("failed to decode world border forcefield override"));
+        assert!(
+            error
+                .message
+                .contains("failed to decode world border forcefield override")
+        );
         assert_eq!(2, frontend.border_asset_generation);
         assert_eq!(1, frontend.border_asset_update_failures);
         assert_eq!(
@@ -9323,12 +11991,36 @@ mod tests {
             vulkan.frame_hashes,
             opengl.frame_hashes,
             max_feature_delta,
-            vulkan.stats.iter().map(|stats| stats.mesh_draw_count).sum::<u64>(),
-            opengl.stats.iter().map(|stats| stats.mesh_draw_count).sum::<u64>(),
-            vulkan.stats.iter().map(|stats| stats.mesh_cache_hits).sum::<u64>(),
-            opengl.stats.iter().map(|stats| stats.mesh_cache_hits).sum::<u64>(),
-            vulkan.stats.iter().map(|stats| stats.mesh_cache_misses).sum::<u64>(),
-            opengl.stats.iter().map(|stats| stats.mesh_cache_misses).sum::<u64>()
+            vulkan
+                .stats
+                .iter()
+                .map(|stats| stats.mesh_draw_count)
+                .sum::<u64>(),
+            opengl
+                .stats
+                .iter()
+                .map(|stats| stats.mesh_draw_count)
+                .sum::<u64>(),
+            vulkan
+                .stats
+                .iter()
+                .map(|stats| stats.mesh_cache_hits)
+                .sum::<u64>(),
+            opengl
+                .stats
+                .iter()
+                .map(|stats| stats.mesh_cache_hits)
+                .sum::<u64>(),
+            vulkan
+                .stats
+                .iter()
+                .map(|stats| stats.mesh_cache_misses)
+                .sum::<u64>(),
+            opengl
+                .stats
+                .iter()
+                .map(|stats| stats.mesh_cache_misses)
+                .sum::<u64>()
         );
         std::fs::write(root.join("comparison-latest.json"), json).map_err(|error| {
             GalError::backend(format!(
@@ -10286,6 +12978,7 @@ mod tests {
             shader_atlas_uv: uv,
             shader_block_id: 12,
             shader_material_type: 1,
+            mid_block_packed: 0,
             color_argb,
             normal_packed: pack_normal_i8(normal),
             light,
@@ -11028,8 +13721,14 @@ mod tests {
             frames[0].stats.mesh_instance_count,
             frames[0].stats.mesh_batch_count,
             mesh_draws,
-            frames.iter().map(|frame| frame.stats.mesh_cache_hits).sum::<u64>(),
-            frames.iter().map(|frame| frame.stats.mesh_cache_misses).sum::<u64>(),
+            frames
+                .iter()
+                .map(|frame| frame.stats.mesh_cache_hits)
+                .sum::<u64>(),
+            frames
+                .iter()
+                .map(|frame| frame.stats.mesh_cache_misses)
+                .sum::<u64>(),
             frames[0].stats.mesh_asset_payload_bytes
         );
         std::fs::write(dir.join("latest.json"), json).map_err(|error| {

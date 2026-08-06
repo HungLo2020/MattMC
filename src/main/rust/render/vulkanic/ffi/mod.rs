@@ -59,6 +59,7 @@ pub(crate) mod layout;
 pub(crate) mod material;
 pub(crate) mod memory;
 pub(crate) mod resources;
+pub(crate) mod shader_pack;
 pub(crate) mod status;
 pub(crate) mod submission;
 pub(crate) mod world;

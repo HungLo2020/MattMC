@@ -5,9 +5,24 @@ use glow::HasContext;
 
 use super::trace;
 use crate::render::vulkanic::backends::{BackendCreateDesc, BackendToken};
+use crate::render::vulkanic::commands::{CommandOp, ValidatedSubmissionBatch};
 use crate::render::vulkanic::error::{GalError, GalResult};
 use crate::render::vulkanic::handles::{Handle, HandleKind};
 use crate::render::vulkanic::resources::*;
+
+// OpenGL has no descriptor-set namespace. Keep that reconstruction entirely
+// private by assigning each GAL set a stable, disjoint binding range.
+// GLSL 4.50 guarantees at least 16 fragment texture-image units. The current
+// two-set terrain contract uses bindings 0..=3 in set 1, so an eight-slot
+// stride keeps every translated sampler binding inside that portable range.
+const OPENGL_RESOURCE_SET_BINDING_STRIDE: u32 = 8;
+
+pub(super) fn opengl_resource_binding_point(set_index: u32, binding: u32) -> GalResult<u32> {
+    set_index
+        .checked_mul(OPENGL_RESOURCE_SET_BINDING_STRIDE)
+        .and_then(|base| base.checked_add(binding))
+        .ok_or_else(|| GalError::backend("OpenGL resource set binding point overflows"))
+}
 
 pub(super) struct OpenGlObjects {
     gl: Rc<glow::Context>,
@@ -57,10 +72,19 @@ impl OpenGlObjects {
                 texture: desc.texture,
                 format: desc.format,
                 base_mip: desc.base_mip,
+                mip_count: desc.mip_count,
                 base_layer: desc.base_layer,
+                layer_count: desc.layer_count,
             }),
             BackendCreateDesc::Sampler(desc) => {
                 OpenGlObject::Sampler(self.create_sampler(desc, token)?)
+            }
+            BackendCreateDesc::CombinedTextureSampler(desc) => {
+                OpenGlObject::CombinedTextureSampler(CombinedTextureSamplerObject {
+                    token,
+                    texture_view: desc.texture_view,
+                    sampler: desc.sampler,
+                })
             }
             BackendCreateDesc::ShaderModule(desc) => {
                 OpenGlObject::ShaderModule(self.create_shader_module(desc, token)?)
@@ -85,10 +109,8 @@ impl OpenGlObjects {
             BackendCreateDesc::GraphicsPipeline(desc) => {
                 OpenGlObject::GraphicsPipeline(self.create_graphics_pipeline(desc, token)?)
             }
-            BackendCreateDesc::ComputePipeline(_) => {
-                return Err(GalError::backend(
-                    "OpenGL backend does not support compute pipelines in the isolated path",
-                ))
+            BackendCreateDesc::ComputePipeline(desc) => {
+                OpenGlObject::ComputePipeline(self.create_compute_pipeline(desc, token)?)
             }
             BackendCreateDesc::RenderTarget(desc) => {
                 OpenGlObject::RenderTarget(self.create_render_target(desc, token)?)
@@ -168,11 +190,42 @@ impl OpenGlObjects {
         }
     }
 
+    pub(super) fn combined_texture_sampler(
+        &self,
+        handle: Handle,
+    ) -> GalResult<&CombinedTextureSamplerObject> {
+        match self.objects.get(&handle) {
+            Some(OpenGlObject::CombinedTextureSampler(object)) => Ok(object),
+            _ => Err(expected("combined texture sampler", handle)),
+        }
+    }
+
     pub(super) fn resource_set(&self, handle: Handle) -> GalResult<&ResourceSetObject> {
         match self.objects.get(&handle) {
             Some(OpenGlObject::ResourceSet(object)) => Ok(object),
             _ => Err(expected("resource set", handle)),
         }
+    }
+
+    pub(super) fn submission_uses_storage_textures(
+        &self,
+        batch: &ValidatedSubmissionBatch,
+    ) -> bool {
+        batch.command_lists.iter().any(|list| {
+            list.operations.iter().any(|operation| {
+                let CommandOp::BindResourceSet { set, .. } = operation else {
+                    return false;
+                };
+                self.resource_set(*set)
+                    .map(|resource_set| {
+                        resource_set
+                            .bindings
+                            .iter()
+                            .any(|binding| binding.kind == ResourceBindingKind::StorageTexture)
+                    })
+                    .unwrap_or(false)
+            })
+        })
     }
 
     pub(super) fn resource_layout(&self, handle: Handle) -> GalResult<&ResourceLayoutObject> {
@@ -193,6 +246,13 @@ impl OpenGlObjects {
         match self.objects.get(&handle) {
             Some(OpenGlObject::GraphicsPipeline(object)) => Ok(object),
             _ => Err(expected("graphics pipeline", handle)),
+        }
+    }
+
+    pub(super) fn compute_pipeline(&self, handle: Handle) -> GalResult<&ComputePipelineObject> {
+        match self.objects.get(&handle) {
+            Some(OpenGlObject::ComputePipeline(object)) => Ok(object),
+            _ => Err(expected("compute pipeline", handle)),
         }
     }
 
@@ -258,11 +318,10 @@ impl OpenGlObjects {
 
     fn create_texture(&self, desc: &TextureDesc, token: BackendToken) -> GalResult<TextureObject> {
         if !matches!(desc.dimension, TextureDimension::D2 | TextureDimension::D3)
-            || desc.mip_levels != 1
             || desc.array_layers != 1
         {
             return Err(GalError::backend(
-                "OpenGL backend requires a single-mip, single-layer D2 or D3 texture",
+                "OpenGL backend requires a single-layer D2 or D3 texture",
             ));
         }
         let format = texture_format(desc.format)?;
@@ -272,38 +331,71 @@ impl OpenGlObjects {
         })?;
         unsafe {
             self.gl.bind_texture(target, Some(texture));
-            self.gl.tex_parameter_i32(target, glow::TEXTURE_MIN_FILTER, glow::LINEAR as i32);
-            self.gl.tex_parameter_i32(target, glow::TEXTURE_MAG_FILTER, glow::LINEAR as i32);
-            match desc.dimension {
-                TextureDimension::D2 => self.gl.tex_image_2d(
-                    target,
-                    0,
-                    format.internal,
-                    i32::try_from(desc.extent.width)
-                        .map_err(|_| GalError::backend("texture width exceeds i32"))?,
-                    i32::try_from(desc.extent.height)
-                        .map_err(|_| GalError::backend("texture height exceeds i32"))?,
-                    0,
-                    format.external,
-                    format.ty,
-                    glow::PixelUnpackData::Slice(None),
-                ),
-                TextureDimension::D3 => self.gl.tex_image_3d(
-                    target,
-                    0,
-                    format.internal,
-                    i32::try_from(desc.extent.width)
-                        .map_err(|_| GalError::backend("texture width exceeds i32"))?,
-                    i32::try_from(desc.extent.height)
-                        .map_err(|_| GalError::backend("texture height exceeds i32"))?,
-                    i32::try_from(desc.extent.depth)
-                        .map_err(|_| GalError::backend("texture depth exceeds i32"))?,
-                    0,
-                    format.external,
-                    format.ty,
-                    glow::PixelUnpackData::Slice(None),
-                ),
-                _ => unreachable!("GAL validated texture dimension"),
+            let min_filter = if format.integer {
+                if desc.mip_levels > 1 {
+                    glow::NEAREST_MIPMAP_NEAREST as i32
+                } else {
+                    glow::NEAREST as i32
+                }
+            } else if desc.mip_levels > 1 {
+                glow::LINEAR_MIPMAP_NEAREST as i32
+            } else {
+                glow::LINEAR as i32
+            };
+            self.gl
+                .tex_parameter_i32(target, glow::TEXTURE_MIN_FILTER, min_filter);
+            self.gl.tex_parameter_i32(
+                target,
+                glow::TEXTURE_MAG_FILTER,
+                if format.integer {
+                    glow::NEAREST as i32
+                } else {
+                    glow::LINEAR as i32
+                },
+            );
+            self.gl
+                .tex_parameter_i32(target, glow::TEXTURE_BASE_LEVEL, 0);
+            self.gl.tex_parameter_i32(
+                target,
+                glow::TEXTURE_MAX_LEVEL,
+                i32::try_from(desc.mip_levels - 1)
+                    .map_err(|_| GalError::backend("texture mip count exceeds i32"))?,
+            );
+            for mip in 0..desc.mip_levels {
+                let extent = texture_mip_extent(desc.extent, mip);
+                match desc.dimension {
+                    TextureDimension::D2 => self.gl.tex_image_2d(
+                        target,
+                        i32::try_from(mip)
+                            .map_err(|_| GalError::backend("texture mip exceeds i32"))?,
+                        format.internal,
+                        i32::try_from(extent.width)
+                            .map_err(|_| GalError::backend("texture width exceeds i32"))?,
+                        i32::try_from(extent.height)
+                            .map_err(|_| GalError::backend("texture height exceeds i32"))?,
+                        0,
+                        format.external,
+                        format.ty,
+                        glow::PixelUnpackData::Slice(None),
+                    ),
+                    TextureDimension::D3 => self.gl.tex_image_3d(
+                        target,
+                        i32::try_from(mip)
+                            .map_err(|_| GalError::backend("texture mip exceeds i32"))?,
+                        format.internal,
+                        i32::try_from(extent.width)
+                            .map_err(|_| GalError::backend("texture width exceeds i32"))?,
+                        i32::try_from(extent.height)
+                            .map_err(|_| GalError::backend("texture height exceeds i32"))?,
+                        i32::try_from(extent.depth)
+                            .map_err(|_| GalError::backend("texture depth exceeds i32"))?,
+                        0,
+                        format.external,
+                        format.ty,
+                        glow::PixelUnpackData::Slice(None),
+                    ),
+                    _ => unreachable!("GAL validated texture dimension"),
+                }
             }
             self.gl.bind_texture(target, None);
         }
@@ -429,6 +521,44 @@ impl OpenGlObjects {
         })
     }
 
+    fn create_compute_pipeline(
+        &self,
+        desc: &ComputePipelineDesc,
+        token: BackendToken,
+    ) -> GalResult<ComputePipelineObject> {
+        let shader = self.shader(desc.shader)?;
+        if shader.stage != ShaderStage::Compute {
+            return Err(GalError::backend(
+                "OpenGL compute pipeline requires a compute shader module",
+            ));
+        }
+        let program = unsafe { self.gl.create_program() }.map_err(|error| {
+            GalError::backend(format!(
+                "failed to create OpenGL compute program '{}': {error}",
+                desc.label
+            ))
+        })?;
+        unsafe {
+            self.gl.attach_shader(program, shader.shader);
+            self.gl.link_program(program);
+            self.gl.detach_shader(program, shader.shader);
+            if !self.gl.get_program_link_status(program) {
+                let log = self.gl.get_program_info_log(program);
+                self.gl.delete_program(program);
+                return Err(GalError::backend(format!(
+                    "OpenGL compute program '{}' failed to link: {log}",
+                    desc.label
+                )));
+            }
+            self.bind_program_interfaces(program, desc.layout, &shader.sampler_bindings)?;
+        }
+        Ok(ComputePipelineObject {
+            token,
+            program,
+            layout: desc.layout,
+        })
+    }
+
     fn create_render_target(
         &self,
         desc: &RenderTargetDesc,
@@ -514,38 +644,42 @@ impl OpenGlObjects {
         sampler_bindings: &BTreeMap<String, u32>,
     ) -> GalResult<()> {
         let pipeline_layout = self.pipeline_layout(layout)?;
-        for resource_layout in &pipeline_layout.resource_layouts {
+        for (set_index, resource_layout) in pipeline_layout.resource_layouts.iter().enumerate() {
             let resource_layout = self.resource_layout(*resource_layout)?;
             for binding in &resource_layout.bindings {
+                let binding_point = opengl_resource_binding_point(
+                    u32::try_from(set_index)
+                        .map_err(|_| GalError::backend("OpenGL resource set index exceeds u32"))?,
+                    binding.binding,
+                )?;
                 unsafe {
                     match binding.kind {
                         ResourceBindingKind::UniformBuffer => {
                             let mut bound = false;
-                            for name in uniform_block_names(binding.binding) {
+                            for name in uniform_block_names(binding_point) {
                                 if let Some(index) = self.gl.get_uniform_block_index(program, &name)
                                 {
-                                    self.gl
-                                        .uniform_block_binding(program, index, binding.binding);
+                                    self.gl.uniform_block_binding(program, index, binding_point);
                                     bound = true;
                                 }
                             }
                             if !bound {
                                 return Err(GalError::backend(format!(
                                     "OpenGL program is missing uniform block for binding {}",
-                                    binding.binding
+                                    binding_point
                                 )));
                             }
                         }
                         ResourceBindingKind::StorageBuffer => {
                             let mut bound = false;
-                            for name in storage_block_names(binding.binding) {
+                            for name in storage_block_names(binding_point) {
                                 if let Some(index) =
                                     self.gl.get_shader_storage_block_index(program, &name)
                                 {
                                     self.gl.shader_storage_block_binding(
                                         program,
                                         index,
-                                        binding.binding,
+                                        binding_point,
                                     );
                                     bound = true;
                                 }
@@ -553,24 +687,25 @@ impl OpenGlObjects {
                             if !bound {
                                 return Err(GalError::backend(format!(
                                     "OpenGL program is missing storage block for binding {}",
-                                    binding.binding
+                                    binding_point
                                 )));
                             }
                         }
-                        ResourceBindingKind::SampledTexture => {
+                        ResourceBindingKind::SampledTexture
+                        | ResourceBindingKind::CombinedTextureSampler => {
                             let mut names = sampler_bindings
                                 .iter()
                                 .filter_map(|(name, declared_binding)| {
-                                    (*declared_binding == binding.binding).then(|| name.clone())
+                                    (*declared_binding == binding_point).then(|| name.clone())
                                 })
                                 .collect::<Vec<_>>();
                             if names.is_empty() {
-                                names = sampler_uniform_names(binding.binding)
+                                names = sampler_uniform_names(binding_point)
                                     .into_iter()
                                     .filter(|name| {
                                         sampler_bindings
                                             .get(name)
-                                            .map(|declared| *declared == binding.binding)
+                                            .map(|declared| *declared == binding_point)
                                             .unwrap_or(true)
                                     })
                                     .collect();
@@ -581,7 +716,7 @@ impl OpenGlObjects {
                                     self.gl.use_program(Some(program));
                                     self.gl.uniform_1_i32(
                                         Some(&location),
-                                        i32::try_from(binding.binding).map_err(|_| {
+                                        i32::try_from(binding_point).map_err(|_| {
                                             GalError::backend("OpenGL sampler binding exceeds i32")
                                         })?,
                                     );
@@ -606,6 +741,9 @@ impl OpenGlObjects {
                 OpenGlObject::Texture(object) => self.gl.delete_texture(object.texture),
                 OpenGlObject::TextureView(_) => {}
                 OpenGlObject::Sampler(object) => self.gl.delete_sampler(object.sampler),
+                // This is a logical GAL pairing. Its native texture and sampler
+                // remain independently owned and retired by their own records.
+                OpenGlObject::CombinedTextureSampler(_) => {}
                 OpenGlObject::ShaderModule(object) => self.gl.delete_shader(object.shader),
                 OpenGlObject::ResourceLayout(_) => {}
                 OpenGlObject::ResourceSet(_) => {}
@@ -614,6 +752,7 @@ impl OpenGlObjects {
                     self.gl.delete_vertex_array(object.vao);
                     self.gl.delete_program(object.program);
                 }
+                OpenGlObject::ComputePipeline(object) => self.gl.delete_program(object.program),
                 OpenGlObject::RenderTarget(object) => {
                     self.gl.delete_framebuffer(object.framebuffer)
                 }
@@ -621,6 +760,14 @@ impl OpenGlObjects {
                 OpenGlObject::RenderPass(_) => {}
             }
         }
+    }
+}
+
+fn texture_mip_extent(base: Extent3d, mip: u32) -> Extent3d {
+    Extent3d {
+        width: (base.width >> mip).max(1),
+        height: (base.height >> mip).max(1),
+        depth: (base.depth >> mip).max(1),
     }
 }
 
@@ -635,11 +782,13 @@ enum OpenGlObject {
     Texture(TextureObject),
     TextureView(TextureViewObject),
     Sampler(SamplerObject),
+    CombinedTextureSampler(CombinedTextureSamplerObject),
     ShaderModule(ShaderModuleObject),
     ResourceLayout(ResourceLayoutObject),
     ResourceSet(ResourceSetObject),
     PipelineLayout(PipelineLayoutObject),
     GraphicsPipeline(GraphicsPipelineObject),
+    ComputePipeline(ComputePipelineObject),
     RenderTarget(RenderTargetObject),
     FrameTarget(FrameTargetObject),
     RenderPass(RenderPassObject),
@@ -652,11 +801,13 @@ impl OpenGlObject {
             Self::Texture(object) => object.token,
             Self::TextureView(object) => object.token,
             Self::Sampler(object) => object.token,
+            Self::CombinedTextureSampler(object) => object.token,
             Self::ShaderModule(object) => object.token,
             Self::ResourceLayout(object) => object.token,
             Self::ResourceSet(object) => object.token,
             Self::PipelineLayout(object) => object.token,
             Self::GraphicsPipeline(object) => object.token,
+            Self::ComputePipeline(object) => object.token,
             Self::RenderTarget(object) => object.token,
             Self::FrameTarget(object) => object.token,
             Self::RenderPass(object) => object.token,
@@ -669,11 +820,13 @@ impl OpenGlObject {
             Self::Texture(_) => HandleKind::Texture,
             Self::TextureView(_) => HandleKind::TextureView,
             Self::Sampler(_) => HandleKind::Sampler,
+            Self::CombinedTextureSampler(_) => HandleKind::CombinedTextureSampler,
             Self::ShaderModule(_) => HandleKind::ShaderModule,
             Self::ResourceLayout(_) => HandleKind::ResourceLayout,
             Self::ResourceSet(_) => HandleKind::ResourceSet,
             Self::PipelineLayout(_) => HandleKind::PipelineLayout,
             Self::GraphicsPipeline(_) => HandleKind::GraphicsPipeline,
+            Self::ComputePipeline(_) => HandleKind::ComputePipeline,
             Self::RenderTarget(_) => HandleKind::RenderTarget,
             Self::FrameTarget(_) => HandleKind::FrameTarget,
             Self::RenderPass(_) => HandleKind::RenderPass,
@@ -711,12 +864,20 @@ pub(super) struct TextureViewObject {
     pub(super) texture: Handle,
     pub(super) format: TextureFormat,
     pub(super) base_mip: u32,
+    pub(super) mip_count: u32,
     pub(super) base_layer: u32,
+    pub(super) layer_count: u32,
 }
 
 pub(super) struct SamplerObject {
     pub(super) token: BackendToken,
     pub(super) sampler: glow::Sampler,
+}
+
+pub(super) struct CombinedTextureSamplerObject {
+    pub(super) token: BackendToken,
+    pub(super) texture_view: Handle,
+    pub(super) sampler: Handle,
 }
 
 #[allow(dead_code)]
@@ -754,6 +915,12 @@ pub(super) struct GraphicsPipelineObject {
     pub(super) blend: BlendMode,
     pub(super) depth_compare: Option<CompareOp>,
     pub(super) depth_write: bool,
+}
+
+pub(super) struct ComputePipelineObject {
+    pub(super) token: BackendToken,
+    pub(super) program: glow::Program,
+    pub(super) layout: Handle,
 }
 
 #[allow(dead_code)]
@@ -809,10 +976,12 @@ mod tests {
         let r8 = texture_format(TextureFormat::R8Uint).unwrap();
         assert_eq!(glow::R8UI as i32, r8.internal);
         assert_eq!(1, r8.bytes_per_pixel);
+        assert!(r8.integer);
         let rgba16 = texture_format(TextureFormat::Rgba16Float).unwrap();
         assert_eq!(glow::RGBA16F as i32, rgba16.internal);
         assert_eq!(glow::HALF_FLOAT, rgba16.ty);
         assert_eq!(8, rgba16.bytes_per_pixel);
+        assert!(!rgba16.integer);
     }
 
     #[test]
@@ -865,6 +1034,53 @@ mod tests {
         assert!(normalized.contains("gl_InstanceID"));
         assert!(!normalized.contains("gl_VertexIndex"));
         assert!(!normalized.contains("gl_InstanceIndex"));
+    }
+
+    #[test]
+    fn opengl_shader_source_maps_descriptor_sets_to_disjoint_binding_ranges() {
+        let source = "\
+layout(set = 0, binding = 6, std430) readonly buffer Mesh { vec4 data[]; };
+layout(set = 1, binding = 0) uniform utexture3D TerrainVoxelOccupancy;
+layout(set=1,binding=3,std140) uniform TerrainVoxelLightMapping { vec4 mapping; };
+";
+        let normalized = opengl_shader_source(source);
+        assert!(normalized.contains("layout(binding = 6, std430)"));
+        assert!(
+            normalized.contains("layout(binding = 8) uniform usampler3D TerrainVoxelOccupancy;")
+        );
+        assert!(
+            normalized.contains("layout(binding = 11, std140) uniform TerrainVoxelLightMapping")
+        );
+        assert!(!normalized.contains("set ="));
+        assert_eq!(11, opengl_resource_binding_point(1, 3).unwrap());
+    }
+
+    #[test]
+    fn opengl_shader_source_maps_colored_voxel_sampler_pair() {
+        let source = "\
+layout(set = 1, binding = 1) uniform texture3D TerrainColoredVoxelLight;
+layout(set = 1, binding = 2) uniform sampler TerrainVoxelLightSampler;
+void main() { vec3 light = texture(sampler3D(TerrainColoredVoxelLight, TerrainVoxelLightSampler), vec3(0.5)).rgb; }
+";
+        let normalized = opengl_shader_source(source);
+        assert!(
+            normalized.contains("layout(binding = 9) uniform sampler3D TerrainColoredVoxelLight;")
+        );
+        assert!(!normalized.contains("TerrainVoxelLightSampler"));
+        assert!(normalized.contains("texture(TerrainColoredVoxelLight, vec3(0.5))"));
+    }
+
+    #[test]
+    fn opengl_shader_source_maps_semantic_terrain_atlas_sampler_pair() {
+        let source = "\
+layout(set = 0, binding = 2) uniform texture2D TerrainAtlasColor;
+layout(set = 0, binding = 3) uniform sampler TerrainAtlasSampler;
+void main() { vec4 color = texture(sampler2D(TerrainAtlasColor, TerrainAtlasSampler), vec2(0.5)); }
+";
+        let normalized = opengl_shader_source(source);
+        assert!(normalized.contains("layout(binding = 2) uniform sampler2D TerrainAtlasColor;"));
+        assert!(!normalized.contains("TerrainAtlasSampler"));
+        assert!(normalized.contains("texture(TerrainAtlasColor, vec2(0.5))"));
     }
 
     #[test]
@@ -944,6 +1160,7 @@ pub(super) struct GlTextureFormat {
     pub(super) external: u32,
     pub(super) ty: u32,
     pub(super) bytes_per_pixel: u32,
+    pub(super) integer: bool,
 }
 
 pub(super) fn texture_format(format: TextureFormat) -> GalResult<GlTextureFormat> {
@@ -953,30 +1170,32 @@ pub(super) fn texture_format(format: TextureFormat) -> GalResult<GlTextureFormat
             external: glow::RGBA,
             ty: glow::UNSIGNED_BYTE,
             bytes_per_pixel: 4,
+            integer: false,
         }),
         TextureFormat::Rgba16Float => Ok(GlTextureFormat {
             internal: glow::RGBA16F as i32,
             external: glow::RGBA,
             ty: glow::HALF_FLOAT,
             bytes_per_pixel: 8,
+            integer: false,
         }),
         TextureFormat::Depth32Float => Ok(GlTextureFormat {
             internal: glow::DEPTH_COMPONENT32F as i32,
             external: glow::DEPTH_COMPONENT,
             ty: glow::FLOAT,
             bytes_per_pixel: 4,
+            integer: false,
         }),
         TextureFormat::R8Uint => Ok(GlTextureFormat {
             internal: glow::R8UI as i32,
             external: glow::RED_INTEGER,
             ty: glow::UNSIGNED_BYTE,
             bytes_per_pixel: 1,
+            integer: true,
         }),
-        TextureFormat::Bgra8Unorm | TextureFormat::Depth24Stencil8 => {
-            Err(GalError::backend(format!(
-                "OpenGL texture format {format:?} is not supported in the isolated path"
-            )))
-        }
+        TextureFormat::Bgra8Unorm | TextureFormat::Depth24Stencil8 => Err(GalError::backend(
+            format!("OpenGL texture format {format:?} is not supported in the isolated path"),
+        )),
     }
 }
 
@@ -988,11 +1207,13 @@ pub(super) fn filter(filter: SamplerFilter) -> i32 {
 }
 
 fn opengl_shader_source(source: &str) -> String {
-    source
-        .replace("layout(set = 0, binding =", "layout(binding =")
-        .replace("layout(set=0,binding=", "layout(binding=")
+    normalize_vulkan_resource_set_layouts(source)
         .replace("uniform texture2D Tex0;", "uniform sampler2D Tex0;")
         .replace("uniform texture2D tex0;", "uniform sampler2D tex0;")
+        .replace(
+            "uniform texture2D TerrainAtlasColor;",
+            "uniform sampler2D TerrainAtlasColor;",
+        )
         .replace(
             "uniform texture2D AlbedoTex;",
             "uniform sampler2D AlbedoTex;",
@@ -1013,32 +1234,123 @@ fn opengl_shader_source(source: &str) -> String {
             "uniform texture2D ShadowDepthTex;",
             "uniform sampler2D ShadowDepthTex;",
         )
+        .replace(
+            "uniform utexture3D TerrainVoxelOccupancy;",
+            "uniform usampler3D TerrainVoxelOccupancy;",
+        )
+        .replace(
+            "uniform texture3D TerrainColoredVoxelLight;",
+            "uniform sampler3D TerrainColoredVoxelLight;",
+        )
         .replace("layout(binding = 2) uniform sampler Samp0;\n", "")
         .replace("layout(binding=2) uniform sampler Samp0;\n", "")
         .replace("layout(binding = 3) uniform sampler Samp0;\n", "")
         .replace("layout(binding=3) uniform sampler Samp0;\n", "")
+        .replace(
+            "layout(binding = 3) uniform sampler TerrainAtlasSampler;\n",
+            "",
+        )
+        .replace(
+            "layout(binding=3) uniform sampler TerrainAtlasSampler;\n",
+            "",
+        )
         .replace("layout(binding = 5) uniform sampler Samp0;\n", "")
         .replace("layout(binding=5) uniform sampler Samp0;\n", "")
         .replace("layout(binding = 1) uniform sampler samp0;\n", "")
         .replace("layout(binding=1) uniform sampler samp0;\n", "")
+        .replace(
+            "layout(binding = 10) uniform sampler TerrainVoxelLightSampler;\n",
+            "",
+        )
+        .replace(
+            "layout(binding=10) uniform sampler TerrainVoxelLightSampler;\n",
+            "",
+        )
         .replace("sampler2D(Tex0, Samp0)", "Tex0")
         .replace("sampler2D(tex0, samp0)", "tex0")
+        .replace(
+            "sampler2D(TerrainAtlasColor, TerrainAtlasSampler)",
+            "TerrainAtlasColor",
+        )
         .replace("sampler2D(AlbedoTex, Samp0)", "AlbedoTex")
         .replace("sampler2D(NormalTex, Samp0)", "NormalTex")
         .replace("sampler2D(MaterialLightTex, Samp0)", "MaterialLightTex")
         .replace("sampler2D(WorldPositionTex, Samp0)", "WorldPositionTex")
         .replace("sampler2D(ShadowDepthTex, Samp0)", "ShadowDepthTex")
+        .replace(
+            "sampler3D(TerrainColoredVoxelLight, TerrainVoxelLightSampler)",
+            "TerrainColoredVoxelLight",
+        )
+        .replace(
+            "usampler3D(TerrainVoxelOccupancy, TerrainVoxelLightSampler)",
+            "TerrainVoxelOccupancy",
+        )
         .replace("gl_VertexIndex", "gl_VertexID")
         .replace("gl_InstanceIndex", "gl_InstanceID")
+}
+
+fn normalize_vulkan_resource_set_layouts(source: &str) -> String {
+    let mut normalized = String::with_capacity(source.len());
+    let mut remaining = source;
+    while let Some(layout_start) = remaining.find("layout(") {
+        normalized.push_str(&remaining[..layout_start]);
+        let layout = &remaining[layout_start..];
+        let Some(layout_end) = layout.find(')') else {
+            normalized.push_str(layout);
+            return normalized;
+        };
+        let qualifiers = &layout[7..layout_end];
+        let mut set = None;
+        let mut binding = None;
+        let mut retained = Vec::new();
+        for qualifier in qualifiers.split(',') {
+            let qualifier = qualifier.trim();
+            let Some((name, value)) = qualifier.split_once('=') else {
+                retained.push(qualifier);
+                continue;
+            };
+            match name.trim() {
+                "set" => set = value.trim().parse::<u32>().ok(),
+                "binding" => binding = value.trim().parse::<u32>().ok(),
+                _ => retained.push(qualifier),
+            }
+        }
+        if let (Some(set), Some(binding)) = (set, binding) {
+            if let Ok(binding_point) = opengl_resource_binding_point(set, binding) {
+                let mut rebuilt = vec![format!("binding = {binding_point}")];
+                rebuilt.extend(retained.into_iter().map(str::to_string));
+                normalized.push_str("layout(");
+                normalized.push_str(&rebuilt.join(", "));
+                normalized.push(')');
+            } else {
+                normalized.push_str(&layout[..=layout_end]);
+            }
+        } else {
+            normalized.push_str(&layout[..=layout_end]);
+        }
+        remaining = &layout[layout_end + 1..];
+    }
+    normalized.push_str(remaining);
+    normalized
 }
 
 fn parse_sampler2d_layout_bindings(source: &str) -> BTreeMap<String, u32> {
     let mut bindings = BTreeMap::new();
     for line in source.lines() {
         let line = line.trim();
-        if !line.starts_with("layout(") || !line.contains("uniform sampler2D ") {
+        if !line.starts_with("layout(") {
             continue;
         }
+        let Some(declaration) = [
+            "uniform sampler2D ",
+            "uniform sampler3D ",
+            "uniform usampler3D ",
+            "uniform isampler3D ",
+        ]
+        .into_iter()
+        .find(|declaration| line.contains(declaration)) else {
+            continue;
+        };
         let Some(binding_start) = line.find("binding") else {
             continue;
         };
@@ -1054,10 +1366,10 @@ fn parse_sampler2d_layout_bindings(source: &str) -> BTreeMap<String, u32> {
         let Ok(binding) = number.parse::<u32>() else {
             continue;
         };
-        let Some(name_start) = line.find("uniform sampler2D ") else {
+        let Some(name_start) = line.find(declaration) else {
             continue;
         };
-        let name = line[name_start + "uniform sampler2D ".len()..]
+        let name = line[name_start + declaration.len()..]
             .trim()
             .trim_end_matches(';')
             .split(['[', ' ', '\t'])
@@ -1103,6 +1415,10 @@ fn uniform_block_names(binding: u32) -> Vec<String> {
             "Projection".to_string(),
         ],
         1 => vec!["WorldMeshInstance".to_string(), "Uniforms1".to_string()],
+        11 => vec![
+            "TerrainVoxelLightMapping".to_string(),
+            "Uniforms11".to_string(),
+        ],
         _ => vec![format!("Uniforms{binding}")],
     }
 }
@@ -1167,12 +1483,12 @@ pub(super) fn shader_stage(stage: ShaderStage) -> GalResult<u32> {
     match stage {
         ShaderStage::Vertex => Ok(glow::VERTEX_SHADER),
         ShaderStage::Fragment => Ok(glow::FRAGMENT_SHADER),
-        ShaderStage::Compute
-        | ShaderStage::Geometry
-        | ShaderStage::TessControl
-        | ShaderStage::TessEvaluation => Err(GalError::backend(format!(
-            "OpenGL shader stage {stage:?} is not supported in the isolated path"
-        ))),
+        ShaderStage::Compute => Ok(glow::COMPUTE_SHADER),
+        ShaderStage::Geometry | ShaderStage::TessControl | ShaderStage::TessEvaluation => {
+            Err(GalError::backend(format!(
+                "OpenGL shader stage {stage:?} is not supported in the isolated path"
+            )))
+        }
     }
 }
 

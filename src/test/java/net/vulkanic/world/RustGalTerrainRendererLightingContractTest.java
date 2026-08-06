@@ -192,6 +192,7 @@ public class RustGalTerrainRendererLightingContractTest {
 			0,
 			0xffffffff,
 			0,
+			0,
 			0
 		);
 	}

@@ -5,7 +5,10 @@ use std::sync::OnceLock;
 
 use glow::HasContext;
 
-use super::resources::{texture_format, texture_target, topology, OpenGlObjects, ResourceSetObject};
+use super::resources::{
+    opengl_resource_binding_point, texture_format, texture_target, topology, OpenGlObjects,
+    ResourceSetObject,
+};
 use super::trace;
 use crate::render::vulkanic::commands::{
     AttachmentLoadOp, BufferImageCopyRegion, CommandOp, ResourceBarrier, TextureUsageState,
@@ -14,7 +17,7 @@ use crate::render::vulkanic::commands::{
 use crate::render::vulkanic::error::{GalError, GalResult};
 use crate::render::vulkanic::handles::Handle;
 use crate::render::vulkanic::resources::{
-    BlendMode, CompareOp, CullMode, ResourceBindingKind, TextureFormat,
+    BlendMode, CompareOp, CullMode, ResourceBindingKind, TextureDimension, TextureFormat,
 };
 use crate::render::vulkanic::sync::SubmissionId;
 
@@ -406,9 +409,27 @@ impl OpenGlLowerer {
                     pipeline.depth_write,
                 );
                 state.pipeline = Some(*handle);
+                state.compute_pipeline = None;
                 state.pipeline_layout = Some(pipeline.layout);
                 state.topology = topology(pipeline.topology);
                 self.trace_draw_state("after-bind-graphics-pipeline", state);
+                Ok(())
+            }
+            CommandOp::BindComputePipeline(handle) => {
+                let _zone = trace::Zone::new("opengl.lowering.bind-compute-pipeline");
+                if state.in_pass {
+                    return Err(GalError::backend(
+                        "OpenGL compute pipeline cannot bind inside a render pass",
+                    ));
+                }
+                let pipeline = objects.compute_pipeline(*handle)?;
+                self.bind_program(Some(pipeline.program));
+                self.bind_vao(None);
+                state.pipeline = None;
+                state.compute_pipeline = Some(*handle);
+                state.pipeline_layout = Some(pipeline.layout);
+                state.index_buffer = None;
+                state.bound_sets.clear();
                 Ok(())
             }
             CommandOp::BindResourceSet {
@@ -432,7 +453,8 @@ impl OpenGlLowerer {
                     ));
                 }
                 state.bound_sets.insert(*set_index, *set);
-                self.bind_resource_set(objects, set_object, dynamic_offsets)?;
+                self.validate_sampled_texture_view_compatibility(objects, state)?;
+                self.bind_resource_set(objects, *set_index, set_object, dynamic_offsets)?;
                 Ok(())
             }
             CommandOp::SetIndexBuffer {
@@ -487,10 +509,25 @@ impl OpenGlLowerer {
                 }
                 Ok(())
             }
+            CommandOp::Dispatch {
+                groups_x,
+                groups_y,
+                groups_z,
+            } => {
+                let _zone = trace::Zone::new("opengl.lowering.dispatch");
+                if state.compute_pipeline.is_none() || state.in_pass {
+                    return Err(GalError::backend(
+                        "OpenGL dispatch requires an active compute pipeline outside a render pass",
+                    ));
+                }
+                unsafe {
+                    self.record_gl_call();
+                    self.gl.dispatch_compute(*groups_x, *groups_y, *groups_z);
+                }
+                Ok(())
+            }
             CommandOp::Barrier(barrier) => self.apply_resource_barrier(barrier),
-            CommandOp::BindComputePipeline(_)
-            | CommandOp::Dispatch { .. }
-            | CommandOp::DispatchIndirect { .. }
+            CommandOp::DispatchIndirect { .. }
             | CommandOp::DrawIndirect { .. }
             | CommandOp::Present { .. }
             | CommandOp::SetVertexBuffer { .. } => Err(GalError::backend(format!(
@@ -556,7 +593,9 @@ impl OpenGlLowerer {
                         rows_per_image
                             .checked_mul(depth.saturating_sub(1))
                             .and_then(|before_last| before_last.checked_add(rows))
-                            .ok_or_else(|| GalError::backend("buffer texture copy rows overflow"))?,
+                            .ok_or_else(|| {
+                                GalError::backend("buffer texture copy rows overflow")
+                            })?,
                     )
                     .ok_or_else(|| GalError::backend("buffer texture copy byte count overflows"))?,
             )
@@ -571,7 +610,13 @@ impl OpenGlLowerer {
             for row in 0..rows {
                 let src = z
                     .checked_mul(rows_per_image)
-                    .and_then(|slice_start| slice_start.checked_add(rows - 1 - row))
+                    .and_then(|slice_start| {
+                        slice_start.checked_add(copy_upload_row_index(
+                            texture.dimension,
+                            row,
+                            rows,
+                        ))
+                    })
                     .and_then(|source_row| source_row.checked_mul(bytes_per_row))
                     .ok_or_else(|| GalError::backend("buffer texture source row overflows"))?;
                 let dst = z
@@ -582,7 +627,7 @@ impl OpenGlLowerer {
                 upload[dst..dst + row_bytes].copy_from_slice(&bytes[src..src + row_bytes]);
             }
         }
-        let gl_y = gl_y_for_top_left_region(texture, region)?;
+        let gl_y = gl_y_for_copy_region(texture, region)?;
         unsafe {
             self.gl.pixel_store_i32(glow::UNPACK_ALIGNMENT, 1);
             self.gl.pixel_store_i32(glow::UNPACK_ROW_LENGTH, 0);
@@ -592,40 +637,44 @@ impl OpenGlLowerer {
             let target = texture_target(texture.dimension);
             self.gl.bind_texture(target, Some(texture.texture));
             match texture.dimension {
-                crate::render::vulkanic::resources::TextureDimension::D2 => self.gl.tex_sub_image_2d(
-                    target,
-                    i32::try_from(region.texture_mip)
-                        .map_err(|_| GalError::backend("texture mip exceeds i32"))?,
-                    i32::try_from(region.texture_origin.x)
-                        .map_err(|_| GalError::backend("texture origin x exceeds i32"))?,
-                    gl_y,
-                    i32::try_from(region.extent.width)
-                        .map_err(|_| GalError::backend("texture width exceeds i32"))?,
-                    i32::try_from(region.extent.height)
-                        .map_err(|_| GalError::backend("texture height exceeds i32"))?,
-                    format.external,
-                    format.ty,
-                    glow::PixelUnpackData::Slice(Some(&upload)),
-                ),
-                crate::render::vulkanic::resources::TextureDimension::D3 => self.gl.tex_sub_image_3d(
-                    target,
-                    i32::try_from(region.texture_mip)
-                        .map_err(|_| GalError::backend("texture mip exceeds i32"))?,
-                    i32::try_from(region.texture_origin.x)
-                        .map_err(|_| GalError::backend("texture origin x exceeds i32"))?,
-                    gl_y,
-                    i32::try_from(region.texture_origin.z)
-                        .map_err(|_| GalError::backend("texture origin z exceeds i32"))?,
-                    i32::try_from(region.extent.width)
-                        .map_err(|_| GalError::backend("texture width exceeds i32"))?,
-                    i32::try_from(region.extent.height)
-                        .map_err(|_| GalError::backend("texture height exceeds i32"))?,
-                    i32::try_from(region.extent.depth)
-                        .map_err(|_| GalError::backend("texture depth exceeds i32"))?,
-                    format.external,
-                    format.ty,
-                    glow::PixelUnpackData::Slice(Some(&upload)),
-                ),
+                crate::render::vulkanic::resources::TextureDimension::D2 => {
+                    self.gl.tex_sub_image_2d(
+                        target,
+                        i32::try_from(region.texture_mip)
+                            .map_err(|_| GalError::backend("texture mip exceeds i32"))?,
+                        i32::try_from(region.texture_origin.x)
+                            .map_err(|_| GalError::backend("texture origin x exceeds i32"))?,
+                        gl_y,
+                        i32::try_from(region.extent.width)
+                            .map_err(|_| GalError::backend("texture width exceeds i32"))?,
+                        i32::try_from(region.extent.height)
+                            .map_err(|_| GalError::backend("texture height exceeds i32"))?,
+                        format.external,
+                        format.ty,
+                        glow::PixelUnpackData::Slice(Some(&upload)),
+                    )
+                }
+                crate::render::vulkanic::resources::TextureDimension::D3 => {
+                    self.gl.tex_sub_image_3d(
+                        target,
+                        i32::try_from(region.texture_mip)
+                            .map_err(|_| GalError::backend("texture mip exceeds i32"))?,
+                        i32::try_from(region.texture_origin.x)
+                            .map_err(|_| GalError::backend("texture origin x exceeds i32"))?,
+                        gl_y,
+                        i32::try_from(region.texture_origin.z)
+                            .map_err(|_| GalError::backend("texture origin z exceeds i32"))?,
+                        i32::try_from(region.extent.width)
+                            .map_err(|_| GalError::backend("texture width exceeds i32"))?,
+                        i32::try_from(region.extent.height)
+                            .map_err(|_| GalError::backend("texture height exceeds i32"))?,
+                        i32::try_from(region.extent.depth)
+                            .map_err(|_| GalError::backend("texture depth exceeds i32"))?,
+                        format.external,
+                        format.ty,
+                        glow::PixelUnpackData::Slice(Some(&upload)),
+                    )
+                }
                 _ => unreachable!("GAL validated texture dimension"),
             }
         }
@@ -656,7 +705,7 @@ impl OpenGlLowerer {
         let read_fbo = unsafe { self.gl.create_framebuffer() }.map_err(|error| {
             GalError::backend(format!("failed to create readback FBO: {error}"))
         })?;
-        let gl_y = gl_y_for_top_left_region(texture, region)?;
+        let gl_y = gl_y_for_copy_region(texture, region)?;
         unsafe {
             self.gl
                 .bind_framebuffer(glow::READ_FRAMEBUFFER, Some(read_fbo));
@@ -697,7 +746,9 @@ impl OpenGlLowerer {
                                 .map_err(|_| GalError::backend("texture mip exceeds i32"))?,
                             i32::try_from(region.texture_origin.z)
                                 .and_then(|origin| i32::try_from(slice).map(|value| origin + value))
-                                .map_err(|_| GalError::backend("texture depth layer exceeds i32"))?,
+                                .map_err(|_| {
+                                    GalError::backend("texture depth layer exceeds i32")
+                                })?,
                         );
                     }
                     _ => unreachable!("GAL validated texture dimension"),
@@ -719,12 +770,14 @@ impl OpenGlLowerer {
             self.gl.bind_framebuffer(glow::READ_FRAMEBUFFER, None);
             self.gl.delete_framebuffer(read_fbo);
         }
-        for slice in 0..depth {
-            flip_rows_in_place(
-                &mut pixels[slice * slice_bytes..(slice + 1) * slice_bytes],
-                row_bytes,
-                height,
-            );
+        if texture.dimension != TextureDimension::D3 {
+            for slice in 0..depth {
+                flip_rows_in_place(
+                    &mut pixels[slice * slice_bytes..(slice + 1) * slice_bytes],
+                    row_bytes,
+                    height,
+                );
+            }
         }
         let target = objects.buffer_mut(region.buffer)?;
         let dst_start = usize::try_from(region.buffer_offset)
@@ -747,7 +800,8 @@ impl OpenGlLowerer {
                 glow::COPY_WRITE_BUFFER,
                 i32::try_from(region.buffer_offset)
                     .map_err(|_| GalError::backend("readback buffer offset exceeds i32"))?,
-                &target.shadow[dst_start..dst_start + bytes_per_row * (rows_per_image * (depth - 1) + height)],
+                &target.shadow[dst_start
+                    ..dst_start + bytes_per_row * (rows_per_image * (depth - 1) + height)],
             );
         }
         Ok(())
@@ -756,6 +810,7 @@ impl OpenGlLowerer {
     fn bind_resource_set(
         &mut self,
         objects: &OpenGlObjects,
+        set_index: u32,
         set: &ResourceSetObject,
         dynamic_offsets: &[u64],
     ) -> GalResult<()> {
@@ -763,21 +818,39 @@ impl OpenGlLowerer {
         let mut sampler_bindings = Vec::new();
         let mut dynamic_offset_index = 0usize;
         for binding in &set.bindings {
+            let binding_point = opengl_resource_binding_point(set_index, binding.binding)?;
             match binding.kind {
                 ResourceBindingKind::SampledTexture => {
                     let view = objects.texture_view(binding.resource)?;
                     let texture = objects.texture(view.texture)?;
-                    let unit = binding.binding;
+                    let unit = binding_point;
                     sampled_texture_units.push(unit);
-                    self.bind_texture_unit(
+                    self.bind_sampled_texture_view(
                         unit,
                         texture_target(texture.dimension),
-                        Some(texture.texture),
+                        texture.texture,
+                        view.base_mip,
+                        view.mip_count,
                     );
                     self.bind_sampler_unit(unit, None);
                 }
                 ResourceBindingKind::Sampler => {
                     sampler_bindings.push(binding.resource);
+                }
+                ResourceBindingKind::CombinedTextureSampler => {
+                    let combined = objects.combined_texture_sampler(binding.resource)?;
+                    let view = objects.texture_view(combined.texture_view)?;
+                    let texture = objects.texture(view.texture)?;
+                    let sampler = objects.sampler(combined.sampler)?;
+                    let unit = binding_point;
+                    self.bind_sampled_texture_view(
+                        unit,
+                        texture_target(texture.dimension),
+                        texture.texture,
+                        view.base_mip,
+                        view.mip_count,
+                    );
+                    self.bind_sampler_unit(unit, Some(sampler.sampler));
                 }
                 ResourceBindingKind::UniformBuffer | ResourceBindingKind::StorageBuffer => {
                     let buffer = objects.buffer(binding.resource)?;
@@ -806,7 +879,7 @@ impl OpenGlLowerer {
                             .unwrap_or_else(|| buffer.size.saturating_sub(offset));
                         self.gl.bind_buffer_range(
                             target,
-                            binding.binding,
+                            binding_point,
                             Some(buffer.buffer),
                             i32::try_from(offset)
                                 .map_err(|_| GalError::backend("dynamic offset exceeds i32"))?,
@@ -816,9 +889,17 @@ impl OpenGlLowerer {
                     }
                 }
                 ResourceBindingKind::StorageTexture => {
-                    return Err(GalError::backend(
-                        "OpenGL storage texture binding is not supported in the isolated path",
-                    ))
+                    let view = objects.texture_view(binding.resource)?;
+                    let texture = objects.texture(view.texture)?;
+                    self.bind_image_unit(
+                        binding_point,
+                        texture.texture,
+                        view.base_mip,
+                        texture.dimension == TextureDimension::D3,
+                        view.base_layer,
+                        storage_texture_access(binding.access)?,
+                        texture_format(view.format)?.internal as u32,
+                    )?;
                 }
             }
         }
@@ -832,6 +913,45 @@ impl OpenGlLowerer {
             let sampler = objects.sampler(sampler_bindings[0])?;
             for unit in sampled_texture_units {
                 self.bind_sampler_unit(unit, Some(sampler.sampler));
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_sampled_texture_view_compatibility(
+        &self,
+        objects: &OpenGlObjects,
+        state: &ExecutionState,
+    ) -> GalResult<()> {
+        let mut views = BTreeMap::new();
+        for set_handle in state.bound_sets.values().copied() {
+            let set = objects.resource_set(set_handle)?;
+            for binding in &set.bindings {
+                if !matches!(
+                    binding.kind,
+                    ResourceBindingKind::SampledTexture
+                        | ResourceBindingKind::CombinedTextureSampler
+                ) {
+                    continue;
+                }
+                let view_handle = match binding.kind {
+                    ResourceBindingKind::SampledTexture => binding.resource,
+                    ResourceBindingKind::CombinedTextureSampler => objects
+                        .combined_texture_sampler(binding.resource)?
+                        .texture_view,
+                    _ => unreachable!(),
+                };
+                let view = objects.texture_view(view_handle)?;
+                record_sampled_texture_view_range(
+                    &mut views,
+                    view.texture,
+                    (
+                        view.base_mip,
+                        view.mip_count,
+                        view.base_layer,
+                        view.layer_count,
+                    ),
+                )?;
             }
         }
         Ok(())
@@ -992,6 +1112,31 @@ impl OpenGlLowerer {
         self.cache.texture_binds += 1;
     }
 
+    fn bind_sampled_texture_view(
+        &mut self,
+        unit: u32,
+        target: u32,
+        texture: glow::Texture,
+        base_mip: u32,
+        mip_count: u32,
+    ) {
+        self.bind_texture_unit(unit, target, Some(texture));
+        unsafe {
+            // OpenGL texture parameters are texture-object state, unlike a
+            // Vulkan image view. The compatibility backend reconstructs this
+            // private detail per binding and rejects simultaneous incompatible
+            // views above so one draw cannot silently sample the wrong mip.
+            self.gl.active_texture(glow::TEXTURE0 + unit);
+            self.gl
+                .tex_parameter_i32(target, glow::TEXTURE_BASE_LEVEL, base_mip as i32);
+            self.gl.tex_parameter_i32(
+                target,
+                glow::TEXTURE_MAX_LEVEL,
+                base_mip.saturating_add(mip_count.saturating_sub(1)) as i32,
+            );
+        }
+    }
+
     fn bind_sampler_unit(&mut self, unit: u32, sampler: Option<glow::Sampler>) {
         if self.cache.samplers.get(&unit).copied().flatten() == sampler {
             return;
@@ -1001,6 +1146,40 @@ impl OpenGlLowerer {
         }
         self.cache.samplers.insert(unit, sampler);
         self.cache.sampler_binds += 1;
+    }
+
+    fn bind_image_unit(
+        &mut self,
+        unit: u32,
+        texture: glow::Texture,
+        mip: u32,
+        layered: bool,
+        layer: u32,
+        access: u32,
+        format: u32,
+    ) -> GalResult<()> {
+        let level =
+            i32::try_from(mip).map_err(|_| GalError::backend("OpenGL image mip exceeds i32"))?;
+        let layer = i32::try_from(layer)
+            .map_err(|_| GalError::backend("OpenGL image layer exceeds i32"))?;
+        let state = ImageUnitBinding {
+            texture,
+            level,
+            layered,
+            layer,
+            access,
+            format,
+        };
+        if self.cache.image_units.get(&unit).copied() == Some(state) {
+            return Ok(());
+        }
+        unsafe {
+            self.gl
+                .bind_image_texture(unit, Some(texture), level, layered, layer, access, format);
+        }
+        self.cache.image_units.insert(unit, state);
+        self.cache.image_binds += 1;
+        Ok(())
     }
 
     fn check_errors(&mut self, context: &str) -> GalResult<()> {
@@ -1038,11 +1217,27 @@ impl OpenGlLowerer {
     }
 }
 
+fn record_sampled_texture_view_range(
+    views: &mut BTreeMap<Handle, (u32, u32, u32, u32)>,
+    texture: Handle,
+    range: (u32, u32, u32, u32),
+) -> GalResult<()> {
+    if let Some(previous) = views.insert(texture, range) {
+        if previous != range {
+            return Err(GalError::backend(
+                "OpenGL lowering cannot bind incompatible mip/layer views of one texture in a single draw",
+            ));
+        }
+    }
+    Ok(())
+}
+
 #[derive(Default)]
 struct ExecutionState {
     in_pass: bool,
     target: Option<Handle>,
     pipeline: Option<Handle>,
+    compute_pipeline: Option<Handle>,
     pipeline_layout: Option<Handle>,
     index_buffer: Option<(Handle, u64, crate::render::vulkanic::resources::IndexType)>,
     topology: u32,
@@ -1061,12 +1256,37 @@ struct StateCache {
     depth_write: bool,
     textures: BTreeMap<u32, (u32, Option<glow::Texture>)>,
     samplers: BTreeMap<u32, Option<glow::Sampler>>,
+    image_units: BTreeMap<u32, ImageUnitBinding>,
     program_binds: usize,
     vao_binds: usize,
     framebuffer_binds: usize,
     texture_binds: usize,
     sampler_binds: usize,
+    image_binds: usize,
     state_changes: usize,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct ImageUnitBinding {
+    texture: glow::Texture,
+    level: i32,
+    layered: bool,
+    layer: i32,
+    access: u32,
+    format: u32,
+}
+
+fn storage_texture_access(
+    access: crate::render::vulkanic::resources::AccessFlags,
+) -> GalResult<u32> {
+    match (access.reads(), access.writes()) {
+        (true, true) => Ok(glow::READ_WRITE),
+        (true, false) => Ok(glow::READ_ONLY),
+        (false, true) => Ok(glow::WRITE_ONLY),
+        (false, false) => Err(GalError::backend(
+            "OpenGL storage texture binding requires read or write access",
+        )),
+    }
 }
 
 #[derive(Copy, Clone)]
@@ -1177,10 +1397,18 @@ fn gl_index_type(index_type: crate::render::vulkanic::resources::IndexType) -> u
 fn gl_memory_barrier_bits(before: TextureUsageState, after: TextureUsageState) -> u32 {
     match (before, after) {
         (TextureUsageState::ShaderWrite, TextureUsageState::ShaderRead) => {
-            glow::SHADER_STORAGE_BARRIER_BIT | glow::TEXTURE_FETCH_BARRIER_BIT
+            glow::SHADER_IMAGE_ACCESS_BARRIER_BIT | glow::TEXTURE_FETCH_BARRIER_BIT
         }
         (TextureUsageState::ShaderWrite, TextureUsageState::ShaderWrite) => {
-            glow::SHADER_STORAGE_BARRIER_BIT
+            glow::SHADER_IMAGE_ACCESS_BARRIER_BIT
+        }
+        (TextureUsageState::ShaderWrite, TextureUsageState::TransferSrc) => {
+            glow::SHADER_IMAGE_ACCESS_BARRIER_BIT
+                | glow::TEXTURE_UPDATE_BARRIER_BIT
+                | glow::FRAMEBUFFER_BARRIER_BIT
+        }
+        (TextureUsageState::TransferDst, TextureUsageState::ShaderWrite) => {
+            glow::TEXTURE_UPDATE_BARRIER_BIT | glow::SHADER_IMAGE_ACCESS_BARRIER_BIT
         }
         (TextureUsageState::TransferDst, TextureUsageState::ShaderRead) => {
             glow::TEXTURE_FETCH_BARRIER_BIT | glow::SHADER_STORAGE_BARRIER_BIT
@@ -1210,10 +1438,17 @@ fn flip_rows_in_place(bytes: &mut [u8], row_bytes: usize, rows: usize) {
     }
 }
 
-fn gl_y_for_top_left_region(
+fn gl_y_for_copy_region(
     texture: &super::resources::TextureObject,
     region: &BufferImageCopyRegion,
 ) -> GalResult<i32> {
+    if texture.dimension == TextureDimension::D3 {
+        // A 3D texture is a semantic volume, not a framebuffer. Its Y axis
+        // must agree with Vulkan image coordinates and shader imageLoad/store;
+        // screen-space top-left normalization applies only to D2 copies.
+        return i32::try_from(region.texture_origin.y)
+            .map_err(|_| GalError::backend("3D texture origin y exceeds i32"));
+    }
     let texture_height = i64::from(texture.extent.height);
     let origin_y = i64::from(region.texture_origin.y);
     let copy_height = i64::from(region.extent.height);
@@ -1222,6 +1457,17 @@ fn gl_y_for_top_left_region(
         .and_then(|value| value.checked_sub(copy_height))
         .ok_or_else(|| GalError::backend("top-left texture region is outside GL image bounds"))?;
     i32::try_from(gl_y).map_err(|_| GalError::backend("translated GL y exceeds i32"))
+}
+
+/// 2D framebuffer-facing resources use the frontend's top-left copy convention,
+/// while a D3 image is a coordinate volume. Applying the 2D row flip to a volume
+/// would make `imageLoad`/`imageStore` disagree with Vulkan at every nonzero Y.
+fn copy_upload_row_index(dimension: TextureDimension, row: usize, height: usize) -> usize {
+    match dimension {
+        TextureDimension::D3 => row,
+        TextureDimension::D2 => height - 1 - row,
+        _ => unreachable!("GAL validated texture dimension"),
+    }
 }
 
 #[cfg(test)]
@@ -1246,6 +1492,15 @@ mod tests {
     }
 
     #[test]
+    fn d3_upload_rows_preserve_semantic_volume_y_coordinates() {
+        assert_eq!(0, copy_upload_row_index(TextureDimension::D3, 0, 3));
+        assert_eq!(1, copy_upload_row_index(TextureDimension::D3, 1, 3));
+        assert_eq!(2, copy_upload_row_index(TextureDimension::D3, 2, 3));
+        assert_eq!(2, copy_upload_row_index(TextureDimension::D2, 0, 3));
+        assert_eq!(0, copy_upload_row_index(TextureDimension::D2, 2, 3));
+    }
+
+    #[test]
     fn multiply_blend_lowers_to_single_source_times_destination() {
         let state = opengl_blend_state(BlendMode::Multiply);
         assert!(state.enabled);
@@ -1260,5 +1515,16 @@ mod tests {
             }),
             state.factors
         );
+    }
+
+    #[test]
+    fn sampled_texture_views_reject_conflicting_mip_ranges() {
+        let texture = Handle::from_raw(0x100);
+        let mut views = BTreeMap::new();
+        record_sampled_texture_view_range(&mut views, texture, (1, 1, 0, 1)).unwrap();
+        record_sampled_texture_view_range(&mut views, texture, (1, 1, 0, 1)).unwrap();
+        let error = record_sampled_texture_view_range(&mut views, texture, (0, 2, 0, 1))
+            .expect_err("one OpenGL draw cannot safely bind two incompatible mip views");
+        assert!(error.message.contains("incompatible mip/layer views"));
     }
 }

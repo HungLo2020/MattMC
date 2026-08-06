@@ -8,7 +8,7 @@ use super::commands::*;
 use super::error::{ErrorDomain, GalError};
 use super::ffi::*;
 use super::frame::*;
-use super::gal::{normalize_submission_batch, CommandNormalizationStats, VulkanicGal};
+use super::gal::{CommandNormalizationStats, VulkanicGal, normalize_submission_batch};
 use super::handles::{Handle, HandleKind, MAX_GENERATION};
 use super::metrics::{Metrics, WholeFrameProfile};
 use super::resources::*;
@@ -241,6 +241,20 @@ fn backend_capabilities_are_queryable_and_fingerprinted_without_api_tokens() {
     assert!(!capabilities.supports(BackendFeature::Compute));
     assert!(!capabilities.supports(BackendFeature::StorageTextures));
     assert!(capabilities.supports(BackendFeature::Texture3d));
+    assert!(capabilities.supports(BackendFeature::TextureMipLevels));
+    assert!(capabilities.supports_texture_3d_usage(TextureFormat::R8Uint, TextureUsage::Sampled));
+    assert!(
+        capabilities
+            .supports_texture_3d_usage(TextureFormat::Rgba16Float, TextureUsage::TransferDst)
+    );
+    assert!(!capabilities.supports_texture_3d_usage(TextureFormat::R8Uint, TextureUsage::Storage));
+    assert!(
+        !capabilities
+            .supports_texture_3d_usage(TextureFormat::R8Uint, TextureUsage::ColorAttachment)
+    );
+    let vulkan = vulkan_capabilities();
+    assert!(vulkan.supports_texture_3d_usage(TextureFormat::R8Uint, TextureUsage::Storage));
+    assert!(vulkan.supports_texture_3d_usage(TextureFormat::Rgba16Float, TextureUsage::Storage));
     let fingerprint = capabilities.fingerprint_json();
     assert!(fingerprint.contains("\"name\":\"Rust OpenGL\""));
     assert!(fingerprint.contains("\"compute\":false"));
@@ -263,14 +277,21 @@ fn backend_capability_rejection_is_deterministic_before_native_creation() {
     let mut gal = gal_with_capabilities(opengl_capabilities());
     assert_unsupported(
         gal.create_texture(TextureDesc {
-            mip_levels: 2,
+            dimension: TextureDimension::D3,
+            extent: Extent3d {
+                width: 8,
+                height: 8,
+                depth: 8,
+            },
+            array_layers: 1,
+            usages: vec![TextureUsage::ColorAttachment],
             ..texture(
-                "mipped",
+                "d3-render-target",
                 TextureFormat::Rgba8Unorm,
-                vec![TextureUsage::Sampled],
+                vec![TextureUsage::ColorAttachment],
             )
         }),
-        "mip count",
+        "not render targets",
     );
     assert_unsupported(
         gal.create_texture(TextureDesc {
@@ -985,6 +1006,194 @@ fn resource_sets_validate_layout_binding_kind_resource_type_and_access() {
         }),
         super::StatusCode::InvalidArgument,
     );
+}
+
+#[test]
+fn resource_sets_reject_linear_sampler_state_for_integer_sampled_textures() {
+    let mut gal = gal();
+    let occupancy = gal
+        .create_texture(texture(
+            "integer-occupancy",
+            TextureFormat::R8Uint,
+            vec![TextureUsage::Sampled],
+        ))
+        .unwrap();
+    let occupancy_view = gal
+        .create_texture_view(view(
+            "integer-occupancy-view",
+            occupancy,
+            TextureFormat::R8Uint,
+        ))
+        .unwrap();
+    let layout = gal
+        .create_resource_layout(ResourceLayoutDesc {
+            label: "integer-sampler-layout".to_owned(),
+            bindings: vec![
+                layout_binding(
+                    0,
+                    ResourceBindingKind::SampledTexture,
+                    PipelineStageFlags::DRAW,
+                ),
+                layout_binding(1, ResourceBindingKind::Sampler, PipelineStageFlags::DRAW),
+            ],
+        })
+        .unwrap();
+    let linear_sampler = gal
+        .create_sampler(sampler("linear-integer-sampler"))
+        .unwrap();
+
+    let error = gal
+        .create_resource_set(ResourceSetDesc {
+            label: "integer-linear-sampler-set".to_owned(),
+            layout,
+            bindings: vec![
+                resource_binding(
+                    0,
+                    occupancy_view,
+                    ResourceBindingKind::SampledTexture,
+                    AccessFlags::READ,
+                ),
+                resource_binding(
+                    1,
+                    linear_sampler,
+                    ResourceBindingKind::Sampler,
+                    AccessFlags::READ,
+                ),
+            ],
+        })
+        .expect_err("integer textures must reject linear sampler filtering");
+    assert_eq!(error.code, super::StatusCode::InvalidArgument);
+    assert!(error.message.contains("integer sampled textures"));
+
+    let nearest_sampler = gal
+        .create_sampler(SamplerDesc {
+            label: "nearest-integer-sampler".to_owned(),
+            min_filter: SamplerFilter::Nearest,
+            mag_filter: SamplerFilter::Nearest,
+            mip_filter: SamplerFilter::Nearest,
+            address_u: SamplerAddressMode::ClampToEdge,
+            address_v: SamplerAddressMode::ClampToEdge,
+            address_w: SamplerAddressMode::ClampToEdge,
+        })
+        .unwrap();
+    gal.create_resource_set(ResourceSetDesc {
+        label: "integer-nearest-sampler-set".to_owned(),
+        layout,
+        bindings: vec![
+            resource_binding(
+                0,
+                occupancy_view,
+                ResourceBindingKind::SampledTexture,
+                AccessFlags::READ,
+            ),
+            resource_binding(
+                1,
+                nearest_sampler,
+                ResourceBindingKind::Sampler,
+                AccessFlags::READ,
+            ),
+        ],
+    })
+    .expect("integer textures must accept nearest sampler filtering");
+}
+
+#[test]
+fn combined_texture_sampler_is_a_read_only_owned_pair() {
+    let mut gal = gal();
+    let occupancy = gal
+        .create_texture(texture(
+            "combined-integer-occupancy",
+            TextureFormat::R8Uint,
+            vec![TextureUsage::Sampled],
+        ))
+        .unwrap();
+    let occupancy_view = gal
+        .create_texture_view(view(
+            "combined-integer-occupancy-view",
+            occupancy,
+            TextureFormat::R8Uint,
+        ))
+        .unwrap();
+    let linear_sampler = gal
+        .create_sampler(sampler("combined-linear-integer-sampler"))
+        .unwrap();
+    let error = gal
+        .create_combined_texture_sampler(CombinedTextureSamplerDesc {
+            label: "combined-linear-integer".to_owned(),
+            texture_view: occupancy_view,
+            sampler: linear_sampler,
+        })
+        .expect_err("integer combined samplers must reject linear filtering");
+    assert_eq!(error.code, super::StatusCode::InvalidArgument);
+    assert!(error.message.contains("integer combined texture samplers"));
+
+    let nearest_sampler = gal
+        .create_sampler(SamplerDesc {
+            label: "combined-nearest-integer-sampler".to_owned(),
+            min_filter: SamplerFilter::Nearest,
+            mag_filter: SamplerFilter::Nearest,
+            mip_filter: SamplerFilter::Nearest,
+            address_u: SamplerAddressMode::ClampToEdge,
+            address_v: SamplerAddressMode::ClampToEdge,
+            address_w: SamplerAddressMode::ClampToEdge,
+        })
+        .unwrap();
+    let combined = gal
+        .create_combined_texture_sampler(CombinedTextureSamplerDesc {
+            label: "combined-nearest-integer".to_owned(),
+            texture_view: occupancy_view,
+            sampler: nearest_sampler,
+        })
+        .unwrap();
+    let layout = gal
+        .create_resource_layout(ResourceLayoutDesc {
+            label: "combined-sampler-layout".to_owned(),
+            bindings: vec![layout_binding(
+                0,
+                ResourceBindingKind::CombinedTextureSampler,
+                PipelineStageFlags::DRAW,
+            )],
+        })
+        .unwrap();
+    let set = gal
+        .create_resource_set(ResourceSetDesc {
+            label: "combined-sampler-set".to_owned(),
+            layout,
+            bindings: vec![resource_binding(
+                0,
+                combined,
+                ResourceBindingKind::CombinedTextureSampler,
+                AccessFlags::READ,
+            )],
+        })
+        .unwrap();
+
+    assert_code(
+        gal.create_resource_set(ResourceSetDesc {
+            label: "combined-sampler-write-set".to_owned(),
+            layout,
+            bindings: vec![resource_binding(
+                0,
+                combined,
+                ResourceBindingKind::CombinedTextureSampler,
+                AccessFlags::WRITE,
+            )],
+        }),
+        super::StatusCode::InvalidArgument,
+    );
+    assert_code(
+        gal.destroy(occupancy_view),
+        super::StatusCode::DependencyViolation,
+    );
+    assert_code(
+        gal.destroy(nearest_sampler),
+        super::StatusCode::DependencyViolation,
+    );
+    gal.destroy(set).unwrap();
+    gal.destroy(combined).unwrap();
+    gal.destroy(nearest_sampler).unwrap();
+    gal.destroy(occupancy_view).unwrap();
+    gal.destroy(occupancy).unwrap();
 }
 
 #[test]
@@ -1831,7 +2040,11 @@ fn d3_texture_validation_enforces_dimension_layers_mips_and_copy_boxes() {
             },
             mip_levels: 1,
             array_layers: 1,
-            usages: vec![TextureUsage::TransferDst, TextureUsage::TransferSrc, TextureUsage::Sampled],
+            usages: vec![
+                TextureUsage::TransferDst,
+                TextureUsage::TransferSrc,
+                TextureUsage::Sampled,
+            ],
         })
         .unwrap();
     let region = BufferImageCopyRegion {
@@ -1914,7 +2127,11 @@ fn d3_texture_lifecycle_validates_mips_storage_transitions_and_retirement() {
             },
             mip_levels: 2,
             array_layers: 1,
-            usages: vec![TextureUsage::Sampled, TextureUsage::Storage, TextureUsage::TransferDst],
+            usages: vec![
+                TextureUsage::Sampled,
+                TextureUsage::Storage,
+                TextureUsage::TransferDst,
+            ],
         })
         .unwrap();
     let full_range = TextureSubresourceRange {
@@ -1953,7 +2170,11 @@ fn d3_texture_lifecycle_validates_mips_storage_transitions_and_retirement() {
         })
         .unwrap();
     gal.destroy(texture).unwrap();
-    assert!(gal.retire_through_for_test(submission.submission).unwrap().contains(&texture));
+    assert!(
+        gal.retire_through_for_test(submission.submission)
+            .unwrap()
+            .contains(&texture)
+    );
     assert_code(
         gal.create_texture_view(TextureViewDesc {
             label: "stale-d3-view".to_owned(),
@@ -3134,9 +3355,24 @@ fn empty_resource_batch() -> FfiResourceBatch {
 }
 
 #[test]
+fn ffi_v1_keeps_private_combined_texture_sampler_bindings_unavailable() {
+    assert_code(
+        resource_binding_kind(ResourceBindingKind::CombinedTextureSampler as u32),
+        super::StatusCode::UnknownEnum,
+    );
+}
+
+#[test]
 fn frozen_ffi_abi_sizes_and_capability_negotiation_are_stable() {
     assert_eq!(FFI_ABI_V1_VERSION, 1);
-    assert_eq!(FFI_ABI_VERSION, 2);
+    assert_eq!(FFI_ABI_V4_VERSION, 4);
+    assert_eq!(FFI_ABI_V5_VERSION, 5);
+    assert_eq!(FFI_ABI_V6_VERSION, 6);
+    assert_eq!(FFI_ABI_V7_VERSION, 7);
+    assert_eq!(FFI_ABI_V8_VERSION, 8);
+    assert_eq!(FFI_ABI_V9_VERSION, 9);
+    assert_eq!(FFI_ABI_V10_VERSION, 10);
+    assert_eq!(FFI_ABI_VERSION, 11);
     assert!(!FFI_INITIAL_PRESENTATION_SUPPORTED);
     assert_eq!(size_of::<FfiHeader>(), 8);
     assert_eq!(size_of::<FfiHandle>(), 8);
@@ -3641,6 +3877,28 @@ fn ffi_rejects_malformed_ranges_unknown_enums_and_unsupported_features() {
         unsafe { decode_resource_batch(&batch, opengl_capabilities()) },
         super::StatusCode::UnsupportedFeature,
     );
+
+    let private_d3_texture = FfiTextureDescAbi {
+        byte_size: size_of::<FfiTextureDescAbi>() as u32,
+        request_id: 3,
+        label: ffi_bytes(b"private-d3-volume"),
+        dimension: TextureDimension::D3 as u32,
+        format: TextureFormat::Rgba16Float as u32,
+        extent: FfiExtent3d {
+            width: 4,
+            height: 4,
+            depth: 4,
+        },
+        mip_levels: 1,
+        array_layers: 1,
+        usage_bits: 1 << 0,
+    };
+    let mut batch = empty_resource_batch();
+    batch.textures = ffi_slice(std::slice::from_ref(&private_d3_texture));
+    let error = unsafe { decode_resource_batch(&batch, vulkan_capabilities()) }
+        .expect_err("stable Java FFI must not admit private D3 resources");
+    assert_eq!(error.code, super::StatusCode::UnsupportedFeature);
+    assert!(error.message.contains("internal-only"));
 
     let op = FfiCommandOpAbi {
         byte_size: size_of::<FfiCommandOpAbi>() as u32,

@@ -1,7 +1,16 @@
 use super::*;
 
 pub const FFI_ABI_V1_VERSION: u32 = 1;
-pub const FFI_ABI_VERSION: u32 = 2;
+pub const FFI_ABI_V2_VERSION: u32 = 2;
+pub const FFI_ABI_V3_VERSION: u32 = 3;
+pub const FFI_ABI_V4_VERSION: u32 = 4;
+pub const FFI_ABI_V5_VERSION: u32 = 5;
+pub const FFI_ABI_V6_VERSION: u32 = 6;
+pub const FFI_ABI_V7_VERSION: u32 = 7;
+pub const FFI_ABI_V8_VERSION: u32 = 8;
+pub const FFI_ABI_V9_VERSION: u32 = 9;
+pub const FFI_ABI_V10_VERSION: u32 = 10;
+pub const FFI_ABI_VERSION: u32 = 11;
 pub const FFI_INITIAL_PRESENTATION_SUPPORTED: bool = false;
 pub const FFI_ABI_NAME: &str = "MattMC VulkanicGAL Java-Rust batch ABI";
 pub const FFI_MAX_LABEL_BYTES: usize = 1024;
@@ -13,6 +22,9 @@ pub const FFI_MAX_WORLD_CRACK_ASSET_BYTES: usize = 4 * 1024 * 1024;
 pub const FFI_MAX_WORLD_MATERIAL_ASSET_BYTES: usize = 4 * 1024 * 1024;
 pub const FFI_MAX_WORLD_MESH_TEXTURE_ASSET_BYTES: usize = 4 * 1024 * 1024;
 pub const FFI_MAX_WORLD_MESH_INDEX_BYTES: usize = 1024 * 1024;
+pub const FFI_MAX_SHADER_PACK_SOURCE_FILES: usize = 4096;
+pub const FFI_MAX_SHADER_PACK_SOURCE_FILE_BYTES: usize = 4 * 1024 * 1024;
+pub const FFI_MAX_SHADER_PACK_SOURCE_TOTAL_BYTES: usize = 64 * 1024 * 1024;
 pub const FFI_MAX_BATCH_ITEMS: usize = 65_536;
 
 #[repr(u32)]
@@ -512,6 +524,28 @@ pub struct FfiWorldMaterialAssetUpdateRequest {
     pub negotiated_feature_bits: u64,
 }
 
+/// One named, copied shader-pack source file. This is semantic pack input,
+/// never a compiled shader, native resource, or backend object.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FfiShaderPackSourceFile {
+    pub byte_size: u32,
+    pub reserved0: u32,
+    pub path_utf8: FfiBytes,
+    pub contents_utf8: FfiBytes,
+}
+
+/// A complete source generation replaces the active owned source atomically.
+/// It is deliberately separate from world mesh/material asset updates.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FfiShaderPackSourceUpdateRequest {
+    pub header: FfiHeader,
+    pub generation: u64,
+    pub pack_name_utf8: FfiBytes,
+    pub files: FfiSlice<FfiShaderPackSourceFile>,
+}
+
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct FfiWorldLineSegmentRequest {
@@ -690,6 +724,9 @@ pub struct FfiWorldMeshVertex {
     pub atlas_v: f32,
     pub shader_block_id: i32,
     pub shader_material_type: i32,
+    /// Copied signed-byte `at_midBlock` xyz plus the source emission byte.
+    /// This is terrain-model semantics, not an Iris binding or GL state.
+    pub mid_block_packed: u32,
 }
 
 #[repr(C)]
@@ -798,6 +835,80 @@ pub struct FfiWorldBackgroundRequest {
     pub viewport_height: i32,
 }
 
+/// Coarse, backend-neutral world and camera semantics for a future
+/// Rust-owned volume mapping. This deliberately carries no resource, shader,
+/// renderer, or native backend object.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FfiWorldVoxelVolumeFrame {
+    pub byte_size: u32,
+    pub enabled: u32,
+    pub reserved0: u32,
+    pub reserved1: u32,
+    pub world_generation: u64,
+    pub resource_generation: u64,
+    pub camera_x: f32,
+    pub camera_y: f32,
+    pub camera_z: f32,
+    pub reserved2: u32,
+}
+
+/// Coarse, copied vanilla environment semantics for future Rust-owned
+/// shader-pack execution. This deliberately excludes Iris state, shader
+/// objects, GL/Vulkan objects, and pack-specific derived values.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FfiWorldShaderEnvironmentFrame {
+    pub byte_size: u32,
+    pub enabled: u32,
+    pub frame_counter: i32,
+    pub world_day: i32,
+    pub world_generation: u64,
+    pub world_time: u64,
+    pub frame_time_seconds: f32,
+    pub frame_time_counter: f32,
+    pub time_of_day: f32,
+    pub rain_strength: f32,
+    pub thunder_strength: f32,
+    pub sky_darken: f32,
+    pub moon_phase: i32,
+    /// Vanilla camera-submersion classification. This is semantic game
+    /// state, never an Iris fog object: 0 none, 1 water, 2 lava, 3 powder
+    /// snow.
+    pub eye_submersion: i32,
+    pub screen_brightness: f32,
+    pub far_plane: f32,
+    pub relative_eye_x: f32,
+    pub relative_eye_y: f32,
+    pub relative_eye_z: f32,
+    pub sky_color_r: f32,
+    pub sky_color_g: f32,
+    pub sky_color_b: f32,
+    pub darkness_light_factor: f32,
+    pub night_vision: f32,
+    pub fog_color_r: f32,
+    pub fog_color_g: f32,
+    pub fog_color_b: f32,
+    /// Vanilla precipitation at the camera block: 0 none, 1 rain, 2 snow.
+    /// Rust owns shader-pack-specific smoothing and use of this semantic.
+    pub biome_precipitation: i32,
+    /// Canonical vanilla or modded biome resource location at the camera.
+    /// This remains gameplay data; Rust evaluates source-defined biome maps.
+    pub biome_resource_location_utf8: FfiBytes,
+    /// Canonical vanilla item-model identity in the player's main hand. An
+    /// empty value represents no semantic held item; Rust owns `item.properties`
+    /// resolution and never receives an Iris integer map.
+    pub main_hand_item_model_resource_location_utf8: FfiBytes,
+    /// Canonical vanilla item-model identity in the player's off hand. See
+    /// `main_hand_item_model_resource_location_utf8` for ownership rules.
+    pub off_hand_item_model_resource_location_utf8: FfiBytes,
+    /// Raw vanilla block-light emission for the main-hand item. Rust applies
+    /// pack-owned hand composition and never receives an Iris light provider.
+    pub main_hand_item_light_emission: i32,
+    /// Raw vanilla block-light emission for the off-hand item.
+    pub off_hand_item_light_emission: i32,
+}
+
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct FfiWholeFrameSubmitRequest {
@@ -822,6 +933,8 @@ pub struct FfiWholeFrameSubmitRequest {
     pub world_mesh_instances: FfiSlice<FfiWorldMeshInstanceRecord>,
     pub gui_sprites: FfiSlice<FfiGuiSpriteRequest>,
     pub negotiated_feature_bits: u64,
+    pub voxel_volume_frame: FfiWorldVoxelVolumeFrame,
+    pub shader_environment_frame: FfiWorldShaderEnvironmentFrame,
 }
 
 #[repr(C)]

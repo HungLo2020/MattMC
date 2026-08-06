@@ -186,6 +186,19 @@ class VulkanicGalBridgeAbiTest {
 		}
 	}
 
+	@Test
+	void shaderPackSourceTransportIsWholeFrameOnlyAndDoesNotBorrowIrisRuntimeState() throws Exception {
+		String coordinator = Files.readString(Path.of("src/main/java/net/vulkanic/gui/RustGalFrameCoordinator.java"));
+		String collector = Files.readString(Path.of("src/main/java/net/vulkanic/shaderpack/RustShaderPackSourceCollector.java"));
+		assertTrue(coordinator.contains("RustGalGuiRenderer.isWholeFrameVulkanActive()"));
+		assertTrue(coordinator.contains("bridge.updateShaderPackSources("));
+		assertTrue(coordinator.contains("source_execution_selected=false"));
+		assertFalse(collector.contains("IrisRenderingPipeline"));
+		assertFalse(collector.contains("WorldRenderingPipeline"));
+		assertFalse(collector.contains("GlImage"));
+		assertFalse(collector.contains("MemorySegment"));
+	}
+
 	private static void restoreProperty(String key, String value) {
 		if (value == null) {
 			System.clearProperty(key);
@@ -633,8 +646,9 @@ class VulkanicGalBridgeAbiTest {
 	}
 
 	@Test
-	void frameAbiV2AddsBorrowedOpenGlAndProductionGuiCrosshairContract() throws Exception {
+	void frameAbiV6PreservesFrameContractAndAddsSemanticShaderEnvironmentPayload() throws Exception {
 		String bridge = Files.readString(Path.of("src/main/java/net/vulkanic/bridge/VulkanicGalBridge.java"));
+		String world = Files.readString(Path.of("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
 		String queue = Files.readString(Path.of("src/main/java/net/vulkanic/gui/RustGalGuiRenderer.java"));
 		String rustGuiFrontend = Files.readString(Path.of("src/main/rust/render/vulkanic/gui_frontend.rs"));
 		String gameRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/GameRenderer.java"));
@@ -643,7 +657,45 @@ class VulkanicGalBridgeAbiTest {
 		String experienceBar = Files.readString(Path.of("src/main/java/net/minecraft/client/gui/contextualbar/ExperienceBarRenderer.java"));
 		String bossOverlay = Files.readString(Path.of("src/main/java/net/minecraft/client/gui/components/BossHealthOverlay.java"));
 
-		assertEquals(2, VulkanicGalBridge.ABI_VERSION);
+		assertEquals(11, VulkanicGalBridge.ABI_VERSION);
+		assertTrue(bridge.contains("int midBlockPacked"));
+		assertTrue(bridge.contains("record WorldVoxelVolumeFrameRecord"));
+		assertTrue(bridge.contains("record WorldShaderEnvironmentFrameRecord"));
+		assertTrue(bridge.contains("WORLD_VOXEL_VOLUME_FRAME(72)"));
+		assertTrue(bridge.contains("WORLD_SHADER_ENVIRONMENT_FRAME(73)"));
+		assertTrue(bridge.contains("voxelVolumeFrame.worldGeneration()"));
+		assertTrue(bridge.contains("voxelVolumeFrame.cameraX()"));
+		assertTrue(bridge.contains("shaderEnvironmentFrame.timeOfDay()"));
+		assertTrue(bridge.contains("shaderEnvironmentFrame.eyeSubmersion()"));
+		assertTrue(bridge.contains("shaderEnvironmentFrame.farPlane()"));
+		assertTrue(bridge.contains("shaderEnvironmentFrame.skyColorRed()"));
+		assertTrue(bridge.contains("shaderEnvironmentFrame.darknessLightFactor()"));
+		assertTrue(bridge.contains("shaderEnvironmentFrame.nightVision()"));
+		assertTrue(bridge.contains("shaderEnvironmentFrame.fogColorRed()"));
+		assertTrue(bridge.contains("shaderEnvironmentFrame.biomePrecipitation()"));
+		assertTrue(bridge.contains("shaderEnvironmentFrame.biomeResourceLocation()"));
+		assertTrue(bridge.contains("shaderEnvironmentFrame.mainHandItemModelResourceLocation()"));
+		assertTrue(bridge.contains("shaderEnvironmentFrame.offHandItemModelResourceLocation()"));
+		assertTrue(bridge.contains("shaderEnvironmentFrame.mainHandItemLightEmission()"));
+		assertTrue(bridge.contains("shaderEnvironmentFrame.offHandItemLightEmission()"));
+		assertFalse(bridge.contains("IrisShaderEnvironmentFrame"));
+		assertTrue(world.contains("level.getSkyColor(camera.getPosition(), shaderPackFramePartialTick)"));
+		assertTrue(world.contains("shaderPackFogColor(level, camera)"));
+		assertTrue(world.contains("fogRenderer.computeFogColor("));
+		assertTrue(world.contains("shaderPackBiomePrecipitation(level, camera)"));
+		assertTrue(world.contains("shaderPackBiomeResourceLocation(level, camera)"));
+		assertTrue(world.contains("shaderPackHeldItemModelResourceLocation("));
+		assertTrue(world.contains("shaderPackHeldItemLightEmission("));
+		assertTrue(world.contains("IrisItemLightProvider"));
+		assertTrue(world.contains("DataComponents.ITEM_MODEL"));
+		assertTrue(world.contains("BuiltInRegistries.ITEM.getKey"));
+		assertTrue(world.contains("Biome.Precipitation precipitation"));
+		assertFalse(world.contains("CapturedRenderingState.INSTANCE.getFogColor"));
+		assertTrue(world.contains("camera.getFluidInCamera()"));
+		assertTrue(world.contains("shaderPackDarknessLightFactor()"));
+		assertTrue(world.contains("shaderPackNightVision()"));
+		assertFalse(world.contains("CapturedRenderingState"));
+		assertTrue(bridge.contains("Struct.WORLD_MESH_VERTEX.setInt(vertexItem, 13, vertex.midBlockPacked())"));
 		assertTrue(bridge.contains("mattmc_vulkanic_gal_context_create_borrowed_opengl"));
 		assertTrue(bridge.contains("mattmc_vulkanic_gal_frame_acquire"));
 		assertTrue(bridge.contains("mattmc_vulkanic_gal_frame_present"));

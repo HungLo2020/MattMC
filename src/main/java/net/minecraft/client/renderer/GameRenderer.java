@@ -723,7 +723,9 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 			: deltaTracker.getGameTimeDeltaPartialTick(true);
 		net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setRealTickDelta(realTickDelta);
 		net.irisshaders.iris.uniforms.SystemTimeUniforms.COUNTER.beginFrame();
-		net.irisshaders.iris.uniforms.SystemTimeUniforms.TIMER.beginFrame(net.minecraft.Util.getNanos());
+		long shaderFrameStartNanos = net.minecraft.Util.getNanos();
+		net.irisshaders.iris.uniforms.SystemTimeUniforms.TIMER.beginFrame(shaderFrameStartNanos);
+		net.vulkanic.world.RustGalWorldPrimitiveRenderer.beginShaderPackFrame(shaderFrameStartNanos, realTickDelta);
 		
 		if (!this.minecraft.isWindowActive()
 			&& this.minecraft.options.pauseOnLostFocus
@@ -939,7 +941,9 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 					view,
 					projection,
 					this.minecraft.getWindow().getWidth(),
-					this.minecraft.getWindow().getHeight()
+					this.minecraft.getWindow().getHeight(),
+					this.minecraft.level,
+					this.mainCamera
 				);
 				net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.frame-begin");
 				net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.background.enqueue");

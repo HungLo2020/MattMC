@@ -322,6 +322,7 @@ pub struct VulkanicGal {
     textures: Arena<ResourceRecord<TextureDesc>>,
     texture_views: Arena<ResourceRecord<TextureViewDesc>>,
     samplers: Arena<ResourceRecord<SamplerDesc>>,
+    combined_texture_samplers: Arena<ResourceRecord<CombinedTextureSamplerDesc>>,
     shaders: Arena<ResourceRecord<ShaderModuleDesc>>,
     resource_layouts: Arena<ResourceRecord<ResourceLayoutDesc>>,
     resource_sets: Arena<ResourceRecord<ResourceSetDesc>>,
@@ -352,6 +353,7 @@ impl VulkanicGal {
             textures: Arena::new(HandleKind::Texture),
             texture_views: Arena::new(HandleKind::TextureView),
             samplers: Arena::new(HandleKind::Sampler),
+            combined_texture_samplers: Arena::new(HandleKind::CombinedTextureSampler),
             shaders: Arena::new(HandleKind::ShaderModule),
             resource_layouts: Arena::new(HandleKind::ResourceLayout),
             resource_sets: Arena::new(HandleKind::ResourceSet),
@@ -651,8 +653,12 @@ impl VulkanicGal {
                 {
                     return self.unsupported(format!(
                         "texture '{}' extent {}x{}x{} exceeds backend '{}' 3D extent limit {}",
-                        desc.label, desc.extent.width, desc.extent.height, desc.extent.depth,
-                        capabilities.name, capabilities.limits.max_texture_extent_3d
+                        desc.label,
+                        desc.extent.width,
+                        desc.extent.height,
+                        desc.extent.depth,
+                        capabilities.name,
+                        capabilities.limits.max_texture_extent_3d
                     ));
                 }
             }
@@ -693,8 +699,9 @@ impl VulkanicGal {
                 "depth formats cannot be used as color, storage, or present textures",
             ));
         }
-        if desc.dimension == TextureDimension::D2 && (desc.extent.width > capabilities.limits.max_texture_extent_2d
-            || desc.extent.height > capabilities.limits.max_texture_extent_2d)
+        if desc.dimension == TextureDimension::D2
+            && (desc.extent.width > capabilities.limits.max_texture_extent_2d
+                || desc.extent.height > capabilities.limits.max_texture_extent_2d)
         {
             return self.unsupported(format!(
                 "texture '{}' extent {}x{} exceeds backend '{}' 2D extent limit {}",
@@ -759,6 +766,16 @@ impl VulkanicGal {
             return self.unsupported(
                 "D3 textures are modeled for sampled, storage, and transfer use, not render targets",
             );
+        }
+        if desc.dimension == TextureDimension::D3 {
+            for usage in desc.usages.iter().copied() {
+                if !capabilities.supports_texture_3d_usage(desc.format, usage) {
+                    return self.unsupported(format!(
+                        "backend '{}' does not support D3 texture format {:?} with usage {:?}",
+                        capabilities.name, desc.format, usage
+                    ));
+                }
+            }
         }
         let handle = self.textures.next_handle()?;
         let token = self
@@ -844,6 +861,48 @@ impl VulkanicGal {
             .create(handle, BackendCreateDesc::Sampler(&desc))?;
         self.metrics.resource_creates += 1;
         self.samplers.insert_at(
+            handle,
+            ResourceRecord {
+                desc,
+                token,
+                last_submission: None,
+            },
+        )
+    }
+
+    /// Creates a logical texture-view/sampler pairing. This is separate from
+    /// either child resource so a source shader can require one combined
+    /// sampling binding without exposing backend descriptor mechanics.
+    pub fn create_combined_texture_sampler(
+        &mut self,
+        desc: CombinedTextureSamplerDesc,
+    ) -> GalResult<Handle> {
+        let view = self.texture_view_info(desc.texture_view)?;
+        let sampler = self.samplers.get(desc.sampler)?;
+        if !view.usages.contains(&TextureUsage::Sampled) {
+            return self.validation_error(GalError::resource(
+                StatusCode::InvalidArgument,
+                "combined texture sampler requires sampled texture usage",
+            ));
+        }
+        if view.format == TextureFormat::R8Uint
+            && (sampler.desc.min_filter != SamplerFilter::Nearest
+                || sampler.desc.mag_filter != SamplerFilter::Nearest
+                || sampler.desc.mip_filter != SamplerFilter::Nearest)
+        {
+            return self.validation_error(GalError::resource(
+                StatusCode::InvalidArgument,
+                "integer combined texture samplers require nearest min, mag, and mip filters",
+            ));
+        }
+        let handle = self.combined_texture_samplers.next_handle()?;
+        let token = self
+            .backend
+            .create(handle, BackendCreateDesc::CombinedTextureSampler(&desc))?;
+        self.add_dependency(desc.texture_view, handle);
+        self.add_dependency(desc.sampler, handle);
+        self.metrics.resource_creates += 1;
+        self.combined_texture_samplers.insert_at(
             handle,
             ResourceRecord {
                 desc,
@@ -1060,6 +1119,7 @@ impl VulkanicGal {
                 }
             }
         }
+        self.validate_integer_sampled_texture_sampler_pairing(&desc.bindings)?;
         let handle = self.resource_sets.next_handle()?;
         let token = self
             .backend
@@ -1350,6 +1410,9 @@ impl VulkanicGal {
             Some(HandleKind::Texture) => self.remove_record(handle, HandleKind::Texture)?,
             Some(HandleKind::TextureView) => self.remove_record(handle, HandleKind::TextureView)?,
             Some(HandleKind::Sampler) => self.remove_record(handle, HandleKind::Sampler)?,
+            Some(HandleKind::CombinedTextureSampler) => {
+                self.remove_record(handle, HandleKind::CombinedTextureSampler)?
+            }
             Some(HandleKind::ShaderModule) => {
                 self.remove_record(handle, HandleKind::ShaderModule)?
             }
@@ -1677,6 +1740,22 @@ impl VulkanicGal {
                     ));
                 }
             }
+            ResourceBindingKind::CombinedTextureSampler => {
+                let pair = self.combined_texture_samplers.get(binding.resource)?;
+                let view = self.texture_view_info(pair.desc.texture_view)?;
+                if !view.usages.contains(&TextureUsage::Sampled) {
+                    return self.validation_error(GalError::resource(
+                        StatusCode::InvalidArgument,
+                        "combined texture sampler requires sampled texture usage",
+                    ));
+                }
+                if binding.access.writes() {
+                    return self.validation_error(GalError::resource(
+                        StatusCode::InvalidArgument,
+                        "combined texture sampler binding cannot declare write access",
+                    ));
+                }
+            }
             ResourceBindingKind::StorageTexture => {
                 let info = self.texture_view_info(binding.resource)?;
                 if !info.usages.contains(&TextureUsage::Storage) {
@@ -1694,6 +1773,43 @@ impl VulkanicGal {
                         "sampler binding cannot declare write access",
                     ));
                 }
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_integer_sampled_texture_sampler_pairing(
+        &mut self,
+        bindings: &[ResourceBinding],
+    ) -> GalResult<()> {
+        // The current semantic resource-set model exposes samplers separately
+        // from sampled textures. Both native backends bind those sampler
+        // objects to the sampled set, so an integer texture cannot safely
+        // coexist with linear sampler state in that set. Keep the restriction
+        // here until the ABI gains an explicit texture-to-sampler association.
+        let has_integer_sampled_texture = bindings.iter().any(|binding| {
+            binding.kind == ResourceBindingKind::SampledTexture
+                && self
+                    .texture_view_info(binding.resource)
+                    .map(|info| info.format == TextureFormat::R8Uint)
+                    .unwrap_or(false)
+        });
+        if !has_integer_sampled_texture {
+            return Ok(());
+        }
+        for binding in bindings {
+            if binding.kind != ResourceBindingKind::Sampler {
+                continue;
+            }
+            let sampler = self.samplers.get(binding.resource)?;
+            if sampler.desc.min_filter != SamplerFilter::Nearest
+                || sampler.desc.mag_filter != SamplerFilter::Nearest
+                || sampler.desc.mip_filter != SamplerFilter::Nearest
+            {
+                return self.validation_error(GalError::resource(
+                    StatusCode::InvalidArgument,
+                    "integer sampled textures require nearest min, mag, and mip sampler filters in the same resource set",
+                ));
             }
         }
         Ok(())
@@ -2300,6 +2416,9 @@ impl VulkanicGal {
             Some(HandleKind::Texture) => self.textures.get(handle).map(|_| ()),
             Some(HandleKind::TextureView) => self.texture_views.get(handle).map(|_| ()),
             Some(HandleKind::Sampler) => self.samplers.get(handle).map(|_| ()),
+            Some(HandleKind::CombinedTextureSampler) => {
+                self.combined_texture_samplers.get(handle).map(|_| ())
+            }
             Some(HandleKind::ShaderModule) => self.shaders.get(handle).map(|_| ()),
             Some(HandleKind::ResourceLayout) => self.resource_layouts.get(handle).map(|_| ()),
             Some(HandleKind::ResourceSet) => self.resource_sets.get(handle).map(|_| ()),
@@ -2643,6 +2762,16 @@ impl VulkanicGal {
                 attachment_load_op: None,
                 attachment_store_op: None,
             }),
+            ResourceBindingKind::CombinedTextureSampler => {
+                let pair = self.combined_texture_samplers.get(binding.resource)?;
+                Ok(AccessEvent {
+                    target: self.texture_view_access_target(pair.desc.texture_view)?,
+                    mode: AccessMode::Read,
+                    family: AccessFamily::Sampled,
+                    attachment_load_op: None,
+                    attachment_store_op: None,
+                })
+            }
             ResourceBindingKind::StorageTexture => Ok(AccessEvent {
                 target: self.texture_view_access_target(binding.resource)?,
                 mode,
@@ -2982,10 +3111,7 @@ impl VulkanicGal {
                 "texture copy z range overflows",
             ));
         };
-        if x_end > mip_extent.width
-            || y_end > mip_extent.height
-            || z_end > mip_extent.depth
-        {
+        if x_end > mip_extent.width || y_end > mip_extent.height || z_end > mip_extent.depth {
             return self.validation_error(GalError::command(
                 StatusCode::InvalidArgument,
                 "texture copy region is outside texture extent",
@@ -3085,6 +3211,16 @@ impl VulkanicGal {
             Some(HandleKind::Sampler) => {
                 self.samplers.get_mut_record(handle)?.last_submission = Some(id)
             }
+            Some(HandleKind::CombinedTextureSampler) => {
+                let pair = self.combined_texture_samplers.get(handle)?.desc.clone();
+                self.combined_texture_samplers
+                    .get_mut_record(handle)?
+                    .last_submission = Some(id);
+                self.texture_views
+                    .get_mut_record(pair.texture_view)?
+                    .last_submission = Some(id);
+                self.samplers.get_mut_record(pair.sampler)?.last_submission = Some(id);
+            }
             Some(HandleKind::ShaderModule) => {
                 self.shaders.get_mut_record(handle)?.last_submission = Some(id)
             }
@@ -3152,6 +3288,7 @@ impl VulkanicGal {
             HandleKind::Texture => remove_from!(self.textures),
             HandleKind::TextureView => remove_from!(self.texture_views),
             HandleKind::Sampler => remove_from!(self.samplers),
+            HandleKind::CombinedTextureSampler => remove_from!(self.combined_texture_samplers),
             HandleKind::ShaderModule => remove_from!(self.shaders),
             HandleKind::ResourceLayout => remove_from!(self.resource_layouts),
             HandleKind::ResourceSet => remove_from!(self.resource_sets),
@@ -3550,7 +3687,10 @@ fn max_texture_mip_levels(extent: Extent3d) -> u32 {
 }
 
 fn is_depth_format(format: TextureFormat) -> bool {
-    matches!(format, TextureFormat::Depth24Stencil8 | TextureFormat::Depth32Float)
+    matches!(
+        format,
+        TextureFormat::Depth24Stencil8 | TextureFormat::Depth32Float
+    )
 }
 
 fn targets_overlap(left: AccessTarget, right: AccessTarget) -> bool {

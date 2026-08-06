@@ -200,10 +200,25 @@ impl VulkanBackend {
 
 impl Backend for VulkanBackend {
     fn capabilities(&self) -> BackendCapabilities {
+        let mut capabilities = vulkan_capabilities();
+        let properties = unsafe {
+            self.context
+                .instance
+                .get_physical_device_properties(self.context.physical_device)
+        };
+        capabilities.limits.max_texture_extent_2d = capabilities
+            .limits
+            .max_texture_extent_2d
+            .min(properties.limits.max_image_dimension2_d);
+        capabilities.limits.max_texture_extent_3d = capabilities
+            .limits
+            .max_texture_extent_3d
+            .min(properties.limits.max_image_dimension3_d);
+        capabilities.features.texture_3d &= properties.limits.max_image_dimension3_d != 0;
         if self.presentation_capable {
-            presentation_capabilities(vulkan_capabilities())
+            presentation_capabilities(capabilities)
         } else {
-            vulkan_capabilities()
+            capabilities
         }
     }
 
@@ -461,6 +476,22 @@ mod tests {
     fn vulkan_backend_can_bootstrap_or_reports_environment_gap() {
         match VulkanBackend::new("MattMC backend bootstrap test") {
             Ok(mut backend) => {
+                let capabilities = backend.capabilities();
+                let properties = unsafe {
+                    backend
+                        .context
+                        .instance
+                        .get_physical_device_properties(backend.context.physical_device)
+                };
+                assert!(
+                    capabilities.limits.max_texture_extent_2d
+                        <= properties.limits.max_image_dimension2_d
+                );
+                assert!(
+                    capabilities.limits.max_texture_extent_3d
+                        <= properties.limits.max_image_dimension3_d
+                        || !capabilities.features.texture_3d
+                );
                 backend
                     .retire(SubmissionId(0))
                     .expect("retirement should be no-op");

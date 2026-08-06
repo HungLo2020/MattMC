@@ -1,4 +1,9 @@
 pub mod diagnostics;
+pub mod dialect;
+pub mod held_light_policy;
+pub mod interface;
+pub mod item_id_map;
+pub mod lowering;
 pub mod manifest;
 pub mod pass_graph;
 pub mod preprocess;
@@ -6,9 +11,15 @@ pub mod programs;
 pub mod resources;
 pub(crate) mod runtime;
 pub mod source;
+pub mod source_temporal;
+pub mod source_uniforms;
 pub mod terrain_contract;
+pub mod terrain_source_resources;
+pub mod terrain_voxelization;
 pub mod uniforms;
+pub mod voxel_emission_table;
 pub mod voxel_light_volume;
+pub mod voxel_material_map;
 
 #[cfg(test)]
 mod tests {
@@ -20,11 +31,12 @@ mod tests {
     };
     use super::preprocess::{preprocess, PreprocessInput};
     use super::programs::{
-        complementary_terrain_subset_program, minimal_composite_color_grade_program,
-        minimal_composite_depth_fog_program, minimal_deferred_lighting_program,
-        minimal_final_copy_program, minimal_shadow_depth_program, minimal_terrain_cutout_program,
+        complementary_terrain_subset_program, complementary_terrain_subset_program_with_resources,
+        minimal_composite_color_grade_program, minimal_composite_depth_fog_program,
+        minimal_deferred_lighting_program, minimal_final_copy_program,
+        minimal_shadow_depth_program, minimal_terrain_cutout_program,
         minimal_terrain_solid_program, ProgramIdentity, ShaderStageKind,
-        TerrainMaterialProgramKind,
+        TerrainMaterialProgramKind, TerrainProgramResource,
     };
     use super::resources::{
         ShaderPackResourceManifest, ShaderPackResources, ShaderPackRuntimePlan,
@@ -37,7 +49,7 @@ mod tests {
     use super::voxel_light_volume::{
         VoxelLightVolumeCache, VoxelLightVolumeDescriptor, VoxelLightVolumeExtent,
         VoxelLightVolumeIdentity, VoxelLightVolumeKind, VoxelLightVolumeMapping,
-        VoxelLightVolumeRegion, VoxelLightVolumeRequirements, VoxelLightVolumeUpdate,
+        VoxelLightVolumeRegion, VoxelLightVolumeUpdate,
     };
 
     #[test]
@@ -56,6 +68,7 @@ mod tests {
             .fragment
             .source
             .contains("out_terrain_material_auxiliary"));
+        assert!(!program.requires(TerrainProgramResource::ColoredVoxelLightVolume));
         assert!(!program.vertex.source.contains("IrisRenderSystem"));
         assert!(!program.fragment.source.contains("IrisRenderSystem"));
 
@@ -355,7 +368,7 @@ mod tests {
     }
 
     #[test]
-    fn selected_source_plan_requires_an_owned_complete_voxel_volume() {
+    fn selected_source_plan_accepts_a_complete_colored_volume_and_declares_its_binding() {
         let source = ShaderPackSource::new(
             "selected-volume",
             17,
@@ -365,6 +378,10 @@ mod tests {
                     "void DoLighting() {}\n/* DRAWBUFFERS:06 */\nvoid main() { vec4 color = texture2D(tex, texCoord); if (color.a <= 0.00001) discard; color.rgb *= glColor.rgb; DoLighting(); gl_FragData[0] = color; gl_FragData[1] = vec4(smoothnessD, materialMask, skyLightFactor, 1.0); }",
                 ),
                 ShaderSourceFile::new("lib/common.glsl", "#define COLORED_LIGHTING 128\n#define RP_MODE 0\n#define BLOCK_REFLECT_QUALITY 0\n"),
+                ShaderSourceFile::new(
+                    "program/shadowcomp.glsl",
+                    "void main() { vec3 posOffset = floor(previousCameraPosition) - floor(cameraPosition); }",
+                ),
                 ShaderSourceFile::new("shaders.properties", "profile.MATTMC=COLORED_LIGHTING=128 RP_MODE=0 BLOCK_REFLECT_QUALITY=0\nimage.voxel_img = voxel_sampler red_integer r8ui unsigned_int true false 128 64 128\nimage.floodfill_img = floodfill_sampler rgba rgba16f half_float false false 128 64 128\nimage.floodfill_img_copy = floodfill_sampler_copy rgba rgba16f half_float false false 128 64 128\n"),
                 ShaderSourceFile::new("block.properties", "block.1=minecraft:stone\n"),
             ],
@@ -375,20 +392,27 @@ mod tests {
             height: 64,
             depth: 128,
         };
+        let contract = derive_complementary_terrain_contract(&source).unwrap();
         let descriptor = VoxelLightVolumeDescriptor {
             identity: VoxelLightVolumeIdentity::new("shader-pack:selected-volume/light").unwrap(),
             shader_pack_generation: 17,
             world_generation: 4,
             resource_generation: 9,
             extent,
-            requirements: VoxelLightVolumeRequirements::complementary(128).unwrap(),
+            // This fixture declares temporal reprojection only. Keep the
+            // volume descriptor source-derived so it does not accidentally
+            // claim the bundled pack's unsupported behind-view policy.
+            requirements: contract.voxel_light_volume_requirements.unwrap(),
             mapping: VoxelLightVolumeMapping::complementary(extent, [0, 64, 0], [0.0; 3]).unwrap(),
         };
         let mut volume = VoxelLightVolumeCache::new();
         volume.replace_descriptor(descriptor.clone()).unwrap();
         assert!(
             ShaderPackRuntimePlan::terrain_material_from_source_with_voxel_light_volume(
-                17, &source, &volume, 0
+                17,
+                &source,
+                &volume.readiness().unwrap().unwrap(),
+                0
             )
             .is_err()
         );
@@ -410,14 +434,53 @@ mod tests {
                 })
                 .unwrap();
         }
-        let plan = ShaderPackRuntimePlan::terrain_material_from_source_with_voxel_light_volume(
-            17, &source, &volume, 0,
+        let readiness = volume.readiness().unwrap().unwrap();
+        let program = complementary_terrain_subset_program_with_resources(
+            &contract,
+            TerrainMaterialProgramKind::Opaque,
+            Some(&readiness),
+            0,
         )
         .unwrap();
-        assert_eq!(Some(descriptor), plan.voxel_light_volume);
+        assert!(program.requires(TerrainProgramResource::ColoredVoxelLightVolume));
+        assert!(program
+            .fragment
+            .source
+            .contains("#define VULKANIC_TERRAIN_COLORED_VOXEL_LIGHT 1"));
+        assert!(program
+            .fragment
+            .source
+            .contains("layout(set = 1, binding = 0) uniform utexture3D TerrainVoxelOccupancy"));
+        assert!(program
+            .fragment
+            .source
+            .contains("layout(set = 1, binding = 1) uniform texture3D TerrainColoredVoxelLight"));
+        assert!(program
+            .fragment
+            .source
+            .contains("layout(set = 1, binding = 3, std140) uniform TerrainVoxelLightMapping"));
+        assert!(program
+            .fragment
+            .source
+            .contains("texture(sampler3D(TerrainColoredVoxelLight, TerrainVoxelLightSampler)"));
+        let plan = ShaderPackRuntimePlan::terrain_material_from_source_with_voxel_light_volume(
+            17, &source, &readiness, 0,
+        )
+        .unwrap();
+        assert_eq!(Some(&descriptor), plan.voxel_light_volume.as_ref());
+        assert!(plan
+            .programs
+            .terrain_opaque
+            .requires(TerrainProgramResource::ColoredVoxelLightVolume));
         assert!(plan
             .terrain_contract_diagnostic_json()
-            .contains("selected_source_plan_admitted"));
+            .contains("\"selected_source_plan_prepared\":true"));
+        assert!(plan.terrain_contract_diagnostic_json().contains(
+            "\"voxel_light_update_policy\":{\"temporal_reprojection\":true,\"alternate_x_half_rate\":false,\"preserve_behind_view\":false}"
+        ));
+        assert!(plan
+            .terrain_contract_diagnostic_json()
+            .contains("\"selected_source_execution_admitted\":false"));
     }
 
     #[test]

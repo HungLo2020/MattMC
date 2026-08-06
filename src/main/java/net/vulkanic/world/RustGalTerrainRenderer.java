@@ -1179,6 +1179,7 @@ public final class RustGalTerrainRenderer {
 		}
 		int bufferVertexCapacity = buffer.remaining() / vertexStride;
 		int shaderBlockIdOffset = activeTerrainShaderBlockIdOffset(vertexStride);
+		int midBlockOffset = activeTerrainMidBlockOffset(vertexStride);
 		int[] vertexSegments = mesh.getVertexSegments();
 		if (vertexSegments.length % 2 != 0) {
 			throw new IllegalArgumentException("static terrain vertex segment array length is odd");
@@ -1260,6 +1261,7 @@ public final class RustGalTerrainRenderer {
 			int packedShaderBlock = shaderBlockIdOffset == 0 ? 0 : buffer.getInt(offset + shaderBlockIdOffset);
 			int shaderBlockId = shaderBlockIdOffset == 0 ? -1 : decodeIrisShaderBlockId(packedShaderBlock);
 			int shaderMaterialType = shaderBlockIdOffset == 0 ? -1 : decodeIrisShaderRenderType(packedShaderBlock);
+			int midBlockPacked = midBlockOffset == 0 ? 0 : buffer.getInt(offset + midBlockOffset);
 			vertices.add(new VulkanicGalBridge.WorldMeshVertexRecord(
 				x,
 				y,
@@ -1272,7 +1274,8 @@ public final class RustGalTerrainRenderer {
 				shaderMaterialType,
 				color,
 				0,
-				decodeLight(lightMaterial, "swapped-block-sky-light".equals(fault))
+				decodeLight(lightMaterial, "swapped-block-sky-light".equals(fault)),
+				midBlockPacked
 			));
 		}
 		List<Integer> indices = new ArrayList<>(Math.max(6, vertexCount / 4 * 6));
@@ -1317,7 +1320,7 @@ public final class RustGalTerrainRenderer {
 				}
 				vertices.set(vertex, new VulkanicGalBridge.WorldMeshVertexRecord(
 					original.x(), original.y(), original.z(), original.u(), original.v(), original.atlasU(), original.atlasV(),
-					original.shaderBlockId(), original.shaderMaterialType(), color, normalPacked, original.light()
+					original.shaderBlockId(), original.shaderMaterialType(), color, normalPacked, original.light(), original.midBlockPacked()
 				));
 			}
 			for (int quadBase = cursor; quadBase + 3 < cursor + segmentVertexCount; quadBase += 4) {
@@ -1450,7 +1453,7 @@ public final class RustGalTerrainRenderer {
 			new VulkanicGalBridge.WorldMeshAssetRecord(
 				meshKey,
 				generation,
-				RustGalWorldPrimitiveRenderer.MESH_VERTEX_LAYOUT_V2,
+				midBlockOffset == 0 ? RustGalWorldPrimitiveRenderer.MESH_VERTEX_LAYOUT_V2 : RustGalWorldPrimitiveRenderer.MESH_VERTEX_LAYOUT_V3,
 				layer == ChunkSectionLayer.TRANSLUCENT ? INDEX_TYPE_U32 : INDEX_TYPE_U16,
 				vertices,
 				indexBytes,
@@ -1816,7 +1819,8 @@ public final class RustGalTerrainRenderer {
 				waterShaderMaterialType(asset.textureId()),
 				original.colorArgb(),
 				original.normalPacked(),
-				original.light()
+				original.light(),
+				original.midBlockPacked()
 			));
 		}
 		return asset.textureId();
@@ -2156,6 +2160,18 @@ public final class RustGalTerrainRenderer {
 	private static int activeTerrainShaderBlockIdOffset(int vertexStride) {
 		try {
 			int offset = WorldRenderingSettings.INSTANCE.getVertexFormat().getNativeFormat().blockIdOffset();
+			if (offset <= 0 || offset + Integer.BYTES > vertexStride) {
+				return 0;
+			}
+			return offset;
+		} catch (RuntimeException error) {
+			return 0;
+		}
+	}
+
+	private static int activeTerrainMidBlockOffset(int vertexStride) {
+		try {
+			int offset = WorldRenderingSettings.INSTANCE.getVertexFormat().getNativeFormat().midBlockOffset();
 			if (offset <= 0 || offset + Integer.BYTES > vertexStride) {
 				return 0;
 			}

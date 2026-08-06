@@ -23,6 +23,7 @@ pub enum HandleKind {
     RenderTarget = 11,
     RenderPass = 12,
     FrameTarget = 13,
+    CombinedTextureSampler = 14,
 }
 
 impl HandleKind {
@@ -41,6 +42,7 @@ impl HandleKind {
             11 => Some(Self::RenderTarget),
             12 => Some(Self::RenderPass),
             13 => Some(Self::FrameTarget),
+            14 => Some(Self::CombinedTextureSampler),
             _ => None,
         }
     }

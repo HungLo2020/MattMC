@@ -671,6 +671,27 @@ pub(crate) fn input_bytes_for_world_mesh_asset_update(
         .saturating_add(sorted_index_payload_bytes)
 }
 
+pub(crate) fn input_bytes_for_shader_pack_source_update(
+    request: &FfiShaderPackSourceUpdateRequest,
+) -> u64 {
+    let file_headers = request
+        .files
+        .count
+        .saturating_mul(size_of::<FfiShaderPackSourceFile>() as u64);
+    let file_bytes = unsafe { read_slice(request.files, true, "shader-pack source files") }
+        .map(|files| {
+            files.iter().fold(0u64, |sum, file| {
+                sum.saturating_add(file.path_utf8.len)
+                    .saturating_add(file.contents_utf8.len)
+            })
+        })
+        .unwrap_or(0);
+    (size_of::<FfiShaderPackSourceUpdateRequest>() as u64)
+        .saturating_add(request.pack_name_utf8.len)
+        .saturating_add(file_headers)
+        .saturating_add(file_bytes)
+}
+
 pub(crate) fn set_feature(bits: &mut u64, feature: u64, enabled: bool) {
     if enabled {
         *bits |= feature;
@@ -1196,6 +1217,14 @@ pub(crate) fn check_texture_capabilities(
     desc: &TextureDesc,
     capabilities: BackendCapabilities,
 ) -> GalResult<()> {
+    // Stable Java resource batches intentionally remain D2-only. D3 is a
+    // private backend/GAL prerequisite until a versioned semantic volume
+    // transport owns generation, updates, and lifetime end to end.
+    if desc.dimension == TextureDimension::D3 {
+        return Err(GalError::unsupported_feature(
+            "D3 texture resources are internal-only; the stable FFI has no semantic volume transport",
+        ));
+    }
     if desc.extent.width > capabilities.limits.max_texture_extent_2d
         || desc.extent.height > capabilities.limits.max_texture_extent_2d
     {

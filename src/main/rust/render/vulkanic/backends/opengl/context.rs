@@ -192,6 +192,16 @@ impl OpenGlContext {
         })
     }
 
+    /// Native texture limits remain a backend detail. The GAL consumes the
+    /// resulting conservative semantic limits through `BackendCapabilities`.
+    pub(super) fn texture_extent_limits(&self) -> (u32, u32) {
+        unsafe {
+            let max_2d = self.gl.get_parameter_i32(glow::MAX_TEXTURE_SIZE).max(1) as u32;
+            let max_3d = self.gl.get_parameter_i32(glow::MAX_3D_TEXTURE_SIZE).max(0) as u32;
+            (max_2d, max_3d)
+        }
+    }
+
     pub(super) fn from_existing_context(desc: ExistingOpenGlContextDesc) -> GalResult<Self> {
         if std::thread::current().id() != desc.render_thread {
             return Err(GalError::backend(
@@ -253,9 +263,24 @@ impl OpenGlContext {
     }
 
     pub(super) fn borrowed_state_guard(&self) -> Option<BorrowedOpenGlStateGuard> {
+        self.borrowed_state_guard_with_images(false)
+    }
+
+    pub(super) fn borrowed_state_guard_with_images(
+        &self,
+        capture_images: bool,
+    ) -> Option<BorrowedOpenGlStateGuard> {
         self.native
             .is_existing()
-            .then(|| BorrowedOpenGlStateGuard::capture(self.gl.clone()))
+            .then(|| BorrowedOpenGlStateGuard::capture(self.gl.clone(), capture_images))
+    }
+
+    pub(super) fn supports_storage_textures(&self) -> bool {
+        supports_storage_textures(&self.gl)
+    }
+
+    pub(super) fn supports_compute_shaders(&self) -> bool {
+        supports_compute_shaders(&self.gl)
     }
 
     pub(super) fn make_current(&self) -> GalResult<()> {
@@ -354,6 +379,7 @@ pub(super) struct BorrowedOpenGlStateGuard {
     read_framebuffer: Option<glow::NativeFramebuffer>,
     active_texture: i32,
     texture_units: Vec<TextureUnitState>,
+    image_units: Vec<ImageUnitState>,
     viewport: [i32; 4],
     scissor_box: [i32; 4],
     scissor_enabled: bool,
@@ -400,7 +426,18 @@ pub(super) struct BorrowedOpenGlStateGuard {
 struct TextureUnitState {
     unit: u32,
     texture_2d: Option<glow::NativeTexture>,
+    texture_3d: Option<glow::NativeTexture>,
     sampler: Option<glow::NativeSampler>,
+}
+
+struct ImageUnitState {
+    unit: u32,
+    texture: Option<glow::NativeTexture>,
+    level: i32,
+    layered: bool,
+    layer: i32,
+    access: u32,
+    format: u32,
 }
 
 struct IndexedBufferBinding {
@@ -421,7 +458,7 @@ struct StencilFaceState {
 }
 
 impl BorrowedOpenGlStateGuard {
-    fn capture(gl: Rc<glow::Context>) -> Self {
+    fn capture(gl: Rc<glow::Context>, capture_images: bool) -> Self {
         let _zone = trace::Zone::new("opengl.borrowed-state.capture");
         unsafe {
             let active_texture = gl.get_parameter_i32(glow::ACTIVE_TEXTURE);
@@ -434,10 +471,33 @@ impl BorrowedOpenGlStateGuard {
                 texture_units.push(TextureUnitState {
                     unit,
                     texture_2d: texture_name(gl.get_parameter_i32(glow::TEXTURE_BINDING_2D)),
+                    texture_3d: texture_name(gl.get_parameter_i32(glow::TEXTURE_BINDING_3D)),
                     sampler: sampler_name(gl.get_parameter_i32(glow::SAMPLER_BINDING)),
                 });
             }
             gl.active_texture(active_texture as u32);
+
+            let image_units = if capture_images && supports_storage_textures(&gl) {
+                let image_unit_count = gl.get_parameter_i32(glow::MAX_IMAGE_UNITS).max(0);
+                (0..u32::try_from(image_unit_count).unwrap_or(0))
+                    .map(|unit| ImageUnitState {
+                        unit,
+                        texture: texture_name(
+                            gl.get_parameter_indexed_i32(glow::IMAGE_BINDING_NAME, unit),
+                        ),
+                        level: gl.get_parameter_indexed_i32(glow::IMAGE_BINDING_LEVEL, unit),
+                        layered: gl.get_parameter_indexed_i32(glow::IMAGE_BINDING_LAYERED, unit)
+                            != 0,
+                        layer: gl.get_parameter_indexed_i32(glow::IMAGE_BINDING_LAYER, unit),
+                        access: gl.get_parameter_indexed_i32(glow::IMAGE_BINDING_ACCESS, unit)
+                            as u32,
+                        format: gl.get_parameter_indexed_i32(glow::IMAGE_BINDING_FORMAT, unit)
+                            as u32,
+                    })
+                    .collect()
+            } else {
+                Vec::new()
+            };
 
             Self {
                 program: program_name(gl.get_parameter_i32(glow::CURRENT_PROGRAM)),
@@ -482,6 +542,7 @@ impl BorrowedOpenGlStateGuard {
                 ),
                 active_texture,
                 texture_units,
+                image_units,
                 viewport: parameter_i32x4(&gl, glow::VIEWPORT),
                 scissor_box: parameter_i32x4(&gl, glow::SCISSOR_BOX),
                 scissor_enabled: gl.is_enabled(glow::SCISSOR_TEST),
@@ -585,7 +646,19 @@ impl Drop for BorrowedOpenGlStateGuard {
             for state in &self.texture_units {
                 self.gl.active_texture(glow::TEXTURE0 + state.unit);
                 self.gl.bind_texture(glow::TEXTURE_2D, state.texture_2d);
+                self.gl.bind_texture(glow::TEXTURE_3D, state.texture_3d);
                 self.gl.bind_sampler(state.unit, state.sampler);
+            }
+            for state in &self.image_units {
+                self.gl.bind_image_texture(
+                    state.unit,
+                    state.texture,
+                    state.level,
+                    state.layered,
+                    state.layer,
+                    state.access,
+                    state.format,
+                );
             }
             self.gl.active_texture(self.active_texture as u32);
             self.gl.viewport(
@@ -678,6 +751,24 @@ impl Drop for BorrowedOpenGlStateGuard {
             set_enabled(&self.gl, glow::MULTISAMPLE, self.multisample_enabled);
         }
     }
+}
+
+fn supports_storage_textures(gl: &glow::Context) -> bool {
+    let version = gl.version();
+    (!version.is_embedded && (version.major > 4 || (version.major == 4 && version.minor >= 2)))
+        || (version.is_embedded
+            && (version.major > 3 || (version.major == 3 && version.minor >= 1)))
+        || gl
+            .supported_extensions()
+            .contains("GL_ARB_shader_image_load_store")
+}
+
+fn supports_compute_shaders(gl: &glow::Context) -> bool {
+    let version = gl.version();
+    (!version.is_embedded && (version.major > 4 || (version.major == 4 && version.minor >= 3)))
+        || (version.is_embedded
+            && (version.major > 3 || (version.major == 3 && version.minor >= 1)))
+        || gl.supported_extensions().contains("GL_ARB_compute_shader")
 }
 
 fn parameter_i32x2(gl: &glow::Context, parameter: u32) -> [i32; 2] {
@@ -870,6 +961,9 @@ mod tests {
 
     #[test]
     fn borrowed_state_guard_restores_indexed_buffer_bindings() {
+        let _graphics_lock = crate::render::vulkanic::backends::graphics_backend_lock()
+            .lock()
+            .expect("OpenGL test lock");
         let context = match OpenGlContext::new("borrowed-state-indexed-bindings-test") {
             Ok(context) => context,
             Err(error) => {
@@ -920,7 +1014,7 @@ mod tests {
             let original_ssbo_size =
                 gl.get_parameter_indexed_i64(glow::SHADER_STORAGE_BUFFER_SIZE, 0);
             {
-                let _guard = BorrowedOpenGlStateGuard::capture(gl.clone());
+                let _guard = BorrowedOpenGlStateGuard::capture(gl.clone(), false);
                 gl.bind_buffer_range(glow::UNIFORM_BUFFER, 0, Some(replacement_ubo), 0, 64);
                 gl.bind_buffer_range(
                     glow::SHADER_STORAGE_BUFFER,
@@ -980,7 +1074,88 @@ mod tests {
     }
 
     #[test]
+    fn borrowed_state_guard_restores_d3_texture_and_image_bindings() {
+        let _graphics_lock = crate::render::vulkanic::backends::graphics_backend_lock()
+            .lock()
+            .expect("OpenGL test lock");
+        let context = match OpenGlContext::new("borrowed-state-d3-image-test") {
+            Ok(context) => context,
+            Err(error) => {
+                assert!(
+                    error.to_string().contains("OpenGL")
+                        || error.to_string().contains("EGL")
+                        || error.to_string().contains("GLX"),
+                    "unexpected OpenGL bootstrap failure: {error}"
+                );
+                return;
+            }
+        };
+        context
+            .make_current()
+            .expect("test OpenGL context should become current");
+        if !context.supports_storage_textures() {
+            return;
+        }
+        let gl = context.gl().clone();
+        unsafe {
+            let original = gl.create_texture().expect("create original D3 texture");
+            let replacement = gl.create_texture().expect("create replacement D3 texture");
+            for texture in [original, replacement] {
+                gl.bind_texture(glow::TEXTURE_3D, Some(texture));
+                gl.tex_image_3d(
+                    glow::TEXTURE_3D,
+                    0,
+                    glow::R8UI as i32,
+                    2,
+                    2,
+                    2,
+                    0,
+                    glow::RED_INTEGER,
+                    glow::UNSIGNED_BYTE,
+                    glow::PixelUnpackData::Slice(None),
+                );
+            }
+            gl.active_texture(glow::TEXTURE0 + 2);
+            gl.bind_texture(glow::TEXTURE_3D, Some(original));
+            gl.bind_image_texture(0, Some(original), 0, true, 0, glow::READ_ONLY, glow::R8UI);
+            let original_image = gl.get_parameter_indexed_i32(glow::IMAGE_BINDING_NAME, 0);
+            {
+                let _guard = BorrowedOpenGlStateGuard::capture(gl.clone(), true);
+                gl.active_texture(glow::TEXTURE0 + 2);
+                gl.bind_texture(glow::TEXTURE_3D, Some(replacement));
+                gl.bind_image_texture(
+                    0,
+                    Some(replacement),
+                    0,
+                    true,
+                    0,
+                    glow::WRITE_ONLY,
+                    glow::R8UI,
+                );
+            }
+            gl.active_texture(glow::TEXTURE0 + 2);
+            assert_eq!(
+                original.0.get() as i32,
+                gl.get_parameter_i32(glow::TEXTURE_BINDING_3D),
+                "borrowed OpenGL guard must restore D3 texture unit bindings"
+            );
+            assert_eq!(
+                original_image,
+                gl.get_parameter_indexed_i32(glow::IMAGE_BINDING_NAME, 0),
+                "borrowed OpenGL guard must restore image-unit bindings"
+            );
+            gl.bind_image_texture(0, None, 0, false, 0, glow::READ_ONLY, glow::R8UI);
+            gl.bind_texture(glow::TEXTURE_3D, None);
+            gl.delete_texture(original);
+            gl.delete_texture(replacement);
+        }
+    }
+
+    #[test]
     fn borrowed_state_guard_restores_outline_sensitive_pipeline_state() {
+        let _graphics_lock = crate::render::vulkanic::backends::graphics_backend_lock()
+            .lock()
+            .expect("OpenGL test lock");
         let context = match OpenGlContext::new("borrowed-state-outline-pipeline-test") {
             Ok(context) => context,
             Err(error) => {
@@ -1030,7 +1205,7 @@ mod tests {
             gl.stencil_op_separate(glow::BACK, glow::ZERO, glow::INVERT, glow::DECR_WRAP);
 
             {
-                let _guard = BorrowedOpenGlStateGuard::capture(gl.clone());
+                let _guard = BorrowedOpenGlStateGuard::capture(gl.clone(), false);
                 gl.bind_vertex_array(Some(replacement_vao));
                 gl.bind_buffer(glow::ELEMENT_ARRAY_BUFFER, Some(replacement_indices));
                 gl.line_width(1.0);

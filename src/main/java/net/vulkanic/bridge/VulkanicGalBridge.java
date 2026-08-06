@@ -22,7 +22,7 @@ import java.util.Map;
 import java.util.Objects;
 
 public final class VulkanicGalBridge implements AutoCloseable {
-	public static final int ABI_VERSION = 2;
+	public static final int ABI_VERSION = 11;
 	public static final int STATUS_OK = 0;
 
 	public static final int BACKEND_VULKAN = 1;
@@ -578,6 +578,92 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		List<WorldMeshInstanceRecord> worldMeshInstances,
 		List<GuiSpriteRecord> guiSprites
 	) {
+		return submitWholeFrame(
+			generation,
+			frameId,
+			correlationId,
+			frameTarget,
+			guiWidth,
+			guiHeight,
+			viewportWidth,
+			viewportHeight,
+			viewMatrix,
+			projectionMatrix,
+			worldBackground,
+			worldSegments,
+			worldCrackQuads,
+			worldBorderQuads,
+			worldMaterialQuads,
+			worldMeshInstances,
+			WorldVoxelVolumeFrameRecord.disabled(),
+			guiSprites
+		);
+	}
+
+	public WholeFrameSubmitResult submitWholeFrame(
+		long generation,
+		long frameId,
+		long correlationId,
+		long frameTarget,
+		int guiWidth,
+		int guiHeight,
+		int viewportWidth,
+		int viewportHeight,
+		float[] viewMatrix,
+		float[] projectionMatrix,
+		WorldBackgroundRecord worldBackground,
+		List<WorldLineSegmentRecord> worldSegments,
+		List<WorldCrackQuadRecord> worldCrackQuads,
+		List<WorldBorderQuadRecord> worldBorderQuads,
+		List<WorldMaterialQuadRecord> worldMaterialQuads,
+		List<WorldMeshInstanceRecord> worldMeshInstances,
+		WorldVoxelVolumeFrameRecord voxelVolumeFrame,
+		List<GuiSpriteRecord> guiSprites
+	) {
+		return submitWholeFrame(
+			generation,
+			frameId,
+			correlationId,
+			frameTarget,
+			guiWidth,
+			guiHeight,
+			viewportWidth,
+			viewportHeight,
+			viewMatrix,
+			projectionMatrix,
+			worldBackground,
+			worldSegments,
+			worldCrackQuads,
+			worldBorderQuads,
+			worldMaterialQuads,
+			worldMeshInstances,
+			voxelVolumeFrame,
+			WorldShaderEnvironmentFrameRecord.disabled(),
+			guiSprites
+		);
+	}
+
+	public WholeFrameSubmitResult submitWholeFrame(
+		long generation,
+		long frameId,
+		long correlationId,
+		long frameTarget,
+		int guiWidth,
+		int guiHeight,
+		int viewportWidth,
+		int viewportHeight,
+		float[] viewMatrix,
+		float[] projectionMatrix,
+		WorldBackgroundRecord worldBackground,
+		List<WorldLineSegmentRecord> worldSegments,
+		List<WorldCrackQuadRecord> worldCrackQuads,
+		List<WorldBorderQuadRecord> worldBorderQuads,
+		List<WorldMaterialQuadRecord> worldMaterialQuads,
+		List<WorldMeshInstanceRecord> worldMeshInstances,
+		WorldVoxelVolumeFrameRecord voxelVolumeFrame,
+		WorldShaderEnvironmentFrameRecord shaderEnvironmentFrame,
+		List<GuiSpriteRecord> guiSprites
+	) {
 		return submitWorldFrame(
 			generation,
 			frameId,
@@ -595,6 +681,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			worldBorderQuads,
 			worldMaterialQuads,
 			worldMeshInstances,
+			voxelVolumeFrame,
+			shaderEnvironmentFrame,
 			guiSprites,
 			true
 		);
@@ -660,6 +748,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			worldBorderQuads,
 			worldMaterialQuads,
 			List.of(),
+			WorldVoxelVolumeFrameRecord.disabled(),
+			WorldShaderEnvironmentFrameRecord.disabled(),
 			List.of(),
 			false
 		);
@@ -697,6 +787,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			worldBorderQuads,
 			worldMaterialQuads,
 			worldMeshInstances,
+			WorldVoxelVolumeFrameRecord.disabled(),
+			WorldShaderEnvironmentFrameRecord.disabled(),
 			List.of(),
 			false
 		);
@@ -719,6 +811,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		List<WorldBorderQuadRecord> worldBorderQuads,
 		List<WorldMaterialQuadRecord> worldMaterialQuads,
 		List<WorldMeshInstanceRecord> worldMeshInstances,
+		WorldVoxelVolumeFrameRecord voxelVolumeFrame,
+		WorldShaderEnvironmentFrameRecord shaderEnvironmentFrame,
 		List<GuiSpriteRecord> guiSprites,
 		boolean wholeFrame
 	) {
@@ -730,6 +824,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		Objects.requireNonNull(worldBorderQuads, "worldBorderQuads");
 		Objects.requireNonNull(worldMaterialQuads, "worldMaterialQuads");
 		Objects.requireNonNull(worldMeshInstances, "worldMeshInstances");
+		Objects.requireNonNull(voxelVolumeFrame, "voxelVolumeFrame");
+		Objects.requireNonNull(shaderEnvironmentFrame, "shaderEnvironmentFrame");
 		Objects.requireNonNull(guiSprites, "guiSprites");
 		if (viewMatrix.length != 16 || projectionMatrix.length != 16) {
 			throw new IllegalArgumentException("whole-frame matrices must contain 16 floats");
@@ -934,6 +1030,57 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 18, meshInstanceArray, worldMeshInstances.size());
 		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 19, spriteArray, guiSprites.size());
 		Struct.WHOLE_FRAME_SUBMIT.setLong(request, 20, negotiatedFeatures);
+		MemorySegment voxelVolume = request.asSlice(
+			Struct.WHOLE_FRAME_SUBMIT.offset(21),
+			Struct.WORLD_VOXEL_VOLUME_FRAME.byteSize()
+		);
+		voxelVolume.set(ValueLayout.JAVA_INT, Struct.WORLD_VOXEL_VOLUME_FRAME.offset(0), Struct.WORLD_VOXEL_VOLUME_FRAME.byteSize());
+		Struct.WORLD_VOXEL_VOLUME_FRAME.setInt(voxelVolume, 1, voxelVolumeFrame.enabled() ? 1 : 0);
+		Struct.WORLD_VOXEL_VOLUME_FRAME.setInt(voxelVolume, 2, 0);
+		Struct.WORLD_VOXEL_VOLUME_FRAME.setInt(voxelVolume, 3, 0);
+		Struct.WORLD_VOXEL_VOLUME_FRAME.setLong(voxelVolume, 4, voxelVolumeFrame.worldGeneration());
+		Struct.WORLD_VOXEL_VOLUME_FRAME.setLong(voxelVolume, 5, voxelVolumeFrame.resourceGeneration());
+		Struct.WORLD_VOXEL_VOLUME_FRAME.setFloat(voxelVolume, 6, voxelVolumeFrame.cameraX());
+		Struct.WORLD_VOXEL_VOLUME_FRAME.setFloat(voxelVolume, 7, voxelVolumeFrame.cameraY());
+		Struct.WORLD_VOXEL_VOLUME_FRAME.setFloat(voxelVolume, 8, voxelVolumeFrame.cameraZ());
+		Struct.WORLD_VOXEL_VOLUME_FRAME.setInt(voxelVolume, 9, 0);
+		MemorySegment shaderEnvironment = request.asSlice(
+			Struct.WHOLE_FRAME_SUBMIT.offset(22),
+			Struct.WORLD_SHADER_ENVIRONMENT_FRAME.byteSize()
+		);
+		shaderEnvironment.set(ValueLayout.JAVA_INT, Struct.WORLD_SHADER_ENVIRONMENT_FRAME.offset(0), Struct.WORLD_SHADER_ENVIRONMENT_FRAME.byteSize());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setInt(shaderEnvironment, 1, shaderEnvironmentFrame.enabled() ? 1 : 0);
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setInt(shaderEnvironment, 2, shaderEnvironmentFrame.frameCounter());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setInt(shaderEnvironment, 3, shaderEnvironmentFrame.worldDay());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setLong(shaderEnvironment, 4, shaderEnvironmentFrame.worldGeneration());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setLong(shaderEnvironment, 5, shaderEnvironmentFrame.worldTime());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 6, shaderEnvironmentFrame.frameTimeSeconds());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 7, shaderEnvironmentFrame.frameTimeCounter());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 8, shaderEnvironmentFrame.timeOfDay());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 9, shaderEnvironmentFrame.rainStrength());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 10, shaderEnvironmentFrame.thunderStrength());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 11, shaderEnvironmentFrame.skyDarken());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setInt(shaderEnvironment, 12, shaderEnvironmentFrame.moonPhase());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setInt(shaderEnvironment, 13, shaderEnvironmentFrame.eyeSubmersion());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 14, shaderEnvironmentFrame.screenBrightness());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 15, shaderEnvironmentFrame.farPlane());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 16, shaderEnvironmentFrame.relativeEyeX());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 17, shaderEnvironmentFrame.relativeEyeY());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 18, shaderEnvironmentFrame.relativeEyeZ());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 19, shaderEnvironmentFrame.skyColorRed());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 20, shaderEnvironmentFrame.skyColorGreen());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 21, shaderEnvironmentFrame.skyColorBlue());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 22, shaderEnvironmentFrame.darknessLightFactor());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 23, shaderEnvironmentFrame.nightVision());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 24, shaderEnvironmentFrame.fogColorRed());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 25, shaderEnvironmentFrame.fogColorGreen());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 26, shaderEnvironmentFrame.fogColorBlue());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setInt(shaderEnvironment, 27, shaderEnvironmentFrame.biomePrecipitation());
+		Abi.writeBytes(arena, shaderEnvironment, Struct.WORLD_SHADER_ENVIRONMENT_FRAME, 28, shaderEnvironmentFrame.biomeResourceLocation());
+		Abi.writeBytes(arena, shaderEnvironment, Struct.WORLD_SHADER_ENVIRONMENT_FRAME, 29, shaderEnvironmentFrame.mainHandItemModelResourceLocation());
+		Abi.writeBytes(arena, shaderEnvironment, Struct.WORLD_SHADER_ENVIRONMENT_FRAME, 30, shaderEnvironmentFrame.offHandItemModelResourceLocation());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setInt(shaderEnvironment, 31, shaderEnvironmentFrame.mainHandItemLightEmission());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setInt(shaderEnvironment, 32, shaderEnvironmentFrame.offHandItemLightEmission());
 		MemorySegment result = Struct.WHOLE_FRAME_SUBMIT_RESULT.allocate(arena);
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("rust-gal.whole-frame.java-record-packing");
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("rust-gal.whole-frame.native-submit-return");
@@ -1079,6 +1226,35 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		}
 	}
 
+	/**
+	 * Copies one complete shader-pack source generation into Rust-owned storage.
+	 * This is semantic source transport only: it neither selects nor executes a
+	 * pack and intentionally carries no Iris/OpenGL/Vulkan runtime objects.
+	 */
+	public Status updateShaderPackSources(long generation, String packName, List<ShaderPackSourceFileRecord> files) {
+		Objects.requireNonNull(packName, "packName");
+		Objects.requireNonNull(files, "files");
+		try (Arena updateArena = Arena.ofConfined()) {
+			MemorySegment fileArray = Struct.SHADER_PACK_SOURCE_FILE.array(updateArena, files.size());
+			for (int i = 0; i < files.size(); i++) {
+				ShaderPackSourceFileRecord file = Objects.requireNonNull(files.get(i), "files[" + i + "]");
+				MemorySegment item = Abi.item(fileArray, Struct.SHADER_PACK_SOURCE_FILE, i);
+				item.set(ValueLayout.JAVA_INT, Struct.SHADER_PACK_SOURCE_FILE.offset(0), Struct.SHADER_PACK_SOURCE_FILE.byteSize());
+				Struct.SHADER_PACK_SOURCE_FILE.setInt(item, 1, 0);
+				Abi.writeBytes(updateArena, item, Struct.SHADER_PACK_SOURCE_FILE, 2, file.path());
+				Abi.writeBytes(updateArena, item, Struct.SHADER_PACK_SOURCE_FILE, 3, file.contentsUtf8());
+			}
+			MemorySegment request = Struct.SHADER_PACK_SOURCE_UPDATE.allocate(updateArena);
+			Abi.writeHeader(request, Struct.SHADER_PACK_SOURCE_UPDATE);
+			Struct.SHADER_PACK_SOURCE_UPDATE.setLong(request, 1, generation);
+			Abi.writeBytes(updateArena, request, Struct.SHADER_PACK_SOURCE_UPDATE, 2, packName);
+			Abi.writeSlice(request, Struct.SHADER_PACK_SOURCE_UPDATE, 3, fileArray, files.size());
+			MemorySegment status = Struct.STATUS.allocate(updateArena);
+			checkStatus(Native.shaderPackUpdateSources(contextId, request, status), "shader-pack source update");
+			return new Status(Struct.STATUS.getLong(status, 5), Struct.STATUS.metricsFfiCalls(status), Struct.STATUS.metricsFfiInputBytes(status), Struct.STATUS.backendMetrics(status));
+		}
+	}
+
 	public Status updateWorldMeshAssets(
 		long generation,
 		List<WorldMeshAssetRecord> meshes,
@@ -1142,6 +1318,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 					Struct.WORLD_MESH_VERTEX.setFloat(vertexItem, 10, vertex.atlasV());
 					Struct.WORLD_MESH_VERTEX.setInt(vertexItem, 11, vertex.shaderBlockId());
 					Struct.WORLD_MESH_VERTEX.setInt(vertexItem, 12, vertex.shaderMaterialType());
+					Struct.WORLD_MESH_VERTEX.setInt(vertexItem, 13, vertex.midBlockPacked());
 				}
 				Abi.writeSlice(item, Struct.WORLD_MESH_ASSET_RECORD, 6, vertexArray, mesh.vertices().size());
 				Abi.writeBytes(updateArena, item, Struct.WORLD_MESH_ASSET_RECORD, 7, mesh.indexBytes());
@@ -1206,6 +1383,13 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	public record WorldMaterialAssetRecord(int textureId, byte[] pngBytes) {
 		public WorldMaterialAssetRecord {
 			Objects.requireNonNull(pngBytes, "pngBytes");
+		}
+	}
+
+	public record ShaderPackSourceFileRecord(String path, byte[] contentsUtf8) {
+		public ShaderPackSourceFileRecord {
+			Objects.requireNonNull(path, "path");
+			Objects.requireNonNull(contentsUtf8, "contentsUtf8");
 		}
 	}
 
@@ -1281,7 +1465,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		int shaderMaterialType,
 		int colorArgb,
 		int normalPacked,
-		int light
+		int light,
+		int midBlockPacked
 	) {
 	}
 
@@ -1705,6 +1890,70 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		}
 	}
 
+	/** Coarse world/camera semantic input for a future Rust-owned volume mapping. */
+	public record WorldVoxelVolumeFrameRecord(
+		boolean enabled,
+		long worldGeneration,
+		long resourceGeneration,
+		float cameraX,
+		float cameraY,
+		float cameraZ
+	) {
+		public static WorldVoxelVolumeFrameRecord disabled() {
+			return new WorldVoxelVolumeFrameRecord(false, 0L, 0L, 0.0F, 0.0F, 0.0F);
+		}
+	}
+
+	/** Copied vanilla environment semantics for future Rust-owned shader work. */
+	public record WorldShaderEnvironmentFrameRecord(
+		boolean enabled,
+		long worldGeneration,
+		long worldTime,
+		int frameCounter,
+		float frameTimeSeconds,
+		float frameTimeCounter,
+		int worldDay,
+		int moonPhase,
+		float timeOfDay,
+		float rainStrength,
+		float thunderStrength,
+		float skyDarken,
+		int eyeSubmersion,
+		float screenBrightness,
+		float farPlane,
+		float relativeEyeX,
+		float relativeEyeY,
+		float relativeEyeZ,
+		float skyColorRed,
+		float skyColorGreen,
+		float skyColorBlue,
+		float darknessLightFactor,
+		float nightVision,
+		float fogColorRed,
+		float fogColorGreen,
+		float fogColorBlue,
+		int biomePrecipitation,
+		String biomeResourceLocation,
+		String mainHandItemModelResourceLocation,
+		String offHandItemModelResourceLocation,
+		int mainHandItemLightEmission,
+		int offHandItemLightEmission
+	) {
+		public static WorldShaderEnvironmentFrameRecord disabled() {
+			return new WorldShaderEnvironmentFrameRecord(
+				false, 0L, 0L, 0,
+				0.0F, 0.0F, 0, 0,
+				0.0F, 0.0F, 0.0F, 0.0F,
+				0, 0.0F, 0.0F,
+				0.0F, 0.0F, 0.0F,
+				0.0F, 0.0F, 0.0F,
+				0.0F, 0.0F,
+				0.0F, 0.0F, 0.0F,
+			0, "", "", "", 0, 0
+		);
+		}
+	}
+
 	public record GuiFrameSubmitResult(
 		long submissionId,
 		long spriteCount,
@@ -1933,6 +2182,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		private static final MethodHandle WORLD_CRACK_UPDATE_ASSETS = downcall("mattmc_vulkanic_gal_world_crack_update_assets", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle WORLD_MATERIAL_UPDATE_ASSETS = downcall("mattmc_vulkanic_gal_world_material_update_assets", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle WORLD_MESH_UPDATE_ASSETS = downcall("mattmc_vulkanic_gal_world_mesh_update_assets", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+		private static final MethodHandle SHADER_PACK_UPDATE_SOURCES = downcall("mattmc_vulkanic_gal_shader_pack_update_sources", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle LAST_ERROR = downcall("mattmc_vulkanic_gal_last_error", FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG));
 
 		private static MethodHandle downcall(String symbol, FunctionDescriptor descriptor) {
@@ -2131,6 +2381,14 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			}
 		}
 
+		static int shaderPackUpdateSources(long contextId, MemorySegment request, MemorySegment result) {
+			try {
+				return (int) SHADER_PACK_UPDATE_SOURCES.invokeExact(contextId, request, result);
+			} catch (Throwable throwable) {
+				throw new IllegalStateException("Failed to update Rust VulkanicGAL shader-pack sources", throwable);
+			}
+		}
+
 		static String lastError(long contextId) {
 			try (Arena arena = Arena.ofConfined()) {
 				MemorySegment bytes = arena.allocate(4096, 1);
@@ -2214,7 +2472,11 @@ public final class VulkanicGalBridge implements AutoCloseable {
 				WORLD_MESH_ASSET_UPDATE(68),
 					WORLD_MESH_INSTANCE_RECORD(69),
 					WORLD_MESH_SORTED_INDEX_RECORD(70),
-					WORLD_MESH_ANIMATION_FRAME_RECORD(71);
+					WORLD_MESH_ANIMATION_FRAME_RECORD(71),
+					WORLD_VOXEL_VOLUME_FRAME(72),
+					WORLD_SHADER_ENVIRONMENT_FRAME(73),
+					SHADER_PACK_SOURCE_FILE(74),
+					SHADER_PACK_SOURCE_UPDATE(75);
 
 		private final int id;
 		private final int byteSize;

@@ -1,7 +1,20 @@
 use super::*;
 
 pub fn validate_header<T>(header: FfiHeader) -> GalResult<()> {
-    if header.version != FFI_ABI_VERSION && header.version != FFI_ABI_V1_VERSION {
+    if !matches!(
+        header.version,
+        FFI_ABI_V1_VERSION
+            | FFI_ABI_V2_VERSION
+            | FFI_ABI_V3_VERSION
+            | FFI_ABI_V4_VERSION
+            | FFI_ABI_V5_VERSION
+            | FFI_ABI_V6_VERSION
+            | FFI_ABI_V7_VERSION
+            | FFI_ABI_V8_VERSION
+            | FFI_ABI_V9_VERSION
+            | FFI_ABI_V10_VERSION
+            | FFI_ABI_VERSION
+    ) {
         return Err(GalError::ffi(
             StatusCode::InvalidArgument,
             format!("unsupported VulkanicGAL FFI version {}", header.version),

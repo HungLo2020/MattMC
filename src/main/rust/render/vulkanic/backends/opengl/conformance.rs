@@ -10,10 +10,265 @@ use crate::render::vulkanic::commands::{
 };
 use crate::render::vulkanic::error::{GalError, GalResult};
 use crate::render::vulkanic::gal::VulkanicGal;
+use crate::render::vulkanic::handles::Handle;
 use crate::render::vulkanic::resources::*;
+use crate::render::vulkanic::shader_pack::programs::{
+    COMPLEMENTARY_TERRAIN_SUBSET_FRAGMENT, MINIMAL_TERRAIN_MATERIAL_VERTEX,
+};
 
 const WIDTH: u32 = 96;
 const HEIGHT: u32 = 64;
+
+#[test]
+fn selected_terrain_pipeline_layout_matches_optional_colored_voxel_interface() {
+    let backend =
+        match OpenGlBackend::new("MattMC VulkanicGAL selected terrain pipeline conformance") {
+            Ok(backend) => backend,
+            Err(error) => {
+                let text = error.to_string();
+                assert!(
+                    text.contains("OpenGL") || text.contains("EGL") || text.contains("GL"),
+                    "unexpected selected terrain pipeline setup failure: {text}"
+                );
+                return;
+            }
+        };
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+
+    for uses_colored_voxel_light in [false, true] {
+        let suffix = if uses_colored_voxel_light {
+            "colored-voxel"
+        } else {
+            "base"
+        };
+        let mesh_layout = gal
+            .create_resource_layout(ResourceLayoutDesc {
+                label: format!("selected-terrain.{suffix}.mesh-layout"),
+                bindings: vec![
+                    ResourceBindingDesc {
+                        binding: 0,
+                        kind: ResourceBindingKind::StorageBuffer,
+                        stages: PipelineStageFlags::DRAW,
+                        array_count: 1,
+                        optional: false,
+                        dynamic_offset_count: 0,
+                    },
+                    ResourceBindingDesc {
+                        binding: 1,
+                        kind: ResourceBindingKind::StorageBuffer,
+                        stages: PipelineStageFlags::DRAW,
+                        array_count: 1,
+                        optional: false,
+                        dynamic_offset_count: 0,
+                    },
+                    ResourceBindingDesc {
+                        binding: 2,
+                        kind: ResourceBindingKind::SampledTexture,
+                        stages: PipelineStageFlags::DRAW,
+                        array_count: 1,
+                        optional: false,
+                        dynamic_offset_count: 0,
+                    },
+                    ResourceBindingDesc {
+                        binding: 3,
+                        kind: ResourceBindingKind::Sampler,
+                        stages: PipelineStageFlags::DRAW,
+                        array_count: 1,
+                        optional: false,
+                        dynamic_offset_count: 0,
+                    },
+                ],
+            })
+            .unwrap();
+        let mut layouts = vec![mesh_layout];
+        if uses_colored_voxel_light {
+            let voxel_layout = gal
+                .create_resource_layout(ResourceLayoutDesc {
+                    label: format!("selected-terrain.{suffix}.voxel-layout"),
+                    bindings: vec![
+                        ResourceBindingDesc {
+                            binding: 0,
+                            kind: ResourceBindingKind::SampledTexture,
+                            stages: PipelineStageFlags::DRAW,
+                            array_count: 1,
+                            optional: false,
+                            dynamic_offset_count: 0,
+                        },
+                        ResourceBindingDesc {
+                            binding: 1,
+                            kind: ResourceBindingKind::SampledTexture,
+                            stages: PipelineStageFlags::DRAW,
+                            array_count: 1,
+                            optional: false,
+                            dynamic_offset_count: 0,
+                        },
+                        ResourceBindingDesc {
+                            binding: 2,
+                            kind: ResourceBindingKind::Sampler,
+                            stages: PipelineStageFlags::DRAW,
+                            array_count: 1,
+                            optional: false,
+                            dynamic_offset_count: 0,
+                        },
+                        ResourceBindingDesc {
+                            binding: 3,
+                            kind: ResourceBindingKind::UniformBuffer,
+                            stages: PipelineStageFlags::DRAW,
+                            array_count: 1,
+                            optional: false,
+                            dynamic_offset_count: 0,
+                        },
+                    ],
+                })
+                .unwrap();
+            create_selected_terrain_colored_voxel_resource_set(
+                &mut gal,
+                voxel_layout,
+                &format!("selected-terrain.{suffix}"),
+            );
+            layouts.push(voxel_layout);
+        }
+        let pipeline_layout = gal
+            .create_pipeline_layout(PipelineLayoutDesc {
+                label: format!("selected-terrain.{suffix}.pipeline-layout"),
+                resource_layouts: layouts,
+            })
+            .unwrap();
+        let fragment_source = if uses_colored_voxel_light {
+            COMPLEMENTARY_TERRAIN_SUBSET_FRAGMENT.replacen(
+                "#version 450\n",
+                "#version 450\n#define VULKANIC_TERRAIN_COLORED_VOXEL_LIGHT 1\n",
+                1,
+            )
+        } else {
+            COMPLEMENTARY_TERRAIN_SUBSET_FRAGMENT.to_owned()
+        };
+        let vertex = gal
+            .create_shader_module(shader_module(
+                &format!("selected-terrain.{suffix}.vertex"),
+                ShaderStage::Vertex,
+                MINIMAL_TERRAIN_MATERIAL_VERTEX,
+            ))
+            .unwrap();
+        let fragment = gal
+            .create_shader_module(shader_module(
+                &format!("selected-terrain.{suffix}.fragment"),
+                ShaderStage::Fragment,
+                &fragment_source,
+            ))
+            .unwrap();
+        gal.create_graphics_pipeline(GraphicsPipelineDesc {
+            label: format!("selected-terrain.{suffix}.pipeline"),
+            layout: pipeline_layout,
+            vertex_shader: vertex,
+            fragment_shader: fragment,
+            topology: PrimitiveTopology::Triangles,
+            cull_mode: CullMode::Back,
+            blend: BlendMode::Disabled,
+            depth_compare: Some(CompareOp::LessOrEqual),
+            depth_write: true,
+            color_formats: vec![TextureFormat::Rgba16Float; 4],
+            depth_format: Some(TextureFormat::Depth32Float),
+        })
+        .unwrap_or_else(|error| {
+            panic!("selected terrain {suffix} pipeline/layout must lower for OpenGL: {error}")
+        });
+    }
+}
+
+fn create_selected_terrain_colored_voxel_resource_set(
+    gal: &mut VulkanicGal,
+    layout: Handle,
+    label: &str,
+) {
+    let extent = Extent3d {
+        width: 4,
+        height: 4,
+        depth: 4,
+    };
+    let occupancy = gal
+        .create_texture(TextureDesc {
+            label: format!("{label}.occupancy"),
+            dimension: TextureDimension::D3,
+            format: TextureFormat::R8Uint,
+            extent,
+            mip_levels: 1,
+            array_layers: 1,
+            usages: vec![TextureUsage::Sampled],
+        })
+        .unwrap();
+    let colored_light = gal
+        .create_texture(TextureDesc {
+            label: format!("{label}.colored-light"),
+            dimension: TextureDimension::D3,
+            format: TextureFormat::Rgba16Float,
+            extent,
+            mip_levels: 1,
+            array_layers: 1,
+            usages: vec![TextureUsage::Sampled],
+        })
+        .unwrap();
+    let occupancy_view = gal
+        .create_texture_view(view(
+            &format!("{label}.occupancy-view"),
+            occupancy,
+            TextureFormat::R8Uint,
+        ))
+        .unwrap();
+    let colored_light_view = gal
+        .create_texture_view(view(
+            &format!("{label}.colored-light-view"),
+            colored_light,
+            TextureFormat::Rgba16Float,
+        ))
+        .unwrap();
+    let sampler = gal
+        .create_sampler(SamplerDesc {
+            label: format!("{label}.voxel-sampler"),
+            min_filter: SamplerFilter::Nearest,
+            mag_filter: SamplerFilter::Nearest,
+            mip_filter: SamplerFilter::Nearest,
+            address_u: SamplerAddressMode::ClampToEdge,
+            address_v: SamplerAddressMode::ClampToEdge,
+            address_w: SamplerAddressMode::ClampToEdge,
+        })
+        .unwrap();
+    let mapping = gal
+        .create_buffer(BufferDesc {
+            label: format!("{label}.mapping"),
+            size: 96,
+            memory: MemoryDomain::DeviceLocal,
+            usages: vec![BufferUsage::Uniform],
+        })
+        .unwrap();
+    gal.create_resource_set(ResourceSetDesc {
+        label: format!("{label}.voxel-set"),
+        layout,
+        bindings: vec![
+            selected_resource_binding(0, occupancy_view, ResourceBindingKind::SampledTexture),
+            selected_resource_binding(1, colored_light_view, ResourceBindingKind::SampledTexture),
+            selected_resource_binding(2, sampler, ResourceBindingKind::Sampler),
+            selected_resource_binding(3, mapping, ResourceBindingKind::UniformBuffer),
+        ],
+    })
+    .expect("selected terrain colored-voxel resource set must be constructed");
+}
+
+fn selected_resource_binding(
+    binding: u32,
+    resource: Handle,
+    kind: ResourceBindingKind,
+) -> ResourceBinding {
+    ResourceBinding {
+        binding,
+        array_index: 0,
+        resource,
+        kind,
+        access: AccessFlags::READ,
+        dynamic_offsets: Vec::new(),
+        buffer_range: None,
+    }
+}
 
 #[test]
 fn isolated_opengl_conformance_renders_indexed_textured_draw() {
@@ -91,7 +346,11 @@ fn isolated_opengl_conformance_round_trips_a_partial_r8uint_d3_box() {
             },
             mip_levels: 1,
             array_layers: 1,
-            usages: vec![TextureUsage::TransferDst, TextureUsage::TransferSrc, TextureUsage::Sampled],
+            usages: vec![
+                TextureUsage::TransferDst,
+                TextureUsage::TransferSrc,
+                TextureUsage::Sampled,
+            ],
         })
         .unwrap();
     let region = BufferImageCopyRegion {
@@ -118,15 +377,31 @@ fn isolated_opengl_conformance_round_trips_a_partial_r8uint_d3_box() {
                     offset: 0,
                     data: pattern.clone(),
                 },
-                buffer_barrier(upload, TextureUsageState::TransferDst, TextureUsageState::TransferSrc),
-                texture_barrier(texture, TextureUsageState::Undefined, TextureUsageState::TransferDst),
+                buffer_barrier(
+                    upload,
+                    TextureUsageState::TransferDst,
+                    TextureUsageState::TransferSrc,
+                ),
+                texture_barrier(
+                    texture,
+                    TextureUsageState::Undefined,
+                    TextureUsageState::TransferDst,
+                ),
                 CommandOp::CopyBufferToTexture(region.clone()),
-                texture_barrier(texture, TextureUsageState::TransferDst, TextureUsageState::TransferSrc),
+                texture_barrier(
+                    texture,
+                    TextureUsageState::TransferDst,
+                    TextureUsageState::TransferSrc,
+                ),
                 CommandOp::CopyTextureToBuffer(BufferImageCopyRegion {
                     buffer: readback,
                     ..region
                 }),
-                buffer_barrier(readback, TextureUsageState::TransferDst, TextureUsageState::ShaderRead),
+                buffer_barrier(
+                    readback,
+                    TextureUsageState::TransferDst,
+                    TextureUsageState::ShaderRead,
+                ),
                 CommandOp::HostReadBuffer {
                     buffer: readback,
                     offset: 0,
@@ -171,10 +446,18 @@ fn isolated_opengl_conformance_round_trips_a_partial_r8uint_d3_box() {
             label: "d3.rgba16float".to_owned(),
             dimension: TextureDimension::D3,
             format: TextureFormat::Rgba16Float,
-            extent: Extent3d { width: 2, height: 2, depth: 2 },
+            extent: Extent3d {
+                width: 2,
+                height: 2,
+                depth: 2,
+            },
             mip_levels: 1,
             array_layers: 1,
-            usages: vec![TextureUsage::TransferDst, TextureUsage::TransferSrc, TextureUsage::Sampled],
+            usages: vec![
+                TextureUsage::TransferDst,
+                TextureUsage::TransferSrc,
+                TextureUsage::Sampled,
+            ],
         })
         .unwrap();
     let rgba16_region = BufferImageCopyRegion {
@@ -186,20 +469,51 @@ fn isolated_opengl_conformance_round_trips_a_partial_r8uint_d3_box() {
         texture_mip: 0,
         texture_layer: 0,
         texture_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
-        extent: Extent3d { width: 2, height: 2, depth: 2 },
+        extent: Extent3d {
+            width: 2,
+            height: 2,
+            depth: 2,
+        },
     };
     let rgba16_commands = gal
         .create_command_list(CommandListDesc {
             label: "d3.rgba16.round-trip".to_owned(),
             operations: vec![
-                CommandOp::HostWriteBuffer { buffer: rgba16_upload, offset: 0, data: rgba16_pattern.clone() },
-                buffer_barrier(rgba16_upload, TextureUsageState::TransferDst, TextureUsageState::TransferSrc),
-                texture_barrier(rgba16_texture, TextureUsageState::Undefined, TextureUsageState::TransferDst),
+                CommandOp::HostWriteBuffer {
+                    buffer: rgba16_upload,
+                    offset: 0,
+                    data: rgba16_pattern.clone(),
+                },
+                buffer_barrier(
+                    rgba16_upload,
+                    TextureUsageState::TransferDst,
+                    TextureUsageState::TransferSrc,
+                ),
+                texture_barrier(
+                    rgba16_texture,
+                    TextureUsageState::Undefined,
+                    TextureUsageState::TransferDst,
+                ),
                 CommandOp::CopyBufferToTexture(rgba16_region.clone()),
-                texture_barrier(rgba16_texture, TextureUsageState::TransferDst, TextureUsageState::TransferSrc),
-                CommandOp::CopyTextureToBuffer(BufferImageCopyRegion { buffer: rgba16_readback, ..rgba16_region }),
-                buffer_barrier(rgba16_readback, TextureUsageState::TransferDst, TextureUsageState::ShaderRead),
-                CommandOp::HostReadBuffer { buffer: rgba16_readback, offset: 0, size: rgba16_pattern.len() as u64 },
+                texture_barrier(
+                    rgba16_texture,
+                    TextureUsageState::TransferDst,
+                    TextureUsageState::TransferSrc,
+                ),
+                CommandOp::CopyTextureToBuffer(BufferImageCopyRegion {
+                    buffer: rgba16_readback,
+                    ..rgba16_region
+                }),
+                buffer_barrier(
+                    rgba16_readback,
+                    TextureUsageState::TransferDst,
+                    TextureUsageState::ShaderRead,
+                ),
+                CommandOp::HostReadBuffer {
+                    buffer: rgba16_readback,
+                    offset: 0,
+                    size: rgba16_pattern.len() as u64,
+                },
             ],
         })
         .unwrap();
@@ -209,13 +523,506 @@ fn isolated_opengl_conformance_round_trips_a_partial_r8uint_d3_box() {
             command_lists: vec![rgba16_commands],
         })
         .unwrap();
-    gal.retire_through_for_test(rgba16_submission.submission).unwrap();
+    gal.retire_through_for_test(rgba16_submission.submission)
+        .unwrap();
     let rgba16_read = gal
         .completed_host_reads()
         .into_iter()
         .find(|read| read.buffer == rgba16_readback)
         .expect("Rgba16Float D3 readback should complete");
     assert_eq!(rgba16_pattern, rgba16_read.bytes);
+}
+
+#[test]
+fn isolated_opengl_conformance_dispatches_a_d3_storage_compute_shader() {
+    let backend = match OpenGlBackend::new("MattMC VulkanicGAL OpenGL D3 compute conformance") {
+        Ok(backend) => backend,
+        Err(error) => {
+            let text = error.to_string();
+            assert!(
+                text.contains("OpenGL") || text.contains("EGL") || text.contains("GL"),
+                "unexpected OpenGL D3 compute setup failure: {text}"
+            );
+            return;
+        }
+    };
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    if !gal.capabilities().supports(BackendFeature::Compute) {
+        return;
+    }
+    let sampled_volume = gal
+        .create_texture(TextureDesc {
+            label: "d3.compute.sampled-volume".to_owned(),
+            dimension: TextureDimension::D3,
+            format: TextureFormat::R8Uint,
+            extent: Extent3d {
+                width: 4,
+                height: 4,
+                depth: 4,
+            },
+            mip_levels: 2,
+            array_layers: 1,
+            usages: vec![TextureUsage::Sampled],
+        })
+        .unwrap();
+    let sampled_mip_view = gal
+        .create_texture_view(TextureViewDesc {
+            label: "d3.compute.sampled-mip-view".to_owned(),
+            texture: sampled_volume,
+            format: TextureFormat::R8Uint,
+            base_mip: 1,
+            mip_count: 1,
+            base_layer: 0,
+            layer_count: 1,
+        })
+        .unwrap();
+    let volume = gal
+        .create_texture(TextureDesc {
+            label: "d3.compute.volume".to_owned(),
+            dimension: TextureDimension::D3,
+            format: TextureFormat::R8Uint,
+            extent: Extent3d {
+                width: 4,
+                height: 4,
+                depth: 4,
+            },
+            mip_levels: 1,
+            array_layers: 1,
+            usages: vec![TextureUsage::Storage, TextureUsage::TransferSrc],
+        })
+        .unwrap();
+    let volume_view = gal
+        .create_texture_view(view(
+            "d3.compute.volume.view",
+            volume,
+            TextureFormat::R8Uint,
+        ))
+        .unwrap();
+    let layout = gal
+        .create_resource_layout(ResourceLayoutDesc {
+            label: "d3.compute.layout".to_owned(),
+            bindings: vec![
+                ResourceBindingDesc {
+                    binding: 0,
+                    kind: ResourceBindingKind::StorageTexture,
+                    stages: PipelineStageFlags::COMPUTE,
+                    array_count: 1,
+                    optional: false,
+                    dynamic_offset_count: 0,
+                },
+                ResourceBindingDesc {
+                    binding: 1,
+                    kind: ResourceBindingKind::SampledTexture,
+                    stages: PipelineStageFlags::COMPUTE,
+                    array_count: 1,
+                    optional: false,
+                    dynamic_offset_count: 0,
+                },
+            ],
+        })
+        .unwrap();
+    let set = gal
+        .create_resource_set(ResourceSetDesc {
+            label: "d3.compute.set".to_owned(),
+            layout,
+            bindings: vec![
+                ResourceBinding {
+                    binding: 0,
+                    array_index: 0,
+                    resource: volume_view,
+                    kind: ResourceBindingKind::StorageTexture,
+                    access: AccessFlags::WRITE,
+                    dynamic_offsets: Vec::new(),
+                    buffer_range: None,
+                },
+                ResourceBinding {
+                    binding: 1,
+                    array_index: 0,
+                    resource: sampled_mip_view,
+                    kind: ResourceBindingKind::SampledTexture,
+                    access: AccessFlags::READ,
+                    dynamic_offsets: Vec::new(),
+                    buffer_range: None,
+                },
+            ],
+        })
+        .unwrap();
+    let pipeline_layout = gal
+        .create_pipeline_layout(PipelineLayoutDesc {
+            label: "d3.compute.pipeline-layout".to_owned(),
+            resource_layouts: vec![layout],
+        })
+        .unwrap();
+    let shader = gal
+        .create_shader_module(shader_module(
+            "d3.compute.shader",
+            ShaderStage::Compute,
+            D3_COMPUTE_R8UINT_SHADER,
+        ))
+        .unwrap();
+    let pipeline = gal
+        .create_compute_pipeline(ComputePipelineDesc {
+            label: "d3.compute.pipeline".to_owned(),
+            layout: pipeline_layout,
+            shader,
+        })
+        .unwrap();
+    let readback = gal
+        .create_buffer(BufferDesc {
+            label: "d3.compute.readback".to_owned(),
+            size: 1,
+            memory: MemoryDomain::Readback,
+            usages: vec![BufferUsage::TransferDst, BufferUsage::HostRead],
+        })
+        .unwrap();
+    let commands = gal
+        .create_command_list(CommandListDesc {
+            label: "d3.compute.commands".to_owned(),
+            operations: vec![
+                texture_barrier(
+                    sampled_volume,
+                    TextureUsageState::Undefined,
+                    TextureUsageState::ShaderRead,
+                ),
+                texture_barrier(
+                    volume,
+                    TextureUsageState::Undefined,
+                    TextureUsageState::ShaderWrite,
+                ),
+                CommandOp::BindComputePipeline(pipeline),
+                CommandOp::BindResourceSet {
+                    pipeline_layout,
+                    set_index: 0,
+                    set,
+                    dynamic_offsets: Vec::new(),
+                },
+                CommandOp::Dispatch {
+                    groups_x: 1,
+                    groups_y: 1,
+                    groups_z: 1,
+                },
+                texture_barrier(
+                    volume,
+                    TextureUsageState::ShaderWrite,
+                    TextureUsageState::TransferSrc,
+                ),
+                CommandOp::CopyTextureToBuffer(BufferImageCopyRegion {
+                    buffer: readback,
+                    buffer_offset: 0,
+                    bytes_per_row: 1,
+                    rows_per_image: 1,
+                    texture: volume,
+                    texture_mip: 0,
+                    texture_layer: 0,
+                    texture_origin: TextureOrigin3d { x: 1, y: 2, z: 3 },
+                    extent: Extent3d {
+                        width: 1,
+                        height: 1,
+                        depth: 1,
+                    },
+                }),
+                buffer_barrier(
+                    readback,
+                    TextureUsageState::TransferDst,
+                    TextureUsageState::ShaderRead,
+                ),
+                CommandOp::HostReadBuffer {
+                    buffer: readback,
+                    offset: 0,
+                    size: 1,
+                },
+            ],
+        })
+        .unwrap();
+    let token = gal
+        .submit(SubmissionBatch {
+            label: "d3.compute.submit".to_owned(),
+            command_lists: vec![commands],
+        })
+        .unwrap();
+    assert_eq!(
+        (1, 1),
+        gal.opengl_backend()
+            .expect("OpenGL backend should remain available")
+            .texture_mip_range_for_test(sampled_volume)
+            .unwrap(),
+        "the sampled D3 view must constrain OpenGL to its requested mip"
+    );
+    gal.retire_through_for_test(token.submission).unwrap();
+    let read = gal
+        .completed_host_reads()
+        .into_iter()
+        .find(|read| read.buffer == readback)
+        .expect("OpenGL compute readback should complete");
+    assert_eq!(vec![0x5a], read.bytes);
+}
+
+#[test]
+fn isolated_opengl_conformance_writes_and_reads_a_r8uint_d3_storage_texel() {
+    run_d3_storage_write_read_test(
+        "r8uint",
+        TextureFormat::R8Uint,
+        D3_STORAGE_R8UINT_FRAGMENT_SHADER,
+        &[0x5a],
+    );
+}
+
+#[test]
+fn isolated_opengl_conformance_writes_and_reads_a_rgba16float_d3_storage_texel() {
+    run_d3_storage_write_read_test(
+        "rgba16float",
+        TextureFormat::Rgba16Float,
+        D3_STORAGE_RGBA16FLOAT_FRAGMENT_SHADER,
+        &[0x00, 0x38, 0x00, 0x34, 0x00, 0x3a, 0x00, 0x3c],
+    );
+}
+
+fn run_d3_storage_write_read_test(
+    format_label: &str,
+    format: TextureFormat,
+    fragment_shader: &str,
+    expected_bytes: &[u8],
+) {
+    let backend = match OpenGlBackend::new("MattMC VulkanicGAL OpenGL D3 storage conformance") {
+        Ok(backend) => backend,
+        Err(error) => {
+            let text = error.to_string();
+            assert!(
+                text.contains("OpenGL") || text.contains("EGL") || text.contains("GL"),
+                "unexpected OpenGL D3 storage setup failure: {text}"
+            );
+            return;
+        }
+    };
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    assert!(gal.capabilities().supports(BackendFeature::StorageTextures));
+
+    let volume = gal
+        .create_texture(TextureDesc {
+            label: "d3.storage.volume".to_owned(),
+            dimension: TextureDimension::D3,
+            format,
+            extent: Extent3d {
+                width: 4,
+                height: 4,
+                depth: 4,
+            },
+            mip_levels: 1,
+            array_layers: 1,
+            usages: vec![TextureUsage::Storage, TextureUsage::TransferSrc],
+        })
+        .unwrap();
+    let volume_view = gal
+        .create_texture_view(view("d3.storage.volume.view", volume, format))
+        .unwrap();
+    let color = gal
+        .create_texture(TextureDesc {
+            label: "d3.storage.color".to_owned(),
+            dimension: TextureDimension::D2,
+            format: TextureFormat::Rgba8Unorm,
+            extent: Extent3d {
+                width: 1,
+                height: 1,
+                depth: 1,
+            },
+            mip_levels: 1,
+            array_layers: 1,
+            usages: vec![TextureUsage::ColorAttachment],
+        })
+        .unwrap();
+    let color_view = gal
+        .create_texture_view(view(
+            "d3.storage.color.view",
+            color,
+            TextureFormat::Rgba8Unorm,
+        ))
+        .unwrap();
+    let target = gal
+        .create_render_target(RenderTargetDesc {
+            label: "d3.storage.target".to_owned(),
+            color_views: vec![color_view],
+            depth_stencil_view: None,
+            extent: Extent3d {
+                width: 1,
+                height: 1,
+                depth: 1,
+            },
+        })
+        .unwrap();
+    let pass = gal
+        .create_render_pass(RenderPassDesc {
+            label: "d3.storage.pass".to_owned(),
+            target,
+            color_formats: vec![TextureFormat::Rgba8Unorm],
+            depth_format: None,
+        })
+        .unwrap();
+    let layout = gal
+        .create_resource_layout(ResourceLayoutDesc {
+            label: "d3.storage.layout".to_owned(),
+            bindings: vec![ResourceBindingDesc {
+                binding: 0,
+                kind: ResourceBindingKind::StorageTexture,
+                stages: PipelineStageFlags::DRAW,
+                array_count: 1,
+                optional: false,
+                dynamic_offset_count: 0,
+            }],
+        })
+        .unwrap();
+    let set = gal
+        .create_resource_set(ResourceSetDesc {
+            label: "d3.storage.set".to_owned(),
+            layout,
+            bindings: vec![ResourceBinding {
+                binding: 0,
+                array_index: 0,
+                resource: volume_view,
+                kind: ResourceBindingKind::StorageTexture,
+                access: AccessFlags::WRITE,
+                dynamic_offsets: Vec::new(),
+                buffer_range: None,
+            }],
+        })
+        .unwrap();
+    let pipeline_layout = gal
+        .create_pipeline_layout(PipelineLayoutDesc {
+            label: "d3.storage.pipeline-layout".to_owned(),
+            resource_layouts: vec![layout],
+        })
+        .unwrap();
+    let vertex = gal
+        .create_shader_module(shader_module(
+            "d3.storage.vertex",
+            ShaderStage::Vertex,
+            D3_STORAGE_VERTEX_SHADER,
+        ))
+        .unwrap();
+    let fragment = gal
+        .create_shader_module(shader_module(
+            "d3.storage.fragment",
+            ShaderStage::Fragment,
+            fragment_shader,
+        ))
+        .unwrap();
+    let pipeline = gal
+        .create_graphics_pipeline(GraphicsPipelineDesc {
+            label: "d3.storage.pipeline".to_owned(),
+            layout: pipeline_layout,
+            vertex_shader: vertex,
+            fragment_shader: fragment,
+            topology: PrimitiveTopology::Triangles,
+            cull_mode: CullMode::None,
+            blend: BlendMode::Disabled,
+            depth_compare: None,
+            depth_write: false,
+            color_formats: vec![TextureFormat::Rgba8Unorm],
+            depth_format: None,
+        })
+        .unwrap();
+    let readback = gal
+        .create_buffer(BufferDesc {
+            label: "d3.storage.readback".to_owned(),
+            size: expected_bytes.len() as u64,
+            memory: MemoryDomain::Readback,
+            usages: vec![BufferUsage::TransferDst, BufferUsage::HostRead],
+        })
+        .unwrap();
+    let read_region = BufferImageCopyRegion {
+        buffer: readback,
+        buffer_offset: 0,
+        bytes_per_row: expected_bytes.len() as u32,
+        rows_per_image: 1,
+        texture: volume,
+        texture_mip: 0,
+        texture_layer: 0,
+        // A D3 image is a semantic volume rather than a framebuffer. The
+        // shader image-store and backend-neutral copy share the same Y axis.
+        texture_origin: TextureOrigin3d { x: 1, y: 2, z: 3 },
+        extent: Extent3d {
+            width: 1,
+            height: 1,
+            depth: 1,
+        },
+    };
+    let list = gal
+        .create_command_list(CommandListDesc {
+            label: "d3.storage.commands".to_owned(),
+            operations: vec![
+                texture_barrier(
+                    volume,
+                    TextureUsageState::Undefined,
+                    TextureUsageState::ShaderWrite,
+                ),
+                texture_barrier(
+                    color,
+                    TextureUsageState::Undefined,
+                    TextureUsageState::ColorAttachment,
+                ),
+                CommandOp::BeginPass {
+                    pass,
+                    target,
+                    colors: vec![PassAttachment {
+                        view: color_view,
+                        load_op: AttachmentLoadOp::Clear,
+                        store_op: AttachmentStoreOp::DontCare,
+                        clear_color: Some(ClearColor {
+                            r: 0.0,
+                            g: 0.0,
+                            b: 0.0,
+                            a: 1.0,
+                        }),
+                    }],
+                    depth_stencil: None,
+                },
+                CommandOp::BindGraphicsPipeline(pipeline),
+                CommandOp::BindResourceSet {
+                    pipeline_layout,
+                    set_index: 0,
+                    set,
+                    dynamic_offsets: Vec::new(),
+                },
+                CommandOp::Draw {
+                    vertices: 3,
+                    instances: 1,
+                },
+                CommandOp::EndPass,
+                texture_barrier(
+                    volume,
+                    TextureUsageState::ShaderWrite,
+                    TextureUsageState::TransferSrc,
+                ),
+                CommandOp::CopyTextureToBuffer(read_region),
+                buffer_barrier(
+                    readback,
+                    TextureUsageState::TransferDst,
+                    TextureUsageState::ShaderRead,
+                ),
+                CommandOp::HostReadBuffer {
+                    buffer: readback,
+                    offset: 0,
+                    size: expected_bytes.len() as u64,
+                },
+            ],
+        })
+        .unwrap();
+    let token = gal
+        .submit(SubmissionBatch {
+            label: format!("d3.storage.{format_label}.submit"),
+            command_lists: vec![list],
+        })
+        .unwrap();
+    gal.retire_through_for_test(token.submission).unwrap();
+    let backend = gal.opengl_backend().unwrap();
+    assert!(backend.gl_errors_for_test().is_empty());
+    let bytes = backend
+        .completed_host_reads_for_test()
+        .iter()
+        .rev()
+        .find(|read| read.buffer == readback)
+        .map(|read| read.bytes.clone())
+        .unwrap();
+    assert_eq!(expected_bytes, bytes.as_slice());
 }
 
 #[test]
@@ -440,20 +1247,17 @@ pub(in crate::render::vulkanic::backends) fn run_conformance(
         address_v: SamplerAddressMode::ClampToEdge,
         address_w: SamplerAddressMode::ClampToEdge,
     })?;
+    let combined_sampler = gal.create_combined_texture_sampler(CombinedTextureSamplerDesc {
+        label: "conformance.combined-sampler".to_string(),
+        texture_view: sampled_view,
+        sampler,
+    })?;
     let resource_layout = gal.create_resource_layout(ResourceLayoutDesc {
         label: "conformance.resource-layout".to_string(),
         bindings: vec![
             ResourceBindingDesc {
                 binding: 1,
-                kind: ResourceBindingKind::SampledTexture,
-                stages: PipelineStageFlags::DRAW,
-                array_count: 1,
-                optional: false,
-                dynamic_offset_count: 0,
-            },
-            ResourceBindingDesc {
-                binding: 2,
-                kind: ResourceBindingKind::Sampler,
+                kind: ResourceBindingKind::CombinedTextureSampler,
                 stages: PipelineStageFlags::DRAW,
                 array_count: 1,
                 optional: false,
@@ -492,17 +1296,8 @@ pub(in crate::render::vulkanic::backends) fn run_conformance(
             ResourceBinding {
                 binding: 1,
                 array_index: 0,
-                resource: sampled_view,
-                kind: ResourceBindingKind::SampledTexture,
-                access: AccessFlags::READ,
-                dynamic_offsets: Vec::new(),
-                buffer_range: None,
-            },
-            ResourceBinding {
-                binding: 2,
-                array_index: 0,
-                resource: sampler,
-                kind: ResourceBindingKind::Sampler,
+                resource: combined_sampler,
+                kind: ResourceBindingKind::CombinedTextureSampler,
                 access: AccessFlags::READ,
                 dynamic_offsets: Vec::new(),
                 buffer_range: None,
@@ -845,6 +1640,15 @@ fn shader_module(label: &str, stage: ShaderStage, source: &str) -> ShaderModuleD
     }
 }
 
+const D3_COMPUTE_R8UINT_SHADER: &str = r#"
+#version 430 core
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+layout(binding = 0, r8ui) uniform writeonly uimage3D volume;
+void main() {
+    imageStore(volume, ivec3(1, 2, 3), uvec4(0x5au));
+}
+"#;
+
 fn texture_bytes() -> Vec<u8> {
     vec![
         255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 0, 255, 255, 255, 255, 255, 0,
@@ -952,6 +1756,38 @@ fn report_path() -> GalResult<PathBuf> {
         .ok_or_else(|| GalError::backend("failed to locate repository root from Cargo manifest"))?;
     Ok(root.join("logs/rust-opengl/conformance/latest.json"))
 }
+
+const D3_STORAGE_VERTEX_SHADER: &str = r#"
+#version 430 core
+const vec2 positions[3] = vec2[3](
+    vec2(-1.0, -1.0),
+    vec2( 3.0, -1.0),
+    vec2(-1.0,  3.0)
+);
+void main() {
+    gl_Position = vec4(positions[gl_VertexID], 0.0, 1.0);
+}
+"#;
+
+const D3_STORAGE_R8UINT_FRAGMENT_SHADER: &str = r#"
+#version 430 core
+layout(binding = 0, r8ui) uniform writeonly uimage3D volume;
+layout(location = 0) out vec4 out_color;
+void main() {
+    imageStore(volume, ivec3(1, 2, 3), uvec4(0x5au));
+    out_color = vec4(0.0);
+}
+"#;
+
+const D3_STORAGE_RGBA16FLOAT_FRAGMENT_SHADER: &str = r#"
+#version 430 core
+layout(binding = 0, rgba16f) uniform writeonly image3D volume;
+layout(location = 0) out vec4 out_color;
+void main() {
+    imageStore(volume, ivec3(1, 2, 3), vec4(0.5, 0.25, 0.75, 1.0));
+    out_color = vec4(0.0);
+}
+"#;
 
 const VERTEX_SHADER: &str = r#"
 #version 330 core

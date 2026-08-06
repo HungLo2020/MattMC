@@ -763,9 +763,9 @@ impl SubmissionLowerer {
                 }
                 CommandOp::BindResourceSet {
                     pipeline_layout,
+                    set_index,
                     set,
                     dynamic_offsets,
-                    ..
                 } => {
                     let layout = objects.pipeline_layout(*pipeline_layout)?;
                     let set = objects.resource_set(*set)?;
@@ -793,7 +793,7 @@ impl SubmissionLowerer {
                         command_buffer,
                         bind_point,
                         layout.layout,
-                        0,
+                        *set_index,
                         &[set.set],
                         bind_dynamic_offsets.as_ref(),
                     );

@@ -1,3 +1,4 @@
+use crate::render::vulkanic::commands::{BufferImageCopyRegion, TextureOrigin3d};
 use crate::render::vulkanic::error::GalError;
 use crate::render::vulkanic::gal::VulkanicGal;
 use crate::render::vulkanic::handles::Handle;
@@ -151,6 +152,490 @@ fn shared_large_copy_lifecycle_conformance_reuses_and_retires_resources() {
     }
 }
 
+/// One semantic D3 fixture is deliberately shared by both private lowerings.
+/// Native compute/storage-image execution stays in the backend conformance
+/// modules, where shader compilation and descriptor details belong.
+#[test]
+fn shared_d3_pattern_fixture_round_trips_r8uint_and_rgba16float() {
+    for backend in [BackendKind::Vulkan, BackendKind::OpenGl] {
+        let mut gal = match gal_for(backend, "MattMC shared D3 pattern conformance") {
+            Ok(gal) => gal,
+            Err(error) => {
+                assert_environment_gap(&error, backend.name());
+                continue;
+            }
+        };
+        assert!(gal.capabilities().supports(BackendFeature::Texture3d));
+        submit_d3_pattern_round_trip(
+            &mut gal,
+            backend.name(),
+            TextureFormat::R8Uint,
+            Extent3d {
+                width: 4,
+                height: 2,
+                depth: 2,
+            },
+            (0_u8..16).collect(),
+        )
+        .unwrap_or_else(|error| panic!("{} R8Uint D3 fixture failed: {error}", backend.name()));
+        submit_d3_pattern_round_trip(
+            &mut gal,
+            backend.name(),
+            TextureFormat::Rgba16Float,
+            Extent3d {
+                width: 2,
+                height: 1,
+                depth: 2,
+            },
+            (0_u8..32).collect(),
+        )
+        .unwrap_or_else(|error| {
+            panic!("{} Rgba16Float D3 fixture failed: {error}", backend.name())
+        });
+    }
+}
+
+#[test]
+fn shared_d3_pattern_fixture_round_trips_a_nonzero_mip_on_both_backends() {
+    for backend in [BackendKind::Vulkan, BackendKind::OpenGl] {
+        let mut gal = match gal_for(backend, "MattMC shared D3 mip conformance") {
+            Ok(gal) => gal,
+            Err(error) => {
+                assert_environment_gap(&error, backend.name());
+                continue;
+            }
+        };
+        assert!(gal
+            .capabilities()
+            .supports(BackendFeature::TextureMipLevels));
+        submit_d3_pattern_round_trip_at_mip(
+            &mut gal,
+            backend.name(),
+            TextureFormat::R8Uint,
+            Extent3d {
+                width: 8,
+                height: 4,
+                depth: 2,
+            },
+            3,
+            1,
+            Extent3d {
+                width: 4,
+                height: 2,
+                depth: 1,
+            },
+            (0x40_u8..0x48).collect(),
+        )
+        .unwrap_or_else(|error| panic!("{} D3 mip fixture failed: {error}", backend.name()));
+    }
+}
+
+/// Exercises the normal sampled-texture resource path rather than only a
+/// transfer round-trip. The selected texel is deliberately on the first Y
+/// row, so an accidental reuse of the OpenGL 2D row flip cannot pass.
+#[test]
+fn shared_d3_pattern_fixture_samples_asymmetric_volume_coordinates() {
+    for backend in [BackendKind::Vulkan, BackendKind::OpenGl] {
+        let mut gal = match gal_for(backend, "MattMC shared D3 sampling conformance") {
+            Ok(gal) => gal,
+            Err(error) => {
+                assert_environment_gap(&error, backend.name());
+                continue;
+            }
+        };
+        submit_d3_sampled_texel(&mut gal, backend.name()).unwrap_or_else(|error| {
+            panic!(
+                "{} sampled D3 coordinate fixture failed: {error}",
+                backend.name()
+            )
+        });
+    }
+}
+
+fn submit_d3_pattern_round_trip(
+    gal: &mut VulkanicGal,
+    backend_name: &str,
+    format: TextureFormat,
+    extent: Extent3d,
+    pattern: Vec<u8>,
+) -> Result<(), GalError> {
+    submit_d3_pattern_round_trip_at_mip(gal, backend_name, format, extent, 1, 0, extent, pattern)
+}
+
+fn submit_d3_pattern_round_trip_at_mip(
+    gal: &mut VulkanicGal,
+    backend_name: &str,
+    format: TextureFormat,
+    texture_extent: Extent3d,
+    mip_levels: u32,
+    texture_mip: u32,
+    extent: Extent3d,
+    pattern: Vec<u8>,
+) -> Result<(), GalError> {
+    let bytes_per_texel = format
+        .copy_bytes_per_texel()
+        .ok_or_else(|| GalError::invalid_argument("D3 fixture format has no texel size"))?;
+    let bytes_per_row = extent
+        .width
+        .checked_mul(bytes_per_texel)
+        .ok_or_else(|| GalError::invalid_argument("D3 fixture row pitch overflows"))?;
+    let expected_len = u64::from(bytes_per_row)
+        .checked_mul(u64::from(extent.height))
+        .and_then(|value| value.checked_mul(u64::from(extent.depth)))
+        .ok_or_else(|| GalError::invalid_argument("D3 fixture byte length overflows"))?;
+    if usize::try_from(expected_len).ok() != Some(pattern.len()) {
+        return Err(GalError::invalid_argument(
+            "D3 fixture pattern length does not match its semantic volume extent",
+        ));
+    }
+    let label = format!("shared-d3-{}-{format:?}", backend_name.to_lowercase());
+    let upload = gal.create_buffer(BufferDesc {
+        label: format!("{label}.upload"),
+        size: expected_len,
+        memory: MemoryDomain::Upload,
+        usages: vec![BufferUsage::HostWrite, BufferUsage::TransferSrc],
+    })?;
+    let readback = gal.create_buffer(BufferDesc {
+        label: format!("{label}.readback"),
+        size: expected_len,
+        memory: MemoryDomain::Readback,
+        usages: vec![BufferUsage::TransferDst, BufferUsage::HostRead],
+    })?;
+    let texture = gal.create_texture(TextureDesc {
+        label: format!("{label}.texture"),
+        dimension: TextureDimension::D3,
+        format,
+        extent: texture_extent,
+        mip_levels,
+        array_layers: 1,
+        usages: vec![
+            TextureUsage::TransferDst,
+            TextureUsage::TransferSrc,
+            TextureUsage::Sampled,
+        ],
+    })?;
+    let region = BufferImageCopyRegion {
+        buffer: upload,
+        buffer_offset: 0,
+        bytes_per_row,
+        rows_per_image: extent.height,
+        texture,
+        texture_mip,
+        texture_layer: 0,
+        texture_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
+        extent,
+    };
+    let list = gal.create_command_list(CommandListDesc {
+        label: format!("{label}.commands"),
+        operations: vec![
+            CommandOp::HostWriteBuffer {
+                buffer: upload,
+                offset: 0,
+                data: pattern.clone(),
+            },
+            buffer_barrier(upload),
+            texture_mip_barrier(
+                texture,
+                texture_mip,
+                TextureUsageState::Undefined,
+                TextureUsageState::TransferDst,
+            ),
+            CommandOp::CopyBufferToTexture(region.clone()),
+            texture_mip_barrier(
+                texture,
+                texture_mip,
+                TextureUsageState::TransferDst,
+                TextureUsageState::TransferSrc,
+            ),
+            CommandOp::CopyTextureToBuffer(BufferImageCopyRegion {
+                buffer: readback,
+                ..region
+            }),
+            buffer_barrier(readback),
+            CommandOp::HostReadBuffer {
+                buffer: readback,
+                offset: 0,
+                size: expected_len,
+            },
+        ],
+    })?;
+    let token = gal.submit(SubmissionBatch {
+        label: format!("{label}.submit"),
+        command_lists: vec![list],
+    })?;
+    gal.destroy(texture)?;
+    gal.destroy(upload)?;
+    gal.destroy(readback)?;
+    gal.retire_through_for_test(token.submission)?;
+    let read = gal
+        .completed_host_reads()
+        .into_iter()
+        .find(|read| read.buffer == readback)
+        .ok_or_else(|| GalError::backend("D3 fixture completed without its readback"))?;
+    if read.bytes != pattern {
+        return Err(GalError::backend(
+            "D3 fixture readback did not match its upload pattern",
+        ));
+    }
+    Ok(())
+}
+
+fn submit_d3_sampled_texel(gal: &mut VulkanicGal, backend_name: &str) -> Result<(), GalError> {
+    const VOLUME_EXTENT: Extent3d = Extent3d {
+        width: 4,
+        height: 3,
+        depth: 2,
+    };
+    const SAMPLE_X: u32 = 2;
+    const SAMPLE_Y: u32 = 0;
+    const SAMPLE_Z: u32 = 1;
+    const SAMPLE_VALUE: u8 = 0x5a;
+
+    let mut volume_bytes = vec![0_u8; (VOLUME_EXTENT.width * VOLUME_EXTENT.height * VOLUME_EXTENT.depth) as usize];
+    let sample_offset = (SAMPLE_Z * VOLUME_EXTENT.width * VOLUME_EXTENT.height
+        + SAMPLE_Y * VOLUME_EXTENT.width
+        + SAMPLE_X) as usize;
+    volume_bytes[sample_offset] = SAMPLE_VALUE;
+    // A distinct last row catches a stale D2-style upload flip.
+    volume_bytes[(SAMPLE_Z * VOLUME_EXTENT.width * VOLUME_EXTENT.height
+        + (VOLUME_EXTENT.height - 1) * VOLUME_EXTENT.width
+        + SAMPLE_X) as usize] = 0xc3;
+
+    let label = format!("shared-d3-sampled-{}", backend_name.to_lowercase());
+    let upload = gal.create_buffer(BufferDesc {
+        label: format!("{label}.upload"),
+        size: volume_bytes.len() as u64,
+        memory: MemoryDomain::Upload,
+        usages: vec![BufferUsage::HostWrite, BufferUsage::TransferSrc],
+    })?;
+    let readback = gal.create_buffer(BufferDesc {
+        label: format!("{label}.readback"),
+        size: 4,
+        memory: MemoryDomain::Readback,
+        usages: vec![BufferUsage::TransferDst, BufferUsage::HostRead],
+    })?;
+    let volume = gal.create_texture(TextureDesc {
+        label: format!("{label}.volume"),
+        dimension: TextureDimension::D3,
+        format: TextureFormat::R8Uint,
+        extent: VOLUME_EXTENT,
+        mip_levels: 1,
+        array_layers: 1,
+        usages: vec![TextureUsage::TransferDst, TextureUsage::Sampled],
+    })?;
+    let color = gal.create_texture(TextureDesc {
+        label: format!("{label}.color"),
+        dimension: TextureDimension::D2,
+        format: TextureFormat::Rgba8Unorm,
+        extent: Extent3d {
+            width: 1,
+            height: 1,
+            depth: 1,
+        },
+        mip_levels: 1,
+        array_layers: 1,
+        usages: vec![TextureUsage::ColorAttachment, TextureUsage::TransferSrc],
+    })?;
+    let volume_view = gal.create_texture_view(view(
+        &format!("{label}.volume.view"),
+        volume,
+        TextureFormat::R8Uint,
+    ))?;
+    let color_view = gal.create_texture_view(view(
+        &format!("{label}.color.view"),
+        color,
+        TextureFormat::Rgba8Unorm,
+    ))?;
+    let sampler = gal.create_sampler(SamplerDesc {
+        label: format!("{label}.sampler"),
+        min_filter: SamplerFilter::Nearest,
+        mag_filter: SamplerFilter::Nearest,
+        mip_filter: SamplerFilter::Nearest,
+        address_u: SamplerAddressMode::ClampToEdge,
+        address_v: SamplerAddressMode::ClampToEdge,
+        address_w: SamplerAddressMode::ClampToEdge,
+    })?;
+    let target = gal.create_render_target(RenderTargetDesc {
+        label: format!("{label}.target"),
+        color_views: vec![color_view],
+        depth_stencil_view: None,
+        extent: Extent3d {
+            width: 1,
+            height: 1,
+            depth: 1,
+        },
+    })?;
+    let pass = gal.create_render_pass(RenderPassDesc {
+        label: format!("{label}.pass"),
+        target,
+        color_formats: vec![TextureFormat::Rgba8Unorm],
+        depth_format: None,
+    })?;
+    let empty_layout = gal.create_resource_layout(ResourceLayoutDesc {
+        label: format!("{label}.empty-layout"),
+        bindings: Vec::new(),
+    })?;
+    let sampled_layout = gal.create_resource_layout(ResourceLayoutDesc {
+        label: format!("{label}.sampled-layout"),
+        bindings: vec![
+            ResourceBindingDesc {
+                binding: 0,
+                kind: ResourceBindingKind::SampledTexture,
+                stages: PipelineStageFlags::DRAW,
+                array_count: 1,
+                optional: false,
+                dynamic_offset_count: 0,
+            },
+            ResourceBindingDesc {
+                binding: 2,
+                kind: ResourceBindingKind::Sampler,
+                stages: PipelineStageFlags::DRAW,
+                array_count: 1,
+                optional: false,
+                dynamic_offset_count: 0,
+            },
+        ],
+    })?;
+    let sampled_set = gal.create_resource_set(ResourceSetDesc {
+        label: format!("{label}.sampled-set"),
+        layout: sampled_layout,
+        bindings: vec![
+            ResourceBinding {
+                binding: 0,
+                array_index: 0,
+                resource: volume_view,
+                kind: ResourceBindingKind::SampledTexture,
+                access: AccessFlags::READ,
+                dynamic_offsets: Vec::new(),
+                buffer_range: None,
+            },
+            ResourceBinding {
+                binding: 2,
+                array_index: 0,
+                resource: sampler,
+                kind: ResourceBindingKind::Sampler,
+                access: AccessFlags::READ,
+                dynamic_offsets: Vec::new(),
+                buffer_range: None,
+            },
+        ],
+    })?;
+    let pipeline_layout = gal.create_pipeline_layout(PipelineLayoutDesc {
+        label: format!("{label}.pipeline-layout"),
+        resource_layouts: vec![empty_layout, sampled_layout],
+    })?;
+    let vertex = gal.create_shader_module(ShaderModuleDesc {
+        label: format!("{label}.vertex"),
+        stage: ShaderStage::Vertex,
+        code_format: ShaderCodeFormat::Glsl,
+        code: D3_SAMPLED_VERTEX_SHADER.as_bytes().to_vec(),
+        entry_point: "main".to_owned(),
+    })?;
+    let fragment = gal.create_shader_module(ShaderModuleDesc {
+        label: format!("{label}.fragment"),
+        stage: ShaderStage::Fragment,
+        code_format: ShaderCodeFormat::Glsl,
+        code: D3_SAMPLED_FRAGMENT_SHADER.as_bytes().to_vec(),
+        entry_point: "main".to_owned(),
+    })?;
+    let pipeline = gal.create_graphics_pipeline(GraphicsPipelineDesc {
+        label: format!("{label}.pipeline"),
+        layout: pipeline_layout,
+        vertex_shader: vertex,
+        fragment_shader: fragment,
+        topology: PrimitiveTopology::Triangles,
+        cull_mode: CullMode::None,
+        blend: BlendMode::Disabled,
+        depth_compare: None,
+        depth_write: false,
+        color_formats: vec![TextureFormat::Rgba8Unorm],
+        depth_format: None,
+    })?;
+    let upload_region = BufferImageCopyRegion {
+        buffer: upload,
+        buffer_offset: 0,
+        bytes_per_row: VOLUME_EXTENT.width,
+        rows_per_image: VOLUME_EXTENT.height,
+        texture: volume,
+        texture_mip: 0,
+        texture_layer: 0,
+        texture_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
+        extent: VOLUME_EXTENT,
+    };
+    let list = gal.create_command_list(CommandListDesc {
+        label: format!("{label}.commands"),
+        operations: vec![
+            CommandOp::HostWriteBuffer {
+                buffer: upload,
+                offset: 0,
+                data: volume_bytes,
+            },
+            buffer_barrier(upload),
+            texture_barrier(volume, TextureUsageState::Undefined, TextureUsageState::TransferDst),
+            CommandOp::CopyBufferToTexture(upload_region),
+            texture_barrier(volume, TextureUsageState::TransferDst, TextureUsageState::ShaderRead),
+            texture_barrier(color, TextureUsageState::Undefined, TextureUsageState::ColorAttachment),
+            CommandOp::BeginPass {
+                pass,
+                target,
+                colors: vec![color_attachment(color_view, 0.0, 0.0, 0.0, 1.0)],
+                depth_stencil: None,
+            },
+            CommandOp::BindGraphicsPipeline(pipeline),
+            CommandOp::BindResourceSet {
+                pipeline_layout,
+                set_index: 1,
+                set: sampled_set,
+                dynamic_offsets: Vec::new(),
+            },
+            CommandOp::Draw {
+                vertices: 3,
+                instances: 1,
+            },
+            CommandOp::EndPass,
+            texture_barrier(color, TextureUsageState::ColorAttachment, TextureUsageState::TransferSrc),
+            CommandOp::CopyTextureToBuffer(BufferImageCopyRegion {
+                buffer: readback,
+                buffer_offset: 0,
+                bytes_per_row: 4,
+                rows_per_image: 1,
+                texture: color,
+                texture_mip: 0,
+                texture_layer: 0,
+                texture_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
+                extent: Extent3d {
+                    width: 1,
+                    height: 1,
+                    depth: 1,
+                },
+            }),
+            buffer_barrier(readback),
+            CommandOp::HostReadBuffer {
+                buffer: readback,
+                offset: 0,
+                size: 4,
+            },
+        ],
+    })?;
+    let token = gal.submit(SubmissionBatch {
+        label: format!("{label}.submit"),
+        command_lists: vec![list],
+    })?;
+    gal.retire_through_for_test(token.submission)?;
+    let bytes = gal
+        .completed_host_reads()
+        .into_iter()
+        .find(|read| read.buffer == readback)
+        .ok_or_else(|| GalError::backend("sampled D3 fixture completed without color readback"))?
+        .bytes;
+    if bytes != [SAMPLE_VALUE, 0, 0, 255] {
+        return Err(GalError::backend(format!(
+            "sampled D3 texel did not preserve semantic coordinate: expected [90, 0, 0, 255], got {bytes:?}"
+        )));
+    }
+    Ok(())
+}
+
 fn assert_environment_gap(error: &GalError, backend: &str) {
     let text = error.to_string();
     assert!(
@@ -161,6 +646,33 @@ fn assert_environment_gap(error: &GalError, backend: &str) {
         "unexpected cross-backend conformance failure: {text}"
     );
 }
+
+const D3_SAMPLED_VERTEX_SHADER: &str = r#"
+#version 450
+vec2 positions[3] = vec2[](
+    vec2(-1.0, -1.0),
+    vec2(3.0, -1.0),
+    vec2(-1.0, 3.0)
+);
+void main() {
+    gl_Position = vec4(positions[gl_VertexIndex], 0.0, 1.0);
+}
+"#;
+
+const D3_SAMPLED_FRAGMENT_SHADER: &str = r#"
+#version 450
+layout(set = 1, binding = 0) uniform utexture3D TerrainVoxelOccupancy;
+layout(set = 1, binding = 2) uniform sampler TerrainVoxelLightSampler;
+layout(location = 0) out vec4 out_color;
+void main() {
+    uint value = texelFetch(
+        usampler3D(TerrainVoxelOccupancy, TerrainVoxelLightSampler),
+        ivec3(2, 0, 1),
+        0
+    ).r;
+    out_color = vec4(float(value) / 255.0, 0.0, 0.0, 1.0);
+}
+"#;
 
 #[derive(Clone, Copy)]
 enum BackendKind {
@@ -351,10 +863,19 @@ fn texture_barrier(
     before: TextureUsageState,
     after: TextureUsageState,
 ) -> CommandOp {
+    texture_mip_barrier(resource, 0, before, after)
+}
+
+fn texture_mip_barrier(
+    resource: Handle,
+    mip: u32,
+    before: TextureUsageState,
+    after: TextureUsageState,
+) -> CommandOp {
     CommandOp::Barrier(ResourceBarrier {
         resource,
         subresources: Some(TextureSubresourceRange {
-            base_mip: 0,
+            base_mip: mip,
             mip_count: 1,
             base_layer: 0,
             layer_count: 1,

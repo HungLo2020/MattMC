@@ -73,6 +73,12 @@ pub(crate) unsafe fn decode_world_mesh_asset_update(
 )> {
     let request = read_struct(request, "world mesh asset update request")?;
     validate_header::<FfiWorldMeshAssetUpdateRequest>(request.header)?;
+    if request.header.version != FFI_ABI_VERSION {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            "world mesh asset updates require ABI v3 semantic vertex records",
+        ));
+    }
     reject_unknown_feature_bits(request.negotiated_feature_bits)?;
     let supported = capability_feature_bits(capabilities);
     if request.negotiated_feature_bits & !supported != 0 {
@@ -177,6 +183,7 @@ pub(crate) unsafe fn decode_world_mesh_asset_update(
                 shader_atlas_uv: [vertex.atlas_u, vertex.atlas_v],
                 shader_block_id: vertex.shader_block_id,
                 shader_material_type: vertex.shader_material_type,
+                mid_block_packed: vertex.mid_block_packed,
                 color_argb: vertex.color_argb,
                 normal_packed: vertex.normal_packed,
                 light: vertex.light,

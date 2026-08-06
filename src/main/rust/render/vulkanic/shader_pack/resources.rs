@@ -11,9 +11,9 @@ use super::programs::{
 };
 use super::terrain_contract::{
     bundled_complementary_hung_loified_source, derive_complementary_terrain_contract,
-    TerrainPassContract,
+    derive_complementary_terrain_contract_for_scope, TerrainPassContract, TerrainProgramScope,
 };
-use super::voxel_light_volume::{VoxelLightVolumeCache, VoxelLightVolumeDescriptor};
+use super::voxel_light_volume::{VoxelLightVolumeDescriptor, VoxelLightVolumeReadiness};
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct MaterialIdentity(String);
@@ -120,12 +120,28 @@ impl ShaderPackRuntimePlan {
         generation: u64,
         source: &super::source::ShaderPackSource,
     ) -> GalResult<TerrainPassContract> {
+        Self::discover_terrain_contract_from_source_for_scope(
+            generation,
+            source,
+            TerrainProgramScope::Default,
+        )
+    }
+
+    pub fn discover_terrain_contract_from_source_for_scope(
+        generation: u64,
+        source: &super::source::ShaderPackSource,
+        scope: TerrainProgramScope,
+    ) -> GalResult<TerrainPassContract> {
         if source.generation() != generation {
             return Err(crate::render::vulkanic::error::GalError::invalid_argument(
                 "shader-pack source generation must match runtime generation",
             ));
         }
-        derive_complementary_terrain_contract(source)
+        if scope == TerrainProgramScope::Default {
+            derive_complementary_terrain_contract(source)
+        } else {
+            derive_complementary_terrain_contract_for_scope(source, scope)
+        }
     }
 
     pub fn terrain_material_from_source(
@@ -151,14 +167,10 @@ impl ShaderPackRuntimePlan {
     pub fn terrain_material_from_source_with_voxel_light_volume(
         generation: u64,
         source: &super::source::ShaderPackSource,
-        volume: &VoxelLightVolumeCache,
+        volume: &VoxelLightVolumeReadiness,
         frame_counter: u64,
     ) -> GalResult<Self> {
-        let descriptor = volume.descriptor().ok_or_else(|| {
-            GalError::invalid_argument(
-                "missing voxel-light volume descriptor for selected terrain source",
-            )
-        })?;
+        let descriptor = volume.descriptor();
         if descriptor.shader_pack_generation != generation {
             return Err(GalError::invalid_argument(
                 "voxel-light shader-pack generation does not match terrain source",
@@ -226,6 +238,17 @@ impl ShaderPackRuntimePlan {
             .as_ref()
             .map(|volume| volume.resource_generation.to_string())
             .unwrap_or_else(|| "null".to_string());
+        let voxel_update_policy = contract
+            .voxel_light_volume_requirements
+            .map(|requirements| {
+                format!(
+                    "{{\"temporal_reprojection\":{},\"alternate_x_half_rate\":{},\"preserve_behind_view\":{}}}",
+                    requirements.update_policy.temporal_reprojection,
+                    requirements.update_policy.alternate_x_half_rate,
+                    requirements.update_policy.preserve_behind_view,
+                )
+            })
+            .unwrap_or_else(|| "null".to_string());
         format!(
             concat!(
                 "{{\"source_contract_discovered\":true,\"pack\":\"{}\",\"generation\":{},",
@@ -242,7 +265,7 @@ impl ShaderPackRuntimePlan {
                 "\"output_bindings\":{{\"terrain_lit_color\":\"terrain color attachment location 0\",",
                 "\"terrain_material_auxiliary\":\"terrain auxiliary attachment location 2\",",
                 "\"terrain_view_space_normal\":\"terrain normal attachment location 1 when declared\"}},",
-                "\"unsupported\":[{}],\"required_resources\":[{}],\"voxel_light_volume_generation\":{},\"selected_source_plan_admitted\":{},\"execution\":\"internal-terrain-fixture; selected-source execution is explicitly unavailable until its semantic resources are GPU-bound and the source-derived program is lowered\"}}"
+                "\"unsupported\":[{}],\"required_resources\":[{}],\"voxel_light_volume_generation\":{},\"voxel_light_update_policy\":{},\"selected_source_plan_prepared\":{},\"selected_source_execution_admitted\":false,\"execution\":\"{}\"}}"
             ),
             json_escape(&contract.pack_name),
             contract.generation,
@@ -253,8 +276,13 @@ impl ShaderPackRuntimePlan {
             unsupported,
             required_resources,
             voxel_generation,
-            contract.supports_selected_subset()
-                && (contract.required_resources.is_empty() || self.voxel_light_volume.is_some()),
+            voxel_update_policy,
+            self.voxel_light_volume.is_some(),
+            if self.voxel_light_volume.is_some() {
+                "source-derived terrain plan prepared privately; production execution is explicitly unadmitted until a complete route policy selects it"
+            } else {
+                "internal-terrain-fixture"
+            },
         )
     }
 
