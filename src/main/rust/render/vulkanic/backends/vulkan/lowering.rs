@@ -896,11 +896,8 @@ impl SubmissionLowerer {
                     let _zone = trace::Zone::new("vulkan.lowering.copy-buffer-to-texture");
                     let buffer = objects.buffer(region.buffer)?;
                     let texture = objects.texture(region.texture)?;
-                    let copy = buffer_image_copy(
-                        region,
-                        texture.aspect,
-                        texture.copy_bytes_per_texel,
-                    );
+                    let copy =
+                        buffer_image_copy(region, texture.aspect, texture.copy_bytes_per_texel);
                     self.context.device.cmd_copy_buffer_to_image(
                         command_buffer,
                         buffer.buffer,
@@ -913,11 +910,8 @@ impl SubmissionLowerer {
                     let _zone = trace::Zone::new("vulkan.lowering.copy-texture-to-buffer");
                     let buffer = objects.buffer(region.buffer)?;
                     let texture = objects.texture(region.texture)?;
-                    let copy = buffer_image_copy(
-                        region,
-                        texture.aspect,
-                        texture.copy_bytes_per_texel,
-                    );
+                    let copy =
+                        buffer_image_copy(region, texture.aspect, texture.copy_bytes_per_texel);
                     self.context.device.cmd_copy_image_to_buffer(
                         command_buffer,
                         texture.image,

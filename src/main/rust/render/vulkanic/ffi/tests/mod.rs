@@ -1,7 +1,7 @@
 use super::*;
 use crate::render::vulkanic::resources::{BackendApi, BackendFeatureFlags, BackendLimits};
 use crate::render::vulkanic::world_primitive_frontend::{
-    WORLD_MATERIAL_TEXTURE_STONE, WorldShaderEnvironmentFrame, WorldVoxelVolumeFrame,
+    WorldShaderEnvironmentFrame, WorldVoxelVolumeFrame, WORLD_MATERIAL_TEXTURE_STONE,
 };
 
 fn test_capabilities() -> BackendCapabilities {
@@ -583,6 +583,27 @@ fn shader_pack_source_update_request(
         header: FfiHeader {
             version: FFI_ABI_VERSION,
             byte_size: size_of::<FfiShaderPackSourceUpdateRequest>() as u32,
+        },
+        generation: 9,
+        pack_name_utf8: FfiBytes {
+            ptr: pack_name.as_ptr(),
+            len: pack_name.len() as u64,
+        },
+        files: FfiSlice {
+            ptr: files.as_ptr(),
+            count: files.len() as u64,
+        },
+    }
+}
+
+fn shader_pack_asset_update_request(
+    pack_name: &[u8],
+    files: &[FfiShaderPackAssetFile],
+) -> FfiShaderPackAssetUpdateRequest {
+    FfiShaderPackAssetUpdateRequest {
+        header: FfiHeader {
+            version: FFI_ABI_VERSION,
+            byte_size: size_of::<FfiShaderPackAssetUpdateRequest>() as u32,
         },
         generation: 9,
         pack_name_utf8: FfiBytes {
@@ -1606,4 +1627,69 @@ fn shader_pack_source_ffi_accepts_an_explicit_empty_generation() {
         .expect("empty source generation clears a prior pack without stale reuse");
     assert_eq!("disabled", decoded.pack_name);
     assert!(decoded.files.is_empty());
+}
+
+#[test]
+fn shader_pack_asset_ffi_copies_owned_binary_files() {
+    let mut pack_name = b"complementary-test".to_vec();
+    let mut path = b"textures/noise.png".to_vec();
+    let mut contents = vec![0x89, b'P', b'N', b'G', 0, 1, 2, 3];
+    let files = [FfiShaderPackAssetFile {
+        byte_size: size_of::<FfiShaderPackAssetFile>() as u32,
+        reserved0: 0,
+        path_utf8: FfiBytes {
+            ptr: path.as_ptr(),
+            len: path.len() as u64,
+        },
+        contents: FfiBytes {
+            ptr: contents.as_ptr(),
+            len: contents.len() as u64,
+        },
+    }];
+    let request = shader_pack_asset_update_request(&pack_name, &files);
+    let decoded = unsafe { super::shader_pack::decode_shader_pack_asset_update(&request) }
+        .expect("valid asset update");
+
+    pack_name.fill(b'x');
+    path.fill(b'x');
+    contents.fill(0xff);
+
+    assert_eq!("complementary-test", decoded.pack_name);
+    assert_eq!(9, decoded.generation);
+    assert_eq!("textures/noise.png", decoded.files[0].path);
+    assert_eq!(
+        vec![0x89, b'P', b'N', b'G', 0, 1, 2, 3],
+        decoded.files[0].bytes
+    );
+}
+
+#[test]
+fn shader_pack_asset_ffi_rejects_malformed_file_records() {
+    let pack_name = b"test";
+    let path = b"textures/noise.png";
+    let contents = [1u8, 2, 3];
+    let mut files = [FfiShaderPackAssetFile {
+        byte_size: size_of::<FfiShaderPackAssetFile>() as u32,
+        reserved0: 1,
+        path_utf8: FfiBytes {
+            ptr: path.as_ptr(),
+            len: path.len() as u64,
+        },
+        contents: FfiBytes {
+            ptr: contents.as_ptr(),
+            len: contents.len() as u64,
+        },
+    }];
+    let request = shader_pack_asset_update_request(pack_name, &files);
+    let reserved = unsafe { super::shader_pack::decode_shader_pack_asset_update(&request) }
+        .expect_err("reserved field must be rejected");
+    assert_eq!(StatusCode::InvalidArgument, reserved.code);
+
+    files[0].reserved0 = 0;
+    files[0].byte_size -= 4;
+    let malformed_request = shader_pack_asset_update_request(pack_name, &files);
+    let malformed =
+        unsafe { super::shader_pack::decode_shader_pack_asset_update(&malformed_request) }
+            .expect_err("truncated item must be rejected");
+    assert_eq!(StatusCode::InvalidArgument, malformed.code);
 }

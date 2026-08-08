@@ -647,6 +647,7 @@ impl GuiFrontend {
                 address_u: SamplerAddressMode::ClampToEdge,
                 address_v: SamplerAddressMode::ClampToEdge,
                 address_w: SamplerAddressMode::ClampToEdge,
+                comparison: None,
             })?;
             created.push(sampler);
             let vertex_shader = gal.create_shader_module(ShaderModuleDesc {

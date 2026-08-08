@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.net.URI;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -44,6 +45,26 @@ class RustShaderPackSourceCollectorTest {
 	}
 
 	@Test
+	void collectsBoundedBinaryAssetsAlongsideButSeparateFromSource() throws Exception {
+		Files.createDirectories(temporaryDirectory.resolve("textures"));
+		Files.writeString(temporaryDirectory.resolve("gbuffers_terrain.fsh"), "fragment");
+		Files.write(temporaryDirectory.resolve("textures/noise.png"), new byte[] {1, 2, 3});
+		Files.writeString(temporaryDirectory.resolve("textures/noise.png.mcmeta"), "{\"animation\":{}}");
+		Files.write(temporaryDirectory.resolve("textures/volume.raw"), new byte[] {4, 5});
+		Files.writeString(temporaryDirectory.resolve("notes.txt"), "not a runtime texture asset");
+
+		RustShaderPackSourceCollector.SourceGeneration generation =
+			RustShaderPackSourceCollector.collectWithAssets(temporaryDirectory, "assets-pack", 8L);
+
+		assertEquals(List.of("gbuffers_terrain.fsh"), generation.files().stream().map(file -> file.path()).toList());
+		assertEquals(
+			List.of("textures/noise.png", "textures/noise.png.mcmeta", "textures/volume.raw"),
+			generation.assets().stream().map(file -> file.path()).toList()
+		);
+		assertEquals(21L, generation.assetTotalBytes());
+	}
+
+	@Test
 	void rejectsOversizedSourceBeforeTransport() throws Exception {
 		Path source = temporaryDirectory.resolve("large.vsh");
 		try (java.io.OutputStream output = Files.newOutputStream(source)) {
@@ -58,6 +79,8 @@ class RustShaderPackSourceCollectorTest {
 		assertEquals("disabled", source.packName());
 		assertEquals(3L, source.generation());
 		assertEquals(0, source.files().size());
+		assertEquals(0, source.assets().size());
+		assertEquals(0L, source.assetTotalBytes());
 	}
 
 	@Test

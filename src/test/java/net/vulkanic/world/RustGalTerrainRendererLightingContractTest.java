@@ -12,6 +12,13 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class RustGalTerrainRendererLightingContractTest {
 	@Test
+	void specularResourceSuffixPreservesResourceLocationExtensions() {
+		assertEquals("block/sand_s", RustGalTerrainRenderer.appendPbrSuffix("block/sand", "_s"));
+		assertEquals("optifine/cit/metal_s.png", RustGalTerrainRenderer.appendPbrSuffix("optifine/cit/metal.png", "_s"));
+		assertEquals("custom/stone_s.png", RustGalTerrainRenderer.appendPbrSuffix("custom/stone.png", "_s"));
+	}
+
+	@Test
 	void preservesIrisPackedBlockMaterialSemantics() {
 		int packed = (10200 + 1 << 1) | 1;
 		assertEquals(10200, RustGalTerrainRenderer.decodeIrisShaderBlockId(packed));

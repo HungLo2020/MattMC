@@ -14,6 +14,10 @@ use super::lowering::{
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TerrainSourceUniformSemantic {
     FrameCounter,
+    /// Semantic world render-category selected by the Rust pass scheduler.
+    /// This is not an Iris render-stage object or callback; source programs
+    /// use its integer value to admit terrain voxelization work by layer.
+    RenderStage,
     FrameModuloEight,
     WorldTime,
     WorldDay,
@@ -31,6 +35,10 @@ pub enum TerrainSourceUniformSemantic {
     ViewMatrixInverse,
     ProjectionMatrix,
     ProjectionMatrixInverse,
+    ShadowModelView,
+    ShadowModelViewInverse,
+    ShadowProjection,
+    ShadowProjectionInverse,
     ViewportWidth,
     ViewportHeight,
     EyeSubmersion,
@@ -59,6 +67,7 @@ impl TerrainSourceUniformSemantic {
     fn for_name(name: &str) -> Option<Self> {
         match name {
             "frameCounter" => Some(Self::FrameCounter),
+            "renderStage" => Some(Self::RenderStage),
             "framemod8" => Some(Self::FrameModuloEight),
             "worldTime" => Some(Self::WorldTime),
             "worldDay" => Some(Self::WorldDay),
@@ -76,6 +85,10 @@ impl TerrainSourceUniformSemantic {
             "gbufferModelViewInverse" => Some(Self::ViewMatrixInverse),
             "gbufferProjection" => Some(Self::ProjectionMatrix),
             "gbufferProjectionInverse" => Some(Self::ProjectionMatrixInverse),
+            "shadowModelView" => Some(Self::ShadowModelView),
+            "shadowModelViewInverse" => Some(Self::ShadowModelViewInverse),
+            "shadowProjection" => Some(Self::ShadowProjection),
+            "shadowProjectionInverse" => Some(Self::ShadowProjectionInverse),
             "viewWidth" => Some(Self::ViewportWidth),
             "viewHeight" => Some(Self::ViewportHeight),
             "isEyeInWater" => Some(Self::EyeSubmersion),
@@ -105,6 +118,7 @@ impl TerrainSourceUniformSemantic {
     fn expected_type(self) -> TerrainSourceUniformType {
         match self {
             Self::FrameCounter
+            | Self::RenderStage
             | Self::WorldTime
             | Self::WorldDay
             | Self::MoonPhase
@@ -126,7 +140,11 @@ impl TerrainSourceUniformSemantic {
             Self::ViewMatrix
             | Self::ViewMatrixInverse
             | Self::ProjectionMatrix
-            | Self::ProjectionMatrixInverse => TerrainSourceUniformType::Mat4,
+            | Self::ProjectionMatrixInverse
+            | Self::ShadowModelView
+            | Self::ShadowModelViewInverse
+            | Self::ShadowProjection
+            | Self::ShadowProjectionInverse => TerrainSourceUniformType::Mat4,
             Self::ViewportWidth
             | Self::ViewportHeight
             | Self::ScreenBrightness
@@ -262,6 +280,9 @@ impl TerrainSourceUniformRequirements {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct TerrainSourceUniformFrame {
     pub frame_counter: Option<i32>,
+    /// Pack-defined world render category for the current Rust-owned pass.
+    /// The runtime must provide it explicitly instead of borrowing Iris state.
+    pub render_stage: Option<i32>,
     pub frame_modulo_eight: Option<f32>,
     pub world_time: Option<i32>,
     pub world_day: Option<i32>,
@@ -281,6 +302,10 @@ pub struct TerrainSourceUniformFrame {
     pub view_matrix_inverse: Option<[f32; 16]>,
     pub projection_matrix: Option<[f32; 16]>,
     pub projection_matrix_inverse: Option<[f32; 16]>,
+    pub shadow_model_view: Option<[f32; 16]>,
+    pub shadow_model_view_inverse: Option<[f32; 16]>,
+    pub shadow_projection: Option<[f32; 16]>,
+    pub shadow_projection_inverse: Option<[f32; 16]>,
     pub viewport_width: Option<f32>,
     pub viewport_height: Option<f32>,
     pub eye_submersion: Option<i32>,
@@ -337,6 +362,13 @@ impl TerrainSourceUniformFrame {
                         &mut bytes,
                         offset,
                         self.required_i32(self.frame_counter, "frame counter")?,
+                    )?;
+                }
+                TerrainSourceUniformSemantic::RenderStage => {
+                    write_i32(
+                        &mut bytes,
+                        offset,
+                        self.required_i32(self.render_stage, "world render stage")?,
                     )?;
                 }
                 TerrainSourceUniformSemantic::FrameModuloEight => {
@@ -460,6 +492,40 @@ impl TerrainSourceUniformFrame {
                         self.required_mat4(
                             self.projection_matrix_inverse,
                             "projection matrix inverse",
+                        )?,
+                    )?;
+                }
+                TerrainSourceUniformSemantic::ShadowModelView => {
+                    write_mat4(
+                        &mut bytes,
+                        offset,
+                        self.required_mat4(self.shadow_model_view, "shadow model view")?,
+                    )?;
+                }
+                TerrainSourceUniformSemantic::ShadowModelViewInverse => {
+                    write_mat4(
+                        &mut bytes,
+                        offset,
+                        self.required_mat4(
+                            self.shadow_model_view_inverse,
+                            "shadow model view inverse",
+                        )?,
+                    )?;
+                }
+                TerrainSourceUniformSemantic::ShadowProjection => {
+                    write_mat4(
+                        &mut bytes,
+                        offset,
+                        self.required_mat4(self.shadow_projection, "shadow projection")?,
+                    )?;
+                }
+                TerrainSourceUniformSemantic::ShadowProjectionInverse => {
+                    write_mat4(
+                        &mut bytes,
+                        offset,
+                        self.required_mat4(
+                            self.shadow_projection_inverse,
+                            "shadow projection inverse",
                         )?,
                     )?;
                 }
@@ -785,6 +851,33 @@ mod tests {
     }
 
     #[test]
+    fn packs_source_derived_shadow_matrices_as_named_semantics() {
+        let requirements = source_requirements(
+            "uniform mat4 shadowModelView;\nuniform mat4 shadowModelViewInverse;",
+            "vec4 source_shadow = shadowModelView * shadowModelViewInverse[0];",
+            "uniform mat4 shadowProjection;\nuniform mat4 shadowProjectionInverse;",
+            "vec4 source_shadow_projection = shadowProjection * shadowProjectionInverse[0];",
+        )
+        .unwrap();
+        assert!(requirements.is_fully_semantic());
+        let identity = [
+            1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+        ];
+        let frame = TerrainSourceUniformFrame {
+            view_matrix: Some(identity),
+            view_matrix_inverse: Some(identity),
+            projection_matrix: Some(identity),
+            projection_matrix_inverse: Some(identity),
+            shadow_model_view: Some(identity),
+            shadow_model_view_inverse: Some(identity),
+            shadow_projection: Some(identity),
+            shadow_projection_inverse: Some(identity),
+            ..TerrainSourceUniformFrame::default()
+        };
+        assert!(frame.pack_std140(&requirements).is_ok());
+    }
+
+    #[test]
     fn maps_camera_environment_semantics_without_renderer_state() {
         let requirements = source_requirements(
             "uniform int isEyeInWater;\nuniform float screenBrightness;\nuniform float darknessLightFactor;\nuniform float nightVision;\nuniform float inDry;\nuniform float inSnowy;\nuniform float inNetherWastes;\nuniform float inCrimsonForest;\nuniform float inWarpedForest;\nuniform float inBasaltDeltas;\nuniform float inSoulValley;",
@@ -794,58 +887,44 @@ mod tests {
         )
         .unwrap();
         assert!(requirements.is_fully_semantic());
-        assert!(
-            requirements
-                .fields()
-                .iter()
-                .any(|requirement| requirement.semantic
-                    == Some(TerrainSourceUniformSemantic::EyeSubmersion))
-        );
-        assert!(
-            requirements
-                .fields()
-                .iter()
-                .any(|requirement| requirement.semantic
-                    == Some(TerrainSourceUniformSemantic::ScreenBrightness))
-        );
-        assert!(
-            requirements
-                .fields()
-                .iter()
-                .any(|requirement| requirement.semantic
-                    == Some(TerrainSourceUniformSemantic::DarknessLightFactor))
-        );
-        assert!(
-            requirements
-                .fields()
-                .iter()
-                .any(|requirement| requirement.semantic
-                    == Some(TerrainSourceUniformSemantic::NightVision))
-        );
+        assert!(requirements
+            .fields()
+            .iter()
+            .any(|requirement| requirement.semantic
+                == Some(TerrainSourceUniformSemantic::EyeSubmersion)));
+        assert!(requirements
+            .fields()
+            .iter()
+            .any(|requirement| requirement.semantic
+                == Some(TerrainSourceUniformSemantic::ScreenBrightness)));
+        assert!(requirements
+            .fields()
+            .iter()
+            .any(|requirement| requirement.semantic
+                == Some(TerrainSourceUniformSemantic::DarknessLightFactor)));
+        assert!(requirements
+            .fields()
+            .iter()
+            .any(|requirement| requirement.semantic
+                == Some(TerrainSourceUniformSemantic::NightVision)));
         assert!(requirements.fields().iter().any(
             |requirement| requirement.semantic == Some(TerrainSourceUniformSemantic::BiomeDry)
         ));
-        assert!(
-            requirements
-                .fields()
-                .iter()
-                .any(|requirement| requirement.semantic
-                    == Some(TerrainSourceUniformSemantic::BiomeNetherWastes))
-        );
-        assert!(
-            requirements
-                .fields()
-                .iter()
-                .any(|requirement| requirement.semantic
-                    == Some(TerrainSourceUniformSemantic::BiomeSoulValley))
-        );
-        assert!(
-            requirements
-                .fields()
-                .iter()
-                .any(|requirement| requirement.semantic
-                    == Some(TerrainSourceUniformSemantic::BiomeSnowy))
-        );
+        assert!(requirements
+            .fields()
+            .iter()
+            .any(|requirement| requirement.semantic
+                == Some(TerrainSourceUniformSemantic::BiomeNetherWastes)));
+        assert!(requirements
+            .fields()
+            .iter()
+            .any(|requirement| requirement.semantic
+                == Some(TerrainSourceUniformSemantic::BiomeSoulValley)));
+        assert!(requirements
+            .fields()
+            .iter()
+            .any(|requirement| requirement.semantic
+                == Some(TerrainSourceUniformSemantic::BiomeSnowy)));
         assert!(requirements.fields().iter().any(
             |requirement| requirement.semantic == Some(TerrainSourceUniformSemantic::FogColor)
         ));
@@ -963,13 +1042,11 @@ mod tests {
                 .map(|field| field.name())
                 .collect::<Vec<_>>()
         );
-        assert!(
-            requirements
-                .require_fully_semantic()
-                .unwrap_err()
-                .to_string()
-                .contains("packSpecificValue")
-        );
+        assert!(requirements
+            .require_fully_semantic()
+            .unwrap_err()
+            .to_string()
+            .contains("packSpecificValue"));
         assert_eq!(
             TerrainSourceUniformRequirementSummary {
                 field_count: 3,
@@ -978,15 +1055,13 @@ mod tests {
             },
             requirements.summary()
         );
-        assert!(
-            source_requirements(
-                "uniform float worldTime;",
-                "float source_world_time = worldTime;",
-                "",
-                "",
-            )
-            .is_err()
-        );
+        assert!(source_requirements(
+            "uniform float worldTime;",
+            "float source_world_time = worldTime;",
+            "",
+            "",
+        )
+        .is_err());
     }
 
     #[test]
@@ -1070,22 +1145,18 @@ mod tests {
             ]),
             ..TerrainSourceUniformFrame::default()
         };
-        assert!(
-            required_transforms
-                .clone()
-                .pack_std140(&requirements)
-                .unwrap_err()
-                .to_string()
-                .contains("material atlas size")
-        );
-        assert!(
-            TerrainSourceUniformFrame {
-                material_atlas_size: Some([0, 512]),
-                ..required_transforms
-            }
+        assert!(required_transforms
+            .clone()
             .pack_std140(&requirements)
-            .is_err()
-        );
+            .unwrap_err()
+            .to_string()
+            .contains("material atlas size"));
+        assert!(TerrainSourceUniformFrame {
+            material_atlas_size: Some([0, 512]),
+            ..required_transforms
+        }
+        .pack_std140(&requirements)
+        .is_err());
     }
 
     #[test]
@@ -1120,21 +1191,19 @@ mod tests {
             0.875_f32.to_le_bytes(),
             bytes[night_vision_offset..night_vision_offset + 4]
         );
-        assert!(
-            TerrainSourceUniformFrame {
-                view_matrix: Some([
-                    1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
-                ]),
-                projection_matrix: Some([
-                    1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
-                ]),
-                ..TerrainSourceUniformFrame::default()
-            }
-            .pack_std140(&requirements)
-            .unwrap_err()
-            .to_string()
-            .contains("night vision")
-        );
+        assert!(TerrainSourceUniformFrame {
+            view_matrix: Some([
+                1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+            ]),
+            projection_matrix: Some([
+                1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+            ]),
+            ..TerrainSourceUniformFrame::default()
+        }
+        .pack_std140(&requirements)
+        .unwrap_err()
+        .to_string()
+        .contains("night vision"));
     }
 
     #[test]
@@ -1169,21 +1238,19 @@ mod tests {
             0.625_f32.to_le_bytes(),
             bytes[rain_factor_offset..rain_factor_offset + 4]
         );
-        assert!(
-            TerrainSourceUniformFrame {
-                view_matrix: Some([
-                    1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
-                ]),
-                projection_matrix: Some([
-                    1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
-                ]),
-                ..TerrainSourceUniformFrame::default()
-            }
-            .pack_std140(&requirements)
-            .unwrap_err()
-            .to_string()
-            .contains("rain factor")
-        );
+        assert!(TerrainSourceUniformFrame {
+            view_matrix: Some([
+                1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+            ]),
+            projection_matrix: Some([
+                1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+            ]),
+            ..TerrainSourceUniformFrame::default()
+        }
+        .pack_std140(&requirements)
+        .unwrap_err()
+        .to_string()
+        .contains("rain factor"));
     }
 
     #[test]
@@ -1330,22 +1397,18 @@ mod tests {
             projection_matrix: Some([1.0; 16]),
             ..TerrainSourceUniformFrame::default()
         };
-        assert!(
-            transforms
-                .pack_std140(&requirements)
-                .unwrap_err()
-                .to_string()
-                .contains("rain strength")
-        );
-        assert!(
-            TerrainSourceUniformFrame {
-                view_matrix: Some([1.0; 16]),
-                projection_matrix: Some([1.0; 16]),
-                rain_strength: Some(f32::NAN),
-                ..TerrainSourceUniformFrame::default()
-            }
+        assert!(transforms
             .pack_std140(&requirements)
-            .is_err()
-        );
+            .unwrap_err()
+            .to_string()
+            .contains("rain strength"));
+        assert!(TerrainSourceUniformFrame {
+            view_matrix: Some([1.0; 16]),
+            projection_matrix: Some([1.0; 16]),
+            rain_strength: Some(f32::NAN),
+            ..TerrainSourceUniformFrame::default()
+        }
+        .pack_std140(&requirements)
+        .is_err());
     }
 }

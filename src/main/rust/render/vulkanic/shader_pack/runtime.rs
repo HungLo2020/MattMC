@@ -5,14 +5,19 @@ use crate::render::vulkanic::commands::{
 use crate::render::vulkanic::error::{GalError, GalResult};
 use crate::render::vulkanic::gal::VulkanicGal;
 use crate::render::vulkanic::handles::Handle;
-use crate::render::vulkanic::resources::{IndexType, QueueClass};
+use crate::render::vulkanic::resources::{
+    CombinedTextureSamplerDesc, CompareOp, IndexType, QueueClass, SamplerAddressMode, SamplerDesc,
+    SamplerFilter,
+};
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
 
+use super::assets::{ShaderPackAssets, TerrainShaderPackAssetBindings};
 use super::interface::{analyze_terrain_vertex_interface, TerrainVertexInterface};
 use super::lowering::{
-    lower_terrain_source_pair, LoweredTerrainSourcePair, TerrainSourceLoweringSummary,
-    TerrainSourceOpaqueResourceBindingPlan,
+    lower_shadow_source_pair, lower_terrain_source_pair, LoweredTerrainSourcePair,
+    TerrainSourceLoweringSummary, TerrainSourceOpaqueResourceBindingPlan,
 };
 use super::pass_graph::{AttachmentRole, PassIdentity};
 use super::preprocess::{preprocess_terrain_sources, PreprocessedTerrainSourceSummary};
@@ -23,14 +28,18 @@ use super::programs::{
 };
 use super::resources::ShaderPackRuntimePlan;
 use super::source::ShaderPackSource;
+use super::source_assets::TerrainSourceAssetResources;
 use super::source_uniforms::{
     TerrainSourceUniformRequirementSummary, TerrainSourceUniformRequirements,
 };
 use super::terrain_contract::bundled_complementary_hung_loified_source;
 use super::terrain_contract::{
-    TerrainPassContract, TerrainPassRequiredResource, TerrainProgramScope,
+    shadow_source_stages_for_scope, TerrainPassContract, TerrainPassRequiredResource,
+    TerrainProgramScope,
 };
-use super::terrain_source_resources::TerrainSourceResourceBindings;
+use super::terrain_source_resources::{
+    TerrainSourceOwnedResourceSet, TerrainSourceResourceBindings, TerrainSourceResourceRole,
+};
 use super::terrain_voxelization::{
     TerrainColoredLightRuntime, TerrainOccupancyRuntime, TerrainVoxelLightSamplingBinding,
 };
@@ -75,13 +84,16 @@ impl TerrainGraphIsolation {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct TerrainMeshDraw {
     pub shadow_pipeline: Option<Handle>,
     pub pipeline: Handle,
     pub pipeline_layout: Handle,
     pub resource_set: Handle,
-    pub resource_set_dynamic_offsets: [u64; 1],
+    /// Dynamic offsets required by the semantic mesh resource set. Fixture
+    /// meshes use one streamed-instance offset; source-derived terrain sets
+    /// may own static bindings and therefore require none.
+    pub resource_set_dynamic_offsets: Vec<u64>,
     /// Optional shader-pack-owned semantic resources. This is distinct from
     /// the mesh/material set and intentionally carries only GAL handles; the
     /// frontend never sees backend state or shader-pack internals.
@@ -215,6 +227,22 @@ pub(crate) enum TerrainSourceCandidateState {
         /// only; it is not a compiled program or render-route decision.
         source_summary: Option<PreprocessedTerrainSourceSummary>,
         source_preprocess_error: Option<String>,
+        /// The semantically scoped shadow-stage pair is expanded separately
+        /// from normal terrain. It is future Rust-owned shadow-color pass
+        /// provenance only and cannot make the terrain source executable.
+        source_shadow_summary: Option<PreprocessedTerrainSourceSummary>,
+        source_shadow_preprocess_error: Option<String>,
+        /// Bounded diagnostic from lowering the scoped shadow fragment's
+        /// named outputs. It cannot create a program or a shadow attachment.
+                source_shadow_output_count: Option<u32>,
+                source_shadow_lowering_error: Option<String>,
+                /// Active resource roles for the separately lowered shadow
+                /// source pair. These remain distinct from the normal terrain
+                /// plan because binding numbers are pass-local, while shared
+                /// pack assets may be prepared from their semantic union.
+                source_shadow_resource_binding_count: Option<u32>,
+                source_shadow_resource_binding_error: Option<String>,
+                source_shadow_resource_bindings: Option<TerrainSourceOpaqueResourceBindingPlan>,
         /// Source-derived, backend-neutral vertex requirements observed after
         /// preprocessing the paired vertex stage. This is a strict future
         /// lowering prerequisite, never a Java/Iris vertex layout.
@@ -241,6 +269,12 @@ pub(crate) enum TerrainSourceCandidateState {
         /// Rust-owned resource-set builder. It carries no native handles,
         /// texture units, or backend descriptors.
         source_resource_bindings: Option<TerrainSourceOpaqueResourceBindingPlan>,
+        /// Source-derived terrain PNG declarations. They are retained only as
+        /// semantic pack paths until the runtime validates matching Rust-owned
+        /// binary assets and creates explicit GAL resources.
+        source_asset_binding_count: Option<u32>,
+        source_asset_binding_error: Option<String>,
+        source_asset_bindings: Option<TerrainShaderPackAssetBindings>,
         voxel_materials: Option<VoxelMaterialMap>,
         voxel_emission: Option<VoxelEmissionTable>,
     },
@@ -262,6 +296,218 @@ pub(crate) struct ShaderPackRuntimeExecutor {
     /// Full private colored-light preparation. It stays unavailable outside
     /// explicit test installation and cannot select a source terrain program.
     terrain_colored_light: Option<TerrainColoredLightRuntime>,
+    /// Decoded pack PNGs referenced by the lowered source binding plan.
+    /// These are private Rust-owned GAL resources only. Creating them cannot
+    /// select the source program or alter the internal fixture execution.
+    source_asset_resources: Option<TerrainSourceAssetResources>,
+    /// Rust-owned semantic wrappers around copied material atlases. The world
+    /// frontend supplies only private GAL view/sampler pairs; source-plan
+    /// lifetime and combined-sampler retirement stay here. Keeping roles
+    /// distinct prevents albedo, specular, and future normal atlases from
+    /// aliasing one another merely because their extents happen to match.
+    source_material_texture_resources: BTreeMap<
+        TerrainSourceResourceRole,
+        TerrainSourceMaterialTextureResources,
+    >,
+    /// Private semantic wrappers around the Rust-owned shadow-depth target.
+    /// They are generation-bound compare samplers, not a source program
+    /// binding and not evidence that selected-source execution is admitted.
+    source_shadow_depth_resources: Option<TerrainSourceShadowDepthResources>,
+    /// Private semantic wrapper for a future Rust-owned shadow-color target.
+    /// The current fixture allocates the distinct backing attachment but does
+    /// not write it; that absence of a source shadow pass keeps selected-source
+    /// execution unavailable rather than aliasing depth as color.
+    source_shadow_color_resources: Option<TerrainSourceShadowColorResources>,
+}
+
+/// Rust-internal handoff from the world texture cache to the shader runtime.
+/// It has no Java, OpenGL, Vulkan, or native-handle representation.
+#[derive(Clone, Debug)]
+pub(crate) struct TerrainSourceMaterialTextureInput {
+    pub role: TerrainSourceResourceRole,
+    pub shader_pack_generation: u64,
+    pub world_generation: u64,
+    pub mesh_asset_generation: u64,
+    pub texture_view: Handle,
+    pub sampler: Handle,
+}
+
+/// Rust-internal handoff from the owned terrain runtime targets to source
+/// resource preparation. This is intentionally a GAL view identity only:
+/// neither backend objects nor shader-pack-specific binding slots escape.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct TerrainSourceShadowDepthInput {
+    pub shader_pack_generation: u64,
+    pub world_generation: u64,
+    pub shader_graph_generation: u64,
+    pub shadow_depth_view: Handle,
+}
+
+/// Rust-internal handoff from a future owned shadow-color target. The input
+/// carries only GAL resource identities and generation semantics; it has no
+/// Java, Iris, OpenGL, Vulkan, or native-handle representation.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct TerrainSourceShadowColorInput {
+    pub shader_pack_generation: u64,
+    pub world_generation: u64,
+    pub shader_graph_generation: u64,
+    pub shadow_color_view: Handle,
+    pub sampler: Handle,
+}
+
+#[derive(Debug)]
+struct TerrainSourceMaterialTextureResources {
+    role: TerrainSourceResourceRole,
+    shader_pack_generation: u64,
+    world_generation: u64,
+    mesh_asset_generation: u64,
+    combined_sampler: Handle,
+}
+
+impl TerrainSourceMaterialTextureResources {
+    fn compatible_with(&self, input: &TerrainSourceMaterialTextureInput) -> bool {
+        self.role == input.role
+            && self.shader_pack_generation == input.shader_pack_generation
+            && self.world_generation == input.world_generation
+            && self.mesh_asset_generation == input.mesh_asset_generation
+    }
+
+    fn semantic_resource_set(&self) -> GalResult<TerrainSourceOwnedResourceSet> {
+        let availability = super::terrain_source_resources::TerrainSourceResourceAvailabilitySet::new(
+            self.shader_pack_generation,
+            self.world_generation,
+            [super::terrain_source_resources::TerrainSourceResourceAvailability {
+                role: self.role.clone(),
+                shape: super::terrain_source_resources::TerrainSourceSampledResourceShape::Texture2d,
+                resource_generation: self.shader_pack_generation,
+            }],
+        )?;
+        TerrainSourceOwnedResourceSet::new(
+            availability,
+            [
+                super::terrain_source_resources::TerrainSourceOwnedResource {
+                    role: self.role.clone(),
+                    combined_sampler: self.combined_sampler,
+                },
+            ],
+        )
+    }
+}
+
+#[derive(Debug)]
+struct TerrainSourceShadowDepthResources {
+    shader_pack_generation: u64,
+    world_generation: u64,
+    shader_graph_generation: u64,
+    primary_sampler: Handle,
+    secondary_sampler: Handle,
+    primary_combined_sampler: Handle,
+    secondary_combined_sampler: Handle,
+}
+
+#[derive(Debug)]
+struct TerrainSourceShadowColorResources {
+    shader_pack_generation: u64,
+    world_generation: u64,
+    shader_graph_generation: u64,
+    shadow_color_view: Handle,
+    sampler: Handle,
+    combined_sampler: Handle,
+}
+
+impl TerrainSourceShadowDepthResources {
+    fn compatible_with(&self, input: TerrainSourceShadowDepthInput) -> bool {
+        self.shader_pack_generation == input.shader_pack_generation
+            && self.world_generation == input.world_generation
+            && self.shader_graph_generation == input.shader_graph_generation
+    }
+
+    fn semantic_resource_set(&self) -> GalResult<TerrainSourceOwnedResourceSet> {
+        use super::terrain_source_resources::{
+            TerrainSourceResourceAvailability, TerrainSourceResourceAvailabilitySet,
+            TerrainSourceSampledResourceShape,
+        };
+
+        let availability = TerrainSourceResourceAvailabilitySet::new(
+            self.shader_pack_generation,
+            self.world_generation,
+            [
+                TerrainSourceResourceAvailability {
+                    role: TerrainSourceResourceRole::ShadowDepthPrimary,
+                    shape: TerrainSourceSampledResourceShape::DepthCompareTexture2d,
+                    resource_generation: self.shader_graph_generation,
+                },
+                TerrainSourceResourceAvailability {
+                    role: TerrainSourceResourceRole::ShadowDepthSecondary,
+                    shape: TerrainSourceSampledResourceShape::DepthCompareTexture2d,
+                    resource_generation: self.shader_graph_generation,
+                },
+            ],
+        )?;
+        TerrainSourceOwnedResourceSet::new(
+            availability,
+            [
+                super::terrain_source_resources::TerrainSourceOwnedResource {
+                    role: TerrainSourceResourceRole::ShadowDepthPrimary,
+                    combined_sampler: self.primary_combined_sampler,
+                },
+                super::terrain_source_resources::TerrainSourceOwnedResource {
+                    role: TerrainSourceResourceRole::ShadowDepthSecondary,
+                    combined_sampler: self.secondary_combined_sampler,
+                },
+            ],
+        )
+    }
+
+    fn destroy(self, gal: &mut VulkanicGal) -> GalResult<()> {
+        for handle in [
+            self.secondary_combined_sampler,
+            self.primary_combined_sampler,
+            self.secondary_sampler,
+            self.primary_sampler,
+        ] {
+            gal.destroy(handle)?;
+        }
+        Ok(())
+    }
+}
+
+impl TerrainSourceShadowColorResources {
+    fn compatible_with(&self, input: TerrainSourceShadowColorInput) -> bool {
+        self.shader_pack_generation == input.shader_pack_generation
+            && self.world_generation == input.world_generation
+            && self.shader_graph_generation == input.shader_graph_generation
+            && self.shadow_color_view == input.shadow_color_view
+            && self.sampler == input.sampler
+    }
+
+    fn semantic_resource_set(&self) -> GalResult<TerrainSourceOwnedResourceSet> {
+        use super::terrain_source_resources::{
+            TerrainSourceResourceAvailability, TerrainSourceResourceAvailabilitySet,
+            TerrainSourceSampledResourceShape,
+        };
+
+        let availability = TerrainSourceResourceAvailabilitySet::new(
+            self.shader_pack_generation,
+            self.world_generation,
+            [TerrainSourceResourceAvailability {
+                role: TerrainSourceResourceRole::ShadowColor,
+                shape: TerrainSourceSampledResourceShape::Texture2d,
+                resource_generation: self.shader_graph_generation,
+            }],
+        )?;
+        TerrainSourceOwnedResourceSet::new(
+            availability,
+            [super::terrain_source_resources::TerrainSourceOwnedResource {
+                role: TerrainSourceResourceRole::ShadowColor,
+                combined_sampler: self.combined_sampler,
+            }],
+        )
+    }
+
+    fn destroy(self, gal: &mut VulkanicGal) -> GalResult<()> {
+        gal.destroy(self.combined_sampler)
+    }
 }
 
 impl ShaderPackRuntimeExecutor {
@@ -287,6 +533,10 @@ impl ShaderPackRuntimeExecutor {
             source_candidate: TerrainSourceCandidateState::Unavailable,
             terrain_occupancy: None,
             terrain_colored_light: None,
+            source_asset_resources: None,
+            source_material_texture_resources: BTreeMap::new(),
+            source_shadow_depth_resources: None,
+            source_shadow_color_resources: None,
         })
     }
 
@@ -414,6 +664,73 @@ impl ShaderPackRuntimeExecutor {
                 let requires_colored_voxel_light = contract
                     .required_resources
                     .contains(&TerrainPassRequiredResource::ColoredVoxelLightVolume);
+                let (
+                    source_shadow_summary,
+                    source_shadow_preprocess_error,
+                    source_shadow_output_count,
+                    source_shadow_lowering_error,
+                    source_shadow_resource_binding_count,
+                    source_shadow_resource_binding_error,
+                    source_shadow_resource_bindings,
+                ) = match shadow_source_stages_for_scope(source, scope)
+                    .and_then(|stages| preprocess_terrain_sources(source, &stages))
+                {
+                    Ok(artifacts) => match lower_shadow_source_pair(
+                        &artifacts.vertex,
+                        &artifacts.fragment,
+                    ) {
+                        Ok(lowered) => {
+                            let resource_bindings: GalResult<_> = (|| -> GalResult<_> {
+                                let declarations = TerrainSourceResourceBindings::from_source(source)?;
+                                lowered
+                                    .opaque_resource_contract()
+                                    .bind_semantic_roles(&declarations)
+                            })();
+                            (
+                                Some(artifacts.summary()),
+                                None,
+                                Some(lowered.fragment().outputs().len() as u32),
+                                None,
+                                resource_bindings
+                                    .as_ref()
+                                    .ok()
+                                    .map(|plan| plan.bindings().len() as u32),
+                                resource_bindings
+                                    .as_ref()
+                                    .err()
+                                    .map(|error| error.to_string()),
+                                resource_bindings.ok(),
+                            )
+                        }
+                        Err(error) => (
+                            Some(artifacts.summary()),
+                            None,
+                            None,
+                            Some(error.to_string()),
+                            None,
+                            None,
+                            None,
+                        ),
+                    },
+                    Err(error) => (
+                        None,
+                        Some(error.to_string()),
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                    ),
+                };
+                let source_asset_bindings = TerrainShaderPackAssetBindings::from_source(source);
+                let source_asset_binding_count = source_asset_bindings
+                    .as_ref()
+                    .ok()
+                    .map(|bindings| bindings.samplers().count() as u32);
+                let source_asset_binding_error = source_asset_bindings
+                    .as_ref()
+                    .err()
+                    .map(ToString::to_string);
                 let (voxel_materials, voxel_emission) = if requires_colored_voxel_light {
                     match (
                         VoxelMaterialMap::derive(source, &contract),
@@ -441,6 +758,13 @@ impl ShaderPackRuntimeExecutor {
                     contract,
                     source_summary,
                     source_preprocess_error,
+                    source_shadow_summary,
+                    source_shadow_preprocess_error,
+                    source_shadow_output_count,
+                    source_shadow_lowering_error,
+                    source_shadow_resource_binding_count,
+                    source_shadow_resource_binding_error,
+                    source_shadow_resource_bindings,
                     source_vertex_interface,
                     source_lowering_summary,
                     source_lowering_error,
@@ -450,6 +774,9 @@ impl ShaderPackRuntimeExecutor {
                     source_resource_binding_count,
                     source_resource_binding_error,
                     source_resource_bindings,
+                    source_asset_binding_count,
+                    source_asset_binding_error,
+                    source_asset_bindings: source_asset_bindings.ok(),
                     voxel_materials,
                     voxel_emission,
                 }
@@ -482,6 +809,510 @@ impl ShaderPackRuntimeExecutor {
             | TerrainSourceCandidateState::Disabled { .. }
             | TerrainSourceCandidateState::Rejected { .. } => None,
         }
+    }
+
+    /// Returns the pass-local plans that can share copied pack assets. They
+    /// are intentionally not merged into one executable layout: terrain and
+    /// shadow bindings remain local to their respective source programs.
+    fn source_resource_binding_plans(&self) -> Vec<&TerrainSourceOpaqueResourceBindingPlan> {
+        match &self.source_candidate {
+            TerrainSourceCandidateState::Discovered {
+                source_resource_bindings,
+                source_shadow_resource_bindings,
+                ..
+            } => source_resource_bindings
+                .iter()
+                .chain(source_shadow_resource_bindings.iter())
+                .collect(),
+            TerrainSourceCandidateState::Unavailable
+            | TerrainSourceCandidateState::Disabled { .. }
+            | TerrainSourceCandidateState::Rejected { .. } => Vec::new(),
+        }
+    }
+
+    /// Returns source-derived PNG sampler paths for diagnostics and a future
+    /// Rust-owned resource preparer. This has no native resource identity and
+    /// cannot select a shader or rendering route.
+    pub(crate) fn source_asset_binding_plan(&self) -> Option<&TerrainShaderPackAssetBindings> {
+        match &self.source_candidate {
+            TerrainSourceCandidateState::Discovered {
+                source_asset_bindings,
+                ..
+            } => source_asset_bindings.as_ref(),
+            TerrainSourceCandidateState::Unavailable
+            | TerrainSourceCandidateState::Disabled { .. }
+            | TerrainSourceCandidateState::Rejected { .. } => None,
+        }
+    }
+
+    /// Creates generation-coherent copied PNG resources for the active,
+    /// lowered source terrain plan. This is a private preparation operation:
+    /// it deliberately does not construct a program resource set, bind a
+    /// pipeline, or make source-selected terrain executable.
+    pub(crate) fn ensure_candidate_source_asset_resources(
+        &mut self,
+        gal: &mut VulkanicGal,
+        assets: &ShaderPackAssets,
+    ) -> GalResult<bool> {
+        let (generation, pack_name, asset_bindings) =
+            match &self.source_candidate {
+                TerrainSourceCandidateState::Discovered {
+                    generation,
+                    pack_name,
+                    source_asset_bindings: Some(asset_bindings),
+                    ..
+                } => (*generation, pack_name.as_str(), asset_bindings),
+                TerrainSourceCandidateState::Unavailable
+                | TerrainSourceCandidateState::Disabled { .. }
+                | TerrainSourceCandidateState::Rejected { .. }
+                | TerrainSourceCandidateState::Discovered { .. } => return Ok(false),
+            };
+        if assets.generation() != generation || assets.pack_name() != pack_name {
+            return Err(GalError::invalid_argument(format!(
+                "shader-pack asset resources '{}'/{} do not match source candidate '{}'/{}",
+                assets.pack_name(),
+                assets.generation(),
+                pack_name,
+                generation
+            )));
+        }
+        if self
+            .source_asset_resources
+            .as_ref()
+            .is_some_and(|resources| {
+                resources.generation() == generation && resources.pack_name() == pack_name
+            })
+        {
+            return Ok(false);
+        }
+        let resource_binding_plans = self.source_resource_binding_plans();
+        if resource_binding_plans.is_empty() {
+            return Ok(false);
+        }
+        let replacement = TerrainSourceAssetResources::create(
+            gal,
+            assets,
+            asset_bindings,
+            &resource_binding_plans,
+        )?;
+        if let Some(previous) = self.source_asset_resources.replace(replacement) {
+            previous.destroy(gal)?;
+        }
+        Ok(true)
+    }
+
+    /// Discards copied PNG preparation when its matching source/assets no
+    /// longer form a complete generation. This does not affect the fixture
+    /// plan or source-candidate discovery state.
+    pub(crate) fn clear_candidate_source_asset_resources(
+        &mut self,
+        gal: &mut VulkanicGal,
+    ) -> GalResult<()> {
+        self.clear_candidate_source_shadow_depth_resources(gal)?;
+        self.clear_candidate_source_shadow_color_resources(gal)?;
+        self.clear_candidate_source_material_texture_resources(gal)?;
+        if let Some(previous) = self.source_asset_resources.take() {
+            previous.destroy(gal)?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn has_candidate_source_asset_resources(&self) -> bool {
+        self.source_asset_resources.is_some()
+    }
+
+    /// Builds the active copied-PNG semantic subset for a concrete world
+    /// generation. It is intentionally incomplete when atlas, lightmap,
+    /// shadow, or voxel roles have not yet been supplied by other Rust-owned
+    /// runtime components.
+    pub(crate) fn candidate_source_asset_resource_set(
+        &self,
+        world_generation: u64,
+    ) -> GalResult<Option<TerrainSourceOwnedResourceSet>> {
+        let Some(resources) = self.source_asset_resources.as_ref() else {
+            return Ok(None);
+        };
+        let binding_plans = self.source_resource_binding_plans();
+        if binding_plans.is_empty() {
+            return Ok(None);
+        }
+        Ok(Some(
+            resources.declared_semantic_resources(&binding_plans, world_generation)?,
+        ))
+    }
+
+    /// Reports whether the lowered candidate references a semantic resource
+    /// role. This keeps world-resource preparation driven by source lowering,
+    /// not by pack filenames or backend-specific binding slots.
+    pub(crate) fn candidate_source_requires_resource(
+        &self,
+        role: TerrainSourceResourceRole,
+    ) -> bool {
+        self.source_resource_binding_plan().is_some_and(|bindings| {
+            bindings
+                .bindings()
+                .iter()
+                .any(|binding| binding.role() == role)
+        })
+    }
+
+    /// Returns active lowered semantic roles that are absent from the current
+    /// Rust-owned resource subsets. This is diagnostic-only; callers must not
+    /// treat partial residency as source-program admission.
+    pub(crate) fn candidate_source_missing_resource_roles(
+        &self,
+        prepared: Option<&TerrainSourceOwnedResourceSet>,
+    ) -> Vec<TerrainSourceResourceRole> {
+        let Some(bindings) = self.source_resource_binding_plan() else {
+            return Vec::new();
+        };
+        bindings
+            .bindings()
+            .iter()
+            .map(|binding| binding.role())
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .filter(|role| {
+                prepared
+                    .and_then(|set| set.availability().resource_for(role.clone()))
+                    .is_none()
+            })
+            .collect()
+    }
+
+    /// Returns the parity-correct owned voxel subset only after the matching
+    /// source candidate and D3 generation are fully confirmed. This is not a
+    /// source-program binding and cannot alter route selection.
+    pub(crate) fn candidate_colored_light_resource_set(
+        &self,
+        frame_counter: u64,
+    ) -> GalResult<Option<TerrainSourceOwnedResourceSet>> {
+        let source_generation = match &self.source_candidate {
+            TerrainSourceCandidateState::Discovered { generation, .. } => *generation,
+            TerrainSourceCandidateState::Unavailable
+            | TerrainSourceCandidateState::Disabled { .. }
+            | TerrainSourceCandidateState::Rejected { .. } => return Ok(None),
+        };
+        let Some(runtime) = self.terrain_colored_light.as_ref() else {
+            return Ok(None);
+        };
+        if runtime.descriptor().shader_pack_generation != source_generation {
+            return Err(GalError::invalid_argument(
+                "colored voxel-light resources do not match the discovered shader-pack generation",
+            ));
+        }
+        if !runtime.is_ready_for_frame(frame_counter) {
+            return Ok(None);
+        }
+        runtime
+            .semantic_resource_set_for_frame(frame_counter)
+            .map(Some)
+    }
+
+    /// Creates a source-runtime-owned semantic material texture wrapper. The
+    /// supplied view and sampler already belong to Rust's world texture cache;
+    /// this method owns only the role-specific combined source-resource object.
+    pub(crate) fn ensure_candidate_source_material_texture_resources(
+        &mut self,
+        gal: &mut VulkanicGal,
+        input: TerrainSourceMaterialTextureInput,
+    ) -> GalResult<Option<TerrainSourceOwnedResourceSet>> {
+        if !matches!(
+            input.role,
+            TerrainSourceResourceRole::MaterialAtlas
+                | TerrainSourceResourceRole::MaterialNormalMap
+                | TerrainSourceResourceRole::MaterialSpecularMap
+        ) {
+            return Err(GalError::invalid_argument(
+                "source material texture wrapper received an unsupported semantic role",
+            ));
+        }
+        if !self.candidate_source_requires_resource(input.role.clone()) {
+            self.clear_candidate_source_material_texture_role(gal, &input.role)?;
+            return Ok(None);
+        }
+        if input.shader_pack_generation == 0
+            || input.world_generation == 0
+            || input.mesh_asset_generation == 0
+        {
+            return Err(GalError::invalid_argument(
+                "source material texture requires non-zero shader-pack, world, and mesh generations",
+            ));
+        }
+        if input.shader_pack_generation != self.expected_shader_pack_generation_for_resources() {
+            return Err(GalError::invalid_argument(
+                "source material texture shader-pack generation does not match the discovered candidate",
+            ));
+        }
+        if let Some(resources) = self.source_material_texture_resources.get(&input.role) {
+            if resources.compatible_with(&input) {
+                return resources.semantic_resource_set().map(Some);
+            }
+        }
+        let combined_sampler = gal.create_combined_texture_sampler(CombinedTextureSamplerDesc {
+            label: format!(
+                "shader-pack.source-material-{}.pack{}.world{}.mesh{}",
+                input.role.semantic_name(),
+                input.shader_pack_generation,
+                input.world_generation,
+                input.mesh_asset_generation
+            ),
+            texture_view: input.texture_view,
+            sampler: input.sampler,
+        })?;
+        let replacement = TerrainSourceMaterialTextureResources {
+            role: input.role.clone(),
+            shader_pack_generation: input.shader_pack_generation,
+            world_generation: input.world_generation,
+            mesh_asset_generation: input.mesh_asset_generation,
+            combined_sampler,
+        };
+        if let Some(previous) = self
+            .source_material_texture_resources
+            .insert(input.role.clone(), replacement)
+        {
+            gal.destroy(previous.combined_sampler)?;
+        }
+        self.source_material_texture_resources
+            .get(&input.role)
+            .expect("material texture wrapper was inserted")
+            .semantic_resource_set()
+            .map(Some)
+    }
+
+    pub(crate) fn clear_candidate_source_material_texture_role(
+        &mut self,
+        gal: &mut VulkanicGal,
+        role: &TerrainSourceResourceRole,
+    ) -> GalResult<()> {
+        if let Some(previous) = self.source_material_texture_resources.remove(role) {
+            gal.destroy(previous.combined_sampler)?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn clear_candidate_source_material_texture_resources(
+        &mut self,
+        gal: &mut VulkanicGal,
+    ) -> GalResult<()> {
+        let resources = std::mem::take(&mut self.source_material_texture_resources);
+        for (_, resource) in resources {
+            gal.destroy(resource.combined_sampler)?;
+        }
+        Ok(())
+    }
+
+    /// Creates private comparison samplers for the two source semantic shadow
+    /// roles. The source route remains unavailable: this owns only a
+    /// generation-coherent GAL resource subset for diagnostics and later
+    /// explicit source-program assembly.
+    pub(crate) fn ensure_candidate_source_shadow_depth_resources(
+        &mut self,
+        gal: &mut VulkanicGal,
+        input: TerrainSourceShadowDepthInput,
+    ) -> GalResult<Option<TerrainSourceOwnedResourceSet>> {
+        let requires_primary =
+            self.candidate_source_requires_resource(TerrainSourceResourceRole::ShadowDepthPrimary);
+        let requires_secondary = self
+            .candidate_source_requires_resource(TerrainSourceResourceRole::ShadowDepthSecondary);
+        if !requires_primary && !requires_secondary {
+            self.clear_candidate_source_shadow_depth_resources(gal)?;
+            return Ok(None);
+        }
+        if input.shader_pack_generation == 0
+            || input.world_generation == 0
+            || input.shader_graph_generation == 0
+        {
+            return Err(GalError::invalid_argument(
+                "source shadow depth requires non-zero shader-pack, world, and shader-graph generations",
+            ));
+        }
+        if input.shader_pack_generation != self.expected_shader_pack_generation_for_resources() {
+            return Err(GalError::invalid_argument(
+                "source shadow depth shader-pack generation does not match the discovered candidate",
+            ));
+        }
+        if self
+            .source_shadow_depth_resources
+            .as_ref()
+            .is_some_and(|resources| resources.compatible_with(input))
+        {
+            return self
+                .source_shadow_depth_resources
+                .as_ref()
+                .map(TerrainSourceShadowDepthResources::semantic_resource_set)
+                .transpose();
+        }
+
+        let label_prefix = format!(
+            "shader-pack.source-shadow-depth.pack{}.world{}.graph{}",
+            input.shader_pack_generation, input.world_generation, input.shader_graph_generation
+        );
+        let compare_desc = |label: String| SamplerDesc {
+            label,
+            min_filter: SamplerFilter::Nearest,
+            mag_filter: SamplerFilter::Nearest,
+            mip_filter: SamplerFilter::Nearest,
+            address_u: SamplerAddressMode::ClampToEdge,
+            address_v: SamplerAddressMode::ClampToEdge,
+            address_w: SamplerAddressMode::ClampToEdge,
+            comparison: Some(CompareOp::LessOrEqual),
+        };
+        let mut created = Vec::new();
+        let result = (|| -> GalResult<TerrainSourceShadowDepthResources> {
+            let primary_sampler =
+                gal.create_sampler(compare_desc(format!("{label_prefix}.primary")))?;
+            created.push(primary_sampler);
+            let secondary_sampler =
+                gal.create_sampler(compare_desc(format!("{label_prefix}.secondary")))?;
+            created.push(secondary_sampler);
+            let primary_combined_sampler =
+                gal.create_combined_texture_sampler(CombinedTextureSamplerDesc {
+                    label: format!("{label_prefix}.primary.combined"),
+                    texture_view: input.shadow_depth_view,
+                    sampler: primary_sampler,
+                })?;
+            created.push(primary_combined_sampler);
+            let secondary_combined_sampler =
+                gal.create_combined_texture_sampler(CombinedTextureSamplerDesc {
+                    label: format!("{label_prefix}.secondary.combined"),
+                    texture_view: input.shadow_depth_view,
+                    sampler: secondary_sampler,
+                })?;
+            created.push(secondary_combined_sampler);
+            Ok(TerrainSourceShadowDepthResources {
+                shader_pack_generation: input.shader_pack_generation,
+                world_generation: input.world_generation,
+                shader_graph_generation: input.shader_graph_generation,
+                primary_sampler,
+                secondary_sampler,
+                primary_combined_sampler,
+                secondary_combined_sampler,
+            })
+        })();
+        let replacement = match result {
+            Ok(resources) => resources,
+            Err(error) => {
+                for handle in created.into_iter().rev() {
+                    let _ = gal.destroy(handle);
+                }
+                return Err(error);
+            }
+        };
+        if let Some(previous) = self.source_shadow_depth_resources.replace(replacement) {
+            previous.destroy(gal)?;
+        }
+        self.source_shadow_depth_resources
+            .as_ref()
+            .map(TerrainSourceShadowDepthResources::semantic_resource_set)
+            .transpose()
+    }
+
+    pub(crate) fn clear_candidate_source_shadow_depth_resources(
+        &mut self,
+        gal: &mut VulkanicGal,
+    ) -> GalResult<()> {
+        if let Some(previous) = self.source_shadow_depth_resources.take() {
+            previous.destroy(gal)?;
+        }
+        Ok(())
+    }
+
+    /// Creates the semantic combined sampler for a future Rust-owned source
+    /// shadow-color attachment. This method does not allocate, clear, render
+    /// to, or otherwise invent that attachment: callers must provide an owned
+    /// color view from a matching shader-graph generation.
+    pub(crate) fn ensure_candidate_source_shadow_color_resources(
+        &mut self,
+        gal: &mut VulkanicGal,
+        input: TerrainSourceShadowColorInput,
+    ) -> GalResult<Option<TerrainSourceOwnedResourceSet>> {
+        if !self.candidate_source_requires_resource(TerrainSourceResourceRole::ShadowColor) {
+            self.clear_candidate_source_shadow_color_resources(gal)?;
+            return Ok(None);
+        }
+        if input.shader_pack_generation == 0
+            || input.world_generation == 0
+            || input.shader_graph_generation == 0
+        {
+            return Err(GalError::invalid_argument(
+                "source shadow color requires non-zero shader-pack, world, and shader-graph generations",
+            ));
+        }
+        if input.shader_pack_generation != self.expected_shader_pack_generation_for_resources() {
+            return Err(GalError::invalid_argument(
+                "source shadow color shader-pack generation does not match the discovered candidate",
+            ));
+        }
+        if self
+            .source_shadow_color_resources
+            .as_ref()
+            .is_some_and(|resources| resources.compatible_with(input))
+        {
+            return self
+                .source_shadow_color_resources
+                .as_ref()
+                .map(TerrainSourceShadowColorResources::semantic_resource_set)
+                .transpose();
+        }
+        let replacement = TerrainSourceShadowColorResources {
+            shader_pack_generation: input.shader_pack_generation,
+            world_generation: input.world_generation,
+            shader_graph_generation: input.shader_graph_generation,
+            shadow_color_view: input.shadow_color_view,
+            sampler: input.sampler,
+            combined_sampler: gal.create_combined_texture_sampler(CombinedTextureSamplerDesc {
+                label: format!(
+                    "shader-pack.source-shadow-color.pack{}.world{}.graph{}",
+                    input.shader_pack_generation,
+                    input.world_generation,
+                    input.shader_graph_generation
+                ),
+                texture_view: input.shadow_color_view,
+                sampler: input.sampler,
+            })?,
+        };
+        if let Some(previous) = self.source_shadow_color_resources.replace(replacement) {
+            previous.destroy(gal)?;
+        }
+        self.source_shadow_color_resources
+            .as_ref()
+            .map(TerrainSourceShadowColorResources::semantic_resource_set)
+            .transpose()
+    }
+
+    pub(crate) fn clear_candidate_source_shadow_color_resources(
+        &mut self,
+        gal: &mut VulkanicGal,
+    ) -> GalResult<()> {
+        if let Some(previous) = self.source_shadow_color_resources.take() {
+            previous.destroy(gal)?;
+        }
+        Ok(())
+    }
+
+    #[cfg(test)]
+    pub(crate) fn candidate_source_material_atlas_identity(&self) -> Option<(Handle, u64)> {
+        self.source_material_texture_resources
+            .get(&TerrainSourceResourceRole::MaterialAtlas)
+            .map(|resources| (resources.combined_sampler, resources.mesh_asset_generation))
+    }
+
+    #[cfg(test)]
+    pub(crate) fn candidate_source_material_texture_identity(
+        &self,
+        role: TerrainSourceResourceRole,
+    ) -> Option<(Handle, u64)> {
+        self.source_material_texture_resources
+            .get(&role)
+            .map(|resources| (resources.combined_sampler, resources.mesh_asset_generation))
+    }
+
+    #[cfg(test)]
+    pub(crate) fn candidate_source_asset_resource_count(&self) -> Option<usize> {
+        self.source_asset_resources
+            .as_ref()
+            .map(TerrainSourceAssetResources::len)
     }
 
     /// Returns an owned binding only when the currently discovered source
@@ -799,7 +1630,8 @@ impl ShaderPackRuntimeExecutor {
         descriptor: VoxelLightVolumeDescriptor,
         materials: VoxelMaterialMap,
     ) -> GalResult<()> {
-        if descriptor.shader_pack_generation != self.expected_shader_pack_generation() {
+        if descriptor.shader_pack_generation != self.expected_shader_pack_generation_for_resources()
+        {
             return Err(GalError::invalid_argument(
                 "private terrain occupancy generation must match its shader runtime",
             ));
@@ -821,7 +1653,8 @@ impl ShaderPackRuntimeExecutor {
         materials: VoxelMaterialMap,
         emission: VoxelEmissionTable,
     ) -> GalResult<()> {
-        if descriptor.shader_pack_generation != self.expected_shader_pack_generation() {
+        if descriptor.shader_pack_generation != self.expected_shader_pack_generation_for_resources()
+        {
             return Err(GalError::invalid_argument(
                 "private colored-light generation must match its shader runtime",
             ));
@@ -874,7 +1707,7 @@ impl ShaderPackRuntimeExecutor {
         Ok(())
     }
 
-    fn expected_shader_pack_generation(&self) -> u64 {
+    pub(crate) fn expected_shader_pack_generation_for_resources(&self) -> u64 {
         match &self.source_candidate {
             TerrainSourceCandidateState::Discovered { generation, .. } => *generation,
             _ => self.plan.generation,
@@ -968,6 +1801,16 @@ impl ShaderPackRuntimeExecutor {
     }
 
     pub(crate) fn destroy(mut self, gal: &mut VulkanicGal) -> GalResult<()> {
+        if let Some(resources) = self.source_shadow_color_resources.take() {
+            resources.destroy(gal)?;
+        }
+        if let Some(resources) = self.source_shadow_depth_resources.take() {
+            resources.destroy(gal)?;
+        }
+        self.clear_candidate_source_material_texture_resources(gal)?;
+        if let Some(resources) = self.source_asset_resources.take() {
+            resources.destroy(gal)?;
+        }
         if let Some(occupancy) = self.terrain_occupancy.take() {
             occupancy.destroy(gal)?;
         }
@@ -1021,6 +1864,22 @@ impl ShaderPackRuntimeExecutor {
             self.append_deferred_and_composites(ops, targets, frame, effective_draws)?;
         }
         Ok(())
+    }
+
+    /// Exercises one validated source-derived G-buffer transaction without
+    /// selecting a gameplay route or claiming the incomplete source shadow
+    /// and composite passes. This is intentionally test-only: production
+    /// callers must enter through the complete runtime graph.
+    #[cfg(test)]
+    pub(crate) fn append_terrain_g_buffer_for_test(
+        &self,
+        ops: &mut Vec<CommandOp>,
+        targets: TerrainRuntimeTargets,
+        background_color: ClearColor,
+        draws: &[TerrainMeshDraw],
+    ) -> GalResult<()> {
+        self.validate_terrain_material_graph()?;
+        self.append_g_buffer_passes(ops, targets, background_color, draws, false)
     }
 
     fn validate_terrain_material_graph(&self) -> GalResult<()> {
@@ -1090,7 +1949,7 @@ impl ShaderPackRuntimeExecutor {
                 shadow_pipeline,
                 draw.pipeline_layout,
                 draw.resource_set,
-                draw.resource_set_dynamic_offsets,
+                &draw.resource_set_dynamic_offsets,
                 draw.shader_resource_set,
                 draw.index_buffer,
                 draw.index_offset,
@@ -1207,7 +2066,7 @@ impl ShaderPackRuntimeExecutor {
                     draw.pipeline,
                     draw.pipeline_layout,
                     draw.resource_set,
-                    draw.resource_set_dynamic_offsets,
+                    &draw.resource_set_dynamic_offsets,
                     draw.shader_resource_set,
                     draw.index_buffer,
                     draw.index_offset,
@@ -1378,7 +2237,7 @@ impl ShaderPackRuntimeExecutor {
                 draw.pipeline,
                 draw.pipeline_layout,
                 draw.resource_set,
-                draw.resource_set_dynamic_offsets,
+                &draw.resource_set_dynamic_offsets,
                 draw.shader_resource_set,
                 draw.index_buffer,
                 draw.index_offset,
@@ -1501,7 +2360,7 @@ impl TerrainCompositeUniforms {
 #[derive(Default)]
 struct IndexedDrawState {
     pipeline: Option<Handle>,
-    resource_set: Option<(Handle, u32, Handle, [u64; 1])>,
+    resource_set: Option<(Handle, u32, Handle, Vec<u64>)>,
     shader_resource_set: Option<(Handle, u32, Handle)>,
     index_buffer: Option<(Handle, u64, IndexType)>,
 }
@@ -1513,7 +2372,7 @@ fn append_indexed_draw(
     pipeline: Handle,
     pipeline_layout: Handle,
     resource_set: Handle,
-    resource_set_dynamic_offsets: [u64; 1],
+    resource_set_dynamic_offsets: &[u64],
     shader_resource_set: Option<TerrainShaderResourceSet>,
     index_buffer: Handle,
     index_offset: u64,
@@ -1531,9 +2390,9 @@ fn append_indexed_draw(
         pipeline_layout,
         0,
         resource_set,
-        resource_set_dynamic_offsets,
+        resource_set_dynamic_offsets.to_vec(),
     );
-    if state.resource_set != Some(resource_set_binding) {
+    if state.resource_set.as_ref() != Some(&resource_set_binding) {
         ops.push(CommandOp::BindResourceSet {
             pipeline_layout,
             set_index: 0,
@@ -1620,11 +2479,18 @@ mod tests {
         mock::MockBackend, presentation_capabilities, vulkan_capabilities,
     };
     use crate::render::vulkanic::handles::HandleKind;
+    use crate::render::vulkanic::resources::{
+        Extent3d, TextureDesc, TextureDimension, TextureFormat, TextureUsage, TextureViewDesc,
+    };
+    use crate::render::vulkanic::shader_pack::assets::{
+        ShaderPackAssetFile, ShaderPackAssetUpdate,
+    };
     use crate::render::vulkanic::shader_pack::preprocess::complete_bundled_pack_source_for_test;
     use crate::render::vulkanic::shader_pack::source::ShaderSourceFile;
     use crate::render::vulkanic::shader_pack::terrain_source_resources::{
         TerrainSourceResourceRole, TERRAIN_RESOURCE_BINDINGS_PATH,
     };
+    use std::path::PathBuf;
 
     fn gal() -> VulkanicGal {
         VulkanicGal::new_with_backend(
@@ -1633,6 +2499,32 @@ mod tests {
             ))),
             false,
         )
+    }
+
+    fn copied_png_assets_for(source: &ShaderPackSource) -> ShaderPackAssets {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../resources/shaders/ComplementaryHungLoIfied/shaders");
+        let bindings = TerrainShaderPackAssetBindings::from_source(source).unwrap();
+        let mut files = Vec::new();
+        for (_, path) in bindings.samplers() {
+            files.push(ShaderPackAssetFile::new(
+                path,
+                fs::read(root.join(path)).unwrap(),
+            ));
+            let sidecar = format!("{path}.mcmeta");
+            if root.join(&sidecar).is_file() {
+                files.push(ShaderPackAssetFile::new(
+                    &sidecar,
+                    fs::read(root.join(&sidecar)).unwrap(),
+                ));
+            }
+        }
+        ShaderPackAssets::new(ShaderPackAssetUpdate {
+            pack_name: source.name().to_string(),
+            generation: source.generation(),
+            files,
+        })
+        .unwrap()
     }
     use crate::render::vulkanic::shader_pack::terrain_contract::bundled_complementary_hung_loified_source;
 
@@ -1705,10 +2597,142 @@ mod tests {
             .unwrap_err()
             .to_string()
             .contains("complete owned colored voxel-light volume"));
+        assert!(matches!(
+            candidate,
+            TerrainSourceCandidateState::Discovered {
+                source_shadow_summary: None,
+                source_shadow_preprocess_error: Some(error),
+                source_shadow_output_count: None,
+                source_shadow_lowering_error: None,
+                ..
+            } if error.contains("missing shadow source for Default")
+        ));
         assert_eq!(
             fixture_program,
             executor.plan().programs.terrain_opaque.identity
         );
+        assert_eq!(
+            Some("lib/textures/noise.png"),
+            executor
+                .source_asset_binding_plan()
+                .and_then(|bindings| bindings.sampler_path("noisetex"))
+        );
+    }
+
+    #[test]
+    fn material_texture_wrapper_rejects_a_non_material_semantic_role_before_handle_use() {
+        let mut executor = ShaderPackRuntimeExecutor::terrain_material_multipass_v1(7).unwrap();
+        let mut gal = gal();
+        let error = executor
+            .ensure_candidate_source_material_texture_resources(
+                &mut gal,
+                TerrainSourceMaterialTextureInput {
+                    role: TerrainSourceResourceRole::Lightmap,
+                    shader_pack_generation: 1,
+                    world_generation: 1,
+                    mesh_asset_generation: 1,
+                    texture_view: Handle::NULL,
+                    sampler: Handle::NULL,
+                },
+            )
+            .unwrap_err();
+        assert!(error
+            .to_string()
+            .contains("unsupported semantic role"));
+    }
+
+    #[test]
+    fn active_normal_map_binding_owns_a_distinct_semantic_material_wrapper() {
+        let source = ShaderPackSource::new(
+            "normal-map-resource",
+            29,
+            vec![
+                ShaderSourceFile::new(
+                    "gbuffers_terrain.vsh",
+                    "#version 130\nout vec2 texCoord;\nout vec4 glColor;\nout float smoothnessD;\nout float materialMask;\nout float skyLightFactor;\nuniform sampler2D tex;\nvoid main() { texCoord = gl_MultiTexCoord0.xy; glColor = vec4(1.0); smoothnessD = 0.0; materialMask = 0.0; skyLightFactor = 1.0; gl_Position = ftransform(); }",
+                ),
+                ShaderSourceFile::new(
+                    "gbuffers_terrain.fsh",
+                    "#version 130\nin vec2 texCoord;\nin vec4 glColor;\nin float smoothnessD;\nin float materialMask;\nin float skyLightFactor;\nuniform sampler2D tex;\nuniform sampler2D normals;\nvoid DoLighting() {}\n/* DRAWBUFFERS:06 */\nvoid main() { vec4 color = texture2D(tex, texCoord); color.rgb += texture2D(normals, texCoord).rgb * 0.0; if (color.a <= 0.00001) discard; color.rgb *= glColor.rgb; DoLighting(); gl_FragData[0] = color; gl_FragData[1] = vec4(smoothnessD, materialMask, skyLightFactor, 1.0); }",
+                ),
+                ShaderSourceFile::new(
+                    TERRAIN_RESOURCE_BINDINGS_PATH,
+                    "tex=material_atlas\nnormals=material_normal_map\n",
+                ),
+                ShaderSourceFile::new("lib/common.glsl", "#define TEST 1\n"),
+                ShaderSourceFile::new("shaders.properties", ""),
+                ShaderSourceFile::new("block.properties", ""),
+            ],
+        )
+        .unwrap();
+        let mut executor = ShaderPackRuntimeExecutor::terrain_material_multipass_v1(7).unwrap();
+        let mut gal = gal();
+        executor.observe_source_candidate(&source);
+        assert!(executor.candidate_source_requires_resource(
+            TerrainSourceResourceRole::MaterialNormalMap
+        ));
+
+        let texture = gal
+            .create_texture(TextureDesc {
+                label: "normal-map-resource.texture".to_string(),
+                dimension: TextureDimension::D2,
+                format: TextureFormat::Rgba8Unorm,
+                extent: Extent3d {
+                    width: 4,
+                    height: 4,
+                    depth: 1,
+                },
+                mip_levels: 1,
+                array_layers: 1,
+                usages: vec![TextureUsage::Sampled, TextureUsage::TransferDst],
+            })
+            .unwrap();
+        let view = gal
+            .create_texture_view(TextureViewDesc {
+                label: "normal-map-resource.view".to_string(),
+                texture,
+                format: TextureFormat::Rgba8Unorm,
+                base_mip: 0,
+                mip_count: 1,
+                base_layer: 0,
+                layer_count: 1,
+            })
+            .unwrap();
+        let sampler = gal
+            .create_sampler(SamplerDesc {
+                label: "normal-map-resource.sampler".to_string(),
+                min_filter: SamplerFilter::Nearest,
+                mag_filter: SamplerFilter::Nearest,
+                mip_filter: SamplerFilter::Nearest,
+                address_u: SamplerAddressMode::ClampToEdge,
+                address_v: SamplerAddressMode::ClampToEdge,
+                address_w: SamplerAddressMode::ClampToEdge,
+                comparison: None,
+            })
+            .unwrap();
+        let resources = executor
+            .ensure_candidate_source_material_texture_resources(
+                &mut gal,
+                TerrainSourceMaterialTextureInput {
+                    role: TerrainSourceResourceRole::MaterialNormalMap,
+                    shader_pack_generation: source.generation(),
+                    world_generation: 3,
+                    mesh_asset_generation: 5,
+                    texture_view: view,
+                    sampler,
+                },
+            )
+            .unwrap()
+            .expect("the active normal-map source role must receive a wrapper");
+        assert!(resources
+            .combined_sampler_for(TerrainSourceResourceRole::MaterialNormalMap)
+            .is_some());
+        executor
+            .clear_candidate_source_material_texture_resources(&mut gal)
+            .unwrap();
+        gal.destroy(sampler).unwrap();
+        gal.destroy(view).unwrap();
+        gal.destroy(texture).unwrap();
     }
 
     #[test]
@@ -1723,6 +2747,10 @@ mod tests {
             TerrainSourceCandidateState::Discovered {
                 source_summary: Some(_),
                 source_preprocess_error: None,
+                source_shadow_summary: Some(shadow_summary),
+                source_shadow_preprocess_error: None,
+                source_shadow_output_count: Some(2),
+                source_shadow_lowering_error: None,
                 source_lowering_summary: Some(summary),
                 source_lowering_error: None,
                 source_resource_binding_count: Some(8),
@@ -1731,11 +2759,252 @@ mod tests {
             } if summary.varying_count > 0
                 && summary.opaque_resource_count > summary.active_opaque_resource_count
                 && summary.active_opaque_resource_count > 0
-        ));
+                && shadow_summary.vertex_entry == "world0/shadow.vsh"
+                && shadow_summary.fragment_entry == "world0/shadow.fsh"
+        ), "{:#?}", executor.source_candidate());
         assert_eq!(
             executor.plan().programs.terrain_opaque.identity.as_str(),
             "vulkanic:builtin/terrain_opaque_v1"
         );
+    }
+
+    #[test]
+    fn source_shadow_depth_resources_are_generation_bound_compare_samplers() {
+        let source = complete_bundled_pack_source_for_test();
+        let mut executor = ShaderPackRuntimeExecutor::terrain_material_multipass_v1(7).unwrap();
+        let mut gal = gal();
+        executor.observe_source_candidate_for_scope(&source, TerrainProgramScope::Overworld);
+
+        let texture = gal
+            .create_texture(TextureDesc {
+                label: "source-shadow-depth-test.texture".to_string(),
+                dimension: TextureDimension::D2,
+                format: TextureFormat::Depth32Float,
+                extent: Extent3d {
+                    width: 16,
+                    height: 16,
+                    depth: 1,
+                },
+                mip_levels: 1,
+                array_layers: 1,
+                usages: vec![TextureUsage::DepthStencilAttachment, TextureUsage::Sampled],
+            })
+            .unwrap();
+        let view = gal
+            .create_texture_view(TextureViewDesc {
+                label: "source-shadow-depth-test.view".to_string(),
+                texture,
+                format: TextureFormat::Depth32Float,
+                base_mip: 0,
+                mip_count: 1,
+                base_layer: 0,
+                layer_count: 1,
+            })
+            .unwrap();
+        let input = TerrainSourceShadowDepthInput {
+            shader_pack_generation: source.generation(),
+            world_generation: 4,
+            shader_graph_generation: 9,
+            shadow_depth_view: view,
+        };
+
+        let first = executor
+            .ensure_candidate_source_shadow_depth_resources(&mut gal, input)
+            .unwrap()
+            .expect("source declares two shadow compare samplers");
+        let primary = first
+            .combined_sampler_for(TerrainSourceResourceRole::ShadowDepthPrimary)
+            .unwrap();
+        let secondary = first
+            .combined_sampler_for(TerrainSourceResourceRole::ShadowDepthSecondary)
+            .unwrap();
+        assert_ne!(primary, secondary);
+        assert_eq!(2, first.len());
+        assert_eq!(
+            Some(TerrainSourceResourceRole::ShadowDepthPrimary.expected_sampled_resource_shape()),
+            first
+                .availability()
+                .resource_for(TerrainSourceResourceRole::ShadowDepthPrimary)
+                .map(|resource| resource.shape)
+        );
+
+        let cached = executor
+            .ensure_candidate_source_shadow_depth_resources(&mut gal, input)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            Some(primary),
+            cached.combined_sampler_for(TerrainSourceResourceRole::ShadowDepthPrimary)
+        );
+
+        let replaced = executor
+            .ensure_candidate_source_shadow_depth_resources(
+                &mut gal,
+                TerrainSourceShadowDepthInput {
+                    shader_graph_generation: 10,
+                    ..input
+                },
+            )
+            .unwrap()
+            .unwrap();
+        assert_ne!(
+            Some(primary),
+            replaced.combined_sampler_for(TerrainSourceResourceRole::ShadowDepthPrimary)
+        );
+        executor
+            .clear_candidate_source_shadow_depth_resources(&mut gal)
+            .unwrap();
+        gal.destroy(view).unwrap();
+        gal.destroy(texture).unwrap();
+    }
+
+    #[test]
+    fn source_shadow_color_requires_an_owned_color_view_and_retires_generation_bound_wrappers() {
+        let source = complete_bundled_pack_source_for_test();
+        let mut executor = ShaderPackRuntimeExecutor::terrain_material_multipass_v1(7).unwrap();
+        let mut gal = gal();
+        executor.observe_source_candidate_for_scope(&source, TerrainProgramScope::Overworld);
+
+        let texture = gal
+            .create_texture(TextureDesc {
+                label: "source-shadow-color-test.texture".to_string(),
+                dimension: TextureDimension::D2,
+                format: TextureFormat::Rgba8Unorm,
+                extent: Extent3d {
+                    width: 16,
+                    height: 16,
+                    depth: 1,
+                },
+                mip_levels: 1,
+                array_layers: 1,
+                usages: vec![
+                    TextureUsage::ColorAttachment,
+                    TextureUsage::Sampled,
+                    TextureUsage::TransferSrc,
+                ],
+            })
+            .unwrap();
+        let view = gal
+            .create_texture_view(TextureViewDesc {
+                label: "source-shadow-color-test.view".to_string(),
+                texture,
+                format: TextureFormat::Rgba8Unorm,
+                base_mip: 0,
+                mip_count: 1,
+                base_layer: 0,
+                layer_count: 1,
+            })
+            .unwrap();
+        let sampler = gal
+            .create_sampler(SamplerDesc {
+                label: "source-shadow-color-test.sampler".to_string(),
+                min_filter: SamplerFilter::Nearest,
+                mag_filter: SamplerFilter::Nearest,
+                mip_filter: SamplerFilter::Nearest,
+                address_u: SamplerAddressMode::ClampToEdge,
+                address_v: SamplerAddressMode::ClampToEdge,
+                address_w: SamplerAddressMode::ClampToEdge,
+                comparison: None,
+            })
+            .unwrap();
+        let input = TerrainSourceShadowColorInput {
+            shader_pack_generation: source.generation(),
+            world_generation: 4,
+            shader_graph_generation: 9,
+            shadow_color_view: view,
+            sampler,
+        };
+
+        let first = executor
+            .ensure_candidate_source_shadow_color_resources(&mut gal, input)
+            .unwrap()
+            .expect("source declares shadowcolor0 as a color resource");
+        let combined = first
+            .combined_sampler_for(TerrainSourceResourceRole::ShadowColor)
+            .unwrap();
+        assert_eq!(1, first.len());
+        assert_eq!(
+            Some(TerrainSourceResourceRole::ShadowColor.expected_sampled_resource_shape()),
+            first
+                .availability()
+                .resource_for(TerrainSourceResourceRole::ShadowColor)
+                .map(|resource| resource.shape)
+        );
+        assert_eq!(
+            Some(combined),
+            executor
+                .ensure_candidate_source_shadow_color_resources(&mut gal, input)
+                .unwrap()
+                .unwrap()
+                .combined_sampler_for(TerrainSourceResourceRole::ShadowColor)
+        );
+
+        let replaced = executor
+            .ensure_candidate_source_shadow_color_resources(
+                &mut gal,
+                TerrainSourceShadowColorInput {
+                    shader_graph_generation: 10,
+                    ..input
+                },
+            )
+            .unwrap()
+            .unwrap();
+        assert_ne!(
+            Some(combined),
+            replaced.combined_sampler_for(TerrainSourceResourceRole::ShadowColor)
+        );
+        executor
+            .clear_candidate_source_shadow_color_resources(&mut gal)
+            .unwrap();
+        gal.destroy(sampler).unwrap();
+        gal.destroy(view).unwrap();
+        gal.destroy(texture).unwrap();
+    }
+
+    #[test]
+    fn copied_source_assets_are_generation_coherent_private_runtime_preparation() {
+        let source = complete_bundled_pack_source_for_test();
+        let assets = copied_png_assets_for(&source);
+        let mut executor = ShaderPackRuntimeExecutor::terrain_material_multipass_v1(7).unwrap();
+        let mut gal = gal();
+
+        executor.observe_source_candidate_for_scope(&source, TerrainProgramScope::Overworld);
+        assert!(executor
+            .ensure_candidate_source_asset_resources(&mut gal, &assets)
+            .unwrap());
+        assert!(executor
+            .candidate_source_asset_resource_count()
+            .is_some_and(|count| count > 0));
+        assert!(
+            executor
+                .source_asset_resources
+                .as_ref()
+                .and_then(|resources| resources.combined_sampler_for("gaux4"))
+                .is_some(),
+            "shadow-only gaux4 must be retained from the separately lowered shadow plan"
+        );
+        assert!(!executor
+            .ensure_candidate_source_asset_resources(&mut gal, &assets)
+            .unwrap());
+
+        let mismatched = ShaderPackAssets::new(ShaderPackAssetUpdate {
+            pack_name: "different-pack".to_string(),
+            generation: source.generation(),
+            files: Vec::new(),
+        })
+        .unwrap();
+        assert!(executor
+            .ensure_candidate_source_asset_resources(&mut gal, &mismatched)
+            .unwrap_err()
+            .to_string()
+            .contains("do not match source candidate"));
+
+        executor
+            .clear_candidate_source_asset_resources(&mut gal)
+            .unwrap();
+        assert_eq!(None, executor.candidate_source_asset_resource_count());
+        executor.destroy(&mut gal).unwrap();
+        assert!(gal.metrics().resource_destroys > 0);
     }
 
     #[test]
@@ -1810,17 +3079,8 @@ mod tests {
         assert_eq!(27, summary.opaque_resource_count);
         assert_eq!(8, summary.active_opaque_resource_count);
         assert_eq!(40, uniform_summary.field_count);
-        assert_eq!(36, uniform_summary.resolved_field_count);
-        assert_eq!(
-            vec![
-                "shadowModelView",
-                "shadowModelViewInverse",
-                "shadowProjection",
-                "shadowProjectionInverse",
-            ],
-            uniform_summary.unresolved_field_names,
-            "unimplemented source semantics must stay explicit and keep source execution unavailable"
-        );
+        assert_eq!(40, uniform_summary.resolved_field_count);
+        assert!(uniform_summary.unresolved_field_names.is_empty());
         assert_eq!(
             vec![
                 "floodfill_sampler",
@@ -1846,11 +3106,19 @@ mod tests {
                 .bindings()
                 .len()
         );
+        assert!(matches!(
+            executor.source_candidate(),
+            TerrainSourceCandidateState::Discovered {
+                source_shadow_resource_binding_count: Some(count),
+                source_shadow_resource_binding_error: None,
+                source_shadow_resource_bindings: Some(_),
+                ..
+            } if *count > 0
+        ));
         assert!(executor
             .prepared_lowered_terrain_source_program(TerrainMaterialProgramKind::Opaque)
-            .unwrap_err()
-            .to_string()
-            .contains("unresolved scalar source uniforms"));
+            .unwrap()
+            .is_some());
     }
 
     #[test]
@@ -2236,7 +3504,7 @@ mod tests {
             pipeline,
             layout,
             set,
-            [0],
+            &[0],
             None,
             index_buffer,
             0,
@@ -2250,7 +3518,7 @@ mod tests {
             pipeline,
             layout,
             set,
-            [0],
+            &[0],
             None,
             index_buffer,
             0,
@@ -2264,7 +3532,7 @@ mod tests {
             pipeline,
             layout,
             other_set,
-            [0],
+            &[0],
             None,
             index_buffer,
             0,
@@ -2278,7 +3546,7 @@ mod tests {
             pipeline,
             layout,
             other_set,
-            [0],
+            &[0],
             None,
             index_buffer,
             12,
@@ -2292,7 +3560,7 @@ mod tests {
             other_pipeline,
             layout,
             other_set,
-            [0],
+            &[0],
             None,
             index_buffer,
             12,
@@ -2325,6 +3593,72 @@ mod tests {
     }
 
     #[test]
+    fn indexed_draw_emission_distinguishes_static_and_dynamic_set_bindings() {
+        let pipeline = test_handle(HandleKind::GraphicsPipeline, 1);
+        let layout = test_handle(HandleKind::PipelineLayout, 2);
+        let set = test_handle(HandleKind::ResourceSet, 3);
+        let index_buffer = test_handle(HandleKind::Buffer, 4);
+        let mut ops = Vec::new();
+        let mut state = IndexedDrawState::default();
+
+        append_indexed_draw(
+            &mut ops,
+            &mut state,
+            pipeline,
+            layout,
+            set,
+            &[],
+            None,
+            index_buffer,
+            0,
+            IndexType::U32,
+            6,
+            1,
+        );
+        append_indexed_draw(
+            &mut ops,
+            &mut state,
+            pipeline,
+            layout,
+            set,
+            &[32],
+            None,
+            index_buffer,
+            0,
+            IndexType::U32,
+            6,
+            1,
+        );
+        append_indexed_draw(
+            &mut ops,
+            &mut state,
+            pipeline,
+            layout,
+            set,
+            &[32],
+            None,
+            index_buffer,
+            0,
+            IndexType::U32,
+            6,
+            1,
+        );
+
+        let dynamic_offsets = ops
+            .iter()
+            .filter_map(|op| match op {
+                CommandOp::BindResourceSet {
+                    set_index: 0,
+                    dynamic_offsets,
+                    ..
+                } => Some(dynamic_offsets.as_slice()),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(vec![&[][..], &[32][..]], dynamic_offsets);
+    }
+
+    #[test]
     fn indexed_draw_emission_binds_optional_shader_resources_by_semantic_set() {
         let pipeline = test_handle(HandleKind::GraphicsPipeline, 1);
         let layout = test_handle(HandleKind::PipelineLayout, 2);
@@ -2353,7 +3687,7 @@ mod tests {
                 pipeline,
                 layout,
                 mesh_set,
-                [0],
+                &[0],
                 binding,
                 index_buffer,
                 0,

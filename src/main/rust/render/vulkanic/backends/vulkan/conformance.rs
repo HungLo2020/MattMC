@@ -17,8 +17,8 @@ use crate::render::vulkanic::handles::Handle;
 use crate::render::vulkanic::resources::*;
 use crate::render::vulkanic::shader_pack::programs::{
     prepare_lowered_terrain_source_program, shader_stage_code_for_backend,
-    COMPLEMENTARY_TERRAIN_SUBSET_FRAGMENT, MINIMAL_TERRAIN_MATERIAL_VERTEX,
-    TerrainMaterialProgramKind,
+    TerrainMaterialProgramKind, COMPLEMENTARY_TERRAIN_SUBSET_FRAGMENT,
+    MINIMAL_TERRAIN_MATERIAL_VERTEX,
 };
 use crate::render::vulkanic::shader_pack::{
     lowering::lower_terrain_source_pair,
@@ -27,9 +27,7 @@ use crate::render::vulkanic::shader_pack::{
     terrain_contract::{
         derive_complementary_terrain_contract, TerrainSourceStage, TerrainSourceStages,
     },
-    terrain_source_resources::{
-        TerrainSourceResourceBindings, TERRAIN_RESOURCE_BINDINGS_PATH,
-    },
+    terrain_source_resources::{TerrainSourceResourceBindings, TERRAIN_RESOURCE_BINDINGS_PATH},
 };
 
 const WIDTH: u32 = 96;
@@ -107,6 +105,61 @@ fn lowered_complete_complementary_terrain_pair_compiles_at_the_vulkan_boundary()
     .expect("lowered Complementary terrain fragment source must compile for Vulkan");
 }
 
+/// Compiles the real bundled Complementary terrain pair through the private
+/// Vulkan backend. This remains isolated source-program conformance and does
+/// not select a gameplay route or borrow Java/Iris state.
+#[test]
+fn lowered_complete_complementary_terrain_pair_creates_vulkan_modules() {
+    let backend = match VulkanBackend::new("MattMC complete source terrain Vulkan conformance") {
+        Ok(backend) => backend,
+        Err(error) => {
+            let text = error.to_string();
+            assert!(
+                text.contains("Vulkan")
+                    || text.contains("vulkan")
+                    || text.contains("physical device"),
+                "unexpected Vulkan complete source terrain setup failure: {text}"
+            );
+            return;
+        }
+    };
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let source = complete_bundled_pack_source_for_test();
+    let stages = TerrainSourceStages {
+        vertex: TerrainSourceStage {
+            path: "world0/gbuffers_terrain.vsh".to_string(),
+            defines: Default::default(),
+        },
+        fragment: TerrainSourceStage {
+            path: "world0/gbuffers_terrain.fsh".to_string(),
+            defines: Default::default(),
+        },
+    };
+    let contract = derive_complementary_terrain_contract(&source).unwrap();
+    let artifacts = preprocess_terrain_sources(&source, &stages).unwrap();
+    let lowered = lower_terrain_source_pair(&artifacts.vertex, &artifacts.fragment).unwrap();
+    let declarations = TerrainSourceResourceBindings::from_source(&source).unwrap();
+    let bindings = lowered
+        .opaque_resource_contract()
+        .bind_semantic_roles(&declarations)
+        .unwrap();
+    let program = prepare_lowered_terrain_source_program(
+        &contract,
+        &lowered,
+        &bindings,
+        TerrainMaterialProgramKind::Opaque,
+    )
+    .unwrap();
+
+    for module in program.shader_module_descriptors(BackendApi::Vulkan) {
+        gal.create_shader_module(module).unwrap_or_else(|error| {
+            panic!(
+                "complete lowered Complementary terrain shader must compile through the Vulkan lowering: {error}"
+            )
+        });
+    }
+}
+
 #[test]
 fn prepared_lowered_terrain_program_compiles_at_the_vulkan_boundary() {
     let source = ShaderPackSource::new(
@@ -129,7 +182,8 @@ fn prepared_lowered_terrain_program_compiles_at_the_vulkan_boundary() {
     )
     .unwrap();
     let contract = derive_complementary_terrain_contract(&source).unwrap();
-    let artifacts = preprocess_terrain_sources(&source, &contract.source_stages().unwrap()).unwrap();
+    let artifacts =
+        preprocess_terrain_sources(&source, &contract.source_stages().unwrap()).unwrap();
     let lowered = lower_terrain_source_pair(&artifacts.vertex, &artifacts.fragment).unwrap();
     let declarations = TerrainSourceResourceBindings::from_source(&source).unwrap();
     let bindings = lowered
@@ -407,6 +461,7 @@ fn create_selected_terrain_colored_voxel_resource_set(
             address_u: SamplerAddressMode::ClampToEdge,
             address_v: SamplerAddressMode::ClampToEdge,
             address_w: SamplerAddressMode::ClampToEdge,
+            comparison: None,
         })
         .unwrap();
     let mapping = gal
@@ -708,7 +763,7 @@ fn isolated_vulkan_conformance_round_trips_r8uint_d3_depth_slices() {
 
 #[test]
 fn isolated_vulkan_conformance_writes_and_reads_a_r8uint_d3_storage_texel() {
-    run_d3_storage_write_read_test(
+    let _ = run_d3_storage_write_read_test(
         "r8uint",
         TextureFormat::R8Uint,
         D3_STORAGE_R8UINT_COMPUTE_SHADER,
@@ -718,7 +773,7 @@ fn isolated_vulkan_conformance_writes_and_reads_a_r8uint_d3_storage_texel() {
 
 #[test]
 fn isolated_vulkan_conformance_writes_and_reads_a_rgba16float_d3_storage_texel() {
-    run_d3_storage_write_read_test(
+    let _ = run_d3_storage_write_read_test(
         "rgba16float",
         TextureFormat::Rgba16Float,
         D3_STORAGE_RGBA16FLOAT_COMPUTE_SHADER,
@@ -731,7 +786,7 @@ fn run_d3_storage_write_read_test(
     format: TextureFormat,
     compute_shader: &str,
     expected_bytes: &[u8],
-) {
+) -> Option<Vec<u8>> {
     let backend = match VulkanBackend::new("MattMC VulkanicGAL Vulkan D3 storage conformance") {
         Ok(backend) => backend,
         Err(error) => {
@@ -742,7 +797,7 @@ fn run_d3_storage_write_read_test(
                     || text.contains("physical device"),
                 "unexpected Vulkan D3 storage setup failure: {text}"
             );
-            return;
+            return None;
         }
     };
     let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
@@ -846,6 +901,7 @@ fn run_d3_storage_write_read_test(
             address_u: SamplerAddressMode::ClampToEdge,
             address_v: SamplerAddressMode::ClampToEdge,
             address_w: SamplerAddressMode::ClampToEdge,
+            comparison: None,
         })
         .unwrap();
     let source_mapping = gal
@@ -1040,6 +1096,27 @@ fn run_d3_storage_write_read_test(
         .find(|read| read.buffer == readback)
         .unwrap();
     assert_eq!(expected_bytes, read.bytes.as_slice());
+    Some(read.bytes)
+}
+
+pub(in crate::render::vulkanic::backends) fn shared_d3_storage_fixture_bytes(
+    format: TextureFormat,
+) -> Option<Vec<u8>> {
+    match format {
+        TextureFormat::R8Uint => run_d3_storage_write_read_test(
+            "shared-r8uint",
+            format,
+            D3_STORAGE_R8UINT_COMPUTE_SHADER,
+            &[0x5a],
+        ),
+        TextureFormat::Rgba16Float => run_d3_storage_write_read_test(
+            "shared-rgba16float",
+            format,
+            D3_STORAGE_RGBA16FLOAT_COMPUTE_SHADER,
+            &[0x00, 0x38, 0x00, 0x34, 0x00, 0x3a, 0x00, 0x3c],
+        ),
+        _ => panic!("shared D3 storage fixture only covers required volume formats"),
+    }
 }
 
 #[test]
@@ -1249,6 +1326,7 @@ pub(in crate::render::vulkanic::backends) fn run_conformance(
         address_u: SamplerAddressMode::ClampToEdge,
         address_v: SamplerAddressMode::ClampToEdge,
         address_w: SamplerAddressMode::ClampToEdge,
+        comparison: None,
     })?;
     let combined_sampler = gal.create_combined_texture_sampler(CombinedTextureSamplerDesc {
         label: "conformance.combined-sampler".to_string(),

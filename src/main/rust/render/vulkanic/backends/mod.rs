@@ -18,10 +18,9 @@ use super::frame::{
 use super::handles::{Handle, HandleKind};
 use super::resources::{
     BackendApi, BackendCapabilities, BackendFeatureFlags, BackendLimits, BufferDesc,
-    CombinedTextureSamplerDesc,
-    ComputePipelineDesc, FrameTargetDesc, GraphicsPipelineDesc, PipelineLayoutDesc, RenderPassDesc,
-    RenderTargetDesc, ResourceLayoutDesc, ResourceSetDesc, SamplerDesc, ShaderModuleDesc,
-    TextureDesc, TextureViewDesc,
+    CombinedTextureSamplerDesc, ComputePipelineDesc, FrameTargetDesc, GraphicsPipelineDesc,
+    PipelineLayoutDesc, RenderPassDesc, RenderTargetDesc, ResourceLayoutDesc, ResourceSetDesc,
+    SamplerDesc, ShaderModuleDesc, TextureDesc, TextureViewDesc,
 };
 use super::sync::SubmissionId;
 

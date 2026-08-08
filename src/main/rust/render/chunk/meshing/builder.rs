@@ -125,7 +125,14 @@ pub(super) unsafe fn section_builder_append_batch(
     quad_count: usize,
     validity: Option<&[u8]>,
 ) -> Result<i32, i32> {
-    section_builder_append_batch_with_kind(builder, facing, batch_address, quad_count, validity, None)
+    section_builder_append_batch_with_kind(
+        builder,
+        facing,
+        batch_address,
+        quad_count,
+        validity,
+        None,
+    )
 }
 
 pub(super) unsafe fn section_builder_append_batch_with_kind(
@@ -287,7 +294,12 @@ pub(super) unsafe fn section_builder_append_batch_encoded_with_kind(
                 .add_optional_stage(PROFILE_STAGING_VERTEX_ENCODING, encode_started);
             buffer.primitive_metadata[start + index] = primitive_metadata_from_quad(
                 quad,
-                primitive_kind_for_index(quad, index, primitive_kind_override, primitive_kind_overrides),
+                primitive_kind_for_index(
+                    quad,
+                    index,
+                    primitive_kind_override,
+                    primitive_kind_overrides,
+                ),
                 facing,
                 -1,
             );
@@ -359,7 +371,12 @@ pub(super) unsafe fn section_builder_append_batch_encoded_with_kind(
             }
             buffer.primitive_metadata[start + output_index] = primitive_metadata_from_quad(
                 &quad,
-                primitive_kind_for_index(&quad, index, primitive_kind_override, primitive_kind_overrides),
+                primitive_kind_for_index(
+                    &quad,
+                    index,
+                    primitive_kind_override,
+                    primitive_kind_overrides,
+                ),
                 facing,
                 -1,
             );

@@ -142,6 +142,9 @@ pub struct SamplerDesc {
     pub address_u: SamplerAddressMode,
     pub address_v: SamplerAddressMode,
     pub address_w: SamplerAddressMode,
+    /// Optional semantic depth comparison. `None` is ordinary sampling;
+    /// `Some` may only be paired with a depth texture view.
+    pub comparison: Option<CompareOp>,
 }
 
 /// One explicit sampled image and sampler pairing. It is backend-neutral:

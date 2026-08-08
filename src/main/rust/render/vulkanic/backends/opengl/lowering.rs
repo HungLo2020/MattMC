@@ -611,11 +611,7 @@ impl OpenGlLowerer {
                 let src = z
                     .checked_mul(rows_per_image)
                     .and_then(|slice_start| {
-                        slice_start.checked_add(copy_upload_row_index(
-                            texture.dimension,
-                            row,
-                            rows,
-                        ))
+                        slice_start.checked_add(copy_upload_row_index(texture.dimension, row, rows))
                     })
                     .and_then(|source_row| source_row.checked_mul(bytes_per_row))
                     .ok_or_else(|| GalError::backend("buffer texture source row overflows"))?;
@@ -936,9 +932,11 @@ impl OpenGlLowerer {
                 }
                 let view_handle = match binding.kind {
                     ResourceBindingKind::SampledTexture => binding.resource,
-                    ResourceBindingKind::CombinedTextureSampler => objects
-                        .combined_texture_sampler(binding.resource)?
-                        .texture_view,
+                    ResourceBindingKind::CombinedTextureSampler => {
+                        objects
+                            .combined_texture_sampler(binding.resource)?
+                            .texture_view
+                    }
                     _ => unreachable!(),
                 };
                 let view = objects.texture_view(view_handle)?;
@@ -1320,7 +1318,7 @@ pub(in crate::render::vulkanic) struct StateCacheSnapshot {
     pub(in crate::render::vulkanic) state_changes: usize,
 }
 
-fn compare_op(compare: CompareOp) -> u32 {
+pub(super) fn compare_op(compare: CompareOp) -> u32 {
     match compare {
         CompareOp::Always => glow::ALWAYS,
         CompareOp::Less => glow::LESS,

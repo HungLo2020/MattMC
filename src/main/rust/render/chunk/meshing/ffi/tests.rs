@@ -531,9 +531,7 @@ fn translucent_encoded_append_stamps_non_fluid_primitive_metadata() {
 
         assert_eq!(
             OK,
-            crate::render::chunk::translucent::mattmc_sodium_translucent_analyzer_destroy(
-                analyzer,
-            )
+            crate::render::chunk::translucent::mattmc_sodium_translucent_analyzer_destroy(analyzer,)
         );
     }
 }
@@ -593,9 +591,16 @@ fn compact_native_lava_fluid_stamps_unsupported_primitive_metadata() {
         let mut counts = [0; 3];
         assert_eq!(
             OK,
-            append_compact(&builders, &header as *const CompactSectionSnapshotHeader as u64, &mut counts)
+            append_compact(
+                &builders,
+                &header as *const CompactSectionSnapshotHeader as u64,
+                &mut counts
+            )
         );
-        assert!(counts[2] > 0, "lava should emit translucent native fluid quads");
+        assert!(
+            counts[2] > 0,
+            "lava should emit translucent native fluid quads"
+        );
 
         let mut metadata = vec![NativeTerrainPrimitiveMetadata::default(); counts[2] as usize];
         assert_eq!(

@@ -26,6 +26,11 @@ use crate::render::vulkanic::world_primitive_frontend::{
 };
 
 use super::programs::shader_stage_code_for_backend;
+use super::terrain_source_resources::{
+    TerrainSourceOwnedResource, TerrainSourceOwnedResourceSet, TerrainSourceOwnedStorageResource,
+    TerrainSourceResourceAvailability, TerrainSourceResourceAvailabilitySet, TerrainSourceResourceRole,
+    TerrainSourceSampledResourceShape,
+};
 use super::voxel_emission_table::{VoxelEmissionTable, VOXEL_TINT_COUNT};
 use super::voxel_light_volume::{
     flood_fill_output_field_for_frame, flood_fill_source_field_for_frame, VoxelLightVolumeCache,
@@ -836,6 +841,72 @@ impl TerrainVoxelLightSamplingResources {
         })
     }
 
+    /// Exposes the complete, parity-correct D3 sampler subset through the
+    /// common source-resource contract. This remains resource preparation
+    /// only: it creates no program layout and cannot select a terrain route.
+    fn semantic_resource_set_for_frame(
+        &self,
+        readiness: &VoxelLightVolumeReadiness,
+        frame_counter: u64,
+        occupancy_view: Handle,
+    ) -> GalResult<TerrainSourceOwnedResourceSet> {
+        let active = readiness.binding_for_frame(frame_counter)?;
+        let (current_light, previous_light) = match active.active_light_field {
+            VoxelLightVolumeKind::FloodFillEven => {
+                (self.even_light_sampler, self.odd_light_sampler)
+            }
+            VoxelLightVolumeKind::FloodFillOdd => (self.odd_light_sampler, self.even_light_sampler),
+            VoxelLightVolumeKind::Occupancy => {
+                return Err(GalError::invalid_argument(
+                    "terrain voxel-light sampling cannot expose occupancy as a colored-light field",
+                ));
+            }
+        };
+        let descriptor = readiness.descriptor();
+        let availability = TerrainSourceResourceAvailabilitySet::new(
+            descriptor.shader_pack_generation,
+            descriptor.world_generation,
+            [
+                TerrainSourceResourceAvailability {
+                    role: TerrainSourceResourceRole::ColoredVoxelOccupancy,
+                    shape: TerrainSourceSampledResourceShape::UnsignedTexture3d,
+                    resource_generation: descriptor.resource_generation,
+                },
+                TerrainSourceResourceAvailability {
+                    role: TerrainSourceResourceRole::ColoredVoxelLightCurrent,
+                    shape: TerrainSourceSampledResourceShape::FloatTexture3d,
+                    resource_generation: active.resource_generation,
+                },
+                TerrainSourceResourceAvailability {
+                    role: TerrainSourceResourceRole::ColoredVoxelLightPrevious,
+                    shape: TerrainSourceSampledResourceShape::FloatTexture3d,
+                    resource_generation: active.resource_generation,
+                },
+            ],
+        )?;
+        TerrainSourceOwnedResourceSet::with_storage_resources(
+            availability,
+            [
+                TerrainSourceOwnedResource {
+                    role: TerrainSourceResourceRole::ColoredVoxelOccupancy,
+                    combined_sampler: self.occupancy_sampler,
+                },
+                TerrainSourceOwnedResource {
+                    role: TerrainSourceResourceRole::ColoredVoxelLightCurrent,
+                    combined_sampler: current_light,
+                },
+                TerrainSourceOwnedResource {
+                    role: TerrainSourceResourceRole::ColoredVoxelLightPrevious,
+                    combined_sampler: previous_light,
+                },
+            ],
+            [TerrainSourceOwnedStorageResource {
+                role: TerrainSourceResourceRole::ColoredVoxelOccupancy,
+                texture_view: occupancy_view,
+            }],
+        )
+    }
+
     fn destroy(self, gal: &mut VulkanicGal) -> GalResult<()> {
         gal.destroy(self.odd_resource_set)?;
         gal.destroy(self.even_resource_set)?;
@@ -963,6 +1034,21 @@ impl TerrainColoredLightRuntime {
     ) -> GalResult<TerrainVoxelLightSamplingBinding> {
         self.sampling
             .binding_for_frame(&self.readiness()?, frame_counter)
+    }
+
+    /// Returns the semantic D3 sampler table for this exact confirmed frame
+    /// parity. It is intentionally separate from the legacy compact sampling
+    /// binding while selected-source terrain execution remains unavailable.
+    pub(crate) fn semantic_resource_set_for_frame(
+        &self,
+        frame_counter: u64,
+    ) -> GalResult<TerrainSourceOwnedResourceSet> {
+        self.sampling
+            .semantic_resource_set_for_frame(
+                &self.readiness()?,
+                frame_counter,
+                self.occupancy.resources.view,
+            )
     }
 
     pub(crate) fn has_pending_submission(&self) -> bool {
@@ -2230,6 +2316,7 @@ impl TerrainFloodFillGpuResources {
             address_u: SamplerAddressMode::ClampToEdge,
             address_v: SamplerAddressMode::ClampToEdge,
             address_w: SamplerAddressMode::ClampToEdge,
+            comparison: None,
         }) {
             Ok(sampler) => sampler,
             Err(error) => {
@@ -4108,6 +4195,40 @@ mod tests {
         assert_eq!(
             descriptor.resource_generation,
             even_binding.resource_generation
+        );
+
+        let even_resources = runtime.semantic_resource_set_for_frame(0).unwrap();
+        let odd_resources = runtime.semantic_resource_set_for_frame(1).unwrap();
+        assert!(even_resources
+            .availability()
+            .resource_for(TerrainSourceResourceRole::ColoredVoxelOccupancy)
+            .is_some());
+        assert!(even_resources
+            .availability()
+            .resource_for(TerrainSourceResourceRole::ColoredVoxelLightCurrent)
+            .is_some());
+        assert!(even_resources
+            .availability()
+            .resource_for(TerrainSourceResourceRole::ColoredVoxelLightPrevious)
+            .is_some());
+        assert_eq!(
+            Some(runtime.occupancy.resources.view),
+            even_resources.storage_texture_for(TerrainSourceResourceRole::ColoredVoxelOccupancy)
+        );
+        assert_eq!(
+            Some(runtime.occupancy.resources.view),
+            odd_resources.storage_texture_for(TerrainSourceResourceRole::ColoredVoxelOccupancy)
+        );
+        assert_ne!(
+            even_resources
+                .combined_sampler_for(TerrainSourceResourceRole::ColoredVoxelLightCurrent),
+            odd_resources.combined_sampler_for(TerrainSourceResourceRole::ColoredVoxelLightCurrent),
+        );
+        assert_eq!(
+            even_resources
+                .combined_sampler_for(TerrainSourceResourceRole::ColoredVoxelLightCurrent),
+            odd_resources
+                .combined_sampler_for(TerrainSourceResourceRole::ColoredVoxelLightPrevious),
         );
 
         let even_texture = runtime.flood_fill.even_texture;

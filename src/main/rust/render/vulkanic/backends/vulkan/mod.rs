@@ -455,7 +455,7 @@ impl Drop for VulkanBackend {
 }
 
 #[cfg(test)]
-pub(super) mod conformance;
+pub(in crate::render::vulkanic::backends) mod conformance;
 
 #[cfg(test)]
 mod tests {

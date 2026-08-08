@@ -155,7 +155,8 @@ fn separate_ao_vertex_format_preserves_raw_ao_for_shader_side_face_shading() {
     let quad = lighting_quad(MODEL_QUAD_FLAG_ALIGNED, 5, 1.0, 1.0, 1.0);
 
     let baked = native_quad_lighting(&block, &quad, lighting_state_record(0));
-    let separate = native_quad_lighting_for_vertex_format(&block, &quad, lighting_state_record(0), true);
+    let separate =
+        native_quad_lighting_for_vertex_format(&block, &quad, lighting_state_record(0), true);
 
     assert_close(separate.ao[0] * ambient_shade(5, true), baked.ao[0]);
     assert!(separate.ao[0] > baked.ao[0]);

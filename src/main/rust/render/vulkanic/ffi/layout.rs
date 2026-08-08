@@ -945,6 +945,16 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
             FfiShaderPackSourceUpdateRequest,
             [header, generation, pack_name_utf8, files]
         ),
+        76 => layout!(
+            76,
+            FfiShaderPackAssetFile,
+            [byte_size, reserved0, path_utf8, contents]
+        ),
+        77 => layout!(
+            77,
+            FfiShaderPackAssetUpdateRequest,
+            [header, generation, pack_name_utf8, files]
+        ),
         73 => layout!(
             73,
             FfiWorldShaderEnvironmentFrame,

@@ -192,11 +192,15 @@ class VulkanicGalBridgeAbiTest {
 		String collector = Files.readString(Path.of("src/main/java/net/vulkanic/shaderpack/RustShaderPackSourceCollector.java"));
 		assertTrue(coordinator.contains("RustGalGuiRenderer.isWholeFrameVulkanActive()"));
 		assertTrue(coordinator.contains("bridge.updateShaderPackSources("));
+		assertTrue(coordinator.contains("bridge.updateShaderPackAssets("));
+		assertTrue(coordinator.contains("uploadedShaderPackSourceGeneration < generation"));
 		assertTrue(coordinator.contains("source_execution_selected=false"));
 		assertFalse(collector.contains("IrisRenderingPipeline"));
 		assertFalse(collector.contains("WorldRenderingPipeline"));
 		assertFalse(collector.contains("GlImage"));
 		assertFalse(collector.contains("MemorySegment"));
+		assertTrue(collector.contains("collectWithAssets"));
+		assertTrue(collector.contains("ShaderPackAssetFileRecord"));
 	}
 
 	private static void restoreProperty(String key, String value) {

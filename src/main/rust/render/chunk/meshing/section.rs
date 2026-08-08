@@ -236,8 +236,10 @@ impl NativeSectionRecordSource for CompactSectionSnapshot<'_> {
         const SEMANTIC_CULL_MASK_SHIFT: i32 = 8;
         const SEMANTIC_CULL_MASK: i32 = 0b11_1111;
         let local_index = self.active_local_index(index)?;
-        Ok(((*self.flags.get_unchecked(local_index)) >> SEMANTIC_CULL_MASK_SHIFT)
-            & SEMANTIC_CULL_MASK)
+        Ok(
+            ((*self.flags.get_unchecked(local_index)) >> SEMANTIC_CULL_MASK_SHIFT)
+                & SEMANTIC_CULL_MASK,
+        )
     }
 
     #[inline(always)]

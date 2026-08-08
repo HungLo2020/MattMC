@@ -656,14 +656,19 @@ pub(crate) fn input_bytes_for_world_mesh_asset_update(
         .sorted_indices
         .count
         .saturating_mul(size_of::<FfiWorldMeshSortedIndexRecord>() as u64);
-    let sorted_index_payload_bytes =
-        unsafe { read_slice(request.sorted_indices, true, "world mesh sorted index updates") }
-            .map(|items| {
-                items
-                    .iter()
-                    .fold(0u64, |sum, item| sum.saturating_add(item.index_bytes.len))
-            })
-            .unwrap_or(0);
+    let sorted_index_payload_bytes = unsafe {
+        read_slice(
+            request.sorted_indices,
+            true,
+            "world mesh sorted index updates",
+        )
+    }
+    .map(|items| {
+        items
+            .iter()
+            .fold(0u64, |sum, item| sum.saturating_add(item.index_bytes.len))
+    })
+    .unwrap_or(0);
     (size_of::<FfiWorldMeshAssetUpdateRequest>() as u64)
         .saturating_add(mesh_headers)
         .saturating_add(texture_headers)
@@ -687,6 +692,27 @@ pub(crate) fn input_bytes_for_shader_pack_source_update(
         })
         .unwrap_or(0);
     (size_of::<FfiShaderPackSourceUpdateRequest>() as u64)
+        .saturating_add(request.pack_name_utf8.len)
+        .saturating_add(file_headers)
+        .saturating_add(file_bytes)
+}
+
+pub(crate) fn input_bytes_for_shader_pack_asset_update(
+    request: &FfiShaderPackAssetUpdateRequest,
+) -> u64 {
+    let file_headers = request
+        .files
+        .count
+        .saturating_mul(size_of::<FfiShaderPackAssetFile>() as u64);
+    let file_bytes = unsafe { read_slice(request.files, true, "shader-pack asset files") }
+        .map(|files| {
+            files.iter().fold(0u64, |sum, file| {
+                sum.saturating_add(file.path_utf8.len)
+                    .saturating_add(file.contents.len)
+            })
+        })
+        .unwrap_or(0);
+    (size_of::<FfiShaderPackAssetUpdateRequest>() as u64)
         .saturating_add(request.pack_name_utf8.len)
         .saturating_add(file_headers)
         .saturating_add(file_bytes)

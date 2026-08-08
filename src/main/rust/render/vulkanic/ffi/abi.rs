@@ -25,6 +25,9 @@ pub const FFI_MAX_WORLD_MESH_INDEX_BYTES: usize = 1024 * 1024;
 pub const FFI_MAX_SHADER_PACK_SOURCE_FILES: usize = 4096;
 pub const FFI_MAX_SHADER_PACK_SOURCE_FILE_BYTES: usize = 4 * 1024 * 1024;
 pub const FFI_MAX_SHADER_PACK_SOURCE_TOTAL_BYTES: usize = 64 * 1024 * 1024;
+pub const FFI_MAX_SHADER_PACK_ASSET_FILES: usize = 4096;
+pub const FFI_MAX_SHADER_PACK_ASSET_FILE_BYTES: usize = 32 * 1024 * 1024;
+pub const FFI_MAX_SHADER_PACK_ASSET_TOTAL_BYTES: usize = 256 * 1024 * 1024;
 pub const FFI_MAX_BATCH_ITEMS: usize = 65_536;
 
 #[repr(u32)]
@@ -544,6 +547,30 @@ pub struct FfiShaderPackSourceUpdateRequest {
     pub generation: u64,
     pub pack_name_utf8: FfiBytes,
     pub files: FfiSlice<FfiShaderPackSourceFile>,
+}
+
+/// One named, copied binary shader-pack asset. It carries pack-relative
+/// semantic bytes only, never an atlas object, decoded texture, or backend
+/// resource.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FfiShaderPackAssetFile {
+    pub byte_size: u32,
+    pub reserved0: u32,
+    pub path_utf8: FfiBytes,
+    pub contents: FfiBytes,
+}
+
+/// A complete binary asset generation paired with an active source
+/// generation. Rust copies and validates it before any decode or backend
+/// upload is considered.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FfiShaderPackAssetUpdateRequest {
+    pub header: FfiHeader,
+    pub generation: u64,
+    pub pack_name_utf8: FfiBytes,
+    pub files: FfiSlice<FfiShaderPackAssetFile>,
 }
 
 #[repr(C)]

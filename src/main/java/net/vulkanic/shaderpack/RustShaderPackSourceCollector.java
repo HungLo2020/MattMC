@@ -25,6 +25,9 @@ public final class RustShaderPackSourceCollector {
 	public static final int MAX_FILES = 4096;
 	public static final int MAX_FILE_BYTES = 4 * 1024 * 1024;
 	public static final long MAX_TOTAL_BYTES = 64L * 1024L * 1024L;
+	public static final int MAX_ASSET_FILES = 4096;
+	public static final int MAX_ASSET_FILE_BYTES = 32 * 1024 * 1024;
+	public static final long MAX_ASSET_TOTAL_BYTES = 256L * 1024L * 1024L;
 	/** Reserved Rust-owned semantic source-config path. */
 	public static final String RUNTIME_OPTIONS_PATH = "mattmc/runtime-options.properties";
 	/** Reserved Rust-owned semantic source-environment path. */
@@ -49,10 +52,10 @@ public final class RustShaderPackSourceCollector {
 		}
 		SourceGeneration source;
 		if (Files.isDirectory(pack)) {
-			source = collect(pack.resolve("shaders"), packName, generation);
+			source = collectWithAssets(pack.resolve("shaders"), packName, generation);
 		} else {
 			try (FileSystem archive = FileSystems.newFileSystem(pack)) {
-				source = collect(archive.getPath("/shaders"), packName, generation);
+				source = collectWithAssets(archive.getPath("/shaders"), packName, generation);
 			}
 		}
 		return withConfiguredSemanticSnapshots(source);
@@ -62,7 +65,7 @@ public final class RustShaderPackSourceCollector {
 		if (generation <= 0L) {
 			throw new IllegalArgumentException("shader-pack source generation must be positive");
 		}
-		return new SourceGeneration("disabled", generation, List.of(), 0L);
+		return new SourceGeneration("disabled", generation, List.of(), 0L, List.of(), 0L);
 	}
 
 	public static SourceGeneration collect(Path shaderRoot, String packName, long generation) throws IOException {
@@ -111,7 +114,57 @@ public final class RustShaderPackSourceCollector {
 				Files.readAllBytes(path)
 			));
 		}
-		return new SourceGeneration(packName, generation, List.copyOf(files), totalBytes);
+		return new SourceGeneration(packName, generation, List.copyOf(files), totalBytes, List.of(), 0L);
+	}
+
+	/**
+	 * Collects source text and binary assets from the same shader-relative root.
+	 * Asset paths retain that root-relative identity so source declarations can
+	 * refer to them without leaking host paths, archives, or Iris resources.
+	 */
+	static SourceGeneration collectWithAssets(Path shaderRoot, String packName, long generation) throws IOException {
+		SourceGeneration source = collect(shaderRoot, packName, generation);
+		Path normalizedRoot = shaderRoot.toAbsolutePath().normalize();
+		List<Path> paths;
+		try (Stream<Path> files = Files.walk(normalizedRoot)) {
+			paths = files
+				.filter(Files::isRegularFile)
+				.filter(RustShaderPackSourceCollector::isAssetFile)
+				.sorted(Comparator.comparing(path -> normalizedRoot.relativize(path).toString()))
+				.toList();
+		}
+		if (paths.size() > MAX_ASSET_FILES) {
+			throw new IOException("shader-pack asset file count exceeds " + MAX_ASSET_FILES);
+		}
+
+		long totalBytes = 0L;
+		List<VulkanicGalBridge.ShaderPackAssetFileRecord> assets = new java.util.ArrayList<>(paths.size());
+		for (Path path : paths) {
+			Path relative = normalizedRoot.relativize(path).normalize();
+			if (relative.isAbsolute() || relative.startsWith("..")) {
+				throw new IOException("shader-pack asset path escapes root: " + path);
+			}
+			long size = Files.size(path);
+			if (size > MAX_ASSET_FILE_BYTES) {
+				throw new IOException("shader-pack asset exceeds " + MAX_ASSET_FILE_BYTES + " bytes: " + relative);
+			}
+			totalBytes = Math.addExact(totalBytes, size);
+			if (totalBytes > MAX_ASSET_TOTAL_BYTES) {
+				throw new IOException("shader-pack asset payload exceeds " + MAX_ASSET_TOTAL_BYTES + " bytes");
+			}
+			assets.add(new VulkanicGalBridge.ShaderPackAssetFileRecord(
+				relative.toString().replace('\\', '/'),
+				Files.readAllBytes(path)
+			));
+		}
+		return new SourceGeneration(
+			source.packName(),
+			source.generation(),
+			source.files(),
+			source.totalBytes(),
+			List.copyOf(assets),
+			totalBytes
+		);
 	}
 
 	private static boolean isSourceFile(Path path) {
@@ -122,6 +175,24 @@ public final class RustShaderPackSourceCollector {
 			|| name.endsWith(".csh")
 			|| name.endsWith(".glsl")
 			|| name.endsWith(".properties");
+	}
+
+	private static boolean isAssetFile(Path path) {
+		String name = path.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
+		return name.endsWith(".png")
+			|| name.endsWith(".jpg")
+			|| name.endsWith(".jpeg")
+			|| name.endsWith(".bmp")
+			|| name.endsWith(".tga")
+			|| name.endsWith(".dds")
+			|| name.endsWith(".ktx")
+			|| name.endsWith(".ktx2")
+			|| name.endsWith(".exr")
+			|| name.endsWith(".raw")
+			|| name.endsWith(".bin")
+			|| name.endsWith(".dat")
+			|| name.endsWith(".mcmeta")
+			|| name.endsWith(".json");
 	}
 
 	/**
@@ -224,7 +295,14 @@ public final class RustShaderPackSourceCollector {
 			throw new IOException("shader-pack source and " + kind + " payload exceed " + MAX_TOTAL_BYTES + " bytes");
 		}
 		files.add(new VulkanicGalBridge.ShaderPackSourceFileRecord(reservedPath, contents));
-		return new SourceGeneration(source.packName(), source.generation(), List.copyOf(files), totalBytes);
+		return new SourceGeneration(
+			source.packName(),
+			source.generation(),
+			List.copyOf(files),
+			totalBytes,
+			source.assets(),
+			source.assetTotalBytes()
+		);
 	}
 
 	private static void validateOptionEntry(String name, String value) throws IOException {
@@ -241,11 +319,14 @@ public final class RustShaderPackSourceCollector {
 		String packName,
 		long generation,
 		List<VulkanicGalBridge.ShaderPackSourceFileRecord> files,
-		long totalBytes
+		long totalBytes,
+		List<VulkanicGalBridge.ShaderPackAssetFileRecord> assets,
+		long assetTotalBytes
 	) {
 		public SourceGeneration {
 			Objects.requireNonNull(packName, "packName");
 			files = List.copyOf(files);
+			assets = List.copyOf(assets);
 		}
 	}
 }

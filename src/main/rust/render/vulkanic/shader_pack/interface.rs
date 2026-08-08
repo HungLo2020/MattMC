@@ -25,6 +25,7 @@ pub enum TerrainVertexSemantic {
     MaterialIdentity,
     SpriteMidpoint,
     Tangent,
+    MidBlock,
 }
 
 impl TerrainVertexSemantic {
@@ -38,6 +39,7 @@ impl TerrainVertexSemantic {
             Self::MaterialIdentity => "material_identity",
             Self::SpriteMidpoint => "sprite_midpoint",
             Self::Tangent => "tangent",
+            Self::MidBlock => "mid_block",
         }
     }
 }
@@ -120,6 +122,9 @@ pub fn analyze_terrain_vertex_interface(
     if tokens.contains("at_tangent") {
         required.insert(TerrainVertexSemantic::Tangent);
     }
+    if tokens.contains("at_midBlock") {
+        required.insert(TerrainVertexSemantic::MidBlock);
+    }
     TerrainVertexInterface {
         entry_path: source.entry_path().to_string(),
         required,
@@ -137,6 +142,7 @@ pub fn world_mesh_transport_semantics() -> BTreeSet<TerrainVertexSemantic> {
         TerrainVertexSemantic::VertexColor,
         TerrainVertexSemantic::GeometricNormal,
         TerrainVertexSemantic::MaterialIdentity,
+        TerrainVertexSemantic::MidBlock,
     ])
 }
 
@@ -209,8 +215,23 @@ mod tests {
     #[test]
     fn comments_do_not_invent_terrain_semantics() {
         let interface = analyze_terrain_vertex_interface(&artifact(
-            "// mc_Entity mc_midTexCoord at_tangent gl_MultiTexCoord1\nvoid main() {}",
+            "// mc_Entity mc_midTexCoord at_tangent at_midBlock gl_MultiTexCoord1\nvoid main() {}",
         ));
         assert!(interface.required().is_empty());
+    }
+
+    #[test]
+    fn maps_mid_block_to_explicit_semantics_without_a_legacy_vertex_layout() {
+        let interface = analyze_terrain_vertex_interface(&artifact(
+            "attribute vec3 at_midBlock; void main() { gl_Position = gl_Vertex + vec4(at_midBlock / 64.0, 0.0); }",
+        ));
+        assert_eq!(
+            BTreeSet::from([
+                TerrainVertexSemantic::Position,
+                TerrainVertexSemantic::MidBlock,
+            ]),
+            *interface.required()
+        );
+        assert!(interface.require_current_world_mesh_support().is_ok());
     }
 }

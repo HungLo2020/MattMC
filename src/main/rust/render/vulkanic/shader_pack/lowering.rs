@@ -42,6 +42,31 @@ impl TerrainFragmentOutput {
     }
 }
 
+/// Named outputs from a source-derived shadow fragment. These are distinct
+/// from terrain G-buffer outputs: a later shadow pass maps them to owned
+/// shadow attachments rather than reusing a terrain attachment by index.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ShadowFragmentOutput {
+    ShadowColor,
+    LightShaftColor,
+}
+
+impl ShadowFragmentOutput {
+    fn legacy_index(self) -> u32 {
+        match self {
+            Self::ShadowColor => 0,
+            Self::LightShaftColor => 1,
+        }
+    }
+
+    fn semantic_name(self) -> &'static str {
+        match self {
+            Self::ShadowColor => "out_shadow_color",
+            Self::LightShaftColor => "out_shadow_light_shaft_color",
+        }
+    }
+}
+
 /// Owned intermediate source from one lowering step. It does not indicate
 /// executable readiness and has no backend-specific binding information.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -49,6 +74,17 @@ pub struct LoweredTerrainFragmentSource {
     entry_path: String,
     source: String,
     outputs: Vec<TerrainFragmentOutput>,
+    remaining_dialect: GlslDialectReport,
+}
+
+/// Owned shadow fragment source after the bounded output lowering step. It
+/// has no pipeline, attachment, or backend binding; those require a later
+/// complete source shadow-pass contract.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct LoweredShadowFragmentSource {
+    entry_path: String,
+    source: String,
+    outputs: Vec<ShadowFragmentOutput>,
     remaining_dialect: GlslDialectReport,
 }
 
@@ -296,6 +332,7 @@ pub struct TerrainSourceOpaqueResourceBinding {
     resource_name: String,
     role: TerrainSourceResourceRole,
     kind: TerrainSourceOpaqueResourceKind,
+    qualifiers: String,
     binding: u32,
 }
 
@@ -305,11 +342,15 @@ impl TerrainSourceOpaqueResourceBinding {
     }
 
     pub fn role(&self) -> TerrainSourceResourceRole {
-        self.role
+        self.role.clone()
     }
 
     pub fn kind(&self) -> TerrainSourceOpaqueResourceKind {
         self.kind
+    }
+
+    pub fn qualifiers(&self) -> &str {
+        &self.qualifiers
     }
 
     pub fn binding(&self) -> u32 {
@@ -328,6 +369,16 @@ pub struct TerrainSourceOpaqueResourceBindingPlan {
 impl TerrainSourceOpaqueResourceBindingPlan {
     pub fn bindings(&self) -> &[TerrainSourceOpaqueResourceBinding] {
         &self.bindings
+    }
+
+    /// Resolves only an active, lowered source resource name. Raw pack
+    /// declarations may include inactive samplers and must not allocate a
+    /// runtime resource by themselves.
+    pub fn role_for(&self, resource_name: &str) -> Option<TerrainSourceResourceRole> {
+        self.bindings
+            .iter()
+            .find(|binding| binding.resource_name == resource_name)
+            .map(TerrainSourceOpaqueResourceBinding::role)
     }
 }
 
@@ -352,40 +403,48 @@ impl TerrainSourceOpaqueResourceContract {
     }
 
     /// Converts pack-declared source names into a closed semantic contract.
-    /// Images are intentionally rejected for the terrain material pass until
-    /// a later source-plan slice supplies an explicit storage-image lifecycle.
+    /// Storage images remain distinct from sampled resources so later source
+    /// program preparation can require an owned texture view rather than
+    /// silently treating a writable image as a sampler.
     pub fn bind_semantic_roles(
         &self,
         declarations: &TerrainSourceResourceBindings,
     ) -> GalResult<TerrainSourceOpaqueResourceBindingPlan> {
         let mut bindings = Vec::with_capacity(self.resources.len());
-        let mut consumed = BTreeMap::new();
         let mut missing_roles = Vec::new();
         for resource in self.active_resources() {
-            if resource.kind != TerrainSourceOpaqueResourceKind::CombinedTextureSampler {
-                return Err(GalError::unsupported_feature(format!(
-                    "terrain material source resource '{}' is a storage image; storage-image source plans are not implemented",
-                    resource.name
-                )));
-            }
             let Some(role) = declarations.role_for(&resource.name) else {
                 missing_roles.push(resource.name.as_str());
                 continue;
             };
-            if resource.type_name != role.expected_sampler_type() {
+            let expected_type = match resource.kind {
+                TerrainSourceOpaqueResourceKind::CombinedTextureSampler => {
+                    role.expected_sampler_type()
+                }
+                TerrainSourceOpaqueResourceKind::StorageImage => role
+                    .expected_storage_image_type()
+                    .ok_or_else(|| {
+                        GalError::unsupported_feature(format!(
+                            "terrain source role '{}' cannot provide storage-image resource '{}'",
+                            role.semantic_name(),
+                            resource.name
+                        ))
+                    })?,
+            };
+            if resource.type_name != expected_type {
                 return Err(GalError::invalid_argument(format!(
                     "terrain material source resource '{}' declares '{}' but role {:?} requires '{}'",
                     resource.name,
                     resource.type_name,
                     role,
-                    role.expected_sampler_type()
+                    expected_type
                 )));
             }
-            consumed.insert(resource.name.as_str(), ());
             bindings.push(TerrainSourceOpaqueResourceBinding {
                 resource_name: resource.name.clone(),
-                role,
+                role: role.clone(),
                 kind: resource.kind,
+                qualifiers: resource.qualifiers.clone(),
                 binding: resource.binding,
             });
         }
@@ -406,15 +465,12 @@ impl TerrainSourceOpaqueResourceContract {
                 suffix.unwrap_or_default()
             )));
         }
-        if let Some(name) = declarations
-            .names()
-            .find(|name| !consumed.contains_key(*name))
-        {
-            return Err(GalError::invalid_argument(format!(
-                "terrain semantic resource declaration '{}' does not exist in the lowered source pair",
-                name
-            )));
-        }
+        // The semantic declaration file is pack-wide: its entries may belong
+        // to a paired shadow, composite, or disabled preprocessing branch.
+        // This source pair owns only the roles it actively consumes. An
+        // unrelated declaration therefore cannot allocate or bind a resource
+        // through this plan, while an active declaration still requires an
+        // exact semantic role above.
         Ok(TerrainSourceOpaqueResourceBindingPlan { bindings })
     }
 }
@@ -438,6 +494,21 @@ impl TerrainSourceVaryingContract {
 pub struct LoweredTerrainSourcePair {
     vertex: LoweredTerrainVertexSource,
     fragment: LoweredTerrainFragmentSource,
+    uniform_contract: TerrainSourceUniformContract,
+    varying_contract: TerrainSourceVaryingContract,
+    opaque_resource_contract: TerrainSourceOpaqueResourceContract,
+}
+
+/// Coherently lowered source pair for a Rust-owned shadow-material pass.
+///
+/// This remains source preparation only. In particular, it neither allocates
+/// a shadow-color attachment nor makes a selected shader-pack route
+/// executable. Keeping it distinct from [`LoweredTerrainSourcePair`] prevents
+/// a source shadow output from being mislabeled as a terrain G-buffer output.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct LoweredShadowSourcePair {
+    vertex: LoweredTerrainVertexSource,
+    fragment: LoweredShadowFragmentSource,
     uniform_contract: TerrainSourceUniformContract,
     varying_contract: TerrainSourceVaryingContract,
     opaque_resource_contract: TerrainSourceOpaqueResourceContract,
@@ -522,10 +593,78 @@ impl LoweredTerrainSourcePair {
         for (resource, binding) in expected.iter().zip(bindings.bindings()) {
             if resource.name() != binding.resource_name()
                 || resource.kind() != binding.kind()
+                || resource.qualifiers() != binding.qualifiers()
                 || resource.binding() != binding.binding()
             {
                 return Err(GalError::invalid_argument(format!(
                     "terrain source resource plan does not match lowered resource '{}' at binding {}",
+                    resource.name(),
+                    resource.binding()
+                )));
+            }
+        }
+        Ok(())
+    }
+}
+
+impl LoweredShadowSourcePair {
+    pub fn vertex(&self) -> &LoweredTerrainVertexSource {
+        &self.vertex
+    }
+
+    pub fn fragment(&self) -> &LoweredShadowFragmentSource {
+        &self.fragment
+    }
+
+    pub fn uniform_contract(&self) -> &TerrainSourceUniformContract {
+        &self.uniform_contract
+    }
+
+    pub fn varying_contract(&self) -> &TerrainSourceVaryingContract {
+        &self.varying_contract
+    }
+
+    pub fn opaque_resource_contract(&self) -> &TerrainSourceOpaqueResourceContract {
+        &self.opaque_resource_contract
+    }
+
+    /// Confirms that both source stages have completed the bounded legacy
+    /// dialect lowering needed before any future backend compiler may see
+    /// them. It still does not create a program or admit source execution.
+    pub fn require_backend_neutral_lowering(&self) -> GalResult<()> {
+        self.vertex
+            .remaining_dialect()
+            .require_backend_neutral_lowering()?;
+        self.fragment
+            .remaining_dialect()
+            .require_backend_neutral_lowering()
+    }
+
+    /// Rejects a semantic role plan produced for a different lowered shadow
+    /// pair. The comparison is source-name and deterministic binding based;
+    /// native resource identity remains outside the source contract.
+    pub fn require_matching_opaque_resource_bindings(
+        &self,
+        bindings: &TerrainSourceOpaqueResourceBindingPlan,
+    ) -> GalResult<()> {
+        let expected = self
+            .opaque_resource_contract
+            .active_resources()
+            .collect::<Vec<_>>();
+        if expected.len() != bindings.bindings().len() {
+            return Err(GalError::invalid_argument(format!(
+                "shadow source resource plan has {} bindings but lowered pair requires {}",
+                bindings.bindings().len(),
+                expected.len()
+            )));
+        }
+        for (resource, binding) in expected.iter().zip(bindings.bindings()) {
+            if resource.name() != binding.resource_name()
+                || resource.kind() != binding.kind()
+                || resource.binding() != binding.binding()
+            {
+                return Err(GalError::invalid_argument(format!(
+                    "shadow source resource plan does not match lowered resource '{}' at binding {}",
                     resource.name(),
                     resource.binding()
                 )));
@@ -567,6 +706,24 @@ impl LoweredTerrainFragmentSource {
     }
 }
 
+impl LoweredShadowFragmentSource {
+    pub fn entry_path(&self) -> &str {
+        &self.entry_path
+    }
+
+    pub fn source(&self) -> &str {
+        &self.source
+    }
+
+    pub fn outputs(&self) -> &[ShadowFragmentOutput] {
+        &self.outputs
+    }
+
+    pub fn remaining_dialect(&self) -> &GlslDialectReport {
+        &self.remaining_dialect
+    }
+}
+
 /// Lowers only the two legacy fragment constructs whose mapping is fully
 /// source-derived today: `texture2D` and `gl_FragData[n]`. This does not
 /// attempt to guess vertex interfaces, fixed transforms, varying locations,
@@ -585,6 +742,96 @@ pub fn lower_terrain_fragment_surface(
     )
 }
 
+/// Lowers a legacy shadow fragment into named shadow-pass outputs. This is
+/// deliberately fragment-only preparation: execution still requires a
+/// separately lowered shadow vertex stage and a complete Rust-owned shadow
+/// attachment/resource contract.
+pub fn lower_shadow_fragment_surface(
+    source: &PreprocessedShaderSource,
+) -> GalResult<LoweredShadowFragmentSource> {
+    let uniform_contract = derive_terrain_source_uniform_contract(source, source)?;
+    let opaque_resource_contract = derive_terrain_source_opaque_resource_contract(source, source)?;
+    lower_shadow_fragment_surface_with_contracts(
+        source,
+        &uniform_contract,
+        None,
+        &opaque_resource_contract,
+    )
+}
+
+fn lower_shadow_fragment_surface_with_contracts(
+    source: &PreprocessedShaderSource,
+    uniform_contract: &TerrainSourceUniformContract,
+    varying_contract: Option<&TerrainSourceVaryingContract>,
+    opaque_resource_contract: &TerrainSourceOpaqueResourceContract,
+) -> GalResult<LoweredShadowFragmentSource> {
+    let mut lowered = upgrade_version(source.expanded_source())?;
+    lowered = strip_nonopaque_uniforms(&lowered)?;
+    for (legacy, explicit) in [
+        ("texture2DLod", "textureLod"),
+        ("texture3DLod", "textureLod"),
+        ("textureCubeLod", "textureLod"),
+        ("texture2D", "texture"),
+        ("texture3D", "texture"),
+        ("textureCube", "texture"),
+        ("shadow2D", "vulkanic_source_shadow2D"),
+    ] {
+        lowered = replace_identifier(&lowered, legacy, explicit);
+    }
+    // A shadow fragment may declare inputs that only its paired vertex stage
+    // produces. Fragment-only preparation deliberately leaves those locations
+    // untouched; complete pair lowering validates and assigns them.
+    if let Some(varying_contract) = varying_contract {
+        lowered = replace_identifier(&lowered, "varying", "in");
+        lowered = apply_varying_locations(&lowered, VaryingStorage::In, varying_contract)?;
+    }
+    lowered = apply_opaque_resource_bindings(&lowered, &opaque_resource_contract)?;
+    let mut outputs = Vec::new();
+    for output in [
+        ShadowFragmentOutput::ShadowColor,
+        ShadowFragmentOutput::LightShaftColor,
+    ] {
+        let (rewritten, occurrences) =
+            replace_fragment_output(&lowered, output.legacy_index(), output.semantic_name())?;
+        lowered = rewritten;
+        if occurrences > 0 {
+            outputs.push(output);
+        }
+    }
+    if contains_fragment_output(&lowered)? {
+        return Err(GalError::unsupported_feature(format!(
+            "shadow fragment '{}' writes an unsupported gl_FragData index",
+            source.entry_path()
+        )));
+    }
+    if !outputs.contains(&ShadowFragmentOutput::ShadowColor) {
+        return Err(GalError::invalid_argument(format!(
+            "shadow fragment '{}' has no shadow color output to lower",
+            source.entry_path()
+        )));
+    }
+    let declarations = outputs
+        .iter()
+        .map(|output| {
+            format!(
+                "layout(location = {}) out vec4 {};\n",
+                output.legacy_index(),
+                output.semantic_name()
+            )
+        })
+        .collect::<String>();
+    lowered = insert_after_version(&lowered, &uniform_block(uniform_contract))?;
+    lowered = insert_after_version(&lowered, FRAGMENT_SEMANTIC_PREAMBLE)?;
+    lowered = insert_after_version(&lowered, &declarations)?;
+    let remaining_dialect = analyze_glsl_text(source.entry_path(), &lowered);
+    Ok(LoweredShadowFragmentSource {
+        entry_path: source.entry_path().to_string(),
+        source: lowered,
+        outputs,
+        remaining_dialect,
+    })
+}
+
 /// Lowers both stages with one exact scalar uniform layout. This is still a
 /// preparation artifact, but it prevents a future program from silently using
 /// mismatched stage-local UBO layouts.
@@ -597,16 +844,55 @@ pub fn lower_terrain_source_pair(
     let opaque_resource_contract =
         derive_terrain_source_opaque_resource_contract(vertex, fragment)?;
     Ok(LoweredTerrainSourcePair {
-        vertex: lower_terrain_vertex_surface_with_contracts(
+        vertex: lower_source_vertex_surface_with_contracts(
             vertex,
             &uniform_contract,
             &varying_contract,
             &opaque_resource_contract,
+            SourceTransformSemantics::Terrain,
         )?,
         fragment: lower_terrain_fragment_surface_with_contracts(
             fragment,
             &uniform_contract,
             &varying_contract,
+            &opaque_resource_contract,
+        )?,
+        uniform_contract,
+        varying_contract,
+        opaque_resource_contract,
+    })
+}
+
+/// Lowers the exact scoped shadow-source pair into explicit source semantics.
+/// Shadow transforms deliberately remain distinct from G-buffer transforms,
+/// and shadow outputs remain distinct from normal terrain outputs. This is
+/// not an executable pass: a future Rust-owned shadow-color attachment and
+/// full named resource plan are still required before source execution can be
+/// admitted.
+pub fn lower_shadow_source_pair(
+    vertex: &PreprocessedShaderSource,
+    fragment: &PreprocessedShaderSource,
+) -> GalResult<LoweredShadowSourcePair> {
+    let uniform_contract = derive_source_uniform_contract(
+        vertex,
+        fragment,
+        SourceTransformSemantics::Shadow,
+    )?;
+    let varying_contract = derive_terrain_source_varying_contract(vertex, fragment)?;
+    let opaque_resource_contract =
+        derive_terrain_source_opaque_resource_contract(vertex, fragment)?;
+    Ok(LoweredShadowSourcePair {
+        vertex: lower_source_vertex_surface_with_contracts(
+            vertex,
+            &uniform_contract,
+            &varying_contract,
+            &opaque_resource_contract,
+            SourceTransformSemantics::Shadow,
+        )?,
+        fragment: lower_shadow_fragment_surface_with_contracts(
+            fragment,
+            &uniform_contract,
+            Some(&varying_contract),
             &opaque_resource_contract,
         )?,
         uniform_contract,
@@ -696,19 +982,43 @@ pub fn lower_terrain_vertex_surface(
     let uniform_contract = derive_terrain_source_uniform_contract(source, source)?;
     let varying_contract = derive_terrain_source_varying_contract(source, source)?;
     let opaque_resource_contract = derive_terrain_source_opaque_resource_contract(source, source)?;
-    lower_terrain_vertex_surface_with_contracts(
+    lower_source_vertex_surface_with_contracts(
         source,
         &uniform_contract,
         &varying_contract,
         &opaque_resource_contract,
+        SourceTransformSemantics::Terrain,
     )
 }
 
-fn lower_terrain_vertex_surface_with_contracts(
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum SourceTransformSemantics {
+    Terrain,
+    Shadow,
+}
+
+impl SourceTransformSemantics {
+    fn model_view_uniform(self) -> &'static str {
+        match self {
+            Self::Terrain => "gbufferModelView",
+            Self::Shadow => "shadowModelView",
+        }
+    }
+
+    fn projection_uniform(self) -> &'static str {
+        match self {
+            Self::Terrain => "gbufferProjection",
+            Self::Shadow => "shadowProjection",
+        }
+    }
+}
+
+fn lower_source_vertex_surface_with_contracts(
     source: &PreprocessedShaderSource,
     uniform_contract: &TerrainSourceUniformContract,
     varying_contract: &TerrainSourceVaryingContract,
     opaque_resource_contract: &TerrainSourceOpaqueResourceContract,
+    transforms: SourceTransformSemantics,
 ) -> GalResult<LoweredTerrainVertexSource> {
     let mut lowered = upgrade_version(source.expanded_source())?;
     lowered = remove_known_legacy_attributes(&lowered)?;
@@ -719,14 +1029,15 @@ fn lower_terrain_vertex_surface_with_contracts(
         ("gl_MultiTexCoord0", "vulkanic_source_atlas_uv"),
         ("gl_MultiTexCoord1", "vulkanic_source_lightmap_uv"),
         ("gl_Color", "vulkanic_source_vertex_color"),
-        ("gl_NormalMatrix", "mat3(gbufferModelView)"),
+        ("gl_NormalMatrix", "vulkanic_source_normal_matrix"),
         ("gl_Normal", "vulkanic_source_normal"),
-        ("gl_ModelViewMatrix", "gbufferModelView"),
+        ("gl_ModelViewMatrix", "vulkanic_source_model_view"),
         ("gl_ProjectionMatrix", "gbufferProjection"),
         ("gl_Vertex", "vulkanic_source_position"),
         ("mc_Entity", "vulkanic_source_entity"),
         ("mc_midTexCoord", "vulkanic_source_mid_tex_coord"),
         ("at_tangent", "vulkanic_source_tangent"),
+        ("at_midBlock", "vulkanic_source_mid_block"),
         ("ftransform", "vulkanic_source_ftransform"),
         ("texture2D", "texture"),
     ] {
@@ -735,7 +1046,7 @@ fn lower_terrain_vertex_surface_with_contracts(
     lowered = apply_varying_locations(&lowered, VaryingStorage::Out, varying_contract)?;
     lowered = apply_opaque_resource_bindings(&lowered, opaque_resource_contract)?;
     lowered = insert_after_version(&lowered, &uniform_block(uniform_contract))?;
-    lowered = insert_after_version(&lowered, VERTEX_SEMANTIC_PREAMBLE)?;
+    lowered = insert_after_version(&lowered, &vertex_semantic_preamble(transforms))?;
     let remaining_dialect = analyze_glsl_text(source.entry_path(), &lowered);
     Ok(LoweredTerrainVertexSource {
         entry_path: source.entry_path().to_string(),
@@ -744,7 +1055,13 @@ fn lower_terrain_vertex_surface_with_contracts(
     })
 }
 
-const VERTEX_SEMANTIC_PREAMBLE: &str = r#"struct VulkanicSourceTerrainVertex {
+fn vertex_semantic_preamble(transforms: SourceTransformSemantics) -> String {
+    VERTEX_SEMANTIC_PREAMBLE_TEMPLATE
+        .replace("{model_view}", transforms.model_view_uniform())
+        .replace("{projection}", transforms.projection_uniform())
+}
+
+const VERTEX_SEMANTIC_PREAMBLE_TEMPLATE: &str = r#"struct VulkanicSourceTerrainVertex {
     vec4 position;
     vec4 color;
     vec4 normal_light;
@@ -752,6 +1069,7 @@ const VERTEX_SEMANTIC_PREAMBLE: &str = r#"struct VulkanicSourceTerrainVertex {
     vec4 entity;
     vec4 mid_tex_coord;
     vec4 tangent;
+    vec4 mid_block;
 };
 layout(set = 0, binding = 0, std430) readonly buffer VulkanicSourceTerrainVertices {
     VulkanicSourceTerrainVertex vulkanic_source_vertices[];
@@ -759,7 +1077,17 @@ layout(set = 0, binding = 0, std430) readonly buffer VulkanicSourceTerrainVertic
 layout(set = 0, binding = 1, std140) uniform VulkanicSourceTerrainLegacyTransforms {
     mat4 vulkanic_source_texture_matrix[2];
 };
+struct VulkanicSourceTerrainInstance {
+    mat4 model_transform;
+};
+layout(set = 0, binding = 3, std430) readonly buffer VulkanicSourceTerrainInstances {
+    VulkanicSourceTerrainInstance vulkanic_source_instances[];
+};
 #define vulkanic_source_vertex vulkanic_source_vertices[gl_VertexIndex]
+#define vulkanic_source_instance vulkanic_source_instances[gl_InstanceIndex]
+#define vulkanic_source_model_transform vulkanic_source_instance.model_transform
+#define vulkanic_source_model_view ({model_view} * vulkanic_source_model_transform)
+#define vulkanic_source_normal_matrix transpose(inverse(mat3(vulkanic_source_model_view)))
 #define vulkanic_source_position vulkanic_source_vertex.position
 #define vulkanic_source_vertex_color vulkanic_source_vertex.color
 #define vulkanic_source_normal vulkanic_source_vertex.normal_light.xyz
@@ -768,7 +1096,8 @@ layout(set = 0, binding = 1, std140) uniform VulkanicSourceTerrainLegacyTransfor
 #define vulkanic_source_entity vulkanic_source_vertex.entity
 #define vulkanic_source_mid_tex_coord vulkanic_source_vertex.mid_tex_coord
 #define vulkanic_source_tangent vulkanic_source_vertex.tangent
-#define vulkanic_source_ftransform() (gbufferProjection * gbufferModelView * vulkanic_source_position)
+#define vulkanic_source_mid_block vulkanic_source_vertex.mid_block.xyz
+#define vulkanic_source_ftransform() ({projection} * vulkanic_source_model_view * vulkanic_source_position)
 "#;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -1175,9 +1504,17 @@ pub fn derive_terrain_source_uniform_contract(
     vertex: &PreprocessedShaderSource,
     fragment: &PreprocessedShaderSource,
 ) -> GalResult<TerrainSourceUniformContract> {
+    derive_source_uniform_contract(vertex, fragment, SourceTransformSemantics::Terrain)
+}
+
+fn derive_source_uniform_contract(
+    vertex: &PreprocessedShaderSource,
+    fragment: &PreprocessedShaderSource,
+    transforms: SourceTransformSemantics,
+) -> GalResult<TerrainSourceUniformContract> {
     let mut declarations = BTreeMap::new();
     for source in [vertex, fragment] {
-        for uniform in collect_nonopaque_uniforms(source.expanded_source())? {
+        for uniform in collect_nonopaque_uniforms(source.expanded_source(), transforms)? {
             match declarations.get(&uniform.name) {
                 Some(existing) if existing != &uniform.declaration => {
                     return Err(GalError::invalid_argument(format!(
@@ -1191,7 +1528,9 @@ pub fn derive_terrain_source_uniform_contract(
                 }
             }
         }
-        for (name, declaration) in required_legacy_transform_uniforms(source.expanded_source()) {
+        for (name, declaration) in
+            required_legacy_transform_uniforms(source.expanded_source(), transforms)
+        {
             match declarations.get(name) {
                 Some(existing) if existing != declaration => {
                     return Err(GalError::invalid_argument(format!(
@@ -1348,7 +1687,10 @@ fn strip_nonopaque_uniforms(source: &str) -> GalResult<String> {
     Ok(output)
 }
 
-fn collect_nonopaque_uniforms(source: &str) -> GalResult<Vec<SourceUniformDeclaration>> {
+fn collect_nonopaque_uniforms(
+    source: &str,
+    transforms: SourceTransformSemantics,
+) -> GalResult<Vec<SourceUniformDeclaration>> {
     // Expanded packs commonly include a broad global uniform header. Only a
     // source-stage reference belongs in this program's explicit ABI; merely
     // declaring a value in an inactive terrain path must not create a fake
@@ -1359,7 +1701,7 @@ fn collect_nonopaque_uniforms(source: &str) -> GalResult<Vec<SourceUniformDeclar
     // Vertex lowering replaces these legacy built-ins with explicit source
     // uniforms after the contract has been derived. Preserve their declared
     // semantic matrices when the original source requires the replacement.
-    for (name, _) in required_legacy_transform_uniforms(source) {
+    for (name, _) in required_legacy_transform_uniforms(source, transforms) {
         referenced.insert(name.to_string());
     }
     let mut uniforms = Vec::new();
@@ -1387,17 +1729,32 @@ fn collect_nonopaque_uniforms(source: &str) -> GalResult<Vec<SourceUniformDeclar
 /// Legacy matrix built-ins are transformed into these named source semantics.
 /// They are added to the uniform ABI even when the original GLSL relied on
 /// built-ins and never declared them explicitly.
-fn required_legacy_transform_uniforms(source: &str) -> Vec<(&'static str, &'static str)> {
+fn required_legacy_transform_uniforms(
+    source: &str,
+    transforms: SourceTransformSemantics,
+) -> Vec<(&'static str, &'static str)> {
     let referenced = glsl_identifiers(source);
     let mut requirements = Vec::with_capacity(2);
     if referenced.contains("gl_ModelViewMatrix")
         || referenced.contains("gl_NormalMatrix")
         || referenced.contains("ftransform")
     {
-        requirements.push(("gbufferModelView", "mat4 gbufferModelView;"));
+        requirements.push((
+            transforms.model_view_uniform(),
+            match transforms {
+                SourceTransformSemantics::Terrain => "mat4 gbufferModelView;",
+                SourceTransformSemantics::Shadow => "mat4 shadowModelView;",
+            },
+        ));
     }
     if referenced.contains("gl_ProjectionMatrix") || referenced.contains("ftransform") {
-        requirements.push(("gbufferProjection", "mat4 gbufferProjection;"));
+        requirements.push((
+            transforms.projection_uniform(),
+            match transforms {
+                SourceTransformSemantics::Terrain => "mat4 gbufferProjection;",
+                SourceTransformSemantics::Shadow => "mat4 shadowProjection;",
+            },
+        ));
     }
     requirements
 }
@@ -1510,7 +1867,10 @@ fn remove_known_legacy_attributes(source: &str) -> GalResult<String> {
                 .last()
                 .ok_or_else(|| GalError::invalid_argument("malformed legacy terrain attribute"))?;
             let name = name.trim_end_matches(|character| character == ';' || character == ']');
-            if !matches!(name, "mc_Entity" | "mc_midTexCoord" | "at_tangent") {
+            if !matches!(
+                name,
+                "mc_Entity" | "mc_midTexCoord" | "at_tangent" | "at_midBlock"
+            ) {
                 return Err(GalError::unsupported_feature(format!(
                     "terrain vertex declares unsupported legacy attribute '{name}'"
                 )));
@@ -1717,16 +2077,131 @@ mod tests {
     #[test]
     fn lowers_known_legacy_vertex_semantics_without_assigning_java_locations() {
         let lowered = lower_terrain_vertex_surface(&artifact(
-            "#version 130\nattribute vec4 mc_Entity;\nattribute vec4 mc_midTexCoord;\nattribute vec4 at_tangent;\nvarying vec2 uv;\nvoid main() { uv = (gl_TextureMatrix[0] * gl_MultiTexCoord0).xy; vec3 n = gl_NormalMatrix * gl_Normal; float id = mc_Entity.x + mc_midTexCoord.x + at_tangent.w; gl_Position = ftransform() + gl_ModelViewMatrix * gl_Vertex + gl_ProjectionMatrix * gl_Color + vec4(n, id); }",
+            "#version 130\nattribute vec4 mc_Entity;\nattribute vec4 mc_midTexCoord;\nattribute vec4 at_tangent;\nattribute vec3 at_midBlock;\nvarying vec2 uv;\nvoid main() { uv = (gl_TextureMatrix[0] * gl_MultiTexCoord0).xy; vec3 n = gl_NormalMatrix * gl_Normal + at_midBlock / 64.0; float id = mc_Entity.x + mc_midTexCoord.x + at_tangent.w; gl_Position = ftransform() + gl_ModelViewMatrix * gl_Vertex + gl_ProjectionMatrix * gl_Color + vec4(n, id); }",
         ))
         .unwrap();
         assert!(lowered.source().contains("VulkanicSourceTerrainVertex"));
+        assert!(lowered.source().contains("VulkanicSourceTerrainInstances"));
         assert!(lowered.source().contains("vulkanic_source_mid_tex_coord"));
+        assert!(lowered.source().contains("vulkanic_source_mid_block"));
+        assert!(lowered.source().contains("vulkanic_source_model_view"));
         assert!(lowered.source().contains("out vec2 uv"));
         assert!(!lowered.source().contains("attribute vec4"));
         assert!(!lowered.source().contains("gl_MultiTexCoord0"));
         assert!(!lowered.source().contains("gl_ModelViewMatrix"));
         assert!(lowered.remaining_dialect().gaps().is_empty());
+    }
+
+    #[test]
+    fn lowers_shadow_color_outputs_without_relabeling_them_as_terrain_gbuffer_data() {
+        let lowered = lower_shadow_fragment_surface(&artifact(
+            "#version 130\nuniform sampler2D tex;\nvoid main() { vec4 color = texture2D(tex, vec2(0.25)); gl_FragData[0] = color; gl_FragData[1] = vec4(color.rgb * 0.25, 1.0); }",
+        ))
+        .unwrap();
+        assert_eq!(
+            vec![
+                ShadowFragmentOutput::ShadowColor,
+                ShadowFragmentOutput::LightShaftColor,
+            ],
+            lowered.outputs()
+        );
+        assert!(lowered.source().contains("out_shadow_color"));
+        assert!(lowered.source().contains("out_shadow_light_shaft_color"));
+        assert!(!lowered.source().contains("out_terrain_lit_color"));
+        assert!(!lowered.source().contains("gl_FragData"));
+    }
+
+    #[test]
+    fn lowers_the_selected_scoped_shadow_fragment_without_a_terrain_output_alias() {
+        let source =
+            crate::render::vulkanic::shader_pack::preprocess::complete_bundled_pack_source_for_test(
+            );
+        let stages = crate::render::vulkanic::shader_pack::terrain_contract::shadow_source_stages_for_scope(
+            &source,
+            crate::render::vulkanic::shader_pack::terrain_contract::TerrainProgramScope::Overworld,
+        )
+        .unwrap();
+        let artifacts =
+            crate::render::vulkanic::shader_pack::preprocess::preprocess_terrain_sources(
+                &source, &stages,
+            )
+            .unwrap();
+        let lowered = lower_shadow_fragment_surface(&artifacts.fragment).unwrap();
+        assert!(lowered
+            .outputs()
+            .contains(&ShadowFragmentOutput::ShadowColor));
+        assert!(lowered.source().contains("out_shadow_color"));
+        assert!(!lowered.source().contains("out_terrain_lit_color"));
+    }
+
+    #[test]
+    fn shadow_pair_uses_shadow_transforms_and_keeps_shadow_outputs_distinct() {
+        let pack = ShaderPackSource::new(
+            "shadow-test",
+            1,
+            vec![
+                ShaderSourceFile::new(
+                    "shadow.vsh",
+                    "#version 130\nout vec2 tex_coord;\nvoid main() { tex_coord = gl_MultiTexCoord0.xy; gl_Position = ftransform(); }",
+                ),
+                ShaderSourceFile::new(
+                    "shadow.fsh",
+                    "#version 130\nin vec2 tex_coord;\nuniform sampler2D tex;\nvoid main() { gl_FragData[0] = texture2D(tex, tex_coord); }",
+                ),
+            ],
+        )
+        .unwrap();
+        let vertex = preprocess_artifact(PreprocessInput {
+            source: &pack,
+            entry: "shadow.vsh",
+            defines: &[],
+        })
+        .unwrap();
+        let fragment = preprocess_artifact(PreprocessInput {
+            source: &pack,
+            entry: "shadow.fsh",
+            defines: &[],
+        })
+        .unwrap();
+
+        let lowered = lower_shadow_source_pair(&vertex, &fragment).unwrap();
+
+        assert!(lowered.vertex().source().contains("shadowModelView"));
+        assert!(lowered.vertex().source().contains("shadowProjection"));
+        assert!(!lowered.vertex().source().contains("gbufferModelView"));
+        assert!(lowered.fragment().source().contains("layout(location = 0) in vec2 tex_coord"));
+        assert!(lowered.fragment().source().contains("out_shadow_color"));
+        assert!(!lowered.fragment().source().contains("out_terrain_lit_color"));
+        lowered.require_backend_neutral_lowering().unwrap();
+    }
+
+    #[test]
+    fn selected_scoped_shadow_pair_preserves_shadow_transform_and_output_semantics() {
+        let source =
+            crate::render::vulkanic::shader_pack::preprocess::complete_bundled_pack_source_for_test(
+            );
+        let stages = crate::render::vulkanic::shader_pack::terrain_contract::shadow_source_stages_for_scope(
+            &source,
+            crate::render::vulkanic::shader_pack::terrain_contract::TerrainProgramScope::Overworld,
+        )
+        .unwrap();
+        let artifacts =
+            crate::render::vulkanic::shader_pack::preprocess::preprocess_terrain_sources(
+                &source, &stages,
+            )
+            .unwrap();
+
+        let lowered = lower_shadow_source_pair(&artifacts.vertex, &artifacts.fragment).unwrap();
+
+        assert!(lowered.vertex().source().contains("shadowModelView"));
+        assert!(lowered.vertex().source().contains("shadowProjection"));
+        assert!(!lowered.vertex().source().contains("#define vulkanic_source_model_view (gbufferModelView"));
+        assert!(lowered
+            .fragment()
+            .outputs()
+            .contains(&ShadowFragmentOutput::ShadowColor));
+        assert!(!lowered.fragment().source().contains("out_terrain_lit_color"));
+        lowered.require_backend_neutral_lowering().unwrap();
     }
 
     #[test]
@@ -2064,15 +2539,15 @@ mod tests {
             vec![
                 ShaderSourceFile::new(
                     "terrain.vsh",
-                    "#version 130\nuniform sampler2D tex;\nuniform usampler3D voxel_sampler;\nvoid main() {}",
+                    "#version 130\nuniform sampler2D tex;\nuniform usampler3D voxel_sampler;\nuniform sampler2D unused_global;\nvoid main() {}",
                 ),
                 ShaderSourceFile::new(
                     "terrain.fsh",
-                    "#version 130\nuniform sampler2D tex;\nuniform usampler3D voxel_sampler;\nvoid main() { gl_FragData[0] = texture2D(tex, vec2(0.0)); }",
+                    "#version 130\nuniform sampler2D tex;\nuniform usampler3D voxel_sampler;\nuniform sampler2D unused_global;\nvoid main() { gl_FragData[0] = texture2D(tex, vec2(0.0)); }",
                 ),
                 ShaderSourceFile::new(
                     super::super::terrain_source_resources::TERRAIN_RESOURCE_BINDINGS_PATH,
-                    "tex=material_atlas\n",
+                    "tex=material_atlas\nunused_global=noise\n",
                 ),
             ],
         )
@@ -2152,6 +2627,13 @@ mod tests {
             .bind_semantic_roles(&declarations)
             .unwrap();
         assert_eq!(1, plan.bindings().len());
+        assert_eq!(
+            vec!["tex"],
+            plan.bindings()
+                .iter()
+                .map(|binding| binding.resource_name())
+                .collect::<Vec<_>>()
+        );
         assert!(lowered
             .fragment()
             .source()
@@ -2195,5 +2677,53 @@ mod tests {
             .unwrap_err()
             .to_string()
             .contains("have no declared semantic roles: tex"));
+    }
+
+    #[test]
+    fn opaque_resources_ignore_pack_wide_declarations_owned_by_other_source_stages() {
+        let pack = ShaderPackSource::new(
+            "test",
+            1,
+            vec![
+                ShaderSourceFile::new(
+                    "terrain.vsh",
+                    "#version 130\nuniform sampler2D tex;\nvoid main() {}",
+                ),
+                ShaderSourceFile::new(
+                    "terrain.fsh",
+                    "#version 130\nuniform sampler2D tex;\nvoid main() { gl_FragData[0] = texture2D(tex, vec2(0.0)); }",
+                ),
+                ShaderSourceFile::new(
+                    super::super::terrain_source_resources::TERRAIN_RESOURCE_BINDINGS_PATH,
+                    "tex=material_atlas\nabsent=noise\n",
+                ),
+            ],
+        )
+        .unwrap();
+        let vertex = preprocess_artifact(PreprocessInput {
+            source: &pack,
+            entry: "terrain.vsh",
+            defines: &[],
+        })
+        .unwrap();
+        let fragment = preprocess_artifact(PreprocessInput {
+            source: &pack,
+            entry: "terrain.fsh",
+            defines: &[],
+        })
+        .unwrap();
+        let lowered = lower_terrain_source_pair(&vertex, &fragment).unwrap();
+        let declarations = TerrainSourceResourceBindings::from_source(&pack).unwrap();
+        let plan = lowered
+            .opaque_resource_contract()
+            .bind_semantic_roles(&declarations)
+            .unwrap();
+        assert_eq!(
+            vec!["tex"],
+            plan.bindings()
+                .iter()
+                .map(|binding| binding.resource_name())
+                .collect::<Vec<_>>()
+        );
     }
 }

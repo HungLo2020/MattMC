@@ -1,3 +1,4 @@
+pub mod assets;
 pub mod diagnostics;
 pub mod dialect;
 pub mod held_light_policy;
@@ -10,7 +11,13 @@ pub mod preprocess;
 pub mod programs;
 pub mod resources;
 pub(crate) mod runtime;
+pub mod shadow_policy;
 pub mod source;
+// The source-selected route is intentionally production-disabled until every
+// semantic terrain resource is owned and validated. Keep its private resource
+// cache compiled and unit-tested without presenting it as an active route.
+#[allow(dead_code)]
+pub(crate) mod source_assets;
 pub mod source_temporal;
 pub mod source_uniforms;
 pub mod terrain_contract;

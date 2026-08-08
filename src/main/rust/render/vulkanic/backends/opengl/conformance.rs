@@ -13,11 +13,134 @@ use crate::render::vulkanic::gal::VulkanicGal;
 use crate::render::vulkanic::handles::Handle;
 use crate::render::vulkanic::resources::*;
 use crate::render::vulkanic::shader_pack::programs::{
+    prepare_lowered_terrain_source_program, TerrainMaterialProgramKind,
     COMPLEMENTARY_TERRAIN_SUBSET_FRAGMENT, MINIMAL_TERRAIN_MATERIAL_VERTEX,
+};
+use crate::render::vulkanic::shader_pack::{
+    lowering::lower_terrain_source_pair,
+    preprocess::{complete_bundled_pack_source_for_test, preprocess_terrain_sources},
+    source::{ShaderPackSource, ShaderSourceFile},
+    terrain_contract::{derive_complementary_terrain_contract, TerrainSourceStage, TerrainSourceStages},
+    terrain_source_resources::{TerrainSourceResourceBindings, TERRAIN_RESOURCE_BINDINGS_PATH},
 };
 
 const WIDTH: u32 = 96;
 const HEIGHT: u32 = 64;
+
+/// The source-derived terrain ABI must compile through the private OpenGL
+/// lowering too. This remains isolated conformance only: it neither selects
+/// a gameplay route nor borrows a shader-pack program from Java.
+#[test]
+fn prepared_lowered_terrain_program_compiles_at_the_opengl_boundary() {
+    let backend = match OpenGlBackend::new("MattMC prepared source terrain OpenGL conformance") {
+        Ok(backend) => backend,
+        Err(error) => {
+            let text = error.to_string();
+            assert!(
+                text.contains("OpenGL") || text.contains("EGL") || text.contains("GL"),
+                "unexpected OpenGL source-terrain setup failure: {text}"
+            );
+            return;
+        }
+    };
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let source = ShaderPackSource::new(
+        "prepared-source-opengl-boundary",
+        37,
+        vec![
+            ShaderSourceFile::new(
+                "gbuffers_terrain.vsh",
+                "#version 130\nout vec2 texCoord;\nout vec4 glColor;\nout float smoothnessD;\nout float materialMask;\nout float skyLightFactor;\nuniform sampler2D tex;\nuniform mat4 gbufferModelView;\nuniform mat4 gbufferProjection;\nvoid main() { texCoord = gl_MultiTexCoord0.xy; glColor = vec4(1.0); smoothnessD = 0.0; materialMask = 0.0; skyLightFactor = 1.0; gl_Position = ftransform(); }",
+            ),
+            ShaderSourceFile::new(
+                "gbuffers_terrain.fsh",
+                "#version 130\nin vec2 texCoord;\nin vec4 glColor;\nin float smoothnessD;\nin float materialMask;\nin float skyLightFactor;\nuniform sampler2D tex;\nvoid DoLighting() {}\n/* DRAWBUFFERS:06 */\nvoid main() { vec4 color = texture2D(tex, texCoord); if (color.a <= 0.00001) discard; color.rgb *= glColor.rgb; DoLighting(); gl_FragData[0] = color; gl_FragData[1] = vec4(smoothnessD, materialMask, skyLightFactor, 1.0); }",
+            ),
+            ShaderSourceFile::new("lib/common.glsl", "#define TEST 1\n"),
+            ShaderSourceFile::new("shaders.properties", ""),
+            ShaderSourceFile::new("block.properties", ""),
+            ShaderSourceFile::new(TERRAIN_RESOURCE_BINDINGS_PATH, "tex=material_atlas\n"),
+        ],
+    )
+    .unwrap();
+    let contract = derive_complementary_terrain_contract(&source).unwrap();
+    let artifacts =
+        preprocess_terrain_sources(&source, &contract.source_stages().unwrap()).unwrap();
+    let lowered = lower_terrain_source_pair(&artifacts.vertex, &artifacts.fragment).unwrap();
+    let declarations = TerrainSourceResourceBindings::from_source(&source).unwrap();
+    let bindings = lowered
+        .opaque_resource_contract()
+        .bind_semantic_roles(&declarations)
+        .unwrap();
+    let program = prepare_lowered_terrain_source_program(
+        &contract,
+        &lowered,
+        &bindings,
+        TerrainMaterialProgramKind::Opaque,
+    )
+    .unwrap();
+
+    for module in program.shader_module_descriptors(BackendApi::OpenGl) {
+        gal.create_shader_module(module).unwrap_or_else(|error| {
+            panic!(
+                "prepared source terrain shader must compile through the OpenGL lowering: {error}"
+            )
+        });
+    }
+}
+
+/// Compiles the real bundled Complementary terrain pair through the private
+/// OpenGL backend. This is source-program conformance only: no Java/Iris
+/// state is acquired and the test does not select a gameplay route.
+#[test]
+fn lowered_complete_complementary_terrain_pair_compiles_at_the_opengl_boundary() {
+    let backend = match OpenGlBackend::new("MattMC complete source terrain OpenGL conformance") {
+        Ok(backend) => backend,
+        Err(error) => {
+            let text = error.to_string();
+            assert!(
+                text.contains("OpenGL") || text.contains("EGL") || text.contains("GL"),
+                "unexpected OpenGL complete source terrain setup failure: {text}"
+            );
+            return;
+        }
+    };
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let source = complete_bundled_pack_source_for_test();
+    let stages = TerrainSourceStages {
+        vertex: TerrainSourceStage {
+            path: "world0/gbuffers_terrain.vsh".to_string(),
+            defines: Default::default(),
+        },
+        fragment: TerrainSourceStage {
+            path: "world0/gbuffers_terrain.fsh".to_string(),
+            defines: Default::default(),
+        },
+    };
+    let contract = derive_complementary_terrain_contract(&source).unwrap();
+    let artifacts = preprocess_terrain_sources(&source, &stages).unwrap();
+    let lowered = lower_terrain_source_pair(&artifacts.vertex, &artifacts.fragment).unwrap();
+    let declarations = TerrainSourceResourceBindings::from_source(&source).unwrap();
+    let bindings = lowered
+        .opaque_resource_contract()
+        .bind_semantic_roles(&declarations)
+        .unwrap();
+    let program = prepare_lowered_terrain_source_program(
+        &contract,
+        &lowered,
+        &bindings,
+        TerrainMaterialProgramKind::Opaque,
+    )
+    .unwrap();
+
+    for module in program.shader_module_descriptors(BackendApi::OpenGl) {
+        gal.create_shader_module(module).unwrap_or_else(|error| {
+            panic!(
+                "complete lowered Complementary terrain shader must compile through the OpenGL lowering: {error}"
+            )
+        });
+    }
+}
 
 #[test]
 fn selected_terrain_pipeline_layout_matches_optional_colored_voxel_interface() {
@@ -231,6 +354,7 @@ fn create_selected_terrain_colored_voxel_resource_set(
             address_u: SamplerAddressMode::ClampToEdge,
             address_v: SamplerAddressMode::ClampToEdge,
             address_w: SamplerAddressMode::ClampToEdge,
+            comparison: None,
         })
         .unwrap();
     let mapping = gal
@@ -759,7 +883,7 @@ fn isolated_opengl_conformance_dispatches_a_d3_storage_compute_shader() {
 
 #[test]
 fn isolated_opengl_conformance_writes_and_reads_a_r8uint_d3_storage_texel() {
-    run_d3_storage_write_read_test(
+    let _ = run_d3_storage_write_read_test(
         "r8uint",
         TextureFormat::R8Uint,
         D3_STORAGE_R8UINT_FRAGMENT_SHADER,
@@ -769,7 +893,7 @@ fn isolated_opengl_conformance_writes_and_reads_a_r8uint_d3_storage_texel() {
 
 #[test]
 fn isolated_opengl_conformance_writes_and_reads_a_rgba16float_d3_storage_texel() {
-    run_d3_storage_write_read_test(
+    let _ = run_d3_storage_write_read_test(
         "rgba16float",
         TextureFormat::Rgba16Float,
         D3_STORAGE_RGBA16FLOAT_FRAGMENT_SHADER,
@@ -782,7 +906,7 @@ fn run_d3_storage_write_read_test(
     format: TextureFormat,
     fragment_shader: &str,
     expected_bytes: &[u8],
-) {
+) -> Option<Vec<u8>> {
     let backend = match OpenGlBackend::new("MattMC VulkanicGAL OpenGL D3 storage conformance") {
         Ok(backend) => backend,
         Err(error) => {
@@ -791,7 +915,7 @@ fn run_d3_storage_write_read_test(
                 text.contains("OpenGL") || text.contains("EGL") || text.contains("GL"),
                 "unexpected OpenGL D3 storage setup failure: {text}"
             );
-            return;
+            return None;
         }
     };
     let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
@@ -1023,6 +1147,27 @@ fn run_d3_storage_write_read_test(
         .map(|read| read.bytes.clone())
         .unwrap();
     assert_eq!(expected_bytes, bytes.as_slice());
+    Some(bytes)
+}
+
+pub(in crate::render::vulkanic::backends) fn shared_d3_storage_fixture_bytes(
+    format: TextureFormat,
+) -> Option<Vec<u8>> {
+    match format {
+        TextureFormat::R8Uint => run_d3_storage_write_read_test(
+            "shared-r8uint",
+            format,
+            D3_STORAGE_R8UINT_FRAGMENT_SHADER,
+            &[0x5a],
+        ),
+        TextureFormat::Rgba16Float => run_d3_storage_write_read_test(
+            "shared-rgba16float",
+            format,
+            D3_STORAGE_RGBA16FLOAT_FRAGMENT_SHADER,
+            &[0x00, 0x38, 0x00, 0x34, 0x00, 0x3a, 0x00, 0x3c],
+        ),
+        _ => panic!("shared D3 storage fixture only covers required volume formats"),
+    }
 }
 
 #[test]
@@ -1246,6 +1391,7 @@ pub(in crate::render::vulkanic::backends) fn run_conformance(
         address_u: SamplerAddressMode::ClampToEdge,
         address_v: SamplerAddressMode::ClampToEdge,
         address_w: SamplerAddressMode::ClampToEdge,
+        comparison: None,
     })?;
     let combined_sampler = gal.create_combined_texture_sampler(CombinedTextureSamplerDesc {
         label: "conformance.combined-sampler".to_string(),

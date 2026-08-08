@@ -1,7 +1,6 @@
 use super::*;
 use crate::render::vulkanic::world_primitive_frontend::{
-    material as world_material_semantics, WorldMeshAnimationFrame,
-    WORLD_MAX_MESH_ANIMATION_FRAMES,
+    material as world_material_semantics, WorldMeshAnimationFrame, WORLD_MAX_MESH_ANIMATION_FRAMES,
 };
 
 pub(crate) unsafe fn decode_world_material_asset_update(
@@ -119,8 +118,11 @@ pub(crate) unsafe fn decode_world_mesh_asset_update(
             FFI_MAX_WORLD_MESH_TEXTURE_ASSET_BYTES,
             "world mesh texture PNG bytes",
         )?;
-        let raw_frames =
-            read_limited_slice(texture.animation_frames, true, "world mesh animation frames")?;
+        let raw_frames = read_limited_slice(
+            texture.animation_frames,
+            true,
+            "world mesh animation frames",
+        )?;
         if raw_frames.len() > WORLD_MAX_MESH_ANIMATION_FRAMES {
             return Err(GalError::ffi(
                 StatusCode::InvalidArgument,
@@ -229,8 +231,11 @@ pub(crate) unsafe fn decode_world_mesh_asset_update(
             sections,
         });
     }
-    let raw_sorted_indices =
-        read_limited_slice(request.sorted_indices, true, "world mesh sorted index updates")?;
+    let raw_sorted_indices = read_limited_slice(
+        request.sorted_indices,
+        true,
+        "world mesh sorted index updates",
+    )?;
     let mut sorted_indices = Vec::with_capacity(raw_sorted_indices.len());
     for update in raw_sorted_indices {
         validate_item_size::<FfiWorldMeshSortedIndexRecord>(

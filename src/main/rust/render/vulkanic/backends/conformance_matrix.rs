@@ -68,6 +68,66 @@ fn shared_pass_shape_conformance_covers_mrt_and_depth_only() {
 }
 
 #[test]
+fn shared_compare_sampler_conformance_creates_depth_only_pairs() {
+    for backend in [BackendKind::Vulkan, BackendKind::OpenGl] {
+        let mut gal = match gal_for(backend, "MattMC comparison sampler conformance") {
+            Ok(gal) => gal,
+            Err(error) => {
+                assert_environment_gap(&error, backend.name());
+                continue;
+            }
+        };
+        let depth = gal
+            .create_texture(TextureDesc {
+                label: format!("{}.comparison-depth", backend.name()),
+                dimension: TextureDimension::D2,
+                format: TextureFormat::Depth32Float,
+                extent: Extent3d {
+                    width: 8,
+                    height: 8,
+                    depth: 1,
+                },
+                mip_levels: 1,
+                array_layers: 1,
+                usages: vec![TextureUsage::Sampled, TextureUsage::DepthStencilAttachment],
+            })
+            .unwrap_or_else(|error| panic!("{} depth texture failed: {error}", backend.name()));
+        let depth_view = gal
+            .create_texture_view(view(
+                &format!("{}.comparison-depth-view", backend.name()),
+                depth,
+                TextureFormat::Depth32Float,
+            ))
+            .unwrap_or_else(|error| panic!("{} depth view failed: {error}", backend.name()));
+        let sampler = gal
+            .create_sampler(SamplerDesc {
+                label: format!("{}.comparison-sampler", backend.name()),
+                min_filter: SamplerFilter::Nearest,
+                mag_filter: SamplerFilter::Nearest,
+                mip_filter: SamplerFilter::Nearest,
+                address_u: SamplerAddressMode::ClampToEdge,
+                address_v: SamplerAddressMode::ClampToEdge,
+                address_w: SamplerAddressMode::ClampToEdge,
+                comparison: Some(CompareOp::LessOrEqual),
+            })
+            .unwrap_or_else(|error| {
+                panic!("{} comparison sampler failed: {error}", backend.name())
+            });
+        let combined = gal
+            .create_combined_texture_sampler(CombinedTextureSamplerDesc {
+                label: format!("{}.comparison-combined", backend.name()),
+                texture_view: depth_view,
+                sampler,
+            })
+            .unwrap_or_else(|error| panic!("{} comparison pair failed: {error}", backend.name()));
+        gal.destroy(combined).unwrap();
+        gal.destroy(sampler).unwrap();
+        gal.destroy(depth_view).unwrap();
+        gal.destroy(depth).unwrap();
+    }
+}
+
+#[test]
 fn shared_large_copy_lifecycle_conformance_reuses_and_retires_resources() {
     for backend in [BackendKind::Vulkan, BackendKind::OpenGl] {
         let mut gal = match gal_for(backend, "MattMC large copy lifecycle conformance") {
@@ -252,6 +312,36 @@ fn shared_d3_pattern_fixture_samples_asymmetric_volume_coordinates() {
     }
 }
 
+/// The two backends use their own native execution mechanisms (Vulkan compute
+/// and an OpenGL storage-image draw), but this fixture makes the semantic
+/// contract explicit: writing the same D3 coordinate then transitioning it to
+/// transfer-read must yield identical bytes. Backend shader/module details stay
+/// in the private backend conformance modules.
+#[test]
+fn shared_d3_storage_fixture_matches_required_volume_formats() {
+    for format in [TextureFormat::R8Uint, TextureFormat::Rgba16Float] {
+        let vulkan = super::vulkan::conformance::shared_d3_storage_fixture_bytes(format);
+        let opengl = super::opengl::conformance::shared_d3_storage_fixture_bytes(format);
+        match (vulkan, opengl) {
+            (Some(vulkan), Some(opengl)) => assert_eq!(
+                vulkan, opengl,
+                "Vulkan and OpenGL D3 storage transitions must agree for {format:?}"
+            ),
+            (None, None) => continue,
+            (None, Some(_)) => {
+                // The Vulkan fixture already classified the missing native
+                // environment. Do not turn an unavailable driver into a
+                // false semantic conformance failure.
+                continue;
+            }
+            (Some(_), None) => {
+                // Ditto for a headless OpenGL environment.
+                continue;
+            }
+        }
+    }
+}
+
 fn submit_d3_pattern_round_trip(
     gal: &mut VulkanicGal,
     backend_name: &str,
@@ -391,7 +481,8 @@ fn submit_d3_sampled_texel(gal: &mut VulkanicGal, backend_name: &str) -> Result<
     const SAMPLE_Z: u32 = 1;
     const SAMPLE_VALUE: u8 = 0x5a;
 
-    let mut volume_bytes = vec![0_u8; (VOLUME_EXTENT.width * VOLUME_EXTENT.height * VOLUME_EXTENT.depth) as usize];
+    let mut volume_bytes =
+        vec![0_u8; (VOLUME_EXTENT.width * VOLUME_EXTENT.height * VOLUME_EXTENT.depth) as usize];
     let sample_offset = (SAMPLE_Z * VOLUME_EXTENT.width * VOLUME_EXTENT.height
         + SAMPLE_Y * VOLUME_EXTENT.width
         + SAMPLE_X) as usize;
@@ -454,6 +545,7 @@ fn submit_d3_sampled_texel(gal: &mut VulkanicGal, backend_name: &str) -> Result<
         address_u: SamplerAddressMode::ClampToEdge,
         address_v: SamplerAddressMode::ClampToEdge,
         address_w: SamplerAddressMode::ClampToEdge,
+        comparison: None,
     })?;
     let target = gal.create_render_target(RenderTargetDesc {
         label: format!("{label}.target"),
@@ -571,10 +663,22 @@ fn submit_d3_sampled_texel(gal: &mut VulkanicGal, backend_name: &str) -> Result<
                 data: volume_bytes,
             },
             buffer_barrier(upload),
-            texture_barrier(volume, TextureUsageState::Undefined, TextureUsageState::TransferDst),
+            texture_barrier(
+                volume,
+                TextureUsageState::Undefined,
+                TextureUsageState::TransferDst,
+            ),
             CommandOp::CopyBufferToTexture(upload_region),
-            texture_barrier(volume, TextureUsageState::TransferDst, TextureUsageState::ShaderRead),
-            texture_barrier(color, TextureUsageState::Undefined, TextureUsageState::ColorAttachment),
+            texture_barrier(
+                volume,
+                TextureUsageState::TransferDst,
+                TextureUsageState::ShaderRead,
+            ),
+            texture_barrier(
+                color,
+                TextureUsageState::Undefined,
+                TextureUsageState::ColorAttachment,
+            ),
             CommandOp::BeginPass {
                 pass,
                 target,
@@ -593,7 +697,11 @@ fn submit_d3_sampled_texel(gal: &mut VulkanicGal, backend_name: &str) -> Result<
                 instances: 1,
             },
             CommandOp::EndPass,
-            texture_barrier(color, TextureUsageState::ColorAttachment, TextureUsageState::TransferSrc),
+            texture_barrier(
+                color,
+                TextureUsageState::ColorAttachment,
+                TextureUsageState::TransferSrc,
+            ),
             CommandOp::CopyTextureToBuffer(BufferImageCopyRegion {
                 buffer: readback,
                 buffer_offset: 0,

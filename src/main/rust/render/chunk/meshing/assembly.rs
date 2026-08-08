@@ -378,16 +378,15 @@ pub(super) unsafe fn copy_section_builder_primitive_metadata(
     if output_capacity < total_quads {
         return ERR_CAPACITY;
     }
-    let output =
-        slice::from_raw_parts_mut(output_address as *mut NativeTerrainPrimitiveMetadata, total_quads);
+    let output = slice::from_raw_parts_mut(
+        output_address as *mut NativeTerrainPrimitiveMetadata,
+        total_quads,
+    );
     let mut cursor = 0usize;
     if slice_reordering != 0 {
-        if let Err(status) = copy_metadata_segment(
-            builder,
-            MODEL_QUAD_FACING_UNASSIGNED,
-            output,
-            &mut cursor,
-        ) {
+        if let Err(status) =
+            copy_metadata_segment(builder, MODEL_QUAD_FACING_UNASSIGNED, output, &mut cursor)
+        {
             return status;
         }
         for step in 0..2 {

@@ -895,6 +895,12 @@ impl VulkanicGal {
                 "integer combined texture samplers require nearest min, mag, and mip filters",
             ));
         }
+        if sampler.desc.comparison.is_some() && !is_depth_format(view.format) {
+            return self.validation_error(GalError::resource(
+                StatusCode::InvalidArgument,
+                "comparison combined texture samplers require a depth texture view",
+            ));
+        }
         let handle = self.combined_texture_samplers.next_handle()?;
         let token = self
             .backend

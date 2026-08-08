@@ -58,6 +58,15 @@ impl TerrainProgramScope {
             ],
         }
     }
+
+    fn shadow_entry_candidates(self) -> &'static [&'static str] {
+        match self {
+            Self::Default => &["shadow.fsh", "program/shadow.glsl"],
+            Self::Overworld => &["world0/shadow.fsh", "shadow.fsh", "program/shadow.glsl"],
+            Self::Nether => &["world-1/shadow.fsh", "shadow.fsh", "program/shadow.glsl"],
+            Self::End => &["world1/shadow.fsh", "shadow.fsh", "program/shadow.glsl"],
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -355,6 +364,28 @@ pub fn derive_complementary_terrain_contract_for_scope(
         voxel_light_volume_requirements,
         unsupported: unsupported_features(&terrain, &property_defines),
     })
+}
+
+/// Resolves the paired shadow-source stages for one semantic world scope.
+/// This is source provenance only: it neither compiles the source nor permits
+/// a route to execute it. A future Rust-owned shadow-color pass must consume
+/// these exact artifacts instead of inferring an Iris program or phase.
+pub fn shadow_source_stages_for_scope(
+    source: &ShaderPackSource,
+    scope: TerrainProgramScope,
+) -> GalResult<TerrainSourceStages> {
+    let entry = scope
+        .shadow_entry_candidates()
+        .iter()
+        .copied()
+        .find(|path| source.get(path).is_some())
+        .ok_or_else(|| {
+            GalError::invalid_argument(format!(
+                "missing shadow source for {scope:?}; tried {}",
+                scope.shadow_entry_candidates().join(", ")
+            ))
+        })?;
+    terrain_source_stages(entry)
 }
 
 /// Expands only the include graph needed to inspect immutable pack source
@@ -760,6 +791,34 @@ mod tests {
         assert_eq!("1", shared.vertex.defines["VERTEX_SHADER"]);
         assert_eq!("1", shared.fragment.defines["FRAGMENT_SHADER"]);
         assert!(terrain_source_stages("program/gbuffers_terrain.vert").is_err());
+    }
+
+    #[test]
+    fn shadow_source_stages_are_scoped_and_never_infer_another_dimension() {
+        let source = ShaderPackSource::new(
+            "test",
+            1,
+            vec![
+                ShaderSourceFile::new("world0/shadow.vsh", "#version 130\nvoid main() {}"),
+                ShaderSourceFile::new("world0/shadow.fsh", "#version 130\nvoid main() {}"),
+                ShaderSourceFile::new("world-1/shadow.vsh", "#version 130\nvoid main() {}"),
+                ShaderSourceFile::new("world-1/shadow.fsh", "#version 130\nvoid main() {}"),
+            ],
+        )
+        .unwrap();
+
+        let overworld =
+            shadow_source_stages_for_scope(&source, TerrainProgramScope::Overworld).unwrap();
+        assert_eq!("world0/shadow.vsh", overworld.vertex.path);
+        assert_eq!("world0/shadow.fsh", overworld.fragment.path);
+
+        let nether = shadow_source_stages_for_scope(&source, TerrainProgramScope::Nether).unwrap();
+        assert_eq!("world-1/shadow.vsh", nether.vertex.path);
+        assert_eq!("world-1/shadow.fsh", nether.fragment.path);
+
+        let error = shadow_source_stages_for_scope(&source, TerrainProgramScope::End).unwrap_err();
+        assert!(error.to_string().contains("missing shadow source for End"));
+        assert!(error.to_string().contains("world1/shadow.fsh"));
     }
 
     #[test]

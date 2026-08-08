@@ -114,6 +114,14 @@ public final class RustGalWorldPrimitiveRenderer {
 	public static final int MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_14 = 0x0B2BDBBD;
 	public static final int MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_15 = 0x019476C0;
 	public static final int MATERIAL_TEXTURE_TERRAIN_BLOCK_ATLAS = 0x54A17A1A;
+	/**
+	 * Stable semantic identity for the copied resource-pack specular atlas. This
+	 * is an asset identity only: it is never an OpenGL texture ID, Iris PBR
+	 * object, or backend handle.
+	 */
+	public static final int MATERIAL_TEXTURE_TERRAIN_BLOCK_SPECULAR_ATLAS = 0x54A17A1B;
+	/** Stable semantic identity for the copied resource-pack normal atlas. */
+	public static final int MATERIAL_TEXTURE_TERRAIN_BLOCK_NORMAL_ATLAS = 0x54A17A1C;
 	public static final int MATERIAL_TEXTURE_WATER_STILL = 0x5A71A501;
 	public static final int MATERIAL_TEXTURE_WATER_FLOW = 0x5A71A502;
 	public static final int MATERIAL_TEXTURE_WATER_OVERLAY = 0x5A71A503;

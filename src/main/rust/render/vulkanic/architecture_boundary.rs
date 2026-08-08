@@ -389,7 +389,10 @@ fn shader_pack_runtime_owns_private_terrain_volume_resources() {
     let world_frontend = rust_root.join("render/vulkanic/world_primitive_frontend.rs");
     let runtime = rust_root.join("render/vulkanic/shader_pack/runtime.rs");
     let world_source = read_source(&world_frontend);
-    let production_world_source = world_source.split("#[cfg(test)]").next().unwrap_or(&world_source);
+    let production_world_source = world_source
+        .split("#[cfg(test)]")
+        .next()
+        .unwrap_or(&world_source);
     let runtime_source = read_source(&runtime);
 
     assert!(

@@ -8,7 +8,7 @@ use super::commands::*;
 use super::error::{ErrorDomain, GalError};
 use super::ffi::*;
 use super::frame::*;
-use super::gal::{CommandNormalizationStats, VulkanicGal, normalize_submission_batch};
+use super::gal::{normalize_submission_batch, CommandNormalizationStats, VulkanicGal};
 use super::handles::{Handle, HandleKind, MAX_GENERATION};
 use super::metrics::{Metrics, WholeFrameProfile};
 use super::resources::*;
@@ -111,6 +111,7 @@ fn sampler(label: &str) -> SamplerDesc {
         address_u: SamplerAddressMode::ClampToEdge,
         address_v: SamplerAddressMode::ClampToEdge,
         address_w: SamplerAddressMode::ClampToEdge,
+        comparison: None,
     }
 }
 
@@ -243,15 +244,11 @@ fn backend_capabilities_are_queryable_and_fingerprinted_without_api_tokens() {
     assert!(capabilities.supports(BackendFeature::Texture3d));
     assert!(capabilities.supports(BackendFeature::TextureMipLevels));
     assert!(capabilities.supports_texture_3d_usage(TextureFormat::R8Uint, TextureUsage::Sampled));
-    assert!(
-        capabilities
-            .supports_texture_3d_usage(TextureFormat::Rgba16Float, TextureUsage::TransferDst)
-    );
+    assert!(capabilities
+        .supports_texture_3d_usage(TextureFormat::Rgba16Float, TextureUsage::TransferDst));
     assert!(!capabilities.supports_texture_3d_usage(TextureFormat::R8Uint, TextureUsage::Storage));
-    assert!(
-        !capabilities
-            .supports_texture_3d_usage(TextureFormat::R8Uint, TextureUsage::ColorAttachment)
-    );
+    assert!(!capabilities
+        .supports_texture_3d_usage(TextureFormat::R8Uint, TextureUsage::ColorAttachment));
     let vulkan = vulkan_capabilities();
     assert!(vulkan.supports_texture_3d_usage(TextureFormat::R8Uint, TextureUsage::Storage));
     assert!(vulkan.supports_texture_3d_usage(TextureFormat::Rgba16Float, TextureUsage::Storage));
@@ -1074,6 +1071,7 @@ fn resource_sets_reject_linear_sampler_state_for_integer_sampled_textures() {
             address_u: SamplerAddressMode::ClampToEdge,
             address_v: SamplerAddressMode::ClampToEdge,
             address_w: SamplerAddressMode::ClampToEdge,
+            comparison: None,
         })
         .unwrap();
     gal.create_resource_set(ResourceSetDesc {
@@ -1136,6 +1134,7 @@ fn combined_texture_sampler_is_a_read_only_owned_pair() {
             address_u: SamplerAddressMode::ClampToEdge,
             address_v: SamplerAddressMode::ClampToEdge,
             address_w: SamplerAddressMode::ClampToEdge,
+            comparison: None,
         })
         .unwrap();
     let combined = gal
@@ -1194,6 +1193,68 @@ fn combined_texture_sampler_is_a_read_only_owned_pair() {
     gal.destroy(nearest_sampler).unwrap();
     gal.destroy(occupancy_view).unwrap();
     gal.destroy(occupancy).unwrap();
+}
+
+#[test]
+fn comparison_samplers_require_depth_views_and_preserve_ffi_default_sampling() {
+    let mut gal = gal();
+    let color = gal
+        .create_texture(texture(
+            "comparison-color",
+            TextureFormat::Rgba8Unorm,
+            vec![TextureUsage::Sampled],
+        ))
+        .unwrap();
+    let color_view = gal
+        .create_texture_view(view(
+            "comparison-color-view",
+            color,
+            TextureFormat::Rgba8Unorm,
+        ))
+        .unwrap();
+    let comparison_sampler = gal
+        .create_sampler(SamplerDesc {
+            comparison: Some(CompareOp::LessOrEqual),
+            ..sampler("comparison-sampler")
+        })
+        .unwrap();
+    let error = gal
+        .create_combined_texture_sampler(CombinedTextureSamplerDesc {
+            label: "comparison-color-combined".to_owned(),
+            texture_view: color_view,
+            sampler: comparison_sampler,
+        })
+        .expect_err("comparison samplers must reject color texture views");
+    assert_eq!(error.code, super::StatusCode::InvalidArgument);
+    assert!(error.message.contains("depth texture view"));
+
+    let depth = gal
+        .create_texture(texture(
+            "comparison-depth",
+            TextureFormat::Depth32Float,
+            vec![TextureUsage::Sampled, TextureUsage::DepthStencilAttachment],
+        ))
+        .unwrap();
+    let depth_view = gal
+        .create_texture_view(view(
+            "comparison-depth-view",
+            depth,
+            TextureFormat::Depth32Float,
+        ))
+        .unwrap();
+    let combined = gal
+        .create_combined_texture_sampler(CombinedTextureSamplerDesc {
+            label: "comparison-depth-combined".to_owned(),
+            texture_view: depth_view,
+            sampler: comparison_sampler,
+        })
+        .unwrap();
+    gal.destroy(combined).unwrap();
+    gal.destroy(depth_view).unwrap();
+    gal.destroy(depth).unwrap();
+    gal.destroy(color_view).unwrap();
+    gal.destroy(color).unwrap();
+    gal.destroy(comparison_sampler).unwrap();
 }
 
 #[test]
@@ -2170,11 +2231,10 @@ fn d3_texture_lifecycle_validates_mips_storage_transitions_and_retirement() {
         })
         .unwrap();
     gal.destroy(texture).unwrap();
-    assert!(
-        gal.retire_through_for_test(submission.submission)
-            .unwrap()
-            .contains(&texture)
-    );
+    assert!(gal
+        .retire_through_for_test(submission.submission)
+        .unwrap()
+        .contains(&texture));
     assert_code(
         gal.create_texture_view(TextureViewDesc {
             label: "stale-d3-view".to_owned(),
@@ -2204,6 +2264,101 @@ fn d3_texture_lifecycle_validates_mips_storage_transitions_and_retirement() {
         }),
         super::StatusCode::InvalidArgument,
     );
+}
+
+#[test]
+fn rejected_d3_copy_does_not_poison_the_following_valid_submission() {
+    let mut gal = gal_with_capabilities(vulkan_capabilities());
+    let upload = gal
+        .create_buffer(BufferDesc {
+            label: "d3-rollback-upload".to_owned(),
+            size: 32,
+            memory: MemoryDomain::Upload,
+            usages: vec![BufferUsage::HostWrite, BufferUsage::TransferSrc],
+        })
+        .unwrap();
+    let texture = gal
+        .create_texture(TextureDesc {
+            label: "d3-rollback-volume".to_owned(),
+            dimension: TextureDimension::D3,
+            format: TextureFormat::R8Uint,
+            extent: Extent3d {
+                width: 4,
+                height: 4,
+                depth: 2,
+            },
+            mip_levels: 1,
+            array_layers: 1,
+            usages: vec![TextureUsage::TransferDst, TextureUsage::Sampled],
+        })
+        .unwrap();
+    let region = BufferImageCopyRegion {
+        buffer: upload,
+        buffer_offset: 0,
+        bytes_per_row: 4,
+        rows_per_image: 4,
+        texture,
+        texture_mip: 0,
+        texture_layer: 0,
+        texture_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
+        extent: Extent3d {
+            width: 4,
+            height: 4,
+            depth: 2,
+        },
+    };
+    let subresources = TextureSubresourceRange {
+        base_mip: 0,
+        mip_count: 1,
+        base_layer: 0,
+        layer_count: 1,
+    };
+    assert_code(
+        gal.create_command_list(CommandListDesc {
+            label: "d3-rejected-copy".to_owned(),
+            operations: vec![CommandOp::CopyBufferToTexture(BufferImageCopyRegion {
+                bytes_per_row: 3,
+                ..region.clone()
+            })],
+        }),
+        super::StatusCode::InvalidArgument,
+    );
+
+    let list = gal
+        .create_command_list(CommandListDesc {
+            label: "d3-valid-copy-after-rejection".to_owned(),
+            operations: vec![
+                CommandOp::Barrier(ResourceBarrier {
+                    resource: texture,
+                    subresources: Some(subresources),
+                    before: TextureUsageState::Undefined,
+                    after: TextureUsageState::TransferDst,
+                    src_queue: QueueClass::Graphics,
+                    dst_queue: QueueClass::Graphics,
+                }),
+                CommandOp::CopyBufferToTexture(region),
+                CommandOp::Barrier(ResourceBarrier {
+                    resource: texture,
+                    subresources: Some(subresources),
+                    before: TextureUsageState::TransferDst,
+                    after: TextureUsageState::ShaderRead,
+                    src_queue: QueueClass::Graphics,
+                    dst_queue: QueueClass::Graphics,
+                }),
+            ],
+        })
+        .unwrap();
+    let submission = gal
+        .submit(SubmissionBatch {
+            label: "d3-valid-copy-after-rejection-submit".to_owned(),
+            command_lists: vec![list],
+        })
+        .unwrap();
+    gal.destroy(texture).unwrap();
+    gal.destroy(upload).unwrap();
+    let retired = gal.retire_through_for_test(submission.submission).unwrap();
+    assert!(retired.contains(&texture));
+    assert!(retired.contains(&upload));
 }
 
 #[test]

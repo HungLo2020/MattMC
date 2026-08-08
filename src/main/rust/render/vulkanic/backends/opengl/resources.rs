@@ -426,6 +426,22 @@ impl OpenGlObjects {
                 .sampler_parameter_i32(sampler, glow::TEXTURE_WRAP_T, address(desc.address_v));
             self.gl
                 .sampler_parameter_i32(sampler, glow::TEXTURE_WRAP_R, address(desc.address_w));
+            self.gl.sampler_parameter_i32(
+                sampler,
+                glow::TEXTURE_COMPARE_MODE,
+                if desc.comparison.is_some() {
+                    glow::COMPARE_REF_TO_TEXTURE as i32
+                } else {
+                    glow::NONE as i32
+                },
+            );
+            if let Some(compare) = desc.comparison {
+                self.gl.sampler_parameter_i32(
+                    sampler,
+                    glow::TEXTURE_COMPARE_FUNC,
+                    super::lowering::compare_op(compare) as i32,
+                );
+            }
         }
         Ok(SamplerObject { token, sampler })
     }

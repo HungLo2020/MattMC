@@ -116,12 +116,10 @@ mod tests {
         assert!(!disabled.main_hand_uses_stronger_off_hand());
         assert_eq!([3, 12], disabled.compose(3, 12).unwrap());
         assert!(ShaderPackHeldLightPolicy::from_source(&source("oldHandLight=maybe\n")).is_err());
-        assert!(
-            ShaderPackHeldLightPolicy::from_source(&source(
-                "oldHandLight=true\noldHandLight=false\n"
-            ))
-            .is_err()
-        );
+        assert!(ShaderPackHeldLightPolicy::from_source(&source(
+            "oldHandLight=true\noldHandLight=false\n"
+        ))
+        .is_err());
         assert!(disabled.compose(16, 0).is_err());
     }
 }

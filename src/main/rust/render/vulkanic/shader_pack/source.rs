@@ -4,6 +4,7 @@ use crate::render::vulkanic::error::{GalError, GalResult};
 
 use super::held_light_policy::ShaderPackHeldLightPolicy;
 use super::item_id_map::ShaderPackItemIdMap;
+use super::shadow_policy::ShaderPackShadowPolicy;
 
 /// Reserved semantic configuration file generated alongside one complete
 /// source generation. It contains copied scalar preprocessor choices only,
@@ -222,6 +223,7 @@ pub struct ShaderPackSourceStore {
     active: Option<ShaderPackSource>,
     active_item_id_map: Option<ShaderPackItemIdMap>,
     active_held_light_policy: Option<ShaderPackHeldLightPolicy>,
+    active_shadow_policy: Option<ShaderPackShadowPolicy>,
     failed_generations: Vec<u64>,
 }
 
@@ -263,9 +265,17 @@ impl ShaderPackSourceStore {
                 return Err(error);
             }
         };
+        let shadow_policy = match ShaderPackShadowPolicy::from_source(&candidate) {
+            Ok(policy) => policy,
+            Err(error) => {
+                self.record_failed_generation(update.generation);
+                return Err(error);
+            }
+        };
         self.active = Some(candidate);
         self.active_item_id_map = Some(item_id_map);
         self.active_held_light_policy = Some(held_light_policy);
+        self.active_shadow_policy = shadow_policy;
         Ok(())
     }
 
@@ -287,6 +297,13 @@ impl ShaderPackSourceStore {
     /// as the item map and source snapshot.
     pub fn active_held_light_policy(&self) -> Option<ShaderPackHeldLightPolicy> {
         self.active_held_light_policy
+    }
+
+    /// Optional source-derived ordinary-world shadow policy. It is absent for
+    /// sources that do not provide the common directive file; selected-source
+    /// admission will then reject any required shadow uniforms explicitly.
+    pub fn active_shadow_policy(&self) -> Option<ShaderPackShadowPolicy> {
+        self.active_shadow_policy
     }
 
     pub fn failed_generations(&self) -> &[u64] {
@@ -351,14 +368,12 @@ mod tests {
         )
         .unwrap();
         assert_eq!(Some("void main() {}"), source.get("/lib/common.glsl"));
-        assert!(
-            ShaderPackSource::new(
-                "test-pack",
-                1,
-                vec![ShaderSourceFile::new("../outside.glsl", "")],
-            )
-            .is_err()
-        );
+        assert!(ShaderPackSource::new(
+            "test-pack",
+            1,
+            vec![ShaderSourceFile::new("../outside.glsl", "")],
+        )
+        .is_err());
     }
 
     #[test]
@@ -537,12 +552,10 @@ mod tests {
                 )],
             })
             .unwrap();
-        assert!(
-            !store
-                .active_held_light_policy()
-                .unwrap()
-                .main_hand_uses_stronger_off_hand()
-        );
+        assert!(!store
+            .active_held_light_policy()
+            .unwrap()
+            .main_hand_uses_stronger_off_hand());
 
         let error = store
             .apply_update(ShaderPackSourceUpdate {
@@ -556,11 +569,9 @@ mod tests {
             .expect_err("a malformed held-light policy must not replace a valid generation");
         assert!(error.to_string().contains("oldHandLight"));
         assert_eq!(Some(1), store.active_generation());
-        assert!(
-            !store
-                .active_held_light_policy()
-                .unwrap()
-                .main_hand_uses_stronger_off_hand()
-        );
+        assert!(!store
+            .active_held_light_policy()
+            .unwrap()
+            .main_hand_uses_stronger_off_hand());
     }
 }

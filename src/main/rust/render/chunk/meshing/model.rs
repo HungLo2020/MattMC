@@ -165,7 +165,8 @@ pub(super) unsafe fn append_direct_compact_static_model_quad(
 
     let lighting_started = profile_start(profile_static_substages);
     let scan_lighting_started = profile_start(profile_scan_substages);
-    let light = native_quad_lighting_for_vertex_format(&block, &quad_record, state, format.separate_ao);
+    let light =
+        native_quad_lighting_for_vertex_format(&block, &quad_record, state, format.separate_ao);
     builder
         .profile
         .add_optional_stage(PROFILE_STATIC_LIGHTING_AO, lighting_started);

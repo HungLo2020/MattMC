@@ -19,17 +19,32 @@ pub(super) fn native_section_culls_quad(
     }
 
     if ((semantic_cull_mask(record.flags) >> quad_record.cull_face) & 1) != 0 {
-        trace_cull_decision(record, state, quad_record, None, true, "semantic-shape-cull-mask");
+        trace_cull_decision(
+            record,
+            state,
+            quad_record,
+            None,
+            true,
+            "semantic-shape-cull-mask",
+        );
         return true;
     }
 
     let neighbor_id = record.neighbor_state_ids[quad_record.cull_face as usize];
     let Some(neighbor) = state_by_id(states, neighbor_id) else {
-        trace_cull_decision(record, state, quad_record, None, false, "neighbor-state-missing");
+        trace_cull_decision(
+            record,
+            state,
+            quad_record,
+            None,
+            false,
+            "neighbor-state-missing",
+        );
         return false;
     };
 
-    let full_or_solid = (neighbor.flags & (STATE_FLAG_FULL_OCCLUSION | STATE_FLAG_SOLID_RENDER)) != 0;
+    let full_or_solid =
+        (neighbor.flags & (STATE_FLAG_FULL_OCCLUSION | STATE_FLAG_SOLID_RENDER)) != 0;
     let same_skip_group = same_skip_group_culls_face(quad_record.cull_face, state, neighbor);
     let culled = full_or_solid || same_skip_group;
     let reason = if full_or_solid {
@@ -64,19 +79,26 @@ fn trace_cull_decision(
         return;
     };
     let section_key = section_key(record.absolute_x, record.absolute_y, record.absolute_z);
-    if section_key != target_section || FACE_CULL_TRACE_EVENTS.fetch_add(1, Ordering::Relaxed) >= FACE_CULL_TRACE_LIMIT {
+    if section_key != target_section
+        || FACE_CULL_TRACE_EVENTS.fetch_add(1, Ordering::Relaxed) >= FACE_CULL_TRACE_LIMIT
+    {
         return;
     }
-    let (neighbor_state_id, neighbor_block_id, neighbor_flags, neighbor_skip_group, neighbor_skip_mask) =
-        neighbor.map_or((-1, -1, 0, 0, 0), |value| {
-            (
-                record.neighbor_state_ids[quad.cull_face.clamp(0, 5) as usize],
-                value.block_id,
-                value.flags,
-                value.skip_group,
-                value.skip_mask,
-            )
-        });
+    let (
+        neighbor_state_id,
+        neighbor_block_id,
+        neighbor_flags,
+        neighbor_skip_group,
+        neighbor_skip_mask,
+    ) = neighbor.map_or((-1, -1, 0, 0, 0), |value| {
+        (
+            record.neighbor_state_ids[quad.cull_face.clamp(0, 5) as usize],
+            value.block_id,
+            value.flags,
+            value.skip_group,
+            value.skip_mask,
+        )
+    });
     eprintln!(
         "MATTMC_NATIVE_CULL_TRACE sectionKey={section_key} pos={},{},{} localY={} stateId={} blockId={} face={} normalFace={} passId={} decision={} reason={} neighborStateId={} neighborBlockId={} stateFlags={} neighborFlags={} skipGroup={} skipMask={} neighborSkipGroup={} neighborSkipMask={}",
         record.absolute_x,

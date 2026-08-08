@@ -1255,6 +1255,35 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		}
 	}
 
+	/**
+	 * Copies one complete binary shader-pack asset generation into Rust-owned
+	 * storage. This is pack data transport only: it neither decodes assets nor
+	 * selects a shader route, and it carries no renderer or backend objects.
+	 */
+	public Status updateShaderPackAssets(long generation, String packName, List<ShaderPackAssetFileRecord> files) {
+		Objects.requireNonNull(packName, "packName");
+		Objects.requireNonNull(files, "files");
+		try (Arena updateArena = Arena.ofConfined()) {
+			MemorySegment fileArray = Struct.SHADER_PACK_ASSET_FILE.array(updateArena, files.size());
+			for (int i = 0; i < files.size(); i++) {
+				ShaderPackAssetFileRecord file = Objects.requireNonNull(files.get(i), "files[" + i + "]");
+				MemorySegment item = Abi.item(fileArray, Struct.SHADER_PACK_ASSET_FILE, i);
+				item.set(ValueLayout.JAVA_INT, Struct.SHADER_PACK_ASSET_FILE.offset(0), Struct.SHADER_PACK_ASSET_FILE.byteSize());
+				Struct.SHADER_PACK_ASSET_FILE.setInt(item, 1, 0);
+				Abi.writeBytes(updateArena, item, Struct.SHADER_PACK_ASSET_FILE, 2, file.path());
+				Abi.writeBytes(updateArena, item, Struct.SHADER_PACK_ASSET_FILE, 3, file.contents());
+			}
+			MemorySegment request = Struct.SHADER_PACK_ASSET_UPDATE.allocate(updateArena);
+			Abi.writeHeader(request, Struct.SHADER_PACK_ASSET_UPDATE);
+			Struct.SHADER_PACK_ASSET_UPDATE.setLong(request, 1, generation);
+			Abi.writeBytes(updateArena, request, Struct.SHADER_PACK_ASSET_UPDATE, 2, packName);
+			Abi.writeSlice(request, Struct.SHADER_PACK_ASSET_UPDATE, 3, fileArray, files.size());
+			MemorySegment status = Struct.STATUS.allocate(updateArena);
+			checkStatus(Native.shaderPackUpdateAssets(contextId, request, status), "shader-pack asset update");
+			return new Status(Struct.STATUS.getLong(status, 5), Struct.STATUS.metricsFfiCalls(status), Struct.STATUS.metricsFfiInputBytes(status), Struct.STATUS.backendMetrics(status));
+		}
+	}
+
 	public Status updateWorldMeshAssets(
 		long generation,
 		List<WorldMeshAssetRecord> meshes,
@@ -1390,6 +1419,13 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		public ShaderPackSourceFileRecord {
 			Objects.requireNonNull(path, "path");
 			Objects.requireNonNull(contentsUtf8, "contentsUtf8");
+		}
+	}
+
+	public record ShaderPackAssetFileRecord(String path, byte[] contents) {
+		public ShaderPackAssetFileRecord {
+			Objects.requireNonNull(path, "path");
+			Objects.requireNonNull(contents, "contents");
 		}
 	}
 
@@ -2183,6 +2219,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		private static final MethodHandle WORLD_MATERIAL_UPDATE_ASSETS = downcall("mattmc_vulkanic_gal_world_material_update_assets", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle WORLD_MESH_UPDATE_ASSETS = downcall("mattmc_vulkanic_gal_world_mesh_update_assets", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle SHADER_PACK_UPDATE_SOURCES = downcall("mattmc_vulkanic_gal_shader_pack_update_sources", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+		private static final MethodHandle SHADER_PACK_UPDATE_ASSETS = downcall("mattmc_vulkanic_gal_shader_pack_update_assets", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle LAST_ERROR = downcall("mattmc_vulkanic_gal_last_error", FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG));
 
 		private static MethodHandle downcall(String symbol, FunctionDescriptor descriptor) {
@@ -2389,6 +2426,14 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			}
 		}
 
+		static int shaderPackUpdateAssets(long contextId, MemorySegment request, MemorySegment result) {
+			try {
+				return (int) SHADER_PACK_UPDATE_ASSETS.invokeExact(contextId, request, result);
+			} catch (Throwable throwable) {
+				throw new IllegalStateException("Failed to update Rust VulkanicGAL shader-pack assets", throwable);
+			}
+		}
+
 		static String lastError(long contextId) {
 			try (Arena arena = Arena.ofConfined()) {
 				MemorySegment bytes = arena.allocate(4096, 1);
@@ -2476,7 +2521,9 @@ public final class VulkanicGalBridge implements AutoCloseable {
 					WORLD_VOXEL_VOLUME_FRAME(72),
 					WORLD_SHADER_ENVIRONMENT_FRAME(73),
 					SHADER_PACK_SOURCE_FILE(74),
-					SHADER_PACK_SOURCE_UPDATE(75);
+					SHADER_PACK_SOURCE_UPDATE(75),
+					SHADER_PACK_ASSET_FILE(76),
+					SHADER_PACK_ASSET_UPDATE(77);
 
 		private final int id;
 		private final int byteSize;

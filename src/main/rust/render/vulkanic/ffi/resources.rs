@@ -182,6 +182,7 @@ pub unsafe fn decode_resource_batch(
                 address_u: sampler_address(item.address_u)?,
                 address_v: sampler_address(item.address_v)?,
                 address_w: sampler_address(item.address_w)?,
+                comparison: None,
             },
         });
     }

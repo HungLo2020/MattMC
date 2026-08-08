@@ -431,10 +431,7 @@ impl VulkanObjects {
             image,
             memory,
             format,
-            copy_bytes_per_texel: desc
-                .format
-                .copy_bytes_per_texel()
-                .unwrap_or(0),
+            copy_bytes_per_texel: desc.format.copy_bytes_per_texel().unwrap_or(0),
             extent: desc.extent,
             dimension: desc.dimension,
             mip_levels: desc.mip_levels,
@@ -497,6 +494,12 @@ impl VulkanObjects {
             .address_mode_u(address_mode(desc.address_u))
             .address_mode_v(address_mode(desc.address_v))
             .address_mode_w(address_mode(desc.address_w))
+            .compare_enable(desc.comparison.is_some())
+            .compare_op(
+                desc.comparison
+                    .map(compare_op)
+                    .unwrap_or(vk::CompareOp::ALWAYS),
+            )
             .max_lod(vk::LOD_CLAMP_NONE);
         let sampler =
             unsafe { self.context.device.create_sampler(&create_info, None) }.map_err(|error| {

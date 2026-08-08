@@ -1,15 +1,30 @@
 use crate::render::vulkanic::error::{GalError, GalResult};
+use crate::render::vulkanic::handles::{Handle, HandleKind};
 use crate::render::vulkanic::resources::{
-    BackendApi, ShaderCodeFormat, ShaderModuleDesc, ShaderStage,
+    AccessFlags, BackendApi, PipelineStageFlags, ResourceBinding, ResourceBindingDesc,
+    ResourceBindingKind, ResourceLayoutDesc, ResourceSetDesc, ShaderCodeFormat, ShaderModuleDesc,
+    ShaderStage,
 };
 
 use super::lowering::{
-    LoweredTerrainSourcePair, TerrainSourceOpaqueResourceBindingPlan, TerrainSourceUniformField,
+    LoweredShadowSourcePair, LoweredTerrainSourcePair, TerrainSourceOpaqueResourceBindingPlan,
+    TerrainSourceOpaqueResourceKind, TerrainSourceUniformField,
 };
 use super::source_uniforms::{TerrainSourceUniformFrame, TerrainSourceUniformRequirements};
 use super::terrain_contract::{
     TerrainMaterialClass, TerrainPassContract, TerrainPassRequiredResource,
 };
+use super::terrain_source_resources::{
+    TerrainSourceOwnedResourceSet, TerrainSourceResourceAvailabilitySet,
+};
+
+/// Fixed std430 source-terrain vertex record declared by the Rust source
+/// lowerer. Frontend staging may use this semantic ABI, but it is not a Java
+/// vertex layout or a native backend format.
+pub(crate) const TERRAIN_SOURCE_VERTEX_BYTES: usize = 8 * 4 * std::mem::size_of::<f32>();
+/// One source terrain instance carries only its semantic model transform.
+/// Per-instance material and backend state remain outside this owned ABI.
+pub(crate) const TERRAIN_SOURCE_INSTANCE_BYTES: usize = 16 * std::mem::size_of::<f32>();
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct ProgramIdentity(String);
@@ -69,13 +84,17 @@ pub struct TerrainMaterialProgram {
     pub required_resources: Vec<TerrainProgramResource>,
 }
 
-/// Actual source text after Rust's bounded terrain lowering, paired with the
-/// pack-declared semantic sampler roles it needs. This is intentionally not a
-/// `TerrainMaterialProgram`: no existing renderer path can compile or draw it
-/// until a later source-mesh and semantic resource-set slice is complete.
+/// Actual source text after Rust's bounded source lowering, paired with the
+/// pack-declared semantic sampler roles it needs. It may represent a normal
+/// terrain or shadow-material source pair; its identity and named outputs keep
+/// those uses distinct. This is intentionally not a `TerrainMaterialProgram`:
+/// no existing renderer path can compile or draw it until a later source-mesh
+/// and semantic resource-set slice is complete.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LoweredTerrainSourceProgram {
     pub identity: ProgramIdentity,
+    /// Exact shader-pack source generation which produced this program.
+    pub shader_pack_generation: u64,
     pub vertex: ShaderStageSource,
     pub fragment: ShaderStageSource,
     /// Fixed semantic bindings inserted by the source lowerer. They describe
@@ -87,6 +106,20 @@ pub struct LoweredTerrainSourceProgram {
     pub scalar_uniform_requirements: TerrainSourceUniformRequirements,
     pub opaque_resource_bindings: TerrainSourceOpaqueResourceBindingPlan,
     pub required_resources: Vec<TerrainProgramResource>,
+}
+
+/// Backend-neutral layouts required to execute a lowered source-terrain
+/// program. These are descriptions only: callers still need to allocate
+/// Rust-owned resources, create GAL layouts/sets, and prove source-plan
+/// readiness before any render route can use them.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TerrainSourceExecutionLayouts {
+    /// Fixed Rust-owned streams and scalar blocks inserted by the source
+    /// lowerer. This is always descriptor set zero.
+    pub source_data: ResourceLayoutDesc,
+    /// Selected-pack sampler resources, mapped from declared semantic roles.
+    /// This is always descriptor set one.
+    pub pack_resources: ResourceLayoutDesc,
 }
 
 impl LoweredTerrainSourceProgram {
@@ -115,6 +148,280 @@ impl LoweredTerrainSourceProgram {
         }
         Ok(bytes)
     }
+
+    /// Packs the two fixed legacy texture transforms consumed by the lowered
+    /// source preamble. They remain an explicit semantic frame input instead
+    /// of a borrowed Java/Iris uniform block or a guessed identity matrix.
+    pub fn pack_legacy_texture_transforms(
+        &self,
+        transforms: &TerrainSourceTextureTransforms,
+    ) -> GalResult<Vec<u8>> {
+        self.execution_interface.validate()?;
+        transforms.validate()?;
+        let mut bytes =
+            Vec::with_capacity(self.execution_interface.legacy_transform_bytes as usize);
+        for value in transforms
+            .atlas_texture_matrix
+            .iter()
+            .chain(transforms.lightmap_texture_matrix.iter())
+        {
+            bytes.extend_from_slice(&value.to_ne_bytes());
+        }
+        if bytes.len() != self.execution_interface.legacy_transform_bytes as usize {
+            return Err(GalError::invalid_argument(
+                "terrain source legacy texture transform pack does not match its fixed ABI size",
+            ));
+        }
+        Ok(bytes)
+    }
+
+    /// Derives the closed GAL layout contract from the fixed source ABI and
+    /// the selected pack's semantic resource plan. It never accepts native
+    /// objects, Java renderer state, or arbitrary binding declarations.
+    pub fn execution_resource_layouts(&self) -> GalResult<TerrainSourceExecutionLayouts> {
+        self.execution_interface.validate()?;
+
+        let mut source_data_bindings = vec![
+            resource_binding_descriptor(self.execution_interface.vertex_stream, false),
+            resource_binding_descriptor(self.execution_interface.legacy_transforms, true),
+            resource_binding_descriptor(self.execution_interface.instance_stream, true),
+        ];
+        if let Some(scalar_uniforms) = self.execution_interface.scalar_uniforms {
+            source_data_bindings.push(resource_binding_descriptor(scalar_uniforms, true));
+        }
+        source_data_bindings.sort_by_key(|binding| binding.binding);
+        validate_unique_layout_bindings("terrain source data", &source_data_bindings)?;
+
+        let mut pack_resource_bindings =
+            Vec::with_capacity(self.opaque_resource_bindings.bindings().len());
+        for source_binding in self.opaque_resource_bindings.bindings() {
+            let kind = match source_binding.kind() {
+                TerrainSourceOpaqueResourceKind::CombinedTextureSampler => {
+                    ResourceBindingKind::CombinedTextureSampler
+                }
+                TerrainSourceOpaqueResourceKind::StorageImage => ResourceBindingKind::StorageTexture,
+            };
+            pack_resource_bindings.push(ResourceBindingDesc {
+                binding: source_binding.binding(),
+                kind,
+                stages: PipelineStageFlags::DRAW,
+                array_count: 1,
+                optional: false,
+                dynamic_offset_count: 0,
+            });
+        }
+        pack_resource_bindings.sort_by_key(|binding| binding.binding);
+        validate_unique_layout_bindings("terrain source pack resources", &pack_resource_bindings)?;
+
+        Ok(TerrainSourceExecutionLayouts {
+            source_data: ResourceLayoutDesc {
+                label: format!("{}:source-data", self.identity.as_str()),
+                bindings: source_data_bindings,
+            },
+            pack_resources: ResourceLayoutDesc {
+                label: format!("{}:pack-resources", self.identity.as_str()),
+                bindings: pack_resource_bindings,
+            },
+        })
+    }
+
+    /// Ensures every active source sampler role has a Rust-owned semantic
+    /// resource in the same shader-pack generation. This remains independent
+    /// of native handles and does not create a GAL resource set.
+    pub fn require_semantic_resources(
+        &self,
+        availability: &TerrainSourceResourceAvailabilitySet,
+    ) -> GalResult<()> {
+        if availability.shader_pack_generation() != self.shader_pack_generation {
+            return Err(GalError::invalid_argument(format!(
+                "terrain source program generation {} does not match resource availability generation {}",
+                self.shader_pack_generation,
+                availability.shader_pack_generation()
+            )));
+        }
+        for binding in self.opaque_resource_bindings.bindings() {
+            if availability.resource_for(binding.role()).is_none() {
+                return Err(GalError::invalid_argument(format!(
+                    "terrain source resource '{}' is unavailable for semantic role '{}'",
+                    binding.resource_name(),
+                    binding.role().semantic_name()
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    /// Builds the deterministic set-one GAL description for the semantic
+    /// source-resource plan. The caller owns all semantic resource lifetimes;
+    /// sampled and writable image bindings remain distinct in the resulting
+    /// GAL set.
+    pub fn pack_resource_set_desc(
+        &self,
+        label: impl Into<String>,
+        layout: Handle,
+        resources: &TerrainSourceOwnedResourceSet,
+    ) -> GalResult<ResourceSetDesc> {
+        if layout.kind() != Some(HandleKind::ResourceLayout) {
+            return Err(GalError::invalid_argument(
+                "terrain source pack resources require a GAL resource-layout handle",
+            ));
+        }
+        self.execution_resource_layouts()?;
+        self.require_semantic_resources(resources.availability())?;
+        let mut bindings = Vec::with_capacity(self.opaque_resource_bindings.bindings().len());
+        for source_binding in self.opaque_resource_bindings.bindings() {
+            let (resource, kind, access) = match source_binding.kind() {
+                TerrainSourceOpaqueResourceKind::CombinedTextureSampler => (
+                    resources
+                        .combined_sampler_for(source_binding.role())
+                        .ok_or_else(|| {
+                            GalError::invalid_argument(format!(
+                                "terrain source resource '{}' has no owned sampler for semantic role '{}'",
+                                source_binding.resource_name(),
+                                source_binding.role().semantic_name()
+                            ))
+                        })?,
+                    ResourceBindingKind::CombinedTextureSampler,
+                    AccessFlags::READ,
+                ),
+                TerrainSourceOpaqueResourceKind::StorageImage => (
+                    resources
+                        .storage_texture_for(source_binding.role())
+                        .ok_or_else(|| {
+                            GalError::invalid_argument(format!(
+                                "terrain source resource '{}' has no owned storage texture view for semantic role '{}'",
+                                source_binding.resource_name(),
+                                source_binding.role().semantic_name()
+                            ))
+                        })?,
+                    ResourceBindingKind::StorageTexture,
+                    source_storage_access(source_binding.qualifiers())?,
+                ),
+            };
+            bindings.push(ResourceBinding {
+                binding: source_binding.binding(),
+                array_index: 0,
+                resource,
+                kind,
+                access,
+                dynamic_offsets: Vec::new(),
+                buffer_range: None,
+            });
+        }
+        Ok(ResourceSetDesc {
+            label: label.into(),
+            layout,
+            bindings,
+        })
+    }
+}
+
+fn source_storage_access(qualifiers: &str) -> GalResult<AccessFlags> {
+    let words = qualifiers.split_whitespace().collect::<Vec<_>>();
+    let readonly = words.contains(&"readonly");
+    let writeonly = words.contains(&"writeonly");
+    if readonly && writeonly {
+        return Err(GalError::invalid_argument(
+            "terrain source storage image cannot be both readonly and writeonly",
+        ));
+    }
+    Ok(if readonly {
+        AccessFlags::READ
+    } else if writeonly {
+        AccessFlags::WRITE
+    } else {
+        AccessFlags(AccessFlags::READ.0 | AccessFlags::WRITE.0)
+    })
+}
+
+/// Exact semantic values for the two fixed legacy texture coordinates used by
+/// the lowered terrain source. The first transforms atlas UVs; the second
+/// transforms packed lightmap coordinates. Neither is a native uniform
+/// location, renderer object, or a license to borrow shader-pack state.
+#[derive(Clone, Debug, PartialEq)]
+pub struct TerrainSourceTextureTransforms {
+    pub atlas_texture_matrix: [f32; 16],
+    pub lightmap_texture_matrix: [f32; 16],
+}
+
+impl TerrainSourceTextureTransforms {
+    /// Canonical Minecraft terrain texture transforms, expressed as owned
+    /// semantic values. Atlas coordinates are already normalized atlas UVs;
+    /// lightmap coordinates are the original UV2 integer values and require
+    /// the vanilla 1/256 scale plus 1/32 texel-center offset. This matches
+    /// the documented `LightTexture` replacement transform, without reading
+    /// an Iris uniform, texture unit, or mutable GL matrix.
+    pub fn canonical_minecraft_terrain() -> Self {
+        Self {
+            atlas_texture_matrix: [
+                1.0, 0.0, 0.0, 0.0, // column 0
+                0.0, 1.0, 0.0, 0.0, // column 1
+                0.0, 0.0, 1.0, 0.0, // column 2
+                0.0, 0.0, 0.0, 1.0, // column 3
+            ],
+            lightmap_texture_matrix: [
+                1.0 / 256.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0 / 256.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0 / 256.0,
+                0.0,
+                1.0 / 32.0,
+                1.0 / 32.0,
+                1.0 / 32.0,
+                1.0,
+            ],
+        }
+    }
+
+    pub fn validate(&self) -> GalResult<()> {
+        for (name, matrix) in [
+            ("atlas", &self.atlas_texture_matrix),
+            ("lightmap", &self.lightmap_texture_matrix),
+        ] {
+            if matrix.iter().any(|value| !value.is_finite()) {
+                return Err(GalError::invalid_argument(format!(
+                    "terrain source {name} texture matrix contains a non-finite value"
+                )));
+            }
+        }
+        Ok(())
+    }
+}
+
+fn resource_binding_descriptor(
+    binding: TerrainSourceFixedBinding,
+    dynamic: bool,
+) -> ResourceBindingDesc {
+    ResourceBindingDesc {
+        binding: binding.binding,
+        kind: match binding.kind {
+            TerrainSourceBindingKind::StorageBuffer => ResourceBindingKind::StorageBuffer,
+            TerrainSourceBindingKind::UniformBuffer => ResourceBindingKind::UniformBuffer,
+        },
+        stages: PipelineStageFlags::DRAW,
+        array_count: 1,
+        optional: false,
+        dynamic_offset_count: u32::from(dynamic),
+    }
+}
+
+fn validate_unique_layout_bindings(label: &str, bindings: &[ResourceBindingDesc]) -> GalResult<()> {
+    if bindings
+        .windows(2)
+        .any(|pair| pair[0].binding == pair[1].binding)
+    {
+        return Err(GalError::invalid_argument(format!(
+            "{label} contains duplicate binding numbers"
+        )));
+    }
+    Ok(())
 }
 
 /// Backend-neutral storage kind required by one fixed source-lowering
@@ -149,9 +456,11 @@ pub struct TerrainSourceVertexField {
 pub struct TerrainSourceExecutionInterface {
     pub vertex_stream: TerrainSourceFixedBinding,
     pub vertex_stride: u32,
-    pub vertex_fields: [TerrainSourceVertexField; 7],
+    pub vertex_fields: [TerrainSourceVertexField; 8],
     pub legacy_transforms: TerrainSourceFixedBinding,
     pub scalar_uniforms: Option<TerrainSourceFixedBinding>,
+    pub instance_stream: TerrainSourceFixedBinding,
+    pub instance_stride: u32,
     pub legacy_transform_bytes: u32,
     pub scalar_uniform_bytes: u32,
     pub scalar_uniform_fields: Vec<TerrainSourceUniformField>,
@@ -173,11 +482,16 @@ impl TerrainSourceExecutionInterface {
         binding: 2,
         kind: TerrainSourceBindingKind::UniformBuffer,
     };
+    const INSTANCE_STREAM: TerrainSourceFixedBinding = TerrainSourceFixedBinding {
+        set: 0,
+        binding: 3,
+        kind: TerrainSourceBindingKind::StorageBuffer,
+    };
 
-    fn from_lowered_pair(lowered: &LoweredTerrainSourcePair) -> Self {
+    fn from_uniform_contract(contract: &super::lowering::TerrainSourceUniformContract) -> Self {
         Self {
             vertex_stream: Self::VERTEX_STREAM,
-            vertex_stride: 7 * 4 * std::mem::size_of::<f32>() as u32,
+            vertex_stride: TERRAIN_SOURCE_VERTEX_BYTES as u32,
             vertex_fields: [
                 TerrainSourceVertexField {
                     name: "position",
@@ -214,15 +528,30 @@ impl TerrainSourceExecutionInterface {
                     offset: 96,
                     component_count: 4,
                 },
+                TerrainSourceVertexField {
+                    name: "mid_block",
+                    offset: 112,
+                    component_count: 4,
+                },
             ],
             legacy_transforms: Self::LEGACY_TRANSFORMS,
-            scalar_uniforms: (!lowered.uniform_contract().fields().is_empty())
+            scalar_uniforms: (!contract.fields().is_empty())
                 .then_some(Self::SCALAR_UNIFORMS),
+            instance_stream: Self::INSTANCE_STREAM,
+            instance_stride: TERRAIN_SOURCE_INSTANCE_BYTES as u32,
             // Two std140 mat4 texture transforms.
             legacy_transform_bytes: 2 * 16 * std::mem::size_of::<f32>() as u32,
-            scalar_uniform_bytes: lowered.uniform_contract().std140_size(),
-            scalar_uniform_fields: lowered.uniform_contract().fields().to_vec(),
+            scalar_uniform_bytes: contract.std140_size(),
+            scalar_uniform_fields: contract.fields().to_vec(),
         }
+    }
+
+    fn from_lowered_pair(lowered: &LoweredTerrainSourcePair) -> Self {
+        Self::from_uniform_contract(lowered.uniform_contract())
+    }
+
+    fn from_lowered_shadow_pair(lowered: &LoweredShadowSourcePair) -> Self {
+        Self::from_uniform_contract(lowered.uniform_contract())
     }
 
     /// Rejects an internally inconsistent prepared-source interface before a
@@ -230,7 +559,7 @@ impl TerrainSourceExecutionInterface {
     /// source lowerer owns this ABI; callers must not be able to reinterpret
     /// it as a legacy renderer vertex format or arbitrary binding scheme.
     pub fn validate(&self) -> GalResult<()> {
-        const EXPECTED_FIELDS: [(&str, u32); 7] = [
+        const EXPECTED_FIELDS: [(&str, u32); 8] = [
             ("position", 0),
             ("color", 16),
             ("normal_light", 32),
@@ -238,6 +567,7 @@ impl TerrainSourceExecutionInterface {
             ("entity", 64),
             ("mid_tex_coord", 80),
             ("tangent", 96),
+            ("mid_block", 112),
         ];
 
         if self.vertex_stream != Self::VERTEX_STREAM {
@@ -245,10 +575,10 @@ impl TerrainSourceExecutionInterface {
                 "terrain source vertex stream must use fixed set 0 binding 0 storage-buffer ABI",
             ));
         }
-        if self.vertex_stride != 112 {
+        if self.vertex_stride != TERRAIN_SOURCE_VERTEX_BYTES as u32 {
             return Err(GalError::invalid_argument(format!(
-                "terrain source vertex stride {} does not match the fixed 112-byte ABI",
-                self.vertex_stride
+                "terrain source vertex stride {} does not match the fixed {}-byte ABI",
+                self.vertex_stride, TERRAIN_SOURCE_VERTEX_BYTES
             )));
         }
         for (field, (expected_name, expected_offset)) in
@@ -268,6 +598,14 @@ impl TerrainSourceExecutionInterface {
             return Err(GalError::invalid_argument(
                 "terrain source legacy transforms must use fixed set 0 binding 1 with two std140 mat4 values",
             ));
+        }
+        if self.instance_stream != Self::INSTANCE_STREAM
+            || self.instance_stride != TERRAIN_SOURCE_INSTANCE_BYTES as u32
+        {
+            return Err(GalError::invalid_argument(format!(
+                "terrain source instance stream must use fixed set 0 binding 3 with {}-byte mat4 records",
+                TERRAIN_SOURCE_INSTANCE_BYTES
+            )));
         }
 
         match (self.scalar_uniforms, self.scalar_uniform_fields.is_empty()) {
@@ -395,13 +733,14 @@ pub fn prepare_lowered_terrain_source_program(
     let scalar_uniform_requirements =
         TerrainSourceUniformRequirements::from_contract(lowered.uniform_contract())?;
     scalar_uniform_requirements.require_fully_semantic()?;
-    Ok(LoweredTerrainSourceProgram {
+    let program = LoweredTerrainSourceProgram {
         identity: ProgramIdentity::new(format!(
             "vulkanic:shader-pack/{}/terrain_{}_source_gen{}",
             contract.pack_name.to_ascii_lowercase(),
             suffix,
             contract.generation
         )),
+        shader_pack_generation: contract.generation,
         vertex: ShaderStageSource {
             stage: ShaderStageKind::Vertex,
             label: format!("{}:lowered-vertex", lowered.vertex().entry_path()),
@@ -422,7 +761,59 @@ pub fn prepare_lowered_terrain_source_program(
         } else {
             Vec::new()
         },
-    })
+    };
+    program.execution_resource_layouts()?;
+    Ok(program)
+}
+
+/// Forms an owned source-shadow program preparation artifact from one exact
+/// scoped shadow pair. The program retains shadow-specific output names and
+/// transform semantics; it is not a normal terrain material program and it
+/// cannot select a route, allocate a shadow target, or issue a draw.
+pub fn prepare_lowered_shadow_source_program(
+    pack_name: &str,
+    shader_pack_generation: u64,
+    lowered: &LoweredShadowSourcePair,
+    opaque_resource_bindings: &TerrainSourceOpaqueResourceBindingPlan,
+) -> GalResult<LoweredTerrainSourceProgram> {
+    if pack_name.trim().is_empty() || shader_pack_generation == 0 {
+        return Err(GalError::invalid_argument(
+            "source shadow program requires a non-empty pack name and non-zero generation",
+        ));
+    }
+    lowered.require_backend_neutral_lowering()?;
+    lowered.require_matching_opaque_resource_bindings(opaque_resource_bindings)?;
+    let execution_interface = TerrainSourceExecutionInterface::from_lowered_shadow_pair(lowered);
+    execution_interface.validate()?;
+    let scalar_uniform_requirements =
+        TerrainSourceUniformRequirements::from_contract(lowered.uniform_contract())?;
+    scalar_uniform_requirements.require_fully_semantic()?;
+    let program = LoweredTerrainSourceProgram {
+        identity: ProgramIdentity::new(format!(
+            "vulkanic:shader-pack/{}/shadow_source_gen{}",
+            pack_name.to_ascii_lowercase(),
+            shader_pack_generation
+        )),
+        shader_pack_generation,
+        vertex: ShaderStageSource {
+            stage: ShaderStageKind::Vertex,
+            label: format!("{}:lowered-shadow-vertex", lowered.vertex().entry_path()),
+            source: lowered.vertex().source().to_string(),
+            entry_point: "main".to_string(),
+        },
+        fragment: ShaderStageSource {
+            stage: ShaderStageKind::Fragment,
+            label: format!("{}:lowered-shadow-fragment", lowered.fragment().entry_path()),
+            source: lowered.fragment().source().to_string(),
+            entry_point: "main".to_string(),
+        },
+        execution_interface,
+        scalar_uniform_requirements,
+        opaque_resource_bindings: opaque_resource_bindings.clone(),
+        required_resources: Vec::new(),
+    };
+    program.execution_resource_layouts()?;
+    Ok(program)
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1133,12 +1524,18 @@ void main() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::render::vulkanic::shader_pack::lowering::lower_terrain_source_pair;
+    use crate::render::vulkanic::handles::{Handle, HandleKind};
+    use crate::render::vulkanic::shader_pack::lowering::{
+        lower_shadow_source_pair, lower_terrain_source_pair,
+    };
     use crate::render::vulkanic::shader_pack::preprocess::preprocess_terrain_sources;
     use crate::render::vulkanic::shader_pack::source::{ShaderPackSource, ShaderSourceFile};
     use crate::render::vulkanic::shader_pack::terrain_contract::derive_complementary_terrain_contract;
     use crate::render::vulkanic::shader_pack::terrain_source_resources::{
-        TerrainSourceResourceBindings, TerrainSourceResourceRole, TERRAIN_RESOURCE_BINDINGS_PATH,
+        TerrainSourceOwnedResource, TerrainSourceOwnedResourceSet,
+        TerrainSourceResourceAvailability, TerrainSourceResourceAvailabilitySet,
+        TerrainSourceResourceBindings, TerrainSourceResourceRole,
+        TerrainSourceSampledResourceShape, TERRAIN_RESOURCE_BINDINGS_PATH,
     };
 
     fn paired_source() -> ShaderPackSource {
@@ -1157,6 +1554,25 @@ mod tests {
                 ShaderSourceFile::new("lib/common.glsl", "#define TEST 1\n"),
                 ShaderSourceFile::new("shaders.properties", ""),
                 ShaderSourceFile::new("block.properties", ""),
+                ShaderSourceFile::new(TERRAIN_RESOURCE_BINDINGS_PATH, "tex=material_atlas\n"),
+            ],
+        )
+        .unwrap()
+    }
+
+    fn paired_shadow_source() -> ShaderPackSource {
+        ShaderPackSource::new(
+            "lowered-shadow-source-test",
+            10,
+            vec![
+                ShaderSourceFile::new(
+                    "shadow.vsh",
+                    "#version 130\nout vec2 texCoord;\nvoid main() { texCoord = gl_MultiTexCoord0.xy; gl_Position = ftransform(); }",
+                ),
+                ShaderSourceFile::new(
+                    "shadow.fsh",
+                    "#version 130\nin vec2 texCoord;\nuniform sampler2D tex;\nvoid main() { gl_FragData[0] = texture2D(tex, texCoord); }",
+                ),
                 ShaderSourceFile::new(TERRAIN_RESOURCE_BINDINGS_PATH, "tex=material_atlas\n"),
             ],
         )
@@ -1188,6 +1604,7 @@ mod tests {
             "vulkanic:shader-pack/lowered-source-test/terrain_opaque_source_gen9",
             program.identity.as_str()
         );
+        assert_eq!(9, program.shader_pack_generation);
         assert_eq!(lowered.vertex().source(), program.vertex.source);
         assert_eq!(lowered.fragment().source(), program.fragment.source);
         assert_eq!(1, program.opaque_resource_bindings.bindings().len());
@@ -1220,7 +1637,10 @@ mod tests {
             },
             program.execution_interface.vertex_stream
         );
-        assert_eq!(112, program.execution_interface.vertex_stride);
+        assert_eq!(
+            TERRAIN_SOURCE_VERTEX_BYTES as u32,
+            program.execution_interface.vertex_stride
+        );
         assert_eq!(
             [
                 "position",
@@ -1230,6 +1650,7 @@ mod tests {
                 "entity",
                 "mid_tex_coord",
                 "tangent",
+                "mid_block",
             ],
             program
                 .execution_interface
@@ -1245,6 +1666,18 @@ mod tests {
             program.execution_interface.legacy_transforms
         );
         assert_eq!(128, program.execution_interface.legacy_transform_bytes);
+        assert_eq!(
+            TerrainSourceFixedBinding {
+                set: 0,
+                binding: 3,
+                kind: TerrainSourceBindingKind::StorageBuffer,
+            },
+            program.execution_interface.instance_stream
+        );
+        assert_eq!(
+            TERRAIN_SOURCE_INSTANCE_BYTES as u32,
+            program.execution_interface.instance_stride
+        );
         assert_eq!(
             Some(TerrainSourceFixedBinding {
                 set: 0,
@@ -1287,6 +1720,145 @@ mod tests {
                 .unwrap()
                 .len()
         );
+        let legacy_texture_transforms = program
+            .pack_legacy_texture_transforms(&TerrainSourceTextureTransforms {
+                atlas_texture_matrix: [1.0; 16],
+                lightmap_texture_matrix: [2.0; 16],
+            })
+            .unwrap();
+        assert_eq!(128, legacy_texture_transforms.len());
+        assert_eq!(
+            1.0,
+            f32::from_ne_bytes(legacy_texture_transforms[0..4].try_into().unwrap())
+        );
+        assert_eq!(
+            2.0,
+            f32::from_ne_bytes(legacy_texture_transforms[64..68].try_into().unwrap())
+        );
+        assert!(TerrainSourceTextureTransforms {
+            atlas_texture_matrix: [f32::NAN; 16],
+            lightmap_texture_matrix: [1.0; 16],
+        }
+        .validate()
+        .unwrap_err()
+        .to_string()
+        .contains("atlas texture matrix"));
+        let canonical_transforms = TerrainSourceTextureTransforms::canonical_minecraft_terrain();
+        canonical_transforms.validate().unwrap();
+        assert_eq!(1.0, canonical_transforms.atlas_texture_matrix[0]);
+        assert_eq!(1.0, canonical_transforms.atlas_texture_matrix[15]);
+        assert_eq!(1.0 / 256.0, canonical_transforms.lightmap_texture_matrix[0]);
+        assert_eq!(1.0 / 256.0, canonical_transforms.lightmap_texture_matrix[5]);
+        assert_eq!(1.0 / 32.0, canonical_transforms.lightmap_texture_matrix[12]);
+        assert_eq!(1.0 / 32.0, canonical_transforms.lightmap_texture_matrix[13]);
+        let layouts = program.execution_resource_layouts().unwrap();
+        assert_eq!(
+            vec![
+                (0, ResourceBindingKind::StorageBuffer),
+                (1, ResourceBindingKind::UniformBuffer),
+                (2, ResourceBindingKind::UniformBuffer),
+                (3, ResourceBindingKind::StorageBuffer),
+            ],
+            layouts
+                .source_data
+                .bindings
+                .iter()
+                .map(|binding| (binding.binding, binding.kind))
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(
+            vec![(0, 0), (1, 1), (2, 1), (3, 1)],
+            layouts
+                .source_data
+                .bindings
+                .iter()
+                .map(|binding| (binding.binding, binding.dynamic_offset_count))
+                .collect::<Vec<_>>()
+        );
+        assert!(layouts.source_data.bindings.iter().all(|binding| {
+            binding.stages == PipelineStageFlags::DRAW
+                && binding.array_count == 1
+                && !binding.optional
+        }));
+        assert_eq!(
+            vec![(
+                program.opaque_resource_bindings.bindings()[0].binding(),
+                ResourceBindingKind::CombinedTextureSampler,
+            )],
+            layouts
+                .pack_resources
+                .bindings
+                .iter()
+                .map(|binding| (binding.binding, binding.kind))
+                .collect::<Vec<_>>()
+        );
+        let missing_resources = TerrainSourceResourceAvailabilitySet::new(9, 4, []).unwrap();
+        assert!(program
+            .require_semantic_resources(&missing_resources)
+            .unwrap_err()
+            .to_string()
+            .contains("material_atlas"));
+        let atlas_resources = TerrainSourceResourceAvailabilitySet::new(
+            9,
+            4,
+            [TerrainSourceResourceAvailability {
+                role: TerrainSourceResourceRole::MaterialAtlas,
+                shape: TerrainSourceSampledResourceShape::Texture2d,
+                resource_generation: 11,
+            }],
+        )
+        .unwrap();
+        program
+            .require_semantic_resources(&atlas_resources)
+            .unwrap();
+        let source_resources = TerrainSourceOwnedResourceSet::new(
+            atlas_resources,
+            [TerrainSourceOwnedResource {
+                role: TerrainSourceResourceRole::MaterialAtlas,
+                combined_sampler: Handle::new(HandleKind::CombinedTextureSampler, 3, 1).unwrap(),
+            }],
+        )
+        .unwrap();
+        let packed_resource_set = program
+            .pack_resource_set_desc(
+                "lowered-source-test.pack-resources",
+                Handle::new(HandleKind::ResourceLayout, 5, 1).unwrap(),
+                &source_resources,
+            )
+            .unwrap();
+        assert_eq!(1, packed_resource_set.bindings.len());
+        assert_eq!(
+            program.opaque_resource_bindings.bindings()[0].binding(),
+            packed_resource_set.bindings[0].binding
+        );
+        assert_eq!(
+            ResourceBindingKind::CombinedTextureSampler,
+            packed_resource_set.bindings[0].kind
+        );
+        assert!(program
+            .pack_resource_set_desc(
+                "wrong-layout",
+                Handle::new(HandleKind::Sampler, 5, 1).unwrap(),
+                &source_resources,
+            )
+            .unwrap_err()
+            .to_string()
+            .contains("resource-layout handle"));
+        let stale_pack_resources = TerrainSourceResourceAvailabilitySet::new(
+            8,
+            4,
+            [TerrainSourceResourceAvailability {
+                role: TerrainSourceResourceRole::MaterialAtlas,
+                shape: TerrainSourceSampledResourceShape::Texture2d,
+                resource_generation: 11,
+            }],
+        )
+        .unwrap();
+        assert!(program
+            .require_semantic_resources(&stale_pack_resources)
+            .unwrap_err()
+            .to_string()
+            .contains("does not match resource availability"));
         assert!(program.required_resources.is_empty());
         assert!(prepare_lowered_terrain_source_program(
             &contract,
@@ -1295,6 +1867,131 @@ mod tests {
             TerrainMaterialProgramKind::Translucent,
         )
         .is_err());
+    }
+
+    #[test]
+    fn lowered_shadow_source_program_keeps_its_shadow_identity_and_outputs() {
+        let source = paired_shadow_source();
+        let vertex = crate::render::vulkanic::shader_pack::preprocess::preprocess_artifact(
+            crate::render::vulkanic::shader_pack::preprocess::PreprocessInput {
+                source: &source,
+                entry: "shadow.vsh",
+                defines: &[],
+            },
+        )
+        .unwrap();
+        let fragment = crate::render::vulkanic::shader_pack::preprocess::preprocess_artifact(
+            crate::render::vulkanic::shader_pack::preprocess::PreprocessInput {
+                source: &source,
+                entry: "shadow.fsh",
+                defines: &[],
+            },
+        )
+        .unwrap();
+        let lowered = lower_shadow_source_pair(&vertex, &fragment).unwrap();
+        let declarations = TerrainSourceResourceBindings::from_source(&source).unwrap();
+        let bindings = lowered
+            .opaque_resource_contract()
+            .bind_semantic_roles(&declarations)
+            .unwrap();
+
+        let program = prepare_lowered_shadow_source_program(
+            source.name(),
+            source.generation(),
+            &lowered,
+            &bindings,
+        )
+        .unwrap();
+
+        assert_eq!(
+            "vulkanic:shader-pack/lowered-shadow-source-test/shadow_source_gen10",
+            program.identity.as_str()
+        );
+        assert!(program.vertex.source.contains("shadowModelView"));
+        assert!(program.vertex.source.contains("shadowProjection"));
+        assert!(program.fragment.source.contains("out_shadow_color"));
+        assert!(!program.fragment.source.contains("out_terrain_lit_color"));
+        assert_eq!(
+            vec!["shadowModelView", "shadowProjection"],
+            program
+                .execution_interface
+                .scalar_uniform_fields
+                .iter()
+                .map(|field| field.name())
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(
+            128,
+            program
+                .pack_scalar_uniforms(&TerrainSourceUniformFrame {
+                    shadow_model_view: Some([1.0; 16]),
+                    shadow_projection: Some([2.0; 16]),
+                    ..TerrainSourceUniformFrame::default()
+                })
+                .unwrap()
+                .len()
+        );
+        assert_eq!(
+            TerrainSourceResourceRole::MaterialAtlas,
+            program.opaque_resource_bindings.bindings()[0].role()
+        );
+        assert!(program.required_resources.is_empty());
+    }
+
+    #[test]
+    fn selected_scoped_shadow_source_prepares_without_becoming_an_executable_pass() {
+        let source =
+            crate::render::vulkanic::shader_pack::preprocess::complete_bundled_pack_source_for_test(
+            );
+        let stages = crate::render::vulkanic::shader_pack::terrain_contract::shadow_source_stages_for_scope(
+            &source,
+            crate::render::vulkanic::shader_pack::terrain_contract::TerrainProgramScope::Overworld,
+        )
+        .unwrap();
+        let artifacts = preprocess_terrain_sources(&source, &stages).unwrap();
+        let lowered = lower_shadow_source_pair(&artifacts.vertex, &artifacts.fragment).unwrap();
+        let declarations = TerrainSourceResourceBindings::from_source(&source).unwrap();
+        let bindings = lowered
+            .opaque_resource_contract()
+            .bind_semantic_roles(&declarations)
+            .unwrap();
+
+        let program = prepare_lowered_shadow_source_program(
+            source.name(),
+            source.generation(),
+            &lowered,
+            &bindings,
+        )
+        .unwrap();
+
+        assert!(program.fragment.source.contains("out_shadow_color"));
+        assert!(program.fragment.source.contains("out_shadow_light_shaft_color"));
+        assert!(!program.fragment.source.contains("out_terrain_lit_color"));
+        let layouts = program.execution_resource_layouts().unwrap();
+        assert!(layouts.pack_resources.bindings.iter().any(|binding| {
+            binding.kind == ResourceBindingKind::StorageTexture
+                && program
+                    .opaque_resource_bindings
+                    .bindings()
+                    .iter()
+                    .any(|source| source.binding() == binding.binding
+                        && source.resource_name() == "voxel_img"
+                        && source.kind() == TerrainSourceOpaqueResourceKind::StorageImage)
+        }));
+    }
+
+    #[test]
+    fn source_storage_access_preserves_glsl_read_write_qualifiers() {
+        assert_eq!(AccessFlags::READ, source_storage_access("readonly").unwrap());
+        assert_eq!(AccessFlags::WRITE, source_storage_access("writeonly coherent").unwrap());
+        assert_eq!(
+            AccessFlags(AccessFlags::READ.0 | AccessFlags::WRITE.0),
+            source_storage_access("coherent restrict").unwrap()
+        );
+        assert!(source_storage_access("readonly writeonly")
+            .unwrap_err()
+            .to_string()
+            .contains("both readonly and writeonly"));
     }
 
     #[test]
@@ -1325,7 +2022,7 @@ mod tests {
             .validate()
             .unwrap_err()
             .to_string()
-            .contains("112-byte ABI"));
+            .contains("128-byte ABI"));
 
         let mut wrong_lane = program.execution_interface.clone();
         wrong_lane.vertex_fields[3].offset = 64;
@@ -1342,6 +2039,14 @@ mod tests {
             .unwrap_err()
             .to_string()
             .contains("scalar fields require fixed set 0 binding 2"));
+
+        let mut wrong_instances = program.execution_interface.clone();
+        wrong_instances.instance_stride = 32;
+        assert!(wrong_instances
+            .validate()
+            .unwrap_err()
+            .to_string()
+            .contains("binding 3"));
     }
 }
 use super::voxel_light_volume::VoxelLightVolumeReadiness;

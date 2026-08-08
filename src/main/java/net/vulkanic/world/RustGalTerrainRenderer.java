@@ -9,6 +9,7 @@ import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.data.AtlasIds;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.packs.resources.Resource;
 import net.sodium.client.render.chunk.RenderSection;
 import net.sodium.client.render.chunk.compile.ChunkBuildOutput;
 import net.sodium.client.render.chunk.compile.ChunkSortOutput;
@@ -33,6 +34,7 @@ import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayDeque;
@@ -43,6 +45,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
@@ -72,6 +75,8 @@ public final class RustGalTerrainRenderer {
 	private static volatile long atlasGeneration;
 	private static volatile long registeredAtlasGeneration;
 	private static volatile byte[] atlasPayload;
+	private static volatile byte[] normalAtlasPayload;
+	private static volatile byte[] specularAtlasPayload;
 	private static volatile FluidSpriteAsset waterStillAsset;
 	private static volatile FluidSpriteAsset waterFlowAsset;
 	private static volatile FluidSpriteAsset waterOverlayAsset;
@@ -718,6 +723,8 @@ public final class RustGalTerrainRenderer {
 		SECTION_ASSETS.clear();
 		synchronized (RustGalTerrainRenderer.class) {
 			atlasPayload = null;
+			normalAtlasPayload = null;
+			specularAtlasPayload = null;
 			atlasGeneration++;
 			registeredAtlasGeneration = 0L;
 		}
@@ -2511,6 +2518,18 @@ public final class RustGalTerrainRenderer {
 			texturePayloadUpdateBytes.addAndGet(atlasPayload.length);
 			ArrayList<VulkanicGalBridge.WorldMeshTextureAssetRecord> records = new ArrayList<>(4);
 			records.add(new VulkanicGalBridge.WorldMeshTextureAssetRecord(RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_TERRAIN_BLOCK_ATLAS, atlasPayload));
+			if (normalAtlasPayload != null) {
+				records.add(new VulkanicGalBridge.WorldMeshTextureAssetRecord(
+					RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_TERRAIN_BLOCK_NORMAL_ATLAS,
+					normalAtlasPayload
+				));
+			}
+			if (specularAtlasPayload != null) {
+				records.add(new VulkanicGalBridge.WorldMeshTextureAssetRecord(
+					RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_TERRAIN_BLOCK_SPECULAR_ATLAS,
+					specularAtlasPayload
+				));
+			}
 			if (waterStillAsset != null) {
 				records.add(waterStillAsset.textureRecord());
 			}
@@ -2565,6 +2584,8 @@ public final class RustGalTerrainRenderer {
 					for (TextureAtlasSprite sprite : atlas.texturesByName.values()) {
 						copySprite(image, sprite);
 					}
+					byte[] nextNormalAtlasPayload = buildPbrAtlasPayload(atlas, "_n", 0x7F7FFFFF);
+					byte[] nextSpecularAtlasPayload = buildPbrAtlasPayload(atlas, "_s", 0x00000000);
 					FluidSpriteAsset nextWaterStillAsset = buildFluidSpriteAsset(
 						atlas,
 						"block/water_still",
@@ -2583,6 +2604,8 @@ public final class RustGalTerrainRenderer {
 					try (ByteArrayOutputStream output = new ByteArrayOutputStream()) {
 						ImageIO.write(image, "png", output);
 						atlasPayload = output.toByteArray();
+						normalAtlasPayload = nextNormalAtlasPayload;
+						specularAtlasPayload = nextSpecularAtlasPayload;
 						waterStillAsset = nextWaterStillAsset;
 						waterFlowAsset = nextWaterFlowAsset;
 						waterOverlayAsset = nextWaterOverlayAsset;
@@ -2657,6 +2680,64 @@ public final class RustGalTerrainRenderer {
 				atlasImage.setRGB(sprite.getX() + x, sprite.getY() + y, sprite.contents().originalImage.getPixel(x, y));
 			}
 		}
+	}
+
+	/**
+	 * Builds an atlas-aligned semantic PBR payload directly from resolved
+	 * resource-pack files. This intentionally does not query Iris PBR atlas
+	 * objects or their GL textures. Missing sprites retain the source-defined
+	 * default value for the requested semantic map.
+	 */
+	private static byte[] buildPbrAtlasPayload(TextureAtlas atlas, String suffix, int defaultArgb) throws IOException {
+		BufferedImage image = new BufferedImage(atlas.width, atlas.height, BufferedImage.TYPE_INT_ARGB);
+		if (defaultArgb != 0) {
+			java.awt.Graphics2D graphics = image.createGraphics();
+			try {
+				graphics.setColor(new java.awt.Color(defaultArgb, true));
+				graphics.fillRect(0, 0, atlas.width, atlas.height);
+			} finally {
+				graphics.dispose();
+			}
+		}
+		for (TextureAtlasSprite sprite : atlas.texturesByName.values()) {
+			copyPbrSprite(image, sprite, suffix);
+		}
+		try (ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+			ImageIO.write(image, "png", output);
+			return output.toByteArray();
+		}
+	}
+
+	private static void copyPbrSprite(BufferedImage atlasImage, TextureAtlasSprite sprite, String suffix) throws IOException {
+		ResourceLocation spriteName = sprite.contents().name();
+		String pbrPath = appendPbrSuffix(spriteName.getPath(), suffix);
+		ResourceLocation pbrLocation = pbrPath.startsWith("optifine/cit/")
+			? ResourceLocation.fromNamespaceAndPath(spriteName.getNamespace(), pbrPath + ".png")
+			: ResourceLocation.fromNamespaceAndPath(spriteName.getNamespace(), "textures/" + pbrPath + ".png");
+		Optional<Resource> resource = Minecraft.getInstance().getResourceManager().getResource(pbrLocation);
+		if (resource.isEmpty()) {
+			return;
+		}
+		try (InputStream input = resource.get().open()) {
+			BufferedImage source = ImageIO.read(input);
+			if (source == null || source.getWidth() <= 0 || source.getHeight() <= 0) {
+				throw new IOException("Unable to decode PBR sprite " + pbrLocation);
+			}
+			int targetWidth = sprite.contents().width();
+			int targetHeight = sprite.contents().height();
+			for (int y = 0; y < targetHeight; y++) {
+				int sourceY = Math.min(source.getHeight() - 1, (int)((long)y * source.getHeight() / targetHeight));
+				for (int x = 0; x < targetWidth; x++) {
+					int sourceX = Math.min(source.getWidth() - 1, (int)((long)x * source.getWidth() / targetWidth));
+					atlasImage.setRGB(sprite.getX() + x, sprite.getY() + y, source.getRGB(sourceX, sourceY));
+				}
+			}
+		}
+	}
+
+	static String appendPbrSuffix(String path, String suffix) {
+		int extension = path.lastIndexOf('.');
+		return extension < 0 ? path + suffix : path.substring(0, extension) + suffix + path.substring(extension);
 	}
 
 	private static long fnv64(String value) {
