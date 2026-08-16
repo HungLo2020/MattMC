@@ -4,6 +4,41 @@ pub(crate) unsafe fn decode_gui_frame_submit(
     request: *const FfiGuiFrameSubmitRequest,
     capabilities: BackendCapabilities,
 ) -> GalResult<(u64, Handle, Vec<GuiSpriteRequest>)> {
+    let (generation, frame_target, sprites, _) =
+        decode_gui_frame_submit_with_affine(request, capabilities)?;
+    Ok((generation, frame_target, sprites))
+}
+
+pub(crate) unsafe fn decode_gui_frame_submit_with_affine(
+    request: *const FfiGuiFrameSubmitRequest,
+    capabilities: BackendCapabilities,
+) -> GalResult<(
+    u64,
+    Handle,
+    Vec<GuiSpriteRequest>,
+    Vec<GuiAffineQuadRequest>,
+)> {
+    let (generation, frame_target, sprites, affine_quads, mesh_batches) =
+        decode_gui_frame_submit_with_mesh(request, capabilities)?;
+    if !mesh_batches.is_empty() {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            "GUI mesh batches require the mesh-aware frame submit path",
+        ));
+    }
+    Ok((generation, frame_target, sprites, affine_quads))
+}
+
+pub(crate) unsafe fn decode_gui_frame_submit_with_mesh(
+    request: *const FfiGuiFrameSubmitRequest,
+    capabilities: BackendCapabilities,
+) -> GalResult<(
+    u64,
+    Handle,
+    Vec<GuiSpriteRequest>,
+    Vec<GuiAffineQuadRequest>,
+    Vec<GuiMeshBatchRequest>,
+)> {
     let request = read_struct(request, "GUI frame submit request")?;
     validate_header::<FfiGuiFrameSubmitRequest>(request.header)?;
     reject_unknown_feature_bits(request.negotiated_feature_bits)?;
@@ -86,9 +121,231 @@ pub(crate) unsafe fn decode_gui_frame_submit(
             height: to_u32(sprite.height, "height")?,
             gui_width: to_u32(sprite.gui_width, "gui_width")?,
             gui_height: to_u32(sprite.gui_height, "gui_height")?,
+            sequence: sprite.sequence,
         });
     }
-    Ok((request.generation, frame_target, owned))
+    let affine_quads =
+        decode_gui_affine_quads(request.affine_quads, request.gui_width, request.gui_height)?;
+    let mesh_batches =
+        decode_gui_mesh_batches(request.mesh_batches, request.gui_width, request.gui_height)?;
+    validate_gui_request_sequences(&owned, &affine_quads, &mesh_batches)?;
+    Ok((
+        request.generation,
+        frame_target,
+        owned,
+        affine_quads,
+        mesh_batches,
+    ))
+}
+
+fn decode_gui_affine_quads(
+    raw: FfiSlice<FfiGuiAffineQuadRequest>,
+    gui_width: i32,
+    gui_height: i32,
+) -> GalResult<Vec<GuiAffineQuadRequest>> {
+    let quads = unsafe { read_slice(raw, true, "GUI affine quad requests") }?;
+    if quads.len() > FFI_MAX_BATCH_ITEMS {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            format!(
+                "GUI affine quad count {} exceeds max {}",
+                quads.len(),
+                FFI_MAX_BATCH_ITEMS
+            ),
+        ));
+    }
+    let mut owned = Vec::with_capacity(quads.len());
+    for quad in quads {
+        validate_item_size::<FfiGuiAffineQuadRequest>(quad.byte_size, "GUI affine quad")?;
+        if quad.asset_id == 0 || quad.gui_width != gui_width || quad.gui_height != gui_height {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                "GUI affine quad asset and viewport must match its frame",
+            ));
+        }
+        let to_u32 = |value: i32, field: &str| -> GalResult<u32> {
+            u32::try_from(value).map_err(|_| {
+                GalError::ffi(
+                    StatusCode::InvalidArgument,
+                    format!("GUI affine quad {field} must be non-negative, got {value}"),
+                )
+            })
+        };
+        let request = GuiAffineQuadRequest {
+            stratum: quad.stratum,
+            asset_id: quad.asset_id,
+            x0: quad.x0,
+            y0: quad.y0,
+            x1: quad.x1,
+            y1: quad.y1,
+            x3: quad.x3,
+            y3: quad.y3,
+            z: quad.z,
+            u0: quad.u0,
+            v0: quad.v0,
+            u1: quad.u1,
+            v1: quad.v1,
+            color_argb: quad.color_argb,
+            gui_width: to_u32(quad.gui_width, "gui_width")?,
+            gui_height: to_u32(quad.gui_height, "gui_height")?,
+            sequence: quad.sequence,
+            clip_mode: quad.clip_mode,
+            clip_left: quad.clip_left,
+            clip_top: quad.clip_top,
+            clip_width: quad.clip_width,
+            clip_height: quad.clip_height,
+        };
+        super::super::gui_frontend::validate_affine_quad(&request)?;
+        owned.push(request);
+    }
+    Ok(owned)
+}
+
+/// Decodes the private coarse GUI mesh family. Callers may use this only once
+/// the owned GUI mesh pass is available; defining the transport does not arm a
+/// route or expose a backend capability.
+pub(crate) unsafe fn decode_gui_mesh_batches(
+    raw: FfiSlice<FfiGuiMeshBatchRequest>,
+    gui_width: i32,
+    gui_height: i32,
+) -> GalResult<Vec<GuiMeshBatchRequest>> {
+    let batches = read_slice(raw, true, "GUI mesh batch requests")?;
+    if batches.len() > GUI_MESH_MAX_BATCHES {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            format!(
+                "GUI mesh batch count {} exceeds max {}",
+                batches.len(),
+                GUI_MESH_MAX_BATCHES
+            ),
+        ));
+    }
+    let mut owned = Vec::with_capacity(batches.len());
+    for batch in batches {
+        validate_item_size::<FfiGuiMeshBatchRequest>(batch.byte_size, "GUI mesh batch")?;
+        if batch.reserved0 != 0 || batch.gui_width != gui_width || batch.gui_height != gui_height {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                "GUI mesh batch reserved fields and frame GUI extent must match",
+            ));
+        }
+        let material_mode = match batch.material_mode {
+            1 => GuiMeshMaterialMode::Opaque,
+            2 => GuiMeshMaterialMode::Cutout,
+            other => {
+                return Err(GalError::ffi(
+                    StatusCode::UnknownEnum,
+                    format!("unknown GUI mesh material mode {other}"),
+                ));
+            }
+        };
+        let lighting_mode = match batch.lighting_mode {
+            1 => GuiMeshLightingMode::Flat,
+            2 => GuiMeshLightingMode::Block,
+            other => {
+                return Err(GalError::ffi(
+                    StatusCode::UnknownEnum,
+                    format!("unknown GUI mesh lighting mode {other}"),
+                ));
+            }
+        };
+        let vertices = read_slice(batch.vertices, true, "GUI mesh vertices")?;
+        let indices = read_slice(batch.indices, true, "GUI mesh indices")?;
+        if vertices.len() > GUI_MESH_MAX_VERTICES || indices.len() > GUI_MESH_MAX_INDICES {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                "GUI mesh payload exceeds its bounded vertex or index capacity",
+            ));
+        }
+        let vertices = vertices
+            .iter()
+            .map(|vertex| GuiMeshVertex {
+                position: vertex.position,
+                atlas_uv: vertex.atlas_uv,
+                local_uv: vertex.local_uv,
+                color_argb: vertex.color_argb,
+                normal_packed: vertex.normal_packed,
+            })
+            .collect();
+        let request = GuiMeshBatchRequest {
+            stratum: batch.stratum,
+            layer_index: batch.layer_index,
+            sequence: batch.sequence,
+            asset_id: batch.asset_id,
+            material_mode,
+            lighting_mode,
+            alpha_cutoff: batch.alpha_cutoff,
+            model_transform: batch.model_transform,
+            gui_pose: batch.gui_pose,
+            bounds: [batch.left, batch.top, batch.right, batch.bottom],
+            gui_extent: [
+                u32::try_from(batch.gui_width).map_err(|_| {
+                    GalError::ffi(
+                        StatusCode::InvalidArgument,
+                        "GUI mesh width must be positive",
+                    )
+                })?,
+                u32::try_from(batch.gui_height).map_err(|_| {
+                    GalError::ffi(
+                        StatusCode::InvalidArgument,
+                        "GUI mesh height must be positive",
+                    )
+                })?,
+            ],
+            render_extent: [
+                u32::try_from(batch.render_width).map_err(|_| {
+                    GalError::ffi(
+                        StatusCode::InvalidArgument,
+                        "GUI mesh render width must be positive",
+                    )
+                })?,
+                u32::try_from(batch.render_height).map_err(|_| {
+                    GalError::ffi(
+                        StatusCode::InvalidArgument,
+                        "GUI mesh render height must be positive",
+                    )
+                })?,
+            ],
+            guard_pixels: batch.guard_pixels,
+            vertices,
+            indices: indices.to_vec(),
+        };
+        validate_gui_mesh_batch(&request)?;
+        owned.push(request);
+    }
+    validate_gui_mesh_batches(&owned)?;
+    Ok(owned)
+}
+
+fn validate_gui_request_sequences(
+    sprites: &[GuiSpriteRequest],
+    affine_quads: &[GuiAffineQuadRequest],
+    mesh_batches: &[GuiMeshBatchRequest],
+) -> GalResult<()> {
+    let mut sequences = Vec::with_capacity(sprites.len() + affine_quads.len());
+    sequences.extend(sprites.iter().map(|request| request.sequence));
+    sequences.extend(affine_quads.iter().map(|request| request.sequence));
+    // Layers intentionally share their item's sequence. The mesh frontend
+    // validates contiguous layer indices and treats them as one ordered item.
+    let mesh_sequences = mesh_batches
+        .iter()
+        .map(|request| request.sequence)
+        .collect::<std::collections::BTreeSet<_>>();
+    sequences.extend(mesh_sequences);
+    if sequences.iter().any(|sequence| *sequence == 0) {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            "GUI requests require non-zero scheduler sequences",
+        ));
+    }
+    sequences.sort_unstable();
+    if sequences.windows(2).any(|pair| pair[0] == pair[1]) {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            "GUI request scheduler sequences must be unique within one frame",
+        ));
+    }
+    Ok(())
 }
 
 pub(crate) unsafe fn decode_gui_asset_update(
@@ -139,6 +396,76 @@ pub(crate) unsafe fn decode_gui_asset_update(
     Ok((request.generation, owned))
 }
 
+pub(crate) unsafe fn decode_gui_raw_image_update(
+    request: *const FfiGuiRawImageUpdateRequest,
+    capabilities: BackendCapabilities,
+) -> GalResult<(u64, Vec<GuiRawImageAssetPayload>)> {
+    let request = read_struct(request, "raw GUI image update request")?;
+    validate_header::<FfiGuiRawImageUpdateRequest>(request.header)?;
+    reject_unknown_feature_bits(request.negotiated_feature_bits)?;
+    let supported = capability_feature_bits(capabilities);
+    if request.negotiated_feature_bits & !supported != 0 {
+        return Err(GalError::unsupported_feature(format!(
+            "requested unsupported raw GUI image feature bits 0x{:x}",
+            request.negotiated_feature_bits & !supported
+        )));
+    }
+    if request.generation == 0 {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            "raw GUI image generation must be non-zero",
+        ));
+    }
+    let assets = read_limited_slice(request.assets, true, "raw GUI image payloads")?;
+    let mut seen = BTreeMap::new();
+    let mut owned = Vec::with_capacity(assets.len());
+    for asset in assets {
+        validate_item_size::<FfiGuiRawImageAssetPayload>(asset.byte_size, "raw GUI image payload")?;
+        if asset.asset_id == 0 || seen.insert(asset.asset_id, ()).is_some() {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                "raw GUI image asset ids must be unique and non-zero",
+            ));
+        }
+        let format = match asset.format {
+            1 => GuiRawImageFormat::Alpha8,
+            2 => GuiRawImageFormat::Rgba8,
+            other => {
+                return Err(GalError::ffi(
+                    StatusCode::UnknownEnum,
+                    format!("unknown raw GUI image format {other}"),
+                ));
+            }
+        };
+        let width = u32::try_from(asset.width).map_err(|_| {
+            GalError::ffi(
+                StatusCode::InvalidArgument,
+                "raw GUI image width must be positive",
+            )
+        })?;
+        let height = u32::try_from(asset.height).map_err(|_| {
+            GalError::ffi(
+                StatusCode::InvalidArgument,
+                "raw GUI image height must be positive",
+            )
+        })?;
+        let pixels = read_bounded_bytes(
+            asset.pixels,
+            true,
+            FFI_MAX_GUI_ASSET_BYTES,
+            "raw GUI image pixels",
+        )?;
+        owned.push(GuiRawImageAssetPayload {
+            asset_id: asset.asset_id,
+            format,
+            width,
+            height,
+            pixels,
+        });
+    }
+    Ok((request.generation, owned))
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_vulkanic_gal_gui_submit_frame(
     context_id: u64,
@@ -172,18 +499,23 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_gui_submit_frame(
         context.ffi_output_bytes = context
             .ffi_output_bytes
             .saturating_add(size_of::<FfiGuiFrameSubmitResult>() as u64);
-        let result = decode_gui_frame_submit(request, context.gal.capabilities()).and_then(
-            |(generation, frame_target, sprites)| {
-                let stats = context.gui_frontend.submit_frame(
-                    &mut context.gal,
-                    generation,
-                    frame_target,
-                    sprites,
-                )?;
-                destroy_stale_frame_targets(context)?;
-                Ok(stats)
-            },
-        );
+        let result = decode_gui_frame_submit_with_mesh(request, context.gal.capabilities())
+            .and_then(
+                |(generation, frame_target, sprites, affine_quads, mesh_batches)| {
+                    let stats = context
+                        .gui_frontend
+                        .submit_frame_with_affine_quads_and_mesh_batches(
+                            &mut context.gal,
+                            generation,
+                            frame_target,
+                            sprites,
+                            affine_quads,
+                            mesh_batches,
+                        )?;
+                    destroy_stale_frame_targets(context)?;
+                    Ok(stats)
+                },
+            );
         match result {
             Ok(stats) => {
                 let value = gui_frame_result_ok(context, stats);
@@ -238,6 +570,52 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_gui_update_assets(
                 context
                     .gui_frontend
                     .apply_asset_update(&mut context.gal, generation, assets)
+            },
+        );
+        match result {
+            Ok(()) => {
+                write_status_out(status_out, status_ok(context));
+                StatusCode::Ok as i32
+            }
+            Err(error) => {
+                set_last_error(context, &error);
+                write_status_out(status_out, status_error(Some(context), &error));
+                error.code as i32
+            }
+        }
+    })
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_vulkanic_gal_gui_update_raw_images(
+    context_id: u64,
+    request: *const FfiGuiRawImageUpdateRequest,
+    status_out: *mut FfiStatusResult,
+) -> i32 {
+    with_registry_mut(|registry| {
+        let Some(context) = registry.contexts.get_mut(&context_id) else {
+            let error = GalError::ffi(
+                StatusCode::StaleHandle,
+                format!("unknown context id {context_id}"),
+            );
+            write_status_out(status_out, status_result_from_error(&error));
+            return error.code as i32;
+        };
+        let input_bytes = if request.is_null() {
+            0
+        } else {
+            input_bytes_for_gui_raw_image_update(&*request)
+        };
+        context.ffi_calls += 1;
+        context.ffi_input_bytes = context.ffi_input_bytes.saturating_add(input_bytes);
+        context.ffi_output_bytes = context
+            .ffi_output_bytes
+            .saturating_add(size_of::<FfiStatusResult>() as u64);
+        let result = decode_gui_raw_image_update(request, context.gal.capabilities()).and_then(
+            |(generation, assets)| {
+                context
+                    .gui_frontend
+                    .apply_raw_image_update(&mut context.gal, generation, assets)
             },
         );
         match result {

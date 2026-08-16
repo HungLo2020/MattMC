@@ -9,6 +9,9 @@ pub mod ffi;
 pub mod frame;
 pub mod gal;
 pub mod gui_frontend;
+/// Backend-neutral GUI mesh semantics. This is not an FFI-admitted route
+/// until the owned offscreen renderer consumes it.
+pub mod gui_mesh_frontend;
 pub mod handles;
 pub mod metrics;
 pub mod resources;

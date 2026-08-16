@@ -2,6 +2,7 @@ package com.seibel.distanthorizons.core.dataObjects.render.bufferBuilding;
 
 import com.seibel.distanthorizons.api.enums.rendering.EDhApiBlockMaterial;
 import com.seibel.distanthorizons.core.config.Config;
+import com.seibel.distanthorizons.core.dataObjects.render.ColumnRenderSource;
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.enums.EDhDirection;
 import com.seibel.distanthorizons.core.level.IDhClientLevel;
@@ -15,6 +16,9 @@ import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRen
 import com.seibel.distanthorizons.coreapi.util.MathUtil;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import org.jetbrains.annotations.NotNull;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class ColumnBox
 {
@@ -36,7 +40,30 @@ public class ColumnBox
 			LodQuadBuilder builder, PhantomArrayListCheckout phantomArrayCheckout, IDhClientLevel clientLevel,
 			short width, short yHeight,
 			short minX, short minY, short minZ,
-			int color, byte irisBlockMaterialId, byte skyLight, byte blockLight,
+			int color, byte irisBlockMaterialId, int semanticMaterialId, byte semanticVariantState,
+			long semanticVariantPosition, byte skyLight, byte blockLight,
+			long topData, long bottomData, ColumnArrayView[] adjData, boolean[] isAdjDataSameDetailLevel)
+	{
+		addBoxQuadsToBuilder(
+			builder, phantomArrayCheckout, clientLevel, width, yHeight, minX, minY, minZ,
+			color, irisBlockMaterialId, semanticMaterialId, semanticVariantState, semanticVariantPosition,
+			List.of(), skyLight, blockLight, topData, bottomData, adjData, isAdjDataSameDetailLevel
+		);
+	}
+
+	/**
+	 * Emits the legacy box geometry while preserving source-material intervals
+	 * for Rust's exact-atlas semantic sidecar.  Only the Rust whole-frame path
+	 * supplies spans; Java's established color-only path continues through the
+	 * overload above unchanged.
+	 */
+	public static void addBoxQuadsToBuilder(
+			LodQuadBuilder builder, PhantomArrayListCheckout phantomArrayCheckout, IDhClientLevel clientLevel,
+			short width, short yHeight,
+			short minX, short minY, short minZ,
+			int color, byte irisBlockMaterialId, int semanticMaterialId, byte semanticVariantState,
+			long semanticVariantPosition, List<ColumnRenderSource.SemanticMaterialSpan> semanticMaterialSpans,
+			byte skyLight, byte blockLight,
 			long topData, long bottomData, ColumnArrayView[] adjData, boolean[] isAdjDataSameDetailLevel)
 	{
 		//================//
@@ -107,7 +134,10 @@ public class ColumnBox
 						|| isWaterSurfaceOccludingMaterial(RenderDataPointUtil.getBlockMaterialId(topData)));
 			if (!skipTop)
 			{
-				builder.addQuadUp(minX, maxY, minZ, width, width, ColorUtil.applyShade(color, MC_RENDER.getShade(EDhDirection.UP)), irisBlockMaterialId, skyLightTop, blockLight);
+				SemanticFaceMaterial faceMaterial = semanticMaterialAt(
+					semanticMaterialSpans, maxY - 1, semanticMaterialId, semanticVariantState, semanticVariantPosition
+				);
+				builder.addQuadUp(minX, maxY, minZ, width, width, ColorUtil.applyShade(color, MC_RENDER.getShade(EDhDirection.UP)), irisBlockMaterialId, skyLightTop, blockLight, faceMaterial.materialId(), faceMaterial.variantState(), faceMaterial.variantPosition());
 			}
 		}
 		
@@ -118,7 +148,10 @@ public class ColumnBox
 					&& !isBottomTransparent;
 			if (!skipBottom)
 			{
-				builder.addQuadDown(minX, minY, minZ, width, width, ColorUtil.applyShade(color, MC_RENDER.getShade(EDhDirection.DOWN)), irisBlockMaterialId, skyLightBot, blockLight);
+				SemanticFaceMaterial faceMaterial = semanticMaterialAt(
+					semanticMaterialSpans, minY, semanticMaterialId, semanticVariantState, semanticVariantPosition
+				);
+				builder.addQuadDown(minX, minY, minZ, width, width, ColorUtil.applyShade(color, MC_RENDER.getShade(EDhDirection.DOWN)), irisBlockMaterialId, skyLightBot, blockLight, faceMaterial.materialId(), faceMaterial.variantState(), faceMaterial.variantPosition());
 			}
 		}
 		
@@ -138,11 +171,12 @@ public class ColumnBox
 				// Add an adjacent face if this is opaque face or transparent over the void.
 				if (!isTransparent || overVoid)
 				{
-					builder.addQuadAdj(
+					addVerticalFaces(
+						builder,
 							EDhDirection.NORTH, 
 							minX, minY, minZ, 
 							width, yHeight, 
-							color, irisBlockMaterialId, LodUtil.MAX_MC_LIGHT, blockLight);
+							color, irisBlockMaterialId, LodUtil.MAX_MC_LIGHT, blockLight, semanticMaterialId, semanticVariantState, semanticVariantPosition, semanticMaterialSpans);
 				}
 			}
 			else
@@ -151,7 +185,7 @@ public class ColumnBox
 						builder, phantomArrayCheckout, 
 						adjCol, adjSameDetailLevel, caveCullingMaxY, EDhDirection.NORTH, 
 						minX, minY, minZ, width, yHeight,
-						color, irisBlockMaterialId, blockLight);
+					color, irisBlockMaterialId, semanticMaterialId, semanticVariantState, semanticVariantPosition, semanticMaterialSpans, blockLight);
 			}
 		}
 		
@@ -163,11 +197,12 @@ public class ColumnBox
 			{
 				if (!isTransparent || overVoid)
 				{
-					builder.addQuadAdj(
+					addVerticalFaces(
+						builder,
 							EDhDirection.SOUTH, 
 							minX, minY, maxZ, 
 							width, yHeight, 
-							color, irisBlockMaterialId, LodUtil.MAX_MC_LIGHT, blockLight);
+							color, irisBlockMaterialId, LodUtil.MAX_MC_LIGHT, blockLight, semanticMaterialId, semanticVariantState, semanticVariantPosition, semanticMaterialSpans);
 				}
 			}
 			else
@@ -176,7 +211,7 @@ public class ColumnBox
 						builder, phantomArrayCheckout,
 						adjCol, adjSameDetailLevel, caveCullingMaxY, EDhDirection.SOUTH,
 						minX, minY, maxZ, width, yHeight,
-						color, irisBlockMaterialId, blockLight);
+					color, irisBlockMaterialId, semanticMaterialId, semanticVariantState, semanticVariantPosition, semanticMaterialSpans, blockLight);
 			}
 		}
 		
@@ -188,11 +223,12 @@ public class ColumnBox
 			{
 				if (!isTransparent || overVoid)
 				{
-					builder.addQuadAdj(
+					addVerticalFaces(
+						builder,
 							EDhDirection.WEST, 
 							minX, minY, minZ, 
 							width, yHeight, 
-							color, irisBlockMaterialId, LodUtil.MAX_MC_LIGHT, blockLight);
+							color, irisBlockMaterialId, LodUtil.MAX_MC_LIGHT, blockLight, semanticMaterialId, semanticVariantState, semanticVariantPosition, semanticMaterialSpans);
 				}
 			}
 			else
@@ -201,7 +237,7 @@ public class ColumnBox
 						builder, phantomArrayCheckout,
 						adjCol, adjSameDetailLevel, caveCullingMaxY, EDhDirection.WEST, 
 						minX, minY, minZ, width, yHeight,
-						color, irisBlockMaterialId, blockLight);
+					color, irisBlockMaterialId, semanticMaterialId, semanticVariantState, semanticVariantPosition, semanticMaterialSpans, blockLight);
 			}
 		}
 		
@@ -213,11 +249,12 @@ public class ColumnBox
 			{
 				if (!isTransparent || overVoid)
 				{
-					builder.addQuadAdj(
+					addVerticalFaces(
+						builder,
 							EDhDirection.EAST, 
 							maxX, minY, minZ, 
 							width, yHeight, 
-							color, irisBlockMaterialId, LodUtil.MAX_MC_LIGHT, blockLight);
+							color, irisBlockMaterialId, LodUtil.MAX_MC_LIGHT, blockLight, semanticMaterialId, semanticVariantState, semanticVariantPosition, semanticMaterialSpans);
 				}
 			}
 			else
@@ -226,7 +263,7 @@ public class ColumnBox
 						builder, phantomArrayCheckout,
 						adjCol, adjSameDetailLevel, caveCullingMaxY, EDhDirection.EAST, 
 						maxX, minY, minZ, width, yHeight,
-						color, irisBlockMaterialId, blockLight);
+					color, irisBlockMaterialId, semanticMaterialId, semanticVariantState, semanticVariantPosition, semanticMaterialSpans, blockLight);
 			}
 		}
 	}
@@ -234,8 +271,10 @@ public class ColumnBox
 	private static void makeAdjVerticalQuad(
 		LodQuadBuilder builder, PhantomArrayListCheckout phantomArrayCheckout,
 		@NotNull ColumnArrayView adjColumnView, boolean adjacentIsSameDetailLevel, int caveCullingMaxY, EDhDirection direction,
-		short x, short yMin, short z, short horizontalWidth, short ySize,
-		int color, byte irisBlockMaterialId, byte blockLight)
+			short x, short yMin, short z, short horizontalWidth, short ySize,
+			int color, byte irisBlockMaterialId, int semanticMaterialId, byte semanticVariantState,
+			long semanticVariantPosition, List<ColumnRenderSource.SemanticMaterialSpan> semanticMaterialSpans,
+			byte blockLight)
 	{
 		// pooled arrays
 		LongArrayList segments = phantomArrayCheckout.getLongArray(0, 0);
@@ -253,7 +292,7 @@ public class ColumnBox
 		if (adjColumnView.size == 0
 			|| RenderDataPointUtil.hasZeroHeight(adjColumnView.get(0)))
 		{
-			builder.addQuadAdj(direction, x, yMin, z, horizontalWidth, ySize, color, irisBlockMaterialId, LodUtil.MAX_MC_LIGHT, blockLight);
+			addVerticalFaces(builder, direction, x, yMin, z, horizontalWidth, ySize, color, irisBlockMaterialId, LodUtil.MAX_MC_LIGHT, blockLight, semanticMaterialId, semanticVariantState, semanticVariantPosition, semanticMaterialSpans);
 			return;
 		}
 		
@@ -348,7 +387,7 @@ public class ColumnBox
 			tryAddVerticalFaceWithSkyLightToBuilder(
 				builder, direction,
 				x, z, horizontalWidth,
-				color, irisBlockMaterialId, blockLight,
+				color, irisBlockMaterialId, semanticMaterialId, semanticVariantState, semanticVariantPosition, semanticMaterialSpans, blockLight,
 				YSegmentUtil.getSkyLight(segment), inputTransparent, YSegmentUtil.getEndY(segment), YSegmentUtil.getStartY(segment)
 			);
 		}
@@ -411,7 +450,9 @@ public class ColumnBox
 	private static void tryAddVerticalFaceWithSkyLightToBuilder(
 			LodQuadBuilder builder, EDhDirection direction,
 			short x, short z, short horizontalWidth,
-			int color, byte irisBlockMaterialId, byte blockLight,
+			int color, byte irisBlockMaterialId, int semanticMaterialId, byte semanticVariantState,
+			long semanticVariantPosition, List<ColumnRenderSource.SemanticMaterialSpan> semanticMaterialSpans,
+			byte blockLight,
 			byte lastSkyLight, boolean inputTransparent, int quadTopY, int quadBottomY
 			)
 	{
@@ -437,12 +478,87 @@ public class ColumnBox
 			return;
 		}
 		
-		builder.addQuadAdj(
-				direction, 
-				x, (short) quadBottomY, z, 
-				horizontalWidth, height, 
-				color, irisBlockMaterialId, lastSkyLight, blockLight);
+		addVerticalFaces(
+			builder, direction, x, (short) quadBottomY, z, horizontalWidth, height,
+			color, irisBlockMaterialId, lastSkyLight, blockLight, semanticMaterialId,
+			semanticVariantState, semanticVariantPosition, semanticMaterialSpans
+		);
 	}
+
+	private static SemanticFaceMaterial semanticMaterialAt(
+		List<ColumnRenderSource.SemanticMaterialSpan> spans, int y, int fallbackMaterialId,
+		byte fallbackVariantState, long fallbackVariantPosition
+	)
+	{
+		for (ColumnRenderSource.SemanticMaterialSpan span : spans)
+		{
+			if (span.minY() <= y && y < span.maxY())
+			{
+				return new SemanticFaceMaterial(span.materialId(), span.variantState(), span.variantPosition());
+			}
+		}
+		return new SemanticFaceMaterial(fallbackMaterialId, fallbackVariantState, fallbackVariantPosition);
+	}
+
+	private static void addVerticalFaces(
+		LodQuadBuilder builder, EDhDirection direction, short x, short yMin, short z,
+		short horizontalWidth, short ySize, int color, byte irisBlockMaterialId, byte skyLight,
+		byte blockLight, int fallbackMaterialId, byte fallbackVariantState,
+		long fallbackVariantPosition, List<ColumnRenderSource.SemanticMaterialSpan> spans
+	)
+	{
+		for (SemanticFaceSegment segment : semanticVerticalFaceSegments(
+			yMin, ySize, fallbackMaterialId, fallbackVariantState, fallbackVariantPosition, spans
+		))
+		{
+			builder.addQuadAdj(
+				direction, x, (short) segment.minY(), z, horizontalWidth, (short) segment.height(),
+				color, irisBlockMaterialId, skyLight, blockLight, segment.materialId(),
+				segment.variantState(), segment.variantPosition()
+			);
+		}
+	}
+
+	/** Pure semantic splitter used before any legacy vertex bytes are written. */
+	static List<SemanticFaceSegment> semanticVerticalFaceSegments(
+		short minY, short ySize, int fallbackMaterialId, byte fallbackVariantState,
+		long fallbackVariantPosition, List<ColumnRenderSource.SemanticMaterialSpan> spans
+	)
+	{
+		int top = minY + ySize;
+		int cursor = minY;
+		List<SemanticFaceSegment> segments = new ArrayList<>();
+		for (ColumnRenderSource.SemanticMaterialSpan span : spans)
+		{
+			int start = Math.max(cursor, span.minY());
+			int end = Math.min(top, span.maxY());
+			if (end <= start)
+			{
+				continue;
+			}
+			if (cursor < start)
+			{
+				segments.add(new SemanticFaceSegment(
+					cursor, start - cursor, fallbackMaterialId, fallbackVariantState, fallbackVariantPosition
+				));
+			}
+			segments.add(new SemanticFaceSegment(
+				start, end - start, span.materialId(), span.variantState(), span.variantPosition()
+			));
+			cursor = end;
+		}
+		if (cursor < top)
+		{
+			segments.add(new SemanticFaceSegment(
+				cursor, top - cursor, fallbackMaterialId, fallbackVariantState, fallbackVariantPosition
+			));
+		}
+		return List.copyOf(segments);
+	}
+
+	private record SemanticFaceMaterial(int materialId, byte variantState, long variantPosition) { }
+
+	record SemanticFaceSegment(int minY, int height, int materialId, byte variantState, long variantPosition) { }
 
 	private static boolean isTransparent(int color, byte materialId, boolean transparencyEnabled)
 	{
@@ -460,12 +576,17 @@ public class ColumnBox
 
 	private static boolean isTransparentMaterial(int materialId)
 	{
-		return isWaterMaterial(materialId);
+		return isWaterMaterial(materialId) || isLeavesMaterial(materialId);
 	}
 
 	private static boolean isWaterMaterial(int materialId)
 	{
 		return materialId == EDhApiBlockMaterial.WATER.index;
+	}
+
+	private static boolean isLeavesMaterial(int materialId)
+	{
+		return materialId == EDhApiBlockMaterial.LEAVES.index;
 	}
 
 	private static boolean isWaterSurfaceOccludingMaterial(int materialId)

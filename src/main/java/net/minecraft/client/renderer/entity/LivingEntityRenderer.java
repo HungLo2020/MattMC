@@ -9,12 +9,22 @@ import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.EntityModel;
+import net.minecraft.client.model.ChickenModel;
+import net.minecraft.client.model.CowModel;
+import net.minecraft.client.model.PigModel;
+import net.minecraft.client.model.RabbitModel;
+import net.minecraft.client.model.ZombieModel;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.layers.HumanoidArmorLayer;
 import net.minecraft.client.renderer.entity.layers.RenderLayer;
 import net.minecraft.client.renderer.entity.state.HitboxRenderState;
+import net.minecraft.client.renderer.entity.state.ChickenRenderState;
+import net.minecraft.client.renderer.entity.state.CowRenderState;
+import net.minecraft.client.renderer.entity.state.PigRenderState;
+import net.minecraft.client.renderer.entity.state.RabbitRenderState;
+import net.minecraft.client.renderer.entity.state.ZombieRenderState;
 import net.minecraft.client.renderer.entity.state.LivingEntityRenderState;
 import net.minecraft.client.renderer.item.ItemModelResolver;
 import net.minecraft.client.renderer.state.CameraRenderState;
@@ -98,9 +108,104 @@ public abstract class LivingEntityRenderer<T extends LivingEntity, S extends Liv
 			int i = getOverlayCoords(livingEntityRenderState, this.getWhiteOverlayProgress(livingEntityRenderState));
 			int j = bl2 ? 654311423 : -1;
 			int k = ARGB.multiply(j, this.getModelTint(livingEntityRenderState));
-			submitNodeCollector.submitModel(
-				this.model, livingEntityRenderState, poseStack, renderType, livingEntityRenderState.lightCoords, i, k, null, livingEntityRenderState.outlineColor, null
-			);
+			ResourceLocation textureIdentity = this.getTextureLocation(livingEntityRenderState);
+			ResourceLocation entityIdentity = net.vulkanic.world.RustGalWorldPrimitiveRenderer.entityIdentity(livingEntityRenderState);
+			boolean rustLivingModelEligible = entityIdentity != null && (this.model.getClass() == ChickenModel.class
+				&& livingEntityRenderState instanceof ChickenRenderState chickenRenderState
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaChickenModelMeshEligible(
+					this.model,
+					chickenRenderState,
+					renderType,
+					textureIdentity,
+					i,
+					livingEntityRenderState.outlineColor,
+					bl,
+					bl2,
+					livingEntityRenderState.appearsGlowing()
+				)
+				|| this.model instanceof CowModel
+				&& livingEntityRenderState instanceof CowRenderState cowRenderState
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaCowModelMeshEligible(
+					this.model,
+					cowRenderState,
+					renderType,
+					textureIdentity,
+					i,
+					livingEntityRenderState.outlineColor,
+					bl,
+					bl2,
+					livingEntityRenderState.appearsGlowing()
+				)
+				|| this.model != null
+					&& this.model.getClass() == PigModel.class
+					&& livingEntityRenderState instanceof PigRenderState pigRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaPigModelMeshEligible(
+						this.model,
+						pigRenderState,
+						renderType,
+						textureIdentity,
+						i,
+						livingEntityRenderState.outlineColor,
+						bl,
+						bl2,
+						livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == ZombieModel.class
+					&& livingEntityRenderState instanceof ZombieRenderState zombieRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaZombieModelMeshEligible(
+						this.model,
+						zombieRenderState,
+						renderType,
+						textureIdentity,
+						i,
+						livingEntityRenderState.outlineColor,
+						bl,
+						bl2,
+						livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == RabbitModel.class
+					&& livingEntityRenderState instanceof RabbitRenderState rabbitRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaRabbitModelMeshEligible(
+						this.model,
+						rabbitRenderState,
+						renderType,
+						textureIdentity,
+						i,
+						livingEntityRenderState.outlineColor,
+						bl,
+						bl2,
+						livingEntityRenderState.appearsGlowing()
+					));
+			var rustLivingModelRoute = net.vulkanic.world.WorldRenderRoutePolicy.currentModelMeshRoute(rustLivingModelEligible);
+			boolean semanticSubmission = EntityRenderDispatcher.isSemanticSubmission();
+			if (rustLivingModelRoute.usesRustWholeFrameVulkan() && !semanticSubmission) {
+				if (!net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMesh(
+					this.model, livingEntityRenderState, poseStack.last(), renderType, textureIdentity, entityIdentity,
+					livingEntityRenderState.lightCoords, i, k
+				)) {
+					throw new IllegalStateException("Rust whole-frame living-model route selected without a copied indexed mesh request");
+				}
+				net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
+					"rust-vulkan-whole-frame", textureIdentity, this.model.getClass().getName(), livingEntityRenderState.entityId, true, true, false
+				);
+			} else {
+				if (rustLivingModelEligible && !semanticSubmission) {
+					net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
+						rustLivingModelRoute == net.vulkanic.world.WorldRenderRoutePolicy.Route.DISABLED ? "disabled" : "java-legacy",
+						textureIdentity,
+						this.model.getClass().getName(),
+						livingEntityRenderState.entityId,
+						false,
+						false,
+						rustLivingModelRoute.usesJavaCompatibility()
+					);
+				}
+				submitNodeCollector.submitModel(
+					this.model, livingEntityRenderState, poseStack, renderType, livingEntityRenderState.lightCoords, i, k, null, livingEntityRenderState.outlineColor, null
+				);
+			}
 		}
 
 		if (this.shouldRenderLayers(livingEntityRenderState) && !this.layers.isEmpty()) {

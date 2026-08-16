@@ -154,6 +154,15 @@ impl VulkanBackend {
         })
     }
 
+    #[cfg(test)]
+    pub(in crate::render::vulkanic) fn new_windowed_for_test(
+        label: &str,
+        surface_owner: &dyn SurfaceOwner,
+        surface_desc: FrameSurfaceDesc,
+    ) -> GalResult<Self> {
+        Self::new_windowed(label, surface_owner, surface_desc)
+    }
+
     pub(in crate::render::vulkanic) fn new_native_windowed(
         label: &str,
         platform: u32,
@@ -184,7 +193,7 @@ impl VulkanBackend {
     }
 
     #[cfg(test)]
-    pub(super) fn clear_acquired_frame_for_test(
+    pub(in crate::render::vulkanic) fn clear_acquired_frame_for_test(
         &mut self,
         frame: crate::render::vulkanic::frame::FrameId,
         color: [f32; 4],
@@ -452,6 +461,163 @@ impl Drop for VulkanBackend {
         }
         self.objects.destroy_all();
     }
+}
+
+#[cfg(all(test, target_os = "linux"))]
+pub(in crate::render::vulkanic) struct WinitTestWindow {
+    _window: winit::window::Window,
+    raw_display: raw_window_handle::RawDisplayHandle,
+    raw_window: raw_window_handle::RawWindowHandle,
+    stable_window_id: u64,
+}
+
+#[cfg(all(test, target_os = "linux"))]
+impl SurfaceOwner for WinitTestWindow {
+    fn required_instance_extensions(&self) -> Vec<&'static std::ffi::CStr> {
+        match self.raw_display {
+            raw_window_handle::RawDisplayHandle::Xlib(_) => {
+                vec![ash::khr::surface::NAME, ash::khr::xlib_surface::NAME]
+            }
+            raw_window_handle::RawDisplayHandle::Xcb(_) => {
+                vec![ash::khr::surface::NAME, ash::khr::xcb_surface::NAME]
+            }
+            raw_window_handle::RawDisplayHandle::Wayland(_) => {
+                vec![ash::khr::surface::NAME, ash::khr::wayland_surface::NAME]
+            }
+            _ => vec![ash::khr::surface::NAME],
+        }
+    }
+
+    fn create_surface(
+        &self,
+        entry: &ash::Entry,
+        instance: &ash::Instance,
+    ) -> GalResult<ash::vk::SurfaceKHR> {
+        match (self.raw_display, self.raw_window) {
+            (
+                raw_window_handle::RawDisplayHandle::Xlib(display),
+                raw_window_handle::RawWindowHandle::Xlib(window),
+            ) => {
+                let display = display.display.ok_or_else(|| {
+                    crate::render::vulkanic::error::GalError::backend(
+                        "winit Xlib display handle is empty",
+                    )
+                })?;
+                let loader = ash::khr::xlib_surface::Instance::new(entry, instance);
+                let info = ash::vk::XlibSurfaceCreateInfoKHR::default()
+                    .dpy(display.as_ptr().cast::<ash::vk::Display>())
+                    .window(window.window);
+                unsafe { loader.create_xlib_surface(&info, None) }.map_err(|error| {
+                    crate::render::vulkanic::error::GalError::backend(format!(
+                        "failed to create winit Xlib Vulkan surface: {error:?}"
+                    ))
+                })
+            }
+            (
+                raw_window_handle::RawDisplayHandle::Xcb(display),
+                raw_window_handle::RawWindowHandle::Xcb(window),
+            ) => {
+                let connection = display.connection.ok_or_else(|| {
+                    crate::render::vulkanic::error::GalError::backend(
+                        "winit XCB connection handle is empty",
+                    )
+                })?;
+                let loader = ash::khr::xcb_surface::Instance::new(entry, instance);
+                let info = ash::vk::XcbSurfaceCreateInfoKHR::default()
+                    .connection(connection.as_ptr().cast::<ash::vk::xcb_connection_t>())
+                    .window(window.window.get());
+                unsafe { loader.create_xcb_surface(&info, None) }.map_err(|error| {
+                    crate::render::vulkanic::error::GalError::backend(format!(
+                        "failed to create winit XCB Vulkan surface: {error:?}"
+                    ))
+                })
+            }
+            (
+                raw_window_handle::RawDisplayHandle::Wayland(display),
+                raw_window_handle::RawWindowHandle::Wayland(window),
+            ) => {
+                let loader = ash::khr::wayland_surface::Instance::new(entry, instance);
+                let info = ash::vk::WaylandSurfaceCreateInfoKHR::default()
+                    .display(display.display.as_ptr())
+                    .surface(window.surface.as_ptr());
+                unsafe { loader.create_wayland_surface(&info, None) }.map_err(|error| {
+                    crate::render::vulkanic::error::GalError::backend(format!(
+                        "failed to create winit Wayland Vulkan surface: {error:?}"
+                    ))
+                })
+            }
+            _ => Err(crate::render::vulkanic::error::GalError::backend(
+                "winit produced unsupported Linux window/display handle pair for Vulkan",
+            )),
+        }
+    }
+
+    fn stable_window_id(&self) -> u64 {
+        self.stable_window_id
+    }
+}
+
+#[cfg(all(test, target_os = "linux"))]
+pub(in crate::render::vulkanic) fn winit_event_loop() -> GalResult<winit::event_loop::EventLoop<()>>
+{
+    use winit::event_loop::EventLoop;
+
+    let mut builder = EventLoop::builder();
+    winit::platform::x11::EventLoopBuilderExtX11::with_any_thread(&mut builder, true);
+    winit::platform::wayland::EventLoopBuilderExtWayland::with_any_thread(&mut builder, true);
+    builder.build().map_err(|error| {
+        crate::render::vulkanic::error::GalError::backend(format!(
+            "failed to create winit event loop for windowed conformance: {error}"
+        ))
+    })
+}
+
+#[cfg(all(test, target_os = "linux"))]
+pub(in crate::render::vulkanic) fn winit_test_window(
+    event_loop: &winit::event_loop::EventLoop<()>,
+    width: u32,
+    height: u32,
+    stable_window_id: u64,
+) -> GalResult<WinitTestWindow> {
+    use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
+    use winit::dpi::PhysicalSize;
+    use winit::window::Window;
+
+    #[allow(deprecated)]
+    let window = event_loop
+        .create_window(
+            Window::default_attributes()
+                .with_title("MattMC VulkanicGAL windowed conformance")
+                .with_inner_size(PhysicalSize::new(width, height))
+                .with_visible(true),
+        )
+        .map_err(|error| {
+            crate::render::vulkanic::error::GalError::backend(format!(
+                "failed to create winit window for conformance: {error}"
+            ))
+        })?;
+    let raw_display = window
+        .display_handle()
+        .map_err(|error| {
+            crate::render::vulkanic::error::GalError::backend(format!(
+                "failed to read winit display handle: {error}"
+            ))
+        })?
+        .as_raw();
+    let raw_window = window
+        .window_handle()
+        .map_err(|error| {
+            crate::render::vulkanic::error::GalError::backend(format!(
+                "failed to read winit window handle: {error}"
+            ))
+        })?
+        .as_raw();
+    Ok(WinitTestWindow {
+        _window: window,
+        raw_display,
+        raw_window,
+        stable_window_id,
+    })
 }
 
 #[cfg(test)]
@@ -861,161 +1027,5 @@ mod tests {
             .retire_through_for_test(last)
             .expect("stress resources should retire cleanly");
         assert_eq!(24, retired.len());
-    }
-
-    #[cfg(target_os = "linux")]
-    struct WinitTestWindow {
-        _window: winit::window::Window,
-        raw_display: raw_window_handle::RawDisplayHandle,
-        raw_window: raw_window_handle::RawWindowHandle,
-        stable_window_id: u64,
-    }
-
-    #[cfg(target_os = "linux")]
-    impl SurfaceOwner for WinitTestWindow {
-        fn required_instance_extensions(&self) -> Vec<&'static std::ffi::CStr> {
-            match self.raw_display {
-                raw_window_handle::RawDisplayHandle::Xlib(_) => {
-                    vec![ash::khr::surface::NAME, ash::khr::xlib_surface::NAME]
-                }
-                raw_window_handle::RawDisplayHandle::Xcb(_) => {
-                    vec![ash::khr::surface::NAME, ash::khr::xcb_surface::NAME]
-                }
-                raw_window_handle::RawDisplayHandle::Wayland(_) => {
-                    vec![ash::khr::surface::NAME, ash::khr::wayland_surface::NAME]
-                }
-                _ => vec![ash::khr::surface::NAME],
-            }
-        }
-
-        fn create_surface(
-            &self,
-            entry: &ash::Entry,
-            instance: &ash::Instance,
-        ) -> GalResult<ash::vk::SurfaceKHR> {
-            match (self.raw_display, self.raw_window) {
-                (
-                    raw_window_handle::RawDisplayHandle::Xlib(display),
-                    raw_window_handle::RawWindowHandle::Xlib(window),
-                ) => {
-                    let display = display.display.ok_or_else(|| {
-                        crate::render::vulkanic::error::GalError::backend(
-                            "winit Xlib display handle is empty",
-                        )
-                    })?;
-                    let loader = ash::khr::xlib_surface::Instance::new(entry, instance);
-                    let info = ash::vk::XlibSurfaceCreateInfoKHR::default()
-                        .dpy(display.as_ptr().cast::<ash::vk::Display>())
-                        .window(window.window);
-                    unsafe { loader.create_xlib_surface(&info, None) }.map_err(|error| {
-                        crate::render::vulkanic::error::GalError::backend(format!(
-                            "failed to create winit Xlib Vulkan surface: {error:?}"
-                        ))
-                    })
-                }
-                (
-                    raw_window_handle::RawDisplayHandle::Xcb(display),
-                    raw_window_handle::RawWindowHandle::Xcb(window),
-                ) => {
-                    let connection = display.connection.ok_or_else(|| {
-                        crate::render::vulkanic::error::GalError::backend(
-                            "winit XCB connection handle is empty",
-                        )
-                    })?;
-                    let loader = ash::khr::xcb_surface::Instance::new(entry, instance);
-                    let info = ash::vk::XcbSurfaceCreateInfoKHR::default()
-                        .connection(connection.as_ptr().cast::<ash::vk::xcb_connection_t>())
-                        .window(window.window.get());
-                    unsafe { loader.create_xcb_surface(&info, None) }.map_err(|error| {
-                        crate::render::vulkanic::error::GalError::backend(format!(
-                            "failed to create winit XCB Vulkan surface: {error:?}"
-                        ))
-                    })
-                }
-                (
-                    raw_window_handle::RawDisplayHandle::Wayland(display),
-                    raw_window_handle::RawWindowHandle::Wayland(window),
-                ) => {
-                    let loader = ash::khr::wayland_surface::Instance::new(entry, instance);
-                    let info = ash::vk::WaylandSurfaceCreateInfoKHR::default()
-                        .display(display.display.as_ptr())
-                        .surface(window.surface.as_ptr());
-                    unsafe { loader.create_wayland_surface(&info, None) }.map_err(|error| {
-                        crate::render::vulkanic::error::GalError::backend(format!(
-                            "failed to create winit Wayland Vulkan surface: {error:?}"
-                        ))
-                    })
-                }
-                _ => Err(crate::render::vulkanic::error::GalError::backend(
-                    "winit produced unsupported Linux window/display handle pair for Vulkan",
-                )),
-            }
-        }
-
-        fn stable_window_id(&self) -> u64 {
-            self.stable_window_id
-        }
-    }
-
-    #[cfg(target_os = "linux")]
-    fn winit_event_loop() -> GalResult<winit::event_loop::EventLoop<()>> {
-        use winit::event_loop::EventLoop;
-
-        let mut builder = EventLoop::builder();
-        winit::platform::x11::EventLoopBuilderExtX11::with_any_thread(&mut builder, true);
-        winit::platform::wayland::EventLoopBuilderExtWayland::with_any_thread(&mut builder, true);
-        builder.build().map_err(|error| {
-            crate::render::vulkanic::error::GalError::backend(format!(
-                "failed to create winit event loop for windowed conformance: {error}"
-            ))
-        })
-    }
-
-    #[cfg(target_os = "linux")]
-    fn winit_test_window(
-        event_loop: &winit::event_loop::EventLoop<()>,
-        width: u32,
-        height: u32,
-        stable_window_id: u64,
-    ) -> GalResult<WinitTestWindow> {
-        use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
-        use winit::dpi::PhysicalSize;
-        use winit::window::Window;
-
-        #[allow(deprecated)]
-        let window = event_loop
-            .create_window(
-                Window::default_attributes()
-                    .with_title("MattMC VulkanicGAL windowed conformance")
-                    .with_inner_size(PhysicalSize::new(width, height))
-                    .with_visible(true),
-            )
-            .map_err(|error| {
-                crate::render::vulkanic::error::GalError::backend(format!(
-                    "failed to create winit window for conformance: {error}"
-                ))
-            })?;
-        let raw_display = window
-            .display_handle()
-            .map_err(|error| {
-                crate::render::vulkanic::error::GalError::backend(format!(
-                    "failed to read winit display handle: {error}"
-                ))
-            })?
-            .as_raw();
-        let raw_window = window
-            .window_handle()
-            .map_err(|error| {
-                crate::render::vulkanic::error::GalError::backend(format!(
-                    "failed to read winit window handle: {error}"
-                ))
-            })?
-            .as_raw();
-        Ok(WinitTestWindow {
-            _window: window,
-            raw_display,
-            raw_window,
-            stable_window_id,
-        })
     }
 }

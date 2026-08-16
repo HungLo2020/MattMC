@@ -2,19 +2,28 @@ package net.vulkanic.shaderpack;
 
 import net.irisshaders.iris.Iris;
 import net.irisshaders.iris.features.FeatureFlags;
+import net.irisshaders.iris.pipeline.WorldRenderingPhase;
 import net.irisshaders.iris.shaderpack.ShaderPack;
 import net.irisshaders.iris.shaderpack.IrisDefines;
+import net.irisshaders.iris.shaderpack.include.AbsolutePackPath;
 import net.irisshaders.iris.shaderpack.option.OptionSet;
+import net.irisshaders.iris.shaderpack.option.OptionType;
 import net.irisshaders.iris.shaderpack.option.values.OptionValues;
 import net.vulkanic.bridge.VulkanicGalBridge;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.Property;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
 import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.TreeMap;
@@ -30,8 +39,12 @@ public final class RustShaderPackSourceCollector {
 	public static final long MAX_ASSET_TOTAL_BYTES = 256L * 1024L * 1024L;
 	/** Reserved Rust-owned semantic source-config path. */
 	public static final String RUNTIME_OPTIONS_PATH = "mattmc/runtime-options.properties";
+	/** Reserved Rust-owned typed source-constant configuration path. */
+	public static final String RUNTIME_CONSTANTS_PATH = "mattmc/runtime-constants.properties";
 	/** Reserved Rust-owned semantic source-environment path. */
 	public static final String RUNTIME_ENVIRONMENT_PATH = "mattmc/runtime-environment.properties";
+	/** Reserved Rust-owned table of canonical Minecraft block-state identities. */
+	public static final String RUNTIME_BLOCK_STATE_IDENTITIES_PATH = "mattmc/runtime-block-states.properties";
 
 	private RustShaderPackSourceCollector() {
 	}
@@ -58,7 +71,22 @@ public final class RustShaderPackSourceCollector {
 				source = collectWithAssets(archive.getPath("/shaders"), packName, generation);
 			}
 		}
-		return withConfiguredSemanticSnapshots(source);
+		ShaderPack resolvedPack = Iris.getCurrentPack().orElseThrow(() ->
+			new IOException("configured shader pack disappeared during source collection"));
+		return withConfiguredSemanticSnapshots(withResolvedIrisSourceSnapshot(source, resolvedPack), resolvedPack);
+	}
+
+	/**
+	 * Returns the configured pack name only after Iris has completed its own
+	 * pack activation. This exposes configuration readiness only: callers use
+	 * it to defer one bounded semantic source collection until startup can
+	 * produce a complete immutable snapshot.
+	 */
+	public static Optional<String> activeConfiguredPackName() {
+		if (!Iris.getIrisConfig().areShadersEnabled() || Iris.getCurrentPack().isEmpty()) {
+			return Optional.empty();
+		}
+		return Iris.getIrisConfig().getShaderPackName().filter(name -> !name.isBlank());
 	}
 
 	public static SourceGeneration disabled(long generation) {
@@ -201,26 +229,142 @@ public final class RustShaderPackSourceCollector {
 	 * FFI; Rust receives one immutable, bounded properties payload alongside
 	 * the selected pack sources.
 	 */
-	private static SourceGeneration withConfiguredOptionSnapshot(SourceGeneration source) throws IOException {
-		ShaderPack pack = Iris.getCurrentPack().orElseThrow(() ->
-			new IOException("configured shader pack has no resolved option state"));
+	private static SourceGeneration withConfiguredOptionSnapshot(SourceGeneration source, ShaderPack pack) throws IOException {
 		OptionSet optionSet = pack.getShaderPackOptions().getOptionSet();
 		OptionValues values = pack.getShaderPackOptions().getOptionValues();
 		TreeMap<String, String> options = new TreeMap<>();
-		optionSet.getBooleanOptions().forEach((name, option) ->
-			options.put(name, values.getBooleanValueOrDefault(name) ? "1" : "0"));
+		TreeMap<String, String> constants = new TreeMap<>();
+		// Shader sources are copied from Iris's resolved include graph. Resolved
+		// string options are transported because a stage may use one without
+		// transitively including its declaration. Boolean defines are different:
+		// Iris discovers source-derived feature gates as BooleanOption entries too.
+		// Sending their defaults back as external definitions changes the source
+		// conditional graph, so only an explicit user boolean selection is sent.
+		// Typed GLSL consts remain separate from macro options.
+		optionSet.getBooleanOptions().forEach((name, option) -> {
+			if (!isShaderStageSelector(name)) {
+				var selected = values.getBooleanValue(name);
+				if (option.getOption().getType() == OptionType.CONST) {
+					if (selected != net.irisshaders.iris.helpers.OptionalBoolean.DEFAULT) {
+						constants.put(name, Boolean.toString(values.getBooleanValueOrDefault(name)));
+					}
+				} else if (selected != net.irisshaders.iris.helpers.OptionalBoolean.DEFAULT) {
+					putEnabledBooleanOption(options, name, values.getBooleanValueOrDefault(name));
+				}
+			}
+		});
 		optionSet.getStringOptions().forEach((name, option) ->
-			options.put(name, values.getStringValueOrDefault(name)));
-		return withRuntimeOptionSnapshot(source, options);
+			{
+				if (!isShaderStageSelector(name)) {
+					var selected = values.getStringValue(name);
+					String resolved = values.getStringValueOrDefault(name);
+					if (option.getOption().getType() == OptionType.CONST) {
+						selected.ifPresent(value -> constants.put(name, value));
+					} else {
+						options.put(name, resolved);
+					}
+				}
+			});
+		return withRuntimeConstantSnapshot(withRuntimeOptionSnapshot(source, options), constants);
 	}
 
-	private static SourceGeneration withConfiguredSemanticSnapshots(SourceGeneration source) throws IOException {
-		ShaderPack pack = Iris.getCurrentPack().orElseThrow(() ->
-			new IOException("configured shader pack has no resolved environment state"));
-		return withRuntimeEnvironmentSnapshot(
-			withConfiguredOptionSnapshot(source),
+	static boolean isShaderStageSelector(String name) {
+		return switch (Objects.requireNonNull(name, "name")) {
+			case "VERTEX_SHADER", "FRAGMENT_SHADER", "GEOMETRY_SHADER", "COMPUTE_SHADER" -> true;
+			default -> false;
+		};
+	}
+
+	static void putEnabledBooleanOption(Map<String, String> options, String name, boolean enabled) {
+		Objects.requireNonNull(options, "options");
+		Objects.requireNonNull(name, "name");
+		if (enabled) {
+			options.put(name, "1");
+		}
+	}
+
+	private static SourceGeneration withConfiguredSemanticSnapshots(SourceGeneration source, ShaderPack pack) throws IOException {
+		return withRuntimeBlockStateIdentitySnapshot(withRuntimeEnvironmentSnapshot(
+			withConfiguredOptionSnapshot(source, pack),
 			configuredEnvironmentDefines(pack)
+		));
+	}
+
+	/**
+	 * Replaces raw shader files with the configured include graph's immutable
+	 * source. This is a source/configuration snapshot only: it copies no Iris
+	 * program, framebuffer, texture, callback, or native handle.
+	 */
+	static SourceGeneration withResolvedIrisSourceSnapshot(SourceGeneration source, ShaderPack pack) throws IOException {
+		Objects.requireNonNull(source, "source");
+		Objects.requireNonNull(pack, "pack");
+		Map<String, byte[]> resolvedSources = new TreeMap<>();
+		pack.getShaderPackOptions().getIncludes().getNodes().forEach((path, node) -> {
+			String relative = relativeShaderPath(path);
+			resolvedSources.put(relative, (String.join("\n", node.getLines()) + "\n").getBytes(StandardCharsets.UTF_8));
+		});
+		return withResolvedSourceSnapshot(source, resolvedSources);
+	}
+
+	static SourceGeneration withResolvedSourceSnapshot(SourceGeneration source, Map<String, byte[]> resolvedSources) throws IOException {
+		Objects.requireNonNull(source, "source");
+		Objects.requireNonNull(resolvedSources, "resolvedSources");
+		long totalBytes = 0L;
+		List<VulkanicGalBridge.ShaderPackSourceFileRecord> files = new java.util.ArrayList<>(source.files().size());
+		for (VulkanicGalBridge.ShaderPackSourceFileRecord file : source.files()) {
+			byte[] contents = resolvedSources.getOrDefault(file.path(), file.contentsUtf8());
+			if (contents.length > MAX_FILE_BYTES) {
+				throw new IOException("resolved shader-pack source file exceeds " + MAX_FILE_BYTES + " bytes: " + file.path());
+			}
+			totalBytes = Math.addExact(totalBytes, contents.length);
+			if (totalBytes > MAX_TOTAL_BYTES) {
+				throw new IOException("resolved shader-pack source payload exceeds " + MAX_TOTAL_BYTES + " bytes");
+			}
+			files.add(new VulkanicGalBridge.ShaderPackSourceFileRecord(file.path(), contents));
+		}
+		return new SourceGeneration(
+			source.packName(), source.generation(), List.copyOf(files), totalBytes, source.assets(), source.assetTotalBytes()
 		);
+	}
+
+	private static String relativeShaderPath(AbsolutePackPath path) {
+		String value = path.getPathString().replace('\\', '/');
+		return value.startsWith("/") ? value.substring(1) : value;
+	}
+
+	/**
+	 * Copies immutable game semantics, not Iris's resolved material map. Rust
+	 * owns the selected-pack parser and resolves these identities against its
+	 * own source-derived block-property contract.
+	 */
+	static SourceGeneration withRuntimeBlockStateIdentitySnapshot(SourceGeneration source) throws IOException {
+		Objects.requireNonNull(source, "source");
+		StringBuilder properties = new StringBuilder();
+		for (Block block : BuiltInRegistries.BLOCK) {
+			String blockId = BuiltInRegistries.BLOCK.getKey(block).toString();
+			for (BlockState state : block.getStateDefinition().getPossibleStates()) {
+				int rawStateId = Block.getId(state);
+				if (rawStateId < 0) {
+					throw new IOException("Minecraft block state has no raw registry identity: " + state);
+				}
+				properties.append("state.").append(rawStateId).append('=').append(blockId);
+				for (Property<?> property : state.getProperties().stream()
+					.sorted(java.util.Comparator.comparing(Property::getName)).toList()) {
+					properties.append('|').append(property.getName()).append('=')
+						.append(propertyValueName(state, property));
+				}
+				properties.append('\n');
+			}
+		}
+		byte[] contents = properties.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+		if (contents.length > MAX_FILE_BYTES) {
+			throw new IOException("shader-pack runtime block-state payload exceeds " + MAX_FILE_BYTES + " bytes");
+		}
+		return appendReservedProperties(source, RUNTIME_BLOCK_STATE_IDENTITIES_PATH, contents, "block-state identity");
+	}
+
+	private static <T extends Comparable<T>> String propertyValueName(BlockState state, Property<T> property) {
+		return property.getName(state.getValue(property));
 	}
 
 	private static TreeMap<String, String> configuredEnvironmentDefines(ShaderPack pack) throws IOException {
@@ -238,6 +382,12 @@ public final class RustShaderPackSourceCollector {
 				putEnvironmentDefine(defines, "IRIS_FEATURE_" + feature.name(), "");
 			}
 		}
+		// These are pack preprocessor semantics copied from the stable render
+		// phase enumeration. They do not expose an active Iris phase, program,
+		// or renderer state; Rust owns pass selection after source lowering.
+		for (WorldRenderingPhase phase : WorldRenderingPhase.values()) {
+			putEnvironmentDefine(defines, "MC_RENDER_STAGE_" + phase.name(), Integer.toString(phase.ordinal()));
+		}
 		return defines;
 	}
 
@@ -250,10 +400,23 @@ public final class RustShaderPackSourceCollector {
 	}
 
 	static SourceGeneration withRuntimeOptionSnapshot(SourceGeneration source, java.util.Map<String, String> options) throws IOException {
+		return withRuntimeScalarSnapshot(source, options, RUNTIME_OPTIONS_PATH, "option");
+	}
+
+	static SourceGeneration withRuntimeConstantSnapshot(SourceGeneration source, java.util.Map<String, String> constants) throws IOException {
+		return withRuntimeScalarSnapshot(source, constants, RUNTIME_CONSTANTS_PATH, "constant");
+	}
+
+	private static SourceGeneration withRuntimeScalarSnapshot(
+		SourceGeneration source,
+		java.util.Map<String, String> values,
+		String reservedPath,
+		String kind
+	) throws IOException {
 		Objects.requireNonNull(source, "source");
-		Objects.requireNonNull(options, "options");
+		Objects.requireNonNull(values, "values");
 		StringBuilder properties = new StringBuilder();
-		for (var entry : new TreeMap<>(options).entrySet()) {
+		for (var entry : new TreeMap<>(values).entrySet()) {
 			validateOptionEntry(entry.getKey(), entry.getValue());
 			properties.append(entry.getKey()).append('=').append(entry.getValue()).append('\n');
 		}
@@ -261,7 +424,7 @@ public final class RustShaderPackSourceCollector {
 		if (contents.length > MAX_FILE_BYTES) {
 			throw new IOException("shader-pack runtime option payload exceeds " + MAX_FILE_BYTES + " bytes");
 		}
-		return appendReservedProperties(source, RUNTIME_OPTIONS_PATH, contents, "option");
+		return appendReservedProperties(source, reservedPath, contents, kind);
 	}
 
 	static SourceGeneration withRuntimeEnvironmentSnapshot(SourceGeneration source, java.util.Map<String, String> defines) throws IOException {

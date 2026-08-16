@@ -45,5 +45,55 @@ pub(super) fn validate_background(frame: &WorldPrimitiveFrame) -> GalResult<()> 
             "world background viewport metadata must match the frame viewport",
         ));
     }
+    let sky = frame.background.sky;
+    if !sky.visible {
+        if sky.sunrise_or_sunset
+            || sky.dark_disc
+            || sky.sun_angle != 0.0
+            || sky.time_of_day != 0.0
+            || sky.rain_brightness != 0.0
+            || sky.star_brightness != 0.0
+            || sky.sunrise_and_sunset_color_argb != 0
+            || sky.moon_phase != 0
+            || sky.end_flash_intensity != 0.0
+            || sky.end_flash_x_angle != 0.0
+            || sky.end_flash_y_angle != 0.0
+            || sky.sky_color_argb != 0
+        {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                "disabled world sky semantics must be zeroed",
+            ));
+        }
+        return Ok(());
+    }
+    if !frame.background.enabled {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            "visible world sky requires an enabled world background",
+        ));
+    }
+    if !(0..=7).contains(&sky.moon_phase) {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            "world sky moon phase must be within [0, 7]",
+        ));
+    }
+    for (label, value) in [
+        ("sun angle", sky.sun_angle),
+        ("time of day", sky.time_of_day),
+        ("rain brightness", sky.rain_brightness),
+        ("star brightness", sky.star_brightness),
+        ("end flash intensity", sky.end_flash_intensity),
+        ("end flash x angle", sky.end_flash_x_angle),
+        ("end flash y angle", sky.end_flash_y_angle),
+    ] {
+        if !value.is_finite() {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                format!("world sky {label} must be finite"),
+            ));
+        }
+    }
     Ok(())
 }

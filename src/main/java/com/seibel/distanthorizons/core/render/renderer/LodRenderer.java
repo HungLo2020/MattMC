@@ -46,7 +46,11 @@ import net.vulkanic.VulkanicPolygonMode;
 import net.vulkanic.VulkanicPrimitiveMode;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicResourceBarriers;
+import net.vulkanic.world.DistantHorizonsSemanticCollector;
+import net.vulkanic.world.WorldRenderRoutePolicy;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.List;
 
 /**
  * This is where all the magic happens. <br>
@@ -118,7 +122,140 @@ public class LodRenderer
 	 * otherwise it will only render opaque LODs.
 	 */
 	public void render(RenderParams renderParams, IProfilerWrapper profiler)
-	{  this.renderLodPass(renderParams, profiler, false);  }
+	{
+		if (DistantHorizonsSemanticCollector.beginVisibleFrame(renderParams)
+			&& this.trySelectRustNonWaterRoute(renderParams, profiler))
+		{
+			return;
+		}
+		this.renderLodPass(renderParams, profiler, false);
+	}
+
+	/**
+	 * Executes only DH's real render-list traversal for the Rust Vulkan
+	 * whole-frame route. Unlike {@link #render}, this method can never issue a
+	 * Java draw when the non-water subset is not admitted: the shell has already
+	 * selected its sole Rust presenter.
+	 */
+	public boolean collectRustOpaqueRouteForWholeFrame(RenderParams renderParams, IProfilerWrapper profiler)
+	{
+		return DistantHorizonsSemanticCollector.beginVisibleFrame(renderParams)
+			&& this.trySelectRustNonWaterRoute(renderParams, profiler);
+	}
+
+	/**
+	 * Performs a read-only traversal of DH's real, already-built render list
+	 * before selecting the bounded Rust material route. Opaque, transparent, and
+	 * water-surface streams retain separate Rust-owned material passes. The caller
+	 * never switches route after a Rust selection.
+	 */
+	private boolean trySelectRustNonWaterRoute(RenderParams renderParams, IProfilerWrapper profiler)
+	{
+		if (!WorldRenderRoutePolicy.currentDistantHorizonsOpaqueRoute().usesRustWholeFrameVulkan())
+		{
+			DistantHorizonsSemanticCollector.recordRustNonWaterRouteRejected("route-policy-not-rust-vulkan", 0, 0, 0);
+			return false;
+		}
+			String unsupportedFeature = unsupportedRustWholeFrameFeature();
+		if (unsupportedFeature != null)
+		{
+			DistantHorizonsSemanticCollector.recordRustNonWaterRouteRejected("unsupported-dh-render-feature:" + unsupportedFeature, 0, 0, 0);
+			return false;
+		}
+		var lightmap = Minecraft.getInstance().gameRenderer.lightTexture()
+			.ensureRustSemanticLightmapInputs(renderParams.partialTicks);
+		if (lightmap == null)
+		{
+			DistantHorizonsSemanticCollector.recordRustNonWaterRouteRejected("waiting-for-rust-lightmap", 0, 0, 0);
+			return false;
+		}
+		net.vulkanic.world.RustGalWorldPrimitiveRenderer.refreshShaderEnvironmentLightmap();
+		if (net.vulkanic.world.RustGalWorldPrimitiveRenderer.pendingShaderEnvironmentLightmapGeneration()
+			!= lightmap.generation())
+		{
+			DistantHorizonsSemanticCollector.recordRustNonWaterRouteRejected("shader-environment-lightmap-refresh-failed", 0, 0, 0);
+			return false;
+		}
+		RenderBufferHandler buffers = renderParams.renderBufferHandler;
+		if (buffers == null)
+		{
+			DistantHorizonsSemanticCollector.recordRustNonWaterRouteRejected("render-buffer-handler-missing", 0, 0, 0);
+			return false;
+		}
+		profiler.push("LOD Rust semantic extraction");
+		try
+		{
+			buffers.buildRenderList(renderParams);
+			List<Long> semanticColumns = buffers.getSemanticColumnRenderPositions();
+			if (semanticColumns.isEmpty())
+			{
+				DistantHorizonsSemanticCollector.recordRenderListObservation(0);
+				DistantHorizonsSemanticCollector.recordRustNonWaterRouteRejected("no-visible-columns", 0, 0, 0);
+				return false;
+			}
+			int opaqueSegments = 0;
+			int transparentSegments = 0;
+			int waterSegments = 0;
+			for (long columnKey : semanticColumns)
+			{
+				DistantHorizonsSemanticCollector.VisibleColumnSegments segments =
+					DistantHorizonsSemanticCollector.recordVisibleMaterialColumn(columnKey);
+				opaqueSegments += segments.opaqueSegments();
+				transparentSegments += segments.transparentSegments();
+				waterSegments += segments.waterSegments();
+			}
+			DistantHorizonsSemanticCollector.recordRenderListObservation(semanticColumns.size());
+			if (opaqueSegments + transparentSegments + waterSegments == 0)
+			{
+				DistantHorizonsSemanticCollector.recordRustNonWaterRouteRejected(
+					DistantHorizonsSemanticCollector.hasUnpublishedVisibleColumns()
+						? "waiting-for-asset-generation"
+						: "no-visible-supported-segments",
+					opaqueSegments, transparentSegments, waterSegments
+				);
+				return false;
+			}
+			DistantHorizonsSemanticCollector.markRustNonWaterRouteSelected();
+			return true;
+		}
+		finally
+		{
+			profiler.pop();
+		}
+	}
+
+	/**
+	 * Reject only features that the Rust-owned whole-frame DH slice does not yet
+	 * model. An active Iris pack is intentionally not part of this decision:
+	 * this preflight copies DH CPU semantics into the Rust frame and never binds
+	 * an Iris program, framebuffer, texture, or vertex stream.
+	 */
+	private static String unsupportedRustWholeFrameFeature()
+	{
+		/*
+		 * These preferences select Java-only post-processing or custom-object
+		 * paths around DH's terrain render list. The whole-frame route neither
+		 * invokes those Java passes nor borrows their state: its source-derived
+		 * Rust pass graph owns the submitted LOD material streams. They therefore
+		 * cannot veto semantic LOD collection. Debug wireframes are different:
+		 * they are extra geometry with no copied semantic producer yet.
+		 */
+		if (Config.Client.Advanced.Debugging.DebugWireframe.enableRendering.get()) return "debug-wireframe";
+		return null;
+	}
+
+	private static int visibleVboCount(GLVertexBuffer[] buffers)
+	{
+		int count = 0;
+		for (GLVertexBuffer buffer : buffers)
+		{
+			if (buffer != null && buffer.getVertexCount() > 0)
+			{
+				count++;
+			}
+		}
+		return count;
+	}
 	
 	/**
 	 * This method is designed for Iris to be able 
@@ -953,12 +1090,22 @@ public class LodRenderer
 					continue;
 				}
 
-				if (vbo.getVertexCount() == 0)
+					if (vbo.getVertexCount() == 0)
 				{
 					continue;
-				}
+					}
+					net.vulkanic.world.DistantHorizonsSemanticCollector.recordVisibleSegment(
+							bufferContainer.pos,
+						switch (phase.bufferBucket()) {
+								case OPAQUE -> 1;
+								case TRANSPARENT_SIDE -> 2;
+								case TRANSPARENT_UP -> 3;
+								case TRANSPARENT_WATER_UP -> 4;
+							},
+							vboIndex
+					);
 
-				vbo.bind();
+					vbo.bind();
 				shaderProgram.bindVertexBuffer(vbo.getId());
 				this.quadIBO.bind();
 				int indexCount = (vbo.getVertexCount() / 4) * 6; // 4 vertices per DH quad, 6 indices per rendered quad.

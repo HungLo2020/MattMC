@@ -14,6 +14,14 @@ import org.jetbrains.annotations.Nullable;
 public interface SubmitNodeCollector extends OrderedSubmitNodeCollector {
 	OrderedSubmitNodeCollector order(int i);
 
+	/**
+	 * A count-only collector invokes normal producer callbacks to inventory
+	 * semantic families. Producers must not enqueue Rust work through it.
+	 */
+	default boolean isSemanticCoverageOnly() {
+		return false;
+	}
+
 	@Environment(EnvType.CLIENT)
 	public interface CustomGeometryRenderer {
 		void render(PoseStack.Pose pose, VertexConsumer vertexConsumer);

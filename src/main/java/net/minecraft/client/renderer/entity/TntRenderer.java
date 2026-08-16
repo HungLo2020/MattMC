@@ -12,6 +12,8 @@ import net.minecraft.world.entity.item.PrimedTnt;
 
 @Environment(EnvType.CLIENT)
 public class TntRenderer extends EntityRenderer<PrimedTnt, TntRenderState> {
+	private static final boolean FORCE_ORDINARY_CAPTURE_STATE =
+		Boolean.getBoolean("mattmc.dev.rustGalWorldMesh.primedTntForceOrdinaryCaptureState");
 	public TntRenderer(EntityRendererProvider.Context context) {
 		super(context);
 		this.shadowRadius = 0.5F;
@@ -34,9 +36,16 @@ public class TntRenderer extends EntityRenderer<PrimedTnt, TntRenderState> {
 		poseStack.translate(-0.5F, -0.5F, 0.5F);
 		poseStack.mulPose(Axis.YP.rotationDegrees(90.0F));
 		if (tntRenderState.blockState != null) {
-			TntMinecartRenderer.submitWhiteSolidBlock(
-				tntRenderState.blockState, poseStack, submitNodeCollector, tntRenderState.lightCoords, (int)f / 5 % 2 == 0, tntRenderState.outlineColor
-			);
+			boolean flashingOverlay = (int)f / 5 % 2 == 0;
+			if (!flashingOverlay && tntRenderState.outlineColor == 0) {
+				submitNodeCollector.submitPrimedTntBlock(
+					poseStack, tntRenderState.blockState, tntRenderState.lightCoords, 0, 0
+				);
+			} else {
+				TntMinecartRenderer.submitWhiteSolidBlock(
+					tntRenderState.blockState, poseStack, submitNodeCollector, tntRenderState.lightCoords, flashingOverlay, tntRenderState.outlineColor
+				);
+			}
 		}
 
 		poseStack.popPose();
@@ -50,6 +59,12 @@ public class TntRenderer extends EntityRenderer<PrimedTnt, TntRenderState> {
 	public void extractRenderState(PrimedTnt primedTnt, TntRenderState tntRenderState, float f) {
 		super.extractRenderState(primedTnt, tntRenderState, f);
 		tntRenderState.fuseRemainingInTicks = primedTnt.getFuse() - f + 1.0F;
+		if (FORCE_ORDINARY_CAPTURE_STATE) {
+			// A capture-only semantic control keeps a real PrimedTnt on the
+			// ordinary baked-block branch. The flashing overlay is intentionally
+			// not part of the first indexed-mesh producer contract.
+			tntRenderState.fuseRemainingInTicks = 999.0F;
+		}
 		tntRenderState.blockState = primedTnt.getBlockState();
 	}
 }

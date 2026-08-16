@@ -13,6 +13,8 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.ExperienceOrb;
+import net.vulkanic.world.RustGalWorldPrimitiveRenderer;
+import net.vulkanic.world.WorldRenderRoutePolicy;
 
 @Environment(EnvType.CLIENT)
 public class ExperienceOrbRenderer extends EntityRenderer<ExperienceOrb, ExperienceOrbRenderState> {
@@ -50,14 +52,29 @@ public class ExperienceOrbRenderer extends EntityRenderer<ExperienceOrb, Experie
 		poseStack.mulPose(cameraRenderState.orientation);
 		float s = 0.3F;
 		poseStack.scale(0.3F, 0.3F, 0.3F);
-		submitNodeCollector.submitCustomGeometry(poseStack, RENDER_TYPE, (pose, vertexConsumer) -> {
-			vertex(vertexConsumer, pose, -0.5F, -0.25F, p, 255, r, f, j, experienceOrbRenderState.lightCoords);
-			vertex(vertexConsumer, pose, 0.5F, -0.25F, p, 255, r, g, j, experienceOrbRenderState.lightCoords);
-			vertex(vertexConsumer, pose, 0.5F, 0.75F, p, 255, r, g, h, experienceOrbRenderState.lightCoords);
-			vertex(vertexConsumer, pose, -0.5F, 0.75F, p, 255, r, f, h, experienceOrbRenderState.lightCoords);
-		});
+		WorldRenderRoutePolicy.Route route = WorldRenderRoutePolicy.currentExperienceOrbRoute();
+		if (!submitNodeCollector.isSemanticCoverageOnly() && route.usesRustWholeFrameVulkan()) {
+			if (!RustGalWorldPrimitiveRenderer.enqueueExperienceOrb(
+				poseStack.last(), experienceOrbRenderState, f, g, h, j, p, r
+			)) {
+				throw new IllegalStateException("Rust whole-frame experience-orb route selected without a semantic material request");
+			}
+			RustGalWorldPrimitiveRenderer.recordExperienceOrbRouteDecision("rust-vulkan-whole-frame", true, true, false);
+		} else if (route != WorldRenderRoutePolicy.Route.DISABLED) {
+			submitNodeCollector.submitCustomGeometry(poseStack, RENDER_TYPE, (pose, vertexConsumer) -> {
+				vertex(vertexConsumer, pose, -0.5F, -0.25F, p, 255, r, f, j, experienceOrbRenderState.lightCoords);
+				vertex(vertexConsumer, pose, 0.5F, -0.25F, p, 255, r, g, j, experienceOrbRenderState.lightCoords);
+				vertex(vertexConsumer, pose, 0.5F, 0.75F, p, 255, r, g, h, experienceOrbRenderState.lightCoords);
+				vertex(vertexConsumer, pose, -0.5F, 0.75F, p, 255, r, f, h, experienceOrbRenderState.lightCoords);
+			});
+			RustGalWorldPrimitiveRenderer.recordExperienceOrbRouteDecision("java-legacy", false, false, !submitNodeCollector.isSemanticCoverageOnly());
+		} else {
+			RustGalWorldPrimitiveRenderer.recordExperienceOrbRouteDecision("disabled", false, false, false);
+		}
 		poseStack.popPose();
-		super.submit(experienceOrbRenderState, poseStack, submitNodeCollector, cameraRenderState);
+		if (submitNodeCollector.isSemanticCoverageOnly() || !route.usesRustWholeFrameVulkan()) {
+			super.submit(experienceOrbRenderState, poseStack, submitNodeCollector, cameraRenderState);
+		}
 	}
 
 	private static void vertex(VertexConsumer vertexConsumer, PoseStack.Pose pose, float f, float g, int i, int j, int k, float h, float l, int m) {

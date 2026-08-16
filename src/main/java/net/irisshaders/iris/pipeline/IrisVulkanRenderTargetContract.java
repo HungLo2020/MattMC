@@ -61,7 +61,7 @@ public final class IrisVulkanRenderTargetContract {
 			fallbackFramebuffer,
 			fallbackHasDepthAttachment,
 			descriptorBacked ? descriptor : null,
-			vulkanRecordedPass
+			vulkanRecordedPass && descriptorBacked
 		);
 	}
 
@@ -112,9 +112,13 @@ public final class IrisVulkanRenderTargetContract {
 
 		public PipelineHandle createPipeline(PipelineDescriptor descriptor) {
 			Objects.requireNonNull(descriptor, "descriptor must not be null");
-			return this.descriptor != null
-				? VulkanicAPI.createPipeline(descriptor, this.descriptor)
-				: VulkanicAPI.createPipeline(descriptor, this.fallbackFramebuffer);
+			if (this.descriptor != null) {
+				return VulkanicAPI.createPipeline(descriptor, this.descriptor);
+			}
+			if (VulkanicAPI.isVulkanBackendSelected()) {
+				return VulkanicAPI.createPipeline(descriptor);
+			}
+			return VulkanicAPI.createPipeline(descriptor, this.fallbackFramebuffer);
 		}
 
 		public RenderPass createRenderPass(Supplier<String> label) {

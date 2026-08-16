@@ -7,6 +7,7 @@ import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRen
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
 import com.seibel.distanthorizons.coreapi.util.MathUtil;
 import com.seibel.distanthorizons.core.util.math.Mat4f;
+import net.minecraft.client.Minecraft;
 
 /**
  * This holds miscellaneous helper code
@@ -153,7 +154,22 @@ public class RenderUtil
 		// therefore, the FOV is left at a fixed value of 70 (MC's default)
 		double fov = 70;
 		
-		double aspectRatio = (double) MC_RENDER.getTargetFramebufferViewportWidth() / MC_RENDER.getTargetFramebufferViewportHeight();
+		int viewportWidth = MC_RENDER.getTargetFramebufferViewportWidth();
+		int viewportHeight = MC_RENDER.getTargetFramebufferViewportHeight();
+		if (viewportWidth <= 0 || viewportHeight <= 0)
+		{
+			// The Rust whole-frame route deliberately has no Java RenderTarget.
+			// DH still needs the current presentation extent to derive a finite
+			// semantic LOD projection; the game window is that extent in this route.
+			var window = Minecraft.getInstance().getWindow();
+			viewportWidth = window.getWidth();
+			viewportHeight = window.getHeight();
+		}
+		if (viewportWidth <= 0 || viewportHeight <= 0)
+		{
+			throw new IllegalStateException("Distant Horizons cannot derive a projection without a valid viewport extent");
+		}
+		double aspectRatio = (double) viewportWidth / viewportHeight;
 		
 		// source: https://stackoverflow.com/questions/8101119/how-do-i-methodically-choose-the-near-clip-plane-distance-for-a-perspective-proj/8101234#8101234
 		return (float) (nearClipPlane

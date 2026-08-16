@@ -13,6 +13,7 @@ import net.vulkanic.bridge.RustGalFrameScheduler;
 import net.vulkanic.bridge.RustGalVulkanWholeFrameMode;
 import net.vulkanic.bridge.VulkanicGalBridge;
 import net.vulkanic.shaderpack.RustShaderPackSourceCollector;
+import net.vulkanic.world.DistantHorizonsSemanticCollector;
 import net.vulkanic.world.RustGalTerrainRenderer;
 import net.vulkanic.world.RustGalWorldPrimitiveRenderer;
 import org.slf4j.Logger;
@@ -21,8 +22,12 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 public final class RustGalFrameCoordinator {
 	private static final Logger LOGGER = LogUtils.getLogger();
@@ -39,6 +44,10 @@ public final class RustGalFrameCoordinator {
 	private static long lastAssetPayloadCount;
 	private static long lastAssetPayloadBytes;
 	private static long assetUpdateFailures;
+	private static long rawImageGeneration = 1L;
+	private static long uploadedRawImageGeneration;
+	private static long attemptedRawImageGeneration;
+	private static final Map<Long, VulkanicGalBridge.GuiRawImageAssetRecord> pendingRawImages = new LinkedHashMap<>();
 	private static long nextShaderPackSourceGeneration = 1L;
 	private static long uploadedShaderPackSourceGeneration;
 	private static long attemptedShaderPackSourceGeneration;
@@ -47,15 +56,58 @@ public final class RustGalFrameCoordinator {
 	private static long attemptedShaderPackAssetGeneration;
 	private static long shaderPackAssetUpdateFailures;
 	private static RustShaderPackSourceCollector.SourceGeneration pendingShaderPackSources;
+	private static String pendingShaderPackSourceName = "";
 	private static long lastSubmitted;
 	private static long lastRetiredSubmission;
-	private static boolean wholeFrameAttachmentCorrelationWritten;
 	private static List<VulkanicGalBridge.GuiAssetRecord> pendingAssets = List.of();
-	private static final RustGalFrameScheduler<VulkanicGalBridge.GuiSpriteRecord> SCHEDULER =
+	private static final RustGalFrameScheduler<QueuedGuiRequest> SCHEDULER =
 		new RustGalFrameScheduler<>("Rust VulkanicGAL deferred GUI");
 	private static final Metrics METRICS = new Metrics();
 
 	private RustGalFrameCoordinator() {
+	}
+
+	/** One ordered, generation-bound semantic GUI work item. */
+	private record QueuedGuiRequest(
+		VulkanicGalBridge.GuiSpriteRecord sprite,
+		VulkanicGalBridge.GuiAffineQuadRecord affineQuad,
+		List<VulkanicGalBridge.GuiMeshBatchRecord> meshBatches
+	) {
+		static QueuedGuiRequest sprite(VulkanicGalBridge.GuiSpriteRecord sprite) {
+			return new QueuedGuiRequest(java.util.Objects.requireNonNull(sprite, "sprite"), null, List.of());
+		}
+
+		static QueuedGuiRequest affineQuad(VulkanicGalBridge.GuiAffineQuadRecord affineQuad) {
+			return new QueuedGuiRequest(null, java.util.Objects.requireNonNull(affineQuad, "affineQuad"), List.of());
+		}
+
+		static QueuedGuiRequest meshBatches(List<VulkanicGalBridge.GuiMeshBatchRecord> meshBatches) {
+			if (meshBatches == null || meshBatches.isEmpty()) throw new IllegalArgumentException("GUI mesh item requires layers");
+			return new QueuedGuiRequest(null, null, List.copyOf(meshBatches));
+		}
+
+		int guiWidth() {
+			return this.sprite != null ? this.sprite.guiWidth() : this.affineQuad != null ? this.affineQuad.guiWidth() : this.meshBatches.getFirst().guiWidth();
+		}
+
+		int guiHeight() {
+			return this.sprite != null ? this.sprite.guiHeight() : this.affineQuad != null ? this.affineQuad.guiHeight() : this.meshBatches.getFirst().guiHeight();
+		}
+
+		void appendTo(
+			List<VulkanicGalBridge.GuiSpriteRecord> sprites,
+			List<VulkanicGalBridge.GuiAffineQuadRecord> affineQuads,
+			List<VulkanicGalBridge.GuiMeshBatchRecord> meshBatches,
+			long sequence
+		) {
+			if (this.sprite != null) {
+				sprites.add(this.sprite.withSequence(sequence));
+			} else if (this.affineQuad != null) {
+				affineQuads.add(this.affineQuad.withSequence(sequence));
+			} else {
+				for (VulkanicGalBridge.GuiMeshBatchRecord batch : this.meshBatches) meshBatches.add(batch.withSequence(sequence));
+			}
+		}
 	}
 
 	static RustGalFrameScheduler.Token enqueueGuiRequest(
@@ -64,9 +116,52 @@ public final class RustGalFrameCoordinator {
 		long startedNanos
 	) {
 		synchronized (LOCK) {
-			RustGalFrameScheduler.Token token = SCHEDULER.enqueue(generation, stratum.id(), stratum.order(), request);
+			RustGalFrameScheduler.Token token = SCHEDULER.enqueue(
+				generation, stratum.id(), stratum.order(), QueuedGuiRequest.sprite(request));
 			METRICS.enqueueNanos += elapsedSince(startedNanos);
 			return token;
+		}
+	}
+
+	static RustGalFrameScheduler.Token enqueueGuiAffineQuadRequest(
+		VulkanicGalBridge.GuiAffineQuadRecord request,
+		GuiRenderStratum stratum,
+		long startedNanos
+	) {
+		synchronized (LOCK) {
+			RustGalFrameScheduler.Token token = SCHEDULER.enqueue(
+				generation, stratum.id(), stratum.order(), QueuedGuiRequest.affineQuad(request));
+			METRICS.enqueueNanos += elapsedSince(startedNanos);
+			return token;
+		}
+	}
+
+	static RustGalFrameScheduler.Token enqueueGuiMeshItemRequest(
+		List<VulkanicGalBridge.GuiMeshBatchRecord> batches,
+		GuiRenderStratum stratum,
+		long startedNanos
+	) {
+		synchronized (LOCK) {
+			RustGalFrameScheduler.Token token = SCHEDULER.enqueue(
+				generation, stratum.id(), stratum.order(), QueuedGuiRequest.meshBatches(batches));
+			METRICS.enqueueNanos += elapsedSince(startedNanos);
+			return token;
+		}
+	}
+
+	static void stageGuiRawImage(VulkanicGalBridge.GuiRawImageAssetRecord asset) {
+		synchronized (LOCK) {
+			VulkanicGalBridge.GuiRawImageAssetRecord previous = pendingRawImages.get(asset.assetId());
+			if (previous != null
+				&& previous.format() == asset.format()
+				&& previous.width() == asset.width()
+				&& previous.height() == asset.height()
+				&& Arrays.equals(previous.pixels(), asset.pixels())) {
+				return;
+			}
+			pendingRawImages.put(asset.assetId(), asset);
+			rawImageGeneration++;
+			attemptedRawImageGeneration = Math.min(attemptedRawImageGeneration, uploadedRawImageGeneration);
 		}
 	}
 
@@ -88,8 +183,9 @@ public final class RustGalFrameCoordinator {
 		Window window = minecraft.getWindow();
 		ensureConfigured(window);
 		synchronized (LOCK) {
+			flushPendingGuiAssetsLocked();
 			List<RustGalFrameScheduler.Token> tokens = elements.stream().map(RustGalGuiElementRenderState::token).toList();
-			List<VulkanicGalBridge.GuiSpriteRecord> requests = SCHEDULER.takeAll(tokens, generation);
+			List<RustGalFrameScheduler.Item<QueuedGuiRequest>> requests = SCHEDULER.takeAllItems(tokens, generation);
 			executeFrameBatches(window, requests, false, window.getGuiScaledWidth(), window.getGuiScaledHeight());
 		}
 	}
@@ -199,13 +295,14 @@ public final class RustGalFrameCoordinator {
 		Window window = minecraft.getWindow();
 		ensureConfigured(window);
 		synchronized (LOCK) {
+			flushPendingGuiAssetsLocked();
 			List<RustGalFrameScheduler.Token> tokens = new ArrayList<>();
 			renderState.forEachElement(element -> {
 				if (element instanceof RustGalGuiElementRenderState rustGalElement) {
 					tokens.add(rustGalElement.token());
 				}
 			}, GuiRenderState.TraverseRange.ALL);
-			List<VulkanicGalBridge.GuiSpriteRecord> requests = SCHEDULER.takeAll(tokens, generation);
+			List<RustGalFrameScheduler.Item<QueuedGuiRequest>> requests = SCHEDULER.takeAllItems(tokens, generation);
 			executeFrameBatches(window, requests, true, window.getGuiScaledWidth(), window.getGuiScaledHeight());
 		}
 	}
@@ -227,6 +324,7 @@ public final class RustGalFrameCoordinator {
 			return;
 		}
 		List<VulkanicGalBridge.GuiAssetRecord> assets = RustGalGuiRenderer.collectResolvedAssets(resourceManager);
+		RustGalGuiItemRenderer.invalidateAssets();
 		RustGalWorldPrimitiveRenderer.reloadWorldAssets(resourceManager);
 		long shaderPackSourceGeneration;
 		synchronized (LOCK) {
@@ -245,15 +343,7 @@ public final class RustGalFrameCoordinator {
 			assetGeneration++;
 			pendingAssets = assets;
 			if (shaderPackSources != null) {
-				pendingShaderPackSources = shaderPackSources;
-				attemptedShaderPackSourceGeneration = Math.min(
-					attemptedShaderPackSourceGeneration,
-					uploadedShaderPackSourceGeneration
-				);
-				attemptedShaderPackAssetGeneration = Math.min(
-					attemptedShaderPackAssetGeneration,
-					uploadedShaderPackAssetGeneration
-				);
+				stageShaderPackSourcesLocked(shaderPackSources);
 			}
 			attemptedAssetGeneration = Math.min(attemptedAssetGeneration, uploadedAssetGeneration);
 			int cancelled = SCHEDULER.cancelAll("resource-reload");
@@ -284,10 +374,13 @@ public final class RustGalFrameCoordinator {
 			renderThread = null;
 			lastSubmitted = 0L;
 			lastRetiredSubmission = 0L;
+			uploadedRawImageGeneration = 0L;
+			attemptedRawImageGeneration = 0L;
 			uploadedShaderPackSourceGeneration = 0L;
 			attemptedShaderPackSourceGeneration = 0L;
 			uploadedShaderPackAssetGeneration = 0L;
 			attemptedShaderPackAssetGeneration = 0L;
+			pendingShaderPackSourceName = "";
 			configuredWidth = 0;
 			configuredHeight = 0;
 			METRICS.cancellations++;
@@ -379,7 +472,13 @@ public final class RustGalFrameCoordinator {
 		}
 	}
 
-	private static void executeFrameBatches(Window window, List<VulkanicGalBridge.GuiSpriteRecord> requests, boolean allowEmpty, int guiWidth, int guiHeight) {
+	private static void executeFrameBatches(
+		Window window,
+		List<RustGalFrameScheduler.Item<QueuedGuiRequest>> requests,
+		boolean allowEmpty,
+		int guiWidth,
+		int guiHeight
+	) {
 		if (requests.isEmpty() && !allowEmpty) {
 			return;
 		}
@@ -401,8 +500,18 @@ public final class RustGalFrameCoordinator {
 		try {
 			if (wholeFrameVulkan) {
 				GraphicsFrameBenchmark.beginPhase("rust-gal.frame.consume-and-flush-world");
-				primitiveFrame = RustGalWorldPrimitiveRenderer.consumeFrame();
+				refreshConfiguredShaderPackSourcesLocked();
 				flushPendingWorldAssetsLocked();
+				// Publish immutable world assets before freezing the semantic frame.
+				// A frame must never contain a visible reference to the generation that
+				// an asset update replaces immediately before native submission.
+				primitiveFrame = RustGalWorldPrimitiveRenderer.consumeFrame();
+				// Consuming a selected semantic frame may publish an immutable shared
+				// resource for the first time. DH exact-atlas columns do this for the
+				// copied block atlas. Flush it before this same frame reaches native
+				// execution; otherwise the first selected draw observes no atlas and
+				// can only fail or render with an unrelated later-frame resource.
+				flushPendingWorldAssetsAfterFrameConsumeLocked();
 				GraphicsFrameBenchmark.endPhase("rust-gal.frame.consume-and-flush-world");
 				if (!primitiveFrame.segments().isEmpty()
 					|| !primitiveFrame.crackQuads().isEmpty()
@@ -454,12 +563,35 @@ public final class RustGalFrameCoordinator {
 				);
 				GraphicsFrameBenchmark.endPhase("rust-gal.frame.viewport-seed");
 			}
+			if (wholeFrameVulkan) {
+				writeWholeFrameAttachmentCaptureRequest(
+					frame,
+					correlationId,
+					net.minecraft.client.dev.DeterministicCameraCapture
+						.claimWholeFrameAttachmentCaptureRenderedFrameIndex()
+				);
+			}
 
 			GraphicsFrameBenchmark.beginPhase("rust-gal.frame.submit-call");
 			submitStarted = System.nanoTime();
 			long packingStarted = submitStarted;
-			int frameGuiWidth = requests.isEmpty() ? guiWidth : requests.get(0).guiWidth();
-			int frameGuiHeight = requests.isEmpty() ? guiHeight : requests.get(0).guiHeight();
+			int frameGuiWidth = requests.isEmpty() ? guiWidth : requests.get(0).payload().guiWidth();
+			int frameGuiHeight = requests.isEmpty() ? guiHeight : requests.get(0).payload().guiHeight();
+			List<VulkanicGalBridge.GuiSpriteRecord> spriteRequests = new ArrayList<>();
+			List<VulkanicGalBridge.GuiAffineQuadRecord> affineQuadRequests = new ArrayList<>();
+			List<VulkanicGalBridge.GuiMeshBatchRecord> meshBatchRequests = new ArrayList<>();
+			int guiTextAffineQuadCount = 0;
+			int guiItemAffineQuadCount = 0;
+			for (RustGalFrameScheduler.Item<QueuedGuiRequest> request : requests) {
+				request.payload().appendTo(spriteRequests, affineQuadRequests, meshBatchRequests, request.token().sequence());
+				if (request.payload().affineQuad() != null) {
+					if (request.token().stratumId().equals(GuiRenderStratum.GUI_TEXT.id())) {
+						guiTextAffineQuadCount++;
+					} else if (request.token().stratumId().equals(GuiRenderStratum.GUI_ITEM.id())) {
+						guiItemAffineQuadCount++;
+					}
+				}
+			}
 			VulkanicGalBridge.WholeFrameSubmitResult wholeFrameResult = null;
 			VulkanicGalBridge.GuiFrameSubmitResult guiResult = null;
 			if (wholeFrameVulkan) {
@@ -475,7 +607,7 @@ public final class RustGalFrameCoordinator {
 					Math.max(1, frame.height())
 				);
 				GraphicsFrameBenchmark.endPhase("rust-gal.frame.viewport-seed");
-				wholeFrameResult = bridge.submitWholeFrame(
+				wholeFrameResult = bridge.submitWholeFrameWithAffineGuiAndWorldTextAndFirstPerson(
 					generation,
 					frameId,
 					correlationId,
@@ -494,7 +626,15 @@ public final class RustGalFrameCoordinator {
 					primitiveFrame.meshInstances(),
 					primitiveFrame.voxelVolumeFrame(),
 					primitiveFrame.shaderEnvironmentFrame(),
-					requests
+					primitiveFrame.lodInstances(),
+					primitiveFrame.lodRenderFrame(),
+					primitiveFrame.featureCoverage(),
+					spriteRequests,
+					affineQuadRequests,
+					meshBatchRequests,
+					RustGalWorldPrimitiveRenderer.encodeWorldTextQuads(primitiveFrame.textQuads()),
+					primitiveFrame.firstPersonFrame(),
+					primitiveFrame.firstPersonMeshInstances()
 				);
 			} else {
 				guiResult = bridge.submitGuiFrame(
@@ -503,7 +643,9 @@ public final class RustGalFrameCoordinator {
 					frame.frameTarget(),
 					frameGuiWidth,
 					frameGuiHeight,
-					requests
+					spriteRequests,
+					affineQuadRequests,
+					meshBatchRequests
 				);
 			}
 			submitEnded = System.nanoTime();
@@ -511,7 +653,87 @@ public final class RustGalFrameCoordinator {
 			GraphicsFrameBenchmark.endPhase("rust-gal.frame.submit-call");
 			recordStatus(Operation.SUBMIT, wholeFrameResult != null ? wholeFrameResult.asStatus() : guiResult.asStatus());
 			submissionId = wholeFrameResult != null ? wholeFrameResult.submissionId() : guiResult.submissionId();
+			if (wholeFrameVulkan && primitiveFrame != null
+				&& (primitiveFrame.lodRenderFrame().flags()
+					& DistantHorizonsSemanticCollector.RENDER_FLAG_RUST_NON_WATER_ROUTE_SELECTED) != 0) {
+				METRICS.worldLodSelectedFrames++;
+				METRICS.worldLodInstancesSubmitted += primitiveFrame.lodInstances().size();
+				METRICS.worldLodFramesExecuted++;
+				if (!primitiveFrame.lodInstances().isEmpty()) {
+					int opaqueInstances = (int)primitiveFrame.lodInstances().stream()
+						.filter(instance -> instance.layer() == 1)
+						.count();
+					int transparentInstances = (int)primitiveFrame.lodInstances().stream()
+						.filter(instance -> instance.layer() == 2 || instance.layer() == 3)
+						.count();
+					int waterInstances = (int)primitiveFrame.lodInstances().stream()
+						.filter(instance -> instance.layer() == 4)
+						.count();
+					DistantHorizonsSemanticCollector.recordRustMaterialRouteExecution(
+						frameId,
+						submissionId,
+						net.minecraft.client.dev.DeterministicCameraCapture.currentCaptureCorrelationRenderedFrameIndex(),
+						primitiveFrame.lodInstances().size(),
+						opaqueInstances,
+						transparentInstances,
+						waterInstances,
+						primitiveFrame.lodRenderFrame().enabled(),
+						primitiveFrame.lodInstances()
+					);
+					net.minecraft.client.dev.DeterministicCameraCapture.recordSubmittedWorkIdentity(
+						"distant-horizons", "rust-vulkan-whole-frame:material-lod"
+					);
+				}
+			}
 			if (wholeFrameVulkan) {
+				if (wholeFrameResult.guiMeshItemCount() > 0L) {
+					net.minecraft.client.dev.DeterministicCameraCapture.recordSubmittedWorkIdentity(
+						"gui-standard-3d",
+						"rust-vulkan-whole-frame:items=" + wholeFrameResult.guiMeshItemCount()
+							+ ":batches=" + wholeFrameResult.guiMeshBatchCount()
+							+ ":draws=" + wholeFrameResult.guiMeshDrawCount()
+					);
+				}
+				RustGalWorldPrimitiveRenderer.recordWholeFrameMovingMeshExecution(
+					frameId,
+					submissionId,
+					primitiveFrame
+				);
+				RustGalWorldPrimitiveRenderer.recordWholeFrameWeatherExecution(
+					frameId,
+					submissionId,
+					primitiveFrame.materialQuads()
+				);
+				RustGalWorldPrimitiveRenderer.recordWholeFrameExperienceOrbExecution(
+					frameId,
+					submissionId,
+					primitiveFrame.materialQuads()
+				);
+				RustGalWorldPrimitiveRenderer.recordWholeFrameBeaconBeamExecution(
+					frameId,
+					submissionId,
+					primitiveFrame.materialQuads()
+				);
+				RustGalWorldPrimitiveRenderer.recordWholeFrameEntityFlameExecution(
+					frameId,
+					submissionId,
+					primitiveFrame.entityFlameQuadCount()
+				);
+				RustGalWorldPrimitiveRenderer.recordWholeFrameEntityShadowExecution(
+					frameId,
+					submissionId,
+					primitiveFrame.materialQuads()
+				);
+				RustGalWorldPrimitiveRenderer.recordWholeFrameEntityLeashExecution(
+					frameId,
+					submissionId,
+					primitiveFrame.materialQuads()
+				);
+				RustGalWorldPrimitiveRenderer.recordWholeFrameCloudExecution(
+					frameId,
+					submissionId,
+					primitiveFrame.materialQuads()
+				);
 				auditWholeFrameTarget(frame, primitiveFrame);
 			}
 			lastSubmitted = Math.max(lastSubmitted, submissionId);
@@ -525,10 +747,26 @@ public final class RustGalFrameCoordinator {
 				if (wholeFrameVulkan) {
 					auditMessage("gal.frame.present backend=vulkan correlation=" + correlationId
 						+ " frame=" + presented.frameId()
-						+ " image=" + presented.frameTargetIdentity()
-						+ " submission=" + submissionId
-						+ " status=" + presented.status());
-					writeWholeFrameAttachmentCorrelation(frame, presented, wholeFrameResult, primitiveFrame);
+					+ " image=" + presented.frameTargetIdentity()
+					+ " submission=" + submissionId
+					+ " status=" + presented.status());
+					net.minecraft.client.dev.DeterministicCameraCapture.recordWholeFramePresentation(
+						net.minecraft.client.dev.DeterministicCameraCapture.currentInProgressRenderedFrameIndex(),
+						frame.frameId(),
+						correlationId,
+						submissionId,
+						frame.frameTargetIdentity(),
+						presented.frameTargetIdentity()
+					);
+					writeWholeFrameAttachmentCorrelation(
+						frame,
+						presented,
+						wholeFrameResult,
+					primitiveFrame,
+					affineQuadRequests.size(),
+					guiTextAffineQuadCount,
+					guiItemAffineQuadCount
+				);
 				}
 			presentEnded = System.nanoTime();
 			METRICS.framePresentNanos += Math.max(0L, presentEnded - presentStarted);
@@ -536,6 +774,12 @@ public final class RustGalFrameCoordinator {
 			if (renderdocFrameCaptureStarted) {
 				RenderDocCaptureHook.endFrameCaptureOnce(window, "rust-vulkan-whole-frame-world#" + frameId + "-submission=" + submissionId);
 				renderdocFrameCaptureStarted = false;
+			}
+			if (wholeFrameVulkan) {
+				// DH extraction can build a replacement while this frame still refers
+				// to the last acknowledged column generation. Publish the replacement
+				// only after presentation so one frame never mixes those generations.
+				flushPendingWorldLodAssetsLocked();
 			}
 
 			METRICS.frames++;
@@ -638,26 +882,29 @@ public final class RustGalFrameCoordinator {
 		VulkanicGalBridge.AcquiredFrame acquired,
 		VulkanicGalBridge.PresentedFrame presented,
 		VulkanicGalBridge.WholeFrameSubmitResult result,
-		RustGalWorldPrimitiveRenderer.PrimitiveFrame primitiveFrame
+		RustGalWorldPrimitiveRenderer.PrimitiveFrame primitiveFrame,
+		int guiAffineQuadCount,
+		int guiTextAffineQuadCount,
+		int guiItemAffineQuadCount
 	) {
 		String dir = System.getenv("MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_DIR");
-		if (dir == null || dir.isBlank() || wholeFrameAttachmentCorrelationWritten || result == null || primitiveFrame == null) {
+		if (dir == null || dir.isBlank() || result == null || primitiveFrame == null) {
 			return;
 		}
-		if (result.worldMeshInstanceCount() <= 0L) {
-			return;
-		}
-		long minFrame = parseLongEnv("MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_MIN_FRAME", 0L);
-		if (acquired.frameId() < minFrame) {
-			return;
-		}
-		wholeFrameAttachmentCorrelationWritten = true;
 		Path root = Path.of(dir);
+		WholeFrameAttachmentRequest request = readWholeFrameAttachmentRequest(root);
+		if (request == null
+			|| request.gameplayFrameId() != acquired.frameId()
+			|| request.correlationId() != acquired.correlationId()
+			|| !attachmentManifestMatches(root, request, result.submissionId())) {
+			return;
+		}
 		String json = "{\n"
 			+ "  \"artifact_class\":\"rust_vulkan_whole_frame_gameplay_correlation\",\n"
 			+ "  \"source\":\"java-frame-coordinator-after-present\",\n"
 			+ "  \"gameplay_frame_id\":" + acquired.frameId() + ",\n"
 			+ "  \"correlation_id\":" + acquired.correlationId() + ",\n"
+			+ "  \"deterministic_rendered_frame_index\":" + request.deterministicRenderedFrameIndex() + ",\n"
 			+ "  \"gal_submission_id\":" + result.submissionId() + ",\n"
 			+ "  \"vulkan_submission_timeline_value\":" + result.submissionId() + ",\n"
 			+ "  \"acquired_swapchain_image\":" + acquired.frameTargetIdentity() + ",\n"
@@ -665,11 +912,19 @@ public final class RustGalFrameCoordinator {
 			+ "  \"present_completed_submission_id\":" + presented.completedSubmissionId() + ",\n"
 			+ "  \"extent\":{\"width\":" + acquired.width() + ",\"height\":" + acquired.height() + "},\n"
 			+ "  \"same_acquired_presented_image\":" + (acquired.frameTargetIdentity() == presented.frameTargetIdentity()) + ",\n"
-			+ "  \"producer_workload_fingerprint\":\"" + escapeJson(primitiveFrameFingerprint(primitiveFrame)) + "\",\n"
-			+ "  \"gui_sprites\":" + result.spriteCount() + ",\n"
+				+ "  \"producer_workload_fingerprint\":\"" + escapeJson(primitiveFrameFingerprint(primitiveFrame)) + "\",\n"
+				+ "  \"gui_sprites\":" + result.spriteCount() + ",\n"
+				+ "  \"gui_affine_quads\":" + guiAffineQuadCount + ",\n"
+				+ "  \"gui_text_affine_quads\":" + guiTextAffineQuadCount + ",\n"
+			+ "  \"gui_item_affine_quads\":" + guiItemAffineQuadCount + ",\n"
+			+ "  \"gui_mesh_items\":" + result.guiMeshItemCount() + ",\n"
+			+ "  \"gui_mesh_batches\":" + result.guiMeshBatchCount() + ",\n"
+			+ "  \"gui_mesh_draws\":" + result.guiMeshDrawCount() + ",\n"
 			+ "  \"world_mesh_instances\":" + result.worldMeshInstanceCount() + ",\n"
 			+ "  \"world_mesh_batches\":" + result.worldMeshBatchCount() + ",\n"
 			+ "  \"world_mesh_draws\":" + result.worldMeshDrawCount() + ",\n"
+			+ "  \"world_lod_instances\":" + primitiveFrame.lodInstances().size() + ",\n"
+			+ "  \"world_lod_route_selected\":" + lodRouteSelected(primitiveFrame.lodRenderFrame()) + ",\n"
 			+ "  \"world_material_quads\":" + result.worldMaterialQuadCount() + ",\n"
 			+ "  \"world_crack_quads\":" + result.worldCrackQuadCount() + ",\n"
 			+ "  \"world_border_quads\":" + result.worldBorderQuadCount() + ",\n"
@@ -679,9 +934,114 @@ public final class RustGalFrameCoordinator {
 		try {
 			Files.createDirectories(root);
 			Files.writeString(root.resolve("gameplay-correlation-frame-" + acquired.frameId() + ".json"), json, StandardCharsets.UTF_8);
+			if (request.sourceSelectedCapture()) {
+				net.minecraft.client.dev.DeterministicCameraCapture.confirmWholeFrameSourceCapture(
+					acquired.frameId(),
+					acquired.correlationId(),
+					request.deterministicRenderedFrameIndex(),
+					result.submissionId(),
+					acquired.frameTargetIdentity(),
+					presented.frameTargetIdentity()
+				);
+			}
 		} catch (IOException exception) {
 			LOGGER.warn("Unable to write Rust whole-frame gameplay attachment correlation sidecar", exception);
 		}
+	}
+
+	private static void writeWholeFrameAttachmentCaptureRequest(
+		VulkanicGalBridge.AcquiredFrame acquired,
+		long correlationId,
+		long deterministicRenderedFrameIndex
+	) {
+		if (deterministicRenderedFrameIndex <= 0L) {
+			return;
+		}
+		String configuredPath = System.getenv("MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_REQUEST");
+		if (configuredPath == null || configuredPath.isBlank()) {
+			return;
+		}
+		Path requestPath = Path.of(configuredPath);
+		Path parent = requestPath.getParent();
+		boolean sourceSelectedCapture = selectedSourceExecutionRequested();
+		boolean requireEntityMesh = sourceSelectedCapture
+			&& net.minecraft.client.dev.DeterministicCameraCapture.requiresSourceEntityMeshCapture();
+		String request = "gameplay_frame_id=" + acquired.frameId() + "\n"
+			+ "correlation_id=" + correlationId + "\n"
+			+ "deterministic_rendered_frame_index=" + deterministicRenderedFrameIndex + "\n"
+			+ "source_selected_capture=" + (sourceSelectedCapture ? 1 : 0) + "\n"
+			+ "source_selected_pending=" + (sourceSelectedCapture ? 1 : 0) + "\n"
+			+ "required_entity_mesh=" + (requireEntityMesh ? 1 : 0) + "\n";
+		try {
+			if (parent != null) {
+				Files.createDirectories(parent);
+			}
+			Path temporary = requestPath.resolveSibling(requestPath.getFileName() + ".tmp");
+			Files.writeString(temporary, request, StandardCharsets.UTF_8);
+			Files.move(temporary, requestPath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+			auditMessage("gal.frame.attachment-capture.request frame=" + acquired.frameId()
+				+ " correlation=" + correlationId
+				+ " deterministicRender=" + deterministicRenderedFrameIndex);
+		} catch (IOException exception) {
+			LOGGER.warn("Unable to write Rust whole-frame attachment capture request", exception);
+		}
+	}
+
+	private static WholeFrameAttachmentRequest readWholeFrameAttachmentRequest(Path root) {
+		String configuredPath = System.getenv("MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_REQUEST");
+		if (configuredPath == null || configuredPath.isBlank()) {
+			return null;
+		}
+		try {
+			long frameId = -1L;
+			long correlationId = -1L;
+			long deterministicRenderedFrameIndex = -1L;
+			boolean sourceSelectedCapture = false;
+			for (String line : Files.readAllLines(Path.of(configuredPath), StandardCharsets.UTF_8)) {
+				int separator = line.indexOf('=');
+				if (separator <= 0) {
+					continue;
+				}
+				long value = Long.parseLong(line.substring(separator + 1).trim());
+				switch (line.substring(0, separator).trim()) {
+					case "gameplay_frame_id" -> frameId = value;
+					case "correlation_id" -> correlationId = value;
+					case "deterministic_rendered_frame_index" -> deterministicRenderedFrameIndex = value;
+					case "source_selected_capture" -> sourceSelectedCapture = value != 0L;
+					default -> { }
+				}
+			}
+			return frameId > 0L && correlationId > 0L && deterministicRenderedFrameIndex > 0L
+				? new WholeFrameAttachmentRequest(frameId, correlationId, deterministicRenderedFrameIndex, sourceSelectedCapture)
+				: null;
+		} catch (IOException | NumberFormatException exception) {
+			return null;
+		}
+	}
+
+	private static boolean attachmentManifestMatches(
+		Path root,
+		WholeFrameAttachmentRequest request,
+		long submissionId
+	) {
+		Path manifest = root.resolve("gameplay-attachments-frame-" + request.gameplayFrameId() + ".json");
+		try {
+			String contents = Files.readString(manifest, StandardCharsets.UTF_8);
+			return contents.contains("\"gameplay_frame_id\":" + request.gameplayFrameId())
+				&& contents.contains("\"correlation_id\":" + request.correlationId())
+				&& contents.contains("\"deterministic_rendered_frame_index\":" + request.deterministicRenderedFrameIndex())
+				&& contents.contains("\"gal_submission_id\":" + submissionId);
+		} catch (IOException exception) {
+			return false;
+		}
+	}
+
+	private record WholeFrameAttachmentRequest(
+		long gameplayFrameId,
+		long correlationId,
+		long deterministicRenderedFrameIndex,
+		boolean sourceSelectedCapture
+	) {
 	}
 
 	private static long parseLongEnv(String name, long fallback) {
@@ -694,6 +1054,19 @@ public final class RustGalFrameCoordinator {
 		} catch (NumberFormatException ignored) {
 			return fallback;
 		}
+	}
+
+	private static boolean selectedSourceExecutionRequested() {
+		// A deterministic capture can require a native source receipt without
+		// selecting the source route. The Rust frontend alone admits that route;
+		// this coordinator only marks an attachment request for correlation.
+		if (!System.getProperty(
+			"mattmc.dev.deterministicCameraCapture.requiredRustSourceExecutionDir", ""
+		).trim().isEmpty()) {
+			return true;
+		}
+		String value = System.getenv("MATTMC_RUST_SELECTED_SOURCE_EXECUTION");
+		return value != null && (value.equals("1") || value.equalsIgnoreCase("true") || value.equalsIgnoreCase("yes"));
 	}
 
 	private static int wholeFramePresentMode(Minecraft minecraft) {
@@ -712,12 +1085,27 @@ public final class RustGalFrameCoordinator {
 	}
 
 	private static String primitiveFrameFingerprint(RustGalWorldPrimitiveRenderer.PrimitiveFrame frame) {
+		VulkanicGalBridge.WorldFeatureCoverageRecord coverage = frame.featureCoverage();
 		return "segments=" + frame.segments().size()
 			+ " crack_quads=" + frame.crackQuads().size()
 			+ " border_quads=" + frame.borderQuads().size()
 			+ " material_quads=" + frame.materialQuads().size()
 			+ " mesh_instances=" + frame.meshInstances().size()
+			+ " lod_instances=" + frame.lodInstances().size()
+			+ " lod_route_selected=" + lodRouteSelected(frame.lodRenderFrame())
+			+ " feature_models=" + coverage.modelSubmits()
+			+ " feature_model_parts=" + coverage.modelPartSubmits()
+			+ " feature_block_models=" + coverage.blockModelSubmits()
+			+ " feature_blocks=" + coverage.ordinaryBlockSubmits()
+			+ " feature_items=" + coverage.itemSubmits()
+			+ " feature_custom=" + coverage.customGeometrySubmits()
+			+ " feature_particles=" + coverage.particleGroupSubmits()
 			+ " background_enabled=" + frame.background().enabled();
+	}
+
+	private static boolean lodRouteSelected(VulkanicGalBridge.WorldLodRenderFrameRecord frame) {
+		return frame.enabled()
+			&& (frame.flags() & DistantHorizonsSemanticCollector.RENDER_FLAG_RUST_NON_WATER_ROUTE_SELECTED) != 0;
 	}
 
 	private static String escapeJson(String value) {
@@ -1054,40 +1442,71 @@ public final class RustGalFrameCoordinator {
 	}
 
 	private static void flushPendingGuiAssetsLocked() {
-		if (bridge == null || uploadedAssetGeneration >= assetGeneration || attemptedAssetGeneration >= assetGeneration) {
+		if (bridge != null && uploadedAssetGeneration < assetGeneration && attemptedAssetGeneration < assetGeneration) {
+			attemptedAssetGeneration = assetGeneration;
+			try {
+				recordStatus(Operation.GUI_ASSET_UPDATE, bridge.updateGuiAssets(assetGeneration, pendingAssets));
+				lastAssetPayloadCount = pendingAssets.size();
+				lastAssetPayloadBytes = pendingAssets.stream().mapToLong(asset -> asset.pngBytes().length).sum();
+				uploadedAssetGeneration = assetGeneration;
+				auditMessage(
+					"Rust VulkanicGAL GUI asset update accepted"
+						+ " generation=" + assetGeneration
+						+ " payloads=" + lastAssetPayloadCount
+						+ " payload_bytes=" + lastAssetPayloadBytes
+						+ " uploaded_generation=" + uploadedAssetGeneration
+				);
+			} catch (RuntimeException error) {
+				assetUpdateFailures++;
+				LOGGER.error(
+					"Rust VulkanicGAL GUI asset update failed for generation {}; preserving last valid atlas",
+					assetGeneration,
+					error
+				);
+				auditMessage(
+					"Rust VulkanicGAL GUI asset update failed"
+						+ " generation=" + assetGeneration
+						+ " uploaded_generation=" + uploadedAssetGeneration
+						+ " failures=" + assetUpdateFailures
+						+ " preserve_last_valid=true"
+				);
+			}
+		}
+		if (bridge == null || uploadedRawImageGeneration >= rawImageGeneration || attemptedRawImageGeneration >= rawImageGeneration) {
 			return;
 		}
-		attemptedAssetGeneration = assetGeneration;
+		attemptedRawImageGeneration = rawImageGeneration;
 		try {
-			recordStatus(Operation.GUI_ASSET_UPDATE, bridge.updateGuiAssets(assetGeneration, pendingAssets));
-			lastAssetPayloadCount = pendingAssets.size();
-			lastAssetPayloadBytes = pendingAssets.stream().mapToLong(asset -> asset.pngBytes().length).sum();
-			uploadedAssetGeneration = assetGeneration;
-			auditMessage(
-				"Rust VulkanicGAL GUI asset update accepted"
-					+ " generation=" + assetGeneration
-					+ " payloads=" + lastAssetPayloadCount
-					+ " payload_bytes=" + lastAssetPayloadBytes
-					+ " uploaded_generation=" + uploadedAssetGeneration
-			);
+			List<VulkanicGalBridge.GuiRawImageAssetRecord> assets = List.copyOf(pendingRawImages.values());
+			recordStatus(Operation.GUI_ASSET_UPDATE, bridge.updateGuiRawImages(rawImageGeneration, assets));
+			uploadedRawImageGeneration = rawImageGeneration;
+			auditMessage("Rust VulkanicGAL GUI raw image update accepted generation=" + rawImageGeneration
+				+ " payloads=" + assets.size());
 		} catch (RuntimeException error) {
 			assetUpdateFailures++;
-			LOGGER.error(
-				"Rust VulkanicGAL GUI asset update failed for generation {}; preserving last valid atlas",
-				assetGeneration,
-				error
-			);
-			auditMessage(
-				"Rust VulkanicGAL GUI asset update failed"
-					+ " generation=" + assetGeneration
-					+ " uploaded_generation=" + uploadedAssetGeneration
-					+ " failures=" + assetUpdateFailures
-					+ " preserve_last_valid=true"
-			);
+			LOGGER.error("Rust VulkanicGAL GUI raw image update failed for generation {}; preserving last valid images", rawImageGeneration, error);
+			auditMessage("Rust VulkanicGAL GUI raw image update failed generation=" + rawImageGeneration
+				+ " uploaded_generation=" + uploadedRawImageGeneration + " preserve_last_valid=true");
 		}
 	}
 
 	private static void flushPendingWorldAssetsLocked() {
+		flushPendingWorldAssetsLocked(true);
+	}
+
+	/**
+	 * Freezing a combined frame can register an immutable mesh texture or asset
+	 * while decoding the semantic work. Publish those resources before native
+	 * submission, but do not mutate the already-frozen instance list: newly
+	 * created geometry is admitted on the following frame. This keeps a reused
+	 * terrain atlas generation available to already-admitted terrain work and
+	 * avoids an unknown-texture failure during the next whole-frame submit.
+	 */
+	private static void flushPendingWorldAssetsAfterFrameConsumeLocked() {
+		flushPendingWorldAssetsLocked(true);
+	}
+
+	private static void flushPendingWorldAssetsLocked(boolean includeWorldMeshAssets) {
 		flushPendingShaderPackSourcesLocked();
 		VulkanicGalBridge.Status status = RustGalWorldPrimitiveRenderer.flushPendingWorldBorderAssets(bridge);
 		if (status != null) {
@@ -1101,10 +1520,67 @@ public final class RustGalFrameCoordinator {
 		if (status != null) {
 			recordStatus(Operation.WORLD_MATERIAL_ASSET_UPDATE, status);
 		}
-		status = RustGalWorldPrimitiveRenderer.flushPendingWorldMeshAssets(bridge);
+		status = RustGalWorldPrimitiveRenderer.flushPendingWorldTextImages(bridge);
 		if (status != null) {
-			recordStatus(Operation.WORLD_MESH_ASSET_UPDATE, status);
+			recordStatus(Operation.WORLD_TEXT_ASSET_UPDATE, status);
 		}
+		if (includeWorldMeshAssets) {
+			status = RustGalWorldPrimitiveRenderer.flushPendingWorldMeshAssets(bridge);
+			if (status != null) {
+				recordStatus(Operation.WORLD_MESH_ASSET_UPDATE, status);
+			}
+		}
+	}
+
+	private static void flushPendingWorldLodAssetsLocked() {
+		if (!RustGalGuiRenderer.isWholeFrameVulkanActive()) {
+			return;
+		}
+		VulkanicGalBridge.Status status = DistantHorizonsSemanticCollector.flushPendingAssets(bridge);
+		if (status != null) {
+			recordStatus(Operation.WORLD_LOD_ASSET_UPDATE, status);
+		}
+	}
+
+	/**
+	 * Resource reload can run before Iris has built its configured pipeline,
+	 * leaving the pending semantic source generation as the deliberately empty
+	 * disabled snapshot. Once Iris reports an active pack, collect it once and
+	 * publish the immutable source/asset generation through the existing FFI
+	 * path. This does not observe a GL object or select a renderer route.
+	 */
+	private static void refreshConfiguredShaderPackSourcesLocked() {
+		var activePack = RustShaderPackSourceCollector.activeConfiguredPackName();
+		if (activePack.isEmpty() || activePack.get().equals(pendingShaderPackSourceName)) {
+			return;
+		}
+		long sourceGeneration = nextShaderPackSourceGeneration++;
+		try {
+			stageShaderPackSourcesLocked(
+				RustShaderPackSourceCollector.collectConfiguredPack(sourceGeneration)
+			);
+			auditMessage("Rust VulkanicGAL shader-pack source became active after reload"
+				+ " generation=" + sourceGeneration
+				+ " pack=" + activePack.get());
+		} catch (IOException | RuntimeException error) {
+			// Iris can briefly report the configured name while its resolved pack
+			// is still changing. Leave the prior valid generation active and retry
+			// on a later frame without treating this as renderer execution.
+			LOGGER.warn("Rust VulkanicGAL shader-pack source is not ready for semantic collection yet", error);
+		}
+	}
+
+	private static void stageShaderPackSourcesLocked(RustShaderPackSourceCollector.SourceGeneration source) {
+		pendingShaderPackSources = source;
+		pendingShaderPackSourceName = source.packName();
+		attemptedShaderPackSourceGeneration = Math.min(
+			attemptedShaderPackSourceGeneration,
+			uploadedShaderPackSourceGeneration
+		);
+		attemptedShaderPackAssetGeneration = Math.min(
+			attemptedShaderPackAssetGeneration,
+			uploadedShaderPackAssetGeneration
+		);
 	}
 
 	private static void flushPendingShaderPackSourcesLocked() {
@@ -1132,6 +1608,7 @@ public final class RustGalFrameCoordinator {
 					+ " pack=" + pendingShaderPackSources.packName()
 					+ " files=" + pendingShaderPackSources.files().size()
 					+ " source_bytes=" + pendingShaderPackSources.totalBytes()
+					+ " source_execution_requested=" + selectedSourceExecutionRequested()
 					+ " source_execution_selected=false");
 			} catch (RuntimeException error) {
 				shaderPackSourceUpdateFailures++;
@@ -1163,6 +1640,7 @@ public final class RustGalFrameCoordinator {
 				+ " pack=" + pendingShaderPackSources.packName()
 				+ " files=" + pendingShaderPackSources.assets().size()
 				+ " asset_bytes=" + pendingShaderPackSources.assetTotalBytes()
+				+ " source_execution_requested=" + selectedSourceExecutionRequested()
 				+ " source_execution_selected=false");
 		} catch (RuntimeException error) {
 			shaderPackAssetUpdateFailures++;
@@ -1170,6 +1648,7 @@ public final class RustGalFrameCoordinator {
 			auditMessage("Rust VulkanicGAL shader-pack asset update failed generation="
 				+ generation
 				+ " failures=" + shaderPackAssetUpdateFailures
+				+ " source_execution_requested=" + selectedSourceExecutionRequested()
 				+ " source_execution_selected=false");
 		}
 	}
@@ -1276,9 +1755,17 @@ public final class RustGalFrameCoordinator {
 				METRICS.worldMaterialAssetUpdateCalls += calls;
 				METRICS.worldMaterialAssetUpdateBytes += bytes;
 			}
+			case WORLD_TEXT_ASSET_UPDATE -> {
+				METRICS.worldTextAssetUpdateCalls += calls;
+				METRICS.worldTextAssetUpdateBytes += bytes;
+			}
 			case WORLD_MESH_ASSET_UPDATE -> {
 				METRICS.worldMeshAssetUpdateCalls += calls;
 				METRICS.worldMeshAssetUpdateBytes += bytes;
+			}
+			case WORLD_LOD_ASSET_UPDATE -> {
+				METRICS.worldLodAssetUpdateCalls += calls;
+				METRICS.worldLodAssetUpdateBytes += bytes;
 			}
 			case SHADER_PACK_SOURCE_UPDATE -> {
 			}
@@ -1322,6 +1809,9 @@ public final class RustGalFrameCoordinator {
 			+ " rust_gal_world_mesh_instances_executed=" + METRICS.worldMeshInstancesExecuted
 			+ " rust_gal_world_mesh_batches_executed=" + METRICS.worldMeshBatchesExecuted
 			+ " rust_gal_world_mesh_draws_executed=" + METRICS.worldMeshDrawsExecuted
+			+ " rust_gal_world_lod_selected_frames=" + METRICS.worldLodSelectedFrames
+			+ " rust_gal_world_lod_instances_submitted=" + METRICS.worldLodInstancesSubmitted
+			+ " rust_gal_world_lod_frames_executed=" + METRICS.worldLodFramesExecuted
 			+ " rust_gal_world_background_clears_executed=" + METRICS.worldBackgroundClearsExecuted
 			+ " rust_gal_world_background_diagnostic_fallbacks=" + METRICS.worldBackgroundDiagnosticFallbacks
 			+ " rust_gal_world_background_sky_type=" + METRICS.lastWorldBackgroundSkyType
@@ -1390,6 +1880,7 @@ public final class RustGalFrameCoordinator {
 			+ " rust_gal_ffi_world_crack_asset_update_calls=" + METRICS.worldCrackAssetUpdateCalls
 			+ " rust_gal_ffi_world_material_asset_update_calls=" + METRICS.worldMaterialAssetUpdateCalls
 			+ " rust_gal_ffi_world_mesh_asset_update_calls=" + METRICS.worldMeshAssetUpdateCalls
+			+ " rust_gal_ffi_world_lod_asset_update_calls=" + METRICS.worldLodAssetUpdateCalls
 			+ " rust_gal_ffi_context_create_bytes=" + METRICS.contextCreateBytes
 			+ " rust_gal_ffi_capability_bytes=" + METRICS.capabilityBytes
 			+ " rust_gal_ffi_frame_configure_bytes=" + METRICS.frameConfigureBytes
@@ -1405,6 +1896,7 @@ public final class RustGalFrameCoordinator {
 			+ " rust_gal_ffi_world_crack_asset_update_bytes=" + METRICS.worldCrackAssetUpdateBytes
 			+ " rust_gal_ffi_world_material_asset_update_bytes=" + METRICS.worldMaterialAssetUpdateBytes
 			+ " rust_gal_ffi_world_mesh_asset_update_bytes=" + METRICS.worldMeshAssetUpdateBytes
+			+ " rust_gal_ffi_world_lod_asset_update_bytes=" + METRICS.worldLodAssetUpdateBytes
 			+ " rust_gal_enqueue_nanos=" + METRICS.enqueueNanos
 			+ " rust_gal_resource_lookup_nanos=" + METRICS.resourceLookupNanos
 			+ " rust_gal_resource_create_nanos=" + METRICS.resourceCreateNanos
@@ -1538,7 +2030,9 @@ public final class RustGalFrameCoordinator {
 		WORLD_BORDER_ASSET_UPDATE,
 		WORLD_CRACK_ASSET_UPDATE,
 		WORLD_MATERIAL_ASSET_UPDATE,
+		WORLD_TEXT_ASSET_UPDATE,
 		WORLD_MESH_ASSET_UPDATE,
+		WORLD_LOD_ASSET_UPDATE,
 		SHADER_PACK_SOURCE_UPDATE,
 		SHADER_PACK_ASSET_UPDATE
 	}
@@ -1613,7 +2107,12 @@ public final class RustGalFrameCoordinator {
 		long worldBorderAssetUpdateCalls;
 		long worldCrackAssetUpdateCalls;
 		long worldMaterialAssetUpdateCalls;
+		long worldTextAssetUpdateCalls;
 		long worldMeshAssetUpdateCalls;
+		long worldLodAssetUpdateCalls;
+		long worldLodSelectedFrames;
+		long worldLodInstancesSubmitted;
+		long worldLodFramesExecuted;
 		long contextCreateBytes;
 		long capabilityBytes;
 		long frameConfigureBytes;
@@ -1628,7 +2127,9 @@ public final class RustGalFrameCoordinator {
 		long worldBorderAssetUpdateBytes;
 		long worldCrackAssetUpdateBytes;
 		long worldMaterialAssetUpdateBytes;
+		long worldTextAssetUpdateBytes;
 		long worldMeshAssetUpdateBytes;
+		long worldLodAssetUpdateBytes;
 		long enqueueNanos;
 		long resourceLookupNanos;
 		long resourceCreateNanos;

@@ -217,6 +217,10 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_frame_present(
                 correlation_id: FrameCorrelationId(request.correlation_id),
                 wait_for: SubmissionId(request.wait_submission_id),
             })?;
+            // Presentation has already synchronized the submitted frame. Poll and retire
+            // only completed work here so persistent frontend streams can safely recycle
+            // their completed ranges on the next frame without introducing a new wait.
+            context.gal.retire_completed()?;
             Ok(FfiFramePresentResult {
                 status: StatusCode::Ok as i32,
                 frame_id: presented.frame.0,

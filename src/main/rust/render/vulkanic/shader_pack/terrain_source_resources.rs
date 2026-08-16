@@ -16,6 +16,10 @@ pub const TERRAIN_RESOURCE_BINDINGS_PATH: &str = "mattmc/terrain-resource-bindin
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum TerrainSourceResourceRole {
+    /// A draw-local material texture resolved from a Rust-owned semantic
+    /// asset. It remains distinct from the Minecraft block atlas even when a
+    /// legacy source program spells both samplers `tex`.
+    MaterialTexture,
     MaterialAtlas,
     MaterialNormalMap,
     MaterialSpecularMap,
@@ -30,15 +34,41 @@ pub enum TerrainSourceResourceRole {
     /// or combine shadow depth rather than issuing a compare sample.
     ShadowDepthRaw,
     ShadowColor,
+    /// A distinct shadow color target sampled by source stages that retain
+    /// multiple shadow attachments. It cannot alias the primary merely
+    /// because both are ordinary 2D color textures.
+    ShadowColorSecondary,
     Noise,
     GBufferAlbedo,
     GBufferNormal,
     GBufferMaterialLight,
     GBufferWorldPosition,
     MainDepth,
+    /// Main-scene depth copied before translucent work. Source packs use this
+    /// as a semantic snapshot, not as an interchangeable live depth view.
+    MainDepthBeforeTranslucency,
+    /// Earlier main-scene depth history retained by packs that declare a
+    /// second snapshot. It stays separate from the current and pre-
+    /// translucent depth streams.
+    MainDepthPrevious,
+    /// A named shader-pack color resource. The semantic name is supplied by
+    /// the pack manifest (for example `primary` or `material_auxiliary`),
+    /// never an OpenGL attachment index or a backend image handle.
+    ShaderPackColor(String),
+    /// The depth written by the source-derived opaque Distant Horizons pass.
+    /// It is raw sampled depth, not a shadow map and not interchangeable with
+    /// the near-terrain depth attachment.
+    DistantHorizonsOpaqueDepth,
+    /// The Distant Horizons depth snapshot taken before translucent work. A
+    /// selected source may consume both variants, so they remain distinct
+    /// semantic resources even when a particular frame gives them equal data.
+    DistantHorizonsDepthBeforeTranslucency,
     ColoredVoxelOccupancy,
     ColoredVoxelLightCurrent,
     ColoredVoxelLightPrevious,
+    /// Rain-puddle occupancy written by the source-derived shadow voxelizer.
+    /// It is an owned unsigned 2D storage image, never an Iris custom image.
+    PuddleOccupancy,
     /// A shader-pack-owned 2D image declared by a normalized pack-relative
     /// asset path. The path is semantic pack data, not a texture unit or
     /// backend handle, and lets several selected-source custom images coexist.
@@ -50,7 +80,13 @@ impl TerrainSourceResourceRole {
         if let Some(path) = value.strip_prefix("pack_texture:") {
             return Ok(Self::PackTexture(normalized_pack_texture_path(path)?));
         }
+        if let Some(name) = value.strip_prefix("shader_pack_color:") {
+            return Ok(Self::ShaderPackColor(normalized_shader_pack_color_name(
+                name,
+            )?));
+        }
         match value {
+            "material_texture" => Ok(Self::MaterialTexture),
             "material_atlas" => Ok(Self::MaterialAtlas),
             "material_normal_map" => Ok(Self::MaterialNormalMap),
             "material_specular_map" => Ok(Self::MaterialSpecularMap),
@@ -63,15 +99,23 @@ impl TerrainSourceResourceRole {
             "shadow_depth_secondary" => Ok(Self::ShadowDepthSecondary),
             "shadow_depth_raw" => Ok(Self::ShadowDepthRaw),
             "shadow_color" => Ok(Self::ShadowColor),
+            "shadow_color_secondary" => Ok(Self::ShadowColorSecondary),
             "noise" => Ok(Self::Noise),
             "g_buffer_albedo" => Ok(Self::GBufferAlbedo),
             "g_buffer_normal" => Ok(Self::GBufferNormal),
             "g_buffer_material_light" => Ok(Self::GBufferMaterialLight),
             "g_buffer_world_position" => Ok(Self::GBufferWorldPosition),
             "main_depth" => Ok(Self::MainDepth),
+            "main_depth_before_translucency" => Ok(Self::MainDepthBeforeTranslucency),
+            "main_depth_previous" => Ok(Self::MainDepthPrevious),
+            "distant_horizons_opaque_depth" => Ok(Self::DistantHorizonsOpaqueDepth),
+            "distant_horizons_depth_before_translucency" => {
+                Ok(Self::DistantHorizonsDepthBeforeTranslucency)
+            }
             "colored_voxel_occupancy" => Ok(Self::ColoredVoxelOccupancy),
             "colored_voxel_light_current" => Ok(Self::ColoredVoxelLightCurrent),
             "colored_voxel_light_previous" => Ok(Self::ColoredVoxelLightPrevious),
+            "puddle_occupancy" => Ok(Self::PuddleOccupancy),
             _ => Err(GalError::unsupported_feature(format!(
                 "unknown semantic terrain source resource role '{value}'"
             ))),
@@ -80,22 +124,49 @@ impl TerrainSourceResourceRole {
 
     pub fn expected_sampler_type(&self) -> &'static str {
         match self {
-            Self::MaterialAtlas
+            Self::MaterialTexture
+            | Self::MaterialAtlas
             | Self::MaterialNormalMap
             | Self::MaterialSpecularMap
             | Self::Lightmap
             | Self::Noise
             | Self::ShadowDepthRaw
             | Self::ShadowColor
+            | Self::ShadowColorSecondary
             | Self::GBufferAlbedo
             | Self::GBufferNormal
             | Self::GBufferMaterialLight
             | Self::GBufferWorldPosition
-            | Self::MainDepth => "sampler2D",
+            | Self::MainDepth
+            | Self::MainDepthBeforeTranslucency
+            | Self::MainDepthPrevious
+            | Self::ShaderPackColor(_)
+            | Self::DistantHorizonsOpaqueDepth
+            | Self::DistantHorizonsDepthBeforeTranslucency => "sampler2D",
             Self::ShadowDepthPrimary | Self::ShadowDepthSecondary => "sampler2DShadow",
             Self::ColoredVoxelOccupancy => "usampler3D",
             Self::ColoredVoxelLightCurrent | Self::ColoredVoxelLightPrevious => "sampler3D",
+            Self::PuddleOccupancy => "usampler2D",
             Self::PackTexture(_) => "sampler2D",
+        }
+    }
+
+    /// Resolves a pack-declared physical shadow-depth resource to the exact
+    /// source-stage sampling contract. `shadow_depth` identifies the owned
+    /// depth image, while each source declaration decides whether it performs
+    /// comparison sampling or reads raw depth. This keeps that distinction in
+    /// semantic source lowering instead of tying it to an Iris texture unit.
+    pub fn resolve_sampled_declaration(&self, type_name: &str) -> GalResult<Self> {
+        match (self, type_name) {
+            (Self::ShadowDepthPrimary | Self::ShadowDepthSecondary, "sampler2D") => {
+                Ok(Self::ShadowDepthRaw)
+            }
+            _ if self.expected_sampler_type() == type_name => Ok(self.clone()),
+            _ => Err(GalError::invalid_argument(format!(
+                "semantic terrain source resource '{}' requires '{}' but source declares '{type_name}'",
+                self.semantic_name(),
+                self.expected_sampler_type(),
+            ))),
         }
     }
 
@@ -105,7 +176,9 @@ impl TerrainSourceResourceRole {
     pub fn expected_storage_image_type(&self) -> Option<&'static str> {
         match self {
             Self::ColoredVoxelOccupancy => Some("uimage3D"),
-            Self::MaterialAtlas
+            Self::PuddleOccupancy => Some("uimage2D"),
+            Self::MaterialTexture
+            | Self::MaterialAtlas
             | Self::MaterialNormalMap
             | Self::MaterialSpecularMap
             | Self::Lightmap
@@ -113,12 +186,18 @@ impl TerrainSourceResourceRole {
             | Self::ShadowDepthSecondary
             | Self::ShadowDepthRaw
             | Self::ShadowColor
+            | Self::ShadowColorSecondary
             | Self::Noise
             | Self::GBufferAlbedo
             | Self::GBufferNormal
             | Self::GBufferMaterialLight
             | Self::GBufferWorldPosition
             | Self::MainDepth
+            | Self::MainDepthBeforeTranslucency
+            | Self::MainDepthPrevious
+            | Self::ShaderPackColor(_)
+            | Self::DistantHorizonsOpaqueDepth
+            | Self::DistantHorizonsDepthBeforeTranslucency
             | Self::ColoredVoxelLightCurrent
             | Self::ColoredVoxelLightPrevious
             | Self::PackTexture(_) => None,
@@ -127,6 +206,7 @@ impl TerrainSourceResourceRole {
 
     pub fn semantic_name(&self) -> &str {
         match self {
+            Self::MaterialTexture => "material_texture",
             Self::MaterialAtlas => "material_atlas",
             Self::MaterialNormalMap => "material_normal_map",
             Self::MaterialSpecularMap => "material_specular_map",
@@ -135,22 +215,50 @@ impl TerrainSourceResourceRole {
             Self::ShadowDepthSecondary => "shadow_depth_secondary",
             Self::ShadowDepthRaw => "shadow_depth_raw",
             Self::ShadowColor => "shadow_color",
+            Self::ShadowColorSecondary => "shadow_color_secondary",
             Self::Noise => "noise",
             Self::GBufferAlbedo => "g_buffer_albedo",
             Self::GBufferNormal => "g_buffer_normal",
             Self::GBufferMaterialLight => "g_buffer_material_light",
             Self::GBufferWorldPosition => "g_buffer_world_position",
             Self::MainDepth => "main_depth",
+            Self::MainDepthBeforeTranslucency => "main_depth_before_translucency",
+            Self::MainDepthPrevious => "main_depth_previous",
+            Self::ShaderPackColor(_) => "shader_pack_color",
+            Self::DistantHorizonsOpaqueDepth => "distant_horizons_opaque_depth",
+            Self::DistantHorizonsDepthBeforeTranslucency => {
+                "distant_horizons_depth_before_translucency"
+            }
             Self::ColoredVoxelOccupancy => "colored_voxel_occupancy",
             Self::ColoredVoxelLightCurrent => "colored_voxel_light_current",
             Self::ColoredVoxelLightPrevious => "colored_voxel_light_previous",
+            Self::PuddleOccupancy => "puddle_occupancy",
             Self::PackTexture(_) => "pack_texture",
+        }
+    }
+
+    /// Stable diagnostic spelling for a concrete semantic resource. Unlike
+    /// [`Self::semantic_name`], this retains a named shader-pack color or
+    /// pack-texture identity so feedback requirements can be correlated
+    /// without exposing an attachment number or native resource.
+    pub fn diagnostic_name(&self) -> String {
+        match self {
+            Self::ShaderPackColor(name) => format!("shader_pack_color:{name}"),
+            Self::PackTexture(path) => format!("pack_texture:{path}"),
+            _ => self.semantic_name().to_string(),
         }
     }
 
     pub fn pack_texture_path(&self) -> Option<&str> {
         match self {
             Self::PackTexture(path) => Some(path),
+            _ => None,
+        }
+    }
+
+    pub fn shader_pack_color_name(&self) -> Option<&str> {
+        match self {
+            Self::ShaderPackColor(name) => Some(name),
             _ => None,
         }
     }
@@ -162,6 +270,10 @@ impl TerrainSourceResourceRole {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TerrainSourceSampledResourceShape {
     Texture2d,
+    /// An integer-valued 2D texture. This stays distinct from ordinary color
+    /// textures so a source `usampler2D` cannot accidentally bind normalized
+    /// material data.
+    UnsignedTexture2d,
     DepthCompareTexture2d,
     UnsignedTexture3d,
     FloatTexture3d,
@@ -174,21 +286,29 @@ impl TerrainSourceResourceRole {
                 TerrainSourceSampledResourceShape::DepthCompareTexture2d
             }
             Self::ColoredVoxelOccupancy => TerrainSourceSampledResourceShape::UnsignedTexture3d,
+            Self::PuddleOccupancy => TerrainSourceSampledResourceShape::UnsignedTexture2d,
             Self::ColoredVoxelLightCurrent | Self::ColoredVoxelLightPrevious => {
                 TerrainSourceSampledResourceShape::FloatTexture3d
             }
-            Self::MaterialAtlas
+            Self::MaterialTexture
+            | Self::MaterialAtlas
             | Self::MaterialNormalMap
             | Self::MaterialSpecularMap
             | Self::Lightmap
             | Self::ShadowDepthRaw
             | Self::ShadowColor
+            | Self::ShadowColorSecondary
             | Self::Noise
             | Self::GBufferAlbedo
             | Self::GBufferNormal
             | Self::GBufferMaterialLight
             | Self::GBufferWorldPosition
             | Self::MainDepth
+            | Self::MainDepthBeforeTranslucency
+            | Self::MainDepthPrevious
+            | Self::ShaderPackColor(_)
+            | Self::DistantHorizonsOpaqueDepth
+            | Self::DistantHorizonsDepthBeforeTranslucency
             | Self::PackTexture(_) => TerrainSourceSampledResourceShape::Texture2d,
         }
     }
@@ -207,6 +327,25 @@ fn normalized_pack_texture_path(path: &str) -> GalResult<String> {
         ));
     }
     Ok(path.to_string())
+}
+
+fn normalized_shader_pack_color_name(name: &str) -> GalResult<String> {
+    let name = name.trim();
+    let legacy_attachment_name = name.strip_prefix("colortex").is_some_and(|suffix| {
+        !suffix.is_empty() && suffix.bytes().all(|byte| byte.is_ascii_digit())
+    });
+    if name.is_empty()
+        || legacy_attachment_name
+        || !name
+            .bytes()
+            .all(|byte| byte == b'_' || byte.is_ascii_lowercase() || byte.is_ascii_digit())
+        || !matches!(name.as_bytes().first(), Some(byte) if *byte == b'_' || byte.is_ascii_lowercase())
+    {
+        return Err(GalError::invalid_argument(
+            "shader-pack color role requires a lowercase semantic identifier",
+        ));
+    }
+    Ok(name.to_string())
 }
 
 /// One Rust-owned resource made available to a selected source program. The
@@ -425,6 +564,169 @@ impl TerrainSourceOwnedResourceSet {
             .collect()
     }
 
+    /// Rebinds one already-declared sampled role for a distinct semantic
+    /// material draw. The caller supplies a stable resource generation rather
+    /// than a GAL/native identity, so frontend cache keys remain meaningful
+    /// across backend implementations while still invalidating when the
+    /// material asset changes.
+    pub fn with_combined_sampler_override(
+        &self,
+        role: TerrainSourceResourceRole,
+        combined_sampler: Handle,
+        resource_generation: u64,
+    ) -> GalResult<Self> {
+        if combined_sampler.kind() != Some(HandleKind::CombinedTextureSampler) {
+            return Err(GalError::invalid_argument(format!(
+                "terrain source override for '{}' is not a combined texture sampler",
+                role.semantic_name()
+            )));
+        }
+        if resource_generation == 0 {
+            return Err(GalError::invalid_argument(format!(
+                "terrain source override for '{}' has zero resource generation",
+                role.semantic_name()
+            )));
+        }
+        let Some(existing) = self.availability.resource_for(role.clone()) else {
+            return Err(GalError::invalid_argument(format!(
+                "terrain source override references unavailable role '{}'",
+                role.semantic_name()
+            )));
+        };
+        if self.storage_views.contains_key(&role) || !self.samplers.contains_key(&role) {
+            return Err(GalError::invalid_argument(format!(
+                "terrain source override requires sampled role '{}'",
+                role.semantic_name()
+            )));
+        }
+        let availability = self
+            .availability
+            .resources()
+            .map(|available| TerrainSourceResourceAvailability {
+                role: available.role.clone(),
+                shape: available.shape,
+                resource_generation: if available.role == role {
+                    resource_generation
+                } else {
+                    available.resource_generation
+                },
+            })
+            .collect::<Vec<_>>();
+        debug_assert!(existing.resource_generation > 0);
+        let resources = self
+            .samplers
+            .iter()
+            .map(|(available_role, sampler)| TerrainSourceOwnedResource {
+                role: available_role.clone(),
+                combined_sampler: if *available_role == role {
+                    combined_sampler
+                } else {
+                    *sampler
+                },
+            })
+            .collect::<Vec<_>>();
+        let storage_resources = self
+            .storage_views
+            .iter()
+            .map(
+                |(available_role, texture_view)| TerrainSourceOwnedStorageResource {
+                    role: available_role.clone(),
+                    texture_view: *texture_view,
+                },
+            )
+            .collect::<Vec<_>>();
+        Self::with_storage_resources(
+            TerrainSourceResourceAvailabilitySet::new(
+                self.availability.shader_pack_generation(),
+                self.availability.world_generation(),
+                availability,
+            )?,
+            resources,
+            storage_resources,
+        )
+    }
+
+    /// Returns the semantic subset whose roles are not already owned by an
+    /// earlier stage in the same source-frame transaction. This is not a
+    /// conflict-resolution policy: callers must explicitly name the earlier
+    /// roles, and `merge` still rejects every accidental duplicate.
+    pub fn excluding_roles(
+        &self,
+        exclusions: impl IntoIterator<Item = TerrainSourceResourceRole>,
+    ) -> GalResult<Self> {
+        let exclusions = exclusions.into_iter().collect::<BTreeSet<_>>();
+        let availability = self
+            .availability
+            .resources()
+            .filter(|resource| !exclusions.contains(&resource.role))
+            .collect::<Vec<_>>();
+        let resources = self
+            .samplers
+            .iter()
+            .filter(|(role, _)| !exclusions.contains(*role))
+            .map(|(role, &combined_sampler)| TerrainSourceOwnedResource {
+                role: role.clone(),
+                combined_sampler,
+            })
+            .collect::<Vec<_>>();
+        let storage_resources = self
+            .storage_views
+            .iter()
+            .filter(|(role, _)| !exclusions.contains(*role))
+            .map(|(role, &texture_view)| TerrainSourceOwnedStorageResource {
+                role: role.clone(),
+                texture_view,
+            })
+            .collect::<Vec<_>>();
+        Self::with_storage_resources(
+            TerrainSourceResourceAvailabilitySet::new(
+                self.availability.shader_pack_generation(),
+                self.availability.world_generation(),
+                availability,
+            )?,
+            resources,
+            storage_resources,
+        )
+    }
+
+    /// Removes roles already supplied by an earlier stage of the same source
+    /// transaction, but only when their semantic generation and owned GAL
+    /// bindings are exactly equal. This lets a confirmed snapshot be carried
+    /// into a later plan without treating a different current/stale resource
+    /// as a harmless duplicate.
+    pub fn excluding_roles_already_owned_by(
+        &self,
+        existing: &TerrainSourceOwnedResourceSet,
+    ) -> GalResult<Self> {
+        if self.availability.shader_pack_generation()
+            != existing.availability.shader_pack_generation()
+            || self.availability.world_generation() != existing.availability.world_generation()
+        {
+            return Err(GalError::invalid_argument(
+                "cannot compare terrain source resources from different shader-pack or world generations",
+            ));
+        }
+        let mut exclusions = BTreeSet::new();
+        for resource in self.availability.resources() {
+            let Some(previous) = existing.availability.resource_for(resource.role.clone()) else {
+                continue;
+            };
+            if previous != resource
+                || existing.combined_sampler_for(resource.role.clone())
+                    != self.combined_sampler_for(resource.role.clone())
+                || existing.storage_texture_for(resource.role.clone())
+                    != self.storage_texture_for(resource.role.clone())
+            {
+                return Err(GalError::invalid_argument(format!(
+                    "terrain source resource role '{}' conflicts with an earlier source-stage binding",
+                    resource.role.diagnostic_name(),
+                )));
+            }
+            exclusions.insert(resource.role);
+        }
+        self.excluding_roles(exclusions)
+    }
+
     /// Merges independently prepared semantic resource subsets for one exact
     /// shader-pack/world generation. This keeps pack-owned PNGs, Minecraft
     /// material assets, runtime attachments, and volume resources separate at
@@ -504,7 +806,6 @@ impl TerrainSourceResourceBindings {
             return Ok(Self::default());
         };
         let mut bindings = BTreeMap::new();
-        let mut roles = BTreeSet::new();
         for (index, raw_line) in contents.lines().enumerate() {
             let line = raw_line.trim();
             if line.is_empty() || line.starts_with('#') {
@@ -524,12 +825,11 @@ impl TerrainSourceResourceBindings {
                 )));
             }
             let role = TerrainSourceResourceRole::parse(role.trim())?;
-            if !roles.insert(role.clone()) {
-                return Err(GalError::invalid_argument(format!(
-                    "terrain resource role {:?} is declared more than once",
-                    role
-                )));
-            }
+            // Multiple pack source identifiers may be aliases for one
+            // Rust-owned resource (for example legacy `gaux*` and
+            // `colortex*` sampler names). The resource table remains unique
+            // by semantic role; this declaration table maps every source
+            // identifier independently and still rejects duplicate names.
             if bindings.insert(name.to_string(), role).is_some() {
                 return Err(GalError::invalid_argument(format!(
                     "terrain resource binding '{}' is declared more than once",
@@ -542,6 +842,27 @@ impl TerrainSourceResourceBindings {
 
     pub fn role_for(&self, name: &str) -> Option<TerrainSourceResourceRole> {
         self.bindings.get(name).cloned()
+    }
+
+    /// Resolves one legacy shader-pack color output slot to its declared
+    /// semantic color role. The slot is source syntax only; callers retain the
+    /// returned named role and must never expose the numeric slot as a GAL or
+    /// frontend attachment identity.
+    pub fn shader_pack_color_output_for_slot(
+        &self,
+        slot: u32,
+    ) -> GalResult<TerrainSourceResourceRole> {
+        let name = format!("colortex{slot}");
+        match self.role_for(&name) {
+            Some(role @ TerrainSourceResourceRole::ShaderPackColor(_)) => Ok(role),
+            Some(role) => Err(GalError::invalid_argument(format!(
+                "shader-pack color output slot {slot} is declared as non-color role '{}'",
+                role.semantic_name()
+            ))),
+            None => Err(GalError::unsupported_feature(format!(
+                "shader-pack source output slot {slot} has no declared semantic color role"
+            ))),
+        }
     }
 
     pub fn names(&self) -> impl Iterator<Item = &str> {
@@ -594,9 +915,11 @@ fn valid_identifier(name: &str) -> bool {
 mod tests {
     use super::*;
     use crate::render::vulkanic::handles::{Handle, HandleKind};
+    use crate::render::vulkanic::shader_pack::preprocess::complete_bundled_pack_source_for_test;
     use crate::render::vulkanic::shader_pack::source::ShaderSourceFile;
     use crate::render::vulkanic::shader_pack::terrain_contract::{
-        TerrainMaterialClass, TerrainPassOperation, TerrainPassOutput, UnsupportedTerrainFeature,
+        TerrainMaterialClass, TerrainPassOperation, TerrainPassOutput, TerrainSourcePassKind,
+        UnsupportedTerrainFeature,
     };
 
     fn contract(
@@ -604,17 +927,21 @@ mod tests {
         required_resources: BTreeSet<TerrainPassRequiredResource>,
     ) -> TerrainPassContract {
         TerrainPassContract {
+            pass_kind: TerrainSourcePassKind::OpaqueCutout,
             pack_name: "test".to_string(),
             generation: 1,
             program_path: "gbuffers_terrain.fsh".to_string(),
             material_classes: BTreeSet::from([TerrainMaterialClass::Opaque]),
             inputs,
             outputs: BTreeSet::from([TerrainPassOutput::LitTerrainColor]),
+            output_color_slots: BTreeMap::from([(TerrainPassOutput::LitTerrainColor, 0)]),
             property_defines: BTreeMap::new(),
             material_ids: BTreeMap::new(),
+            runtime_block_state_material_ids: None,
             operations: vec![TerrainPassOperation::AtlasSample],
             required_resources,
             voxel_light_volume_requirements: None,
+            translucent_raster_state: None,
             unsupported: BTreeSet::<UnsupportedTerrainFeature>::new(),
         }
     }
@@ -642,6 +969,50 @@ mod tests {
                 .unwrap()
                 .expected_sampler_type()
         );
+    }
+
+    #[test]
+    fn bundled_pack_declares_voxel_sampler_as_owned_occupancy_volume() {
+        let source = complete_bundled_pack_source_for_test();
+        let bindings = TerrainSourceResourceBindings::from_source(&source).unwrap();
+
+        assert_eq!(
+            Some(TerrainSourceResourceRole::ColoredVoxelOccupancy),
+            bindings.role_for("voxel_sampler")
+        );
+        assert_eq!(
+            Some(TerrainSourceResourceRole::PuddleOccupancy),
+            bindings.role_for("puddle_sampler")
+        );
+        assert_eq!(
+            Some(TerrainSourceResourceRole::PuddleOccupancy),
+            bindings.role_for("puddle_img")
+        );
+    }
+
+    #[test]
+    fn puddle_occupancy_is_an_unsigned_2d_sampler_and_storage_contract() {
+        let source = ShaderPackSource::new(
+            "test",
+            1,
+            vec![ShaderSourceFile::new(
+                TERRAIN_RESOURCE_BINDINGS_PATH,
+                "puddle_sampler=puddle_occupancy\npuddle_img=puddle_occupancy\n",
+            )],
+        )
+        .unwrap();
+        let bindings = TerrainSourceResourceBindings::from_source(&source).unwrap();
+        let role = bindings.role_for("puddle_sampler").unwrap();
+
+        assert_eq!(TerrainSourceResourceRole::PuddleOccupancy, role);
+        assert_eq!("puddle_occupancy", role.semantic_name());
+        assert_eq!("usampler2D", role.expected_sampler_type());
+        assert_eq!(Some("uimage2D"), role.expected_storage_image_type());
+        assert_eq!(
+            TerrainSourceSampledResourceShape::UnsignedTexture2d,
+            role.expected_sampled_resource_shape()
+        );
+        assert_eq!(Some(role.clone()), bindings.role_for("puddle_img"));
     }
 
     #[test]
@@ -740,7 +1111,65 @@ mod tests {
     }
 
     #[test]
-    fn rejects_duplicate_or_unknown_semantic_roles() {
+    fn keeps_distant_depth_streams_distinct_from_shadow_depth() {
+        let source = ShaderPackSource::new(
+            "test",
+            1,
+            vec![ShaderSourceFile::new(
+                TERRAIN_RESOURCE_BINDINGS_PATH,
+                concat!(
+                    "dh_opaque=distant_horizons_opaque_depth\n",
+                    "dh_pre_translucent=distant_horizons_depth_before_translucency\n",
+                ),
+            )],
+        )
+        .unwrap();
+        let bindings = TerrainSourceResourceBindings::from_source(&source).unwrap();
+        for name in ["dh_opaque", "dh_pre_translucent"] {
+            let role = bindings.role_for(name).unwrap();
+            assert_eq!("sampler2D", role.expected_sampler_type());
+            assert_eq!(
+                TerrainSourceSampledResourceShape::Texture2d,
+                role.expected_sampled_resource_shape()
+            );
+            assert_ne!(TerrainSourceResourceRole::ShadowDepthRaw, role);
+        }
+    }
+
+    #[test]
+    fn shader_pack_color_roles_are_named_semantics_not_attachment_indices() {
+        let source = ShaderPackSource::new(
+            "test",
+            1,
+            vec![ShaderSourceFile::new(
+                TERRAIN_RESOURCE_BINDINGS_PATH,
+                "color=shader_pack_color:primary\n",
+            )],
+        )
+        .unwrap();
+        let bindings = TerrainSourceResourceBindings::from_source(&source).unwrap();
+        let role = bindings.role_for("color").unwrap();
+        assert_eq!(Some("primary"), role.shader_pack_color_name());
+        assert_eq!("shader_pack_color:primary", role.diagnostic_name());
+        assert_eq!("sampler2D", role.expected_sampler_type());
+        assert_eq!(
+            TerrainSourceSampledResourceShape::Texture2d,
+            role.expected_sampled_resource_shape()
+        );
+        assert!(ShaderPackSource::new(
+            "test",
+            1,
+            vec![ShaderSourceFile::new(
+                TERRAIN_RESOURCE_BINDINGS_PATH,
+                "color=shader_pack_color:colortex0\n",
+            )],
+        )
+        .and_then(|source| TerrainSourceResourceBindings::from_source(&source))
+        .is_err());
+    }
+
+    #[test]
+    fn permits_semantic_resource_aliases_but_rejects_duplicate_names_or_unknown_roles() {
         let source = ShaderPackSource::new(
             "test",
             1,
@@ -750,7 +1179,25 @@ mod tests {
             )],
         )
         .unwrap();
-        assert!(TerrainSourceResourceBindings::from_source(&source).is_err());
+        let bindings = TerrainSourceResourceBindings::from_source(&source).unwrap();
+        assert_eq!(
+            Some(TerrainSourceResourceRole::MaterialAtlas),
+            bindings.role_for("tex")
+        );
+        assert_eq!(
+            Some(TerrainSourceResourceRole::MaterialAtlas),
+            bindings.role_for("other")
+        );
+        let duplicate_name = ShaderPackSource::new(
+            "test",
+            1,
+            vec![ShaderSourceFile::new(
+                TERRAIN_RESOURCE_BINDINGS_PATH,
+                "tex=material_atlas\ntex=material_normal_map\n",
+            )],
+        )
+        .unwrap();
+        assert!(TerrainSourceResourceBindings::from_source(&duplicate_name).is_err());
         let source = ShaderPackSource::new(
             "test",
             1,
@@ -804,6 +1251,19 @@ mod tests {
         .unwrap_err()
         .to_string()
         .contains("requires UnsignedTexture3d"));
+
+        assert!(TerrainSourceResourceAvailabilitySet::new(
+            7,
+            12,
+            [TerrainSourceResourceAvailability {
+                role: TerrainSourceResourceRole::PuddleOccupancy,
+                shape: TerrainSourceSampledResourceShape::Texture2d,
+                resource_generation: 4,
+            }],
+        )
+        .unwrap_err()
+        .to_string()
+        .contains("requires UnsignedTexture2d"));
         assert!(TerrainSourceResourceAvailabilitySet::new(
             7,
             12,
@@ -972,6 +1432,69 @@ mod tests {
     }
 
     #[test]
+    fn sampled_resource_override_replaces_only_the_named_semantic_role() {
+        let availability = TerrainSourceResourceAvailabilitySet::new(
+            7,
+            12,
+            [
+                TerrainSourceResourceAvailability {
+                    role: TerrainSourceResourceRole::MaterialAtlas,
+                    shape: TerrainSourceSampledResourceShape::Texture2d,
+                    resource_generation: 3,
+                },
+                TerrainSourceResourceAvailability {
+                    role: TerrainSourceResourceRole::Noise,
+                    shape: TerrainSourceSampledResourceShape::Texture2d,
+                    resource_generation: 9,
+                },
+            ],
+        )
+        .unwrap();
+        let atlas = Handle::new(HandleKind::CombinedTextureSampler, 4, 1).unwrap();
+        let noise = Handle::new(HandleKind::CombinedTextureSampler, 5, 1).unwrap();
+        let local = Handle::new(HandleKind::CombinedTextureSampler, 6, 1).unwrap();
+        let resources = TerrainSourceOwnedResourceSet::new(
+            availability,
+            [
+                TerrainSourceOwnedResource {
+                    role: TerrainSourceResourceRole::MaterialAtlas,
+                    combined_sampler: atlas,
+                },
+                TerrainSourceOwnedResource {
+                    role: TerrainSourceResourceRole::Noise,
+                    combined_sampler: noise,
+                },
+            ],
+        )
+        .unwrap();
+        let overridden = resources
+            .with_combined_sampler_override(TerrainSourceResourceRole::MaterialAtlas, local, 17)
+            .unwrap();
+        assert_eq!(
+            Some(local),
+            overridden.combined_sampler_for(TerrainSourceResourceRole::MaterialAtlas)
+        );
+        assert_eq!(
+            Some(noise),
+            overridden.combined_sampler_for(TerrainSourceResourceRole::Noise)
+        );
+        assert_eq!(
+            vec![
+                (TerrainSourceResourceRole::MaterialAtlas, 17),
+                (TerrainSourceResourceRole::Noise, 9),
+            ],
+            overridden.generation_signature()
+        );
+        assert!(resources
+            .with_combined_sampler_override(
+                TerrainSourceResourceRole::MaterialAtlas,
+                Handle::new(HandleKind::Sampler, 6, 1).unwrap(),
+                17,
+            )
+            .is_err());
+    }
+
+    #[test]
     fn owned_resource_set_keeps_storage_views_distinct_from_samplers() {
         let availability = TerrainSourceResourceAvailabilitySet::new(
             7,
@@ -1063,5 +1586,22 @@ mod tests {
         .unwrap();
         assert!(TerrainSourceOwnedResourceSet::merge([&noise, &stale]).is_err());
         assert!(TerrainSourceOwnedResourceSet::merge([&noise, &noise]).is_err());
+
+        let exact_duplicate = noise.excluding_roles_already_owned_by(&noise).unwrap();
+        assert_eq!(0, exact_duplicate.len());
+
+        let conflicting_noise = TerrainSourceOwnedResourceSet::new(
+            availability(TerrainSourceResourceRole::Noise, 7, 12),
+            [TerrainSourceOwnedResource {
+                role: TerrainSourceResourceRole::Noise,
+                combined_sampler: Handle::new(HandleKind::CombinedTextureSampler, 9, 1).unwrap(),
+            }],
+        )
+        .unwrap();
+        assert!(conflicting_noise
+            .excluding_roles_already_owned_by(&noise)
+            .unwrap_err()
+            .to_string()
+            .contains("conflicts with an earlier source-stage binding"));
     }
 }

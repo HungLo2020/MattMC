@@ -349,7 +349,7 @@ public class LodQuadTree extends QuadTree<LodRenderSection> implements IDebugRen
 			
 			// prepare this section for rendering
 			if (!renderSection.gpuUploadInProgress()
-				&& renderSection.bufferContainer == null
+				&& !renderSection.canRender()
 				// TODO this is commented out since some users reported LODs refusing to
 				//  load at their expected higher-detail levels
 				// this check is specifically for N-sized world generators where the higher quality
@@ -469,7 +469,7 @@ public class LodQuadTree extends QuadTree<LodRenderSection> implements IDebugRen
 		for (int i = 0; i < loadSectionList.size(); i++)
 		{
 			LodRenderSection renderSection = loadSectionList.get(i);
-			if (!renderSection.gpuUploadInProgress() && renderSection.bufferContainer == null)
+			if (!renderSection.gpuUploadInProgress() && !renderSection.canRender())
 			{
 				renderSection.uploadRenderDataToGpuAsync();
 			}

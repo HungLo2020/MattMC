@@ -1,6 +1,7 @@
 package com.seibel.distanthorizons.core.dataObjects.render.bufferBuilding;
 
 import com.seibel.distanthorizons.core.config.Config;
+import com.seibel.distanthorizons.core.dataObjects.render.ColumnRenderSource;
 import com.seibel.distanthorizons.core.enums.EDhDirection;
 import com.seibel.distanthorizons.core.util.LodUtil;
 
@@ -37,6 +38,14 @@ public final class BufferQuad
 	public final byte skyLight;
 	public final byte blockLight;
 	public final EDhDirection direction;
+	/**
+	 * Sidecar-only source identity for a future material-aware LOD route. It is
+	 * deliberately absent from the legacy DH vertex ABI.
+	 */
+	public int semanticMaterialId;
+	/** One exact source position, or an explicit unavailable/mixed outcome. */
+	public byte semanticVariantState;
+	public long semanticVariantPosition;
 	
 	public boolean hasError = false;
 	
@@ -45,7 +54,18 @@ public final class BufferQuad
 	BufferQuad(
 			short x, short y, short z, short widthEastWest, short widthNorthSouthOrUpDown,
 			int color, byte irisBlockMaterialId, byte skylight, byte blockLight,
-			EDhDirection direction)
+			EDhDirection direction, int semanticMaterialId)
+	{
+		this(x, y, z, widthEastWest, widthNorthSouthOrUpDown, color, irisBlockMaterialId,
+			skylight, blockLight, direction, semanticMaterialId,
+			ColumnRenderSource.SEMANTIC_VARIANT_UNAVAILABLE, 0L);
+	}
+
+	BufferQuad(
+			short x, short y, short z, short widthEastWest, short widthNorthSouthOrUpDown,
+			int color, byte irisBlockMaterialId, byte skylight, byte blockLight,
+			EDhDirection direction, int semanticMaterialId, byte semanticVariantState,
+			long semanticVariantPosition)
 	{
 		if (widthEastWest == 0 || widthNorthSouthOrUpDown == 0)
 			throw new IllegalArgumentException("Size 0 quad!");
@@ -62,6 +82,10 @@ public final class BufferQuad
 		this.skyLight = skylight;
 		this.blockLight = blockLight;
 		this.direction = direction;
+		this.semanticMaterialId = semanticMaterialId;
+		this.semanticVariantState = semanticVariantState;
+		this.semanticVariantPosition = semanticVariantState == ColumnRenderSource.SEMANTIC_VARIANT_EXACT
+			? semanticVariantPosition : 0L;
 	}
 	
 	
@@ -304,6 +328,24 @@ public final class BufferQuad
 		else // if (mergeDirection == MergeDirection.EastWest)
 		{
 			this.widthEastWest += quad.widthEastWest;
+		}
+
+		// Existing visual greedy merging is intentionally unchanged. A merged
+		// quad may no longer represent one source block/material, so never keep
+		// either identity as though it were an exact texture assignment.
+		if (this.semanticMaterialId != quad.semanticMaterialId)
+		{
+			this.semanticMaterialId = ColumnRenderSource.SEMANTIC_MATERIAL_MIXED;
+		}
+		if (this.semanticVariantState != ColumnRenderSource.SEMANTIC_VARIANT_EXACT
+			|| quad.semanticVariantState != ColumnRenderSource.SEMANTIC_VARIANT_EXACT
+			|| this.semanticVariantPosition != quad.semanticVariantPosition)
+		{
+			this.semanticVariantState = this.semanticVariantState == ColumnRenderSource.SEMANTIC_VARIANT_UNAVAILABLE
+				|| quad.semanticVariantState == ColumnRenderSource.SEMANTIC_VARIANT_UNAVAILABLE
+				? ColumnRenderSource.SEMANTIC_VARIANT_UNAVAILABLE
+				: ColumnRenderSource.SEMANTIC_VARIANT_MIXED;
+			this.semanticVariantPosition = 0L;
 		}
 		
 		// merge successful

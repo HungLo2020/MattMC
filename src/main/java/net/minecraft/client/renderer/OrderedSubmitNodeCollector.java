@@ -4,6 +4,7 @@ import net.blaze3d.vertex.PoseStack;
 import java.util.List;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
+import net.minecraft.core.BlockPos;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.model.Model;
 import net.minecraft.client.model.geom.ModelPart;
@@ -106,6 +107,20 @@ public interface OrderedSubmitNodeCollector {
 	void submitBlock(PoseStack poseStack, BlockState blockState, int i, int j, int k);
 
 	default void submitBlockDisplay(PoseStack poseStack, BlockState blockState, int i, int j, int k) {
+		this.submitBlock(poseStack, blockState, i, j, k);
+	}
+
+	default void submitBlockDisplay(PoseStack poseStack, BlockState blockState, int i, int j, int k, BlockPos tintPos) {
+		this.submitBlockDisplay(poseStack, blockState, i, j, k);
+	}
+
+	/**
+	 * Marks the bounded primed-TNT block submit without changing its copied
+	 * gameplay inputs. Implementations that do not retain submit provenance
+	 * still receive the ordinary block call; the collection used by rendering
+	 * records the explicit semantic source before route selection.
+	 */
+	default void submitPrimedTntBlock(PoseStack poseStack, BlockState blockState, int i, int j, int k) {
 		this.submitBlock(poseStack, blockState, i, j, k);
 	}
 

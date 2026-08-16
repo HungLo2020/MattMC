@@ -111,15 +111,15 @@ public class BlockFeatureRenderer {
 		for (SubmitNodeStorage.BlockSubmit blockSubmit : submitNodeCollection.getBlockSubmits()) {
 			this.poseStack.pushPose();
 			this.poseStack.last().set(blockSubmit.pose());
-			WorldRenderRoutePolicy.Route blockDisplayRoute = WorldRenderRoutePolicy.currentBlockDisplayRoute();
-			if (blockDisplayRoute == WorldRenderRoutePolicy.Route.DISABLED) {
-				GraphicsFrameBenchmark.recordSubmittedWorkIdentity("block-display", "disabled:" + blockSubmit.state().getBlockHolder().getRegisteredName());
-			} else if (!RustGalWorldPrimitiveRenderer.enqueueBlockDisplay(blockRenderDispatcher, blockSubmit)) {
-				GraphicsFrameBenchmark.recordSubmittedWorkIdentity("block-display", "java-legacy:" + blockSubmit.state().getBlockHolder().getRegisteredName());
-				blockRenderDispatcher.renderSingleBlock(blockSubmit.state(), this.poseStack, bufferSource, blockSubmit.lightCoords(), blockSubmit.overlayCoords());
-				if (blockSubmit.outlineColor() != 0) {
-					outlineBufferSource.setColor(blockSubmit.outlineColor());
-					blockRenderDispatcher.renderSingleBlock(blockSubmit.state(), this.poseStack, outlineBufferSource, blockSubmit.lightCoords(), blockSubmit.overlayCoords());
+			if (blockSubmit.source() == SubmitNodeStorage.BlockSubmitSource.PRIMED_TNT) {
+				this.routePrimedTntBlock(blockRenderDispatcher, bufferSource, outlineBufferSource, blockSubmit);
+			} else {
+				WorldRenderRoutePolicy.Route blockDisplayRoute = WorldRenderRoutePolicy.currentBlockDisplayRoute();
+				if (blockDisplayRoute == WorldRenderRoutePolicy.Route.DISABLED) {
+					GraphicsFrameBenchmark.recordSubmittedWorkIdentity("block-display", "disabled:" + blockSubmit.state().getBlockHolder().getRegisteredName());
+				} else if (!RustGalWorldPrimitiveRenderer.enqueueBlockDisplay(blockRenderDispatcher, blockSubmit)) {
+					GraphicsFrameBenchmark.recordSubmittedWorkIdentity("block-display", "java-legacy:" + blockSubmit.state().getBlockHolder().getRegisteredName());
+					this.renderJavaBlockSubmit(blockRenderDispatcher, bufferSource, outlineBufferSource, blockSubmit);
 				}
 			}
 
@@ -151,6 +151,60 @@ public class BlockFeatureRenderer {
 					blockModelSubmit.overlayCoords()
 				);
 			}
+		}
+	}
+
+	private void routePrimedTntBlock(
+		BlockRenderDispatcher blockRenderDispatcher,
+		MultiBufferSource.BufferSource bufferSource,
+		OutlineBufferSource outlineBufferSource,
+		SubmitNodeStorage.BlockSubmit blockSubmit
+	) {
+		String blockIdentity = blockSubmit.state().getBlockHolder().getRegisteredName();
+		WorldRenderRoutePolicy.Route route = WorldRenderRoutePolicy.currentPrimedTntRoute();
+		if (route == WorldRenderRoutePolicy.Route.DISABLED) {
+			RustGalWorldPrimitiveRenderer.recordMovingBlockRouteDecision(
+				"primed-tnt", "disabled", blockSubmit.state(), false, false, false
+			);
+			GraphicsFrameBenchmark.recordSubmittedWorkIdentity("primed-tnt", "disabled:" + blockIdentity);
+			return;
+		}
+		if (!RustGalWorldPrimitiveRenderer.isPrimedTntMeshEligible(blockSubmit)
+			|| route == WorldRenderRoutePolicy.Route.JAVA_COMPATIBILITY) {
+			RustGalWorldPrimitiveRenderer.recordMovingBlockRouteDecision(
+				"primed-tnt", "java-legacy", blockSubmit.state(), false, false, true
+			);
+			GraphicsFrameBenchmark.recordSubmittedWorkIdentity("primed-tnt", "java-legacy:" + blockIdentity);
+			this.renderJavaBlockSubmit(blockRenderDispatcher, bufferSource, outlineBufferSource, blockSubmit);
+			return;
+		}
+		if (!RustGalWorldPrimitiveRenderer.enqueuePrimedTntBlock(blockRenderDispatcher, blockSubmit)) {
+			throw new IllegalStateException("Rust Primed TNT route selected without a submitted mesh instance");
+		}
+		RustGalWorldPrimitiveRenderer.recordMovingBlockRouteDecision(
+			"primed-tnt",
+			route.usesRustWholeFrameVulkan() ? "rust-vulkan-whole-frame" : "rust-opengl",
+			blockSubmit.state(),
+			true,
+			true,
+			false
+		);
+		GraphicsFrameBenchmark.recordSubmittedWorkIdentity(
+			"primed-tnt",
+			"rust:" + blockIdentity
+		);
+	}
+
+	private void renderJavaBlockSubmit(
+		BlockRenderDispatcher blockRenderDispatcher,
+		MultiBufferSource.BufferSource bufferSource,
+		OutlineBufferSource outlineBufferSource,
+		SubmitNodeStorage.BlockSubmit blockSubmit
+	) {
+		blockRenderDispatcher.renderSingleBlock(blockSubmit.state(), this.poseStack, bufferSource, blockSubmit.lightCoords(), blockSubmit.overlayCoords());
+		if (blockSubmit.outlineColor() != 0) {
+			outlineBufferSource.setColor(blockSubmit.outlineColor());
+			blockRenderDispatcher.renderSingleBlock(blockSubmit.state(), this.poseStack, outlineBufferSource, blockSubmit.lightCoords(), blockSubmit.overlayCoords());
 		}
 	}
 

@@ -96,15 +96,49 @@ public class DistantHorizonsCommandContextMigrationTest {
             "com/seibel/distanthorizons/core/render/renderer/shaders/DhFadeShader.java"));
     }
 
-    @Test
-    public void testDhCoreRenderersUseBackendNeutralContext() throws IOException {
+	@Test
+	public void testDhCoreRenderersUseBackendNeutralContext() throws IOException {
         assertBackendNeutralSingleContext(SRC_MAIN_JAVA.resolve(
             "com/seibel/distanthorizons/core/render/renderer/LodRenderer.java"));
         assertBackendNeutralSingleContext(SRC_MAIN_JAVA.resolve(
             "com/seibel/distanthorizons/core/render/renderer/generic/GenericObjectRenderer.java"));
         assertBackendNeutralSingleContext(SRC_MAIN_JAVA.resolve(
             "com/seibel/distanthorizons/core/render/renderer/generic/RenderableBoxGroup.java"));
-    }
+	}
+
+	@Test
+	public void testRustWholeFrameDhPreflightDoesNotBorrowOrRejectIrisState() throws IOException {
+		Path lodRenderer = SRC_MAIN_JAVA.resolve(
+			"com/seibel/distanthorizons/core/render/renderer/LodRenderer.java");
+		String sourceWithoutComments = readSourceWithoutComments(lodRenderer);
+
+		assertTrue(sourceWithoutComments.contains("unsupportedRustWholeFrameFeature()"),
+			"DH Rust selection should use its explicit whole-frame feature gate");
+		assertFalse(sourceWithoutComments.contains("return \"iris-shader-pack\""),
+			"an Iris pack must not reject Rust-owned whole-frame semantic extraction");
+		assertFalse(sourceWithoutComments.contains("return \"generic-rendering\""),
+			"DH's Java-only generic-object preference must not reject Rust LOD terrain collection");
+		assertFalse(sourceWithoutComments.contains("return \"ssao\""),
+			"DH's Java-only SSAO preference must not reject Rust LOD terrain collection");
+		assertFalse(sourceWithoutComments.contains("return \"dh-fog\""),
+			"DH's Java-only fog preference must not reject Rust LOD terrain collection");
+		assertTrue(sourceWithoutComments.contains("this.trySelectRustNonWaterRoute(renderParams, profiler)"),
+			"the real DH render-list traversal remains the sole Rust selection path");
+	}
+
+	@Test
+	public void testRustWholeFrameDhPublishesReplacementAfterPresent() throws IOException {
+		Path coordinator = SRC_MAIN_JAVA.resolve("net/vulkanic/gui/RustGalFrameCoordinator.java");
+		String sourceWithoutComments = readSourceWithoutComments(coordinator);
+		int present = sourceWithoutComments.indexOf("VulkanicGalBridge.PresentedFrame presented = bridge.presentFrame");
+		int lodFlush = sourceWithoutComments.indexOf("flushPendingWorldLodAssetsLocked();", present);
+
+		assertTrue(present >= 0, "the Rust whole-frame coordinator must present the owned frame");
+		assertTrue(lodFlush > present,
+			"a DH replacement must become active after the visible generation has presented");
+		assertTrue(sourceWithoutComments.contains("DistantHorizonsSemanticCollector.flushPendingAssets(bridge)"),
+			"DH publication remains an explicit coordinator-owned semantic asset update");
+	}
 
     @Test
     public void testDhGlObjectLayerExposesContextAwareSeams() throws IOException {
@@ -387,7 +421,8 @@ public class DistantHorizonsCommandContextMigrationTest {
             "makeTransparentUpVertexBuffers() { return this.makeVertexBuffers(this.transparentQuads, TRANSPARENT_UP_DIRECTION_RENDER_ORDER, quad -> !isWater(quad));");
         int transparentWaterUpBuffers = sourceWithoutComments.indexOf("makeTransparentWaterUpVertexBuffers()");
         int materialTransparentRouting = sourceWithoutComments.indexOf("shouldUseTransparentBuffer");
-        int waterTransparentRouting = sourceWithoutComments.indexOf("irisBlockMaterialId == EDhApiBlockMaterial.WATER.index", materialTransparentRouting);
+        int waterTransparentRouting = sourceWithoutComments.indexOf("materialId == EDhApiBlockMaterial.WATER.index", materialTransparentRouting);
+        int leavesTransparentRouting = sourceWithoutComments.indexOf("materialId == EDhApiBlockMaterial.LEAVES.index", materialTransparentRouting);
         int waterOrderingHelper = rendererSource.indexOf("private boolean shouldUseVulkanNoShaderWaterOrdering()");
         int waterOrderingVulkanGuard = rendererSource.indexOf("VulkanicAPI.isVulkanBackendSelected()", waterOrderingHelper);
         int waterOrderingShaderGuard = rendererSource.indexOf("!isIrisShaderRenderingEnabled()", waterOrderingVulkanGuard);
@@ -420,12 +455,14 @@ public class DistantHorizonsCommandContextMigrationTest {
             "DH transparent UP buffers should contain only UP faces");
         assertTrue(transparentBuffers > up && transparentUpBuffers > transparentBuffers && transparentWaterUpBuffers > transparentUpBuffers,
             "DH transparent LOD buffer creation should build separate side, non-water UP, and water UP buffers");
-        assertTrue(materialTransparentRouting >= 0 && waterTransparentRouting > materialTransparentRouting,
-            "DH water material should route through transparent water buffers even when its color alpha is opaque");
+        assertTrue(materialTransparentRouting >= 0 && waterTransparentRouting > materialTransparentRouting
+                && leavesTransparentRouting > waterTransparentRouting,
+            "DH water and foliage material categories should route through transparent buffers even when their packed LOD colors are opaque");
 	        assertTrue(columnBoxSource.contains("isTransparent(color, irisBlockMaterialId, transparencyEnabled)")
 	                && columnBoxSource.contains("isTransparent(topData, transparencyEnabled)")
 	                && columnBoxSource.contains("isTransparent(bottomData, transparencyEnabled)")
-	                && columnBoxSource.contains("isWaterMaterial(irisBlockMaterialId)")
+	        && columnBoxSource.contains("isWaterMaterial(irisBlockMaterialId)")
+	        && columnBoxSource.contains("isLeavesMaterial(materialId)")
 	                && columnBoxSource.contains("isWaterSurfaceOccludingMaterial(RenderDataPointUtil.getBlockMaterialId(topData))"),
 	            "DH column face culling should treat water as transparent by material and preserve water top faces below non-occluding details");
         assertTrue(containerSource.contains("public GLVertexBuffer[] vbosTransparentUp")

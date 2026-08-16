@@ -699,6 +699,30 @@ class CaptureRunner:
                 self.append_meta("forced_dh_enableDistantGeneration=false")
             if upsert_toml_value(dh_file, "rendererMode", '"DISABLED"'):
                 self.append_meta("forced_dh_rendererMode=DISABLED")
+        dh_opaque_only = os.environ.get("MATTMC_CAPTURE_DH_RUST_OPAQUE_ONLY", "false").lower() == "true"
+        dh_non_water = os.environ.get("MATTMC_CAPTURE_DH_RUST_NON_WATER", "false").lower() == "true"
+        if dh_opaque_only or dh_non_water:
+            # Both bounded routes exclude legacy auxiliary work. The legacy
+            # opaque row additionally disables transparent DH streams; the
+            # non-water row deliberately leaves them enabled for real routing.
+            for key, value in (
+                ("enableSsao", "false"),
+                ("enableGenericRendering", "false"),
+                ("dhFadeFarClipPlane", "false"),
+                ("enableDhFog", "false"),
+                ("enableRendering", "false"),
+                ("lodChunkRenderDistanceRadius", "4"),
+            ):
+                if upsert_toml_value(dh_file, key, value):
+                    self.append_meta(f"forced_dh_non_water_{key}={value}")
+            if dh_opaque_only and upsert_toml_value(dh_file, "transparency", '"DISABLED"'):
+                self.append_meta('forced_dh_opaque_transparency="DISABLED"')
+            if dh_non_water and upsert_toml_value(dh_file, "transparency", '"COMPLETE"'):
+                # The non-water route is meaningful only when DH generates its
+                # real transparent streams. Keep this scoped to the explicit
+                # deterministic coverage row; normal captures retain the
+                # copied configuration.
+                self.append_meta('forced_dh_non_water_transparency="COMPLETE"')
         voxelmap_file = self.run_dir / "config" / "voxelmap.properties"
         if voxelmap_file.is_file():
             upsert_option(voxelmap_file, "Welcome Message", "false")
@@ -765,19 +789,27 @@ class CaptureRunner:
                     "-Dmattmc.dev.rustGalStaticTerrain.waterAnimationDenseFrames=24",
                 ])
                 self.append_meta("static_terrain_water_animation_dense_capture=true")
-            if static_terrain_requires_translucent_camera_sort(self.config.world_static_terrain_scenario):
+            moving_mesh_sequence = self.has_active_moving_mesh_capture_sequence()
+            if static_terrain_requires_translucent_camera_sort(
+                self.config.world_static_terrain_scenario
+            ) and not moving_mesh_sequence:
                 self.append_java_tool_options([
                     "-Dmattmc.dev.deterministicCameraCapture.poseCount=7",
                     "-Dmattmc.dev.deterministicCameraCapture.framesPerPose=1",
                     "-Dmattmc.dev.deterministicCameraCapture.yawDelta=18.0",
                 ])
                 self.append_meta("deterministic_static_camera_capture=translucent_camera_sequence")
-            else:
+            elif not moving_mesh_sequence:
                 self.append_java_tool_options([
                     "-Dmattmc.dev.deterministicCameraCapture.poseCount=1",
                     "-Dmattmc.dev.deterministicCameraCapture.yawDelta=0.0",
                 ])
                 self.append_meta("deterministic_static_camera_capture=true")
+            else:
+                # Moving-mesh scenarios own their multi-pose sequence. Static
+                # terrain diagnostics remain enabled, but must not append a
+                # later poseCount that collapses falling/piston motion proof.
+                self.append_meta("deterministic_static_camera_capture=readiness_only_moving_sequence")
         configured_shader_pack = extract_property_value(self.run_dir / "config" / "iris.properties", "shaderPack")
         if not client_args_contains_assignment(self.config.client_args, "shaderPack"):
             if self.config.shaders == "on" and not configured_shader_pack:
@@ -945,6 +977,7 @@ class CaptureRunner:
 
         self.configure_validation_environment()
         self.configure_java_tool_options()
+        gradle_cmd = self.fresh_environment_launch_command(gradle_cmd)
         gradle_cmd = self.renderdoc_wrapped_command(gradle_cmd)
 
         log_handle = self.run_log.open("wb")
@@ -1014,6 +1047,37 @@ class CaptureRunner:
             return [command[0], "--no-daemon", *command[1:]]
         return command
 
+    def fresh_environment_launch_command(self, command: list[str]) -> list[str]:
+        """Avoid a stale Gradle daemon for native diagnostic environment inputs."""
+        if not command:
+            return command
+        diagnostic_inputs = {
+            name: value.strip()
+            for name, value in self.env.items()
+            if value.strip()
+            and (
+                name.startswith("MATTMC_RUST_SELECTED_SOURCE_")
+                or name.startswith("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_")
+                or name.startswith("MATTMC_STATIC_TERRAIN_APPEARANCE_TRACE_")
+                or name.startswith("MATTMC_STATIC_TERRAIN_BATCH_TRACE_")
+            )
+        }
+        launcher = Path(command[0]).name
+        if (
+            diagnostic_inputs
+            and launcher in {"gradlew", "gradlew.bat"}
+            and "--no-daemon" not in command
+        ):
+            self.append_meta(
+                "native_diagnostic_forced_gradle_no_daemon=true"
+            )
+            self.append_meta(
+                "native_diagnostic_inputs="
+                + ",".join(sorted(diagnostic_inputs))
+            )
+            return [command[0], "--no-daemon", *command[1:]]
+        return command
+
     def configure_validation_environment(self) -> None:
         if not self.validation_enabled:
             return
@@ -1070,24 +1134,28 @@ class CaptureRunner:
             ]
             if self.config.shader_input_parity == "full":
                 parity_options.append("-Dmattmc.vulkan.traceStandaloneUniformBlockMembers=true")
-            if self.config.deterministic_camera_capture:
-                parity_options.extend(
-                    [
-                        "-Dmattmc.vulkan.deterministicTemporalParity=true",
-                        "-Dmattmc.vulkan.deterministicTemporalParity.frameCounter=0",
-                        "-Dmattmc.vulkan.deterministicTemporalParity.frameTime=0.016666668",
-                        "-Dmattmc.vulkan.deterministicTemporalParity.frameTimeCounter=0.0",
-                        "-Dmattmc.vulkan.deterministicTemporalParity.partialTick=1.0",
-                        "-Dmattmc.vulkan.deterministicTemporalParity.fovModifier=1.0",
-                        "-Dmattmc.vulkan.deterministicTemporalParity.worldTime=6000",
-                    ]
-                )
             self.append_java_tool_options(parity_options)
             self.append_meta(f"shader_input_parity_java_options={' '.join(parity_options)}")
             self.append_meta(f"java_tool_options={self.env.get('JAVA_TOOL_OPTIONS', '')}")
             self.append_meta("deterministic_lightmap_parity=true")
-            if self.config.deterministic_camera_capture:
-                self.append_meta("deterministic_temporal_parity=true")
+
+        # A deterministic camera fixture is a cross-route scene comparison,
+        # even when its verbose shader-input trace is disabled. Keep the
+        # temporal game inputs fixed independently of that diagnostic switch.
+        if self.config.deterministic_camera_capture:
+            temporal_options = [
+                "-Dmattmc.vulkan.deterministicTemporalParity=true",
+                "-Dmattmc.vulkan.deterministicTemporalParity.frameCounter=0",
+                "-Dmattmc.vulkan.deterministicTemporalParity.frameTime=0.016666668",
+                "-Dmattmc.vulkan.deterministicTemporalParity.frameTimeCounter=0.0",
+                "-Dmattmc.vulkan.deterministicTemporalParity.partialTick=1.0",
+                "-Dmattmc.vulkan.deterministicTemporalParity.fovModifier=1.0",
+                "-Dmattmc.vulkan.deterministicTemporalParity.worldTime=6000",
+            ]
+            self.append_java_tool_options(temporal_options)
+            self.append_meta(f"deterministic_temporal_java_options={' '.join(temporal_options)}")
+            self.append_meta(f"java_tool_options={self.env.get('JAVA_TOOL_OPTIONS', '')}")
+            self.append_meta("deterministic_temporal_parity=true")
 
         if self.config.deterministic_camera_capture:
             deterministic_options = [
@@ -1178,6 +1246,27 @@ class CaptureRunner:
         joined_text = " ".join(shlex.quote(option) for option in joined if option)
         self.env["JAVA_TOOL_OPTIONS"] = joined_text
 
+    def has_active_moving_mesh_capture_sequence(self) -> bool:
+        """Whether an upstream scenario owns a multi-frame moving-mesh capture."""
+        inactive = {"", "false", "disabled", "hidden", "none", "off"}
+        prefixes = (
+            "-Dmattmc.dev.rustGalWorldMesh.fallingBlockScenario=",
+            "-Dmattmc.dev.rustGalWorldMesh.pistonScenario=",
+            "-Dmattmc.dev.rustGalWorldMesh.primedTntScenario=",
+            "-Dmattmc.dev.rustGalWorldMesh.arrowScenario=",
+            "-Dmattmc.dev.rustGalWorldMesh.modelScenario=",
+            "-Dmattmc.dev.rustGalWorldEntityFlame.scenario=",
+        )
+        try:
+            options = shlex.split(self.env.get("JAVA_TOOL_OPTIONS", ""))
+        except ValueError:
+            options = self.env.get("JAVA_TOOL_OPTIONS", "").split()
+        for option in options:
+            for prefix in prefixes:
+                if option.startswith(prefix):
+                    return option.removeprefix(prefix).strip().lower() not in inactive
+        return False
+
     def monitor_gradle(self) -> int:
         assert self.gradle_process is not None
         elapsed = 0
@@ -1232,7 +1321,10 @@ class CaptureRunner:
             client_pid = self.find_client_pid()
             if client_pid:
                 append_text(self.thread_dump, f"\n===== final jcmd Thread.print before termination (pid={client_pid}) =====\n")
-                append_text(self.thread_dump, command_text(["jcmd", str(client_pid), "Thread.print"], cwd=self.root))
+                append_text(
+                    self.thread_dump,
+                    command_text(["jcmd", str(client_pid), "Thread.print"], cwd=self.root, timeout_secs=8),
+                )
             self.terminate_run_processes("timeout")
 
         if self.gradle_process.poll() is None:
@@ -1415,7 +1507,7 @@ class CaptureRunner:
                 line for line in process_table.splitlines()
                 if line.strip().startswith("PID") or f" {self.gradle_process.pid} " in f" {line} "
             )
-        lines.extend(["", "===== jcmd -l =====", command_text(["jcmd", "-l"], cwd=self.root)])
+        lines.extend(["", "===== jcmd -l =====", command_text(["jcmd", "-l"], cwd=self.root, timeout_secs=8)])
         self.process_snapshot.write_text("\n".join(lines) + "\n", encoding="utf-8", errors="replace")
 
         if self.screenshot_enabled and self.platform_name == "linux" and shutil.which("xwininfo"):
@@ -1427,7 +1519,7 @@ class CaptureRunner:
         self.append_meta(f"client_pid={client_pid or 'none'}")
         if client_pid:
             text = f"===== jcmd Thread.print (pid={client_pid}) =====\n"
-            text += command_text(["jcmd", str(client_pid), "Thread.print"], cwd=self.root)
+            text += command_text(["jcmd", str(client_pid), "Thread.print"], cwd=self.root, timeout_secs=8)
             self.thread_dump.write_text(text, encoding="utf-8", errors="replace")
             self.collect_client_memory_snapshot(f"dump_elapsed_{elapsed}", client_pid)
         else:
@@ -1446,10 +1538,14 @@ class CaptureRunner:
             lines.extend([
                 "",
                 "===== jcmd GC.heap_info =====",
-                command_text(["jcmd", str(client_pid), "GC.heap_info"], cwd=self.root),
+                command_text(["jcmd", str(client_pid), "GC.heap_info"], cwd=self.root, timeout_secs=8),
                 "",
                 "===== jcmd VM.native_memory summary =====",
-                command_text(["jcmd", str(client_pid), "VM.native_memory", "summary"], cwd=self.root),
+                command_text(
+                    ["jcmd", str(client_pid), "VM.native_memory", "summary"],
+                    cwd=self.root,
+                    timeout_secs=8,
+                ),
             ])
         if self.platform_name == "linux":
             lines.extend(read_proc_memory_summary(client_pid))
@@ -1912,11 +2008,20 @@ def lock_refusal_message() -> str:
     )
 
 
-def command_text(command: list[str], *, cwd: Path) -> str:
+def command_text(command: list[str], *, cwd: Path, timeout_secs: int | None = None) -> str:
     if not shutil.which(command[0]) and not Path(command[0]).exists():
         return ""
     try:
-        result = subprocess.run(command, cwd=cwd, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        result = subprocess.run(
+            command,
+            cwd=cwd,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            timeout=timeout_secs,
+        )
+    except subprocess.TimeoutExpired:
+        return f"command timed out after {timeout_secs}s: {' '.join(command)}\n"
     except OSError as exc:
         return str(exc)
     return result.stdout or ""
@@ -2253,6 +2358,18 @@ WORLD_MATERIAL_TERRAIN_PARTICLE_TEXTURES = (
     "assets/minecraft/textures/block/gravel.png",
     "assets/minecraft/textures/block/white_concrete_powder.png",
 )
+WORLD_STATIC_TERRAIN_IDENTITY_TEXTURES = {
+	"assets/minecraft/textures/block/grass_block_top.png": (42, 98, 51, 255),
+	"assets/minecraft/textures/block/grass_block_side.png": (35, 87, 44, 255),
+	"assets/minecraft/textures/block/grass_block_side_overlay.png": (26, 126, 39, 255),
+	"assets/minecraft/textures/block/dirt.png": (92, 57, 36, 255),
+	"assets/minecraft/textures/block/redstone_ore.png": (230, 27, 45, 255),
+	"assets/minecraft/textures/block/yellow_terracotta.png": (244, 185, 28, 255),
+	"assets/minecraft/textures/block/oak_leaves.png": (54, 112, 48, 255),
+	"assets/minecraft/textures/block/oak_leaves2.png": (47, 104, 42, 255),
+	"assets/minecraft/textures/block/oak_leaves_bushy.png": (61, 121, 51, 255),
+	"assets/minecraft/textures/block/oak_leaves_bushy1.png": (43, 94, 37, 255),
+}
 
 
 GUI_PACK_COLORS = {
@@ -2332,6 +2449,15 @@ def gui_resource_pack_specs(scenario: str) -> list[dict[str, object]]:
                 ),
             }
         ]
+    if scenario == "terrain-identity":
+        return [
+            {
+                **base,
+                "name": "mattmc-rust-terrain-identity",
+                "variant": "a",
+                "terrain_identity_textures": WORLD_STATIC_TERRAIN_IDENTITY_TEXTURES,
+            }
+        ]
     if scenario in WATER_ANIMATION_SCENARIOS:
         return [
             {
@@ -2343,7 +2469,7 @@ def gui_resource_pack_specs(scenario: str) -> list[dict[str, object]]:
         ]
     raise SystemExit(
         "--gui-resource-pack-scenario must be one of: vanilla, pack-a, pack-b, "
-        "priority-a-b, priority-b-a, missing, malformed, unsupported, "
+        "priority-a-b, priority-b-a, missing, malformed, unsupported, terrain-identity, "
         + ", ".join(sorted(WATER_ANIMATION_SCENARIOS))
     )
 
@@ -2402,6 +2528,10 @@ def write_gui_resource_pack(pack_dir: Path, spec: dict[str, object]) -> None:
             continue
         actual_width = 17 if resource_path in wrong_size else 16
         target.write_bytes(asymmetric_png(actual_width, 16, GUI_PACK_COLORS[variant], variant))
+    for resource_path, color in dict(spec.get("terrain_identity_textures", {})).items():
+        target = pack_dir / str(resource_path)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(asymmetric_png(16, 16, tuple(color), "identity"))
     water_animation = str(spec.get("water_animation", "default"))
     for water_texture in spec.get("water_textures", ()):  # type: ignore[assignment]
         resource_path = str(water_texture)
@@ -2752,6 +2882,22 @@ def validate_deterministic_metadata(metadata_path: Path, screenshot_dir: Path, t
         screenshot = Path(capture.get("screenshot", ""))
         if not screenshot.is_file():
             raise RuntimeError(f"deterministic screenshot missing for {capture.get('poseName')}: {screenshot}")
+        try:
+            from PIL import Image
+
+            with Image.open(screenshot) as image:
+                rgb = image.convert("RGB")
+                rgb.thumbnail((64, 36))
+                pixels = list(rgb.getdata())
+        except Exception as exc:
+            raise RuntimeError(
+                f"deterministic screenshot is not a readable rendered image for {capture.get('poseName')}: {screenshot}: {exc}"
+            ) from exc
+        visible_pixels = sum(1 for red, green, blue in pixels if max(red, green, blue) > 24)
+        if not pixels or visible_pixels / len(pixels) < 0.05:
+            raise RuntimeError(
+                f"deterministic screenshot is blank for {capture.get('poseName')}: {screenshot}"
+            )
         if not screenshot.name.startswith(f"{capture.get('index'):02d}_{capture.get('poseName')}"):
             raise RuntimeError(f"deterministic screenshot name does not match pose: {screenshot}")
         for key, expected in [
@@ -2882,7 +3028,7 @@ def parse_args() -> CaptureConfig:
         default=os.environ.get("MATTMC_WORLD_STATIC_TERRAIN_RESOURCE_PACK_SCENARIO", ""),
         help=(
             "Generate and select diagnostic block-texture resource packs for Rust static-terrain atlas coverage. "
-            "Supported: vanilla, pack-a, pack-b, priority-a-b, priority-b-a, missing, malformed, unsupported, "
+            "Supported: vanilla, pack-a, pack-b, priority-a-b, priority-b-a, missing, malformed, unsupported, terrain-identity, "
             "water-non-sequential, water-unequal-duration, water-interpolation-off, water-interpolation-on, "
             "water-pixel-replacement."
         ),

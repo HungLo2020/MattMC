@@ -33,4 +33,19 @@ class DeterministicCameraCaptureVignetteRegressionTest {
 		assertTrue(source.contains("cyclesCompleted"),
 			"The deterministic artifact must record screen-cycle state for capture validation");
 	}
+
+	@Test
+	void texturePaletteFixtureRebuildsOnlyItsEditedSections() throws Exception {
+		String source = Files.readString(Path.of("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java"));
+		int paletteCase = source.indexOf("case \"texture-palette\" -> {");
+		int nextCase = source.indexOf("case \"resource-reload\"", paletteCase);
+		String paletteFixture = source.substring(paletteCase, nextCase);
+
+		assertTrue(paletteFixture.contains("applyStaticTerrainTexturePalette(minecraft, serverLevel, target);"),
+			"The palette fixture must still place the real client/server block states");
+		assertTrue(source.contains("minecraft.levelRenderer.setBlocksDirty("),
+			"The palette helper must request a bounded Sodium rebuild for its changed blocks");
+		assertTrue(!paletteFixture.contains("minecraft.levelRenderer.allChanged();"),
+			"The palette fixture must not invalidate every terrain source snapshot after its local edits");
+	}
 }

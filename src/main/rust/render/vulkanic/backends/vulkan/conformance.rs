@@ -16,22 +16,419 @@ use crate::render::vulkanic::gal::VulkanicGal;
 use crate::render::vulkanic::handles::Handle;
 use crate::render::vulkanic::resources::*;
 use crate::render::vulkanic::shader_pack::programs::{
-    prepare_lowered_terrain_source_program, shader_stage_code_for_backend,
-    TerrainMaterialProgramKind, COMPLEMENTARY_TERRAIN_SUBSET_FRAGMENT,
-    MINIMAL_TERRAIN_MATERIAL_VERTEX,
+    distant_horizons_lod_opaque_resource_layouts,
+    minimal_distant_horizons_lod_exact_atlas_opaque_program,
+    minimal_distant_horizons_lod_opaque_program, minimal_distant_horizons_lod_transparent_program,
+    prepare_lowered_distant_horizons_exact_atlas_source_program,
+    prepare_lowered_distant_horizons_source_program, prepare_lowered_fullscreen_source_program,
+    prepare_lowered_hand_source_program, prepare_lowered_terrain_source_program,
+    prepare_lowered_textured_material_source_program, prepare_lowered_weather_source_program,
+    shader_stage_code_for_backend, LoweredTerrainSourceProgram, TerrainMaterialProgramKind,
+    COMPLEMENTARY_TERRAIN_SUBSET_FRAGMENT, MINIMAL_TERRAIN_MATERIAL_VERTEX,
 };
 use crate::render::vulkanic::shader_pack::{
-    lowering::lower_terrain_source_pair,
-    preprocess::{complete_bundled_pack_source_for_test, preprocess_terrain_sources},
-    source::{ShaderPackSource, ShaderSourceFile},
+    distant_horizons_contract::{
+        derive_distant_horizons_opaque_contract, derive_distant_horizons_translucent_contract,
+    },
+    hand_contract::{bind_hand_source_resources, derive_hand_contract, lower_hand_source_pair},
+    lowering::{
+        lower_distant_horizons_source_pair, lower_fullscreen_source_pair,
+        lower_fullscreen_source_pair_with_raster_primitive, lower_shadow_source_pair,
+        lower_terrain_source_pair, FullscreenSourceRasterPrimitive,
+    },
+    material_contract::{derive_textured_material_contract, lower_textured_material_source_pair},
+    preprocess::{
+        complete_bundled_pack_source_for_test, preprocess_distant_horizons_sources,
+        preprocess_source_stage_pair, preprocess_terrain_sources,
+    },
+    source::{ShaderPackSource, ShaderSourceFile, RUNTIME_CONSTANTS_PATH, RUNTIME_OPTIONS_PATH},
     terrain_contract::{
-        derive_complementary_terrain_contract, TerrainSourceStage, TerrainSourceStages,
+        derive_complementary_terrain_contract, derive_complementary_terrain_contract_for_scope,
+        shadow_source_stages_for_scope, TerrainProgramScope, TerrainSourceStage,
+        TerrainSourceStages,
     },
     terrain_source_resources::{TerrainSourceResourceBindings, TERRAIN_RESOURCE_BINDINGS_PATH},
+    weather_contract::{derive_weather_pass_contract, lower_weather_source_pair},
 };
 
 const WIDTH: u32 = 96;
 const HEIGHT: u32 = 64;
+
+#[test]
+fn gui_mesh_shaders_compile_with_the_shared_frame_uniform_contract() {
+    let (vertex, fragment) =
+        crate::render::vulkanic::gui_mesh_frontend::vulkan_shader_sources_for_backend_test();
+    compile_glsl_for_backend_test(shaderc::ShaderKind::Vertex, vertex, "gui-mesh.vertex")
+        .expect("Vulkan GUI mesh vertex shader must compile");
+    compile_glsl_for_backend_test(shaderc::ShaderKind::Fragment, fragment, "gui-mesh.fragment")
+        .expect("Vulkan GUI mesh fragment shader must compile");
+}
+
+#[test]
+fn lowered_complementary_celestial_source_pair_compiles_for_vulkan() {
+    let source = complete_bundled_pack_source_for_test();
+    let stages = TerrainSourceStages {
+        vertex: TerrainSourceStage {
+            path: "world0/gbuffers_skytextured.vsh".to_string(),
+            defines: Default::default(),
+        },
+        fragment: TerrainSourceStage {
+            path: "world0/gbuffers_skytextured.fsh".to_string(),
+            defines: Default::default(),
+        },
+    };
+    let artifacts = preprocess_source_stage_pair(&source, &stages).unwrap();
+    let bindings = TerrainSourceResourceBindings::from_source(&source).unwrap();
+    let lowered = lower_fullscreen_source_pair_with_raster_primitive(
+        &artifacts.vertex,
+        &artifacts.fragment,
+        &bindings,
+        FullscreenSourceRasterPrimitive::VanillaCelestialQuad,
+    )
+    .unwrap();
+    let resource_bindings = lowered
+        .opaque_resource_contract()
+        .bind_semantic_roles(&bindings)
+        .unwrap();
+    let program = prepare_lowered_fullscreen_source_program(
+        source.name(),
+        source.generation(),
+        "world0/gbuffers_skytextured.fsh",
+        &lowered,
+        &resource_bindings,
+    )
+    .unwrap();
+
+    for module in program.shader_module_descriptors(BackendApi::Vulkan) {
+        compile_glsl_for_backend_test(
+            match module.stage {
+                ShaderStage::Vertex => shaderc::ShaderKind::Vertex,
+                ShaderStage::Fragment => shaderc::ShaderKind::Fragment,
+                stage => panic!("unexpected celestial shader stage {stage:?}"),
+            },
+            std::str::from_utf8(&module.code).unwrap(),
+            &module.label,
+        )
+        .unwrap_or_else(|error| {
+            panic!(
+                "owned Complementary celestial source {} must compile for Vulkan: {error}",
+                module.label
+            )
+        });
+    }
+}
+
+#[test]
+fn distant_horizons_lod_opaque_program_compiles_for_vulkan_without_legacy_state() {
+    let program = minimal_distant_horizons_lod_opaque_program();
+    for module in program.shader_module_descriptors(BackendApi::Vulkan) {
+        compile_glsl_for_backend_test(
+            match module.stage {
+                ShaderStage::Vertex => shaderc::ShaderKind::Vertex,
+                ShaderStage::Fragment => shaderc::ShaderKind::Fragment,
+                stage => panic!("unexpected DH LOD shader stage {stage:?}"),
+            },
+            std::str::from_utf8(&module.code).unwrap(),
+            &module.label,
+        )
+        .unwrap_or_else(|error| {
+            panic!(
+                "Rust-owned Distant Horizons opaque LOD {} must compile for Vulkan: {error}",
+                module.label
+            )
+        });
+    }
+}
+
+#[test]
+fn distant_horizons_lod_exact_atlas_program_compiles_for_vulkan() {
+    let program = minimal_distant_horizons_lod_exact_atlas_opaque_program();
+    for module in program.shader_module_descriptors(BackendApi::Vulkan) {
+        compile_glsl_for_backend_test(
+            match module.stage {
+                ShaderStage::Vertex => shaderc::ShaderKind::Vertex,
+                ShaderStage::Fragment => shaderc::ShaderKind::Fragment,
+                stage => panic!("unexpected exact-atlas DH LOD shader stage {stage:?}"),
+            },
+            std::str::from_utf8(&module.code).unwrap(),
+            &module.label,
+        )
+        .unwrap_or_else(|error| {
+            panic!(
+                "Rust-owned Distant Horizons exact-atlas LOD {} must compile for Vulkan: {error}",
+                module.label
+            )
+        });
+    }
+}
+
+#[test]
+fn selected_source_exact_atlas_distant_horizons_program_compiles_for_vulkan() {
+    let source = complete_bundled_pack_source_for_test();
+    let contract =
+        derive_distant_horizons_opaque_contract(&source, TerrainProgramScope::Overworld).unwrap();
+    let artifacts = preprocess_distant_horizons_sources(&source, &contract.source_stages).unwrap();
+    let lowered =
+        lower_distant_horizons_source_pair(&artifacts.vertex, &artifacts.fragment).unwrap();
+    let declarations = TerrainSourceResourceBindings::from_source(&source).unwrap();
+    let bindings = lowered
+        .opaque_resource_contract()
+        .bind_semantic_roles(&declarations)
+        .unwrap();
+    let source_program =
+        prepare_lowered_distant_horizons_source_program(&contract, &lowered, &bindings).unwrap();
+    let program =
+        prepare_lowered_distant_horizons_exact_atlas_source_program(&source_program).unwrap();
+
+    for module in program.shader_module_descriptors(BackendApi::Vulkan) {
+        compile_glsl_for_backend_test(
+            match module.stage {
+                ShaderStage::Vertex => shaderc::ShaderKind::Vertex,
+                ShaderStage::Fragment => shaderc::ShaderKind::Fragment,
+                stage => panic!("unexpected exact-atlas selected DH shader stage {stage:?}"),
+            },
+            std::str::from_utf8(&module.code).unwrap(),
+            &module.label,
+        )
+        .unwrap_or_else(|error| {
+            panic!(
+                "selected-source exact-atlas Distant Horizons {} must compile for Vulkan: {error}",
+                module.label
+            )
+        });
+    }
+}
+
+#[test]
+fn distant_horizons_lod_transparent_program_compiles_for_vulkan_without_legacy_state() {
+    let program = minimal_distant_horizons_lod_transparent_program();
+    for module in program.shader_module_descriptors(BackendApi::Vulkan) {
+        compile_glsl_for_backend_test(
+            match module.stage {
+                ShaderStage::Vertex => shaderc::ShaderKind::Vertex,
+                ShaderStage::Fragment => shaderc::ShaderKind::Fragment,
+                stage => panic!("unexpected DH transparent LOD shader stage {stage:?}"),
+            },
+            std::str::from_utf8(&module.code).unwrap(),
+            &module.label,
+        )
+        .unwrap_or_else(|error| {
+            panic!(
+                "Rust-owned Distant Horizons transparent LOD {} must compile for Vulkan: {error}",
+                module.label
+            )
+        });
+    }
+}
+
+#[test]
+fn lowered_fullscreen_source_compiles_for_vulkan_without_a_vertex_stream() {
+    let source = ShaderPackSource::new(
+        "fullscreen-source-vulkan",
+        1,
+        vec![
+            ShaderSourceFile::new(
+                "world0/deferred1.vsh",
+                "#version 130\nout vec2 uv;\nvoid main() { uv = gl_MultiTexCoord0.xy; gl_Position = ftransform(); }",
+            ),
+                ShaderSourceFile::new(
+                    "world0/deferred1.fsh",
+                    "#version 130\nin vec2 uv;\nuniform sampler2D colortex0;\n/* DRAWBUFFERS:0 */\nvoid main() { gl_FragData[0] = texture2D(colortex0, uv); }",
+            ),
+            ShaderSourceFile::new(
+                TERRAIN_RESOURCE_BINDINGS_PATH,
+                "colortex0=shader_pack_color:primary\n",
+            ),
+        ],
+    )
+    .unwrap();
+    let stages = TerrainSourceStages {
+        vertex: TerrainSourceStage {
+            path: "world0/deferred1.vsh".to_string(),
+            defines: Default::default(),
+        },
+        fragment: TerrainSourceStage {
+            path: "world0/deferred1.fsh".to_string(),
+            defines: Default::default(),
+        },
+    };
+    let artifacts = preprocess_source_stage_pair(&source, &stages).unwrap();
+    let declarations = TerrainSourceResourceBindings::from_source(&source).unwrap();
+    let lowered =
+        lower_fullscreen_source_pair(&artifacts.vertex, &artifacts.fragment, &declarations)
+            .unwrap();
+    let bindings = lowered
+        .opaque_resource_contract()
+        .bind_semantic_roles(&declarations)
+        .unwrap();
+    let program = prepare_lowered_fullscreen_source_program(
+        source.name(),
+        source.generation(),
+        "world0/deferred1.fsh",
+        &lowered,
+        &bindings,
+    )
+    .unwrap();
+    for module in program.shader_module_descriptors(BackendApi::Vulkan) {
+        compile_glsl_for_backend_test(
+            match module.stage {
+                ShaderStage::Vertex => shaderc::ShaderKind::Vertex,
+                ShaderStage::Fragment => shaderc::ShaderKind::Fragment,
+                stage => panic!("unexpected fullscreen source shader stage {stage:?}"),
+            },
+            std::str::from_utf8(&module.code).unwrap(),
+            &module.label,
+        )
+        .unwrap_or_else(|error| {
+            panic!(
+                "lowered fullscreen source must compile for Vulkan without a vertex stream: {error}"
+            )
+        });
+    }
+}
+
+/// The selected pack's real DH pair must compile from the owned source and
+/// copied column-stream contract. This stops before draw selection: legacy
+/// DH remains the only live route until owned distant targets and the
+/// source-derived composite are ready together.
+#[test]
+fn lowered_complete_complementary_distant_horizons_pair_compiles_for_vulkan() {
+    let source = complete_bundled_pack_source_for_test();
+    let contract = derive_distant_horizons_opaque_contract(&source, TerrainProgramScope::Overworld)
+        .expect("the bundled Complementary source must expose an Overworld DH pair");
+    let artifacts = preprocess_distant_horizons_sources(&source, &contract.source_stages).unwrap();
+    let lowered =
+        lower_distant_horizons_source_pair(&artifacts.vertex, &artifacts.fragment).unwrap();
+    let declarations = TerrainSourceResourceBindings::from_source(&source).unwrap();
+    let bindings = lowered
+        .opaque_resource_contract()
+        .bind_semantic_roles(&declarations)
+        .unwrap();
+    let program =
+        prepare_lowered_distant_horizons_source_program(&contract, &lowered, &bindings).unwrap();
+
+    for module in program.shader_module_descriptors(BackendApi::Vulkan) {
+        compile_glsl_for_backend_test(
+            match module.stage {
+                ShaderStage::Vertex => shaderc::ShaderKind::Vertex,
+                ShaderStage::Fragment => shaderc::ShaderKind::Fragment,
+                stage => panic!("unexpected lowered DH shader stage {stage:?}"),
+            },
+            std::str::from_utf8(&module.code).unwrap(),
+            &module.label,
+        )
+        .unwrap_or_else(|error| {
+            panic!(
+                "complete lowered Complementary Distant Horizons {} must compile for Vulkan: {error}",
+                module.label
+            )
+        });
+    }
+}
+
+/// `dh_water` is a separate source-derived translucent phase. Compile its
+/// selected source through Vulkan without selecting a DH gameplay route.
+#[test]
+fn lowered_complete_complementary_distant_horizons_water_pair_compiles_for_vulkan() {
+    let bundled = complete_bundled_pack_source_for_test();
+    let source = ShaderPackSource::new(
+        "complete-dh-water-vulkan-boundary",
+        93,
+        bundled
+            .files()
+            .into_iter()
+            .chain(std::iter::once(ShaderSourceFile::new(
+                RUNTIME_OPTIONS_PATH,
+                "DISTANT_HORIZONS=1\nSHADOW_QUALITY=-1\nFXAA_DEFINE=-1\nCOLORED_LIGHTING=0\nENTITY_SHADOWS_DEFINE=-1\nPLAYER_SHADOW=-1\nRAIN_PUDDLES=0\n",
+            )))
+            .collect(),
+    )
+    .unwrap();
+    let contract =
+        derive_distant_horizons_translucent_contract(&source, TerrainProgramScope::Overworld)
+            .expect("the bundled Complementary source must expose an Overworld dh_water pair");
+    let artifacts = preprocess_distant_horizons_sources(&source, &contract.source_stages).unwrap();
+    let lowered =
+        lower_distant_horizons_source_pair(&artifacts.vertex, &artifacts.fragment).unwrap();
+    let declarations = TerrainSourceResourceBindings::from_source(&source).unwrap();
+    let bindings = lowered
+        .opaque_resource_contract()
+        .bind_semantic_roles(&declarations)
+        .unwrap();
+    let program =
+        prepare_lowered_distant_horizons_source_program(&contract, &lowered, &bindings).unwrap();
+
+    for module in program.shader_module_descriptors(BackendApi::Vulkan) {
+        compile_glsl_for_backend_test(
+            match module.stage {
+                ShaderStage::Vertex => shaderc::ShaderKind::Vertex,
+                ShaderStage::Fragment => shaderc::ShaderKind::Fragment,
+                stage => panic!("unexpected lowered dh_water shader stage {stage:?}"),
+            },
+            std::str::from_utf8(&module.code).unwrap(),
+            &module.label,
+        )
+        .unwrap_or_else(|error| {
+            panic!(
+                "complete lowered Complementary Distant Horizons water {} must compile for Vulkan: {error}",
+                module.label
+            )
+        });
+    }
+}
+
+#[test]
+fn distant_horizons_lod_opaque_pipeline_uses_explicit_two_set_gal_layout() {
+    let backend =
+        match VulkanBackend::new("MattMC Distant Horizons LOD Vulkan pipeline conformance") {
+            Ok(backend) => backend,
+            Err(error) => {
+                let text = error.to_string();
+                assert!(
+                    text.contains("Vulkan")
+                        || text.contains("vulkan")
+                        || text.contains("physical device"),
+                    "unexpected Vulkan DH LOD setup failure: {text}"
+                );
+                return;
+            }
+        };
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    create_distant_horizons_lod_opaque_pipeline(&mut gal, "dh-lod.vulkan")
+        .expect("Rust-owned DH LOD pipeline must lower through Vulkan");
+}
+
+fn create_distant_horizons_lod_opaque_pipeline(
+    gal: &mut VulkanicGal,
+    label: &str,
+) -> GalResult<Handle> {
+    let program = minimal_distant_horizons_lod_opaque_program();
+    let [geometry_and_frame, lightmap] = distant_horizons_lod_opaque_resource_layouts(label);
+    let geometry_and_frame = gal.create_resource_layout(geometry_and_frame)?;
+    let lightmap = gal.create_resource_layout(lightmap)?;
+    let pipeline_layout = gal.create_pipeline_layout(PipelineLayoutDesc {
+        label: format!("{label}.pipeline-layout"),
+        resource_layouts: vec![geometry_and_frame, lightmap],
+    })?;
+    let [vertex, fragment] = program.shader_module_descriptors(BackendApi::Vulkan);
+    let vertex_shader = gal.create_shader_module(vertex)?;
+    let fragment_shader = gal.create_shader_module(fragment)?;
+    gal.create_graphics_pipeline(GraphicsPipelineDesc {
+        label: format!("{label}.pipeline"),
+        layout: pipeline_layout,
+        vertex_shader,
+        fragment_shader,
+        topology: PrimitiveTopology::Triangles,
+        cull_mode: CullMode::Back,
+        front_face: crate::render::vulkanic::resources::FrontFace::CounterClockwise,
+        blend: BlendMode::Disabled,
+        depth_compare: Some(CompareOp::LessOrEqual),
+        depth_write: true,
+        depth_bias: None,
+        color_formats: vec![TextureFormat::Rgba8Unorm; 4],
+        depth_format: Some(TextureFormat::Depth32Float),
+    })
+}
 
 #[test]
 fn selected_terrain_fragment_compiles_with_and_without_colored_voxel_resources() {
@@ -71,7 +468,21 @@ fn selected_terrain_fragment_compiles_with_and_without_colored_voxel_resources()
 
 #[test]
 fn lowered_complete_complementary_terrain_pair_compiles_at_the_vulkan_boundary() {
-    let source = complete_bundled_pack_source_for_test();
+    let bundled = complete_bundled_pack_source_for_test();
+    let mut files = bundled.files();
+    // `shadowDistance` is an Iris CONST option in the selected Complementary
+    // pack. It must reach the lowered source as a rewritten GLSL const, never
+    // as a macro that corrupts the declaration.
+    files.push(ShaderSourceFile::new(
+        RUNTIME_CONSTANTS_PATH,
+        "shadowDistance=192.0\n",
+    ));
+    files.push(ShaderSourceFile::new(
+        RUNTIME_OPTIONS_PATH,
+        "COLORED_LIGHTING=256\nUNDERWATERCOLOR_B=100\nUNDERWATERCOLOR_G=100\nUNDERWATERCOLOR_R=100\n",
+    ));
+    let source = ShaderPackSource::new("complete-terrain-const-vulkan-boundary", 94, files)
+        .expect("the bounded runtime constant snapshot must remain valid");
     let stages = TerrainSourceStages {
         vertex: TerrainSourceStage {
             path: "world0/gbuffers_terrain.vsh".to_string(),
@@ -103,6 +514,65 @@ fn lowered_complete_complementary_terrain_pair_compiles_at_the_vulkan_boundary()
         lowered.fragment().entry_path(),
     )
     .expect("lowered Complementary terrain fragment source must compile for Vulkan");
+}
+
+#[test]
+fn lowered_complete_complementary_scalar_uniform_offsets_match_spirv_std140_layout() {
+    let source = complete_bundled_pack_source_for_test();
+    let stages = TerrainSourceStages {
+        vertex: TerrainSourceStage {
+            path: "world0/gbuffers_terrain.vsh".to_string(),
+            defines: Default::default(),
+        },
+        fragment: TerrainSourceStage {
+            path: "world0/gbuffers_terrain.fsh".to_string(),
+            defines: Default::default(),
+        },
+    };
+    let artifacts = preprocess_terrain_sources(&source, &stages).unwrap();
+    let lowered = lower_terrain_source_pair(&artifacts.vertex, &artifacts.fragment).unwrap();
+    let fragment = shader_stage_code_for_backend(BackendApi::Vulkan, lowered.fragment().source());
+    let spirv = compile_glsl_for_backend_test(
+        shaderc::ShaderKind::Fragment,
+        std::str::from_utf8(&fragment).unwrap(),
+        lowered.fragment().entry_path(),
+    )
+    .expect("lowered Complementary terrain fragment must compile for Vulkan");
+    let offsets = spirv_uniform_block_member_offsets(&spirv, "VulkanicSourceTerrainUniforms")
+        .expect("compiled terrain fragment must retain the scalar UBO member offsets");
+    for field in lowered.uniform_contract().fields() {
+        assert_eq!(
+            Some(&field.offset()),
+            offsets.get(field.name()),
+            "SPIR-V std140 offset diverged for source uniform '{}'",
+            field.name()
+        );
+    }
+}
+
+#[test]
+fn lowered_complete_complementary_shadow_pair_compiles_at_the_vulkan_boundary() {
+    let source = complete_bundled_pack_source_for_test();
+    let stages = shadow_source_stages_for_scope(&source, TerrainProgramScope::Overworld)
+        .expect("the bundled Complementary source must expose an Overworld shadow pair");
+    let artifacts = preprocess_terrain_sources(&source, &stages).unwrap();
+    let lowered = lower_shadow_source_pair(&artifacts.vertex, &artifacts.fragment).unwrap();
+    assert!(lowered.fragment().outputs().len() >= 1);
+    assert!(!lowered.vertex().source().contains("voxel_img"));
+    assert!(!lowered.vertex().source().contains("imageStore"));
+
+    compile_glsl_for_backend_test(
+        shaderc::ShaderKind::Vertex,
+        lowered.vertex().source(),
+        lowered.vertex().entry_path(),
+    )
+    .expect("lowered Complementary shadow vertex source must compile for Vulkan");
+    compile_glsl_for_backend_test(
+        shaderc::ShaderKind::Fragment,
+        lowered.fragment().source(),
+        lowered.fragment().entry_path(),
+    )
+    .expect("lowered Complementary shadow fragment source must compile for Vulkan");
 }
 
 /// Compiles the real bundled Complementary terrain pair through the private
@@ -158,6 +628,280 @@ fn lowered_complete_complementary_terrain_pair_creates_vulkan_modules() {
             )
         });
     }
+}
+
+/// Compiles the selected hand source through the Rust Vulkan boundary. This
+/// is deliberately source-program conformance only: it cannot select a hand
+/// route, borrow Iris state, or create a gameplay hand pass.
+#[test]
+fn lowered_complete_complementary_hand_pair_creates_vulkan_modules() {
+    let backend = match VulkanBackend::new("MattMC complete source hand Vulkan conformance") {
+        Ok(backend) => backend,
+        Err(error) => {
+            let text = error.to_string();
+            assert!(
+                text.contains("Vulkan")
+                    || text.contains("vulkan")
+                    || text.contains("physical device"),
+                "unexpected Vulkan complete source hand setup failure: {text}"
+            );
+            return;
+        }
+    };
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let source = complete_bundled_pack_source_for_test();
+    let contract = derive_hand_contract(&source, TerrainProgramScope::Overworld)
+        .expect("the bundled Complementary scope must expose gbuffers_hand");
+    let lowered = lower_hand_source_pair(&source, &contract).unwrap();
+    let declarations = TerrainSourceResourceBindings::from_source(&source).unwrap();
+    let bindings = bind_hand_source_resources(&lowered, &declarations).unwrap();
+    let program = prepare_lowered_hand_source_program(&contract, &lowered, &bindings).unwrap();
+
+    for module in program.shader_module_descriptors(BackendApi::Vulkan) {
+        gal.create_shader_module(module).unwrap_or_else(|error| {
+            panic!(
+                "complete lowered Complementary hand shader must compile through the Vulkan lowering: {error}"
+            )
+        });
+    }
+}
+
+#[test]
+fn lowered_complete_complementary_textured_material_pair_creates_vulkan_modules() {
+    let backend =
+        match VulkanBackend::new("MattMC complete source textured-material Vulkan conformance") {
+            Ok(backend) => backend,
+            Err(error) => {
+                let text = error.to_string();
+                assert!(
+                    text.contains("Vulkan")
+                        || text.contains("vulkan")
+                        || text.contains("physical device"),
+                    "unexpected Vulkan complete source textured-material setup failure: {text}"
+                );
+                return;
+            }
+        };
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let source = complete_bundled_pack_source_for_test();
+    let contract = derive_textured_material_contract(&source, TerrainProgramScope::Overworld)
+        .expect("the bundled Complementary scope must expose gbuffers_textured");
+    let lowered = lower_textured_material_source_pair(&source, &contract).unwrap();
+    let declarations = TerrainSourceResourceBindings::from_source(&source).unwrap();
+    let bindings = lowered
+        .opaque_resource_contract()
+        .bind_semantic_roles(&declarations)
+        .unwrap();
+    let program =
+        prepare_lowered_textured_material_source_program(&contract, &lowered, &bindings).unwrap();
+
+    for module in program.shader_module_descriptors(BackendApi::Vulkan) {
+        gal.create_shader_module(module).unwrap_or_else(|error| {
+            panic!(
+                "complete lowered Complementary textured-material shader must compile through the Vulkan lowering: {error}"
+            )
+        });
+    }
+}
+
+#[test]
+fn lowered_complete_complementary_weather_pair_creates_vulkan_modules() {
+    let backend = match VulkanBackend::new("MattMC complete source weather Vulkan conformance") {
+        Ok(backend) => backend,
+        Err(error) => {
+            let text = error.to_string();
+            assert!(
+                text.contains("Vulkan")
+                    || text.contains("vulkan")
+                    || text.contains("physical device"),
+                "unexpected Vulkan complete source weather setup failure: {text}"
+            );
+            return;
+        }
+    };
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let source = complete_bundled_pack_source_for_test();
+    let contract = derive_weather_pass_contract(&source, TerrainProgramScope::Overworld)
+        .expect("the bundled Complementary scope must expose gbuffers_weather");
+    let lowered = lower_weather_source_pair(&source, &contract).unwrap();
+    let declarations = TerrainSourceResourceBindings::from_source(&source).unwrap();
+    let bindings = lowered
+        .opaque_resource_contract()
+        .bind_semantic_roles(&declarations)
+        .unwrap();
+    let program = prepare_lowered_weather_source_program(&contract, &lowered, &bindings).unwrap();
+
+    for module in program.shader_module_descriptors(BackendApi::Vulkan) {
+        gal.create_shader_module(module).unwrap_or_else(|error| {
+            panic!(
+                "complete lowered Complementary weather shader must compile through the Vulkan lowering: {error}"
+            )
+        });
+    }
+}
+
+#[test]
+fn lowered_complete_complementary_shadow_pair_creates_vulkan_modules() {
+    let backend = match VulkanBackend::new("MattMC complete source shadow Vulkan conformance") {
+        Ok(backend) => backend,
+        Err(error) => {
+            let text = error.to_string();
+            assert!(
+                text.contains("Vulkan")
+                    || text.contains("vulkan")
+                    || text.contains("physical device"),
+                "unexpected Vulkan complete source shadow setup failure: {text}"
+            );
+            return;
+        }
+    };
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let source = complete_bundled_pack_source_for_test();
+    let stages = shadow_source_stages_for_scope(&source, TerrainProgramScope::Overworld)
+        .expect("the bundled Complementary source must expose an Overworld shadow pair");
+    let artifacts = preprocess_terrain_sources(&source, &stages).unwrap();
+    let lowered = lower_shadow_source_pair(&artifacts.vertex, &artifacts.fragment).unwrap();
+    let declarations = TerrainSourceResourceBindings::from_source(&source).unwrap();
+    let bindings = lowered
+        .opaque_resource_contract()
+        .bind_semantic_roles(&declarations)
+        .unwrap();
+    let program =
+        crate::render::vulkanic::shader_pack::programs::prepare_lowered_shadow_source_program(
+            source.name(),
+            source.generation(),
+            &lowered,
+            &bindings,
+        )
+        .unwrap();
+
+    for module in program.shader_module_descriptors(BackendApi::Vulkan) {
+        gal.create_shader_module(module).unwrap_or_else(|error| {
+            panic!(
+                "complete lowered Complementary shadow shader must compile through the Vulkan lowering: {error}"
+            )
+        });
+    }
+}
+
+/// Takes the same explicit resource-layout and pipeline path used by the
+/// world frontend. The test deliberately stops before draw submission: source
+/// route selection remains test-only until all runtime semantic resources are
+/// promoted together.
+fn create_lowered_source_graphics_pipeline(
+    gal: &mut VulkanicGal,
+    program: &LoweredTerrainSourceProgram,
+    label: &str,
+    color_formats: Vec<TextureFormat>,
+) -> GalResult<Handle> {
+    let layouts = program.execution_resource_layouts()?;
+    let source_data = gal.create_resource_layout(layouts.source_data)?;
+    let pack_resources = gal.create_resource_layout(layouts.pack_resources)?;
+    let pipeline_layout = gal.create_pipeline_layout(PipelineLayoutDesc {
+        label: format!("{label}.layout"),
+        resource_layouts: vec![source_data, pack_resources],
+    })?;
+    let [vertex_desc, fragment_desc] = program.shader_module_descriptors(BackendApi::Vulkan);
+    let vertex_shader = gal.create_shader_module(vertex_desc)?;
+    let fragment_shader = gal.create_shader_module(fragment_desc)?;
+    gal.create_graphics_pipeline(GraphicsPipelineDesc {
+        label: format!("{label}.pipeline"),
+        layout: pipeline_layout,
+        vertex_shader,
+        fragment_shader,
+        topology: PrimitiveTopology::Triangles,
+        cull_mode: CullMode::Back,
+        front_face: crate::render::vulkanic::resources::FrontFace::CounterClockwise,
+        blend: BlendMode::Disabled,
+        depth_compare: Some(CompareOp::LessOrEqual),
+        depth_write: true,
+        depth_bias: None,
+        color_formats,
+        depth_format: Some(TextureFormat::Depth32Float),
+    })
+}
+
+#[test]
+fn lowered_complete_complementary_source_pairs_create_vulkan_graphics_pipelines() {
+    let backend = match VulkanBackend::new("MattMC complete source pipeline Vulkan conformance") {
+        Ok(backend) => backend,
+        Err(error) => {
+            let text = error.to_string();
+            assert!(
+                text.contains("Vulkan")
+                    || text.contains("vulkan")
+                    || text.contains("physical device"),
+                "unexpected Vulkan complete source pipeline setup failure: {text}"
+            );
+            return;
+        }
+    };
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let source = complete_bundled_pack_source_for_test();
+    let declarations = TerrainSourceResourceBindings::from_source(&source).unwrap();
+
+    let terrain_contract =
+        derive_complementary_terrain_contract_for_scope(&source, TerrainProgramScope::Overworld)
+            .unwrap();
+    // The semantic contract identifies the selected terrain program, while
+    // the complete pack supplies the explicit scoped vertex/fragment pair.
+    // Do not infer a vertex path by rewriting the contract fragment entry.
+    let terrain_stages = TerrainSourceStages {
+        vertex: TerrainSourceStage {
+            path: "world0/gbuffers_terrain.vsh".to_string(),
+            defines: Default::default(),
+        },
+        fragment: TerrainSourceStage {
+            path: "world0/gbuffers_terrain.fsh".to_string(),
+            defines: Default::default(),
+        },
+    };
+    let terrain_artifacts = preprocess_terrain_sources(&source, &terrain_stages).unwrap();
+    let terrain_lowered =
+        lower_terrain_source_pair(&terrain_artifacts.vertex, &terrain_artifacts.fragment).unwrap();
+    let terrain_bindings = terrain_lowered
+        .opaque_resource_contract()
+        .bind_semantic_roles(&declarations)
+        .unwrap();
+    let terrain_program = prepare_lowered_terrain_source_program(
+        &terrain_contract,
+        &terrain_lowered,
+        &terrain_bindings,
+        TerrainMaterialProgramKind::Opaque,
+    )
+    .unwrap();
+    create_lowered_source_graphics_pipeline(
+        &mut gal,
+        &terrain_program,
+        "complete-source-terrain",
+        vec![TextureFormat::Rgba8Unorm; 4],
+    )
+    .expect("complete lowered Complementary terrain pipeline must lower through Vulkan");
+
+    let shadow_stages = shadow_source_stages_for_scope(&source, TerrainProgramScope::Overworld)
+        .expect("the bundled Complementary source must expose an Overworld shadow pair");
+    let shadow_artifacts = preprocess_terrain_sources(&source, &shadow_stages).unwrap();
+    let shadow_lowered =
+        lower_shadow_source_pair(&shadow_artifacts.vertex, &shadow_artifacts.fragment).unwrap();
+    let shadow_bindings = shadow_lowered
+        .opaque_resource_contract()
+        .bind_semantic_roles(&declarations)
+        .unwrap();
+    let shadow_program =
+        crate::render::vulkanic::shader_pack::programs::prepare_lowered_shadow_source_program(
+            source.name(),
+            source.generation(),
+            &shadow_lowered,
+            &shadow_bindings,
+        )
+        .unwrap();
+    create_lowered_source_graphics_pipeline(
+        &mut gal,
+        &shadow_program,
+        "complete-source-shadow",
+        vec![TextureFormat::Rgba8Unorm; 2],
+    )
+    .expect("complete lowered Complementary shadow pipeline must lower through Vulkan");
 }
 
 #[test]
@@ -394,9 +1138,11 @@ fn selected_terrain_pipeline_layout_matches_optional_colored_voxel_interface() {
             fragment_shader: fragment,
             topology: PrimitiveTopology::Triangles,
             cull_mode: CullMode::Back,
+            front_face: crate::render::vulkanic::resources::FrontFace::CounterClockwise,
             blend: BlendMode::Disabled,
             depth_compare: Some(CompareOp::LessOrEqual),
             depth_write: true,
+            depth_bias: None,
             color_formats: vec![TextureFormat::Rgba16Float; 4],
             depth_format: Some(TextureFormat::Depth32Float),
         })
@@ -523,6 +1269,37 @@ fn isolated_vulkan_conformance_renders_indexed_textured_draw() {
                     || text.contains("vulkan")
                     || text.contains("physical device"),
                 "unexpected conformance failure: {text}"
+            );
+        }
+    }
+}
+
+#[test]
+fn isolated_vulkan_conformance_reads_host_written_dynamic_uniform_at_nonzero_offset() {
+    let result = run_dynamic_uniform_offset_conformance();
+    match result {
+        Ok(pixel) => {
+            assert!(
+                (62..=66).contains(&pixel[0]),
+                "dynamic UBO red channel was not read from offset 256: {pixel:?}"
+            );
+            assert!(
+                (126..=130).contains(&pixel[1]),
+                "dynamic UBO green channel was not read from offset 256: {pixel:?}"
+            );
+            assert!(
+                (189..=193).contains(&pixel[2]),
+                "dynamic UBO blue channel was not read from offset 256: {pixel:?}"
+            );
+            assert_eq!(255, pixel[3]);
+        }
+        Err(error) => {
+            let text = error.to_string();
+            assert!(
+                text.contains("Vulkan")
+                    || text.contains("vulkan")
+                    || text.contains("physical device"),
+                "unexpected dynamic UBO conformance failure: {text}"
             );
         }
     }
@@ -1222,6 +1999,275 @@ fn assert_conformance_conventions(report: &ConformanceReport) {
         .contains("\"alpha_counts\":{\"255\":6144}"));
 }
 
+/// Exercises the exact generic contract used by the source-terrain scalar
+/// block: one host write, a transfer-to-shader-read transition, and a
+/// non-zero dynamic UBO offset. Keep this independent of shader-pack and
+/// terrain code so a failure pinpoints backend transport.
+fn run_dynamic_uniform_offset_conformance() -> GalResult<[u8; 4]> {
+    let backend = VulkanBackend::new("MattMC dynamic UBO conformance")?;
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let extent = Extent3d {
+        width: 8,
+        height: 8,
+        depth: 1,
+    };
+    let vertex_stream = gal.create_buffer(BufferDesc {
+        label: "dynamic-ubo.vertex-stream".to_owned(),
+        size: 16,
+        memory: MemoryDomain::Upload,
+        usages: vec![BufferUsage::Storage],
+    })?;
+    let stream = gal.create_buffer(BufferDesc {
+        label: "dynamic-ubo.stream".to_owned(),
+        size: 768,
+        memory: MemoryDomain::Upload,
+        usages: vec![
+            BufferUsage::Uniform,
+            BufferUsage::Storage,
+            BufferUsage::HostWrite,
+        ],
+    })?;
+    let color = gal.create_texture(TextureDesc {
+        label: "dynamic-ubo.color".to_owned(),
+        dimension: TextureDimension::D2,
+        format: TextureFormat::Rgba8Unorm,
+        extent,
+        mip_levels: 1,
+        array_layers: 1,
+        usages: vec![TextureUsage::ColorAttachment, TextureUsage::TransferSrc],
+    })?;
+    let color_view = gal.create_texture_view(view(
+        "dynamic-ubo.color-view",
+        color,
+        TextureFormat::Rgba8Unorm,
+    ))?;
+    let readback = gal.create_buffer(BufferDesc {
+        label: "dynamic-ubo.readback".to_owned(),
+        size: u64::from(extent.width) * u64::from(extent.height) * 4,
+        memory: MemoryDomain::Readback,
+        usages: vec![BufferUsage::TransferDst, BufferUsage::HostRead],
+    })?;
+    let layout = gal.create_resource_layout(ResourceLayoutDesc {
+        label: "dynamic-ubo.layout".to_owned(),
+        bindings: vec![
+            ResourceBindingDesc {
+                binding: 0,
+                kind: ResourceBindingKind::StorageBuffer,
+                stages: PipelineStageFlags::DRAW,
+                array_count: 1,
+                optional: false,
+                dynamic_offset_count: 0,
+            },
+            ResourceBindingDesc {
+                binding: 1,
+                kind: ResourceBindingKind::UniformBuffer,
+                stages: PipelineStageFlags::DRAW,
+                array_count: 1,
+                optional: false,
+                dynamic_offset_count: 1,
+            },
+            ResourceBindingDesc {
+                binding: 2,
+                kind: ResourceBindingKind::UniformBuffer,
+                stages: PipelineStageFlags::DRAW,
+                array_count: 1,
+                optional: false,
+                dynamic_offset_count: 1,
+            },
+            ResourceBindingDesc {
+                binding: 3,
+                kind: ResourceBindingKind::StorageBuffer,
+                stages: PipelineStageFlags::DRAW,
+                array_count: 1,
+                optional: false,
+                dynamic_offset_count: 1,
+            },
+        ],
+    })?;
+    let set = gal.create_resource_set(ResourceSetDesc {
+        label: "dynamic-ubo.set".to_owned(),
+        layout,
+        bindings: vec![
+            ResourceBinding {
+                binding: 0,
+                array_index: 0,
+                resource: vertex_stream,
+                kind: ResourceBindingKind::StorageBuffer,
+                access: AccessFlags::READ,
+                dynamic_offsets: Vec::new(),
+                buffer_range: None,
+            },
+            ResourceBinding {
+                binding: 1,
+                array_index: 0,
+                resource: stream,
+                kind: ResourceBindingKind::UniformBuffer,
+                access: AccessFlags::READ,
+                dynamic_offsets: vec![0],
+                buffer_range: Some(128),
+            },
+            ResourceBinding {
+                binding: 2,
+                array_index: 0,
+                resource: stream,
+                kind: ResourceBindingKind::UniformBuffer,
+                access: AccessFlags::READ,
+                dynamic_offsets: vec![0],
+                buffer_range: Some(16),
+            },
+            ResourceBinding {
+                binding: 3,
+                array_index: 0,
+                resource: stream,
+                kind: ResourceBindingKind::StorageBuffer,
+                access: AccessFlags::READ,
+                dynamic_offsets: vec![0],
+                buffer_range: Some(16),
+            },
+        ],
+    })?;
+    let pipeline_layout = gal.create_pipeline_layout(PipelineLayoutDesc {
+        label: "dynamic-ubo.pipeline-layout".to_owned(),
+        resource_layouts: vec![layout],
+    })?;
+    let vertex_shader = gal.create_shader_module(shader_module(
+        "dynamic-ubo.vertex",
+        ShaderStage::Vertex,
+        shaderc::ShaderKind::Vertex,
+        DYNAMIC_UNIFORM_VERTEX_SHADER,
+    )?)?;
+    let fragment_shader = gal.create_shader_module(shader_module(
+        "dynamic-ubo.fragment",
+        ShaderStage::Fragment,
+        shaderc::ShaderKind::Fragment,
+        DYNAMIC_UNIFORM_FRAGMENT_SHADER,
+    )?)?;
+    let pipeline = gal.create_graphics_pipeline(GraphicsPipelineDesc {
+        label: "dynamic-ubo.pipeline".to_owned(),
+        layout: pipeline_layout,
+        vertex_shader,
+        fragment_shader,
+        topology: PrimitiveTopology::Triangles,
+        cull_mode: CullMode::None,
+        front_face: crate::render::vulkanic::resources::FrontFace::CounterClockwise,
+        blend: BlendMode::Disabled,
+        depth_compare: None,
+        depth_write: false,
+        depth_bias: None,
+        color_formats: vec![TextureFormat::Rgba8Unorm],
+        depth_format: None,
+    })?;
+    let target = gal.create_render_target(RenderTargetDesc {
+        label: "dynamic-ubo.target".to_owned(),
+        color_views: vec![color_view],
+        depth_stencil_view: None,
+        extent,
+    })?;
+    let pass = gal.create_render_pass(RenderPassDesc {
+        label: "dynamic-ubo.pass".to_owned(),
+        target,
+        color_formats: vec![TextureFormat::Rgba8Unorm],
+        depth_format: None,
+    })?;
+    let mut uniform_bytes = Vec::with_capacity(16);
+    for value in [0.25_f32, 0.5, 0.75, 1.0] {
+        uniform_bytes.extend(value.to_ne_bytes());
+    }
+    let command_list = gal.create_command_list(CommandListDesc {
+        label: "dynamic-ubo.commands".to_owned(),
+        operations: vec![
+            CommandOp::HostWriteBuffer {
+                buffer: stream,
+                offset: 256,
+                data: uniform_bytes,
+            },
+            buffer_barrier(
+                stream,
+                TextureUsageState::TransferDst,
+                TextureUsageState::ShaderRead,
+            ),
+            texture_barrier(
+                color,
+                TextureUsageState::Undefined,
+                TextureUsageState::ColorAttachment,
+            ),
+            CommandOp::BeginPass {
+                pass,
+                target,
+                colors: vec![PassAttachment {
+                    view: color_view,
+                    load_op: AttachmentLoadOp::Clear,
+                    store_op: AttachmentStoreOp::Store,
+                    clear_color: Some(ClearColor {
+                        r: 0.0,
+                        g: 0.0,
+                        b: 0.0,
+                        a: 1.0,
+                    }),
+                }],
+                depth_stencil: None,
+            },
+            CommandOp::BindGraphicsPipeline(pipeline),
+            CommandOp::BindResourceSet {
+                pipeline_layout,
+                set_index: 0,
+                set,
+                dynamic_offsets: vec![0, 256, 512],
+            },
+            CommandOp::Draw {
+                vertices: 3,
+                instances: 1,
+            },
+            CommandOp::EndPass,
+            texture_barrier(
+                color,
+                TextureUsageState::ColorAttachment,
+                TextureUsageState::TransferSrc,
+            ),
+            CommandOp::CopyTextureToBuffer(BufferImageCopyRegion {
+                buffer: readback,
+                buffer_offset: 0,
+                bytes_per_row: extent.width * 4,
+                rows_per_image: extent.height,
+                texture: color,
+                texture_mip: 0,
+                texture_layer: 0,
+                texture_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
+                extent,
+            }),
+            buffer_barrier(
+                readback,
+                TextureUsageState::TransferDst,
+                TextureUsageState::ShaderRead,
+            ),
+            CommandOp::HostReadBuffer {
+                buffer: readback,
+                offset: 0,
+                size: u64::from(extent.width) * u64::from(extent.height) * 4,
+            },
+        ],
+    })?;
+    let token = gal.submit(SubmissionBatch {
+        label: "dynamic-ubo.submit".to_owned(),
+        command_lists: vec![command_list],
+    })?;
+    gal.retire_through_for_test(token.submission)?;
+    let reads = gal
+        .vulkan_backend()
+        .ok_or_else(|| GalError::backend("dynamic UBO conformance backend was not Vulkan"))?
+        .completed_host_reads_for_test();
+    let read = reads
+        .iter()
+        .rev()
+        .find(|read| read.buffer == readback)
+        .ok_or_else(|| GalError::backend("dynamic UBO conformance produced no readback"))?;
+    let center =
+        ((extent.height as usize / 2) * extent.width as usize + extent.width as usize / 2) * 4;
+    Ok(read.bytes[center..center + 4]
+        .try_into()
+        .expect("center pixel range is statically in bounds"))
+}
+
 pub(in crate::render::vulkanic::backends) fn run_conformance(
     mode: &str,
     extent: Extent3d,
@@ -1437,9 +2483,11 @@ pub(in crate::render::vulkanic::backends) fn run_conformance(
         fragment_shader,
         topology: PrimitiveTopology::Triangles,
         cull_mode: CullMode::Back,
+        front_face: crate::render::vulkanic::resources::FrontFace::CounterClockwise,
         blend: BlendMode::Alpha,
         depth_compare: Some(CompareOp::LessOrEqual),
         depth_write: true,
+        depth_bias: None,
         color_formats: vec![TextureFormat::Rgba8Unorm],
         depth_format: Some(TextureFormat::Depth32Float),
     })?;
@@ -1720,6 +2768,82 @@ fn shader_module(
     })
 }
 
+/// Reads the small reflection subset needed to verify that shaderc assigned
+/// the same std140 offsets as the source-lowering contract. Keeping this in
+/// conformance avoids adding a runtime reflection dependency just for an
+/// invariant the Rust packer can prove at build time.
+fn spirv_uniform_block_member_offsets(
+    bytes: &[u8],
+    block_name: &str,
+) -> Option<std::collections::BTreeMap<String, u32>> {
+    const OP_NAME: u16 = 5;
+    const OP_MEMBER_NAME: u16 = 6;
+    const OP_MEMBER_DECORATE: u16 = 72;
+    const DECORATION_OFFSET: u32 = 35;
+    if bytes.len() % 4 != 0 || bytes.len() < 20 {
+        return None;
+    }
+    let words = bytes
+        .chunks_exact(4)
+        .map(|word| u32::from_le_bytes(word.try_into().expect("SPIR-V word width")))
+        .collect::<Vec<_>>();
+    if words.first().copied() != Some(0x0723_0203) {
+        return None;
+    }
+    let mut named_ids = std::collections::BTreeMap::<u32, String>::new();
+    let mut member_names = std::collections::BTreeMap::<(u32, u32), String>::new();
+    let mut member_offsets = std::collections::BTreeMap::<(u32, u32), u32>::new();
+    let mut cursor = 5usize;
+    while cursor < words.len() {
+        let header = words[cursor];
+        let word_count = (header >> 16) as usize;
+        let opcode = header as u16;
+        if word_count == 0 || cursor.checked_add(word_count)? > words.len() {
+            return None;
+        }
+        let operands = &words[cursor + 1..cursor + word_count];
+        match opcode {
+            OP_NAME if operands.len() >= 2 => {
+                named_ids.insert(operands[0], spirv_string(&operands[1..]));
+            }
+            OP_MEMBER_NAME if operands.len() >= 3 => {
+                member_names.insert((operands[0], operands[1]), spirv_string(&operands[2..]));
+            }
+            OP_MEMBER_DECORATE if operands.len() >= 4 && operands[2] == DECORATION_OFFSET => {
+                member_offsets.insert((operands[0], operands[1]), operands[3]);
+            }
+            _ => {}
+        }
+        cursor += word_count;
+    }
+    let block = named_ids
+        .into_iter()
+        .find_map(|(id, name)| (name == block_name).then_some(id))?;
+    let offsets = member_names
+        .into_iter()
+        .filter_map(|((struct_id, member), name)| {
+            (struct_id == block)
+                .then(|| {
+                    member_offsets
+                        .get(&(struct_id, member))
+                        .copied()
+                        .map(|offset| (name, offset))
+                })
+                .flatten()
+        })
+        .collect::<std::collections::BTreeMap<_, _>>();
+    (!offsets.is_empty()).then_some(offsets)
+}
+
+fn spirv_string(words: &[u32]) -> String {
+    words
+        .iter()
+        .flat_map(|word| word.to_le_bytes())
+        .take_while(|byte| *byte != 0)
+        .map(char::from)
+        .collect()
+}
+
 fn texture_bytes() -> Vec<u8> {
     vec![
         255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 0, 255, 255, 255, 255, 255, 0,
@@ -1839,6 +2963,25 @@ layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
 layout(set = 0, binding = 0, rgba16f) uniform writeonly image3D volume;
 void main() {
     imageStore(volume, ivec3(1, 2, 3), vec4(0.5, 0.25, 0.75, 1.0));
+}
+"#;
+
+const DYNAMIC_UNIFORM_VERTEX_SHADER: &str = r#"
+#version 450
+vec2 positions[3] = vec2[](vec2(-1.0, -1.0), vec2(3.0, -1.0), vec2(-1.0, 3.0));
+void main() {
+    gl_Position = vec4(positions[gl_VertexIndex], 0.0, 1.0);
+}
+"#;
+
+const DYNAMIC_UNIFORM_FRAGMENT_SHADER: &str = r#"
+#version 450
+layout(set = 0, binding = 2, std140) uniform DynamicColor {
+    vec4 color;
+} dynamic_color;
+layout(location = 0) out vec4 out_color;
+void main() {
+    out_color = dynamic_color.color;
 }
 "#;
 

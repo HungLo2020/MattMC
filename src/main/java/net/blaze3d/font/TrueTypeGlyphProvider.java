@@ -199,6 +199,27 @@ public class TrueTypeGlyphProvider implements GlyphProvider {
 				}
 
 				@Override
+				public boolean copyTo(NativeImage nativeImage, int i, int j) {
+					if (nativeImage.format() != NativeImage.Format.LUMINANCE) {
+						return false;
+					}
+					FT_Face fT_Face = TrueTypeGlyphProvider.this.validateFontOpen();
+					try (NativeImage nativeImage2 = new NativeImage(NativeImage.Format.LUMINANCE, Glyph.this.width, Glyph.this.height, false)) {
+						if (!nativeImage2.copyFromFont(fT_Face, Glyph.this.index)) {
+							return false;
+						}
+						for (int k = 0; k < Glyph.this.height; k++) {
+							MemoryUtil.memCopy(
+								nativeImage2.getPointer() + (long)k * Glyph.this.width,
+								nativeImage.getPointer() + (long)(i + (j + k) * nativeImage.getWidth()),
+								Glyph.this.width
+							);
+						}
+						return true;
+					}
+				}
+
+				@Override
 				public boolean isColored() {
 					return false;
 				}

@@ -382,6 +382,28 @@ public class UnihexProvider implements GlyphProvider {
 					}
 
 					@Override
+					public boolean copyTo(NativeImage nativeImage, int i, int j) {
+						if (nativeImage.format() != NativeImage.Format.RGBA) {
+							return false;
+						}
+						IntBuffer intBuffer = MemoryUtil.memAllocInt(Glyph.this.width() * 16);
+						try {
+							UnihexProvider.unpackBitsToBytes(intBuffer, Glyph.this.contents, Glyph.this.left, Glyph.this.right);
+							long l = MemoryUtil.memAddress(intBuffer);
+							for (int k = 0; k < 16; k++) {
+								MemoryUtil.memCopy(
+									l + (long)k * Glyph.this.width() * Integer.BYTES,
+									nativeImage.getPointer() + ((long)(j + k) * nativeImage.getWidth() + i) * Integer.BYTES,
+									(long)Glyph.this.width() * Integer.BYTES
+								);
+							}
+							return true;
+						} finally {
+							MemoryUtil.memFree(intBuffer);
+						}
+					}
+
+					@Override
 					public boolean isColored() {
 						return true;
 					}

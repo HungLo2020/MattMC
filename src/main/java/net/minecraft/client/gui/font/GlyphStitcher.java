@@ -35,6 +35,22 @@ public class GlyphStitcher implements AutoCloseable {
 		this.reset();
 	}
 
+	/**
+	 * Returns copied semantic atlas snapshots for a future Rust-owned GUI frame.
+	 * The snapshots expose source pixels only; render textures remain private to
+	 * the normal Java renderer.
+	 */
+	public List<FontTexture.SemanticAtlasSnapshot> semanticAtlasSnapshots() {
+		List<FontTexture.SemanticAtlasSnapshot> list = new ArrayList<>();
+		for (FontTexture fontTexture : this.textures) {
+			FontTexture.SemanticAtlasSnapshot semanticAtlasSnapshot = fontTexture.semanticAtlasSnapshot();
+			if (semanticAtlasSnapshot != null) {
+				list.add(semanticAtlasSnapshot);
+			}
+		}
+		return List.copyOf(list);
+	}
+
 	@Nullable
 	public BakedSheetGlyph stitch(GlyphInfo glyphInfo, GlyphBitmap glyphBitmap) {
 		for (FontTexture fontTexture : this.textures) {
@@ -50,7 +66,7 @@ public class GlyphStitcher implements AutoCloseable {
 		GlyphRenderTypes glyphRenderTypes = bl
 			? GlyphRenderTypes.createForColorTexture(resourceLocation)
 			: GlyphRenderTypes.createForIntensityTexture(resourceLocation);
-		FontTexture fontTexture2 = new FontTexture(resourceLocation::toString, glyphRenderTypes, bl);
+		FontTexture fontTexture2 = new FontTexture(resourceLocation, glyphRenderTypes, bl);
 		this.textures.add(fontTexture2);
 		this.textureManager.register(resourceLocation, fontTexture2);
 		return fontTexture2.add(glyphInfo, glyphBitmap);

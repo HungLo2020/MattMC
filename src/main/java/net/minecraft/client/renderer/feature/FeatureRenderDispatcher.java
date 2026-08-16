@@ -9,6 +9,8 @@ import net.minecraft.client.renderer.SubmitNodeCollection;
 import net.minecraft.client.renderer.SubmitNodeStorage;
 import net.minecraft.client.renderer.block.BlockRenderDispatcher;
 import net.minecraft.client.resources.model.AtlasManager;
+import net.vulkanic.world.RustGalWorldPrimitiveRenderer;
+import net.vulkanic.world.WorldRenderRoutePolicy;
 
 @Environment(EnvType.CLIENT)
 public class FeatureRenderDispatcher implements AutoCloseable {
@@ -52,14 +54,45 @@ public class FeatureRenderDispatcher implements AutoCloseable {
 
 	public void renderAllFeatures() {
 		for (SubmitNodeCollection submitNodeCollection : this.submitNodeStorage.getSubmitsPerOrder().values()) {
-			this.shadowFeatureRenderer.render(submitNodeCollection, this.bufferSource);
+			if (WorldRenderRoutePolicy.currentEntityShadowRoute().usesRustWholeFrameVulkan()) {
+				RustGalWorldPrimitiveRenderer.collectEntityShadowSemantics(submitNodeCollection.getShadowSubmits());
+			} else if (WorldRenderRoutePolicy.currentEntityShadowRoute().usesJavaCompatibility()) {
+				this.shadowFeatureRenderer.render(submitNodeCollection, this.bufferSource);
+			}
 			this.modelFeatureRenderer.render(submitNodeCollection, this.bufferSource, this.outlineBufferSource, this.crumblingBufferSource);
 			this.modelPartFeatureRenderer.render(submitNodeCollection, this.bufferSource, this.outlineBufferSource, this.crumblingBufferSource);
-			this.flameFeatureRenderer.render(submitNodeCollection, this.bufferSource, this.atlasManager);
-			this.nameTagFeatureRenderer.render(submitNodeCollection, this.bufferSource, this.font);
-			this.textFeatureRenderer.render(submitNodeCollection, this.bufferSource);
+			if (WorldRenderRoutePolicy.currentEntityFlameRoute().usesRustWholeFrameVulkan()) {
+				RustGalWorldPrimitiveRenderer.collectEntityFlameSemantics(submitNodeCollection.getFlameSubmits(), this.atlasManager);
+			} else if (!WorldRenderRoutePolicy.currentEntityFlameRoute().equals(WorldRenderRoutePolicy.Route.DISABLED)) {
+				this.flameFeatureRenderer.render(submitNodeCollection, this.bufferSource, this.atlasManager);
+			}
+			if (WorldRenderRoutePolicy.currentWorldTextRoute().usesRustWholeFrameVulkan()) {
+				var text = RustGalWorldPrimitiveRenderer.collectWorldTextSemantics(
+					submitNodeCollection.getNameTagSubmits().semanticSnapshot(), this.font
+				);
+				if (!text.fullySupported()) {
+					throw new IllegalStateException(
+						"Rust world-text route selected but name-tag semantic extraction was unsupported"
+					);
+				}
+				var ordinaryText = RustGalWorldPrimitiveRenderer.collectWorldTextSemantics(
+					submitNodeCollection.getTextSubmits(), this.font
+				);
+				if (!ordinaryText.fullySupported()) {
+					throw new IllegalStateException(
+						"Rust world-text route selected but ordinary text requires unsupported outline or polygon-offset semantics"
+					);
+				}
+			} else if (!WorldRenderRoutePolicy.currentWorldTextRoute().equals(WorldRenderRoutePolicy.Route.DISABLED)) {
+				this.nameTagFeatureRenderer.render(submitNodeCollection, this.bufferSource, this.font);
+				this.textFeatureRenderer.render(submitNodeCollection, this.bufferSource);
+			}
 			this.hitboxFeatureRenderer.render(submitNodeCollection, this.bufferSource);
-			this.leashFeatureRenderer.render(submitNodeCollection, this.bufferSource);
+			if (WorldRenderRoutePolicy.currentEntityLeashRoute().usesRustWholeFrameVulkan()) {
+				RustGalWorldPrimitiveRenderer.collectEntityLeashSemantics(submitNodeCollection.getLeashSubmits());
+			} else if (WorldRenderRoutePolicy.currentEntityLeashRoute().usesJavaCompatibility()) {
+				this.leashFeatureRenderer.render(submitNodeCollection, this.bufferSource);
+			}
 			this.itemFeatureRenderer.render(submitNodeCollection, this.bufferSource, this.outlineBufferSource);
 			this.blockFeatureRenderer.render(submitNodeCollection, this.bufferSource, this.blockRenderDispatcher, this.outlineBufferSource);
 			this.customFeatureRenderer.render(submitNodeCollection, this.bufferSource);
@@ -69,8 +102,57 @@ public class FeatureRenderDispatcher implements AutoCloseable {
 		this.submitNodeStorage.clear();
 	}
 
+	/**
+	 * Collects copied world-text semantics from the real extracted submit lists for the
+	 * Rust-owned whole-frame route. This intentionally performs no Java draw
+	 * and does not clear the lists; the normal block-only whole-frame dispatcher
+	 * remains responsible for the selected indexed-mesh producer work.
+	 */
+	public void collectRustWorldTextSemanticsForWholeFrame() {
+		this.collectRustWorldTextSemanticsForWholeFrame(this.submitNodeStorage);
+	}
+
+	/**
+	 * Consumes an isolated name-tag and ordinary-text submit queue built by real
+	 * entity and block-entity callbacks. Keeping it separate from the
+	 * block-feature queue prevents semantic extraction from retaining unrelated
+	 * Java draw work.
+	 */
+	public void collectRustWorldTextSemanticsForWholeFrame(SubmitNodeStorage textSubmitStorage) {
+		if (!WorldRenderRoutePolicy.currentWorldTextRoute().usesRustWholeFrameVulkan()) {
+			return;
+		}
+		for (SubmitNodeCollection submitNodeCollection : textSubmitStorage.getSubmitsPerOrder().values()) {
+			var text = RustGalWorldPrimitiveRenderer.collectWorldTextSemantics(
+				submitNodeCollection.getNameTagSubmits().semanticSnapshot(), this.font
+			);
+			if (!text.fullySupported()) {
+				throw new IllegalStateException(
+					"Rust world-text route selected but real name-tag semantic extraction was unsupported"
+				);
+			}
+			var ordinaryText = RustGalWorldPrimitiveRenderer.collectWorldTextSemantics(
+				submitNodeCollection.getTextSubmits(), this.font
+			);
+			if (!ordinaryText.fullySupported()) {
+				throw new IllegalStateException(
+					"Rust world-text route selected but real ordinary text requires unsupported outline or polygon-offset semantics"
+				);
+			}
+		}
+	}
+
 	public void renderBlockFeaturesOnly() {
 		for (SubmitNodeCollection submitNodeCollection : this.submitNodeStorage.getSubmitsPerOrder().values()) {
+			if (WorldRenderRoutePolicy.currentEntityShadowRoute().usesRustWholeFrameVulkan()) {
+				RustGalWorldPrimitiveRenderer.collectEntityShadowSemantics(submitNodeCollection.getShadowSubmits());
+			}
+			if (WorldRenderRoutePolicy.currentEntityFlameRoute().usesRustWholeFrameVulkan()) {
+				RustGalWorldPrimitiveRenderer.collectEntityFlameSemantics(submitNodeCollection.getFlameSubmits(), this.atlasManager);
+			}
+			if (WorldRenderRoutePolicy.currentEntityLeashRoute().usesRustWholeFrameVulkan()) {
+				RustGalWorldPrimitiveRenderer.collectEntityLeashSemantics(submitNodeCollection.getLeashSubmits());
+			}
 			this.blockFeatureRenderer.render(submitNodeCollection, this.bufferSource, this.blockRenderDispatcher, this.outlineBufferSource);
 		}
 

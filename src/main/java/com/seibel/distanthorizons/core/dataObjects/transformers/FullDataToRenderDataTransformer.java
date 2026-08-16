@@ -24,6 +24,7 @@ import com.seibel.distanthorizons.core.logging.DhLogger;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.HashSet;
+import java.util.List;
 
 /**
  * Handles converting {@link FullDataSourceV2}'s to {@link ColumnRenderSource}.
@@ -111,7 +112,7 @@ public class FullDataToRenderDataTransformer
 				LongArrayList dataColumn = fullDataSource.getColumnAtRelPos(x, z);
 				
 				updateOrReplaceRenderDataViewColumnWithFullDataColumn(
-						levelWrapper, fullDataSource, 
+						levelWrapper, fullDataSource, columnSource, x, z,
 						// bitshift is to account for LODs with a detail level greater than 0 so the block pos is correct
 						baseX + BitShiftUtil.pow(x,dataDetail), baseZ + BitShiftUtil.pow(z,dataDetail), 
 						columnArrayView, dataColumn);
@@ -126,10 +127,12 @@ public class FullDataToRenderDataTransformer
 	/** Updates the given {@link ColumnArrayView} to match the incoming Full data {@link LongArrayList} */
 	public static void updateOrReplaceRenderDataViewColumnWithFullDataColumn(
 			IClientLevelWrapper levelWrapper,
-			FullDataSourceV2 fullDataSource, int blockX, int blockZ, 
+			FullDataSourceV2 fullDataSource, ColumnRenderSource columnSource, int renderSourceX, int renderSourceZ,
+			int blockX, int blockZ,
 			ColumnArrayView columnArrayView, 
 			LongArrayList fullDataColumn)
 	{
+		columnSource.clearSemanticMaterialsForColumn(renderSourceX, renderSourceZ);
 		// we can't do anything if the full data is missing or empty
 		if (fullDataColumn == null 
 			|| fullDataColumn.size() == 0)
@@ -141,7 +144,10 @@ public class FullDataToRenderDataTransformer
 		if (fullDataLength <= columnArrayView.verticalSize())
 		{
 			// Directly use the arrayView since it fits.
-			setRenderColumnView(levelWrapper, fullDataSource, blockX, blockZ, columnArrayView, fullDataColumn);
+			setRenderColumnView(
+				levelWrapper, fullDataSource, columnSource, renderSourceX, renderSourceZ,
+				blockX, blockZ, columnArrayView, fullDataColumn, true, null, null, null
+			);
 		}
 		else
 		{
@@ -152,9 +158,44 @@ public class FullDataToRenderDataTransformer
 			{
 				// expand the ColumnArrayView to fit the new larger max vertical size
 				ColumnArrayView newColumnArrayView = new ColumnArrayView(dataArrayList, fullDataLength, 0, fullDataLength);
-				setRenderColumnView(levelWrapper, fullDataSource, blockX, blockZ, newColumnArrayView, fullDataColumn);
+				int[] expandedSemanticMaterials = new int[fullDataLength];
+				byte[] expandedVariantStates = new byte[fullDataLength];
+				long[] expandedVariantPositions = new long[fullDataLength];
+				setRenderColumnView(
+					levelWrapper, fullDataSource, columnSource, renderSourceX, renderSourceZ,
+					blockX, blockZ, newColumnArrayView, fullDataColumn, true, expandedSemanticMaterials,
+					expandedVariantStates, expandedVariantPositions
+				);
 				
-				columnArrayView.changeVerticalSizeFrom(newColumnArrayView);
+				int[] reducedSemanticMaterials = new int[columnArrayView.size()];
+				RenderDataPointUtil.mergeMultiData(
+						newColumnArrayView, expandedSemanticMaterials,
+						columnArrayView, reducedSemanticMaterials
+				);
+				for (int index = 0; index < columnArrayView.verticalSize(); index++)
+				{
+					columnSource.setSemanticMaterialId(
+						renderSourceX, renderSourceZ, index, reducedSemanticMaterials[index]
+					);
+					// Reduction may combine source intervals whose weighted-model seeds
+					// differ. Keep the material sidecar but make variant provenance
+					// explicitly unavailable rather than inventing a representative seed.
+					columnSource.setSemanticVariantProvenance(
+						renderSourceX, renderSourceZ, index,
+						ColumnRenderSource.SEMANTIC_VARIANT_UNAVAILABLE, 0L
+					);
+					List<ColumnRenderSource.SemanticMaterialSpan> spans = reducedSemanticMaterialSpans(
+						newColumnArrayView,
+						expandedSemanticMaterials,
+						expandedVariantStates,
+						expandedVariantPositions,
+						columnArrayView.get(index)
+					);
+					if (spans.size() > 1)
+					{
+						columnSource.setSemanticMaterialSpans(renderSourceX, renderSourceZ, index, spans);
+					}
+				}
 			}
 			finally
 			{
@@ -162,11 +203,88 @@ public class FullDataToRenderDataTransformer
 			}
 		}
 	}
+
+	/**
+	 * Preserves the exact source intervals covered by one reduced entry. The
+	 * primary material sidecar intentionally remains mixed after reduction; a
+	 * later Rust-owned face expansion can consume these copied intervals rather
+	 * than guessing one block texture for the whole coarse face.
+	 */
+	static List<ColumnRenderSource.SemanticMaterialSpan> reducedSemanticMaterialSpans(
+		ColumnArrayView sourceData, int[] sourceMaterials, byte[] sourceVariantStates,
+		long[] sourceVariantPositions, long reducedData
+	)
+	{
+		if (sourceMaterials.length < sourceData.size()
+			|| sourceVariantStates.length < sourceData.size()
+			|| sourceVariantPositions.length < sourceData.size())
+		{
+			throw new IllegalArgumentException("Semantic source sidecars do not cover the reduced column input");
+		}
+		if (!RenderDataPointUtil.doesDataPointExist(reducedData))
+		{
+			return List.of();
+		}
+		int reducedMinY = RenderDataPointUtil.getYMin(reducedData);
+		int reducedMaxY = RenderDataPointUtil.getYMax(reducedData);
+		List<ColumnRenderSource.SemanticMaterialSpan> spans = new java.util.ArrayList<>();
+		for (int sourceIndex = 0; sourceIndex < sourceData.size(); sourceIndex++)
+		{
+			long source = sourceData.get(sourceIndex);
+			if (!RenderDataPointUtil.doesDataPointExist(source))
+			{
+				continue;
+			}
+			int minY = Math.max(reducedMinY, RenderDataPointUtil.getYMin(source));
+			int maxY = Math.min(reducedMaxY, RenderDataPointUtil.getYMax(source));
+			if (maxY <= minY)
+			{
+				continue;
+			}
+			int materialId = sourceMaterials[sourceIndex];
+			byte variantState = sourceVariantStates[sourceIndex];
+			long variantPosition = variantState == ColumnRenderSource.SEMANTIC_VARIANT_EXACT
+				? sourceVariantPositions[sourceIndex] : 0L;
+			if (!spans.isEmpty())
+			{
+				ColumnRenderSource.SemanticMaterialSpan previous = spans.getLast();
+				if (previous.maxY() == minY
+					&& previous.materialId() == materialId
+					&& previous.variantState() == variantState
+					&& previous.variantPosition() == variantPosition)
+				{
+					spans.set(spans.size() - 1, new ColumnRenderSource.SemanticMaterialSpan(
+						previous.minY(), maxY, materialId, variantState, variantPosition
+					));
+					continue;
+				}
+			}
+			spans.add(new ColumnRenderSource.SemanticMaterialSpan(
+				minY, maxY, materialId, variantState, variantPosition
+			));
+		}
+		spans.sort(java.util.Comparator.comparingInt(ColumnRenderSource.SemanticMaterialSpan::minY));
+		return List.copyOf(spans);
+	}
 	private static void setRenderColumnView(
 			IClientLevelWrapper levelWrapper, FullDataSourceV2 fullDataSource,
+			ColumnRenderSource columnSource, int renderSourceX, int renderSourceZ,
 			int blockX, int blockZ,
-			ColumnArrayView renderColumnData, LongArrayList fullColumnData)
+			ColumnArrayView renderColumnData, LongArrayList fullColumnData,
+			boolean preserveSemanticMaterials, int[] semanticMaterialScratch,
+			byte[] semanticVariantStateScratch, long[] semanticVariantPositionScratch)
 	{
+		if (semanticMaterialScratch != null && semanticMaterialScratch.length < renderColumnData.size())
+		{
+			throw new IllegalArgumentException("Semantic material scratch does not cover the render column");
+		}
+		if ((semanticVariantStateScratch == null) != (semanticVariantPositionScratch == null)
+			|| (semanticVariantStateScratch != null && (
+				semanticVariantStateScratch.length < renderColumnData.size()
+				|| semanticVariantPositionScratch.length < renderColumnData.size())))
+		{
+			throw new IllegalArgumentException("Semantic variant scratch does not cover the render column");
+		}
 		//===============//
 		// config values //
 		//===============//
@@ -345,6 +463,8 @@ public class FullDataToRenderDataTransformer
 						colorToApplyToNextBlock = ColorUtil.setAlpha(tempColor, 255);
 						skylightToApplyToNextBlock = skyLight;
 						blocklightToApplyToNextBlock = blockLight;
+						// The visible surface will use another block's geometry but this
+						// avoided block's color. It has no exact texture identity.
 					}
 				}
 				
@@ -354,11 +474,27 @@ public class FullDataToRenderDataTransformer
 			
 			
 			int color;
+			int semanticMaterialId = ColumnRenderSource.SEMANTIC_MATERIAL_UNAVAILABLE;
+			byte semanticVariantState = ColumnRenderSource.SEMANTIC_VARIANT_UNAVAILABLE;
+			long semanticVariantPosition = 0L;
 			if (colorToApplyToNextBlock == -1 || block.isLiquid())
 			{
 				// use this block's color
 				color = levelWrapper.getBlockColor(mutableBlockPos, biome, fullDataSource, block);
 				colorToApplyToNextBlock = -1;
+				if (preserveSemanticMaterials)
+				{
+					semanticMaterialId = columnSource.internSemanticMaterial(
+						block.getSerialString(), biome.getSerialString()
+					);
+					if (semanticMaterialId > ColumnRenderSource.SEMANTIC_MATERIAL_UNAVAILABLE)
+					{
+						semanticVariantState = ColumnRenderSource.SEMANTIC_VARIANT_EXACT;
+						semanticVariantPosition = ColumnRenderSource.packSemanticVariantPosition(
+							blockX, bottomY + levelWrapper.getMinHeight(), blockZ
+						);
+					}
+				}
 			}
 			else
 			{
@@ -377,13 +513,27 @@ public class FullDataToRenderDataTransformer
 			
 			// check if they share a top-bottom face and if they have same color
 			if (color == lastColor 
-				&& bottomY + blockHeight == lastBottom  
-				&& renderDataIndex > 0)
+				&& bottomY + blockHeight == lastBottom
+				&& renderDataIndex > 0
+				&& (!preserveSemanticMaterials || sameSemanticMaterial(
+					semanticMaterialAt(
+						columnSource, renderSourceX, renderSourceZ, semanticMaterialScratch, renderDataIndex - 1
+					),
+					semanticMaterialId
+				)))
 			{
 				//replace the previous block with new bottom
 				long columnData = renderColumnData.get(renderDataIndex - 1);
 				columnData = RenderDataPointUtil.setYMin(columnData, bottomY);
 				renderColumnData.set(renderDataIndex - 1, columnData);
+				if (preserveSemanticMaterials)
+				{
+					mergeSemanticVariantAt(
+						columnSource, renderSourceX, renderSourceZ,
+						semanticVariantStateScratch, semanticVariantPositionScratch,
+						renderDataIndex - 1, semanticVariantState, semanticVariantPosition
+					);
+				}
 			}
 			else
 			{
@@ -391,6 +541,18 @@ public class FullDataToRenderDataTransformer
 				isColumnVoid = false;
 				long columnData = RenderDataPointUtil.createDataPoint(bottomY + blockHeight, bottomY, color, skyLight, blockLight, block.getMaterialId());
 				renderColumnData.set(renderDataIndex, columnData);
+				if (preserveSemanticMaterials)
+				{
+					setSemanticMaterialAt(
+						columnSource, renderSourceX, renderSourceZ, semanticMaterialScratch,
+						renderDataIndex, semanticMaterialId
+					);
+					setSemanticVariantAt(
+						columnSource, renderSourceX, renderSourceZ,
+						semanticVariantStateScratch, semanticVariantPositionScratch,
+						renderDataIndex, semanticVariantState, semanticVariantPosition
+					);
+				}
 				renderDataIndex++;
 			}
 			lastBottom = bottomY;
@@ -403,6 +565,103 @@ public class FullDataToRenderDataTransformer
 			renderColumnData.set(0, RenderDataPointUtil.EMPTY_DATA);
 		}
 	}
+
+	static boolean sameSemanticMaterial(int leftMaterialId, int rightMaterialId)
+	{
+		return leftMaterialId == rightMaterialId;
+	}
+
+	private static int semanticMaterialAt(
+		ColumnRenderSource columnSource, int renderSourceX, int renderSourceZ,
+		int[] semanticMaterialScratch, int index
+	)
+	{
+		return semanticMaterialScratch == null
+			? columnSource.getSemanticMaterialId(renderSourceX, renderSourceZ, index)
+			: semanticMaterialScratch[index];
+	}
+
+	private static void setSemanticMaterialAt(
+		ColumnRenderSource columnSource, int renderSourceX, int renderSourceZ,
+		int[] semanticMaterialScratch, int index, int materialId
+	)
+	{
+		if (semanticMaterialScratch == null)
+		{
+			columnSource.setSemanticMaterialId(renderSourceX, renderSourceZ, index, materialId);
+		}
+		else
+		{
+			semanticMaterialScratch[index] = materialId;
+		}
+	}
+
+	private static byte semanticVariantStateAt(
+		ColumnRenderSource columnSource, int renderSourceX, int renderSourceZ,
+		byte[] semanticVariantStateScratch, int index
+	)
+	{
+		return semanticVariantStateScratch == null
+			? columnSource.getSemanticVariantState(renderSourceX, renderSourceZ, index)
+			: semanticVariantStateScratch[index];
+	}
+
+	private static long semanticVariantPositionAt(
+		ColumnRenderSource columnSource, int renderSourceX, int renderSourceZ,
+		long[] semanticVariantPositionScratch, int index
+	)
+	{
+		return semanticVariantPositionScratch == null
+			? columnSource.getSemanticVariantPosition(renderSourceX, renderSourceZ, index)
+			: semanticVariantPositionScratch[index];
+	}
+
+	private static void setSemanticVariantAt(
+		ColumnRenderSource columnSource, int renderSourceX, int renderSourceZ,
+		byte[] semanticVariantStateScratch, long[] semanticVariantPositionScratch,
+		int index, byte state, long position
+	)
+	{
+		if (semanticVariantStateScratch == null)
+		{
+			columnSource.setSemanticVariantProvenance(renderSourceX, renderSourceZ, index, state, position);
+		}
+		else
+		{
+			semanticVariantStateScratch[index] = state;
+			semanticVariantPositionScratch[index] = state == ColumnRenderSource.SEMANTIC_VARIANT_EXACT ? position : 0L;
+		}
+	}
+
+	private static void mergeSemanticVariantAt(
+		ColumnRenderSource columnSource, int renderSourceX, int renderSourceZ,
+		byte[] semanticVariantStateScratch, long[] semanticVariantPositionScratch,
+		int index, byte incomingState, long incomingPosition
+	)
+	{
+		byte currentState = semanticVariantStateAt(
+			columnSource, renderSourceX, renderSourceZ, semanticVariantStateScratch, index
+		);
+		long currentPosition = semanticVariantPositionAt(
+			columnSource, renderSourceX, renderSourceZ, semanticVariantPositionScratch, index
+		);
+		if (currentState == ColumnRenderSource.SEMANTIC_VARIANT_EXACT
+			&& incomingState == ColumnRenderSource.SEMANTIC_VARIANT_EXACT
+			&& currentPosition == incomingPosition)
+		{
+			return;
+		}
+		byte mergedState = currentState == ColumnRenderSource.SEMANTIC_VARIANT_UNAVAILABLE
+			|| incomingState == ColumnRenderSource.SEMANTIC_VARIANT_UNAVAILABLE
+			? ColumnRenderSource.SEMANTIC_VARIANT_UNAVAILABLE
+			: ColumnRenderSource.SEMANTIC_VARIANT_MIXED;
+		setSemanticVariantAt(
+			columnSource, renderSourceX, renderSourceZ,
+			semanticVariantStateScratch, semanticVariantPositionScratch,
+			index, mergedState, 0L
+		);
+	}
+
 	
 	
 	

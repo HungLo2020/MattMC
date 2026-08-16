@@ -5,7 +5,7 @@ use std::ptr::NonNull;
 
 use super::backends::{mock::MockBackend, opengl_capabilities, vulkan_capabilities};
 use super::commands::*;
-use super::error::{ErrorDomain, GalError};
+use super::error::{ErrorDomain, GalError, StatusCode};
 use super::ffi::*;
 use super::frame::*;
 use super::gal::{normalize_submission_batch, CommandNormalizationStats, VulkanicGal};
@@ -222,9 +222,11 @@ fn simple_graphics_scene(gal: &mut VulkanicGal) -> (Handle, Handle, Handle, Hand
             fragment_shader,
             topology: PrimitiveTopology::Triangles,
             cull_mode: CullMode::Back,
+            front_face: crate::render::vulkanic::resources::FrontFace::CounterClockwise,
             blend: BlendMode::Disabled,
             depth_compare: None,
             depth_write: false,
+            depth_bias: None,
             color_formats: vec![TextureFormat::Rgba8Unorm],
             depth_format: None,
         })
@@ -365,9 +367,11 @@ fn capability_limits_reject_descriptor_and_attachment_overflows() {
             fragment_shader,
             topology: PrimitiveTopology::Triangles,
             cull_mode: CullMode::None,
+            front_face: crate::render::vulkanic::resources::FrontFace::CounterClockwise,
             blend: BlendMode::Disabled,
             depth_compare: None,
             depth_write: false,
+            depth_bias: None,
             color_formats: vec![TextureFormat::Rgba8Unorm; 5],
             depth_format: None,
         }),
@@ -591,9 +595,11 @@ fn acquired_frame_targets_are_normal_pass_targets_without_attachment_borrows() {
             fragment_shader,
             topology: PrimitiveTopology::Triangles,
             cull_mode: CullMode::Back,
+            front_face: crate::render::vulkanic::resources::FrontFace::CounterClockwise,
             blend: BlendMode::Alpha,
             depth_compare: None,
             depth_write: false,
+            depth_bias: None,
             color_formats: vec![TextureFormat::Rgba8Unorm],
             depth_format: None,
         })
@@ -637,6 +643,42 @@ fn acquired_frame_targets_are_normal_pass_targets_without_attachment_borrows() {
         })
         .unwrap();
     assert_eq!(presented.completed_submission, submission.submission);
+}
+
+#[test]
+fn frame_target_descriptor_exposes_only_semantic_swapchain_identity() {
+    let mut gal = gal_with_capabilities(presentation_capabilities());
+    gal.configure_frame_surface(frame_surface("semantic-frame-target"))
+        .unwrap();
+    let acquired = gal
+        .acquire_frame(FrameAcquireDesc {
+            correlation_id: FrameCorrelationId(102),
+            expected_extent: Extent3d {
+                width: 128,
+                height: 72,
+                depth: 1,
+            },
+        })
+        .unwrap();
+    let frame_target = gal
+        .create_frame_target(FrameTargetDesc {
+            label: "semantic-frame-target".to_owned(),
+            frame_id: acquired.frame.0,
+            render_target: acquired.render_target,
+            extent: acquired.extent,
+            color_format: TextureFormat::Rgba8Unorm,
+        })
+        .unwrap();
+    let descriptor = gal.frame_target_desc(frame_target).unwrap();
+    assert_eq!(acquired.frame.0, descriptor.frame_id);
+    assert_eq!(acquired.render_target, descriptor.render_target);
+    assert_eq!(acquired.extent, descriptor.extent);
+    assert_eq!(TextureFormat::Rgba8Unorm, descriptor.color_format);
+    gal.destroy(frame_target).unwrap();
+    assert_code(
+        gal.frame_target_desc(frame_target),
+        super::StatusCode::StaleHandle,
+    );
 }
 
 #[test]
@@ -1417,9 +1459,11 @@ fn pipeline_and_pass_compatibility_is_validated() {
             fragment_shader,
             topology: PrimitiveTopology::Triangles,
             cull_mode: CullMode::Back,
+            front_face: crate::render::vulkanic::resources::FrontFace::CounterClockwise,
             blend: BlendMode::Disabled,
             depth_compare: None,
             depth_write: false,
+            depth_bias: None,
             color_formats: vec![TextureFormat::Bgra8Unorm],
             depth_format: None,
         })
@@ -1440,6 +1484,65 @@ fn pipeline_and_pass_compatibility_is_validated() {
         }),
         super::StatusCode::InvalidArgument,
     );
+}
+
+#[test]
+fn graphics_pipeline_depth_bias_requires_finite_enabled_depth_contract() {
+    let mut gal = gal();
+    let layout = gal
+        .create_pipeline_layout(PipelineLayoutDesc {
+            label: "depth-bias-layout".to_owned(),
+            resource_layouts: vec![],
+        })
+        .unwrap();
+    let vertex_shader = gal
+        .create_shader_module(shader("depth-bias-vertex", ShaderStage::Vertex))
+        .unwrap();
+    let fragment_shader = gal
+        .create_shader_module(shader("depth-bias-fragment", ShaderStage::Fragment))
+        .unwrap();
+    let pipeline = |label: &str, depth_compare, depth_bias, depth_format| GraphicsPipelineDesc {
+        label: label.to_owned(),
+        layout,
+        vertex_shader,
+        fragment_shader,
+        topology: PrimitiveTopology::Triangles,
+        cull_mode: CullMode::None,
+        front_face: FrontFace::CounterClockwise,
+        blend: BlendMode::Disabled,
+        depth_compare,
+        depth_write: false,
+        depth_bias,
+        color_formats: vec![TextureFormat::Rgba8Unorm],
+        depth_format,
+    };
+
+    assert_code(
+        gal.create_graphics_pipeline(pipeline(
+            "non-finite-depth-bias",
+            Some(CompareOp::LessOrEqual),
+            Some(DepthBias::new(f32::NAN, -1.0)),
+            Some(TextureFormat::Depth32Float),
+        )),
+        StatusCode::InvalidArgument,
+    );
+    assert_code(
+        gal.create_graphics_pipeline(pipeline(
+            "depth-bias-without-depth-test",
+            None,
+            Some(DepthBias::new(-10.0, -1.0)),
+            Some(TextureFormat::Depth32Float),
+        )),
+        StatusCode::InvalidArgument,
+    );
+    assert!(gal
+        .create_graphics_pipeline(pipeline(
+            "valid-depth-bias",
+            Some(CompareOp::LessOrEqual),
+            Some(DepthBias::new(-10.0, -1.0)),
+            Some(TextureFormat::Depth32Float),
+        ))
+        .is_ok());
 }
 
 #[test]
@@ -1585,9 +1688,11 @@ fn attachment_and_presentation_hazards_require_semantic_separation() {
             fragment_shader,
             topology: PrimitiveTopology::Triangles,
             cull_mode: CullMode::Back,
+            front_face: crate::render::vulkanic::resources::FrontFace::CounterClockwise,
             blend: BlendMode::Disabled,
             depth_compare: None,
             depth_write: false,
+            depth_bias: None,
             color_formats: vec![TextureFormat::Rgba8Unorm, TextureFormat::Rgba8Unorm],
             depth_format: None,
         })
@@ -1649,9 +1754,11 @@ fn attachment_and_presentation_hazards_require_semantic_separation() {
             fragment_shader,
             topology: PrimitiveTopology::Triangles,
             cull_mode: CullMode::Back,
+            front_face: crate::render::vulkanic::resources::FrontFace::CounterClockwise,
             blend: BlendMode::Disabled,
             depth_compare: None,
             depth_write: false,
+            depth_bias: None,
             color_formats: vec![TextureFormat::Rgba8Unorm],
             depth_format: None,
         })
@@ -2084,6 +2191,91 @@ fn buffer_texture_copy_commands_validate_usage_ranges_and_hazards() {
 }
 
 #[test]
+fn texture_copy_validates_depth_snapshot_regions_and_transfer_hazards() {
+    let mut gal = gal();
+    let source = gal
+        .create_texture(texture(
+            "depth-copy-source",
+            TextureFormat::Depth32Float,
+            vec![TextureUsage::TransferSrc],
+        ))
+        .unwrap();
+    let destination = gal
+        .create_texture(texture(
+            "depth-copy-destination",
+            TextureFormat::Depth32Float,
+            vec![TextureUsage::TransferDst],
+        ))
+        .unwrap();
+    let region = TextureImageCopyRegion {
+        src_texture: source,
+        src_mip: 0,
+        src_layer: 0,
+        src_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
+        dst_texture: destination,
+        dst_mip: 0,
+        dst_layer: 0,
+        dst_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
+        extent: Extent3d {
+            width: 4,
+            height: 4,
+            depth: 1,
+        },
+    };
+    gal.create_command_list(CommandListDesc {
+        label: "depth-snapshot-copy".to_owned(),
+        operations: vec![
+            CommandOp::Barrier(ResourceBarrier {
+                resource: source,
+                subresources: None,
+                before: TextureUsageState::Undefined,
+                after: TextureUsageState::TransferSrc,
+                src_queue: QueueClass::Graphics,
+                dst_queue: QueueClass::Transfer,
+            }),
+            CommandOp::Barrier(ResourceBarrier {
+                resource: destination,
+                subresources: None,
+                before: TextureUsageState::Undefined,
+                after: TextureUsageState::TransferDst,
+                src_queue: QueueClass::Graphics,
+                dst_queue: QueueClass::Transfer,
+            }),
+            CommandOp::CopyTexture(region.clone()),
+        ],
+    })
+    .unwrap();
+
+    let rgba_destination = gal
+        .create_texture(texture(
+            "depth-copy-rgba-destination",
+            TextureFormat::Rgba8Unorm,
+            vec![TextureUsage::TransferDst],
+        ))
+        .unwrap();
+    assert_code(
+        gal.create_command_list(CommandListDesc {
+            label: "depth-copy-format-mismatch".to_owned(),
+            operations: vec![CommandOp::CopyTexture(TextureImageCopyRegion {
+                dst_texture: rgba_destination,
+                ..region.clone()
+            })],
+        }),
+        super::StatusCode::InvalidArgument,
+    );
+    assert_code(
+        gal.create_command_list(CommandListDesc {
+            label: "depth-copy-outside-extent".to_owned(),
+            operations: vec![CommandOp::CopyTexture(TextureImageCopyRegion {
+                dst_origin: TextureOrigin3d { x: 127, y: 0, z: 0 },
+                ..region
+            })],
+        }),
+        super::StatusCode::InvalidArgument,
+    );
+}
+
+#[test]
 fn d3_texture_validation_enforces_dimension_layers_mips_and_copy_boxes() {
     let mut gal = gal_with_capabilities(vulkan_capabilities());
     let upload = gal
@@ -2263,6 +2455,130 @@ fn d3_texture_lifecycle_validates_mips_storage_transitions_and_retirement() {
             usages: vec![TextureUsage::Sampled],
         }),
         super::StatusCode::InvalidArgument,
+    );
+}
+
+#[test]
+fn mip_generation_requires_explicit_ranges_usages_and_non_integer_color_formats() {
+    let mut gal = gal_with_capabilities(vulkan_capabilities());
+    let texture = gal
+        .create_texture(TextureDesc {
+            label: "mip-generation-color".to_owned(),
+            dimension: TextureDimension::D2,
+            format: TextureFormat::Rgba8Unorm,
+            extent: Extent3d {
+                width: 16,
+                height: 8,
+                depth: 1,
+            },
+            mip_levels: 5,
+            array_layers: 1,
+            usages: vec![
+                TextureUsage::TransferSrc,
+                TextureUsage::TransferDst,
+                TextureUsage::Sampled,
+            ],
+        })
+        .unwrap();
+    let base_range = TextureSubresourceRange {
+        base_mip: 0,
+        mip_count: 1,
+        base_layer: 0,
+        layer_count: 1,
+    };
+    let descendant_range = TextureSubresourceRange {
+        base_mip: 1,
+        mip_count: 4,
+        base_layer: 0,
+        layer_count: 1,
+    };
+    let full_range = TextureSubresourceRange {
+        base_mip: 0,
+        mip_count: 5,
+        base_layer: 0,
+        layer_count: 1,
+    };
+    let list = gal
+        .create_command_list(CommandListDesc {
+            label: "mip-generation-valid".to_owned(),
+            operations: vec![
+                CommandOp::Barrier(ResourceBarrier {
+                    resource: texture,
+                    subresources: Some(base_range),
+                    before: TextureUsageState::Undefined,
+                    after: TextureUsageState::TransferSrc,
+                    src_queue: QueueClass::Graphics,
+                    dst_queue: QueueClass::Graphics,
+                }),
+                CommandOp::Barrier(ResourceBarrier {
+                    resource: texture,
+                    subresources: Some(descendant_range),
+                    before: TextureUsageState::Undefined,
+                    after: TextureUsageState::TransferDst,
+                    src_queue: QueueClass::Graphics,
+                    dst_queue: QueueClass::Graphics,
+                }),
+                CommandOp::GenerateMipmaps {
+                    texture,
+                    subresources: full_range,
+                },
+                CommandOp::Barrier(ResourceBarrier {
+                    resource: texture,
+                    subresources: Some(full_range),
+                    before: TextureUsageState::TransferSrc,
+                    after: TextureUsageState::ShaderRead,
+                    src_queue: QueueClass::Graphics,
+                    dst_queue: QueueClass::Graphics,
+                }),
+            ],
+        })
+        .unwrap();
+    gal.submit(SubmissionBatch {
+        label: "mip-generation-valid-submit".to_owned(),
+        command_lists: vec![list],
+    })
+    .unwrap();
+
+    assert_code(
+        gal.create_command_list(CommandListDesc {
+            label: "mip-generation-one-level".to_owned(),
+            operations: vec![CommandOp::GenerateMipmaps {
+                texture,
+                subresources: base_range,
+            }],
+        }),
+        super::StatusCode::InvalidArgument,
+    );
+
+    let integer = gal
+        .create_texture(TextureDesc {
+            label: "mip-generation-integer".to_owned(),
+            dimension: TextureDimension::D2,
+            format: TextureFormat::R8Uint,
+            extent: Extent3d {
+                width: 4,
+                height: 4,
+                depth: 1,
+            },
+            mip_levels: 3,
+            array_layers: 1,
+            usages: vec![TextureUsage::TransferSrc, TextureUsage::TransferDst],
+        })
+        .unwrap();
+    assert_unsupported(
+        gal.create_command_list(CommandListDesc {
+            label: "mip-generation-integer-command".to_owned(),
+            operations: vec![CommandOp::GenerateMipmaps {
+                texture: integer,
+                subresources: TextureSubresourceRange {
+                    base_mip: 0,
+                    mip_count: 3,
+                    base_layer: 0,
+                    layer_count: 1,
+                },
+            }],
+        }),
+        "non-depth, non-integer",
     );
 }
 
@@ -3527,7 +3843,20 @@ fn frozen_ffi_abi_sizes_and_capability_negotiation_are_stable() {
     assert_eq!(FFI_ABI_V8_VERSION, 8);
     assert_eq!(FFI_ABI_V9_VERSION, 9);
     assert_eq!(FFI_ABI_V10_VERSION, 10);
-    assert_eq!(FFI_ABI_VERSION, 11);
+    assert_eq!(FFI_ABI_V11_VERSION, 11);
+    assert_eq!(FFI_ABI_V12_VERSION, 12);
+    assert_eq!(FFI_ABI_V13_VERSION, 13);
+    assert_eq!(FFI_ABI_V14_VERSION, 14);
+    assert_eq!(FFI_ABI_V15_VERSION, 15);
+    assert_eq!(FFI_ABI_V16_VERSION, 16);
+    assert_eq!(FFI_ABI_V17_VERSION, 17);
+    assert_eq!(FFI_ABI_V18_VERSION, 18);
+    assert_eq!(FFI_ABI_V19_VERSION, 19);
+    assert_eq!(FFI_ABI_V20_VERSION, 20);
+    assert_eq!(FFI_ABI_V21_VERSION, 21);
+    assert_eq!(FFI_ABI_V22_VERSION, 22);
+    assert_eq!(FFI_ABI_V23_VERSION, 23);
+    assert_eq!(FFI_ABI_VERSION, FFI_ABI_V23_VERSION);
     assert!(!FFI_INITIAL_PRESENTATION_SUPPORTED);
     assert_eq!(size_of::<FfiHeader>(), 8);
     assert_eq!(size_of::<FfiHandle>(), 8);

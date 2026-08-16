@@ -303,7 +303,15 @@ def _is_successful(path: Path) -> bool:
 
 
 def _is_preserved(path: Path) -> bool:
-    return (path / ".preserve").exists() or (path / "PRESERVE").exists()
+    # A matrix-level marker protects each nested mode/tool/run artifact. The
+    # marker deliberately lives at the invocation root, not in every row.
+    cursor = path
+    while True:
+        if (cursor / ".preserve").exists() or (cursor / "PRESERVE").exists():
+            return True
+        if cursor.parent == cursor:
+            return False
+        cursor = cursor.parent
 
 
 def _is_heavy(path: Path) -> bool:

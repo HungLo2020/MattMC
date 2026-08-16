@@ -6,6 +6,7 @@ import net.blaze3d.buffers.GpuBufferSlice;
 import net.blaze3d.pipeline.CompiledRenderPipeline;
 import net.blaze3d.pipeline.RenderPipeline;
 import net.blaze3d.platform.GLX;
+import net.blaze3d.platform.NativeImage;
 import net.blaze3d.shaders.ShaderType;
 import net.blaze3d.systems.CommandEncoder;
 import net.blaze3d.systems.GpuDevice;
@@ -46,6 +47,9 @@ import java.lang.reflect.Proxy;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.nio.ByteBuffer;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -8291,6 +8295,7 @@ public class VulkanicAPI {
                 );
             }
         }
+        dumpIrisColortex0PhaseImage(phase, pingPong, textureId, phaseKey, textureView);
         String lifecycleInfo = textureView == null
             ? "textureView=missing"
             : diagnosticTextureLifecycleInfo(textureView, "colortex0");
@@ -9082,6 +9087,72 @@ public class VulkanicAPI {
         return null;
     }
 
+    /**
+     * Observational readback for one requested Iris attachment and
+     * deterministic pose. It does not alter the framebuffer, program, or
+     * bindings being diagnosed.
+     */
+    private static void dumpIrisColortex0PhaseImage(
+        String phase,
+        String pingPong,
+        int textureId,
+        String phaseKey,
+        @Nullable VulkanicTextureView textureView
+    ) {
+        if (!VulkanicDiagnostics.shouldDumpIrisColortex0Phase(phase)
+            || getActiveBackendType() != GraphicsBackendType.OPENGL
+            || !(textureView instanceof net.vulkanic.backends.opengl.OpenGLTextureView openGLTextureView)
+            || !VulkanicDiagnostics.IRIS_COLORTEX0_PHASE_IMAGE_KEYS.add(phaseKey)) {
+            return;
+        }
+        int width = Math.max(0, safeTextureViewWidth(textureView));
+        int height = Math.max(0, safeTextureViewHeight(textureView));
+        if (width <= 0 || height <= 0) {
+            LOGGER.warn("IrisColortex0PhaseImage unavailable phase={} pingPong={} textureId={} reason=empty", phase, pingPong, textureId);
+            return;
+        }
+        try {
+            ByteBuffer pixels = BufferUtils.createByteBuffer(Math.multiplyExact(Math.multiplyExact(width, height), 4));
+            org.lwjgl.opengl.GL45.glGetTextureSubImage(
+                openGLTextureView.glHandle(), textureView.getBaseMipLevel(), 0, 0, 0,
+                width, height, 1, org.lwjgl.opengl.GL11.GL_RGBA,
+                org.lwjgl.opengl.GL11.GL_UNSIGNED_BYTE, pixels
+            );
+            String pose = DeterministicCameraCapture.currentPoseNameForDiagnostics();
+            String filename = "iris_colortex0_" + diagnosticArtifactComponent(phase)
+                + '_' + diagnosticArtifactComponent(pingPong)
+                + '_' + diagnosticArtifactComponent(pose) + ".png";
+            Path output = DeterministicCameraCapture.diagnosticArtifactPath(filename);
+            Files.createDirectories(output.getParent());
+            try (NativeImage image = new NativeImage(width, height, false)) {
+                for (int y = 0; y < height; y++) {
+                    for (int x = 0; x < width; x++) {
+                        int offset = (x + y * width) * 4;
+                        int red = pixels.get(offset) & 0xFF;
+                        int green = pixels.get(offset + 1) & 0xFF;
+                        int blue = pixels.get(offset + 2) & 0xFF;
+                        int alpha = pixels.get(offset + 3) & 0xFF;
+                        image.setPixelABGR(x, height - y - 1, alpha << 24 | blue << 16 | green << 8 | red);
+                    }
+                }
+                image.writeToFile(output);
+            }
+            LOGGER.info(
+                "IrisColortex0PhaseImage phase={} pingPong={} textureId={} pose={} path={} width={} height={} {}",
+                shaderInputParitySanitizeLabel(phase), shaderInputParitySanitizeLabel(pingPong), textureId,
+                shaderInputParitySanitizeLabel(pose), output.toAbsolutePath(), width, height,
+                shaderInputParityDeterministicContextFields()
+            );
+        } catch (IOException | RuntimeException exception) {
+            LOGGER.warn("IrisColortex0PhaseImage unavailable phase={} pingPong={} textureId={} reason={}", phase, pingPong, textureId,
+                exception.getClass().getSimpleName() + '-' + exception.getMessage());
+        }
+    }
+
+    private static String diagnosticArtifactComponent(String value) {
+        return shaderInputParitySanitizeLabel(value == null ? "unknown" : value).replace('-', '_');
+    }
+
     private static boolean isLogicalColortex0(String resourceName, @Nullable VulkanicTextureView textureView) {
         String normalizedName = resourceName == null ? "" : resourceName.toLowerCase(Locale.ROOT);
         if ("colortex0".equals(normalizedName)) {
@@ -9187,7 +9258,7 @@ public class VulkanicAPI {
             shaderInputParityDeterministicContextFields(),
             shaderInputParityHash(bytes, bytes.remaining()),
             shaderInputParityFloatSample(normalized),
-            shaderInputParityDecodedFloatField(name, normalized)
+            shaderInputParityDecodedFloatField(program, programIdentity, name, normalized)
         );
     }
 
@@ -9314,7 +9385,7 @@ public class VulkanicAPI {
             shaderInputParityDeterministicContextFields(),
             payloadHash,
             shaderInputParityFloatSample(values),
-            shaderInputParityDecodedFloatField(name, values)
+            shaderInputParityDecodedFloatField(program, programIdentity, name, values)
         );
     }
 
@@ -9994,9 +10065,17 @@ public class VulkanicAPI {
         return builder.append(']').toString();
     }
 
-    private static String shaderInputParityDecodedFloatField(@Nullable String name, float[] values) {
+    private static String shaderInputParityDecodedFloatField(
+        int program,
+        @Nullable String programIdentity,
+        @Nullable String name,
+        float[] values
+    ) {
         String sanitizedName = sanitizeShaderInputParityUniformName(name);
-        if (!VulkanicDiagnostics.DECODED_STANDALONE_UNIFORM_TRACE_NAMES.contains(sanitizedName)) {
+        boolean traceSkyBasicMatrices = Boolean.getBoolean("mattmc.vulkan.traceShaderInputParity.skyBasicUniforms")
+            && "sky_basic".equals(shaderInputParityProgramIdentity(program, programIdentity));
+        if (!traceSkyBasicMatrices
+            && !VulkanicDiagnostics.DECODED_STANDALONE_UNIFORM_TRACE_NAMES.contains(sanitizedName)) {
             return "";
         }
         StringBuilder builder = new StringBuilder(" decoded=[");

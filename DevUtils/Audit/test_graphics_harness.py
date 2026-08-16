@@ -282,6 +282,48 @@ def write_block_display_probe_image(path: Path, *, scenario: str = "stone") -> N
     image.save(path)
 
 
+def write_zombie_model_probe_image(path: Path) -> None:
+    from PIL import Image
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    image = Image.new("RGB", (1280, 720), (80, 130, 195))
+    # The fixture's mirrored crop covers this head/body stack.
+    for x in range(540, 700):
+        for y in range(370, 400):
+            image.putpixel((x, y), (72, 104, 54))
+        for y in range(400, 430):
+            image.putpixel((x, y), (42, 128, 128))
+        for y in range(430, 470):
+            image.putpixel((x, y), (70, 60, 140))
+    image.save(path)
+
+
+def write_primed_tnt_probe_image(path: Path) -> None:
+    from PIL import Image
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    image = Image.new("RGB", (1280, 720), (36, 48, 120))
+    left, top, right, bottom = 520, 250, 760, 490
+    for x in range(left, right):
+        for y in range(top, bottom):
+            image.putpixel((x, y), (182, 48, 40) if (x + y) % 11 else (54, 50, 48))
+    image.save(path)
+
+
+def write_experience_orb_probe_image(path: Path, *, visible: bool) -> None:
+    from PIL import Image
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    image = Image.new("RGB", (1280, 720), (120, 167, 223))
+    if visible:
+        for center_x, center_y in ((630, 350), (646, 360), (660, 370)):
+            for x in range(center_x - 10, center_x + 11):
+                for y in range(center_y - 10, center_y + 11):
+                    if (x - center_x) ** 2 + (y - center_y) ** 2 <= 100:
+                        image.putpixel((x, y), (86, 183, 150))
+    image.save(path)
+
+
 def write_desktop_sized_block_display_probe_image(path: Path, *, scenario: str = "stone") -> None:
     from PIL import Image
 
@@ -581,6 +623,139 @@ def gameplay_artifact_for(temp: Path, mode: harness.ModeSpec, *, world: str = "O
 
 
 class GraphicsAuditHarnessTests(unittest.TestCase):
+    def test_world_text_scenario_requires_real_name_tag_semantic_and_execution_receipts(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-rust-vulkan-shaders-off")
+            target = fake_repo(temp, mode.target)
+            capture = temp / "capture"
+            write_capture(capture, backend=mode.backend, shaders=mode.shaders, world="Origin")
+            log_path = capture / "runClient_20260101_000000.log"
+            log_path.write_text(
+                log_path.read_text(encoding="utf-8")
+                + "-Dmattmc.dev.rustGalWorldText.scenario=block-display\n",
+                encoding="utf-8",
+            )
+            missing = harness.normalize_capture_artifact(
+                target, mode, capture, "correctness", True, ["fake"], 0, False, tool_kind="capture"
+            )
+            self.assertFalse(missing["validation"]["complete"])
+            self.assertTrue(
+                any("real vanilla text producer" in message for message in missing["validation"]["messages"]),
+                missing["validation"]["messages"],
+            )
+            deterministic = capture / "deterministic_camera_capture_20260101_000000.json"
+            document = json.loads(deterministic.read_text(encoding="utf-8"))
+            document["rustGalWorldText"] = {
+                "scenario": "block-display", "semanticFrame": 33, "visibleEntityStates": 2,
+                "nameTagCallbacks": 1, "textCallbacks": 0, "normalSubmits": 1,
+                "seeThroughSubmits": 1, "emittedQuads": 27, "emittedImages": 1,
+                "fullySupported": True, "consumedQuads": 27,
+            }
+            deterministic.write_text(json.dumps(document), encoding="utf-8")
+            admitted = harness.normalize_capture_artifact(
+                target, mode, capture, "correctness", True, ["fake"], 0, False, tool_kind="capture"
+            )
+            self.assertFalse(
+                any("real vanilla text producer" in message for message in admitted["validation"]["messages"]),
+                admitted["validation"]["messages"],
+            )
+            metrics = admitted["metrics"]["rust_gal_slice"]
+            self.assertEqual("block-display", metrics["world_text_scenario"])
+            self.assertEqual(27, metrics["world_text_metrics"]["consumedQuads"])
+
+            contract_dir = capture / "terrain_pass_contract"
+            contract_dir.mkdir()
+            (contract_dir / "terrain-pass-contract-generation-1.json").write_text(
+                json.dumps({"selected_source_execution_requested": True}), encoding="utf-8"
+            )
+            source_receipt = contract_dir / "selected-source-execution-frame-44.json"
+            source_receipt.write_text(
+                json.dumps({"frame_id": 44, "submission_id": 55, "world_generation": 2, "route": "rust-native-selected-source"}),
+                encoding="utf-8",
+            )
+            missing_source_writer = harness.normalize_capture_artifact(
+                target, mode, capture, "correctness", True, ["fake"], 0, False, tool_kind="capture"
+            )
+            self.assertTrue(
+                any("selected-source world-text frame did not execute" in message
+                    for message in missing_source_writer["validation"]["messages"]),
+                missing_source_writer["validation"]["messages"],
+            )
+            source_receipt.write_text(
+                json.dumps({
+                    "frame_id": 44, "submission_id": 55, "world_generation": 2, "route": "rust-native-selected-source",
+                    "world_text_execution": {"quads": 27, "draws": 2, "clip_xy_visible_quads": 27},
+                }),
+                encoding="utf-8",
+            )
+            source_writer_admitted = harness.normalize_capture_artifact(
+                target, mode, capture, "correctness", True, ["fake"], 0, False, tool_kind="capture"
+            )
+            self.assertFalse(
+                any("selected-source world-text frame did not execute" in message
+                    for message in source_writer_admitted["validation"]["messages"]),
+                source_writer_admitted["validation"]["messages"],
+            )
+
+    def test_text_display_scenario_requires_real_ordinary_text_callback(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-rust-vulkan-shaders-off")
+            target = fake_repo(temp, mode.target)
+            capture = temp / "capture"
+            write_capture(capture, backend=mode.backend, shaders=mode.shaders, world="Origin")
+            log_path = capture / "runClient_20260101_000000.log"
+            log_path.write_text(
+                log_path.read_text(encoding="utf-8")
+                + "-Dmattmc.dev.rustGalWorldText.scenario=text-display\n",
+                encoding="utf-8",
+            )
+            deterministic = capture / "deterministic_camera_capture_20260101_000000.json"
+            document = json.loads(deterministic.read_text(encoding="utf-8"))
+            document["rustGalWorldText"] = {
+                "scenario": "text-display", "semanticFrame": 33, "visibleEntityStates": 2,
+                "nameTagCallbacks": 0, "textCallbacks": 0, "normalSubmits": 0,
+                "seeThroughSubmits": 1, "emittedQuads": 27, "emittedImages": 1,
+                "fullySupported": True, "consumedQuads": 27,
+            }
+            deterministic.write_text(json.dumps(document), encoding="utf-8")
+            missing = harness.normalize_capture_artifact(
+                target, mode, capture, "correctness", True, ["fake"], 0, False, tool_kind="capture"
+            )
+            self.assertTrue(
+                any("ordinary text callbacks" in message for message in missing["validation"]["messages"]),
+                missing["validation"]["messages"],
+            )
+            document["rustGalWorldText"]["textCallbacks"] = 1
+            deterministic.write_text(json.dumps(document), encoding="utf-8")
+            admitted = harness.normalize_capture_artifact(
+                target, mode, capture, "correctness", True, ["fake"], 0, False, tool_kind="capture"
+            )
+            self.assertFalse(
+                any("ordinary text callbacks" in message for message in admitted["validation"]["messages"]),
+                admitted["validation"]["messages"],
+            )
+            self.assertFalse(
+                any("normal submits" in message for message in admitted["validation"]["messages"]),
+                admitted["validation"]["messages"],
+            )
+
+    def test_capture_runner_bounds_diagnostic_command_timeout(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            with mock.patch.object(
+                capture_runner.subprocess,
+                "run",
+                side_effect=subprocess.TimeoutExpired(["/bin/echo", "diagnostic"], 8),
+            ):
+                output = capture_runner.command_text(
+                    ["/bin/echo", "diagnostic"],
+                    cwd=Path(temp),
+                    timeout_secs=8,
+                )
+        self.assertIn("command timed out after 8s", output)
+        self.assertIn("/bin/echo diagnostic", output)
+
     def test_setup_project_mentions_required_graphics_tools(self) -> None:
         setup = Path(__file__).resolve().parents[1] / "SetupProject.sh"
         text = setup.read_text(encoding="utf-8")
@@ -650,6 +825,404 @@ class GraphicsAuditHarnessTests(unittest.TestCase):
             self.assertEqual(counters["world_material_marker_last_texture_id"], texture_id)
             self.assertEqual("present", counters["world_material_marker_pixel_evidence"]["status"])
             self.assertEqual([texture_id], counters["world_material_marker_pixel_evidence"]["validated_texture_ids"])
+
+    def test_selected_source_block_marker_requires_local_material_semantics(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-rust-vulkan-shaders-on")
+            target = fake_repo(temp, mode.target)
+            capture = temp / "capture"
+            write_capture(capture, backend=mode.backend, shaders=mode.shaders, world="Origin")
+            screenshot = capture / "block_marker_source.png"
+            texture_id = harness.WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_BARRIER
+            material_id = harness.WORLD_MATERIAL_BLOCK_MARKER_CUTOUT
+            write_block_marker_probe_image(screenshot, texture_id=texture_id)
+            deterministic = capture / "deterministic_camera_capture_20260101_000000.json"
+            doc = json.loads(deterministic.read_text(encoding="utf-8"))
+            doc["captures"][0]["screenshot"] = str(screenshot)
+            doc["rustGalWorldMaterialMarkerScenario"] = "barrier"
+            doc["rustGalWorldMaterialMarkers"] = [
+                {
+                    "route": "rust-vulkan-whole-frame",
+                    "textureId": texture_id,
+                    "center": {"x": 1.5, "y": 80.5, "z": 2.5},
+                    "quadSize": 0.5,
+                    "colorArgb": 0xFFFFFFFF,
+                    "viewport": {"width": 1280, "height": 720},
+                    "projected": True,
+                    "screenBounds": {"left": 560.0, "top": 300.0, "right": 640.0, "bottom": 380.0},
+                }
+            ]
+            deterministic.write_text(json.dumps(doc), encoding="utf-8")
+            (capture / "runClient_20260101_000000.log").write_text(
+                "\n".join(
+                    [
+                        "-Dmattmc.dev.rustGalWorldMaterial.blockMarkerScenario=barrier",
+                        f"Rust VulkanicGAL BlockMarker semantic request route=rust-vulkan-whole-frame texture_id={texture_id} material_id={material_id} result=queued",
+                        f"gal.frame.target.begin backend=vulkan frame=1 material_marker_barrier_quads=1 material_marker_light_quads=0 material_marker_light_level_mask=0 material_marker_last_light_level=-1 material_marker_last_texture_id={texture_id}",
+                        "rust_gal_world_material_quads_executed=1",
+                        "rust_gal_world_material_batches_executed=1",
+                        "rust_gal_world_material_draws_executed=1",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            contract_dir = capture / "terrain_pass_contract"
+            contract_dir.mkdir()
+            (contract_dir / "terrain-pass-contract-generation-1.json").write_text(
+                json.dumps({"selected_source_execution_requested": True}), encoding="utf-8"
+            )
+            receipt_path = contract_dir / "selected-source-execution-frame-42.json"
+            receipt = {
+                "frame_id": 42,
+                "submission_id": 9,
+                "world_generation": 2,
+                "route": "rust-native-selected-source",
+                "source_material_coverage": {"batches": 1, "quads": 1, "draws": 1, "vertices": 6},
+                "source_material_semantics": {
+                    "atlas_quads": 0,
+                    "local_quads": 0,
+                    "unsupported_quads": 0,
+                    "records": [],
+                },
+            }
+            receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+
+            missing = harness.normalize_capture_artifact(
+                target, mode, capture, "correctness", True, ["fake"], 0, False, tool_kind="capture"
+            )
+            self.assertFalse(missing["validation"]["complete"])
+            self.assertTrue(
+                any(
+                    "did not retain a local Rust-owned material texture semantic receipt" in message
+                    for message in missing["validation"]["messages"]
+                ),
+                missing["validation"]["messages"],
+            )
+
+            receipt["source_material_semantics"]["local_quads"] = 1
+            receipt["source_material_semantics"]["records"] = [
+                {"material_id": material_id, "texture_id": texture_id, "uv_space": 0, "quads": 1}
+            ]
+            receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+            admitted = harness.normalize_capture_artifact(
+                target, mode, capture, "correctness", True, ["fake"], 0, False, tool_kind="capture"
+            )
+            self.assertFalse(
+                any(
+                    "did not retain a local Rust-owned material texture semantic receipt" in message
+                    for message in admitted["validation"]["messages"]
+                ),
+                admitted["validation"]["messages"],
+            )
+
+    def test_selected_source_cloud_requires_matching_writer_execution_receipt(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-rust-vulkan-shaders-on")
+            target = fake_repo(temp, mode.target)
+            capture = temp / "capture"
+            write_capture(capture, backend=mode.backend, shaders=mode.shaders, world="Origin")
+            deterministic = capture / "deterministic_camera_capture_20260101_000000.json"
+            deterministic_doc = json.loads(deterministic.read_text(encoding="utf-8"))
+            deterministic_doc["rustGalWorldClouds"] = {
+                "scenario": "fast",
+                "traversalReceipts": [{"route": "rust_vulkan_whole_frame", "cells": 4, "radius": 2}],
+                "semanticReceipts": [{"quads": 4, "sourceProgram": 3}],
+                "executionReceipts": [
+                    {"route": "rust_vulkan_whole_frame", "quads": 4, "sourceProgram": 3}
+                ],
+            }
+            deterministic.write_text(json.dumps(deterministic_doc), encoding="utf-8")
+            (capture / "runClient_20260101_000000.log").write_text(
+                "-Dmattmc.dev.rustGalClouds.scenario=fast\n", encoding="utf-8"
+            )
+            contract_dir = capture / "terrain_pass_contract"
+            contract_dir.mkdir()
+            (contract_dir / "terrain-pass-contract-generation-1.json").write_text(
+                json.dumps({"selected_source_execution_requested": True}), encoding="utf-8"
+            )
+            receipt_path = contract_dir / "selected-source-execution-frame-42.json"
+            receipt = {
+                "frame_id": 42,
+                "submission_id": 9,
+                "world_generation": 2,
+                "route": "rust-native-selected-source",
+                "source_material_semantics": {"cloud_quads": 4},
+                "source_material_execution": {
+                    "clouds": {"batches": 1, "quads": 0, "draws": 0, "vertices": 0}
+                },
+            }
+            receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+
+            missing = harness.normalize_capture_artifact(
+                target, mode, capture, "correctness", True, ["fake"], 0, False, tool_kind="capture"
+            )
+            self.assertTrue(
+                any(
+                    "selected-source cloud execution did not retain matching Rust-owned gbuffers_clouds"
+                    in message
+                    for message in missing["validation"]["messages"]
+                ),
+                missing["validation"]["messages"],
+            )
+
+            receipt["source_material_execution"]["clouds"] = {
+                "batches": 1,
+                "quads": 4,
+                "draws": 1,
+                "vertices": 24,
+            }
+            receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+            admitted = harness.normalize_capture_artifact(
+                target, mode, capture, "correctness", True, ["fake"], 0, False, tool_kind="capture"
+            )
+            self.assertFalse(
+                any(
+                    "selected-source cloud execution did not retain matching Rust-owned gbuffers_clouds"
+                    in message
+                    for message in admitted["validation"]["messages"]
+                ),
+                admitted["validation"]["messages"],
+            )
+
+            receipt["source_material_execution"]["clouds"] = {
+                "batches": 0,
+                "quads": 0,
+                "draws": 0,
+                "vertices": 0,
+                "suppressed_quads": 4,
+            }
+            receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+            ambiguous = harness.normalize_capture_artifact(
+                target, mode, capture, "correctness", True, ["fake"], 0, False, tool_kind="capture"
+            )
+            self.assertTrue(
+                any(
+                    "selected-source cloud execution did not retain matching Rust-owned gbuffers_clouds"
+                    in message
+                    for message in ambiguous["validation"]["messages"]
+                ),
+                ambiguous["validation"]["messages"],
+            )
+
+            receipt["source_material_execution"]["clouds"] = {
+                "batches": 0,
+                "quads": 0,
+                "draws": 0,
+                "vertices": 0,
+                "suppressed_quads": 4,
+                "face_disposition": "suppressed",
+            }
+            receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+            suppressed = harness.normalize_capture_artifact(
+                target, mode, capture, "correctness", True, ["fake"], 0, False, tool_kind="capture"
+            )
+            self.assertTrue(
+                any(
+                    "selected-source cloud execution did not retain matching Rust-owned gbuffers_clouds"
+                    in message
+                    for message in suppressed["validation"]["messages"]
+                ),
+                suppressed["validation"]["messages"],
+            )
+
+            receipt["source_material_execution"]["clouds"]["fullscreen_cloud_stages"] = 1
+            receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+            suppressed = harness.normalize_capture_artifact(
+                target, mode, capture, "correctness", True, ["fake"], 0, False, tool_kind="capture"
+            )
+            self.assertFalse(
+                any(
+                    "selected-source cloud execution did not retain matching Rust-owned gbuffers_clouds"
+                    in message
+                    for message in suppressed["validation"]["messages"]
+                ),
+                suppressed["validation"]["messages"],
+            )
+            self.assertTrue(
+                any(
+                    "explicitly suppresses vanilla cloud faces" in message
+                    for message in suppressed["validation"]["messages"]
+                ),
+                suppressed["validation"]["messages"],
+            )
+
+            receipt_path.unlink()
+            distant_receipt_path = contract_dir / "selected-source-execution-distant-horizons-frame-42.json"
+            distant_receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+            distant = harness.normalize_capture_artifact(
+                target, mode, capture, "correctness", True, ["fake"], 0, False, tool_kind="capture"
+            )
+            self.assertFalse(
+                any(
+                    "selected-source cloud execution did not retain matching Rust-owned gbuffers_clouds"
+                    in message
+                    for message in distant["validation"]["messages"]
+                ),
+                distant["validation"]["messages"],
+            )
+
+    def test_selected_source_weather_requires_matching_writer_execution_receipt(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-rust-vulkan-shaders-on")
+            target = fake_repo(temp, mode.target)
+            capture = temp / "capture"
+            write_capture(capture, backend=mode.backend, shaders=mode.shaders, world="Origin")
+            deterministic = capture / "deterministic_camera_capture_20260101_000000.json"
+            deterministic_doc = json.loads(deterministic.read_text(encoding="utf-8"))
+            deterministic_doc["rustGalWorldWeather"] = {
+                "scenario": "rain",
+                "setupComplete": True,
+                "setupStage": "setup-complete",
+                "traversalReceipts": [
+                    {"route": "rust_vulkan_whole_frame", "rainColumns": 4, "intensity": 1.0}
+                ],
+                "semanticReceipts": [{"rainColumns": 4, "quads": 4, "intensity": 1.0}],
+                "executionReceipts": [{"route": "rust_vulkan_whole_frame", "quads": 4}],
+            }
+            deterministic.write_text(json.dumps(deterministic_doc), encoding="utf-8")
+            (capture / "runClient_20260101_000000.log").write_text(
+                "-Dmattmc.dev.rustGalWeather.scenario=rain\n", encoding="utf-8"
+            )
+            contract_dir = capture / "terrain_pass_contract"
+            contract_dir.mkdir()
+            (contract_dir / "terrain-pass-contract-generation-1.json").write_text(
+                json.dumps({"selected_source_execution_requested": True}), encoding="utf-8"
+            )
+            receipt_path = contract_dir / "selected-source-execution-frame-42.json"
+            receipt = {
+                "frame_id": 42,
+                "submission_id": 9,
+                "world_generation": 2,
+                "route": "rust-native-selected-source",
+                "source_material_semantics": {"weather_quads": 4},
+                "source_material_execution": {
+                    "weather": {"batches": 1, "quads": 0, "draws": 0, "vertices": 0}
+                },
+            }
+            receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+
+            missing = harness.normalize_capture_artifact(
+                target, mode, capture, "correctness", True, ["fake"], 0, False, tool_kind="capture"
+            )
+            self.assertTrue(
+                any(
+                    "selected-source weather execution did not retain matching Rust-owned gbuffers_weather"
+                    in message
+                    for message in missing["validation"]["messages"]
+                ),
+                missing["validation"]["messages"],
+            )
+
+            receipt["source_material_execution"]["weather"] = {
+                "batches": 1,
+                "quads": 4,
+                "draws": 1,
+                "vertices": 24,
+            }
+            receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+            admitted = harness.normalize_capture_artifact(
+                target, mode, capture, "correctness", True, ["fake"], 0, False, tool_kind="capture"
+            )
+            self.assertFalse(
+                any(
+                    "selected-source weather execution did not retain matching Rust-owned gbuffers_weather"
+                    in message
+                    for message in admitted["validation"]["messages"]
+                ),
+                admitted["validation"]["messages"],
+            )
+
+    def test_selected_source_terrain_particles_require_atlas_semantics_and_textured_execution(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-rust-vulkan-shaders-on")
+            target = fake_repo(temp, mode.target)
+            capture = temp / "capture"
+            write_capture(capture, backend=mode.backend, shaders=mode.shaders, world="Origin")
+            screenshot = capture / "terrain_particle_source.png"
+            texture_id = harness.WORLD_MATERIAL_TEXTURE_STONE
+            write_terrain_particle_probe_image(screenshot, texture_id=texture_id)
+            deterministic_path = capture / "deterministic_camera_capture_20260101_000000.json"
+            deterministic = json.loads(deterministic_path.read_text(encoding="utf-8"))
+            deterministic["captures"][0]["screenshot"] = str(screenshot)
+            deterministic["rustGalWorldTerrainParticleScenario"] = "stone"
+            deterministic["rustGalWorldTerrainParticles"] = [
+                {
+                    "route": "rust-vulkan-whole-frame",
+                    "textureId": texture_id,
+                    "center": {"x": 1.5, "y": 80.5, "z": 2.5},
+                    "quadSize": 0.5,
+                    "colorArgb": 0xFFFFFFFF,
+                    "materialMode": 1,
+                    "viewport": {"width": 1280, "height": 720},
+                    "projected": True,
+                    "screenBounds": {"left": 560.0, "top": 300.0, "right": 640.0, "bottom": 380.0},
+                }
+            ]
+            deterministic_path.write_text(json.dumps(deterministic), encoding="utf-8")
+            (capture / "runClient_20260101_000000.log").write_text(
+                "-Dmattmc.dev.rustGalWorldMaterial.terrainParticleScenario=stone\n"
+                "material_terrain_particle_quads=1 material_terrain_particle_texture_mask=2\n"
+                "rust_gal_world_material_quads_executed=1\n"
+                "rust_gal_world_material_batches_executed=1\n"
+                "rust_gal_world_material_draws_executed=1\n",
+                encoding="utf-8",
+            )
+            contract_dir = capture / "terrain_pass_contract"
+            contract_dir.mkdir()
+            (contract_dir / "terrain-pass-contract-generation-1.json").write_text(
+                json.dumps({"selected_source_execution_requested": True}), encoding="utf-8"
+            )
+            receipt_path = contract_dir / "selected-source-execution-frame-42.json"
+            receipt = {
+                "frame_id": 42,
+                "submission_id": 9,
+                "world_generation": 2,
+                "route": "rust-native-selected-source",
+                "source_material_semantics": {"atlas_quads": 1, "records": []},
+                "source_material_execution": {
+                    "textured": {"batches": 1, "quads": 0, "draws": 0, "vertices": 0}
+                },
+            }
+            receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+
+            missing = harness.normalize_capture_artifact(
+                target, mode, capture, "correctness", True, ["fake"], 0, False, tool_kind="capture"
+            )
+            self.assertTrue(
+                any(
+                    "selected-source TerrainParticle execution did not retain matching atlas-semantic"
+                    in message
+                    for message in missing["validation"]["messages"]
+                ),
+                missing["validation"]["messages"],
+            )
+
+            receipt["source_material_semantics"]["records"] = [
+                {"texture_id": texture_id, "uv_space": 1, "quads": 1}
+            ]
+            receipt["source_material_execution"]["textured"] = {
+                "batches": 1,
+                "quads": 1,
+                "draws": 1,
+                "vertices": 6,
+            }
+            receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+            admitted = harness.normalize_capture_artifact(
+                target, mode, capture, "correctness", True, ["fake"], 0, False, tool_kind="capture"
+            )
+            self.assertFalse(
+                any(
+                    "selected-source TerrainParticle execution did not retain matching atlas-semantic"
+                    in message
+                    for message in admitted["validation"]["messages"]
+                ),
+                admitted["validation"]["messages"],
+            )
 
     def test_terrain_particle_summary_uses_projected_crop_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1369,6 +1942,207 @@ class GraphicsAuditHarnessTests(unittest.TestCase):
             self.assertEqual("passed", evidence["frame_sequence_status"])
             self.assertEqual(5, evidence["frames_validated"])
 
+    def test_falling_block_capture_accepts_correlated_rust_vulkan_final_output(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            screenshots = []
+            for frame in range(4):
+                screenshot = temp / f"falling_block_final_output_{frame}.png"
+                write_falling_block_probe_image(screenshot, scenario="sand")
+                screenshots.append(screenshot)
+            document = {
+                "window": {"width": 1280, "height": 720},
+                "rustGalWorldFallingBlockSetup": {
+                    "status": "spawned",
+                    "blockId": "minecraft:sand",
+                    "spawnMethod": "FallingBlockEntity.fall",
+                    "entityCount": 1,
+                },
+                "rustGalWorldFallingBlockExtractionProbe": {
+                    "seen": 4,
+                    "shouldRender": 4,
+                    "extracted": 4,
+                },
+                "captures": [
+                    {
+                        "poseName": f"falling-{frame:02d}",
+                        "renderedFrameIndex": 8 + frame,
+                        "screenshot": str(screenshots[frame]),
+                        "backend": "vulkan",
+                        "window": {"width": 1280, "height": 720},
+                        "captureMethod": "rust-vulkan-final-output",
+                        "targetWindow": "rust-vulkan-final-output",
+                    }
+                    for frame in range(4)
+                ],
+                "rustGalWorldFallingBlocks": [
+                    {
+                        "frameIndex": 8 + frame,
+                        "route": "rust-vulkan-whole-frame",
+                        "blockId": "minecraft:sand",
+                        "meshKey": 42,
+                        "meshGeneration": 2,
+                        "indexType": 1,
+                        "vertexCount": 24,
+                        "indexBytes": 72,
+                        "sectionCount": 6,
+                        "textureIds": "2269692870",
+                        "materialMode": 1,
+                        "viewport": {"width": 1280, "height": 720},
+                        "projected": True,
+                        "screenBounds": {"left": 500.0, "top": 60.0, "right": 720.0, "bottom": 280.0},
+                    }
+                    for frame in range(4)
+                ],
+            }
+
+            evidence = harness.deterministic_world_mesh_falling_block_pixel_evidence(document, "sand")
+
+            self.assertEqual("present", evidence["status"])
+            self.assertEqual("passed", evidence["capture_method_status"])
+            self.assertEqual("passed", evidence["game_window_status"])
+
+    def test_primed_tnt_capture_requires_matching_provenance_and_route(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            screenshots = []
+            for frame in range(4):
+                screenshot = temp / f"primed_tnt_{frame}.png"
+                write_primed_tnt_probe_image(screenshot)
+                screenshots.append(screenshot)
+            document = {
+                "status": "complete",
+                "window": {"width": 1280, "height": 720},
+                "rustGalWorldPrimedTntScenario": "ordinary",
+                "rustGalWorldPrimedTntSetup": {
+                    "status": "spawned",
+                    "blockId": "minecraft:tnt",
+                    "entityCount": 1,
+                },
+                "captures": [
+                    {
+                        "poseName": f"primed-tnt-{frame:02d}",
+                        "renderedFrameIndex": 20 + frame,
+                        "screenshot": str(screenshots[frame]),
+                        "window": {"width": 1280, "height": 720},
+                        "captureMethod": "internal-main-render-target",
+                    }
+                    for frame in range(4)
+                ],
+                "rustGalWorldMovingBlockRouteDecisions": [
+                    {
+                        "frameIndex": 20 + frame,
+                        "provenance": "primed-tnt",
+                        "route": "rust-opengl",
+                        "blockId": "minecraft:tnt",
+                        "rustSelected": True,
+                        "rustQueued": True,
+                        "javaDrawn": False,
+                    }
+                    for frame in range(4)
+                ],
+                "rustGalWorldMovingBlocks": [
+                    {
+                        "frameIndex": 20 + frame,
+                        "route": "rust-opengl",
+                        "provenance": "primed-tnt",
+                        "blockId": "minecraft:tnt",
+                        "meshKey": 99,
+                        "meshGeneration": 3,
+                        "indexType": 1,
+                        "vertexCount": 24,
+                        "indexBytes": 72,
+                        "sectionCount": 6,
+                        "textureIds": "123",
+                        "materialMode": 1,
+                        "projected": True,
+                        "screenBounds": {"left": 500.0, "top": 60.0, "right": 720.0, "bottom": 280.0},
+                    }
+                    for frame in range(4)
+                ],
+            }
+            evidence = harness.deterministic_world_mesh_primed_tnt_pixel_evidence(document, "ordinary")
+            self.assertEqual("present", evidence["status"])
+            self.assertEqual("passed", evidence["route_status"])
+            self.assertEqual(4, evidence["frames_validated"])
+
+            document["rustGalWorldMovingBlockRouteDecisions"] = []
+            missing_route = harness.deterministic_world_mesh_primed_tnt_pixel_evidence(document, "ordinary")
+            self.assertEqual("missing_rust_route", missing_route["status"])
+
+    def test_experience_orb_capture_requires_real_route_receipt_and_projected_frames(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            screenshots = []
+            for frame in range(5):
+                screenshot = temp / f"experience_orb_{frame}.png"
+                write_experience_orb_probe_image(screenshot, visible=True)
+                screenshots.append(screenshot)
+            document = {
+                "status": "complete",
+                "window": {"width": 1280, "height": 720},
+                "rustGalWorldExperienceOrbSetup": {
+                    "status": "spawned",
+                    "entityCount": 3,
+                },
+                "captures": [
+                    {
+                        "poseName": f"experience-orb-{frame:02d}",
+                        "renderedFrameIndex": 20 + frame,
+                        "screenshot": str(screenshots[frame]),
+                        "window": {"width": 1280, "height": 720},
+                        "captureMethod": "rust-vulkan-final-output",
+                        "targetWindow": "rust-vulkan-final-output",
+                    }
+                    for frame in range(5)
+                ],
+                "rustGalWorldExperienceOrbRouteDecisions": [
+                    {
+                        "frameIndex": 20 + frame,
+                        "route": "rust-vulkan-whole-frame",
+                        "rustSelected": True,
+                        "rustQueued": True,
+                        "javaDrawn": False,
+                    }
+                    for frame in range(5)
+                ],
+                "rustGalWorldExperienceOrbs": [
+                    {
+                        "frameIndex": 20 + frame,
+                        "route": "rust-vulkan-whole-frame",
+                        "projected": True,
+                        "colorArgb": 0x80FFFFFF,
+                        "packedLight": 0x00F000F0,
+                        "screenBounds": {"left": 520.0, "top": 250.0, "right": 760.0, "bottom": 490.0},
+                    }
+                    for frame in range(5)
+                ],
+                "rustGalWorldExperienceOrbExecution": [
+                    {
+                        "deterministicFrameIndex": 20 + frame,
+                        "route": "rust-vulkan-whole-frame",
+                        "gameplayFrameId": 120 + frame,
+                        "submissionId": 220 + frame,
+                        "quads": 3,
+                    }
+                    for frame in range(5)
+                ],
+            }
+            evidence = harness.deterministic_world_experience_orb_capture_evidence(document, "ordinary")
+            self.assertEqual("visible_final_frames", evidence["status"])
+            self.assertEqual(5, evidence["matched_frames"])
+
+            for screenshot in screenshots:
+                write_experience_orb_probe_image(screenshot, visible=False)
+            missing_pixels = harness.deterministic_world_experience_orb_capture_evidence(document, "ordinary")
+            self.assertEqual("missing_visible_orb_footprint", missing_pixels["status"])
+            for screenshot in screenshots:
+                write_experience_orb_probe_image(screenshot, visible=True)
+
+            document["rustGalWorldExperienceOrbExecution"] = []
+            missing_execution = harness.deterministic_world_experience_orb_capture_evidence(document, "ordinary")
+            self.assertEqual("missing_execution_receipt", missing_execution["status"])
+
     def test_falling_block_capture_rejects_desktop_screenshot(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp = Path(temp_dir)
@@ -1470,6 +2244,334 @@ class GraphicsAuditHarnessTests(unittest.TestCase):
                 evidence["game_window"],
             )
 
+    def test_arrow_capture_requires_frame_correlated_route_and_execution(self) -> None:
+        from PIL import Image
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            screenshots: list[Path] = []
+            for frame in range(4):
+                screenshot = root / f"arrow_{frame}.png"
+                image = Image.new("RGB", (1280, 720), (31, 52, 77))
+                for offset in range(96):
+                    image.putpixel((560 + offset, 400 + offset // 4), (228, 220, 196))
+                image.save(screenshot)
+                screenshots.append(screenshot)
+
+            document = {
+                "status": "complete",
+                "window": {"width": 1280, "height": 720},
+                "rustGalWorldArrowScenario": "ordinary",
+                "rustGalWorldArrowSetup": {
+                    "status": "spawned",
+                    "texture": "minecraft:textures/entity/projectiles/arrow.png",
+                    "entityCount": 1,
+                },
+                "captures": [
+                    {
+                        "poseName": f"arrow-{frame:02d}",
+                        "renderedFrameIndex": 40 + frame,
+                        "screenshot": str(screenshots[frame]),
+                        "window": {"width": 1280, "height": 720},
+                        "captureMethod": "external-window-request",
+                        "targetWindow": "Minecraft",
+                    }
+                    for frame in range(4)
+                ],
+                "rustGalWorldArrows": [
+                    {
+                        "frameIndex": 40 + frame,
+                        "route": "rust-vulkan-whole-frame",
+                        "textureId": "minecraft:textures/entity/projectiles/arrow.png",
+                        "meshKey": 1001,
+                        "meshGeneration": 3,
+                        "vertexCount": 32,
+                        "indexBytes": 72,
+                        "sectionCount": 2,
+                        "packedLight": 15728880,
+                        "projected": True,
+                        "screenBounds": {"left": 555.0, "top": 270.0, "right": 680.0, "bottom": 330.0},
+                    }
+                    for frame in range(4)
+                ],
+                "rustGalWorldArrowRouteDecisions": [
+                    {
+                        "frameIndex": 40 + frame,
+                        "route": "rust-vulkan-whole-frame",
+                        "textureId": "minecraft:textures/entity/projectiles/arrow.png",
+                        "rustSelected": True,
+                        "rustQueued": True,
+                        "javaDrawn": False,
+                    }
+                    for frame in range(4)
+                ],
+                "rustGalWorldMovingMeshExecution": [
+                    {
+                        "deterministicFrameIndex": 40 + frame,
+                        "route": "rust-vulkan-whole-frame",
+                        "provenance": "arrow",
+                        "gameplayFrameId": 900 + frame,
+                        "submissionId": 700 + frame,
+                        "instances": 1,
+                    }
+                    for frame in range(4)
+                ],
+            }
+
+            evidence = harness.deterministic_world_mesh_arrow_capture_evidence(document, "ordinary")
+            self.assertEqual("structural_present", evidence["status"])
+            self.assertEqual(4, evidence["matched_frames"])
+            self.assertTrue(all(crop["submission_id"] > 0 for crop in evidence["crops"]))
+            with Image.open(evidence["crops"][0]["crop_path"]) as crop:
+                # The semantic bounds are bottom-left coordinates. A top-left
+                # crop would miss this deliberately asymmetric Arrow stripe.
+                self.assertIn((228, 220, 196), crop.convert("RGB").getdata())
+
+            document["captures"][0].update(
+                {
+                    "captureMethod": "rust-vulkan-final-output",
+                    "targetWindow": "rust-vulkan-final-output",
+                }
+            )
+            backend_final = harness.deterministic_world_mesh_arrow_capture_evidence(document, "ordinary")
+            self.assertEqual("structural_present", backend_final["status"])
+            self.assertEqual("rust-vulkan-final-output", backend_final["crops"][0]["capture_method"])
+
+            document["rustGalWorldMovingMeshExecution"] = document["rustGalWorldMovingMeshExecution"][:1]
+            missing = harness.deterministic_world_mesh_arrow_capture_evidence(document, "ordinary")
+            self.assertEqual("missing_frame_correlated_execution", missing["status"])
+
+    def test_arrow_capture_hidden_state_requires_zero_mesh_metadata(self) -> None:
+        evidence = harness.deterministic_world_mesh_arrow_capture_evidence(
+            {"rustGalWorldArrows": [], "rustGalWorldArrowRouteDecisions": []},
+            "hidden",
+        )
+        self.assertEqual("absent_expected", evidence["status"])
+
+    def test_model_capture_requires_real_chest_route_and_execution(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            screenshots = [temp / f"model-{frame}.png" for frame in range(4)]
+            for screenshot in screenshots:
+                write_block_display_probe_image(screenshot, scenario="stone")
+            document = {
+                "status": "complete",
+                "dimension": "minecraft:overworld",
+                "window": {"width": 1280, "height": 720},
+                "rustGalWorldModelMeshScenario": "chest",
+                "rustGalWorldModelMeshSetup": {
+                    "status": "spawned",
+                    "blockId": "minecraft:chest",
+                    "clientBlockEntityPresent": True,
+                },
+                "captures": [
+                    {
+                        "renderedFrameIndex": 80 + frame,
+                        "screenshot": str(screenshots[frame]),
+                        "window": {"width": 1280, "height": 720},
+                        "captureMethod": "external-window-request",
+                        "targetWindow": "Minecraft",
+                    }
+                    for frame in range(4)
+                ],
+                "rustGalWorldModelMeshes": [
+                    {
+                        "frameIndex": 80 + frame,
+                        "route": "rust-vulkan-whole-frame",
+                        "textureId": "minecraft:entity/chest/normal",
+                        "meshKey": 2001,
+                        "meshGeneration": 4,
+                        "sectionCount": 3,
+                        "projected": True,
+                        "screenBounds": {"left": 555.0, "top": 270.0, "right": 680.0, "bottom": 330.0},
+                    }
+                    for frame in range(4)
+                ],
+                "rustGalWorldModelMeshRouteDecisions": [
+                    {
+                        "frameIndex": 80 + frame,
+                        "route": "rust-vulkan-whole-frame",
+                        "textureId": "minecraft:entity/chest/normal",
+                        "rustSelected": True,
+                        "rustQueued": True,
+                        "javaDrawn": False,
+                    }
+                    for frame in range(4)
+                ],
+                "rustGalWorldMovingMeshExecution": [
+                    {
+                        "deterministicFrameIndex": 80 + frame,
+                        "route": "rust-vulkan-whole-frame",
+                        "provenance": "model",
+                        "gameplayFrameId": 1000 + frame,
+                        "submissionId": 800 + frame,
+                        "instances": 1,
+                    }
+                    for frame in range(4)
+                ],
+            }
+            evidence = harness.deterministic_world_mesh_model_capture_evidence(document, "chest")
+            self.assertEqual("structural_present", evidence["status"])
+            self.assertEqual(4, evidence["matched_frames"])
+            cow_document = dict(document)
+            cow_document["rustGalWorldModelMeshScenario"] = "cow"
+            cow_document["rustGalWorldModelMeshSetup"] = {
+                "status": "spawned",
+                "blockId": "minecraft:cow",
+                "serverEntityPresent": True,
+                "clientEntityPresent": True,
+                "serverEntityId": 41,
+                "clientEntityId": 41,
+            }
+            cow_document["rustGalWorldModelMeshes"] = [
+                {
+                    **mesh,
+                    "textureId": "minecraft:textures/entity/cow/temperate_cow.png",
+                    "semanticModelIdentity": "minecraft:cow",
+                    "entityId": 41,
+                }
+                for mesh in document["rustGalWorldModelMeshes"]
+            ]
+            cow_document["rustGalWorldModelMeshRouteDecisions"] = [
+                {**decision, "textureId": "minecraft:textures/entity/cow/temperate_cow.png", "entityId": 41}
+                for decision in document["rustGalWorldModelMeshRouteDecisions"]
+            ]
+            cow = harness.deterministic_world_mesh_model_capture_evidence(cow_document, "cow")
+            self.assertEqual("structural_present", cow["status"])
+            self.assertEqual("passed", cow["setup_status"])
+            chicken_document = dict(cow_document)
+            chicken_document["rustGalWorldModelMeshScenario"] = "chicken"
+            chicken_document["rustGalWorldModelMeshSetup"] = {
+                **cow_document["rustGalWorldModelMeshSetup"],
+                "blockId": "minecraft:chicken",
+            }
+            chicken_document["rustGalWorldModelMeshes"] = [
+                {
+                    **mesh,
+                    "textureId": "minecraft:textures/entity/chicken/temperate_chicken.png",
+                    "semanticModelIdentity": "minecraft:chicken",
+                }
+                for mesh in cow_document["rustGalWorldModelMeshes"]
+            ]
+            chicken_document["rustGalWorldModelMeshRouteDecisions"] = [
+                {**decision, "textureId": "minecraft:textures/entity/chicken/temperate_chicken.png"}
+                for decision in cow_document["rustGalWorldModelMeshRouteDecisions"]
+            ]
+            chicken = harness.deterministic_world_mesh_model_capture_evidence(chicken_document, "chicken")
+            self.assertEqual("structural_present", chicken["status"])
+            self.assertEqual("passed", chicken["setup_status"])
+            pig_document = dict(cow_document)
+            pig_document["rustGalWorldModelMeshScenario"] = "pig"
+            pig_document["rustGalWorldModelMeshSetup"] = {
+                **cow_document["rustGalWorldModelMeshSetup"],
+                "blockId": "minecraft:pig",
+            }
+            pig_document["rustGalWorldModelMeshes"] = [
+				{
+					**mesh,
+					"textureId": "minecraft:textures/entity/pig/temperate_pig.png",
+					"semanticModelIdentity": "minecraft:pig",
+				}
+                for mesh in cow_document["rustGalWorldModelMeshes"]
+            ]
+            pig_document["rustGalWorldModelMeshRouteDecisions"] = [
+				{**decision, "textureId": "minecraft:textures/entity/pig/temperate_pig.png"}
+                for decision in cow_document["rustGalWorldModelMeshRouteDecisions"]
+            ]
+            pig = harness.deterministic_world_mesh_model_capture_evidence(pig_document, "pig")
+            self.assertEqual("structural_present", pig["status"])
+            self.assertEqual("passed", pig["setup_status"])
+            rabbit_document = dict(cow_document)
+            rabbit_document["rustGalWorldModelMeshScenario"] = "rabbit"
+            rabbit_document["rustGalWorldModelMeshSetup"] = {
+                **cow_document["rustGalWorldModelMeshSetup"],
+                "blockId": "minecraft:rabbit",
+            }
+            rabbit_document["rustGalWorldModelMeshes"] = [
+                {
+                    **mesh,
+                    "textureId": "minecraft:textures/entity/rabbit/brown.png",
+                    "semanticModelIdentity": "minecraft:rabbit",
+                }
+                for mesh in cow_document["rustGalWorldModelMeshes"]
+            ]
+            rabbit_document["rustGalWorldModelMeshRouteDecisions"] = [
+                {**decision, "textureId": "minecraft:textures/entity/rabbit/brown.png"}
+                for decision in cow_document["rustGalWorldModelMeshRouteDecisions"]
+            ]
+            rabbit = harness.deterministic_world_mesh_model_capture_evidence(rabbit_document, "rabbit")
+            self.assertEqual("structural_present", rabbit["status"])
+            self.assertEqual("passed", rabbit["setup_status"])
+            zombie_document = dict(cow_document)
+            zombie_document["rustGalWorldModelMeshScenario"] = "zombie"
+            zombie_document["rustGalWorldModelMeshSetup"] = {
+                **cow_document["rustGalWorldModelMeshSetup"],
+                "blockId": "minecraft:zombie",
+            }
+            zombie_document["rustGalWorldModelMeshes"] = [
+                {
+                    **mesh,
+                    "textureId": "minecraft:textures/entity/zombie/zombie.png",
+                    "semanticModelIdentity": "minecraft:zombie",
+                }
+                for mesh in cow_document["rustGalWorldModelMeshes"]
+            ]
+            zombie_document["rustGalWorldModelMeshRouteDecisions"] = [
+                {**decision, "textureId": "minecraft:textures/entity/zombie/zombie.png"}
+                for decision in cow_document["rustGalWorldModelMeshRouteDecisions"]
+            ]
+            zombie_screenshots = [temp / f"zombie-{frame}.png" for frame in range(4)]
+            for screenshot in zombie_screenshots:
+                write_zombie_model_probe_image(screenshot)
+            zombie_document["captures"] = [
+                {**capture, "screenshot": str(zombie_screenshots[index])}
+                for index, capture in enumerate(zombie_document["captures"])
+            ]
+            zombie = harness.deterministic_world_mesh_model_capture_evidence(zombie_document, "zombie")
+            self.assertEqual("structural_present", zombie["status"])
+            self.assertEqual("passed", zombie["setup_status"])
+            selected_source_zombie = dict(zombie_document)
+            selected_source_zombie["captures"] = [
+                {
+                    **zombie_document["captures"][0],
+                    "captureMethod": "rust-vulkan-final-output",
+                    "targetWindow": "rust-vulkan-final-output",
+                }
+            ]
+            selected_source_zombie_evidence = harness.deterministic_world_mesh_model_capture_evidence(
+                selected_source_zombie, "zombie"
+            )
+            self.assertEqual("structural_present", selected_source_zombie_evidence["status"])
+            self.assertEqual(1, selected_source_zombie_evidence["required_capture_frames"])
+            self.assertEqual(
+                "selected_source_entity_final_output",
+                selected_source_zombie_evidence["capture_contract"],
+            )
+            document["captures"][0].update(
+                {
+                    "captureMethod": "rust-vulkan-final-output",
+                    "targetWindow": "rust-vulkan-final-output",
+                }
+            )
+            backend_final = harness.deterministic_world_mesh_model_capture_evidence(document, "chest")
+            self.assertEqual("structural_present", backend_final["status"])
+            self.assertEqual("rust-vulkan-final-output", backend_final["crops"][0]["capture_method"])
+            document["rustGalWorldMovingMeshExecution"] = []
+            missing = harness.deterministic_world_mesh_model_capture_evidence(document, "chest")
+            self.assertEqual("missing_execution_receipt", missing["status"])
+            document["rustGalWorldModelMeshRouteDecisions"] = [
+                {
+                    "frameIndex": 80,
+                    "route": "java-legacy",
+                    "textureId": "minecraft:entity/chest/normal",
+                    "rustSelected": False,
+                    "rustQueued": False,
+                    "javaDrawn": True,
+                }
+            ]
+            control = harness.deterministic_world_mesh_model_capture_evidence(document, "chest", "java-compatibility")
+            self.assertEqual("control_traversal_present", control["status"])
+
     def test_piston_capture_rejects_desktop_screenshot(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp = Path(temp_dir)
@@ -1566,6 +2668,307 @@ class GraphicsAuditHarnessTests(unittest.TestCase):
         self.assertEqual("pack-a", stats["texture_signature"])
         self.assertGreaterEqual(stats["matching_pixels"], 96)
         self.assertTrue(stats["coverage_ok"])
+
+    def test_distant_horizons_palette_final_frame_rejects_swapped_material_color(self) -> None:
+        from PIL import Image
+
+        def projected_target(x: int, y: int, sprites: list[str]) -> dict[str, object]:
+            def ndc(pixel_x: int, pixel_y: int) -> list[float]:
+                return [pixel_x / 255.0 * 2.0 - 1.0, 1.0 - pixel_y / 255.0 * 2.0, 0.0]
+
+            return {
+                "matched": True,
+                "tileRepeatRequired": True,
+                "expectedSprites": sprites,
+                "projection": {
+                    "status": "ok",
+                    "insideClip": True,
+                    "ndc": [x / 255.0 * 2.0 - 1.0, 1.0 - y / 255.0 * 2.0],
+                },
+                "matches": [{
+                    "sprite": sprites[0],
+                    "tileSpan": [4.0, 1.0],
+                    "atlasRect": [0.0, 0.0, 0.25, 0.25],
+                    "projection": {
+                        "status": "ok",
+                        "insideClip": True,
+                        "ndcVertices": [
+                            ndc(x - 20, y - 20),
+                            ndc(x + 20, y - 20),
+                            ndc(x + 20, y + 20),
+                            ndc(x - 20, y + 20),
+                        ],
+                    },
+                }],
+            }
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            screenshot = Path(temp_dir) / "palette.png"
+            image = Image.new("RGB", (256, 256), (0, 0, 0))
+            palette = [
+                (48, 48, (42, 98, 190), ["minecraft:block/lapis_block"]),
+                (192, 48, (116, 45, 62), ["minecraft:block/redstone_ore"]),
+                (48, 192, (168, 101, 39), ["minecraft:block/yellow_terracotta"]),
+                # The selected source path can emit an equal-channel cyan
+                # diamond swatch after shader-pack material processing.
+                (192, 192, (54, 190, 190), ["minecraft:block/diamond_block"]),
+            ]
+            for x, y, color, _sprites in palette:
+                for pixel_x in range(x - 20, x + 21):
+                    for pixel_y in range(y - 20, y + 21):
+                        image.putpixel((pixel_x, pixel_y), color)
+            image.save(screenshot)
+            plan = {
+                "paletteTargetCoverage": [
+                    projected_target(x, y, sprites) for x, y, _color, sprites in palette
+                ]
+            }
+            document = {"captures": [{"screenshot": str(screenshot)}]}
+
+            passing = harness.deterministic_distant_horizons_texture_palette_pixel_evidence(
+                document, plan
+            )
+            self.assertEqual("present", passing["status"])
+            self.assertEqual(4, passing["passed_targets"])
+            self.assertEqual(4, passing["repeat_geometry_targets"])
+
+            # The lapis target now has the redstone field. Semantic source
+            # receipts can still be valid in this situation; the final-frame
+            # gate must reject it rather than reporting a texture pass.
+            for pixel_x in range(48 - 20, 48 + 21):
+                for pixel_y in range(48 - 20, 48 + 21):
+                    image.putpixel((pixel_x, pixel_y), (116, 45, 62))
+            image.save(screenshot)
+            swapped = harness.deterministic_distant_horizons_texture_palette_pixel_evidence(
+                document, plan
+            )
+            self.assertEqual("palette_mismatch", swapped["status"])
+            self.assertEqual(3, swapped["passed_targets"])
+
+            plan["paletteTargetCoverage"][0]["matches"][0]["tileSpan"] = [1.0, 1.0]
+            stretched = harness.deterministic_distant_horizons_texture_palette_pixel_evidence(
+                document, plan
+            )
+            self.assertEqual("palette_mismatch", stretched["status"])
+            self.assertEqual("missing_repeat_geometry", stretched["targets"][0]["status"])
+
+    def test_distant_horizons_palette_uses_the_exact_quad_footprint(self) -> None:
+        from PIL import Image
+
+        def ndc(pixel_x: int, pixel_y: int) -> list[float]:
+            return [pixel_x / 255.0 * 2.0 - 1.0, 1.0 - pixel_y / 255.0 * 2.0, 0.0]
+
+        palette = [
+            (48, 48, (42, 98, 190), "minecraft:block/lapis_block"),
+            (192, 48, (116, 45, 62), "minecraft:block/redstone_ore"),
+            (48, 192, (168, 101, 39), "minecraft:block/yellow_terracotta"),
+            (192, 192, (54, 190, 170), "minecraft:block/diamond_block"),
+        ]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            screenshot = Path(temp_dir) / "tight-palette.png"
+            # This background is deliberately redstone-like. A former 41px
+            # square crop would classify three of these tiny valid quads as
+            # texture swaps; the projected draw footprint must not.
+            image = Image.new("RGB", (256, 256), (116, 45, 62))
+            targets = []
+            for x, y, color, sprite in palette:
+                for pixel_x in range(x - 6, x + 7):
+                    for pixel_y in range(y - 6, y + 7):
+                        image.putpixel((pixel_x, pixel_y), color)
+                targets.append({
+                    "matched": True,
+                    "tileRepeatRequired": False,
+                    "expectedSprites": [sprite],
+                    "matches": [{
+                        "sprite": sprite,
+                        "tileSpan": [1.0, 1.0],
+                        "atlasRect": [0.0, 0.0, 0.25, 0.25],
+                        "projection": {
+                            "status": "ok",
+                            "insideClip": True,
+                            "ndcVertices": [
+                                ndc(x - 6, y - 6), ndc(x + 6, y - 6),
+                                ndc(x + 6, y + 6), ndc(x - 6, y + 6),
+                            ],
+                        },
+                    }],
+                })
+            image.save(screenshot)
+            evidence = harness.deterministic_distant_horizons_texture_palette_pixel_evidence(
+                {"captures": [{"screenshot": str(screenshot)}]},
+                {"paletteTargetCoverage": targets},
+            )
+            self.assertEqual("present", evidence["status"])
+            self.assertEqual(4, evidence["passed_targets"])
+            self.assertTrue(all(target["footprint_pixels"] >= 100 for target in evidence["targets"]))
+
+            # A tiny correctly-coloured remnant is not final-frame texture
+            # evidence for a reduced DH surface. This used to pass and masked
+            # broad unresolved colour-only terrain.
+            targets[0]["matches"][0]["projection"]["ndcVertices"] = [
+                ndc(46, 46), ndc(50, 46), ndc(50, 50), ndc(46, 50),
+            ]
+            insufficient = harness.deterministic_distant_horizons_texture_palette_pixel_evidence(
+                {"captures": [{"screenshot": str(screenshot)}]},
+                {"paletteTargetCoverage": targets},
+            )
+            self.assertEqual("palette_mismatch", insufficient["status"])
+            self.assertEqual("insufficient_texture_footprint", insufficient["targets"][0]["status"])
+
+    def test_distant_horizons_source_palette_uses_its_declared_row_orientation(self) -> None:
+        from PIL import Image
+
+        def ndc(pixel_x: int, pixel_y: int) -> list[float]:
+            # The raw Vulkan attachment has already been normalized to a
+            # top-left PNG, while its source viewport keeps positive NDC Y
+            # downward for this diagnostic contract.
+            return [pixel_x / 255.0 * 2.0 - 1.0, pixel_y / 255.0 * 2.0 - 1.0, 0.0]
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            screenshot = Path(temp_dir) / "source-primary.png"
+            image = Image.new("RGB", (256, 256), (0, 0, 0))
+            for x in range(80, 177):
+                for y in range(80, 177):
+                    image.putpixel((x, y), (216, 104, 90))
+            image.save(screenshot)
+            plan = {
+                "paletteTargetCoverage": [{
+                    "matched": True,
+                    "tileRepeatRequired": True,
+                    "expectedSprites": ["minecraft:block/redstone_ore"],
+                    "requiredSprites": ["minecraft:block/redstone_ore"],
+                    "matches": [{
+                        "sprite": "minecraft:block/redstone_ore",
+                        "tileSpan": [8.0, 1.0],
+                        "atlasRect": [0.0, 0.0, 0.25, 0.25],
+                        "projection": {
+                            "status": "ok",
+                            "insideClip": True,
+                            "ndcVertices": [
+                                ndc(80, 80), ndc(176, 80), ndc(176, 176), ndc(80, 176),
+                            ],
+                        },
+                    }],
+                }]
+            }
+            # The shared four-target palette schema remains mandatory.
+            plan["paletteTargetCoverage"] *= 4
+            evidence = harness.deterministic_distant_horizons_texture_palette_pixel_evidence(
+                {"captures": [{"screenshot": str(screenshot)}]},
+                plan,
+                ndc_y_positive_down=True,
+                minimum_texture_footprint_pixels=12,
+            )
+            self.assertEqual("present", evidence["status"])
+            self.assertEqual(4, evidence["passed_targets"])
+
+    def test_distant_horizons_final_visibility_allows_pack_fog_but_requires_source_identity(self) -> None:
+        source = {
+            "targets": [
+                {"target": [1, 2, 3], "mean_rgb": [0.9, 0.2, 0.1]},
+                {"target": [4, 5, 6], "mean_rgb": [0.2, 0.8, 0.1]},
+                {"target": [7, 8, 9], "mean_rgb": [0.8, 0.6, 0.1]},
+                {"target": [10, 11, 12], "mean_rgb": [0.1, 0.7, 0.2]},
+            ]
+        }
+        final = {
+            "targets": [
+                {"target": [1, 2, 3], "mean_rgb": [0.7, 0.75, 0.85]},
+                {"target": [4, 5, 6], "mean_rgb": [0.7, 0.75, 0.85]},
+                {"target": [7, 8, 9], "mean_rgb": [0.7, 0.75, 0.85]},
+                {"target": [10, 11, 12], "mean_rgb": [0.7, 0.75, 0.85]},
+            ]
+        }
+        evidence = harness.distant_horizons_source_to_final_color_transform_evidence(source, final)
+        self.assertEqual("pack_transform_present", evidence["status"])
+        self.assertEqual(4, evidence["transformed_targets"])
+
+    def test_distant_horizons_final_visibility_rejects_an_uncontrasted_world_footprint(self) -> None:
+        from PIL import Image
+
+        def ndc(pixel_x: int, pixel_y: int) -> list[float]:
+            return [pixel_x / 255.0 * 2.0 - 1.0, 1.0 - pixel_y / 255.0 * 2.0, 0.0]
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            screenshot = Path(temp_dir) / "fogged-empty.png"
+            Image.new("RGB", (256, 256), (179, 191, 217)).save(screenshot)
+            target = {
+                "matched": True,
+                "tileRepeatRequired": True,
+                "expectedSprites": ["minecraft:block/redstone_ore"],
+                "matches": [{
+                    "sprite": "minecraft:block/redstone_ore",
+                    "tileSpan": [4.0, 1.0],
+                    "atlasRect": [0.0, 0.0, 0.25, 0.25],
+                    "projection": {
+                        "status": "ok",
+                        "insideClip": True,
+                        "ndcVertices": [
+                            ndc(96, 96), ndc(160, 96), ndc(160, 160), ndc(96, 160),
+                        ],
+                    },
+                }],
+            }
+            evidence = harness.deterministic_distant_horizons_texture_palette_pixel_evidence(
+                {"captures": [{"screenshot": str(screenshot)}]},
+                {"paletteTargetCoverage": [target] * 4},
+                require_palette_color=False,
+                minimum_passed_targets=2,
+                minimum_world_contrast=0.02,
+            )
+            self.assertEqual("palette_mismatch", evidence["status"])
+            self.assertTrue(
+                all(entry["status"] == "insufficient_world_contrast" for entry in evidence["targets"]),
+                evidence,
+            )
+
+    def test_static_terrain_palette_final_frame_rejects_swapped_material_color(self) -> None:
+        from PIL import Image
+
+        def probe(x: int, y: int, sprites: list[str]) -> dict[str, object]:
+            return {
+                "matched": True,
+                "position": f"{x},{y},0",
+                "allowedSprites": sprites,
+                # The harness scales these semantic 1280x720 coordinates to
+                # the retained image rather than trusting a desktop crop.
+                "projection": {"screen": [x * 5, y * 720 / 256], "insideViewport": True},
+            }
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            screenshot = Path(temp_dir) / "palette.png"
+            image = Image.new("RGB", (256, 256), (0, 0, 0))
+            palette = [
+                (48, 48, (42, 98, 51), ["minecraft:block/grass_block_top"]),
+                (192, 48, (116, 45, 62), ["minecraft:block/redstone_ore"]),
+                (48, 192, (168, 101, 39), ["minecraft:block/yellow_terracotta"]),
+                (192, 192, (54, 112, 48), ["minecraft:block/oak_leaves"]),
+            ]
+            for x, y, color, _sprites in palette:
+                for pixel_x in range(x - 20, x + 21):
+                    for pixel_y in range(y - 20, y + 21):
+                        image.putpixel((pixel_x, pixel_y), color)
+            image.save(screenshot)
+            document = {"captures": [{"screenshot": str(screenshot)}]}
+            receipt = {"probes": [probe(x, y, sprites) for x, y, _color, sprites in palette]}
+
+            passing = harness.deterministic_static_terrain_texture_palette_pixel_evidence(
+                document, receipt
+            )
+            self.assertEqual("present", passing["status"])
+            self.assertEqual(4, passing["passed_targets"])
+
+            # A correct atlas receipt alone must not excuse a final shader
+            # sampling swap from grass to redstone.
+            for pixel_x in range(48 - 20, 48 + 21):
+                for pixel_y in range(48 - 20, 48 + 21):
+                    image.putpixel((pixel_x, pixel_y), (116, 45, 62))
+            image.save(screenshot)
+            swapped = harness.deterministic_static_terrain_texture_palette_pixel_evidence(
+                document, receipt
+            )
+            self.assertEqual("palette_mismatch", swapped["status"])
+            self.assertEqual(3, swapped["passed_targets"])
 
     def test_falling_block_crop_reports_missing_texture_fallback_signature(self) -> None:
         from PIL import Image
@@ -2605,6 +4008,7 @@ else:
                 world_outline_depth_probe=True,
                 world_material_marker_scenario="light-15",
                 world_mesh_block_display_scenario="stone",
+                world_text_scenario="block-display",
                 gui_resource_pack_scenario="",
                 world="Origin",
                 max_secs=1,
@@ -2629,6 +4033,7 @@ else:
                 self.assertIn("mattmc.dev.renderdocCapture=true", env["JAVA_TOOL_OPTIONS"])
                 self.assertIn("mattmc.dev.rustGalWorldMaterial.blockMarkerScenario=light-15", env["JAVA_TOOL_OPTIONS"])
                 self.assertIn("mattmc.dev.rustGalWorldMesh.blockDisplayScenario=stone", env["JAVA_TOOL_OPTIONS"])
+                self.assertIn("mattmc.dev.rustGalWorldText.scenario=block-display", env["JAVA_TOOL_OPTIONS"])
                 _, gameplay_env = harness.build_capture_command(
                     target,
                     harness.MATRIX_MODES[0],
@@ -2639,6 +4044,10 @@ else:
                 )
                 self.assertIn(
                     "mattmc.dev.rustGalWorldMesh.blockDisplayScenario=stone",
+                    gameplay_env["JAVA_TOOL_OPTIONS"],
+                )
+                self.assertIn(
+                    "mattmc.dev.rustGalWorldText.scenario=block-display",
                     gameplay_env["JAVA_TOOL_OPTIONS"],
                 )
             finally:
@@ -2680,6 +4089,974 @@ else:
             self.assertEqual("info", env["VK_LOADER_DEBUG"])
             self.assertIn("validate_sync=true", env["VK_LAYER_SETTINGS"])
 
+    def test_selected_source_execution_is_explicit_and_rust_vulkan_only(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            target = fake_repo(root, "current")
+            rust_mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-rust-vulkan-shaders-on")
+            args = harness.parse_args(
+                [
+                    "capture",
+                    "--profile",
+                    "standard",
+                    "--mode",
+                    rust_mode.name,
+                    "--rust-selected-source-execution",
+                    "--world-mesh-model-scenario",
+                    "decorated-pot",
+                ]
+            )
+            _command, env = harness.build_capture_command(
+                target, rust_mode, root / "capture", "correctness", args, "capture"
+            )
+            self.assertEqual("1", env["MATTMC_RUST_SELECTED_SOURCE_EXECUTION"])
+            self.assertEqual("true", env["MATTMC_GRAPHICS_AUDIT"])
+            self.assertIn(
+                "-Dmattmc.dev.deterministicCameraCapture.requiredRustSourceExecutionDir="
+                + str(root / "capture" / "terrain_pass_contract"),
+                env["JAVA_TOOL_OPTIONS"],
+            )
+            self.assertNotIn("-Dmattmc.dev.rustGalWorldModelPart.v1=true", env["JAVA_TOOL_OPTIONS"])
+
+            source_generic_model_args = harness.parse_args(
+                [
+                    "capture",
+                    "--profile",
+                    "standard",
+                    "--mode",
+                    rust_mode.name,
+                    "--rust-selected-source-execution",
+                    "--world-mesh-model-scenario",
+                    "chest",
+                ]
+            )
+            _, source_generic_model_env = harness.build_capture_command(
+                target, rust_mode, root / "generic-model", "correctness", source_generic_model_args, "capture"
+            )
+            self.assertNotIn("-Dmattmc.dev.rustGalWorldModelMesh.v1=true", source_generic_model_env["JAVA_TOOL_OPTIONS"])
+
+            source_weather_cloud_args = harness.parse_args(
+                [
+                    "capture",
+                    "--profile",
+                    "standard",
+                    "--mode",
+                    rust_mode.name,
+                    "--rust-selected-source-execution",
+                    "--world-weather-scenario",
+                    "rain",
+                    "--world-cloud-scenario",
+                    "bounded",
+                ]
+            )
+            _, source_weather_cloud_env = harness.build_capture_command(
+                target, rust_mode, root / "weather-cloud", "correctness", source_weather_cloud_args, "capture"
+            )
+            self.assertNotIn("-Dmattmc.dev.rustGalWeather.v1=true", source_weather_cloud_env["JAVA_TOOL_OPTIONS"])
+            self.assertNotIn("-Dmattmc.dev.rustGalClouds.v1=true", source_weather_cloud_env["JAVA_TOOL_OPTIONS"])
+            self.assertIn(
+                "-Dmattmc.dev.deterministicCameraCapture.sourceEntityIsolation=true",
+                source_weather_cloud_env["JAVA_TOOL_OPTIONS"],
+            )
+
+            source_dh_args = harness.parse_args(
+                [
+                    "capture",
+                    "--profile",
+                    "standard",
+                    "--mode",
+                    rust_mode.name,
+                    "--rust-selected-source-execution",
+                    "--world-distant-horizons-opaque",
+                ]
+            )
+            _, source_dh_env = harness.build_capture_command(
+                target, rust_mode, root / "distant-horizons", "correctness", source_dh_args, "capture"
+            )
+            self.assertNotIn("-Dmattmc.dev.rustGalDistantHorizons.opaqueV1=true", source_dh_env["JAVA_TOOL_OPTIONS"])
+            self.assertIn("-Dmattmc.dev.rustGalDistantHorizons.semanticCapture=true", source_dh_env["JAVA_TOOL_OPTIONS"])
+
+            isolated_args = harness.parse_args(
+                [
+                    "capture",
+                    "--profile",
+                    "standard",
+                    "--mode",
+                    rust_mode.name,
+                    "--world-mesh-model-scenario",
+                    "decorated-pot",
+                ]
+            )
+            _, isolated_env = harness.build_capture_command(
+                target, rust_mode, root / "isolated", "correctness", isolated_args, "capture"
+            )
+            self.assertNotIn("-Dmattmc.dev.rustGalWorldModelPart.v1=true", isolated_env["JAVA_TOOL_OPTIONS"])
+            self.assertNotIn("-Dmattmc.dev.rustGalWorldModelMesh.v1=true", isolated_env["JAVA_TOOL_OPTIONS"])
+            self.assertIn(
+                "-Dmattmc.dev.deterministicCameraCapture.sourceEntityIsolation=true",
+                isolated_env["JAVA_TOOL_OPTIONS"],
+            )
+
+            java_mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-java-vulkan-shaders-on")
+            with self.assertRaisesRegex(ValueError, "requires the Current Rust Vulkan whole-frame route"):
+                harness.build_capture_command(
+                    target, java_mode, root / "java-vulkan", "correctness", args, "capture"
+                )
+
+            shaders_off_mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-rust-vulkan-shaders-off")
+            shaders_off_args = harness.parse_args(
+                [
+                    "capture",
+                    "--profile",
+                    "standard",
+                    "--mode",
+                    shaders_off_mode.name,
+                    "--rust-selected-source-execution",
+                    "--world-mesh-model-scenario",
+                    "cow",
+                ]
+            )
+            with self.assertRaisesRegex(ValueError, "requires shaders on"):
+                harness.build_capture_command(
+                    target, shaders_off_mode, root / "rust-vulkan-shaders-off", "correctness", shaders_off_args, "capture"
+                )
+
+            flame_args = harness.parse_args(
+                [
+                    "capture",
+                    "--profile",
+                    "standard",
+                    "--mode",
+                    rust_mode.name,
+                    "--world-mesh-model-scenario",
+                    "cow",
+                    "--world-entity-flame-scenario",
+                    "cow",
+                ]
+            )
+            _, flame_env = harness.build_capture_command(
+                target, rust_mode, root / "entity-flame", "correctness", flame_args, "capture"
+            )
+            self.assertIn("-Dmattmc.dev.rustGalWorldMesh.modelScenario=cow", flame_env["JAVA_TOOL_OPTIONS"])
+            self.assertIn("-Dmattmc.dev.rustGalWorldEntityFlame.scenario=cow", flame_env["JAVA_TOOL_OPTIONS"])
+            self.assertIn(
+                "-Dmattmc.dev.deterministicCameraCapture.sourceEntityIsolation=true",
+                flame_env["JAVA_TOOL_OPTIONS"],
+            )
+
+            shadow_args = harness.parse_args(
+                [
+                    "capture",
+                    "--profile",
+                    "standard",
+                    "--mode",
+                    rust_mode.name,
+                    "--world-mesh-model-scenario",
+                    "cow",
+                    "--world-entity-shadow-scenario",
+                    "cow",
+                ]
+            )
+            _, shadow_env = harness.build_capture_command(
+                target, rust_mode, root / "entity-shadow", "correctness", shadow_args, "capture"
+            )
+            self.assertIn("-Dmattmc.dev.rustGalWorldMesh.modelScenario=cow", shadow_env["JAVA_TOOL_OPTIONS"])
+            self.assertIn("-Dmattmc.dev.rustGalWorldEntityShadow.scenario=cow", shadow_env["JAVA_TOOL_OPTIONS"])
+
+            leash_args = harness.parse_args(
+                [
+                    "capture",
+                    "--profile",
+                    "standard",
+                    "--mode",
+                    rust_mode.name,
+                    "--world-mesh-model-scenario",
+                    "cow",
+                    "--world-entity-leash-scenario",
+                    "cow",
+                ]
+            )
+            _, leash_env = harness.build_capture_command(
+                target, rust_mode, root / "entity-leash", "correctness", leash_args, "capture"
+            )
+            self.assertIn("-Dmattmc.dev.rustGalWorldMesh.modelScenario=cow", leash_env["JAVA_TOOL_OPTIONS"])
+            self.assertIn("-Dmattmc.dev.rustGalWorldEntityLeash.scenario=cow", leash_env["JAVA_TOOL_OPTIONS"])
+
+            invalid_flame_args = harness.parse_args(
+                [
+                    "capture",
+                    "--profile",
+                    "standard",
+                    "--mode",
+                    rust_mode.name,
+                    "--world-entity-flame-scenario",
+                    "cow",
+                ]
+            )
+            with self.assertRaisesRegex(ValueError, "requires --world-mesh-model-scenario cow"):
+                harness.build_capture_command(
+                    target, rust_mode, root / "invalid-entity-flame", "correctness", invalid_flame_args, "capture"
+                )
+
+            invalid_shadow_args = harness.parse_args(
+                [
+                    "capture",
+                    "--profile",
+                    "standard",
+                    "--mode",
+                    rust_mode.name,
+                    "--world-entity-shadow-scenario",
+                    "cow",
+                ]
+            )
+            with self.assertRaisesRegex(ValueError, "requires --world-mesh-model-scenario cow"):
+                harness.build_capture_command(
+                    target, rust_mode, root / "invalid-entity-shadow", "correctness", invalid_shadow_args, "capture"
+                )
+
+            invalid_leash_args = harness.parse_args(
+                [
+                    "capture",
+                    "--profile",
+                    "standard",
+                    "--mode",
+                    rust_mode.name,
+                    "--world-entity-leash-scenario",
+                    "cow",
+                ]
+            )
+            with self.assertRaisesRegex(ValueError, "requires --world-mesh-model-scenario cow"):
+                harness.build_capture_command(
+                    target, rust_mode, root / "invalid-entity-leash", "correctness", invalid_leash_args, "capture"
+                )
+
+    def test_static_capture_does_not_require_unrequested_selected_source_execution(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            target = fake_repo(root, "current")
+            for mode_name in ("current-rust-vulkan-shaders-off", "current-rust-vulkan-shaders-on"):
+                mode = next(mode for mode in harness.MATRIX_MODES if mode.name == mode_name)
+                args = harness.parse_args(
+                    [
+                        "capture",
+                        "--profile",
+                        "standard",
+                        "--mode",
+                        mode.name,
+                        "--world-static-terrain-scenario",
+                        "texture-palette",
+                    ]
+                )
+                _command, env = harness.build_capture_command(
+                    target, mode, root / mode_name, "correctness", args, "capture"
+                )
+                self.assertNotIn("MATTMC_RUST_SELECTED_SOURCE_EXECUTION", env)
+                self.assertNotIn("requiredRustSourceExecutionDir", env.get("JAVA_TOOL_OPTIONS", ""))
+
+    def test_selected_source_execution_does_not_leak_into_subsystem_rows(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            target = fake_repo(root, "current")
+            mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-rust-vulkan-shaders-on")
+            args = harness.parse_args(
+                [
+                    "matrix",
+                    "--profile",
+                    "standard",
+                    "--mode",
+                    mode.name,
+                    "--rust-selected-source-execution",
+                ]
+            )
+            _command, env = harness.build_capture_command(
+                target, mode, root / "subsystem", "correctness", args, "subsystem"
+            )
+            self.assertNotIn("MATTMC_RUST_SELECTED_SOURCE_EXECUTION", env)
+            self.assertNotIn("MATTMC_GRAPHICS_AUDIT", env)
+
+    def test_selected_source_execution_grace_requires_an_observed_native_receipt(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            capture = Path(temp_dir) / "capture"
+            self.assertFalse(harness.selected_source_execution_armed(capture))
+            self.assertFalse(harness.selected_source_execution_observed(capture))
+            contract_dir = capture / "terrain_pass_contract"
+            contract_dir.mkdir(parents=True)
+            (contract_dir / "selected-source-admission-status.json").write_text(
+                json.dumps({"source_execution_armed": False}), encoding="utf-8"
+            )
+            self.assertFalse(harness.selected_source_execution_armed(capture))
+            (contract_dir / "selected-source-admission-status.json").write_text(
+                json.dumps({"source_execution_armed": True}), encoding="utf-8"
+            )
+            self.assertTrue(harness.selected_source_execution_armed(capture))
+            self.assertFalse(harness.selected_source_execution_observed(capture))
+            (contract_dir / "selected-source-execution-distant-horizons-frame-42.json").write_text(
+                json.dumps(
+                    {
+                        "frame_id": 42,
+                        "submission_id": 9,
+                        "route": "rust-native-selected-source",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            self.assertTrue(harness.selected_source_execution_observed(capture))
+
+    def test_selected_source_falling_block_requires_correlated_moving_mesh_execution(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-rust-vulkan-shaders-on")
+            target = fake_repo(root, mode.target)
+            capture = root / "capture"
+            write_capture(capture, backend=mode.backend, shaders=mode.shaders, world="Origin")
+            deterministic_path = next(capture.glob("deterministic_camera_capture_*.json"))
+            deterministic = json.loads(deterministic_path.read_text(encoding="utf-8"))
+            deterministic.update(
+                {
+                    "rustGalWorldFallingBlockScenario": "sand",
+                    "rustGalWorldFallingBlockSetup": {
+                        "status": "spawned",
+                        "blockId": "minecraft:sand",
+                        "spawnMethod": "FallingBlockEntity.fall",
+                        "entityCount": 1,
+                    },
+                    "rustGalWorldFallingBlockExtractionProbe": {
+                        "seen": 1,
+                        "shouldRender": 1,
+                        "compiledSection": 1,
+                        "extracted": 1,
+                    },
+                    "rustGalWorldFallingBlocks": [
+                        {
+                            "frameIndex": 42,
+                            "route": "rust-vulkan-whole-frame",
+                            "blockId": "minecraft:sand",
+                            "meshKey": 42,
+                            "meshGeneration": 2,
+                            "vertexLayoutVersion": 3,
+                            "indexType": 1,
+                            "vertexCount": 24,
+                            "indexBytes": 72,
+                            "sectionCount": 6,
+                            "textureIds": "2269692870",
+                            "materialMode": 1,
+                            "viewport": {"width": 1280, "height": 720},
+                            "projected": True,
+                            "screenBounds": {"left": 500.0, "top": 60.0, "right": 720.0, "bottom": 280.0},
+                        }
+                    ],
+                    "rustGalWorldFallingBlockRouteDecisions": [
+                        {
+                            "frameIndex": 42,
+                            "route": "rust-vulkan-whole-frame",
+                            "blockId": "minecraft:sand",
+                            "rustSelected": True,
+                            "rustQueued": True,
+                            "javaDrawn": False,
+                        }
+                    ],
+                }
+            )
+            deterministic_path.write_text(json.dumps(deterministic), encoding="utf-8")
+            (capture / "runClient_20260101_000000.log").write_text(
+                "-Dmattmc.dev.rustGalWorldMesh.fallingBlockScenario=sand\n"
+                "rust_gal_world_mesh_instances_executed=1 "
+                "rust_gal_world_mesh_batches_executed=1 "
+                "rust_gal_world_mesh_draws_executed=1\n",
+                encoding="utf-8",
+            )
+            contract_dir = capture / "terrain_pass_contract"
+            contract_dir.mkdir()
+            (contract_dir / "terrain-pass-contract-generation-1.json").write_text(
+                json.dumps({"selected_source_execution_requested": True}), encoding="utf-8"
+            )
+            receipt = {
+                "frame_id": 42,
+                "submission_id": 9,
+                "world_generation": 2,
+                "route": "rust-native-selected-source",
+                "source_mesh_instance_semantics": {"moving_mesh_instances": 0},
+            }
+            (contract_dir / "selected-source-execution-frame-42.json").write_text(
+                json.dumps(receipt), encoding="utf-8"
+            )
+
+            missing = harness.normalize_capture_artifact(
+                target, mode, capture, "correctness", True, ["fake"], 0, False, tool_kind="capture"
+            )
+            self.assertTrue(
+                any(
+                    "selected-source FallingBlock execution did not retain a frame/submission-correlated"
+                    in message
+                    for message in missing["validation"]["messages"]
+                ),
+                missing["validation"]["messages"],
+            )
+
+            deterministic["rustGalWorldMovingMeshExecution"] = [
+                {
+                    "deterministicFrameIndex": 42,
+                    "route": "rust-vulkan-whole-frame",
+                    "provenance": "falling-block",
+                    "gameplayFrameId": 42,
+                    "submissionId": 9,
+                    "instances": 1,
+                }
+            ]
+            deterministic_path.write_text(json.dumps(deterministic), encoding="utf-8")
+            receipt["source_mesh_instance_semantics"]["moving_mesh_instances"] = 1
+            (contract_dir / "selected-source-execution-frame-42.json").write_text(
+                json.dumps(receipt), encoding="utf-8"
+            )
+            admitted = harness.normalize_capture_artifact(
+                target, mode, capture, "correctness", True, ["fake"], 0, False, tool_kind="capture"
+            )
+            self.assertFalse(
+                any(
+                    "selected-source FallingBlock execution did not retain a frame/submission-correlated"
+                    in message
+                    for message in admitted["validation"]["messages"]
+                ),
+                admitted["validation"]["messages"],
+            )
+
+    def test_selected_source_static_capture_bounds_only_the_vanilla_fixture_radius(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            target = fake_repo(root, "current")
+            mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-rust-vulkan-shaders-on")
+            args = harness.parse_args(
+                [
+                    "capture",
+                    "--profile",
+                    "standard",
+                    "--mode",
+                    mode.name,
+                    "--world-static-terrain-scenario",
+                    "texture-palette",
+                    "--rust-selected-source-execution",
+                ]
+            )
+            _command, env = harness.build_capture_command(
+                target, mode, root / "capture", "correctness", args, "capture"
+            )
+            self.assertEqual("4", env["MATTMC_CAPTURE_RENDER_DISTANCE"])
+            self.assertEqual("4", env["MATTMC_CAPTURE_SIMULATION_DISTANCE"])
+            self.assertNotEqual("true", env.get("MATTMC_CAPTURE_DISABLE_DH_FOR_PERF", "false"))
+
+    def test_selected_source_distant_horizons_palette_keeps_its_target_inside_the_client_radius(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            target = fake_repo(root, "current")
+            mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-rust-vulkan-shaders-on")
+            args = harness.parse_args(
+                [
+                    "capture",
+                    "--profile",
+                    "standard",
+                    "--mode",
+                    mode.name,
+                    "--world-distant-horizons-opaque",
+                    "--world-distant-horizons-texture-palette",
+                    "--rust-selected-source-execution",
+                ]
+            )
+            _command, env = harness.build_capture_command(
+                target, mode, root / "capture", "correctness", args, "capture"
+            )
+            self.assertEqual("6", env["MATTMC_CAPTURE_RENDER_DISTANCE"])
+            self.assertEqual("5", env["MATTMC_CAPTURE_SIMULATION_DISTANCE"])
+            self.assertIn(
+                "-Dmattmc.dev.deterministicCameraCapture.settledReadyFrames=2",
+                env["JAVA_TOOL_OPTIONS"],
+            )
+            self.assertIn(
+                "-Dmattmc.dev.deterministicCameraCapture.settledReadyFamilies=distant-horizons",
+                env["JAVA_TOOL_OPTIONS"],
+            )
+            self.assertIn(
+                "-Dmattmc.dev.deterministicCameraCapture.sourceEntityIsolation=true",
+                env["JAVA_TOOL_OPTIONS"],
+            )
+            self.assertNotIn(
+                "-Dmattmc.dev.deterministicCameraCapture.settledReadyFamilies=static-terrain",
+                env["JAVA_TOOL_OPTIONS"],
+            )
+
+    def test_capture_runner_keeps_dh_palette_source_radius_bounded(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            config = isolated_capture_config(root, world="Origin")
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "MATTMC_CAPTURE_DH_RUST_OPAQUE_ONLY": "true",
+                    "MATTMC_CAPTURE_DH_TEXTURE_PALETTE": "true",
+                },
+                clear=False,
+            ):
+                runner = capture_runner.CaptureRunner(config)
+                runner.run_dir = root / "run"
+                runner.options_file = runner.run_dir / "options.txt"
+                runner.run_dir.mkdir(parents=True)
+                dh_config_path = runner.run_dir / "config" / "DistantHorizons.toml"
+                dh_config_path.parent.mkdir(parents=True)
+                dh_config_path.write_text("lodChunkRenderDistanceRadius = 4\n", encoding="utf-8")
+                runner.configure_backend_and_validation()
+            dh_config = (runner.run_dir / "config" / "DistantHorizons.toml").read_text(encoding="utf-8")
+            self.assertIn("lodChunkRenderDistanceRadius = 4", dh_config)
+
+    def test_selected_source_distant_horizons_requires_extended_profile_for_capture_and_gameplay(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            target = fake_repo(root, "current")
+            mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-rust-vulkan-shaders-on")
+            args = harness.parse_args(
+                [
+                    "capture",
+                    "--profile",
+                    "standard",
+                    "--mode",
+                    mode.name,
+                    "--world-distant-horizons-opaque",
+                    "--world-distant-horizons-texture-palette",
+                    "--rust-selected-source-execution",
+                ]
+            )
+            reason = harness.profile_not_supported_reason("standard", mode, "capture", args)
+            self.assertIn("requires at least extended", reason or "")
+            self.assertIsNone(harness.profile_not_supported_reason("extended", mode, "capture", args))
+            reason = harness.profile_not_supported_reason("standard", mode, "gameplay", args)
+            self.assertIn("requires at least extended", reason or "")
+            self.assertIsNone(harness.profile_not_supported_reason("extended", mode, "gameplay", args))
+
+    def test_requested_source_plan_rejects_normal_terrain_without_native_admission(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-rust-vulkan-shaders-on")
+            target = fake_repo(root, "current")
+            capture = root / "capture"
+            write_capture(capture, backend=mode.backend, shaders=mode.shaders, world="Origin")
+            contract_dir = capture / "terrain_pass_contract"
+            contract_dir.mkdir()
+            (contract_dir / "terrain-pass-contract-generation-1.json").write_text(
+                json.dumps(
+                    {
+                        "source_contract_discovered": True,
+                        "selected_source_execution_requested": True,
+                        "selected_source_execution_admitted": False,
+                        "execution": "internal-terrain-fixture",
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            artifact = harness.normalize_capture_artifact(
+                target,
+                mode,
+                capture,
+                "gameplay",
+                True,
+                ["fake"],
+                0,
+                False,
+                tool_kind="capture",
+            )
+
+            self.assertFalse(artifact["validation"]["complete"])
+            self.assertTrue(
+                any(
+                    "selected-source execution was requested but Rust did not admit a complete source submission"
+                    in message
+                    for message in artifact["validation"]["messages"]
+                )
+            )
+
+    def test_selected_source_texture_palette_rejects_black_source_overlay(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-rust-vulkan-shaders-on")
+            target = fake_repo(root, "current")
+            capture = root / "capture"
+            write_capture(capture, backend=mode.backend, shaders=mode.shaders, world="Origin")
+            deterministic = capture / "deterministic_camera_capture_20260101_000000.json"
+            document = json.loads(deterministic.read_text(encoding="utf-8"))
+            document["rustGalStaticTerrainScenario"] = "texture-palette"
+            deterministic.write_text(json.dumps(document), encoding="utf-8")
+            contract_dir = capture / "terrain_pass_contract"
+            contract_dir.mkdir()
+            (contract_dir / "terrain-pass-contract-generation-1.json").write_text(
+                json.dumps({"selected_source_execution_requested": True}), encoding="utf-8"
+            )
+            (contract_dir / "selected-source-execution-frame-42.json").write_text(
+                json.dumps(
+                    {
+                        "frame_id": 42,
+                        "submission_id": 9,
+                        "world_generation": 2,
+                        "route": "rust-native-selected-source",
+                        "source_material_coverage": {
+                            "batches": 1,
+                            "quads": 1,
+                            "draws": 1,
+                            "vertices": 6,
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            from PIL import Image
+
+            overlay = contract_dir / "selected-source-overlay-frame-42.png"
+            (contract_dir / "selected-source-overlay-frame-42.json").write_text(
+                json.dumps(
+                    {
+                        "artifact_class": "rust_selected_source_overlay",
+                        "frame_id": 42,
+                        "submission_id": 9,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            Image.new("RGB", (128, 72), (0, 0, 0)).save(overlay)
+
+            artifact = harness.normalize_capture_artifact(
+                target, mode, capture, "correctness", True, ["fake"], 0, False, tool_kind="capture"
+            )
+            self.assertFalse(artifact["validation"]["complete"])
+            self.assertTrue(
+                any(
+                    "selected-source texture-palette execution did not retain visible source-world output"
+                    in message
+                    for message in artifact["validation"]["messages"]
+                ),
+                artifact["validation"]["messages"],
+            )
+            evidence = artifact["capture"]["terrain_pass_contract"]["selected_source_overlay_evidence"]
+            self.assertEqual("world_output_black", evidence["status"])
+            source_execution = artifact["capture"]["terrain_pass_contract"][
+                "selected_source_execution_doc"
+            ]
+            self.assertEqual(
+                {"batches": 1, "quads": 1, "draws": 1, "vertices": 6},
+                source_execution["source_material_coverage"],
+            )
+
+            Image.new("RGB", (128, 72), (48, 96, 32)).save(overlay)
+            visible = harness.normalize_capture_artifact(
+                target, mode, capture, "correctness", True, ["fake"], 0, False, tool_kind="capture"
+            )
+            self.assertFalse(
+                any(
+                    "selected-source texture-palette execution did not retain visible source-world output"
+                    in message
+                    for message in visible["validation"]["messages"]
+                ),
+                visible["validation"]["messages"],
+            )
+            self.assertEqual(
+                "world_output_present",
+                visible["capture"]["terrain_pass_contract"]["selected_source_overlay_evidence"]["status"],
+            )
+
+    def test_selected_source_stage_capture_correlates_with_dh_only_submission(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-rust-vulkan-shaders-on")
+            target = fake_repo(root, "current")
+            capture = root / "capture"
+            write_capture(capture, backend=mode.backend, shaders=mode.shaders, world="Origin")
+            contract_dir = capture / "terrain_pass_contract"
+            contract_dir.mkdir()
+            (contract_dir / "terrain-pass-contract-generation-1.json").write_text(
+                json.dumps({"selected_source_execution_requested": True}), encoding="utf-8"
+            )
+            (contract_dir / "selected-source-execution-distant-horizons-frame-42.json").write_text(
+                json.dumps(
+                    {
+                        "frame_id": 42,
+                        "submission_id": 9,
+                        "world_generation": 2,
+                        "route": "rust-native-selected-source",
+                        "lod_opaque_instances": 1,
+                        "distant_horizons_opaque_program_ready": True,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            from PIL import Image
+
+            stage = contract_dir / "selected-source-terrain-primary-frame-42.png"
+            (contract_dir / "selected-source-terrain-primary-frame-42.json").write_text(
+                json.dumps(
+                    {
+                        "artifact_class": "rust_selected_source_overlay",
+                        "frame_id": 42,
+                        "submission_id": 9,
+                        "source_role": 'ShaderPackColor("primary")',
+                    }
+                ),
+                encoding="utf-8",
+            )
+            Image.new("RGB", (128, 72), (48, 96, 32)).save(stage)
+
+            artifact = harness.normalize_capture_artifact(
+                target, mode, capture, "correctness", True, ["fake"], 0, False, tool_kind="capture"
+            )
+            evidence = artifact["capture"]["terrain_pass_contract"]["selected_source_overlay_evidence"]
+            self.assertEqual("world_output_present", evidence["status"])
+            self.assertEqual('ShaderPackColor("primary")', evidence["source_role"])
+
+    def test_selected_source_distant_horizons_requires_its_own_execution_record(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-rust-vulkan-shaders-on")
+            target = fake_repo(root, "current")
+            capture = root / "capture"
+            write_capture(capture, backend=mode.backend, shaders=mode.shaders, world="Origin")
+            (capture / "runClient_20260101_000000.log").write_text(
+                "-Dmattmc.dev.rustGalDistantHorizons.opaqueV1=true\n"
+                "rust_gal_world_lod_selected_frames=1\n"
+                "rust_gal_world_lod_instances_submitted=4\n"
+                "rust_gal_world_lod_frames_executed=1\n",
+                encoding="utf-8",
+            )
+            deterministic = capture / "deterministic_camera_capture_20260101_000000.json"
+            document = json.loads(deterministic.read_text(encoding="utf-8"))
+            document["rustGalDistantHorizonsRoute"] = {
+                "decision": "selected",
+                "reason": "visible-work",
+                "opaqueSegments": 4,
+                "transparentSegments": 0,
+                "waterSegments": 0,
+                "selected": True,
+            }
+            deterministic.write_text(json.dumps(document), encoding="utf-8")
+            contract_dir = capture / "terrain_pass_contract"
+            contract_dir.mkdir()
+            (contract_dir / "terrain-pass-contract-generation-1.json").write_text(
+                json.dumps({"selected_source_execution_requested": True}), encoding="utf-8"
+            )
+            (contract_dir / "selected-source-execution-frame-8.json").write_text(
+                json.dumps(
+                    {
+                        "frame_id": 8,
+                        "submission_id": 12,
+                        "world_generation": 3,
+                        "route": "rust-native-selected-source",
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            artifact = harness.normalize_capture_artifact(
+                target,
+                mode,
+                capture,
+                "gameplay",
+                True,
+                ["fake"],
+                0,
+                False,
+                tool_kind="capture",
+            )
+
+            self.assertFalse(artifact["validation"]["complete"])
+            self.assertTrue(
+                any(
+                    "selected-source Distant Horizons row lacks a successful source submission record"
+                    in message
+                    for message in artifact["validation"]["messages"]
+                )
+            )
+
+    def test_distant_horizons_texture_palette_requires_the_screenshot_frame_atlas_plan(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-rust-vulkan-shaders-on")
+            target = fake_repo(root, "current")
+            capture = root / "capture"
+            write_capture(capture, backend=mode.backend, shaders=mode.shaders, world="Origin")
+            (capture / "runClient_20260101_000000.log").write_text(
+                "-Dmattmc.dev.rustGalDistantHorizons.opaqueV1=true\n"
+                "-Dmattmc.dev.rustGalDistantHorizons.texturePalette=true\n"
+                "rust_gal_world_lod_selected_frames=1\n"
+                "rust_gal_world_lod_instances_submitted=4\n"
+                "rust_gal_world_lod_frames_executed=1\n",
+                encoding="utf-8",
+            )
+            deterministic = capture / "deterministic_camera_capture_20260101_000000.json"
+            document = json.loads(deterministic.read_text(encoding="utf-8"))
+            document["rustGalDistantHorizonsRoute"] = {
+                "decision": "selected",
+                "reason": "visible-work",
+                "opaqueSegments": 4,
+                "transparentSegments": 0,
+                "waterSegments": 0,
+                "selected": True,
+            }
+            deterministic.write_text(json.dumps(document), encoding="utf-8")
+
+            receipt_dir = capture / "deterministic_camera_capture_20260101_000000"
+            receipt_dir.mkdir()
+            (receipt_dir / "capture_request_01_distant-horizons-texture-palette.ack.json").write_text(
+                json.dumps(
+                    {
+                        # Final-output correlation belongs to the retained
+                        # acknowledgement, not the summary capture entry.
+                        "wholeFramePresentationCorrelation": {
+                            "gameplayFrameId": 42,
+                            "submissionId": 9,
+                        },
+                        "rustGalDistantHorizonsExecution": {
+                            "worldFrame": 42,
+                            "submission": 9,
+                            "captureFrame": 8,
+                            "instances": 4,
+                            "opaqueInstances": 4,
+                            "transparentInstances": 0,
+                            "waterInstances": 0,
+                            "semanticFrameEnabled": True,
+                        },
+                        "rustGalDistantHorizonsTextureProbeReceipt": {"matched": True, "status": "ok"},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            contract_dir = capture / "terrain_pass_contract"
+            contract_dir.mkdir()
+            plan = {
+                "frameId": 42,
+                "executedExactSegments": 4,
+                "selectedSpriteCounts": {
+                    "minecraft:block/lapis_block": 1,
+                    "minecraft:block/redstone_ore": 1,
+                    "minecraft:block/yellow_terracotta": 1,
+                    "minecraft:block/diamond_block": 1,
+                },
+                "paletteTargetCoverage": [
+                    {"position": [88, 80, 552], "matched": True},
+                    {"position": [104, 80, 552], "matched": True},
+                    {"position": [88, 80, 536], "matched": True},
+                    {"position": [104, 80, 536], "matched": True},
+                ],
+            }
+            (contract_dir / "world-lod-exact-atlas-plan-frame-42.json").write_text(
+                json.dumps(plan), encoding="utf-8"
+            )
+
+            artifact = harness.normalize_capture_artifact(
+                target, mode, capture, "correctness", True, ["fake"], 0, False, tool_kind="capture"
+            )
+            self.assertFalse(
+                any("screenshot-frame-correlated Rust exact-atlas receipt" in message for message in artifact["validation"]["messages"]),
+                artifact["validation"]["messages"],
+            )
+            self.assertFalse(
+                any("Distant Horizons screenshot lacks matching successful Rust material-route" in message
+                    for message in artifact["validation"]["messages"]),
+                artifact["validation"]["messages"],
+            )
+
+            (contract_dir / "world-lod-exact-atlas-plan-frame-42.json").unlink()
+            (contract_dir / "world-lod-exact-atlas-plan-frame-41.json").write_text(
+                json.dumps({**plan, "frameId": 41}), encoding="utf-8"
+            )
+            stale = harness.normalize_capture_artifact(
+                target, mode, capture, "correctness", True, ["fake"], 0, False, tool_kind="capture"
+            )
+            self.assertTrue(
+                any("screenshot-frame-correlated Rust exact-atlas receipt" in message for message in stale["validation"]["messages"]),
+                stale["validation"]["messages"],
+            )
+
+            (contract_dir / "world-lod-exact-atlas-plan-frame-41.json").unlink()
+            (contract_dir / "world-lod-exact-atlas-plan-frame-42.json").write_text(
+                json.dumps({
+                    **plan,
+                    "paletteTargetCoverage": [
+                        {"position": [88, 80, 552], "matched": True},
+                        {"position": [104, 80, 552], "matched": False},
+                        {"position": [88, 80, 536], "matched": True},
+                        {"position": [104, 80, 536], "matched": True},
+                    ],
+                }),
+                encoding="utf-8",
+            )
+            missing_target = harness.normalize_capture_artifact(
+                target, mode, capture, "correctness", True, ["fake"], 0, False, tool_kind="capture"
+            )
+            self.assertTrue(
+                any("unmatchedTargets" in message for message in missing_target["validation"]["messages"]),
+                missing_target["validation"]["messages"],
+            )
+
+            # Complementary's real `dh_terrain` program consumes the compact
+            # DH color/category stream rather than a Minecraft atlas sampler.
+            # The source row must retain the same-frame semantic receipt, but
+            # a reduced-color source contract is not itself a rejection.
+            (contract_dir / "world-lod-selected-source-material-contract-frame-42.json").write_text(
+                json.dumps({
+                    "frame_id": 42,
+                    "texture_identity_contract": "reduced-color-material-category",
+                    "material_atlas_bound": False,
+                    "opaque_draw_count": 4,
+                    "opaque_index_count": 24,
+                    "exact_atlas_draw_count": 0,
+                    "exact_atlas_index_count": 0,
+                }),
+                encoding="utf-8",
+            )
+            (contract_dir / "world-lod-exact-atlas-plan-frame-42.json").unlink()
+            reduced_contract = harness.normalize_capture_artifact(
+                target, mode, capture, "correctness", True, ["fake"], 0, False, tool_kind="capture"
+            )
+            messages = reduced_contract["validation"]["messages"]
+            self.assertFalse(
+                any("screenshot-frame-correlated Rust exact-atlas receipt" in message for message in messages),
+                messages,
+            )
+            self.assertFalse(
+                any("reduced-color source contract lacks" in message for message in messages),
+                messages,
+            )
+
+            (contract_dir / "world-lod-selected-source-material-contract-frame-42.json").write_text(
+                json.dumps({
+                    "frame_id": 42,
+                    "texture_identity_contract": "reduced-color-material-category",
+                    "material_atlas_bound": False,
+                    "opaque_draw_count": 4,
+                    "opaque_index_count": 24,
+                    "exact_atlas_draw_count": 1,
+                    "exact_atlas_index_count": 6,
+                }),
+                encoding="utf-8",
+            )
+            injected_atlas = harness.normalize_capture_artifact(
+                target, mode, capture, "correctness", True, ["fake"], 0, False, tool_kind="capture"
+            )
+            self.assertTrue(
+                any("reduced-color source contract lacks" in message for message in injected_atlas["validation"]["messages"]),
+                injected_atlas["validation"]["messages"],
+            )
+
+            # Vanilla whole-frame DH still proves the same real selected LOD
+            # work and final palette footprint, but it has no selected-source
+            # shader attachment to retain. Do not make the shaders-off route
+            # fail solely because that shader-only artifact is absent.
+            vanilla_mode = next(
+                candidate for candidate in harness.MATRIX_MODES
+                if candidate.name == "current-rust-vulkan-shaders-off"
+            )
+            vanilla = harness.normalize_capture_artifact(
+                target, vanilla_mode, capture, "correctness", True, ["fake"], 0, False, tool_kind="capture"
+            )
+            self.assertFalse(
+                any("exact source-stage material identity" in message for message in vanilla["validation"]["messages"]),
+                vanilla["validation"]["messages"],
+            )
+
     def test_capture_runner_receives_profile_shutdown_budget(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -2715,6 +5092,31 @@ else:
             )
             _, env = harness.build_capture_command(target, harness.MATRIX_MODES[0], root / "capture", "correctness", args, "capture")
             self.assertEqual("37", env["MATTMC_DETERMINISTIC_SHUTDOWN_GRACE_SECS"])
+
+    def test_rust_full_gameplay_attachment_diagnostic_is_explicit_and_bounded(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            target = fake_repo(root, "current")
+            mode = next(candidate for candidate in harness.MATRIX_MODES if candidate.name == "current-rust-vulkan-shaders-on")
+            args = harness.parse_args(
+                [
+                    "capture",
+                    "--profile",
+                    "extended",
+                    "--mode",
+                    mode.name,
+                    "--world",
+                    "Origin",
+                    "--rust-selected-source-execution",
+                    "--world-distant-horizons-opaque",
+                    "--rust-full-gameplay-attachments",
+                    "--diagnostic",
+                ]
+            )
+            _command, env = harness.build_capture_command(
+                target, mode, root / "capture", "correctness", args, "capture"
+            )
+            self.assertEqual("0", env["MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_FINAL_ONLY"])
 
     def test_static_terrain_second_world_is_forwarded_to_child_and_java(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -2972,6 +5374,45 @@ else:
             self.assertTrue(any("renderdoc_forced_gradle_no_daemon=true" in line for line in meta_lines))
             self.assertTrue(any("renderdoc_wrapped_actual_game_command=" in line for line in meta_lines))
 
+    def test_capture_runner_source_probe_forces_fresh_gradle_environment(self) -> None:
+        runner = capture_runner.CaptureRunner.__new__(capture_runner.CaptureRunner)
+        runner.env = {
+            "MATTMC_RUST_SELECTED_SOURCE_FRAGMENT_PROBE": "shadow-coordinate",
+            "MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE": "distant-horizons-fog-inputs",
+        }
+        meta_lines: list[str] = []
+        runner.append_meta = meta_lines.append  # type: ignore[method-assign]
+
+        command = runner.fresh_environment_launch_command(["./gradlew", "runClient"])
+
+        self.assertEqual(command, ["./gradlew", "--no-daemon", "runClient"])
+        self.assertIn("native_diagnostic_forced_gradle_no_daemon=true", meta_lines)
+        self.assertIn(
+            "native_diagnostic_inputs=MATTMC_RUST_SELECTED_SOURCE_FRAGMENT_PROBE,MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE",
+            meta_lines,
+        )
+
+        runner.env = {
+            "MATTMC_STATIC_TERRAIN_APPEARANCE_TRACE_SECTION": "4",
+            "MATTMC_STATIC_TERRAIN_APPEARANCE_TRACE_MESH_KEY": "8f8b94fe68f34da8",
+        }
+        meta_lines.clear()
+        self.assertEqual(
+            runner.fresh_environment_launch_command(["./gradlew", "runClient"]),
+            ["./gradlew", "--no-daemon", "runClient"],
+        )
+        self.assertIn("native_diagnostic_forced_gradle_no_daemon=true", meta_lines)
+        self.assertIn(
+            "native_diagnostic_inputs=MATTMC_STATIC_TERRAIN_APPEARANCE_TRACE_MESH_KEY,MATTMC_STATIC_TERRAIN_APPEARANCE_TRACE_SECTION",
+            meta_lines,
+        )
+
+        runner.env = {}
+        self.assertEqual(
+            runner.fresh_environment_launch_command(["./gradlew", "runClient"]),
+            ["./gradlew", "runClient"],
+        )
+
     def test_renderdoc_workload_proof_checks_outline_and_image_identity(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             capture = Path(temp_dir)
@@ -3190,6 +5631,23 @@ else:
             self.assertTrue(current.exists())
             self.assertFalse(copied.exists())
             self.assertIn(str(copied), result["removed_game_dirs"])
+
+    def test_parent_preserve_marker_protects_nested_capture_rows(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "artifacts"
+            artifact_retention.ensure_marker(root)
+            invocation = root / "capture" / "20260101-000000"
+            nested = invocation / "current-rust-vulkan" / "capture" / "run-01"
+            nested.mkdir(parents=True)
+            write_retention_manifest(nested, success=False)
+            (invocation / ".preserve").write_text("keep\n", encoding="utf-8")
+
+            result = artifact_retention.cleanup(
+                artifact_retention.policy_for("smoke", root, keep_failed=0, global_limit_mb=0)
+            )
+
+            self.assertEqual([], result["removed"])
+            self.assertTrue(nested.exists())
 
     def test_artifact_retention_preflight_free_space_rejection(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -4363,6 +6821,118 @@ else:
             self.assertIn("graphics_backend=vulkan", (game_dir / "options.txt").read_text(encoding="utf-8"))
             self.assertIn("-Dmattmc.dev.rustGalVulkanWholeFrame=true", runner.env["JAVA_TOOL_OPTIONS"])
 
+    def test_capture_runner_preserves_moving_mesh_pose_sequence_with_static_terrain_diagnostics(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            game_dir = root / "game"
+            (game_dir / "config").mkdir(parents=True)
+            (game_dir / "options.txt").write_text("graphics_backend=vulkan\n", encoding="utf-8")
+            (game_dir / "config" / "iris.properties").write_text(
+                "shaderPack=ComplementaryHungLoIfied\n", encoding="utf-8"
+            )
+            config = isolated_capture_config(root, scenario="real-world")
+            config.game_dir = str(game_dir)
+            config.deterministic_static_camera_capture = True
+            config.client_args = "enableShaders=true"
+            runner = capture_runner.CaptureRunner(config)
+            runner.env["JAVA_TOOL_OPTIONS"] = " ".join(
+                [
+                    "-Dmattmc.dev.rustGalWorldMesh.fallingBlockScenario=sand",
+                    "-Dmattmc.dev.deterministicCameraCapture.poseCount=5",
+                    "-Dmattmc.dev.deterministicCameraCapture.framesPerPose=2",
+                ]
+            )
+
+            runner.configure_client_args()
+
+            options = shlex.split(runner.env["JAVA_TOOL_OPTIONS"])
+            self.assertEqual(1, options.count("-Dmattmc.dev.deterministicCameraCapture.poseCount=5"))
+            self.assertNotIn("-Dmattmc.dev.deterministicCameraCapture.poseCount=1", options)
+            self.assertNotIn("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=1", options)
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=2", options)
+
+    def test_capture_runner_preserves_model_part_pose_sequence_with_static_terrain_diagnostics(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            game_dir = root / "game"
+            (game_dir / "config").mkdir(parents=True)
+            (game_dir / "options.txt").write_text("graphics_backend=vulkan\n", encoding="utf-8")
+            (game_dir / "config" / "iris.properties").write_text(
+                "shaderPack=ComplementaryHungLoIfied\n", encoding="utf-8"
+            )
+            config = isolated_capture_config(root, scenario="real-world")
+            config.game_dir = str(game_dir)
+            config.deterministic_static_camera_capture = True
+            config.client_args = "enableShaders=true"
+            runner = capture_runner.CaptureRunner(config)
+            runner.env["JAVA_TOOL_OPTIONS"] = " ".join(
+                [
+                    "-Dmattmc.dev.rustGalWorldMesh.modelScenario=decorated-pot",
+                    "-Dmattmc.dev.deterministicCameraCapture.poseCount=5",
+                    "-Dmattmc.dev.deterministicCameraCapture.framesPerPose=2",
+                ]
+            )
+
+            runner.configure_client_args()
+
+            options = shlex.split(runner.env["JAVA_TOOL_OPTIONS"])
+            self.assertEqual(1, options.count("-Dmattmc.dev.deterministicCameraCapture.poseCount=5"))
+            self.assertNotIn("-Dmattmc.dev.deterministicCameraCapture.poseCount=1", options)
+            self.assertNotIn("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=1", options)
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=2", options)
+
+    def test_deterministic_capture_freezes_temporal_inputs_without_shader_trace(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            game_dir = root / "game"
+            game_dir.mkdir()
+            (game_dir / "options.txt").write_text("graphics_backend=opengl\n", encoding="utf-8")
+            config = capture_runner.CaptureConfig(
+                backend="opengl",
+                shaders="on",
+                max_secs=1,
+                dump_secs=1,
+                client_rss_limit_mb=128,
+                screenshot_interval_secs=0,
+                screenshot_max_count=0,
+                screenshot_start_delay_secs=0,
+                validation_mode="off",
+                shader_input_parity="off",
+                shader_input_parity_max_logs=0,
+                lightmap_info_parity_max_logs=0,
+                skip_tests=True,
+                client_args="",
+                deterministic_camera_capture=True,
+                deterministic_static_camera_capture=False,
+                deterministic_pose_tolerance=0.001,
+                audio_validation=False,
+                capture_meshing_corpus=False,
+                meshing_corpus_output="",
+                meshing_corpus_fixture="all",
+                meshing_corpus_warmup=0,
+                meshing_corpus_measure=0,
+                artifact_dir=str(root / "artifacts"),
+                platform_name="linux",
+                world="Origin",
+                game_dir=str(game_dir),
+                jvm_args=[],
+                gui_resource_pack_scenario="vanilla",
+                world_static_terrain_scenario="",
+                world_static_terrain_second_world="",
+                world_static_terrain_fault="",
+                world_static_terrain_resource_pack_scenario="",
+                world_static_terrain_water_animation_capture=False,
+                region_validation=False,
+                region_validation_copy_world=False,
+                poi_validation=False,
+            )
+            runner = capture_runner.CaptureRunner(config)
+            runner.configure_java_tool_options()
+            options = runner.env["JAVA_TOOL_OPTIONS"]
+            self.assertIn("-Dmattmc.vulkan.deterministicTemporalParity=true", options)
+            self.assertIn("-Dmattmc.vulkan.deterministicTemporalParity.worldTime=6000", options)
+            self.assertNotIn("-Dmattmc.vulkan.traceShaderInputParity=true", options)
+
     def test_rust_vulkan_shell_correctness_capture_is_static_single_pose(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -4423,10 +6993,8 @@ else:
                 gui_resource_pack_scenario="vanilla",
             )
             mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-rust-vulkan-shaders-off")
-            _, env = harness.build_capture_command(target, mode, root / "capture", "correctness", args, "capture")
-            java_options = env["JAVA_TOOL_OPTIONS"]
-            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.poseCount=1", java_options)
-            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.yawDelta=0.0", java_options)
+            command, _ = harness.build_capture_command(target, mode, root / "capture", "correctness", args, "capture")
+            self.assertIn("--deterministic-camera-capture", command)
 
     def test_static_translucent_overlap_capture_keeps_full_camera_sequence(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -4449,7 +7017,11 @@ else:
             _, env = harness.build_capture_command(target, mode, root / "capture", "correctness", args, "capture")
             java_options = env["JAVA_TOOL_OPTIONS"]
             self.assertIn("-Dmattmc.dev.deterministicCameraCapture.poseCount=7", java_options)
-            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=1", java_options)
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=2", java_options)
+            self.assertGreater(
+                java_options.rfind("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=2"),
+                java_options.rfind("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=1"),
+            )
             self.assertGreater(
                 java_options.rfind("-Dmattmc.dev.deterministicCameraCapture.poseCount=7"),
                 java_options.rfind("-Dmattmc.dev.deterministicCameraCapture.poseCount=1"),
@@ -4475,12 +7047,309 @@ else:
             )
             _, env = harness.build_capture_command(target, mode, root / "capture", "correctness", args, "capture")
             self.assertTrue(env["MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_DIR"].endswith("whole_frame_gameplay_attachments"))
+            self.assertTrue(
+                env["MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_REQUEST"].endswith(
+                    "whole_frame_gameplay_attachments/requested-gameplay-frame.properties"
+                )
+            )
+            self.assertEqual("1", env["MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_FINAL_ONLY"])
             self.assertEqual("2", env["MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_MIN_MESH_INSTANCES"])
             java_options = env["JAVA_TOOL_OPTIONS"]
             self.assertIn("-Dmattmc.dev.rustGalWorldMesh.freezePistonProgress=true", java_options)
             self.assertIn("-Dmattmc.dev.rustGalWorldMesh.fallingBlockScenario=sand", java_options)
             self.assertIn("-Dmattmc.dev.rustGalWorldMesh.pistonScenario=normal-extending", java_options)
             self.assertIn("-Dmattmc.dev.deterministicCameraCapture.poseCount=12", java_options)
+            self.assertNotIn(
+                "-Dmattmc.dev.deterministicCameraCapture.poseCount=1",
+                shlex.split(java_options),
+            )
+
+    def test_full_gameplay_attachment_flag_requests_complete_dump(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            target = fake_repo(root, "current")
+            mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-rust-vulkan-shaders-on")
+            args = harness.parse_args(
+                [
+                    "capture",
+                    "--profile",
+                    "standard",
+                    "--mode",
+                    mode.name,
+                    "--world-mesh-falling-block-scenario",
+                    "sand",
+                    "--rust-full-gameplay-attachments",
+                ]
+            )
+            _, env = harness.build_capture_command(target, mode, root / "capture", "correctness", args, "capture")
+            self.assertEqual("0", env["MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_FINAL_ONLY"])
+
+    def test_static_terrain_readiness_does_not_collapse_falling_mesh_capture_sequence(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            target = fake_repo(root, "current")
+            mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-rust-vulkan-shaders-on")
+            args = harness.parse_args(
+                [
+                    "capture",
+                    "--profile",
+                    "standard",
+                    "--mode",
+                    mode.name,
+                    "--world-static-terrain-scenario",
+                    "real-world",
+                    "--world-mesh-falling-block-scenario",
+                    "sand",
+                    "--rust-selected-source-execution",
+                ]
+            )
+            _, env = harness.build_capture_command(target, mode, root / "capture", "correctness", args, "capture")
+            java_options = shlex.split(env["JAVA_TOOL_OPTIONS"])
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.poseCount=5", java_options)
+            self.assertNotIn("-Dmattmc.dev.deterministicCameraCapture.poseCount=1", java_options)
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=2", java_options)
+            self.assertIn(
+                "-Dmattmc.dev.deterministicCameraCapture.rustFinalOutputEveryPose=true",
+                java_options,
+            )
+
+    def test_static_terrain_readiness_does_not_collapse_arrow_mesh_capture_sequence(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            target = fake_repo(root, "current")
+            mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-rust-vulkan-shaders-on")
+            args = harness.parse_args(
+                [
+                    "capture",
+                    "--profile",
+                    "standard",
+                    "--mode",
+                    mode.name,
+                    "--world-static-terrain-scenario",
+                    "real-world",
+                    "--world-mesh-arrow-scenario",
+                    "ordinary",
+                ]
+            )
+            _, env = harness.build_capture_command(target, mode, root / "capture", "correctness", args, "capture")
+            java_options = shlex.split(env["JAVA_TOOL_OPTIONS"])
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.poseCount=5", java_options)
+            self.assertNotIn("-Dmattmc.dev.deterministicCameraCapture.poseCount=1", java_options)
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=2", java_options)
+
+    def test_selected_source_capture_does_not_collapse_model_part_sequence(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            target = fake_repo(root, "current")
+            mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-rust-vulkan-shaders-on")
+            args = harness.parse_args(
+                [
+                    "capture",
+                    "--profile",
+                    "standard",
+                    "--mode",
+                    mode.name,
+                    "--world-static-terrain-scenario",
+                    "real-world",
+                    "--world-mesh-model-scenario",
+                    "decorated-pot",
+                    "--rust-selected-source-execution",
+                ]
+            )
+            _, env = harness.build_capture_command(target, mode, root / "capture", "correctness", args, "capture")
+            java_options = shlex.split(env["JAVA_TOOL_OPTIONS"])
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.poseCount=5", java_options)
+            self.assertNotIn("-Dmattmc.dev.deterministicCameraCapture.poseCount=1", java_options)
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=2", java_options)
+
+    def test_java_vulkan_deterministic_capture_uses_internal_main_target_once(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            target = fake_repo(root, "current")
+            mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-java-vulkan-shaders-off")
+            args = harness.parse_args(
+                [
+                    "capture",
+                    "--profile",
+                    "standard",
+                    "--mode",
+                    mode.name,
+                    "--world-mesh-arrow-scenario",
+                    "ordinary",
+                ]
+            )
+            command, env = harness.build_capture_command(target, mode, root / "capture", "correctness", args, "capture")
+            java_options = shlex.split(env["JAVA_TOOL_OPTIONS"])
+            self.assertIn("--deterministic-camera-capture", command)
+            self.assertEqual(
+                1,
+                java_options.count("-Dmattmc.dev.deterministicCameraCapture.internalScreenshots=true"),
+            )
+
+    def test_opengl_distant_horizons_capture_uses_internal_main_target(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            target = fake_repo(root, "current")
+            mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-opengl-shaders-on")
+            args = harness.parse_args(
+                [
+                    "capture",
+                    "--profile",
+                    "extended",
+                    "--mode",
+                    mode.name,
+                    "--world-distant-horizons-opaque",
+                ]
+            )
+            command, env = harness.build_capture_command(target, mode, root / "capture", "correctness", args, "capture")
+            java_options = shlex.split(env["JAVA_TOOL_OPTIONS"])
+            self.assertIn("--deterministic-camera-capture", command)
+            self.assertEqual(
+                1,
+                java_options.count("-Dmattmc.dev.deterministicCameraCapture.internalScreenshots=true"),
+            )
+
+    def test_selected_source_falling_capture_preserves_multi_frame_sequence(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            target = fake_repo(root, "current")
+            mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-rust-vulkan-shaders-on")
+            args = harness.parse_args(
+                [
+                    "capture",
+                    "--profile",
+                    "standard",
+                    "--mode",
+                    mode.name,
+                    "--world-mesh-falling-block-scenario",
+                    "sand",
+                    "--rust-selected-source-execution",
+                ]
+            )
+            command, env = harness.build_capture_command(target, mode, root / "capture", "correctness", args, "capture")
+            options = env["JAVA_TOOL_OPTIONS"]
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.poseCount=5", options)
+            self.assertNotIn(
+                "-Dmattmc.dev.deterministicCameraCapture.poseCount=1",
+                shlex.split(options),
+            )
+            self.assertIn(
+                "-Dmattmc.dev.deterministicCameraCapture.rustFinalOutputEveryPose=true",
+                options,
+            )
+            self.assertIn("--deterministic-camera-capture", command)
+            self.assertNotIn("--deterministic-static-camera-capture", command)
+            self.assertIn(
+                "-Dmattmc.dev.deterministicCameraCapture.sourceEntityIsolation=true",
+                shlex.split(options),
+            )
+            self.assertEqual("4", env["MATTMC_CAPTURE_RENDER_DISTANCE"])
+            self.assertEqual("5", env["MATTMC_CAPTURE_SIMULATION_DISTANCE"])
+            self.assertNotIn(
+                "-Dmattmc.dev.deterministicCameraCapture.settledReadyFamilies=static-terrain",
+                shlex.split(options),
+            )
+
+    def test_selected_source_stage_diagnostic_keeps_the_real_falling_sequence(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            target = fake_repo(root, "current")
+            mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-rust-vulkan-shaders-on")
+            args = harness.parse_args(
+                [
+                    "capture",
+                    "--profile",
+                    "standard",
+                    "--mode",
+                    mode.name,
+                    "--world-mesh-falling-block-scenario",
+                    "sand",
+                    "--rust-selected-source-execution",
+                ]
+            )
+            with mock.patch.dict(
+                os.environ,
+                {"MATTMC_RUST_SELECTED_SOURCE_CAPTURE_STAGE": "shader-pack-stage:test:primary"},
+                clear=False,
+            ):
+                _, env = harness.build_capture_command(
+                    target, mode, root / "capture", "correctness", args, "capture"
+            )
+            options = shlex.split(env["JAVA_TOOL_OPTIONS"])
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.poseCount=5", options)
+            self.assertNotIn("-Dmattmc.dev.deterministicCameraCapture.poseCount=1", options)
+
+    def test_raw_primed_tnt_jvm_scenario_uses_the_typed_capture_sequence(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            target = fake_repo(root, "current")
+            mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-rust-vulkan-shaders-on")
+            args = harness.parse_args(
+                [
+                    "capture",
+                    "--profile",
+                    "standard",
+                    "--mode",
+                    mode.name,
+                    "--rust-selected-source-execution",
+                    "--jvm-arg=-Dmattmc.dev.rustGalWorldMesh.primedTntScenario=ordinary",
+                ]
+            )
+            command, env = harness.build_capture_command(target, mode, root / "capture", "correctness", args, "capture")
+            options = shlex.split(env["JAVA_TOOL_OPTIONS"])
+
+            self.assertEqual("ordinary", args.world_mesh_primed_tnt_scenario)
+            self.assertIn("--deterministic-camera-capture", command)
+            self.assertNotIn("--deterministic-static-camera-capture", command)
+            self.assertEqual(
+                1,
+                options.count("-Dmattmc.dev.rustGalWorldMesh.primedTntScenario=ordinary"),
+            )
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.poseCount=5", options)
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=2", options)
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.sourceEntityIsolation=true", options)
+
+    def test_rust_vulkan_weather_capture_uses_copied_world_route_and_attachment_dump(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            target = fake_repo(root, "current")
+            mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-rust-vulkan-shaders-on")
+            args = harness.parse_args(
+                [
+                    "capture",
+                    "--profile",
+                    "standard",
+                    "--mode",
+                    mode.name,
+                    "--workload-profile",
+                    "correctness",
+                    "--world-weather-scenario",
+                    "rain",
+                    "--rust-selected-source-execution",
+                ]
+            )
+            command, env = harness.build_capture_command(target, mode, root / "capture", "correctness", args, "capture")
+            java_options = env["JAVA_TOOL_OPTIONS"]
+            self.assertIn("--deterministic-camera-capture", command)
+            self.assertNotIn("-Dmattmc.dev.rustGalWeather.v1=true", java_options)
+            self.assertIn("-Dmattmc.dev.rustGalWeather.scenario=rain", java_options)
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.sourceEntityIsolation=true", java_options)
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=2", java_options)
+            self.assertIn("MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_DIR", env)
+
+    def test_static_terrain_capture_execution_uses_the_captured_submission_without_a_lifecycle(self) -> None:
+        valid, evidence = harness.static_terrain_capture_execution_evidence(
+            {"required": True, "requestSubmission": 270, "requestInstances": 13}, "real-world"
+        )
+        self.assertTrue(valid, evidence)
+        self.assertEqual("captured-submission", evidence)
+
+    def test_static_terrain_lifecycle_capture_still_requires_post_setup_execution(self) -> None:
+        invalid, evidence = harness.static_terrain_capture_execution_evidence(
+            {"required": True, "requestSubmission": 270, "requestInstances": 13}, "texture-palette"
+        )
+        self.assertFalse(invalid)
+        self.assertIn("post-setup Rust execution", evidence)
 
     def test_static_terrain_capture_requests_deterministic_capture_for_gameplay_profile(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -4506,11 +7375,60 @@ else:
             self.assertIn("--deterministic-camera-capture", command)
             self.assertIn("--deterministic-static-camera-capture", command)
             self.assertIn("MATTMC_DETERMINISTIC_METADATA", env)
-            self.assertIn("-Dmattmc.dev.deterministicCameraCapture=true", env["JAVA_TOOL_OPTIONS"])
+            self.assertNotIn("-Dmattmc.dev.deterministicCameraCapture.metadata=", env["JAVA_TOOL_OPTIONS"])
+            self.assertNotIn("-Dmattmc.dev.deterministicCameraCapture.screenshotDir=", env["JAVA_TOOL_OPTIONS"])
             self.assertIn(
                 "-Dmattmc.dev.rustGalStaticTerrain.scenario=translucent-mixed-unsupported",
                 env["JAVA_TOOL_OPTIONS"],
             )
+
+    def test_selected_source_capture_uses_one_settled_pose(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            target = fake_repo(root, "current")
+            mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-rust-vulkan-shaders-on")
+            args = harness.parse_args(
+                [
+                    "capture",
+                    "--profile",
+                    "standard",
+                    "--mode",
+                    mode.name,
+                    "--workload-profile",
+                    "gameplay",
+                    "--world-distant-horizons-opaque",
+                    "--rust-selected-source-execution",
+                ]
+            )
+
+            command, env = harness.build_capture_command(target, mode, root / "capture", "gameplay", args, "capture")
+
+            self.assertIn("--deterministic-camera-capture", command)
+            self.assertIn("--deterministic-static-camera-capture", command)
+            self.assertIn(
+                "-Dmattmc.dev.deterministicCameraCapture.framesPerPose=2",
+                env["JAVA_TOOL_OPTIONS"],
+            )
+
+    def test_static_terrain_capture_rejects_non_rust_vulkan_routes_before_launch(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            target = fake_repo(root, "current")
+            mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-rust-opengl-shaders-on")
+            args = harness.parse_args(
+                [
+                    "capture",
+                    "--profile",
+                    "standard",
+                    "--mode",
+                    mode.name,
+                    "--world-static-terrain-scenario",
+                    "texture-palette",
+                ]
+            )
+
+            with self.assertRaisesRegex(ValueError, "requires current-rust-vulkan"):
+                harness.build_capture_command(target, mode, root / "capture", "correctness", args, "capture")
 
     def test_rust_vulkan_gameplay_timing_does_not_request_attachment_readback(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -4988,6 +7906,77 @@ else:
             self.assertIn("-Dmattmc.dev.directTriggerDiagnostics=true", options)
             self.assertIn("-Dmattmc.dev.deterministicCameraCapture.settledReadyFamilies=sodium-terrain,distant-horizons", options)
 
+            dh = harness.parse_args(
+                ["capture", "--profile", "standard", "--world", "Origin", "--world-distant-horizons-opaque"]
+            )
+            _, dh_env = harness.build_capture_command(
+                target, harness.MATRIX_MODES[0], root / "capture-dh", "correctness", dh, "capture"
+            )
+            dh_options = shlex.split(dh_env["JAVA_TOOL_OPTIONS"])
+            self.assertIn(
+                "-Dmattmc.dev.deterministicCameraCapture.settledReadyFamilies=distant-horizons",
+                dh_options,
+            )
+
+            dh_non_water = harness.parse_args(
+                ["capture", "--profile", "standard", "--world", "Origin", "--world-distant-horizons-non-water"]
+            )
+            _, dh_non_water_env = harness.build_capture_command(
+                target, harness.MATRIX_MODES[0], root / "capture-dh-non-water", "correctness", dh_non_water, "capture"
+            )
+            self.assertEqual("true", dh_non_water_env["MATTMC_CAPTURE_DH_RUST_NON_WATER"])
+            self.assertEqual("false", dh_non_water_env["MATTMC_CAPTURE_DH_RUST_OPAQUE_ONLY"])
+            self.assertIn(
+                "-Dmattmc.dev.rustGalDistantHorizons.requireTransparent=true",
+                shlex.split(dh_non_water_env["JAVA_TOOL_OPTIONS"]),
+            )
+
+            dh_water = harness.parse_args(
+                [
+                    "capture",
+                    "--profile",
+                    "standard",
+                    "--world",
+                    "Origin",
+                    "--world-distant-horizons-opaque",
+                    "--world-distant-horizons-water",
+                ]
+            )
+            _, dh_water_env = harness.build_capture_command(
+                target, harness.MATRIX_MODES[0], root / "capture-dh-water", "correctness", dh_water, "capture"
+            )
+            self.assertEqual("false", dh_water_env["MATTMC_CAPTURE_DH_RUST_OPAQUE_ONLY"])
+            self.assertIn(
+                "-Dmattmc.dev.rustGalDistantHorizons.requireWater=true",
+                shlex.split(dh_water_env["JAVA_TOOL_OPTIONS"]),
+            )
+
+            ordinary_source = harness.parse_args(
+                [
+                    "capture",
+                    "--profile",
+                    "standard",
+                    "--mode",
+                    "current-rust-vulkan-shaders-on",
+                    "--world",
+                    "Origin",
+                    "--rust-selected-source-execution",
+                ]
+            )
+            rust_vulkan = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-rust-vulkan-shaders-on")
+            _, ordinary_source_env = harness.build_capture_command(
+                target, rust_vulkan, root / "capture-ordinary-source", "correctness", ordinary_source, "capture"
+            )
+            ordinary_source_options = shlex.split(ordinary_source_env["JAVA_TOOL_OPTIONS"])
+            self.assertIn(
+                "-Dmattmc.dev.deterministicCameraCapture.settledReadyFamilies=distant-horizons",
+                ordinary_source_options,
+            )
+            self.assertNotIn(
+                "-Dmattmc.dev.deterministicCameraCapture.settledReadyFamilies=sodium-terrain,distant-horizons",
+                ordinary_source_options,
+            )
+
     def test_readiness_state_classifies_affected_world_dh_generation_timeout(self) -> None:
         text = "\n".join(
             [
@@ -5170,6 +8159,18 @@ else:
             self.assertTrue((game_dir / "resourcepacks" / "mattmc-rust-gui-pack-b" / "assets/minecraft/textures/misc/forcefield.png").is_file())
             self.assertTrue((game_dir / "resourcepacks" / "mattmc-rust-gui-pack-b" / "assets/minecraft/textures/block/stone.png").is_file())
             self.assertTrue((game_dir / "resourcepacks" / "mattmc-rust-gui-pack-b" / "assets/minecraft/textures/block/oak_leaves.png").is_file())
+
+    def test_generated_terrain_identity_pack_keeps_each_palette_sprite_distinct(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            pack_dir = Path(temp) / "mattmc-rust-terrain-identity"
+            spec = capture_runner.gui_resource_pack_specs("terrain-identity")[0]
+            capture_runner.write_gui_resource_pack(pack_dir, spec)
+
+            pixels = {}
+            for resource_path in capture_runner.WORLD_STATIC_TERRAIN_IDENTITY_TEXTURES:
+                payload = (pack_dir / resource_path).read_bytes()
+                pixels[resource_path] = payload
+            self.assertEqual(len(pixels), len(set(pixels.values())))
 
     def test_rust_opengl_attribution_is_not_confused_by_vulkanicgal_name(self) -> None:
         mode = harness.ModeSpec("current-opengl-shaders-on", "current", "opengl", "on", "java-opengl", False)
@@ -5797,6 +8798,60 @@ else:
             self.assertTrue(Path(str(regions["background_color_field"]["crop_path"])).is_file())
             self.assertGreater(regions["fixed_gui_sprite_group"]["bright_pixels"], 0)
 
+    def test_selected_source_gui_evidence_requires_the_correlated_rust_final_hud(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            screenshot = root / "source_final.png"
+            write_rust_shell_scene_image(screenshot)
+            from PIL import Image, ImageDraw
+
+            with Image.open(screenshot) as source:
+                hud = source.copy()
+            draw = ImageDraw.Draw(hud)
+            for slot in range(9):
+                left = 365 + slot * 60
+                draw.rectangle((left, 4, left + 54, 62), outline=(0, 0, 0), width=5)
+                draw.rectangle((left + 7, 11, left + 47, 55), fill=(36, 48, 40))
+            hud.save(screenshot)
+            deterministic = {
+                "captures": [
+                    {
+                        "renderedFrameIndex": 7,
+                        "captureMethod": "rust-vulkan-final-output",
+                        "targetWindow": "rust-vulkan-final-output",
+                        "screenshot": str(screenshot),
+                    }
+                ]
+            }
+            shell_evidence = harness.deterministic_rust_vulkan_shell_scene_evidence(
+                deterministic,
+                None,
+                None,
+            )
+            correlation = {
+                "gameplay_frame_id": 211,
+                "gal_submission_id": 249,
+                "deterministic_rendered_frame_index": 7,
+                "gui_sprites": 3,
+            }
+            evidence = harness.selected_source_gui_final_evidence(
+                deterministic,
+                correlation,
+                True,
+                shell_evidence,
+            )
+            self.assertEqual("visible", evidence["status"])
+            self.assertGreaterEqual(evidence["dark_hud_pixels"], evidence["minimum_dark_hud_pixels"])
+
+            correlation["deterministic_rendered_frame_index"] = 8
+            uncorrelated = harness.selected_source_gui_final_evidence(
+                deterministic,
+                correlation,
+                True,
+                shell_evidence,
+            )
+            self.assertEqual("missing_correlated_rust_final_capture", uncorrelated["status"])
+
     def test_hidden_world_border_capture_rejects_visible_pixels(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -5948,7 +9003,7 @@ else:
             captures = []
             for index, pose_name in enumerate(("playing", "paused", "unpaused"), start=1):
                 screenshot = screenshot_dir / f"{index:02d}_{pose_name}.png"
-                screenshot.write_bytes(b"not-a-real-image")
+                write_world_border_probe_image(screenshot, visible=True)
                 captures.append(
                     {
                         "index": index,
@@ -6000,7 +9055,7 @@ else:
             for index in range(5):
                 pose_name = f"falling-{index:02d}"
                 screenshot = screenshot_dir / f"{index + 1:02d}_{pose_name}.png"
-                screenshot.write_bytes(b"not-a-real-image")
+                write_falling_block_probe_image(screenshot)
                 captures.append(
                     {
                         "index": index + 1,
@@ -6042,6 +9097,57 @@ else:
             )
 
             capture_runner.validate_deterministic_metadata(metadata, screenshot_dir, 0.001)
+
+    def test_capture_runner_rejects_blank_deterministic_screenshot(self) -> None:
+        from PIL import Image
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            screenshot_dir = root / "screens"
+            screenshot_dir.mkdir()
+            screenshot = screenshot_dir / "01_initial.png"
+            Image.new("RGB", (1280, 720), (0, 0, 0)).save(screenshot)
+            metadata = root / "deterministic.json"
+            metadata.write_text(
+                json.dumps(
+                    {
+                        "status": "complete",
+                        "backend": "opengl",
+                        "shaderEnabled": False,
+                        "shaderPack": "unset",
+                        "gitCommit": "abc123",
+                        "dimension": "minecraft:overworld",
+                        "yawDelta": 0.0,
+                        "initialPose": {"name": "initial", "yaw": 12.0, "pitch": 5.0},
+                        "initialPosition": {"x": 1.0, "y": 80.0, "z": 2.0},
+                        "window": {"width": 1280, "height": 720},
+                        "poseSequence": ["initial"],
+                        "captures": [
+                            {
+                                "index": 1,
+                                "poseName": "initial",
+                                "screenshot": str(screenshot),
+                                "backend": "opengl",
+                                "shaderEnabled": False,
+                                "shaderPack": "unset",
+                                "gitCommit": "abc123",
+                                "window": {"width": 1280, "height": 720},
+                                "dimension": "minecraft:overworld",
+                                "position": {"x": 1.0, "y": 80.0, "z": 2.0},
+                                "requestedYaw": 12.0,
+                                "requestedPitch": 5.0,
+                                "observedYaw": 12.0,
+                                "observedPitch": 5.0,
+                                "renderedFrameIndex": 8,
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(RuntimeError, "screenshot is blank"):
+                capture_runner.validate_deterministic_metadata(metadata, screenshot_dir, 0.001)
 
     def test_java_vulkan_world_outline_capture_uses_java_route_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

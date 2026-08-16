@@ -20,7 +20,15 @@ use super::frame::{
     PresentMode,
 };
 use super::gal::VulkanicGal;
-use super::gui_frontend::{GuiAssetPayload, GuiFrontend, GuiSpriteRequest, GuiSubmitStats};
+use super::gui_frontend::{
+    GuiAffineQuadRequest, GuiAssetPayload, GuiFrontend, GuiRawImageAssetPayload, GuiRawImageFormat,
+    GuiSpriteRequest, GuiSubmitStats,
+};
+use super::gui_mesh_frontend::{
+    validate_batch as validate_gui_mesh_batch, validate_batches as validate_gui_mesh_batches,
+    GuiMeshBatchRequest, GuiMeshLightingMode, GuiMeshMaterialMode, GuiMeshVertex,
+    GUI_MESH_MAX_BATCHES, GUI_MESH_MAX_INDICES, GUI_MESH_MAX_VERTICES,
+};
 use super::handles::{Handle, HandleKind};
 use super::metrics::Metrics;
 use super::resources::{
@@ -36,18 +44,21 @@ use super::resources::{
 use super::sync::SubmissionId;
 use super::world_primitive_frontend::{
     WorldBackgroundRequest, WorldBorderAssetPayload, WorldBorderQuadRequest,
-    WorldCrackAssetPayload, WorldCrackQuadRequest, WorldLineSegmentRequest,
-    WorldMaterialAssetPayload, WorldMaterialQuadRequest, WorldMeshAsset, WorldMeshInstanceRequest,
-    WorldMeshSection, WorldMeshSortedIndexUpdate, WorldMeshTextureAssetPayload, WorldMeshVertex,
-    WorldPrimitiveFrame, WorldPrimitiveFrontend, WorldPrimitiveSubmitStats,
-    WORLD_BACKGROUND_LOAD_CLEAR, WORLD_BACKGROUND_SKY_CUSTOM, WORLD_BACKGROUND_SKY_END,
-    WORLD_BACKGROUND_SKY_NETHER, WORLD_BACKGROUND_SKY_OVERWORLD, WORLD_BACKGROUND_STORE_STORE,
-    WORLD_CULL_BACK, WORLD_CULL_FRONT, WORLD_CULL_NONE, WORLD_DEPTH_POLICY_DISABLED,
+    WorldCrackAssetPayload, WorldCrackQuadRequest, WorldLineSegmentRequest, WorldLodColumnAsset,
+    WorldLodColumnInstanceRequest, WorldLodColumnMaterialProvenance, WorldLodColumnRetirement,
+    WorldLodFaceMaterial, WorldLodMaterialIdentity, WorldLodSegment,
+    WorldLodSegmentMaterialProvenance, WorldLodVertex, WorldMaterialAssetPayload,
+    WorldMaterialQuadRequest, WorldMeshAsset, WorldMeshInstanceRequest, WorldMeshSection,
+    WorldMeshSortedIndexUpdate, WorldMeshTextureAssetPayload, WorldMeshVertex, WorldPrimitiveFrame,
+    WorldPrimitiveFrontend, WorldPrimitiveSubmitStats, WORLD_BACKGROUND_LOAD_CLEAR,
+    WORLD_BACKGROUND_SKY_CUSTOM, WORLD_BACKGROUND_SKY_END, WORLD_BACKGROUND_SKY_NETHER,
+    WORLD_BACKGROUND_SKY_OVERWORLD, WORLD_BACKGROUND_STORE_STORE, WORLD_CULL_BACK,
+    WORLD_CULL_FRONT, WORLD_CULL_NONE, WORLD_DEPTH_POLICY_DISABLED,
     WORLD_DEPTH_POLICY_TEST_NO_WRITE, WORLD_DEPTH_POLICY_TEST_WRITE,
-    WORLD_MATERIAL_ID_OPAQUE_TEXTURED, WORLD_MATERIAL_MODE_CUTOUT, WORLD_MATERIAL_MODE_OPAQUE,
-    WORLD_MATERIAL_MODE_TRANSLUCENT, WORLD_STRATUM_MOVING_MESH,
-    WORLD_STRATUM_OPAQUE_TEXTURED_GEOMETRY, WORLD_STRATUM_TERRAIN, WORLD_TOPOLOGY_TRIANGLES,
-    WORLD_WINDING_CCW, WORLD_WINDING_CW,
+    WORLD_LOD_MAX_MATERIAL_IDENTITIES_PER_COLUMN, WORLD_MATERIAL_ID_OPAQUE_TEXTURED,
+    WORLD_MATERIAL_MODE_CUTOUT, WORLD_MATERIAL_MODE_OPAQUE, WORLD_MATERIAL_MODE_TRANSLUCENT,
+    WORLD_STRATUM_ENTITY_MESH, WORLD_STRATUM_MOVING_MESH, WORLD_STRATUM_OPAQUE_TEXTURED_GEOMETRY,
+    WORLD_STRATUM_TERRAIN, WORLD_TOPOLOGY_TRIANGLES, WORLD_WINDING_CCW, WORLD_WINDING_CW,
 };
 
 pub(crate) mod abi;

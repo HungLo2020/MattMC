@@ -147,7 +147,8 @@ public class LodRenderSection implements IDebugRenderable, AutoCloseable
 	/** @return true if the upload started, false if it wasn't able to for any reason */
 	public synchronized boolean uploadRenderDataToGpuAsync()
 	{
-		if (!GLProxy.hasInstance())
+		if (!GLProxy.hasInstance()
+			&& !net.vulkanic.world.DistantHorizonsSemanticCollector.usesRustWholeFrameSemanticBuild())
 		{
 			// it's possible to try uploading buffers before the GLProxy has been initialized
 			// which would cause the system to crash
@@ -159,6 +160,7 @@ public class LodRenderSection implements IDebugRenderable, AutoCloseable
 			// don't accidentally queue multiple uploads at the same time
 			return false;
 		}
+		net.vulkanic.world.DistantHorizonsSemanticCollector.recordSemanticBuildAttempt(this.pos);
 		
 		PriorityTaskPicker.Executor executor = ThreadPoolUtil.getRenderLoadingExecutor();
 		if (executor == null || executor.isTerminated())
@@ -397,7 +399,12 @@ public class LodRenderSection implements IDebugRenderable, AutoCloseable
 	//====================//
 	//region enabling rendering
 	
-	public boolean canRender() { return this.bufferContainer != null; }
+	public boolean canRender()
+	{
+		return this.bufferContainer != null
+			|| (net.vulkanic.world.DistantHorizonsSemanticCollector.usesRustWholeFrameSemanticBuild()
+				&& net.vulkanic.world.DistantHorizonsSemanticCollector.hasColumn(this.pos));
+	}
 	
 	public boolean getRenderingEnabled() { return this.renderingEnabled; }
 	/**

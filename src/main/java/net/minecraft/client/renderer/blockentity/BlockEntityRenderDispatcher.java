@@ -98,11 +98,35 @@ public class BlockEntityRenderDispatcher implements ResourceManagerReloadListene
 	public <S extends BlockEntityRenderState> void submit(
 		S blockEntityRenderState, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, CameraRenderState cameraRenderState
 	) {
+		this.submitInternal(blockEntityRenderState, poseStack, submitNodeCollector, cameraRenderState, true);
+	}
+
+	/**
+	 * Collects producer semantics without entering Iris render tracking. This
+	 * is used by the Rust whole-frame coverage inventory only; it never draws.
+	 */
+	public <S extends BlockEntityRenderState> void submitSemantic(
+		S blockEntityRenderState, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, CameraRenderState cameraRenderState
+	) {
+		this.submitInternal(blockEntityRenderState, poseStack, submitNodeCollector, cameraRenderState, false);
+	}
+
+	private <S extends BlockEntityRenderState> void submitInternal(
+		S blockEntityRenderState,
+		PoseStack poseStack,
+		SubmitNodeCollector submitNodeCollector,
+		CameraRenderState cameraRenderState,
+		boolean captureIrisRenderState
+	) {
 		BlockEntityRenderer<?, S> blockEntityRenderer = this.getRenderer(blockEntityRenderState);
 		if (blockEntityRenderer != null) {
 			// Iris: From MixinBlockEntityRenderDispatcher - begin entity render tracking
-			it.unimi.dsi.fastutil.objects.Object2IntMap<net.minecraft.world.level.block.state.BlockState> blockStateIds = net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getBlockStateIds();
-			net.irisshaders.iris.vertices.ImmediateState.isRenderingBEs = true;
+			it.unimi.dsi.fastutil.objects.Object2IntMap<net.minecraft.world.level.block.state.BlockState> blockStateIds = captureIrisRenderState
+				? net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getBlockStateIds()
+				: null;
+			if (captureIrisRenderState) {
+				net.irisshaders.iris.vertices.ImmediateState.isRenderingBEs = true;
+			}
 			if (blockStateIds != null && net.irisshaders.iris.vertices.ImmediateState.isRenderingLevel) {
 				int intId = blockStateIds.applyAsInt(blockEntityRenderState.blockState);
 				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentBlockEntity(intId);
@@ -117,8 +141,10 @@ public class BlockEntityRenderDispatcher implements ResourceManagerReloadListene
 				throw new ReportedException(crashReport);
 			} finally {
 				// Iris: From MixinBlockEntityRenderDispatcher - end entity render tracking
-				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentBlockEntity(0);
-				net.irisshaders.iris.vertices.ImmediateState.isRenderingBEs = false;
+				if (captureIrisRenderState) {
+					net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentBlockEntity(0);
+					net.irisshaders.iris.vertices.ImmediateState.isRenderingBEs = false;
+				}
 			}
 		}
 	}

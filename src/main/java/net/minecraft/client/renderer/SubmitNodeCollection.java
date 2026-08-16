@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
+import net.minecraft.core.BlockPos;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.model.Model;
@@ -21,6 +22,7 @@ import net.minecraft.client.renderer.feature.NameTagFeatureRenderer;
 import net.minecraft.client.renderer.item.ItemStackRenderState;
 import net.minecraft.client.renderer.state.CameraRenderState;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.world.item.ItemDisplayContext;
@@ -85,11 +87,28 @@ public class SubmitNodeCollection implements OrderedSubmitNodeCollector, Ordered
 	public void submitText(
 		PoseStack poseStack, float f, float g, FormattedCharSequence formattedCharSequence, boolean bl, Font.DisplayMode displayMode, int i, int j, int k, int l
 	) {
-		this.wasUsed = true;
-		SubmitNodeStorage.TextSubmit textSubmit = new SubmitNodeStorage.TextSubmit(new Matrix4f(poseStack.last().pose()), f, g, formattedCharSequence, bl, displayMode, i, j, k, l);
+		SubmitNodeStorage.TextSubmit textSubmit = this.copyTextSubmit(poseStack, f, g, formattedCharSequence, bl, displayMode, i, j, k, l);
 		// Iris: Capture model storage (merged from MixinModelStorageTrigger)
 		((net.irisshaders.iris.mixinterface.ModelStorage) textSubmit).iris$capture();
 		this.textSubmits.add(textSubmit);
+	}
+
+	/**
+	 * Stores copied text semantics from a whole-frame extraction callback. The
+	 * selected Rust route must not capture Iris model state because it neither
+	 * borrows Iris programs nor invokes the Java text renderer.
+	 */
+	public void submitTextSemantic(
+		PoseStack poseStack, float f, float g, FormattedCharSequence formattedCharSequence, boolean bl, Font.DisplayMode displayMode, int i, int j, int k, int l
+	) {
+		this.textSubmits.add(this.copyTextSubmit(poseStack, f, g, formattedCharSequence, bl, displayMode, i, j, k, l));
+	}
+
+	private SubmitNodeStorage.TextSubmit copyTextSubmit(
+		PoseStack poseStack, float f, float g, FormattedCharSequence formattedCharSequence, boolean bl, Font.DisplayMode displayMode, int i, int j, int k, int l
+	) {
+		this.wasUsed = true;
+		return new SubmitNodeStorage.TextSubmit(new Matrix4f(poseStack.last().pose()), f, g, formattedCharSequence, bl, displayMode, i, j, k, l);
 	}
 
 	@Override
@@ -117,6 +136,29 @@ public class SubmitNodeCollection implements OrderedSubmitNodeCollector, Ordered
 		int l,
 		@Nullable ModelFeatureRenderer.CrumblingOverlay crumblingOverlay
 	) {
+		boolean rustEligible = net.vulkanic.world.RustGalWorldPrimitiveRenderer.isModelMeshEligible(
+			model, renderType, textureAtlasSprite, j, l, crumblingOverlay
+		);
+		net.vulkanic.world.WorldRenderRoutePolicy.Route rustRoute =
+			net.vulkanic.world.WorldRenderRoutePolicy.currentModelMeshRoute(rustEligible);
+		if (rustRoute.usesRustWholeFrameVulkan()) {
+			if (!net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueModelMesh(
+				model, object, poseStack.last(), renderType, textureAtlasSprite, i, j, k
+			)) {
+				throw new IllegalStateException("Rust whole-frame model route selected without a copied indexed mesh request");
+			}
+			net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
+				"rust-vulkan-whole-frame", textureAtlasSprite.contents().name(), model.getClass().getName(), true, true, false
+			);
+			return;
+		}
+		if (rustEligible) {
+			net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
+				rustRoute == net.vulkanic.world.WorldRenderRoutePolicy.Route.DISABLED ? "disabled" : "java-legacy",
+				textureAtlasSprite.contents().name(), model.getClass().getName(), false, false,
+				rustRoute.usesJavaCompatibility()
+			);
+		}
 		// Iris: Change render type if rendering block entities (merged from MixinModelStorageTrigger)
 		if (net.irisshaders.iris.vertices.ImmediateState.isRenderingBEs) {
 			renderType = net.irisshaders.iris.layer.OuterWrappedRenderType.wrapExactlyOnce("iris:block_entity", renderType, net.irisshaders.iris.layer.BlockEntityRenderStateShard.INSTANCE);
@@ -145,6 +187,35 @@ public class SubmitNodeCollection implements OrderedSubmitNodeCollector, Ordered
 		@Nullable ModelFeatureRenderer.CrumblingOverlay crumblingOverlay,
 		int l
 	) {
+		String rustEligibility = net.vulkanic.world.RustGalWorldPrimitiveRenderer.modelPartMeshEligibilityReason(
+			modelPart, renderType, textureAtlasSprite, j, bl, bl2, k, crumblingOverlay
+		);
+		boolean rustEligible = "eligible".equals(rustEligibility);
+		net.vulkanic.world.WorldRenderRoutePolicy.Route rustRoute =
+			net.vulkanic.world.WorldRenderRoutePolicy.currentModelPartMeshRoute(rustEligible);
+		net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelPartMeshTraversal(
+			rustRoute.name().toLowerCase(java.util.Locale.ROOT),
+			rustEligibility,
+			textureAtlasSprite == null ? null : textureAtlasSprite.contents().name(),
+			renderType == null ? null : renderType.toString()
+		);
+		if (rustRoute.usesRustWholeFrameVulkan()) {
+			if (!net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueModelPartMesh(
+				modelPart, poseStack.last(), renderType, textureAtlasSprite, i, j, bl, bl2, l, crumblingOverlay, k
+			)) {
+				throw new IllegalStateException("Rust whole-frame ModelPart route selected without a copied indexed mesh request");
+			}
+			net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
+				"rust-vulkan-whole-frame", textureAtlasSprite.contents().name(), modelPart.getClass().getName(), true, true, false
+			);
+			return;
+		}
+		if (rustEligible) {
+			net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
+				rustRoute == net.vulkanic.world.WorldRenderRoutePolicy.Route.DISABLED ? "disabled" : "java-legacy",
+				textureAtlasSprite.contents().name(), modelPart.getClass().getName(), false, false, rustRoute.usesJavaCompatibility()
+			);
+		}
 		this.wasUsed = true;
 		SubmitNodeStorage.ModelPartSubmit modelPartSubmit = new SubmitNodeStorage.ModelPartSubmit(poseStack.last().copy(), modelPart, i, j, textureAtlasSprite, bl, bl2, k, crumblingOverlay, l);
 		// Iris: Capture model storage (merged from MixinModelStorageTrigger)
@@ -155,15 +226,28 @@ public class SubmitNodeCollection implements OrderedSubmitNodeCollector, Ordered
 	@Override
 	public void submitBlock(PoseStack poseStack, BlockState blockState, int i, int j, int k) {
 		this.wasUsed = true;
-		this.blockSubmits.add(new SubmitNodeStorage.BlockSubmit(poseStack.last().copy(), blockState, i, j, k, SubmitNodeStorage.BlockSubmitSource.ORDINARY));
+		this.blockSubmits.add(new SubmitNodeStorage.BlockSubmit(poseStack.last().copy(), blockState, i, j, k, SubmitNodeStorage.BlockSubmitSource.ORDINARY, BlockPos.ZERO));
 		((SpecialBlockModelRenderer)Minecraft.getInstance().getModelManager().specialBlockModelRenderer().get())
 			.renderByBlock(blockState.getBlock(), ItemDisplayContext.NONE, poseStack, this.submitNodeStorage, i, j, k);
 	}
 
 	@Override
 	public void submitBlockDisplay(PoseStack poseStack, BlockState blockState, int i, int j, int k) {
+		this.submitBlockDisplay(poseStack, blockState, i, j, k, BlockPos.ZERO);
+	}
+
+	@Override
+	public void submitBlockDisplay(PoseStack poseStack, BlockState blockState, int i, int j, int k, BlockPos tintPos) {
 		this.wasUsed = true;
-		this.blockSubmits.add(new SubmitNodeStorage.BlockSubmit(poseStack.last().copy(), blockState, i, j, k, SubmitNodeStorage.BlockSubmitSource.BLOCK_DISPLAY));
+		this.blockSubmits.add(new SubmitNodeStorage.BlockSubmit(poseStack.last().copy(), blockState, i, j, k, SubmitNodeStorage.BlockSubmitSource.BLOCK_DISPLAY, tintPos));
+		((SpecialBlockModelRenderer)Minecraft.getInstance().getModelManager().specialBlockModelRenderer().get())
+			.renderByBlock(blockState.getBlock(), ItemDisplayContext.NONE, poseStack, this.submitNodeStorage, i, j, k);
+	}
+
+	@Override
+	public void submitPrimedTntBlock(PoseStack poseStack, BlockState blockState, int i, int j, int k) {
+		this.wasUsed = true;
+		this.blockSubmits.add(new SubmitNodeStorage.BlockSubmit(poseStack.last().copy(), blockState, i, j, k, SubmitNodeStorage.BlockSubmitSource.PRIMED_TNT, BlockPos.ZERO));
 		((SpecialBlockModelRenderer)Minecraft.getInstance().getModelManager().specialBlockModelRenderer().get())
 			.renderByBlock(blockState.getBlock(), ItemDisplayContext.NONE, poseStack, this.submitNodeStorage, i, j, k);
 	}
@@ -197,6 +281,29 @@ public class SubmitNodeCollection implements OrderedSubmitNodeCollector, Ordered
 		RenderType renderType,
 		ItemStackRenderState.FoilType foilType
 	) {
+		if (net.vulkanic.world.RustGalWorldPrimitiveRenderer.isItemEntitySubmissionActive()) {
+			String itemEntityIneligibility = net.vulkanic.world.RustGalWorldPrimitiveRenderer.itemEntityMeshIneligibility(
+				itemDisplayContext, i, j, k, is, list, renderType, foilType
+			);
+			boolean rustEligible = itemEntityIneligibility == null;
+			net.vulkanic.world.WorldRenderRoutePolicy.Route rustRoute =
+				net.vulkanic.world.WorldRenderRoutePolicy.currentItemEntityMeshRoute(rustEligible);
+			if (rustRoute.usesRustWholeFrameVulkan()) {
+				boolean rustQueued = net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueItemEntityMesh(
+					poseStack.last(), itemDisplayContext, i, j, k, is, list, renderType, foilType
+				);
+				net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordItemEntityRouteDecision(
+					rustRoute.name().toLowerCase(java.util.Locale.ROOT).replace('_', '-'), true, null, true, rustQueued, false
+				);
+				if (!rustQueued) {
+					throw new IllegalStateException("Rust whole-frame item-entity route selected without a copied indexed mesh request");
+				}
+				return;
+			}
+			net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordItemEntityRouteDecision(
+				rustRoute.name().toLowerCase(java.util.Locale.ROOT).replace('_', '-'), rustEligible, itemEntityIneligibility, false, false, true
+			);
+		}
 		this.wasUsed = true;
 		SubmitNodeStorage.ItemSubmit itemSubmit = new SubmitNodeStorage.ItemSubmit(poseStack.last().copy(), itemDisplayContext, i, j, k, is, list, renderType, foilType);
 		// Iris: Capture model storage (merged from MixinModelStorageTrigger)
@@ -277,6 +384,35 @@ public class SubmitNodeCollection implements OrderedSubmitNodeCollector, Ordered
 		return this.customGeometrySubmits;
 	}
 
+	/**
+	 * A copied inventory of feature work collected during this frame. The Rust
+	 * whole-frame route uses this only to make unported producer families
+	 * explicit before presentation; no renderer object crosses this boundary.
+	 */
+	public WorldFeatureCoverageSnapshot worldFeatureCoverageSnapshot() {
+		int ordinaryBlockSubmits = 0;
+		for (SubmitNodeStorage.BlockSubmit submit : this.blockSubmits) {
+			if (submit.source() == SubmitNodeStorage.BlockSubmitSource.ORDINARY) {
+				ordinaryBlockSubmits++;
+			}
+		}
+		return new WorldFeatureCoverageSnapshot(
+			this.modelSubmits.totalSubmitCount(),
+			this.modelPartSubmits.totalSubmitCount(),
+			this.blockModelSubmits.size(),
+			ordinaryBlockSubmits,
+			this.itemSubmits.size() + this.meshItemCommands.size(),
+			this.customGeometrySubmits.totalSubmitCount(),
+			this.shadowSubmits.size(),
+			this.flameSubmits.size(),
+			this.nameTagSubmits.totalSubmitCount(),
+			this.textSubmits.size(),
+			this.hitboxSubmits.size(),
+			this.leashSubmits.size(),
+			this.particleGroupRenderers.size()
+		);
+	}
+
 	public boolean wasUsed() {
 		return this.wasUsed;
 	}
@@ -321,5 +457,59 @@ public class SubmitNodeCollection implements OrderedSubmitNodeCollector, Ordered
 		this.modelPartSubmits.endFrame();
 		this.customGeometrySubmits.endFrame();
 		this.wasUsed = false;
+	}
+
+	@Environment(EnvType.CLIENT)
+	public record WorldFeatureCoverageSnapshot(
+		int modelSubmits,
+		int modelPartSubmits,
+		int blockModelSubmits,
+		int ordinaryBlockSubmits,
+		int itemSubmits,
+		int customGeometrySubmits,
+		int shadowSubmits,
+		int flameSubmits,
+		int nameTagSubmits,
+		int textSubmits,
+		int hitboxSubmits,
+		int leashSubmits,
+		int particleGroupSubmits
+	) {
+		public WorldFeatureCoverageSnapshot plus(WorldFeatureCoverageSnapshot other) {
+			if (other == null) {
+				return this;
+			}
+			return new WorldFeatureCoverageSnapshot(
+				this.modelSubmits + other.modelSubmits,
+				this.modelPartSubmits + other.modelPartSubmits,
+				this.blockModelSubmits + other.blockModelSubmits,
+				this.ordinaryBlockSubmits + other.ordinaryBlockSubmits,
+				this.itemSubmits + other.itemSubmits,
+				this.customGeometrySubmits + other.customGeometrySubmits,
+				this.shadowSubmits + other.shadowSubmits,
+				this.flameSubmits + other.flameSubmits,
+				this.nameTagSubmits + other.nameTagSubmits,
+				this.textSubmits + other.textSubmits,
+				this.hitboxSubmits + other.hitboxSubmits,
+				this.leashSubmits + other.leashSubmits,
+				this.particleGroupSubmits + other.particleGroupSubmits
+			);
+		}
+
+		public boolean hasUnsupportedRustWholeFrameWork() {
+			return modelSubmits != 0
+				|| modelPartSubmits != 0
+				|| blockModelSubmits != 0
+				|| ordinaryBlockSubmits != 0
+				|| itemSubmits != 0
+				|| customGeometrySubmits != 0
+				|| shadowSubmits != 0
+				|| flameSubmits != 0
+				|| nameTagSubmits != 0
+				|| textSubmits != 0
+				|| hitboxSubmits != 0
+				|| leashSubmits != 0
+				|| particleGroupSubmits != 0;
+		}
 	}
 }

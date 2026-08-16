@@ -7,9 +7,11 @@ import net.blaze3d.font.GlyphInfo;
 import net.blaze3d.vertex.VertexConsumer;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.StringSplitter;
+import net.minecraft.client.gui.font.TextGlyphQuad;
 import net.minecraft.client.gui.font.TextRenderable;
 import net.minecraft.client.gui.font.glyphs.BakedGlyph;
 import net.minecraft.client.gui.font.glyphs.EffectGlyph;
@@ -237,8 +239,15 @@ public class Font {
 	public interface PreparedText {
 		void visit(Font.GlyphVisitor glyphVisitor);
 
+		Font.SemanticTextExtraction collectSemanticQuads(Consumer<TextGlyphQuad> consumer);
+
 		@Nullable
 		ScreenRectangle bounds();
+	}
+
+	/** Ordered CPU-only text extraction diagnostics for future Rust admission. */
+	@Environment(EnvType.CLIENT)
+	public record SemanticTextExtraction(int renderableCount, int quadCount, int unsupportedRenderableCount) {
 	}
 
 	@Environment(EnvType.CLIENT)
@@ -356,6 +365,46 @@ public class Font {
 					glyphVisitor.acceptEffect(textRenderable);
 				}
 			}
+		}
+
+		@Override
+		public Font.SemanticTextExtraction collectSemanticQuads(Consumer<TextGlyphQuad> consumer) {
+			int i = 0;
+			int j = 0;
+			int k = 0;
+			if (ARGB.alpha(this.backgroundColor) != 0) {
+				TextRenderable textRenderable = Font.this.provider
+					.effect()
+					.createEffect(this.backgroundLeft, this.backgroundTop, this.backgroundRight, this.backgroundBottom, -0.01F, this.backgroundColor, 0, 0.0F);
+				i++;
+				int l = textRenderable.collectSemanticQuads(consumer);
+				j += l;
+				if (l == 0) {
+					k++;
+				}
+			}
+
+			for (TextRenderable textRenderable : this.glyphs) {
+				i++;
+				int l = textRenderable.collectSemanticQuads(consumer);
+				j += l;
+				if (l == 0) {
+					k++;
+				}
+			}
+
+			if (this.effects != null) {
+				for (TextRenderable textRenderable : this.effects) {
+					i++;
+					int l = textRenderable.collectSemanticQuads(consumer);
+					j += l;
+					if (l == 0) {
+						k++;
+					}
+				}
+			}
+
+			return new Font.SemanticTextExtraction(i, j, k);
 		}
 
 		private int getTextColor(@Nullable TextColor textColor) {

@@ -1,11 +1,21 @@
 pub mod assets;
+pub mod cloud_contract;
+pub mod custom_uniform_policy;
 pub mod diagnostics;
 pub mod dialect;
+pub mod distant_horizons_contract;
+pub mod entity_contract;
+pub mod entity_id_map;
+pub(crate) mod fullscreen;
+pub mod fullscreen_contract;
+pub mod hand_contract;
 pub mod held_light_policy;
 pub mod interface;
 pub mod item_id_map;
+pub mod lightmap;
 pub mod lowering;
 pub mod manifest;
+pub mod material_contract;
 pub mod pass_graph;
 pub mod preprocess;
 pub mod programs;
@@ -13,6 +23,7 @@ pub mod resources;
 pub(crate) mod runtime;
 pub mod shadow_policy;
 pub mod source;
+pub mod source_targets;
 // The source-selected route is intentionally production-disabled until every
 // semantic terrain resource is owned and validated. Keep its private resource
 // cache compiled and unit-tested without presenting it as an active route.
@@ -27,14 +38,16 @@ pub mod uniforms;
 pub mod voxel_emission_table;
 pub mod voxel_light_volume;
 pub mod voxel_material_map;
+pub mod weather_contract;
+pub mod wetness_policy;
 
 #[cfg(test)]
 mod tests {
     use super::manifest::ShaderPackConfig;
     use super::manifest::ShaderPackManifest;
     use super::pass_graph::{
-        builtin_terrain_material_pass_graph, AttachmentRole, LoadIntent, PassGraph, PassIdentity,
-        ShaderPassDesc, StoreIntent,
+        builtin_terrain_material_pass_graph, distant_horizons_opaque_pass_graph, AttachmentRole,
+        LoadIntent, PassGraph, PassIdentity, ShaderPassDesc, StoreIntent,
     };
     use super::preprocess::{preprocess, PreprocessInput};
     use super::programs::{
@@ -207,6 +220,18 @@ mod tests {
     }
 
     #[test]
+    fn distant_horizons_graph_keeps_distant_depth_out_of_near_terrain_targets() {
+        let graph =
+            distant_horizons_opaque_pass_graph(ProgramIdentity::new("pack:dh_terrain")).unwrap();
+        assert_eq!(1, graph.passes().len());
+        assert_eq!(
+            vec![AttachmentRole::ShaderPackPrimaryColor],
+            graph.passes()[0].colors
+        );
+        assert_eq!(Some(AttachmentRole::DistantDepth), graph.passes()[0].depth);
+    }
+
+    #[test]
     fn shader_pack_resource_manifest_is_versioned_and_backend_neutral() {
         let resources = ShaderPackResourceManifest::terrain_material_v1(12).unwrap();
         assert_eq!(12, resources.generation.0);
@@ -307,7 +332,7 @@ mod tests {
     }
 
     #[test]
-    fn complementary_terrain_contract_is_source_derived_and_never_uses_draw_buffer_slots() {
+    fn complementary_terrain_contract_exposes_only_source_writable_named_outputs() {
         let source = bundled_complementary_hung_loified_source(9).unwrap();
         let contract = derive_complementary_terrain_contract(&source).unwrap();
         assert!(contract
@@ -316,9 +341,24 @@ mod tests {
         assert!(contract
             .outputs
             .contains(&TerrainPassOutput::MaterialAuxiliary));
-        assert!(contract
-            .outputs
-            .contains(&TerrainPassOutput::ViewSpaceNormal));
+        assert!(
+            contract
+                .outputs
+                .contains(&TerrainPassOutput::ViewSpaceNormal),
+            "the selected source now declares its normal output through an active DRAWBUFFERS target"
+        );
+        assert_eq!(
+            Some(0),
+            contract.output_color_slot(TerrainPassOutput::LitTerrainColor)
+        );
+        assert_eq!(
+            Some(6),
+            contract.output_color_slot(TerrainPassOutput::MaterialAuxiliary)
+        );
+        assert_eq!(
+            Some(5),
+            contract.output_color_slot(TerrainPassOutput::ViewSpaceNormal)
+        );
         assert!(contract.material_ids.contains_key(&10009));
         let diagnostic_plan = ShaderPackRuntimePlan::terrain_material_multipass_v1(9).unwrap();
         let mut diagnostic_plan = diagnostic_plan;
@@ -485,9 +525,9 @@ mod tests {
         assert!(plan.terrain_contract_diagnostic_json().contains(
             "\"voxel_light_update_policy\":{\"temporal_reprojection\":true,\"alternate_x_half_rate\":false,\"preserve_behind_view\":false}"
         ));
-        assert!(plan
-            .terrain_contract_diagnostic_json()
-            .contains("\"selected_source_execution_admitted\":false"));
+        assert!(plan.terrain_contract_diagnostic_json().contains(
+            "\"selected_source_execution_admission_scope\":\"per-frame-runtime-status\""
+        ));
     }
 
     #[test]

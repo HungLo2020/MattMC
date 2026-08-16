@@ -134,8 +134,11 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 	private float spinningEffectSpeed;
 	// Iris: Merged from MixinModelViewBobbing
 	private boolean areShadersOn;
-	private float fovModifier;
-	private float oldFovModifier;
+	// The regular renderer gets a tick before its first world frame. Rust
+	// whole-frame presentation can legitimately render first, so retain the
+	// neutral gameplay FOV until the first tick computes the live modifier.
+	private float fovModifier = 1.0F;
+	private float oldFovModifier = 1.0F;
 	private float darkenWorldAmount;
 	private float darkenWorldAmountO;
 	private boolean renderBlockOutline = true;
@@ -902,6 +905,20 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 			this.mainCamera
 				.setup(this.minecraft.level, entity, !this.minecraft.options.getCameraType().isFirstPerson(), this.minecraft.options.getCameraType().isMirrored(), g);
 			this.extractCamera(f);
+			this.renderDistance = this.minecraft.options.getEffectiveRenderDistance() * 16;
+			boolean worldFog = this.minecraft.level.effects().isFoggyAt(
+				this.mainCamera.getBlockPosition().getX(), this.mainCamera.getBlockPosition().getZ()
+			) || this.minecraft.gui.getBossOverlay().shouldCreateWorldFog();
+			// Whole-frame Vulkan does not use the Java fog UBO. Publish the same
+			// computed gameplay fog record before Rust extracts source semantics.
+			this.fogRenderer.collectFogParameters(
+				this.mainCamera,
+				this.minecraft.options.getEffectiveRenderDistance(),
+				worldFog,
+				deltaTracker,
+				this.getDarkenWorldAmount(f),
+				this.minecraft.level
+			);
 			float h = this.getFov(this.mainCamera, f, true);
 			Matrix4f projection = this.getProjectionMatrix(h);
 			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.rust-vulkan.camera-setup");
@@ -946,12 +963,26 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 					this.mainCamera
 				);
 				net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.frame-begin");
+				if (net.vulkanic.world.DistantHorizonsSemanticCollector.requiresWholeFrameSemanticCollection()) {
+					net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.distant-horizons.enqueue");
+					com.seibel.distanthorizons.fabric.hooks.DistantHorizonsLevelRenderHook.collectRustOpaqueForWholeFrame(view, projection);
+					net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.distant-horizons.enqueue");
+				}
 				net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.background.enqueue");
 				net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueWorldBackground(this.minecraft.level, this.mainCamera, f);
 				net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.background.enqueue");
 				net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.enqueue");
 				this.minecraft.levelRenderer.enqueueRustGalStaticTerrainForWholeFrame(this.mainCamera, view, projection);
 				net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.enqueue");
+				net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.weather.enqueue");
+				this.minecraft.levelRenderer.enqueueRustGalWeatherForWholeFrame(this.mainCamera, f);
+				net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.weather.enqueue");
+				net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.sky.enqueue");
+				this.minecraft.levelRenderer.enqueueRustGalSkyForWholeFrame(this.mainCamera, f);
+				net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.sky.enqueue");
+				net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.clouds.enqueue");
+				this.minecraft.levelRenderer.enqueueRustGalCloudsForWholeFrame(this.mainCamera, f);
+				net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.clouds.enqueue");
 				net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.block-outline.enqueue");
 				net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueBlockOutline(this.minecraft, this, this.mainCamera);
 				net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.block-outline.enqueue");
@@ -971,8 +1002,9 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 				this.minecraft.levelRenderer.enqueueRustGalIndexedMeshFeaturesForWholeFrame(this.mainCamera, deltaTracker, view, projection);
 				net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.indexed-mesh.enqueue");
 				net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.rust-vulkan.semantic-world-extraction");
-		}
-		profilerFiller.push("rustVulkanWholeFrameGuiExtraction");
+			}
+			net.vulkanic.gui.RustGalGuiItemRenderer.enqueueDebugStandard3dItem(this.guiRenderState);
+			profilerFiller.push("rustVulkanWholeFrameGuiExtraction");
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.rust-vulkan.semantic-gui-extraction");
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("gui.state-create");
 		GuiGraphics guiGraphics = new GuiGraphics(this.minecraft, this.guiRenderState);
@@ -985,6 +1017,12 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 			this.minecraft.gui.renderSavingIndicator(guiGraphics, deltaTracker);
 			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("gui.saving-indicator");
 		}
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("gui.text-semantic-enqueue");
+		this.guiRenderer.collectRustGalTextSemantics();
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("gui.text-semantic-enqueue");
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("gui.item-semantic-enqueue");
+		this.guiRenderer.collectRustGalItemSemantics();
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("gui.item-semantic-enqueue");
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.rust-vulkan.semantic-gui-extraction");
 		profilerFiller.popPush("rustVulkanWholeFramePresent");
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.rust-vulkan.frame-coordinator");
@@ -1195,6 +1233,7 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 			this.handProjectionMatrixBuffer.getBuffer(handProjection),
 			ProjectionType.PERSPECTIVE
 		);
+		net.vulkanic.world.RustGalWorldPrimitiveRenderer.beginFirstPersonFrame(handProjection, matrix4f2);
 		VulkanicAPI.createCommandEncoder().clearDepthTexture(this.minecraft.getMainRenderTarget().getDepthTexture(), 1.0);
 		this.renderItemInHand(f, bl3, matrix4f2);
 		VulkanicAPI.setProjectionMatrix(

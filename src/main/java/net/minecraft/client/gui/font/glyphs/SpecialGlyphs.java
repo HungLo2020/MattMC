@@ -9,6 +9,7 @@ import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.gui.font.GlyphStitcher;
 import org.jetbrains.annotations.Nullable;
+import org.lwjgl.system.MemoryUtil;
 
 @Environment(EnvType.CLIENT)
 public enum SpecialGlyphs implements GlyphInfo {
@@ -69,6 +70,21 @@ public enum SpecialGlyphs implements GlyphInfo {
 				public void upload(int i, int j, GpuTexture gpuTexture) {
 					net.vulkanic.VulkanicAPI.createCommandEncoder()
 						.writeToTexture(gpuTexture, SpecialGlyphs.this.image, 0, 0, i, j, SpecialGlyphs.this.image.getWidth(), SpecialGlyphs.this.image.getHeight(), 0, 0);
+				}
+
+				@Override
+				public boolean copyTo(NativeImage nativeImage, int i, int j) {
+					if (nativeImage.format() != NativeImage.Format.RGBA) {
+						return false;
+					}
+					for (int k = 0; k < SpecialGlyphs.this.image.getHeight(); k++) {
+						MemoryUtil.memCopy(
+							SpecialGlyphs.this.image.getPointer() + (long)k * SpecialGlyphs.this.image.getWidth() * Integer.BYTES,
+							nativeImage.getPointer() + ((long)(j + k) * nativeImage.getWidth() + i) * Integer.BYTES,
+							(long)SpecialGlyphs.this.image.getWidth() * Integer.BYTES
+						);
+					}
+					return true;
 				}
 
 				@Override

@@ -1,19 +1,31 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::render::vulkanic::error::{GalError, GalResult};
 
+use super::custom_uniform_policy::ShaderPackCustomUniformPolicy;
 use super::held_light_policy::ShaderPackHeldLightPolicy;
 use super::item_id_map::ShaderPackItemIdMap;
 use super::shadow_policy::ShaderPackShadowPolicy;
+use super::wetness_policy::ShaderPackWetnessPolicy;
 
 /// Reserved semantic configuration file generated alongside one complete
 /// source generation. It contains copied scalar preprocessor choices only,
 /// never Java/Iris objects or backend state.
 pub const RUNTIME_OPTIONS_PATH: &str = "mattmc/runtime-options.properties";
+/// Reserved typed source-constant values selected by the pack configuration.
+/// These are deliberately distinct from preprocessor definitions: a GLSL
+/// `const float shadowDistance` cannot be represented as `#define
+/// shadowDistance ...` without corrupting its declaration.
+pub const RUNTIME_CONSTANTS_PATH: &str = "mattmc/runtime-constants.properties";
 /// Reserved semantic environment generated for one selected source
 /// generation. It carries scalar preprocessor facts only, never Iris objects,
 /// active GPU state, or backend handles.
 pub const RUNTIME_ENVIRONMENT_PATH: &str = "mattmc/runtime-environment.properties";
+/// Reserved immutable Minecraft block-state table for one selected source
+/// generation. Entries are canonical game semantics; Rust resolves them
+/// against the pack's own `block.properties` rules and never reads Iris's
+/// material map or renderer state.
+pub const RUNTIME_BLOCK_STATE_IDENTITIES_PATH: &str = "mattmc/runtime-block-states.properties";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ShaderSourceFile {
@@ -138,13 +150,42 @@ impl ShaderPackSource {
         self.runtime_define_file(RUNTIME_OPTIONS_PATH, "option")
     }
 
+    /// Returns typed GLSL source constants selected by the pack configuration.
+    /// Callers must rewrite only an emitted matching `const` declaration; these
+    /// values are never valid preprocessor definitions.
+    pub fn runtime_constant_values(&self) -> GalResult<BTreeMap<String, String>> {
+        self.runtime_define_file(RUNTIME_CONSTANTS_PATH, "constant")
+    }
+
+    pub(crate) fn runtime_option_semantic_defines(&self) -> GalResult<BTreeMap<String, String>> {
+        let include_guards = self.translation_unit_include_guards();
+        let mut defines = self.runtime_option_defines()?;
+        defines.retain(|key, _| !include_guards.contains(key));
+        Ok(defines)
+    }
+
+    pub(crate) fn runtime_environment_semantic_defines(
+        &self,
+    ) -> GalResult<BTreeMap<String, String>> {
+        let include_guards = self.translation_unit_include_guards();
+        let mut defines = self.runtime_define_file(RUNTIME_ENVIRONMENT_PATH, "environment")?;
+        defines.retain(|key, _| !include_guards.contains(key));
+        Ok(defines)
+    }
+
     /// Complete scalar source configuration for deterministic preprocessing.
     /// Pack-selected options and host environment defines remain distinct files
     /// on transport, then merge here with duplicate rejection so a source
     /// branch never depends on an implicit precedence rule.
     pub fn runtime_semantic_defines(&self) -> GalResult<BTreeMap<String, String>> {
-        let mut defines = self.runtime_option_defines()?;
-        for (key, value) in self.runtime_define_file(RUNTIME_ENVIRONMENT_PATH, "environment")? {
+        // Iris's option discovery can surface an include guard from a pack
+        // source as an apparent option. A translation-unit guard is not a
+        // user-selected semantic configuration value: seeding it before Rust
+        // expands the source would erase that file's contents. Recognize the
+        // conventional guard form generically rather than naming a pack or a
+        // particular shader feature here.
+        let mut defines = self.runtime_option_semantic_defines()?;
+        for (key, value) in self.runtime_environment_semantic_defines()? {
             if defines.insert(key.clone(), value).is_some() {
                 return Err(GalError::invalid_argument(format!(
                     "runtime shader-pack define '{key}' is present in both option and environment snapshots"
@@ -152,6 +193,49 @@ impl ShaderPackSource {
             }
         }
         Ok(defines)
+    }
+
+    /// Include guards are translation-unit-local implementation details. The
+    /// bounded detection intentionally accepts only the standard file-header
+    /// `#ifndef NAME` followed by `#define NAME` form, so regular pack
+    /// configuration defines remain visible to the semantic source contract.
+    fn translation_unit_include_guards(&self) -> BTreeSet<String> {
+        self.files
+            .values()
+            .filter_map(|contents| {
+                let mut directives = contents.lines().filter_map(|raw| {
+                    let line = raw.trim();
+                    if line.is_empty() || line.starts_with("//") || line.starts_with("/*") {
+                        return None;
+                    }
+                    line.strip_prefix('#').map(str::trim)
+                });
+                let guard = directives.next()?.strip_prefix("ifndef ")?.trim();
+                let define = directives.next()?.strip_prefix("define ")?.trim();
+                let name = define.split_whitespace().next()?;
+                (name == guard).then(|| guard.to_string())
+            })
+            .collect()
+    }
+
+    /// Resolves one source-generation scalar define required by a Rust-owned
+    /// pass scheduler. This is intentionally a semantic configuration value,
+    /// never a borrowed Iris phase object or a backend program property.
+    pub fn runtime_semantic_i32(&self, name: &str) -> GalResult<i32> {
+        let value = self
+            .runtime_semantic_defines()?
+            .get(name)
+            .cloned()
+            .ok_or_else(|| {
+                GalError::unsupported_feature(format!(
+                    "shader-pack source generation is missing required semantic define {name}"
+                ))
+            })?;
+        value.parse::<i32>().map_err(|_| {
+            GalError::invalid_argument(format!(
+                "shader-pack semantic define {name} must be a signed integer, found '{value}'"
+            ))
+        })
     }
 
     fn runtime_define_file(
@@ -222,8 +306,10 @@ pub struct ShaderPackSourceUpdate {
 pub struct ShaderPackSourceStore {
     active: Option<ShaderPackSource>,
     active_item_id_map: Option<ShaderPackItemIdMap>,
+    active_custom_uniform_policy: Option<ShaderPackCustomUniformPolicy>,
     active_held_light_policy: Option<ShaderPackHeldLightPolicy>,
     active_shadow_policy: Option<ShaderPackShadowPolicy>,
+    active_wetness_policy: Option<ShaderPackWetnessPolicy>,
     failed_generations: Vec<u64>,
 }
 
@@ -258,6 +344,13 @@ impl ShaderPackSourceStore {
                 return Err(error);
             }
         };
+        let custom_uniform_policy = match ShaderPackCustomUniformPolicy::from_source(&candidate) {
+            Ok(policy) => policy,
+            Err(error) => {
+                self.record_failed_generation(update.generation);
+                return Err(error);
+            }
+        };
         let held_light_policy = match ShaderPackHeldLightPolicy::from_source(&candidate) {
             Ok(policy) => policy,
             Err(error) => {
@@ -272,10 +365,19 @@ impl ShaderPackSourceStore {
                 return Err(error);
             }
         };
+        let wetness_policy = match ShaderPackWetnessPolicy::from_source(&candidate) {
+            Ok(policy) => policy,
+            Err(error) => {
+                self.record_failed_generation(update.generation);
+                return Err(error);
+            }
+        };
         self.active = Some(candidate);
         self.active_item_id_map = Some(item_id_map);
+        self.active_custom_uniform_policy = Some(custom_uniform_policy);
         self.active_held_light_policy = Some(held_light_policy);
         self.active_shadow_policy = shadow_policy;
+        self.active_wetness_policy = Some(wetness_policy);
         Ok(())
     }
 
@@ -293,6 +395,13 @@ impl ShaderPackSourceStore {
         self.active_item_id_map.as_ref()
     }
 
+    /// Source-defined custom scalar declarations for this exact generation.
+    /// Their values are still supplied only by explicitly supported Rust
+    /// semantic evaluators.
+    pub fn active_custom_uniform_policy(&self) -> Option<&ShaderPackCustomUniformPolicy> {
+        self.active_custom_uniform_policy.as_ref()
+    }
+
     /// The held-light policy belongs to the exact immutable source generation
     /// as the item map and source snapshot.
     pub fn active_held_light_policy(&self) -> Option<ShaderPackHeldLightPolicy> {
@@ -304,6 +413,12 @@ impl ShaderPackSourceStore {
     /// admission will then reject any required shadow uniforms explicitly.
     pub fn active_shadow_policy(&self) -> Option<ShaderPackShadowPolicy> {
         self.active_shadow_policy
+    }
+
+    /// Immutable wetness timing policy derived from the active source
+    /// generation. This remains pack data, never Iris smoothing state.
+    pub fn active_wetness_policy(&self) -> Option<ShaderPackWetnessPolicy> {
+        self.active_wetness_policy
     }
 
     pub fn failed_generations(&self) -> &[u64] {
@@ -495,6 +610,70 @@ mod tests {
         )
         .unwrap();
         assert!(duplicate.runtime_semantic_defines().is_err());
+    }
+
+    #[test]
+    fn semantic_snapshot_excludes_translation_unit_include_guards() {
+        let source = ShaderPackSource::new(
+            "test-pack",
+            5,
+            vec![
+                ShaderSourceFile::new(
+                    "lib/guarded.glsl",
+                    "#ifndef INCLUDE_GUARDED\n#define INCLUDE_GUARDED\nfloat guarded;\n#endif\n",
+                ),
+                ShaderSourceFile::new(RUNTIME_OPTIONS_PATH, "INCLUDE_GUARDED=1\nQUALITY=2\n"),
+                ShaderSourceFile::new(RUNTIME_ENVIRONMENT_PATH, "INCLUDE_GUARDED=1\nIS_IRIS=1\n"),
+            ],
+        )
+        .unwrap();
+
+        assert_eq!(
+            BTreeMap::from([
+                ("IS_IRIS".to_string(), "1".to_string()),
+                ("QUALITY".to_string(), "2".to_string()),
+            ]),
+            source.runtime_semantic_defines().unwrap()
+        );
+    }
+
+    #[test]
+    fn semantic_i32_define_requires_a_present_integer() {
+        let source = ShaderPackSource::new(
+            "test-pack",
+            5,
+            vec![ShaderSourceFile::new(
+                RUNTIME_ENVIRONMENT_PATH,
+                "MC_RENDER_STAGE_TERRAIN_SOLID=8\n",
+            )],
+        )
+        .unwrap();
+        assert_eq!(
+            8,
+            source
+                .runtime_semantic_i32("MC_RENDER_STAGE_TERRAIN_SOLID")
+                .unwrap()
+        );
+        assert!(source
+            .runtime_semantic_i32("MC_RENDER_STAGE_TERRAIN_CUTOUT")
+            .unwrap_err()
+            .to_string()
+            .contains("missing required semantic define"));
+
+        let malformed = ShaderPackSource::new(
+            "test-pack",
+            6,
+            vec![ShaderSourceFile::new(
+                RUNTIME_ENVIRONMENT_PATH,
+                "MC_RENDER_STAGE_TERRAIN_SOLID=solid\n",
+            )],
+        )
+        .unwrap();
+        assert!(malformed
+            .runtime_semantic_i32("MC_RENDER_STAGE_TERRAIN_SOLID")
+            .unwrap_err()
+            .to_string()
+            .contains("must be a signed integer"));
     }
 
     #[test]

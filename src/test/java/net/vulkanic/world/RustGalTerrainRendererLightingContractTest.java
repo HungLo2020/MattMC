@@ -8,7 +8,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class RustGalTerrainRendererLightingContractTest {
 	@Test
@@ -44,6 +46,124 @@ public class RustGalTerrainRendererLightingContractTest {
 		int compactAbgr = 0xffffffff;
 
 		assertEquals(0xffffffff, RustGalTerrainRenderer.decodeCompactTerrainColorForRust(compactAbgr, true));
+	}
+
+	@Test
+	public void compactTerrainAtlasCoordinatesRemainTopOriginForCopiedAtlas() {
+		int copiedAtlasV = Math.round(0.710938F * (1 << 15));
+		float decoded = RustGalTerrainRenderer.decodeTexture(copiedAtlasV);
+
+		assertEquals(0.710938F, decoded, 1.0F / (1 << 15));
+		assertTrue(Math.abs(decoded - (1.0F - 0.710938F)) > 0.2F,
+			"a vertically mirrored compact V coordinate selects an unrelated copied-atlas row");
+	}
+
+	@Test
+	public void wholeFrameShaderEnvironmentUsesFreshVanillaFogInsteadOfSodiumHookCache() throws Exception {
+		String source = java.nio.file.Files.readString(java.nio.file.Path.of(
+			"src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"
+		));
+		int method = source.indexOf("private static FogParameters shaderPackFogParameters()");
+		int nextMethod = source.indexOf("\n\tprivate static", method + 1);
+		String body = source.substring(method, nextMethod < 0 ? source.length() : nextMethod);
+
+		assertTrue(body.contains("gameRenderer.fogRenderer.sodium$getFogParameters()"));
+		assertTrue(!body.contains("instanceof FogStorage"));
+	}
+
+	@Test
+	public void wholeFrameShaderEnvironmentUsesBlockDistanceForDistantHorizonsFog() throws Exception {
+		String source = java.nio.file.Files.readString(java.nio.file.Path.of(
+			"src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"
+		));
+		int method = source.indexOf("private static int shaderPackDistantHorizonsRenderDistance()");
+		int nextMethod = source.indexOf("\n\tprivate static", method + 1);
+		String body = source.substring(method, nextMethod < 0 ? source.length() : nextMethod);
+
+		assertTrue(body.contains("DhApi.Delayed.configs.graphics().chunkRenderDistance().getValue() * 16"));
+		assertTrue(body.contains("options.getEffectiveRenderDistance() * 16"));
+		assertTrue(!source.contains("DHCompat.getRenderDistance()"));
+	}
+
+	@Test
+	public void primitiveMetadataRestoresCompactTerrainShaderSemantics() {
+		List<VulkanicGalBridge.WorldMeshVertexRecord> vertices = new ArrayList<>();
+		for (int index = 0; index < 4; index++) {
+			vertices.add(new VulkanicGalBridge.WorldMeshVertexRecord(
+				2.0F + index * 0.25F,
+				3.5F,
+				4.25F,
+				0.0F,
+				0.0F,
+				0.0F,
+				0.0F,
+				-1,
+				-1,
+				0xffffffff,
+				0,
+				0,
+				0
+			));
+		}
+		int[] metadata = primitiveMetadata(NativeSectionMeshBuilder.PRIMITIVE_KIND_UNKNOWN);
+		metadata[2] = 12;
+		metadata[3] = 2;
+		metadata[4] = 3;
+		metadata[5] = 4;
+		metadata[6] = 0;
+		metadata[9] = 9;
+
+		RustGalTerrainRenderer.applyPrimitiveSemanticFallback(metadata, vertices, 4, false, false);
+
+		for (VulkanicGalBridge.WorldMeshVertexRecord vertex : vertices) {
+			assertEquals(12, vertex.shaderBlockId());
+			assertEquals(0, vertex.shaderMaterialType());
+		}
+		assertEquals(0x09100020, vertices.get(0).midBlockPacked());
+	}
+
+	@Test
+	public void primitiveMetadataOverridesPrivatePackedBlockIdentity() {
+		int[] metadata = primitiveMetadata(NativeSectionMeshBuilder.PRIMITIVE_KIND_UNKNOWN);
+		metadata[2] = 12;
+		metadata[6] = 0;
+		List<VulkanicGalBridge.WorldMeshVertexRecord> vertices = testVertices(1);
+		for (int index = 0; index < vertices.size(); index++) {
+			VulkanicGalBridge.WorldMeshVertexRecord vertex = vertices.get(index);
+			vertices.set(index, new VulkanicGalBridge.WorldMeshVertexRecord(
+				vertex.x(), vertex.y(), vertex.z(), vertex.u(), vertex.v(), vertex.atlasU(), vertex.atlasV(),
+				32000, vertex.shaderMaterialType(), vertex.colorArgb(), vertex.normalPacked(), vertex.light(), vertex.midBlockPacked()
+			));
+		}
+
+		RustGalTerrainRenderer.applyPrimitiveSemanticFallback(metadata, vertices, 4, true, false);
+
+		for (VulkanicGalBridge.WorldMeshVertexRecord vertex : vertices) {
+			assertEquals(12, vertex.shaderBlockId());
+			assertEquals(0, vertex.shaderMaterialType());
+		}
+	}
+
+	@Test
+	public void primitiveMetadataOverridesPrivatePackedRenderType() {
+		int[] metadata = primitiveMetadata(NativeSectionMeshBuilder.PRIMITIVE_KIND_UNKNOWN);
+		metadata[2] = 12;
+		metadata[6] = 1;
+		List<VulkanicGalBridge.WorldMeshVertexRecord> vertices = testVertices(1);
+		for (int index = 0; index < vertices.size(); index++) {
+			VulkanicGalBridge.WorldMeshVertexRecord vertex = vertices.get(index);
+			vertices.set(index, new VulkanicGalBridge.WorldMeshVertexRecord(
+				vertex.x(), vertex.y(), vertex.z(), vertex.u(), vertex.v(), vertex.atlasU(), vertex.atlasV(),
+				32000, 2, vertex.colorArgb(), vertex.normalPacked(), vertex.light(), vertex.midBlockPacked()
+			));
+		}
+
+		RustGalTerrainRenderer.applyPrimitiveSemanticFallback(metadata, vertices, 4, true, false);
+
+		for (VulkanicGalBridge.WorldMeshVertexRecord vertex : vertices) {
+			assertEquals(12, vertex.shaderBlockId());
+			assertEquals(1, vertex.shaderMaterialType());
+		}
 	}
 
 	@Test
@@ -138,11 +258,39 @@ public class RustGalTerrainRendererLightingContractTest {
 	}
 
 	@Test
-	public void translucentPrimitiveMetadataRejectsAllUnsupportedPayload() {
+	public void facingLocalStaticSortIndicesNormalizeIntoTheCopiedGlobalVertexStream() {
+		byte[] facingLocal = sortedQuads(0, 0);
+
+		byte[] normalized = RustGalTerrainRenderer.normalizeTranslucentSortedIndexBytes(
+			facingLocal,
+			8,
+			new int[] { 1, 1 }
+		);
+
+		assertArrayEquals(sortedQuads(0, 1), normalized);
+		assertArrayEquals(
+			sortedQuads(1, 0),
+			RustGalTerrainRenderer.normalizeTranslucentSortedIndexBytes(sortedQuads(1, 0), 8, new int[] { 1, 1 }),
+			"already-global dynamic or topological sorter payloads must pass through unchanged"
+		);
+		assertThrows(IllegalArgumentException.class,
+			() -> RustGalTerrainRenderer.normalizeTranslucentSortedIndexBytes(sortedQuads(0, 0), 8, new int[] { 2 }));
+	}
+
+	@Test
+	public void translucentPrimitiveMetadataRepresentsAllUnsupportedPayloadAsAnEmptyFilteredRange() {
 		int[] metadata = primitiveMetadata(NativeSectionMeshBuilder.PRIMITIVE_KIND_UNSUPPORTED_FLUID);
 
-		assertThrows(IllegalArgumentException.class,
-			() -> RustGalTerrainRenderer.buildOrderedTranslucentMesh(sortedQuads(0), metadata, testVertices(1), 4));
+		RustGalTerrainRenderer.OrderedTranslucentMesh mesh =
+			RustGalTerrainRenderer.buildOrderedTranslucentMesh(sortedQuads(0), metadata, testVertices(1), 4);
+
+		assertEquals(1, mesh.sourcePrimitiveCount());
+		assertEquals(1, mesh.unsupportedPrimitiveCount());
+		assertEquals(0, mesh.retainedPrimitiveCount());
+		assertEquals(1, mesh.omittedPrimitiveCount());
+		assertEquals(0, mesh.retainedIndexCount());
+		assertEquals(6, mesh.omittedIndexCount());
+		assertTrue(mesh.sections().isEmpty());
 	}
 
 	private static int[] primitiveMetadata(int... kinds) {

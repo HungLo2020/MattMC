@@ -194,7 +194,11 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_shader_pack_update_sources(
         let result = decode_shader_pack_source_update(request).and_then(|update| {
             context
                 .world_primitive_frontend
-                .apply_shader_pack_source_update(update)
+                .apply_shader_pack_source_update(update)?;
+            context
+                .world_primitive_frontend
+                .retire_source_final_outputs_for_shader_reload(&mut context.gal);
+            Ok(())
         });
         match result {
             Ok(()) => {

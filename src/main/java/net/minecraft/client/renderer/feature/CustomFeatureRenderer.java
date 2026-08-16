@@ -65,6 +65,14 @@ public class CustomFeatureRenderer {
 			}
 		}
 
+		public int totalSubmitCount() {
+			int total = 0;
+			for (List<SubmitNodeStorage.CustomGeometrySubmit> submits : this.customGeometrySubmits.values()) {
+				total += submits.size();
+			}
+			return total;
+		}
+
 		public void endFrame() {
 			this.customGeometrySubmits.keySet().removeIf(renderType -> !this.customGeometrySubmitsUsage.contains(renderType));
 			this.customGeometrySubmitsUsage.clear();

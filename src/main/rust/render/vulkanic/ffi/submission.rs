@@ -831,6 +831,14 @@ pub(crate) fn serialize_command_op(out: &mut Vec<u8>, op: &CommandOp) {
             push_u32(out, FfiCommandOpKind::CopyTextureToBuffer as u32);
             serialize_copy_region(out, region);
         }
+        CommandOp::CopyTexture(_) => unreachable!(
+            "Rust-owned texture snapshots are not Java FFI submission commands; they remain inside the Rust shader-pack executor"
+        ),
+        CommandOp::GenerateMipmaps { .. } => {
+            unreachable!(
+                "Rust-owned mip generation is not a Java FFI submission command; it must remain inside the Rust shader-pack executor"
+            );
+        }
         CommandOp::HostWriteBuffer {
             buffer,
             offset,

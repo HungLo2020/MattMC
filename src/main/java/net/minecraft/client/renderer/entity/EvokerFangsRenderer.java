@@ -11,11 +11,14 @@ import net.minecraft.client.renderer.entity.state.EvokerFangsRenderState;
 import net.minecraft.client.renderer.state.CameraRenderState;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.resources.ResourceLocation;
+import net.vulkanic.world.RustGalWorldPrimitiveRenderer;
+import net.vulkanic.world.WorldRenderRoutePolicy;
 import net.minecraft.world.entity.projectile.EvokerFangs;
 
 @Environment(EnvType.CLIENT)
 public class EvokerFangsRenderer extends EntityRenderer<EvokerFangs, EvokerFangsRenderState> {
 	private static final ResourceLocation TEXTURE_LOCATION = ResourceLocation.withDefaultNamespace("textures/entity/illager/evoker_fangs.png");
+	private static final ResourceLocation EVOKER_FANGS_ENTITY_ID = ResourceLocation.withDefaultNamespace("evoker_fangs");
 	private final EvokerFangsModel model;
 
 	public EvokerFangsRenderer(EntityRendererProvider.Context context) {
@@ -32,16 +35,40 @@ public class EvokerFangsRenderer extends EntityRenderer<EvokerFangs, EvokerFangs
 			poseStack.mulPose(Axis.YP.rotationDegrees(90.0F - evokerFangsRenderState.yRot));
 			poseStack.scale(-1.0F, -1.0F, 1.0F);
 			poseStack.translate(0.0F, -1.501F, 0.0F);
-			submitNodeCollector.submitModel(
+			var renderType = this.model.renderType(TEXTURE_LOCATION);
+			boolean eligible = RustGalWorldPrimitiveRenderer.isStandaloneModelMeshEligible(
+				this.model, renderType, TEXTURE_LOCATION, OverlayTexture.NO_OVERLAY, evokerFangsRenderState.outlineColor, null
+			);
+			WorldRenderRoutePolicy.Route route = WorldRenderRoutePolicy.currentModelMeshRoute(eligible);
+			if (!submitNodeCollector.isSemanticCoverageOnly() && route.usesRustWholeFrameVulkan()) {
+				if (!RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMesh(
+					this.model, evokerFangsRenderState, poseStack.last(), renderType, TEXTURE_LOCATION,
+					EVOKER_FANGS_ENTITY_ID,
+					evokerFangsRenderState.lightCoords, OverlayTexture.NO_OVERLAY, -1
+				)) {
+					throw new IllegalStateException("Rust whole-frame EvokerFangs route selected without a copied indexed mesh request");
+				}
+				RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
+					"rust-vulkan-whole-frame", TEXTURE_LOCATION, true, true, false
+				);
+			} else {
+				if (eligible) {
+					RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
+						route == WorldRenderRoutePolicy.Route.DISABLED ? "disabled" : "java-legacy", TEXTURE_LOCATION,
+						false, false, !submitNodeCollector.isSemanticCoverageOnly() && route.usesJavaCompatibility()
+					);
+				}
+				submitNodeCollector.submitModel(
 				this.model,
 				evokerFangsRenderState,
 				poseStack,
-				this.model.renderType(TEXTURE_LOCATION),
+				renderType,
 				evokerFangsRenderState.lightCoords,
 				OverlayTexture.NO_OVERLAY,
 				evokerFangsRenderState.outlineColor,
 				null
 			);
+			}
 			poseStack.popPose();
 			super.submit(evokerFangsRenderState, poseStack, submitNodeCollector, cameraRenderState);
 		}

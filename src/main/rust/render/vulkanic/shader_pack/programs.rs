@@ -1,30 +1,63 @@
+use std::collections::BTreeSet;
+
 use crate::render::vulkanic::error::{GalError, GalResult};
 use crate::render::vulkanic::handles::{Handle, HandleKind};
 use crate::render::vulkanic::resources::{
-    AccessFlags, BackendApi, PipelineStageFlags, ResourceBinding, ResourceBindingDesc,
+    AccessFlags, BackendApi, BlendMode, PipelineStageFlags, ResourceBinding, ResourceBindingDesc,
     ResourceBindingKind, ResourceLayoutDesc, ResourceSetDesc, ShaderCodeFormat, ShaderModuleDesc,
     ShaderStage,
 };
 
+use super::cloud_contract::{CloudBlend, CloudPassContract};
+use super::distant_horizons_contract::{DistantHorizonsPassContract, DistantHorizonsPassKind};
+use super::entity_contract::{EntityPassContract, EntitySourceDrawSemantics, EntitySourceOutput};
+use super::hand_contract::{HandPassContract, HandSourceOutput};
 use super::lowering::{
-    LoweredShadowSourcePair, LoweredTerrainSourcePair, TerrainSourceOpaqueResourceBindingPlan,
-    TerrainSourceOpaqueResourceKind, TerrainSourceUniformField,
+    DistantHorizonsFragmentOutput, FullscreenSourceFragmentOutput, FullscreenSourceRasterPrimitive,
+    LoweredCloudSourcePair, LoweredDistantHorizonsSourcePair, LoweredEntitySourcePair,
+    LoweredFullscreenSourcePair, LoweredHandSourcePair, LoweredShadowSourcePair,
+    LoweredTerrainSourcePair, LoweredTexturedMaterialSourcePair,
+    LoweredTranslucentTerrainSourcePair, LoweredWeatherSourcePair,
+    TerrainSourceOpaqueResourceBindingPlan, TerrainSourceOpaqueResourceKind,
+    TerrainSourceUniformField,
+};
+use super::material_contract::{
+    pack_textured_material_source_primitives, TexturedMaterialPassContract,
+    TexturedMaterialSourcePrimitive, TEXTURED_MATERIAL_SOURCE_VERTEX_BYTES,
 };
 use super::source_uniforms::{TerrainSourceUniformFrame, TerrainSourceUniformRequirements};
 use super::terrain_contract::{
-    TerrainMaterialClass, TerrainPassContract, TerrainPassRequiredResource,
+    TerrainMaterialClass, TerrainPassContract, TerrainPassOutput, TerrainPassRequiredResource,
+    TerrainTranslucentBlend, TerrainTranslucentRasterState,
 };
 use super::terrain_source_resources::{
-    TerrainSourceOwnedResourceSet, TerrainSourceResourceAvailabilitySet,
+    TerrainSourceOwnedResourceSet, TerrainSourceResourceAvailabilitySet, TerrainSourceResourceRole,
 };
+use super::weather_contract::{WeatherBlend, WeatherPassContract};
 
 /// Fixed std430 source-terrain vertex record declared by the Rust source
 /// lowerer. Frontend staging may use this semantic ABI, but it is not a Java
 /// vertex layout or a native backend format.
 pub(crate) const TERRAIN_SOURCE_VERTEX_BYTES: usize = 8 * 4 * std::mem::size_of::<f32>();
-/// One source terrain instance carries only its semantic model transform.
-/// Per-instance material and backend state remain outside this owned ABI.
-pub(crate) const TERRAIN_SOURCE_INSTANCE_BYTES: usize = 16 * std::mem::size_of::<f32>();
+/// One source terrain instance carries a copied semantic model transform and
+/// color modulation. This is deliberately independent of a Java vertex
+/// layout or backend state, but preserves the per-instance appearance already
+/// present in the shared world-mesh semantic request.
+pub(crate) const TERRAIN_SOURCE_INSTANCE_BYTES: usize = 20 * std::mem::size_of::<f32>();
+/// Fixed std430 record copied from the DH CPU mesh stream and expanded by the
+/// Rust world frontend. This is intentionally distinct from the near-terrain
+/// source record: DH has pre-resolved vertex color/light/material data rather
+/// than atlas-backed Minecraft terrain vertices.
+pub(crate) const DISTANT_HORIZONS_SOURCE_VERTEX_BYTES: usize = 32;
+/// Private Rust source-stream record for a DH range with complete atlas
+/// provenance. It extends the regular DH semantic record with one exact
+/// atlas rectangle and repeated tile coordinates; it is not a Java/DH GL
+/// layout or backend-native vertex format.
+pub(crate) const DISTANT_HORIZONS_EXACT_ATLAS_SOURCE_VERTEX_BYTES: usize = 56;
+/// The per-column std140 semantic frame block consumed by the lowered DH
+/// source preamble. It carries a Rust-owned column origin and LOD controls;
+/// source-declared `dh*` matrices live in the separately typed scalar block.
+pub(crate) const DISTANT_HORIZONS_SOURCE_COLUMN_FRAME_BYTES: usize = 128;
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct ProgramIdentity(String);
@@ -93,6 +126,9 @@ pub struct TerrainMaterialProgram {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LoweredTerrainSourceProgram {
     pub identity: ProgramIdentity,
+    /// Semantic material pass admitted by this program. Shadow-only programs
+    /// intentionally carry no material kind.
+    pub material_kind: Option<TerrainMaterialProgramKind>,
     /// Exact shader-pack source generation which produced this program.
     pub shader_pack_generation: u64,
     pub vertex: ShaderStageSource,
@@ -106,6 +142,140 @@ pub struct LoweredTerrainSourceProgram {
     pub scalar_uniform_requirements: TerrainSourceUniformRequirements,
     pub opaque_resource_bindings: TerrainSourceOpaqueResourceBindingPlan,
     pub required_resources: Vec<TerrainProgramResource>,
+    /// Exact named terrain outputs retained from the source contract. Shadow
+    /// programs intentionally leave this absent because their outputs belong
+    /// to a separate shadow pass schema.
+    terrain_outputs: Option<Vec<TerrainPassOutput>>,
+    /// Source-declared shader-pack color slot for each named terrain output.
+    /// These slots are source metadata used to resolve Rust-owned semantic
+    /// targets; they are never GAL attachment indices or backend bindings.
+    terrain_output_color_slots: Option<Vec<(TerrainPassOutput, u32)>>,
+    /// Explicit source-derived raster semantics for the separate translucent
+    /// stage. Normal terrain and shadow programs deliberately leave this
+    /// empty instead of borrowing a renderer default.
+    translucent_raster_state: Option<TerrainTranslucentRasterState>,
+}
+
+/// Prepared selected-source entity program. This owns source text and typed
+/// semantic requirements only; it cannot compile a backend pipeline, bind a
+/// native texture, or select a producer route. Keeping it distinct from
+/// terrain prevents local entity textures and `entity.properties` IDs from
+/// being mistaken for terrain-atlas semantics.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct LoweredEntitySourceProgram {
+    pub identity: ProgramIdentity,
+    pub shader_pack_generation: u64,
+    /// Exact source generation for the Rust-owned entity ID map.
+    pub entity_id_generation: u64,
+    /// The source-pack entity map remains Rust-owned with the prepared
+    /// program. Frame preparation resolves copied canonical identities here;
+    /// Java never transports a shader-pack numeric entity ID.
+    entity_contract: EntityPassContract,
+    pub vertex: ShaderStageSource,
+    pub fragment: ShaderStageSource,
+    pub execution_interface: TerrainSourceExecutionInterface,
+    pub scalar_uniform_requirements: TerrainSourceUniformRequirements,
+    pub opaque_resource_bindings: TerrainSourceOpaqueResourceBindingPlan,
+    named_output_color_slots: Vec<(TerrainPassOutput, u32)>,
+}
+
+/// Prepared selected-source first-person hand/item program. It has the same
+/// owned indexed-stream ABI as an entity program, but retains a distinct hand
+/// contract so a later writer cannot accidentally use world-camera transforms
+/// or the entity pass depth domain.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct LoweredHandSourceProgram {
+    pub identity: ProgramIdentity,
+    pub shader_pack_generation: u64,
+    hand_contract: HandPassContract,
+    pub vertex: ShaderStageSource,
+    pub fragment: ShaderStageSource,
+    pub execution_interface: TerrainSourceExecutionInterface,
+    pub scalar_uniform_requirements: TerrainSourceUniformRequirements,
+    pub opaque_resource_bindings: TerrainSourceOpaqueResourceBindingPlan,
+    named_output_color_slots: Vec<(TerrainPassOutput, u32)>,
+}
+
+/// Shared typed contract for Rust-owned indexed streams with a local material
+/// texture. Entity and hand passes intentionally retain distinct source
+/// contracts and pass ownership, but their frontend resource preparation uses
+/// the same fixed ABI and semantic resource-set rules.
+///
+/// This is not a backend abstraction: it exposes only source-derived shader
+/// metadata and typed GAL descriptions. The frontend still owns cache keys,
+/// uploads, and pass scheduling.
+pub trait LocalTexturedSourceProgram {
+    fn identity(&self) -> &ProgramIdentity;
+    fn shader_pack_generation(&self) -> u64;
+    fn execution_interface(&self) -> &TerrainSourceExecutionInterface;
+    fn shader_module_descriptors_with_alpha_cutoff(
+        &self,
+        api: BackendApi,
+        alpha_cutoff: Option<f32>,
+    ) -> [ShaderModuleDesc; 2];
+    fn execution_resource_layouts(&self) -> GalResult<TerrainSourceExecutionLayouts>;
+    fn require_semantic_resources(
+        &self,
+        availability: &TerrainSourceResourceAvailabilitySet,
+    ) -> GalResult<()>;
+    fn pack_resource_set_desc(
+        &self,
+        label: String,
+        layout: Handle,
+        resources: &TerrainSourceOwnedResourceSet,
+    ) -> GalResult<ResourceSetDesc>;
+}
+
+/// Source-derived program preparation for generic textured world material.
+/// It retains the selected source's named outputs and semantic resource plan,
+/// but has no executable vertex-stream/pipeline allocation yet. That keeps
+/// the legacy post-final overlay from being mistaken for shader-pack
+/// participation while a dedicated Rust-owned material writer is staged.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct LoweredTexturedMaterialSourceProgram {
+    pub identity: ProgramIdentity,
+    pub shader_pack_generation: u64,
+    pub vertex: ShaderStageSource,
+    pub fragment: ShaderStageSource,
+    /// Fixed source-material stream contract. It has no terrain-only lanes
+    /// and no per-instance transform table because its vertices are explicit
+    /// camera-relative semantic positions.
+    pub execution_interface: TexturedMaterialSourceExecutionInterface,
+    pub scalar_uniform_requirements: TerrainSourceUniformRequirements,
+    pub opaque_resource_bindings: TerrainSourceOpaqueResourceBindingPlan,
+    named_output_color_slots: Vec<(TerrainPassOutput, u32)>,
+}
+
+/// Prepared selected-source weather program. It owns no target, pipeline, or
+/// route; the runtime must later provide a dedicated named weather pass.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct LoweredWeatherSourceProgram {
+    pub identity: ProgramIdentity,
+    pub shader_pack_generation: u64,
+    pub vertex: ShaderStageSource,
+    pub fragment: ShaderStageSource,
+    pub execution_interface: TexturedMaterialSourceExecutionInterface,
+    pub scalar_uniform_requirements: TerrainSourceUniformRequirements,
+    pub opaque_resource_bindings: TerrainSourceOpaqueResourceBindingPlan,
+    pub lit_color_output_slot: u8,
+    pub alpha_discard_threshold_bits: u32,
+    pub blend: WeatherBlend,
+}
+
+/// Prepared selected-source vanilla-cloud program. It owns no target,
+/// pipeline, or route; a future cloud writer must provide an explicit named
+/// pass and fully semantic resource availability.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct LoweredCloudSourceProgram {
+    pub identity: ProgramIdentity,
+    pub shader_pack_generation: u64,
+    pub vertex: ShaderStageSource,
+    pub fragment: ShaderStageSource,
+    pub execution_interface: TexturedMaterialSourceExecutionInterface,
+    pub scalar_uniform_requirements: TerrainSourceUniformRequirements,
+    pub opaque_resource_bindings: TerrainSourceOpaqueResourceBindingPlan,
+    pub blend: CloudBlend,
+    named_output_color_slots: Vec<(TerrainPassOutput, u32)>,
 }
 
 /// Backend-neutral layouts required to execute a lowered source-terrain
@@ -122,7 +292,1034 @@ pub struct TerrainSourceExecutionLayouts {
     pub pack_resources: ResourceLayoutDesc,
 }
 
+/// Backend-neutral layouts for the compact source-material stream. Set zero
+/// contains only Rust-owned vertex/transforms/scalar data; set one contains
+/// the selected pack's pass-local semantic resources.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TexturedMaterialSourceExecutionLayouts {
+    pub source_data: ResourceLayoutDesc,
+    pub pack_resources: ResourceLayoutDesc,
+}
+
+/// Fixed stream ABI for a source-derived generic textured-material pass.
+/// This explicitly models the data `gbuffers_textured` may consume and keeps
+/// it distinct from terrain's material/entity/tangent stream.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TexturedMaterialSourceExecutionInterface {
+    pub vertex_stream: TerrainSourceFixedBinding,
+    pub vertex_stride: u32,
+    pub vertex_fields: [TerrainSourceVertexField; 4],
+    pub legacy_transforms: TerrainSourceFixedBinding,
+    pub scalar_uniforms: Option<TerrainSourceFixedBinding>,
+    pub legacy_transform_bytes: u32,
+    pub scalar_uniform_bytes: u32,
+    pub scalar_uniform_fields: Vec<TerrainSourceUniformField>,
+}
+
+/// Source-derived executable preparation for the distinct Distant Horizons
+/// terrain stage. The program is deliberately separate from
+/// [`LoweredTerrainSourceProgram`]: DH uses a copied 32-byte column stream,
+/// one column-frame block per draw, and `dh*` transform semantics. Keeping
+/// the ABI distinct prevents the near-terrain selected-source route from
+/// interpreting a DH asset as an atlas-backed mesh.
+///
+/// This remains a preparation artifact. It owns no native object, creates no
+/// target, and cannot select a gameplay route.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct LoweredDistantHorizonsSourceProgram {
+    pub identity: ProgramIdentity,
+    pub shader_pack_generation: u64,
+    /// The semantic DH material phase selected from source. It prevents a
+    /// later pass owner from applying opaque depth/blend behavior to a
+    /// separately lowered `dh_water` program.
+    pub pass_kind: DistantHorizonsPassKind,
+    /// Source-declared blend semantics for the translucent phase only. This
+    /// is intentionally not an API pipeline flag.
+    pub translucent_blend: Option<TerrainTranslucentBlend>,
+    pub vertex: ShaderStageSource,
+    pub fragment: ShaderStageSource,
+    pub execution_interface: DistantHorizonsSourceExecutionInterface,
+    pub scalar_uniform_requirements: TerrainSourceUniformRequirements,
+    pub opaque_resource_bindings: TerrainSourceOpaqueResourceBindingPlan,
+    pub required_resources: Vec<TerrainProgramResource>,
+}
+
+/// Source-derived DH program variant for a range whose copied semantic
+/// provenance resolves one exact Minecraft atlas sprite per quad. It keeps
+/// the selected pack's transform, material-category, lighting, and fragment
+/// logic intact; the adapter supplies only the source `gl_Color` input from
+/// Rust-owned atlas data.
+///
+/// This is deliberately distinct from the reduced-color stream ABI. It owns
+/// no target or native resource and remains a shader-pack preparation
+/// artifact, while the world frontend owns its private vertex stream and
+/// atlas resource lifetime.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct LoweredDistantHorizonsExactAtlasSourceProgram {
+    pub source: LoweredDistantHorizonsSourceProgram,
+}
+
+impl LoweredDistantHorizonsExactAtlasSourceProgram {
+    pub fn shader_module_descriptors(&self, api: BackendApi) -> [ShaderModuleDesc; 2] {
+        self.source.shader_module_descriptors(api)
+    }
+}
+
+/// Derives the exact-atlas variant of an already admitted DH source program.
+/// The selected source remains authoritative for all shader-pack logic. This
+/// adapter changes only the private Rust vertex/material input convention so
+/// a provenance-resolved atlas tile can become `gl_Color` before the source
+/// vertex and fragment stages execute.
+pub fn prepare_lowered_distant_horizons_exact_atlas_source_program(
+    program: &LoweredDistantHorizonsSourceProgram,
+) -> GalResult<LoweredDistantHorizonsExactAtlasSourceProgram> {
+    if program.pass_kind != DistantHorizonsPassKind::Opaque || program.translucent_blend.is_some() {
+        return Err(GalError::invalid_argument(
+            "exact-atlas Distant Horizons source adapter requires an opaque source program",
+        ));
+    }
+    if program.vertex.source.contains("vulkanic_source_dh_atlas_")
+        || program
+            .fragment
+            .source
+            .contains("vulkanic_source_dh_atlas_")
+    {
+        return Err(GalError::invalid_argument(
+            "Distant Horizons source program already contains an exact-atlas adapter interface",
+        ));
+    }
+    if !program
+        .vertex
+        .source
+        .contains("vulkanic_source_vertex_color")
+        || !program
+            .vertex
+            .source
+            .contains("vulkanic_source_dh_material_id")
+    {
+        return Err(GalError::unsupported_feature(
+            "Distant Horizons source program does not expose the required semantic color/material interface",
+        ));
+    }
+
+    let varying_locations = exact_atlas_distant_horizons_varying_locations(
+        &program.vertex.source,
+        &program.fragment.source,
+    )?;
+    let vertex = inject_exact_atlas_distant_horizons_vertex_adapter(
+        &program.vertex.source,
+        varying_locations,
+    )?;
+    let fragment = inject_exact_atlas_distant_horizons_fragment_adapter(
+        &program.fragment.source,
+        varying_locations,
+    )?;
+    let mut source = program.clone();
+    source.identity = ProgramIdentity::new(format!("{}:exact-atlas", program.identity.as_str()));
+    source.vertex = ShaderStageSource {
+        stage: ShaderStageKind::Vertex,
+        label: format!("{}:exact-atlas-adapter", program.vertex.label),
+        source: vertex,
+        entry_point: "main".to_string(),
+    };
+    source.fragment = ShaderStageSource {
+        stage: ShaderStageKind::Fragment,
+        label: format!("{}:exact-atlas-adapter", program.fragment.label),
+        source: fragment,
+        entry_point: "main".to_string(),
+    };
+    source.execution_interface.vertex_stride =
+        DISTANT_HORIZONS_EXACT_ATLAS_SOURCE_VERTEX_BYTES as u32;
+    source.execution_interface.material_identity_contract =
+        DistantHorizonsMaterialIdentityContract::AtlasBacked;
+    source.execution_interface.validate()?;
+    Ok(LoweredDistantHorizonsExactAtlasSourceProgram { source })
+}
+
+#[derive(Clone, Copy, Debug)]
+struct ExactAtlasDistantHorizonsVaryingLocations {
+    tile_uv: u32,
+    atlas_rect: u32,
+    tint_and_material: u32,
+}
+
+/// Allocates three locations outside the selected source interface. The
+/// adapter must not reserve a high arbitrary location: Vulkan counts declared
+/// interface components against the device limit even when lower locations are
+/// unused.
+fn exact_atlas_distant_horizons_varying_locations(
+    vertex: &str,
+    fragment: &str,
+) -> GalResult<ExactAtlasDistantHorizonsVaryingLocations> {
+    let mut occupied = std::collections::BTreeSet::new();
+    for source in [vertex, fragment] {
+        for line in source.lines() {
+            let Some(location_start) = line.find("layout(location = ") else {
+                continue;
+            };
+            let value = &line[location_start + "layout(location = ".len()..];
+            let Some(location_end) = value.find(')') else {
+                return Err(GalError::invalid_argument(
+                    "Distant Horizons source has an unterminated explicit varying location",
+                ));
+            };
+            let location = value[..location_end].trim().parse::<u32>().map_err(|_| {
+                GalError::invalid_argument(
+                    "Distant Horizons source has a non-numeric explicit varying location",
+                )
+            })?;
+            occupied.insert(location);
+        }
+    }
+    for first in 0..=u32::MAX - 2 {
+        if !occupied.contains(&first)
+            && !occupied.contains(&(first + 1))
+            && !occupied.contains(&(first + 2))
+        {
+            return Ok(ExactAtlasDistantHorizonsVaryingLocations {
+                tile_uv: first,
+                atlas_rect: first + 1,
+                tint_and_material: first + 2,
+            });
+        }
+    }
+    Err(GalError::unsupported_feature(
+        "Distant Horizons source has no three-location interval for the exact-atlas adapter",
+    ))
+}
+
+fn inject_exact_atlas_distant_horizons_vertex_adapter(
+    source: &str,
+    locations: ExactAtlasDistantHorizonsVaryingLocations,
+) -> GalResult<String> {
+    let start = source.find("struct VulkanicDistantHorizonsVertex {").ok_or_else(|| {
+        GalError::unsupported_feature(
+            "Distant Horizons source vertex adapter could not find the semantic vertex-color definition",
+        )
+    })?;
+    let end_marker = "#define vulkanic_source_ftransform() (dhProjection * vulkanic_source_model_view * vulkanic_source_position)";
+    let end = source[start..]
+        .find(end_marker)
+        .map(|offset| start + offset + end_marker.len())
+        .ok_or_else(|| {
+            GalError::unsupported_feature(
+                "Distant Horizons source vertex adapter could not find the semantic transform definition",
+            )
+        })?;
+    let preamble = r#"struct VulkanicDistantHorizonsExactAtlasVertex {
+    float local_x;
+    float local_y;
+    float local_z;
+    float micro_x;
+    float micro_y;
+    float micro_z;
+    float tile_u;
+    float tile_v;
+    float atlas_u0;
+    float atlas_v0;
+    float atlas_u1;
+    float atlas_v1;
+    uint color_rgba;
+    uint light_normal_tint_material;
+};
+layout(set = 0, binding = 0, std430) readonly buffer VulkanicDistantHorizonsExactAtlasVertices {
+    VulkanicDistantHorizonsExactAtlasVertex vulkanic_source_dh_vertices[];
+};
+layout(set = 0, binding = 1, std140) uniform VulkanicDistantHorizonsColumnFrame {
+    mat4 vulkanic_source_dh_unused_combined_matrix;
+    vec4 vulkanic_source_dh_column_origin_and_world_y;
+    vec4 vulkanic_source_dh_model_offset_and_reserved;
+    vec4 vulkanic_source_dh_clip_micro_noise_earth;
+    uvec4 vulkanic_source_dh_flags_and_noise;
+};
+#define VULKANIC_SOURCE_DH_ATLAS_TILE_LOCATION __VULKANIC_SOURCE_DH_ATLAS_TILE_LOCATION__
+#define VULKANIC_SOURCE_DH_ATLAS_RECT_LOCATION __VULKANIC_SOURCE_DH_ATLAS_RECT_LOCATION__
+#define VULKANIC_SOURCE_DH_ATLAS_TINT_LOCATION __VULKANIC_SOURCE_DH_ATLAS_TINT_LOCATION__
+layout(location = VULKANIC_SOURCE_DH_ATLAS_TILE_LOCATION) out vec2 vulkanic_source_dh_atlas_tile_uv;
+layout(location = VULKANIC_SOURCE_DH_ATLAS_RECT_LOCATION) flat out vec4 vulkanic_source_dh_atlas_rect;
+layout(location = VULKANIC_SOURCE_DH_ATLAS_TINT_LOCATION) flat out uint vulkanic_source_dh_atlas_tint_and_material;
+#define vulkanic_source_dh_vertex vulkanic_source_dh_vertices[gl_VertexIndex]
+vec3 vulkanic_source_dh_normal(uint normal) {
+    if (normal == 0u) return vec3(0.0, -1.0, 0.0);
+    if (normal == 1u) return vec3(0.0, 1.0, 0.0);
+    if (normal == 2u) return vec3(0.0, 0.0, -1.0);
+    if (normal == 3u) return vec3(0.0, 0.0, 1.0);
+    if (normal == 4u) return vec3(-1.0, 0.0, 0.0);
+    return vec3(1.0, 0.0, 0.0);
+}
+vec4 vulkanic_source_dh_position() {
+    return vec4(
+        vec3(vulkanic_source_dh_vertex.local_x, vulkanic_source_dh_vertex.local_y, vulkanic_source_dh_vertex.local_z)
+            // Match Iris's DHTerrainTransformer: compact DH micro offsets
+            // perturb the horizontal quad edges only.
+            + vec3(vulkanic_source_dh_vertex.micro_x, 0.0, vulkanic_source_dh_vertex.micro_z)
+            // The column origin already carries the dimension's minimum Y.
+            // Keep worldYOffset as source-pack context, never as a second
+            // geometry translation.
+            + vulkanic_source_dh_model_offset_and_reserved.xyz,
+        1.0
+    );
+}
+vec4 vulkanic_source_dh_vertex_color() {
+    return vec4(
+        float(vulkanic_source_dh_vertex.color_rgba & 0xffu),
+        float((vulkanic_source_dh_vertex.color_rgba >> 8u) & 0xffu),
+        float((vulkanic_source_dh_vertex.color_rgba >> 16u) & 0xffu),
+        float((vulkanic_source_dh_vertex.color_rgba >> 24u) & 0xffu)
+    ) / 255.0;
+}
+vec2 vulkanic_source_dh_packed_lightmap_coordinates() {
+    return (vec2(
+        // Iris's DHTerrainTransformer expands the packed byte as
+        // `(blockLight, skyLight)`: upper nibble first, lower nibble second.
+        // The copied DH semantic record retains the original order as
+        // `(skyLight, blockLight)`, so preserve the source lightmap contract
+        // here instead of treating its byte layout as a texture coordinate.
+        float((vulkanic_source_dh_vertex.light_normal_tint_material >> 8u) & 0xffu),
+        float(vulkanic_source_dh_vertex.light_normal_tint_material & 0xffu)
+    ) + vec2(0.5)) / 16.0;
+}
+#define vulkanic_source_texture_matrix (mat4[2](mat4(1.0), mat4(1.0)))
+#define vulkanic_source_lightmap_uv vec4(vulkanic_source_dh_packed_lightmap_coordinates(), 0.0, 1.0)
+#define vulkanic_source_position vulkanic_source_dh_position()
+#define vulkanic_source_vertex_color vulkanic_source_dh_vertex_color()
+#define vulkanic_source_normal vulkanic_source_dh_normal((vulkanic_source_dh_vertex.light_normal_tint_material >> 16u) & 0xffu)
+#define vulkanic_source_dh_material_id int((vulkanic_source_dh_vertex.light_normal_tint_material >> 25u) & 0x0fu)
+#define vulkanic_source_model_view dhModelView
+#define vulkanic_source_normal_matrix transpose(inverse(mat3(vulkanic_source_model_view)))
+#define vulkanic_source_ftransform() (dhProjection * vulkanic_source_model_view * vulkanic_source_position)"#;
+    let preamble = preamble
+        .replace(
+            "__VULKANIC_SOURCE_DH_ATLAS_TILE_LOCATION__",
+            &locations.tile_uv.to_string(),
+        )
+        .replace(
+            "__VULKANIC_SOURCE_DH_ATLAS_RECT_LOCATION__",
+            &locations.atlas_rect.to_string(),
+        )
+        .replace(
+            "__VULKANIC_SOURCE_DH_ATLAS_TINT_LOCATION__",
+            &locations.tint_and_material.to_string(),
+        );
+    let mut lowered = String::with_capacity(source.len() + preamble.len());
+    lowered.push_str(&source[..start]);
+    lowered.push_str(&preamble);
+    lowered.push_str(&source[end..]);
+    let closing = main_function_closing_brace(&lowered).ok_or_else(|| {
+        GalError::invalid_argument(
+            "Distant Horizons source vertex adapter requires a brace-balanced void main body",
+        )
+    })?;
+    lowered.insert_str(
+        closing,
+        r#"
+    vulkanic_source_dh_atlas_tile_uv = vec2(vulkanic_source_dh_vertex.tile_u, vulkanic_source_dh_vertex.tile_v);
+    vulkanic_source_dh_atlas_rect = vec4(vulkanic_source_dh_vertex.atlas_u0, vulkanic_source_dh_vertex.atlas_v0, vulkanic_source_dh_vertex.atlas_u1, vulkanic_source_dh_vertex.atlas_v1);
+    vulkanic_source_dh_atlas_tint_and_material = vulkanic_source_dh_vertex.light_normal_tint_material >> 24u;
+"#,
+    );
+    Ok(lowered)
+}
+
+fn inject_exact_atlas_distant_horizons_fragment_adapter(
+    source: &str,
+    locations: ExactAtlasDistantHorizonsVaryingLocations,
+) -> GalResult<String> {
+    if !source.contains("void main()") {
+        return Err(GalError::invalid_argument(
+            "Distant Horizons source fragment adapter requires a void main function",
+        ));
+    }
+    let declarations = r#"
+layout(set = 2, binding = 0) uniform texture2D vulkanic_source_dh_atlas_texture;
+layout(set = 2, binding = 1) uniform sampler vulkanic_source_dh_atlas_sampler;
+#define VULKANIC_SOURCE_DH_ATLAS_TILE_LOCATION __VULKANIC_SOURCE_DH_ATLAS_TILE_LOCATION__
+#define VULKANIC_SOURCE_DH_ATLAS_RECT_LOCATION __VULKANIC_SOURCE_DH_ATLAS_RECT_LOCATION__
+#define VULKANIC_SOURCE_DH_ATLAS_TINT_LOCATION __VULKANIC_SOURCE_DH_ATLAS_TINT_LOCATION__
+layout(location = VULKANIC_SOURCE_DH_ATLAS_TILE_LOCATION) in vec2 vulkanic_source_dh_atlas_tile_uv;
+layout(location = VULKANIC_SOURCE_DH_ATLAS_RECT_LOCATION) flat in vec4 vulkanic_source_dh_atlas_rect;
+layout(location = VULKANIC_SOURCE_DH_ATLAS_TINT_LOCATION) flat in uint vulkanic_source_dh_atlas_tint_and_material;
+vec4 vulkanic_source_dh_atlas_color() {
+    vec2 extent = vec2(textureSize(sampler2D(vulkanic_source_dh_atlas_texture, vulkanic_source_dh_atlas_sampler), 0));
+    vec2 texel = vec2(0.5) / extent;
+    vec2 sprite_min = vulkanic_source_dh_atlas_rect.xy + texel;
+    vec2 sprite_max = vulkanic_source_dh_atlas_rect.zw - texel;
+    vec2 atlas_uv = mix(sprite_min, max(sprite_min, sprite_max), fract(vulkanic_source_dh_atlas_tile_uv));
+    vec4 color = texture(sampler2D(vulkanic_source_dh_atlas_texture, vulkanic_source_dh_atlas_sampler), atlas_uv);
+    // DH's reduced vertex color is still a semantic material input after an
+    // exact sprite replaces the reduced-color-only route. It carries the
+    // source material's face color for ordinary blocks as well as biome tint
+    // for tinted blocks. Applying it only to the tint bit loses that source
+    // factor for materials such as redstone ore and terracotta.
+    color.rgb *= glColor.rgb;
+    color.a *= glColor.a;
+    return color;
+}
+"#;
+    // The lowered source declares pack varyings, including `glColor`, between
+    // its version line and main. Insert our extra interface after that source
+    // interface so the adapter can consume the selected program's color
+    // semantic without assuming a declaration order.
+    let declarations = declarations
+        .replace(
+            "__VULKANIC_SOURCE_DH_ATLAS_TILE_LOCATION__",
+            &locations.tile_uv.to_string(),
+        )
+        .replace(
+            "__VULKANIC_SOURCE_DH_ATLAS_RECT_LOCATION__",
+            &locations.atlas_rect.to_string(),
+        )
+        .replace(
+            "__VULKANIC_SOURCE_DH_ATLAS_TINT_LOCATION__",
+            &locations.tint_and_material.to_string(),
+        );
+    let mut lowered = insert_before_main(source, &declarations)?;
+    let anchor = "vec4 color = vec4(glColor.rgb, 1.0);";
+    if !lowered.contains(anchor) {
+        return Err(GalError::unsupported_feature(
+            "Distant Horizons source fragment adapter could not locate the source color initialization",
+        ));
+    }
+    lowered = lowered.replacen(anchor, "vec4 color = vulkanic_source_dh_atlas_color();", 1);
+    apply_exact_atlas_distant_horizons_fragment_probe(
+        &mut lowered,
+        std::env::var("MATTMC_RUST_SELECTED_SOURCE_FRAGMENT_PROBE")
+            .ok()
+            .as_deref(),
+    )?;
+    Ok(lowered)
+}
+
+/// The regular selected-source fragment probe operates on the near-terrain
+/// `tex`/`texCoord` interface. The exact-atlas DH adapter has a deliberately
+/// different interface, so its probe must be injected here, after this
+/// adapter has supplied the atlas color. Keeping it local prevents a capture
+/// receipt from claiming that a near-terrain-only probe observed DH output.
+fn apply_exact_atlas_distant_horizons_fragment_probe(
+    source: &mut String,
+    mode: Option<&str>,
+) -> GalResult<()> {
+    let Some(mode) = mode.map(str::trim).filter(|mode| !mode.is_empty()) else {
+        return Ok(());
+    };
+    let (label, probe) = match mode {
+        "atlas" => (
+            "atlas",
+            "out_distant_horizons_lit_color = color;\n    return;",
+        ),
+        "atlas-uv" => (
+            "atlas-uv",
+            "out_distant_horizons_lit_color = vec4(fract(vulkanic_source_dh_atlas_tile_uv), 0.0, 1.0);\n    return;",
+        ),
+        "atlas-alpha" => (
+            "atlas-alpha",
+            "out_distant_horizons_lit_color = vec4(vec3(color.a), 1.0);\n    return;",
+        ),
+        // These checkpoints preserve the real selected-source program and
+        // its Rust-owned target/resources while locating whether the first
+        // visible loss is before or inside the pack lighting function.
+        // They remain unavailable unless a graphics-audit capture opts in.
+        "pre-lighting" => (
+            "pre-lighting",
+            "out_distant_horizons_lit_color = color;\n    return;",
+        ),
+        "lightmap" => (
+            "lightmap",
+            "out_distant_horizons_lit_color = vec4(lmCoord, 0.0, 1.0);\n    return;",
+        ),
+        // Other modes are defined by the near-terrain source interface and
+        // intentionally leave the DH program unmodified. This lets a single
+        // capture use a terrain-only probe without inventing DH semantics.
+        _ => return Ok(()),
+    };
+    let anchor = "vec4 color = vulkanic_source_dh_atlas_color();";
+    if !source.contains(anchor) {
+        return Err(GalError::invalid_argument(format!(
+            "exact-atlas Distant Horizons {label} probe could not locate the adapter color initialization"
+        )));
+    }
+    let insertion = match label {
+        "pre-lighting" => {
+            let anchor = "DoLighting(color, shadowMult,";
+            source.find(anchor).ok_or_else(|| {
+                GalError::invalid_argument(
+                    "exact-atlas Distant Horizons pre-lighting probe could not locate the source lighting call",
+                )
+            })?
+        }
+        _ => source.find(anchor).expect("checked source anchor") + anchor.len(),
+    };
+    source.insert_str(
+        insertion,
+        &format!("\n    // selected-source diagnostic probe: {label}\n    {probe}\n"),
+    );
+    Ok(())
+}
+
+fn main_function_closing_brace(source: &str) -> Option<usize> {
+    let main = source.find("void main()")?;
+    let open = source[main..].find('{')? + main;
+    let mut depth = 0usize;
+    for (offset, character) in source[open..].char_indices() {
+        match character {
+            '{' => depth += 1,
+            '}' => {
+                depth = depth.checked_sub(1)?;
+                if depth == 0 {
+                    return Some(open + offset);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+fn insert_before_main(source: &str, declarations: &str) -> GalResult<String> {
+    let main = source.find("void main()").ok_or_else(|| {
+        GalError::invalid_argument("lowered shader source has no void main function")
+    })?;
+    let mut output = String::with_capacity(source.len() + declarations.len());
+    output.push_str(&source[..main]);
+    output.push_str(declarations);
+    output.push_str(&source[main..]);
+    Ok(output)
+}
+
+/// Source-derived preparation for a pass-local fullscreen stage. This covers
+/// deferred/composite consumers without relabeling them as terrain meshes or
+/// inheriting an Iris/Java fullscreen draw. It owns no target, pipeline,
+/// descriptor set, or route selection.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct LoweredFullscreenSourceProgram {
+    pub identity: ProgramIdentity,
+    /// Pack-relative source stage identity retained for diagnostics and
+    /// source-to-runtime correlation. It is semantic shader-pack metadata,
+    /// not an attachment, native program, or backend handle.
+    pub source_stage_path: String,
+    pub shader_pack_generation: u64,
+    /// Explicit Rust-owned geometry contract for this source stage. Backends
+    /// receive only its draw count, never Java/Iris buffers or state.
+    pub raster_primitive: FullscreenSourceRasterPrimitive,
+    pub vertex: ShaderStageSource,
+    pub fragment: ShaderStageSource,
+    pub execution_interface: FullscreenSourceExecutionInterface,
+    pub scalar_uniform_requirements: TerrainSourceUniformRequirements,
+    pub opaque_resource_bindings: TerrainSourceOpaqueResourceBindingPlan,
+    pub outputs: Vec<FullscreenSourceFragmentOutput>,
+    /// A source fullscreen pass cannot sample and write the same semantic
+    /// color resource in one draw. These requirements force a future Rust
+    /// executor to allocate an explicit previous/current pair instead of
+    /// accidentally binding one image for both uses.
+    pub feedback_requirements: Vec<FullscreenSourceFeedbackRequirement>,
+    /// Program-local source directives requesting mip generation for a
+    /// semantic pack color before this pass samples it. The source language
+    /// keeps these directives in the fragment stage; they are not global
+    /// attachment metadata and cannot be guessed from texture usage alone.
+    pub mipmap_requirements: Vec<FullscreenSourceMipmapRequirement>,
+}
+
+/// One source-declared sampled/output alias that needs a Rust-owned feedback
+/// pair. The source location and binding are retained only for diagnostic
+/// correlation; allocation and native image identity remain runtime-private.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FullscreenSourceFeedbackRequirement {
+    pub role: TerrainSourceResourceRole,
+    pub sampled_binding: u32,
+    pub output_location: u32,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FullscreenSourceMipmapRequirement {
+    pub role: TerrainSourceResourceRole,
+    pub sampled_binding: u32,
+}
+
+/// Fixed backend-neutral source ABI for a fullscreen pass. A Rust-owned
+/// procedural triangle supplies position, primary UV, and secondary UV from
+/// the draw vertex index, so no Java/Iris stream or backend-specific vertex
+/// declaration participates. The second coordinate retains the semantic role
+/// of legacy texture-coordinate set one. Set zero owns only semantic texture
+/// transforms and scalar source uniforms; sampled resources remain in the
+/// separate pack set.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FullscreenSourceExecutionInterface {
+    pub texture_transforms: TerrainSourceFixedBinding,
+    pub texture_transform_bytes: u32,
+    pub scalar_uniforms: Option<TerrainSourceFixedBinding>,
+    pub scalar_uniform_bytes: u32,
+    pub scalar_uniform_fields: Vec<TerrainSourceUniformField>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FullscreenSourceExecutionLayouts {
+    pub source_data: ResourceLayoutDesc,
+    pub pack_resources: ResourceLayoutDesc,
+}
+
+impl FullscreenSourceExecutionInterface {
+    const TEXTURE_TRANSFORMS: TerrainSourceFixedBinding = TerrainSourceFixedBinding {
+        set: 0,
+        binding: 0,
+        kind: TerrainSourceBindingKind::UniformBuffer,
+    };
+    const SCALAR_UNIFORMS: TerrainSourceFixedBinding = TerrainSourceFixedBinding {
+        set: 0,
+        binding: 2,
+        kind: TerrainSourceBindingKind::UniformBuffer,
+    };
+
+    fn from_lowered_pair(lowered: &LoweredFullscreenSourcePair) -> Self {
+        let contract = lowered.uniform_contract();
+        Self {
+            texture_transforms: Self::TEXTURE_TRANSFORMS,
+            texture_transform_bytes: 2 * 16 * std::mem::size_of::<f32>() as u32,
+            scalar_uniforms: (!contract.fields().is_empty()).then_some(Self::SCALAR_UNIFORMS),
+            scalar_uniform_bytes: contract.std140_size(),
+            scalar_uniform_fields: contract.fields().to_vec(),
+        }
+    }
+
+    pub fn validate(&self) -> GalResult<()> {
+        if self.texture_transforms != Self::TEXTURE_TRANSFORMS
+            || self.texture_transform_bytes != 128
+        {
+            return Err(GalError::invalid_argument(
+                "fullscreen source texture transforms must use fixed set 0 binding 0 with two std140 mat4 values",
+            ));
+        }
+        validate_source_scalar_uniform_block(
+            self.scalar_uniforms,
+            self.scalar_uniform_bytes,
+            &self.scalar_uniform_fields,
+            Self::SCALAR_UNIFORMS,
+            "fullscreen source",
+        )
+    }
+}
+
+impl LoweredFullscreenSourceProgram {
+    pub fn shader_module_descriptors(&self, api: BackendApi) -> [ShaderModuleDesc; 2] {
+        [
+            self.vertex.shader_module_descriptor(api),
+            self.fragment.shader_module_descriptor(api),
+        ]
+    }
+
+    pub fn pack_scalar_uniforms(&self, frame: &TerrainSourceUniformFrame) -> GalResult<Vec<u8>> {
+        let bytes = frame.pack_std140(&self.scalar_uniform_requirements)?;
+        if bytes.len() != self.execution_interface.scalar_uniform_bytes as usize {
+            return Err(GalError::invalid_argument(format!(
+                "fullscreen source scalar uniform pack is {} bytes but program ABI requires {}",
+                bytes.len(),
+                self.execution_interface.scalar_uniform_bytes
+            )));
+        }
+        Ok(bytes)
+    }
+
+    pub fn pack_texture_transforms(
+        &self,
+        transforms: &TerrainSourceTextureTransforms,
+    ) -> GalResult<Vec<u8>> {
+        self.execution_interface.validate()?;
+        transforms.validate()?;
+        let mut bytes =
+            Vec::with_capacity(self.execution_interface.texture_transform_bytes as usize);
+        for value in transforms
+            .atlas_texture_matrix
+            .iter()
+            .chain(transforms.lightmap_texture_matrix.iter())
+        {
+            bytes.extend_from_slice(&value.to_ne_bytes());
+        }
+        if bytes.len() != self.execution_interface.texture_transform_bytes as usize {
+            return Err(GalError::invalid_argument(
+                "fullscreen source texture transform pack does not match its fixed ABI size",
+            ));
+        }
+        Ok(bytes)
+    }
+
+    pub fn execution_resource_layouts(&self) -> GalResult<FullscreenSourceExecutionLayouts> {
+        self.execution_interface.validate()?;
+        let mut source_data_bindings = vec![resource_binding_descriptor(
+            self.execution_interface.texture_transforms,
+            true,
+        )];
+        if let Some(scalar_uniforms) = self.execution_interface.scalar_uniforms {
+            source_data_bindings.push(resource_binding_descriptor(scalar_uniforms, true));
+        }
+        source_data_bindings.sort_by_key(|binding| binding.binding);
+        validate_unique_layout_bindings("fullscreen source data", &source_data_bindings)?;
+        Ok(FullscreenSourceExecutionLayouts {
+            source_data: ResourceLayoutDesc {
+                label: format!("{}:source-data", self.identity.as_str()),
+                bindings: source_data_bindings,
+            },
+            pack_resources: source_pack_resource_layout(
+                format!("{}:pack-resources", self.identity.as_str()),
+                &self.opaque_resource_bindings,
+            )?,
+        })
+    }
+
+    pub fn require_semantic_resources(
+        &self,
+        availability: &TerrainSourceResourceAvailabilitySet,
+    ) -> GalResult<()> {
+        if availability.shader_pack_generation() != self.shader_pack_generation {
+            return Err(GalError::invalid_argument(format!(
+                "fullscreen source program generation {} does not match resource availability generation {}",
+                self.shader_pack_generation,
+                availability.shader_pack_generation()
+            )));
+        }
+        for binding in self.opaque_resource_bindings.bindings() {
+            if availability.resource_for(binding.role()).is_none() {
+                return Err(GalError::invalid_argument(format!(
+                    "fullscreen source resource '{}' is unavailable for semantic role '{}'",
+                    binding.resource_name(),
+                    binding.role().semantic_name()
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    /// Builds the deterministic set-one GAL description for the semantic
+    /// fullscreen source-resource plan. The caller owns the resources and
+    /// pass lifetime; this only maps already validated semantic roles into a
+    /// backend-neutral GAL descriptor set.
+    pub fn pack_resource_set_desc(
+        &self,
+        label: impl Into<String>,
+        layout: Handle,
+        resources: &TerrainSourceOwnedResourceSet,
+    ) -> GalResult<ResourceSetDesc> {
+        if layout.kind() != Some(HandleKind::ResourceLayout) {
+            return Err(GalError::invalid_argument(
+                "fullscreen source pack resources require a GAL resource-layout handle",
+            ));
+        }
+        self.execution_resource_layouts()?;
+        self.require_semantic_resources(resources.availability())?;
+        let mut bindings = Vec::with_capacity(self.opaque_resource_bindings.bindings().len());
+        for source_binding in self.opaque_resource_bindings.bindings() {
+            let (resource, kind, access) = match source_binding.kind() {
+                TerrainSourceOpaqueResourceKind::CombinedTextureSampler => (
+                    resources
+                        .combined_sampler_for(source_binding.role())
+                        .ok_or_else(|| {
+                            GalError::invalid_argument(format!(
+                                "fullscreen source resource '{}' has no owned sampler for semantic role '{}'",
+                                source_binding.resource_name(),
+                                source_binding.role().semantic_name()
+                            ))
+                        })?,
+                    ResourceBindingKind::CombinedTextureSampler,
+                    AccessFlags::READ,
+                ),
+                TerrainSourceOpaqueResourceKind::StorageImage => (
+                    resources
+                        .storage_texture_for(source_binding.role())
+                        .ok_or_else(|| {
+                            GalError::invalid_argument(format!(
+                                "fullscreen source storage resource '{}' has no owned texture view for semantic role '{}'",
+                                source_binding.resource_name(),
+                                source_binding.role().semantic_name()
+                            ))
+                        })?,
+                    ResourceBindingKind::StorageTexture,
+                    source_storage_access(source_binding.qualifiers())?,
+                ),
+            };
+            bindings.push(ResourceBinding {
+                binding: source_binding.binding(),
+                array_index: 0,
+                resource,
+                kind,
+                access,
+                dynamic_offsets: Vec::new(),
+                buffer_range: None,
+            });
+        }
+        Ok(ResourceSetDesc {
+            label: label.into(),
+            layout,
+            bindings,
+        })
+    }
+}
+
+/// Fixed Rust-owned descriptor ABI inserted by the DH source lowerer.
+/// Binding numbers describe owned semantic resources only; they do not map to
+/// Java, Iris, OpenGL, or Vulkan objects.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DistantHorizonsSourceExecutionInterface {
+    pub vertex_stream: TerrainSourceFixedBinding,
+    pub vertex_stride: u32,
+    /// The texture identity carried by the source vertex stream. This is
+    /// semantic shader-pack data, never a backend texture binding.
+    pub material_identity_contract: DistantHorizonsMaterialIdentityContract,
+    pub column_frame: TerrainSourceFixedBinding,
+    pub column_frame_bytes: u32,
+    pub scalar_uniforms: Option<TerrainSourceFixedBinding>,
+    pub scalar_uniform_bytes: u32,
+    pub scalar_uniform_fields: Vec<TerrainSourceUniformField>,
+}
+
+/// Describes whether a Distant Horizons source stream can identify the exact
+/// Minecraft material sampled by a terrain fragment. A reduced vertex color
+/// and material category are deliberately insufficient: they cannot stand in
+/// for atlas UVs and an atlas-backed material identity.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DistantHorizonsMaterialIdentityContract {
+    ReducedColorMaterialCategory,
+    AtlasBacked,
+}
+
+/// Backend-neutral layouts for a lowered DH source program. Descriptor set
+/// zero contains only fixed DH geometry/frame/scalar semantics; descriptor
+/// set one contains source-declared semantic sampler/image roles.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DistantHorizonsSourceExecutionLayouts {
+    pub source_data: ResourceLayoutDesc,
+    pub pack_resources: ResourceLayoutDesc,
+}
+
+impl DistantHorizonsSourceExecutionInterface {
+    const VERTEX_STREAM: TerrainSourceFixedBinding = TerrainSourceFixedBinding {
+        set: 0,
+        binding: 0,
+        kind: TerrainSourceBindingKind::StorageBuffer,
+    };
+    const COLUMN_FRAME: TerrainSourceFixedBinding = TerrainSourceFixedBinding {
+        set: 0,
+        binding: 1,
+        kind: TerrainSourceBindingKind::UniformBuffer,
+    };
+    const SCALAR_UNIFORMS: TerrainSourceFixedBinding = TerrainSourceFixedBinding {
+        set: 0,
+        binding: 2,
+        kind: TerrainSourceBindingKind::UniformBuffer,
+    };
+
+    fn from_lowered_pair(lowered: &LoweredDistantHorizonsSourcePair) -> Self {
+        let contract = lowered.uniform_contract();
+        Self {
+            vertex_stream: Self::VERTEX_STREAM,
+            vertex_stride: DISTANT_HORIZONS_SOURCE_VERTEX_BYTES as u32,
+            material_identity_contract:
+                DistantHorizonsMaterialIdentityContract::ReducedColorMaterialCategory,
+            column_frame: Self::COLUMN_FRAME,
+            column_frame_bytes: DISTANT_HORIZONS_SOURCE_COLUMN_FRAME_BYTES as u32,
+            scalar_uniforms: (!contract.fields().is_empty()).then_some(Self::SCALAR_UNIFORMS),
+            scalar_uniform_bytes: contract.std140_size(),
+            scalar_uniform_fields: contract.fields().to_vec(),
+        }
+    }
+
+    pub fn validate(&self) -> GalResult<()> {
+        if self.vertex_stream != Self::VERTEX_STREAM
+            || !matches!(
+                self.vertex_stride as usize,
+                DISTANT_HORIZONS_SOURCE_VERTEX_BYTES
+                    | DISTANT_HORIZONS_EXACT_ATLAS_SOURCE_VERTEX_BYTES
+            )
+        {
+            return Err(GalError::invalid_argument(format!(
+                "Distant Horizons source vertex stream must use fixed set 0 binding 0 with {}-byte reduced-color or {}-byte exact-atlas records",
+                DISTANT_HORIZONS_SOURCE_VERTEX_BYTES,
+                DISTANT_HORIZONS_EXACT_ATLAS_SOURCE_VERTEX_BYTES,
+            )));
+        }
+        if self.column_frame != Self::COLUMN_FRAME
+            || self.column_frame_bytes != DISTANT_HORIZONS_SOURCE_COLUMN_FRAME_BYTES as u32
+        {
+            return Err(GalError::invalid_argument(format!(
+                "Distant Horizons source column frame must use fixed set 0 binding 1 with {} bytes",
+                DISTANT_HORIZONS_SOURCE_COLUMN_FRAME_BYTES
+            )));
+        }
+        validate_source_scalar_uniform_block(
+            self.scalar_uniforms,
+            self.scalar_uniform_bytes,
+            &self.scalar_uniform_fields,
+            Self::SCALAR_UNIFORMS,
+            "Distant Horizons source",
+        )
+    }
+
+    pub fn has_exact_material_texture_identity(&self) -> bool {
+        matches!(
+            self.material_identity_contract,
+            DistantHorizonsMaterialIdentityContract::AtlasBacked
+        )
+    }
+}
+
+impl LoweredDistantHorizonsSourceProgram {
+    /// A selected shader-pack DH program may own a frame only when its copied
+    /// semantic stream can identify the exact material texture it samples.
+    /// Declaring an atlas sampler alone is not sufficient; the vertex stream
+    /// must also carry atlas-addressable material identity.
+    pub fn has_exact_material_texture_identity(&self) -> bool {
+        self.execution_interface
+            .has_exact_material_texture_identity()
+            && self
+                .opaque_resource_bindings
+                .bindings()
+                .iter()
+                .any(|binding| matches!(binding.role(), TerrainSourceResourceRole::MaterialAtlas))
+    }
+
+    pub fn shader_module_descriptors(&self, api: BackendApi) -> [ShaderModuleDesc; 2] {
+        [
+            self.vertex.shader_module_descriptor(api),
+            self.fragment.shader_module_descriptor(api),
+        ]
+    }
+
+    pub fn pack_scalar_uniforms(&self, frame: &TerrainSourceUniformFrame) -> GalResult<Vec<u8>> {
+        let bytes = frame.pack_std140(&self.scalar_uniform_requirements)?;
+        if bytes.len() != self.execution_interface.scalar_uniform_bytes as usize {
+            return Err(GalError::invalid_argument(format!(
+                "Distant Horizons source scalar uniform pack is {} bytes but program ABI requires {}",
+                bytes.len(), self.execution_interface.scalar_uniform_bytes
+            )));
+        }
+        Ok(bytes)
+    }
+
+    pub fn execution_resource_layouts(&self) -> GalResult<DistantHorizonsSourceExecutionLayouts> {
+        self.execution_interface.validate()?;
+        let mut source_data_bindings = vec![
+            resource_binding_descriptor(self.execution_interface.vertex_stream, false),
+            resource_binding_descriptor(self.execution_interface.column_frame, true),
+        ];
+        if let Some(scalar_uniforms) = self.execution_interface.scalar_uniforms {
+            source_data_bindings.push(resource_binding_descriptor(scalar_uniforms, true));
+        }
+        source_data_bindings.sort_by_key(|binding| binding.binding);
+        validate_unique_layout_bindings("Distant Horizons source data", &source_data_bindings)?;
+        Ok(DistantHorizonsSourceExecutionLayouts {
+            source_data: ResourceLayoutDesc {
+                label: format!("{}:source-data", self.identity.as_str()),
+                bindings: source_data_bindings,
+            },
+            pack_resources: source_pack_resource_layout(
+                format!("{}:pack-resources", self.identity.as_str()),
+                &self.opaque_resource_bindings,
+            )?,
+        })
+    }
+
+    /// Requires every source-declared sampler/image to be available as a
+    /// Rust-owned semantic resource from the same shader-pack generation.
+    /// This admits neither legacy DH textures nor Iris-managed bindings.
+    pub fn require_semantic_resources(
+        &self,
+        availability: &TerrainSourceResourceAvailabilitySet,
+    ) -> GalResult<()> {
+        if availability.shader_pack_generation() != self.shader_pack_generation {
+            return Err(GalError::invalid_argument(format!(
+                "Distant Horizons source program generation {} does not match resource availability generation {}",
+                self.shader_pack_generation,
+                availability.shader_pack_generation()
+            )));
+        }
+        for binding in self.opaque_resource_bindings.bindings() {
+            if availability.resource_for(binding.role()).is_none() {
+                return Err(GalError::invalid_argument(format!(
+                    "Distant Horizons source resource '{}' is unavailable for semantic role '{}'",
+                    binding.resource_name(),
+                    binding.role().semantic_name()
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    /// Builds the deterministic source pack-resource set for the DH program.
+    /// The resource set contains only owned GAL handles after their semantic
+    /// role and generation were checked above.
+    pub fn pack_resource_set_desc(
+        &self,
+        label: impl Into<String>,
+        layout: Handle,
+        resources: &TerrainSourceOwnedResourceSet,
+    ) -> GalResult<ResourceSetDesc> {
+        if layout.kind() != Some(HandleKind::ResourceLayout) {
+            return Err(GalError::invalid_argument(
+                "Distant Horizons source pack resources require a GAL resource-layout handle",
+            ));
+        }
+        self.execution_resource_layouts()?;
+        self.require_semantic_resources(resources.availability())?;
+        let mut bindings = Vec::with_capacity(self.opaque_resource_bindings.bindings().len());
+        for source_binding in self.opaque_resource_bindings.bindings() {
+            let (resource, kind, access) = match source_binding.kind() {
+                TerrainSourceOpaqueResourceKind::CombinedTextureSampler => (
+                    resources
+                        .combined_sampler_for(source_binding.role())
+                        .ok_or_else(|| {
+                            GalError::invalid_argument(format!(
+                                "Distant Horizons source resource '{}' has no owned sampler for semantic role '{}'",
+                                source_binding.resource_name(),
+                                source_binding.role().semantic_name()
+                            ))
+                        })?,
+                    ResourceBindingKind::CombinedTextureSampler,
+                    AccessFlags::READ,
+                ),
+                TerrainSourceOpaqueResourceKind::StorageImage => (
+                    resources
+                        .storage_texture_for(source_binding.role())
+                        .ok_or_else(|| {
+                            GalError::invalid_argument(format!(
+                                "Distant Horizons source resource '{}' has no owned storage texture view for semantic role '{}'",
+                                source_binding.resource_name(),
+                                source_binding.role().semantic_name()
+                            ))
+                        })?,
+                    ResourceBindingKind::StorageTexture,
+                    source_storage_access(source_binding.qualifiers())?,
+                ),
+            };
+            bindings.push(ResourceBinding {
+                binding: source_binding.binding(),
+                array_index: 0,
+                resource,
+                kind,
+                access,
+                dynamic_offsets: Vec::new(),
+                buffer_range: None,
+            });
+        }
+        Ok(ResourceSetDesc {
+            label: label.into(),
+            layout,
+            bindings,
+        })
+    }
+}
+
 impl LoweredTerrainSourceProgram {
+    /// Returns the source-derived terrain output schema when this is a normal
+    /// terrain program. Consumers use the semantic names to build Rust-owned
+    /// targets; attachment locations and native handles stay elsewhere.
+    pub fn terrain_outputs(&self) -> Option<&[TerrainPassOutput]> {
+        self.terrain_outputs.as_deref()
+    }
+
+    /// Retains the selected source pass's named-output to shader-pack-color
+    /// mapping. Normal terrain consumers resolve this through the source
+    /// target manifest before constructing an explicit GAL target.
+    pub fn terrain_output_color_slots(&self) -> Option<&[(TerrainPassOutput, u32)]> {
+        self.terrain_output_color_slots.as_deref()
+    }
+
     /// Produces explicit GAL shader descriptions from the retained, lowered
     /// source pair. Creating these descriptions does not allocate shader
     /// modules, make a pipeline, bind resources, or select a render route.
@@ -131,6 +1328,23 @@ impl LoweredTerrainSourceProgram {
             self.vertex.shader_module_descriptor(api),
             self.fragment.shader_module_descriptor(api),
         ]
+    }
+
+    /// Returns the source-declared raster semantics only for the independent
+    /// translucent stage. Callers must translate this to explicit GAL state;
+    /// it never exposes a legacy renderer state object.
+    pub fn translucent_raster_state(&self) -> Option<TerrainTranslucentRasterState> {
+        self.translucent_raster_state
+    }
+
+    /// Maps the source's semantic translucent blend rule to the explicit GAL
+    /// pipeline model. This mapping is shared by both Rust backends; neither
+    /// OpenGL blend state nor Vulkan blend factors leak out of the backends.
+    pub fn translucent_blend_mode(&self) -> Option<BlendMode> {
+        self.translucent_raster_state
+            .map(|state| match state.blend {
+                TerrainTranslucentBlend::SourceAlphaOver => BlendMode::Alpha,
+            })
     }
 
     /// Packs only the named source semantics admitted by this prepared
@@ -182,6 +1396,9 @@ impl LoweredTerrainSourceProgram {
         self.execution_interface.validate()?;
 
         let mut source_data_bindings = vec![
+            // Material vertices share the completion-gated frame stream with
+            // transforms and scalar data. The explicit per-draw byte range
+            // is selected through this dynamic offset.
             resource_binding_descriptor(self.execution_interface.vertex_stream, false),
             resource_binding_descriptor(self.execution_interface.legacy_transforms, true),
             resource_binding_descriptor(self.execution_interface.instance_stream, true),
@@ -199,7 +1416,9 @@ impl LoweredTerrainSourceProgram {
                 TerrainSourceOpaqueResourceKind::CombinedTextureSampler => {
                     ResourceBindingKind::CombinedTextureSampler
                 }
-                TerrainSourceOpaqueResourceKind::StorageImage => ResourceBindingKind::StorageTexture,
+                TerrainSourceOpaqueResourceKind::StorageImage => {
+                    ResourceBindingKind::StorageTexture
+                }
             };
             pack_resource_bindings.push(ResourceBindingDesc {
                 binding: source_binding.binding(),
@@ -316,6 +1535,898 @@ impl LoweredTerrainSourceProgram {
     }
 }
 
+impl LoweredEntitySourceProgram {
+    /// Converts retained entity source into explicit GAL shader descriptions.
+    /// Backend compilation remains private to the backend and this does not
+    /// allocate a pipeline or choose a rendering route.
+    pub fn shader_module_descriptors(&self, api: BackendApi) -> [ShaderModuleDesc; 2] {
+        [
+            self.vertex.shader_module_descriptor(api),
+            self.fragment.shader_module_descriptor(api),
+        ]
+    }
+
+    /// Creates the source-derived entity stages for one explicit material
+    /// alpha contract.  This is a semantic pipeline specialization, not a
+    /// backend alpha-test state: Java's cutout policy is represented by the
+    /// copied material mode and Rust supplies the corresponding shader hook.
+    pub fn shader_module_descriptors_with_alpha_cutoff(
+        &self,
+        api: BackendApi,
+        alpha_cutoff: Option<f32>,
+    ) -> [ShaderModuleDesc; 2] {
+        let fragment_source = match alpha_cutoff {
+            Some(cutoff) => {
+                debug_assert!(cutoff.is_finite() && cutoff >= 0.0);
+                let declaration =
+                    format!("#define VULKANIC_SOURCE_ENTITY_ALPHA_CUTOFF {cutoff:.8}\n");
+                self.fragment.source.replacen(
+                    "#version 450\n",
+                    &format!("#version 450\n{declaration}"),
+                    1,
+                )
+            }
+            None => self.fragment.source.clone(),
+        };
+        [
+            self.vertex.shader_module_descriptor(api),
+            ShaderModuleDesc {
+                label: self.fragment.label.clone(),
+                stage: ShaderStage::Fragment,
+                code_format: ShaderCodeFormat::Glsl,
+                code: shader_stage_code_for_backend(api, &fragment_source),
+                entry_point: self.fragment.entry_point.clone(),
+            },
+        ]
+    }
+
+    /// Packs only source-declared entity uniforms through the typed semantic
+    /// catalog. The caller must supply resolved `entityId` and `entityColor`;
+    /// arbitrary bytes and Java/Iris uniform state are rejected by design.
+    pub fn pack_scalar_uniforms(&self, frame: &TerrainSourceUniformFrame) -> GalResult<Vec<u8>> {
+        let bytes = frame.pack_std140(&self.scalar_uniform_requirements)?;
+        if bytes.len() != self.execution_interface.scalar_uniform_bytes as usize {
+            return Err(GalError::invalid_argument(format!(
+                "entity source scalar uniform pack is {} bytes but program ABI requires {}",
+                bytes.len(),
+                self.execution_interface.scalar_uniform_bytes
+            )));
+        }
+        Ok(bytes)
+    }
+
+    /// Packs the fixed source texture/lightmap transform block used by the
+    /// owned entity stream. Entity-local UVs use the identity atlas lane;
+    /// packed light coordinates retain the same explicit Minecraft semantic
+    /// conversion as terrain. No Java/Iris uniform block is borrowed.
+    pub fn pack_legacy_texture_transforms(
+        &self,
+        transforms: &TerrainSourceTextureTransforms,
+    ) -> GalResult<Vec<u8>> {
+        self.execution_interface.validate()?;
+        transforms.validate()?;
+        let mut bytes =
+            Vec::with_capacity(self.execution_interface.legacy_transform_bytes as usize);
+        for value in transforms
+            .atlas_texture_matrix
+            .iter()
+            .chain(transforms.lightmap_texture_matrix.iter())
+        {
+            bytes.extend_from_slice(&value.to_ne_bytes());
+        }
+        if bytes.len() != self.execution_interface.legacy_transform_bytes as usize {
+            return Err(GalError::invalid_argument(
+                "entity source legacy texture transform pack does not match its fixed ABI size",
+            ));
+        }
+        Ok(bytes)
+    }
+
+    /// Derives the closed GAL layout contract for one Rust-owned entity
+    /// writer. It uses the same fixed source stream ABI as terrain, but its
+    /// set-one roles remain entity-local (not terrain-atlas aliases).
+    pub fn execution_resource_layouts(&self) -> GalResult<TerrainSourceExecutionLayouts> {
+        self.execution_interface.validate()?;
+        let mut source_data_bindings = vec![
+            resource_binding_descriptor(self.execution_interface.vertex_stream, false),
+            resource_binding_descriptor(self.execution_interface.legacy_transforms, true),
+            resource_binding_descriptor(self.execution_interface.instance_stream, true),
+        ];
+        if let Some(scalar_uniforms) = self.execution_interface.scalar_uniforms {
+            source_data_bindings.push(resource_binding_descriptor(scalar_uniforms, true));
+        }
+        source_data_bindings.sort_by_key(|binding| binding.binding);
+        validate_unique_layout_bindings("entity source data", &source_data_bindings)?;
+
+        let mut pack_resource_bindings =
+            Vec::with_capacity(self.opaque_resource_bindings.bindings().len());
+        for source_binding in self.opaque_resource_bindings.bindings() {
+            let kind = match source_binding.kind() {
+                TerrainSourceOpaqueResourceKind::CombinedTextureSampler => {
+                    ResourceBindingKind::CombinedTextureSampler
+                }
+                TerrainSourceOpaqueResourceKind::StorageImage => {
+                    ResourceBindingKind::StorageTexture
+                }
+            };
+            pack_resource_bindings.push(ResourceBindingDesc {
+                binding: source_binding.binding(),
+                kind,
+                stages: PipelineStageFlags::DRAW,
+                array_count: 1,
+                optional: false,
+                dynamic_offset_count: 0,
+            });
+        }
+        pack_resource_bindings.sort_by_key(|binding| binding.binding);
+        validate_unique_layout_bindings("entity source pack resources", &pack_resource_bindings)?;
+
+        Ok(TerrainSourceExecutionLayouts {
+            source_data: ResourceLayoutDesc {
+                label: format!("{}:source-data", self.identity.as_str()),
+                bindings: source_data_bindings,
+            },
+            pack_resources: ResourceLayoutDesc {
+                label: format!("{}:pack-resources", self.identity.as_str()),
+                bindings: pack_resource_bindings,
+            },
+        })
+    }
+
+    /// Validates that every selected-pack entity resource is owned by Rust
+    /// for the same source generation. This is semantic availability only;
+    /// no descriptor set or backend object is created here.
+    pub fn require_semantic_resources(
+        &self,
+        availability: &TerrainSourceResourceAvailabilitySet,
+    ) -> GalResult<()> {
+        if availability.shader_pack_generation() != self.shader_pack_generation {
+            return Err(GalError::invalid_argument(format!(
+                "entity source program generation {} does not match resource availability generation {}",
+                self.shader_pack_generation,
+                availability.shader_pack_generation()
+            )));
+        }
+        for binding in self.opaque_resource_bindings.bindings() {
+            if availability.resource_for(binding.role()).is_none() {
+                return Err(GalError::invalid_argument(format!(
+                    "entity source resource '{}' is unavailable for semantic role '{}'",
+                    binding.resource_name(),
+                    binding.role().semantic_name()
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    /// Builds the explicit semantic set-one description for a future owned
+    /// entity pass. The caller must provide a local material resource from
+    /// Rust's cache; Java/Iris bindings cannot enter this boundary.
+    pub fn pack_resource_set_desc(
+        &self,
+        label: impl Into<String>,
+        layout: Handle,
+        resources: &TerrainSourceOwnedResourceSet,
+    ) -> GalResult<ResourceSetDesc> {
+        if layout.kind() != Some(HandleKind::ResourceLayout) {
+            return Err(GalError::invalid_argument(
+                "entity source pack resources require a GAL resource-layout handle",
+            ));
+        }
+        self.execution_resource_layouts()?;
+        self.require_semantic_resources(resources.availability())?;
+        let mut bindings = Vec::with_capacity(self.opaque_resource_bindings.bindings().len());
+        for source_binding in self.opaque_resource_bindings.bindings() {
+            let (resource, kind, access) = match source_binding.kind() {
+                TerrainSourceOpaqueResourceKind::CombinedTextureSampler => (
+                    resources
+                        .combined_sampler_for(source_binding.role())
+                        .ok_or_else(|| {
+                            GalError::invalid_argument(format!(
+                                "entity source resource '{}' has no owned sampler for semantic role '{}'",
+                                source_binding.resource_name(),
+                                source_binding.role().semantic_name()
+                            ))
+                        })?,
+                    ResourceBindingKind::CombinedTextureSampler,
+                    AccessFlags::READ,
+                ),
+                TerrainSourceOpaqueResourceKind::StorageImage => (
+                    resources
+                        .storage_texture_for(source_binding.role())
+                        .ok_or_else(|| {
+                            GalError::invalid_argument(format!(
+                                "entity source resource '{}' has no owned storage texture view for semantic role '{}'",
+                                source_binding.resource_name(),
+                                source_binding.role().semantic_name()
+                            ))
+                        })?,
+                    ResourceBindingKind::StorageTexture,
+                    source_storage_access(source_binding.qualifiers())?,
+                ),
+            };
+            bindings.push(ResourceBinding {
+                binding: source_binding.binding(),
+                array_index: 0,
+                resource,
+                kind,
+                access,
+                dynamic_offsets: Vec::new(),
+                buffer_range: None,
+            });
+        }
+        Ok(ResourceSetDesc {
+            label: label.into(),
+            layout,
+            bindings,
+        })
+    }
+
+    /// Resolves one copied semantic entity identity through the immutable
+    /// source generation retained by this program. This is CPU-only semantic
+    /// preparation, not a backend binding or uniform-location lookup.
+    pub fn resolve_draw_semantics(
+        &self,
+        entity_identity: &str,
+        entity_color_argb: u32,
+    ) -> GalResult<EntitySourceDrawSemantics> {
+        let semantics = self
+            .entity_contract
+            .resolve_draw_semantics(entity_identity, entity_color_argb)?;
+        if semantics.entity_id_generation != self.entity_id_generation {
+            return Err(GalError::invalid_argument(
+                "entity source program resolved a stale entity-id generation",
+            ));
+        }
+        Ok(semantics)
+    }
+
+    /// Named source outputs retain their shader-pack slot metadata without
+    /// exposing attachment indices or backend framebuffer state.
+    pub fn named_output_color_slots(&self) -> &[(TerrainPassOutput, u32)] {
+        &self.named_output_color_slots
+    }
+}
+
+impl LocalTexturedSourceProgram for LoweredEntitySourceProgram {
+    fn identity(&self) -> &ProgramIdentity {
+        &self.identity
+    }
+
+    fn shader_pack_generation(&self) -> u64 {
+        self.shader_pack_generation
+    }
+
+    fn execution_interface(&self) -> &TerrainSourceExecutionInterface {
+        &self.execution_interface
+    }
+
+    fn shader_module_descriptors_with_alpha_cutoff(
+        &self,
+        api: BackendApi,
+        alpha_cutoff: Option<f32>,
+    ) -> [ShaderModuleDesc; 2] {
+        LoweredEntitySourceProgram::shader_module_descriptors_with_alpha_cutoff(
+            self,
+            api,
+            alpha_cutoff,
+        )
+    }
+
+    fn execution_resource_layouts(&self) -> GalResult<TerrainSourceExecutionLayouts> {
+        LoweredEntitySourceProgram::execution_resource_layouts(self)
+    }
+
+    fn require_semantic_resources(
+        &self,
+        availability: &TerrainSourceResourceAvailabilitySet,
+    ) -> GalResult<()> {
+        LoweredEntitySourceProgram::require_semantic_resources(self, availability)
+    }
+
+    fn pack_resource_set_desc(
+        &self,
+        label: String,
+        layout: Handle,
+        resources: &TerrainSourceOwnedResourceSet,
+    ) -> GalResult<ResourceSetDesc> {
+        LoweredEntitySourceProgram::pack_resource_set_desc(self, label, layout, resources)
+    }
+}
+
+impl LoweredHandSourceProgram {
+    pub fn shader_module_descriptors(&self, api: BackendApi) -> [ShaderModuleDesc; 2] {
+        [
+            self.vertex.shader_module_descriptor(api),
+            self.fragment.shader_module_descriptor(api),
+        ]
+    }
+
+    /// The first-person writer has the same explicit cutout contract as an
+    /// entity writer, but the projection/depth domain remains hand-specific.
+    pub fn shader_module_descriptors_with_alpha_cutoff(
+        &self,
+        api: BackendApi,
+        alpha_cutoff: Option<f32>,
+    ) -> [ShaderModuleDesc; 2] {
+        let fragment_source = match alpha_cutoff {
+            Some(cutoff) => {
+                debug_assert!(cutoff.is_finite() && cutoff >= 0.0);
+                let declaration =
+                    format!("#define VULKANIC_SOURCE_ENTITY_ALPHA_CUTOFF {cutoff:.8}\n");
+                self.fragment.source.replacen(
+                    "#version 450\n",
+                    &format!("#version 450\n{declaration}"),
+                    1,
+                )
+            }
+            None => self.fragment.source.clone(),
+        };
+        [
+            self.vertex.shader_module_descriptor(api),
+            ShaderModuleDesc {
+                label: self.fragment.label.clone(),
+                stage: ShaderStage::Fragment,
+                code_format: ShaderCodeFormat::Glsl,
+                code: shader_stage_code_for_backend(api, &fragment_source),
+                entry_point: self.fragment.entry_point.clone(),
+            },
+        ]
+    }
+
+    pub fn pack_scalar_uniforms(&self, frame: &TerrainSourceUniformFrame) -> GalResult<Vec<u8>> {
+        let bytes = frame.pack_std140(&self.scalar_uniform_requirements)?;
+        if bytes.len() != self.execution_interface.scalar_uniform_bytes as usize {
+            return Err(GalError::invalid_argument(format!(
+                "hand source scalar uniform pack is {} bytes but program ABI requires {}",
+                bytes.len(),
+                self.execution_interface.scalar_uniform_bytes
+            )));
+        }
+        Ok(bytes)
+    }
+
+    pub fn pack_legacy_texture_transforms(
+        &self,
+        transforms: &TerrainSourceTextureTransforms,
+    ) -> GalResult<Vec<u8>> {
+        self.execution_interface.validate()?;
+        transforms.validate()?;
+        let mut bytes =
+            Vec::with_capacity(self.execution_interface.legacy_transform_bytes as usize);
+        for value in transforms
+            .atlas_texture_matrix
+            .iter()
+            .chain(transforms.lightmap_texture_matrix.iter())
+        {
+            bytes.extend_from_slice(&value.to_ne_bytes());
+        }
+        if bytes.len() != self.execution_interface.legacy_transform_bytes as usize {
+            return Err(GalError::invalid_argument(
+                "hand source legacy texture transform pack does not match its fixed ABI size",
+            ));
+        }
+        Ok(bytes)
+    }
+
+    pub fn execution_resource_layouts(&self) -> GalResult<TerrainSourceExecutionLayouts> {
+        self.execution_interface.validate()?;
+        let mut source_data_bindings = vec![
+            resource_binding_descriptor(self.execution_interface.vertex_stream, false),
+            resource_binding_descriptor(self.execution_interface.legacy_transforms, true),
+            resource_binding_descriptor(self.execution_interface.instance_stream, true),
+        ];
+        if let Some(scalar_uniforms) = self.execution_interface.scalar_uniforms {
+            source_data_bindings.push(resource_binding_descriptor(scalar_uniforms, true));
+        }
+        source_data_bindings.sort_by_key(|binding| binding.binding);
+        validate_unique_layout_bindings("hand source data", &source_data_bindings)?;
+
+        let mut pack_resource_bindings =
+            Vec::with_capacity(self.opaque_resource_bindings.bindings().len());
+        for source_binding in self.opaque_resource_bindings.bindings() {
+            let kind = match source_binding.kind() {
+                TerrainSourceOpaqueResourceKind::CombinedTextureSampler => {
+                    ResourceBindingKind::CombinedTextureSampler
+                }
+                TerrainSourceOpaqueResourceKind::StorageImage => {
+                    ResourceBindingKind::StorageTexture
+                }
+            };
+            pack_resource_bindings.push(ResourceBindingDesc {
+                binding: source_binding.binding(),
+                kind,
+                stages: PipelineStageFlags::DRAW,
+                array_count: 1,
+                optional: false,
+                dynamic_offset_count: 0,
+            });
+        }
+        pack_resource_bindings.sort_by_key(|binding| binding.binding);
+        validate_unique_layout_bindings("hand source pack resources", &pack_resource_bindings)?;
+        Ok(TerrainSourceExecutionLayouts {
+            source_data: ResourceLayoutDesc {
+                label: format!("{}:source-data", self.identity.as_str()),
+                bindings: source_data_bindings,
+            },
+            pack_resources: ResourceLayoutDesc {
+                label: format!("{}:pack-resources", self.identity.as_str()),
+                bindings: pack_resource_bindings,
+            },
+        })
+    }
+
+    pub fn require_semantic_resources(
+        &self,
+        availability: &TerrainSourceResourceAvailabilitySet,
+    ) -> GalResult<()> {
+        if availability.shader_pack_generation() != self.shader_pack_generation {
+            return Err(GalError::invalid_argument(format!(
+                "hand source program generation {} does not match resource availability generation {}",
+                self.shader_pack_generation,
+                availability.shader_pack_generation()
+            )));
+        }
+        for binding in self.opaque_resource_bindings.bindings() {
+            if availability.resource_for(binding.role()).is_none() {
+                return Err(GalError::invalid_argument(format!(
+                    "hand source resource '{}' is unavailable for semantic role '{}'",
+                    binding.resource_name(),
+                    binding.role().semantic_name()
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    pub fn pack_resource_set_desc(
+        &self,
+        label: impl Into<String>,
+        layout: Handle,
+        resources: &TerrainSourceOwnedResourceSet,
+    ) -> GalResult<ResourceSetDesc> {
+        if layout.kind() != Some(HandleKind::ResourceLayout) {
+            return Err(GalError::invalid_argument(
+                "hand source pack resources require a GAL resource-layout handle",
+            ));
+        }
+        self.execution_resource_layouts()?;
+        self.require_semantic_resources(resources.availability())?;
+        let mut bindings = Vec::with_capacity(self.opaque_resource_bindings.bindings().len());
+        for source_binding in self.opaque_resource_bindings.bindings() {
+            let (resource, kind, access) = match source_binding.kind() {
+                TerrainSourceOpaqueResourceKind::CombinedTextureSampler => (
+                    resources.combined_sampler_for(source_binding.role()).ok_or_else(|| {
+                        GalError::invalid_argument(format!(
+                            "hand source resource '{}' has no owned sampler for semantic role '{}'",
+                            source_binding.resource_name(),
+                            source_binding.role().semantic_name()
+                        ))
+                    })?,
+                    ResourceBindingKind::CombinedTextureSampler,
+                    AccessFlags::READ,
+                ),
+                TerrainSourceOpaqueResourceKind::StorageImage => (
+                    resources.storage_texture_for(source_binding.role()).ok_or_else(|| {
+                        GalError::invalid_argument(format!(
+                            "hand source resource '{}' has no owned storage texture view for semantic role '{}'",
+                            source_binding.resource_name(),
+                            source_binding.role().semantic_name()
+                        ))
+                    })?,
+                    ResourceBindingKind::StorageTexture,
+                    source_storage_access(source_binding.qualifiers())?,
+                ),
+            };
+            bindings.push(ResourceBinding {
+                binding: source_binding.binding(),
+                array_index: 0,
+                resource,
+                kind,
+                access,
+                dynamic_offsets: Vec::new(),
+                buffer_range: None,
+            });
+        }
+        Ok(ResourceSetDesc {
+            label: label.into(),
+            layout,
+            bindings,
+        })
+    }
+
+    pub fn named_output_color_slots(&self) -> &[(TerrainPassOutput, u32)] {
+        &self.named_output_color_slots
+    }
+
+    pub fn contract(&self) -> &HandPassContract {
+        &self.hand_contract
+    }
+}
+
+impl LocalTexturedSourceProgram for LoweredHandSourceProgram {
+    fn identity(&self) -> &ProgramIdentity {
+        &self.identity
+    }
+
+    fn shader_pack_generation(&self) -> u64 {
+        self.shader_pack_generation
+    }
+
+    fn execution_interface(&self) -> &TerrainSourceExecutionInterface {
+        &self.execution_interface
+    }
+
+    fn shader_module_descriptors_with_alpha_cutoff(
+        &self,
+        api: BackendApi,
+        alpha_cutoff: Option<f32>,
+    ) -> [ShaderModuleDesc; 2] {
+        LoweredHandSourceProgram::shader_module_descriptors_with_alpha_cutoff(
+            self,
+            api,
+            alpha_cutoff,
+        )
+    }
+
+    fn execution_resource_layouts(&self) -> GalResult<TerrainSourceExecutionLayouts> {
+        LoweredHandSourceProgram::execution_resource_layouts(self)
+    }
+
+    fn require_semantic_resources(
+        &self,
+        availability: &TerrainSourceResourceAvailabilitySet,
+    ) -> GalResult<()> {
+        LoweredHandSourceProgram::require_semantic_resources(self, availability)
+    }
+
+    fn pack_resource_set_desc(
+        &self,
+        label: String,
+        layout: Handle,
+        resources: &TerrainSourceOwnedResourceSet,
+    ) -> GalResult<ResourceSetDesc> {
+        LoweredHandSourceProgram::pack_resource_set_desc(self, label, layout, resources)
+    }
+}
+
+impl LoweredTexturedMaterialSourceProgram {
+    /// Exact named shader-pack outputs produced by this source stage. These
+    /// remain semantic target roles; neither a GLSL output location nor a
+    /// backend attachment index escapes program preparation.
+    pub fn named_output_color_slots(&self) -> &[(TerrainPassOutput, u32)] {
+        &self.named_output_color_slots
+    }
+
+    pub fn shader_module_descriptors(&self, api: BackendApi) -> [ShaderModuleDesc; 2] {
+        [
+            self.vertex.shader_module_descriptor(api),
+            self.fragment.shader_module_descriptor(api),
+        ]
+    }
+
+    /// Builds the bounded `gbuffers_textured` source stream. The selected
+    /// program declares one semantic base-color sampler; the frontend binds
+    /// either the copied terrain atlas or one Rust-owned local material asset
+    /// for a compatible batch. No backend object or Java texture leaks into
+    /// that selection.
+    pub fn pack_material_primitives(
+        &self,
+        primitives: &[TexturedMaterialSourcePrimitive],
+    ) -> GalResult<Vec<u8>> {
+        self.execution_interface.validate()?;
+        if !self
+            .opaque_resource_bindings
+            .bindings()
+            .iter()
+            .any(|binding| binding.role() == TerrainSourceResourceRole::MaterialAtlas)
+        {
+            return Err(GalError::unsupported_feature(
+                "textured material source program has no declared base-color sampler",
+            ));
+        }
+        pack_textured_material_source_primitives(primitives)
+    }
+
+    pub fn pack_scalar_uniforms(&self, frame: &TerrainSourceUniformFrame) -> GalResult<Vec<u8>> {
+        self.execution_interface.validate()?;
+        let bytes = frame.pack_std140(&self.scalar_uniform_requirements)?;
+        if bytes.len() != self.execution_interface.scalar_uniform_bytes as usize {
+            return Err(GalError::invalid_argument(format!(
+                "textured material source scalar uniform pack is {} bytes but program ABI requires {}",
+                bytes.len(), self.execution_interface.scalar_uniform_bytes
+            )));
+        }
+        Ok(bytes)
+    }
+
+    pub fn pack_legacy_texture_transforms(
+        &self,
+        transforms: &TerrainSourceTextureTransforms,
+    ) -> GalResult<Vec<u8>> {
+        self.execution_interface.validate()?;
+        transforms.validate()?;
+        let mut bytes =
+            Vec::with_capacity(self.execution_interface.legacy_transform_bytes as usize);
+        for value in transforms
+            .atlas_texture_matrix
+            .iter()
+            .chain(transforms.lightmap_texture_matrix.iter())
+        {
+            bytes.extend_from_slice(&value.to_ne_bytes());
+        }
+        if bytes.len() != self.execution_interface.legacy_transform_bytes as usize {
+            return Err(GalError::invalid_argument(
+                "textured material source texture transforms do not match their fixed ABI size",
+            ));
+        }
+        Ok(bytes)
+    }
+
+    pub fn execution_resource_layouts(&self) -> GalResult<TexturedMaterialSourceExecutionLayouts> {
+        self.execution_interface.validate()?;
+        let mut source_data_bindings = vec![
+            resource_binding_descriptor(self.execution_interface.vertex_stream, true),
+            resource_binding_descriptor(self.execution_interface.legacy_transforms, true),
+        ];
+        if let Some(scalar_uniforms) = self.execution_interface.scalar_uniforms {
+            source_data_bindings.push(resource_binding_descriptor(scalar_uniforms, true));
+        }
+        source_data_bindings.sort_by_key(|binding| binding.binding);
+        validate_unique_layout_bindings("textured material source data", &source_data_bindings)?;
+        Ok(TexturedMaterialSourceExecutionLayouts {
+            source_data: ResourceLayoutDesc {
+                label: format!("{}:source-data", self.identity.as_str()),
+                bindings: source_data_bindings,
+            },
+            pack_resources: source_pack_resource_layout(
+                format!("{}:pack-resources", self.identity.as_str()),
+                &self.opaque_resource_bindings,
+            )?,
+        })
+    }
+
+    pub fn require_semantic_resources(
+        &self,
+        availability: &TerrainSourceResourceAvailabilitySet,
+    ) -> GalResult<()> {
+        if availability.shader_pack_generation() != self.shader_pack_generation {
+            return Err(GalError::invalid_argument(format!(
+                "textured material source generation {} does not match resource generation {}",
+                self.shader_pack_generation,
+                availability.shader_pack_generation()
+            )));
+        }
+        for binding in self.opaque_resource_bindings.bindings() {
+            if availability.resource_for(binding.role()).is_none() {
+                return Err(GalError::invalid_argument(format!(
+                    "textured material source resource '{}' is unavailable for semantic role '{}'",
+                    binding.resource_name(),
+                    binding.role().semantic_name()
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    /// Materializes the selected source's set-one semantic resource plan for
+    /// the compact textured-material writer. Set zero remains a distinct
+    /// Rust-owned quad stream; this method deliberately shares only the
+    /// backend-neutral resource-role contract with terrain.
+    pub fn pack_resource_set_desc(
+        &self,
+        label: impl Into<String>,
+        layout: Handle,
+        resources: &TerrainSourceOwnedResourceSet,
+    ) -> GalResult<ResourceSetDesc> {
+        if layout.kind() != Some(HandleKind::ResourceLayout) {
+            return Err(GalError::invalid_argument(
+                "textured material source pack resources require a GAL resource-layout handle",
+            ));
+        }
+        self.execution_resource_layouts()?;
+        self.require_semantic_resources(resources.availability())?;
+        let mut bindings = Vec::with_capacity(self.opaque_resource_bindings.bindings().len());
+        for source_binding in self.opaque_resource_bindings.bindings() {
+            let (resource, kind, access) = match source_binding.kind() {
+                TerrainSourceOpaqueResourceKind::CombinedTextureSampler => (
+                    resources
+                        .combined_sampler_for(source_binding.role())
+                        .ok_or_else(|| {
+                            GalError::invalid_argument(format!(
+                                "textured material source resource '{}' has no owned sampler for semantic role '{}'",
+                                source_binding.resource_name(),
+                                source_binding.role().semantic_name()
+                            ))
+                        })?,
+                    ResourceBindingKind::CombinedTextureSampler,
+                    AccessFlags::READ,
+                ),
+                TerrainSourceOpaqueResourceKind::StorageImage => (
+                    resources
+                        .storage_texture_for(source_binding.role())
+                        .ok_or_else(|| {
+                            GalError::invalid_argument(format!(
+                                "textured material source resource '{}' has no owned storage texture view for semantic role '{}'",
+                                source_binding.resource_name(),
+                                source_binding.role().semantic_name()
+                            ))
+                        })?,
+                    ResourceBindingKind::StorageTexture,
+                    source_storage_access(source_binding.qualifiers())?,
+                ),
+            };
+            bindings.push(ResourceBinding {
+                binding: source_binding.binding(),
+                array_index: 0,
+                resource,
+                kind,
+                access,
+                dynamic_offsets: Vec::new(),
+                buffer_range: None,
+            });
+        }
+        Ok(ResourceSetDesc {
+            label: label.into(),
+            layout,
+            bindings,
+        })
+    }
+}
+
+impl LoweredWeatherSourceProgram {
+    /// Adapts the weather program to the shared compact world-material stream.
+    /// The adapter preserves the weather program identity, shader source,
+    /// named output, and semantic bindings; it merely avoids a second copy of
+    /// the Rust-owned quad transport and resource-set machinery.
+    pub fn material_stream_program(&self) -> LoweredTexturedMaterialSourceProgram {
+        LoweredTexturedMaterialSourceProgram {
+            identity: self.identity.clone(),
+            shader_pack_generation: self.shader_pack_generation,
+            vertex: self.vertex.clone(),
+            fragment: self.fragment.clone(),
+            execution_interface: self.execution_interface.clone(),
+            scalar_uniform_requirements: self.scalar_uniform_requirements.clone(),
+            opaque_resource_bindings: self.opaque_resource_bindings.clone(),
+            named_output_color_slots: vec![(
+                TerrainPassOutput::LitTerrainColor,
+                u32::from(self.lit_color_output_slot),
+            )],
+        }
+    }
+
+    pub fn shader_module_descriptors(&self, api: BackendApi) -> [ShaderModuleDesc; 2] {
+        [
+            self.vertex.shader_module_descriptor(api),
+            self.fragment.shader_module_descriptor(api),
+        ]
+    }
+
+    pub fn alpha_discard_threshold(&self) -> f32 {
+        f32::from_bits(self.alpha_discard_threshold_bits)
+    }
+
+    pub fn execution_resource_layouts(&self) -> GalResult<TexturedMaterialSourceExecutionLayouts> {
+        self.execution_interface.validate()?;
+        let mut source_data_bindings = vec![
+            resource_binding_descriptor(self.execution_interface.vertex_stream, true),
+            resource_binding_descriptor(self.execution_interface.legacy_transforms, true),
+        ];
+        if let Some(scalar_uniforms) = self.execution_interface.scalar_uniforms {
+            source_data_bindings.push(resource_binding_descriptor(scalar_uniforms, true));
+        }
+        source_data_bindings.sort_by_key(|binding| binding.binding);
+        validate_unique_layout_bindings("weather source data", &source_data_bindings)?;
+        Ok(TexturedMaterialSourceExecutionLayouts {
+            source_data: ResourceLayoutDesc {
+                label: format!("{}:source-data", self.identity.as_str()),
+                bindings: source_data_bindings,
+            },
+            pack_resources: source_pack_resource_layout(
+                format!("{}:pack-resources", self.identity.as_str()),
+                &self.opaque_resource_bindings,
+            )?,
+        })
+    }
+
+    pub fn require_semantic_resources(
+        &self,
+        availability: &TerrainSourceResourceAvailabilitySet,
+    ) -> GalResult<()> {
+        if availability.shader_pack_generation() != self.shader_pack_generation {
+            return Err(GalError::invalid_argument(format!(
+                "weather source generation {} does not match resource generation {}",
+                self.shader_pack_generation,
+                availability.shader_pack_generation()
+            )));
+        }
+        for binding in self.opaque_resource_bindings.bindings() {
+            if availability.resource_for(binding.role()).is_none() {
+                return Err(GalError::invalid_argument(format!(
+                    "weather source resource '{}' is unavailable for semantic role '{}'",
+                    binding.resource_name(),
+                    binding.role().semantic_name()
+                )));
+            }
+        }
+        Ok(())
+    }
+}
+
+impl LoweredCloudSourceProgram {
+    /// Adapts the cloud stage to the shared compact material stream while
+    /// preserving cloud's separate source identity and named outputs.
+    pub fn material_stream_program(&self) -> LoweredTexturedMaterialSourceProgram {
+        LoweredTexturedMaterialSourceProgram {
+            identity: self.identity.clone(),
+            shader_pack_generation: self.shader_pack_generation,
+            vertex: self.vertex.clone(),
+            fragment: self.fragment.clone(),
+            execution_interface: self.execution_interface.clone(),
+            scalar_uniform_requirements: self.scalar_uniform_requirements.clone(),
+            opaque_resource_bindings: self.opaque_resource_bindings.clone(),
+            named_output_color_slots: self.named_output_color_slots.clone(),
+        }
+    }
+
+    pub fn shader_module_descriptors(&self, api: BackendApi) -> [ShaderModuleDesc; 2] {
+        [
+            self.vertex.shader_module_descriptor(api),
+            self.fragment.shader_module_descriptor(api),
+        ]
+    }
+
+    pub fn named_output_color_slots(&self) -> &[(TerrainPassOutput, u32)] {
+        &self.named_output_color_slots
+    }
+
+    pub fn execution_resource_layouts(&self) -> GalResult<TexturedMaterialSourceExecutionLayouts> {
+        self.execution_interface.validate()?;
+        let mut source_data_bindings = vec![
+            resource_binding_descriptor(self.execution_interface.vertex_stream, true),
+            resource_binding_descriptor(self.execution_interface.legacy_transforms, true),
+        ];
+        if let Some(scalar_uniforms) = self.execution_interface.scalar_uniforms {
+            source_data_bindings.push(resource_binding_descriptor(scalar_uniforms, true));
+        }
+        source_data_bindings.sort_by_key(|binding| binding.binding);
+        validate_unique_layout_bindings("cloud source data", &source_data_bindings)?;
+        Ok(TexturedMaterialSourceExecutionLayouts {
+            source_data: ResourceLayoutDesc {
+                label: format!("{}:source-data", self.identity.as_str()),
+                bindings: source_data_bindings,
+            },
+            pack_resources: source_pack_resource_layout(
+                format!("{}:pack-resources", self.identity.as_str()),
+                &self.opaque_resource_bindings,
+            )?,
+        })
+    }
+
+    pub fn require_semantic_resources(
+        &self,
+        availability: &TerrainSourceResourceAvailabilitySet,
+    ) -> GalResult<()> {
+        if availability.shader_pack_generation() != self.shader_pack_generation {
+            return Err(GalError::invalid_argument(format!(
+                "cloud source generation {} does not match resource generation {}",
+                self.shader_pack_generation,
+                availability.shader_pack_generation()
+            )));
+        }
+        for binding in self.opaque_resource_bindings.bindings() {
+            if availability.resource_for(binding.role()).is_none() {
+                return Err(GalError::invalid_argument(format!(
+                    "cloud source resource '{}' is unavailable for semantic role '{}'",
+                    binding.resource_name(),
+                    binding.role().semantic_name()
+                )));
+            }
+        }
+        Ok(())
+    }
+}
+
 fn source_storage_access(qualifiers: &str) -> GalResult<AccessFlags> {
     let words = qualifiers.split_whitespace().collect::<Vec<_>>();
     let readonly = words.contains(&"readonly");
@@ -410,6 +2521,112 @@ fn resource_binding_descriptor(
         optional: false,
         dynamic_offset_count: u32::from(dynamic),
     }
+}
+
+fn source_pack_resource_layout(
+    label: String,
+    opaque_resource_bindings: &TerrainSourceOpaqueResourceBindingPlan,
+) -> GalResult<ResourceLayoutDesc> {
+    let mut bindings = Vec::with_capacity(opaque_resource_bindings.bindings().len());
+    for source_binding in opaque_resource_bindings.bindings() {
+        let kind = match source_binding.kind() {
+            TerrainSourceOpaqueResourceKind::CombinedTextureSampler => {
+                ResourceBindingKind::CombinedTextureSampler
+            }
+            TerrainSourceOpaqueResourceKind::StorageImage => ResourceBindingKind::StorageTexture,
+        };
+        bindings.push(ResourceBindingDesc {
+            binding: source_binding.binding(),
+            kind,
+            stages: PipelineStageFlags::DRAW,
+            array_count: 1,
+            optional: false,
+            dynamic_offset_count: 0,
+        });
+    }
+    bindings.sort_by_key(|binding| binding.binding);
+    validate_unique_layout_bindings(&label, &bindings)?;
+    Ok(ResourceLayoutDesc { label, bindings })
+}
+
+fn validate_source_scalar_uniform_block(
+    scalar_uniforms: Option<TerrainSourceFixedBinding>,
+    scalar_uniform_bytes: u32,
+    scalar_uniform_fields: &[TerrainSourceUniformField],
+    expected_binding: TerrainSourceFixedBinding,
+    source_label: &str,
+) -> GalResult<()> {
+    match (scalar_uniforms, scalar_uniform_fields.is_empty()) {
+        (None, true) if scalar_uniform_bytes == 0 => return Ok(()),
+        (Some(binding), false) if binding == expected_binding => {}
+        (None, false) => {
+            return Err(GalError::invalid_argument(format!(
+                "{source_label} scalar fields require fixed set 0 binding {}",
+                expected_binding.binding
+            )));
+        }
+        (Some(_), true) => {
+            return Err(GalError::invalid_argument(format!(
+                "{source_label} scalar binding is present without scalar fields"
+            )));
+        }
+        (Some(_), false) => {
+            return Err(GalError::invalid_argument(format!(
+                "{source_label} scalar block must use fixed set 0 binding {} uniform-buffer ABI",
+                expected_binding.binding
+            )));
+        }
+        (None, true) => {
+            return Err(GalError::invalid_argument(format!(
+                "{source_label} empty scalar block has non-zero byte size"
+            )));
+        }
+    }
+
+    let mut previous_end = 0_u32;
+    let mut previous_name = "";
+    for field in scalar_uniform_fields {
+        if field.name() <= previous_name {
+            return Err(GalError::invalid_argument(format!(
+                "{source_label} scalar fields must be strictly name-sorted"
+            )));
+        }
+        if field.offset() < previous_end || field.offset() % 4 != 0 {
+            return Err(GalError::invalid_argument(format!(
+                "{source_label} scalar field '{}' has overlapping or unaligned std140 offset {}",
+                field.name(),
+                field.offset()
+            )));
+        }
+        let end = field.offset().checked_add(field.size()).ok_or_else(|| {
+            GalError::invalid_argument(format!("{source_label} scalar field range overflows u32"))
+        })?;
+        if field.array_length() == 1 && field.array_stride() != 0 {
+            return Err(GalError::invalid_argument(format!(
+                "{source_label} scalar field '{}' is not an array but has an array stride",
+                field.name()
+            )));
+        }
+        if field.array_length() > 1 && (field.array_stride() == 0 || field.array_stride() % 16 != 0)
+        {
+            return Err(GalError::invalid_argument(format!(
+                "{source_label} scalar array '{}' has invalid std140 stride {}",
+                field.name(),
+                field.array_stride()
+            )));
+        }
+        previous_end = end;
+        previous_name = field.name();
+    }
+    if scalar_uniform_bytes == 0
+        || scalar_uniform_bytes % 16 != 0
+        || previous_end > scalar_uniform_bytes
+    {
+        return Err(GalError::invalid_argument(format!(
+            "{source_label} scalar block size is not a valid std140 envelope"
+        )));
+    }
+    Ok(())
 }
 
 fn validate_unique_layout_bindings(label: &str, bindings: &[ResourceBindingDesc]) -> GalResult<()> {
@@ -535,8 +2752,7 @@ impl TerrainSourceExecutionInterface {
                 },
             ],
             legacy_transforms: Self::LEGACY_TRANSFORMS,
-            scalar_uniforms: (!contract.fields().is_empty())
-                .then_some(Self::SCALAR_UNIFORMS),
+            scalar_uniforms: (!contract.fields().is_empty()).then_some(Self::SCALAR_UNIFORMS),
             instance_stream: Self::INSTANCE_STREAM,
             instance_stride: TERRAIN_SOURCE_INSTANCE_BYTES as u32,
             // Two std140 mat4 texture transforms.
@@ -547,6 +2763,18 @@ impl TerrainSourceExecutionInterface {
     }
 
     fn from_lowered_pair(lowered: &LoweredTerrainSourcePair) -> Self {
+        Self::from_uniform_contract(lowered.uniform_contract())
+    }
+
+    fn from_lowered_entity_pair(lowered: &LoweredEntitySourcePair) -> Self {
+        Self::from_uniform_contract(lowered.uniform_contract())
+    }
+
+    fn from_lowered_hand_pair(lowered: &LoweredHandSourcePair) -> Self {
+        Self::from_uniform_contract(lowered.uniform_contract())
+    }
+
+    fn from_lowered_translucent_pair(lowered: &LoweredTranslucentTerrainSourcePair) -> Self {
         Self::from_uniform_contract(lowered.uniform_contract())
     }
 
@@ -603,7 +2831,7 @@ impl TerrainSourceExecutionInterface {
             || self.instance_stride != TERRAIN_SOURCE_INSTANCE_BYTES as u32
         {
             return Err(GalError::invalid_argument(format!(
-                "terrain source instance stream must use fixed set 0 binding 3 with {}-byte mat4 records",
+                "terrain source instance stream must use fixed set 0 binding 3 with {}-byte transform/color records",
                 TERRAIN_SOURCE_INSTANCE_BYTES
             )));
         }
@@ -681,12 +2909,115 @@ impl TerrainSourceExecutionInterface {
     }
 }
 
+impl TexturedMaterialSourceExecutionInterface {
+    const VERTEX_STREAM: TerrainSourceFixedBinding = TerrainSourceFixedBinding {
+        set: 0,
+        binding: 0,
+        kind: TerrainSourceBindingKind::StorageBuffer,
+    };
+    const LEGACY_TRANSFORMS: TerrainSourceFixedBinding = TerrainSourceFixedBinding {
+        set: 0,
+        binding: 1,
+        kind: TerrainSourceBindingKind::UniformBuffer,
+    };
+    const SCALAR_UNIFORMS: TerrainSourceFixedBinding = TerrainSourceFixedBinding {
+        set: 0,
+        binding: 2,
+        kind: TerrainSourceBindingKind::UniformBuffer,
+    };
+
+    fn from_uniform_contract(contract: &super::lowering::TerrainSourceUniformContract) -> Self {
+        Self {
+            vertex_stream: Self::VERTEX_STREAM,
+            vertex_stride: TEXTURED_MATERIAL_SOURCE_VERTEX_BYTES as u32,
+            vertex_fields: [
+                TerrainSourceVertexField {
+                    name: "position",
+                    offset: 0,
+                    component_count: 4,
+                },
+                TerrainSourceVertexField {
+                    name: "color",
+                    offset: 16,
+                    component_count: 4,
+                },
+                TerrainSourceVertexField {
+                    name: "normal_light",
+                    offset: 32,
+                    component_count: 4,
+                },
+                TerrainSourceVertexField {
+                    name: "texture_uv_lightmap",
+                    offset: 48,
+                    component_count: 4,
+                },
+            ],
+            legacy_transforms: Self::LEGACY_TRANSFORMS,
+            scalar_uniforms: (!contract.fields().is_empty()).then_some(Self::SCALAR_UNIFORMS),
+            legacy_transform_bytes: 2 * 16 * std::mem::size_of::<f32>() as u32,
+            scalar_uniform_bytes: contract.std140_size(),
+            scalar_uniform_fields: contract.fields().to_vec(),
+        }
+    }
+
+    fn from_lowered_pair(lowered: &LoweredTexturedMaterialSourcePair) -> Self {
+        Self::from_uniform_contract(lowered.uniform_contract())
+    }
+
+    pub fn validate(&self) -> GalResult<()> {
+        const EXPECTED_FIELDS: [(&str, u32); 4] = [
+            ("position", 0),
+            ("color", 16),
+            ("normal_light", 32),
+            ("texture_uv_lightmap", 48),
+        ];
+        if self.vertex_stream != Self::VERTEX_STREAM
+            || self.vertex_stride != TEXTURED_MATERIAL_SOURCE_VERTEX_BYTES as u32
+        {
+            return Err(GalError::invalid_argument(
+                "textured material source must use its fixed set 0 binding 0 64-byte storage stream",
+            ));
+        }
+        for (field, (name, offset)) in self.vertex_fields.iter().zip(EXPECTED_FIELDS) {
+            if field.name != name || field.offset != offset || field.component_count != 4 {
+                return Err(GalError::invalid_argument(format!(
+                    "textured material source field '{}' is not the fixed {} vec4 lane at offset {}",
+                    field.name, name, offset
+                )));
+            }
+        }
+        if self.legacy_transforms != Self::LEGACY_TRANSFORMS || self.legacy_transform_bytes != 128 {
+            return Err(GalError::invalid_argument(
+                "textured material source transforms must use fixed set 0 binding 1 with two std140 mat4 values",
+            ));
+        }
+        validate_source_scalar_uniform_block(
+            self.scalar_uniforms,
+            self.scalar_uniform_bytes,
+            &self.scalar_uniform_fields,
+            Self::SCALAR_UNIFORMS,
+            "textured material source",
+        )
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TerrainProgramResource {
     ColoredVoxelLightVolume,
 }
 
 impl TerrainMaterialProgram {
+    /// Converts a Rust-owned built-in terrain program into explicit GAL
+    /// shader modules. This is shared by ordinary mesh materials and DH LOD
+    /// materials so neither frontend has to reproduce backend dialect
+    /// selection or module descriptions.
+    pub fn shader_module_descriptors(&self, api: BackendApi) -> [ShaderModuleDesc; 2] {
+        [
+            self.vertex.shader_module_descriptor(api),
+            self.fragment.shader_module_descriptor(api),
+        ]
+    }
+
     pub fn requires(&self, resource: TerrainProgramResource) -> bool {
         self.required_resources.contains(&resource)
     }
@@ -733,6 +3064,22 @@ pub fn prepare_lowered_terrain_source_program(
     let scalar_uniform_requirements =
         TerrainSourceUniformRequirements::from_contract(lowered.uniform_contract())?;
     scalar_uniform_requirements.require_fully_semantic()?;
+    let terrain_outputs = contract.outputs.iter().copied().collect::<Vec<_>>();
+    let terrain_output_color_slots = terrain_outputs
+        .iter()
+        .copied()
+        .map(|output| {
+            contract
+                .output_color_slot(output)
+                .map(|slot| (output, slot))
+                .ok_or_else(|| {
+                    GalError::invalid_argument(format!(
+                        "selected terrain source contract has no shader-pack color slot for '{}'",
+                        output.semantic_name()
+                    ))
+                })
+        })
+        .collect::<GalResult<Vec<_>>>()?;
     let program = LoweredTerrainSourceProgram {
         identity: ProgramIdentity::new(format!(
             "vulkanic:shader-pack/{}/terrain_{}_source_gen{}",
@@ -740,6 +3087,7 @@ pub fn prepare_lowered_terrain_source_program(
             suffix,
             contract.generation
         )),
+        material_kind: Some(kind),
         shader_pack_generation: contract.generation,
         vertex: ShaderStageSource {
             stage: ShaderStageKind::Vertex,
@@ -761,9 +3109,703 @@ pub fn prepare_lowered_terrain_source_program(
         } else {
             Vec::new()
         },
+        terrain_outputs: Some(terrain_outputs),
+        terrain_output_color_slots: Some(terrain_output_color_slots),
+        translucent_raster_state: None,
     };
     program.execution_resource_layouts()?;
     Ok(program)
+}
+
+/// Prepares one selected ordinary-entity source program after its source
+/// contract, Rust-owned entity-ID generation, lowered shader pair, and local
+/// material resource plan agree. It intentionally stops before pipeline,
+/// target, geometry stream, and draw construction; no compatibility route can
+/// mistake this preparation artifact for executed entity work.
+pub fn prepare_lowered_entity_source_program(
+    contract: &EntityPassContract,
+    lowered: &LoweredEntitySourcePair,
+    opaque_resource_bindings: &TerrainSourceOpaqueResourceBindingPlan,
+) -> GalResult<LoweredEntitySourceProgram> {
+    if contract.generation == 0 || contract.entity_id_generation() == 0 {
+        return Err(GalError::invalid_argument(
+            "entity source preparation requires non-zero shader and entity-id generations",
+        ));
+    }
+    if contract.outputs.is_empty() || contract.outputs.len() != contract.output_color_slots.len() {
+        return Err(GalError::invalid_argument(
+            "entity source outputs and shader-pack slots must be non-empty and aligned",
+        ));
+    }
+    lowered.require_backend_neutral_lowering()?;
+    lowered.require_matching_opaque_resource_bindings(opaque_resource_bindings)?;
+    let execution_interface = TerrainSourceExecutionInterface::from_lowered_entity_pair(lowered);
+    execution_interface.validate()?;
+    let scalar_uniform_requirements =
+        TerrainSourceUniformRequirements::from_contract(lowered.uniform_contract())?;
+    scalar_uniform_requirements.require_fully_semantic()?;
+    let named_output_color_slots = contract
+        .outputs
+        .iter()
+        .copied()
+        .zip(contract.output_color_slots.iter().copied())
+        .map(|(output, slot)| (entity_output_to_terrain_output(output), slot))
+        .collect::<Vec<_>>();
+    let program = LoweredEntitySourceProgram {
+        identity: ProgramIdentity::new(format!(
+            "vulkanic:shader-pack/{}/entity_source_gen{}",
+            contract.pack_name.to_ascii_lowercase(),
+            contract.generation
+        )),
+        shader_pack_generation: contract.generation,
+        entity_id_generation: contract.entity_id_generation(),
+        entity_contract: contract.clone(),
+        vertex: ShaderStageSource {
+            stage: ShaderStageKind::Vertex,
+            label: format!("{}:lowered-vertex", lowered.vertex().entry_path()),
+            source: lowered.vertex().source().to_string(),
+            entry_point: "main".to_string(),
+        },
+        fragment: ShaderStageSource {
+            stage: ShaderStageKind::Fragment,
+            label: format!("{}:lowered-fragment", lowered.fragment().entry_path()),
+            source: lowered.fragment().source().to_string(),
+            entry_point: "main".to_string(),
+        },
+        execution_interface,
+        scalar_uniform_requirements,
+        opaque_resource_bindings: opaque_resource_bindings.clone(),
+        named_output_color_slots,
+    };
+    program.execution_resource_layouts()?;
+    Ok(program)
+}
+
+fn entity_output_to_terrain_output(output: EntitySourceOutput) -> TerrainPassOutput {
+    match output {
+        EntitySourceOutput::LitColor => TerrainPassOutput::LitTerrainColor,
+        EntitySourceOutput::MaterialAuxiliary => TerrainPassOutput::MaterialAuxiliary,
+        EntitySourceOutput::ViewSpaceNormal => TerrainPassOutput::ViewSpaceNormal,
+    }
+}
+
+/// Prepares a selected first-person source program while keeping it separate
+/// from the entity writer. Preparation proves that source code, semantic
+/// resources, and the fixed owned stream ABI agree; it intentionally does
+/// not allocate a pipeline, select a route, or create the hand pass.
+pub fn prepare_lowered_hand_source_program(
+    contract: &HandPassContract,
+    lowered: &LoweredHandSourcePair,
+    opaque_resource_bindings: &TerrainSourceOpaqueResourceBindingPlan,
+) -> GalResult<LoweredHandSourceProgram> {
+    if contract.generation == 0 {
+        return Err(GalError::invalid_argument(
+            "hand source preparation requires a non-zero shader-pack generation",
+        ));
+    }
+    if contract.outputs.is_empty() || contract.outputs.len() != contract.output_color_slots.len() {
+        return Err(GalError::invalid_argument(
+            "hand source outputs and shader-pack slots must be non-empty and aligned",
+        ));
+    }
+    lowered.require_backend_neutral_lowering()?;
+    lowered.require_matching_opaque_resource_bindings(opaque_resource_bindings)?;
+    let execution_interface = TerrainSourceExecutionInterface::from_lowered_hand_pair(lowered);
+    execution_interface.validate()?;
+    let scalar_uniform_requirements =
+        TerrainSourceUniformRequirements::from_contract(lowered.uniform_contract())?;
+    scalar_uniform_requirements.require_fully_semantic()?;
+    let named_output_color_slots = contract
+        .outputs
+        .iter()
+        .copied()
+        .zip(contract.output_color_slots.iter().copied())
+        .map(|(output, slot)| (hand_output_to_terrain_output(output), slot))
+        .collect::<Vec<_>>();
+    let program = LoweredHandSourceProgram {
+        identity: ProgramIdentity::new(format!(
+            "vulkanic:shader-pack/{}/hand_source_gen{}",
+            contract.pack_name.to_ascii_lowercase(),
+            contract.generation
+        )),
+        shader_pack_generation: contract.generation,
+        hand_contract: contract.clone(),
+        vertex: ShaderStageSource {
+            stage: ShaderStageKind::Vertex,
+            label: format!("{}:lowered-vertex", lowered.vertex().entry_path()),
+            source: lowered.vertex().source().to_string(),
+            entry_point: "main".to_string(),
+        },
+        fragment: ShaderStageSource {
+            stage: ShaderStageKind::Fragment,
+            label: format!("{}:lowered-fragment", lowered.fragment().entry_path()),
+            source: lowered.fragment().source().to_string(),
+            entry_point: "main".to_string(),
+        },
+        execution_interface,
+        scalar_uniform_requirements,
+        opaque_resource_bindings: opaque_resource_bindings.clone(),
+        named_output_color_slots,
+    };
+    program.execution_resource_layouts()?;
+    Ok(program)
+}
+
+fn hand_output_to_terrain_output(output: HandSourceOutput) -> TerrainPassOutput {
+    match output {
+        HandSourceOutput::LitColor => TerrainPassOutput::LitTerrainColor,
+        HandSourceOutput::MaterialAuxiliary => TerrainPassOutput::MaterialAuxiliary,
+        HandSourceOutput::ViewSpaceNormal => TerrainPassOutput::ViewSpaceNormal,
+    }
+}
+
+/// Prepares one source-derived `gbuffers_textured` program only after its
+/// shader-pack generation, source lowering, scalar uniforms, and pass-local
+/// semantic resource plan agree. This intentionally stops before pipeline and
+/// stream construction: a future writer must provide a dedicated Rust-owned
+/// material stream and named target pass rather than reusing the final-output
+/// overlay path.
+pub fn prepare_lowered_textured_material_source_program(
+    contract: &TexturedMaterialPassContract,
+    lowered: &LoweredTexturedMaterialSourcePair,
+    opaque_resource_bindings: &TerrainSourceOpaqueResourceBindingPlan,
+) -> GalResult<LoweredTexturedMaterialSourceProgram> {
+    if contract.generation == 0 {
+        return Err(GalError::invalid_argument(
+            "textured material source preparation requires a non-zero shader-pack generation",
+        ));
+    }
+    if contract.outputs.len() != contract.output_color_slots.len() || contract.outputs.is_empty() {
+        return Err(GalError::invalid_argument(
+            "textured material source outputs and shader-pack slots must be non-empty and aligned",
+        ));
+    }
+    lowered.require_backend_neutral_lowering()?;
+    lowered.require_matching_opaque_resource_bindings(opaque_resource_bindings)?;
+    let execution_interface = TexturedMaterialSourceExecutionInterface::from_lowered_pair(lowered);
+    execution_interface.validate()?;
+    let scalar_uniform_requirements =
+        TerrainSourceUniformRequirements::from_contract(lowered.uniform_contract())?;
+    scalar_uniform_requirements.require_fully_semantic()?;
+    let named_output_color_slots = contract
+        .outputs
+        .iter()
+        .copied()
+        .zip(contract.output_color_slots.iter().copied())
+        .map(|(output, slot)| (output.terrain_output(), slot))
+        .collect::<Vec<_>>();
+    if named_output_color_slots
+        .iter()
+        .map(|(output, _)| output)
+        .collect::<BTreeSet<_>>()
+        .len()
+        != named_output_color_slots.len()
+    {
+        return Err(GalError::invalid_argument(
+            "textured material source maps multiple outputs to one semantic named target",
+        ));
+    }
+    let program = LoweredTexturedMaterialSourceProgram {
+        identity: ProgramIdentity::new(format!(
+            "vulkanic:shader-pack/{}/textured_material_source_gen{}",
+            contract.pack_name.to_ascii_lowercase(),
+            contract.generation
+        )),
+        shader_pack_generation: contract.generation,
+        vertex: ShaderStageSource {
+            stage: ShaderStageKind::Vertex,
+            label: format!("{}:lowered-vertex", lowered.vertex().entry_path()),
+            source: lowered.vertex().source().to_string(),
+            entry_point: "main".to_string(),
+        },
+        fragment: ShaderStageSource {
+            stage: ShaderStageKind::Fragment,
+            label: format!("{}:lowered-fragment", lowered.fragment().entry_path()),
+            source: lowered.fragment().source().to_string(),
+            entry_point: "main".to_string(),
+        },
+        execution_interface,
+        scalar_uniform_requirements,
+        opaque_resource_bindings: opaque_resource_bindings.clone(),
+        named_output_color_slots,
+    };
+    program.execution_resource_layouts()?;
+    Ok(program)
+}
+
+/// Prepares the independently selected weather source. This deliberately
+/// stops before target creation and draw recording, so preparation cannot
+/// select a mixed Java/Rust weather route.
+pub fn prepare_lowered_weather_source_program(
+    contract: &WeatherPassContract,
+    lowered: &LoweredWeatherSourcePair,
+    opaque_resource_bindings: &TerrainSourceOpaqueResourceBindingPlan,
+) -> GalResult<LoweredWeatherSourceProgram> {
+    if contract.generation == 0 || contract.lit_color_output_slot != 0 {
+        return Err(GalError::invalid_argument(
+            "weather source preparation requires a non-zero generation and named lit-color slot zero",
+        ));
+    }
+    lowered.require_backend_neutral_lowering()?;
+    lowered.require_matching_opaque_resource_bindings(opaque_resource_bindings)?;
+    let execution_interface =
+        TexturedMaterialSourceExecutionInterface::from_uniform_contract(lowered.uniform_contract());
+    execution_interface.validate()?;
+    let scalar_uniform_requirements =
+        TerrainSourceUniformRequirements::from_contract(lowered.uniform_contract())?;
+    scalar_uniform_requirements.require_fully_semantic()?;
+    let program = LoweredWeatherSourceProgram {
+        identity: ProgramIdentity::new(format!(
+            "vulkanic:shader-pack/{}/weather_source_gen{}",
+            contract.pack_name.to_ascii_lowercase(),
+            contract.generation
+        )),
+        shader_pack_generation: contract.generation,
+        vertex: ShaderStageSource {
+            stage: ShaderStageKind::Vertex,
+            label: format!("{}:lowered-vertex", lowered.vertex().entry_path()),
+            source: lowered.vertex().source().to_string(),
+            entry_point: "main".to_string(),
+        },
+        fragment: ShaderStageSource {
+            stage: ShaderStageKind::Fragment,
+            label: format!("{}:lowered-fragment", lowered.fragment().entry_path()),
+            source: lowered.fragment().source().to_string(),
+            entry_point: "main".to_string(),
+        },
+        execution_interface,
+        scalar_uniform_requirements,
+        opaque_resource_bindings: opaque_resource_bindings.clone(),
+        lit_color_output_slot: contract.lit_color_output_slot,
+        alpha_discard_threshold_bits: contract.alpha_discard_threshold_bits,
+        blend: contract.blend,
+    };
+    program.execution_resource_layouts()?;
+    Ok(program)
+}
+
+/// Prepares the selected vanilla-cloud source without creating a target,
+/// pipeline, or route. The dedicated Rust-owned cloud writer remains a later
+/// transaction that must prove its resources and named targets explicitly.
+pub fn prepare_lowered_cloud_source_program(
+    contract: &CloudPassContract,
+    lowered: &LoweredCloudSourcePair,
+    opaque_resource_bindings: &TerrainSourceOpaqueResourceBindingPlan,
+) -> GalResult<LoweredCloudSourceProgram> {
+    if contract.generation == 0 || contract.outputs.is_empty() {
+        return Err(GalError::invalid_argument(
+            "cloud source preparation requires a non-zero generation and named outputs",
+        ));
+    }
+    if contract.outputs.len() != 3 || contract.outputs.len() != contract.output_color_slots.len() {
+        return Err(GalError::unsupported_feature(
+            "cloud source preparation supports exactly lit, material, and translucency outputs",
+        ));
+    }
+    lowered.require_backend_neutral_lowering()?;
+    lowered.require_matching_opaque_resource_bindings(opaque_resource_bindings)?;
+    let execution_interface =
+        TexturedMaterialSourceExecutionInterface::from_uniform_contract(lowered.uniform_contract());
+    execution_interface.validate()?;
+    let scalar_uniform_requirements =
+        TerrainSourceUniformRequirements::from_contract(lowered.uniform_contract())?;
+    scalar_uniform_requirements.require_fully_semantic()?;
+    let named_output_color_slots = contract
+        .outputs
+        .iter()
+        .copied()
+        .zip(contract.output_color_slots.iter().copied())
+        .map(|(output, slot)| (output.terrain_output(), slot))
+        .collect::<Vec<_>>();
+    if named_output_color_slots
+        .iter()
+        .map(|(output, _)| output)
+        .collect::<BTreeSet<_>>()
+        .len()
+        != named_output_color_slots.len()
+    {
+        return Err(GalError::invalid_argument(
+            "cloud source maps multiple outputs to one semantic named target",
+        ));
+    }
+    let program = LoweredCloudSourceProgram {
+        identity: ProgramIdentity::new(format!(
+            "vulkanic:shader-pack/{}/cloud_source_gen{}",
+            contract.pack_name.to_ascii_lowercase(),
+            contract.generation
+        )),
+        shader_pack_generation: contract.generation,
+        vertex: ShaderStageSource {
+            stage: ShaderStageKind::Vertex,
+            label: format!("{}:lowered-vertex", lowered.vertex().entry_path()),
+            source: lowered.vertex().source().to_string(),
+            entry_point: "main".to_string(),
+        },
+        fragment: ShaderStageSource {
+            stage: ShaderStageKind::Fragment,
+            label: format!("{}:lowered-fragment", lowered.fragment().entry_path()),
+            source: lowered.fragment().source().to_string(),
+            entry_point: "main".to_string(),
+        },
+        execution_interface,
+        scalar_uniform_requirements,
+        opaque_resource_bindings: opaque_resource_bindings.clone(),
+        blend: contract.blend,
+        named_output_color_slots,
+    };
+    program.execution_resource_layouts()?;
+    Ok(program)
+}
+
+/// Prepares the distinct translucent terrain source program without merging it
+/// into the normal opaque/cutout G-buffer contract. This remains preparation
+/// only: the caller must later provide an explicit target, depth/history, and
+/// blend pass before it can execute.
+pub fn prepare_lowered_translucent_terrain_source_program(
+    contract: &TerrainPassContract,
+    lowered: &LoweredTranslucentTerrainSourcePair,
+    opaque_resource_bindings: &TerrainSourceOpaqueResourceBindingPlan,
+) -> GalResult<LoweredTerrainSourceProgram> {
+    if contract.pass_kind != super::terrain_contract::TerrainSourcePassKind::Translucent
+        || !contract
+            .material_classes
+            .contains(&TerrainMaterialClass::Translucent)
+    {
+        return Err(GalError::unsupported_feature(
+            "translucent source preparation requires a translucent terrain contract",
+        ));
+    }
+    let translucent_raster_state = contract.translucent_raster_state.ok_or_else(|| {
+        GalError::unsupported_feature(
+            "selected translucent terrain source has no explicit alpha/blend raster contract",
+        )
+    })?;
+    // Parsing a `gbuffers_water` stage is not enough to admit it. The source
+    // contract must have modeled every feature it selected before a later
+    // executor may even receive this preparation artifact.
+    contract.require_selected_subset()?;
+    lowered.require_backend_neutral_lowering()?;
+    lowered.require_matching_opaque_resource_bindings(opaque_resource_bindings)?;
+    let execution_interface =
+        TerrainSourceExecutionInterface::from_lowered_translucent_pair(lowered);
+    execution_interface.validate()?;
+    let scalar_uniform_requirements =
+        TerrainSourceUniformRequirements::from_contract(lowered.uniform_contract())?;
+    scalar_uniform_requirements.require_fully_semantic()?;
+    let terrain_outputs = contract.outputs.iter().copied().collect::<Vec<_>>();
+    let terrain_output_color_slots = terrain_outputs
+        .iter()
+        .copied()
+        .map(|output| {
+            contract
+                .output_color_slot(output)
+                .map(|slot| (output, slot))
+                .ok_or_else(|| {
+                    GalError::invalid_argument(format!(
+                    "selected translucent source contract has no shader-pack color slot for '{}'",
+                    output.semantic_name()
+                ))
+                })
+        })
+        .collect::<GalResult<Vec<_>>>()?;
+    let program = LoweredTerrainSourceProgram {
+        identity: ProgramIdentity::new(format!(
+            "vulkanic:shader-pack/{}/terrain_translucent_source_gen{}",
+            contract.pack_name.to_ascii_lowercase(),
+            contract.generation
+        )),
+        material_kind: Some(TerrainMaterialProgramKind::Translucent),
+        shader_pack_generation: contract.generation,
+        vertex: ShaderStageSource {
+            stage: ShaderStageKind::Vertex,
+            label: format!(
+                "{}:lowered-translucent-vertex",
+                lowered.vertex().entry_path()
+            ),
+            source: lowered.vertex().source().to_string(),
+            entry_point: "main".to_string(),
+        },
+        fragment: ShaderStageSource {
+            stage: ShaderStageKind::Fragment,
+            label: format!(
+                "{}:lowered-translucent-fragment",
+                lowered.fragment().entry_path()
+            ),
+            source: lowered.fragment().source().to_string(),
+            entry_point: "main".to_string(),
+        },
+        execution_interface,
+        scalar_uniform_requirements,
+        opaque_resource_bindings: opaque_resource_bindings.clone(),
+        required_resources: Vec::new(),
+        terrain_outputs: Some(terrain_outputs),
+        terrain_output_color_slots: Some(terrain_output_color_slots),
+        translucent_raster_state: Some(translucent_raster_state),
+    };
+    program.execution_resource_layouts()?;
+    Ok(program)
+}
+
+/// Forms the owned preparation artifact for the selected Distant Horizons
+/// source stage. Unlike near terrain, this requires the exact DH column-stream
+/// ABI and exposes only the source's own named distant color output. It is
+/// deliberately not a route selector or a compatibility path for Iris.
+pub fn prepare_lowered_distant_horizons_source_program(
+    contract: &DistantHorizonsPassContract,
+    lowered: &LoweredDistantHorizonsSourcePair,
+    opaque_resource_bindings: &TerrainSourceOpaqueResourceBindingPlan,
+) -> GalResult<LoweredDistantHorizonsSourceProgram> {
+    if contract.pack_name.trim().is_empty() || contract.generation == 0 {
+        return Err(GalError::invalid_argument(
+            "Distant Horizons source program requires a non-empty pack name and non-zero generation",
+        ));
+    }
+    if lowered.fragment().outputs() != [DistantHorizonsFragmentOutput::LitColor] {
+        return Err(GalError::unsupported_feature(
+            "Distant Horizons source program requires exactly one named lit-color output",
+        ));
+    }
+    match (contract.pass_kind, contract.translucent_blend) {
+        (DistantHorizonsPassKind::Opaque, None)
+        | (DistantHorizonsPassKind::Translucent, Some(TerrainTranslucentBlend::SourceAlphaOver)) => {
+        }
+        (DistantHorizonsPassKind::Opaque, Some(_)) => {
+            return Err(GalError::invalid_argument(
+                "opaque Distant Horizons source program must not carry translucent blend semantics",
+            ));
+        }
+        (DistantHorizonsPassKind::Translucent, None) => {
+            return Err(GalError::invalid_argument(
+                "translucent Distant Horizons source program requires explicit source blend semantics",
+            ));
+        }
+    }
+    lowered.require_backend_neutral_lowering()?;
+    lowered.require_matching_opaque_resource_bindings(opaque_resource_bindings)?;
+    let execution_interface = DistantHorizonsSourceExecutionInterface::from_lowered_pair(lowered);
+    execution_interface.validate()?;
+    let scalar_uniform_requirements =
+        TerrainSourceUniformRequirements::from_contract(lowered.uniform_contract())?;
+    scalar_uniform_requirements.require_fully_semantic()?;
+    let program = LoweredDistantHorizonsSourceProgram {
+        identity: ProgramIdentity::new(format!(
+            "vulkanic:shader-pack/{}/distant_horizons_{}_source_gen{}",
+            contract.pack_name.to_ascii_lowercase(),
+            match contract.pass_kind {
+                DistantHorizonsPassKind::Opaque => "opaque",
+                DistantHorizonsPassKind::Translucent => "translucent",
+            },
+            contract.generation
+        )),
+        shader_pack_generation: contract.generation,
+        pass_kind: contract.pass_kind,
+        translucent_blend: contract.translucent_blend,
+        vertex: ShaderStageSource {
+            stage: ShaderStageKind::Vertex,
+            label: format!(
+                "{}:lowered-distant-horizons-vertex",
+                lowered.vertex().entry_path()
+            ),
+            source: lowered.vertex().source().to_string(),
+            entry_point: "main".to_string(),
+        },
+        fragment: ShaderStageSource {
+            stage: ShaderStageKind::Fragment,
+            label: format!(
+                "{}:lowered-distant-horizons-fragment",
+                lowered.fragment().entry_path()
+            ),
+            source: lowered.fragment().source().to_string(),
+            entry_point: "main".to_string(),
+        },
+        execution_interface,
+        scalar_uniform_requirements,
+        opaque_resource_bindings: opaque_resource_bindings.clone(),
+        required_resources: if contract
+            .required_resources
+            .contains(&TerrainPassRequiredResource::ColoredVoxelLightVolume)
+        {
+            vec![TerrainProgramResource::ColoredVoxelLightVolume]
+        } else {
+            Vec::new()
+        },
+    };
+    program.execution_resource_layouts()?;
+    Ok(program)
+}
+
+/// Creates a preparation artifact for one source-defined fullscreen consumer.
+/// The caller must later supply named output attachments, owned fullscreen
+/// geometry, complete source uniforms, semantic sampler resources, and pass
+/// ordering. This function performs none of those actions and cannot admit a
+/// live route on its own.
+pub fn prepare_lowered_fullscreen_source_program(
+    pack_name: &str,
+    shader_pack_generation: u64,
+    stage_path: &str,
+    lowered: &LoweredFullscreenSourcePair,
+    opaque_resource_bindings: &TerrainSourceOpaqueResourceBindingPlan,
+) -> GalResult<LoweredFullscreenSourceProgram> {
+    if pack_name.trim().is_empty() || shader_pack_generation == 0 || stage_path.trim().is_empty() {
+        return Err(GalError::invalid_argument(
+            "fullscreen source program requires pack name, generation, and stage path",
+        ));
+    }
+    lowered.require_backend_neutral_lowering()?;
+    lowered.require_matching_opaque_resource_bindings(opaque_resource_bindings)?;
+    let execution_interface = FullscreenSourceExecutionInterface::from_lowered_pair(lowered);
+    execution_interface.validate()?;
+    let scalar_uniform_requirements =
+        TerrainSourceUniformRequirements::from_contract(lowered.uniform_contract())?;
+    scalar_uniform_requirements.require_fully_semantic()?;
+    let outputs = lowered.fragment().outputs().to_vec();
+    if outputs.is_empty() {
+        return Err(GalError::invalid_argument(
+            "fullscreen source program requires at least one named semantic output",
+        ));
+    }
+    let mut feedback_requirements = Vec::new();
+    for output in &outputs {
+        if !matches!(output.role(), TerrainSourceResourceRole::ShaderPackColor(_)) {
+            return Err(GalError::invalid_argument(format!(
+                "fullscreen source output '{}' is not a semantic shader-pack color resource",
+                output.semantic_name()
+            )));
+        }
+        for binding in opaque_resource_bindings.bindings() {
+            if binding.kind() == TerrainSourceOpaqueResourceKind::CombinedTextureSampler
+                && binding.role() == output.role()
+            {
+                feedback_requirements.push(FullscreenSourceFeedbackRequirement {
+                    role: output.role(),
+                    sampled_binding: binding.binding(),
+                    output_location: output.source_location(),
+                });
+            }
+        }
+    }
+    feedback_requirements.sort_by(|left, right| {
+        left.output_location
+            .cmp(&right.output_location)
+            .then_with(|| left.sampled_binding.cmp(&right.sampled_binding))
+            .then_with(|| left.role.cmp(&right.role))
+    });
+    feedback_requirements.dedup();
+    let mipmap_requirements = derive_fullscreen_mipmap_requirements(
+        lowered.fragment().source(),
+        opaque_resource_bindings,
+    )?;
+    let program = LoweredFullscreenSourceProgram {
+        identity: ProgramIdentity::new(format!(
+            "vulkanic:shader-pack/{}/{}-source-gen{}",
+            pack_name.to_ascii_lowercase(),
+            stage_path
+                .trim_end_matches(".fsh")
+                .trim_end_matches(".glsl")
+                .replace('/', "-"),
+            shader_pack_generation
+        )),
+        source_stage_path: stage_path.to_string(),
+        shader_pack_generation,
+        raster_primitive: lowered.raster_primitive(),
+        vertex: ShaderStageSource {
+            stage: ShaderStageKind::Vertex,
+            label: format!(
+                "{}:lowered-fullscreen-vertex",
+                lowered.vertex().entry_path()
+            ),
+            source: lowered.vertex().source().to_string(),
+            entry_point: "main".to_string(),
+        },
+        fragment: ShaderStageSource {
+            stage: ShaderStageKind::Fragment,
+            label: format!(
+                "{}:lowered-fullscreen-fragment",
+                lowered.fragment().entry_path()
+            ),
+            source: lowered.fragment().source().to_string(),
+            entry_point: "main".to_string(),
+        },
+        execution_interface,
+        scalar_uniform_requirements,
+        opaque_resource_bindings: opaque_resource_bindings.clone(),
+        outputs,
+        feedback_requirements,
+        mipmap_requirements,
+    };
+    program.execution_resource_layouts()?;
+    Ok(program)
+}
+
+fn derive_fullscreen_mipmap_requirements(
+    fragment_source: &str,
+    bindings: &TerrainSourceOpaqueResourceBindingPlan,
+) -> GalResult<Vec<FullscreenSourceMipmapRequirement>> {
+    let mut requested = std::collections::BTreeMap::<String, bool>::new();
+    for line in fragment_source.lines() {
+        let Some(fragment) = line.find("const bool ").map(|index| &line[index..]) else {
+            continue;
+        };
+        let Some((name, value)) = fragment
+            .strip_prefix("const bool ")
+            .and_then(|rest| rest.split_once('='))
+        else {
+            continue;
+        };
+        let name = name.trim();
+        let Some(resource_name) = name.strip_suffix("MipmapEnabled") else {
+            continue;
+        };
+        let value = value
+            .split_once(';')
+            .map(|(value, _)| value)
+            .unwrap_or(value)
+            .trim();
+        let enabled = match value {
+            "true" => true,
+            "false" => false,
+            _ => {
+                return Err(GalError::invalid_argument(format!(
+                    "fullscreen source mip directive '{name}' must be true or false"
+                )))
+            }
+        };
+        requested.insert(resource_name.to_string(), enabled);
+    }
+    let mut requirements = Vec::new();
+    for (resource_name, enabled) in requested {
+        if !enabled {
+            continue;
+        }
+        let binding = bindings
+            .bindings()
+            .iter()
+            .find(|binding| binding.resource_name() == resource_name)
+            .ok_or_else(|| GalError::unsupported_feature(format!(
+                "fullscreen source requests mipmaps for '{resource_name}', which has no active semantic resource binding"
+            )))?;
+        if binding.kind() != TerrainSourceOpaqueResourceKind::CombinedTextureSampler
+            || !matches!(
+                binding.role(),
+                TerrainSourceResourceRole::ShaderPackColor(_)
+            )
+        {
+            return Err(GalError::unsupported_feature(format!(
+                "fullscreen source requests mipmaps for '{resource_name}', which is not a semantic shader-pack color sampler"
+            )));
+        }
+        requirements.push(FullscreenSourceMipmapRequirement {
+            role: binding.role(),
+            sampled_binding: binding.binding(),
+        });
+    }
+    requirements.sort_by(|left, right| {
+        left.sampled_binding
+            .cmp(&right.sampled_binding)
+            .then_with(|| left.role.cmp(&right.role))
+    });
+    requirements.dedup();
+    Ok(requirements)
 }
 
 /// Forms an owned source-shadow program preparation artifact from one exact
@@ -794,6 +3836,7 @@ pub fn prepare_lowered_shadow_source_program(
             pack_name.to_ascii_lowercase(),
             shader_pack_generation
         )),
+        material_kind: None,
         shader_pack_generation,
         vertex: ShaderStageSource {
             stage: ShaderStageKind::Vertex,
@@ -803,7 +3846,10 @@ pub fn prepare_lowered_shadow_source_program(
         },
         fragment: ShaderStageSource {
             stage: ShaderStageKind::Fragment,
-            label: format!("{}:lowered-shadow-fragment", lowered.fragment().entry_path()),
+            label: format!(
+                "{}:lowered-shadow-fragment",
+                lowered.fragment().entry_path()
+            ),
             source: lowered.fragment().source().to_string(),
             entry_point: "main".to_string(),
         },
@@ -811,6 +3857,9 @@ pub fn prepare_lowered_shadow_source_program(
         scalar_uniform_requirements,
         opaque_resource_bindings: opaque_resource_bindings.clone(),
         required_resources: Vec::new(),
+        terrain_outputs: None,
+        terrain_output_color_slots: None,
+        translucent_raster_state: None,
     };
     program.execution_resource_layouts()?;
     Ok(program)
@@ -854,6 +3903,232 @@ pub fn minimal_terrain_solid_program() -> TerrainMaterialProgram {
 
 pub fn minimal_terrain_cutout_program() -> TerrainMaterialProgram {
     minimal_terrain_material_program(TerrainMaterialProgramKind::Cutout)
+}
+
+/// First Rust-owned material program for Distant Horizons' opaque CPU LOD
+/// stream. It is intentionally separate from Minecraft terrain: DH carries
+/// pre-resolved vertex color and packed light, not atlas UVs or sprite
+/// identities. The eventual frontend supplies its four explicit bindings as
+/// Rust-owned GAL resources; this description contains no Java/DH GPU state.
+pub fn minimal_distant_horizons_lod_opaque_program() -> TerrainMaterialProgram {
+    TerrainMaterialProgram {
+        identity: ProgramIdentity::new("vulkanic:builtin/distant_horizons_lod_opaque_v1"),
+        vertex: ShaderStageSource {
+            stage: ShaderStageKind::Vertex,
+            label: "minimal-distant-horizons-lod-opaque.vertex".to_string(),
+            source: MINIMAL_DISTANT_HORIZONS_LOD_OPAQUE_VERTEX.to_string(),
+            entry_point: "main".to_string(),
+        },
+        fragment: ShaderStageSource {
+            stage: ShaderStageKind::Fragment,
+            label: "minimal-distant-horizons-lod-opaque.fragment".to_string(),
+            source: MINIMAL_DISTANT_HORIZONS_LOD_OPAQUE_FRAGMENT.to_string(),
+            entry_point: "main".to_string(),
+        },
+        required_resources: Vec::new(),
+    }
+}
+
+/// Rust-owned alpha-blended material program for Distant Horizons' non-water
+/// transparent CPU LOD streams. It shares the copied DH vertex and semantic
+/// lightmap contract with the opaque program, but writes one composited color
+/// attachment and deliberately does not participate in the G-buffer or shadow
+/// pass. Water remains a distinct, explicitly unavailable material contract.
+pub fn minimal_distant_horizons_lod_transparent_program() -> TerrainMaterialProgram {
+    TerrainMaterialProgram {
+        identity: ProgramIdentity::new("vulkanic:builtin/distant_horizons_lod_transparent_v1"),
+        vertex: ShaderStageSource {
+            stage: ShaderStageKind::Vertex,
+            label: "minimal-distant-horizons-lod-transparent.vertex".to_string(),
+            source: MINIMAL_DISTANT_HORIZONS_LOD_OPAQUE_VERTEX.to_string(),
+            entry_point: "main".to_string(),
+        },
+        fragment: ShaderStageSource {
+            stage: ShaderStageKind::Fragment,
+            label: "minimal-distant-horizons-lod-transparent.fragment".to_string(),
+            source: MINIMAL_DISTANT_HORIZONS_LOD_TRANSPARENT_FRAGMENT.to_string(),
+            entry_point: "main".to_string(),
+        },
+        required_resources: Vec::new(),
+    }
+}
+
+/// Exact-atlas opaque DH material program. This is deliberately distinct from
+/// the reduced color stream: it is admitted only for immutable column
+/// segments whose copied face provenance resolves every quad to the owned
+/// Minecraft terrain atlas.
+pub fn minimal_distant_horizons_lod_exact_atlas_opaque_program() -> TerrainMaterialProgram {
+    TerrainMaterialProgram {
+        identity: ProgramIdentity::new(
+            "vulkanic:builtin/distant_horizons_lod_exact_atlas_opaque_v2",
+        ),
+        vertex: ShaderStageSource {
+            stage: ShaderStageKind::Vertex,
+            label: "minimal-distant-horizons-lod-exact-atlas-opaque.vertex".to_string(),
+            source: MINIMAL_DISTANT_HORIZONS_LOD_EXACT_ATLAS_OPAQUE_VERTEX.to_string(),
+            entry_point: "main".to_string(),
+        },
+        fragment: ShaderStageSource {
+            stage: ShaderStageKind::Fragment,
+            label: "minimal-distant-horizons-lod-exact-atlas-opaque.fragment".to_string(),
+            source: MINIMAL_DISTANT_HORIZONS_LOD_EXACT_ATLAS_OPAQUE_FRAGMENT.to_string(),
+            entry_point: "main".to_string(),
+        },
+        required_resources: Vec::new(),
+    }
+}
+
+/// Exact-atlas DH writer for a source-derived frame. The selected DH program
+/// writes one named primary color target; this private Rust writer therefore
+/// retains that exact output schema while resolving immutable face ranges to
+/// an owned Minecraft atlas. It does not reinterpret DH as an ordinary
+/// terrain G-buffer writer.
+pub fn minimal_distant_horizons_lod_exact_atlas_source_program() -> TerrainMaterialProgram {
+    TerrainMaterialProgram {
+        identity: ProgramIdentity::new(
+            "vulkanic:builtin/distant_horizons_lod_exact_atlas_source_v1",
+        ),
+        vertex: ShaderStageSource {
+            stage: ShaderStageKind::Vertex,
+            label: "minimal-distant-horizons-lod-exact-atlas-source.vertex".to_string(),
+            source: MINIMAL_DISTANT_HORIZONS_LOD_EXACT_ATLAS_OPAQUE_VERTEX.to_string(),
+            entry_point: "main".to_string(),
+        },
+        fragment: ShaderStageSource {
+            stage: ShaderStageKind::Fragment,
+            label: "minimal-distant-horizons-lod-exact-atlas-source.fragment".to_string(),
+            source: MINIMAL_DISTANT_HORIZONS_LOD_EXACT_ATLAS_SOURCE_FRAGMENT.to_string(),
+            entry_point: "main".to_string(),
+        },
+        required_resources: Vec::new(),
+    }
+}
+
+/// The complete two-set binding contract for the private DH opaque program.
+/// Set zero changes with a visible LOD segment; set one changes only with a
+/// complete Rust-owned vanilla-lightmap generation. The descriptions are
+/// backend-neutral and can be consumed unchanged by the Rust Vulkan and
+/// OpenGL implementations.
+pub fn distant_horizons_lod_opaque_resource_layouts(label: &str) -> [ResourceLayoutDesc; 2] {
+    [
+        ResourceLayoutDesc {
+            label: format!("{label}.geometry-and-frame"),
+            bindings: vec![
+                ResourceBindingDesc {
+                    binding: 0,
+                    kind: ResourceBindingKind::StorageBuffer,
+                    stages: PipelineStageFlags::DRAW,
+                    array_count: 1,
+                    optional: false,
+                    dynamic_offset_count: 0,
+                },
+                ResourceBindingDesc {
+                    binding: 1,
+                    kind: ResourceBindingKind::UniformBuffer,
+                    stages: PipelineStageFlags::DRAW,
+                    array_count: 1,
+                    optional: false,
+                    dynamic_offset_count: 0,
+                },
+            ],
+        },
+        ResourceLayoutDesc {
+            label: format!("{label}.lightmap"),
+            bindings: vec![
+                ResourceBindingDesc {
+                    binding: 0,
+                    kind: ResourceBindingKind::SampledTexture,
+                    stages: PipelineStageFlags::DRAW,
+                    array_count: 1,
+                    optional: false,
+                    dynamic_offset_count: 0,
+                },
+                ResourceBindingDesc {
+                    binding: 1,
+                    kind: ResourceBindingKind::Sampler,
+                    stages: PipelineStageFlags::DRAW,
+                    array_count: 1,
+                    optional: false,
+                    dynamic_offset_count: 0,
+                },
+            ],
+        },
+    ]
+}
+
+/// Three-set contract for a DH segment with fully resolved per-face Minecraft
+/// atlas provenance. The atlas and lightmap are both Rust-owned semantic
+/// resources; neither is a borrowed Java/OpenGL binding.
+pub fn distant_horizons_lod_exact_atlas_resource_layouts(label: &str) -> [ResourceLayoutDesc; 2] {
+    let [geometry_and_frame, _lightmap] = distant_horizons_lod_opaque_resource_layouts(label);
+    [
+        geometry_and_frame,
+        ResourceLayoutDesc {
+            label: format!("{label}.terrain-atlas-and-lightmap"),
+            bindings: vec![
+                ResourceBindingDesc {
+                    binding: 0,
+                    kind: ResourceBindingKind::SampledTexture,
+                    stages: PipelineStageFlags::DRAW,
+                    array_count: 1,
+                    optional: false,
+                    dynamic_offset_count: 0,
+                },
+                ResourceBindingDesc {
+                    binding: 1,
+                    kind: ResourceBindingKind::Sampler,
+                    stages: PipelineStageFlags::DRAW,
+                    array_count: 1,
+                    optional: false,
+                    dynamic_offset_count: 0,
+                },
+                ResourceBindingDesc {
+                    binding: 2,
+                    kind: ResourceBindingKind::SampledTexture,
+                    stages: PipelineStageFlags::DRAW,
+                    array_count: 1,
+                    optional: false,
+                    dynamic_offset_count: 0,
+                },
+                ResourceBindingDesc {
+                    binding: 3,
+                    kind: ResourceBindingKind::Sampler,
+                    stages: PipelineStageFlags::DRAW,
+                    array_count: 1,
+                    optional: false,
+                    dynamic_offset_count: 0,
+                },
+            ],
+        },
+    ]
+}
+
+/// Additional set used only by the source-derived exact-atlas DH adapter.
+/// The selected pack's declared resources remain in its ordinary set one;
+/// this set supplies the copied Minecraft atlas that turns resolved tile UVs
+/// into the source program's semantic vertex color.
+pub fn distant_horizons_exact_atlas_source_resource_layout(label: &str) -> ResourceLayoutDesc {
+    ResourceLayoutDesc {
+        label: format!("{label}.exact-atlas"),
+        bindings: vec![
+            ResourceBindingDesc {
+                binding: 0,
+                kind: ResourceBindingKind::SampledTexture,
+                stages: PipelineStageFlags::DRAW,
+                array_count: 1,
+                optional: false,
+                dynamic_offset_count: 0,
+            },
+            ResourceBindingDesc {
+                binding: 1,
+                kind: ResourceBindingKind::Sampler,
+                stages: PipelineStageFlags::DRAW,
+                array_count: 1,
+                optional: false,
+                dynamic_offset_count: 0,
+            },
+        ],
+    }
 }
 
 pub fn minimal_terrain_translucent_program() -> TerrainMaterialProgram {
@@ -1086,13 +4361,38 @@ pub fn shader_stage_code_for_backend(api: BackendApi, source: &str) -> Vec<u8> {
     if api != BackendApi::Vulkan {
         return source.as_bytes().to_vec();
     }
-    source
-        .replacen(
-            "#version 450\n",
-            "#version 450\n#define VULKANIC_GAL_ZERO_TO_ONE_CLIP_DEPTH 1\n#define VULKANIC_GAL_FLIP_FULLSCREEN_UV_Y 1\n",
-            1,
-        )
-        .into_bytes()
+    // A Vulkan framebuffer's row direction and sampled-image coordinates
+    // differ from the pass graph's top-left image convention. Every
+    // fullscreen transfer compensates exactly once; otherwise forward work
+    // inserted after a transfer acquires a different vertical parity from
+    // G-buffer content.
+    let prefix = "#version 450\n#define VULKANIC_GAL_ZERO_TO_ONE_CLIP_DEPTH 1\n#define VULKANIC_GAL_FLIP_FULLSCREEN_UV_Y 1\n";
+    source.replacen("#version 450\n", &prefix, 1).into_bytes()
+}
+
+#[cfg(test)]
+mod shader_stage_code_tests {
+    use super::*;
+
+    #[test]
+    fn vulkan_fullscreen_transfers_correct_framebuffer_to_texture_row_origin() {
+        let source = "#version 450\n#ifdef VULKANIC_GAL_FULLSCREEN_UV_TOP_ORIGIN\n#endif\n";
+        let lowered = String::from_utf8(shader_stage_code_for_backend(BackendApi::Vulkan, source))
+            .expect("Vulkan shader source must remain UTF-8");
+
+        assert!(lowered.contains("#define VULKANIC_GAL_ZERO_TO_ONE_CLIP_DEPTH 1"));
+        assert!(lowered.contains("#define VULKANIC_GAL_FLIP_FULLSCREEN_UV_Y 1"));
+        assert!(!lowered.contains("#define VULKANIC_GAL_FULLSCREEN_UV_TOP_ORIGIN 1"));
+    }
+
+    #[test]
+    fn vulkan_fullscreen_transfers_correct_the_framebuffer_to_texture_row_origin() {
+        let source = "#version 450\n#ifdef VULKANIC_GAL_FLIP_FULLSCREEN_UV_Y\n#endif\n";
+        let lowered = String::from_utf8(shader_stage_code_for_backend(BackendApi::Vulkan, source))
+            .expect("Vulkan shader source must remain UTF-8");
+
+        assert!(lowered.contains("#define VULKANIC_GAL_FLIP_FULLSCREEN_UV_Y 1"));
+    }
 }
 
 pub const MINIMAL_TERRAIN_MATERIAL_VERTEX: &str = r#"#version 450
@@ -1146,6 +4446,290 @@ void main() {
     v_light = clamp(vertex.extra_data.xy, vec2(0.0), vec2(1.0));
     float shadow_range = max(shadow_params.w, 1.0);
     v_world_position = world.xyz / shadow_range * 0.5 + 0.5;
+}
+"#;
+
+/// Rust-owned DH vertex contract. The semantic record is exactly the private
+/// 32-byte expansion produced by `world_primitive_frontend::lod`, not DH's
+/// legacy GL vertex format. `LightmapTexture` and `LightmapSampler` are a
+/// separately bound Rust-owned 16x16 semantic vanilla lightmap.
+pub const MINIMAL_DISTANT_HORIZONS_LOD_OPAQUE_VERTEX: &str = r#"#version 450
+struct DistantHorizonsLodVertex {
+    float local_x;
+    float local_y;
+    float local_z;
+    float micro_x;
+    float micro_y;
+    float micro_z;
+    uint color_rgba;
+    uint light_material_normal;
+};
+layout(set = 0, binding = 0, std430) readonly buffer DistantHorizonsLodVertices {
+    DistantHorizonsLodVertex vertices[];
+};
+layout(set = 0, binding = 1, std140) uniform DistantHorizonsLodFrame {
+    mat4 combined_matrix;
+    vec4 column_origin_and_world_y;
+    vec4 model_offset_and_reserved;
+    vec4 clip_micro_noise_earth;
+    uvec4 flags_and_noise;
+};
+layout(location = 0) out vec4 v_color;
+layout(location = 1) flat out uvec2 v_light;
+layout(location = 2) flat out uint v_material;
+layout(location = 3) flat out uint v_normal;
+layout(location = 4) out vec3 v_world_position;
+
+vec3 dh_normal(uint normal) {
+    if (normal == 0u) return vec3(0.0, -1.0, 0.0);
+    if (normal == 1u) return vec3(0.0, 1.0, 0.0);
+    if (normal == 2u) return vec3(0.0, 0.0, -1.0);
+    if (normal == 3u) return vec3(0.0, 0.0, 1.0);
+    if (normal == 4u) return vec3(-1.0, 0.0, 0.0);
+    return vec3(1.0, 0.0, 0.0);
+}
+
+void main() {
+    DistantHorizonsLodVertex vertex = vertices[gl_VertexIndex];
+    // DH's compact stream stores a third micro field, but its terrain
+    // transformer applies edge perturbation in the horizontal plane only.
+    // Treating micro_y as height moves otherwise flat water geometry away
+    // from the source terrain surface.
+    vec3 local = vec3(vertex.local_x, vertex.local_y, vertex.local_z)
+        + vec3(vertex.micro_x, 0.0, vertex.micro_z);
+    vec3 world = local + column_origin_and_world_y.xyz;
+    vec4 clip = combined_matrix * vec4(
+        local + model_offset_and_reserved.xyz,
+        1.0
+    );
+#ifdef VULKANIC_GAL_ZERO_TO_ONE_CLIP_DEPTH
+    clip.z = clip.z * 0.5 + clip.w * 0.5;
+#endif
+    gl_Position = clip;
+    v_color = vec4(
+        float(vertex.color_rgba & 0xffu),
+        float((vertex.color_rgba >> 8u) & 0xffu),
+        float((vertex.color_rgba >> 16u) & 0xffu),
+        float((vertex.color_rgba >> 24u) & 0xffu)
+    ) / 255.0;
+    v_light = uvec2(
+        vertex.light_material_normal & 0xffu,
+        (vertex.light_material_normal >> 8u) & 0xffu
+    );
+    v_material = (vertex.light_material_normal >> 16u) & 0xffu;
+    v_normal = (vertex.light_material_normal >> 24u) & 0xffu;
+    v_world_position = world;
+}
+"#;
+
+/// Private Rust vertex stream for the exact-atlas DH subset. Its 56-byte
+/// layout is owned by the world frontend and is not DH's legacy GL format.
+pub const MINIMAL_DISTANT_HORIZONS_LOD_EXACT_ATLAS_OPAQUE_VERTEX: &str = r#"#version 450
+struct DistantHorizonsLodExactAtlasVertex {
+    float local_x;
+    float local_y;
+    float local_z;
+    float micro_x;
+    float micro_y;
+    float micro_z;
+    float tile_u;
+    float tile_v;
+    float atlas_u0;
+    float atlas_v0;
+    float atlas_u1;
+    float atlas_v1;
+    uint color_rgba;
+    uint light_normal_pad;
+};
+layout(set = 0, binding = 0, std430) readonly buffer DistantHorizonsLodExactAtlasVertices {
+    DistantHorizonsLodExactAtlasVertex vertices[];
+};
+layout(set = 0, binding = 1, std140) uniform DistantHorizonsLodFrame {
+    mat4 combined_matrix;
+    vec4 column_origin_and_world_y;
+    vec4 model_offset_and_reserved;
+    vec4 clip_micro_noise_earth;
+    uvec4 flags_and_noise;
+};
+layout(location = 0) out vec2 v_tile_uv;
+layout(location = 1) flat out vec4 v_atlas_rect;
+layout(location = 2) out vec4 v_color;
+layout(location = 3) flat out uvec2 v_light;
+layout(location = 4) flat out uint v_normal;
+layout(location = 5) out vec3 v_world_position;
+layout(location = 6) flat out uint v_material_flags;
+
+void main() {
+    DistantHorizonsLodExactAtlasVertex vertex = vertices[gl_VertexIndex];
+    // Keep the exact-atlas stream on the same DH X/Z-only micro-offset
+    // contract as the reduced-color stream.
+    vec3 local = vec3(vertex.local_x, vertex.local_y, vertex.local_z)
+        + vec3(vertex.micro_x, 0.0, vertex.micro_z);
+    vec3 world = local + column_origin_and_world_y.xyz;
+    vec4 clip = combined_matrix * vec4(
+        local + model_offset_and_reserved.xyz,
+        1.0
+    );
+#ifdef VULKANIC_GAL_ZERO_TO_ONE_CLIP_DEPTH
+    clip.z = clip.z * 0.5 + clip.w * 0.5;
+#endif
+    gl_Position = clip;
+    v_tile_uv = vec2(vertex.tile_u, vertex.tile_v);
+    v_atlas_rect = vec4(vertex.atlas_u0, vertex.atlas_v0, vertex.atlas_u1, vertex.atlas_v1);
+    v_color = vec4(
+        float(vertex.color_rgba & 0xffu),
+        float((vertex.color_rgba >> 8u) & 0xffu),
+        float((vertex.color_rgba >> 16u) & 0xffu),
+        float((vertex.color_rgba >> 24u) & 0xffu)
+    ) / 255.0;
+    v_light = uvec2(
+        vertex.light_normal_pad & 0xffu,
+        (vertex.light_normal_pad >> 8u) & 0xffu
+    );
+    v_normal = (vertex.light_normal_pad >> 16u) & 0xffu;
+    v_material_flags = (vertex.light_normal_pad >> 24u) & 0xffu;
+    v_world_position = world;
+}
+"#;
+
+pub const MINIMAL_DISTANT_HORIZONS_LOD_OPAQUE_FRAGMENT: &str = r#"#version 450
+layout(set = 1, binding = 0) uniform texture2D LightmapTexture;
+layout(set = 1, binding = 1) uniform sampler LightmapSampler;
+layout(location = 0) in vec4 v_color;
+layout(location = 1) flat in uvec2 v_light;
+layout(location = 2) flat in uint v_material;
+layout(location = 3) flat in uint v_normal;
+layout(location = 4) in vec3 v_world_position;
+layout(location = 0) out vec4 out_terrain_lit_color;
+layout(location = 1) out vec4 out_terrain_view_space_normal;
+layout(location = 2) out vec4 out_terrain_material_auxiliary;
+layout(location = 3) out vec4 out_world_position;
+
+vec3 dh_normal(uint normal) {
+    if (normal == 0u) return vec3(0.0, -1.0, 0.0);
+    if (normal == 1u) return vec3(0.0, 1.0, 0.0);
+    if (normal == 2u) return vec3(0.0, 0.0, -1.0);
+    if (normal == 3u) return vec3(0.0, 0.0, 1.0);
+    if (normal == 4u) return vec3(-1.0, 0.0, 0.0);
+    return vec3(1.0, 0.0, 0.0);
+}
+
+void main() {
+    vec2 light_uv = (vec2(v_light) + vec2(0.5)) / 16.0;
+    vec3 light_color = texture(sampler2D(LightmapTexture, LightmapSampler), light_uv).rgb;
+    vec4 color = vec4(v_color.rgb * light_color, v_color.a);
+    vec3 normal = dh_normal(v_normal);
+    out_terrain_lit_color = color;
+    out_terrain_view_space_normal = vec4(normal * 0.5 + 0.5, color.a);
+    out_terrain_material_auxiliary = vec4(
+        float(v_material) / 255.0,
+        float(v_light.x) / 15.0,
+        float(v_light.y) / 15.0,
+        color.a
+    );
+    // The existing minimal deferred path stores a bounded world-space
+    // encoding. LOD admission is not enabled until its exact frame range is
+    // supplied by the future LOD pass/resource contract.
+    out_world_position = vec4(clamp(v_world_position / 1024.0 * 0.5 + 0.5, 0.0, 1.0), color.a);
+}
+"#;
+
+pub const MINIMAL_DISTANT_HORIZONS_LOD_EXACT_ATLAS_OPAQUE_FRAGMENT: &str = r#"#version 450
+layout(set = 1, binding = 0) uniform texture2D TerrainAtlasColor;
+layout(set = 1, binding = 1) uniform sampler TerrainAtlasSampler;
+layout(set = 1, binding = 2) uniform texture2D LightmapTexture;
+layout(set = 1, binding = 3) uniform sampler LightmapSampler;
+layout(location = 0) in vec2 v_tile_uv;
+layout(location = 1) flat in vec4 v_atlas_rect;
+layout(location = 2) in vec4 v_color;
+layout(location = 3) flat in uvec2 v_light;
+layout(location = 4) flat in uint v_normal;
+layout(location = 5) in vec3 v_world_position;
+layout(location = 6) flat in uint v_material_flags;
+layout(location = 0) out vec4 out_terrain_lit_color;
+layout(location = 1) out vec4 out_terrain_view_space_normal;
+layout(location = 2) out vec4 out_terrain_material_auxiliary;
+layout(location = 3) out vec4 out_world_position;
+
+vec3 dh_normal(uint normal) {
+    if (normal == 0u) return vec3(0.0, -1.0, 0.0);
+    if (normal == 1u) return vec3(0.0, 1.0, 0.0);
+    if (normal == 2u) return vec3(0.0, 0.0, -1.0);
+    if (normal == 3u) return vec3(0.0, 0.0, 1.0);
+    if (normal == 4u) return vec3(-1.0, 0.0, 0.0);
+    return vec3(1.0, 0.0, 0.0);
+}
+
+void main() {
+    vec2 atlas_extent = vec2(textureSize(sampler2D(TerrainAtlasColor, TerrainAtlasSampler), 0));
+    vec2 texel = vec2(0.5) / atlas_extent;
+    vec2 sprite_min = v_atlas_rect.xy + texel;
+    vec2 sprite_max = v_atlas_rect.zw - texel;
+    // DH can merge one semantic material across many blocks. Repeat inside
+    // that named sprite instead of letting a large face stretch one tile or
+    // escape into a neighbour in the global Minecraft atlas.
+    vec2 atlas_uv = mix(sprite_min, max(sprite_min, sprite_max), fract(v_tile_uv));
+    vec4 atlas_color = texture(sampler2D(TerrainAtlasColor, TerrainAtlasSampler), atlas_uv);
+    vec2 light_uv = (vec2(v_light) + vec2(0.5)) / 16.0;
+    vec3 light_color = texture(sampler2D(LightmapTexture, LightmapSampler), light_uv).rgb;
+    vec3 semantic_tint = (v_material_flags & 1u) != 0u ? v_color.rgb : vec3(1.0);
+    vec4 color = vec4(atlas_color.rgb * semantic_tint * light_color, atlas_color.a * v_color.a);
+    if (color.a < 0.1) discard;
+    vec3 normal = dh_normal(v_normal);
+    out_terrain_lit_color = color;
+    out_terrain_view_space_normal = vec4(normal * 0.5 + 0.5, color.a);
+    out_terrain_material_auxiliary = vec4(0.0, float(v_light.x) / 15.0, float(v_light.y) / 15.0, color.a);
+    out_world_position = vec4(clamp(v_world_position / 1024.0 * 0.5 + 0.5, 0.0, 1.0), color.a);
+}
+"#;
+
+/// The provenance-resolved exact-atlas source writer owns DH's one declared
+/// lit-color output. Its target schema intentionally matches the selected
+/// `dh_terrain` contract rather than ordinary terrain's G-buffer outputs.
+pub const MINIMAL_DISTANT_HORIZONS_LOD_EXACT_ATLAS_SOURCE_FRAGMENT: &str = r#"#version 450
+layout(set = 1, binding = 0) uniform texture2D TerrainAtlasColor;
+layout(set = 1, binding = 1) uniform sampler TerrainAtlasSampler;
+layout(set = 1, binding = 2) uniform texture2D LightmapTexture;
+layout(set = 1, binding = 3) uniform sampler LightmapSampler;
+layout(location = 0) in vec2 v_tile_uv;
+layout(location = 1) flat in vec4 v_atlas_rect;
+layout(location = 2) in vec4 v_color;
+layout(location = 3) flat in uvec2 v_light;
+layout(location = 4) flat in uint v_normal;
+layout(location = 5) in vec3 v_world_position;
+layout(location = 6) flat in uint v_material_flags;
+layout(location = 0) out vec4 out_source_primary;
+
+void main() {
+    vec2 atlas_extent = vec2(textureSize(sampler2D(TerrainAtlasColor, TerrainAtlasSampler), 0));
+    vec2 texel = vec2(0.5) / atlas_extent;
+    vec2 sprite_min = v_atlas_rect.xy + texel;
+    vec2 sprite_max = v_atlas_rect.zw - texel;
+    vec2 atlas_uv = mix(sprite_min, max(sprite_min, sprite_max), fract(v_tile_uv));
+    vec4 atlas_color = texture(sampler2D(TerrainAtlasColor, TerrainAtlasSampler), atlas_uv);
+    vec2 light_uv = (vec2(v_light) + vec2(0.5)) / 16.0;
+    vec3 light_color = texture(sampler2D(LightmapTexture, LightmapSampler), light_uv).rgb;
+    vec3 semantic_tint = (v_material_flags & 1u) != 0u ? v_color.rgb : vec3(1.0);
+    vec4 color = vec4(atlas_color.rgb * semantic_tint * light_color, atlas_color.a * v_color.a);
+    if (color.a < 0.1) discard;
+    out_source_primary = color;
+}
+"#;
+
+/// The non-water transparent pass is composited after deferred lighting. It
+/// keeps DH's source-visible alpha and lightmap result intact, with blend and
+/// depth-write policy declared by the backend-neutral graphics pipeline.
+pub const MINIMAL_DISTANT_HORIZONS_LOD_TRANSPARENT_FRAGMENT: &str = r#"#version 450
+layout(set = 1, binding = 0) uniform texture2D LightmapTexture;
+layout(set = 1, binding = 1) uniform sampler LightmapSampler;
+layout(location = 0) in vec4 v_color;
+layout(location = 1) flat in uvec2 v_light;
+layout(location = 0) out vec4 out_color;
+
+void main() {
+    vec2 light_uv = (vec2(v_light) + vec2(0.5)) / 16.0;
+    vec3 light_color = texture(sampler2D(LightmapTexture, LightmapSampler), light_uv).rgb;
+    out_color = vec4(v_color.rgb * light_color, v_color.a);
 }
 "#;
 
@@ -1363,14 +4947,11 @@ layout(location = 0) in vec2 v_uv;
 layout(location = 0) out vec4 out_color;
 void main() {
     vec4 albedo = texture(sampler2D(AlbedoTex, Samp0), v_uv);
-    vec3 normal = normalize(texture(sampler2D(NormalTex, Samp0), v_uv).xyz * 2.0 - 1.0);
     vec4 material_light = texture(sampler2D(MaterialLightTex, Samp0), v_uv);
     if (material_light.a < 0.5) {
         out_color = vec4(albedo.rgb, 0.0);
         return;
     }
-    float face = clamp(dot(normal, normalize(vec3(0.35, 0.65, 0.68))), 0.18, 1.0);
-    float light = clamp(max(material_light.y, material_light.z) * 0.75 + 0.25, 0.2, 1.0);
     vec4 packed_world = texture(sampler2D(WorldPositionTex, Samp0), v_uv);
     float shadow_range = max(shadow_params.w, 1.0);
     vec3 world_position = (packed_world.xyz * 2.0 - 1.0) * shadow_range;
@@ -1386,7 +4967,13 @@ void main() {
         float bias = shadow_params.y;
         shadow_factor = compare_depth - bias > shadow_depth ? shadow_params.z : 1.0;
     }
-    out_color = vec4(albedo.rgb * face * light * shadow_factor, albedo.a);
+    // Terrain material passes write terrain_lit_color, not raw base color.
+    // Their vertex color has already applied Minecraft's per-face shade and
+    // packed block/sky-light factor. Relighting it here darkens horizontal
+    // faces a second time and makes correct atlas regions look like unrelated
+    // dark materials. Keep this pass limited to the explicit shadow dependency
+    // until a source-derived deferred-lighting contract replaces it.
+    out_color = vec4(albedo.rgb * shadow_factor, albedo.a);
 }
 "#;
 
@@ -1525,18 +5112,62 @@ void main() {
 mod tests {
     use super::*;
     use crate::render::vulkanic::handles::{Handle, HandleKind};
-    use crate::render::vulkanic::shader_pack::lowering::{
-        lower_shadow_source_pair, lower_terrain_source_pair,
+    use crate::render::vulkanic::shader_pack::cloud_contract::{
+        derive_cloud_pass_contract, lower_cloud_source_pair,
     };
-    use crate::render::vulkanic::shader_pack::preprocess::preprocess_terrain_sources;
+    use crate::render::vulkanic::shader_pack::distant_horizons_contract::{
+        derive_distant_horizons_opaque_contract, derive_distant_horizons_translucent_contract,
+        DistantHorizonsPassKind,
+    };
+    use crate::render::vulkanic::shader_pack::entity_contract::{
+        bind_entity_source_resources, derive_entity_contract, lower_entity_source_pair,
+    };
+    use crate::render::vulkanic::shader_pack::lowering::{
+        lower_distant_horizons_source_pair, lower_fullscreen_source_pair, lower_shadow_source_pair,
+        lower_terrain_source_pair, lower_translucent_terrain_source_pair,
+    };
+    use crate::render::vulkanic::shader_pack::preprocess::{
+        complete_bundled_pack_source_for_test, preprocess_distant_horizons_sources,
+        preprocess_source_stage_pair, preprocess_terrain_sources,
+    };
     use crate::render::vulkanic::shader_pack::source::{ShaderPackSource, ShaderSourceFile};
-    use crate::render::vulkanic::shader_pack::terrain_contract::derive_complementary_terrain_contract;
+    use crate::render::vulkanic::shader_pack::terrain_contract::{
+        derive_complementary_terrain_contract, derive_complementary_translucent_terrain_contract,
+        TerrainProgramScope, TerrainSourceStage, TerrainSourceStages, TerrainTranslucentBlend,
+    };
     use crate::render::vulkanic::shader_pack::terrain_source_resources::{
         TerrainSourceOwnedResource, TerrainSourceOwnedResourceSet,
         TerrainSourceResourceAvailability, TerrainSourceResourceAvailabilitySet,
         TerrainSourceResourceBindings, TerrainSourceResourceRole,
         TerrainSourceSampledResourceShape, TERRAIN_RESOURCE_BINDINGS_PATH,
     };
+
+    #[test]
+    fn minimal_distant_horizons_streams_keep_compact_micro_y_non_positional() {
+        for source in [
+            MINIMAL_DISTANT_HORIZONS_LOD_OPAQUE_VERTEX,
+            MINIMAL_DISTANT_HORIZONS_LOD_EXACT_ATLAS_OPAQUE_VERTEX,
+        ] {
+            assert!(source.contains("vec3(vertex.micro_x, 0.0, vertex.micro_z)"));
+            assert!(
+                !source.contains("vec3(vertex.micro_x, vertex.micro_y, vertex.micro_z)"),
+                "DH micro_y is payload metadata, not a terrain height offset"
+            );
+        }
+    }
+
+    #[test]
+    fn distant_horizons_streams_do_not_apply_the_dimension_world_y_offset_twice() {
+        for source in [
+            MINIMAL_DISTANT_HORIZONS_LOD_OPAQUE_VERTEX,
+            MINIMAL_DISTANT_HORIZONS_LOD_EXACT_ATLAS_OPAQUE_VERTEX,
+        ] {
+            assert!(
+                !source.contains("+ vec3(0.0, column_origin_and_world_y.w, 0.0)"),
+                "the column origin already contains DH's min-world-Y"
+            );
+        }
+    }
 
     fn paired_source() -> ShaderPackSource {
         ShaderPackSource::new(
@@ -1560,6 +5191,26 @@ mod tests {
         .unwrap()
     }
 
+    fn paired_entity_source() -> ShaderPackSource {
+        ShaderPackSource::new(
+            "lowered-entity-source-test",
+            11,
+            vec![
+                ShaderSourceFile::new(
+                    "world0/gbuffers_entities.vsh",
+                    "#version 130\nvoid main() { vec4 p = gl_Vertex; vec2 light = GetLightMapCoordinates(); vec3 normal = gl_Normal; vec4 color = gl_Color; gl_Position = ftransform(); }",
+                ),
+                ShaderSourceFile::new(
+                    "world0/gbuffers_entities.fsh",
+                    "#version 130\nuniform sampler2D tex;\nuniform int entityId;\nuniform vec4 entityColor;\nvoid DoLighting() {}\nvoid main() { vec4 color = texture2D(tex, texCoord); color *= glColor; color.rgb = mix(color.rgb, entityColor.rgb, entityColor.a); DoLighting(); gl_FragData[0] = color; gl_FragData[1] = color; /* DRAWBUFFERS:06 */ }",
+                ),
+                ShaderSourceFile::new("entity.properties", "entity.50076=boat\n"),
+                ShaderSourceFile::new(TERRAIN_RESOURCE_BINDINGS_PATH, "tex=material_atlas\n"),
+            ],
+        )
+        .unwrap()
+    }
+
     fn paired_shadow_source() -> ShaderPackSource {
         ShaderPackSource::new(
             "lowered-shadow-source-test",
@@ -1577,6 +5228,62 @@ mod tests {
             ],
         )
         .unwrap()
+    }
+
+    fn paired_translucent_source() -> ShaderPackSource {
+        ShaderPackSource::new(
+            "lowered-translucent-source-test",
+            12,
+            vec![
+                ShaderSourceFile::new(
+                    "gbuffers_water.vsh",
+                    "#version 130\nout vec2 texCoord;\nout vec4 glColor;\nvoid main() { texCoord = gl_MultiTexCoord0.xy; glColor = vec4(1.0); gl_Position = ftransform(); }",
+                ),
+                ShaderSourceFile::new(
+                    "gbuffers_water.fsh",
+                    "#version 130\nin vec2 texCoord;\nin vec4 glColor;\nuniform sampler2D tex;\nvoid DoLighting() {}\nvoid DoFog(inout vec3 color, inout float sky, float distance, vec3 player, float up, float sun, float dither) {}\n/* DRAWBUFFERS:03 */\nvoid main() { vec4 colorP = texture2D(tex, texCoord); vec4 color = colorP * vec4(glColor.rgb, 1.0); vec3 viewPos = vec3(0.0); vec3 playerPos = vec3(0.0); float lViewPos = 0.0; float VdotU = 0.0; float VdotS = 0.0; float dither = 0.0; vec4 translucentMult = vec4(1.0); DoLighting(); float sky = 0.0; DoFog(color.rgb, sky, lViewPos, playerPos, VdotU, VdotS, dither); gl_FragData[0] = color; gl_FragData[1] = vec4(1.0 - translucentMult.rgb, translucentMult.a); }",
+                ),
+                ShaderSourceFile::new("lib/common.glsl", "#define WATER_REFLECT_QUALITY -1\n"),
+                ShaderSourceFile::new(
+                    "shaders.properties",
+                    "alphaTest.gbuffers_water=GREATER 0.0001\nblend.gbuffers_water=SRC_ALPHA ONE_MINUS_SRC_ALPHA ONE ONE_MINUS_SRC_ALPHA\n",
+                ),
+                ShaderSourceFile::new("block.properties", "block.32000=minecraft:water\n"),
+                ShaderSourceFile::new(TERRAIN_RESOURCE_BINDINGS_PATH, "tex=material_atlas\n"),
+            ],
+        )
+        .unwrap()
+    }
+
+    fn paired_cloud_source() -> ShaderPackSource {
+        ShaderPackSource::new(
+            "lowered-cloud-source-test",
+            13,
+            vec![
+                ShaderSourceFile::new(
+                    "world0/gbuffers_clouds.vsh",
+                    "#version 130\nout vec2 texCoord;\nout vec4 glColor;\nvoid main() { texCoord = (gl_TextureMatrix[0] * gl_MultiTexCoord0).xy; glColor = gl_Color; gl_Position = gbufferModelView * gl_Vertex; }",
+                ),
+                ShaderSourceFile::new(
+                    "world0/gbuffers_clouds.fsh",
+                    "#version 130\nin vec2 texCoord;\nin vec4 glColor;\nuniform sampler2D tex;\n/* DRAWBUFFERS:063 */\nvoid main() { vec4 color = texture2D(tex, texCoord) * glColor; gl_FragData[0] = color; gl_FragData[1] = vec4(0.0); gl_FragData[2] = vec4(1.0); }",
+                ),
+                ShaderSourceFile::new(TERRAIN_RESOURCE_BINDINGS_PATH, "tex=material_atlas\n"),
+            ],
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn minimal_deferred_pass_does_not_relight_already_lit_terrain_color() {
+        // The terrain material contract names attachment zero terrain_lit_color:
+        // Java/Sodium has already supplied its directional shade and packed
+        // light through the vertex color. Applying another synthetic normal
+        // term here made valid atlas regions appear as the wrong dark block.
+        assert!(MINIMAL_DEFERRED_LIGHTING_FRAGMENT
+            .contains("out_color = vec4(albedo.rgb * shadow_factor, albedo.a);"));
+        assert!(!MINIMAL_DEFERRED_LIGHTING_FRAGMENT.contains("float face ="));
+        assert!(!MINIMAL_DEFERRED_LIGHTING_FRAGMENT.contains("float light ="));
     }
 
     #[test]
@@ -1605,8 +5312,34 @@ mod tests {
             program.identity.as_str()
         );
         assert_eq!(9, program.shader_pack_generation);
+        assert_eq!(
+            Some(TerrainMaterialProgramKind::Opaque),
+            program.material_kind
+        );
         assert_eq!(lowered.vertex().source(), program.vertex.source);
         assert_eq!(lowered.fragment().source(), program.fragment.source);
+        assert_eq!(
+            Some(
+                [
+                    TerrainPassOutput::LitTerrainColor,
+                    TerrainPassOutput::MaterialAuxiliary,
+                ]
+                .as_slice()
+            ),
+            program.terrain_outputs(),
+            "prepared source terrain programs must retain the named source output schema"
+        );
+        assert_eq!(
+            Some(
+                [
+                    (TerrainPassOutput::LitTerrainColor, 0),
+                    (TerrainPassOutput::MaterialAuxiliary, 6),
+                ]
+                .as_slice()
+            ),
+            program.terrain_output_color_slots(),
+            "prepared source terrain programs must retain source-declared color-target semantics"
+        );
         assert_eq!(1, program.opaque_resource_bindings.bindings().len());
         assert_eq!(
             TerrainSourceResourceRole::MaterialAtlas,
@@ -1624,9 +5357,15 @@ mod tests {
             .unwrap()
             .contains("VULKANIC_GAL_ZERO_TO_ONE_CLIP_DEPTH"));
         let opengl_modules = program.shader_module_descriptors(BackendApi::OpenGl);
-        assert!(!std::str::from_utf8(&opengl_modules[0].code)
-            .unwrap()
-            .contains("VULKANIC_GAL_ZERO_TO_ONE_CLIP_DEPTH"));
+        let opengl_vertex = std::str::from_utf8(&opengl_modules[0].code).unwrap();
+        assert!(
+            opengl_vertex.contains("VULKANIC_GAL_ZERO_TO_ONE_CLIP_DEPTH"),
+            "the backend-neutral source retains its conditional clip-depth finalizer"
+        );
+        assert!(
+            !opengl_vertex.contains("#define VULKANIC_GAL_ZERO_TO_ONE_CLIP_DEPTH 1"),
+            "only Vulkan enables the backend-neutral clip-depth finalizer"
+        );
         assert_eq!(program.vertex.label, vulkan_modules[0].label);
         assert_eq!(program.fragment.label, vulkan_modules[1].label);
         assert_eq!(
@@ -1870,6 +5609,770 @@ mod tests {
     }
 
     #[test]
+    fn lowered_entity_program_requires_typed_identity_color_and_local_texture_contract() {
+        let source = paired_entity_source();
+        let contract = derive_entity_contract(&source, TerrainProgramScope::Overworld).unwrap();
+        let lowered = lower_entity_source_pair(&source, &contract).unwrap();
+        let declarations = TerrainSourceResourceBindings::from_source(&source).unwrap();
+        let bindings = bind_entity_source_resources(&lowered, &declarations).unwrap();
+
+        let program =
+            prepare_lowered_entity_source_program(&contract, &lowered, &bindings).unwrap();
+        assert_eq!(
+            "vulkanic:shader-pack/lowered-entity-source-test/entity_source_gen11",
+            program.identity.as_str()
+        );
+        assert_eq!(11, program.shader_pack_generation);
+        assert_eq!(11, program.entity_id_generation);
+        assert_eq!(
+            [
+                (TerrainPassOutput::LitTerrainColor, 0),
+                (TerrainPassOutput::MaterialAuxiliary, 6),
+            ]
+            .as_slice(),
+            program.named_output_color_slots()
+        );
+        assert_eq!(
+            Some(TerrainSourceResourceRole::MaterialTexture),
+            program.opaque_resource_bindings.role_for("tex")
+        );
+        let cutout_descriptors =
+            program.shader_module_descriptors_with_alpha_cutoff(BackendApi::Vulkan, Some(0.1));
+        let cutout =
+            String::from_utf8(cutout_descriptors.into_iter().nth(1).unwrap().code).unwrap();
+        assert!(cutout.contains("#define VULKANIC_SOURCE_ENTITY_ALPHA_CUTOFF 0.10000000"));
+        let opaque_descriptors =
+            program.shader_module_descriptors_with_alpha_cutoff(BackendApi::Vulkan, None);
+        let opaque =
+            String::from_utf8(opaque_descriptors.into_iter().nth(1).unwrap().code).unwrap();
+        assert!(opaque.contains("#define VULKANIC_SOURCE_ENTITY_ALPHA_CUTOFF -1.0"));
+        let layouts = program.execution_resource_layouts().unwrap();
+        assert_eq!(
+            vec![0, 1, 2, 3],
+            layouts
+                .source_data
+                .bindings
+                .iter()
+                .map(|binding| binding.binding)
+                .collect::<Vec<_>>(),
+            "entity source data must use only the fixed Rust-owned stream and uniform bindings"
+        );
+        assert_eq!(
+            vec![0],
+            layouts
+                .pack_resources
+                .bindings
+                .iter()
+                .map(|binding| binding.binding)
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(
+            ResourceBindingKind::CombinedTextureSampler,
+            layouts.pack_resources.bindings[0].kind
+        );
+        let uniforms = program
+            .pack_scalar_uniforms(&TerrainSourceUniformFrame {
+                entity_id: Some(50_076),
+                entity_color: Some([0.25, 0.5, 0.75, 1.0]),
+                view_matrix: Some([1.0; 16]),
+                projection_matrix: Some([1.0; 16]),
+                ..TerrainSourceUniformFrame::default()
+            })
+            .unwrap();
+        assert_eq!(
+            program.execution_interface.scalar_uniform_bytes as usize,
+            uniforms.len()
+        );
+        let transforms = program
+            .pack_legacy_texture_transforms(
+                &TerrainSourceTextureTransforms::canonical_minecraft_terrain(),
+            )
+            .unwrap();
+        assert_eq!(
+            program.execution_interface.legacy_transform_bytes as usize,
+            transforms.len(),
+            "entity local UVs and packed light coordinates must use the fixed owned source transform ABI"
+        );
+        assert!(program
+            .pack_scalar_uniforms(&TerrainSourceUniformFrame {
+                entity_id: Some(50_076),
+                view_matrix: Some([1.0; 16]),
+                projection_matrix: Some([1.0; 16]),
+                ..TerrainSourceUniformFrame::default()
+            })
+            .unwrap_err()
+            .to_string()
+            .contains("current rendered entity color"));
+    }
+
+    #[test]
+    fn lowered_translucent_source_program_has_a_separate_output_contract() {
+        let source = paired_translucent_source();
+        let contract = derive_complementary_translucent_terrain_contract(&source).unwrap();
+        let artifacts =
+            preprocess_terrain_sources(&source, &contract.source_stages().unwrap()).unwrap();
+        let lowered =
+            lower_translucent_terrain_source_pair(&artifacts.vertex, &artifacts.fragment).unwrap();
+        let declarations = TerrainSourceResourceBindings::from_source(&source).unwrap();
+        let bindings = lowered
+            .opaque_resource_contract()
+            .bind_semantic_roles(&declarations)
+            .unwrap();
+
+        let program =
+            prepare_lowered_translucent_terrain_source_program(&contract, &lowered, &bindings)
+                .unwrap();
+
+        assert_eq!(
+            "vulkanic:shader-pack/lowered-translucent-source-test/terrain_translucent_source_gen12",
+            program.identity.as_str()
+        );
+        assert_eq!(
+            Some(TerrainMaterialProgramKind::Translucent),
+            program.material_kind
+        );
+        assert_eq!(
+            Some(
+                [
+                    TerrainPassOutput::LitTerrainColor,
+                    TerrainPassOutput::TranslucencyAuxiliary,
+                ]
+                .as_slice()
+            ),
+            program.terrain_outputs()
+        );
+        assert_eq!(
+            Some(
+                [
+                    (TerrainPassOutput::LitTerrainColor, 0),
+                    (TerrainPassOutput::TranslucencyAuxiliary, 3),
+                ]
+                .as_slice()
+            ),
+            program.terrain_output_color_slots()
+        );
+        let raster = program
+            .translucent_raster_state
+            .expect("the prepared translucent program must retain source raster semantics");
+        assert_eq!(TerrainTranslucentBlend::SourceAlphaOver, raster.blend);
+        assert!((raster.alpha_test.greater_than() - 0.0001).abs() < f32::EPSILON);
+        assert_eq!(Some(BlendMode::Alpha), program.translucent_blend_mode());
+    }
+
+    #[test]
+    fn translucent_source_program_rejects_missing_explicit_raster_contract() {
+        let mut files = paired_translucent_source().files();
+        files.retain(|file| file.path != "shaders.properties");
+        files.push(ShaderSourceFile::new("shaders.properties", ""));
+        let source = ShaderPackSource::new("missing-translucent-raster", 13, files).unwrap();
+        let contract = derive_complementary_translucent_terrain_contract(&source).unwrap();
+        let artifacts =
+            preprocess_terrain_sources(&source, &contract.source_stages().unwrap()).unwrap();
+        let lowered =
+            lower_translucent_terrain_source_pair(&artifacts.vertex, &artifacts.fragment).unwrap();
+        let declarations = TerrainSourceResourceBindings::from_source(&source).unwrap();
+        let bindings = lowered
+            .opaque_resource_contract()
+            .bind_semantic_roles(&declarations)
+            .unwrap();
+
+        let error =
+            prepare_lowered_translucent_terrain_source_program(&contract, &lowered, &bindings)
+                .unwrap_err();
+        assert!(error
+            .to_string()
+            .contains("no explicit alpha/blend raster contract"));
+    }
+
+    #[test]
+    fn lowered_fullscreen_program_owns_semantic_outputs_without_terrain_mesh_state() {
+        let source = ShaderPackSource::new(
+            "fullscreen-program",
+            12,
+            vec![
+                ShaderSourceFile::new(
+                    "world0/deferred1.vsh",
+                    "#version 130\nout vec2 uv;\nvoid main() { uv = (gl_TextureMatrix[0] * gl_MultiTexCoord0).xy; gl_Position = ftransform(); }",
+                ),
+                ShaderSourceFile::new(
+                    "world0/deferred1.fsh",
+                    "#version 130\nin vec2 uv;\nuniform sampler2D tex;\n/* DRAWBUFFERS:0 */\nvoid main() { gl_FragData[0] = texture2D(tex, uv); }",
+                ),
+                ShaderSourceFile::new(
+                    TERRAIN_RESOURCE_BINDINGS_PATH,
+                    "tex=material_atlas\ncolortex0=shader_pack_color:primary\n",
+                ),
+            ],
+        )
+        .unwrap();
+        let stages = TerrainSourceStages {
+            vertex: TerrainSourceStage {
+                path: "world0/deferred1.vsh".to_string(),
+                defines: Default::default(),
+            },
+            fragment: TerrainSourceStage {
+                path: "world0/deferred1.fsh".to_string(),
+                defines: Default::default(),
+            },
+        };
+        let artifacts = preprocess_source_stage_pair(&source, &stages).unwrap();
+        let declarations = TerrainSourceResourceBindings::from_source(&source).unwrap();
+        let lowered =
+            lower_fullscreen_source_pair(&artifacts.vertex, &artifacts.fragment, &declarations)
+                .unwrap();
+        let bindings = lowered
+            .opaque_resource_contract()
+            .bind_semantic_roles(&declarations)
+            .unwrap();
+        let program = prepare_lowered_fullscreen_source_program(
+            source.name(),
+            source.generation(),
+            "world0/deferred1.fsh",
+            &lowered,
+            &bindings,
+        )
+        .unwrap();
+        assert_eq!(
+            "vulkanic:shader-pack/fullscreen-program/world0-deferred1-source-gen12",
+            program.identity.as_str()
+        );
+        assert_eq!(
+            TerrainSourceResourceRole::ShaderPackColor("primary".to_string()),
+            program.outputs[0].role()
+        );
+        assert!(program.feedback_requirements.is_empty());
+        let layouts = program.execution_resource_layouts().unwrap();
+        assert_eq!(
+            vec![0],
+            layouts
+                .source_data
+                .bindings
+                .iter()
+                .map(|binding| binding.binding)
+                .collect::<Vec<_>>()
+        );
+        assert!(program
+            .vertex
+            .source
+            .contains("VulkanicSourceFullscreenFrame"));
+        assert!(!program
+            .vertex
+            .source
+            .contains("VulkanicSourceTerrainVertices"));
+        let resources = TerrainSourceOwnedResourceSet::new(
+            TerrainSourceResourceAvailabilitySet::new(
+                source.generation(),
+                4,
+                [TerrainSourceResourceAvailability {
+                    role: TerrainSourceResourceRole::MaterialAtlas,
+                    shape: TerrainSourceSampledResourceShape::Texture2d,
+                    resource_generation: 9,
+                }],
+            )
+            .unwrap(),
+            [TerrainSourceOwnedResource {
+                role: TerrainSourceResourceRole::MaterialAtlas,
+                combined_sampler: Handle::new(HandleKind::CombinedTextureSampler, 3, 1).unwrap(),
+            }],
+        )
+        .unwrap();
+        let set = program
+            .pack_resource_set_desc(
+                "lowered-fullscreen-test.pack-resources",
+                Handle::new(HandleKind::ResourceLayout, 4, 1).unwrap(),
+                &resources,
+            )
+            .unwrap();
+        assert_eq!(1, set.bindings.len());
+        assert_eq!(
+            ResourceBindingKind::CombinedTextureSampler,
+            set.bindings[0].kind
+        );
+        assert!(program
+            .pack_resource_set_desc(
+                "lowered-fullscreen-test.wrong-layout",
+                Handle::new(HandleKind::Sampler, 4, 1).unwrap(),
+                &resources,
+            )
+            .unwrap_err()
+            .to_string()
+            .contains("resource-layout handle"));
+    }
+
+    #[test]
+    fn lowered_fullscreen_program_requires_ping_pong_for_sampled_output_role() {
+        let source = ShaderPackSource::new(
+            "fullscreen-feedback",
+            13,
+            vec![
+                ShaderSourceFile::new(
+                    "world0/deferred1.vsh",
+                    "#version 130\nout vec2 uv;\nvoid main() { uv = gl_MultiTexCoord0.xy; gl_Position = ftransform(); }",
+                ),
+                ShaderSourceFile::new(
+                    "world0/deferred1.fsh",
+                    "#version 130\nin vec2 uv;\nuniform sampler2D colortex0;\n/* DRAWBUFFERS:0 */\nvoid main() { gl_FragData[0] = texture2D(colortex0, uv); }",
+                ),
+                ShaderSourceFile::new(
+                    TERRAIN_RESOURCE_BINDINGS_PATH,
+                    "colortex0=shader_pack_color:primary\n",
+                ),
+            ],
+        )
+        .unwrap();
+        let stages = TerrainSourceStages {
+            vertex: TerrainSourceStage {
+                path: "world0/deferred1.vsh".to_string(),
+                defines: Default::default(),
+            },
+            fragment: TerrainSourceStage {
+                path: "world0/deferred1.fsh".to_string(),
+                defines: Default::default(),
+            },
+        };
+        let artifacts = preprocess_source_stage_pair(&source, &stages).unwrap();
+        let declarations = TerrainSourceResourceBindings::from_source(&source).unwrap();
+        let lowered =
+            lower_fullscreen_source_pair(&artifacts.vertex, &artifacts.fragment, &declarations)
+                .unwrap();
+        let bindings = lowered
+            .opaque_resource_contract()
+            .bind_semantic_roles(&declarations)
+            .unwrap();
+        let program = prepare_lowered_fullscreen_source_program(
+            source.name(),
+            source.generation(),
+            "world0/deferred1.fsh",
+            &lowered,
+            &bindings,
+        )
+        .unwrap();
+
+        assert_eq!(
+            vec![FullscreenSourceFeedbackRequirement {
+                role: TerrainSourceResourceRole::ShaderPackColor("primary".to_string()),
+                sampled_binding: 0,
+                output_location: 0,
+            }],
+            program.feedback_requirements
+        );
+    }
+
+    #[test]
+    fn lowered_fullscreen_program_derives_mipmap_requirement_from_active_semantic_sampler() {
+        let source = ShaderPackSource::new(
+            "fullscreen-mipmap",
+            14,
+            vec![
+                ShaderSourceFile::new(
+                    "world0/deferred1.vsh",
+                    "#version 130\nout vec2 uv;\nvoid main() { uv = gl_MultiTexCoord0.xy; gl_Position = ftransform(); }",
+                ),
+                ShaderSourceFile::new(
+                    "world0/deferred1.fsh",
+                    "#version 130\nin vec2 uv;\nuniform sampler2D colortex0;\n/* DRAWBUFFERS:0 */\n/* const bool colortex0MipmapEnabled = true; */\nvoid main() { gl_FragData[0] = texture2D(colortex0, uv); }",
+                ),
+                ShaderSourceFile::new(
+                    TERRAIN_RESOURCE_BINDINGS_PATH,
+                    "colortex0=shader_pack_color:primary\n",
+                ),
+            ],
+        )
+        .unwrap();
+        let stages = TerrainSourceStages {
+            vertex: TerrainSourceStage {
+                path: "world0/deferred1.vsh".to_string(),
+                defines: Default::default(),
+            },
+            fragment: TerrainSourceStage {
+                path: "world0/deferred1.fsh".to_string(),
+                defines: Default::default(),
+            },
+        };
+        let artifacts = preprocess_source_stage_pair(&source, &stages).unwrap();
+        let declarations = TerrainSourceResourceBindings::from_source(&source).unwrap();
+        let lowered =
+            lower_fullscreen_source_pair(&artifacts.vertex, &artifacts.fragment, &declarations)
+                .unwrap();
+        let bindings = lowered
+            .opaque_resource_contract()
+            .bind_semantic_roles(&declarations)
+            .unwrap();
+        let program = prepare_lowered_fullscreen_source_program(
+            source.name(),
+            source.generation(),
+            "world0/deferred1.fsh",
+            &lowered,
+            &bindings,
+        )
+        .unwrap();
+
+        assert_eq!(
+            vec![FullscreenSourceMipmapRequirement {
+                role: TerrainSourceResourceRole::ShaderPackColor("primary".to_string()),
+                sampled_binding: 0,
+            }],
+            program.mipmap_requirements
+        );
+    }
+
+    #[test]
+    fn lowered_fullscreen_program_rejects_mipmap_directive_without_active_sampler() {
+        let source = ShaderPackSource::new(
+            "fullscreen-mipmap-unbound",
+            15,
+            vec![
+                ShaderSourceFile::new(
+                    "world0/deferred1.vsh",
+                    "#version 130\nout vec2 uv;\nvoid main() { uv = gl_MultiTexCoord0.xy; gl_Position = ftransform(); }",
+                ),
+                ShaderSourceFile::new(
+                    "world0/deferred1.fsh",
+                    "#version 130\nin vec2 uv;\n/* DRAWBUFFERS:0 */\n/* const bool colortex0MipmapEnabled = true; */\nvoid main() { gl_FragData[0] = vec4(1.0); }",
+                ),
+                ShaderSourceFile::new(
+                    TERRAIN_RESOURCE_BINDINGS_PATH,
+                    "colortex0=shader_pack_color:primary\n",
+                ),
+            ],
+        )
+        .unwrap();
+        let stages = TerrainSourceStages {
+            vertex: TerrainSourceStage {
+                path: "world0/deferred1.vsh".to_string(),
+                defines: Default::default(),
+            },
+            fragment: TerrainSourceStage {
+                path: "world0/deferred1.fsh".to_string(),
+                defines: Default::default(),
+            },
+        };
+        let artifacts = preprocess_source_stage_pair(&source, &stages).unwrap();
+        let declarations = TerrainSourceResourceBindings::from_source(&source).unwrap();
+        let lowered =
+            lower_fullscreen_source_pair(&artifacts.vertex, &artifacts.fragment, &declarations)
+                .unwrap();
+        let bindings = lowered
+            .opaque_resource_contract()
+            .bind_semantic_roles(&declarations)
+            .unwrap();
+        let error = prepare_lowered_fullscreen_source_program(
+            source.name(),
+            source.generation(),
+            "world0/deferred1.fsh",
+            &lowered,
+            &bindings,
+        )
+        .unwrap_err();
+
+        assert!(error
+            .to_string()
+            .contains("no active semantic resource binding"));
+    }
+
+    #[test]
+    fn exact_atlas_distant_horizons_source_writer_preserves_owned_material_inputs() {
+        let program = minimal_distant_horizons_lod_exact_atlas_source_program();
+
+        assert_eq!(
+            "vulkanic:builtin/distant_horizons_lod_exact_atlas_source_v1",
+            program.identity.as_str()
+        );
+        assert!(program.vertex.source.contains("v_tile_uv"));
+        assert!(program.fragment.source.contains("TerrainAtlasColor"));
+        assert!(program.fragment.source.contains("LightmapTexture"));
+        assert!(program.fragment.source.contains("out_source_primary"));
+        assert!(program.fragment.source.contains("discard"));
+    }
+
+    #[test]
+    fn lowered_distant_horizons_program_uses_its_own_column_stream_contract() {
+        let source = complete_bundled_pack_source_for_test();
+        let contract =
+            derive_distant_horizons_opaque_contract(&source, TerrainProgramScope::Overworld)
+                .unwrap();
+        let artifacts =
+            preprocess_distant_horizons_sources(&source, &contract.source_stages).unwrap();
+        let lowered =
+            lower_distant_horizons_source_pair(&artifacts.vertex, &artifacts.fragment).unwrap();
+        let declarations = TerrainSourceResourceBindings::from_source(&source).unwrap();
+        let bindings = lowered
+            .opaque_resource_contract()
+            .bind_semantic_roles(&declarations)
+            .unwrap();
+        let program =
+            prepare_lowered_distant_horizons_source_program(&contract, &lowered, &bindings)
+                .unwrap();
+
+        assert_eq!(
+            "vulkanic:shader-pack/complementaryhungloified-complete-test/distant_horizons_opaque_source_gen91",
+            program.identity.as_str()
+        );
+        assert_eq!(91, program.shader_pack_generation);
+        assert_eq!(
+            DISTANT_HORIZONS_SOURCE_VERTEX_BYTES as u32,
+            program.execution_interface.vertex_stride
+        );
+        assert_eq!(
+            DistantHorizonsMaterialIdentityContract::ReducedColorMaterialCategory,
+            program.execution_interface.material_identity_contract,
+            "the bundled Complementary DH source consumes DH color/category semantics, not atlas-backed texels"
+        );
+        assert_eq!(
+            DISTANT_HORIZONS_SOURCE_COLUMN_FRAME_BYTES as u32,
+            program.execution_interface.column_frame_bytes
+        );
+        assert_eq!(
+            TerrainSourceFixedBinding {
+                set: 0,
+                binding: 0,
+                kind: TerrainSourceBindingKind::StorageBuffer,
+            },
+            program.execution_interface.vertex_stream
+        );
+        assert_eq!(
+            TerrainSourceFixedBinding {
+                set: 0,
+                binding: 1,
+                kind: TerrainSourceBindingKind::UniformBuffer,
+            },
+            program.execution_interface.column_frame
+        );
+        assert!(program
+            .vertex
+            .source
+            .contains("VulkanicDistantHorizonsVertices"));
+        assert!(program
+            .vertex
+            .source
+            .contains("vulkanic_source_dh_vertex.light_material_normal >> 16u"));
+        assert!(!program
+            .vertex
+            .source
+            .contains("VulkanicDistantHorizonsMaterialIds"));
+        assert!(program.vertex.source.contains("dhModelView"));
+        assert!(program
+            .fragment
+            .source
+            .contains("out_distant_horizons_lit_color"));
+        assert!(!program.fragment.source.contains("out_terrain_lit_color"));
+        let layouts = program.execution_resource_layouts().unwrap();
+        assert_eq!(
+            vec![0, 1, 2],
+            layouts
+                .source_data
+                .bindings
+                .iter()
+                .map(|binding| binding.binding)
+                .collect::<Vec<_>>()
+        );
+        assert!(!layouts.pack_resources.bindings.is_empty());
+
+        let mut near_terrain_abi = program.clone();
+        near_terrain_abi.execution_interface.vertex_stride = TERRAIN_SOURCE_VERTEX_BYTES as u32;
+        assert!(near_terrain_abi
+            .execution_resource_layouts()
+            .unwrap_err()
+            .to_string()
+            .contains("Distant Horizons source vertex stream"));
+    }
+
+    #[test]
+    fn exact_atlas_distant_horizons_adapter_preserves_the_selected_source_contract() {
+        let source = complete_bundled_pack_source_for_test();
+        let contract =
+            derive_distant_horizons_opaque_contract(&source, TerrainProgramScope::Overworld)
+                .unwrap();
+        let artifacts =
+            preprocess_distant_horizons_sources(&source, &contract.source_stages).unwrap();
+        let lowered =
+            lower_distant_horizons_source_pair(&artifacts.vertex, &artifacts.fragment).unwrap();
+        let declarations = TerrainSourceResourceBindings::from_source(&source).unwrap();
+        let bindings = lowered
+            .opaque_resource_contract()
+            .bind_semantic_roles(&declarations)
+            .unwrap();
+        let program =
+            prepare_lowered_distant_horizons_source_program(&contract, &lowered, &bindings)
+                .unwrap();
+
+        let exact = prepare_lowered_distant_horizons_exact_atlas_source_program(&program)
+            .expect("the selected opaque DH source exposes the semantic adapter anchors");
+
+        assert!(exact.source.identity.as_str().ends_with(":exact-atlas"));
+        assert_eq!(
+            DISTANT_HORIZONS_EXACT_ATLAS_SOURCE_VERTEX_BYTES as u32,
+            exact.source.execution_interface.vertex_stride
+        );
+        assert_eq!(
+            DistantHorizonsMaterialIdentityContract::AtlasBacked,
+            exact.source.execution_interface.material_identity_contract
+        );
+        assert!(exact
+            .source
+            .vertex
+            .source
+            .contains("VulkanicDistantHorizonsExactAtlasVertex"));
+        assert!(exact
+            .source
+            .vertex
+            .source
+            .contains("vulkanic_source_dh_atlas_tint_and_material"));
+        let lightmap = exact
+            .source
+            .vertex
+            .source
+            .split("vec2 vulkanic_source_dh_packed_lightmap_coordinates()")
+            .nth(1)
+            .expect("the exact-atlas adapter must define its DH lightmap conversion")
+            .split("#define vulkanic_source_texture_matrix")
+            .next()
+            .expect(
+                "the exact-atlas adapter lightmap conversion must terminate before its aliases",
+            );
+        let block_offset = lightmap
+            .find("light_normal_tint_material >> 8u")
+            .expect("the DH block-light nibble must be emitted");
+        let sky_offset = lightmap
+            .find("light_normal_tint_material & 0xffu")
+            .expect("the DH sky-light nibble must be emitted");
+        assert!(
+            block_offset < sky_offset,
+            "Iris DH lightmap coordinates are (block, sky), not the copied byte order (sky, block)"
+        );
+        assert!(
+            exact.source.vertex.source.contains(
+                "vec3(vulkanic_source_dh_vertex.micro_x, 0.0, vulkanic_source_dh_vertex.micro_z)"
+            ),
+            "the exact-atlas DH adapter must retain Iris's X/Z-only micro-offset semantics"
+        );
+        assert!(exact
+            .source
+            .fragment
+            .source
+            .contains("vulkanic_source_dh_atlas_color"));
+        assert!(exact
+            .source
+            .fragment
+            .source
+            .contains("color.rgb *= glColor.rgb;"));
+        assert!(!exact
+            .source
+            .fragment
+            .source
+            .contains("if ((vulkanic_source_dh_atlas_tint_and_material & 1u) != 0u)"));
+        assert!(exact
+            .source
+            .fragment
+            .source
+            .contains("layout(set = 2, binding = 0) uniform texture2D"));
+        assert!(
+            exact.source.fragment.source.contains("DoLighting"),
+            "the adapter must retain selected source lighting rather than substitute minimal DH lighting"
+        );
+        assert!(!exact.source.fragment.source.contains("TerrainAtlasColor"));
+    }
+
+    #[test]
+    fn exact_atlas_distant_horizons_probe_observes_the_adapter_color() {
+        let mut fragment = r#"
+void main() {
+    vec4 color = vulkanic_source_dh_atlas_color();
+    out_distant_horizons_lit_color = color;
+}
+"#
+        .to_string();
+
+        apply_exact_atlas_distant_horizons_fragment_probe(&mut fragment, Some("atlas"))
+            .expect("the exact-atlas probe must use the DH adapter color anchor");
+
+        assert!(fragment.contains("selected-source diagnostic probe: atlas"));
+        assert!(fragment.contains("out_distant_horizons_lit_color = color;\n    return;"));
+        assert_eq!(
+            1,
+            fragment
+                .matches("vec4 color = vulkanic_source_dh_atlas_color();")
+                .count(),
+            "the probe must preserve the exact-atlas color initialization"
+        );
+    }
+
+    #[test]
+    fn exact_atlas_distant_horizons_probes_preserve_source_lighting_boundaries() {
+        let source = r#"
+void main() {
+    vec2 lmCoord = vec2(0.5);
+    vec4 color = vulkanic_source_dh_atlas_color();
+    DoLighting(color, shadowMult, playerPos);
+}
+"#;
+        let mut pre_lighting = source.to_string();
+        apply_exact_atlas_distant_horizons_fragment_probe(&mut pre_lighting, Some("pre-lighting"))
+            .expect("the pre-lighting probe must locate the source lighting boundary");
+        assert!(pre_lighting.contains(
+            "selected-source diagnostic probe: pre-lighting\n    out_distant_horizons_lit_color = color;\n    return;\nDoLighting"
+        ));
+
+        let mut lightmap = source.to_string();
+        apply_exact_atlas_distant_horizons_fragment_probe(&mut lightmap, Some("lightmap"))
+            .expect("the lightmap probe must use the adapter color anchor");
+        assert!(lightmap.contains("out_distant_horizons_lit_color = vec4(lmCoord, 0.0, 1.0);"));
+    }
+
+    #[test]
+    fn lowered_dh_water_program_retains_source_alpha_phase_and_dh_column_abi() {
+        let complete = complete_bundled_pack_source_for_test();
+        let source = ShaderPackSource::new(
+            "complete-dh-water-program",
+            92,
+            complete
+                .files()
+                .into_iter()
+                .chain(std::iter::once(ShaderSourceFile::new(
+                    crate::render::vulkanic::shader_pack::source::RUNTIME_OPTIONS_PATH,
+                    "DISTANT_HORIZONS=1\nSHADOW_QUALITY=-1\nFXAA_DEFINE=-1\nCOLORED_LIGHTING=0\nENTITY_SHADOWS_DEFINE=-1\nPLAYER_SHADOW=-1\nRAIN_PUDDLES=0\n",
+                )))
+                .collect(),
+        )
+        .unwrap();
+        let contract =
+            derive_distant_horizons_translucent_contract(&source, TerrainProgramScope::Overworld)
+                .unwrap();
+        let artifacts =
+            preprocess_distant_horizons_sources(&source, &contract.source_stages).unwrap();
+        let lowered =
+            lower_distant_horizons_source_pair(&artifacts.vertex, &artifacts.fragment).unwrap();
+        let declarations = TerrainSourceResourceBindings::from_source(&source).unwrap();
+        let bindings = lowered
+            .opaque_resource_contract()
+            .bind_semantic_roles(&declarations)
+            .unwrap();
+        let program =
+            prepare_lowered_distant_horizons_source_program(&contract, &lowered, &bindings)
+                .unwrap();
+
+        assert_eq!(DistantHorizonsPassKind::Translucent, program.pass_kind);
+        assert_eq!(
+            Some(TerrainTranslucentBlend::SourceAlphaOver),
+            program.translucent_blend
+        );
+        assert!(program
+            .identity
+            .as_str()
+            .contains("distant_horizons_translucent_source_gen92"));
+        assert_eq!(
+            DISTANT_HORIZONS_SOURCE_VERTEX_BYTES as u32,
+            program.execution_interface.vertex_stride
+        );
+        assert!(program.fragment.source.contains("depthtex1"));
+        assert!(program
+            .fragment
+            .source
+            .contains("out_distant_horizons_lit_color"));
+        program.execution_resource_layouts().unwrap();
+    }
+
+    #[test]
     fn lowered_shadow_source_program_keeps_its_shadow_identity_and_outputs() {
         let source = paired_shadow_source();
         let vertex = crate::render::vulkanic::shader_pack::preprocess::preprocess_artifact(
@@ -1939,6 +6442,43 @@ mod tests {
     }
 
     #[test]
+    fn lowered_cloud_source_program_retains_its_named_output_schema() {
+        let source = paired_cloud_source();
+        let contract = derive_cloud_pass_contract(&source, TerrainProgramScope::Overworld).unwrap();
+        let lowered = lower_cloud_source_pair(&source, &contract).unwrap();
+        let declarations = TerrainSourceResourceBindings::from_source(&source).unwrap();
+        let bindings = lowered
+            .opaque_resource_contract()
+            .bind_semantic_roles(&declarations)
+            .unwrap();
+        let program = prepare_lowered_cloud_source_program(&contract, &lowered, &bindings).unwrap();
+
+        assert_eq!(
+            "vulkanic:shader-pack/lowered-cloud-source-test/cloud_source_gen13",
+            program.identity.as_str()
+        );
+        assert!(program.vertex.source.contains("vulkanic_source_position"));
+        assert!(program.fragment.source.contains("out_cloud_lit_color"));
+        assert!(program
+            .fragment
+            .source
+            .contains("out_cloud_material_auxiliary"));
+        assert!(program
+            .fragment
+            .source
+            .contains("out_cloud_translucency_auxiliary"));
+        assert_eq!(
+            vec![
+                (TerrainPassOutput::LitTerrainColor, 0),
+                (TerrainPassOutput::MaterialAuxiliary, 6),
+                (TerrainPassOutput::TranslucencyAuxiliary, 3),
+            ],
+            program.named_output_color_slots()
+        );
+        program.execution_resource_layouts().unwrap();
+    }
+
+    #[test]
     fn selected_scoped_shadow_source_prepares_without_becoming_an_executable_pass() {
         let source =
             crate::render::vulkanic::shader_pack::preprocess::complete_bundled_pack_source_for_test(
@@ -1965,25 +6505,34 @@ mod tests {
         .unwrap();
 
         assert!(program.fragment.source.contains("out_shadow_color"));
-        assert!(program.fragment.source.contains("out_shadow_light_shaft_color"));
+        assert!(program
+            .fragment
+            .source
+            .contains("out_shadow_light_shaft_color"));
         assert!(!program.fragment.source.contains("out_terrain_lit_color"));
         let layouts = program.execution_resource_layouts().unwrap();
-        assert!(layouts.pack_resources.bindings.iter().any(|binding| {
-            binding.kind == ResourceBindingKind::StorageTexture
-                && program
-                    .opaque_resource_bindings
-                    .bindings()
-                    .iter()
-                    .any(|source| source.binding() == binding.binding
-                        && source.resource_name() == "voxel_img"
-                        && source.kind() == TerrainSourceOpaqueResourceKind::StorageImage)
-        }));
+        assert!(layouts
+            .pack_resources
+            .bindings
+            .iter()
+            .all(|binding| binding.kind != ResourceBindingKind::StorageTexture));
+        assert!(program
+            .opaque_resource_bindings
+            .bindings()
+            .iter()
+            .all(|source| source.resource_name() != "voxel_img"));
     }
 
     #[test]
     fn source_storage_access_preserves_glsl_read_write_qualifiers() {
-        assert_eq!(AccessFlags::READ, source_storage_access("readonly").unwrap());
-        assert_eq!(AccessFlags::WRITE, source_storage_access("writeonly coherent").unwrap());
+        assert_eq!(
+            AccessFlags::READ,
+            source_storage_access("readonly").unwrap()
+        );
+        assert_eq!(
+            AccessFlags::WRITE,
+            source_storage_access("writeonly coherent").unwrap()
+        );
         assert_eq!(
             AccessFlags(AccessFlags::READ.0 | AccessFlags::WRITE.0),
             source_storage_access("coherent restrict").unwrap()
@@ -2047,6 +6596,86 @@ mod tests {
             .unwrap_err()
             .to_string()
             .contains("binding 3"));
+    }
+
+    #[test]
+    fn prepared_textured_material_interface_rejects_mutated_fixed_abi_fields() {
+        let source = complete_bundled_pack_source_for_test();
+        let contract = super::super::material_contract::derive_textured_material_contract(
+            &source,
+            super::super::terrain_contract::TerrainProgramScope::Overworld,
+        )
+        .unwrap();
+        let lowered = super::super::material_contract::lower_textured_material_source_pair(
+            &source, &contract,
+        )
+        .unwrap();
+        let declarations = TerrainSourceResourceBindings::from_source(&source).unwrap();
+        let bindings = lowered
+            .opaque_resource_contract()
+            .bind_semantic_roles(&declarations)
+            .unwrap();
+        let program =
+            prepare_lowered_textured_material_source_program(&contract, &lowered, &bindings)
+                .unwrap();
+
+        program.execution_interface.validate().unwrap();
+
+        let mut wrong_stride = program.execution_interface.clone();
+        wrong_stride.vertex_stride = 48;
+        assert!(wrong_stride
+            .validate()
+            .unwrap_err()
+            .to_string()
+            .contains("64-byte storage stream"));
+
+        let mut wrong_lane = program.execution_interface.clone();
+        wrong_lane.vertex_fields[3].offset = 44;
+        assert!(wrong_lane
+            .validate()
+            .unwrap_err()
+            .to_string()
+            .contains("texture_uv_lightmap"));
+
+        let mut missing_scalar_binding = program.execution_interface.clone();
+        missing_scalar_binding.scalar_uniforms = None;
+        assert!(missing_scalar_binding
+            .validate()
+            .unwrap_err()
+            .to_string()
+            .contains("scalar fields require fixed set 0 binding 2"));
+
+        let mut invalid_scalar_envelope = program.execution_interface.clone();
+        invalid_scalar_envelope.scalar_uniform_bytes = 0;
+        assert!(invalid_scalar_envelope
+            .validate()
+            .unwrap_err()
+            .to_string()
+            .contains("not a valid std140 envelope"));
+
+        let local_texture_primitive =
+            super::super::material_contract::stage_textured_material_primitive(
+                [
+                    [-1.0, -1.0, 2.0],
+                    [1.0, -1.0, 2.0],
+                    [1.0, 1.0, 2.0],
+                    [-1.0, 1.0, 2.0],
+                ],
+                [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]],
+                0xffff_ffff,
+                0,
+                super::super::material_contract::TexturedMaterialTextureCoordinates::LocalTexture,
+                super::super::material_contract::TexturedMaterialWinding::CounterClockwise,
+            )
+            .unwrap();
+        assert_eq!(
+            super::super::material_contract::TEXTURED_MATERIAL_SOURCE_VERTEX_BYTES * 4,
+            program
+                .pack_material_primitives(&[local_texture_primitive])
+                .unwrap()
+                .len(),
+            "the source ABI accepts local UVs; the frontend selects the owned semantic texture binding"
+        );
     }
 }
 use super::voxel_light_volume::VoxelLightVolumeReadiness;

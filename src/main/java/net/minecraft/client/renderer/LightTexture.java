@@ -21,6 +21,7 @@ import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.util.Mth;
 import net.minecraft.util.profiling.Profiler;
 import net.minecraft.util.profiling.ProfilerFiller;
@@ -29,6 +30,7 @@ import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.dimension.DimensionType;
 import org.joml.Vector3f;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)
@@ -63,6 +65,13 @@ public class LightTexture implements AutoCloseable {
 	private boolean dumpedShaderLightmapProbeDebug;
 	private boolean updateLightTexture;
 	private float blockLightRedFlicker;
+	/**
+	 * Immutable gameplay inputs used to build the current vanilla lightmap.
+	 * Rust consumes these scalars through the normal semantic frame transport;
+	 * it never receives this texture, a view, or a command encoder.
+	 */
+	private volatile RustSemanticLightmapInputs rustSemanticLightmapInputs;
+	private long rustSemanticLightmapGeneration;
 	private final GameRenderer renderer;
 	private final Minecraft minecraft;
 	private final MappableRingBuffer ubo;
@@ -104,6 +113,49 @@ public class LightTexture implements AutoCloseable {
 	public GpuTextureView getTextureView() {
 		return this.textureView;
 	}
+
+	@Nullable
+	public RustSemanticLightmapInputs rustSemanticLightmapInputs() {
+		return this.rustSemanticLightmapInputs;
+	}
+
+	/**
+	 * Supplies the first copied lightmap snapshot to a Rust-owned whole-frame
+	 * route before vanilla's later GPU lightmap update has run. This is pure
+	 * gameplay-semantic extraction: it neither creates a command encoder nor
+	 * exposes this class's texture, UBO, or Iris state.
+	 */
+	@Nullable
+	public RustSemanticLightmapInputs ensureRustSemanticLightmapInputs(float partialTicks) {
+		if (this.rustSemanticLightmapInputs != null) {
+			return this.rustSemanticLightmapInputs;
+		}
+		ClientLevel clientLevel = this.minecraft.level;
+		if (clientLevel == null || this.minecraft.player == null) {
+			return null;
+		}
+		this.rustSemanticLightmapInputs = this.computeRustSemanticLightmapInputs(
+			clientLevel, this.minecraft.player, partialTicks, false
+		);
+		return this.rustSemanticLightmapInputs;
+	}
+
+	public record RustSemanticLightmapInputs(
+		long generation,
+		float ambientLightFactor,
+		float skyFactor,
+		float blockFactor,
+		float nightVisionFactor,
+		float darknessScale,
+		float darkenWorldFactor,
+		float brightnessFactor,
+		float skyLightRed,
+		float skyLightGreen,
+		float skyLightBlue,
+		float ambientRed,
+		float ambientGreen,
+		float ambientBlue
+	) { }
 
 	public String debugDescribePackedLight(int packedLight) {
 		int blockLight = packedLight & 0xF;
@@ -154,6 +206,58 @@ public class LightTexture implements AutoCloseable {
 		return result;
 	}
 
+	private RustSemanticLightmapInputs computeRustSemanticLightmapInputs(
+		ClientLevel clientLevel, LocalPlayer player, float partialTicks, boolean updateIrisDarkness
+	) {
+		float skyDarken = clientLevel.getSkyDarken(1.0F);
+		float skyFactor;
+		Vector3f ambientColor;
+		if (clientLevel.effects().hasEndFlashes()) {
+			ambientColor = new Vector3f(0.99F, 1.12F, 1.0F);
+			EndFlashState endFlashState = clientLevel.endFlashState();
+			if (endFlashState != null && !this.minecraft.options.hideLightningFlash().get()) {
+				float intensity = endFlashState.getIntensity(partialTicks);
+				skyFactor = this.minecraft.gui.getBossOverlay().shouldCreateWorldFog() ? intensity / 3.0F : intensity;
+			} else {
+				skyFactor = 0.0F;
+			}
+		} else {
+			ambientColor = new Vector3f(1.0F, 1.0F, 1.0F);
+			skyFactor = clientLevel.getSkyFlashTime() > 0 ? 1.0F : skyDarken * 0.95F + 0.05F;
+		}
+
+		float darknessEffectScale = this.minecraft.options.darknessEffectScale().get().floatValue();
+		float darknessBlend = player.getEffectBlendFactor(MobEffects.DARKNESS, partialTicks) * darknessEffectScale;
+		float darknessScale = (updateIrisDarkness
+			? this.calculateDarknessScale(player, darknessBlend, partialTicks)
+			: Math.max(0.0F, Mth.cos((player.tickCount - partialTicks) * (float)Math.PI * 0.025F) * 0.45F * darknessBlend)
+		) * darknessEffectScale;
+		float waterVision = player.getWaterVision();
+		float nightVisionFactor;
+		if (player.hasEffect(MobEffects.NIGHT_VISION)) {
+			nightVisionFactor = GameRenderer.getNightVisionScale(player, partialTicks);
+		} else if (waterVision > 0.0F && player.hasEffect(MobEffects.CONDUIT_POWER)) {
+			nightVisionFactor = waterVision;
+		} else {
+			nightVisionFactor = 0.0F;
+		}
+
+		Vector3f skyLightColor = clientLevel.effects().hasEndFlashes()
+			? END_FLASH_SKY_LIGHT_COLOR
+			: new Vector3f(skyDarken, skyDarken, 1.0F).lerp(new Vector3f(1.0F, 1.0F, 1.0F), 0.35F);
+		if (DETERMINISTIC_LIGHTMAP_PARITY) {
+			this.blockLightRedFlicker = 0.0F;
+		}
+		return new RustSemanticLightmapInputs(
+			++this.rustSemanticLightmapGeneration,
+			clientLevel.dimensionType().ambientLight(), skyFactor, this.blockLightRedFlicker + 1.5F,
+			nightVisionFactor, darknessScale, this.renderer.getDarkenWorldAmount(partialTicks),
+			Math.max(0.0F, this.minecraft.options.gamma().get().floatValue() - darknessBlend),
+			skyLightColor.x, skyLightColor.y, skyLightColor.z,
+			ambientColor.x, ambientColor.y, ambientColor.z
+		);
+	}
+
 	public void updateLightTexture(float f) {
 		if (this.updateLightTexture) {
 			this.updateLightTexture = false;
@@ -164,59 +268,23 @@ public class LightTexture implements AutoCloseable {
 				// Iris: Reset darkness value before calculating
 				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setDarknessLightFactor(0.0F);
 				
-				float g = clientLevel.getSkyDarken(1.0F);
-				float i;
-				Vector3f vector3f;
-				if (clientLevel.effects().hasEndFlashes()) {
-					vector3f = new Vector3f(0.99F, 1.12F, 1.0F);
-					EndFlashState endFlashState = clientLevel.endFlashState();
-					if (endFlashState != null && !this.minecraft.options.hideLightningFlash().get()) {
-						float h = endFlashState.getIntensity(f);
-						if (this.minecraft.gui.getBossOverlay().shouldCreateWorldFog()) {
-							i = h / 3.0F;
-						} else {
-							i = h;
-						}
-					} else {
-						i = 0.0F;
-					}
-				} else {
-					vector3f = new Vector3f(1.0F, 1.0F, 1.0F);
-					if (clientLevel.getSkyFlashTime() > 0) {
-						i = 1.0F;
-					} else {
-						i = g * 0.95F + 0.05F;
-					}
-				}
-
-				float j = this.minecraft.options.darknessEffectScale().get().floatValue();
-				float h = this.minecraft.player.getEffectBlendFactor(MobEffects.DARKNESS, f) * j;
-				float k = this.calculateDarknessScale(this.minecraft.player, h, f) * j;
-				float l = this.minecraft.player.getWaterVision();
-				float m;
-				if (this.minecraft.player.hasEffect(MobEffects.NIGHT_VISION)) {
-					m = GameRenderer.getNightVisionScale(this.minecraft.player, f);
-				} else if (l > 0.0F && this.minecraft.player.hasEffect(MobEffects.CONDUIT_POWER)) {
-					m = l;
-				} else {
-					m = 0.0F;
-				}
-
-				Vector3f vector3f2;
-				if (clientLevel.effects().hasEndFlashes()) {
-					vector3f2 = END_FLASH_SKY_LIGHT_COLOR;
-				} else {
-					vector3f2 = new Vector3f(g, g, 1.0F).lerp(new Vector3f(1.0F, 1.0F, 1.0F), 0.35F);
-				}
-
-				if (DETERMINISTIC_LIGHTMAP_PARITY) {
-					this.blockLightRedFlicker = 0.0F;
-				}
-				float n = this.blockLightRedFlicker + 1.5F;
-				float o = clientLevel.dimensionType().ambientLight();
-				float p = this.minecraft.options.gamma().get().floatValue();
-				float q = this.renderer.getDarkenWorldAmount(f);
-				float r = Math.max(0.0F, p - h);
+				this.rustSemanticLightmapInputs = this.computeRustSemanticLightmapInputs(
+					clientLevel, this.minecraft.player, f, true
+				);
+				RustSemanticLightmapInputs lightmap = this.rustSemanticLightmapInputs;
+				float o = lightmap.ambientLightFactor();
+				float i = lightmap.skyFactor();
+				float n = lightmap.blockFactor();
+				float m = lightmap.nightVisionFactor();
+				float k = lightmap.darknessScale();
+				float q = lightmap.darkenWorldFactor();
+				float r = lightmap.brightnessFactor();
+				Vector3f vector3f2 = new Vector3f(
+					lightmap.skyLightRed(), lightmap.skyLightGreen(), lightmap.skyLightBlue()
+				);
+				Vector3f vector3f = new Vector3f(
+					lightmap.ambientRed(), lightmap.ambientGreen(), lightmap.ambientBlue()
+				);
 				CommandEncoder commandEncoder = VulkanicAPI.createCommandEncoder();
 
 				try (GpuBuffer.MappedView mappedView = commandEncoder.mapBuffer(this.ubo.currentBuffer(), false, true)) {

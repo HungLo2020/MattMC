@@ -9,8 +9,8 @@ use super::device::VulkanContext;
 use super::resources::VulkanObjects;
 use super::trace;
 use crate::render::vulkanic::commands::{
-    AttachmentLoadOp, AttachmentStoreOp, BufferImageCopyRegion, CommandOp, TextureUsageState,
-    ValidatedSubmissionBatch,
+    AttachmentLoadOp, AttachmentStoreOp, BufferImageCopyRegion, CommandOp, TextureImageCopyRegion,
+    TextureUsageState, ValidatedSubmissionBatch,
 };
 use crate::render::vulkanic::error::{GalError, GalResult};
 use crate::render::vulkanic::handles::{Handle, HandleKind};
@@ -920,6 +920,100 @@ impl SubmissionLowerer {
                         &[copy],
                     );
                 }
+                CommandOp::CopyTexture(region) => {
+                    let _zone = trace::Zone::new("vulkan.lowering.copy-texture");
+                    let source = objects.texture(region.src_texture)?;
+                    let destination = objects.texture(region.dst_texture)?;
+                    let copy = texture_image_copy(region, source.aspect, destination.aspect);
+                    self.context.device.cmd_copy_image(
+                        command_buffer,
+                        source.image,
+                        vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
+                        destination.image,
+                        vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+                        &[copy],
+                    );
+                }
+                CommandOp::GenerateMipmaps {
+                    texture,
+                    subresources,
+                } => {
+                    let _zone = trace::Zone::new("vulkan.lowering.generate-mipmaps");
+                    let texture = objects.texture(*texture)?;
+                    let mip_end = subresources
+                        .base_mip
+                        .checked_add(subresources.mip_count)
+                        .ok_or_else(|| GalError::backend("mip generation range overflows"))?;
+                    for source_mip in subresources.base_mip..mip_end - 1 {
+                        let destination_mip = source_mip + 1;
+                        let source_extent = vk::Offset3D {
+                            x: i32::try_from((texture.extent.width >> source_mip).max(1))
+                                .map_err(|_| GalError::backend("source mip width exceeds i32"))?,
+                            y: i32::try_from((texture.extent.height >> source_mip).max(1))
+                                .map_err(|_| GalError::backend("source mip height exceeds i32"))?,
+                            z: i32::try_from((texture.extent.depth >> source_mip).max(1))
+                                .map_err(|_| GalError::backend("source mip depth exceeds i32"))?,
+                        };
+                        let destination_extent = vk::Offset3D {
+                            x: i32::try_from((texture.extent.width >> destination_mip).max(1))
+                                .map_err(|_| {
+                                    GalError::backend("destination mip width exceeds i32")
+                                })?,
+                            y: i32::try_from((texture.extent.height >> destination_mip).max(1))
+                                .map_err(|_| {
+                                    GalError::backend("destination mip height exceeds i32")
+                                })?,
+                            z: i32::try_from((texture.extent.depth >> destination_mip).max(1))
+                                .map_err(|_| {
+                                    GalError::backend("destination mip depth exceeds i32")
+                                })?,
+                        };
+                        let blit = vk::ImageBlit::default()
+                            .src_subresource(vk::ImageSubresourceLayers {
+                                aspect_mask: texture.aspect,
+                                mip_level: source_mip,
+                                base_array_layer: subresources.base_layer,
+                                layer_count: subresources.layer_count,
+                            })
+                            .src_offsets([vk::Offset3D::default(), source_extent])
+                            .dst_subresource(vk::ImageSubresourceLayers {
+                                aspect_mask: texture.aspect,
+                                mip_level: destination_mip,
+                                base_array_layer: subresources.base_layer,
+                                layer_count: subresources.layer_count,
+                            })
+                            .dst_offsets([vk::Offset3D::default(), destination_extent]);
+                        self.context.device.cmd_blit_image(
+                            command_buffer,
+                            texture.image,
+                            vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
+                            texture.image,
+                            vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+                            &[blit],
+                            vk::Filter::LINEAR,
+                        );
+                        let image_barrier = vk::ImageMemoryBarrier2::default()
+                            .src_stage_mask(stage_mask(TextureUsageState::TransferDst))
+                            .src_access_mask(access_mask(TextureUsageState::TransferDst))
+                            .dst_stage_mask(stage_mask(TextureUsageState::TransferSrc))
+                            .dst_access_mask(access_mask(TextureUsageState::TransferSrc))
+                            .old_layout(vk::ImageLayout::TRANSFER_DST_OPTIMAL)
+                            .new_layout(vk::ImageLayout::TRANSFER_SRC_OPTIMAL)
+                            .image(texture.image)
+                            .subresource_range(vk::ImageSubresourceRange {
+                                aspect_mask: texture.aspect,
+                                base_mip_level: destination_mip,
+                                level_count: 1,
+                                base_array_layer: subresources.base_layer,
+                                layer_count: subresources.layer_count,
+                            });
+                        let dependency = vk::DependencyInfo::default()
+                            .image_memory_barriers(std::slice::from_ref(&image_barrier));
+                        self.context
+                            .device
+                            .cmd_pipeline_barrier2(command_buffer, &dependency);
+                    }
+                }
                 CommandOp::Barrier(barrier) => {
                     let _zone = trace::Zone::new("vulkan.lowering.barrier");
                     if barrier.resource.kind()
@@ -1368,6 +1462,42 @@ mod timestamp_tests {
     }
 
     #[test]
+    fn texture_image_copy_preserves_independent_depth_subresources() {
+        use crate::render::vulkanic::commands::{TextureImageCopyRegion, TextureOrigin3d};
+        use crate::render::vulkanic::handles::{Handle, HandleKind};
+        use crate::render::vulkanic::resources::Extent3d;
+
+        let copy = texture_image_copy(
+            &TextureImageCopyRegion {
+                src_texture: Handle::new(HandleKind::Texture, 1, 1).unwrap(),
+                src_mip: 1,
+                src_layer: 0,
+                src_origin: TextureOrigin3d { x: 3, y: 5, z: 0 },
+                dst_texture: Handle::new(HandleKind::Texture, 2, 1).unwrap(),
+                dst_mip: 2,
+                dst_layer: 0,
+                dst_origin: TextureOrigin3d { x: 7, y: 11, z: 0 },
+                extent: Extent3d {
+                    width: 13,
+                    height: 17,
+                    depth: 1,
+                },
+            },
+            vk::ImageAspectFlags::DEPTH,
+            vk::ImageAspectFlags::DEPTH,
+        );
+        assert_eq!(1, copy.src_subresource.mip_level);
+        assert_eq!(2, copy.dst_subresource.mip_level);
+        assert_eq!(3, copy.src_offset.x);
+        assert_eq!(11, copy.dst_offset.y);
+        assert_eq!(17, copy.extent.height);
+        assert!(copy
+            .src_subresource
+            .aspect_mask
+            .contains(vk::ImageAspectFlags::DEPTH));
+    }
+
+    #[test]
     fn timestamp_pass_labels_classify_shader_graph_passes() {
         assert_eq!(
             Some(TimestampPassKind::ShadowDepth),
@@ -1623,6 +1753,41 @@ fn buffer_image_copy(
             z: region.texture_origin.z as i32,
         })
         .image_extent(vk::Extent3D {
+            width: region.extent.width,
+            height: region.extent.height,
+            depth: region.extent.depth,
+        })
+}
+
+fn texture_image_copy(
+    region: &TextureImageCopyRegion,
+    src_aspect_mask: vk::ImageAspectFlags,
+    dst_aspect_mask: vk::ImageAspectFlags,
+) -> vk::ImageCopy {
+    vk::ImageCopy::default()
+        .src_subresource(vk::ImageSubresourceLayers {
+            aspect_mask: src_aspect_mask,
+            mip_level: region.src_mip,
+            base_array_layer: region.src_layer,
+            layer_count: 1,
+        })
+        .src_offset(vk::Offset3D {
+            x: region.src_origin.x as i32,
+            y: region.src_origin.y as i32,
+            z: region.src_origin.z as i32,
+        })
+        .dst_subresource(vk::ImageSubresourceLayers {
+            aspect_mask: dst_aspect_mask,
+            mip_level: region.dst_mip,
+            base_array_layer: region.dst_layer,
+            layer_count: 1,
+        })
+        .dst_offset(vk::Offset3D {
+            x: region.dst_origin.x as i32,
+            y: region.dst_origin.y as i32,
+            z: region.dst_origin.z as i32,
+        })
+        .extent(vk::Extent3D {
             width: region.extent.width,
             height: region.extent.height,
             depth: region.extent.depth,

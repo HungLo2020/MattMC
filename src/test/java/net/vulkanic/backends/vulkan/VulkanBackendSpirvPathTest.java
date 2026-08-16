@@ -513,6 +513,22 @@ public class VulkanBackendSpirvPathTest {
     }
 
     @Test
+    public void testNormalizeForVulkanDoesNotDoubleRemapRustOwnedClipDepth() {
+        String source = "#version 450\n"
+            + "#define VULKANIC_GAL_ZERO_TO_ONE_CLIP_DEPTH 1\n"
+            + "void main(){ gl_Position = vec4(0.0);\n"
+            + "#ifdef VULKANIC_GAL_ZERO_TO_ONE_CLIP_DEPTH\n"
+            + "gl_Position.z = (gl_Position.z + gl_Position.w) * 0.5;\n"
+            + "#endif\n"
+            + "}";
+
+        String normalized = ShadercSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.VERTEX, source);
+
+        assertFalse(normalized.contains("vulkanicOpenGlClipDepthToVulkan"));
+        assertEquals(1, normalized.split("gl_Position.z =", -1).length - 1);
+    }
+
+    @Test
     public void testNormalizeForVulkanMovesMinecraftLightingFlipIntoShader() {
         String source = "#version 450\n"
             + "layout(std140) uniform Lighting {\n"

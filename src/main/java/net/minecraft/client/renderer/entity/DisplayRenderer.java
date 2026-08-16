@@ -163,7 +163,12 @@ public abstract class DisplayRenderer<T extends Display, S, ST extends DisplayEn
 			BlockDisplayEntityRenderState blockDisplayEntityRenderState, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, float f
 		) {
 			submitNodeCollector.submitBlockDisplay(
-				poseStack, blockDisplayEntityRenderState.blockRenderState.blockState(), i, OverlayTexture.NO_OVERLAY, blockDisplayEntityRenderState.outlineColor
+				poseStack,
+				blockDisplayEntityRenderState.blockRenderState.blockState(),
+				i,
+				OverlayTexture.NO_OVERLAY,
+				blockDisplayEntityRenderState.outlineColor,
+				BlockPos.containing(blockDisplayEntityRenderState.x, blockDisplayEntityRenderState.y, blockDisplayEntityRenderState.z)
 			);
 		}
 	}

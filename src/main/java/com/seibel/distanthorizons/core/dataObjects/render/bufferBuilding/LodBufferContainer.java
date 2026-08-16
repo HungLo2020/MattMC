@@ -12,6 +12,7 @@ import org.lwjgl.system.MemoryUtil;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.*;
 
 /**
@@ -84,10 +85,49 @@ public class LodBufferContainer implements AutoCloseable
 		
 		
 			// make the buffers
-			ArrayList<ByteBuffer> opaqueBuffers = builder.makeOpaqueVertexBuffers();
-			ArrayList<ByteBuffer> transparentBuffers = builder.makeTransparentVertexBuffers();
-			ArrayList<ByteBuffer> transparentUpBuffers = builder.makeTransparentUpVertexBuffers();
-			ArrayList<ByteBuffer> transparentWaterUpBuffers = builder.makeTransparentWaterUpVertexBuffers();
+			boolean captureSemanticMaterials = net.vulkanic.world.DistantHorizonsSemanticCollector.enabled();
+			LodQuadBuilder.VertexBufferBuild opaqueBuild = captureSemanticMaterials
+				? builder.makeOpaqueVertexBuffersWithSemanticMaterials()
+				: new LodQuadBuilder.VertexBufferBuild(builder.makeOpaqueVertexBuffers(), List.of());
+			LodQuadBuilder.VertexBufferBuild transparentBuild = captureSemanticMaterials
+				? builder.makeTransparentVertexBuffersWithSemanticMaterials()
+				: new LodQuadBuilder.VertexBufferBuild(builder.makeTransparentVertexBuffers(), List.of());
+			LodQuadBuilder.VertexBufferBuild transparentUpBuild = captureSemanticMaterials
+				? builder.makeTransparentUpVertexBuffersWithSemanticMaterials()
+				: new LodQuadBuilder.VertexBufferBuild(builder.makeTransparentUpVertexBuffers(), List.of());
+			LodQuadBuilder.VertexBufferBuild transparentWaterUpBuild = captureSemanticMaterials
+				? builder.makeTransparentWaterUpVertexBuffersWithSemanticMaterials()
+				: new LodQuadBuilder.VertexBufferBuild(builder.makeTransparentWaterUpVertexBuffers(), List.of());
+			ArrayList<ByteBuffer> opaqueBuffers = new ArrayList<>(opaqueBuild.vertexBuffers());
+			ArrayList<ByteBuffer> transparentBuffers = new ArrayList<>(transparentBuild.vertexBuffers());
+			ArrayList<ByteBuffer> transparentUpBuffers = new ArrayList<>(transparentUpBuild.vertexBuffers());
+			ArrayList<ByteBuffer> transparentWaterUpBuffers = new ArrayList<>(transparentWaterUpBuild.vertexBuffers());
+			// Capture only copied CPU semantics before the legacy path uploads and
+			// frees these direct buffers. This is private diagnostic groundwork for
+			// a future Rust LOD route, never a GL/Vulkan handle bridge.
+			net.vulkanic.world.DistantHorizonsSemanticCollector.recordBuiltColumn(
+				this.pos,
+				this.minCornerBlockPos,
+				builder.semanticMaterials(),
+				builder.semanticQuadCoverage(),
+				LodQuadBuilder.semanticQuadCoverage(
+					opaqueBuild, transparentBuild, transparentUpBuild, transparentWaterUpBuild
+				),
+				opaqueBuild,
+				transparentBuild,
+				transparentUpBuild,
+				transparentWaterUpBuild
+			);
+			if (net.vulkanic.world.DistantHorizonsSemanticCollector.usesRustWholeFrameSemanticBuild())
+			{
+				// The Rust whole-frame route owns the GPU asset. Completing this
+				// CPU stage releases DH's temporary buffers without creating a Java
+				// VBO or queuing a GL upload.
+				freeBuffers(opaqueBuffers, transparentBuffers, transparentUpBuffers, transparentWaterUpBuffers);
+				this.uploadFuture = null;
+				future.complete(this);
+				return future;
+			}
 		
 		this.vbos = resizeBuffer(this.vbos, opaqueBuffers.size());
 		this.vbosTransparent = resizeBuffer(this.vbosTransparent, transparentBuffers.size());
@@ -136,29 +176,24 @@ public class LodBufferContainer implements AutoCloseable
 			{
 				// all the buffers must be manually freed to prevent memory leaks
 				
-				for (ByteBuffer buffer : opaqueBuffers)
-				{
-					MemoryUtil.memFree(buffer);
-				}
-				
-				for (ByteBuffer buffer : transparentBuffers)
-				{
-					MemoryUtil.memFree(buffer);
-				}
-
-				for (ByteBuffer buffer : transparentUpBuffers)
-				{
-					MemoryUtil.memFree(buffer);
-				}
-
-				for (ByteBuffer buffer : transparentWaterUpBuffers)
-				{
-					MemoryUtil.memFree(buffer);
-				}
+				freeBuffers(opaqueBuffers, transparentBuffers, transparentUpBuffers, transparentWaterUpBuffers);
 			}
 		});
 		
 		return future;
+	}
+
+	private static void freeBuffers(
+		List<ByteBuffer> opaqueBuffers,
+		List<ByteBuffer> transparentBuffers,
+		List<ByteBuffer> transparentUpBuffers,
+		List<ByteBuffer> transparentWaterUpBuffers
+	)
+	{
+		for (ByteBuffer buffer : opaqueBuffers) MemoryUtil.memFree(buffer);
+		for (ByteBuffer buffer : transparentBuffers) MemoryUtil.memFree(buffer);
+		for (ByteBuffer buffer : transparentUpBuffers) MemoryUtil.memFree(buffer);
+		for (ByteBuffer buffer : transparentWaterUpBuffers) MemoryUtil.memFree(buffer);
 	}
 	private static GLVertexBuffer[] resizeBuffer(GLVertexBuffer[] vbos, int newSize)
 	{
@@ -305,6 +340,9 @@ public class LodBufferContainer implements AutoCloseable
 	public void close()
 	{
 		this.buffersUploaded = false;
+		// Keep the copied semantic asset lifecycle aligned with the legacy LOD
+		// container. This touches no native renderer object or GL state.
+		net.vulkanic.world.DistantHorizonsSemanticCollector.removeColumn(this.pos);
 		
 		GLProxy.queueRunningOnRenderThread(() ->
 		{

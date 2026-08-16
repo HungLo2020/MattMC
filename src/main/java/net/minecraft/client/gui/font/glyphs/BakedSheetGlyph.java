@@ -8,11 +8,13 @@ import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.font.GlyphRenderTypes;
+import net.minecraft.client.gui.font.TextGlyphQuad;
 import net.minecraft.client.gui.font.TextRenderable;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.network.chat.Style;
 import net.sodium.client.render.vertex.VertexConsumerUtils;
 import org.joml.Matrix4f;
+import java.util.function.Consumer;
 
 @Environment(EnvType.CLIENT)
 public class BakedSheetGlyph implements BakedGlyph, EffectGlyph {
@@ -20,6 +22,8 @@ public class BakedSheetGlyph implements BakedGlyph, EffectGlyph {
 	private final GlyphInfo info;
 	final GlyphRenderTypes renderTypes;
 	final GpuTextureView textureView;
+	private final String semanticAtlasIdentity;
+	private final boolean semanticAtlasColored;
 	private final float u0;
 	private final float u1;
 	private final float v0;
@@ -30,11 +34,25 @@ public class BakedSheetGlyph implements BakedGlyph, EffectGlyph {
 	private final float down;
 
 	public BakedSheetGlyph(
-		GlyphInfo glyphInfo, GlyphRenderTypes glyphRenderTypes, GpuTextureView gpuTextureView, float f, float g, float h, float i, float j, float k, float l, float m
+		GlyphInfo glyphInfo,
+		GlyphRenderTypes glyphRenderTypes,
+		GpuTextureView gpuTextureView,
+		String string,
+		boolean bl,
+		float f,
+		float g,
+		float h,
+		float i,
+		float j,
+		float k,
+		float l,
+		float m
 	) {
 		this.info = glyphInfo;
 		this.renderTypes = glyphRenderTypes;
 		this.textureView = gpuTextureView;
+		this.semanticAtlasIdentity = string;
+		this.semanticAtlasColored = bl;
 		this.u0 = f;
 		this.u1 = g;
 		this.v0 = h;
@@ -143,6 +161,97 @@ public class BakedSheetGlyph implements BakedGlyph, EffectGlyph {
 		vertexConsumer.addVertex(matrix4f, k + p - q, n + q, h).setColor(i).setUv(this.u0, this.v1).setLight(j);
 		vertexConsumer.addVertex(matrix4f, l + p + q, n + q, h).setColor(i).setUv(this.u1, this.v1).setLight(j);
 		vertexConsumer.addVertex(matrix4f, l + o + q, m - q, h).setColor(i).setUv(this.u1, this.v0).setLight(j);
+	}
+
+	private void appendGlyphQuad(Consumer<TextGlyphQuad> consumer, boolean bl, float f, float g, float h, int i, boolean bl2) {
+		float j = f + this.left;
+		float k = f + this.right;
+		float l = g + this.up;
+		float m = g + this.down;
+		float n = bl ? this.shearTop() : 0.0F;
+		float o = bl ? this.shearBottom() : 0.0F;
+		float p = extraThickness(bl2);
+		consumer.accept(
+			new TextGlyphQuad(
+				this.semanticAtlasIdentity,
+				this.semanticAtlasColored,
+				j + n - p,
+				l - p,
+				j + o - p,
+				m + p,
+				k + o + p,
+				m + p,
+				k + n + p,
+				l - p,
+				h,
+				this.u0,
+				this.v0,
+				this.u1,
+				this.v1,
+				i
+			)
+		);
+	}
+
+	private void appendGlyphSemantics(BakedSheetGlyph.GlyphInstance glyphInstance, Consumer<TextGlyphQuad> consumer) {
+		Style style = glyphInstance.style();
+		boolean bl = style.isItalic();
+		boolean bl2 = style.isBold();
+		float f = 0.0F;
+		if (glyphInstance.hasShadow()) {
+			this.appendGlyphQuad(consumer, bl, glyphInstance.x() + glyphInstance.shadowOffset(), glyphInstance.y() + glyphInstance.shadowOffset(), 0.0F, glyphInstance.shadowColor(), bl2);
+			if (bl2) {
+				this.appendGlyphQuad(
+					consumer,
+					bl,
+					glyphInstance.x() + glyphInstance.boldOffset() + glyphInstance.shadowOffset(),
+					glyphInstance.y() + glyphInstance.shadowOffset(),
+					0.001F,
+					glyphInstance.shadowColor(),
+					true
+				);
+			}
+
+			f = 0.03F;
+		}
+
+		this.appendGlyphQuad(consumer, bl, glyphInstance.x(), glyphInstance.y(), f, glyphInstance.color(), bl2);
+		if (bl2) {
+			this.appendGlyphQuad(consumer, bl, glyphInstance.x() + glyphInstance.boldOffset(), glyphInstance.y(), f + 0.001F, glyphInstance.color(), true);
+		}
+	}
+
+	private void appendEffectSemantics(BakedSheetGlyph.EffectInstance effectInstance, Consumer<TextGlyphQuad> consumer, float f, float g, int i) {
+		consumer.accept(
+			new TextGlyphQuad(
+				this.semanticAtlasIdentity,
+				this.semanticAtlasColored,
+				effectInstance.x0() + f,
+				effectInstance.y1() + f,
+				effectInstance.x1() + f,
+				effectInstance.y1() + f,
+				effectInstance.x1() + f,
+				effectInstance.y0() + f,
+				effectInstance.x0() + f,
+				effectInstance.y0() + f,
+				g,
+				this.u0,
+				this.v0,
+				this.u1,
+				this.v1,
+				i
+			)
+		);
+	}
+
+	private void appendEffectSemantics(BakedSheetGlyph.EffectInstance effectInstance, Consumer<TextGlyphQuad> consumer) {
+		float f = effectInstance.depth();
+		if (effectInstance.hasShadow()) {
+			this.appendEffectSemantics(effectInstance, consumer, effectInstance.shadowOffset(), f, effectInstance.shadowColor());
+			f += 0.03F;
+		}
+
+		this.appendEffectSemantics(effectInstance, consumer, 0.0F, f, effectInstance.color());
 	}
 
 	private static float extraThickness(boolean bl) {
@@ -276,6 +385,12 @@ public class BakedSheetGlyph implements BakedGlyph, EffectGlyph {
 		}
 
 		@Override
+		public int collectSemanticQuads(Consumer<TextGlyphQuad> consumer) {
+			this.glyph.appendEffectSemantics(this, consumer);
+			return this.hasShadow() ? 2 : 1;
+		}
+
+		@Override
 		public RenderPipeline guiPipeline() {
 			return this.glyph.renderTypes.guiPipeline();
 		}
@@ -322,6 +437,12 @@ public class BakedSheetGlyph implements BakedGlyph, EffectGlyph {
 		@Override
 		public GpuTextureView textureView() {
 			return this.glyph.textureView;
+		}
+
+		@Override
+		public int collectSemanticQuads(Consumer<TextGlyphQuad> consumer) {
+			this.glyph.appendGlyphSemantics(this, consumer);
+			return (this.hasShadow() ? 2 : 1) * (this.style().isBold() ? 2 : 1);
 		}
 
 		@Override

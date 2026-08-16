@@ -92,6 +92,35 @@ public class ItemStackRenderState implements net.irisshaders.iris.mixinterface.I
 		return this.activeLayerCount == 0;
 	}
 
+	/**
+	 * Exposes one Java-only snapshot of the resolved item model layers. Consumers
+	 * must copy the needed semantics immediately; renderer objects never cross
+	 * the native boundary.
+	 */
+	public void forEachSemanticLayer(Consumer<SemanticLayer> consumer) {
+		for (int i = 0; i < this.activeLayerCount; i++) {
+			ItemStackRenderState.LayerRenderState layer = this.layers[i];
+			PoseStack.Pose transformPose = new PoseStack.Pose();
+			layer.transform.apply(this.displayContext.leftHand(), transformPose);
+			float[] modelTransform = new float[16];
+			transformPose.pose().get(modelTransform);
+			consumer.accept(new SemanticLayer(
+				layer.quads,
+				layer.tintLayers,
+				layer.renderType,
+				layer.foilType,
+				layer.usesBlockLight,
+				layer.specialRenderer != null,
+				layer.transform == ItemTransform.NO_TRANSFORM,
+				modelTransform
+			));
+		}
+	}
+
+	public ItemDisplayContext displayContext() {
+		return this.displayContext;
+	}
+
 	public boolean usesBlockLight() {
 		return this.firstLayer().usesBlockLight;
 	}
@@ -164,6 +193,45 @@ public class ItemStackRenderState implements net.irisshaders.iris.mixinterface.I
 		NONE,
 		STANDARD,
 		SPECIAL;
+	}
+
+	/**
+	 * Java-local resolved item layer semantics. This type deliberately contains
+	 * vanilla objects only so an extractor can consume them before FFI packing.
+	 */
+	public record SemanticLayer(
+		List<BakedQuad> quads,
+		int[] tintLayers,
+		@Nullable RenderType renderType,
+		FoilType foilType,
+		boolean usesBlockLight,
+		boolean hasSpecialRenderer,
+		boolean identityTransform,
+		float[] modelTransform
+	) {
+		public SemanticLayer {
+			quads = List.copyOf(quads);
+			tintLayers = tintLayers.clone();
+			if (modelTransform.length != 16) {
+				throw new IllegalArgumentException("semantic item layer transform must contain 16 floats");
+			}
+			for (float value : modelTransform) {
+				if (!Float.isFinite(value)) {
+					throw new IllegalArgumentException("semantic item layer transform must be finite");
+				}
+			}
+			modelTransform = modelTransform.clone();
+		}
+
+		@Override
+		public int[] tintLayers() {
+			return this.tintLayers.clone();
+		}
+
+		@Override
+		public float[] modelTransform() {
+			return this.modelTransform.clone();
+		}
 	}
 
 	@Environment(EnvType.CLIENT)

@@ -11,13 +11,13 @@ use super::resources::{
 };
 use super::trace;
 use crate::render::vulkanic::commands::{
-    AttachmentLoadOp, BufferImageCopyRegion, CommandOp, ResourceBarrier, TextureUsageState,
-    ValidatedSubmissionBatch,
+    AttachmentLoadOp, BufferImageCopyRegion, CommandOp, ResourceBarrier, TextureImageCopyRegion,
+    TextureUsageState, ValidatedSubmissionBatch,
 };
 use crate::render::vulkanic::error::{GalError, GalResult};
 use crate::render::vulkanic::handles::Handle;
 use crate::render::vulkanic::resources::{
-    BlendMode, CompareOp, CullMode, ResourceBindingKind, TextureDimension, TextureFormat,
+    BlendMode, CompareOp, CullMode, FrontFace, ResourceBindingKind, TextureDimension, TextureFormat,
 };
 use crate::render::vulkanic::sync::SubmissionId;
 
@@ -275,6 +275,11 @@ impl OpenGlLowerer {
             }
             CommandOp::CopyBufferToTexture(region) => self.copy_buffer_to_texture(objects, region),
             CommandOp::CopyTextureToBuffer(region) => self.copy_texture_to_buffer(objects, region),
+            CommandOp::CopyTexture(region) => self.copy_texture(objects, region),
+            CommandOp::GenerateMipmaps {
+                texture,
+                subresources,
+            } => self.generate_mipmaps(objects, *texture, *subresources),
             CommandOp::HostReadBuffer {
                 buffer,
                 offset,
@@ -404,9 +409,11 @@ impl OpenGlLowerer {
                 self.bind_vao(Some(pipeline.vao));
                 self.apply_fixed_state(
                     pipeline.cull_mode,
+                    pipeline.front_face,
                     pipeline.blend,
                     pipeline.depth_compare,
                     pipeline.depth_write,
+                    pipeline.depth_bias,
                 );
                 state.pipeline = Some(*handle);
                 state.compute_pipeline = None;
@@ -803,6 +810,85 @@ impl OpenGlLowerer {
         Ok(())
     }
 
+    fn copy_texture(
+        &mut self,
+        objects: &OpenGlObjects,
+        region: &TextureImageCopyRegion,
+    ) -> GalResult<()> {
+        let _zone = trace::Zone::new("opengl.lowering.copy-texture");
+        let source = objects.texture(region.src_texture)?;
+        let destination = objects.texture(region.dst_texture)?;
+        let src_y = gl_y_for_texture_copy(
+            source,
+            region.src_mip,
+            region.src_origin.y,
+            region.extent.height,
+        )?;
+        let dst_y = gl_y_for_texture_copy(
+            destination,
+            region.dst_mip,
+            region.dst_origin.y,
+            region.extent.height,
+        )?;
+        unsafe {
+            self.gl.copy_image_sub_data(
+                source.texture,
+                texture_target(source.dimension),
+                i32::try_from(region.src_mip)
+                    .map_err(|_| GalError::backend("source texture mip exceeds i32"))?,
+                i32::try_from(region.src_origin.x)
+                    .map_err(|_| GalError::backend("source texture origin x exceeds i32"))?,
+                src_y,
+                i32::try_from(region.src_origin.z)
+                    .map_err(|_| GalError::backend("source texture origin z exceeds i32"))?,
+                destination.texture,
+                texture_target(destination.dimension),
+                i32::try_from(region.dst_mip)
+                    .map_err(|_| GalError::backend("destination texture mip exceeds i32"))?,
+                i32::try_from(region.dst_origin.x)
+                    .map_err(|_| GalError::backend("destination texture origin x exceeds i32"))?,
+                dst_y,
+                i32::try_from(region.dst_origin.z)
+                    .map_err(|_| GalError::backend("destination texture origin z exceeds i32"))?,
+                i32::try_from(region.extent.width)
+                    .map_err(|_| GalError::backend("texture copy width exceeds i32"))?,
+                i32::try_from(region.extent.height)
+                    .map_err(|_| GalError::backend("texture copy height exceeds i32"))?,
+                i32::try_from(region.extent.depth)
+                    .map_err(|_| GalError::backend("texture copy depth exceeds i32"))?,
+            );
+        }
+        Ok(())
+    }
+
+    fn generate_mipmaps(
+        &mut self,
+        objects: &mut OpenGlObjects,
+        texture: Handle,
+        subresources: crate::render::vulkanic::resources::TextureSubresourceRange,
+    ) -> GalResult<()> {
+        let _zone = trace::Zone::new("opengl.lowering.generate-mipmaps");
+        let texture = objects.texture(texture)?;
+        if subresources.base_mip != 0
+            || subresources.mip_count != texture.mip_levels
+            || subresources.base_layer != 0
+            || subresources.layer_count != texture.array_layers
+        {
+            return Err(GalError::backend(
+                "OpenGL mip generation requires the validated complete texture mip and layer range",
+            ));
+        }
+        unsafe {
+            self.gl
+                .bind_texture(texture_target(texture.dimension), Some(texture.texture));
+            self.gl.generate_mipmap(texture_target(texture.dimension));
+        }
+        // This native operation binds a texture outside descriptor reconstruction.
+        // Make following explicit resource-set binds re-establish all texture state.
+        self.cache.textures.clear();
+        Ok(())
+    }
+
     fn bind_resource_set(
         &mut self,
         objects: &OpenGlObjects,
@@ -958,15 +1044,19 @@ impl OpenGlLowerer {
     fn apply_fixed_state(
         &mut self,
         cull_mode: CullMode,
+        front_face: FrontFace,
         blend: BlendMode,
         depth_compare: Option<CompareOp>,
         depth_write: bool,
+        depth_bias: Option<crate::render::vulkanic::resources::DepthBias>,
     ) {
         unsafe {
-            if self.cache.front_face_ccw != Some(true) {
+            let front_face_ccw = gl_front_face_is_counter_clockwise(front_face);
+            if self.cache.front_face_ccw != Some(front_face_ccw) {
                 self.record_gl_call();
-                self.gl.front_face(glow::CCW);
-                self.cache.front_face_ccw = Some(true);
+                self.gl
+                    .front_face(if front_face_ccw { glow::CCW } else { glow::CW });
+                self.cache.front_face_ccw = Some(front_face_ccw);
                 self.cache.state_changes += 1;
             }
             if self.cache.cull != Some(cull_mode) {
@@ -1015,6 +1105,17 @@ impl OpenGlLowerer {
                 }
                 self.cache.depth_compare = depth_compare;
                 self.cache.depth_write = depth_write;
+                self.cache.state_changes += 1;
+            }
+            if self.cache.depth_bias != depth_bias {
+                if let Some(bias) = depth_bias {
+                    self.gl.enable(glow::POLYGON_OFFSET_FILL);
+                    self.gl
+                        .polygon_offset(bias.slope_factor, bias.constant_factor);
+                } else {
+                    self.gl.disable(glow::POLYGON_OFFSET_FILL);
+                }
+                self.cache.depth_bias = depth_bias;
                 self.cache.state_changes += 1;
             }
         }
@@ -1215,6 +1316,10 @@ impl OpenGlLowerer {
     }
 }
 
+fn gl_front_face_is_counter_clockwise(front_face: FrontFace) -> bool {
+    matches!(front_face, FrontFace::CounterClockwise)
+}
+
 fn record_sampled_texture_view_range(
     views: &mut BTreeMap<Handle, (u32, u32, u32, u32)>,
     texture: Handle,
@@ -1252,6 +1357,7 @@ struct StateCache {
     blend: Option<BlendMode>,
     depth_compare: Option<CompareOp>,
     depth_write: bool,
+    depth_bias: Option<crate::render::vulkanic::resources::DepthBias>,
     textures: BTreeMap<u32, (u32, Option<glow::Texture>)>,
     samplers: BTreeMap<u32, Option<glow::Sampler>>,
     image_units: BTreeMap<u32, ImageUnitBinding>,
@@ -1447,30 +1553,79 @@ fn gl_y_for_copy_region(
         return i32::try_from(region.texture_origin.y)
             .map_err(|_| GalError::backend("3D texture origin y exceeds i32"));
     }
-    let texture_height = i64::from(texture.extent.height);
+    let texture_height = i64::from((texture.extent.height >> region.texture_mip).max(1));
     let origin_y = i64::from(region.texture_origin.y);
     let copy_height = i64::from(region.extent.height);
-    let gl_y = texture_height
-        .checked_sub(origin_y)
-        .and_then(|value| value.checked_sub(copy_height))
-        .ok_or_else(|| GalError::backend("top-left texture region is outside GL image bounds"))?;
+    let end_y = origin_y
+        .checked_add(copy_height)
+        .ok_or_else(|| GalError::backend("top-left texture region overflows"))?;
+    if end_y > texture_height {
+        return Err(GalError::backend(
+            "top-left texture region is outside GL image bounds",
+        ));
+    }
+    let gl_y = texture_height - end_y;
     i32::try_from(gl_y).map_err(|_| GalError::backend("translated GL y exceeds i32"))
 }
 
-/// 2D framebuffer-facing resources use the frontend's top-left copy convention,
-/// while a D3 image is a coordinate volume. Applying the 2D row flip to a volume
-/// would make `imageLoad`/`imageStore` disagree with Vulkan at every nonzero Y.
-fn copy_upload_row_index(dimension: TextureDimension, row: usize, height: usize) -> usize {
-    match dimension {
-        TextureDimension::D3 => row,
-        TextureDimension::D2 => height - 1 - row,
-        _ => unreachable!("GAL validated texture dimension"),
+fn gl_y_for_texture_copy(
+    texture: &super::resources::TextureObject,
+    mip: u32,
+    origin_y: u32,
+    height: u32,
+) -> GalResult<i32> {
+    gl_y_for_texture_copy_values(
+        texture.dimension,
+        texture.extent.height,
+        mip,
+        origin_y,
+        height,
+    )
+}
+
+fn gl_y_for_texture_copy_values(
+    dimension: TextureDimension,
+    base_height: u32,
+    mip: u32,
+    origin_y: u32,
+    height: u32,
+) -> GalResult<i32> {
+    if dimension == TextureDimension::D3 {
+        return i32::try_from(origin_y)
+            .map_err(|_| GalError::backend("3D texture origin y exceeds i32"));
     }
+    let mip_height = i64::from((base_height >> mip).max(1));
+    let end_y = i64::from(origin_y)
+        .checked_add(i64::from(height))
+        .ok_or_else(|| GalError::backend("top-left texture copy overflows"))?;
+    if end_y > mip_height {
+        return Err(GalError::backend(
+            "top-left texture copy is outside GL image bounds",
+        ));
+    }
+    let gl_y = mip_height - end_y;
+    i32::try_from(gl_y).map_err(|_| GalError::backend("translated GL y exceeds i32"))
+}
+
+/// `gl_y_for_copy_region` is the sole OpenGL coordinate conversion for a
+/// top-left semantic texture upload. Reversing source rows here as well would
+/// vertically swap every D2 atlas region. D3 volume uploads use the same
+/// source order without a screen-space conversion.
+fn copy_upload_row_index(_dimension: TextureDimension, row: usize, _height: usize) -> usize {
+    row
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn explicit_front_face_selects_the_matching_opengl_convention() {
+        assert!(gl_front_face_is_counter_clockwise(
+            FrontFace::CounterClockwise
+        ));
+        assert!(!gl_front_face_is_counter_clockwise(FrontFace::Clockwise));
+    }
 
     #[test]
     fn overlay_blend_lowers_to_source_alpha_additive_equation() {
@@ -1490,12 +1645,26 @@ mod tests {
     }
 
     #[test]
-    fn d3_upload_rows_preserve_semantic_volume_y_coordinates() {
+    fn uploads_preserve_semantic_row_order_for_d2_and_d3() {
+        assert_eq!(0, copy_upload_row_index(TextureDimension::D2, 0, 3));
+        assert_eq!(1, copy_upload_row_index(TextureDimension::D2, 1, 3));
+        assert_eq!(2, copy_upload_row_index(TextureDimension::D2, 2, 3));
         assert_eq!(0, copy_upload_row_index(TextureDimension::D3, 0, 3));
         assert_eq!(1, copy_upload_row_index(TextureDimension::D3, 1, 3));
         assert_eq!(2, copy_upload_row_index(TextureDimension::D3, 2, 3));
-        assert_eq!(2, copy_upload_row_index(TextureDimension::D2, 0, 3));
-        assert_eq!(0, copy_upload_row_index(TextureDimension::D2, 2, 3));
+    }
+
+    #[test]
+    fn texture_copy_preserves_top_left_coordinates_across_mips() {
+        assert_eq!(
+            20,
+            gl_y_for_texture_copy_values(TextureDimension::D2, 64, 1, 5, 7).unwrap()
+        );
+        assert_eq!(
+            5,
+            gl_y_for_texture_copy_values(TextureDimension::D3, 64, 1, 5, 7).unwrap()
+        );
+        assert!(gl_y_for_texture_copy_values(TextureDimension::D2, 16, 0, 15, 2).is_err());
     }
 
     #[test]

@@ -41,6 +41,29 @@ unsafe fn write_error(message: String, out_error_ptr: *mut u64, out_error_len: *
     write_boxed_bytes(message.into_bytes(), out_error_ptr, out_error_len);
 }
 
+/// Keeps shader compiler failures actionable without retaining or writing a
+/// full generated pack source. Shaderc uses one-based source lines in its
+/// diagnostics; include a small numbered window when that line is present.
+fn shader_error_context(source: &str, diagnostic: &str) -> Option<String> {
+    let line = diagnostic
+        .split(':')
+        .find_map(|part| part.trim().parse::<usize>().ok())?;
+    let first = line.saturating_sub(3).max(1);
+    let last = line.saturating_add(2);
+    let context = source
+        .lines()
+        .enumerate()
+        .filter_map(|(index, text)| {
+            let number = index + 1;
+            (first..=last)
+                .contains(&number)
+                .then(|| format!("{number}: {text}"))
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    (!context.is_empty()).then_some(context)
+}
+
 unsafe fn compile_inner(
     stage: i32,
     source_ptr: *const u8,
@@ -81,8 +104,12 @@ unsafe fn compile_inner(
             Some(&options),
         )
         .map_err(|error| {
+            let diagnostic = error.to_string();
+            let context = shader_error_context(source, &diagnostic)
+                .map(|context| format!("\nsource context:\n{context}"))
+                .unwrap_or_default();
             format!(
-                "SPIR-V compilation failed for '{source_name}' (stage={stage}, entryPoint={entry_point}) using Shaderc: {error}"
+                "SPIR-V compilation failed for '{source_name}' (stage={stage}, entryPoint={entry_point}) using Shaderc: {diagnostic}{context}"
             )
         })?;
 
@@ -125,7 +152,7 @@ pub(super) fn compile_glsl_for_backend(
 }
 
 #[cfg(test)]
-pub(super) fn compile_glsl_for_backend_test(
+pub(crate) fn compile_glsl_for_backend_test(
     stage: shaderc::ShaderKind,
     source: &str,
     source_name: &str,
@@ -206,6 +233,22 @@ pub unsafe extern "C" fn mattmc_vulkan_shaderc_free_buffer(ptr: u64, len: u64) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn shader_error_context_extracts_a_bounded_one_based_window() {
+        let source = "one\ntwo\nthree\nfour\nfive\nsix\nseven\n";
+        let context = shader_error_context(source, "source:5: error: malformed")
+            .expect("a Shaderc-style source line must produce context");
+        assert_eq!(
+            "2: two\n3: three\n4: four\n5: five\n6: six\n7: seven",
+            context
+        );
+    }
+
+    #[test]
+    fn shader_error_context_ignores_diagnostics_without_a_source_line() {
+        assert!(shader_error_context("one", "error: malformed").is_none());
+    }
 
     #[test]
     fn shaderc_compiles_minimal_vertex_shader() {

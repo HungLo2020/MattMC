@@ -16,7 +16,9 @@ public enum GuiRenderStratum {
 	GUI_ATTACK_HOTBAR_BACKGROUND("gui.attack.hotbar.background", 520),
 	GUI_ATTACK_HOTBAR_PROGRESS("gui.attack.hotbar.progress", 530),
 	GUI_BOSS_BAR_BACKGROUND("gui.boss.background", 600),
-	GUI_BOSS_BAR_PROGRESS("gui.boss.progress", 610);
+	GUI_BOSS_BAR_PROGRESS("gui.boss.progress", 610),
+	GUI_ITEM("gui.item", 650),
+	GUI_TEXT("gui.text", 700);
 
 	private final String id;
 	private final int order;

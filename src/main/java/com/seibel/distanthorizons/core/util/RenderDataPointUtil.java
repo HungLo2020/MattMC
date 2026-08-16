@@ -293,5 +293,27 @@ public class RenderDataPointUtil
 			}
 		}
 	}
+
+	/**
+	 * Semantic companion to the normal reducer. The compact render-data ABI
+	 * remains unchanged; callers may provide one source identity per input node
+	 * and receive the identity of the node that survives the same reduction.
+	 */
+	public static void mergeMultiData(
+		IColumnDataView sourceData, int[] sourceSemanticMaterials,
+		ColumnArrayView output, int[] outputSemanticMaterials
+	)
+	{
+		if (sourceSemanticMaterials == null || sourceSemanticMaterials.length < sourceData.size()
+			|| outputSemanticMaterials == null || outputSemanticMaterials.length < output.size())
+		{
+			throw new IllegalArgumentException("Semantic material arrays must cover their render-data views");
+		}
+		try (RenderDataPointReducingList list = new RenderDataPointReducingList(sourceData, sourceSemanticMaterials))
+		{
+			list.reduce(output.verticalSize());
+			list.copyTo(output, outputSemanticMaterials);
+		}
+	}
 	
 }

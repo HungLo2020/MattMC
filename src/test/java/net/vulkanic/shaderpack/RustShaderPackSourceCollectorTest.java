@@ -10,7 +10,9 @@ import java.net.URI;
 import java.util.List;
 import java.util.Map;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class RustShaderPackSourceCollectorTest {
@@ -132,6 +134,71 @@ class RustShaderPackSourceCollectorTest {
 			fresh,
 			Map.of("VALID_OPTION", "")
 		));
+	}
+
+	@Test
+	void resolvedSourceSnapshotReplacesOnlyKnownShaderSources() throws Exception {
+		Files.writeString(temporaryDirectory.resolve("gbuffers_terrain.vsh"), "#define QUALITY 1\n");
+		Files.writeString(temporaryDirectory.resolve("shaders.properties"), "profile.default=QUALITY=1\n");
+		RustShaderPackSourceCollector.SourceGeneration raw = RustShaderPackSourceCollector.collect(
+			temporaryDirectory,
+			"configured-pack",
+			14L
+		);
+
+		RustShaderPackSourceCollector.SourceGeneration resolved =
+			RustShaderPackSourceCollector.withResolvedSourceSnapshot(raw, Map.of(
+				"gbuffers_terrain.vsh", "#define QUALITY 3 // Iris resolved option\n".getBytes(java.nio.charset.StandardCharsets.UTF_8),
+				"missing.vsh", "must not be introduced".getBytes(java.nio.charset.StandardCharsets.UTF_8)
+			));
+
+		assertEquals(
+			"#define QUALITY 3 // Iris resolved option\n",
+			new String(resolved.files().stream()
+				.filter(file -> file.path().equals("gbuffers_terrain.vsh"))
+				.findFirst().orElseThrow().contentsUtf8(), java.nio.charset.StandardCharsets.UTF_8)
+		);
+		assertEquals(
+			"profile.default=QUALITY=1\n",
+			new String(resolved.files().stream()
+				.filter(file -> file.path().equals("shaders.properties"))
+				.findFirst().orElseThrow().contentsUtf8(), java.nio.charset.StandardCharsets.UTF_8)
+		);
+		assertEquals(2, resolved.files().size());
+	}
+
+	@Test
+	void runtimeConstantSnapshotIsSortedBoundedAndSeparateFromMacros() throws Exception {
+		RustShaderPackSourceCollector.SourceGeneration source = RustShaderPackSourceCollector.collect(
+			temporaryDirectory,
+			"configured-pack",
+			13L
+		);
+		RustShaderPackSourceCollector.SourceGeneration configured =
+			RustShaderPackSourceCollector.withRuntimeConstantSnapshot(source, Map.of(
+				"shadowDistance", "320.0",
+				"A_CONST", "1"
+			));
+
+		assertEquals(1, configured.files().size());
+		assertEquals(RustShaderPackSourceCollector.RUNTIME_CONSTANTS_PATH, configured.files().get(0).path());
+		assertEquals("A_CONST=1\nshadowDistance=320.0\n", new String(configured.files().get(0).contentsUtf8()));
+	}
+
+	@Test
+	void disabledBooleanOptionsRemainUndefinedForDefinedGuards() {
+		Map<String, String> options = new java.util.TreeMap<>();
+		RustShaderPackSourceCollector.putEnabledBooleanOption(options, "POM", false);
+		RustShaderPackSourceCollector.putEnabledBooleanOption(options, "TAA", true);
+
+		assertEquals(Map.of("TAA", "1"), options);
+	}
+
+	@Test
+	void stageSelectorsAreNeverCopiedAsShaderPackOptions() {
+		assertTrue(RustShaderPackSourceCollector.isShaderStageSelector("VERTEX_SHADER"));
+		assertTrue(RustShaderPackSourceCollector.isShaderStageSelector("FRAGMENT_SHADER"));
+		assertFalse(RustShaderPackSourceCollector.isShaderStageSelector("POM"));
 	}
 
 	@Test

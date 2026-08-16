@@ -24,6 +24,23 @@ public class DistantHorizonsLevelRenderHook implements LevelRendererHooks {
 
     @Override
     public void onBeforeRenderLevel(Camera camera, Matrix4f positionMatrix, Matrix4f projectionMatrix) {
+        seedRenderState(positionMatrix, projectionMatrix);
+
+        // handled here and in MixinChunkSectionsToRender (now DistantHorizonsChunkRenderHook)
+    }
+
+    /**
+     * Invoked by the Rust Vulkan whole-frame shell because that shell does
+     * not enter LevelRenderer's normal DH hook. This shares the normal DH
+     * camera/world semantic setup, then asks ClientApi for a draw-free opaque
+     * preflight. A rejected frame contributes no Java draw to the shell.
+     */
+    public static boolean collectRustOpaqueForWholeFrame(Matrix4f positionMatrix, Matrix4f projectionMatrix) {
+        seedRenderState(positionMatrix, projectionMatrix);
+        return ClientApi.INSTANCE.collectRustOpaqueLodsForWholeFrame();
+    }
+
+    private static void seedRenderState(Matrix4f positionMatrix, Matrix4f projectionMatrix) {
         ClientApi.RENDER_STATE.mcModelViewMatrix = McObjectConverter.Convert(positionMatrix);
         ClientApi.RENDER_STATE.mcProjectionMatrix = McObjectConverter.Convert(projectionMatrix);
         
@@ -35,8 +52,6 @@ public class DistantHorizonsLevelRenderHook implements LevelRendererHooks {
             ClientApi.RENDER_STATE.clientLevelWrapper,
             levelRenderer.level
         );
-        
-        // handled here and in MixinChunkSectionsToRender (now DistantHorizonsChunkRenderHook)
     }
 
     @Override

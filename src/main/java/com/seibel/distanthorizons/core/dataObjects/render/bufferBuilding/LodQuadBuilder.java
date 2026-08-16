@@ -8,6 +8,7 @@ import com.seibel.distanthorizons.api.enums.config.EDhApiGrassSideRendering;
 import com.seibel.distanthorizons.api.enums.rendering.EDhApiBlockMaterial;
 import com.seibel.distanthorizons.api.enums.rendering.EDhApiDebugRendering;
 import com.seibel.distanthorizons.core.config.Config;
+import com.seibel.distanthorizons.core.dataObjects.render.ColumnRenderSource;
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.enums.EDhDirection;
 import com.seibel.distanthorizons.core.util.ColorUtil;
@@ -15,6 +16,7 @@ import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftCli
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
 import com.seibel.distanthorizons.coreapi.util.MathUtil;
+import net.vulkanic.world.DistantHorizonsSemanticCollector;
 import org.lwjgl.system.MemoryUtil;
 
 /**
@@ -36,6 +38,16 @@ public class LodQuadBuilder
 	
 	private final EDhApiDebugRendering debugRenderingMode;
 	private final EDhApiGrassSideRendering grassSideRenderingMode;
+	private static final int MAX_SEMANTIC_MATERIAL_IDENTITIES = 4096;
+	/** Builder-local table whose IDs are safe to retain with the CPU build. */
+	private final List<ColumnRenderSource.SemanticMaterialIdentity> semanticMaterials = new ArrayList<>();
+	private final Map<ColumnRenderSource.SemanticMaterialIdentity, Integer> semanticMaterialIds = new HashMap<>();
+	private int emittedKnownSemanticQuads;
+	private int emittedMixedSemanticQuads;
+	private int emittedUnavailableSemanticQuads;
+	private int emittedOpaqueKnownSemanticQuads;
+	private int emittedOpaqueMixedSemanticQuads;
+	private int emittedOpaqueUnavailableSemanticQuads;
 
 	private static final int[] DEFAULT_DIRECTION_RENDER_ORDER = new int[] {
 			EDhDirection.DOWN.ordinal(),
@@ -129,6 +141,49 @@ public class LodQuadBuilder
 		this.grassSideRenderingMode = Config.Client.Advanced.Graphics.Quality.grassSideRendering.get();
 		
 	}
+
+	/**
+	 * Converts a render-source-local identity into a bounded builder-local ID.
+	 * The returned ID is never written into DH's legacy vertex bytes.
+	 */
+	public int internSemanticMaterial(ColumnRenderSource.SemanticMaterialIdentity identity)
+	{
+		if (identity == null)
+		{
+			return ColumnRenderSource.SEMANTIC_MATERIAL_UNAVAILABLE;
+		}
+		Integer existing = this.semanticMaterialIds.get(identity);
+		if (existing != null)
+		{
+			return existing;
+		}
+		if (this.semanticMaterials.size() >= MAX_SEMANTIC_MATERIAL_IDENTITIES)
+		{
+			return ColumnRenderSource.SEMANTIC_MATERIAL_UNAVAILABLE;
+		}
+		int materialId = this.semanticMaterials.size() + 1;
+		this.semanticMaterials.add(identity);
+		this.semanticMaterialIds.put(identity, materialId);
+		return materialId;
+	}
+
+	public List<ColumnRenderSource.SemanticMaterialIdentity> semanticMaterials()
+	{
+		return List.copyOf(this.semanticMaterials);
+	}
+
+	/** Bounded source-side evidence for copied material provenance. */
+	public SemanticQuadCoverage semanticQuadCoverage()
+	{
+		return new SemanticQuadCoverage(
+			this.emittedKnownSemanticQuads,
+			this.emittedMixedSemanticQuads,
+			this.emittedUnavailableSemanticQuads,
+			this.emittedOpaqueKnownSemanticQuads,
+			this.emittedOpaqueMixedSemanticQuads,
+			this.emittedOpaqueUnavailableSemanticQuads
+		);
+	}
 	
 	
 	
@@ -141,6 +196,31 @@ public class LodQuadBuilder
 			short x, short y, short z,
 			short widthEastWest, short widthNorthSouthOrUpDown,
 			int color, byte irisBlockMaterialId, byte skyLight, byte blockLight)
+	{
+		this.addQuadAdj(
+			dir, x, y, z, widthEastWest, widthNorthSouthOrUpDown,
+			color, irisBlockMaterialId, skyLight, blockLight,
+			ColumnRenderSource.SEMANTIC_MATERIAL_UNAVAILABLE);
+	}
+
+	public void addQuadAdj(
+			EDhDirection dir,
+			short x, short y, short z,
+			short widthEastWest, short widthNorthSouthOrUpDown,
+			int color, byte irisBlockMaterialId, byte skyLight, byte blockLight,
+		int semanticMaterialId)
+	{
+		this.addQuadAdj(dir, x, y, z, widthEastWest, widthNorthSouthOrUpDown,
+			color, irisBlockMaterialId, skyLight, blockLight, semanticMaterialId,
+			ColumnRenderSource.SEMANTIC_VARIANT_UNAVAILABLE, 0L);
+	}
+
+	public void addQuadAdj(
+			EDhDirection dir,
+			short x, short y, short z,
+			short widthEastWest, short widthNorthSouthOrUpDown,
+			int color, byte irisBlockMaterialId, byte skyLight, byte blockLight,
+			int semanticMaterialId, byte semanticVariantState, long semanticVariantPosition)
 	{
 		if (dir == EDhDirection.DOWN)
 		{
@@ -158,8 +238,14 @@ public class LodQuadBuilder
 			quadList = this.opaqueQuads[dir.ordinal()]; 
 		}
 		
-		BufferQuad quad = new BufferQuad(x, y, z, widthEastWest, widthNorthSouthOrUpDown, color, irisBlockMaterialId, skyLight, blockLight, dir);
+		BufferQuad quad = new BufferQuad(x, y, z, widthEastWest, widthNorthSouthOrUpDown, color, irisBlockMaterialId, skyLight, blockLight, dir, semanticMaterialId, semanticVariantState, semanticVariantPosition);
+		this.recordSemanticQuad(semanticMaterialId, this.shouldUseTransparentBuffer(color, irisBlockMaterialId));
 		if (!quadList.isEmpty()
+			&& canMergeSemanticMaterials(
+				DistantHorizonsSemanticCollector.usesRustWholeFrameSemanticBuild(),
+				quadList.get(quadList.size() - 1).semanticMaterialId,
+				quad.semanticMaterialId
+			)
 			&& (
 				quadList.get(quadList.size() - 1).tryMerge(quad, BufferMergeDirectionEnum.EastWest)
 				|| quadList.get(quadList.size() - 1).tryMerge(quad, BufferMergeDirectionEnum.NorthSouthOrUpDown))
@@ -175,22 +261,52 @@ public class LodQuadBuilder
 	// XZ
 	public void addQuadUp(short minX, short maxY, short minZ, short widthEastWest, short widthNorthSouthOrUpDown, int color, byte irisBlockMaterialId, byte skylight, byte blocklight) // TODO argument names are wrong
 	{
+		this.addQuadUp(
+			minX, maxY, minZ, widthEastWest, widthNorthSouthOrUpDown,
+			color, irisBlockMaterialId, skylight, blocklight,
+			ColumnRenderSource.SEMANTIC_MATERIAL_UNAVAILABLE);
+	}
+
+	public void addQuadUp(short minX, short maxY, short minZ, short widthEastWest, short widthNorthSouthOrUpDown, int color, byte irisBlockMaterialId, byte skylight, byte blocklight, int semanticMaterialId) // TODO argument names are wrong
+	{
+		this.addQuadUp(minX, maxY, minZ, widthEastWest, widthNorthSouthOrUpDown,
+			color, irisBlockMaterialId, skylight, blocklight, semanticMaterialId,
+			ColumnRenderSource.SEMANTIC_VARIANT_UNAVAILABLE, 0L);
+	}
+
+	public void addQuadUp(short minX, short maxY, short minZ, short widthEastWest, short widthNorthSouthOrUpDown, int color, byte irisBlockMaterialId, byte skylight, byte blocklight, int semanticMaterialId, byte semanticVariantState, long semanticVariantPosition) // TODO argument names are wrong
+	{
 		boolean isTransparent = this.shouldUseTransparentBuffer(color, irisBlockMaterialId);
 		ArrayList<BufferQuad> quadList = isTransparent 
 				? this.transparentQuads[EDhDirection.UP.ordinal()] 
 				: this.opaqueQuads[EDhDirection.UP.ordinal()];
 		
-		BufferQuad quad = new BufferQuad(minX, maxY, minZ, widthEastWest, widthNorthSouthOrUpDown, color, irisBlockMaterialId, skylight, blocklight, EDhDirection.UP);
+		BufferQuad quad = new BufferQuad(minX, maxY, minZ, widthEastWest, widthNorthSouthOrUpDown, color, irisBlockMaterialId, skylight, blocklight, EDhDirection.UP, semanticMaterialId, semanticVariantState, semanticVariantPosition);
+		this.recordSemanticQuad(semanticMaterialId, isTransparent);
 		quadList.add(quad);
 	}
 	
 	public void addQuadDown(short x, short y, short z, short width, short wz, int color, byte irisBlockMaterialId, byte skylight, byte blocklight)
 	{
+		this.addQuadDown(
+			x, y, z, width, wz, color, irisBlockMaterialId, skylight, blocklight,
+			ColumnRenderSource.SEMANTIC_MATERIAL_UNAVAILABLE);
+	}
+
+	public void addQuadDown(short x, short y, short z, short width, short wz, int color, byte irisBlockMaterialId, byte skylight, byte blocklight, int semanticMaterialId)
+	{
+		this.addQuadDown(x, y, z, width, wz, color, irisBlockMaterialId, skylight, blocklight,
+			semanticMaterialId, ColumnRenderSource.SEMANTIC_VARIANT_UNAVAILABLE, 0L);
+	}
+
+	public void addQuadDown(short x, short y, short z, short width, short wz, int color, byte irisBlockMaterialId, byte skylight, byte blocklight, int semanticMaterialId, byte semanticVariantState, long semanticVariantPosition)
+	{
 		ArrayList<BufferQuad> quadArray = this.shouldUseTransparentBuffer(color, irisBlockMaterialId)
 				? this.transparentQuads[EDhDirection.DOWN.ordinal()]
 				: this.opaqueQuads[EDhDirection.DOWN.ordinal()];
 		
-		BufferQuad quad = new BufferQuad(x, y, z, width, wz, color, irisBlockMaterialId, skylight, blocklight, EDhDirection.DOWN);
+		BufferQuad quad = new BufferQuad(x, y, z, width, wz, color, irisBlockMaterialId, skylight, blocklight, EDhDirection.DOWN, semanticMaterialId, semanticVariantState, semanticVariantPosition);
+		this.recordSemanticQuad(semanticMaterialId, this.shouldUseTransparentBuffer(color, irisBlockMaterialId));
 		quadArray.add(quad);
 	}
 	
@@ -251,7 +367,11 @@ public class LodQuadBuilder
 		{
 			BufferQuad nextQuad = iter.next();
 			
-			if (currentQuad.tryMerge(nextQuad, mergeDirection))
+			if (canMergeSemanticMaterials(
+				DistantHorizonsSemanticCollector.usesRustWholeFrameSemanticBuild(),
+				currentQuad.semanticMaterialId,
+				nextQuad.semanticMaterialId
+			) && currentQuad.tryMerge(nextQuad, mergeDirection))
 			{
 				// merge successful, attempt to merge the next quad
 				mergeCount++;
@@ -266,6 +386,37 @@ public class LodQuadBuilder
 		list[directionIndex].removeIf(Objects::isNull);
 		return mergeCount;
 	}
+
+	/**
+	 * The legacy DH route intentionally keeps its existing greedy reduction.
+	 * Rust's exact-atlas route must not collapse two source identities into one
+	 * quad: a single atlas region cannot truthfully represent both. Keeping the
+	 * boundary here preserves the producer's semantic identity without putting
+	 * texture selection or batching policy into Java's renderer path.
+	 */
+	static boolean canMergeSemanticMaterials(boolean exactAtlasRoute, int leftMaterialId, int rightMaterialId)
+	{
+		return !exactAtlasRoute || leftMaterialId == rightMaterialId;
+	}
+
+	private void recordSemanticQuad(int semanticMaterialId, boolean transparent)
+	{
+		if (semanticMaterialId > ColumnRenderSource.SEMANTIC_MATERIAL_UNAVAILABLE)
+		{
+			this.emittedKnownSemanticQuads++;
+			if (!transparent) this.emittedOpaqueKnownSemanticQuads++;
+		}
+		else if (semanticMaterialId == ColumnRenderSource.SEMANTIC_MATERIAL_MIXED)
+		{
+			this.emittedMixedSemanticQuads++;
+			if (!transparent) this.emittedOpaqueMixedSemanticQuads++;
+		}
+		else
+		{
+			this.emittedUnavailableSemanticQuads++;
+			if (!transparent) this.emittedOpaqueUnavailableSemanticQuads++;
+		}
+	}
 	
 	
 	
@@ -277,6 +428,17 @@ public class LodQuadBuilder
 	public ArrayList<ByteBuffer> makeTransparentVertexBuffers() { return this.makeVertexBuffers(this.transparentQuads, TRANSPARENT_NON_UP_DIRECTION_RENDER_ORDER); }
 	public ArrayList<ByteBuffer> makeTransparentUpVertexBuffers() { return this.makeVertexBuffers(this.transparentQuads, TRANSPARENT_UP_DIRECTION_RENDER_ORDER, quad -> !isWater(quad)); }
 	public ArrayList<ByteBuffer> makeTransparentWaterUpVertexBuffers() { return this.makeVertexBuffers(this.transparentQuads, TRANSPARENT_UP_DIRECTION_RENDER_ORDER, LodQuadBuilder::isWater); }
+
+	/**
+	 * Creates the normal DH CPU vertex buffers plus one semantic identity per
+	 * emitted quad. The sidecar is opt-in so the legacy GL route does not pay
+	 * for data it cannot consume.
+	 */
+	public VertexBufferBuild makeOpaqueVertexBuffersWithSemanticMaterials() { return this.makeVertexBufferBuild(this.opaqueQuads, DEFAULT_DIRECTION_RENDER_ORDER); }
+	public VertexBufferBuild makeTransparentVertexBuffersWithSemanticMaterials() { return this.makeVertexBufferBuild(this.transparentQuads, TRANSPARENT_NON_UP_DIRECTION_RENDER_ORDER); }
+	public VertexBufferBuild makeTransparentUpVertexBuffersWithSemanticMaterials() { return this.makeVertexBufferBuild(this.transparentQuads, TRANSPARENT_UP_DIRECTION_RENDER_ORDER, quad -> !isWater(quad)); }
+	public VertexBufferBuild makeTransparentWaterUpVertexBuffersWithSemanticMaterials() { return this.makeVertexBufferBuild(this.transparentQuads, TRANSPARENT_UP_DIRECTION_RENDER_ORDER, LodQuadBuilder::isWater); }
+
 	private ArrayList<ByteBuffer> makeVertexBuffers(ArrayList<BufferQuad>[] quadList, int[] directionRenderOrder)
 	{
 		return this.makeVertexBuffers(quadList, directionRenderOrder, quad -> true);
@@ -325,6 +487,178 @@ public class LodQuadBuilder
 		
 		return byteBufferList;
 	}
+
+	private VertexBufferBuild makeVertexBufferBuild(ArrayList<BufferQuad>[] quadList, int[] directionRenderOrder)
+	{
+		return this.makeVertexBufferBuild(quadList, directionRenderOrder, quad -> true);
+	}
+
+	private VertexBufferBuild makeVertexBufferBuild(ArrayList<BufferQuad>[] quadList, int[] directionRenderOrder, Predicate<BufferQuad> quadFilter)
+	{
+		ArrayList<ByteBuffer> vertexBuffers = new ArrayList<>(3);
+		ArrayList<int[]> semanticMaterialIds = new ArrayList<>(3);
+		ArrayList<byte[]> semanticVariantStates = new ArrayList<>(3);
+		ArrayList<long[]> semanticVariantPositions = new ArrayList<>(3);
+		ByteBuffer buffer = null;
+		int[] materialIds = null;
+		byte[] variantStates = null;
+		long[] variantPositions = null;
+		for (int directionIndex : directionRenderOrder)
+		{
+			for (BufferQuad quad : quadList[directionIndex])
+			{
+				if (!quadFilter.test(quad))
+				{
+					continue;
+				}
+				if (buffer == null || !buffer.hasRemaining())
+				{
+					buffer = MemoryUtil.memAlloc(LodBufferContainer.FULL_SIZED_BUFFER);
+					vertexBuffers.add(buffer);
+					materialIds = new int[LodBufferContainer.MAX_QUADS_PER_BUFFER];
+					variantStates = new byte[LodBufferContainer.MAX_QUADS_PER_BUFFER];
+					variantPositions = new long[LodBufferContainer.MAX_QUADS_PER_BUFFER];
+					semanticMaterialIds.add(materialIds);
+					semanticVariantStates.add(variantStates);
+					semanticVariantPositions.add(variantPositions);
+				}
+				int quadIndex = buffer.position() / LodBufferContainer.QUADS_BYTE_SIZE;
+				materialIds[quadIndex] = quad.semanticMaterialId;
+				variantStates[quadIndex] = quad.semanticVariantState;
+				variantPositions[quadIndex] = quad.semanticVariantPosition;
+				this.putQuad(buffer, quad);
+			}
+		}
+		for (int index = 0; index < vertexBuffers.size(); index++)
+		{
+			buffer = vertexBuffers.get(index);
+			int quadCount = buffer.position() / LodBufferContainer.QUADS_BYTE_SIZE;
+			buffer.limit(buffer.position());
+			buffer.rewind();
+			semanticMaterialIds.set(index, Arrays.copyOf(semanticMaterialIds.get(index), quadCount));
+			semanticVariantStates.set(index, Arrays.copyOf(semanticVariantStates.get(index), quadCount));
+			semanticVariantPositions.set(index, Arrays.copyOf(semanticVariantPositions.get(index), quadCount));
+		}
+		return new VertexBufferBuild(vertexBuffers, semanticMaterialIds, semanticVariantStates, semanticVariantPositions);
+	}
+
+	/** CPU-owned sidecar; it intentionally contains no GL/Vulkan object. */
+	public record VertexBufferBuild(
+		List<ByteBuffer> vertexBuffers,
+		List<int[]> semanticMaterialIds,
+		List<byte[]> semanticVariantStates,
+		List<long[]> semanticVariantPositions)
+	{
+		public VertexBufferBuild(List<ByteBuffer> vertexBuffers, List<int[]> semanticMaterialIds)
+		{
+			this(vertexBuffers, semanticMaterialIds, List.of(), List.of());
+		}
+
+		public VertexBufferBuild
+		{
+			Objects.requireNonNull(vertexBuffers, "vertexBuffers");
+			Objects.requireNonNull(semanticMaterialIds, "semanticMaterialIds");
+			Objects.requireNonNull(semanticVariantStates, "semanticVariantStates");
+			Objects.requireNonNull(semanticVariantPositions, "semanticVariantPositions");
+			if (!semanticMaterialIds.isEmpty() && vertexBuffers.size() != semanticMaterialIds.size())
+			{
+				throw new IllegalArgumentException("DH semantic material sidecars must align with vertex buffers");
+			}
+			if ((!semanticVariantStates.isEmpty() && vertexBuffers.size() != semanticVariantStates.size())
+				|| (!semanticVariantPositions.isEmpty() && vertexBuffers.size() != semanticVariantPositions.size())
+				|| semanticVariantStates.size() != semanticVariantPositions.size())
+			{
+				throw new IllegalArgumentException("DH semantic variant sidecars must align with vertex buffers");
+			}
+			for (int index = 0; index < semanticMaterialIds.size(); index++)
+			{
+				if (!semanticVariantStates.isEmpty()
+					&& (semanticMaterialIds.get(index).length != semanticVariantStates.get(index).length
+						|| semanticMaterialIds.get(index).length != semanticVariantPositions.get(index).length))
+				{
+					throw new IllegalArgumentException("DH semantic variant records must align one-for-one with material IDs");
+				}
+			}
+		}
+	}
+
+	/**
+	 * Counts IDs from the completed sidecars rather than from source quad
+	 * construction. This is diagnostic-only: it lets the capture harness
+	 * distinguish an identity lost while building the CPU buffers from one lost
+	 * later while retaining a copied column snapshot.
+	 */
+	public static SemanticQuadCoverage semanticQuadCoverage(VertexBufferBuild opaque, VertexBufferBuild transparentSide, VertexBufferBuild transparentUp, VertexBufferBuild transparentWaterUp)
+	{
+		return semanticQuadCoverage(List.of(
+			new SemanticBuildLayer(Objects.requireNonNull(opaque, "opaque"), true),
+			new SemanticBuildLayer(Objects.requireNonNull(transparentSide, "transparentSide"), false),
+			new SemanticBuildLayer(Objects.requireNonNull(transparentUp, "transparentUp"), false),
+			new SemanticBuildLayer(Objects.requireNonNull(transparentWaterUp, "transparentWaterUp"), false)
+		));
+	}
+
+	private static SemanticQuadCoverage semanticQuadCoverage(List<SemanticBuildLayer> layers)
+	{
+		int known = 0;
+		int mixed = 0;
+		int unavailable = 0;
+		int opaqueKnown = 0;
+		int opaqueMixed = 0;
+		int opaqueUnavailable = 0;
+		for (SemanticBuildLayer layer : layers)
+		{
+			for (int[] materialIds : layer.build().semanticMaterialIds())
+			{
+				for (int materialId : materialIds)
+				{
+					if (materialId > ColumnRenderSource.SEMANTIC_MATERIAL_UNAVAILABLE)
+					{
+						known++;
+						if (layer.opaque()) opaqueKnown++;
+					}
+					else if (materialId == ColumnRenderSource.SEMANTIC_MATERIAL_MIXED)
+					{
+						mixed++;
+						if (layer.opaque()) opaqueMixed++;
+					}
+					else
+					{
+						unavailable++;
+						if (layer.opaque()) opaqueUnavailable++;
+					}
+				}
+			}
+		}
+		return new SemanticQuadCoverage(known, mixed, unavailable, opaqueKnown, opaqueMixed, opaqueUnavailable);
+	}
+
+	private record SemanticBuildLayer(VertexBufferBuild build, boolean opaque) { }
+
+	public record SemanticQuadCoverage(
+		int known,
+		int mixed,
+		int unavailable,
+		int opaqueKnown,
+		int opaqueMixed,
+		int opaqueUnavailable
+	)
+	{
+		public SemanticQuadCoverage
+		{
+			if (known < 0 || mixed < 0 || unavailable < 0
+				|| opaqueKnown < 0 || opaqueMixed < 0 || opaqueUnavailable < 0
+				|| opaqueKnown > known || opaqueMixed > mixed || opaqueUnavailable > unavailable)
+			{
+				throw new IllegalArgumentException("Semantic quad coverage cannot be negative");
+			}
+		}
+
+		public SemanticQuadCoverage(int known, int mixed, int unavailable)
+		{
+			this(known, mixed, unavailable, 0, 0, 0);
+		}
+	}
 	private static boolean isWater(BufferQuad quad)
 	{
 		return quad.irisBlockMaterialId == EDhApiBlockMaterial.WATER.index;
@@ -332,7 +666,18 @@ public class LodQuadBuilder
 	private boolean shouldUseTransparentBuffer(int color, byte irisBlockMaterialId)
 	{
 		return this.doTransparency
-			&& (ColorUtil.getAlpha(color) < 255 || irisBlockMaterialId == EDhApiBlockMaterial.WATER.index);
+			&& (ColorUtil.getAlpha(color) < 255 || isTransparentMaterial(irisBlockMaterialId));
+	}
+	/**
+	 * The column builder has already classified these DH material categories as
+	 * transparent. Preserve that semantic classification when the quad stream is
+	 * split; alpha alone is insufficient for foliage because its packed LOD
+	 * color is commonly opaque.
+	 */
+	private static boolean isTransparentMaterial(byte materialId)
+	{
+		return materialId == EDhApiBlockMaterial.WATER.index
+			|| materialId == EDhApiBlockMaterial.LEAVES.index;
 	}
 	private void putQuad(ByteBuffer bb, BufferQuad quad)
 	{

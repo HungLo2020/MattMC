@@ -28,6 +28,8 @@ import org.joml.Matrix4fc;
 import net.vulkanic.VulkanicAPI;
 
 import java.util.Iterator;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * This object tells the {@link LodRenderer} what buffers to render
@@ -44,6 +46,7 @@ public class RenderBufferHandler implements AutoCloseable
 	public final LodQuadTree lodQuadTree;
 	
 	private final SortedArraySet<LodBufferContainer> loadedNearToFarBuffers;
+	private final List<Long> semanticColumnPositionsNearToFar = new ArrayList<>();
 	
 	private int visibleBufferCount;
 	private int culledBufferCount;
@@ -101,6 +104,7 @@ public class RenderBufferHandler implements AutoCloseable
 	{
 		// clear the old list so we can start fresh
 		this.loadedNearToFarBuffers.clear();
+		this.semanticColumnPositionsNearToFar.clear();
 		
 		
 		
@@ -232,15 +236,24 @@ public class RenderBufferHandler implements AutoCloseable
 			
 			try
 			{
-				LodBufferContainer bufferContainer = renderSection.bufferContainer;
-				if (bufferContainer == null)
-				{
-					nullBufferCount++;
-					continue;
-				}
+				// Both the legacy VBO route and the Rust semantic route must honor the
+				// quadtree's live visibility decision before inspecting their backing
+				// representation. Rust-owned columns deliberately have no legacy VBO.
 				if (!renderSection.getRenderingEnabled())
 				{
 					disabledSectionCount++;
+					continue;
+				}
+				LodBufferContainer bufferContainer = renderSection.bufferContainer;
+				if (bufferContainer == null)
+				{
+					if (net.vulkanic.world.DistantHorizonsSemanticCollector.usesRustWholeFrameSemanticBuild()
+						&& net.vulkanic.world.DistantHorizonsSemanticCollector.hasColumn(renderSection.pos))
+					{
+						this.semanticColumnPositionsNearToFar.add(renderSection.pos);
+						continue;
+					}
+					nullBufferCount++;
 					continue;
 				}
 				
@@ -261,6 +274,7 @@ public class RenderBufferHandler implements AutoCloseable
 		{
 			this.visibleBufferCount = this.loadedNearToFarBuffers.size();
 		}
+		this.semanticColumnPositionsNearToFar.sort(this::sortSemanticColumnPositionsNearToFar);
 		if (VulkanicAPI.isShaderInputParityTracingEnabled())
 		{
 			VulkanicAPI.traceShaderInputParityOrdering(
@@ -285,6 +299,18 @@ public class RenderBufferHandler implements AutoCloseable
 	//================//
 	
 	public SortedArraySet<LodBufferContainer> getColumnRenderBuffers() { return this.loadedNearToFarBuffers; }
+
+	/** Real DH quadtree/frustum visibility, expressed only as copied CPU column
+	 * identities for the Rust whole-frame route. */
+	public List<Long> getSemanticColumnRenderPositions() { return List.copyOf(this.semanticColumnPositionsNearToFar); }
+
+	private int sortSemanticColumnPositionsNearToFar(long columnA, long columnB)
+	{
+		Pos2D aPos = DhSectionPos.getCenterBlockPos(columnA).toPos2D();
+		Pos2D bPos = DhSectionPos.getCenterBlockPos(columnB).toPos2D();
+		Pos2D centerPos = this.lodQuadTree.getCenterBlockPos().toPos2D();
+		return aPos.manhattanDist(centerPos) - bPos.manhattanDist(centerPos);
+	}
 	
 	
 	

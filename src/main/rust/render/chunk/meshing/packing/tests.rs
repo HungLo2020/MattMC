@@ -81,6 +81,45 @@ fn compact_encoder_writes_expected_base_words() {
 }
 
 #[test]
+fn compact_encoder_preserves_top_origin_atlas_v_coordinates() {
+    // This intentionally uses an asymmetric atlas row. A global `1.0 - v`
+    // conversion still produces valid packed coordinates but samples an
+    // unrelated sprite row from the copied Minecraft atlas.
+    let mut input = quad();
+    input.vertices[0].u = 0.453_125;
+    input.vertices[1].u = 0.460_938;
+    input.vertices[2].u = 0.460_938;
+    input.vertices[3].u = 0.453_125;
+    input.vertices[0].v = 0.710_938;
+    input.vertices[1].v = 0.710_938;
+    input.vertices[2].v = 0.718_750;
+    input.vertices[3].v = 0.718_750;
+    let expected_v = [
+        input.vertices[0].v,
+        input.vertices[1].v,
+        input.vertices[2].v,
+        input.vertices[3].v,
+    ];
+    let mut output = vec![0u8; 4 * COMPACT_VERTEX_STRIDE as usize];
+
+    encode_compact_quad_vertices(&input.vertices, input.material_bits, 3, &mut output);
+
+    for (vertex, expected_v) in expected_v.into_iter().enumerate() {
+        let offset = vertex * COMPACT_VERTEX_STRIDE as usize + 12;
+        let packed = i32::from_ne_bytes(output[offset..offset + 4].try_into().unwrap()) as u32;
+        let decoded_v = ((packed >> 16) & 0x7fff) as f32 / TEXTURE_MAX_VALUE;
+        assert!(
+            (decoded_v - expected_v).abs() <= 2.0 / TEXTURE_MAX_VALUE,
+            "vertex {vertex} V coordinate changed during compact packing: expected {expected_v}, got {decoded_v}"
+        );
+        assert!(
+            (decoded_v - (1.0 - expected_v)).abs() > 0.2,
+            "vertex {vertex} was vertically mirrored while packing the copied atlas"
+        );
+    }
+}
+
+#[test]
 fn block_id_pack_matches_java_wrapping_int_arithmetic() {
     let mut input = quad();
     input.block_id = i32::MAX;

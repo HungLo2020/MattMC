@@ -20,9 +20,20 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public final class VulkanicGalBridge implements AutoCloseable {
-	public static final int ABI_VERSION = 11;
+	/** Texture bytes already use VulkanicGAL's sampler-row convention. */
+	public static final int WORLD_MESH_TEXTURE_COORDINATE_ORIGIN_VULKANIC = 0;
+	/** PNG rows use Minecraft model UVs, whose V origin is the image top edge. */
+	public static final int WORLD_MESH_TEXTURE_COORDINATE_ORIGIN_MINECRAFT_TOP_LEFT = 1;
+	private static final boolean TRACE_WORLD_MATERIAL_FRAME =
+		Boolean.getBoolean("mattmc.dev.graphicsAuditMaterialFrameTrace");
+	private static final int TRACE_WORLD_MATERIAL_FRAME_MAX_LOGS =
+		Integer.getInteger("mattmc.dev.graphicsAuditMaterialFrameTrace.maxLogs", 4);
+	private static final AtomicInteger WORLD_MATERIAL_FRAME_TRACE_LOGS = new AtomicInteger();
+
+	public static final int ABI_VERSION = 23;
 	public static final int STATUS_OK = 0;
 
 	public static final int BACKEND_VULKAN = 1;
@@ -433,7 +444,34 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		int guiHeight,
 		List<GuiSpriteRecord> sprites
 	) {
+		return submitGuiFrame(generation, frameId, frameTarget, guiWidth, guiHeight, sprites, List.of(), List.of());
+	}
+
+	public GuiFrameSubmitResult submitGuiFrame(
+		long generation,
+		long frameId,
+		long frameTarget,
+		int guiWidth,
+		int guiHeight,
+		List<GuiSpriteRecord> sprites,
+		List<GuiAffineQuadRecord> affineQuads
+	) {
+		return submitGuiFrame(generation, frameId, frameTarget, guiWidth, guiHeight, sprites, affineQuads, List.of());
+	}
+
+	public GuiFrameSubmitResult submitGuiFrame(
+		long generation,
+		long frameId,
+		long frameTarget,
+		int guiWidth,
+		int guiHeight,
+		List<GuiSpriteRecord> sprites,
+		List<GuiAffineQuadRecord> affineQuads,
+		List<GuiMeshBatchRecord> meshBatches
+	) {
 		Objects.requireNonNull(sprites, "sprites");
+		Objects.requireNonNull(affineQuads, "affineQuads");
+		Objects.requireNonNull(meshBatches, "meshBatches");
 		MemorySegment spriteArray = Struct.GUI_SPRITE_REQUEST.array(arena, sprites.size());
 		for (int i = 0; i < sprites.size(); i++) {
 			GuiSpriteRecord sprite = sprites.get(i);
@@ -451,7 +489,10 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			Struct.GUI_SPRITE_REQUEST.setInt(item, 10, sprite.height());
 			Struct.GUI_SPRITE_REQUEST.setInt(item, 11, sprite.guiWidth());
 			Struct.GUI_SPRITE_REQUEST.setInt(item, 12, sprite.guiHeight());
+			Struct.GUI_SPRITE_REQUEST.setLong(item, 13, sprite.sequence());
 		}
+		MemorySegment affineQuadArray = encodeGuiAffineQuads(affineQuads);
+		MemorySegment meshBatchArray = encodeGuiMeshBatches(meshBatches);
 		MemorySegment request = Struct.GUI_FRAME_SUBMIT.allocate(arena);
 		Abi.writeHeader(request, Struct.GUI_FRAME_SUBMIT);
 		Struct.GUI_FRAME_SUBMIT.setLong(request, 1, generation);
@@ -460,7 +501,9 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		Struct.GUI_FRAME_SUBMIT.setInt(request, 4, guiWidth);
 		Struct.GUI_FRAME_SUBMIT.setInt(request, 5, guiHeight);
 		Abi.writeSlice(request, Struct.GUI_FRAME_SUBMIT, 6, spriteArray, sprites.size());
-		Struct.GUI_FRAME_SUBMIT.setLong(request, 7, negotiatedFeatures);
+		Abi.writeSlice(request, Struct.GUI_FRAME_SUBMIT, 7, affineQuadArray, affineQuads.size());
+		Struct.GUI_FRAME_SUBMIT.setLong(request, 8, negotiatedFeatures);
+		Abi.writeSlice(request, Struct.GUI_FRAME_SUBMIT, 9, meshBatchArray, meshBatches.size());
 		MemorySegment result = Struct.GUI_FRAME_SUBMIT_RESULT.allocate(arena);
 		checkStatus(Native.guiSubmitFrame(contextId, request, result), "GUI frame submission");
 		long metricsOffset = Struct.GUI_FRAME_SUBMIT_RESULT.offset(11);
@@ -480,6 +523,81 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			ffiInputBytes,
 			metrics
 		);
+	}
+
+	private MemorySegment encodeGuiMeshBatches(List<GuiMeshBatchRecord> batches) {
+		MemorySegment batchArray = Struct.GUI_MESH_BATCH_REQUEST.array(arena, batches.size());
+		for (int i = 0; i < batches.size(); i++) {
+			GuiMeshBatchRecord batch = batches.get(i);
+			MemorySegment vertices = Struct.GUI_MESH_VERTEX.array(arena, batch.vertices().size());
+			for (int vertexIndex = 0; vertexIndex < batch.vertices().size(); vertexIndex++) {
+				GuiMeshVertexRecord vertex = batch.vertices().get(vertexIndex);
+				MemorySegment item = Abi.item(vertices, Struct.GUI_MESH_VERTEX, vertexIndex);
+				for (int component = 0; component < 3; component++) item.set(ValueLayout.JAVA_FLOAT, Struct.GUI_MESH_VERTEX.offset(0) + component * 4L, vertex.position()[component]);
+				for (int component = 0; component < 2; component++) item.set(ValueLayout.JAVA_FLOAT, Struct.GUI_MESH_VERTEX.offset(1) + component * 4L, vertex.atlasUv()[component]);
+				for (int component = 0; component < 2; component++) item.set(ValueLayout.JAVA_FLOAT, Struct.GUI_MESH_VERTEX.offset(2) + component * 4L, vertex.localUv()[component]);
+				Struct.GUI_MESH_VERTEX.setInt(item, 3, vertex.colorArgb());
+				Struct.GUI_MESH_VERTEX.setInt(item, 4, vertex.normalPacked());
+			}
+			MemorySegment indices = arena.allocate((long)batch.indices().size() * Integer.BYTES, Integer.BYTES);
+			for (int index = 0; index < batch.indices().size(); index++) indices.setAtIndex(ValueLayout.JAVA_INT, index, batch.indices().get(index));
+			MemorySegment item = Abi.item(batchArray, Struct.GUI_MESH_BATCH_REQUEST, i);
+			Struct.GUI_MESH_BATCH_REQUEST.setInt(item, 0, Struct.GUI_MESH_BATCH_REQUEST.byteSize());
+			Struct.GUI_MESH_BATCH_REQUEST.setInt(item, 1, batch.stratum());
+			Struct.GUI_MESH_BATCH_REQUEST.setInt(item, 2, batch.layerIndex());
+			Struct.GUI_MESH_BATCH_REQUEST.setInt(item, 3, batch.materialMode());
+			Struct.GUI_MESH_BATCH_REQUEST.setInt(item, 4, batch.lightingMode());
+			Struct.GUI_MESH_BATCH_REQUEST.setLong(item, 5, batch.assetId());
+			Struct.GUI_MESH_BATCH_REQUEST.setLong(item, 6, batch.sequence());
+			Struct.GUI_MESH_BATCH_REQUEST.setFloat(item, 7, batch.alphaCutoff());
+			Struct.GUI_MESH_BATCH_REQUEST.setInt(item, 8, 0);
+			for (int component = 0; component < 16; component++) item.set(ValueLayout.JAVA_FLOAT, Struct.GUI_MESH_BATCH_REQUEST.offset(9) + component * 4L, batch.modelTransform()[component]);
+			for (int component = 0; component < 6; component++) item.set(ValueLayout.JAVA_FLOAT, Struct.GUI_MESH_BATCH_REQUEST.offset(10) + component * 4L, batch.guiPose()[component]);
+			Struct.GUI_MESH_BATCH_REQUEST.setInt(item, 11, batch.left());
+			Struct.GUI_MESH_BATCH_REQUEST.setInt(item, 12, batch.top());
+			Struct.GUI_MESH_BATCH_REQUEST.setInt(item, 13, batch.right());
+			Struct.GUI_MESH_BATCH_REQUEST.setInt(item, 14, batch.bottom());
+			Struct.GUI_MESH_BATCH_REQUEST.setInt(item, 15, batch.guiWidth());
+			Struct.GUI_MESH_BATCH_REQUEST.setInt(item, 16, batch.guiHeight());
+			Struct.GUI_MESH_BATCH_REQUEST.setInt(item, 17, batch.renderWidth());
+			Struct.GUI_MESH_BATCH_REQUEST.setInt(item, 18, batch.renderHeight());
+			Struct.GUI_MESH_BATCH_REQUEST.setInt(item, 19, batch.guardPixels());
+			Abi.writeSlice(item, Struct.GUI_MESH_BATCH_REQUEST, 20, vertices, batch.vertices().size());
+			Abi.writeSlice(item, Struct.GUI_MESH_BATCH_REQUEST, 21, indices, batch.indices().size());
+		}
+		return batchArray;
+	}
+
+	private MemorySegment encodeGuiAffineQuads(List<GuiAffineQuadRecord> affineQuads) {
+		MemorySegment affineQuadArray = Struct.GUI_AFFINE_QUAD_REQUEST.array(arena, affineQuads.size());
+		for (int i = 0; i < affineQuads.size(); i++) {
+			GuiAffineQuadRecord quad = affineQuads.get(i);
+			MemorySegment item = Abi.item(affineQuadArray, Struct.GUI_AFFINE_QUAD_REQUEST, i);
+			item.set(ValueLayout.JAVA_INT, Struct.GUI_AFFINE_QUAD_REQUEST.offset(0), Struct.GUI_AFFINE_QUAD_REQUEST.byteSize());
+			Struct.GUI_AFFINE_QUAD_REQUEST.setInt(item, 1, quad.stratum());
+			Struct.GUI_AFFINE_QUAD_REQUEST.setLong(item, 2, quad.assetId());
+			Struct.GUI_AFFINE_QUAD_REQUEST.setFloat(item, 3, quad.x0());
+			Struct.GUI_AFFINE_QUAD_REQUEST.setFloat(item, 4, quad.y0());
+			Struct.GUI_AFFINE_QUAD_REQUEST.setFloat(item, 5, quad.x1());
+			Struct.GUI_AFFINE_QUAD_REQUEST.setFloat(item, 6, quad.y1());
+			Struct.GUI_AFFINE_QUAD_REQUEST.setFloat(item, 7, quad.x3());
+			Struct.GUI_AFFINE_QUAD_REQUEST.setFloat(item, 8, quad.y3());
+			Struct.GUI_AFFINE_QUAD_REQUEST.setFloat(item, 9, quad.z());
+			Struct.GUI_AFFINE_QUAD_REQUEST.setFloat(item, 10, quad.u0());
+			Struct.GUI_AFFINE_QUAD_REQUEST.setFloat(item, 11, quad.v0());
+			Struct.GUI_AFFINE_QUAD_REQUEST.setFloat(item, 12, quad.u1());
+			Struct.GUI_AFFINE_QUAD_REQUEST.setFloat(item, 13, quad.v1());
+			Struct.GUI_AFFINE_QUAD_REQUEST.setInt(item, 14, quad.colorArgb());
+			Struct.GUI_AFFINE_QUAD_REQUEST.setInt(item, 15, quad.guiWidth());
+			Struct.GUI_AFFINE_QUAD_REQUEST.setInt(item, 16, quad.guiHeight());
+			Struct.GUI_AFFINE_QUAD_REQUEST.setLong(item, 17, quad.sequence());
+			Struct.GUI_AFFINE_QUAD_REQUEST.setInt(item, 18, quad.clipMode());
+			Struct.GUI_AFFINE_QUAD_REQUEST.setInt(item, 19, quad.clipLeft());
+			Struct.GUI_AFFINE_QUAD_REQUEST.setInt(item, 20, quad.clipTop());
+			Struct.GUI_AFFINE_QUAD_REQUEST.setInt(item, 21, quad.clipWidth());
+			Struct.GUI_AFFINE_QUAD_REQUEST.setInt(item, 22, quad.clipHeight());
+		}
+		return affineQuadArray;
 	}
 
 	public WholeFrameSubmitResult submitWholeFrame(
@@ -664,6 +782,38 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		WorldShaderEnvironmentFrameRecord shaderEnvironmentFrame,
 		List<GuiSpriteRecord> guiSprites
 	) {
+		return submitWholeFrame(
+			generation, frameId, correlationId, frameTarget, guiWidth, guiHeight, viewportWidth, viewportHeight,
+			viewMatrix, projectionMatrix, worldBackground, worldSegments, worldCrackQuads, worldBorderQuads,
+			worldMaterialQuads, worldMeshInstances, voxelVolumeFrame, shaderEnvironmentFrame, List.of(),
+			WorldLodRenderFrameRecord.disabled(), WorldFeatureCoverageRecord.empty(), guiSprites
+		);
+	}
+
+	public WholeFrameSubmitResult submitWholeFrame(
+		long generation,
+		long frameId,
+		long correlationId,
+		long frameTarget,
+		int guiWidth,
+		int guiHeight,
+		int viewportWidth,
+		int viewportHeight,
+		float[] viewMatrix,
+		float[] projectionMatrix,
+		WorldBackgroundRecord worldBackground,
+		List<WorldLineSegmentRecord> worldSegments,
+		List<WorldCrackQuadRecord> worldCrackQuads,
+		List<WorldBorderQuadRecord> worldBorderQuads,
+		List<WorldMaterialQuadRecord> worldMaterialQuads,
+		List<WorldMeshInstanceRecord> worldMeshInstances,
+		WorldVoxelVolumeFrameRecord voxelVolumeFrame,
+		WorldShaderEnvironmentFrameRecord shaderEnvironmentFrame,
+		List<WorldLodColumnInstanceRecord> worldLodInstances,
+		WorldLodRenderFrameRecord worldLodRenderFrame,
+		WorldFeatureCoverageRecord worldFeatureCoverage,
+		List<GuiSpriteRecord> guiSprites
+	) {
 		return submitWorldFrame(
 			generation,
 			frameId,
@@ -683,7 +833,15 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			worldMeshInstances,
 			voxelVolumeFrame,
 			shaderEnvironmentFrame,
+			worldLodInstances,
+			worldLodRenderFrame,
+			worldFeatureCoverage,
 			guiSprites,
+			List.of(),
+			List.of(),
+			List.of(),
+			WorldFirstPersonFrameRecord.disabled(),
+			List.of(),
 			true
 		);
 	}
@@ -751,6 +909,14 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			WorldVoxelVolumeFrameRecord.disabled(),
 			WorldShaderEnvironmentFrameRecord.disabled(),
 			List.of(),
+			WorldLodRenderFrameRecord.disabled(),
+			WorldFeatureCoverageRecord.empty(),
+			List.of(),
+			List.of(),
+			List.of(),
+			List.of(),
+			WorldFirstPersonFrameRecord.disabled(),
+			List.of(),
 			false
 		);
 	}
@@ -790,7 +956,133 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			WorldVoxelVolumeFrameRecord.disabled(),
 			WorldShaderEnvironmentFrameRecord.disabled(),
 			List.of(),
+			WorldLodRenderFrameRecord.disabled(),
+			WorldFeatureCoverageRecord.empty(),
+			List.of(),
+			List.of(),
+			List.of(),
+			List.of(),
+			WorldFirstPersonFrameRecord.disabled(),
+			List.of(),
 			false
+		);
+	}
+
+	public WholeFrameSubmitResult submitWholeFrameWithAffineGui(
+		long generation,
+		long frameId,
+		long correlationId,
+		long frameTarget,
+		int guiWidth,
+		int guiHeight,
+		int viewportWidth,
+		int viewportHeight,
+		float[] viewMatrix,
+		float[] projectionMatrix,
+		WorldBackgroundRecord worldBackground,
+		List<WorldLineSegmentRecord> worldSegments,
+		List<WorldCrackQuadRecord> worldCrackQuads,
+		List<WorldBorderQuadRecord> worldBorderQuads,
+		List<WorldMaterialQuadRecord> worldMaterialQuads,
+		List<WorldMeshInstanceRecord> worldMeshInstances,
+		WorldVoxelVolumeFrameRecord voxelVolumeFrame,
+		WorldShaderEnvironmentFrameRecord shaderEnvironmentFrame,
+		List<WorldLodColumnInstanceRecord> worldLodInstances,
+		WorldLodRenderFrameRecord worldLodRenderFrame,
+			WorldFeatureCoverageRecord worldFeatureCoverage,
+			List<GuiSpriteRecord> guiSprites,
+			List<GuiAffineQuadRecord> guiAffineQuads
+	) {
+		return submitWholeFrameWithAffineGuiAndWorldText(
+			generation, frameId, correlationId, frameTarget, guiWidth, guiHeight, viewportWidth, viewportHeight,
+			viewMatrix, projectionMatrix, worldBackground, worldSegments, worldCrackQuads, worldBorderQuads,
+			worldMaterialQuads, worldMeshInstances, voxelVolumeFrame, shaderEnvironmentFrame, worldLodInstances,
+			worldLodRenderFrame, worldFeatureCoverage, guiSprites, guiAffineQuads, List.of(), List.of()
+		);
+	}
+
+	/**
+	 * Submits shared semantic world text alongside the combined frame. This is
+	 * intentionally separate from route selection: callers may only send it
+	 * once the Rust-owned world-text resource and pass contracts are admitted.
+	 */
+	public WholeFrameSubmitResult submitWholeFrameWithAffineGuiAndWorldText(
+		long generation,
+		long frameId,
+		long correlationId,
+		long frameTarget,
+		int guiWidth,
+		int guiHeight,
+		int viewportWidth,
+		int viewportHeight,
+		float[] viewMatrix,
+		float[] projectionMatrix,
+		WorldBackgroundRecord worldBackground,
+		List<WorldLineSegmentRecord> worldSegments,
+		List<WorldCrackQuadRecord> worldCrackQuads,
+		List<WorldBorderQuadRecord> worldBorderQuads,
+		List<WorldMaterialQuadRecord> worldMaterialQuads,
+		List<WorldMeshInstanceRecord> worldMeshInstances,
+		WorldVoxelVolumeFrameRecord voxelVolumeFrame,
+		WorldShaderEnvironmentFrameRecord shaderEnvironmentFrame,
+		List<WorldLodColumnInstanceRecord> worldLodInstances,
+		WorldLodRenderFrameRecord worldLodRenderFrame,
+		WorldFeatureCoverageRecord worldFeatureCoverage,
+		List<GuiSpriteRecord> guiSprites,
+		List<GuiAffineQuadRecord> guiAffineQuads,
+		List<GuiMeshBatchRecord> guiMeshBatches,
+		List<WorldTextQuadRecord> worldTextQuads
+	) {
+		return submitWholeFrameWithAffineGuiAndWorldTextAndFirstPerson(
+			generation, frameId, correlationId, frameTarget, guiWidth, guiHeight, viewportWidth, viewportHeight,
+			viewMatrix, projectionMatrix, worldBackground, worldSegments, worldCrackQuads, worldBorderQuads,
+			worldMaterialQuads, worldMeshInstances, voxelVolumeFrame, shaderEnvironmentFrame, worldLodInstances,
+			worldLodRenderFrame, worldFeatureCoverage, guiSprites, guiAffineQuads, guiMeshBatches, worldTextQuads,
+			WorldFirstPersonFrameRecord.disabled(), List.of()
+		);
+	}
+
+	/**
+	 * Combined-frame transport for the future Rust-owned first-person pass.
+	 * The record is semantic only: no Java renderer, Iris object, or native
+	 * resource can enter this method. Existing callers delegate with explicit
+	 * zero work until extraction and Rust execution are selected together.
+	 */
+	public WholeFrameSubmitResult submitWholeFrameWithAffineGuiAndWorldTextAndFirstPerson(
+		long generation,
+		long frameId,
+		long correlationId,
+		long frameTarget,
+		int guiWidth,
+		int guiHeight,
+		int viewportWidth,
+		int viewportHeight,
+		float[] viewMatrix,
+		float[] projectionMatrix,
+		WorldBackgroundRecord worldBackground,
+		List<WorldLineSegmentRecord> worldSegments,
+		List<WorldCrackQuadRecord> worldCrackQuads,
+		List<WorldBorderQuadRecord> worldBorderQuads,
+		List<WorldMaterialQuadRecord> worldMaterialQuads,
+		List<WorldMeshInstanceRecord> worldMeshInstances,
+		WorldVoxelVolumeFrameRecord voxelVolumeFrame,
+		WorldShaderEnvironmentFrameRecord shaderEnvironmentFrame,
+		List<WorldLodColumnInstanceRecord> worldLodInstances,
+		WorldLodRenderFrameRecord worldLodRenderFrame,
+		WorldFeatureCoverageRecord worldFeatureCoverage,
+		List<GuiSpriteRecord> guiSprites,
+		List<GuiAffineQuadRecord> guiAffineQuads,
+		List<GuiMeshBatchRecord> guiMeshBatches,
+		List<WorldTextQuadRecord> worldTextQuads,
+		WorldFirstPersonFrameRecord firstPersonFrame,
+		List<WorldMeshInstanceRecord> firstPersonMeshInstances
+	) {
+		return submitWorldFrame(
+			generation, frameId, correlationId, frameTarget, guiWidth, guiHeight, viewportWidth, viewportHeight,
+			viewMatrix, projectionMatrix, worldBackground, worldSegments, worldCrackQuads, worldBorderQuads,
+			worldMaterialQuads, worldMeshInstances, voxelVolumeFrame, shaderEnvironmentFrame, worldLodInstances,
+			worldLodRenderFrame, worldFeatureCoverage, guiSprites, guiAffineQuads, guiMeshBatches, worldTextQuads,
+			firstPersonFrame, firstPersonMeshInstances, true
 		);
 	}
 
@@ -813,7 +1105,15 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		List<WorldMeshInstanceRecord> worldMeshInstances,
 		WorldVoxelVolumeFrameRecord voxelVolumeFrame,
 		WorldShaderEnvironmentFrameRecord shaderEnvironmentFrame,
+		List<WorldLodColumnInstanceRecord> worldLodInstances,
+		WorldLodRenderFrameRecord worldLodRenderFrame,
+		WorldFeatureCoverageRecord worldFeatureCoverage,
 		List<GuiSpriteRecord> guiSprites,
+		List<GuiAffineQuadRecord> guiAffineQuads,
+		List<GuiMeshBatchRecord> guiMeshBatches,
+		List<WorldTextQuadRecord> worldTextQuads,
+		WorldFirstPersonFrameRecord firstPersonFrame,
+		List<WorldMeshInstanceRecord> firstPersonMeshInstances,
 		boolean wholeFrame
 	) {
 		Objects.requireNonNull(viewMatrix, "viewMatrix");
@@ -826,7 +1126,15 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		Objects.requireNonNull(worldMeshInstances, "worldMeshInstances");
 		Objects.requireNonNull(voxelVolumeFrame, "voxelVolumeFrame");
 		Objects.requireNonNull(shaderEnvironmentFrame, "shaderEnvironmentFrame");
+		Objects.requireNonNull(worldLodInstances, "worldLodInstances");
+		Objects.requireNonNull(worldLodRenderFrame, "worldLodRenderFrame");
+		Objects.requireNonNull(worldFeatureCoverage, "worldFeatureCoverage");
 		Objects.requireNonNull(guiSprites, "guiSprites");
+		Objects.requireNonNull(guiAffineQuads, "guiAffineQuads");
+		Objects.requireNonNull(guiMeshBatches, "guiMeshBatches");
+		Objects.requireNonNull(worldTextQuads, "worldTextQuads");
+		Objects.requireNonNull(firstPersonFrame, "firstPersonFrame");
+		Objects.requireNonNull(firstPersonMeshInstances, "firstPersonMeshInstances");
 		if (viewMatrix.length != 16 || projectionMatrix.length != 16) {
 			throw new IllegalArgumentException("whole-frame matrices must contain 16 floats");
 		}
@@ -896,11 +1204,56 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			Struct.WORLD_BORDER_QUAD_REQUEST.setInt(item, 28, quad.viewportWidth());
 			Struct.WORLD_BORDER_QUAD_REQUEST.setInt(item, 29, quad.viewportHeight());
 		}
-		MemorySegment materialArray = MemorySegment.NULL;
+		List<WorldMaterialQuadRecord> vertexModulatedMaterialQuads = new ArrayList<>();
+		List<WorldMaterialQuadRecord> compactMaterialQuads = new ArrayList<>(worldMaterialQuads.size());
+		for (WorldMaterialQuadRecord quad : worldMaterialQuads) {
+			if (quad.hasVertexModulation()) {
+				vertexModulatedMaterialQuads.add(quad);
+			} else {
+				compactMaterialQuads.add(quad);
+			}
+		}
+		MemorySegment materialArray = Struct.WORLD_MATERIAL_QUAD_REQUEST.array(arena, vertexModulatedMaterialQuads.size());
+		for (int i = 0; i < vertexModulatedMaterialQuads.size(); i++) {
+			WorldMaterialQuadRecord quad = vertexModulatedMaterialQuads.get(i);
+			MemorySegment item = Abi.item(materialArray, Struct.WORLD_MATERIAL_QUAD_REQUEST, i);
+			item.set(ValueLayout.JAVA_INT, Struct.WORLD_MATERIAL_QUAD_REQUEST.offset(0), Struct.WORLD_MATERIAL_QUAD_REQUEST.byteSize());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 1, quad.stratum());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 2, quad.materialId());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 3, quad.textureId());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 4, quad.materialMode());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 5, quad.depthPolicy());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 6, quad.cullPolicy());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 7, quad.topology());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 8, quad.colorArgb());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 9, quad.winding());
+			float[] positions = {quad.p0X(), quad.p0Y(), quad.p0Z(), quad.p1X(), quad.p1Y(), quad.p1Z(), quad.p2X(), quad.p2Y(), quad.p2Z(), quad.p3X(), quad.p3Y(), quad.p3Z()};
+			for (int field = 0; field < positions.length; field++) {
+				Struct.WORLD_MATERIAL_QUAD_REQUEST.setFloat(item, 10 + field, positions[field]);
+			}
+			float[] uvs = {quad.uv0U(), quad.uv0V(), quad.uv1U(), quad.uv1V(), quad.uv2U(), quad.uv2V(), quad.uv3U(), quad.uv3V()};
+			for (int field = 0; field < uvs.length; field++) {
+				Struct.WORLD_MATERIAL_QUAD_REQUEST.setFloat(item, 22 + field, uvs[field]);
+			}
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 30, quad.viewportWidth());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 31, quad.viewportHeight());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 32, quad.sourceProgram());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 33, quad.sourceColorArgb());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 34, quad.packedLight());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 35, quad.sourceUvSpace());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 36, quad.vertex0ColorArgb());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 37, quad.vertex1ColorArgb());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 38, quad.vertex2ColorArgb());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 39, quad.vertex3ColorArgb());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 40, quad.vertex0PackedLight());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 41, quad.vertex1PackedLight());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 42, quad.vertex2PackedLight());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 43, quad.vertex3PackedLight());
+		}
 		LinkedHashMap<WorldMaterialKeyRecord, Integer> materialTable = new LinkedHashMap<>();
-		int[] materialIndexes = new int[worldMaterialQuads.size()];
-		for (int i = 0; i < worldMaterialQuads.size(); i++) {
-			WorldMaterialQuadRecord quad = worldMaterialQuads.get(i);
+		int[] materialIndexes = new int[compactMaterialQuads.size()];
+		for (int i = 0; i < compactMaterialQuads.size(); i++) {
+			WorldMaterialQuadRecord quad = compactMaterialQuads.get(i);
 			WorldMaterialKeyRecord key = WorldMaterialKeyRecord.from(quad);
 			Integer index = materialTable.get(key);
 			if (index == null) {
@@ -923,16 +1276,17 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			Struct.WORLD_MATERIAL_TABLE_RECORD.setInt(item, 6, key.cullPolicy());
 			Struct.WORLD_MATERIAL_TABLE_RECORD.setInt(item, 7, key.topology());
 			Struct.WORLD_MATERIAL_TABLE_RECORD.setInt(item, 8, key.winding());
-			Struct.WORLD_MATERIAL_TABLE_RECORD.setInt(item, 9, 0);
+			Struct.WORLD_MATERIAL_TABLE_RECORD.setInt(item, 9, key.sourceProgram());
 		}
-		MemorySegment compactMaterialArray = Struct.WORLD_MATERIAL_COMPACT_QUAD_REQUEST.array(arena, worldMaterialQuads.size());
-		for (int i = 0; i < worldMaterialQuads.size(); i++) {
-			WorldMaterialQuadRecord quad = worldMaterialQuads.get(i);
+		traceWorldMaterialFrame(frameId, worldMaterialQuads.size(), materialTable);
+		MemorySegment compactMaterialArray = Struct.WORLD_MATERIAL_COMPACT_QUAD_REQUEST.array(arena, compactMaterialQuads.size());
+		for (int i = 0; i < compactMaterialQuads.size(); i++) {
+			WorldMaterialQuadRecord quad = compactMaterialQuads.get(i);
 			MemorySegment item = Abi.item(compactMaterialArray, Struct.WORLD_MATERIAL_COMPACT_QUAD_REQUEST, i);
 			item.set(ValueLayout.JAVA_INT, Struct.WORLD_MATERIAL_COMPACT_QUAD_REQUEST.offset(0), Struct.WORLD_MATERIAL_COMPACT_QUAD_REQUEST.byteSize());
 			Struct.WORLD_MATERIAL_COMPACT_QUAD_REQUEST.setInt(item, 1, materialIndexes[i]);
 			Struct.WORLD_MATERIAL_COMPACT_QUAD_REQUEST.setInt(item, 2, quad.colorArgb());
-			Struct.WORLD_MATERIAL_COMPACT_QUAD_REQUEST.setInt(item, 3, 0);
+			Struct.WORLD_MATERIAL_COMPACT_QUAD_REQUEST.setInt(item, 3, quad.sourceUvSpace());
 			Struct.WORLD_MATERIAL_COMPACT_QUAD_REQUEST.setFloat(item, 4, quad.p0X());
 			Struct.WORLD_MATERIAL_COMPACT_QUAD_REQUEST.setFloat(item, 5, quad.p0Y());
 			Struct.WORLD_MATERIAL_COMPACT_QUAD_REQUEST.setFloat(item, 6, quad.p0Z());
@@ -953,6 +1307,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			Struct.WORLD_MATERIAL_COMPACT_QUAD_REQUEST.setFloat(item, 21, quad.uv2V());
 			Struct.WORLD_MATERIAL_COMPACT_QUAD_REQUEST.setFloat(item, 22, quad.uv3U());
 			Struct.WORLD_MATERIAL_COMPACT_QUAD_REQUEST.setFloat(item, 23, quad.uv3V());
+			Struct.WORLD_MATERIAL_COMPACT_QUAD_REQUEST.setInt(item, 24, quad.sourceColorArgb());
+			Struct.WORLD_MATERIAL_COMPACT_QUAD_REQUEST.setInt(item, 25, quad.packedLight());
 		}
 		MemorySegment meshInstanceArray = Struct.WORLD_MESH_INSTANCE_RECORD.array(arena, worldMeshInstances.size());
 		for (int i = 0; i < worldMeshInstances.size(); i++) {
@@ -969,11 +1325,74 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			Struct.WORLD_MESH_INSTANCE_RECORD.setInt(item, 8, instance.viewportHeight());
 			Struct.WORLD_MESH_INSTANCE_RECORD.setLong(item, 9, instance.meshKey());
 			Struct.WORLD_MESH_INSTANCE_RECORD.setLong(item, 10, instance.meshGeneration());
-			long transformOffset = Struct.WORLD_MESH_INSTANCE_RECORD.offset(11);
+			Struct.WORLD_MESH_INSTANCE_RECORD.setInt(item, 11, instance.entityId());
+			Struct.WORLD_MESH_INSTANCE_RECORD.setInt(item, 12, instance.entityColorArgb());
+			long transformOffset = Struct.WORLD_MESH_INSTANCE_RECORD.offset(13);
 			float[] transform = instance.transform();
 			for (int field = 0; field < 16; field++) {
 				item.set(ValueLayout.JAVA_FLOAT, transformOffset + field * 4L, transform[field]);
 			}
+		}
+		MemorySegment firstPersonMeshInstanceArray = Struct.WORLD_MESH_INSTANCE_RECORD.array(arena, firstPersonMeshInstances.size());
+		for (int i = 0; i < firstPersonMeshInstances.size(); i++) {
+			WorldMeshInstanceRecord instance = firstPersonMeshInstances.get(i);
+			MemorySegment item = Abi.item(firstPersonMeshInstanceArray, Struct.WORLD_MESH_INSTANCE_RECORD, i);
+			item.set(ValueLayout.JAVA_INT, Struct.WORLD_MESH_INSTANCE_RECORD.offset(0), Struct.WORLD_MESH_INSTANCE_RECORD.byteSize());
+			Struct.WORLD_MESH_INSTANCE_RECORD.setInt(item, 1, instance.stratum());
+			Struct.WORLD_MESH_INSTANCE_RECORD.setInt(item, 2, instance.meshSectionIndex());
+			Struct.WORLD_MESH_INSTANCE_RECORD.setInt(item, 3, instance.depthPolicy());
+			Struct.WORLD_MESH_INSTANCE_RECORD.setInt(item, 4, instance.cullPolicy());
+			Struct.WORLD_MESH_INSTANCE_RECORD.setInt(item, 5, instance.winding());
+			Struct.WORLD_MESH_INSTANCE_RECORD.setInt(item, 6, instance.colorArgb());
+			Struct.WORLD_MESH_INSTANCE_RECORD.setInt(item, 7, instance.viewportWidth());
+			Struct.WORLD_MESH_INSTANCE_RECORD.setInt(item, 8, instance.viewportHeight());
+			Struct.WORLD_MESH_INSTANCE_RECORD.setLong(item, 9, instance.meshKey());
+			Struct.WORLD_MESH_INSTANCE_RECORD.setLong(item, 10, instance.meshGeneration());
+			Struct.WORLD_MESH_INSTANCE_RECORD.setInt(item, 11, instance.entityId());
+			Struct.WORLD_MESH_INSTANCE_RECORD.setInt(item, 12, instance.entityColorArgb());
+			long transformOffset = Struct.WORLD_MESH_INSTANCE_RECORD.offset(13);
+			float[] transform = instance.transform();
+			for (int field = 0; field < 16; field++) {
+				item.set(ValueLayout.JAVA_FLOAT, transformOffset + field * 4L, transform[field]);
+			}
+		}
+		MemorySegment worldTextQuadArray = Struct.WORLD_TEXT_QUAD_REQUEST.array(arena, worldTextQuads.size());
+		for (int i = 0; i < worldTextQuads.size(); i++) {
+			WorldTextQuadRecord quad = worldTextQuads.get(i);
+			MemorySegment item = Abi.item(worldTextQuadArray, Struct.WORLD_TEXT_QUAD_REQUEST, i);
+			item.set(ValueLayout.JAVA_INT, Struct.WORLD_TEXT_QUAD_REQUEST.offset(0), Struct.WORLD_TEXT_QUAD_REQUEST.byteSize());
+			Struct.WORLD_TEXT_QUAD_REQUEST.setInt(item, 1, quad.colored() ? 1 : 0);
+			Struct.WORLD_TEXT_QUAD_REQUEST.setInt(item, 2, quad.depthPolicy());
+			Struct.WORLD_TEXT_QUAD_REQUEST.setInt(item, 3, quad.packedLight());
+			Struct.WORLD_TEXT_QUAD_REQUEST.setInt(item, 4, quad.colorArgb());
+			Struct.WORLD_TEXT_QUAD_REQUEST.setInt(item, 5, 0);
+			Struct.WORLD_TEXT_QUAD_REQUEST.setLong(item, 6, quad.assetId());
+			Struct.WORLD_TEXT_QUAD_REQUEST.setLong(item, 7, quad.atlasGeneration());
+			Struct.WORLD_TEXT_QUAD_REQUEST.setLong(item, 8, quad.atlasRevision());
+			item.set(ValueLayout.JAVA_DOUBLE, Struct.WORLD_TEXT_QUAD_REQUEST.offset(9), quad.distanceToCameraSq());
+			float[] modelView = quad.modelViewMatrix();
+			float[] positions = quad.positions();
+			float[] uvs = quad.uvs();
+			for (int field = 0; field < 16; field++) {
+				item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_TEXT_QUAD_REQUEST.offset(10) + field * 4L, modelView[field]);
+			}
+			for (int field = 0; field < 12; field++) {
+				item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_TEXT_QUAD_REQUEST.offset(11) + field * 4L, positions[field]);
+			}
+			for (int field = 0; field < 8; field++) {
+				item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_TEXT_QUAD_REQUEST.offset(12) + field * 4L, uvs[field]);
+			}
+		}
+		MemorySegment lodInstanceArray = Struct.WORLD_LOD_COLUMN_INSTANCE_RECORD.array(arena, worldLodInstances.size());
+		for (int i = 0; i < worldLodInstances.size(); i++) {
+			WorldLodColumnInstanceRecord instance = worldLodInstances.get(i);
+			MemorySegment item = Abi.item(lodInstanceArray, Struct.WORLD_LOD_COLUMN_INSTANCE_RECORD, i);
+			item.set(ValueLayout.JAVA_INT, Struct.WORLD_LOD_COLUMN_INSTANCE_RECORD.offset(0), Struct.WORLD_LOD_COLUMN_INSTANCE_RECORD.byteSize());
+			Struct.WORLD_LOD_COLUMN_INSTANCE_RECORD.setInt(item, 1, instance.layer());
+			Struct.WORLD_LOD_COLUMN_INSTANCE_RECORD.setInt(item, 2, instance.segmentIndex());
+			Struct.WORLD_LOD_COLUMN_INSTANCE_RECORD.setInt(item, 3, instance.order());
+			Struct.WORLD_LOD_COLUMN_INSTANCE_RECORD.setLong(item, 4, instance.columnKey());
+			Struct.WORLD_LOD_COLUMN_INSTANCE_RECORD.setLong(item, 5, instance.columnGeneration());
 		}
 		MemorySegment spriteArray = Struct.GUI_SPRITE_REQUEST.array(arena, guiSprites.size());
 		for (int i = 0; i < guiSprites.size(); i++) {
@@ -992,7 +1411,10 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			Struct.GUI_SPRITE_REQUEST.setInt(item, 10, sprite.height());
 			Struct.GUI_SPRITE_REQUEST.setInt(item, 11, sprite.guiWidth());
 			Struct.GUI_SPRITE_REQUEST.setInt(item, 12, sprite.guiHeight());
+			Struct.GUI_SPRITE_REQUEST.setLong(item, 13, sprite.sequence());
 		}
+		MemorySegment affineQuadArray = encodeGuiAffineQuads(guiAffineQuads);
+		MemorySegment guiMeshBatchArray = encodeGuiMeshBatches(guiMeshBatches);
 		MemorySegment request = Struct.WHOLE_FRAME_SUBMIT.allocate(arena);
 		Abi.writeHeader(request, Struct.WHOLE_FRAME_SUBMIT);
 		Struct.WHOLE_FRAME_SUBMIT.setLong(request, 1, generation);
@@ -1021,17 +1443,32 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		Struct.WORLD_BACKGROUND_REQUEST.setInt(background, 5, worldBackground.colorArgb());
 		Struct.WORLD_BACKGROUND_REQUEST.setInt(background, 6, worldBackground.viewportWidth());
 		Struct.WORLD_BACKGROUND_REQUEST.setInt(background, 7, worldBackground.viewportHeight());
+		Struct.WORLD_BACKGROUND_REQUEST.setInt(background, 8, worldBackground.skyVisible() ? 1 : 0);
+		Struct.WORLD_BACKGROUND_REQUEST.setInt(background, 9, worldBackground.skySunriseOrSunset() ? 1 : 0);
+		Struct.WORLD_BACKGROUND_REQUEST.setInt(background, 10, worldBackground.skyDarkDisc() ? 1 : 0);
+		Struct.WORLD_BACKGROUND_REQUEST.setInt(background, 11, 0);
+		Struct.WORLD_BACKGROUND_REQUEST.setFloat(background, 12, worldBackground.skySunAngle());
+		Struct.WORLD_BACKGROUND_REQUEST.setFloat(background, 13, worldBackground.skyTimeOfDay());
+		Struct.WORLD_BACKGROUND_REQUEST.setFloat(background, 14, worldBackground.skyRainBrightness());
+		Struct.WORLD_BACKGROUND_REQUEST.setFloat(background, 15, worldBackground.skyStarBrightness());
+		Struct.WORLD_BACKGROUND_REQUEST.setInt(background, 16, worldBackground.skySunriseAndSunsetColorArgb());
+		Struct.WORLD_BACKGROUND_REQUEST.setInt(background, 17, worldBackground.skyMoonPhase());
+		Struct.WORLD_BACKGROUND_REQUEST.setFloat(background, 18, worldBackground.skyEndFlashIntensity());
+		Struct.WORLD_BACKGROUND_REQUEST.setFloat(background, 19, worldBackground.skyEndFlashXAngle());
+		Struct.WORLD_BACKGROUND_REQUEST.setFloat(background, 20, worldBackground.skyEndFlashYAngle());
+		Struct.WORLD_BACKGROUND_REQUEST.setInt(background, 21, worldBackground.skyColorArgb());
 		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 12, segmentArray, worldSegments.size());
 		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 13, crackArray, worldCrackQuads.size());
 		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 14, borderArray, worldBorderQuads.size());
-		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 15, materialArray, 0);
+		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 15, materialArray, vertexModulatedMaterialQuads.size());
 		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 16, materialTableArray, materialTable.size());
-		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 17, compactMaterialArray, worldMaterialQuads.size());
+		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 17, compactMaterialArray, compactMaterialQuads.size());
 		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 18, meshInstanceArray, worldMeshInstances.size());
 		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 19, spriteArray, guiSprites.size());
-		Struct.WHOLE_FRAME_SUBMIT.setLong(request, 20, negotiatedFeatures);
+		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 20, affineQuadArray, guiAffineQuads.size());
+		Struct.WHOLE_FRAME_SUBMIT.setLong(request, 21, negotiatedFeatures);
 		MemorySegment voxelVolume = request.asSlice(
-			Struct.WHOLE_FRAME_SUBMIT.offset(21),
+			Struct.WHOLE_FRAME_SUBMIT.offset(22),
 			Struct.WORLD_VOXEL_VOLUME_FRAME.byteSize()
 		);
 		voxelVolume.set(ValueLayout.JAVA_INT, Struct.WORLD_VOXEL_VOLUME_FRAME.offset(0), Struct.WORLD_VOXEL_VOLUME_FRAME.byteSize());
@@ -1045,9 +1482,84 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		Struct.WORLD_VOXEL_VOLUME_FRAME.setFloat(voxelVolume, 8, voxelVolumeFrame.cameraZ());
 		Struct.WORLD_VOXEL_VOLUME_FRAME.setInt(voxelVolume, 9, 0);
 		MemorySegment shaderEnvironment = request.asSlice(
-			Struct.WHOLE_FRAME_SUBMIT.offset(22),
+			Struct.WHOLE_FRAME_SUBMIT.offset(23),
 			Struct.WORLD_SHADER_ENVIRONMENT_FRAME.byteSize()
 		);
+		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 24, lodInstanceArray, worldLodInstances.size());
+		MemorySegment lodRenderFrame = request.asSlice(
+			Struct.WHOLE_FRAME_SUBMIT.offset(25),
+			Struct.WORLD_LOD_RENDER_FRAME.byteSize()
+		);
+		lodRenderFrame.set(ValueLayout.JAVA_INT, Struct.WORLD_LOD_RENDER_FRAME.offset(0), Struct.WORLD_LOD_RENDER_FRAME.byteSize());
+		Struct.WORLD_LOD_RENDER_FRAME.setInt(lodRenderFrame, 1, worldLodRenderFrame.enabled() ? 1 : 0);
+		Struct.WORLD_LOD_RENDER_FRAME.setInt(lodRenderFrame, 2, worldLodRenderFrame.flags());
+		Struct.WORLD_LOD_RENDER_FRAME.setInt(lodRenderFrame, 3, worldLodRenderFrame.worldYOffset());
+		long lodMatrixOffset = Struct.WORLD_LOD_RENDER_FRAME.offset(4);
+		float[] lodCombinedMatrix = worldLodRenderFrame.combinedMatrix();
+		for (int i = 0; i < 16; i++) {
+			lodRenderFrame.set(ValueLayout.JAVA_FLOAT, lodMatrixOffset + i * 4L, lodCombinedMatrix[i]);
+		}
+		MemorySegment featureCoverage = request.asSlice(
+			Struct.WHOLE_FRAME_SUBMIT.offset(26),
+			Struct.WORLD_FEATURE_COVERAGE.byteSize()
+		);
+		featureCoverage.set(ValueLayout.JAVA_INT, Struct.WORLD_FEATURE_COVERAGE.offset(0), Struct.WORLD_FEATURE_COVERAGE.byteSize());
+		Struct.WORLD_FEATURE_COVERAGE.setInt(featureCoverage, 1, worldFeatureCoverage.modelSubmits());
+		Struct.WORLD_FEATURE_COVERAGE.setInt(featureCoverage, 2, worldFeatureCoverage.modelPartSubmits());
+		Struct.WORLD_FEATURE_COVERAGE.setInt(featureCoverage, 3, worldFeatureCoverage.blockModelSubmits());
+		Struct.WORLD_FEATURE_COVERAGE.setInt(featureCoverage, 4, worldFeatureCoverage.ordinaryBlockSubmits());
+		Struct.WORLD_FEATURE_COVERAGE.setInt(featureCoverage, 5, worldFeatureCoverage.itemSubmits());
+		Struct.WORLD_FEATURE_COVERAGE.setInt(featureCoverage, 6, worldFeatureCoverage.customGeometrySubmits());
+		Struct.WORLD_FEATURE_COVERAGE.setInt(featureCoverage, 7, worldFeatureCoverage.shadowSubmits());
+		Struct.WORLD_FEATURE_COVERAGE.setInt(featureCoverage, 8, worldFeatureCoverage.flameSubmits());
+		Struct.WORLD_FEATURE_COVERAGE.setInt(featureCoverage, 9, worldFeatureCoverage.nameTagSubmits());
+		Struct.WORLD_FEATURE_COVERAGE.setInt(featureCoverage, 10, worldFeatureCoverage.textSubmits());
+		Struct.WORLD_FEATURE_COVERAGE.setInt(featureCoverage, 11, worldFeatureCoverage.hitboxSubmits());
+		Struct.WORLD_FEATURE_COVERAGE.setInt(featureCoverage, 12, worldFeatureCoverage.leashSubmits());
+		Struct.WORLD_FEATURE_COVERAGE.setInt(featureCoverage, 13, worldFeatureCoverage.particleGroupSubmits());
+		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 27, worldTextQuadArray, worldTextQuads.size());
+		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 28, guiMeshBatchArray, guiMeshBatches.size());
+		MemorySegment firstPerson = request.asSlice(
+			Struct.WHOLE_FRAME_SUBMIT.offset(29),
+			Struct.WORLD_FIRST_PERSON_FRAME.byteSize()
+		);
+		firstPerson.set(ValueLayout.JAVA_INT, Struct.WORLD_FIRST_PERSON_FRAME.offset(0), Struct.WORLD_FIRST_PERSON_FRAME.byteSize());
+		Struct.WORLD_FIRST_PERSON_FRAME.setInt(firstPerson, 1, firstPersonFrame.enabled() ? 1 : 0);
+		Struct.WORLD_FIRST_PERSON_FRAME.setInt(firstPerson, 2, firstPersonFrame.clearDepthBefore() ? 1 : 0);
+		Struct.WORLD_FIRST_PERSON_FRAME.setInt(firstPerson, 3, firstPersonFrame.mainHandInstanceCount());
+		long firstPersonProjectionOffset = Struct.WORLD_FIRST_PERSON_FRAME.offset(4);
+		float[] firstPersonProjection = firstPersonFrame.projectionMatrix();
+		for (int i = 0; i < 16; i++) {
+			firstPerson.set(ValueLayout.JAVA_FLOAT, firstPersonProjectionOffset + i * 4L, firstPersonProjection[i]);
+		}
+		long firstPersonModelViewOffset = Struct.WORLD_FIRST_PERSON_FRAME.offset(5);
+		float[] firstPersonModelView = firstPersonFrame.modelViewMatrix();
+		for (int i = 0; i < 16; i++) {
+			firstPerson.set(ValueLayout.JAVA_FLOAT, firstPersonModelViewOffset + i * 4L, firstPersonModelView[i]);
+		}
+		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 30, firstPersonMeshInstanceArray, firstPersonMeshInstances.size());
+		long lodModelViewOffset = Struct.WORLD_LOD_RENDER_FRAME.offset(5);
+		long lodProjectionOffset = Struct.WORLD_LOD_RENDER_FRAME.offset(6);
+		long lodProjectionInverseOffset = Struct.WORLD_LOD_RENDER_FRAME.offset(7);
+		float[] lodModelViewMatrix = worldLodRenderFrame.modelViewMatrix();
+		float[] lodProjectionMatrix = worldLodRenderFrame.projectionMatrix();
+		float[] lodProjectionInverseMatrix = worldLodRenderFrame.projectionInverseMatrix();
+		for (int i = 0; i < 16; i++) {
+			lodRenderFrame.set(ValueLayout.JAVA_FLOAT, lodModelViewOffset + i * 4L, lodModelViewMatrix[i]);
+			lodRenderFrame.set(ValueLayout.JAVA_FLOAT, lodProjectionOffset + i * 4L, lodProjectionMatrix[i]);
+			lodRenderFrame.set(ValueLayout.JAVA_FLOAT, lodProjectionInverseOffset + i * 4L, lodProjectionInverseMatrix[i]);
+		}
+		Struct.WORLD_LOD_RENDER_FRAME.setFloat(lodRenderFrame, 8, worldLodRenderFrame.clipDistance());
+		Struct.WORLD_LOD_RENDER_FRAME.setFloat(lodRenderFrame, 9, worldLodRenderFrame.microOffset());
+		Struct.WORLD_LOD_RENDER_FRAME.setFloat(lodRenderFrame, 10, worldLodRenderFrame.noiseIntensity());
+		Struct.WORLD_LOD_RENDER_FRAME.setFloat(lodRenderFrame, 11, worldLodRenderFrame.earthRadius());
+		Struct.WORLD_LOD_RENDER_FRAME.setInt(lodRenderFrame, 12, worldLodRenderFrame.noiseSteps());
+		Struct.WORLD_LOD_RENDER_FRAME.setInt(lodRenderFrame, 13, worldLodRenderFrame.noiseDropoff());
+		Struct.WORLD_LOD_RENDER_FRAME.setInt(lodRenderFrame, 14, 0);
+		float[] lodCameraWorldPosition = worldLodRenderFrame.cameraWorldPosition();
+		Struct.WORLD_LOD_RENDER_FRAME.setFloat(lodRenderFrame, 15, lodCameraWorldPosition[0]);
+		Struct.WORLD_LOD_RENDER_FRAME.setFloat(lodRenderFrame, 16, lodCameraWorldPosition[1]);
+		Struct.WORLD_LOD_RENDER_FRAME.setFloat(lodRenderFrame, 17, lodCameraWorldPosition[2]);
 		shaderEnvironment.set(ValueLayout.JAVA_INT, Struct.WORLD_SHADER_ENVIRONMENT_FRAME.offset(0), Struct.WORLD_SHADER_ENVIRONMENT_FRAME.byteSize());
 		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setInt(shaderEnvironment, 1, shaderEnvironmentFrame.enabled() ? 1 : 0);
 		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setInt(shaderEnvironment, 2, shaderEnvironmentFrame.frameCounter());
@@ -1081,6 +1593,35 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		Abi.writeBytes(arena, shaderEnvironment, Struct.WORLD_SHADER_ENVIRONMENT_FRAME, 30, shaderEnvironmentFrame.offHandItemModelResourceLocation());
 		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setInt(shaderEnvironment, 31, shaderEnvironmentFrame.mainHandItemLightEmission());
 		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setInt(shaderEnvironment, 32, shaderEnvironmentFrame.offHandItemLightEmission());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setInt(shaderEnvironment, 33, shaderEnvironmentFrame.lightmapEnabled() ? 1 : 0);
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setInt(shaderEnvironment, 34, 0);
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setLong(shaderEnvironment, 35, shaderEnvironmentFrame.lightmapGeneration());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 36, shaderEnvironmentFrame.lightmapAmbientLightFactor());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 37, shaderEnvironmentFrame.lightmapSkyFactor());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 38, shaderEnvironmentFrame.lightmapBlockFactor());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 39, shaderEnvironmentFrame.lightmapNightVisionFactor());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 40, shaderEnvironmentFrame.lightmapDarknessScale());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 41, shaderEnvironmentFrame.lightmapDarkenWorldFactor());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 42, shaderEnvironmentFrame.lightmapBrightnessFactor());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 43, shaderEnvironmentFrame.lightmapSkyLightRed());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 44, shaderEnvironmentFrame.lightmapSkyLightGreen());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 45, shaderEnvironmentFrame.lightmapSkyLightBlue());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 46, shaderEnvironmentFrame.lightmapAmbientRed());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 47, shaderEnvironmentFrame.lightmapAmbientGreen());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 48, shaderEnvironmentFrame.lightmapAmbientBlue());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 49, shaderEnvironmentFrame.blindness());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 50, shaderEnvironmentFrame.darknessFactor());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setInt(shaderEnvironment, 51, shaderEnvironmentFrame.eyeBrightnessBlock());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setInt(shaderEnvironment, 52, shaderEnvironmentFrame.eyeBrightnessSky());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 53, shaderEnvironmentFrame.fogParameterColorRed());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 54, shaderEnvironmentFrame.fogParameterColorGreen());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 55, shaderEnvironmentFrame.fogParameterColorBlue());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 56, shaderEnvironmentFrame.fogParameterColorAlpha());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 57, shaderEnvironmentFrame.fogEnvironmentalStart());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 58, shaderEnvironmentFrame.fogEnvironmentalEnd());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 59, shaderEnvironmentFrame.fogRenderDistanceStart());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 60, shaderEnvironmentFrame.fogRenderDistanceEnd());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setInt(shaderEnvironment, 61, shaderEnvironmentFrame.distantHorizonsRenderDistance());
 		MemorySegment result = Struct.WHOLE_FRAME_SUBMIT_RESULT.allocate(arena);
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("rust-gal.whole-frame.java-record-packing");
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("rust-gal.whole-frame.native-submit-return");
@@ -1089,8 +1630,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			: Native.worldPrimitivesSubmit(contextId, request, result);
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("rust-gal.whole-frame.native-submit-return");
 		checkStatus(status, wholeFrame ? "whole-frame submission" : "world primitive submission");
-		long metricsOffset = Struct.WHOLE_FRAME_SUBMIT_RESULT.offset(44);
-		long profileOffset = Struct.WHOLE_FRAME_SUBMIT_RESULT.offset(45);
+		long metricsOffset = Struct.WHOLE_FRAME_SUBMIT_RESULT.offset(47);
+		long profileOffset = Struct.WHOLE_FRAME_SUBMIT_RESULT.offset(48);
 		BackendMetrics metrics = backendMetricsAt(result, metricsOffset);
 		WholeFrameProfile profile = wholeFrameProfileAt(result, profileOffset);
 		long ffiCalls = result.get(ValueLayout.JAVA_LONG, metricsOffset + 64);
@@ -1137,11 +1678,48 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			Struct.WHOLE_FRAME_SUBMIT_RESULT.getLong(result, 41),
 			Struct.WHOLE_FRAME_SUBMIT_RESULT.getLong(result, 42),
 			Struct.WHOLE_FRAME_SUBMIT_RESULT.getLong(result, 43),
+			Struct.WHOLE_FRAME_SUBMIT_RESULT.getLong(result, 44),
+			Struct.WHOLE_FRAME_SUBMIT_RESULT.getLong(result, 45),
+			Struct.WHOLE_FRAME_SUBMIT_RESULT.getLong(result, 46),
 			ffiCalls,
 			ffiInputBytes,
 			metrics,
 			profile
 		);
+	}
+
+	private static void traceWorldMaterialFrame(
+		long frameId,
+		int quadCount,
+		LinkedHashMap<WorldMaterialKeyRecord, Integer> materialTable
+	) {
+		if (!TRACE_WORLD_MATERIAL_FRAME || materialTable.isEmpty()
+			|| WORLD_MATERIAL_FRAME_TRACE_LOGS.getAndIncrement() >= TRACE_WORLD_MATERIAL_FRAME_MAX_LOGS) {
+			return;
+		}
+		StringBuilder message = new StringBuilder("[MattMC graphics audit] world-material-frame")
+			.append(" frame=").append(frameId)
+			.append(" quads=").append(quadCount)
+			.append(" table=").append(materialTable.size());
+		int sample = 0;
+		for (Map.Entry<WorldMaterialKeyRecord, Integer> entry : materialTable.entrySet()) {
+			if (sample++ == 8) {
+				message.append(" ...");
+				break;
+			}
+			WorldMaterialKeyRecord key = entry.getKey();
+			message.append(" entry[").append(entry.getValue()).append("]={")
+				.append("stratum=").append(key.stratum())
+				.append(",material=").append(key.materialId())
+				.append(",texture=").append(key.textureId())
+				.append(",mode=").append(key.materialMode())
+				.append(",depth=").append(key.depthPolicy())
+				.append(",cull=").append(key.cullPolicy())
+				.append(",topology=").append(key.topology())
+				.append(",winding=").append(key.winding())
+				.append('}');
+		}
+		System.out.println(message);
 	}
 
 	public Status updateGuiAssets(long generation, List<GuiAssetRecord> assets) {
@@ -1162,6 +1740,67 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			Struct.GUI_ASSET_UPDATE.setLong(request, 3, negotiatedFeatures);
 			MemorySegment status = Struct.STATUS.allocate(updateArena);
 			checkStatus(Native.guiUpdateAssets(contextId, request, status), "GUI asset update");
+			return new Status(Struct.STATUS.getLong(status, 5), Struct.STATUS.metricsFfiCalls(status), Struct.STATUS.metricsFfiInputBytes(status), Struct.STATUS.backendMetrics(status));
+		}
+	}
+
+	/**
+	 * Uploads copied semantic GUI image assets. Intended for font atlases and
+	 * other source-owned images; callers cannot pass atlas objects or textures.
+	 */
+	public Status updateGuiRawImages(long generation, List<GuiRawImageAssetRecord> assets) {
+		Objects.requireNonNull(assets, "assets");
+		try (Arena updateArena = Arena.ofConfined()) {
+			MemorySegment assetArray = Struct.GUI_RAW_IMAGE_ASSET_PAYLOAD.array(updateArena, assets.size());
+			for (int i = 0; i < assets.size(); i++) {
+				GuiRawImageAssetRecord asset = assets.get(i);
+				MemorySegment item = Abi.item(assetArray, Struct.GUI_RAW_IMAGE_ASSET_PAYLOAD, i);
+				item.set(ValueLayout.JAVA_INT, Struct.GUI_RAW_IMAGE_ASSET_PAYLOAD.offset(0), Struct.GUI_RAW_IMAGE_ASSET_PAYLOAD.byteSize());
+				Struct.GUI_RAW_IMAGE_ASSET_PAYLOAD.setInt(item, 1, asset.format());
+				Struct.GUI_RAW_IMAGE_ASSET_PAYLOAD.setLong(item, 2, asset.assetId());
+				Struct.GUI_RAW_IMAGE_ASSET_PAYLOAD.setInt(item, 3, asset.width());
+				Struct.GUI_RAW_IMAGE_ASSET_PAYLOAD.setInt(item, 4, asset.height());
+				Abi.writeBytes(updateArena, item, Struct.GUI_RAW_IMAGE_ASSET_PAYLOAD, 5, asset.pixels());
+			}
+			MemorySegment request = Struct.GUI_RAW_IMAGE_UPDATE.allocate(updateArena);
+			Abi.writeHeader(request, Struct.GUI_RAW_IMAGE_UPDATE);
+			Struct.GUI_RAW_IMAGE_UPDATE.setLong(request, 1, generation);
+			Abi.writeSlice(request, Struct.GUI_RAW_IMAGE_UPDATE, 2, assetArray, assets.size());
+			Struct.GUI_RAW_IMAGE_UPDATE.setLong(request, 3, negotiatedFeatures);
+			MemorySegment status = Struct.STATUS.allocate(updateArena);
+			checkStatus(Native.guiUpdateRawImages(contextId, request, status), "raw GUI image update");
+			return new Status(Struct.STATUS.getLong(status, 5), Struct.STATUS.metricsFfiCalls(status), Struct.STATUS.metricsFfiInputBytes(status), Struct.STATUS.backendMetrics(status));
+		}
+	}
+
+	/**
+	 * Uploads copied world-text atlas pixels. The payload is intentionally
+	 * distinct from GUI images because world-text lifetime and depth ordering
+	 * belong to the world frontend.
+	 */
+	public Status updateWorldTextImages(long generation, List<WorldTextImageAssetRecord> assets) {
+		Objects.requireNonNull(assets, "assets");
+		try (Arena updateArena = Arena.ofConfined()) {
+			MemorySegment assetArray = Struct.WORLD_TEXT_IMAGE_ASSET_PAYLOAD.array(updateArena, assets.size());
+			for (int i = 0; i < assets.size(); i++) {
+				WorldTextImageAssetRecord asset = assets.get(i);
+				MemorySegment item = Abi.item(assetArray, Struct.WORLD_TEXT_IMAGE_ASSET_PAYLOAD, i);
+				item.set(ValueLayout.JAVA_INT, Struct.WORLD_TEXT_IMAGE_ASSET_PAYLOAD.offset(0), Struct.WORLD_TEXT_IMAGE_ASSET_PAYLOAD.byteSize());
+				Struct.WORLD_TEXT_IMAGE_ASSET_PAYLOAD.setInt(item, 1, asset.format());
+				Struct.WORLD_TEXT_IMAGE_ASSET_PAYLOAD.setInt(item, 2, asset.width());
+				Struct.WORLD_TEXT_IMAGE_ASSET_PAYLOAD.setInt(item, 3, asset.height());
+				Struct.WORLD_TEXT_IMAGE_ASSET_PAYLOAD.setLong(item, 4, asset.assetId());
+				Struct.WORLD_TEXT_IMAGE_ASSET_PAYLOAD.setLong(item, 5, asset.atlasGeneration());
+				Struct.WORLD_TEXT_IMAGE_ASSET_PAYLOAD.setLong(item, 6, asset.atlasRevision());
+				Abi.writeBytes(updateArena, item, Struct.WORLD_TEXT_IMAGE_ASSET_PAYLOAD, 7, asset.pixels());
+			}
+			MemorySegment request = Struct.WORLD_TEXT_IMAGE_UPDATE.allocate(updateArena);
+			Abi.writeHeader(request, Struct.WORLD_TEXT_IMAGE_UPDATE);
+			Struct.WORLD_TEXT_IMAGE_UPDATE.setLong(request, 1, generation);
+			Abi.writeSlice(request, Struct.WORLD_TEXT_IMAGE_UPDATE, 2, assetArray, assets.size());
+			Struct.WORLD_TEXT_IMAGE_UPDATE.setLong(request, 3, negotiatedFeatures);
+			MemorySegment status = Struct.STATUS.allocate(updateArena);
+			checkStatus(Native.worldTextUpdateImages(contextId, request, status), "world text image update");
 			return new Status(Struct.STATUS.getLong(status, 5), Struct.STATUS.metricsFfiCalls(status), Struct.STATUS.metricsFfiInputBytes(status), Struct.STATUS.backendMetrics(status));
 		}
 	}
@@ -1308,7 +1947,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 				Struct.WORLD_MESH_TEXTURE_ASSET_PAYLOAD.setInt(item, 7, texture.animationFlags());
 				Struct.WORLD_MESH_TEXTURE_ASSET_PAYLOAD.setInt(item, 8, texture.frameRowSize());
 				Struct.WORLD_MESH_TEXTURE_ASSET_PAYLOAD.setInt(item, 9, texture.interpolationPolicy());
-				Struct.WORLD_MESH_TEXTURE_ASSET_PAYLOAD.setInt(item, 10, 0);
+				Struct.WORLD_MESH_TEXTURE_ASSET_PAYLOAD.setInt(item, 10, texture.coordinateOrigin());
 				MemorySegment animationFrameArray = Struct.WORLD_MESH_ANIMATION_FRAME_RECORD.array(updateArena, texture.animationFrames().size());
 				for (int frameIndex = 0; frameIndex < texture.animationFrames().size(); frameIndex++) {
 					WorldMeshAnimationFrameRecord frame = texture.animationFrames().get(frameIndex);
@@ -1365,6 +2004,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 					Struct.WORLD_MESH_SECTION_RECORD.setInt(sectionItem, 7, section.indexCount());
 				}
 				Abi.writeSlice(item, Struct.WORLD_MESH_ASSET_RECORD, 8, sectionArray, mesh.sections().size());
+				Abi.writeBytes(updateArena, item, Struct.WORLD_MESH_ASSET_RECORD, 9, mesh.entityIdentity());
 			}
 			MemorySegment sortedIndexArray = Struct.WORLD_MESH_SORTED_INDEX_RECORD.array(updateArena, sortedIndices.size());
 			for (int i = 0; i < sortedIndices.size(); i++) {
@@ -1391,9 +2031,209 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		}
 	}
 
+	/**
+	 * Copies Distant Horizons CPU LOD column semantics into the private Rust
+	 * registry. This does not select a route or issue a draw; callers remain
+	 * responsible for keeping the legacy renderer active until a complete Rust
+	 * LOD material/pass path is admitted.
+	 */
+	public Status updateWorldLodAssets(
+		long generation,
+		List<WorldLodColumnAssetRecord> assets,
+		List<WorldLodColumnRetirementRecord> retirements
+	) {
+		return updateWorldLodAssets(generation, assets, retirements, List.of());
+	}
+
+	public Status updateWorldLodAssets(
+		long generation,
+		List<WorldLodColumnAssetRecord> assets,
+		List<WorldLodColumnRetirementRecord> retirements,
+		List<WorldLodColumnMaterialProvenanceRecord> materialProvenance
+	) {
+		Objects.requireNonNull(assets, "assets");
+		Objects.requireNonNull(retirements, "retirements");
+		Objects.requireNonNull(materialProvenance, "materialProvenance");
+		try (Arena updateArena = Arena.ofConfined()) {
+			MemorySegment assetArray = Struct.WORLD_LOD_COLUMN_ASSET_RECORD.array(updateArena, assets.size());
+			for (int assetIndex = 0; assetIndex < assets.size(); assetIndex++) {
+				WorldLodColumnAssetRecord asset = Objects.requireNonNull(assets.get(assetIndex), "assets[" + assetIndex + "]");
+				MemorySegment item = Abi.item(assetArray, Struct.WORLD_LOD_COLUMN_ASSET_RECORD, assetIndex);
+				item.set(ValueLayout.JAVA_INT, Struct.WORLD_LOD_COLUMN_ASSET_RECORD.offset(0), Struct.WORLD_LOD_COLUMN_ASSET_RECORD.byteSize());
+				Struct.WORLD_LOD_COLUMN_ASSET_RECORD.setInt(item, 1, asset.vertexLayoutVersion());
+				Struct.WORLD_LOD_COLUMN_ASSET_RECORD.setInt(item, 2, asset.originX());
+				Struct.WORLD_LOD_COLUMN_ASSET_RECORD.setInt(item, 3, asset.originY());
+				Struct.WORLD_LOD_COLUMN_ASSET_RECORD.setInt(item, 4, asset.originZ());
+				Struct.WORLD_LOD_COLUMN_ASSET_RECORD.setInt(item, 5, 0);
+				Struct.WORLD_LOD_COLUMN_ASSET_RECORD.setLong(item, 6, asset.columnKey());
+				Struct.WORLD_LOD_COLUMN_ASSET_RECORD.setLong(item, 7, asset.columnGeneration());
+				MemorySegment segmentArray = Struct.WORLD_LOD_SEGMENT_RECORD.array(updateArena, asset.segments().size());
+				for (int segmentIndex = 0; segmentIndex < asset.segments().size(); segmentIndex++) {
+					WorldLodSegmentRecord segment = asset.segments().get(segmentIndex);
+					MemorySegment segmentItem = Abi.item(segmentArray, Struct.WORLD_LOD_SEGMENT_RECORD, segmentIndex);
+					segmentItem.set(ValueLayout.JAVA_INT, Struct.WORLD_LOD_SEGMENT_RECORD.offset(0), Struct.WORLD_LOD_SEGMENT_RECORD.byteSize());
+					Struct.WORLD_LOD_SEGMENT_RECORD.setInt(segmentItem, 1, segment.layer());
+					MemorySegment vertexArray = Struct.WORLD_LOD_VERTEX.array(updateArena, segment.vertices().size());
+					for (int vertexIndex = 0; vertexIndex < segment.vertices().size(); vertexIndex++) {
+						WorldLodVertexRecord vertex = segment.vertices().get(vertexIndex);
+						MemorySegment vertexItem = Abi.item(vertexArray, Struct.WORLD_LOD_VERTEX, vertexIndex);
+						vertexItem.set(ValueLayout.JAVA_INT, Struct.WORLD_LOD_VERTEX.offset(0), Struct.WORLD_LOD_VERTEX.byteSize());
+						vertexItem.set(ValueLayout.JAVA_SHORT, Struct.WORLD_LOD_VERTEX.offset(1), (short)vertex.localX());
+						vertexItem.set(ValueLayout.JAVA_SHORT, Struct.WORLD_LOD_VERTEX.offset(2), (short)vertex.localY());
+						vertexItem.set(ValueLayout.JAVA_SHORT, Struct.WORLD_LOD_VERTEX.offset(3), (short)vertex.localZ());
+						vertexItem.set(ValueLayout.JAVA_SHORT, Struct.WORLD_LOD_VERTEX.offset(4), (short)vertex.packedLightAndMicroOffset());
+						Struct.WORLD_LOD_VERTEX.setInt(vertexItem, 5, vertex.colorRgba());
+						Struct.WORLD_LOD_VERTEX.setInt(vertexItem, 6, vertex.materialId());
+						Struct.WORLD_LOD_VERTEX.setInt(vertexItem, 7, vertex.normalIndex());
+					}
+					Abi.writeSlice(segmentItem, Struct.WORLD_LOD_SEGMENT_RECORD, 2, vertexArray, segment.vertices().size());
+				}
+				Abi.writeSlice(item, Struct.WORLD_LOD_COLUMN_ASSET_RECORD, 8, segmentArray, asset.segments().size());
+			}
+			MemorySegment retirementArray = Struct.WORLD_LOD_COLUMN_RETIREMENT_RECORD.array(updateArena, retirements.size());
+			for (int index = 0; index < retirements.size(); index++) {
+				WorldLodColumnRetirementRecord retirement = Objects.requireNonNull(retirements.get(index), "retirements[" + index + "]");
+				MemorySegment item = Abi.item(retirementArray, Struct.WORLD_LOD_COLUMN_RETIREMENT_RECORD, index);
+				item.set(ValueLayout.JAVA_INT, Struct.WORLD_LOD_COLUMN_RETIREMENT_RECORD.offset(0), Struct.WORLD_LOD_COLUMN_RETIREMENT_RECORD.byteSize());
+				Struct.WORLD_LOD_COLUMN_RETIREMENT_RECORD.setInt(item, 1, 0);
+				Struct.WORLD_LOD_COLUMN_RETIREMENT_RECORD.setLong(item, 2, retirement.columnKey());
+				Struct.WORLD_LOD_COLUMN_RETIREMENT_RECORD.setLong(item, 3, retirement.columnGeneration());
+			}
+			MemorySegment provenanceArray = Struct.WORLD_LOD_COLUMN_MATERIAL_PROVENANCE_RECORD.array(updateArena, materialProvenance.size());
+			for (int provenanceIndex = 0; provenanceIndex < materialProvenance.size(); provenanceIndex++) {
+				WorldLodColumnMaterialProvenanceRecord provenance = Objects.requireNonNull(
+					materialProvenance.get(provenanceIndex), "materialProvenance[" + provenanceIndex + "]"
+				);
+				MemorySegment provenanceItem = Abi.item(
+					provenanceArray, Struct.WORLD_LOD_COLUMN_MATERIAL_PROVENANCE_RECORD, provenanceIndex
+				);
+				provenanceItem.set(ValueLayout.JAVA_INT,
+					Struct.WORLD_LOD_COLUMN_MATERIAL_PROVENANCE_RECORD.offset(0),
+					Struct.WORLD_LOD_COLUMN_MATERIAL_PROVENANCE_RECORD.byteSize());
+				Struct.WORLD_LOD_COLUMN_MATERIAL_PROVENANCE_RECORD.setInt(provenanceItem, 1, 0);
+				Struct.WORLD_LOD_COLUMN_MATERIAL_PROVENANCE_RECORD.setLong(provenanceItem, 2, provenance.columnKey());
+				Struct.WORLD_LOD_COLUMN_MATERIAL_PROVENANCE_RECORD.setLong(provenanceItem, 3, provenance.columnGeneration());
+				MemorySegment identityArray = Struct.WORLD_LOD_MATERIAL_IDENTITY_RECORD.array(updateArena, provenance.identities().size());
+				for (int identityIndex = 0; identityIndex < provenance.identities().size(); identityIndex++) {
+					WorldLodMaterialIdentityRecord identity = provenance.identities().get(identityIndex);
+					MemorySegment identityItem = Abi.item(identityArray, Struct.WORLD_LOD_MATERIAL_IDENTITY_RECORD, identityIndex);
+					identityItem.set(ValueLayout.JAVA_INT, Struct.WORLD_LOD_MATERIAL_IDENTITY_RECORD.offset(0),
+						Struct.WORLD_LOD_MATERIAL_IDENTITY_RECORD.byteSize());
+					Struct.WORLD_LOD_MATERIAL_IDENTITY_RECORD.setInt(identityItem, 1, 0);
+					Abi.writeBytes(updateArena, identityItem, Struct.WORLD_LOD_MATERIAL_IDENTITY_RECORD, 2,
+						identity.blockStateIdentity().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+					Abi.writeBytes(updateArena, identityItem, Struct.WORLD_LOD_MATERIAL_IDENTITY_RECORD, 3,
+						identity.biomeIdentity().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+				}
+				MemorySegment segmentArray = Struct.WORLD_LOD_SEGMENT_MATERIAL_PROVENANCE_RECORD.array(updateArena, provenance.segments().size());
+				for (int segmentIndex = 0; segmentIndex < provenance.segments().size(); segmentIndex++) {
+					WorldLodSegmentMaterialProvenanceRecord segment = provenance.segments().get(segmentIndex);
+					MemorySegment segmentItem = Abi.item(segmentArray, Struct.WORLD_LOD_SEGMENT_MATERIAL_PROVENANCE_RECORD, segmentIndex);
+					segmentItem.set(ValueLayout.JAVA_INT,
+						Struct.WORLD_LOD_SEGMENT_MATERIAL_PROVENANCE_RECORD.offset(0),
+						Struct.WORLD_LOD_SEGMENT_MATERIAL_PROVENANCE_RECORD.byteSize());
+					Struct.WORLD_LOD_SEGMENT_MATERIAL_PROVENANCE_RECORD.setInt(segmentItem, 1, segment.layer());
+					Struct.WORLD_LOD_SEGMENT_MATERIAL_PROVENANCE_RECORD.setInt(segmentItem, 2, segment.segmentIndex());
+					Struct.WORLD_LOD_SEGMENT_MATERIAL_PROVENANCE_RECORD.setInt(segmentItem, 3, 0);
+					MemorySegment materialIds = updateArena.allocate(ValueLayout.JAVA_INT, segment.quadMaterialIds().length);
+					for (int materialIndex = 0; materialIndex < segment.quadMaterialIds().length; materialIndex++) {
+						materialIds.setAtIndex(ValueLayout.JAVA_INT, materialIndex, segment.quadMaterialIds()[materialIndex]);
+					}
+					Abi.writeSlice(segmentItem, Struct.WORLD_LOD_SEGMENT_MATERIAL_PROVENANCE_RECORD, 4,
+						materialIds, segment.quadMaterialIds().length);
+					MemorySegment variantStates = updateArena.allocate(ValueLayout.JAVA_BYTE, segment.quadVariantStates().length);
+					MemorySegment variantPositions = updateArena.allocate(ValueLayout.JAVA_LONG, segment.quadVariantPositions().length);
+					for (int variantIndex = 0; variantIndex < segment.quadVariantStates().length; variantIndex++) {
+						variantStates.setAtIndex(ValueLayout.JAVA_BYTE, variantIndex, segment.quadVariantStates()[variantIndex]);
+						variantPositions.setAtIndex(ValueLayout.JAVA_LONG, variantIndex, segment.quadVariantPositions()[variantIndex]);
+					}
+					Abi.writeSlice(segmentItem, Struct.WORLD_LOD_SEGMENT_MATERIAL_PROVENANCE_RECORD, 5,
+						variantStates, segment.quadVariantStates().length);
+					Abi.writeSlice(segmentItem, Struct.WORLD_LOD_SEGMENT_MATERIAL_PROVENANCE_RECORD, 6,
+						variantPositions, segment.quadVariantPositions().length);
+				}
+				MemorySegment faceMaterialArray = Struct.WORLD_LOD_FACE_MATERIAL_RECORD.array(updateArena, provenance.faceMaterials().size());
+				for (int faceIndex = 0; faceIndex < provenance.faceMaterials().size(); faceIndex++) {
+					WorldLodFaceMaterialRecord face = provenance.faceMaterials().get(faceIndex);
+					MemorySegment faceItem = Abi.item(faceMaterialArray, Struct.WORLD_LOD_FACE_MATERIAL_RECORD, faceIndex);
+					faceItem.set(ValueLayout.JAVA_INT, Struct.WORLD_LOD_FACE_MATERIAL_RECORD.offset(0), Struct.WORLD_LOD_FACE_MATERIAL_RECORD.byteSize());
+					Struct.WORLD_LOD_FACE_MATERIAL_RECORD.setInt(faceItem, 1, face.materialId());
+					Struct.WORLD_LOD_FACE_MATERIAL_RECORD.setInt(faceItem, 2, face.face());
+					Struct.WORLD_LOD_FACE_MATERIAL_RECORD.setInt(faceItem, 3,
+						face.faceLayer() | (face.tinted() ? 0x4 : 0) | ((face.tintArgb() & 0x00ffffff) << 3));
+					Abi.writeBytes(updateArena, faceItem, Struct.WORLD_LOD_FACE_MATERIAL_RECORD, 4, face.atlasIdentity().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+					Abi.writeBytes(updateArena, faceItem, Struct.WORLD_LOD_FACE_MATERIAL_RECORD, 5, face.spriteIdentity().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+					Struct.WORLD_LOD_FACE_MATERIAL_RECORD.setFloat(faceItem, 6, face.u0());
+					Struct.WORLD_LOD_FACE_MATERIAL_RECORD.setFloat(faceItem, 7, face.v0());
+					Struct.WORLD_LOD_FACE_MATERIAL_RECORD.setFloat(faceItem, 8, face.u1());
+					Struct.WORLD_LOD_FACE_MATERIAL_RECORD.setFloat(faceItem, 9, face.v1());
+					Struct.WORLD_LOD_FACE_MATERIAL_RECORD.setInt(faceItem, 10, face.uvCornerOrder());
+					Struct.WORLD_LOD_FACE_MATERIAL_RECORD.setLong(faceItem, 11, face.variantPosition());
+				}
+				Abi.writeSlice(provenanceItem, Struct.WORLD_LOD_COLUMN_MATERIAL_PROVENANCE_RECORD, 4,
+					identityArray, provenance.identities().size());
+				Abi.writeSlice(provenanceItem, Struct.WORLD_LOD_COLUMN_MATERIAL_PROVENANCE_RECORD, 5,
+					segmentArray, provenance.segments().size());
+				Abi.writeSlice(provenanceItem, Struct.WORLD_LOD_COLUMN_MATERIAL_PROVENANCE_RECORD, 6,
+					faceMaterialArray, provenance.faceMaterials().size());
+			}
+			MemorySegment request = Struct.WORLD_LOD_ASSET_UPDATE.allocate(updateArena);
+			Abi.writeHeader(request, Struct.WORLD_LOD_ASSET_UPDATE);
+			Struct.WORLD_LOD_ASSET_UPDATE.setLong(request, 1, generation);
+			Abi.writeSlice(request, Struct.WORLD_LOD_ASSET_UPDATE, 2, assetArray, assets.size());
+			Abi.writeSlice(request, Struct.WORLD_LOD_ASSET_UPDATE, 3, retirementArray, retirements.size());
+			Struct.WORLD_LOD_ASSET_UPDATE.setLong(request, 4, negotiatedFeatures);
+			Abi.writeSlice(request, Struct.WORLD_LOD_ASSET_UPDATE, 5, provenanceArray, materialProvenance.size());
+			MemorySegment status = Struct.STATUS.allocate(updateArena);
+			checkStatus(Native.worldLodUpdateAssets(contextId, request, status), "world LOD asset update");
+			return new Status(Struct.STATUS.getLong(status, 5), Struct.STATUS.metricsFfiCalls(status), Struct.STATUS.metricsFfiInputBytes(status), Struct.STATUS.backendMetrics(status));
+		}
+	}
+
 	public record GuiAssetRecord(int spriteId, byte[] pngBytes) {
 		public GuiAssetRecord {
 			Objects.requireNonNull(pngBytes, "pngBytes");
+		}
+	}
+
+	/** Format values deliberately match the semantic Rust image contract. */
+	public record GuiRawImageAssetRecord(long assetId, int format, int width, int height, byte[] pixels) {
+		public GuiRawImageAssetRecord {
+			if (assetId == 0L || format < 1 || format > 2 || width <= 0 || height <= 0) {
+				throw new IllegalArgumentException("invalid semantic GUI raw image asset");
+			}
+			Objects.requireNonNull(pixels, "pixels");
+			pixels = pixels.clone();
+		}
+
+		@Override
+		public byte[] pixels() {
+			return this.pixels.clone();
+		}
+	}
+
+	/** Immutable copied world-text image with semantic atlas generation data. */
+	public record WorldTextImageAssetRecord(
+		long assetId,
+		long atlasGeneration,
+		long atlasRevision,
+		int format,
+		int width,
+		int height,
+		byte[] pixels
+	) {
+		public WorldTextImageAssetRecord {
+			if (assetId == 0L || atlasGeneration <= 0L || atlasRevision <= 0L
+				|| format < 1 || format > 2 || width <= 0 || height <= 0) {
+				throw new IllegalArgumentException("invalid semantic world text image asset");
+			}
+			Objects.requireNonNull(pixels, "pixels");
+			pixels = pixels.clone();
+		}
+
+		@Override
+		public byte[] pixels() {
+			return this.pixels.clone();
 		}
 	}
 
@@ -1439,10 +2279,11 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		int animationFlags,
 		int frameRowSize,
 		int interpolationPolicy,
-		List<WorldMeshAnimationFrameRecord> animationFrames
+		List<WorldMeshAnimationFrameRecord> animationFrames,
+		int coordinateOrigin
 	) {
 		public WorldMeshTextureAssetRecord(int textureId, byte[] pngBytes) {
-			this(textureId, pngBytes, 0, 0, 1, 1, 0, 0, 0, List.of());
+			this(textureId, pngBytes, 0, 0, 1, 1, 0, 0, 0, List.of(), WORLD_MESH_TEXTURE_COORDINATE_ORIGIN_VULKANIC);
 		}
 
 		public WorldMeshTextureAssetRecord(
@@ -1454,7 +2295,22 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			int frameTicks,
 			int animationFlags
 		) {
-			this(textureId, pngBytes, frameWidth, frameHeight, frameCount, frameTicks, animationFlags, 0, 0, List.of());
+			this(textureId, pngBytes, frameWidth, frameHeight, frameCount, frameTicks, animationFlags, 0, 0, List.of(), WORLD_MESH_TEXTURE_COORDINATE_ORIGIN_VULKANIC);
+		}
+
+		public WorldMeshTextureAssetRecord(
+			int textureId,
+			byte[] pngBytes,
+			int frameWidth,
+			int frameHeight,
+			int frameCount,
+			int frameTicks,
+			int animationFlags,
+			int frameRowSize,
+			int interpolationPolicy,
+			List<WorldMeshAnimationFrameRecord> animationFrames
+		) {
+			this(textureId, pngBytes, frameWidth, frameHeight, frameCount, frameTicks, animationFlags, frameRowSize, interpolationPolicy, animationFrames, WORLD_MESH_TEXTURE_COORDINATE_ORIGIN_VULKANIC);
 		}
 
 		public WorldMeshTextureAssetRecord {
@@ -1464,6 +2320,10 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			animationFrames = List.copyOf(animationFrames);
 			if (frameWidth < 0 || frameHeight < 0 || frameCount < 0 || frameTicks < 0 || frameRowSize < 0 || interpolationPolicy < 0) {
 				throw new IllegalArgumentException("negative world mesh texture animation metadata");
+			}
+			if (coordinateOrigin != WORLD_MESH_TEXTURE_COORDINATE_ORIGIN_VULKANIC
+				&& coordinateOrigin != WORLD_MESH_TEXTURE_COORDINATE_ORIGIN_MINECRAFT_TOP_LEFT) {
+				throw new IllegalArgumentException("unknown world mesh texture coordinate origin " + coordinateOrigin);
 			}
 		}
 	}
@@ -1524,15 +2384,315 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		int indexType,
 		List<WorldMeshVertexRecord> vertices,
 		byte[] indexBytes,
-		List<WorldMeshSectionRecord> sections
+		List<WorldMeshSectionRecord> sections,
+		String entityIdentity
 	) {
 		public WorldMeshAssetRecord {
 			Objects.requireNonNull(vertices, "vertices");
 			Objects.requireNonNull(indexBytes, "indexBytes");
 			Objects.requireNonNull(sections, "sections");
+			Objects.requireNonNull(entityIdentity, "entityIdentity");
 			vertices = List.copyOf(vertices);
 			indexBytes = indexBytes.clone();
 			sections = List.copyOf(sections);
+		}
+
+		public WorldMeshAssetRecord(
+			long meshKey,
+			long meshGeneration,
+			int vertexLayoutVersion,
+			int indexType,
+			List<WorldMeshVertexRecord> vertices,
+			byte[] indexBytes,
+			List<WorldMeshSectionRecord> sections
+		) {
+			this(meshKey, meshGeneration, vertexLayoutVersion, indexType, vertices, indexBytes, sections, "");
+		}
+	}
+
+	/** Semantic DH LOD vertex, independent of the producer's legacy GL VAO. */
+	public record WorldLodVertexRecord(
+		int localX,
+		int localY,
+		int localZ,
+		int packedLightAndMicroOffset,
+		int colorRgba,
+		int materialId,
+		int normalIndex
+	) {
+		public WorldLodVertexRecord {
+			if (localX < 0 || localX > 0xFFFF || localY < 0 || localY > 0xFFFF || localZ < 0 || localZ > 0xFFFF
+				|| packedLightAndMicroOffset < 0 || packedLightAndMicroOffset > 0xFFFF
+				|| materialId < 0 || materialId > 0xFF || normalIndex < 0 || normalIndex > 0xFF) {
+				throw new IllegalArgumentException("world LOD vertex field outside its semantic range");
+			}
+		}
+	}
+
+	public record WorldLodSegmentRecord(int layer, List<WorldLodVertexRecord> vertices) {
+		public WorldLodSegmentRecord {
+			Objects.requireNonNull(vertices, "vertices");
+			vertices = List.copyOf(vertices);
+		}
+	}
+
+	public record WorldLodColumnAssetRecord(
+		long columnKey,
+		long columnGeneration,
+		int vertexLayoutVersion,
+		int originX,
+		int originY,
+		int originZ,
+		List<WorldLodSegmentRecord> segments
+	) {
+		public WorldLodColumnAssetRecord {
+			Objects.requireNonNull(segments, "segments");
+			segments = List.copyOf(segments);
+		}
+	}
+
+	public record WorldLodColumnRetirementRecord(long columnKey, long columnGeneration) {
+	}
+
+	/** Stable semantic identity for a reduced DH quad. It is not an atlas or
+	 * renderer object; Rust resolves any future material resources itself. */
+	public record WorldLodMaterialIdentityRecord(String blockStateIdentity, String biomeIdentity) {
+		public WorldLodMaterialIdentityRecord {
+			Objects.requireNonNull(blockStateIdentity, "blockStateIdentity");
+			Objects.requireNonNull(biomeIdentity, "biomeIdentity");
+			if (blockStateIdentity.isBlank() || biomeIdentity.isBlank()) {
+				throw new IllegalArgumentException("world LOD material identities must be non-blank");
+			}
+		}
+	}
+
+	/** One material reference per emitted quad in one compact DH segment. */
+	public record WorldLodSegmentMaterialProvenanceRecord(
+		int layer, int segmentIndex, int[] quadMaterialIds, byte[] quadVariantStates,
+		long[] quadVariantPositions) {
+		public WorldLodSegmentMaterialProvenanceRecord(int layer, int segmentIndex, int[] quadMaterialIds) {
+			this(layer, segmentIndex, quadMaterialIds,
+				new byte[Objects.requireNonNull(quadMaterialIds, "quadMaterialIds").length],
+				new long[quadMaterialIds.length]);
+		}
+
+		public WorldLodSegmentMaterialProvenanceRecord {
+			if (layer <= 0 || segmentIndex < 0) {
+				throw new IllegalArgumentException("world LOD segment provenance has an invalid layer or index");
+			}
+			Objects.requireNonNull(quadMaterialIds, "quadMaterialIds");
+			Objects.requireNonNull(quadVariantStates, "quadVariantStates");
+			Objects.requireNonNull(quadVariantPositions, "quadVariantPositions");
+			if (quadVariantStates.length != quadMaterialIds.length
+				|| quadVariantPositions.length != quadMaterialIds.length) {
+				throw new IllegalArgumentException("world LOD variant provenance must align with material IDs");
+			}
+			quadMaterialIds = quadMaterialIds.clone();
+			quadVariantStates = quadVariantStates.clone();
+			quadVariantPositions = quadVariantPositions.clone();
+		}
+	}
+
+	/** One exact, copied atlas face for a reduced DH material identity. */
+	public record WorldLodFaceMaterialRecord(
+		int materialId,
+		int face,
+		int faceLayer,
+		String atlasIdentity,
+		String spriteIdentity,
+		float u0,
+		float v0,
+		float u1,
+		float v1,
+		int uvCornerOrder,
+		long variantPosition,
+		boolean tinted,
+		int tintArgb
+	) {
+		public WorldLodFaceMaterialRecord {
+			if (materialId <= 0 || face < 0 || face > 5 || faceLayer < 0 || faceLayer > 3) {
+				throw new IllegalArgumentException("world LOD face material has an invalid material ID, face, or layer");
+			}
+			Objects.requireNonNull(atlasIdentity, "atlasIdentity");
+			Objects.requireNonNull(spriteIdentity, "spriteIdentity");
+			if (atlasIdentity.isBlank() || spriteIdentity.isBlank()
+				|| !Float.isFinite(u0) || !Float.isFinite(v0) || !Float.isFinite(u1) || !Float.isFinite(v1)
+				|| u0 < 0.0F || v0 < 0.0F || u1 > 1.0F || v1 > 1.0F || u0 >= u1 || v0 >= v1) {
+				throw new IllegalArgumentException("world LOD face material must contain a normalized atlas region");
+			}
+			if (!validUvCornerOrder(uvCornerOrder)) {
+				throw new IllegalArgumentException("world LOD face material UV corner order must be a permutation");
+			}
+		}
+
+		public WorldLodFaceMaterialRecord(
+			int materialId, int face, String atlasIdentity, String spriteIdentity,
+			float u0, float v0, float u1, float v1
+		) {
+			this(materialId, face, 0, atlasIdentity, spriteIdentity, u0, v0, u1, v1, 0x78, 0L, false, 0xffffffff);
+		}
+
+		public WorldLodFaceMaterialRecord(
+			int materialId, int face, String atlasIdentity, String spriteIdentity,
+			float u0, float v0, float u1, float v1, int uvCornerOrder
+		) {
+			this(materialId, face, 0, atlasIdentity, spriteIdentity, u0, v0, u1, v1, uvCornerOrder, 0L, false, 0xffffffff);
+		}
+
+		private static boolean validUvCornerOrder(int order) {
+			if (order < 0 || order > 0xff) {
+				return false;
+			}
+			int mask = 0;
+			for (int index = 0; index < 4; index++) {
+				int corner = order >>> (index * 2) & 0x3;
+				int bit = 1 << corner;
+				if ((mask & bit) != 0) {
+					return false;
+				}
+				mask |= bit;
+			}
+			return mask == 0xf;
+		}
+	}
+
+	/** Generation-bound copied material provenance sidecar for a DH column.
+	 * The color-only route does not render this table as textures. */
+	public record WorldLodColumnMaterialProvenanceRecord(
+		long columnKey,
+		long columnGeneration,
+		List<WorldLodMaterialIdentityRecord> identities,
+		List<WorldLodSegmentMaterialProvenanceRecord> segments,
+		List<WorldLodFaceMaterialRecord> faceMaterials
+	) {
+		public WorldLodColumnMaterialProvenanceRecord(
+			long columnKey,
+			long columnGeneration,
+			List<WorldLodMaterialIdentityRecord> identities,
+			List<WorldLodSegmentMaterialProvenanceRecord> segments
+		) {
+			this(columnKey, columnGeneration, identities, segments, List.of());
+		}
+
+		public WorldLodColumnMaterialProvenanceRecord {
+			if (columnGeneration <= 0L) {
+				throw new IllegalArgumentException("world LOD material provenance generation must be non-zero");
+			}
+			Objects.requireNonNull(identities, "identities");
+			Objects.requireNonNull(segments, "segments");
+			Objects.requireNonNull(faceMaterials, "faceMaterials");
+			identities = List.copyOf(identities);
+			segments = List.copyOf(segments);
+			faceMaterials = List.copyOf(faceMaterials);
+		}
+	}
+
+	/** One visible semantic DH LOD segment in legacy render-list order. */
+	public record WorldLodColumnInstanceRecord(
+		long columnKey,
+		long columnGeneration,
+		int layer,
+		int segmentIndex,
+		int order
+	) {
+		public WorldLodColumnInstanceRecord {
+			if (columnGeneration <= 0L || layer <= 0 || segmentIndex < 0 || order < 0) {
+				throw new IllegalArgumentException("world LOD instance has an invalid semantic field");
+			}
+		}
+	}
+
+	/**
+	 * Resolved, backend-neutral render semantics for one Distant Horizons frame.
+	 * This is intentionally data only: it carries no shader, framebuffer,
+	 * lightmap, or native resource identity from the legacy renderer.
+	 */
+	public record WorldLodRenderFrameRecord(
+		boolean enabled,
+		int flags,
+		int worldYOffset,
+		float[] combinedMatrix,
+		float[] modelViewMatrix,
+		float[] projectionMatrix,
+		float[] projectionInverseMatrix,
+		float clipDistance,
+		float microOffset,
+		float noiseIntensity,
+		float earthRadius,
+		int noiseSteps,
+		int noiseDropoff,
+		float[] cameraWorldPosition
+	) {
+		public WorldLodRenderFrameRecord {
+		combinedMatrix = copyFiniteMatrix(combinedMatrix, "combined");
+		modelViewMatrix = copyFiniteMatrix(modelViewMatrix, "model-view");
+		projectionMatrix = copyFiniteMatrix(projectionMatrix, "projection");
+		projectionInverseMatrix = copyFiniteMatrix(projectionInverseMatrix, "projection inverse");
+		cameraWorldPosition = copyFiniteCameraPosition(cameraWorldPosition);
+			if (flags < 0 || flags > 0x1F || !Float.isFinite(clipDistance) || !Float.isFinite(microOffset)
+				|| !Float.isFinite(noiseIntensity) || !Float.isFinite(earthRadius)) {
+				throw new IllegalArgumentException("world LOD render frame contains an invalid semantic field");
+			}
+			if (enabled && (clipDistance < 0.0F || microOffset <= 0.0F)) {
+				throw new IllegalArgumentException("enabled world LOD render frame has invalid clip or micro-offset semantics");
+			}
+		}
+
+		public static WorldLodRenderFrameRecord disabled() {
+			return new WorldLodRenderFrameRecord(false, 0, 0, new float[16], new float[16], new float[16], new float[16], 0.0F, 0.0F, 0.0F, 0.0F, 0, 0, new float[3]);
+		}
+
+		@Override
+		public float[] combinedMatrix() {
+			return combinedMatrix.clone();
+		}
+
+		@Override
+		public float[] modelViewMatrix() {
+			return modelViewMatrix.clone();
+		}
+
+		@Override
+		public float[] projectionMatrix() {
+			return projectionMatrix.clone();
+		}
+
+		@Override
+		public float[] projectionInverseMatrix() {
+			return projectionInverseMatrix.clone();
+		}
+
+		private static float[] copyFiniteMatrix(float[] matrix, String label) {
+			Objects.requireNonNull(matrix, label + " matrix");
+			if (matrix.length != 16) {
+				throw new IllegalArgumentException("world LOD " + label + " matrix must contain 16 floats");
+			}
+			float[] copy = matrix.clone();
+			for (float value : copy) {
+				if (!Float.isFinite(value)) {
+					throw new IllegalArgumentException("world LOD render frame must contain finite values");
+				}
+			}
+			return copy;
+		}
+
+		@Override
+		public float[] cameraWorldPosition() {
+			return cameraWorldPosition.clone();
+		}
+
+		private static float[] copyFiniteCameraPosition(float[] position) {
+			Objects.requireNonNull(position, "camera world position");
+			if (position.length != 3) {
+				throw new IllegalArgumentException("world LOD camera world position must contain three floats");
+			}
+			float[] copy = position.clone();
+			for (float value : copy) {
+				if (!Float.isFinite(value)) {
+					throw new IllegalArgumentException("world LOD camera world position must be finite");
+				}
+			}
+			return copy;
 		}
 	}
 
@@ -1764,8 +2924,145 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		int width,
 		int height,
 		int guiWidth,
-		int guiHeight
+		int guiHeight,
+		long sequence
 	) {
+		public GuiSpriteRecord(
+			int stratum, int spriteId, int selectedSlot, float progressFraction, int fillDirection, int colorArgb,
+			int x, int y, int width, int height, int guiWidth, int guiHeight
+		) {
+			this(stratum, spriteId, selectedSlot, progressFraction, fillDirection, colorArgb,
+				x, y, width, height, guiWidth, guiHeight, 0L);
+		}
+
+		public GuiSpriteRecord withSequence(long value) {
+			return new GuiSpriteRecord(
+				this.stratum, this.spriteId, this.selectedSlot, this.progressFraction, this.fillDirection,
+				this.colorArgb, this.x, this.y, this.width, this.height, this.guiWidth, this.guiHeight, value
+			);
+		}
+	}
+
+	/** Backend-neutral affine glyph/image primitive in GUI logical coordinates. */
+	public record GuiAffineQuadRecord(
+		int stratum,
+		long assetId,
+		float x0,
+		float y0,
+		float x1,
+		float y1,
+		float x3,
+		float y3,
+		float z,
+		float u0,
+		float v0,
+		float u1,
+		float v1,
+		int colorArgb,
+		int guiWidth,
+		int guiHeight,
+		long sequence,
+		int clipMode,
+		int clipLeft,
+		int clipTop,
+		int clipWidth,
+		int clipHeight
+	) {
+		public GuiAffineQuadRecord(
+			int stratum, long assetId, float x0, float y0, float x1, float y1, float x3, float y3,
+			float z, float u0, float v0, float u1, float v1, int colorArgb, int guiWidth, int guiHeight
+		) {
+			this(stratum, assetId, x0, y0, x1, y1, x3, y3, z, u0, v0, u1, v1,
+				colorArgb, guiWidth, guiHeight, 0L, 0, 0, 0, 0, 0);
+		}
+
+		public GuiAffineQuadRecord {
+			if (assetId == 0L || guiWidth <= 0 || guiHeight <= 0
+				|| !Float.isFinite(x0) || !Float.isFinite(y0) || !Float.isFinite(x1) || !Float.isFinite(y1)
+				|| !Float.isFinite(x3) || !Float.isFinite(y3) || !Float.isFinite(z)
+				|| !Float.isFinite(u0) || !Float.isFinite(v0) || !Float.isFinite(u1) || !Float.isFinite(v1)
+				|| u0 < 0.0F || u0 > 1.0F || v0 < 0.0F || v0 > 1.0F
+				|| u1 < 0.0F || u1 > 1.0F || v1 < 0.0F || v1 > 1.0F
+				|| (clipMode == 0 && (clipLeft != 0 || clipTop != 0 || clipWidth != 0 || clipHeight != 0))
+				|| (clipMode == 1 && (clipLeft < 0 || clipTop < 0 || clipWidth < 0 || clipHeight < 0
+					|| (long)clipLeft + clipWidth > guiWidth || (long)clipTop + clipHeight > guiHeight))
+				|| (clipMode != 0 && clipMode != 1)) {
+				throw new IllegalArgumentException("invalid semantic GUI affine quad");
+			}
+		}
+
+		public GuiAffineQuadRecord withSequence(long value) {
+			return new GuiAffineQuadRecord(
+				this.stratum, this.assetId, this.x0, this.y0, this.x1, this.y1, this.x3, this.y3,
+				this.z, this.u0, this.v0, this.u1, this.v1, this.colorArgb, this.guiWidth, this.guiHeight, value,
+				this.clipMode, this.clipLeft, this.clipTop, this.clipWidth, this.clipHeight
+			);
+		}
+
+		public GuiAffineQuadRecord withClip(int left, int top, int width, int height) {
+			return new GuiAffineQuadRecord(
+				this.stratum, this.assetId, this.x0, this.y0, this.x1, this.y1, this.x3, this.y3,
+				this.z, this.u0, this.v0, this.u1, this.v1, this.colorArgb, this.guiWidth, this.guiHeight,
+				this.sequence, 1, left, top, width, height
+			);
+		}
+	}
+
+	/** Copied semantic vertex for one Rust-owned standard-3D GUI item layer. */
+	public record GuiMeshVertexRecord(
+		float[] position,
+		float[] atlasUv,
+		float[] localUv,
+		int colorArgb,
+		int normalPacked
+	) {
+		public GuiMeshVertexRecord {
+			position = checkedFiniteCopy(position, 3, "GUI mesh position");
+			atlasUv = checkedFiniteCopy(atlasUv, 2, "GUI mesh atlas UV");
+			localUv = checkedFiniteCopy(localUv, 2, "GUI mesh local UV");
+		}
+
+		@Override public float[] position() { return this.position.clone(); }
+		@Override public float[] atlasUv() { return this.atlasUv.clone(); }
+		@Override public float[] localUv() { return this.localUv.clone(); }
+	}
+
+	/** One coarse copied material layer. Backends see no Java renderer state. */
+	public record GuiMeshBatchRecord(
+		int stratum, int layerIndex, int materialMode, int lightingMode, long assetId, long sequence,
+		float alphaCutoff, float[] modelTransform, float[] guiPose,
+		int left, int top, int right, int bottom, int guiWidth, int guiHeight,
+		int renderWidth, int renderHeight, int guardPixels,
+		List<GuiMeshVertexRecord> vertices, List<Integer> indices
+	) {
+		public GuiMeshBatchRecord {
+			if (assetId == 0L || layerIndex < 0 || (materialMode != 1 && materialMode != 2)
+				|| (lightingMode != 1 && lightingMode != 2) || !Float.isFinite(alphaCutoff)
+				|| guiWidth <= 0 || guiHeight <= 0 || renderWidth <= guardPixels * 2 || renderHeight <= guardPixels * 2
+				|| left >= right || top >= bottom) throw new IllegalArgumentException("invalid semantic GUI mesh batch");
+			modelTransform = checkedFiniteCopy(modelTransform, 16, "GUI mesh model transform");
+			guiPose = checkedFiniteCopy(guiPose, 6, "GUI mesh GUI pose");
+			vertices = List.copyOf(vertices);
+			indices = List.copyOf(indices);
+			if (vertices.isEmpty() || indices.isEmpty()) throw new IllegalArgumentException("GUI mesh batch requires geometry");
+			for (int index : indices) if (index < 0 || index >= vertices.size()) throw new IllegalArgumentException("GUI mesh index out of range");
+		}
+
+		@Override public float[] modelTransform() { return this.modelTransform.clone(); }
+		@Override public float[] guiPose() { return this.guiPose.clone(); }
+
+		public GuiMeshBatchRecord withSequence(long value) {
+			return new GuiMeshBatchRecord(stratum, layerIndex, materialMode, lightingMode, assetId, value,
+				alphaCutoff, modelTransform, guiPose, left, top, right, bottom, guiWidth, guiHeight,
+				renderWidth, renderHeight, guardPixels, vertices, indices);
+		}
+	}
+
+	private static float[] checkedFiniteCopy(float[] values, int length, String name) {
+		if (values == null || values.length != length) throw new IllegalArgumentException(name + " length");
+		float[] copy = values.clone();
+		for (float value : copy) if (!Float.isFinite(value)) throw new IllegalArgumentException(name + " must be finite");
+		return copy;
 	}
 
 	public record WorldLineSegmentRecord(
@@ -1782,7 +3079,43 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		float endZ,
 		int viewportWidth,
 		int viewportHeight
+		,
+		int entityId,
+		int entityColorArgb
 	) {
+		public WorldLineSegmentRecord(
+			int stratum,
+			int style,
+			int depthPolicy,
+			int colorArgb,
+			float lineWidth,
+			float startX,
+			float startY,
+			float startZ,
+			float endX,
+			float endY,
+			float endZ,
+			int viewportWidth,
+			int viewportHeight
+		) {
+			this(
+				stratum,
+				style,
+				depthPolicy,
+				colorArgb,
+				lineWidth,
+				startX,
+				startY,
+				startZ,
+				endX,
+				endY,
+				endZ,
+				viewportWidth,
+				viewportHeight,
+				0,
+				0
+			);
+		}
 	}
 
 	public record WorldCrackQuadRecord(
@@ -1862,8 +3195,44 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		float uv3U,
 		float uv3V,
 		int viewportWidth,
-		int viewportHeight
+		int viewportHeight,
+		int sourceProgram,
+		int sourceUvSpace,
+		int sourceColorArgb,
+		int packedLight,
+		int vertex0ColorArgb,
+		int vertex1ColorArgb,
+		int vertex2ColorArgb,
+		int vertex3ColorArgb,
+		int vertex0PackedLight,
+		int vertex1PackedLight,
+		int vertex2PackedLight,
+		int vertex3PackedLight
 	) {
+		public WorldMaterialQuadRecord(
+			int stratum, int materialId, int textureId, int materialMode, int depthPolicy, int cullPolicy,
+			int topology, int winding, int colorArgb,
+			float p0X, float p0Y, float p0Z, float p1X, float p1Y, float p1Z,
+			float p2X, float p2Y, float p2Z, float p3X, float p3Y, float p3Z,
+			float uv0U, float uv0V, float uv1U, float uv1V, float uv2U, float uv2V, float uv3U, float uv3V,
+			int viewportWidth, int viewportHeight, int sourceProgram, int sourceUvSpace, int sourceColorArgb, int packedLight
+		) {
+			this(
+				stratum, materialId, textureId, materialMode, depthPolicy, cullPolicy, topology, winding, colorArgb,
+				p0X, p0Y, p0Z, p1X, p1Y, p1Z, p2X, p2Y, p2Z, p3X, p3Y, p3Z,
+				uv0U, uv0V, uv1U, uv1V, uv2U, uv2V, uv3U, uv3V,
+				viewportWidth, viewportHeight, sourceProgram, sourceUvSpace, sourceColorArgb, packedLight,
+				sourceColorArgb, sourceColorArgb, sourceColorArgb, sourceColorArgb,
+				packedLight, packedLight, packedLight, packedLight
+			);
+		}
+
+		public boolean hasVertexModulation() {
+			return vertex0ColorArgb != sourceColorArgb || vertex1ColorArgb != sourceColorArgb
+				|| vertex2ColorArgb != sourceColorArgb || vertex3ColorArgb != sourceColorArgb
+				|| vertex0PackedLight != packedLight || vertex1PackedLight != packedLight
+				|| vertex2PackedLight != packedLight || vertex3PackedLight != packedLight;
+		}
 	}
 
 	private record WorldMaterialKeyRecord(
@@ -1874,7 +3243,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		int depthPolicy,
 		int cullPolicy,
 		int topology,
-		int winding
+		int winding,
+		int sourceProgram
 	) {
 		static WorldMaterialKeyRecord from(WorldMaterialQuadRecord quad) {
 			return new WorldMaterialKeyRecord(
@@ -1885,7 +3255,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 				quad.depthPolicy(),
 				quad.cullPolicy(),
 				quad.topology(),
-				quad.winding()
+				quad.winding(),
+				quad.sourceProgram()
 			);
 		}
 	}
@@ -1901,14 +3272,106 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		int colorArgb,
 		float[] transform,
 		int viewportWidth,
-		int viewportHeight
+		int viewportHeight,
+		int entityId,
+		int entityColorArgb
 	) {
+		public WorldMeshInstanceRecord(
+			int stratum,
+			long meshKey,
+			long meshGeneration,
+			int meshSectionIndex,
+			int depthPolicy,
+			int cullPolicy,
+			int winding,
+			int colorArgb,
+			float[] transform,
+			int viewportWidth,
+			int viewportHeight
+		) {
+			this(
+				stratum,
+				meshKey,
+				meshGeneration,
+				meshSectionIndex,
+				depthPolicy,
+				cullPolicy,
+				winding,
+				colorArgb,
+				transform,
+				viewportWidth,
+				viewportHeight,
+				0,
+				0
+			);
+		}
+
 		public WorldMeshInstanceRecord {
 			Objects.requireNonNull(transform, "transform");
 			if (transform.length != 16) {
 				throw new IllegalArgumentException("world mesh instance transform must contain 16 floats");
 			}
 			transform = transform.clone();
+		}
+	}
+
+	/** One copied backend-neutral glyph quad in a shared world-text frame stream. */
+	public record WorldTextQuadRecord(
+		long assetId,
+		long atlasGeneration,
+		long atlasRevision,
+		boolean colored,
+		int depthPolicy,
+		int packedLight,
+		int colorArgb,
+		double distanceToCameraSq,
+		float[] modelViewMatrix,
+		float[] positions,
+		float[] uvs
+	) {
+		public WorldTextQuadRecord {
+			Objects.requireNonNull(modelViewMatrix, "modelViewMatrix");
+			Objects.requireNonNull(positions, "positions");
+			Objects.requireNonNull(uvs, "uvs");
+			if (assetId == 0L || atlasGeneration <= 0L || atlasRevision <= 0L
+				|| (depthPolicy != 1 && depthPolicy != 2 && depthPolicy != 3) || !Double.isFinite(distanceToCameraSq)
+				|| distanceToCameraSq < 0.0 || modelViewMatrix.length != 16
+				|| positions.length != 12 || uvs.length != 8) {
+				throw new IllegalArgumentException("invalid semantic world text quad");
+			}
+			for (float value : modelViewMatrix) {
+				if (!Float.isFinite(value)) {
+					throw new IllegalArgumentException("world text matrix must be finite");
+				}
+			}
+			for (float value : positions) {
+				if (!Float.isFinite(value)) {
+					throw new IllegalArgumentException("world text positions must be finite");
+				}
+			}
+			for (float value : uvs) {
+				if (!Float.isFinite(value)) {
+					throw new IllegalArgumentException("world text UVs must be finite");
+				}
+			}
+			modelViewMatrix = modelViewMatrix.clone();
+			positions = positions.clone();
+			uvs = uvs.clone();
+		}
+
+		@Override
+		public float[] modelViewMatrix() {
+			return this.modelViewMatrix.clone();
+		}
+
+		@Override
+		public float[] positions() {
+			return this.positions.clone();
+		}
+
+		@Override
+		public float[] uvs() {
+			return this.uvs.clone();
 		}
 	}
 
@@ -1919,8 +3382,63 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		int storeIntent,
 		int colorArgb,
 		int viewportWidth,
-		int viewportHeight
+		int viewportHeight,
+		boolean skyVisible,
+		boolean skySunriseOrSunset,
+		boolean skyDarkDisc,
+		float skySunAngle,
+		float skyTimeOfDay,
+		float skyRainBrightness,
+		float skyStarBrightness,
+		int skySunriseAndSunsetColorArgb,
+		int skyMoonPhase,
+		float skyEndFlashIntensity,
+		float skyEndFlashXAngle,
+		float skyEndFlashYAngle,
+		int skyColorArgb
 	) {
+		/** Preserves the original clear-only constructor for existing routes. */
+		public WorldBackgroundRecord(
+			boolean enabled,
+			int skyType,
+			int loadIntent,
+			int storeIntent,
+			int colorArgb,
+			int viewportWidth,
+			int viewportHeight
+		) {
+			this(
+				enabled, skyType, loadIntent, storeIntent, colorArgb, viewportWidth, viewportHeight,
+				false, false, false, 0.0F, 0.0F, 0.0F, 0.0F, 0, 0, 0.0F, 0.0F, 0.0F, 0
+			);
+		}
+
+		/**
+		 * Attaches copied vanilla sky semantics without introducing a Java render
+		 * object, native handle, or pass-selection policy to the transport record.
+		 */
+		public WorldBackgroundRecord withSky(
+			boolean visible,
+			boolean sunriseOrSunset,
+			boolean darkDisc,
+			float sunAngle,
+			float timeOfDay,
+			float rainBrightness,
+			float starBrightness,
+			int sunriseAndSunsetColorArgb,
+			int moonPhase,
+			float endFlashIntensity,
+			float endFlashXAngle,
+			float endFlashYAngle,
+			int skyColorArgb
+		) {
+			return new WorldBackgroundRecord(
+				enabled, skyType, loadIntent, storeIntent, colorArgb, viewportWidth, viewportHeight,
+				visible, sunriseOrSunset, darkDisc, sunAngle, timeOfDay, rainBrightness, starBrightness,
+				sunriseAndSunsetColorArgb, moonPhase, endFlashIntensity, endFlashXAngle, endFlashYAngle, skyColorArgb
+			);
+		}
+
 		public static WorldBackgroundRecord diagnosticFallback() {
 			return new WorldBackgroundRecord(false, 0, 0, 0, 0, 0, 0);
 		}
@@ -1937,6 +3455,40 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	) {
 		public static WorldVoxelVolumeFrameRecord disabled() {
 			return new WorldVoxelVolumeFrameRecord(false, 0L, 0L, 0.0F, 0.0F, 0.0F);
+		}
+	}
+
+	/**
+	 * Coarse first-person projection/depth semantics for the future Rust-owned
+	 * held-item pass. This contains no Java renderer, Iris state, native object,
+	 * or backend policy. Per-item transforms remain mesh-instance data while
+	 * the frame supplies the distinct hand model-view and projection domains.
+	 */
+	public record WorldFirstPersonFrameRecord(
+		boolean enabled,
+		boolean clearDepthBefore,
+		int mainHandInstanceCount,
+		float[] projectionMatrix,
+		float[] modelViewMatrix
+	) {
+		public WorldFirstPersonFrameRecord {
+			Objects.requireNonNull(projectionMatrix, "projectionMatrix");
+			Objects.requireNonNull(modelViewMatrix, "modelViewMatrix");
+			if (projectionMatrix.length != 16) {
+				throw new IllegalArgumentException("first-person projection matrix must contain 16 floats");
+			}
+			if (modelViewMatrix.length != 16) {
+				throw new IllegalArgumentException("first-person model-view matrix must contain 16 floats");
+			}
+			if (mainHandInstanceCount < 0) {
+				throw new IllegalArgumentException("first-person main-hand instance count must be non-negative");
+			}
+			projectionMatrix = projectionMatrix.clone();
+			modelViewMatrix = modelViewMatrix.clone();
+		}
+
+		public static WorldFirstPersonFrameRecord disabled() {
+			return new WorldFirstPersonFrameRecord(false, false, 0, new float[16], new float[16]);
 		}
 	}
 
@@ -1973,7 +3525,35 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		String mainHandItemModelResourceLocation,
 		String offHandItemModelResourceLocation,
 		int mainHandItemLightEmission,
-		int offHandItemLightEmission
+		int offHandItemLightEmission,
+		boolean lightmapEnabled,
+		long lightmapGeneration,
+		float lightmapAmbientLightFactor,
+		float lightmapSkyFactor,
+		float lightmapBlockFactor,
+		float lightmapNightVisionFactor,
+		float lightmapDarknessScale,
+		float lightmapDarkenWorldFactor,
+		float lightmapBrightnessFactor,
+		float lightmapSkyLightRed,
+		float lightmapSkyLightGreen,
+		float lightmapSkyLightBlue,
+		float lightmapAmbientRed,
+		float lightmapAmbientGreen,
+		float lightmapAmbientBlue,
+		float blindness,
+		float darknessFactor,
+		int eyeBrightnessBlock,
+		int eyeBrightnessSky,
+		float fogParameterColorRed,
+		float fogParameterColorGreen,
+		float fogParameterColorBlue,
+		float fogParameterColorAlpha,
+		float fogEnvironmentalStart,
+		float fogEnvironmentalEnd,
+		float fogRenderDistanceStart,
+		float fogRenderDistanceEnd,
+		int distantHorizonsRenderDistance
 	) {
 		public static WorldShaderEnvironmentFrameRecord disabled() {
 			return new WorldShaderEnvironmentFrameRecord(
@@ -1985,8 +3565,38 @@ public final class VulkanicGalBridge implements AutoCloseable {
 				0.0F, 0.0F, 0.0F,
 				0.0F, 0.0F,
 				0.0F, 0.0F, 0.0F,
-			0, "", "", "", 0, 0
+			0, "", "", "", 0, 0,
+			false, 0L,
+			0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F,
+			0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F,
+			0.0F, 0.0F, 0, 0,
+			0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0
 		);
+		}
+	}
+
+	/**
+	 * Copied feature-family inventory for whole-frame source-route admission.
+	 * These counts contain no render types, models, callbacks, Iris state, or
+	 * native backend objects.
+	 */
+	public record WorldFeatureCoverageRecord(
+		int modelSubmits,
+		int modelPartSubmits,
+		int blockModelSubmits,
+		int ordinaryBlockSubmits,
+		int itemSubmits,
+		int customGeometrySubmits,
+		int shadowSubmits,
+		int flameSubmits,
+		int nameTagSubmits,
+		int textSubmits,
+		int hitboxSubmits,
+		int leashSubmits,
+		int particleGroupSubmits
+	) {
+		public static WorldFeatureCoverageRecord empty() {
+			return new WorldFeatureCoverageRecord(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 		}
 	}
 
@@ -2045,6 +3655,9 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		long meshCacheMisses,
 		long spriteCount,
 		long spriteBatchCount,
+		long guiMeshItemCount,
+		long guiMeshBatchCount,
+		long guiMeshDrawCount,
 		long cacheHits,
 		long cacheMisses,
 		long resourceCreates,
@@ -2214,10 +3827,13 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		private static final MethodHandle WHOLE_FRAME_SUBMIT = downcall("mattmc_vulkanic_gal_whole_frame_submit", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle WORLD_PRIMITIVES_SUBMIT = downcall("mattmc_vulkanic_gal_world_primitives_submit", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle GUI_UPDATE_ASSETS = downcall("mattmc_vulkanic_gal_gui_update_assets", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+		private static final MethodHandle GUI_UPDATE_RAW_IMAGES = downcall("mattmc_vulkanic_gal_gui_update_raw_images", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+		private static final MethodHandle WORLD_TEXT_UPDATE_IMAGES = downcall("mattmc_vulkanic_gal_world_text_update_images", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle WORLD_BORDER_UPDATE_ASSET = downcall("mattmc_vulkanic_gal_world_border_update_asset", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle WORLD_CRACK_UPDATE_ASSETS = downcall("mattmc_vulkanic_gal_world_crack_update_assets", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle WORLD_MATERIAL_UPDATE_ASSETS = downcall("mattmc_vulkanic_gal_world_material_update_assets", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle WORLD_MESH_UPDATE_ASSETS = downcall("mattmc_vulkanic_gal_world_mesh_update_assets", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+		private static final MethodHandle WORLD_LOD_UPDATE_ASSETS = downcall("mattmc_vulkanic_gal_world_lod_update_assets", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle SHADER_PACK_UPDATE_SOURCES = downcall("mattmc_vulkanic_gal_shader_pack_update_sources", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle SHADER_PACK_UPDATE_ASSETS = downcall("mattmc_vulkanic_gal_shader_pack_update_assets", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle LAST_ERROR = downcall("mattmc_vulkanic_gal_last_error", FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG));
@@ -2386,11 +4002,27 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			}
 		}
 
+		static int guiUpdateRawImages(long contextId, MemorySegment request, MemorySegment result) {
+			try {
+				return (int) GUI_UPDATE_RAW_IMAGES.invokeExact(contextId, request, result);
+			} catch (Throwable throwable) {
+				throw new IllegalStateException("Failed to update Rust VulkanicGAL raw GUI images", throwable);
+			}
+		}
+
 		static int worldBorderUpdateAsset(long contextId, MemorySegment request, MemorySegment result) {
 			try {
 				return (int) WORLD_BORDER_UPDATE_ASSET.invokeExact(contextId, request, result);
 			} catch (Throwable throwable) {
 				throw new IllegalStateException("Failed to update Rust VulkanicGAL world-border asset", throwable);
+			}
+		}
+
+		static int worldTextUpdateImages(long contextId, MemorySegment request, MemorySegment result) {
+			try {
+				return (int) WORLD_TEXT_UPDATE_IMAGES.invokeExact(contextId, request, result);
+			} catch (Throwable throwable) {
+				throw new IllegalStateException("Failed to update Rust VulkanicGAL world text images", throwable);
 			}
 		}
 
@@ -2415,6 +4047,14 @@ public final class VulkanicGalBridge implements AutoCloseable {
 				return (int) WORLD_MESH_UPDATE_ASSETS.invokeExact(contextId, request, result);
 			} catch (Throwable throwable) {
 				throw new IllegalStateException("Failed to update Rust VulkanicGAL world mesh assets", throwable);
+			}
+		}
+
+		static int worldLodUpdateAssets(long contextId, MemorySegment request, MemorySegment result) {
+			try {
+				return (int) WORLD_LOD_UPDATE_ASSETS.invokeExact(contextId, request, result);
+			} catch (Throwable throwable) {
+				throw new IllegalStateException("Failed to update Rust VulkanicGAL world LOD assets", throwable);
 			}
 		}
 
@@ -2523,7 +4163,30 @@ public final class VulkanicGalBridge implements AutoCloseable {
 					SHADER_PACK_SOURCE_FILE(74),
 					SHADER_PACK_SOURCE_UPDATE(75),
 					SHADER_PACK_ASSET_FILE(76),
-					SHADER_PACK_ASSET_UPDATE(77);
+					SHADER_PACK_ASSET_UPDATE(77),
+					WORLD_LOD_VERTEX(78),
+					WORLD_LOD_SEGMENT_RECORD(79),
+					WORLD_LOD_COLUMN_ASSET_RECORD(80),
+					WORLD_LOD_COLUMN_RETIREMENT_RECORD(81),
+					WORLD_LOD_ASSET_UPDATE(82),
+					WORLD_LOD_COLUMN_INSTANCE_RECORD(83),
+					WORLD_LOD_RENDER_FRAME(84),
+					WORLD_LOD_MATERIAL_IDENTITY_RECORD(85),
+					WORLD_LOD_SEGMENT_MATERIAL_PROVENANCE_RECORD(86),
+					WORLD_LOD_COLUMN_MATERIAL_PROVENANCE_RECORD(87),
+			WORLD_LOD_FACE_MATERIAL_RECORD(88),
+			WORLD_FEATURE_COVERAGE(89),
+			GUI_RAW_IMAGE_ASSET_PAYLOAD(90),
+			GUI_RAW_IMAGE_UPDATE(91),
+			GUI_AFFINE_QUAD_REQUEST(92),
+			WORLD_TEXT_QUAD_REQUEST(93),
+			WORLD_TEXT_IMAGE_ASSET_PAYLOAD(94),
+			WORLD_TEXT_IMAGE_UPDATE(95),
+			// Coarse semantic GUI-item mesh layouts. They are accepted only by the
+			// explicit Rust-owned standard-3D GUI route.
+			GUI_MESH_VERTEX(96),
+			GUI_MESH_BATCH_REQUEST(97),
+			WORLD_FIRST_PERSON_FRAME(98);
 
 		private final int id;
 		private final int byteSize;

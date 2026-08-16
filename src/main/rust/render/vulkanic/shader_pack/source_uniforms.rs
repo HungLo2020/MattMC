@@ -24,28 +24,67 @@ pub enum TerrainSourceUniformSemantic {
     MoonPhase,
     FrameTimeSeconds,
     FrameTimeCounter,
+    /// Source-declared temporal smoothing of `frameTime`, owned by Rust from
+    /// copied frame duration rather than an Iris custom-uniform object.
+    FrameTimeSmooth,
+    AspectRatio,
+    Blindness,
+    DarknessFactor,
+    MaxBlindnessDarkness,
     SunAngle,
+    /// Rust-owned celestial primitive selector. `0` is the sun and `1` is
+    /// the moon; the selected source program still receives its pack-defined
+    /// render-stage integer separately.
+    CelestialIsMoon,
+    /// Copied vanilla celestial vertex alpha. This is per owned sky draw,
+    /// not a Java dynamic-transform or backend blend state.
+    CelestialAlpha,
+    /// Parsed shader-pack sun-path rotation used by the owned celestial
+    /// transform. The value is source configuration, never Iris state.
+    CelestialSunPathRotation,
     RainStrength,
     RainFactor,
     ThunderStrength,
     SkyDarken,
     CameraWorldPosition,
+    /// Integer block-space camera origin used by source programs for stable
+    /// world-coordinate reconstruction. Rust derives this from the same
+    /// copied semantic camera position as the floating and fractional forms.
+    CameraWorldPositionInt,
     CameraWorldPositionFract,
+    PreviousCameraWorldPosition,
+    /// Magnitude of current-minus-previous semantic camera position.
+    CameraVelocity,
     ViewMatrix,
     ViewMatrixInverse,
     ProjectionMatrix,
     ProjectionMatrixInverse,
+    PreviousViewMatrix,
+    PreviousProjectionMatrix,
     ShadowModelView,
     ShadowModelViewInverse,
     ShadowProjection,
     ShadowProjectionInverse,
+    DistantModelView,
+    DistantProjection,
+    DistantProjectionInverse,
     ViewportWidth,
     ViewportHeight,
+    NearPlane,
     EyeSubmersion,
     ScreenBrightness,
     DarknessLightFactor,
     NightVision,
+    EyeBrightness,
+    EyeBrightnessM,
+    EyeBrightnessM2,
     FogColor,
+    /// Exact RGBA and environmental range used by legacy `gl_Fog`. These are
+    /// distinct from a pack's `fogColor` uniform, which may have different
+    /// source-defined composition semantics.
+    LegacyFogColor,
+    LegacyFogEnvironmentalStart,
+    LegacyFogEnvironmentalEnd,
     BiomeDry,
     BiomeSnowy,
     BiomeNetherWastes,
@@ -53,10 +92,35 @@ pub enum TerrainSourceUniformSemantic {
     BiomeWarpedForest,
     BiomeBasaltDeltas,
     BiomeSoulValley,
+    BiomePaleGarden,
+    BiomeRainy,
+    /// Source-defined surface wetness. Rust receives a semantic gameplay
+    /// value; packs retain ownership of how it affects shading.
+    Wetness,
     SkyColor,
     MaterialAtlasSize,
     FarPlane,
+    /// Distant Horizons' configured block render distance. Iris exposes this
+    /// whenever the pack enables its shared `DISTANT_HORIZONS` source branch,
+    /// including near-terrain programs. Rust receives copied gameplay
+    /// configuration rather than an Iris uniform value.
+    DistantHorizonsRenderDistance,
     RelativeEyePosition,
+    /// The currently rendered entity identity. Static terrain explicitly uses
+    /// the documented non-entity sentinel; future entity passes must provide
+    /// their own resolved semantic value.
+    EntityId,
+    /// Per-draw entity color override. This is a copied gameplay color owned
+    /// by the Rust source-pass contract; it is not a Java/Iris uniform value
+    /// or a backend binding.
+    EntityColor,
+    /// Pack-defined identity for the current item-render pass. Non-item
+    /// passes use the explicit `-1` sentinel rather than inheriting a value
+    /// from any legacy renderer state.
+    CurrentRenderedItemId,
+    /// The currently rendered block-entity identity. Static terrain explicitly
+    /// uses the documented non-block-entity sentinel.
+    BlockEntityId,
     HeldItemIdMain,
     HeldItemIdOffHand,
     HeldBlockLightMain,
@@ -74,28 +138,51 @@ impl TerrainSourceUniformSemantic {
             "moonPhase" => Some(Self::MoonPhase),
             "frameTime" => Some(Self::FrameTimeSeconds),
             "frameTimeCounter" => Some(Self::FrameTimeCounter),
+            "frameTimeSmooth" => Some(Self::FrameTimeSmooth),
+            "aspectRatio" => Some(Self::AspectRatio),
+            "blindness" => Some(Self::Blindness),
+            "darknessFactor" => Some(Self::DarknessFactor),
+            "maxBlindnessDarkness" => Some(Self::MaxBlindnessDarkness),
             "sunAngle" => Some(Self::SunAngle),
+            "vulkanic_source_celestial_is_moon" => Some(Self::CelestialIsMoon),
+            "vulkanic_source_celestial_alpha" => Some(Self::CelestialAlpha),
+            "vulkanic_source_celestial_sun_path_rotation" => Some(Self::CelestialSunPathRotation),
             "rainStrength" => Some(Self::RainStrength),
             "rainFactor" => Some(Self::RainFactor),
             "thunderStrength" => Some(Self::ThunderStrength),
             "skyDarken" => Some(Self::SkyDarken),
             "cameraPosition" => Some(Self::CameraWorldPosition),
+            "cameraPositionInt" => Some(Self::CameraWorldPositionInt),
             "cameraPositionFract" => Some(Self::CameraWorldPositionFract),
+            "previousCameraPosition" => Some(Self::PreviousCameraWorldPosition),
+            "velocity" => Some(Self::CameraVelocity),
             "gbufferModelView" => Some(Self::ViewMatrix),
             "gbufferModelViewInverse" => Some(Self::ViewMatrixInverse),
             "gbufferProjection" => Some(Self::ProjectionMatrix),
             "gbufferProjectionInverse" => Some(Self::ProjectionMatrixInverse),
+            "gbufferPreviousModelView" => Some(Self::PreviousViewMatrix),
+            "gbufferPreviousProjection" => Some(Self::PreviousProjectionMatrix),
             "shadowModelView" => Some(Self::ShadowModelView),
             "shadowModelViewInverse" => Some(Self::ShadowModelViewInverse),
             "shadowProjection" => Some(Self::ShadowProjection),
             "shadowProjectionInverse" => Some(Self::ShadowProjectionInverse),
+            "dhModelView" => Some(Self::DistantModelView),
+            "dhProjection" => Some(Self::DistantProjection),
+            "dhProjectionInverse" => Some(Self::DistantProjectionInverse),
             "viewWidth" => Some(Self::ViewportWidth),
             "viewHeight" => Some(Self::ViewportHeight),
+            "near" => Some(Self::NearPlane),
             "isEyeInWater" => Some(Self::EyeSubmersion),
             "screenBrightness" => Some(Self::ScreenBrightness),
             "darknessLightFactor" => Some(Self::DarknessLightFactor),
             "nightVision" => Some(Self::NightVision),
+            "eyeBrightness" => Some(Self::EyeBrightness),
+            "eyeBrightnessM" => Some(Self::EyeBrightnessM),
+            "eyeBrightnessM2" => Some(Self::EyeBrightnessM2),
             "fogColor" => Some(Self::FogColor),
+            "vulkanic_source_fog_parameter_color" => Some(Self::LegacyFogColor),
+            "vulkanic_source_fog_environmental_start" => Some(Self::LegacyFogEnvironmentalStart),
+            "vulkanic_source_fog_environmental_end" => Some(Self::LegacyFogEnvironmentalEnd),
             "inDry" => Some(Self::BiomeDry),
             "inSnowy" => Some(Self::BiomeSnowy),
             "inNetherWastes" => Some(Self::BiomeNetherWastes),
@@ -103,10 +190,18 @@ impl TerrainSourceUniformSemantic {
             "inWarpedForest" => Some(Self::BiomeWarpedForest),
             "inBasaltDeltas" => Some(Self::BiomeBasaltDeltas),
             "inSoulValley" => Some(Self::BiomeSoulValley),
+            "inPaleGarden" => Some(Self::BiomePaleGarden),
+            "inRainy" => Some(Self::BiomeRainy),
+            "wetness" => Some(Self::Wetness),
             "skyColor" => Some(Self::SkyColor),
             "atlasSize" => Some(Self::MaterialAtlasSize),
             "far" => Some(Self::FarPlane),
+            "dhRenderDistance" => Some(Self::DistantHorizonsRenderDistance),
             "relativeEyePosition" => Some(Self::RelativeEyePosition),
+            "entityId" => Some(Self::EntityId),
+            "entityColor" => Some(Self::EntityColor),
+            "currentRenderedItemId" => Some(Self::CurrentRenderedItemId),
+            "blockEntityId" => Some(Self::BlockEntityId),
             "heldItemId" => Some(Self::HeldItemIdMain),
             "heldItemId2" => Some(Self::HeldItemIdOffHand),
             "heldBlockLightValue" => Some(Self::HeldBlockLightMain),
@@ -122,34 +217,56 @@ impl TerrainSourceUniformSemantic {
             | Self::WorldTime
             | Self::WorldDay
             | Self::MoonPhase
+            | Self::CelestialIsMoon
+            | Self::EntityId
+            | Self::CurrentRenderedItemId
+            | Self::BlockEntityId
             | Self::HeldItemIdMain
             | Self::HeldItemIdOffHand
             | Self::HeldBlockLightMain
             | Self::HeldBlockLightOffHand => TerrainSourceUniformType::Int,
+            Self::EntityColor => TerrainSourceUniformType::Vec4,
             Self::FrameModuloEight
             | Self::FrameTimeSeconds
             | Self::FrameTimeCounter
+            | Self::FrameTimeSmooth
+            | Self::AspectRatio
+            | Self::Blindness
+            | Self::DarknessFactor
+            | Self::MaxBlindnessDarkness
             | Self::SunAngle
+            | Self::CelestialAlpha
+            | Self::CelestialSunPathRotation
             | Self::RainStrength
             | Self::RainFactor
             | Self::ThunderStrength
             | Self::SkyDarken => TerrainSourceUniformType::Float,
-            Self::CameraWorldPosition | Self::CameraWorldPositionFract => {
-                TerrainSourceUniformType::Vec3
-            }
+            Self::CameraWorldPosition
+            | Self::CameraWorldPositionFract
+            | Self::PreviousCameraWorldPosition => TerrainSourceUniformType::Vec3,
+            Self::CameraWorldPositionInt => TerrainSourceUniformType::IVec3,
+            Self::CameraVelocity => TerrainSourceUniformType::Float,
             Self::ViewMatrix
             | Self::ViewMatrixInverse
             | Self::ProjectionMatrix
             | Self::ProjectionMatrixInverse
+            | Self::PreviousViewMatrix
+            | Self::PreviousProjectionMatrix
             | Self::ShadowModelView
             | Self::ShadowModelViewInverse
             | Self::ShadowProjection
-            | Self::ShadowProjectionInverse => TerrainSourceUniformType::Mat4,
+            | Self::ShadowProjectionInverse
+            | Self::DistantModelView
+            | Self::DistantProjection
+            | Self::DistantProjectionInverse => TerrainSourceUniformType::Mat4,
             Self::ViewportWidth
             | Self::ViewportHeight
+            | Self::NearPlane
             | Self::ScreenBrightness
             | Self::DarknessLightFactor
-            | Self::NightVision => TerrainSourceUniformType::Float,
+            | Self::NightVision
+            | Self::EyeBrightnessM
+            | Self::EyeBrightnessM2 => TerrainSourceUniformType::Float,
             Self::BiomeDry
             | Self::BiomeSnowy
             | Self::BiomeNetherWastes
@@ -157,10 +274,19 @@ impl TerrainSourceUniformSemantic {
             | Self::BiomeWarpedForest
             | Self::BiomeBasaltDeltas
             | Self::BiomeSoulValley => TerrainSourceUniformType::Float,
+            Self::BiomePaleGarden | Self::BiomeRainy | Self::Wetness => {
+                TerrainSourceUniformType::Float
+            }
             Self::EyeSubmersion => TerrainSourceUniformType::Int,
             Self::FogColor | Self::SkyColor => TerrainSourceUniformType::Vec3,
+            Self::LegacyFogColor => TerrainSourceUniformType::Vec4,
+            Self::LegacyFogEnvironmentalStart | Self::LegacyFogEnvironmentalEnd => {
+                TerrainSourceUniformType::Float
+            }
             Self::MaterialAtlasSize => TerrainSourceUniformType::IVec2,
+            Self::EyeBrightness => TerrainSourceUniformType::IVec2,
             Self::FarPlane => TerrainSourceUniformType::Float,
+            Self::DistantHorizonsRenderDistance => TerrainSourceUniformType::Int,
             Self::RelativeEyePosition => TerrainSourceUniformType::Vec3,
         }
     }
@@ -289,30 +415,57 @@ pub struct TerrainSourceUniformFrame {
     pub moon_phase: Option<i32>,
     pub frame_time_seconds: Option<f32>,
     pub frame_time_counter: Option<f32>,
+    pub frame_time_smooth: Option<f32>,
+    pub aspect_ratio: Option<f32>,
+    pub blindness: Option<f32>,
+    pub darkness_factor: Option<f32>,
+    pub max_blindness_darkness: Option<f32>,
     pub sun_angle: Option<f32>,
+    pub celestial_is_moon: Option<i32>,
+    pub celestial_alpha: Option<f32>,
+    pub celestial_sun_path_rotation: Option<f32>,
     pub rain_strength: Option<f32>,
     pub rain_factor: Option<f32>,
     pub thunder_strength: Option<f32>,
     pub sky_darken: Option<f32>,
     pub camera_world_position: Option<[f32; 3]>,
+    pub camera_world_position_int: Option<[i32; 3]>,
     pub camera_world_position_fract: Option<[f32; 3]>,
+    pub previous_camera_world_position: Option<[f32; 3]>,
+    pub camera_velocity: Option<f32>,
     /// Source matrix convention is retained exactly as copied semantic data.
     /// No row/column or API coordinate conversion occurs in this packer.
     pub view_matrix: Option<[f32; 16]>,
     pub view_matrix_inverse: Option<[f32; 16]>,
     pub projection_matrix: Option<[f32; 16]>,
     pub projection_matrix_inverse: Option<[f32; 16]>,
+    pub previous_view_matrix: Option<[f32; 16]>,
+    pub previous_projection_matrix: Option<[f32; 16]>,
     pub shadow_model_view: Option<[f32; 16]>,
     pub shadow_model_view_inverse: Option<[f32; 16]>,
     pub shadow_projection: Option<[f32; 16]>,
     pub shadow_projection_inverse: Option<[f32; 16]>,
+    /// Distant Horizons' source-declared view transform. This is copied
+    /// semantic frame data, not a borrowed DH or OpenGL matrix object.
+    pub distant_model_view: Option<[f32; 16]>,
+    pub distant_projection: Option<[f32; 16]>,
+    pub distant_projection_inverse: Option<[f32; 16]>,
     pub viewport_width: Option<f32>,
     pub viewport_height: Option<f32>,
+    pub near_plane: Option<f32>,
     pub eye_submersion: Option<i32>,
     pub screen_brightness: Option<f32>,
     pub darkness_light_factor: Option<f32>,
     pub night_vision: Option<f32>,
+    pub eye_brightness: Option<[i32; 2]>,
+    pub eye_brightness_m: Option<f32>,
+    pub eye_brightness_m2: Option<f32>,
     pub fog_color: Option<[f32; 3]>,
+    /// Exact copied RGBA fog parameter record and environmental range used by
+    /// legacy `gl_Fog`, never a renderer-owned compatibility object.
+    pub legacy_fog_parameter_color: Option<[f32; 4]>,
+    pub legacy_fog_environmental_start: Option<f32>,
+    pub legacy_fog_environmental_end: Option<f32>,
     /// Raw vanilla precipitation at the camera block. This stays raw so the
     /// selected source's smoothing policy is owned by Rust.
     pub biome_precipitation: Option<i32>,
@@ -326,13 +479,31 @@ pub struct TerrainSourceUniformFrame {
     pub biome_warped_forest: Option<f32>,
     pub biome_basalt_deltas: Option<f32>,
     pub biome_soul_valley: Option<f32>,
+    pub biome_pale_garden: Option<f32>,
+    pub biome_rainy: Option<f32>,
+    pub wetness: Option<f32>,
     pub sky_color: Option<[f32; 3]>,
     /// Dimensions of the Rust-owned terrain atlas selected by the source
     /// resource contract. This is resource metadata, not a Java texture ID
     /// or backend handle.
     pub material_atlas_size: Option<[i32; 2]>,
     pub far_plane: Option<f32>,
+    pub distant_horizons_render_distance: Option<i32>,
     pub relative_eye_position: Option<[f32; 3]>,
+    /// Explicit current-pass entity identity. `-1` means no entity is being
+    /// rendered, matching the shader-pack semantic default rather than an
+    /// inherited Iris uniform value.
+    pub entity_id: Option<i32>,
+    /// Explicit current-pass entity color in normalized RGBA order. An entity
+    /// source writer must set this per compatible draw group rather than
+    /// relying on any Java/Iris-managed state.
+    pub entity_color: Option<[f32; 4]>,
+    /// Explicit current rendered-item identity. `-1` is the source-standard
+    /// non-item sentinel used by entity and terrain passes.
+    pub current_rendered_item_id: Option<i32>,
+    /// Explicit current-pass block-entity identity. `-1` means no block entity
+    /// is being rendered.
+    pub block_entity_id: Option<i32>,
     /// Item IDs are pack-owned integers resolved by Rust from copied vanilla
     /// item-model identities.
     pub held_item_id_main: Option<i32>,
@@ -413,11 +584,73 @@ impl TerrainSourceUniformFrame {
                         self.required_f32(self.frame_time_counter, "frame time counter")?,
                     )?;
                 }
+                TerrainSourceUniformSemantic::FrameTimeSmooth => {
+                    write_f32(
+                        &mut bytes,
+                        offset,
+                        self.required_f32(self.frame_time_smooth, "smoothed frame time")?,
+                    )?;
+                }
+                TerrainSourceUniformSemantic::AspectRatio => {
+                    write_f32(
+                        &mut bytes,
+                        offset,
+                        self.required_f32(self.aspect_ratio, "aspect ratio")?,
+                    )?;
+                }
+                TerrainSourceUniformSemantic::Blindness => {
+                    write_f32(
+                        &mut bytes,
+                        offset,
+                        self.required_f32(self.blindness, "blindness")?,
+                    )?;
+                }
+                TerrainSourceUniformSemantic::DarknessFactor => {
+                    write_f32(
+                        &mut bytes,
+                        offset,
+                        self.required_f32(self.darkness_factor, "darkness factor")?,
+                    )?;
+                }
+                TerrainSourceUniformSemantic::MaxBlindnessDarkness => {
+                    write_f32(
+                        &mut bytes,
+                        offset,
+                        self.required_f32(
+                            self.max_blindness_darkness,
+                            "maximum blindness/darkness factor",
+                        )?,
+                    )?;
+                }
                 TerrainSourceUniformSemantic::SunAngle => {
                     write_f32(
                         &mut bytes,
                         offset,
                         self.required_f32(self.sun_angle, "sun angle")?,
+                    )?;
+                }
+                TerrainSourceUniformSemantic::CelestialIsMoon => {
+                    write_i32(
+                        &mut bytes,
+                        offset,
+                        self.required_i32(self.celestial_is_moon, "celestial moon selector")?,
+                    )?;
+                }
+                TerrainSourceUniformSemantic::CelestialAlpha => {
+                    write_f32(
+                        &mut bytes,
+                        offset,
+                        self.required_f32(self.celestial_alpha, "celestial alpha")?,
+                    )?;
+                }
+                TerrainSourceUniformSemantic::CelestialSunPathRotation => {
+                    write_f32(
+                        &mut bytes,
+                        offset,
+                        self.required_f32(
+                            self.celestial_sun_path_rotation,
+                            "celestial sun-path rotation",
+                        )?,
                     )?;
                 }
                 TerrainSourceUniformSemantic::RainStrength => {
@@ -455,6 +688,15 @@ impl TerrainSourceUniformFrame {
                         write_f32(&mut bytes, offset + component * 4, value)?;
                     }
                 }
+                TerrainSourceUniformSemantic::CameraWorldPositionInt => {
+                    let value = self.required_ivec3(
+                        self.camera_world_position_int,
+                        "integer camera world position",
+                    )?;
+                    for (component, value) in value.into_iter().enumerate() {
+                        write_i32(&mut bytes, offset + component * 4, value)?;
+                    }
+                }
                 TerrainSourceUniformSemantic::CameraWorldPositionFract => {
                     let value = self.required_vec3(
                         self.camera_world_position_fract,
@@ -463,6 +705,22 @@ impl TerrainSourceUniformFrame {
                     for (component, value) in value.into_iter().enumerate() {
                         write_f32(&mut bytes, offset + component * 4, value)?;
                     }
+                }
+                TerrainSourceUniformSemantic::PreviousCameraWorldPosition => {
+                    let value = self.required_vec3(
+                        self.previous_camera_world_position,
+                        "previous camera world position",
+                    )?;
+                    for (component, value) in value.into_iter().enumerate() {
+                        write_f32(&mut bytes, offset + component * 4, value)?;
+                    }
+                }
+                TerrainSourceUniformSemantic::CameraVelocity => {
+                    write_f32(
+                        &mut bytes,
+                        offset,
+                        self.required_f32(self.camera_velocity, "camera velocity")?,
+                    )?;
                 }
                 TerrainSourceUniformSemantic::ViewMatrix => {
                     write_mat4(
@@ -492,6 +750,23 @@ impl TerrainSourceUniformFrame {
                         self.required_mat4(
                             self.projection_matrix_inverse,
                             "projection matrix inverse",
+                        )?,
+                    )?;
+                }
+                TerrainSourceUniformSemantic::PreviousViewMatrix => {
+                    write_mat4(
+                        &mut bytes,
+                        offset,
+                        self.required_mat4(self.previous_view_matrix, "previous view matrix")?,
+                    )?;
+                }
+                TerrainSourceUniformSemantic::PreviousProjectionMatrix => {
+                    write_mat4(
+                        &mut bytes,
+                        offset,
+                        self.required_mat4(
+                            self.previous_projection_matrix,
+                            "previous projection matrix",
                         )?,
                     )?;
                 }
@@ -529,6 +804,30 @@ impl TerrainSourceUniformFrame {
                         )?,
                     )?;
                 }
+                TerrainSourceUniformSemantic::DistantModelView => {
+                    write_mat4(
+                        &mut bytes,
+                        offset,
+                        self.required_mat4(self.distant_model_view, "Distant Horizons model view")?,
+                    )?;
+                }
+                TerrainSourceUniformSemantic::DistantProjection => {
+                    write_mat4(
+                        &mut bytes,
+                        offset,
+                        self.required_mat4(self.distant_projection, "Distant Horizons projection")?,
+                    )?;
+                }
+                TerrainSourceUniformSemantic::DistantProjectionInverse => {
+                    write_mat4(
+                        &mut bytes,
+                        offset,
+                        self.required_mat4(
+                            self.distant_projection_inverse,
+                            "Distant Horizons projection inverse",
+                        )?,
+                    )?;
+                }
                 TerrainSourceUniformSemantic::ViewportWidth => {
                     write_f32(
                         &mut bytes,
@@ -541,6 +840,13 @@ impl TerrainSourceUniformFrame {
                         &mut bytes,
                         offset,
                         self.required_f32(self.viewport_height, "viewport height")?,
+                    )?;
+                }
+                TerrainSourceUniformSemantic::NearPlane => {
+                    write_f32(
+                        &mut bytes,
+                        offset,
+                        self.required_f32(self.near_plane, "near plane")?,
                     )?;
                 }
                 TerrainSourceUniformSemantic::EyeSubmersion => {
@@ -571,11 +877,60 @@ impl TerrainSourceUniformFrame {
                         self.required_f32(self.night_vision, "night vision")?,
                     )?;
                 }
+                TerrainSourceUniformSemantic::EyeBrightness => {
+                    let value = self.required_eye_brightness()?;
+                    for (component, value) in value.into_iter().enumerate() {
+                        write_i32(&mut bytes, offset + component * 4, value)?;
+                    }
+                }
+                TerrainSourceUniformSemantic::EyeBrightnessM => {
+                    write_f32(
+                        &mut bytes,
+                        offset,
+                        self.required_f32(self.eye_brightness_m, "smoothed eye brightness")?,
+                    )?;
+                }
+                TerrainSourceUniformSemantic::EyeBrightnessM2 => {
+                    write_f32(
+                        &mut bytes,
+                        offset,
+                        self.required_f32(self.eye_brightness_m2, "binary eye brightness")?,
+                    )?;
+                }
                 TerrainSourceUniformSemantic::FogColor => {
                     let value = self.required_vec3(self.fog_color, "fog color")?;
                     for (component, value) in value.into_iter().enumerate() {
                         write_f32(&mut bytes, offset + component * 4, value)?;
                     }
+                }
+                TerrainSourceUniformSemantic::LegacyFogColor => {
+                    let value = self.required_vec4(
+                        self.legacy_fog_parameter_color,
+                        "legacy fog parameter color",
+                    )?;
+                    for (component, value) in value.into_iter().enumerate() {
+                        write_f32(&mut bytes, offset + component * 4, value)?;
+                    }
+                }
+                TerrainSourceUniformSemantic::LegacyFogEnvironmentalStart => {
+                    write_f32(
+                        &mut bytes,
+                        offset,
+                        self.required_f32(
+                            self.legacy_fog_environmental_start,
+                            "legacy fog environmental start",
+                        )?,
+                    )?;
+                }
+                TerrainSourceUniformSemantic::LegacyFogEnvironmentalEnd => {
+                    write_f32(
+                        &mut bytes,
+                        offset,
+                        self.required_f32(
+                            self.legacy_fog_environmental_end,
+                            "legacy fog environmental end",
+                        )?,
+                    )?;
                 }
                 TerrainSourceUniformSemantic::BiomeDry => {
                     write_f32(
@@ -629,6 +984,27 @@ impl TerrainSourceUniformFrame {
                         self.required_f32(self.biome_soul_valley, "Soul Sand Valley biome factor")?,
                     )?;
                 }
+                TerrainSourceUniformSemantic::BiomePaleGarden => {
+                    write_f32(
+                        &mut bytes,
+                        offset,
+                        self.required_f32(self.biome_pale_garden, "Pale Garden biome factor")?,
+                    )?;
+                }
+                TerrainSourceUniformSemantic::BiomeRainy => {
+                    write_f32(
+                        &mut bytes,
+                        offset,
+                        self.required_f32(self.biome_rainy, "rainy-biome factor")?,
+                    )?;
+                }
+                TerrainSourceUniformSemantic::Wetness => {
+                    write_f32(
+                        &mut bytes,
+                        offset,
+                        self.required_f32(self.wetness, "surface wetness")?,
+                    )?;
+                }
                 TerrainSourceUniformSemantic::SkyColor => {
                     let value = self.required_vec3(self.sky_color, "sky color")?;
                     for (component, value) in value.into_iter().enumerate() {
@@ -649,12 +1025,56 @@ impl TerrainSourceUniformFrame {
                         self.required_f32(self.far_plane, "far plane")?,
                     )?;
                 }
+                TerrainSourceUniformSemantic::DistantHorizonsRenderDistance => {
+                    write_i32(
+                        &mut bytes,
+                        offset,
+                        self.required_i32(
+                            self.distant_horizons_render_distance,
+                            "Distant Horizons render distance",
+                        )?,
+                    )?;
+                }
                 TerrainSourceUniformSemantic::RelativeEyePosition => {
                     let value =
                         self.required_vec3(self.relative_eye_position, "relative eye position")?;
                     for (component, value) in value.into_iter().enumerate() {
                         write_f32(&mut bytes, offset + component * 4, value)?;
                     }
+                }
+                TerrainSourceUniformSemantic::EntityId => {
+                    write_i32(
+                        &mut bytes,
+                        offset,
+                        self.required_i32(self.entity_id, "current rendered entity id")?,
+                    )?;
+                }
+                TerrainSourceUniformSemantic::EntityColor => {
+                    let value =
+                        self.required_vec4(self.entity_color, "current rendered entity color")?;
+                    for (component, value) in value.into_iter().enumerate() {
+                        write_f32(&mut bytes, offset + component * 4, value)?;
+                    }
+                }
+                TerrainSourceUniformSemantic::CurrentRenderedItemId => {
+                    write_i32(
+                        &mut bytes,
+                        offset,
+                        self.required_i32(
+                            self.current_rendered_item_id,
+                            "current rendered item id",
+                        )?,
+                    )?;
+                }
+                TerrainSourceUniformSemantic::BlockEntityId => {
+                    write_i32(
+                        &mut bytes,
+                        offset,
+                        self.required_i32(
+                            self.block_entity_id,
+                            "current rendered block-entity id",
+                        )?,
+                    )?;
                 }
                 TerrainSourceUniformSemantic::HeldItemIdMain => {
                     write_i32(
@@ -701,13 +1121,28 @@ impl TerrainSourceUniformFrame {
         })
     }
 
+    fn required_eye_brightness(&self) -> GalResult<[i32; 2]> {
+        let value = self
+            .eye_brightness
+            .ok_or_else(|| GalError::invalid_argument("terrain source requires eye brightness"))?;
+        if value
+            .iter()
+            .any(|component| !(0..=240).contains(component) || component % 16 != 0)
+        {
+            return Err(GalError::invalid_argument(format!(
+                "terrain source eye brightness must contain packed vanilla light values in [0, 240]"
+            )));
+        }
+        Ok(value)
+    }
+
     fn required_ivec2(&self, value: Option<[i32; 2]>, label: &str) -> GalResult<[i32; 2]> {
         let value = value.ok_or_else(|| {
             GalError::invalid_argument(format!("terrain source requires {label}"))
         })?;
         if value.iter().any(|component| *component <= 0) {
             return Err(GalError::invalid_argument(format!(
-                "terrain source {label} must contain positive finite values"
+                "terrain source {label} must contain positive values"
             )));
         }
         Ok(value)
@@ -726,6 +1161,26 @@ impl TerrainSourceUniformFrame {
     }
 
     fn required_vec3(&self, value: Option<[f32; 3]>, label: &str) -> GalResult<[f32; 3]> {
+        let value = value.ok_or_else(|| {
+            GalError::invalid_argument(format!("terrain source uniform requires {label}"))
+        })?;
+        if value.iter().any(|component| !component.is_finite()) {
+            return Err(GalError::invalid_argument(format!(
+                "terrain source uniform {label} must be finite"
+            )));
+        }
+        Ok(value)
+    }
+
+    fn required_ivec3(&self, value: Option<[i32; 3]>, label: &str) -> GalResult<[i32; 3]> {
+        value.ok_or_else(|| {
+            GalError::invalid_argument(format!(
+                "source uniform frame is missing required {label} semantic"
+            ))
+        })
+    }
+
+    fn required_vec4(&self, value: Option<[f32; 4]>, label: &str) -> GalResult<[f32; 4]> {
         let value = value.ok_or_else(|| {
             GalError::invalid_argument(format!("terrain source uniform requires {label}"))
         })?;
@@ -851,6 +1306,33 @@ mod tests {
     }
 
     #[test]
+    fn maps_and_packs_distant_horizons_render_distance_as_a_gameplay_semantic() {
+        let requirements = source_requirements(
+            "uniform int dhRenderDistance;",
+            "float source_dh_distance = float(dhRenderDistance);",
+            "",
+            "",
+        )
+        .unwrap();
+        assert!(requirements.is_fully_semantic());
+        assert_eq!(
+            Some(TerrainSourceUniformSemantic::DistantHorizonsRenderDistance),
+            requirements.fields()[0].semantic
+        );
+        let bytes = TerrainSourceUniformFrame {
+            distant_horizons_render_distance: Some(384),
+            view_matrix: Some([1.0; 16]),
+            view_matrix_inverse: Some([1.0; 16]),
+            projection_matrix: Some([1.0; 16]),
+            projection_matrix_inverse: Some([1.0; 16]),
+            ..TerrainSourceUniformFrame::default()
+        }
+        .pack_std140(&requirements)
+        .unwrap();
+        assert_eq!(384_i32.to_le_bytes(), bytes[0..4]);
+    }
+
+    #[test]
     fn packs_source_derived_shadow_matrices_as_named_semantics() {
         let requirements = source_requirements(
             "uniform mat4 shadowModelView;\nuniform mat4 shadowModelViewInverse;",
@@ -934,6 +1416,43 @@ mod tests {
     }
 
     #[test]
+    fn packs_temporal_camera_and_visibility_semantics_without_iris_state() {
+        let requirements = source_requirements(
+            "uniform float aspectRatio;\nuniform float blindness;\nuniform float darknessFactor;\nuniform float maxBlindnessDarkness;\nuniform float near;\nuniform ivec2 eyeBrightness;\nuniform float eyeBrightnessM;\nuniform float eyeBrightnessM2;\nuniform vec3 previousCameraPosition;\nuniform mat4 gbufferPreviousModelView;",
+            "float source_visibility = aspectRatio + blindness + darknessFactor + maxBlindnessDarkness + near + eyeBrightnessM + eyeBrightnessM2;\nvec3 source_previous_camera = previousCameraPosition;\nvec4 source_previous_view = gbufferPreviousModelView[0];",
+            "uniform mat4 gbufferPreviousProjection;",
+            "vec4 source_previous_projection = gbufferPreviousProjection[0];",
+        )
+        .unwrap();
+        assert!(requirements.is_fully_semantic());
+        let identity = [
+            1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+        ];
+        let frame = TerrainSourceUniformFrame {
+            aspect_ratio: Some(16.0 / 9.0),
+            blindness: Some(0.25),
+            darkness_factor: Some(0.5),
+            max_blindness_darkness: Some(0.5),
+            near_plane: Some(0.05),
+            eye_brightness: Some([80, 240]),
+            eye_brightness_m: Some(0.75),
+            eye_brightness_m2: Some(1.0),
+            previous_camera_world_position: Some([1.0, 2.0, 3.0]),
+            view_matrix: Some(identity),
+            view_matrix_inverse: Some(identity),
+            projection_matrix: Some(identity),
+            projection_matrix_inverse: Some(identity),
+            previous_view_matrix: Some(identity),
+            previous_projection_matrix: Some(identity),
+            ..TerrainSourceUniformFrame::default()
+        };
+        assert!(frame.pack_std140(&requirements).is_ok());
+        let mut dark_frame = frame;
+        dark_frame.eye_brightness = Some([0, 0]);
+        assert!(dark_frame.pack_std140(&requirements).is_ok());
+    }
+
+    #[test]
     fn packs_rust_resolved_main_and_off_hand_item_ids() {
         let requirements = source_requirements(
             "uniform int heldItemId;\nuniform int heldItemId2;",
@@ -977,6 +1496,114 @@ mod tests {
             (-1_i32).to_le_bytes(),
             bytes[off_hand_offset..off_hand_offset + 4]
         );
+    }
+
+    #[test]
+    fn packs_explicit_non_entity_sentinels_for_static_terrain() {
+        let requirements = source_requirements(
+            "uniform int entityId;\nuniform int blockEntityId;",
+            "float source_non_entity = float(entityId + blockEntityId);",
+            "",
+            "",
+        )
+        .unwrap();
+        assert!(requirements.is_fully_semantic());
+        let entity_offset = requirements
+            .fields()
+            .iter()
+            .find(|field| field.semantic == Some(TerrainSourceUniformSemantic::EntityId))
+            .expect("entityId must retain its semantic")
+            .field
+            .offset() as usize;
+        let block_entity_offset = requirements
+            .fields()
+            .iter()
+            .find(|field| field.semantic == Some(TerrainSourceUniformSemantic::BlockEntityId))
+            .expect("blockEntityId must retain its semantic")
+            .field
+            .offset() as usize;
+        let bytes = TerrainSourceUniformFrame {
+            entity_id: Some(-1),
+            block_entity_id: Some(-1),
+            view_matrix: Some([
+                1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+            ]),
+            projection_matrix: Some([
+                1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+            ]),
+            ..TerrainSourceUniformFrame::default()
+        }
+        .pack_std140(&requirements)
+        .unwrap();
+        assert_eq!(
+            (-1_i32).to_le_bytes(),
+            bytes[entity_offset..entity_offset + 4]
+        );
+        assert_eq!(
+            (-1_i32).to_le_bytes(),
+            bytes[block_entity_offset..block_entity_offset + 4]
+        );
+    }
+
+    #[test]
+    fn packs_entity_identity_and_color_from_typed_semantics() {
+        let requirements = source_requirements(
+            "uniform int entityId;\nuniform vec4 entityColor;",
+            "vec4 source_entity = entityColor + vec4(float(entityId));",
+            "",
+            "",
+        )
+        .unwrap();
+        assert!(requirements.is_fully_semantic());
+        let entity_id_offset = requirements
+            .fields()
+            .iter()
+            .find(|field| field.semantic == Some(TerrainSourceUniformSemantic::EntityId))
+            .expect("entityId must retain its semantic")
+            .field
+            .offset() as usize;
+        let color_offset = requirements
+            .fields()
+            .iter()
+            .find(|field| field.semantic == Some(TerrainSourceUniformSemantic::EntityColor))
+            .expect("entityColor must retain its semantic")
+            .field
+            .offset() as usize;
+        let bytes = TerrainSourceUniformFrame {
+            entity_id: Some(50_076),
+            entity_color: Some([0.25, 0.5, 0.75, 1.0]),
+            view_matrix: Some([
+                1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+            ]),
+            projection_matrix: Some([
+                1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+            ]),
+            ..TerrainSourceUniformFrame::default()
+        }
+        .pack_std140(&requirements)
+        .unwrap();
+        assert_eq!(
+            50_076_i32.to_le_bytes(),
+            bytes[entity_id_offset..entity_id_offset + 4]
+        );
+        assert_eq!(
+            0.25_f32.to_le_bytes(),
+            bytes[color_offset..color_offset + 4]
+        );
+        assert_eq!(
+            1.0_f32.to_le_bytes(),
+            bytes[color_offset + 12..color_offset + 16]
+        );
+
+        let missing_color = TerrainSourceUniformFrame {
+            entity_id: Some(50_076),
+            ..TerrainSourceUniformFrame::default()
+        }
+        .pack_std140(&requirements)
+        .unwrap_err();
+        assert!(missing_color
+            .to_string()
+            .contains("current rendered entity color"));
     }
 
     #[test]
@@ -1377,6 +2004,84 @@ mod tests {
                 .iter()
                 .find(|field| field.semantic == Some(semantic))
                 .expect("named Nether semantic must retain its source field")
+                .field
+                .offset() as usize;
+            assert_eq!(expected.to_le_bytes(), bytes[offset..offset + 4]);
+        }
+    }
+
+    #[test]
+    fn packs_selected_pack_wetness_and_biome_environment_without_untyped_defaults() {
+        let requirements = source_requirements(
+            "uniform float inPaleGarden;\nuniform float inRainy;\nuniform float wetness;",
+            "float environment = inPaleGarden + inRainy + wetness;",
+            "",
+            "",
+        )
+        .unwrap();
+        assert!(requirements.is_fully_semantic());
+        let bytes = TerrainSourceUniformFrame {
+            biome_pale_garden: Some(0.25),
+            biome_rainy: Some(0.5),
+            wetness: Some(0.75),
+            view_matrix: Some([
+                1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+            ]),
+            projection_matrix: Some([
+                1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+            ]),
+            ..TerrainSourceUniformFrame::default()
+        }
+        .pack_std140(&requirements)
+        .unwrap();
+        for (semantic, expected) in [
+            (TerrainSourceUniformSemantic::BiomePaleGarden, 0.25_f32),
+            (TerrainSourceUniformSemantic::BiomeRainy, 0.5_f32),
+            (TerrainSourceUniformSemantic::Wetness, 0.75_f32),
+        ] {
+            let offset = requirements
+                .fields()
+                .iter()
+                .find(|field| field.semantic == Some(semantic))
+                .expect("named environment semantic must retain its source field")
+                .field
+                .offset() as usize;
+            assert_eq!(expected.to_le_bytes(), bytes[offset..offset + 4]);
+        }
+    }
+
+    #[test]
+    fn packs_source_frame_time_smooth_and_camera_velocity_as_named_semantics() {
+        let requirements = source_requirements(
+            "uniform float frameTimeSmooth;\nuniform float velocity;",
+            "float temporal = frameTimeSmooth + velocity;",
+            "",
+            "",
+        )
+        .unwrap();
+        assert!(requirements.is_fully_semantic());
+        let bytes = TerrainSourceUniformFrame {
+            frame_time_smooth: Some(0.125),
+            camera_velocity: Some(0.75),
+            view_matrix: Some([
+                1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+            ]),
+            projection_matrix: Some([
+                1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+            ]),
+            ..TerrainSourceUniformFrame::default()
+        }
+        .pack_std140(&requirements)
+        .unwrap();
+        for (semantic, expected) in [
+            (TerrainSourceUniformSemantic::FrameTimeSmooth, 0.125_f32),
+            (TerrainSourceUniformSemantic::CameraVelocity, 0.75_f32),
+        ] {
+            let offset = requirements
+                .fields()
+                .iter()
+                .find(|field| field.semantic == Some(semantic))
+                .expect("named temporal semantic must retain its source field")
                 .field
                 .offset() as usize;
             assert_eq!(expected.to_le_bytes(), bytes[offset..offset + 4]);

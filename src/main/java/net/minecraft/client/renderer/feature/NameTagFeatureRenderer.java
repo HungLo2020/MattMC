@@ -60,6 +60,19 @@ public class NameTagFeatureRenderer {
 		final List<SubmitNodeStorage.NameTagSubmit> nameTagSubmitsSeethrough = new ArrayList();
 		final List<SubmitNodeStorage.NameTagSubmit> nameTagSubmitsNormal = new ArrayList();
 
+		/**
+		 * Returns immutable producer semantics before the Java font renderer
+		 * consumes them. The pose, colors, packed light, and ordered display mode
+		 * remain explicit; no font atlas, buffer, or renderer state crosses this
+		 * boundary.
+		 */
+		public SemanticSnapshot semanticSnapshot() {
+			return new SemanticSnapshot(
+				List.copyOf(this.nameTagSubmitsSeethrough),
+				List.copyOf(this.nameTagSubmitsNormal)
+			);
+		}
+
 		public void add(PoseStack poseStack, @Nullable Vec3 vec3, int i, Component component, boolean bl, int j, double d, CameraRenderState cameraRenderState) {
 			if (vec3 != null) {
 				Minecraft minecraft = Minecraft.getInstance();
@@ -84,6 +97,20 @@ public class NameTagFeatureRenderer {
 		public void clear() {
 			this.nameTagSubmitsNormal.clear();
 			this.nameTagSubmitsSeethrough.clear();
+		}
+
+		public int totalSubmitCount() {
+			return this.nameTagSubmitsNormal.size() + this.nameTagSubmitsSeethrough.size();
+		}
+
+		public record SemanticSnapshot(
+			List<SubmitNodeStorage.NameTagSubmit> seeThrough,
+			List<SubmitNodeStorage.NameTagSubmit> normal
+		) {
+			public SemanticSnapshot {
+				seeThrough = List.copyOf(seeThrough);
+				normal = List.copyOf(normal);
+			}
 		}
 	}
 }

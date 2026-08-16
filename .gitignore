@@ -20,6 +20,10 @@ run/
 logs/
 crash-reports/
 
+# Historical graphics captures were previously written at repository root.
+# Keep the consolidated archive out of version control.
+/logs/graphics-audit/root-capture-archive/
+
 # OS
 .DS_Store
 Thumbs.db

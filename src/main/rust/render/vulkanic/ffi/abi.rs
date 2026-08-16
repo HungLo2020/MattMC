@@ -10,7 +10,26 @@ pub const FFI_ABI_V7_VERSION: u32 = 7;
 pub const FFI_ABI_V8_VERSION: u32 = 8;
 pub const FFI_ABI_V9_VERSION: u32 = 9;
 pub const FFI_ABI_V10_VERSION: u32 = 10;
-pub const FFI_ABI_VERSION: u32 = 11;
+pub const FFI_ABI_V11_VERSION: u32 = 11;
+pub const FFI_ABI_V12_VERSION: u32 = 12;
+pub const FFI_ABI_V13_VERSION: u32 = 13;
+pub const FFI_ABI_V14_VERSION: u32 = 14;
+pub const FFI_ABI_V15_VERSION: u32 = 15;
+pub const FFI_ABI_V16_VERSION: u32 = 16;
+pub const FFI_ABI_V17_VERSION: u32 = 17;
+pub const FFI_ABI_V18_VERSION: u32 = 18;
+pub const FFI_ABI_V19_VERSION: u32 = 19;
+pub const FFI_ABI_V20_VERSION: u32 = 20;
+pub const FFI_ABI_V21_VERSION: u32 = 21;
+/// v22 appends a dedicated first-person mesh stream to the whole-frame
+/// request. It reuses the stable indexed-mesh record layout, but keeps the
+/// hand depth/projection domain separate from ordinary world mesh instances.
+pub const FFI_ABI_V22_VERSION: u32 = 22;
+/// v23 appends the first-person model-view matrix. A hand source requires a
+/// distinct transform domain in addition to its projection and cleared depth
+/// domain; it must never inherit camera-space world matrices implicitly.
+pub const FFI_ABI_V23_VERSION: u32 = 23;
+pub const FFI_ABI_VERSION: u32 = 23;
 pub const FFI_INITIAL_PRESENTATION_SUPPORTED: bool = false;
 pub const FFI_ABI_NAME: &str = "MattMC VulkanicGAL Java-Rust batch ABI";
 pub const FFI_MAX_LABEL_BYTES: usize = 1024;
@@ -433,6 +452,80 @@ pub struct FfiGuiSpriteRequest {
     pub height: i32,
     pub gui_width: i32,
     pub gui_height: i32,
+    pub sequence: u64,
+}
+
+/// Generic GUI image quad. Java supplies affine screen-space geometry and
+/// semantic image identity only; Rust owns its texture resource and batching.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FfiGuiAffineQuadRequest {
+    pub byte_size: u32,
+    pub stratum: u32,
+    pub asset_id: u64,
+    pub x0: f32,
+    pub y0: f32,
+    pub x1: f32,
+    pub y1: f32,
+    pub x3: f32,
+    pub y3: f32,
+    pub z: f32,
+    pub u0: f32,
+    pub v0: f32,
+    pub u1: f32,
+    pub v1: f32,
+    pub color_argb: u32,
+    pub gui_width: i32,
+    pub gui_height: i32,
+    pub sequence: u64,
+    pub clip_mode: u32,
+    pub clip_left: i32,
+    pub clip_top: i32,
+    pub clip_width: i32,
+    pub clip_height: i32,
+}
+
+/// Fixed copied vertex for the private Rust-owned GUI mesh family. This is a
+/// semantic vertex record: no Java renderer object, atlas object, or native
+/// resource identity crosses this boundary.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FfiGuiMeshVertex {
+    pub position: [f32; 3],
+    pub atlas_uv: [f32; 2],
+    pub local_uv: [f32; 2],
+    pub color_argb: u32,
+    pub normal_packed: u32,
+}
+
+/// One coarse material-homogeneous GUI item mesh layer. Geometry payloads are
+/// copied through nested bounded slices; the Rust GUI mesh frontend owns
+/// offscreen targets, material resources, batching, and execution.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FfiGuiMeshBatchRequest {
+    pub byte_size: u32,
+    pub stratum: u32,
+    pub layer_index: u32,
+    pub material_mode: u32,
+    pub lighting_mode: u32,
+    pub asset_id: u64,
+    pub sequence: u64,
+    pub alpha_cutoff: f32,
+    pub reserved0: u32,
+    pub model_transform: [f32; 16],
+    pub gui_pose: [f32; 6],
+    pub left: i32,
+    pub top: i32,
+    pub right: i32,
+    pub bottom: i32,
+    pub gui_width: i32,
+    pub gui_height: i32,
+    pub render_width: i32,
+    pub render_height: i32,
+    pub guard_pixels: u32,
+    pub vertices: FfiSlice<FfiGuiMeshVertex>,
+    pub indices: FfiSlice<u32>,
 }
 
 #[repr(C)]
@@ -445,7 +538,11 @@ pub struct FfiGuiFrameSubmitRequest {
     pub gui_width: i32,
     pub gui_height: i32,
     pub sprites: FfiSlice<FfiGuiSpriteRequest>,
+    pub affine_quads: FfiSlice<FfiGuiAffineQuadRequest>,
     pub negotiated_feature_bits: u64,
+    /// Appended semantic GUI item meshes. Each item may contain several
+    /// ordered layers sharing one scheduler sequence.
+    pub mesh_batches: FfiSlice<FfiGuiMeshBatchRequest>,
 }
 
 #[repr(C)]
@@ -479,6 +576,29 @@ pub struct FfiGuiAssetUpdateRequest {
     pub header: FfiHeader,
     pub generation: u64,
     pub assets: FfiSlice<FfiGuiAssetPayload>,
+    pub negotiated_feature_bits: u64,
+}
+
+/// Versioned raw GUI image transport. It is intentionally separate from the
+/// legacy PNG sprite registry: font atlases are CPU-source pixel data, not
+/// renderer textures or atlas handles.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FfiGuiRawImageAssetPayload {
+    pub byte_size: u32,
+    pub format: u32,
+    pub asset_id: u64,
+    pub width: i32,
+    pub height: i32,
+    pub pixels: FfiBytes,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FfiGuiRawImageUpdateRequest {
+    pub header: FfiHeader,
+    pub generation: u64,
+    pub assets: FfiSlice<FfiGuiRawImageAssetPayload>,
     pub negotiated_feature_bits: u64,
 }
 
@@ -666,7 +786,9 @@ pub struct FfiWorldMaterialQuadRequest {
     pub cull_policy: u32,
     pub topology: u32,
     pub color_argb: u32,
-    pub reserved0: u32,
+    /// `0` preserves the historical CCW default. This direct-record field is
+    /// part of the existing winding contract and must not be reused.
+    pub winding: u32,
     pub p0_x: f32,
     pub p0_y: f32,
     pub p0_z: f32,
@@ -689,6 +811,29 @@ pub struct FfiWorldMaterialQuadRequest {
     pub uv3_v: f32,
     pub viewport_width: i32,
     pub viewport_height: i32,
+    /// Named source-pack material family. This is semantic program selection,
+    /// never an Iris program or backend object.
+    pub source_program: u32,
+    /// Unlit producer color retained for a future source-derived material
+    /// program. `color_argb` preserves the ordinary prelit material route.
+    pub source_color_argb: u32,
+    /// Vanilla packed block/sky light retained without baking it into source
+    /// shader inputs.
+    pub packed_light: u32,
+    /// Semantic source UV coordinate space. It is ignored by the ordinary
+    /// material route and consumed only by future source-derived staging.
+    pub source_uv_space: u32,
+    /// Per-vertex source modulation. Uniform quads repeat `source_color_argb`
+    /// and `packed_light`; the legacy/full-record transport is reserved for
+    /// the rare dynamic primitive that needs distinct endpoint values.
+    pub vertex0_color_argb: u32,
+    pub vertex1_color_argb: u32,
+    pub vertex2_color_argb: u32,
+    pub vertex3_color_argb: u32,
+    pub vertex0_packed_light: u32,
+    pub vertex1_packed_light: u32,
+    pub vertex2_packed_light: u32,
+    pub vertex3_packed_light: u32,
 }
 
 #[repr(C)]
@@ -703,7 +848,7 @@ pub struct FfiWorldMaterialTableRecord {
     pub cull_policy: u32,
     pub topology: u32,
     pub winding: u32,
-    pub reserved0: u32,
+    pub source_program: u32,
 }
 
 #[repr(C)]
@@ -712,7 +857,9 @@ pub struct FfiWorldMaterialCompactQuadRequest {
     pub byte_size: u32,
     pub material_index: u32,
     pub color_argb: u32,
-    pub reserved0: u32,
+    /// Semantic source UV coordinate space, retained per quad because one
+    /// material table entry can be used by more than one source family.
+    pub source_uv_space: u32,
     pub p0_x: f32,
     pub p0_y: f32,
     pub p0_z: f32,
@@ -733,6 +880,8 @@ pub struct FfiWorldMaterialCompactQuadRequest {
     pub uv2_v: f32,
     pub uv3_u: f32,
     pub uv3_v: f32,
+    pub source_color_argb: u32,
+    pub packed_light: u32,
 }
 
 #[repr(C)]
@@ -781,6 +930,10 @@ pub struct FfiWorldMeshAssetRecord {
     pub vertices: FfiSlice<FfiWorldMeshVertex>,
     pub index_bytes: FfiBytes,
     pub sections: FfiSlice<FfiWorldMeshSectionRecord>,
+    /// Canonical gameplay entity identity for entity-model assets. Empty means
+    /// this immutable mesh is not an entity model. Rust resolves any selected
+    /// source pack ID from `entity.properties`.
+    pub entity_identity_utf8: FfiBytes,
 }
 
 #[repr(C)]
@@ -832,6 +985,167 @@ pub struct FfiWorldMeshAssetUpdateRequest {
     pub negotiated_feature_bits: u64,
 }
 
+/// Coarse, backend-neutral Distant Horizons LOD vertex semantics. This is a
+/// copied CPU record, not a legacy DH/OpenGL vertex attribute declaration.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FfiWorldLodVertex {
+    pub byte_size: u32,
+    pub local_x: u16,
+    pub local_y: u16,
+    pub local_z: u16,
+    pub packed_light_and_micro_offset: u16,
+    pub color_rgba: u32,
+    pub material_id: u32,
+    pub normal_index: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FfiWorldLodSegmentRecord {
+    pub byte_size: u32,
+    pub layer: u32,
+    pub vertices: FfiSlice<FfiWorldLodVertex>,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FfiWorldLodColumnAssetRecord {
+    pub byte_size: u32,
+    pub vertex_layout_version: u32,
+    pub origin_x: i32,
+    pub origin_y: i32,
+    pub origin_z: i32,
+    pub reserved0: u32,
+    pub column_key: u64,
+    pub column_generation: u64,
+    pub segments: FfiSlice<FfiWorldLodSegmentRecord>,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FfiWorldLodColumnRetirementRecord {
+    pub byte_size: u32,
+    pub reserved0: u32,
+    pub column_key: u64,
+    pub column_generation: u64,
+}
+
+/// One stable, copied source identity for a Distant Horizons reduced quad.
+/// The strings are semantic resource identities, never atlas objects or
+/// backend handles. IDs in the segment records are one-based into the
+/// enclosing column table; zero is unavailable and `u32::MAX` is mixed.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FfiWorldLodMaterialIdentityRecord {
+    pub byte_size: u32,
+    pub reserved0: u32,
+    pub block_state_identity_utf8: FfiBytes,
+    pub biome_identity_utf8: FfiBytes,
+}
+
+/// Per-emitted-quad semantic material references for one compact LOD segment.
+/// This remains separate from DH's copied vertex stream so existing vertex
+/// layout/version semantics stay intact.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FfiWorldLodSegmentMaterialProvenanceRecord {
+    pub byte_size: u32,
+    pub layer: u32,
+    pub segment_index: u32,
+    pub reserved0: u32,
+    pub quad_material_ids: FfiSlice<u32>,
+    pub quad_variant_states: FfiSlice<u8>,
+    pub quad_variant_positions: FfiSlice<u64>,
+}
+
+/// One exact copied atlas region for one material identity and block face.
+/// It is source data only: neither an atlas object nor a backend texture.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct FfiWorldLodFaceMaterialRecord {
+    pub byte_size: u32,
+    pub material_id: u32,
+    pub face: u32,
+    /// Ordered co-planar face layer. Kept in the original reserved slot so
+    /// the Panama layout remains exactly 88 bytes.
+    pub face_layer: u32,
+    pub atlas_identity_utf8: FfiBytes,
+    pub sprite_identity_utf8: FfiBytes,
+    pub u0: f32,
+    pub v0: f32,
+    pub u1: f32,
+    pub v1: f32,
+    /// Stable UV-corner permutation for the copied baked face. Tint semantics
+    /// live in `face_layer` so this field stays an unambiguous permutation.
+    pub uv_corner_order: u32,
+    pub variant_position: u64,
+}
+
+/// Bounded semantic material sidecar paired with one immutable LOD column
+/// asset generation. It is copied at the FFI boundary and cannot select a
+/// textured route on its own.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FfiWorldLodColumnMaterialProvenanceRecord {
+    pub byte_size: u32,
+    pub reserved0: u32,
+    pub column_key: u64,
+    pub column_generation: u64,
+    pub identities: FfiSlice<FfiWorldLodMaterialIdentityRecord>,
+    pub segments: FfiSlice<FfiWorldLodSegmentMaterialProvenanceRecord>,
+    pub face_materials: FfiSlice<FfiWorldLodFaceMaterialRecord>,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FfiWorldLodAssetUpdateRequest {
+    pub header: FfiHeader,
+    pub generation: u64,
+    pub assets: FfiSlice<FfiWorldLodColumnAssetRecord>,
+    pub retirements: FfiSlice<FfiWorldLodColumnRetirementRecord>,
+    pub negotiated_feature_bits: u64,
+    pub material_provenance: FfiSlice<FfiWorldLodColumnMaterialProvenanceRecord>,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FfiWorldLodColumnInstanceRecord {
+    pub byte_size: u32,
+    pub layer: u32,
+    pub segment_index: u32,
+    pub order: u32,
+    pub column_key: u64,
+    pub column_generation: u64,
+}
+
+/// Coarse resolved Distant Horizons render semantics for one combined frame.
+/// This deliberately contains values consumed by the public DH terrain
+/// program, never a program object, VBO/VAO identity, texture unit, or other
+/// native renderer state.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FfiWorldLodRenderFrame {
+    pub byte_size: u32,
+    pub enabled: u32,
+    pub flags: u32,
+    pub world_y_offset: i32,
+    pub combined_matrix: [f32; 16],
+    pub model_view_matrix: [f32; 16],
+    pub projection_matrix: [f32; 16],
+    pub projection_inverse_matrix: [f32; 16],
+    pub clip_distance: f32,
+    pub micro_offset: f32,
+    pub noise_intensity: f32,
+    pub earth_radius: f32,
+    pub noise_steps: u32,
+    pub noise_dropoff: i32,
+    pub reserved0: u32,
+    pub camera_world_x: f32,
+    pub camera_world_y: f32,
+    pub camera_world_z: f32,
+}
+
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct FfiWorldMeshInstanceRecord {
@@ -846,11 +1160,18 @@ pub struct FfiWorldMeshInstanceRecord {
     pub viewport_height: i32,
     pub mesh_key: u64,
     pub mesh_generation: u64,
+    /// Semantic entity/material identity for source-selected entity passes.
+    /// Zero is the explicit generic default, not a backend handle or renderer
+    /// object.
+    pub entity_id: i32,
+    /// Straight ARGB semantic entity-color override. A zero alpha value means
+    /// no override, matching the source-program mix contract.
+    pub entity_color_argb: u32,
     pub transform: [f32; 16],
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct FfiWorldBackgroundRequest {
     pub byte_size: u32,
     pub enabled: u32,
@@ -860,6 +1181,22 @@ pub struct FfiWorldBackgroundRequest {
     pub color_argb: u32,
     pub viewport_width: i32,
     pub viewport_height: i32,
+    /// Appended vanilla sky semantics. These are copied gameplay/render-state
+    /// values, not Java renderer resources, Iris state, or backend handles.
+    pub sky_visible: u32,
+    pub sky_sunrise_or_sunset: u32,
+    pub sky_dark_disc: u32,
+    pub sky_reserved0: u32,
+    pub sky_sun_angle: f32,
+    pub sky_time_of_day: f32,
+    pub sky_rain_brightness: f32,
+    pub sky_star_brightness: f32,
+    pub sky_sunrise_and_sunset_color_argb: u32,
+    pub sky_moon_phase: i32,
+    pub sky_end_flash_intensity: f32,
+    pub sky_end_flash_x_angle: f32,
+    pub sky_end_flash_y_angle: f32,
+    pub sky_color_argb: u32,
 }
 
 /// Coarse, backend-neutral world and camera semantics for a future
@@ -934,6 +1271,132 @@ pub struct FfiWorldShaderEnvironmentFrame {
     pub main_hand_item_light_emission: i32,
     /// Raw vanilla block-light emission for the off-hand item.
     pub off_hand_item_light_emission: i32,
+    /// Exact scalar inputs for Rust's owned vanilla lightmap reconstruction.
+    /// These are appended to preserve all prior Panama field offsets.
+    pub lightmap_enabled: u32,
+    pub lightmap_reserved: u32,
+    pub lightmap_generation: u64,
+    pub lightmap_ambient_light_factor: f32,
+    pub lightmap_sky_factor: f32,
+    pub lightmap_block_factor: f32,
+    pub lightmap_night_vision_factor: f32,
+    pub lightmap_darkness_scale: f32,
+    pub lightmap_darken_world_factor: f32,
+    pub lightmap_brightness_factor: f32,
+    pub lightmap_sky_light_r: f32,
+    pub lightmap_sky_light_g: f32,
+    pub lightmap_sky_light_b: f32,
+    pub lightmap_ambient_r: f32,
+    pub lightmap_ambient_g: f32,
+    pub lightmap_ambient_b: f32,
+    /// Appended semantic shader-frame inputs. These preserve every prior
+    /// Panama offset and contain only copied vanilla gameplay values.
+    pub blindness: f32,
+    pub darkness_factor: f32,
+    pub eye_brightness_block: i32,
+    pub eye_brightness_sky: i32,
+    /// Copied vanilla/Sodium fog parameters. These preserve all earlier
+    /// Panama offsets and are semantic inputs only: Rust derives any
+    /// shader-pack compatibility representation from them.
+    pub fog_parameter_color_r: f32,
+    pub fog_parameter_color_g: f32,
+    pub fog_parameter_color_b: f32,
+    pub fog_parameter_color_a: f32,
+    pub fog_environmental_start: f32,
+    pub fog_environmental_end: f32,
+    pub fog_render_distance_start: f32,
+    pub fog_render_distance_end: f32,
+    /// Appended copied DH configuration semantic. It intentionally carries no
+    /// renderer instance, Java callback, or backend state.
+    pub distant_horizons_render_distance: i32,
+}
+
+/// Coarse inventory of Java feature families observed during the same real
+/// whole-frame extraction. It is diagnostic route policy only: no Java
+/// renderer object, render type, shader object, or backend state crosses FFI.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct FfiWorldFeatureCoverage {
+    pub byte_size: u32,
+    pub model_submits: u32,
+    pub model_part_submits: u32,
+    pub block_model_submits: u32,
+    pub ordinary_block_submits: u32,
+    pub item_submits: u32,
+    pub custom_geometry_submits: u32,
+    pub shadow_submits: u32,
+    pub flame_submits: u32,
+    pub name_tag_submits: u32,
+    pub text_submits: u32,
+    pub hitbox_submits: u32,
+    pub leash_submits: u32,
+    pub particle_group_submits: u32,
+}
+
+/// Copied first-person frame semantics. This is deliberately an append-only
+/// frame record: Java supplies neither an Iris hand pass nor any backend
+/// object. Per-item transforms remain in ordinary semantic mesh records; the
+/// hand pass owns its model-view, projection, and isolated depth domain
+/// separately.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FfiWorldFirstPersonFrame {
+    pub byte_size: u32,
+    pub enabled: u32,
+    pub clear_depth_before: u32,
+    /// Number of leading entries in `world_first_person_mesh_instances` that
+    /// belong to the main hand. Remaining entries belong to the off hand.
+    /// This repurposes an ABI-reserved lane without changing the record size
+    /// or any established Panama offset.
+    pub main_hand_instance_count: u32,
+    pub projection_matrix: [f32; 16],
+    /// Appended in ABI v23 to preserve every pre-existing field offset.
+    pub model_view_matrix: [f32; 16],
+}
+
+/// One copied, backend-neutral world-text glyph quad. The atlas asset is a
+/// semantic Rust-owned resource identity; it is never a Java font texture or
+/// a native backend handle.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FfiWorldTextQuadRequest {
+    pub byte_size: u32,
+    pub flags: u32,
+    pub depth_policy: u32,
+    pub packed_light: u32,
+    pub color_argb: u32,
+    pub reserved0: u32,
+    pub asset_id: u64,
+    pub atlas_generation: u64,
+    pub atlas_revision: u64,
+    pub distance_to_camera_sq: f64,
+    pub model_view_matrix: [f32; 16],
+    pub positions: [f32; 12],
+    pub uvs: [f32; 8],
+}
+
+/// One copied source font-atlas image. This is an immutable semantic payload,
+/// not a Java texture, atlas object, or backend resource.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FfiWorldTextImageAssetPayload {
+    pub byte_size: u32,
+    pub format: u32,
+    pub width: u32,
+    pub height: u32,
+    pub asset_id: u64,
+    pub atlas_generation: u64,
+    pub atlas_revision: u64,
+    pub pixels: FfiBytes,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FfiWorldTextImageUpdateRequest {
+    pub header: FfiHeader,
+    pub generation: u64,
+    pub assets: FfiSlice<FfiWorldTextImageAssetPayload>,
+    pub negotiated_feature_bits: u64,
 }
 
 #[repr(C)]
@@ -959,9 +1422,26 @@ pub struct FfiWholeFrameSubmitRequest {
     pub world_material_compact_quads: FfiSlice<FfiWorldMaterialCompactQuadRequest>,
     pub world_mesh_instances: FfiSlice<FfiWorldMeshInstanceRecord>,
     pub gui_sprites: FfiSlice<FfiGuiSpriteRequest>,
+    pub gui_affine_quads: FfiSlice<FfiGuiAffineQuadRequest>,
     pub negotiated_feature_bits: u64,
     pub voxel_volume_frame: FfiWorldVoxelVolumeFrame,
     pub shader_environment_frame: FfiWorldShaderEnvironmentFrame,
+    pub world_lod_instances: FfiSlice<FfiWorldLodColumnInstanceRecord>,
+    pub world_lod_render_frame: FfiWorldLodRenderFrame,
+    pub world_feature_coverage: FfiWorldFeatureCoverage,
+    /// Appended in ABI v20. The stream is semantic only and remains rejected
+    /// until the Rust world-text pass is installed.
+    pub world_text_quads: FfiSlice<FfiWorldTextQuadRequest>,
+    /// Appended so legacy whole-frame field offsets remain stable.
+    pub gui_mesh_batches: FfiSlice<FfiGuiMeshBatchRequest>,
+    /// Appended in ABI v21. It is transport-only until the Rust-owned hand
+    /// pass can consume every declared semantic input.
+    pub world_first_person_frame: FfiWorldFirstPersonFrame,
+    /// Appended in ABI v22. These copied mesh references share the existing
+    /// asset/cache contract, but are intentionally distinct from camera-space
+    /// world instances. The stream remains unavailable until the Rust-owned
+    /// first-person pass is installed.
+    pub world_first_person_mesh_instances: FfiSlice<FfiWorldMeshInstanceRecord>,
 }
 
 #[repr(C)]
@@ -1006,6 +1486,9 @@ pub struct FfiWholeFrameSubmitResult {
     pub mesh_cache_misses: u64,
     pub sprite_count: u64,
     pub sprite_batch_count: u64,
+    pub gui_mesh_item_count: u64,
+    pub gui_mesh_batch_count: u64,
+    pub gui_mesh_draw_count: u64,
     pub cache_hits: u64,
     pub cache_misses: u64,
     pub resource_creates: u64,
@@ -1206,6 +1689,9 @@ impl Default for FfiWholeFrameSubmitResult {
             mesh_cache_misses: 0,
             sprite_count: 0,
             sprite_batch_count: 0,
+            gui_mesh_item_count: 0,
+            gui_mesh_batch_count: 0,
+            gui_mesh_draw_count: 0,
             cache_hits: 0,
             cache_misses: 0,
             resource_creates: 0,

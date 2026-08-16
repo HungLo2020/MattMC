@@ -76,6 +76,22 @@ pub struct BufferImageCopyRegion {
     pub extent: Extent3d,
 }
 
+/// One explicit texture-to-texture copy. Source and destination subresources
+/// are named independently so a frontend can retain immutable depth/history
+/// snapshots without exposing an API-specific image copy primitive.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TextureImageCopyRegion {
+    pub src_texture: Handle,
+    pub src_mip: u32,
+    pub src_layer: u32,
+    pub src_origin: TextureOrigin3d,
+    pub dst_texture: Handle,
+    pub dst_mip: u32,
+    pub dst_layer: u32,
+    pub dst_origin: TextureOrigin3d,
+    pub extent: Extent3d,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum CommandOp {
     BeginPass {
@@ -131,6 +147,14 @@ pub enum CommandOp {
     },
     CopyBufferToTexture(BufferImageCopyRegion),
     CopyTextureToBuffer(BufferImageCopyRegion),
+    CopyTexture(TextureImageCopyRegion),
+    /// Generates the descendant mip levels in one explicit texture range.
+    /// The first level is the source; every following level is written by the
+    /// operation. Backends choose their native implementation privately.
+    GenerateMipmaps {
+        texture: Handle,
+        subresources: TextureSubresourceRange,
+    },
     HostWriteBuffer {
         buffer: Handle,
         offset: u64,

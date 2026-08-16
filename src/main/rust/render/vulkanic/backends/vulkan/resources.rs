@@ -349,40 +349,41 @@ impl VulkanObjects {
         }
         let format = texture_format(desc.format);
         let usage = texture_usage_flags(&desc.usages);
-        if desc.dimension == TextureDimension::D3 {
-            let properties = unsafe {
-                self.context
-                    .instance
-                    .get_physical_device_image_format_properties(
-                        self.context.physical_device,
-                        format,
-                        vk::ImageType::TYPE_3D,
-                        vk::ImageTiling::OPTIMAL,
-                        usage,
-                        vk::ImageCreateFlags::empty(),
-                    )
+        let image_type = match desc.dimension {
+            TextureDimension::D2 => vk::ImageType::TYPE_2D,
+            TextureDimension::D3 => vk::ImageType::TYPE_3D,
+            _ => unreachable!("GAL validated supported texture dimension"),
+        };
+        let properties = unsafe {
+            self.context
+                .instance
+                .get_physical_device_image_format_properties(
+                    self.context.physical_device,
+                    format,
+                    image_type,
+                    vk::ImageTiling::OPTIMAL,
+                    usage,
+                    vk::ImageCreateFlags::empty(),
+                )
+        }
+        .map_err(|error| {
+            if error == vk::Result::ERROR_FORMAT_NOT_SUPPORTED {
+                GalError::unsupported_feature(format!(
+                    "Vulkan device does not support {:?} format {:?} with requested usages {:?}",
+                    desc.dimension, desc.format, desc.usages
+                ))
+            } else {
+                GalError::backend(format!(
+                    "failed to query Vulkan image format support for '{}': {error:?}",
+                    desc.label
+                ))
             }
-            .map_err(|error| {
-                if error == vk::Result::ERROR_FORMAT_NOT_SUPPORTED {
-                    GalError::unsupported_feature(format!(
-                        "Vulkan device does not support D3 format {:?} with requested usages {:?}",
-                        desc.format, desc.usages
-                    ))
-                } else {
-                    GalError::backend(format!(
-                        "failed to query Vulkan D3 image format support for '{}': {error:?}",
-                        desc.label
-                    ))
-                }
-            })?;
+        })?;
+        if desc.dimension == TextureDimension::D3 {
             validate_d3_image_format_properties(desc, properties)?;
         }
         let create_info = vk::ImageCreateInfo::default()
-            .image_type(match desc.dimension {
-                TextureDimension::D2 => vk::ImageType::TYPE_2D,
-                TextureDimension::D3 => vk::ImageType::TYPE_3D,
-                _ => unreachable!("GAL validated supported texture dimension"),
-            })
+            .image_type(image_type)
             .format(format)
             .extent(vk::Extent3D {
                 width: desc.extent.width,
@@ -876,11 +877,15 @@ impl VulkanObjects {
         let viewport_state = vk::PipelineViewportStateCreateInfo::default()
             .viewport_count(1)
             .scissor_count(1);
+        let depth_bias = desc.depth_bias;
         let rasterization = vk::PipelineRasterizationStateCreateInfo::default()
             .polygon_mode(vk::PolygonMode::FILL)
             .line_width(1.0)
             .cull_mode(cull_mode(desc.cull_mode))
-            .front_face(vk::FrontFace::COUNTER_CLOCKWISE);
+            .front_face(front_face(desc.front_face))
+            .depth_bias_enable(depth_bias.is_some())
+            .depth_bias_constant_factor(depth_bias.map_or(0.0, |bias| bias.constant_factor))
+            .depth_bias_slope_factor(depth_bias.map_or(0.0, |bias| bias.slope_factor));
         let multisample = vk::PipelineMultisampleStateCreateInfo::default()
             .rasterization_samples(vk::SampleCountFlags::TYPE_1);
         let color_blend_attachments = desc
@@ -893,14 +898,7 @@ impl VulkanObjects {
         let dynamic_states = [vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR];
         let dynamic_state =
             vk::PipelineDynamicStateCreateInfo::default().dynamic_states(&dynamic_states);
-        let depth_state = desc.depth_format.map(|_| {
-            vk::PipelineDepthStencilStateCreateInfo::default()
-                .depth_test_enable(true)
-                .depth_write_enable(desc.depth_write)
-                .depth_compare_op(compare_op(
-                    desc.depth_compare.unwrap_or(CompareOp::LessOrEqual),
-                ))
-        });
+        let depth_state = depth_stencil_state(desc);
         let color_formats = desc
             .color_formats
             .iter()
@@ -1259,6 +1257,11 @@ pub(super) fn texture_format(format: TextureFormat) -> vk::Format {
         TextureFormat::Depth24Stencil8 => vk::Format::D24_UNORM_S8_UINT,
         TextureFormat::Depth32Float => vk::Format::D32_SFLOAT,
         TextureFormat::R8Uint => vk::Format::R8_UINT,
+        TextureFormat::R11fG11fB10f => vk::Format::B10G11R11_UFLOAT_PACK32,
+        TextureFormat::R32Float => vk::Format::R32_SFLOAT,
+        TextureFormat::Rgb16Float => vk::Format::R16G16B16_SFLOAT,
+        TextureFormat::R8Unorm => vk::Format::R8_UNORM,
+        TextureFormat::Rgba8Snorm => vk::Format::R8G8B8A8_SNORM,
     }
 }
 
@@ -1425,6 +1428,15 @@ pub(super) fn cull_mode(mode: CullMode) -> vk::CullModeFlags {
     }
 }
 
+pub(super) fn front_face(face: crate::render::vulkanic::resources::FrontFace) -> vk::FrontFace {
+    match face {
+        crate::render::vulkanic::resources::FrontFace::CounterClockwise => {
+            vk::FrontFace::COUNTER_CLOCKWISE
+        }
+        crate::render::vulkanic::resources::FrontFace::Clockwise => vk::FrontFace::CLOCKWISE,
+    }
+}
+
 pub(super) fn compare_op(compare: CompareOp) -> vk::CompareOp {
     match compare {
         CompareOp::Always => vk::CompareOp::ALWAYS,
@@ -1432,6 +1444,25 @@ pub(super) fn compare_op(compare: CompareOp) -> vk::CompareOp {
         CompareOp::LessOrEqual => vk::CompareOp::LESS_OR_EQUAL,
         CompareOp::Equal => vk::CompareOp::EQUAL,
     }
+}
+
+/// Keeps Vulkan lowering aligned with the explicit GAL contract: absence of a
+/// compare operation means depth testing is disabled. A depth attachment may
+/// still be present for another pass or for compatible render-target reuse.
+fn depth_stencil_state(
+    desc: &GraphicsPipelineDesc,
+) -> Option<vk::PipelineDepthStencilStateCreateInfo<'static>> {
+    desc.depth_format.map(|_| {
+        let depth_test_enabled = desc.depth_compare.is_some();
+        vk::PipelineDepthStencilStateCreateInfo::default()
+            .depth_test_enable(depth_test_enabled)
+            .depth_write_enable(depth_test_enabled && desc.depth_write)
+            .depth_compare_op(
+                desc.depth_compare
+                    .map(compare_op)
+                    .unwrap_or(vk::CompareOp::ALWAYS),
+            )
+    })
 }
 
 pub(super) fn color_blend_attachment(blend: BlendMode) -> vk::PipelineColorBlendAttachmentState {
@@ -1544,6 +1575,15 @@ mod tests {
     }
 
     #[test]
+    fn shader_pack_color_formats_map_to_exact_vulkan_formats() {
+        assert!(vk::Format::B10G11R11_UFLOAT_PACK32 == texture_format(TextureFormat::R11fG11fB10f));
+        assert!(vk::Format::R32_SFLOAT == texture_format(TextureFormat::R32Float));
+        assert!(vk::Format::R16G16B16_SFLOAT == texture_format(TextureFormat::Rgb16Float));
+        assert!(vk::Format::R8_UNORM == texture_format(TextureFormat::R8Unorm));
+        assert!(vk::Format::R8G8B8A8_SNORM == texture_format(TextureFormat::Rgba8Snorm));
+    }
+
+    #[test]
     fn overlay_blend_lowers_to_source_alpha_additive_equation() {
         let attachment = color_blend_attachment(BlendMode::Overlay);
         assert_eq!(vk::TRUE, attachment.blend_enable);
@@ -1567,5 +1607,59 @@ mod tests {
         assert!(attachment.dst_alpha_blend_factor == vk::BlendFactor::ZERO);
         assert!(attachment.alpha_blend_op == vk::BlendOp::ADD);
         assert!(attachment.color_write_mask == vk::ColorComponentFlags::RGBA);
+    }
+
+    #[test]
+    fn explicit_front_face_lowers_without_defaulting_to_counter_clockwise() {
+        use crate::render::vulkanic::resources::FrontFace;
+
+        assert!(front_face(FrontFace::CounterClockwise) == vk::FrontFace::COUNTER_CLOCKWISE);
+        assert!(front_face(FrontFace::Clockwise) == vk::FrontFace::CLOCKWISE);
+    }
+
+    #[test]
+    fn depth_compare_none_disables_depth_testing_even_with_a_depth_attachment() {
+        let desc = GraphicsPipelineDesc {
+            label: "depth-disabled".to_owned(),
+            layout: Handle::from_raw(1),
+            vertex_shader: Handle::from_raw(2),
+            fragment_shader: Handle::from_raw(3),
+            topology: PrimitiveTopology::Triangles,
+            cull_mode: CullMode::Back,
+            front_face: crate::render::vulkanic::resources::FrontFace::CounterClockwise,
+            blend: BlendMode::Disabled,
+            depth_compare: None,
+            depth_write: true,
+            depth_bias: None,
+            color_formats: vec![TextureFormat::Rgba8Unorm],
+            depth_format: Some(TextureFormat::Depth32Float),
+        };
+        let state = depth_stencil_state(&desc).expect("depth attachment has Vulkan state");
+        assert_eq!(vk::FALSE, state.depth_test_enable);
+        assert_eq!(vk::FALSE, state.depth_write_enable);
+        assert!(state.depth_compare_op == vk::CompareOp::ALWAYS);
+    }
+
+    #[test]
+    fn explicit_depth_compare_preserves_testing_and_write_policy() {
+        let desc = GraphicsPipelineDesc {
+            label: "depth-enabled".to_owned(),
+            layout: Handle::from_raw(1),
+            vertex_shader: Handle::from_raw(2),
+            fragment_shader: Handle::from_raw(3),
+            topology: PrimitiveTopology::Triangles,
+            cull_mode: CullMode::Back,
+            front_face: crate::render::vulkanic::resources::FrontFace::CounterClockwise,
+            blend: BlendMode::Disabled,
+            depth_compare: Some(CompareOp::LessOrEqual),
+            depth_write: true,
+            depth_bias: None,
+            color_formats: vec![TextureFormat::Rgba8Unorm],
+            depth_format: Some(TextureFormat::Depth32Float),
+        };
+        let state = depth_stencil_state(&desc).expect("depth attachment has Vulkan state");
+        assert_eq!(vk::TRUE, state.depth_test_enable);
+        assert_eq!(vk::TRUE, state.depth_write_enable);
+        assert!(state.depth_compare_op == vk::CompareOp::LESS_OR_EQUAL);
     }
 }

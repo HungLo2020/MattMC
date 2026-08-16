@@ -875,7 +875,9 @@ final class ShadercSpirvCompiler implements SpirvCompiler {
     }
 
     private static String rewriteVertexClipDepthForVulkan(String shaderSource) {
-        if (!shaderSource.contains("gl_Position") || shaderSource.contains("vulkanicOpenGlClipDepthToVulkan")) {
+        if (!shaderSource.contains("gl_Position")
+            || shaderSource.contains("vulkanicOpenGlClipDepthToVulkan")
+            || shaderSource.contains("VULKANIC_GAL_ZERO_TO_ONE_CLIP_DEPTH")) {
             return shaderSource;
         }
 

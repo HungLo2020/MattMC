@@ -35,7 +35,10 @@ pub(crate) unsafe fn decode_world_material_asset_update(
             .ok_or_else(|| {
                 GalError::ffi(
                     StatusCode::UnknownEnum,
-                    format!("unknown world material texture id {}", asset.texture_id),
+                    format!(
+                        "unknown world material asset texture id {}",
+                        asset.texture_id
+                    ),
                 )
             })?;
         if seen.insert(texture_id, ()).is_some() {
@@ -155,6 +158,7 @@ pub(crate) unsafe fn decode_world_mesh_asset_update(
             frame_row_size: texture.frame_row_size,
             interpolation_policy: texture.interpolation_policy,
             animation_frames,
+            coordinate_origin: texture.reserved0,
         });
     }
     let raw_meshes = read_limited_slice(request.meshes, true, "world mesh assets")?;
@@ -221,6 +225,18 @@ pub(crate) unsafe fn decode_world_mesh_asset_update(
                 index_count: section.index_count,
             });
         }
+        let entity_identity = read_label(
+            mesh.entity_identity_utf8,
+            "world mesh asset entity identity",
+        )?;
+        if !entity_identity.is_empty()
+            && !super::world::is_canonical_resource_location(&entity_identity)
+        {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                "world mesh asset entity identity must be canonical namespace:path text",
+            ));
+        }
         meshes.push(WorldMeshAsset {
             mesh_key: mesh.mesh_key,
             mesh_generation: mesh.mesh_generation,
@@ -229,6 +245,7 @@ pub(crate) unsafe fn decode_world_mesh_asset_update(
             vertices,
             index_bytes,
             sections,
+            entity_identity,
         });
     }
     let raw_sorted_indices = read_limited_slice(

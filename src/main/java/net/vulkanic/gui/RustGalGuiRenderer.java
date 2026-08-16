@@ -6,6 +6,11 @@ import net.vulkanic.bridge.VulkanicGalBridge;
 import net.logging.LogUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.dev.GraphicsFrameBenchmark;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.font.FontTexture;
+import net.minecraft.client.gui.font.TextGlyphQuad;
+import net.minecraft.client.gui.navigation.ScreenRectangle;
+import net.minecraft.client.gui.render.state.GuiTextRenderState;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.server.packs.resources.ResourceManager;
@@ -19,8 +24,12 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import org.jetbrains.annotations.Nullable;
+import org.joml.Matrix3x2f;
 
 public final class RustGalGuiRenderer {
 	private static final Logger LOGGER = LogUtils.getLogger();
@@ -43,6 +52,14 @@ public final class RustGalGuiRenderer {
 	private static final String MOUNT_HEART_PRODUCER = "minecraft.gui.mount-heart";
 	private static final boolean ASSET_UPDATES_DISABLED =
 		Boolean.getBoolean("mattmc.dev.rustGalGui.assetUpdates.disabled");
+	private static final boolean TEXT_ROUTE_ENABLED =
+		Boolean.parseBoolean(System.getProperty("mattmc.rustGal.guiText.enabled", "true"));
+	private static final boolean TEXT_ROUTE_DIAGNOSTICS_ENABLED =
+		Boolean.getBoolean("mattmc.dev.rustGalGui.textDiagnostics");
+	private static final Map<Long, String> TEXT_ATLAS_IDENTITIES = new HashMap<>();
+	private static final Map<String, TextAtlasGeneration> TEXT_ATLAS_GENERATIONS = new HashMap<>();
+	private static final Map<String, Boolean> TEXT_ROUTE_DIAGNOSTICS = new HashMap<>();
+	private static final String TEXT_PRODUCER = "minecraft.gui.text";
 
 	private RustGalGuiRenderer() {
 	}
@@ -73,6 +90,142 @@ public final class RustGalGuiRenderer {
 	public static boolean isMigratedGuiEnabled() {
 		String legacyCrosshairFlag = System.getProperty("mattmc.rustGal.guiCrosshair.enabled", "true");
 		return Boolean.parseBoolean(System.getProperty("mattmc.rustGal.gui.enabled", legacyCrosshairFlag));
+	}
+
+	/**
+	 * Attempts one explicit semantic text extraction. Returning {@code null}
+	 * preserves the normal Java text path for unsupported state.
+	 */
+	@Nullable
+	public static List<RustGalGuiElementRenderState> tryEnqueueText(GuiTextRenderState textState, int guiWidth, int guiHeight) {
+		if (!TEXT_ROUTE_ENABLED || !currentExecutionRoute().usesRustGui()) {
+			return null;
+		}
+		List<TextGlyphQuad> quads = new ArrayList<>();
+		Font.SemanticTextExtraction extraction = textState.ensurePrepared().collectSemanticQuads(quads::add);
+		if (extraction.unsupportedRenderableCount() != 0) {
+			recordTextRouteDiagnostic("unsupported-renderables=" + extraction.unsupportedRenderableCount()
+				+ " renderables=" + extraction.renderableCount() + " quads=" + extraction.quadCount());
+			return null;
+		}
+		List<TextAtlasRequest> atlasRequests = new ArrayList<>(quads.size());
+		List<VulkanicGalBridge.GuiAffineQuadRecord> requests = new ArrayList<>(quads.size());
+		try {
+			for (TextGlyphQuad quad : quads) {
+				if (!isParallelogram(quad)) {
+					recordTextRouteDiagnostic("non-parallelogram");
+					return null;
+				}
+				FontTexture.SemanticAtlasSnapshot atlas = FontTexture.semanticAtlasSnapshot(quad.atlasIdentity());
+				if (atlas == null) {
+					recordTextRouteDiagnostic("missing-semantic-atlas=" + quad.atlasIdentity());
+					return null;
+				}
+				long assetId = semanticTextAtlasId(atlas.identity(), atlas.colored());
+				atlasRequests.add(new TextAtlasRequest(assetId, atlas));
+				requests.add(transformTextQuad(quad, textState.pose, assetId, guiWidth, guiHeight, textState.scissor));
+			}
+		} catch (RuntimeException error) {
+			LOGGER.debug("Rust GUI text semantic extraction declined", error);
+			recordTextRouteDiagnostic("extraction-error=" + error.getClass().getSimpleName());
+			return null;
+		}
+
+		for (TextAtlasRequest atlasRequest : atlasRequests) {
+			stageTextAtlas(atlasRequest.assetId(), atlasRequest.atlas());
+		}
+		List<RustGalGuiElementRenderState> elements = new ArrayList<>(requests.size());
+		long startedNanos = System.nanoTime();
+		for (VulkanicGalBridge.GuiAffineQuadRecord request : requests) {
+			var token = RustGalFrameCoordinator.enqueueGuiAffineQuadRequest(
+				request, GuiRenderStratum.GUI_TEXT, startedNanos);
+			elements.add(new RustGalGuiElementRenderState(
+				token, GuiRenderStratum.GUI_TEXT, TEXT_PRODUCER, -1, -1.0F, GuiFillDirection.NONE,
+				(int)Math.floor(Math.min(request.x0(), Math.min(request.x1(), request.x3()))),
+				(int)Math.floor(Math.min(request.y0(), Math.min(request.y1(), request.y3()))),
+				Math.max(1, (int)Math.ceil(Math.max(request.x0(), Math.max(request.x1(), request.x3()))
+					- Math.min(request.x0(), Math.min(request.x1(), request.x3())))),
+				Math.max(1, (int)Math.ceil(Math.max(request.y0(), Math.max(request.y1(), request.y3()))
+					- Math.min(request.y0(), Math.min(request.y1(), request.y3())))),
+				guiWidth, guiHeight
+			));
+		}
+		if (!requests.isEmpty()) {
+			VulkanicGalBridge.GuiAffineQuadRecord first = requests.getFirst();
+			recordTextRouteDiagnostic(
+				"accepted quads=" + requests.size() + " asset=" + first.assetId()
+					+ " origin=" + first.x0() + "," + first.y0()
+					+ " u_axis=" + first.x1() + "," + first.y1()
+					+ " v_axis=" + first.x3() + "," + first.y3()
+					+ " uv=" + first.u0() + "," + first.v0() + ".." + first.u1() + "," + first.v1()
+			);
+		}
+		return List.copyOf(elements);
+	}
+
+	private static synchronized void recordTextRouteDiagnostic(String detail) {
+		if (!TEXT_ROUTE_DIAGNOSTICS_ENABLED || TEXT_ROUTE_DIAGNOSTICS.putIfAbsent(detail, Boolean.TRUE) != null) {
+			return;
+		}
+		RustGalFrameCoordinator.auditMessage("gui.text.route " + detail);
+	}
+
+	static VulkanicGalBridge.GuiAffineQuadRecord transformTextQuad(
+		TextGlyphQuad quad, Matrix3x2f pose, long assetId, int guiWidth, int guiHeight, @Nullable ScreenRectangle scissor
+	) {
+		float x0 = pose.m00() * quad.x0() + pose.m10() * quad.y0() + pose.m20();
+		float y0 = pose.m01() * quad.x0() + pose.m11() * quad.y0() + pose.m21();
+		// TextGlyphQuad follows Minecraft's vertex order: TL, BL, BR, TR. The
+		// semantic affine ABI is origin, U-axis endpoint, V-axis endpoint.
+		float x1 = pose.m00() * quad.x3() + pose.m10() * quad.y3() + pose.m20();
+		float y1 = pose.m01() * quad.x3() + pose.m11() * quad.y3() + pose.m21();
+		float x3 = pose.m00() * quad.x1() + pose.m10() * quad.y1() + pose.m20();
+		float y3 = pose.m01() * quad.x1() + pose.m11() * quad.y1() + pose.m21();
+		VulkanicGalBridge.GuiAffineQuadRecord request = new VulkanicGalBridge.GuiAffineQuadRecord(
+			GuiRenderStratum.GUI_TEXT.order(), assetId, x0, y0, x1, y1, x3, y3, quad.z(),
+			quad.u0(), quad.v0(), quad.u1(), quad.v1(), quad.colorArgb(), guiWidth, guiHeight
+		);
+		return scissor == null ? request : request.withClip(scissor.left(), scissor.top(), scissor.width(), scissor.height());
+	}
+
+	private static boolean isParallelogram(TextGlyphQuad quad) {
+		return Math.abs((quad.x1() + quad.x3()) - (quad.x0() + quad.x2())) <= 0.001F
+			&& Math.abs((quad.y1() + quad.y3()) - (quad.y0() + quad.y2())) <= 0.001F;
+	}
+
+	private static synchronized long semanticTextAtlasId(String identity, boolean colored) {
+		long hash = 0xcbf29ce484222325L;
+		String key = identity + (colored ? "#rgba" : "#alpha");
+		for (int i = 0; i < key.length(); i++) {
+			hash ^= key.charAt(i);
+			hash *= 0x100000001b3L;
+		}
+		if (hash == 0L) {
+			hash = 1L;
+		}
+		String previous = TEXT_ATLAS_IDENTITIES.putIfAbsent(hash, key);
+		if (previous != null && !previous.equals(key)) {
+			throw new IllegalStateException("semantic text atlas identity collision");
+		}
+		return hash;
+	}
+
+	private static synchronized void stageTextAtlas(long assetId, FontTexture.SemanticAtlasSnapshot atlas) {
+		String key = atlas.identity() + (atlas.colored() ? "#rgba" : "#alpha");
+		TextAtlasGeneration generation = new TextAtlasGeneration(atlas.generation(), atlas.revision());
+		if (generation.equals(TEXT_ATLAS_GENERATIONS.get(key))) {
+			return;
+		}
+		RustGalFrameCoordinator.stageGuiRawImage(new VulkanicGalBridge.GuiRawImageAssetRecord(
+			assetId, atlas.colored() ? 2 : 1, atlas.width(), atlas.height(), atlas.pixels()
+		));
+		TEXT_ATLAS_GENERATIONS.put(key, generation);
+	}
+
+	private record TextAtlasGeneration(long atlasGeneration, long revision) {
+	}
+
+	private record TextAtlasRequest(long assetId, FontTexture.SemanticAtlasSnapshot atlas) {
 	}
 
 	public static boolean isWholeFrameVulkanEnabled() {

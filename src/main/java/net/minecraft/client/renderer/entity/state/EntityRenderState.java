@@ -15,6 +15,11 @@ import org.jetbrains.annotations.Nullable;
 @Environment(EnvType.CLIENT)
 public class EntityRenderState {
 	public static final int NO_OUTLINE = 0;
+	/**
+	 * Stable client entity identity for semantic render diagnostics. This remains
+	 * Java render-state data and never crosses a renderer ABI boundary.
+	 */
+	public int entityId = -1;
 	public EntityType<?> entityType;
 	public double x;
 	public double y;

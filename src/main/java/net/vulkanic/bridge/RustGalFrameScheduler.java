@@ -31,9 +31,14 @@ public final class RustGalFrameScheduler<T> {
 	}
 
 	public List<T> takeAll(List<Token> tokens, long generation) {
+		return this.takeAllItems(tokens, generation).stream().map(Item::payload).toList();
+	}
+
+	/** Returns the semantic payload with its stable scheduler sequence. */
+	public List<Item<T>> takeAllItems(List<Token> tokens, long generation) {
 		List<Token> ordered = new ArrayList<>(tokens);
 		ordered.sort(Comparator.comparingInt(Token::stratumOrder).thenComparingLong(Token::sequence));
-		List<T> payloads = new ArrayList<>(ordered.size());
+		List<Item<T>> payloads = new ArrayList<>(ordered.size());
 		int lastOrder = Integer.MIN_VALUE;
 		for (Token token : ordered) {
 			Scheduled<T> scheduled = this.take(token, generation);
@@ -41,7 +46,7 @@ public final class RustGalFrameScheduler<T> {
 				throw new IllegalStateException(this.label + " batch executed out of stratum order: stratum=" + scheduled.token().stratumId());
 			}
 			lastOrder = scheduled.token().stratumOrder();
-			payloads.add(scheduled.payload());
+			payloads.add(new Item<>(scheduled.token(), scheduled.payload()));
 		}
 		this.lastExecutedOrder = Integer.MIN_VALUE;
 		return payloads;
@@ -92,6 +97,9 @@ public final class RustGalFrameScheduler<T> {
 	}
 
 	public record Token(long batchId, long sequence, long generation, String stratumId, int stratumOrder) {
+	}
+
+	public record Item<T>(Token token, T payload) {
 	}
 
 	private record Scheduled<T>(Token token, T payload) {

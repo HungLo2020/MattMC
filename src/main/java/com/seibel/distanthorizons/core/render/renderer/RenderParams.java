@@ -176,6 +176,42 @@ public class RenderParams extends DhApiRenderParam
 		
 		return null;
 	}
+
+	/**
+	 * Validates the real CPU render-list traversal used by the Rust whole-frame
+	 * route. Unlike {@link #getValidationErrorMessage()}, this deliberately
+	 * excludes Java draw-only state such as the legacy lightmap wrapper and the
+	 * generic renderer. The caller neither binds nor retains either resource.
+	 */
+	public String getSemanticTraversalValidationErrorMessage()
+	{
+		this.validationRun = true;
+		if (!MC_CLIENT.playerExists())
+		{
+			return "No Player Exists";
+		}
+		if (this.dhClientWorld == null)
+		{
+			return "No DH Client World Loaded";
+		}
+		if (this.dhClientLevel == null)
+		{
+			return "No DH Client Level Loaded";
+		}
+		if (this.clientLevelWrapper == null)
+		{
+			return "No Client Level Wrapper Loaded";
+		}
+		if (this.renderBufferHandler == null)
+		{
+			return "No RenderBufferHandler Present";
+		}
+		if (this.dhModelViewMatrix == null || this.mcModelViewMatrix == null)
+		{
+			return "No MVM or Proj Matrix Given";
+		}
+		return null;
+	}
 	
 	
 	

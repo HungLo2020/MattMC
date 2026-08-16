@@ -16,12 +16,15 @@ import net.minecraft.client.renderer.state.CameraRenderState;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
+import net.vulkanic.world.RustGalWorldPrimitiveRenderer;
+import net.vulkanic.world.WorldRenderRoutePolicy;
 import net.minecraft.world.entity.projectile.WitherSkull;
 
 @Environment(EnvType.CLIENT)
 public class WitherSkullRenderer extends EntityRenderer<WitherSkull, WitherSkullRenderState> {
 	private static final ResourceLocation WITHER_INVULNERABLE_LOCATION = ResourceLocation.withDefaultNamespace("textures/entity/wither/wither_invulnerable.png");
 	private static final ResourceLocation WITHER_LOCATION = ResourceLocation.withDefaultNamespace("textures/entity/wither/wither.png");
+	private static final ResourceLocation WITHER_SKULL_ENTITY_ID = ResourceLocation.withDefaultNamespace("wither_skull");
 	private final SkullModel model;
 
 	public WitherSkullRenderer(EntityRendererProvider.Context context) {
@@ -45,16 +48,19 @@ public class WitherSkullRenderer extends EntityRenderer<WitherSkull, WitherSkull
 	) {
 		poseStack.pushPose();
 		poseStack.scale(-1.0F, -1.0F, 1.0F);
-		submitNodeCollector.submitModel(
-			this.model,
-			witherSkullRenderState.modelState,
-			poseStack,
-			this.model.renderType(this.getTextureLocation(witherSkullRenderState)),
-			witherSkullRenderState.lightCoords,
-			OverlayTexture.NO_OVERLAY,
-			witherSkullRenderState.outlineColor,
-			null
-		);
+		ResourceLocation texture = this.getTextureLocation(witherSkullRenderState);
+		var renderType = this.model.renderType(texture);
+		boolean eligible = RustGalWorldPrimitiveRenderer.isStandaloneModelMeshEligible(this.model, renderType, texture, OverlayTexture.NO_OVERLAY, witherSkullRenderState.outlineColor, null);
+		WorldRenderRoutePolicy.Route route = WorldRenderRoutePolicy.currentModelMeshRoute(eligible);
+		if (!submitNodeCollector.isSemanticCoverageOnly() && route.usesRustWholeFrameVulkan()) {
+			if (!RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMesh(this.model, witherSkullRenderState.modelState, poseStack.last(), renderType, texture, WITHER_SKULL_ENTITY_ID, witherSkullRenderState.lightCoords, OverlayTexture.NO_OVERLAY, -1)) {
+				throw new IllegalStateException("Rust whole-frame WitherSkull route selected without a copied indexed mesh request");
+			}
+			RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision("rust-vulkan-whole-frame", texture, true, true, false);
+		} else {
+			if (eligible) RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(route == WorldRenderRoutePolicy.Route.DISABLED ? "disabled" : "java-legacy", texture, false, false, !submitNodeCollector.isSemanticCoverageOnly() && route.usesJavaCompatibility());
+			submitNodeCollector.submitModel(this.model, witherSkullRenderState.modelState, poseStack, renderType, witherSkullRenderState.lightCoords, OverlayTexture.NO_OVERLAY, witherSkullRenderState.outlineColor, null);
+		}
 		poseStack.popPose();
 		super.submit(witherSkullRenderState, poseStack, submitNodeCollector, cameraRenderState);
 	}

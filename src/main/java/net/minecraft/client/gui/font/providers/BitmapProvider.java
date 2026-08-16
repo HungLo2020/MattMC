@@ -26,6 +26,7 @@ import net.minecraft.client.gui.font.glyphs.BakedGlyph;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.ResourceManager;
 import org.jetbrains.annotations.Nullable;
+import org.lwjgl.system.MemoryUtil;
 import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)
@@ -229,6 +230,20 @@ public class BitmapProvider implements GlyphProvider {
 					public void upload(int i, int j, GpuTexture gpuTexture) {
 						net.vulkanic.VulkanicAPI.createCommandEncoder()
 							.writeToTexture(gpuTexture, Glyph.this.image, 0, 0, i, j, Glyph.this.width, Glyph.this.height, Glyph.this.offsetX, Glyph.this.offsetY);
+					}
+
+					@Override
+					public boolean copyTo(NativeImage nativeImage, int i, int j) {
+						int k = Glyph.this.image.format().components();
+						if (nativeImage.format().components() != k) {
+							return false;
+						}
+						for (int l = 0; l < Glyph.this.height; l++) {
+							long m = ((long)(Glyph.this.offsetY + l) * Glyph.this.image.getWidth() + Glyph.this.offsetX) * k;
+							long n = ((long)(j + l) * nativeImage.getWidth() + i) * k;
+							MemoryUtil.memCopy(Glyph.this.image.getPointer() + m, nativeImage.getPointer() + n, (long)Glyph.this.width * k);
+						}
+						return true;
 					}
 
 					@Override

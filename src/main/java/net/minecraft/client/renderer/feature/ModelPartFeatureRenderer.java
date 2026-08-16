@@ -106,6 +106,14 @@ public class ModelPartFeatureRenderer {
 			}
 		}
 
+		public int totalSubmitCount() {
+			int total = 0;
+			for (List<SubmitNodeStorage.ModelPartSubmit> submits : this.modelPartSubmits.values()) {
+				total += submits.size();
+			}
+			return total;
+		}
+
 		public void endFrame() {
 			this.modelPartSubmits.keySet().removeIf(renderType -> !this.modelPartSubmitsUsage.contains(renderType));
 			this.modelPartSubmitsUsage.clear();

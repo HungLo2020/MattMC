@@ -303,6 +303,54 @@ const TEXTURES: &[SemanticTexture] = &[
         ),
         legacy_keys: &[],
     },
+    SemanticTexture {
+        key: WORLD_MATERIAL_TEXTURE_WEATHER_RAIN,
+        resource_location: "minecraft:textures/environment/rain.png",
+        default_png: include_bytes!(
+            "../../../../resources/assets/minecraft/textures/environment/rain.png"
+        ),
+        legacy_keys: &[],
+    },
+    SemanticTexture {
+        key: WORLD_MATERIAL_TEXTURE_WEATHER_SNOW,
+        resource_location: "minecraft:textures/environment/snow.png",
+        default_png: include_bytes!(
+            "../../../../resources/assets/minecraft/textures/environment/snow.png"
+        ),
+        legacy_keys: &[],
+    },
+    SemanticTexture {
+        key: WORLD_MATERIAL_TEXTURE_EXPERIENCE_ORB,
+        resource_location: "minecraft:textures/entity/experience_orb.png",
+        default_png: include_bytes!(
+            "../../../../resources/assets/minecraft/textures/entity/experience_orb.png"
+        ),
+        legacy_keys: &[],
+    },
+    SemanticTexture {
+        key: WORLD_MATERIAL_TEXTURE_BEACON_BEAM,
+        resource_location: "minecraft:textures/entity/beacon_beam.png",
+        default_png: include_bytes!(
+            "../../../../resources/assets/minecraft/textures/entity/beacon_beam.png"
+        ),
+        legacy_keys: &[],
+    },
+    SemanticTexture {
+        key: WORLD_MATERIAL_TEXTURE_ENTITY_SHADOW,
+        resource_location: "minecraft:textures/misc/shadow.png",
+        default_png: include_bytes!(
+            "../../../../resources/assets/minecraft/textures/misc/shadow.png"
+        ),
+        legacy_keys: &[],
+    },
+    SemanticTexture {
+        key: WORLD_MATERIAL_TEXTURE_GENERATED_WHITE,
+        resource_location: "vulkanic:generated/white",
+        default_png: include_bytes!(
+            "../../../../resources/assets/minecraft/textures/item/white_dye.png"
+        ),
+        legacy_keys: &[],
+    },
 ];
 
 pub(crate) fn material(key: u32) -> Option<&'static SemanticMaterial> {
@@ -347,4 +395,79 @@ pub(crate) fn cutout_threshold(material_key: u32) -> f32 {
     material(material_key)
         .map(|entry| entry.cutout_threshold)
         .unwrap_or(0.0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn weather_textures_are_stable_rust_owned_semantic_assets() {
+        let rain = texture(WORLD_MATERIAL_TEXTURE_WEATHER_RAIN).expect("rain texture");
+        let snow = texture(WORLD_MATERIAL_TEXTURE_WEATHER_SNOW).expect("snow texture");
+
+        assert_eq!(
+            rain.resource_location,
+            "minecraft:textures/environment/rain.png"
+        );
+        assert_eq!(
+            snow.resource_location,
+            "minecraft:textures/environment/snow.png"
+        );
+        assert_ne!(rain.key, snow.key);
+        assert!(!rain.default_png.is_empty());
+        assert!(!snow.default_png.is_empty());
+        assert!(material_matches_mode(
+            WORLD_MATERIAL_ID_TRANSLUCENT_TEXTURED,
+            WORLD_MATERIAL_MODE_TRANSLUCENT
+        ));
+    }
+
+    #[test]
+    fn experience_orb_sheet_is_a_stable_translucent_semantic_asset() {
+        let orb = texture(WORLD_MATERIAL_TEXTURE_EXPERIENCE_ORB).expect("experience-orb texture");
+
+        assert_eq!(
+            orb.resource_location,
+            "minecraft:textures/entity/experience_orb.png"
+        );
+        assert!(!orb.default_png.is_empty());
+        assert_ne!(orb.key, WORLD_MATERIAL_TEXTURE_GENERATED_WHITE);
+        assert!(material_matches_mode(
+            WORLD_MATERIAL_ID_TRANSLUCENT_TEXTURED,
+            WORLD_MATERIAL_MODE_TRANSLUCENT
+        ));
+    }
+
+    #[test]
+    fn beacon_beam_sheet_is_a_stable_translucent_semantic_asset() {
+        let beam = texture(WORLD_MATERIAL_TEXTURE_BEACON_BEAM).expect("beacon-beam texture");
+
+        assert_eq!(
+            beam.resource_location,
+            "minecraft:textures/entity/beacon_beam.png"
+        );
+        assert!(!beam.default_png.is_empty());
+        assert_ne!(beam.key, WORLD_MATERIAL_TEXTURE_EXPERIENCE_ORB);
+        assert!(material_matches_mode(
+            WORLD_MATERIAL_ID_TRANSLUCENT_TEXTURED,
+            WORLD_MATERIAL_MODE_TRANSLUCENT
+        ));
+    }
+
+    #[test]
+    fn entity_shadow_texture_is_a_stable_translucent_semantic_asset() {
+        let shadow = texture(WORLD_MATERIAL_TEXTURE_ENTITY_SHADOW).expect("entity-shadow texture");
+
+        assert_eq!(
+            shadow.resource_location,
+            "minecraft:textures/misc/shadow.png"
+        );
+        assert!(!shadow.default_png.is_empty());
+        assert_ne!(shadow.key, WORLD_MATERIAL_TEXTURE_BEACON_BEAM);
+        assert!(material_matches_mode(
+            WORLD_MATERIAL_ID_TRANSLUCENT_TEXTURED,
+            WORLD_MATERIAL_MODE_TRANSLUCENT
+        ));
+    }
 }

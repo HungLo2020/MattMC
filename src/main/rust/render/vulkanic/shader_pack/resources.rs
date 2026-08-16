@@ -201,7 +201,7 @@ impl ShaderPackRuntimePlan {
 
     pub fn terrain_contract_diagnostic_json(&self) -> String {
         let Some(contract) = &self.terrain_contract else {
-            return "{\"source_contract_discovered\":false,\"execution\":\"internal-terrain-fixture\"}".to_string();
+            return "{\"source_contract_discovered\":false,\"execution\":\"discovery-only; per-frame runtime status is authoritative\"}".to_string();
         };
         let inputs = contract
             .inputs
@@ -233,6 +233,12 @@ impl ShaderPackRuntimePlan {
             .map(|resource| format!("\"{resource:?}\""))
             .collect::<Vec<_>>()
             .join(",");
+        let property_defines = contract
+            .property_defines
+            .iter()
+            .map(|(name, value)| format!("\"{}\":\"{}\"", json_escape(name), json_escape(value)))
+            .collect::<Vec<_>>()
+            .join(",");
         let voxel_generation = self
             .voxel_light_volume
             .as_ref()
@@ -249,6 +255,12 @@ impl ShaderPackRuntimePlan {
                 )
             })
             .unwrap_or_else(|| "null".to_string());
+        let selected_source_execution_requested = matches!(
+            std::env::var("MATTMC_RUST_SELECTED_SOURCE_EXECUTION")
+                .as_deref()
+                .map(str::trim),
+            Ok("1") | Ok("true") | Ok("TRUE")
+        );
         format!(
             concat!(
                 "{{\"source_contract_discovered\":true,\"pack\":\"{}\",\"generation\":{},",
@@ -265,7 +277,7 @@ impl ShaderPackRuntimePlan {
                 "\"output_bindings\":{{\"terrain_lit_color\":\"terrain color attachment location 0\",",
                 "\"terrain_material_auxiliary\":\"terrain auxiliary attachment location 2\",",
                 "\"terrain_view_space_normal\":\"terrain normal attachment location 1 when declared\"}},",
-                "\"unsupported\":[{}],\"required_resources\":[{}],\"voxel_light_volume_generation\":{},\"voxel_light_update_policy\":{},\"selected_source_plan_prepared\":{},\"selected_source_execution_admitted\":false,\"execution\":\"{}\"}}"
+                "\"property_defines\":{{{}}},\"unsupported\":[{}],\"required_resources\":[{}],\"voxel_light_volume_generation\":{},\"voxel_light_update_policy\":{},\"selected_source_execution_requested\":{},\"selected_source_plan_prepared\":{},\"selected_source_execution_admission_scope\":\"per-frame-runtime-status\",\"execution\":\"{}\"}}"
             ),
             json_escape(&contract.pack_name),
             contract.generation,
@@ -273,15 +285,17 @@ impl ShaderPackRuntimePlan {
             operations,
             outputs,
             inputs,
+            property_defines,
             unsupported,
             required_resources,
             voxel_generation,
             voxel_update_policy,
+            selected_source_execution_requested,
             self.voxel_light_volume.is_some(),
             if self.voxel_light_volume.is_some() {
-                "source-derived terrain plan prepared privately; production execution is explicitly unadmitted until a complete route policy selects it"
+                "source-derived terrain plan prepared privately; per-frame admission and execution are recorded only by the Rust-owned selected-source runtime status"
             } else {
-                "internal-terrain-fixture"
+                "source-derived terrain contract discovered; per-frame admission and execution are recorded only by the Rust-owned selected-source runtime status"
             },
         )
     }

@@ -163,6 +163,15 @@ RUNTIME_PROFILES = {
     "extended": RuntimeProfile("extended", 300, 55, 65, 40, 125, 15, 15, 270, 60, 240, 600, 360, 3000, 200),
 }
 PROFILE_RANK = {name: index for index, name in enumerate(RUNTIME_PROFILE_NAMES)}
+# A selected-source capture has a deliberate two-step transaction: a normal
+# Rust submission confirms the exact resource snapshot, then the following
+# frame is the first frame allowed to execute the source plan. Give that one
+# transition a bounded grace period rather than stretching ordinary rows.
+# A selected-source world frame currently takes several seconds while the
+# Rust-owned graph compiles and validates its first real material workload.
+# This bounded grace applies only after the capture has already recorded a
+# native source submission; ordinary rows retain their profile timeout.
+SELECTED_SOURCE_ADMISSION_GRACE_SECONDS = 60
 
 WORLD_PROFILES = {
     "migration-gate": WorldProfile(
@@ -1260,6 +1269,39 @@ def read_json(path: Path) -> dict[str, object] | None:
     return value if isinstance(value, dict) else None
 
 
+def selected_source_execution_armed(capture_dir: Path) -> bool:
+    status = read_json(
+        capture_dir / "terrain_pass_contract" / "selected-source-admission-status.json"
+    )
+    return isinstance(status, dict) and bool(status.get("source_execution_armed"))
+
+
+def selected_source_execution_observed(capture_dir: Path) -> bool:
+    """Returns true only for an already-recorded native source submission.
+
+    The Rust executor consumes its one-frame arm before it writes the receipt,
+    so the live arm is deliberately not a timeout signal. A DH source receipt
+    is a first-class selected-source workload and is not interchangeable with
+    the static-terrain receipt family.
+    """
+    contract_dir = capture_dir / "terrain_pass_contract"
+    for pattern in (
+        "selected-source-execution-frame-*.json",
+        "selected-source-execution-distant-horizons-frame-*.json",
+    ):
+        receipt_path = latest_matching(contract_dir, pattern)
+        receipt = read_json(receipt_path) if receipt_path else None
+        if not isinstance(receipt, dict):
+            continue
+        if (
+            int(parse_number(receipt.get("frame_id")) or 0) > 0
+            and int(parse_number(receipt.get("submission_id")) or 0) > 0
+            and str(receipt.get("route") or "") == "rust-native-selected-source"
+        ):
+            return True
+    return False
+
+
 def read_key_values(path: Path | None) -> dict[str, str]:
     if path is None or not path.is_file():
         return {}
@@ -2310,7 +2352,7 @@ def static_terrain_translucent_final_order_evidence(doc: dict[str, object] | Non
             "reason": "missing front/rear/return translucent overlap captures",
         }
     try:
-        from PIL import Image
+        from PIL import Image, ImageDraw
     except ImportError:
         return {
             "status": "fail",
@@ -2624,6 +2666,79 @@ def static_terrain_base_scenario(scenario: str) -> str:
     if suffix in aliases:
         return aliases[suffix]
     return suffix if suffix in base_scenarios else scenario
+
+
+STATIC_TERRAIN_POST_SETUP_EXECUTION_SCENARIOS = frozenset(
+    {
+        "interior-edit",
+        "boundary-x-edit",
+        "boundary-y-edit",
+        "boundary-z-edit",
+        "section-reentry",
+        "resource-reload",
+        "opaque-texture-replacement",
+        "cutout-texture-replacement",
+        "pack-priority-reversal",
+        "missing-atlas-payload",
+        "malformed-png-payload",
+        "translucent-glass",
+        "translucent-overlap",
+        "translucent-water",
+        "translucent-mixed",
+        "translucent-mixed-unsupported",
+        "partial-texture-update",
+        "model-resource-generation-change",
+        "resize-cycle",
+        "swapchain-recreate",
+        "world-unload-reload",
+        "world-different-reload",
+        "view-distance-decrease",
+        "view-distance-increase",
+        "camera-relocation",
+        "return-visited-terrain",
+        "memory-cache-soak",
+        "steady-state-performance",
+        "texture-palette",
+    }
+)
+
+
+def static_terrain_requires_post_setup_execution(scenario: str) -> bool:
+    """Whether this capture performed a terrain lifecycle action before capture."""
+    return static_terrain_base_scenario(scenario) in STATIC_TERRAIN_POST_SETUP_EXECUTION_SCENARIOS
+
+
+def static_terrain_capture_execution_evidence(
+    execution: dict[str, object], scenario: str
+) -> tuple[bool, str]:
+    """Validate the completed static-terrain work that the screenshot represents.
+
+    Lifecycle fixtures need an execution newer than their setup baseline. Ordinary
+    real-world fixtures have no lifecycle setup, so their authoritative evidence
+    is the completed submission captured by the request itself.
+    """
+    required = bool(execution.get("required"))
+    request_submission = int(parse_number(execution.get("requestSubmission")) or -1)
+    request_instances = int(parse_number(execution.get("requestInstances")) or 0)
+    if static_terrain_requires_post_setup_execution(scenario):
+        baseline = int(parse_number(execution.get("setupSubmissionBaseline")) or -1)
+        submission = int(parse_number(execution.get("lifecycleSubmission")) or -1)
+        instances = int(parse_number(execution.get("lifecycleInstances")) or 0)
+        if required and submission > baseline and instances > 0 and request_submission >= submission:
+            return True, "post-setup"
+        return (
+            False,
+            "post-setup Rust execution was not correlated "
+            f"(required={required}, baseline={baseline}, executionSubmission={submission}, "
+            f"executionInstances={instances}, requestSubmission={request_submission})",
+        )
+    if request_submission > 0 and request_instances > 0:
+        return True, "captured-submission"
+    return (
+        False,
+        "captured Rust execution was absent "
+        f"(requestSubmission={request_submission}, requestInstances={request_instances})",
+    )
 
 
 def static_terrain_is_translucent_scenario(scenario: str) -> bool:
@@ -3084,6 +3199,32 @@ def parse_java_property(text: str, key: str) -> str | None:
     pattern = re.compile(rf"-D{re.escape(key)}=([^\s'\"\\]+)")
     match = pattern.search(text)
     return match.group(1) if match else None
+
+
+def java_option_property(options: Iterable[str], key: str) -> str | None:
+    """Return the effective value of a direct JVM option without parsing logs."""
+    prefix = f"-D{key}="
+    value: str | None = None
+    for option in options:
+        if option.startswith(prefix):
+            value = option[len(prefix) :]
+    return value
+
+
+def normalize_direct_primed_tnt_scenario(args: argparse.Namespace) -> None:
+    """Treat the direct JVM scenario spelling like the typed capture option.
+
+    The capture harness owns pose sequencing. A raw scenario property must not
+    bypass that sequencing and leave a valid real producer with too few poses.
+    """
+    if getattr(args, "world_mesh_primed_tnt_scenario", ""):
+        return
+    scenario = java_option_property(
+        getattr(args, "jvm_arg", []) or [],
+        "mattmc.dev.rustGalWorldMesh.primedTntScenario",
+    )
+    if scenario in {"hidden", "ordinary"}:
+        args.world_mesh_primed_tnt_scenario = scenario
 
 
 def detect_attribution(mode: ModeSpec, meta: dict[str, str], logs: str) -> str:
@@ -3831,6 +3972,183 @@ def expected_falling_block_id(scenario_name: str) -> str | None:
     }.get(scenario_name)
 
 
+def deterministic_world_mesh_primed_tnt_pixel_evidence(
+    doc: dict[str, object] | None,
+    scenario: object,
+) -> dict[str, object]:
+    scenario_name = str(scenario or "").strip().lower()
+    evidence: dict[str, object] = {
+        "checked": False,
+        "status": "not_requested",
+        "scenario": scenario_name or None,
+        "expected_block_id": "minecraft:tnt",
+        "crops": [],
+        "validated_mesh_keys": [],
+        "matching_pixels": 0,
+        "setup_status": "not_checked",
+        "route_status": "not_checked",
+        "texture_status": "not_checked",
+        "material_status": "not_checked",
+        "position_status": "not_checked",
+        "game_window_status": "not_checked",
+        "frame_sequence_status": "not_checked",
+        "threshold": 96,
+    }
+    if not scenario_name:
+        return evidence
+    moving_blocks = doc.get("rustGalWorldMovingBlocks") if isinstance(doc, dict) else []
+    decisions = doc.get("rustGalWorldMovingBlockRouteDecisions") if isinstance(doc, dict) else []
+    captures = doc.get("captures") if isinstance(doc, dict) else []
+    moving_blocks = moving_blocks if isinstance(moving_blocks, list) else []
+    decisions = decisions if isinstance(decisions, list) else []
+    captures = captures if isinstance(captures, list) else []
+    primed_blocks = [
+        block for block in moving_blocks
+        if isinstance(block, dict) and str(block.get("provenance") or "") == "primed-tnt"
+    ]
+    evidence["primed_tnt_blocks_reported"] = len(primed_blocks)
+    if scenario_name == "hidden":
+        evidence.update(
+            {
+                "checked": True,
+                "status": "absent_expected" if not primed_blocks else "unexpected_mesh_metadata",
+                "texture_status": "absent_expected",
+                "material_status": "absent_expected",
+                "position_status": "absent_expected",
+            }
+        )
+        return evidence
+    setup = doc.get("rustGalWorldPrimedTntSetup") if isinstance(doc, dict) else None
+    if not isinstance(setup, dict) or setup.get("status") != "spawned" or setup.get("blockId") != "minecraft:tnt":
+        evidence.update({"checked": True, "status": "missing_real_setup", "setup_status": "failed", "setup": setup})
+        return evidence
+    evidence["setup_status"] = "passed"
+    if not any(
+        isinstance(decision, dict)
+        and str(decision.get("provenance") or "") == "primed-tnt"
+        and bool(decision.get("rustSelected"))
+        and bool(decision.get("rustQueued"))
+        and not bool(decision.get("javaDrawn"))
+        for decision in decisions
+    ):
+        evidence.update({"checked": True, "status": "missing_rust_route", "route_status": "failed"})
+        return evidence
+    evidence["route_status"] = "passed"
+    if not captures:
+        evidence.update({"checked": True, "status": "missing_capture"})
+        return evidence
+    try:
+        from PIL import Image
+    except Exception as exc:  # pragma: no cover
+        evidence["status"] = f"pillow_unavailable:{exc}"
+        return evidence
+    primed_captures = [
+        capture for capture in captures
+        if isinstance(capture, dict) and str(capture.get("poseName") or "").startswith("primed-tnt-")
+    ]
+    if len(primed_captures) < FALLING_BLOCK_MIN_CAPTURE_FRAMES:
+        evidence.update(
+            {
+                "checked": True,
+                "status": "incomplete_frame_sequence",
+                "frame_sequence_status": "failed",
+                "captures_reported": len(primed_captures),
+            }
+        )
+        return evidence
+    crops: list[dict[str, object]] = []
+    validated: list[str] = []
+    total_matching = 0
+    game_windows: list[dict[str, object]] = []
+    try:
+        for capture_index, capture in enumerate(primed_captures):
+            screenshot = Path(str(capture.get("screenshot") or ""))
+            if not screenshot.is_file():
+                evidence.update({"checked": True, "status": "missing_screenshot_file"})
+                return evidence
+            capture_frame = parse_number(capture.get("renderedFrameIndex"))
+            if capture_frame is None:
+                evidence.update({"checked": True, "status": "missing_capture_frame"})
+                return evidence
+            with Image.open(screenshot) as image:
+                rgb = image.convert("RGB")
+            game_window = captured_game_window_evidence(rgb.size, doc, capture)
+            game_windows.append(game_window)
+            if game_window.get("status") != "passed":
+                evidence.update({"checked": True, "status": "not_game_window", "game_window_status": "failed"})
+                return evidence
+            candidates = [
+                block for block in primed_blocks
+                if block.get("blockId") == "minecraft:tnt"
+                and block.get("projected") is True
+                and isinstance(block.get("screenBounds"), dict)
+                and abs(int(parse_number(block.get("frameIndex")) or -999999) - int(capture_frame)) <= 1
+            ]
+            if not candidates:
+                crops.append({"status": "missing_matching_primed_tnt_mesh", "capture_index": capture_index})
+                continue
+            best: dict[str, object] | None = None
+            for block in candidates[:8]:
+                bounds = block["screenBounds"]
+                assert isinstance(bounds, dict)
+                for mirrored in (False, True):
+                    crop_box = marker_crop_box(bounds, rgb.width, rgb.height, mirrored_y=mirrored)
+                    if crop_box is None:
+                        continue
+                    crop = rgb.crop(crop_box)
+                    stats = primed_tnt_crop_stats(crop)
+                    if best is None or int(stats.get("matching_pixels") or 0) > int(best.get("matching_pixels") or 0):
+                        mesh_key = str(block.get("meshKey") or "unknown")
+                        crop_path = screenshot.with_name(
+                            f"world_mesh_primed_tnt_crop_{capture_index}_{mesh_key}_{'mirrored' if mirrored else 'projected'}.png"
+                        )
+                        crop.save(crop_path)
+                        best = {
+                            **stats,
+                            "capture_index": capture_index,
+                            "rendered_frame_index": capture_frame,
+                            "mesh_key": mesh_key,
+                            "texture_ids": block.get("textureIds"),
+                            "material_mode": int(parse_number(block.get("materialMode")) or -1),
+                            "crop_path": str(crop_path),
+                        }
+            if best is None:
+                continue
+            crops.append(best)
+            matching = int(best.get("matching_pixels") or 0)
+            total_matching += matching
+            if matching >= int(evidence["threshold"]) and best.get("material_mode") == 1 and best.get("coverage_ok") is True:
+                validated.append(str(best["mesh_key"]))
+        frames_validated = len({
+            int(crop.get("capture_index") or -1)
+            for crop in crops
+            if isinstance(crop, dict)
+            and int(crop.get("matching_pixels") or 0) >= int(evidence["threshold"])
+            and crop.get("material_mode") == 1
+            and crop.get("coverage_ok") is True
+        })
+        evidence.update(
+            {
+                "checked": True,
+                "status": "present" if frames_validated >= FALLING_BLOCK_MIN_CAPTURE_FRAMES else "absent",
+                "crops": crops,
+                "validated_mesh_keys": sorted(set(validated)),
+                "matching_pixels": total_matching,
+                "texture_status": "passed" if validated else "failed",
+                "material_status": "passed" if frames_validated >= FALLING_BLOCK_MIN_CAPTURE_FRAMES else "failed",
+                "position_status": "projected_crop_hit" if frames_validated >= FALLING_BLOCK_MIN_CAPTURE_FRAMES else "missing_projected_crop_hit",
+                "game_window_status": "passed",
+                "game_windows": game_windows,
+                "frame_sequence_status": "passed" if frames_validated >= FALLING_BLOCK_MIN_CAPTURE_FRAMES else "failed",
+                "frames_validated": frames_validated,
+                "required_capture_frames": FALLING_BLOCK_MIN_CAPTURE_FRAMES,
+            }
+        )
+    except Exception as exc:  # pragma: no cover - local image support varies.
+        evidence["status"] = f"read_failed:{exc}"
+    return evidence
+
+
 def deterministic_world_mesh_block_display_pixel_evidence(
     doc: dict[str, object] | None,
     scenario: object,
@@ -3996,6 +4314,495 @@ def deterministic_world_mesh_block_display_pixel_evidence(
     return evidence
 
 
+def deterministic_distant_horizons_texture_palette_pixel_evidence(
+    doc: dict[str, object] | None,
+    plan: dict[str, object] | None,
+    *,
+    minimum_texture_footprint_pixels: int = 96,
+    ndc_y_positive_down: bool = False,
+    require_palette_color: bool = True,
+    minimum_passed_targets: int = 4,
+    minimum_world_contrast: float | None = None,
+) -> dict[str, object]:
+    """Classify deliberately distinct DH palette regions in one named output.
+
+    The normal presented image maps positive NDC Y upward. Raw Vulkan source
+    attachments intentionally use the opposite viewport convention after their
+    readback is normalized to a top-left PNG. Callers must state that semantic
+    mapping explicitly instead of silently treating raw and presented images as
+    interchangeable evidence.
+    """
+    # A one-block far-LOD remnant can have the expected average colour while
+    # the surrounding reduced surface is still rendered by the unresolved
+    # colour-only path. Require enough final-frame coverage to distinguish a
+    # visible material sample from an edge fragment or a coincidental colour.
+    evidence: dict[str, object] = {
+        "checked": False,
+        "status": "not_requested",
+        "screenshot": None,
+        "targets": [],
+        "passed_targets": 0,
+        "expected_targets": 4,
+        "repeat_geometry_targets": 0,
+        "minimum_world_contrast": minimum_world_contrast,
+    }
+    if not isinstance(doc, dict) or not isinstance(plan, dict):
+        return evidence
+    captures = doc.get("captures")
+    target_coverage = plan.get("paletteTargetCoverage")
+    if not isinstance(captures, list) or not captures:
+        evidence["status"] = "missing_capture"
+        return evidence
+    if not isinstance(target_coverage, list) or len(target_coverage) != 4:
+        evidence["status"] = "missing_palette_targets"
+        return evidence
+    capture = captures[0]
+    if not isinstance(capture, dict) or not capture.get("screenshot"):
+        evidence["status"] = "missing_screenshot"
+        return evidence
+    screenshot = Path(str(capture["screenshot"]))
+    evidence["screenshot"] = str(screenshot)
+    if not screenshot.is_file():
+        evidence["status"] = "missing_screenshot_file"
+        return evidence
+    try:
+        from PIL import Image, ImageDraw
+
+        with Image.open(screenshot) as image:
+            rgb = image.convert("RGB")
+            results: list[dict[str, object]] = []
+            for target in target_coverage:
+                if not isinstance(target, dict):
+                    results.append({"status": "invalid_target"})
+                    continue
+                expected_sprites = target.get("expectedSprites")
+                required_sprites = target.get("requiredSprites")
+                matches = target.get("matches")
+                tile_repeat_required = target.get("tileRepeatRequired")
+                if (
+                    not bool(target.get("matched"))
+                    or not isinstance(expected_sprites, list)
+                    or not isinstance(matches, list)
+                    or not isinstance(tile_repeat_required, bool)
+                ):
+                    results.append({"status": "unprojected_or_unmatched", "target": target.get("position")})
+                    continue
+                sprites = {str(sprite) for sprite in expected_sprites}
+                required = (
+                    {str(sprite) for sprite in required_sprites}
+                    if isinstance(required_sprites, list)
+                    else set()
+                )
+                preferred_sprites = required or sprites
+                projected_matches: list[tuple[float, dict[str, object], list[tuple[float, float]]]] = []
+                for match in matches:
+                    if not isinstance(match, dict) or str(match.get("sprite")) not in preferred_sprites:
+                        continue
+                    projection = match.get("projection")
+                    if (
+                        not isinstance(projection, dict)
+                        or projection.get("status") != "ok"
+                        or projection.get("insideClip") is not True
+                        or not isinstance(projection.get("ndcVertices"), list)
+                    ):
+                        continue
+                    ndc_vertices: list[tuple[float, float]] = []
+                    for vertex in projection["ndcVertices"]:
+                        if not isinstance(vertex, list) or len(vertex) < 2:
+                            ndc_vertices = []
+                            break
+                        try:
+                            ndc_vertices.append((float(vertex[0]), float(vertex[1])))
+                        except (TypeError, ValueError):
+                            ndc_vertices = []
+                            break
+                    if len(ndc_vertices) != 4:
+                        continue
+                    screen_vertices = [
+                        (
+                            (ndc_x + 1.0) * 0.5 * (rgb.width - 1),
+                            ((1.0 + ndc_y) if ndc_y_positive_down else (1.0 - ndc_y))
+                            * 0.5
+                            * (rgb.height - 1),
+                        )
+                        for ndc_x, ndc_y in ndc_vertices
+                    ]
+                    area = abs(sum(
+                        screen_vertices[index][0] * screen_vertices[(index + 1) % 4][1]
+                        - screen_vertices[(index + 1) % 4][0] * screen_vertices[index][1]
+                        for index in range(4)
+                    )) * 0.5
+                    if area >= 1.0:
+                        projected_matches.append((area, match, screen_vertices))
+                if not projected_matches:
+                    results.append({
+                        "status": "missing_projected_quad_footprint",
+                        "target": target.get("position"),
+                        "preferred_sprites": sorted(preferred_sprites),
+                    })
+                    continue
+                _, selected_match, screen_vertices = max(projected_matches, key=lambda candidate: candidate[0])
+                left = max(0, int(min(vertex[0] for vertex in screen_vertices)))
+                top = max(0, int(min(vertex[1] for vertex in screen_vertices)))
+                right = min(rgb.width, int(max(vertex[0] for vertex in screen_vertices)) + 1)
+                bottom = min(rgb.height, int(max(vertex[1] for vertex in screen_vertices)) + 1)
+                # Perspective can project a real one-block DH top face to a
+                # two-row strip. The polygon-mask count below is the actual
+                # footprint authority; rejecting it from its axis-aligned box
+                # alone loses valid material evidence.
+                if right <= left or bottom <= top:
+                    results.append({"status": "projected_crop_outside_frame", "target": target.get("position")})
+                    continue
+                crop = rgb.crop((left, top, right, bottom))
+                mask = Image.new("L", crop.size, 0)
+                ImageDraw.Draw(mask).polygon(
+                    [(x - left, y - top) for x, y in screen_vertices],
+                    fill=255,
+                )
+                pixels = [
+                    pixel
+                    for pixel, included in zip(crop.getdata(), mask.getdata())
+                    if included
+                ]
+                if len(pixels) < 9:
+                    results.append({"status": "projected_footprint_too_small", "target": target.get("position")})
+                    continue
+                if len(pixels) < minimum_texture_footprint_pixels:
+                    results.append({
+                        "status": "insufficient_texture_footprint",
+                        "target": target.get("position"),
+                        "selected_sprite": selected_match.get("sprite"),
+                        "footprint_pixels": len(pixels),
+                        "minimum_footprint_pixels": minimum_texture_footprint_pixels,
+                    })
+                    continue
+                red = sum(pixel[0] for pixel in pixels) / (255.0 * len(pixels))
+                green = sum(pixel[1] for pixel in pixels) / (255.0 * len(pixels))
+                blue = sum(pixel[2] for pixel in pixels) / (255.0 * len(pixels))
+                padding = max(4, min(24, max(right - left, bottom - top) // 2))
+                surround_left = max(0, left - padding)
+                surround_top = max(0, top - padding)
+                surround_right = min(rgb.width, right + padding)
+                surround_bottom = min(rgb.height, bottom + padding)
+                surround = rgb.crop((surround_left, surround_top, surround_right, surround_bottom))
+                surround_mask = Image.new("L", surround.size, 0)
+                ImageDraw.Draw(surround_mask).polygon(
+                    [(x - surround_left, y - surround_top) for x, y in screen_vertices],
+                    fill=255,
+                )
+                surrounding_pixels = [
+                    pixel
+                    for pixel, included in zip(surround.getdata(), surround_mask.getdata())
+                    if not included
+                ]
+                surrounding_mean = (
+                    [
+                        sum(pixel[channel] for pixel in surrounding_pixels) / (255.0 * len(surrounding_pixels))
+                        for channel in range(3)
+                    ]
+                    if surrounding_pixels
+                    else None
+                )
+                world_contrast = (
+                    sum(abs((red, green, blue)[channel] - surrounding_mean[channel]) for channel in range(3)) / 3.0
+                    if surrounding_mean is not None
+                    else None
+                )
+                repeat_geometry = any(
+                    isinstance(match, dict)
+                    and str(match.get("sprite")) in sprites
+                    and isinstance(match.get("tileSpan"), list)
+                    and len(match["tileSpan"]) == 2
+                    and max(abs(float(match["tileSpan"][0])), abs(float(match["tileSpan"][1]))) >= 2.0
+                    for match in matches
+                )
+                tile_geometry_reported = any(
+                    isinstance(match, dict)
+                    and str(match.get("sprite")) in sprites
+                    and isinstance(match.get("tileSpan"), list)
+                    and len(match["tileSpan"]) == 2
+                    and all(float(value) >= 0.0 for value in match["tileSpan"])
+                    and isinstance(match.get("atlasRect"), list)
+                    and len(match["atlasRect"]) == 4
+                    for match in matches
+                )
+                if not require_palette_color:
+                    classification = "shader_pack_transformed"
+                    passed = (
+                        minimum_world_contrast is None
+                        or (world_contrast is not None and world_contrast >= minimum_world_contrast)
+                    )
+                elif "minecraft:block/redstone_ore" in sprites:
+                    classification = "redstone"
+                    passed = red > green + 0.025 and red > blue + 0.005
+                elif "minecraft:block/yellow_terracotta" in sprites:
+                    classification = "yellow_terracotta"
+                    passed = red > green + 0.050 and green > blue + 0.020
+                elif "minecraft:block/diamond_block" in sprites:
+                    classification = "diamond"
+                    # The selected source program may preserve diamond as a
+                    # balanced cyan rather than a green-dominant swatch.
+                    # Require both cyan channels to remain distinct from the
+                    # red channel; this still rejects the other fixture
+                    # materials without inventing a pack-specific color bias.
+                    passed = green > red + 0.025 and blue > red + 0.025
+                else:
+                    classification = "lapis"
+                    passed = blue > red + 0.025 and blue > green + 0.025
+                crop_path = screenshot.with_name(
+                    f"distant_horizons_texture_palette_crop_{classification}.png"
+                )
+                masked_crop = Image.new("RGB", crop.size, (0, 0, 0))
+                masked_crop.paste(crop, mask=mask)
+                masked_crop.save(crop_path)
+                if not tile_geometry_reported or (tile_repeat_required and not repeat_geometry):
+                    passed = False
+                results.append(
+                    {
+                        "status": "present" if passed else (
+                            "missing_repeat_geometry"
+                            if tile_repeat_required and not repeat_geometry
+                            else "missing_tile_geometry"
+                            if not tile_geometry_reported
+                            else "insufficient_world_contrast"
+                            if not require_palette_color and minimum_world_contrast is not None
+                            else "unexpected_palette_color"
+                        ),
+                        "classification": classification,
+                        "target": target.get("position"),
+                        "mean_rgb": [round(red, 6), round(green, 6), round(blue, 6)],
+                        "surrounding_mean_rgb": (
+                            [round(channel, 6) for channel in surrounding_mean]
+                            if surrounding_mean is not None
+                            else None
+                        ),
+                        "world_contrast": round(world_contrast, 6) if world_contrast is not None else None,
+                        "minimum_world_contrast": minimum_world_contrast,
+                        "repeat_geometry": repeat_geometry,
+                        "tile_repeat_required": tile_repeat_required,
+                        "tile_geometry_reported": tile_geometry_reported,
+                        "selected_sprite": selected_match.get("sprite"),
+                        "selected_face_layer": selected_match.get("faceLayer"),
+                        "footprint_pixels": len(pixels),
+                        "footprint_area": round(max(projected_matches, key=lambda candidate: candidate[0])[0], 3),
+                        "crop": {"left": left, "top": top, "right": right, "bottom": bottom},
+                        "crop_path": str(crop_path),
+                    }
+                )
+            passed_targets = sum(1 for result in results if result.get("status") == "present")
+            repeat_geometry_targets = sum(1 for result in results if result.get("repeat_geometry"))
+            evidence.update(
+                {
+                    "checked": True,
+                    "targets": results,
+                    "passed_targets": passed_targets,
+                    "repeat_geometry_targets": repeat_geometry_targets,
+                    "status": "present" if passed_targets >= minimum_passed_targets else "palette_mismatch",
+                    "minimum_passed_targets": minimum_passed_targets,
+                }
+            )
+    except Exception as exc:  # pragma: no cover - local image support varies.
+        evidence["status"] = f"read_failed:{exc}"
+    return evidence
+
+
+def distant_horizons_source_to_final_color_transform_evidence(
+    source: dict[str, object],
+    final: dict[str, object],
+) -> dict[str, object]:
+    """Correlate exact source material pixels with their final pack result.
+
+    This is deliberately not a palette-equality assertion. Complementary's
+    deferred world stage applies distance fog to DH geometry, so a correct
+    final pixel need not retain raw atlas colour. The source image proves
+    identity before that stage; this receipt proves the final image contains
+    the corresponding projected output and was transformed by the pack.
+    """
+    evidence: dict[str, object] = {
+        "checked": False,
+        "status": "missing_source_or_final_targets",
+        "targets": [],
+        "transformed_targets": 0,
+        "minimum_transformed_targets": 2,
+    }
+    source_targets = source.get("targets") if isinstance(source, dict) else None
+    final_targets = final.get("targets") if isinstance(final, dict) else None
+    if not isinstance(source_targets, list) or not isinstance(final_targets, list):
+        return evidence
+    final_by_position = {
+        tuple(entry.get("target") or []): entry
+        for entry in final_targets
+        if isinstance(entry, dict) and isinstance(entry.get("target"), list)
+    }
+    targets: list[dict[str, object]] = []
+    for source_target in source_targets:
+        if not isinstance(source_target, dict) or not isinstance(source_target.get("target"), list):
+            continue
+        final_target = final_by_position.get(tuple(source_target["target"]))
+        source_mean = source_target.get("mean_rgb")
+        final_mean = final_target.get("mean_rgb") if isinstance(final_target, dict) else None
+        if (
+            not isinstance(source_mean, list)
+            or not isinstance(final_mean, list)
+            or len(source_mean) != 3
+            or len(final_mean) != 3
+        ):
+            targets.append({"target": source_target.get("target"), "status": "missing_mean"})
+            continue
+        delta = sum(abs(float(source_mean[index]) - float(final_mean[index])) for index in range(3)) / 3.0
+        targets.append(
+            {
+                "target": source_target.get("target"),
+                "source_mean_rgb": source_mean,
+                "final_mean_rgb": final_mean,
+                "mean_channel_delta": round(delta, 6),
+                "status": "pack_transformed" if delta >= 0.02 else "near_identity",
+            }
+        )
+    transformed = sum(1 for target in targets if target.get("status") == "pack_transformed")
+    evidence.update(
+        {
+            "checked": True,
+            "targets": targets,
+            "transformed_targets": transformed,
+            "status": (
+                "pack_transform_present"
+                if len(targets) == 4 and transformed >= int(evidence["minimum_transformed_targets"])
+                else "pack_transform_missing"
+            ),
+        }
+    )
+    return evidence
+
+
+def deterministic_static_terrain_texture_palette_pixel_evidence(
+    doc: dict[str, object] | None,
+    probe_receipt: dict[str, object] | None,
+) -> dict[str, object]:
+    """Verify the final game frame did not swap the fixed static-terrain palette.
+
+    The Java receipt proves source atlas identity before FFI. This deliberately
+    small final-frame companion catches the distinct failure where a valid
+    atlas/UV record reaches the selected Rust source draw but samples a wrong
+    region afterwards. It is limited to the four deterministic blocks and is
+    not a general texture-recognition heuristic.
+    """
+    evidence: dict[str, object] = {
+        "checked": False,
+        "status": "not_requested",
+        "screenshot": None,
+        "targets": [],
+        "passed_targets": 0,
+        "expected_targets": 4,
+    }
+    if not isinstance(doc, dict) or not isinstance(probe_receipt, dict):
+        return evidence
+    captures = doc.get("captures")
+    probes = probe_receipt.get("probes")
+    if not isinstance(captures, list) or not captures:
+        evidence["status"] = "missing_capture"
+        return evidence
+    if not isinstance(probes, list) or len(probes) != 4:
+        evidence["status"] = "missing_palette_probes"
+        return evidence
+    capture = captures[0]
+    if not isinstance(capture, dict) or not capture.get("screenshot"):
+        evidence["status"] = "missing_screenshot"
+        return evidence
+    screenshot = Path(str(capture["screenshot"]))
+    evidence["screenshot"] = str(screenshot)
+    if not screenshot.is_file():
+        evidence["status"] = "missing_screenshot_file"
+        return evidence
+    try:
+        from PIL import Image
+
+        with Image.open(screenshot) as image:
+            rgb = image.convert("RGB")
+            results: list[dict[str, object]] = []
+            for probe in probes:
+                if not isinstance(probe, dict):
+                    results.append({"status": "invalid_probe"})
+                    continue
+                sprites = probe.get("allowedSprites")
+                projection = probe.get("projection")
+                if (
+                    not bool(probe.get("matched"))
+                    or not isinstance(sprites, list)
+                    or not isinstance(projection, dict)
+                    or projection.get("insideViewport") is not True
+                    or not isinstance(projection.get("screen"), list)
+                    or len(projection["screen"]) != 2
+                ):
+                    results.append({"status": "unprojected_or_unmatched", "target": probe.get("position")})
+                    continue
+                center_x = round(float(projection["screen"][0]) / 1280.0 * rgb.width)
+                center_y = round(float(projection["screen"][1]) / 720.0 * rgb.height)
+                radius = max(8, round(min(rgb.width / 1280.0, rgb.height / 720.0) * 14))
+                left = max(0, center_x - radius)
+                top = max(0, center_y - radius)
+                right = min(rgb.width, center_x + radius + 1)
+                bottom = min(rgb.height, center_y + radius + 1)
+                if right - left < 9 or bottom - top < 9:
+                    results.append({"status": "projected_crop_outside_frame", "target": probe.get("position")})
+                    continue
+                pixels = list(rgb.crop((left, top, right, bottom)).getdata())
+                red = sum(pixel[0] for pixel in pixels) / (255.0 * len(pixels))
+                green = sum(pixel[1] for pixel in pixels) / (255.0 * len(pixels))
+                blue = sum(pixel[2] for pixel in pixels) / (255.0 * len(pixels))
+                red_ore_coverage = sum(
+                    pixel[0] > pixel[1] + 24
+                    and pixel[0] > pixel[2] + 12
+                    and pixel[0] > 75
+                    for pixel in pixels
+                ) / len(pixels)
+                names = {str(sprite) for sprite in sprites}
+                if "minecraft:block/redstone_ore" in names:
+                    classification = "redstone"
+                    # Ore is deliberately mostly neutral stone. A crop-mean
+                    # test misclassifies a correct redstone top whenever its
+                    # sparse red texels are shaded; require a bounded set of
+                    # actual red ore texels instead.
+                    passed = (
+                        (red > green + 0.025 and red > blue + 0.005)
+                        or red_ore_coverage >= 0.04
+                    )
+                elif "minecraft:block/yellow_terracotta" in names:
+                    classification = "yellow_terracotta"
+                    passed = red > green + 0.050 and green > blue + 0.020
+                elif any("grass_block" in name for name in names):
+                    classification = "grass"
+                    passed = green > red + 0.025 and green > blue + 0.025
+                else:
+                    classification = "oak_leaves"
+                    passed = green > red + 0.025 and green > blue + 0.025
+                crop_path = screenshot.with_name(f"static_terrain_texture_palette_crop_{classification}.png")
+                rgb.crop((left, top, right, bottom)).save(crop_path)
+                results.append(
+                    {
+                        "status": "present" if passed else "unexpected_palette_color",
+                        "classification": classification,
+                        "target": probe.get("position"),
+                        "mean_rgb": [round(red, 6), round(green, 6), round(blue, 6)],
+                        "red_ore_coverage": round(red_ore_coverage, 6),
+                        "crop": {"left": left, "top": top, "right": right, "bottom": bottom},
+                        "crop_path": str(crop_path),
+                    }
+                )
+            passed_targets = sum(1 for result in results if result.get("status") == "present")
+            evidence.update(
+                {
+                    "checked": True,
+                    "targets": results,
+                    "passed_targets": passed_targets,
+                    "status": "present" if passed_targets == 4 else "palette_mismatch",
+                }
+            )
+    except Exception as exc:  # pragma: no cover - local image support varies.
+        evidence["status"] = f"read_failed:{exc}"
+    return evidence
+
+
 def deterministic_world_mesh_falling_block_pixel_evidence(
     doc: dict[str, object] | None,
     scenario: object,
@@ -4124,12 +4931,21 @@ def deterministic_world_mesh_falling_block_pixel_evidence(
                 return evidence
             capture_method = str(first.get("captureMethod") or "")
             capture_methods.append(capture_method)
+            # Rust Vulkan's explicitly named final-output capture is produced
+            # from the same backend-owned game frame as presentation.  It is
+            # not a desktop/root-window capture, so accept it alongside an
+            # externally targeted game-window capture.  Every other Vulkan
+            # capture method remains invalid for this production gate.
+            backend_final_output = (
+                capture_method == "rust-vulkan-final-output"
+                and str(first.get("targetWindow") or "") == "rust-vulkan-final-output"
+            )
             expected_capture_method = (
                 "external-window-request"
                 if str(first.get("backend") or "").lower() == "vulkan"
                 else "internal-main-render-target"
             )
-            if capture_method != expected_capture_method:
+            if capture_method != expected_capture_method and not backend_final_output:
                 evidence.update(
                     {
                         "checked": True,
@@ -4288,6 +5104,893 @@ def deterministic_world_mesh_falling_block_pixel_evidence(
         )
     except Exception as exc:
         evidence["status"] = f"read_failed:{exc}"
+    return evidence
+
+
+def deterministic_world_mesh_arrow_capture_evidence(
+    doc: dict[str, object] | None,
+    scenario: object,
+) -> dict[str, object]:
+    """Retain frame-correlated Arrow crops without treating a thin sprite as a broad color pass.
+
+    Arrow is deliberately admitted only on the Rust whole-frame route. The
+    producer, route decision, completed Rust submission, game window, and
+    projected crop must all agree. Pixel interpretation remains manual until
+    there is a matched Java control with a robust arrow-specific classifier.
+    """
+    scenario_name = str(scenario or "").strip().lower()
+    evidence: dict[str, object] = {
+        "checked": False,
+        "status": "not_requested",
+        "scenario": scenario_name or None,
+        "expected_texture": "minecraft:textures/entity/projectiles/arrow.png",
+        "setup_status": "not_checked",
+        "route_status": "not_checked",
+        "execution_status": "not_checked",
+        "game_window_status": "not_checked",
+        "frame_sequence_status": "not_checked",
+        "projected_bounds_status": "not_checked",
+        "manual_review_required": True,
+        "crops": [],
+    }
+    if not scenario_name:
+        return evidence
+    arrows = doc.get("rustGalWorldArrows") if isinstance(doc, dict) else []
+    decisions = doc.get("rustGalWorldArrowRouteDecisions") if isinstance(doc, dict) else []
+    receipts = doc.get("rustGalWorldMovingMeshExecution") if isinstance(doc, dict) else []
+    captures = doc.get("captures") if isinstance(doc, dict) else []
+    arrows = arrows if isinstance(arrows, list) else []
+    decisions = decisions if isinstance(decisions, list) else []
+    receipts = receipts if isinstance(receipts, list) else []
+    captures = captures if isinstance(captures, list) else []
+    evidence["arrows_reported"] = len(arrows)
+    if scenario_name == "hidden":
+        evidence.update(
+            {
+                "checked": True,
+                "status": "absent_expected" if not arrows else "unexpected_mesh_metadata",
+                "setup_status": "absent_expected",
+                "route_status": "absent_expected",
+                "execution_status": "absent_expected",
+                "projected_bounds_status": "absent_expected",
+            }
+        )
+        return evidence
+    setup = doc.get("rustGalWorldArrowSetup") if isinstance(doc, dict) else None
+    if (
+        not isinstance(setup, dict)
+        or setup.get("status") != "spawned"
+        or setup.get("texture") != evidence["expected_texture"]
+        or int(parse_number(setup.get("entityCount")) or 0) <= 0
+    ):
+        evidence.update({"checked": True, "status": "missing_real_setup", "setup_status": "failed", "setup": setup})
+        return evidence
+    evidence["setup_status"] = "passed"
+    if not any(
+        isinstance(decision, dict)
+        and str(decision.get("route") or "") == "rust-vulkan-whole-frame"
+        and str(decision.get("textureId") or "") == evidence["expected_texture"]
+        and bool(decision.get("rustSelected"))
+        and bool(decision.get("rustQueued"))
+        and not bool(decision.get("javaDrawn"))
+        for decision in decisions
+    ):
+        evidence.update({"checked": True, "status": "missing_rust_route", "route_status": "failed"})
+        return evidence
+    evidence["route_status"] = "passed"
+    if not any(
+        isinstance(receipt, dict)
+        and str(receipt.get("route") or "") == "rust-vulkan-whole-frame"
+        and str(receipt.get("provenance") or "") == "arrow"
+        and int(parse_number(receipt.get("instances")) or 0) > 0
+        and int(parse_number(receipt.get("submissionId")) or 0) > 0
+        for receipt in receipts
+    ):
+        evidence.update({"checked": True, "status": "missing_execution_receipt", "execution_status": "failed"})
+        return evidence
+    evidence["execution_status"] = "passed"
+    arrow_captures = [
+        capture for capture in captures
+        if isinstance(capture, dict) and str(capture.get("poseName") or "").startswith("arrow-")
+    ]
+    if len(arrow_captures) < FALLING_BLOCK_MIN_CAPTURE_FRAMES:
+        evidence.update(
+            {
+                "checked": True,
+                "status": "incomplete_frame_sequence",
+                "frame_sequence_status": "failed",
+                "captures_reported": len(arrow_captures),
+            }
+        )
+        return evidence
+    try:
+        from PIL import Image
+    except Exception as exc:  # pragma: no cover
+        evidence["status"] = f"pillow_unavailable:{exc}"
+        return evidence
+    crops: list[dict[str, object]] = []
+    game_windows: list[dict[str, object]] = []
+    try:
+        for capture_index, capture in enumerate(arrow_captures):
+            screenshot = Path(str(capture.get("screenshot") or ""))
+            capture_frame = parse_number(capture.get("renderedFrameIndex"))
+            if not screenshot.is_file() or capture_frame is None:
+                evidence.update({"checked": True, "status": "missing_capture_frame"})
+                return evidence
+            capture_method = str(capture.get("captureMethod") or "")
+            # Selected-source Vulkan captures can retain the backend-owned
+            # final output before presentation.  This is a correlated game
+            # frame, not a desktop capture, provided its explicit target is
+            # recorded.  Keep the external-window requirement for every
+            # other capture method.
+            backend_final_output = (
+                capture_method == "rust-vulkan-final-output"
+                and str(capture.get("targetWindow") or "") == "rust-vulkan-final-output"
+            )
+            if capture_method != "external-window-request" and not backend_final_output:
+                evidence.update({"checked": True, "status": "wrong_capture_method"})
+                return evidence
+            with Image.open(screenshot) as image:
+                rgb = image.convert("RGB")
+            game_window = captured_game_window_evidence(rgb.size, doc, capture)
+            game_windows.append(game_window)
+            if game_window.get("status") != "passed":
+                evidence.update({"checked": True, "status": "not_game_window", "game_window_status": "failed"})
+                return evidence
+            candidates = [
+                arrow for arrow in arrows
+                if isinstance(arrow, dict)
+                and str(arrow.get("route") or "") == "rust-vulkan-whole-frame"
+                and str(arrow.get("textureId") or "") == evidence["expected_texture"]
+                and bool(arrow.get("projected"))
+                and isinstance(arrow.get("screenBounds"), dict)
+                and abs(int(parse_number(arrow.get("frameIndex")) or -999999) - int(capture_frame)) <= 1
+            ]
+            if not candidates:
+                crops.append({"capture_index": capture_index, "status": "missing_matching_arrow_mesh"})
+                continue
+            arrow = candidates[0]
+            route_decision = next(
+                (
+                    decision
+                    for decision in decisions
+                    if isinstance(decision, dict)
+                    and str(decision.get("route") or "") == "rust-vulkan-whole-frame"
+                    and str(decision.get("textureId") or "") == evidence["expected_texture"]
+                    and bool(decision.get("rustSelected"))
+                    and bool(decision.get("rustQueued"))
+                    and not bool(decision.get("javaDrawn"))
+                    and abs(int(parse_number(decision.get("frameIndex")) or -999999) - int(capture_frame)) <= 1
+                ),
+                None,
+            )
+            receipt = next(
+                (
+                    item
+                    for item in receipts
+                    if isinstance(item, dict)
+                    and str(item.get("route") or "") == "rust-vulkan-whole-frame"
+                    and str(item.get("provenance") or "") == "arrow"
+                    and int(parse_number(item.get("instances")) or 0) > 0
+                    and int(parse_number(item.get("submissionId")) or 0) > 0
+                    and abs(int(parse_number(item.get("deterministicFrameIndex")) or -999999) - int(capture_frame)) <= 1
+                ),
+                None,
+            )
+            if route_decision is None:
+                crops.append({"capture_index": capture_index, "status": "missing_frame_correlated_route"})
+                continue
+            if receipt is None:
+                crops.append({"capture_index": capture_index, "status": "missing_frame_correlated_execution"})
+                continue
+            bounds = arrow["screenBounds"]
+            assert isinstance(bounds, dict)
+            # Java records projected bounds in render-target coordinates; the
+            # external PNG has a top-left row origin.
+            crop_box = marker_crop_box(bounds, rgb.width, rgb.height, mirrored_y=True)
+            if crop_box is None:
+                crops.append({"capture_index": capture_index, "status": "bounds_outside_game_viewport"})
+                continue
+            crop_path = screenshot.with_name(
+                f"world_mesh_arrow_crop_{capture_index}_{arrow.get('meshKey') or 'unknown'}.png"
+            )
+            rgb.crop(crop_box).save(crop_path)
+            crops.append(
+                {
+                    "capture_index": capture_index,
+                    "rendered_frame_index": capture_frame,
+                    "mesh_key": arrow.get("meshKey"),
+                    "mesh_generation": arrow.get("meshGeneration"),
+                    "packed_light": arrow.get("packedLight"),
+                    "vertex_count": arrow.get("vertexCount"),
+                    "index_bytes": arrow.get("indexBytes"),
+                    "section_count": arrow.get("sectionCount"),
+                    "submission_id": receipt.get("submissionId"),
+                    "gameplay_frame_id": receipt.get("gameplayFrameId"),
+                    "capture_method": capture_method,
+                    "crop_path": str(crop_path),
+                    "full_frame_path": str(screenshot),
+                }
+            )
+        matched_frames = sum(1 for crop in crops if crop.get("crop_path"))
+        missing_execution = any(crop.get("status") == "missing_frame_correlated_execution" for crop in crops)
+        missing_route = any(crop.get("status") == "missing_frame_correlated_route" for crop in crops)
+        evidence.update(
+            {
+                "checked": True,
+                "status": (
+                    "missing_frame_correlated_execution"
+                    if missing_execution
+                    else "missing_frame_correlated_route"
+                    if missing_route
+                    else "structural_present"
+                    if matched_frames >= FALLING_BLOCK_MIN_CAPTURE_FRAMES
+                    else "missing_projected_crops"
+                ),
+                "crops": crops,
+                "game_window_status": "passed",
+                "game_windows": game_windows,
+                "frame_sequence_status": "passed" if matched_frames >= FALLING_BLOCK_MIN_CAPTURE_FRAMES else "failed",
+                "projected_bounds_status": "passed" if matched_frames >= FALLING_BLOCK_MIN_CAPTURE_FRAMES else "failed",
+                "matched_frames": matched_frames,
+                "required_capture_frames": FALLING_BLOCK_MIN_CAPTURE_FRAMES,
+            }
+        )
+    except Exception as exc:  # pragma: no cover - local image support varies.
+        evidence["status"] = f"read_failed:{exc}"
+    return evidence
+
+
+def deterministic_world_experience_orb_capture_evidence(
+    doc: dict[str, object] | None,
+    scenario: object,
+) -> dict[str, object]:
+    """Require real ExperienceOrb traversal, Rust execution, and bounded final-frame crops."""
+    scenario_name = str(scenario or "").strip().lower()
+    evidence: dict[str, object] = {
+        "checked": False,
+        "status": "not_requested",
+        "scenario": scenario_name or None,
+        "crops": [],
+    }
+    if not scenario_name:
+        return evidence
+    orbs = doc.get("rustGalWorldExperienceOrbs") if isinstance(doc, dict) else []
+    decisions = doc.get("rustGalWorldExperienceOrbRouteDecisions") if isinstance(doc, dict) else []
+    receipts = doc.get("rustGalWorldExperienceOrbExecution") if isinstance(doc, dict) else []
+    captures = doc.get("captures") if isinstance(doc, dict) else []
+    orbs = orbs if isinstance(orbs, list) else []
+    decisions = decisions if isinstance(decisions, list) else []
+    receipts = receipts if isinstance(receipts, list) else []
+    captures = captures if isinstance(captures, list) else []
+    if scenario_name == "hidden":
+        evidence.update({"checked": True, "status": "absent_expected" if not orbs else "unexpected_orb_work"})
+        return evidence
+    setup = doc.get("rustGalWorldExperienceOrbSetup") if isinstance(doc, dict) else None
+    if not isinstance(setup, dict) or setup.get("status") != "spawned" or int(parse_number(setup.get("entityCount")) or 0) <= 0:
+        evidence.update({"checked": True, "status": "missing_real_setup", "setup": setup})
+        return evidence
+    if not any(
+        isinstance(decision, dict)
+        and str(decision.get("route") or "") == "rust-vulkan-whole-frame"
+        and bool(decision.get("rustSelected"))
+        and bool(decision.get("rustQueued"))
+        and not bool(decision.get("javaDrawn"))
+        for decision in decisions
+    ):
+        evidence.update({"checked": True, "status": "missing_rust_route"})
+        return evidence
+    if not any(
+        isinstance(receipt, dict)
+        and str(receipt.get("route") or "") == "rust-vulkan-whole-frame"
+        and int(parse_number(receipt.get("quads")) or 0) > 0
+        and int(parse_number(receipt.get("submissionId")) or 0) > 0
+        for receipt in receipts
+    ):
+        evidence.update({"checked": True, "status": "missing_execution_receipt"})
+        return evidence
+    orb_captures = [
+        capture for capture in captures
+        if isinstance(capture, dict) and str(capture.get("poseName") or "").startswith("experience-orb-")
+    ]
+    if len(orb_captures) < FALLING_BLOCK_MIN_CAPTURE_FRAMES:
+        evidence.update({"checked": True, "status": "incomplete_frame_sequence", "captures_reported": len(orb_captures)})
+        return evidence
+    try:
+        from PIL import Image
+        crops: list[dict[str, object]] = []
+        for capture_index, capture in enumerate(orb_captures):
+            screenshot = Path(str(capture.get("screenshot") or ""))
+            capture_frame = parse_number(capture.get("renderedFrameIndex"))
+            if not screenshot.is_file() or capture_frame is None:
+                evidence.update({"checked": True, "status": "missing_capture_frame"})
+                return evidence
+            capture_method = str(capture.get("captureMethod") or "")
+            backend_final_output = (
+                capture_method == "rust-vulkan-final-output"
+                and str(capture.get("targetWindow") or "") == "rust-vulkan-final-output"
+            )
+            if capture_method != "external-window-request" and not backend_final_output:
+                evidence.update({"checked": True, "status": "wrong_capture_method"})
+                return evidence
+            with Image.open(screenshot) as image:
+                rgb = image.convert("RGB")
+            game_window = captured_game_window_evidence(rgb.size, doc, capture)
+            if game_window.get("status") != "passed":
+                evidence.update({"checked": True, "status": "not_game_window"})
+                return evidence
+            candidates = [
+                orb for orb in orbs
+                if isinstance(orb, dict)
+                and str(orb.get("route") or "") == "rust-vulkan-whole-frame"
+                and bool(orb.get("projected"))
+                and isinstance(orb.get("screenBounds"), dict)
+                and abs(int(parse_number(orb.get("frameIndex")) or -999999) - int(capture_frame)) <= 1
+            ]
+            if not candidates:
+                crops.append({"capture_index": capture_index, "status": "missing_matching_orb"})
+                continue
+            orb = candidates[0]
+            bounds = orb["screenBounds"]
+            assert isinstance(bounds, dict)
+            crop_box = marker_crop_box(bounds, rgb.width, rgb.height, mirrored_y=True)
+            if crop_box is None:
+                crops.append({"capture_index": capture_index, "status": "bounds_outside_game_viewport"})
+                continue
+            crop_path = screenshot.with_name(f"world_experience_orb_crop_{capture_index}.png")
+            rgb.crop(crop_box).save(crop_path)
+            stats = experience_orb_crop_stats(rgb.crop(crop_box))
+            crops.append({
+                "capture_index": capture_index,
+                "rendered_frame_index": capture_frame,
+                "color_argb": orb.get("colorArgb"),
+                "packed_light": orb.get("packedLight"),
+                "crop_path": str(crop_path),
+                "full_frame_path": str(screenshot),
+                **stats,
+            })
+        matched_frames = sum(1 for crop in crops if crop.get("visible_filled_orb") is True)
+        evidence.update({
+            "checked": True,
+            "status": "visible_final_frames" if matched_frames >= FALLING_BLOCK_MIN_CAPTURE_FRAMES else "missing_visible_orb_footprint",
+            "crops": crops,
+            "matched_frames": matched_frames,
+            "required_capture_frames": FALLING_BLOCK_MIN_CAPTURE_FRAMES,
+        })
+    except Exception as exc:  # pragma: no cover - local image support varies.
+        evidence["status"] = f"read_failed:{exc}"
+    return evidence
+
+
+def deterministic_world_beacon_beam_capture_evidence(
+    doc: dict[str, object] | None,
+    scenario: object,
+) -> dict[str, object]:
+    """Require an ordinary Beacon renderer traversal and final-frame Rust receipt."""
+    scenario_name = str(scenario or "").strip().lower()
+    evidence: dict[str, object] = {
+        "checked": False,
+        "status": "not_requested",
+        "scenario": scenario_name or None,
+        "crops": [],
+    }
+    if not scenario_name:
+        return evidence
+    beams = doc.get("rustGalWorldBeaconBeams") if isinstance(doc, dict) else []
+    receipts = doc.get("rustGalWorldBeaconBeamExecution") if isinstance(doc, dict) else []
+    captures = doc.get("captures") if isinstance(doc, dict) else []
+    beams = beams if isinstance(beams, list) else []
+    receipts = receipts if isinstance(receipts, list) else []
+    captures = captures if isinstance(captures, list) else []
+    if scenario_name == "hidden":
+        evidence.update({"checked": True, "status": "absent_expected" if not beams else "unexpected_beacon_work"})
+        return evidence
+    setup = doc.get("rustGalWorldBeaconBeamSetup") if isinstance(doc, dict) else None
+    if not isinstance(setup, dict) or setup.get("status") != "spawned" or not bool(setup.get("clientBeamSectionsReady")):
+        evidence.update({"checked": True, "status": "missing_real_setup", "setup": setup})
+        return evidence
+    if not any(
+        isinstance(receipt, dict)
+        and str(receipt.get("route") or "") == "rust-vulkan-whole-frame"
+        and int(parse_number(receipt.get("quads")) or 0) >= 8
+        and int(parse_number(receipt.get("submissionId")) or 0) > 0
+        for receipt in receipts
+    ):
+        evidence.update({"checked": True, "status": "missing_execution_receipt"})
+        return evidence
+    try:
+        from PIL import Image
+        crops: list[dict[str, object]] = []
+        for capture_index, capture in enumerate(captures):
+            if not isinstance(capture, dict):
+                continue
+            screenshot = Path(str(capture.get("screenshot") or ""))
+            capture_frame = parse_number(capture.get("renderedFrameIndex"))
+            if not screenshot.is_file() or capture_frame is None:
+                continue
+            candidates = [
+                beam for beam in beams
+                if isinstance(beam, dict)
+                and bool(beam.get("projected"))
+                and isinstance(beam.get("screenBounds"), dict)
+                and abs(int(parse_number(beam.get("frameIndex")) or -999999) - int(capture_frame)) <= 1
+            ]
+            if not candidates:
+                continue
+            with Image.open(screenshot) as image:
+                rgb = image.convert("RGB")
+            game_window = captured_game_window_evidence(rgb.size, doc, capture)
+            if game_window.get("status") != "passed":
+                evidence.update({"checked": True, "status": "not_game_window"})
+                return evidence
+            bounds = candidates[0]["screenBounds"]
+            assert isinstance(bounds, dict)
+            crop_box = marker_crop_box(bounds, rgb.width, rgb.height, mirrored_y=True)
+            if crop_box is None:
+                continue
+            crop = rgb.crop(crop_box)
+            pixels = list(crop.getdata())
+            border = [
+                pixel for y in range(crop.height) for x in range(crop.width)
+                if x < 2 or y < 2 or x >= crop.width - 2 or y >= crop.height - 2
+                for pixel in [crop.getpixel((x, y))]
+            ]
+            background = tuple(sum(channel[index] for channel in border) / max(1, len(border)) for index in range(3))
+            foreground = sum(
+                1 for pixel in pixels
+                if sum(abs(pixel[index] - background[index]) for index in range(3)) >= 45.0
+            )
+            coverage = foreground / max(1, len(pixels))
+            crop_path = screenshot.with_name(f"world_beacon_beam_crop_{capture_index}.png")
+            crop.save(crop_path)
+            crops.append({
+                "capture_index": capture_index,
+                "rendered_frame_index": capture_frame,
+                "crop_path": str(crop_path),
+                "full_frame_path": str(screenshot),
+                "foreground_coverage": coverage,
+                "visible_filled_beam": coverage >= 0.02,
+            })
+        matched = sum(1 for crop in crops if crop.get("visible_filled_beam") is True)
+        evidence.update({
+            "checked": True,
+            "status": "visible_final_frame" if matched else "missing_visible_beam_footprint",
+            "crops": crops,
+            "matched_frames": matched,
+        })
+    except Exception as exc:  # pragma: no cover - local image support varies.
+        evidence["status"] = f"read_failed:{exc}"
+    return evidence
+
+
+def experience_orb_crop_stats(crop: Any) -> dict[str, object]:
+    """Detect a filled vanilla ExperienceOrb sprite, rather than generic scene pixels.
+
+    The real sprite is a small green/turquoise billboard.  A projected crop often
+    contains mostly sky, so the classifier requires a connected foreground patch
+    with green dominance and enough interior coverage to reject sky-only and
+    edge/depth-only false positives.
+    """
+    width, height = crop.size
+    border: list[tuple[int, int, int]] = []
+    for y in range(height):
+        for x in range(width):
+            if x < 2 or y < 2 or x >= width - 2 or y >= height - 2:
+                border.append(crop.getpixel((x, y)))
+    if not border:
+        return {"visible_filled_orb": False, "status": "empty_crop"}
+    border_mean = tuple(sum(pixel[channel] for pixel in border) / len(border) for channel in range(3))
+    foreground: set[tuple[int, int]] = set()
+    for y in range(height):
+        for x in range(width):
+            red, green, blue = crop.getpixel((x, y))
+            color_delta = abs(red - border_mean[0]) + abs(green - border_mean[1]) + abs(blue - border_mean[2])
+            green_orb = green >= 80 and green >= red + 15 and green >= blue + 8
+            if green_orb and color_delta >= 45:
+                foreground.add((x, y))
+    components: list[list[tuple[int, int]]] = []
+    while foreground:
+        component = [foreground.pop()]
+        cursor = 0
+        while cursor < len(component):
+            x, y = component[cursor]
+            cursor += 1
+            for neighbour in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):
+                if neighbour in foreground:
+                    foreground.remove(neighbour)
+                    component.append(neighbour)
+        components.append(component)
+    largest = max(components, key=len, default=[])
+    if largest:
+        xs = [point[0] for point in largest]
+        ys = [point[1] for point in largest]
+        component_width = max(xs) - min(xs) + 1
+        component_height = max(ys) - min(ys) + 1
+        component_area = component_width * component_height
+    else:
+        component_width = component_height = component_area = 0
+    minimum_pixels = max(12, int(width * height * 0.005))
+    fill_ratio = len(largest) / max(1, component_area)
+    visible_filled_orb = (
+        len(largest) >= minimum_pixels
+        and component_width >= 3
+        and component_height >= 3
+        and fill_ratio >= 0.35
+    )
+    return {
+        "foreground_pixels": sum(len(component) for component in components),
+        "largest_component_pixels": len(largest),
+        "largest_component_width": component_width,
+        "largest_component_height": component_height,
+        "largest_component_fill_ratio": round(fill_ratio, 6),
+        "minimum_foreground_pixels": minimum_pixels,
+        "border_mean_rgb": [round(value, 3) for value in border_mean],
+        "visible_filled_orb": visible_filled_orb,
+        "status": "visible_filled_orb" if visible_filled_orb else "missing_filled_orb",
+    }
+
+
+def deterministic_world_mesh_model_capture_evidence(
+    doc: dict[str, object] | None,
+    scenario: object,
+    control: str = "rust",
+) -> dict[str, object]:
+    """Require a real copied ModelPart producer, route, execution, and game-window crop.
+
+    The first generic family is intentionally bounded, but its proof must
+    remain tied to the ordinary submitModel call rather than unrelated entity
+    mesh work in the same whole-frame submission.
+    """
+    scenario_name = str(scenario or "").strip().lower()
+    evidence: dict[str, object] = {
+        "checked": False,
+        "status": "not_requested",
+        "scenario": scenario_name or None,
+        "setup_status": "not_checked",
+        "route_status": "not_checked",
+        "execution_status": "not_checked",
+        "game_window_status": "not_checked",
+        "frame_sequence_status": "not_checked",
+        "projected_bounds_status": "not_checked",
+        "manual_review_required": True,
+        "crops": [],
+    }
+    if not scenario_name:
+        return evidence
+    models = doc.get("rustGalWorldModelMeshes") if isinstance(doc, dict) else []
+    decisions = doc.get("rustGalWorldModelMeshRouteDecisions") if isinstance(doc, dict) else []
+    receipts = doc.get("rustGalWorldMovingMeshExecution") if isinstance(doc, dict) else []
+    captures = doc.get("captures") if isinstance(doc, dict) else []
+    models = models if isinstance(models, list) else []
+    decisions = decisions if isinstance(decisions, list) else []
+    receipts = receipts if isinstance(receipts, list) else []
+    captures = captures if isinstance(captures, list) else []
+    evidence["models_reported"] = len(models)
+    if scenario_name == "hidden":
+        evidence.update(
+            {
+                "checked": True,
+                "status": "absent_expected" if not models else "unexpected_mesh_metadata",
+                "setup_status": "absent_expected",
+                "route_status": "absent_expected",
+                "execution_status": "absent_expected",
+                "projected_bounds_status": "absent_expected",
+            }
+        )
+        return evidence
+    setup = doc.get("rustGalWorldModelMeshSetup") if isinstance(doc, dict) else None
+    expected_block = {
+        "chest": "minecraft:chest",
+        "bed": "minecraft:red_bed",
+        "bell": "minecraft:bell",
+        "shulker": "minecraft:purple_shulker_box",
+        "decorated-pot": "minecraft:decorated_pot",
+        "llama-spit": "minecraft:llama_spit",
+        "evoker-fangs": "minecraft:evoker_fangs",
+        "wither-skull": "minecraft:wither_skull",
+        "chicken": "minecraft:chicken",
+        "cow": "minecraft:cow",
+        "pig": "minecraft:pig",
+        "rabbit": "minecraft:rabbit",
+        "zombie": "minecraft:zombie",
+    }.get(scenario_name)
+    expected_texture = {
+        "chest": "minecraft:entity/chest/normal",
+        "bed": "minecraft:entity/bed/red",
+        "bell": "minecraft:entity/bell/bell_body",
+        "shulker": "minecraft:entity/shulker/shulker_purple",
+        "decorated-pot": "minecraft:entity/decorated_pot/decorated_pot_base",
+        "llama-spit": "minecraft:textures/entity/llama/spit.png",
+        "evoker-fangs": "minecraft:textures/entity/illager/evoker_fangs.png",
+        "wither-skull": "minecraft:textures/entity/wither/wither.png",
+        "chicken": "minecraft:textures/entity/chicken/temperate_chicken.png",
+        "cow": "minecraft:textures/entity/cow/temperate_cow.png",
+        "pig": "minecraft:textures/entity/pig/temperate_pig.png",
+        "rabbit": "minecraft:textures/entity/rabbit/brown.png",
+        "zombie": "minecraft:textures/entity/zombie/zombie.png",
+    }.get(scenario_name)
+    # Direct entity-model meshes must carry the canonical gameplay identity
+    # used by Rust's selected-source `entity.properties` resolver. Block
+    # entity ModelPart scenarios intentionally have no entity identity rule.
+    expected_semantic_identity = {
+        "llama-spit": "minecraft:llama_spit",
+        "evoker-fangs": "minecraft:evoker_fangs",
+        "wither-skull": "minecraft:wither_skull",
+        "chicken": "minecraft:chicken",
+        "cow": "minecraft:cow",
+        "pig": "minecraft:pig",
+        "rabbit": "minecraft:rabbit",
+        "zombie": "minecraft:zombie",
+    }.get(scenario_name)
+    selected_source_entity_final_output = (
+        scenario_name in {"chicken", "cow", "pig", "rabbit", "zombie"}
+        and len(captures) == 1
+        and isinstance(captures[0], dict)
+        and str(captures[0].get("captureMethod") or "") == "rust-vulkan-final-output"
+        and str(captures[0].get("targetWindow") or "") == "rust-vulkan-final-output"
+    )
+    required_capture_frames = 1 if selected_source_entity_final_output else FALLING_BLOCK_MIN_CAPTURE_FRAMES
+    evidence["required_capture_frames"] = required_capture_frames
+    evidence["capture_contract"] = (
+        "selected_source_entity_final_output" if selected_source_entity_final_output else "multi_frame_model_capture"
+    )
+    expected_entity_id = None
+    if scenario_name in {"chicken", "cow", "pig", "rabbit", "zombie"} and isinstance(setup, dict):
+        expected_entity_id = parse_number(setup.get("clientEntityId"))
+        expected_producer_present = (
+            bool(setup.get("serverEntityPresent"))
+            and bool(setup.get("clientEntityPresent"))
+            and expected_entity_id is not None
+            and int(expected_entity_id) >= 0
+            and int(parse_number(setup.get("serverEntityId")) or -1) == int(expected_entity_id)
+        )
+    else:
+        expected_producer_present = (
+            bool(setup.get("serverEntityPresent"))
+            if scenario_name in {"llama-spit", "evoker-fangs", "wither-skull", "chicken"} and isinstance(setup, dict)
+            else bool(setup.get("clientBlockEntityPresent")) if isinstance(setup, dict) else False
+        )
+
+    def matches_expected_entity(record: object) -> bool:
+        return (
+            not isinstance(record, dict)
+            or expected_entity_id is None
+            or int(parse_number(record.get("entityId")) or -1) == int(expected_entity_id)
+        )
+    def matches_semantic_identity(record: object) -> bool:
+        return (
+            expected_semantic_identity is None
+            or isinstance(record, dict)
+            and str(record.get("semanticModelIdentity") or "") == expected_semantic_identity
+        )
+    if (
+        expected_block is None
+        or not isinstance(setup, dict)
+        or setup.get("status") != "spawned"
+        or setup.get("blockId") != expected_block
+        or not expected_producer_present
+    ):
+        evidence.update({"checked": True, "status": "missing_real_setup", "setup_status": "failed", "setup": setup})
+        return evidence
+    evidence["setup_status"] = "passed"
+    if control in {"disabled", "legacy", "java-compatibility"}:
+        expected_route = "disabled" if control == "disabled" else "java-legacy"
+        if not any(
+            isinstance(decision, dict)
+            and str(decision.get("route") or "") == expected_route
+            and str(decision.get("textureId") or "") == expected_texture
+            and matches_expected_entity(decision)
+            and not bool(decision.get("rustQueued"))
+            for decision in decisions
+        ):
+            evidence.update({"checked": True, "status": "missing_control_route", "route_status": "failed"})
+            return evidence
+        evidence.update(
+            {
+                "checked": True,
+                "status": "control_traversal_present",
+                "route_status": "passed",
+                "execution_status": "absent_expected",
+                "frame_sequence_status": "not_required",
+                "projected_bounds_status": "not_required",
+            }
+        )
+        return evidence
+    if not any(
+        isinstance(decision, dict)
+        and str(decision.get("route") or "") == "rust-vulkan-whole-frame"
+        and str(decision.get("textureId") or "") == expected_texture
+        and matches_expected_entity(decision)
+        and bool(decision.get("rustSelected"))
+        and bool(decision.get("rustQueued"))
+        and not bool(decision.get("javaDrawn"))
+        for decision in decisions
+    ):
+        evidence.update({"checked": True, "status": "missing_rust_route", "route_status": "failed"})
+        return evidence
+    evidence["route_status"] = "passed"
+    if expected_semantic_identity is not None and not any(
+        isinstance(model, dict)
+        and str(model.get("route") or "") == "rust-vulkan-whole-frame"
+        and str(model.get("textureId") or "") == expected_texture
+        and matches_expected_entity(model)
+        and matches_semantic_identity(model)
+        for model in models
+    ):
+        evidence.update(
+            {
+                "checked": True,
+                "status": "missing_semantic_entity_identity",
+                "semantic_identity_status": "failed",
+                "expected_semantic_identity": expected_semantic_identity,
+            }
+        )
+        return evidence
+    evidence["semantic_identity_status"] = "passed" if expected_semantic_identity is not None else "not_required"
+    expected_provenance = "model-part" if scenario_name == "decorated-pot" else "model"
+    if not any(
+        isinstance(receipt, dict)
+        and str(receipt.get("route") or "") == "rust-vulkan-whole-frame"
+        and str(receipt.get("provenance") or "") == expected_provenance
+        and int(parse_number(receipt.get("instances")) or 0) > 0
+        and int(parse_number(receipt.get("submissionId")) or 0) > 0
+        for receipt in receipts
+    ):
+        evidence.update({"checked": True, "status": "missing_execution_receipt", "execution_status": "failed"})
+        return evidence
+    evidence["execution_status"] = "passed"
+    if len(captures) < required_capture_frames:
+        evidence.update(
+            {"checked": True, "status": "incomplete_frame_sequence", "frame_sequence_status": "failed", "captures_reported": len(captures)}
+        )
+        return evidence
+    try:
+        from PIL import Image
+    except Exception as exc:  # pragma: no cover
+        evidence["status"] = f"pillow_unavailable:{exc}"
+        return evidence
+    crops: list[dict[str, object]] = []
+    try:
+        for capture_index, capture in enumerate(captures):
+            if not isinstance(capture, dict):
+                continue
+            screenshot = Path(str(capture.get("screenshot") or ""))
+            capture_frame = parse_number(capture.get("renderedFrameIndex"))
+            if not screenshot.is_file() or capture_frame is None:
+                crops.append({"capture_index": capture_index, "status": "missing_capture_frame"})
+                continue
+            capture_method = str(capture.get("captureMethod") or "")
+            # A Rust Vulkan selected-source frame is read from the backend-owned
+            # final output before presentation. It is the authoritative game
+            # frame for that route, provided the capture records that exact
+            # target; treating it as a desktop capture would discard the one
+            # submission-correlated image in an otherwise valid sequence.
+            backend_final_output = (
+                capture_method == "rust-vulkan-final-output"
+                and str(capture.get("targetWindow") or "") == "rust-vulkan-final-output"
+            )
+            if capture_method != "external-window-request" and not backend_final_output:
+                crops.append({"capture_index": capture_index, "status": "wrong_capture_method"})
+                continue
+            with Image.open(screenshot) as image:
+                rgb = image.convert("RGB")
+            game_window = captured_game_window_evidence(rgb.size, doc, capture)
+            if game_window.get("status") != "passed":
+                crops.append({"capture_index": capture_index, "status": "not_game_window"})
+                continue
+            model = next(
+                (
+                    item
+                    for item in models
+                    if isinstance(item, dict)
+                    and str(item.get("route") or "") == "rust-vulkan-whole-frame"
+                    and str(item.get("textureId") or "") == expected_texture
+                    and matches_expected_entity(item)
+                    and matches_semantic_identity(item)
+                    and bool(item.get("projected"))
+                    and int(parse_number(item.get("sectionCount")) or 0) > 0
+                    and abs(int(parse_number(item.get("frameIndex")) or -999999) - int(capture_frame)) <= 1
+                ),
+                None,
+            )
+            if scenario_name in {"chicken", "cow", "pig", "rabbit", "zombie"}:
+                matching_models = [
+                    item
+                    for item in models
+                    if isinstance(item, dict)
+                    and str(item.get("route") or "") == "rust-vulkan-whole-frame"
+                    and str(item.get("textureId") or "") == expected_texture
+                    and matches_expected_entity(item)
+                    and matches_semantic_identity(item)
+                    and abs(int(parse_number(item.get("frameIndex")) or -999999) - int(capture_frame)) <= 1
+                ]
+                closest_delta = min(
+                    (abs(int(parse_number(item.get("frameIndex")) or -999999) - int(capture_frame)) for item in matching_models),
+                    default=None,
+                )
+                closest_models = [
+                    item
+                    for item in matching_models
+                    if closest_delta is not None
+                    and abs(int(parse_number(item.get("frameIndex")) or -999999) - int(capture_frame)) == closest_delta
+                ]
+                if len(closest_models) != 1:
+                    crops.append({"capture_index": capture_index, "status": "duplicate_or_missing_expected_entity_mesh"})
+                    continue
+            receipt = next(
+                (
+                    item
+                    for item in receipts
+                    if isinstance(item, dict)
+                    and str(item.get("route") or "") == "rust-vulkan-whole-frame"
+                    and str(item.get("provenance") or "") == expected_provenance
+                    and int(parse_number(item.get("instances")) or 0) > 0
+                    and int(parse_number(item.get("submissionId")) or 0) > 0
+                    and abs(int(parse_number(item.get("deterministicFrameIndex")) or -999999) - int(capture_frame)) <= 1
+                ),
+                None,
+            )
+            if model is None:
+                crops.append({"capture_index": capture_index, "status": "missing_matching_model_mesh"})
+                continue
+            if receipt is None:
+                crops.append({"capture_index": capture_index, "status": "missing_frame_correlated_execution"})
+                continue
+            bounds = model.get("screenBounds")
+            crop_box = marker_crop_box(bounds, rgb.width, rgb.height, mirrored_y=True) if isinstance(bounds, dict) else None
+            if crop_box is None:
+                crops.append({"capture_index": capture_index, "status": "bounds_outside_game_viewport"})
+                continue
+            crop_path = screenshot.with_name(f"world_mesh_model_crop_{capture_index}_{model.get('meshKey') or 'unknown'}.png")
+            rgb.crop(crop_box).save(crop_path)
+            crops.append(
+                {
+                    "capture_index": capture_index,
+                    "rendered_frame_index": capture_frame,
+                    "mesh_key": model.get("meshKey"),
+                    "mesh_generation": model.get("meshGeneration"),
+                    "texture_id": model.get("textureId"),
+                    "section_count": model.get("sectionCount"),
+                    "submission_id": receipt.get("submissionId"),
+                    "capture_method": capture_method,
+                    "crop_path": str(crop_path),
+                    "status": "present",
+                }
+            )
+    except Exception as exc:
+        evidence.update({"checked": True, "status": f"crop_failed:{exc}", "crops": crops})
+        return evidence
+    evidence["crops"] = crops
+    if len(crops) < required_capture_frames or any(crop.get("status") != "present" for crop in crops):
+        evidence.update({"checked": True, "status": "incomplete_frame_correlation", "frame_sequence_status": "failed"})
+        return evidence
+    if scenario_name == "zombie":
+        head_texture_crops: list[dict[str, object]] = []
+        for crop in crops:
+            crop_path = Path(str(crop.get("crop_path") or ""))
+            with Image.open(crop_path) as image:
+                result = zombie_head_texture_evidence(image.convert("RGB"))
+            head_texture_crops.append({"crop_path": str(crop_path), **result})
+        evidence["zombie_head_texture"] = head_texture_crops
+        if any(result.get("status") != "present" for result in head_texture_crops):
+            evidence.update(
+                {
+                    "checked": True,
+                    "status": "zombie_head_texture_missing_or_black",
+                    "frame_sequence_status": "failed",
+                }
+            )
+            return evidence
+    evidence.update(
+        {
+            "checked": True,
+            "status": "structural_present",
+            "game_window_status": "passed",
+            "frame_sequence_status": "passed",
+            "projected_bounds_status": "passed",
+            "matched_frames": len(crops),
+        }
+    )
     return evidence
 
 
@@ -4574,6 +6277,57 @@ def block_display_crop_stats(crop: Any, scenario_name: str) -> dict[str, object]
     }
 
 
+def primed_tnt_crop_stats(crop: Any) -> dict[str, object]:
+    """Classify a filled, non-neutral TNT footprint without assuming pack colors."""
+    width, height = crop.size
+    saturated_detail = 0
+    dark_detail = 0
+    visible = 0
+    min_x = width
+    min_y = height
+    max_x = -1
+    max_y = -1
+    for y in range(height):
+        for x in range(width):
+            red, green, blue = crop.getpixel((x, y))
+            average = (red + green + blue) / 3.0
+            chroma = max(red, green, blue) - min(red, green, blue)
+            # Resource packs may recolor TNT. The semantic mesh/material
+            # receipt establishes identity; final-frame validation only proves
+            # that the projected cube has substantial non-background texture
+            # detail rather than assuming vanilla red pixels.
+            is_saturated_detail = average >= 35 and chroma >= 40
+            is_dark_detail = 18 <= average <= 170 and chroma <= 52
+            if is_saturated_detail:
+                saturated_detail += 1
+            if is_dark_detail:
+                dark_detail += 1
+            if is_saturated_detail or is_dark_detail:
+                visible += 1
+                min_x = min(min_x, x)
+                min_y = min(min_y, y)
+                max_x = max(max_x, x)
+                max_y = max(max_y, y)
+    coverage_ok = (
+        max_x > min_x
+        and max_y > min_y
+        and (max_x - min_x + 1) >= max(8, int(width * 0.25))
+        and (max_y - min_y + 1) >= max(8, int(height * 0.25))
+    )
+    return {
+        "matching_pixels": saturated_detail + dark_detail,
+        "texture_signature": "tnt-pack-colored-filled",
+        "saturated_detail_pixels": saturated_detail,
+        "dark_detail_pixels": dark_detail,
+        "colored_pixels": visible,
+        "coverage_ok": coverage_ok,
+        "transparency_status": "passed",
+        "orientation_status": "passed" if coverage_ok else "failed",
+        "crop_width": width,
+        "crop_height": height,
+    }
+
+
 def falling_block_crop_stats(crop: Any, scenario_name: str) -> dict[str, object]:
     width, height = crop.size
     sand = 0
@@ -4816,6 +6570,32 @@ def marker_crop_box(
     if max_x - min_x < 8 or max_y - min_y < 8:
         return None
     return (min_x, min_y, max_x, max_y)
+
+
+def zombie_head_texture_evidence(crop: Any) -> dict[str, object]:
+    """Classify the canonical Zombie head rather than generic colored pixels."""
+    width, height = crop.size
+    left = max(0, int(width * 0.25))
+    right = min(width, max(left + 1, int(width * 0.75)))
+    bottom = min(height, max(1, int(height * 0.36)))
+    total = max(1, (right - left) * bottom)
+    green_head = 0
+    near_black = 0
+    for y in range(bottom):
+        for x in range(left, right):
+            red, green, blue = crop.getpixel((x, y))
+            if max(red, green, blue) <= 28:
+                near_black += 1
+            if 35 <= red <= 135 and green >= red + 12 and green >= blue + 18 and green >= 55:
+                green_head += 1
+    green_coverage = green_head / total
+    black_coverage = near_black / total
+    return {
+        "status": "present" if green_coverage >= 0.18 and black_coverage <= 0.35 else "missing_or_black",
+        "green_head_coverage": green_coverage,
+        "near_black_coverage": black_coverage,
+        "region": {"left": left, "top": 0, "right": right, "bottom": bottom},
+    }
 
 
 def marker_crop_stats(crop: Any, texture_id: int) -> dict[str, object]:
@@ -5309,6 +7089,92 @@ def deterministic_rust_vulkan_shell_scene_evidence(
             )
     except Exception as exc:
         evidence["status"] = f"read_failed:{exc}"
+    return evidence
+
+
+def selected_source_gui_final_evidence(
+    deterministic_doc: dict[str, object] | None,
+    gameplay_correlation_doc: dict[str, object] | None,
+    selected_source_requested: bool,
+    shell_evidence: dict[str, object],
+) -> dict[str, object]:
+    """Join a selected-source GUI receipt to its exact Rust-final capture.
+
+    A source receipt alone proves enqueue/execution, while a screenshot alone
+    could be an unrelated normal frame. The deterministic renderer records the
+    selected submission's rendered-frame index in the presentation correlation;
+    require the retained Rust-final image to carry that same index before
+    checking the fixed HUD crop.
+    """
+    evidence: dict[str, object] = {
+        "checked": False,
+        "status": "not_requested",
+        "gameplay_frame_id": None,
+        "submission_id": None,
+        "rendered_frame_index": None,
+        "gui_sprites": 0,
+        "screenshot": None,
+        "dark_hud_pixels": 0,
+        "bright_hud_pixels": 0,
+        "minimum_dark_hud_pixels": 256,
+    }
+    if not selected_source_requested:
+        return evidence
+    if not isinstance(gameplay_correlation_doc, dict):
+        evidence["status"] = "missing_gameplay_correlation"
+        return evidence
+    gui_sprites = int(parse_number(gameplay_correlation_doc.get("gui_sprites")) or 0)
+    evidence.update(
+        {
+            "gameplay_frame_id": int(parse_number(gameplay_correlation_doc.get("gameplay_frame_id")) or 0) or None,
+            "submission_id": int(parse_number(gameplay_correlation_doc.get("gal_submission_id")) or 0) or None,
+            "rendered_frame_index": int(
+                parse_number(gameplay_correlation_doc.get("deterministic_rendered_frame_index")) or 0
+            ) or None,
+            "gui_sprites": gui_sprites,
+        }
+    )
+    if gui_sprites == 0:
+        evidence.update({"checked": True, "status": "no_gui_expected"})
+        return evidence
+    captures = deterministic_doc.get("captures") if isinstance(deterministic_doc, dict) else None
+    rendered_frame_index = evidence["rendered_frame_index"]
+    matching_capture = next(
+        (
+            capture
+            for capture in captures
+            if isinstance(capture, dict)
+            and int(parse_number(capture.get("renderedFrameIndex")) or -1) == rendered_frame_index
+            and str(capture.get("captureMethod") or "") == "rust-vulkan-final-output"
+            and str(capture.get("targetWindow") or "") == "rust-vulkan-final-output"
+        ),
+        None,
+    ) if isinstance(captures, list) else None
+    if not isinstance(matching_capture, dict):
+        evidence["status"] = "missing_correlated_rust_final_capture"
+        return evidence
+    screenshot = matching_capture.get("screenshot")
+    evidence["screenshot"] = screenshot
+    regions = shell_evidence.get("regions") if isinstance(shell_evidence, dict) else None
+    gui_region = regions.get("fixed_gui_sprite_group") if isinstance(regions, dict) else None
+    if not isinstance(gui_region, dict):
+        evidence["status"] = "missing_gui_crop"
+        return evidence
+    dark_pixels = int(parse_number(gui_region.get("dark_texture_pixels")) or 0)
+    bright_pixels = int(parse_number(gui_region.get("bright_pixels")) or 0)
+    evidence.update(
+        {
+            "checked": True,
+            "dark_hud_pixels": dark_pixels,
+            "bright_hud_pixels": bright_pixels,
+            "crop_path": gui_region.get("crop_path"),
+            "status": (
+                "visible"
+                if dark_pixels >= int(evidence["minimum_dark_hud_pixels"])
+                else "hud_structure_missing"
+            ),
+        }
+    )
     return evidence
 
 
@@ -6557,7 +8423,34 @@ def child_process_timeout_seconds(args: argparse.Namespace) -> int:
     return max(1, per_mode_timeout_seconds(args) - cleanup_budget - 1)
 
 
-def minimum_supported_profile(mode: ModeSpec, tool_kind: str) -> str:
+def selected_source_distant_horizons_requires_extended_profile(
+    args: argparse.Namespace | None,
+    mode: ModeSpec,
+    tool_kind: str,
+) -> bool:
+    """Keep the copied-world DH source fixture inside a truthful bounded budget.
+
+    The fixture begins its capture sequence only after the copied save, DH
+    renderer, and target palette column have all become live. Standard's
+    process budget can expire during that preparation, producing a run with
+    real DH work but no valid palette frames.
+    """
+    return bool(
+        args is not None
+        and tool_kind in {"capture", "gameplay"}
+        and mode.backend == "rust-vulkan"
+        and getattr(args, "rust_selected_source_execution", False)
+        and getattr(args, "world_distant_horizons_opaque", False)
+    )
+
+
+def minimum_supported_profile(
+    mode: ModeSpec,
+    tool_kind: str,
+    args: argparse.Namespace | None = None,
+) -> str:
+    if selected_source_distant_horizons_requires_extended_profile(args, mode, tool_kind):
+        return "extended"
     if tool_kind == "gameplay" and mode.expected_attribution == "java-vulkan":
         return "standard"
     if tool_kind == "capture" and mode.backend == "rust-vulkan":
@@ -6569,8 +8462,13 @@ def minimum_supported_profile(mode: ModeSpec, tool_kind: str) -> str:
     return "smoke"
 
 
-def profile_not_supported_reason(profile: str, mode: ModeSpec, tool_kind: str) -> str | None:
-    minimum = minimum_supported_profile(mode, tool_kind)
+def profile_not_supported_reason(
+    profile: str,
+    mode: ModeSpec,
+    tool_kind: str,
+    args: argparse.Namespace | None = None,
+) -> str | None:
+    minimum = minimum_supported_profile(mode, tool_kind, args)
     if PROFILE_RANK[profile] >= PROFILE_RANK[minimum]:
         return None
     return (
@@ -6778,11 +8676,39 @@ def normalize_capture_artifact(
     tool_kind: str = "capture",
     runtime_profile: dict[str, object] | None = None,
     repository_paths: dict[str, object] | None = None,
+    require_complete_gameplay_attachments: bool = False,
 ) -> dict[str, object]:
     files = load_capture_files(capture_dir)
     meta = read_key_values(files["meta"])
     shader_summary = read_key_values(files["shader_summary"])
     deterministic_doc = read_json(files["deterministic"]) if files["deterministic"] else None
+    distant_horizons_capture_execution_doc: dict[str, object] = {}
+    distant_horizons_capture_presentation_doc: dict[str, object] = {}
+    distant_horizons_texture_probe_doc: dict[str, object] = {}
+    static_terrain_capture_execution_doc: dict[str, object] = {}
+    static_terrain_texture_probe_doc: dict[str, object] = {}
+    distant_horizons_capture_acks = sorted(capture_dir.glob("deterministic_camera_capture_*/capture_request_*.ack.json"))
+    for distant_horizons_capture_ack in reversed(distant_horizons_capture_acks):
+        candidate_ack = read_json(distant_horizons_capture_ack)
+        if not isinstance(candidate_ack, dict):
+            continue
+        candidate_execution = candidate_ack.get("rustGalDistantHorizonsExecution")
+        if isinstance(candidate_execution, dict):
+            distant_horizons_capture_execution_doc = candidate_execution
+            candidate_presentation = candidate_ack.get("wholeFramePresentationCorrelation")
+            if isinstance(candidate_presentation, dict):
+                distant_horizons_capture_presentation_doc = candidate_presentation
+        candidate_texture_probe = candidate_ack.get("rustGalDistantHorizonsTextureProbeReceipt")
+        if isinstance(candidate_texture_probe, dict):
+            distant_horizons_texture_probe_doc = candidate_texture_probe
+        candidate_static_execution = candidate_ack.get("rustGalStaticTerrainExecution")
+        if isinstance(candidate_static_execution, dict):
+            static_terrain_capture_execution_doc = candidate_static_execution
+        candidate_static_texture_probe = candidate_ack.get("rustGalStaticTerrainTextureProbeReceipt")
+        if isinstance(candidate_static_texture_probe, dict):
+            static_terrain_texture_probe_doc = candidate_static_texture_probe
+        if distant_horizons_capture_execution_doc and static_terrain_capture_execution_doc:
+            break
     frame_doc = read_json(files["frame_benchmark"]) if files["frame_benchmark"] else None
     subsystem_doc = read_json(files["subsystem_benchmark"]) if files["subsystem_benchmark"] else None
     renderdoc_doc = read_json(files["renderdoc_summary"]) if files["renderdoc_summary"] else None
@@ -6792,6 +8718,247 @@ def normalize_capture_artifact(
     gameplay_attachment_correlation_path = latest_matching(gameplay_attachment_dir, "gameplay-correlation-frame-*.json") if gameplay_attachment_dir.exists() else None
     gameplay_attachment_doc = read_json(gameplay_attachment_manifest_path) if gameplay_attachment_manifest_path else None
     gameplay_attachment_correlation_doc = read_json(gameplay_attachment_correlation_path) if gameplay_attachment_correlation_path else None
+    terrain_contract_dir = capture_dir / "terrain_pass_contract"
+    terrain_contract_path = latest_matching(terrain_contract_dir, "terrain-pass-contract-generation-*.json") if terrain_contract_dir.exists() else None
+    terrain_contract_doc = read_json(terrain_contract_path) if terrain_contract_path else None
+    selected_source_output_path: Path | None = None
+    selected_source_output_doc: dict[str, object] | None = None
+    if terrain_contract_dir.exists():
+        selected_source_outputs: list[tuple[int, Path, dict[str, object]]] = []
+        for candidate in terrain_contract_dir.glob("selected-source-*-frame-*.json"):
+            document = read_json(candidate)
+            if not isinstance(document, dict) or document.get("artifact_class") != "rust_selected_source_overlay":
+                continue
+            frame_id = int(parse_number(document.get("frame_id")) or -1)
+            if frame_id > 0:
+                selected_source_outputs.append((frame_id, candidate, document))
+        if selected_source_outputs:
+            _frame_id, selected_source_output_path, selected_source_output_doc = max(
+                selected_source_outputs, key=lambda item: (item[0], item[1].name)
+            )
+    selected_source_execution_candidates: list[tuple[int, Path, dict[str, object]]] = []
+    if terrain_contract_dir.exists():
+        for pattern in (
+            "selected-source-execution-frame-*.json",
+            "selected-source-execution-distant-horizons-frame-*.json",
+        ):
+            for candidate in terrain_contract_dir.glob(pattern):
+                document = read_json(candidate)
+                if not isinstance(document, dict):
+                    continue
+                frame_id = int(parse_number(document.get("frame_id")) or -1)
+                if frame_id > 0 and str(document.get("route") or "") == "rust-native-selected-source":
+                    selected_source_execution_candidates.append((frame_id, candidate, document))
+    selected_source_execution_path: Path | None = None
+    selected_source_execution_doc: dict[str, object] | None = None
+    selected_source_output_frame = (
+        int(parse_number(selected_source_output_doc.get("frame_id")) or -1)
+        if isinstance(selected_source_output_doc, dict)
+        else -1
+    )
+    matching_execution_candidates = [
+        candidate
+        for candidate in selected_source_execution_candidates
+        if candidate[0] == selected_source_output_frame
+    ]
+    if matching_execution_candidates:
+        _frame_id, selected_source_execution_path, selected_source_execution_doc = max(
+            matching_execution_candidates, key=lambda item: item[1].name
+        )
+    elif selected_source_execution_candidates:
+        _frame_id, selected_source_execution_path, selected_source_execution_doc = max(
+            selected_source_execution_candidates, key=lambda item: (item[0], item[1].name)
+        )
+
+    def selected_source_receipts_for_producer(
+        producer_execution_receipts: object,
+    ) -> list[dict[str, object]]:
+        """Return source receipts correlated to real producer execution.
+
+        Production producer receipts carry the gameplay frame and submission
+        identity. Older unit fixtures intentionally omit those fields, so they
+        retain the selected receipt fallback while any real correlation turns
+        this into an exact frame/submission join.
+        """
+        receipts = producer_execution_receipts if isinstance(producer_execution_receipts, list) else []
+        correlations = {
+            (
+                int(parse_number(receipt.get("gameplayFrameId")) or 0),
+                int(parse_number(receipt.get("submissionId")) or 0),
+            )
+            for receipt in receipts
+            if isinstance(receipt, dict)
+            and int(parse_number(receipt.get("gameplayFrameId")) or 0) > 0
+            and int(parse_number(receipt.get("submissionId")) or 0) > 0
+        }
+        if not correlations:
+            return [selected_source_execution_doc] if isinstance(selected_source_execution_doc, dict) else []
+        return [
+            document
+            for _frame_id, _path, document in selected_source_execution_candidates
+            if (
+                int(parse_number(document.get("frame_id")) or 0),
+                int(parse_number(document.get("submission_id")) or 0),
+            )
+            in correlations
+        ]
+
+    def selected_source_moving_mesh_execution_complete(provenance: str) -> bool:
+        """Require a real moving producer to reach its correlated source submission.
+
+        Route-selection and generic mesh totals are intentionally insufficient:
+        static terrain or DH must not satisfy a falling-block or piston row.
+        The receipt is emitted after the Rust whole-frame submit and joined to
+        the selected-source diagnostic by gameplay frame and submission.
+        """
+        receipts = (
+            deterministic_doc.get("rustGalWorldMovingMeshExecution")
+            if isinstance(deterministic_doc, dict)
+            else []
+        )
+        receipts = receipts if isinstance(receipts, list) else []
+        matching_receipts = [
+            receipt
+            for receipt in receipts
+            if isinstance(receipt, dict)
+            and str(receipt.get("route") or "") == "rust-vulkan-whole-frame"
+            and str(receipt.get("provenance") or "") == provenance
+            and int(parse_number(receipt.get("instances")) or 0) > 0
+        ]
+        source_receipts = selected_source_receipts_for_producer(matching_receipts)
+        return any(
+            isinstance(document.get("source_mesh_instance_semantics"), dict)
+            and int(
+                parse_number(
+                    document["source_mesh_instance_semantics"].get("moving_mesh_instances")
+                )
+                or 0
+            )
+            > 0
+            for document in source_receipts
+        )
+    selected_source_overlay_evidence: dict[str, object] = {
+        "status": "not_requested",
+        "frame_id": None,
+        "submission_id": None,
+        "source_role": None,
+        "path": None,
+        "world_pixels": 0,
+        "nonblack_pixels": 0,
+        "minimum_nonblack_pixels": 0,
+    }
+    if isinstance(selected_source_output_doc, dict):
+        source_frame = int(parse_number(selected_source_output_doc.get("frame_id")) or -1)
+        selected_source_overlay_evidence["frame_id"] = source_frame if source_frame >= 0 else None
+        selected_source_overlay_evidence["submission_id"] = int(
+            parse_number(selected_source_output_doc.get("submission_id")) or 0
+        ) or None
+        selected_source_overlay_evidence["source_role"] = selected_source_output_doc.get("source_role")
+        if source_frame >= 0:
+            overlay_path = selected_source_output_path.with_suffix(".png")
+            selected_source_overlay_evidence["path"] = str(overlay_path)
+            # A DH-only selected-source row does not produce a normal terrain
+            # receipt. Its output is still valid only when it agrees with the
+            # matching real DH submission; selecting a diagnostic source stage
+            # must not accidentally turn that into an uncorrelated artifact.
+            correlated_execution_doc = selected_source_execution_doc
+            if not isinstance(correlated_execution_doc, dict) and terrain_contract_dir.exists():
+                distant_candidate = (
+                    terrain_contract_dir
+                    / f"selected-source-execution-distant-horizons-frame-{source_frame}.json"
+                )
+                distant_document = read_json(distant_candidate)
+                if isinstance(distant_document, dict):
+                    correlated_execution_doc = distant_document
+            execution_submission = int(
+                parse_number(correlated_execution_doc.get("submission_id")) or 0
+            ) if isinstance(correlated_execution_doc, dict) else 0
+            output_submission = int(parse_number(selected_source_output_doc.get("submission_id")) or 0)
+            if execution_submission <= 0 or execution_submission != output_submission:
+                selected_source_overlay_evidence["status"] = "uncorrelated_submission"
+            elif not overlay_path.is_file():
+                selected_source_overlay_evidence["status"] = "missing_overlay"
+            else:
+                try:
+                    from PIL import Image
+
+                    with Image.open(overlay_path) as image:
+                        rgb = image.convert("RGB")
+                        # A hotbar or crosshair is not valid evidence that the
+                        # source-owned world graph produced a visible frame.
+                        world_height = max(1, int(rgb.height * 0.85))
+                        world = rgb.crop((0, 0, rgb.width, world_height))
+                        world_pixels = world.width * world.height
+                        nonblack_pixels = sum(
+                            1
+                            for red, green, blue in world.getdata()
+                            if red > 8 or green > 8 or blue > 8
+                        )
+                        minimum_nonblack_pixels = max(1024, world_pixels // 100)
+                        selected_source_overlay_evidence.update(
+                            {
+                                "world_pixels": world_pixels,
+                                "nonblack_pixels": nonblack_pixels,
+                                "minimum_nonblack_pixels": minimum_nonblack_pixels,
+                                "status": (
+                                    "world_output_present"
+                                    if nonblack_pixels >= minimum_nonblack_pixels
+                                    else "world_output_black"
+                                ),
+                            }
+                        )
+                except Exception as exc:  # pragma: no cover - local image support varies.
+                    selected_source_overlay_evidence["status"] = f"overlay_read_failed:{exc}"
+    elif terrain_contract_dir.exists() and latest_matching(
+        terrain_contract_dir, "selected-source-execution-frame-*.json"
+    ):
+        selected_source_overlay_evidence["status"] = "missing_output_manifest"
+    selected_source_distant_horizons_execution_path = (
+        latest_matching(terrain_contract_dir, "selected-source-execution-distant-horizons-frame-*.json")
+        if terrain_contract_dir.exists()
+        else None
+    )
+    selected_source_distant_horizons_execution_doc = (
+        read_json(selected_source_distant_horizons_execution_path)
+        if selected_source_distant_horizons_execution_path
+        else None
+    )
+    selected_source_distant_horizons_primary_doc: dict[str, object] | None = None
+    selected_source_distant_horizons_primary_path: Path | None = None
+    if isinstance(selected_source_distant_horizons_execution_doc, dict):
+        frame_id = int(parse_number(selected_source_distant_horizons_execution_doc.get("frame_id")) or -1)
+        submission_id = int(parse_number(selected_source_distant_horizons_execution_doc.get("submission_id")) or 0)
+        candidate = terrain_contract_dir / f"selected-source-distant-horizons-primary-frame-{frame_id}.json"
+        candidate_doc = read_json(candidate)
+        if (
+            isinstance(candidate_doc, dict)
+            and candidate_doc.get("artifact_class") == "rust_selected_source_overlay"
+            and candidate_doc.get("source_role") == 'DistantHorizons::ShaderPackColor("primary")'
+            and int(parse_number(candidate_doc.get("frame_id")) or -1) == frame_id
+            and int(parse_number(candidate_doc.get("submission_id")) or 0) == submission_id
+        ):
+            selected_source_distant_horizons_primary_doc = candidate_doc
+            selected_source_distant_horizons_primary_path = candidate.with_suffix(".png")
+    distant_horizons_exact_atlas_plan_doc: dict[str, object] = {}
+    distant_horizons_exact_atlas_plan_path: Path | None = None
+    distant_horizons_source_material_contract_doc: dict[str, object] = {}
+    distant_horizons_source_material_contract_path: Path | None = None
+    if distant_horizons_capture_execution_doc:
+        world_frame = int(parse_number(distant_horizons_capture_execution_doc.get("worldFrame")) or -1)
+        if world_frame >= 0:
+            candidate = terrain_contract_dir / f"world-lod-exact-atlas-plan-frame-{world_frame}.json"
+            candidate_doc = read_json(candidate)
+            if isinstance(candidate_doc, dict):
+                distant_horizons_exact_atlas_plan_path = candidate
+                distant_horizons_exact_atlas_plan_doc = candidate_doc
+            source_candidate = (
+                terrain_contract_dir
+                / f"world-lod-selected-source-material-contract-frame-{world_frame}.json"
+            )
+            source_candidate_doc = read_json(source_candidate)
+            if isinstance(source_candidate_doc, dict):
+                distant_horizons_source_material_contract_path = source_candidate
+                distant_horizons_source_material_contract_doc = source_candidate_doc
     effective_meta = {**shader_summary, **meta}
     launch_uses_renderdoc = bool(command and Path(command[0]).name == "renderdoccmd") or bool(
         effective_meta.get("renderdoc_wrapped_actual_game_command")
@@ -6995,6 +9162,9 @@ def normalize_capture_artifact(
     requested_world_mesh_block_display_scenario = parse_java_property(
         combined_logs, "mattmc.dev.rustGalWorldMesh.blockDisplayScenario"
     )
+    requested_world_text_scenario = parse_java_property(
+        combined_logs, "mattmc.dev.rustGalWorldText.scenario"
+    )
     requested_world_mesh_block_display_workload = parse_java_property(
         combined_logs, "mattmc.dev.rustGalWorldMesh.blockDisplayWorkload"
     ) or "single"
@@ -7013,8 +9183,71 @@ def normalize_capture_artifact(
     requested_world_mesh_falling_block_legacy = (
         parse_java_property(combined_logs, "mattmc.dev.rustGalWorldFallingBlock.legacyControl") == "true"
     )
+    requested_world_mesh_arrow_scenario = parse_java_property(
+        combined_logs, "mattmc.dev.rustGalWorldMesh.arrowScenario"
+    )
+    requested_world_mesh_arrow_disabled = (
+        parse_java_property(combined_logs, "mattmc.dev.rustGalWorldArrow.disabled") == "true"
+    )
+    requested_world_mesh_arrow_legacy = (
+        parse_java_property(combined_logs, "mattmc.dev.rustGalWorldArrow.legacyControl") == "true"
+    )
+    requested_world_experience_orb_scenario = parse_java_property(
+        combined_logs, "mattmc.dev.rustGalWorldExperienceOrb.scenario"
+    )
+    requested_world_experience_orb_disabled = (
+        parse_java_property(combined_logs, "mattmc.dev.rustGalWorldExperienceOrb.disabled") == "true"
+    )
+    requested_world_experience_orb_legacy = (
+        parse_java_property(combined_logs, "mattmc.dev.rustGalWorldExperienceOrb.legacyControl") == "true"
+    )
+    requested_world_beacon_beam_scenario = parse_java_property(
+        combined_logs, "mattmc.dev.rustGalWorldBeaconBeam.scenario"
+    )
+    requested_world_beacon_beam_disabled = (
+        parse_java_property(combined_logs, "mattmc.dev.rustGalWorldBeaconBeam.disabled") == "true"
+    )
+    requested_world_beacon_beam_legacy = (
+        parse_java_property(combined_logs, "mattmc.dev.rustGalWorldBeaconBeam.legacyControl") == "true"
+    )
+    requested_world_mesh_model_scenario = parse_java_property(
+        combined_logs, "mattmc.dev.rustGalWorldMesh.modelScenario"
+    )
+    requested_world_mesh_model_disabled = (
+        parse_java_property(combined_logs, "mattmc.dev.rustGalWorldModelMesh.disabled") == "true"
+    )
+    requested_world_mesh_model_legacy = (
+        parse_java_property(combined_logs, "mattmc.dev.rustGalWorldModelMesh.legacyControl") == "true"
+    )
+    requested_world_mesh_model_part_disabled = (
+        parse_java_property(combined_logs, "mattmc.dev.rustGalWorldModelPart.disabled") == "true"
+    )
+    requested_world_mesh_model_part_legacy = (
+        parse_java_property(combined_logs, "mattmc.dev.rustGalWorldModelPart.legacyControl") == "true"
+    )
+    requested_world_mesh_primed_tnt_scenario = parse_java_property(
+        combined_logs, "mattmc.dev.rustGalWorldMesh.primedTntScenario"
+    )
+    requested_world_mesh_primed_tnt_disabled = (
+        parse_java_property(combined_logs, "mattmc.dev.rustGalWorldPrimedTnt.disabled") == "true"
+    )
+    requested_world_mesh_primed_tnt_legacy = (
+        parse_java_property(combined_logs, "mattmc.dev.rustGalWorldPrimedTnt.legacyControl") == "true"
+    )
     requested_world_mesh_piston_scenario = parse_java_property(
         combined_logs, "mattmc.dev.rustGalWorldMesh.pistonScenario"
+    )
+    requested_world_weather_scenario = parse_java_property(
+        combined_logs, "mattmc.dev.rustGalWeather.scenario"
+    )
+    requested_world_cloud_scenario = parse_java_property(
+        combined_logs, "mattmc.dev.rustGalClouds.scenario"
+    )
+    requested_world_weather_disabled = (
+        parse_java_property(combined_logs, "mattmc.dev.rustGalWeather.disabled") == "true"
+    )
+    requested_world_weather_legacy = (
+        parse_java_property(combined_logs, "mattmc.dev.rustGalWeather.legacyControl") == "true"
     )
     requested_world_static_terrain_scenario = parse_java_property(
         combined_logs, "mattmc.dev.rustGalStaticTerrain.scenario"
@@ -7037,10 +9270,40 @@ def normalize_capture_artifact(
     )
     if not requested_world_mesh_falling_block_scenario and isinstance(deterministic_doc, dict):
         requested_world_mesh_falling_block_scenario = str(deterministic_doc.get("rustGalWorldFallingBlockScenario") or "")
+    if not requested_world_mesh_arrow_scenario and isinstance(deterministic_doc, dict):
+        requested_world_mesh_arrow_scenario = str(deterministic_doc.get("rustGalWorldArrowScenario") or "")
+    if not requested_world_experience_orb_scenario and isinstance(deterministic_doc, dict):
+        requested_world_experience_orb_scenario = str(deterministic_doc.get("rustGalWorldExperienceOrbScenario") or "")
+    if not requested_world_beacon_beam_scenario and isinstance(deterministic_doc, dict):
+        requested_world_beacon_beam_scenario = str(deterministic_doc.get("rustGalWorldBeaconBeamScenario") or "")
+    if not requested_world_mesh_model_scenario and isinstance(deterministic_doc, dict):
+        requested_world_mesh_model_scenario = str(deterministic_doc.get("rustGalWorldModelMeshScenario") or "")
+    if not requested_world_mesh_primed_tnt_scenario and isinstance(deterministic_doc, dict):
+        requested_world_mesh_primed_tnt_scenario = str(deterministic_doc.get("rustGalWorldPrimedTntScenario") or "")
     if not requested_world_mesh_block_display_scenario and isinstance(deterministic_doc, dict):
         requested_world_mesh_block_display_scenario = str(deterministic_doc.get("rustGalWorldBlockDisplayScenario") or "")
+    if not requested_world_text_scenario and isinstance(deterministic_doc, dict):
+        world_text_scenario_doc = deterministic_doc.get("rustGalWorldText")
+        if isinstance(world_text_scenario_doc, dict):
+            requested_world_text_scenario = str(world_text_scenario_doc.get("scenario") or "")
     if not requested_world_mesh_piston_scenario and isinstance(deterministic_doc, dict):
         requested_world_mesh_piston_scenario = str(deterministic_doc.get("rustGalWorldPistonScenario") or "")
+    weather_doc = (
+        deterministic_doc.get("rustGalWorldWeather")
+        if isinstance(deterministic_doc, dict)
+        and isinstance(deterministic_doc.get("rustGalWorldWeather"), dict)
+        else {}
+    )
+    if not requested_world_weather_scenario and isinstance(weather_doc, dict):
+        requested_world_weather_scenario = str(weather_doc.get("scenario") or "")
+    cloud_doc = (
+        deterministic_doc.get("rustGalWorldClouds")
+        if isinstance(deterministic_doc, dict)
+        and isinstance(deterministic_doc.get("rustGalWorldClouds"), dict)
+        else {}
+    )
+    if not requested_world_cloud_scenario and isinstance(cloud_doc, dict):
+        requested_world_cloud_scenario = str(cloud_doc.get("scenario") or "")
     if not requested_world_static_terrain_scenario and isinstance(deterministic_doc, dict):
         requested_world_static_terrain_scenario = str(deterministic_doc.get("rustGalStaticTerrainScenario") or "")
     block_display_doc = (
@@ -7053,6 +9316,17 @@ def normalize_capture_artifact(
         if isinstance(frame_doc, dict) and isinstance(frame_doc.get("submittedWorkCounts"), dict)
         else {}
     )
+    deterministic_submitted_work_counts = (
+        deterministic_doc.get("rustGalSubmittedWorkCounts")
+        if isinstance(deterministic_doc, dict) and isinstance(deterministic_doc.get("rustGalSubmittedWorkCounts"), dict)
+        else {}
+    )
+
+    def submitted_work_count(family: str) -> int:
+        return max(
+            int(parse_number(submitted_work_counts.get(family)) or 0),
+            int(parse_number(deterministic_submitted_work_counts.get(family)) or 0),
+        )
     static_terrain_doc = (
         deterministic_doc.get("rustGalStaticTerrainDiagnostics")
         if isinstance(deterministic_doc, dict) and isinstance(deterministic_doc.get("rustGalStaticTerrainDiagnostics"), dict)
@@ -7073,7 +9347,33 @@ def normalize_capture_artifact(
         if isinstance(frame_doc, dict) and isinstance(frame_doc.get("staticTerrainPerformance"), dict)
         else {}
     )
-    static_terrain_submitted_count = int(parse_number(submitted_work_counts.get("static-terrain")) or 0)
+    distant_horizons_route_doc = (
+        deterministic_doc.get("rustGalDistantHorizonsRoute")
+        if isinstance(deterministic_doc, dict) and isinstance(deterministic_doc.get("rustGalDistantHorizonsRoute"), dict)
+        else {}
+    )
+    requested_world_distant_horizons_opaque = (
+        parse_java_property(combined_logs, "mattmc.dev.rustGalDistantHorizons.opaqueV1") == "true"
+        or parse_java_property(combined_logs, "mattmc.dev.rustGalDistantHorizons.semanticCapture") == "true"
+    )
+    requested_world_distant_horizons_non_water = (
+        parse_java_property(combined_logs, "mattmc.dev.rustGalDistantHorizons.requireTransparent") == "true"
+    )
+    requested_world_distant_horizons_water = (
+        parse_java_property(combined_logs, "mattmc.dev.rustGalDistantHorizons.requireWater") == "true"
+    )
+    requested_world_distant_horizons_texture_palette = (
+        parse_java_property(combined_logs, "mattmc.dev.rustGalDistantHorizons.texturePalette") == "true"
+    )
+    requested_world_distant_horizons_legacy_observation = (
+        parse_java_property(combined_logs, "mattmc.dev.rustGalDistantHorizons.legacyObservation") == "true"
+    )
+    requested_world_distant_horizons = (
+        requested_world_distant_horizons_opaque
+        or requested_world_distant_horizons_non_water
+        or requested_world_distant_horizons_water
+    )
+    static_terrain_submitted_count = submitted_work_count("static-terrain")
     if static_terrain_submitted_count <= 0:
         static_source_doc = static_terrain_doc if static_terrain_doc else static_terrain_frame_doc
         if isinstance(static_source_doc, dict):
@@ -7198,7 +9498,12 @@ def normalize_capture_artifact(
     static_terrain_expected_fault = static_terrain_fault_expectations.get(
         (requested_world_static_terrain_fault or "").strip().lower()
     )
-    block_display_submitted_count = int(parse_number(submitted_work_counts.get("block-display")) or 0)
+    block_display_submitted_count = submitted_work_count("block-display")
+    world_text_doc = (
+        deterministic_doc.get("rustGalWorldText")
+        if isinstance(deterministic_doc, dict) and isinstance(deterministic_doc.get("rustGalWorldText"), dict)
+        else {}
+    )
     if isinstance(block_display_doc, dict):
         requested_world_mesh_block_display_workload = str(
             block_display_doc.get("workload") or requested_world_mesh_block_display_workload or "single"
@@ -7222,7 +9527,7 @@ def normalize_capture_artifact(
         and isinstance(deterministic_doc.get("rustGalWorldFallingBlockRouteDecisions"), list)
         else []
     )
-    falling_block_submitted_count = int(parse_number(submitted_work_counts.get("falling-block")) or 0)
+    falling_block_submitted_count = submitted_work_count("falling-block")
     world_mesh_falling_block_control = "disabled" if requested_world_mesh_falling_block_disabled else ("legacy" if requested_world_mesh_falling_block_legacy else "rust")
     if isinstance(falling_block_doc, dict) and falling_block_doc.get("routeControl"):
         world_mesh_falling_block_control = str(falling_block_doc.get("routeControl") or world_mesh_falling_block_control)
@@ -7246,6 +9551,93 @@ def normalize_capture_artifact(
         sum(int(parse_number(value) or 0) for value in falling_block_route_counts.values())
         + sum(deterministic_falling_block_route_counts.values())
     )
+    arrow_doc = (
+        deterministic_doc.get("rustGalWorldArrowSetup")
+        if isinstance(deterministic_doc, dict) and isinstance(deterministic_doc.get("rustGalWorldArrowSetup"), dict)
+        else {}
+    )
+    deterministic_arrows = (
+        deterministic_doc.get("rustGalWorldArrows")
+        if isinstance(deterministic_doc, dict) and isinstance(deterministic_doc.get("rustGalWorldArrows"), list)
+        else []
+    )
+    deterministic_arrow_route_decisions = (
+        deterministic_doc.get("rustGalWorldArrowRouteDecisions")
+        if isinstance(deterministic_doc, dict) and isinstance(deterministic_doc.get("rustGalWorldArrowRouteDecisions"), list)
+        else []
+    )
+    experience_orb_doc = (
+        deterministic_doc.get("rustGalWorldExperienceOrbSetup")
+        if isinstance(deterministic_doc, dict) and isinstance(deterministic_doc.get("rustGalWorldExperienceOrbSetup"), dict)
+        else {}
+    )
+    deterministic_experience_orbs = (
+        deterministic_doc.get("rustGalWorldExperienceOrbs")
+        if isinstance(deterministic_doc, dict) and isinstance(deterministic_doc.get("rustGalWorldExperienceOrbs"), list)
+        else []
+    )
+    deterministic_experience_orb_route_decisions = (
+        deterministic_doc.get("rustGalWorldExperienceOrbRouteDecisions")
+        if isinstance(deterministic_doc, dict) and isinstance(deterministic_doc.get("rustGalWorldExperienceOrbRouteDecisions"), list)
+        else []
+    )
+    experience_orb_submitted_count = submitted_work_count("experience-orb")
+    world_experience_orb_control = "disabled" if requested_world_experience_orb_disabled else (
+        "legacy" if requested_world_experience_orb_legacy else "rust"
+    )
+    world_beacon_beam_control = "disabled" if requested_world_beacon_beam_disabled else (
+        "legacy" if requested_world_beacon_beam_legacy else "rust"
+    )
+    experience_orb_route_counts: dict[str, int] = {}
+    for decision in deterministic_experience_orb_route_decisions:
+        if not isinstance(decision, dict):
+            continue
+        route = str(decision.get("route") or "").strip()
+        if route:
+            experience_orb_route_counts[route] = experience_orb_route_counts.get(route, 0) + 1
+    arrow_submitted_count = submitted_work_count("arrow")
+    world_mesh_arrow_control = "disabled" if requested_world_mesh_arrow_disabled else (
+        "legacy" if requested_world_mesh_arrow_legacy else "rust"
+    )
+    arrow_route_counts: dict[str, int] = {}
+    for decision in deterministic_arrow_route_decisions:
+        if not isinstance(decision, dict):
+            continue
+        route = str(decision.get("route") or "").strip()
+        if route:
+            arrow_route_counts[route] = arrow_route_counts.get(route, 0) + 1
+    model_doc = (
+        deterministic_doc.get("rustGalWorldModelMeshSetup")
+        if isinstance(deterministic_doc, dict) and isinstance(deterministic_doc.get("rustGalWorldModelMeshSetup"), dict)
+        else {}
+    )
+    deterministic_models = (
+        deterministic_doc.get("rustGalWorldModelMeshes")
+        if isinstance(deterministic_doc, dict) and isinstance(deterministic_doc.get("rustGalWorldModelMeshes"), list)
+        else []
+    )
+    deterministic_model_route_decisions = (
+        deterministic_doc.get("rustGalWorldModelMeshRouteDecisions")
+        if isinstance(deterministic_doc, dict) and isinstance(deterministic_doc.get("rustGalWorldModelMeshRouteDecisions"), list)
+        else []
+    )
+    model_scenario_kind = (requested_world_mesh_model_scenario or "").strip().lower()
+    model_part_scenario = model_scenario_kind == "decorated-pot"
+    model_submitted_count = submitted_work_count("model-part" if model_part_scenario else "model")
+    world_mesh_model_control = "disabled" if (
+        requested_world_mesh_model_part_disabled if model_part_scenario else requested_world_mesh_model_disabled
+    ) else (
+        "legacy" if (
+            requested_world_mesh_model_part_legacy if model_part_scenario else requested_world_mesh_model_legacy
+        ) else "rust"
+    )
+    model_route_counts: dict[str, int] = {}
+    for decision in deterministic_model_route_decisions:
+        if not isinstance(decision, dict):
+            continue
+        route = str(decision.get("route") or "").strip()
+        if route:
+            model_route_counts[route] = model_route_counts.get(route, 0) + 1
     piston_doc = (
         frame_doc.get("pistonScenario")
         if isinstance(frame_doc, dict) and isinstance(frame_doc.get("pistonScenario"), dict)
@@ -7260,6 +9652,10 @@ def normalize_capture_artifact(
         block for block in deterministic_moving_blocks
         if isinstance(block, dict) and str(block.get("provenance") or "") == "piston"
     ]
+    deterministic_primed_tnt_blocks = [
+        block for block in deterministic_moving_blocks
+        if isinstance(block, dict) and str(block.get("provenance") or "") == "primed-tnt"
+    ]
     deterministic_moving_route_decisions = (
         deterministic_doc.get("rustGalWorldMovingBlockRouteDecisions")
         if isinstance(deterministic_doc, dict)
@@ -7273,7 +9669,7 @@ def normalize_capture_artifact(
         route = str(decision.get("route") or "").strip()
         if route:
             deterministic_piston_route_counts[route] = deterministic_piston_route_counts.get(route, 0) + 1
-    piston_submitted_count = int(parse_number(submitted_work_counts.get("piston")) or 0)
+    piston_submitted_count = submitted_work_count("piston")
     world_mesh_piston_control = "disabled" if requested_world_mesh_piston_disabled else ("legacy" if requested_world_mesh_piston_legacy else "rust")
     if isinstance(piston_doc, dict) and piston_doc.get("routeControl"):
         world_mesh_piston_control = str(piston_doc.get("routeControl") or world_mesh_piston_control)
@@ -7325,6 +9721,28 @@ def normalize_capture_artifact(
         sum(int(parse_number(value) or 0) for value in piston_moving_route_counts.values())
         + sum(deterministic_piston_route_counts.values())
     )
+    deterministic_primed_tnt_route_counts: dict[str, int] = {}
+    for decision in deterministic_moving_route_decisions:
+        if not isinstance(decision, dict) or str(decision.get("provenance") or "") != "primed-tnt":
+            continue
+        route = str(decision.get("route") or "").strip()
+        if route:
+            deterministic_primed_tnt_route_counts[route] = deterministic_primed_tnt_route_counts.get(route, 0) + 1
+    primed_tnt_submitted_count = submitted_work_count("primed-tnt")
+    primed_tnt_execution_count = sum(
+        1
+        for block in deterministic_primed_tnt_blocks
+        if bool(block.get("projected"))
+        and int(parse_number(block.get("vertexCount")) or 0) > 0
+        and int(parse_number(block.get("indexBytes")) or 0) > 0
+    )
+    world_mesh_primed_tnt_control = "disabled" if requested_world_mesh_primed_tnt_disabled else (
+        "legacy" if requested_world_mesh_primed_tnt_legacy else "rust"
+    )
+    # PrimedTnt accounting is assembled before the outline-specific gate below.
+    # The shell distinction is a route property, not an outline dependency.
+    if mode.expected_attribution == "java-vulkan" and mode.backend != "rust-vulkan":
+        world_mesh_primed_tnt_control = "java-compatibility"
     terrain_particle_real_doc = (
         frame_doc.get("terrainParticleRealGameplay")
         if isinstance(frame_doc, dict) and isinstance(frame_doc.get("terrainParticleRealGameplay"), dict)
@@ -7369,9 +9787,101 @@ def normalize_capture_artifact(
         deterministic_doc,
         requested_world_mesh_block_display_scenario,
     )
+    world_distant_horizons_texture_palette_pixel_evidence = (
+        (
+            {
+                "checked": True,
+                "status": "legacy_observation",
+                "screenshot": None,
+                "targets": [],
+                "passed_targets": 0,
+                "expected_targets": 4,
+                "repeat_geometry_targets": 0,
+            }
+            if requested_world_distant_horizons_legacy_observation
+            else
+                deterministic_distant_horizons_texture_palette_pixel_evidence(
+                    deterministic_doc,
+                    distant_horizons_exact_atlas_plan_doc,
+                    require_palette_color=False,
+                    minimum_passed_targets=2,
+                    minimum_world_contrast=0.02,
+                )
+        )
+        if requested_world_distant_horizons_texture_palette
+        else {"checked": False, "status": "not_requested"}
+    )
+    world_distant_horizons_source_palette_evidence = {
+        "checked": False,
+        "status": "not_requested",
+    }
+    if requested_world_distant_horizons_texture_palette and not requested_world_distant_horizons_legacy_observation:
+        if not isinstance(selected_source_distant_horizons_primary_doc, dict):
+            world_distant_horizons_source_palette_evidence = {
+                "checked": True,
+                "status": "missing_or_uncorrelated_source_primary",
+                "path": None,
+            }
+        elif not selected_source_distant_horizons_primary_path or not selected_source_distant_horizons_primary_path.is_file():
+            world_distant_horizons_source_palette_evidence = {
+                "checked": True,
+                "status": "missing_source_primary_png",
+                "path": str(selected_source_distant_horizons_primary_path) if selected_source_distant_horizons_primary_path else None,
+            }
+        else:
+            world_distant_horizons_source_palette_evidence = deterministic_distant_horizons_texture_palette_pixel_evidence(
+                {"captures": [{"screenshot": str(selected_source_distant_horizons_primary_path)}]},
+                distant_horizons_exact_atlas_plan_doc,
+                minimum_texture_footprint_pixels=12,
+                # Vulkan attachment readback is normalized into a top-left PNG;
+                # its viewport coordinates retain the opposite semantic Y axis.
+                ndc_y_positive_down=True,
+            )
+            world_distant_horizons_source_palette_evidence["path"] = str(selected_source_distant_horizons_primary_path)
+            world_distant_horizons_source_palette_evidence["frame_id"] = selected_source_distant_horizons_primary_doc.get("frame_id")
+            world_distant_horizons_source_palette_evidence["submission_id"] = selected_source_distant_horizons_primary_doc.get("submission_id")
+    world_distant_horizons_palette_transform_evidence = (
+        distant_horizons_source_to_final_color_transform_evidence(
+            world_distant_horizons_source_palette_evidence,
+            world_distant_horizons_texture_palette_pixel_evidence,
+        )
+        if requested_world_distant_horizons_texture_palette and not requested_world_distant_horizons_legacy_observation
+        else {"checked": False, "status": "not_requested"}
+    )
+    world_static_terrain_texture_palette_pixel_evidence = (
+        deterministic_static_terrain_texture_palette_pixel_evidence(
+            deterministic_doc,
+            static_terrain_texture_probe_doc,
+        )
+        if str(requested_world_static_terrain_scenario or "").strip().lower() == "texture-palette"
+        else {"checked": False, "status": "not_requested"}
+    )
     world_mesh_falling_block_pixel_evidence = deterministic_world_mesh_falling_block_pixel_evidence(
         deterministic_doc,
         requested_world_mesh_falling_block_scenario,
+    )
+    world_mesh_arrow_capture_evidence = deterministic_world_mesh_arrow_capture_evidence(
+        deterministic_doc,
+        requested_world_mesh_arrow_scenario,
+    )
+    world_experience_orb_capture_evidence = deterministic_world_experience_orb_capture_evidence(
+        deterministic_doc,
+        requested_world_experience_orb_scenario,
+    )
+    world_beacon_beam_capture_evidence = deterministic_world_beacon_beam_capture_evidence(
+        deterministic_doc,
+        requested_world_beacon_beam_scenario,
+    )
+    world_mesh_model_capture_evidence = deterministic_world_mesh_model_capture_evidence(
+        deterministic_doc,
+        requested_world_mesh_model_scenario,
+        "java-compatibility"
+        if mode.expected_attribution == "java-vulkan" and mode.backend != "rust-vulkan"
+        else world_mesh_model_control,
+    )
+    world_mesh_primed_tnt_pixel_evidence = deterministic_world_mesh_primed_tnt_pixel_evidence(
+        deterministic_doc,
+        requested_world_mesh_primed_tnt_scenario,
     )
     world_mesh_piston_pixel_evidence = deterministic_world_mesh_piston_pixel_evidence(
         deterministic_doc,
@@ -7464,6 +9974,15 @@ def normalize_capture_artifact(
     rust_gal_world_mesh_draws_for_validation = last_number(
         combined_logs, r"rust_gal_world_mesh_draws_executed[=: ]+(\d+)"
     )
+    rust_gal_world_lod_selected_frames_for_validation = last_number(
+        combined_logs, r"rust_gal_world_lod_selected_frames[=: ]+(\d+)"
+    )
+    rust_gal_world_lod_instances_submitted_for_validation = last_number(
+        combined_logs, r"rust_gal_world_lod_instances_submitted[=: ]+(\d+)"
+    )
+    rust_gal_world_lod_frames_executed_for_validation = last_number(
+        combined_logs, r"rust_gal_world_lod_frames_executed[=: ]+(\d+)"
+    )
     rust_gal_world_background_clears_for_validation = last_number(
         combined_logs, r"rust_gal_world_background_clears_executed[=: ]+(\d+)"
     )
@@ -7497,6 +10016,93 @@ def normalize_capture_artifact(
         validation_messages.append("isolated subsystem benchmark did not complete all required workloads")
     if tool_kind == "capture" and not deterministic_complete:
         validation_messages.append("deterministic correctness capture did not complete")
+    selected_source_execution_requested = bool(
+        isinstance(terrain_contract_doc, dict)
+        and terrain_contract_doc.get("selected_source_execution_requested") is True
+    )
+    selected_source_execution_complete = True
+    selected_source_requires_static_receipt = (
+        selected_source_execution_requested and not requested_world_distant_horizons
+    )
+    if selected_source_execution_requested:
+        if mode.backend != "rust-vulkan" or mode.expected_attribution != "rust-vulkan":
+            selected_source_execution_complete = False
+            validation_messages.append(
+                "selected-source execution was requested outside the Rust Vulkan whole-frame route"
+            )
+        elif selected_source_requires_static_receipt and not isinstance(selected_source_execution_doc, dict):
+            selected_source_execution_complete = False
+            validation_messages.append(
+                "selected-source execution was requested but Rust did not admit a complete source submission; "
+                "normal Rust terrain work is not source-plan evidence"
+            )
+        elif selected_source_requires_static_receipt and (
+            int(parse_number(selected_source_execution_doc.get("frame_id")) or 0) <= 0
+            or int(parse_number(selected_source_execution_doc.get("submission_id")) or 0) <= 0
+            or int(parse_number(selected_source_execution_doc.get("world_generation")) or 0) <= 0
+            or str(selected_source_execution_doc.get("route") or "") != "rust-native-selected-source"
+        ):
+            selected_source_execution_complete = False
+            validation_messages.append(
+                "selected-source execution admission record is malformed or not a native Rust source submission"
+            )
+        elif selected_source_requires_static_receipt and (
+            str(requested_world_static_terrain_scenario or "").strip().lower() == "texture-palette"
+            and selected_source_overlay_evidence.get("status") != "world_output_present"
+        ):
+            selected_source_execution_complete = False
+            validation_messages.append(
+                "selected-source texture-palette execution did not retain visible source-world output "
+                f"(status={selected_source_overlay_evidence.get('status')}, "
+                f"frame={selected_source_overlay_evidence.get('frame_id')}, "
+                f"nonblack={selected_source_overlay_evidence.get('nonblack_pixels')}, "
+                f"minimum={selected_source_overlay_evidence.get('minimum_nonblack_pixels')})"
+            )
+    selected_source_gui_evidence = selected_source_gui_final_evidence(
+        deterministic_doc,
+        gameplay_attachment_correlation_doc,
+        selected_source_execution_requested,
+        rust_vulkan_shell_scene_evidence,
+    )
+    if (
+        selected_source_execution_requested
+        and int(parse_number(selected_source_gui_evidence.get("gui_sprites")) or 0) > 0
+        and selected_source_gui_evidence.get("status") != "visible"
+    ):
+        selected_source_execution_complete = False
+        validation_messages.append(
+            "selected-source GUI receipt did not retain a correlated visible Rust-final HUD "
+            f"(status={selected_source_gui_evidence.get('status')}, "
+            f"frame={selected_source_gui_evidence.get('gameplay_frame_id')}, "
+            f"submission={selected_source_gui_evidence.get('submission_id')}, "
+            f"sprites={selected_source_gui_evidence.get('gui_sprites')}, "
+            f"dark_hud_pixels={selected_source_gui_evidence.get('dark_hud_pixels')})"
+        )
+    selected_source_distant_horizons_execution_complete = True
+    if selected_source_execution_requested and requested_world_distant_horizons:
+        if not isinstance(selected_source_distant_horizons_execution_doc, dict):
+            selected_source_distant_horizons_execution_complete = False
+            validation_messages.append(
+                "selected-source Distant Horizons row lacks a successful source submission record with real DH work"
+            )
+        else:
+            dh_source_lod_instances = sum(
+                int(parse_number(selected_source_distant_horizons_execution_doc.get(name)) or 0)
+                for name in ("lod_opaque_instances", "lod_transparent_instances", "lod_water_instances")
+            )
+            if (
+                int(parse_number(selected_source_distant_horizons_execution_doc.get("frame_id")) or 0) <= 0
+                or int(parse_number(selected_source_distant_horizons_execution_doc.get("submission_id")) or 0) <= 0
+                or dh_source_lod_instances <= 0
+                or str(selected_source_distant_horizons_execution_doc.get("route") or "")
+                != "rust-native-selected-source"
+                or not bool(selected_source_distant_horizons_execution_doc.get("distant_horizons_opaque_program_ready"))
+            ):
+                selected_source_distant_horizons_execution_complete = False
+                validation_messages.append(
+                    "selected-source Distant Horizons execution record is malformed, lacks Rust LOD work, "
+                    "or did not retain the exact opaque source program"
+                )
     world_outline_workload_complete = True
     rust_shell_outline_mode = mode.backend == "rust-vulkan"
     rust_opengl_outline_mode = (
@@ -7815,6 +10421,23 @@ def normalize_capture_artifact(
                     + ", ".join(missing_material_counts)
                     + " evidence was captured"
                 )
+            if selected_source_execution_requested and mode.backend == "rust-vulkan":
+                source_material_semantics = (
+                    selected_source_execution_doc.get("source_material_semantics")
+                    if isinstance(selected_source_execution_doc, dict)
+                    else None
+                )
+                local_source_quads = (
+                    int(parse_number(source_material_semantics.get("local_quads")) or 0)
+                    if isinstance(source_material_semantics, dict)
+                    else 0
+                )
+                if local_source_quads <= 0:
+                    world_material_marker_workload_complete = False
+                    validation_messages.append(
+                        "selected-source BlockMarker execution did not retain a local Rust-owned material "
+                        "texture semantic receipt"
+                    )
             if material_marker_scenario == "barrier":
                 if int(rust_gal_world_material_marker_barrier_quads_for_validation or 0) <= 0:
                     world_material_marker_workload_complete = False
@@ -7901,6 +10524,50 @@ def normalize_capture_artifact(
                     f"expected={world_material_terrain_particle_pixel_evidence.get('expected_texture_ids')}, "
                     f"matching_pixels={world_material_terrain_particle_pixel_evidence.get('matching_pixels')})"
                 )
+            if selected_source_execution_requested and mode.backend == "rust-vulkan":
+                expected_particle_texture_ids = set(expected_terrain_particle_texture_ids(terrain_particle_scenario))
+                source_material_semantics = (
+                    selected_source_execution_doc.get("source_material_semantics")
+                    if isinstance(selected_source_execution_doc, dict)
+                    else None
+                )
+                source_material_execution = (
+                    selected_source_execution_doc.get("source_material_execution")
+                    if isinstance(selected_source_execution_doc, dict)
+                    else None
+                )
+                source_records = (
+                    source_material_semantics.get("records")
+                    if isinstance(source_material_semantics, dict)
+                    else []
+                )
+                source_records = source_records if isinstance(source_records, list) else []
+                executed_texture_ids = {
+                    int(parse_number(record.get("texture_id")) or 0)
+                    for record in source_records
+                    if isinstance(record, dict)
+                    and int(parse_number(record.get("uv_space")) or -1) == 1
+                    and int(parse_number(record.get("quads")) or 0) > 0
+                }
+                source_textured_execution = (
+                    source_material_execution.get("textured")
+                    if isinstance(source_material_execution, dict)
+                    else None
+                )
+                matching_source_execution = (
+                    expected_particle_texture_ids.issubset(executed_texture_ids)
+                    and isinstance(source_textured_execution, dict)
+                    and int(parse_number(source_textured_execution.get("quads")) or 0) > 0
+                    and int(parse_number(source_textured_execution.get("draws")) or 0) > 0
+                )
+                if not matching_source_execution:
+                    world_material_terrain_particle_workload_complete = False
+                    validation_messages.append(
+                        "selected-source TerrainParticle execution did not retain matching atlas-semantic "
+                        "gbuffers_textured records and Rust execution in the selected gameplay receipt "
+                        f"(expectedTextures={sorted(expected_particle_texture_ids)}, "
+                        f"executedTextures={sorted(executed_texture_ids)})"
+                    )
     if requested_world_material_terrain_particle_real_gameplay and tool_kind == "gameplay":
         real_drive_calls = parse_number(terrain_particle_real_doc.get("driveCalls"))
         real_continue_calls = parse_number(terrain_particle_real_doc.get("continueCalls"))
@@ -7969,7 +10636,7 @@ def normalize_capture_artifact(
     static_terrain_expected_fault_rejected = False
     static_terrain_readiness_failure_stage: str | None = None
     static_terrain_scenario = (requested_world_static_terrain_scenario or "").strip().lower()
-    if static_terrain_scenario and rust_outline_mode and tool_kind != "subsystem":
+    if static_terrain_scenario and rust_shell_outline_mode and tool_kind != "subsystem":
         static_doc = static_terrain_doc if static_terrain_doc else static_terrain_frame_doc
 
         def static_metric(name: str) -> int:
@@ -8030,11 +10697,31 @@ def normalize_capture_artifact(
                 static_terrain_workload_complete = False
                 validation_messages.append("deterministic static-terrain scenario did not execute any Rust indexed-mesh terrain instances")
             deterministic_static_terrain_gate_required = tool_kind == "capture"
+            if deterministic_static_terrain_gate_required:
+                execution_valid, execution_reason = static_terrain_capture_execution_evidence(
+                    static_terrain_capture_execution_doc, static_terrain_scenario
+                )
+                if not execution_valid:
+                    static_terrain_workload_complete = False
+                    validation_messages.append(
+                        "deterministic static-terrain screenshot execution correlation failed: " + execution_reason
+                    )
             if deterministic_static_terrain_gate_required and static_terrain_geometry.get("status") != "pass":
                 static_terrain_workload_complete = False
                 validation_messages.append(
                     "deterministic static-terrain geometry truth gate failed: "
                     f"{static_terrain_geometry.get('failure') or 'unknown'}"
+                )
+            if (
+                deterministic_static_terrain_gate_required
+                and static_terrain_scenario == "texture-palette"
+                and world_static_terrain_texture_palette_pixel_evidence.get("status") != "present"
+            ):
+                static_terrain_workload_complete = False
+                validation_messages.append(
+                    "deterministic static-terrain texture palette did not prove final-frame material identity "
+                    f"(status={world_static_terrain_texture_palette_pixel_evidence.get('status')}, "
+                    f"passedTargets={world_static_terrain_texture_palette_pixel_evidence.get('passed_targets')})"
                 )
             if deterministic_static_terrain_gate_required and static_terrain_lifecycle.get("status") == "fail":
                 static_terrain_workload_complete = False
@@ -8118,6 +10805,217 @@ def normalize_capture_artifact(
         if static_terrain_submitted_count > 0 or int(rust_gal_world_mesh_instances_for_validation or 0) != 0:
             static_terrain_workload_complete = False
             validation_messages.append("normal Java Vulkan static-terrain control emitted unexpected Rust terrain mesh work")
+    world_distant_horizons_opaque_workload_complete = True
+    if requested_world_distant_horizons and tool_kind != "subsystem":
+        decision = str(distant_horizons_route_doc.get("decision") or "")
+        reason = str(distant_horizons_route_doc.get("reason") or "unknown")
+        opaque_segments = int(parse_number(distant_horizons_route_doc.get("opaqueSegments")) or 0)
+        transparent_segments = int(parse_number(distant_horizons_route_doc.get("transparentSegments")) or 0)
+        water_segments = int(parse_number(distant_horizons_route_doc.get("waterSegments")) or 0)
+        admitted_segments = opaque_segments + transparent_segments + water_segments
+        selected = bool(distant_horizons_route_doc.get("selected"))
+        capture_frame = int(parse_number(distant_horizons_capture_execution_doc.get("captureFrame")) or -1)
+        capture_submission = int(parse_number(distant_horizons_capture_execution_doc.get("submission")) or 0)
+        capture_instances = int(parse_number(distant_horizons_capture_execution_doc.get("instances")) or 0)
+        capture_opaque_instances = int(parse_number(distant_horizons_capture_execution_doc.get("opaqueInstances")) or 0)
+        capture_transparent_instances = int(parse_number(distant_horizons_capture_execution_doc.get("transparentInstances")) or 0)
+        capture_water_instances = int(parse_number(distant_horizons_capture_execution_doc.get("waterInstances")) or 0)
+        capture_semantics_enabled = bool(distant_horizons_capture_execution_doc.get("semanticFrameEnabled"))
+        captured_frame_indices = (
+            [int(parse_number(capture.get("renderedFrameIndex")) or -1) for capture in deterministic_doc.get("captures", [])]
+            if isinstance(deterministic_doc, dict) and isinstance(deterministic_doc.get("captures"), list)
+            else []
+        )
+        # `captureFrame` is the deterministic frame that submitted DH semantic
+        # work before the final-output request was acknowledged. A Rust-owned
+        # final-output screenshot is instead identified exactly by its
+        # gameplay-frame/submission presentation correlation. Comparing the
+        # former to the later screenshot index rejected valid same-submission
+        # captures as an N+1 mismatch.
+        presentations = (
+            ([distant_horizons_capture_presentation_doc] if distant_horizons_capture_presentation_doc else [])
+            + [
+                capture.get("wholeFramePresentationCorrelation")
+                for capture in deterministic_doc.get("captures", [])
+                if isinstance(capture, dict)
+                and isinstance(capture.get("wholeFramePresentationCorrelation"), dict)
+            ]
+            if isinstance(deterministic_doc, dict) and isinstance(deterministic_doc.get("captures"), list)
+            else []
+        )
+        presentation = next(
+            (
+                candidate
+                for candidate in presentations
+                if int(parse_number(candidate.get("gameplayFrameId")) or -1)
+                    == int(parse_number(distant_horizons_capture_execution_doc.get("worldFrame")) or -1)
+                and int(parse_number(candidate.get("submissionId")) or 0) == capture_submission
+                and int(parse_number(candidate.get("gameplayFrameId")) or -1) >= 0
+            ),
+            None,
+        )
+        capture_frame_matches = presentation is not None
+        if requested_world_distant_horizons_legacy_observation:
+            if mode.backend != "opengl" or mode.expected_attribution != "java-opengl":
+                world_distant_horizons_opaque_workload_complete = False
+                validation_messages.append(
+                    "Distant Horizons legacy observation requires the Java OpenGL control route"
+                )
+            elif not bool(distant_horizons_texture_probe_doc.get("matched")):
+                world_distant_horizons_opaque_workload_complete = False
+                validation_messages.append(
+                    "deterministic Distant Horizons Java legacy observation did not prove semantic palette coverage "
+                    f"(status={distant_horizons_texture_probe_doc.get('status') or 'missing receipt'})"
+                )
+            elif not captured_frame_indices:
+                world_distant_horizons_opaque_workload_complete = False
+                validation_messages.append(
+                    "deterministic Distant Horizons Java legacy observation did not retain a captured game frame"
+                )
+        elif mode.expected_attribution == "java-vulkan":
+            if selected or int(rust_gal_world_lod_instances_submitted_for_validation or 0) != 0:
+                world_distant_horizons_opaque_workload_complete = False
+                validation_messages.append("normal Java Vulkan DH control emitted unexpected Rust opaque LOD work")
+        elif mode.backend != "rust-vulkan":
+            world_distant_horizons_opaque_workload_complete = False
+            validation_messages.append("Rust Distant Horizons opaque route requires the Rust Vulkan whole-frame backend")
+        elif not selected or decision != "selected" or admitted_segments <= 0 \
+            or (requested_world_distant_horizons_non_water and transparent_segments <= 0) \
+            or (requested_world_distant_horizons_water and water_segments <= 0):
+            world_distant_horizons_opaque_workload_complete = False
+            validation_messages.append(
+                "deterministic Distant Horizons material route was not selected with admitted visible work "
+                f"(decision={decision or 'missing'}, reason={reason}, opaqueSegments={opaque_segments}, "
+                f"transparentSegments={transparent_segments}, waterSegments={water_segments})"
+            )
+        elif int(rust_gal_world_lod_selected_frames_for_validation or 0) <= 0 \
+            or int(rust_gal_world_lod_instances_submitted_for_validation or 0) <= 0 \
+            or int(rust_gal_world_lod_frames_executed_for_validation or 0) <= 0:
+            world_distant_horizons_opaque_workload_complete = False
+            validation_messages.append(
+                "deterministic Distant Horizons opaque route selected but did not reach successful Rust whole-frame execution "
+                f"(selectedFrames={rust_gal_world_lod_selected_frames_for_validation}, "
+                f"instances={rust_gal_world_lod_instances_submitted_for_validation}, "
+                f"executedFrames={rust_gal_world_lod_frames_executed_for_validation})"
+            )
+        elif not capture_frame_matches or capture_submission <= 0 or capture_instances <= 0 \
+            or capture_opaque_instances + capture_transparent_instances + capture_water_instances != capture_instances \
+            or not capture_semantics_enabled \
+            or (requested_world_distant_horizons_water and capture_water_instances <= 0):
+            world_distant_horizons_opaque_workload_complete = False
+            validation_messages.append(
+                "deterministic Distant Horizons screenshot lacks matching successful Rust material-route execution evidence "
+                f"(captureFrame={capture_frame}, screenshotFrames={captured_frame_indices}, presentations={presentations}, "
+                f"submission={capture_submission}, instances={capture_instances}, "
+                f"opaqueInstances={capture_opaque_instances}, transparentInstances={capture_transparent_instances}, "
+                f"waterInstances={capture_water_instances}, "
+                f"semanticFrameEnabled={capture_semantics_enabled})"
+            )
+        elif requested_world_distant_horizons_texture_palette and not bool(distant_horizons_texture_probe_doc.get("matched")):
+            world_distant_horizons_opaque_workload_complete = False
+            validation_messages.append(
+                "deterministic Distant Horizons texture palette did not prove exact semantic sprite coverage "
+                f"(status={distant_horizons_texture_probe_doc.get('status') or 'missing receipt'})"
+            )
+        elif requested_world_distant_horizons_texture_palette:
+            source_texture_contract = str(
+                distant_horizons_source_material_contract_doc.get("texture_identity_contract") or ""
+            )
+            source_atlas_bound = distant_horizons_source_material_contract_doc.get("material_atlas_bound")
+            source_frame = int(
+                parse_number(distant_horizons_source_material_contract_doc.get("frame_id")) or -1
+            )
+            source_opaque_draws = int(
+                parse_number(distant_horizons_source_material_contract_doc.get("opaque_draw_count")) or 0
+            )
+            source_opaque_indices = int(
+                parse_number(distant_horizons_source_material_contract_doc.get("opaque_index_count")) or 0
+            )
+            source_exact_atlas_draws = int(
+                parse_number(distant_horizons_source_material_contract_doc.get("exact_atlas_draw_count")) or 0
+            )
+            source_exact_atlas_indices = int(
+                parse_number(distant_horizons_source_material_contract_doc.get("exact_atlas_index_count")) or 0
+            )
+            expected_atlas_sprites = {
+                "minecraft:block/lapis_block",
+                "minecraft:block/redstone_ore",
+                "minecraft:block/yellow_terracotta",
+                "minecraft:block/diamond_block",
+            }
+            plan_frame = int(parse_number(distant_horizons_exact_atlas_plan_doc.get("frameId")) or -1)
+            plan_sprites = distant_horizons_exact_atlas_plan_doc.get("selectedSpriteCounts")
+            plan_sprites = plan_sprites if isinstance(plan_sprites, dict) else {}
+            missing_sprites = sorted(
+                sprite for sprite in expected_atlas_sprites
+                if int(parse_number(plan_sprites.get(sprite)) or 0) <= 0
+            )
+            target_coverage = distant_horizons_exact_atlas_plan_doc.get("paletteTargetCoverage")
+            target_coverage = target_coverage if isinstance(target_coverage, list) else []
+            unmatched_targets = [
+                entry.get("position")
+                for entry in target_coverage
+                if not isinstance(entry, dict) or not bool(entry.get("matched"))
+            ]
+            if source_texture_contract == "reduced-color-material-category" and source_atlas_bound is False:
+                # Complementary's selected dh_terrain program declares DH's
+                # reduced color/category interface. An atlas writer is not a
+                # valid substitute for that contract, even as diagnostics.
+                if source_frame != int(parse_number(distant_horizons_capture_execution_doc.get("worldFrame")) or -1) \
+                    or source_opaque_draws <= 0 \
+                    or source_opaque_indices <= 0 \
+                    or source_exact_atlas_draws != 0 \
+                    or source_exact_atlas_indices != 0:
+                    world_distant_horizons_opaque_workload_complete = False
+                    validation_messages.append(
+                        "deterministic Distant Horizons reduced-color source contract lacks a matching opaque execution "
+                        "receipt or injected an undeclared exact-atlas stream "
+                        f"(sourceFrame={source_frame}, opaqueDraws={source_opaque_draws}, "
+                        f"opaqueIndices={source_opaque_indices}, exactAtlasDraws={source_exact_atlas_draws}, "
+                        f"exactAtlasIndices={source_exact_atlas_indices})"
+                    )
+            elif plan_frame != int(parse_number(distant_horizons_capture_execution_doc.get("worldFrame")) or -1) \
+                or int(parse_number(distant_horizons_exact_atlas_plan_doc.get("executedExactSegments")) or 0) <= 0 \
+                or missing_sprites \
+                or len(target_coverage) != 4 \
+                or unmatched_targets:
+                world_distant_horizons_opaque_workload_complete = False
+                validation_messages.append(
+                    "deterministic Distant Horizons texture palette lacks a screenshot-frame-correlated Rust exact-atlas "
+                    "receipt "
+                    f"(plan={distant_horizons_exact_atlas_plan_path or 'missing'}, planFrame={plan_frame}, "
+                    f"missingSprites={missing_sprites}, targetCoverage={len(target_coverage)}, "
+                    f"unmatchedTargets={unmatched_targets})"
+                )
+            elif source_atlas_bound is not False and (
+                tool_kind == "capture"
+                and selected_source_execution_requested
+                and world_distant_horizons_source_palette_evidence.get("status") != "present"
+            ):
+                world_distant_horizons_opaque_workload_complete = False
+                validation_messages.append(
+                    "deterministic Distant Horizons texture palette did not prove exact source-stage material identity "
+                    f"(status={world_distant_horizons_source_palette_evidence.get('status')}, "
+                    f"passedTargets={world_distant_horizons_source_palette_evidence.get('passed_targets')})"
+                )
+            elif source_atlas_bound is not False and tool_kind == "capture" and world_distant_horizons_texture_palette_pixel_evidence.get("status") != "present":
+                world_distant_horizons_opaque_workload_complete = False
+                validation_messages.append(
+                    "deterministic Distant Horizons texture palette did not retain the final projected world footprint "
+                    f"(status={world_distant_horizons_texture_palette_pixel_evidence.get('status')}, "
+                    f"passedTargets={world_distant_horizons_texture_palette_pixel_evidence.get('passed_targets')})"
+                )
+            elif source_atlas_bound is not False and (
+                tool_kind == "capture"
+                and selected_source_execution_requested
+                and world_distant_horizons_palette_transform_evidence.get("status") != "pack_transform_present"
+            ):
+                world_distant_horizons_opaque_workload_complete = False
+                validation_messages.append(
+                    "deterministic Distant Horizons texture palette did not prove the selected shader-pack transform "
+                    f"(status={world_distant_horizons_palette_transform_evidence.get('status')}, "
+                    f"transformedTargets={world_distant_horizons_palette_transform_evidence.get('transformed_targets')})"
+                )
     world_mesh_block_display_workload_complete = True
     block_display_scenario = (requested_world_mesh_block_display_scenario or "").strip().lower()
     if block_display_scenario and rust_outline_mode and tool_kind != "subsystem":
@@ -8219,6 +11117,75 @@ def normalize_capture_artifact(
         if int(rust_gal_world_mesh_instances_for_validation or 0) != 0:
             world_mesh_block_display_workload_complete = False
             validation_messages.append("normal Java Vulkan BlockDisplay control emitted unexpected Rust mesh work")
+    world_text_workload_complete = True
+    world_text_scenario = (requested_world_text_scenario or "").strip().lower()
+    if world_text_scenario and tool_kind != "subsystem":
+        if mode.backend != "rust-vulkan" or mode.expected_attribution != "rust-vulkan":
+            world_text_workload_complete = False
+            validation_messages.append(
+                "deterministic world-text scenario requires the Rust Vulkan whole-frame route"
+            )
+        else:
+            producer_callback_name = (
+                "ordinary text callbacks" if world_text_scenario.startswith("text-display") else "name-tag callbacks"
+            )
+            producer_callback_count = (
+                world_text_doc.get("textCallbacks")
+                if world_text_scenario.startswith("text-display")
+                else world_text_doc.get("nameTagCallbacks")
+            )
+            required_text_counts = {
+                "visible entity states": world_text_doc.get("visibleEntityStates"),
+                producer_callback_name: producer_callback_count,
+                "emitted quads": world_text_doc.get("emittedQuads"),
+                "emitted images": world_text_doc.get("emittedImages"),
+                "consumed quads": world_text_doc.get("consumedQuads"),
+            }
+            if world_text_scenario == "text-display":
+                required_text_counts["see-through submits"] = world_text_doc.get("seeThroughSubmits")
+            elif world_text_scenario == "text-display-polygon-offset":
+                required_text_counts["polygon-offset submits"] = world_text_doc.get("polygonOffsetSubmits")
+            else:
+                required_text_counts["normal submits"] = world_text_doc.get("normalSubmits")
+                required_text_counts["see-through submits"] = world_text_doc.get("seeThroughSubmits")
+            missing_text_counts = [
+                name for name, value in required_text_counts.items() if int(parse_number(value) or 0) <= 0
+            ]
+            if int(parse_number(world_text_doc.get("semanticFrame")) or -1) < 0:
+                missing_text_counts.append("semantic frame")
+            if not bool(world_text_doc.get("fullySupported")):
+                missing_text_counts.append("fully-supported semantic translation")
+            if missing_text_counts:
+                world_text_workload_complete = False
+                validation_messages.append(
+                    "deterministic world-text scenario did not prove the real vanilla text producer "
+                    "to Rust whole-frame execution path: missing " + ", ".join(missing_text_counts)
+                )
+            if selected_source_execution_requested:
+                source_text_execution = (
+                    selected_source_execution_doc.get("world_text_execution")
+                    if isinstance(selected_source_execution_doc, dict)
+                    and isinstance(selected_source_execution_doc.get("world_text_execution"), dict)
+                    else {}
+                )
+                required_source_text_counts = {
+                    "selected-source text quads": source_text_execution.get("quads"),
+                    "selected-source text draws": source_text_execution.get("draws"),
+                    "selected-source clip-visible text quads": source_text_execution.get(
+                        "clip_xy_visible_quads"
+                    ),
+                }
+                missing_source_text_counts = [
+                    name
+                    for name, value in required_source_text_counts.items()
+                    if int(parse_number(value) or 0) <= 0
+                ]
+                if missing_source_text_counts:
+                    world_text_workload_complete = False
+                    validation_messages.append(
+                        "selected-source world-text frame did not execute the Rust text writer: missing "
+                        + ", ".join(missing_source_text_counts)
+                    )
     world_mesh_falling_block_workload_complete = True
     falling_block_scenario = (requested_world_mesh_falling_block_scenario or "").strip().lower()
     if falling_block_scenario and rust_outline_mode and tool_kind != "subsystem":
@@ -8280,6 +11247,16 @@ def normalize_capture_artifact(
                     + ", ".join(missing_mesh_counts)
                     + " evidence was captured"
                 )
+            if (
+                selected_source_execution_requested
+                and mode.backend == "rust-vulkan"
+                and not selected_source_moving_mesh_execution_complete("falling-block")
+            ):
+                world_mesh_falling_block_workload_complete = False
+                validation_messages.append(
+                    "selected-source FallingBlock execution did not retain a frame/submission-correlated "
+                    "Rust moving-mesh receipt; static terrain or DH work cannot satisfy this producer gate"
+                )
             if tool_kind == "capture":
                 shader_enabled = str(deterministic_doc.get("shaderEnabled") if isinstance(deterministic_doc, dict) else "").strip().lower()
                 shader_pack = str(deterministic_doc.get("shaderPack") if isinstance(deterministic_doc, dict) else "").strip()
@@ -8312,6 +11289,320 @@ def normalize_capture_artifact(
         if int(rust_gal_world_mesh_instances_for_validation or 0) != 0:
             world_mesh_falling_block_workload_complete = False
             validation_messages.append("normal Java Vulkan FallingBlock control emitted unexpected Rust mesh work")
+    world_mesh_arrow_workload_complete = True
+    arrow_scenario = (requested_world_mesh_arrow_scenario or "").strip().lower()
+    if arrow_scenario and rust_outline_mode and tool_kind != "subsystem":
+        arrow_status = str(arrow_doc.get("status") or "")
+        arrow_entity_count = int(parse_number(arrow_doc.get("entityCount")) or 0)
+        arrow_rust_route_count = arrow_route_counts.get("rust-vulkan-whole-frame", 0)
+        if arrow_scenario == "hidden":
+            if deterministic_arrows or arrow_submitted_count > 0:
+                world_mesh_arrow_workload_complete = False
+                validation_messages.append("deterministic hidden Arrow scenario emitted unexpected Rust mesh work")
+        elif world_mesh_arrow_control == "disabled":
+            if arrow_route_counts.get("disabled", 0) <= 0:
+                world_mesh_arrow_workload_complete = False
+                validation_messages.append("Arrow disabled control did not prove real producer route traversal")
+            if deterministic_arrows or arrow_submitted_count > 0:
+                world_mesh_arrow_workload_complete = False
+                validation_messages.append("Arrow disabled control emitted unexpected Rust mesh work")
+        elif world_mesh_arrow_control == "legacy":
+            if arrow_route_counts.get("java-legacy", 0) <= 0:
+                world_mesh_arrow_workload_complete = False
+                validation_messages.append("Arrow Java compatibility control did not prove real producer route traversal")
+            if deterministic_arrows or arrow_submitted_count > 0:
+                world_mesh_arrow_workload_complete = False
+                validation_messages.append("Arrow Java compatibility control emitted unexpected Rust mesh work")
+        else:
+            if arrow_status != "spawned" or arrow_entity_count <= 0:
+                world_mesh_arrow_workload_complete = False
+                validation_messages.append(
+                    f"deterministic Arrow scenario did not spawn real vanilla Arrow entities (status={arrow_status!r}, entities={arrow_entity_count})"
+                )
+            if arrow_rust_route_count <= 0:
+                world_mesh_arrow_workload_complete = False
+                validation_messages.append("Arrow Rust route did not record a Rust whole-frame route decision")
+            # Correctness captures have no frame-benchmark document. Their
+            # frame-correlated producer, route, and execution receipts below
+            # are the authoritative proof of Rust work instead.
+            if (tool_kind != "capture" and arrow_submitted_count <= 0) or not deterministic_arrows:
+                world_mesh_arrow_workload_complete = False
+                validation_messages.append("Arrow Rust route did not emit matching semantic mesh work")
+            if mode.backend == "rust-vulkan":
+                arrow_execution = (
+                    deterministic_doc.get("rustGalWorldMovingMeshExecution")
+                    if isinstance(deterministic_doc, dict)
+                    and isinstance(deterministic_doc.get("rustGalWorldMovingMeshExecution"), list)
+                    else []
+                )
+                if not any(
+                    isinstance(receipt, dict)
+                    and receipt.get("route") == "rust-vulkan-whole-frame"
+                    and receipt.get("provenance") == "arrow"
+                    and int(parse_number(receipt.get("instances")) or 0) > 0
+                    and int(parse_number(receipt.get("submissionId")) or 0) > 0
+                    for receipt in arrow_execution
+                ):
+                    world_mesh_arrow_workload_complete = False
+                    validation_messages.append("Arrow Rust route did not retain a frame/submission-correlated execution receipt")
+            if tool_kind == "capture":
+                if world_mesh_arrow_capture_evidence.get("status") != "structural_present":
+                    world_mesh_arrow_workload_complete = False
+                    validation_messages.append(
+                        "deterministic Arrow capture did not prove real producer/route/execution/projected-window correlation "
+                        f"(status={world_mesh_arrow_capture_evidence.get('status')})"
+                    )
+    if arrow_scenario and mode.expected_attribution == "java-vulkan" and mode.backend != "rust-vulkan":
+        if deterministic_arrows or arrow_submitted_count > 0:
+            world_mesh_arrow_workload_complete = False
+            validation_messages.append("normal Java Vulkan Arrow control emitted unexpected Rust mesh work")
+    world_experience_orb_workload_complete = True
+    experience_orb_scenario = (requested_world_experience_orb_scenario or "").strip().lower()
+    if experience_orb_scenario and rust_outline_mode and tool_kind != "subsystem":
+        orb_status = str(experience_orb_doc.get("status") or "")
+        orb_entity_count = int(parse_number(experience_orb_doc.get("entityCount")) or 0)
+        if experience_orb_scenario == "hidden":
+            if deterministic_experience_orbs or experience_orb_submitted_count > 0:
+                world_experience_orb_workload_complete = False
+                validation_messages.append("deterministic hidden ExperienceOrb scenario emitted unexpected Rust material work")
+        elif world_experience_orb_control == "disabled":
+            if experience_orb_route_counts.get("disabled", 0) <= 0:
+                world_experience_orb_workload_complete = False
+                validation_messages.append("ExperienceOrb disabled control did not prove real producer route traversal")
+            if deterministic_experience_orbs or experience_orb_submitted_count > 0:
+                world_experience_orb_workload_complete = False
+                validation_messages.append("ExperienceOrb disabled control emitted unexpected Rust material work")
+        elif world_experience_orb_control == "legacy":
+            if experience_orb_route_counts.get("java-legacy", 0) <= 0:
+                world_experience_orb_workload_complete = False
+                validation_messages.append("ExperienceOrb Java compatibility control did not prove real producer route traversal")
+            if deterministic_experience_orbs or experience_orb_submitted_count > 0:
+                world_experience_orb_workload_complete = False
+                validation_messages.append("ExperienceOrb Java compatibility control emitted unexpected Rust material work")
+        else:
+            if orb_status != "spawned" or orb_entity_count <= 0:
+                world_experience_orb_workload_complete = False
+                validation_messages.append(
+                    f"deterministic ExperienceOrb scenario did not spawn real vanilla entities (status={orb_status!r}, entities={orb_entity_count})"
+                )
+            if experience_orb_route_counts.get("rust-vulkan-whole-frame", 0) <= 0:
+                world_experience_orb_workload_complete = False
+                validation_messages.append("ExperienceOrb Rust route did not record a Rust whole-frame route decision")
+            if (tool_kind != "capture" and experience_orb_submitted_count <= 0) or not deterministic_experience_orbs:
+                world_experience_orb_workload_complete = False
+                validation_messages.append("ExperienceOrb Rust route did not emit matching semantic material work")
+            execution = (
+                deterministic_doc.get("rustGalWorldExperienceOrbExecution")
+                if isinstance(deterministic_doc, dict) and isinstance(deterministic_doc.get("rustGalWorldExperienceOrbExecution"), list)
+                else []
+            )
+            if mode.backend == "rust-vulkan" and not any(
+                isinstance(receipt, dict)
+                and str(receipt.get("route") or "") == "rust-vulkan-whole-frame"
+                and int(parse_number(receipt.get("quads")) or 0) > 0
+                and int(parse_number(receipt.get("submissionId")) or 0) > 0
+                for receipt in execution
+            ):
+                world_experience_orb_workload_complete = False
+                validation_messages.append("ExperienceOrb Rust route did not retain a frame/submission-correlated execution receipt")
+            if tool_kind == "capture" and world_experience_orb_capture_evidence.get("status") != "visible_final_frames":
+                world_experience_orb_workload_complete = False
+                validation_messages.append(
+                    "deterministic ExperienceOrb capture did not prove real producer/route/execution/projected-window correlation "
+                    f"(status={world_experience_orb_capture_evidence.get('status')})"
+                )
+    if experience_orb_scenario and mode.expected_attribution == "java-vulkan" and mode.backend != "rust-vulkan":
+        if deterministic_experience_orbs or experience_orb_submitted_count > 0:
+            world_experience_orb_workload_complete = False
+            validation_messages.append("normal Java Vulkan ExperienceOrb control emitted unexpected Rust material work")
+    world_beacon_beam_workload_complete = True
+    beacon_beam_scenario = (requested_world_beacon_beam_scenario or "").strip().lower()
+    if beacon_beam_scenario and rust_outline_mode and tool_kind != "subsystem":
+        beacon_setup = (
+            deterministic_doc.get("rustGalWorldBeaconBeamSetup")
+            if isinstance(deterministic_doc, dict)
+            and isinstance(deterministic_doc.get("rustGalWorldBeaconBeamSetup"), dict)
+            else {}
+        )
+        beacon_execution = (
+            deterministic_doc.get("rustGalWorldBeaconBeamExecution")
+            if isinstance(deterministic_doc, dict)
+            and isinstance(deterministic_doc.get("rustGalWorldBeaconBeamExecution"), list)
+            else []
+        )
+        if beacon_beam_scenario == "hidden":
+            if beacon_execution:
+                world_beacon_beam_workload_complete = False
+                validation_messages.append("deterministic hidden Beacon scenario emitted unexpected Rust material work")
+        elif world_beacon_beam_control != "rust":
+            if beacon_execution:
+                world_beacon_beam_workload_complete = False
+                validation_messages.append("Beacon Java/disabled control emitted unexpected Rust material work")
+        else:
+            if str(beacon_setup.get("status") or "") != "spawned" or not bool(beacon_setup.get("clientBeamSectionsReady")):
+                world_beacon_beam_workload_complete = False
+                validation_messages.append("deterministic Beacon scenario did not create client-visible beam sections")
+            if not any(
+                isinstance(receipt, dict)
+                and str(receipt.get("route") or "") == "rust-vulkan-whole-frame"
+                and int(parse_number(receipt.get("quads")) or 0) >= 8
+                and int(parse_number(receipt.get("submissionId")) or 0) > 0
+                for receipt in beacon_execution
+            ):
+                world_beacon_beam_workload_complete = False
+                validation_messages.append("Beacon Rust route did not retain a frame/submission-correlated execution receipt")
+            if tool_kind == "capture" and world_beacon_beam_capture_evidence.get("status") != "visible_final_frame":
+                world_beacon_beam_workload_complete = False
+                validation_messages.append(
+                    "deterministic Beacon capture did not prove real producer/execution/projected-window correlation "
+                    f"(status={world_beacon_beam_capture_evidence.get('status')})"
+                )
+    world_mesh_model_workload_complete = True
+    model_scenario = (requested_world_mesh_model_scenario or "").strip().lower()
+    model_execution_provenance = "model-part" if model_scenario == "decorated-pot" else "model"
+    # Copied model-producer scenarios are created by DeterministicCameraCapture. Gameplay
+    # timing rows intentionally do not start that capture state machine, so
+    # requiring its receipts there would classify a completed benchmark as a
+    # producer failure before any model can exist.
+    if model_scenario and rust_outline_mode and tool_kind == "capture":
+        model_status = str(model_doc.get("status") or "")
+        model_client_block_entity_present = bool(model_doc.get("clientBlockEntityPresent"))
+        model_server_entity_present = bool(model_doc.get("serverEntityPresent"))
+        model_rust_route_count = model_route_counts.get("rust-vulkan-whole-frame", 0)
+        if model_scenario == "hidden":
+            if deterministic_models or model_submitted_count > 0:
+                world_mesh_model_workload_complete = False
+                validation_messages.append("deterministic hidden model scenario emitted unexpected Rust mesh work")
+        elif world_mesh_model_control == "disabled":
+            if model_route_counts.get("disabled", 0) <= 0:
+                world_mesh_model_workload_complete = False
+                validation_messages.append("model disabled control did not prove real producer route traversal")
+            if deterministic_models or model_submitted_count > 0:
+                world_mesh_model_workload_complete = False
+                validation_messages.append("model disabled control emitted unexpected Rust mesh work")
+        elif world_mesh_model_control in {"legacy", "java-compatibility"}:
+            if model_route_counts.get("java-legacy", 0) <= 0:
+                world_mesh_model_workload_complete = False
+                validation_messages.append("model Java compatibility control did not prove real producer route traversal")
+            if deterministic_models or model_submitted_count > 0:
+                world_mesh_model_workload_complete = False
+                validation_messages.append("model Java compatibility control emitted unexpected Rust mesh work")
+        else:
+            model_producer_present = (
+            model_server_entity_present if model_scenario in {"llama-spit", "evoker-fangs", "wither-skull", "chicken", "cow", "pig", "rabbit", "zombie"} else model_client_block_entity_present
+            )
+            if model_status != "spawned" or not model_producer_present:
+                world_mesh_model_workload_complete = False
+                validation_messages.append(
+                    f"deterministic model scenario did not create its real producer (status={model_status!r})"
+                )
+            if model_rust_route_count <= 0:
+                world_mesh_model_workload_complete = False
+                validation_messages.append("model Rust route did not record a Rust whole-frame route decision")
+            if (tool_kind != "capture" and model_submitted_count <= 0) or not deterministic_models:
+                world_mesh_model_workload_complete = False
+                validation_messages.append("model Rust route did not emit matching semantic mesh work")
+            if mode.backend == "rust-vulkan":
+                model_execution = (
+                    deterministic_doc.get("rustGalWorldMovingMeshExecution")
+                    if isinstance(deterministic_doc, dict)
+                    and isinstance(deterministic_doc.get("rustGalWorldMovingMeshExecution"), list)
+                    else []
+                )
+                if not any(
+                    isinstance(receipt, dict)
+                    and receipt.get("route") == "rust-vulkan-whole-frame"
+                    and receipt.get("provenance") == model_execution_provenance
+                    and int(parse_number(receipt.get("instances")) or 0) > 0
+                    and int(parse_number(receipt.get("submissionId")) or 0) > 0
+                    for receipt in model_execution
+                ):
+                    world_mesh_model_workload_complete = False
+                    validation_messages.append("model Rust route did not retain a frame/submission-correlated execution receipt")
+            if tool_kind == "capture" and world_mesh_model_capture_evidence.get("status") != "structural_present":
+                world_mesh_model_workload_complete = False
+                validation_messages.append(
+                    "deterministic model capture did not prove real producer/route/execution/projected-window correlation "
+                    f"(status={world_mesh_model_capture_evidence.get('status')})"
+                )
+    if (
+        model_scenario
+        and tool_kind == "capture"
+        and mode.expected_attribution == "java-vulkan"
+        and mode.backend != "rust-vulkan"
+    ):
+        if deterministic_models or model_submitted_count > 0:
+            world_mesh_model_workload_complete = False
+            validation_messages.append("normal Java Vulkan model control emitted unexpected Rust mesh work")
+    world_mesh_primed_tnt_workload_complete = True
+    primed_tnt_scenario = (requested_world_mesh_primed_tnt_scenario or "").strip().lower()
+    if primed_tnt_scenario and rust_outline_mode and tool_kind != "subsystem":
+        if primed_tnt_scenario == "hidden":
+            if deterministic_primed_tnt_blocks:
+                world_mesh_primed_tnt_workload_complete = False
+                validation_messages.append("deterministic hidden PrimedTnt scenario emitted unexpected Rust mesh instances")
+        elif world_mesh_primed_tnt_control == "disabled":
+            if not deterministic_primed_tnt_route_counts.get("disabled"):
+                world_mesh_primed_tnt_workload_complete = False
+                validation_messages.append("PrimedTnt disabled control did not prove production route traversal")
+            if deterministic_primed_tnt_blocks:
+                world_mesh_primed_tnt_workload_complete = False
+                validation_messages.append("PrimedTnt disabled control emitted unexpected Rust mesh instances")
+        elif world_mesh_primed_tnt_control in {"legacy", "java-compatibility"}:
+            if not deterministic_primed_tnt_route_counts.get("java-legacy"):
+                world_mesh_primed_tnt_workload_complete = False
+                validation_messages.append("PrimedTnt Java compatibility control did not prove Java traversal")
+            if deterministic_primed_tnt_blocks:
+                world_mesh_primed_tnt_workload_complete = False
+                validation_messages.append("PrimedTnt Java compatibility control emitted unexpected Rust mesh instances")
+        else:
+            rust_route_count = (
+                deterministic_primed_tnt_route_counts.get("rust-opengl", 0)
+                + deterministic_primed_tnt_route_counts.get("rust-vulkan-whole-frame", 0)
+            )
+            if rust_route_count <= 0:
+                world_mesh_primed_tnt_workload_complete = False
+                validation_messages.append("PrimedTnt Rust route did not record a matching route decision")
+            if (primed_tnt_submitted_count <= 0 and primed_tnt_execution_count <= 0) or not deterministic_primed_tnt_blocks:
+                world_mesh_primed_tnt_workload_complete = False
+                validation_messages.append("PrimedTnt Rust route did not produce matching semantic mesh work")
+            if mode.backend == "rust-vulkan":
+                primed_tnt_execution = (
+                    deterministic_doc.get("rustGalWorldMovingMeshExecution")
+                    if isinstance(deterministic_doc, dict)
+                    and isinstance(deterministic_doc.get("rustGalWorldMovingMeshExecution"), list)
+                    else []
+                )
+                if not any(
+                    isinstance(receipt, dict)
+                    and receipt.get("route") == "rust-vulkan-whole-frame"
+                    and receipt.get("provenance") == "primed-tnt"
+                    and int(parse_number(receipt.get("instances")) or 0) > 0
+                    and int(parse_number(receipt.get("submissionId")) or 0) > 0
+                    for receipt in primed_tnt_execution
+                ):
+                    world_mesh_primed_tnt_workload_complete = False
+                    validation_messages.append(
+                        "PrimedTnt Rust route did not retain a frame/submission-correlated execution receipt"
+                    )
+            if tool_kind == "capture":
+                if world_mesh_primed_tnt_pixel_evidence.get("status") != "present":
+                    world_mesh_primed_tnt_workload_complete = False
+                    validation_messages.append(
+                        "deterministic PrimedTnt projected crop evidence did not prove final-frame visibility "
+                        f"(status={world_mesh_primed_tnt_pixel_evidence.get('status')}, "
+                        f"position={world_mesh_primed_tnt_pixel_evidence.get('position_status')})"
+                    )
+                elif (
+                    world_mesh_primed_tnt_pixel_evidence.get("texture_status") != "passed"
+                    or world_mesh_primed_tnt_pixel_evidence.get("material_status") != "passed"
+                ):
+                    world_mesh_primed_tnt_workload_complete = False
+                    validation_messages.append("PrimedTnt projected crop evidence did not prove material coverage")
+    if primed_tnt_scenario and mode.expected_attribution == "java-vulkan" and mode.backend != "rust-vulkan":
+        if deterministic_primed_tnt_blocks or int(rust_gal_world_mesh_instances_for_validation or 0) != 0:
+            world_mesh_primed_tnt_workload_complete = False
+            validation_messages.append("normal Java Vulkan PrimedTnt control emitted unexpected Rust mesh work")
     world_mesh_piston_workload_complete = True
     piston_scenario = (requested_world_mesh_piston_scenario or "").strip().lower()
     if piston_scenario and rust_outline_mode and tool_kind != "subsystem":
@@ -8373,6 +11664,16 @@ def normalize_capture_artifact(
                     + ", ".join(missing_mesh_counts)
                     + " evidence was captured"
                 )
+            if (
+                selected_source_execution_requested
+                and mode.backend == "rust-vulkan"
+                and not selected_source_moving_mesh_execution_complete("piston")
+            ):
+                world_mesh_piston_workload_complete = False
+                validation_messages.append(
+                    "selected-source Piston execution did not retain a frame/submission-correlated "
+                    "Rust moving-mesh receipt; static terrain or DH work cannot satisfy this producer gate"
+                )
             if mode.expected_attribution == "rust-vulkan":
                 shell_scan_samples = int(parse_number(piston_shell_scan.get("samples")) or 0)
                 shell_scan_states = int(parse_number(piston_shell_scan.get("pistonStatesExtracted")) or 0)
@@ -8418,6 +11719,171 @@ def normalize_capture_artifact(
         if deterministic_piston_blocks or int(rust_gal_world_mesh_instances_for_validation or 0) != 0:
             world_mesh_piston_workload_complete = False
             validation_messages.append("normal Java Vulkan Piston control emitted unexpected Rust mesh work")
+    world_weather_workload_complete = True
+    weather_scenario = (requested_world_weather_scenario or "").strip().lower()
+    if weather_scenario and tool_kind != "subsystem":
+        weather_control = "disabled" if requested_world_weather_disabled else (
+            "legacy" if requested_world_weather_legacy else "rust"
+        )
+        semantic_receipts = weather_doc.get("semanticReceipts") if isinstance(weather_doc, dict) else []
+        execution_receipts = weather_doc.get("executionReceipts") if isinstance(weather_doc, dict) else []
+        semantic_receipts = semantic_receipts if isinstance(semantic_receipts, list) else []
+        execution_receipts = execution_receipts if isinstance(execution_receipts, list) else []
+        semantic_work = any(
+            isinstance(receipt, dict)
+            and int(parse_number(receipt.get("rainColumns")) or 0) > 0
+            and int(parse_number(receipt.get("quads")) or 0) > 0
+            and float(parse_number(receipt.get("intensity")) or 0.0) > 0.0
+            for receipt in semantic_receipts
+        )
+        # Weather ownership is selected before rendering. A default Rust test
+        # request cannot override normal Java Vulkan compatibility ownership.
+        # Keep that distinction explicit so the control proves real traversal
+        # without demanding Rust work from a route that must not produce it.
+        if weather_control == "disabled":
+            expected_route = "disabled"
+        elif weather_control == "legacy" or mode.expected_attribution == "java-vulkan":
+            expected_route = "java_compatibility"
+        elif mode.expected_attribution == "rust-vulkan":
+            expected_route = "rust_vulkan_whole_frame"
+        else:
+            expected_route = "rust_opengl_borrowed_context"
+        rust_route_selected = expected_route in {
+            "rust_vulkan_whole_frame",
+            "rust_opengl_borrowed_context",
+        }
+        execution_work = any(
+            isinstance(receipt, dict)
+            and str(receipt.get("route") or "") == expected_route
+            and int(parse_number(receipt.get("quads")) or 0) > 0
+            for receipt in execution_receipts
+        )
+        traversal_receipts = weather_doc.get("traversalReceipts") if isinstance(weather_doc, dict) else []
+        traversal_receipts = traversal_receipts if isinstance(traversal_receipts, list) else []
+        traversal_work = any(
+            isinstance(receipt, dict)
+            and str(receipt.get("route") or "") == expected_route
+            and int(parse_number(receipt.get("rainColumns")) or 0) > 0
+            and float(parse_number(receipt.get("intensity")) or 0.0) > 0.0
+            for receipt in traversal_receipts
+        )
+        if not traversal_work:
+            world_weather_workload_complete = False
+            validation_messages.append(
+                "deterministic weather scenario did not prove real weather traversal on its selected route "
+                f"(expected={expected_route})"
+            )
+        if rust_route_selected:
+            if not bool(weather_doc.get("setupComplete")) or str(weather_doc.get("setupStage") or "") != "setup-complete":
+                world_weather_workload_complete = False
+                validation_messages.append(
+                    "deterministic weather scenario did not complete copied-world rain setup "
+                    f"(stage={weather_doc.get('setupStage')!r}, missing={weather_doc.get('setupLastMissing')!r})"
+                )
+            if not semantic_work:
+                world_weather_workload_complete = False
+                validation_messages.append(
+                    "deterministic weather scenario did not prove real rain-column semantic extraction"
+                )
+            if not execution_work:
+                world_weather_workload_complete = False
+                validation_messages.append(
+                    "deterministic weather scenario did not prove Rust weather execution"
+                )
+            if selected_source_execution_requested and mode.backend == "rust-vulkan":
+                weather_source_receipts = selected_source_receipts_for_producer(execution_receipts)
+                matching_weather_receipt = any(
+                    isinstance(document.get("source_material_semantics"), dict)
+                    and isinstance(document.get("source_material_execution"), dict)
+                    and int(parse_number(document["source_material_semantics"].get("weather_quads")) or 0) > 0
+                    and isinstance(document["source_material_execution"].get("weather"), dict)
+                    and int(parse_number(document["source_material_execution"]["weather"].get("quads")) or 0) > 0
+                    and int(parse_number(document["source_material_execution"]["weather"].get("draws")) or 0) > 0
+                    for document in weather_source_receipts
+                )
+                if not matching_weather_receipt:
+                    world_weather_workload_complete = False
+                    validation_messages.append(
+                        "selected-source weather execution did not retain matching Rust-owned gbuffers_weather "
+                        "semantic and execution receipts correlated to the producer gameplay frame and submission"
+                    )
+        elif semantic_work or execution_work:
+            world_weather_workload_complete = False
+            validation_messages.append(
+                "weather control emitted Rust weather semantic or execution work after route selection"
+            )
+    world_cloud_workload_complete = True
+    cloud_scenario = (requested_world_cloud_scenario or "").strip().lower()
+    if cloud_scenario and tool_kind != "subsystem":
+        traversal_receipts = cloud_doc.get("traversalReceipts") if isinstance(cloud_doc, dict) else []
+        semantic_receipts = cloud_doc.get("semanticReceipts") if isinstance(cloud_doc, dict) else []
+        execution_receipts = cloud_doc.get("executionReceipts") if isinstance(cloud_doc, dict) else []
+        traversal_receipts = traversal_receipts if isinstance(traversal_receipts, list) else []
+        semantic_receipts = semantic_receipts if isinstance(semantic_receipts, list) else []
+        execution_receipts = execution_receipts if isinstance(execution_receipts, list) else []
+        expected_cloud_route = "rust_vulkan_whole_frame" if mode.expected_attribution == "rust-vulkan" else "java_compatibility"
+        traversal_work = any(
+            isinstance(receipt, dict)
+            and str(receipt.get("route") or "") == expected_cloud_route
+            and int(parse_number(receipt.get("cells")) or 0) > 0
+            and int(parse_number(receipt.get("radius")) or 0) > 0
+            for receipt in traversal_receipts
+        )
+        semantic_work = any(
+            isinstance(receipt, dict)
+            and int(parse_number(receipt.get("quads")) or 0) > 0
+            and int(parse_number(receipt.get("sourceProgram")) or -1) == 3
+            for receipt in semantic_receipts
+        )
+        execution_work = any(
+            isinstance(receipt, dict)
+            and str(receipt.get("route") or "") == expected_cloud_route
+            and int(parse_number(receipt.get("quads")) or 0) > 0
+            and int(parse_number(receipt.get("sourceProgram")) or -1) == 3
+            for receipt in execution_receipts
+        )
+        if expected_cloud_route != "rust_vulkan_whole_frame":
+            world_cloud_workload_complete = False
+            validation_messages.append("deterministic Rust cloud scenario requires the Rust Vulkan whole-frame route")
+        elif not traversal_work or not semantic_work or not execution_work:
+            world_cloud_workload_complete = False
+            validation_messages.append(
+                "deterministic cloud scenario did not prove real cloud traversal, cloud-source semantic enqueue, and Rust execution"
+            )
+        if selected_source_execution_requested and mode.backend == "rust-vulkan":
+            cloud_source_receipts = selected_source_receipts_for_producer(execution_receipts)
+            cloud_source_suppressed = any(
+                isinstance(document.get("source_material_semantics"), dict)
+                and isinstance(document.get("source_material_execution"), dict)
+                and isinstance(document["source_material_execution"].get("clouds"), dict)
+                and int(parse_number(document["source_material_semantics"].get("cloud_quads")) or 0) > 0
+                and int(parse_number(document["source_material_execution"]["clouds"].get("suppressed_quads")) or 0)
+                == int(parse_number(document["source_material_semantics"].get("cloud_quads")) or 0)
+                and int(parse_number(document["source_material_execution"]["clouds"].get("quads")) or 0) == 0
+                and int(parse_number(document["source_material_execution"]["clouds"].get("draws")) or 0) == 0
+                and str(document["source_material_execution"]["clouds"].get("face_disposition") or "") == "suppressed"
+                and int(parse_number(document["source_material_execution"]["clouds"].get("fullscreen_cloud_stages")) or 0) > 0
+                for document in cloud_source_receipts
+            )
+            matching_cloud_draw = any(
+                isinstance(document.get("source_material_semantics"), dict)
+                and isinstance(document.get("source_material_execution"), dict)
+                and isinstance(document["source_material_execution"].get("clouds"), dict)
+                and int(parse_number(document["source_material_semantics"].get("cloud_quads")) or 0) > 0
+                and int(parse_number(document["source_material_execution"]["clouds"].get("quads")) or 0) > 0
+                and int(parse_number(document["source_material_execution"]["clouds"].get("draws")) or 0) > 0
+                for document in cloud_source_receipts
+            )
+            if cloud_source_suppressed:
+                validation_messages.append(
+                    "selected shader source explicitly suppresses vanilla cloud faces; matched Rust-owned fullscreen cloud execution receipt retained"
+                )
+            elif not matching_cloud_draw:
+                world_cloud_workload_complete = False
+                validation_messages.append(
+                    "selected-source cloud execution did not retain matching Rust-owned gbuffers_clouds "
+                    "semantic and execution receipts correlated to the producer gameplay frame and submission"
+                )
     background_scenario = (requested_world_background_scenario or "").strip().lower()
     if background_scenario and rust_shell_outline_mode:
         if background_scenario in {"hidden", "invalid"}:
@@ -8478,7 +11944,11 @@ def normalize_capture_artifact(
     if rust_shell_has_java_vulkan_frame:
         validation_messages.append("Rust whole-frame shell executed Java Vulkan frame/present work")
     require_rust_vulkan_gameplay_attachments = tool_kind == "capture" and bool(
-        falling_block_scenario or piston_scenario or static_terrain_scenario
+        falling_block_scenario
+        or piston_scenario
+        or primed_tnt_scenario
+        or static_terrain_scenario
+        or requested_world_distant_horizons
     )
     if require_rust_vulkan_gameplay_attachments and mode.expected_attribution == "rust-vulkan":
         if not isinstance(gameplay_attachment_doc, dict):
@@ -8490,9 +11960,26 @@ def normalize_capture_artifact(
         if not isinstance(gameplay_attachment_correlation_doc, dict):
             validation_messages.append("Rust Vulkan gameplay row did not retain acquire/submit/present correlation for attachment dumps")
         if isinstance(gameplay_attachment_doc, dict) and isinstance(gameplay_attachment_correlation_doc, dict):
-            for field in ("gameplay_frame_id", "correlation_id", "gal_submission_id", "vulkan_submission_timeline_value"):
+            for field in ("gameplay_frame_id", "correlation_id", "deterministic_rendered_frame_index", "gal_submission_id", "vulkan_submission_timeline_value", "world_lod_instances", "world_lod_route_selected"):
                 if gameplay_attachment_doc.get(field) != gameplay_attachment_correlation_doc.get(field):
                     validation_messages.append(f"Rust Vulkan gameplay attachment correlation mismatch for {field}")
+            acknowledged_frames = {
+                int(parse_number(candidate_ack.get("renderedFrameIndex")) or -1)
+                for candidate_ack in (read_json(path) for path in distant_horizons_capture_acks)
+                if isinstance(candidate_ack, dict)
+            }
+            attachment_frame = int(parse_number(gameplay_attachment_doc.get("deterministic_rendered_frame_index")) or -1)
+            if attachment_frame not in acknowledged_frames:
+                validation_messages.append(
+                    "Rust Vulkan gameplay attachment dump did not match an acknowledged deterministic screenshot frame"
+                )
+            if requested_world_distant_horizons and (
+                int(parse_number(gameplay_attachment_doc.get("world_lod_instances")) or 0) <= 0
+                or gameplay_attachment_doc.get("world_lod_route_selected") is not True
+            ):
+                validation_messages.append(
+                    "Rust Vulkan gameplay attachment dump did not prove selected Distant Horizons LOD work"
+                )
             extent = gameplay_attachment_doc.get("extent")
             correlation_extent = gameplay_attachment_correlation_doc.get("extent")
             if extent != correlation_extent:
@@ -8512,9 +11999,11 @@ def normalize_capture_artifact(
                 "composite_1",
                 "final_output",
             ]
-            if not isinstance(evidence, dict) or any(name not in evidence for name in required):
+            if not isinstance(evidence, dict) or "final_output" not in evidence:
+                validation_messages.append("Rust Vulkan gameplay attachment dump did not include final output evidence")
+            elif require_complete_gameplay_attachments and any(name not in evidence for name in required):
                 validation_messages.append("Rust Vulkan gameplay attachment dump did not include the complete required attachment set")
-            else:
+            elif require_complete_gameplay_attachments:
                 for color_name in ("albedo", "normal", "material_light", "world_position", "deferred_lit", "composite_0", "composite_1", "final_output"):
                     value = evidence.get(color_name) if isinstance(evidence.get(color_name), dict) else {}
                     if parse_number(value.get("nonblack_rgb")) in (None, 0):
@@ -8523,6 +12012,10 @@ def normalize_capture_artifact(
                     value = evidence.get(depth_name) if isinstance(evidence.get(depth_name), dict) else {}
                     if parse_number(value.get("less_than_clear")) in (None, 0):
                         validation_messages.append(f"Rust Vulkan gameplay attachment {depth_name} did not prove non-empty depth data")
+            else:
+                final_output = evidence.get("final_output") if isinstance(evidence.get("final_output"), dict) else {}
+                if parse_number(final_output.get("nonblack_rgb")) in (None, 0):
+                    validation_messages.append("Rust Vulkan gameplay final-output attachment did not prove non-empty color data")
     renderdoc_workload_assertions_complete = True
     if (
         isinstance(instrumentation, dict)
@@ -8532,6 +12025,7 @@ def normalize_capture_artifact(
             or (border_scenario and border_scenario not in {"hidden", "far", "no-target"})
             or (block_display_scenario and block_display_scenario != "hidden")
             or (piston_scenario and piston_scenario not in {"hidden", "completed", "removed"})
+            or (primed_tnt_scenario and primed_tnt_scenario != "hidden")
             or (static_terrain_scenario and static_terrain_scenario != "hidden")
         )
     ):
@@ -8547,6 +12041,8 @@ def normalize_capture_artifact(
         if block_display_scenario and block_display_scenario != "hidden":
             required_workload_keys.extend(["non_zero_mesh_workload", "mesh_marker_evidence"])
         if piston_scenario and piston_scenario not in {"hidden", "completed", "removed"}:
+            required_workload_keys.extend(["non_zero_mesh_workload", "mesh_marker_evidence"])
+        if primed_tnt_scenario and primed_tnt_scenario != "hidden":
             required_workload_keys.extend(["non_zero_mesh_workload", "mesh_marker_evidence"])
         if static_terrain_scenario and static_terrain_scenario != "hidden":
             required_workload_keys.extend(["non_zero_mesh_workload", "mesh_marker_evidence"])
@@ -8877,9 +12373,20 @@ def normalize_capture_artifact(
         and world_material_marker_workload_complete
         and world_material_terrain_particle_workload_complete
         and static_terrain_workload_complete
+        and world_distant_horizons_opaque_workload_complete
         and world_mesh_block_display_workload_complete
+        and world_text_workload_complete
         and world_mesh_falling_block_workload_complete
+        and world_mesh_arrow_workload_complete
+        and world_experience_orb_workload_complete
+        and world_beacon_beam_workload_complete
+        and world_mesh_model_workload_complete
+        and world_mesh_primed_tnt_workload_complete
         and world_mesh_piston_workload_complete
+        and world_weather_workload_complete
+        and world_cloud_workload_complete
+        and selected_source_execution_complete
+        and selected_source_distant_horizons_execution_complete
         and validation_layer_exercised
         and renderdoc_complete
         and renderdoc_workload_assertions_complete
@@ -8912,6 +12419,38 @@ def normalize_capture_artifact(
                 "correlation": str(gameplay_attachment_correlation_path) if gameplay_attachment_correlation_path else None,
                 "manifest_doc": gameplay_attachment_doc if isinstance(gameplay_attachment_doc, dict) else None,
                 "correlation_doc": gameplay_attachment_correlation_doc if isinstance(gameplay_attachment_correlation_doc, dict) else None,
+            },
+            "terrain_pass_contract": {
+                "directory": str(terrain_contract_dir) if terrain_contract_dir.exists() else None,
+                "contract": str(terrain_contract_path) if terrain_contract_path else None,
+                "contract_doc": terrain_contract_doc if isinstance(terrain_contract_doc, dict) else None,
+                "selected_source_execution": (
+                    str(selected_source_execution_path) if selected_source_execution_path else None
+                ),
+                "selected_source_execution_doc": (
+                    selected_source_execution_doc if isinstance(selected_source_execution_doc, dict) else None
+                ),
+                "selected_source_overlay_evidence": selected_source_overlay_evidence,
+                "selected_source_distant_horizons_execution_doc": (
+                    selected_source_distant_horizons_execution_doc
+                    if isinstance(selected_source_distant_horizons_execution_doc, dict)
+                    else None
+                ),
+                "selected_source_distant_horizons_primary": (
+                    str(selected_source_distant_horizons_primary_path)
+                    if selected_source_distant_horizons_primary_path
+                    else None
+                ),
+                "selected_source_distant_horizons_primary_doc": (
+                    selected_source_distant_horizons_primary_doc
+                    if isinstance(selected_source_distant_horizons_primary_doc, dict)
+                    else None
+                ),
+                "distant_horizons_source_palette_evidence": world_distant_horizons_source_palette_evidence,
+                "distant_horizons_final_visibility_evidence": world_distant_horizons_texture_palette_pixel_evidence,
+                "distant_horizons_source_to_final_transform_evidence": (
+                    world_distant_horizons_palette_transform_evidence
+                ),
             },
         },
         "runtime_profile": runtime_profile or {},
@@ -9029,12 +12568,41 @@ def normalize_capture_artifact(
                 "world_static_terrain_water_animation_dense_evidence": static_terrain_water_animation_dense,
                 "world_static_terrain_lifecycle": static_terrain_lifecycle_doc,
                 "world_static_terrain_lifecycle_evidence": static_terrain_lifecycle,
+                "world_static_terrain_capture_execution": static_terrain_capture_execution_doc,
+                "world_static_terrain_texture_palette_pixel_evidence": world_static_terrain_texture_palette_pixel_evidence,
+                "world_distant_horizons_opaque_requested": requested_world_distant_horizons_opaque,
+                "world_distant_horizons_non_water_requested": requested_world_distant_horizons_non_water,
+                "world_distant_horizons_water_requested": requested_world_distant_horizons_water,
+                "world_distant_horizons_texture_palette_requested": requested_world_distant_horizons_texture_palette,
+                "world_distant_horizons_opaque_route": distant_horizons_route_doc,
+                "world_distant_horizons_opaque_capture_execution": distant_horizons_capture_execution_doc,
+                "world_distant_horizons_texture_probe": distant_horizons_texture_probe_doc,
+                "world_distant_horizons_exact_atlas_plan": distant_horizons_exact_atlas_plan_doc,
+                "world_distant_horizons_source_material_contract": distant_horizons_source_material_contract_doc,
+                "world_distant_horizons_texture_palette_pixel_evidence": world_distant_horizons_texture_palette_pixel_evidence,
+                "world_distant_horizons_source_palette_evidence": world_distant_horizons_source_palette_evidence,
+                "world_distant_horizons_palette_transform_evidence": world_distant_horizons_palette_transform_evidence,
+                "world_distant_horizons_exact_atlas_plan_path": (
+                    str(distant_horizons_exact_atlas_plan_path)
+                    if distant_horizons_exact_atlas_plan_path
+                    else None
+                ),
+                "world_distant_horizons_source_material_contract_path": (
+                    str(distant_horizons_source_material_contract_path)
+                    if distant_horizons_source_material_contract_path
+                    else None
+                ),
+                "world_distant_horizons_opaque_selected_frames": rust_gal_world_lod_selected_frames_for_validation,
+                "world_distant_horizons_opaque_instances_submitted": rust_gal_world_lod_instances_submitted_for_validation,
+                "world_distant_horizons_opaque_frames_executed": rust_gal_world_lod_frames_executed_for_validation,
                 "world_mesh_block_display_scenario": requested_world_mesh_block_display_scenario or None,
                 "world_mesh_block_display_workload": requested_world_mesh_block_display_workload or None,
                 "world_mesh_block_display_control": world_mesh_block_display_control,
                 "world_mesh_block_display_submitted_work": block_display_submitted_count,
                 "world_mesh_block_display_metrics": block_display_doc,
                 "world_mesh_block_display_pixel_evidence": world_mesh_block_display_pixel_evidence,
+                "world_text_scenario": requested_world_text_scenario or None,
+                "world_text_metrics": world_text_doc,
                 "world_mesh_falling_block_scenario": requested_world_mesh_falling_block_scenario or None,
                 "world_mesh_falling_block_control": world_mesh_falling_block_control,
                 "world_mesh_falling_block_submitted_work": falling_block_submitted_count,
@@ -9047,6 +12615,45 @@ def normalize_capture_artifact(
                     },
                 },
                 "world_mesh_falling_block_pixel_evidence": world_mesh_falling_block_pixel_evidence,
+                "world_mesh_arrow_scenario": requested_world_mesh_arrow_scenario or None,
+                "world_mesh_arrow_control": world_mesh_arrow_control,
+                "world_mesh_arrow_submitted_work": arrow_submitted_count,
+                "world_mesh_arrow_metrics": arrow_doc,
+                "world_mesh_arrow_route_counts": {
+                    f"deterministic:{key}": value
+                    for key, value in arrow_route_counts.items()
+                },
+                "world_mesh_arrow_capture_evidence": world_mesh_arrow_capture_evidence,
+                "world_experience_orb_scenario": requested_world_experience_orb_scenario or None,
+                "world_experience_orb_control": world_experience_orb_control,
+                "world_experience_orb_submitted_work": experience_orb_submitted_count,
+                "world_experience_orb_metrics": experience_orb_doc,
+                "world_experience_orb_route_counts": {
+                    f"deterministic:{key}": value
+                    for key, value in experience_orb_route_counts.items()
+                },
+                "world_experience_orb_capture_evidence": world_experience_orb_capture_evidence,
+                "world_beacon_beam_scenario": requested_world_beacon_beam_scenario or None,
+                "world_beacon_beam_control": world_beacon_beam_control,
+                "world_beacon_beam_capture_evidence": world_beacon_beam_capture_evidence,
+                "world_mesh_model_scenario": requested_world_mesh_model_scenario or None,
+                "world_mesh_model_control": world_mesh_model_control,
+                "world_mesh_model_submitted_work": model_submitted_count,
+                "world_mesh_model_metrics": model_doc,
+                "world_mesh_model_route_counts": {
+                    f"deterministic:{key}": value
+                    for key, value in model_route_counts.items()
+                },
+                "world_mesh_model_capture_evidence": world_mesh_model_capture_evidence,
+                "world_mesh_primed_tnt_scenario": requested_world_mesh_primed_tnt_scenario or None,
+                "world_mesh_primed_tnt_control": world_mesh_primed_tnt_control,
+                "world_mesh_primed_tnt_submitted_work": primed_tnt_submitted_count,
+                "world_mesh_primed_tnt_executed_work": primed_tnt_execution_count,
+                "world_mesh_primed_tnt_route_counts": {
+                    f"deterministic:{key}": value
+                    for key, value in deterministic_primed_tnt_route_counts.items()
+                },
+                "world_mesh_primed_tnt_pixel_evidence": world_mesh_primed_tnt_pixel_evidence,
                 "world_mesh_piston_scenario": requested_world_mesh_piston_scenario or None,
                 "world_mesh_piston_control": world_mesh_piston_control,
                 "world_mesh_piston_submitted_work": piston_submitted_count,
@@ -9071,7 +12678,17 @@ def normalize_capture_artifact(
                 },
                 "world_mesh_piston_shell_scan": piston_shell_scan,
                 "world_mesh_piston_pixel_evidence": world_mesh_piston_pixel_evidence,
+                "world_weather_scenario": requested_world_weather_scenario or None,
+                "world_weather_control": (
+                    "disabled" if requested_world_weather_disabled else (
+                        "legacy" if requested_world_weather_legacy else "rust"
+                    )
+                ),
+                "world_weather_metrics": weather_doc,
+                "world_cloud_scenario": requested_world_cloud_scenario or None,
+                "world_cloud_metrics": cloud_doc,
                 "rust_vulkan_shell_scene_evidence": rust_vulkan_shell_scene_evidence,
+                "selected_source_gui_final_evidence": selected_source_gui_evidence,
                 "cache_hits": last_number(combined_logs, r"rust_gal_cache_hits[=: ]+(\d+)"),
                 "cache_misses": last_number(combined_logs, r"rust_gal_cache_misses[=: ]+(\d+)"),
                 "queue_depth": last_number(combined_logs, r"rust_gal_queue_depth[=: ]+(\d+)"),
@@ -10482,9 +14099,31 @@ def build_capture_command(
     args: argparse.Namespace,
     tool_kind: str,
 ) -> tuple[list[str], dict[str, str]]:
+    normalize_direct_primed_tnt_scenario(args)
     kind, entrypoint = run_dev_capture_entrypoint(target.root)
     requested_validation = "routine" if args.validation == "standard" else args.validation
     validation = "standard" if mode.supports_validation and requested_validation != "off" else "off"
+    static_terrain_scenario = str(getattr(args, "world_static_terrain_scenario", "") or "").strip()
+    selected_source_moving_mesh_capture = (
+        tool_kind == "capture"
+        and mode.backend == "rust-vulkan"
+        and bool(getattr(args, "rust_selected_source_execution", False))
+        and bool(
+            getattr(args, "world_mesh_falling_block_scenario", "")
+            or getattr(args, "world_mesh_piston_scenario", "")
+            or getattr(args, "world_mesh_primed_tnt_scenario", "")
+            or getattr(args, "world_mesh_arrow_scenario", "")
+            or getattr(args, "world_experience_orb_scenario", "")
+            or getattr(args, "world_beacon_beam_scenario", "")
+            or getattr(args, "world_mesh_model_scenario", "")
+            or getattr(args, "world_entity_flame_scenario", "")
+        )
+    )
+    if static_terrain_scenario and mode.backend != "rust-vulkan":
+        raise ValueError(
+            "--world-static-terrain-scenario requires current-rust-vulkan: "
+            "static terrain has no Rust OpenGL or Java Vulkan capture route"
+        )
     static_terrain_second_world = (
         getattr(args, "world_static_terrain_second_world", "")
         or (
@@ -10529,12 +14168,33 @@ def build_capture_command(
         static_terrain_capture_requested = tool_kind == "capture" and bool(
             getattr(args, "world_static_terrain_scenario", "")
         )
+        # A source-derived whole-frame row needs a single settled screenshot
+        # frame. Its source plan can take several seconds to prepare, so the
+        # generic four-pose sequence exhausts the capture budget before the
+        # row can finish despite having already executed valid real work.
+        selected_source_capture_requested = tool_kind == "capture" and bool(
+            getattr(args, "rust_selected_source_execution", False)
+        )
+        moving_mesh_capture_requested = bool(
+            getattr(args, "world_mesh_falling_block_scenario", "")
+            or getattr(args, "world_mesh_piston_scenario", "")
+            or getattr(args, "world_mesh_primed_tnt_scenario", "")
+            or getattr(args, "world_mesh_arrow_scenario", "")
+            or getattr(args, "world_experience_orb_scenario", "")
+            or getattr(args, "world_beacon_beam_scenario", "")
+            or getattr(args, "world_mesh_model_scenario", "")
+            or getattr(args, "world_entity_flame_scenario", "")
+        )
         if tool_kind == "capture" and (
-            workload_profile in {"correctness", "moving-camera"} or static_terrain_capture_requested
+            workload_profile in {"correctness", "moving-camera"}
+            or static_terrain_capture_requested
+            or selected_source_capture_requested
         ):
             command.append("--deterministic-camera-capture")
         if tool_kind == "capture" and (
-            workload_profile == "settled-static" or static_terrain_capture_requested
+            (workload_profile == "settled-static" and not moving_mesh_capture_requested)
+            or static_terrain_capture_requested
+            or (selected_source_capture_requested and not moving_mesh_capture_requested)
         ):
             command.append("--deterministic-static-camera-capture")
         if getattr(args, "gui_resource_pack_scenario", ""):
@@ -10667,6 +14327,122 @@ def build_capture_command(
             f"-Dmattmc.dev.deterministicCameraCapture.settledReadyMaxWaitFrames={world_profile.deterministic_ready_max_wait_frames}",
         ]
     )
+    dh_opaque_only = bool(getattr(args, "world_distant_horizons_opaque", False))
+    dh_non_water = bool(getattr(args, "world_distant_horizons_non_water", False))
+    dh_water = bool(getattr(args, "world_distant_horizons_water", False))
+    dh_texture_palette = bool(getattr(args, "world_distant_horizons_texture_palette", False))
+    ordinary_selected_source_dh_capture = (
+        tool_kind == "capture"
+        and mode.backend == "rust-vulkan"
+        and bool(getattr(args, "rust_selected_source_execution", False))
+        and args.world == "Origin"
+        and not (
+            dh_opaque_only
+            or dh_non_water
+            or dh_water
+            or getattr(args, "world_mesh_model_scenario", "")
+            or getattr(args, "world_mesh_falling_block_scenario", "")
+            or getattr(args, "world_mesh_piston_scenario", "")
+            or getattr(args, "world_mesh_primed_tnt_scenario", "")
+            or getattr(args, "world_mesh_arrow_scenario", "")
+            or getattr(args, "world_experience_orb_scenario", "")
+            or getattr(args, "world_beacon_beam_scenario", "")
+            or getattr(args, "world_static_terrain_scenario", "")
+            or getattr(args, "world_weather_scenario", "")
+            or getattr(args, "world_cloud_scenario", "")
+        )
+    )
+    if (dh_texture_palette or dh_water) and not dh_opaque_only:
+        required = "--world-distant-horizons-texture-palette" if dh_texture_palette else "--world-distant-horizons-water"
+        raise ValueError(f"{required} requires --world-distant-horizons-opaque")
+    explicit_model_mesh_capture = tool_kind == "capture" and bool(
+        getattr(args, "world_mesh_model_scenario", "")
+        or getattr(args, "world_entity_flame_scenario", "")
+    )
+    selected_source_entity_isolation = (
+        tool_kind == "capture"
+        and (
+            explicit_model_mesh_capture
+            or (
+                mode.backend == "rust-vulkan"
+                and bool(getattr(args, "rust_selected_source_execution", False))
+                and (
+                    selected_source_moving_mesh_capture
+                    or dh_opaque_only
+                    or dh_non_water
+                    or dh_water
+                    or bool(getattr(args, "world_weather_scenario", ""))
+                    or bool(getattr(args, "world_cloud_scenario", ""))
+                )
+            )
+        )
+    )
+    if selected_source_entity_isolation:
+        # A producer-specific copied-world frame owns its visible entities.
+        # Remove unrelated entities and block entities before the real
+        # scenario producer is spawned. The capture hook performs this on the
+        # integrated server thread and waits for ordinary client
+        # synchronization; it never changes production routes.
+        java_options.append("-Dmattmc.dev.deterministicCameraCapture.sourceEntityIsolation=true")
+        # This is a producer-route proof, not a terrain throughput benchmark.
+        # Keep the copied world within the normal bounded capture distance so
+        # new section ingestion cannot consume every pose before the real
+        # entity or block-entity producer is observed.
+        env.setdefault("MATTMC_CAPTURE_RENDER_DISTANCE", "6" if (dh_opaque_only or dh_non_water or dh_water) else "4")
+        env.setdefault("MATTMC_CAPTURE_SIMULATION_DISTANCE", "5")
+    if dh_opaque_only or dh_non_water or dh_water:
+        # The opaque palette is a shared far-column witness. It must not turn
+        # off the transparent stream when a companion transparent or water
+        # witness is explicitly requested in that same real DH column.
+        env["MATTMC_CAPTURE_DH_RUST_OPAQUE_ONLY"] = (
+            "true" if dh_opaque_only and not (dh_non_water or dh_water) else "false"
+        )
+        env["MATTMC_CAPTURE_DH_RUST_NON_WATER"] = "true" if dh_non_water else "false"
+        java_options.extend(
+            [
+                "-Dmattmc.dev.rustGalDistantHorizons.semanticCapture=true",
+                # This row validates the real DH collector/executor. Static
+                # terrain has its own scenario and readiness anvil; requiring
+                # it here can reject a stable DH-only frame with no relevant
+                # sodium-terrain submission.
+                "-Dmattmc.dev.deterministicCameraCapture.settledReadyFamilies=distant-horizons",
+                # The palette's own post-placement gate verifies the actual
+                # DH material column, selected route, execution receipt, and
+                # screenshot correlation. Two pre-placement selected frames
+                # are therefore enough to establish a live source path; eight
+                # starves that real setup on the intentionally expensive
+                # selected-source shader route.
+                "-Dmattmc.dev.deterministicCameraCapture.settledReadyFrames="
+                + ("2" if dh_texture_palette else "8"),
+                "-Dmattmc.dev.deterministicCameraCapture.settledReadyMaxWaitFrames="
+                + ("900" if args.profile == "extended" else str(world_profile.deterministic_ready_max_wait_frames)),
+            ]
+        )
+        if dh_non_water:
+            java_options.append("-Dmattmc.dev.rustGalDistantHorizons.requireTransparent=true")
+        if dh_water:
+            java_options.append("-Dmattmc.dev.rustGalDistantHorizons.requireWater=true")
+        if dh_texture_palette:
+            env["MATTMC_CAPTURE_DH_TEXTURE_PALETTE"] = "true"
+            # The texture-palette gate consumes a bounded Rust-side receipt
+            # for the same submitted world frame as its screenshot. This is
+            # diagnostic-only and never selects or changes the DH route.
+            env["MATTMC_GRAPHICS_AUDIT"] = "true"
+            java_options.append("-Dmattmc.dev.rustGalDistantHorizons.texturePalette=true")
+            if mode.name in {"current-opengl-shaders-off", "current-opengl-shaders-on"}:
+                # The Java control keeps one bounded copied DH observation
+                # after the legacy VBO is released. This proves the actual
+                # Java draw reached the palette without routing it through
+                # Rust or retaining a native object.
+                java_options.extend(
+                    [
+                        "-Dmattmc.dev.rustGalDistantHorizons.legacyObservation=true",
+                        # Java owns this control's main render target. Capture
+                        # it internally instead of grabbing a composited X
+                        # window; Rust Vulkan keeps its external-present path.
+                        "-Dmattmc.dev.deterministicCameraCapture.internalScreenshots=true",
+                    ]
+                )
     if getattr(args, "armor_value", None) is not None:
         java_options.append(f"-Dmattmc.dev.graphicsFrameBenchmark.armorValue={args.armor_value}")
         java_options.append(f"-Dmattmc.dev.deterministicCameraCapture.armorValue={args.armor_value}")
@@ -10718,6 +14494,10 @@ def build_capture_command(
         and (
             workload_profile in {"correctness", "moving-camera", "settled-static"}
             or bool(getattr(args, "world_static_terrain_scenario", ""))
+            or bool(getattr(args, "world_distant_horizons_opaque", False))
+            or bool(getattr(args, "world_distant_horizons_non_water", False))
+            or bool(getattr(args, "world_distant_horizons_water", False))
+            or bool(getattr(args, "world_distant_horizons_texture_palette", False))
         )
         and (
             mode.backend == "rust-vulkan"
@@ -10725,7 +14505,18 @@ def build_capture_command(
             or bool(getattr(args, "world_mesh_block_display_scenario", ""))
             or bool(getattr(args, "world_mesh_falling_block_scenario", ""))
             or bool(getattr(args, "world_mesh_piston_scenario", ""))
+            or bool(getattr(args, "world_mesh_arrow_scenario", ""))
+            or bool(getattr(args, "world_experience_orb_scenario", ""))
+            or bool(getattr(args, "world_beacon_beam_scenario", ""))
+            or bool(getattr(args, "world_mesh_model_scenario", ""))
+            or bool(getattr(args, "world_entity_flame_scenario", ""))
+            or bool(getattr(args, "world_weather_scenario", ""))
+            or bool(getattr(args, "world_cloud_scenario", ""))
             or bool(getattr(args, "world_static_terrain_scenario", ""))
+            or bool(getattr(args, "world_distant_horizons_opaque", False))
+            or bool(getattr(args, "world_distant_horizons_non_water", False))
+            or bool(getattr(args, "world_distant_horizons_water", False))
+            or bool(getattr(args, "world_distant_horizons_texture_palette", False))
         )
     )
     if deterministic_capture_requested:
@@ -10736,21 +14527,52 @@ def build_capture_command(
         env["MATTMC_GRAPHICS_CORRECTNESS_CAPTURE"] = "true"
         env["MATTMC_DETERMINISTIC_METADATA"] = str(deterministic_metadata)
         env["MATTMC_DETERMINISTIC_SCREENSHOT_DIR"] = str(deterministic_screenshot_dir)
-        java_options.extend(
-            [
-                "-Dmattmc.dev.deterministicCameraCapture=true",
-                f"-Dmattmc.dev.deterministicCameraCapture.metadata={deterministic_metadata}",
-                f"-Dmattmc.dev.deterministicCameraCapture.screenshotDir={deterministic_screenshot_dir}",
-                f"-Dmattmc.dev.deterministicCameraCapture.shaderEnabled={'true' if mode.shaders == 'on' else 'false'}",
-                "-Dmattmc.dev.deterministicCameraCapture.shaderPack=ComplementaryHungLoIfied.zip",
-                f"-Dmattmc.dev.deterministicCameraCapture.gitCommit={target_git_commit}",
-                f"-Dmattmc.dev.deterministicCameraCapture.world={args.world}",
-                "-Dmattmc.dev.deterministicCameraCapture.stopAfterComplete=true",
-                "-Dmattmc.dev.deterministicCameraCapture.ackTimeoutFrames=12000",
-                "-Dmattmc.dev.deterministicCameraCapture.poseCount=1",
-                "-Dmattmc.dev.deterministicCameraCapture.yawDelta=0.0",
-            ]
-        )
+        if mode.backend == "vulkan" or (
+            mode.backend == "opengl"
+            and (
+                bool(getattr(args, "world_distant_horizons_opaque", False))
+                or bool(getattr(args, "world_distant_horizons_non_water", False))
+                or bool(getattr(args, "world_distant_horizons_water", False))
+            )
+        ):
+            # Normal Java Vulkan presents through Minecraft's main target.
+            # An X-window grab can acknowledge after presentation while
+            # retaining a black compositor surface, so deterministic controls
+            # capture the verified in-game target instead.
+            java_options.append("-Dmattmc.dev.deterministicCameraCapture.internalScreenshots=true")
+        # The Python capture runner creates its own run-id-specific metadata and
+        # screenshot paths. Supplying another pair here leaves duplicate JVM
+        # properties whose winner depends on command construction order.
+        if kind == "shell":
+            java_options.extend(
+                [
+                    "-Dmattmc.dev.deterministicCameraCapture=true",
+                    f"-Dmattmc.dev.deterministicCameraCapture.metadata={deterministic_metadata}",
+                    f"-Dmattmc.dev.deterministicCameraCapture.screenshotDir={deterministic_screenshot_dir}",
+                    f"-Dmattmc.dev.deterministicCameraCapture.shaderEnabled={'true' if mode.shaders == 'on' else 'false'}",
+                    "-Dmattmc.dev.deterministicCameraCapture.shaderPack=ComplementaryHungLoIfied.zip",
+                    f"-Dmattmc.dev.deterministicCameraCapture.gitCommit={target_git_commit}",
+                    f"-Dmattmc.dev.deterministicCameraCapture.world={args.world}",
+                    "-Dmattmc.dev.deterministicCameraCapture.stopAfterComplete=true",
+                    "-Dmattmc.dev.deterministicCameraCapture.ackTimeoutFrames=12000",
+                    "-Dmattmc.dev.deterministicCameraCapture.yawDelta=0.0",
+                ]
+            )
+            # Moving producers own an explicit multi-frame sequence. Do not
+            # append the shell default after their setup, because Java keeps
+            # the last duplicate system property and would collapse that
+            # sequence to one capture frame.
+            if not (
+                getattr(args, "world_mesh_falling_block_scenario", "")
+                or getattr(args, "world_mesh_piston_scenario", "")
+                or getattr(args, "world_mesh_primed_tnt_scenario", "")
+                or getattr(args, "world_mesh_arrow_scenario", "")
+                or getattr(args, "world_experience_orb_scenario", "")
+                or getattr(args, "world_beacon_beam_scenario", "")
+                or getattr(args, "world_mesh_model_scenario", "")
+                or getattr(args, "world_entity_flame_scenario", "")
+            ):
+                java_options.append("-Dmattmc.dev.deterministicCameraCapture.poseCount=1")
     if getattr(args, "player_heart_variant", None):
         java_options.append(f"-Dmattmc.dev.deterministicCameraCapture.playerHeartVariant={args.player_heart_variant}")
     if getattr(args, "player_heart_flash", False):
@@ -10814,6 +14636,29 @@ def build_capture_command(
         java_options.append(
             f"-Dmattmc.dev.rustGalWorldMaterial.terrainParticleScenario={args.world_material_terrain_particle_scenario}"
         )
+    if getattr(args, "world_weather_scenario", ""):
+        # The copied-world fixture sets rain through normal server/client
+        # weather state. Java contributes extracted column semantics only.
+        java_options.append(
+            f"-Dmattmc.dev.rustGalWeather.scenario={args.world_weather_scenario}"
+        )
+        weather_control = getattr(args, "world_weather_control", "rust")
+        if weather_control == "disabled":
+            java_options.append("-Dmattmc.dev.rustGalWeather.disabled=true")
+        elif weather_control == "legacy":
+            java_options.append("-Dmattmc.dev.rustGalWeather.legacyControl=true")
+        if tool_kind == "capture" and mode.backend in {"opengl", "rust-opengl"}:
+            # Borrowed OpenGL and its Java controls render into Minecraft's
+            # main target. Capturing that target avoids a composited X window
+            # which can acknowledge successfully while producing a blank image.
+            java_options.append("-Dmattmc.dev.deterministicCameraCapture.internalScreenshots=true")
+    if getattr(args, "world_cloud_scenario", ""):
+        java_options.extend(
+            [
+                f"-Dmattmc.dev.rustGalClouds.scenario={args.world_cloud_scenario}",
+                "-Dmattmc.dev.rustGalClouds.radiusLimit=8",
+            ]
+        )
     if getattr(args, "world_mesh_block_display_scenario", ""):
         block_display_workload = getattr(args, "world_mesh_block_display_workload", "single")
         java_options.append(
@@ -10835,6 +14680,19 @@ def build_capture_command(
             java_options.append("-Dmattmc.dev.rustGalWorldBlockDisplay.disabled=true")
         elif block_display_control == "legacy":
             java_options.append("-Dmattmc.dev.rustGalWorldBlockDisplay.legacyControl=true")
+    if getattr(args, "world_text_scenario", ""):
+        java_options.append(
+            f"-Dmattmc.dev.rustGalWorldText.scenario={args.world_text_scenario}"
+        )
+        if args.world_text_scenario == "name-tag":
+            # The copied-world cow is a real server/client entity. Its normal
+            # NameTagFeatureRenderer callback is the text producer under test.
+            java_options.extend(
+                [
+                    "-Dmattmc.dev.rustGalWorldMesh.modelScenario=cow",
+                    "-Dmattmc.dev.rustGalWorldText.requireSourceCapture=true",
+                ]
+            )
     if getattr(args, "world_mesh_falling_block_scenario", ""):
         java_options.append(
             f"-Dmattmc.dev.rustGalWorldMesh.fallingBlockScenario={args.world_mesh_falling_block_scenario}"
@@ -10847,7 +14705,7 @@ def build_capture_command(
         elif tool_kind == "capture":
             java_options.append("-Dmattmc.dev.deterministicCameraCapture.poseCount=5")
             java_options.append("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=1")
-            java_options.append("-Dmattmc.dev.rustGalWorldMesh.fallingBlockFallHeight=192")
+            java_options.append("-Dmattmc.dev.rustGalWorldMesh.fallingBlockFallHeight=12")
             java_options.append("-Dmattmc.dev.rustGalWorldMesh.fallingBlockSlowCapture=true")
         if tool_kind == "gameplay":
             java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.yawDelta=0.0")
@@ -10863,6 +14721,107 @@ def build_capture_command(
             java_options.append("-Dmattmc.dev.rustGalWorldFallingBlock.disabled=true")
         elif falling_block_control == "legacy":
             java_options.append("-Dmattmc.dev.rustGalWorldFallingBlock.legacyControl=true")
+    if getattr(args, "world_mesh_arrow_scenario", ""):
+        java_options.append(
+            f"-Dmattmc.dev.rustGalWorldMesh.arrowScenario={args.world_mesh_arrow_scenario}"
+        )
+        if tool_kind == "capture":
+            java_options.append("-Dmattmc.dev.deterministicCameraCapture.poseCount=5")
+            java_options.append("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=1")
+        if getattr(args, "world_mesh_arrow_count", -1) > 0:
+            java_options.append(
+                f"-Dmattmc.dev.rustGalWorldMesh.arrowCount={args.world_mesh_arrow_count}"
+            )
+        arrow_control = getattr(args, "world_mesh_arrow_control", "rust")
+        if arrow_control == "disabled":
+            java_options.append("-Dmattmc.dev.rustGalWorldArrow.disabled=true")
+        elif arrow_control == "legacy":
+            java_options.append("-Dmattmc.dev.rustGalWorldArrow.legacyControl=true")
+    if getattr(args, "world_experience_orb_scenario", ""):
+        java_options.append(
+            f"-Dmattmc.dev.rustGalWorldExperienceOrb.scenario={args.world_experience_orb_scenario}"
+        )
+        if tool_kind == "capture":
+            java_options.append("-Dmattmc.dev.deterministicCameraCapture.poseCount=5")
+            java_options.append("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=1")
+        if getattr(args, "world_experience_orb_count", -1) > 0:
+            java_options.append(
+                f"-Dmattmc.dev.rustGalWorldExperienceOrb.count={args.world_experience_orb_count}"
+            )
+        experience_orb_control = getattr(args, "world_experience_orb_control", "rust")
+        if experience_orb_control == "disabled":
+            java_options.append("-Dmattmc.dev.rustGalWorldExperienceOrb.disabled=true")
+        elif experience_orb_control == "legacy":
+            java_options.append("-Dmattmc.dev.rustGalWorldExperienceOrb.legacyControl=true")
+    if getattr(args, "world_beacon_beam_scenario", ""):
+        java_options.append(
+            f"-Dmattmc.dev.rustGalWorldBeaconBeam.scenario={args.world_beacon_beam_scenario}"
+        )
+        if tool_kind == "capture":
+            java_options.append("-Dmattmc.dev.deterministicCameraCapture.poseCount=1")
+            java_options.append("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=3")
+        beacon_beam_control = getattr(args, "world_beacon_beam_control", "rust")
+        if beacon_beam_control == "disabled":
+            java_options.append("-Dmattmc.dev.rustGalWorldBeaconBeam.disabled=true")
+        elif beacon_beam_control == "legacy":
+            java_options.append("-Dmattmc.dev.rustGalWorldBeaconBeam.legacyControl=true")
+    if getattr(args, "world_mesh_model_scenario", ""):
+        java_options.append(
+            f"-Dmattmc.dev.rustGalWorldMesh.modelScenario={args.world_mesh_model_scenario}"
+        )
+        model_part_scenario = args.world_mesh_model_scenario == "decorated-pot"
+        if tool_kind == "capture":
+            java_options.append("-Dmattmc.dev.deterministicCameraCapture.poseCount=5")
+            java_options.append("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=1")
+        model_control = getattr(args, "world_mesh_model_control", "rust")
+        if model_control == "disabled":
+            java_options.append(
+                "-Dmattmc.dev.rustGalWorldModelPart.disabled=true"
+                if model_part_scenario
+                else "-Dmattmc.dev.rustGalWorldModelMesh.disabled=true"
+            )
+        elif model_control == "legacy":
+            java_options.append(
+                "-Dmattmc.dev.rustGalWorldModelPart.legacyControl=true"
+                if model_part_scenario
+                else "-Dmattmc.dev.rustGalWorldModelMesh.legacyControl=true"
+            )
+    if getattr(args, "world_entity_flame_scenario", ""):
+        flame_scenario = args.world_entity_flame_scenario
+        if flame_scenario != "cow":
+            raise ValueError("--world-entity-flame-scenario currently supports only cow")
+        if getattr(args, "world_mesh_model_scenario", "") != "cow":
+            raise ValueError("--world-entity-flame-scenario cow requires --world-mesh-model-scenario cow")
+        java_options.append(f"-Dmattmc.dev.rustGalWorldEntityFlame.scenario={flame_scenario}")
+        flame_control = getattr(args, "world_entity_flame_control", "rust")
+        if flame_control == "disabled":
+            java_options.append("-Dmattmc.dev.rustGalWorldEntityFlame.disabled=true")
+        elif flame_control == "legacy":
+            java_options.append("-Dmattmc.dev.rustGalWorldEntityFlame.legacyControl=true")
+    if getattr(args, "world_entity_shadow_scenario", ""):
+        shadow_scenario = args.world_entity_shadow_scenario
+        if shadow_scenario != "cow":
+            raise ValueError("--world-entity-shadow-scenario currently supports only cow")
+        if getattr(args, "world_mesh_model_scenario", "") != "cow":
+            raise ValueError("--world-entity-shadow-scenario cow requires --world-mesh-model-scenario cow")
+        java_options.append(f"-Dmattmc.dev.rustGalWorldEntityShadow.scenario={shadow_scenario}")
+        shadow_control = getattr(args, "world_entity_shadow_control", "rust")
+        if shadow_control == "disabled":
+            java_options.append("-Dmattmc.dev.rustGalWorldEntityShadow.disabled=true")
+        elif shadow_control == "legacy":
+            java_options.append("-Dmattmc.dev.rustGalWorldEntityShadow.legacyControl=true")
+    if getattr(args, "world_entity_leash_scenario", ""):
+        leash_scenario = args.world_entity_leash_scenario
+        if leash_scenario != "cow":
+            raise ValueError("--world-entity-leash-scenario currently supports only cow")
+        if getattr(args, "world_mesh_model_scenario", "") != "cow":
+            raise ValueError("--world-entity-leash-scenario cow requires --world-mesh-model-scenario cow")
+        java_options.append(f"-Dmattmc.dev.rustGalWorldEntityLeash.scenario={leash_scenario}")
+        leash_control = getattr(args, "world_entity_leash_control", "rust")
+        if leash_control == "disabled":
+            java_options.append("-Dmattmc.dev.rustGalWorldEntityLeash.disabled=true")
+        elif leash_control == "legacy":
+            java_options.append("-Dmattmc.dev.rustGalWorldEntityLeash.legacyControl=true")
     if getattr(args, "world_mesh_piston_scenario", ""):
         java_options.append(
             f"-Dmattmc.dev.rustGalWorldMesh.pistonScenario={args.world_mesh_piston_scenario}"
@@ -10898,6 +14857,28 @@ def build_capture_command(
             java_options.append("-Dmattmc.dev.rustGalWorldPiston.disabled=true")
         elif piston_control == "legacy":
             java_options.append("-Dmattmc.dev.rustGalWorldPiston.legacyControl=true")
+    if getattr(args, "world_mesh_primed_tnt_scenario", ""):
+        primed_tnt_scenario_option = (
+            f"-Dmattmc.dev.rustGalWorldMesh.primedTntScenario={args.world_mesh_primed_tnt_scenario}"
+        )
+        if java_option_property(
+            java_options,
+            "mattmc.dev.rustGalWorldMesh.primedTntScenario",
+        ) != args.world_mesh_primed_tnt_scenario:
+            java_options.append(primed_tnt_scenario_option)
+        java_options.append("-Dmattmc.dev.rustGalWorldMesh.primedTntForceOrdinaryCaptureState=true")
+        if tool_kind == "capture" and mode.backend != "rust-vulkan":
+            java_options.append("-Dmattmc.dev.deterministicCameraCapture.internalScreenshots=true")
+            java_options.append("-Dmattmc.dev.deterministicCameraCapture.poseCount=5")
+            java_options.append("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=1")
+        elif tool_kind == "capture":
+            java_options.append("-Dmattmc.dev.deterministicCameraCapture.poseCount=5")
+            java_options.append("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=1")
+        primed_tnt_control = getattr(args, "world_mesh_primed_tnt_control", "rust")
+        if primed_tnt_control == "disabled":
+            java_options.append("-Dmattmc.dev.rustGalWorldPrimedTnt.disabled=true")
+        elif primed_tnt_control == "legacy":
+            java_options.append("-Dmattmc.dev.rustGalWorldPrimedTnt.legacyControl=true")
     if (
         tool_kind == "capture"
         and getattr(args, "world_mesh_falling_block_scenario", "")
@@ -10909,6 +14890,18 @@ def build_capture_command(
         java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.displayFpsCheckEnabled=false")
         if not getattr(args, "game_mode", None):
             java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.gameMode=survival")
+    elif ordinary_selected_source_dh_capture:
+        # Ordinary whole-frame Origin captures must not take their screenshot
+        # while DH columns are still copied but unpublished. This is a real
+        # source-route readiness requirement, not a synthetic DH fixture.
+        java_options.extend(
+            [
+                "-Dmattmc.dev.deterministicCameraCapture.settledReadyFamilies=distant-horizons",
+                "-Dmattmc.dev.deterministicCameraCapture.settledReadyFrames=3",
+                "-Dmattmc.dev.deterministicCameraCapture.settledReadyMaxWaitFrames="
+                + ("900" if args.profile == "extended" else str(world_profile.deterministic_ready_max_wait_frames)),
+            ]
+        )
     terrain_particle_control = getattr(args, "world_material_terrain_particle_control", "rust")
     if terrain_particle_control == "disabled":
         java_options.append("-Dmattmc.dev.rustGalWorldMaterial.terrainParticle.disabled=true")
@@ -10919,7 +14912,7 @@ def build_capture_command(
     if getattr(args, "world_static_terrain_scenario", ""):
         java_options.append(f"-Dmattmc.dev.rustGalStaticTerrain.scenario={args.world_static_terrain_scenario}")
         java_options.append(f"-Dmattmc.dev.rustGalStaticTerrain.worldId={args.world}")
-        if tool_kind == "capture":
+        if tool_kind == "capture" and mode.backend == "rust-vulkan":
             static_terrain_parity_path = capture_dir / "static_terrain_parity_diagnostics.jsonl"
             java_options.append("-Dmattmc.dev.staticTerrainParityDiagnostics=true")
             java_options.append(f"-Dmattmc.dev.staticTerrainParityDiagnostics.path={static_terrain_parity_path}")
@@ -10943,11 +14936,29 @@ def build_capture_command(
         if getattr(args, "world_static_terrain_water_animation_capture", False):
             java_options.append("-Dmattmc.dev.rustGalStaticTerrain.waterAnimationDenseCapture=true")
             java_options.append("-Dmattmc.dev.rustGalStaticTerrain.waterAnimationDenseFrames=24")
-        if tool_kind == "capture":
+        if (
+            tool_kind == "capture"
+            and mode.backend == "rust-vulkan"
+            and getattr(args, "world_static_terrain_scenario", "")
+        ):
             java_options.append("-Dmattmc.dev.deterministicCameraCapture.settledReadyFamilies=static-terrain")
             java_options.append("-Dmattmc.dev.deterministicCameraCapture.settledReadyFrames=3")
             java_options.append("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=1")
-            if static_terrain_requires_translucent_camera_sort(args.world_static_terrain_scenario):
+            has_moving_mesh_capture = bool(
+                getattr(args, "world_mesh_falling_block_scenario", "")
+                or getattr(args, "world_mesh_piston_scenario", "")
+                or getattr(args, "world_mesh_primed_tnt_scenario", "")
+                or getattr(args, "world_mesh_arrow_scenario", "")
+                or getattr(args, "world_experience_orb_scenario", "")
+                or getattr(args, "world_beacon_beam_scenario", "")
+                or getattr(args, "world_mesh_model_scenario", "")
+            )
+            if has_moving_mesh_capture:
+                # Moving-object evidence owns its pose sequence. Static terrain
+                # still supplies the readiness family, but must not collapse a
+                # required airborne/interpolation frame series to one pose.
+                pass
+            elif static_terrain_requires_translucent_camera_sort(args.world_static_terrain_scenario):
                 java_options.append("-Dmattmc.dev.deterministicCameraCapture.poseCount=7")
             else:
                 java_options.append("-Dmattmc.dev.deterministicCameraCapture.poseCount=1")
@@ -10995,6 +15006,15 @@ def build_capture_command(
     if tool_kind == "capture" and mode.backend == "rust-vulkan":
         attachment_dir = capture_dir / "whole_frame_gameplay_attachments"
         env["MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_DIR"] = str(attachment_dir)
+        env["MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_REQUEST"] = str(
+            attachment_dir / "requested-gameplay-frame.properties"
+        )
+        # Dense selected-source sequences retain only the exact Rust final image.
+        # A bounded diagnostic row may opt into one complete attachment set for
+        # pass-local investigation without changing normal capture behavior.
+        env["MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_FINAL_ONLY"] = (
+            "0" if getattr(args, "rust_full_gameplay_attachments", False) else "1"
+        )
         env["MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR"] = str(
             capture_dir / "terrain_pass_contract"
         )
@@ -11003,6 +15023,94 @@ def build_capture_command(
         if getattr(args, "world_mesh_falling_block_scenario", "") or getattr(args, "world_mesh_piston_scenario", ""):
             min_mesh_instances = 2
         env.setdefault("MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_MIN_MESH_INSTANCES", str(min_mesh_instances))
+        if (
+            getattr(args, "world_mesh_falling_block_scenario", "")
+            or getattr(args, "world_mesh_piston_scenario", "")
+            or getattr(args, "world_weather_scenario", "")
+            or getattr(args, "world_cloud_scenario", "")
+            or getattr(args, "world_static_terrain_scenario", "")
+            or bool(getattr(args, "world_distant_horizons_opaque", False))
+            or bool(getattr(args, "world_distant_horizons_non_water", False))
+            or bool(getattr(args, "world_distant_horizons_water", False))
+        ):
+            # The exact screenshot-frame selector is armed on the settled
+            # penultimate render. One-frame poses cannot establish that
+            # causal link, so use the smallest bounded two-frame pose.
+            java_options.append("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=2")
+    if getattr(args, "rust_selected_source_execution", False) and tool_kind in {"capture", "gameplay"}:
+        if mode.backend != "rust-vulkan" or mode.expected_attribution != "rust-vulkan":
+            raise ValueError(
+                "--rust-selected-source-execution requires the Current Rust Vulkan whole-frame route"
+            )
+        if mode.shaders != "on":
+            raise ValueError(
+                "--rust-selected-source-execution requires shaders on; "
+                "shaders-off controls validate the normal Rust whole-frame route directly"
+            )
+        # This is deliberately a native Rust opt-in. Java continues to submit
+        # semantic records only and cannot select, seed, or fall back from the
+        # source-derived shader plan.
+        env["MATTMC_RUST_SELECTED_SOURCE_EXECUTION"] = "1"
+        env["MATTMC_GRAPHICS_AUDIT"] = "true"
+        if tool_kind == "capture" and dh_texture_palette:
+            # Keep one same-submission source-primary readback for the DH
+            # palette. It is the only stage where raw atlas identity is
+            # meaningful; the configured pack intentionally fogs the final
+            # far terrain result during its deferred chain.
+            env.setdefault(
+                "MATTMC_RUST_SELECTED_SOURCE_CAPTURE_STAGE",
+                "distant-horizons-primary",
+            )
+        if tool_kind == "capture":
+            # Source-plan attachment correlation needs one warmup render and
+            # one selected render. Every later deterministic pose must retain
+            # the same Rust-owned final-output proof rather than switching to
+            # an external window sample that can observe a compositor frame.
+            java_options.append("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=2")
+            java_options.append(
+                "-Dmattmc.dev.deterministicCameraCapture.rustFinalOutputEveryPose=true"
+            )
+            # A named source-stage readback is a one-frame diagnostic of the
+            # same real producer path. Keep it to one settled pose so the
+            # diagnostic cannot turn into five expensive duplicate source
+            # submissions for a moving-object scenario.
+            if (
+                env.get("MATTMC_RUST_SELECTED_SOURCE_CAPTURE_STAGE", "").strip()
+                and not getattr(args, "world_mesh_falling_block_scenario", "")
+                and not getattr(args, "world_mesh_piston_scenario", "")
+                and not getattr(args, "world_mesh_primed_tnt_scenario", "")
+                and not getattr(args, "world_mesh_arrow_scenario", "")
+                and not getattr(args, "world_experience_orb_scenario", "")
+                and not getattr(args, "world_beacon_beam_scenario", "")
+                and not getattr(args, "world_mesh_model_scenario", "")
+            ):
+                java_options.append("-Dmattmc.dev.deterministicCameraCapture.poseCount=1")
+        # Selected-source terrain capture is an explicit real-world
+        # correctness fixture, not a view-distance stress row. Keep its
+        # copied vanilla section set bounded enough to reach the settled
+        # source submission while preserving normal Sodium terrain extraction
+        # and leaving Distant Horizons enabled for its own semantic route.
+        if tool_kind == "capture" and (
+            getattr(args, "world_static_terrain_scenario", "")
+            or bool(getattr(args, "world_distant_horizons_opaque", False))
+            or bool(getattr(args, "world_distant_horizons_non_water", False))
+        ):
+            # The DH palette is placed 80 blocks in front of the saved
+            # camera, so it needs a six-chunk client radius rather than the
+            # four chunks sufficient for the local static-terrain fixture.
+            # Keeping the copied world bounded lets the real DH column settle
+            # before the correctness window expires; it does not alter the
+            # route or synthesize a column.
+            env.setdefault(
+                "MATTMC_CAPTURE_RENDER_DISTANCE",
+                "4" if getattr(args, "world_static_terrain_scenario", "") else "6",
+            )
+            env.setdefault("MATTMC_CAPTURE_SIMULATION_DISTANCE", "4")
+        if tool_kind == "capture":
+            java_options.append(
+                "-Dmattmc.dev.deterministicCameraCapture.requiredRustSourceExecutionDir="
+                + str(capture_dir / "terrain_pass_contract")
+            )
     if tool_kind == "gameplay":
         frame_status = capture_dir / f"graphics_frame_benchmark_{timestamp()}.json"
         settle_frames = mode_frame_count(args.settle_frames, mode, args, "--settle-frames")
@@ -11783,7 +15891,7 @@ def run_mode(
     current_root = selected_current_root(args)
     explicit_frozen_repo = getattr(args, "frozen_repo", None)
     repository_paths = repository_resolution(current_root, find_frozen_repo(current_root, explicit_frozen_repo), explicit_frozen_repo)
-    unsupported_profile_reason = profile_not_supported_reason(args.profile, mode, tool_kind)
+    unsupported_profile_reason = profile_not_supported_reason(args.profile, mode, tool_kind, args)
     if unsupported_profile_reason:
         capture_dir.mkdir(parents=True, exist_ok=True)
         output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -11802,7 +15910,7 @@ def run_mode(
             repository_paths=repository_paths,
         )
         artifact["capture"]["profile_not_supported"] = True
-        artifact["capture"]["minimum_supported_profile"] = minimum_supported_profile(mode, tool_kind)
+        artifact["capture"]["minimum_supported_profile"] = minimum_supported_profile(mode, tool_kind, args)
         artifact["capture"]["requested_profile"] = args.profile
         artifact["capture"]["success"] = True
         artifact["capture"]["failed_phase"] = "profile-not-supported"
@@ -12059,6 +16167,7 @@ def run_mode(
             emitted_live_events: set[str] = set()
             subsystem_terminal_started: float | None = None
             artifact_finalization_started: float | None = None
+            selected_source_admission_grace_applied = False
             while True:
                 exit_code = process.poll()
                 if exit_code is not None:
@@ -12129,6 +16238,21 @@ def run_mode(
                         emitted_live_events.add("shutdown-started")
                     emit_matrix_progress(args, row_label, "active", f"{live_phase}; elapsed={int(now - started)}s; {live_detail}")
                 if now - started > timeout_seconds:
+                    if (
+                        getattr(args, "rust_selected_source_execution", False)
+                        and not selected_source_admission_grace_applied
+                        and selected_source_execution_observed(capture_dir)
+                    ):
+                        selected_source_admission_grace_applied = True
+                        timeout_seconds += SELECTED_SOURCE_ADMISSION_GRACE_SECONDS
+                        emit_matrix_progress(
+                            args,
+                            row_label,
+                            "active",
+                            "selected-source admission confirmed; granting "
+                            f"{SELECTED_SOURCE_ADMISSION_GRACE_SECONDS}s execution grace",
+                        )
+                        continue
                     if live_phase == "artifact-finalization":
                         meta_path = latest_capture_meta_path(capture_dir)
                         meta = read_key_values(meta_path) if meta_path else {}
@@ -12278,6 +16402,7 @@ def run_mode(
         tool_kind=tool_kind,
         runtime_profile=runtime_profile_dict(args),
         repository_paths=repository_paths,
+        require_complete_gameplay_attachments=bool(getattr(args, "rust_full_gameplay_attachments", False)),
     )
     validation = artifact.get("validation") if isinstance(artifact.get("validation"), dict) else {}
     if not validation.get("complete"):
@@ -12581,6 +16706,30 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         subparser.add_argument("--workload-profile", choices=WORKLOAD_PROFILES, default="correctness")
         subparser.add_argument("--world-profile", choices=WORLD_PROFILE_NAMES, default=os.environ.get("MATTMC_GRAPHICS_WORLD_PROFILE", "migration-gate"))
         subparser.add_argument("--world", default=os.environ.get("MATTMC_CAPTURE_WORLD"))
+        subparser.add_argument(
+            "--world-distant-horizons-opaque",
+            action="store_true",
+            default=os.environ.get("MATTMC_WORLD_DISTANT_HORIZONS_OPAQUE", "").lower() in {"1", "true", "yes"},
+            help="Require real Distant Horizons opaque render-list traversal to select the Rust Vulkan whole-frame route.",
+        )
+        subparser.add_argument(
+            "--world-distant-horizons-non-water",
+            action="store_true",
+            default=os.environ.get("MATTMC_WORLD_DISTANT_HORIZONS_NON_WATER", "").lower() in {"1", "true", "yes"},
+            help="Require the real Distant Horizons Rust route to execute a transparent non-water LOD segment; visible water rejects the row.",
+        )
+        subparser.add_argument(
+            "--world-distant-horizons-water",
+            action="store_true",
+            default=os.environ.get("MATTMC_WORLD_DISTANT_HORIZONS_WATER", "").lower() in {"1", "true", "yes"},
+            help="Require a deterministic copied-world water surface to execute through the real Rust Distant Horizons water stream.",
+        )
+        subparser.add_argument(
+            "--world-distant-horizons-texture-palette",
+            action="store_true",
+            default=os.environ.get("MATTMC_WORLD_DISTANT_HORIZONS_TEXTURE_PALETTE", "").lower() in {"1", "true", "yes"},
+            help="Require a deterministic far-LOD material palette to reach the real Rust Distant Horizons route.",
+        )
         subparser.add_argument("--client-args", default=os.environ.get("CLIENT_ARGS", ""))
         subparser.add_argument("--jvm-arg", action="append", default=[], help="Extra JVM option appended to JAVA_TOOL_OPTIONS for launched clients.")
         subparser.add_argument(
@@ -12784,6 +16933,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
             help="Select the BlockDisplay route for gameplay controls.",
         )
         subparser.add_argument(
+            "--world-text-scenario",
+            choices=("block-display", "name-tag", "text-display", "text-display-polygon-offset"),
+            default=os.environ.get("MATTMC_WORLD_TEXT_SCENARIO", ""),
+            help="Select a deterministic vanilla name-tag or ordinary TextDisplay source fixture.",
+        )
+        subparser.add_argument(
             "--world-mesh-falling-block-scenario",
             choices=("hidden", "sand", "gravel", "concrete-powder"),
             default=os.environ.get("MATTMC_WORLD_MESH_FALLING_BLOCK_SCENARIO", ""),
@@ -12800,6 +16955,132 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
             choices=("rust", "disabled", "legacy"),
             default=os.environ.get("MATTMC_WORLD_MESH_FALLING_BLOCK_CONTROL", "rust"),
             help="Select the FallingBlock route for gameplay controls.",
+        )
+        subparser.add_argument(
+            "--world-mesh-arrow-scenario",
+            choices=("hidden", "ordinary"),
+            default=os.environ.get("MATTMC_WORLD_MESH_ARROW_SCENARIO", ""),
+            help="Spawn deterministic vanilla Arrow entities for the shared indexed entity-mesh route.",
+        )
+        subparser.add_argument(
+            "--world-mesh-arrow-count",
+            type=int,
+            default=int(os.environ.get("MATTMC_WORLD_MESH_ARROW_COUNT", "-1")),
+            help="Override deterministic Arrow entity count for shared entity-mesh probes.",
+        )
+        subparser.add_argument(
+            "--world-mesh-arrow-control",
+            choices=("rust", "disabled", "legacy"),
+            default=os.environ.get("MATTMC_WORLD_MESH_ARROW_CONTROL", "rust"),
+            help="Select the Arrow route control for deterministic evidence.",
+        )
+        subparser.add_argument(
+            "--world-experience-orb-scenario",
+            choices=("hidden", "ordinary"),
+            default=os.environ.get("MATTMC_WORLD_EXPERIENCE_ORB_SCENARIO", ""),
+            help="Spawn deterministic vanilla ExperienceOrb entities for Rust-owned material-route validation.",
+        )
+        subparser.add_argument(
+            "--world-experience-orb-count",
+            type=int,
+            default=int(os.environ.get("MATTMC_WORLD_EXPERIENCE_ORB_COUNT", "-1")),
+            help="Override deterministic ExperienceOrb entity count for material-quad probes.",
+        )
+        subparser.add_argument(
+            "--world-experience-orb-control",
+            choices=("rust", "disabled", "legacy"),
+            default=os.environ.get("MATTMC_WORLD_EXPERIENCE_ORB_CONTROL", "rust"),
+            help="Select the ExperienceOrb route control for deterministic evidence.",
+        )
+        subparser.add_argument(
+            "--world-beacon-beam-scenario",
+            choices=("hidden", "ordinary"),
+            default=os.environ.get("MATTMC_WORLD_BEACON_BEAM_SCENARIO", ""),
+            help="Place a deterministic vanilla Beacon for the shared translucent material route.",
+        )
+        subparser.add_argument(
+            "--world-beacon-beam-control",
+            choices=("rust", "disabled", "legacy"),
+            default=os.environ.get("MATTMC_WORLD_BEACON_BEAM_CONTROL", "rust"),
+            help="Select the Beacon beam route control for deterministic evidence.",
+        )
+        subparser.add_argument(
+            "--world-mesh-model-scenario",
+            choices=("hidden", "chest", "bed", "bell", "shulker", "decorated-pot", "llama-spit", "evoker-fangs", "wither-skull", "chicken", "cow", "pig", "rabbit", "zombie"),
+            default=os.environ.get("MATTMC_WORLD_MESH_MODEL_SCENARIO", ""),
+        help="Create a real copied-world vanilla model producer for generic mesh-route validation.",
+        )
+        subparser.add_argument(
+            "--world-mesh-model-control",
+            choices=("rust", "disabled", "legacy"),
+            default=os.environ.get("MATTMC_WORLD_MESH_MODEL_CONTROL", "rust"),
+            help="Select the generic copied ModelPart route control.",
+        )
+        subparser.add_argument(
+            "--world-entity-flame-scenario",
+            choices=("hidden", "cow"),
+            default=os.environ.get("MATTMC_WORLD_ENTITY_FLAME_SCENARIO", ""),
+            help="Ignite the deterministic copied cow and validate its real vanilla entity-fire submit.",
+        )
+        subparser.add_argument(
+            "--world-entity-flame-control",
+            choices=("rust", "disabled", "legacy"),
+            default=os.environ.get("MATTMC_WORLD_ENTITY_FLAME_CONTROL", "rust"),
+            help="Select the entity-fire route for deterministic evidence.",
+        )
+        subparser.add_argument(
+            "--world-entity-shadow-scenario",
+            choices=("hidden", "cow"),
+            default=os.environ.get("MATTMC_WORLD_ENTITY_SHADOW_SCENARIO", ""),
+            help="Use the deterministic copied cow and validate its vanilla ground-shadow submit.",
+        )
+        subparser.add_argument(
+            "--world-entity-shadow-control",
+            choices=("rust", "disabled", "legacy"),
+            default=os.environ.get("MATTMC_WORLD_ENTITY_SHADOW_CONTROL", "rust"),
+            help="Select the entity-shadow route for deterministic evidence.",
+        )
+        subparser.add_argument(
+            "--world-entity-leash-scenario",
+            choices=("hidden", "cow"),
+            default=os.environ.get("MATTMC_WORLD_ENTITY_LEASH_SCENARIO", ""),
+            help="Leash the deterministic copied cow and validate its real vanilla leash submit.",
+        )
+        subparser.add_argument(
+            "--world-entity-leash-control",
+            choices=("rust", "disabled", "legacy"),
+            default=os.environ.get("MATTMC_WORLD_ENTITY_LEASH_CONTROL", "rust"),
+            help="Select the entity-leash route for deterministic evidence.",
+        )
+        subparser.add_argument(
+            "--world-mesh-primed-tnt-scenario",
+            choices=("hidden", "ordinary"),
+            default=os.environ.get("MATTMC_WORLD_MESH_PRIMED_TNT_SCENARIO", ""),
+            help="Spawn deterministic vanilla PrimedTnt entities for indexed-mesh route validation.",
+        )
+        subparser.add_argument(
+            "--world-mesh-primed-tnt-control",
+            choices=("rust", "disabled", "legacy"),
+            default=os.environ.get("MATTMC_WORLD_MESH_PRIMED_TNT_CONTROL", "rust"),
+            help="Select the PrimedTnt route for deterministic controls.",
+        )
+        subparser.add_argument(
+            "--world-weather-scenario",
+            choices=("rain",),
+            default=os.environ.get("MATTMC_WORLD_WEATHER_SCENARIO", ""),
+            help="Enable deterministic copied-world weather for Rust source-pass validation.",
+        )
+        subparser.add_argument(
+            "--world-cloud-scenario",
+            choices=("bounded",),
+            default=os.environ.get("MATTMC_WORLD_CLOUD_SCENARIO", ""),
+            help="Exercise real vanilla cloud-cell extraction through the bounded Rust whole-frame material route.",
+        )
+        subparser.add_argument(
+            "--world-weather-control",
+            choices=("rust", "disabled", "legacy"),
+            default=os.environ.get("MATTMC_WORLD_WEATHER_CONTROL", "rust"),
+            help="Select the deterministic weather route control.",
         )
         subparser.add_argument(
             "--world-mesh-piston-scenario",
@@ -12860,6 +17141,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
             "--world-static-terrain-scenario",
             choices=(
                 "real-world",
+                "texture-palette",
                 "hidden",
                 "interior-edit",
                 "boundary-x-edit",
@@ -13030,6 +17312,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
                 "missing",
                 "malformed",
                 "unsupported",
+                "terrain-identity",
                 "water-non-sequential",
                 "water-unequal-duration",
                 "water-interpolation-off",
@@ -13072,6 +17355,23 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
             "--shader-gbuffer-scene",
             action="store_true",
             help="Run the Rust-owned shader-pack/G-buffer validation scene as an isolated subsystem workload.",
+        )
+        subparser.add_argument(
+            "--rust-selected-source-execution",
+            action="store_true",
+            default=os.environ.get("MATTMC_RUST_SELECTED_SOURCE_EXECUTION", "").lower() in {"1", "true", "yes"},
+            help=(
+                "Explicitly opt a Current Rust Vulkan whole-frame capture/gameplay row into the "
+                "fully Rust-owned selected shader-pack source plan after native admission."
+            ),
+        )
+        subparser.add_argument(
+            "--rust-full-gameplay-attachments",
+            action="store_true",
+            help=(
+                "Capture one selected Rust Vulkan gameplay frame with the complete backend-owned "
+                "attachment set. Diagnostic only; ordinary captures retain final output only."
+            ),
         )
         subparser.add_argument("--warmup-frames", type=int)
         subparser.add_argument("--measure-frames", type=int)

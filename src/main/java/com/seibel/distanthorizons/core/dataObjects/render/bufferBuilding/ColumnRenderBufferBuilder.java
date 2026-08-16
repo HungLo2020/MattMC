@@ -18,6 +18,8 @@ import com.seibel.distanthorizons.core.util.LodUtil;
 import com.seibel.distanthorizons.core.util.RenderDataPointUtil;
 import com.seibel.distanthorizons.core.dataObjects.render.columnViews.ColumnArrayView;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -49,13 +51,25 @@ public class ColumnRenderBufferBuilder
 		CompletableFuture<LodBufferContainer> uploadFuture = bufferContainer.makeAndUploadBuffersAsync(quadBuilder);
 		uploadFuture.whenComplete((uploadedBuffer, exception) -> 
 		{
-			// clean up if not uploaded
-			if (uploadedBuffer != null && !uploadedBuffer.buffersUploaded)
+			// A selected Rust whole-frame route completes this CPU build without a
+			// Java VBO by design. Its copied semantic asset is now owned by the
+			// collector, so treating it as a failed legacy upload would immediately
+			// retire the asset before the real quadtree can select it.
+			if (uploadedBuffer != null
+				&& !uploadedBuffer.buffersUploaded
+				&& shouldCloseUnuploadedContainer(
+					net.vulkanic.world.DistantHorizonsSemanticCollector.usesRustWholeFrameSemanticBuild()
+				))
 			{
 				uploadedBuffer.close();
 			}
 		});
 		return uploadFuture;
+	}
+
+	static boolean shouldCloseUnuploadedContainer(boolean rustWholeFrameSemanticBuild)
+	{
+		return !rustWholeFrameSemanticBuild;
 	}
 	public static void makeLodRenderData(
 			LodQuadBuilder quadBuilder, ColumnRenderSource renderSource, IDhClientLevel clientLevel,
@@ -248,16 +262,43 @@ public class ColumnRenderBufferBuilder
 						{
 							break;
 						}
+						net.vulkanic.world.DistantHorizonsSemanticCollector.recordWaterSourceInput(
+							renderSource.pos,
+							thisDetailLevel,
+							DhSectionPos.getMinCornerBlockX(renderSource.pos) + (relX << thisDetailLevel),
+							clientLevel.getLevelWrapper().getMinHeight(),
+							DhSectionPos.getMinCornerBlockZ(renderSource.pos) + (relZ << thisDetailLevel),
+							data,
+							renderSource.getSemanticMaterialId(relX, relZ, i)
+						);
 						
 						long topDataPoint = (i - 1) >= 0 ? columnRenderData.get(i - 1) : RenderDataPointUtil.EMPTY_DATA;
 						long bottomDataPoint = (i + 1) < columnRenderData.size() ? columnRenderData.get(i + 1) : RenderDataPointUtil.EMPTY_DATA;
+						SemanticMaterialProvenance semanticMaterial = semanticMaterialProvenanceForDetailLevel(
+							net.vulkanic.world.DistantHorizonsSemanticCollector.usesRustWholeFrameSemanticBuild(),
+							thisDetailLevel,
+							renderSource.getSemanticMaterialId(relX, relZ, i),
+							renderSource.getSemanticVariantState(relX, relZ, i),
+							renderSource.getSemanticVariantPosition(relX, relZ, i)
+						);
+						int semanticMaterialId = semanticMaterial.materialId();
+						if (semanticMaterialId > ColumnRenderSource.SEMANTIC_MATERIAL_UNAVAILABLE)
+						{
+							semanticMaterialId = quadBuilder.internSemanticMaterial(
+								renderSource.getSemanticMaterialIdentity(semanticMaterialId)
+							);
+						}
+						List<ColumnRenderSource.SemanticMaterialSpan> semanticMaterialSpans =
+							resolveSemanticMaterialSpans(renderSource, thisDetailLevel, relX, relZ, i, quadBuilder);
 						
 						addRenderDataPointToBuilder(
 								clientLevel, phantomArrayCheckout,
 								data, topDataPoint, bottomDataPoint,
 								adjColumnViews, isSameDetailLevel,
-								thisDetailLevel, relX, relZ,
-								quadBuilder, debugSourceFlag);
+							thisDetailLevel, relX, relZ, semanticMaterialId,
+							semanticMaterial.variantState(), semanticMaterial.variantPosition(),
+							semanticMaterialSpans,
+							quadBuilder, debugSourceFlag);
 					}
 					
 				}// for z
@@ -266,11 +307,78 @@ public class ColumnRenderBufferBuilder
 		
 		quadBuilder.mergeQuads();
 	}
+
+	/**
+	 * Exact atlas provenance is only truthful for block-resolution DH geometry.
+	 * At wider detail levels one emitted face represents multiple horizontal block
+	 * cells, while this sidecar has only one material identity. Repeating that
+	 * one sprite across the whole LOD face would assign a valid texture to the
+	 * wrong terrain. Keep the reduced DH material path for those faces until the
+	 * transport can express horizontal contributor coverage.
+	 */
+	static SemanticMaterialProvenance semanticMaterialProvenanceForDetailLevel(
+		boolean rustWholeFrameSemanticBuild, byte detailLevel, int materialId,
+		byte variantState, long variantPosition
+	)
+	{
+		if (rustWholeFrameSemanticBuild && detailLevel > 0)
+		{
+			return new SemanticMaterialProvenance(
+				ColumnRenderSource.SEMANTIC_MATERIAL_UNAVAILABLE,
+				ColumnRenderSource.SEMANTIC_VARIANT_UNAVAILABLE,
+				0L
+			);
+		}
+		return new SemanticMaterialProvenance(materialId, variantState, variantPosition);
+	}
+
+	static record SemanticMaterialProvenance(int materialId, byte variantState, long variantPosition) { }
+
+	/**
+	 * A vertically reduced block-resolution DH entry can cover several real
+	 * source blocks. Convert its material intervals into builder-local IDs for
+	 * the CPU sidecar; no texture or backend object crosses this boundary.
+	 */
+	private static List<ColumnRenderSource.SemanticMaterialSpan> resolveSemanticMaterialSpans(
+		ColumnRenderSource renderSource, byte detailLevel, int relX, int relZ, int verticalIndex,
+		LodQuadBuilder quadBuilder
+	)
+	{
+		if (!net.vulkanic.world.DistantHorizonsSemanticCollector.usesRustWholeFrameSemanticBuild()
+			|| detailLevel > 0)
+		{
+			return List.of();
+		}
+		List<ColumnRenderSource.SemanticMaterialSpan> sourceSpans =
+			renderSource.getSemanticMaterialSpans(relX, relZ, verticalIndex);
+		if (sourceSpans.isEmpty())
+		{
+			return List.of();
+		}
+		List<ColumnRenderSource.SemanticMaterialSpan> resolved = new ArrayList<>(sourceSpans.size());
+		for (ColumnRenderSource.SemanticMaterialSpan span : sourceSpans)
+		{
+			int materialId = span.materialId();
+			if (materialId > ColumnRenderSource.SEMANTIC_MATERIAL_UNAVAILABLE)
+			{
+				materialId = quadBuilder.internSemanticMaterial(
+					renderSource.getSemanticMaterialIdentity(materialId)
+				);
+			}
+			resolved.add(new ColumnRenderSource.SemanticMaterialSpan(
+				span.minY(), span.maxY(), materialId, span.variantState(), span.variantPosition()
+			));
+		}
+		return List.copyOf(resolved);
+	}
+
 	private static void addRenderDataPointToBuilder(
 			IDhClientLevel clientLevel, PhantomArrayListCheckout phantomArrayCheckout,
 			long renderData, long topRenderData, long bottomRenderData, 
 			ColumnArrayView[] adjColumnViews, boolean[] isSameDetailLevel,
-			byte detailLevel, int renderSourceOffsetPosX, int renderSourceOffsetPosZ, 
+			byte detailLevel, int renderSourceOffsetPosX, int renderSourceOffsetPosZ, int semanticMaterialId,
+			byte semanticVariantState, long semanticVariantPosition,
+			List<ColumnRenderSource.SemanticMaterialSpan> semanticMaterialSpans,
 			LodQuadBuilder quadBuilder, ColumnRenderSource.DebugSourceFlag debugSource)
 	{
 		long sectionPos = DhSectionPos.encode(detailLevel, renderSourceOffsetPosX, renderSourceOffsetPosZ);
@@ -404,7 +512,11 @@ public class ColumnRenderBufferBuilder
 				blockMinX, blockMinY, blockMinZ,
 				color,
 				blockMaterialId,
-				RenderDataPointUtil.getLightSky(renderData),
+			semanticMaterialId,
+			semanticVariantState,
+			semanticVariantPosition,
+			semanticMaterialSpans,
+			RenderDataPointUtil.getLightSky(renderData),
 				fullBright ? LodUtil.MAX_MC_LIGHT : RenderDataPointUtil.getLightBlock(renderData),
 				topRenderData, bottomRenderData, adjColumnViews, isSameDetailLevel);
 	}

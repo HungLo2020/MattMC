@@ -135,13 +135,48 @@ class VulkanicGalBridgeAbiTest {
 		);
 		assertTrue(
 			Files.readString(Path.of("src/main/java/net/vulkanic/world/WorldRenderRoutePolicy.java"))
-				.contains("selected.usesRustOpenGl() && net.irisshaders.iris.Iris.isPackInUseQuick()"),
+				.contains("if (selected.usesRustOpenGl() && irisPackActive)"),
 			"Iris-active OpenGL falling blocks must be routed to Java compatibility before Rust selection"
 		);
 		assertTrue(
 			Files.readString(Path.of("src/main/java/net/vulkanic/world/WorldRenderRoutePolicy.java"))
 				.contains("currentPistonMovingBlockRoute()")
 		);
+		String weatherRoutePolicy = Files.readString(Path.of("src/main/java/net/vulkanic/world/WorldRenderRoutePolicy.java"));
+		assertTrue(weatherRoutePolicy.contains("currentWeatherRoute()"));
+		assertFalse(
+			weatherRoutePolicy.contains("mattmc.dev.rustGalWeather.v1"),
+			"weather must follow whole-frame ownership without a separate opt-in"
+		);
+		assertTrue(
+			weatherRoutePolicy.contains("return selectShaderAffectedRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());"),
+			"weather must use the shared shader-aware policy once the bounded Rust weather feature is selected"
+		);
+		String weatherRenderer = Files.readString(Path.of("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+		assertTrue(weatherRenderer.contains("enqueueWorldWeather(WeatherRenderState state, Vec3 cameraPos, boolean depthWrite)"));
+		assertTrue(weatherRenderer.contains("refreshBorrowedOpenGlFrameSeed"));
+		assertTrue(weatherRenderer.contains("route=rust-vulkan-whole-frame"));
+		assertTrue(weatherRenderer.contains("Rust VulkanicGAL weather submission failed after Rust route selection"));
+		assertFalse(weatherRenderer.contains("return RustGalFrameCoordinator.executeWorldPrimitiveFrame(minecraft, frame, \"minecraft.world.weather\")"));
+		String cloudRoutePolicy = Files.readString(Path.of("src/main/java/net/vulkanic/world/WorldRenderRoutePolicy.java"));
+		assertTrue(cloudRoutePolicy.contains("currentCloudRoute()"));
+		assertFalse(cloudRoutePolicy.contains("mattmc.dev.rustGalClouds.v1"));
+		assertTrue(weatherRoutePolicy.contains("currentDistantHorizonsOpaqueRoute()"));
+		assertFalse(
+			weatherRoutePolicy.contains("mattmc.dev.rustGalDistantHorizons.opaqueV1"),
+			"DH must rely on its real render-list admission, not an opt-in flag before preflight"
+		);
+		assertTrue(
+			Files.readString(Path.of("src/main/java/com/seibel/distanthorizons/core/render/renderer/LodRenderer.java"))
+				.contains("buffers.buildRenderList(renderParams)"),
+			"DH route selection must inspect the real render list before Rust ownership"
+		);
+		String cloudRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/CloudRenderer.java"));
+		assertTrue(cloudRenderer.contains("enqueueRustGalClouds"));
+		assertTrue(cloudRenderer.contains("this.texture.cells()"));
+		assertFalse(cloudRenderer.contains("enqueueWorldCloudFaces(\n\t\t\tthis.texture,"));
+		String levelRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/LevelRenderer.java"));
+		assertTrue(levelRenderer.contains("currentCloudRoute().usesRustWholeFrameVulkan()"));
 		assertEquals(
 			WorldRenderRoutePolicy.Route.JAVA_COMPATIBILITY,
 			WorldRenderRoutePolicy.selectWholeFrameRouteForTests(false, false, false, false),
@@ -160,6 +195,354 @@ class VulkanicGalBridgeAbiTest {
 				.contains("WorldRenderRoutePolicy.staticTerrainBuildRequiresRustWholeFrameMetadata()"),
 			"chunk builds must prepare Rust terrain metadata before backend-selected state is stable"
 		);
+	}
+
+	@Test
+	void shaderAffectedWeatherRouteKeepsIrisAndNormalJavaVulkanCompatibilityOwned() {
+		assertEquals(
+			WorldRenderRoutePolicy.Route.RUST_VULKAN_WHOLE_FRAME,
+			WorldRenderRoutePolicy.selectShaderAffectedRouteForTests(true, true, true, false, false),
+			"a selected Rust Vulkan whole-frame route owns weather even with a shader pack configured"
+		);
+		assertEquals(
+			WorldRenderRoutePolicy.Route.JAVA_COMPATIBILITY,
+			WorldRenderRoutePolicy.selectShaderAffectedRouteForTests(true, false, false, false, false),
+			"normal Java Vulkan must remain on the compatibility route"
+		);
+		assertEquals(
+			WorldRenderRoutePolicy.Route.JAVA_COMPATIBILITY,
+			WorldRenderRoutePolicy.selectShaderAffectedRouteForTests(false, false, true, false, false),
+			"Iris OpenGL must remain Java-compatible until Rust owns the complete shader frame"
+		);
+		assertEquals(
+			WorldRenderRoutePolicy.Route.RUST_OPENGL_BORROWED_CONTEXT,
+			WorldRenderRoutePolicy.selectShaderAffectedRouteForTests(false, false, false, false, false),
+			"non-Iris OpenGL may select Rust's explicit borrowed-context route"
+		);
+		assertEquals(
+			WorldRenderRoutePolicy.Route.DISABLED,
+			WorldRenderRoutePolicy.selectShaderAffectedRouteForTests(true, true, false, true, false)
+		);
+		assertEquals(
+			WorldRenderRoutePolicy.Route.JAVA_COMPATIBILITY,
+			WorldRenderRoutePolicy.selectShaderAffectedRouteForTests(true, true, false, false, true)
+		);
+	}
+
+	@Test
+	void arrowRouteIsWholeFrameOnlyAndStaysExplicitOutsideItsBoundedEligibility() throws Exception {
+		assertEquals(
+			WorldRenderRoutePolicy.Route.JAVA_COMPATIBILITY,
+			WorldRenderRoutePolicy.currentArrowRoute(false),
+			"unsupported arrow semantics must remain Java-owned before route selection"
+		);
+		String routePolicy = Files.readString(Path.of("src/main/java/net/vulkanic/world/WorldRenderRoutePolicy.java"));
+		String arrowRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/entity/ArrowRenderer.java"));
+		String worldRenderer = Files.readString(Path.of("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+		assertTrue(routePolicy.contains("currentArrowRoute(boolean eligible)"));
+		assertTrue(routePolicy.contains("return selectWholeFrameRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());"));
+		assertTrue(arrowRenderer.contains("enqueueArrowModel("));
+		assertTrue(arrowRenderer.contains("isSemanticCoverageOnly()"));
+		assertTrue(arrowRenderer.contains("Rust whole-frame Arrow encountered unsupported semantic state before route selection"));
+		String deterministicCapture = Files.readString(Path.of("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java"));
+		assertTrue(deterministicCapture.contains("decision.javaDrawn() && !decision.rustSelected() && !decision.rustQueued()"));
+		assertTrue(deterministicCapture.contains("decision.rustSelected() && decision.rustQueued() && !decision.javaDrawn()"));
+		assertTrue(deterministicCapture.contains("server.execute(() -> applySourceEntityIsolationOnServer(server, dimension))"));
+		assertTrue(deterministicCapture.contains("private static void applySourceEntityIsolationOnServer"));
+		int captureAfterRender = deterministicCapture.indexOf("public static void afterRender(Minecraft minecraft)");
+		int captureIsolationAdvance = deterministicCapture.indexOf("prepareSourceEntityIsolationBeforeFrame(minecraft);", captureAfterRender);
+		int captureSettledGate = deterministicCapture.indexOf("settledReadyGateSatisfied(minecraft)", captureAfterRender);
+		assertTrue(captureIsolationAdvance >= 0 && captureIsolationAdvance < captureSettledGate,
+			"whole-frame captures must advance copied-world source isolation before checking source-plan readiness");
+		int captureModelSetup = deterministicCapture.indexOf("setupMovingMeshScenarioAfterSettledReady(minecraft)", captureAfterRender);
+		int captureSourceReceiptGate = deterministicCapture.indexOf("selectedSourceCaptureRequested() && !requiredRustSourceExecutionObserved()", captureAfterRender);
+		assertTrue(captureModelSetup >= 0 && captureModelSetup < captureSourceReceiptGate,
+			"selected-source receipt validation must run after copied-world producer setup so a required model can produce it");
+		assertTrue(deterministicCapture.contains("else if (!MODEL_MESH_SCENARIO.isEmpty() && !\"hidden\".equals(MODEL_MESH_SCENARIO))"),
+			"static ModelPart scenarios must retain the same bounded capture sequence as animated model fixtures");
+		assertTrue(deterministicCapture.contains("selectedSourceCaptureRequested() && isModelMeshEntityScenario()"),
+			"selected-source entity captures must retain the exact producer-visible pose instead of accepting unrelated later entity work");
+		assertTrue(worldRenderer.contains("extractArrowModelMesh"));
+		assertTrue(worldRenderer.contains("STRATUM_WORLD_ENTITY_MESH"));
+		assertTrue(worldRenderer.contains("applyPackedLight(0xffffffff, packedLight)"));
+		assertTrue(worldRenderer.contains("normalPacked, 0, 0"));
+		assertTrue(worldRenderer.contains("state.nameTag == null"));
+		assertTrue(worldRenderer.contains("state.shadowPieces.isEmpty()"));
+		String levelRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/LevelRenderer.java"));
+		assertTrue(levelRenderer.contains("isVanillaArrowStateEligible(arrowState)"));
+		assertFalse(worldRenderer.contains("TextureAtlasSprite sprite, ResourceLocation textureLocation"));
+		String modelSubmitter = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/SubmitNodeCollection.java"));
+		String livingEntityRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/entity/LivingEntityRenderer.java"));
+		assertTrue(routePolicy.contains("currentModelMeshRoute(boolean eligible)"));
+		assertFalse(
+			routePolicy.contains("mattmc.dev.rustGalWorldModelMesh.v1"),
+			"eligible indexed entity models must follow Rust whole-frame ownership without an opt-in"
+		);
+		assertTrue(worldRenderer.contains("model instanceof ChestModel"));
+		assertTrue(worldRenderer.contains("modelMeshIneligibilityReason("));
+		assertTrue(levelRenderer.contains("eligibility=\" + (ineligibility"));
+		assertTrue(worldRenderer.contains("model instanceof ShulkerBoxRenderer.ShulkerBoxModel"));
+		assertTrue(worldRenderer.contains("model instanceof LlamaSpitModel"));
+		assertTrue(worldRenderer.contains("model instanceof EvokerFangsModel"));
+		assertTrue(worldRenderer.contains("model instanceof SkullModel"));
+		assertTrue(worldRenderer.contains("isStandaloneModelMeshEligible("));
+		assertTrue(worldRenderer.contains("enqueueStandaloneModelMesh("));
+		assertTrue(worldRenderer.contains("readModelTexturePayload(textureIdentity)"));
+		assertTrue(worldRenderer.contains("path.startsWith(\"textures/\") && path.endsWith(\".png\")"));
+		assertTrue(worldRenderer.contains("neither the RenderType nor its backing GPU"));
+		assertTrue(worldRenderer.contains("modelMeshRenderSemantics(renderType)"));
+		assertTrue(worldRenderer.contains("BlendFunction.TRANSLUCENT.equals(blend.get())"));
+		assertTrue(worldRenderer.contains("MATERIAL_MODE_TRANSLUCENT"));
+		assertTrue(worldRenderer.contains("renderType.pipeline().isCull() ? CULL_BACK : CULL_NONE"));
+		assertTrue(worldRenderer.contains("extractModelPartMesh("));
+		assertTrue(worldRenderer.contains("recordModelMeshRouteDecision("));
+		assertTrue(worldRenderer.contains("hasCurrentFrameRustModelMeshDecision(Model<?> model, TextureAtlasSprite sprite)"));
+		assertTrue(worldRenderer.contains("hasCurrentFrameRustModelMeshDecision(Model<?> model, ResourceLocation textureIdentity)"));
+		assertTrue(worldRenderer.contains("PENDING_MODEL_MESH_SEMANTICS.add(new ModelMeshSemanticIdentity("));
+		assertTrue(worldRenderer.contains("PENDING_MODEL_MESH_SEMANTICS.contains(new ModelMeshSemanticIdentity("));
+		assertTrue(worldRenderer.contains("isVanillaCowModelMeshEligible("));
+		assertTrue(worldRenderer.contains("isVanillaZombieModelMeshEligible("));
+		assertFalse(worldRenderer.contains("decision.frameIndex() == frameIndex"),
+			"coverage replay must use the active semantic request, not a delayed capture-frame counter");
+		assertTrue(levelRenderer.contains("isSelectedWholeFrameModelSemantic("),
+			"coverage replay may suppress a model only after the real same-frame Rust semantic route selected it");
+		assertTrue(levelRenderer.contains("model instanceof net.minecraft.client.model.ChestModel && state instanceof Float"));
+		assertTrue(levelRenderer.contains("state instanceof net.minecraft.client.renderer.entity.state.CowRenderState cowRenderState"));
+		assertTrue(levelRenderer.contains("state instanceof net.minecraft.client.renderer.entity.state.PigRenderState pigRenderState"));
+		assertTrue(levelRenderer.contains("state instanceof net.minecraft.client.renderer.entity.state.RabbitRenderState rabbitRenderState"));
+		assertTrue(levelRenderer.contains("entityRenderState instanceof net.minecraft.client.renderer.entity.state.ZombieRenderState"));
+		assertTrue(levelRenderer.contains("state instanceof net.minecraft.client.renderer.entity.state.ZombieRenderState"));
+		assertTrue(livingEntityRenderer.contains("Rust whole-frame living-model route selected without a copied indexed mesh request"));
+		assertTrue(livingEntityRenderer.contains("isVanillaCowModelMeshEligible("));
+		assertTrue(livingEntityRenderer.contains("isVanillaPigModelMeshEligible("));
+		assertTrue(livingEntityRenderer.contains("isVanillaRabbitModelMeshEligible("));
+		assertTrue(livingEntityRenderer.contains("isVanillaZombieModelMeshEligible("));
+		assertTrue(livingEntityRenderer.contains("ZombieRenderState zombieRenderState"));
+		assertTrue(worldRenderer.contains("&& !state.displayFireAnimation"));
+		assertTrue(deterministicCapture.contains("prepareModelMeshScenarioDifficulty"));
+		assertTrue(deterministicCapture.contains("zombie-requires-non-peaceful-difficulty"));
+		assertTrue(deterministicCapture.contains("difficultyEffective"));
+		assertTrue(deterministicCapture.contains("case \"zombie\" -> \"minecraft:textures/entity/zombie/zombie.png\""));
+		assertTrue(worldRenderer.contains("textures/entity/pig/temperate_pig.png"));
+		assertTrue(worldRenderer.contains("textures/entity/pig/warm_pig.png"));
+		assertFalse(worldRenderer.contains("textures/entity/pig/pig.png"),
+			"the direct-texture Pig contract must use the current vanilla variant identities, not the removed pre-variant texture");
+		assertTrue(livingEntityRenderer.contains("enqueueStandaloneModelMesh("));
+		assertTrue(livingEntityRenderer.contains("EntityRenderDispatcher.isSemanticSubmission()"));
+		int wholeFrameEntitySubmitStart = levelRenderer.indexOf("private void submitSelectedWholeFrameMeshEntities");
+		int wholeFrameEntitySubmitEnd = levelRenderer.indexOf("private void submitWholeFrameWorldText", wholeFrameEntitySubmitStart);
+		String wholeFrameEntitySubmit = levelRenderer.substring(wholeFrameEntitySubmitStart, wholeFrameEntitySubmitEnd);
+		assertTrue(wholeFrameEntitySubmit.contains("entityRenderState instanceof net.minecraft.client.renderer.entity.state.CowRenderState"));
+		assertTrue(wholeFrameEntitySubmit.contains("entityRenderState instanceof net.minecraft.client.renderer.entity.state.PigRenderState"),
+			"an eligible Pig must reach the same real whole-frame entity submit traversal as Cow before its renderer makes the final route decision");
+		assertTrue(modelSubmitter.contains("enqueueModelMesh("));
+		assertTrue(modelSubmitter.contains("Rust whole-frame model route selected without a copied indexed mesh request"));
+		assertTrue(routePolicy.contains("currentModelPartMeshRoute(boolean eligible)"));
+		assertFalse(routePolicy.contains("mattmc.dev.rustGalWorldModelPart.v1"));
+		assertTrue(worldRenderer.contains("isModelPartMeshEligible("));
+		assertTrue(worldRenderer.contains("enqueueModelPartMesh("));
+		assertTrue(worldRenderer.contains("modelPartEntityIdentity(textureIdentity)"));
+		assertTrue(worldRenderer.contains("\":model_part/\""));
+		assertTrue(worldRenderer.contains("if (outlineColor > 0) return \"outline\";"));
+		assertTrue(worldRenderer.contains("resolvedModelInstanceColor(tintedColor)"));
+		assertTrue(worldRenderer.contains("tintedColor == 0 ? 0xffffffff : tintedColor"));
+		assertTrue(worldRenderer.contains("PENDING_MESH_PRODUCERS.add(PendingMeshProducer.MODEL_PART)"));
+		assertTrue(worldRenderer.contains("The coordinator calls this only after the owning Rust whole-frame"));
+		assertFalse(worldRenderer.contains("instancesByProducer.isEmpty() || !DeterministicCameraCapture.isActiveForDiagnostics()"));
+		assertTrue(worldRenderer.contains("if (containsWorldMeshAsset(meshes, mesh.meshKey()))"));
+		assertTrue(modelSubmitter.contains("currentModelPartMeshRoute(rustEligible)"));
+		assertTrue(modelSubmitter.contains("Rust whole-frame ModelPart route selected without a copied indexed mesh request"));
+		assertTrue(levelRenderer.contains("currentModelMeshRoute(true).usesRustWholeFrameVulkan()"));
+		assertTrue(levelRenderer.contains("currentModelPartMeshRoute(true).usesRustWholeFrameVulkan()"));
+		assertTrue(levelRenderer.contains("submitSelectedWholeFrameModelBlockEntities"));
+		assertTrue(levelRenderer.contains("instanceof net.minecraft.client.renderer.blockentity.state.ChestRenderState"));
+		assertTrue(levelRenderer.contains("instanceof BedRenderState"));
+		assertTrue(levelRenderer.contains("instanceof net.minecraft.client.renderer.blockentity.state.DecoratedPotRenderState"));
+		assertTrue(levelRenderer.contains("instanceof BellRenderState"));
+		assertTrue(levelRenderer.contains("instanceof net.minecraft.client.renderer.entity.state.LlamaSpitRenderState"));
+		assertTrue(levelRenderer.contains("Animated and translucent models remain semantic coverage"));
+		assertTrue(levelRenderer.contains("isSelectedWholeFrameModelSemantic(model, state, sprite)"));
+		assertTrue(levelRenderer.contains("model instanceof net.minecraft.client.model.LlamaSpitModel"));
+		assertTrue(levelRenderer.contains("sprite.contents().name().getPath().startsWith(\"entity/bed/\")"));
+		assertTrue(levelRenderer.contains("hasCurrentFrameRustModelMeshDecision(model, sprite)"),
+			"selected-source coverage must only exempt a model after the real same-frame Rust submit queued it");
+		String llamaSpitRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/entity/LlamaSpitRenderer.java"));
+		assertTrue(llamaSpitRenderer.contains("enqueueStandaloneModelMesh("));
+		assertTrue(llamaSpitRenderer.contains("Rust whole-frame LlamaSpit route selected"));
+		assertFalse(llamaSpitRenderer.contains("TextureAtlasSprite"));
+		String evokerFangsRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/entity/EvokerFangsRenderer.java"));
+		assertTrue(evokerFangsRenderer.contains("enqueueStandaloneModelMesh("));
+		assertTrue(evokerFangsRenderer.contains("Rust whole-frame EvokerFangs route selected"));
+		assertFalse(evokerFangsRenderer.contains("TextureAtlasSprite"));
+		String witherSkullRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/entity/WitherSkullRenderer.java"));
+		assertTrue(witherSkullRenderer.contains("enqueueStandaloneModelMesh("));
+		assertTrue(witherSkullRenderer.contains("Rust whole-frame WitherSkull route selected"));
+		assertFalse(witherSkullRenderer.contains("TextureAtlasSprite"));
+		assertTrue(deterministicCapture.contains("\"evoker-fangs\".equals(MODEL_MESH_SCENARIO)"));
+		assertTrue(deterministicCapture.contains("\"wither-skull\".equals(MODEL_MESH_SCENARIO)"));
+		assertTrue(deterministicCapture.contains("\"cow\".equals(MODEL_MESH_SCENARIO)"));
+		assertTrue(deterministicCapture.contains("\"pig\".equals(MODEL_MESH_SCENARIO)"));
+		assertTrue(deterministicCapture.contains("&& (MODEL_MESH_SCENARIO.isEmpty() || \"hidden\".equals(MODEL_MESH_SCENARIO))"));
+	}
+
+	@Test
+	void experienceOrbRouteUsesOnlyTheSharedSemanticMaterialPath() throws Exception {
+		String routePolicy = Files.readString(Path.of("src/main/java/net/vulkanic/world/WorldRenderRoutePolicy.java"));
+		String orbRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/entity/ExperienceOrbRenderer.java"));
+		String levelRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/LevelRenderer.java"));
+		String worldRenderer = Files.readString(Path.of("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+		String coordinator = Files.readString(Path.of("src/main/java/net/vulkanic/gui/RustGalFrameCoordinator.java"));
+		String capture = Files.readString(Path.of("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java"));
+
+		assertTrue(routePolicy.contains("currentExperienceOrbRoute()"));
+		assertTrue(routePolicy.contains("mattmc.dev.rustGalWorldExperienceOrb.disabled"));
+		assertTrue(routePolicy.contains("selectShaderAffectedRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive())"));
+		assertTrue(orbRenderer.contains("enqueueExperienceOrb("));
+		assertTrue(orbRenderer.contains("!submitNodeCollector.isSemanticCoverageOnly() && route.usesRustWholeFrameVulkan()"));
+		assertTrue(orbRenderer.contains("Rust whole-frame experience-orb route selected without a semantic material request"));
+		assertTrue(orbRenderer.contains("!route.usesRustWholeFrameVulkan()"));
+		assertTrue(levelRenderer.contains("boolean experienceOrbs = net.vulkanic.world.WorldRenderRoutePolicy.currentExperienceOrbRoute().usesRustWholeFrameVulkan();"));
+		assertTrue(levelRenderer.contains("experienceOrbs && entityRenderState instanceof ExperienceOrbRenderState"));
+		assertTrue(worldRenderer.contains("MATERIAL_TEXTURE_EXPERIENCE_ORB"));
+		assertTrue(worldRenderer.contains("MATERIAL_MODE_TRANSLUCENT"));
+		assertTrue(worldRenderer.contains("recordWholeFrameExperienceOrbExecution"));
+		assertTrue(coordinator.contains("recordWholeFrameExperienceOrbExecution("));
+		assertTrue(capture.contains("setupExperienceOrbScenario"));
+		assertTrue(capture.contains("rustGalWorldExperienceOrbExecution"));
+		assertTrue(capture.contains("hasCurrentExperienceOrbRoute"));
+	}
+
+	@Test
+	void beaconBeamRouteUsesTheSharedTranslucentMaterialPath() throws Exception {
+		String routePolicy = Files.readString(Path.of("src/main/java/net/vulkanic/world/WorldRenderRoutePolicy.java"));
+		String beaconRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/blockentity/BeaconRenderer.java"));
+		String worldRenderer = Files.readString(Path.of("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+		String coordinator = Files.readString(Path.of("src/main/java/net/vulkanic/gui/RustGalFrameCoordinator.java"));
+		String capture = Files.readString(Path.of("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java"));
+
+		assertTrue(routePolicy.contains("currentBeaconBeamRoute()"));
+		assertTrue(routePolicy.contains("mattmc.dev.rustGalWorldBeaconBeam.disabled"));
+		assertTrue(routePolicy.contains("selectWholeFrameRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive())"));
+		assertTrue(beaconRenderer.contains("enqueueBeaconBeam("));
+		assertTrue(beaconRenderer.contains("!submitNodeCollector.isSemanticCoverageOnly()"));
+		assertTrue(beaconRenderer.contains("BEAM_LOCATION.equals(resourceLocation)"));
+		assertTrue(worldRenderer.contains("MATERIAL_TEXTURE_BEACON_BEAM"));
+		assertTrue(worldRenderer.contains("MATERIAL_MODE_TRANSLUCENT"));
+		assertTrue(worldRenderer.contains("MATERIAL_SOURCE_UV_LOCAL_TEXTURE"));
+		assertTrue(worldRenderer.contains("recordWholeFrameBeaconBeamExecution"));
+		assertTrue(coordinator.contains("recordWholeFrameBeaconBeamExecution("));
+		assertTrue(capture.contains("setupBeaconBeamScenario"));
+		assertTrue(capture.contains("hasCurrentBeaconBeamRoute"));
+		assertFalse(beaconRenderer.contains("TextureAtlasSprite"));
+	}
+
+	@Test
+	void entityFireRouteIsCollectedBeforeWholeFrameFeatureQueuesAreCleared() throws Exception {
+		String routePolicy = Files.readString(Path.of("src/main/java/net/vulkanic/world/WorldRenderRoutePolicy.java"));
+		String features = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/feature/FeatureRenderDispatcher.java"));
+		String levelRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/LevelRenderer.java"));
+		String worldRenderer = Files.readString(Path.of("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+		String coordinator = Files.readString(Path.of("src/main/java/net/vulkanic/gui/RustGalFrameCoordinator.java"));
+		String capture = Files.readString(Path.of("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java"));
+
+		assertTrue(routePolicy.contains("currentEntityFlameRoute()"));
+		assertTrue(routePolicy.contains("mattmc.dev.rustGalWorldEntityFlame.disabled"));
+		assertTrue(routePolicy.contains("selectWholeFrameRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive())"));
+		assertTrue(features.contains("collectEntityFlameSemantics(submitNodeCollection.getFlameSubmits(), this.atlasManager)"));
+		assertTrue(features.contains("public void renderBlockFeaturesOnly()"));
+		assertTrue(features.contains("this.submitNodeStorage.clear();"));
+		assertTrue(levelRenderer.contains("!net.vulkanic.world.WorldRenderRoutePolicy.currentEntityFlameRoute().usesRustWholeFrameVulkan()"));
+		assertTrue(worldRenderer.contains("collectEntityFlameSemantics("));
+		assertTrue(worldRenderer.contains("MATERIAL_TEXTURE_TERRAIN_BLOCK_ATLAS"));
+		assertTrue(worldRenderer.contains("MATERIAL_SOURCE_UV_MINECRAFT_BLOCK_ATLAS"));
+		assertTrue(worldRenderer.contains("MATERIAL_MODE_CUTOUT"));
+		assertTrue(worldRenderer.contains("Rust whole-frame entity-fire route selected before the copied terrain atlas was registered"));
+		assertTrue(worldRenderer.contains("\"entity-flame\", \"rust-vulkan-whole-frame:cutout-quads=\""));
+		assertTrue(worldRenderer.contains("pendingEntityFlameQuadCount"));
+		assertTrue(worldRenderer.contains("recordWholeFrameEntityFlameExecution"));
+		assertTrue(coordinator.contains("primitiveFrame.entityFlameQuadCount()"));
+		assertTrue(capture.contains("mattmc.dev.rustGalWorldEntityFlame.scenario"));
+		assertTrue(capture.contains("igniteEntityFlameCarrier"));
+		assertTrue(capture.contains("hasCurrentEntityFlameRoute"));
+		assertTrue(capture.contains("entityFlameSemantic"));
+		assertTrue(capture.contains("entityFlameExecuted"));
+	}
+
+	@Test
+	void entityShadowRouteUsesCopiedMaterialQuadsWithoutJavaDrawOrBackendState() throws Exception {
+		String routePolicy = Files.readString(Path.of("src/main/java/net/vulkanic/world/WorldRenderRoutePolicy.java"));
+		String features = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/feature/FeatureRenderDispatcher.java"));
+		String entityDispatcher = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/entity/EntityRenderDispatcher.java"));
+		String worldRenderer = Files.readString(Path.of("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+		String coordinator = Files.readString(Path.of("src/main/java/net/vulkanic/gui/RustGalFrameCoordinator.java"));
+
+		assertTrue(routePolicy.contains("currentEntityShadowRoute()"));
+		assertTrue(routePolicy.contains("mattmc.dev.rustGalWorldEntityShadow.disabled"));
+		assertTrue(routePolicy.contains("selectWholeFrameRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive())"));
+		assertTrue(features.contains("collectEntityShadowSemantics(submitNodeCollection.getShadowSubmits())"));
+		assertTrue(features.contains("public void renderBlockFeaturesOnly()"));
+		assertTrue(entityDispatcher.contains("rustWholeFrameShadowRoute"));
+		assertTrue(entityDispatcher.contains("!rustWholeFrameShadowRoute"));
+		assertTrue(entityDispatcher.contains("submitNodeCollector.submitShadow"));
+		assertTrue(worldRenderer.contains("collectEntityShadowSemantics("));
+		assertTrue(worldRenderer.contains("MATERIAL_TEXTURE_ENTITY_SHADOW"));
+		assertTrue(worldRenderer.contains("textures/misc/shadow.png"));
+		assertTrue(worldRenderer.contains("MATERIAL_MODE_TRANSLUCENT"));
+		assertTrue(worldRenderer.contains("DEPTH_POLICY_TEST_NO_WRITE"));
+		assertTrue(worldRenderer.contains("recordWholeFrameEntityShadowExecution"));
+		assertTrue(coordinator.contains("recordWholeFrameEntityShadowExecution("));
+		assertFalse(worldRenderer.contains("TextureAtlasSprite entityShadow"));
+		assertFalse(worldRenderer.contains("RenderType.entityShadow"));
+	}
+
+	@Test
+	void itemEntityRouteUsesOnlyTheSharedIndexedMeshPath() throws Exception {
+		String routePolicy = Files.readString(Path.of("src/main/java/net/vulkanic/world/WorldRenderRoutePolicy.java"));
+		String itemRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/entity/ItemEntityRenderer.java"));
+		String submitCollection = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/SubmitNodeCollection.java"));
+		String levelRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/LevelRenderer.java"));
+		String worldRenderer = Files.readString(Path.of("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+		String deterministicCapture = Files.readString(Path.of("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java"));
+
+		assertTrue(routePolicy.contains("currentItemEntityMeshRoute(boolean eligible)"));
+		assertTrue(routePolicy.contains("mattmc.dev.rustGalWorldItemEntity.disabled"));
+		assertTrue(routePolicy.contains("selectWholeFrameRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive())"));
+		assertTrue(itemRenderer.contains("beginItemEntitySubmission()"));
+		assertTrue(itemRenderer.contains("endItemEntitySubmission()"));
+		assertTrue(submitCollection.contains("isItemEntitySubmissionActive()"));
+		assertTrue(submitCollection.contains("itemEntityMeshIneligibility("));
+		assertTrue(submitCollection.contains("currentItemEntityMeshRoute(rustEligible)"));
+		assertTrue(submitCollection.contains("enqueueItemEntityMesh("));
+		assertTrue(levelRenderer.contains("currentItemEntityMeshRoute(true).usesRustWholeFrameVulkan()"));
+		assertTrue(levelRenderer.contains("itemEntities && entityRenderState instanceof ItemEntityRenderState"));
+		assertTrue(worldRenderer.contains("displayContext != ItemDisplayContext.GROUND"));
+		assertTrue(worldRenderer.contains("foilType != ItemStackRenderState.FoilType.NONE"));
+		assertTrue(worldRenderer.contains("ItemStackRenderState deliberately keeps an empty tint array"));
+		assertTrue(worldRenderer.contains("itemQuadTintColor(bakedQuad, tintLayers)"));
+		assertTrue(worldRenderer.contains("extractItemQuadMesh("));
+		assertTrue(worldRenderer.contains("MATERIAL_ID_TRANSLUCENT_TEXTURED"));
+		assertTrue(worldRenderer.contains("DEPTH_POLICY_TEST_NO_WRITE"));
+		assertTrue(worldRenderer.contains("PENDING_MESH_PRODUCERS.add(PendingMeshProducer.ITEM_ENTITY)"));
+		assertTrue(worldRenderer.contains("\"item-entity\".equals(producer)"));
+		assertFalse(submitCollection.contains("getItemRenderer().render"));
+		assertTrue(deterministicCapture.contains("setupItemEntityScenario"));
+		assertTrue(deterministicCapture.contains("new ItemEntity(serverLevel"));
+		assertTrue(deterministicCapture.contains("hasCurrentItemEntityRoute"));
+		assertTrue(deterministicCapture.contains("if (!movingMeshProducerReady())"));
+		assertFalse(deterministicCapture.contains("!wholeFrameAttachmentCaptureReady && !movingMeshProducerReady()"));
+		assertTrue(deterministicCapture.contains("movingMeshProducerReady(deterministicRenderedFrameIndex)"));
+		assertTrue(deterministicCapture.contains("required-moving-producer-not-in-submission"));
+		String worldFrontend = Files.readString(Path.of("src/main/rust/render/vulkanic/world_primitive_frontend.rs"));
+		assertTrue(worldFrontend.contains("WORLD_MATERIAL_MODE_TRANSLUCENT"));
+		assertTrue(worldFrontend.contains("depth_policy != WORLD_DEPTH_POLICY_TEST_NO_WRITE"));
+	}
+
+	@Test
+	void indexedMeshShaderStateIdentityUsesTheCopiedRuntimeTableKey() throws Exception {
+		String worldRenderer = Files.readString(Path.of("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+
+		assertTrue(worldRenderer.contains("int rawStateId = Block.getId(blockState);"));
+		assertFalse(worldRenderer.contains("return blockState.toString().hashCode();"));
 	}
 
 	@Test
@@ -201,6 +584,8 @@ class VulkanicGalBridgeAbiTest {
 		assertFalse(collector.contains("MemorySegment"));
 		assertTrue(collector.contains("collectWithAssets"));
 		assertTrue(collector.contains("ShaderPackAssetFileRecord"));
+		assertTrue(collector.contains("getBooleanValueOrDefault(name)"));
+		assertTrue(collector.contains("getStringValueOrDefault(name)"));
 	}
 
 	private static void restoreProperty(String key, String value) {
@@ -222,9 +607,11 @@ class VulkanicGalBridgeAbiTest {
 			"baked quads whose emitted indices face the baked Direction must be tagged as CCW for GAL culling");
 		assertTrue(rustMeshFrontend.contains("(WORLD_CULL_BACK, WORLD_WINDING_CCW) => Ok(CullMode::Back)"));
 		assertTrue(rustMeshFrontend.contains("(WORLD_CULL_BACK, WORLD_WINDING_CW) => Ok(CullMode::Front)"));
-		assertTrue(rustOpenGlLowering.contains("self.gl.front_face(glow::CCW);"),
-			"OpenGL backend must seed the GAL CCW front-face convention instead of inheriting Java/Iris state");
-		assertTrue(rustVulkanResources.contains(".front_face(vk::FrontFace::COUNTER_CLOCKWISE)"));
+		assertTrue(rustOpenGlLowering.contains(".front_face(if front_face_ccw { glow::CCW } else { glow::CW })"),
+			"OpenGL backend must apply the explicit GAL front-face convention instead of inheriting Java/Iris state");
+		assertTrue(rustVulkanResources.contains(".front_face(front_face(desc.front_face))"));
+		assertTrue(rustVulkanResources.contains("FrontFace::CounterClockwise"));
+		assertTrue(rustVulkanResources.contains("vk::FrontFace::COUNTER_CLOCKWISE"));
 	}
 
 	@Test
@@ -240,11 +627,13 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(meshHelper.contains("currentBlockDisplayRoute().usesRustOpenGl()"));
 		assertTrue(meshHelper.contains("currentFallingBlockRoute().usesRustOpenGl()"));
 		assertTrue(meshHelper.contains("currentPistonMovingBlockRoute().usesRustOpenGl()"));
+		assertTrue(meshHelper.contains("currentPrimedTntRoute().usesRustOpenGl()"));
 
 		int frameHelperStart = worldRenderer.indexOf("public static boolean shouldUseRustOpenGlWorldPrimitives()");
 		int frameHelperEnd = worldRenderer.indexOf("public static boolean crackDisabledForDiagnostics()", frameHelperStart);
 		String frameHelper = worldRenderer.substring(frameHelperStart, frameHelperEnd);
 		assertTrue(frameHelper.contains("currentPistonMovingBlockRoute().usesRustOpenGl()"));
+		assertTrue(frameHelper.contains("currentPrimedTntRoute().usesRustOpenGl()"));
 		assertTrue(worldRenderer.contains("movingBlockLightColor(movingBlockRenderState, blockState, movingBlockRenderState.blockPos)"));
 		assertTrue(worldRenderer.contains("return dot >= 0.0F ? WORLD_WINDING_CCW : WORLD_WINDING_CW;"));
 		assertTrue(worldRenderer.contains("public static PrimitiveFrame withViewport(PrimitiveFrame frame, int viewportWidth, int viewportHeight)"));
@@ -303,7 +692,9 @@ class VulkanicGalBridgeAbiTest {
 			assertTrue(worldCrackAssetFlush > worldPrimitiveExecution && worldCrackAssetFlush < worldPrimitiveSubmit,
 				"standalone world primitive execution must flush crack assets before submitting real crack work");
 		assertTrue(gameRenderer.contains("renderRustVulkanWholeFrameShell"));
-			assertTrue(gameRenderer.contains("RustGalWorldPrimitiveRenderer.enqueueBlockOutline"));
+		assertTrue(gameRenderer.contains("private float fovModifier = 1.0F;"),
+			"the whole-frame shell must start from the neutral gameplay FOV before its first client tick");
+		assertTrue(gameRenderer.contains("RustGalWorldPrimitiveRenderer.enqueueBlockOutline"));
 			assertTrue(gameRenderer.contains("RustGalWorldPrimitiveRenderer.enqueueWorldBackground"));
 			assertTrue(gameRenderer.contains("levelRenderer.enqueueRustGalBlockBreakingCracks"));
 		assertTrue(gameRenderer.contains("levelRenderer.enqueueRustGalWorldBorder"));
@@ -328,16 +719,45 @@ class VulkanicGalBridgeAbiTest {
 			assertTrue(worldRenderer.contains("currentBlockDisplayRoute()"));
 			assertTrue(worldRenderer.contains("enqueueFallingBlock"));
 			assertTrue(worldRenderer.contains("currentFallingBlockRoute()"));
-			assertTrue(worldRenderer.contains("enqueuePistonMovingBlock"));
-			assertTrue(worldRenderer.contains("currentPistonMovingBlockRoute()"));
+		assertTrue(worldRenderer.contains("enqueuePistonMovingBlock"));
+		assertTrue(worldRenderer.contains("currentPistonMovingBlockRoute()"));
+		assertTrue(worldRenderer.contains("enqueuePrimedTntBlock"));
+		assertTrue(worldRenderer.contains("isPrimedTntMeshEligible"));
+		assertTrue(worldRenderer.contains("BlockSubmitSource.PRIMED_TNT"));
+		assertTrue(worldRenderer.contains("Primed TNT extraction failed after Rust route selection"));
+		assertTrue(worldRenderer.contains("recordWorldMeshSubmittedWorkIdentity"));
+		assertTrue(worldRenderer.contains("DeterministicCameraCapture.recordSubmittedWorkIdentity(family, identity)"),
+			"deterministic gameplay captures must receive the same semantic mesh submission identities as benchmark rows");
 			assertTrue(worldRenderer.contains("MovingBlockSubmitSource.FALLING_BLOCK"));
 			assertTrue(worldRenderer.contains("MovingBlockSubmitSource.PISTON"));
 			assertTrue(worldRenderer.contains("SubmitNodeStorage.BlockSubmitSource.BLOCK_DISPLAY"));
+			assertTrue(worldRenderer.contains("blockSubmit.tintPos()"),
+				"BlockDisplay extraction must retain the real copied display position for biome-tint semantics");
+			assertTrue(worldRenderer.contains("Minecraft.getInstance().level"),
+				"BlockDisplay extraction must resolve eligible model tint from the semantic client world, not an empty placeholder");
+			String displayRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/entity/DisplayRenderer.java"));
+			assertTrue(displayRenderer.contains("BlockPos.containing(blockDisplayEntityRenderState.x"),
+				"BlockDisplay submit must carry its render-state position before Rust route selection");
 			assertTrue(worldRenderer.contains("RenderShape.MODEL"));
 			assertTrue(worldRenderer.contains("specialBlockModelRenderer().get().hasRenderer(blockState.getBlock())"));
-			assertTrue(worldRenderer.contains("WorldMeshAssetRecord"));
-			assertTrue(worldRenderer.contains("WorldMeshInstanceRecord"));
-			assertTrue(worldRenderer.contains("flushPendingWorldMeshAssets"));
+		assertTrue(worldRenderer.contains("WorldMeshAssetRecord"));
+		assertTrue(worldRenderer.contains("WorldMeshInstanceRecord"));
+		assertTrue(worldRenderer.contains("WorldFeatureCoverageRecord"));
+		assertTrue(worldRenderer.contains("enqueueWorldFeatureCoverage"));
+		assertTrue(levelRenderer.contains("WorldFeatureCoverageCollector"));
+		assertTrue(levelRenderer.contains("submitSemantic("));
+		int coverageStart = levelRenderer.indexOf("private void collectUnsupportedWholeFrameFeatures");
+		int coverageEnd = levelRenderer.indexOf("private static final class WorldFeatureCoverageCollector", coverageStart);
+		String coverageMethod = levelRenderer.substring(coverageStart, coverageEnd);
+		assertFalse(coverageMethod.contains("renderAllFeatures()"),
+			"whole-frame feature coverage must collect semantic counts without issuing Java feature draws");
+		String entityDispatcher = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/entity/EntityRenderDispatcher.java"));
+		String blockEntityDispatcher = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/blockentity/BlockEntityRenderDispatcher.java"));
+		assertTrue(entityDispatcher.contains("void submitSemantic("));
+		assertTrue(blockEntityDispatcher.contains("void submitSemantic("));
+		assertTrue(entityDispatcher.contains("captureIrisRenderState"));
+		assertTrue(blockEntityDispatcher.contains("captureIrisRenderState"));
+		assertTrue(worldRenderer.contains("flushPendingWorldMeshAssets"));
 		assertTrue(worldRenderer.contains("flushPendingWorldBorderAssets"));
 		assertTrue(worldRenderer.contains("textures/misc/forcefield.png"));
 		assertTrue(worldRenderer.contains("WorldCrackQuadRecord"));
@@ -354,6 +774,13 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(worldRenderer.contains("WorldRenderRoutePolicy.currentWorldBorderRoute()"));
 		assertTrue(worldRoutePolicy.contains("currentStaticTerrainRoute()"));
 		assertTrue(gameRenderer.contains("enqueueRustGalStaticTerrainForWholeFrame"));
+		assertTrue(gameRenderer.contains("enqueueRustGalWeatherForWholeFrame"));
+		assertTrue(gameRenderer.contains("enqueueRustGalSkyForWholeFrame"));
+		assertTrue(levelRenderer.contains("weatherEffectRenderer.extractRenderState"));
+		assertTrue(levelRenderer.contains("weatherRenderState.reset()"));
+		assertTrue(levelRenderer.contains("RustGalWorldPrimitiveRenderer.enqueueWorldWeather"));
+		assertTrue(levelRenderer.contains("skyRenderer.extractRenderState"));
+		assertTrue(levelRenderer.contains("RustGalWorldPrimitiveRenderer.enqueueWorldSky"));
 		assertTrue(levelRenderer.contains("this.cullTerrain(camera, frustum, this.minecraft.player.isSpectator())"));
 		assertTrue(sodiumWorldRenderer.contains("enqueueRustGalStaticTerrain"));
 		assertTrue(renderSectionManager.contains("RustGalTerrainRenderer.acceptChunkBuildOutput(chunkBuildOutput)"));
@@ -371,13 +798,42 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(renderSectionManager.contains("RustGalTerrainRenderer.acceptChunkSortOutput(sortOutput)"));
 		assertTrue(terrainRenderer.contains("registeredAtlasGeneration"));
 		assertTrue(terrainRenderer.contains("atlasTextureUpdatePayload()"));
-		assertTrue(terrainRenderer.contains("vertex.colorArgb()"));
-		assertTrue(terrainRenderer.contains("vertex.light()"));
-		assertTrue(terrainRenderer.contains("WorldMeshSectionRecord section"));
+			assertTrue(terrainRenderer.contains("vertex.colorArgb()"));
+			assertTrue(terrainRenderer.contains("vertex.light()"));
+			assertTrue(terrainRenderer.contains("fnv64Int(hash, vertex.midBlockPacked())"),
+				"the mesh generation must cover every semantic field retained by the Rust occupancy source");
+			assertTrue(terrainRenderer.contains("WorldMeshSectionRecord section"));
 		assertTrue(terrainRenderer.contains("removeSection(int x, int y, int z, String reason)"));
 		assertTrue(terrainRenderer.contains("TerrainDiagnostics"));
 		assertTrue(terrainRenderer.contains("DeterministicCameraCapture.recordSubmittedWorkIdentity(\"static-terrain\""));
+		assertTrue(terrainRenderer.contains("recordVisibleSubmissionIdentity"),
+			"static-terrain readiness must identify the section/layer/generation that actually reached Rust");
+		assertTrue(terrainRenderer.contains("staticTerrainExecutionSnapshot"),
+			"static-terrain captures must distinguish completed static-terrain execution from unrelated world work");
+		assertTrue(deterministicCapture.contains("visible-submission-identities"),
+			"off-camera streaming must not replace visible semantic submission stability as the capture gate");
 		assertTrue(deterministicCapture.contains("rustGalStaticTerrainDiagnostics"));
+		assertTrue(deterministicCapture.contains("waiting-for-post-setup-static-terrain-execution"),
+			"a static-terrain screenshot must wait for an execution after fixture setup, not merely asset registration");
+		assertTrue(deterministicCapture.contains("rustGalStaticTerrainExecution"),
+			"static-terrain screenshot acknowledgements must carry route-specific execution correlation");
+		assertTrue(deterministicCapture.contains("appendStaticTerrainExecutionCorrelation(json, 2)"),
+			"Rust final-output captures must retain static-terrain correlation instead of only the normal screenshot path");
+		int finalOutputCaptureStart = deterministicCapture.indexOf("private static boolean captureWholeFrameFinalOutput()");
+		int finalOutputCaptureEnd = deterministicCapture.indexOf("public static void beforeTick", finalOutputCaptureStart);
+		String finalOutputCapture = deterministicCapture.substring(finalOutputCaptureStart, finalOutputCaptureEnd);
+		assertTrue(finalOutputCapture.contains("appendStaticTerrainAtlasReceipt(json, 2)"),
+			"Rust final-output captures must retain the atlas receipt for their exact terrain frame");
+		assertTrue(finalOutputCapture.contains("appendStaticTerrainTextureProbeReceipt(json, 2)"),
+			"Rust final-output captures must retain the projected palette probes required to validate that image");
+		assertTrue(deterministicCapture.contains("requiredRustSourceExecutionDir"),
+			"selected-source captures must wait for Rust execution evidence, not only normal-graph preparation");
+		assertTrue(deterministicCapture.contains("selected-source-execution-frame-*.json"),
+			"the capture gate must require the bounded Rust-written source execution record");
+		assertTrue(deterministicCapture.contains("sourceExecutionReceiptHasVisibleWorldWork"),
+			"selected-source capture readiness must recognize real world work independent of its producer family");
+		assertTrue(deterministicCapture.contains("readJsonLongField(json, \"lod_instances\", 0L) > 0L"),
+			"Distant Horizons-only selected-source frames must not be misclassified as zero work");
 		assertTrue(graphicsHarness.contains("--world-static-terrain-scenario"));
 		assertTrue(graphicsHarness.contains("static_terrain_workload_complete"));
 		assertTrue(renderSectionManager.contains("RustGalTerrainRenderer.removeSection(x, y, z, \"section-removed\")"));
@@ -385,8 +841,8 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(worldRenderer.contains("DIRTY_WORLD_MESH_SORTED_INDICES"));
 		assertTrue(worldRenderer.contains("registerStaticTerrainSortedIndex"));
 		assertTrue(bridge.contains("record WorldMeshSortedIndexRecord"));
-		assertTrue(worldRenderer.contains("dirtyWorldMeshTextureAssetsLocked()"));
-		assertTrue(worldRenderer.contains("dirtyWorldMeshSortedIndicesLocked()"));
+		assertTrue(worldRenderer.contains("dirtyWorldMeshTextureAssetsLocked("));
+		assertTrue(worldRenderer.contains("dirtyWorldMeshSortedIndicesLocked("));
 		assertTrue(worldRenderer.contains("removeStaticTerrainMeshAsset"));
 			assertTrue(rustWorldFrontend.contains("self.mesh_texture_assets.insert(texture_id, texture);")
 					&& rustWorldFrontend.contains("destroy_mesh_texture_resources_for_ids(gal, &incoming_texture_ids);"),
@@ -650,7 +1106,7 @@ class VulkanicGalBridgeAbiTest {
 	}
 
 	@Test
-	void frameAbiV6PreservesFrameContractAndAddsSemanticShaderEnvironmentPayload() throws Exception {
+	void frameAbiV15PreservesFrameContractAndAddsSemanticFogInputs() throws Exception {
 		String bridge = Files.readString(Path.of("src/main/java/net/vulkanic/bridge/VulkanicGalBridge.java"));
 		String world = Files.readString(Path.of("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
 		String queue = Files.readString(Path.of("src/main/java/net/vulkanic/gui/RustGalGuiRenderer.java"));
@@ -661,12 +1117,26 @@ class VulkanicGalBridgeAbiTest {
 		String experienceBar = Files.readString(Path.of("src/main/java/net/minecraft/client/gui/contextualbar/ExperienceBarRenderer.java"));
 		String bossOverlay = Files.readString(Path.of("src/main/java/net/minecraft/client/gui/components/BossHealthOverlay.java"));
 
-		assertEquals(11, VulkanicGalBridge.ABI_VERSION);
+		assertEquals(23, VulkanicGalBridge.ABI_VERSION);
+		assertTrue(bridge.contains("GUI_AFFINE_QUAD_REQUEST(92)"));
+		assertTrue(bridge.contains("WORLD_TEXT_QUAD_REQUEST(93)"));
+		assertTrue(bridge.contains("WORLD_TEXT_IMAGE_ASSET_PAYLOAD(94)"));
+		assertTrue(bridge.contains("record WorldTextImageAssetRecord"));
+		assertTrue(bridge.contains("record WorldTextQuadRecord"));
+		assertTrue(bridge.contains("record GuiAffineQuadRecord"));
 		assertTrue(bridge.contains("int midBlockPacked"));
 		assertTrue(bridge.contains("record WorldVoxelVolumeFrameRecord"));
 		assertTrue(bridge.contains("record WorldShaderEnvironmentFrameRecord"));
+		assertTrue(bridge.contains("record WorldLodRenderFrameRecord"));
+		assertTrue(bridge.contains("float[] modelViewMatrix"));
+		assertTrue(bridge.contains("float[] projectionMatrix"));
+		assertTrue(bridge.contains("float[] projectionInverseMatrix"));
 		assertTrue(bridge.contains("WORLD_VOXEL_VOLUME_FRAME(72)"));
 		assertTrue(bridge.contains("WORLD_SHADER_ENVIRONMENT_FRAME(73)"));
+		assertTrue(bridge.contains("WORLD_FIRST_PERSON_FRAME(98)"));
+		assertTrue(bridge.contains("record WorldFirstPersonFrameRecord"));
+		assertTrue(bridge.contains("float[] modelViewMatrix"));
+		assertTrue(bridge.contains("firstPersonMeshInstances"));
 		assertTrue(bridge.contains("voxelVolumeFrame.worldGeneration()"));
 		assertTrue(bridge.contains("voxelVolumeFrame.cameraX()"));
 		assertTrue(bridge.contains("shaderEnvironmentFrame.timeOfDay()"));
@@ -674,6 +1144,13 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(bridge.contains("shaderEnvironmentFrame.farPlane()"));
 		assertTrue(bridge.contains("shaderEnvironmentFrame.skyColorRed()"));
 		assertTrue(bridge.contains("shaderEnvironmentFrame.darknessLightFactor()"));
+		assertTrue(bridge.contains("shaderEnvironmentFrame.blindness()"));
+		assertTrue(bridge.contains("shaderEnvironmentFrame.darknessFactor()"));
+		assertTrue(bridge.contains("shaderEnvironmentFrame.eyeBrightnessBlock()"));
+		assertTrue(bridge.contains("shaderEnvironmentFrame.eyeBrightnessSky()"));
+		assertTrue(bridge.contains("shaderEnvironmentFrame.fogParameterColorRed()"));
+		assertTrue(bridge.contains("shaderEnvironmentFrame.fogEnvironmentalStart()"));
+		assertTrue(bridge.contains("shaderEnvironmentFrame.fogRenderDistanceEnd()"));
 		assertTrue(bridge.contains("shaderEnvironmentFrame.nightVision()"));
 		assertTrue(bridge.contains("shaderEnvironmentFrame.fogColorRed()"));
 		assertTrue(bridge.contains("shaderEnvironmentFrame.biomePrecipitation()"));
@@ -685,6 +1162,13 @@ class VulkanicGalBridgeAbiTest {
 		assertFalse(bridge.contains("IrisShaderEnvironmentFrame"));
 		assertTrue(world.contains("level.getSkyColor(camera.getPosition(), shaderPackFramePartialTick)"));
 		assertTrue(world.contains("shaderPackFogColor(level, camera)"));
+		assertTrue(world.contains("shaderPackFogParameters()"));
+		assertTrue(world.contains("fogRenderer.sodium$getFogParameters()"));
+		assertFalse(world.contains("FogStorage"));
+		assertFalse(world.contains("FogParameters.NONE"));
+		assertTrue(world.contains("shaderPackBlindness()"));
+		assertTrue(world.contains("shaderPackDarknessFactor()"));
+		assertTrue(world.contains("shaderPackEyeBrightness()"));
 		assertTrue(world.contains("fogRenderer.computeFogColor("));
 		assertTrue(world.contains("shaderPackBiomePrecipitation(level, camera)"));
 		assertTrue(world.contains("shaderPackBiomeResourceLocation(level, camera)"));
@@ -740,7 +1224,8 @@ class VulkanicGalBridgeAbiTest {
 		assertFalse(queue.contains("DeferredBatchScheduler"));
 		String frameCoordinator = Files.readString(Path.of("src/main/java/net/vulkanic/gui/RustGalFrameCoordinator.java"));
 		assertFalse(queue.contains("RustGalFrameScheduler<VulkanicGalBridge.GuiSpriteRecord>"));
-		assertTrue(frameCoordinator.contains("RustGalFrameScheduler<VulkanicGalBridge.GuiSpriteRecord>"));
+		assertTrue(frameCoordinator.contains("RustGalFrameScheduler<QueuedGuiRequest>"));
+		assertTrue(frameCoordinator.contains("enqueueGuiAffineQuadRequest"));
 		assertFalse(queue.contains("record CachedResources"));
 		assertFalse(queue.contains("record CacheKey"));
 		assertFalse(Files.exists(Path.of("src/main/java/net/vulkanic/gui/GuiBatchBuilder.java")));
@@ -789,6 +1274,29 @@ class VulkanicGalBridgeAbiTest {
 			guiRenderer.indexOf("RustGalFrameCoordinator.executeGuiFrame") < guiRenderer.indexOf("rustGalFrameExecuted.setTrue()"),
 			"the combined Rust GUI frame should be marked executed only after the scoped render-pass submission"
 		);
+	}
+
+	@Test
+	void semanticGuiTextTransportStaysCopiedAndBackendNeutral() throws Exception {
+		String guiRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/gui/render/GuiRenderer.java"));
+		String rustGui = Files.readString(Path.of("src/main/java/net/vulkanic/gui/RustGalGuiRenderer.java"));
+		String coordinator = Files.readString(Path.of("src/main/java/net/vulkanic/gui/RustGalFrameCoordinator.java"));
+		String bridge = Files.readString(Path.of("src/main/java/net/vulkanic/bridge/VulkanicGalBridge.java"));
+
+		assertTrue(guiRenderer.contains("RustGalGuiRenderer.tryEnqueueText"));
+		assertTrue(rustGui.contains("FontTexture.semanticAtlasSnapshot"));
+		assertTrue(rustGui.contains("GuiAffineQuadRecord"));
+		assertTrue(rustGui.contains("List<TextAtlasRequest>"));
+		assertTrue(rustGui.contains("request.withClip"));
+		assertFalse(rustGui.contains("textState.scissor != null"));
+		assertFalse(rustGui.contains("semantic-text-extraction-failed"));
+		assertFalse(rustGui.contains("getTextureView("));
+		assertFalse(rustGui.contains("RenderSystem."));
+		assertTrue(coordinator.contains("enqueueGuiAffineQuadRequest"));
+		assertTrue(coordinator.contains("SCHEDULER.takeAllItems"));
+		assertTrue(coordinator.contains("withSequence(sequence)"));
+		assertTrue(coordinator.contains("updateGuiRawImages"));
+		assertTrue(bridge.contains("GUI_AFFINE_QUAD_REQUEST(92)"));
 	}
 
 	@Test
@@ -971,6 +1479,7 @@ class VulkanicGalBridgeAbiTest {
 		String gameRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/GameRenderer.java"));
 		String levelRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/LevelRenderer.java"));
 		String featureRenderDispatcher = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/feature/FeatureRenderDispatcher.java"));
+		String worldPrimitiveRenderer = Files.readString(Path.of("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
 		String renderSystem = Files.readString(Path.of("src/main/java/net/blaze3d/systems/RenderSystem.java"));
 		String window = Files.readString(Path.of("src/main/java/net/blaze3d/platform/Window.java"));
 		String vulkanicApi = Files.readString(Path.of("src/main/java/net/vulkanic/VulkanicAPI.java"));
@@ -995,18 +1504,58 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(levelRenderer.contains("enqueueRustGalIndexedMeshFeaturesForWholeFrame"));
 		assertTrue(levelRenderer.contains("this.entityRenderDispatcher"));
 		assertTrue(levelRenderer.contains(".submit("));
-		assertTrue(queue.contains("primitiveFrame = RustGalWorldPrimitiveRenderer.consumeFrame();\n\t\t\t\tflushPendingWorldAssetsLocked();"));
+		assertTrue(levelRenderer.contains("rustWorldTextSubmitNodeStorage"));
+		assertTrue(levelRenderer.contains("submitWholeFrameWorldText"));
+		assertTrue(levelRenderer.contains("WorldTextSubmitSemanticCollector"));
+		assertTrue(levelRenderer.contains("this.entityRenderDispatcher.submitSemantic("));
+		assertTrue(levelRenderer.contains("this.blockEntityRenderDispatcher.submitSemantic("));
+		assertTrue(levelRenderer.contains("this.target.submitNameTag("));
+		assertTrue(levelRenderer.contains("this.target.submitTextSemantic("));
+		assertTrue(worldPrimitiveRenderer.contains("recordWorldTextTextSnapshot(submits, result)"));
+		assertTrue(featureRenderDispatcher.contains("collectRustWorldTextSemanticsForWholeFrame(SubmitNodeStorage textSubmitStorage)"));
+		assertTrue(featureRenderDispatcher.contains("textSubmitStorage.getSubmitsPerOrder()"));
+		int rustWorldTextRoute = featureRenderDispatcher.indexOf("if (WorldRenderRoutePolicy.currentWorldTextRoute().usesRustWholeFrameVulkan())");
+		int javaWorldTextCompatibility = featureRenderDispatcher.indexOf("} else if (!WorldRenderRoutePolicy.currentWorldTextRoute().equals(WorldRenderRoutePolicy.Route.DISABLED))", rustWorldTextRoute);
+		int javaTextDraw = featureRenderDispatcher.indexOf("this.textFeatureRenderer.render", rustWorldTextRoute);
+		assertTrue(rustWorldTextRoute >= 0 && javaWorldTextCompatibility > rustWorldTextRoute);
+		assertTrue(javaTextDraw > javaWorldTextCompatibility,
+			"the selected Rust world-text route must enqueue semantics rather than invoke Java text rendering");
+		String worldTextCaptureSource = Files.readString(Path.of("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java"));
+		assertTrue(worldTextCaptureSource.contains("mattmc.dev.rustGalWorldText.requireSourceCapture"));
+		assertTrue(worldTextCaptureSource.contains("new Display.TextDisplay(EntityType.TEXT_DISPLAY"));
+		assertTrue(worldTextCaptureSource.contains("Display.TextDisplay.FLAG_SEE_THROUGH"));
+		assertTrue(worldTextCaptureSource.contains("mattmc.dev.rustGalWorldItemEntity.requireSourceCapture"));
+		assertTrue(worldTextCaptureSource.contains("configureWorldTextCaptureCarrier(entity, scenario)"));
+		assertTrue(worldTextCaptureSource.contains("world_text_execution")
+			&& worldTextCaptureSource.contains("readJsonLongField(json.substring(textStart), \"draws\", 0L) <= 0L"),
+			"the source capture must require executed Rust text, not just a name-tag producer callback");
+		assertTrue(worldTextCaptureSource.contains("minecraft:item_entity/ground"),
+			"the source capture must require the semantic dropped-item identity, not unrelated entity meshes");
+		int wholeFrameAssetFlush = queue.indexOf("flushPendingWorldAssetsLocked();", queue.indexOf("if (wholeFrameVulkan) {"));
+		int wholeFrameFrameConsume = queue.indexOf("primitiveFrame = RustGalWorldPrimitiveRenderer.consumeFrame();", wholeFrameAssetFlush);
+		assertTrue(wholeFrameAssetFlush >= 0 && wholeFrameFrameConsume > wholeFrameAssetFlush);
+		int lateWorldAssetFlush = queue.indexOf("flushPendingWorldAssetsAfterFrameConsumeLocked();", wholeFrameFrameConsume);
+		assertTrue(lateWorldAssetFlush > wholeFrameFrameConsume,
+			"resources discovered while freezing a whole frame must publish before native submission");
+		assertTrue(queue.contains("flushPendingWorldAssetsLocked(true);"),
+			"the post-consume flush must include mesh assets and textures rather than leaving a stale native registry");
 		int shellBlockDisplaysStart = levelRenderer.indexOf("enqueueRustGalIndexedMeshFeaturesForWholeFrame");
 		int shellBlockDisplaysEnd = levelRenderer.indexOf("public void extractVisibleBlockEntities", shellBlockDisplaysStart);
 		String shellBlockDisplays = levelRenderer.substring(shellBlockDisplaysStart, shellBlockDisplaysEnd);
 		assertFalse(shellBlockDisplays.contains("isSectionCompiled"));
-		assertTrue(shellBlockDisplays.contains("Display.BlockDisplay"));
-		assertTrue(shellBlockDisplays.contains("FallingBlockEntity"));
+		assertTrue(shellBlockDisplays.contains("BlockDisplayEntityRenderState"));
+		assertTrue(shellBlockDisplays.contains("FallingBlockRenderState"));
+		assertTrue(shellBlockDisplays.contains("TntRenderState"));
+		assertTrue(shellBlockDisplays.contains("currentPrimedTntRoute()"));
+		String deterministicCapture = Files.readString(Path.of("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java"));
+		assertTrue(deterministicCapture.contains("RUST_FINAL_OUTPUT_EVERY_POSE"));
+		assertTrue(deterministicCapture.contains("captureWholeFrameAttachmentsForPose"));
+		assertTrue(deterministicCapture.contains("resetWholeFrameAttachmentCaptureState();"));
 		assertTrue(shellBlockDisplays.contains("submitPistonMovingBlocksForWholeFrame"));
-		assertTrue(shellBlockDisplays.contains("extractPistonMovingBlocksForWholeFrame"));
+		assertTrue(shellBlockDisplays.contains("ensurePistonMovingBlocksPresentForWholeFrame"));
 		assertTrue(shellBlockDisplays.contains("currentPistonMovingBlockRoute()"));
 		assertTrue(levelRenderer.contains("PistonHeadRenderState"));
-		assertTrue(levelRenderer.contains("this.extractVisibleBlockEntities(camera, partialTick, levelRenderState);"));
+		assertTrue(levelRenderer.contains("this.extractVisibleBlockEntities(camera, deltaTracker.getGameTimeDeltaPartialTick(false), this.levelRenderState);"));
 		assertTrue(levelRenderer.contains("PistonMovingBlockEntity pistonMovingBlockEntity"));
 		assertTrue(levelRenderer.contains("this.blockEntityRenderDispatcher.tryExtractRenderState"));
 		assertTrue(levelRenderer.contains("this.level.getChunkSource().getChunk(chunkX, chunkZ, ChunkStatus.FULL, false)"));
@@ -1016,7 +1565,10 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(gameRenderer.contains("RustGalFrameCoordinator.executeWholeFrameVulkan"));
 		int shellStart = gameRenderer.indexOf("renderRustVulkanWholeFrameShell");
 		int shellEnd = gameRenderer.indexOf("private void tryTakeScreenshotIfNeeded", shellStart);
-		assertFalse(gameRenderer.substring(shellStart, shellEnd).contains("renderLevel(deltaTracker)"));
+		String shell = gameRenderer.substring(shellStart, shellEnd);
+		assertFalse(shell.contains("renderLevel(deltaTracker)"));
+		assertTrue(shell.contains("this.renderDistance = this.minecraft.options.getEffectiveRenderDistance() * 16;"),
+			"the whole-frame shell must initialize the same projection depth distance as the normal world renderer");
 		assertTrue(renderSystem.contains("RustGalVulkanWholeFrameMode.enabledForBackend"));
 		assertTrue(renderSystem.indexOf("RustGalVulkanWholeFrameMode.enabledForBackend") < renderSystem.indexOf("VulkanicAPI.beginFrame()"));
 		assertTrue(window.contains("RustGalVulkanWholeFrameMode.enabled()"));
@@ -1029,7 +1581,8 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(rustVulkan.contains("WINDOW_PLATFORM_X11"));
 		assertTrue(rustVulkan.contains("WINDOW_PLATFORM_WAYLAND"));
 		assertTrue(rustGuiFrontend.contains("if batches.is_empty()"));
-		assertTrue(rustGuiFrontend.contains("frame_target_color_format(frame_target)"));
+		assertTrue(rustGuiFrontend.contains("gal.pass_target_color_format(frame_target)?"),
+			"GUI pass creation must derive its format from the explicit GAL frame target");
 		assertFalse(rustFfi.contains("ash::"));
 	}
 
@@ -1060,7 +1613,8 @@ class VulkanicGalBridgeAbiTest {
 		assertFalse(scheduler.contains("atlas"));
 		assertFalse(scheduler.contains("pipeline"));
 		assertFalse(guiRenderer.contains("RustGalFrameScheduler<VulkanicGalBridge.GuiSpriteRecord>"));
-		assertTrue(frameCoordinator.contains("RustGalFrameScheduler<VulkanicGalBridge.GuiSpriteRecord>"));
+		assertTrue(frameCoordinator.contains("RustGalFrameScheduler<QueuedGuiRequest>"));
+		assertTrue(frameCoordinator.contains("QueuedGuiRequest"));
 		assertFalse(guiRenderer.contains("record CachedResources"));
 		assertFalse(guiRenderer.contains("record TextureAtlas"));
 		assertFalse(guiRenderer.contains("record FrameSpriteBatch"));

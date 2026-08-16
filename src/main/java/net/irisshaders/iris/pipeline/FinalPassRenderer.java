@@ -343,6 +343,14 @@ public class FinalPassRenderer {
 	}
 
 	private IrisVulkanRenderTargetContract.TargetSelection selectFinalRenderTarget(VulkanicRenderTargetDescriptor descriptor) {
+		if (VulkanicAPI.isVulkanBackendSelected() && !VulkanicAPI.getCommandContext().isImmediate()) {
+			return new IrisVulkanRenderTargetContract.TargetSelection(
+				this.colorHolder.getId(),
+				false,
+				descriptor,
+				true
+			);
+		}
 		return IrisVulkanRenderTargetContract.selectTarget(
 			"final",
 			null,

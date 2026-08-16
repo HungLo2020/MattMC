@@ -1,5 +1,6 @@
 package net.blaze3d.font;
 
+import net.blaze3d.platform.NativeImage;
 import net.blaze3d.textures.GpuTexture;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
@@ -13,6 +14,16 @@ public interface GlyphBitmap {
 	void upload(int i, int j, GpuTexture gpuTexture);
 
 	boolean isColored();
+
+	/**
+	 * Copies this glyph's source pixels into a CPU-owned font atlas. A provider
+	 * that cannot expose source pixels must return {@code false}; callers use
+	 * that signal to keep a semantic atlas unavailable instead of reading a GPU
+	 * texture back or manufacturing a partial payload.
+	 */
+	default boolean copyTo(NativeImage nativeImage, int i, int j) {
+		return false;
+	}
 
 	float getOversample();
 

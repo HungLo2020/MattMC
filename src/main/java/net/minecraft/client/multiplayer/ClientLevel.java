@@ -550,9 +550,12 @@ public class ClientLevel extends Level implements CacheSlot.Cleaner<ClientLevel>
 		}
 		Vec3 eye = this.minecraft.player.getEyePosition();
 		Vec3 look = this.minecraft.player.getLookAngle();
-		double x = eye.x + look.x * 3.0;
-		double y = eye.y + look.y * 3.0;
-		double z = eye.z + look.z * 3.0;
+		// Keep the diagnostic particle off the crosshair while retaining the
+		// normal camera-relative TerrainParticle extraction path.
+		Vec3 right = new Vec3(-look.z, 0.0, look.x).normalize();
+		double x = eye.x + look.x * 3.0 + right.x * 0.7;
+		double y = eye.y + look.y * 3.0 + 0.35;
+		double z = eye.z + look.z * 3.0 + right.z * 0.7;
 		if (scenario.equals("barrier")) {
 			this.addParticle(new BlockParticleOption(ParticleTypes.BLOCK_MARKER, Blocks.BARRIER.defaultBlockState()), x, y, z, 0.0, 0.0, 0.0);
 				this.auditDeterministicBlockMarkerSpawn(scenario, RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_BLOCK_MARKER_BARRIER, x, y, z);

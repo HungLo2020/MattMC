@@ -64,7 +64,11 @@ pub(super) fn primitive_metadata_from_quad(
         render_type: quad.render_type as i32,
         face_kind,
         facing: facing as i32,
-        reserved0: 0,
+        // The assembled primitive stream is also the CPU-side semantic source
+        // for Rust-owned terrain passes. Preserve the original emission byte
+        // here so compact vertex layouts do not need an Iris extension merely
+        // to reconstruct `at_midBlock.w` later.
+        reserved0: i32::from(quad.block_emission),
     }
 }
 
@@ -519,6 +523,19 @@ mod tests {
             TERRAIN_PRIMITIVE_NON_FLUID_TRANSLUCENT,
             primitive_kind_for_quad(&quad)
         );
+    }
+
+    #[test]
+    fn primitive_metadata_preserves_block_emission_for_compact_semantics() {
+        let mut quad = NativeQuad::default();
+        quad.block_emission = 13;
+        quad.block_id = 12;
+        quad.render_type = 0;
+
+        let metadata = primitive_metadata_from_quad(&quad, TERRAIN_PRIMITIVE_UNKNOWN, 0, -1);
+
+        assert_eq!(12, metadata.block_id);
+        assert_eq!(13, metadata.reserved0);
     }
 }
 

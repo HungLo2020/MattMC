@@ -8,6 +8,7 @@ import net.minecraft.api.Environment;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.renderer.RenderType;
 import org.joml.Matrix4f;
+import java.util.function.Consumer;
 
 @Environment(EnvType.CLIENT)
 public interface TextRenderable {
@@ -26,4 +27,13 @@ public interface TextRenderable {
 	float right();
 
 	float bottom();
+
+	/**
+	 * Emits resolved glyph geometry without touching Java rendering state. Only
+	 * baked font-sheet glyphs currently implement this; callers must treat an
+	 * empty result as unsupported semantic work rather than inventing geometry.
+	 */
+	default int collectSemanticQuads(Consumer<TextGlyphQuad> consumer) {
+		return 0;
+	}
 }

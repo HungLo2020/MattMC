@@ -405,6 +405,8 @@ impl OpenGlObjects {
             format: desc.format,
             extent: desc.extent,
             dimension: desc.dimension,
+            mip_levels: desc.mip_levels,
+            array_layers: desc.array_layers,
         })
     }
 
@@ -531,9 +533,11 @@ impl OpenGlObjects {
             layout: desc.layout,
             topology: desc.topology,
             cull_mode: desc.cull_mode,
+            front_face: desc.front_face,
             blend: desc.blend,
             depth_compare: desc.depth_compare,
             depth_write: desc.depth_write,
+            depth_bias: desc.depth_bias,
         })
     }
 
@@ -864,6 +868,8 @@ pub(super) struct TextureObject {
     pub(super) format: TextureFormat,
     pub(super) extent: Extent3d,
     pub(super) dimension: TextureDimension,
+    pub(super) mip_levels: u32,
+    pub(super) array_layers: u32,
 }
 
 pub(super) fn texture_target(dimension: TextureDimension) -> u32 {
@@ -928,9 +934,11 @@ pub(super) struct GraphicsPipelineObject {
     pub(super) layout: Handle,
     pub(super) topology: PrimitiveTopology,
     pub(super) cull_mode: CullMode,
+    pub(super) front_face: crate::render::vulkanic::resources::FrontFace,
     pub(super) blend: BlendMode,
     pub(super) depth_compare: Option<CompareOp>,
     pub(super) depth_write: bool,
+    pub(super) depth_bias: Option<crate::render::vulkanic::resources::DepthBias>,
 }
 
 pub(super) struct ComputePipelineObject {
@@ -988,7 +996,7 @@ mod tests {
     }
 
     #[test]
-    fn r8uint_and_rgba16float_have_explicit_native_copy_formats() {
+    fn shader_pack_color_formats_have_explicit_native_copy_formats() {
         let r8 = texture_format(TextureFormat::R8Uint).unwrap();
         assert_eq!(glow::R8UI as i32, r8.internal);
         assert_eq!(1, r8.bytes_per_pixel);
@@ -998,6 +1006,29 @@ mod tests {
         assert_eq!(glow::HALF_FLOAT, rgba16.ty);
         assert_eq!(8, rgba16.bytes_per_pixel);
         assert!(!rgba16.integer);
+
+        let r11 = texture_format(TextureFormat::R11fG11fB10f).unwrap();
+        assert_eq!(glow::R11F_G11F_B10F as i32, r11.internal);
+        assert_eq!(glow::UNSIGNED_INT_10F_11F_11F_REV, r11.ty);
+        assert_eq!(4, r11.bytes_per_pixel);
+
+        let r32 = texture_format(TextureFormat::R32Float).unwrap();
+        assert_eq!(glow::R32F as i32, r32.internal);
+        assert_eq!(glow::FLOAT, r32.ty);
+        assert_eq!(4, r32.bytes_per_pixel);
+
+        let rgb16 = texture_format(TextureFormat::Rgb16Float).unwrap();
+        assert_eq!(glow::RGB16F as i32, rgb16.internal);
+        assert_eq!(6, rgb16.bytes_per_pixel);
+
+        let r8unorm = texture_format(TextureFormat::R8Unorm).unwrap();
+        assert_eq!(glow::R8 as i32, r8unorm.internal);
+        assert_eq!(1, r8unorm.bytes_per_pixel);
+
+        let snorm = texture_format(TextureFormat::Rgba8Snorm).unwrap();
+        assert_eq!(glow::RGBA8_SNORM as i32, snorm.internal);
+        assert_eq!(glow::BYTE, snorm.ty);
+        assert_eq!(4, snorm.bytes_per_pixel);
     }
 
     #[test]
@@ -1097,6 +1128,22 @@ void main() { vec4 color = texture(sampler2D(TerrainAtlasColor, TerrainAtlasSamp
         assert!(normalized.contains("layout(binding = 2) uniform sampler2D TerrainAtlasColor;"));
         assert!(!normalized.contains("TerrainAtlasSampler"));
         assert!(normalized.contains("texture(TerrainAtlasColor, vec2(0.5))"));
+    }
+
+    #[test]
+    fn opengl_shader_source_maps_distant_horizons_lightmap_sampler_pair() {
+        let source = "\
+layout(set = 1, binding = 0) uniform texture2D LightmapTexture;
+layout(set = 1, binding = 1) uniform sampler LightmapSampler;
+void main() { vec4 color = texture(sampler2D(LightmapTexture, LightmapSampler), vec2(0.5)); }
+";
+        let normalized = opengl_shader_source(source);
+        assert!(normalized.contains("layout(binding = 8) uniform sampler2D LightmapTexture;"));
+        assert!(!normalized.contains("LightmapSampler"));
+        assert!(normalized.contains("texture(LightmapTexture, vec2(0.5))"));
+        assert!(sampler_uniform_names(8)
+            .iter()
+            .any(|name| name == "LightmapTexture"));
     }
 
     #[test]
@@ -1209,6 +1256,41 @@ pub(super) fn texture_format(format: TextureFormat) -> GalResult<GlTextureFormat
             bytes_per_pixel: 1,
             integer: true,
         }),
+        TextureFormat::R11fG11fB10f => Ok(GlTextureFormat {
+            internal: glow::R11F_G11F_B10F as i32,
+            external: glow::RGB,
+            ty: glow::UNSIGNED_INT_10F_11F_11F_REV,
+            bytes_per_pixel: 4,
+            integer: false,
+        }),
+        TextureFormat::R32Float => Ok(GlTextureFormat {
+            internal: glow::R32F as i32,
+            external: glow::RED,
+            ty: glow::FLOAT,
+            bytes_per_pixel: 4,
+            integer: false,
+        }),
+        TextureFormat::Rgb16Float => Ok(GlTextureFormat {
+            internal: glow::RGB16F as i32,
+            external: glow::RGB,
+            ty: glow::HALF_FLOAT,
+            bytes_per_pixel: 6,
+            integer: false,
+        }),
+        TextureFormat::R8Unorm => Ok(GlTextureFormat {
+            internal: glow::R8 as i32,
+            external: glow::RED,
+            ty: glow::UNSIGNED_BYTE,
+            bytes_per_pixel: 1,
+            integer: false,
+        }),
+        TextureFormat::Rgba8Snorm => Ok(GlTextureFormat {
+            internal: glow::RGBA8_SNORM as i32,
+            external: glow::RGBA,
+            ty: glow::BYTE,
+            bytes_per_pixel: 4,
+            integer: false,
+        }),
         TextureFormat::Bgra8Unorm | TextureFormat::Depth24Stencil8 => Err(GalError::backend(
             format!("OpenGL texture format {format:?} is not supported in the isolated path"),
         )),
@@ -1251,6 +1333,14 @@ fn opengl_shader_source(source: &str) -> String {
             "uniform sampler2D ShadowDepthTex;",
         )
         .replace(
+            "uniform texture2D LightmapTexture;",
+            "uniform sampler2D LightmapTexture;",
+        )
+        .replace(
+            "uniform texture2D vulkanic_source_dh_atlas_texture;",
+            "uniform sampler2D vulkanic_source_dh_atlas_texture;",
+        )
+        .replace(
             "uniform utexture3D TerrainVoxelOccupancy;",
             "uniform usampler3D TerrainVoxelOccupancy;",
         )
@@ -1272,6 +1362,16 @@ fn opengl_shader_source(source: &str) -> String {
         )
         .replace("layout(binding = 5) uniform sampler Samp0;\n", "")
         .replace("layout(binding=5) uniform sampler Samp0;\n", "")
+        .replace("layout(binding = 9) uniform sampler LightmapSampler;\n", "")
+        .replace("layout(binding=9) uniform sampler LightmapSampler;\n", "")
+        .replace(
+            "layout(binding = 17) uniform sampler vulkanic_source_dh_atlas_sampler;\n",
+            "",
+        )
+        .replace(
+            "layout(binding=17) uniform sampler vulkanic_source_dh_atlas_sampler;\n",
+            "",
+        )
         .replace("layout(binding = 1) uniform sampler samp0;\n", "")
         .replace("layout(binding=1) uniform sampler samp0;\n", "")
         .replace(
@@ -1293,6 +1393,14 @@ fn opengl_shader_source(source: &str) -> String {
         .replace("sampler2D(MaterialLightTex, Samp0)", "MaterialLightTex")
         .replace("sampler2D(WorldPositionTex, Samp0)", "WorldPositionTex")
         .replace("sampler2D(ShadowDepthTex, Samp0)", "ShadowDepthTex")
+        .replace(
+            "sampler2D(LightmapTexture, LightmapSampler)",
+            "LightmapTexture",
+        )
+        .replace(
+            "sampler2D(vulkanic_source_dh_atlas_texture, vulkanic_source_dh_atlas_sampler)",
+            "vulkanic_source_dh_atlas_texture",
+        )
         .replace(
             "sampler3D(TerrainColoredVoxelLight, TerrainVoxelLightSampler)",
             "TerrainColoredVoxelLight",
@@ -1430,7 +1538,11 @@ fn uniform_block_names(binding: u32) -> Vec<String> {
             "DynamicTransforms".to_string(),
             "Projection".to_string(),
         ],
-        1 => vec!["WorldMeshInstance".to_string(), "Uniforms1".to_string()],
+        1 => vec![
+            "WorldMeshInstance".to_string(),
+            "DistantHorizonsLodFrame".to_string(),
+            "Uniforms1".to_string(),
+        ],
         11 => vec![
             "TerrainVoxelLightMapping".to_string(),
             "Uniforms11".to_string(),
@@ -1444,6 +1556,7 @@ fn storage_block_names(binding: u32) -> Vec<String> {
         0 => vec![
             "WorldMaterialBatch".to_string(),
             "WorldMeshVertices".to_string(),
+            "DistantHorizonsLodVertices".to_string(),
             "Storage0".to_string(),
         ],
         1 => vec!["WorldMeshInstances".to_string(), "Storage1".to_string()],
@@ -1491,6 +1604,7 @@ pub(super) fn sampler_uniform_names(binding: u32) -> Vec<String> {
             "ShadowDepthTex".to_string(),
             "DepthTex".to_string(),
         ],
+        8 => vec!["LightmapTexture".to_string(), "Sampler8".to_string()],
         _ => vec![format!("Sampler{binding}"), format!("tex{binding}")],
     }
 }

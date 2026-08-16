@@ -44,6 +44,8 @@ import org.joml.Quaternionf;
 
 @Environment(EnvType.CLIENT)
 public class EntityRenderDispatcher implements ResourceManagerReloadListener {
+	/** Semantic-only callbacks must not enqueue a second Rust render request. */
+	private static final ThreadLocal<Boolean> SEMANTIC_SUBMISSION = ThreadLocal.withInitial(() -> false);
 	private Map<EntityType<?>, EntityRenderer<?, ?>> renderers = ImmutableMap.of();
 	private Map<PlayerModelType, AvatarRenderer<AbstractClientPlayer>> playerRenderers = Map.of();
 	private Map<PlayerModelType, AvatarRenderer<ClientMannequin>> mannequinRenderers = Map.of();
@@ -152,6 +154,41 @@ public class EntityRenderDispatcher implements ResourceManagerReloadListener {
 	public <S extends EntityRenderState> void submit(
 		S entityRenderState, CameraRenderState cameraRenderState, double d, double e, double f, PoseStack poseStack, SubmitNodeCollector submitNodeCollector
 	) {
+		this.submitInternal(entityRenderState, cameraRenderState, d, e, f, poseStack, submitNodeCollector, true);
+	}
+
+	/**
+	 * Invokes the vanilla producer callback to collect copied semantic feature
+	 * categories without entering Iris render tracking. Callers must use a
+	 * discard-only collector; this is not a rendering entry point.
+	 */
+	public <S extends EntityRenderState> void submitSemantic(
+		S entityRenderState, CameraRenderState cameraRenderState, double d, double e, double f, PoseStack poseStack, SubmitNodeCollector submitNodeCollector
+	) {
+		boolean previous = SEMANTIC_SUBMISSION.get();
+		SEMANTIC_SUBMISSION.set(true);
+		try {
+			this.submitInternal(entityRenderState, cameraRenderState, d, e, f, poseStack, submitNodeCollector, false);
+		} finally {
+			SEMANTIC_SUBMISSION.set(previous);
+		}
+	}
+
+	/** True only while a discard-only semantic collector invokes a renderer callback. */
+	public static boolean isSemanticSubmission() {
+		return SEMANTIC_SUBMISSION.get();
+	}
+
+	private <S extends EntityRenderState> void submitInternal(
+		S entityRenderState,
+		CameraRenderState cameraRenderState,
+		double d,
+		double e,
+		double f,
+		PoseStack poseStack,
+		SubmitNodeCollector submitNodeCollector,
+		boolean captureIrisRenderState
+	) {
 		EntityRenderer<?, ? super S> entityRenderer = this.getRenderer(entityRenderState);
 
 		try {
@@ -163,7 +200,9 @@ public class EntityRenderDispatcher implements ResourceManagerReloadListener {
 			poseStack.translate(g, h, i);
 			
 			// Iris: From MixinEntityRenderDispatcher - begin entity render tracking
-			it.unimi.dsi.fastutil.objects.Object2IntFunction<net.irisshaders.iris.shaderpack.materialmap.NamespacedId> entityIds = net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getEntityIds();
+			it.unimi.dsi.fastutil.objects.Object2IntFunction<net.irisshaders.iris.shaderpack.materialmap.NamespacedId> entityIds = captureIrisRenderState
+				? net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getEntityIds()
+				: null;
 			if (entityIds != null && net.irisshaders.iris.vertices.ImmediateState.isRenderingLevel) {
 				int intId;
 				net.irisshaders.iris.shaderpack.materialmap.NamespacedId CURRENT_PLAYER = new net.irisshaders.iris.shaderpack.materialmap.NamespacedId("minecraft", "current_player");
@@ -194,10 +233,17 @@ public class EntityRenderDispatcher implements ResourceManagerReloadListener {
 				poseStack.translate(-vec3.x(), -vec3.y(), -vec3.z());
 			}
 
-			// Iris: From MixinEntityRenderDispatcher (main package) - suppress shadows if pipeline requests
+			// Iris suppresses the legacy Java shadow draw when its own pipeline owns
+			// the pass. A selected Rust whole-frame route owns that semantic pass
+			// instead, so retain the ordinary copied submit for Rust extraction.
 			if (!entityRenderState.shadowPieces.isEmpty()) {
 				net.irisshaders.iris.pipeline.WorldRenderingPipeline pipeline = net.irisshaders.iris.Iris.getPipelineManager().getPipelineNullable();
-				boolean suppressShadows = pipeline != null && pipeline.shouldDisableVanillaEntityShadows();
+				boolean rustWholeFrameShadowRoute = net.vulkanic.world.WorldRenderRoutePolicy
+					.currentEntityShadowRoute()
+					.usesRustWholeFrameVulkan();
+				boolean suppressShadows = !rustWholeFrameShadowRoute
+					&& pipeline != null
+					&& pipeline.shouldDisableVanillaEntityShadows();
 				
 				if (!suppressShadows) {
 					submitNodeCollector.submitShadow(poseStack, entityRenderState.shadowRadius, entityRenderState.shadowPieces);
@@ -215,8 +261,10 @@ public class EntityRenderDispatcher implements ResourceManagerReloadListener {
 			poseStack.popPose();
 			
 			// Iris: From MixinEntityRenderDispatcher - end entity render tracking
-			net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentEntity(0);
-			net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentRenderedItem(0);
+			if (captureIrisRenderState) {
+				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentEntity(0);
+				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentRenderedItem(0);
+			}
 		} catch (Throwable var19) {
 			CrashReport crashReport = CrashReport.forThrowable(var19, "Rendering entity in world");
 			CrashReportCategory crashReportCategory = crashReport.addCategory("EntityRenderState being rendered");

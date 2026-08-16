@@ -73,6 +73,14 @@ public class FontSet implements AutoCloseable {
 		this.stitcher = glyphStitcher;
 	}
 
+	/**
+	 * Semantic source snapshots for the completed glyph atlases. This is kept on
+	 * the font-set boundary so callers never need to inspect render textures.
+	 */
+	public List<FontTexture.SemanticAtlasSnapshot> semanticAtlasSnapshots() {
+		return this.stitcher.semanticAtlasSnapshots();
+	}
+
 	public void reload(List<GlyphProvider.Conditional> list, Set<FontOption> set) {
 		this.allProviders = list;
 		this.reload(set);

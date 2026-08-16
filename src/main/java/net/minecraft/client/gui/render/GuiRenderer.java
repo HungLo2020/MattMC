@@ -27,7 +27,9 @@ import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
+import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -66,6 +68,8 @@ import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicResourceBarriers;
 import net.vulkanic.gui.RustGalFrameCoordinator;
 import net.vulkanic.gui.RustGalGuiElementRenderState;
+import net.vulkanic.gui.RustGalGuiItemRenderer;
+import net.vulkanic.gui.RustGalGuiRenderer;
 import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3x2f;
@@ -100,6 +104,8 @@ public class GuiRenderer implements AutoCloseable {
 	private final Map<Object, GuiRenderer.AtlasPosition> atlasPositions = new Object2ObjectOpenHashMap<>();
 	private final Map<Object, OversizedItemRenderer> oversizedItemRenderers = new Object2ObjectOpenHashMap<>();
 	private final Map<Object, Standard3dItemRenderer> standard3dItemRenderers = new Object2ObjectOpenHashMap<>();
+	/** States selected before GUI prepare; selected states never enter Java PIP. */
+	private final Set<GuiItemRenderState> rustOwnedStandard3dItems = Collections.newSetFromMap(new IdentityHashMap<>());
 	final GuiRenderState renderState;
 	private final List<GuiRenderer.DrawStep> draws = new ArrayList();
 	private final List<GuiRenderer.PreparedStep> meshesToDraw = new ArrayList();
@@ -159,6 +165,49 @@ public class GuiRenderer implements AutoCloseable {
 		this.frameNumber++;
 	}
 
+	/**
+	 * Extracts text semantics for the Rust whole-frame route without preparing
+	 * Java meshes or issuing a Java draw.
+	 */
+	public void collectRustGalTextSemantics() {
+		this.renderState.forEachText(guiTextRenderState -> {
+			List<RustGalGuiElementRenderState> elements = RustGalGuiRenderer.tryEnqueueText(
+				guiTextRenderState,
+				Minecraft.getInstance().getWindow().getGuiScaledWidth(),
+				Minecraft.getInstance().getWindow().getGuiScaledHeight()
+			);
+			if (elements != null) {
+				for (RustGalGuiElementRenderState element : elements) {
+					this.renderState.submitGlyphToCurrentLayer(element);
+				}
+			}
+		});
+	}
+
+	/**
+	 * Converts admitted flat and standard-3D vanilla item semantics for a
+	 * Rust-owned whole frame. Once a standard-3D item is selected, its Java PIP
+	 * renderer is excluded from that frame rather than drawn a second time.
+	 */
+	public void collectRustGalItemSemantics() {
+		int guiWidth = Minecraft.getInstance().getWindow().getGuiScaledWidth();
+		int guiHeight = Minecraft.getInstance().getWindow().getGuiScaledHeight();
+		this.renderState.forEachItem(guiItemRenderState -> {
+			boolean standard3dCandidate = guiItemRenderState.itemStackRenderState().usesBlockLight()
+				&& RustGalGuiItemRenderer.standard3dRouteEnabled()
+				&& RustGalGuiRenderer.currentExecutionRoute() == RustGalGuiRenderer.GuiExecutionRoute.RUST_VULKAN_WHOLE_FRAME;
+			List<RustGalGuiElementRenderState> elements = standard3dCandidate
+				? RustGalGuiItemRenderer.tryEnqueueStandard3dItem(guiItemRenderState, guiWidth, guiHeight)
+				: RustGalGuiItemRenderer.tryEnqueueFlatItem(guiItemRenderState, guiWidth, guiHeight);
+			if (standard3dCandidate && !elements.isEmpty()) {
+				this.rustOwnedStandard3dItems.add(guiItemRenderState);
+			}
+			for (RustGalGuiElementRenderState element : elements) {
+				this.renderState.submitGlyphToCurrentLayer(element);
+			}
+		});
+	}
+
 	public void render(GpuBufferSlice gpuBufferSlice) {
 		this.prepare();
 		this.draw(gpuBufferSlice);
@@ -169,6 +218,7 @@ public class GuiRenderer implements AutoCloseable {
 
 		this.draws.clear();
 		this.meshesToDraw.clear();
+		this.rustOwnedStandard3dItems.clear();
 		this.renderState.reset();
 		this.firstDrawIndexAfterBlur = Integer.MAX_VALUE;
 		this.clearUnusedOversizedItemRenderers();
@@ -414,6 +464,17 @@ public class GuiRenderer implements AutoCloseable {
 
 	private void prepareText() {
 		this.renderState.forEachText(guiTextRenderState -> {
+			List<RustGalGuiElementRenderState> rustGalText = RustGalGuiRenderer.tryEnqueueText(
+				guiTextRenderState,
+				Minecraft.getInstance().getWindow().getGuiScaledWidth(),
+				Minecraft.getInstance().getWindow().getGuiScaledHeight()
+			);
+			if (rustGalText != null) {
+				for (RustGalGuiElementRenderState element : rustGalText) {
+					this.renderState.submitGlyphToCurrentLayer(element);
+				}
+				return;
+			}
 			final Matrix3x2f matrix3x2f = guiTextRenderState.pose;
 			final ScreenRectangle screenRectangle = guiTextRenderState.scissor;
 			guiTextRenderState.ensurePrepared().visit(new Font.GlyphVisitor() {
@@ -550,6 +611,9 @@ public class GuiRenderer implements AutoCloseable {
 
 	private void prepareItemsViaPictureInPicture(int i) {
 		this.renderState.forEachItem(guiItemRenderState -> {
+			if (this.rustOwnedStandard3dItems.contains(guiItemRenderState)) {
+				return;
+			}
 			TrackingItemStackRenderState trackingItemStackRenderState = guiItemRenderState.itemStackRenderState();
 			ScreenRectangle screenRectangle = guiItemRenderState.oversizedItemBounds();
 			int j = screenRectangle != null ? screenRectangle.left() : guiItemRenderState.x();

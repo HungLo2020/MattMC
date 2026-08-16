@@ -33,10 +33,24 @@ pub(crate) fn destroy_stale_frame_targets(context: &mut BridgeContext) -> GalRes
 }
 
 pub(crate) fn destroy_all_frame_targets(context: &mut BridgeContext) -> GalResult<()> {
-    context.gui_frontend.clear_frame_pass(&mut context.gal);
-    context
-        .world_primitive_frontend
-        .clear_frame_pass(&mut context.gal);
+    let active_targets = context
+        .frame_targets
+        .values()
+        .map(|cached| cached.handle)
+        .collect::<Vec<_>>();
+    if !active_targets.is_empty() {
+        context
+            .gui_frontend
+            .clear_frame_passes_for_targets(&mut context.gal, &active_targets);
+        context
+            .world_primitive_frontend
+            .clear_frame_passes_for_targets(&mut context.gal, &active_targets);
+    } else {
+        context.gui_frontend.clear_frame_pass(&mut context.gal);
+        context
+            .world_primitive_frontend
+            .clear_frame_pass(&mut context.gal);
+    }
     destroy_stale_frame_targets(context)?;
     for (_identity, cached) in std::mem::take(&mut context.frame_targets) {
         context.gal.destroy(cached.handle)?;

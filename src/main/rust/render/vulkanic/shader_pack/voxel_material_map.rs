@@ -76,7 +76,25 @@ impl VoxelMaterialMap {
             GalError::invalid_argument("selected shader pack has no voxelization source")
         })?;
         let active = active_lines(text, &contract.property_defines)?;
-        let function = function_body(&active, "GetVoxelIDs")?;
+        let function = function_body(&active, "GetVoxelIDs").map_err(|error| {
+            let define = |name: &str| {
+                contract
+                    .property_defines
+                    .get(name)
+                    .map(String::as_str)
+                    .unwrap_or("<absent>")
+            };
+            GalError::invalid_argument(format!(
+                "{error}; voxel source bytes contain GetVoxelIDs={} after semantic preprocessing; \
+                 INCLUDE_VOXELIZATION={}, COLORED_LIGHTING={}, COLORED_LIGHTING_INTERNAL={}, \
+                 IRIS_FEATURE_CUSTOM_IMAGES={}",
+                text.contains("GetVoxelIDs("),
+                define("INCLUDE_VOXELIZATION"),
+                define("COLORED_LIGHTING"),
+                define("COLORED_LIGHTING_INTERNAL"),
+                define("IRIS_FEATURE_CUSTOM_IMAGES"),
+            ))
+        })?;
         // `UpdateVoxelMap` is compiled only for the shadow vertex stage. Its
         // admission expression is still source semantics for the owned
         // voxelizer, so inspect that function before stage-condition pruning.
@@ -463,23 +481,28 @@ mod tests {
     use super::super::source::ShaderSourceFile;
     use super::super::terrain_contract::{
         TerrainPassContract, TerrainPassInput, TerrainPassOperation, TerrainPassOutput,
+        TerrainSourcePassKind,
     };
     use super::*;
     use std::collections::BTreeSet;
 
     fn contract() -> TerrainPassContract {
         TerrainPassContract {
+            pass_kind: TerrainSourcePassKind::OpaqueCutout,
             pack_name: "test".to_string(),
             generation: 7,
             program_path: "unused".to_string(),
             material_classes: BTreeSet::new(),
             inputs: BTreeSet::from([TerrainPassInput::ColoredVoxelLightVolume]),
             outputs: BTreeSet::from([TerrainPassOutput::LitTerrainColor]),
+            output_color_slots: BTreeMap::from([(TerrainPassOutput::LitTerrainColor, 0)]),
             property_defines: BTreeMap::from([("ENABLE_LIGHT".to_string(), "1".to_string())]),
             material_ids: BTreeMap::new(),
+            runtime_block_state_material_ids: None,
             operations: vec![TerrainPassOperation::ColoredVoxelLighting],
             required_resources: BTreeSet::new(),
             voxel_light_volume_requirements: None,
+            translucent_raster_state: None,
             unsupported: BTreeSet::new(),
         }
     }

@@ -2,6 +2,7 @@ package com.seibel.distanthorizons.core.util;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.seibel.distanthorizons.api.enums.rendering.EDhApiBlockMaterial;
+import com.seibel.distanthorizons.core.dataObjects.render.ColumnRenderSource;
 import com.seibel.distanthorizons.core.dataObjects.render.columnViews.ColumnArrayView;
 import com.seibel.distanthorizons.core.dataObjects.render.columnViews.IColumnDataView;
 import com.seibel.distanthorizons.core.pooling.AbstractPhantomArrayList;
@@ -87,6 +88,9 @@ public class RenderDataPointReducingList extends AbstractPhantomArrayList
 	private short lowest, highest, smallest, biggest;
 	private short sizeWithAir, sizeWithoutAir;
 	private final LongArrayList links, data;
+	/** Optional semantic companion to {@link #data}; it is intentionally
+	 * private to the reducer and never changes the compact render-data ABI. */
+	private final int[] semanticMaterials;
 	/**
 	 * a temporary array to be used for sorting nodes.
 	 * the array is first populated such that every index
@@ -103,11 +107,21 @@ public class RenderDataPointReducingList extends AbstractPhantomArrayList
 	// constructor //
 	//=============//
 	
-	public RenderDataPointReducingList(IColumnDataView view) 
+	public RenderDataPointReducingList(IColumnDataView view)
+	{
+		this(view, null);
+	}
+
+	public RenderDataPointReducingList(IColumnDataView view, int[] sourceSemanticMaterials)
 	{
 		super(ARRAY_LIST_POOL, 0, 1, 2);
 		
 		int size = view.size();
+		if (sourceSemanticMaterials != null && sourceSemanticMaterials.length < size)
+		{
+			throw new IllegalArgumentException("Semantic material source does not cover reducer input");
+		}
+		this.semanticMaterials = sourceSemanticMaterials == null ? null : new int[Math.max(0, (size << 1) - 1)];
 		if (size == 0) 
 		{
 			this.setLowest(NULL);
@@ -142,7 +156,8 @@ public class RenderDataPointReducingList extends AbstractPhantomArrayList
 			// air nodes will be inserted *after* the nodes have been sorted by Y level.
 			if (isDataVisible(packedData) && RenderDataPointUtil.getYMin(packedData) < RenderDataPointUtil.getYMax(packedData)) 
 			{
-				this.setData(sizeWithoutAir, packedData);
+			this.setData(sizeWithoutAir, packedData);
+			this.setSemanticMaterial(sizeWithoutAir, sourceSemanticMaterials == null ? 0 : sourceSemanticMaterials[index]);
 				this.setSortingIndex(sizeWithoutAir, sizeWithoutAir);
 				sizeWithoutAir++;
 			}
@@ -197,6 +212,7 @@ public class RenderDataPointReducingList extends AbstractPhantomArrayList
 						RenderDataPointUtil.getBlockMaterialId(higherData)
 					)
 				);
+				this.setSemanticMaterial(sizeWithAir, 0);
 				
 				this.setSortingIndex(sizeWithAir, sizeWithAir);
 				this.setLower(higherIndex, sizeWithAir);
@@ -294,7 +310,7 @@ public class RenderDataPointReducingList extends AbstractPhantomArrayList
 	 */
 	public void reduce(int target)
 	{
-		long waterSurfaceToPreserve = this.findWaterSurfaceToPreserve();
+		WaterSurface waterSurfaceToPreserve = this.findWaterSurfaceToPreserve();
 		if (this.mergeVerySmallConnectedSegments(target))
 		{
 			this.preserveWaterSurfaceIfNeeded(waterSurfaceToPreserve);
@@ -395,6 +411,7 @@ public class RenderDataPointReducingList extends AbstractPhantomArrayList
 		else this.setBiggest(smaller);
 		
 		this.setData(index, DEFAUlT_DATA);
+		this.setSemanticMaterial(index, 0);
 		this.links.set(index, DEFAULT_LINKS);
 		this.sizeWithAir--;
 		
@@ -615,6 +632,7 @@ public class RenderDataPointReducingList extends AbstractPhantomArrayList
 		// if (result == toRemove) result = fastPath ? this.getSmaller(result) : this.getBigger(result);
 		if (result == toRemove) result = this.getSmaller(result);
 		
+		this.mergeSemanticMaterialInto(toExtendDownwards, toRemove);
 		this.setMinY(toExtendDownwards, this.getMinY(toRemove));
 		if (!fastPath) this.resortSize(toExtendDownwards);
 		
@@ -756,6 +774,8 @@ public class RenderDataPointReducingList extends AbstractPhantomArrayList
 			int higher = this.getHigher(center);
 			if (lower != NULL && higher != NULL && this.getAlpha(lower) == this.getAlpha(higher))
 			{
+				this.mergeSemanticMaterialInto(higher, lower);
+				this.mergeSemanticMaterialInto(higher, center);
 				this.setMinY(higher, this.getMinY(lower));
 				this.resortSize(higher);
 				this.remove(lower);
@@ -822,6 +842,7 @@ public class RenderDataPointReducingList extends AbstractPhantomArrayList
 				// to the minY of the bottom visible segment.
 				if (this.isIndexVisible(higher))
 				{
+					this.mergeSemanticMaterialInto(higher, lowest);
 					this.setMinY(higher, lowY);
 					this.resortSize(higher);
 					this.remove(lowest);
@@ -935,22 +956,23 @@ public class RenderDataPointReducingList extends AbstractPhantomArrayList
 			&& RenderDataPointUtil.getBlockMaterialId(dataPoint) == EDhApiBlockMaterial.WATER.index;
 	}
 
-	private long findWaterSurfaceToPreserve()
+	private WaterSurface findWaterSurfaceToPreserve()
 	{
-		long highestWaterDataPoint = RenderDataPointUtil.EMPTY_DATA;
+		int highestWaterIndex = NULL;
 		for (int index = this.getLowest(); index != NULL; index = this.getHigher(index))
 		{
 			long dataPoint = this.getData(index);
 			if (this.isIndexVisible(index)
 				&& isWater(dataPoint)
-				&& (!RenderDataPointUtil.doesDataPointExist(highestWaterDataPoint)
-					|| this.getMaxY(index) > RenderDataPointUtil.getYMax(highestWaterDataPoint)))
+				&& (highestWaterIndex == NULL || this.getMaxY(index) > this.getMaxY(highestWaterIndex)))
 			{
-				highestWaterDataPoint = dataPoint;
+				highestWaterIndex = index;
 			}
 		}
 
-		return highestWaterDataPoint;
+		return highestWaterIndex == NULL
+			? WaterSurface.NONE
+			: new WaterSurface(this.getData(highestWaterIndex), this.getSemanticMaterial(highestWaterIndex));
 	}
 
 	private boolean hasOpaqueVisibleSegmentAbove(int y)
@@ -967,21 +989,22 @@ public class RenderDataPointReducingList extends AbstractPhantomArrayList
 		return false;
 	}
 
-	private void preserveWaterSurfaceIfNeeded(long waterDataPoint)
+	private void preserveWaterSurfaceIfNeeded(WaterSurface waterSurface)
 	{
-		if (!RenderDataPointUtil.doesDataPointExist(waterDataPoint)
-			|| this.containsWaterSurfaceAtOrAbove(RenderDataPointUtil.getYMax(waterDataPoint)))
+		if (!RenderDataPointUtil.doesDataPointExist(waterSurface.data())
+			|| this.containsWaterSurfaceAtOrAbove(RenderDataPointUtil.getYMax(waterSurface.data())))
 		{
 			return;
 		}
 
-		int targetIndex = this.findVisibleSegmentCoveringY(RenderDataPointUtil.getYMax(waterDataPoint));
+		int targetIndex = this.findVisibleSegmentCoveringY(RenderDataPointUtil.getYMax(waterSurface.data()));
 		if (targetIndex == NULL)
 		{
 			return;
 		}
 
-		this.setData(targetIndex, waterDataPoint);
+		this.setData(targetIndex, waterSurface.data());
+		this.setSemanticMaterial(targetIndex, waterSurface.semanticMaterial());
 	}
 
 	private boolean containsWaterSurfaceAtOrAbove(int y)
@@ -1068,6 +1091,35 @@ public class RenderDataPointReducingList extends AbstractPhantomArrayList
 			view.set(writeIndex, RenderDataPointUtil.EMPTY_DATA);
 		}
 	}
+
+	/** Copies the exact semantic companion in the same highest-to-lowest order
+	 * as {@link #copyTo(ColumnArrayView)}. */
+	public void copyTo(ColumnArrayView view, int[] outputSemanticMaterials)
+	{
+		if (outputSemanticMaterials == null || outputSemanticMaterials.length < view.size())
+		{
+			throw new IllegalArgumentException("Semantic material output does not cover reducer result");
+		}
+		int writeIndex = 0;
+		for (int node = this.getHighest(); node != NULL; node = this.getLower(node))
+		{
+			if (this.isIndexVisible(node))
+			{
+				view.set(writeIndex, this.getData(node));
+				outputSemanticMaterials[writeIndex++] = this.getSemanticMaterial(node);
+			}
+		}
+		if (writeIndex == 0)
+		{
+			view.set(writeIndex, RenderDataPointUtil.EMPTY_DATA);
+			outputSemanticMaterials[writeIndex++] = 0;
+		}
+		for (int size = view.size(); writeIndex < size; writeIndex++)
+		{
+			view.set(writeIndex, RenderDataPointUtil.EMPTY_DATA);
+			outputSemanticMaterials[writeIndex] = 0;
+		}
+	}
 	
 	
 	
@@ -1147,6 +1199,45 @@ public class RenderDataPointReducingList extends AbstractPhantomArrayList
 	}
 
 	public void setData(int index, long data) { this.data.set(index, data); }
+
+	private int getSemanticMaterial(int index)
+	{
+		return this.semanticMaterials == null ? 0 : this.semanticMaterials[index];
+	}
+
+	private void setSemanticMaterial(int index, int semanticMaterial)
+	{
+		if (this.semanticMaterials != null)
+		{
+			this.semanticMaterials[index] = semanticMaterial;
+		}
+	}
+
+	/**
+	 * The compact reduction is free to merge vertical visual segments, but an
+	 * exact texture identity survives only when every visible contributor has
+	 * the same semantic material. Without this companion update a surviving
+	 * segment can retain an unrelated material ID and make the Rust exact-atlas
+	 * route sample a valid, but wrong, block sprite.
+	 */
+	private void mergeSemanticMaterialInto(int survivor, int removed)
+	{
+		if (this.semanticMaterials == null || !this.isIndexVisible(removed))
+		{
+			return;
+		}
+		int survivorMaterial = this.getSemanticMaterial(survivor);
+		int removedMaterial = this.getSemanticMaterial(removed);
+		if (survivorMaterial != removedMaterial)
+		{
+			this.setSemanticMaterial(survivor, ColumnRenderSource.SEMANTIC_MATERIAL_MIXED);
+		}
+	}
+
+	private record WaterSurface(long data, int semanticMaterial)
+	{
+		private static final WaterSurface NONE = new WaterSurface(RenderDataPointUtil.EMPTY_DATA, 0);
+	}
 
 	public void setMinY(int index, int minY) 
 	{

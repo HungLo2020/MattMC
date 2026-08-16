@@ -5,6 +5,7 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectAVLTreeMap;
 import java.util.List;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
+import net.minecraft.core.BlockPos;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.model.Model;
 import net.minecraft.client.model.geom.ModelPart;
@@ -72,6 +73,13 @@ public class SubmitNodeStorage implements SubmitNodeCollector, OrderedSubmitNode
 		this.order(0).submitText(poseStack, f, g, formattedCharSequence, bl, displayMode, i, j, k, l);
 	}
 
+	/** Stores text copied from a semantic extraction callback without Iris state capture. */
+	public void submitTextSemantic(
+		int order, PoseStack poseStack, float f, float g, FormattedCharSequence formattedCharSequence, boolean bl, Font.DisplayMode displayMode, int i, int j, int k, int l
+	) {
+		this.order(order).submitTextSemantic(poseStack, f, g, formattedCharSequence, bl, displayMode, i, j, k, l);
+	}
+
 	@Override
 	public void submitFlame(PoseStack poseStack, EntityRenderState entityRenderState, Quaternionf quaternionf) {
 		this.order(0).submitFlame(poseStack, entityRenderState, quaternionf);
@@ -123,6 +131,11 @@ public class SubmitNodeStorage implements SubmitNodeCollector, OrderedSubmitNode
 	@Override
 	public void submitBlockDisplay(PoseStack poseStack, BlockState blockState, int i, int j, int k) {
 		this.order(0).submitBlockDisplay(poseStack, blockState, i, j, k);
+	}
+
+	@Override
+	public void submitPrimedTntBlock(PoseStack poseStack, BlockState blockState, int i, int j, int k) {
+		this.order(0).submitPrimedTntBlock(poseStack, blockState, i, j, k);
 	}
 
 	@Override
@@ -178,6 +191,48 @@ public class SubmitNodeStorage implements SubmitNodeCollector, OrderedSubmitNode
 		return this.submitsPerOrder;
 	}
 
+	/**
+	 * Aggregates copied feature-family counts after ordinary Java extraction.
+	 * It deliberately exposes no renderer state: Rust uses it to reject a
+	 * selected-source frame before unsupported work could be silently omitted.
+	 */
+	public SubmitNodeCollection.WorldFeatureCoverageSnapshot worldFeatureCoverageSnapshot() {
+		int modelSubmits = 0;
+		int modelPartSubmits = 0;
+		int blockModelSubmits = 0;
+		int ordinaryBlockSubmits = 0;
+		int itemSubmits = 0;
+		int customGeometrySubmits = 0;
+		int shadowSubmits = 0;
+		int flameSubmits = 0;
+		int nameTagSubmits = 0;
+		int textSubmits = 0;
+		int hitboxSubmits = 0;
+		int leashSubmits = 0;
+		int particleGroupSubmits = 0;
+		for (SubmitNodeCollection.WorldFeatureCoverageSnapshot coverage : this.submitsPerOrder.values()
+			.stream().map(SubmitNodeCollection::worldFeatureCoverageSnapshot).toList()) {
+			modelSubmits += coverage.modelSubmits();
+			modelPartSubmits += coverage.modelPartSubmits();
+			blockModelSubmits += coverage.blockModelSubmits();
+			ordinaryBlockSubmits += coverage.ordinaryBlockSubmits();
+			itemSubmits += coverage.itemSubmits();
+			customGeometrySubmits += coverage.customGeometrySubmits();
+			shadowSubmits += coverage.shadowSubmits();
+			flameSubmits += coverage.flameSubmits();
+			nameTagSubmits += coverage.nameTagSubmits();
+			textSubmits += coverage.textSubmits();
+			hitboxSubmits += coverage.hitboxSubmits();
+			leashSubmits += coverage.leashSubmits();
+			particleGroupSubmits += coverage.particleGroupSubmits();
+		}
+		return new SubmitNodeCollection.WorldFeatureCoverageSnapshot(
+			modelSubmits, modelPartSubmits, blockModelSubmits, ordinaryBlockSubmits, itemSubmits,
+			customGeometrySubmits, shadowSubmits, flameSubmits, nameTagSubmits, textSubmits,
+			hitboxSubmits, leashSubmits, particleGroupSubmits
+		);
+	}
+
 	@Environment(EnvType.CLIENT)
 	public record BlockModelSubmit(
 		PoseStack.Pose pose, RenderType renderType, BlockStateModel model, float r, float g, float b, int lightCoords, int overlayCoords, int outlineColor
@@ -187,11 +242,12 @@ public class SubmitNodeStorage implements SubmitNodeCollector, OrderedSubmitNode
 	@Environment(EnvType.CLIENT)
 	public enum BlockSubmitSource {
 		ORDINARY,
-		BLOCK_DISPLAY
+		BLOCK_DISPLAY,
+		PRIMED_TNT
 	}
 
 	@Environment(EnvType.CLIENT)
-	public record BlockSubmit(PoseStack.Pose pose, BlockState state, int lightCoords, int overlayCoords, int outlineColor, BlockSubmitSource source) {
+	public record BlockSubmit(PoseStack.Pose pose, BlockState state, int lightCoords, int overlayCoords, int outlineColor, BlockSubmitSource source, BlockPos tintPos) {
 	}
 
 	@Environment(EnvType.CLIENT)

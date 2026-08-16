@@ -19,6 +19,10 @@ pub enum GlslDialectGap {
     CompatibilityFragmentOutputs,
     FixedFunctionVertexTransform,
     CompatibilityVertexAttributes,
+    /// Legacy fixed-function fog parameters such as `gl_Fog.start` and
+    /// `gl_Fog.scale`. These require an explicit semantic fog-range contract;
+    /// a fog color alone is not equivalent.
+    CompatibilityFogParameters,
 }
 
 impl GlslDialectGap {
@@ -29,6 +33,7 @@ impl GlslDialectGap {
             Self::CompatibilityFragmentOutputs => "compatibility_fragment_outputs",
             Self::FixedFunctionVertexTransform => "fixed_function_vertex_transform",
             Self::CompatibilityVertexAttributes => "compatibility_vertex_attributes",
+            Self::CompatibilityFogParameters => "compatibility_fog_parameters",
         }
     }
 }
@@ -110,6 +115,9 @@ pub(crate) fn analyze_glsl_text(entry_path: &str, source: &str) -> GlslDialectRe
         .any(|token| tokens.contains(*token))
     {
         gaps.insert(GlslDialectGap::FixedFunctionVertexTransform);
+    }
+    if tokens.contains("gl_Fog") {
+        gaps.insert(GlslDialectGap::CompatibilityFogParameters);
     }
     if [
         "attribute",
@@ -286,5 +294,22 @@ mod tests {
         assert!(legacy
             .gaps()
             .contains(&GlslDialectGap::CompatibilityTextureBuiltin));
+    }
+
+    #[test]
+    fn legacy_fog_parameters_remain_an_explicit_semantic_blocker() {
+        let report = analyze_glsl_dialect(&artifact(
+            "#version 450\nvoid main() { float fog = (1.0 - gl_Fog.start) * gl_Fog.scale; }",
+        ));
+        assert_eq!(Some(450), report.declared_version());
+        assert_eq!(
+            &BTreeSet::from([GlslDialectGap::CompatibilityFogParameters]),
+            report.gaps()
+        );
+        assert!(report
+            .require_backend_neutral_lowering()
+            .unwrap_err()
+            .to_string()
+            .contains("compatibility_fog_parameters"));
     }
 }

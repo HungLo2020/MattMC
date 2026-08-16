@@ -138,6 +138,12 @@ public final class GraphicsFrameBenchmark {
 	private static boolean frameActive;
 	private static boolean measurementFrame;
 	private static boolean preMeasurementGcIssued;
+	private static long beginFrameCalls;
+	private static long activeBeginFrameCalls;
+	private static long endFrameCalls;
+	private static long endFrameInactiveReturns;
+	private static long endFrameTerminalReturns;
+	private static String lastFrameLifecycle = "not-entered";
 	private static long initializationWaitFrames;
 	private static long frameIndex;
 	private static long settledFrameIndex = -1L;
@@ -253,23 +259,33 @@ public final class GraphicsFrameBenchmark {
 	}
 
 	public static void beginFrame(Minecraft minecraft) {
+		beginFrameCalls++;
 		if (!ENABLED) {
+			lastFrameLifecycle = "begin-disabled";
 			return;
 		}
 		currentFrameStartNanos = System.nanoTime();
 		if ((complete || failed) && STOP_AFTER_COMPLETE && !stopIssued) {
+			lastFrameLifecycle = complete ? "begin-complete" : "begin-failed";
 			stopIssued = true;
 			minecraft.stop();
 			return;
 		}
 		if (complete || failed) {
+			lastFrameLifecycle = complete ? "begin-complete" : "begin-failed";
 			return;
 		}
 		frameActive = ensureInitialized(minecraft) && !complete && !failed;
 		measurementFrame = false;
 		PHASE_STACK.clear();
 		if (!frameActive) {
+			lastFrameLifecycle = "begin-not-ready";
 			return;
+		}
+		activeBeginFrameCalls++;
+		lastFrameLifecycle = "begin-active";
+		if ((beginFrameCalls % 60L) == 0L) {
+			writeStatus(minecraft, "frame-lifecycle");
 		}
 		frameAllocatedBytesAtStart = currentThreadAllocatedBytes();
 		frameGcCountAtStart = totalGcCount();
@@ -320,7 +336,15 @@ public final class GraphicsFrameBenchmark {
 	}
 
 	public static void endFrame(Minecraft minecraft, long frameNanos) {
-		if (!ENABLED || !frameActive || complete || failed) {
+		endFrameCalls++;
+		if (!ENABLED || !frameActive) {
+			endFrameInactiveReturns++;
+			lastFrameLifecycle = !ENABLED ? "end-disabled" : "end-inactive";
+			return;
+		}
+		if (complete || failed) {
+			endFrameTerminalReturns++;
+			lastFrameLifecycle = complete ? "end-complete" : "end-failed";
 			return;
 		}
 		if (measurementFrame) {
@@ -359,6 +383,7 @@ public final class GraphicsFrameBenchmark {
 		}
 		frameActive = false;
 		measurementFrame = false;
+		lastFrameLifecycle = "end-completed";
 		frameAllocatedBytesAtStart = -1L;
 		frameGcCountAtStart = -1L;
 		frameGcTimeAtStart = -1L;
@@ -563,6 +588,10 @@ public final class GraphicsFrameBenchmark {
 			boolean ready = isBenchmarkWorldReady(minecraft);
 			if (!ready) {
 				recordInitializationBlocker(minecraft);
+			} else {
+				// A dismissed startup screen is historical context, not a continuing
+				// readiness failure once the active world satisfies every gate.
+				lastReadinessBlocker = "ready";
 			}
 			return ready;
 		}
@@ -573,6 +602,7 @@ public final class GraphicsFrameBenchmark {
 			return false;
 		}
 		initialized = true;
+		lastReadinessBlocker = "ready";
 		staticTerrainWorldReadyNanos = System.nanoTime();
 		applyGameModeOverride(minecraft);
 		applyArmorOverride(player);
@@ -1566,6 +1596,12 @@ public final class GraphicsFrameBenchmark {
 		json.append("  \"gcBeforeMeasurement\": ").append(GC_BEFORE_MEASUREMENT).append(",\n");
 		json.append("  \"gcBeforeMeasurementOffsetFrames\": ").append(GC_BEFORE_MEASUREMENT_OFFSET_FRAMES).append(",\n");
 		json.append("  \"preMeasurementGcIssued\": ").append(preMeasurementGcIssued).append(",\n");
+		json.append("  \"beginFrameCalls\": ").append(beginFrameCalls).append(",\n");
+		json.append("  \"activeBeginFrameCalls\": ").append(activeBeginFrameCalls).append(",\n");
+		json.append("  \"endFrameCalls\": ").append(endFrameCalls).append(",\n");
+		json.append("  \"endFrameInactiveReturns\": ").append(endFrameInactiveReturns).append(",\n");
+		json.append("  \"endFrameTerminalReturns\": ").append(endFrameTerminalReturns).append(",\n");
+		field(json, "lastFrameLifecycle", lastFrameLifecycle, 2, true);
 		json.append("  \"initializationWaitFrames\": ").append(initializationWaitFrames).append(",\n");
 		field(json, "lastReadinessBlocker", lastReadinessBlocker, 2, true);
 		json.append("  \"producerWorkloadWaitFrames\": ").append(producerWorkloadWaitFrames).append(",\n");

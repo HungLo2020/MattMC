@@ -13,19 +13,361 @@ use crate::render::vulkanic::gal::VulkanicGal;
 use crate::render::vulkanic::handles::Handle;
 use crate::render::vulkanic::resources::*;
 use crate::render::vulkanic::shader_pack::programs::{
-    prepare_lowered_terrain_source_program, TerrainMaterialProgramKind,
-    COMPLEMENTARY_TERRAIN_SUBSET_FRAGMENT, MINIMAL_TERRAIN_MATERIAL_VERTEX,
+    distant_horizons_lod_opaque_resource_layouts,
+    minimal_distant_horizons_lod_exact_atlas_opaque_program,
+    minimal_distant_horizons_lod_opaque_program, minimal_distant_horizons_lod_transparent_program,
+    prepare_lowered_distant_horizons_exact_atlas_source_program,
+    prepare_lowered_distant_horizons_source_program, prepare_lowered_fullscreen_source_program,
+    prepare_lowered_hand_source_program, prepare_lowered_terrain_source_program,
+    prepare_lowered_textured_material_source_program, prepare_lowered_weather_source_program,
+    TerrainMaterialProgramKind, COMPLEMENTARY_TERRAIN_SUBSET_FRAGMENT,
+    MINIMAL_TERRAIN_MATERIAL_VERTEX,
 };
 use crate::render::vulkanic::shader_pack::{
-    lowering::lower_terrain_source_pair,
-    preprocess::{complete_bundled_pack_source_for_test, preprocess_terrain_sources},
-    source::{ShaderPackSource, ShaderSourceFile},
-    terrain_contract::{derive_complementary_terrain_contract, TerrainSourceStage, TerrainSourceStages},
+    distant_horizons_contract::{
+        derive_distant_horizons_opaque_contract, derive_distant_horizons_translucent_contract,
+    },
+    hand_contract::{bind_hand_source_resources, derive_hand_contract, lower_hand_source_pair},
+    lowering::{
+        lower_distant_horizons_source_pair, lower_fullscreen_source_pair, lower_terrain_source_pair,
+    },
+    material_contract::{derive_textured_material_contract, lower_textured_material_source_pair},
+    preprocess::{
+        complete_bundled_pack_source_for_test, preprocess_distant_horizons_sources,
+        preprocess_source_stage_pair, preprocess_terrain_sources,
+    },
+    source::{ShaderPackSource, ShaderSourceFile, RUNTIME_OPTIONS_PATH},
+    terrain_contract::{
+        derive_complementary_terrain_contract, TerrainProgramScope, TerrainSourceStage,
+        TerrainSourceStages,
+    },
     terrain_source_resources::{TerrainSourceResourceBindings, TERRAIN_RESOURCE_BINDINGS_PATH},
+    weather_contract::{derive_weather_pass_contract, lower_weather_source_pair},
 };
 
 const WIDTH: u32 = 96;
 const HEIGHT: u32 = 64;
+
+#[test]
+fn distant_horizons_lod_opaque_program_compiles_at_the_opengl_boundary() {
+    let backend = match OpenGlBackend::new("MattMC Distant Horizons LOD OpenGL conformance") {
+        Ok(backend) => backend,
+        Err(error) => {
+            let text = error.to_string();
+            assert!(
+                text.contains("OpenGL") || text.contains("EGL") || text.contains("GL"),
+                "unexpected OpenGL DH LOD setup failure: {text}"
+            );
+            return;
+        }
+    };
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let program = minimal_distant_horizons_lod_opaque_program();
+    for module in program.shader_module_descriptors(BackendApi::OpenGl) {
+        gal.create_shader_module(module).unwrap_or_else(|error| {
+            panic!(
+                "Rust-owned Distant Horizons opaque LOD shader must compile through OpenGL lowering: {error}"
+            )
+        });
+    }
+}
+
+#[test]
+fn distant_horizons_lod_exact_atlas_program_compiles_at_the_opengl_boundary() {
+    let backend = match OpenGlBackend::new("MattMC Distant Horizons exact-atlas OpenGL conformance")
+    {
+        Ok(backend) => backend,
+        Err(error) => {
+            let text = error.to_string();
+            assert!(
+                text.contains("OpenGL") || text.contains("EGL") || text.contains("GL"),
+                "unexpected OpenGL exact-atlas DH LOD setup failure: {text}"
+            );
+            return;
+        }
+    };
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let program = minimal_distant_horizons_lod_exact_atlas_opaque_program();
+    for module in program.shader_module_descriptors(BackendApi::OpenGl) {
+        gal.create_shader_module(module).unwrap_or_else(|error| {
+            panic!(
+                "Rust-owned Distant Horizons exact-atlas LOD shader must compile through OpenGL lowering: {error}"
+            )
+        });
+    }
+}
+
+#[test]
+fn selected_source_exact_atlas_distant_horizons_program_compiles_at_the_opengl_boundary() {
+    let backend =
+        match OpenGlBackend::new("MattMC selected-source exact-atlas DH OpenGL conformance") {
+            Ok(backend) => backend,
+            Err(error) => {
+                let text = error.to_string();
+                assert!(
+                    text.contains("OpenGL") || text.contains("EGL") || text.contains("GL"),
+                    "unexpected OpenGL selected-source exact-atlas DH setup failure: {text}"
+                );
+                return;
+            }
+        };
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let source = complete_bundled_pack_source_for_test();
+    let contract =
+        derive_distant_horizons_opaque_contract(&source, TerrainProgramScope::Overworld).unwrap();
+    let artifacts = preprocess_distant_horizons_sources(&source, &contract.source_stages).unwrap();
+    let lowered =
+        lower_distant_horizons_source_pair(&artifacts.vertex, &artifacts.fragment).unwrap();
+    let declarations = TerrainSourceResourceBindings::from_source(&source).unwrap();
+    let bindings = lowered
+        .opaque_resource_contract()
+        .bind_semantic_roles(&declarations)
+        .unwrap();
+    let source_program =
+        prepare_lowered_distant_horizons_source_program(&contract, &lowered, &bindings).unwrap();
+    let program =
+        prepare_lowered_distant_horizons_exact_atlas_source_program(&source_program).unwrap();
+
+    for module in program.shader_module_descriptors(BackendApi::OpenGl) {
+        gal.create_shader_module(module).unwrap_or_else(|error| {
+            panic!(
+                "selected-source exact-atlas Distant Horizons shader must compile through OpenGL lowering: {error}"
+            )
+        });
+    }
+}
+
+#[test]
+fn distant_horizons_lod_transparent_program_compiles_at_the_opengl_boundary() {
+    let backend =
+        match OpenGlBackend::new("MattMC Distant Horizons transparent LOD OpenGL conformance") {
+            Ok(backend) => backend,
+            Err(error) => {
+                let text = error.to_string();
+                assert!(
+                    text.contains("OpenGL") || text.contains("EGL") || text.contains("GL"),
+                    "unexpected OpenGL transparent DH LOD setup failure: {text}"
+                );
+                return;
+            }
+        };
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let program = minimal_distant_horizons_lod_transparent_program();
+    for module in program.shader_module_descriptors(BackendApi::OpenGl) {
+        gal.create_shader_module(module).unwrap_or_else(|error| {
+            panic!(
+                "Rust-owned Distant Horizons transparent LOD shader must compile through OpenGL lowering: {error}"
+            )
+        });
+    }
+}
+
+#[test]
+fn lowered_fullscreen_source_compiles_at_the_opengl_boundary_without_a_vertex_stream() {
+    let backend = match OpenGlBackend::new("MattMC fullscreen source OpenGL conformance") {
+        Ok(backend) => backend,
+        Err(error) => {
+            let text = error.to_string();
+            assert!(
+                text.contains("OpenGL") || text.contains("EGL") || text.contains("GL"),
+                "unexpected OpenGL fullscreen source setup failure: {text}"
+            );
+            return;
+        }
+    };
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let source = ShaderPackSource::new(
+        "fullscreen-source-opengl",
+        1,
+        vec![
+            ShaderSourceFile::new(
+                "world0/deferred1.vsh",
+                "#version 130\nout vec2 uv;\nvoid main() { uv = gl_MultiTexCoord0.xy; gl_Position = ftransform(); }",
+            ),
+                ShaderSourceFile::new(
+                    "world0/deferred1.fsh",
+                    "#version 130\nin vec2 uv;\nuniform sampler2D colortex0;\n/* DRAWBUFFERS:0 */\nvoid main() { gl_FragData[0] = texture2D(colortex0, uv); }",
+            ),
+            ShaderSourceFile::new(
+                TERRAIN_RESOURCE_BINDINGS_PATH,
+                "colortex0=shader_pack_color:primary\n",
+            ),
+        ],
+    )
+    .unwrap();
+    let stages = TerrainSourceStages {
+        vertex: TerrainSourceStage {
+            path: "world0/deferred1.vsh".to_string(),
+            defines: Default::default(),
+        },
+        fragment: TerrainSourceStage {
+            path: "world0/deferred1.fsh".to_string(),
+            defines: Default::default(),
+        },
+    };
+    let artifacts = preprocess_source_stage_pair(&source, &stages).unwrap();
+    let declarations = TerrainSourceResourceBindings::from_source(&source).unwrap();
+    let lowered =
+        lower_fullscreen_source_pair(&artifacts.vertex, &artifacts.fragment, &declarations)
+            .unwrap();
+    let bindings = lowered
+        .opaque_resource_contract()
+        .bind_semantic_roles(&declarations)
+        .unwrap();
+    let program = prepare_lowered_fullscreen_source_program(
+        source.name(),
+        source.generation(),
+        "world0/deferred1.fsh",
+        &lowered,
+        &bindings,
+    )
+    .unwrap();
+    for module in program.shader_module_descriptors(BackendApi::OpenGl) {
+        gal.create_shader_module(module).unwrap_or_else(|error| {
+            panic!(
+                "lowered fullscreen source must compile through OpenGL without a vertex stream: {error}"
+            )
+        });
+    }
+}
+
+#[test]
+fn lowered_complete_complementary_distant_horizons_pair_compiles_at_the_opengl_boundary() {
+    let backend = match OpenGlBackend::new("MattMC complete source DH OpenGL conformance") {
+        Ok(backend) => backend,
+        Err(error) => {
+            let text = error.to_string();
+            assert!(
+                text.contains("OpenGL") || text.contains("EGL") || text.contains("GL"),
+                "unexpected OpenGL complete source DH setup failure: {text}"
+            );
+            return;
+        }
+    };
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let source = complete_bundled_pack_source_for_test();
+    let contract = derive_distant_horizons_opaque_contract(&source, TerrainProgramScope::Overworld)
+        .expect("the bundled Complementary source must expose an Overworld DH pair");
+    let artifacts = preprocess_distant_horizons_sources(&source, &contract.source_stages).unwrap();
+    let lowered =
+        lower_distant_horizons_source_pair(&artifacts.vertex, &artifacts.fragment).unwrap();
+    let declarations = TerrainSourceResourceBindings::from_source(&source).unwrap();
+    let bindings = lowered
+        .opaque_resource_contract()
+        .bind_semantic_roles(&declarations)
+        .unwrap();
+    let program =
+        prepare_lowered_distant_horizons_source_program(&contract, &lowered, &bindings).unwrap();
+
+    for module in program.shader_module_descriptors(BackendApi::OpenGl) {
+        gal.create_shader_module(module).unwrap_or_else(|error| {
+            panic!(
+                "complete lowered Complementary Distant Horizons shader must compile through OpenGL lowering: {error}"
+            )
+        });
+    }
+}
+
+/// The private OpenGL lowering must compile the same source-derived
+/// `dh_water` ABI as Vulkan. This remains conformance only, not a borrowed
+/// Iris path or a Java compatibility draw.
+#[test]
+fn lowered_complete_complementary_distant_horizons_water_pair_compiles_at_the_opengl_boundary() {
+    let backend = match OpenGlBackend::new("MattMC complete source DH water OpenGL conformance") {
+        Ok(backend) => backend,
+        Err(error) => {
+            let text = error.to_string();
+            assert!(
+                text.contains("OpenGL") || text.contains("EGL") || text.contains("GL"),
+                "unexpected OpenGL complete source DH water setup failure: {text}"
+            );
+            return;
+        }
+    };
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let bundled = complete_bundled_pack_source_for_test();
+    let source = ShaderPackSource::new(
+        "complete-dh-water-opengl-boundary",
+        93,
+        bundled
+            .files()
+            .into_iter()
+            .chain(std::iter::once(ShaderSourceFile::new(
+                RUNTIME_OPTIONS_PATH,
+                "DISTANT_HORIZONS=1\nSHADOW_QUALITY=-1\nFXAA_DEFINE=-1\nCOLORED_LIGHTING=0\nENTITY_SHADOWS_DEFINE=-1\nPLAYER_SHADOW=-1\nRAIN_PUDDLES=0\n",
+            )))
+            .collect(),
+    )
+    .unwrap();
+    let contract =
+        derive_distant_horizons_translucent_contract(&source, TerrainProgramScope::Overworld)
+            .expect("the bundled Complementary source must expose an Overworld dh_water pair");
+    let artifacts = preprocess_distant_horizons_sources(&source, &contract.source_stages).unwrap();
+    let lowered =
+        lower_distant_horizons_source_pair(&artifacts.vertex, &artifacts.fragment).unwrap();
+    let declarations = TerrainSourceResourceBindings::from_source(&source).unwrap();
+    let bindings = lowered
+        .opaque_resource_contract()
+        .bind_semantic_roles(&declarations)
+        .unwrap();
+    let program =
+        prepare_lowered_distant_horizons_source_program(&contract, &lowered, &bindings).unwrap();
+
+    for module in program.shader_module_descriptors(BackendApi::OpenGl) {
+        gal.create_shader_module(module).unwrap_or_else(|error| {
+            panic!(
+                "complete lowered Complementary Distant Horizons water shader must compile through OpenGL lowering: {error}"
+            )
+        });
+    }
+}
+
+#[test]
+fn distant_horizons_lod_opaque_pipeline_uses_explicit_two_set_gal_layout() {
+    let backend =
+        match OpenGlBackend::new("MattMC Distant Horizons LOD OpenGL pipeline conformance") {
+            Ok(backend) => backend,
+            Err(error) => {
+                let text = error.to_string();
+                assert!(
+                    text.contains("OpenGL") || text.contains("EGL") || text.contains("GL"),
+                    "unexpected OpenGL DH LOD setup failure: {text}"
+                );
+                return;
+            }
+        };
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let program = minimal_distant_horizons_lod_opaque_program();
+    let [geometry_and_frame, lightmap] =
+        distant_horizons_lod_opaque_resource_layouts("dh-lod.opengl");
+    let geometry_and_frame = gal.create_resource_layout(geometry_and_frame).unwrap();
+    let lightmap = gal.create_resource_layout(lightmap).unwrap();
+    let pipeline_layout = gal
+        .create_pipeline_layout(PipelineLayoutDesc {
+            label: "dh-lod.opengl.pipeline-layout".to_string(),
+            resource_layouts: vec![geometry_and_frame, lightmap],
+        })
+        .unwrap();
+    let [vertex, fragment] = program.shader_module_descriptors(BackendApi::OpenGl);
+    let vertex_shader = gal.create_shader_module(vertex).unwrap();
+    let fragment_shader = gal.create_shader_module(fragment).unwrap();
+    gal.create_graphics_pipeline(GraphicsPipelineDesc {
+        label: "dh-lod.opengl.pipeline".to_string(),
+        layout: pipeline_layout,
+        vertex_shader,
+        fragment_shader,
+        topology: PrimitiveTopology::Triangles,
+        cull_mode: CullMode::Back,
+        front_face: crate::render::vulkanic::resources::FrontFace::CounterClockwise,
+        blend: BlendMode::Disabled,
+        depth_compare: Some(CompareOp::LessOrEqual),
+        depth_write: true,
+        depth_bias: None,
+        color_formats: vec![TextureFormat::Rgba8Unorm; 4],
+        depth_format: Some(TextureFormat::Depth32Float),
+    })
+    .expect("Rust-owned DH LOD pipeline must lower through OpenGL");
+}
 
 /// The source-derived terrain ABI must compile through the private OpenGL
 /// lowering too. This remains isolated conformance only: it neither selects
@@ -93,6 +435,79 @@ fn prepared_lowered_terrain_program_compiles_at_the_opengl_boundary() {
 /// OpenGL backend. This is source-program conformance only: no Java/Iris
 /// state is acquired and the test does not select a gameplay route.
 #[test]
+fn lowered_complete_complementary_textured_material_pair_compiles_at_the_opengl_boundary() {
+    let backend =
+        match OpenGlBackend::new("MattMC complete source textured-material OpenGL conformance") {
+            Ok(backend) => backend,
+            Err(error) => {
+                let text = error.to_string();
+                assert!(
+                    text.contains("OpenGL") || text.contains("EGL") || text.contains("GL"),
+                    "unexpected OpenGL complete source textured-material setup failure: {text}"
+                );
+                return;
+            }
+        };
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let source = complete_bundled_pack_source_for_test();
+    let contract = derive_textured_material_contract(&source, TerrainProgramScope::Overworld)
+        .expect("the bundled Complementary scope must expose gbuffers_textured");
+    let lowered = lower_textured_material_source_pair(&source, &contract).unwrap();
+    let declarations = TerrainSourceResourceBindings::from_source(&source).unwrap();
+    let bindings = lowered
+        .opaque_resource_contract()
+        .bind_semantic_roles(&declarations)
+        .unwrap();
+    let program =
+        prepare_lowered_textured_material_source_program(&contract, &lowered, &bindings).unwrap();
+
+    for module in program.shader_module_descriptors(BackendApi::OpenGl) {
+        gal.create_shader_module(module).unwrap_or_else(|error| {
+            panic!(
+                "complete lowered Complementary textured-material shader must compile through the OpenGL lowering: {error}"
+            )
+        });
+    }
+}
+
+/// Compiles the selected bundled weather source through the private OpenGL
+/// lowering. This checks Rust-owned source lowering only; it neither borrows
+/// Iris state nor selects a mixed gameplay route.
+#[test]
+fn lowered_complete_complementary_weather_pair_compiles_at_the_opengl_boundary() {
+    let backend = match OpenGlBackend::new("MattMC complete source weather OpenGL conformance") {
+        Ok(backend) => backend,
+        Err(error) => {
+            let text = error.to_string();
+            assert!(
+                text.contains("OpenGL") || text.contains("EGL") || text.contains("GL"),
+                "unexpected OpenGL complete source weather setup failure: {text}"
+            );
+            return;
+        }
+    };
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let source = complete_bundled_pack_source_for_test();
+    let contract = derive_weather_pass_contract(&source, TerrainProgramScope::Overworld)
+        .expect("the bundled Complementary scope must expose gbuffers_weather");
+    let lowered = lower_weather_source_pair(&source, &contract).unwrap();
+    let declarations = TerrainSourceResourceBindings::from_source(&source).unwrap();
+    let bindings = lowered
+        .opaque_resource_contract()
+        .bind_semantic_roles(&declarations)
+        .unwrap();
+    let program = prepare_lowered_weather_source_program(&contract, &lowered, &bindings).unwrap();
+
+    for module in program.shader_module_descriptors(BackendApi::OpenGl) {
+        gal.create_shader_module(module).unwrap_or_else(|error| {
+            panic!(
+                "complete lowered Complementary weather shader must compile through the OpenGL lowering: {error}"
+            )
+        });
+    }
+}
+
+#[test]
 fn lowered_complete_complementary_terrain_pair_compiles_at_the_opengl_boundary() {
     let backend = match OpenGlBackend::new("MattMC complete source terrain OpenGL conformance") {
         Ok(backend) => backend,
@@ -137,6 +552,40 @@ fn lowered_complete_complementary_terrain_pair_compiles_at_the_opengl_boundary()
         gal.create_shader_module(module).unwrap_or_else(|error| {
             panic!(
                 "complete lowered Complementary terrain shader must compile through the OpenGL lowering: {error}"
+            )
+        });
+    }
+}
+
+/// Compiles the selected hand source through the private OpenGL boundary.
+/// This is source-program conformance only: it does not borrow Iris state or
+/// select a hand gameplay route.
+#[test]
+fn lowered_complete_complementary_hand_pair_compiles_at_the_opengl_boundary() {
+    let backend = match OpenGlBackend::new("MattMC complete source hand OpenGL conformance") {
+        Ok(backend) => backend,
+        Err(error) => {
+            let text = error.to_string();
+            assert!(
+                text.contains("OpenGL") || text.contains("EGL") || text.contains("GL"),
+                "unexpected OpenGL complete source hand setup failure: {text}"
+            );
+            return;
+        }
+    };
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let source = complete_bundled_pack_source_for_test();
+    let contract = derive_hand_contract(&source, TerrainProgramScope::Overworld)
+        .expect("the bundled Complementary scope must expose gbuffers_hand");
+    let lowered = lower_hand_source_pair(&source, &contract).unwrap();
+    let declarations = TerrainSourceResourceBindings::from_source(&source).unwrap();
+    let bindings = bind_hand_source_resources(&lowered, &declarations).unwrap();
+    let program = prepare_lowered_hand_source_program(&contract, &lowered, &bindings).unwrap();
+
+    for module in program.shader_module_descriptors(BackendApi::OpenGl) {
+        gal.create_shader_module(module).unwrap_or_else(|error| {
+            panic!(
+                "complete lowered Complementary hand shader must compile through the OpenGL lowering: {error}"
             )
         });
     }
@@ -287,9 +736,11 @@ fn selected_terrain_pipeline_layout_matches_optional_colored_voxel_interface() {
             fragment_shader: fragment,
             topology: PrimitiveTopology::Triangles,
             cull_mode: CullMode::Back,
+            front_face: crate::render::vulkanic::resources::FrontFace::CounterClockwise,
             blend: BlendMode::Disabled,
             depth_compare: Some(CompareOp::LessOrEqual),
             depth_write: true,
+            depth_bias: None,
             color_formats: vec![TextureFormat::Rgba16Float; 4],
             depth_format: Some(TextureFormat::Depth32Float),
         })
@@ -1037,9 +1488,11 @@ fn run_d3_storage_write_read_test(
             fragment_shader: fragment,
             topology: PrimitiveTopology::Triangles,
             cull_mode: CullMode::None,
+            front_face: crate::render::vulkanic::resources::FrontFace::CounterClockwise,
             blend: BlendMode::Disabled,
             depth_compare: None,
             depth_write: false,
+            depth_bias: None,
             color_formats: vec![TextureFormat::Rgba8Unorm],
             depth_format: None,
         })
@@ -1498,9 +1951,11 @@ pub(in crate::render::vulkanic::backends) fn run_conformance(
         fragment_shader,
         topology: PrimitiveTopology::Triangles,
         cull_mode: CullMode::Back,
+        front_face: crate::render::vulkanic::resources::FrontFace::CounterClockwise,
         blend: BlendMode::Alpha,
         depth_compare: Some(CompareOp::LessOrEqual),
         depth_write: true,
+        depth_bias: None,
         color_formats: vec![TextureFormat::Rgba8Unorm],
         depth_format: Some(TextureFormat::Depth32Float),
     })?;

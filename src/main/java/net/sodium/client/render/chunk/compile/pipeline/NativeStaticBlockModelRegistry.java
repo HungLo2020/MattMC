@@ -235,7 +235,7 @@ public final class NativeStaticBlockModelRegistry {
             Material fluidMaterial = DefaultMaterials.forFluidState(fluidState);
             fluidMaterialBits = fluidMaterial.bits();
             fluidPassId = passId(fluidMaterial.pass);
-            fluidBlockId = irisFluidBlockId(fluidState);
+			fluidBlockId = semanticFluidStateId(fluidState);
         }
 
         int flags = 0;
@@ -272,7 +272,7 @@ public final class NativeStaticBlockModelRegistry {
         FluidSpriteMetadata fluidSprites = fluidSpriteMetadata(fluidState);
         int sameBlockSkipMask = sameBlockSkipMask(state);
         NativeStaticBlockModelCache.registerState(stateId, selectorId, flags, material.bits(), modelPassId,
-                state.getLightEmission(), 0, irisBlockId(state), fluidMaterialBits, fluidPassId, fluidBlockId,
+				state.getLightEmission(), 0, semanticBlockStateId(state), fluidMaterialBits, fluidPassId, fluidBlockId,
                 skipGroup(state, sameBlockSkipMask), sameBlockSkipMask, fluidType,
                 fluidState.isEmpty() ? 0.0F : fluidState.getOwnHeight(),
                 fluidState.hasProperty(net.minecraft.world.level.material.FlowingFluid.FALLING) && fluidState.getValue(net.minecraft.world.level.material.FlowingFluid.FALLING) ? 1 : 0,
@@ -549,15 +549,13 @@ public final class NativeStaticBlockModelRegistry {
         return true;
     }
 
-    private static int irisBlockId(BlockState state) {
-        var ids = net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getBlockStateIds();
-        return ids == null ? -1 : ids.getOrDefault(state, -1);
-    }
+	private static int semanticBlockStateId(BlockState state) {
+		return Block.getId(state);
+	}
 
-    private static int irisFluidBlockId(FluidState state) {
-        var ids = net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getBlockStateIds();
-        return ids == null ? -1 : ids.getInt(state.createLegacyBlock());
-    }
+	private static int semanticFluidStateId(FluidState state) {
+		return Block.getId(state.createLegacyBlock());
+	}
 
     private static int skipGroup(BlockState state, int sameBlockSkipMask) {
         if (sameBlockSkipMask == 0) {

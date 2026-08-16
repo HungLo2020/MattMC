@@ -166,6 +166,14 @@ public class ModelFeatureRenderer {
 			}
 		}
 
+		public int totalSubmitCount() {
+			int total = this.translucentModelSubmits.size();
+			for (List<SubmitNodeStorage.ModelSubmit<?>> submits : this.opaqueModelSubmits.values()) {
+				total += submits.size();
+			}
+			return total;
+		}
+
 		public void endFrame() {
 			this.opaqueModelSubmits.keySet().removeIf(renderType -> !this.usedModelSubmitBuckets.contains(renderType));
 			this.usedModelSubmitBuckets.clear();

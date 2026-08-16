@@ -98,7 +98,6 @@ public class TerrainParticle extends SingleQuadParticle {
 		}
 		if (this.enqueueRustGal(camera, f)) {
 			GraphicsFrameBenchmark.endPhase("game.particles.terrain.extract");
-			GraphicsFrameBenchmark.recordTerrainParticleExtraction("rust", this.blockState, System.nanoTime() - startNanos);
 			return;
 		}
 		super.extract(quadParticleRenderState, camera, f);
@@ -107,6 +106,7 @@ public class TerrainParticle extends SingleQuadParticle {
 	}
 
 	boolean enqueueRustGal(Camera camera, float f) {
+		long startNanos = System.nanoTime();
 		if (!RustGalWorldPrimitiveRenderer.shouldRouteTerrainParticle(this.blockState)) {
 			return false;
 		}
@@ -115,7 +115,7 @@ public class TerrainParticle extends SingleQuadParticle {
 		if (this.roll != 0.0F) {
 			quaternionf.rotateZ(net.minecraft.util.Mth.lerp(f, this.oRoll, this.roll));
 		}
-		return RustGalWorldPrimitiveRenderer.enqueueTerrainParticle(
+		boolean queued = RustGalWorldPrimitiveRenderer.enqueueTerrainParticle(
 			this.blockState,
 			this.sprite.contents().name(),
 			camera,
@@ -133,9 +133,18 @@ public class TerrainParticle extends SingleQuadParticle {
 			this.sprite.getVOffset(this.getV0()),
 			this.sprite.getVOffset(this.getV1()),
 				ARGB.colorFromFloat(this.alpha, this.rCol, this.gCol, this.bCol),
-				this.getLightColor(f),
-				!this.alphaTested
+			this.getLightColor(f),
+			!this.alphaTested
 			);
+		if (queued) {
+			// Both the normal particle pass and the Rust whole-frame collector
+			// call this semantic enqueue path. Record here so route evidence
+			// describes the producer that actually reached Rust exactly once.
+			GraphicsFrameBenchmark.recordTerrainParticleExtraction(
+				"rust", this.blockState, System.nanoTime() - startNanos
+			);
+		}
+		return queued;
 	}
 
 	@Override

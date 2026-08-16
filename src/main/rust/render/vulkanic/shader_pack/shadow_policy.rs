@@ -71,6 +71,13 @@ impl ShaderPackShadowPolicy {
         self.generation
     }
 
+    /// Source-defined celestial path rotation shared by the owned shadow and
+    /// sky transforms. This exposes a pack semantic only; it carries no Iris
+    /// pipeline, renderer, or backend state.
+    pub fn sun_path_rotation_degrees(self) -> f32 {
+        self.sun_path_rotation_degrees
+    }
+
     /// Derives ordinary Overworld/Nether shadow uniforms from semantic frame
     /// inputs. End is explicit unsupported because Iris's End flash branch is
     /// not represented by the current semantic world frame.

@@ -2,12 +2,15 @@ package net.minecraft.client.gui.font;
 
 import net.blaze3d.font.GlyphBitmap;
 import net.blaze3d.font.GlyphInfo;
+import net.blaze3d.platform.NativeImage;
 import net.blaze3d.platform.TextureUtil;
 import net.blaze3d.systems.RenderSystem;
 import net.blaze3d.textures.FilterMode;
 import net.blaze3d.textures.TextureFormat;
 import java.nio.file.Path;
-import java.util.function.Supplier;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.gui.font.glyphs.BakedSheetGlyph;
@@ -15,21 +18,33 @@ import net.minecraft.client.renderer.texture.AbstractTexture;
 import net.minecraft.client.renderer.texture.Dumpable;
 import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
+import org.lwjgl.system.MemoryUtil;
 
 @Environment(EnvType.CLIENT)
 public class FontTexture extends AbstractTexture implements Dumpable {
 	private static final int SIZE = 256;
+	private static final Map<String, FontTexture> SEMANTIC_ATLASES = new ConcurrentHashMap<>();
+	private static final AtomicLong NEXT_SEMANTIC_GENERATION = new AtomicLong(1L);
+	private final ResourceLocation semanticAtlasIdentity;
+	private final long semanticAtlasGeneration;
+	private final NativeImage semanticAtlasPixels;
+	private boolean semanticAtlasComplete = true;
+	private long semanticAtlasRevision;
 	private final GlyphRenderTypes renderTypes;
 	private final boolean colored;
 	private final FontTexture.Node root;
 
-	public FontTexture(Supplier<String> supplier, GlyphRenderTypes glyphRenderTypes, boolean bl) {
+	public FontTexture(ResourceLocation resourceLocation, GlyphRenderTypes glyphRenderTypes, boolean bl) {
+		this.semanticAtlasIdentity = resourceLocation;
+		this.semanticAtlasGeneration = NEXT_SEMANTIC_GENERATION.getAndIncrement();
 		this.colored = bl;
 		this.root = new FontTexture.Node(0, 0, 256, 256);
-		this.texture = net.vulkanic.VulkanicAPI.createTexture(supplier, 7, bl ? TextureFormat.RGBA8 : TextureFormat.RED8, 256, 256, 1, 1);
+		this.semanticAtlasPixels = new NativeImage(bl ? NativeImage.Format.RGBA : NativeImage.Format.LUMINANCE, SIZE, SIZE, true);
+		this.texture = net.vulkanic.VulkanicAPI.createTexture(resourceLocation::toString, 7, bl ? TextureFormat.RGBA8 : TextureFormat.RED8, 256, 256, 1, 1);
 		this.texture.setTextureFilter(FilterMode.NEAREST, false);
 		this.textureView = net.vulkanic.VulkanicAPI.createTextureView(this.texture);
 		this.renderTypes = glyphRenderTypes;
+		SEMANTIC_ATLASES.put(this.semanticAtlasIdentity.toString(), this);
 	}
 
 	@Nullable
@@ -40,6 +55,16 @@ public class FontTexture extends AbstractTexture implements Dumpable {
 			FontTexture.Node node = this.root.insert(glyphBitmap);
 			if (node != null) {
 				glyphBitmap.upload(node.x, node.y, this.getTexture());
+				if (this.semanticAtlasComplete) {
+					try {
+						if (!glyphBitmap.copyTo(this.semanticAtlasPixels, node.x, node.y)) {
+							this.semanticAtlasComplete = false;
+						}
+					} catch (RuntimeException runtimeException) {
+						this.semanticAtlasComplete = false;
+					}
+				}
+				this.semanticAtlasRevision++;
 				float f = 256.0F;
 				float g = 256.0F;
 				float h = 0.01F;
@@ -47,6 +72,8 @@ public class FontTexture extends AbstractTexture implements Dumpable {
 					glyphInfo,
 					this.renderTypes,
 					this.getTextureView(),
+					this.semanticAtlasIdentity.toString(),
+					this.colored,
 					(node.x + 0.01F) / 256.0F,
 					(node.x - 0.01F + glyphBitmap.getPixelWidth()) / 256.0F,
 					(node.y + 0.01F) / 256.0F,
@@ -59,6 +86,46 @@ public class FontTexture extends AbstractTexture implements Dumpable {
 			} else {
 				return null;
 			}
+		}
+	}
+
+	@Nullable
+	public SemanticAtlasSnapshot semanticAtlasSnapshot() {
+		if (!this.semanticAtlasComplete) {
+			return null;
+		}
+		int i = SIZE * SIZE * this.semanticAtlasPixels.format().components();
+		byte[] bytes = new byte[i];
+		MemoryUtil.memByteBuffer(this.semanticAtlasPixels.getPointer(), i).get(bytes);
+		return new SemanticAtlasSnapshot(
+			this.semanticAtlasIdentity.toString(), this.colored, SIZE, SIZE,
+			this.semanticAtlasGeneration, this.semanticAtlasRevision, bytes
+		);
+	}
+
+	@Nullable
+	public static SemanticAtlasSnapshot semanticAtlasSnapshot(String identity) {
+		FontTexture fontTexture = SEMANTIC_ATLASES.get(identity);
+		return fontTexture == null ? null : fontTexture.semanticAtlasSnapshot();
+	}
+
+	@Override
+	public void close() {
+		SEMANTIC_ATLASES.remove(this.semanticAtlasIdentity.toString(), this);
+		super.close();
+		this.semanticAtlasPixels.close();
+	}
+
+	public record SemanticAtlasSnapshot(
+		String identity, boolean colored, int width, int height, long generation, long revision, byte[] pixels
+	) {
+		public SemanticAtlasSnapshot {
+			pixels = pixels.clone();
+		}
+
+		@Override
+		public byte[] pixels() {
+			return this.pixels.clone();
 		}
 	}
 

@@ -28,8 +28,8 @@ use crate::render::vulkanic::world_primitive_frontend::{
 use super::programs::shader_stage_code_for_backend;
 use super::terrain_source_resources::{
     TerrainSourceOwnedResource, TerrainSourceOwnedResourceSet, TerrainSourceOwnedStorageResource,
-    TerrainSourceResourceAvailability, TerrainSourceResourceAvailabilitySet, TerrainSourceResourceRole,
-    TerrainSourceSampledResourceShape,
+    TerrainSourceResourceAvailability, TerrainSourceResourceAvailabilitySet,
+    TerrainSourceResourceRole, TerrainSourceSampledResourceShape,
 };
 use super::voxel_emission_table::{VoxelEmissionTable, VOXEL_TINT_COUNT};
 use super::voxel_light_volume::{
@@ -82,11 +82,604 @@ impl TerrainVoxelSample {
 pub struct TerrainOccupancyUpdateStats {
     pub input_samples: u32,
     pub emitted_samples: u32,
+    /// Coarse cells written by different source material values. The selected
+    /// pack's vertex-stage image stores permit this, so the ordered copied
+    /// source stream deterministically retains its later value.
+    pub overwritten_samples: u32,
     pub skipped_non_solid_samples: u32,
     pub skipped_out_of_bounds_samples: u32,
     pub changed_voxels: u32,
     pub uploaded_bytes: u32,
     pub updated_region: Option<VoxelLightVolumeRegion>,
+}
+
+/// Semantic description of Complementary's camera-relative puddle exclusion
+/// field. It is deliberately independent from the colored-light D3 volume:
+/// the source writes a fixed 128x128 unsigned image from shadow-scene
+/// coordinates, then samples it while shading opaque/cutout terrain.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct PuddleOccupancyDescriptor {
+    pub shader_pack_generation: u64,
+    pub world_generation: u64,
+    pub resource_generation: u64,
+    pub camera_fraction: [f32; 3],
+    /// Column-major semantic transform corresponding to the source expression
+    /// `shadowModelViewInverse * gl_ModelViewMatrix`. It is copied uniform
+    /// data, never a backend matrix or Iris state object.
+    pub shadow_scene_from_world: [f32; 16],
+}
+
+impl PuddleOccupancyDescriptor {
+    pub const EXTENT: u32 = 128;
+
+    fn validate(self) -> GalResult<()> {
+        if self.shader_pack_generation == 0
+            || self.world_generation == 0
+            || self.resource_generation == 0
+        {
+            return Err(GalError::invalid_argument(
+                "puddle occupancy descriptor requires non-zero shader-pack, world, and resource generations",
+            ));
+        }
+        if self
+            .camera_fraction
+            .iter()
+            .any(|value| !value.is_finite() || !(0.0..1.0).contains(value))
+            || self
+                .shadow_scene_from_world
+                .iter()
+                .any(|value| !value.is_finite())
+        {
+            return Err(GalError::invalid_argument(
+                "puddle occupancy descriptor requires finite camera fraction and shadow-scene transform",
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// Bounded diagnostic facts from one semantic puddle voxelization update.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) struct PuddleOccupancyUpdateStats {
+    pub translucent_samples: u32,
+    pub water_samples_skipped: u32,
+    pub below_scene_samples_skipped: u32,
+    pub out_of_bounds_samples_skipped: u32,
+    pub changed_texels: u32,
+}
+
+/// Bounded, handle-free state for source-route admission diagnostics.
+/// This distinguishes an uninitialized puddle field from a resource snapshot
+/// assembly problem without exposing backend residency details.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) struct TerrainPuddleDiagnosticState {
+    pub ready: bool,
+    pub submission_pending: bool,
+    pub initialized: bool,
+    pub changed_texels: u32,
+}
+
+/// Rust-owned CPU semantic generation for the source-derived puddle field.
+/// GPU allocation/upload and source-program binding remain a later private
+/// runtime step; this type exists so those layers consume an exact, tested
+/// field instead of replaying source GLSL or guessing terrain material layers.
+#[derive(Clone, Debug)]
+pub(crate) struct TerrainPuddleVoxelizer {
+    descriptor: PuddleOccupancyDescriptor,
+    texels: Vec<u8>,
+}
+
+/// Private GAL residency for one completed puddle field. Its handles never
+/// cross FFI; a later shader-runtime transaction may expose them only through
+/// the `PuddleOccupancy` semantic role after submission confirmation.
+#[derive(Debug)]
+pub(crate) struct TerrainPuddleGpuResources {
+    texture: Handle,
+    view: Handle,
+    sampler: Handle,
+    combined_sampler: Handle,
+    upload_buffer: Handle,
+    descriptor: PuddleOccupancyDescriptor,
+    initialized: bool,
+    upload_pending: bool,
+}
+
+/// One private, source-derived puddle field generation. Unlike the colored
+/// voxel-light volume this has no compute passes: Complementary's shadow
+/// stage writes a fixed unsigned 2D occupancy image and terrain later samples
+/// it. The runtime keeps the copied semantic reconstruction and GAL upload in
+/// the same submission transaction so a rejected frame cannot expose a new
+/// camera mapping or a partially uploaded field.
+#[derive(Debug)]
+pub(crate) struct TerrainPuddleRuntime {
+    voxelizer: TerrainPuddleVoxelizer,
+    resources: TerrainPuddleGpuResources,
+    pending_voxelizer_rollback: Option<TerrainPuddleVoxelizer>,
+    pending_resource_descriptor_rollback: Option<PuddleOccupancyDescriptor>,
+    submission_pending: bool,
+    last_update: PuddleOccupancyUpdateStats,
+}
+
+impl TerrainPuddleVoxelizer {
+    pub(crate) fn new(descriptor: PuddleOccupancyDescriptor) -> GalResult<Self> {
+        descriptor.validate()?;
+        let len = usize::try_from(PuddleOccupancyDescriptor::EXTENT)
+            .ok()
+            .and_then(|extent| extent.checked_mul(extent))
+            .ok_or_else(|| GalError::invalid_argument("puddle occupancy extent overflows"))?;
+        Ok(Self {
+            descriptor,
+            texels: vec![0; len],
+        })
+    }
+
+    pub(crate) fn descriptor(&self) -> PuddleOccupancyDescriptor {
+        self.descriptor
+    }
+
+    pub(crate) fn texels(&self) -> &[u8] {
+        &self.texels
+    }
+
+    fn replace_descriptor(&mut self, descriptor: PuddleOccupancyDescriptor) -> GalResult<()> {
+        descriptor.validate()?;
+        if !self.descriptor.resource_compatible_with(descriptor) {
+            return Err(GalError::invalid_argument(
+                "puddle occupancy descriptor changed resource generation without replacing residency",
+            ));
+        }
+        self.descriptor = descriptor;
+        Ok(())
+    }
+
+    /// Rebuilds the exact fixed-size source field from copied translucent
+    /// mesh indices. Source code emits value 10 for non-water vertices inside
+    /// the volume and above the shadow-scene floor; repeated quad vertices
+    /// are idempotent writes to the same unsigned texel.
+    pub(crate) fn rebuild_from_meshes(
+        &mut self,
+        meshes: impl IntoIterator<Item = TerrainVoxelSourceMesh>,
+    ) -> GalResult<PuddleOccupancyUpdateStats> {
+        self.descriptor.validate()?;
+        let mut next = vec![0; self.texels.len()];
+        let mut stats = PuddleOccupancyUpdateStats::default();
+        for mesh in meshes {
+            for index in mesh.translucent_indices.iter().copied() {
+                let vertex = mesh.vertices.get(index as usize).ok_or_else(|| {
+                    GalError::invalid_argument(format!(
+                        "puddle occupancy mesh {} generation {} references translucent vertex {} outside {} vertices",
+                        mesh.mesh_key,
+                        mesh.mesh_generation,
+                        index,
+                        mesh.vertices.len()
+                    ))
+                })?;
+                stats.translucent_samples = stats.translucent_samples.saturating_add(1);
+                if vertex.shader_material_id == 32_000 {
+                    stats.water_samples_skipped = stats.water_samples_skipped.saturating_add(1);
+                    continue;
+                }
+                let world = TerrainVoxelSample {
+                    vertex_position: vertex.position,
+                    mid_block_packed: vertex.mid_block_packed,
+                    shader_material_id: vertex.shader_material_id,
+                    model_transform: mesh.transform,
+                }
+                .world_block_center()?;
+                let scene = transform_point(self.descriptor.shadow_scene_from_world, world)?;
+                if scene[1] < -3.5 {
+                    stats.below_scene_samples_skipped =
+                        stats.below_scene_samples_skipped.saturating_add(1);
+                    continue;
+                }
+                let coordinate = [
+                    (scene[0]
+                        + self.descriptor.camera_fraction[0]
+                        + PuddleOccupancyDescriptor::EXTENT as f32 * 0.5)
+                        .floor() as i32,
+                    (scene[2]
+                        + self.descriptor.camera_fraction[2]
+                        + PuddleOccupancyDescriptor::EXTENT as f32 * 0.5)
+                        .floor() as i32,
+                ];
+                if coordinate
+                    .iter()
+                    .any(|value| *value < 0 || *value >= PuddleOccupancyDescriptor::EXTENT as i32)
+                {
+                    stats.out_of_bounds_samples_skipped =
+                        stats.out_of_bounds_samples_skipped.saturating_add(1);
+                    continue;
+                }
+                let offset = coordinate[1] as usize * PuddleOccupancyDescriptor::EXTENT as usize
+                    + coordinate[0] as usize;
+                next[offset] = 10;
+            }
+        }
+        stats.changed_texels = self
+            .texels
+            .iter()
+            .zip(&next)
+            .filter(|(previous, next)| previous != next)
+            .count()
+            .try_into()
+            .unwrap_or(u32::MAX);
+        self.texels = next;
+        Ok(stats)
+    }
+}
+
+impl TerrainPuddleGpuResources {
+    pub(crate) fn create(
+        gal: &mut VulkanicGal,
+        descriptor: PuddleOccupancyDescriptor,
+    ) -> GalResult<Self> {
+        descriptor.validate()?;
+        let extent = Extent3d {
+            width: PuddleOccupancyDescriptor::EXTENT,
+            height: PuddleOccupancyDescriptor::EXTENT,
+            depth: 1,
+        };
+        let label = format!(
+            "shader-pack.puddle.{}.{}.{}",
+            descriptor.shader_pack_generation,
+            descriptor.world_generation,
+            descriptor.resource_generation
+        );
+        let texture = gal.create_texture(TextureDesc {
+            label: format!("{label}.texture"),
+            dimension: TextureDimension::D2,
+            format: TextureFormat::R8Uint,
+            extent,
+            mip_levels: 1,
+            array_layers: 1,
+            usages: vec![
+                TextureUsage::Sampled,
+                TextureUsage::Storage,
+                TextureUsage::TransferDst,
+            ],
+        })?;
+        let view = match gal.create_texture_view(TextureViewDesc {
+            label: format!("{label}.view"),
+            texture,
+            format: TextureFormat::R8Uint,
+            base_mip: 0,
+            mip_count: 1,
+            base_layer: 0,
+            layer_count: 1,
+        }) {
+            Ok(value) => value,
+            Err(error) => {
+                let _ = gal.destroy(texture);
+                return Err(error);
+            }
+        };
+        let sampler = match gal.create_sampler(SamplerDesc {
+            label: format!("{label}.sampler"),
+            min_filter: SamplerFilter::Nearest,
+            mag_filter: SamplerFilter::Nearest,
+            mip_filter: SamplerFilter::Nearest,
+            address_u: SamplerAddressMode::ClampToEdge,
+            address_v: SamplerAddressMode::ClampToEdge,
+            address_w: SamplerAddressMode::ClampToEdge,
+            comparison: None,
+        }) {
+            Ok(value) => value,
+            Err(error) => {
+                let _ = gal.destroy(view);
+                let _ = gal.destroy(texture);
+                return Err(error);
+            }
+        };
+        let combined_sampler =
+            match gal.create_combined_texture_sampler(CombinedTextureSamplerDesc {
+                label: format!("{label}.combined"),
+                texture_view: view,
+                sampler,
+            }) {
+                Ok(value) => value,
+                Err(error) => {
+                    let _ = gal.destroy(sampler);
+                    let _ = gal.destroy(view);
+                    let _ = gal.destroy(texture);
+                    return Err(error);
+                }
+            };
+        let upload_buffer = match gal.create_buffer(BufferDesc {
+            label: format!("{label}.upload"),
+            size: u64::from(PuddleOccupancyDescriptor::EXTENT).pow(2),
+            memory: MemoryDomain::Upload,
+            usages: vec![BufferUsage::HostWrite, BufferUsage::TransferSrc],
+        }) {
+            Ok(value) => value,
+            Err(error) => {
+                let _ = gal.destroy(combined_sampler);
+                let _ = gal.destroy(sampler);
+                let _ = gal.destroy(view);
+                let _ = gal.destroy(texture);
+                return Err(error);
+            }
+        };
+        Ok(Self {
+            texture,
+            view,
+            sampler,
+            combined_sampler,
+            upload_buffer,
+            descriptor,
+            initialized: false,
+            upload_pending: false,
+        })
+    }
+
+    pub(crate) fn append_upload(
+        &mut self,
+        texels: &[u8],
+        operations: &mut Vec<CommandOp>,
+    ) -> GalResult<()> {
+        if self.upload_pending
+            || texels.len()
+                != PuddleOccupancyDescriptor::EXTENT as usize
+                    * PuddleOccupancyDescriptor::EXTENT as usize
+        {
+            return Err(GalError::invalid_argument(
+                "puddle occupancy upload is pending or has an invalid fixed extent",
+            ));
+        }
+        operations.push(CommandOp::HostWriteBuffer {
+            buffer: self.upload_buffer,
+            offset: 0,
+            data: texels.to_vec(),
+        });
+        operations.push(CommandOp::Barrier(resource_barrier(
+            self.upload_buffer,
+            None,
+            TextureUsageState::TransferDst,
+            TextureUsageState::TransferSrc,
+        )));
+        operations.push(CommandOp::Barrier(resource_barrier(
+            self.texture,
+            None,
+            if self.initialized {
+                TextureUsageState::ShaderRead
+            } else {
+                TextureUsageState::Undefined
+            },
+            TextureUsageState::TransferDst,
+        )));
+        operations.push(CommandOp::CopyBufferToTexture(BufferImageCopyRegion {
+            buffer: self.upload_buffer,
+            buffer_offset: 0,
+            bytes_per_row: PuddleOccupancyDescriptor::EXTENT,
+            rows_per_image: PuddleOccupancyDescriptor::EXTENT,
+            texture: self.texture,
+            texture_mip: 0,
+            texture_layer: 0,
+            texture_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
+            extent: Extent3d {
+                width: PuddleOccupancyDescriptor::EXTENT,
+                height: PuddleOccupancyDescriptor::EXTENT,
+                depth: 1,
+            },
+        }));
+        operations.push(CommandOp::Barrier(resource_barrier(
+            self.texture,
+            None,
+            TextureUsageState::TransferDst,
+            TextureUsageState::ShaderRead,
+        )));
+        self.upload_pending = true;
+        Ok(())
+    }
+
+    pub(crate) fn confirm_submission(&mut self) -> GalResult<()> {
+        if !self.upload_pending {
+            return Err(GalError::invalid_argument(
+                "no puddle occupancy upload is pending confirmation",
+            ));
+        }
+        self.initialized = true;
+        self.upload_pending = false;
+        Ok(())
+    }
+
+    pub(crate) fn discard_pending_submission(&mut self) {
+        self.upload_pending = false;
+    }
+
+    fn replace_descriptor(&mut self, descriptor: PuddleOccupancyDescriptor) -> GalResult<()> {
+        descriptor.validate()?;
+        if !self.descriptor.resource_compatible_with(descriptor) {
+            return Err(GalError::invalid_argument(
+                "puddle occupancy residency cannot adopt a different resource generation",
+            ));
+        }
+        self.descriptor = descriptor;
+        Ok(())
+    }
+
+    pub(crate) fn destroy(self, gal: &mut VulkanicGal) -> GalResult<()> {
+        gal.destroy(self.upload_buffer)?;
+        gal.destroy(self.combined_sampler)?;
+        gal.destroy(self.sampler)?;
+        gal.destroy(self.view)?;
+        gal.destroy(self.texture)
+    }
+}
+
+impl PuddleOccupancyDescriptor {
+    fn resource_compatible_with(self, other: Self) -> bool {
+        self.shader_pack_generation == other.shader_pack_generation
+            && self.world_generation == other.world_generation
+            && self.resource_generation == other.resource_generation
+    }
+}
+
+impl TerrainPuddleRuntime {
+    pub(crate) fn create(
+        gal: &mut VulkanicGal,
+        descriptor: PuddleOccupancyDescriptor,
+    ) -> GalResult<Self> {
+        let voxelizer = TerrainPuddleVoxelizer::new(descriptor)?;
+        let resources = TerrainPuddleGpuResources::create(gal, descriptor)?;
+        Ok(Self {
+            voxelizer,
+            resources,
+            pending_voxelizer_rollback: None,
+            pending_resource_descriptor_rollback: None,
+            submission_pending: false,
+            last_update: PuddleOccupancyUpdateStats::default(),
+        })
+    }
+
+    pub(crate) fn descriptor(&self) -> PuddleOccupancyDescriptor {
+        self.voxelizer.descriptor()
+    }
+
+    pub(crate) fn resource_compatible_with(&self, descriptor: PuddleOccupancyDescriptor) -> bool {
+        self.descriptor().resource_compatible_with(descriptor)
+    }
+
+    pub(crate) fn is_ready(&self) -> bool {
+        self.resources.initialized && !self.submission_pending
+    }
+
+    pub(crate) fn has_pending_submission(&self) -> bool {
+        self.submission_pending
+    }
+
+    pub(crate) fn last_update(&self) -> PuddleOccupancyUpdateStats {
+        self.last_update
+    }
+
+    pub(crate) fn diagnostic_state(&self) -> TerrainPuddleDiagnosticState {
+        TerrainPuddleDiagnosticState {
+            ready: self.is_ready(),
+            submission_pending: self.submission_pending,
+            initialized: self.resources.initialized,
+            changed_texels: self.last_update.changed_texels,
+        }
+    }
+
+    pub(crate) fn append_terrain_source_snapshot(
+        &mut self,
+        descriptor: PuddleOccupancyDescriptor,
+        meshes: impl IntoIterator<Item = TerrainVoxelSourceMesh>,
+        operations: &mut Vec<CommandOp>,
+    ) -> GalResult<PuddleOccupancyUpdateStats> {
+        if self.submission_pending {
+            return Err(GalError::invalid_argument(
+                "puddle occupancy runtime already has a submission awaiting confirmation",
+            ));
+        }
+        if !self.resource_compatible_with(descriptor) {
+            return Err(GalError::invalid_argument(
+                "puddle occupancy runtime received a mismatched resource generation",
+            ));
+        }
+        let previous_voxelizer = self.voxelizer.clone();
+        let previous_resource_descriptor = self.resources.descriptor;
+        let result = (|| {
+            self.voxelizer.replace_descriptor(descriptor)?;
+            let stats = self.voxelizer.rebuild_from_meshes(meshes)?;
+            if !self.resources.initialized || stats.changed_texels != 0 {
+                self.resources
+                    .append_upload(self.voxelizer.texels(), operations)?;
+                self.pending_voxelizer_rollback = Some(previous_voxelizer.clone());
+                self.pending_resource_descriptor_rollback = Some(previous_resource_descriptor);
+                self.submission_pending = true;
+            } else {
+                self.resources.replace_descriptor(descriptor)?;
+            }
+            self.last_update = stats;
+            Ok(stats)
+        })();
+        if result.is_err() {
+            self.voxelizer = previous_voxelizer;
+            let _ = self
+                .resources
+                .replace_descriptor(previous_resource_descriptor);
+            self.pending_voxelizer_rollback = None;
+            self.pending_resource_descriptor_rollback = None;
+            self.submission_pending = false;
+        }
+        result
+    }
+
+    pub(crate) fn confirm_submission(&mut self) -> GalResult<()> {
+        if !self.submission_pending {
+            return Err(GalError::invalid_argument(
+                "no puddle occupancy submission is pending confirmation",
+            ));
+        }
+        self.resources.confirm_submission()?;
+        self.resources
+            .replace_descriptor(self.voxelizer.descriptor())?;
+        self.pending_voxelizer_rollback = None;
+        self.pending_resource_descriptor_rollback = None;
+        self.submission_pending = false;
+        Ok(())
+    }
+
+    pub(crate) fn discard_submission(&mut self) {
+        if !self.submission_pending {
+            return;
+        }
+        self.resources.discard_pending_submission();
+        if let Some(previous) = self.pending_voxelizer_rollback.take() {
+            self.voxelizer = previous;
+        }
+        if let Some(previous) = self.pending_resource_descriptor_rollback.take() {
+            let _ = self.resources.replace_descriptor(previous);
+        }
+        self.submission_pending = false;
+    }
+
+    pub(crate) fn semantic_resource_set(&self) -> GalResult<TerrainSourceOwnedResourceSet> {
+        if !self.is_ready() {
+            return Err(GalError::invalid_argument(
+                "puddle occupancy resources are not confirmed for sampling",
+            ));
+        }
+        self.semantic_resource_set_unchecked()
+    }
+
+    pub(crate) fn semantic_resource_set_for_pending_submission(
+        &self,
+    ) -> GalResult<TerrainSourceOwnedResourceSet> {
+        if !self.submission_pending {
+            return Err(GalError::invalid_argument(
+                "puddle occupancy pending sampler set requires the exact pending submission",
+            ));
+        }
+        self.semantic_resource_set_unchecked()
+    }
+
+    fn semantic_resource_set_unchecked(&self) -> GalResult<TerrainSourceOwnedResourceSet> {
+        let descriptor = self.descriptor();
+        TerrainSourceOwnedResourceSet::with_storage_resources(
+            TerrainSourceResourceAvailabilitySet::new(
+                descriptor.shader_pack_generation,
+                descriptor.world_generation,
+                [TerrainSourceResourceAvailability {
+                    role: TerrainSourceResourceRole::PuddleOccupancy,
+                    shape: TerrainSourceSampledResourceShape::UnsignedTexture2d,
+                    resource_generation: descriptor.resource_generation,
+                }],
+            )?,
+            [TerrainSourceOwnedResource {
+                role: TerrainSourceResourceRole::PuddleOccupancy,
+                combined_sampler: self.resources.combined_sampler,
+            }],
+            [TerrainSourceOwnedStorageResource {
+                role: TerrainSourceResourceRole::PuddleOccupancy,
+                texture_view: self.resources.view,
+            }],
+        )
+    }
+
+    pub(crate) fn destroy(self, gal: &mut VulkanicGal) -> GalResult<()> {
+        self.resources.destroy(gal)
+    }
 }
 
 /// CPU-owned semantic occupancy field. A complete initial generation is
@@ -155,6 +748,48 @@ struct TerrainOccupancySourceIdentity {
     transform: [f32; 16],
 }
 
+fn snapshot_difference(
+    existing: &TerrainOccupancyMeshSnapshot,
+    incoming: &TerrainOccupancyMeshSnapshot,
+) -> String {
+    if existing.samples.len() != incoming.samples.len() {
+        return format!(
+            "sample-count {} -> {}",
+            existing.samples.len(),
+            incoming.samples.len()
+        );
+    }
+    for (index, (previous, next)) in existing.samples.iter().zip(&incoming.samples).enumerate() {
+        if previous.vertex_position != next.vertex_position {
+            return format!("sample[{index}].vertex-position");
+        }
+        if previous.mid_block_packed != next.mid_block_packed {
+            return format!("sample[{index}].mid-block");
+        }
+        if previous.shader_material_id != next.shader_material_id {
+            return format!("sample[{index}].shader-material");
+        }
+        if previous.model_transform != next.model_transform {
+            return format!("sample[{index}].world-transform");
+        }
+    }
+    match (&existing.source_identity, &incoming.source_identity) {
+        (Some(previous), Some(next)) => {
+            if previous.vertices != next.vertices {
+                "source-vertices".to_owned()
+            } else if previous.indices != next.indices {
+                "source-indices".to_owned()
+            } else if previous.transform != next.transform {
+                "source-world-transform".to_owned()
+            } else {
+                "unclassified-snapshot-field".to_owned()
+            }
+        }
+        (None, None) => "unclassified-snapshot-field".to_owned(),
+        _ => "source-identity-presence".to_owned(),
+    }
+}
+
 /// One private, generation-bound occupancy upload transaction. It owns only
 /// static-terrain semantic mesh extraction and an `R8Uint` D3 residency; it
 /// cannot bind a terrain program or admit selected shader-pack execution.
@@ -187,6 +822,11 @@ pub struct TerrainColoredLightRuntime {
     submission_pending: bool,
     pending_compute_rollback: Option<TerrainFloodFillComputeResources>,
     pending_flood_mapping_rollback: Option<VoxelLightVolumeDescriptor>,
+    // Bounded accounting from the last semantic voxelization pass that
+    // actually inspected source samples. This is diagnostics only: it keeps
+    // an unchanged snapshot from erasing the evidence needed to distinguish
+    // unsupported materials from out-of-volume geometry.
+    last_occupancy_update: TerrainOccupancyUpdateStats,
 }
 
 /// Private, backend-neutral draw binding for one confirmed semantic volume.
@@ -199,6 +839,41 @@ pub(crate) struct TerrainVoxelLightSamplingBinding {
     pub resource_set: Handle,
     pub active_light_field: VoxelLightVolumeKind,
     pub resource_generation: u64,
+}
+
+/// Bounded, semantic-only visibility into colored-light preparation. It is
+/// intentionally limited to transaction readiness facts so graphics audit
+/// rows can identify the first unmet dependency without exposing any texture,
+/// descriptor, or backend object.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct TerrainColoredLightDiagnosticState {
+    /// Semantic extent of the owned volume. These fields intentionally expose
+    /// no backend allocation or handle details; they let capture rows separate
+    /// the declared D3 footprint from accidental per-frame residency growth.
+    pub extent_width: u32,
+    pub extent_height: u32,
+    pub extent_depth: u32,
+    pub expected_owned_bytes: u64,
+    pub mesh_snapshot_count: usize,
+    pub submission_pending: bool,
+    pub occupancy_upload_pending: bool,
+    pub occupancy_initialized: bool,
+    pub emission_ready: bool,
+    pub tint_ready: bool,
+    pub sampling_mapping_ready: bool,
+    pub compute_even_initialized: bool,
+    pub compute_odd_initialized: bool,
+    pub pending_initialization_frame: Option<u64>,
+    pub pending_propagation_frame: Option<u64>,
+    pub pending_compute_output_ready: bool,
+    pub frame_ready: bool,
+    pub occupancy_input_samples: u32,
+    pub occupancy_emitted_samples: u32,
+    pub occupancy_overwritten_samples: u32,
+    pub occupancy_skipped_non_solid_samples: u32,
+    pub occupancy_skipped_out_of_bounds_samples: u32,
+    pub occupancy_changed_voxels: u32,
+    pub occupancy_uploaded_bytes: u32,
 }
 
 #[derive(Debug)]
@@ -410,17 +1085,17 @@ impl TerrainOccupancyRuntime {
                         ));
                     };
                     if let Some(existing) = candidate.get(&mesh_key) {
-                        if snapshot.mesh_generation < existing.mesh_generation {
-                            return Err(GalError::invalid_argument(format!(
-                                "terrain occupancy mesh {mesh_key} update generation {} is older than live generation {}",
-                                snapshot.mesh_generation, existing.mesh_generation
-                            )));
-                        }
+                        // Terrain mesh generations are content identities
+                        // (FNV hashes), not a numeric sequence. A different
+                        // identity may therefore be numerically smaller than
+                        // the prior one while still representing the current
+                        // complete semantic snapshot.
                         if snapshot.mesh_generation == existing.mesh_generation {
                             if &snapshot != existing {
                                 return Err(GalError::invalid_argument(format!(
-                                    "terrain occupancy mesh {mesh_key} changed semantic data without advancing generation {}",
-                                    snapshot.mesh_generation
+                                    "terrain occupancy mesh {mesh_key} changed semantic data without advancing generation {}; first difference={}",
+                                    snapshot.mesh_generation,
+                                    snapshot_difference(existing, &snapshot)
                                 )));
                             }
                             continue;
@@ -536,16 +1211,11 @@ impl TerrainOccupancyRuntime {
             let Some(existing) = self.meshes.get(mesh_key) else {
                 continue;
             };
-            if incoming.mesh_generation < existing.mesh_generation {
-                return Err(GalError::invalid_argument(format!(
-                    "terrain occupancy snapshot mesh {mesh_key} generation {} is older than live generation {}",
-                    incoming.mesh_generation, existing.mesh_generation
-                )));
-            }
             if incoming.mesh_generation == existing.mesh_generation && incoming != existing {
                 return Err(GalError::invalid_argument(format!(
-                    "terrain occupancy snapshot mesh {mesh_key} changed semantic data without advancing generation {}",
-                    incoming.mesh_generation
+                    "terrain occupancy snapshot mesh {mesh_key} changed semantic data without advancing generation {}; first difference={}",
+                    incoming.mesh_generation,
+                    snapshot_difference(existing, incoming)
                 )));
             }
         }
@@ -553,10 +1223,9 @@ impl TerrainOccupancyRuntime {
     }
 
     /// Confirms that a complete source snapshot is backed by the exact
-    /// immutable arrays already validated and retained by this runtime. This
-    /// is a Rust-owned cache identity, not a content hash: asset replacement
-    /// creates new arrays and advances a semantic generation before it can be
-    /// observed here.
+    /// immutable arrays already validated and retained by this runtime. A
+    /// mesh generation is a content identity, not an ordered counter: a
+    /// changed identity invalidates the match regardless of its numeric value.
     fn confirmed_terrain_source_meshes_match(
         &self,
         meshes: &[TerrainVoxelSourceMesh],
@@ -585,12 +1254,6 @@ impl TerrainOccupancyRuntime {
             let Some(existing) = self.meshes.get(&mesh.mesh_key) else {
                 return Ok(false);
             };
-            if mesh.mesh_generation < existing.mesh_generation {
-                return Err(GalError::invalid_argument(format!(
-                    "terrain occupancy snapshot mesh {} generation {} is older than live generation {}",
-                    mesh.mesh_key, mesh.mesh_generation, existing.mesh_generation
-                )));
-            }
             if mesh.mesh_generation != existing.mesh_generation {
                 return Ok(false);
             }
@@ -972,6 +1635,7 @@ impl TerrainColoredLightRuntime {
             submission_pending: false,
             pending_compute_rollback: None,
             pending_flood_mapping_rollback: None,
+            last_occupancy_update: TerrainOccupancyUpdateStats::default(),
         })
     }
 
@@ -1043,23 +1707,147 @@ impl TerrainColoredLightRuntime {
         &self,
         frame_counter: u64,
     ) -> GalResult<TerrainSourceOwnedResourceSet> {
-        self.sampling
-            .semantic_resource_set_for_frame(
-                &self.readiness()?,
-                frame_counter,
-                self.occupancy.resources.view,
-            )
+        self.sampling.semantic_resource_set_for_frame(
+            &self.readiness()?,
+            frame_counter,
+            self.occupancy.resources.view,
+        )
+    }
+
+    /// Returns the parity-correct sampler table for a field that will become
+    /// shader-readable earlier in the same combined submission. This is not
+    /// a relaxed readiness check: it is valid only for the exact pending
+    /// compute frame, after that compute pass has appended its explicit
+    /// write-to-read transition, and it remains rollback-bound until the
+    /// submission is confirmed.
+    pub(crate) fn semantic_resource_set_for_pending_submission(
+        &self,
+        frame_counter: u64,
+    ) -> GalResult<TerrainSourceOwnedResourceSet> {
+        if !self.submission_pending {
+            return Err(GalError::invalid_argument(
+                "colored-light same-submission resources require a pending submission",
+            ));
+        }
+        if (!self.flood_fill.emission_ready() && !self.flood_fill.emission_upload_pending)
+            || (!self.flood_fill.tint_ready() && !self.flood_fill.tint_upload_pending)
+        {
+            return Err(GalError::invalid_argument(
+                "colored-light same-submission resources require ordered emission and tint tables",
+            ));
+        }
+        if !self.sampling.mapping_ready_for(self.occupancy.descriptor())
+            && !self.sampling.mapping_upload_pending
+        {
+            return Err(GalError::invalid_argument(
+                "colored-light same-submission resources require an ordered mapping upload",
+            ));
+        }
+        if !self
+            .compute
+            .has_pending_output_for_frame(frame_counter, self.occupancy.descriptor())
+        {
+            return Err(GalError::invalid_argument(
+                "colored-light same-submission resources require the exact frame's pending flood-fill output",
+            ));
+        }
+        let active = flood_fill_output_field_for_frame(frame_counter);
+        // Initialization writes both temporal fields before either can be
+        // sampled. Treat both as pending-ready inside this one command list;
+        // propagation, by contrast, only produces its selected target field.
+        let pending_initialization = self.compute.pending_initialization.is_some();
+        let readiness = VoxelLightVolumeReadiness::new(
+            self.occupancy.descriptor().clone(),
+            true,
+            self.compute.even_initialized
+                || pending_initialization
+                || active == VoxelLightVolumeKind::FloodFillEven,
+            self.compute.odd_initialized
+                || pending_initialization
+                || active == VoxelLightVolumeKind::FloodFillOdd,
+        )?;
+        self.sampling.semantic_resource_set_for_frame(
+            &readiness,
+            frame_counter,
+            self.occupancy.resources.view,
+        )
     }
 
     pub(crate) fn has_pending_submission(&self) -> bool {
         self.submission_pending
     }
 
-    /// Appends at most one colored-light compute step once its exact owned
-    /// occupancy and source-derived tables are confirmed. The first complete
-    /// occupancy generation seeds both ping-pong fields. Later occupancy and
-    /// camera-cell updates preserve that history and require a source-derived
-    /// temporal propagation before the changed mapping can be sampled.
+    /// Whether this exact pending transaction has already produced a
+    /// shader-readable flood-fill field. A first-generation table or mapping
+    /// upload is valid Rust-owned preparation, but it is not yet a source
+    /// terrain input. Keeping that distinction here lets higher-level
+    /// admission report the roles as unavailable without treating expected
+    /// transactional ordering as an asset failure.
+    pub(crate) fn pending_sampling_ready_for_frame(&self, frame_counter: u64) -> bool {
+        self.submission_pending
+            && (self.occupancy.is_initialized() || self.occupancy.has_pending_submission())
+            && (self.flood_fill.emission_ready() || self.flood_fill.emission_upload_pending)
+            && (self.flood_fill.tint_ready() || self.flood_fill.tint_upload_pending)
+            && (self.sampling.mapping_ready_for(self.occupancy.descriptor())
+                || self.sampling.mapping_upload_pending)
+            && self
+                .compute
+                .has_pending_output_for_frame(frame_counter, self.occupancy.descriptor())
+    }
+
+    pub(crate) fn diagnostic_state(
+        &self,
+        frame_counter: u64,
+    ) -> TerrainColoredLightDiagnosticState {
+        let extent = self.occupancy.descriptor().extent;
+        let expected_owned_bytes =
+            extent
+                .byte_len(super::voxel_light_volume::VoxelLightVolumeFormat::OccupancyR8Uint)
+                .saturating_add(extent.byte_len(
+                    super::voxel_light_volume::VoxelLightVolumeFormat::LightingRgba16Float,
+                ))
+                .saturating_add(extent.byte_len(
+                    super::voxel_light_volume::VoxelLightVolumeFormat::LightingRgba16Float,
+                ));
+        TerrainColoredLightDiagnosticState {
+            extent_width: extent.width,
+            extent_height: extent.height,
+            extent_depth: extent.depth,
+            expected_owned_bytes,
+            mesh_snapshot_count: self.occupancy.mesh_snapshot_count(),
+            submission_pending: self.submission_pending,
+            occupancy_upload_pending: self.occupancy.has_pending_submission(),
+            occupancy_initialized: self.occupancy.is_initialized(),
+            emission_ready: self.flood_fill.emission_ready(),
+            tint_ready: self.flood_fill.tint_ready(),
+            sampling_mapping_ready: self.sampling.mapping_ready_for(self.occupancy.descriptor()),
+            compute_even_initialized: self.compute.even_initialized,
+            compute_odd_initialized: self.compute.odd_initialized,
+            pending_initialization_frame: self.compute.pending_initialization,
+            pending_propagation_frame: self.compute.pending_propagation,
+            pending_compute_output_ready: self
+                .compute
+                .has_pending_output_for_frame(frame_counter, self.occupancy.descriptor()),
+            frame_ready: self.is_ready_for_frame(frame_counter),
+            occupancy_input_samples: self.last_occupancy_update.input_samples,
+            occupancy_emitted_samples: self.last_occupancy_update.emitted_samples,
+            occupancy_overwritten_samples: self.last_occupancy_update.overwritten_samples,
+            occupancy_skipped_non_solid_samples: self
+                .last_occupancy_update
+                .skipped_non_solid_samples,
+            occupancy_skipped_out_of_bounds_samples: self
+                .last_occupancy_update
+                .skipped_out_of_bounds_samples,
+            occupancy_changed_voxels: self.last_occupancy_update.changed_voxels,
+            occupancy_uploaded_bytes: self.last_occupancy_update.uploaded_bytes,
+        }
+    }
+
+    /// Appends at most one colored-light compute step after its exact owned
+    /// occupancy and source-derived tables have been ordered into this
+    /// combined submission. The upload paths transition every input to shader
+    /// read before this dispatch, while confirmation/rollback remains atomic
+    /// with the enclosing submission.
     pub(crate) fn append_terrain_source_snapshot_for_mapping(
         &mut self,
         frame_counter: u64,
@@ -1078,7 +1866,12 @@ impl TerrainColoredLightRuntime {
             let stats = self
                 .occupancy
                 .append_terrain_source_snapshot_for_mapping(mapping, meshes, operations)?;
-            if self.flood_fill.descriptor.mapping != self.occupancy.descriptor().mapping {
+            if stats.input_samples != 0 || stats.updated_region.is_some() {
+                self.last_occupancy_update = stats;
+            }
+            let mapping_changed =
+                self.flood_fill.descriptor.mapping != self.occupancy.descriptor().mapping;
+            if mapping_changed {
                 self.pending_flood_mapping_rollback = Some(self.flood_fill.descriptor.clone());
                 self.flood_fill
                     .update_mapping(self.occupancy.descriptor())?;
@@ -1098,9 +1891,29 @@ impl TerrainColoredLightRuntime {
             self.sampling
                 .append_mapping_upload(self.occupancy.descriptor(), operations)?;
 
-            if !self.occupancy.has_pending_submission()
-                && self.flood_fill.emission_ready()
-                && self.flood_fill.tint_ready()
+            // A discovered source candidate may exist before any visible
+            // terrain mesh has populated the owned occupancy field. Uploading
+            // tables/mapping is safe preparation; dispatching flood-fill is
+            // not. Keep that state explicitly unready instead of making the
+            // ordinary whole-frame route fail during source preflight.
+            // A confirmed field remains valid for a stable camera cell and
+            // unchanged terrain. Re-dispatching propagation unconditionally
+            // makes an otherwise complete source route permanently pending at
+            // its own admission boundary. Only seed once, or propagate after
+            // an occupancy/mapping change that actually changes semantic
+            // input to the selected terrain pass.
+            let propagation_required = !self.compute.has_seed()
+                || stats.updated_region.is_some()
+                // The mapping upload commits before a temporal propagation.
+                // Compare the compute stage's confirmed mapping, not only the
+                // flood-fill descriptor just updated above, so a cell move
+                // schedules exactly one later propagation and a stable frame
+                // schedules none.
+                || !self.compute.mapping_ready_for(self.occupancy.descriptor());
+            if propagation_required
+                && (self.occupancy.is_initialized() || self.occupancy.has_pending_submission())
+                && (self.flood_fill.emission_ready() || self.flood_fill.emission_upload_pending)
+                && (self.flood_fill.tint_ready() || self.flood_fill.tint_upload_pending)
             {
                 if !self.compute.has_seed() {
                     self.compute.append_initialization(
@@ -1411,19 +2224,19 @@ impl TerrainFloodFillDispatch {
                 "flood-fill occupancy and light resources use different generations",
             ));
         }
-        if !occupancy.is_initialized() {
+        if !occupancy.is_initialized() && !occupancy.has_pending_submission() {
             return Err(GalError::invalid_argument(
-                "flood-fill dispatch requires initialized occupancy data",
+                "flood-fill dispatch requires initialized or ordered occupancy data",
             ));
         }
-        if !flood_fill.emission_ready() {
+        if !flood_fill.emission_ready() && !flood_fill.emission_upload_pending {
             return Err(GalError::invalid_argument(
-                "flood-fill dispatch requires a confirmed source-derived emission table",
+                "flood-fill dispatch requires a confirmed or ordered source-derived emission table",
             ));
         }
-        if !flood_fill.tint_ready() {
+        if !flood_fill.tint_ready() && !flood_fill.tint_upload_pending {
             return Err(GalError::invalid_argument(
-                "flood-fill dispatch requires a confirmed source-derived tint table",
+                "flood-fill dispatch requires a confirmed or ordered source-derived tint table",
             ));
         }
         let extent = occupancy.descriptor.extent;
@@ -1812,52 +2625,57 @@ impl TerrainFloodFillComputeResources {
         }
         let dispatch = TerrainFloodFillDispatch::prepare(occupancy, flood_fill, frame_counter)?;
         let frame_mapping = VoxelLightVolumeFrameMapping::from_descriptor(&occupancy.descriptor);
-        // `shadowcomp` writes the copy field on even frames and the primary
-        // field on odd frames. Seed the same output field so its first
-        // terrain sample observes the source-defined parity.
-        let target_field = flood_fill_output_field_for_frame(frame_counter);
-        let (target_texture, init_set) = match target_field {
-            VoxelLightVolumeKind::FloodFillEven => (flood_fill.even_texture, self.even_init_set),
-            VoxelLightVolumeKind::FloodFillOdd => (flood_fill.odd_texture, self.odd_init_set),
-            VoxelLightVolumeKind::Occupancy => {
-                return Err(GalError::invalid_argument(
-                    "flood-fill initialization cannot target occupancy",
-                ));
-            }
-        };
-        let target_initialized = self.field_initialized(target_field);
-        operations.push(CommandOp::Barrier(resource_barrier(
-            target_texture,
-            None,
-            if target_initialized {
-                TextureUsageState::ShaderRead
-            } else {
-                TextureUsageState::Undefined
-            },
-            TextureUsageState::ShaderWrite,
-        )));
-        dispatch.append(
-            self.init_pipeline,
-            self.init_pipeline_layout,
-            init_set,
-            operations,
-        );
-        operations.push(CommandOp::Barrier(resource_barrier(
-            target_texture,
-            None,
-            TextureUsageState::ShaderWrite,
-            TextureUsageState::ShaderRead,
-        )));
+        // Gameplay frame IDs may skip parity while resources are warming up.
+        // Seed both fields from the same coherent occupancy generation so the
+        // first propagation always has a defined source field. Subsequent
+        // iterations retain Complementary's frame-parity selection.
+        for (target_field, target_texture, init_set) in [
+            (
+                VoxelLightVolumeKind::FloodFillEven,
+                flood_fill.even_texture,
+                self.even_init_set,
+            ),
+            (
+                VoxelLightVolumeKind::FloodFillOdd,
+                flood_fill.odd_texture,
+                self.odd_init_set,
+            ),
+        ] {
+            let target_initialized = self.field_initialized(target_field);
+            operations.push(CommandOp::Barrier(resource_barrier(
+                target_texture,
+                None,
+                if target_initialized {
+                    TextureUsageState::ShaderRead
+                } else {
+                    TextureUsageState::Undefined
+                },
+                TextureUsageState::ShaderWrite,
+            )));
+            dispatch.append(
+                self.init_pipeline,
+                self.init_pipeline_layout,
+                init_set,
+                operations,
+            );
+            operations.push(CommandOp::Barrier(resource_barrier(
+                target_texture,
+                None,
+                TextureUsageState::ShaderWrite,
+                TextureUsageState::ShaderRead,
+            )));
+        }
         self.pending_initialization = Some(frame_counter);
         self.pending_frame_mapping = Some(frame_mapping);
         Ok(())
     }
 
     pub fn confirm_initialization(&mut self) -> GalResult<()> {
-        let frame_counter = self.pending_initialization.take().ok_or_else(|| {
+        self.pending_initialization.take().ok_or_else(|| {
             GalError::invalid_argument("no flood-fill initialization is pending confirmation")
         })?;
-        self.mark_field_initialized(flood_fill_output_field_for_frame(frame_counter))?;
+        self.mark_field_initialized(VoxelLightVolumeKind::FloodFillEven)?;
+        self.mark_field_initialized(VoxelLightVolumeKind::FloodFillOdd)?;
         self.confirmed_frame_mapping = self.pending_frame_mapping.take();
         Ok(())
     }
@@ -1880,6 +2698,19 @@ impl TerrainFloodFillComputeResources {
 
     fn has_pending_submission(&self) -> bool {
         self.pending_initialization.is_some() || self.pending_propagation.is_some()
+    }
+
+    fn has_pending_output_for_frame(
+        &self,
+        frame_counter: u64,
+        descriptor: &VoxelLightVolumeDescriptor,
+    ) -> bool {
+        (self.pending_initialization == Some(frame_counter)
+            || self.pending_propagation == Some(frame_counter))
+            && self
+                .pending_frame_mapping
+                .as_ref()
+                .is_some_and(|mapping| mapping.matches_descriptor(descriptor))
     }
 
     fn confirm_pending_submission(&mut self) -> GalResult<()> {
@@ -2482,6 +3313,12 @@ impl TerrainFloodFillGpuResources {
             offset: 0,
             data: table.std140_bytes(),
         });
+        operations.push(CommandOp::Barrier(resource_barrier(
+            self.emission_buffer,
+            None,
+            TextureUsageState::TransferDst,
+            TextureUsageState::ShaderRead,
+        )));
         self.emission_upload_pending = true;
         Ok(true)
     }
@@ -2527,6 +3364,12 @@ impl TerrainFloodFillGpuResources {
             offset: 0,
             data: table.tint_std140_bytes(),
         });
+        operations.push(CommandOp::Barrier(resource_barrier(
+            self.tint_buffer,
+            None,
+            TextureUsageState::TransferDst,
+            TextureUsageState::ShaderRead,
+        )));
         self.tint_upload_pending = true;
         Ok(true)
     }
@@ -2646,6 +3489,13 @@ impl TerrainOccupancyGpuResources {
     /// occupancy upload must first establish the owned D3 field.
     pub fn is_initialized(&self) -> bool {
         self.initialized && !self.upload_pending
+    }
+
+    /// The enclosing transaction has already ordered the upload through a
+    /// transfer-to-shader-read transition. It is usable by a later command in
+    /// that same list, but cannot be exposed as a confirmed residency yet.
+    fn has_pending_submission(&self) -> bool {
+        self.upload_pending
     }
 
     fn validate_mapping(&self, descriptor: &VoxelLightVolumeDescriptor) -> GalResult<()> {
@@ -2923,10 +3773,11 @@ impl TerrainOccupancyVoxelizer {
             )?;
             let existing = next[index];
             if existing != 0 && existing != value {
-                return Err(GalError::invalid_argument(format!(
-                    "conflicting terrain occupancy values {existing} and {value} at voxel {:?}",
-                    voxel
-                )));
+                // Complementary calls imageStore for every eligible vertex;
+                // its source contains no uniqueness test for a coarse cell.
+                // Preserve the input execution order in our immutable copied
+                // stream rather than rejecting normal overlapping terrain.
+                stats.overwritten_samples = stats.overwritten_samples.saturating_add(1);
             }
             next[index] = value;
             stats.emitted_samples = stats.emitted_samples.saturating_add(1);
@@ -3139,6 +3990,7 @@ mod tests {
     };
     use crate::render::vulkanic::shader_pack::terrain_contract::{
         TerrainPassContract, TerrainPassInput, TerrainPassOperation, TerrainPassOutput,
+        TerrainSourcePassKind,
     };
     use crate::render::vulkanic::world_primitive_frontend::TerrainVoxelSourceVertex;
 
@@ -3191,17 +4043,24 @@ mod tests {
         )
         .unwrap();
         let contract = TerrainPassContract {
+            pass_kind: TerrainSourcePassKind::OpaqueCutout,
             pack_name: "test".to_string(),
             generation: 1,
             program_path: "unused".to_string(),
             material_classes: Default::default(),
             inputs: std::collections::BTreeSet::from([TerrainPassInput::ColoredVoxelLightVolume]),
             outputs: std::collections::BTreeSet::from([TerrainPassOutput::LitTerrainColor]),
+            output_color_slots: std::collections::BTreeMap::from([(
+                TerrainPassOutput::LitTerrainColor,
+                0,
+            )]),
             property_defines: Default::default(),
             material_ids: Default::default(),
+            runtime_block_state_material_ids: None,
             operations: vec![TerrainPassOperation::ColoredVoxelLighting],
             required_resources: Default::default(),
             voxel_light_volume_requirements: None,
+            translucent_raster_state: None,
             unsupported: Default::default(),
         };
         VoxelMaterialMap::derive(&source, &contract).unwrap()
@@ -3238,6 +4097,7 @@ mod tests {
             ],
             index_bytes: vec![0, 0, 1, 0, 2, 0],
             sections: Vec::new(),
+            entity_identity: String::new(),
         }
     }
 
@@ -3303,19 +4163,27 @@ mod tests {
     }
 
     #[test]
-    fn skips_non_solids_and_rejects_conflicting_voxel_materials() {
+    fn skips_non_solids_and_uses_later_source_samples_for_coarse_voxel_collisions() {
         let mut voxelizer = new_voxelizer(descriptor());
         let stats = voxelizer
             .update_from_samples([sample([0.0, 0.0, 0.0], 32_000)])
             .unwrap();
         assert_eq!(1, stats.skipped_non_solid_samples);
         assert!(stats.updated_region.is_none());
-        assert!(voxelizer
+        let stats = voxelizer
             .update_from_samples([
                 sample([0.0, 0.0, 0.0], 30_008),
-                sample([0.0, 0.0, 0.0], 30_012)
+                sample([0.0, 0.0, 0.0], 30_004),
+                sample([0.0, 0.0, 0.0], 30_012),
             ])
-            .is_err());
+            .unwrap();
+        assert_eq!(3, stats.emitted_samples);
+        assert_eq!(2, stats.overwritten_samples);
+        assert!(voxelizer
+            .pending_upload()
+            .expect("merged occupancy update")
+            .texels
+            .contains(&3));
     }
 
     #[test]
@@ -3599,10 +4467,16 @@ mod tests {
                 &mut Vec::new(),
             )
             .is_err());
+        let conflicting_identity = static_terrain_mesh_with_identity(
+            0x10,
+            first_replacement.mesh_generation,
+            [5.0, 0.0, 0.0],
+            WORLD_MESH_VERTEX_LAYOUT_V3,
+        );
         assert!(runtime
             .append_static_terrain_snapshot(
                 [
-                    (&first, transform, WORLD_STRATUM_TERRAIN),
+                    (&conflicting_identity, transform, WORLD_STRATUM_TERRAIN),
                     (&second, transform, WORLD_STRATUM_TERRAIN),
                 ],
                 &mut Vec::new(),
@@ -3670,6 +4544,64 @@ mod tests {
     }
 
     #[test]
+    fn occupancy_runtime_accepts_a_newer_complete_snapshot_with_a_lower_hash_identity() {
+        let descriptor = descriptor();
+        let mut gal = VulkanicGal::new_with_backend(Box::new(MockBackend::default()), false);
+        let mut runtime =
+            TerrainOccupancyRuntime::create(&mut gal, descriptor, materials()).unwrap();
+        let transform = identity_transform();
+        let high_hash_identity = static_terrain_mesh_with_identity(
+            0x71,
+            u64::MAX - 1,
+            [0.0, 0.0, 0.0],
+            WORLD_MESH_VERTEX_LAYOUT_V3,
+        );
+        let mut first_operations = Vec::new();
+        runtime
+            .append_static_terrain_snapshot(
+                [(&high_hash_identity, transform, WORLD_STRATUM_TERRAIN)],
+                &mut first_operations,
+            )
+            .unwrap();
+        submit_runtime_update(
+            &mut gal,
+            &mut runtime,
+            "occupancy-runtime-high-hash-identity",
+            first_operations,
+        );
+
+        let lower_hash_identity = static_terrain_mesh_with_identity(
+            0x71,
+            7,
+            [1.0, 0.0, 0.0],
+            WORLD_MESH_VERTEX_LAYOUT_V3,
+        );
+        let mut replacement_operations = Vec::new();
+        runtime
+            .append_static_terrain_snapshot(
+                [(&lower_hash_identity, transform, WORLD_STRATUM_TERRAIN)],
+                &mut replacement_operations,
+            )
+            .expect(
+                "complete terrain snapshots must compare generation identities, not hash order",
+            );
+        submit_runtime_update(
+            &mut gal,
+            &mut runtime,
+            "occupancy-runtime-lower-hash-identity",
+            replacement_operations,
+        );
+        assert_eq!(
+            7,
+            runtime
+                .meshes
+                .get(&0x71)
+                .expect("replacement snapshot must become live")
+                .mesh_generation
+        );
+    }
+
+    #[test]
     fn occupancy_runtime_replaces_generations_atomically_and_drops_old_mesh_state() {
         let descriptor = descriptor();
         let mut gal = VulkanicGal::new_with_backend(Box::new(MockBackend::default()), false);
@@ -3729,6 +4661,7 @@ mod tests {
             mesh_generation: 1,
             vertices: Arc::new(vertices.to_vec()),
             indices: Arc::new(vec![0, 0, 0]),
+            translucent_indices: Arc::new(Vec::new()),
             transform: identity_transform(),
         };
         let mut operations = Vec::new();
@@ -3755,6 +4688,179 @@ mod tests {
     }
 
     #[test]
+    fn puddle_voxelizer_uses_only_translucent_non_water_shadow_scene_samples() {
+        let descriptor = PuddleOccupancyDescriptor {
+            shader_pack_generation: 1,
+            world_generation: 2,
+            resource_generation: 3,
+            camera_fraction: [0.25, 0.5, 0.75],
+            shadow_scene_from_world: identity_transform(),
+        };
+        let mut puddles = TerrainPuddleVoxelizer::new(descriptor).unwrap();
+        let mesh = TerrainVoxelSourceMesh {
+            mesh_key: 0x90,
+            mesh_generation: 1,
+            vertices: Arc::new(vec![
+                TerrainVoxelSourceVertex {
+                    position: [0.0, 0.0, 0.0],
+                    mid_block_packed: 0,
+                    shader_material_id: 30_008,
+                },
+                TerrainVoxelSourceVertex {
+                    position: [1.0, 0.0, 0.0],
+                    mid_block_packed: 0,
+                    shader_material_id: 32_000,
+                },
+                TerrainVoxelSourceVertex {
+                    position: [0.0, -4.0, 0.0],
+                    mid_block_packed: 0,
+                    shader_material_id: 30_008,
+                },
+                TerrainVoxelSourceVertex {
+                    position: [100.0, 0.0, 0.0],
+                    mid_block_packed: 0,
+                    shader_material_id: 30_008,
+                },
+            ]),
+            indices: Arc::new(vec![0, 1, 2, 3]),
+            translucent_indices: Arc::new(vec![0, 0, 1, 2, 3]),
+            transform: identity_transform(),
+        };
+
+        let stats = puddles.rebuild_from_meshes([mesh]).unwrap();
+        assert_eq!(5, stats.translucent_samples);
+        assert_eq!(1, stats.water_samples_skipped);
+        assert_eq!(1, stats.below_scene_samples_skipped);
+        assert_eq!(1, stats.out_of_bounds_samples_skipped);
+        assert_eq!(1, stats.changed_texels);
+        let center = 64 * PuddleOccupancyDescriptor::EXTENT as usize + 64;
+        assert_eq!(10, puddles.texels()[center]);
+
+        let unchanged = puddles.rebuild_from_meshes(Vec::new()).unwrap();
+        assert_eq!(1, unchanged.changed_texels);
+        assert_eq!(0, puddles.texels()[center]);
+    }
+
+    #[test]
+    fn puddle_gpu_residency_records_a_confirmed_2d_unsigned_upload_and_retires() {
+        let descriptor = PuddleOccupancyDescriptor {
+            shader_pack_generation: 1,
+            world_generation: 2,
+            resource_generation: 3,
+            camera_fraction: [0.0; 3],
+            shadow_scene_from_world: identity_transform(),
+        };
+        let mut gal = VulkanicGal::new_with_backend(Box::new(MockBackend::default()), false);
+        let mut resources = TerrainPuddleGpuResources::create(&mut gal, descriptor).unwrap();
+        let mut operations = Vec::new();
+        resources
+            .append_upload(
+                &vec![
+                    0;
+                    PuddleOccupancyDescriptor::EXTENT as usize
+                        * PuddleOccupancyDescriptor::EXTENT as usize
+                ],
+                &mut operations,
+            )
+            .unwrap();
+        assert!(operations.iter().any(|operation| matches!(
+            operation,
+            CommandOp::CopyBufferToTexture(region)
+                if region.extent.width == PuddleOccupancyDescriptor::EXTENT
+                    && region.extent.height == PuddleOccupancyDescriptor::EXTENT
+                    && region.extent.depth == 1
+        )));
+        assert!(resources.append_upload(&[], &mut Vec::new()).is_err());
+        let list = gal
+            .create_command_list(CommandListDesc {
+                label: "puddle.upload.list".to_string(),
+                operations,
+            })
+            .unwrap();
+        gal.submit(SubmissionBatch {
+            label: "puddle.upload".to_string(),
+            command_lists: vec![list],
+        })
+        .unwrap();
+        resources.confirm_submission().unwrap();
+        resources.destroy(&mut gal).unwrap();
+    }
+
+    #[test]
+    fn puddle_runtime_exposes_only_confirmed_semantic_resources_and_rolls_back_rejected_uploads() {
+        let descriptor = PuddleOccupancyDescriptor {
+            shader_pack_generation: 1,
+            world_generation: 2,
+            resource_generation: 3,
+            camera_fraction: [0.0, 0.0, 0.0],
+            shadow_scene_from_world: identity_transform(),
+        };
+        let mut gal = VulkanicGal::new_with_backend(Box::new(MockBackend::default()), false);
+        let mut runtime = TerrainPuddleRuntime::create(&mut gal, descriptor).unwrap();
+        let mesh = TerrainVoxelSourceMesh {
+            mesh_key: 0x90,
+            mesh_generation: 1,
+            vertices: Arc::new(vec![TerrainVoxelSourceVertex {
+                position: [0.0, 0.0, 0.0],
+                mid_block_packed: 0,
+                shader_material_id: 2,
+            }]),
+            indices: Arc::new(vec![0]),
+            translucent_indices: Arc::new(vec![0]),
+            transform: identity_transform(),
+        };
+        assert!(runtime.semantic_resource_set().is_err());
+
+        let mut first_ops = Vec::new();
+        runtime
+            .append_terrain_source_snapshot(descriptor, [mesh.clone()], &mut first_ops)
+            .unwrap();
+        assert!(runtime.has_pending_submission());
+        let pending = runtime
+            .semantic_resource_set_for_pending_submission()
+            .unwrap();
+        assert!(pending
+            .combined_sampler_for(TerrainSourceResourceRole::PuddleOccupancy)
+            .is_some());
+        assert!(pending
+            .storage_texture_for(TerrainSourceResourceRole::PuddleOccupancy)
+            .is_some());
+        let first_list = gal
+            .create_command_list(CommandListDesc {
+                label: "puddle-runtime-initial".to_owned(),
+                operations: first_ops,
+            })
+            .unwrap();
+        gal.submit(SubmissionBatch {
+            label: "puddle-runtime-initial".to_owned(),
+            command_lists: vec![first_list],
+        })
+        .unwrap();
+        runtime.confirm_submission().unwrap();
+        assert!(runtime.is_ready());
+        assert_eq!(1, runtime.last_update().changed_texels);
+
+        let mut unchanged_ops = Vec::new();
+        runtime
+            .append_terrain_source_snapshot(descriptor, [mesh.clone()], &mut unchanged_ops)
+            .unwrap();
+        assert!(unchanged_ops.is_empty());
+        assert!(runtime.is_ready());
+
+        let mut moved = descriptor;
+        moved.shadow_scene_from_world[12] = 1.0;
+        let mut rejected_ops = Vec::new();
+        runtime
+            .append_terrain_source_snapshot(moved, [mesh], &mut rejected_ops)
+            .unwrap();
+        assert!(runtime.has_pending_submission());
+        runtime.discard_submission();
+        assert!(runtime.is_ready());
+        assert_eq!(descriptor, runtime.descriptor());
+        runtime.destroy(&mut gal).unwrap();
+    }
+
+    #[test]
     fn occupancy_runtime_revoxelizes_on_camera_cell_crossing_without_recreating_d3_resources() {
         let descriptor = descriptor();
         let mut gal = VulkanicGal::new_with_backend(Box::new(MockBackend::default()), false);
@@ -3769,6 +4875,7 @@ mod tests {
                 shader_material_id: 30_008,
             }]),
             indices: Arc::new(vec![0, 0, 0]),
+            translucent_indices: Arc::new(Vec::new()),
             transform: identity_transform(),
         };
         let mut initial_ops = Vec::new();
@@ -3844,6 +4951,7 @@ mod tests {
                 shader_material_id: 30_008,
             }]),
             indices: Arc::new(vec![0, 0, 0]),
+            translucent_indices: Arc::new(Vec::new()),
             transform: identity_transform(),
         };
         let mut initial_ops = Vec::new();
@@ -3913,6 +5021,7 @@ mod tests {
                 shader_material_id: 30_008,
             }]),
             indices: Arc::new(vec![0, 0]),
+            translucent_indices: Arc::new(Vec::new()),
             transform: identity_transform(),
         };
         let error = runtime
@@ -3936,6 +5045,7 @@ mod tests {
                 shader_material_id: 30_008,
             }]),
             indices: Arc::new(vec![0, 0, 0]),
+            translucent_indices: Arc::new(Vec::new()),
             transform: identity_transform(),
         };
         let mut operations = Vec::new();
@@ -4022,18 +5132,20 @@ mod tests {
             .append_emission_upload(&table, &mut operations)
             .unwrap());
         assert!(!resources.emission_ready());
-        assert!(
-            matches!(operations.as_slice(), [CommandOp::HostWriteBuffer { data, .. }] if data.len() == 4096)
-        );
+        assert!(matches!(
+            operations.as_slice(),
+            [CommandOp::HostWriteBuffer { data, .. }, CommandOp::Barrier(_)] if data.len() == 4096
+        ));
         resources.confirm_emission_submission().unwrap();
         assert!(resources.emission_ready());
         assert!(resources
             .append_tint_upload(&table, &mut operations)
             .unwrap());
         assert!(!resources.tint_ready());
-        assert!(
-            matches!(operations.last(), Some(CommandOp::HostWriteBuffer { data, .. }) if data.len() == VOXEL_TINT_COUNT * 16)
-        );
+        assert!(matches!(operations.last(), Some(CommandOp::Barrier(_))));
+        assert!(operations.iter().any(|operation| {
+            matches!(operation, CommandOp::HostWriteBuffer { data, .. } if data.len() == VOXEL_TINT_COUNT * 16)
+        }));
         resources.confirm_tint_submission().unwrap();
         assert!(resources.tint_ready());
         assert!(!resources
@@ -4051,7 +5163,7 @@ mod tests {
     }
 
     #[test]
-    fn colored_light_runtime_confirms_occupancy_tables_and_ping_pong_in_separate_submissions() {
+    fn colored_light_runtime_orders_occupancy_tables_and_ping_pong_in_one_submission() {
         let descriptor = descriptor();
         let source = bundled_complementary_hung_loified_source(1).unwrap();
         let contract = derive_complementary_terrain_contract(&source).unwrap();
@@ -4070,6 +5182,7 @@ mod tests {
                 shader_material_id: 30_008,
             }]),
             indices: Arc::new(vec![0, 0, 0]),
+            translucent_indices: Arc::new(Vec::new()),
             transform: identity_transform(),
         };
 
@@ -4114,61 +5227,40 @@ mod tests {
                 })
                 .count()
         );
-        assert!(!upload_ops
-            .iter()
-            .any(|operation| matches!(operation, CommandOp::Dispatch { .. })));
-        submit(&mut gal, &mut runtime, "colored-light.upload", upload_ops);
-        assert!(!runtime.is_ready_for_frame(0));
-        assert!(runtime.readiness().is_err());
-
-        let mut seed_ops = Vec::new();
-        runtime
-            .append_terrain_source_snapshot_for_mapping(
-                1,
-                descriptor.mapping,
-                None,
-                [mesh.clone()],
-                &mut seed_ops,
-            )
-            .unwrap();
         assert_eq!(
-            1,
-            seed_ops
+            2,
+            upload_ops
                 .iter()
                 .filter(|operation| matches!(operation, CommandOp::Dispatch { .. }))
                 .count()
         );
-        assert!(!seed_ops.iter().any(|operation| {
-            matches!(operation, CommandOp::HostWriteBuffer { data, .. } if data.len() == VoxelLightVolumeShaderMapping::STD140_SIZE)
-        }));
-        submit(&mut gal, &mut runtime, "colored-light.seed", seed_ops);
-        assert!(!runtime.is_ready_for_frame(0));
+        assert!(runtime.pending_sampling_ready_for_frame(0));
+        assert!(runtime
+            .semantic_resource_set_for_pending_submission(0)
+            .is_ok());
+        submit(&mut gal, &mut runtime, "colored-light.upload", upload_ops);
+        assert!(runtime.is_ready_for_frame(0));
         assert!(runtime.is_ready_for_frame(1));
-        assert!(runtime.readiness().unwrap().binding_for_frame(0).is_err());
+        assert!(runtime.readiness().unwrap().binding_for_frame(0).is_ok());
 
-        let mut propagate_ops = Vec::new();
+        let mut steady_ops = Vec::new();
         runtime
             .append_terrain_source_snapshot_for_mapping(
                 0,
                 descriptor.mapping,
                 None,
                 [mesh.clone()],
-                &mut propagate_ops,
+                &mut steady_ops,
             )
             .unwrap();
         assert_eq!(
-            1,
-            propagate_ops
+            0,
+            steady_ops
                 .iter()
                 .filter(|operation| matches!(operation, CommandOp::Dispatch { .. }))
                 .count()
         );
-        submit(
-            &mut gal,
-            &mut runtime,
-            "colored-light.propagate",
-            propagate_ops,
-        );
+        assert!(!runtime.has_pending_submission());
         assert!(runtime.is_ready_for_frame(0));
         assert!(runtime.is_ready_for_frame(1));
         let ready = runtime.readiness().unwrap();
@@ -4254,18 +5346,49 @@ mod tests {
                 })
                 .count()
         );
-        assert!(!moved_ops
+        assert_eq!(
+            1,
+            moved_ops
+                .iter()
+                .filter(|operation| matches!(operation, CommandOp::Dispatch { .. }))
+                .count()
+        );
+        let temporal_bytes = moved_ops
             .iter()
-            .any(|operation| matches!(operation, CommandOp::Dispatch { .. })));
+            .find_map(|operation| match operation {
+                CommandOp::HostWriteBuffer { buffer, data, .. }
+                    if *buffer == runtime.compute.temporal_mapping_buffer =>
+                {
+                    Some(data)
+                }
+                _ => None,
+            })
+            .expect("same-submission propagation must upload its camera-cell mapping");
+        assert_eq!(
+            -1,
+            i32::from_le_bytes(temporal_bytes[0..4].try_into().unwrap()),
+            "previousCameraPosition - cameraPosition must reproject a +X camera move",
+        );
         assert!(runtime.sampling_binding(0).is_err());
+        let pending_resources = runtime
+            .semantic_resource_set_for_pending_submission(2)
+            .expect("the ordered propagation output may bind only inside its combined submission");
+        assert!(pending_resources
+            .availability()
+            .resource_for(TerrainSourceResourceRole::ColoredVoxelLightCurrent)
+            .is_some());
+        assert!(pending_resources
+            .availability()
+            .resource_for(TerrainSourceResourceRole::ColoredVoxelLightPrevious)
+            .is_some());
         submit(
             &mut gal,
             &mut runtime,
             "colored-light.mapping-upload",
             moved_ops,
         );
-        assert!(!runtime.is_ready_for_frame(0));
-        assert!(!runtime.is_ready_for_frame(1));
+        assert!(runtime.is_ready_for_frame(0));
+        assert!(runtime.is_ready_for_frame(1));
 
         let mut temporal_ops = Vec::new();
         runtime
@@ -4277,39 +5400,10 @@ mod tests {
                 &mut temporal_ops,
             )
             .unwrap();
-        assert!(temporal_ops.iter().any(|operation| matches!(
-            operation,
-            CommandOp::BindResourceSet { set, .. } if *set == runtime.compute.odd_to_even_set
-        )));
-        assert!(temporal_ops.iter().any(|operation| matches!(
-            operation,
-            CommandOp::HostWriteBuffer { buffer, offset, data }
-                if *buffer == runtime.compute.temporal_mapping_buffer
-                    && *offset == 0
-                    && data.len() == VoxelLightVolumeTemporalMapping::STD140_SIZE
-        )));
-        let temporal_bytes = temporal_ops
+        assert!(!temporal_ops
             .iter()
-            .find_map(|operation| match operation {
-                CommandOp::HostWriteBuffer { buffer, data, .. }
-                    if *buffer == runtime.compute.temporal_mapping_buffer =>
-                {
-                    Some(data)
-                }
-                _ => None,
-            })
-            .expect("temporal propagation must upload its camera-cell mapping");
-        assert_eq!(
-            -1,
-            i32::from_le_bytes(temporal_bytes[0..4].try_into().unwrap()),
-            "previousCameraPosition - cameraPosition must reproject a +X camera move",
-        );
-        submit(
-            &mut gal,
-            &mut runtime,
-            "colored-light.mapping-temporal-propagation",
-            temporal_ops,
-        );
+            .any(|operation| matches!(operation, CommandOp::Dispatch { .. })));
+        assert!(!runtime.has_pending_submission());
         assert!(runtime.is_ready_for_frame(0));
         assert!(runtime.is_ready_for_frame(1));
 
@@ -4340,6 +5434,60 @@ mod tests {
         assert!(runtime.is_ready_for_frame(0));
         assert!(runtime.is_ready_for_frame(1));
         assert!(runtime.readiness().is_ok());
+    }
+
+    #[test]
+    fn empty_source_snapshot_never_dispatches_flood_fill_before_occupancy_exists() {
+        let descriptor = descriptor();
+        let source = bundled_complementary_hung_loified_source(1).unwrap();
+        let contract = derive_complementary_terrain_contract(&source).unwrap();
+        let emission = VoxelEmissionTable::derive(&source, &contract).unwrap();
+        let mut gal = VulkanicGal::new_with_backend(Box::new(MockBackend::default()), false);
+        let mut runtime =
+            TerrainColoredLightRuntime::create(&mut gal, descriptor.clone(), materials(), emission)
+                .unwrap();
+
+        let mut first_ops = Vec::new();
+        runtime
+            .append_terrain_source_snapshot_for_mapping(
+                0,
+                descriptor.mapping,
+                None,
+                std::iter::empty(),
+                &mut first_ops,
+            )
+            .unwrap();
+        assert!(first_ops
+            .iter()
+            .all(|operation| !matches!(operation, CommandOp::Dispatch { .. })));
+        let list = gal
+            .create_command_list(CommandListDesc {
+                label: "colored-light.empty-source.prepare".to_owned(),
+                operations: first_ops,
+            })
+            .unwrap();
+        gal.submit(SubmissionBatch {
+            label: "colored-light.empty-source.prepare".to_owned(),
+            command_lists: vec![list],
+        })
+        .unwrap();
+        runtime.confirm_submission().unwrap();
+
+        let mut steady_ops = Vec::new();
+        runtime
+            .append_terrain_source_snapshot_for_mapping(
+                1,
+                descriptor.mapping,
+                None,
+                std::iter::empty(),
+                &mut steady_ops,
+            )
+            .unwrap();
+        assert!(steady_ops
+            .iter()
+            .all(|operation| !matches!(operation, CommandOp::Dispatch { .. })));
+        assert!(!runtime.has_pending_submission());
+        assert!(runtime.readiness().is_err());
     }
 
     #[test]
@@ -4418,6 +5566,10 @@ mod tests {
             operation,
             CommandOp::BindResourceSet { set, .. } if *set == compute.odd_init_set
         )));
+        assert!(seed_ops.iter().any(|operation| matches!(
+            operation,
+            CommandOp::BindResourceSet { set, .. } if *set == compute.even_init_set
+        )));
         assert!(compute
             .append_propagation(&occupancy, &flood_fill, 0, None, &mut Vec::new())
             .is_err());
@@ -4434,10 +5586,10 @@ mod tests {
             })
             .unwrap();
         compute.confirm_initialization().unwrap();
-        assert!(!compute.even_initialized);
+        assert!(compute.even_initialized);
         assert!(compute.odd_initialized);
         assert!(compute.is_initialized_for_frame(0));
-        assert!(!compute.is_initialized_for_frame(1));
+        assert!(compute.is_initialized_for_frame(1));
 
         let mut propagation_ops = Vec::new();
         compute
@@ -4753,13 +5905,15 @@ mod tests {
                 shader_material_id: 30_008,
             }]),
             indices: Arc::new(vec![0, 0, 0]),
+            translucent_indices: Arc::new(Vec::new()),
             transform: identity_transform(),
         };
 
+        let mut submitted_transactions = 0_u32;
         for (frame_counter, label) in [
             (0_u64, "private-colored-light.upload"),
             (1_u64, "private-colored-light.seed"),
-            (0_u64, "private-colored-light.propagate"),
+            (0_u64, "private-colored-light.stable"),
         ] {
             let mut operations = Vec::new();
             runtime
@@ -4771,6 +5925,13 @@ mod tests {
                     &mut operations,
                 )
                 .unwrap();
+            if operations.is_empty() {
+                assert!(
+                    !runtime.has_pending_submission(),
+                    "an unchanged voxel field must not retain a pending submission"
+                );
+                continue;
+            }
             assert!(runtime.has_pending_submission());
             let list = gal
                 .create_command_list(CommandListDesc {
@@ -4784,7 +5945,12 @@ mod tests {
             })
             .unwrap();
             runtime.confirm_submission().unwrap();
+            submitted_transactions += 1;
         }
+        assert!(
+            submitted_transactions >= 1,
+            "the initial semantic occupancy snapshot must stage real GPU work"
+        );
         assert!(runtime.is_ready_for_frame(0));
         assert!(runtime.is_ready_for_frame(1));
         runtime.destroy(gal).unwrap();

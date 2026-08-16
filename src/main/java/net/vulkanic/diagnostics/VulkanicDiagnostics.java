@@ -49,6 +49,9 @@ public final class VulkanicDiagnostics {
         Boolean.getBoolean("mattmc.vulkan.traceRenderTargetSamplerBindingHashes");
     public static final boolean TRACE_IRIS_COLORTEX0_PHASE_HASHES =
         Boolean.getBoolean("mattmc.vulkan.traceIrisColortex0PhaseHashes");
+    /** Exact Iris phase to retain as a bounded diagnostic image, or {@code *}. */
+    public static final String DUMP_IRIS_COLORTEX0_PHASE =
+        System.getProperty("mattmc.vulkan.dumpIrisColortex0Phase", "").trim();
     public static final boolean TRACE_SHADER_INPUT_SAMPLER_CONTENT_HASHES =
         Boolean.getBoolean("mattmc.vulkan.traceShaderInputSamplerContentHashes");
     public static final boolean TRACE_RENDER_TARGET_CONTENT_HASHES_INITIAL_POSE_ONLY =
@@ -107,6 +110,8 @@ public final class VulkanicDiagnostics {
         java.util.Collections.newSetFromMap(new ConcurrentHashMap<>());
     public static final Set<String> IRIS_COLORTEX0_PHASE_HASH_KEYS =
         java.util.Collections.newSetFromMap(new ConcurrentHashMap<>());
+    public static final Set<String> IRIS_COLORTEX0_PHASE_IMAGE_KEYS =
+        java.util.Collections.newSetFromMap(new ConcurrentHashMap<>());
     public static final AtomicInteger SHADER_INPUT_PARITY_LOG_COUNT = new AtomicInteger();
     public static final AtomicLong SHADER_INPUT_PARITY_ORDERING_ORDINAL = new AtomicLong();
     public static final ConcurrentMap<Integer, String> SHADER_INPUT_PARITY_PROGRAM_NAMES = new ConcurrentHashMap<>();
@@ -135,6 +140,11 @@ public final class VulkanicDiagnostics {
     public static int diagnosticLimit(String property, int defaultValue) {
         int value = Integer.getInteger(property, defaultValue);
         return value < 0 ? defaultValue : value;
+    }
+
+    public static boolean shouldDumpIrisColortex0Phase(String phase) {
+        return !DUMP_IRIS_COLORTEX0_PHASE.isEmpty()
+            && ("*".equals(DUMP_IRIS_COLORTEX0_PHASE) || DUMP_IRIS_COLORTEX0_PHASE.equals(phase));
     }
 
     public interface Scope extends AutoCloseable {
@@ -539,6 +549,7 @@ public final class VulkanicDiagnostics {
         RENDER_TARGET_CONTENT_READBACK_COUNT.set(0);
         RENDER_TARGET_CONTENT_READBACK_KEYS.clear();
         IRIS_COLORTEX0_PHASE_HASH_KEYS.clear();
+        IRIS_COLORTEX0_PHASE_IMAGE_KEYS.clear();
         SHADER_INPUT_PARITY_LOG_COUNT.set(0);
         SHADER_INPUT_PARITY_ORDERING_ORDINAL.set(0);
         SHADER_INPUT_PARITY_PROGRAM_NAMES.clear();

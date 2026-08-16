@@ -51,6 +51,16 @@ pub enum TextureFormat {
     /// Single-channel unsigned-integer resource data. This is not
     /// a color attachment format; it is valid for sampled/storage textures.
     R8Uint = 6,
+    /// Packed unsigned floating-point RGB color data.
+    R11fG11fB10f = 7,
+    /// Single-channel floating-point color/resource data.
+    R32Float = 8,
+    /// Three-channel half-float color data.
+    Rgb16Float = 9,
+    /// Single-channel normalized color/resource data.
+    R8Unorm = 10,
+    /// Four-channel signed-normalized color data.
+    Rgba8Snorm = 11,
 }
 
 impl TextureFormat {
@@ -59,9 +69,15 @@ impl TextureFormat {
     /// their aspect-specific copy contract is modeled.
     pub const fn copy_bytes_per_texel(self) -> Option<u32> {
         match self {
-            Self::Rgba8Unorm | Self::Bgra8Unorm | Self::Depth32Float => Some(4),
+            Self::Rgba8Unorm
+            | Self::Bgra8Unorm
+            | Self::Depth32Float
+            | Self::R11fG11fB10f
+            | Self::R32Float
+            | Self::Rgba8Snorm => Some(4),
             Self::Rgba16Float => Some(8),
-            Self::R8Uint => Some(1),
+            Self::Rgb16Float => Some(6),
+            Self::R8Uint | Self::R8Unorm => Some(1),
             Self::Depth24Stencil8 => None,
         }
     }
@@ -287,6 +303,41 @@ pub enum CullMode {
     Front = 2,
     Back = 3,
 }
+
+/// Semantic winding convention for front-face classification.
+///
+/// The backend owns how its viewport convention realizes this declaration.
+#[repr(u32)]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum FrontFace {
+    CounterClockwise = 1,
+    Clockwise = 2,
+}
+
+/// Explicit raster depth bias in backend-neutral units.
+///
+/// `slope_factor` scales the maximum depth slope and `constant_factor` applies
+/// a constant depth-unit offset. Backends own their native realization.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct DepthBias {
+    pub constant_factor: f32,
+    pub slope_factor: f32,
+}
+
+impl DepthBias {
+    pub const fn new(constant_factor: f32, slope_factor: f32) -> Self {
+        Self {
+            constant_factor,
+            slope_factor,
+        }
+    }
+
+    pub const fn is_finite(self) -> bool {
+        self.constant_factor.is_finite() && self.slope_factor.is_finite()
+    }
+}
+
+impl Eq for DepthBias {}
 
 #[repr(u32)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -530,9 +581,13 @@ pub struct GraphicsPipelineDesc {
     pub fragment_shader: Handle,
     pub topology: PrimitiveTopology,
     pub cull_mode: CullMode,
+    pub front_face: FrontFace,
     pub blend: BlendMode,
     pub depth_compare: Option<CompareOp>,
     pub depth_write: bool,
+    /// Optional explicit raster depth bias. It is only meaningful with an
+    /// enabled depth test and a depth attachment.
+    pub depth_bias: Option<DepthBias>,
     pub color_formats: Vec<ColorFormat>,
     pub depth_format: Option<TextureFormat>,
 }

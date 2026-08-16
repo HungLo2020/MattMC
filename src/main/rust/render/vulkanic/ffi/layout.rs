@@ -454,7 +454,8 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 width,
                 height,
                 gui_width,
-                gui_height
+                gui_height,
+                sequence
             ]
         ),
         45 => layout!(
@@ -468,7 +469,9 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 gui_width,
                 gui_height,
                 sprites,
-                negotiated_feature_bits
+                affine_quads,
+                negotiated_feature_bits,
+                mesh_batches
             ]
         ),
         46 => layout!(
@@ -493,6 +496,78 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
         48 => layout!(
             48,
             FfiGuiAssetUpdateRequest,
+            [header, generation, assets, negotiated_feature_bits]
+        ),
+        90 => layout!(
+            90,
+            FfiGuiRawImageAssetPayload,
+            [byte_size, format, asset_id, width, height, pixels]
+        ),
+        92 => layout!(
+            92,
+            FfiGuiAffineQuadRequest,
+            [
+                byte_size,
+                stratum,
+                asset_id,
+                x0,
+                y0,
+                x1,
+                y1,
+                x3,
+                y3,
+                z,
+                u0,
+                v0,
+                u1,
+                v1,
+                color_argb,
+                gui_width,
+                gui_height,
+                sequence,
+                clip_mode,
+                clip_left,
+                clip_top,
+                clip_width,
+                clip_height
+            ]
+        ),
+        96 => layout!(
+            96,
+            FfiGuiMeshVertex,
+            [position, atlas_uv, local_uv, color_argb, normal_packed]
+        ),
+        97 => layout!(
+            97,
+            FfiGuiMeshBatchRequest,
+            [
+                byte_size,
+                stratum,
+                layer_index,
+                material_mode,
+                lighting_mode,
+                asset_id,
+                sequence,
+                alpha_cutoff,
+                reserved0,
+                model_transform,
+                gui_pose,
+                left,
+                top,
+                right,
+                bottom,
+                gui_width,
+                gui_height,
+                render_width,
+                render_height,
+                guard_pixels,
+                vertices,
+                indices
+            ]
+        ),
+        91 => layout!(
+            91,
+            FfiGuiRawImageUpdateRequest,
             [header, generation, assets, negotiated_feature_bits]
         ),
         49 => layout!(
@@ -621,10 +696,76 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 world_material_compact_quads,
                 world_mesh_instances,
                 gui_sprites,
+                gui_affine_quads,
                 negotiated_feature_bits,
                 voxel_volume_frame,
-                shader_environment_frame
+                shader_environment_frame,
+                world_lod_instances,
+                world_lod_render_frame,
+                world_feature_coverage,
+                world_text_quads,
+                gui_mesh_batches,
+                world_first_person_frame,
+                world_first_person_mesh_instances
             ]
+        ),
+        89 => layout!(
+            89,
+            FfiWorldFeatureCoverage,
+            [
+                byte_size,
+                model_submits,
+                model_part_submits,
+                block_model_submits,
+                ordinary_block_submits,
+                item_submits,
+                custom_geometry_submits,
+                shadow_submits,
+                flame_submits,
+                name_tag_submits,
+                text_submits,
+                hitbox_submits,
+                leash_submits,
+                particle_group_submits
+            ]
+        ),
+        93 => layout!(
+            93,
+            FfiWorldTextQuadRequest,
+            [
+                byte_size,
+                flags,
+                depth_policy,
+                packed_light,
+                color_argb,
+                reserved0,
+                asset_id,
+                atlas_generation,
+                atlas_revision,
+                distance_to_camera_sq,
+                model_view_matrix,
+                positions,
+                uvs
+            ]
+        ),
+        94 => layout!(
+            94,
+            FfiWorldTextImageAssetPayload,
+            [
+                byte_size,
+                format,
+                width,
+                height,
+                asset_id,
+                atlas_generation,
+                atlas_revision,
+                pixels
+            ]
+        ),
+        95 => layout!(
+            95,
+            FfiWorldTextImageUpdateRequest,
+            [header, generation, assets, negotiated_feature_bits]
         ),
         54 => layout!(
             54,
@@ -669,6 +810,9 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 mesh_cache_misses,
                 sprite_count,
                 sprite_batch_count,
+                gui_mesh_item_count,
+                gui_mesh_batch_count,
+                gui_mesh_draw_count,
                 cache_hits,
                 cache_misses,
                 resource_creates,
@@ -701,7 +845,21 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 store_intent,
                 color_argb,
                 viewport_width,
-                viewport_height
+                viewport_height,
+                sky_visible,
+                sky_sunrise_or_sunset,
+                sky_dark_disc,
+                sky_reserved0,
+                sky_sun_angle,
+                sky_time_of_day,
+                sky_rain_brightness,
+                sky_star_brightness,
+                sky_sunrise_and_sunset_color_argb,
+                sky_moon_phase,
+                sky_end_flash_intensity,
+                sky_end_flash_x_angle,
+                sky_end_flash_y_angle,
+                sky_color_argb
             ]
         ),
         57 => layout!(57, FfiWorldCrackAssetPayload, [byte_size, stage, png_bytes]),
@@ -723,7 +881,7 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 cull_policy,
                 topology,
                 color_argb,
-                reserved0,
+                winding,
                 p0_x,
                 p0_y,
                 p0_z,
@@ -745,7 +903,19 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 uv3_u,
                 uv3_v,
                 viewport_width,
-                viewport_height
+                viewport_height,
+                source_program,
+                source_color_argb,
+                packed_light,
+                source_uv_space,
+                vertex0_color_argb,
+                vertex1_color_argb,
+                vertex2_color_argb,
+                vertex3_color_argb,
+                vertex0_packed_light,
+                vertex1_packed_light,
+                vertex2_packed_light,
+                vertex3_packed_light
             ]
         ),
         60 => layout!(
@@ -771,7 +941,7 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 cull_policy,
                 topology,
                 winding,
-                reserved0
+                source_program
             ]
         ),
         63 => layout!(
@@ -781,7 +951,7 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 byte_size,
                 material_index,
                 color_argb,
-                reserved0,
+                source_uv_space,
                 p0_x,
                 p0_y,
                 p0_z,
@@ -801,7 +971,9 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 uv2_u,
                 uv2_v,
                 uv3_u,
-                uv3_v
+                uv3_v,
+                source_color_argb,
+                packed_light
             ]
         ),
         64 => layout!(
@@ -850,7 +1022,8 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 mesh_generation,
                 vertices,
                 index_bytes,
-                sections
+                sections,
+                entity_identity_utf8
             ]
         ),
         67 => layout!(
@@ -903,6 +1076,8 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 viewport_height,
                 mesh_key,
                 mesh_generation,
+                entity_id,
+                entity_color_argb,
                 transform
             ]
         ),
@@ -955,6 +1130,143 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
             FfiShaderPackAssetUpdateRequest,
             [header, generation, pack_name_utf8, files]
         ),
+        78 => layout!(
+            78,
+            FfiWorldLodVertex,
+            [
+                byte_size,
+                local_x,
+                local_y,
+                local_z,
+                packed_light_and_micro_offset,
+                color_rgba,
+                material_id,
+                normal_index
+            ]
+        ),
+        79 => layout!(79, FfiWorldLodSegmentRecord, [byte_size, layer, vertices]),
+        80 => layout!(
+            80,
+            FfiWorldLodColumnAssetRecord,
+            [
+                byte_size,
+                vertex_layout_version,
+                origin_x,
+                origin_y,
+                origin_z,
+                reserved0,
+                column_key,
+                column_generation,
+                segments
+            ]
+        ),
+        81 => layout!(
+            81,
+            FfiWorldLodColumnRetirementRecord,
+            [byte_size, reserved0, column_key, column_generation]
+        ),
+        82 => layout!(
+            82,
+            FfiWorldLodAssetUpdateRequest,
+            [
+                header,
+                generation,
+                assets,
+                retirements,
+                negotiated_feature_bits,
+                material_provenance
+            ]
+        ),
+        83 => layout!(
+            83,
+            FfiWorldLodColumnInstanceRecord,
+            [
+                byte_size,
+                layer,
+                segment_index,
+                order,
+                column_key,
+                column_generation
+            ]
+        ),
+        84 => layout!(
+            84,
+            FfiWorldLodRenderFrame,
+            [
+                byte_size,
+                enabled,
+                flags,
+                world_y_offset,
+                combined_matrix,
+                model_view_matrix,
+                projection_matrix,
+                projection_inverse_matrix,
+                clip_distance,
+                micro_offset,
+                noise_intensity,
+                earth_radius,
+                noise_steps,
+                noise_dropoff,
+                reserved0,
+                camera_world_x,
+                camera_world_y,
+                camera_world_z
+            ]
+        ),
+        85 => layout!(
+            85,
+            FfiWorldLodMaterialIdentityRecord,
+            [
+                byte_size,
+                reserved0,
+                block_state_identity_utf8,
+                biome_identity_utf8
+            ]
+        ),
+        86 => layout!(
+            86,
+            FfiWorldLodSegmentMaterialProvenanceRecord,
+            [
+                byte_size,
+                layer,
+                segment_index,
+                reserved0,
+                quad_material_ids,
+                quad_variant_states,
+                quad_variant_positions
+            ]
+        ),
+        87 => layout!(
+            87,
+            FfiWorldLodColumnMaterialProvenanceRecord,
+            [
+                byte_size,
+                reserved0,
+                column_key,
+                column_generation,
+                identities,
+                segments,
+                face_materials
+            ]
+        ),
+        88 => layout!(
+            88,
+            FfiWorldLodFaceMaterialRecord,
+            [
+                byte_size,
+                material_id,
+                face,
+                face_layer,
+                atlas_identity_utf8,
+                sprite_identity_utf8,
+                u0,
+                v0,
+                u1,
+                v1,
+                uv_corner_order,
+                variant_position
+            ]
+        ),
         73 => layout!(
             73,
             FfiWorldShaderEnvironmentFrame,
@@ -991,7 +1303,48 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 main_hand_item_model_resource_location_utf8,
                 off_hand_item_model_resource_location_utf8,
                 main_hand_item_light_emission,
-                off_hand_item_light_emission
+                off_hand_item_light_emission,
+                lightmap_enabled,
+                lightmap_reserved,
+                lightmap_generation,
+                lightmap_ambient_light_factor,
+                lightmap_sky_factor,
+                lightmap_block_factor,
+                lightmap_night_vision_factor,
+                lightmap_darkness_scale,
+                lightmap_darken_world_factor,
+                lightmap_brightness_factor,
+                lightmap_sky_light_r,
+                lightmap_sky_light_g,
+                lightmap_sky_light_b,
+                lightmap_ambient_r,
+                lightmap_ambient_g,
+                lightmap_ambient_b,
+                blindness,
+                darkness_factor,
+                eye_brightness_block,
+                eye_brightness_sky,
+                fog_parameter_color_r,
+                fog_parameter_color_g,
+                fog_parameter_color_b,
+                fog_parameter_color_a,
+                fog_environmental_start,
+                fog_environmental_end,
+                fog_render_distance_start,
+                fog_render_distance_end,
+                distant_horizons_render_distance
+            ]
+        ),
+        98 => layout!(
+            98,
+            FfiWorldFirstPersonFrame,
+            [
+                byte_size,
+                enabled,
+                clear_depth_before,
+                main_hand_instance_count,
+                projection_matrix,
+                model_view_matrix
             ]
         ),
         _ => {

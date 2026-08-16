@@ -19,6 +19,7 @@ import net.minecraft.client.renderer.item.ItemStackRenderState;
 import net.minecraft.client.renderer.special.TaczGlock17SpecialRenderer;
 import net.minecraft.client.renderer.state.MapRenderState;
 import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.vulkanic.world.RustGalWorldPrimitiveRenderer;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
@@ -136,12 +137,29 @@ public class ItemInHandRenderer {
 	public void renderItem(
 		LivingEntity livingEntity, ItemStack itemStack, ItemDisplayContext itemDisplayContext, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i
 	) {
+		this.renderItem(livingEntity, itemStack, itemDisplayContext, poseStack, submitNodeCollector, i, false);
+	}
+
+	private void renderItem(
+		LivingEntity livingEntity,
+		ItemStack itemStack,
+		ItemDisplayContext itemDisplayContext,
+		PoseStack poseStack,
+		SubmitNodeCollector submitNodeCollector,
+		int i,
+		boolean mainHand
+	) {
 		if (!itemStack.isEmpty()) {
 			ItemStackRenderState itemStackRenderState = new ItemStackRenderState();
 			this.itemModelResolver
 				.updateForTopItem(
 					itemStackRenderState, itemStack, itemDisplayContext, livingEntity.level(), livingEntity, livingEntity.getId() + itemDisplayContext.ordinal()
 				);
+			if (RustGalWorldPrimitiveRenderer.enqueueFirstPersonItemMesh(
+				poseStack.last(), itemStackRenderState, itemStack, i, mainHand
+			)) {
+				return;
+			}
 			itemStackRenderState.submit(poseStack, submitNodeCollector, i, OverlayTexture.NO_OVERLAY, 0);
 		}
 	}
@@ -467,7 +485,8 @@ public class ItemInHandRenderer {
 					bl3 ? ItemDisplayContext.FIRST_PERSON_RIGHT_HAND : ItemDisplayContext.FIRST_PERSON_LEFT_HAND,
 					poseStack,
 					submitNodeCollector,
-					j
+					j,
+					bl
 				);
 			} else {
 				boolean bl2 = humanoidArm == HumanoidArm.RIGHT;
@@ -559,7 +578,8 @@ public class ItemInHandRenderer {
 					bl2 ? ItemDisplayContext.FIRST_PERSON_RIGHT_HAND : ItemDisplayContext.FIRST_PERSON_LEFT_HAND,
 					poseStack,
 					submitNodeCollector,
-					j
+					j,
+					bl
 				);
 			}
 

@@ -2,7 +2,10 @@ package net.sodium.client.render;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
+import net.minecraft.client.renderer.texture.TextureAtlas;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.SectionPos;
+import net.minecraft.data.AtlasIds;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.chunk.DataLayer;
@@ -1427,9 +1430,66 @@ public final class StaticTerrainParityDiagnostics {
             appendField(json, "extensionWord24", String.format(Locale.ROOT, "%08x", sample.extensionWord24())).append(", ");
             appendField(json, "extensionWord28", String.format(Locale.ROOT, "%08x", sample.extensionWord28())).append(", ");
             appendField(json, "extensionWord32", String.format(Locale.ROOT, "%08x", sample.extensionWord32())).append(", ");
-            appendField(json, "extensionWord36", String.format(Locale.ROOT, "%08x", sample.extensionWord36()));
+            appendField(json, "extensionWord36", String.format(Locale.ROOT, "%08x", sample.extensionWord36())).append(", ");
+            appendTerrainAtlasSample(json, sample.u(), sample.v());
             json.append("}");
         }
+    }
+
+    /**
+     * Bounded observability for the copied atlas contract. The normal source
+     * renderer continues to use its existing texture and UV path; this merely
+     * shows whether a vertex's source UV and a vertically mirrored UV resolve
+     * to the same semantic sprite.
+     */
+    private static void appendTerrainAtlasSample(StringBuilder builder, float u, float v) {
+        builder.append("\"atlasSampling\": {");
+        try {
+            TextureAtlas atlas = Minecraft.getInstance().getAtlasManager().getAtlasOrThrow(AtlasIds.BLOCKS);
+            int width = atlas.width;
+            int height = atlas.height;
+            appendField(builder, "width", width).append(", ");
+            appendField(builder, "height", height).append(", ");
+            appendField(builder, "sourcePixel", atlasPixel(u, v, width, height)).append(", ");
+            appendSpriteAtUv(builder, "source", atlas, u, v);
+            builder.append(", ");
+            float mirroredV = 1.0F - v;
+            appendField(builder, "mirroredPixel", atlasPixel(u, mirroredV, width, height)).append(", ");
+            appendSpriteAtUv(builder, "mirrored", atlas, u, mirroredV);
+        } catch (RuntimeException ignored) {
+            appendField(builder, "status", "atlas-unavailable");
+        }
+        builder.append("}");
+    }
+
+    private static String atlasPixel(float u, float v, int width, int height) {
+        int x = clampAtlasPixel(u, width);
+        int y = clampAtlasPixel(v, height);
+        return x + "," + y;
+    }
+
+    private static int clampAtlasPixel(float coordinate, int extent) {
+        if (extent <= 0 || !Float.isFinite(coordinate)) {
+            return -1;
+        }
+        return Math.max(0, Math.min(extent - 1, (int)Math.floor(coordinate * extent)));
+    }
+
+    private static void appendSpriteAtUv(StringBuilder builder, String name, TextureAtlas atlas, float u, float v) {
+        TextureAtlasSprite selected = null;
+        for (TextureAtlasSprite sprite : atlas.texturesByName.values()) {
+            if (u >= sprite.getU0() && u <= sprite.getU1() && v >= sprite.getV0() && v <= sprite.getV1()) {
+                selected = sprite;
+                break;
+            }
+        }
+        if (selected == null || selected.contents() == null || selected.contents().name() == null) {
+            appendField(builder, name + "Sprite", "none");
+            return;
+        }
+        appendField(builder, name + "Sprite", selected.contents().name().toString()).append(", ");
+        appendField(builder, name + "Bounds", selected.getX() + "," + selected.getY() + ","
+                + selected.contents().width() + "," + selected.contents().height());
     }
 
     private static boolean usesSeparateAo() {

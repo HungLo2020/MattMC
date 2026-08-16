@@ -1,5 +1,5 @@
 use crate::render::vulkanic::commands::{BufferImageCopyRegion, TextureOrigin3d};
-use crate::render::vulkanic::error::GalError;
+use crate::render::vulkanic::error::{GalError, StatusCode};
 use crate::render::vulkanic::gal::VulkanicGal;
 use crate::render::vulkanic::handles::Handle;
 use crate::render::vulkanic::resources::*;
@@ -124,6 +124,96 @@ fn shared_compare_sampler_conformance_creates_depth_only_pairs() {
         gal.destroy(sampler).unwrap();
         gal.destroy(depth_view).unwrap();
         gal.destroy(depth).unwrap();
+    }
+}
+
+#[test]
+fn shared_mip_generation_round_trips_a_color_texel_on_both_backends() {
+    for backend in [BackendKind::Vulkan, BackendKind::OpenGl] {
+        let mut gal = match gal_for(backend, "MattMC mip generation conformance") {
+            Ok(gal) => gal,
+            Err(error) => {
+                assert_environment_gap(&error, backend.name());
+                continue;
+            }
+        };
+        submit_mip_generation_round_trip(&mut gal, backend.name()).unwrap_or_else(|error| {
+            panic!(
+                "{} mip generation conformance failed: {error}",
+                backend.name()
+            )
+        });
+    }
+}
+
+/// Source-derived color targets must be created in their declared format on
+/// both native backends. This intentionally stops before pass execution: it
+/// proves that later source-plan admission cannot silently substitute a
+/// nearby attachment format for a pack declaration.
+#[test]
+fn shared_shader_pack_color_target_formats_create_exact_private_resources() {
+    let formats = [
+        TextureFormat::R11fG11fB10f,
+        TextureFormat::R32Float,
+        TextureFormat::Rgb16Float,
+        TextureFormat::Rgba8Unorm,
+        TextureFormat::R8Unorm,
+        TextureFormat::Rgba8Snorm,
+        TextureFormat::Rgba16Float,
+    ];
+    for backend in [BackendKind::Vulkan, BackendKind::OpenGl] {
+        let mut gal = match gal_for(backend, "MattMC source color target format conformance") {
+            Ok(gal) => gal,
+            Err(error) => {
+                assert_environment_gap(&error, backend.name());
+                continue;
+            }
+        };
+        for format in formats {
+            let texture = match gal.create_texture(TextureDesc {
+                label: format!("{}.source-color.{format:?}.texture", backend.name()),
+                dimension: TextureDimension::D2,
+                format,
+                extent: Extent3d {
+                    width: 16,
+                    height: 8,
+                    depth: 1,
+                },
+                mip_levels: 1,
+                array_layers: 1,
+                usages: vec![
+                    TextureUsage::ColorAttachment,
+                    TextureUsage::Sampled,
+                    TextureUsage::TransferSrc,
+                ],
+            }) {
+                Ok(texture) => texture,
+                Err(error) => {
+                    assert_eq!(
+                        StatusCode::UnsupportedFeature,
+                        error.code,
+                        "{} must report an unsupported exact shader-pack color format before source-plan admission, not fail later: {error}",
+                        backend.name()
+                    );
+                    assert!(error.message.contains(&format!("{format:?}")));
+                    continue;
+                }
+            };
+            let texture_view = gal
+                .create_texture_view(view(
+                    &format!("{}.source-color.{format:?}.view", backend.name()),
+                    texture,
+                    format,
+                ))
+                .unwrap_or_else(|error| {
+                    panic!(
+                        "{} must create an exact shader-pack color view for {format:?}: {error}",
+                        backend.name()
+                    )
+                });
+            gal.destroy(texture_view).unwrap();
+            gal.destroy(texture).unwrap();
+        }
     }
 }
 
@@ -350,6 +440,170 @@ fn submit_d3_pattern_round_trip(
     pattern: Vec<u8>,
 ) -> Result<(), GalError> {
     submit_d3_pattern_round_trip_at_mip(gal, backend_name, format, extent, 1, 0, extent, pattern)
+}
+
+fn submit_mip_generation_round_trip(
+    gal: &mut VulkanicGal,
+    backend_name: &str,
+) -> Result<(), GalError> {
+    let label = format!("shared-mip-generation-{}", backend_name.to_lowercase());
+    let source_texel = [31_u8, 79, 163, 255];
+    let source_pattern = source_texel.repeat(16);
+    let upload = gal.create_buffer(BufferDesc {
+        label: format!("{label}.upload"),
+        size: source_pattern.len() as u64,
+        memory: MemoryDomain::Upload,
+        usages: vec![BufferUsage::HostWrite, BufferUsage::TransferSrc],
+    })?;
+    let readback = gal.create_buffer(BufferDesc {
+        label: format!("{label}.readback"),
+        size: 4,
+        memory: MemoryDomain::Readback,
+        usages: vec![BufferUsage::TransferDst, BufferUsage::HostRead],
+    })?;
+    let texture = gal.create_texture(TextureDesc {
+        label: format!("{label}.texture"),
+        dimension: TextureDimension::D2,
+        format: TextureFormat::Rgba8Unorm,
+        extent: Extent3d {
+            width: 4,
+            height: 4,
+            depth: 1,
+        },
+        mip_levels: 3,
+        array_layers: 1,
+        usages: vec![
+            TextureUsage::TransferDst,
+            TextureUsage::TransferSrc,
+            TextureUsage::Sampled,
+        ],
+    })?;
+    let descendants = TextureSubresourceRange {
+        base_mip: 1,
+        mip_count: 2,
+        base_layer: 0,
+        layer_count: 1,
+    };
+    let full_range = TextureSubresourceRange {
+        base_mip: 0,
+        mip_count: 3,
+        base_layer: 0,
+        layer_count: 1,
+    };
+    let base_upload = BufferImageCopyRegion {
+        buffer: upload,
+        buffer_offset: 0,
+        bytes_per_row: 16,
+        rows_per_image: 4,
+        texture,
+        texture_mip: 0,
+        texture_layer: 0,
+        texture_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
+        extent: Extent3d {
+            width: 4,
+            height: 4,
+            depth: 1,
+        },
+    };
+    let final_read = BufferImageCopyRegion {
+        buffer: readback,
+        buffer_offset: 0,
+        bytes_per_row: 4,
+        rows_per_image: 1,
+        texture,
+        texture_mip: 2,
+        texture_layer: 0,
+        texture_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
+        extent: Extent3d {
+            width: 1,
+            height: 1,
+            depth: 1,
+        },
+    };
+    let list = gal.create_command_list(CommandListDesc {
+        label: format!("{label}.commands"),
+        operations: vec![
+            CommandOp::HostWriteBuffer {
+                buffer: upload,
+                offset: 0,
+                data: source_pattern,
+            },
+            buffer_barrier(upload),
+            texture_mip_barrier(
+                texture,
+                0,
+                TextureUsageState::Undefined,
+                TextureUsageState::TransferDst,
+            ),
+            CommandOp::CopyBufferToTexture(base_upload),
+            texture_mip_barrier(
+                texture,
+                0,
+                TextureUsageState::TransferDst,
+                TextureUsageState::TransferSrc,
+            ),
+            CommandOp::Barrier(ResourceBarrier {
+                resource: texture,
+                subresources: Some(descendants),
+                before: TextureUsageState::Undefined,
+                after: TextureUsageState::TransferDst,
+                src_queue: QueueClass::Graphics,
+                dst_queue: QueueClass::Graphics,
+            }),
+            CommandOp::GenerateMipmaps {
+                texture,
+                subresources: full_range,
+            },
+            CommandOp::Barrier(ResourceBarrier {
+                resource: texture,
+                subresources: Some(full_range),
+                before: TextureUsageState::TransferSrc,
+                after: TextureUsageState::ShaderRead,
+                src_queue: QueueClass::Graphics,
+                dst_queue: QueueClass::Graphics,
+            }),
+            CommandOp::Barrier(ResourceBarrier {
+                resource: texture,
+                subresources: Some(TextureSubresourceRange {
+                    base_mip: 2,
+                    mip_count: 1,
+                    base_layer: 0,
+                    layer_count: 1,
+                }),
+                before: TextureUsageState::ShaderRead,
+                after: TextureUsageState::TransferSrc,
+                src_queue: QueueClass::Graphics,
+                dst_queue: QueueClass::Graphics,
+            }),
+            CommandOp::CopyTextureToBuffer(final_read),
+            buffer_barrier(readback),
+            CommandOp::HostReadBuffer {
+                buffer: readback,
+                offset: 0,
+                size: 4,
+            },
+        ],
+    })?;
+    let submission = gal.submit(SubmissionBatch {
+        label: format!("{label}.submit"),
+        command_lists: vec![list],
+    })?;
+    gal.destroy(texture)?;
+    gal.destroy(upload)?;
+    gal.destroy(readback)?;
+    gal.retire_through_for_test(submission.submission)?;
+    let read = gal
+        .completed_host_reads()
+        .into_iter()
+        .find(|read| read.buffer == readback)
+        .ok_or_else(|| GalError::backend("mip generation fixture completed without readback"))?;
+    if read.bytes != source_texel {
+        return Err(GalError::backend(format!(
+            "mip generation fixture read {:?}, expected {:?}",
+            read.bytes, source_texel
+        )));
+    }
+    Ok(())
 }
 
 fn submit_d3_pattern_round_trip_at_mip(
@@ -637,9 +891,11 @@ fn submit_d3_sampled_texel(gal: &mut VulkanicGal, backend_name: &str) -> Result<
         fragment_shader: fragment,
         topology: PrimitiveTopology::Triangles,
         cull_mode: CullMode::None,
+        front_face: crate::render::vulkanic::resources::FrontFace::CounterClockwise,
         blend: BlendMode::Disabled,
         depth_compare: None,
         depth_write: false,
+        depth_bias: None,
         color_formats: vec![TextureFormat::Rgba8Unorm],
         depth_format: None,
     })?;

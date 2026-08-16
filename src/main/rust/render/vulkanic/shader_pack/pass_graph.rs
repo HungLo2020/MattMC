@@ -31,6 +31,13 @@ impl AttachmentIdentity {
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum AttachmentRole {
     ShadowDepth,
+    /// The source-selected primary shader-pack color target. This is a named
+    /// semantic role, not a `DRAWBUFFERS` index: both normal terrain and DH
+    /// may write it when the selected pack says they share that target.
+    ShaderPackPrimaryColor,
+    /// Distant-Horizons depth retained separately for later shader-pack
+    /// consumers. It is not interchangeable with the near terrain depth.
+    DistantDepth,
     GBufferAlbedo,
     GBufferNormal,
     GBufferMaterialLight,
@@ -89,6 +96,7 @@ impl PassGraph {
             }
             if pass.colors.contains(&AttachmentRole::Depth)
                 || pass.colors.contains(&AttachmentRole::ShadowDepth)
+                || pass.colors.contains(&AttachmentRole::DistantDepth)
             {
                 return Err(GalError::invalid_argument(
                     "shader pass color attachment cannot be depth",
@@ -104,6 +112,7 @@ impl PassGraph {
                     | Some(AttachmentRole::DeferredLitColor)
                     | Some(AttachmentRole::Composite0)
                     | Some(AttachmentRole::Composite1)
+                    | Some(AttachmentRole::ShaderPackPrimaryColor)
             ) {
                 return Err(GalError::invalid_argument(
                     "shader pass depth attachment must use a depth role",
@@ -116,6 +125,47 @@ impl PassGraph {
     pub fn passes(&self) -> &[ShaderPassDesc] {
         &self.passes
     }
+}
+
+/// The semantic pass graph required for a shader pack that has a distinct
+/// Distant Horizons terrain stage. The source-selected DH program writes the
+/// same named primary pack color target as its declared `DRAWBUFFERS` target,
+/// while retaining distinct distant depth for later source-declared consumers.
+/// It is deliberately independent from the built-in near-terrain graph.
+///
+/// This describes attachment roles and ordering only. It creates no native
+/// targets, chooses no backend state, and is not a route-selection signal.
+pub fn distant_horizons_opaque_pass_graph(
+    terrain_program: ProgramIdentity,
+) -> GalResult<PassGraph> {
+    PassGraph::new(vec![ShaderPassDesc {
+        identity: PassIdentity::new("vulkanic:pass/distant_horizons_opaque"),
+        label: "Distant Horizons opaque terrain".to_string(),
+        program: terrain_program,
+        colors: vec![AttachmentRole::ShaderPackPrimaryColor],
+        depth: Some(AttachmentRole::DistantDepth),
+        load: LoadIntent::Load,
+        store: StoreIntent::Store,
+    }])
+}
+
+/// The late source-derived Distant Horizons translucent phase. It preserves
+/// the named primary color written by ordinary terrain and DH opaque work,
+/// while loading the distinct DH depth attachment. Its depth history is a
+/// sampled semantic input declared by the source contract, not an attachment
+/// number or a backend-specific framebuffer alias.
+pub fn distant_horizons_translucent_pass_graph(
+    terrain_program: ProgramIdentity,
+) -> GalResult<PassGraph> {
+    PassGraph::new(vec![ShaderPassDesc {
+        identity: PassIdentity::new("vulkanic:pass/distant_horizons_translucent"),
+        label: "Distant Horizons translucent terrain".to_string(),
+        program: terrain_program,
+        colors: vec![AttachmentRole::ShaderPackPrimaryColor],
+        depth: Some(AttachmentRole::DistantDepth),
+        load: LoadIntent::Load,
+        store: StoreIntent::Store,
+    }])
 }
 
 pub fn builtin_terrain_material_pass_graph() -> GalResult<PassGraph> {

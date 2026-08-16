@@ -172,6 +172,7 @@ public abstract class EntityRenderer<T extends Entity, S extends EntityRenderSta
 	}
 
 	public void extractRenderState(T entity, S entityRenderState, float f) {
+		entityRenderState.entityId = entity.getId();
 		entityRenderState.entityType = entity.getType();
 		entityRenderState.x = Mth.lerp(f, entity.xOld, entity.getX());
 		entityRenderState.y = Mth.lerp(f, entity.yOld, entity.getY());

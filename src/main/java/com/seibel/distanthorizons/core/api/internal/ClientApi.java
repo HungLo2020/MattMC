@@ -363,6 +363,41 @@ public class ClientApi
 		this.renderLodLayer(false); 
 		//LOGGER.debug("[DH-RENDER] renderLods() completed");
 	}
+
+	/**
+	 * Builds the normal DH render parameters and performs only the bounded
+	 * opaque semantic traversal needed by the Rust Vulkan whole-frame route.
+	 * It intentionally skips GLProxy work and never invokes Java rendering.
+	 */
+	public boolean collectRustOpaqueLodsForWholeFrame()
+	{
+		if (this.rendererDisabledBecauseOfExceptions
+			|| Config.Client.Advanced.Debugging.rendererMode.get() != EDhApiRendererMode.DEFAULT)
+		{
+			net.vulkanic.world.DistantHorizonsSemanticCollector.recordRustOpaqueRouteRejected(
+				"renderer-disabled-or-nondefault-mode", 0
+			);
+			return false;
+		}
+		RenderParams renderParams = new RenderParams(
+			EDhApiRenderPass.OPAQUE_AND_TRANSPARENT,
+			RENDER_STATE.frameTime,
+			RENDER_STATE.mcProjectionMatrix,
+			RENDER_STATE.mcModelViewMatrix,
+			RENDER_STATE.clientLevelWrapper
+		);
+		String validationMessage = renderParams.getSemanticTraversalValidationErrorMessage();
+		if (validationMessage != null)
+		{
+			this.lastRenderParamValidationMessage = validationMessage;
+			net.vulkanic.world.DistantHorizonsSemanticCollector.recordRustOpaqueRouteRejected(
+				"render-param-validation:" + validationMessage, 0
+			);
+			return false;
+		}
+		this.lastRenderParamValidationMessage = null;
+		return LodRenderer.INSTANCE.collectRustOpaqueRouteForWholeFrame(renderParams, MC_CLIENT.getProfiler());
+	}
 	
 	/** 
 	 * Only necessary when Shaders are in use.

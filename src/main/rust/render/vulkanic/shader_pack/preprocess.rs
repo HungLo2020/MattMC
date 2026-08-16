@@ -40,6 +40,34 @@ pub struct PreprocessedTerrainSources {
     pub fragment: PreprocessedShaderSource,
 }
 
+/// Engine semantic defines required by Distant Horizons' documented CPU
+/// material stream. These values match the copied `WorldLodMaterialCategory`
+/// contract, not an Iris program or an OpenGL binding.
+const DISTANT_HORIZONS_STANDARD_DEFINES: [(&str, &str); 16] = [
+    ("DH_BLOCK_UNKNOWN", "0"),
+    ("DH_BLOCK_LEAVES", "1"),
+    ("DH_BLOCK_STONE", "2"),
+    ("DH_BLOCK_WOOD", "3"),
+    ("DH_BLOCK_METAL", "4"),
+    ("DH_BLOCK_DIRT", "5"),
+    ("DH_BLOCK_LAVA", "6"),
+    ("DH_BLOCK_DEEPSLATE", "7"),
+    ("DH_BLOCK_SNOW", "8"),
+    ("DH_BLOCK_SAND", "9"),
+    ("DH_BLOCK_TERRACOTTA", "10"),
+    ("DH_BLOCK_NETHER_STONE", "11"),
+    ("DH_BLOCK_WATER", "12"),
+    ("DH_BLOCK_GRASS", "13"),
+    ("DH_BLOCK_AIR", "14"),
+    ("DH_BLOCK_ILLUMINATED", "15"),
+];
+
+/// Fullscreen consumers following a Distant Horizons source writer must be
+/// expanded in the same pack mode as that writer. In particular, the pack's
+/// deferred/composite stages use this semantic mode to distinguish pixels
+/// backed by `dhDepthTex` from the normal Minecraft sky path.
+const DISTANT_HORIZONS_FULLSCREEN_DEFINES: [(&str, &str); 1] = [("DISTANT_HORIZONS", "1")];
+
 /// Bounded provenance retained after source expansion. Runtime candidate
 /// discovery stores this summary rather than expanded GLSL, keeping source
 /// validation auditable without duplicating large pack contents in memory.
@@ -104,6 +132,35 @@ impl PreprocessedShaderSource {
     pub fn fingerprint(&self) -> u64 {
         self.fingerprint
     }
+
+    /// Retains the same owned source provenance while applying one bounded,
+    /// backend-neutral lowering rewrite. Callers cannot alter pack identity,
+    /// generation, entry point, or preprocessor facts through this helper.
+    pub(crate) fn rewritten_for_lowering(&self, expanded_source: String) -> GalResult<Self> {
+        if expanded_source.len() > Self::MAX_EXPANDED_BYTES {
+            return Err(GalError::invalid_argument(format!(
+                "rewritten shader source exceeds {} bytes",
+                Self::MAX_EXPANDED_BYTES
+            )));
+        }
+        let resolved_paths = self.resolved_paths.iter().cloned().collect::<BTreeSet<_>>();
+        Ok(Self {
+            pack_name: self.pack_name.clone(),
+            source_generation: self.source_generation,
+            entry_path: self.entry_path.clone(),
+            defines: self.defines.clone(),
+            resolved_paths: self.resolved_paths.clone(),
+            fingerprint: source_fingerprint(
+                &self.pack_name,
+                self.source_generation,
+                &self.entry_path,
+                &self.defines,
+                &resolved_paths,
+                &expanded_source,
+            ),
+            expanded_source,
+        })
+    }
 }
 
 /// Expands one shader source generation without any Iris, Java renderer, or
@@ -117,6 +174,13 @@ pub fn preprocess(input: PreprocessInput<'_>) -> GalResult<String> {
 /// lowering. Creating this artifact does not admit the program for rendering:
 /// semantic source lowering and backend compilation remain separate gates.
 pub fn preprocess_artifact(input: PreprocessInput<'_>) -> GalResult<PreprocessedShaderSource> {
+    preprocess_artifact_with_protected_defines(input, &BTreeSet::new())
+}
+
+fn preprocess_artifact_with_protected_defines(
+    input: PreprocessInput<'_>,
+    protected_defines: &BTreeSet<String>,
+) -> GalResult<PreprocessedShaderSource> {
     let mut defines = BTreeMap::new();
     let mut resolved_paths = BTreeSet::new();
     let mut out = String::new();
@@ -146,12 +210,18 @@ pub fn preprocess_artifact(input: PreprocessInput<'_>) -> GalResult<Preprocessed
     if !inject_after_version {
         out.push_str(&external_defines);
     }
+    // A selected option owns its initial definition. The pack may still
+    // explicitly `#undef` it inside a scoped branch (for example a feature
+    // unavailable in the Nether); after that directive, ordinary pack
+    // definitions regain ownership of the name.
+    let mut active_protected_defines = protected_defines.clone();
     expand_file(
         input.source,
         &entry,
         &mut BTreeSet::new(),
         &mut resolved_paths,
         &mut defines,
+        &mut active_protected_defines,
         inject_after_version.then_some(external_defines.as_str()),
         &mut out,
     )?;
@@ -189,33 +259,151 @@ pub fn preprocess_artifact_with_runtime_options(
     entry: &str,
     defines: &[(&str, &str)],
 ) -> GalResult<PreprocessedShaderSource> {
-    let mut merged = source.runtime_semantic_defines()?;
-    for (key, value) in defines {
-        validate_define(key, value)?;
-        if merged
-            .insert((*key).to_owned(), (*value).to_owned())
-            .is_some()
-        {
+    let option_defines = source.runtime_option_semantic_defines()?;
+    reject_runtime_stage_selectors("option", &option_defines)?;
+    // The immutable option snapshot is the selected pack configuration. It
+    // owns preprocessor values across every source entry, including DH stages
+    // that do not transitively include the pack's user-settings file. Typed
+    // GLSL `const` options remain separate and are rewritten only after this
+    // conditional expansion completes.
+    let mut merged = option_defines.clone();
+    let environment_defines = source.runtime_environment_semantic_defines()?;
+    reject_runtime_stage_selectors("environment", &environment_defines)?;
+    for (key, value) in environment_defines {
+        if merged.insert(key.clone(), value).is_some() {
             return Err(GalError::invalid_argument(format!(
-                "caller shader define '{key}' conflicts with runtime shader-pack option"
+                "runtime shader-pack define '{key}' is present in both option and environment snapshots"
             )));
         }
+    }
+    for (key, value) in defines {
+        validate_define(key, value)?;
+        if let Some(runtime_value) = merged.get(*key) {
+            // Engine semantic constants can also be present in Iris's
+            // standard macro snapshot. The same value is an agreement on one
+            // source-level contract, not an override; a different value still
+            // rejects the source pair before any route can be admitted.
+            if runtime_value != value {
+                return Err(GalError::invalid_argument(format!(
+                    "caller shader define '{key}={value}' conflicts with runtime shader-pack option '{runtime_value}'"
+                )));
+            }
+            continue;
+        }
+        merged.insert((*key).to_owned(), (*value).to_owned());
     }
     let references = merged
         .iter()
         .map(|(key, value)| (key.as_str(), value.as_str()))
         .collect::<Vec<_>>();
-    preprocess_artifact(PreprocessInput {
-        source,
-        entry,
-        defines: &references,
-    })
+    let protected_option_defines = option_defines.into_keys().collect::<BTreeSet<_>>();
+    let artifact = preprocess_artifact_with_protected_defines(
+        PreprocessInput {
+            source,
+            entry,
+            defines: &references,
+        },
+        &protected_option_defines,
+    )?;
+    let constants = source.runtime_constant_values()?;
+    if constants.is_empty() {
+        return Ok(artifact);
+    }
+    artifact.rewritten_for_lowering(apply_runtime_constant_values(
+        artifact.expanded_source(),
+        &constants,
+    )?)
+}
+
+/// Applies an Iris-resolved `const` option only to its own emitted GLSL
+/// declaration. This happens after conditional expansion, so an option that
+/// belongs to an inactive branch has no effect and cannot manufacture a macro
+/// collision in another translation unit.
+fn apply_runtime_constant_values(
+    source: &str,
+    constants: &BTreeMap<String, String>,
+) -> GalResult<String> {
+    let mut rewritten = String::with_capacity(source.len());
+    for line in source.split_inclusive('\n') {
+        let line_without_newline = line.strip_suffix('\n').unwrap_or(line);
+        let newline = line.ends_with('\n');
+        let trimmed = line_without_newline.trim_start();
+        let replacement = if let Some(const_declaration) = trimmed.strip_prefix("const ") {
+            let Some((left, right)) = const_declaration.split_once('=') else {
+                rewritten.push_str(line);
+                continue;
+            };
+            let Some((_, suffix)) = right.split_once(';') else {
+                rewritten.push_str(line);
+                continue;
+            };
+            let Some(name) = left.split_whitespace().last() else {
+                rewritten.push_str(line);
+                continue;
+            };
+            constants.get(name).map(|value| {
+                let indent = &line_without_newline[..line_without_newline.len() - trimmed.len()];
+                format!("{indent}const {left}= {value};{suffix}")
+            })
+        } else {
+            None
+        };
+        if let Some(replacement) = replacement {
+            rewritten.push_str(&replacement);
+            if newline {
+                rewritten.push('\n');
+            }
+        } else {
+            rewritten.push_str(line);
+        }
+    }
+    Ok(rewritten)
+}
+
+/// A selected shader stage is determined by its source entry or the explicit
+/// paired-stage request. A copied runtime option/environment snapshot must not
+/// select a stage globally: doing so could expand both guarded shader bodies
+/// into one owned artifact. This is a source-transport invariant, not a
+/// backend compiler or Iris-state rule.
+fn reject_runtime_stage_selectors(
+    snapshot_kind: &str,
+    defines: &BTreeMap<String, String>,
+) -> GalResult<()> {
+    const STAGE_SELECTORS: [&str; 4] = [
+        "VERTEX_SHADER",
+        "FRAGMENT_SHADER",
+        "GEOMETRY_SHADER",
+        "COMPUTE_SHADER",
+    ];
+    for selector in STAGE_SELECTORS {
+        if defines.contains_key(selector) {
+            return Err(GalError::invalid_argument(format!(
+                "runtime {snapshot_kind} snapshot must not define shader stage selector '{selector}'"
+            )));
+        }
+    }
+    Ok(())
 }
 
 /// Expands both semantically paired normal-terrain stages from one immutable
 /// source generation. Each stage receives the same runtime option snapshot
 /// plus its explicit stage-selection defines.
 pub fn preprocess_terrain_sources(
+    source: &ShaderPackSource,
+    stages: &TerrainSourceStages,
+) -> GalResult<PreprocessedTerrainSources> {
+    preprocess_source_stage_pair(source, stages)
+}
+
+/// Expands one explicitly paired shader stage from an immutable source
+/// generation. Despite the historical `TerrainSourceStages` name, this is
+/// deliberately generic: deferred/composite stages use the same paired source
+/// identity but must not be forced through terrain-mesh lowering merely to
+/// establish owned source provenance.
+///
+/// The returned artifacts still carry only source text and semantic defines.
+/// They create no program, target, descriptor, or route decision.
+pub fn preprocess_source_stage_pair(
     source: &ShaderPackSource,
     stages: &TerrainSourceStages,
 ) -> GalResult<PreprocessedTerrainSources> {
@@ -226,6 +414,73 @@ pub fn preprocess_terrain_sources(
             .collect::<Vec<_>>();
         preprocess_artifact_with_runtime_options(source, path, &references)
     };
+    Ok(PreprocessedTerrainSources {
+        vertex: preprocess_stage(&stages.vertex.path, &stages.vertex.defines)?,
+        fragment: preprocess_stage(&stages.fragment.path, &stages.fragment.defines)?,
+    })
+}
+
+/// Expands the paired DH source stages with the fixed semantic material
+/// constants supplied by the copied DH CPU stream. This is an owned
+/// preprocessor contract: it never reads Iris's macro table or any live GL
+/// state. A pack attempting to redefine one of these semantic identities is
+/// rejected rather than silently changing the vertex material meaning.
+pub fn preprocess_distant_horizons_sources(
+    source: &ShaderPackSource,
+    stages: &TerrainSourceStages,
+) -> GalResult<PreprocessedTerrainSources> {
+    let preprocess_stage =
+        |path: &str, stage_defines: &std::collections::BTreeMap<String, String>| {
+            let mut defines = DISTANT_HORIZONS_STANDARD_DEFINES
+                .iter()
+                .map(|(key, value)| ((*key).to_string(), (*value).to_string()))
+                .collect::<BTreeMap<_, _>>();
+            for (key, value) in stage_defines {
+                if defines.insert(key.clone(), value.clone()).is_some() {
+                    return Err(GalError::invalid_argument(format!(
+                        "Distant Horizons source stage redefines engine semantic '{key}'"
+                    )));
+                }
+            }
+            let references = defines
+                .iter()
+                .map(|(key, value)| (key.as_str(), value.as_str()))
+                .collect::<Vec<_>>();
+            preprocess_artifact_with_runtime_options(source, path, &references)
+        };
+    Ok(PreprocessedTerrainSources {
+        vertex: preprocess_stage(&stages.vertex.path, &stages.vertex.defines)?,
+        fragment: preprocess_stage(&stages.fragment.path, &stages.fragment.defines)?,
+    })
+}
+
+/// Expands one post-terrain source stage in the explicit Distant Horizons
+/// mode. This is source configuration, not an Iris program flag or backend
+/// state: the selected Rust frame owns both the DH writer and the consumers
+/// that read its named depth/color resources.
+pub fn preprocess_distant_horizons_fullscreen_stage_pair(
+    source: &ShaderPackSource,
+    stages: &TerrainSourceStages,
+) -> GalResult<PreprocessedTerrainSources> {
+    let preprocess_stage =
+        |path: &str, stage_defines: &std::collections::BTreeMap<String, String>| {
+            let mut defines = DISTANT_HORIZONS_FULLSCREEN_DEFINES
+                .iter()
+                .map(|(key, value)| ((*key).to_string(), (*value).to_string()))
+                .collect::<BTreeMap<_, _>>();
+            for (key, value) in stage_defines {
+                if defines.insert(key.clone(), value.clone()).is_some() {
+                    return Err(GalError::invalid_argument(format!(
+                        "Distant Horizons fullscreen stage redefines engine semantic '{key}'"
+                    )));
+                }
+            }
+            let references = defines
+                .iter()
+                .map(|(key, value)| (key.as_str(), value.as_str()))
+                .collect::<Vec<_>>();
+            preprocess_artifact_with_runtime_options(source, path, &references)
+        };
     Ok(PreprocessedTerrainSources {
         vertex: preprocess_stage(&stages.vertex.path, &stages.vertex.defines)?,
         fragment: preprocess_stage(&stages.fragment.path, &stages.fragment.defines)?,
@@ -279,6 +534,7 @@ fn expand_file(
     include_stack: &mut BTreeSet<String>,
     resolved_paths: &mut BTreeSet<String>,
     defines: &mut BTreeMap<String, String>,
+    active_protected_defines: &mut BTreeSet<String>,
     external_defines_after_version: Option<&str>,
     out: &mut String,
 ) -> GalResult<()> {
@@ -299,6 +555,7 @@ fn expand_file(
         include_stack,
         resolved_paths,
         defines,
+        active_protected_defines,
         external_defines_after_version,
         out,
     );
@@ -313,6 +570,7 @@ fn expand_contents(
     include_stack: &mut BTreeSet<String>,
     resolved_paths: &mut BTreeSet<String>,
     defines: &mut BTreeMap<String, String>,
+    active_protected_defines: &mut BTreeSet<String>,
     external_defines_after_version: Option<&str>,
     out: &mut String,
 ) -> GalResult<()> {
@@ -425,6 +683,7 @@ fn expand_contents(
                         include_stack,
                         resolved_paths,
                         defines,
+                        active_protected_defines,
                         None,
                         out,
                     )?;
@@ -434,15 +693,19 @@ fn expand_contents(
             if let Some(rest) = directive.strip_prefix("define ") {
                 if active {
                     let (key, value) = parse_define(rest)?;
-                    defines.insert(key, value);
-                    out.push_str(raw);
-                    out.push('\n');
+                    if !active_protected_defines.contains(&key) {
+                        defines.insert(key, value);
+                        out.push_str(raw);
+                        out.push('\n');
+                    }
                 }
                 continue;
             }
             if let Some(name) = directive.strip_prefix("undef ") {
                 if active {
-                    defines.remove(strip_line_comment(name).trim());
+                    let name = strip_line_comment(name).trim();
+                    defines.remove(name);
+                    active_protected_defines.remove(name);
                     out.push_str(raw);
                     out.push('\n');
                 }
@@ -753,6 +1016,13 @@ pub(crate) fn complete_bundled_pack_source_for_test() -> ShaderPackSource {
             "IRIS_FEATURE_SSBO=1\n",
             "MC_OS_LINUX=1\n",
             "MC_MIPMAP_LEVEL=4\n",
+            "MC_RENDER_STAGE_SUN=4\n",
+            "MC_RENDER_STAGE_MOON=5\n",
+            "MC_RENDER_STAGE_TERRAIN_SOLID=8\n",
+            "MC_RENDER_STAGE_TERRAIN_CUTOUT_MIPPED=9\n",
+            "MC_RENDER_STAGE_TERRAIN_CUTOUT=10\n",
+            "MC_RENDER_STAGE_TERRAIN_TRANSLUCENT=15\n",
+            "MC_RENDER_STAGE_RAIN_SNOW=19\n",
         ),
     ));
     files.sort_by(|left, right| left.path.cmp(&right.path));
@@ -774,11 +1044,11 @@ mod tests {
         let stages = super::super::terrain_contract::TerrainSourceStages {
             vertex: super::super::terrain_contract::TerrainSourceStage {
                 path: "world0/gbuffers_terrain.vsh".to_string(),
-                defines: BTreeMap::new(),
+                defines: std::collections::BTreeMap::new(),
             },
             fragment: super::super::terrain_contract::TerrainSourceStage {
                 path: "world0/gbuffers_terrain.fsh".to_string(),
-                defines: BTreeMap::new(),
+                defines: std::collections::BTreeMap::new(),
             },
         };
         let artifacts = preprocess_terrain_sources(&source, &stages).unwrap();
@@ -936,6 +1206,193 @@ mod tests {
     }
 
     #[test]
+    fn caller_semantic_define_must_agree_with_runtime_option_snapshot() {
+        let source = source(vec![
+            ShaderSourceFile::new("program.glsl", "#if DH_BLOCK_AIR == 14\nselected\n#endif"),
+            ShaderSourceFile::new(
+                super::super::source::RUNTIME_OPTIONS_PATH,
+                "DH_BLOCK_AIR=14\n",
+            ),
+        ]);
+
+        let agreed = preprocess_artifact_with_runtime_options(
+            &source,
+            "program.glsl",
+            &[("DH_BLOCK_AIR", "14")],
+        )
+        .expect("matching engine and runtime semantic defines must deduplicate");
+        assert!(agreed.expanded_source().contains("selected"));
+        assert_eq!(
+            Some("14"),
+            agreed
+                .defines()
+                .iter()
+                .find_map(|(key, value)| (key == "DH_BLOCK_AIR").then_some(value.as_str()))
+        );
+
+        let error = preprocess_artifact_with_runtime_options(
+            &source,
+            "program.glsl",
+            &[("DH_BLOCK_AIR", "99")],
+        )
+        .expect_err("a mismatched engine semantic define must remain a hard rejection");
+        assert!(error.to_string().contains("DH_BLOCK_AIR=99"));
+        assert!(error.to_string().contains("'14'"));
+    }
+
+    #[test]
+    fn runtime_constant_snapshot_rewrites_only_matching_const_declarations() {
+        let source = source(vec![
+            ShaderSourceFile::new(
+                "program.glsl",
+                "#version 450\nconst float shadowDistance = 192.0; // selected\nfloat useValue() { return shadowDistance; }",
+            ),
+            ShaderSourceFile::new(
+                super::super::source::RUNTIME_CONSTANTS_PATH,
+                "shadowDistance=320.0\n",
+            ),
+        ]);
+
+        let artifact =
+            preprocess_artifact_with_runtime_options(&source, "program.glsl", &[]).unwrap();
+        assert!(artifact
+            .expanded_source()
+            .contains("const float shadowDistance = 320.0; // selected"));
+        assert!(!artifact
+            .expanded_source()
+            .contains("#define shadowDistance"));
+        assert!(artifact
+            .expanded_source()
+            .contains("return shadowDistance;"));
+    }
+
+    #[test]
+    fn runtime_snapshots_cannot_select_a_shader_stage() {
+        let option_source = source(vec![
+            ShaderSourceFile::new("program.glsl", "#version 450\nvoid main() {}"),
+            ShaderSourceFile::new(
+                super::super::source::RUNTIME_OPTIONS_PATH,
+                "FRAGMENT_SHADER=1\n",
+            ),
+        ]);
+        assert!(preprocess_artifact_with_runtime_options(&option_source, "program.glsl", &[])
+            .unwrap_err()
+            .to_string()
+            .contains("runtime option snapshot must not define shader stage selector 'FRAGMENT_SHADER'"));
+
+        let environment_source = source(vec![
+            ShaderSourceFile::new("program.glsl", "#version 450\nvoid main() {}"),
+            ShaderSourceFile::new(
+                super::super::source::RUNTIME_ENVIRONMENT_PATH,
+                "VERTEX_SHADER=1\n",
+            ),
+        ]);
+        assert!(preprocess_artifact_with_runtime_options(
+            &environment_source,
+            "program.glsl",
+            &[]
+        )
+        .unwrap_err()
+        .to_string()
+        .contains("runtime environment snapshot must not define shader stage selector 'VERTEX_SHADER'"));
+    }
+
+    #[test]
+    fn runtime_option_snapshot_owns_its_selected_value() {
+        let source = source(vec![
+            ShaderSourceFile::new(
+                "program.glsl",
+                "#include \"common.glsl\"\n#ifdef CUSTOM_PBR\nunsupported\n#endif",
+            ),
+            ShaderSourceFile::new(
+                "common.glsl",
+                "#define RP_MODE 1\n#if RP_MODE >= 2\n#define CUSTOM_PBR\n#endif",
+            ),
+            ShaderSourceFile::new(super::super::source::RUNTIME_OPTIONS_PATH, "RP_MODE=0\n"),
+        ]);
+
+        let artifact =
+            preprocess_artifact_with_runtime_options(&source, "program.glsl", &[]).unwrap();
+        assert_eq!(
+            Some("0"),
+            artifact
+                .defines()
+                .iter()
+                .find_map(|(key, value)| (key == "RP_MODE").then_some(value.as_str()))
+        );
+        assert!(!artifact.expanded_source().contains("unsupported"));
+        assert!(!artifact
+            .defines()
+            .iter()
+            .any(|(key, _)| key == "CUSTOM_PBR"));
+        assert_eq!(
+            1,
+            artifact
+                .expanded_source()
+                .matches("#define RP_MODE 0")
+                .count(),
+            "the selected runtime value must be emitted once rather than allowing the pack default to redefine it"
+        );
+    }
+
+    #[test]
+    fn runtime_option_fallback_is_emitted_for_a_stage_without_its_declaration() {
+        let source = source(vec![
+            ShaderSourceFile::new(
+                "program/dh_terrain.glsl",
+                "#version 450\n#if SHADOW_QUALITY >= 2\nconst int selected = 1;\n#endif\nvoid main() {}",
+            ),
+            ShaderSourceFile::new(
+                "lib/common.glsl",
+                "#define SHADOW_QUALITY 0\n",
+            ),
+            ShaderSourceFile::new(
+                super::super::source::RUNTIME_OPTIONS_PATH,
+                "SHADOW_QUALITY=2\n",
+            ),
+        ]);
+
+        let artifact =
+            preprocess_artifact_with_runtime_options(&source, "program/dh_terrain.glsl", &[])
+                .unwrap();
+        let version = artifact.expanded_source().find("#version 450").unwrap();
+        let fallback = artifact
+            .expanded_source()
+            .find("#define SHADOW_QUALITY 2")
+            .unwrap();
+        assert!(version < fallback);
+        assert!(artifact
+            .expanded_source()
+            .contains("const int selected = 1;"));
+    }
+
+    #[test]
+    fn source_conditional_can_undefine_a_configured_option() {
+        let source = source(vec![
+            ShaderSourceFile::new(
+                "program.glsl",
+                "#ifdef NETHER\n#undef ATMOSPHERIC_FOG\n#endif\n#ifdef ATMOSPHERIC_FOG\nselected\n#endif",
+            ),
+            ShaderSourceFile::new(
+                super::super::source::RUNTIME_OPTIONS_PATH,
+                "ATMOSPHERIC_FOG=1\n",
+            ),
+            ShaderSourceFile::new(
+                super::super::source::RUNTIME_ENVIRONMENT_PATH,
+                "NETHER=1\n",
+            ),
+        ]);
+
+        let artifact =
+            preprocess_artifact_with_runtime_options(&source, "program.glsl", &[]).unwrap();
+        assert!(!artifact.expanded_source().contains("selected"));
+        assert!(!artifact
+            .defines()
+            .iter()
+            .any(|(key, _)| key == "ATMOSPHERIC_FOG"));
+    }
+
+    #[test]
     fn paired_terrain_sources_expand_both_stage_definitions_from_one_generation() {
         let source = source(vec![
             ShaderSourceFile::new(
@@ -967,6 +1424,41 @@ mod tests {
         assert_eq!("program/gbuffers_terrain.glsl", summary.fragment_entry);
         assert_ne!(0, summary.vertex_fingerprint);
         assert_ne!(0, summary.fragment_fingerprint);
+    }
+
+    #[test]
+    fn distant_horizons_fullscreen_consumers_use_the_dh_source_mode() {
+        let source = source(vec![ShaderSourceFile::new(
+            "program/deferred1.glsl",
+            "#ifdef VERTEX_SHADER\nvertex\n#endif\n#ifdef FRAGMENT_SHADER\n#ifdef DISTANT_HORIZONS\ndh-depth-consumer\n#else\nsky-path\n#endif\n#endif",
+        )]);
+        let stages = super::super::terrain_contract::TerrainSourceStages {
+            vertex: super::super::terrain_contract::TerrainSourceStage {
+                path: "program/deferred1.glsl".to_string(),
+                defines: BTreeMap::from([("VERTEX_SHADER".to_string(), "1".to_string())]),
+            },
+            fragment: super::super::terrain_contract::TerrainSourceStage {
+                path: "program/deferred1.glsl".to_string(),
+                defines: BTreeMap::from([("FRAGMENT_SHADER".to_string(), "1".to_string())]),
+            },
+        };
+        let ordinary = preprocess_source_stage_pair(&source, &stages).unwrap();
+        let distant = preprocess_distant_horizons_fullscreen_stage_pair(&source, &stages).unwrap();
+        assert!(ordinary.fragment.expanded_source().contains("sky-path"));
+        assert!(!ordinary
+            .fragment
+            .expanded_source()
+            .contains("dh-depth-consumer"));
+        assert!(distant
+            .fragment
+            .expanded_source()
+            .contains("dh-depth-consumer"));
+        assert!(!distant.fragment.expanded_source().contains("sky-path"));
+        assert!(distant
+            .fragment
+            .defines()
+            .iter()
+            .any(|(name, value)| name == "DISTANT_HORIZONS" && value == "1"));
     }
 
     #[test]
@@ -1132,6 +1624,39 @@ mod tests {
             defines: &[],
         })
         .is_err());
+    }
+
+    #[test]
+    fn distant_horizons_preprocessing_injects_owned_material_semantics() {
+        let source = source(vec![
+            ShaderSourceFile::new(
+                "dh_terrain.vsh",
+                "#version 130\n#if DH_BLOCK_SAND == 9\nvertex_selected\n#endif",
+            ),
+            ShaderSourceFile::new(
+                "dh_terrain.fsh",
+                "#version 130\n#if DH_BLOCK_LEAVES == 1 && DH_BLOCK_LAVA == 6\nfragment_selected\n#endif",
+            ),
+        ]);
+        let stages = TerrainSourceStages {
+            vertex: super::super::terrain_contract::TerrainSourceStage {
+                path: "dh_terrain.vsh".to_string(),
+                defines: BTreeMap::new(),
+            },
+            fragment: super::super::terrain_contract::TerrainSourceStage {
+                path: "dh_terrain.fsh".to_string(),
+                defines: BTreeMap::new(),
+            },
+        };
+        let artifacts = preprocess_distant_horizons_sources(&source, &stages).unwrap();
+        assert!(artifacts
+            .vertex
+            .expanded_source()
+            .contains("vertex_selected"));
+        assert!(artifacts
+            .fragment
+            .expanded_source()
+            .contains("fragment_selected"));
     }
 
     #[test]

@@ -82,6 +82,43 @@ public class BeaconRenderer<T extends BlockEntity & BeaconBeamOwner> implements 
 			// TODO: This isn't necessary on most shaderpacks if we support blockEntityId
 			return;
 		}
+		// End-gateway beams use a separate texture and remain Java-owned until
+		// that material is explicitly admitted. Route selection happens before
+		// either producer submits custom geometry.
+		net.vulkanic.world.WorldRenderRoutePolicy.Route rustRoute = BEAM_LOCATION.equals(resourceLocation)
+			? net.vulkanic.world.WorldRenderRoutePolicy.currentBeaconBeamRoute()
+			: net.vulkanic.world.WorldRenderRoutePolicy.Route.JAVA_COMPATIBILITY;
+		if (rustRoute.usesRustWholeFrameVulkan() && !submitNodeCollector.isSemanticCoverageOnly()) {
+			int endY = i + j;
+			float scrollTime = j < 0 ? g : -g;
+			float scroll = Mth.frac(scrollTime * 0.2F - Mth.floor(scrollTime * 0.1F));
+			poseStack.pushPose();
+			poseStack.translate(0.5, 0.0, 0.5);
+			poseStack.pushPose();
+			poseStack.mulPose(Axis.YP.rotationDegrees(g * 2.25F - 45.0F));
+			org.joml.Matrix4f solidTransform = new org.joml.Matrix4f(poseStack.last().pose());
+			poseStack.popPose();
+			org.joml.Matrix4f glowTransform = new org.joml.Matrix4f(poseStack.last().pose());
+			poseStack.popPose();
+			if (!net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueBeaconBeam(
+				resourceLocation,
+				solidTransform,
+				glowTransform,
+				scroll,
+				f,
+				i,
+				endY,
+				k,
+				h,
+				l
+			)) {
+				throw new IllegalStateException("Rust Vulkan beacon-beam route selected without a queued semantic request");
+			}
+			return;
+		}
+		if (rustRoute == net.vulkanic.world.WorldRenderRoutePolicy.Route.DISABLED) {
+			return;
+		}
 		
 		final int iFinal = i;
 		final int jFinal = j;

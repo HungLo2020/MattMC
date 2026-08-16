@@ -168,6 +168,65 @@ public class FogRenderer implements AutoCloseable, FogStorage {
 	}
 
 	public Vector4f setupFog(Camera camera, int i, boolean bl, DeltaTracker deltaTracker, float f, ClientLevel clientLevel) {
+		FogComputation fog = this.computeFogParameters(camera, i, bl, deltaTracker, f, clientLevel);
+		FogParameters fogParameters = fog.parameters();
+		Vector4f vector4f = new Vector4f(
+			fogParameters.red(), fogParameters.green(), fogParameters.blue(), fogParameters.alpha()
+		);
+
+		try (GpuBuffer.MappedView mappedView = net.vulkanic.VulkanicAPI.createCommandEncoder().mapBuffer(this.regularBuffer.currentBuffer(), false, true)) {
+			this.updateBuffer(
+				mappedView.data(),
+				0,
+				vector4f,
+				fogParameters.environmentalStart(),
+				fogParameters.environmentalEnd(),
+				fogParameters.renderStart(),
+				fogParameters.renderEnd(),
+				fog.skyEnd(),
+				fog.cloudEnd()
+			);
+		}
+
+		if (TRACE_FOG_STATE) {
+			LOGGER.info(
+				"FogStateTrace backend={} renderer={} fogType={} dhCancel={} cameraNotInFluid={} specialFog={} wrapperSpecial={} enableVanillaFog={} color=({},{},{},{}) envStart={} envEnd={} renderStart={} renderEnd={} skyEnd={} cloudEnd={}",
+				VulkanicAPI.getActiveBackendType().name().toLowerCase(java.util.Locale.ROOT),
+				Integer.toHexString(System.identityHashCode(this)),
+				fog.fogType(),
+				fog.dhFogCancelState().cancelFog(),
+				fog.dhFogCancelState().cameraNotInFluid(),
+				fog.dhFogCancelState().specialFog(),
+				fog.dhFogCancelState().wrapperSpecialFog(),
+				fog.dhFogCancelState().enableVanillaFog(),
+				vector4f.x,
+				vector4f.y,
+				vector4f.z,
+				vector4f.w,
+				fogParameters.environmentalStart(),
+				fogParameters.environmentalEnd(),
+				fogParameters.renderStart(),
+				fogParameters.renderEnd(),
+				fog.skyEnd(),
+				fog.cloudEnd()
+			);
+		}
+
+		// Iris: Capture fog color for the legacy Java render path only.
+		net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setFogColor(vector4f.x, vector4f.y, vector4f.z);
+		return vector4f;
+	}
+
+	/**
+	 * Computes and publishes the vanilla/Sodium fog record without encoding a
+	 * Java GPU command. Rust-owned whole-frame extraction consumes this copied
+	 * gameplay semantic after camera setup and before it builds its frame.
+	 */
+	public FogParameters collectFogParameters(Camera camera, int i, boolean bl, DeltaTracker deltaTracker, float f, ClientLevel clientLevel) {
+		return this.computeFogParameters(camera, i, bl, deltaTracker, f, clientLevel).parameters();
+	}
+
+	private FogComputation computeFogParameters(Camera camera, int i, boolean bl, DeltaTracker deltaTracker, float f, ClientLevel clientLevel) {
 		// Iris: Setup legacy water fog density
 		if (camera.getFluidInCamera() == net.minecraft.world.level.material.FogType.WATER) {
 			net.minecraft.world.entity.Entity entity2 = camera.getEntity();
@@ -223,50 +282,12 @@ public class FogRenderer implements AutoCloseable, FogStorage {
 			hook.onFogParametersCalculated(camera, i, bl, deltaTracker, f, clientLevel, fogData, vector4f);
 		}
 
-		try (GpuBuffer.MappedView mappedView = net.vulkanic.VulkanicAPI.createCommandEncoder().mapBuffer(this.regularBuffer.currentBuffer(), false, true)) {
-			this.updateBuffer(
-				mappedView.data(),
-				0,
-				vector4f,
-				fogData.environmentalStart,
-				fogData.environmentalEnd,
-				fogData.renderDistanceStart,
-				fogData.renderDistanceEnd,
-				fogData.skyEnd,
-				fogData.cloudEnd
-			);
-			// Sodium: Store fog parameters (from FogRendererMixin)
-			parameters = new FogParameters(vector4f.x, vector4f.y, vector4f.z, vector4f.w, fogData.environmentalStart, fogData.environmentalEnd, fogData.renderDistanceStart, fogData.renderDistanceEnd);
-		}
-
-		if (TRACE_FOG_STATE) {
-			LOGGER.info(
-				"FogStateTrace backend={} renderer={} fogType={} dhCancel={} cameraNotInFluid={} specialFog={} wrapperSpecial={} enableVanillaFog={} color=({},{},{},{}) envStart={} envEnd={} renderStart={} renderEnd={} skyEnd={} cloudEnd={}",
-				VulkanicAPI.getActiveBackendType().name().toLowerCase(java.util.Locale.ROOT),
-				Integer.toHexString(System.identityHashCode(this)),
-				fogType,
-				dhFogCancelState.cancelFog(),
-				dhFogCancelState.cameraNotInFluid(),
-				dhFogCancelState.specialFog(),
-				dhFogCancelState.wrapperSpecialFog(),
-				dhFogCancelState.enableVanillaFog(),
-				vector4f.x,
-				vector4f.y,
-				vector4f.z,
-				vector4f.w,
-				fogData.environmentalStart,
-				fogData.environmentalEnd,
-				fogData.renderDistanceStart,
-				fogData.renderDistanceEnd,
-				fogData.skyEnd,
-				fogData.cloudEnd
-			);
-		}
-		
-		// Iris: Capture fog color
-		net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setFogColor(vector4f.x, vector4f.y, vector4f.z);
-
-		return vector4f;
+		parameters = new FogParameters(
+			vector4f.x, vector4f.y, vector4f.z, vector4f.w,
+			fogData.environmentalStart, fogData.environmentalEnd,
+			fogData.renderDistanceStart, fogData.renderDistanceEnd
+		);
+		return new FogComputation(parameters, fogType, dhFogCancelState, fogData.skyEnd, fogData.cloudEnd);
 	}
 
 	private FogType getFogType(Camera camera, boolean bl) {
@@ -305,6 +326,15 @@ public class FogRenderer implements AutoCloseable, FogStorage {
 		boolean specialFog,
 		boolean wrapperSpecialFog,
 		boolean enableVanillaFog
+	) {
+	}
+
+	private record FogComputation(
+		FogParameters parameters,
+		FogType fogType,
+		DhFogCancelState dhFogCancelState,
+		float skyEnd,
+		float cloudEnd
 	) {
 	}
 	

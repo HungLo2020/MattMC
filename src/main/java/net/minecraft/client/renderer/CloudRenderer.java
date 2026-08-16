@@ -47,6 +47,11 @@ public class CloudRenderer extends SimplePreparableReloadListener<Optional<Cloud
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private static final ResourceLocation TEXTURE_LOCATION = ResourceLocation.withDefaultNamespace("textures/environment/clouds.png");
 	private static final float BLOCKS_PER_SECOND = 0.6F;
+	/** Capture-only cap for bounded Rust cloud-route validation. Zero preserves vanilla range. */
+	private static final int RUST_ROUTE_RADIUS_LIMIT = Math.max(
+		0,
+		Math.min(32, Integer.getInteger("mattmc.dev.rustGalClouds.radiusLimit", 0))
+	);
 	private static final long EMPTY_CELL = 0L;
 	private static final int COLOR_OFFSET = 4;
 	private static final int NORTH_OFFSET = 3;
@@ -237,6 +242,52 @@ public class CloudRenderer extends SimplePreparableReloadListener<Optional<Cloud
 				}
 			}
 		}
+	}
+
+	/**
+	 * Copies ordinary vanilla cloud-cell semantics for the Rust whole-frame
+	 * route. This is deliberately separate from {@link #render}: no Java buffer,
+	 * pipeline, texture, or callback crosses the semantic boundary.
+	 */
+	public void enqueueRustGalClouds(int cloudColorArgb, CloudStatus cloudStatus, float cloudHeight, Vec3 cameraPos, float partialTick) {
+		if (!net.vulkanic.world.WorldRenderRoutePolicy.currentCloudRoute().usesRustWholeFrameVulkan()
+			|| this.texture == null || cloudStatus == CloudStatus.OFF || cameraPos == null) {
+			return;
+		}
+		int distance = Math.min(Minecraft.getInstance().options.cloudRange().get(), MAX_RADIUS_CHUNKS) * 16;
+		int radius = Mth.ceil(distance / CELL_SIZE_IN_BLOCKS);
+		if (RUST_ROUTE_RADIUS_LIMIT > 0) {
+			radius = Math.min(radius, RUST_ROUTE_RADIUS_LIMIT);
+		}
+		float verticalOffset = cloudHeight - (float)cameraPos.y;
+		float relation = verticalOffset + 4.0F;
+		RelativeCameraPos cameraRelation = relation < 0.0F
+			? RelativeCameraPos.ABOVE_CLOUDS
+			: verticalOffset > 0.0F ? RelativeCameraPos.BELOW_CLOUDS : RelativeCameraPos.INSIDE_CLOUDS;
+		double scrollX = cameraPos.x + partialTick * BLOCKS_PER_SECOND;
+		double scrollZ = cameraPos.z + 3.96F;
+		double repeatX = this.texture.width * CELL_SIZE_IN_BLOCKS;
+		double repeatZ = this.texture.height * CELL_SIZE_IN_BLOCKS;
+		scrollX -= Mth.floor(scrollX / repeatX) * repeatX;
+		scrollZ -= Mth.floor(scrollZ / repeatZ) * repeatZ;
+		int cellX = Mth.floor(scrollX / CELL_SIZE_IN_BLOCKS);
+		int cellZ = Mth.floor(scrollZ / CELL_SIZE_IN_BLOCKS);
+		float offsetX = (float)(scrollX - cellX * CELL_SIZE_IN_BLOCKS);
+		float offsetZ = (float)(scrollZ - cellZ * CELL_SIZE_IN_BLOCKS);
+		net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueWorldCloudFaces(
+			this.texture.cells(),
+			this.texture.width(),
+			this.texture.height(),
+			cloudColorArgb,
+			cloudStatus == CloudStatus.FANCY,
+			cameraRelation.ordinal(),
+			cellX,
+			cellZ,
+			offsetX,
+			verticalOffset,
+			offsetZ,
+			radius
+		);
 	}
 
 	private void buildMesh(CloudRenderer.RelativeCameraPos relativeCameraPos, ByteBuffer byteBuffer, int i, int j, boolean bl, int k) {

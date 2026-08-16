@@ -121,7 +121,7 @@ public class ShulkerBoxRenderer implements BlockEntityRenderer<ShulkerBoxBlockEn
 	}
 
 	@Environment(EnvType.CLIENT)
-	static class ShulkerBoxModel extends Model<Float> {
+	public static class ShulkerBoxModel extends Model<Float> {
 		private final ModelPart lid;
 
 		public ShulkerBoxModel(ModelPart modelPart) {
