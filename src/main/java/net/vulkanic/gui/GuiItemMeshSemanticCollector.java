@@ -12,8 +12,11 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.ARGB;
 import net.minecraft.util.Mth;
 import net.minecraft.world.phys.AABB;
+import net.sodium.api.math.MatrixHelper;
+import net.sodium.client.render.immediate.model.BakedModelEncoder;
 import net.sodium.client.model.quad.BakedQuadView;
 import net.blaze3d.vertex.PoseStack;
+import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 
 /**
@@ -99,12 +102,12 @@ public final class GuiItemMeshSemanticCollector {
 		if (mode == null) return "render-type";
 
 		List<GuiItemMeshQuad> quads = new ArrayList<>(layer.quads().size());
+		Matrix4f combined = new Matrix4f().set(standard3dTransform).mul(new Matrix4f().set(layer.modelTransform()));
 		for (BakedQuad quad : layer.quads()) {
-			GuiItemMeshQuad copied = copyQuad(quad, layer.tintLayers());
+			GuiItemMeshQuad copied = copyQuad(quad, layer.tintLayers(), combined);
 			if (copied == null) return "unsupported-quad";
 			quads.add(copied);
 		}
-		Matrix4f combined = new Matrix4f().set(standard3dTransform).mul(new Matrix4f().set(layer.modelTransform()));
 		float[] modelTransform = new float[16];
 		combined.get(modelTransform);
 		output.add(new GuiItemMeshLayer(mode, layer.usesBlockLight(), modelTransform, quads));
@@ -117,7 +120,7 @@ public final class GuiItemMeshSemanticCollector {
 		return name.contains("item") || name.contains("solid") ? MaterialMode.OPAQUE : null;
 	}
 
-	private static GuiItemMeshQuad copyQuad(BakedQuad bakedQuad, int[] tintLayers) {
+	private static GuiItemMeshQuad copyQuad(BakedQuad bakedQuad, int[] tintLayers, Matrix4f modelTransform) {
 		if (!(bakedQuad instanceof BakedQuadView quad)) return null;
 		TextureAtlasSprite sprite = quad.getSprite();
 		ResourceLocation spriteIdentity = sprite == null ? null : sprite.contents().name();
@@ -148,13 +151,26 @@ public final class GuiItemMeshSemanticCollector {
 			atlasUvs[uv + 1] = v;
 			localUvs[uv] = localU(sprite, u);
 			localUvs[uv + 1] = localV(sprite, v);
-			colors[index] = shadedColor(quad.getColor(index), tint);
-			normals[index] = quad.getAccurateNormal(index);
+			// Keep this aligned with ItemRenderer's Sodium fast path. Fabric's
+			// current item path does not multiply the baked per-vertex color, so
+			// applying it here would add face shading that Java never renders.
+			colors[index] = standard3dVertexColor(
+				quad.getColor(index), tint, BakedModelEncoder.shouldMultiplyAlpha()
+			);
+			// Match the normal matrix used by the Java item encoder before this
+			// semantic record crosses FFI. Position transforms remain explicit in
+			// the mesh request; normals are already in the item-lighting space.
+			normals[index] = transformGuiNormal(modelTransform, quad.getAccurateNormal(index));
 		}
 		return new GuiItemMeshQuad(
 			assetId, spriteIdentity.toString(), positions, atlasUvs, localUvs, colors, normals,
 			quad.getLightFace().get3DDataValue(), quad.hasShade()
 		);
+	}
+
+	static int transformGuiNormal(Matrix4f modelTransform, int packedNormal) {
+		Matrix3f normalTransform = new Matrix3f(modelTransform).invert().transpose();
+		return MatrixHelper.transformNormal(normalTransform, false, packedNormal);
 	}
 
 	private static float localU(TextureAtlasSprite sprite, float atlasU) {
@@ -171,6 +187,13 @@ public final class GuiItemMeshSemanticCollector {
 		if (!quad.isTinted() || tintLayers.length == 0 || quad.tintIndex() < 0 || quad.tintIndex() >= tintLayers.length) return 0xffffffff;
 		int tint = tintLayers[quad.tintIndex()];
 		return tint == -1 ? 0xffffffff : tint;
+	}
+
+	static int standard3dVertexColor(int bakedColor, int tint, boolean multiplyBakedVertexColor) {
+		if (!multiplyBakedVertexColor) {
+			return tint;
+		}
+		return shadedColor(bakedColor, tint);
 	}
 
 	private static int shadedColor(int bakedColor, int tint) {
@@ -262,7 +285,7 @@ public final class GuiItemMeshSemanticCollector {
 			colorsArgb = colorsArgb.clone();
 			packedNormals = packedNormals.clone();
 			if (colorsArgb.length != 4 || packedNormals.length != 4) {
-				throw new IllegalArgumentException("GUI item mesh quad requires four colors and normals");
+				throw new IllegalArgumentException("GUI item mesh quad requires four colors and item-lighting-space normals");
 			}
 		}
 

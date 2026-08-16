@@ -228,8 +228,9 @@ pub enum GuiMeshLightingMode {
     Block,
 }
 
-/// One copied model vertex. `normal_packed` retains the producer's semantic
-/// normal encoding; only the eventual Rust GUI mesh shader decodes it.
+/// One copied model vertex. `normal_packed` is a Java-resolved normal in the
+/// item-lighting space, packed with the stable vanilla signed-i8 encoding.
+/// Rust owns decoding and drawing, but must not apply a second model transform.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct GuiMeshVertex {
     pub position: [f32; 3],
@@ -651,22 +652,7 @@ fn transformed_front_face(
     vertices: &[GuiMeshPreparedVertex],
     indices: &[u32],
 ) -> GalResult<super::resources::FrontFace> {
-    let a = matrix[0];
-    let b = matrix[4];
-    let c = matrix[8];
-    let d = matrix[1];
-    let e = matrix[5];
-    let f = matrix[9];
-    let g = matrix[2];
-    let h = matrix[6];
-    let i = matrix[10];
-    let determinant = a * (e * i - f * h) - b * (d * i - f * g) + c * (d * h - e * g);
-    if !determinant.is_finite() || determinant.abs() <= f32::EPSILON {
-        return Err(GalError::ffi(
-            StatusCode::InvalidArgument,
-            "GUI mesh model transform has no usable winding determinant",
-        ));
-    }
+    let determinant = model_transform_determinant(matrix)?;
     // The mesh vertex stage maps GUI pixels to top-left-origin clip space,
     // which contributes one final Y reflection. This must be included with
     // the copied model basis when deciding the front face. Vanilla's
@@ -707,6 +693,26 @@ fn transformed_front_face(
         front_face = flip_front_face(front_face);
     }
     Ok(front_face)
+}
+
+fn model_transform_determinant(matrix: [f32; 16]) -> GalResult<f32> {
+    let a = matrix[0];
+    let b = matrix[4];
+    let c = matrix[8];
+    let d = matrix[1];
+    let e = matrix[5];
+    let f = matrix[9];
+    let g = matrix[2];
+    let h = matrix[6];
+    let i = matrix[10];
+    let determinant = a * (e * i - f * h) - b * (d * i - f * g) + c * (d * h - e * g);
+    if !determinant.is_finite() || determinant.abs() <= f32::EPSILON {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            "GUI mesh model transform has no usable winding determinant",
+        ));
+    }
+    Ok(determinant)
 }
 
 fn first_triangle_indices(indices: &[u32], vertex_count: usize) -> GalResult<[usize; 3]> {
@@ -1479,10 +1485,7 @@ fn prepare_draw(batch: &GuiMeshBatchRequest) -> GalResult<GuiMeshPreparedDraw> {
         .iter()
         .map(|vertex| {
             let position = transform_point(batch.model_transform, vertex.position)?;
-            let normal = transform_normal(
-                batch.model_transform,
-                unpack_normal_i8(vertex.normal_packed),
-            )?;
+            let normal = normalize_semantic_normal(unpack_normal_i8(vertex.normal_packed))?;
             Ok(GuiMeshPreparedVertex {
                 position,
                 local_uv: vertex.local_uv,
@@ -1491,13 +1494,14 @@ fn prepare_draw(batch: &GuiMeshBatchRequest) -> GalResult<GuiMeshPreparedDraw> {
             })
         })
         .collect::<GalResult<Vec<_>>>()?;
+    let front_face = transformed_front_face(batch.model_transform, &vertices, &batch.indices)?;
     Ok(GuiMeshPreparedDraw {
         stratum: batch.stratum,
         layer_index: batch.layer_index,
         sequence: batch.sequence,
         asset_id: batch.asset_id,
         material_mode: batch.material_mode,
-        front_face: transformed_front_face(batch.model_transform, &vertices, &batch.indices)?,
+        front_face,
         lighting_mode: batch.lighting_mode,
         alpha_cutoff: batch.alpha_cutoff,
         gui_pose: batch.gui_pose,
@@ -1548,46 +1552,19 @@ fn transform_point(matrix: [f32; 16], position: [f32; 3]) -> GalResult<[f32; 3]>
     }
 }
 
-fn transform_normal(matrix: [f32; 16], normal: [f32; 3]) -> GalResult<[f32; 3]> {
-    let a = matrix[0];
-    let b = matrix[4];
-    let c = matrix[8];
-    let d = matrix[1];
-    let e = matrix[5];
-    let f = matrix[9];
-    let g = matrix[2];
-    let h = matrix[6];
-    let i = matrix[10];
-    let determinant = a * (e * i - f * h) - b * (d * i - f * g) + c * (d * h - e * g);
-    if !determinant.is_finite() || determinant.abs() <= f32::EPSILON {
-        return Err(GalError::ffi(
-            StatusCode::InvalidArgument,
-            "GUI mesh model transform has no usable normal matrix",
-        ));
-    }
-    let inverse_determinant = determinant.recip();
-    // Inverse-transpose of the copied model-space basis. This keeps baked
-    // normals correct for vanilla item transforms with non-uniform scaling.
-    let transformed = [
-        ((e * i - f * h) * normal[0] + (f * g - d * i) * normal[1] + (d * h - e * g) * normal[2])
-            * inverse_determinant,
-        ((c * h - b * i) * normal[0] + (a * i - c * g) * normal[1] + (b * g - a * h) * normal[2])
-            * inverse_determinant,
-        ((b * f - c * e) * normal[0] + (c * d - a * f) * normal[1] + (a * e - b * d) * normal[2])
-            * inverse_determinant,
-    ];
-    let length_squared = transformed.iter().map(|value| value * value).sum::<f32>();
+fn normalize_semantic_normal(normal: [f32; 3]) -> GalResult<[f32; 3]> {
+    let length_squared = normal.iter().map(|value| value * value).sum::<f32>();
     if !length_squared.is_finite() || length_squared <= f32::EPSILON {
         return Err(GalError::ffi(
             StatusCode::InvalidArgument,
-            "GUI mesh model transform produced a degenerate normal",
+            "GUI mesh contains a degenerate item-lighting-space normal",
         ));
     }
     let inverse_length = length_squared.sqrt().recip();
     Ok([
-        transformed[0] * inverse_length,
-        transformed[1] * inverse_length,
-        transformed[2] * inverse_length,
+        normal[0] * inverse_length,
+        normal[1] * inverse_length,
+        normal[2] * inverse_length,
     ])
 }
 
@@ -1993,6 +1970,53 @@ mod tests {
             super::super::resources::FrontFace::CounterClockwise
         );
         assert_eq!(gui_mesh_raster_state(draw.material_mode).0, CullMode::Back);
+    }
+
+    #[test]
+    fn reflected_gui_item_pose_keeps_posestack_lighting_normals() {
+        let mut reflected = batch();
+        reflected.model_transform[5] = -1.0;
+
+        let draw = prepare_draws(&[reflected])
+            .expect("reflected vanilla GUI item transform remains valid")
+            .pop()
+            .unwrap();
+
+        assert_eq!(
+            draw.front_face,
+            super::super::resources::FrontFace::CounterClockwise,
+            "culling remains derived before the lighting orientation correction"
+        );
+        assert_eq!(
+            [0.0, 0.0, 1.0],
+            draw.vertices[0].normal,
+            "the GUI clip-space reflection changes raster winding only; vanilla lighting uses the PoseStack normal matrix"
+        );
+    }
+
+    #[test]
+    fn semantic_item_normals_are_not_transformed_twice() {
+        // Java has already applied PoseStack's item normal matrix before the
+        // record crosses FFI. The position transform remains necessary for
+        // raster placement, but it must not reorient this semantic normal.
+        let matrix = [
+            1.0, 0.0, 0.0, 0.0, // column 0
+            0.0, 0.0, 1.0, 0.0, // column 1
+            0.0, -1.0, 0.0, 0.0, // column 2
+            0.0, 0.0, 0.0, 1.0, // translation
+        ];
+        let mut request = batch();
+        for vertex in &mut request.vertices {
+            // The Java PoseStack normal matrix has already rotated +Z to -Y.
+            vertex.normal_packed = 0x0000_8100;
+        }
+        request.model_transform = matrix;
+        assert_eq!(
+            [0.0, -1.0, 0.0],
+            normalize_semantic_normal([0.0, -1.0, 0.0]).expect("semantic normal")
+        );
+        let draw = prepare_draws(&[request]).expect("prepare semantic normal");
+        assert_eq!([0.0, -1.0, 0.0], draw[0].vertices[0].normal);
     }
 
     #[test]

@@ -4318,9 +4318,7 @@ fn world_lod_exact_atlas_segment_is_complete(
             "world LOD exact-atlas instance generation differs from its immutable asset",
         ));
     }
-    if !asset.segments.iter().any(|segment| {
-        segment.source_segment_index == instance.segment_index && segment.layer == instance.layer
-    }) {
+    if !world_lod_exact_atlas_has_packed_source_segment(asset, instance) {
         return Err(GalError::invalid_argument(
             "world LOD exact-atlas instance does not name a packed source segment",
         ));
@@ -4328,6 +4326,34 @@ fn world_lod_exact_atlas_segment_is_complete(
     Ok(!asset
         .unavailable_source_segments
         .contains(&instance.segment_index))
+}
+
+/// A copied DH source segment need not have a corresponding exact-atlas
+/// segment: it may contain only reduced-color material data or no resolvable
+/// atlas quads. Presence selects the private exact-atlas path; completeness
+/// is meaningful only after that selection.
+fn world_lod_exact_atlas_has_packed_source_segment(
+    asset: &lod::WorldLodTexturedGpuColumnAsset,
+    instance: &WorldLodColumnInstanceRequest,
+) -> bool {
+    asset.column_generation == instance.column_generation
+        && asset.segments.iter().any(|segment| {
+            segment.source_segment_index == instance.segment_index
+                && segment.layer == instance.layer
+        })
+}
+
+/// Returns `None` when the visible semantic source segment has no resolved
+/// exact-atlas payload and must therefore remain on the reduced-color path.
+/// A present segment is still validated strictly before it can be selected.
+fn world_lod_exact_atlas_segment_completeness(
+    asset: &lod::WorldLodTexturedGpuColumnAsset,
+    instance: &WorldLodColumnInstanceRequest,
+) -> GalResult<Option<bool>> {
+    if !world_lod_exact_atlas_has_packed_source_segment(asset, instance) {
+        return Ok(None);
+    }
+    world_lod_exact_atlas_segment_is_complete(asset, instance).map(Some)
 }
 
 impl WorldPrimitiveFrontend {
@@ -13184,12 +13210,8 @@ impl WorldPrimitiveFrontend {
                         "world LOD exact-atlas source instance {} has no matching immutable column asset",
                         instance.column_key
                     )))?;
-                let complete = world_lod_exact_atlas_segment_is_complete(asset, instance)?;
-                let has_exact_quads = asset.segments.iter().any(|segment| {
-                    segment.source_segment_index == instance.segment_index
-                        && segment.layer == instance.layer
-                });
-                if has_exact_quads {
+                if let Some(complete) = world_lod_exact_atlas_segment_completeness(asset, instance)?
+                {
                     exact_atlas_instances.push(*instance);
                     if !complete {
                         partial_exact_instances.push(*instance);
@@ -19137,16 +19159,11 @@ impl WorldPrimitiveFrontend {
                     "world LOD exact-atlas visible instance {} has no matching immutable column asset",
                     instance.column_key
                 )))?;
-            let complete = world_lod_exact_atlas_segment_is_complete(asset, instance)?;
-            let has_exact_quads = asset.segments.iter().any(|segment| {
-                segment.source_segment_index == instance.segment_index
-                    && segment.layer == instance.layer
-            });
-            if has_exact_quads {
+            if let Some(complete) = world_lod_exact_atlas_segment_completeness(asset, instance)? {
                 exact_atlas_instances.push(*instance);
-            }
-            if !complete && has_exact_quads {
-                partial_exact_instances.push(*instance);
+                if !complete {
+                    partial_exact_instances.push(*instance);
+                }
             }
         }
         self.lod_textured_gpu_residency.stage_visible_uploads(
@@ -40614,6 +40631,15 @@ mod tests {
             "a complete segment remains eligible for one exact-atlas replacement draw"
         );
         asset.segments.clear();
+        assert!(
+            !world_lod_exact_atlas_has_packed_source_segment(&asset, &instance),
+            "a source-only segment must remain on the reduced-color path rather than becoming an invalid exact-atlas draw"
+        );
+        assert_eq!(
+            None,
+            world_lod_exact_atlas_segment_completeness(&asset, &instance).unwrap(),
+            "source-only segments are a valid non-selection, not malformed exact-atlas work"
+        );
         assert!(world_lod_exact_atlas_segment_is_complete(&asset, &instance)
             .unwrap_err()
             .to_string()

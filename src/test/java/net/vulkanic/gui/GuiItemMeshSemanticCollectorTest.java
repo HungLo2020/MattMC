@@ -1,12 +1,33 @@
 package net.vulkanic.gui;
 
 import java.util.List;
+import net.blaze3d.vertex.PoseStack;
+import net.sodium.api.math.MatrixHelper;
 import org.junit.jupiter.api.Test;
+import org.joml.Matrix4f;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class GuiItemMeshSemanticCollectorTest {
+	@Test
+	void standard3dVertexColorFollowsTheActiveItemEncoderPolicy() {
+		int bakedVertexColor = 0xff4080c0;
+		int tint = 0xff80a040;
+
+		assertEquals(
+			tint,
+			GuiItemMeshSemanticCollector.standard3dVertexColor(bakedVertexColor, tint, false),
+			"the current Fabric item fast path deliberately ignores baked vertex color"
+		);
+		assertEquals(
+			0xff605010,
+			GuiItemMeshSemanticCollector.standard3dVertexColor(bakedVertexColor, tint, true),
+			"platforms that enable Java's baked-vertex multiplication retain it exactly once"
+		);
+	}
+
 	@Test
 	void copiedMeshSemanticsDoNotRetainMutableCallerArrays() {
 		float[] transform = identityMatrix();
@@ -69,6 +90,20 @@ class GuiItemMeshSemanticCollectorTest {
 		assertThrows(IllegalArgumentException.class, () -> new GuiItemMeshSemanticCollector.GuiItemMesh(
 			"minecraft:stone", 0, 0, 0, 0, 16, 16, new float[6], 2, 2, 1, identityMatrix(), List.of()
 		));
+	}
+
+	@Test
+	void copiedNormalsMatchTheJavaItemPoseNormalMatrix() {
+		Matrix4f transform = new Matrix4f().rotateX((float)(Math.PI / 2.0)).scale(1.0F, -1.0F, -1.0F);
+		PoseStack poseStack = new PoseStack();
+		poseStack.mulPose(transform);
+		int rawNormal = 0x007f0000;
+
+		assertEquals(
+			MatrixHelper.transformNormal(poseStack.last().normal(), poseStack.last().trustedNormals, rawNormal),
+			GuiItemMeshSemanticCollector.transformGuiNormal(transform, rawNormal),
+			"the copied normal must match Java's item encoder before Rust receives it"
+		);
 	}
 
 	private static float[] identityMatrix() {

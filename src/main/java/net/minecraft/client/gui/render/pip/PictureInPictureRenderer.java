@@ -183,6 +183,12 @@ public abstract class PictureInPictureRenderer<T extends PictureInPictureRenderS
 	}
 
 	private Path getAutoCaptureDir() {
+		String deterministicCaptureDir = System.getProperty("mattmc.dev.deterministicCameraCapture.screenshotDir", "");
+		if (!deterministicCaptureDir.isBlank()) {
+			// Retain the already-existing PIP debug target beside the verified
+			// game-window frames when deterministic capture explicitly enables it.
+			return Path.of(deterministicCaptureDir).toAbsolutePath().normalize();
+		}
 		Path gameDir = Minecraft.getInstance().gameDirectory.toPath().toAbsolutePath().normalize();
 		Path parent = gameDir.getParent();
 		return (parent != null ? parent : gameDir).resolve("logs/auto-capture");

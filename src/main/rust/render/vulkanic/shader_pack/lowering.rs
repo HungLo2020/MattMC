@@ -3255,17 +3255,82 @@ fn lower_world_material_fragment_coordinates(
         "gl_FragCoord",
         "vulkanic_source_world_fragment_coord()",
     );
+    let (source, source_target_sampling_preamble) =
+        lower_world_material_source_target_sampling(source);
     insert_after_version(
         &source,
-        r#"vec4 vulkanic_source_world_fragment_coord() {
+        &format!(
+            r#"vec4 vulkanic_source_world_fragment_coord() {{
     vec4 coordinate = gl_FragCoord;
 #ifdef VULKANIC_GAL_ZERO_TO_ONE_CLIP_DEPTH
     coordinate.y = viewHeight - coordinate.y;
 #endif
     return coordinate;
-}
-"#,
+}}
+{}"#,
+            source_target_sampling_preamble
+        ),
     )
+}
+
+/// Source terrain fragments express screen coordinates in the OpenGL
+/// lower-left domain. Rust-owned pass targets are sampled in their native
+/// image domain, so source-target samplers must flip that coordinate exactly
+/// once. Atlas/material samplers deliberately remain untouched.
+fn lower_world_material_source_target_sampling(mut source: String) -> (String, String) {
+    const SOURCE_TARGET_SAMPLERS: &[&str] = &[
+        "depthtex0",
+        "depthtex1",
+        "depthtex2",
+        "dhDepthTex",
+        "dhDepthTex0",
+        "dhDepthTex1",
+        "gaux1",
+        "gaux2",
+        "gaux3",
+        "gaux4",
+        "colortex0",
+        "colortex1",
+        "colortex2",
+        "colortex3",
+        "colortex4",
+        "colortex5",
+        "colortex6",
+        "colortex7",
+        "colortex8",
+        "colortex9",
+        "colortex10",
+        "colortex11",
+        "colortex12",
+        "colortex13",
+        "colortex14",
+        "colortex15",
+    ];
+
+    let mut preamble = String::from(
+        r#"#ifdef VULKANIC_GAL_ZERO_TO_ONE_CLIP_DEPTH
+#define vulkanic_source_world_target_uv(source_uv) vec2((source_uv).x, 1.0 - (source_uv).y)
+#else
+#define vulkanic_source_world_target_uv(source_uv) (source_uv)
+#endif
+"#,
+    );
+    for sampler in SOURCE_TARGET_SAMPLERS {
+        let source_call = format!("texture({sampler},");
+        if !source.contains(&source_call) {
+            continue;
+        }
+        let helper = format!("vulkanic_source_sample_target_{sampler}");
+        source = source.replace(&source_call, &format!("{helper}("));
+        // A macro deliberately expands at the original source call site. The
+        // source sampler declarations can occur after our semantic preamble,
+        // while a GLSL function body would require each sampler to have been
+        // declared before that body is parsed.
+        preamble.push_str(&format!(
+            "#define {helper}(source_uv) texture({sampler}, vulkanic_source_world_target_uv(source_uv))\n"
+        ));
+    }
+    (source, preamble)
 }
 
 /// Lowers the audited terrain vertex compatibility names into an explicit
@@ -3617,6 +3682,13 @@ fn lower_fullscreen_source_fragment_with_contracts(
     if uses_legacy_fog {
         lowered = insert_after_version(&lowered, LEGACY_FOG_SEMANTIC_PREAMBLE)?;
     }
+    // Fullscreen source stages need two explicit coordinate domains. Source
+    // math (fog, reconstruction, dithering) is authored around OpenGL's
+    // lower-left gl_FragCoord, while source target texelFetch calls must keep
+    // naming Rust-owned image storage in its native address space. Leaving
+    // gl_FragCoord native made deferred stages fetch one pixel and reconstruct
+    // the vertically opposite view ray on Vulkan.
+    lowered = lower_fullscreen_fragment_coordinates(lowered, uniform_contract)?;
     lowered = insert_after_version(&lowered, FRAGMENT_SEMANTIC_PREAMBLE)?;
     lowered = insert_after_version(&lowered, &uniform_block(uniform_contract))?;
     lowered = insert_after_version(&lowered, &declarations)?;
@@ -3627,6 +3699,75 @@ fn lower_fullscreen_source_fragment_with_contracts(
         outputs,
         remaining_dialect,
     })
+}
+
+/// Preserves the source pack's lower-left fragment-space convention in
+/// fullscreen stages without reinterpreting source-target image addresses.
+///
+/// Complementary's shared `common.glsl` derives `texelCoord` directly from
+/// `gl_FragCoord` and uses it for `texelFetch`. Its fullscreen varying
+/// `texCoord` is also dual-purpose: it samples Rust-owned target storage and
+/// forms source-space view/reprojection coordinates. On Vulkan, the sampler
+/// coordinate must remain vertically flipped while the reconstruction
+/// coordinate must retain the source pack's lower-left convention. Rewrite
+/// those distinct source forms explicitly instead of making either backend
+/// interpretation leak into the pass graph.
+fn lower_fullscreen_fragment_coordinates(
+    mut source: String,
+    uniform_contract: &TerrainSourceUniformContract,
+) -> GalResult<String> {
+    if !glsl_identifiers(&source).contains("gl_FragCoord") {
+        return Ok(source);
+    }
+    if !uniform_contract
+        .fields()
+        .iter()
+        .any(|field| field.name() == "viewHeight")
+    {
+        return Err(GalError::unsupported_feature(
+            "fullscreen source reads gl_FragCoord but does not declare viewHeight for explicit coordinate conversion",
+        ));
+    }
+    source = replace_identifier(
+        &source,
+        "gl_FragCoord",
+        "vulkanic_source_fullscreen_fragment_coord()",
+    );
+    source = source.replace(
+        "ivec2 texelCoord = ivec2(vulkanic_source_fullscreen_fragment_coord().xy);",
+        "// Source texelCoord addresses the Rust-owned target storage, not the source-space screen direction.\n        ivec2 texelCoord = ivec2(gl_FragCoord.xy);",
+    );
+    // Source fullscreen programs conventionally use `vec[34](texCoord, ...)`
+    // as an NDC/reprojection input. Leave `texCoord` itself in the native
+    // image-sampling domain and convert only the explicitly constructed
+    // screen-space vectors. This covers the common deferred, composite, TAA,
+    // and Distant Horizons reconstruction form without changing sampler calls.
+    source = source.replace(
+        "vec4(texCoord,",
+        "vec4(vulkanic_source_fullscreen_screen_uv(texCoord),",
+    );
+    source = source.replace(
+        "vec3(texCoord,",
+        "vec3(vulkanic_source_fullscreen_screen_uv(texCoord),",
+    );
+    insert_after_version(
+        &source,
+        r#"vec4 vulkanic_source_fullscreen_fragment_coord() {
+    vec4 coordinate = gl_FragCoord;
+#ifdef VULKANIC_GAL_ZERO_TO_ONE_CLIP_DEPTH
+    coordinate.y = viewHeight - coordinate.y;
+#endif
+    return coordinate;
+}
+vec2 vulkanic_source_fullscreen_screen_uv(vec2 image_uv) {
+#ifdef VULKANIC_GAL_ZERO_TO_ONE_CLIP_DEPTH
+    return vec2(image_uv.x, 1.0 - image_uv.y);
+#else
+    return image_uv;
+#endif
+}
+"#,
+    )
 }
 
 /// Capture-only diagnostic for the source-defined sky initializer. It keeps
@@ -6059,6 +6200,60 @@ mod tests {
     }
 
     #[test]
+    fn fullscreen_fragment_coordinates_keep_source_math_and_native_target_addresses() {
+        let pack = ShaderPackSource::new(
+            "fullscreen-fragment-coordinate-domains",
+            5,
+            vec![
+                ShaderSourceFile::new(
+                    "world0/deferred.vsh",
+                    "#version 130\nout vec2 texCoord;\nvoid main() { texCoord = gl_MultiTexCoord0.xy; gl_Position = ftransform(); }",
+                ),
+                ShaderSourceFile::new(
+                    "world0/deferred.fsh",
+                    "#version 130\n/* DRAWBUFFERS:0 */\nin vec2 texCoord;\nuniform float viewHeight;\nuniform sampler2D colortex0;\nvoid main() { ivec2 texelCoord = ivec2(gl_FragCoord.xy); vec2 sourceScreen = gl_FragCoord.xy / vec2(1.0, viewHeight); vec4 reconstructed = vec4(texCoord, texelFetch(colortex0, texelCoord, 0).r, 1.0); gl_FragData[0] = texelFetch(colortex0, texelCoord, 0) + vec4(sourceScreen, 0.0, 0.0) + reconstructed; }",
+                ),
+                ShaderSourceFile::new(
+                    super::super::terrain_source_resources::TERRAIN_RESOURCE_BINDINGS_PATH,
+                    "colortex0=shader_pack_color:primary\n",
+                ),
+            ],
+        )
+        .unwrap();
+        let vertex = preprocess_artifact(PreprocessInput {
+            source: &pack,
+            entry: "world0/deferred.vsh",
+            defines: &[],
+        })
+        .unwrap();
+        let fragment = preprocess_artifact(PreprocessInput {
+            source: &pack,
+            entry: "world0/deferred.fsh",
+            defines: &[],
+        })
+        .unwrap();
+        let bindings = TerrainSourceResourceBindings::from_source(&pack).unwrap();
+        let lowered = lower_fullscreen_source_pair(&vertex, &fragment, &bindings).unwrap();
+        let fragment = lowered.fragment().source();
+
+        assert!(fragment.contains("vec4 vulkanic_source_fullscreen_fragment_coord()"));
+        assert!(fragment.contains("coordinate.y = viewHeight - coordinate.y;"));
+        assert!(fragment.contains("vec2 vulkanic_source_fullscreen_screen_uv(vec2 image_uv)"));
+        assert!(fragment.contains("ivec2 texelCoord = ivec2(gl_FragCoord.xy);"));
+        assert!(fragment.contains(
+            "vec2 sourceScreen = vulkanic_source_fullscreen_fragment_coord().xy / vec2(1.0, viewHeight);"
+        ));
+        assert!(fragment.contains(
+            "vec4 reconstructed = vec4(vulkanic_source_fullscreen_screen_uv(texCoord), texelFetch(colortex0, texelCoord, 0).r, 1.0);"
+        ));
+        assert!(
+            fragment.find("uniform float viewHeight;")
+                < fragment.find("vec4 vulkanic_source_fullscreen_fragment_coord()"),
+            "the source viewport uniform must be declared before the coordinate helper"
+        );
+    }
+
+    #[test]
     fn fullscreen_source_composite7_fxaa_probe_only_suppresses_the_targeted_call() {
         let prior = std::env::var_os("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE");
         std::env::set_var(
@@ -7108,6 +7303,45 @@ mod tests {
                 "the source extent must be declared before the coordinate helper"
             );
         }
+    }
+
+    #[test]
+    fn world_material_screen_target_sampling_uses_native_image_coordinates() {
+        let source = concat!(
+            "#version 130\n",
+            "uniform float viewHeight;\n",
+            "uniform sampler2D depthtex1;\n",
+            "uniform sampler2D tex;\n",
+            "void main() {\n",
+            "  vec2 screen = gl_FragCoord.xy / vec2(1.0, viewHeight);\n",
+            "  vec4 scene = texture2D(depthtex1, screen);\n",
+            "  vec4 atlas = texture2D(tex, screen);\n",
+            "  gl_FragData[0] = scene + atlas;\n",
+            "}\n"
+        );
+        let lowered = lower_world_material_fragment_coordinates(
+            replace_identifier(source, "texture2D", "texture"),
+            &TerrainSourceUniformContract {
+                declarations: vec!["float viewHeight;".to_string()],
+                fields: vec![TerrainSourceUniformField {
+                    name: "viewHeight".to_string(),
+                    ty: TerrainSourceUniformType::Float,
+                    array_length: 1,
+                    offset: 0,
+                    size: 4,
+                    array_stride: 0,
+                }],
+                std140_size: 4,
+            },
+        )
+        .unwrap();
+
+        assert!(lowered.contains(
+            "#define vulkanic_source_sample_target_depthtex1(source_uv) texture(depthtex1, vulkanic_source_world_target_uv(source_uv))"
+        ));
+        assert!(lowered.contains("scene = vulkanic_source_sample_target_depthtex1( screen);"));
+        assert!(lowered.contains("vec4 atlas = texture(tex, screen);"));
+        assert!(lowered.contains("vec2((source_uv).x, 1.0 - (source_uv).y)"));
     }
 
     #[test]

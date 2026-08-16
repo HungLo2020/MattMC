@@ -138,6 +138,14 @@ public final class DeterministicCameraCapture {
 	private static final String FORCED_CAMERA_TYPE = System.getProperty("mattmc.dev.deterministicCameraCapture.cameraType", "").trim();
 	private static final String FORCED_GAME_MODE = System.getProperty("mattmc.dev.deterministicCameraCapture.gameMode", "").trim();
 	private static final int FORCED_SELECTED_HOTBAR_SLOT = Integer.getInteger("mattmc.dev.deterministicCameraCapture.selectedHotbarSlot", 0);
+	/**
+	 * Capture-only inventory fixture for validating the Rust-owned standard-3D
+	 * GUI-item route with known, non-flat vanilla block models. It is inactive
+	 * in ordinary gameplay and restores the copied player's original hotbar on
+	 * capture shutdown.
+	 */
+	private static final String HOTBAR_ITEM_FIXTURE =
+		System.getProperty("mattmc.dev.deterministicCameraCapture.hotbarItemFixture", "").trim().toLowerCase(Locale.ROOT);
 	private static final float FORCED_EXPERIENCE_PROGRESS =
 		Float.parseFloat(System.getProperty("mattmc.dev.deterministicCameraCapture.experienceProgress", "NaN"));
 	private static final int FORCED_EXPERIENCE_LEVEL =
@@ -594,6 +602,7 @@ public final class DeterministicCameraCapture {
 	private static boolean originalHighContrastBlockOutline;
 	private static boolean originalNoGravity;
 	private static int originalSelectedHotbarSlot;
+	private static List<ItemStack> originalHotbarItems = List.of();
 	private static float originalExperienceProgress;
 	private static int originalExperienceLevel;
 	private static int originalExperienceDisplayStartTick;
@@ -3833,6 +3842,12 @@ public final class DeterministicCameraCapture {
 					originalHighContrastBlockOutline = minecraft.options.highContrastBlockOutline().get();
 					originalNoGravity = player.isNoGravity();
 					originalSelectedHotbarSlot = player.getInventory().getSelectedSlot();
+					if (!HOTBAR_ITEM_FIXTURE.isEmpty()) {
+						originalHotbarItems = new ArrayList<>(9);
+						for (int slot = 0; slot < 9; slot++) {
+							originalHotbarItems.add(player.getInventory().getItem(slot).copy());
+						}
+					}
 			originalExperienceProgress = player.experienceProgress;
 			originalExperienceLevel = player.experienceLevel;
 					originalExperienceDisplayStartTick = player.experienceDisplayStartTick;
@@ -4676,6 +4691,7 @@ public final class DeterministicCameraCapture {
 				player.getInventory().setSelectedSlot(selectedSlot);
 			}
 		}
+		applyHotbarItemFixture(player);
 		if (!Float.isNaN(FORCED_EXPERIENCE_PROGRESS)) {
 			float progress = Math.max(0.0F, Math.min(1.0F, FORCED_EXPERIENCE_PROGRESS));
 			if (player.experienceProgress != progress) {
@@ -4731,7 +4747,30 @@ public final class DeterministicCameraCapture {
 			// This diagnostic scenario needs the ordinary vanilla producer to run.
 			minecraft.options.cloudStatus().set(CloudStatus.FANCY);
 		}
+	}
+
+	private static void applyHotbarItemFixture(LocalPlayer player) {
+		if (HOTBAR_ITEM_FIXTURE.isEmpty()) {
+			return;
 		}
+		List<ItemStack> items = switch (HOTBAR_ITEM_FIXTURE) {
+			case "standard-3d" -> List.of(
+				new ItemStack(Blocks.STONE),
+				new ItemStack(Blocks.GRASS_BLOCK),
+				new ItemStack(Blocks.REDSTONE_ORE),
+				new ItemStack(Blocks.OAK_LEAVES),
+				new ItemStack(Blocks.OAK_SLAB),
+				new ItemStack(Blocks.OAK_TRAPDOOR),
+				new ItemStack(Blocks.WHITE_WOOL),
+				new ItemStack(Blocks.CRAFTING_TABLE),
+				new ItemStack(Blocks.DIRT)
+			);
+			default -> throw new IllegalStateException("unknown deterministic hotbar fixture: " + HOTBAR_ITEM_FIXTURE);
+		};
+		for (int slot = 0; slot < items.size(); slot++) {
+			player.getInventory().setItem(slot, items.get(slot));
+		}
+	}
 
 	private static void restoreRuntimeOverrides(Minecraft minecraft) {
 		releaseDistantHorizonsTexturePaletteChunks(minecraft);
@@ -4740,6 +4779,12 @@ public final class DeterministicCameraCapture {
 		}
 		if (minecraft.player != null && FORCED_SELECTED_HOTBAR_SLOT > 0 && originalSelectedHotbarSlot >= 0 && originalSelectedHotbarSlot < 9) {
 			minecraft.player.getInventory().setSelectedSlot(originalSelectedHotbarSlot);
+		}
+		if (minecraft.player != null && !originalHotbarItems.isEmpty()) {
+			for (int slot = 0; slot < originalHotbarItems.size(); slot++) {
+				minecraft.player.getInventory().setItem(slot, originalHotbarItems.get(slot).copy());
+			}
+			originalHotbarItems = List.of();
 		}
 		if (minecraft.player != null && !Float.isNaN(FORCED_EXPERIENCE_PROGRESS)) {
 			minecraft.player.experienceProgress = originalExperienceProgress;
@@ -7016,6 +7061,7 @@ public final class DeterministicCameraCapture {
 			appendField(json, "bossBarProgress", FORCED_BOSS_BAR_PROGRESS).append(",\n");
 			appendField(json, "bossBarOverlay", FORCED_BOSS_BAR_OVERLAY).append(",\n");
 			json.append("  \"selectedHotbarSlot\": ").append(player == null ? -1 : currentSelectedHotbarSlot(player)).append(",\n");
+			appendField(json, "hotbarItemFixture", HOTBAR_ITEM_FIXTURE).append(",\n");
 		json.append("  \"experienceProgress\": ").append(player == null ? -1.0F : player.experienceProgress).append(",\n");
 		json.append("  \"experienceLevel\": ").append(player == null ? -1 : player.experienceLevel).append(",\n");
 		json.append("  \"framesPerPose\": ").append(FRAMES_PER_POSE).append(",\n");
