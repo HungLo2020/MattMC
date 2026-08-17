@@ -577,8 +577,10 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 			this.seenInsecureChatWarning = true;
 		}
 		
-		// Iris: Show update message and error messages
-		if (this.minecraft.player != null) {
+		// Iris owns this diagnostic/compatibility lifecycle only for legacy
+		// renderers. Rust whole-frame Vulkan obtains shader-pack and Distant
+		// Horizons admission from copied semantic configuration instead.
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() && this.minecraft.player != null) {
 			net.irisshaders.iris.Iris.getStoredError().ifPresent(e ->
 				this.minecraft.player.displayClientMessage(net.minecraft.network.chat.Component.translatable(e instanceof net.irisshaders.iris.gl.shader.ShaderCompileException ? "iris.load.failure.shader" : "iris.load.failure.generic").append(net.minecraft.network.chat.Component.literal("Copy Info").withStyle(arg -> arg.withUnderlined(true).withColor(net.minecraft.ChatFormatting.BLUE).withClickEvent(new net.minecraft.network.chat.ClickEvent.CopyToClipboard(e.getMessage())).withHoverEvent(new net.minecraft.network.chat.HoverEvent.ShowText(net.minecraft.network.chat.Component.translatable("chat.copy.click"))))), false));
 

@@ -115,6 +115,7 @@ import net.sodium.client.util.FlawlessFrames;
 import net.sodium.client.util.SodiumChunkSection;
 import net.sodium.client.world.LevelRendererExtension;
 import net.sodium.fabric.SodiumFogRenderHook;
+import net.vulkanic.world.RustGalWholeFrameTerrainSource;
 import net.voxelmap.VoxelConstants;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
@@ -212,6 +213,7 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	private static final EnumMap<ChunkSectionLayer, List<RenderPass.Draw<GpuBufferSlice[]>>> SODIUM_STATIC_MAP = new EnumMap<>(ChunkSectionLayer.class);
 	private SodiumWorldRenderer renderer;
 	private ChunkRenderMatrices matrices;
+	private final RustGalWholeFrameTerrainSource rustGalWholeFrameTerrainSource = new RustGalWholeFrameTerrainSource();
 
 	public LevelRenderer(
 		Minecraft minecraft,
@@ -244,6 +246,13 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	
 	// Iris: Helper method to disable fabulous graphics when shaders are enabled
 	private void disableFabulousGraphicsIfNeeded() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			// Rust owns shader-pack admission for whole-frame Vulkan.  Do not query
+			// Iris's Java lifecycle while resource reload is constructing semantic
+			// world state.
+			return;
+		}
+
 		net.minecraft.client.Options options = this.minecraft.options;
 		
 		if (!net.irisshaders.iris.Iris.getIrisConfig().areShadersEnabled()) {
@@ -324,11 +333,15 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		this.gameTestBlockHighlightRenderer.clear();
 		
 		// Sodium: Update renderer when world changes
-		RenderDevice.enterManagedCode();
-		try {
-			this.renderer.setLevel(clientLevel);
-		} finally {
-			RenderDevice.exitManagedCode();
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			RenderDevice.enterManagedCode();
+			try {
+				this.renderer.setLevel(clientLevel);
+			} finally {
+				RenderDevice.exitManagedCode();
+			}
+		} else {
+			this.rustGalWholeFrameTerrainSource.setLevel(clientLevel);
 		}
 	}
 
@@ -368,11 +381,15 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		}
 		
 		// Sodium: Reload renderer
-		RenderDevice.enterManagedCode();
-		try {
-			this.renderer.reload();
-		} finally {
-			RenderDevice.exitManagedCode();
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			RenderDevice.enterManagedCode();
+			try {
+				this.renderer.reload();
+			} finally {
+				RenderDevice.exitManagedCode();
+			}
+		} else {
+			this.rustGalWholeFrameTerrainSource.setLevel(this.level);
 		}
 	}
 
@@ -415,6 +432,15 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	}
 
 public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // Made public for Iris shadow rendering
+	if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		// Vanilla's visibility graph is CPU semantic state.  Sodium's terrain
+		// setup scope initializes a Java GL render device, which cannot coexist
+		// with the Rust-owned presenter.  Rust terrain admission is separately
+		// verified by the whole-frame execution correlation gate.
+		this.applyFrustum(frustum);
+		return;
+	}
+
 // Sodium: Redirect terrain setup to our renderer
 	var viewport = ((ViewportProvider) frustum).sodium$createViewport();
 	var updateChunksImmediately = FlawlessFrames.isActive();
@@ -1080,6 +1106,10 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.indexed-mesh.dispatcher-prepare");
 		Vec3 cameraPos = camera.getPosition();
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.indexed-mesh.frustum-prepare");
+		// Frustum composes its second matrix with its first, so the vanilla
+		// render-level contract is model-view followed by projection. Keep the
+		// semantic whole-frame collector on that same order; reversing it creates
+		// a degenerate CPU visibility set even though the GPU matrices are valid.
 		Frustum frustum = this.prepareCullFrustum(viewMatrix, projectionMatrix, cameraPos);
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.indexed-mesh.frustum-prepare");
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.indexed-mesh.real-state-extraction");
@@ -1617,6 +1647,8 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		}
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.cull");
 		Vec3 cameraPos = camera.getPosition();
+		// Keep the CPU terrain source on vanilla's model-view/projection frustum
+		// contract. Frustum internally computes projection * model-view.
 		Frustum frustum = this.prepareCullFrustum(viewMatrix, projectionMatrix, cameraPos);
 		this.matrices = new ChunkRenderMatrices(projectionMatrix, viewMatrix);
 		this.cullTerrain(camera, frustum, this.minecraft.player.isSpectator());
@@ -1646,7 +1678,12 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		);
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.cull");
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.visible-submit");
-		this.renderer.enqueueRustGalStaticTerrain(camera);
+		this.rustGalWholeFrameTerrainSource.enqueue(
+			camera,
+			frustum,
+			this.minecraft.getWindow().getWidth(),
+			this.minecraft.getWindow().getHeight()
+		);
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.visible-submit");
 	}
 
@@ -1729,9 +1766,34 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 	}
 
 	public void extractVisibleBlockEntities(Camera camera, float f, LevelRenderState levelRenderState) { // Made public for Iris shadow rendering
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			PoseStack poseStack = new PoseStack();
+			for (SectionRenderDispatcher.RenderSection section : this.visibleSections) {
+				if (!(section.getSectionMesh() instanceof CompiledSectionMesh compiled)) continue;
+				for (BlockEntity blockEntity : compiled.getRenderableBlockEntities()) {
+					this.extractWholeFrameBlockEntity(blockEntity, poseStack, camera, f, levelRenderState);
+				}
+			}
+			return;
+		}
+
 		// Sodium: Redirect to SodiumWorldRenderer instead of using vanilla visibleSections
 		// This was previously done via LevelRendererMixin but has been inlined
 		this.renderer.extractBlockEntities(camera, f, this.destructionProgress, levelRenderState);
+	}
+
+	private void extractWholeFrameBlockEntity(BlockEntity blockEntity, PoseStack poseStack, Camera camera, float partialTick, LevelRenderState levelRenderState) {
+		BlockPos blockPos = blockEntity.getBlockPos();
+		SortedSet<BlockDestructionProgress> progress = this.destructionProgress.get(blockPos.asLong());
+		net.minecraft.client.renderer.feature.ModelFeatureRenderer.CrumblingOverlay crumbling = null;
+		if (progress != null && !progress.isEmpty()) {
+			poseStack.pushPose();
+			poseStack.translate(blockPos.getX() - camera.position().x, blockPos.getY() - camera.position().y, blockPos.getZ() - camera.position().z);
+			crumbling = new net.minecraft.client.renderer.feature.ModelFeatureRenderer.CrumblingOverlay(progress.last().getProgress(), poseStack.last());
+			poseStack.popPose();
+		}
+		BlockEntityRenderState state = this.blockEntityRenderDispatcher.tryExtractRenderState(blockEntity, partialTick, crumbling);
+		if (state != null) levelRenderState.blockEntityRenderStates.add(state);
 	}
 
 	private void submitBlockEntities(PoseStack poseStack, LevelRenderState levelRenderState, SubmitNodeStorage submitNodeStorage) {
@@ -3093,12 +3155,25 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 	}
 
 	public void setBlocksDirty(int minX, int minY, int minZ, int maxX, int maxY, int maxZ) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			this.setSectionRangeDirty(
+				SectionPos.blockToSectionCoord(minX), SectionPos.blockToSectionCoord(minY), SectionPos.blockToSectionCoord(minZ),
+				SectionPos.blockToSectionCoord(maxX), SectionPos.blockToSectionCoord(maxY), SectionPos.blockToSectionCoord(maxZ)
+			);
+			return;
+		}
+
 		// Sodium: Redirect chunk updates to our renderer
 		this.renderer.scheduleRebuildForBlockArea(minX, minY, minZ, maxX, maxY, maxZ, false);
 	}
 
 	public void setBlockDirty(BlockPos blockPos, BlockState blockState, BlockState blockState2) {
 		if (this.minecraft.getModelManager().requiresRender(blockState, blockState2)) {
+			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+				this.setBlockDirty(blockPos, true);
+				return;
+			}
+
 			// Sodium: Redirect chunk updates to our renderer
 			this.renderer.scheduleRebuildForBlockArea(blockPos.getX() - 1, blockPos.getY() - 1, blockPos.getZ() - 1, 
 				blockPos.getX() + 1, blockPos.getY() + 1, blockPos.getZ() + 1, true);
@@ -3106,6 +3181,11 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 	}
 
 	public void setSectionDirtyWithNeighbors(int x, int y, int z) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			this.setSectionRangeDirty(x - 1, y - 1, z - 1, x + 1, y + 1, z + 1);
+			return;
+		}
+
 		// Sodium: Redirect chunk updates to our renderer  
 		this.renderer.scheduleRebuildForChunks(x - 1, y - 1, z - 1, x + 1, y + 1, z + 1, false);
 	}
@@ -3125,6 +3205,12 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 	}
 
 	private void setSectionDirty(int x, int y, int z, boolean important) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			if (this.viewArea != null) this.viewArea.setDirty(x, y, z, important);
+			this.rustGalWholeFrameTerrainSource.invalidate(x, y, z);
+			return;
+		}
+
 		// Sodium: Redirect to renderer
 		this.renderer.scheduleRebuildForChunk(x, y, z, important);
 		
@@ -3212,6 +3298,11 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 	}
 
 	public boolean isSectionCompiled(BlockPos blockPos) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			SectionRenderDispatcher.RenderSection section = this.viewArea == null ? null : this.viewArea.getRenderSectionAt(blockPos);
+			return section != null && section.getSectionMesh() != CompiledSectionMesh.UNCOMPILED;
+		}
+
 		// Sodium: Redirect to renderer
 		return this.renderer.isSectionReady(blockPos.getX() >> 4, blockPos.getY() >> 4, blockPos.getZ() >> 4);
 	}

@@ -617,8 +617,8 @@ fn compact_native_lava_fluid_stamps_unsupported_primitive_metadata() {
         assert!(
             metadata
                 .iter()
-                .all(|record| record.primitive_kind == TERRAIN_PRIMITIVE_UNSUPPORTED_FLUID),
-            "compact lava fluid metadata should be unsupported: {:?}",
+                .all(|record| record.primitive_kind == TERRAIN_PRIMITIVE_GENERIC_FLUID),
+            "compact lava fluid metadata should select the generic semantic fluid lane: {:?}",
             metadata
                 .iter()
                 .map(|record| record.primitive_kind)

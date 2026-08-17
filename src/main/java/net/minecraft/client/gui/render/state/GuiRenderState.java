@@ -164,21 +164,24 @@ public class GuiRenderState {
 	}
 
 	public void forEachElement(Consumer<GuiElementRenderState> consumer, GuiRenderState.TraverseRange traverseRange) {
-		this.traverse(node -> {
-			if (node.elementStates != null || node.glyphStates != null) {
-				if (node.elementStates != null) {
-					for (GuiElementRenderState guiElementRenderState : node.elementStates) {
+		GuiRenderState.Node previousNode = this.current;
+		this.traverse(currentNode -> {
+			this.current = currentNode;
+			if (currentNode.elementStates != null || currentNode.glyphStates != null) {
+				if (currentNode.elementStates != null) {
+					for (GuiElementRenderState guiElementRenderState : currentNode.elementStates) {
 						consumer.accept(guiElementRenderState);
 					}
 				}
 
-				if (node.glyphStates != null) {
-					for (GuiElementRenderState guiElementRenderState : node.glyphStates) {
+				if (currentNode.glyphStates != null) {
+					for (GuiElementRenderState guiElementRenderState : currentNode.glyphStates) {
 						consumer.accept(guiElementRenderState);
 					}
 				}
 			}
 		}, traverseRange);
+		this.current = previousNode;
 	}
 
 	public void forEachItem(Consumer<GuiItemRenderState> consumer) {
@@ -232,6 +235,32 @@ public class GuiRenderState {
 				node.elementStates.sort(comparator);
 			}
 		}, GuiRenderState.TraverseRange.ALL);
+	}
+
+	/**
+	 * Returns the deterministic source-layer position of the node currently
+	 * being visited by one of the semantic collectors. The phase mirrors the
+	 * order in which {@code GuiRenderer.prepare()} materializes a node: ordinary
+	 * elements (including prepared item blits), then text glyphs. It is semantic ordering only
+	 * and never exposes a renderer object or GPU handle.
+	 */
+	public int currentSemanticLayerOrder(GuiRenderState.SemanticPhase phase) {
+		GuiRenderState.Node selected = this.current;
+		if (selected == null) {
+			throw new IllegalStateException("semantic GUI layer requested outside traversal");
+		}
+		int[] nodeOrdinal = new int[] {0};
+		int[] selectedOrdinal = new int[] {-1};
+		this.traverse(node -> {
+			if (node == selected) {
+				selectedOrdinal[0] = nodeOrdinal[0];
+			}
+			nodeOrdinal[0]++;
+		}, GuiRenderState.TraverseRange.ALL);
+		if (selectedOrdinal[0] < 0) {
+			throw new IllegalStateException("current semantic GUI node is not part of this frame");
+		}
+		return Math.addExact(Math.multiplyExact(selectedOrdinal[0], GuiRenderState.SemanticPhase.values().length), phase.offset());
 	}
 
 	private void traverse(Consumer<GuiRenderState.Node> consumer, GuiRenderState.TraverseRange traverseRange) {
@@ -330,5 +359,22 @@ public class GuiRenderState {
 		ALL,
 		BEFORE_BLUR,
 		AFTER_BLUR;
+	}
+
+	@Environment(EnvType.CLIENT)
+	public static enum SemanticPhase {
+		ELEMENTS(0),
+		ITEMS(1),
+		TEXT(2);
+
+		private final int offset;
+
+		SemanticPhase(int offset) {
+			this.offset = offset;
+		}
+
+		int offset() {
+			return this.offset;
+		}
 	}
 }

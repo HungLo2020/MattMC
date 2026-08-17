@@ -624,7 +624,8 @@ public final class GraphicsFrameBenchmark {
 
 	private static void dismissKnownGameplayScreen(Minecraft minecraft) {
 		disableVoxelMapWelcomeScreen();
-		if (minecraft.level == null || minecraft.player == null || minecraft.getConnection() == null || minecraft.getOverlay() != null || minecraft.screen == null) {
+		if (minecraft.level == null || minecraft.player == null || minecraft.getConnection() == null
+			|| !minecraft.getConnection().isAcceptingMessages() || minecraft.getOverlay() != null || minecraft.screen == null) {
 			return;
 		}
 		String screen = minecraft.screen.getClass().getSimpleName();

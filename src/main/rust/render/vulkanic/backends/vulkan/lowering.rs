@@ -1086,8 +1086,12 @@ impl SubmissionLowerer {
                             data,
                         );
                     } else {
+                        let memory_offset =
+                            buffer.memory_offset.checked_add(*offset).ok_or_else(|| {
+                                GalError::backend("Vulkan host-write buffer offset overflow")
+                            })?;
                         self.context
-                            .write_mapped_memory(buffer.memory, *offset, data)?;
+                            .write_mapped_memory(buffer.memory, memory_offset, data)?;
                     }
                 }
                 CommandOp::HostReadBuffer {
@@ -1100,6 +1104,7 @@ impl SubmissionLowerer {
                     state.host_reads.push(HostReadRequest {
                         buffer: *buffer,
                         memory: buffer_object.memory,
+                        memory_offset: buffer_object.memory_offset,
                         offset: *offset,
                         size: *size,
                     });
@@ -1152,10 +1157,15 @@ impl SubmissionLowerer {
     fn complete_host_reads(&mut self, complete: &InFlightSubmission) {
         let _zone = trace::Zone::new("vulkan.backend.host-readback");
         for request in &complete.host_reads {
-            match self
-                .context
-                .read_mapped_memory(request.memory, request.offset, request.size)
-            {
+            let result = request
+                .memory_offset
+                .checked_add(request.offset)
+                .ok_or_else(|| GalError::backend("Vulkan host-read buffer offset overflow"))
+                .and_then(|offset| {
+                    self.context
+                        .read_mapped_memory(request.memory, offset, request.size)
+                });
+            match result {
                 Ok(bytes) => self.completed_host_reads.push(CompletedHostRead {
                     submission: complete.id,
                     buffer: request.buffer,
@@ -1647,6 +1657,7 @@ struct InFlightSubmission {
 struct HostReadRequest {
     buffer: Handle,
     memory: vk::DeviceMemory,
+    memory_offset: u64,
     offset: u64,
     size: u64,
 }

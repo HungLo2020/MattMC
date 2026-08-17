@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Properties;
 import java.util.TreeMap;
 import java.util.stream.Stream;
 
@@ -50,6 +51,12 @@ public final class RustShaderPackSourceCollector {
 	}
 
 	public static SourceGeneration collectConfiguredPack(long generation) throws IOException {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			if (!wholeFrameShaderConfigEnabled()) {
+				return disabled(generation);
+			}
+			throw new IOException("configured Iris shader packs are unavailable until their Rust-owned source configuration collector is complete");
+		}
 		if (!Iris.getIrisConfig().areShadersEnabled()) {
 			return disabled(generation);
 		}
@@ -83,10 +90,30 @@ public final class RustShaderPackSourceCollector {
 	 * produce a complete immutable snapshot.
 	 */
 	public static Optional<String> activeConfiguredPackName() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			// Do not touch Iris configuration or resolved-pack objects after Rust
+			// owns presentation. A configured pack is deliberately unadmitted until
+			// the Rust-owned source configuration path can represent it completely.
+			return Optional.empty();
+		}
 		if (!Iris.getIrisConfig().areShadersEnabled() || Iris.getCurrentPack().isEmpty()) {
 			return Optional.empty();
 		}
 		return Iris.getIrisConfig().getShaderPackName().filter(name -> !name.isBlank());
+	}
+
+	/** Reads only the copied on-disk preference used to reject unported packs. */
+	private static boolean wholeFrameShaderConfigEnabled() throws IOException {
+		Path config = net.minecraft.client.Minecraft.getInstance().gameDirectory.toPath()
+			.resolve("config").resolve("iris.properties");
+		if (!Files.isRegularFile(config)) {
+			return true;
+		}
+		Properties values = new Properties();
+		try (var input = Files.newInputStream(config)) {
+			values.load(input);
+		}
+		return !"false".equals(values.getProperty("enableShaders"));
 	}
 
 	public static SourceGeneration disabled(long generation) {

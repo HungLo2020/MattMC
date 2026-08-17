@@ -73,6 +73,12 @@ public class TitleScreen extends Screen {
 	}
 
 	public static void registerTextures(TextureManager textureManager) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			// Rust's whole-frame title path copies these resource-pack images by
+			// identity. Registering Java textures here would create unused Java GPU
+			// state before the Rust presenter owns the frame.
+			return;
+		}
 		textureManager.registerForNextReload(LogoRenderer.MINECRAFT_LOGO);
 		textureManager.registerForNextReload(LogoRenderer.MINECRAFT_EDITION);
 		textureManager.registerForNextReload(PanoramaRenderer.PANORAMA_OVERLAY);
@@ -122,11 +128,12 @@ public class TitleScreen extends Screen {
 			new PlainTextButton(j, this.height - 10, i, 10, COPYRIGHT_TEXT, button -> this.minecraft.setScreen(new CreditsAndAttributionScreen(this)), this.font)
 		);
 		
-		// Iris: On first title screen init, complete loading
-		if (!iris$hasFirstInit) {
+		// Iris owns this hook only on the legacy renderer route. Rust whole-frame
+		// presentation must not initialize or borrow Iris renderer runtime state.
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() && !iris$hasFirstInit) {
 			net.irisshaders.iris.Iris.onLoadingComplete();
+			iris$hasFirstInit = true;
 		}
-		iris$hasFirstInit = true;
 	}
 
 	private int createTestWorldButton(int i, int j) {

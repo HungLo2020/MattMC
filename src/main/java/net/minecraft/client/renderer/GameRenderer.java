@@ -71,6 +71,7 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.ResourceProvider;
 import net.minecraft.util.Mth;
+import net.minecraft.util.ARGB;
 import net.minecraft.util.RandomSource;
 import net.minecraft.util.profiling.Profiler;
 import net.minecraft.util.profiling.ProfilerFiller;
@@ -504,8 +505,14 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 	}
 
 	private void tickFov() {
-		if (SystemTimeUniforms.isDeterministicTemporalParityEnabled()) {
-			float modifier = SystemTimeUniforms.deterministicTemporalFovModifier();
+		boolean rustWholeFrame = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
+		boolean deterministicTiming = rustWholeFrame
+			? net.vulkanic.bridge.RustGalDeterministicTiming.enabled()
+			: SystemTimeUniforms.isDeterministicTemporalParityEnabled();
+		if (deterministicTiming) {
+			float modifier = rustWholeFrame
+				? net.vulkanic.bridge.RustGalDeterministicTiming.fovModifier()
+				: SystemTimeUniforms.deterministicTemporalFovModifier();
 			this.oldFovModifier = modifier;
 			this.fovModifier = modifier;
 			return;
@@ -530,7 +537,10 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 		if (this.panoramicMode) {
 			return 90.0F;
 		} else {
-			if (SystemTimeUniforms.isDeterministicTemporalParityEnabled()) {
+			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+				&& net.vulkanic.bridge.RustGalDeterministicTiming.enabled()) {
+				f = net.vulkanic.bridge.RustGalDeterministicTiming.deterministicPartialTick();
+			} else if (SystemTimeUniforms.isDeterministicTemporalParityEnabled()) {
 				f = SystemTimeUniforms.deterministicTemporalPartialTick();
 			}
 
@@ -720,14 +730,20 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 	}
 
 	public void render(DeltaTracker deltaTracker, boolean bl) {
-		// Iris: From MixinGameRenderer - set real tick delta and begin frame timers
-		float realTickDelta = SystemTimeUniforms.isDeterministicTemporalParityEnabled()
-			? SystemTimeUniforms.deterministicTemporalPartialTick()
-			: deltaTracker.getGameTimeDeltaPartialTick(true);
-		net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setRealTickDelta(realTickDelta);
-		net.irisshaders.iris.uniforms.SystemTimeUniforms.COUNTER.beginFrame();
+		boolean rustWholeFrame = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
+		// Rust owns timing and frame submission in whole-frame mode. Keep the
+		// legacy Iris counters entirely out of that renderer route.
+		float realTickDelta = rustWholeFrame
+			? net.vulkanic.bridge.RustGalDeterministicTiming.partialTick(deltaTracker)
+			: (SystemTimeUniforms.isDeterministicTemporalParityEnabled()
+				? SystemTimeUniforms.deterministicTemporalPartialTick()
+				: deltaTracker.getGameTimeDeltaPartialTick(true));
 		long shaderFrameStartNanos = net.minecraft.Util.getNanos();
-		net.irisshaders.iris.uniforms.SystemTimeUniforms.TIMER.beginFrame(shaderFrameStartNanos);
+		if (!rustWholeFrame) {
+			net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setRealTickDelta(realTickDelta);
+			net.irisshaders.iris.uniforms.SystemTimeUniforms.COUNTER.beginFrame();
+			net.irisshaders.iris.uniforms.SystemTimeUniforms.TIMER.beginFrame(shaderFrameStartNanos);
+		}
 		net.vulkanic.world.RustGalWorldPrimitiveRenderer.beginShaderPackFrame(shaderFrameStartNanos, realTickDelta);
 		
 		if (!this.minecraft.isWindowActive()
@@ -886,9 +902,7 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 		this.guiRenderState.reset();
 		net.vulkanic.world.RustGalWorldPrimitiveRenderer.clearFrame();
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.rust-vulkan.frame-reset");
-		float f = SystemTimeUniforms.isDeterministicTemporalParityEnabled()
-			? SystemTimeUniforms.deterministicTemporalPartialTick()
-			: deltaTracker.getGameTimeDeltaPartialTick(true);
+		float f = net.vulkanic.bridge.RustGalDeterministicTiming.partialTick(deltaTracker);
 		if (gameLoadFinished && bl && this.minecraft.level != null && this.minecraft.player != null) {
 			LocalPlayer localPlayer = this.minecraft.player;
 			if (this.minecraft.getCameraEntity() == null) {
@@ -911,7 +925,7 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 			) || this.minecraft.gui.getBossOverlay().shouldCreateWorldFog();
 			// Whole-frame Vulkan does not use the Java fog UBO. Publish the same
 			// computed gameplay fog record before Rust extracts source semantics.
-			this.fogRenderer.collectFogParameters(
+			net.sodium.client.util.FogParameters wholeFrameFog = this.fogRenderer.collectFogParameters(
 				this.mainCamera,
 				this.minecraft.options.getEffectiveRenderDistance(),
 				worldFog,
@@ -919,12 +933,20 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 				this.getDarkenWorldAmount(f),
 				this.minecraft.level
 			);
+			int wholeFrameFogColor = ARGB.color(
+				255,
+				Mth.clamp(Math.round(wholeFrameFog.red() * 255.0F), 0, 255),
+				Mth.clamp(Math.round(wholeFrameFog.green() * 255.0F), 0, 255),
+				Mth.clamp(Math.round(wholeFrameFog.blue() * 255.0F), 0, 255)
+			);
 			float h = this.getFov(this.mainCamera, f, true);
 			Matrix4f projection = this.getProjectionMatrix(h);
 			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.rust-vulkan.camera-setup");
 			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.rust-vulkan.matrix-build");
 			PoseStack poseStack = new PoseStack();
-			areShadersOn = net.irisshaders.iris.Iris.isPackInUseQuick();
+			// Whole-frame Vulkan uses the source collector's immutable pack
+			// readiness signal, never Iris's renderer-facing runtime state.
+			areShadersOn = net.vulkanic.shaderpack.RustShaderPackSourceCollector.activeConfiguredPackName().isPresent();
 			if (areShadersOn) {
 				poseStack.pushPose();
 				poseStack.last().pose().identity();
@@ -969,7 +991,9 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 					net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.distant-horizons.enqueue");
 				}
 				net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.background.enqueue");
-				net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueWorldBackground(this.minecraft.level, this.mainCamera, f);
+				net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueWorldBackground(
+					this.minecraft.level, this.mainCamera, f, wholeFrameFogColor
+				);
 				net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.background.enqueue");
 				net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.enqueue");
 				this.minecraft.levelRenderer.enqueueRustGalStaticTerrainForWholeFrame(this.mainCamera, view, projection);
@@ -1017,12 +1041,46 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 			this.minecraft.gui.renderSavingIndicator(guiGraphics, deltaTracker);
 			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("gui.saving-indicator");
 		}
+		if (bl && this.minecraft.getOverlay() != null) {
+			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("gui.loading-overlay-semantic-extraction");
+			this.minecraft.getOverlay().render(
+				guiGraphics,
+				(int)this.minecraft.mouseHandler.getScaledXPos(this.minecraft.getWindow()),
+				(int)this.minecraft.mouseHandler.getScaledYPos(this.minecraft.getWindow()),
+				deltaTracker.getGameTimeDeltaTicks()
+			);
+			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("gui.loading-overlay-semantic-extraction");
+		} else if (gameLoadFinished && bl && this.minecraft.screen != null) {
+			if (!(this.minecraft.screen instanceof net.minecraft.client.gui.screens.TitleScreen)
+				&& !(this.minecraft.screen instanceof net.minecraft.client.gui.screens.LevelLoadingScreen)) {
+				throw new IllegalStateException("Rust whole-frame Vulkan has no complete semantic route for screen "
+					+ this.minecraft.screen.getClass().getName());
+			}
+			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("gui.screen-semantic-extraction");
+			this.minecraft.screen.renderWithTooltipAndSubtitles(
+				guiGraphics,
+				(int)this.minecraft.mouseHandler.getScaledXPos(this.minecraft.getWindow()),
+				(int)this.minecraft.mouseHandler.getScaledYPos(this.minecraft.getWindow()),
+				deltaTracker.getGameTimeDeltaTicks()
+			);
+			if (net.minecraft.SharedConstants.DEBUG_CURSOR_POS) {
+				this.minecraft.mouseHandler.drawDebugMouseInfo(this.minecraft.font, guiGraphics);
+			}
+			this.minecraft.screen.handleDelayedNarration();
+			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("gui.screen-semantic-extraction");
+		}
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("gui.text-semantic-enqueue");
 		this.guiRenderer.collectRustGalTextSemantics();
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("gui.text-semantic-enqueue");
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("gui.item-semantic-enqueue");
 		this.guiRenderer.collectRustGalItemSemantics();
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("gui.item-semantic-enqueue");
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("gui.rectangle-semantic-enqueue");
+		this.guiRenderer.collectRustGalRectangleSemantics();
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("gui.rectangle-semantic-enqueue");
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("gui.file-backed-blit-semantic-enqueue");
+		this.guiRenderer.collectRustGalCopiedBlitSemantics();
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("gui.file-backed-blit-semantic-enqueue");
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.rust-vulkan.semantic-gui-extraction");
 		profilerFiller.popPush("rustVulkanWholeFramePresent");
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.rust-vulkan.frame-coordinator");

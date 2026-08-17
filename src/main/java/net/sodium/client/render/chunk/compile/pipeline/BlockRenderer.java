@@ -84,8 +84,12 @@ public class BlockRenderer extends AbstractBlockRenderContext implements net.iri
     }
 
     public void renderModel(BlockStateModel model, BlockState state, BlockPos pos, BlockPos origin) {
-        // Iris: From MixinBlockRenderer - check for block type override at HEAD
-        if (net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getBlockTypeIds().containsKey(state.getBlock())) {
+        // The whole-frame Vulkan source owns the compact semantic layout and
+        // must not read Iris material-map state.  Iris overrides remain a
+        // private compatibility concern for the legacy renderer.
+        if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+                && net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE
+                .getBlockTypeIds().containsKey(state.getBlock())) {
             iris$hasOverride = true;
         }
         

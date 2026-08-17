@@ -46,6 +46,9 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable,
 	public int width;
 	public int height;
 	public int mipLevel;
+	private long semanticSnapshotGeneration;
+	@Nullable
+	private TextureAtlas.SemanticRawSnapshot semanticRawSnapshot;
 	
 	// Iris PBR: From texture.pbr.MixinTextureAtlas - PBR atlas holder
 	@Nullable
@@ -67,7 +70,8 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable,
 	}
 
 	private void refreshVulkanMipmaps() {
-		if (this.texture == null || this.texture.getMipLevels() <= 1 || !VulkanicAPI.isVulkanBackendSelected()) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| this.texture == null || this.texture.getMipLevels() <= 1 || !VulkanicAPI.isVulkanBackendSelected()) {
 			return;
 		}
 
@@ -75,10 +79,25 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable,
 	}
 
 	public void upload(SpriteLoader.Preparations preparations) {
-		this.createTexture(preparations.width(), preparations.height(), preparations.mipLevel());
+		boolean rustWholeFrame = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
+		if (rustWholeFrame) {
+			// Semantic GUI consumers retain only the stitched CPU source. Do not
+			// allocate a Java texture/view merely to provide metadata that Rust
+			// already receives as an explicit raw-image asset.
+			this.close();
+			this.width = preparations.width();
+			this.height = preparations.height();
+			this.mipLevel = preparations.mipLevel();
+		} else {
+			this.createTexture(preparations.width(), preparations.height(), preparations.mipLevel());
+		}
 		this.clearTextureData();
-		this.setFilter(false, this.mipLevel > 1);
+		if (!rustWholeFrame) {
+			this.setFilter(false, this.mipLevel > 1);
+		}
 		this.texturesByName = Map.copyOf(preparations.regions());
+		this.semanticSnapshotGeneration++;
+		this.semanticRawSnapshot = null;
 		this.missingSprite = (TextureAtlasSprite)this.texturesByName.get(MissingTextureAtlasSprite.getLocation());
 		if (this.missingSprite == null) {
 			throw new IllegalStateException("Atlas '" + this.location + "' (" + this.texturesByName.size() + " sprites) has no missing texture sprite");
@@ -89,17 +108,19 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable,
 			for (TextureAtlasSprite textureAtlasSprite : preparations.regions().values()) {
 				list.add(textureAtlasSprite.contents());
 
-				try {
-					textureAtlasSprite.uploadFirstFrame(this.texture);
-				} catch (Throwable var10) {
-					CrashReport crashReport = CrashReport.forThrowable(var10, "Stitching texture atlas");
-					CrashReportCategory crashReportCategory = crashReport.addCategory("Texture being stitched together");
-					crashReportCategory.setDetail("Atlas path", this.location);
-					crashReportCategory.setDetail("Sprite", textureAtlasSprite);
-					throw new ReportedException(crashReport);
+				if (!rustWholeFrame) {
+					try {
+						textureAtlasSprite.uploadFirstFrame(this.texture);
+					} catch (Throwable var10) {
+						CrashReport crashReport = CrashReport.forThrowable(var10, "Stitching texture atlas");
+						CrashReportCategory crashReportCategory = crashReport.addCategory("Texture being stitched together");
+						crashReportCategory.setDetail("Atlas path", this.location);
+						crashReportCategory.setDetail("Sprite", textureAtlasSprite);
+						throw new ReportedException(crashReport);
+					}
 				}
 
-				TextureAtlasSprite.Ticker ticker = textureAtlasSprite.createTicker();
+				TextureAtlasSprite.Ticker ticker = rustWholeFrame ? null : textureAtlasSprite.createTicker();
 				if (ticker != null) {
 					list2.add(ticker);
 				}
@@ -120,13 +141,15 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable,
 			}
 		}
 		
-		// Call hooks after atlas upload
-		for (TextureAtlasHooks hook : HookRegistry.getTextureAtlasHooks()) {
-			hook.onAtlasUpload(this, this.location, preparations);
+		if (!rustWholeFrame) {
+			// Call hooks after atlas upload
+			for (TextureAtlasHooks hook : HookRegistry.getTextureAtlasHooks()) {
+				hook.onAtlasUpload(this, this.location, preparations);
+			}
+
+			// Iris PBR: From texture.pbr.MixinTextureAtlas - track texture after upload
+			net.irisshaders.iris.pbr.TextureTracker.INSTANCE.trackTexture(net.vulkanic.VulkanicCoreAPI.textureId(texture), this);
 		}
-		
-		// Iris PBR: From texture.pbr.MixinTextureAtlas - track texture after upload
-		net.irisshaders.iris.pbr.TextureTracker.INSTANCE.trackTexture(net.vulkanic.VulkanicCoreAPI.textureId(texture), this);
 	}
 
 	@Override
@@ -178,6 +201,9 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable,
 	}
 
 	public void cycleAnimationFrames() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			return;
+		}
 		if (this.texture != null) {
 			for (TextureAtlasSprite.Ticker ticker : this.animatedTextures) {
 				ticker.tickAndUpload(this.texture);
@@ -222,6 +248,74 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable,
 		this.animatedTextures = List.of();
 		this.texturesByName = Map.of();
 		this.missingSprite = null;
+		this.semanticSnapshotGeneration++;
+		this.semanticRawSnapshot = null;
+	}
+
+	/**
+	 * Bounded CPU copy of the exact first-frame atlas composition. This is a
+	 * semantic resource-pack snapshot for Rust whole-frame consumers; it does
+	 * not read or expose the Java GPU texture.
+	 */
+	@Nullable
+	public synchronized TextureAtlas.SemanticRawSnapshot semanticRawSnapshot() {
+		if (this.width <= 0 || this.height <= 0 || this.texturesByName.isEmpty()
+			|| (long)this.width * this.height > 16L * 1024L * 1024L) {
+			return null;
+		}
+		if (this.semanticRawSnapshot != null && this.semanticRawSnapshot.generation() == this.semanticSnapshotGeneration) {
+			return this.semanticRawSnapshot;
+		}
+		byte[] pixels;
+		try {
+			pixels = new byte[Math.multiplyExact(Math.multiplyExact(this.width, this.height), 4)];
+		} catch (ArithmeticException error) {
+			return null;
+		}
+		for (TextureAtlasSprite sprite : this.texturesByName.values()) {
+			SpriteContents contents = sprite.contents();
+			int sourceX = 0;
+			int sourceY = 0;
+			if (contents.animatedTexture != null) {
+				if (contents.animatedTexture.frames.isEmpty()) {
+					return null;
+				}
+				int frame = contents.animatedTexture.frames.getFirst().index();
+				sourceX = contents.animatedTexture.getFrameX(frame) * contents.width();
+				sourceY = contents.animatedTexture.getFrameY(frame) * contents.height();
+			}
+			if (sprite.getX() < 0 || sprite.getY() < 0 || sprite.getX() + contents.width() > this.width
+				|| sprite.getY() + contents.height() > this.height
+				|| sourceX + contents.width() > contents.originalImage.getWidth()
+				|| sourceY + contents.height() > contents.originalImage.getHeight()) {
+				return null;
+			}
+			for (int y = 0; y < contents.height(); y++) {
+				for (int x = 0; x < contents.width(); x++) {
+					int argb = contents.originalImage.getPixel(sourceX + x, sourceY + y);
+					int offset = ((sprite.getY() + y) * this.width + sprite.getX() + x) * 4;
+					pixels[offset] = (byte)net.minecraft.util.ARGB.red(argb);
+					pixels[offset + 1] = (byte)net.minecraft.util.ARGB.green(argb);
+					pixels[offset + 2] = (byte)net.minecraft.util.ARGB.blue(argb);
+					pixels[offset + 3] = (byte)net.minecraft.util.ARGB.alpha(argb);
+				}
+			}
+		}
+		this.semanticRawSnapshot = new TextureAtlas.SemanticRawSnapshot(
+			this.location, this.semanticSnapshotGeneration, this.width, this.height, pixels
+		);
+		return this.semanticRawSnapshot;
+	}
+
+	public record SemanticRawSnapshot(ResourceLocation atlasLocation, long generation, int width, int height, byte[] pixels) {
+		public SemanticRawSnapshot {
+			pixels = pixels.clone();
+		}
+
+		@Override
+		public byte[] pixels() {
+			return this.pixels.clone();
+		}
 	}
 
 	public ResourceLocation location() {

@@ -103,6 +103,7 @@ import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
 public class Gui {
+	private static final ResourceLocation VOXELMAP_MINIMAP_HUD_ELEMENT = ResourceLocation.parse("voxelmap:minimap");
 	private static final ResourceLocation CROSSHAIR_SPRITE = ResourceLocation.withDefaultNamespace("hud/crosshair");
 	private static final ResourceLocation CROSSHAIR_ATTACK_INDICATOR_FULL_SPRITE = ResourceLocation.withDefaultNamespace("hud/crosshair_attack_indicator_full");
 	private static final ResourceLocation CROSSHAIR_ATTACK_INDICATOR_BACKGROUND_SPRITE = ResourceLocation.withDefaultNamespace(
@@ -238,8 +239,12 @@ public class Gui {
 			return;
 		}
 		
-		// Iris: Add GL debug markers (from MixinGui)
-		net.irisshaders.iris.gl.GLDebug.pushGroup(1000, "GUI");
+		// GL debug groups are legacy Iris renderer state. Whole-frame Vulkan
+		// submits semantic HUD commands directly to Rust and must not touch it.
+		boolean legacyIrisDebugGroup = !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
+		if (legacyIrisDebugGroup) {
+			net.irisshaders.iris.gl.GLDebug.pushGroup(1000, "GUI");
+		}
 		
 		if (!(this.minecraft.screen instanceof LevelLoadingScreen)) {
 			if (!this.minecraft.options.hideGui) {
@@ -267,6 +272,10 @@ public class Gui {
 		
 		// VoxelMap: Render minimap overlay (after boss bar, before debug overlay)
 		if (!this.minecraft.options.hideGui) {
+			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+				&& net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry.isRegistered(VOXELMAP_MINIMAP_HUD_ELEMENT)) {
+				throw new IllegalStateException("Rust whole-frame Vulkan has no semantic VoxelMap minimap route; refusing its Java GPU renderer");
+			}
 			try {
 				net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry.renderAll(guiGraphics, deltaTracker);
 			} catch (Exception e) {
@@ -274,8 +283,9 @@ public class Gui {
 			}
 		}
 		
-		// Iris: End GL debug marker (from MixinGui)
-		net.irisshaders.iris.gl.GLDebug.popGroup();
+		if (legacyIrisDebugGroup) {
+			net.irisshaders.iris.gl.GLDebug.popGroup();
+		}
 	}
 
 	private void renderBossOverlay(GuiGraphics guiGraphics, DeltaTracker deltaTracker) {

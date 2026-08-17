@@ -181,7 +181,7 @@ WORLD_PROFILES = {
         True,
         "Small stable pre-generated world for every producer migration.",
         "sodium-terrain",
-        0,
+        8,
         180,
     ),
     "stress-diagnostic": WorldProfile(
@@ -8029,13 +8029,23 @@ def latest_static_terrain_coverage_event(
     stage: str,
     layer: str,
     preferred_game_time: int | None = None,
+    preferred_deterministic_frame: int | None = None,
 ) -> dict[str, object] | None:
     candidates = [
         event
         for event in events
         if event.get("stage") == stage and event.get("layer") == layer
     ]
-    if preferred_game_time is not None:
+    if preferred_deterministic_frame is not None:
+        capture_frame = [
+            event
+            for event in candidates
+            if int(parse_number(event.get("deterministicRenderedFrameIndex")) or -1)
+            == preferred_deterministic_frame
+        ]
+        if capture_frame:
+            candidates = capture_frame
+    if preferred_game_time is not None and preferred_deterministic_frame is None:
         synchronized = [
             event for event in candidates
             if int(parse_number(event.get("gameTime")) or -1) == preferred_game_time
@@ -8051,6 +8061,33 @@ def latest_static_terrain_coverage_event(
         int(parse_number(event.get("frameId")) or -1),
         int(parse_number(event.get("eventIndex")) or -1),
     )))
+
+
+def deterministic_capture_rendered_frame_index(artifact_path: Path) -> int | None:
+    """Return the exact deterministic screenshot frame retained by an artifact."""
+    artifact = read_json(artifact_path)
+    if not isinstance(artifact, Mapping):
+        return None
+    capture = artifact.get("capture")
+    if not isinstance(capture, Mapping):
+        return None
+    files = capture.get("files")
+    if not isinstance(files, Mapping):
+        return None
+    deterministic_path = files.get("deterministic")
+    if not deterministic_path:
+        return None
+    deterministic = read_json(Path(str(deterministic_path)))
+    if not isinstance(deterministic, Mapping):
+        return None
+    captures = deterministic.get("captures")
+    if not isinstance(captures, list) or not captures:
+        return None
+    first_capture = captures[0]
+    if not isinstance(first_capture, Mapping):
+        return None
+    frame = parse_number(first_capture.get("renderedFrameIndex"))
+    return int(frame) if frame is not None else None
 
 
 def static_terrain_records_from_event(event: Mapping[str, object] | None) -> dict[tuple[str, str], dict[str, object]]:
@@ -8079,7 +8116,35 @@ def static_terrain_nonempty_records(
     }
 
 
-def latest_static_terrain_execution_records(events: Sequence[Mapping[str, object]]) -> dict[tuple[str, str], dict[str, object]]:
+def latest_static_terrain_execution_events(
+    events: Sequence[Mapping[str, object]],
+    preferred_deterministic_frame: int | None = None,
+) -> list[Mapping[str, object]]:
+    """Return backend-executed terrain receipts for the capture frame when available.
+
+    The grouped receipt is emitted after Rust encodes the real mesh instances;
+    it is intentionally preferred over capped per-instance trace events.
+    """
+    grouped = [
+        event for event in events
+        if event.get("stage") == "rust-vulkan-executed-coverage"
+        and isinstance(event.get("records"), list)
+        and event.get("records")
+    ]
+    if preferred_deterministic_frame is not None:
+        exact_grouped = [
+            event for event in grouped
+            if int(parse_number(event.get("deterministicRenderedFrameIndex")) or -1)
+            == preferred_deterministic_frame
+        ]
+        if exact_grouped:
+            return exact_grouped
+    if grouped:
+        max_frame = max(int(parse_number(event.get("frameId")) or -1) for event in grouped)
+        return [
+            event for event in grouped
+            if int(parse_number(event.get("frameId")) or -1) == max_frame
+        ]
     executed = [
         event for event in events
         if event.get("stage") == "rust-vulkan-executed"
@@ -8087,32 +8152,34 @@ def latest_static_terrain_execution_records(events: Sequence[Mapping[str, object
         and event.get("records")
     ]
     if not executed:
-        return {}
+        return []
     max_frame = max(int(parse_number(event.get("frameId")) or -1) for event in executed)
-    latest = [
+    return [
         event for event in executed
         if int(parse_number(event.get("frameId")) or -1) == max_frame
     ]
+
+
+def latest_static_terrain_execution_records(
+    events: Sequence[Mapping[str, object]],
+    preferred_deterministic_frame: int | None = None,
+) -> dict[tuple[str, str], dict[str, object]]:
+    latest = latest_static_terrain_execution_events(events, preferred_deterministic_frame)
+    if not latest:
+        return {}
     records: dict[tuple[str, str], dict[str, object]] = {}
     for event in latest:
         records.update(static_terrain_records_from_event(event))
     return records
 
 
-def latest_static_terrain_execution_game_time(events: Sequence[Mapping[str, object]]) -> int | None:
-    executed = [
-        event for event in events
-        if event.get("stage") == "rust-vulkan-executed"
-        and isinstance(event.get("records"), list)
-        and event.get("records")
-    ]
-    if not executed:
+def latest_static_terrain_execution_game_time(
+    events: Sequence[Mapping[str, object]],
+    preferred_deterministic_frame: int | None = None,
+) -> int | None:
+    latest = latest_static_terrain_execution_events(events, preferred_deterministic_frame)
+    if not latest:
         return None
-    max_frame = max(int(parse_number(event.get("frameId")) or -1) for event in executed)
-    latest = [
-        event for event in executed
-        if int(parse_number(event.get("frameId")) or -1) == max_frame
-    ]
     selected = max(latest, key=lambda event: int(parse_number(event.get("eventIndex")) or -1))
     game_time = parse_number(selected.get("gameTime"))
     return int(game_time) if game_time is not None else None
@@ -8197,8 +8264,9 @@ def cross_repository_static_terrain_draw_coverage_report(cross_repo_parity: Mapp
             failures.append("frozen_static_terrain_coverage_parse_error")
         if current_parse_errors:
             failures.append("current_static_terrain_coverage_parse_error")
-        current_executed_records = latest_static_terrain_execution_records(current_events)
-        current_execution_game_time = latest_static_terrain_execution_game_time(current_events)
+        current_capture_frame = deterministic_capture_rendered_frame_index(current_artifact)
+        current_executed_records = latest_static_terrain_execution_records(current_events, current_capture_frame)
+        current_execution_game_time = latest_static_terrain_execution_game_time(current_events, current_capture_frame)
         current_non_execution_reasons = latest_static_terrain_non_execution_reasons(current_events)
         for layer in ("solid", "cutout"):
             baseline_event = latest_static_terrain_coverage_event(baseline_events, "java-opengl-draw-coverage", layer)
@@ -8207,6 +8275,7 @@ def cross_repository_static_terrain_draw_coverage_report(cross_repo_parity: Mapp
                 "rust-vulkan-enqueue-source-coverage",
                 layer,
                 current_execution_game_time,
+                current_capture_frame,
             )
             baseline_records = static_terrain_records_from_event(baseline_event)
             current_records = static_terrain_records_from_event(current_event)
@@ -14104,6 +14173,20 @@ def build_capture_command(
     requested_validation = "routine" if args.validation == "standard" else args.validation
     validation = "standard" if mode.supports_validation and requested_validation != "off" else "off"
     static_terrain_scenario = str(getattr(args, "world_static_terrain_scenario", "") or "").strip()
+    shell_settled_static_capture = (
+        kind == "shell"
+        and tool_kind == "capture"
+        and workload_profile == "settled-static"
+    )
+    # The explicit Rust CPU terrain source must settle its full visible vertical
+    # volume before a parity screenshot is admissible. Keep the same bounded
+    # frame allowance on both repositories; the standard outer wall-clock
+    # profile may still reject a slow machine rather than capture partial work.
+    settled_static_ready_max_wait_frames = (
+        (900 if args.profile == "extended" else 300)
+        if (tool_kind == "capture" and workload_profile == "settled-static")
+        else world_profile.deterministic_ready_max_wait_frames
+    )
     selected_source_moving_mesh_capture = (
         tool_kind == "capture"
         and mode.backend == "rust-vulkan"
@@ -14324,9 +14407,29 @@ def build_capture_command(
             f"-Dmattmc.dev.graphicsWorldProfile={world_profile.name}",
             f"-Dmattmc.dev.deterministicCameraCapture.settledReadyFamilies={world_profile.deterministic_ready_families}",
             f"-Dmattmc.dev.deterministicCameraCapture.settledReadyFrames={world_profile.deterministic_ready_frames}",
-            f"-Dmattmc.dev.deterministicCameraCapture.settledReadyMaxWaitFrames={world_profile.deterministic_ready_max_wait_frames}",
+            f"-Dmattmc.dev.deterministicCameraCapture.settledReadyMaxWaitFrames={settled_static_ready_max_wait_frames}",
         ]
     )
+    if shell_settled_static_capture:
+        # The Frozen baseline runs through its shell capture entrypoint, so it
+        # cannot receive capture_runner.py's --deterministic-static-camera-
+        # capture switch.  Supply the same Java-only readiness protocol here.
+        # This changes neither Frozen's renderer nor its route selection; it
+        # merely prevents the harness from photographing the first unloaded
+        # frame while Current waits for settled terrain work.
+        static_parity_path = capture_dir / f"static_terrain_parity_diagnostics_{timestamp()}.jsonl"
+        java_options.extend(
+            [
+                "-Dmattmc.dev.staticTerrainParityDiagnostics=true",
+                f"-Dmattmc.dev.staticTerrainParityDiagnostics.path={static_parity_path}",
+                "-Dmattmc.dev.staticTerrainParityDiagnostics.waitForStable=true",
+                "-Dmattmc.dev.staticTerrainParityDiagnostics.readyFrames=3",
+                "-Dmattmc.dev.staticTerrainParityDiagnostics.maxSamples=512",
+                "-Dmattmc.dev.staticTerrainParityDiagnostics.maxCoverageSamples=1024",
+                "-Dmattmc.dev.staticTerrainParityDiagnostics.maxCoverageEvents=16384",
+                "-Dmattmc.dev.staticTerrainParityDiagnostics.maxFaceCullTraceEvents=16384",
+            ]
+        )
     dh_opaque_only = bool(getattr(args, "world_distant_horizons_opaque", False))
     dh_non_water = bool(getattr(args, "world_distant_horizons_non_water", False))
     dh_water = bool(getattr(args, "world_distant_horizons_water", False))

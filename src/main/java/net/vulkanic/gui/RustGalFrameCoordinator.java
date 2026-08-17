@@ -33,6 +33,19 @@ public final class RustGalFrameCoordinator {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private static final Object LOCK = new Object();
 	private static VulkanicGalBridge bridge;
+	/**
+	 * The bridge owns a native graphics context for its entire lifetime.  These
+	 * modes must never be interchanged: doing so would let a whole-frame Vulkan
+	 * submission accidentally reach the borrowed OpenGL bridge created by the
+	 * partial-frame route.
+	 */
+	private enum BridgeMode {
+		NONE,
+		BORROWED_OPENGL,
+		WINDOWED_VULKAN
+	}
+
+	private static BridgeMode bridgeMode = BridgeMode.NONE;
 	private static Thread renderThread;
 	private static int configuredWidth;
 	private static int configuredHeight;
@@ -128,9 +141,22 @@ public final class RustGalFrameCoordinator {
 		GuiRenderStratum stratum,
 		long startedNanos
 	) {
+		return enqueueGuiAffineQuadRequest(request, stratum.id(), stratum.order(), startedNanos);
+	}
+
+	/** Queues an explicitly ordered whole-frame GUI primitive without a fixed HUD stratum. */
+	static RustGalFrameScheduler.Token enqueueGuiAffineQuadRequest(
+		VulkanicGalBridge.GuiAffineQuadRecord request,
+		String semanticLayerId,
+		int semanticLayerOrder,
+		long startedNanos
+	) {
+		if (semanticLayerId == null || semanticLayerId.isBlank() || semanticLayerOrder < 0) {
+			throw new IllegalArgumentException("invalid semantic GUI layer");
+		}
 		synchronized (LOCK) {
 			RustGalFrameScheduler.Token token = SCHEDULER.enqueue(
-				generation, stratum.id(), stratum.order(), QueuedGuiRequest.affineQuad(request));
+				generation, semanticLayerId, semanticLayerOrder, QueuedGuiRequest.affineQuad(request));
 			METRICS.enqueueNanos += elapsedSince(startedNanos);
 			return token;
 		}
@@ -141,9 +167,22 @@ public final class RustGalFrameCoordinator {
 		GuiRenderStratum stratum,
 		long startedNanos
 	) {
+		return enqueueGuiMeshItemRequest(batches, stratum.id(), stratum.order(), startedNanos);
+	}
+
+	/** Queues a whole-frame GUI mesh item at its explicit source-layer position. */
+	static RustGalFrameScheduler.Token enqueueGuiMeshItemRequest(
+		List<VulkanicGalBridge.GuiMeshBatchRecord> batches,
+		String semanticLayerId,
+		int semanticLayerOrder,
+		long startedNanos
+	) {
+		if (semanticLayerId == null || semanticLayerId.isBlank() || semanticLayerOrder < 0) {
+			throw new IllegalArgumentException("invalid semantic GUI layer");
+		}
 		synchronized (LOCK) {
 			RustGalFrameScheduler.Token token = SCHEDULER.enqueue(
-				generation, stratum.id(), stratum.order(), QueuedGuiRequest.meshBatches(batches));
+				generation, semanticLayerId, semanticLayerOrder, QueuedGuiRequest.meshBatches(batches));
 			METRICS.enqueueNanos += elapsedSince(startedNanos);
 			return token;
 		}
@@ -371,6 +410,8 @@ public final class RustGalFrameCoordinator {
 			retireOutstanding(true);
 			auditMessage(metricsAuditLine(0L, METRICS.frames, lastSubmitted, RustGalGuiRenderer.isWholeFrameVulkanEnabled()));
 			bridge = null;
+			bridgeMode = BridgeMode.NONE;
+			RustGalVulkanWholeFrameMode.deactivateRustPresentation();
 			renderThread = null;
 			lastSubmitted = 0L;
 			lastRetiredSubmission = 0L;
@@ -1378,8 +1419,13 @@ public final class RustGalFrameCoordinator {
 		if (!VulkanicGalBridge.isBorrowedOpenGlContextCurrent(window)) {
 			throw new IllegalStateException("Rust VulkanicGAL deferred OpenGL execution requires Minecraft's current GL context");
 		}
+		if (bridge != null && bridgeMode != BridgeMode.BORROWED_OPENGL) {
+			throw new IllegalStateException("Rust VulkanicGAL borrowed OpenGL execution cannot reuse a "
+				+ bridgeMode + " bridge");
+		}
 		if (bridge == null) {
 			bridge = VulkanicGalBridge.createBorrowedOpenGl(window);
+			bridgeMode = BridgeMode.BORROWED_OPENGL;
 			recordFixedOperation(Operation.CONTEXT_CREATE, VulkanicGalBridge.Struct.BORROWED_OPENGL_CONTEXT_CREATE.byteSize());
 			recordFixedOperation(Operation.CAPABILITY_QUERY, VulkanicGalBridge.Struct.CAPABILITY_QUERY.byteSize());
 			flushPendingGuiAssetsLocked();
@@ -1397,6 +1443,10 @@ public final class RustGalFrameCoordinator {
 			throw new IllegalStateException("Rust VulkanicGAL whole-frame queue used from the wrong render thread");
 		}
 		Window window = minecraft.getWindow();
+		if (bridge != null && bridgeMode != BridgeMode.WINDOWED_VULKAN) {
+			throw new IllegalStateException("Rust Vulkan whole-frame execution cannot reuse a "
+				+ bridgeMode + " bridge; create a Rust-owned windowed Vulkan context instead");
+		}
 		if (bridge == null) {
 			bridge = VulkanicGalBridge.createWindowedVulkan(
 				window,
@@ -1404,6 +1454,11 @@ public final class RustGalFrameCoordinator {
 				Math.max(1, window.getHeight()),
 				wholeFramePresentMode(minecraft)
 			);
+			bridgeMode = BridgeMode.WINDOWED_VULKAN;
+			// From this point the Rust bridge owns the only active presenter.
+			// Do not let normal Java backend lookups fall back to the temporary
+			// OpenGL bootstrap backend while the frame route is live.
+			RustGalVulkanWholeFrameMode.activateRustPresentation();
 			recordFixedOperation(Operation.CONTEXT_CREATE, VulkanicGalBridge.Struct.WINDOWED_VULKAN_CONTEXT_CREATE.byteSize());
 			recordFixedOperation(Operation.CAPABILITY_QUERY, VulkanicGalBridge.Struct.CAPABILITY_QUERY.byteSize());
 			flushPendingGuiAssetsLocked();
@@ -1420,10 +1475,10 @@ public final class RustGalFrameCoordinator {
 			return;
 		}
 		if (configuredWidth == 0 || configuredHeight == 0) {
-			String label = RustGalGuiRenderer.isWholeFrameVulkanEnabled() && VulkanicAPI.isVulkanBackendSelected()
+			String label = bridgeMode == BridgeMode.WINDOWED_VULKAN
 				? "minecraft.rust-vulkan.swapchain"
 				: "minecraft.borrowed.opengl.default";
-			int presentMode = RustGalGuiRenderer.isWholeFrameVulkanEnabled() && VulkanicAPI.isVulkanBackendSelected()
+			int presentMode = bridgeMode == BridgeMode.WINDOWED_VULKAN
 				? wholeFramePresentMode(Minecraft.getInstance())
 				: VulkanicGalBridge.PRESENT_FIFO;
 			recordStatus(Operation.FRAME_CONFIGURE, bridge.configureFrame(

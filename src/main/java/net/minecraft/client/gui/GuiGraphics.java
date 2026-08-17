@@ -539,10 +539,13 @@ public class GuiGraphics {
 	) {
 		if (k > 0 && l > 0) {
 			if (o > 0 && p > 0) {
-				GpuTextureView gpuTextureView = this.minecraft.getTextureManager().getTexture(textureAtlasSprite.atlasLocation()).getTextureView();
+				GpuTextureView gpuTextureView = net.vulkanic.gui.RustGalGuiRenderer.isWholeFrameVulkanActive()
+					? null
+					: this.minecraft.getTextureManager().getTexture(textureAtlasSprite.atlasLocation()).getTextureView();
 				this.submitTiledBlit(
 					renderPipeline,
 					gpuTextureView,
+					textureAtlasSprite.atlasLocation(),
 					o,
 					p,
 					i,
@@ -584,26 +587,52 @@ public class GuiGraphics {
 	}
 
 	private void innerBlit(RenderPipeline renderPipeline, ResourceLocation resourceLocation, int i, int j, int k, int l, float f, float g, float h, float m, int n) {
-		GpuTextureView gpuTextureView = this.minecraft.getTextureManager().getTexture(resourceLocation).getTextureView();
-		this.submitBlit(renderPipeline, gpuTextureView, i, k, j, l, f, g, h, m, n);
+		GpuTextureView gpuTextureView = net.vulkanic.gui.RustGalGuiRenderer.isWholeFrameVulkanActive()
+			? null
+			: this.minecraft.getTextureManager().getTexture(resourceLocation).getTextureView();
+		this.submitBlit(renderPipeline, gpuTextureView, resourceLocation, i, k, j, l, f, g, h, m, n);
 	}
 
 	private void submitBlit(RenderPipeline renderPipeline, GpuTextureView gpuTextureView, int i, int j, int k, int l, float f, float g, float h, float m, int n) {
+		this.submitBlit(renderPipeline, gpuTextureView, null, i, j, k, l, f, g, h, m, n);
+	}
+
+	private void submitBlit(
+		RenderPipeline renderPipeline,
+		GpuTextureView gpuTextureView,
+		@Nullable ResourceLocation semanticTexture,
+		int i,
+		int j,
+		int k,
+		int l,
+		float f,
+		float g,
+		float h,
+		float m,
+		int n
+	) {
+		TextureSetup textureSetup = semanticTexture != null && net.vulkanic.gui.RustGalGuiRenderer.isWholeFrameVulkanActive()
+			? TextureSetup.noTexture()
+			: TextureSetup.singleTexture(gpuTextureView);
 		this.guiRenderState
 			.submitGuiElement(
 				new BlitRenderState(
-					renderPipeline, TextureSetup.singleTexture(gpuTextureView), new Matrix3x2f(this.pose), i, j, k, l, f, g, h, m, n, this.scissorStack.peek()
+					renderPipeline, textureSetup, semanticTexture, new Matrix3x2f(this.pose), i, j, k, l, f, g, h, m, n, this.scissorStack.peek()
 				)
 			);
 	}
 
 	private void submitTiledBlit(
-		RenderPipeline renderPipeline, GpuTextureView gpuTextureView, int i, int j, int k, int l, int m, int n, float f, float g, float h, float o, int p
+		RenderPipeline renderPipeline, GpuTextureView gpuTextureView, ResourceLocation semanticTexture,
+		int i, int j, int k, int l, int m, int n, float f, float g, float h, float o, int p
 	) {
+		TextureSetup textureSetup = semanticTexture != null && net.vulkanic.gui.RustGalGuiRenderer.isWholeFrameVulkanActive()
+			? TextureSetup.noTexture()
+			: TextureSetup.singleTexture(gpuTextureView);
 		this.guiRenderState
 			.submitGuiElement(
 				new TiledBlitRenderState(
-					renderPipeline, TextureSetup.singleTexture(gpuTextureView), new Matrix3x2f(this.pose), i, j, k, l, m, n, f, g, h, o, p, this.scissorStack.peek()
+					renderPipeline, textureSetup, semanticTexture, new Matrix3x2f(this.pose), i, j, k, l, m, n, f, g, h, o, p, this.scissorStack.peek()
 				)
 			);
 	}
@@ -897,6 +926,9 @@ public class GuiGraphics {
 	}
 
 	public void submitMapRenderState(MapRenderState mapRenderState) {
+		if (net.vulkanic.gui.RustGalGuiRenderer.isWholeFrameVulkanActive()) {
+			throw new IllegalStateException("Rust whole-frame Vulkan has no semantic map-GUI route; refusing Java texture-view rendering");
+		}
 		Minecraft minecraft = Minecraft.getInstance();
 		TextureManager textureManager = minecraft.getTextureManager();
 		GpuTextureView gpuTextureView = textureManager.getTexture(mapRenderState.texture).getTextureView();

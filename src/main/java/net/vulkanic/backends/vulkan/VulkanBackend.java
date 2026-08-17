@@ -692,6 +692,12 @@ void main() {
     }
 
     public long prepareRendererBootstrapWindow(long mainWindowHandle) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			// The Rust presenter creates its own Vulkan context later from the
+			// actual game window.  Whole-frame startup must not create a hidden GL
+			// window merely to satisfy legacy renderer allocation APIs.
+			return mainWindowHandle;
+		}
         if (auxiliaryOpenGlContextWindow != MemoryUtil.NULL) {
             return auxiliaryOpenGlContextWindow;
         }
@@ -721,6 +727,12 @@ void main() {
         boolean debugLabelsEnabled
     ) {
         boolean compatibilityOnly = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
+		if (compatibilityOnly) {
+			this.compatibilityDevice = null;
+			this.compatibilityBackend = null;
+			this.rendererDebuggingEnabled = false;
+			return new VulkanWholeFrameSemanticGpuDevice();
+		}
         GraphicsBackend compatibilityBackend = compatibilityOnly
             ? net.vulkanic.VulkanicAPI.createOpenGlCompatibilityBackendForVulkanShell()
             : null;
@@ -1086,8 +1098,18 @@ void main() {
 
     public void onRendererDeviceInitialized(long mainWindowHandle, GpuDevice gpuDevice) {
         if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-            LOGGER.info("Rust Vulkan whole-frame shell enabled; skipping Java Vulkan renderer swapchain startup.");
-            initializeVulkanCompatibilityHooks(mainWindowHandle);
+            LOGGER.info("Rust Vulkan whole-frame shell enabled; skipping Java Vulkan and Iris GPU renderer startup.");
+
+            // The shell may still have been constructed before the native
+            // Rust presenter exists, but it must not initialize or borrow an
+            // Iris GL renderer.  Rust receives copied source/configuration
+            // snapshots and owns pack pass execution once that support is
+            // coherent; until then unsupported calls fail closed at the
+            // compatibility-device boundary.
+            if (mainWindowHandle != MemoryUtil.NULL) {
+                GLFW.glfwShowWindow(mainWindowHandle);
+                GLFW.glfwFocusWindow(mainWindowHandle);
+            }
             return;
         }
 
@@ -1115,28 +1137,6 @@ void main() {
         }
 
         cleanupRendererBootstrapResources();
-    }
-
-    private void initializeVulkanCompatibilityHooks(long mainWindowHandle) {
-        withCompatibilityBackend(() -> {
-            // Iris subsystems must be initialized on the Vulkan path exactly as they are on the OpenGL path.
-            // The whole-frame Rust shell still needs these Java-side capability hooks, but Java Vulkan must not
-            // create or own the Minecraft window surface/swapchain in this mode.
-            net.irisshaders.iris.Iris.duringRenderSystemInit();
-            net.irisshaders.iris.gl.GLDebug.reloadDebugState();
-            net.irisshaders.iris.gl.IrisRenderSystem.initRenderer();
-            net.irisshaders.iris.samplers.IrisSamplers.initRenderer();
-            net.irisshaders.iris.Iris.onRenderSystemInit();
-
-            if (mainWindowHandle != MemoryUtil.NULL) {
-                LOGGER.info("Reasserting GLFW main window visibility/focus after Vulkan renderer startup: 0x{}",
-                    Long.toHexString(mainWindowHandle));
-                GLFW.glfwShowWindow(mainWindowHandle);
-                GLFW.glfwFocusWindow(mainWindowHandle);
-            }
-
-            return null;
-        });
     }
 
     public void cleanupRendererBootstrapResources() {

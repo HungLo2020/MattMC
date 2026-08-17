@@ -26,11 +26,22 @@ public class ChunkBuildBuffers {
 
     private final ChunkVertexType vertexType;
     private final NativeChunkVertexFormat nativeFormat;
+    private final boolean separateAo;
 
     public ChunkBuildBuffers(ChunkVertexType vertexType) {
+		this(vertexType, usesSeparateAo());
+	}
+
+	/**
+	 * Builds an explicit CPU mesh layout without consulting Iris.  The Rust
+	 * whole-frame terrain source uses the compact layout here so its semantic
+	 * mesh production has no shader-pack runtime dependency.
+	 */
+	public ChunkBuildBuffers(ChunkVertexType vertexType, boolean separateAo) {
         NativeChunkMeshEncoder.verifyAvailable();
         this.vertexType = vertexType;
         this.nativeFormat = vertexType.getNativeFormat();
+		this.separateAo = separateAo;
 
         for (TerrainRenderPass pass : DefaultTerrainRenderPasses.ALL) {
             NativeSectionMeshBuilder sectionBuilder = NativeSectionMeshBuilder.create(128 * 1024 / 4);
@@ -38,7 +49,7 @@ public class ChunkBuildBuffers {
 
             for (int facing = 0; facing < ModelQuadFacing.COUNT; facing++) {
                 vertexBuffers[facing] = new NativeSectionMeshBuilder.FacingBuffer(this.nativeFormat, sectionBuilder,
-                        facing, false);
+						facing, false, this.separateAo);
             }
 
             this.builders.put(pass, new BakedChunkModelBuilder(vertexBuffers, sectionBuilder));
@@ -81,13 +92,13 @@ public class ChunkBuildBuffers {
     public BuiltSectionMeshParts createMesh(TerrainRenderPass pass, int visibleSlices, boolean forceUnassigned, boolean sliceReordering) {
         var builder = this.builders.get(pass);
         return builder.getSectionBuilder().finishMesh(this.nativeFormat, visibleSlices,
-                forceUnassigned, sliceReordering, usesSeparateAo());
+                forceUnassigned, sliceReordering, this.separateAo);
     }
 
     public BuiltSectionMeshParts createModifiedTranslucentMesh(NativeUpdatedQuads updatedQuads) {
         var builder = this.builders.get(DefaultTerrainRenderPasses.TRANSLUCENT);
         return builder.getSectionBuilder().finishModifiedTranslucentMesh(updatedQuads, this.nativeFormat,
-                usesSeparateAo());
+                this.separateAo);
     }
 
     public int appendStaticModelSnapshot(TerrainRenderPass pass, long recordAddress, int recordCount,
@@ -98,7 +109,7 @@ public class ChunkBuildBuffers {
 
         var builder = this.builders.get(pass);
         return builder.getSectionBuilder().appendStaticModelBatchEncoded(recordAddress, recordCount,
-                this.nativeFormat, sectionIndex, usesSeparateAo(), storeRawQuads);
+                this.nativeFormat, sectionIndex, this.separateAo, storeRawQuads);
     }
 
     public int[] appendCompactNativeSectionSnapshotAllPasses(long snapshotAddress, int sectionIndex,
@@ -114,7 +125,7 @@ public class ChunkBuildBuffers {
                 ? collector.nativeAnalyzerHandle()
                 : 0L;
         return NativeSectionMeshBuilder.appendCompactNativeSectionAllPassesEncoded(solid, cutout, translucent,
-                snapshotAddress, this.nativeFormat, sectionIndex, usesSeparateAo(), analyzerHandle);
+                snapshotAddress, this.nativeFormat, sectionIndex, this.separateAo, analyzerHandle);
     }
 
     public int nativeFluidSpriteMask(TerrainRenderPass pass) {

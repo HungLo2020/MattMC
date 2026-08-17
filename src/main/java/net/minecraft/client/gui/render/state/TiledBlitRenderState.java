@@ -6,6 +6,7 @@ import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.gui.render.TextureSetup;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3x2f;
@@ -14,6 +15,7 @@ import org.joml.Matrix3x2f;
 public record TiledBlitRenderState(
 	RenderPipeline pipeline,
 	TextureSetup textureSetup,
+	@Nullable ResourceLocation semanticTexture,
 	Matrix3x2f pose,
 	int tileWidth,
 	int tileHeight,
@@ -46,7 +48,28 @@ public record TiledBlitRenderState(
 		int p,
 		@Nullable ScreenRectangle screenRectangle
 	) {
-		this(renderPipeline, textureSetup, matrix3x2f, i, j, k, l, m, n, f, g, h, o, p, screenRectangle, getBounds(k, l, m, n, matrix3x2f, screenRectangle));
+		this(renderPipeline, textureSetup, null, matrix3x2f, i, j, k, l, m, n, f, g, h, o, p, screenRectangle, getBounds(k, l, m, n, matrix3x2f, screenRectangle));
+	}
+
+	public TiledBlitRenderState(
+		RenderPipeline renderPipeline,
+		TextureSetup textureSetup,
+		@Nullable ResourceLocation semanticTexture,
+		Matrix3x2f matrix3x2f,
+		int i,
+		int j,
+		int k,
+		int l,
+		int m,
+		int n,
+		float f,
+		float g,
+		float h,
+		float o,
+		int p,
+		@Nullable ScreenRectangle screenRectangle
+	) {
+		this(renderPipeline, textureSetup, semanticTexture, matrix3x2f, i, j, k, l, m, n, f, g, h, o, p, screenRectangle, getBounds(k, l, m, n, matrix3x2f, screenRectangle));
 	}
 
 	@Override

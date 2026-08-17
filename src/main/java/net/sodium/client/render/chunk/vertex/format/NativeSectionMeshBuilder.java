@@ -373,7 +373,13 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
     public static final int PRIMITIVE_KIND_UNKNOWN = 0;
     public static final int PRIMITIVE_KIND_NON_FLUID_TRANSLUCENT = 1;
     public static final int PRIMITIVE_KIND_BUILTIN_WATER = 2;
-    public static final int PRIMITIVE_KIND_UNSUPPORTED_FLUID = 3;
+    /**
+     * Non-water fluid geometry that is fully represented by the stitched block
+     * atlas and ordinary translucent material semantics (for example lava).
+     */
+    public static final int PRIMITIVE_KIND_GENERIC_FLUID = 3;
+    /** Metadata that has no explicit semantic material contract yet. */
+    public static final int PRIMITIVE_KIND_UNSUPPORTED_FLUID = 4;
 
     private NativeSectionMeshBuilder(long handle) {
         this.state = new State(handle);
@@ -395,13 +401,13 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
     public static FacingBuffer createFacingBuffer(ChunkVertexType vertexType, int initialCapacity) {
         return new FacingBuffer(vertexType.getNativeFormat(),
                 NativeSectionMeshBuilder.create(Math.max(1, (initialCapacity + 3) >> 2)),
-                ModelQuadFacing.UNASSIGNED.ordinal(), true, true);
+				ModelQuadFacing.UNASSIGNED.ordinal(), true, true, FacingBuffer.activeSeparateAo());
     }
 
     public static FacingBuffer createEncodedFacingBuffer(ChunkVertexType vertexType, int initialCapacity) {
         return new FacingBuffer(vertexType.getNativeFormat(),
                 NativeSectionMeshBuilder.create(Math.max(1, (initialCapacity + 3) >> 2)),
-                ModelQuadFacing.UNASSIGNED.ordinal(), true, false);
+				ModelQuadFacing.UNASSIGNED.ordinal(), true, false, FacingBuffer.activeSeparateAo());
     }
 
     public void start(int sectionIndex) {
@@ -1354,6 +1360,7 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
         private final int facing;
         private final boolean ownsSectionBuilder;
         private final boolean storeRawQuads;
+		private final boolean separateAo;
         private final StagingBuffers stagingBuffers;
         private final RecordStagingBuffers recordStagingBuffers;
 
@@ -1365,21 +1372,27 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
 
         public FacingBuffer(NativeChunkVertexFormat nativeFormat, NativeSectionMeshBuilder sectionBuilder,
                 int facing) {
-            this(nativeFormat, sectionBuilder, facing, false, true);
+			this(nativeFormat, sectionBuilder, facing, false, true, activeSeparateAo());
         }
 
         public FacingBuffer(NativeChunkVertexFormat nativeFormat, NativeSectionMeshBuilder sectionBuilder,
                 int facing, boolean storeRawQuads) {
-            this(nativeFormat, sectionBuilder, facing, false, storeRawQuads);
+			this(nativeFormat, sectionBuilder, facing, false, storeRawQuads, activeSeparateAo());
         }
 
+        public FacingBuffer(NativeChunkVertexFormat nativeFormat, NativeSectionMeshBuilder sectionBuilder,
+                int facing, boolean storeRawQuads, boolean separateAo) {
+			this(nativeFormat, sectionBuilder, facing, false, storeRawQuads, separateAo);
+		}
+
         private FacingBuffer(NativeChunkVertexFormat nativeFormat, NativeSectionMeshBuilder sectionBuilder,
-                int facing, boolean ownsSectionBuilder, boolean storeRawQuads) {
+                int facing, boolean ownsSectionBuilder, boolean storeRawQuads, boolean separateAo) {
             this.nativeFormat = nativeFormat;
             this.sectionBuilder = sectionBuilder;
             this.facing = facing;
             this.ownsSectionBuilder = ownsSectionBuilder;
             this.storeRawQuads = storeRawQuads;
+			this.separateAo = separateAo;
             this.stagingBuffers = sectionBuilder.stagingBuffers(facing);
             this.recordStagingBuffers = sectionBuilder.recordStagingBuffers(facing);
             if (this.recordStagingBuffers.capacity() != this.stagingBuffers.capacity()) {
@@ -1630,8 +1643,7 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
 
             int quadCount = this.pendingQuadCount;
             TranslucentGeometryCollector collector = this.pendingCollector;
-            boolean separateAo = net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE
-                    .shouldUseSeparateAo();
+			boolean separateAo = this.separateAo;
 
             if (this.pendingKind == PENDING_LIGHT_BLOCK_RECORDS) {
                 int committedCount = this.sectionBuilder.appendLightBlockBatchEncoded(this.facing,
@@ -1699,6 +1711,13 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
 
             this.clearPending();
         }
+
+		private static boolean activeSeparateAo() {
+			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+				return false;
+			}
+			return net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.shouldUseSeparateAo();
+		}
 
         private long pendingQuadAddress() {
             return this.stagingBuffers.quadAddress() + (long) this.pendingQuadCount * this.nativeQuadStride;

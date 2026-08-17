@@ -33,6 +33,19 @@ public final class HudElementRegistry {
         }
     }
 
+    /**
+     * Lets an explicit backend reject a registered hook whose producer has not
+     * crossed the semantic rendering boundary yet.
+     */
+    public static boolean isRegistered(ResourceLocation id) {
+        for (HudElementEntry entry : ELEMENTS) {
+            if (entry.id.equals(id)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static class HudElementEntry {
         final ResourceLocation id;
         final HudElement element;

@@ -792,7 +792,9 @@ public class VulkanicAPI {
         if (backend == null) {
             initialize();
         }
-        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() && rawVulkanBackend != null) {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+            && !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.isRustPresentationActive()
+            && rawVulkanBackend != null) {
             GraphicsBackend compatibilityBackend = rawVulkanBackend.shellCompatibilityBackend();
             if (compatibilityBackend != null) {
                 return compatibilityBackend;
@@ -1129,6 +1131,21 @@ public class VulkanicAPI {
                 if (method.getDeclaringClass() == Object.class) {
                     return method.invoke(vulkanBackend, args);
                 }
+
+				// Once the Rust-owned windowed context is live, this proxy must no
+				// longer provide any Java Vulkan execution route.  Identity is kept
+				// readable for menu/routing checks and cleanup remains legal, but all
+				// rendering operations fail at the architectural boundary rather than
+				// becoming an invisible second backend.
+				if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.isRustPresentationActive()
+					&& !method.getName().equals("getBackendType")
+					&& !method.getName().equals("cleanupRendererBootstrapResources")) {
+					throw new IllegalStateException(
+						"Rust Vulkan whole-frame presentation is active; Java Vulkan backend method '"
+							+ method.getName()
+							+ "' is unavailable. Port this callsite to explicit VulkanicGAL semantics."
+					);
+				}
 
                 Method backendMethod = implementedMethods.get(method);
                 if (backendMethod == null && missingMethods.contains(method)) {
@@ -3846,6 +3863,9 @@ public class VulkanicAPI {
      * Enqueues a callback to run after all currently submitted GPU work completes.
      */
     public static void queueFencedTask(Runnable runnable) {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+            throw new IllegalStateException("Java GPU fenced callbacks are unavailable while Rust owns whole-frame Vulkan completion");
+        }
         long syncObject = createGpuCompletionFence(getCommandContext());
         PENDING_FENCED_TASKS.addLast(new GpuAsyncTask(runnable, syncObject));
     }
@@ -3854,6 +3874,12 @@ public class VulkanicAPI {
      * Executes queued fenced callbacks whose GPU fences have signaled.
      */
     public static void executePendingFenceTasks() {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+            if (!PENDING_FENCED_TASKS.isEmpty()) {
+                throw new IllegalStateException("Java GPU fenced callbacks were queued while Rust owns whole-frame Vulkan completion");
+            }
+            return;
+        }
         CommandContext ctx = getCommandContext();
 
         for (GpuAsyncTask task = PENDING_FENCED_TASKS.peekFirst();
@@ -3951,7 +3977,7 @@ public class VulkanicAPI {
      */
     public static CommandEncoder createCommandEncoder() {
         if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() && rawVulkanBackend != null) {
-            return rawVulkanBackend.withCompatibilityBackend(() -> getBackend().createCommandEncoder());
+			return getDevice().createCommandEncoder();
         }
         VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
         return directVulkanBackend != null
@@ -4081,9 +4107,7 @@ public class VulkanicAPI {
         int mipLevels
     ) {
         if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() && rawVulkanBackend != null) {
-            return rawVulkanBackend.withCompatibilityBackend(
-                () -> getBackend().createTexture(supplier, usage, format, width, height, depthOrLayers, mipLevels)
-            );
+			return getDevice().createTexture(supplier, usage, format, width, height, depthOrLayers, mipLevels);
         }
         VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
         return directVulkanBackend != null
@@ -4104,9 +4128,7 @@ public class VulkanicAPI {
         int mipLevels
     ) {
         if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() && rawVulkanBackend != null) {
-            return rawVulkanBackend.withCompatibilityBackend(
-                () -> getBackend().createTexture(label, usage, format, width, height, depthOrLayers, mipLevels)
-            );
+			return getDevice().createTexture(label, usage, format, width, height, depthOrLayers, mipLevels);
         }
         VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
         return directVulkanBackend != null
@@ -4119,7 +4141,7 @@ public class VulkanicAPI {
      */
     public static GpuBuffer createBuffer(@Nullable java.util.function.Supplier<String> supplier, int usage, int size) {
         if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() && rawVulkanBackend != null) {
-            return rawVulkanBackend.withCompatibilityBackend(() -> getBackend().createBuffer(supplier, usage, size));
+			return getDevice().createBuffer(supplier, usage, size);
         }
         VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
         return directVulkanBackend != null
@@ -4132,7 +4154,7 @@ public class VulkanicAPI {
      */
     public static GpuBuffer createBuffer(@Nullable java.util.function.Supplier<String> supplier, int usage, ByteBuffer data) {
         if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() && rawVulkanBackend != null) {
-            return rawVulkanBackend.withCompatibilityBackend(() -> getBackend().createBuffer(supplier, usage, data));
+			return getDevice().createBuffer(supplier, usage, data);
         }
         VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
         return directVulkanBackend != null
@@ -4145,7 +4167,7 @@ public class VulkanicAPI {
      */
     public static GpuTextureView createTextureView(GpuTexture texture) {
         if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() && rawVulkanBackend != null) {
-            return rawVulkanBackend.withCompatibilityBackend(() -> getBackend().createTextureView(texture));
+			return getDevice().createTextureView(texture);
         }
         VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
         return directVulkanBackend != null
@@ -4158,7 +4180,7 @@ public class VulkanicAPI {
      */
     public static GpuTextureView createTextureView(GpuTexture texture, int baseMipLevel, int mipLevelCount) {
         if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() && rawVulkanBackend != null) {
-            return rawVulkanBackend.withCompatibilityBackend(() -> getBackend().createTextureView(texture, baseMipLevel, mipLevelCount));
+			return getDevice().createTextureView(texture, baseMipLevel, mipLevelCount);
         }
         VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
         return directVulkanBackend != null
@@ -4241,7 +4263,9 @@ public class VulkanicAPI {
     public static void initializeDynamicUniforms() {
         assertOnRenderThread();
         if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() && rawVulkanBackend != null) {
-            dynamicUniforms = rawVulkanBackend.withCompatibilityBackend(DynamicUniforms::new);
+			// This owns only copied CPU uniform bytes.  The Rust whole-frame
+			// renderer never consumes a Java GL uniform ring.
+			dynamicUniforms = new DynamicUniforms();
             return;
         }
         dynamicUniforms = new DynamicUniforms();
@@ -4257,6 +4281,12 @@ public class VulkanicAPI {
     }
 
     public static void resetDynamicUniforms() {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.isRustPresentationActive()) {
+			// The whole-frame route uses only semantic CPU buffers here; reset
+			// their cursor without touching a Java GL uniform ring.
+			getDynamicUniforms().reset();
+            return;
+        }
         if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() && rawVulkanBackend != null) {
             rawVulkanBackend.withCompatibilityBackend(() -> {
                 getDynamicUniforms().reset();
@@ -4568,6 +4598,10 @@ public class VulkanicAPI {
      * Returns the backend-owned GPU vendor name for shader macro and diagnostics.
      */
     public static String getBackendVendorName() {
+		GpuDevice semanticDevice = wholeFrameSemanticDevice();
+		if (semanticDevice != null) {
+			return semanticDevice.getVendor();
+		}
         String value = getBackend().getBackendVendorName();
         return value == null || value.isBlank() ? "unknown" : value;
     }
@@ -4576,6 +4610,10 @@ public class VulkanicAPI {
      * Returns the backend-owned GPU renderer name for shader macro and diagnostics.
      */
     public static String getBackendRendererName() {
+		GpuDevice semanticDevice = wholeFrameSemanticDevice();
+		if (semanticDevice != null) {
+			return semanticDevice.getRenderer();
+		}
         String value = getBackend().getBackendRendererName();
         return value == null || value.isBlank() ? "unknown" : value;
     }
@@ -4584,6 +4622,10 @@ public class VulkanicAPI {
      * Returns the backend-owned version descriptor for diagnostics.
      */
     public static String getBackendVersionName() {
+		GpuDevice semanticDevice = wholeFrameSemanticDevice();
+		if (semanticDevice != null) {
+			return semanticDevice.getVersion();
+		}
         String value = getBackend().getBackendVersionName();
         return value == null || value.isBlank() ? "unknown" : value;
     }
@@ -4592,6 +4634,10 @@ public class VulkanicAPI {
      * Returns backend-owned extension identifiers when the backend exposes them.
      */
     public static java.util.List<String> getBackendEnabledExtensions() {
+		GpuDevice semanticDevice = wholeFrameSemanticDevice();
+		if (semanticDevice != null) {
+			return semanticDevice.getEnabledExtensions();
+		}
         java.util.List<String> values = getBackend().getBackendEnabledExtensions();
         return values == null ? java.util.List.of() : java.util.List.copyOf(values);
     }
@@ -4600,6 +4646,10 @@ public class VulkanicAPI {
      * Returns backend-owned optional feature names for diagnostics/reporting.
      */
     public static java.util.List<String> getBackendOptionalFeatureNames() {
+		GpuDevice semanticDevice = wholeFrameSemanticDevice();
+		if (semanticDevice != null) {
+			return semanticDevice.getOptionalFeatureNames();
+		}
         java.util.List<String> values = getBackend().getBackendOptionalFeatureNames();
         return values == null ? java.util.List.of() : java.util.List.copyOf(values);
     }
@@ -4608,6 +4658,10 @@ public class VulkanicAPI {
      * Returns backend-owned max texture size capability.
      */
     public static int getBackendMaxTextureSize() {
+		GpuDevice semanticDevice = wholeFrameSemanticDevice();
+		if (semanticDevice != null) {
+			return semanticDevice.getMaxTextureSize();
+		}
         return getBackend().getBackendMaxTextureSize();
     }
 
@@ -4615,6 +4669,10 @@ public class VulkanicAPI {
      * Returns backend-owned uniform-buffer offset alignment capability.
      */
     public static int getBackendUniformOffsetAlignment() {
+		GpuDevice semanticDevice = wholeFrameSemanticDevice();
+		if (semanticDevice != null) {
+			return semanticDevice.getUniformOffsetAlignment();
+		}
         return getBackend().getBackendUniformOffsetAlignment();
     }
 
@@ -4622,8 +4680,22 @@ public class VulkanicAPI {
      * Returns backend-owned device info snapshot for diagnostics and warnlist checks.
      */
     public static GpuDevice.GpuDeviceInfo getBackendDeviceInfo() {
+		GpuDevice semanticDevice = wholeFrameSemanticDevice();
+		if (semanticDevice != null) {
+			return semanticDevice.getDeviceInfo();
+		}
         return getBackend().getBackendDeviceInfo();
     }
+
+	/**
+	 * The whole-frame route publishes only its non-rendering semantic startup
+	 * device to shared Java diagnostics and allocation code.  Calling the Java
+	 * Vulkan backend after Rust owns presentation would create a second route.
+	 */
+	@Nullable
+	private static GpuDevice wholeFrameSemanticDevice() {
+		return net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() ? device : null;
+	}
 
     /**
      * Returns the backend-native texture handle for transitional integrations.

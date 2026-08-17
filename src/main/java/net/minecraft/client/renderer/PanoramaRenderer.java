@@ -26,7 +26,9 @@ public class PanoramaRenderer {
 			this.spin = wrap(this.spin + g * 0.1F, 360.0F);
 		}
 
-		this.cubeMap.render(this.minecraft, 10.0F, -this.spin);
+		if (!net.vulkanic.gui.RustGalPanoramaRenderer.enqueue(this.cubeMap, 10.0F, -this.spin, i, j)) {
+			this.cubeMap.render(this.minecraft, 10.0F, -this.spin);
+		}
 		guiGraphics.blit(RenderPipelines.GUI_TEXTURED, PANORAMA_OVERLAY, 0, 0, 0.0F, 0.0F, i, j, 16, 128, 16, 128);
 	}
 

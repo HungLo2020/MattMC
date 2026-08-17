@@ -2191,7 +2191,7 @@ public final class RustGalWorldPrimitiveRenderer {
 		}
 	}
 
-	public static void enqueueWorldBackground(ClientLevel level, Camera camera, float partialTick) {
+	public static void enqueueWorldBackground(ClientLevel level, Camera camera, float partialTick, int fogColorArgb) {
 		if (!WorldRenderRoutePolicy.currentBackgroundRoute().usesRustWholeFrameVulkan()) {
 			return;
 		}
@@ -2207,13 +2207,12 @@ public final class RustGalWorldPrimitiveRenderer {
 				pendingBackground = diagnostic;
 				return;
 			}
-			int color = level.getSkyColor(camera.getPosition(), partialTick);
 			pendingBackground = new VulkanicGalBridge.WorldBackgroundRecord(
 				true,
 				backgroundSkyType(level),
 				BACKGROUND_LOAD_CLEAR,
 				BACKGROUND_STORE_STORE,
-				ARGB.color(255, ARGB.red(color), ARGB.green(color), ARGB.blue(color)),
+				ARGB.color(255, ARGB.red(fogColorArgb), ARGB.green(fogColorArgb), ARGB.blue(fogColorArgb)),
 				viewportWidth,
 				viewportHeight
 			);

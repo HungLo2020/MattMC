@@ -68,6 +68,9 @@ public class TextureManager implements PreparableReloadListener, Tickable, AutoC
 
 	public void register(ResourceLocation resourceLocation, AbstractTexture abstractTexture) {
 		AbstractTexture abstractTexture2 = (AbstractTexture)this.byPath.put(resourceLocation, abstractTexture);
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() && abstractTexture instanceof DynamicTexture dynamicTexture) {
+			net.vulkanic.gui.RustGalGuiRawImageAssets.registerDynamicTexture(resourceLocation, dynamicTexture);
+		}
 		if (abstractTexture2 != abstractTexture) {
 			if (abstractTexture2 != null) {
 				this.safeClose(resourceLocation, abstractTexture2);
@@ -81,6 +84,9 @@ public class TextureManager implements PreparableReloadListener, Tickable, AutoC
 
 	private void safeClose(ResourceLocation resourceLocation, AbstractTexture abstractTexture) {
 		this.tickableTextures.remove(abstractTexture);
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() && abstractTexture instanceof DynamicTexture dynamicTexture) {
+			net.vulkanic.gui.RustGalGuiRawImageAssets.unregisterDynamicTexture(resourceLocation, dynamicTexture);
+		}
 
 		try {
 			abstractTexture.close();

@@ -180,7 +180,10 @@ final class VulkanCompatibilityGpuDevice implements GpuDevice {
 	@Override
 	public void close() {
 		try {
-			this.withCompatibilityBackend(() -> {
+			// Teardown is the one compatibility operation that remains legal after
+			// presentation ownership has moved to Rust.  It only releases the
+			// bootstrap objects; it must never be reachable from frame rendering.
+			this.withCompatibilityBackendForTeardown(() -> {
 				this.compatibilityDevice.close();
 				return null;
 			});
@@ -196,6 +199,17 @@ final class VulkanCompatibilityGpuDevice implements GpuDevice {
 	}
 
 	private <T> T withCompatibilityBackend(Supplier<T> action) {
+		if (this.compatibilityOnly
+			&& net.vulkanic.bridge.RustGalVulkanWholeFrameMode.isRustPresentationActive()) {
+			throw new IllegalStateException(
+				"Rust Vulkan whole-frame presentation is active; Java OpenGL compatibility device "
+					+ "cannot execute rendering work. Port this callsite to explicit VulkanicGAL semantics."
+			);
+		}
+		return this.withCompatibilityBackendForTeardown(action);
+	}
+
+	private <T> T withCompatibilityBackendForTeardown(Supplier<T> action) {
 		return this.compatibilityOnly && this.compatibilityBackend != null
 			? net.vulkanic.VulkanicAPI.withScopedBackendOverride(this.compatibilityBackend, action)
 			: action.get();

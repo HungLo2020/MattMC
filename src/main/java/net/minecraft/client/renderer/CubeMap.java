@@ -29,7 +29,17 @@ public class CubeMap implements AutoCloseable {
 		this.projectionMatrixUbo = new CachedPerspectiveProjectionMatrixBuffer("cubemap", 0.05F, 10.0F);
 	}
 
+	/** Semantic source identity for the Rust-owned panorama path. */
+	public ResourceLocation semanticTextureLocation() {
+		return this.location;
+	}
+
 	public void render(Minecraft minecraft, float f, float g) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException(
+				"Java cube-map rendering is unavailable while Rust owns whole-frame Vulkan presentation; port this callsite to explicit panorama semantics."
+			);
+		}
 		net.vulkanic.VulkanicAPI.setProjectionMatrix(
 			this.projectionMatrixUbo.getBuffer(minecraft.getWindow().getWidth(), minecraft.getWindow().getHeight(), 85.0F), ProjectionType.PERSPECTIVE
 		);
@@ -62,10 +72,16 @@ public class CubeMap implements AutoCloseable {
 	}
 
 	public void registerTextures(TextureManager textureManager) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			return;
+		}
 		textureManager.register(this.location, new CubeMapTexture(this.location));
 	}
 
 	public void registerAndLoadTextures(TextureManager textureManager) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			return;
+		}
 		textureManager.registerAndLoad(this.location, new CubeMapTexture(this.location));
 	}
 

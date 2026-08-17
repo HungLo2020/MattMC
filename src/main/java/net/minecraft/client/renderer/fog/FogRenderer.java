@@ -168,7 +168,7 @@ public class FogRenderer implements AutoCloseable, FogStorage {
 	}
 
 	public Vector4f setupFog(Camera camera, int i, boolean bl, DeltaTracker deltaTracker, float f, ClientLevel clientLevel) {
-		FogComputation fog = this.computeFogParameters(camera, i, bl, deltaTracker, f, clientLevel);
+		FogComputation fog = this.computeFogParameters(camera, i, bl, deltaTracker, f, clientLevel, true);
 		FogParameters fogParameters = fog.parameters();
 		Vector4f vector4f = new Vector4f(
 			fogParameters.red(), fogParameters.green(), fogParameters.blue(), fogParameters.alpha()
@@ -223,12 +223,15 @@ public class FogRenderer implements AutoCloseable, FogStorage {
 	 * gameplay semantic after camera setup and before it builds its frame.
 	 */
 	public FogParameters collectFogParameters(Camera camera, int i, boolean bl, DeltaTracker deltaTracker, float f, ClientLevel clientLevel) {
-		return this.computeFogParameters(camera, i, bl, deltaTracker, f, clientLevel).parameters();
+		return this.computeFogParameters(camera, i, bl, deltaTracker, f, clientLevel, false).parameters();
 	}
 
-	private FogComputation computeFogParameters(Camera camera, int i, boolean bl, DeltaTracker deltaTracker, float f, ClientLevel clientLevel) {
-		// Iris: Setup legacy water fog density
-		if (camera.getFluidInCamera() == net.minecraft.world.level.material.FogType.WATER) {
+	private FogComputation computeFogParameters(
+		Camera camera, int i, boolean bl, DeltaTracker deltaTracker, float f, ClientLevel clientLevel, boolean updateLegacyIrisFogState
+	) {
+		// Iris fog density is a legacy Java renderer side effect. The Rust
+		// whole-frame route needs only the copied gameplay fog record below.
+		if (updateLegacyIrisFogState && camera.getFluidInCamera() == net.minecraft.world.level.material.FogType.WATER) {
 			net.minecraft.world.entity.Entity entity2 = camera.getEntity();
 			
 			float density = 0.05F;
@@ -243,7 +246,7 @@ public class FogRenderer implements AutoCloseable, FogStorage {
 			}
 			
 			net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setFogDensity(density);
-		} else {
+		} else if (updateLegacyIrisFogState) {
 			net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setFogDensity(-1.0F);
 		}
 		

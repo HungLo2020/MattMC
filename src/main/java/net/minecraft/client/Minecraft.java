@@ -447,8 +447,9 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		this.fixerUpper = DataFixers.getDataFixer();
 		this.gameThread = Thread.currentThread();
 		
-		// Iris: Early initialization before Options creation
-		if (!iris$initialized) {
+		// Whole-frame Vulkan does not borrow Iris's renderer lifecycle or GPU
+		// initialization. The normal Java route retains its original ordering.
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() && !iris$initialized) {
 			iris$initialized = true;
 			new net.irisshaders.iris.Iris().onEarlyInitialize();
 		}
@@ -670,7 +671,9 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		this.window.setAllowCursorChanges(this.options.allowCursorChanges().get());
 		this.window.setDefaultErrorCallback();
 		this.resizeDisplay();
-		this.gameRenderer.preloadUiShader(this.vanillaPackResources.asProvider());
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			this.gameRenderer.preloadUiShader(this.vanillaPackResources.asProvider());
+		}
 		this.profileKeyPairManager = this.offlineDeveloperMode
 			? ProfileKeyPairManager.EMPTY_KEY_MANAGER
 			: ProfileKeyPairManager.create(this.userApiService, this.user, path);
@@ -706,8 +709,9 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 
 		this.packetProcessor = new PacketProcessor(this.gameThread);
 		
-		// Iris: Setup GUI texture images
-		if (!net.irisshaders.iris.platform.IrisPlatformHelpers.getInstance().isModLoaded("fabric-resource-loader-v0")) {
+		// These are Java/Iris texture objects, not Rust semantic assets.
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			&& !net.irisshaders.iris.platform.IrisPlatformHelpers.getInstance().isModLoaded("fabric-resource-loader-v0")) {
 			try {
 				this.textureManager.register(net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("iris", "textures/gui/widgets.png"), new net.irisshaders.iris.targets.backed.NativeImageBackedCustomTexture(new net.irisshaders.iris.shaderpack.texture.CustomTextureData.PngData(new net.irisshaders.iris.shaderpack.texture.TextureFilteringData(false, false), org.apache.commons.io.IOUtils.toByteArray(net.irisshaders.iris.Iris.class.getResourceAsStream("/assets/iris/textures/gui/widgets.png")))));
 			} catch (java.io.IOException e) {
@@ -715,11 +719,14 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 			}
 		}
 		
-		// VoxelMap: Initialize early (similar to Iris pattern)
-		try {
-			VoxelMapInitializer.initialize();
-		} catch (Exception e) {
-			LOGGER.error("Failed to initialize VoxelMap", e);
+		// VoxelMap still owns Java offscreen textures and render passes. Keep it
+		// unavailable in a Rust-owned frame until it emits explicit semantics.
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			try {
+				VoxelMapInitializer.initialize();
+			} catch (Exception e) {
+				LOGGER.error("Failed to initialize VoxelMap", e);
+			}
 		}
 
 		// TACZ MVP: Register client controls using MattMC's direct key mapping list.
@@ -1433,11 +1440,14 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 			this.window.updateDisplay(this.tracyFrameCapture);
 			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("api.present.update-display");
 			int k = this.framerateLimitTracker.getFramerateLimit();
-		if (DEBUG_FPS_LIMIT_LOGS < 20) {
-			DEBUG_FPS_LIMIT_LOGS++;
-			net.blaze3d.textures.GpuTexture mainColorTexture = renderTarget.getColorTexture();
-			int mainColorTextureId = mainColorTexture == null ? 0 : net.vulkanic.VulkanicCoreAPI.textureId(mainColorTexture);
-			String mainColorTextureLabel = mainColorTexture == null ? "null" : mainColorTexture.getLabel();
+			if (DEBUG_FPS_LIMIT_LOGS < 20) {
+				DEBUG_FPS_LIMIT_LOGS++;
+				net.blaze3d.textures.GpuTexture mainColorTexture = renderTarget.getColorTexture();
+				boolean rustWholeFrame = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
+				int mainColorTextureId = mainColorTexture == null || rustWholeFrame
+					? 0 : net.vulkanic.VulkanicCoreAPI.textureId(mainColorTexture);
+				String mainColorTextureLabel = mainColorTexture == null ? "null"
+					: rustWholeFrame ? "rust-semantic-frame-target" : mainColorTexture.getLabel();
 			LOGGER.info(
 				"FPS limit debug#{}: limit={} reason={} iconified={} minimized={} levelPresent={} screen={} overlay={} mainColorTexId={} mainColorTexLabel={}",
 				DEBUG_FPS_LIMIT_LOGS,
@@ -2016,10 +2026,14 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		this.keyboardHandler.tick();
 		profilerFiller.pop();
 		
-		// Iris: Check for keybinds at end of tick
-		profilerFiller.push("iris_keybinds");
-		net.irisshaders.iris.Iris.handleKeybinds(this);
-		profilerFiller.pop();
+		// Iris owns Java shader-pack state.  Whole-frame Vulkan has no Iris
+		// renderer/runtime to toggle, so leave those controls unavailable rather
+		// than constructing or borrowing its GPU state.
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			profilerFiller.push("iris_keybinds");
+			net.irisshaders.iris.Iris.handleKeybinds(this);
+			profilerFiller.pop();
+		}
 		
 		// VoxelMap: Client tick hook
 		profilerFiller.push("voxelmap_tick");

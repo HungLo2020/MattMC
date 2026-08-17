@@ -28,10 +28,19 @@ public class ChunkBuilder {
     private final ChunkBuildContext localContext;
 
     public ChunkBuilder(ClientLevel level, ChunkVertexType vertexType) {
+		this(level, vertexType, net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.shouldUseSeparateAo());
+	}
+
+	/**
+	 * Creates CPU meshing workers with an explicit vertex-layout policy. Whole-frame
+	 * Rust rendering uses this overload so its semantic terrain source never reads
+	 * Iris renderer configuration while Vulkan is selected.
+	 */
+	public ChunkBuilder(ClientLevel level, ChunkVertexType vertexType, boolean separateAo) {
         int count = getThreadCount();
 
         for (int i = 0; i < count; i++) {
-            ChunkBuildContext context = new ChunkBuildContext(level, vertexType);
+            ChunkBuildContext context = new ChunkBuildContext(level, vertexType, separateAo);
             WorkerRunnable worker = new WorkerRunnable("Chunk Render Task Executor #" + i, context);
 
             Thread thread = new Thread(worker, "Chunk Render Task Executor #" + i);
@@ -43,7 +52,7 @@ public class ChunkBuilder {
 
         LOGGER.info("Started {} worker threads", this.threads.size());
 
-        this.localContext = new ChunkBuildContext(level, vertexType);
+        this.localContext = new ChunkBuildContext(level, vertexType, separateAo);
     }
 
     /**

@@ -13,8 +13,223 @@ use crate::render::vulkanic::error::{GalError, GalResult};
 use crate::render::vulkanic::handles::{Handle, HandleKind};
 use crate::render::vulkanic::resources::*;
 
+/// A modest page amortizes the native allocation granularity many Vulkan
+/// drivers apply to small buffers.  This is deliberately backend-private: GAL
+/// still owns individually addressable buffers, lifetimes, and barriers.
+const HOST_VISIBLE_BUFFER_PAGE_SIZE: u64 = 16 * 1024 * 1024;
+const DEVICE_LOCAL_BUFFER_PAGE_SIZE: u64 = 64 * 1024 * 1024;
+
+#[derive(Clone, Copy)]
+struct BufferMemoryAllocation {
+    block_id: u64,
+    memory: vk::DeviceMemory,
+    offset: u64,
+    size: u64,
+}
+
+struct BufferMemoryBlock {
+    id: u64,
+    memory: vk::DeviceMemory,
+    memory_type_index: u32,
+    size: u64,
+    free_ranges: Vec<BufferMemoryRange>,
+}
+
+#[derive(Clone, Copy)]
+struct BufferMemoryRange {
+    offset: u64,
+    size: u64,
+}
+
+impl BufferMemoryBlock {
+    fn allocate(&mut self, size: u64, alignment: u64) -> Option<u64> {
+        for index in 0..self.free_ranges.len() {
+            let range = self.free_ranges[index];
+            let offset = align_up(range.offset, alignment)?;
+            let end = offset.checked_add(size)?;
+            let range_end = range.offset.checked_add(range.size)?;
+            if end > range_end {
+                continue;
+            }
+            self.free_ranges.remove(index);
+            if offset > range.offset {
+                self.free_ranges.insert(
+                    index,
+                    BufferMemoryRange {
+                        offset: range.offset,
+                        size: offset - range.offset,
+                    },
+                );
+            }
+            if end < range_end {
+                let tail_index = if offset > range.offset {
+                    index + 1
+                } else {
+                    index
+                };
+                self.free_ranges.insert(
+                    tail_index,
+                    BufferMemoryRange {
+                        offset: end,
+                        size: range_end - end,
+                    },
+                );
+            }
+            return Some(offset);
+        }
+        None
+    }
+
+    fn release(&mut self, allocation: BufferMemoryAllocation) {
+        debug_assert_eq!(self.id, allocation.block_id);
+        self.free_ranges.push(BufferMemoryRange {
+            offset: allocation.offset,
+            size: allocation.size,
+        });
+        self.free_ranges.sort_by_key(|range| range.offset);
+        let mut merged: Vec<BufferMemoryRange> = Vec::with_capacity(self.free_ranges.len());
+        for range in self.free_ranges.drain(..) {
+            if let Some(previous) = merged.last_mut() {
+                let previous_end = previous
+                    .offset
+                    .checked_add(previous.size)
+                    .expect("buffer allocator range overflow");
+                if previous_end == range.offset {
+                    previous.size = previous
+                        .size
+                        .checked_add(range.size)
+                        .expect("buffer allocator range overflow");
+                    continue;
+                }
+                debug_assert!(
+                    previous_end < range.offset,
+                    "overlapping buffer allocations"
+                );
+            }
+            merged.push(range);
+        }
+        self.free_ranges = merged;
+    }
+
+    fn is_empty(&self) -> bool {
+        matches!(self.free_ranges.as_slice(), [range] if range.offset == 0 && range.size == self.size)
+    }
+}
+
+/// Reclaimable native memory for distinct Vulkan buffer objects.  Vulkan
+/// command offsets remain relative to their buffer, so suballocation does not
+/// leak an implicit global buffer into the explicit GAL API.
+struct BufferMemoryAllocator {
+    context: Arc<VulkanContext>,
+    blocks: Vec<BufferMemoryBlock>,
+    next_block_id: u64,
+}
+
+impl BufferMemoryAllocator {
+    fn new(context: Arc<VulkanContext>) -> Self {
+        Self {
+            context,
+            blocks: Vec::new(),
+            next_block_id: 1,
+        }
+    }
+
+    fn allocate(
+        &mut self,
+        requirements: vk::MemoryRequirements,
+        properties: vk::MemoryPropertyFlags,
+    ) -> GalResult<BufferMemoryAllocation> {
+        let memory_type_index = self
+            .context
+            .find_memory_type(requirements.memory_type_bits, properties)?;
+        for block in &mut self.blocks {
+            if block.memory_type_index != memory_type_index {
+                continue;
+            }
+            if let Some(offset) = block.allocate(requirements.size, requirements.alignment) {
+                return Ok(BufferMemoryAllocation {
+                    block_id: block.id,
+                    memory: block.memory,
+                    offset,
+                    size: requirements.size,
+                });
+            }
+        }
+
+        let page_size = if properties.contains(vk::MemoryPropertyFlags::HOST_VISIBLE) {
+            HOST_VISIBLE_BUFFER_PAGE_SIZE
+        } else {
+            DEVICE_LOCAL_BUFFER_PAGE_SIZE
+        };
+        let allocation_size = align_up(page_size.max(requirements.size), requirements.alignment)
+            .ok_or_else(|| GalError::backend("Vulkan buffer allocation size overflow"))?;
+        let allocate_info = vk::MemoryAllocateInfo::default()
+            .allocation_size(allocation_size)
+            .memory_type_index(memory_type_index);
+        let memory = unsafe { self.context.device.allocate_memory(&allocate_info, None) }.map_err(
+            |error| {
+                GalError::backend(format!(
+                    "failed to allocate Vulkan buffer memory page: {error:?}"
+                ))
+            },
+        )?;
+        let mut block = BufferMemoryBlock {
+            id: self.next_block_id,
+            memory,
+            memory_type_index,
+            size: allocation_size,
+            free_ranges: vec![BufferMemoryRange {
+                offset: 0,
+                size: allocation_size,
+            }],
+        };
+        self.next_block_id = self.next_block_id.checked_add(1).ok_or_else(|| {
+            GalError::backend("Vulkan buffer memory allocator block identifier overflow")
+        })?;
+        let offset = block
+            .allocate(requirements.size, requirements.alignment)
+            .expect("fresh Vulkan buffer memory page must fit requested allocation");
+        let allocation = BufferMemoryAllocation {
+            block_id: block.id,
+            memory,
+            offset,
+            size: requirements.size,
+        };
+        self.blocks.push(block);
+        Ok(allocation)
+    }
+
+    fn release(&mut self, allocation: BufferMemoryAllocation) {
+        let Some(index) = self
+            .blocks
+            .iter()
+            .position(|block| block.id == allocation.block_id)
+        else {
+            debug_assert!(false, "released unknown Vulkan buffer memory allocation");
+            return;
+        };
+        let block = &mut self.blocks[index];
+        debug_assert_eq!(block.memory, allocation.memory);
+        block.release(allocation);
+        if block.is_empty() {
+            let block = self.blocks.remove(index);
+            unsafe { self.context.device.free_memory(block.memory, None) };
+        }
+    }
+}
+
+fn align_up(value: u64, alignment: u64) -> Option<u64> {
+    let alignment = alignment.max(1);
+    let remainder = value % alignment;
+    value.checked_add((alignment - remainder) % alignment)
+}
+
 pub(super) struct VulkanObjects {
     context: Arc<VulkanContext>,
+    /// Vulkan buffers remain distinct explicit GAL resources.  Their native
+    /// memory, however, is suballocated here so a terrain section cannot turn
+    /// into a driver-sized `VkDeviceMemory` allocation of its own.
+    buffer_memory: BufferMemoryAllocator,
     objects: BTreeMap<Handle, VulkanObject>,
     next_token: u64,
 }
@@ -22,6 +237,7 @@ pub(super) struct VulkanObjects {
 impl VulkanObjects {
     pub(super) fn new(context: Arc<VulkanContext>) -> Self {
         Self {
+            buffer_memory: BufferMemoryAllocator::new(context.clone()),
             context,
             objects: BTreeMap::new(),
             next_token: 1,
@@ -287,7 +503,7 @@ impl VulkanObjects {
     }
 
     fn create_buffer(
-        &self,
+        &mut self,
         handle: Handle,
         desc: &BufferDesc,
         token: BackendToken,
@@ -305,21 +521,25 @@ impl VulkanObjects {
                 ))
             })?;
         let requirements = unsafe { self.context.device.get_buffer_memory_requirements(buffer) };
-        let memory = match self
-            .context
-            .allocate_memory(requirements, memory_flags(desc.memory))
+        let allocation = match self
+            .buffer_memory
+            .allocate(requirements, memory_flags(desc.memory))
         {
-            Ok(memory) => memory,
+            Ok(allocation) => allocation,
             Err(error) => {
                 unsafe { self.context.device.destroy_buffer(buffer, None) };
                 return Err(error);
             }
         };
-        if let Err(error) = unsafe { self.context.device.bind_buffer_memory(buffer, memory, 0) } {
+        if let Err(error) = unsafe {
+            self.context
+                .device
+                .bind_buffer_memory(buffer, allocation.memory, allocation.offset)
+        } {
             unsafe {
-                self.context.device.free_memory(memory, None);
                 self.context.device.destroy_buffer(buffer, None);
             }
+            self.buffer_memory.release(allocation);
             return Err(GalError::backend(format!(
                 "failed to bind buffer memory '{}': {error:?}",
                 desc.label
@@ -330,7 +550,9 @@ impl VulkanObjects {
         Ok(BufferObject {
             token,
             buffer,
-            memory,
+            memory: allocation.memory,
+            memory_offset: allocation.offset,
+            allocation,
             size: desc.size,
             memory_domain: desc.memory,
         })
@@ -998,13 +1220,13 @@ impl VulkanObjects {
         }
     }
 
-    fn destroy_object(&self, object: VulkanObject) {
+    fn destroy_object(&mut self, object: VulkanObject) {
         let _zone = trace::Zone::new("vulkan.resources.destroy-native");
         unsafe {
             match object {
                 VulkanObject::Buffer(object) => {
                     self.context.device.destroy_buffer(object.buffer, None);
-                    self.context.device.free_memory(object.memory, None);
+                    self.buffer_memory.release(object.allocation);
                 }
                 VulkanObject::Texture(object) => {
                     self.context.device.destroy_image(object.image, None);
@@ -1143,6 +1365,11 @@ pub(super) struct BufferObject {
     pub(super) token: BackendToken,
     pub(super) buffer: vk::Buffer,
     pub(super) memory: vk::DeviceMemory,
+    /// The physical byte offset where this logical GAL buffer is bound.
+    /// Commands use `buffer` offsets and therefore remain in logical space;
+    /// only host mapping needs to add this offset.
+    pub(super) memory_offset: u64,
+    allocation: BufferMemoryAllocation,
     pub(super) size: u64,
     pub(super) memory_domain: MemoryDomain,
 }
@@ -1524,6 +1751,46 @@ fn debug_name(kind: &str, handle: Handle, label: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn buffer_memory_block_reuses_aligned_ranges_after_destroy() {
+        let memory = vk::DeviceMemory::null();
+        let mut block = BufferMemoryBlock {
+            id: 7,
+            memory,
+            memory_type_index: 0,
+            size: 256,
+            free_ranges: vec![BufferMemoryRange {
+                offset: 0,
+                size: 256,
+            }],
+        };
+        let first_offset = block.allocate(32, 64).expect("first allocation");
+        let second_offset = block.allocate(32, 64).expect("second allocation");
+        assert_eq!(0, first_offset);
+        assert_eq!(64, second_offset);
+
+        block.release(BufferMemoryAllocation {
+            block_id: 7,
+            memory,
+            offset: first_offset,
+            size: 32,
+        });
+        block.release(BufferMemoryAllocation {
+            block_id: 7,
+            memory,
+            offset: second_offset,
+            size: 32,
+        });
+        assert!(block.is_empty());
+        assert_eq!(0, block.allocate(128, 128).expect("reused allocation"));
+    }
+
+    #[test]
+    fn buffer_memory_alignment_rejects_overflow() {
+        assert_eq!(Some(192), align_up(129, 64));
+        assert_eq!(None, align_up(u64::MAX, 2));
+    }
 
     fn d3_texture_desc() -> TextureDesc {
         TextureDesc {

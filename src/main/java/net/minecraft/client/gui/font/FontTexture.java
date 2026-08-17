@@ -9,6 +9,7 @@ import net.blaze3d.textures.FilterMode;
 import net.blaze3d.textures.TextureFormat;
 import java.nio.file.Path;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import net.minecraft.api.EnvType;
@@ -54,7 +55,12 @@ public class FontTexture extends AbstractTexture implements Dumpable {
 		} else {
 			FontTexture.Node node = this.root.insert(glyphBitmap);
 			if (node != null) {
-				glyphBitmap.upload(node.x, node.y, this.getTexture());
+				if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+					glyphBitmap.upload(node.x, node.y, this.getTexture());
+				}
+				// The whole-frame Vulkan route owns a copied atlas image, not this
+				// Java texture.  Glyph pixels below are copied into that semantic
+				// snapshot and uploaded through VulkanicGAL by the text collector.
 				if (this.semanticAtlasComplete) {
 					try {
 						if (!glyphBitmap.copyTo(this.semanticAtlasPixels, node.x, node.y)) {
@@ -68,10 +74,13 @@ public class FontTexture extends AbstractTexture implements Dumpable {
 				float f = 256.0F;
 				float g = 256.0F;
 				float h = 0.01F;
+				net.blaze3d.textures.GpuTextureView glyphTextureView = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+					? Objects.requireNonNull(this.textureView, "semantic font texture view")
+					: this.getTextureView();
 				return new BakedSheetGlyph(
 					glyphInfo,
 					this.renderTypes,
-					this.getTextureView(),
+					glyphTextureView,
 					this.semanticAtlasIdentity.toString(),
 					this.colored,
 					(node.x + 0.01F) / 256.0F,

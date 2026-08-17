@@ -118,7 +118,7 @@ public class DefaultFluidRenderer implements net.irisshaders.iris.vertices.sodiu
         Fluid fluid = fluidState.getType();
         this.rustGalPrimitiveKind = fluidState.is(FluidTags.WATER)
                 ? NativeSectionMeshBuilder.PRIMITIVE_KIND_BUILTIN_WATER
-                : NativeSectionMeshBuilder.PRIMITIVE_KIND_UNSUPPORTED_FLUID;
+                : NativeSectionMeshBuilder.PRIMITIVE_KIND_GENERIC_FLUID;
 
         boolean cullUp = this.isFullBlockFluidOccluded(level, blockPos, Direction.UP, blockState, fluidState);
         boolean cullDown = this.isFullBlockFluidOccluded(level, blockPos, Direction.DOWN, blockState, fluidState) ||
@@ -375,7 +375,8 @@ public class DefaultFluidRenderer implements net.irisshaders.iris.vertices.sodiu
 
                 // Iris: From MixinDefaultFluidRenderer - modify brightness for directional shading
                 float br = dir.getAxis() == Direction.Axis.Z ? 0.8F : 0.6F;
-                if (net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.shouldDisableDirectionalShading()) {
+				if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+						&& net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.shouldDisableDirectionalShading()) {
                     br = 1.0f;
                 }
 

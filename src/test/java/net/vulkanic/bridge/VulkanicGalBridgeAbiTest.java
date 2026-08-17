@@ -171,6 +171,11 @@ class VulkanicGalBridgeAbiTest {
 				.contains("buffers.buildRenderList(renderParams)"),
 			"DH route selection must inspect the real render list before Rust ownership"
 		);
+		assertTrue(
+			Files.readString(Path.of("src/main/java/com/seibel/distanthorizons/core/render/renderer/LodRenderer.java"))
+				.contains("hasCompleteVisibleExactAtlasCoverage()"),
+			"DH must reject visible material streams that lack exact Rust-owned atlas coverage"
+		);
 		String cloudRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/CloudRenderer.java"));
 		assertTrue(cloudRenderer.contains("enqueueRustGalClouds"));
 		assertTrue(cloudRenderer.contains("this.texture.cells()"));
@@ -583,6 +588,10 @@ class VulkanicGalBridgeAbiTest {
 		assertFalse(collector.contains("GlImage"));
 		assertFalse(collector.contains("MemorySegment"));
 		assertTrue(collector.contains("collectWithAssets"));
+		assertTrue(collector.contains("RustGalVulkanWholeFrameMode.enabled()")
+			&& collector.contains("wholeFrameShaderConfigEnabled()")
+			&& collector.indexOf("wholeFrameShaderConfigEnabled()") < collector.indexOf("Iris.getIrisConfig().areShadersEnabled()"),
+			"whole-frame shader-source discovery must read only the copied preference before any Iris runtime state");
 		assertTrue(collector.contains("ShaderPackAssetFileRecord"));
 		assertTrue(collector.contains("getBooleanValueOrDefault(name)"));
 		assertTrue(collector.contains("getStringValueOrDefault(name)"));
@@ -662,6 +671,30 @@ class VulkanicGalBridgeAbiTest {
 		String sodiumWorldRenderer = Files.readString(Path.of("src/main/java/net/sodium/client/render/SodiumWorldRenderer.java"));
 		String renderSectionManager = Files.readString(Path.of("src/main/java/net/sodium/client/render/chunk/RenderSectionManager.java"));
 		String terrainRenderer = Files.readString(Path.of("src/main/java/net/vulkanic/world/RustGalTerrainRenderer.java"));
+		String wholeFrameTerrainSource = Files.readString(Path.of("src/main/java/net/vulkanic/world/RustGalWholeFrameTerrainSource.java"));
+		assertTrue(wholeFrameTerrainSource.contains("getEffectiveRenderDistance()"));
+		assertTrue(wholeFrameTerrainSource.contains("admitSection"));
+		assertTrue(wholeFrameTerrainSource.contains("drainVisibilityFrontier"));
+		assertTrue(wholeFrameTerrainSource.contains("OcclusionCuller.getVisibilityConnections"));
+		assertTrue(wholeFrameTerrainSource.contains("new ChunkBuilder(level, ChunkMeshFormats.COMPACT, false)"));
+		assertTrue(wholeFrameTerrainSource.contains("workerBuilder.scheduleTask"));
+		assertTrue(wholeFrameTerrainSource.contains("propagationPending"));
+		assertTrue(wholeFrameTerrainSource.contains("Frustum frustum"));
+		assertTrue(wholeFrameTerrainSource.contains("drainCompletedBuilds(frustum)"));
+		assertFalse(wholeFrameTerrainSource.contains("RenderDevice"),
+			"the direct CPU terrain source must not construct Sodium's OpenGL render-device scope");
+		assertFalse(wholeFrameTerrainSource.contains("task.execute(this."),
+			"whole-frame terrain meshing must not synchronously block the render thread");
+		assertFalse(wholeFrameTerrainSource.contains("BUILDS_PER_FRAME"));
+		assertTrue(wholeFrameTerrainSource.contains("isWholeFrameSurfaceQueueDrained"));
+		assertTrue(wholeFrameTerrainSource.contains("isWholeFrameTerrainQueueDrained"));
+		assertTrue(wholeFrameTerrainSource.contains("wholeFrameTerrainQueueSummary"));
+		assertTrue(wholeFrameTerrainSource.contains("this.level.hasChunk(section.getX(), section.getZ())"),
+			"the direct CPU source must only mesh client-resident chunks and never request server generation");
+		assertFalse(wholeFrameTerrainSource.contains("HORIZONTAL_RADIUS"));
+		assertFalse(wholeFrameTerrainSource.contains("VERTICAL_RADIUS"));
+		String fluidRenderer = Files.readString(Path.of("src/main/java/net/sodium/client/render/chunk/compile/pipeline/DefaultFluidRenderer.java"));
+		String blockRenderer = Files.readString(Path.of("src/main/java/net/sodium/client/render/chunk/compile/pipeline/BlockRenderer.java"));
 		String deterministicCapture = Files.readString(Path.of("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java"));
 		String graphicsHarness = Files.readString(Path.of("DevUtils/Common/graphics_harness.py"));
 		String rustFfi = readRustFfiModules();
@@ -696,6 +729,10 @@ class VulkanicGalBridgeAbiTest {
 			"the whole-frame shell must start from the neutral gameplay FOV before its first client tick");
 		assertTrue(gameRenderer.contains("RustGalWorldPrimitiveRenderer.enqueueBlockOutline"));
 			assertTrue(gameRenderer.contains("RustGalWorldPrimitiveRenderer.enqueueWorldBackground"));
+			assertTrue(gameRenderer.contains("FogParameters wholeFrameFog"),
+				"whole-frame background must receive the CPU fog semantic rather than raw sky color");
+			assertFalse(worldRenderer.contains("level.getSkyColor(camera.getPosition(), partialTick)"),
+				"Rust whole-frame background must not substitute raw sky color for the extracted fog semantic");
 			assertTrue(gameRenderer.contains("levelRenderer.enqueueRustGalBlockBreakingCracks"));
 		assertTrue(gameRenderer.contains("levelRenderer.enqueueRustGalWorldBorder"));
 		assertTrue(levelRenderer.contains("RustGalWorldPrimitiveRenderer.enqueueWorldBorder"));
@@ -782,16 +819,39 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(levelRenderer.contains("skyRenderer.extractRenderState"));
 		assertTrue(levelRenderer.contains("RustGalWorldPrimitiveRenderer.enqueueWorldSky"));
 		assertTrue(levelRenderer.contains("this.cullTerrain(camera, frustum, this.minecraft.player.isSpectator())"));
+		assertTrue(levelRenderer.contains("this.rustGalWholeFrameTerrainSource.enqueue("));
+		assertFalse(levelRenderer.contains("this.renderer.enqueueRustGalStaticTerrain(camera)"),
+			"whole-frame Vulkan terrain must not source visibility from Sodium's GL renderer");
 		assertTrue(sodiumWorldRenderer.contains("enqueueRustGalStaticTerrain"));
 		assertTrue(renderSectionManager.contains("RustGalTerrainRenderer.acceptChunkBuildOutput(chunkBuildOutput)"));
+		assertTrue(wholeFrameTerrainSource.contains("new ChunkBuilder(level, ChunkMeshFormats.COMPACT, false)"));
+		assertTrue(wholeFrameTerrainSource.contains("RustGalTerrainRenderer.acceptWholeFrameChunkBuildOutput(output)"));
+		assertTrue(wholeFrameTerrainSource.contains("output.destroy()"),
+			"the direct CPU source must release native intermediate mesh buffers after VulkanicGAL copies them");
+		assertFalse(wholeFrameTerrainSource.contains("MAX_RESIDENT_RENDERABLE_SECTIONS"),
+			"Rust-owned Vulkan terrain must not conceal incomplete coverage behind a resident-section cap");
+		assertTrue(wholeFrameTerrainSource.contains("cpu-source-window-evicted"));
+		assertFalse(wholeFrameTerrainSource.contains("RenderDevice"));
+		assertFalse(wholeFrameTerrainSource.contains("RenderRegion"));
+		assertFalse(wholeFrameTerrainSource.contains("WorldRenderingSettings"));
+		assertTrue(blockRenderer.contains("!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()"),
+			"the compact whole-frame source must not read Iris material-map state while producing semantic terrain");
 		assertTrue(terrainRenderer.contains("WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan()"));
+		assertTrue(terrainRenderer.contains("enqueueWholeFrameTerrainSections"));
+		assertTrue(terrainRenderer.contains("TerrainMeshLayout.compact()"));
+		assertTrue(terrainRenderer.contains("recordSubmittedWorkIdentity(\"sodium-terrain\", identity)"),
+			"the direct CPU terrain producer must participate in the shared settled-work family");
 		assertTrue(terrainRenderer.contains("DefaultTerrainRenderPasses.SOLID"));
 		assertTrue(terrainRenderer.contains("DefaultTerrainRenderPasses.CUTOUT"));
 			assertTrue(terrainRenderer.contains("DefaultTerrainRenderPasses.TRANSLUCENT"));
 			assertTrue(terrainRenderer.contains("ChunkSectionLayer.TRANSLUCENT"));
-				assertTrue(terrainRenderer.contains("asset.unsupportedPrimitiveCount() > 0"));
-			assertTrue(terrainRenderer.contains("unsupported-fluid-omitted"),
-				"water terrain v1 must omit unsupported fluids without discarding supported mixed translucent sections");
+			assertTrue(terrainRenderer.contains("PRIMITIVE_KIND_GENERIC_FLUID"),
+				"non-water fluid terrain must retain an explicit generic-fluid semantic lane");
+			assertTrue(fluidRenderer.contains(": NativeSectionMeshBuilder.PRIMITIVE_KIND_GENERIC_FLUID")
+				&& fluidRenderer.contains("this.rustGalPrimitiveKind != NativeSectionMeshBuilder.PRIMITIVE_KIND_UNSUPPORTED_FLUID"),
+				"the fluid callsite must retain non-water atlas sprites instead of classifying them as omitted work");
+			assertTrue(terrainRenderer.contains("without a semantic material route"),
+				"unknown fluid metadata must fail closed rather than being omitted from a Rust frame");
 			assertTrue(terrainRenderer.contains("MATERIAL_ID_WATER_TRANSLUCENT"),
 				"built-in water must carry an explicit semantic material identity");
 		assertTrue(terrainRenderer.contains("acceptChunkSortOutput"));
@@ -845,7 +905,7 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(worldRenderer.contains("dirtyWorldMeshSortedIndicesLocked("));
 		assertTrue(worldRenderer.contains("removeStaticTerrainMeshAsset"));
 			assertTrue(rustWorldFrontend.contains("self.mesh_texture_assets.insert(texture_id, texture);")
-					&& rustWorldFrontend.contains("destroy_mesh_texture_resources_for_ids(gal, &incoming_texture_ids);"),
+					&& rustWorldFrontend.contains("destroy_mesh_texture_resources_for_ids(gal, &replaced_texture_ids);"),
 				"incremental mesh updates must preserve previously uploaded semantic texture assets");
 		assertTrue(rustTerrainFrontend.contains("Static chunk-terrain frontend boundary"));
 		assertFalse(worldRenderer.contains("CRACK_DISABLED_CONTROL ||"));
@@ -1477,29 +1537,140 @@ class VulkanicGalBridgeAbiTest {
 		String queue = Files.readString(Path.of("src/main/java/net/vulkanic/gui/RustGalFrameCoordinator.java"));
 		String minecraft = Files.readString(Path.of("src/main/java/net/minecraft/client/Minecraft.java"));
 		String gameRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/GameRenderer.java"));
+		String guiRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/gui/render/GuiRenderer.java"));
+		String hud = Files.readString(Path.of("src/main/java/net/minecraft/client/gui/Gui.java"));
+		String guiState = Files.readString(Path.of("src/main/java/net/minecraft/client/gui/render/state/GuiRenderState.java"));
+		String blitState = Files.readString(Path.of("src/main/java/net/minecraft/client/gui/render/state/BlitRenderState.java"));
+		String guiGraphics = Files.readString(Path.of("src/main/java/net/minecraft/client/gui/GuiGraphics.java"));
+		String guiSemanticRenderer = Files.readString(Path.of("src/main/java/net/vulkanic/gui/RustGalGuiRenderer.java"));
+		String guiStratum = Files.readString(Path.of("src/main/java/net/vulkanic/gui/GuiRenderStratum.java"));
 		String levelRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/LevelRenderer.java"));
 		String featureRenderDispatcher = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/feature/FeatureRenderDispatcher.java"));
 		String worldPrimitiveRenderer = Files.readString(Path.of("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
 		String renderSystem = Files.readString(Path.of("src/main/java/net/blaze3d/systems/RenderSystem.java"));
 		String window = Files.readString(Path.of("src/main/java/net/blaze3d/platform/Window.java"));
 		String vulkanicApi = Files.readString(Path.of("src/main/java/net/vulkanic/VulkanicAPI.java"));
+		String vulkanBackend = Files.readString(Path.of("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"));
 		String rustBackends = Files.readString(Path.of("src/main/rust/render/vulkanic/backends/mod.rs"));
 		String rustVulkan = Files.readString(Path.of("src/main/rust/render/vulkanic/backends/vulkan/mod.rs"));
 		String rustGuiFrontend = Files.readString(Path.of("src/main/rust/render/vulkanic/gui_frontend.rs"));
 		String rustFfi = readRustFfiModules();
+		String cubeMap = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/CubeMap.java"));
+		String panoramaRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/PanoramaRenderer.java"));
+		String semanticPanorama = Files.readString(Path.of("src/main/java/net/vulkanic/gui/RustGalPanoramaRenderer.java"));
+		String wholeFrameTextureAtlas = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/texture/TextureAtlas.java"));
+		String wholeFrameTiming = Files.readString(Path.of("src/main/java/net/vulkanic/bridge/RustGalDeterministicTiming.java"));
 
 		assertTrue(mode.contains("mattmc.dev.rustGalVulkanWholeFrame"));
+		assertTrue(mode.contains("isRustPresentationActive"));
+		assertTrue(mode.contains("activateRustPresentation"));
 		assertTrue(bridge.contains("mattmc_vulkanic_gal_context_create_windowed_vulkan"));
 		assertTrue(bridge.contains("WINDOWED_VULKAN_CONTEXT_CREATE(49)"));
 		assertTrue(queue.contains("createWindowedVulkan"));
 		assertTrue(queue.contains("executeWholeFrameVulkan"));
+		assertTrue(queue.contains("enum BridgeMode"));
+		assertTrue(queue.contains("WINDOWED_VULKAN"));
+		assertTrue(queue.contains("RustGalVulkanWholeFrameMode.activateRustPresentation"));
+		assertTrue(queue.contains("whole-frame execution cannot reuse a"),
+			"whole-frame Vulkan must fail closed instead of reusing a borrowed OpenGL bridge");
+		assertTrue(queue.contains("borrowed OpenGL execution cannot reuse a"),
+			"the partial-frame route must likewise reject a native Vulkan bridge");
 		assertFalse(queue.contains("GLFWNativeX11.glfwGetX11Window"));
 		assertFalse(queue.contains("GLFWNativeWayland.glfwGetWaylandWindow"));
 		assertTrue(bridge.contains("GLFWNativeX11.glfwGetX11Window"));
 		assertTrue(bridge.contains("GLFWNativeWayland.glfwGetWaylandWindow"));
 		assertTrue(minecraft.contains("renderRustVulkanWholeFrameShell"));
 		assertTrue(minecraft.contains("game.rendering.rust-vulkan-whole-frame"));
+		int fpsHandleLookup = minecraft.indexOf("net.vulkanic.VulkanicCoreAPI.textureId(mainColorTexture)");
+		int fpsWholeFrameGuard = minecraft.lastIndexOf("RustGalVulkanWholeFrameMode.enabled()", fpsHandleLookup);
+		assertTrue(fpsHandleLookup > 0 && fpsWholeFrameGuard >= 0 && fpsWholeFrameGuard < fpsHandleLookup
+			&& minecraft.contains("rust-semantic-frame-target"),
+			"whole-frame diagnostics must not query a Java main-target native texture handle");
+		int irisKeybinds = minecraft.indexOf("net.irisshaders.iris.Iris.handleKeybinds(this)");
+		int irisKeybindGuard = minecraft.lastIndexOf("if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())", irisKeybinds);
+		assertTrue(irisKeybinds > 0 && irisKeybindGuard >= 0 && irisKeybindGuard < irisKeybinds,
+			"whole-frame Vulkan must not invoke Iris's Java shader-toggle runtime");
+		assertTrue(minecraft.contains("!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()")
+			&& minecraft.contains("preloadUiShader"),
+			"Rust whole-frame startup must not precompile Java GUI pipelines");
+		assertTrue(minecraft.contains("!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() && !iris$initialized")
+			&& minecraft.contains("Whole-frame Vulkan does not borrow Iris's renderer lifecycle"),
+			"Rust whole-frame startup must not initialize Iris before presentation ownership transfers");
+		int voxelMapBootstrap = minecraft.indexOf("VoxelMap still owns Java offscreen textures and render passes");
+		assertTrue(voxelMapBootstrap >= 0
+			&& minecraft.indexOf("if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())", voxelMapBootstrap) > voxelMapBootstrap
+			&& minecraft.indexOf("VoxelMapInitializer.initialize();", voxelMapBootstrap) > voxelMapBootstrap,
+			"whole-frame startup must keep VoxelMap's Java renderer unavailable");
 		assertTrue(gameRenderer.contains("rustVulkanWholeFrameGuiExtraction"));
+		int legacyIrisFrameState = gameRenderer.indexOf("net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setRealTickDelta");
+		assertTrue(gameRenderer.contains("RustGalDeterministicTiming.partialTick(deltaTracker)")
+			&& legacyIrisFrameState > gameRenderer.indexOf("if (!rustWholeFrame) {"),
+			"the whole-frame route must use renderer-neutral timing before Iris frame state is touched");
+		assertTrue(wholeFrameTiming.contains("mattmc.vulkan.deterministicTemporalParity.partialTick")
+			&& !wholeFrameTiming.contains("net.irisshaders"),
+			"whole-frame deterministic timing must preserve parity fixture settings without Iris runtime internals");
+		assertTrue(gameRenderer.contains("gui.screen-semantic-extraction"),
+			"the Rust whole-frame shell must extract screen semantics rather than leaving the main menu unrendered");
+		assertTrue(gameRenderer.contains("gui.loading-overlay-semantic-extraction"),
+			"startup overlay primitives must be submitted to Rust rather than skipped before the title screen");
+		assertTrue(Files.readString(Path.of("src/main/java/net/minecraft/client/gui/screens/LoadingOverlay.java"))
+			.contains("renderCompatibleScreen"),
+			"loading-overlay screen delegation must fail closed outside the admitted title route");
+		String titleScreen = Files.readString(Path.of("src/main/java/net/minecraft/client/gui/screens/TitleScreen.java"));
+		assertTrue(titleScreen.contains("!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() && !iris$hasFirstInit"),
+			"the admitted title route must not initialize Iris renderer runtime state");
+		assertTrue(hud.contains("boolean legacyIrisDebugGroup = !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()")
+			&& hud.contains("if (legacyIrisDebugGroup) {"),
+			"whole-frame HUD extraction must not enter Iris GL debug state");
+		assertTrue(hud.contains("no semantic VoxelMap minimap route; refusing its Java GPU renderer"),
+			"a Java-GPU HUD hook must fail explicitly instead of being swallowed by the legacy HUD-hook catch block");
+		assertTrue(gameRenderer.contains("renderWithTooltipAndSubtitles(guiGraphics"));
+		assertTrue(gameRenderer.contains("instanceof net.minecraft.client.gui.screens.TitleScreen"),
+			"screens without an established semantic route must remain fail-closed");
+		assertTrue(gameRenderer.contains("instanceof net.minecraft.client.gui.screens.LevelLoadingScreen")
+			&& Files.readString(Path.of("src/main/java/net/minecraft/client/gui/screens/LoadingOverlay.java"))
+				.contains("instanceof LevelLoadingScreen"),
+			"world-load progress must use the established semantic GUI extraction path rather than a Java renderer");
+		assertTrue(cubeMap.contains("Java cube-map rendering is unavailable while Rust owns whole-frame Vulkan presentation"),
+			"the incomplete title panorama must fail closed instead of executing Java rendering in a Rust-owned frame");
+		assertTrue(panoramaRenderer.contains("RustGalPanoramaRenderer.enqueue"));
+		assertTrue(semanticPanorama.contains("resolveCubeMap") && semanticPanorama.contains("enqueueGuiMeshItemRequest"),
+			"the title panorama must cross the boundary as copied semantic image data and Rust-owned mesh work");
+		assertTrue(gameRenderer.contains("gui.rectangle-semantic-enqueue"));
+		assertTrue(guiRenderer.contains("collectRustGalRectangleSemantics()"));
+		assertTrue(guiRenderer.contains("ColoredRectangleRenderState rectangle"));
+		assertTrue(guiState.contains("this.current = currentNode;"),
+			"semantic GUI extraction must retain the source stratum when it appends explicit commands");
+		assertTrue(guiState.contains("currentSemanticLayerOrder(GuiRenderState.SemanticPhase phase)"));
+		assertTrue(guiState.contains("ELEMENTS(0)") && guiState.contains("ITEMS(1)") && guiState.contains("TEXT(2)"),
+			"semantic GUI ordering must mirror GuiRenderer's element/item/text preparation phases");
+		assertTrue(guiRenderer.contains("currentSemanticLayerOrder(GuiRenderState.SemanticPhase.TEXT)"));
+		assertTrue(guiRenderer.contains("currentSemanticLayerOrder(GuiRenderState.SemanticPhase.ELEMENTS)"));
+		assertTrue(queue.contains("String semanticLayerId") && queue.contains("int semanticLayerOrder"),
+			"whole-frame GUI requests must carry an explicit source-layer order rather than a fixed HUD-only stratum");
+		assertTrue(blitState.contains("@Nullable ResourceLocation semanticTexture"),
+			"generic GUI blits must retain a resource identity rather than requiring a GPU-view lookup");
+		assertTrue(guiGraphics.contains("submitBlit(renderPipeline, gpuTextureView, resourceLocation"),
+			"GuiGraphics must attach the original resource location at the semantic callsite");
+		assertTrue(guiGraphics.contains("RustGalGuiRenderer.isWholeFrameVulkanActive()")
+			&& guiGraphics.contains("TextureSetup.noTexture()"),
+			"whole-frame semantic blits must not materialize Java texture views before Rust copies their resource bytes");
+		assertTrue(guiGraphics.contains("no semantic map-GUI route; refusing Java texture-view rendering"),
+			"map GUI must remain unavailable until it has a semantic image route rather than creating a Java texture view");
+		assertTrue(guiSemanticRenderer.contains("semanticSingleTexture"),
+			"the Rust semantic GUI frontend must accept explicit resource identities without Java texture views");
+		assertTrue(wholeFrameTextureAtlas.contains("Semantic GUI consumers retain only the stitched CPU source")
+			&& wholeFrameTextureAtlas.contains("if (!rustWholeFrame) {")
+			&& wholeFrameTextureAtlas.contains("this.createTexture(preparations.width(), preparations.height(), preparations.mipLevel());"),
+			"whole-frame GUI atlases must not allocate Java GPU textures before Rust stages the snapshot");
+		assertTrue(guiSemanticRenderer.contains("tryEnqueueUniformRectangle("));
+		assertTrue(guiSemanticRenderer.contains("currentExecutionRoute() != GuiExecutionRoute.RUST_VULKAN_WHOLE_FRAME"),
+			"rectangle semantics must not leak into the borrowed OpenGL GUI route");
+		assertTrue(guiSemanticRenderer.contains("tryEnqueueVerticalGradientRectangle"),
+			"gradient rectangles must use Rust-owned mesh interpolation rather than a Java rendering fallback");
+		assertTrue(guiSemanticRenderer.contains("RECTANGLE_PRODUCER + \".gradient\""));
+		assertTrue(guiSemanticRenderer.contains("SOLID_WHITE_ASSET_ID"));
+		assertTrue(guiStratum.contains("GUI_RECTANGLES(\"gui.rectangles\", 100)"));
 		assertTrue(gameRenderer.contains("enqueueRustGalIndexedMeshFeaturesForWholeFrame"));
 		assertTrue(levelRenderer.contains("enqueueRustGalIndexedMeshFeaturesForWholeFrame"));
 		assertTrue(levelRenderer.contains("this.entityRenderDispatcher"));
@@ -1569,11 +1740,167 @@ class VulkanicGalBridgeAbiTest {
 		assertFalse(shell.contains("renderLevel(deltaTracker)"));
 		assertTrue(shell.contains("this.renderDistance = this.minecraft.options.getEffectiveRenderDistance() * 16;"),
 			"the whole-frame shell must initialize the same projection depth distance as the normal world renderer");
+		assertTrue(shell.contains("RustShaderPackSourceCollector.activeConfiguredPackName().isPresent()"),
+			"whole-frame camera semantics must use the bounded shader-pack source readiness signal");
+		assertFalse(shell.contains("Iris.isPackInUseQuick()"),
+			"whole-frame camera semantics must not query Iris renderer runtime state");
 		assertTrue(renderSystem.contains("RustGalVulkanWholeFrameMode.enabledForBackend"));
 		assertTrue(renderSystem.indexOf("RustGalVulkanWholeFrameMode.enabledForBackend") < renderSystem.indexOf("VulkanicAPI.beginFrame()"));
 		assertTrue(window.contains("RustGalVulkanWholeFrameMode.enabled()"));
 		assertTrue(vulkanicApi.contains("Java Vulkan beginFrame is disabled while Rust owns whole-frame Vulkan presentation"));
+		int fencedTaskDrain = vulkanicApi.indexOf("public static void executePendingFenceTasks()");
+		int wholeFrameFenceGuard = vulkanicApi.indexOf("RustGalVulkanWholeFrameMode.enabled()", fencedTaskDrain);
+		int pendingFenceContext = vulkanicApi.indexOf("CommandContext ctx = getCommandContext();", fencedTaskDrain);
+		assertTrue(fencedTaskDrain >= 0 && wholeFrameFenceGuard > fencedTaskDrain && pendingFenceContext > wholeFrameFenceGuard,
+			"whole-frame Vulkan must reject Java fenced callbacks before querying a Java command context");
 		assertTrue(vulkanicApi.contains("Java Vulkan presentTextureToScreen is disabled while Rust owns whole-frame Vulkan presentation"));
+		assertTrue(vulkanicApi.contains("!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.isRustPresentationActive()"),
+			"the Java OpenGL bootstrap backend must not remain reachable after Rust owns presentation");
+		assertTrue(vulkanicApi.contains("The whole-frame route uses only semantic CPU buffers here"),
+			"Rust presentation must not keep Java's dynamic-uniform GL ring active");
+		assertTrue(vulkanicApi.contains("return getDevice().createCommandEncoder();"),
+			"whole-frame shared resource helpers must use the semantic device, not an OpenGL compatibility backend");
+		assertTrue(vulkanicApi.contains("Java Vulkan backend method '"),
+			"the Java Vulkan proxy must become non-rendering once Rust owns presentation");
+		assertTrue(vulkanicApi.contains("!method.getName().equals(\"getBackendType\")"),
+			"only backend identity may remain observable after the Rust handoff");
+		String compatibilityDevice = Files.readString(Path.of("src/main/java/net/vulkanic/backends/vulkan/VulkanCompatibilityGpuDevice.java"));
+		assertTrue(compatibilityDevice.contains("Java OpenGL compatibility device ")
+			&& compatibilityDevice.contains("cannot execute rendering work. Port this callsite to explicit VulkanicGAL semantics."),
+			"a live Rust presenter must reject, not execute, Java OpenGL compatibility rendering");
+		assertTrue(compatibilityDevice.contains("withCompatibilityBackendForTeardown"),
+			"the only post-handoff compatibility action must be bounded bootstrap teardown");
+		assertTrue(vulkanBackend.contains("skipping Java Vulkan and Iris GPU renderer startup"),
+			"the Rust whole-frame shell must not initialize Iris GPU state");
+		assertFalse(vulkanBackend.contains("initializeVulkanCompatibilityHooks"),
+			"the Rust whole-frame shell must not retain a Java/Iris GL initialization hook");
+		assertTrue(vulkanBackend.contains("new VulkanWholeFrameSemanticGpuDevice()"),
+			"whole-frame renderer startup must use a non-rendering semantic device instead of GlDevice");
+		String semanticDevice = Files.readString(Path.of("src/main/java/net/vulkanic/backends/vulkan/VulkanWholeFrameSemanticGpuDevice.java"));
+		String fontTexture = Files.readString(Path.of("src/main/java/net/minecraft/client/gui/font/FontTexture.java"));
+		String textureAtlas = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/texture/TextureAtlas.java"));
+		String dynamicTexture = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/texture/DynamicTexture.java"));
+		String textureManager = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/texture/TextureManager.java"));
+		String rawImages = Files.readString(Path.of("src/main/java/net/vulkanic/gui/RustGalGuiRawImageAssets.java"));
+		String sodiumGpuSync = Files.readString(Path.of("src/main/java/net/sodium/fabric/SodiumGpuSyncHelper.java"));
+		String shaderManager = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/ShaderManager.java"));
+		String itemBlockRenderTypes = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/ItemBlockRenderTypes.java"));
+		String skyRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/SkyRenderer.java"));
+		String lightTexture = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/LightTexture.java"));
+		String fogRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/fog/FogRenderer.java"));
+		assertTrue(semanticDevice.contains("semantic-only; port this callsite to explicit VulkanicGAL semantics"),
+			"the whole-frame bootstrap device must reject Java rendering rather than emulate it");
+		assertFalse(semanticDevice.contains("org.lwjgl") || semanticDevice.contains("IrisRenderSystem"),
+			"the whole-frame bootstrap device must own no native GL/Vulkan or Iris GPU state");
+		assertTrue(fontTexture.contains("!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()"),
+			"whole-frame font-atlas updates must bypass Java texture upload");
+		assertTrue(fontTexture.contains("uploaded through VulkanicGAL by the text collector"),
+			"whole-frame font glyphs must retain a copied semantic atlas path");
+		assertTrue(fontTexture.contains("Objects.requireNonNull(this.textureView, \"semantic font texture view\")")
+			&& fontTexture.indexOf("semantic font texture view") < fontTexture.indexOf(": this.getTextureView()"),
+			"whole-frame font stitching must retain metadata directly and avoid AbstractTexture's Iris texture tracker");
+		assertTrue(textureAtlas.contains("boolean rustWholeFrame = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()"),
+			"whole-frame texture-atlas setup must make its non-rendering route explicit");
+		assertTrue(textureAtlas.contains("TextureAtlasSprite.Ticker ticker = rustWholeFrame ? null"),
+			"whole-frame texture-atlas animation must not perform Java texture uploads");
+		assertTrue(dynamicTexture.contains("RustGalVulkanWholeFrameMode.enabled()")
+			&& dynamicTexture.contains("RustGalGuiRawImageAssets.stageDynamicTexture(this)")
+			&& dynamicTexture.indexOf("stageDynamicTexture(this)") < dynamicTexture.indexOf("writeToTexture(this.texture, this.pixels)"),
+			"whole-frame DynamicTexture updates must become copied semantic image assets before any Java upload path");
+		assertTrue(textureManager.contains("RustGalGuiRawImageAssets.registerDynamicTexture(resourceLocation, dynamicTexture)")
+			&& textureManager.contains("RustGalGuiRawImageAssets.unregisterDynamicTexture(resourceLocation, dynamicTexture)"),
+			"DynamicTexture resource identities must be bound and retired by the texture manager, not by Java GPU handles");
+		assertTrue(rawImages.contains("MemoryUtil.memByteBuffer(image.getPointer(), pixels.length).get(pixels)")
+			&& rawImages.contains("stage(asset)")
+			&& rawImages.contains("DYNAMIC_TEXTURES"),
+			"whole-frame dynamic images must copy bounded CPU pixels into the existing VulkanicGAL raw-image queue");
+		assertTrue(bridge.contains("MAX_RAW_IMAGE_BYTES = 64 * 1024 * 1024")
+			&& rustFfi.contains("FFI_MAX_GUI_ASSET_BYTES: usize = 64 * 1024 * 1024"),
+			"Java and Rust raw-image boundaries must share the explicit 64 MiB semantic-image limit");
+		assertTrue(rustGuiFrontend.contains("if batches.is_empty()"));
+		String rustGuiRenderer = Files.readString(Path.of("src/main/java/net/vulkanic/gui/RustGalGuiRenderer.java"));
+		assertTrue(rustGuiRenderer.contains("admissibleAffineQuad(")
+			&& rustGuiRenderer.contains("copied-blit-outside-affine-contract")
+			&& rustGuiRenderer.indexOf("admissibleAffineQuad(") < rustGuiRenderer.indexOf("new VulkanicGalBridge.GuiAffineQuadRecord(", rustGuiRenderer.indexOf("tryEnqueueCopiedBlit")),
+			"whole-frame copied blits must decline an unrepresentable affine contract before semantic submission");
+		assertTrue(sodiumGpuSync.contains("RustGalVulkanWholeFrameMode.enabled()")
+			&& sodiumGpuSync.indexOf("RustGalVulkanWholeFrameMode.enabled()") < sodiumGpuSync.indexOf("VulkanicAPI.getCommandContext()")
+			&& sodiumGpuSync.contains("Rust owns the Vulkan queue, submission completion, and pacing."),
+			"Sodium's Java GL-style fence queue must be unavailable when Rust owns whole-frame Vulkan completion");
+		int wholeFrameShaderManagerGuard = shaderManager.indexOf("if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())");
+		int javaPipelineCacheClear = shaderManager.indexOf("VulkanicAPI.clearBackendPipelineCache()");
+		assertTrue(wholeFrameShaderManagerGuard >= 0 && javaPipelineCacheClear > wholeFrameShaderManagerGuard
+			&& shaderManager.contains("Java render-pipeline compilation/cache ownership ends at the\n\t\t\t// whole-frame handoff."),
+			"whole-frame resource reload must not compile or clear Java rendering pipelines after the Rust handoff");
+		int irisMaterialMap = itemBlockRenderTypes.indexOf("WorldRenderingSettings.INSTANCE.getBlockTypeIds()");
+		int terrainLayerGuard = itemBlockRenderTypes.lastIndexOf("if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())", irisMaterialMap);
+		assertTrue(irisMaterialMap > 0 && terrainLayerGuard >= 0 && terrainLayerGuard < irisMaterialMap
+			&& itemBlockRenderTypes.contains("whole-frame terrain receives the ordinary semantic layer below"),
+			"whole-frame terrain material classification must not read Iris's Java material map");
+		int fabulousIrisConfig = levelRenderer.indexOf("net.irisshaders.iris.Iris.getIrisConfig().areShadersEnabled()");
+		int fabulousWholeFrameGuard = levelRenderer.lastIndexOf("if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())", fabulousIrisConfig);
+		assertTrue(fabulousIrisConfig > 0 && fabulousWholeFrameGuard >= 0 && fabulousWholeFrameGuard < fabulousIrisConfig
+			&& levelRenderer.contains("Rust owns shader-pack admission for whole-frame Vulkan"),
+			"whole-frame resource reload must not inspect Iris configuration while Rust owns shader-pack admission");
+		String clientPacketListener = Files.readString(Path.of("src/main/java/net/minecraft/client/multiplayer/ClientPacketListener.java"));
+		int dhIrisCompatibility = clientPacketListener.indexOf("net.irisshaders.iris.Iris.loadedIncompatiblePack()");
+		int dhWholeFrameGuard = clientPacketListener.lastIndexOf("if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()", dhIrisCompatibility);
+		assertTrue(dhIrisCompatibility > 0 && dhWholeFrameGuard >= 0 && dhWholeFrameGuard < dhIrisCompatibility
+			&& clientPacketListener.contains("copied semantic configuration instead"),
+			"whole-frame login must not invoke Iris/Distant Horizons Java compatibility state");
+		String benchmark = Files.readString(Path.of("src/main/java/net/minecraft/client/dev/GraphicsFrameBenchmark.java"));
+		assertTrue(benchmark.contains("!minecraft.getConnection().isAcceptingMessages()")
+			&& benchmark.indexOf("!minecraft.getConnection().isAcceptingMessages()") < benchmark.indexOf("minecraft.setScreen(null);"),
+			"benchmark cleanup must not mutate GUI state after connection teardown begins");
+		int skyTextureInit = skyRenderer.indexOf("this.endSkyTexture = this.getTexture(END_SKY_LOCATION);");
+		int skyWholeFrameGuard = skyRenderer.lastIndexOf("if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())", skyTextureInit);
+		assertTrue(skyTextureInit > 0 && skyWholeFrameGuard >= 0 && skyWholeFrameGuard < skyTextureInit
+			&& skyRenderer.contains("copies its celestial source assets"),
+			"whole-frame sky reload must use the Rust-owned copied celestial assets instead of Java texture uploads");
+		int sodiumSetLevel = levelRenderer.indexOf("this.renderer.setLevel(clientLevel);");
+		int sodiumSetLevelGuard = levelRenderer.lastIndexOf("if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())", sodiumSetLevel);
+		int sodiumReload = levelRenderer.indexOf("this.renderer.reload();");
+		int sodiumReloadGuard = levelRenderer.lastIndexOf("if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())", sodiumReload);
+		assertTrue(sodiumSetLevel > 0 && sodiumSetLevelGuard >= 0 && sodiumSetLevelGuard < sodiumSetLevel
+			&& sodiumReload > 0 && sodiumReloadGuard >= 0 && sodiumReloadGuard < sodiumReload,
+			"whole-frame world changes must not initialize Sodium's Java GL render device");
+		int sodiumCullSetup = levelRenderer.indexOf("this.renderer.setupTerrain(camera, viewport");
+		int wholeFrameCullGuard = levelRenderer.lastIndexOf("if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())", sodiumCullSetup);
+		assertTrue(sodiumCullSetup > 0 && wholeFrameCullGuard >= 0 && wholeFrameCullGuard < sodiumCullSetup
+			&& levelRenderer.contains("this.applyFrustum(frustum);"),
+			"whole-frame terrain visibility must remain CPU semantic state without initializing Sodium's Java GL device");
+		int sodiumSectionReady = levelRenderer.indexOf("this.renderer.isSectionReady(");
+		int wholeFrameSectionGuard = levelRenderer.lastIndexOf("if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())", sodiumSectionReady);
+		assertTrue(sodiumSectionReady > 0 && wholeFrameSectionGuard >= 0 && wholeFrameSectionGuard < sodiumSectionReady
+			&& levelRenderer.contains("section.getSectionMesh() != CompiledSectionMesh.UNCOMPILED"),
+			"whole-frame entity extraction must use CPU section readiness instead of Sodium's Java GL manager");
+		int sodiumBlockEntities = levelRenderer.indexOf("this.renderer.extractBlockEntities(camera, f, this.destructionProgress, levelRenderState);");
+		int wholeFrameBlockEntityGuard = levelRenderer.lastIndexOf("if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())", sodiumBlockEntities);
+		assertTrue(sodiumBlockEntities > 0 && wholeFrameBlockEntityGuard >= 0 && wholeFrameBlockEntityGuard < sodiumBlockEntities
+			&& levelRenderer.contains("compiled.getRenderableBlockEntities()")
+			&& levelRenderer.contains("extractWholeFrameBlockEntity"),
+			"whole-frame block entities must extract semantic state from CPU compiled sections without Sodium GL render lists");
+		int sodiumRebuild = levelRenderer.indexOf("this.renderer.scheduleRebuildForChunk(x, y, z, important);");
+		int wholeFrameDirtyGuard = levelRenderer.lastIndexOf("if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())", sodiumRebuild);
+		assertTrue(sodiumRebuild > 0 && wholeFrameDirtyGuard >= 0 && wholeFrameDirtyGuard < sodiumRebuild
+			&& levelRenderer.contains("this.viewArea.setDirty(x, y, z, important)"),
+			"packet-driven world updates must mark CPU semantic sections dirty before any Sodium GL rebuild path");
+		assertTrue(lightTexture.contains("this.rustSemanticLightmapInputs = this.computeRustSemanticLightmapInputs(")
+			&& lightTexture.contains("clientLevel, this.minecraft.player, f, false"),
+			"whole-frame lightmap updates must publish gameplay scalars rather than a Java GPU texture");
+		int wholeFrameLightmap = lightTexture.indexOf("if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())", lightTexture.indexOf("public void updateLightTexture"));
+		int irisLightmapState = lightTexture.indexOf("CapturedRenderingState.INSTANCE.setDarknessLightFactor(0.0F)", wholeFrameLightmap);
+		assertTrue(wholeFrameLightmap >= 0 && irisLightmapState > wholeFrameLightmap
+			&& lightTexture.substring(wholeFrameLightmap, irisLightmapState).contains("return;"),
+			"the whole-frame lightmap path must return before Java Iris and GPU lightmap work");
+		assertTrue(lightTexture.contains("if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {\n\t\t\tVulkanicAPI.createCommandEncoder().clearColorTexture"),
+			"whole-frame lightmap construction must not submit a Java texture clear");
+		assertTrue(fogRenderer.contains("return this.computeFogParameters(camera, i, bl, deltaTracker, f, clientLevel, false).parameters();"),
+			"whole-frame fog extraction must use the semantic-only calculation path");
+		assertTrue(fogRenderer.contains("computeFogParameters(camera, i, bl, deltaTracker, f, clientLevel, true)"),
+			"the normal Java fog renderer must retain its legacy-Iris side effect explicitly");
+		assertTrue(fogRenderer.contains("if (updateLegacyIrisFogState && camera.getFluidInCamera()"),
+			"the copied whole-frame fog record must not update Iris runtime state");
 		assertTrue(vulkanicApi.contains("RustGalVulkanWholeFrameMode.enabled()"));
 		assertTrue(vulkanicApi.indexOf("RustGalVulkanWholeFrameMode.enabled()") < vulkanicApi.indexOf("if (configuredValue == null)"));
 		assertTrue(rustBackends.contains("create_native_windowed_vulkan_backend"));

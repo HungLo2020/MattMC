@@ -102,6 +102,13 @@ public class SkyRenderer implements AutoCloseable {
 	}
 
 	protected void initTextures() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			// The admitted whole-frame sky route copies its celestial source assets
+			// through RustGalWorldPrimitiveRenderer during reload.  Retaining these
+			// Java texture objects would only recreate the legacy GPU upload path.
+			return;
+		}
+
 		this.endSkyTexture = this.getTexture(END_SKY_LOCATION);
 		this.endFlashTexture = this.getTexture(END_LIGHT_LOCATION);
 		this.sunTexture = this.getTexture(SUN_LOCATION);

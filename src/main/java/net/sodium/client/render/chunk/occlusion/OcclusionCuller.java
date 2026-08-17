@@ -419,7 +419,13 @@ public class OcclusionCuller {
         }
     }
 
-    static int getVisibilityConnections(long visibilityData, int incoming, boolean useIncoming) {
+    /**
+     * Returns the outgoing portal directions for immutable CPU section
+     * visibility data. This is deliberately independent of render regions,
+     * command lists, and GPU state so semantic terrain producers can use the
+     * same culling contract without constructing the OpenGL renderer.
+     */
+    public static int getVisibilityConnections(long visibilityData, int incoming, boolean useIncoming) {
         check(VERIFY_STATUS, "native occlusion verification");
         int connections = invokeConnections(visibilityData, incoming, useIncoming ? 1 : 0);
         if (connections < 0) {

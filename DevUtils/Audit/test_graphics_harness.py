@@ -7382,6 +7382,37 @@ else:
                 env["JAVA_TOOL_OPTIONS"],
             )
 
+    def test_frozen_shell_settled_static_capture_waits_for_the_same_terrain_readiness(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            target = fake_repo(root, "frozen")
+            capture_runner = target.root / "DevUtils" / "Common" / "capture_runner.py"
+            capture_runner.unlink()
+            shell_entrypoint = target.root / "DevUtils" / "Common" / "capture_runner.sh"
+            shell_entrypoint.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+            mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "frozen-opengl-shaders-off")
+            args = harness.parse_args(
+                [
+                    "capture",
+                    "--profile",
+                    "standard",
+                    "--mode",
+                    mode.name,
+                    "--workload-profile",
+                    "settled-static",
+                ]
+            )
+
+            command, env = harness.build_capture_command(target, mode, root / "capture", "settled-static", args, "capture")
+
+            self.assertEqual("bash", command[0])
+            java_options = shlex.split(env["JAVA_TOOL_OPTIONS"])
+            self.assertIn("-Dmattmc.dev.staticTerrainParityDiagnostics=true", java_options)
+            self.assertIn("-Dmattmc.dev.staticTerrainParityDiagnostics.waitForStable=true", java_options)
+            self.assertIn("-Dmattmc.dev.staticTerrainParityDiagnostics.readyFrames=3", java_options)
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.settledReadyMaxWaitFrames=300", java_options)
+            self.assertTrue(any(option.startswith("-Dmattmc.dev.staticTerrainParityDiagnostics.path=") for option in java_options))
+
     def test_selected_source_capture_uses_one_settled_pose(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

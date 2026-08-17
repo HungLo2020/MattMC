@@ -6,6 +6,7 @@ import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.gui.render.TextureSetup;
+import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3x2f;
 
@@ -13,6 +14,7 @@ import org.joml.Matrix3x2f;
 public record BlitRenderState(
 	RenderPipeline pipeline,
 	TextureSetup textureSetup,
+	@Nullable ResourceLocation semanticTexture,
 	Matrix3x2f pose,
 	int x0,
 	int y0,
@@ -48,7 +50,26 @@ public record BlitRenderState(
 		int n,
 		@Nullable ScreenRectangle screenRectangle
 	) {
-		this(renderPipeline, textureSetup, matrix3x2f, i, j, k, l, f, g, h, m, n, screenRectangle, getBounds(i, j, k, l, matrix3x2f, screenRectangle), null);
+		this(renderPipeline, textureSetup, null, matrix3x2f, i, j, k, l, f, g, h, m, n, screenRectangle, getBounds(i, j, k, l, matrix3x2f, screenRectangle), null);
+	}
+
+	public BlitRenderState(
+		RenderPipeline renderPipeline,
+		TextureSetup textureSetup,
+		@Nullable ResourceLocation semanticTexture,
+		Matrix3x2f matrix3x2f,
+		int i,
+		int j,
+		int k,
+		int l,
+		float f,
+		float g,
+		float h,
+		float m,
+		int n,
+		@Nullable ScreenRectangle screenRectangle
+	) {
+		this(renderPipeline, textureSetup, semanticTexture, matrix3x2f, i, j, k, l, f, g, h, m, n, screenRectangle, getBounds(i, j, k, l, matrix3x2f, screenRectangle), null);
 	}
 
 	public BlitRenderState(
@@ -70,6 +91,7 @@ public record BlitRenderState(
 		this(
 			renderPipeline,
 			textureSetup,
+			null,
 			matrix3x2f,
 			i,
 			j,
@@ -84,6 +106,26 @@ public record BlitRenderState(
 			getBounds(i, j, k, l, matrix3x2f, screenRectangle),
 			shaderInputParityGeometryContext
 		);
+	}
+
+	public BlitRenderState(
+		RenderPipeline renderPipeline,
+		TextureSetup textureSetup,
+		Matrix3x2f matrix3x2f,
+		int i,
+		int j,
+		int k,
+		int l,
+		float f,
+		float g,
+		float h,
+		float m,
+		int n,
+		@Nullable ScreenRectangle screenRectangle,
+		@Nullable ScreenRectangle bounds,
+		@Nullable String shaderInputParityGeometryContext
+	) {
+		this(renderPipeline, textureSetup, null, matrix3x2f, i, j, k, l, f, g, h, m, n, screenRectangle, bounds, shaderInputParityGeometryContext);
 	}
 
 	@Override

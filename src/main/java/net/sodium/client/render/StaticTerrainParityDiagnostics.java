@@ -68,6 +68,11 @@ public final class StaticTerrainParityDiagnostics {
             0,
             Integer.getInteger("mattmc.dev.staticTerrainParityDiagnostics.maxCoverageSamples", 768)
     );
+    /** Reserved independently from build tracing for capture-frame receipts. */
+    private static final int MAX_WHOLE_FRAME_COVERAGE_EVENTS = Math.max(
+            1,
+            Integer.getInteger("mattmc.dev.staticTerrainParityDiagnostics.maxWholeFrameCoverageEvents", 512)
+    );
     private static final long TRANSFORM_TRACE_SECTION = parseTransformTraceSection();
     private static final long APPEARANCE_TRACE_SECTION = parseAppearanceTraceSection();
     private static final int[] APPEARANCE_TRACE_BLOCK = parseAppearanceTraceBlock();
@@ -77,11 +82,16 @@ public final class StaticTerrainParityDiagnostics {
     ));
     private static final AtomicInteger EVENTS = new AtomicInteger();
     private static final AtomicInteger COVERAGE_EVENTS = new AtomicInteger();
+    private static final AtomicInteger WHOLE_FRAME_COVERAGE_EVENTS = new AtomicInteger();
     private static final AtomicInteger TRANSFORM_TRACE_EVENTS = new AtomicInteger();
     private static final AtomicInteger APPEARANCE_TRACE_EVENTS = new AtomicInteger();
     private static final AtomicInteger APPEARANCE_LIGHT_TRACE_EVENTS = new AtomicInteger();
     private static final AtomicInteger APPEARANCE_LIGHT_SNAPSHOT_EVENTS = new AtomicInteger();
     private static final Map<CoverageKey, MeshCoverage> SOURCE_MESHES = new ConcurrentHashMap<>();
+    /** Copied explicit terrain assets keyed by semantic section/layer. */
+    private static final Map<CoverageKey, MeshCoverage> RUST_ENQUEUE_MESHES = new ConcurrentHashMap<>();
+    /** Actual Rust-backend execution metadata, retained only for frame receipts. */
+    private static final Map<CoverageKey, MeshCoverage> RUST_EXECUTED_MESHES = new ConcurrentHashMap<>();
     private static final Map<CoverageKey, AppearanceSource> SOURCE_APPEARANCES = new ConcurrentHashMap<>();
     private static final Map<CoverageKey, String> RUST_ADMISSION_REASONS = new ConcurrentHashMap<>();
     private static volatile int latestSolidSectionCount;
@@ -229,6 +239,104 @@ public final class StaticTerrainParityDiagnostics {
                         rustEnqueueFrameId
                 )
         );
+    }
+
+    /**
+     * Writes one frame-scoped receipt for the CPU sections selected by the
+     * whole-frame semantic terrain callsite.  This is intentionally emitted
+     * from copied mesh metadata, not a Sodium render list or GPU resource, so
+     * Current/Frozen coverage comparison can join the exact semantic frame
+     * without borrowing Java OpenGL state.
+     */
+    public static void recordRustWholeFrameEnqueueCoverage(
+            Iterable<RenderSection> sections,
+            long semanticFrameId,
+            double cameraX,
+            double cameraY,
+            double cameraZ,
+            int viewportWidth,
+            int viewportHeight
+    ) {
+        if (!ENABLED || sections == null || semanticFrameId <= 0L) {
+            return;
+        }
+        for (String layer : List.of("solid", "cutout")) {
+            int sectionCount = 0;
+            int recordCount = 0;
+            int missingCoverage = 0;
+            int animatedSections = 0;
+            long vertexTotal = 0L;
+            long indexTotal = 0L;
+            long primitiveTotal = 0L;
+            StringBuilder records = new StringBuilder("[");
+            for (RenderSection section : sections) {
+                if (section == null || !section.isBuilt()) {
+                    continue;
+                }
+                long sectionKey = section.getPosition().asLong();
+                MeshCoverage coverage = RUST_ENQUEUE_MESHES.get(new CoverageKey(sectionKey, layer));
+                if (coverage == null) {
+                    coverage = SOURCE_MESHES.get(new CoverageKey(sectionKey, layer));
+                }
+                if (coverage == null) {
+                    // Empty layers are not draw coverage; preserve only a real
+                    // missing copied asset as a diagnostic failure candidate.
+                    continue;
+                }
+                sectionCount++;
+                boolean animated = (section.getFlags() & RenderSectionFlags.MASK_HAS_ANIMATED_SPRITES) != 0;
+                if (animated) {
+                    animatedSections++;
+                }
+                vertexTotal += coverage.vertexCount();
+                indexTotal += coverage.indexCount();
+                primitiveTotal += coverage.primitiveCount();
+                if (recordCount < MAX_COVERAGE_SAMPLES) {
+                    appendCoverageRecord(
+                            records,
+                            sectionKey,
+                            section.getChunkX(),
+                            section.getChunkY(),
+                            section.getChunkZ(),
+                            section.getOriginX(),
+                            section.getOriginY(),
+                            section.getOriginZ(),
+                            section.getFlags(),
+                            animated,
+                            coverage,
+                            true,
+                            "rust-vulkan-whole-frame-semantic-enqueue",
+                            coverage.meshGeneration(),
+                            0L
+                    );
+                    recordCount++;
+                }
+            }
+            records.append("]");
+            writeWholeFrameCoverageEvent(
+                    "rust-vulkan-enqueue-source-coverage",
+                    layer,
+                    semanticFrameId,
+                    0,
+                    animatedSections,
+                    cameraX,
+                    cameraY,
+                    cameraZ,
+                    viewportWidth,
+                    viewportHeight,
+                    sectionCount,
+                    vertexTotal,
+                    indexTotal,
+                    primitiveTotal,
+                    missingCoverage,
+                    sectionCount,
+                    builder -> {
+                        if (records.length() > 1) {
+                            builder.append(records, 1, records.length() - 1);
+                        }
+                    }
+            );
+        }
     }
 
     static void recordVisibleLists(
@@ -425,9 +533,14 @@ public final class StaticTerrainParityDiagnostics {
                 0,
                 0,
                 0,
+                0,
                 "",
                 "rust-static-terrain-asset"
         );
+        RUST_ENQUEUE_MESHES.put(new CoverageKey(sectionKey, normalizedLayer), coverage);
+        if ("rust-vulkan-executed".equals(stage)) {
+            RUST_EXECUTED_MESHES.put(new CoverageKey(sectionKey, normalizedLayer), coverage);
+        }
         writeCoverageEvent(
                 stage,
                 normalizedLayer,
@@ -463,6 +576,93 @@ public final class StaticTerrainParityDiagnostics {
                         rustEnqueueFrameId
                 )
         );
+    }
+
+    /**
+     * Copied identity of a mesh instance that the Rust backend actually
+     * encoded for a submitted frame. This is deliberately distinct from the
+     * semantic enqueue receipt: it is emitted only after Rust reports the
+     * instance as executed, and carries no GPU/native handle.
+     */
+    public record RustExecutionIdentity(long sectionKey, String layer, long visibleGeneration) {
+    }
+
+    /**
+     * Writes one exact-frame, bounded execution receipt for the Rust backend.
+     * Per-instance trace events are intentionally budgeted and can become
+     * stale during initial terrain population; this grouped receipt cannot
+     * silently turn that diagnostic truncation into a false execution gap.
+     */
+    public static void recordRustWholeFrameExecutionCoverage(
+            Iterable<RustExecutionIdentity> executions,
+            long backendFrameId
+    ) {
+        if (!ENABLED || executions == null || backendFrameId <= 0L) {
+            return;
+        }
+        for (String layer : List.of("solid", "cutout")) {
+            int recordCount = 0;
+            int animatedSections = 0;
+            long vertexTotal = 0L;
+            long indexTotal = 0L;
+            long primitiveTotal = 0L;
+            StringBuilder records = new StringBuilder("[");
+            for (RustExecutionIdentity execution : executions) {
+                if (execution == null || !layer.equals(normalizeLayer(execution.layer()))) {
+                    continue;
+                }
+                MeshCoverage coverage = RUST_EXECUTED_MESHES.get(
+                        new CoverageKey(execution.sectionKey(), layer)
+                );
+                if (coverage == null) {
+                    continue;
+                }
+                vertexTotal += coverage.vertexCount();
+                indexTotal += coverage.indexCount();
+                primitiveTotal += coverage.primitiveCount();
+                appendCoverageRecord(
+                        records,
+                        execution.sectionKey(),
+                        coverage.sectionOriginX() >> 4,
+                        coverage.sectionOriginY() >> 4,
+                        coverage.sectionOriginZ() >> 4,
+                        coverage.sectionOriginX(),
+                        coverage.sectionOriginY(),
+                        coverage.sectionOriginZ(),
+                        0,
+                        false,
+                        coverage,
+                        true,
+                        "rust-vulkan-whole-frame-backend-executed",
+                        execution.visibleGeneration(),
+                        0L
+                );
+                recordCount++;
+            }
+            records.append("]");
+            if (recordCount == 0) {
+                continue;
+            }
+            writeWholeFrameCoverageEvent(
+                    "rust-vulkan-executed-coverage",
+                    layer,
+                    backendFrameId,
+                    0,
+                    animatedSections,
+                    0.0D,
+                    0.0D,
+                    0.0D,
+                    0,
+                    0,
+                    recordCount,
+                    vertexTotal,
+                    indexTotal,
+                    primitiveTotal,
+                    0,
+                    recordCount,
+                    builder -> builder.append(records, 1, records.length() - 1)
+            );
+        }
     }
 
     public static boolean isSolidVisibleListStable(int requiredFrames, int minimumSections) {
@@ -1055,6 +1255,7 @@ public final class StaticTerrainParityDiagnostics {
         int primitiveMetadataRecords = 0;
         int unknownPrimitiveCount = 0;
         int nonFluidTranslucentPrimitiveCount = 0;
+        int genericFluidPrimitiveCount = 0;
         int builtinWaterPrimitiveCount = 0;
         int unsupportedFluidPrimitiveCount = 0;
         int[] primitiveMetadata = mesh.getPrimitiveMetadata();
@@ -1065,6 +1266,7 @@ public final class StaticTerrainParityDiagnostics {
                 switch (primitiveMetadata[offset]) {
                     case NativeSectionMeshBuilder.PRIMITIVE_KIND_UNKNOWN -> unknownPrimitiveCount++;
                     case NativeSectionMeshBuilder.PRIMITIVE_KIND_NON_FLUID_TRANSLUCENT -> nonFluidTranslucentPrimitiveCount++;
+                    case NativeSectionMeshBuilder.PRIMITIVE_KIND_GENERIC_FLUID -> genericFluidPrimitiveCount++;
                     case NativeSectionMeshBuilder.PRIMITIVE_KIND_BUILTIN_WATER -> builtinWaterPrimitiveCount++;
                     case NativeSectionMeshBuilder.PRIMITIVE_KIND_UNSUPPORTED_FLUID -> unsupportedFluidPrimitiveCount++;
                     default -> unknownPrimitiveCount++;
@@ -1104,6 +1306,7 @@ public final class StaticTerrainParityDiagnostics {
                 primitiveMetadataRecords,
                 unknownPrimitiveCount,
                 nonFluidTranslucentPrimitiveCount,
+                genericFluidPrimitiveCount,
                 builtinWaterPrimitiveCount,
                 unsupportedFluidPrimitiveCount,
                 animatedSpriteIdentities(output),
@@ -1275,8 +1478,66 @@ public final class StaticTerrainParityDiagnostics {
             int executedRecords,
             CoverageRecordAppender appender
     ) {
+        writeCoverageEvent(false, stage, layer, frameId, flags, animatedSections, cameraX, cameraY, cameraZ,
+                viewportWidth, viewportHeight, recordCount, vertexTotal, indexTotal, primitiveTotal,
+                missingCoverage, executedRecords, appender);
+    }
+
+    /**
+     * Whole-frame capture receipts must survive an arbitrarily busy CPU mesh
+     * trace. They retain their own bounded budget rather than displacing or
+     * being displaced by build diagnostics.
+     */
+    private static void writeWholeFrameCoverageEvent(
+            String stage,
+            String layer,
+            long frameId,
+            int flags,
+            int animatedSections,
+            double cameraX,
+            double cameraY,
+            double cameraZ,
+            int viewportWidth,
+            int viewportHeight,
+            int recordCount,
+            long vertexTotal,
+            long indexTotal,
+            long primitiveTotal,
+            int missingCoverage,
+            int executedRecords,
+            CoverageRecordAppender appender
+    ) {
+        writeCoverageEvent(true, stage, layer, frameId, flags, animatedSections, cameraX, cameraY, cameraZ,
+                viewportWidth, viewportHeight, recordCount, vertexTotal, indexTotal, primitiveTotal,
+                missingCoverage, executedRecords, appender);
+    }
+
+    private static void writeCoverageEvent(
+            boolean wholeFrameCritical,
+            String stage,
+            String layer,
+            long frameId,
+            int flags,
+            int animatedSections,
+            double cameraX,
+            double cameraY,
+            double cameraZ,
+            int viewportWidth,
+            int viewportHeight,
+            int recordCount,
+            long vertexTotal,
+            long indexTotal,
+            long primitiveTotal,
+            int missingCoverage,
+            int executedRecords,
+            CoverageRecordAppender appender
+    ) {
         int eventIndex = COVERAGE_EVENTS.incrementAndGet();
-        if (eventIndex > MAX_COVERAGE_EVENTS) {
+        if (wholeFrameCritical
+                && WHOLE_FRAME_COVERAGE_EVENTS.incrementAndGet() > MAX_WHOLE_FRAME_COVERAGE_EVENTS) {
+            return;
+        }
+        if (!wholeFrameCritical && eventIndex > MAX_COVERAGE_EVENTS) {
             return;
         }
         StringBuilder json = new StringBuilder(4096);
@@ -1287,6 +1548,8 @@ public final class StaticTerrainParityDiagnostics {
         appendField(json, "stage", stage).append(", ");
         appendField(json, "layer", normalizeLayer(layer)).append(", ");
         appendField(json, "frameId", frameId).append(", ");
+        appendField(json, "deterministicRenderedFrameIndex",
+                net.minecraft.client.dev.DeterministicCameraCapture.currentRenderedFrameIndex()).append(", ");
         appendField(json, "gameTime", Minecraft.getInstance().level == null ? -1L : Minecraft.getInstance().level.getGameTime()).append(", ");
         appendField(json, "nanoTime", System.nanoTime()).append(", ");
         json.append("\"camera\": { ");
@@ -1373,6 +1636,7 @@ public final class StaticTerrainParityDiagnostics {
         appendField(records, "primitiveMetadataRecords", value.primitiveMetadataRecords()).append(", ");
         appendField(records, "unknownPrimitiveCount", value.unknownPrimitiveCount()).append(", ");
         appendField(records, "nonFluidTranslucentPrimitiveCount", value.nonFluidTranslucentPrimitiveCount()).append(", ");
+        appendField(records, "genericFluidPrimitiveCount", value.genericFluidPrimitiveCount()).append(", ");
         appendField(records, "builtinWaterPrimitiveCount", value.builtinWaterPrimitiveCount()).append(", ");
         appendField(records, "unsupportedFluidPrimitiveCount", value.unsupportedFluidPrimitiveCount()).append(", ");
         appendField(records, "layerAnimatedMaterialClassification", layerAnimatedMaterialClassification(value)).append(", ");
@@ -1517,6 +1781,9 @@ public final class StaticTerrainParityDiagnostics {
     }
 
     private static String layerAnimatedMaterialClassification(MeshCoverage coverage) {
+        if (coverage.genericFluidPrimitiveCount() > 0) {
+            return "generic-fluid";
+        }
         if (coverage.builtinWaterPrimitiveCount() > 0) {
             return "builtin-water";
         }
@@ -1894,6 +2161,7 @@ public final class StaticTerrainParityDiagnostics {
             int primitiveMetadataRecords,
             int unknownPrimitiveCount,
             int nonFluidTranslucentPrimitiveCount,
+            int genericFluidPrimitiveCount,
             int builtinWaterPrimitiveCount,
             int unsupportedFluidPrimitiveCount,
             String sectionAnimatedSpriteIdentities,
@@ -1926,6 +2194,7 @@ public final class StaticTerrainParityDiagnostics {
                 false,
                 "",
                 "",
+                0,
                 0,
                 0,
                 0,

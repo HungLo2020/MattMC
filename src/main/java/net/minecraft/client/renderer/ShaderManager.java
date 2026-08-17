@@ -204,6 +204,15 @@ public class ShaderManager extends SimplePreparableReloadListener<ShaderManager.
 
 	protected void apply(ShaderManager.Configs configs, ResourceManager resourceManager, ProfilerFiller profilerFiller) {
 		ShaderManager.CompilationCache compilationCache = new ShaderManager.CompilationCache(configs);
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			// Java render-pipeline compilation/cache ownership ends at the
+			// whole-frame handoff. Keep the parsed source cache for ordinary
+			// resource bookkeeping, but do not ask the Java backend to compile,
+			// clear, or validate pipelines that Rust never consumes.
+			this.compilationCache.close();
+			this.compilationCache = compilationCache;
+			return;
+		}
 		Set<RenderPipeline> set = new HashSet(RenderPipelines.getStaticPipelines());
 		List<ResourceLocation> list = new ArrayList();
 		net.vulkanic.VulkanicAPI.clearBackendPipelineCache();

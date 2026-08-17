@@ -10,7 +10,16 @@ public class ChunkBuildContext {
     public final BlockRenderCache cache;
 
     public ChunkBuildContext(ClientLevel level, ChunkVertexType vertexType) {
-        this.buffers = new ChunkBuildBuffers(vertexType);
+        this(level, vertexType, net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.shouldUseSeparateAo());
+    }
+
+	/**
+	 * Creates a CPU meshing context with an explicitly selected vertex layout.
+	 * This is used by the Rust whole-frame source so it does not borrow Iris
+	 * material-map state while Vulkan is selected.
+	 */
+	public ChunkBuildContext(ClientLevel level, ChunkVertexType vertexType, boolean separateAo) {
+		this.buffers = new ChunkBuildBuffers(vertexType, separateAo);
         this.cache = new BlockRenderCache(Minecraft.getInstance(), level);
     }
 

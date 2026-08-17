@@ -49,10 +49,12 @@ import net.minecraft.client.gui.render.pip.OversizedItemRenderer;
 import net.minecraft.client.gui.render.pip.PictureInPictureRenderer;
 import net.minecraft.client.gui.render.pip.Standard3dItemRenderer;
 import net.minecraft.client.gui.render.state.BlitRenderState;
+import net.minecraft.client.gui.render.state.ColoredRectangleRenderState;
 import net.minecraft.client.gui.render.state.GlyphRenderState;
 import net.minecraft.client.gui.render.state.GuiElementRenderState;
 import net.minecraft.client.gui.render.state.GuiItemRenderState;
 import net.minecraft.client.gui.render.state.GuiRenderState;
+import net.minecraft.client.gui.render.state.TiledBlitRenderState;
 import net.minecraft.client.gui.render.state.pip.OversizedItemRenderState;
 import net.minecraft.client.gui.render.state.pip.PictureInPictureRenderState;
 import net.minecraft.client.renderer.CachedOrthoProjectionMatrixBuffer;
@@ -171,10 +173,12 @@ public class GuiRenderer implements AutoCloseable {
 	 */
 	public void collectRustGalTextSemantics() {
 		this.renderState.forEachText(guiTextRenderState -> {
+			int dynamicLayerOrder = this.renderState.currentSemanticLayerOrder(GuiRenderState.SemanticPhase.TEXT);
 			List<RustGalGuiElementRenderState> elements = RustGalGuiRenderer.tryEnqueueText(
 				guiTextRenderState,
 				Minecraft.getInstance().getWindow().getGuiScaledWidth(),
-				Minecraft.getInstance().getWindow().getGuiScaledHeight()
+				Minecraft.getInstance().getWindow().getGuiScaledHeight(),
+				dynamicLayerOrder
 			);
 			if (elements != null) {
 				for (RustGalGuiElementRenderState element : elements) {
@@ -193,12 +197,13 @@ public class GuiRenderer implements AutoCloseable {
 		int guiWidth = Minecraft.getInstance().getWindow().getGuiScaledWidth();
 		int guiHeight = Minecraft.getInstance().getWindow().getGuiScaledHeight();
 		this.renderState.forEachItem(guiItemRenderState -> {
+			int dynamicLayerOrder = this.renderState.currentSemanticLayerOrder(GuiRenderState.SemanticPhase.ITEMS);
 			boolean standard3dCandidate = guiItemRenderState.itemStackRenderState().usesBlockLight()
 				&& RustGalGuiItemRenderer.standard3dRouteEnabled()
 				&& RustGalGuiRenderer.currentExecutionRoute() == RustGalGuiRenderer.GuiExecutionRoute.RUST_VULKAN_WHOLE_FRAME;
 			List<RustGalGuiElementRenderState> elements = standard3dCandidate
-				? RustGalGuiItemRenderer.tryEnqueueStandard3dItem(guiItemRenderState, guiWidth, guiHeight)
-				: RustGalGuiItemRenderer.tryEnqueueFlatItem(guiItemRenderState, guiWidth, guiHeight);
+				? RustGalGuiItemRenderer.tryEnqueueStandard3dItem(guiItemRenderState, guiWidth, guiHeight, dynamicLayerOrder)
+				: RustGalGuiItemRenderer.tryEnqueueFlatItem(guiItemRenderState, guiWidth, guiHeight, dynamicLayerOrder);
 			if (standard3dCandidate && !elements.isEmpty()) {
 				this.rustOwnedStandard3dItems.add(guiItemRenderState);
 			}
@@ -206,6 +211,62 @@ public class GuiRenderer implements AutoCloseable {
 				this.renderState.submitGlyphToCurrentLayer(element);
 			}
 		});
+	}
+
+	/**
+	 * Extracts only exact uniform-color GUI rectangles. Unsupported GUI element
+	 * families remain unavailable to the whole-frame route instead of being
+	 * reconstructed through Java rendering.
+	 */
+	public void collectRustGalRectangleSemantics() {
+		int guiWidth = Minecraft.getInstance().getWindow().getGuiScaledWidth();
+		int guiHeight = Minecraft.getInstance().getWindow().getGuiScaledHeight();
+		this.renderState.forEachElement(guiElementRenderState -> {
+			if (guiElementRenderState instanceof ColoredRectangleRenderState rectangle) {
+				int dynamicLayerOrder = this.renderState.currentSemanticLayerOrder(GuiRenderState.SemanticPhase.ELEMENTS);
+				List<RustGalGuiElementRenderState> elements = RustGalGuiRenderer.tryEnqueueUniformRectangle(
+					rectangle, guiWidth, guiHeight, dynamicLayerOrder
+				);
+				if (elements != null) {
+					for (RustGalGuiElementRenderState element : elements) {
+						this.renderState.submitGlyphToCurrentLayer(element);
+					}
+				}
+			}
+		}, GuiRenderState.TraverseRange.ALL);
+	}
+
+	/**
+	 * Extracts only one-sampler GUI_TEXTURED blits backed by copied resource PNGs
+	 * or copied stitched-atlas pixels. All other GUI materials remain absent
+	 * rather than crossing the whole-frame boundary through a Java texture view.
+	 */
+	public void collectRustGalCopiedBlitSemantics() {
+		int guiWidth = Minecraft.getInstance().getWindow().getGuiScaledWidth();
+		int guiHeight = Minecraft.getInstance().getWindow().getGuiScaledHeight();
+		this.renderState.forEachElement(guiElementRenderState -> {
+			if (guiElementRenderState instanceof BlitRenderState blit) {
+				int dynamicLayerOrder = this.renderState.currentSemanticLayerOrder(GuiRenderState.SemanticPhase.ELEMENTS);
+				List<RustGalGuiElementRenderState> elements = RustGalGuiRenderer.tryEnqueueCopiedBlit(
+					blit, guiWidth, guiHeight, dynamicLayerOrder
+				);
+				if (elements != null) {
+					for (RustGalGuiElementRenderState element : elements) {
+						this.renderState.submitGlyphToCurrentLayer(element);
+					}
+				}
+			} else if (guiElementRenderState instanceof TiledBlitRenderState tiledBlit) {
+				int dynamicLayerOrder = this.renderState.currentSemanticLayerOrder(GuiRenderState.SemanticPhase.ELEMENTS);
+				List<RustGalGuiElementRenderState> elements = RustGalGuiRenderer.tryEnqueueTiledCopiedBlit(
+					tiledBlit, guiWidth, guiHeight, dynamicLayerOrder
+				);
+				if (elements != null) {
+					for (RustGalGuiElementRenderState element : elements) {
+						this.renderState.submitGlyphToCurrentLayer(element);
+					}
+				}
+			}
+		}, GuiRenderState.TraverseRange.ALL);
 	}
 
 	public void render(GpuBufferSlice gpuBufferSlice) {

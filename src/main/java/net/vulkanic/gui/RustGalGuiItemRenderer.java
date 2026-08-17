@@ -1,15 +1,9 @@
 package net.vulkanic.gui;
 
-import java.awt.image.BufferedImage;
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
-import javax.imageio.ImageIO;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.gui.render.state.GuiItemRenderState;
@@ -20,7 +14,6 @@ import net.minecraft.client.renderer.item.ItemStackRenderState;
 import net.minecraft.client.renderer.item.TrackingItemStackRenderState;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.util.ARGB;
 import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemDisplayContext;
@@ -28,6 +21,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Blocks;
 import net.vulkanic.bridge.VulkanicGalBridge;
 import net.sodium.client.model.quad.BakedQuadView;
+import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3x2f;
 
 /**
@@ -37,11 +31,8 @@ import org.joml.Matrix3x2f;
  */
 public final class RustGalGuiItemRenderer {
 	private static final String PRODUCER = "minecraft.gui.item.flat";
-	private static final int RAW_RGBA8 = 2;
 	private static final boolean STANDARD_3D_ROUTE_DISABLED = Boolean.getBoolean("mattmc.rustGal.gui.standard3d.disabled");
 	private static final boolean DEBUG_STANDARD_3D_ITEM_ENABLED = Boolean.getBoolean("mattmc.rustGal.gui.standard3d.debugItem");
-	private static final Map<Long, String> ASSET_IDENTITIES = new HashMap<>();
-	private static final Map<ResourceLocation, ImageAsset> IMAGE_CACHE = new HashMap<>();
 	private static final Map<String, Boolean> DIAGNOSTICS = new HashMap<>();
 
 	private RustGalGuiItemRenderer() {
@@ -89,6 +80,15 @@ public final class RustGalGuiItemRenderer {
 		int guiWidth,
 		int guiHeight
 	) {
+		return tryEnqueueFlatItem(item, guiWidth, guiHeight, null);
+	}
+
+	public static List<RustGalGuiElementRenderState> tryEnqueueFlatItem(
+		GuiItemRenderState item,
+		int guiWidth,
+		int guiHeight,
+		@Nullable Integer dynamicLayerOrder
+	) {
 		if (RustGalGuiRenderer.currentExecutionRoute() != RustGalGuiRenderer.GuiExecutionRoute.RUST_VULKAN_WHOLE_FRAME) {
 			return List.of();
 		}
@@ -116,10 +116,12 @@ public final class RustGalGuiItemRenderer {
 
 		List<RustGalGuiElementRenderState> elements = new ArrayList<>(quads.size());
 		long startedNanos = System.nanoTime();
+		int requestLayerOrder = dynamicLayerOrder == null ? GuiRenderStratum.GUI_ITEM.order()
+			: RustGalGuiRenderer.dynamicLayerOrder(dynamicLayerOrder);
 		for (FlatQuad quad : quads) {
-			stageImage(quad.asset());
+			RustGalGuiRawImageAssets.stage(quad.asset());
 			VulkanicGalBridge.GuiAffineQuadRecord request = new VulkanicGalBridge.GuiAffineQuadRecord(
-				GuiRenderStratum.GUI_ITEM.order(),
+				requestLayerOrder,
 				quad.asset().assetId(),
 				quad.x0(), quad.y0(), quad.x1(), quad.y1(), quad.x3(), quad.y3(),
 				0.0F,
@@ -129,7 +131,11 @@ public final class RustGalGuiItemRenderer {
 			if (quad.clipWidth() != 0 || quad.clipHeight() != 0) {
 				request = request.withClip(quad.clipLeft(), quad.clipTop(), quad.clipWidth(), quad.clipHeight());
 			}
-			var token = RustGalFrameCoordinator.enqueueGuiAffineQuadRequest(request, GuiRenderStratum.GUI_ITEM, startedNanos);
+			var token = dynamicLayerOrder == null
+				? RustGalFrameCoordinator.enqueueGuiAffineQuadRequest(request, GuiRenderStratum.GUI_ITEM, startedNanos)
+				: RustGalFrameCoordinator.enqueueGuiAffineQuadRequest(
+					request, RustGalGuiRenderer.dynamicLayerId(dynamicLayerOrder),
+					requestLayerOrder, startedNanos);
 			int left = Math.max(0, (int)Math.floor(Math.min(request.x0(), Math.min(request.x1(), request.x3()))));
 			int top = Math.max(0, (int)Math.floor(Math.min(request.y0(), Math.min(request.y1(), request.y3()))));
 			int right = Math.min(guiWidth, (int)Math.ceil(Math.max(request.x0(), Math.max(request.x1(), request.x3()))));
@@ -153,6 +159,15 @@ public final class RustGalGuiItemRenderer {
 		int guiWidth,
 		int guiHeight
 	) {
+		return tryEnqueueStandard3dItem(item, guiWidth, guiHeight, null);
+	}
+
+	public static List<RustGalGuiElementRenderState> tryEnqueueStandard3dItem(
+		GuiItemRenderState item,
+		int guiWidth,
+		int guiHeight,
+		@Nullable Integer dynamicLayerOrder
+	) {
 		if (RustGalGuiRenderer.currentExecutionRoute() != RustGalGuiRenderer.GuiExecutionRoute.RUST_VULKAN_WHOLE_FRAME) {
 			return List.of();
 		}
@@ -168,6 +183,8 @@ public final class RustGalGuiItemRenderer {
 			return List.of();
 		}
 		List<VulkanicGalBridge.GuiMeshBatchRecord> batches = new ArrayList<>();
+		int requestLayerOrder = dynamicLayerOrder == null ? GuiRenderStratum.GUI_ITEM.order()
+			: RustGalGuiRenderer.dynamicLayerOrder(dynamicLayerOrder);
 		int batchLayerIndex = 0;
 		for (int layerIndex = 0; layerIndex < mesh.layers().size(); layerIndex++) {
 			GuiItemMeshSemanticCollector.GuiItemMeshLayer layer = mesh.layers().get(layerIndex);
@@ -184,7 +201,7 @@ public final class RustGalGuiItemRenderer {
 					));
 				}
 				batches.add(new VulkanicGalBridge.GuiMeshBatchRecord(
-					GuiRenderStratum.GUI_ITEM.order(), batchLayerIndex++,
+					requestLayerOrder, batchLayerIndex++,
 					layer.materialMode() == GuiItemMeshSemanticCollector.MaterialMode.CUTOUT ? 2 : 1,
 					layer.blockLight() ? 2 : 1, quad.assetId(), 0L,
 					layer.materialMode() == GuiItemMeshSemanticCollector.MaterialMode.CUTOUT ? 0.1F : 0.0F,
@@ -196,7 +213,11 @@ public final class RustGalGuiItemRenderer {
 		}
 		if (batches.isEmpty()) return List.of();
 		long startedNanos = System.nanoTime();
-		var token = RustGalFrameCoordinator.enqueueGuiMeshItemRequest(batches, GuiRenderStratum.GUI_ITEM, startedNanos);
+		var token = dynamicLayerOrder == null
+			? RustGalFrameCoordinator.enqueueGuiMeshItemRequest(batches, GuiRenderStratum.GUI_ITEM, startedNanos)
+			: RustGalFrameCoordinator.enqueueGuiMeshItemRequest(
+				batches, RustGalGuiRenderer.dynamicLayerId(dynamicLayerOrder),
+				requestLayerOrder, startedNanos);
 		recordDiagnostic("mesh-accepted-layers=" + batches.size());
 		return List.of(new RustGalGuiElementRenderState(
 			token, GuiRenderStratum.GUI_ITEM, "minecraft.gui.item.standard3d", -1, -1.0F, GuiFillDirection.NONE,
@@ -205,9 +226,7 @@ public final class RustGalGuiItemRenderer {
 	}
 
 	public static void invalidateAssets() {
-		synchronized (IMAGE_CACHE) {
-			IMAGE_CACHE.clear();
-		}
+		RustGalGuiRawImageAssets.invalidate();
 	}
 
 	private static String appendSupportedLayer(
@@ -245,7 +264,7 @@ public final class RustGalGuiItemRenderer {
 		if (!(bakedQuad instanceof BakedQuadView quad)) return null;
 		TextureAtlasSprite sprite = quad.getSprite();
 		if (sprite == null || sprite.contents().name() == null || sprite.contents().isAnimated()) return null;
-		ImageAsset asset = imageAsset(sprite.contents().name());
+		RustGalGuiRawImageAssets.Asset asset = RustGalGuiRawImageAssets.resolve(sprite.contents().name());
 		if (asset == null) return null;
 		int tint = itemTint(bakedQuad, tintLayers);
 		int color = shadedColor(quad.getColor(0), tint);
@@ -307,73 +326,18 @@ public final class RustGalGuiItemRenderer {
 		return new float[] {pose.m00() * x + pose.m10() * y + pose.m20(), pose.m01() * x + pose.m11() * y + pose.m21()};
 	}
 
-	private static ImageAsset imageAsset(ResourceLocation sprite) {
-		synchronized (IMAGE_CACHE) {
-			ImageAsset cached = IMAGE_CACHE.get(sprite);
-			if (cached != null) return cached;
-		}
-		ResourceLocation texture = ResourceLocation.fromNamespaceAndPath(sprite.getNamespace(), "textures/" + sprite.getPath() + ".png");
-		Optional<Resource> resource = Minecraft.getInstance().getResourceManager().getResource(texture);
-		if (resource.isEmpty()) return null;
-		try (InputStream input = resource.get().open()) {
-			byte[] png = input.readAllBytes();
-			BufferedImage image = ImageIO.read(new ByteArrayInputStream(png));
-			if (image == null || image.getWidth() <= 0 || image.getHeight() <= 0) return null;
-			byte[] pixels = new byte[Math.multiplyExact(Math.multiplyExact(image.getWidth(), image.getHeight()), 4)];
-			for (int y = 0; y < image.getHeight(); y++) {
-				for (int x = 0; x < image.getWidth(); x++) {
-					int argb = image.getRGB(x, y);
-					int offset = (y * image.getWidth() + x) * 4;
-					pixels[offset] = (byte)ARGB.red(argb);
-					pixels[offset + 1] = (byte)ARGB.green(argb);
-					pixels[offset + 2] = (byte)ARGB.blue(argb);
-					pixels[offset + 3] = (byte)ARGB.alpha(argb);
-				}
-			}
-			long assetId = semanticAssetId(texture.toString());
-			ImageAsset result = new ImageAsset(assetId, texture.toString(), image.getWidth(), image.getHeight(), pixels);
-			synchronized (IMAGE_CACHE) {
-				IMAGE_CACHE.put(sprite, result);
-			}
-			return result;
-		} catch (IOException | ArithmeticException error) {
-			recordDiagnostic("image-read-failure=" + texture);
-			return null;
-		}
-	}
-
-	private static void stageImage(ImageAsset asset) {
-		RustGalFrameCoordinator.stageGuiRawImage(new VulkanicGalBridge.GuiRawImageAssetRecord(
-			asset.assetId(), RAW_RGBA8, asset.width(), asset.height(), asset.pixels()
-		));
-	}
-
 	/**
 	 * Resolves and stages a copied semantic image for a future Rust-owned mesh
 	 * layer. The returned key is stable across a resource generation; neither a
 	 * sprite nor an atlas object escapes this Java boundary.
 	 */
 	static long stageSemanticImage(ResourceLocation sprite) {
-		ImageAsset asset = imageAsset(sprite);
+		RustGalGuiRawImageAssets.Asset asset = RustGalGuiRawImageAssets.resolve(sprite);
 		if (asset == null) {
 			return 0L;
 		}
-		stageImage(asset);
+		RustGalGuiRawImageAssets.stage(asset);
 		return asset.assetId();
-	}
-
-	private static long semanticAssetId(String identity) {
-		long hash = 0xcbf29ce484222325L;
-		for (int index = 0; index < identity.length(); index++) {
-			hash ^= identity.charAt(index);
-			hash *= 0x100000001b3L;
-		}
-		if (hash == 0L) hash = 1L;
-		String previous = ASSET_IDENTITIES.putIfAbsent(hash, identity);
-		if (previous != null && !previous.equals(identity)) {
-			throw new IllegalStateException("semantic GUI item image identity collision");
-		}
-		return hash;
 	}
 
 	private static int itemTint(BakedQuad quad, int[] tintLayers) {
@@ -414,19 +378,8 @@ public final class RustGalGuiItemRenderer {
 		}
 	}
 
-	private record ImageAsset(long assetId, String identity, int width, int height, byte[] pixels) {
-		private ImageAsset {
-			pixels = pixels.clone();
-		}
-
-		@Override
-		public byte[] pixels() {
-			return this.pixels.clone();
-		}
-	}
-
 	private record FlatQuad(
-		ImageAsset asset,
+		RustGalGuiRawImageAssets.Asset asset,
 		float x0, float y0, float x1, float y1, float x3, float y3,
 		float u0, float v0, float u1, float v1,
 		int colorArgb,

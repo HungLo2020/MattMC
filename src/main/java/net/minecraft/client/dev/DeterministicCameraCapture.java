@@ -2262,7 +2262,7 @@ public final class DeterministicCameraCapture {
 		if (staticTerrainBaseTranslucentFixtureScenario()) {
 			RustGalTerrainRenderer.TerrainDiagnostics diagnostics = RustGalTerrainRenderer.diagnosticsSnapshot();
 			boolean unsupportedFixtureReady = !"translucent-mixed-unsupported".equals(STATIC_TERRAIN_SCENARIO)
-				|| diagnostics.unsupportedFluidOmittedSections() > 0;
+				|| diagnostics.unsupportedFluidRejectedSections() == 0;
 			if (diagnostics.visibleLayerSubmissions() > 0
 				&& unsupportedFixtureReady
 				&& framesWaitingForStaticTerrainLifecycle >= Math.max(4, FRAMES_PER_POSE / 2)) {
@@ -4116,6 +4116,12 @@ public final class DeterministicCameraCapture {
 				.append(" signature=")
 				.append(staticTerrainSettledSignature);
 		}
+		if (WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan()) {
+			summary.append(";rust-whole-frame-terrain=")
+				.append(net.vulkanic.world.RustGalWholeFrameTerrainSource.wholeFrameTerrainQueueSummary());
+			summary.append(";rust-whole-frame-assets=")
+				.append(RustGalTerrainRenderer.wholeFrameAssetUploadSummary());
+		}
 		String appearanceLightReadiness = net.sodium.client.render.StaticTerrainParityDiagnostics.appearanceLightReadinessSummary();
 		if (!appearanceLightReadiness.endsWith("ready=true")) {
 			summary.append(";static-terrain-light=").append(appearanceLightReadiness);
@@ -4260,6 +4266,18 @@ public final class DeterministicCameraCapture {
 	}
 
 	private static boolean staticTerrainAssetsSettled() {
+		boolean rustWholeFrameTerrain = WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan();
+		if (rustWholeFrameTerrain
+			&& !net.vulkanic.world.RustGalWholeFrameTerrainSource.isWholeFrameTerrainQueueDrained()) {
+			staticTerrainSettledFrames = 0;
+			staticTerrainSettledSignature = "rust-whole-frame-queue-not-drained";
+			return false;
+		}
+		if (rustWholeFrameTerrain && !RustGalTerrainRenderer.areWholeFrameAssetsUploaded()) {
+			staticTerrainSettledFrames = 0;
+			staticTerrainSettledSignature = "rust-whole-frame-assets-not-uploaded";
+			return false;
+		}
 		if (!staticTerrainRequiresSettledAssets()) {
 			return true;
 		}
@@ -4270,9 +4288,17 @@ public final class DeterministicCameraCapture {
 			return false;
 		}
 		// Stable per-section/layer/generation identities are checked by
-		// settledReadyGateSatisfied above. Do not reject valid visible work just
-		// because unrelated terrain assets are still streaming outside the view.
-		staticTerrainSettledSignature = "visible-submission-identities";
+		// settledReadyGateSatisfied above. For the direct CPU terrain source, also
+		// keep the portal frontier drained for the same consecutive frame window;
+		// a one-frame empty queue can otherwise be followed by completed builds
+		// that expand the visible traversal after the capture was admitted.
+		staticTerrainSettledSignature = rustWholeFrameTerrain
+			? "visible-submission-identities+rust-whole-frame-queue-drained+assets-uploaded"
+			: "visible-submission-identities";
+		if (rustWholeFrameTerrain) {
+			staticTerrainSettledFrames = Math.min(SETTLED_READY_FRAMES, staticTerrainSettledFrames + 1);
+			return staticTerrainSettledFrames >= SETTLED_READY_FRAMES;
+		}
 		staticTerrainSettledFrames = SETTLED_READY_FRAMES;
 		return true;
 	}
@@ -7769,7 +7795,7 @@ public final class DeterministicCameraCapture {
 		json.append("    \"skippedUnsupportedAnimatedSections\": ").append(diagnostics.skippedUnsupportedAnimatedSections()).append(",\n");
 		json.append("    \"skippedUnsupportedFluidTranslucentSections\": ").append(diagnostics.skippedUnsupportedFluidTranslucentSections()).append(",\n");
 		json.append("    \"acceptedWaterAnimatedSections\": ").append(diagnostics.acceptedWaterAnimatedSections()).append(",\n");
-		json.append("    \"unsupportedFluidOmittedSections\": ").append(diagnostics.unsupportedFluidOmittedSections()).append(",\n");
+		json.append("    \"unsupportedFluidRejectedSections\": ").append(diagnostics.unsupportedFluidRejectedSections()).append(",\n");
 		json.append("    \"skippedEmptyLayers\": ").append(diagnostics.skippedEmptyLayers()).append(",\n");
 		json.append("    \"registeredMeshes\": ").append(diagnostics.registeredMeshes()).append(",\n");
 		json.append("    \"registeredTranslucentSorts\": ").append(diagnostics.registeredTranslucentSorts()).append(",\n");

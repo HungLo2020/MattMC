@@ -106,7 +106,13 @@ public class LightTexture implements AutoCloseable {
 			this.shaderLightmapProbeTexture.setTextureFilter(FilterMode.LINEAR, false);
 			this.shaderLightmapProbeView = VulkanicAPI.createTextureView(this.shaderLightmapProbeTexture);
 		}
-		VulkanicAPI.createCommandEncoder().clearColorTexture(this.texture, -1);
+		// The whole-frame Rust path derives its lightmap from the semantic
+		// gameplay inputs below.  Do not submit a Java clear into its startup
+		// device: this texture is retained only as an inert compatibility object
+		// for callers that have not yet been ported to the semantic lightmap.
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			VulkanicAPI.createCommandEncoder().clearColorTexture(this.texture, -1);
+		}
 		this.ubo = new MappableRingBuffer(() -> "Lightmap UBO", 130, LIGHTMAP_UBO_SIZE);
 	}
 
@@ -186,11 +192,17 @@ public class LightTexture implements AutoCloseable {
 	}
 
 	public void turnOffLightLayer() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			return;
+		}
 		IrisRenderSystem.bindTextureToUnit(2, 0);
 		TextureTracker.INSTANCE.onSetShaderTexture(2, null);
 	}
 
 	public void turnOnLightLayer() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			return;
+		}
 		var ctx = VulkanicAPI.getCommandContext();
 		VulkanicAPI.bindTextureUnit(ctx, 2, this.textureView);
 		TextureTracker.INSTANCE.onSetShaderTexture(2, this.textureView);
@@ -265,6 +277,16 @@ public class LightTexture implements AutoCloseable {
 			profilerFiller.push("lightTex");
 			ClientLevel clientLevel = this.minecraft.level;
 			if (clientLevel != null) {
+				// Rust's whole-frame renderer consumes this immutable record directly.
+				// Keep the Java GPU lightmap, its UBO, and Iris runtime state entirely
+				// outside that route until each remaining texture consumer is semantic.
+				if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+					this.rustSemanticLightmapInputs = this.computeRustSemanticLightmapInputs(
+						clientLevel, this.minecraft.player, f, false
+					);
+					profilerFiller.pop();
+					return;
+				}
 				// Iris: Reset darkness value before calculating
 				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setDarknessLightFactor(0.0F);
 				

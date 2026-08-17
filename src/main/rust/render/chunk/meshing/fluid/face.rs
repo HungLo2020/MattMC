@@ -213,7 +213,7 @@ pub(in crate::render::chunk::meshing) fn fluid_semantic_record(
         primitive_kind: if state.fluid_type == FLUID_WATER {
             TERRAIN_PRIMITIVE_BUILTIN_WATER
         } else {
-            TERRAIN_PRIMITIVE_UNSUPPORTED_FLUID
+            TERRAIN_PRIMITIVE_GENERIC_FLUID
         },
     }
 }

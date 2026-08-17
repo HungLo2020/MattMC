@@ -728,9 +728,13 @@ if (isMacOS) {
     clientJvmArgs += '-XX:+UseStringDeduplication'
     clientJvmArgs += '-XX:MaxGCPauseMillis=200'
 } else {
-    // Use ZGC on Linux/Windows for better performance
-    clientJvmArgs += '-XX:+UseZGC'
-    clientJvmArgs += '-XX:+UseCompactObjectHeaders'
+	// Use ZGC on Linux/Windows for better performance
+	clientJvmArgs += '-XX:+UseZGC'
+	clientJvmArgs += '-XX:+UseCompactObjectHeaders'
+	// Whole-frame Vulkan owns large, short-lived semantic staging batches while
+	// worlds stream. Reclaim idle ZGC capacity promptly so completed batches do
+	// not keep the process above its bounded-resource budget between frames.
+	clientJvmArgs += '-XX:ZUncommitDelay=5'
 }
 
 // Add macOS-specific JVM arguments for LWJGL/GLFW

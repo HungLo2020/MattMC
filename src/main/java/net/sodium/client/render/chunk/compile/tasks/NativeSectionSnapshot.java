@@ -350,11 +350,17 @@ final class NativeSectionSnapshot implements AutoCloseable {
     }
 
     private static int irisBlockId(BlockState state) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			return -1;
+		}
         var ids = net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getBlockStateIds();
         return ids == null ? -1 : ids.getOrDefault(state, -1);
     }
 
     private static int irisFluidBlockId(FluidState state) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			return -1;
+		}
         var ids = net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getBlockStateIds();
         return ids == null ? -1 : ids.getInt(state.createLegacyBlock());
     }

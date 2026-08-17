@@ -67,6 +67,9 @@ public class LoadingOverlay extends Overlay {
 	}
 
 	public static void registerTextures(TextureManager textureManager) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			return;
+		}
 		textureManager.registerAndLoad(MOJANG_STUDIOS_LOGO_LOCATION, new LoadingOverlay.LogoTexture());
 	}
 
@@ -107,7 +110,7 @@ public class LoadingOverlay extends Overlay {
 		float o;
 		if (g >= 1.0F) {
 			if (this.minecraft.screen != null) {
-				this.minecraft.screen.renderWithTooltipAndSubtitles(guiGraphics, 0, 0, f);
+				this.renderCompatibleScreen(guiGraphics, 0, 0, f);
 			} else {
 				this.minecraft.gui.renderDeferredSubtitles();
 			}
@@ -118,7 +121,7 @@ public class LoadingOverlay extends Overlay {
 			o = 1.0F - Mth.clamp(g - 1.0F, 0.0F, 1.0F);
 		} else if (this.fadeIn) {
 			if (this.minecraft.screen != null && h < 1.0F) {
-				this.minecraft.screen.renderWithTooltipAndSubtitles(guiGraphics, i, j, f);
+				this.renderCompatibleScreen(guiGraphics, i, j, f);
 			} else {
 				this.minecraft.gui.renderDeferredSubtitles();
 			}
@@ -155,7 +158,7 @@ public class LoadingOverlay extends Overlay {
 			this.minecraft.setOverlay(null);
 		}
 
-		if (DEBUG_RENDER_LOGS < 12) {
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() && DEBUG_RENDER_LOGS < 12) {
 			DEBUG_RENDER_LOGS++;
 			int logoTextureId = 0;
 			int logoMinFilter = 0;
@@ -192,6 +195,16 @@ public class LoadingOverlay extends Overlay {
 				logoWrapT
 			);
 		}
+	}
+
+	private void renderCompatibleScreen(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			&& !(this.minecraft.screen instanceof TitleScreen)
+			&& !(this.minecraft.screen instanceof LevelLoadingScreen)) {
+			throw new IllegalStateException("Rust whole-frame Vulkan loading overlay cannot compose unsupported screen "
+				+ this.minecraft.screen.getClass().getName());
+		}
+		this.minecraft.screen.renderWithTooltipAndSubtitles(guiGraphics, mouseX, mouseY, partialTick);
 	}
 
 	@Override

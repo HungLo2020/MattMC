@@ -1275,6 +1275,24 @@ public final class DistantHorizonsSemanticCollector {
 		List<ByteBuffer> transparentUp,
 		List<ByteBuffer> transparentWaterUp
 	) {
+		recordBuiltColumnSnapshot(columnKey, origin, opaque, transparentSide, transparentUp, transparentWaterUp, null);
+	}
+
+	/**
+	 * Publishes geometry and its optional material provenance as one immutable
+	 * transaction. The frame coordinator may flush pending columns immediately
+	 * after this method returns, so installing provenance in a second lock scope
+	 * can pair a new column with an old sidecar (or no sidecar at all).
+	 */
+	private static void recordBuiltColumnSnapshot(
+		long columnKey,
+		DhBlockPos origin,
+		List<ByteBuffer> opaque,
+		List<ByteBuffer> transparentSide,
+		List<ByteBuffer> transparentUp,
+		List<ByteBuffer> transparentWaterUp,
+		LodMaterialProvenanceSnapshot provenance
+	) {
 		if (!enabled()) {
 			return;
 		}
@@ -1300,6 +1318,19 @@ public final class DistantHorizonsSemanticCollector {
 				// DH can rebuild an unchanged visible column on consecutive frames.
 				// Keep its acknowledged semantic generation stable so the same Rust
 				// asset remains eligible until its copied payload actually changes.
+				if (provenance != null) {
+					replaceMaterialProvenanceLocked(columnKey, provenance);
+					if (retainsLegacyObservationSnapshots()) {
+						PUBLISHED_MATERIAL_PROVENANCE.put(columnKey, provenance);
+					} else {
+						// Material identities can change while the compact geometry bytes
+						// remain the same. Re-publish the acknowledged immutable column
+						// with its new copied sidecar instead of leaving Rust stale.
+						PENDING_COLUMNS.put(columnKey, replaced);
+					}
+				} else {
+					removeMaterialProvenanceLocked(columnKey);
+				}
 				semanticColumnsBuilt++;
 				semanticColumnsReused++;
 				return;
@@ -1310,6 +1341,11 @@ public final class DistantHorizonsSemanticCollector {
 				LAST_COLUMN_PAYLOAD_DIFFERENCES.put(columnKey, lastPayloadDifference);
 			}
 			COLUMNS.put(columnKey, snapshot);
+			if (provenance == null) {
+				removeMaterialProvenanceLocked(columnKey);
+			} else {
+				replaceMaterialProvenanceLocked(columnKey, provenance);
+			}
 			if (replaced != null) {
 				retainedBytes -= replaced.byteSize();
 			}
@@ -1321,6 +1357,9 @@ public final class DistantHorizonsSemanticCollector {
 				// recordVisibleSegment can correlate that draw; no FFI update is made.
 				PUBLISHED_GENERATIONS.put(columnKey, snapshot.generation());
 				PUBLISHED_COLUMNS.put(columnKey, snapshot);
+				if (provenance != null) {
+					PUBLISHED_MATERIAL_PROVENANCE.put(columnKey, provenance);
+				}
 				PENDING_COLUMNS.remove(columnKey);
 			} else {
 				PENDING_COLUMNS.put(columnKey, snapshot);
@@ -1395,22 +1434,12 @@ public final class DistantHorizonsSemanticCollector {
 			,copyVariantStates(transparentWaterUp),
 			copyVariantPositions(transparentWaterUp)
 		);
-		recordBuiltColumn(
+		recordBuiltColumnSnapshot(
 			columnKey, origin,
 			opaque.vertexBuffers(), transparentSide.vertexBuffers(),
-			transparentUp.vertexBuffers(), transparentWaterUp.vertexBuffers()
+			transparentUp.vertexBuffers(), transparentWaterUp.vertexBuffers(),
+			provenance
 		);
-		synchronized (COLUMNS) {
-			if (COLUMNS.containsKey(columnKey)) {
-				replaceMaterialProvenanceLocked(columnKey, provenance);
-				if (retainsLegacyObservationSnapshots()) {
-					PUBLISHED_MATERIAL_PROVENANCE.put(columnKey, provenance);
-				}
-				trimRetainedColumnsLocked(MAX_RETAINED_COLUMNS, MAX_RETAINED_BYTES);
-			} else {
-				removeMaterialProvenanceLocked(columnKey);
-			}
-		}
 	}
 
 	private static List<int[]> copyMaterialIds(
@@ -1997,8 +2026,10 @@ public final class DistantHorizonsSemanticCollector {
 			// The coordinator activates a pending replacement after this frame has
 			// presented. The visible list therefore stays paired with the last
 			// acknowledged immutable column generation for the entire submission.
-			List<VulkanicGalBridge.WorldLodColumnInstanceRecord> result = List.copyOf(PENDING_VISIBLE_SEGMENTS);
-			if (!result.isEmpty() && routeSelected) {
+			List<VulkanicGalBridge.WorldLodColumnInstanceRecord> result = routeSelected
+				? List.copyOf(PENDING_VISIBLE_SEGMENTS)
+				: List.of();
+			if (!result.isEmpty()) {
 				// The visible DH set uses the same copied block atlas as indexed
 				// terrain meshes. Publish that semantic resource before the combined
 				// frame consumes its exact-atlas draws; do not wait for a nearby
@@ -2083,6 +2114,11 @@ public final class DistantHorizonsSemanticCollector {
 			routeTransparentSegments = transparentSegments;
 			routeWaterSegments = waterSegments;
 			routeSelected = false;
+			PENDING_VISIBLE_SEGMENTS.clear();
+			PENDING_RENDER_FRAME = withFlags(
+				PENDING_RENDER_FRAME,
+				PENDING_RENDER_FRAME.flags() & ~RENDER_FLAG_RUST_NON_WATER_ROUTE_SELECTED
+			);
 		}
 	}
 
@@ -2228,6 +2264,21 @@ public final class DistantHorizonsSemanticCollector {
 	public static boolean hasUnpublishedVisibleColumns() {
 		synchronized (COLUMNS) {
 			return routeUnpublishedVisibleColumns > 0;
+		}
+	}
+
+	/**
+	 * Rust may select a visible DH frame only when every copied quad has an
+	 * exact owned material identity. A colored-geometry approximation is not an
+	 * acceptable whole-frame Vulkan fallback: it would make an unavailable
+	 * texture/material look like admitted Distant Horizons support.
+	 */
+	public static boolean hasCompleteVisibleExactAtlasCoverage() {
+		synchronized (COLUMNS) {
+			return !PENDING_VISIBLE_SEGMENTS.isEmpty()
+				&& routeExactAtlasOutputMixedQuads == 0
+				&& routeExactAtlasOutputUnavailableQuads == 0
+				&& routeExactAtlasInvalidIdentityQuads == 0;
 		}
 	}
 

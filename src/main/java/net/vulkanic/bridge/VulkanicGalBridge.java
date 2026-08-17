@@ -2198,11 +2198,16 @@ public final class VulkanicGalBridge implements AutoCloseable {
 
 	/** Format values deliberately match the semantic Rust image contract. */
 	public record GuiRawImageAssetRecord(long assetId, int format, int width, int height, byte[] pixels) {
+		private static final int MAX_RAW_IMAGE_BYTES = 64 * 1024 * 1024;
+
 		public GuiRawImageAssetRecord {
 			if (assetId == 0L || format < 1 || format > 2 || width <= 0 || height <= 0) {
 				throw new IllegalArgumentException("invalid semantic GUI raw image asset");
 			}
 			Objects.requireNonNull(pixels, "pixels");
+			if (pixels.length > MAX_RAW_IMAGE_BYTES) {
+				throw new IllegalArgumentException("semantic GUI raw image exceeds the 64 MiB ABI bound");
+			}
 			pixels = pixels.clone();
 		}
 
@@ -2996,6 +3001,17 @@ public final class VulkanicGalBridge implements AutoCloseable {
 				this.stratum, this.assetId, this.x0, this.y0, this.x1, this.y1, this.x3, this.y3,
 				this.z, this.u0, this.v0, this.u1, this.v1, this.colorArgb, this.guiWidth, this.guiHeight, value,
 				this.clipMode, this.clipLeft, this.clipTop, this.clipWidth, this.clipHeight
+			);
+		}
+
+		public GuiAffineQuadRecord withStratum(int value) {
+			if (value < 0) {
+				throw new IllegalArgumentException("negative semantic GUI stratum");
+			}
+			return new GuiAffineQuadRecord(
+				value, this.assetId, this.x0, this.y0, this.x1, this.y1, this.x3, this.y3,
+				this.z, this.u0, this.v0, this.u1, this.v1, this.colorArgb, this.guiWidth, this.guiHeight,
+				this.sequence, this.clipMode, this.clipLeft, this.clipTop, this.clipWidth, this.clipHeight
 			);
 		}
 

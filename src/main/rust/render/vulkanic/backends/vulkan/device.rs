@@ -254,19 +254,23 @@ impl VulkanContext {
         offset: u64,
         bytes: &[u8],
     ) -> GalResult<()> {
+        let offset = usize::try_from(offset)
+            .map_err(|_| GalError::backend("Vulkan upload offset does not fit usize"))?;
         let ptr = unsafe {
-            self.device.map_memory(
-                memory,
-                offset,
-                bytes.len() as u64,
-                vk::MemoryMapFlags::empty(),
-            )
+            self.device
+                .map_memory(memory, 0, vk::WHOLE_SIZE, vk::MemoryMapFlags::empty())
         }
         .map_err(|error| {
             GalError::backend(format!("failed to map Vulkan upload memory: {error:?}"))
         })?;
         unsafe {
-            std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr.cast::<u8>(), bytes.len());
+            // Mapping from zero keeps suballocated writes valid even when a
+            // buffer's physical offset is not minMemoryMapAlignment-aligned.
+            std::ptr::copy_nonoverlapping(
+                bytes.as_ptr(),
+                ptr.cast::<u8>().add(offset),
+                bytes.len(),
+            );
             self.device.unmap_memory(memory);
         }
         Ok(())
@@ -278,16 +282,21 @@ impl VulkanContext {
         offset: u64,
         size: u64,
     ) -> GalResult<Vec<u8>> {
+        let offset = usize::try_from(offset)
+            .map_err(|_| GalError::backend("Vulkan readback offset does not fit usize"))?;
         let size = usize::try_from(size)
             .map_err(|_| GalError::backend("Vulkan readback size does not fit usize"))?;
         let ptr = unsafe {
             self.device
-                .map_memory(memory, offset, size as u64, vk::MemoryMapFlags::empty())
+                .map_memory(memory, 0, vk::WHOLE_SIZE, vk::MemoryMapFlags::empty())
         }
         .map_err(|error| {
             GalError::backend(format!("failed to map Vulkan readback memory: {error:?}"))
         })?;
-        let bytes = unsafe { std::slice::from_raw_parts(ptr.cast::<u8>(), size).to_vec() };
+        // See `write_mapped_memory`: the range starts at a suballocation
+        // offset, while Vulkan mapping itself begins at an aligned zero.
+        let bytes =
+            unsafe { std::slice::from_raw_parts(ptr.cast::<u8>().add(offset), size).to_vec() };
         unsafe { self.device.unmap_memory(memory) };
         Ok(bytes)
     }

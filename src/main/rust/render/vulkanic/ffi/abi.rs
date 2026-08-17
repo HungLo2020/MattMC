@@ -35,7 +35,10 @@ pub const FFI_ABI_NAME: &str = "MattMC VulkanicGAL Java-Rust batch ABI";
 pub const FFI_MAX_LABEL_BYTES: usize = 1024;
 pub const FFI_MAX_SHADER_BYTES: usize = 16 * 1024 * 1024;
 pub const FFI_MAX_INLINE_BYTES: usize = 64 * 1024 * 1024;
-pub const FFI_MAX_GUI_ASSET_BYTES: usize = 4 * 1024 * 1024;
+/// Copied GUI images are bounded independently from encoded sprite assets.
+/// A 16-million-pixel RGBA semantic image is the largest Java producer may
+/// publish, so the ABI must admit its 64 MiB byte representation intact.
+pub const FFI_MAX_GUI_ASSET_BYTES: usize = 64 * 1024 * 1024;
 pub const FFI_MAX_WORLD_BORDER_ASSET_BYTES: usize = 2 * 1024 * 1024;
 pub const FFI_MAX_WORLD_CRACK_ASSET_BYTES: usize = 4 * 1024 * 1024;
 pub const FFI_MAX_WORLD_MATERIAL_ASSET_BYTES: usize = 4 * 1024 * 1024;

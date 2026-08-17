@@ -1,6 +1,9 @@
 package net.vulkanic.gui;
 
 public enum GuiRenderStratum {
+	/** Flat semantic GUI rectangles, kept below specialized HUD strata. */
+	GUI_RECTANGLES("gui.rectangles", 100),
+	GUI_PANORAMA("gui.panorama", 50),
 	GUI_CROSSHAIR("gui.crosshair", 200),
 	GUI_HOTBAR_BASE("gui.hotbar.base", 300),
 	GUI_HOTBAR_SELECTION("gui.hotbar.selection", 310),
@@ -18,7 +21,8 @@ public enum GuiRenderStratum {
 	GUI_BOSS_BAR_BACKGROUND("gui.boss.background", 600),
 	GUI_BOSS_BAR_PROGRESS("gui.boss.progress", 610),
 	GUI_ITEM("gui.item", 650),
-	GUI_TEXT("gui.text", 700);
+	GUI_TEXT("gui.text", 700),
+	GUI_FILE_BACKED_BLIT("gui.file-backed.blit", 750);
 
 	private final String id;
 	private final int order;

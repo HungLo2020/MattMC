@@ -215,6 +215,14 @@ public class LodRenderer
 				);
 				return false;
 			}
+			if (!DistantHorizonsSemanticCollector.hasCompleteVisibleExactAtlasCoverage())
+			{
+				DistantHorizonsSemanticCollector.recordRustNonWaterRouteRejected(
+					"unrepresentable-visible-materials",
+					opaqueSegments, transparentSegments, waterSegments
+				);
+				return false;
+			}
 			DistantHorizonsSemanticCollector.markRustNonWaterRouteSelected();
 			return true;
 		}

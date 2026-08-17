@@ -67,6 +67,9 @@ final class NativeMeshingCompatibilityFallback {
     }
 
     private static void beginIrisBlock(BlockRenderer blockRenderer, BlockState blockState, BlockPos blockPos) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			return;
+		}
         var ids = net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getBlockStateIds();
         if (ids != null) {
             ((net.irisshaders.iris.vertices.sodium.terrain.VertexEncoderInterface) blockRenderer).beginBlock(
@@ -77,6 +80,9 @@ final class NativeMeshingCompatibilityFallback {
 
     private static void beginIrisFluid(BlockRenderCache cache, BlockState blockState, FluidState fluidState,
             BlockPos blockPos) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			return;
+		}
         var ids = net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getBlockStateIds();
         if (ids != null) {
             ((net.irisshaders.iris.vertices.sodium.terrain.VertexEncoderInterface) cache.getFluidRenderer()).beginBlock(

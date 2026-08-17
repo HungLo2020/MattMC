@@ -93,7 +93,7 @@ impl NativeFluidFaceSink for BuilderFluidFaceSink<'_, '_> {
                     if face.fluid_type == FLUID_WATER {
                         TERRAIN_PRIMITIVE_BUILTIN_WATER
                     } else {
-                        TERRAIN_PRIMITIVE_UNSUPPORTED_FLUID
+                        TERRAIN_PRIMITIVE_GENERIC_FLUID
                     },
                     face.facing,
                     self.pending_counts,
@@ -173,7 +173,7 @@ pub(in crate::render::chunk::meshing) unsafe fn append_direct_compact_fluid_face
     let primitive_kind = if face.fluid_type == FLUID_WATER {
         TERRAIN_PRIMITIVE_BUILTIN_WATER
     } else {
-        TERRAIN_PRIMITIVE_UNSUPPORTED_FLUID
+        TERRAIN_PRIMITIVE_GENERIC_FLUID
     };
     buffer.primitive_metadata[start] = primitive_metadata_from_quad(
         &face.to_native_quad(),
@@ -255,7 +255,9 @@ pub(in crate::render::chunk::meshing) unsafe fn section_builder_append_fluid_fac
                 pending.quads[index] = fluid_face_record_to_quad(record)?;
                 pending.packed_normals[index] = record.packed_normal;
                 pending.primitive_kinds[index] = match record.primitive_kind {
-                    TERRAIN_PRIMITIVE_BUILTIN_WATER | TERRAIN_PRIMITIVE_UNSUPPORTED_FLUID => {
+                    TERRAIN_PRIMITIVE_BUILTIN_WATER
+                    | TERRAIN_PRIMITIVE_GENERIC_FLUID
+                    | TERRAIN_PRIMITIVE_UNSUPPORTED_FLUID => {
                         record.primitive_kind
                     }
                     _ => return Err(ERR_INVALID_ARGUMENT),

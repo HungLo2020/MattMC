@@ -8402,6 +8402,12 @@ impl WorldPrimitiveFrontend {
             ));
         }
         let mut incoming_texture_ids = BTreeSet::new();
+		// Empty texture descriptors carry the current semantic IDs alongside an
+		// incremental mesh update; they do not replace the already-uploaded
+		// texture payload. Keep replacement tracking distinct so that a normal
+		// terrain mesh stream cannot invalidate every cached resource set on
+		// every frame.
+		let mut replaced_texture_ids = BTreeSet::new();
         let mut decoded_textures = Vec::with_capacity(textures.len());
         let mut payload_bytes = 0u64;
         for payload in textures {
@@ -8420,6 +8426,7 @@ impl WorldPrimitiveFrontend {
             if payload.png_bytes.is_empty() {
                 continue;
             }
+			replaced_texture_ids.insert(payload.texture_id);
             payload_bytes = payload_bytes.saturating_add(payload.png_bytes.len() as u64);
             let coordinate_origin =
                 WorldMeshTextureCoordinateOrigin::try_from(payload.coordinate_origin)?;
@@ -8573,7 +8580,7 @@ impl WorldPrimitiveFrontend {
             .keys()
             .copied()
             .filter(|key| {
-                incoming_texture_ids.contains(&key.texture_id)
+                replaced_texture_ids.contains(&key.texture_id)
                     || (incoming_mesh_keys.contains(&key.mesh_key)
                         && decoded_meshes
                             .iter()
@@ -8604,14 +8611,14 @@ impl WorldPrimitiveFrontend {
         // the ordinary indexed-mesh resources. Replacing one copied texture
         // must retire only bindings that name that semantic texture, never
         // let a later source frame retain its old payload.
-        if !incoming_texture_ids.is_empty() {
+		if !replaced_texture_ids.is_empty() {
             self.discard_all_unsubmitted_source_terrain_frames(gal);
-            self.discard_unsubmitted_source_material_textures(gal, &incoming_texture_ids);
+			self.discard_unsubmitted_source_material_textures(gal, &replaced_texture_ids);
         }
         self.destroy_mesh_resources_for_keys(gal, stale_resource_keys);
         self.destroy_lowered_source_terrain_resources_for_keys(gal, stale_lowered_source_keys);
-        self.destroy_material_resources_for_texture_ids(gal, &incoming_texture_ids);
-        self.destroy_mesh_texture_resources_for_ids(gal, &incoming_texture_ids);
+		self.destroy_material_resources_for_texture_ids(gal, &replaced_texture_ids);
+		self.destroy_mesh_texture_resources_for_ids(gal, &replaced_texture_ids);
         for (texture_id, texture) in decoded_textures {
             self.mesh_texture_assets.insert(texture_id, texture);
         }
@@ -36934,6 +36941,61 @@ mod tests {
             .unwrap();
         assert_eq!(1, stats.mesh_cache_hits);
         assert_eq!(0, stats.mesh_cache_misses);
+    }
+
+    #[test]
+    fn empty_incremental_texture_descriptor_does_not_evict_mesh_resources() {
+        let mut gal = gal();
+        let target = frame_target(&mut gal, 1, 128, 128);
+        let mut frontend = WorldPrimitiveFrontend::default();
+        frontend
+            .apply_world_mesh_asset_update(
+                &mut gal,
+                1,
+                vec![mesh_asset(82, 1, IndexType::U16)],
+                vec![WorldMeshTextureAssetPayload {
+                    texture_id: WORLD_MATERIAL_TEXTURE_STONE,
+                    png_bytes: material_scene_png(0),
+                    frame_width: 0,
+                    frame_height: 0,
+                    frame_count: 1,
+                    frame_ticks: 1,
+                    animation_flags: 0,
+                    frame_row_size: 0,
+                    interpolation_policy: 0,
+                    animation_frames: Vec::new(),
+                    coordinate_origin: 0,
+                }],
+            )
+            .unwrap();
+        let mut frame = frame(Vec::new());
+        frame.mesh_instances.push(mesh_instance(82, 1));
+        let (_, first) = frontend.append_frame_ops(&mut gal, 1, target, frame.clone()).unwrap();
+        assert_eq!(1, first.mesh_cache_misses);
+
+        frontend
+            .apply_world_mesh_asset_update(
+                &mut gal,
+                2,
+                Vec::new(),
+                vec![WorldMeshTextureAssetPayload {
+                    texture_id: WORLD_MATERIAL_TEXTURE_STONE,
+                    png_bytes: Vec::new(),
+                    frame_width: 0,
+                    frame_height: 0,
+                    frame_count: 0,
+                    frame_ticks: 0,
+                    animation_flags: 0,
+                    frame_row_size: 0,
+                    interpolation_policy: 0,
+                    animation_frames: Vec::new(),
+                    coordinate_origin: 0,
+                }],
+            )
+            .unwrap();
+        let (_, second) = frontend.append_frame_ops(&mut gal, 2, target, frame).unwrap();
+        assert_eq!(1, second.mesh_cache_hits);
+        assert_eq!(0, second.mesh_cache_misses);
     }
 
     #[test]

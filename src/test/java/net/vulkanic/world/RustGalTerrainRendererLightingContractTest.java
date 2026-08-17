@@ -206,11 +206,11 @@ public class RustGalTerrainRendererLightingContractTest {
 	}
 
 	@Test
-	public void translucentPrimitiveMetadataFiltersUnsupportedFluidWithoutReorderingRetainedQuads() {
+	public void translucentPrimitiveMetadataRetainsGenericFluidWithAtlasSemanticsWithoutReordering() {
 		byte[] sorted = sortedQuads(0, 1, 2);
 		int[] metadata = primitiveMetadata(
 			NativeSectionMeshBuilder.PRIMITIVE_KIND_NON_FLUID_TRANSLUCENT,
-			NativeSectionMeshBuilder.PRIMITIVE_KIND_UNSUPPORTED_FLUID,
+			NativeSectionMeshBuilder.PRIMITIVE_KIND_GENERIC_FLUID,
 			NativeSectionMeshBuilder.PRIMITIVE_KIND_BUILTIN_WATER
 		);
 		RustGalTerrainRenderer.installTestingFluidSpriteAssetsForUnitTests();
@@ -219,22 +219,23 @@ public class RustGalTerrainRendererLightingContractTest {
 			RustGalTerrainRenderer.buildOrderedTranslucentMesh(sorted, metadata, testVertices(3), 12);
 		List<VulkanicGalBridge.WorldMeshSectionRecord> sections = mesh.sections();
 
-		assertEquals(48, mesh.indexBytes().length, "one unsupported primitive should be removed from the sorted payload");
+		assertEquals(72, mesh.indexBytes().length, "a generic fluid must remain in the sorted payload");
 		assertEquals(3, mesh.sourcePrimitiveCount());
-		assertEquals(1, mesh.nonFluidPrimitiveCount());
+		assertEquals(2, mesh.nonFluidPrimitiveCount());
 		assertEquals(1, mesh.waterPrimitiveCount());
-		assertEquals(1, mesh.unsupportedPrimitiveCount());
-		assertEquals(2, mesh.retainedPrimitiveCount());
-		assertEquals(1, mesh.omittedPrimitiveCount());
+		assertEquals(0, mesh.unsupportedPrimitiveCount());
+		assertEquals(3, mesh.retainedPrimitiveCount());
+		assertEquals(0, mesh.omittedPrimitiveCount());
 		assertEquals(18, mesh.sourceIndexCount());
-		assertEquals(12, mesh.retainedIndexCount());
-		assertEquals(6, mesh.omittedIndexCount());
-		assertEquals(2, sections.size());
+		assertEquals(18, mesh.retainedIndexCount());
+		assertEquals(0, mesh.omittedIndexCount());
+		assertEquals(2, sections.size(), "adjacent generic-fluid and ordinary translucent atlas ranges should coalesce");
 		assertEquals(RustGalWorldPrimitiveRenderer.MATERIAL_ID_TRANSLUCENT_TEXTURED, sections.get(0).materialId());
 		assertEquals(0, sections.get(0).indexOffset());
+		assertEquals(12, sections.get(0).indexCount());
 		assertEquals(RustGalWorldPrimitiveRenderer.MATERIAL_ID_WATER_TRANSLUCENT, sections.get(1).materialId());
 		assertEquals(RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_WATER_FLOW, sections.get(1).textureId());
-		assertEquals(24, sections.get(1).indexOffset());
+		assertEquals(48, sections.get(1).indexOffset());
 	}
 
 	@Test

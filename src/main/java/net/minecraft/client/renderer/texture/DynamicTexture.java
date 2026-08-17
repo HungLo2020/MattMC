@@ -49,6 +49,13 @@ public class DynamicTexture extends AbstractTexture implements Dumpable {
 
 	public void upload() {
 		if (this.pixels != null && this.texture != null) {
+			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+				// A DynamicTexture is a CPU source in the whole-frame route.  Its
+				// registered resource identity is copied to VulkanicGAL; Java never
+				// executes a texture upload or owns the resulting GPU image.
+				net.vulkanic.gui.RustGalGuiRawImageAssets.stageDynamicTexture(this);
+				return;
+			}
 			net.vulkanic.VulkanicAPI.createCommandEncoder().writeToTexture(this.texture, this.pixels);
 		} else {
 			LOGGER.warn("Trying to upload disposed texture {}", this.getTexture().getLabel());

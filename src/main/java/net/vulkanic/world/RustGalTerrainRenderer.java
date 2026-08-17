@@ -87,7 +87,7 @@ public final class RustGalTerrainRenderer {
 	private static final AtomicLong skippedUnsupportedAnimatedSections = new AtomicLong();
 	private static final AtomicLong skippedUnsupportedFluidTranslucentSections = new AtomicLong();
 	private static final AtomicLong acceptedWaterAnimatedSections = new AtomicLong();
-	private static final AtomicLong unsupportedFluidOmittedSections = new AtomicLong();
+	private static final AtomicLong unsupportedFluidRejectedSections = new AtomicLong();
 	private static final AtomicLong skippedEmptyLayers = new AtomicLong();
 	private static final AtomicLong registeredMeshes = new AtomicLong();
 	private static final AtomicLong registeredTranslucentSorts = new AtomicLong();
@@ -270,6 +270,19 @@ public final class RustGalTerrainRenderer {
 	}
 
 	public static void acceptChunkBuildOutput(ChunkBuildOutput output) {
+		acceptChunkBuildOutput(output, TerrainMeshLayout.activeIrisCompatible());
+	}
+
+	/**
+	 * Admits a CPU-built section directly into the explicit Rust terrain route.
+	 * The layout is carried by the producer rather than recovered from Iris at
+	 * decode time, so selecting Vulkan cannot borrow shader-pack runtime state.
+	 */
+	public static void acceptWholeFrameChunkBuildOutput(ChunkBuildOutput output) {
+		acceptChunkBuildOutput(output, TerrainMeshLayout.compact());
+	}
+
+	private static void acceptChunkBuildOutput(ChunkBuildOutput output, TerrainMeshLayout layout) {
 		if (!WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan()) {
 			skippedRouteBuildOutputs.incrementAndGet();
 			return;
@@ -287,9 +300,9 @@ public final class RustGalTerrainRenderer {
 		acceptedBuildOutputs.incrementAndGet();
 		long extractionFrameId = terrainExtractionFrames.incrementAndGet();
 		ensureAtlasPayload();
-		acceptLayer(output, DefaultTerrainRenderPasses.SOLID, ChunkSectionLayer.SOLID, extractionFrameId);
-		acceptLayer(output, DefaultTerrainRenderPasses.CUTOUT, ChunkSectionLayer.CUTOUT_MIPPED, extractionFrameId);
-		acceptLayer(output, DefaultTerrainRenderPasses.TRANSLUCENT, ChunkSectionLayer.TRANSLUCENT, extractionFrameId);
+		acceptLayer(output, DefaultTerrainRenderPasses.SOLID, ChunkSectionLayer.SOLID, extractionFrameId, layout);
+		acceptLayer(output, DefaultTerrainRenderPasses.CUTOUT, ChunkSectionLayer.CUTOUT_MIPPED, extractionFrameId, layout);
+		acceptLayer(output, DefaultTerrainRenderPasses.TRANSLUCENT, ChunkSectionLayer.TRANSLUCENT, extractionFrameId, layout);
 		recordTranslucentSortData(output);
 	}
 
@@ -717,6 +730,43 @@ public final class RustGalTerrainRenderer {
 		}
 	}
 
+	/**
+	 * Submits the explicitly owned whole-frame source's CPU-built sections.  It
+	 * intentionally accepts sections rather than Sodium render lists: those
+	 * lists are coupled to Java GL region storage and must never exist on this
+	 * route.
+	 */
+	public static void enqueueWholeFrameTerrainSections(Iterable<RenderSection> sections, Camera camera,
+			int viewportWidth, int viewportHeight) {
+		if (!WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan()
+			|| sections == null || camera == null) {
+			return;
+		}
+		Set<VisibleSubmitKey> visibleSubmissions = new HashSet<>();
+		int translucentDrawOrder = 0;
+		for (RenderSection section : sections) {
+			if (section == null || !section.isBuilt()) {
+				continue;
+			}
+			enqueueSectionLayer(section, ChunkSectionLayer.SOLID, camera, viewportWidth, viewportHeight, 0, visibleSubmissions);
+			enqueueSectionLayer(section, ChunkSectionLayer.CUTOUT_MIPPED, camera, viewportWidth, viewportHeight, 0, visibleSubmissions);
+			enqueueSectionLayer(section, ChunkSectionLayer.TRANSLUCENT, camera, viewportWidth, viewportHeight,
+				translucentDrawOrder++, visibleSubmissions);
+		}
+		// The companion receipt is built from the same CPU-owned RenderSection
+		// values that this semantic callsite submitted. It deliberately contains
+		// no Sodium render list, GL object, or backend handle.
+		net.sodium.client.render.StaticTerrainParityDiagnostics.recordRustWholeFrameEnqueueCoverage(
+			sections,
+			currentGameplayFrameId(),
+			camera.getPosition().x(),
+			camera.getPosition().y(),
+			camera.getPosition().z(),
+			viewportWidth,
+			viewportHeight
+		);
+	}
+
 	public static void invalidateForResourceReload() {
 		SECTION_ASSETS.clear();
 		synchronized (RustGalTerrainRenderer.class) {
@@ -769,7 +819,7 @@ public final class RustGalTerrainRenderer {
 				skippedUnsupportedAnimatedSections.get(),
 				skippedUnsupportedFluidTranslucentSections.get(),
 				acceptedWaterAnimatedSections.get(),
-				unsupportedFluidOmittedSections.get(),
+				unsupportedFluidRejectedSections.get(),
 				skippedEmptyLayers.get(),
 				registeredMeshes.get(),
 				registeredTranslucentSorts.get(),
@@ -1332,6 +1382,38 @@ public final class RustGalTerrainRenderer {
 		);
 	}
 
+	/**
+	 * The direct CPU source may finish meshing before its copied assets have
+	 * crossed the explicit VulkanicGAL upload boundary. A settled whole-frame
+	 * capture is valid only once that bounded queue has drained; otherwise the
+	 * backend would correctly omit unknown mesh resources from its draw plan.
+	 */
+	public static boolean areWholeFrameAssetsUploaded() {
+		RustGalWorldPrimitiveRenderer.WorldMeshAssetMetrics metrics =
+			RustGalWorldPrimitiveRenderer.worldMeshAssetMetrics();
+		return metrics.failures() == 0L
+			&& metrics.dirtyMeshes() == 0
+			&& metrics.dirtyTextures() == 0
+			&& metrics.pendingInstances() == 0
+			&& metrics.uploadedMeshes() >= metrics.cachedMeshes()
+			&& metrics.uploadedTextures() >= metrics.cachedTextures();
+	}
+
+	/** Capture diagnostic companion to {@link #areWholeFrameAssetsUploaded()}. */
+	public static String wholeFrameAssetUploadSummary() {
+		RustGalWorldPrimitiveRenderer.WorldMeshAssetMetrics metrics =
+			RustGalWorldPrimitiveRenderer.worldMeshAssetMetrics();
+		return "cachedMeshes=" + metrics.cachedMeshes()
+			+ ",uploadedMeshes=" + metrics.uploadedMeshes()
+			+ ",dirtyMeshes=" + metrics.dirtyMeshes()
+			+ ",cachedTextures=" + metrics.cachedTextures()
+			+ ",uploadedTextures=" + metrics.uploadedTextures()
+			+ ",dirtyTextures=" + metrics.dirtyTextures()
+			+ ",pendingInstances=" + metrics.pendingInstances()
+			+ ",failures=" + metrics.failures()
+			+ ",ready=" + areWholeFrameAssetsUploaded();
+	}
+
 	public static void recordExecutedStaticTerrainInstances(
 		List<VulkanicGalBridge.WorldMeshInstanceRecord> instances,
 		long frameId,
@@ -1341,6 +1423,8 @@ public final class RustGalTerrainRenderer {
 			return;
 		}
 		long executedStaticTerrainInstances = 0L;
+		List<net.sodium.client.render.StaticTerrainParityDiagnostics.RustExecutionIdentity> executionReceipt =
+			new ArrayList<>();
 		for (VulkanicGalBridge.WorldMeshInstanceRecord instance : instances) {
 			TerrainSectionAsset asset = null;
 			LayerKey layerKey = null;
@@ -1389,6 +1473,9 @@ public final class RustGalTerrainRenderer {
 				frameId,
 				0L
 			);
+			executionReceipt.add(new net.sodium.client.render.StaticTerrainParityDiagnostics.RustExecutionIdentity(
+				layerKey.sectionPos(), layerKey.layer().name(), instance.meshGeneration()
+			));
 			recordEvent(
 				layerKey.sectionPos(),
 				layerKey.layer(),
@@ -1422,13 +1509,17 @@ public final class RustGalTerrainRenderer {
 			);
 		}
 		if (executedStaticTerrainInstances > 0L) {
+			net.sodium.client.render.StaticTerrainParityDiagnostics.recordRustWholeFrameExecutionCoverage(
+				executionReceipt, frameId
+			);
 			lastExecutedStaticTerrainFrameId.set(frameId);
 			lastExecutedStaticTerrainSubmissionId.set(submissionId);
 			lastExecutedStaticTerrainInstances.set(executedStaticTerrainInstances);
 		}
 	}
 
-	private static void acceptLayer(ChunkBuildOutput output, TerrainRenderPass pass, ChunkSectionLayer layer, long extractionFrameId) {
+	private static void acceptLayer(ChunkBuildOutput output, TerrainRenderPass pass, ChunkSectionLayer layer, long extractionFrameId,
+			TerrainMeshLayout layout) {
 		BuiltSectionMeshParts mesh = output.getMesh(pass);
 		if (mesh == null || mesh.getVertexData().getLength() == 0) {
 			skippedEmptyLayers.incrementAndGet();
@@ -1439,7 +1530,7 @@ public final class RustGalTerrainRenderer {
 			return;
 		}
 			try {
-				TerrainSectionAsset asset = decodeMesh(output, mesh, layer);
+				TerrainSectionAsset asset = decodeMesh(output, mesh, layer, layout);
 				if (asset == null) {
 					skippedEmptyLayers.incrementAndGet();
 					net.sodium.client.render.StaticTerrainParityDiagnostics.recordRustStaticTerrainAdmission(
@@ -1456,27 +1547,8 @@ public final class RustGalTerrainRenderer {
 					asset.asset().vertices()
 				);
 				if (layer == ChunkSectionLayer.TRANSLUCENT && asset.unsupportedPrimitiveCount() > 0) {
-					unsupportedFluidOmittedSections.incrementAndGet();
-					recordEvent(
-						output.render.getPosition().asLong(),
-						layer,
-						output.submitTime,
-						asset.meshGeneration(),
-						0L,
-						atlasGeneration,
-						asset,
-						output.render.getOriginX(),
-						output.render.getOriginY(),
-						output.render.getOriginZ(),
-						0.0F,
-						0.0F,
-						0.0F,
-						"unsupported-fluid-omitted",
-						extractionFrameId,
-						0L,
-						0L,
-						0L
-					);
+					unsupportedFluidRejectedSections.incrementAndGet();
+					throw new IllegalStateException("Rust whole-frame Vulkan encountered translucent fluid metadata without a semantic material route");
 				}
 				SECTION_ASSETS.put(new LayerKey(output.render.getPosition().asLong(), layer), asset);
 				net.sodium.client.render.StaticTerrainParityDiagnostics.recordRustStaticTerrainAdmission(
@@ -1527,10 +1599,11 @@ public final class RustGalTerrainRenderer {
 		}
 	}
 
-	private static TerrainSectionAsset decodeMesh(ChunkBuildOutput output, BuiltSectionMeshParts mesh, ChunkSectionLayer layer) {
+	private static TerrainSectionAsset decodeMesh(ChunkBuildOutput output, BuiltSectionMeshParts mesh, ChunkSectionLayer layer,
+			TerrainMeshLayout layout) {
 		ByteBuffer buffer = mesh.getVertexData().getDirectBuffer().duplicate().order(ByteOrder.nativeOrder());
-		int vertexStride = activeTerrainVertexStride();
-		boolean separateAo = WorldRenderingSettings.INSTANCE.shouldUseSeparateAo();
+		int vertexStride = layout.vertexStride();
+		boolean separateAo = layout.separateAo();
 		String fault = activeFault();
 		if (vertexStride < COMPACT_PREFIX_STRIDE) {
 			throw new IllegalArgumentException("static terrain vertex stride " + vertexStride + " is smaller than compact prefix " + COMPACT_PREFIX_STRIDE);
@@ -1539,8 +1612,8 @@ public final class RustGalTerrainRenderer {
 			throw new IllegalArgumentException("static terrain vertex buffer length is not aligned to stride " + vertexStride);
 		}
 		int bufferVertexCapacity = buffer.remaining() / vertexStride;
-		int shaderBlockIdOffset = activeTerrainShaderBlockIdOffset(vertexStride);
-		int midBlockOffset = activeTerrainMidBlockOffset(vertexStride);
+		int shaderBlockIdOffset = layout.shaderBlockIdOffset();
+		int midBlockOffset = layout.midBlockOffset();
 		int[] vertexSegments = mesh.getVertexSegments();
 		if (vertexSegments.length % 2 != 0) {
 			throw new IllegalArgumentException("static terrain vertex segment array length is odd");
@@ -2013,6 +2086,7 @@ public final class RustGalTerrainRenderer {
 			int primitiveKind = primitiveMetadata[metadataOffset];
 			switch (primitiveKind) {
 				case NativeSectionMeshBuilder.PRIMITIVE_KIND_NON_FLUID_TRANSLUCENT -> nonFluidPrimitiveCount++;
+				case NativeSectionMeshBuilder.PRIMITIVE_KIND_GENERIC_FLUID -> nonFluidPrimitiveCount++;
 				case NativeSectionMeshBuilder.PRIMITIVE_KIND_BUILTIN_WATER -> waterPrimitiveCount++;
 				case NativeSectionMeshBuilder.PRIMITIVE_KIND_UNSUPPORTED_FLUID -> unsupportedPrimitiveCount++;
 				default -> {
@@ -2236,6 +2310,8 @@ public final class RustGalTerrainRenderer {
 	private static int translucentMaterialForPrimitiveKind(int primitiveKind) {
 		return switch (primitiveKind) {
 			case NativeSectionMeshBuilder.PRIMITIVE_KIND_NON_FLUID_TRANSLUCENT ->
+				RustGalWorldPrimitiveRenderer.MATERIAL_ID_TRANSLUCENT_TEXTURED;
+			case NativeSectionMeshBuilder.PRIMITIVE_KIND_GENERIC_FLUID ->
 				RustGalWorldPrimitiveRenderer.MATERIAL_ID_TRANSLUCENT_TEXTURED;
 			case NativeSectionMeshBuilder.PRIMITIVE_KIND_BUILTIN_WATER ->
 				RustGalWorldPrimitiveRenderer.MATERIAL_ID_WATER_TRANSLUCENT;
@@ -2628,6 +2704,12 @@ public final class RustGalTerrainRenderer {
 		String identity = "rust-vulkan-whole-frame:section=" + sectionPos
 			+ ":layer=" + layer.name()
 			+ ":generation=" + generation;
+		// The direct CPU producer replaces Sodium's GL-region renderer on this
+		// route, but it is still the semantic sodium-terrain family. Recording
+		// that identity lets the shared parity capture wait for real submitted
+		// terrain instead of accepting an empty first Rust frame.
+		net.minecraft.client.dev.GraphicsFrameBenchmark.recordSubmittedWorkIdentity("sodium-terrain", identity);
+		net.minecraft.client.dev.DeterministicCameraCapture.recordSubmittedWorkIdentity("sodium-terrain", identity);
 		net.minecraft.client.dev.GraphicsFrameBenchmark.recordSubmittedWorkIdentity("static-terrain", identity);
 		net.minecraft.client.dev.DeterministicCameraCapture.recordSubmittedWorkIdentity("static-terrain", identity);
 	}
@@ -2717,6 +2799,9 @@ public final class RustGalTerrainRenderer {
 	}
 
 	private static int activeTerrainVertexStride() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			return COMPACT_PREFIX_STRIDE;
+		}
 		try {
 			return WorldRenderingSettings.INSTANCE.getVertexFormat().getNativeFormat().stride();
 		} catch (RuntimeException error) {
@@ -2725,6 +2810,9 @@ public final class RustGalTerrainRenderer {
 	}
 
 	private static int activeTerrainShaderBlockIdOffset(int vertexStride) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			return 0;
+		}
 		try {
 			int offset = WorldRenderingSettings.INSTANCE.getVertexFormat().getNativeFormat().blockIdOffset();
 			if (offset <= 0 || offset + Integer.BYTES > vertexStride) {
@@ -2737,6 +2825,9 @@ public final class RustGalTerrainRenderer {
 	}
 
 	private static int activeTerrainMidBlockOffset(int vertexStride) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			return 0;
+		}
 		try {
 			int offset = WorldRenderingSettings.INSTANCE.getVertexFormat().getNativeFormat().midBlockOffset();
 			if (offset <= 0 || offset + Integer.BYTES > vertexStride) {
@@ -2745,6 +2836,23 @@ public final class RustGalTerrainRenderer {
 			return offset;
 		} catch (RuntimeException error) {
 			return 0;
+		}
+	}
+
+	private record TerrainMeshLayout(int vertexStride, boolean separateAo, int shaderBlockIdOffset, int midBlockOffset) {
+		private static TerrainMeshLayout compact() {
+			return new TerrainMeshLayout(COMPACT_PREFIX_STRIDE, false, 0, 0);
+		}
+
+		private static TerrainMeshLayout activeIrisCompatible() {
+			int stride = activeTerrainVertexStride();
+			boolean separateAo = false;
+			try {
+				separateAo = WorldRenderingSettings.INSTANCE.shouldUseSeparateAo();
+			} catch (RuntimeException ignored) {
+			}
+			return new TerrainMeshLayout(stride, separateAo, activeTerrainShaderBlockIdOffset(stride),
+				activeTerrainMidBlockOffset(stride));
 		}
 	}
 
@@ -3852,7 +3960,7 @@ public final class RustGalTerrainRenderer {
 		long skippedUnsupportedAnimatedSections,
 		long skippedUnsupportedFluidTranslucentSections,
 		long acceptedWaterAnimatedSections,
-		long unsupportedFluidOmittedSections,
+		long unsupportedFluidRejectedSections,
 		long skippedEmptyLayers,
 		long registeredMeshes,
 		long registeredTranslucentSorts,
