@@ -294,19 +294,28 @@ public final class WorldRenderRoutePolicy {
 	}
 
 	/**
-	 * Arrow models are the first ordinary entity-model producer on the shared
-	 * indexed-mesh family. They are owned only by the Rust whole-frame route:
-	 * Java OpenGL, including Iris, remains the compatibility owner until its
-	 * private full-frame path is selected.
+	 * Returns the owner of the Arrow callsite independently of whether the
+	 * current Arrow state is representable as the copied indexed-mesh semantic
+	 * payload. Once Rust owns the whole Vulkan frame, failed Arrow admission is
+	 * unavailable for that frame and must never authorize a Java entity draw.
 	 */
-	public static Route currentArrowRoute(boolean eligible) {
+	public static Route currentArrowOwnershipRoute() {
 		if (Boolean.getBoolean("mattmc.dev.rustGalWorldArrow.disabled")) {
 			return Route.DISABLED;
 		}
-		if (Boolean.getBoolean("mattmc.dev.rustGalWorldArrow.legacyControl") || !eligible) {
+		if (Boolean.getBoolean("mattmc.dev.rustGalWorldArrow.legacyControl")) {
 			return Route.JAVA_COMPATIBILITY;
 		}
 		return selectWholeFrameRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
+	}
+
+	/** Per-Arrow admission for the Rust indexed-mesh producer. */
+	public static Route currentArrowRoute(boolean eligible) {
+		Route ownership = currentArrowOwnershipRoute();
+		if (!eligible && ownership != Route.DISABLED) {
+			return Route.JAVA_COMPATIBILITY;
+		}
+		return ownership;
 	}
 
 	/**
