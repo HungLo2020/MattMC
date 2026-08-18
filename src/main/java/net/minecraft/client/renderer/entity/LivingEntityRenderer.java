@@ -114,11 +114,14 @@ public abstract class LivingEntityRenderer<T extends LivingEntity, S extends Liv
 				&& livingEntityRenderState instanceof ChickenRenderState
 				|| this.model instanceof CowModel
 					&& livingEntityRenderState instanceof CowRenderState
-				|| this.model.getClass() == PigModel.class
+				|| this.model != null
+					&& this.model.getClass() == PigModel.class
 					&& livingEntityRenderState instanceof PigRenderState
-				|| this.model.getClass() == ZombieModel.class
+				|| this.model != null
+					&& this.model.getClass() == ZombieModel.class
 					&& livingEntityRenderState instanceof ZombieRenderState
-				|| this.model.getClass() == RabbitModel.class
+				|| this.model != null
+					&& this.model.getClass() == RabbitModel.class
 					&& livingEntityRenderState instanceof RabbitRenderState;
 			boolean rustLivingModelEligible = entityIdentity != null && (this.model.getClass() == ChickenModel.class
 				&& livingEntityRenderState instanceof ChickenRenderState chickenRenderState
@@ -146,7 +149,8 @@ public abstract class LivingEntityRenderer<T extends LivingEntity, S extends Liv
 					bl2,
 					livingEntityRenderState.appearsGlowing()
 				)
-				|| this.model.getClass() == PigModel.class
+				|| this.model != null
+					&& this.model.getClass() == PigModel.class
 					&& livingEntityRenderState instanceof PigRenderState pigRenderState
 					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaPigModelMeshEligible(
 						this.model,
@@ -159,7 +163,8 @@ public abstract class LivingEntityRenderer<T extends LivingEntity, S extends Liv
 						bl2,
 						livingEntityRenderState.appearsGlowing()
 					)
-				|| this.model.getClass() == ZombieModel.class
+				|| this.model != null
+					&& this.model.getClass() == ZombieModel.class
 					&& livingEntityRenderState instanceof ZombieRenderState zombieRenderState
 					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaZombieModelMeshEligible(
 						this.model,
@@ -172,7 +177,8 @@ public abstract class LivingEntityRenderer<T extends LivingEntity, S extends Liv
 						bl2,
 						livingEntityRenderState.appearsGlowing()
 					)
-				|| this.model.getClass() == RabbitModel.class
+				|| this.model != null
+					&& this.model.getClass() == RabbitModel.class
 					&& livingEntityRenderState instanceof RabbitRenderState rabbitRenderState
 					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaRabbitModelMeshEligible(
 						this.model,
@@ -446,8 +452,7 @@ public abstract class LivingEntityRenderer<T extends LivingEntity, S extends Liv
 			aABB.maxZ - livingEntity.getZ(),
 			1.0F,
 			0.0F,
-			0.0F,
-			1.0F
+			0.0F
 		);
 		builder.add(hitboxRenderState);
 	}
