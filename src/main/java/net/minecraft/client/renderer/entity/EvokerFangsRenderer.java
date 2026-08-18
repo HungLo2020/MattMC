@@ -12,6 +12,7 @@ import net.minecraft.client.renderer.state.CameraRenderState;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.resources.ResourceLocation;
 import net.vulkanic.world.RustGalWorldPrimitiveRenderer;
+import net.vulkanic.world.StandaloneModelRenderOwnershipPolicy;
 import net.vulkanic.world.WorldRenderRoutePolicy;
 import net.minecraft.world.entity.projectile.EvokerFangs;
 
@@ -39,8 +40,11 @@ public class EvokerFangsRenderer extends EntityRenderer<EvokerFangs, EvokerFangs
 			boolean eligible = RustGalWorldPrimitiveRenderer.isStandaloneModelMeshEligible(
 				this.model, renderType, TEXTURE_LOCATION, OverlayTexture.NO_OVERLAY, evokerFangsRenderState.outlineColor, null
 			);
-			WorldRenderRoutePolicy.Route route = WorldRenderRoutePolicy.currentModelMeshRoute(eligible);
-			if (!submitNodeCollector.isSemanticCoverageOnly() && route.usesRustWholeFrameVulkan()) {
+			WorldRenderRoutePolicy.Route ownership = StandaloneModelRenderOwnershipPolicy.currentOwnershipRoute();
+			StandaloneModelRenderOwnershipPolicy.Disposition disposition = StandaloneModelRenderOwnershipPolicy.classify(
+				submitNodeCollector.isSemanticCoverageOnly(), eligible, ownership
+			);
+			if (disposition == StandaloneModelRenderOwnershipPolicy.Disposition.RUST_AVAILABLE) {
 				if (!RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMesh(
 					this.model, evokerFangsRenderState, poseStack.last(), renderType, TEXTURE_LOCATION,
 					EVOKER_FANGS_ENTITY_ID,
@@ -51,23 +55,27 @@ public class EvokerFangsRenderer extends EntityRenderer<EvokerFangs, EvokerFangs
 				RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
 					"rust-vulkan-whole-frame", TEXTURE_LOCATION, true, true, false
 				);
+			} else if (disposition == StandaloneModelRenderOwnershipPolicy.Disposition.RUST_UNAVAILABLE) {
+				RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
+					"rust-vulkan-unavailable", TEXTURE_LOCATION, false, false, false
+				);
 			} else {
 				if (eligible) {
 					RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
-						route == WorldRenderRoutePolicy.Route.DISABLED ? "disabled" : "java-legacy", TEXTURE_LOCATION,
-						false, false, !submitNodeCollector.isSemanticCoverageOnly() && route.usesJavaCompatibility()
+						ownership == WorldRenderRoutePolicy.Route.DISABLED ? "disabled" : "java-legacy", TEXTURE_LOCATION,
+						false, false, !submitNodeCollector.isSemanticCoverageOnly() && ownership.usesJavaCompatibility()
 					);
 				}
 				submitNodeCollector.submitModel(
-				this.model,
-				evokerFangsRenderState,
-				poseStack,
-				renderType,
-				evokerFangsRenderState.lightCoords,
-				OverlayTexture.NO_OVERLAY,
-				evokerFangsRenderState.outlineColor,
-				null
-			);
+					this.model,
+					evokerFangsRenderState,
+					poseStack,
+					renderType,
+					evokerFangsRenderState.lightCoords,
+					OverlayTexture.NO_OVERLAY,
+					evokerFangsRenderState.outlineColor,
+					null
+				);
 			}
 			poseStack.popPose();
 			super.submit(evokerFangsRenderState, poseStack, submitNodeCollector, cameraRenderState);
