@@ -3,6 +3,8 @@ package net.vulkanic.world;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.bridge.RustGalVulkanWholeFrameMode;
 
+import java.util.function.BooleanSupplier;
+
 public final class WorldRenderRoutePolicy {
 	private WorldRenderRoutePolicy() {
 	}
@@ -420,6 +422,14 @@ public final class WorldRenderRoutePolicy {
 		if (legacyControl) {
 			return Route.JAVA_COMPATIBILITY;
 		}
+		return selectShaderAffectedRoute(vulkanBackendSelected, wholeFrameVulkanEnabled, () -> irisPackActive);
+	}
+
+	static Route selectShaderAffectedRouteForTests(
+		boolean vulkanBackendSelected,
+		boolean wholeFrameVulkanEnabled,
+		BooleanSupplier irisPackActive
+	) {
 		return selectShaderAffectedRoute(vulkanBackendSelected, wholeFrameVulkanEnabled, irisPackActive);
 	}
 
@@ -430,24 +440,30 @@ public final class WorldRenderRoutePolicy {
 		return Route.RUST_OPENGL_BORROWED_CONTEXT;
 	}
 
+	/**
+	 * Iris runtime state is relevant only to the borrowed OpenGL compatibility
+	 * route. Vulkan ownership is decided entirely from Vulkanic/MattMC state and
+	 * must not consult Iris after selecting either Java Vulkan compatibility or
+	 * the Rust Vulkan whole-frame renderer.
+	 */
 	private static Route selectShaderAffectedRoute(boolean vulkanBackendSelected, boolean wholeFrameVulkanEnabled) {
 		return selectShaderAffectedRoute(
 			vulkanBackendSelected,
 			wholeFrameVulkanEnabled,
-			net.irisshaders.iris.Iris.isPackInUseQuick()
+			net.irisshaders.iris.Iris::isPackInUseQuick
 		);
 	}
 
 	private static Route selectShaderAffectedRoute(
 		boolean vulkanBackendSelected,
 		boolean wholeFrameVulkanEnabled,
-		boolean irisPackActive
+		BooleanSupplier irisPackActive
 	) {
 		Route selected = selectRoute(vulkanBackendSelected, wholeFrameVulkanEnabled);
-		if (selected.usesRustOpenGl() && irisPackActive) {
-			return Route.JAVA_COMPATIBILITY;
+		if (!selected.usesRustOpenGl()) {
+			return selected;
 		}
-		return selected;
+		return irisPackActive.getAsBoolean() ? Route.JAVA_COMPATIBILITY : selected;
 	}
 
 	private static Route selectWholeFrameRoute(boolean vulkanBackendSelected, boolean wholeFrameVulkanEnabled) {
