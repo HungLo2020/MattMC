@@ -16,14 +16,36 @@ public final class ItemEntityRenderOwnershipPolicy {
 	}
 
 	public static WorldRenderRoutePolicy.Route currentOwnershipRoute() {
-		if (Boolean.getBoolean("mattmc.dev.rustGalWorldItemEntity.disabled")) {
+		return selectOwnership(
+			VulkanicAPI.isVulkanBackendSelected(),
+			RustGalVulkanWholeFrameMode.enabledForBackend(VulkanicAPI.isVulkanBackendSelected()),
+			Boolean.getBoolean("mattmc.dev.rustGalWorldItemEntity.disabled"),
+			Boolean.getBoolean("mattmc.dev.rustGalWorldItemEntity.legacyControl")
+		);
+	}
+
+	static WorldRenderRoutePolicy.Route selectOwnershipForTests(
+		boolean vulkanBackendSelected,
+		boolean wholeFrameVulkanEnabled,
+		boolean disabled,
+		boolean legacyControl
+	) {
+		return selectOwnership(vulkanBackendSelected, wholeFrameVulkanEnabled, disabled, legacyControl);
+	}
+
+	private static WorldRenderRoutePolicy.Route selectOwnership(
+		boolean vulkanBackendSelected,
+		boolean wholeFrameVulkanEnabled,
+		boolean disabled,
+		boolean legacyControl
+	) {
+		if (disabled) {
 			return WorldRenderRoutePolicy.Route.DISABLED;
 		}
-		if (Boolean.getBoolean("mattmc.dev.rustGalWorldItemEntity.legacyControl")) {
+		if (legacyControl) {
 			return WorldRenderRoutePolicy.Route.JAVA_COMPATIBILITY;
 		}
-		boolean vulkanBackendSelected = VulkanicAPI.isVulkanBackendSelected();
-		return RustGalVulkanWholeFrameMode.enabledForBackend(vulkanBackendSelected)
+		return vulkanBackendSelected && wholeFrameVulkanEnabled
 			? WorldRenderRoutePolicy.Route.RUST_VULKAN_WHOLE_FRAME
 			: WorldRenderRoutePolicy.Route.JAVA_COMPATIBILITY;
 	}
