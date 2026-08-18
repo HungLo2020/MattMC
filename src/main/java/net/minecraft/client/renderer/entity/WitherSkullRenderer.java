@@ -17,6 +17,7 @@ import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.vulkanic.world.RustGalWorldPrimitiveRenderer;
+import net.vulkanic.world.StandaloneModelRenderOwnershipPolicy;
 import net.vulkanic.world.WorldRenderRoutePolicy;
 import net.minecraft.world.entity.projectile.WitherSkull;
 
@@ -50,16 +51,54 @@ public class WitherSkullRenderer extends EntityRenderer<WitherSkull, WitherSkull
 		poseStack.scale(-1.0F, -1.0F, 1.0F);
 		ResourceLocation texture = this.getTextureLocation(witherSkullRenderState);
 		var renderType = this.model.renderType(texture);
-		boolean eligible = RustGalWorldPrimitiveRenderer.isStandaloneModelMeshEligible(this.model, renderType, texture, OverlayTexture.NO_OVERLAY, witherSkullRenderState.outlineColor, null);
-		WorldRenderRoutePolicy.Route route = WorldRenderRoutePolicy.currentModelMeshRoute(eligible);
-		if (!submitNodeCollector.isSemanticCoverageOnly() && route.usesRustWholeFrameVulkan()) {
-			if (!RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMesh(this.model, witherSkullRenderState.modelState, poseStack.last(), renderType, texture, WITHER_SKULL_ENTITY_ID, witherSkullRenderState.lightCoords, OverlayTexture.NO_OVERLAY, -1)) {
+		boolean eligible = RustGalWorldPrimitiveRenderer.isStandaloneModelMeshEligible(
+			this.model, renderType, texture, OverlayTexture.NO_OVERLAY, witherSkullRenderState.outlineColor, null
+		);
+		WorldRenderRoutePolicy.Route ownership = StandaloneModelRenderOwnershipPolicy.currentOwnershipRoute();
+		StandaloneModelRenderOwnershipPolicy.Disposition disposition = StandaloneModelRenderOwnershipPolicy.classify(
+			submitNodeCollector.isSemanticCoverageOnly(), eligible, ownership
+		);
+		if (disposition == StandaloneModelRenderOwnershipPolicy.Disposition.RUST_AVAILABLE) {
+			if (!RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMesh(
+				this.model,
+				witherSkullRenderState.modelState,
+				poseStack.last(),
+				renderType,
+				texture,
+				WITHER_SKULL_ENTITY_ID,
+				witherSkullRenderState.lightCoords,
+				OverlayTexture.NO_OVERLAY,
+				-1
+			)) {
 				throw new IllegalStateException("Rust whole-frame WitherSkull route selected without a copied indexed mesh request");
 			}
-			RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision("rust-vulkan-whole-frame", texture, true, true, false);
+			RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
+				"rust-vulkan-whole-frame", texture, true, true, false
+			);
+		} else if (disposition == StandaloneModelRenderOwnershipPolicy.Disposition.RUST_UNAVAILABLE) {
+			RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
+				"rust-vulkan-unavailable", texture, false, false, false
+			);
 		} else {
-			if (eligible) RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(route == WorldRenderRoutePolicy.Route.DISABLED ? "disabled" : "java-legacy", texture, false, false, !submitNodeCollector.isSemanticCoverageOnly() && route.usesJavaCompatibility());
-			submitNodeCollector.submitModel(this.model, witherSkullRenderState.modelState, poseStack, renderType, witherSkullRenderState.lightCoords, OverlayTexture.NO_OVERLAY, witherSkullRenderState.outlineColor, null);
+			if (eligible) {
+				RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
+					ownership == WorldRenderRoutePolicy.Route.DISABLED ? "disabled" : "java-legacy",
+					texture,
+					false,
+					false,
+					!submitNodeCollector.isSemanticCoverageOnly() && ownership.usesJavaCompatibility()
+				);
+			}
+			submitNodeCollector.submitModel(
+				this.model,
+				witherSkullRenderState.modelState,
+				poseStack,
+				renderType,
+				witherSkullRenderState.lightCoords,
+				OverlayTexture.NO_OVERLAY,
+				witherSkullRenderState.outlineColor,
+				null
+			);
 		}
 		poseStack.popPose();
 		super.submit(witherSkullRenderState, poseStack, submitNodeCollector, cameraRenderState);
