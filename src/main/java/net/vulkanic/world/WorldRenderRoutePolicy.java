@@ -163,21 +163,35 @@ public final class WorldRenderRoutePolicy {
 	}
 
 	/**
-	 * First-person items require the dedicated Rust-owned hand source pass.
-	 * Until the selected-source executor is explicitly requested, Java retains
-	 * ownership before any item submit is selected; this avoids a mixed
-	 * presenter or a speculative hand record in the ordinary whole-frame graph.
+	 * Returns the owner of the first-person item callsite independently of the
+	 * current item's representability or resource residency. Until the dedicated
+	 * selected-source hand executor is requested, Java remains the owner. Once
+	 * this returns Rust whole-frame ownership, per-item admission may still fail
+	 * closed but must never authorize a Java Vulkan draw in the same frame.
 	 */
-	public static Route currentFirstPersonItemRoute(boolean eligible) {
+	public static Route currentFirstPersonItemOwnershipRoute() {
 		if (Boolean.getBoolean("mattmc.dev.rustGalFirstPersonItem.disabled")) {
 			return Route.DISABLED;
 		}
 		if (Boolean.getBoolean("mattmc.dev.rustGalFirstPersonItem.legacyControl")
-			|| !eligible
 			|| !RustGalWorldPrimitiveRenderer.requiresSelectedSourceFeatureCoverage()) {
 			return Route.JAVA_COMPATIBILITY;
 		}
 		return selectWholeFrameRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
+	}
+
+	/**
+	 * Per-item admission for the dedicated Rust-owned hand source pass. This is
+	 * deliberately narrower than ownership: an ineligible item is unavailable
+	 * to Rust, while {@link #currentFirstPersonItemOwnershipRoute()} decides
+	 * whether Java is still legally allowed to render the callsite.
+	 */
+	public static Route currentFirstPersonItemRoute(boolean eligible) {
+		Route ownership = currentFirstPersonItemOwnershipRoute();
+		if (!eligible && ownership != Route.DISABLED) {
+			return Route.JAVA_COMPATIBILITY;
+		}
+		return ownership;
 	}
 
 	/**
