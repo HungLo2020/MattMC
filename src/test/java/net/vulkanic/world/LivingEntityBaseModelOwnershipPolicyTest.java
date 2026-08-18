@@ -2,7 +2,6 @@ package net.vulkanic.world;
 
 import org.junit.jupiter.api.Test;
 
-import static net.vulkanic.world.LivingEntityBaseModelOwnershipPolicy.Disposition.JAVA_COMPATIBILITY;
 import static net.vulkanic.world.LivingEntityBaseModelOwnershipPolicy.Disposition.RUST_AVAILABLE;
 import static net.vulkanic.world.LivingEntityBaseModelOwnershipPolicy.Disposition.RUST_UNAVAILABLE;
 import static net.vulkanic.world.WorldRenderRoutePolicy.Route.DISABLED;
@@ -62,19 +61,19 @@ final class LivingEntityBaseModelOwnershipPolicyTest {
 	@Test
 	void unportedAndSemanticSubmissionsRemainJavaObservable() {
 		assertEquals(
-			JAVA_COMPATIBILITY,
+			LivingEntityBaseModelOwnershipPolicy.Disposition.JAVA_COMPATIBILITY,
 			LivingEntityBaseModelOwnershipPolicy.classify(false, false, false, RUST_VULKAN_WHOLE_FRAME)
 		);
 		assertEquals(
-			JAVA_COMPATIBILITY,
+			LivingEntityBaseModelOwnershipPolicy.Disposition.JAVA_COMPATIBILITY,
 			LivingEntityBaseModelOwnershipPolicy.classify(true, true, false, RUST_VULKAN_WHOLE_FRAME)
 		);
 		assertEquals(
-			JAVA_COMPATIBILITY,
+			LivingEntityBaseModelOwnershipPolicy.Disposition.JAVA_COMPATIBILITY,
 			LivingEntityBaseModelOwnershipPolicy.classify(false, true, false, WorldRenderRoutePolicy.Route.JAVA_COMPATIBILITY)
 		);
 		assertEquals(
-			JAVA_COMPATIBILITY,
+			LivingEntityBaseModelOwnershipPolicy.Disposition.JAVA_COMPATIBILITY,
 			LivingEntityBaseModelOwnershipPolicy.classify(false, true, true, DISABLED)
 		);
 	}
