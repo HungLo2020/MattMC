@@ -13,6 +13,7 @@ import net.minecraft.client.renderer.state.CameraRenderState;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.resources.ResourceLocation;
 import net.vulkanic.world.RustGalWorldPrimitiveRenderer;
+import net.vulkanic.world.StandaloneModelRenderOwnershipPolicy;
 import net.vulkanic.world.WorldRenderRoutePolicy;
 import net.minecraft.world.entity.projectile.LlamaSpit;
 
@@ -43,8 +44,11 @@ public class LlamaSpitRenderer extends EntityRenderer<LlamaSpit, LlamaSpitRender
 			llamaSpitRenderState.outlineColor,
 			null
 		);
-		WorldRenderRoutePolicy.Route route = WorldRenderRoutePolicy.currentModelMeshRoute(eligible);
-		if (!submitNodeCollector.isSemanticCoverageOnly() && route.usesRustWholeFrameVulkan()) {
+		WorldRenderRoutePolicy.Route ownership = StandaloneModelRenderOwnershipPolicy.currentOwnershipRoute();
+		StandaloneModelRenderOwnershipPolicy.Disposition disposition = StandaloneModelRenderOwnershipPolicy.classify(
+			submitNodeCollector.isSemanticCoverageOnly(), eligible, ownership
+		);
+		if (disposition == StandaloneModelRenderOwnershipPolicy.Disposition.RUST_AVAILABLE) {
 			if (!RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMesh(
 				this.model,
 				llamaSpitRenderState,
@@ -61,26 +65,30 @@ public class LlamaSpitRenderer extends EntityRenderer<LlamaSpit, LlamaSpitRender
 			RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
 				"rust-vulkan-whole-frame", LLAMA_SPIT_LOCATION, true, true, false
 			);
+		} else if (disposition == StandaloneModelRenderOwnershipPolicy.Disposition.RUST_UNAVAILABLE) {
+			RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
+				"rust-vulkan-unavailable", LLAMA_SPIT_LOCATION, false, false, false
+			);
 		} else {
 			if (eligible) {
 				RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
-					route == WorldRenderRoutePolicy.Route.DISABLED ? "disabled" : "java-legacy",
+					ownership == WorldRenderRoutePolicy.Route.DISABLED ? "disabled" : "java-legacy",
 					LLAMA_SPIT_LOCATION,
 					false,
 					false,
-					!submitNodeCollector.isSemanticCoverageOnly() && route.usesJavaCompatibility()
+					!submitNodeCollector.isSemanticCoverageOnly() && ownership.usesJavaCompatibility()
 				);
 			}
-		submitNodeCollector.submitModel(
-			this.model,
-			llamaSpitRenderState,
-			poseStack,
-			renderType,
-			llamaSpitRenderState.lightCoords,
-			OverlayTexture.NO_OVERLAY,
-			llamaSpitRenderState.outlineColor,
-			null
-		);
+			submitNodeCollector.submitModel(
+				this.model,
+				llamaSpitRenderState,
+				poseStack,
+				renderType,
+				llamaSpitRenderState.lightCoords,
+				OverlayTexture.NO_OVERLAY,
+				llamaSpitRenderState.outlineColor,
+				null
+			);
 		}
 		poseStack.popPose();
 		super.submit(llamaSpitRenderState, poseStack, submitNodeCollector, cameraRenderState);
