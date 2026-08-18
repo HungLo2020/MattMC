@@ -36,7 +36,7 @@ final class ItemInHandRendererFirstPersonOwnershipTest {
 		String source = Files.readString(PROJECT_ROOT.resolve(
 			"src/main/java/net/minecraft/client/renderer/ItemInHandRenderer.java"
 		));
-		int ownership = source.indexOf("WorldRenderRoutePolicy.currentFirstPersonItemRoute(true)");
+		int ownership = source.indexOf("WorldRenderRoutePolicy.currentFirstPersonItemOwnershipRoute()");
 		int enqueue = source.indexOf("boolean rustSubmitted = RustGalWorldPrimitiveRenderer.enqueueFirstPersonItemMesh(");
 		int classify = source.indexOf("FirstPersonItemSubmitDisposition disposition = classifyFirstPersonItemSubmit(", enqueue);
 		int javaSubmit = source.indexOf("itemStackRenderState.submit(", enqueue);

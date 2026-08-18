@@ -157,7 +157,7 @@ public class ItemInHandRenderer {
 					itemStackRenderState, itemStack, itemDisplayContext, livingEntity.level(), livingEntity, livingEntity.getId() + itemDisplayContext.ordinal()
 				);
 			WorldRenderRoutePolicy.Route firstPersonRoute = itemDisplayContext.firstPerson()
-				? WorldRenderRoutePolicy.currentFirstPersonItemRoute(true)
+				? WorldRenderRoutePolicy.currentFirstPersonItemOwnershipRoute()
 				: WorldRenderRoutePolicy.Route.JAVA_COMPATIBILITY;
 			boolean rustSubmitted = RustGalWorldPrimitiveRenderer.enqueueFirstPersonItemMesh(
 				poseStack.last(), itemStackRenderState, itemStack, i, mainHand
