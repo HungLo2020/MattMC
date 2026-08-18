@@ -20,7 +20,7 @@ import net.minecraft.world.entity.projectile.AbstractArrow;
 public abstract class ArrowRenderer<T extends AbstractArrow, S extends ArrowRenderState> extends EntityRenderer<T, S> {
 	private final ArrowModel model;
 
-	public ItemRenderer(EntityRendererProvider.Context context) {
+	public ArrowRenderer(EntityRendererProvider.Context context) {
 		super(context);
 		this.model = new ArrowModel(context.bakeLayer(ModelLayers.ARROW));
 	}
@@ -99,7 +99,7 @@ public abstract class ArrowRenderer<T extends AbstractArrow, S extends ArrowRend
 		return ArrowSubmitDisposition.JAVA_COMPATIBILITY;
 	}
 
-	static enum ArrowSubmitDisposition {
+	enum ArrowSubmitDisposition {
 		DISABLED,
 		JAVA_COMPATIBILITY,
 		RUST_AVAILABLE,
