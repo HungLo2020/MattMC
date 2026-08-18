@@ -52,11 +52,15 @@ public class ItemEntityRenderer extends EntityRenderer<ItemEntity, ItemEntityRen
 			poseStack.translate(0.0F, g + f, 0.0F);
 			float h = ItemEntity.getSpin(itemEntityRenderState.ageInTicks, itemEntityRenderState.bobOffset);
 			poseStack.mulPose(Axis.YP.rotation(h));
-			net.vulkanic.world.RustGalWorldPrimitiveRenderer.beginItemEntitySubmission();
-			try {
+			if (submitNodeCollector.isSemanticCoverageOnly()) {
 				submitMultipleFromCount(poseStack, submitNodeCollector, itemEntityRenderState.lightCoords, itemEntityRenderState, this.random, aABB);
-			} finally {
-				net.vulkanic.world.RustGalWorldPrimitiveRenderer.endItemEntitySubmission();
+			} else {
+				net.vulkanic.world.RustGalWorldPrimitiveRenderer.beginItemEntitySubmission();
+				try {
+					submitMultipleFromCount(poseStack, submitNodeCollector, itemEntityRenderState.lightCoords, itemEntityRenderState, this.random, aABB);
+				} finally {
+					net.vulkanic.world.RustGalWorldPrimitiveRenderer.endItemEntitySubmission();
+				}
 			}
 			poseStack.popPose();
 			super.submit(itemEntityRenderState, poseStack, submitNodeCollector, cameraRenderState);
