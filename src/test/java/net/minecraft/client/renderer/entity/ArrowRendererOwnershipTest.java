@@ -59,9 +59,9 @@ final class ArrowRendererOwnershipTest {
 			"src/main/java/net/minecraft/client/renderer/entity/ArrowRenderer.java"
 		));
 		int ownershipQuery = source.indexOf("WorldRenderRoutePolicy.currentArrowOwnershipRoute()");
-		int classification = source.indexOf("classifyArrowSubmit(");
-		int unavailable = source.indexOf("ArrowSubmitDisposition.RUST_UNAVAILABLE");
-		int javaSubmit = source.indexOf("submitNodeCollector.submitModel(");
+		int classification = source.indexOf("classifyArrowSubmit(", ownershipQuery);
+		int unavailable = source.indexOf("ArrowSubmitDisposition.RUST_UNAVAILABLE", classification);
+		int javaSubmit = source.indexOf("submitNodeCollector.submitModel(", unavailable);
 
 		assertTrue(ownershipQuery >= 0, "Arrow callsite must resolve ownership explicitly");
 		assertTrue(classification > ownershipQuery, "Arrow disposition must be classified after ownership is resolved");
