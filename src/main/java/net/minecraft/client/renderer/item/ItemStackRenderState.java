@@ -22,6 +22,9 @@ import net.sodium.client.render.frapi.mesh.MutableMeshImpl;
 import net.sodium.client.render.frapi.render.AccessLayerRenderState;
 import net.sodium.client.render.frapi.render.OrderedSubmitNodeCollectorExtension;
 import net.sodium.client.render.frapi.render.QuadToPosPipe;
+import net.vulkanic.world.ItemEntityRenderOwnershipPolicy;
+import net.vulkanic.world.RustGalWorldPrimitiveRenderer;
+import net.vulkanic.world.WorldRenderRoutePolicy;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
@@ -317,6 +320,60 @@ public class ItemStackRenderState implements net.irisshaders.iris.mixinterface.I
 		}
 
 		void submit(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, int j, int k) {
+			if (RustGalWorldPrimitiveRenderer.isItemEntitySubmissionActive()) {
+				WorldRenderRoutePolicy.Route ownership = ItemEntityRenderOwnershipPolicy.currentOwnershipRoute();
+				if (ownership.usesRustWholeFrameVulkan()) {
+					poseStack.pushPose();
+					this.transform.apply(ItemStackRenderState.this.displayContext.leftHand(), poseStack.last());
+
+					String unavailableReason;
+					if (this.specialRenderer != null) {
+						unavailableReason = "special-renderer";
+					} else if (this.mutableMesh.size() > 0) {
+						unavailableReason = "fabric-mesh";
+					} else {
+						unavailableReason = RustGalWorldPrimitiveRenderer.itemEntityMeshIneligibility(
+							ItemStackRenderState.this.displayContext,
+							i,
+							j,
+							k,
+							this.tintLayers,
+							this.quads,
+							this.renderType,
+							this.foilType
+						);
+					}
+
+					if (unavailableReason != null) {
+						RustGalWorldPrimitiveRenderer.recordItemEntityRouteDecision(
+							"rust-vulkan-unavailable", false, unavailableReason, false, false, false
+						);
+						poseStack.popPose();
+						return;
+					}
+
+					boolean rustQueued = RustGalWorldPrimitiveRenderer.enqueueItemEntityMesh(
+						poseStack.last(),
+						ItemStackRenderState.this.displayContext,
+						i,
+						j,
+						k,
+						this.tintLayers,
+						this.quads,
+						this.renderType,
+						this.foilType
+					);
+					RustGalWorldPrimitiveRenderer.recordItemEntityRouteDecision(
+						"rust-vulkan-whole-frame", true, null, true, rustQueued, false
+					);
+					poseStack.popPose();
+					if (!rustQueued) {
+						throw new IllegalStateException("Rust whole-frame item-entity layer was eligible but did not enqueue a copied indexed mesh request");
+					}
+					return;
+				}
+			}
+
 			// Iris: Save block entity state before rendering (from ItemStackStateLayerMixin)
 			int lastBState = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedBlockEntity();
 			iris$setupId(ItemStackRenderState.this.iris_displayStack, ItemStackRenderState.this.iris_displayModelId);
