@@ -77,10 +77,12 @@ class AbstractBoatRendererOwnershipTest {
 
 		int semanticCoverage = boat.indexOf("!submitNodeCollector.isSemanticCoverageOnly()");
 		int rustOwner = boat.indexOf("StandaloneModelRenderOwnershipPolicy.currentOwnershipRoute().usesRustWholeFrameVulkan()", semanticCoverage);
+		int unavailableEvidence = boat.indexOf("recordSubmittedWorkIdentity(\"boat-water-mask\", \"rust-vulkan-unavailable\")", rustOwner);
 		int unavailableReturn = boat.indexOf("return;", rustOwner);
 		int javaWaterMask = boat.indexOf("submitNodeCollector.submitModel(", unavailableReturn);
-		assertTrue(semanticCoverage >= 0 && rustOwner > semanticCoverage && unavailableReturn > rustOwner && javaWaterMask > unavailableReturn,
-			"Rust whole-frame ownership must stop before the Java water-mask submit while semantic coverage remains observational");
+		assertTrue(semanticCoverage >= 0 && rustOwner > semanticCoverage && unavailableEvidence > rustOwner
+			&& unavailableReturn > unavailableEvidence && javaWaterMask > unavailableReturn,
+			"Rust whole-frame ownership must record explicit unavailability and stop before the Java water-mask submit");
 		assertTrue(boat.substring(rustOwner, javaWaterMask).contains("return;"));
 		assertTrue(boat.contains("this.waterPatchModel.renderType(this.texture)"),
 			"normal Java/OpenGL compatibility must retain the original water-mask submission");
