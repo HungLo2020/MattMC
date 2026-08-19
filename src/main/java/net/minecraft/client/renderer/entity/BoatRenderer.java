@@ -14,18 +14,21 @@ import net.minecraft.client.renderer.entity.state.BoatRenderState;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Unit;
+import net.vulkanic.world.StandaloneModelRenderOwnershipPolicy;
 
 @Environment(EnvType.CLIENT)
 public class BoatRenderer extends AbstractBoatRenderer {
 	private final Model.Simple waterPatchModel;
 	private final ResourceLocation texture;
 	private final EntityModel<BoatRenderState> model;
+	private final Model.Simple rustSemanticModel;
 
 	public BoatRenderer(EntityRendererProvider.Context context, ModelLayerLocation modelLayerLocation) {
 		super(context);
 		this.texture = modelLayerLocation.model().withPath(string -> "textures/entity/" + string + ".png");
 		this.waterPatchModel = new Model.Simple(context.bakeLayer(ModelLayers.BOAT_WATER_PATCH), resourceLocation -> RenderType.waterMask());
 		this.model = new BoatModel(context.bakeLayer(modelLayerLocation));
+		this.rustSemanticModel = new Model.Simple(this.model.root(), this.model::renderType);
 	}
 
 	@Override
@@ -34,13 +37,33 @@ public class BoatRenderer extends AbstractBoatRenderer {
 	}
 
 	@Override
+	protected Model.Simple rustSemanticModel() {
+		return this.rustSemanticModel;
+	}
+
+	@Override
 	protected RenderType renderType() {
 		return this.model.renderType(this.texture);
 	}
 
 	@Override
+	protected ResourceLocation textureLocation() {
+		return this.texture;
+	}
+
+	@Override
 	protected void submitTypeAdditions(BoatRenderState boatRenderState, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i) {
 		if (!boatRenderState.isUnderWater) {
+			// Vanilla WATER_MASK is a depth-writing, color-write-disabled pass.
+			// VulkanicGAL does not yet expose a color-write mask in its explicit
+			// graphics-pipeline contract, so a Rust-owned whole frame must keep
+			// this capability unavailable rather than escape into a Java draw.
+			// Semantic coverage remains observational and normal Java/OpenGL keeps
+			// the original water-mask submit unchanged.
+			if (!submitNodeCollector.isSemanticCoverageOnly()
+				&& StandaloneModelRenderOwnershipPolicy.currentOwnershipRoute().usesRustWholeFrameVulkan()) {
+				return;
+			}
 			submitNodeCollector.submitModel(
 				this.waterPatchModel,
 				Unit.INSTANCE,
