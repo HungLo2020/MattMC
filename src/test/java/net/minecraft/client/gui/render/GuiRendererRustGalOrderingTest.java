@@ -38,16 +38,28 @@ class GuiRendererRustGalOrderingTest {
 	}
 
 	@Test
-	void borrowedOpenGlExecutionNoLongerHoistsTheWholeRustGuiFrame() throws Exception {
+	void borrowedOpenGlExecutionPreservesEachRustRunAtItsJavaDrawPosition() throws Exception {
 		String source = Files.readString(Path.of("src/main/java/net/minecraft/client/gui/render/GuiRenderer.java"));
 
 		assertFalse(source.contains("rustGalFrameElements()"),
 			"partial-frame OpenGL must not gather every Rust GUI element and submit it at the first marker");
-		assertFalse(source.contains("rustGalFrameExecuted"),
-			"partial-frame OpenGL must not suppress later Rust draw positions with a one-shot frame flag");
-		assertTrue(source.contains("contiguousRustGalDrawGroup(this.draws, k, j)"));
+		assertTrue(source.contains("MutableBoolean rustGalFrameExecuted = new MutableBoolean(false);"),
+			"execution state must be local to one before/after-blur draw range");
+		assertTrue(source.contains("contiguousRustGalDrawGroup(this.draws, k, j)"),
+			"each Rust submission must be capped by the current Java draw position and draw-range boundary");
 		assertTrue(source.contains("RustGalFrameCoordinator.executeGuiFrame(minecraft, rustGalDrawGroup)"));
-		assertTrue(source.contains("k += rustGalDrawGroup.size();"));
+		assertTrue(source.contains("rustGalFrameExecuted.setTrue();"));
+		assertTrue(source.contains("rustGalFrameExecuted.setFalse();"),
+			"Java work must reset the run marker so a later Rust text group executes instead of being suppressed");
+		int rustBranch = source.indexOf("if (step instanceof GuiRenderer.RustGalDraw)");
+		int execute = source.indexOf("RustGalFrameCoordinator.executeGuiFrame(minecraft, rustGalDrawGroup)", rustBranch);
+		int markExecuted = source.indexOf("rustGalFrameExecuted.setTrue();", execute);
+		int resetForJava = source.indexOf("rustGalFrameExecuted.setFalse();", markExecuted);
+		int javaRun = source.indexOf("int start = k;", resetForJava);
+		assertTrue(rustBranch >= 0 && execute > rustBranch && markExecuted > execute,
+			"the current Rust run must be marked only after its scoped GAL submission");
+		assertTrue(resetForJava > markExecuted && javaRun > resetForJava,
+			"the run marker must reset before the compositor resumes Java rendering");
 	}
 
 	private static RustGalGuiElementRenderState rustElement(long sequence) {
