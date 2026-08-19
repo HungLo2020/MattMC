@@ -435,27 +435,32 @@ public class GuiRenderer implements AutoCloseable {
 		int j
 	) {
 		Minecraft minecraft = Minecraft.getInstance();
+		MutableBoolean rustGalFrameExecuted = new MutableBoolean(false);
 		int k = i;
 		while (k < j) {
 			GuiRenderer.DrawStep step = this.draws.get(k);
 			if (step instanceof GuiRenderer.RustGalDraw) {
-				List<RustGalGuiElementRenderState> rustGalDrawGroup = contiguousRustGalDrawGroup(this.draws, k, j);
-				if (rustGalDrawGroup.isEmpty()) {
-					throw new IllegalStateException("Rust GUI draw marker produced an empty contiguous group");
+				if (!rustGalFrameExecuted.booleanValue()) {
+					List<RustGalGuiElementRenderState> rustGalDrawGroup = contiguousRustGalDrawGroup(this.draws, k, j);
+					if (rustGalDrawGroup.isEmpty()) {
+						throw new IllegalStateException("Rust GUI draw marker produced an empty contiguous group");
+					}
+					try (RenderPass ignored = VulkanicAPI.createRenderPass(
+								supplier,
+								renderTarget.getColorTextureView(),
+								OptionalInt.empty(),
+								renderTarget.useDepth ? renderTarget.getDepthTextureView() : null,
+								OptionalDouble.empty()
+							)) {
+						RustGalFrameCoordinator.executeGuiFrame(minecraft, rustGalDrawGroup);
+					}
+					rustGalFrameExecuted.setTrue();
 				}
-				try (RenderPass ignored = VulkanicAPI.createRenderPass(
-							supplier,
-							renderTarget.getColorTextureView(),
-							OptionalInt.empty(),
-							renderTarget.useDepth ? renderTarget.getDepthTextureView() : null,
-							OptionalDouble.empty()
-						)) {
-					RustGalFrameCoordinator.executeGuiFrame(minecraft, rustGalDrawGroup);
-				}
-				k += rustGalDrawGroup.size();
+				k++;
 				continue;
 			}
 
+			rustGalFrameExecuted.setFalse();
 			int start = k;
 			while (k < j && this.draws.get(k) instanceof GuiRenderer.Draw) {
 				k++;
