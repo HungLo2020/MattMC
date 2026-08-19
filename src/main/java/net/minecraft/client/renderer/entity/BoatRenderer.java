@@ -3,6 +3,7 @@ package net.minecraft.client.renderer.entity;
 import net.blaze3d.vertex.PoseStack;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
+import net.minecraft.client.dev.GraphicsFrameBenchmark;
 import net.minecraft.client.model.BoatModel;
 import net.minecraft.client.model.EntityModel;
 import net.minecraft.client.model.Model;
@@ -62,6 +63,7 @@ public class BoatRenderer extends AbstractBoatRenderer {
 			// the original water-mask submit unchanged.
 			if (!submitNodeCollector.isSemanticCoverageOnly()
 				&& StandaloneModelRenderOwnershipPolicy.currentOwnershipRoute().usesRustWholeFrameVulkan()) {
+				GraphicsFrameBenchmark.recordSubmittedWorkIdentity("boat-water-mask", "rust-vulkan-unavailable");
 				return;
 			}
 			submitNodeCollector.submitModel(
