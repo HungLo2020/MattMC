@@ -12,14 +12,20 @@ class AbstractMinecartRendererOwnershipTest {
 	@Test
 	void minecartBodyUsesCopiedStandaloneMeshWithoutEligibilityDrivenJavaFallback() throws Exception {
 		String source = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/entity/AbstractMinecartRenderer.java"));
+		String rustWorld = Files.readString(Path.of("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
 
 		assertTrue(source.contains("private final Model.Simple rustSemanticModel;"),
 			"minecart body extraction should use an already-admitted semantic model type instead of widening generic EntityModel admission");
 		assertTrue(source.contains("new Model.Simple(this.model.root(), this.model::renderType)"),
 			"the Rust semantic model must share the exact baked vanilla minecart root and render-type semantics");
+		assertTrue(rustWorld.contains("model instanceof Model.Simple"),
+			"the semantic adapter must remain an explicitly admitted existing Rust model family rather than relying on accidental generic EntityModel support");
 		assertTrue(source.contains("RustGalWorldPrimitiveRenderer.entityIdentity(minecartRenderState)"),
 			"the copied mesh must retain the canonical entity identity for Rust/source-pack semantics");
 		assertTrue(source.contains("RustGalWorldPrimitiveRenderer.isStandaloneModelMeshEligible("));
+		assertTrue(rustWorld.contains("public static <S> boolean enqueueStandaloneModelMesh("));
+		assertTrue(rustWorld.contains("return enqueueEligibleModelMesh("),
+			"standalone minecart semantics must enter the existing copied indexed-mesh asset/instance path");
 		assertTrue(source.contains("minecartRenderState.outlineColor"),
 			"outline state must participate in admission instead of being silently dropped by the Rust body path");
 		assertTrue(source.contains("StandaloneModelRenderOwnershipPolicy.currentOwnershipRoute()"));
