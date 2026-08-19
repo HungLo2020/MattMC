@@ -88,8 +88,6 @@ final class StuckInBodyLayerOwnershipTest {
 
 		assertTrue(source.contains("new Model.Simple(model.root(), model::renderType)"),
 			"Rust must copy the exact model root used by the vanilla feature layer");
-		assertTrue(source.contains("this.model.setupAnim(this.modelState);"),
-			"the real model state must be applied before the no-op semantic wrapper is copied");
 		assertTrue(source.contains("RandomSource.create(avatarRenderState.id)"));
 		assertTrue(source.contains("this.getParentModel().getRandomBodyPart(randomSource)"));
 		assertTrue(source.contains("modelPart.getRandomCube(randomSource)"));
@@ -103,9 +101,10 @@ final class StuckInBodyLayerOwnershipTest {
 		assertTrue(source.contains("Math.atan2(yDirection, horizontal)"));
 
 		int orientation = source.indexOf("poseStack.mulPose(Axis.ZP.rotationDegrees(pitch));");
-		int enqueue = source.indexOf("RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMesh(", orientation);
-		assertTrue(orientation >= 0 && enqueue > orientation,
-			"Rust must receive the completed vanilla placement/orientation pose");
+		int animate = source.indexOf("this.model.setupAnim(this.modelState);", orientation);
+		int enqueue = source.indexOf("RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMesh(", animate);
+		assertTrue(orientation >= 0 && animate > orientation && enqueue > animate,
+			"each Rust instance must receive the completed placement pose and a fresh vanilla model-state application before extraction");
 		String enqueueCall = source.substring(enqueue, source.indexOf(")) {", enqueue) + 2);
 		assertTrue(enqueueCall.contains("this.rustSemanticModel"));
 		assertTrue(enqueueCall.contains("poseStack.last()"));
