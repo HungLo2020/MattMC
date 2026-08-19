@@ -23,6 +23,9 @@ final class ShulkerBulletRendererOwnershipTest {
 		String entityModel = Files.readString(PROJECT_ROOT.resolve(
 			"src/main/java/net/minecraft/client/model/EntityModel.java"
 		));
+		String worldRenderer = Files.readString(PROJECT_ROOT.resolve(
+			"src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"
+		));
 
 		assertTrue(renderer.contains("new Model.Simple(this.model.root(), this.model::renderType)"),
 			"Rust must copy the exact baked Shulker Bullet root rather than a reconstructed model");
@@ -33,6 +36,8 @@ final class ShulkerBulletRendererOwnershipTest {
 		assertTrue(renderer.contains("RenderType.entityTranslucent(TEXTURE_LOCATION)"),
 			"the glow shell must retain the vanilla translucent contract");
 		assertTrue(renderer.contains("private static final int GLOW_TINT = 654311423;"));
+		assertTrue(worldRenderer.contains("model instanceof Model.Simple"),
+			"the semantic wrapper must remain an explicitly admitted existing Rust mesh model type");
 
 		int available = renderer.indexOf("Disposition.RUST_AVAILABLE");
 		int animate = renderer.indexOf("this.model.setupAnim(shulkerBulletRenderState);", available);
