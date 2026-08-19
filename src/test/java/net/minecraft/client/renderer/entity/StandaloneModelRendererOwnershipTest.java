@@ -14,7 +14,8 @@ final class StandaloneModelRendererOwnershipTest {
 	private static final List<String> PRODUCERS = List.of(
 		"LlamaSpitRenderer.java",
 		"EvokerFangsRenderer.java",
-		"WitherSkullRenderer.java"
+		"WitherSkullRenderer.java",
+		"ShulkerBulletRenderer.java"
 	);
 
 	@Test
