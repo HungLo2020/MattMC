@@ -20,6 +20,7 @@ import net.minecraft.client.renderer.special.TaczGlock17SpecialRenderer;
 import net.minecraft.client.renderer.state.MapRenderState;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.vulkanic.world.RustGalWorldPrimitiveRenderer;
+import net.vulkanic.world.WorldRenderRoutePolicy;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
@@ -155,13 +156,45 @@ public class ItemInHandRenderer {
 				.updateForTopItem(
 					itemStackRenderState, itemStack, itemDisplayContext, livingEntity.level(), livingEntity, livingEntity.getId() + itemDisplayContext.ordinal()
 				);
-			if (RustGalWorldPrimitiveRenderer.enqueueFirstPersonItemMesh(
+			WorldRenderRoutePolicy.Route firstPersonRoute = itemDisplayContext.firstPerson()
+				? WorldRenderRoutePolicy.currentFirstPersonItemOwnershipRoute()
+				: WorldRenderRoutePolicy.Route.JAVA_COMPATIBILITY;
+			boolean rustSubmitted = RustGalWorldPrimitiveRenderer.enqueueFirstPersonItemMesh(
 				poseStack.last(), itemStackRenderState, itemStack, i, mainHand
-			)) {
+			);
+			FirstPersonItemSubmitDisposition disposition = classifyFirstPersonItemSubmit(
+				rustSubmitted,
+				firstPersonRoute.usesRustWholeFrameVulkan()
+			);
+			// Whole-frame Rust ownership is independent of per-item eligibility or
+			// resource residency. Once selected, a failed Rust enqueue is an
+			// unavailable Rust capability for this frame, never permission to emit
+			// a hidden Java Vulkan draw through ItemStackRenderState.submit().
+			if (disposition != FirstPersonItemSubmitDisposition.JAVA_COMPATIBILITY) {
 				return;
 			}
 			itemStackRenderState.submit(poseStack, submitNodeCollector, i, OverlayTexture.NO_OVERLAY, 0);
 		}
+	}
+
+	/**
+	 * Resolves ownership separately from whether the current item was ready to
+	 * enqueue. Java submission is legal only while Java owns the callsite. A
+	 * selected Rust whole-frame route consumes the callsite even when the item is
+	 * unsupported or its copied resources are not resident yet, so the feature
+	 * fails closed instead of silently rendering through Java Vulkan.
+	 */
+	@VisibleForTesting
+	static FirstPersonItemSubmitDisposition classifyFirstPersonItemSubmit(
+		boolean rustSubmitted,
+		boolean rustWholeFrameOwnsFirstPersonItems
+	) {
+		if (rustSubmitted) {
+			return FirstPersonItemSubmitDisposition.RUST_SUBMITTED;
+		}
+		return rustWholeFrameOwnsFirstPersonItems
+			? FirstPersonItemSubmitDisposition.RUST_UNAVAILABLE
+			: FirstPersonItemSubmitDisposition.JAVA_COMPATIBILITY;
 	}
 
 	private float calculateMapTilt(float f) {
@@ -670,6 +703,13 @@ public class ItemInHandRenderer {
 		} else {
 			this.offHandHeight = 0.0F;
 		}
+	}
+
+	@VisibleForTesting
+	static enum FirstPersonItemSubmitDisposition {
+		JAVA_COMPATIBILITY,
+		RUST_SUBMITTED,
+		RUST_UNAVAILABLE
 	}
 
 	@Environment(EnvType.CLIENT)

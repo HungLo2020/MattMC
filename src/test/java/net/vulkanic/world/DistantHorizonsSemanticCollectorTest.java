@@ -453,9 +453,10 @@ class DistantHorizonsSemanticCollectorTest {
 		assertFalse(concurrent.assets().stream().anyMatch(asset -> asset.columnKey() == 16L),
 			"a live asset update must reserve its column until acknowledgement, even when a newer build arrives");
 		DistantHorizonsSemanticCollector.acknowledgeForTest(update);
-		DistantHorizonsSemanticCollector.beginVisibleFrameForTest();
+		DistantHorizonsSemanticCollector.beginRustOpaqueRouteFrameForTest();
 		assertEquals(1, DistantHorizonsSemanticCollector.recordVisibleMaterialColumn(16L).opaqueSegments(),
 			"the acknowledged asset remains drawable while its replacement is pending");
+		DistantHorizonsSemanticCollector.markRustNonWaterRouteSelected();
 		assertEquals(update.assets().getFirst().columnGeneration(),
 			DistantHorizonsSemanticCollector.consumeVisibleSegments().getFirst().columnGeneration(),
 			"visibility must retain the coherent acknowledged generation until replacement acknowledgement");
@@ -463,8 +464,9 @@ class DistantHorizonsSemanticCollectorTest {
 		assertEquals(16L, replacement.assets().getFirst().columnKey(),
 			"a newer visible generation must retain publication priority after its older generation is acknowledged");
 		DistantHorizonsSemanticCollector.acknowledgeForTest(replacement);
-		DistantHorizonsSemanticCollector.beginVisibleFrameForTest();
+		DistantHorizonsSemanticCollector.beginRustOpaqueRouteFrameForTest();
 		assertEquals(1, DistantHorizonsSemanticCollector.recordVisibleMaterialColumn(16L).opaqueSegments());
+		DistantHorizonsSemanticCollector.markRustNonWaterRouteSelected();
 		assertEquals(replacement.assets().getFirst().columnGeneration(),
 			DistantHorizonsSemanticCollector.consumeVisibleSegments().getFirst().columnGeneration(),
 			"visibility switches atomically to the acknowledged replacement generation");
@@ -482,10 +484,11 @@ class DistantHorizonsSemanticCollectorTest {
 			List.of()
 		);
 		publishPendingForTest();
-		DistantHorizonsSemanticCollector.beginVisibleFrameForTest();
+		DistantHorizonsSemanticCollector.beginRustOpaqueRouteFrameForTest();
 		DistantHorizonsSemanticCollector.recordVisibleSegment(77L, 1, 0);
 		DistantHorizonsSemanticCollector.recordVisibleSegment(77L, 1, 1);
 		DistantHorizonsSemanticCollector.recordVisibleSegment(77L, 2, 0);
+		DistantHorizonsSemanticCollector.markRustNonWaterRouteSelected();
 
 		List<net.vulkanic.bridge.VulkanicGalBridge.WorldLodColumnInstanceRecord> visible =
 			DistantHorizonsSemanticCollector.consumeVisibleSegments();
@@ -497,7 +500,7 @@ class DistantHorizonsSemanticCollectorTest {
 		assertEquals(1, visible.get(1).segmentIndex());
 		assertEquals(1, visible.get(1).order());
 		assertEquals(List.of(), DistantHorizonsSemanticCollector.consumeVisibleSegments());
-		assertFalse(DistantHorizonsSemanticCollector.consumeRenderFrame().enabled());
+		assertTrue(DistantHorizonsSemanticCollector.consumeRenderFrame().enabled());
 	}
 
 	@Test
@@ -516,12 +519,13 @@ class DistantHorizonsSemanticCollectorTest {
 		);
 		publishPendingForTest();
 
-		DistantHorizonsSemanticCollector.beginVisibleFrameForTest();
+		DistantHorizonsSemanticCollector.beginRustOpaqueRouteFrameForTest();
 		var segments = DistantHorizonsSemanticCollector.recordVisibleMaterialColumn(93L);
 
 		assertEquals(2, segments.opaqueSegments());
 		assertEquals(1, segments.transparentSegments());
 		assertEquals(1, segments.waterSegments());
+		DistantHorizonsSemanticCollector.markRustNonWaterRouteSelected();
 		List<net.vulkanic.bridge.VulkanicGalBridge.WorldLodColumnInstanceRecord> visible =
 			DistantHorizonsSemanticCollector.consumeVisibleSegments();
 		assertEquals(4, visible.size());
@@ -621,8 +625,9 @@ class DistantHorizonsSemanticCollectorTest {
 		);
 		publishPendingForTest();
 
-		DistantHorizonsSemanticCollector.beginVisibleFrameForTest();
+		DistantHorizonsSemanticCollector.beginRustOpaqueRouteFrameForTest();
 		DistantHorizonsSemanticCollector.recordVisibleMaterialColumn(unrelatedColumn);
+		DistantHorizonsSemanticCollector.markRustNonWaterRouteSelected();
 		DistantHorizonsSemanticCollector.consumeVisibleSegments();
 		assertFalse(DistantHorizonsSemanticCollector.hasLastConsumedVisibleOpaqueColumnCoveringBlock(
 			DhSectionPos.getMinCornerBlockX(targetColumn) + 4,
@@ -634,8 +639,9 @@ class DistantHorizonsSemanticCollectorTest {
 			List.of("minecraft:grass_block", "minecraft:redstone_ore", "minecraft:yellow_terracotta", "minecraft:oak_leaves")
 		));
 
-		DistantHorizonsSemanticCollector.beginVisibleFrameForTest();
+		DistantHorizonsSemanticCollector.beginRustOpaqueRouteFrameForTest();
 		DistantHorizonsSemanticCollector.recordVisibleMaterialColumn(targetColumn);
+		DistantHorizonsSemanticCollector.markRustNonWaterRouteSelected();
 		DistantHorizonsSemanticCollector.consumeVisibleSegments();
 		assertTrue(DistantHorizonsSemanticCollector.hasLastConsumedVisibleOpaqueColumnCoveringBlock(
 			DhSectionPos.getMinCornerBlockX(targetColumn) + 4,
@@ -671,8 +677,11 @@ class DistantHorizonsSemanticCollectorTest {
 			columnKey, origin, List.of(grass, redstone, terracotta, leaves), exactBuild, empty, empty, empty
 		);
 		publishPendingForTest();
-		DistantHorizonsSemanticCollector.beginVisibleFrameForTest();
+		DistantHorizonsSemanticCollector.beginRustOpaqueRouteFrameForTest();
 		DistantHorizonsSemanticCollector.recordVisibleMaterialColumn(columnKey);
+		assertTrue(DistantHorizonsSemanticCollector.hasCompleteVisibleExactAtlasCoverage(),
+			"the exact material fixture must pass the same pre-submit atlas admission used by the Rust route");
+		DistantHorizonsSemanticCollector.markRustNonWaterRouteSelected();
 		DistantHorizonsSemanticCollector.consumeVisibleSegments();
 		assertTrue(DistantHorizonsSemanticCollector.hasLastConsumedVisibleColumnCoveringBlockWithExecutedOpaqueSemanticMaterialIdentities(
 			DhSectionPos.getMinCornerBlockX(columnKey) + 4,
@@ -707,9 +716,18 @@ class DistantHorizonsSemanticCollectorTest {
 			columnKey, origin, List.of(grass, redstone, terracotta, leaves), unavailableBuild, empty, empty, empty
 		);
 		publishPendingForTest();
-		DistantHorizonsSemanticCollector.beginVisibleFrameForTest();
-		DistantHorizonsSemanticCollector.recordVisibleMaterialColumn(columnKey);
-		DistantHorizonsSemanticCollector.consumeVisibleSegments();
+		DistantHorizonsSemanticCollector.beginRustOpaqueRouteFrameForTest();
+		var unavailableSegments = DistantHorizonsSemanticCollector.recordVisibleMaterialColumn(columnKey);
+		assertFalse(DistantHorizonsSemanticCollector.hasCompleteVisibleExactAtlasCoverage(),
+			"unavailable quad-sidecar material identity must reject the strict Rust route before submission");
+		DistantHorizonsSemanticCollector.recordRustNonWaterRouteRejected(
+			"incomplete-exact-atlas-coverage",
+			unavailableSegments.opaqueSegments(),
+			unavailableSegments.transparentSegments(),
+			unavailableSegments.waterSegments()
+		);
+		assertEquals(List.of(), DistantHorizonsSemanticCollector.consumeVisibleSegments(),
+			"a rejected exact-atlas frame must never expose its pending segments as Rust-consumed work");
 		assertFalse(DistantHorizonsSemanticCollector.hasLastConsumedVisibleColumnCoveringBlockWithExecutedOpaqueSemanticMaterialIdentities(
 			DhSectionPos.getMinCornerBlockX(columnKey) + 4,
 			DhSectionPos.getMinCornerBlockZ(columnKey) + 4,
@@ -920,8 +938,9 @@ class DistantHorizonsSemanticCollectorTest {
 		assertFalse(DistantHorizonsSemanticCollector.hasUnpublishedVisibleColumns());
 
 		publishPendingForTest();
-		DistantHorizonsSemanticCollector.beginVisibleFrameForTest();
+		DistantHorizonsSemanticCollector.beginRustOpaqueRouteFrameForTest();
 		assertEquals(1, DistantHorizonsSemanticCollector.recordVisibleOpaqueColumn(101L).opaqueSegments());
+		DistantHorizonsSemanticCollector.markRustOpaqueRouteSelected();
 		List<net.vulkanic.bridge.VulkanicGalBridge.WorldLodColumnInstanceRecord> visible =
 			DistantHorizonsSemanticCollector.consumeVisibleSegments();
 		assertEquals(2L, visible.getFirst().columnGeneration());
@@ -956,8 +975,9 @@ class DistantHorizonsSemanticCollectorTest {
 		assertEquals("asset-generation-advanced-before-submit", route.reason());
 		assertFalse(route.selected());
 
-		DistantHorizonsSemanticCollector.beginVisibleFrameForTest();
+		DistantHorizonsSemanticCollector.beginRustOpaqueRouteFrameForTest();
 		assertEquals(1, DistantHorizonsSemanticCollector.recordVisibleOpaqueColumn(211L).opaqueSegments());
+		DistantHorizonsSemanticCollector.markRustOpaqueRouteSelected();
 		assertEquals(2L, DistantHorizonsSemanticCollector.consumeVisibleSegments().getFirst().columnGeneration());
 	}
 
@@ -975,8 +995,6 @@ class DistantHorizonsSemanticCollectorTest {
 		DistantHorizonsSemanticCollector.recordVisibleOpaqueColumn(212L);
 		DistantHorizonsSemanticCollector.markRustOpaqueRouteSelected();
 
-		// Do not acknowledge this rebuild. The current frame retains generation
-		// one and the coordinator activates generation two only after present.
 		DistantHorizonsSemanticCollector.recordBuiltColumn(
 			212L,
 			new DhBlockPos(0, 64, 0),

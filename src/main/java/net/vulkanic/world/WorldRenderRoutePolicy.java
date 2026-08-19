@@ -3,6 +3,8 @@ package net.vulkanic.world;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.bridge.RustGalVulkanWholeFrameMode;
 
+import java.util.function.BooleanSupplier;
+
 public final class WorldRenderRoutePolicy {
 	private WorldRenderRoutePolicy() {
 	}
@@ -163,21 +165,35 @@ public final class WorldRenderRoutePolicy {
 	}
 
 	/**
-	 * First-person items require the dedicated Rust-owned hand source pass.
-	 * Until the selected-source executor is explicitly requested, Java retains
-	 * ownership before any item submit is selected; this avoids a mixed
-	 * presenter or a speculative hand record in the ordinary whole-frame graph.
+	 * Returns the owner of the first-person item callsite independently of the
+	 * current item's representability or resource residency. Until the dedicated
+	 * selected-source hand executor is requested, Java remains the owner. Once
+	 * this returns Rust whole-frame ownership, per-item admission may still fail
+	 * closed but must never authorize a Java Vulkan draw in the same frame.
 	 */
-	public static Route currentFirstPersonItemRoute(boolean eligible) {
+	public static Route currentFirstPersonItemOwnershipRoute() {
 		if (Boolean.getBoolean("mattmc.dev.rustGalFirstPersonItem.disabled")) {
 			return Route.DISABLED;
 		}
 		if (Boolean.getBoolean("mattmc.dev.rustGalFirstPersonItem.legacyControl")
-			|| !eligible
 			|| !RustGalWorldPrimitiveRenderer.requiresSelectedSourceFeatureCoverage()) {
 			return Route.JAVA_COMPATIBILITY;
 		}
 		return selectWholeFrameRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
+	}
+
+	/**
+	 * Per-item admission for the dedicated Rust-owned hand source pass. This is
+	 * deliberately narrower than ownership: an ineligible item is unavailable
+	 * to Rust, while {@link #currentFirstPersonItemOwnershipRoute()} decides
+	 * whether Java is still legally allowed to render the callsite.
+	 */
+	public static Route currentFirstPersonItemRoute(boolean eligible) {
+		Route ownership = currentFirstPersonItemOwnershipRoute();
+		if (!eligible && ownership != Route.DISABLED) {
+			return Route.JAVA_COMPATIBILITY;
+		}
+		return ownership;
 	}
 
 	/**
@@ -278,19 +294,28 @@ public final class WorldRenderRoutePolicy {
 	}
 
 	/**
-	 * Arrow models are the first ordinary entity-model producer on the shared
-	 * indexed-mesh family. They are owned only by the Rust whole-frame route:
-	 * Java OpenGL, including Iris, remains the compatibility owner until its
-	 * private full-frame path is selected.
+	 * Returns the owner of the Arrow callsite independently of whether the
+	 * current Arrow state is representable as the copied indexed-mesh semantic
+	 * payload. Once Rust owns the whole Vulkan frame, failed Arrow admission is
+	 * unavailable for that frame and must never authorize a Java entity draw.
 	 */
-	public static Route currentArrowRoute(boolean eligible) {
+	public static Route currentArrowOwnershipRoute() {
 		if (Boolean.getBoolean("mattmc.dev.rustGalWorldArrow.disabled")) {
 			return Route.DISABLED;
 		}
-		if (Boolean.getBoolean("mattmc.dev.rustGalWorldArrow.legacyControl") || !eligible) {
+		if (Boolean.getBoolean("mattmc.dev.rustGalWorldArrow.legacyControl")) {
 			return Route.JAVA_COMPATIBILITY;
 		}
 		return selectWholeFrameRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
+	}
+
+	/** Per-Arrow admission for the Rust indexed-mesh producer. */
+	public static Route currentArrowRoute(boolean eligible) {
+		Route ownership = currentArrowOwnershipRoute();
+		if (!eligible && ownership != Route.DISABLED) {
+			return Route.JAVA_COMPATIBILITY;
+		}
+		return ownership;
 	}
 
 	/**
@@ -420,6 +445,14 @@ public final class WorldRenderRoutePolicy {
 		if (legacyControl) {
 			return Route.JAVA_COMPATIBILITY;
 		}
+		return selectShaderAffectedRoute(vulkanBackendSelected, wholeFrameVulkanEnabled, () -> irisPackActive);
+	}
+
+	static Route selectShaderAffectedRouteForTests(
+		boolean vulkanBackendSelected,
+		boolean wholeFrameVulkanEnabled,
+		BooleanSupplier irisPackActive
+	) {
 		return selectShaderAffectedRoute(vulkanBackendSelected, wholeFrameVulkanEnabled, irisPackActive);
 	}
 
@@ -430,24 +463,30 @@ public final class WorldRenderRoutePolicy {
 		return Route.RUST_OPENGL_BORROWED_CONTEXT;
 	}
 
+	/**
+	 * Iris runtime state is relevant only to the borrowed OpenGL compatibility
+	 * route. Vulkan ownership is decided entirely from Vulkanic/MattMC state and
+	 * must not consult Iris after selecting either Java Vulkan compatibility or
+	 * the Rust Vulkan whole-frame renderer.
+	 */
 	private static Route selectShaderAffectedRoute(boolean vulkanBackendSelected, boolean wholeFrameVulkanEnabled) {
 		return selectShaderAffectedRoute(
 			vulkanBackendSelected,
 			wholeFrameVulkanEnabled,
-			net.irisshaders.iris.Iris.isPackInUseQuick()
+			net.irisshaders.iris.Iris::isPackInUseQuick
 		);
 	}
 
 	private static Route selectShaderAffectedRoute(
 		boolean vulkanBackendSelected,
 		boolean wholeFrameVulkanEnabled,
-		boolean irisPackActive
+		BooleanSupplier irisPackActive
 	) {
 		Route selected = selectRoute(vulkanBackendSelected, wholeFrameVulkanEnabled);
-		if (selected.usesRustOpenGl() && irisPackActive) {
-			return Route.JAVA_COMPATIBILITY;
+		if (!selected.usesRustOpenGl()) {
+			return selected;
 		}
-		return selected;
+		return irisPackActive.getAsBoolean() ? Route.JAVA_COMPATIBILITY : selected;
 	}
 
 	private static Route selectWholeFrameRoute(boolean vulkanBackendSelected, boolean wholeFrameVulkanEnabled) {

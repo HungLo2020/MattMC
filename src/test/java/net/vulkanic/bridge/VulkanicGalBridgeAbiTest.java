@@ -133,11 +133,17 @@ class VulkanicGalBridgeAbiTest {
 			Files.readString(Path.of("src/main/java/net/vulkanic/world/WorldRenderRoutePolicy.java"))
 				.contains("currentFallingBlockRoute()")
 		);
-		assertTrue(
-			Files.readString(Path.of("src/main/java/net/vulkanic/world/WorldRenderRoutePolicy.java"))
-				.contains("if (selected.usesRustOpenGl() && irisPackActive)"),
-			"Iris-active OpenGL falling blocks must be routed to Java compatibility before Rust selection"
-		);
+		String shaderAffectedRoutePolicy = Files.readString(Path.of("src/main/java/net/vulkanic/world/WorldRenderRoutePolicy.java"));
+		assertTrue(shaderAffectedRoutePolicy.contains("BooleanSupplier irisPackActive"),
+			"shader-affected routing must keep Iris state behind a lazy supplier boundary");
+		assertTrue(shaderAffectedRoutePolicy.contains("net.irisshaders.iris.Iris::isPackInUseQuick"),
+			"borrowed OpenGL may query Iris only through the lazy compatibility supplier");
+		assertTrue(shaderAffectedRoutePolicy.contains("if (!selected.usesRustOpenGl())"),
+			"both Vulkan routes must return before consulting Iris runtime state");
+		assertTrue(shaderAffectedRoutePolicy.contains("irisPackActive.getAsBoolean() ? Route.JAVA_COMPATIBILITY : selected"),
+			"only the borrowed OpenGL route may resolve Iris pack activity");
+		assertFalse(shaderAffectedRoutePolicy.contains("if (selected.usesRustOpenGl() && irisPackActive)"),
+			"shader-aware routing must not restore the old eagerly-evaluated Iris boolean path");
 		assertTrue(
 			Files.readString(Path.of("src/main/java/net/vulkanic/world/WorldRenderRoutePolicy.java"))
 				.contains("currentPistonMovingBlockRoute()")
@@ -239,16 +245,27 @@ class VulkanicGalBridgeAbiTest {
 		assertEquals(
 			WorldRenderRoutePolicy.Route.JAVA_COMPATIBILITY,
 			WorldRenderRoutePolicy.currentArrowRoute(false),
-			"unsupported arrow semantics must remain Java-owned before route selection"
+			"per-Arrow admission remains unavailable when the current state is unsupported"
 		);
 		String routePolicy = Files.readString(Path.of("src/main/java/net/vulkanic/world/WorldRenderRoutePolicy.java"));
 		String arrowRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/entity/ArrowRenderer.java"));
 		String worldRenderer = Files.readString(Path.of("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+		assertTrue(routePolicy.contains("currentArrowOwnershipRoute()"),
+			"Arrow ownership must be independent of per-state admission");
 		assertTrue(routePolicy.contains("currentArrowRoute(boolean eligible)"));
 		assertTrue(routePolicy.contains("return selectWholeFrameRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());"));
+		assertTrue(arrowRenderer.contains("WorldRenderRoutePolicy.currentArrowOwnershipRoute()"));
+		assertTrue(arrowRenderer.contains("ArrowSubmitDisposition.RUST_UNAVAILABLE"));
+		assertTrue(arrowRenderer.contains("\"rust-vulkan-unavailable\""));
 		assertTrue(arrowRenderer.contains("enqueueArrowModel("));
 		assertTrue(arrowRenderer.contains("isSemanticCoverageOnly()"));
-		assertTrue(arrowRenderer.contains("Rust whole-frame Arrow encountered unsupported semantic state before route selection"));
+		assertFalse(arrowRenderer.contains("Rust whole-frame Arrow encountered unsupported semantic state before route selection"),
+			"unsupported Rust-owned Arrow state must be explicit unavailable work, not crash-as-routing-control-flow");
+		int arrowOwnership = arrowRenderer.indexOf("WorldRenderRoutePolicy.currentArrowOwnershipRoute()");
+		int arrowUnavailable = arrowRenderer.indexOf("ArrowSubmitDisposition.RUST_UNAVAILABLE", arrowOwnership);
+		int arrowJavaSubmit = arrowRenderer.indexOf("submitNodeCollector.submitModel(", arrowUnavailable);
+		assertTrue(arrowOwnership >= 0 && arrowUnavailable > arrowOwnership && arrowJavaSubmit > arrowUnavailable,
+			"Java Arrow submission must remain outside the Rust-unavailable branch");
 		String deterministicCapture = Files.readString(Path.of("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java"));
 		assertTrue(deterministicCapture.contains("decision.javaDrawn() && !decision.rustSelected() && !decision.rustQueued()"));
 		assertTrue(deterministicCapture.contains("decision.rustSelected() && decision.rustQueued() && !decision.javaDrawn()"));

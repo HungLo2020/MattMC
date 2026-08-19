@@ -336,6 +336,7 @@ public class GuiRenderer implements AutoCloseable {
 		this.previousScissorArea = null;
 		this.previousPipeline = null;
 		this.previousTextureSetup = null;
+		this.previousScissorArea = null;
 		this.previousShaderInputParityGeometryContext = null;
 		this.bufferBuilder = null;
 		this.renderState.forEachElement(this::addElementToMesh, traverseRange);
@@ -367,8 +368,6 @@ public class GuiRenderer implements AutoCloseable {
 			GpuBufferSlice gpuBufferSlice2 = VulkanicAPI.getDynamicUniforms()
 				.writeTransform(new Matrix4f().setTranslation(0.0F, 0.0F, -11000.0F), new Vector4f(1.0F, 1.0F, 1.0F, 1.0F), new Vector3f(), new Matrix4f(), 0.0F);
 			if (this.firstDrawIndexAfterBlur > 0) {
-				List<RustGalGuiElementRenderState> rustGalFrameElements = this.rustGalFrameElements();
-				MutableBoolean rustGalFrameExecuted = new MutableBoolean(false);
 				this.executeDrawRange(
 					() -> "GUI before blur",
 					renderTarget,
@@ -377,9 +376,7 @@ public class GuiRenderer implements AutoCloseable {
 					gpuBuffer,
 					indexType,
 					0,
-					Math.min(this.firstDrawIndexAfterBlur, this.draws.size()),
-					rustGalFrameElements,
-					rustGalFrameExecuted
+					Math.min(this.firstDrawIndexAfterBlur, this.draws.size())
 				);
 
 				if (this.draws.size() > this.firstDrawIndexAfterBlur) {
@@ -393,14 +390,10 @@ public class GuiRenderer implements AutoCloseable {
 						gpuBuffer,
 						indexType,
 						this.firstDrawIndexAfterBlur,
-						this.draws.size(),
-						rustGalFrameElements,
-						rustGalFrameExecuted
+						this.draws.size()
 					);
 				}
 			} else if (this.draws.size() > this.firstDrawIndexAfterBlur) {
-				List<RustGalGuiElementRenderState> rustGalFrameElements = this.rustGalFrameElements();
-				MutableBoolean rustGalFrameExecuted = new MutableBoolean(false);
 				VulkanicAPI.createCommandEncoder().clearDepthTexture(renderTarget.getDepthTexture(), 1.0);
 				minecraft.gameRenderer.processBlurEffect();
 				this.executeDrawRange(
@@ -411,22 +404,24 @@ public class GuiRenderer implements AutoCloseable {
 					gpuBuffer,
 					indexType,
 					this.firstDrawIndexAfterBlur,
-					this.draws.size(),
-					rustGalFrameElements,
-					rustGalFrameExecuted
+					this.draws.size()
 				);
 			}
 		}
 	}
 
-	private List<RustGalGuiElementRenderState> rustGalFrameElements() {
-		List<RustGalGuiElementRenderState> rustGalElements = new ArrayList<>();
-		for (GuiRenderer.DrawStep step : this.draws) {
-			if (step instanceof GuiRenderer.RustGalDraw rustGalDraw) {
-				rustGalElements.add(rustGalDraw.element);
-			}
+	static List<RustGalGuiElementRenderState> contiguousRustGalDrawGroup(List<GuiRenderer.DrawStep> draws, int start, int end) {
+		if (start < 0 || end < start || end > draws.size()) {
+			throw new IndexOutOfBoundsException("invalid Rust GUI draw group range " + start + ".." + end + " for " + draws.size() + " draws");
 		}
-		return rustGalElements;
+		List<RustGalGuiElementRenderState> group = new ArrayList<>();
+		for (int index = start; index < end; index++) {
+			if (!(draws.get(index) instanceof GuiRenderer.RustGalDraw rustGalDraw)) {
+				break;
+			}
+			group.add(rustGalDraw.element());
+		}
+		return List.copyOf(group);
 	}
 
 	private void executeDrawRange(
@@ -437,16 +432,19 @@ public class GuiRenderer implements AutoCloseable {
 		GpuBuffer gpuBuffer,
 		VertexFormat.IndexType indexType,
 		int i,
-		int j,
-		List<RustGalGuiElementRenderState> rustGalFrameElements,
-		MutableBoolean rustGalFrameExecuted
+		int j
 	) {
 		Minecraft minecraft = Minecraft.getInstance();
+		MutableBoolean rustGalFrameExecuted = new MutableBoolean(false);
 		int k = i;
 		while (k < j) {
 			GuiRenderer.DrawStep step = this.draws.get(k);
-			if (step instanceof GuiRenderer.RustGalDraw rustGalDraw) {
+			if (step instanceof GuiRenderer.RustGalDraw) {
 				if (!rustGalFrameExecuted.booleanValue()) {
+					List<RustGalGuiElementRenderState> rustGalDrawGroup = contiguousRustGalDrawGroup(this.draws, k, j);
+					if (rustGalDrawGroup.isEmpty()) {
+						throw new IllegalStateException("Rust GUI draw marker produced an empty contiguous group");
+					}
 					try (RenderPass ignored = VulkanicAPI.createRenderPass(
 								supplier,
 								renderTarget.getColorTextureView(),
@@ -454,7 +452,7 @@ public class GuiRenderer implements AutoCloseable {
 								renderTarget.useDepth ? renderTarget.getDepthTextureView() : null,
 								OptionalDouble.empty()
 							)) {
-						RustGalFrameCoordinator.executeGuiFrame(minecraft, rustGalFrameElements);
+						RustGalFrameCoordinator.executeGuiFrame(minecraft, rustGalDrawGroup);
 					}
 					rustGalFrameExecuted.setTrue();
 				}
@@ -462,6 +460,7 @@ public class GuiRenderer implements AutoCloseable {
 				continue;
 			}
 
+			rustGalFrameExecuted.setFalse();
 			int start = k;
 			while (k < j && this.draws.get(k) instanceof GuiRenderer.Draw) {
 				k++;

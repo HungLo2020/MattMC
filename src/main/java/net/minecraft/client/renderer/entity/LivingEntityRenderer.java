@@ -110,6 +110,19 @@ public abstract class LivingEntityRenderer<T extends LivingEntity, S extends Liv
 			int k = ARGB.multiply(j, this.getModelTint(livingEntityRenderState));
 			ResourceLocation textureIdentity = this.getTextureLocation(livingEntityRenderState);
 			ResourceLocation entityIdentity = net.vulkanic.world.RustGalWorldPrimitiveRenderer.entityIdentity(livingEntityRenderState);
+			boolean rustLivingModelFamily = this.model.getClass() == ChickenModel.class
+				&& livingEntityRenderState instanceof ChickenRenderState
+				|| this.model instanceof CowModel
+					&& livingEntityRenderState instanceof CowRenderState
+				|| this.model != null
+					&& this.model.getClass() == PigModel.class
+					&& livingEntityRenderState instanceof PigRenderState
+				|| this.model != null
+					&& this.model.getClass() == ZombieModel.class
+					&& livingEntityRenderState instanceof ZombieRenderState
+				|| this.model != null
+					&& this.model.getClass() == RabbitModel.class
+					&& livingEntityRenderState instanceof RabbitRenderState;
 			boolean rustLivingModelEligible = entityIdentity != null && (this.model.getClass() == ChickenModel.class
 				&& livingEntityRenderState instanceof ChickenRenderState chickenRenderState
 				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaChickenModelMeshEligible(
@@ -178,9 +191,12 @@ public abstract class LivingEntityRenderer<T extends LivingEntity, S extends Liv
 						bl2,
 						livingEntityRenderState.appearsGlowing()
 					));
-			var rustLivingModelRoute = net.vulkanic.world.WorldRenderRoutePolicy.currentModelMeshRoute(rustLivingModelEligible);
+			var rustLivingModelOwnership = net.vulkanic.world.LivingEntityBaseModelOwnershipPolicy.currentOwnershipRoute(rustLivingModelFamily);
 			boolean semanticSubmission = EntityRenderDispatcher.isSemanticSubmission();
-			if (rustLivingModelRoute.usesRustWholeFrameVulkan() && !semanticSubmission) {
+			var rustLivingModelDisposition = net.vulkanic.world.LivingEntityBaseModelOwnershipPolicy.classify(
+				semanticSubmission, rustLivingModelFamily, rustLivingModelEligible, rustLivingModelOwnership
+			);
+			if (rustLivingModelDisposition == net.vulkanic.world.LivingEntityBaseModelOwnershipPolicy.Disposition.RUST_AVAILABLE) {
 				if (!net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMesh(
 					this.model, livingEntityRenderState, poseStack.last(), renderType, textureIdentity, entityIdentity,
 					livingEntityRenderState.lightCoords, i, k
@@ -190,16 +206,20 @@ public abstract class LivingEntityRenderer<T extends LivingEntity, S extends Liv
 				net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
 					"rust-vulkan-whole-frame", textureIdentity, this.model.getClass().getName(), livingEntityRenderState.entityId, true, true, false
 				);
+			} else if (rustLivingModelDisposition == net.vulkanic.world.LivingEntityBaseModelOwnershipPolicy.Disposition.RUST_UNAVAILABLE) {
+				net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
+					"rust-vulkan-unavailable", textureIdentity, this.model.getClass().getName(), livingEntityRenderState.entityId, false, false, false
+				);
 			} else {
-				if (rustLivingModelEligible && !semanticSubmission) {
+				if (rustLivingModelFamily && !semanticSubmission) {
 					net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
-						rustLivingModelRoute == net.vulkanic.world.WorldRenderRoutePolicy.Route.DISABLED ? "disabled" : "java-legacy",
+						rustLivingModelOwnership == net.vulkanic.world.WorldRenderRoutePolicy.Route.DISABLED ? "disabled" : "java-legacy",
 						textureIdentity,
 						this.model.getClass().getName(),
 						livingEntityRenderState.entityId,
 						false,
 						false,
-						rustLivingModelRoute.usesJavaCompatibility()
+						rustLivingModelOwnership.usesJavaCompatibility()
 					);
 				}
 				submitNodeCollector.submitModel(
