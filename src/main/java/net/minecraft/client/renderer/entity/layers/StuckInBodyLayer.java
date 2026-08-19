@@ -78,6 +78,9 @@ public abstract class StuckInBodyLayer<M extends PlayerModel, S> extends RenderL
 		poseStack.mulPose(Axis.YP.rotationDegrees(yaw - 90.0F));
 		poseStack.mulPose(Axis.ZP.rotationDegrees(pitch));
 		if (rustAvailable) {
+			// Match ModelFeatureRenderer exactly: reset/apply model semantics for
+			// every submitted embedded instance immediately before extraction.
+			this.model.setupAnim(this.modelState);
 			if (!RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMesh(
 				this.rustSemanticModel,
 				Unit.INSTANCE,
@@ -135,13 +138,6 @@ public abstract class StuckInBodyLayer<M extends PlayerModel, S> extends RenderL
 		}
 
 		boolean rustAvailable = disposition == StandaloneModelRenderOwnershipPolicy.Disposition.RUST_AVAILABLE;
-		if (rustAvailable) {
-			// Vanilla ModelFeatureRenderer invokes setupAnim before each draw. These
-			// bounded layer states are identical for every embedded instance, so one
-			// reset/application populates the shared root for all copied instances.
-			this.model.setupAnim(this.modelState);
-		}
-
 		RandomSource randomSource = RandomSource.create(avatarRenderState.id);
 		for (int index = 0; index < stuckCount; index++) {
 			poseStack.pushPose();
