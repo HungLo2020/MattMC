@@ -1,0 +1,639 @@
+name: Temporary indexed-mesh alpha semantic patch
+
+on:
+  push:
+    branches:
+      - agent/rust-generic-quad-particles
+    paths:
+      - .github/workflows/temporary-indexed-mesh-alpha-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/rust-generic-quad-particles
+          fetch-depth: 0
+
+      - name: Apply exact semantic patch
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              text = p.read_text()
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected exactly one occurrence, found {count}: {old[:120]!r}")
+              p.write_text(text.replace(old, new, 1))
+
+          def replace_count(path, old, new, expected):
+              p = Path(path)
+              text = p.read_text()
+              count = text.count(old)
+              if count != expected:
+                  raise SystemExit(f"{path}: expected {expected} occurrences, found {count}: {old[:120]!r}")
+              p.write_text(text.replace(old, new))
+
+          def regex_once(path, pattern, replacement):
+              p = Path(path)
+              text = p.read_text()
+              updated, count = re.subn(pattern, replacement, text, count=1, flags=re.S)
+              if count != 1:
+                  raise SystemExit(f"{path}: regex expected exactly one match, found {count}: {pattern[:120]!r}")
+              p.write_text(updated)
+
+          java = "src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"
+          rust = "src/main/rust/render/vulkanic/world_primitive_frontend.rs"
+          registry = "src/main/rust/render/vulkanic/world_primitive_frontend/material_registry.rs"
+
+          replace_once(java,
+          "\tpublic static final int MATERIAL_ID_OPAQUE_TEXTURED = 0x6A2FD335;\n"
+          "\tpublic static final int MATERIAL_ID_CUTOUT_TEXTURED = 0x129B1B90;\n"
+          "\tpublic static final int MATERIAL_ID_TRANSLUCENT_TEXTURED = 0x4D21A7C3;\n",
+          "\tpublic static final int MATERIAL_ID_OPAQUE_TEXTURED = 0x6A2FD335;\n"
+          "\t/** Alpha-tested textured material matching ALPHA_CUTOUT=0.1. */\n"
+          "\tpublic static final int MATERIAL_ID_CUTOUT_TEXTURED_0_1 = 0x259D874B;\n"
+          "\t/** Alpha-tested textured material matching ALPHA_CUTOUT=0.5. */\n"
+          "\tpublic static final int MATERIAL_ID_CUTOUT_TEXTURED = 0x129B1B90;\n"
+          "\tpublic static final int MATERIAL_ID_TRANSLUCENT_TEXTURED = 0x4D21A7C3;\n"
+          "\t/** Translucent textured material that still discards alpha below 0.1. */\n"
+          "\tpublic static final int MATERIAL_ID_TRANSLUCENT_CUTOUT_TEXTURED_0_1 = 0x24D0895B;\n")
+
+          replace_once(java,
+          "\t\t\t\t\t\tSTRATUM_WORLD_MATERIAL, MATERIAL_ID_CUTOUT_TEXTURED, MATERIAL_TEXTURE_TERRAIN_BLOCK_ATLAS,\n",
+          "\t\t\t\t\t\tSTRATUM_WORLD_MATERIAL, MATERIAL_ID_CUTOUT_TEXTURED_0_1, MATERIAL_TEXTURE_TERRAIN_BLOCK_ATLAS,\n")
+
+          old_classifier = '''\tprivate static ModelMeshRenderSemantics modelMeshRenderSemantics(RenderType renderType) {
+\t\tif (renderType == null) {
+\t\t\treturn null;
+\t\t}
+\t\tvar blend = renderType.pipeline().getBlendFunction();
+\t\tif (blend.isPresent()) {
+\t\t\tif (!BlendFunction.TRANSLUCENT.equals(blend.get())) {
+\t\t\t\treturn null;
+\t\t\t}
+\t\t\treturn new ModelMeshRenderSemantics(
+\t\t\t\tMATERIAL_ID_TRANSLUCENT_TEXTURED,
+\t\t\t\tMATERIAL_MODE_TRANSLUCENT,
+\t\t\t\tDEPTH_POLICY_TEST_NO_WRITE,
+\t\t\t\trenderType.pipeline().isCull() ? CULL_BACK : CULL_NONE
+\t\t\t);
+\t\t}
+\t\treturn new ModelMeshRenderSemantics(
+\t\t\tMATERIAL_ID_CUTOUT_TEXTURED,
+\t\t\tMATERIAL_MODE_CUTOUT,
+\t\t\tDEPTH_POLICY_TEST_WRITE,
+\t\t\trenderType.pipeline().isCull() ? CULL_BACK : CULL_NONE
+\t\t);
+\t}
+'''
+          new_classifier = '''\tprivate static ModelMeshRenderSemantics modelMeshRenderSemantics(RenderType renderType) {
+\t\tif (renderType == null) {
+\t\t\treturn null;
+\t\t}
+\t\tvar pipeline = renderType.pipeline();
+\t\tif (!pipeline.isWriteColor() || !pipeline.isWriteAlpha()
+\t\t\t|| pipeline.getDepthTestFunction() != net.blaze3d.platform.DepthTestFunction.LEQUAL_DEPTH_TEST) {
+\t\t\treturn null;
+\t\t}
+\t\tvar blend = pipeline.getBlendFunction();
+\t\tboolean translucent = blend.isPresent();
+\t\tif (translucent && !BlendFunction.TRANSLUCENT.equals(blend.get())) {
+\t\t\treturn null;
+\t\t}
+\t\tString alphaCutout = pipeline.getShaderDefines().values().get("ALPHA_CUTOUT");
+\t\tint materialId;
+\t\tint materialMode;
+\t\tif (alphaCutout == null) {
+\t\t\tmaterialId = translucent ? MATERIAL_ID_TRANSLUCENT_TEXTURED : MATERIAL_ID_OPAQUE_TEXTURED;
+\t\t\tmaterialMode = translucent ? MATERIAL_MODE_TRANSLUCENT : MATERIAL_MODE_OPAQUE;
+\t\t} else if ("0.1".equals(alphaCutout)) {
+\t\t\tmaterialId = translucent ? MATERIAL_ID_TRANSLUCENT_CUTOUT_TEXTURED_0_1 : MATERIAL_ID_CUTOUT_TEXTURED_0_1;
+\t\t\tmaterialMode = translucent ? MATERIAL_MODE_TRANSLUCENT : MATERIAL_MODE_CUTOUT;
+\t\t} else if ("0.5".equals(alphaCutout) && !translucent) {
+\t\t\tmaterialId = MATERIAL_ID_CUTOUT_TEXTURED;
+\t\t\tmaterialMode = MATERIAL_MODE_CUTOUT;
+\t\t} else {
+\t\t\treturn null;
+\t\t}
+\t\treturn new ModelMeshRenderSemantics(
+\t\t\tmaterialId,
+\t\t\tmaterialMode,
+\t\t\tpipeline.isWriteDepth() ? DEPTH_POLICY_TEST_WRITE : DEPTH_POLICY_TEST_NO_WRITE,
+\t\t\tpipeline.isCull() ? CULL_BACK : CULL_NONE
+\t\t);
+\t}
+'''
+          replace_once(java, old_classifier, new_classifier)
+
+          replace_once(java,
+          '''\tprivate static MeshMaterial meshMaterialForChunkLayer(ChunkSectionLayer layer) {
+\t\tif (layer == ChunkSectionLayer.SOLID) {
+\t\t\treturn new MeshMaterial(MATERIAL_ID_OPAQUE_TEXTURED, MATERIAL_MODE_OPAQUE);
+\t\t}
+\t\tif (layer == ChunkSectionLayer.CUTOUT || layer == ChunkSectionLayer.CUTOUT_MIPPED) {
+\t\t\treturn new MeshMaterial(MATERIAL_ID_CUTOUT_TEXTURED, MATERIAL_MODE_CUTOUT);
+\t\t}
+\t\treturn null;
+\t}
+
+\tprivate static MeshMaterial meshMaterialForMovingRenderType(RenderType renderType) {
+\t\tif (renderType == RenderType.solid()) {
+\t\t\treturn new MeshMaterial(MATERIAL_ID_OPAQUE_TEXTURED, MATERIAL_MODE_OPAQUE);
+\t\t}
+\t\tif (renderType == RenderType.cutout() || renderType == RenderType.cutoutMipped()) {
+\t\t\treturn new MeshMaterial(MATERIAL_ID_CUTOUT_TEXTURED, MATERIAL_MODE_CUTOUT);
+\t\t}
+\t\treturn null;
+\t}
+''',
+          '''\tprivate static MeshMaterial meshMaterialForChunkLayer(ChunkSectionLayer layer) {
+\t\tif (layer == ChunkSectionLayer.SOLID) {
+\t\t\treturn new MeshMaterial(MATERIAL_ID_OPAQUE_TEXTURED, MATERIAL_MODE_OPAQUE);
+\t\t}
+\t\tif (layer == ChunkSectionLayer.CUTOUT) {
+\t\t\treturn new MeshMaterial(MATERIAL_ID_CUTOUT_TEXTURED_0_1, MATERIAL_MODE_CUTOUT);
+\t\t}
+\t\tif (layer == ChunkSectionLayer.CUTOUT_MIPPED) {
+\t\t\treturn new MeshMaterial(MATERIAL_ID_CUTOUT_TEXTURED, MATERIAL_MODE_CUTOUT);
+\t\t}
+\t\treturn null;
+\t}
+
+\tprivate static MeshMaterial meshMaterialForMovingRenderType(RenderType renderType) {
+\t\tif (renderType == RenderType.solid()) {
+\t\t\treturn new MeshMaterial(MATERIAL_ID_OPAQUE_TEXTURED, MATERIAL_MODE_OPAQUE);
+\t\t}
+\t\tif (renderType == RenderType.cutout()) {
+\t\t\treturn new MeshMaterial(MATERIAL_ID_CUTOUT_TEXTURED_0_1, MATERIAL_MODE_CUTOUT);
+\t\t}
+\t\tif (renderType == RenderType.cutoutMipped()) {
+\t\t\treturn new MeshMaterial(MATERIAL_ID_CUTOUT_TEXTURED, MATERIAL_MODE_CUTOUT);
+\t\t}
+\t\treturn null;
+\t}
+''')
+
+          replace_once(java,
+          "\t\t\t\t\tMATERIAL_ID_CUTOUT_TEXTURED,\n\t\t\t\t\ttextureId,\n\t\t\t\t\tMATERIAL_MODE_CUTOUT,\n\t\t\t\t\tCULL_BACK,\n",
+          "\t\t\t\t\tMATERIAL_ID_CUTOUT_TEXTURED_0_1,\n\t\t\t\t\ttextureId,\n\t\t\t\t\tMATERIAL_MODE_CUTOUT,\n\t\t\t\t\tCULL_BACK,\n")
+
+          replace_once(java,
+          "\t\t\tint materialId = opaque ? MATERIAL_ID_OPAQUE_TEXTURED : MATERIAL_ID_CUTOUT_TEXTURED;\n",
+          "\t\t\tint materialId = opaque ? MATERIAL_ID_OPAQUE_TEXTURED : MATERIAL_ID_CUTOUT_TEXTURED_0_1;\n")
+
+          replace_once(rust,
+          "pub const WORLD_MATERIAL_ID_OPAQUE_TEXTURED: u32 = 0x6a2f_d335;\n"
+          "pub const WORLD_MATERIAL_ID_CUTOUT_TEXTURED: u32 = 0x129b_1b90;\n"
+          "pub const WORLD_MATERIAL_ID_TRANSLUCENT_TEXTURED: u32 = 0x4d21_a7c3;\n",
+          "pub const WORLD_MATERIAL_ID_OPAQUE_TEXTURED: u32 = 0x6a2f_d335;\n"
+          "pub const WORLD_MATERIAL_ID_CUTOUT_TEXTURED_0_1: u32 = 0x259d_874b;\n"
+          "pub const WORLD_MATERIAL_ID_CUTOUT_TEXTURED: u32 = 0x129b_1b90;\n"
+          "pub const WORLD_MATERIAL_ID_TRANSLUCENT_TEXTURED: u32 = 0x4d21_a7c3;\n"
+          "pub const WORLD_MATERIAL_ID_TRANSLUCENT_CUTOUT_TEXTURED_0_1: u32 = 0x24d0_895b;\n")
+
+          replace_once(rust,
+          '''        if batch.key.material_mode == WORLD_MATERIAL_MODE_CUTOUT {
+            push_f32(
+                out,
+                material_registry::cutout_threshold(batch.key.material_id),
+            );
+        } else {
+            push_f32(out, 0.0);
+        }
+''',
+          '''        push_f32(
+            out,
+            material_registry::cutout_threshold(batch.key.material_id),
+        );
+''')
+
+          # Carry exact material identity through both selected-source entity and hand frames.
+          replace_once(rust,
+          '''pub(crate) struct PreparedSourceEntityFrame {
+    pub frame_id: u64,
+    pub mesh: Arc<SourceEntityMeshAsset>,
+    pub section_index: u32,
+    pub texture_id: u32,
+    pub material_mode: u32,
+''',
+          '''pub(crate) struct PreparedSourceEntityFrame {
+    pub frame_id: u64,
+    pub material_id: u32,
+    pub mesh: Arc<SourceEntityMeshAsset>,
+    pub section_index: u32,
+    pub texture_id: u32,
+    pub material_mode: u32,
+''')
+          replace_once(rust,
+          '''struct PreparedSourceHandFrame {
+    frame_id: u64,
+    hand: FirstPersonHand,
+    mesh: Arc<SourceEntityMeshAsset>,
+    section_index: u32,
+    texture_id: u32,
+    material_mode: u32,
+''',
+          '''struct PreparedSourceHandFrame {
+    frame_id: u64,
+    hand: FirstPersonHand,
+    material_id: u32,
+    mesh: Arc<SourceEntityMeshAsset>,
+    section_index: u32,
+    texture_id: u32,
+    material_mode: u32,
+''')
+          replace_once(rust,
+          '''            prepared.push(PreparedSourceEntityFrame {
+                frame_id: frame.frame_id,
+                mesh,
+                section_index,
+                texture_id,
+                material_mode,
+''',
+          '''            prepared.push(PreparedSourceEntityFrame {
+                frame_id: frame.frame_id,
+                material_id: mesh.sections[section_index as usize].material_id,
+                mesh,
+                section_index,
+                texture_id,
+                material_mode,
+''')
+          replace_once(rust,
+          '''            prepared.push(PreparedSourceHandFrame {
+                frame_id: frame.frame_id,
+                hand,
+                mesh,
+                section_index,
+                texture_id,
+                material_mode,
+''',
+          '''            prepared.push(PreparedSourceHandFrame {
+                frame_id: frame.frame_id,
+                hand,
+                material_id: mesh.sections[section_index as usize].material_id,
+                mesh,
+                section_index,
+                texture_id,
+                material_mode,
+''')
+
+          # Selected-source pipeline compatibility must include semantic material identity.
+          regex_once(rust,
+          r'''(struct LoweredEntitySourcePipelineKey \{\n    shader_program_identity: ProgramIdentity,\n    shader_pack_generation: u64,\n)(    material_mode: u32,)''',
+          r'''\1    material_id: u32,\n\2''')
+          regex_once(rust,
+          r'''(fn ensure_lowered_local_source_pipeline_resources<P: LocalTexturedSourceProgram>\(\n        &mut self,\n        gal: &mut VulkanicGal,\n        program: &P,\n)(        material_mode: u32,)''',
+          r'''\1        material_id: u32,\n\2''')
+          replace_once(rust,
+          '''        let key = LoweredEntitySourcePipelineKey {
+            shader_program_identity: program.identity().clone(),
+            shader_pack_generation: program.shader_pack_generation(),
+            material_mode,
+''',
+          '''        let key = LoweredEntitySourcePipelineKey {
+            shader_program_identity: program.identity().clone(),
+            shader_pack_generation: program.shader_pack_generation(),
+            material_id,
+            material_mode,
+''')
+          replace_once(rust,
+          "                source_entity_alpha_cutoff(material_mode)?,\n",
+          "                source_entity_alpha_cutoff(material_id, material_mode)?,\n")
+
+          regex_once(rust,
+          r'''(fn prepare_lowered_local_source_draw<P: LocalTexturedSourceProgram>\(\n        &mut self,\n        gal: &mut VulkanicGal,\n        program: &P,\n        frame_id: u64,\n        mesh: &Arc<SourceEntityMeshAsset>,\n        section_index: u32,\n        texture_id: u32,\n)(        material_mode: u32,)''',
+          r'''\1        material_id: u32,\n\2''')
+          replace_once(rust,
+          '''        let pipeline_key = self.ensure_lowered_local_source_pipeline_resources(
+            gal,
+            program,
+            material_mode,
+''',
+          '''        let pipeline_key = self.ensure_lowered_local_source_pipeline_resources(
+            gal,
+            program,
+            material_id,
+            material_mode,
+''')
+          replace_count(rust,
+          '''            prepared.section_index,
+            prepared.texture_id,
+            prepared.material_mode,
+''',
+          '''            prepared.section_index,
+            prepared.texture_id,
+            prepared.material_id,
+            prepared.material_mode,
+''', 2)
+
+          regex_once(rust,
+          r'''fn source_entity_alpha_cutoff\(material_mode: u32\) -> GalResult<Option<f32>> \{.*?\n\}\n\n''',
+          '''fn source_entity_alpha_cutoff(material_id: u32, material_mode: u32) -> GalResult<Option<f32>> {
+    if !material_registry::material_matches_mode(material_id, material_mode) {
+        return Err(GalError::unsupported_feature(format!(
+            "entity source program rejects material {material_id} for mode {material_mode}"
+        )));
+    }
+    let threshold = material_registry::cutout_threshold(material_id);
+    if threshold > 0.0 {
+        Ok(Some(threshold))
+    } else {
+        Ok(None)
+    }
+}
+
+''')
+          regex_once(rust,
+          r'''    #\[test\]\n    fn entity_source_alpha_cutoff_preserves_opaque_and_translucent_semantics\(\) \{.*?\n    \}\n''',
+          '''    #[test]
+    fn entity_source_alpha_cutoff_comes_from_semantic_material_identity() {
+        assert_eq!(
+            None,
+            source_entity_alpha_cutoff(
+                WORLD_MATERIAL_ID_OPAQUE_TEXTURED,
+                WORLD_MATERIAL_MODE_OPAQUE,
+            )
+            .unwrap()
+        );
+        assert_eq!(
+            Some(0.1),
+            source_entity_alpha_cutoff(
+                WORLD_MATERIAL_ID_CUTOUT_TEXTURED_0_1,
+                WORLD_MATERIAL_MODE_CUTOUT,
+            )
+            .unwrap()
+        );
+        assert_eq!(
+            Some(0.5),
+            source_entity_alpha_cutoff(
+                WORLD_MATERIAL_ID_CUTOUT_TEXTURED,
+                WORLD_MATERIAL_MODE_CUTOUT,
+            )
+            .unwrap()
+        );
+        assert_eq!(
+            None,
+            source_entity_alpha_cutoff(
+                WORLD_MATERIAL_ID_TRANSLUCENT_TEXTURED,
+                WORLD_MATERIAL_MODE_TRANSLUCENT,
+            )
+            .unwrap()
+        );
+        assert_eq!(
+            Some(0.1),
+            source_entity_alpha_cutoff(
+                WORLD_MATERIAL_ID_TRANSLUCENT_CUTOUT_TEXTURED_0_1,
+                WORLD_MATERIAL_MODE_TRANSLUCENT,
+            )
+            .unwrap()
+        );
+        assert!(source_entity_alpha_cutoff(
+            WORLD_MATERIAL_ID_OPAQUE_TEXTURED,
+            WORLD_MATERIAL_MODE_CUTOUT,
+        )
+        .unwrap_err()
+        .to_string()
+        .contains("rejects material"));
+    }
+''')
+
+          replace_once(registry,
+          "pub(crate) const WORLD_MATERIAL_REGISTRY_VERSION: u32 = 1;\n",
+          "pub(crate) const WORLD_MATERIAL_REGISTRY_VERSION: u32 = 2;\n")
+          replace_once(registry,
+          '''    SemanticMaterial {
+        key: WORLD_MATERIAL_ID_CUTOUT_TEXTURED,
+        resource_location: "minecraft:material/cutout_textured",
+        mode: WORLD_MATERIAL_MODE_CUTOUT,
+        cutout_threshold: 0.5,
+        sampler: MaterialSamplerPolicy::NearestClamp,
+        mip: MaterialMipPolicy::SingleMip,
+        tint: MaterialTintChannel::VertexColor,
+        emissive: false,
+        fullbright: false,
+        legacy_keys: &[2],
+    },
+''',
+          '''    SemanticMaterial {
+        key: WORLD_MATERIAL_ID_CUTOUT_TEXTURED_0_1,
+        resource_location: "minecraft:material/cutout_textured_0_1",
+        mode: WORLD_MATERIAL_MODE_CUTOUT,
+        cutout_threshold: 0.1,
+        sampler: MaterialSamplerPolicy::NearestClamp,
+        mip: MaterialMipPolicy::SingleMip,
+        tint: MaterialTintChannel::VertexColor,
+        emissive: false,
+        fullbright: false,
+        legacy_keys: &[],
+    },
+    SemanticMaterial {
+        key: WORLD_MATERIAL_ID_CUTOUT_TEXTURED,
+        resource_location: "minecraft:material/cutout_textured",
+        mode: WORLD_MATERIAL_MODE_CUTOUT,
+        cutout_threshold: 0.5,
+        sampler: MaterialSamplerPolicy::NearestClamp,
+        mip: MaterialMipPolicy::SingleMip,
+        tint: MaterialTintChannel::VertexColor,
+        emissive: false,
+        fullbright: false,
+        legacy_keys: &[2],
+    },
+''')
+          replace_once(registry,
+          '''    SemanticMaterial {
+        key: WORLD_MATERIAL_ID_TRANSLUCENT_TEXTURED,
+        resource_location: "minecraft:material/translucent_textured",
+        mode: WORLD_MATERIAL_MODE_TRANSLUCENT,
+        cutout_threshold: 0.0,
+        sampler: MaterialSamplerPolicy::NearestClamp,
+        mip: MaterialMipPolicy::SingleMip,
+        tint: MaterialTintChannel::VertexColor,
+        emissive: false,
+        fullbright: false,
+        legacy_keys: &[3],
+    },
+''',
+          '''    SemanticMaterial {
+        key: WORLD_MATERIAL_ID_TRANSLUCENT_TEXTURED,
+        resource_location: "minecraft:material/translucent_textured",
+        mode: WORLD_MATERIAL_MODE_TRANSLUCENT,
+        cutout_threshold: 0.0,
+        sampler: MaterialSamplerPolicy::NearestClamp,
+        mip: MaterialMipPolicy::SingleMip,
+        tint: MaterialTintChannel::VertexColor,
+        emissive: false,
+        fullbright: false,
+        legacy_keys: &[3],
+    },
+    SemanticMaterial {
+        key: WORLD_MATERIAL_ID_TRANSLUCENT_CUTOUT_TEXTURED_0_1,
+        resource_location: "minecraft:material/translucent_cutout_textured_0_1",
+        mode: WORLD_MATERIAL_MODE_TRANSLUCENT,
+        cutout_threshold: 0.1,
+        sampler: MaterialSamplerPolicy::NearestClamp,
+        mip: MaterialMipPolicy::SingleMip,
+        tint: MaterialTintChannel::VertexColor,
+        emissive: false,
+        fullbright: false,
+        legacy_keys: &[],
+    },
+''')
+          replace_once(registry,
+          '''        key: WORLD_MATERIAL_ID_BLOCK_MARKER_CUTOUT,
+        resource_location: "minecraft:material/block_marker_cutout",
+        mode: WORLD_MATERIAL_MODE_CUTOUT,
+        cutout_threshold: 0.5,
+''',
+          '''        key: WORLD_MATERIAL_ID_BLOCK_MARKER_CUTOUT,
+        resource_location: "minecraft:material/block_marker_cutout",
+        mode: WORLD_MATERIAL_MODE_CUTOUT,
+        cutout_threshold: 0.1,
+''')
+          replace_once(registry,
+          '''mod tests {
+    use super::*;
+
+''',
+          '''mod tests {
+    use super::*;
+
+    #[test]
+    fn alpha_cutout_materials_preserve_exact_threshold_and_mode() {
+        assert_eq!(
+            cutout_threshold(WORLD_MATERIAL_ID_CUTOUT_TEXTURED_0_1),
+            0.1
+        );
+        assert_eq!(cutout_threshold(WORLD_MATERIAL_ID_CUTOUT_TEXTURED), 0.5);
+        assert_eq!(
+            cutout_threshold(WORLD_MATERIAL_ID_TRANSLUCENT_CUTOUT_TEXTURED_0_1),
+            0.1
+        );
+        assert_eq!(cutout_threshold(WORLD_MATERIAL_ID_TRANSLUCENT_TEXTURED), 0.0);
+        assert!(material_matches_mode(
+            WORLD_MATERIAL_ID_CUTOUT_TEXTURED_0_1,
+            WORLD_MATERIAL_MODE_CUTOUT
+        ));
+        assert!(material_matches_mode(
+            WORLD_MATERIAL_ID_TRANSLUCENT_CUTOUT_TEXTURED_0_1,
+            WORLD_MATERIAL_MODE_TRANSLUCENT
+        ));
+        assert!(!material_matches_mode(
+            WORLD_MATERIAL_ID_TRANSLUCENT_CUTOUT_TEXTURED_0_1,
+            WORLD_MATERIAL_MODE_CUTOUT
+        ));
+    }
+
+''')
+
+          # Source-level regression proof across the Java semantic boundary and Rust lowering.
+          test = Path("src/test/java/net/vulkanic/world/IndexedMeshAlphaMaterialSemanticsTest.java")
+          test.write_text('''package net.vulkanic.world;
+
+import org.junit.jupiter.api.Test;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class IndexedMeshAlphaMaterialSemanticsTest {
+    @Test
+    void javaClassifierCarriesExactPipelineAlphaSemantics() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+
+        assertTrue(source.contains("getShaderDefines().values().get(\\\"ALPHA_CUTOUT\\\")"));
+        assertTrue(source.contains("MATERIAL_ID_CUTOUT_TEXTURED_0_1 = 0x259D874B"));
+        assertTrue(source.contains("MATERIAL_ID_TRANSLUCENT_CUTOUT_TEXTURED_0_1 = 0x24D0895B"));
+        assertTrue(source.contains("alphaCutout == null"));
+        assertTrue(source.contains("\\\"0.1\\\".equals(alphaCutout)"));
+        assertTrue(source.contains("\\\"0.5\\\".equals(alphaCutout) && !translucent"));
+        assertTrue(source.contains("pipeline.isWriteDepth() ? DEPTH_POLICY_TEST_WRITE : DEPTH_POLICY_TEST_NO_WRITE"));
+        assertTrue(source.contains("pipeline.getDepthTestFunction() != net.blaze3d.platform.DepthTestFunction.LEQUAL_DEPTH_TEST"));
+        assertTrue(source.contains("!pipeline.isWriteColor() || !pipeline.isWriteAlpha()"));
+        assertFalse(source.contains("return new ModelMeshRenderSemantics(\\n\\t\\t\\tMATERIAL_ID_CUTOUT_TEXTURED,\\n\\t\\t\\tMATERIAL_MODE_CUTOUT,\\n\\t\\t\\tDEPTH_POLICY_TEST_WRITE"),
+            "generic model admission must not collapse every non-blended pipeline to 0.5 cutout");
+    }
+
+    @Test
+    void knownPointOneConsumersUseThePointOneIdentity() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+
+        assertTrue(source.contains("STRATUM_WORLD_MATERIAL, MATERIAL_ID_CUTOUT_TEXTURED_0_1, MATERIAL_TEXTURE_TERRAIN_BLOCK_ATLAS"),
+            "entity flame uses entityCutout through Sheets.cutoutBlockSheet and must preserve its 0.1 discard");
+        assertTrue(source.contains("int materialId = opaque ? MATERIAL_ID_OPAQUE_TEXTURED : MATERIAL_ID_CUTOUT_TEXTURED_0_1;"),
+            "alpha-tested terrain particles use the particle-family 0.1 discard");
+        assertTrue(source.contains("if (layer == ChunkSectionLayer.CUTOUT)"));
+        assertTrue(source.contains("if (layer == ChunkSectionLayer.CUTOUT_MIPPED)"));
+        assertTrue(source.contains("if (renderType == RenderType.cutout())"));
+        assertTrue(source.contains("if (renderType == RenderType.cutoutMipped())"));
+    }
+
+    @Test
+    void rustBuiltinAndSelectedSourceWritersUseMaterialIdentityNotProducerHeuristics() throws Exception {
+        String source = Files.readString(Path.of("src/main/rust/render/vulkanic/world_primitive_frontend.rs"));
+        String registry = Files.readString(Path.of("src/main/rust/render/vulkanic/world_primitive_frontend/material_registry.rs"));
+
+        assertTrue(source.contains("material_registry::cutout_threshold(batch.key.material_id)"));
+        assertFalse(source.contains("if batch.key.material_mode == WORLD_MATERIAL_MODE_CUTOUT {\\n            push_f32"),
+            "translucent alpha-tested mesh materials must not have their cutoff erased by mode");
+        assertTrue(source.contains("material_id: u32"));
+        assertTrue(source.contains("source_entity_alpha_cutoff(material_id, material_mode)"));
+        assertTrue(source.contains("material_registry::material_matches_mode(material_id, material_mode)"));
+        assertFalse(source.contains("entity_identity.contains("),
+            "alpha cutoff must not be inferred from entity names or texture domains");
+        assertTrue(registry.contains("resource_location: \\\"minecraft:material/cutout_textured_0_1\\\""));
+        assertTrue(registry.contains("resource_location: \\\"minecraft:material/translucent_cutout_textured_0_1\\\""));
+        assertTrue(registry.contains("WORLD_MATERIAL_REGISTRY_VERSION: u32 = 2"));
+    }
+}
+''')
+
+          # Final invariants before committing.
+          java_text = Path(java).read_text()
+          rust_text = Path(rust).read_text()
+          registry_text = Path(registry).read_text()
+          required = [
+              "MATERIAL_ID_CUTOUT_TEXTURED_0_1",
+              "MATERIAL_ID_TRANSLUCENT_CUTOUT_TEXTURED_0_1",
+              'getShaderDefines().values().get("ALPHA_CUTOUT")',
+          ]
+          if not all(item in java_text for item in required):
+              raise SystemExit("Java alpha semantic patch incomplete")
+          if "source_entity_alpha_cutoff(material_id, material_mode)?" not in rust_text:
+              raise SystemExit("selected-source alpha semantic patch incomplete")
+          if "WORLD_MATERIAL_REGISTRY_VERSION: u32 = 2" not in registry_text:
+              raise SystemExit("material registry version was not advanced")
+          PY
+
+      - name: Validate patch shape
+        shell: bash
+        run: |
+          git diff --check
+          git diff --stat
+          git diff -- src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java
+          git diff -- src/main/rust/render/vulkanic/world_primitive_frontend/material_registry.rs
+          git diff -- src/test/java/net/vulkanic/world/IndexedMeshAlphaMaterialSemanticsTest.java
+
+      - name: Commit semantic fix and remove temporary runner
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/temporary-indexed-mesh-alpha-fix.yml
+          git add src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java
+          git add src/main/rust/render/vulkanic/world_primitive_frontend.rs
+          git add src/main/rust/render/vulkanic/world_primitive_frontend/material_registry.rs
+          git add src/test/java/net/vulkanic/world/IndexedMeshAlphaMaterialSemanticsTest.java
+          git diff --cached --check
+          git commit -m "Make indexed mesh alpha cutout semantics explicit"
+          git push origin HEAD:agent/rust-generic-quad-particles
