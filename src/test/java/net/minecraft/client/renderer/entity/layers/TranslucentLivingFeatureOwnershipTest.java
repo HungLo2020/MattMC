@@ -69,7 +69,8 @@ final class TranslucentLivingFeatureOwnershipTest {
 		assertTrue(capability.contains("getShaderDefines().values().get(\"ALPHA_CUTOUT\")"));
 		assertTrue(capability.contains("float currentRustThreshold = blend.isPresent() ? 0.0F : 0.5F"));
 		assertFalse(capability.contains("entityIdentity"));
-		assertFalse(capability.contains("texture"));
+		assertFalse(capability.contains("getPath()"));
+		assertFalse(capability.contains("getNamespace()"));
 
 		int entityTranslucent = renderPipelines.indexOf("public static final RenderPipeline ENTITY_TRANSLUCENT");
 		int nextPipeline = renderPipelines.indexOf("public static final RenderPipeline", entityTranslucent + 1);
