@@ -6,13 +6,16 @@ import java.util.Objects;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.model.MinecartModel;
+import net.minecraft.client.model.Model;
 import net.minecraft.client.model.geom.ModelLayerLocation;
+import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.state.MinecartRenderState;
 import net.minecraft.client.renderer.state.CameraRenderState;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
+import net.minecraft.util.Unit;
 import net.minecraft.world.entity.vehicle.AbstractMinecart;
 import net.minecraft.world.entity.vehicle.NewMinecartBehavior;
 import net.minecraft.world.entity.vehicle.OldMinecartBehavior;
@@ -20,17 +23,29 @@ import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+import net.vulkanic.world.RustGalWorldPrimitiveRenderer;
+import net.vulkanic.world.StandaloneModelRenderOwnershipPolicy;
+import net.vulkanic.world.WorldRenderRoutePolicy;
 
 @Environment(EnvType.CLIENT)
 public abstract class AbstractMinecartRenderer<T extends AbstractMinecart, S extends MinecartRenderState> extends EntityRenderer<T, S> {
 	private static final ResourceLocation MINECART_LOCATION = ResourceLocation.withDefaultNamespace("textures/entity/minecart.png");
 	private static final float DISPLAY_BLOCK_SCALE = 0.75F;
 	protected final MinecartModel model;
+	/**
+	 * Semantic-only view of the static minecart chassis. The Rust indexed-mesh
+	 * extractor already admits {@link Model.Simple}; sharing the baked root here
+	 * avoids widening that generic admission boundary to every EntityModel while
+	 * preserving the exact vanilla minecart geometry. No renderer/GPU state is
+	 * retained by this adapter.
+	 */
+	private final Model.Simple rustSemanticModel;
 
 	public AbstractMinecartRenderer(EntityRendererProvider.Context context, ModelLayerLocation modelLayerLocation) {
 		super(context);
 		this.shadowRadius = 0.7F;
 		this.model = new MinecartModel(context.bakeLayer(modelLayerLocation));
+		this.rustSemanticModel = new Model.Simple(this.model.root(), this.model::renderType);
 	}
 
 	public void submit(S minecartRenderState, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, CameraRenderState cameraRenderState) {
@@ -63,16 +78,83 @@ public abstract class AbstractMinecartRenderer<T extends AbstractMinecart, S ext
 		}
 
 		poseStack.scale(-1.0F, -1.0F, 1.0F);
-		submitNodeCollector.submitModel(
-			this.model,
-			minecartRenderState,
-			poseStack,
-			this.model.renderType(MINECART_LOCATION),
-			minecartRenderState.lightCoords,
-			OverlayTexture.NO_OVERLAY,
-			minecartRenderState.outlineColor,
-			null
+		RenderType minecartRenderType = this.model.renderType(MINECART_LOCATION);
+		ResourceLocation entityIdentity = RustGalWorldPrimitiveRenderer.entityIdentity(minecartRenderState);
+		boolean rustMinecartBodyEligible = entityIdentity != null
+			&& RustGalWorldPrimitiveRenderer.isStandaloneModelMeshEligible(
+				this.rustSemanticModel,
+				minecartRenderType,
+				MINECART_LOCATION,
+				OverlayTexture.NO_OVERLAY,
+				minecartRenderState.outlineColor,
+				null
+			);
+		WorldRenderRoutePolicy.Route minecartBodyOwnership = StandaloneModelRenderOwnershipPolicy.currentOwnershipRoute();
+		StandaloneModelRenderOwnershipPolicy.Disposition minecartBodyDisposition = StandaloneModelRenderOwnershipPolicy.classify(
+			submitNodeCollector.isSemanticCoverageOnly(),
+			rustMinecartBodyEligible,
+			minecartBodyOwnership
 		);
+		if (minecartBodyDisposition == StandaloneModelRenderOwnershipPolicy.Disposition.RUST_AVAILABLE) {
+			// ModelFeatureRenderer normally calls setupAnim before the Java draw.
+			// MinecartModel has no dynamic model animation, so resetting this shared
+			// baked root reproduces the exact vanilla pre-draw pose before copying it.
+			this.rustSemanticModel.resetPose();
+			if (!RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMesh(
+				this.rustSemanticModel,
+				Unit.INSTANCE,
+				poseStack.last(),
+				minecartRenderType,
+				MINECART_LOCATION,
+				entityIdentity,
+				minecartRenderState.lightCoords,
+				OverlayTexture.NO_OVERLAY,
+				-1
+			)) {
+				throw new IllegalStateException("Rust whole-frame minecart body was admitted but did not enqueue a copied indexed mesh");
+			}
+			RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
+				"rust-vulkan-whole-frame",
+				MINECART_LOCATION,
+				this.model.getClass().getName(),
+				minecartRenderState.entityId,
+				true,
+				true,
+				false
+			);
+		} else if (minecartBodyDisposition == StandaloneModelRenderOwnershipPolicy.Disposition.RUST_UNAVAILABLE) {
+			RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
+				"rust-vulkan-unavailable",
+				MINECART_LOCATION,
+				this.model.getClass().getName(),
+				minecartRenderState.entityId,
+				false,
+				false,
+				false
+			);
+		} else {
+			if (rustMinecartBodyEligible && !submitNodeCollector.isSemanticCoverageOnly()) {
+				RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
+					minecartBodyOwnership == WorldRenderRoutePolicy.Route.DISABLED ? "disabled" : "java-legacy",
+					MINECART_LOCATION,
+					this.model.getClass().getName(),
+					minecartRenderState.entityId,
+					false,
+					false,
+					minecartBodyOwnership.usesJavaCompatibility()
+				);
+			}
+			submitNodeCollector.submitModel(
+				this.model,
+				minecartRenderState,
+				poseStack,
+				minecartRenderType,
+				minecartRenderState.lightCoords,
+				OverlayTexture.NO_OVERLAY,
+				minecartRenderState.outlineColor,
+				null
+			);
+		}
 		poseStack.popPose();
 	}
 

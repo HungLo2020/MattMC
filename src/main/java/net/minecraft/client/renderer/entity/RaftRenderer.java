@@ -3,6 +3,7 @@ package net.minecraft.client.renderer.entity;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.model.EntityModel;
+import net.minecraft.client.model.Model;
 import net.minecraft.client.model.RaftModel;
 import net.minecraft.client.model.geom.ModelLayerLocation;
 import net.minecraft.client.renderer.RenderType;
@@ -12,12 +13,14 @@ import net.minecraft.resources.ResourceLocation;
 @Environment(EnvType.CLIENT)
 public class RaftRenderer extends AbstractBoatRenderer {
 	private final EntityModel<BoatRenderState> model;
+	private final Model.Simple rustSemanticModel;
 	private final ResourceLocation texture;
 
 	public RaftRenderer(EntityRendererProvider.Context context, ModelLayerLocation modelLayerLocation) {
 		super(context);
 		this.texture = modelLayerLocation.model().withPath(string -> "textures/entity/" + string + ".png");
 		this.model = new RaftModel(context.bakeLayer(modelLayerLocation));
+		this.rustSemanticModel = new Model.Simple(this.model.root(), this.model::renderType);
 	}
 
 	@Override
@@ -26,7 +29,17 @@ public class RaftRenderer extends AbstractBoatRenderer {
 	}
 
 	@Override
+	protected Model.Simple rustSemanticModel() {
+		return this.rustSemanticModel;
+	}
+
+	@Override
 	protected RenderType renderType() {
 		return this.model.renderType(this.texture);
+	}
+
+	@Override
+	protected ResourceLocation textureLocation() {
+		return this.texture;
 	}
 }

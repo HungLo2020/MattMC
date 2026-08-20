@@ -80,7 +80,7 @@ public class FeatureRenderDispatcher implements AutoCloseable {
 				);
 				if (!ordinaryText.fullySupported()) {
 					throw new IllegalStateException(
-						"Rust world-text route selected but ordinary text requires unsupported outline or polygon-offset semantics"
+						"Rust world-text route selected but ordinary text semantic extraction was unsupported"
 					);
 				}
 			} else if (!WorldRenderRoutePolicy.currentWorldTextRoute().equals(WorldRenderRoutePolicy.Route.DISABLED)) {
@@ -136,7 +136,7 @@ public class FeatureRenderDispatcher implements AutoCloseable {
 			);
 			if (!ordinaryText.fullySupported()) {
 				throw new IllegalStateException(
-					"Rust world-text route selected but real ordinary text requires unsupported outline or polygon-offset semantics"
+					"Rust world-text route selected but real ordinary text semantic extraction was unsupported"
 				);
 			}
 		}
