@@ -6,6 +6,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Objects;
 import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.FontOutlineSemanticExtractor;
 import net.minecraft.client.gui.font.FontTexture;
 import net.minecraft.client.gui.font.TextGlyphQuad;
 import net.minecraft.client.renderer.SubmitNodeStorage;
@@ -46,14 +47,19 @@ public final class WorldTextSemanticCollector {
 
 	/**
 	 * Extracts the ordinary resolved text-submit family through the same copied
-	 * glyph/image contract as name tags. Outlined text has additional raster
-	 * semantics and remains unavailable until explicitly modeled.
+	 * glyph/image contract as name tags. Vanilla 8x-outline text is expanded
+	 * into its exact ordered normal-depth outline glyphs followed by the
+	 * polygon-offset fill; no Java font draw participates in the Rust route.
 	 */
 	public static Result collectTextSubmits(List<SubmitNodeStorage.TextSubmit> submits, Font font) {
 		List<WorldTextQuad> quads = new ArrayList<>();
 		LinkedHashMap<Long, WorldTextImage> images = new LinkedHashMap<>();
 		int unsupportedSubmits = 0;
 		for (SubmitNodeStorage.TextSubmit submit : submits) {
+			if (submit.outlineColor() != 0) {
+				unsupportedSubmits += collectOutlinedTextSubmit(submit, font, quads, images);
+				continue;
+			}
 			int depthPolicy = textSubmitDepthPolicy(submit);
 			if (depthPolicy == 0) {
 				unsupportedSubmits++;
@@ -68,7 +74,12 @@ public final class WorldTextSemanticCollector {
 		return new Result(List.copyOf(quads), List.copyOf(images.values()), unsupportedSubmits);
 	}
 
-	/** Returns zero when the submit needs world-text semantics not yet modeled. */
+	/**
+	 * Returns zero when a submit is not a single-pass world-text depth mode.
+	 * Outlined text deliberately returns zero here because it is expanded by
+	 * {@link #collectOutlinedTextSubmit} into normal-depth outline passes plus a
+	 * polygon-offset fill rather than being represented by one depth policy.
+	 */
 	static int textSubmitDepthPolicy(SubmitNodeStorage.TextSubmit submit) {
 		if (submit.outlineColor() != 0) {
 			return 0;
@@ -78,6 +89,39 @@ public final class WorldTextSemanticCollector {
 			case SEE_THROUGH -> DEPTH_SEE_THROUGH;
 			case POLYGON_OFFSET -> DEPTH_POLYGON_OFFSET;
 		};
+	}
+
+	private static int collectOutlinedTextSubmit(
+		SubmitNodeStorage.TextSubmit submit,
+		Font font,
+		List<WorldTextQuad> output,
+		LinkedHashMap<Long, WorldTextImage> images
+	) {
+		List<TextGlyphQuad> outlineGlyphs = new ArrayList<>();
+		List<TextGlyphQuad> fillGlyphs = new ArrayList<>();
+		Font.SemanticTextExtraction extraction = FontOutlineSemanticExtractor.collect(
+			font,
+			submit.string(),
+			submit.x(),
+			submit.y(),
+			submit.color(),
+			submit.outlineColor(),
+			outlineGlyphs::add,
+			fillGlyphs::add
+		);
+		if (extraction.unsupportedRenderableCount() != 0) {
+			return 1;
+		}
+		// drawInBatch8xOutline renders all eight outline copies first with the
+		// normal depth pipeline, then the original fill with polygon offset.
+		if (appendGlyphs(
+			outlineGlyphs, submit.lightCoords(), 0.0, submit.pose(), DEPTH_NORMAL, output, images
+		) != 0) {
+			return 1;
+		}
+		return appendGlyphs(
+			fillGlyphs, submit.lightCoords(), 0.0, submit.pose(), DEPTH_POLYGON_OFFSET, output, images
+		);
 	}
 
 	private static int collect(
@@ -106,6 +150,18 @@ public final class WorldTextSemanticCollector {
 		if (extraction.unsupportedRenderableCount() != 0) {
 			return 1;
 		}
+		return appendGlyphs(glyphs, packedLight, distanceToCameraSq, pose, depthPolicy, output, images);
+	}
+
+	private static int appendGlyphs(
+		List<TextGlyphQuad> glyphs,
+		int packedLight,
+		double distanceToCameraSq,
+		org.joml.Matrix4f pose,
+		int depthPolicy,
+		List<WorldTextQuad> output,
+		LinkedHashMap<Long, WorldTextImage> images
+	) {
 		for (TextGlyphQuad glyph : glyphs) {
 			FontTexture.SemanticAtlasSnapshot atlas = FontTexture.semanticAtlasSnapshot(glyph.atlasIdentity());
 			if (atlas == null) {
