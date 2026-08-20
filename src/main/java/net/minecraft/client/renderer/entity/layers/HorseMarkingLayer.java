@@ -16,6 +16,7 @@ import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Unit;
 import net.minecraft.world.entity.animal.horse.Markings;
+import net.vulkanic.world.IndexedMeshMaterialCapabilities;
 import net.vulkanic.world.RustGalWorldPrimitiveRenderer;
 import net.vulkanic.world.StandaloneModelRenderOwnershipPolicy;
 import net.vulkanic.world.WorldRenderRoutePolicy;
@@ -55,7 +56,8 @@ public class HorseMarkingLayer extends RenderLayer<HorseRenderState, HorseModel>
 		RenderType renderType = RenderType.entityTranslucent(texture);
 		int overlayCoords = LivingEntityRenderer.getOverlayCoords(horseRenderState, 0.0F);
 		ResourceLocation entityIdentity = RustGalWorldPrimitiveRenderer.entityIdentity(horseRenderState);
-		boolean rustEligible = entityIdentity != null
+		boolean rustEligible = IndexedMeshMaterialCapabilities.preservesAlphaCutout(renderType)
+			&& entityIdentity != null
 			&& overlayCoords == OverlayTexture.NO_OVERLAY
 			&& RustGalWorldPrimitiveRenderer.isStandaloneModelMeshEligible(
 				this.rustSemanticModel,
