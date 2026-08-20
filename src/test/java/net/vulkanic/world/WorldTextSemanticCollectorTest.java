@@ -6,11 +6,18 @@ import net.minecraft.client.renderer.SubmitNodeStorage;
 import org.junit.jupiter.api.Test;
 import org.joml.Matrix4f;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class WorldTextSemanticCollectorTest {
+	private static final Path PROJECT_ROOT = Path.of(System.getProperty("user.dir"));
+
 	@Test
 	void worldTextQuadCopiesTheModelViewMatrix() {
 		float[] matrix = identityMatrix();
@@ -47,7 +54,7 @@ class WorldTextSemanticCollectorTest {
 	}
 
 	@Test
-	void ordinaryTextAdmissionPreservesExplicitDepthModesAndRejectsOutline() {
+	void ordinaryTextAdmissionPreservesSinglePassDepthModesAndReservesOutlineForMultipassExpansion() {
 		assertEquals(WorldTextSemanticCollector.DEPTH_NORMAL,
 			WorldTextSemanticCollector.textSubmitDepthPolicy(textSubmit(Font.DisplayMode.NORMAL, 0)));
 		assertEquals(WorldTextSemanticCollector.DEPTH_SEE_THROUGH,
@@ -55,7 +62,49 @@ class WorldTextSemanticCollectorTest {
 		assertEquals(WorldTextSemanticCollector.DEPTH_POLYGON_OFFSET,
 			WorldTextSemanticCollector.textSubmitDepthPolicy(textSubmit(Font.DisplayMode.POLYGON_OFFSET, 0)));
 		assertEquals(0,
-			WorldTextSemanticCollector.textSubmitDepthPolicy(textSubmit(Font.DisplayMode.NORMAL, 0xFF000000)));
+			WorldTextSemanticCollector.textSubmitDepthPolicy(textSubmit(Font.DisplayMode.NORMAL, 0xFF000000)),
+			"outlined text is a normal-depth outline plus polygon-offset fill, not one depth mode");
+	}
+
+	@Test
+	void outlinedTextCopiesTheExactVanillaEightPassProducerWithoutRendering() throws Exception {
+		String extractor = Files.readString(PROJECT_ROOT.resolve(
+			"src/main/java/net/minecraft/client/gui/FontOutlineSemanticExtractor.java"
+		));
+		String collector = Files.readString(PROJECT_ROOT.resolve(
+			"src/main/java/net/vulkanic/world/WorldTextSemanticCollector.java"
+		));
+
+		assertTrue(extractor.contains("for (int xOffset = -1; xOffset <= 1; xOffset++)"));
+		assertTrue(extractor.contains("for (int yOffset = -1; yOffset <= 1; yOffset++)"));
+		assertTrue(extractor.contains("xOffset == 0 && yOffset == 0"));
+		assertTrue(extractor.contains("resolvedXOffset * glyph.info().getShadowOffset()"));
+		assertTrue(extractor.contains("resolvedYOffset * glyph.info().getShadowOffset()"));
+		assertTrue(extractor.contains("cursor[0] += glyph.info().getAdvance(bold)"));
+		assertTrue(extractor.contains("style.withColor(outlineColor)"));
+		assertTrue(extractor.contains("new PreparedTextBuilder(x, y, textColor, false)"));
+		assertTrue(extractor.contains("for (TextRenderable renderable : outline.glyphs)"),
+			"vanilla intentionally excludes underline/strikethrough effects from the eight outline copies");
+		assertFalse(extractor.contains("MultiBufferSource"));
+		assertFalse(extractor.contains("VertexConsumer"));
+		assertFalse(extractor.contains(".render("));
+
+		int outlineCollect = collector.indexOf("FontOutlineSemanticExtractor.collect(");
+		int normalDepth = collector.indexOf("DEPTH_NORMAL, output, images", outlineCollect);
+		int polygonOffset = collector.indexOf("DEPTH_POLYGON_OFFSET, output, images", normalDepth);
+		assertTrue(outlineCollect >= 0 && normalDepth > outlineCollect && polygonOffset > normalDepth,
+			"Rust world-text must preserve vanilla outline-first then polygon-offset-fill ordering");
+	}
+
+	@Test
+	void rustWorldTextAlreadyOwnsTheExactPolygonOffsetDepthBias() throws Exception {
+		String rust = Files.readString(PROJECT_ROOT.resolve(
+			"src/main/rust/render/vulkanic/world_primitive_frontend/world_text.rs"
+		));
+		assertTrue(rust.contains("WORLD_TEXT_DEPTH_POLYGON_OFFSET"));
+		assertTrue(rust.contains("DepthBias::new(-10.0, -1.0)"),
+			"Minecraft's slope=-1, constant=-10 polygon offset must remain explicit in GAL semantics");
+		assertTrue(rust.contains("pipeline_depth_test_polygon_offset"));
 	}
 
 	private static SubmitNodeStorage.TextSubmit textSubmit(Font.DisplayMode mode, int outlineColor) {
