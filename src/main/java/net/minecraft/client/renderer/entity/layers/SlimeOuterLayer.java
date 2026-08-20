@@ -16,6 +16,7 @@ import net.minecraft.client.renderer.entity.state.SlimeRenderState;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Unit;
+import net.vulkanic.world.IndexedMeshMaterialCapabilities;
 import net.vulkanic.world.RustGalWorldPrimitiveRenderer;
 import net.vulkanic.world.StandaloneModelRenderOwnershipPolicy;
 import net.vulkanic.world.WorldRenderRoutePolicy;
@@ -45,6 +46,7 @@ public class SlimeOuterLayer extends RenderLayer<SlimeRenderState, SlimeModel> {
 			: RenderType.entityTranslucent(SlimeRenderer.SLIME_LOCATION);
 		ResourceLocation entityIdentity = RustGalWorldPrimitiveRenderer.entityIdentity(slimeRenderState);
 		boolean rustEligible = !invisibleGlowOutline
+			&& IndexedMeshMaterialCapabilities.preservesAlphaCutout(renderType)
 			&& entityIdentity != null
 			&& overlayCoords == OverlayTexture.NO_OVERLAY
 			&& RustGalWorldPrimitiveRenderer.isStandaloneModelMeshEligible(
