@@ -57,6 +57,11 @@ import net.minecraft.client.gui.render.state.GuiRenderState;
 import net.minecraft.client.gui.render.state.TiledBlitRenderState;
 import net.minecraft.client.gui.render.state.pip.OversizedItemRenderState;
 import net.minecraft.client.gui.render.state.pip.PictureInPictureRenderState;
+import net.minecraft.client.gui.render.state.pip.GuiSkinRenderState;
+import net.minecraft.client.gui.render.state.pip.GuiBookModelRenderState;
+import net.minecraft.client.gui.render.state.pip.GuiSignRenderState;
+import net.minecraft.client.gui.render.state.pip.GuiBannerResultRenderState;
+import net.minecraft.client.gui.render.state.pip.GuiEntityRenderState;
 import net.minecraft.client.renderer.CachedOrthoProjectionMatrixBuffer;
 import net.minecraft.client.renderer.MappableRingBuffer;
 import net.minecraft.client.renderer.MultiBufferSource;
@@ -66,6 +71,7 @@ import net.minecraft.client.renderer.feature.FeatureRenderDispatcher;
 import net.minecraft.client.renderer.item.TrackingItemStackRenderState;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.util.Mth;
+import net.math.Axis;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicResourceBarriers;
 import net.vulkanic.gui.RustGalFrameCoordinator;
@@ -108,14 +114,18 @@ public class GuiRenderer implements AutoCloseable {
 	private final Map<Object, Standard3dItemRenderer> standard3dItemRenderers = new Object2ObjectOpenHashMap<>();
 	/** States selected before GUI prepare; selected states never enter Java PIP. */
 	private final Set<GuiItemRenderState> rustOwnedStandard3dItems = Collections.newSetFromMap(new IdentityHashMap<>());
+	/** Picture-in-picture states already copied into Rust GUI meshes this frame. */
+	private final Set<PictureInPictureRenderState> rustOwnedPictureInPictureStates = Collections.newSetFromMap(new IdentityHashMap<>());
 	final GuiRenderState renderState;
 	private final List<GuiRenderer.DrawStep> draws = new ArrayList();
 	private final List<GuiRenderer.PreparedStep> meshesToDraw = new ArrayList();
 	private final ByteBufferBuilder byteBufferBuilder = new ByteBufferBuilder(786432);
 	private final Map<VertexFormat, MappableRingBuffer> vertexBuffers = new Object2ObjectOpenHashMap<>();
 	private int firstDrawIndexAfterBlur = Integer.MAX_VALUE;
-	private final CachedOrthoProjectionMatrixBuffer guiProjectionMatrixBuffer = new CachedOrthoProjectionMatrixBuffer("gui", 1000.0F, 11000.0F, true);
-	private final CachedOrthoProjectionMatrixBuffer itemsProjectionMatrixBuffer = new CachedOrthoProjectionMatrixBuffer("items", -1000.0F, 1000.0F, true);
+	@Nullable
+	private final CachedOrthoProjectionMatrixBuffer guiProjectionMatrixBuffer;
+	@Nullable
+	private final CachedOrthoProjectionMatrixBuffer itemsProjectionMatrixBuffer;
 	private final MultiBufferSource.BufferSource bufferSource;
 	private final SubmitNodeCollector submitNodeCollector;
 	private final FeatureRenderDispatcher featureRenderDispatcher;
@@ -154,6 +164,16 @@ public class GuiRenderer implements AutoCloseable {
 		this.bufferSource = bufferSource;
 		this.submitNodeCollector = submitNodeCollector;
 		this.featureRenderDispatcher = featureRenderDispatcher;
+		if (RustGalGuiRenderer.isWholeFrameVulkanActive()) {
+			// Rust owns GUI projection and mesh lowering for whole-frame Vulkan;
+			// avoid constructing Java compatibility UBOs that the semantic route
+			// never consumes.
+			this.guiProjectionMatrixBuffer = null;
+			this.itemsProjectionMatrixBuffer = null;
+		} else {
+			this.guiProjectionMatrixBuffer = new CachedOrthoProjectionMatrixBuffer("gui", 1000.0F, 11000.0F, true);
+			this.itemsProjectionMatrixBuffer = new CachedOrthoProjectionMatrixBuffer("items", -1000.0F, 1000.0F, true);
+		}
 		Builder<Class<? extends PictureInPictureRenderState>, PictureInPictureRenderer<?>> builder = ImmutableMap.builder();
 
 		for (PictureInPictureRenderer<?> pictureInPictureRenderer : list) {
@@ -184,6 +204,8 @@ public class GuiRenderer implements AutoCloseable {
 				for (RustGalGuiElementRenderState element : elements) {
 					this.renderState.submitGlyphToCurrentLayer(element);
 				}
+			} else {
+				RustGalGuiRenderer.recordUnsupportedElement("text");
 			}
 		});
 	}
@@ -198,6 +220,13 @@ public class GuiRenderer implements AutoCloseable {
 		int guiHeight = Minecraft.getInstance().getWindow().getGuiScaledHeight();
 		this.renderState.forEachItem(guiItemRenderState -> {
 			int dynamicLayerOrder = this.renderState.currentSemanticLayerOrder(GuiRenderState.SemanticPhase.ITEMS);
+			List<RustGalGuiElementRenderState> specialElements = guiItemRenderState.itemStackRenderState().hasSpecialRenderer()
+				? RustGalGuiItemRenderer.tryEnqueueSpecialItem(guiItemRenderState, guiWidth, guiHeight, dynamicLayerOrder)
+				: List.of();
+			if (!specialElements.isEmpty()) {
+				for (RustGalGuiElementRenderState element : specialElements) this.renderState.submitGlyphToCurrentLayer(element);
+				return;
+			}
 			boolean standard3dCandidate = guiItemRenderState.itemStackRenderState().usesBlockLight()
 				&& RustGalGuiItemRenderer.standard3dRouteEnabled()
 				&& RustGalGuiRenderer.currentExecutionRoute() == RustGalGuiRenderer.GuiExecutionRoute.RUST_VULKAN_WHOLE_FRAME;
@@ -207,8 +236,135 @@ public class GuiRenderer implements AutoCloseable {
 			if (standard3dCandidate && !elements.isEmpty()) {
 				this.rustOwnedStandard3dItems.add(guiItemRenderState);
 			}
+			if (elements.isEmpty()) {
+				RustGalGuiRenderer.recordUnsupportedElement("item");
+			}
 			for (RustGalGuiElementRenderState element : elements) {
 				this.renderState.submitGlyphToCurrentLayer(element);
+			}
+		});
+	}
+
+	/**
+	 * Copies oversized-item picture-in-picture states into the same explicit
+	 * Rust GUI item routes used by ordinary item nodes. Whole-frame Vulkan never
+	 * prepares the Java off-screen PIP renderer, so admitted states must become
+	 * owned semantic elements here or remain absent for the frame.
+	 */
+	public void collectRustGalPictureInPictureSemantics() {
+		int guiWidth = Minecraft.getInstance().getWindow().getGuiScaledWidth();
+		int guiHeight = Minecraft.getInstance().getWindow().getGuiScaledHeight();
+		this.renderState.forEachPictureInPicture(pictureInPictureRenderState -> {
+			if (pictureInPictureRenderState instanceof net.minecraft.client.gui.render.state.pip.GuiProfilerChartRenderState chart) {
+				int dynamicLayerOrder = this.renderState.currentSemanticLayerOrder(GuiRenderState.SemanticPhase.ELEMENTS);
+				List<RustGalGuiElementRenderState> elements = RustGalGuiRenderer.tryEnqueueProfilerChart(
+					chart, guiWidth, guiHeight, dynamicLayerOrder
+				);
+				if (elements != null && !elements.isEmpty()) {
+					this.rustOwnedPictureInPictureStates.add(pictureInPictureRenderState);
+					for (RustGalGuiElementRenderState element : elements) this.renderState.submitGlyphToCurrentLayer(element);
+				} else {
+					RustGalGuiRenderer.recordUnsupportedElement("picture-in-picture:profiler-chart");
+				}
+				return;
+			}
+			int modelLayerOrder = this.renderState.currentSemanticLayerOrder(GuiRenderState.SemanticPhase.ITEMS);
+			if (pictureInPictureRenderState instanceof GuiEntityRenderState entityPip) {
+				List<RustGalGuiElementRenderState> elements = RustGalGuiRenderer.tryEnqueueEntityPip(entityPip, modelLayerOrder);
+				if (elements != null && !elements.isEmpty()) {
+					this.rustOwnedPictureInPictureStates.add(pictureInPictureRenderState);
+					for (RustGalGuiElementRenderState element : elements) this.renderState.submitGlyphToCurrentLayer(element);
+				} else {
+					RustGalGuiRenderer.recordUnsupportedElement("picture-in-picture:entity");
+				}
+				return;
+			}
+			if (pictureInPictureRenderState instanceof GuiSkinRenderState skin) {
+				List<RustGalGuiElementRenderState> elements = RustGalGuiRenderer.tryEnqueueModelPip(
+					skin.playerModel(), skin.texture(), skin.x0(), skin.y0(), skin.x1(), skin.y1(), skin.scale(),
+					new Matrix3x2f(), skin.scissorArea(), modelLayerOrder, pose -> {
+						pose.translate(0.0F, -skin.pivotY(), 0.0F);
+						pose.mulPose(Axis.XP.rotationDegrees(skin.rotationX()));
+						pose.translate(0.0F, skin.pivotY(), 0.0F);
+						pose.mulPose(Axis.YP.rotationDegrees(-skin.rotationY()));
+						pose.translate(0.0F, -1.6010001F, 0.0F);
+					});
+				if (elements != null && !elements.isEmpty()) {
+					this.rustOwnedPictureInPictureStates.add(pictureInPictureRenderState);
+					for (RustGalGuiElementRenderState element : elements) this.renderState.submitGlyphToCurrentLayer(element);
+				} else {
+					RustGalGuiRenderer.recordUnsupportedElement("picture-in-picture:skin");
+				}
+				return;
+			}
+			if (pictureInPictureRenderState instanceof GuiBookModelRenderState book) {
+				float h = Mth.clamp(Mth.frac(book.flip() + 0.25F) * 1.6F - 0.3F, 0.0F, 1.0F);
+				float i = Mth.clamp(Mth.frac(book.flip() + 0.75F) * 1.6F - 0.3F, 0.0F, 1.0F);
+				book.bookModel().setupAnim(new net.minecraft.client.model.BookModel.State(0.0F, h, i, book.open()));
+				List<RustGalGuiElementRenderState> elements = RustGalGuiRenderer.tryEnqueueModelPip(
+					book.bookModel(), book.texture(), book.x0(), book.y0(), book.x1(), book.y1(), book.scale(),
+					new Matrix3x2f(), book.scissorArea(), modelLayerOrder, pose -> {
+						pose.mulPose(Axis.YP.rotationDegrees(180.0F));
+						pose.mulPose(Axis.XP.rotationDegrees(25.0F));
+						float open = book.open();
+						pose.translate((1.0F - open) * 0.2F, (1.0F - open) * 0.1F, (1.0F - open) * 0.25F);
+						pose.mulPose(Axis.YP.rotationDegrees(-(1.0F - open) * 90.0F - 90.0F));
+						pose.mulPose(Axis.XP.rotationDegrees(180.0F));
+					});
+				if (elements != null && !elements.isEmpty()) {
+					this.rustOwnedPictureInPictureStates.add(pictureInPictureRenderState);
+					for (RustGalGuiElementRenderState element : elements) this.renderState.submitGlyphToCurrentLayer(element);
+				} else {
+					RustGalGuiRenderer.recordUnsupportedElement("picture-in-picture:book");
+				}
+				return;
+			}
+			if (pictureInPictureRenderState instanceof GuiSignRenderState sign) {
+				net.minecraft.client.resources.model.Material signMaterial = net.minecraft.client.renderer.Sheets.getSignMaterial(sign.woodType());
+				List<RustGalGuiElementRenderState> elements = RustGalGuiRenderer.tryEnqueueModelPip(
+					sign.signModel(), signMaterial.texture(), sign.x0(), sign.y0(), sign.x1(), sign.y1(), sign.scale(),
+					new Matrix3x2f(), sign.scissorArea(), modelLayerOrder, pose -> pose.translate(0.0F, -0.75F, 0.0F));
+				if (elements != null && !elements.isEmpty()) {
+					this.rustOwnedPictureInPictureStates.add(pictureInPictureRenderState);
+					for (RustGalGuiElementRenderState element : elements) this.renderState.submitGlyphToCurrentLayer(element);
+				} else {
+					RustGalGuiRenderer.recordUnsupportedElement("picture-in-picture:sign");
+				}
+				return;
+			}
+			if (pictureInPictureRenderState instanceof GuiBannerResultRenderState banner) {
+				List<RustGalGuiElementRenderState> elements = RustGalGuiRenderer.tryEnqueueBannerPip(banner, modelLayerOrder);
+				if (elements != null && !elements.isEmpty()) {
+					this.rustOwnedPictureInPictureStates.add(pictureInPictureRenderState);
+					for (RustGalGuiElementRenderState element : elements) this.renderState.submitGlyphToCurrentLayer(element);
+				} else {
+					RustGalGuiRenderer.recordUnsupportedElement("picture-in-picture:banner");
+				}
+				return;
+			}
+			if (!(pictureInPictureRenderState instanceof OversizedItemRenderState oversized)) {
+				RustGalGuiRenderer.recordUnsupportedElement("picture-in-picture:" + pictureInPictureRenderState.getClass().getName());
+				return;
+			}
+			GuiItemRenderState item = oversized.guiItemRenderState();
+			int dynamicLayerOrder = this.renderState.currentSemanticLayerOrder(GuiRenderState.SemanticPhase.ITEMS);
+			boolean standard3dCandidate = item.itemStackRenderState().usesBlockLight()
+				&& RustGalGuiItemRenderer.standard3dRouteEnabled()
+				&& RustGalGuiRenderer.currentExecutionRoute() == RustGalGuiRenderer.GuiExecutionRoute.RUST_VULKAN_WHOLE_FRAME;
+			List<RustGalGuiElementRenderState> elements = standard3dCandidate
+				? RustGalGuiItemRenderer.tryEnqueueStandard3dItem(item, guiWidth, guiHeight, dynamicLayerOrder)
+				: RustGalGuiItemRenderer.tryEnqueueFlatItem(item, guiWidth, guiHeight, dynamicLayerOrder);
+			if (!elements.isEmpty()) {
+				this.rustOwnedPictureInPictureStates.add(pictureInPictureRenderState);
+				if (standard3dCandidate) {
+					this.rustOwnedStandard3dItems.add(item);
+				}
+			}
+			for (RustGalGuiElementRenderState element : elements) {
+				this.renderState.submitGlyphToCurrentLayer(element);
+			}
+			if (elements.isEmpty()) {
+				RustGalGuiRenderer.recordUnsupportedElement("picture-in-picture:oversized-item");
 			}
 		});
 	}
@@ -231,6 +387,8 @@ public class GuiRenderer implements AutoCloseable {
 					for (RustGalGuiElementRenderState element : elements) {
 						this.renderState.submitGlyphToCurrentLayer(element);
 					}
+				} else {
+					RustGalGuiRenderer.recordUnsupportedElement("rectangle");
 				}
 			}
 		}, GuiRenderState.TraverseRange.ALL);
@@ -254,6 +412,12 @@ public class GuiRenderer implements AutoCloseable {
 					for (RustGalGuiElementRenderState element : elements) {
 						this.renderState.submitGlyphToCurrentLayer(element);
 					}
+				} else {
+					RustGalGuiRenderer.recordUnsupportedElement("blit");
+					RustGalGuiRenderer.recordUnsupportedElementDetail(
+						"blit-source:" + (blit.semanticTexture() == null ? "missing-texture" : blit.semanticTexture())
+					);
+					RustGalGuiRenderer.recordUnsupportedElementDetail("blit-reason:" + RustGalGuiRenderer.copiedBlitFailureDetail(blit));
 				}
 			} else if (guiElementRenderState instanceof TiledBlitRenderState tiledBlit) {
 				int dynamicLayerOrder = this.renderState.currentSemanticLayerOrder(GuiRenderState.SemanticPhase.ELEMENTS);
@@ -264,12 +428,20 @@ public class GuiRenderer implements AutoCloseable {
 					for (RustGalGuiElementRenderState element : elements) {
 						this.renderState.submitGlyphToCurrentLayer(element);
 					}
+				} else {
+					RustGalGuiRenderer.recordUnsupportedElement("tiled-blit");
+					RustGalGuiRenderer.recordUnsupportedElementDetail(
+						"tiled-blit-source:" + (tiledBlit.semanticTexture() == null ? "missing-texture" : tiledBlit.semanticTexture())
+					);
 				}
 			}
 		}, GuiRenderState.TraverseRange.ALL);
 	}
 
 	public void render(GpuBufferSlice gpuBufferSlice) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java GUI rendering is unavailable while Rust owns whole-frame presentation");
+		}
 		this.prepare();
 		this.draw(gpuBufferSlice);
 
@@ -280,6 +452,7 @@ public class GuiRenderer implements AutoCloseable {
 		this.draws.clear();
 		this.meshesToDraw.clear();
 		this.rustOwnedStandard3dItems.clear();
+		this.rustOwnedPictureInPictureStates.clear();
 		this.renderState.reset();
 		this.firstDrawIndexAfterBlur = Integer.MAX_VALUE;
 		this.clearUnusedOversizedItemRenderers();
@@ -535,6 +708,14 @@ public class GuiRenderer implements AutoCloseable {
 				}
 				return;
 			}
+			if (RustGalGuiRenderer.isWholeFrameVulkanActive()) {
+				// A semantic extraction miss is an admission failure for the
+				// exclusive Rust presenter. Do not put Java glyph state back into
+				// the render state, where it could become a hidden same-frame
+				// fallback or be silently dropped by the Rust scheduler.
+				RustGalGuiRenderer.recordUnsupportedElement("text");
+				return;
+			}
 			final Matrix3x2f matrix3x2f = guiTextRenderState.pose;
 			final ScreenRectangle screenRectangle = guiTextRenderState.scissor;
 			guiTextRenderState.ensurePrepared().visit(new Font.GlyphVisitor() {
@@ -557,14 +738,15 @@ public class GuiRenderer implements AutoCloseable {
 
 	private void prepareItemElements() {
 		int i = this.getGuiScaleInvalidatingItemAtlasIfChanged();
-		if (Standard3dItemRenderer.isDebugDumpEnabled()) {
+		if (Standard3dItemRenderer.isDebugDumpEnabled() && !RustGalGuiRenderer.isWholeFrameVulkanActive()) {
 			Standard3dItemRenderer debugStandard3dItemRenderer = (Standard3dItemRenderer)this.standard3dItemRenderers
 				.computeIfAbsent("debug_standard_3d_grass_block", object -> new Standard3dItemRenderer(this.bufferSource));
 			debugStandard3dItemRenderer.prepareDebugStandardBlockItemDump(this.renderState, i);
 		}
 
 		if (VulkanicAPI.isVulkanBackendSelected()) {
-			if (!this.renderState.getItemModelIdentities().isEmpty()) {
+			if (!RustGalGuiRenderer.isWholeFrameVulkanActive()
+				&& !this.renderState.getItemModelIdentities().isEmpty()) {
 				this.prepareItemsViaPictureInPicture(i);
 			}
 
@@ -695,7 +877,12 @@ public class GuiRenderer implements AutoCloseable {
 
 	private void preparePictureInPicture() {
 		int i = Minecraft.getInstance().getWindow().getGuiScale();
-		this.renderState.forEachPictureInPicture(pictureInPictureRenderState -> this.preparePictureInPictureState(pictureInPictureRenderState, i));
+		this.renderState.forEachPictureInPicture(pictureInPictureRenderState -> {
+			if (!this.rustOwnedPictureInPictureStates.contains(pictureInPictureRenderState)
+				&& !RustGalGuiRenderer.isWholeFrameVulkanActive()) {
+				this.preparePictureInPictureState(pictureInPictureRenderState, i);
+			}
+		});
 	}
 
 	private <T extends PictureInPictureRenderState> void preparePictureInPictureState(T pictureInPictureRenderState, int i) {
@@ -1011,8 +1198,12 @@ public class GuiRenderer implements AutoCloseable {
 		}
 
 		this.pictureInPictureRenderers.values().forEach(PictureInPictureRenderer::close);
-		this.guiProjectionMatrixBuffer.close();
-		this.itemsProjectionMatrixBuffer.close();
+		if (this.guiProjectionMatrixBuffer != null) {
+			this.guiProjectionMatrixBuffer.close();
+		}
+		if (this.itemsProjectionMatrixBuffer != null) {
+			this.itemsProjectionMatrixBuffer.close();
+		}
 
 		for (MappableRingBuffer mappableRingBuffer : this.vertexBuffers.values()) {
 			mappableRingBuffer.close();

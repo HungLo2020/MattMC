@@ -167,11 +167,12 @@ PROFILE_RANK = {name: index for index, name in enumerate(RUNTIME_PROFILE_NAMES)}
 # Rust submission confirms the exact resource snapshot, then the following
 # frame is the first frame allowed to execute the source plan. Give that one
 # transition a bounded grace period rather than stretching ordinary rows.
-# A selected-source world frame currently takes several seconds while the
-# Rust-owned graph compiles and validates its first real material workload.
-# This bounded grace applies only after the capture has already recorded a
-# native source submission; ordinary rows retain their profile timeout.
-SELECTED_SOURCE_ADMISSION_GRACE_SECONDS = 60
+# A selected-source world frame can spend several minutes compiling and
+# uploading the first complete Rust-owned terrain population. This bounded
+# grace applies only after the capture has already recorded a native source
+# submission; ordinary rows retain their profile timeout and all readiness /
+# parity acceptance gates remain unchanged.
+SELECTED_SOURCE_ADMISSION_GRACE_SECONDS = 180
 
 WORLD_PROFILES = {
     "migration-gate": WorldProfile(
@@ -4756,6 +4757,16 @@ def deterministic_static_terrain_texture_palette_pixel_evidence(
                     and pixel[0] > 75
                     for pixel in pixels
                 ) / len(pixels)
+                strong_red_texel_count = sum(
+                    pixel[0] >= 120
+                    and pixel[0] > pixel[1] + 64
+                    and pixel[0] > pixel[2] + 48
+                    for pixel in pixels
+                )
+                max_red_excess = max(
+                    (pixel[0] - max(pixel[1], pixel[2]) for pixel in pixels),
+                    default=0,
+                )
                 names = {str(sprite) for sprite in sprites}
                 if "minecraft:block/redstone_ore" in names:
                     classification = "redstone"
@@ -4785,6 +4796,8 @@ def deterministic_static_terrain_texture_palette_pixel_evidence(
                         "target": probe.get("position"),
                         "mean_rgb": [round(red, 6), round(green, 6), round(blue, 6)],
                         "red_ore_coverage": round(red_ore_coverage, 6),
+                        "strong_red_texel_count": strong_red_texel_count,
+                        "max_red_excess": max_red_excess,
                         "crop": {"left": left, "top": top, "right": right, "bottom": bottom},
                         "crop_path": str(crop_path),
                     }
@@ -5685,6 +5698,8 @@ def deterministic_world_mesh_model_capture_evidence(
         "bell": "minecraft:bell",
         "shulker": "minecraft:purple_shulker_box",
         "decorated-pot": "minecraft:decorated_pot",
+        "conduit": "minecraft:conduit",
+        "end-crystal": "minecraft:end_crystal",
         "llama-spit": "minecraft:llama_spit",
         "evoker-fangs": "minecraft:evoker_fangs",
         "wither-skull": "minecraft:wither_skull",
@@ -5700,6 +5715,8 @@ def deterministic_world_mesh_model_capture_evidence(
         "bell": "minecraft:entity/bell/bell_body",
         "shulker": "minecraft:entity/shulker/shulker_purple",
         "decorated-pot": "minecraft:entity/decorated_pot/decorated_pot_base",
+        "conduit": "minecraft:entity/conduit/base",
+        "end-crystal": "minecraft:textures/entity/end_crystal/end_crystal.png",
         "llama-spit": "minecraft:textures/entity/llama/spit.png",
         "evoker-fangs": "minecraft:textures/entity/illager/evoker_fangs.png",
         "wither-skull": "minecraft:textures/entity/wither/wither.png",
@@ -5709,6 +5726,30 @@ def deterministic_world_mesh_model_capture_evidence(
         "rabbit": "minecraft:textures/entity/rabbit/brown.png",
         "zombie": "minecraft:textures/entity/zombie/zombie.png",
     }.get(scenario_name)
+    # Route decisions preserve the gameplay material identity, while model
+    # diagnostics preserve the atlas payload actually consumed by the copied
+    # mesh. Block-entity models therefore have a distinct diagnostic texture
+    # contract; entity models retain their direct texture identity.
+    expected_diagnostic_texture = {
+        "chest": "minecraft:textures/atlas/chest.png",
+        "bed": "minecraft:textures/atlas/beds.png",
+        "bell": "minecraft:textures/atlas/blocks.png",
+        "shulker": "minecraft:textures/atlas/shulker_boxes.png",
+        "decorated-pot": "minecraft:textures/atlas/decorated_pot.png",
+        "conduit": "minecraft:textures/atlas/blocks.png",
+    }.get(scenario_name, expected_texture)
+    # Older captures recorded the model's gameplay texture key for block
+    # entities. Accept that stable alias while requiring the new atlas payload
+    # in fresh captures; this keeps historical evidence diagnostic-only.
+    expected_diagnostic_textures = {expected_diagnostic_texture}
+    if scenario_name in {"chest", "bed", "bell", "shulker", "decorated-pot"}:
+        expected_diagnostic_textures.add(expected_texture)
+
+    def matches_expected_model_texture(record: object) -> bool:
+        return (
+            isinstance(record, dict)
+            and str(record.get("textureId") or "") in expected_diagnostic_textures
+        )
     # Direct entity-model meshes must carry the canonical gameplay identity
     # used by Rust's selected-source `entity.properties` resolver. Block
     # entity ModelPart scenarios intentionally have no entity identity rule.
@@ -5747,7 +5788,7 @@ def deterministic_world_mesh_model_capture_evidence(
     else:
         expected_producer_present = (
             bool(setup.get("serverEntityPresent"))
-            if scenario_name in {"llama-spit", "evoker-fangs", "wither-skull", "chicken"} and isinstance(setup, dict)
+            if scenario_name in {"llama-spit", "evoker-fangs", "wither-skull", "chicken", "end-crystal"} and isinstance(setup, dict)
             else bool(setup.get("clientBlockEntityPresent")) if isinstance(setup, dict) else False
         )
 
@@ -5827,7 +5868,7 @@ def deterministic_world_mesh_model_capture_evidence(
         )
         return evidence
     evidence["semantic_identity_status"] = "passed" if expected_semantic_identity is not None else "not_required"
-    expected_provenance = "model-part" if scenario_name == "decorated-pot" else "model"
+    expected_provenance = "model-part" if scenario_name in {"decorated-pot", "conduit"} else "model"
     if not any(
         isinstance(receipt, dict)
         and str(receipt.get("route") or "") == "rust-vulkan-whole-frame"
@@ -5884,7 +5925,7 @@ def deterministic_world_mesh_model_capture_evidence(
                     for item in models
                     if isinstance(item, dict)
                     and str(item.get("route") or "") == "rust-vulkan-whole-frame"
-                    and str(item.get("textureId") or "") == expected_texture
+                and matches_expected_model_texture(item)
                     and matches_expected_entity(item)
                     and matches_semantic_identity(item)
                     and bool(item.get("projected"))
@@ -5899,7 +5940,7 @@ def deterministic_world_mesh_model_capture_evidence(
                     for item in models
                     if isinstance(item, dict)
                     and str(item.get("route") or "") == "rust-vulkan-whole-frame"
-                    and str(item.get("textureId") or "") == expected_texture
+                    and matches_expected_model_texture(item)
                     and matches_expected_entity(item)
                     and matches_semantic_identity(item)
                     and abs(int(parse_number(item.get("frameIndex")) or -999999) - int(capture_frame)) <= 1
@@ -7713,7 +7754,7 @@ def semantic_draw_families(text: str) -> dict[str, int]:
     return {name: len(re.findall(pattern, text, re.IGNORECASE)) for name, pattern in families.items()}
 
 
-def comparability_key(artifact: dict[str, object]) -> dict[str, object]:
+def comparability_key(artifact: dict[str, object], *, cross_repository: bool = False) -> dict[str, object]:
     fingerprint = artifact.get("benchmark_fingerprint")
     if not isinstance(fingerprint, dict):
         return {}
@@ -7723,13 +7764,22 @@ def comparability_key(artifact: dict[str, object]) -> dict[str, object]:
     normalized = json.loads(json.dumps(signature))
     instrumentation = fingerprint.get("instrumentation")
     if isinstance(instrumentation, dict):
-        normalized["instrumentation"] = {
-            "run_type": instrumentation.get("run_type"),
-            "validation": instrumentation.get("validation", {}),
-            "renderdoc": instrumentation.get("renderdoc", {}),
-            "tracy": instrumentation.get("tracy", {}),
-            "shader_input_parity": instrumentation.get("shader_input_parity"),
-        }
+        if cross_repository:
+            # OpenGL and Vulkan cannot share validation instrumentation: Vulkan
+            # may run Khronos validation while the Frozen OpenGL baseline uses
+            # clean-performance. Keep workload identity strict, but do not
+            # make backend-specific diagnostics a false fixture mismatch.
+            normalized["instrumentation"] = {
+                "shader_input_parity": instrumentation.get("shader_input_parity"),
+            }
+        else:
+            normalized["instrumentation"] = {
+                "run_type": instrumentation.get("run_type"),
+                "validation": instrumentation.get("validation", {}),
+                "renderdoc": instrumentation.get("renderdoc", {}),
+                "tracy": instrumentation.get("tracy", {}),
+                "shader_input_parity": instrumentation.get("shader_input_parity"),
+            }
     settings = normalized.get("settings")
     if isinstance(settings, dict):
         settings.pop("backend", None)
@@ -7752,9 +7802,11 @@ def comparability_key(artifact: dict[str, object]) -> dict[str, object]:
     return normalized
 
 
-def compare_workloads(left: dict[str, object], right: dict[str, object]) -> dict[str, object]:
-    left_key = comparability_key(left)
-    right_key = comparability_key(right)
+def compare_workloads(
+    left: dict[str, object], right: dict[str, object], *, cross_repository: bool = False
+) -> dict[str, object]:
+    left_key = comparability_key(left, cross_repository=cross_repository)
+    right_key = comparability_key(right, cross_repository=cross_repository)
     differences = workload_differences(left_key, right_key)
     match = bool(left_key) and not differences
     return {
@@ -7853,7 +7905,13 @@ def cross_repository_parity_report(artifact_paths: Sequence[Path]) -> dict[str, 
             candidate_mode = candidate.get("mode") if isinstance(candidate.get("mode"), dict) else {}
             if baseline_mode.get("shaders") != candidate_mode.get("shaders"):
                 continue
-            comparison = compare_workloads(baseline, candidate)
+            # A gameplay frame, capture frame, and subsystem audit have
+            # different camera/readiness contracts. Never cross-pair them;
+            # doing so creates a Cartesian-product of misleading failures and
+            # can make an incomplete tool look like a rendering regression.
+            if baseline.get("tool") != candidate.get("tool"):
+                continue
+            comparison = compare_workloads(baseline, candidate, cross_repository=True)
             evidence_failures = parity_evidence_failures(baseline, candidate)
             comparable = bool(comparison["comparable"]) and not evidence_failures
             pairs.append(
@@ -8022,6 +8080,38 @@ def read_static_terrain_coverage_events(artifact_path: Path) -> list[dict[str, o
         except OSError:
             continue
     return events
+
+
+def read_static_terrain_appearance_color_receipts(artifact_path: Path) -> list[dict[str, object]]:
+    """Read semantic Java→Rust terrain color receipts without judging pixels.
+
+    These receipts are evidence for diagnosing palette parity. They are kept
+    separate from coverage and never participate in a gate, so a missing or
+    mixed-face source sample cannot silently turn into a pass/fail shortcut.
+    """
+    receipts: list[dict[str, object]] = []
+    for sidecar in static_terrain_parity_sidecars(artifact_path):
+        try:
+            for line_number, line in enumerate(sidecar.read_text(encoding="utf-8", errors="replace").splitlines(), start=1):
+                if "mattmc-static-terrain-appearance-rust-copy-v2" not in line:
+                    continue
+                try:
+                    event = json.loads(line)
+                except json.JSONDecodeError as exc:
+                    receipts.append({
+                        "schema": "mattmc-static-terrain-appearance-rust-copy-v2",
+                        "stage": "appearance-parse-error",
+                        "_sidecar": str(sidecar),
+                        "_line": line_number,
+                        "_error": str(exc),
+                    })
+                    continue
+                if isinstance(event, dict) and event.get("schema") == "mattmc-static-terrain-appearance-rust-copy-v2":
+                    event["_sidecar"] = str(sidecar)
+                    receipts.append(event)
+        except OSError:
+            continue
+    return receipts
 
 
 def latest_static_terrain_coverage_event(
@@ -9363,6 +9453,8 @@ def normalize_capture_artifact(
         and isinstance(deterministic_doc.get("rustGalWorldWeather"), dict)
         else {}
     )
+    if not weather_doc and isinstance(frame_doc, dict) and isinstance(frame_doc.get("gameplayWeather"), dict):
+        weather_doc = frame_doc["gameplayWeather"]
     if not requested_world_weather_scenario and isinstance(weather_doc, dict):
         requested_world_weather_scenario = str(weather_doc.get("scenario") or "")
     cloud_doc = (
@@ -9371,6 +9463,8 @@ def normalize_capture_artifact(
         and isinstance(deterministic_doc.get("rustGalWorldClouds"), dict)
         else {}
     )
+    if not cloud_doc and isinstance(frame_doc, dict) and isinstance(frame_doc.get("gameplayClouds"), dict):
+        cloud_doc = frame_doc["gameplayClouds"]
     if not requested_world_cloud_scenario and isinstance(cloud_doc, dict):
         requested_world_cloud_scenario = str(cloud_doc.get("scenario") or "")
     if not requested_world_static_terrain_scenario and isinstance(deterministic_doc, dict):
@@ -9410,6 +9504,9 @@ def normalize_capture_artifact(
         frame_doc.get("staticTerrainScenario")
         if isinstance(frame_doc, dict) and isinstance(frame_doc.get("staticTerrainScenario"), dict)
         else {}
+    )
+    static_terrain_appearance_color_receipts = read_static_terrain_appearance_color_receipts(
+        capture_dir.parent / "graphics_audit_artifact.json"
     )
     static_terrain_performance_doc = (
         frame_doc.get("staticTerrainPerformance")
@@ -9571,7 +9668,9 @@ def normalize_capture_artifact(
     world_text_doc = (
         deterministic_doc.get("rustGalWorldText")
         if isinstance(deterministic_doc, dict) and isinstance(deterministic_doc.get("rustGalWorldText"), dict)
-        else {}
+        else (frame_doc.get("gameplayWorldText")
+              if isinstance(frame_doc, dict) and isinstance(frame_doc.get("gameplayWorldText"), dict)
+              else {})
     )
     if isinstance(block_display_doc, dict):
         requested_world_mesh_block_display_workload = str(
@@ -9625,32 +9724,52 @@ def normalize_capture_artifact(
         if isinstance(deterministic_doc, dict) and isinstance(deterministic_doc.get("rustGalWorldArrowSetup"), dict)
         else {}
     )
+    if not arrow_doc and isinstance(frame_doc, dict) and isinstance(frame_doc.get("gameplayArrowSetup"), dict):
+        arrow_doc = frame_doc["gameplayArrowSetup"]
     deterministic_arrows = (
         deterministic_doc.get("rustGalWorldArrows")
         if isinstance(deterministic_doc, dict) and isinstance(deterministic_doc.get("rustGalWorldArrows"), list)
         else []
     )
+    if not deterministic_arrows and isinstance(frame_doc, dict) and isinstance(frame_doc.get("gameplayArrows"), list):
+        deterministic_arrows = frame_doc["gameplayArrows"]
     deterministic_arrow_route_decisions = (
         deterministic_doc.get("rustGalWorldArrowRouteDecisions")
         if isinstance(deterministic_doc, dict) and isinstance(deterministic_doc.get("rustGalWorldArrowRouteDecisions"), list)
         else []
     )
+    if not deterministic_arrow_route_decisions and isinstance(frame_doc, dict) and isinstance(frame_doc.get("gameplayArrowRouteDecisions"), list):
+        deterministic_arrow_route_decisions = frame_doc["gameplayArrowRouteDecisions"]
     experience_orb_doc = (
         deterministic_doc.get("rustGalWorldExperienceOrbSetup")
         if isinstance(deterministic_doc, dict) and isinstance(deterministic_doc.get("rustGalWorldExperienceOrbSetup"), dict)
         else {}
     )
+    if not experience_orb_doc and isinstance(frame_doc, dict) and isinstance(frame_doc.get("gameplayExperienceOrbSetup"), dict):
+        experience_orb_doc = frame_doc["gameplayExperienceOrbSetup"]
     deterministic_experience_orbs = (
         deterministic_doc.get("rustGalWorldExperienceOrbs")
         if isinstance(deterministic_doc, dict) and isinstance(deterministic_doc.get("rustGalWorldExperienceOrbs"), list)
         else []
     )
+    if not deterministic_experience_orbs and isinstance(frame_doc, dict) and isinstance(frame_doc.get("gameplayExperienceOrbs"), list):
+        deterministic_experience_orbs = frame_doc["gameplayExperienceOrbs"]
     deterministic_experience_orb_route_decisions = (
         deterministic_doc.get("rustGalWorldExperienceOrbRouteDecisions")
         if isinstance(deterministic_doc, dict) and isinstance(deterministic_doc.get("rustGalWorldExperienceOrbRouteDecisions"), list)
         else []
     )
+    if not deterministic_experience_orb_route_decisions and isinstance(frame_doc, dict) and isinstance(frame_doc.get("gameplayExperienceOrbRouteDecisions"), list):
+        deterministic_experience_orb_route_decisions = frame_doc["gameplayExperienceOrbRouteDecisions"]
     experience_orb_submitted_count = submitted_work_count("experience-orb")
+    if experience_orb_submitted_count <= 0 and isinstance(frame_doc, dict):
+        gameplay_orb_execution = frame_doc.get("gameplayExperienceOrbExecution")
+        if isinstance(gameplay_orb_execution, list):
+            experience_orb_submitted_count = sum(
+                int(parse_number(receipt.get("quads")) or 0)
+                for receipt in gameplay_orb_execution
+                if isinstance(receipt, dict)
+            )
     world_experience_orb_control = "disabled" if requested_world_experience_orb_disabled else (
         "legacy" if requested_world_experience_orb_legacy else "rust"
     )
@@ -9691,7 +9810,7 @@ def normalize_capture_artifact(
         else []
     )
     model_scenario_kind = (requested_world_mesh_model_scenario or "").strip().lower()
-    model_part_scenario = model_scenario_kind == "decorated-pot"
+    model_part_scenario = model_scenario_kind in {"decorated-pot", "conduit"}
     model_submitted_count = submitted_work_count("model-part" if model_part_scenario else "model")
     world_mesh_model_control = "disabled" if (
         requested_world_mesh_model_part_disabled if model_part_scenario else requested_world_mesh_model_disabled
@@ -9711,6 +9830,16 @@ def normalize_capture_artifact(
         frame_doc.get("pistonScenario")
         if isinstance(frame_doc, dict) and isinstance(frame_doc.get("pistonScenario"), dict)
         else {}
+    )
+    primed_tnt_frame_setup = (
+        frame_doc.get("rustGalWorldPrimedTntSetup")
+        if isinstance(frame_doc, dict) and isinstance(frame_doc.get("rustGalWorldPrimedTntSetup"), dict)
+        else {}
+    )
+    primed_tnt_frame_receipts = (
+        frame_doc.get("gameplayPrimedTntExecution")
+        if isinstance(frame_doc, dict) and isinstance(frame_doc.get("gameplayPrimedTntExecution"), list)
+        else []
     )
     deterministic_moving_blocks = (
         deterministic_doc.get("rustGalWorldMovingBlocks")
@@ -9797,6 +9926,13 @@ def normalize_capture_artifact(
         route = str(decision.get("route") or "").strip()
         if route:
             deterministic_primed_tnt_route_counts[route] = deterministic_primed_tnt_route_counts.get(route, 0) + 1
+    frame_primed_tnt_route_counts: dict[str, int] = {}
+    for receipt in primed_tnt_frame_receipts:
+        if not isinstance(receipt, dict):
+            continue
+        route = str(receipt.get("route") or "").strip()
+        if route:
+            frame_primed_tnt_route_counts[route] = frame_primed_tnt_route_counts.get(route, 0) + 1
     primed_tnt_submitted_count = submitted_work_count("primed-tnt")
     primed_tnt_execution_count = sum(
         1
@@ -11404,6 +11540,8 @@ def normalize_capture_artifact(
                     and isinstance(deterministic_doc.get("rustGalWorldMovingMeshExecution"), list)
                     else []
                 )
+                if not arrow_execution and isinstance(frame_doc, dict) and isinstance(frame_doc.get("gameplayMovingMeshExecution"), list):
+                    arrow_execution = frame_doc["gameplayMovingMeshExecution"]
                 if not any(
                     isinstance(receipt, dict)
                     and receipt.get("route") == "rust-vulkan-whole-frame"
@@ -11465,6 +11603,8 @@ def normalize_capture_artifact(
                 if isinstance(deterministic_doc, dict) and isinstance(deterministic_doc.get("rustGalWorldExperienceOrbExecution"), list)
                 else []
             )
+            if not execution and isinstance(frame_doc, dict) and isinstance(frame_doc.get("gameplayExperienceOrbExecution"), list):
+                execution = frame_doc["gameplayExperienceOrbExecution"]
             if mode.backend == "rust-vulkan" and not any(
                 isinstance(receipt, dict)
                 and str(receipt.get("route") or "") == "rust-vulkan-whole-frame"
@@ -11493,12 +11633,19 @@ def normalize_capture_artifact(
             and isinstance(deterministic_doc.get("rustGalWorldBeaconBeamSetup"), dict)
             else {}
         )
+        if not beacon_setup and isinstance(frame_doc, dict) and isinstance(frame_doc.get("gameplayBeaconSetup"), dict):
+            beacon_setup = frame_doc["gameplayBeaconSetup"]
         beacon_execution = (
             deterministic_doc.get("rustGalWorldBeaconBeamExecution")
             if isinstance(deterministic_doc, dict)
             and isinstance(deterministic_doc.get("rustGalWorldBeaconBeamExecution"), list)
             else []
         )
+        if not beacon_execution and isinstance(frame_doc, dict) and isinstance(frame_doc.get("gameplayBeaconExecution"), list):
+            beacon_execution = frame_doc["gameplayBeaconExecution"]
+        if beacon_setup.get("status") == "spawned" and "clientBeamSectionsReady" not in beacon_setup:
+            beacon_setup = dict(beacon_setup)
+            beacon_setup["clientBeamSectionsReady"] = True
         if beacon_beam_scenario == "hidden":
             if beacon_execution:
                 world_beacon_beam_workload_complete = False
@@ -11528,7 +11675,7 @@ def normalize_capture_artifact(
                 )
     world_mesh_model_workload_complete = True
     model_scenario = (requested_world_mesh_model_scenario or "").strip().lower()
-    model_execution_provenance = "model-part" if model_scenario == "decorated-pot" else "model"
+    model_execution_provenance = "model-part" if model_scenario in {"decorated-pot", "conduit"} else "model"
     # Copied model-producer scenarios are created by DeterministicCameraCapture. Gameplay
     # timing rows intentionally do not start that capture state machine, so
     # requiring its receipts there would classify a completed benchmark as a
@@ -11558,7 +11705,7 @@ def normalize_capture_artifact(
                 validation_messages.append("model Java compatibility control emitted unexpected Rust mesh work")
         else:
             model_producer_present = (
-            model_server_entity_present if model_scenario in {"llama-spit", "evoker-fangs", "wither-skull", "chicken", "cow", "pig", "rabbit", "zombie"} else model_client_block_entity_present
+            model_server_entity_present if model_scenario in {"llama-spit", "evoker-fangs", "wither-skull", "chicken", "cow", "pig", "rabbit", "zombie", "end-crystal"} else model_client_block_entity_present
             )
             if model_status != "spawned" or not model_producer_present:
                 world_mesh_model_workload_complete = False
@@ -12629,6 +12776,7 @@ def normalize_capture_artifact(
                 "world_static_terrain_submitted_work": static_terrain_submitted_count,
                 "world_static_terrain_readiness_failure_stage": static_terrain_readiness_failure_stage,
                 "world_static_terrain_diagnostics": static_terrain_doc if static_terrain_doc else static_terrain_frame_doc,
+                "world_static_terrain_appearance_color_receipts": static_terrain_appearance_color_receipts,
                 "world_static_terrain_geometry_evidence": static_terrain_geometry,
                 "world_static_terrain_translucent_evidence": static_terrain_translucent,
                 "world_static_terrain_translucent_final_order": static_terrain_translucent_final_order,
@@ -12722,6 +12870,9 @@ def normalize_capture_artifact(
                     f"deterministic:{key}": value
                     for key, value in deterministic_primed_tnt_route_counts.items()
                 },
+                "world_mesh_primed_tnt_frame_setup": primed_tnt_frame_setup,
+                "world_mesh_primed_tnt_frame_receipts": primed_tnt_frame_receipts,
+                "world_mesh_primed_tnt_frame_route_counts": frame_primed_tnt_route_counts,
                 "world_mesh_primed_tnt_pixel_evidence": world_mesh_primed_tnt_pixel_evidence,
                 "world_mesh_piston_scenario": requested_world_mesh_piston_scenario or None,
                 "world_mesh_piston_control": world_mesh_piston_control,
@@ -14056,7 +14207,18 @@ main()
 
 def renderdoc_capture_path_from_env(env: dict[str, str], capture_dir: Path) -> Path:
     configured = env.get("MATTMC_RENDERDOC_CAPTURE_PATH")
-    return Path(configured) if configured else capture_dir / f"renderdoc_{timestamp()}.rdc"
+    if not configured:
+        return capture_dir / f"renderdoc_{timestamp()}.rdc"
+    requested = Path(configured)
+    # RenderDoc is an artifact producer just like the capture runner. Keep
+    # every requested path inside the run's ignored capture directory so a
+    # stale absolute/relative ``.capture`` setting cannot recreate files at
+    # the repository root (or elsewhere in the source tree).
+    if not requested.is_absolute() or requested.parent != capture_dir:
+        requested = capture_dir / requested.name
+    if requested.name.startswith(".capture"):
+        requested = capture_dir / ("renderdoc_" + requested.name.lstrip("."))
+    return requested
 
 
 def resolve_renderdoc_capture_path(capture_dir: Path, requested: Path) -> Path:
@@ -14173,6 +14335,7 @@ def build_capture_command(
     requested_validation = "routine" if args.validation == "standard" else args.validation
     validation = "standard" if mode.supports_validation and requested_validation != "off" else "off"
     static_terrain_scenario = str(getattr(args, "world_static_terrain_scenario", "") or "").strip()
+    world_profile = world_profile_for_args(args)
     shell_settled_static_capture = (
         kind == "shell"
         and tool_kind == "capture"
@@ -14356,7 +14519,6 @@ def build_capture_command(
     )
     env["MATTMC_GRAPHICS_TOOL_INTERNAL"] = "1"
     env["MATTMC_GRAPHICS_RUN_TYPE"] = run_type
-    world_profile = world_profile_for_args(args)
     env["MATTMC_GRAPHICS_WORLD_PROFILE"] = world_profile.name
     env["MATTMC_GRAPHICS_WORLD_PROFILE_ROLE"] = world_profile.role
     env["MATTMC_GRAPHICS_MIGRATION_GATE_BLOCKING"] = "true" if world_profile.migration_gate_blocking else "false"
@@ -14365,9 +14527,12 @@ def build_capture_command(
     if requested_validation in {"routine", "deep"}:
         env["VK_INSTANCE_LAYERS"] = "VK_LAYER_KHRONOS_validation"
         env["VK_LOADER_DEBUG"] = "info"
-        env["VK_LAYER_SETTINGS"] = "validate_sync=true,validate_best_practices=true"
+        env.setdefault("VK_LAYER_SETTINGS", "validate_sync=true,validate_best_practices=true")
         if requested_validation == "deep":
-            env["VK_LAYER_SETTINGS"] = "validate_sync=true,validate_best_practices=true,gpuav_enable=true,printf_enable=true"
+            env.setdefault(
+                "VK_LAYER_SETTINGS",
+                "validate_sync=true,validate_best_practices=true,gpuav_enable=true,printf_enable=true",
+            )
     env["MATTMC_RENDERDOC_CAPTURE"] = "true" if getattr(args, "renderdoc_capture", False) else "false"
     env["MATTMC_RENDERDOC_FRAME"] = str(getattr(args, "renderdoc_frame", 8))
     env["MATTMC_TRACY_CAPTURE"] = "true" if getattr(args, "tracy_capture", False) else "false"
@@ -14434,27 +14599,21 @@ def build_capture_command(
     dh_non_water = bool(getattr(args, "world_distant_horizons_non_water", False))
     dh_water = bool(getattr(args, "world_distant_horizons_water", False))
     dh_texture_palette = bool(getattr(args, "world_distant_horizons_texture_palette", False))
-    ordinary_selected_source_dh_capture = (
+    ordinary_selected_source_capture = (
         tool_kind == "capture"
         and mode.backend == "rust-vulkan"
         and bool(getattr(args, "rust_selected_source_execution", False))
         and args.world == "Origin"
-        and not (
-            dh_opaque_only
-            or dh_non_water
-            or dh_water
-            or getattr(args, "world_mesh_model_scenario", "")
-            or getattr(args, "world_mesh_falling_block_scenario", "")
-            or getattr(args, "world_mesh_piston_scenario", "")
-            or getattr(args, "world_mesh_primed_tnt_scenario", "")
-            or getattr(args, "world_mesh_arrow_scenario", "")
-            or getattr(args, "world_experience_orb_scenario", "")
-            or getattr(args, "world_beacon_beam_scenario", "")
-            or getattr(args, "world_static_terrain_scenario", "")
-            or getattr(args, "world_weather_scenario", "")
-            or getattr(args, "world_cloud_scenario", "")
-        )
+        and not (dh_opaque_only or dh_non_water or dh_water or dh_texture_palette)
     )
+    if ordinary_selected_source_capture:
+        # The ordinary Origin selected-source fixture proves near-world Rust
+        # ownership. Keep DH generation out of this startup path so its
+        # loading screen cannot mask the near-world readiness gate. Explicit
+        # DH rows above retain their own real generation and execution gates;
+        # this is not a DH coverage shortcut.
+        env["MATTMC_CAPTURE_DISABLE_DH_FOR_ORDINARY_SOURCE"] = "true"
+        java_options.append("-Dmattmc.dev.rustGalDistantHorizons.disabled=true")
     if (dh_texture_palette or dh_water) and not dh_opaque_only:
         required = "--world-distant-horizons-texture-palette" if dh_texture_palette else "--world-distant-horizons-water"
         raise ValueError(f"{required} requires --world-distant-horizons-opaque")
@@ -14504,6 +14663,10 @@ def build_capture_command(
         java_options.extend(
             [
                 "-Dmattmc.dev.rustGalDistantHorizons.semanticCapture=true",
+                # Do not begin gameplay measurement on pre-DH frames.  The
+                # asynchronous section build must first publish an executed
+                # Rust DH receipt, preserving a strict source/execution gate.
+                "-Dmattmc.dev.graphicsFrameBenchmark.requireDistantHorizonsExecution=true",
                 # This row validates the real DH collector/executor. Static
                 # terrain has its own scenario and readiness anvil; requiring
                 # it here can reject a stable DH-only frame with no relevant
@@ -14872,7 +15035,7 @@ def build_capture_command(
         java_options.append(
             f"-Dmattmc.dev.rustGalWorldMesh.modelScenario={args.world_mesh_model_scenario}"
         )
-        model_part_scenario = args.world_mesh_model_scenario == "decorated-pot"
+        model_part_scenario = args.world_mesh_model_scenario in {"decorated-pot", "conduit"}
         if tool_kind == "capture":
             java_options.append("-Dmattmc.dev.deterministicCameraCapture.poseCount=5")
             java_options.append("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=1")
@@ -14993,18 +15156,13 @@ def build_capture_command(
         java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.displayFpsCheckEnabled=false")
         if not getattr(args, "game_mode", None):
             java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.gameMode=survival")
-    elif ordinary_selected_source_dh_capture:
-        # Ordinary whole-frame Origin captures must not take their screenshot
-        # while DH columns are still copied but unpublished. This is a real
-        # source-route readiness requirement, not a synthetic DH fixture.
-        java_options.extend(
-            [
-                "-Dmattmc.dev.deterministicCameraCapture.settledReadyFamilies=distant-horizons",
-                "-Dmattmc.dev.deterministicCameraCapture.settledReadyFrames=3",
-                "-Dmattmc.dev.deterministicCameraCapture.settledReadyMaxWaitFrames="
-                + ("900" if args.profile == "extended" else str(world_profile.deterministic_ready_max_wait_frames)),
-            ]
-        )
+    # Ordinary selected-source captures retain the world profile's readiness
+    # family.  They do not necessarily contain a Distant Horizons LOD stream
+    # (the Origin fixture commonly reports lod_instances=0), so requiring the
+    # DH family here would leave the deterministic camera permanently
+    # uninitialized.  Explicit DH fixtures above select that family and keep
+    # their producer-specific gates; the selected-source receipt remains an
+    # independent route-admission check.
     terrain_particle_control = getattr(args, "world_material_terrain_particle_control", "rust")
     if terrain_particle_control == "disabled":
         java_options.append("-Dmattmc.dev.rustGalWorldMaterial.terrainParticle.disabled=true")
@@ -15025,6 +15183,15 @@ def build_capture_command(
             java_options.append("-Dmattmc.dev.staticTerrainParityDiagnostics.maxCoverageSamples=1024")
             java_options.append("-Dmattmc.dev.staticTerrainParityDiagnostics.maxCoverageEvents=16384")
             java_options.append("-Dmattmc.dev.staticTerrainParityDiagnostics.maxFaceCullTraceEvents=16384")
+            if str(getattr(args, "world_static_terrain_scenario", "")).strip().lower() == "texture-palette":
+                # The deterministic fixture places its four palette probes at
+                # known block coordinates. Enable the bounded source-color
+                # receipt for the grass probe's section; the Java diagnostics
+                # match the requested block while the Rust route remains a
+                # pure semantic consumer. This is evidence only and never a
+                # rendering admission or parity shortcut.
+                env["MATTMC_STATIC_TERRAIN_APPEARANCE_TRACE_SECTION"] = "35184407740421"
+                env["MATTMC_STATIC_TERRAIN_APPEARANCE_TRACE_BLOCK"] = "133,82,559"
         if static_terrain_second_world:
             java_options.append(f"-Dmattmc.dev.rustGalStaticTerrain.worldB={static_terrain_second_world}")
         if static_terrain_base_scenario(args.world_static_terrain_scenario) == "world-different-reload":
@@ -15216,9 +15383,51 @@ def build_capture_command(
             )
     if tool_kind == "gameplay":
         frame_status = capture_dir / f"graphics_frame_benchmark_{timestamp()}.json"
+        # Gameplay probes normally avoid filesystem diagnostics, but an
+        # explicitly requested Rust selected-source run must retain the same
+        # bounded admission receipt as correctness captures.  Without this
+        # directory the probe can only report a readiness timeout and cannot
+        # distinguish an incomplete shader-pack lowering from a world/DH
+        # readiness delay.  The path is always inside the caller's ignored
+        # artifact directory and Rust overwrites a single bounded status file.
+        if mode.backend == "rust-vulkan" and (
+            getattr(args, "diagnostic", False)
+            or getattr(args, "rust_selected_source_execution", False)
+        ):
+            env["MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR"] = str(
+                capture_dir / "terrain_pass_contract"
+            )
         settle_frames = mode_frame_count(args.settle_frames, mode, args, "--settle-frames")
         max_settle_frames = mode_frame_count(args.max_settle_frames, mode, args, "--max-settle-frames")
         warmup_frames = mode_frame_count(args.warmup_frames, mode, args, "--warmup-frames")
+        # Orb/beacon translucent producers can be the first shader-pack
+        # source to request depthtex0. Give the Rust-owned G-buffer two bounded
+        # warmup frames to publish main-depth resources before measurement;
+        # this does not relax route, semantic, execution, or parity gates.
+        if getattr(args, "world_experience_orb_scenario", ""):
+            warmup_frames = max(warmup_frames, 2)
+        if getattr(args, "world_beacon_beam_scenario", ""):
+            # The copied beacon block entity needs a few client ticks to
+            # receive and build its real beam-section list.
+            warmup_frames = max(warmup_frames, 8)
+        readiness_timeout_seconds = getattr(
+            args, "readiness_timeout_seconds", RUNTIME_PROFILES["standard"].readiness_timeout_seconds
+        )
+        if getattr(args, "world_beacon_beam_scenario", ""):
+            # Beacon activation is an ordinary server/client block-entity
+            # exchange. Keep the readiness gate strict, but allow the bounded
+            # client tick window needed for that real packet to arrive.
+            readiness_timeout_seconds = max(readiness_timeout_seconds, 30)
+        pack_scenario = (
+            getattr(args, "gui_resource_pack_scenario", "")
+            or getattr(args, "world_static_terrain_resource_pack_scenario", "")
+        ).strip().lower()
+        if pack_scenario and pack_scenario != "vanilla":
+            # Generated packs trigger an additional resource reload before the
+            # fixture world can publish its first semantic frame. Give that
+            # bounded reload time to complete; this does not relax any
+            # rendering or parity gate once the world is entered.
+            readiness_timeout_seconds = max(readiness_timeout_seconds, 30)
         measure_frames = mode_frame_count(args.measure_frames, mode, args, "--measure-frames")
         java_options.extend(
             [
@@ -15228,7 +15437,7 @@ def build_capture_command(
                 f"-Dmattmc.dev.graphicsFrameBenchmark.maxSettleFrames={max_settle_frames}",
                 f"-Dmattmc.dev.graphicsFrameBenchmark.warmupFrames={warmup_frames}",
                 f"-Dmattmc.dev.graphicsFrameBenchmark.measureFrames={measure_frames}",
-                f"-Dmattmc.dev.graphicsFrameBenchmark.readinessTimeoutSeconds={getattr(args, 'readiness_timeout_seconds', RUNTIME_PROFILES['standard'].readiness_timeout_seconds)}",
+                f"-Dmattmc.dev.graphicsFrameBenchmark.readinessTimeoutSeconds={readiness_timeout_seconds}",
                 f"-Dmattmc.dev.graphicsFrameBenchmark.workloadProfile={workload_profile}",
                 f"-Dmattmc.dev.graphicsFrameBenchmark.world={args.world}",
                 f"-Dmattmc.dev.graphicsFrameBenchmark.backend={mode.backend}",
@@ -15269,9 +15478,12 @@ def build_capture_command(
         )
         env["MATTMC_GRAPHICS_AUDIT"] = "true"
     if validation == "routine":
-        env["VK_LAYER_SETTINGS"] = "validate_sync=true,validate_best_practices=true"
+        env.setdefault("VK_LAYER_SETTINGS", "validate_sync=true,validate_best_practices=true")
     elif validation == "deep":
-        env["VK_LAYER_SETTINGS"] = "validate_sync=true,validate_best_practices=true,gpuav_enable=true,printf_enable=true"
+        env.setdefault(
+            "VK_LAYER_SETTINGS",
+            "validate_sync=true,validate_best_practices=true,gpuav_enable=true,printf_enable=true",
+        )
     if getattr(args, "tracy_capture", False):
         env["MATTMC_GRAPHICS_AUDIT"] = "true"
         java_options.append("-Dmattmc.dev.tracyCapture=true")
@@ -15477,9 +15689,12 @@ def shader_gbuffer_command_and_env(
     if requested_validation in {"routine", "deep"}:
         env["VK_INSTANCE_LAYERS"] = "VK_LAYER_KHRONOS_validation"
         env["VK_LOADER_DEBUG"] = "info"
-        env["VK_LAYER_SETTINGS"] = "validate_sync=true,validate_best_practices=true"
+        env.setdefault("VK_LAYER_SETTINGS", "validate_sync=true,validate_best_practices=true")
         if requested_validation == "deep":
-            env["VK_LAYER_SETTINGS"] = "validate_sync=true,validate_best_practices=true,gpuav_enable=true,printf_enable=true"
+            env.setdefault(
+                "VK_LAYER_SETTINGS",
+                "validate_sync=true,validate_best_practices=true,gpuav_enable=true,printf_enable=true",
+            )
     base = [
         "cargo",
         "test",
@@ -17109,7 +17324,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         )
         subparser.add_argument(
             "--world-mesh-model-scenario",
-            choices=("hidden", "chest", "bed", "bell", "shulker", "decorated-pot", "llama-spit", "evoker-fangs", "wither-skull", "chicken", "cow", "pig", "rabbit", "zombie"),
+            choices=("hidden", "chest", "bed", "bell", "shulker", "decorated-pot", "conduit", "llama-spit", "evoker-fangs", "wither-skull", "chicken", "cow", "pig", "rabbit", "zombie", "end-crystal"),
             default=os.environ.get("MATTMC_WORLD_MESH_MODEL_SCENARIO", ""),
         help="Create a real copied-world vanilla model producer for generic mesh-route validation.",
         )
@@ -17590,9 +17805,42 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     return args
 
 
+def normalize_configured_artifact_dir(current_root: Path, configured: Path | None) -> Path | None:
+    """Keep repository-local capture output inside the ignored artifact root.
+
+    External temporary directories remain valid for unit tests and CI callers.
+    A path supplied from inside the current repository, however, must not make
+    the harness create manifests, screenshots, or RenderDoc captures beside
+    source files. Preserve only its leaf below the managed capture subtree.
+    """
+    if configured is None:
+        return None
+    resolved = configured.resolve()
+    repository_root = current_root.resolve()
+    try:
+        resolved.relative_to(repository_root)
+    except ValueError:
+        return resolved
+    managed_roots = (
+        artifact_retention.default_artifact_base(repository_root).resolve(),
+        (repository_root / "artifacts" / "graphics-captures").resolve(),
+    )
+    for managed_root in managed_roots:
+        try:
+            resolved.relative_to(managed_root)
+            return resolved
+        except ValueError:
+            continue
+    leaf = resolved.name or "configured"
+    if leaf.startswith(".capture"):
+        leaf = "configured"
+    return managed_roots[0] / leaf
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
     targets = select_targets(args)
+    args.artifact_dir = normalize_configured_artifact_dir(targets["current"].root, args.artifact_dir)
     retention_root = (
         args.artifact_dir.resolve()
         if args.artifact_dir

@@ -20,9 +20,9 @@ public class LayerRaccoonEyes extends RenderLayer<RaccoonRenderState, ModelRacco
     @Override
     public void submit(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int packedLight, RaccoonRenderState state, float bob, float yRot) {
         if (!state.isRigby) {
-            submitNodeCollector.order(1).submitModel(
+            submitNodeCollector.order(1).submitModelSemanticTexture(
                 this.getParentModel(), state, poseStack, RenderType.eyes(TEXTURE), 
-                packedLight, OverlayTexture.NO_OVERLAY, -1, null, state.outlineColor, null
+                packedLight, OverlayTexture.NO_OVERLAY, -1, TEXTURE, state.outlineColor, null
             );
         }
     }

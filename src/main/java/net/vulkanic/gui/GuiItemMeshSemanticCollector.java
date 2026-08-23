@@ -2,10 +2,14 @@ package net.vulkanic.gui;
 
 import java.util.ArrayList;
 import java.util.List;
+import net.minecraft.Util;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.gui.render.state.GuiItemRenderState;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.block.model.BakedQuad;
+import net.minecraft.core.Direction;
+import net.minecraft.client.renderer.entity.ItemRenderer;
 import net.minecraft.client.renderer.item.ItemStackRenderState;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.resources.ResourceLocation;
@@ -18,6 +22,7 @@ import net.sodium.client.model.quad.BakedQuadView;
 import net.blaze3d.vertex.PoseStack;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
+import org.joml.Vector3f;
 
 /**
  * Copies ordinary vanilla GUI item-model semantics before any native packing.
@@ -39,9 +44,6 @@ public final class GuiItemMeshSemanticCollector {
 		}
 		if (!item.itemStackRenderState().usesBlockLight()) {
 			return CollectionResult.rejected("flat-lighting");
-		}
-		if (item.itemStackRenderState().isAnimated()) {
-			return CollectionResult.rejected("animated-item");
 		}
 		if (guiScale <= 0) {
 			return CollectionResult.rejected("gui-scale");
@@ -96,7 +98,11 @@ public final class GuiItemMeshSemanticCollector {
 
 	private static String appendLayer(ItemStackRenderState.SemanticLayer layer, float[] standard3dTransform, List<GuiItemMeshLayer> output) {
 		if (layer.hasSpecialRenderer()) return "special-renderer";
-		if (layer.foilType() != ItemStackRenderState.FoilType.NONE) return "foil";
+		if (layer.foilType() == ItemStackRenderState.FoilType.SPECIAL) {
+			RustGalGuiRawImageAssets.Asset glint = RustGalGuiRawImageAssets.resolve(ItemRenderer.ENCHANTED_GLINT_ITEM);
+			if (glint == null) return "glint-texture-unavailable";
+			RustGalGuiRawImageAssets.stage(glint);
+		}
 		if (layer.renderType() == null || layer.quads().isEmpty()) return "empty-or-missing-render-type";
 		MaterialMode mode = materialMode(layer.renderType());
 		if (mode == null) return "render-type";
@@ -111,11 +117,77 @@ public final class GuiItemMeshSemanticCollector {
 		float[] modelTransform = new float[16];
 		combined.get(modelTransform);
 		output.add(new GuiItemMeshLayer(mode, layer.usesBlockLight(), modelTransform, quads));
+		if (layer.foilType() == ItemStackRenderState.FoilType.STANDARD) {
+			RustGalGuiRawImageAssets.Asset glint = RustGalGuiRawImageAssets.resolve(ItemRenderer.ENCHANTED_GLINT_ITEM);
+			if (glint == null) return "glint-texture-unavailable";
+			RustGalGuiRawImageAssets.stage(glint);
+			List<GuiItemMeshQuad> glintQuads = new ArrayList<>(quads.size());
+			for (GuiItemMeshQuad quad : quads) {
+				glintQuads.add(glintQuad(quad, glint.assetId()));
+			}
+			output.add(new GuiItemMeshLayer(MaterialMode.GLINT, false, modelTransform, glintQuads));
+		} else if (layer.foilType() == ItemStackRenderState.FoilType.SPECIAL) {
+			RustGalGuiRawImageAssets.Asset glint = RustGalGuiRawImageAssets.resolve(ItemRenderer.ENCHANTED_GLINT_ITEM);
+			List<GuiItemMeshQuad> glintQuads = new ArrayList<>(quads.size());
+			for (GuiItemMeshQuad quad : quads) glintQuads.add(specialFoilQuad(quad, glint.assetId(), combined));
+			output.add(new GuiItemMeshLayer(MaterialMode.GLINT, false, modelTransform, glintQuads));
+		}
 		return null;
+	}
+
+	private static GuiItemMeshQuad specialFoilQuad(GuiItemMeshQuad source, long glintAssetId, Matrix4f pose) {
+		Matrix4f inversePose = new Matrix4f(pose).invert();
+		Matrix3f inverseNormal = new Matrix3f(pose).invert();
+		float[] positions = source.positions();
+		int[] normals = source.packedNormals();
+		float[] uvs = new float[8];
+		for (int vertex = 0; vertex < 4; vertex++) {
+			Vector3f projected = inversePose.transformPosition(
+				positions[vertex * 3], positions[vertex * 3 + 1], positions[vertex * 3 + 2], new Vector3f());
+			Vector3f normal = inverseNormal.transform(unpackNormal(normals[vertex]), new Vector3f());
+			Direction direction = Direction.getApproximateNearest(normal.x, normal.y, normal.z);
+			projected.rotateY((float)Math.PI).rotateX((float)(-Math.PI / 2.0)).rotate(direction.getRotation());
+			uvs[vertex * 2] = -projected.x * ItemRenderer.SPECIAL_FOIL_TEXTURE_SCALE;
+			uvs[vertex * 2 + 1] = -projected.y * ItemRenderer.SPECIAL_FOIL_TEXTURE_SCALE;
+		}
+		int strength = Mth.clamp((int)Math.round(Minecraft.getInstance().options.glintStrength().get() * 255.0F), 0, 255);
+		int[] colors = {ARGB.color(strength, 255, 255, 255), ARGB.color(strength, 255, 255, 255), ARGB.color(strength, 255, 255, 255), ARGB.color(strength, 255, 255, 255)};
+		return new GuiItemMeshQuad(glintAssetId, "minecraft:special-glint", positions, uvs, uvs, colors, normals, source.lightFace(), false);
+	}
+
+	private static Vector3f unpackNormal(int packed) {
+		return new Vector3f((byte)(packed & 0xff) / 127.0F, (byte)((packed >>> 8) & 0xff) / 127.0F, (byte)((packed >>> 16) & 0xff) / 127.0F);
+	}
+
+	/** Copies vanilla's time-varying GLINT texture matrix into semantic UVs. */
+	private static GuiItemMeshQuad glintQuad(GuiItemMeshQuad source, long glintAssetId) {
+		long ticks = (long)(Util.getMillis() * Minecraft.getInstance().options.glintSpeed().get() * 8.0);
+		float g = (float)(ticks % 110000L) / 110000.0F;
+		float h = (float)(ticks % 30000L) / 30000.0F;
+		float angle = (float)(Math.PI / 18.0);
+		float scale = 8.0F;
+		float cos = (float)Math.cos(angle) * scale;
+		float sin = (float)Math.sin(angle) * scale;
+		float[] atlasUvs = source.atlasUvs();
+		float[] glintUvs = new float[8];
+		for (int vertex = 0; vertex < 4; vertex++) {
+			float u = atlasUvs[vertex * 2];
+			float v = atlasUvs[vertex * 2 + 1];
+			glintUvs[vertex * 2] = cos * u - sin * v - g;
+			glintUvs[vertex * 2 + 1] = sin * u + cos * v + h;
+		}
+		int strength = Mth.clamp((int)Math.round(Minecraft.getInstance().options.glintStrength().get() * 255.0F), 0, 255);
+		int[] colors = new int[] {
+			ARGB.color(strength, 255, 255, 255), ARGB.color(strength, 255, 255, 255),
+			ARGB.color(strength, 255, 255, 255), ARGB.color(strength, 255, 255, 255)
+		};
+		return new GuiItemMeshQuad(glintAssetId, "minecraft:glint", source.positions(), glintUvs,
+			glintUvs, colors, source.packedNormals(), source.lightFace(), false);
 	}
 
 	private static MaterialMode materialMode(RenderType renderType) {
 		String name = renderType.toString();
+		if (name.contains("translucent")) return MaterialMode.TRANSLUCENT;
 		if (name.contains("cutout")) return MaterialMode.CUTOUT;
 		return name.contains("item") || name.contains("solid") ? MaterialMode.OPAQUE : null;
 	}
@@ -124,8 +196,8 @@ public final class GuiItemMeshSemanticCollector {
 		if (!(bakedQuad instanceof BakedQuadView quad)) return null;
 		TextureAtlasSprite sprite = quad.getSprite();
 		ResourceLocation spriteIdentity = sprite == null ? null : sprite.contents().name();
-		if (spriteIdentity == null || sprite.contents().isAnimated()) return null;
-		long assetId = RustGalGuiItemRenderer.stageSemanticImage(spriteIdentity);
+		if (spriteIdentity == null) return null;
+		long assetId = RustGalGuiItemRenderer.stageSemanticImage(sprite);
 		if (assetId == 0L) return null;
 		float[] positions = new float[12];
 		float[] atlasUvs = new float[8];
@@ -206,7 +278,9 @@ public final class GuiItemMeshSemanticCollector {
 
 	public enum MaterialMode {
 		OPAQUE,
-		CUTOUT
+		CUTOUT,
+		TRANSLUCENT,
+		GLINT
 	}
 
 	public record CollectionResult(GuiItemMesh mesh, String rejection) {

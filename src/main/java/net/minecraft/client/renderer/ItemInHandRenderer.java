@@ -3,6 +3,8 @@ package net.minecraft.client.renderer;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.MoreObjects;
 import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import net.blaze3d.vertex.PoseStack;
 import net.math.Axis;
@@ -45,6 +47,8 @@ public class ItemInHandRenderer {
 	private static final RenderType MAP_BACKGROUND_CHECKERBOARD = RenderType.text(
 		ResourceLocation.withDefaultNamespace("textures/map/map_background_checkerboard.png")
 	);
+	private static final ResourceLocation MAP_BACKGROUND_TEXTURE = ResourceLocation.withDefaultNamespace("textures/map/map_background.png");
+	private static final ResourceLocation MAP_CHECKERBOARD_TEXTURE = ResourceLocation.withDefaultNamespace("textures/map/map_background_checkerboard.png");
 	private static final float ITEM_SWING_X_POS_SCALE = -0.4F;
 	private static final float ITEM_SWING_Y_POS_SCALE = 0.2F;
 	private static final float ITEM_SWING_Z_POS_SCALE = -0.2F;
@@ -160,17 +164,55 @@ public class ItemInHandRenderer {
 				? WorldRenderRoutePolicy.currentFirstPersonItemOwnershipRoute()
 				: WorldRenderRoutePolicy.Route.JAVA_COMPATIBILITY;
 			boolean rustSubmitted = RustGalWorldPrimitiveRenderer.enqueueFirstPersonItemMesh(
-				poseStack.last(), itemStackRenderState, itemStack, i, mainHand
+				poseStack.last(), itemStackRenderState, itemStack, i, mainHand,
+				firstPersonRoute.usesRustWholeFrameVulkan()
 			);
+			if (!rustSubmitted && firstPersonRoute.usesRustWholeFrameVulkan() && itemStackRenderState.hasSpecialRenderer()) {
+				int meshCountBefore = RustGalWorldPrimitiveRenderer.pendingIndexedItemMeshCount();
+				RustGalWorldPrimitiveRenderer.beginFirstPersonSemanticItem(itemStack);
+				try {
+					itemStackRenderState.submitSpecialRenderers(
+						poseStack, submitNodeCollector, i, OverlayTexture.NO_OVERLAY, 0
+					);
+				} finally {
+					RustGalWorldPrimitiveRenderer.endFirstPersonSemanticItem();
+				}
+				rustSubmitted = RustGalWorldPrimitiveRenderer.pendingIndexedItemMeshCount() > meshCountBefore;
+				RustGalWorldPrimitiveRenderer.recordItemEntityRouteDecision(
+					rustSubmitted ? "rust-vulkan-whole-frame" : "rust-vulkan-unavailable",
+					rustSubmitted,
+					rustSubmitted ? null : "first-person-special-renderer-semantic-receipt",
+					rustSubmitted,
+					rustSubmitted,
+					false
+				);
+			}
 			FirstPersonItemSubmitDisposition disposition = classifyFirstPersonItemSubmit(
 				rustSubmitted,
 				firstPersonRoute.usesRustWholeFrameVulkan()
 			);
+			if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+				&& firstPersonRoute == WorldRenderRoutePolicy.Route.DISABLED
+				&& !rustSubmitted) {
+				RustGalWorldPrimitiveRenderer.recordUnsupportedFirstPersonItem();
+				throw new IllegalStateException(
+					"First-person item route is unavailable on Vulkan until its Rust semantic mesh is admitted"
+				);
+			}
 			// Whole-frame Rust ownership is independent of per-item eligibility or
 			// resource residency. Once selected, a failed Rust enqueue is an
 			// unavailable Rust capability for this frame, never permission to emit
 			// a hidden Java Vulkan draw through ItemStackRenderState.submit().
 			if (disposition != FirstPersonItemSubmitDisposition.JAVA_COMPATIBILITY) {
+				if (!rustSubmitted) {
+					RustGalWorldPrimitiveRenderer.recordUnsupportedFirstPersonItem();
+					if (firstPersonRoute.usesRustWholeFrameVulkan()) {
+						throw new IllegalStateException(
+							"Rust whole-frame first-person item route has no semantic mesh for "
+								+ itemStack.getItem()
+						);
+					}
+				}
 				return;
 			}
 			itemStackRenderState.submit(poseStack, submitNodeCollector, i, OverlayTexture.NO_OVERLAY, 0);
@@ -278,12 +320,23 @@ public class ItemInHandRenderer {
 		MapId mapId = (MapId)itemStack.get(DataComponents.MAP_ID);
 		MapItemSavedData mapItemSavedData = MapItem.getSavedData(mapId, this.minecraft.level);
 		RenderType renderType = mapItemSavedData == null ? MAP_BACKGROUND : MAP_BACKGROUND_CHECKERBOARD;
-		submitNodeCollector.submitCustomGeometry(poseStack, renderType, (pose, vertexConsumer) -> {
-			vertexConsumer.addVertex(pose, -7.0F, 135.0F, 0.0F).setColor(-1).setUv(0.0F, 1.0F).setLight(i);
-			vertexConsumer.addVertex(pose, 135.0F, 135.0F, 0.0F).setColor(-1).setUv(1.0F, 1.0F).setLight(i);
-			vertexConsumer.addVertex(pose, 135.0F, -7.0F, 0.0F).setColor(-1).setUv(1.0F, 0.0F).setLight(i);
-			vertexConsumer.addVertex(pose, -7.0F, -7.0F, 0.0F).setColor(-1).setUv(0.0F, 0.0F).setLight(i);
-		});
+		float[] mapBackgroundVertices = {-7.0F, 135.0F, 0.0F, 135.0F, 135.0F, 0.0F, 135.0F, -7.0F, 0.0F, -7.0F, -7.0F, 0.0F};
+		float[] mapBackgroundUvs = {0.0F, 1.0F, 1.0F, 1.0F, 1.0F, 0.0F, 0.0F, 0.0F};
+		ResourceLocation mapBackgroundTexture = mapItemSavedData == null ? MAP_BACKGROUND_TEXTURE : MAP_CHECKERBOARD_TEXTURE;
+		if (!submitNodeCollector.submitTexturedQuad(poseStack, renderType, mapBackgroundTexture, mapBackgroundVertices, mapBackgroundUvs, -1, i)) {
+			if (net.vulkanic.world.WorldRenderRoutePolicy.currentTexturedBillboardRoute().usesRustWholeFrameVulkan()) {
+				throw new IllegalStateException("Rust whole-frame first-person map route rejected semantic background quad");
+			}
+			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+				throw new IllegalStateException("Rust whole-frame first-person map route is unavailable; Java map geometry is not a fallback");
+			}
+			submitNodeCollector.submitCustomGeometry(poseStack, renderType, (pose, vertexConsumer) -> {
+				vertexConsumer.addVertex(pose, -7.0F, 135.0F, 0.0F).setColor(-1).setUv(0.0F, 1.0F).setLight(i);
+				vertexConsumer.addVertex(pose, 135.0F, 135.0F, 0.0F).setColor(-1).setUv(1.0F, 1.0F).setLight(i);
+				vertexConsumer.addVertex(pose, 135.0F, -7.0F, 0.0F).setColor(-1).setUv(1.0F, 0.0F).setLight(i);
+				vertexConsumer.addVertex(pose, -7.0F, -7.0F, 0.0F).setColor(-1).setUv(0.0F, 0.0F).setLight(i);
+			});
+		}
 		if (mapItemSavedData != null) {
 			MapRenderer mapRenderer = this.minecraft.getMapRenderer();
 			mapRenderer.extractRenderState(mapId, mapItemSavedData, this.mapRenderState);
@@ -377,6 +430,9 @@ public class ItemInHandRenderer {
 	}
 
 	public void renderHandsWithItems(float f, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, LocalPlayer localPlayer, int i) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java first-person hand rendering is unavailable while Rust owns whole-frame presentation");
+		}
 		float g = localPlayer.getAttackAnim(f);
 		InteractionHand interactionHand = MoreObjects.firstNonNull(localPlayer.swingingArm, InteractionHand.MAIN_HAND);
 		float h = localPlayer.getXRot(f);
@@ -399,6 +455,46 @@ public class ItemInHandRenderer {
 
 		this.minecraft.gameRenderer.getFeatureRenderDispatcher().renderAllFeatures();
 		this.minecraft.renderBuffers().bufferSource().endBatch();
+	}
+
+	/**
+	 * Runs the first-person semantic callsite for the Rust whole-frame route.
+	 * The Rust presenter owns the resulting frame, so this deliberately avoids
+	 * Java feature dispatch and buffer submission after the item callsite.
+	 */
+	public void renderRustVulkanHands(float f, PoseStack poseStack, LocalPlayer localPlayer, int packedLight, org.joml.Matrix4f worldView, org.joml.Matrix4f worldProjection) {
+		SubmitNodeStorage semanticCollector = new SubmitNodeStorage();
+		RustGalWorldPrimitiveRenderer.beginFirstPersonGuiCapture();
+		try {
+			float swing = localPlayer.getAttackAnim(f);
+			InteractionHand swingingHand = MoreObjects.firstNonNull(localPlayer.swingingArm, InteractionHand.MAIN_HAND);
+			float viewPitch = localPlayer.getXRot(f);
+			HandRenderSelection selection = evaluateWhichHandsToRender(localPlayer);
+			float bobX = Mth.lerp(f, localPlayer.xBobO, localPlayer.xBob);
+			float bobY = Mth.lerp(f, localPlayer.yBobO, localPlayer.yBob);
+			poseStack.mulPose(Axis.XP.rotationDegrees((localPlayer.getViewXRot(f) - bobX) * 0.1F));
+			poseStack.mulPose(Axis.YP.rotationDegrees((localPlayer.getViewYRot(f) - bobY) * 0.1F));
+			if (selection.renderMainHand) {
+				RustGalWorldPrimitiveRenderer.setFirstPersonMainHandCapture(true);
+				float handSwing = swingingHand == InteractionHand.MAIN_HAND ? swing : 0.0F;
+				float equip = 1.0F - Mth.lerp(f, this.oMainHandHeight, this.mainHandHeight);
+				this.renderArmWithItem(localPlayer, f, viewPitch, InteractionHand.MAIN_HAND, handSwing, this.mainHandItem, equip, poseStack, semanticCollector, packedLight);
+			}
+			if (selection.renderOffHand) {
+				RustGalWorldPrimitiveRenderer.setFirstPersonMainHandCapture(false);
+				float handSwing = swingingHand == InteractionHand.OFF_HAND ? swing : 0.0F;
+				float equip = 1.0F - Mth.lerp(f, this.oOffHandHeight, this.offHandHeight);
+				this.renderArmWithItem(localPlayer, f, viewPitch, InteractionHand.OFF_HAND, handSwing, this.offHandItem, equip, poseStack, semanticCollector, packedLight);
+			}
+			List<SubmitNodeStorage.TextSubmit> textSubmits = new ArrayList<>();
+			semanticCollector.getSubmitsPerOrder().values().forEach(collection -> textSubmits.addAll(collection.getTextSubmits()));
+			if (!textSubmits.isEmpty()) {
+				RustGalWorldPrimitiveRenderer.collectFirstPersonTextSemantics(textSubmits, this.minecraft.font, worldView, worldProjection);
+			}
+		} finally {
+			RustGalWorldPrimitiveRenderer.setFirstPersonMainHandCapture(false);
+			RustGalWorldPrimitiveRenderer.endFirstPersonGuiCapture();
+		}
 	}
 
 	@VisibleForTesting
@@ -447,7 +543,10 @@ public class ItemInHandRenderer {
 		int j
 	) {
 		// Iris: Skip translucent hands in solid pass and vice versa
-		if (net.irisshaders.iris.Iris.isPackInUseQuick() && net.irisshaders.iris.pathways.HandRenderer.INSTANCE.isActive()) {
+		boolean rustWholeFrame = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			&& net.vulkanic.world.WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan();
+		boolean rustPresentation = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
+		if (!rustPresentation && !rustWholeFrame && net.irisshaders.iris.Iris.isPackInUseQuick() && net.irisshaders.iris.pathways.HandRenderer.INSTANCE.isActive()) {
 			if (net.irisshaders.iris.pathways.HandRenderer.INSTANCE.isRenderingSolid() && 
 				net.irisshaders.iris.pathways.HandRenderer.INSTANCE.isHandTranslucent(interactionHand)) {
 				return;
@@ -462,6 +561,9 @@ public class ItemInHandRenderer {
 			HumanoidArm humanoidArm = bl ? abstractClientPlayer.getMainArm() : abstractClientPlayer.getMainArm().getOpposite();
 			poseStack.pushPose();
 			if (itemStack.getItem() instanceof TaczMvpGunItem) {
+				// TaczGlock17SpecialRenderer owns a copied Bedrock-root semantic
+				// producer for the Rust route. Invoke that producer directly; its
+				// attachment admission remains fail-closed inside the renderer.
 				if (bl) {
 					this.renderTaczGlockFirstPerson(abstractClientPlayer, f, h, itemStack, i, poseStack, submitNodeCollector, j, humanoidArm);
 				}

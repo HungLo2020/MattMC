@@ -108,6 +108,10 @@ public class DhFadeRenderer
 	
 	public void render(Mat4f mcModelViewMatrix, Mat4f mcProjectionMatrix, float partialTicks, IProfilerWrapper profiler)
 	{
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
+		{
+			throw new IllegalStateException("Java Distant Horizons fade rendering is unavailable while Rust owns whole-frame presentation");
+		}
 		try
 		{
 			CommandContext ctx = VulkanicAPI.getCommandContext();

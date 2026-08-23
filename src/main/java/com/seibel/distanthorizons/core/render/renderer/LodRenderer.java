@@ -123,8 +123,17 @@ public class LodRenderer
 	 */
 	public void render(RenderParams renderParams, IProfilerWrapper profiler)
 	{
+		boolean rustWholeFrame = WorldRenderRoutePolicy.currentDistantHorizonsOpaqueRoute()
+			.usesRustWholeFrameVulkan();
 		if (DistantHorizonsSemanticCollector.beginVisibleFrame(renderParams)
 			&& this.trySelectRustNonWaterRoute(renderParams, profiler))
+		{
+			return;
+		}
+		// The normal DH hook still fires while the Rust whole-frame shell owns
+		// Vulkan. A rejected semantic preflight is unavailable for this frame;
+		// it must never fall through to DH's Java Vulkan render passes.
+		if (rustWholeFrame)
 		{
 			return;
 		}
@@ -182,6 +191,12 @@ public class LodRenderer
 			DistantHorizonsSemanticCollector.recordRustNonWaterRouteRejected("render-buffer-handler-missing", 0, 0, 0);
 			return false;
 		}
+		// Do not publish background DH assets before the visible render list is
+		// known.  The collector deliberately gives visible demand priority, but
+		// an empty demand set means "all pending columns"; flushing here would
+		// synchronously expand/upload unrelated background columns on the render
+		// thread before route admission.  The bounded post-traversal flush below
+		// publishes only the columns this frame can actually draw.
 		profiler.push("LOD Rust semantic extraction");
 		try
 		{
@@ -204,6 +219,10 @@ public class LodRenderer
 				transparentSegments += segments.transparentSegments();
 				waterSegments += segments.waterSegments();
 			}
+			// The traversal above is the first point at which pending asset demand is
+			// known to be visible. Publish that bounded demand before freezing route
+			// semantics; the draw itself still waits for the next coherent frame.
+			net.vulkanic.gui.RustGalFrameCoordinator.flushPendingWorldLodAssetsForSemanticPreflight();
 			DistantHorizonsSemanticCollector.recordRenderListObservation(semanticColumns.size());
 			if (opaqueSegments + transparentSegments + waterSegments == 0)
 			{
@@ -215,14 +234,15 @@ public class LodRenderer
 				);
 				return false;
 			}
-			if (!DistantHorizonsSemanticCollector.hasCompleteVisibleExactAtlasCoverage())
-			{
-				DistantHorizonsSemanticCollector.recordRustNonWaterRouteRejected(
-					"unrepresentable-visible-materials",
-					opaqueSegments, transparentSegments, waterSegments
-				);
-				return false;
-			}
+			/*
+			 * Rust owns both sides of a partial material result: resolved quads use
+			 * the exact atlas overlay and unresolved quads retain their copied DH
+			 * reduced-color index range. Requiring complete atlas coverage here
+			 * would make that already-implemented complementary path unreachable.
+			 * The sidecar and vertex ranges are still validated by the Rust update
+			 * and frame planner before admission; this only removes the obsolete
+			 * Java-side all-or-nothing gate.
+			 */
 			DistantHorizonsSemanticCollector.markRustNonWaterRouteSelected();
 			return true;
 		}
@@ -272,7 +292,15 @@ public class LodRenderer
 	 * but shouldn't be activated as per deferWaterRendering.
 	 */
 	public void renderDeferred(RenderParams renderParams, IProfilerWrapper profiler)
-	{ this.renderLodPass(renderParams, profiler, true); }
+	{
+		if (WorldRenderRoutePolicy.currentDistantHorizonsOpaqueRoute().usesRustWholeFrameVulkan())
+		{
+			// Deferred DH passes are Java framebuffer/pipeline work and are not
+			// admitted while the Rust whole-frame presenter owns Vulkan.
+			return;
+		}
+		this.renderLodPass(renderParams, profiler, true);
+	}
 	
 	private void renderLodPass(RenderParams renderParams, IProfilerWrapper profiler, boolean runningDeferredPass)
 	{
@@ -1268,6 +1296,10 @@ public class LodRenderer
 
 	private RenderPass createVulkanCompatibilityRenderPass(String label)
 	{
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
+		{
+			throw new IllegalStateException("Java Distant Horizons compatibility render pass is unavailable while Rust owns whole-frame presentation");
+		}
 		if (!VulkanicAPI.isVulkanBackendSelected())
 		{
 			return null;

@@ -39,15 +39,22 @@ public class BoatRenderer extends AbstractBoatRenderer {
 	}
 
 	@Override
+	protected ResourceLocation textureLocation() {
+		return this.texture;
+	}
+
+	@Override
 	protected void submitTypeAdditions(BoatRenderState boatRenderState, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i) {
 		if (!boatRenderState.isUnderWater) {
-			submitNodeCollector.submitModel(
+			submitNodeCollector.submitModelSemanticTexture(
 				this.waterPatchModel,
 				Unit.INSTANCE,
 				poseStack,
 				this.waterPatchModel.renderType(this.texture),
 				i,
 				OverlayTexture.NO_OVERLAY,
+				-1,
+				this.textureLocation(),
 				boatRenderState.outlineColor,
 				null
 			);

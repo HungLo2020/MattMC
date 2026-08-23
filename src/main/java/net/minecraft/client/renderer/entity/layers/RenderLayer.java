@@ -47,7 +47,7 @@ public abstract class RenderLayer<S extends EntityRenderState, M extends EntityM
 		int k
 	) {
 		submitNodeCollector.order(k)
-			.submitModel(
+			.submitModelSemanticTexture(
 				model,
 				livingEntityRenderState,
 				poseStack,
@@ -55,7 +55,7 @@ public abstract class RenderLayer<S extends EntityRenderState, M extends EntityM
 				i,
 				LivingEntityRenderer.getOverlayCoords(livingEntityRenderState, 0.0F),
 				j,
-				null,
+				resourceLocation,
 				livingEntityRenderState.outlineColor,
 				null
 			);

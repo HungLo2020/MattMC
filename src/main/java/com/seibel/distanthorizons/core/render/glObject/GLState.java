@@ -72,6 +72,11 @@ public class GLState
 
 	public void saveState(CommandContext ctx)
 	{
+		if (VulkanicAPI.isVulkanBackendInitializedAndSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException(
+				"Java Distant Horizons GL state is unavailable while Rust owns whole-frame presentation");
+		}
 		this.program = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.CURRENT_PROGRAM);
 		this.vao = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.VERTEX_ARRAY_BINDING);
 		this.vbo = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.ARRAY_BUFFER_BINDING);

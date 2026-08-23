@@ -522,6 +522,7 @@ pub(crate) struct TerrainRuntimeTargets {
     pub final_resource_set: Handle,
     pub screen_pipeline_layout: Handle,
     pub composite_uniform_buffer: Handle,
+    pub shadow_targets_initialized: bool,
 }
 
 /// The source-derived shadow writer's complete Rust-owned target contract.
@@ -539,6 +540,7 @@ pub(crate) struct TerrainSourceShadowPassTargets {
     pub shadow_light_shaft_view: Handle,
     pub shadow_target: Handle,
     pub shadow_pass: Handle,
+    pub initialized: bool,
 }
 
 impl From<TerrainRuntimeTargets> for TerrainSourceShadowPassTargets {
@@ -552,6 +554,7 @@ impl From<TerrainRuntimeTargets> for TerrainSourceShadowPassTargets {
             shadow_light_shaft_view: targets.shadow_light_shaft_view,
             shadow_target: targets.shadow_target,
             shadow_pass: targets.shadow_pass,
+            initialized: targets.shadow_targets_initialized,
         }
     }
 }
@@ -662,9 +665,12 @@ impl TerrainSourceColorPassPhase {
             Self::TexturedMaterial
             | Self::Weather
             | Self::Clouds
-            | Self::Entities
-            | Self::Hands
-            | Self::Translucent => TextureUsageState::ShaderRead,
+            | Self::Entities => TextureUsageState::ShaderRead,
+            // Hands own a fresh private depth attachment.  Its first use is
+            // the explicit clear/load pass, so the semantic predecessor is
+            // Undefined rather than the shared world-depth read state.
+            Self::Hands => TextureUsageState::Undefined,
+            Self::Translucent => TextureUsageState::ShaderRead,
         }
     }
 
@@ -738,6 +744,13 @@ pub(crate) struct TerrainRuntimeFrame {
     /// Optional private source-depth history. Normal world material output is
     /// unchanged when no source stage declares a need for these snapshots.
     pub depth_history: Option<TerrainDepthHistoryPlan>,
+    /// Shadow attachments are persistent graph resources just like the
+    /// deferred screen targets; only their first use starts from Undefined.
+    pub shadow_targets_initialized: bool,
+    /// Composite attachments persist across frames. The first frame starts
+    /// from Undefined; later frames begin from ShaderRead after the prior
+    /// composite chain's final transition.
+    pub screen_targets_initialized: bool,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -2453,8 +2466,8 @@ impl ShaderPackRuntimeExecutor {
 
     /// Resolves one lowered normal-terrain program's named outputs through
     /// the selected pack manifest and staged Rust-owned target generation.
-    /// The result is preparation data only: a caller still owns the explicit
-    /// depth target, render pass, source transaction, and combined
+    /// The result is preparation data for the world frontend, which owns the
+    /// explicit depth target, render pass, source transaction, and combined
     /// submission. Keeping that split prevents either ordinary terrain or DH
     /// from treating legacy source slots as backend attachments.
     pub(crate) fn resolve_terrain_source_color_outputs(
@@ -3230,9 +3243,8 @@ impl ShaderPackRuntimeExecutor {
     /// special knowledge of normal terrain or Distant Horizons: the caller
     /// supplies the union of generation-coherent semantic inputs accumulated
     /// by those frontends, and every stage receives the same explicit source
-    /// target contract. It remains preparation-only until a higher-level
-    /// executor can schedule all writers, this chain, and final output in one
-    /// Rust-owned submission.
+    /// target contract. The world frontend schedules all writers, this chain,
+    /// and final output in one Rust-owned submission.
     pub(crate) fn stage_complete_post_terrain_execution_plans(
         &self,
         gal: &mut VulkanicGal,
@@ -5201,7 +5213,7 @@ impl ShaderPackRuntimeExecutor {
         gal: &mut VulkanicGal,
         input: TerrainSourceMainDepthInput,
     ) -> GalResult<Option<TerrainSourceOwnedResourceSet>> {
-        let required = [
+        let mut required = [
             TerrainSourceResourceRole::MainDepth,
             TerrainSourceResourceRole::MainDepthBeforeTranslucency,
             TerrainSourceResourceRole::MainDepthPrevious,
@@ -5209,6 +5221,33 @@ impl ShaderPackRuntimeExecutor {
         .into_iter()
         .filter(|role| self.candidate_source_requires_resource(role.clone()))
         .collect::<Vec<_>>();
+        // A complete selected-source plan may discover depth consumption in a
+        // retained fullscreen stage after the terrain candidate was observed.
+        // The caller supplies the exact Rust-owned G-buffer view here, so keep
+        // the current main-depth role available for that same frame rather
+        // than allowing the later fullscreen admission to see a stale subset.
+        if !required.contains(&TerrainSourceResourceRole::MainDepth) {
+            required.push(TerrainSourceResourceRole::MainDepth);
+        }
+        // The selected-frame planner may discover a temporal sampler while
+        // the immutable candidate snapshot is still carrying the prior
+        // frame's role set.  An explicitly supplied Rust-owned view is safe
+        // to wrap now; final completeness still rejects any undeclared or
+        // missing role before execution.
+        for (role, view) in [
+            (
+                TerrainSourceResourceRole::MainDepthBeforeTranslucency,
+                input.before_translucency_view,
+            ),
+            (
+                TerrainSourceResourceRole::MainDepthPrevious,
+                input.previous_view,
+            ),
+        ] {
+            if view.is_some() && !required.contains(&role) {
+                required.push(role);
+            }
+        }
         if required.is_empty() {
             self.clear_candidate_source_main_depth_resources(gal)?;
             return Ok(None);
@@ -6227,7 +6266,12 @@ impl ShaderPackRuntimeExecutor {
                 | TerrainGraphIsolation::TerrainPlusShadow
                 | TerrainGraphIsolation::FullDrawsSkipped
         ) {
-            self.append_shadow_depth_pass(ops, targets.into(), effective_draws)?;
+            self.append_shadow_depth_pass(
+                ops,
+                targets.into(),
+                effective_draws,
+                frame.shadow_targets_initialized,
+            )?;
         }
         self.append_g_buffer_passes(
             ops,
@@ -6235,6 +6279,7 @@ impl ShaderPackRuntimeExecutor {
             frame.background_color,
             effective_draws,
             isolation == TerrainGraphIsolation::FullDrawsSkipped,
+            frame.screen_targets_initialized,
         )?;
         if let Some(history) = frame.depth_history {
             Self::append_main_depth_history(ops, targets.depth_history, history)?;
@@ -6357,7 +6402,7 @@ impl ShaderPackRuntimeExecutor {
         draws: &[TerrainMeshDraw],
     ) -> GalResult<()> {
         self.validate_terrain_material_graph()?;
-        self.append_g_buffer_passes(ops, targets, background_color, draws, false)
+        self.append_g_buffer_passes(ops, targets, background_color, draws, false, false)
     }
 
     /// Appends one normal-terrain source pass to its named shader-pack color
@@ -6755,7 +6800,7 @@ impl ShaderPackRuntimeExecutor {
         targets: TerrainSourceShadowPassTargets,
         draws: &[TerrainMeshDraw],
     ) -> GalResult<()> {
-        self.append_shadow_depth_pass(ops, targets, draws)
+        self.append_shadow_depth_pass(ops, targets, draws, targets.initialized)
     }
 
     fn validate_terrain_material_graph(&self) -> GalResult<()> {
@@ -6790,11 +6835,17 @@ impl ShaderPackRuntimeExecutor {
         ops: &mut Vec<CommandOp>,
         targets: TerrainSourceShadowPassTargets,
         draws: &[TerrainMeshDraw],
+        targets_initialized: bool,
     ) -> GalResult<()> {
         let pass = self.pass_identity(AttachmentRole::ShadowDepth)?;
+        let attachment_before = if targets_initialized {
+            TextureUsageState::ShaderRead
+        } else {
+            TextureUsageState::Undefined
+        };
         ops.push(CommandOp::Barrier(texture_barrier(
             targets.shadow_depth_texture,
-            TextureUsageState::Undefined,
+            attachment_before,
             TextureUsageState::DepthStencilAttachment,
         )));
         for texture in [
@@ -6803,7 +6854,7 @@ impl ShaderPackRuntimeExecutor {
         ] {
             ops.push(CommandOp::Barrier(texture_barrier(
                 texture,
-                TextureUsageState::Undefined,
+                attachment_before,
                 TextureUsageState::ColorAttachment,
             )));
         }
@@ -6893,7 +6944,13 @@ impl ShaderPackRuntimeExecutor {
         background_color: ClearColor,
         draws: &[TerrainMeshDraw],
         force_empty_clear: bool,
+        targets_initialized: bool,
     ) -> GalResult<()> {
+        let attachment_before = if targets_initialized {
+            TextureUsageState::ShaderRead
+        } else {
+            TextureUsageState::Undefined
+        };
         for texture in [
             targets.albedo_texture,
             targets.normal_texture,
@@ -6902,13 +6959,13 @@ impl ShaderPackRuntimeExecutor {
         ] {
             ops.push(CommandOp::Barrier(texture_barrier(
                 texture,
-                TextureUsageState::Undefined,
+                attachment_before,
                 TextureUsageState::ColorAttachment,
             )));
         }
         ops.push(CommandOp::Barrier(texture_barrier(
             targets.depth_texture,
-            TextureUsageState::Undefined,
+            attachment_before,
             TextureUsageState::DepthStencilAttachment,
         )));
 
@@ -7026,6 +7083,7 @@ impl ShaderPackRuntimeExecutor {
         draws: &[TerrainMeshDraw],
         forward_material_draws: &[TerrainForwardMaterialDraw],
     ) -> GalResult<()> {
+        let screen_texture_before = screen_texture_before(frame.screen_targets_initialized);
         ops.push(CommandOp::Barrier(buffer_barrier(
             targets.composite_uniform_buffer,
             TextureUsageState::ShaderRead,
@@ -7052,6 +7110,7 @@ impl ShaderPackRuntimeExecutor {
             targets.deferred_lighting_resource_set,
             targets.screen_pipeline_layout,
             transparent_clear(frame.background_color),
+            screen_texture_before,
         );
         self.append_translucent_pass(ops, targets, draws)?;
         self.append_forward_material_pass(ops, targets, forward_material_draws)?;
@@ -7065,6 +7124,7 @@ impl ShaderPackRuntimeExecutor {
             targets.composite0_resource_set,
             targets.screen_pipeline_layout,
             transparent_clear(frame.background_color),
+            screen_texture_before,
         );
         self.append_screen_pass(
             ops,
@@ -7076,6 +7136,7 @@ impl ShaderPackRuntimeExecutor {
             targets.composite1_resource_set,
             targets.screen_pipeline_layout,
             transparent_clear(frame.background_color),
+            screen_texture_before,
         );
 
         ops.push(CommandOp::BeginPass {
@@ -7263,10 +7324,11 @@ impl ShaderPackRuntimeExecutor {
         resource_set: Handle,
         pipeline_layout: Handle,
         clear_color: ClearColor,
+        texture_before: TextureUsageState,
     ) {
         ops.push(CommandOp::Barrier(texture_barrier(
             texture,
-            TextureUsageState::Undefined,
+            texture_before,
             TextureUsageState::ColorAttachment,
         )));
         ops.push(CommandOp::BeginPass {
@@ -7309,6 +7371,14 @@ impl ShaderPackRuntimeExecutor {
             .ok_or_else(|| {
                 GalError::invalid_argument(format!("shader runtime graph is missing {role:?} pass"))
             })
+    }
+}
+
+fn screen_texture_before(initialized: bool) -> TextureUsageState {
+    if initialized {
+        TextureUsageState::ShaderRead
+    } else {
+        TextureUsageState::Undefined
     }
 }
 
@@ -7553,6 +7623,18 @@ mod tests {
             ))),
             false,
         )
+    }
+
+    #[test]
+    fn persistent_screen_targets_use_shader_read_after_first_frame() {
+        assert_eq!(
+            TextureUsageState::Undefined,
+            screen_texture_before(false)
+        );
+        assert_eq!(
+            TextureUsageState::ShaderRead,
+            screen_texture_before(true)
+        );
     }
 
     fn copied_png_assets_for(source: &ShaderPackSource) -> ShaderPackAssets {
@@ -7999,9 +8081,9 @@ mod tests {
             "first-person output must begin a fresh Rust-owned depth domain"
         );
         assert_eq!(
-            TextureUsageState::ShaderRead,
+            TextureUsageState::Undefined,
             TerrainSourceColorPassPhase::Hands.depth_before(),
-            "the shared depth image must transition explicitly before the first-person clear"
+            "the private first-person depth image must transition explicitly from its initial state"
         );
         let entity_program = executor
             .prepared_lowered_entity_source_program()
@@ -9867,7 +9949,7 @@ mod tests {
                 operation,
                 CommandOp::Barrier(barrier)
                     if barrier.resource == depth_texture
-                        && barrier.before == TextureUsageState::ShaderRead
+                        && barrier.before == TextureUsageState::Undefined
                         && barrier.after == TextureUsageState::DepthStencilAttachment
             )),
             "the hand writer must explicitly transition its fresh depth domain"

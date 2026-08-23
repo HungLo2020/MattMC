@@ -45,6 +45,7 @@ import net.vulkanic.VulkanicRenderPass;
 import net.vulkanic.VulkanicRenderTargetDescriptor;
 import net.vulkanic.VulkanicTexture;
 import net.vulkanic.VulkanicTextureView;
+import net.vulkanic.bridge.RustGalVulkanWholeFrameMode;
 import org.jetbrains.annotations.Nullable;
 
 import java.nio.ByteBuffer;
@@ -74,6 +75,9 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
     private static final boolean DEBUG_DESCRIPTOR_BINDINGS =
         Boolean.getBoolean("mattmc.vulkan.debugDescriptorBindingSeam");
     private static final int MAX_IRIS_PROGRAM_LIVE_DESCRIPTOR_CACHE_ENTRIES = 128;
+    private static final int MAX_RENDER_PASS_SAMPLERS = 128;
+    private static final int MAX_RENDER_PASS_UNIFORMS = 256;
+    private static final int MAX_RENDER_PASS_IRIS_PROGRAM_STATES = 128;
     private static final Map<IrisProgramLiveDescriptorKey, PipelineDescriptor> IRIS_PROGRAM_LIVE_DESCRIPTOR_CACHE =
         new java.util.concurrent.ConcurrentHashMap<>();
     private static int debugCustomPassLogs;
@@ -123,6 +127,11 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
 
     @Nullable
     private static GlProgram resolveIrisOverrideProgram(RenderPipeline renderPipeline) {
+        if (RustGalVulkanWholeFrameMode.enabled()) {
+            // Rust Vulkan consumes explicit semantic pipeline descriptors; do not
+            // inspect Iris' live pipeline manager from the Java compatibility encoder.
+            return null;
+        }
         if (renderPipeline == net.irisshaders.iris.pipeline.CompositeRenderer.COMPOSITE_PIPELINE) {
             return null;
         }
@@ -191,6 +200,7 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
         @Nullable GpuTextureView depthTextureView,
         OptionalDouble clearDepth
     ) {
+        this.ensureJavaVulkanRenderingAvailable();
         this.ensureNoRenderPass();
         CommandContext ctx = this.backend.beginCommandBuffer();
         VulkanicTextureView colorView = this.createTextureView(colorTextureView);
@@ -221,6 +231,7 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
 
     @Override
     public RenderPass createRenderPass(Supplier<String> label, int framebuffer, boolean hasDepthTexture) {
+        this.ensureJavaVulkanRenderingAvailable();
         this.ensureNoRenderPass();
         if (this.resourceMode == ResourceMode.GENERAL
                 && !this.backend.canCreateNativeFramebufferRenderPass(framebuffer, hasDepthTexture)) {
@@ -239,6 +250,7 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
 
     @Override
     public RenderPass createRenderPass(VulkanicRenderTargetDescriptor descriptor) {
+        this.ensureJavaVulkanRenderingAvailable();
         this.ensureNoRenderPass();
         CommandContext ctx = this.backend.beginCommandBuffer();
         VulkanicRenderPass pass = this.backend.beginRenderPass(ctx, descriptor);
@@ -257,6 +269,7 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
         int fallbackFramebuffer,
         boolean preferDescriptor
     ) {
+        this.ensureJavaVulkanRenderingAvailable();
         this.ensureNoRenderPass();
         if (preferDescriptor
                 && this.backend.renderTargetDescriptorCompatibilityWithFramebuffer(fallbackFramebuffer, descriptor)
@@ -269,7 +282,8 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
 
     @Override
     public void writeToBuffer(GpuBufferSlice slice, ByteBuffer data) {
-        if (!net.irisshaders.iris.vertices.ImmediateState.temporarilyIgnorePass) {
+        this.ensureJavaVulkanRenderingAvailable();
+        if (!legacyImmediatePassIgnored()) {
             this.ensureNoRenderPass();
         }
         GpuBuffer buffer = slice.buffer();
@@ -305,11 +319,13 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
 
     @Override
     public GpuBuffer.MappedView mapBuffer(GpuBuffer buffer, boolean read, boolean write) {
+        this.ensureJavaVulkanRenderingAvailable();
         return this.mapBuffer(buffer.slice(), read, write);
     }
 
     @Override
     public GpuBuffer.MappedView mapBuffer(GpuBufferSlice slice, boolean read, boolean write) {
+        this.ensureJavaVulkanRenderingAvailable();
         this.ensureNoRenderPass();
         if (slice.buffer().isClosed()) {
             throw new IllegalStateException("Buffer already closed");
@@ -372,6 +388,7 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
 
     @Override
     public void copyToBuffer(GpuBufferSlice source, GpuBufferSlice target) {
+        this.ensureJavaVulkanRenderingAvailable();
         this.ensureNoRenderPass();
         GpuBuffer sourceBuffer = source.buffer();
         GpuBuffer targetBuffer = target.buffer();
@@ -417,6 +434,7 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
 
     @Override
     public void clearColorTexture(GpuTexture texture, int clearColor) {
+        this.ensureJavaVulkanRenderingAvailable();
         this.ensureNoRenderPass();
         this.verifyColorTexture(texture);
         CommandContext ctx = this.backend.beginCommandBuffer();
@@ -434,6 +452,7 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
 
     @Override
     public void clearColorAndDepthTextures(GpuTexture colorTexture, int clearColor, GpuTexture depthTexture, double clearDepth) {
+        this.ensureJavaVulkanRenderingAvailable();
         this.ensureNoRenderPass();
         this.verifyColorTexture(colorTexture);
         this.verifyDepthTexture(depthTexture);
@@ -455,6 +474,7 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
 
     @Override
     public void clearColorAndDepthTextures(GpuTexture colorTexture, int clearColor, GpuTexture depthTexture, double clearDepth, int x, int y, int width, int height) {
+        this.ensureJavaVulkanRenderingAvailable();
         this.ensureNoRenderPass();
         this.verifyColorTexture(colorTexture);
         this.verifyDepthTexture(depthTexture);
@@ -485,6 +505,7 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
 
     @Override
     public void clearDepthTexture(GpuTexture texture, double clearDepth) {
+        this.ensureJavaVulkanRenderingAvailable();
         this.ensureNoRenderPass();
         this.verifyDepthTexture(texture);
         CommandContext ctx = this.commandContext();
@@ -507,6 +528,7 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
 
     @Override
     public void writeToTexture(GpuTexture texture, NativeImage image) {
+        this.ensureJavaVulkanRenderingAvailable();
         int width = texture.getWidth(0);
         int height = texture.getHeight(0);
         if (image.getWidth() != width || image.getHeight() != height) {
@@ -525,7 +547,8 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
 
     @Override
     public void writeToTexture(GpuTexture texture, NativeImage image, int mipLevel, int depth, int targetX, int targetY, int width, int height, int sourceX, int sourceY) {
-        if (!net.irisshaders.iris.vertices.ImmediateState.temporarilyIgnorePass) {
+        this.ensureJavaVulkanRenderingAvailable();
+        if (!legacyImmediatePassIgnored()) {
             this.ensureNoRenderPass();
         }
         this.verifyTextureWrite(texture, mipLevel, sourceX, sourceY, targetX, targetY, width, height, depth);
@@ -549,7 +572,8 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
 
     @Override
     public void writeToTexture(GpuTexture texture, ByteBuffer data, NativeImage.Format format, int mipLevel, int depth, int targetX, int targetY, int width, int height) {
-        if (!net.irisshaders.iris.vertices.ImmediateState.temporarilyIgnorePass) {
+        this.ensureJavaVulkanRenderingAvailable();
+        if (!legacyImmediatePassIgnored()) {
             this.ensureNoRenderPass();
         }
         this.verifyTextureWrite(texture, mipLevel, 0, 0, targetX, targetY, width, height, depth);
@@ -573,12 +597,14 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
 
     @Override
     public void copyTextureToBuffer(GpuTexture texture, GpuBuffer buffer, int offset, Runnable callback, int mipLevel) {
+        this.ensureJavaVulkanRenderingAvailable();
         this.ensureNoRenderPass();
         this.copyTextureToBuffer(texture, buffer, offset, callback, mipLevel, 0, 0, texture.getWidth(mipLevel), texture.getHeight(mipLevel));
     }
 
     @Override
     public void copyTextureToBuffer(GpuTexture texture, GpuBuffer buffer, int offset, Runnable callback, int mipLevel, int x, int y, int width, int height) {
+        this.ensureJavaVulkanRenderingAvailable();
         this.ensureNoRenderPass();
         this.verifyTextureCopyToBuffer(texture, buffer, mipLevel, x, y, width, height, offset);
         CommandContext ctx = this.commandContext();
@@ -601,6 +627,7 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
 
     @Override
     public void copyTextureToTexture(GpuTexture source, GpuTexture target, int mipLevel, int targetX, int targetY, int sourceX, int sourceY, int width, int height) {
+        this.ensureJavaVulkanRenderingAvailable();
         this.ensureNoRenderPass();
         this.verifyTextureCopyToTexture(source, target, mipLevel, targetX, targetY, sourceX, sourceY, width, height);
         VulkanicAPI.copyImageSubData2D(
@@ -631,6 +658,11 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
 
     @Override
     public void presentTexture(GpuTextureView textureView) {
+        if (RustGalVulkanWholeFrameMode.enabled()) {
+            throw new IllegalStateException(
+                "Java Vulkan command-encoder presentation is unavailable while Rust owns whole-frame presentation"
+            );
+        }
         this.ensureNoRenderPass();
         if (!textureView.texture().getFormat().hasColorAspect()) {
             throw new IllegalStateException("Cannot present a non-color texture!");
@@ -646,6 +678,7 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
 
     @Override
     public GpuFence createFence() {
+        this.ensureJavaVulkanRenderingAvailable();
         this.ensureNoRenderPass();
         return new NativeFence(this.commandContext());
     }
@@ -679,6 +712,15 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
     private void ensureNoRenderPass() {
         if (this.inRenderPass) {
             throw new IllegalStateException("Close the existing Vulkan render pass before issuing another encoder command");
+        }
+    }
+
+    /** Java Vulkan render passes are never a fallback once Rust owns presentation. */
+    private void ensureJavaVulkanRenderingAvailable() {
+        if (RustGalVulkanWholeFrameMode.enabled()) {
+            throw new IllegalStateException(
+                "Java Vulkan render passes are unavailable while Rust owns whole-frame presentation"
+            );
         }
     }
 
@@ -1030,11 +1072,14 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
         public void bindSampler(String name, @Nullable GpuTextureView view, int textureUnit) {
             this.checkOpen();
             this.markResourceBindingsDirty();
-            this.closeSampler(name);
             if (view == null) {
+                this.closeSampler(name);
                 this.samplerUnits.remove(name);
                 return;
             }
+
+            this.ensureBindingCapacity(this.samplers, name, MAX_RENDER_PASS_SAMPLERS, "samplers");
+            this.closeSampler(name);
 
             if (!(view.texture() instanceof VulkanicTexture texture)) {
                 throw new IllegalArgumentException("Sampler " + name + " is not backed by a VulkanicTexture");
@@ -1068,11 +1113,14 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
         public boolean bindLegacySampler(String name, int textureId, int textureUnit) {
             this.checkOpen();
             this.markResourceBindingsDirty();
-            this.closeSampler(name);
             if (textureId <= 0) {
+                this.closeSampler(name);
                 this.samplerUnits.remove(name);
                 return false;
             }
+
+            this.ensureBindingCapacity(this.samplers, name, MAX_RENDER_PASS_SAMPLERS, "samplers");
+            this.closeSampler(name);
 
             VulkanicTextureView view = VulkanicAPI.createManagedLegacyTextureView(textureId);
             if (view == null) {
@@ -1109,6 +1157,7 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
         @Override
         public void setUniform(String name, GpuBufferSlice slice) {
             this.checkOpen();
+            this.ensureBindingCapacity(this.uniforms, name, MAX_RENDER_PASS_UNIFORMS, "uniforms");
             VulkanicBufferSlice resolvedSlice = new VulkanicBufferSlice(
                 VulkanicAPI.resolveVulkanicBuffer(slice.buffer()),
                 slice.offset(),
@@ -1351,6 +1400,7 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
             if (this.closed) {
                 return;
             }
+            VulkanNativeCommandEncoder.this.ensureJavaVulkanRenderingAvailable();
             if (this.debugGroups != 0) {
                 throw new IllegalStateException("Render pass had debug groups left open");
             }
@@ -1450,6 +1500,13 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
                 );
             }
             irisProgram.iris$setupState();
+            if (this.irisProgramsToClear.size() >= MAX_RENDER_PASS_IRIS_PROGRAM_STATES) {
+                irisProgram.iris$clearState();
+                throw new IllegalStateException(
+                    "Vulkan native render pass exceeded the bounded Iris program-state limit of "
+                        + MAX_RENDER_PASS_IRIS_PROGRAM_STATES
+                );
+            }
             this.irisProgramsToClear.add(irisProgram);
         }
 
@@ -1965,6 +2022,11 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
 
         @Nullable
         private GpuTextureView recoverSamplerView(String name, @Nullable Integer textureUnit) {
+            if (RustGalVulkanWholeFrameMode.enabled()) {
+                // This compatibility encoder is not admitted on the Rust-owned route;
+                // never recover bindings from Iris' runtime texture cache there.
+                return null;
+            }
             Integer samplerIndex = textureUnit != null ? textureUnit : parseSamplerIndex(name);
             if (samplerIndex != null) {
                 GpuTextureView shaderTexture = TextureTracker.INSTANCE.getShaderTexture(samplerIndex);
@@ -2002,6 +2064,14 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
             }
         }
 
+        private <K, V> void ensureBindingCapacity(Map<K, V> bindings, K key, int limit, String kind) {
+            if (!bindings.containsKey(key) && bindings.size() >= limit) {
+                throw new IllegalStateException(
+                    "Vulkan native render pass exceeded the bounded " + kind + " limit of " + limit
+                );
+            }
+        }
+
         private void markResourceBindingsDirty() {
             this.resourceStateGeneration++;
             this.cachedResourceSubmission = null;
@@ -2012,6 +2082,7 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
         }
 
         private void checkOpen() {
+            VulkanNativeCommandEncoder.this.ensureJavaVulkanRenderingAvailable();
             if (this.closed) {
                 throw new IllegalStateException("Can't use a closed render pass");
             }
@@ -2037,8 +2108,22 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
 
     @Nullable
     private static Integer currentBoundSamplerObject(int samplerUnit) {
+        if (RustGalVulkanWholeFrameMode.enabled()) {
+            return null;
+        }
         int samplerObject = IrisRenderSystem.getBoundSamplerOnUnit(samplerUnit);
         return samplerObject > 0 ? samplerObject : null;
+    }
+
+    /**
+     * The ImmediateState flag belongs to Iris' borrowed Java compatibility
+     * encoder.  Rust-owned Vulkan must not read that live GPU-state shard even
+     * for upload bookkeeping; its explicit command stream has its own pass
+     * boundaries.
+     */
+    private static boolean legacyImmediatePassIgnored() {
+        return !RustGalVulkanWholeFrameMode.enabled()
+            && net.irisshaders.iris.vertices.ImmediateState.temporarilyIgnorePass;
     }
 
     @Nullable

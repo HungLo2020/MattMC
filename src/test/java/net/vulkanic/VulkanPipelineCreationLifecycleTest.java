@@ -83,7 +83,11 @@ public class VulkanPipelineCreationLifecycleTest {
                 () -> VulkanicAPI.createPipeline(descriptorWithDummySpirv()),
                 "Vulkan-selected createPipeline should fail hard with readiness diagnostics when runtime is unavailable"
             );
-            assertTrue(failure.getMessage().contains("Readiness report:"));
+            assertTrue(
+                failure.getMessage().contains("Readiness report:")
+                    || failure.getMessage().contains("Rust Vulkan whole-frame ownership"),
+                "Pipeline creation must fail with either native readiness diagnostics or the Rust ownership boundary"
+            );
             return;
         }
 
@@ -195,5 +199,7 @@ public class VulkanPipelineCreationLifecycleTest {
         Field rawVulkanBackendField = VulkanicAPI.class.getDeclaredField("rawVulkanBackend");
         rawVulkanBackendField.setAccessible(true);
         rawVulkanBackendField.set(null, null);
+        net.vulkanic.bridge.RustGalVulkanWholeFrameMode.deactivateRustPresentation();
+        net.vulkanic.bridge.RustGalVulkanWholeFrameMode.clearVulkanBackendSelection();
     }
 }

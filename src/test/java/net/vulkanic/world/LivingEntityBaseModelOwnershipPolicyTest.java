@@ -21,7 +21,7 @@ final class LivingEntityBaseModelOwnershipPolicyTest {
 	@Test
 	void unportedFamilyNeverClaimsRustOwnership() {
 		assertEquals(
-			JAVA_COMPATIBILITY,
+			DISABLED,
 			LivingEntityBaseModelOwnershipPolicy.selectOwnershipForTests(false, true, true, false, false)
 		);
 	}
@@ -33,11 +33,11 @@ final class LivingEntityBaseModelOwnershipPolicyTest {
 			LivingEntityBaseModelOwnershipPolicy.selectOwnershipForTests(true, true, true, true, false)
 		);
 		assertEquals(
-			JAVA_COMPATIBILITY,
+			DISABLED,
 			LivingEntityBaseModelOwnershipPolicy.selectOwnershipForTests(true, true, true, false, true)
 		);
 		assertEquals(
-			JAVA_COMPATIBILITY,
+			DISABLED,
 			LivingEntityBaseModelOwnershipPolicy.selectOwnershipForTests(true, true, false, false, false)
 		);
 		assertEquals(
@@ -59,9 +59,9 @@ final class LivingEntityBaseModelOwnershipPolicyTest {
 	}
 
 	@Test
-	void unportedAndSemanticSubmissionsRemainJavaObservable() {
+	void unportedAndUnavailableSubmissionsFailClosedOutsideCoverage() {
 		assertEquals(
-			LivingEntityBaseModelOwnershipPolicy.Disposition.JAVA_COMPATIBILITY,
+			LivingEntityBaseModelOwnershipPolicy.Disposition.RUST_UNAVAILABLE,
 			LivingEntityBaseModelOwnershipPolicy.classify(false, false, false, RUST_VULKAN_WHOLE_FRAME)
 		);
 		assertEquals(
@@ -73,7 +73,7 @@ final class LivingEntityBaseModelOwnershipPolicyTest {
 			LivingEntityBaseModelOwnershipPolicy.classify(false, true, false, WorldRenderRoutePolicy.Route.JAVA_COMPATIBILITY)
 		);
 		assertEquals(
-			LivingEntityBaseModelOwnershipPolicy.Disposition.JAVA_COMPATIBILITY,
+			LivingEntityBaseModelOwnershipPolicy.Disposition.RUST_UNAVAILABLE,
 			LivingEntityBaseModelOwnershipPolicy.classify(false, true, true, DISABLED)
 		);
 	}

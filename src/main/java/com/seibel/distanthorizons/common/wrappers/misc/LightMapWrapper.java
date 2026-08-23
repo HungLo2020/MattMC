@@ -52,6 +52,10 @@ public class LightMapWrapper implements ILightMapWrapper
 	@Override
 	public void bind()
 	{
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
+		{
+			throw new IllegalStateException("Java Distant Horizons lightmap binding is unavailable while Rust owns whole-frame presentation");
+		}
 		if (VulkanicAPI.isVulkanBackendSelected())
 		{
 			Minecraft.getInstance().gameRenderer.lightTexture().turnOnLightLayer();
@@ -65,6 +69,10 @@ public class LightMapWrapper implements ILightMapWrapper
 	@Override
 	public void unbind()
 	{
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
+		{
+			throw new IllegalStateException("Java Distant Horizons lightmap unbinding is unavailable while Rust owns whole-frame presentation");
+		}
 		if (VulkanicAPI.isVulkanBackendSelected())
 		{
 			return;

@@ -69,11 +69,17 @@ public class WaypointContainer {
     }
 
     public void renderWaypoints(float gameTimeDeltaPartialTick, PoseStack poseStack, BufferSource bufferSource, Camera camera) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+            throw new IllegalStateException("Java VoxelMap waypoint rendering is unavailable while Rust owns whole-frame presentation");
+        }
         this.renderWaypointsBeams(gameTimeDeltaPartialTick, poseStack, bufferSource, camera);
         this.renderWaypointsLabels(gameTimeDeltaPartialTick, poseStack, bufferSource, camera);
     }
 
     public void renderWaypointsBeams(float gameTimeDeltaPartialTick, PoseStack poseStack, BufferSource bufferSource, Camera camera) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+            throw new IllegalStateException("Java VoxelMap waypoint beam rendering is unavailable while Rust owns whole-frame presentation");
+        }
         Vec3 cameraPos = camera.getPosition();
         double bottomOfWorld = VoxelConstants.getPlayer().level().getMinY() - cameraPos.y;
 
@@ -92,6 +98,9 @@ public class WaypointContainer {
     }
 
     public void renderWaypointsLabels(float gameTimeDeltaPartialTick, PoseStack poseStack, BufferSource bufferSource, Camera camera) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+            throw new IllegalStateException("Java VoxelMap waypoint label rendering is unavailable while Rust owns whole-frame presentation");
+        }
         if (!this.options.showWaypoints) return;
         if (minecraft.options.hideGui) return;
 

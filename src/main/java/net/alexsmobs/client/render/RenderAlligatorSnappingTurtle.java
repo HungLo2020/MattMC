@@ -57,7 +57,7 @@ public class RenderAlligatorSnappingTurtle extends MobRenderer<EntityAlligatorSn
                 float mossAlpha = 0.15F * Mth.clamp(state.mossLevel, 0, 10);
                 RenderType renderType = AMRenderTypes.entityTranslucent(TEXTURE_MOSS);
                 int color = AMColorUtil.packColor(1.0F, 1.0F, 1.0F, Math.min(1.0F, mossAlpha));
-                collector.order(1).submitModel(this.getParentModel(), state, poseStack, renderType, packedLight, OverlayTexture.NO_OVERLAY, color, null, state.outlineColor, null);
+                collector.order(1).submitModelSemanticTexture(this.getParentModel(), state, poseStack, renderType, packedLight, OverlayTexture.NO_OVERLAY, color, TEXTURE_MOSS, state.outlineColor, null);
             }
         }
     }

@@ -393,6 +393,9 @@ public class ShadowRenderer {
 	}
 
 	public void renderShadows(LevelRenderer levelRenderer, Camera playerCamera, CameraRenderState renderState) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris shadow renderer entrypoint is unavailable while Rust owns whole-frame presentation");
+		}
 		if (IrisVideoSettings.getOverriddenShadowDistance(IrisVideoSettings.shadowDistance) == 0) {
 			return;
 		}

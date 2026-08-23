@@ -229,6 +229,7 @@ fn simple_graphics_scene(gal: &mut VulkanicGal) -> (Handle, Handle, Handle, Hand
             depth_bias: None,
             color_formats: vec![TextureFormat::Rgba8Unorm],
             depth_format: None,
+            stencil: None,
         })
         .unwrap();
     (color_view, target, pass, layout, pipeline)
@@ -374,6 +375,7 @@ fn capability_limits_reject_descriptor_and_attachment_overflows() {
             depth_bias: None,
             color_formats: vec![TextureFormat::Rgba8Unorm; 5],
             depth_format: None,
+            stencil: None,
         }),
         "color attachment count",
     );
@@ -543,6 +545,31 @@ fn frame_lifecycle_rejects_present_without_acquire() {
 }
 
 #[test]
+fn frame_lifecycle_cancel_releases_an_acquired_frame() {
+    let mut gal = gal_with_capabilities(presentation_capabilities());
+    gal.configure_frame_surface(frame_surface("cancel")).unwrap();
+    let acquired = gal
+        .acquire_frame(FrameAcquireDesc {
+            correlation_id: FrameCorrelationId(8),
+            expected_extent: Extent3d {
+                width: 128,
+                height: 72,
+                depth: 1,
+            },
+        })
+        .unwrap();
+    gal.cancel_frame(acquired.frame).unwrap();
+    assert_code(
+        gal.present_frame(PresentFrameDesc {
+            frame: acquired.frame,
+            correlation_id: acquired.correlation_id,
+            wait_for: SubmissionId(1),
+        }),
+        super::StatusCode::InvalidArgument,
+    );
+}
+
+#[test]
 fn acquired_frame_targets_are_normal_pass_targets_without_attachment_borrows() {
     let mut gal = gal_with_capabilities(presentation_capabilities());
     gal.configure_frame_surface(frame_surface("borrowed-default-framebuffer"))
@@ -602,6 +629,7 @@ fn acquired_frame_targets_are_normal_pass_targets_without_attachment_borrows() {
             depth_bias: None,
             color_formats: vec![TextureFormat::Rgba8Unorm],
             depth_format: None,
+            stencil: None,
         })
         .unwrap();
     let list = gal
@@ -678,6 +706,101 @@ fn frame_target_descriptor_exposes_only_semantic_swapchain_identity() {
     assert_code(
         gal.frame_target_desc(frame_target),
         super::StatusCode::StaleHandle,
+    );
+}
+
+#[test]
+fn frame_target_copy_requires_explicit_owned_destination_and_matching_extent() {
+    let mut gal = gal_with_capabilities(presentation_capabilities());
+    gal.configure_frame_surface(frame_surface("frame-copy-contract"))
+        .unwrap();
+    let acquired = gal
+        .acquire_frame(FrameAcquireDesc {
+            correlation_id: FrameCorrelationId(103),
+            expected_extent: Extent3d {
+                width: 128,
+                height: 72,
+                depth: 1,
+            },
+        })
+        .unwrap();
+    let frame_target = gal
+        .create_frame_target(FrameTargetDesc {
+            label: "frame-copy-source".to_owned(),
+            frame_id: acquired.frame.0,
+            render_target: acquired.render_target,
+            extent: acquired.extent,
+            color_format: TextureFormat::Rgba8Unorm,
+        })
+        .unwrap();
+    let destination = gal
+        .create_texture(texture(
+            "frame-copy-destination",
+            TextureFormat::Rgba8Unorm,
+            vec![TextureUsage::TransferDst],
+        ))
+        .unwrap();
+
+    gal.create_command_list(CommandListDesc {
+        label: "valid-frame-copy".to_owned(),
+        operations: vec![
+            CommandOp::Barrier(ResourceBarrier {
+                resource: destination,
+                subresources: None,
+                before: TextureUsageState::Undefined,
+                after: TextureUsageState::TransferDst,
+                src_queue: QueueClass::Graphics,
+                dst_queue: QueueClass::Transfer,
+            }),
+            CommandOp::CopyFrameTargetToTexture {
+                src: frame_target,
+                dst: destination,
+                extent: Extent3d {
+                    width: 128,
+                    height: 72,
+                    depth: 1,
+                },
+            },
+        ],
+    })
+    .unwrap();
+
+    let color_only_destination = gal
+        .create_texture(texture(
+            "frame-copy-color-only",
+            TextureFormat::Rgba8Unorm,
+            vec![TextureUsage::ColorAttachment],
+        ))
+        .unwrap();
+    assert_code(
+        gal.create_command_list(CommandListDesc {
+            label: "frame-copy-without-transfer-dst".to_owned(),
+            operations: vec![CommandOp::CopyFrameTargetToTexture {
+                src: frame_target,
+                dst: color_only_destination,
+                extent: Extent3d {
+                    width: 64,
+                    height: 36,
+                    depth: 1,
+                },
+            }],
+        }),
+        super::StatusCode::InvalidArgument,
+    );
+    assert_code(
+        gal.create_command_list(CommandListDesc {
+            label: "frame-copy-outside-source".to_owned(),
+            operations: vec![CommandOp::CopyFrameTargetToTexture {
+                src: frame_target,
+                dst: destination,
+                extent: Extent3d {
+                    width: 129,
+                    height: 72,
+                    depth: 1,
+                },
+            }],
+        }),
+        super::StatusCode::InvalidArgument,
     );
 }
 
@@ -809,6 +932,26 @@ fn vulkan_capabilities_accept_mip_layer_copy_and_indirect_commands() {
         .create_buffer(buffer("indirect", vec![BufferUsage::Indirect]))
         .unwrap();
     let (_color_view, target, pass, _layout, graphics) = simple_graphics_scene(&mut gal);
+    assert_code(
+        gal.create_command_list(CommandListDesc {
+            label: "copy-inside-render-pass".to_owned(),
+            operations: vec![
+                CommandOp::BeginPass {
+                    pass,
+                    target,
+                    colors: vec![color_attachment(_color_view)],
+                    depth_stencil: None,
+                },
+                CommandOp::CopyBuffer {
+                    src: upload,
+                    dst: readback,
+                    size: 4,
+                },
+                CommandOp::EndPass,
+            ],
+        }),
+        super::StatusCode::InvalidArgument,
+    );
     gal.create_command_list(CommandListDesc {
         label: "indirect-draw".to_owned(),
         operations: vec![
@@ -1466,6 +1609,7 @@ fn pipeline_and_pass_compatibility_is_validated() {
             depth_bias: None,
             color_formats: vec![TextureFormat::Bgra8Unorm],
             depth_format: None,
+            stencil: None,
         })
         .unwrap();
     assert_code(
@@ -1515,6 +1659,7 @@ fn graphics_pipeline_depth_bias_requires_finite_enabled_depth_contract() {
         depth_bias,
         color_formats: vec![TextureFormat::Rgba8Unorm],
         depth_format,
+        stencil: None,
     };
 
     assert_code(
@@ -1695,6 +1840,7 @@ fn attachment_and_presentation_hazards_require_semantic_separation() {
             depth_bias: None,
             color_formats: vec![TextureFormat::Rgba8Unorm, TextureFormat::Rgba8Unorm],
             depth_format: None,
+            stencil: None,
         })
         .unwrap();
     let overlapping_list = gal
@@ -1761,6 +1907,7 @@ fn attachment_and_presentation_hazards_require_semantic_separation() {
             depth_bias: None,
             color_formats: vec![TextureFormat::Rgba8Unorm],
             depth_format: None,
+            stencil: None,
         })
         .unwrap();
     let full_range = TextureSubresourceRange {
@@ -3856,7 +4003,9 @@ fn frozen_ffi_abi_sizes_and_capability_negotiation_are_stable() {
     assert_eq!(FFI_ABI_V21_VERSION, 21);
     assert_eq!(FFI_ABI_V22_VERSION, 22);
     assert_eq!(FFI_ABI_V23_VERSION, 23);
-    assert_eq!(FFI_ABI_VERSION, FFI_ABI_V23_VERSION);
+    assert_eq!(FFI_ABI_V24_VERSION, 24);
+    assert_eq!(FFI_ABI_V25_VERSION, 25);
+    assert_eq!(FFI_ABI_VERSION, FFI_ABI_V25_VERSION);
     assert!(!FFI_INITIAL_PRESENTATION_SUPPORTED);
     assert_eq!(size_of::<FfiHeader>(), 8);
     assert_eq!(size_of::<FfiHandle>(), 8);

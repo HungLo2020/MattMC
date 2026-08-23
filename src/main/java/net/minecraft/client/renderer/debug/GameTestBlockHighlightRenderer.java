@@ -26,6 +26,9 @@ public class GameTestBlockHighlightRenderer {
 	}
 
 	public void render(PoseStack poseStack, MultiBufferSource multiBufferSource) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java game-test block highlights are unavailable while Rust owns whole-frame presentation");
+		}
 		long l = Util.getMillis();
 		this.markers.entrySet().removeIf(entry -> l > ((GameTestBlockHighlightRenderer.Marker)entry.getValue()).removeAtTime);
 		this.markers.forEach((blockPos, marker) -> this.renderMarker(poseStack, multiBufferSource, blockPos, marker));

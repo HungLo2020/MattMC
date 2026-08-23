@@ -320,6 +320,7 @@ pub unsafe fn decode_resource_batch(
             depth_bias: None,
             color_formats,
             depth_format: optional_texture_format(item.depth_format)?,
+            stencil: None,
         };
         check_graphics_pipeline_capabilities(&desc, capabilities)?;
         owned.graphics_pipelines.push(FfiOwnedCreate {

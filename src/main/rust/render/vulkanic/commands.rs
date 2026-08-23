@@ -13,6 +13,9 @@ pub enum TextureUsageState {
     TransferDst = 7,
     Present = 8,
     IndexRead = 9,
+    /// Read-only access through a storage-image descriptor. Unlike sampled
+    /// reads this remains in Vulkan GENERAL layout.
+    ShaderStorageRead = 10,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -148,6 +151,18 @@ pub enum CommandOp {
     CopyBufferToTexture(BufferImageCopyRegion),
     CopyTextureToBuffer(BufferImageCopyRegion),
     CopyTexture(TextureImageCopyRegion),
+    /// Copies the acquired presentation image into a Rust-owned texture.
+    ///
+    /// Frame targets are intentionally opaque GAL resources; this operation
+    /// is the only legal way for a frontend to make their pixels sampleable
+    /// without exposing a backend image/view or native swapchain handle.
+    /// The destination must be explicitly transitioned to `TransferDst` by a
+    /// preceding GAL barrier in the same submission.
+    CopyFrameTargetToTexture {
+        src: Handle,
+        dst: Handle,
+        extent: Extent3d,
+    },
     /// Generates the descendant mip levels in one explicit texture range.
     /// The first level is the source; every following level is written by the
     /// operation. Backends choose their native implementation privately.

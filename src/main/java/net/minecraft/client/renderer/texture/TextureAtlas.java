@@ -202,6 +202,16 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable,
 
 	public void cycleAnimationFrames() {
 		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			boolean advancedSemanticFrame = false;
+			if (!this.animatedTextures.isEmpty()) {
+				for (TextureAtlasSprite.Ticker ticker : this.animatedTextures) {
+					advancedSemanticFrame |= ticker.tickSemantic();
+				}
+			}
+			if (advancedSemanticFrame) {
+				this.semanticSnapshotGeneration++;
+				this.semanticRawSnapshot = null;
+			}
 			return;
 		}
 		if (this.texture != null) {
@@ -280,7 +290,7 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable,
 				if (contents.animatedTexture.frames.isEmpty()) {
 					return null;
 				}
-				int frame = contents.animatedTexture.frames.getFirst().index();
+				int frame = contents.semanticFrameIndex();
 				sourceX = contents.animatedTexture.getFrameX(frame) * contents.width();
 				sourceY = contents.animatedTexture.getFrameY(frame) * contents.height();
 			}

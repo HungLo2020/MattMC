@@ -44,7 +44,7 @@ public class LivingEntityEmissiveLayer<S extends LivingEntityRenderState, M exte
 				int j = ARGB.white(h);
 				RenderType renderType = (RenderType)this.bufferProvider.apply((ResourceLocation)this.textureProvider.apply(livingEntityRenderState));
 				submitNodeCollector.order(1)
-					.submitModel(
+					.submitModelSemanticTexture(
 						this.model,
 						livingEntityRenderState,
 						poseStack,
@@ -52,7 +52,7 @@ public class LivingEntityEmissiveLayer<S extends LivingEntityRenderState, M exte
 						i,
 						LivingEntityRenderer.getOverlayCoords(livingEntityRenderState, 0.0F),
 						j,
-						null,
+						(ResourceLocation)this.textureProvider.apply(livingEntityRenderState),
 						livingEntityRenderState.outlineColor,
 						null
 					);

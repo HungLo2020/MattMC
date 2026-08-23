@@ -26,7 +26,6 @@ import net.sodium.client.util.iterator.ByteIterator;
 import net.sodium.client.util.NativeBuffer;
 import net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings;
 import net.vulkanic.bridge.VulkanicGalBridge;
-import org.joml.Matrix4f;
 import org.slf4j.Logger;
 import net.logging.LogUtils;
 
@@ -41,6 +40,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -73,9 +73,18 @@ public final class RustGalTerrainRenderer {
 	private static final ArrayDeque<TerrainDiagnosticEvent> RECENT_EVENTS = new ArrayDeque<>(MAX_RECENT_EVENTS);
 	private static final ArrayDeque<TerrainDiagnosticEvent> LIFECYCLE_EVENTS = new ArrayDeque<>(MAX_LIFECYCLE_EVENTS);
 	private static final ArrayDeque<TerrainDiagnosticEvent> TRANSLUCENT_EVENTS = new ArrayDeque<>(MAX_TRANSLUCENT_EVENTS);
+	/**
+	 * Sort metadata is part of the semantic submission, not mutable mesh-cache
+	 * state.  Rust execution can occur after a later camera sort has replaced the
+	 * cache entry, so retain the exact receipt by gameplay frame and mesh key.
+	 */
+	private static final Map<Long, ArrayDeque<TranslucentExecutionMetadata>> TRANSLUCENT_EXECUTION_METADATA = new ConcurrentHashMap<>();
+	private static final Map<Long, CameraSortKey> LAST_DYNAMIC_SORT_CAMERA = new ConcurrentHashMap<>();
 	private static volatile long atlasGeneration;
 	private static volatile long registeredAtlasGeneration;
 	private static volatile long publishedWorldMeshAtlasGeneration;
+	/** Semantic atlas generation last copied into the Rust-owned PNG payload. */
+	private static volatile long copiedAtlasSemanticGeneration;
 	private static volatile byte[] atlasPayload;
 	private static volatile byte[] normalAtlasPayload;
 	private static volatile byte[] specularAtlasPayload;
@@ -114,6 +123,43 @@ public final class RustGalTerrainRenderer {
 	private static volatile TerrainSectionAsset lastWorldUnloadAsset;
 	private static volatile long lastWorldUnloadSectionPos;
 	private static volatile ChunkSectionLayer lastWorldUnloadLayer = ChunkSectionLayer.SOLID;
+
+	private record TranslucentExecutionMetadata(
+		long sortGeneration,
+		long sortedIndexHash,
+		double cameraX,
+		double cameraY,
+		double cameraZ,
+		int drawOrder
+	) {}
+
+	private record CameraSortKey(double x, double y, double z) {}
+
+	private static void retainTranslucentExecutionMetadata(long meshKey, TranslucentExecutionMetadata metadata) {
+		ArrayDeque<TranslucentExecutionMetadata> queue = TRANSLUCENT_EXECUTION_METADATA.computeIfAbsent(
+			meshKey, ignored -> new ArrayDeque<>()
+		);
+		synchronized (queue) {
+			if (queue.size() >= 32) {
+				queue.removeFirst();
+			}
+			queue.addLast(metadata);
+		}
+	}
+
+	private static TranslucentExecutionMetadata takeTranslucentExecutionMetadata(long meshKey) {
+		ArrayDeque<TranslucentExecutionMetadata> queue = TRANSLUCENT_EXECUTION_METADATA.get(meshKey);
+		if (queue == null) {
+			return null;
+		}
+		synchronized (queue) {
+			TranslucentExecutionMetadata metadata = queue.pollFirst();
+			if (queue.isEmpty()) {
+				TRANSLUCENT_EXECUTION_METADATA.remove(meshKey, queue);
+			}
+			return metadata;
+		}
+	}
 
 	private record FluidSpriteAsset(
 		int textureId,
@@ -270,6 +316,17 @@ public final class RustGalTerrainRenderer {
 	}
 
 	public static void acceptChunkBuildOutput(ChunkBuildOutput output) {
+		// Select the owner before constructing any layout.  The whole-frame
+		// Vulkan producer is compact and must not even query Iris's live vertex
+		// format; Iris-derived layout metadata is private to the OpenGL route.
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+			if (!WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan()) {
+				skippedRouteBuildOutputs.incrementAndGet();
+				return;
+			}
+			acceptChunkBuildOutput(output, TerrainMeshLayout.compact());
+			return;
+		}
 		acceptChunkBuildOutput(output, TerrainMeshLayout.activeIrisCompatible());
 	}
 
@@ -742,22 +799,45 @@ public final class RustGalTerrainRenderer {
 			|| sections == null || camera == null) {
 			return;
 		}
+		List<RenderSection> sectionSnapshot = new ArrayList<>();
+		for (RenderSection section : sections) {
+			if (section != null && section.isBuilt()) {
+				sectionSnapshot.add(section);
+			}
+		}
 		Set<VisibleSubmitKey> visibleSubmissions = new HashSet<>();
 		int translucentDrawOrder = 0;
-		for (RenderSection section : sections) {
-			if (section == null || !section.isBuilt()) {
-				continue;
-			}
+		for (RenderSection section : sectionSnapshot) {
 			enqueueSectionLayer(section, ChunkSectionLayer.SOLID, camera, viewportWidth, viewportHeight, 0, visibleSubmissions);
 			enqueueSectionLayer(section, ChunkSectionLayer.CUTOUT_MIPPED, camera, viewportWidth, viewportHeight, 0, visibleSubmissions);
+		}
+		// Translucent sections are a single camera-sorted semantic stream. The
+		// legacy Sodium render list is unavailable on the Rust whole-frame route,
+		// so retain no list/GL state and order copied section centers explicitly.
+		sectionSnapshot.sort(Comparator.comparingDouble((RenderSection section) -> {
+			double dx = section.getOriginX() + 8.0D - camera.getPosition().x();
+			double dy = section.getOriginY() + 8.0D - camera.getPosition().y();
+			double dz = section.getOriginZ() + 8.0D - camera.getPosition().z();
+			return dx * dx + dy * dy + dz * dz;
+		}).reversed());
+		for (RenderSection section : sectionSnapshot) {
 			enqueueSectionLayer(section, ChunkSectionLayer.TRANSLUCENT, camera, viewportWidth, viewportHeight,
 				translucentDrawOrder++, visibleSubmissions);
+		}
+		// Report the semantic terrain workload at the producer boundary. These
+		// names are parity-family labels only: the work above is Rust-owned CPU
+		// extraction and explicit mesh submission, never a Java Sodium draw.
+		if (!sectionSnapshot.isEmpty()) {
+			net.minecraft.client.dev.GraphicsFrameBenchmark.recordPhaseSample("sodium.terrain.setup", 1L);
+			net.minecraft.client.dev.GraphicsFrameBenchmark.recordPhaseSample("sodium.terrain.draw", 1L);
+			net.minecraft.client.dev.GraphicsFrameBenchmark.recordPhaseSample("sodium.terrain.draw", 1L);
+			net.minecraft.client.dev.GraphicsFrameBenchmark.recordPhaseSample("sodium.terrain.draw", 1L);
 		}
 		// The companion receipt is built from the same CPU-owned RenderSection
 		// values that this semantic callsite submitted. It deliberately contains
 		// no Sodium render list, GL object, or backend handle.
 		net.sodium.client.render.StaticTerrainParityDiagnostics.recordRustWholeFrameEnqueueCoverage(
-			sections,
+			sectionSnapshot,
 			currentGameplayFrameId(),
 			camera.getPosition().x(),
 			camera.getPosition().y(),
@@ -769,8 +849,11 @@ public final class RustGalTerrainRenderer {
 
 	public static void invalidateForResourceReload() {
 		SECTION_ASSETS.clear();
+		LAST_DYNAMIC_SORT_CAMERA.clear();
+		TRANSLUCENT_EXECUTION_METADATA.clear();
 		synchronized (RustGalTerrainRenderer.class) {
 			atlasPayload = null;
+			copiedAtlasSemanticGeneration = 0L;
 			normalAtlasPayload = null;
 			specularAtlasPayload = null;
 			atlasGeneration++;
@@ -786,6 +869,8 @@ public final class RustGalTerrainRenderer {
 		// Discard them with the existing terrain world epoch so no later Rust
 		// route can accidentally observe data from a disconnected level.
 		DistantHorizonsSemanticCollector.clear();
+		LAST_DYNAMIC_SORT_CAMERA.clear();
+		TRANSLUCENT_EXECUTION_METADATA.clear();
 		for (LayerKey key : List.copyOf(SECTION_ASSETS.keySet())) {
 			removeLayer(key.sectionPos(), key.layer(), "world-unload");
 		}
@@ -1440,10 +1525,21 @@ public final class RustGalTerrainRenderer {
 				continue;
 			}
 			executedStaticTerrainInstances++;
+		TranslucentExecutionMetadata submittedMetadata =
+				layerKey.layer() == ChunkSectionLayer.TRANSLUCENT
+					? takeTranslucentExecutionMetadata(instance.meshKey())
+					: null;
 			TranslucentSortSnapshot sortedIndex =
 				layerKey.layer() == ChunkSectionLayer.TRANSLUCENT ? currentTranslucentSortSnapshot(asset) : null;
-			long sortGeneration = sortedIndex == null ? 0L : sortedIndex.sortGeneration();
-			long sortedIndexHash = sortedIndex == null ? 0L : sortedIndex.indexHash();
+		// Execution is recorded after command generation. Report the sorted
+		// payload currently owned by Rust at that point; an older queued receipt
+		// must not masquerade as the active draw after a camera resort.
+		long sortGeneration = sortedIndex == null ? 0L : sortedIndex.sortGeneration();
+		long sortedIndexHash = sortedIndex == null ? 0L : sortedIndex.indexHash();
+		double cameraX = layerKey.layer() == ChunkSectionLayer.TRANSLUCENT ? currentCameraX() : 0.0D;
+		double cameraY = layerKey.layer() == ChunkSectionLayer.TRANSLUCENT ? currentCameraY() : 0.0D;
+		double cameraZ = layerKey.layer() == ChunkSectionLayer.TRANSLUCENT ? currentCameraZ() : 0.0D;
+			int drawOrder = submittedMetadata != null ? submittedMetadata.drawOrder() : 0;
 			net.sodium.client.render.StaticTerrainParityDiagnostics.recordRustStaticTerrainExecution(
 				"rust-vulkan-executed",
 				layerKey.sectionPos(),
@@ -1496,16 +1592,16 @@ public final class RustGalTerrainRenderer {
 				frameId,
 				submissionId,
 				layerKey.layer() == ChunkSectionLayer.TRANSLUCENT ? sortGeneration : 0L,
-				0.0D,
-				0.0D,
-				0.0D,
+				cameraX,
+				cameraY,
+				cameraZ,
 				asset.sectionOriginX() + 8.0D,
 				asset.sectionOriginY() + 8.0D,
 				asset.sectionOriginZ() + 8.0D,
 				layerKey.layer() == ChunkSectionLayer.TRANSLUCENT ? Math.max(0, asset.indexCount() / 6) : 0,
 				sortedIndexHash,
 				sortGeneration,
-				0
+				drawOrder
 			);
 		}
 		if (executedStaticTerrainInstances > 0L) {
@@ -2084,6 +2180,14 @@ public final class RustGalTerrainRenderer {
 			seen[primitiveId] = true;
 			int metadataOffset = primitiveId * metadataStride;
 			int primitiveKind = primitiveMetadata[metadataOffset];
+			// Flat translucent quads do not carry a fluid record.  The native
+			// metadata ABI leaves their kind at UNKNOWN (0) on the ordinary
+			// compact path; the modified-translucent path already normalizes this
+			// value.  Treating it as a non-fluid translucent quad here preserves
+			// the semantic atlas material instead of rejecting the whole section.
+			if (primitiveKind == NativeSectionMeshBuilder.PRIMITIVE_KIND_UNKNOWN) {
+				primitiveKind = NativeSectionMeshBuilder.PRIMITIVE_KIND_NON_FLUID_TRANSLUCENT;
+			}
 			switch (primitiveKind) {
 				case NativeSectionMeshBuilder.PRIMITIVE_KIND_NON_FLUID_TRANSLUCENT -> nonFluidPrimitiveCount++;
 				case NativeSectionMeshBuilder.PRIMITIVE_KIND_GENERIC_FLUID -> nonFluidPrimitiveCount++;
@@ -2300,7 +2404,10 @@ public final class RustGalTerrainRenderer {
 			materialId,
 			textureId == 0 ? RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_TERRAIN_BLOCK_ATLAS : textureId,
 			RustGalWorldPrimitiveRenderer.MATERIAL_MODE_TRANSLUCENT,
-			RustGalWorldPrimitiveRenderer.CULL_BACK,
+			// Vanilla translucent terrain is rendered two-sided.  The section
+			// policy is consumed by Rust's material pipeline (the instance policy
+			// alone cannot override it), so keep the semantic cull choice here.
+			RustGalWorldPrimitiveRenderer.CULL_NONE,
 			RustGalWorldPrimitiveRenderer.WORLD_WINDING_CCW,
 			startIndex * Integer.BYTES,
 			currentIndexCount - startIndex
@@ -2537,14 +2644,15 @@ public final class RustGalTerrainRenderer {
 			);
 			return false;
 		}
-		float[] transform = new Matrix4f()
-			.translation(
-				(float)(section.getOriginX() - camera.getPosition().x()),
-				(float)(section.getOriginY() - camera.getPosition().y()),
-				(float)(section.getOriginZ() - camera.getPosition().z())
-			)
-			.get(new float[16]);
+		float[] transform = cameraRelativeTranslationTransform(
+			(float)(section.getOriginX() - camera.getPosition().x()),
+			(float)(section.getOriginY() - camera.getPosition().y()),
+			(float)(section.getOriginZ() - camera.getPosition().z())
+		);
 		long visibleGeneration = "stale-generation".equals(activeFault()) ? asset.meshGeneration() + 1L : asset.meshGeneration();
+		if (layer == ChunkSectionLayer.TRANSLUCENT) {
+			ensureDynamicTranslucentSort(asset, camera);
+		}
 			TranslucentSortSnapshot sortedIndex =
 				layer == ChunkSectionLayer.TRANSLUCENT ? currentTranslucentSortSnapshot(asset) : null;
 			long sortGeneration = sortedIndex == null ? 0L : sortedIndex.sortGeneration();
@@ -2595,13 +2703,24 @@ public final class RustGalTerrainRenderer {
 			transform,
 			viewportWidth,
 			viewportHeight,
-			layer == ChunkSectionLayer.TRANSLUCENT ? RustGalWorldPrimitiveRenderer.DEPTH_POLICY_TEST_NO_WRITE : RustGalWorldPrimitiveRenderer.DEPTH_POLICY_TEST_WRITE
+			layer == ChunkSectionLayer.TRANSLUCENT ? RustGalWorldPrimitiveRenderer.DEPTH_POLICY_TEST_NO_WRITE : RustGalWorldPrimitiveRenderer.DEPTH_POLICY_TEST_WRITE,
+			layer == ChunkSectionLayer.TRANSLUCENT ? RustGalWorldPrimitiveRenderer.CULL_NONE : RustGalWorldPrimitiveRenderer.CULL_BACK
 		);
 		long enqueueFrameId = rustEnqueueFrames.incrementAndGet();
 		if (submitted) {
 			visibleLayerSubmissions.incrementAndGet();
 			recordCurrentFrameVisibleSubmission(enqueueFrameId);
 			recordVisibleSubmissionIdentity(section.getPosition().asLong(), layer, visibleGeneration);
+			if (layer == ChunkSectionLayer.TRANSLUCENT) {
+				retainTranslucentExecutionMetadata(asset.meshKey(), new TranslucentExecutionMetadata(
+						sortGeneration,
+						sortedIndexHash,
+						camera.getPosition().x(),
+						camera.getPosition().y(),
+						camera.getPosition().z(),
+						drawOrder
+				));
+			}
 			net.sodium.client.render.StaticTerrainParityDiagnostics.recordRustStaticTerrainExecution(
 				"rust-vulkan-enqueued",
 				section.getPosition().asLong(),
@@ -2631,6 +2750,7 @@ public final class RustGalTerrainRenderer {
 				currentGameplayFrameId(),
 				enqueueFrameId
 			);
+			if (detailedTerrainDiagnosticsEnabled()) {
 			recordEvent(
 				section.getPosition().asLong(),
 				layer,
@@ -2662,7 +2782,8 @@ public final class RustGalTerrainRenderer {
 				sortGeneration,
 				drawOrder
 			);
-			if ("duplicate-visible-section".equals(activeFault())) {
+			}
+			if (detailedTerrainDiagnosticsEnabled() && "duplicate-visible-section".equals(activeFault())) {
 				recordEvent(
 					section.getPosition().asLong(),
 					layer,
@@ -2692,6 +2813,21 @@ public final class RustGalTerrainRenderer {
 			recordEvent(section.getPosition().asLong(), layer, 0L, asset.meshGeneration(), visibleGeneration, atlasGeneration, asset, section.getOriginX(), section.getOriginY(), section.getOriginZ(), 0.0F, 0.0F, 0.0F, "stale-or-unregistered-submit", 0L, enqueueFrameId, 0L, 0L);
 		}
 		return submitted;
+	}
+
+	/**
+	 * Builds the column-major affine translation used by the semantic terrain
+	 * instance ABI without constructing a temporary JOML matrix. The returned
+	 * array is intentionally fresh because the queued semantic record retains
+	 * it until the frame coordinator consumes the exact frame snapshot.
+	 */
+	private static float[] cameraRelativeTranslationTransform(float x, float y, float z) {
+		return new float[] {
+			1.0F, 0.0F, 0.0F, 0.0F,
+			0.0F, 1.0F, 0.0F, 0.0F,
+			0.0F, 0.0F, 1.0F, 0.0F,
+			x, y, z, 1.0F
+		};
 	}
 
 	/**
@@ -2726,7 +2862,7 @@ public final class RustGalTerrainRenderer {
 		boolean submitted = RustGalWorldPrimitiveRenderer.enqueueStaticTerrainMeshInstance(
 			stale.meshKey(),
 			stale.meshGeneration(),
-			new Matrix4f().identity().get(new float[16]),
+			cameraRelativeTranslationTransform(0.0F, 0.0F, 0.0F),
 			viewportWidth,
 			viewportHeight
 		);
@@ -2871,6 +3007,20 @@ public final class RustGalTerrainRenderer {
 			return "";
 		}
 		return System.getProperty(FAULT_PROPERTY, "").trim().toLowerCase(Locale.ROOT);
+	}
+
+	/**
+	 * Per-visible-layer diagnostic records are intentionally capture/fault-only.
+	 * Ordinary gameplay still records semantic submission counts and Rust
+	 * execution receipts, but constructing a large object plus locking the recent
+	 * event deque for every visible layer would turn the producer into the frame
+	 * bottleneck. Deterministic captures and fault fixtures retain the complete
+	 * event stream needed by their validation contracts.
+	 */
+	private static boolean detailedTerrainDiagnosticsEnabled() {
+		return Boolean.getBoolean("mattmc.dev.deterministicCameraCapture")
+			|| Boolean.getBoolean("mattmc.dev.staticTerrainParityDiagnostics")
+			|| !activeFault().isEmpty();
 	}
 
 	private static boolean isStaticTerrainTranslucentScenario() {
@@ -3065,6 +3215,128 @@ public final class RustGalTerrainRenderer {
 			);
 		}
 
+		/**
+		 * Reorders copied translucent quads for the current camera when Sodium's
+		 * normal render-list sorter is not running on the Rust whole-frame route.
+		 * The operation is entirely over immutable semantic vertex/index payloads;
+		 * it never touches a Java GL buffer or retains a sorter/backend object.
+		 */
+		private static void ensureDynamicTranslucentSort(TerrainSectionAsset asset, Camera camera) {
+			if (asset == null || camera == null || asset.indexCount() < 6) {
+				return;
+			}
+			CameraSortKey nextCamera = new CameraSortKey(
+				camera.getPosition().x(), camera.getPosition().y(), camera.getPosition().z()
+			);
+			CameraSortKey previousCamera = LAST_DYNAMIC_SORT_CAMERA.get(asset.meshKey());
+			if (previousCamera != null
+				&& Math.abs(previousCamera.x() - nextCamera.x()) < 0.001D
+				&& Math.abs(previousCamera.y() - nextCamera.y()) < 0.001D
+				&& Math.abs(previousCamera.z() - nextCamera.z()) < 0.001D) {
+				return;
+			}
+			byte[] source = asset.asset().indexBytes();
+			int indexStride = asset.indexType() == INDEX_TYPE_U16 ? Short.BYTES : Integer.BYTES;
+			if (source.length == 0 || source.length % (indexStride * 6) != 0) {
+				return;
+			}
+			List<VulkanicGalBridge.WorldMeshVertexRecord> vertices = asset.asset().vertices();
+			byte[] sorted = source.clone();
+			for (VulkanicGalBridge.WorldMeshSectionRecord section : asset.asset().sections()) {
+				int firstIndex = section.indexOffset() / indexStride;
+				int quadCount = section.indexCount() / 6;
+				if (section.indexOffset() % indexStride != 0 || section.indexCount() % 6 != 0
+					|| firstIndex < 0 || (firstIndex + section.indexCount() / indexStride) > source.length / indexStride) {
+					return;
+				}
+				List<SortedQuad> quads = new ArrayList<>(quadCount);
+				for (int quad = 0; quad < quadCount; quad++) {
+					int byteOffset = (firstIndex + quad * 6) * indexStride;
+					int[] indices = new int[6];
+					for (int lane = 0; lane < indices.length; lane++) {
+						indices[lane] = readIndex(source, byteOffset + lane * indexStride, asset.indexType());
+						if (indices[lane] < 0 || indices[lane] >= vertices.size()) {
+							return;
+						}
+					}
+					double centerX = 0.0D;
+					double centerY = 0.0D;
+					double centerZ = 0.0D;
+					for (int lane = 0; lane < 4; lane++) {
+						VulkanicGalBridge.WorldMeshVertexRecord vertex = vertices.get(indices[lane]);
+						centerX += vertex.x() + asset.sectionOriginX();
+						centerY += vertex.y() + asset.sectionOriginY();
+						centerZ += vertex.z() + asset.sectionOriginZ();
+					}
+					centerX *= 0.25D;
+					centerY *= 0.25D;
+					centerZ *= 0.25D;
+					double dx = centerX - nextCamera.x();
+					double dy = centerY - nextCamera.y();
+					double dz = centerZ - nextCamera.z();
+					quads.add(new SortedQuad(quad, dx * dx + dy * dy + dz * dz, indices));
+				}
+				quads.sort(Comparator.comparingDouble(SortedQuad::distanceSquared).reversed()
+					.thenComparingInt(SortedQuad::ordinal));
+				for (int quad = 0; quad < quads.size(); quad++) {
+					int byteOffset = (firstIndex + quad * 6) * indexStride;
+					int[] indices = quads.get(quad).indices();
+					for (int lane = 0; lane < indices.length; lane++) {
+						writeIndex(sorted, byteOffset + lane * indexStride, asset.indexType(), indices[lane]);
+					}
+				}
+			}
+			LAST_DYNAMIC_SORT_CAMERA.put(asset.meshKey(), nextCamera);
+			if (Arrays.equals(source, sorted)) {
+				return;
+			}
+			long indexGeneration = translucentSortGenerations.incrementAndGet();
+			long hash = sortedIndexHash(sorted);
+			long sampleHash = sortedIndexSampleHash(sorted);
+			String sample = sortedIndexSample(sorted, asset.indexType(), 12);
+			long sectionPos = findSectionPos(asset.meshKey());
+			recordTranslucentSortPayloadEvent(
+				sectionPos, 0L, asset, asset.sectionOriginX(), asset.sectionOriginY(), asset.sectionOriginZ(),
+				"translucent-source-sort", indexGeneration, nextCamera.x(), nextCamera.y(), nextCamera.z(),
+				asset.sectionOriginX() + 8.0D, asset.sectionOriginY() + 8.0D, asset.sectionOriginZ() + 8.0D,
+				Math.max(0, asset.indexCount() / 6), hash, indexGeneration, "rust-cpu-camera-sort",
+				hash, 0L, sampleHash, 0L, sample
+			);
+			RustGalWorldPrimitiveRenderer.registerStaticTerrainSortedIndex(new VulkanicGalBridge.WorldMeshSortedIndexRecord(
+				asset.meshKey(), asset.meshGeneration(), indexGeneration, asset.indexType(), sorted
+			));
+		}
+
+		private record SortedQuad(int ordinal, double distanceSquared, int[] indices) {}
+
+		private static int readIndex(byte[] bytes, int offset, int indexType) {
+			if (indexType == INDEX_TYPE_U16) {
+				return (bytes[offset] & 0xff) | ((bytes[offset + 1] & 0xff) << 8);
+			}
+			return (bytes[offset] & 0xff)
+				| ((bytes[offset + 1] & 0xff) << 8)
+				| ((bytes[offset + 2] & 0xff) << 16)
+				| ((bytes[offset + 3] & 0xff) << 24);
+		}
+
+		private static void writeIndex(byte[] bytes, int offset, int indexType, int value) {
+			bytes[offset] = (byte)value;
+			bytes[offset + 1] = (byte)(value >>> 8);
+			if (indexType == INDEX_TYPE_U32) {
+				bytes[offset + 2] = (byte)(value >>> 16);
+				bytes[offset + 3] = (byte)(value >>> 24);
+			}
+		}
+
+		private static long findSectionPos(long meshKey) {
+			for (Map.Entry<LayerKey, TerrainSectionAsset> entry : SECTION_ASSETS.entrySet()) {
+				if (entry.getValue().meshKey() == meshKey) {
+					return entry.getKey().sectionPos();
+				}
+			}
+			return 0L;
+		}
+
 	static long sortedIndexHash(byte[] indexBytes) {
 		return fnv64Bytes(fnv64("static-terrain-translucent-sort-bytes-v1"), indexBytes == null ? new byte[0] : indexBytes);
 	}
@@ -3243,21 +3515,24 @@ public final class RustGalTerrainRenderer {
 				lastWorldUnloadLayer = layer;
 			}
 			removedLayers.incrementAndGet();
+			TRANSLUCENT_EXECUTION_METADATA.remove(removed.meshKey());
 			RustGalWorldPrimitiveRenderer.removeStaticTerrainMeshAsset(removed.meshKey());
 				recordEvent(sectionPos, layer, 0L, removed.meshGeneration(), 0L, atlasGeneration, removed, 0, 0, 0, 0.0F, 0.0F, 0.0F, reason);
 		}
 	}
 
 	private static void ensureAtlasPayload() {
-		if (atlasPayload != null) {
-			return;
-		}
+		TextureAtlas atlas = Minecraft.getInstance().getAtlasManager().getAtlasOrThrow(AtlasIds.BLOCKS);
+		TextureAtlas.SemanticRawSnapshot semanticSnapshot = atlas.semanticRawSnapshot();
+		if (semanticSnapshot == null) return;
+		long semanticGeneration = semanticSnapshot.generation();
+		if (atlasPayload != null && copiedAtlasSemanticGeneration == semanticGeneration) return;
 		synchronized (RustGalTerrainRenderer.class) {
-			if (atlasPayload != null) {
-				return;
-			}
+			// Animation ticks advance TextureAtlas' semantic generation. Rebuild the
+			// copied atlas when it changes so Rust never keeps an old frame while the
+			// Java atlas has moved on.
+			if (atlasPayload != null && copiedAtlasSemanticGeneration == semanticGeneration) return;
 				try {
-					TextureAtlas atlas = Minecraft.getInstance().getAtlasManager().getAtlasOrThrow(AtlasIds.BLOCKS);
 					BufferedImage image = new BufferedImage(atlas.width, atlas.height, BufferedImage.TYPE_INT_ARGB);
 					for (TextureAtlasSprite sprite : atlas.texturesByName.values()) {
 						copySprite(image, sprite);
@@ -3287,6 +3562,7 @@ public final class RustGalTerrainRenderer {
 						waterStillAsset = nextWaterStillAsset;
 						waterFlowAsset = nextWaterFlowAsset;
 						waterOverlayAsset = nextWaterOverlayAsset;
+						copiedAtlasSemanticGeneration = semanticGeneration;
 						atlasGeneration++;
 					}
 			} catch (RuntimeException | IOException error) {
@@ -3353,9 +3629,18 @@ public final class RustGalTerrainRenderer {
 	}
 
 	private static void copySprite(BufferedImage atlasImage, TextureAtlasSprite sprite) {
+		SpriteContents contents = sprite.contents();
+		int sourceX = 0;
+		int sourceY = 0;
+		if (contents.animatedTexture != null) {
+			int frame = contents.semanticFrameIndex();
+			sourceX = contents.animatedTexture.getFrameX(frame) * contents.width();
+			sourceY = contents.animatedTexture.getFrameY(frame) * contents.height();
+		}
 		for (int y = 0; y < sprite.contents().height(); y++) {
 			for (int x = 0; x < sprite.contents().width(); x++) {
-				atlasImage.setRGB(sprite.getX() + x, sprite.getY() + y, sprite.contents().originalImage.getPixel(x, y));
+				atlasImage.setRGB(sprite.getX() + x, sprite.getY() + y,
+					contents.originalImage.getPixel(sourceX + x, sourceY + y));
 			}
 		}
 	}

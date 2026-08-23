@@ -31,6 +31,11 @@ public class ShulkerBoxSpecialRenderer implements NoDataSpecialModelRenderer {
 		this.material = material;
 	}
 
+	public ShulkerBoxRenderer renderer() { return this.shulkerBoxRenderer; }
+	public float openness() { return this.openness; }
+	public Direction orientation() { return this.orientation; }
+	public Material material() { return this.material; }
+
 	@Override
 	public void submit(ItemDisplayContext itemDisplayContext, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, int j, boolean bl, int k) {
 		this.shulkerBoxRenderer.submit(poseStack, submitNodeCollector, i, j, this.orientation, this.openness, null, this.material, k);

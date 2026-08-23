@@ -40,7 +40,7 @@ public class HorseMarkingLayer extends RenderLayer<HorseRenderState, HorseModel>
 		ResourceLocation resourceLocation = (ResourceLocation)LOCATION_BY_MARKINGS.get(horseRenderState.markings);
 		if (resourceLocation != INVISIBLE_TEXTURE && !horseRenderState.isInvisible) {
 			submitNodeCollector.order(1)
-				.submitModel(
+				.submitModelSemanticTexture(
 					this.getParentModel(),
 					horseRenderState,
 					poseStack,
@@ -48,7 +48,7 @@ public class HorseMarkingLayer extends RenderLayer<HorseRenderState, HorseModel>
 					i,
 					LivingEntityRenderer.getOverlayCoords(horseRenderState, 0.0F),
 					-1,
-					null,
+					resourceLocation,
 					horseRenderState.outlineColor,
 					null
 				);

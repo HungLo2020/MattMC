@@ -154,7 +154,9 @@ public class EntityRenderDispatcher implements ResourceManagerReloadListener {
 	public <S extends EntityRenderState> void submit(
 		S entityRenderState, CameraRenderState cameraRenderState, double d, double e, double f, PoseStack poseStack, SubmitNodeCollector submitNodeCollector
 	) {
-		this.submitInternal(entityRenderState, cameraRenderState, d, e, f, poseStack, submitNodeCollector, true);
+		boolean rustWholeFrame = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			&& net.vulkanic.world.WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan();
+		this.submitInternal(entityRenderState, cameraRenderState, d, e, f, poseStack, submitNodeCollector, !rustWholeFrame);
 	}
 
 	/**
@@ -237,7 +239,8 @@ public class EntityRenderDispatcher implements ResourceManagerReloadListener {
 			// the pass. A selected Rust whole-frame route owns that semantic pass
 			// instead, so retain the ordinary copied submit for Rust extraction.
 			if (!entityRenderState.shadowPieces.isEmpty()) {
-				net.irisshaders.iris.pipeline.WorldRenderingPipeline pipeline = net.irisshaders.iris.Iris.getPipelineManager().getPipelineNullable();
+				net.irisshaders.iris.pipeline.WorldRenderingPipeline pipeline = captureIrisRenderState
+					? net.irisshaders.iris.Iris.getPipelineManager().getPipelineNullable() : null;
 				boolean rustWholeFrameShadowRoute = net.vulkanic.world.WorldRenderRoutePolicy
 					.currentEntityShadowRoute()
 					.usesRustWholeFrameVulkan();

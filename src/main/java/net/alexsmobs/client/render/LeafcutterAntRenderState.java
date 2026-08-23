@@ -17,4 +17,6 @@ public class LeafcutterAntRenderState extends LivingEntityRenderState {
     public BlockPos leafHarvestedPos;
     public int animationTick;
     public int id;
+    /** Copied vertical motion used only for the attachment transition pose. */
+    public double verticalVelocity;
 }

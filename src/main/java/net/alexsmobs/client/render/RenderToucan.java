@@ -75,9 +75,9 @@ public class RenderToucan extends MobRenderer<EntityToucan, ToucanRenderState, M
                 ToucanRenderState state, float f, float g) {
             if(state.isEnchanted){
                 int color = -1;
-                submitNodeCollector.order(1).submitModel(
+                submitNodeCollector.order(1).submitModelSemanticTexture(
                     this.getParentModel(), state, poseStack, RenderType.armorCutoutNoCull(TEXTURE_GOLDEN), packedLight,
-                    LivingEntityRenderer.getOverlayCoords(state, 0.0F), color, null, state.outlineColor, null
+                    LivingEntityRenderer.getOverlayCoords(state, 0.0F), color, TEXTURE_GOLDEN, state.outlineColor, null
                 );
             }
         }

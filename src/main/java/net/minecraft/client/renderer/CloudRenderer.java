@@ -68,9 +68,16 @@ public class CloudRenderer extends SimplePreparableReloadListener<Optional<Cloud
 	private CloudRenderer.TextureData texture;
 	private int quadCount = 0;
 	private final VulkanicAPI.AutoStorageIndexBuffer indices = VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS);
-	private final MappableRingBuffer ubo = new MappableRingBuffer(() -> "Cloud UBO", 130, UBO_SIZE);
+	@Nullable
+	private final MappableRingBuffer ubo;
 	@Nullable
 	private MappableRingBuffer utb;
+
+	public CloudRenderer() {
+		this.ubo = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			? null
+			: new MappableRingBuffer(() -> "Cloud UBO", 130, UBO_SIZE);
+	}
 
 	protected Optional<CloudRenderer.TextureData> prepare(ResourceManager resourceManager, ProfilerFiller profilerFiller) {
 		try {
@@ -158,6 +165,9 @@ public class CloudRenderer extends SimplePreparableReloadListener<Optional<Cloud
 	}
 
 	public void render(int i, CloudStatus cloudStatus, float f, Vec3 vec3, float g) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java cloud rendering is unavailable while Rust owns whole-frame presentation");
+		}
 		if (this.texture != null) {
 			int j = Math.min(Minecraft.getInstance().options.cloudRange().get(), 128) * 16;
 			int k = Mth.ceil(j / 12.0F);
@@ -250,9 +260,16 @@ public class CloudRenderer extends SimplePreparableReloadListener<Optional<Cloud
 	 * pipeline, texture, or callback crosses the semantic boundary.
 	 */
 	public void enqueueRustGalClouds(int cloudColorArgb, CloudStatus cloudStatus, float cloudHeight, Vec3 cameraPos, float partialTick) {
-		if (!net.vulkanic.world.WorldRenderRoutePolicy.currentCloudRoute().usesRustWholeFrameVulkan()
-			|| this.texture == null || cloudStatus == CloudStatus.OFF || cameraPos == null) {
+		if (!net.vulkanic.world.WorldRenderRoutePolicy.currentCloudRoute().usesRustWholeFrameVulkan()) {
 			return;
+		}
+		if (cloudStatus == CloudStatus.OFF || cameraPos == null) {
+			return;
+		}
+		if (this.texture == null) {
+			throw new IllegalStateException(
+				"Rust whole-frame cloud route requires a decoded semantic cloud-cell field"
+			);
 		}
 		int distance = Math.min(Minecraft.getInstance().options.cloudRange().get(), MAX_RADIUS_CHUNKS) * 16;
 		int radius = Mth.ceil(distance / CELL_SIZE_IN_BLOCKS);
@@ -381,11 +398,16 @@ public class CloudRenderer extends SimplePreparableReloadListener<Optional<Cloud
 	}
 
 	public void endFrame() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			return;
+		}
 		this.ubo.rotate();
 	}
 
 	public void close() {
-		this.ubo.close();
+		if (this.ubo != null) {
+			this.ubo.close();
+		}
 		if (this.utb != null) {
 			this.utb.close();
 		}

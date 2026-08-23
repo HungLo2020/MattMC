@@ -1665,6 +1665,11 @@ public class Options {
 	}
 
 	public CloudStatus getCloudsType() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			// Rust cloud semantics consume the copied gameplay setting and source
+			// pack snapshot; do not query Iris' renderer pipeline here.
+			return this.cloudStatus.get();
+		}
 		// Iris: Override clouds type if shader pack specifies
 		if (renderDistance.get() >= 4) {
 			net.irisshaders.iris.pipeline.WorldRenderingPipeline pipeline = 

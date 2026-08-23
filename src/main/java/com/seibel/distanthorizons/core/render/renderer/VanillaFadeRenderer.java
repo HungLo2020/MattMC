@@ -112,6 +112,10 @@ public class VanillaFadeRenderer
 	
 	public void render(Mat4f mcModelViewMatrix, Mat4f mcProjectionMatrix, float partialTicks, IClientLevelWrapper level)
 	{
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
+		{
+			throw new IllegalStateException("Java Distant Horizons vanilla fade rendering is unavailable while Rust owns whole-frame presentation");
+		}
 		int depthTextureId = LodRenderer.INSTANCE.getActiveDepthTextureId();
 		if (depthTextureId == -1)
 		{

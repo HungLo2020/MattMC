@@ -5,15 +5,20 @@ import org.slf4j.Logger;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
-import java.util.NavigableMap;
-import java.util.TreeMap;
+import java.util.Map;
 
 public final class RustGalFrameScheduler<T> {
 	private static final Logger LOGGER = LogUtils.getLogger();
+	/** Sequence space reserved by each token for an ordered semantic sub-batch. */
+	public static final long SEQUENCE_STRIDE = 1_000_000L;
 
 	private final String label;
-	private final NavigableMap<Long, Scheduled<T>> pending = new TreeMap<>();
+	// Tokens carry the explicit sequence/stratum ordering; pending lookup is by
+	// opaque batch id only. A hash table avoids an unnecessary O(log n) tree
+	// operation for every semantic GUI item in a large text frame.
+	private final Map<Long, Scheduled<T>> pending = new HashMap<>();
 	private long nextBatchId = 1L;
 	private long nextSequence = 1L;
 	private int lastExecutedOrder = Integer.MIN_VALUE;
@@ -25,6 +30,7 @@ public final class RustGalFrameScheduler<T> {
 	public Token enqueue(long generation, String stratumId, int stratumOrder, T payload) {
 		long batchId = this.nextBatchId++;
 		long sequence = this.nextSequence++;
+		this.nextSequence = Math.addExact(this.nextSequence - 1L, SEQUENCE_STRIDE);
 		Token token = new Token(batchId, sequence, generation, stratumId, stratumOrder);
 		this.pending.put(batchId, new Scheduled<>(token, payload));
 		return token;

@@ -41,6 +41,11 @@ public final class GuiUtil {
 	 * used for succeeding draw calls.
 	 */
 	public static void bindIrisWidgetsTexture() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			// Rust GUI callsites carry the widget resource identity in their
+			// semantic blit; never materialize an Iris Java texture view here.
+			return;
+		}
 		GpuTextureView textureView = Minecraft.getInstance().getTextureManager().getTexture(IRIS_WIDGETS_TEX).getTextureView();
 		IrisRenderSystem.bindTextureToUnit(0, net.vulkanic.VulkanicCoreAPI.textureId(textureView));
 		TextureTracker.INSTANCE.onSetShaderTexture(0, textureView);

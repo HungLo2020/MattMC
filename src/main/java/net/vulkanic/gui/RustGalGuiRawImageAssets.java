@@ -16,8 +16,11 @@ import net.blaze3d.platform.NativeImage;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.client.renderer.texture.TextureAtlas;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.minecraft.client.renderer.texture.SpriteContents;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.Resource;
+import net.minecraft.server.packs.resources.ResourceProvider;
 import net.minecraft.util.ARGB;
 import net.vulkanic.bridge.VulkanicGalBridge;
 import org.jetbrains.annotations.Nullable;
@@ -32,8 +35,11 @@ public final class RustGalGuiRawImageAssets {
 	private static final int RAW_RGBA8 = 2;
 	private static final int MAX_ENCODED_BYTES = 32 * 1024 * 1024;
 	private static final int MAX_DECODED_PIXELS = 16 * 1024 * 1024;
+	private static final int MAX_SEMANTIC_IDENTITIES = 4096;
+	private static final int MAX_CACHED_ASSET_ENTRIES = 4096;
 	private static final Object LOCK = new Object();
 	private static final Map<ResourceLocation, Asset> CACHE = new HashMap<>();
+	private static final Map<ResourceLocation, Asset> EARLY_VANILLA_CACHE = new HashMap<>();
 	private static final Map<ResourceLocation, AtlasAsset> ATLAS_CACHE = new HashMap<>();
 	private static final Map<ResourceLocation, Asset> CUBEMAP_CACHE = new HashMap<>();
 	/** Dynamic sources are indexed by their semantic resource identity, never a Java texture handle. */
@@ -97,7 +103,7 @@ public final class RustGalGuiRawImageAssets {
 		Asset asset = new Asset(assetId("dynamic:" + identity), "dynamic:" + identity, image.getWidth(), image.getHeight(), pixels);
 		synchronized (LOCK) {
 			if (DYNAMIC_TEXTURES.get(identity) != texture) return false;
-			DYNAMIC_ASSETS.put(identity, asset);
+			if (!cachePutLocked(DYNAMIC_ASSETS, identity, asset)) return false;
 		}
 		stage(asset);
 		return true;
@@ -106,6 +112,10 @@ public final class RustGalGuiRawImageAssets {
 	static void invalidate() {
 		synchronized (LOCK) {
 			CACHE.clear();
+			// The early cache exists only for the pre-reload loading overlay. It
+			// must not survive a resource-pack reload or it can shadow the newly
+			// selected pack's image for the same semantic identity.
+			EARLY_VANILLA_CACHE.clear();
 			ATLAS_CACHE.clear();
 			CUBEMAP_CACHE.clear();
 			STAGED_CUBEMAP_ASSETS.clear();
@@ -120,12 +130,24 @@ public final class RustGalGuiRawImageAssets {
 	 */
 	@Nullable
 	static Asset resolve(ResourceLocation source) {
-		synchronized (LOCK) {
+		// Atlas identities refer to the stitched CPU snapshot, not to a Java
+		// texture handle or a file-backed PNG. Resolve them before the ordinary
+		// resource candidates so model previews and semantic image producers can
+		// consume resource-pack atlas contents through the same owned asset path.
+		if (source != null && source.getPath().startsWith("textures/atlas/")) {
+			Asset atlas = resolveAtlas(source);
+			if (atlas != null) return atlas;
+		}
+		 synchronized (LOCK) {
+			Asset earlySource = EARLY_VANILLA_CACHE.get(source);
+			if (earlySource != null) return earlySource;
 			Asset dynamic = DYNAMIC_ASSETS.get(source);
 			if (dynamic != null) return dynamic;
 		}
 		for (ResourceLocation candidate : candidates(source)) {
 			synchronized (LOCK) {
+				Asset early = EARLY_VANILLA_CACHE.get(candidate);
+				if (early != null) return early;
 				Asset cached = CACHE.get(candidate);
 				if (cached != null) {
 					return cached;
@@ -140,11 +162,125 @@ public final class RustGalGuiRawImageAssets {
 				return null;
 			}
 			synchronized (LOCK) {
-				CACHE.put(candidate, decoded);
+				if (!cachePutLocked(CACHE, candidate, decoded)) return null;
 			}
 			return decoded;
 		}
+		// The loading overlay can submit the vanilla logo before the first
+		// ResourceManager reload has published its pack stack. Keep that early
+		// frame semantic (CPU PNG -> Rust-owned image) instead of borrowing the
+		// Java texture; normal resource-pack resolution above always wins.
+		if (source != null && "minecraft".equals(source.getNamespace())) {
+			for (ResourceLocation candidate : candidates(source)) {
+				String classpathName = "/assets/" + candidate.getNamespace() + "/" + candidate.getPath();
+				try (InputStream input = RustGalGuiRawImageAssets.class.getResourceAsStream(classpathName)) {
+					if (input == null) continue;
+					byte[] encoded = input.readNBytes(MAX_ENCODED_BYTES + 1);
+					if (encoded.length > MAX_ENCODED_BYTES) return null;
+					Asset decoded = decode(candidate, encoded, MAX_DECODED_PIXELS);
+					if (decoded != null) {
+						 synchronized (LOCK) {
+							if (!cachePutLocked(CACHE, candidate, decoded)) return null;
+						 }
+						return decoded;
+					}
+				} catch (IOException error) {
+					return null;
+				}
+			}
+		}
 		return null;
+	}
+
+	/** Returns a bounded CPU image snapshot for non-GUI semantic consumers. */
+	@Nullable
+	public static SemanticRawImageSnapshot semanticSnapshot(ResourceLocation source) {
+		if (source == null) return null;
+		Asset asset = resolve(source);
+		if (asset == null) return null;
+		stage(asset);
+		long revision = 0xcbf29ce484222325L;
+		for (byte value : asset.pixels()) {
+			revision ^= value & 0xffL;
+			revision *= 0x100000001b3L;
+		}
+		return new SemanticRawImageSnapshot(asset.identity(), asset.width(), asset.height(), 1L, revision, asset.pixels());
+	}
+
+	/** Stages an early vanilla-pack image before the reload manager publishes its stack. */
+	public static boolean stageVanillaResource(ResourceLocation source, ResourceProvider provider) {
+		if (source == null || provider == null) return false;
+		try (InputStream input = provider.open(source)) {
+			byte[] encoded = input.readNBytes(MAX_ENCODED_BYTES + 1);
+			if (encoded.length > MAX_ENCODED_BYTES) return false;
+			Asset asset = decode(source, encoded, MAX_DECODED_PIXELS);
+			if (asset == null) return false;
+			 synchronized (LOCK) {
+				int newEntries = (EARLY_VANILLA_CACHE.containsKey(source) ? 0 : 1)
+					+ (CACHE.containsKey(source) ? 0 : 1);
+				if (!cacheHasCapacityLocked(newEntries)) return false;
+				cachePutLocked(EARLY_VANILLA_CACHE, source, asset);
+				cachePutLocked(CACHE, source, asset);
+			 }
+			stage(asset);
+			return true;
+		} catch (IOException error) {
+			return false;
+		}
+	}
+
+	/** Copies a CPU NativeImage produced by a vanilla loader into the Rust asset store. */
+	public static boolean stageNativeImage(ResourceLocation source, NativeImage image) {
+		if (source == null || image == null || image.format() != NativeImage.Format.RGBA) return false;
+		long pixels = (long) image.getWidth() * image.getHeight();
+		if (pixels <= 0 || pixels > MAX_DECODED_PIXELS) return false;
+		byte[] data = new byte[Math.toIntExact(pixels * 4L)];
+		MemoryUtil.memByteBuffer(image.getPointer(), data.length).get(data);
+		Asset asset = new Asset(assetId(source.toString()), source.toString(), image.getWidth(), image.getHeight(), data);
+		synchronized (LOCK) {
+			int newEntries = (EARLY_VANILLA_CACHE.containsKey(source) ? 0 : 1)
+				+ (CACHE.containsKey(source) ? 0 : 1);
+			if (!cacheHasCapacityLocked(newEntries)) return false;
+			cachePutLocked(EARLY_VANILLA_CACHE, source, asset);
+			cachePutLocked(CACHE, source, asset);
+		}
+		stage(asset);
+		return true;
+	}
+
+	/**
+	 * Copies the currently selected frame of an animated sprite into one stable
+	 * semantic image identity. The identity is intentionally frame-independent:
+	 * staging a later frame replaces the same Rust-owned asset instead of
+	 * allocating an unbounded resource per animation tick.
+	 */
+	@Nullable
+	static Asset resolveAnimatedSprite(TextureAtlasSprite sprite) {
+		if (sprite == null || sprite.contents() == null || !sprite.contents().isAnimated()) return null;
+		SpriteContents contents = sprite.contents();
+		int width = contents.width();
+		int height = contents.height();
+		if (width <= 0 || height <= 0 || (long)width * height > MAX_DECODED_PIXELS) return null;
+		int frame = contents.semanticFrameIndex();
+		if (contents.animatedTexture == null || frame < 0) return null;
+		int frameX = contents.animatedTexture.getFrameX(frame);
+		int frameY = contents.animatedTexture.getFrameY(frame);
+		if (frameX < 0 || frameY < 0
+			|| (long)(frameX + 1) * width > contents.originalImage.getWidth()
+			|| (long)(frameY + 1) * height > contents.originalImage.getHeight()) return null;
+		byte[] pixels = new byte[Math.multiplyExact(Math.multiplyExact(width, height), 4)];
+		for (int y = 0; y < height; y++) {
+			for (int x = 0; x < width; x++) {
+				int argb = contents.originalImage.getPixel(frameX * width + x, frameY * height + y);
+				int offset = (y * width + x) * 4;
+				pixels[offset] = (byte)ARGB.red(argb);
+				pixels[offset + 1] = (byte)ARGB.green(argb);
+				pixels[offset + 2] = (byte)ARGB.blue(argb);
+				pixels[offset + 3] = (byte)ARGB.alpha(argb);
+			}
+		}
+		String identity = "animated-sprite:" + contents.name() + ":" + width + "x" + height;
+		return new Asset(assetId(identity), identity, width, height, pixels);
 	}
 
 	@Nullable
@@ -160,7 +296,7 @@ public final class RustGalGuiRawImageAssets {
 		Asset decoded = decode(source, resource.get(), MAX_DECODED_PIXELS / 6);
 		if (decoded == null) return null;
 		synchronized (LOCK) {
-			CACHE.put(source, decoded);
+			if (!cachePutLocked(CACHE, source, decoded)) return null;
 		}
 		return decoded;
 	}
@@ -209,7 +345,7 @@ public final class RustGalGuiRawImageAssets {
 		}
 		Asset result = new Asset(assetId("cubemap:" + source), "cubemap:" + source, width, height * suffixes.length, pixels);
 		synchronized (LOCK) {
-			CUBEMAP_CACHE.put(source, result);
+			if (!cachePutLocked(CUBEMAP_CACHE, source, result)) return null;
 		}
 		return result;
 	}
@@ -255,7 +391,7 @@ public final class RustGalGuiRawImageAssets {
 			"atlas:" + snapshot.atlasLocation(), snapshot.width(), snapshot.height(), snapshot.pixels()
 		);
 		synchronized (LOCK) {
-			ATLAS_CACHE.put(snapshot.atlasLocation(), new AtlasAsset(snapshot.generation(), asset));
+			if (!cachePutLocked(ATLAS_CACHE, snapshot.atlasLocation(), new AtlasAsset(snapshot.generation(), asset))) return null;
 		}
 		return asset;
 	}
@@ -264,6 +400,11 @@ public final class RustGalGuiRawImageAssets {
 		LinkedHashSet<ResourceLocation> values = new LinkedHashSet<>();
 		String path = source.getPath();
 		if (path.startsWith("textures/") && path.endsWith(".png")) {
+			values.add(source);
+		} else if (path.endsWith(".png")) {
+			// Mod-owned semantic GUI producers may publish ordinary asset paths
+			// (for example voxelmap:images/roundmap.png). Keep the source identity
+			// intact; never infer a Java texture or GPU handle from it.
 			values.add(source);
 		} else if (!path.startsWith("textures/") && !path.endsWith(".png")) {
 			values.add(ResourceLocation.fromNamespaceAndPath(source.getNamespace(), "textures/" + path + ".png"));
@@ -278,6 +419,15 @@ public final class RustGalGuiRawImageAssets {
 			if (encoded.length > MAX_ENCODED_BYTES) {
 				return null;
 			}
+			return decode(resourceId, encoded, maximumPixels);
+		} catch (IOException error) {
+			return null;
+		}
+	}
+
+	@Nullable
+	private static Asset decode(ResourceLocation resourceId, byte[] encoded, int maximumPixels) {
+		try {
 			BufferedImage image = ImageIO.read(new ByteArrayInputStream(encoded));
 			if (image == null || image.getWidth() <= 0 || image.getHeight() <= 0
 				|| (long)image.getWidth() * image.getHeight() > maximumPixels) {
@@ -300,6 +450,30 @@ public final class RustGalGuiRawImageAssets {
 		}
 	}
 
+	/** Must be called while holding {@link #LOCK}. */
+	private static <K, V> boolean cachePutLocked(Map<K, V> cache, K key, V value) {
+		if (!cache.containsKey(key) && !cacheHasCapacityLocked(1)) {
+			return false;
+		}
+		cache.put(key, value);
+		return true;
+	}
+
+	/** Must be called while holding {@link #LOCK}. */
+	private static boolean cacheHasCapacityLocked(int newEntries) {
+		return newEntries >= 0
+			&& cachedAssetEntryCountLocked() <= MAX_CACHED_ASSET_ENTRIES - newEntries;
+	}
+
+	/** Must be called while holding {@link #LOCK}. */
+	private static int cachedAssetEntryCountLocked() {
+		return CACHE.size()
+			+ EARLY_VANILLA_CACHE.size()
+			+ ATLAS_CACHE.size()
+			+ CUBEMAP_CACHE.size()
+			+ DYNAMIC_ASSETS.size();
+	}
+
 	private static long assetId(String identity) {
 		synchronized (LOCK) {
 		long hash = 0xcbf29ce484222325L;
@@ -310,7 +484,15 @@ public final class RustGalGuiRawImageAssets {
 		if (hash == 0L) {
 			hash = 1L;
 		}
-		String previous = IDENTITIES.putIfAbsent(hash, identity);
+		String previous = IDENTITIES.get(hash);
+		if (previous == null && IDENTITIES.size() >= MAX_SEMANTIC_IDENTITIES) {
+			throw new IllegalStateException(
+				"semantic GUI raw-image identity table exceeded bound " + MAX_SEMANTIC_IDENTITIES
+			);
+		}
+		if (previous == null) {
+			IDENTITIES.put(hash, identity);
+		}
 		if (previous != null && !previous.equals(identity)) {
 			throw new IllegalStateException("semantic GUI raw-image identity collision");
 		}
@@ -326,6 +508,17 @@ public final class RustGalGuiRawImageAssets {
 		@Override
 		public byte[] pixels() {
 			return this.pixels.clone();
+		}
+	}
+
+	public record SemanticRawImageSnapshot(String identity, int width, int height, long generation, long revision, byte[] pixels) {
+		public SemanticRawImageSnapshot {
+			pixels = pixels.clone();
+		}
+
+		@Override
+		public byte[] pixels() {
+			return pixels.clone();
 		}
 	}
 

@@ -36,8 +36,20 @@ public class ChunkBuilder {
 	 * Rust rendering uses this overload so its semantic terrain source never reads
 	 * Iris renderer configuration while Vulkan is selected.
 	 */
-	public ChunkBuilder(ClientLevel level, ChunkVertexType vertexType, boolean separateAo) {
-        int count = getThreadCount();
+    public ChunkBuilder(ClientLevel level, ChunkVertexType vertexType, boolean separateAo) {
+        this(level, vertexType, separateAo, Integer.MAX_VALUE);
+    }
+
+	/**
+	 * Creates a CPU meshing pool with an explicit upper bound.  The Rust
+	 * whole-frame producer uses this bounded form so semantic Vulkan startup
+	 * cannot allocate one native scratch arena per general Sodium worker.
+	 */
+	public ChunkBuilder(ClientLevel level, ChunkVertexType vertexType, boolean separateAo, int maximumThreads) {
+		if (maximumThreads < 1) {
+			throw new IllegalArgumentException("maximum chunk-builder threads must be positive");
+		}
+        int count = Math.min(getThreadCount(), maximumThreads);
 
         for (int i = 0; i < count; i++) {
             ChunkBuildContext context = new ChunkBuildContext(level, vertexType, separateAo);

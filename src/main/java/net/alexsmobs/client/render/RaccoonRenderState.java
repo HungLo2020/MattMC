@@ -2,9 +2,11 @@ package net.alexsmobs.client.render;
 
 import net.citadel.animation.Animation;
 import net.minecraft.client.renderer.entity.state.LivingEntityRenderState;
+import net.minecraft.client.renderer.item.ItemStackRenderState;
 import net.minecraft.world.item.DyeColor;
 
 public class RaccoonRenderState extends LivingEntityRenderState {
+    public final ItemStackRenderState mainHandItem = new ItemStackRenderState();
     public float begProgress;
     public float standProgress;
     public float sitProgress;

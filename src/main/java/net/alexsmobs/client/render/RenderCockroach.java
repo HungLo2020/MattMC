@@ -1,7 +1,6 @@
 package net.alexsmobs.client.render;
 
 import net.alexsmobs.client.model.ModelCockroach;
-import net.alexsmobs.client.render.layer.LayerCockroachMaracas;
 import net.alexsmobs.client.render.state.CockroachRenderState;
 import net.alexsmobs.entity.EntityCockroach;
 import net.blaze3d.vertex.PoseStack;
@@ -14,7 +13,6 @@ public class RenderCockroach extends MobRenderer<EntityCockroach, CockroachRende
 
     public RenderCockroach(EntityRendererProvider.Context renderManagerIn) {
         super(renderManagerIn, new ModelCockroach(), 0.3F);
-        this.addLayer(new LayerCockroachMaracas(this, renderManagerIn));
     }
 
     @Override

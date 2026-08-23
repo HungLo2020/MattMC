@@ -30,6 +30,10 @@ public class StandingSignSpecialRenderer implements NoDataSpecialModelRenderer {
 		this.material = material;
 	}
 
+	/** Semantic GUI copier accessors; transient model/material stay Java-side. */
+	public Model.Simple model() { return this.model; }
+	public Material material() { return this.material; }
+
 	@Override
 	public void submit(ItemDisplayContext itemDisplayContext, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, int j, boolean bl, int k) {
 		SignRenderer.submitSpecial(this.materials, poseStack, submitNodeCollector, i, j, this.model, this.material);

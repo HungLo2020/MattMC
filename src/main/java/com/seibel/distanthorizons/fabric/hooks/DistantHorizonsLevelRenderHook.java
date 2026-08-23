@@ -24,6 +24,9 @@ public class DistantHorizonsLevelRenderHook implements LevelRendererHooks {
 
     @Override
     public void onBeforeRenderLevel(Camera camera, Matrix4f positionMatrix, Matrix4f projectionMatrix) {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+            return;
+        }
         seedRenderState(positionMatrix, projectionMatrix);
 
         // handled here and in MixinChunkSectionsToRender (now DistantHorizonsChunkRenderHook)
@@ -56,6 +59,9 @@ public class DistantHorizonsLevelRenderHook implements LevelRendererHooks {
 
     @Override
     public void onBeforePrepareChunkRenders(Matrix4fc modelViewMatrix, double camX, double camY, double camZ) {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+            return;
+        }
         ClientApi.RENDER_STATE.mcModelViewMatrix = McObjectConverter.Convert(modelViewMatrix);
         
         LevelRenderer levelRenderer = Minecraft.getInstance().levelRenderer;

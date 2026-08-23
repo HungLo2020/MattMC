@@ -636,6 +636,14 @@ impl SourceFinalOutputPlan {
     /// presents; the owning frame coordinator remains solely responsible for
     /// the single Rust submission and present.
     pub(crate) fn append_source_copy(&self, operations: &mut Vec<CommandOp>) {
+        // A newly staged overlay has no prior attachment writer. Establish
+        // the explicit color-attachment layout before the first source copy;
+        // the final present copy below returns it to sampled state.
+        operations.push(CommandOp::Barrier(texture_barrier(
+            self.overlay.color_texture(),
+            TextureUsageState::Undefined,
+            TextureUsageState::ColorAttachment,
+        )));
         // Source fullscreen consumers may have sampled the exact main depth
         // before the final color copy. Reattaching it to the private overlay
         // target is an explicit semantic transition; it is not an implicit
@@ -771,11 +779,6 @@ impl SourceFinalOutputPlan {
         result
     }
 
-    pub(crate) fn append_draw(&self, operations: &mut Vec<CommandOp>) {
-        self.append_source_copy(operations);
-        self.append_present_copy(operations);
-    }
-
     pub(crate) fn source_role(&self) -> &TerrainSourceResourceRole {
         &self.source_role
     }
@@ -812,6 +815,15 @@ impl SourceFinalPresentationCapture {
     }
 
     pub(crate) fn append_draw(&self, operations: &mut Vec<CommandOp>) {
+        // The mirror is frame-local and its first writer is the exact final
+        // presentation copy. Establish the target attachment layout explicitly
+        // before that draw; the subsequent GUI replay remains in the same
+        // color-attachment state until the readback path transitions it.
+        operations.push(CommandOp::Barrier(texture_barrier(
+            self.color_texture,
+            TextureUsageState::Undefined,
+            TextureUsageState::ColorAttachment,
+        )));
         self.copy.append_draw(operations);
     }
 
@@ -912,6 +924,7 @@ impl SourceColorCopyPlan {
                 depth_bias: None,
                 color_formats: vec![color_format],
                 depth_format,
+                stencil: None,
             })?;
             created.push(pipeline);
             Ok(Self {
@@ -986,6 +999,11 @@ impl SourceColorCopyPlan {
 }
 
 impl SourceFinalOutputCache {
+    /// Keep a small retirement-safe history for a reused frame slot.  A few
+    /// generations may overlap while the backend drains in-flight work, but
+    /// the cache must not grow with every graph rebuild or world generation.
+    const MAX_PLANS_PER_FRAME_TARGET: usize = 8;
+
     /// Ensures one persistent final-copy binding for a semantic source output
     /// and acquired swapchain image slot. Validation happens before cache
     /// lookup so an otherwise warm cache cannot conceal an incompatible frame
@@ -1009,6 +1027,48 @@ impl SourceFinalOutputCache {
             main_depth_view,
             graph_generation,
         )?;
+        // A frame slot is reused across source/world graph generations.  The
+        // old final-copy plan cannot be reused once any compatibility fact
+        // changes, but retaining every generation until swapchain teardown
+        // would make the cache grow with gameplay time.  Retire stale plans
+        // for this exact acquired slot and semantic output now.  `destroy`
+        // is GAL-owned and therefore defers native destruction until the last
+        // submission that referenced the plan has completed; in-flight work
+        // remains valid while the cache stays bounded by active frame slots.
+        let mut stale_identities = self
+            .plans
+            .keys()
+            .filter(|identity| {
+                identity.render_target == input.identity.render_target
+                    && identity.source_role == input.identity.source_role
+                    && **identity != input.identity
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+        if stale_identities.len() >= Self::MAX_PLANS_PER_FRAME_TARGET {
+            // BTreeMap order is stable and the identity's generation fields
+            // are monotonic in normal operation, so removing the oldest
+            // entries gives the backend a bounded retirement window while
+            // retaining the most recent plans for overlapping submissions.
+            stale_identities.sort_by_key(|identity| {
+                (
+                    identity.world_generation,
+                    identity.shader_pack_generation,
+                    identity.graph_generation,
+                )
+            });
+            let remove_count = stale_identities
+                .len()
+                .saturating_sub(Self::MAX_PLANS_PER_FRAME_TARGET - 1);
+            stale_identities.truncate(remove_count);
+        } else {
+            stale_identities.clear();
+        }
+        for identity in stale_identities {
+            if let Some(plan) = self.plans.remove(&identity) {
+                plan.destroy(gal);
+            }
+        }
         if self.plans.contains_key(&input.identity) {
             return Ok(SourceFinalOutputReservation {
                 identity: input.identity,
@@ -1192,7 +1252,16 @@ impl PreparedFullscreenSourcePass {
         }
         if let Err(error) = program.require_semantic_resources(inputs.availability()) {
             color_resources.destroy(gal);
-            return Err(error);
+            let available = inputs
+                .availability()
+                .resources()
+                .map(|resource| resource.role.semantic_name().to_string())
+                .collect::<Vec<_>>()
+                .join(",");
+            return Err(GalError::invalid_argument(format!(
+                "fullscreen source program '{}' semantic resources unavailable: {error}; available=[{}]",
+                program.identity.as_str(), available
+            )));
         }
         if let Err(error) = validate_feedback_separation(program, &outputs) {
             color_resources.destroy(gal);
@@ -1306,6 +1375,7 @@ impl PreparedFullscreenSourcePass {
                 depth_bias: None,
                 color_formats,
                 depth_format: None,
+            stencil: None,
             })?;
             created.push(pipeline);
             Ok(CompiledFullscreenSourcePass {
@@ -2266,6 +2336,30 @@ mod tests {
         final_cache.discard(second, &mut gal);
         assert_eq!(1, final_cache.len());
 
+        // Repeated graph rebuilds for one acquired slot must not retain a
+        // plan per generation forever.  Confirm each replacement to model
+        // ordinary submitted frames; GAL retirement keeps any in-flight
+        // native use safe while the semantic cache remains bounded.
+        for graph_generation in 3..=16 {
+            let replacement = final_cache
+                .reserve(
+                    &mut gal,
+                    &program,
+                    &targets,
+                    frame_target,
+                    frame_target,
+                    depth_view,
+                    graph_generation,
+                )
+                .unwrap();
+            assert!(replacement.newly_staged);
+            final_cache.confirm(&replacement).unwrap();
+        }
+        assert!(
+            final_cache.len() <= SourceFinalOutputCache::MAX_PLANS_PER_FRAME_TARGET,
+            "repeated graph rebuilds must retain only a bounded frame-slot history"
+        );
+
         let other_target = gal
             .create_frame_target(FrameTargetDesc {
                 label: "source-final-output.cached-frame-other-slot".to_string(),
@@ -2279,6 +2373,7 @@ mod tests {
                 color_format: TextureFormat::Rgba8Unorm,
             })
             .unwrap();
+        let frame_slot_history = final_cache.len();
         let unsubmitted = final_cache
             .reserve(
                 &mut gal,
@@ -2291,9 +2386,13 @@ mod tests {
             )
             .unwrap();
         assert!(unsubmitted.newly_staged);
-        assert_eq!(2, final_cache.len());
+        assert_eq!(
+            frame_slot_history + 1,
+            final_cache.len(),
+            "a distinct acquired slot may add one independent final-output plan"
+        );
         final_cache.discard(unsubmitted, &mut gal);
-        assert_eq!(1, final_cache.len());
+        assert_eq!(frame_slot_history, final_cache.len());
 
         final_cache.retire_frame_targets(&mut gal, &[frame_target]);
         assert_eq!(

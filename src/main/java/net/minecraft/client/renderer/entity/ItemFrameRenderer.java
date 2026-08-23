@@ -76,17 +76,28 @@ public class ItemFrameRenderer<T extends ItemFrame> extends EntityRenderer<T, It
 			BlockStateModel blockStateModel = this.blockRenderer.getBlockModel(blockState);
 			poseStack.pushPose();
 			poseStack.translate(-0.5F, -0.5F, -0.5F);
-			submitNodeCollector.submitBlockModel(
-				poseStack,
-				RenderType.entitySolidZOffsetForward(TextureAtlas.LOCATION_BLOCKS),
-				blockStateModel,
-				1.0F,
-				1.0F,
-				1.0F,
-				itemFrameRenderState.lightCoords,
-				OverlayTexture.NO_OVERLAY,
-				itemFrameRenderState.outlineColor
-			);
+			if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+				&& net.vulkanic.world.WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()) {
+				// The Rust block-display producer owns copied quads and texture
+				// identities; do not leave this ordinary frame backing in the Java
+				// block-model storage that the whole-frame route never replays.
+				submitNodeCollector.submitBlockDisplay(
+					poseStack, blockState, itemFrameRenderState.lightCoords,
+					OverlayTexture.NO_OVERLAY, itemFrameRenderState.outlineColor
+				);
+			} else {
+				submitNodeCollector.submitBlockModel(
+					poseStack,
+					RenderType.entitySolidZOffsetForward(TextureAtlas.LOCATION_BLOCKS),
+					blockStateModel,
+					1.0F,
+					1.0F,
+					1.0F,
+					itemFrameRenderState.lightCoords,
+					OverlayTexture.NO_OVERLAY,
+					itemFrameRenderState.outlineColor
+				);
+			}
 			poseStack.popPose();
 		}
 

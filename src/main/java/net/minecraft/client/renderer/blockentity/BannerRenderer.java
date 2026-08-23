@@ -62,6 +62,15 @@ public class BannerRenderer implements BlockEntityRenderer<BannerBlockEntity, Ba
 		this.wallFlagModel = new BannerFlagModel(entityModelSet.bakeLayer(ModelLayers.WALL_BANNER_FLAG));
 	}
 
+	/** Read-only model accessors for bounded semantic special-item capture. */
+	public BannerModel standingModel() {
+		return this.standingModel;
+	}
+
+	public BannerFlagModel standingFlagModel() {
+		return this.standingFlagModel;
+	}
+
 	public BannerRenderState createRenderState() {
 		return new BannerRenderState();
 	}

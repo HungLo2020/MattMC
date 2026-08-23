@@ -47,7 +47,7 @@ class DistantHorizonsFaceMaterialResolverTest {
 	}
 
 	@Test
-	void animatedAndUnculledQuadsRemainExplicitlyUnavailable() {
+	void animatedAtlasRegionsRemainAvailableWhileUnculledQuadsStayUnavailable() {
 		var animated = DistantHorizonsFaceMaterialResolver.resolveCandidates(List.of(
 			new DistantHorizonsFaceMaterialResolver.FaceCandidate(Direction.UP, material("minecraft:block/water_still"), true, false)
 		));
@@ -55,7 +55,8 @@ class DistantHorizonsFaceMaterialResolverTest {
 			new DistantHorizonsFaceMaterialResolver.FaceCandidate(Direction.UP, material("minecraft:block/grass_block_top"), false, true)
 		));
 
-		assertEquals(DistantHorizonsFaceMaterialResolver.Status.ANIMATED_SPRITE, animated.status());
+		assertEquals(DistantHorizonsFaceMaterialResolver.Status.COMPLETE, animated.status());
+		assertTrue(animated.isComplete());
 		assertEquals(DistantHorizonsFaceMaterialResolver.Status.UNCULLED_QUAD, unculled.status());
 	}
 

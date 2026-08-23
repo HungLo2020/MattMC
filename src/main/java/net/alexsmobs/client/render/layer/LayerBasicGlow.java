@@ -26,8 +26,8 @@ public class LayerBasicGlow<T extends LivingEntityRenderState> extends RenderLay
 
     @Override
     public void submit(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, T renderState, float f, float g) {
-        submitNodeCollector.order(1).submitModel(
-            this.getParentModel(), renderState, poseStack, renderType, i, OverlayTexture.NO_OVERLAY, -1, null, renderState.outlineColor, null
+        submitNodeCollector.order(1).submitModelSemanticTexture(
+            this.getParentModel(), renderState, poseStack, renderType, i, OverlayTexture.NO_OVERLAY, -1, texture, renderState.outlineColor, null
         );
     }
 

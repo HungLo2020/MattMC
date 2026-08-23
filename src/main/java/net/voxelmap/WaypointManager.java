@@ -35,6 +35,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -92,6 +93,21 @@ public class WaypointManager {
         this.textureAtlasChooser = new TextureAtlas("chooser", resourceTextureAtlasWaypointChooser);
         this.textureAtlasChooser.setFilter(true, false);
         this.waypointContainer = new WaypointContainer(this.options);
+    }
+
+    /**
+     * The Rust whole-frame route does not yet have a copied 3D waypoint
+     * beam/icon/text contract. Expose the current semantic state so the shell
+     * can reject an active overlay instead of silently omitting it.
+     */
+    public boolean hasRenderableWaypoints() {
+        if (!this.options.waypointsAllowed || (!this.options.showBeacons && !this.options.showWaypoints)) {
+            return false;
+        }
+        for (Waypoint waypoint : this.wayPts) {
+            if (waypoint != null && waypoint.isActive()) return true;
+        }
+        return false;
     }
 
     public void onResourceManagerReload(ResourceManager resourceManager) {
@@ -769,12 +785,12 @@ public class WaypointManager {
         }
 
         try {
-            String path = this.getCurrentWorldName();
+            String path = resourcePathSegment(this.getCurrentWorldName());
             String subworldDescriptor = this.getCurrentSubworldDescriptor(false);
             if (subworldDescriptor != null && !subworldDescriptor.isEmpty()) {
-                path = path + "/" + subworldDescriptor;
+                path = path + "/" + resourcePathSegment(subworldDescriptor);
             }
-            path = path + "/" + this.currentDimension.getStorageName();
+            path = path + "/" + resourcePathSegment(this.currentDimension.getStorageName());
             String tempPath = "images/backgroundmaps/" + path + "/map.png";
             ResourceLocation identifier = ResourceLocation.fromNamespaceAndPath("voxelmap", tempPath);
 
@@ -810,6 +826,14 @@ public class WaypointManager {
             isr.close();
         } catch (Exception ignore) {
         }
+    }
+
+    private static String resourcePathSegment(String value) {
+        if (value == null || value.isEmpty()) {
+            return "unknown";
+        }
+        String normalized = value.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9._-]", "_");
+        return normalized.isEmpty() ? "unknown" : normalized;
     }
 
     public BackgroundImageInfo getBackgroundImageInfo() {

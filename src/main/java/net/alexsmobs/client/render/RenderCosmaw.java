@@ -5,14 +5,12 @@ import net.alexsmobs.client.render.layer.LayerBasicGlow;
 import net.alexsmobs.entity.EntityCosmaw;
 import net.blaze3d.vertex.PoseStack;
 import net.math.Axis;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.ItemInHandRenderer;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.entity.MobRenderer;
 import net.minecraft.client.renderer.entity.layers.RenderLayer;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.client.renderer.texture.OverlayTexture;
 
 public class RenderCosmaw extends MobRenderer<EntityCosmaw, CosmawRenderState, ModelCosmaw> {
     private static final ResourceLocation TEXTURE = ResourceLocation.withDefaultNamespace("textures/entity/cosmaw.png");
@@ -36,7 +34,8 @@ public class RenderCosmaw extends MobRenderer<EntityCosmaw, CosmawRenderState, M
         state.openProgress = entity.prevOpenProgress + (entity.openProgress - entity.prevOpenProgress) * partialTick;
         state.cosmawPitch = entity.getClampedCosmawPitch(partialTick);
         state.biteProgress = entity.prevBiteProgress + (entity.biteProgress - entity.prevBiteProgress) * partialTick;
-        state.mainHandItem = entity.getMainHandItem().copy();
+        this.itemModelResolver.updateForLiving(state.mainHandItem, entity.getMainHandItem(),
+            net.minecraft.world.item.ItemDisplayContext.GROUND, entity);
     }
 
     protected void scale(CosmawRenderState state, PoseStack matrixStackIn) {
@@ -54,8 +53,7 @@ public class RenderCosmaw extends MobRenderer<EntityCosmaw, CosmawRenderState, M
         }
 
         public void submit(PoseStack matrixStackIn, SubmitNodeCollector bufferIn, int packedLightIn, CosmawRenderState state, float limbSwing, float limbSwingAmount) {
-            ItemStack itemstack = state.mainHandItem;
-            if (!itemstack.isEmpty()) {
+            if (!state.mainHandItem.isEmpty()) {
                 matrixStackIn.pushPose();
                 translateToHand(matrixStackIn);
                 matrixStackIn.translate(-0.0, 0.1F, -1.35F);
@@ -63,10 +61,8 @@ public class RenderCosmaw extends MobRenderer<EntityCosmaw, CosmawRenderState, M
                 matrixStackIn.mulPose(Axis.YP.rotationDegrees(-180F));
                 matrixStackIn.mulPose(Axis.ZP.rotationDegrees(135F));
                 matrixStackIn.scale(2, 2, 2);
-                ItemInHandRenderer renderer = Minecraft.getInstance().getEntityRenderDispatcher().getItemInHandRenderer();
-                // TODO: Update to 1.21 ItemInHandRenderer API - needs SubmitNodeCollector instead of MultiBufferSource
-                // For now, skip item rendering to avoid compilation error
-                // renderer.renderItem(null, itemstack, ItemDisplayContext.GROUND, matrixStackIn, bufferIn, packedLightIn);
+                state.mainHandItem.submit(matrixStackIn, bufferIn, packedLightIn,
+                    OverlayTexture.NO_OVERLAY, state.outlineColor);
                 matrixStackIn.popPose();
             }
         }

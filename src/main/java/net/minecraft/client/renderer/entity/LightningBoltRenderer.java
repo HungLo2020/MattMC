@@ -36,6 +36,34 @@ public class LightningBoltRenderer extends EntityRenderer<LightningBolt, Lightni
 
 		float h = f;
 		float j = g;
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			&& net.vulkanic.world.WorldRenderRoutePolicy.currentProceduralQuadRoute().usesRustWholeFrameVulkan()) {
+			float[] vertices = new float[56 * 12];
+			float[] uvs = new float[56 * 8];
+			int[] colors = new int[56];
+			int quadIndex = 0;
+			for (int layer = 0; layer < 4; layer++) {
+				RandomSource layerRandom = RandomSource.create(lightningBoltRenderState.seed);
+				for (int branch = 0; branch < 3; branch++) {
+					int start = branch > 0 ? 7 - branch : 7;
+					int end = branch > 0 ? start - 2 : 0;
+					float x = fs[start] - h, z = gs[start] - j;
+					for (int segment = start; segment >= end; segment--) {
+						float ox = x, oz = z;
+						if (branch == 0) { x += layerRandom.nextInt(11) - 5; z += layerRandom.nextInt(11) - 5; }
+						else { x += layerRandom.nextInt(31) - 15; z += layerRandom.nextInt(31) - 15; }
+						float u0 = 0.1F + layer * 0.2F, u1 = u0, scale0 = 0.5F, scale1 = 0.45F;
+						if (branch == 0) { u0 *= segment * 0.1F + 1.0F; u1 *= (segment - 1.0F) * 0.1F + 1.0F; }
+						appendLightningQuad(vertices, uvs, colors, quadIndex++, x, z, segment, ox, oz, scale1, scale1, scale0, u0, u1, false, false, true, false);
+						appendLightningQuad(vertices, uvs, colors, quadIndex++, x, z, segment, ox, oz, scale1, scale1, scale0, u0, u1, true, false, true, true);
+						appendLightningQuad(vertices, uvs, colors, quadIndex++, x, z, segment, ox, oz, scale1, scale1, scale0, u0, u1, true, true, false, true);
+						appendLightningQuad(vertices, uvs, colors, quadIndex++, x, z, segment, ox, oz, scale1, scale1, scale0, u0, u1, false, true, false, false);
+					}
+				}
+			}
+			if (submitNodeCollector.submitColoredQuads(poseStack, RenderType.lightning(), vertices, uvs, colors, lightningBoltRenderState.lightCoords)) return;
+			throw new IllegalStateException("Rust whole-frame lightning route rejected semantic quads");
+		}
 		submitNodeCollector.submitCustomGeometry(poseStack, RenderType.lightning(), (pose, vertexConsumer) -> {
 			Matrix4f matrix4f = pose.pose();
 
@@ -89,6 +117,18 @@ public class LightningBoltRenderer extends EntityRenderer<LightningBolt, Lightni
 				}
 			}
 		});
+	}
+
+	private static void appendLightningQuad(float[] vertices, float[] uvs, int[] colors, int quad, float x, float z, int segment, float ox, float oz, float sx, float sz, float sy, float u0, float u1, boolean bx0, boolean bz0, boolean bx1, boolean bz1) {
+		int v = quad * 12;
+		float ax = x + (bx0 ? sy : -sy), az = z + (bz0 ? sy : -sy);
+		float bx = ox + (bx0 ? sx : -sx), bz = oz + (bz0 ? sx : -sx);
+		float cx = ox + (bx1 ? sx : -sx), cz = oz + (bz1 ? sx : -sx);
+		float dx = x + (bx1 ? sy : -sy), dz = z + (bz1 ? sy : -sy);
+		float[] p = {ax, segment * 16.0F, az, bx, (segment + 1) * 16.0F, bz, cx, (segment + 1) * 16.0F, cz, dx, segment * 16.0F, dz};
+		System.arraycopy(p, 0, vertices, v, 12);
+		int t = quad * 8; float[] tex = {0, u0, 1, u1, 1, u1, 0, u0}; System.arraycopy(tex, 0, uvs, t, 8);
+		colors[quad] = net.minecraft.util.ARGB.colorFromFloat(0.3F, 0.45F, 0.45F, 0.5F);
 	}
 
 	private static void quad(

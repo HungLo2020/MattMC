@@ -18,6 +18,11 @@ public class DhLightTextureHook implements LightTextureHooks {
 
     @Override
     public void onLightTextureUpdated(LightTexture lightTexture, float partialTicks) {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+            // Rust owns the copied semantic lightmap inputs; DH must not turn
+            // the Java lightmap object into a native handle for compatibility state.
+            return;
+        }
         IMinecraftClientWrapper mc = SingletonInjector.INSTANCE.get(IMinecraftClientWrapper.class);
         if (mc == null) {
             return;

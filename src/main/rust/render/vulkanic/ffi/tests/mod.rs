@@ -5,6 +5,7 @@ use crate::render::vulkanic::world_primitive_frontend::{
     WorldShaderEnvironmentFrame, WorldVoxelVolumeFrame, WORLD_LOD_FLAG_RUST_OPAQUE_ROUTE_SELECTED,
     WORLD_LOD_LAYER_OPAQUE, WORLD_LOD_VARIANT_EXACT, WORLD_LOD_VERTEX_LAYOUT_V1,
     WORLD_MATERIAL_ID_TRANSLUCENT_TEXTURED, WORLD_MATERIAL_SOURCE_CLOUDS,
+    WORLD_MATERIAL_SOURCE_PARTICLES,
     WORLD_MATERIAL_SOURCE_TEXTURED, WORLD_MATERIAL_SOURCE_UNSPECIFIED,
     WORLD_MATERIAL_SOURCE_UV_LOCAL_TEXTURE, WORLD_MATERIAL_SOURCE_UV_MINECRAFT_BLOCK_ATLAS,
     WORLD_MATERIAL_SOURCE_WEATHER, WORLD_MATERIAL_TEXTURE_EXPERIENCE_ORB,
@@ -206,6 +207,11 @@ fn gui_mesh_batch_request(
         render_width: 34,
         render_height: 34,
         guard_pixels: 1,
+        clip_mode: 0,
+        clip_left: 0,
+        clip_top: 0,
+        clip_width: 0,
+        clip_height: 0,
         vertices: FfiSlice {
             ptr: vertices.as_ptr(),
             count: vertices.len() as u64,
@@ -244,10 +250,10 @@ fn gui_layout_exports_cover_whole_frame_sequence_and_clip_fields() {
         mesh_vertex.field_offsets[2]
     );
     let mesh_batch = super::layout::layout_for_struct(97).expect("GUI mesh batch layout");
-    assert_eq!(22, mesh_batch.field_count);
+    assert_eq!(27, mesh_batch.field_count);
     assert_eq!(
         std::mem::offset_of!(FfiGuiMeshBatchRequest, indices) as u32,
-        mesh_batch.field_offsets[21]
+        mesh_batch.field_offsets[26]
     );
 
     let whole_result = super::layout::layout_for_struct(54).expect("whole-frame result layout");
@@ -269,13 +275,25 @@ fn gui_layout_exports_cover_whole_frame_sequence_and_clip_fields() {
         first_person.field_offsets[5]
     );
     let whole_frame = super::layout::layout_for_struct(53).expect("whole-frame layout");
-    assert_eq!(31, whole_frame.field_count);
+    assert_eq!(34, whole_frame.field_count);
     assert_eq!(
         std::mem::offset_of!(
             FfiWholeFrameSubmitRequest,
             world_first_person_mesh_instances
         ) as u32,
         whole_frame.field_offsets[30]
+    );
+    assert_eq!(
+        std::mem::offset_of!(FfiWholeFrameSubmitRequest, gui_blur_before_stratum) as u32,
+        whole_frame.field_offsets[31]
+    );
+    assert_eq!(
+        std::mem::offset_of!(FfiWholeFrameSubmitRequest, gui_blur_radius) as u32,
+        whole_frame.field_offsets[32]
+    );
+    assert_eq!(
+        std::mem::offset_of!(FfiWholeFrameSubmitRequest, post_effect_id) as u32,
+        whole_frame.field_offsets[33]
     );
 }
 
@@ -754,6 +772,8 @@ fn whole_frame_request(
             ptr: std::ptr::null(),
             count: 0,
         },
+        gui_blur_before_stratum: -1,
+        gui_blur_radius: -1,
         world_lod_instances: FfiSlice {
             ptr: std::ptr::null(),
             count: 0,
@@ -781,6 +801,10 @@ fn whole_frame_request(
         gui_mesh_batches: FfiSlice {
             ptr: std::ptr::null(),
             count: 0,
+        },
+        post_effect_id: FfiBytes {
+            ptr: std::ptr::null(),
+            len: 0,
         },
     }
 }
@@ -1141,6 +1165,7 @@ fn mesh_instance() -> FfiWorldMeshInstanceRecord {
         mesh_generation: 9,
         entity_id: 0,
         entity_color_argb: 0,
+        outline_color_argb: 0,
         transform: [
             1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
         ],
@@ -1353,6 +1378,7 @@ fn whole_frame_first_person_mesh_stream_is_copied_and_requires_its_own_domain() 
         mesh_generation: 3,
         entity_id: 0,
         entity_color_argb: 0,
+        outline_color_argb: 0,
         transform: projection,
     }];
     request.world_first_person_mesh_instances = FfiSlice {
@@ -1503,7 +1529,17 @@ fn whole_frame_gui_affine_quads_share_the_owned_frame_decode() {
         ptr: affine_quads.as_ptr(),
         count: affine_quads.len() as u64,
     };
-    let (_generation, _target, _frame, decoded_sprites, decoded_affine_quads, decoded_mesh_batches) =
+    let (
+        _generation,
+        _target,
+        _frame,
+        decoded_sprites,
+        decoded_affine_quads,
+        decoded_mesh_batches,
+        _blur_boundary,
+        _blur_radius,
+        _post_effect_id,
+    ) =
         unsafe { decode_whole_frame_submit_with_gui(&request, test_vulkan_capabilities()).unwrap() };
     affine_quads[0].y3 = 99.0;
     assert_eq!(decoded_sprites.len(), 1);
@@ -2189,6 +2225,25 @@ fn compact_world_material_ffi_accepts_the_explicit_cloud_source_family() {
 }
 
 #[test]
+fn compact_world_material_ffi_accepts_the_explicit_particle_source_family() {
+    let mut table = vec![material_table_record()];
+    table[0].material_mode = WORLD_MATERIAL_MODE_TRANSLUCENT;
+    table[0].material_id = WORLD_MATERIAL_ID_TRANSLUCENT_TEXTURED;
+    table[0].depth_policy = WORLD_DEPTH_POLICY_TEST_NO_WRITE;
+    table[0].cull_policy = WORLD_CULL_NONE;
+    table[0].source_program = WORLD_MATERIAL_SOURCE_PARTICLES;
+    let request =
+        whole_frame_request_with_compact_materials(&table, &[compact_material_quad_request()]);
+    let (_generation, _target, frame, _gui) =
+        unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()).unwrap() };
+
+    assert_eq!(
+        WORLD_MATERIAL_SOURCE_PARTICLES,
+        frame.material_quads[0].source_program
+    );
+}
+
+#[test]
 fn compact_world_material_ffi_rejects_malformed_indexes_and_preserves_mixed_full_records() {
     let table = vec![material_table_record()];
     let mut compact = vec![compact_material_quad_request()];
@@ -2512,6 +2567,7 @@ fn world_material_asset_ffi_rejects_duplicates_and_bad_item_size() {
 #[test]
 fn whole_frame_world_mesh_ffi_copies_and_rejects_malformed_payloads() {
     let mut instances = vec![mesh_instance()];
+    instances[0].outline_color_argb = 0x80_10_20_30;
     let request = whole_frame_request_with_mesh_instances(&instances);
     let (_generation, _target, frame, _gui) =
         unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()).unwrap() };
@@ -2525,6 +2581,7 @@ fn whole_frame_world_mesh_ffi_copies_and_rejects_malformed_payloads() {
     assert_eq!(9, frame.mesh_instances[0].mesh_generation);
     assert_eq!(0, frame.mesh_instances[0].entity_id);
     assert_eq!(0, frame.mesh_instances[0].entity_color_argb);
+    assert_eq!(0x80_10_20_30, frame.mesh_instances[0].outline_color_argb);
     assert_eq!(0.0, frame.mesh_instances[0].transform[12]);
 
     instances[0] = mesh_instance();
@@ -3059,6 +3116,51 @@ fn whole_frame_ffi_copies_bounded_lod_segment_references() {
         unsafe { decode_whole_frame_submit(&non_finite_render_frame, test_vulkan_capabilities()) }
             .unwrap_err();
     assert_eq!(StatusCode::InvalidArgument, error.code);
+}
+
+#[test]
+fn whole_frame_ffi_keeps_gui_blur_semantic_boundary_explicit_and_bounded() {
+    let mut request = whole_frame_request(&[], &[]);
+    request.gui_blur_before_stratum = -2;
+    let error = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }
+        .unwrap_err();
+    assert_eq!(StatusCode::InvalidArgument, error.code);
+
+    request.gui_blur_before_stratum = 3;
+    request.gui_blur_radius = 65;
+    let error = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }
+        .unwrap_err();
+    assert_eq!(StatusCode::InvalidArgument, error.code);
+    request.gui_blur_radius = -1;
+    let decoded = unsafe {
+        decode_whole_frame_submit_with_gui(&request, test_vulkan_capabilities()).unwrap()
+    };
+    assert_eq!(3, decoded.6);
+    assert_eq!(-1, decoded.7);
+}
+
+#[test]
+fn whole_frame_post_effect_identity_is_bounded_utf8_semantic_data() {
+    let mut request = whole_frame_request(&[], &[]);
+    let id = b"minecraft:custom";
+    request.post_effect_id = FfiBytes {
+        ptr: id.as_ptr(),
+        len: id.len() as u64,
+    };
+    unsafe {
+        super::world::decode_whole_frame_submit_with_gui(&request, test_vulkan_capabilities())
+            .expect("valid copied post-effect identity must decode");
+    }
+    let invalid = [0xffu8];
+    request.post_effect_id = FfiBytes {
+        ptr: invalid.as_ptr(),
+        len: invalid.len() as u64,
+    };
+    let error = unsafe {
+        super::world::decode_whole_frame_submit_with_gui(&request, test_vulkan_capabilities())
+    }
+    .unwrap_err();
+    assert!(error.to_string().contains("UTF-8"));
 }
 
 #[test]

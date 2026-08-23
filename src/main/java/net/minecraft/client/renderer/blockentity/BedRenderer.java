@@ -57,6 +57,10 @@ public class BedRenderer implements BlockEntityRenderer<BedBlockEntity, BedRende
 		this.footModel = new Model.Simple(entityModelSet.bakeLayer(ModelLayers.BED_FOOT), RenderType::entitySolid);
 	}
 
+	/** Semantic special-item accessors; models remain Java-transient. */
+	public Model.Simple headModel() { return this.headModel; }
+	public Model.Simple footModel() { return this.footModel; }
+
 	public static LayerDefinition createHeadLayer() {
 		MeshDefinition meshDefinition = new MeshDefinition();
 		PartDefinition partDefinition = meshDefinition.getRoot();

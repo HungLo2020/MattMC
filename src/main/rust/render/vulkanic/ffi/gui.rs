@@ -232,6 +232,8 @@ pub(crate) unsafe fn decode_gui_mesh_batches(
         let material_mode = match batch.material_mode {
             1 => GuiMeshMaterialMode::Opaque,
             2 => GuiMeshMaterialMode::Cutout,
+            3 => GuiMeshMaterialMode::Translucent,
+            4 => GuiMeshMaterialMode::Glint,
             other => {
                 return Err(GalError::ffi(
                     StatusCode::UnknownEnum,
@@ -307,6 +309,11 @@ pub(crate) unsafe fn decode_gui_mesh_batches(
                 })?,
             ],
             guard_pixels: batch.guard_pixels,
+            clip_mode: batch.clip_mode,
+            clip_left: batch.clip_left,
+            clip_top: batch.clip_top,
+            clip_width: batch.clip_width,
+            clip_height: batch.clip_height,
             vertices,
             indices: indices.to_vec(),
         };

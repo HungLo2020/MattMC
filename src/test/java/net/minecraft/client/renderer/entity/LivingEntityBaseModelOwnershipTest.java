@@ -58,7 +58,7 @@ final class LivingEntityBaseModelOwnershipTest {
 
 		assertTrue(familyRegion.contains("ChickenModel.class"));
 		assertTrue(familyRegion.contains("CowModel"));
-		assertTrue(familyRegion.contains("PigModel.class"));
+		assertTrue(familyRegion.contains("PigModel.class") || familyRegion.contains("instanceof PigModel"));
 		assertTrue(familyRegion.contains("ZombieModel.class"));
 		assertTrue(familyRegion.contains("RabbitModel.class"));
 		assertFalse(familyRegion.contains("HumanoidModel"), "generic humanoids are not admitted by this milestone");

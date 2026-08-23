@@ -279,7 +279,8 @@ public class ColumnRenderBufferBuilder
 							thisDetailLevel,
 							renderSource.getSemanticMaterialId(relX, relZ, i),
 							renderSource.getSemanticVariantState(relX, relZ, i),
-							renderSource.getSemanticVariantPosition(relX, relZ, i)
+							renderSource.getSemanticVariantPosition(relX, relZ, i),
+							renderSource.hasSemanticHorizontalUniformity(relX, relZ, i)
 						);
 						int semanticMaterialId = semanticMaterial.materialId();
 						if (semanticMaterialId > ColumnRenderSource.SEMANTIC_MATERIAL_UNAVAILABLE)
@@ -321,7 +322,18 @@ public class ColumnRenderBufferBuilder
 		byte variantState, long variantPosition
 	)
 	{
-		if (rustWholeFrameSemanticBuild && detailLevel > 0)
+		return semanticMaterialProvenanceForDetailLevel(
+			rustWholeFrameSemanticBuild, detailLevel, materialId, variantState, variantPosition,
+			detailLevel == 0
+		);
+	}
+
+	static SemanticMaterialProvenance semanticMaterialProvenanceForDetailLevel(
+		boolean rustWholeFrameSemanticBuild, byte detailLevel, int materialId,
+		byte variantState, long variantPosition, boolean horizontalUniform
+	)
+	{
+		if (rustWholeFrameSemanticBuild && detailLevel > 0 && !horizontalUniform)
 		{
 			return new SemanticMaterialProvenance(
 				ColumnRenderSource.SEMANTIC_MATERIAL_UNAVAILABLE,
@@ -344,8 +356,12 @@ public class ColumnRenderBufferBuilder
 		LodQuadBuilder quadBuilder
 	)
 	{
+		// Coarse LOD may retain vertical source intervals only after the producer
+		// proves that its complete horizontal footprint is one semantic column.
+		// Without that proof, these spans describe only one contributor and cannot
+		// safely select a texture for the whole coarse face.
 		if (!net.vulkanic.world.DistantHorizonsSemanticCollector.usesRustWholeFrameSemanticBuild()
-			|| detailLevel > 0)
+			|| (detailLevel > 0 && !renderSource.hasSemanticHorizontalUniformity(relX, relZ, verticalIndex)))
 		{
 			return List.of();
 		}

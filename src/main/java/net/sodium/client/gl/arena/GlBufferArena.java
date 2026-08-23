@@ -264,6 +264,9 @@ public class GlBufferArena implements ChunkBufferArena {
 
     @Override
     public GpuBuffer gpuBufferView(Supplier<String> label, int usage) {
+        if (net.vulkanic.VulkanicAPI.isVulkanBackendInitializedAndSelected()) {
+            throw new IllegalStateException("Selected Vulkan cannot expose Sodium's legacy GL buffer arena");
+        }
         return new LegacyHandleGlBuffer(label, usage, Math.toIntExact(this.arenaBuffer.getSize()), this.arenaBuffer.handle());
     }
 

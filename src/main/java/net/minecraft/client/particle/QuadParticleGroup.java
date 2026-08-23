@@ -58,4 +58,8 @@ public class QuadParticleGroup extends ParticleGroup<SingleQuadParticle> {
 		}
 		return enqueued;
 	}
+
+	public int enqueueRustGalParticles() {
+		return this.particleTypeRenderState.enqueueRustGal();
+	}
 }

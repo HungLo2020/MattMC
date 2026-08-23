@@ -70,6 +70,11 @@ public class TextureAtlasSprite implements TextureAtlasSpriteExtension {
 			}
 
 			@Override
+			public boolean tickSemantic() {
+				return spriteTicker.tickSemantic();
+			}
+
+			@Override
 			public void close() {
 				spriteTicker.close();
 			}
@@ -154,6 +159,10 @@ public class TextureAtlasSprite implements TextureAtlasSpriteExtension {
 	@Environment(EnvType.CLIENT)
 	public interface Ticker extends AutoCloseable {
 		void tickAndUpload(GpuTexture gpuTexture);
+
+		default boolean tickSemantic() {
+			return false;
+		}
 
 		void close();
 	}

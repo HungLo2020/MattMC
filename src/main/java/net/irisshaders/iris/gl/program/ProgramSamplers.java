@@ -67,6 +67,11 @@ public class ProgramSamplers {
 	}
 
 	public void update() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			// Rust Vulkan receives copied semantic sampler bindings; Java/Iris sampler
+			// initialization must not mutate or inspect compatibility texture units.
+			return;
+		}
 		if (active != null) {
 			active.removeListeners();
 		}
@@ -130,6 +135,9 @@ public class ProgramSamplers {
 
 	@SuppressWarnings("null")
 	public void bindToRenderPass(RenderPass renderPass) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			return;
+		}
 		for (NamedSamplerBinding binding : namedSamplerBindings) {
 			int suppliedTextureId = binding.texture() != null ? binding.texture().getAsInt() : 0;
 			int textureId = suppliedTextureId;

@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Backend-owned chunk arena for Vulkan terrain buffers.
@@ -30,6 +31,7 @@ public class GpuChunkBufferArena implements ChunkBufferArena {
     private final int stride;
 
     private Segment head;
+    @Nullable
     private GpuBuffer arenaBuffer;
     private long capacity;
     private long used;
@@ -49,11 +51,19 @@ public class GpuChunkBufferArena implements ChunkBufferArena {
         this.stride = stride;
         this.head = new Segment(this, 0, initialCapacity);
         this.head.setFree(true);
-        this.arenaBuffer = createBuffer(this.label, this.usage, this.capacity * this.stride);
+        if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+            this.arenaBuffer = createBuffer(this.label, this.usage, this.capacity * this.stride);
+        } else {
+            this.arenaBuffer = null;
+            this.capacity = 0;
+        }
     }
 
     @Override
     public boolean upload(CommandList commandList, Stream<PendingUpload> stream) {
+        if (this.arenaBuffer == null) {
+            throw new IllegalStateException("Java Sodium chunk arena is unavailable while Rust owns whole-frame presentation");
+        }
         GpuBuffer previousBuffer = this.arenaBuffer;
         List<PendingUpload> queue = stream.collect(Collectors.toCollection(LinkedList::new));
 
@@ -264,7 +274,9 @@ public class GpuChunkBufferArena implements ChunkBufferArena {
 
     @Override
     public void delete(CommandList commandList) {
-        this.arenaBuffer.close();
+        if (this.arenaBuffer != null) {
+            this.arenaBuffer.close();
+        }
     }
 
     @Override
@@ -284,6 +296,9 @@ public class GpuChunkBufferArena implements ChunkBufferArena {
 
     @Override
     public GpuBuffer gpuBufferView(Supplier<String> label, int usage) {
+        if (this.arenaBuffer == null) {
+            throw new IllegalStateException("Java Sodium chunk arena is unavailable while Rust owns whole-frame presentation");
+        }
         return this.arenaBuffer;
     }
 

@@ -22,10 +22,10 @@ public record DirectoryLister(String sourcePath, String idPrefix) implements Spr
 	@Override
 	public void run(ResourceManager resourceManager, SpriteSource.Output output) {
 		FileToIdConverter fileToIdConverter = new FileToIdConverter("textures/" + this.sourcePath, ".png");
-		// Iris: Filter out PBR texture suffixes if base texture exists
+		// Filter PBR suffixes at the resource boundary without consulting Iris
+		// runtime classes. Rust shader-pack preparation owns the copied PBR assets.
 		fileToIdConverter.listMatchingResources(resourceManager).forEach((resourceLocation, resource) -> {
-			// Iris PBR: Check if this is a PBR suffix texture
-			String basePath = net.irisshaders.iris.pbr.texture.PBRType.removeSuffix(resourceLocation.getPath());
+			String basePath = removePbrSuffix(resourceLocation.getPath());
 			if (basePath != null) {
 				ResourceLocation baseLocation = resourceLocation.withPath(basePath);
 				if (resourceManager.getResource(baseLocation).isPresent()) {
@@ -36,6 +36,12 @@ public record DirectoryLister(String sourcePath, String idPrefix) implements Spr
 			ResourceLocation resourceLocation2 = fileToIdConverter.fileToId(resourceLocation).withPrefix(this.idPrefix);
 			output.add(resourceLocation2, resource);
 		});
+	}
+
+	private static String removePbrSuffix(String path) {
+		if (path.endsWith("_n.png")) return path.substring(0, path.length() - "_n.png".length()) + ".png";
+		if (path.endsWith("_s.png")) return path.substring(0, path.length() - "_s.png".length()) + ".png";
+		return null;
 	}
 
 	@Override

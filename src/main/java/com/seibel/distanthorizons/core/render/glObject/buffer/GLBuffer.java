@@ -64,13 +64,22 @@ public class GLBuffer implements AutoCloseable
 
 	private static int createTrackedBufferId()
 	{
-		net.irisshaders.iris.gl.IrisRenderSystem.incrementTrackedBuffers();
+		if (VulkanicAPI.isVulkanBackendInitializedAndSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException(
+				"Java Distant Horizons buffers are unavailable while Rust owns whole-frame presentation");
+		}
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			net.irisshaders.iris.gl.IrisRenderSystem.incrementTrackedBuffers();
+		}
 		return VulkanicAPI.createBuffer(commandContext());
 	}
 
 	private static void deleteTrackedBufferId(int id)
 	{
-		net.irisshaders.iris.gl.IrisRenderSystem.decrementTrackedBuffers();
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			net.irisshaders.iris.gl.IrisRenderSystem.decrementTrackedBuffers();
+		}
 		VulkanicAPI.deleteBuffer(commandContext(), id);
 	}
 	

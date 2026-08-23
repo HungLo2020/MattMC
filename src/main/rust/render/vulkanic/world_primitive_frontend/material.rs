@@ -16,7 +16,10 @@ pub(super) fn validate_quad(
             format!("unknown world material id {}", quad.material_id),
         ));
     }
-    if !is_known_texture_id(quad.texture_id) {
+    let dynamic_particle_texture = quad.source_program == WORLD_MATERIAL_SOURCE_PARTICLES
+        && quad.source_uv_space == WORLD_MATERIAL_SOURCE_UV_LOCAL_TEXTURE
+        && quad.texture_id != 0;
+    if !is_known_texture_id(quad.texture_id) && !dynamic_particle_texture {
         return Err(GalError::ffi(
             StatusCode::UnknownEnum,
             format!("unknown world material texture id {}", quad.texture_id),
@@ -24,7 +27,10 @@ pub(super) fn validate_quad(
     }
     if !matches!(
         quad.material_mode,
-        WORLD_MATERIAL_MODE_OPAQUE | WORLD_MATERIAL_MODE_CUTOUT | WORLD_MATERIAL_MODE_TRANSLUCENT
+        WORLD_MATERIAL_MODE_OPAQUE
+            | WORLD_MATERIAL_MODE_CUTOUT
+            | WORLD_MATERIAL_MODE_TRANSLUCENT
+            | WORLD_MATERIAL_MODE_GLINT
     ) {
         return Err(GalError::ffi(
             StatusCode::UnknownEnum,
@@ -35,6 +41,7 @@ pub(super) fn validate_quad(
         quad.source_program,
         WORLD_MATERIAL_SOURCE_UNSPECIFIED
             | WORLD_MATERIAL_SOURCE_TEXTURED
+            | WORLD_MATERIAL_SOURCE_PARTICLES
             | WORLD_MATERIAL_SOURCE_WEATHER
             | WORLD_MATERIAL_SOURCE_CLOUDS
     ) {
@@ -146,12 +153,20 @@ pub(crate) fn canonical_texture_id(texture_id: u32) -> Option<u32> {
 /// The copied Minecraft atlas is a Rust-owned runtime asset, not a bundled
 /// standalone texture. It is admitted only with its original atlas UV space.
 pub(crate) fn is_runtime_mesh_texture_id(texture_id: u32) -> bool {
-    texture_id == WORLD_MESH_TEXTURE_TERRAIN_BLOCK_ATLAS
+    matches!(
+        texture_id,
+        WORLD_MESH_TEXTURE_TERRAIN_BLOCK_ATLAS | WORLD_MATERIAL_TEXTURE_PARTICLE_ATLAS
+    )
 }
 
 pub(crate) fn texture_supports_uv_space(texture_id: u32, uv_space: u32) -> bool {
-    !is_runtime_mesh_texture_id(texture_id)
-        || uv_space == WORLD_MATERIAL_SOURCE_UV_MINECRAFT_BLOCK_ATLAS
+    match texture_id {
+        WORLD_MESH_TEXTURE_TERRAIN_BLOCK_ATLAS => {
+            uv_space == WORLD_MATERIAL_SOURCE_UV_MINECRAFT_BLOCK_ATLAS
+        }
+        WORLD_MATERIAL_TEXTURE_PARTICLE_ATLAS => uv_space == WORLD_MATERIAL_SOURCE_UV_LOCAL_TEXTURE,
+        _ => true,
+    }
 }
 
 pub(crate) fn material_matches_mode(material_id: u32, mode: u32) -> bool {
@@ -178,5 +193,17 @@ mod tests {
             WORLD_MATERIAL_SOURCE_UV_LOCAL_TEXTURE
         ));
         assert!(!is_known_texture_id(0xdead_beef));
+    }
+
+    #[test]
+    fn copied_particle_atlas_is_a_runtime_local_texture() {
+        assert_eq!(
+            Some(WORLD_MATERIAL_TEXTURE_PARTICLE_ATLAS),
+            canonical_texture_id(WORLD_MATERIAL_TEXTURE_PARTICLE_ATLAS)
+        );
+        assert!(texture_supports_uv_space(
+            WORLD_MATERIAL_TEXTURE_PARTICLE_ATLAS,
+            WORLD_MATERIAL_SOURCE_UV_LOCAL_TEXTURE
+        ));
     }
 }

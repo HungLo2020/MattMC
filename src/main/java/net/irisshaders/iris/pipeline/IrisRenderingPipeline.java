@@ -857,6 +857,9 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 
 	@Override
 	public void beginLevelRendering() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris level begin/clear passes are unavailable while Rust owns whole-frame presentation");
+		}
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("iris.begin-level");
 		try {
 		isRenderingWorld = true;
@@ -1016,6 +1019,9 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 
 	@Override
 	public void renderShadows(LevelRenderer worldRenderer, Camera playerCamera, CameraRenderState renderState) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris shadow rendering is unavailable while Rust owns whole-frame presentation");
+		}
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("iris.shadows");
 		try {
 		if (shadowRenderer != null) {
@@ -1045,6 +1051,9 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 
 	@Override
 	public void beginHand() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris depth-copy hand prepass is unavailable while Rust owns whole-frame presentation");
+		}
 		centerDepthSampler.sampleCenterDepth();
 
 		// We need to copy the current depth texture so that depthtex2 can contain the depth values for
@@ -1054,6 +1063,9 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 
 	@Override
 	public void beginTranslucents() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris deferred rendering is unavailable while Rust owns whole-frame presentation");
+		}
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("iris.deferred-translucents");
 		try {
 		if (destroyed) {
@@ -1089,6 +1101,9 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 
 	@Override
 	public void finalizeLevelRendering() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris composite/final rendering is unavailable while Rust owns whole-frame presentation");
+		}
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("iris.composite-final");
 		try {
 		isRenderingWorld = false;
@@ -1103,6 +1118,9 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 
 	@Override
 	public void finalizeGameRendering() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris color-space post-processing is unavailable while Rust owns whole-frame presentation");
+		}
 		colorSpaceConverter.process(Minecraft.getInstance().getMainRenderTarget().getColorTexture());
 	}
 
@@ -1303,6 +1321,9 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 
 	@Override
 	public void onBeginClear() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris sky clear/horizon rendering is unavailable while Rust owns whole-frame presentation");
+		}
 		setPhase(WorldRenderingPhase.SKY);
 
 		// Render our horizon box before actual sky rendering to avoid being broken by mods that do weird things
@@ -1382,6 +1403,9 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 	}
 
 	public void bindDefault() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris default framebuffer binding is unavailable while Rust owns whole-frame presentation");
+		}
 		if (isBeforeTranslucent) {
 			defaultFB.bind();
 		} else {
@@ -1391,6 +1415,9 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 
 	@Override
 	public RenderPass createSkyRenderPass(Supplier<String> label, boolean includeDepth) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris sky render-pass creation is unavailable while Rust owns whole-frame presentation");
+		}
 		GlFramebuffer framebuffer = isBeforeTranslucent ? defaultFB : defaultFBAlt;
 		if (USE_IRIS_SKY_RENDER_TARGET_CONTRACT && VulkanicAPI.isVulkanBackendSelected() && !VulkanicAPI.getCommandContext().isImmediate()) {
 			return VulkanicAPI.createRenderPass(framebuffer.createRenderTargetDescriptor(label, renderTargets.getCurrentWidth(), renderTargets.getCurrentHeight(), includeDepth));
@@ -1404,6 +1431,9 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 	}
 
 	public void bindDefaultShadow() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris shadow framebuffer binding is unavailable while Rust owns whole-frame presentation");
+		}
 		defaultFBShadow.bind();
 	}
 

@@ -93,6 +93,13 @@ public class SSAORenderer
 	
 	public void render(Mat4f projectionMatrix, float partialTicks)
 	{
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
+		{
+			// SSAO is part of the Rust-owned DH/material graph on Vulkan. The
+			// legacy renderer must not acquire a Java command context if a mod hook
+			// invokes it outside LodRenderer's normal route gate.
+			return;
+		}
 		CommandContext ctx = VulkanicAPI.getCommandContext();
 		GLState state = new GLState(ctx);
 		

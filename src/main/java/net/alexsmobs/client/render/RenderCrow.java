@@ -29,6 +29,8 @@ public class RenderCrow extends MobRenderer<EntityCrow, CrowRenderState, ModelCr
         renderState.attackProgress = entity.prevAttackProgress + (entity.attackProgress - entity.prevAttackProgress) * partialTick;
         renderState.sitProgress = entity.prevSitProgress + (entity.sitProgress - entity.prevSitProgress) * partialTick;
         renderState.hasItemInBeak = !entity.getMainHandItem().isEmpty();
+        this.itemModelResolver.updateForLiving(renderState.heldItem, entity.getMainHandItem(),
+            net.minecraft.world.item.ItemDisplayContext.GROUND, entity);
     }
 
     protected void scale(CrowRenderState renderState, PoseStack matrixStackIn) {

@@ -36,8 +36,8 @@ public abstract class AbstractBoatRenderer extends EntityRenderer<AbstractBoat, 
 
 		poseStack.scale(-1.0F, -1.0F, 1.0F);
 		poseStack.mulPose(Axis.YP.rotationDegrees(90.0F));
-		submitNodeCollector.submitModel(
-			this.model(), boatRenderState, poseStack, this.renderType(), boatRenderState.lightCoords, OverlayTexture.NO_OVERLAY, boatRenderState.outlineColor, null
+		submitNodeCollector.submitModelSemanticTexture(
+			this.model(), boatRenderState, poseStack, this.renderType(), boatRenderState.lightCoords, OverlayTexture.NO_OVERLAY, -1, this.textureLocation(), boatRenderState.outlineColor, null
 		);
 		this.submitTypeAdditions(boatRenderState, poseStack, submitNodeCollector, boatRenderState.lightCoords);
 		poseStack.popPose();
@@ -50,6 +50,8 @@ public abstract class AbstractBoatRenderer extends EntityRenderer<AbstractBoat, 
 	protected abstract EntityModel<BoatRenderState> model();
 
 	protected abstract RenderType renderType();
+
+	protected abstract net.minecraft.resources.ResourceLocation textureLocation();
 
 	public BoatRenderState createRenderState() {
 		return new BoatRenderState();

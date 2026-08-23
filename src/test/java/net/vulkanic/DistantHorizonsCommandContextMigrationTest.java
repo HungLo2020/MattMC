@@ -74,6 +74,13 @@ public class DistantHorizonsCommandContextMigrationTest {
             "AbstractShaderRenderer should pass shared context into uniform hook");
         assertTrue(sourceWithoutComments.contains("onRender(ctx)"),
             "AbstractShaderRenderer should pass shared context into render hook");
+        assertTrue(sourceWithoutComments.contains("RustGalVulkanWholeFrameMode.enabled()"),
+            "AbstractShaderRenderer must remain closed on the Rust-owned Vulkan whole-frame route");
+        int wholeFrameGuard = sourceWithoutComments.indexOf("RustGalVulkanWholeFrameMode.enabled()");
+        int earlyReturn = sourceWithoutComments.indexOf("return;", wholeFrameGuard);
+        int init = sourceWithoutComments.indexOf("this.init();");
+        assertTrue(wholeFrameGuard >= 0 && earlyReturn > wholeFrameGuard && init > earlyReturn,
+            "The DH legacy shader boundary must return before Java shader initialization");
     }
 
     @Test
@@ -124,6 +131,34 @@ public class DistantHorizonsCommandContextMigrationTest {
 			"DH's Java-only fog preference must not reject Rust LOD terrain collection");
 		assertTrue(sourceWithoutComments.contains("this.trySelectRustNonWaterRoute(renderParams, profiler)"),
 			"the real DH render-list traversal remains the sole Rust selection path");
+	}
+
+	@Test
+	public void testRustWholeFrameDhPublishesOnlyAfterVisibleListSelection() throws IOException {
+		Path lodRenderer = SRC_MAIN_JAVA.resolve(
+			"com/seibel/distanthorizons/core/render/renderer/LodRenderer.java");
+		String sourceWithoutComments = readSourceWithoutComments(lodRenderer);
+		int renderList = sourceWithoutComments.indexOf("buffers.buildRenderList(renderParams);");
+		int visibleFlush = sourceWithoutComments.indexOf(
+			"flushPendingWorldLodAssetsForSemanticPreflight();", renderList);
+		assertTrue(renderList >= 0, "Rust DH admission must traverse the real visible render list");
+		assertTrue(visibleFlush > renderList,
+			"DH asset publication must wait until visible columns are known; background uploads must not block admission");
+	}
+
+	@Test
+	public void testRustWholeFrameDhPrefersSemanticColumnsOverRetainedLegacyContainers() throws IOException {
+		Path renderBufferHandler = SRC_MAIN_JAVA.resolve(
+			"com/seibel/distanthorizons/core/render/RenderBufferHandler.java");
+		String sourceWithoutComments = readSourceWithoutComments(renderBufferHandler);
+		int semanticCheck = sourceWithoutComments.indexOf(
+			"DistantHorizonsSemanticCollector.hasColumn(renderSection.pos)");
+		int nullContainerBranch = sourceWithoutComments.indexOf("if (bufferContainer == null)", semanticCheck);
+		int legacyAdd = sourceWithoutComments.indexOf("this.loadedNearToFarBuffers.add(bufferContainer)", semanticCheck);
+		assertTrue(semanticCheck >= 0,
+			"DH render-list traversal must recognize copied semantic columns");
+		assertTrue(nullContainerBranch > semanticCheck && legacyAdd > nullContainerBranch,
+			"semantic-column preference must run before retained legacy-container admission");
 	}
 
 	@Test
@@ -795,15 +830,29 @@ public class DistantHorizonsCommandContextMigrationTest {
     }
 
     @Test
-    public void testDhPostProcessRenderersAvoidImmediateContext() throws IOException {
-        assertNoImmediateContext(SRC_MAIN_JAVA.resolve(
-            "com/seibel/distanthorizons/core/render/renderer/SSAORenderer.java"));
-        assertNoImmediateContext(SRC_MAIN_JAVA.resolve(
-            "com/seibel/distanthorizons/core/render/renderer/FogRenderer.java"));
+	public void testDhPostProcessRenderersAvoidImmediateContext() throws IOException {
+		Path ssao = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/SSAORenderer.java");
+		String ssaoSource = readSourceWithoutComments(ssao);
+		assertNoImmediateContext(ssao);
+		assertTrue(ssaoSource.indexOf("RustGalVulkanWholeFrameMode.enabled()")
+			< ssaoSource.indexOf("VulkanicAPI.getCommandContext()"),
+			"SSAO must fence Java command-context acquisition on Rust Vulkan");
+		assertNoImmediateContext(SRC_MAIN_JAVA.resolve(
+			"com/seibel/distanthorizons/core/render/renderer/FogRenderer.java"));
         assertNoImmediateContext(SRC_MAIN_JAVA.resolve(
             "com/seibel/distanthorizons/core/render/renderer/DhFadeRenderer.java"));
-        assertNoImmediateContext(SRC_MAIN_JAVA.resolve(
-            "com/seibel/distanthorizons/core/render/renderer/VanillaFadeRenderer.java"));
+		assertNoImmediateContext(SRC_MAIN_JAVA.resolve(
+			"com/seibel/distanthorizons/core/render/renderer/VanillaFadeRenderer.java"));
+		for (String renderer : new String[] {
+			"com/seibel/distanthorizons/core/render/renderer/FogRenderer.java",
+			"com/seibel/distanthorizons/core/render/renderer/DhFadeRenderer.java",
+			"com/seibel/distanthorizons/core/render/renderer/VanillaFadeRenderer.java"
+		}) {
+			String source = readSourceWithoutComments(SRC_MAIN_JAVA.resolve(renderer));
+			assertTrue(source.contains("RustGalVulkanWholeFrameMode.enabled()")
+					&& source.indexOf("RustGalVulkanWholeFrameMode.enabled()") < source.indexOf("VulkanicAPI.getCommandContext()"),
+				renderer + " must reject Rust whole-frame Vulkan before Java command-context acquisition");
+		}
     }
 
     @Test
@@ -817,14 +866,27 @@ public class DistantHorizonsCommandContextMigrationTest {
     }
 
     @Test
-    public void testDhSharedAndDebugRenderPathsAvoidImmediateContext() throws IOException {
-        assertNoImmediateContext(SRC_MAIN_JAVA.resolve(
-            "com/seibel/distanthorizons/core/render/renderer/ScreenQuad.java"));
-        assertNoImmediateContext(SRC_MAIN_JAVA.resolve(
-            "com/seibel/distanthorizons/core/render/renderer/DebugRenderer.java"));
-        assertNoImmediateContext(SRC_MAIN_JAVA.resolve(
-            "com/seibel/distanthorizons/core/render/renderer/TestRenderer.java"));
-    }
+	public void testDhSharedAndDebugRenderPathsAvoidImmediateContext() throws IOException {
+		assertNoImmediateContext(SRC_MAIN_JAVA.resolve(
+			"com/seibel/distanthorizons/core/render/renderer/ScreenQuad.java"));
+		String screenQuadSource = readSourceWithoutComments(SRC_MAIN_JAVA.resolve(
+			"com/seibel/distanthorizons/core/render/renderer/ScreenQuad.java"));
+		assertTrue(screenQuadSource.indexOf("RustGalVulkanWholeFrameMode.enabled()")
+				< screenQuadSource.indexOf("this.render(VulkanicAPI.getCommandContext())"),
+			"screen-quad convenience rendering must reject Rust whole-frame Vulkan before acquiring context");
+		Path debug = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/DebugRenderer.java");
+		String debugSource = readSourceWithoutComments(debug);
+		assertNoImmediateContext(debug);
+		assertTrue(debugSource.indexOf("RustGalVulkanWholeFrameMode.enabled()")
+			< debugSource.indexOf("VulkanicAPI.getCommandContext()"),
+			"debug wireframes must fence Java command-context acquisition on Rust Vulkan");
+		Path testRenderer = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/TestRenderer.java");
+		String testSource = readSourceWithoutComments(testRenderer);
+		assertNoImmediateContext(testRenderer);
+		assertTrue(testSource.indexOf("RustGalVulkanWholeFrameMode.enabled()")
+			< testSource.indexOf("VulkanicAPI.getCommandContext()"),
+			"diagnostic test rendering must fence Java command-context acquisition on Rust Vulkan");
+	}
 
     @Test
     public void testDhFramebufferExposesExplicitRenderTargetDescriptor() throws IOException {

@@ -93,6 +93,9 @@ public class SharedQuadIndexBuffer {
         if (this.gpuBuffer != null) {
             return this.gpuBuffer;
         }
+        if (net.vulkanic.VulkanicAPI.isVulkanBackendInitializedAndSelected()) {
+            throw new IllegalStateException("Selected Vulkan cannot expose a legacy shared quad index buffer");
+        }
         return new LegacyHandleGlBuffer(() -> "Shared quad index buffer", usage, Math.toIntExact(this.buffer.getSize()), this.buffer.handle());
     }
 

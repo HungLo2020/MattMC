@@ -30,6 +30,17 @@ public class MainTarget extends RenderTarget {
 	}
 
 	private void createFrameBuffer(int i, int j) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			// MainTarget overrides RenderTarget.createBuffers, so the base
+			// whole-frame guard cannot protect this entry point. Rust owns the
+			// acquired presentation images; retain only dimensions for semantic
+			// extraction and never allocate a second Java framebuffer.
+			MainTarget.Dimension dimension = this.listWithFallbackDimensions(i, j);
+			this.width = dimension.width;
+			this.height = dimension.height;
+			this.filterMode = FilterMode.NEAREST;
+			return;
+		}
 		MainTarget.Dimension dimension = this.allocateAttachments(i, j);
 		if (this.colorTexture != null && this.depthTexture != null) {
 			this.colorTexture.setTextureFilter(FilterMode.NEAREST, false);
@@ -41,6 +52,10 @@ public class MainTarget extends RenderTarget {
 		} else {
 			throw new IllegalStateException("Missing color and/or depth textures");
 		}
+	}
+
+	private MainTarget.Dimension listWithFallbackDimensions(int i, int j) {
+		return MainTarget.Dimension.listWithFallback(i, j).get(0);
 	}
 
 	private MainTarget.Dimension allocateAttachments(int i, int j) {

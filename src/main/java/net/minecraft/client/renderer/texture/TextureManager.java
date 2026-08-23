@@ -125,8 +125,12 @@ public class TextureManager implements PreparableReloadListener, Tickable, AutoC
 		this.byPath.clear();
 		this.tickableTextures.clear();
 		
-		// Iris: Clear PBR textures on close (from MixinTextureManager)
-		net.irisshaders.iris.pbr.texture.PBRTextureManager.INSTANCE.close();
+		// Iris PBR textures belong to the Java compatibility renderer. Rust
+		// whole-frame resource reloads publish copied asset bytes to VulkanicGAL
+		// instead of touching Iris' runtime texture registry.
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			net.irisshaders.iris.pbr.texture.PBRTextureManager.INSTANCE.close();
+		}
 	}
 
 	public CompletableFuture<Void> reload(SharedState sharedState, Executor executor, PreparationBarrier preparationBarrier, Executor executor2) {
@@ -145,8 +149,11 @@ public class TextureManager implements PreparableReloadListener, Tickable, AutoC
 				}
 			}, executor2);
 		
-		// Iris: Clear PBR textures on reload (from MixinTextureManager)
-		net.irisshaders.iris.pbr.texture.PBRTextureManager.INSTANCE.clear();
+		// PBR registry maintenance is compatibility-only; Rust owns copied
+		// resource-pack generations while it owns presentation.
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			net.irisshaders.iris.pbr.texture.PBRTextureManager.INSTANCE.clear();
+		}
 		
 		return result;
 	}
@@ -169,8 +176,9 @@ public class TextureManager implements PreparableReloadListener, Tickable, AutoC
 			}
 		});
 		
-		// Iris: Dump PBR textures (from MixinTextureManager)
-		net.irisshaders.iris.pbr.texture.PBRTextureManager.INSTANCE.dumpTextures(path);
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			net.irisshaders.iris.pbr.texture.PBRTextureManager.INSTANCE.dumpTextures(path);
+		}
 	}
 
 	private static TextureContents loadContents(ResourceManager resourceManager, ResourceLocation resourceLocation, ReloadableTexture reloadableTexture) throws IOException {

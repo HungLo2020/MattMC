@@ -24,6 +24,13 @@ crash-reports/
 # Keep the consolidated archive out of version control.
 /logs/graphics-audit/root-capture-archive/
 
+# Keep graphics capture artifacts in this dedicated ignored subtree; never
+# write them as dot-directories at the repository root.
+/artifacts/graphics-captures/
+# Legacy RenderDoc/capture probes must never become repository files. The
+# capture runner relocates these into the ignored artifact subtree.
+/.capture*
+
 # OS
 .DS_Store
 Thumbs.db

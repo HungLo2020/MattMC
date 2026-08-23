@@ -36,8 +36,27 @@ public abstract class AbstractEndPortalRenderer<T extends TheEndPortalBlockEntit
 	}
 
 	public void submit(S endPortalRenderState, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, CameraRenderState cameraRenderState) {
+		boolean rustWholeFrame = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			&& net.vulkanic.world.WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan();
+		if (rustWholeFrame && submitNodeCollector.isSemanticCoverageOnly()) {
+			// The whole-frame route keeps end-portal custom geometry unavailable
+			// until its copied material primitive is admitted; do not count this
+			// already-owned route as a hidden Java callback during source coverage.
+			return;
+		}
+		if (rustWholeFrame) {
+			boolean[] faces = new boolean[Direction.values().length];
+			for (Direction direction : endPortalRenderState.facesToShow) faces[direction.ordinal()] = true;
+			float gameTime = net.minecraft.client.Minecraft.getInstance().level.getGameTime()
+				+ net.vulkanic.bridge.RustGalDeterministicTiming.partialTick(
+					net.minecraft.client.Minecraft.getInstance().getDeltaTracker()
+				);
+			if (submitNodeCollector.submitEndPortal(poseStack, faces, gameTime, 15728880)) return;
+			throw new IllegalStateException("Rust whole-frame End Portal route unavailable for semantic cube");
+		}
 		// Iris: Cancel default rendering when shader pack is loaded (from MixinTheEndPortalRenderer)
-		if (net.irisshaders.iris.Iris.getCurrentPack().isPresent()) {
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			&& !rustWholeFrame && net.irisshaders.iris.Iris.getCurrentPack().isPresent()) {
 			// Custom rendering is handled by the renderType override which returns RenderType.entitySolid()
 			return;
 		}
@@ -90,7 +109,10 @@ public abstract class AbstractEndPortalRenderer<T extends TheEndPortalBlockEntit
 
 	protected RenderType renderType() {
 		// Iris: Use entitySolid render type when shader pack is loaded (from MixinTheEndPortalRenderer)
-		if (net.irisshaders.iris.Iris.getCurrentPack().isPresent()) {
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			&& !(net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			&& net.vulkanic.world.WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan())
+			&& net.irisshaders.iris.Iris.getCurrentPack().isPresent()) {
 			return net.minecraft.client.renderer.RenderType.entitySolid(net.minecraft.client.renderer.blockentity.TheEndPortalRenderer.END_PORTAL_LOCATION);
 		}
 		return RenderType.endPortal();

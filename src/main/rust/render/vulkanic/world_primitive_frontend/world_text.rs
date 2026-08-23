@@ -661,6 +661,7 @@ impl WorldTextFrontend {
                     depth_bias,
                     color_formats: vec![key.color_format],
                     depth_format: Some(TextureFormat::Depth32Float),
+                    stencil: None,
                 })
             };
             let pipeline_depth_disabled = build_pipeline(None, None, "see-through")?;

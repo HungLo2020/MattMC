@@ -7,6 +7,8 @@ import net.alexsmobs.entity.EntityCachalotPart;
 import net.alexsmobs.entity.EntityCachalotWhale;
 import net.blaze3d.vertex.PoseStack;
 import net.minecraft.client.renderer.culling.Frustum;
+import net.minecraft.client.renderer.state.CameraRenderState;
+import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.entity.MobRenderer;
 import net.minecraft.resources.ResourceLocation;
@@ -28,6 +30,13 @@ public class RenderCachalotWhale extends MobRenderer<EntityCachalotWhale, Cachal
     }
 
     @Override
+    public void submit(CachalotWhaleRenderState renderState, PoseStack poseStack,
+                       SubmitNodeCollector collector, CameraRenderState cameraRenderState) {
+        renderState.cameraRenderState = cameraRenderState;
+        super.submit(renderState, poseStack, collector, cameraRenderState);
+    }
+
+    @Override
     public void extractRenderState(EntityCachalotWhale entity, CachalotWhaleRenderState renderState, float partialTick) {
         super.extractRenderState(entity, renderState, partialTick);
         renderState.chargeProgress = entity.prevChargingProgress + (entity.chargeProgress - entity.prevChargingProgress) * partialTick;
@@ -39,7 +48,9 @@ public class RenderCachalotWhale extends MobRenderer<EntityCachalotWhale, Cachal
         renderState.isSleeping = entity.isSleeping();
         renderState.isBeached = entity.isBeached();
         renderState.hasCaughtSquid = entity.hasCaughtSquid();
-        renderState.caughtSquid = entity.getCaughtSquid();
+        net.minecraft.world.entity.Entity caughtSquid = entity.getCaughtSquid();
+        renderState.caughtSquidState = caughtSquid == null
+            ? null : this.entityRenderDispatcher.extractEntity(caughtSquid, partialTick);
         renderState.isHoldingSquidLeft = entity.isHoldingSquidLeft();
         // Store movement offsets for model animation
         for (int i = 0; i < renderState.movementOffsets.length; i++) {

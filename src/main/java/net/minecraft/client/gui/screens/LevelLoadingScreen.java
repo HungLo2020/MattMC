@@ -158,6 +158,13 @@ public class LevelLoadingScreen extends Screen {
 				guiGraphics.blitSprite(RenderPipelines.GUI_OPAQUE_TEXTURED_BACKGROUND, this.getNetherPortalSprite(), 0, 0, guiGraphics.guiWidth(), guiGraphics.guiHeight());
 				break;
 			case END_PORTAL:
+				if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+					float gameTime = Minecraft.getInstance().level == null
+						? 0.0F
+						: (float)Minecraft.getInstance().level.getGameTime() + f;
+					guiGraphics.submitRustEndPortal(gameTime);
+					break;
+				}
 				TextureManager textureManager = Minecraft.getInstance().getTextureManager();
 				TextureSetup textureSetup = TextureSetup.doubleTexture(
 					textureManager.getTexture(AbstractEndPortalRenderer.END_SKY_LOCATION).getTextureView(),

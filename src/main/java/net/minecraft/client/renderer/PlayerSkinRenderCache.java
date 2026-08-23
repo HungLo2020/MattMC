@@ -116,7 +116,12 @@ public class PlayerSkinRenderCache {
 			return this.itemRenderType;
 		}
 
+		@Nullable
 		public GpuTextureView textureView() {
+			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+				return null;
+			}
+
 			if (this.textureView == null) {
 				this.textureView = PlayerSkinRenderCache.this.textureManager.getTexture(this.playerSkin.body().texturePath()).getTextureView();
 			}

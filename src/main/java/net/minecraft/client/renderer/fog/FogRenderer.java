@@ -35,6 +35,7 @@ import net.sodium.client.util.FogStorage;
 import net.vulkanic.VulkanicAPI;
 import org.joml.Vector4f;
 import org.lwjgl.system.MemoryStack;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)
@@ -52,33 +53,45 @@ public class FogRenderer implements AutoCloseable, FogStorage {
 		new AtmosphericFogEnvironment()
 	);
 	private static boolean fogEnabled = true;
+	@Nullable
 	private final GpuBuffer emptyBuffer;
+	@Nullable
 	private final MappableRingBuffer regularBuffer;
 	// Sodium: FogStorage interface implementation (from FogRendererMixin)
 	private FogParameters parameters = FogParameters.NONE;
 
 	public FogRenderer() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			// Rust consumes copied fog parameters; Java UBOs and shader-fog
+			// publication are compatibility-only on the whole-frame route.
+			this.regularBuffer = null;
+			this.emptyBuffer = null;
+			return;
+		}
 		this.regularBuffer = new MappableRingBuffer(() -> "Fog UBO", 130, FOG_UBO_SIZE);
 
 		try (MemoryStack memoryStack = MemoryStack.stackPush()) {
 			ByteBuffer byteBuffer = memoryStack.malloc(FOG_UBO_SIZE);
 			this.updateBuffer(byteBuffer, 0, new Vector4f(0.0F), Float.MAX_VALUE, Float.MAX_VALUE, Float.MAX_VALUE, Float.MAX_VALUE, Float.MAX_VALUE, Float.MAX_VALUE);
-			this.emptyBuffer = net.vulkanic.VulkanicAPI.createBuffer(() -> "Empty fog", 128, byteBuffer.flip());
+		this.emptyBuffer = net.vulkanic.VulkanicAPI.createBuffer(() -> "Empty fog", 128, byteBuffer.flip());
 		}
 
 		VulkanicAPI.setShaderFog(this.getBuffer(FogRenderer.FogMode.NONE));
 	}
 
 	public void close() {
-		this.emptyBuffer.close();
-		this.regularBuffer.close();
+		if (this.emptyBuffer != null) this.emptyBuffer.close();
+		if (this.regularBuffer != null) this.regularBuffer.close();
 	}
 
 	public void endFrame() {
-		this.regularBuffer.rotate();
+		if (this.regularBuffer != null) this.regularBuffer.rotate();
 	}
 
 	public GpuBufferSlice getBuffer(FogRenderer.FogMode fogMode) {
+		if (this.emptyBuffer == null || this.regularBuffer == null) {
+			throw new IllegalStateException("Java fog UBO rendering is unavailable while Rust owns whole-frame presentation");
+		}
 		if (!fogEnabled) {
 			return this.emptyBuffer.slice(0, FOG_UBO_SIZE);
 		} else {
@@ -91,6 +104,17 @@ public class FogRenderer implements AutoCloseable, FogStorage {
 
 	// VoxelMap: Made accessible
 	public Vector4f computeFogColor(Camera camera, float f, ClientLevel clientLevel, int i, float g, boolean bl) {
+		return this.computeFogColor(camera, f, clientLevel, i, g, bl, true);
+	}
+
+	/** Computes the same fog color without publishing Java/Iris compatibility state. */
+	public Vector4f computeFogColorSemantic(Camera camera, float f, ClientLevel clientLevel, int i, float g, boolean bl) {
+		return this.computeFogColor(camera, f, clientLevel, i, g, bl, false);
+	}
+
+	private Vector4f computeFogColor(
+		Camera camera, float f, ClientLevel clientLevel, int i, float g, boolean bl, boolean updateLegacyIrisFogState
+	) {
 		FogType fogType = this.getFogType(camera, bl);
 		Entity entity = camera.getEntity();
 		FogEnvironment fogEnvironment = null;
@@ -159,7 +183,11 @@ public class FogRenderer implements AutoCloseable, FogStorage {
 				n = Mth.lerp(o, n, n * p);
 			}
 
-			return new Vector4f(l, m, n, 1.0F);
+			Vector4f result = new Vector4f(l, m, n, 1.0F);
+			if (updateLegacyIrisFogState) {
+				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setFogColor(result.x, result.y, result.z);
+			}
+			return result;
 		}
 	}
 
@@ -168,6 +196,9 @@ public class FogRenderer implements AutoCloseable, FogStorage {
 	}
 
 	public Vector4f setupFog(Camera camera, int i, boolean bl, DeltaTracker deltaTracker, float f, ClientLevel clientLevel) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java fog UBO rendering is unavailable while Rust owns whole-frame presentation");
+		}
 		FogComputation fog = this.computeFogParameters(camera, i, bl, deltaTracker, f, clientLevel, true);
 		FogParameters fogParameters = fog.parameters();
 		Vector4f vector4f = new Vector4f(
@@ -212,9 +243,8 @@ public class FogRenderer implements AutoCloseable, FogStorage {
 			);
 		}
 
-		// Iris: Capture fog color for the legacy Java render path only.
-		net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setFogColor(vector4f.x, vector4f.y, vector4f.z);
-		return vector4f;
+			// Fog color capture is handled by computeFogColor's explicit legacy flag.
+			return vector4f;
 	}
 
 	/**
@@ -251,7 +281,7 @@ public class FogRenderer implements AutoCloseable, FogStorage {
 		}
 		
 		float g = deltaTracker.getGameTimeDeltaPartialTick(false);
-		Vector4f vector4f = this.computeFogColor(camera, g, clientLevel, i, f, bl);
+		Vector4f vector4f = this.computeFogColor(camera, g, clientLevel, i, f, bl, updateLegacyIrisFogState);
 		float h = i * 16;
 		FogType fogType = this.getFogType(camera, bl);
 		Entity entity = camera.getEntity();

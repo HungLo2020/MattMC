@@ -234,8 +234,11 @@ public class Gui {
 	}
 
 	public void render(GuiGraphics guiGraphics, DeltaTracker deltaTracker) {
-		// Iris: Hide HUD for certain screens (from MixinGui)
-		if (this.minecraft.screen instanceof net.irisshaders.iris.gui.screen.HudHideable) {
+		// Iris HUD visibility is compatibility-renderer state. Rust whole-frame
+		// Vulkan receives semantic GUI elements directly and must not query Iris
+		// screen/runtime internals while assembling that frame.
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			&& this.minecraft.screen instanceof net.irisshaders.iris.gui.screen.HudHideable) {
 			return;
 		}
 		
@@ -272,14 +275,24 @@ public class Gui {
 		
 		// VoxelMap: Render minimap overlay (after boss bar, before debug overlay)
 		if (!this.minecraft.options.hideGui) {
-			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-				&& net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry.isRegistered(VOXELMAP_MINIMAP_HUD_ELEMENT)) {
-				throw new IllegalStateException("Rust whole-frame Vulkan has no semantic VoxelMap minimap route; refusing its Java GPU renderer");
-			}
-			try {
-				net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry.renderAll(guiGraphics, deltaTracker);
-			} catch (Exception e) {
-				// Silently ignore errors to avoid crashing the game
+			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+				// The semantic producer owns fail-closed admission on Rust Vulkan;
+				// swallowing its boundary error would make an unavailable overlay
+				// indistinguishable from a Java fallback.
+				if (net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry.isRegistered(VOXELMAP_MINIMAP_HUD_ELEMENT)) {
+					net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry.renderAll(guiGraphics, deltaTracker);
+				} else {
+					// Some stripped test/client boots do not load VoxelMap's Fabric
+					// initializer. Keep the semantic callsite live without reopening
+					// the Java GPU overlay path.
+					net.voxelmap.VoxelConstants.renderOverlay(guiGraphics);
+				}
+			} else {
+				try {
+					net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry.renderAll(guiGraphics, deltaTracker);
+				} catch (Exception e) {
+					// Silently ignore errors to avoid crashing the game
+				}
 			}
 		}
 		
@@ -1483,8 +1496,10 @@ public class Gui {
 
 	private void renderVignette(GuiGraphics guiGraphics, @Nullable Entity entity) {
 		// Iris: Check if vignette should be rendered
-		net.irisshaders.iris.pipeline.WorldRenderingPipeline pipeline = 
-			net.irisshaders.iris.Iris.getPipelineManager().getPipelineNullable();
+		net.irisshaders.iris.pipeline.WorldRenderingPipeline pipeline =
+			net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+				? null
+				: net.irisshaders.iris.Iris.getPipelineManager().getPipelineNullable();
 		
 		if (pipeline != null && !pipeline.shouldRenderVignette()) {
 			return;

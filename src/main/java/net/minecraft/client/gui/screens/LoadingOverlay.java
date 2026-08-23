@@ -67,6 +67,22 @@ public class LoadingOverlay extends Overlay {
 	}
 
 	public static void registerTextures(TextureManager textureManager) {
+		// Capture the vanilla logo as a semantic CPU asset before route selection
+		// can switch to Rust whole-frame mode; this call is harmless when the
+		// ordinary Java texture route remains active.
+		boolean semanticLogoLoaded = false;
+		try {
+			TextureContents logo = new LogoTexture().loadContents(Minecraft.getInstance().getResourceManager());
+			try {
+				semanticLogoLoaded = net.vulkanic.gui.RustGalGuiRawImageAssets.stageNativeImage(MOJANG_STUDIOS_LOGO_LOCATION, logo.image());
+			} finally {
+				logo.close();
+			}
+		} catch (IOException error) {
+			// The normal resource-manager path remains available after reload; do
+			// not admit a Java texture or fallback if this early preload is absent.
+		}
+		LOGGER.info("Rust semantic loading-overlay logo preload={}", semanticLogoLoaded);
 		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			return;
 		}
@@ -198,12 +214,11 @@ public class LoadingOverlay extends Overlay {
 	}
 
 	private void renderCompatibleScreen(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			&& !(this.minecraft.screen instanceof TitleScreen)
-			&& !(this.minecraft.screen instanceof LevelLoadingScreen)) {
-			throw new IllegalStateException("Rust whole-frame Vulkan loading overlay cannot compose unsupported screen "
-				+ this.minecraft.screen.getClass().getName());
-		}
+		// In the Rust whole-frame route this is semantic screen extraction, not a
+		// Java presenter.  Keep the callsite broad so resource-pack failure,
+		// disconnect, and other loading screens can contribute supported GUI
+		// elements; RustGalFrameCoordinator rejects any element family it cannot
+		// lower instead of reopening a Java draw as a fallback.
 		this.minecraft.screen.renderWithTooltipAndSubtitles(guiGraphics, mouseX, mouseY, partialTick);
 	}
 

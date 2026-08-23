@@ -77,6 +77,18 @@ const MATERIALS: &[SemanticMaterial] = &[
         legacy_keys: &[3],
     },
     SemanticMaterial {
+        key: WORLD_MATERIAL_ID_GLINT_TEXTURED,
+        resource_location: "minecraft:material/glint_textured",
+        mode: WORLD_MATERIAL_MODE_GLINT,
+        cutout_threshold: 0.0,
+        sampler: MaterialSamplerPolicy::NearestClamp,
+        mip: MaterialMipPolicy::SingleMip,
+        tint: MaterialTintChannel::VertexColor,
+        emissive: true,
+        fullbright: true,
+        legacy_keys: &[],
+    },
+    SemanticMaterial {
         key: WORLD_MATERIAL_ID_WATER_TRANSLUCENT,
         resource_location: "minecraft:material/water_translucent",
         mode: WORLD_MATERIAL_MODE_TRANSLUCENT,
@@ -320,6 +332,22 @@ const TEXTURES: &[SemanticTexture] = &[
         legacy_keys: &[],
     },
     SemanticTexture {
+        key: WORLD_MATERIAL_TEXTURE_SKY_SUN,
+        resource_location: "minecraft:textures/environment/sun.png",
+        default_png: include_bytes!(
+            "../../../../resources/assets/minecraft/textures/environment/sun.png"
+        ),
+        legacy_keys: &[],
+    },
+    SemanticTexture {
+        key: WORLD_MATERIAL_TEXTURE_SKY_MOON_PHASES,
+        resource_location: "minecraft:textures/environment/moon_phases.png",
+        default_png: include_bytes!(
+            "../../../../resources/assets/minecraft/textures/environment/moon_phases.png"
+        ),
+        legacy_keys: &[],
+    },
+    SemanticTexture {
         key: WORLD_MATERIAL_TEXTURE_EXPERIENCE_ORB,
         resource_location: "minecraft:textures/entity/experience_orb.png",
         default_png: include_bytes!(
@@ -332,6 +360,46 @@ const TEXTURES: &[SemanticTexture] = &[
         resource_location: "minecraft:textures/entity/beacon_beam.png",
         default_png: include_bytes!(
             "../../../../resources/assets/minecraft/textures/entity/beacon_beam.png"
+        ),
+        legacy_keys: &[],
+    },
+    SemanticTexture {
+        key: WORLD_MATERIAL_TEXTURE_CRYSTAL_BEAM,
+        resource_location: "minecraft:textures/entity/end_crystal/end_crystal_beam.png",
+        default_png: include_bytes!(
+            "../../../../resources/assets/minecraft/textures/entity/end_crystal/end_crystal_beam.png"
+        ),
+        legacy_keys: &[],
+    },
+    SemanticTexture {
+        key: WORLD_MATERIAL_TEXTURE_END_GATEWAY_BEAM,
+        resource_location: "minecraft:textures/entity/end_gateway_beam.png",
+        default_png: include_bytes!(
+            "../../../../resources/assets/minecraft/textures/entity/end_gateway_beam.png"
+        ),
+        legacy_keys: &[],
+    },
+    SemanticTexture {
+        key: WORLD_MATERIAL_TEXTURE_END_SKY,
+        resource_location: "minecraft:textures/environment/end_sky.png",
+        default_png: include_bytes!(
+            "../../../../resources/assets/minecraft/textures/environment/end_sky.png"
+        ),
+        legacy_keys: &[],
+    },
+    SemanticTexture {
+        key: WORLD_MATERIAL_TEXTURE_END_FLASH,
+        resource_location: "minecraft:textures/environment/end_flash.png",
+        default_png: include_bytes!(
+            "../../../../resources/assets/minecraft/textures/environment/end_flash.png"
+        ),
+        legacy_keys: &[],
+    },
+    SemanticTexture {
+        key: WORLD_MATERIAL_TEXTURE_END_PORTAL,
+        resource_location: "minecraft:textures/entity/end_portal.png",
+        default_png: include_bytes!(
+            "../../../../resources/assets/minecraft/textures/entity/end_portal.png"
         ),
         legacy_keys: &[],
     },
@@ -381,10 +449,6 @@ pub(crate) fn is_known_material_key(key: u32) -> bool {
     canonical_material_key(key).is_some()
 }
 
-pub(crate) fn is_known_texture_key(key: u32) -> bool {
-    canonical_texture_key(key).is_some()
-}
-
 pub(crate) fn material_matches_mode(material_key: u32, mode: u32) -> bool {
     material(material_key)
         .map(|entry| entry.mode == mode)
@@ -400,6 +464,18 @@ pub(crate) fn cutout_threshold(material_key: u32) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn vanilla_celestial_textures_are_owned_semantic_assets() {
+        for key in [
+            WORLD_MATERIAL_TEXTURE_SKY_SUN,
+            WORLD_MATERIAL_TEXTURE_SKY_MOON_PHASES,
+        ] {
+            let texture = texture(key).expect("vanilla celestial texture must be registered");
+            assert!(!texture.default_png.is_empty());
+            assert_eq!(Some(key), canonical_texture_key(key));
+        }
+    }
 
     #[test]
     fn weather_textures_are_stable_rust_owned_semantic_assets() {
@@ -449,6 +525,27 @@ mod tests {
         );
         assert!(!beam.default_png.is_empty());
         assert_ne!(beam.key, WORLD_MATERIAL_TEXTURE_EXPERIENCE_ORB);
+        assert!(material_matches_mode(
+            WORLD_MATERIAL_ID_TRANSLUCENT_TEXTURED,
+            WORLD_MATERIAL_MODE_TRANSLUCENT
+        ));
+    }
+
+    #[test]
+    fn end_portal_layers_are_stable_rust_owned_semantic_assets() {
+        let sky = texture(WORLD_MATERIAL_TEXTURE_END_SKY).expect("end-sky texture");
+        let portal = texture(WORLD_MATERIAL_TEXTURE_END_PORTAL).expect("end-portal texture");
+        assert_eq!(
+            sky.resource_location,
+            "minecraft:textures/environment/end_sky.png"
+        );
+        assert_eq!(
+            portal.resource_location,
+            "minecraft:textures/entity/end_portal.png"
+        );
+        assert_ne!(sky.key, portal.key);
+        assert!(!sky.default_png.is_empty());
+        assert!(!portal.default_png.is_empty());
         assert!(material_matches_mode(
             WORLD_MATERIAL_ID_TRANSLUCENT_TEXTURED,
             WORLD_MATERIAL_MODE_TRANSLUCENT

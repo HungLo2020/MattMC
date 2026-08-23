@@ -42,7 +42,12 @@ public class SnowGolemHeadLayer extends RenderLayer<SnowGolemRenderState, SnowGo
 				RenderType renderType = snowGolemRenderState.appearsGlowing() && snowGolemRenderState.isInvisible
 					? RenderType.outline(TextureAtlas.LOCATION_BLOCKS)
 					: ItemBlockRenderTypes.getRenderType(blockState);
-				submitNodeCollector.submitBlockModel(poseStack, renderType, blockStateModel, 0.0F, 0.0F, 0.0F, i, j, snowGolemRenderState.outlineColor);
+				if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+					&& net.vulkanic.world.WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()) {
+					submitNodeCollector.submitBlockDisplay(poseStack, blockState, i, j, snowGolemRenderState.outlineColor);
+				} else {
+					submitNodeCollector.submitBlockModel(poseStack, renderType, blockStateModel, 0.0F, 0.0F, 0.0F, i, j, snowGolemRenderState.outlineColor);
+				}
 				poseStack.popPose();
 			}
 		}

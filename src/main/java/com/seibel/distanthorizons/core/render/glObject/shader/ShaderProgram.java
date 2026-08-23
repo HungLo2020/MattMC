@@ -89,6 +89,7 @@ public class ShaderProgram
 
 	public ShaderProgram(CommandContext ctx, List<Supplier<String>> vertSupplierList, List<Supplier<String>> fragSupplierList, String[] attributes)
 	{
+		rejectRustWholeFrameJavaShaderProgram();
 		VulkanicProgramHandle program = VulkanicAPI.createShaderProgramHandle(ctx);
 		this.id = program.value();
 		
@@ -119,6 +120,16 @@ public class ShaderProgram
 			throw new RuntimeException(message);
 		}
 		VulkanicAPI.bindShaderProgram(ctx, this.id); // This HAVE to be a direct call to prevent calling the overloaded version
+	}
+
+	private static void rejectRustWholeFrameJavaShaderProgram()
+	{
+		if (VulkanicAPI.isVulkanBackendInitializedAndSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
+		{
+			throw new IllegalStateException(
+				"Java Distant Horizons shader programs are unavailable while Rust owns whole-frame presentation");
+		}
 	}
 	
 	

@@ -92,6 +92,9 @@ public class SkullBlockRenderer implements BlockEntityRenderer<SkullBlockEntity,
 		int i = bl ? RotationSegment.convertToSegment(skullBlockRenderState.direction.getOpposite()) : (Integer)blockState.getValue(SkullBlock.ROTATION);
 		skullBlockRenderState.rotationDegrees = RotationSegment.convertToDegrees(i);
 		skullBlockRenderState.skullType = ((AbstractSkullBlock)blockState.getBlock()).getType();
+		skullBlockRenderState.textureIdentity = skullBlockRenderState.skullType == Types.PLAYER
+			? null
+			: SKIN_BY_TYPE.get(skullBlockRenderState.skullType);
 		skullBlockRenderState.renderType = this.resolveSkullRenderType(skullBlockRenderState.skullType, skullBlockEntity);
 	}
 
@@ -109,7 +112,8 @@ public class SkullBlockRenderer implements BlockEntityRenderer<SkullBlockEntity,
 			skullModelBase,
 			skullBlockRenderState.renderType,
 			0,
-			skullBlockRenderState.breakProgress
+			skullBlockRenderState.breakProgress,
+			skullBlockRenderState.textureIdentity
 		);
 	}
 
@@ -123,7 +127,8 @@ public class SkullBlockRenderer implements BlockEntityRenderer<SkullBlockEntity,
 		SkullModelBase skullModelBase,
 		RenderType renderType,
 		int j,
-		@Nullable ModelFeatureRenderer.CrumblingOverlay crumblingOverlay
+		@Nullable ModelFeatureRenderer.CrumblingOverlay crumblingOverlay,
+		@Nullable ResourceLocation semanticTexture
 	) {
 		poseStack.pushPose();
 		if (direction == null) {
@@ -137,7 +142,13 @@ public class SkullBlockRenderer implements BlockEntityRenderer<SkullBlockEntity,
 		SkullModelBase.State state = new SkullModelBase.State();
 		state.animationPos = g;
 		state.yRot = f;
-		submitNodeCollector.submitModel(skullModelBase, state, poseStack, renderType, i, OverlayTexture.NO_OVERLAY, j, crumblingOverlay);
+		if (semanticTexture != null) {
+			submitNodeCollector.submitModelSemanticTexture(
+				skullModelBase, state, poseStack, renderType, i, OverlayTexture.NO_OVERLAY, -1, semanticTexture, j, crumblingOverlay
+			);
+		} else {
+			submitNodeCollector.submitModel(skullModelBase, state, poseStack, renderType, i, OverlayTexture.NO_OVERLAY, j, crumblingOverlay);
+		}
 		poseStack.popPose();
 	}
 
@@ -154,6 +165,11 @@ public class SkullBlockRenderer implements BlockEntityRenderer<SkullBlockEntity,
 
 	public static RenderType getSkullRenderType(Type type, @Nullable ResourceLocation resourceLocation) {
 		return RenderType.entityCutoutNoCullZOffset(resourceLocation != null ? resourceLocation : (ResourceLocation)SKIN_BY_TYPE.get(type));
+	}
+
+	/** Semantic texture identity for model-copy routes; does not expose GPU state. */
+	public static ResourceLocation defaultTexture(Type type) {
+		return SKIN_BY_TYPE.get(type);
 	}
 
 	public static RenderType getPlayerSkinRenderType(ResourceLocation resourceLocation) {

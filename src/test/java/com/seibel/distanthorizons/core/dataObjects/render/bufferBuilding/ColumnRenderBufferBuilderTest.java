@@ -42,6 +42,18 @@ class ColumnRenderBufferBuilderTest {
 	}
 
 	@Test
+	void coarseRustGeometryAcceptsOnlyAnExplicitUniformContributorProof() {
+		ColumnRenderBufferBuilder.SemanticMaterialProvenance provenance =
+			ColumnRenderBufferBuilder.semanticMaterialProvenanceForDetailLevel(
+				true, (byte) 1, 42, (byte) 1, 123L, true
+			);
+
+		assertEquals(42, provenance.materialId());
+		assertEquals((byte) 1, provenance.variantState());
+		assertEquals(123L, provenance.variantPosition());
+	}
+
+	@Test
 	void legacyGeometryKeepsItsExistingSemanticSidecars() {
 		ColumnRenderBufferBuilder.SemanticMaterialProvenance provenance =
 			ColumnRenderBufferBuilder.semanticMaterialProvenanceForDetailLevel(false, (byte) 3,

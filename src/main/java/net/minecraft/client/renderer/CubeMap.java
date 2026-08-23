@@ -18,15 +18,19 @@ import org.joml.Matrix4f;
 import org.joml.Matrix4fStack;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
+import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
 public class CubeMap implements AutoCloseable {
+	@Nullable
 	private final CachedPerspectiveProjectionMatrixBuffer projectionMatrixUbo;
 	private final ResourceLocation location;
 
 	public CubeMap(ResourceLocation resourceLocation) {
 		this.location = resourceLocation;
-		this.projectionMatrixUbo = new CachedPerspectiveProjectionMatrixBuffer("cubemap", 0.05F, 10.0F);
+		this.projectionMatrixUbo = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			? null
+			: new CachedPerspectiveProjectionMatrixBuffer("cubemap", 0.05F, 10.0F);
 	}
 
 	/** Semantic source identity for the Rust-owned panorama path. */
@@ -36,9 +40,14 @@ public class CubeMap implements AutoCloseable {
 
 	public void render(Minecraft minecraft, float f, float g) {
 		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			throw new IllegalStateException(
-				"Java cube-map rendering is unavailable while Rust owns whole-frame Vulkan presentation; port this callsite to explicit panorama semantics."
-			);
+			int width = minecraft.getWindow().getGuiScaledWidth();
+			int height = minecraft.getWindow().getGuiScaledHeight();
+			if (!net.vulkanic.gui.RustGalPanoramaRenderer.enqueue(this, f, g, width, height)) {
+				throw new IllegalStateException(
+					"Rust Vulkan whole-frame panorama asset is unavailable; Java cube-map rendering is not a fallback"
+				);
+			}
+			return;
 		}
 		net.vulkanic.VulkanicAPI.setProjectionMatrix(
 			this.projectionMatrixUbo.getBuffer(minecraft.getWindow().getWidth(), minecraft.getWindow().getHeight(), 85.0F), ProjectionType.PERSPECTIVE
@@ -86,6 +95,8 @@ public class CubeMap implements AutoCloseable {
 	}
 
 	public void close() {
-		this.projectionMatrixUbo.close();
+		if (this.projectionMatrixUbo != null) {
+			this.projectionMatrixUbo.close();
+		}
 	}
 }

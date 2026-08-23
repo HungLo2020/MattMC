@@ -25,7 +25,7 @@ public class WolfCollarLayer extends RenderLayer<WolfRenderState, WolfModel> {
 		if (dyeColor != null && !wolfRenderState.isInvisible) {
 			int j = dyeColor.getTextureDiffuseColor();
 			submitNodeCollector.order(1)
-				.submitModel(
+				.submitModelSemanticTexture(
 					this.getParentModel(),
 					wolfRenderState,
 					poseStack,
@@ -33,7 +33,7 @@ public class WolfCollarLayer extends RenderLayer<WolfRenderState, WolfModel> {
 					i,
 					OverlayTexture.NO_OVERLAY,
 					j,
-					null,
+					WOLF_COLLAR_LOCATION,
 					wolfRenderState.outlineColor,
 					null
 				);

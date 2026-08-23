@@ -40,7 +40,11 @@ public record ChunkSectionsToRender(
 			hook.onBeforeRenderLayer(chunkSectionLayerGroup);
 		}
 		
-		// Sodium: Let Sodium renderer handle if active (from ChunkSectionsToRenderMixin)
+			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+				throw new IllegalStateException("Java chunk-section rendering is unavailable while Rust owns whole-frame presentation");
+			}
+
+			// Sodium: Let Sodium renderer handle if active (from ChunkSectionsToRenderMixin)
 		if (renderer != null) {
 			RenderDevice.enterManagedCode();
 			try {

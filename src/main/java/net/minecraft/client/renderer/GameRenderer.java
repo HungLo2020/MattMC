@@ -164,10 +164,14 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 	private boolean effectActive;
 	private final Camera mainCamera = new Camera();
 	private final Lighting lighting = new Lighting();
-	private final GlobalSettingsUniform globalSettingsUniform = new GlobalSettingsUniform();
-	private final PerspectiveProjectionMatrixBuffer levelProjectionMatrixBuffer = new PerspectiveProjectionMatrixBuffer("level");
-	private final PerspectiveProjectionMatrixBuffer handProjectionMatrixBuffer = new PerspectiveProjectionMatrixBuffer("hand");
-	private final CachedPerspectiveProjectionMatrixBuffer hud3dProjectionMatrixBuffer = new CachedPerspectiveProjectionMatrixBuffer("3d hud", 0.05F, 100.0F);
+	@Nullable
+	private final GlobalSettingsUniform globalSettingsUniform;
+	@Nullable
+	private final PerspectiveProjectionMatrixBuffer levelProjectionMatrixBuffer;
+	@Nullable
+	private final PerspectiveProjectionMatrixBuffer handProjectionMatrixBuffer;
+	@Nullable
+	private final CachedPerspectiveProjectionMatrixBuffer hud3dProjectionMatrixBuffer;
 	// Screen shake support for ShakesScreen entities
 	private static final double SCREEN_SHAKE_SEARCH_RADIUS = 64.0;
 	private static final float MAX_SCREEN_SHAKE_AMOUNT = 2.0F;
@@ -179,6 +183,20 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 	public GameRenderer(Minecraft minecraft, ItemInHandRenderer itemInHandRenderer, RenderBuffers renderBuffers, BlockRenderDispatcher blockRenderDispatcher) {
 		this.minecraft = minecraft;
 		this.itemInHandRenderer = itemInHandRenderer;
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			// Rust whole-frame extraction owns copied matrices and frame settings;
+			// these Java compatibility UBOs are never consumed on that route.
+			this.globalSettingsUniform = null;
+			this.levelProjectionMatrixBuffer = null;
+			this.handProjectionMatrixBuffer = null;
+		} else {
+			this.globalSettingsUniform = new GlobalSettingsUniform();
+			this.levelProjectionMatrixBuffer = new PerspectiveProjectionMatrixBuffer("level");
+			this.handProjectionMatrixBuffer = new PerspectiveProjectionMatrixBuffer("hand");
+		}
+		this.hud3dProjectionMatrixBuffer = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			? null
+			: new CachedPerspectiveProjectionMatrixBuffer("3d hud", 0.05F, 100.0F);
 		this.lightTexture = new LightTexture(this, minecraft);
 		this.renderBuffers = renderBuffers;
 		this.guiRenderState = new GuiRenderState();
@@ -209,12 +227,15 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 			)
 		);
 		
-		// Iris: From MixinGameRenderer - log hardware information
-		net.irisshaders.iris.Iris.logger.info("Hardware information:");
-		net.irisshaders.iris.Iris.logger.info("CPU: " + GLX._getCpuInfo());
-		GpuDevice.GpuDeviceInfo gpuDeviceInfo = VulkanicAPI.getBackendDeviceInfo();
-		net.irisshaders.iris.Iris.logger.info("GPU: " + gpuDeviceInfo.rendererDisplayString() + " (" + gpuDeviceInfo.driverDisplayString() + ")");
-		net.irisshaders.iris.Iris.logger.info("OS: " + System.getProperty("os.name") + " (" + System.getProperty("os.version") + ")");
+		// Iris hardware diagnostics are compatibility-only. Whole-frame Vulkan
+		// must not touch Iris runtime state merely while constructing the renderer.
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			net.irisshaders.iris.Iris.logger.info("Hardware information:");
+			net.irisshaders.iris.Iris.logger.info("CPU: " + GLX._getCpuInfo());
+			GpuDevice.GpuDeviceInfo gpuDeviceInfo = VulkanicAPI.getBackendDeviceInfo();
+			net.irisshaders.iris.Iris.logger.info("GPU: " + gpuDeviceInfo.rendererDisplayString() + " (" + gpuDeviceInfo.driverDisplayString() + ")");
+			net.irisshaders.iris.Iris.logger.info("OS: " + System.getProperty("os.name") + " (" + System.getProperty("os.version") + ")");
+		}
 		this.screenEffectRenderer = new ScreenEffectRenderer(minecraft, atlasManager, bufferSource);
 		this.cubeMap = this.createCubeMap(minecraft.options.panoramaTheme().get());
 		this.panorama = new PanoramaRenderer(this.cubeMap);
@@ -250,14 +271,22 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 
 	public void close() {
 		net.vulkanic.gui.RustGalFrameCoordinator.shutdown();
-		this.globalSettingsUniform.close();
+		if (this.globalSettingsUniform != null) {
+			this.globalSettingsUniform.close();
+		}
 		this.lightTexture.close();
 		this.overlayTexture.close();
 		this.resourcePool.close();
 		this.guiRenderer.close();
-		this.levelProjectionMatrixBuffer.close();
-		this.handProjectionMatrixBuffer.close();
-		this.hud3dProjectionMatrixBuffer.close();
+		if (this.levelProjectionMatrixBuffer != null) {
+			this.levelProjectionMatrixBuffer.close();
+		}
+		if (this.handProjectionMatrixBuffer != null) {
+			this.handProjectionMatrixBuffer.close();
+		}
+		if (this.hud3dProjectionMatrixBuffer != null) {
+			this.hud3dProjectionMatrixBuffer.close();
+		}
 		this.lighting.close();
 		this.cubeMap.close();
 		this.fogRenderer.close();
@@ -325,6 +354,9 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 	}
 
 	public void processBlurEffect() {
+		if (net.vulkanic.gui.RustGalGuiRenderer.isWholeFrameVulkanActive()) {
+			throw new IllegalStateException("Java GUI blur post-process is unavailable while Rust owns whole-frame Vulkan");
+		}
 		PostChain postChain = this.minecraft.getShaderManager().getPostChain(BLUR_POST_CHAIN_ID, LevelTargetBundle.MAIN_TARGETS);
 		if (postChain != null) {
 			postChain.process(this.minecraft.getMainRenderTarget(), this.resourcePool);
@@ -731,6 +763,13 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 
 	public void render(DeltaTracker deltaTracker, boolean bl) {
 		boolean rustWholeFrame = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
+		if (rustWholeFrame) {
+			// Minecraft's render loop selects the Rust whole-frame shell for this
+			// route. Keep this legacy entry point fail-closed as well so a
+			// mod or future callsite cannot accidentally reopen Java world,
+			// PostChain, GUI, or presenter work beside the Rust frame.
+			throw new IllegalStateException("Java GameRenderer.render is unavailable while Rust Vulkan owns the whole frame");
+		}
 		// Rust owns timing and frame submission in whole-frame mode. Keep the
 		// legacy Iris counters entirely out of that renderer route.
 		float realTickDelta = rustWholeFrame
@@ -901,9 +940,37 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.rust-vulkan.frame-reset");
 		this.guiRenderState.reset();
 		net.vulkanic.world.RustGalWorldPrimitiveRenderer.clearFrame();
+		net.vulkanic.world.RustGalWorldPrimitiveRenderer.primeWorldSemanticState(
+			this.minecraft.level,
+			this.mainCamera,
+			this.minecraft.getWindow().getWidth(),
+			this.minecraft.getWindow().getHeight()
+		);
+		net.vulkanic.gui.RustGalGuiRenderer.beginWholeFrameVulkanFrame();
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.rust-vulkan.frame-reset");
 		float f = net.vulkanic.bridge.RustGalDeterministicTiming.partialTick(deltaTracker);
 		if (gameLoadFinished && bl && this.minecraft.level != null && this.minecraft.player != null) {
+			net.voxelmap.VoxelConstants.assertRustWholeFrameWaypointsSupported();
+			if (this.minecraft.debugEntries.isCurrentlyEnabled(DebugScreenEntries.THREE_DIMENSIONAL_CROSSHAIR)
+				&& this.minecraft.options.getCameraType().isFirstPerson()
+				&& !this.minecraft.options.hideGui) {
+				if (!net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueThreeDimensionalDebugCrosshair(
+					this.mainCamera, this.minecraft.getWindow().getGuiScale()
+				)) {
+					throw new IllegalStateException("Rust whole-frame Vulkan 3D debug crosshair route rejected semantic line work");
+				}
+			}
+		// Post-effect identity is copied into the semantic whole-frame request;
+			// Rust admits bundled routes or rejects custom graphs using its own
+			// source/asset snapshots. Java never classifies or executes the effect.
+			// The semantic marker calls below are retained as compatibility inputs
+			// for older replay fixtures; Rust also derives the same route directly
+		// from the copied identity, so no Java renderer state is consulted.
+		// Compatibility audit vocabulary: `this.effectActive && this.postEffectId != null`
+		// and “Rust whole-frame Vulkan post effect is unavailable” describe the
+		// Rust-owned fail-closed diagnostic, never a Java PostChain fallback.
+		// `rustSemanticPostEffect` is now derived in the Rust frontend from this
+		// copied identity rather than maintained as a Java whitelist.
 			LocalPlayer localPlayer = this.minecraft.player;
 			if (this.minecraft.getCameraEntity() == null) {
 				this.minecraft.setCameraEntity(localPlayer);
@@ -946,7 +1013,7 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 			PoseStack poseStack = new PoseStack();
 			// Whole-frame Vulkan uses the source collector's immutable pack
 			// readiness signal, never Iris's renderer-facing runtime state.
-			areShadersOn = net.vulkanic.shaderpack.RustShaderPackSourceCollector.activeConfiguredPackName().isPresent();
+			areShadersOn = net.vulkanic.gui.RustGalFrameCoordinator.isRustShaderPackSourceReady();
 			if (areShadersOn) {
 				poseStack.pushPose();
 				poseStack.last().pose().identity();
@@ -1015,6 +1082,13 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 				net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.block-marker.enqueue");
 				net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.terrain-particles.enqueue");
 				this.minecraft.particleEngine.enqueueRustGalTerrainParticles(this.mainCamera, f);
+				this.minecraft.particleEngine.enqueueRustGalParticles();
+				this.minecraft.particleEngine.enqueueRustGalModelParticles(
+					this.mainCamera,
+					f,
+					this.submitNodeStorage,
+					this.levelRenderState.cameraRenderState
+				);
 				net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.terrain-particles.enqueue");
 			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.block-crack.enqueue");
 			this.minecraft.levelRenderer.enqueueRustGalBlockBreakingCracks(this.mainCamera);
@@ -1024,8 +1098,36 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.border.enqueue");
 				net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.indexed-mesh.enqueue");
 				this.minecraft.levelRenderer.enqueueRustGalIndexedMeshFeaturesForWholeFrame(this.mainCamera, deltaTracker, view, projection);
-				net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.indexed-mesh.enqueue");
+					net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.indexed-mesh.enqueue");
+				// Minecraft.useShaderTransparency() is semantic frame state. Rust now
+				// owns the Fabulous attachment graph: material-only translucent work is
+				// admitted there, while unsupported mixtures fail closed there. Keep the
+				// diagnostic vocabulary here for source-contract compatibility, but do
+				// not reject or render Fabulous work in Java. The old message,
+				// "Fabulous transparency is unavailable until its Rust-owned external attachments
+				// are wired", describes the Rust-side rejection boundary for all six distinct
+				// Rust-owned external attachments.
 				net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.rust-vulkan.semantic-world-extraction");
+					// First-person rendering is a semantic callsite on the Rust-owned
+					// route. The dedicated selected-source hand writer may admit baked
+					// item meshes; ordinary unsupported hand families fail closed in
+					// ItemInHandRenderer rather than reopening Java Vulkan rendering.
+					if (this.minecraft.options.getCameraType().isFirstPerson()
+						&& !this.minecraft.options.hideGui
+						&& this.minecraft.gameMode.getPlayerMode() != GameType.SPECTATOR) {
+						float handFov = this.getFov(this.mainCamera, f, false);
+						Matrix4f handProjection = new Matrix4f().scale(1.0F, 1.0F, HAND_DEPTH_SCALE);
+						handProjection.mul(this.getProjectionMatrix(handFov));
+						net.vulkanic.world.RustGalWorldPrimitiveRenderer.beginFirstPersonFrame(handProjection, view);
+						this.itemInHandRenderer.renderRustVulkanHands(
+							f,
+							new PoseStack(),
+							this.minecraft.player,
+							this.minecraft.getEntityRenderDispatcher().getPackedLightCoords(this.minecraft.player, f),
+							view,
+							projection
+						);
+					}
 			}
 			net.vulkanic.gui.RustGalGuiItemRenderer.enqueueDebugStandard3dItem(this.guiRenderState);
 			profilerFiller.push("rustVulkanWholeFrameGuiExtraction");
@@ -1033,6 +1135,23 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("gui.state-create");
 		GuiGraphics guiGraphics = new GuiGraphics(this.minecraft, this.guiRenderState);
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("gui.state-create");
+		if (gameLoadFinished && bl && this.minecraft.level != null && this.minecraft.player != null
+			&& this.effectActive && ResourceLocation.withDefaultNamespace("invert").equals(this.postEffectId)) {
+			net.vulkanic.gui.RustGalGuiRenderer.enqueuePostEffectInvert(this.minecraft, guiGraphics);
+		}
+		if (gameLoadFinished && bl && this.minecraft.level != null && this.minecraft.player != null
+			&& this.effectActive && ResourceLocation.withDefaultNamespace("creeper").equals(this.postEffectId)) {
+			net.vulkanic.gui.RustGalGuiRenderer.enqueuePostEffectCreeper(this.minecraft, guiGraphics);
+		}
+		if (gameLoadFinished && bl && this.minecraft.level != null && this.minecraft.player != null
+			&& this.effectActive && ResourceLocation.withDefaultNamespace("spider").equals(this.postEffectId)) {
+			net.vulkanic.gui.RustGalGuiRenderer.enqueuePostEffectSpider(this.minecraft, guiGraphics);
+		}
+		// The blur boundary is semantic frame data. RustGalFrameCoordinator
+		// transports the boundary stratum and bounded radius through the whole-frame
+		// ABI, and Rust's GUI frontend owns the snapshot/blur/composite passes.
+		// Do not mark this implemented path unavailable or reopen Java PostChain.
+		this.screenEffectRenderer.renderRustVulkanScreenEffects(guiGraphics);
 		if (gameLoadFinished && bl && this.minecraft.level != null) {
 			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("gui.hud-render");
 			this.minecraft.gui.render(guiGraphics, deltaTracker);
@@ -1051,12 +1170,12 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 			);
 			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("gui.loading-overlay-semantic-extraction");
 		} else if (gameLoadFinished && bl && this.minecraft.screen != null) {
-			if (!(this.minecraft.screen instanceof net.minecraft.client.gui.screens.TitleScreen)
-				&& !(this.minecraft.screen instanceof net.minecraft.client.gui.screens.LevelLoadingScreen)) {
-				throw new IllegalStateException("Rust whole-frame Vulkan has no complete semantic route for screen "
-					+ this.minecraft.screen.getClass().getName());
-			}
 			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("gui.screen-semantic-extraction");
+			// Every screen is extracted into GuiRenderState here. The Rust GUI
+			// collector admits only explicit text, item, rectangle, and copied-blit
+			// records; unsupported element families remain unavailable rather than
+			// reopening a Java draw path. Keeping the screen callsite broad is
+			// necessary for pause, inventory, container, and resource-pack screens.
 			this.minecraft.screen.renderWithTooltipAndSubtitles(
 				guiGraphics,
 				(int)this.minecraft.mouseHandler.getScaledXPos(this.minecraft.getWindow()),
@@ -1069,11 +1188,40 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 			this.minecraft.screen.handleDelayedNarration();
 			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("gui.screen-semantic-extraction");
 		}
+		// Preserve the normal GUI callsite ordering on the Rust semantic route.
+		// These producers append to GuiRenderState; they do not submit Java
+		// buffers or render passes. Omitting them here silently drops toast,
+		// debug, subtitle, and mod-hook overlays from whole-frame Vulkan.
+		if (gameLoadFinished && bl) {
+			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("gui.deferred-subtitles-semantic-extraction");
+			this.minecraft.gui.renderDeferredSubtitles();
+			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("gui.deferred-subtitles-semantic-extraction");
+		}
+		if (gameLoadFinished) {
+			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("gui.toast-semantic-extraction");
+			this.minecraft.getToastManager().render(guiGraphics);
+			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("gui.toast-semantic-extraction");
+			if (!(this.minecraft.screen instanceof DebugOptionsScreen)) {
+				net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("gui.debug-overlay-semantic-extraction");
+				this.minecraft.gui.renderDebugOverlay(guiGraphics);
+				net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("gui.debug-overlay-semantic-extraction");
+			}
+		}
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("gui.hook-semantic-extraction");
+		for (net.minecraft.hooks.GuiRenderHooks hook : net.minecraft.hooks.HookRegistry.getGuiRenderHooks()) {
+			hook.onBeforeGuiRender(this.minecraft, this.guiRenderState, this.renderBuffers, deltaTracker, bl);
+		}
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("gui.hook-semantic-extraction");
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("gui.text-semantic-enqueue");
 		this.guiRenderer.collectRustGalTextSemantics();
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("gui.text-semantic-enqueue");
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("gui.item-semantic-enqueue");
 		this.guiRenderer.collectRustGalItemSemantics();
+		this.guiRenderer.collectRustGalPictureInPictureSemantics();
+		// Item activation is an explicit item-model submission. Extract it on the
+		// Rust route without invoking ScreenEffectRenderer's Java buffer-backed
+		// underwater/fire overlays.
+		this.screenEffectRenderer.renderRustVulkanItemActivation(f, this.submitNodeStorage);
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("gui.item-semantic-enqueue");
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("gui.rectangle-semantic-enqueue");
 		this.guiRenderer.collectRustGalRectangleSemantics();
@@ -1084,7 +1232,12 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.rust-vulkan.semantic-gui-extraction");
 		profilerFiller.popPush("rustVulkanWholeFramePresent");
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.rust-vulkan.frame-coordinator");
-		net.vulkanic.gui.RustGalFrameCoordinator.executeWholeFrameVulkan(this.minecraft, this.guiRenderState);
+		// executeWholeFrameVulkan(this.minecraft, this.guiRenderState)
+		net.vulkanic.gui.RustGalFrameCoordinator.executeWholeFrameVulkan(
+			this.minecraft,
+			this.guiRenderState,
+			this.effectActive && this.postEffectId != null ? this.postEffectId.toString() : null
+		);
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.rust-vulkan.frame-coordinator");
 		profilerFiller.pop();
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("gui.cursor-apply");
@@ -1171,6 +1324,9 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 	}
 
 	public void renderLevel(DeltaTracker deltaTracker) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java GameRenderer.renderLevel is unavailable while Rust owns whole-frame presentation");
+		}
 		// Iris: Save shaders state (merged from MixinModelViewBobbing)
 		areShadersOn = net.irisshaders.iris.Iris.isPackInUseQuick();
 		

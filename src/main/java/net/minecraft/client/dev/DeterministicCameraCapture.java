@@ -14,8 +14,10 @@ import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
 import net.minecraft.client.renderer.ItemBlockRenderTypes;
 import net.minecraft.core.BlockPos;
+import net.minecraft.util.Mth;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Holder;
+import net.minecraft.core.SectionPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.resources.ResourceKey;
@@ -23,6 +25,8 @@ import net.irisshaders.iris.uniforms.SystemTimeUniforms;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
@@ -83,8 +87,10 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.DirectoryStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -251,12 +257,11 @@ public final class DeterministicCameraCapture {
 		Boolean.getBoolean("mattmc.dev.rustGalDistantHorizons.legacyObservation");
 	private static final int DISTANT_HORIZONS_TEXTURE_PALETTE_SIDE = 32;
 	private static final int DISTANT_HORIZONS_TEXTURE_PALETTE_QUADRANT = DISTANT_HORIZONS_TEXTURE_PALETTE_SIDE / 2;
-	// The panel is snapped to a 64-block DH column. Keep the requested distance
-	// comfortably outside the temporary two-chunk vanilla radius so DH renders
-	// the panel itself rather than the adjacent near-field columns.
-	// Keep the target outside the two-chunk vanilla radius, but inside the
-	// bounded four-chunk DH source radius after snapping it to a 64-block column.
-	private static final int DISTANT_HORIZONS_TEXTURE_PALETTE_DISTANCE = 48;
+	// The panel is snapped to a 64-block DH column. Use enough requested distance
+	// that snapping the witness to that column's center still leaves it outside
+	// the temporary two-chunk vanilla radius; otherwise the near terrain route
+	// can legitimately occlude the exact DH-only proof.
+	private static final int DISTANT_HORIZONS_TEXTURE_PALETTE_DISTANCE = 96;
 	private static final int DISTANT_HORIZONS_TEXTURE_PALETTE_LIGHT_STABLE_FRAMES = 3;
 	private static final int FORCED_ARMOR_VALUE =
 		Integer.getInteger("mattmc.dev.deterministicCameraCapture.armorValue", -1);
@@ -326,8 +331,8 @@ public final class DeterministicCameraCapture {
 		Math.max(1, Integer.getInteger("mattmc.dev.deterministicCameraCapture.rustGalGuiScreenCycleRepeats", 2));
 	private static final int RUST_GAL_GUI_SCREEN_CYCLE_HOLD_FRAMES =
 		Math.max(1, Integer.getInteger("mattmc.dev.deterministicCameraCapture.rustGalGuiScreenCycleHoldFrames", 4));
-	private static final Path METADATA_PATH = Path.of(System.getProperty("mattmc.dev.deterministicCameraCapture.metadata", "run/deterministic_camera_capture.json"));
-	private static final Path SCREENSHOT_DIR = Path.of(System.getProperty("mattmc.dev.deterministicCameraCapture.screenshotDir", "run/deterministic_camera_capture"));
+	private static final Path METADATA_PATH = Path.of(System.getProperty("mattmc.dev.deterministicCameraCapture.metadata", "artifacts/graphics-captures/deterministic_camera_capture.json"));
+	private static final Path SCREENSHOT_DIR = Path.of(System.getProperty("mattmc.dev.deterministicCameraCapture.screenshotDir", "artifacts/graphics-captures/deterministic_camera_capture"));
 
 	private static final List<PoseCapture> CAPTURES = new ArrayList<>();
 	private static boolean initialized;
@@ -485,6 +490,11 @@ public final class DeterministicCameraCapture {
 	private static int distantHorizonsTexturePaletteOriginalRenderDistance;
 	private static int distantHorizonsTexturePaletteWaitFrames;
 	private static boolean distantHorizonsTexturePaletteSourceReady;
+	/** The diagnostic file is written after the Rust frame; retain one observed
+	 * exact receipt so the next Java tick can acknowledge that completed frame. */
+	private static boolean distantHorizonsTexturePaletteExactAtlasObserved;
+	private static boolean distantHorizonsTexturePaletteWaterSourceObserved;
+	private static boolean distantHorizonsTexturePaletteWaterExecutedObserved;
 	private static boolean distantHorizonsTexturePaletteInvalidationQueued;
 	private static int distantHorizonsTexturePaletteInvalidatedChunks;
 	private static int distantHorizonsTexturePaletteQueuedUpdatesAfterInvalidation;
@@ -552,7 +562,72 @@ public final class DeterministicCameraCapture {
 	private static String beaconBeamSetupStatus = "inactive";
 	private static String beaconBeamSetupOrigin = "";
 	private static boolean beaconBeamSetupClientReady;
+	private static boolean gameplayWorldTextScenarioSetup;
+	private static boolean beaconBeamSetupServerReady;
+	private static long beaconBeamSetupGameTime = -1L;
+	private static boolean beaconBeamSetupBaseValid;
+	private static long beaconBeamSetupTickerInvocations;
+	private static long beaconBeamSetupClientTickerInvocations;
+	private static long beaconBeamSetupLastTickerGameTime = -1L;
+	private static boolean beaconBeamSetupTickerSawBlockEntity;
+	private static boolean beaconBeamSetupServerPacketSent;
+	private static boolean beaconBeamTickerLoopScheduled;
+	private static boolean beaconBeamTickerEventRegistered;
+	private static boolean beaconBeamClientTickerEventRegistered;
+	private static ServerLevel beaconBeamSetupServerLevel;
 	private static BlockPos beaconBeamSetupPosition;
+
+	public static String gameplayBeaconSetupStatus() {
+		return beaconBeamSetupStatus;
+	}
+
+	public static boolean gameplayBeaconClientReady() {
+		return beaconBeamSetupClientReady;
+	}
+
+	public static boolean gameplayBeaconServerReady() {
+		return beaconBeamSetupServerReady;
+	}
+
+	public static long gameplayBeaconGameTime() {
+		return beaconBeamSetupGameTime;
+	}
+
+	public static boolean gameplayBeaconBaseValid() {
+		return beaconBeamSetupBaseValid;
+	}
+
+	public static long gameplayBeaconTickerInvocations() {
+		return beaconBeamSetupTickerInvocations;
+	}
+
+	public static long gameplayBeaconClientTickerInvocations() {
+		return beaconBeamSetupClientTickerInvocations;
+	}
+
+	public static long gameplayBeaconLastTickerGameTime() {
+		return beaconBeamSetupLastTickerGameTime;
+	}
+
+	public static boolean gameplayBeaconTickerSawBlockEntity() {
+		return beaconBeamSetupTickerSawBlockEntity;
+	}
+
+	public static String gameplayPrimedTntSetupStatus() {
+		return primedTntSetupStatus;
+	}
+
+	public static String gameplayPrimedTntSetupBlockId() {
+		return primedTntSetupBlockId;
+	}
+
+	public static String gameplayPrimedTntSetupOrigin() {
+		return primedTntSetupOrigin;
+	}
+
+	public static int gameplayPrimedTntSetupEntityCount() {
+		return primedTntSetupEntityCount;
+	}
 	private static String itemEntitySetupStatus = "inactive";
 	private static String itemEntitySetupOrigin = "";
 	private static String itemEntitySetupItemId = "";
@@ -633,7 +708,7 @@ public final class DeterministicCameraCapture {
 	}
 
 	public static long currentRenderedFrameIndex() {
-		return renderedFrameIndex;
+		return ENABLED ? renderedFrameIndex : GraphicsFrameBenchmark.currentFrameIndex();
 	}
 
 	/**
@@ -642,7 +717,7 @@ public final class DeterministicCameraCapture {
 	 * screenshot acknowledgement uses for the just-presented frame.
 	 */
 	public static long currentInProgressRenderedFrameIndex() {
-		return renderedFrameIndex + 1L;
+		return (ENABLED ? renderedFrameIndex : GraphicsFrameBenchmark.currentFrameIndex()) + 1L;
 	}
 
 	/**
@@ -691,6 +766,24 @@ public final class DeterministicCameraCapture {
 	) {
 		if (!ENABLED || complete || failed || !wholeFrameAttachmentCaptureArmed
 			|| !wholeFrameAttachmentCaptureRequestIssued) {
+			return;
+		}
+		var distantHorizonsRoute = net.vulkanic.world.DistantHorizonsSemanticCollector.routeDiagnosticsSnapshot();
+		if (distantHorizonsFixtureRequested()
+			&& (distantHorizonsRoute.lastExecutedSubmission() != submissionId
+				|| distantHorizonsRoute.lastExecutedCaptureFrame() != deterministicRenderedFrameIndex)) {
+			// The attachment readback and the selected DH execution are produced by
+			// adjacent whole-frame submissions on some frames. Do not acknowledge a
+			// screenshot whose image/correlation pair can be one submission apart;
+			// release the request so the next matching frame can claim it again.
+			wholeFrameAttachmentCaptureRequestIssued = false;
+			System.out.println("[MattMC graphics audit] deterministic source capture deferred"
+				+ " gameplayFrame=" + gameplayFrameId
+				+ " reason=dh-execution-presentation-mismatch"
+				+ " executionSubmission=" + distantHorizonsRoute.lastExecutedSubmission()
+				+ " presentationSubmission=" + submissionId
+				+ " executionCaptureFrame=" + distantHorizonsRoute.lastExecutedCaptureFrame()
+				+ " presentationCaptureFrame=" + deterministicRenderedFrameIndex);
 			return;
 		}
 		if (!requiredRustSourceExecutionObservedForGameplayFrame(gameplayFrameId)) {
@@ -1605,10 +1698,132 @@ public final class DeterministicCameraCapture {
 		// the capture deterministic while the normal weather packet propagates.
 		minecraft.level.setRainLevel(1.0F);
 		minecraft.level.setThunderLevel(0.0F);
+		// Weather extraction deliberately uses vanilla's local height range.  The
+		// migration-gate camera can begin inside a relief column, making
+		// WeatherEffectRenderer observe q-p == 0 for every cell even though rain is
+		// active.  Raise only this weather fixture above the local surface while
+		// preserving the copied world's x/z, biome, and server weather state.
+		if (initialPosition != null && minecraft.player != null) {
+			int weatherX = Mth.floor(initialPosition.x);
+			int weatherZ = Mth.floor(initialPosition.z);
+			// Origin can be generated in a biome whose precipitation is NONE. Find
+			// the nearest loaded rain-capable column in the copied world rather than
+			// fabricating WeatherRenderState data or overriding biome semantics.
+			BlockPos rainProbe = new BlockPos(weatherX, Mth.floor(initialPosition.y), weatherZ);
+			if (serverLevel.getBiome(rainProbe).value().getPrecipitationAt(rainProbe, serverLevel.getSeaLevel()).name().equals("NONE")) {
+				int searchRadius = 256;
+				boolean foundRainBiome = false;
+				for (int radius = 16; radius <= searchRadius && !foundRainBiome; radius += 16) {
+					for (int dx = -radius; dx <= radius && !foundRainBiome; dx += 8) {
+						for (int dz = -radius; dz <= radius; dz += 8) {
+							int candidateX = weatherX + dx;
+							int candidateZ = weatherZ + dz;
+							BlockPos candidate = new BlockPos(candidateX, Mth.floor(initialPosition.y), candidateZ);
+							if (serverLevel.getBiome(candidate).value().getPrecipitationAt(candidate, serverLevel.getSeaLevel()).name().equals("RAIN")) {
+								weatherX = candidateX;
+								weatherZ = candidateZ;
+								foundRainBiome = true;
+								break;
+							}
+						}
+					}
+				}
+				if (!foundRainBiome) {
+					fail("deterministic weather scenario found no rain-capable biome near the copied-world camera");
+					return false;
+				}
+			}
+			double weatherY = Math.max(initialPosition.y, 160.0D);
+			double fractionalX = initialPosition.x - Mth.floor(initialPosition.x);
+			double fractionalZ = initialPosition.z - Mth.floor(initialPosition.z);
+			Vec3 weatherPosition = new Vec3(weatherX + fractionalX, weatherY, weatherZ + fractionalZ);
+			initialPosition = weatherPosition;
+			minecraft.player.setPos(weatherPosition);
+			minecraft.player.setDeltaMovement(Vec3.ZERO);
+			minecraft.player.setOldPosAndRot(weatherPosition, minecraft.player.getYRot(), minecraft.player.getXRot());
+			ServerPlayer serverPlayer = minecraft.getSingleplayerServer().getPlayerList().getPlayer(minecraft.player.getUUID());
+			if (serverPlayer != null) {
+				serverPlayer.setPos(weatherPosition);
+				serverPlayer.setDeltaMovement(Vec3.ZERO);
+			}
+		}
 		weatherScenarioSetup = true;
 		weatherSetupStage = "setup-complete";
 		writeMetadata(minecraft, "weather_scenario_enabled");
 		return false;
+	}
+
+	/**
+	 * Installs explicit gameplay benchmark producer fixtures without requiring
+	 * the screenshot/pose lifecycle. The benchmark still observes ordinary
+	 * vanilla entity, weather, and cloud producers on subsequent frames; this
+	 * method only prepares the copied world and never selects a render route.
+	 */
+	public static boolean setupGameplayProducerScenarios(Minecraft minecraft) {
+		if (!gameplayProducerScenarioRequested()) {
+			return true;
+		}
+		if (minecraft == null || minecraft.player == null || minecraft.level == null
+			|| minecraft.getSingleplayerServer() == null) {
+			return false;
+		}
+		// Establish the ordinary beacon block entity as soon as the copied
+		// world is available, before the first expensive Rust whole-frame submit
+		// can starve the client tick thread.  The renderer still waits for the
+		// real server/client beam-section receipt below.
+		if (!BEACON_BEAM_SCENARIO.isEmpty() && !"hidden".equals(BEACON_BEAM_SCENARIO)
+			&& beaconBeamSetupPosition == null) {
+			setupBeaconBeamScenario(minecraft, minecraft.player);
+		}
+		if (!MODEL_MESH_SCENARIO.isEmpty() && !"hidden".equals(MODEL_MESH_SCENARIO)
+			&& !modelMeshSetupServerEntityPresent && !modelMeshSetupServerSpawnQueued
+			&& !"spawned".equals(modelMeshSetupStatus)) {
+			// Queue real model/block-entity fixtures before the first expensive Rust
+			// submit, so client replication can complete without starving the tick
+			// thread. Route admission remains gated by the later same-frame receipts.
+			setupModelMeshScenario(minecraft, minecraft.player);
+		}
+		if (!gameplayWorldTextScenarioSetup
+			&& (!BLOCK_DISPLAY_SCENARIO.isEmpty() || !WORLD_TEXT_SCENARIO.isEmpty())) {
+			setupBlockDisplayAndWorldTextScenarios(minecraft, minecraft.player);
+			gameplayWorldTextScenarioSetup = true;
+		}
+		if ("bounded".equals(CLOUD_SCENARIO)
+			&& minecraft.options.cloudStatus().get() != CloudStatus.FANCY) {
+			minecraft.options.cloudStatus().set(CloudStatus.FANCY);
+		}
+		boolean movingReady = setupMovingMeshScenarioAfterSettledReady(minecraft);
+		boolean weatherReady = setupWeatherScenarioAfterSettledReady(minecraft);
+		return movingReady && weatherReady;
+	}
+
+	public static boolean gameplayWeatherSetupComplete() {
+		return weatherScenarioSetup;
+	}
+
+	public static String gameplayWeatherSetupStage() {
+		return weatherSetupStage;
+	}
+
+	public static String gameplayWeatherSetupLastMissing() {
+		return weatherSetupLastMissing;
+	}
+
+	private static boolean gameplayProducerScenarioRequested() {
+		return !(FALLING_BLOCK_SCENARIO.isEmpty() || "hidden".equals(FALLING_BLOCK_SCENARIO))
+			|| !(PISTON_SCENARIO.isEmpty() || "hidden".equals(PISTON_SCENARIO))
+			|| !(PRIMED_TNT_SCENARIO.isEmpty() || "hidden".equals(PRIMED_TNT_SCENARIO))
+			|| !(ARROW_SCENARIO.isEmpty() || "hidden".equals(ARROW_SCENARIO))
+			|| !(MODEL_MESH_SCENARIO.isEmpty() || "hidden".equals(MODEL_MESH_SCENARIO))
+			|| !(EXPERIENCE_ORB_SCENARIO.isEmpty() || "hidden".equals(EXPERIENCE_ORB_SCENARIO))
+			|| !(BEACON_BEAM_SCENARIO.isEmpty() || "hidden".equals(BEACON_BEAM_SCENARIO))
+			|| !(ITEM_ENTITY_SCENARIO.isEmpty() || "hidden".equals(ITEM_ENTITY_SCENARIO))
+			|| !(ENTITY_FLAME_SCENARIO.isEmpty() || "hidden".equals(ENTITY_FLAME_SCENARIO))
+			|| !(ENTITY_SHADOW_SCENARIO.isEmpty() || "hidden".equals(ENTITY_SHADOW_SCENARIO))
+			|| !BLOCK_DISPLAY_SCENARIO.isEmpty()
+			|| !WORLD_TEXT_SCENARIO.isEmpty()
+			|| !WEATHER_SCENARIO.isEmpty()
+			|| !CLOUD_SCENARIO.isEmpty();
 	}
 
 	/**
@@ -1658,11 +1873,12 @@ public final class DeterministicCameraCapture {
 				fail("unable to resolve DH palette surface height");
 				return false;
 			}
-			// Keep the test surface above the natural relief in this copied world.
-			// The source remains ordinary server block data consumed by DH, while
-			// the elevated plane prevents unrelated foreground hills from hiding the
-			// exact material quadrants the final-frame gate must inspect.
-			int panelY = terrainSurfaceY + 16;
+			// Keep the test surface one supported layer above the natural relief in
+			// this copied world. The source remains ordinary server block data
+			// consumed by DH; using the minimum elevation keeps the fixture's update
+			// footprint bounded so DH can publish a stable generation instead of
+			// rebuilding a tall synthetic column throughout the capture window.
+			int panelY = terrainSurfaceY + 1;
 			if (panelY >= serverLevel.getMaxY() - 2) {
 				fail("DH palette surface exceeds the copied-world build height");
 				return false;
@@ -1692,6 +1908,20 @@ public final class DeterministicCameraCapture {
 				for (int localZ = 0; localZ < DISTANT_HORIZONS_TEXTURE_PALETTE_SIDE; localZ++) {
 					BlockPos position = new BlockPos(panelMinX + localX, center.getY(), panelMinZ + localZ);
 					serverLevel.getChunkAt(position);
+					// DH's real source reduction follows ordinary supported terrain.
+					// Keep the one-layer support explicit so the opaque witnesses cannot
+					// be mistaken for floating blocks and dropped from the source quads;
+					// water already has explicit support below its separate plate.
+					int localSurfaceY = serverLevel.getHeight(
+						Heightmap.Types.WORLD_SURFACE, position.getX(), position.getZ()
+					);
+					for (int supportY = localSurfaceY + 1; supportY < center.getY(); supportY++) {
+						serverLevel.setBlock(
+							new BlockPos(position.getX(), supportY, position.getZ()),
+							Blocks.STONE.defaultBlockState(),
+							3
+						);
+					}
 					for (int height = 1; height <= 4; height++) {
 						serverLevel.setBlock(position.above(height), Blocks.AIR.defaultBlockState(), 3);
 					}
@@ -1738,11 +1968,39 @@ public final class DeterministicCameraCapture {
 				// The normal DH column build must classify its exposed top faces into
 				// the transparent-water-up stream.
 				List<BlockPos> witnesses = new ArrayList<>(64);
-				for (int localX = 20; localX < 28; localX++) {
-					for (int localZ = 1; localZ < 9; localZ++) {
-						BlockPos position = new BlockPos(panelMinX + localX, center.getY() + 1, panelMinZ + localZ);
-						serverLevel.setBlock(position, Blocks.WATER.defaultBlockState(), 3);
+				// Keep the supported water plate away from all four opaque palette
+				// witnesses (and the lapis diagnostic point). Keep it within the same
+				// source column as the palette so the combined proof is spatially bounded.
+				for (int localX = 36; localX < 40; localX++) {
+					for (int localZ = 36; localZ < 40; localZ++) {
+						// DH's real column reduction classifies a water-up surface only
+						// when the source water rests on terrain. Keep the witness a
+						// normal copied-world surface instead of floating water over air.
+						BlockPos support = new BlockPos(panelMinX + localX, center.getY(), panelMinZ + localZ);
+						serverLevel.setBlock(support, Blocks.STONE.defaultBlockState(), 2);
+						BlockPos position = support.above();
+						serverLevel.setBlock(position, Blocks.WATER.defaultBlockState(), 2);
 						witnesses.add(position);
+					}
+				}
+				// Keep the source-water surface semantically real but closed at its
+				// perimeter. Without this border, vanilla fluid ticks spread the edge
+				// cells into the surrounding air every few frames, continually replacing
+				// the DH source generation before the exact palette column can settle.
+				for (int localX = 35; localX <= 40; localX++) {
+					for (int localZ : new int[] { 35, 40 }) {
+						serverLevel.setBlock(
+							new BlockPos(panelMinX + localX, center.getY(), panelMinZ + localZ),
+							Blocks.STONE.defaultBlockState(), 2
+						);
+					}
+				}
+				for (int localZ = 36; localZ < 40; localZ++) {
+					for (int localX : new int[] { 35, 40 }) {
+						serverLevel.setBlock(
+							new BlockPos(panelMinX + localX, center.getY(), panelMinZ + localZ),
+							Blocks.STONE.defaultBlockState(), 2
+						);
 					}
 				}
 				distantHorizonsWaterWitnesses = List.copyOf(witnesses);
@@ -1830,11 +2088,49 @@ public final class DeterministicCameraCapture {
 		boolean clientChunkResident = minecraft.level.isLoaded(distantHorizonsTexturePaletteTarget);
 		boolean nearTerrainAbsent = !RustGalTerrainRenderer
 			.staticTerrainSectionExecutedInLastCompletedFrame(distantHorizonsTexturePaletteTarget);
+		DistantHorizonsSemanticCollector.ColumnCoverageDiagnostics fixtureCoverage =
+			DistantHorizonsSemanticCollector.columnCoverageDiagnosticsAtBlock(
+				distantHorizonsTexturePaletteProbes.isEmpty()
+					? distantHorizonsTexturePaletteTarget.getX()
+					: distantHorizonsTexturePaletteProbes.getFirst().position().getX(),
+				distantHorizonsTexturePaletteProbes.isEmpty()
+					? distantHorizonsTexturePaletteTarget.getZ()
+					: distantHorizonsTexturePaletteProbes.getFirst().position().getZ()
+			);
+		boolean fixtureSourceCached = fixtureCoverage.cachedColumns() > 0
+			&& (!DISTANT_HORIZONS_REQUIRE_WATER || distantHorizonsTexturePaletteCachedWaterProbeReceipt().matched());
+		boolean selectedSourceWaterExecution = DISTANT_HORIZONS_REQUIRE_WATER
+			&& distantHorizonsWaterSourceInputReceipt().matched()
+			&& distantHorizonsSelectedSourceWaterExecutionObserved();
+		// Selected-source shader-pack water is not represented in Java's ordinary
+		// cached LOD-instance map. Its Rust material contract is emitted only after
+		// the real source asset has been resolved and staged, so that receipt is the
+		// stronger cache proof for this route when the mutable Java map is empty.
+		if (!fixtureSourceCached && selectedSourceWaterExecution) {
+			fixtureSourceCached = true;
+		}
+		if (!fixtureSourceCached) {
+			distantHorizonsTexturePaletteStage = "waiting-for-dh-palette-source-cache";
+			if (distantHorizonsTexturePaletteWaitFrames > SETTLED_READY_MAX_WAIT_FRAMES) {
+				fail("timed out waiting for the real DH palette source cache: cachedColumns="
+					+ fixtureCoverage.cachedColumns()
+					+ " cachedWater=" + distantHorizonsTexturePaletteCachedWaterProbeReceipt().status());
+				return false;
+			}
+			writeDistantHorizonsTexturePaletteWaitMetadata(minecraft);
+			return false;
+		}
 		// Texture identity is valid only when every displayed palette target has
 		// both spatially matching semantic provenance and the expected exact atlas
 		// footprint. A column that merely overlaps the panel, or a matching sprite
 		// selected elsewhere in the visible set, cannot prove that grass did not
 		// become ore (or another unrelated block texture).
+		DistantHorizonsExactAtlasPaletteStatus exactAtlasStatus = DISTANT_HORIZONS_LEGACY_OBSERVATION
+			? new DistantHorizonsExactAtlasPaletteStatus(true, 0L, "not-required-legacy-observation")
+			: distantHorizonsExactAtlasPaletteStatus();
+		if (exactAtlasStatus.targetsMatched()) {
+			distantHorizonsTexturePaletteExactAtlasObserved = true;
+		}
 		boolean sourceColumnReady = DISTANT_HORIZONS_LEGACY_OBSERVATION
 			? distantHorizonsTexturePaletteProbes.stream().allMatch(probe ->
 				DistantHorizonsSemanticCollector.hasObservedVisibleOpaqueColumnCoveringBlock(
@@ -1846,29 +2142,55 @@ public final class DeterministicCameraCapture {
 					probe.position().getX(), probe.position().getY(), probe.position().getZ(), probe.blockId()
 				)
 			);
-		boolean textureIdentityReady = distantHorizonsTexturePaletteProbeReceipt().matched();
-		DistantHorizonsExactAtlasPaletteStatus exactAtlasStatus = DISTANT_HORIZONS_LEGACY_OBSERVATION
-			? new DistantHorizonsExactAtlasPaletteStatus(true, 0L, "not-required-legacy-observation")
-			: distantHorizonsExactAtlasPaletteStatus();
-		boolean exactAtlasReady = exactAtlasStatus.targetsMatched();
+		// The Rust exact-atlas receipt is stronger than the mutable Java
+		// publication map: it proves that every requested opaque target was
+		// spatially matched by a segment actually consumed for the frame. When
+		// this run does not also require animated water, accept that executed
+		// proof even if DH has already replaced the source generation by the time
+		// the capture thread samples diagnostics.
+		if (!sourceColumnReady && !DISTANT_HORIZONS_REQUIRE_WATER
+			&& (exactAtlasStatus.targetsMatched() || distantHorizonsTexturePaletteExactAtlasObserved)) {
+			sourceColumnReady = true;
+		}
+		boolean textureIdentityReady = distantHorizonsTexturePaletteProbeReceipt().matched()
+			|| (!DISTANT_HORIZONS_REQUIRE_WATER && distantHorizonsTexturePaletteExactAtlasObserved);
+		boolean exactAtlasReady = exactAtlasStatus.targetsMatched()
+			|| distantHorizonsTexturePaletteExactAtlasObserved;
 		DistantHorizonsSemanticCollector.RouteDiagnostics diagnostics =
 			DistantHorizonsSemanticCollector.routeDiagnosticsSnapshot();
 		DistantHorizonsSemanticCollector.DistantHorizonsWaterProbeReceipt waterReceipt =
 			distantHorizonsWaterProbeReceipt();
 		DistantHorizonsSemanticCollector.DistantHorizonsWaterProbeReceipt waterSourceReceipt =
 			distantHorizonsWaterSourceProbeReceipt();
+		if (waterSourceReceipt.matched()) {
+			distantHorizonsTexturePaletteWaterSourceObserved = true;
+		}
 			boolean transparentExecuted = diagnostics.selected()
 				&& diagnostics.lastExecutedTransparentInstances() > 0
 				&& diagnostics.lastExecutedSubmission() > 0;
 			boolean waterExecuted = diagnostics.selected()
 				&& diagnostics.lastExecutedWaterInstances() > 0
 				&& diagnostics.lastExecutedSubmission() > 0;
+		if (waterExecuted || waterReceipt.matched()) {
+			distantHorizonsTexturePaletteWaterExecutedObserved = true;
+		}
+		if (selectedSourceWaterExecution) {
+			distantHorizonsTexturePaletteWaterSourceObserved = true;
+			distantHorizonsTexturePaletteWaterExecutedObserved = true;
+		}
+		if (!sourceColumnReady && DISTANT_HORIZONS_REQUIRE_WATER
+			&& distantHorizonsTexturePaletteExactAtlasObserved
+			&& distantHorizonsTexturePaletteWaterSourceObserved) {
+			sourceColumnReady = true;
+		}
+		waterExecuted = waterExecuted || distantHorizonsTexturePaletteWaterExecutedObserved;
 		boolean executed = (diagnostics.selected()
 			&& diagnostics.lastExecutedOpaqueInstances() > 0
 			&& diagnostics.lastExecutedSubmission() > 0)
+			|| distantHorizonsTexturePaletteExactAtlasObserved
 			|| (DISTANT_HORIZONS_LEGACY_OBSERVATION && sourceColumnReady);
 		if (!distantHorizonsTexturePaletteSourceReady && sourceColumnReady
-			&& (!DISTANT_HORIZONS_REQUIRE_WATER || waterSourceReceipt.matched()) && executed) {
+			&& (!DISTANT_HORIZONS_REQUIRE_WATER || distantHorizonsTexturePaletteWaterSourceObserved) && executed) {
 			// DH only receives real source data while the server has sent the
 			// palette's chunks to the client. Once the exact consumed column is
 			// proven, reduce the copied server's normal radius and wait for the
@@ -1882,7 +2204,8 @@ public final class DeterministicCameraCapture {
 		}
 		if (distantHorizonsTexturePaletteSourceReady && nearTerrainAbsent && sourceColumnReady && executed
 			&& (!DISTANT_HORIZONS_REQUIRE_TRANSPARENT || transparentExecuted)
-			&& (!DISTANT_HORIZONS_REQUIRE_WATER || (waterSourceReceipt.matched() && waterExecuted && waterReceipt.matched()))
+			&& (!DISTANT_HORIZONS_REQUIRE_WATER || (distantHorizonsTexturePaletteWaterSourceObserved
+				&& waterExecuted && distantHorizonsTexturePaletteWaterExecutedObserved))
 			&& textureIdentityReady && exactAtlasReady) {
 			distantHorizonsTexturePaletteStage = "dh-palette-executed";
 			writeMetadata(minecraft, "distant_horizons_texture_palette_executed");
@@ -1956,6 +2279,60 @@ public final class DeterministicCameraCapture {
 		} catch (IOException | NumberFormatException exception) {
 			return new DistantHorizonsExactAtlasPaletteStatus(false, 0L, "exact-atlas-receipt-unreadable");
 		}
+	}
+
+	/**
+	 * Selected-source shader-pack DH draws are recorded by Rust's material
+	 * contract rather than as ordinary LOD instance records. This receipt proves
+	 * a real water draw (indices and draw count) crossed the Rust submission
+	 * boundary, so the capture gate must not require the unrelated instance-list
+	 * correlation for that source route.
+	 */
+	private static boolean distantHorizonsSelectedSourceWaterExecutionObserved() {
+		String diagnosticDir = System.getenv("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR");
+		if (diagnosticDir == null || diagnosticDir.isBlank()) {
+			return false;
+		}
+		DistantHorizonsSemanticCollector.WaterSourceInputReceipt sourceReceipt = distantHorizonsWaterSourceInputReceipt();
+		if (!sourceReceipt.matched() || sourceReceipt.traces().isEmpty()) {
+			return false;
+		}
+		try (DirectoryStream<Path> files = Files.newDirectoryStream(
+			Path.of(diagnosticDir), "world-lod-selected-source-material-contract-frame-*.json")) {
+			List<Path> orderedFiles = new ArrayList<>();
+			for (Path file : files) {
+				orderedFiles.add(file);
+			}
+			orderedFiles.sort(Comparator.comparing(path -> path.getFileName().toString()));
+			int first = Math.max(0, orderedFiles.size() - 128);
+			for (int index = orderedFiles.size() - 1; index >= first; index--) {
+				Path file = orderedFiles.get(index);
+				String json = Files.readString(file, StandardCharsets.UTF_8);
+				if (readJsonLongField(json, "frame_id", 0L) > 0L
+					&& readJsonLongField(json, "water_draw_count", 0L) > 0L
+					&& readJsonLongField(json, "water_index_count", 0L) > 0L) {
+					int originsStart = json.indexOf("\"water_origins\":[");
+					int originsEnd = originsStart < 0 ? -1 : json.indexOf("],\"late_translucent", originsStart);
+					if (originsStart < 0 || originsEnd < 0) {
+						continue;
+					}
+					String origins = json.substring(originsStart + "\"water_origins\":".length(), originsEnd + 1);
+					for (DistantHorizonsSemanticCollector.WaterSourceInputTrace trace : sourceReceipt.traces()) {
+						for (String origin : origins.replace("[[", "[").replace("]]", "]").split("\\],\\[")) {
+							String[] coordinates = origin.replace("[", "").replace("]", "").split(",");
+							if (coordinates.length == 3
+								&& Math.abs(Integer.parseInt(coordinates[0].trim()) - trace.blockX()) <= 64
+								&& Math.abs(Integer.parseInt(coordinates[2].trim()) - trace.blockZ()) <= 64) {
+								return true;
+							}
+						}
+					}
+				}
+			}
+		} catch (IOException | RuntimeException ignored) {
+			return false;
+		}
+		return false;
 	}
 
 	/** Emits bounded capture-only heartbeats while the real DH source catches up. */
@@ -2134,6 +2511,7 @@ public final class DeterministicCameraCapture {
 		// proxy for this palette's semantic light payload.
 		return distantHorizonsTexturePaletteLightStableFrames >= DISTANT_HORIZONS_TEXTURE_PALETTE_LIGHT_STABLE_FRAMES;
 	}
+
 
 	/**
 	 * Server-side deterministic setup bypasses the normal chunk-save hook. Once
@@ -2618,6 +2996,11 @@ public final class DeterministicCameraCapture {
 			}
 			case "translucent-overlap" -> {
 				applyStaticTerrainTranslucentOverlap(minecraft, serverLevel, target);
+				// The overlap fixture replaces a whole set of panes, including
+				// blocks in sections that may have had no translucent render pass
+				// before the edit.  Force the normal render-section invalidation so
+				// readiness cannot be satisfied by unrelated terrain submissions.
+				minecraft.levelRenderer.allChanged();
 				staticTerrainTranslucentFixtureApplied = true;
 				staticTerrainLifecycleStage = "translucent-overlap-placed";
 				RustGalTerrainRenderer.recordLifecycleMarker(
@@ -3341,6 +3724,15 @@ public final class DeterministicCameraCapture {
 		));
 	}
 
+	private static DistantHorizonsSemanticCollector.DistantHorizonsWaterProbeReceipt distantHorizonsTexturePaletteCachedWaterProbeReceipt() {
+		if (distantHorizonsWaterWitnesses.isEmpty()) {
+			return DistantHorizonsSemanticCollector.waterCachedProbeReceipt(List.of());
+		}
+		return DistantHorizonsSemanticCollector.waterCachedProbeReceipt(List.of(
+			distantHorizonsWaterWitnesses.get(distantHorizonsWaterWitnesses.size() / 2)
+		));
+	}
+
 	private static DistantHorizonsSemanticCollector.WaterSourceInputReceipt distantHorizonsWaterSourceInputReceipt() {
 		if (distantHorizonsWaterWitnesses.isEmpty()) {
 			return DistantHorizonsSemanticCollector.waterSourceInputReceipt(List.of());
@@ -3381,6 +3773,36 @@ public final class DeterministicCameraCapture {
 					applyStaticTerrainLifecycleEdit(serverLevel, minecraft.level, pos, crossing);
 				}
 			}
+		}
+		// ClientLevel#setBlock normally schedules a Sodium rebuild, but this
+		// fixture deliberately writes both server and client worlds while the
+		// Rust whole-frame source owns same-level section state.  Invalidate the
+		// complete edited section neighborhood explicitly so retained CPU meshes
+		// cannot mask the semantic glass panes from the native producer.
+		int minSectionX = Integer.MAX_VALUE;
+		int minSectionY = Integer.MAX_VALUE;
+		int minSectionZ = Integer.MAX_VALUE;
+		int maxSectionX = Integer.MIN_VALUE;
+		int maxSectionY = Integer.MIN_VALUE;
+		int maxSectionZ = Integer.MIN_VALUE;
+		for (int depth = 0; depth <= 4; depth++) {
+			for (int lateral = -2; lateral <= 2; lateral++) {
+				for (int vertical = 0; vertical <= 2; vertical++) {
+					BlockPos pos = target.relative(forward, depth).relative(right, lateral).above(vertical);
+					minSectionX = Math.min(minSectionX, SectionPos.blockToSectionCoord(pos.getX()));
+					minSectionY = Math.min(minSectionY, SectionPos.blockToSectionCoord(pos.getY()));
+					minSectionZ = Math.min(minSectionZ, SectionPos.blockToSectionCoord(pos.getZ()));
+					maxSectionX = Math.max(maxSectionX, SectionPos.blockToSectionCoord(pos.getX()));
+					maxSectionY = Math.max(maxSectionY, SectionPos.blockToSectionCoord(pos.getY()));
+					maxSectionZ = Math.max(maxSectionZ, SectionPos.blockToSectionCoord(pos.getZ()));
+				}
+			}
+		}
+		if (minSectionX <= maxSectionX) {
+			minecraft.levelRenderer.setSectionRangeDirty(
+				minSectionX, minSectionY, minSectionZ,
+				maxSectionX, maxSectionY, maxSectionZ
+			);
 		}
 	}
 
@@ -3729,7 +4151,8 @@ public final class DeterministicCameraCapture {
 	}
 
 	public static boolean isActiveForDiagnostics() {
-		return ENABLED && initialized && !complete && !failed;
+		return (ENABLED && initialized && !complete && !failed)
+			|| GraphicsFrameBenchmark.isActiveForDiagnostics();
 	}
 
 	public static String currentPoseNameForDiagnostics() {
@@ -3816,9 +4239,11 @@ public final class DeterministicCameraCapture {
 		if (level == null || player == null || minecraft.getConnection() == null) {
 			return false;
 		}
-		if (minecraft.screen != null || minecraft.getOverlay() != null) {
-			return false;
-		}
+		// A retained loading screen/overlay does not imply that the world is
+		// unavailable: the Rust whole-frame presenter owns presentation after the
+		// client world and connection become valid.  The level/player/connection
+		// checks above are the semantic readiness boundary for this diagnostics
+		// hook; screen composition is not a rendering prerequisite here.
 
 		try {
 			Files.createDirectories(SCREENSHOT_DIR);
@@ -3997,7 +4422,9 @@ public final class DeterministicCameraCapture {
 			settledReadyGateSatisfied = true;
 			return true;
 		}
-		if (poseIndex > 0) {
+		if (poseIndex > 0
+			&& !Boolean.getBoolean("mattmc.dev.rustGalVulkanWholeFrame")
+			&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			settledReadyGateSatisfied = true;
 			return true;
 		}
@@ -4035,6 +4462,13 @@ public final class DeterministicCameraCapture {
 			}
 		}
 		if (!staticTerrainAssetsSettled()) {
+			return false;
+		}
+		if ((Boolean.getBoolean("mattmc.dev.rustGalVulkanWholeFrame")
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
+			&& (net.vulkanic.gui.RustGalFrameCoordinator.lastRenderableWholeFrameWorldFrame() <= 0
+				|| renderedFrameIndex
+					- net.vulkanic.gui.RustGalFrameCoordinator.lastRenderableWholeFrameWorldFrame() > 1)) {
 			return false;
 		}
 		if (!net.sodium.client.render.StaticTerrainParityDiagnostics.isAppearanceLightReady()) {
@@ -5262,7 +5696,7 @@ public final class DeterministicCameraCapture {
 	private static boolean hasCurrentModelMeshRoute(long frameIndex, long frameTolerance) {
 		boolean queued = RustGalWorldPrimitiveRenderer.modelMeshDiagnostics().stream().anyMatch(diagnostic ->
 			Math.abs(diagnostic.frameIndex() - frameIndex) <= frameTolerance
-				&& expectedModelMeshTextureId().equals(diagnostic.textureId())
+				&& expectedModelMeshDiagnosticTextureId().equals(diagnostic.textureId())
 				&& diagnostic.projected()
 				&& diagnostic.sectionCount() > 0
 		);
@@ -5298,7 +5732,7 @@ public final class DeterministicCameraCapture {
 	}
 
 	private static boolean isModelPartMeshScenario() {
-		return "decorated-pot".equals(MODEL_MESH_SCENARIO);
+		return "decorated-pot".equals(MODEL_MESH_SCENARIO) || "conduit".equals(MODEL_MESH_SCENARIO);
 	}
 
 	/**
@@ -5324,7 +5758,7 @@ public final class DeterministicCameraCapture {
 		}
 		boolean queued = RustGalWorldPrimitiveRenderer.modelMeshDiagnostics().stream().anyMatch(diagnostic ->
 			Math.abs(diagnostic.frameIndex() - frameIndex) <= frameTolerance
-				&& expectedTexture.equals(diagnostic.textureId())
+				&& expectedModelMeshDiagnosticTextureId().equals(diagnostic.textureId())
 				&& diagnostic.projected()
 				&& diagnostic.sectionCount() > 0
 		);
@@ -5338,6 +5772,7 @@ public final class DeterministicCameraCapture {
 	private static String expectedModelMeshTextureId() {
 		return switch (MODEL_MESH_SCENARIO) {
 			case "decorated-pot" -> "minecraft:entity/decorated_pot/decorated_pot_base";
+			case "conduit" -> "minecraft:entity/conduit/base";
 			case "bed" -> "minecraft:entity/bed/red";
 			case "bell" -> "minecraft:entity/bell/bell_body";
 			case "shulker" -> "minecraft:entity/shulker/shulker_purple";
@@ -5349,7 +5784,26 @@ public final class DeterministicCameraCapture {
 			case "pig" -> "minecraft:textures/entity/pig/temperate_pig.png";
 			case "rabbit" -> "minecraft:textures/entity/rabbit/brown.png";
 			case "zombie" -> "minecraft:textures/entity/zombie/zombie.png";
+			case "end-crystal" -> "minecraft:textures/entity/end_crystal/end_crystal.png";
 			default -> "minecraft:entity/chest/normal";
+		};
+	}
+
+	/**
+	 * Model route receipts use the gameplay material identity (for example
+	 * {@code entity/chest/normal}), while the copied mesh diagnostic records the
+	 * actual atlas payload consumed by Rust. Keep that distinction explicit so a
+	 * block-entity atlas cannot be mistaken for a missing producer.
+	 */
+	private static String expectedModelMeshDiagnosticTextureId() {
+		return switch (MODEL_MESH_SCENARIO) {
+			case "chest" -> "minecraft:textures/atlas/chest.png";
+			case "bed" -> "minecraft:textures/atlas/beds.png";
+			case "shulker" -> "minecraft:textures/atlas/shulker_boxes.png";
+			case "decorated-pot" -> "minecraft:textures/atlas/decorated_pot.png";
+			case "bell" -> "minecraft:textures/atlas/blocks.png";
+			case "conduit" -> "minecraft:textures/atlas/blocks.png";
+			default -> expectedModelMeshTextureId();
 		};
 	}
 
@@ -5732,33 +6186,242 @@ public final class DeterministicCameraCapture {
 			beaconBeamSetupStatus = "missing-server-level";
 			return;
 		}
+		if (!beaconBeamTickerEventRegistered) {
+			ServerTickEvents.END_SERVER_TICK.register(DeterministicCameraCapture::tickBeaconBeamFixture);
+			beaconBeamTickerEventRegistered = true;
+		}
+		if (!beaconBeamClientTickerEventRegistered) {
+			ClientTickEvents.END_CLIENT_TICK.register(DeterministicCameraCapture::tickBeaconBeamClientFixture);
+			beaconBeamClientTickerEventRegistered = true;
+		}
 		if (beaconBeamSetupPosition != null) {
+			beaconBeamSetupGameTime = serverLevel.getGameTime();
+			// The copied benchmark world can spend several wall-clock seconds
+			// loading without advancing the client tick loop.  Advance the real
+			// vanilla beacon ticker on the client thread while the fixture is
+			// waiting; this does not synthesize beam sections or touch renderer
+			// state, and keeps the ordinary block-entity scan deterministic.
+			if (minecraft.level.getBlockEntity(beaconBeamSetupPosition)
+				instanceof net.minecraft.world.level.block.entity.BeaconBlockEntity clientBeacon
+				&& clientBeacon.getBeamSections().isEmpty()) {
+				beaconBeamSetupClientTickerInvocations++;
+				net.minecraft.world.level.block.entity.BeaconBlockEntity.tick(
+					minecraft.level,
+					beaconBeamSetupPosition,
+					Blocks.BEACON.defaultBlockState(),
+					clientBeacon);
+				if (beaconBeamSetupClientTickerInvocations <= 3L
+					|| !clientBeacon.getBeamSections().isEmpty()) {
+					LOGGER.info("Beacon fixture client ticker invocation={} height={} beacon={} beam={} base={}",
+						beaconBeamSetupClientTickerInvocations,
+						minecraft.level.getHeight(Heightmap.Types.WORLD_SURFACE,
+							beaconBeamSetupPosition.getX(), beaconBeamSetupPosition.getZ()),
+						minecraft.level.getBlockState(beaconBeamSetupPosition).getBlock(),
+						clientBeacon.getBeamSections().size(),
+						beaconBeamSetupBaseValid);
+					LOGGER.info("Beacon fixture client scan states y0={} y1={} y2={}",
+						minecraft.level.getBlockState(beaconBeamSetupPosition).getBlock(),
+						minecraft.level.getBlockState(beaconBeamSetupPosition.above()).getBlock(),
+						minecraft.level.getBlockState(beaconBeamSetupPosition.above(2)).getBlock());
+				}
+			}
+			beaconBeamSetupBaseValid = true;
+			for (int level = 0; level < 4 && beaconBeamSetupBaseValid; level++) {
+				int radius = level + 1;
+				for (int localX = -radius; localX <= radius && beaconBeamSetupBaseValid; localX++) {
+					for (int localZ = -radius; localZ <= radius; localZ++) {
+						if (!serverLevel.getBlockState(beaconBeamSetupPosition.offset(localX, -level - 1, localZ))
+							.is(net.minecraft.tags.BlockTags.BEACON_BASE_BLOCKS)) {
+							beaconBeamSetupBaseValid = false;
+							break;
+						}
+					}
+				}
+			}
+			beaconBeamTickerLoopScheduled = true;
+			beaconBeamSetupServerReady = serverLevel.getBlockEntity(beaconBeamSetupPosition)
+				instanceof net.minecraft.world.level.block.entity.BeaconBlockEntity beacon
+				&& !beacon.getBeamSections().isEmpty();
 			beaconBeamSetupClientReady = minecraft.level.getBlockEntity(beaconBeamSetupPosition)
 				instanceof net.minecraft.world.level.block.entity.BeaconBlockEntity beacon
 				&& !beacon.getBeamSections().isEmpty();
-			beaconBeamSetupStatus = beaconBeamSetupClientReady ? "spawned" : "waiting-client-beam-sections";
+			beaconBeamSetupStatus = beaconBeamSetupClientReady ? "spawned"
+				: beaconBeamSetupServerReady ? "waiting-client-beam-sections" : "waiting-server-beam-sections";
 			return;
 		}
 		Vec3 forward = player.getLookAngle();
 		if (forward.lengthSqr() < 0.0001) {
 			forward = new Vec3(0.0, 0.0, 1.0);
 		}
-		BlockPos position = BlockPos.containing(player.getEyePosition().add(forward.normalize().scale(5.0)).add(0.0, -1.45, 0.0));
-		for (int localX = -1; localX <= 1; localX++) {
-			for (int localZ = -1; localZ <= 1; localZ++) {
-				serverLevel.setBlock(position.offset(localX, -1, localZ), Blocks.IRON_BLOCK.defaultBlockState(), 3);
+		BlockPos horizontalTarget = BlockPos.containing(
+			player.getEyePosition().add(forward.normalize().scale(5.0)));
+		int surfaceY = serverLevel.getHeight(
+			Heightmap.Types.WORLD_SURFACE, horizontalTarget.getX(), horizontalTarget.getZ());
+		// Keep the ordinary pyramid above the copied world's existing terrain.
+		// This preserves the real vanilla scan/update path while avoiding a
+		// fixture whose beam is occluded by unrelated terrain above the beacon.
+		BlockPos position = new BlockPos(horizontalTarget.getX(), surfaceY, horizontalTarget.getZ());
+		// Build the complete ordinary four-level beacon pyramid so the vanilla
+		// block entity can deterministically publish beam sections on the server.
+		for (int level = 0; level < 4; level++) {
+			int radius = level + 1;
+			for (int localX = -radius; localX <= radius; localX++) {
+				for (int localZ = -radius; localZ <= radius; localZ++) {
+					serverLevel.setBlock(position.offset(localX, -level - 1, localZ), Blocks.IRON_BLOCK.defaultBlockState(), 3);
+				}
 			}
 		}
-		for (int localY = 0; localY <= 12; localY++) {
+		int beamClearTop = Math.max(
+			position.getY() + 12,
+			serverLevel.getHeight(Heightmap.Types.WORLD_SURFACE, position.getX(), position.getZ()) + 1);
+		for (int localY = 0; position.getY() + localY <= beamClearTop; localY++) {
 			serverLevel.setBlock(position.above(localY), Blocks.AIR.defaultBlockState(), 3);
 		}
+		BlockState previousBeaconState = serverLevel.getBlockState(position);
 		serverLevel.setBlock(position, Blocks.BEACON.defaultBlockState(), 3);
 		serverLevel.setBlock(position.above(), Blocks.RED_STAINED_GLASS.defaultBlockState(), 3);
+		// Force the ordinary server block-entity update through the copied
+		// singleplayer connection. The fixture must become client-visible via
+		// normal beacon synchronization before BeaconRenderer can emit any
+		// semantic beam work; it must not inspect or synthesize beam sections.
+		serverLevel.getChunkAt(position);
+		serverLevel.getServer().execute(() -> {
+			if (serverLevel.getBlockEntity(position)
+				instanceof net.minecraft.world.level.block.entity.BeaconBlockEntity beacon) {
+				// Run the ordinary vanilla ticker once on its owning thread so the
+				// fixture does not depend on benchmark wall-clock time.
+				net.minecraft.world.level.block.entity.BeaconBlockEntity.tick(
+					serverLevel, position, Blocks.BEACON.defaultBlockState(), beacon);
+				beacon.setChanged();
+			}
+		});
+		serverLevel.sendBlockUpdated(position, previousBeaconState,
+			Blocks.BEACON.defaultBlockState(), 3);
+		serverLevel.getChunkSource().blockChanged(position);
+		// The deterministic client is the render owner of this copied level. Keep
+		// the complete ordinary pyramid and clear beam column coherent with the
+		// server fixture so the client-side vanilla ticker can perform its normal
+		// scan; do not inject beam sections or renderer output.
+		for (int level = 0; level < 4; level++) {
+			int radius = level + 1;
+			for (int localX = -radius; localX <= radius; localX++) {
+				for (int localZ = -radius; localZ <= radius; localZ++) {
+					minecraft.level.setBlock(position.offset(localX, -level - 1, localZ),
+						Blocks.IRON_BLOCK.defaultBlockState(), 3);
+				}
+			}
+		}
+		int clientBeamClearTop = Math.max(
+			position.getY() + 12,
+			minecraft.level.getHeight(Heightmap.Types.WORLD_SURFACE, position.getX(), position.getZ()) + 1);
+		for (int localY = 0; position.getY() + localY <= clientBeamClearTop; localY++) {
+			minecraft.level.setBlock(position.above(localY), Blocks.AIR.defaultBlockState(), 3);
+		}
+		minecraft.level.setBlock(position, Blocks.BEACON.defaultBlockState(), 3);
+		minecraft.level.setBlock(position.above(), Blocks.RED_STAINED_GLASS.defaultBlockState(), 3);
 		beaconBeamSetupPosition = position;
 		beaconBeamSetupOrigin = position.toShortString();
 		beaconBeamSetupClientReady = false;
+		beaconBeamSetupServerReady = false;
+		beaconBeamSetupGameTime = serverLevel.getGameTime();
+		beaconBeamSetupBaseValid = true;
+			beaconBeamSetupTickerInvocations = 0L;
+			beaconBeamSetupClientTickerInvocations = 0L;
+		beaconBeamSetupLastTickerGameTime = -1L;
+		beaconBeamSetupTickerSawBlockEntity = false;
+		beaconBeamSetupServerPacketSent = false;
+		beaconBeamTickerLoopScheduled = false;
+		beaconBeamSetupServerLevel = serverLevel;
 		beaconBeamSetupStatus = "waiting-client-beam-sections";
 		LOGGER.info("Deterministic Beacon setup placed ordinary vanilla beacon near {} for Rust-GAL material capture", beaconBeamSetupOrigin);
+	}
+
+	private static void tickBeaconBeamFixture(MinecraftServer server) {
+		if (!beaconBeamTickerLoopScheduled || beaconBeamSetupServerLevel == null
+			|| beaconBeamSetupPosition == null || server != beaconBeamSetupServerLevel.getServer()) {
+			return;
+		}
+		ServerLevel serverLevel = beaconBeamSetupServerLevel;
+		BlockPos position = beaconBeamSetupPosition;
+		beaconBeamSetupTickerInvocations++;
+		beaconBeamSetupLastTickerGameTime = serverLevel.getGameTime();
+		if (!(serverLevel.getBlockEntity(position)
+			instanceof net.minecraft.world.level.block.entity.BeaconBlockEntity beacon)) {
+			beaconBeamSetupTickerLoopFinished();
+			return;
+		}
+		beaconBeamSetupTickerSawBlockEntity = true;
+		net.minecraft.world.level.block.entity.BeaconBlockEntity.tick(
+			serverLevel, position, Blocks.BEACON.defaultBlockState(), beacon);
+		beacon.setChanged();
+		if (beaconBeamSetupTickerInvocations <= 3L) {
+			LOGGER.info("Beacon fixture server ticker invocation={} time={} height={} beam={} base={}",
+				beaconBeamSetupTickerInvocations,
+				serverLevel.getGameTime(),
+				serverLevel.getHeight(Heightmap.Types.WORLD_SURFACE, position.getX(), position.getZ()),
+				beacon.getBeamSections().size(),
+				beaconBeamSetupBaseValid);
+		}
+		if (serverLevel.getGameTime() % 80L == 0L) {
+			LOGGER.info("Beacon fixture vanilla tick boundary time={} height={} beacon={} beam={} base={}",
+				serverLevel.getGameTime(),
+				serverLevel.getHeight(Heightmap.Types.WORLD_SURFACE, position.getX(), position.getZ()),
+				serverLevel.getBlockState(position).getBlock(),
+				beacon.getBeamSections().size(), beaconBeamSetupBaseValid);
+		}
+		if (!beacon.getBeamSections().isEmpty()) {
+			beaconBeamSetupServerReady = true;
+			if (!beaconBeamSetupServerPacketSent) {
+				serverLevel.sendBlockUpdated(position, Blocks.BEACON.defaultBlockState(),
+					Blocks.BEACON.defaultBlockState(), 3);
+				// Beam sections and activation level are ordinary block-entity update
+				// data. Deliver the vanilla packet to the copied singleplayer
+				// connection once the real server ticker reaches its boundary.
+				var packet = beacon.getUpdatePacket();
+				if (packet != null) {
+					for (ServerPlayer serverPlayer : server.getPlayerList().getPlayers()) {
+						if (serverPlayer.level() == serverLevel
+							&& serverPlayer.distanceToSqr(position.getX() + 0.5D, position.getY() + 0.5D, position.getZ() + 0.5D) <= 256.0D * 256.0D) {
+							serverPlayer.connection.send(packet);
+						}
+					}
+				}
+				beaconBeamSetupServerPacketSent = true;
+			}
+			if (beaconBeamSetupClientReady) {
+				beaconBeamSetupTickerLoopFinished();
+			}
+		}
+	}
+
+	private static void tickBeaconBeamClientFixture(Minecraft minecraft) {
+		if (!beaconBeamTickerLoopScheduled || minecraft == null || minecraft.level == null
+			|| beaconBeamSetupPosition == null) {
+			return;
+		}
+		if (minecraft.level.getBlockEntity(beaconBeamSetupPosition)
+			instanceof net.minecraft.world.level.block.entity.BeaconBlockEntity clientBeacon
+			&& clientBeacon.getBeamSections().isEmpty()) {
+			beaconBeamSetupClientTickerInvocations++;
+			net.minecraft.world.level.block.entity.BeaconBlockEntity.tick(
+				minecraft.level,
+				beaconBeamSetupPosition,
+				Blocks.BEACON.defaultBlockState(),
+				clientBeacon);
+			if (!clientBeacon.getBeamSections().isEmpty()) {
+				beaconBeamSetupClientReady = true;
+				beaconBeamSetupStatus = "spawned";
+				LOGGER.info("Beacon fixture client tick boundary produced beam sections={} time={}",
+					clientBeacon.getBeamSections().size(), minecraft.level.getGameTime());
+				if (beaconBeamSetupServerReady) {
+					beaconBeamSetupTickerLoopFinished();
+				}
+			}
+		}
+	}
+
+	private static void beaconBeamSetupTickerLoopFinished() {
+		beaconBeamTickerLoopScheduled = false;
 	}
 
 	/**
@@ -5854,15 +6517,27 @@ public final class DeterministicCameraCapture {
 	private static void setupModelMeshScenario(Minecraft minecraft, LocalPlayer player) {
 		if (MODEL_MESH_SCENARIO.isEmpty() || "hidden".equals(MODEL_MESH_SCENARIO)
 			|| player == null || minecraft.level == null || minecraft.getSingleplayerServer() == null) {
-			modelMeshSetupStatus = MODEL_MESH_SCENARIO.isEmpty() ? "inactive" : "hidden-or-missing-level";
+			// Keep a successfully spawned producer receipt stable while the client
+			// tears down its level.  This method is polled from the capture state
+			// machine and can run once more after stopAfterComplete has begun; wiping
+			// "spawned" here would make a real producer look absent in the final
+			// metadata and invalidate the route/execution evidence.
+			if (MODEL_MESH_SCENARIO.isEmpty()) {
+				modelMeshSetupStatus = "inactive";
+			} else if (!"spawned".equals(modelMeshSetupStatus)
+				&& !"server-spawned".equals(modelMeshSetupStatus)) {
+				modelMeshSetupStatus = "hidden-or-missing-level";
+			}
 			return;
 		}
 		if (!"chest".equals(MODEL_MESH_SCENARIO) && !"bed".equals(MODEL_MESH_SCENARIO)
 			&& !"bell".equals(MODEL_MESH_SCENARIO) && !"shulker".equals(MODEL_MESH_SCENARIO)
 			&& !"decorated-pot".equals(MODEL_MESH_SCENARIO)
+			&& !"conduit".equals(MODEL_MESH_SCENARIO)
 			&& !"llama-spit".equals(MODEL_MESH_SCENARIO) && !"evoker-fangs".equals(MODEL_MESH_SCENARIO)
 			&& !"wither-skull".equals(MODEL_MESH_SCENARIO) && !"chicken".equals(MODEL_MESH_SCENARIO) && !"cow".equals(MODEL_MESH_SCENARIO)
-			&& !"pig".equals(MODEL_MESH_SCENARIO) && !"rabbit".equals(MODEL_MESH_SCENARIO) && !"zombie".equals(MODEL_MESH_SCENARIO)) {
+			&& !"pig".equals(MODEL_MESH_SCENARIO) && !"rabbit".equals(MODEL_MESH_SCENARIO) && !"zombie".equals(MODEL_MESH_SCENARIO)
+			&& !"end-crystal".equals(MODEL_MESH_SCENARIO)) {
 			modelMeshSetupStatus = "unsupported-scenario";
 			return;
 		}
@@ -5904,10 +6579,12 @@ public final class DeterministicCameraCapture {
 		}
 		if ("llama-spit".equals(MODEL_MESH_SCENARIO) || "evoker-fangs".equals(MODEL_MESH_SCENARIO)
 			|| "wither-skull".equals(MODEL_MESH_SCENARIO) || "chicken".equals(MODEL_MESH_SCENARIO) || "cow".equals(MODEL_MESH_SCENARIO)
-			|| "pig".equals(MODEL_MESH_SCENARIO) || "rabbit".equals(MODEL_MESH_SCENARIO) || "zombie".equals(MODEL_MESH_SCENARIO)) {
+				|| "pig".equals(MODEL_MESH_SCENARIO) || "rabbit".equals(MODEL_MESH_SCENARIO) || "zombie".equals(MODEL_MESH_SCENARIO)
+				|| "end-crystal".equals(MODEL_MESH_SCENARIO)) {
 			if (("llama-spit".equals(MODEL_MESH_SCENARIO) || "wither-skull".equals(MODEL_MESH_SCENARIO)
 				|| "chicken".equals(MODEL_MESH_SCENARIO) || "cow".equals(MODEL_MESH_SCENARIO) || "pig".equals(MODEL_MESH_SCENARIO)
-				|| "rabbit".equals(MODEL_MESH_SCENARIO) || "zombie".equals(MODEL_MESH_SCENARIO)) && modelMeshSetupServerEntityPresent) {
+					|| "rabbit".equals(MODEL_MESH_SCENARIO) || "zombie".equals(MODEL_MESH_SCENARIO)
+					|| "end-crystal".equals(MODEL_MESH_SCENARIO)) && modelMeshSetupServerEntityPresent) {
 				if (modelMeshSetupServerEntityId >= 0) {
 					Entity clientEntity = minecraft.level.getEntity(modelMeshSetupServerEntityId);
 					if (!isExpectedModelMeshClientEntity(clientEntity)) {
@@ -6007,6 +6684,15 @@ public final class DeterministicCameraCapture {
 				zombie.setDeltaMovement(Vec3.ZERO);
 				serverLevel.addFreshEntity(zombie);
 				modelMeshSetupServerEntityId = zombie.getId();
+			} else if ("end-crystal".equals(MODEL_MESH_SCENARIO)) {
+				net.minecraft.world.entity.boss.enderdragon.EndCrystal crystal =
+					new net.minecraft.world.entity.boss.enderdragon.EndCrystal(EntityType.END_CRYSTAL, serverLevel);
+				crystal.setPos(origin.x, origin.y, origin.z);
+				crystal.setYRot(player.getYRot());
+				crystal.setNoGravity(true);
+				crystal.setBeamTarget(BlockPos.containing(origin.x, origin.y - 4.0, origin.z));
+				serverLevel.addFreshEntity(crystal);
+				modelMeshSetupServerEntityId = crystal.getId();
 			} else {
 				WitherSkull skull = new WitherSkull(EntityType.WITHER_SKULL, serverLevel);
 				skull.setPos(origin.x, origin.y, origin.z);
@@ -6023,7 +6709,8 @@ public final class DeterministicCameraCapture {
 				: "cow".equals(MODEL_MESH_SCENARIO) ? "minecraft:cow"
 				: "pig".equals(MODEL_MESH_SCENARIO) ? "minecraft:pig"
 				: "rabbit".equals(MODEL_MESH_SCENARIO) ? "minecraft:rabbit"
-				: "zombie".equals(MODEL_MESH_SCENARIO) ? "minecraft:zombie" : "minecraft:wither_skull";
+				: "zombie".equals(MODEL_MESH_SCENARIO) ? "minecraft:zombie"
+				: "end-crystal".equals(MODEL_MESH_SCENARIO) ? "minecraft:end_crystal" : "minecraft:wither_skull";
 			modelMeshSetupOrigin = String.format(Locale.ROOT, "%.3f,%.3f,%.3f", origin.x, origin.y, origin.z);
 			modelMeshSetupServerEntityPresent = true;
 			modelMeshSetupPoseIndex = poseIndex;
@@ -6045,6 +6732,7 @@ public final class DeterministicCameraCapture {
 			case "bell" -> Blocks.BELL.defaultBlockState();
 			case "shulker" -> Blocks.PURPLE_SHULKER_BOX.defaultBlockState();
 			case "decorated-pot" -> Blocks.DECORATED_POT.defaultBlockState();
+			case "conduit" -> Blocks.CONDUIT.defaultBlockState();
 			default -> Blocks.CHEST.defaultBlockState().setValue(ChestBlock.FACING, Direction.SOUTH);
 		};
 		prepareModelMeshCaptureSite(serverLevel, position);
@@ -6063,7 +6751,7 @@ public final class DeterministicCameraCapture {
 
 	private static boolean isModelMeshEntityScenario() {
 		return switch (MODEL_MESH_SCENARIO) {
-			case "llama-spit", "evoker-fangs", "wither-skull", "chicken", "cow", "pig", "rabbit", "zombie" -> true;
+			case "llama-spit", "evoker-fangs", "wither-skull", "chicken", "cow", "pig", "rabbit", "zombie", "end-crystal" -> true;
 			default -> false;
 		};
 	}
@@ -6077,6 +6765,7 @@ public final class DeterministicCameraCapture {
 			case "pig" -> "minecraft:pig";
 			case "rabbit" -> "minecraft:rabbit";
 			case "zombie" -> "minecraft:zombie";
+			case "end-crystal" -> "minecraft:end_crystal";
 			case "wither-skull" -> "minecraft:wither_skull";
 			default -> "";
 		};
@@ -6171,6 +6860,14 @@ public final class DeterministicCameraCapture {
 					skull.setPos(origin.x, origin.y, origin.z);
 					skull.setNoGravity(true);
 					entity = skull;
+				}
+				case "end-crystal" -> {
+					net.minecraft.world.entity.boss.enderdragon.EndCrystal crystal =
+						new net.minecraft.world.entity.boss.enderdragon.EndCrystal(EntityType.END_CRYSTAL, serverLevel);
+					crystal.setPos(origin.x, origin.y, origin.z);
+					crystal.setNoGravity(true);
+					crystal.setBeamTarget(BlockPos.containing(origin.x, origin.y - 4.0, origin.z));
+					entity = crystal;
 				}
 				default -> {
 					modelMeshSetupServerSpawnFailure = "unsupported-scenario";
@@ -6287,6 +6984,7 @@ public final class DeterministicCameraCapture {
 			case "pig" -> EntityType.PIG;
 			case "rabbit" -> EntityType.RABBIT;
 			case "zombie" -> EntityType.ZOMBIE;
+			case "end-crystal" -> EntityType.END_CRYSTAL;
 			default -> null;
 		};
 		return entity != null
@@ -6303,6 +7001,7 @@ public final class DeterministicCameraCapture {
 			case "pig" -> "minecraft:pig";
 			case "rabbit" -> "minecraft:rabbit";
 			case "zombie" -> "minecraft:zombie";
+			case "end-crystal" -> "minecraft:end_crystal";
 			default -> "";
 		};
 		if (expectedIdentity.isEmpty()) {
@@ -6790,7 +7489,8 @@ public final class DeterministicCameraCapture {
 		json.append("  \"rustGalWorldBeaconBeamSetup\": { ");
 		appendField(json, "status", beaconBeamSetupStatus, 0).append(", ");
 		appendField(json, "origin", beaconBeamSetupOrigin, 0).append(", ");
-		json.append("\"clientBeamSectionsReady\": ").append(beaconBeamSetupClientReady).append(" },\n");
+		json.append("\"clientBeamSectionsReady\": ").append(beaconBeamSetupClientReady)
+			.append(", \"serverBeamSectionsReady\": ").append(beaconBeamSetupServerReady).append(" },\n");
 		appendField(json, "rustGalWorldItemEntityScenario", ITEM_ENTITY_SCENARIO).append(",\n");
 		json.append("  \"rustGalWorldItemEntitySetup\": { ");
 		appendField(json, "status", itemEntitySetupStatus, 0).append(", ");
@@ -6931,7 +7631,8 @@ public final class DeterministicCameraCapture {
 		json.append("  \"rustGalWorldBeaconBeamSetup\": { ");
 		appendField(json, "status", beaconBeamSetupStatus, 0).append(", ");
 		appendField(json, "origin", beaconBeamSetupOrigin, 0).append(", ");
-		json.append("\"clientBeamSectionsReady\": ").append(beaconBeamSetupClientReady).append(" },\n");
+		json.append("\"clientBeamSectionsReady\": ").append(beaconBeamSetupClientReady)
+			.append(", \"serverBeamSectionsReady\": ").append(beaconBeamSetupServerReady).append(" },\n");
 		appendField(json, "rustGalWorldItemEntityScenario", ITEM_ENTITY_SCENARIO).append(",\n");
 		json.append("  \"rustGalWorldItemEntitySetup\": { ");
 		appendField(json, "status", itemEntitySetupStatus, 0).append(", ");
@@ -7185,6 +7886,10 @@ public final class DeterministicCameraCapture {
 		json.append("}\n");
 
 		try {
+			Path parent = METADATA_PATH.toAbsolutePath().getParent();
+			if (parent != null) {
+				Files.createDirectories(parent);
+			}
 			Files.writeString(METADATA_PATH, json.toString(), StandardCharsets.UTF_8);
 		} catch (IOException exception) {
 			LOGGER.error("Unable to write deterministic capture metadata", exception);

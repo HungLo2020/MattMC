@@ -29,7 +29,8 @@ import java.util.Objects;
  * <p>The output contains no {@link TextureAtlasSprite}, model, renderer, or
  * backend object. It is deliberately strict: a reduced LOD quad may use a
 	 * sprite only when its source state resolves to one or more co-planar,
-	 * non-animated atlas regions for that face. A reduced DH face can reproduce
+	 * copied atlas regions for that face. Animated regions are refreshed through
+	 * the atlas semantic generation before Rust submission. A reduced DH face can reproduce
 	 * ordinary baked-model overlays such as grass sides only by retaining their
 	 * ordered layers; callers retain the color-only path for geometry that cannot
 	 * be represented by the reduced face contract.</p>
@@ -168,10 +169,6 @@ final class DistantHorizonsFaceMaterialResolver {
 					unavailable = Status.UNCULLED_QUAD;
 					break;
 				}
-				if (candidate.animated()) {
-					unavailable = Status.ANIMATED_SPRITE;
-					break;
-				}
 				materials.add(candidate.material());
 				if (materials.size() > MAX_FACE_LAYERS) {
 					unavailable = Status.MULTIPLE_FACE_QUADS;
@@ -256,9 +253,6 @@ final class DistantHorizonsFaceMaterialResolver {
 		LinkedHashSet<FaceMaterial> materials = new LinkedHashSet<>();
 		for (BakedQuad quad : quads) {
 			TextureAtlasSprite sprite = quad.sprite();
-			if (sprite.contents().isAnimated()) {
-				return new FaceResolution(List.of(), Status.ANIMATED_SPRITE);
-			}
 			int uvCornerOrder = canonicalUvCornerOrder((BakedQuadView)(Object)quad, direction, sprite);
 			if (uvCornerOrder < 0) {
 				return new FaceResolution(List.of(), Status.UNSUPPORTED_FACE_MAPPING);
@@ -410,21 +404,85 @@ final class DistantHorizonsFaceMaterialResolver {
 	}
 
 	private static int canonicalUvCornerOrder(BakedQuadView quad, Direction face, TextureAtlasSprite sprite) {
+		// Most vanilla cube faces use the unit-cube coordinates handled by the
+		// fast path below. Slabs, stairs, and other baked models may occupy an
+		// inset/expanded axis-aligned rectangle instead. Normalize those bounds
+		// only when all four vertices are coplanar on the requested face and map
+		// to four distinct rectangle corners; crossed or diagonal quads remain
+		// deliberately unavailable rather than receiving guessed texture data.
 		int order = 0;
 		int seenCorners = 0;
+		boolean fastPathValid = true;
 		for (int sourceIndex = 0; sourceIndex < 4; sourceIndex++) {
 			int canonicalIndex = canonicalFaceCorner(face, quad.getX(sourceIndex), quad.getY(sourceIndex), quad.getZ(sourceIndex));
 			if (canonicalIndex < 0 || (seenCorners & 1 << canonicalIndex) != 0) {
-				return -1;
+				fastPathValid = false;
+				break;
 			}
 			int spriteCorner = spriteCorner(sprite, quad.getTexU(sourceIndex), quad.getTexV(sourceIndex));
 			if (spriteCorner < 0) {
-				return -1;
+				fastPathValid = false;
+				break;
 			}
 			order |= spriteCorner << (canonicalIndex * 2);
 			seenCorners |= 1 << canonicalIndex;
 		}
+		if (fastPathValid && seenCorners == 0xf && validUvCornerOrder(order)) return order;
+
+		return boundedPlanarUvCornerOrder(quad, face, sprite);
+	}
+
+	private static int boundedPlanarUvCornerOrder(BakedQuadView quad, Direction face, TextureAtlasSprite sprite) {
+		float minX = Float.POSITIVE_INFINITY, minY = Float.POSITIVE_INFINITY, minZ = Float.POSITIVE_INFINITY;
+		float maxX = Float.NEGATIVE_INFINITY, maxY = Float.NEGATIVE_INFINITY, maxZ = Float.NEGATIVE_INFINITY;
+		for (int index = 0; index < 4; index++) {
+			float x = quad.getX(index), y = quad.getY(index), z = quad.getZ(index);
+			if (!Float.isFinite(x) || !Float.isFinite(y) || !Float.isFinite(z)) return -1;
+			minX = Math.min(minX, x); maxX = Math.max(maxX, x);
+			minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+			minZ = Math.min(minZ, z); maxZ = Math.max(maxZ, z);
+		}
+		float normalMin = switch (face) {
+			case DOWN, UP -> minY;
+			case NORTH, SOUTH -> minZ;
+			case WEST, EAST -> minX;
+		};
+		float normalMax = switch (face) {
+			case DOWN, UP -> maxY;
+			case NORTH, SOUTH -> maxZ;
+			case WEST, EAST -> maxX;
+		};
+		// A planar face has no extent along its normal. Do not infer one from a
+		// slanted or non-planar quad.
+		if (Math.abs(normalMax - normalMin) > 0.0001F) return -1;
+		int order = 0;
+		int seenCorners = 0;
+		for (int sourceIndex = 0; sourceIndex < 4; sourceIndex++) {
+			float x = quad.getX(sourceIndex), y = quad.getY(sourceIndex), z = quad.getZ(sourceIndex);
+			int xBit = boundedBit(x, minX, maxX), yBit = boundedBit(y, minY, maxY), zBit = boundedBit(z, minZ, maxZ);
+			if (xBit < 0 || yBit < 0 || zBit < 0) return -1;
+			int canonicalIndex = switch (face) {
+				case DOWN -> cornerIndex(xBit, zBit);
+				case UP -> cornerIndex(1 - xBit, zBit);
+				case NORTH -> cornerIndex(xBit, yBit);
+				case SOUTH -> cornerIndex(1 - xBit, yBit);
+				case WEST -> cornerIndex(zBit, yBit);
+				case EAST -> cornerIndex(zBit, 1 - yBit);
+			};
+			if ((seenCorners & 1 << canonicalIndex) != 0) return -1;
+			int spriteCorner = spriteCorner(sprite, quad.getTexU(sourceIndex), quad.getTexV(sourceIndex));
+			if (spriteCorner < 0) return -1;
+			order |= spriteCorner << (canonicalIndex * 2);
+			seenCorners |= 1 << canonicalIndex;
+		}
 		return seenCorners == 0xf && validUvCornerOrder(order) ? order : -1;
+	}
+
+	private static int boundedBit(float value, float minimum, float maximum) {
+		float tolerance = Math.max(0.0001F, Math.abs(maximum - minimum) * 0.001F);
+		if (Math.abs(value - minimum) <= tolerance) return 0;
+		if (Math.abs(value - maximum) <= tolerance) return 1;
+		return -1;
 	}
 
 	private static int canonicalFaceCorner(Direction face, float x, float y, float z) {

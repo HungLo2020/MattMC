@@ -93,6 +93,13 @@ public class FullDataSourceV2
 	 * The y data should be sorted from top to bottom
 	 */
 	public final LongArrayList[] dataPoints;
+	/**
+	 * Conservative proof that a downsampled column's horizontal footprint had
+	 * one identical semantic source column. This is metadata only; it never
+	 * changes DH's legacy color/geometry reduction. A false value keeps exact
+	 * textured Rust admission unavailable rather than guessing a sprite.
+	 */
+	private final boolean[] semanticHorizontalUniform;
 	
 	public boolean isEmpty;
 	/** Will be null if we don't want to update this value in the DB */
@@ -216,11 +223,14 @@ public class FullDataSourceV2
 		
 		// pooled data arrays
 		this.dataPoints = new LongArrayList[WIDTH * WIDTH];
+		this.semanticHorizontalUniform = new boolean[WIDTH * WIDTH];
+		boolean blockResolution = DhSectionPos.getDetailLevel(pos) == DhSectionPos.SECTION_BLOCK_DETAIL_LEVEL;
 		for (int i = 0; i < WIDTH * WIDTH; i++)
 		{
 			// size defaulting to 0 since we don't know how many datapoints
 			// will be in this column yet
 			this.dataPoints[i] = this.pooledArraysCheckout.getLongArray(i, 0);
+			this.semanticHorizontalUniform[i] = blockResolution;
 		}
 		
 		// use incoming data if present
@@ -263,6 +273,13 @@ public class FullDataSourceV2
 	
 	public LongArrayList getColumnAtRelPos(int relX, int relZ) throws IndexOutOfBoundsException 
 	{ return this.dataPoints[relativePosToIndex(relX, relZ)]; }
+
+	/** Returns only a copied-data proof; callers must still validate material identity. */
+	public boolean hasSemanticHorizontalUniformity(int relX, int relZ)
+	{ return this.semanticHorizontalUniform[relativePosToIndex(relX, relZ)]; }
+
+	public void setSemanticHorizontalUniformity(int relX, int relZ, boolean uniform)
+	{ this.semanticHorizontalUniform[relativePosToIndex(relX, relZ)] = uniform; }
 	
 	@Nullable
 	public LongArrayList tryGetColumnAtRelPos(int relX, int relZ)
@@ -556,6 +573,7 @@ public class FullDataSourceV2
 				this.columnGenerationSteps.set(index, inputGenState);
 				// always overwrite the compression mode since we're replacing this column
 				this.columnWorldCompressionMode.set(index, inputDataSource.columnWorldCompressionMode.getByte(index));
+				this.semanticHorizontalUniform[index] = inputDataSource.semanticHorizontalUniform[index];
 				this.isEmpty = false;
 			}
 		}
@@ -608,6 +626,10 @@ public class FullDataSourceV2
 				
 				// data points //
 				LongArrayList mergedInputDataArray = mergeInputTwoByTwoDataColumn(inputDataSource, x, z);
+				int targetIndex = recipientIndex;
+				this.semanticHorizontalUniform[targetIndex] = semanticallyUniformTwoByTwo(
+					inputDataSource, x, z, remappedIds
+				);
 				
 				// check if the data changed
 				if (this.dataPoints[recipientIndex] == null)
@@ -918,6 +940,59 @@ public class FullDataSourceV2
 		
 		return newColumnList;
 	}
+
+	/**
+	 * Proves that a coarser cell's four horizontal contributors have the same
+	 * semantic column. Raw packed IDs are remapped before comparison because
+	 * parent and child data sources own independent mapping tables. Lighting is
+	 * intentionally ignored: it affects shading, not atlas/material identity.
+	 */
+	private static boolean semanticallyUniformTwoByTwo(
+		FullDataSourceV2 source, int x, int z, int[] remappedIds
+	) {
+		if (x < 0 || z < 0 || x + 1 >= WIDTH || z + 1 >= WIDTH) return false;
+		int referenceIndex = relativePosToIndex(x, z);
+		if (source.columnWorldCompressionMode.getByte(referenceIndex)
+			!= EDhApiWorldCompressionMode.MERGE_SAME_BLOCKS.value
+			|| !source.semanticHorizontalUniform[referenceIndex]) {
+			return false;
+		}
+		LongArrayList reference = source.dataPoints[referenceIndex];
+		for (int dx = 0; dx < 2; dx++) {
+			for (int dz = 0; dz < 2; dz++) {
+				int index = relativePosToIndex(x + dx, z + dz);
+				if (source.columnWorldCompressionMode.getByte(index)
+					!= EDhApiWorldCompressionMode.MERGE_SAME_BLOCKS.value
+					|| !source.semanticHorizontalUniform[index]
+					|| !semanticDataColumnEquals(reference, source.dataPoints[index], remappedIds)) {
+					return false;
+				}
+			}
+		}
+		return true;
+	}
+
+	private static boolean semanticDataColumnEquals(
+		LongArrayList left, LongArrayList right, int[] remappedIds
+	) {
+		if (left == null || right == null) return left == right;
+		if (left.size() != right.size()) return false;
+		for (int index = 0; index < left.size(); index++) {
+			long leftPoint = left.getLong(index);
+			long rightPoint = right.getLong(index);
+			if (FullDataPointUtil.getBottomY(leftPoint) != FullDataPointUtil.getBottomY(rightPoint)
+				|| FullDataPointUtil.getHeight(leftPoint) != FullDataPointUtil.getHeight(rightPoint)) {
+				return false;
+			}
+			int leftId = FullDataPointUtil.getId(leftPoint);
+			int rightId = FullDataPointUtil.getId(rightPoint);
+			if (leftId < 0 || leftId >= remappedIds.length || rightId < 0 || rightId >= remappedIds.length
+				|| remappedIds[leftId] != remappedIds[rightId]) {
+				return false;
+			}
+		}
+		return true;
+	}
 	/**
 	 * Only update the ID once it's been added to this data source.
 	 * Updating the incoming data source will cause issues if it is applied 
@@ -1082,6 +1157,15 @@ public class FullDataSourceV2
 				// world compression //
 				byte worldCompressionMode = inputDataSource.columnWorldCompressionMode.getByte(recipientIndex);
 				this.columnWorldCompressionMode.set(recipientIndex, worldCompressionMode);
+				/*
+				 * A coarse cell is only safe for exact Rust material lookup when the
+				 * complete 2x2 source footprint agrees.  Inheriting the bit from the
+				 * first child alone could label a heterogeneous cell as uniform and
+				 * make the renderer guess one texture for several source columns.
+				 */
+				this.semanticHorizontalUniform[recipientIndex] = hasSemanticUniformInputFootprint(
+					inputDataSource, inputX, inputZ
+				);
 				
 				
 				
@@ -1125,6 +1209,36 @@ public class FullDataSourceV2
 		}
 		
 		return dataChanged;
+	}
+
+	/** Conservative proof for one 2x2 downsample footprint. */
+	static boolean hasSemanticUniformInputFootprint(FullDataSourceV2 inputDataSource, int inputX, int inputZ)
+	{
+		if (inputX < 0 || inputZ < 0 || inputX + 1 >= WIDTH || inputZ + 1 >= WIDTH)
+		{
+			return false;
+		}
+		LongArrayList reference = inputDataSource.dataPoints[relativePosToIndex(inputX, inputZ)];
+		if (reference == null || !inputDataSource.semanticHorizontalUniform[relativePosToIndex(inputX, inputZ)])
+		{
+			return false;
+		}
+		for (int x = inputX; x <= inputX + 1; x++)
+		{
+			for (int z = inputZ; z <= inputZ + 1; z++)
+			{
+				int index = relativePosToIndex(x, z);
+				if (!inputDataSource.semanticHorizontalUniform[index]
+					|| inputDataSource.columnWorldCompressionMode.getByte(index)
+						!= EDhApiWorldCompressionMode.MERGE_SAME_BLOCKS.value
+					|| !java.util.Objects.equals(reference, inputDataSource.dataPoints[index]))
+				{
+					return false;
+				}
+			}
+		}
+		return inputDataSource.columnWorldCompressionMode.getByte(relativePosToIndex(inputX, inputZ))
+			== EDhApiWorldCompressionMode.MERGE_SAME_BLOCKS.value;
 	}
 	
 	
@@ -1271,6 +1385,8 @@ public class FullDataSourceV2
 		this.dataPoints[index] = longArray;
 		this.columnGenerationSteps.set(index, worldGenStep.value);
 		this.columnWorldCompressionMode.set(index, worldCompressionMode.value);
+		this.semanticHorizontalUniform[index] = DhSectionPos.getDetailLevel(this.pos)
+			== DhSectionPos.SECTION_BLOCK_DETAIL_LEVEL;
 		
 		
 		if (RUN_UPDATE_DEV_VALIDATION)

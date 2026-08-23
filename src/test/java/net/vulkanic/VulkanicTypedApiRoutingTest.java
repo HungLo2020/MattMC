@@ -28,6 +28,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class VulkanicTypedApiRoutingTest {
 
     private final RecordingInvocationHandler invocationHandler = new RecordingInvocationHandler();
+    private String previousWholeFrameProperty;
+
+    private static boolean rustWholeFrameOwnsVulkan() {
+        return net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
+    }
 
     private static final CommandContext TEST_CONTEXT = new CommandContext() {
         @Override
@@ -48,6 +53,9 @@ public class VulkanicTypedApiRoutingTest {
 
     @BeforeEach
     public void setUp() throws Exception {
+        previousWholeFrameProperty = System.getProperty("mattmc.dev.rustGalVulkanWholeFrame");
+        System.clearProperty("mattmc.dev.rustGalVulkanWholeFrame");
+        net.vulkanic.bridge.RustGalVulkanWholeFrameMode.clearVulkanBackendSelection();
         resetBackendState();
         invocationHandler.configureProgramReflection(java.util.List.of(), java.util.List.of());
         invocationHandler.configureLinkedProgramSpirvModules(java.util.List.of());
@@ -67,6 +75,12 @@ public class VulkanicTypedApiRoutingTest {
     @AfterEach
     public void tearDown() throws Exception {
         resetBackendState();
+        if (previousWholeFrameProperty == null) {
+            System.clearProperty("mattmc.dev.rustGalVulkanWholeFrame");
+        } else {
+            System.setProperty("mattmc.dev.rustGalVulkanWholeFrame", previousWholeFrameProperty);
+        }
+        net.vulkanic.bridge.RustGalVulkanWholeFrameMode.clearVulkanBackendSelection();
     }
 
     @Test
@@ -247,6 +261,13 @@ public class VulkanicTypedApiRoutingTest {
 
     @Test
     public void testCreateCommandEncoderRoutesThroughBackendSeam() {
+        if (rustWholeFrameOwnsVulkan()) {
+            org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+                VulkanicAPI::createCommandEncoder,
+                "Java Vulkan command-encoder creation must remain unavailable while Rust owns the frame");
+            assertNull(invocationHandler.lastInvocation);
+            return;
+        }
         CommandEncoder commandEncoder = VulkanicAPI.createCommandEncoder();
         assertNotNull(commandEncoder);
 
@@ -257,6 +278,13 @@ public class VulkanicTypedApiRoutingTest {
 
     @Test
     public void testCreateRenderPassRoutesThroughBackendSeam() {
+        if (rustWholeFrameOwnsVulkan()) {
+            org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+                () -> VulkanicAPI.createRenderPass(() -> "routing-test-pass", null, OptionalInt.empty()),
+                "Java Vulkan render-pass creation must remain unavailable while Rust owns the frame");
+            assertNull(invocationHandler.lastInvocation);
+            return;
+        }
         VulkanicAPI.createRenderPass(() -> "routing-test-pass", null, OptionalInt.empty());
 
         RecordedInvocation colorOnlyInvocation = invocationHandler.lastInvocation;
@@ -333,6 +361,13 @@ public class VulkanicTypedApiRoutingTest {
 
         invocationHandler.lastInvocation = null;
 
+        if (rustWholeFrameOwnsVulkan()) {
+            org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+                () -> VulkanicAPI.createTextureView(null),
+                "Java Vulkan texture-view creation must remain unavailable while Rust owns the frame");
+            assertNull(invocationHandler.lastInvocation);
+            return;
+        }
         VulkanicAPI.createTextureView(null);
 
         assertNull(invocationHandler.lastInvocation,
@@ -351,6 +386,13 @@ public class VulkanicTypedApiRoutingTest {
 
         invocationHandler.lastInvocation = null;
 
+        if (rustWholeFrameOwnsVulkan()) {
+            org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+                () -> VulkanicAPI.createTextureView(null, 2, 3),
+                "Java Vulkan mip-ranged texture-view creation must remain unavailable while Rust owns the frame");
+            assertNull(invocationHandler.lastInvocation);
+            return;
+        }
         VulkanicAPI.createTextureView(null, 2, 3);
 
         assertNull(invocationHandler.lastInvocation,
@@ -371,6 +413,13 @@ public class VulkanicTypedApiRoutingTest {
 
         invocationHandler.lastInvocation = null;
 
+        if (rustWholeFrameOwnsVulkan()) {
+            org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+                () -> VulkanicAPI.createRenderPass(() -> "direct-pass", null, OptionalInt.empty()),
+                "Java Vulkan render-pass creation must remain unavailable while Rust owns the frame");
+            assertNull(invocationHandler.lastInvocation);
+            return;
+        }
         VulkanicAPI.createRenderPass(() -> "direct-pass", null, OptionalInt.empty());
 
         assertNull(invocationHandler.lastInvocation,
@@ -389,6 +438,13 @@ public class VulkanicTypedApiRoutingTest {
 
         invocationHandler.lastInvocation = null;
 
+        if (rustWholeFrameOwnsVulkan()) {
+            org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+                () -> VulkanicAPI.createTexture(() -> "direct-texture", 7, TextureFormat.RGBA8, 4, 4, 1, 1),
+                "Java Vulkan texture creation must remain unavailable while Rust owns the frame");
+            assertNull(invocationHandler.lastInvocation);
+            return;
+        }
         VulkanicAPI.createTexture(() -> "direct-texture", 7, TextureFormat.RGBA8, 4, 4, 1, 1);
 
         assertNull(invocationHandler.lastInvocation,
@@ -407,6 +463,13 @@ public class VulkanicTypedApiRoutingTest {
 
         invocationHandler.lastInvocation = null;
 
+        if (rustWholeFrameOwnsVulkan()) {
+            org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+                () -> VulkanicAPI.createBuffer(() -> "direct-buffer", 9, 64),
+                "Java Vulkan buffer creation must remain unavailable while Rust owns the frame");
+            assertNull(invocationHandler.lastInvocation);
+            return;
+        }
         VulkanicAPI.createBuffer(() -> "direct-buffer", 9, 64);
 
         assertNull(invocationHandler.lastInvocation,
@@ -417,6 +480,13 @@ public class VulkanicTypedApiRoutingTest {
 
     @Test
     public void testPresentTextureToScreenRoutesThroughBackendSeam() {
+        if (rustWholeFrameOwnsVulkan()) {
+            org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+                () -> VulkanicAPI.presentTextureToScreen(TEST_CONTEXT, null),
+                "Java Vulkan presentation must remain unavailable while Rust owns the frame");
+            assertNull(invocationHandler.lastInvocation);
+            return;
+        }
         VulkanicAPI.presentTextureToScreen(TEST_CONTEXT, null);
 
         RecordedInvocation invocation = invocationHandler.lastInvocation;
@@ -478,6 +548,11 @@ public class VulkanicTypedApiRoutingTest {
             VulkanicTextureParameterValue.LINEAR
         );
 
+        if (rustWholeFrameOwnsVulkan()) {
+            assertNotNull(invocationHandler.lastInvocation,
+                "Java Vulkan texture parameters must stay on the compatibility seam when Rust owns the frame");
+            return;
+        }
         assertNull(invocationHandler.lastInvocation,
             "Typed Vulkan texture-parameter routing should bypass the proxy backend when raw Vulkan backend is available");
         assertEquals(VulkanicAPI.GL_TEXTURE_2D, recordingVulkanBackend.lastTarget);
@@ -1150,6 +1225,8 @@ public class VulkanicTypedApiRoutingTest {
         Field rawVulkanBackendField = VulkanicAPI.class.getDeclaredField("rawVulkanBackend");
         rawVulkanBackendField.setAccessible(true);
         rawVulkanBackendField.set(null, null);
+        net.vulkanic.bridge.RustGalVulkanWholeFrameMode.deactivateRustPresentation();
+        net.vulkanic.bridge.RustGalVulkanWholeFrameMode.clearVulkanBackendSelection();
     }
 
     private static final class RecordedInvocation {

@@ -53,7 +53,7 @@ final class ArrowRendererOwnershipTest {
 	}
 
 	@Test
-	void productionCallsiteUsesExplicitOwnershipAndHasNoUnsupportedArrowCrashFallback() throws IOException {
+	void productionCallsiteUsesExplicitOwnershipAndFailsClosedForUnsupportedRustArrows() throws IOException {
 		String source = Files.readString(Path.of(
 			System.getProperty("user.dir"),
 			"src/main/java/net/minecraft/client/renderer/entity/ArrowRenderer.java"
@@ -67,6 +67,10 @@ final class ArrowRendererOwnershipTest {
 		assertTrue(classification > ownershipQuery, "Arrow disposition must be classified after ownership is resolved");
 		assertTrue(unavailable > classification, "Rust-unavailable handling must be explicit");
 		assertTrue(javaSubmit > unavailable, "Java submit must remain outside the Rust-unavailable branch");
+		assertTrue(source.contains("Rust whole-frame Arrow route has no semantic mesh"),
+			"unsupported Rust-owned arrows must abort rather than disappear from the frame");
+		assertFalse(source.contains("|| disposition == ArrowSubmitDisposition.DISABLED"),
+			"disabled Arrow ownership must not reopen the Java entity submit path");
 		assertFalse(source.contains("currentArrowRoute(true)"), "Arrow ownership must not be inferred by pretending admission succeeded");
 		assertFalse(
 			source.contains("Rust whole-frame Arrow encountered unsupported semantic state before route selection"),

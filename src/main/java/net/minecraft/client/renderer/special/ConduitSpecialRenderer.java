@@ -24,6 +24,8 @@ public class ConduitSpecialRenderer implements NoDataSpecialModelRenderer {
 		this.model = modelPart;
 	}
 
+	public ModelPart model() { return this.model; }
+
 	@Override
 	public void submit(ItemDisplayContext itemDisplayContext, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, int j, boolean bl, int k) {
 		poseStack.pushPose();

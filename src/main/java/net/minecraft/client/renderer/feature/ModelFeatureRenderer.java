@@ -34,6 +34,9 @@ public class ModelFeatureRenderer {
 		OutlineBufferSource outlineBufferSource,
 		MultiBufferSource.BufferSource bufferSource2
 	) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java model feature rendering is unavailable while Rust owns whole-frame presentation");
+		}
 		ModelFeatureRenderer.Storage storage = submitNodeCollection.getModelSubmits();
 		this.renderBatch(bufferSource, outlineBufferSource, storage.opaqueModelSubmits, bufferSource2);
 		storage.translucentModelSubmits.sort(Comparator.comparingDouble(translucentModelSubmit -> -translucentModelSubmit.position().lengthSquared()));

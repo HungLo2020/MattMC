@@ -36,7 +36,7 @@ public class ThrownTridentRenderer extends EntityRenderer<ThrownTrident, ThrownT
 
 		for (int i = 0; i < list.size(); i++) {
 			submitNodeCollector.order(i)
-				.submitModel(
+				.submitModelSemanticTexture(
 					this.model,
 					Unit.INSTANCE,
 					poseStack,
@@ -44,7 +44,7 @@ public class ThrownTridentRenderer extends EntityRenderer<ThrownTrident, ThrownT
 					thrownTridentRenderState.lightCoords,
 					OverlayTexture.NO_OVERLAY,
 					-1,
-					null,
+					TRIDENT_LOCATION,
 					thrownTridentRenderState.outlineColor,
 					null
 				);

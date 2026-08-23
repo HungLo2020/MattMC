@@ -8,6 +8,10 @@ public abstract class GlBuffer extends GlObject {
     private GlBufferMapping activeMapping;
 
     protected GlBuffer() {
+        if (net.vulkanic.VulkanicAPI.isVulkanBackendInitializedAndSelected()
+            || net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+            throw new IllegalStateException("Java Sodium buffers are unavailable while Rust owns whole-frame presentation");
+        }
         CommandContext ctx = VulkanicAPI.getCommandContext();
         this.setHandle(VulkanicAPI.createBuffer(ctx));
     }

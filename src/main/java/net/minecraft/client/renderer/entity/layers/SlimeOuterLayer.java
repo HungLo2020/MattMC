@@ -28,14 +28,38 @@ public class SlimeOuterLayer extends RenderLayer<SlimeRenderState, SlimeModel> {
 		if (!slimeRenderState.isInvisible || bl) {
 			int j = LivingEntityRenderer.getOverlayCoords(slimeRenderState, 0.0F);
 			if (bl) {
+				if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+					&& net.vulkanic.world.WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan()
+					&& j == net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMesh(
+						this.model, slimeRenderState, poseStack.last(), RenderType.outline(SlimeRenderer.SLIME_LOCATION),
+						SlimeRenderer.SLIME_LOCATION, net.minecraft.resources.ResourceLocation.withDefaultNamespace("slime_outer_outline"),
+						i, j, -1, slimeRenderState.outlineColor)) {
+					return;
+				}
+				if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+					&& net.vulkanic.world.WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan()) {
+					throw new IllegalStateException("Rust whole-frame slime-outline route has no semantic mesh");
+				}
 				submitNodeCollector.order(1)
 					.submitModel(
 						this.model, slimeRenderState, poseStack, RenderType.outline(SlimeRenderer.SLIME_LOCATION), i, j, -1, null, slimeRenderState.outlineColor, null
 					);
 			} else {
+				if (net.vulkanic.world.WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan()
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMesh(
+						this.model, slimeRenderState, poseStack.last(), RenderType.entityTranslucent(SlimeRenderer.SLIME_LOCATION),
+						SlimeRenderer.SLIME_LOCATION, net.minecraft.resources.ResourceLocation.withDefaultNamespace("slime_outer"), i,
+						-1, 0, slimeRenderState.outlineColor)) {
+					return;
+				}
+				if (net.vulkanic.world.WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan()) {
+					throw new IllegalStateException("Rust whole-frame slime route has no semantic mesh");
+				}
 				submitNodeCollector.order(1)
-					.submitModel(
-						this.model, slimeRenderState, poseStack, RenderType.entityTranslucent(SlimeRenderer.SLIME_LOCATION), i, j, -1, null, slimeRenderState.outlineColor, null
+					.submitModelSemanticTexture(
+						this.model, slimeRenderState, poseStack, RenderType.entityTranslucent(SlimeRenderer.SLIME_LOCATION),
+						i, j, -1, SlimeRenderer.SLIME_LOCATION, slimeRenderState.outlineColor, null
 					);
 			}
 		}

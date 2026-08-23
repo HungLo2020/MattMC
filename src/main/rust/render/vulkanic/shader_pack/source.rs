@@ -580,6 +580,7 @@ mod tests {
         }
     }
 
+
     #[test]
     fn semantic_snapshot_merges_environment_defines_without_implicit_precedence() {
         let source = ShaderPackSource::new(

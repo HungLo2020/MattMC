@@ -41,6 +41,8 @@ public class FullDataSourceV2DTO
 	{
 		public static final int V1_NO_ADJACENT_DATA = 1;
 		public static final int V2_LATEST = 2;
+		/** V2 payload plus copied coarse semantic-horizontal uniformity proof. */
+		public static final int V3_LATEST = 3;
 	}
 	
 	
@@ -92,7 +94,7 @@ public class FullDataSourceV2DTO
 		// populate arrays
 		writeDataSourceDataArrayToBlobV2(dataSource.dataPoints, dto.compressedDataByteArray, null, compressionModeEnum);
 		writeGenerationStepsToBlob(dataSource.columnGenerationSteps, dto.compressedColumnGenStepByteArray, compressionModeEnum);
-		writeWorldCompressionModeToBlob(dataSource.columnWorldCompressionMode, dto.compressedWorldCompressionModeByteArray, compressionModeEnum);
+		writeWorldCompressionModeToBlob(dataSource, dto.compressedWorldCompressionModeByteArray, compressionModeEnum);
 		writeDataMappingToBlob(dataSource.mapping, dto.compressedMappingByteArray, compressionModeEnum);
 		// adjacent full data
 		writeDataSourceDataArrayToBlobV2(dataSource.dataPoints, dto.compressedNorthAdjDataByteArray, EDhDirection.NORTH, compressionModeEnum);
@@ -106,7 +108,7 @@ public class FullDataSourceV2DTO
 			// the mapping hash isn't included since it takes significantly longer to calculate and 
 			// as of the time of this comment (2025-1-22) the checksum isn't used for anything so changing it shouldn't cause any issues
 			dto.dataChecksum = dataSource.hashCode();
-			dto.dataFormatVersion = DATA_FORMAT.V2_LATEST;
+			dto.dataFormatVersion = DATA_FORMAT.V3_LATEST;
 			dto.compressionModeValue = compressionModeEnum.value;
 			dto.lastModifiedUnixDateTime = dataSource.lastModifiedUnixDateTime;
 			dto.createdUnixDateTime = dataSource.createdUnixDateTime;
@@ -179,7 +181,8 @@ public class FullDataSourceV2DTO
 		// format validation //
 		
 		if (this.dataFormatVersion != DATA_FORMAT.V1_NO_ADJACENT_DATA 
-			&& this.dataFormatVersion != DATA_FORMAT.V2_LATEST)
+			&& this.dataFormatVersion != DATA_FORMAT.V2_LATEST
+			&& this.dataFormatVersion != DATA_FORMAT.V3_LATEST)
 		{
 			throw new IllegalStateException("Data source population only supports formats: ["+DATA_FORMAT.V1_NO_ADJACENT_DATA +","+DATA_FORMAT.V2_LATEST +"], data format found: ["+this.dataFormatVersion+"].");
 		}
@@ -221,6 +224,11 @@ public class FullDataSourceV2DTO
 		{
 			readBlobToGenerationSteps(this.compressedColumnGenStepByteArray, dataSource.columnGenerationSteps, compressionModeEnum);
 			readBlobToWorldCompressionMode(this.compressedWorldCompressionModeByteArray, dataSource.columnWorldCompressionMode, compressionModeEnum);
+			if (this.dataFormatVersion >= DATA_FORMAT.V3_LATEST) {
+				readBlobToSemanticHorizontalUniformity(
+					this.compressedWorldCompressionModeByteArray, dataSource, compressionModeEnum
+				);
+			}
 			
 			if (this.dataFormatVersion == 1)
 			{
@@ -668,13 +676,18 @@ public class FullDataSourceV2DTO
 	}
 	
 	
-	private static void writeWorldCompressionModeToBlob(ByteArrayList inputWorldCompressionModeByteArray, ByteArrayList outputByteArray, EDhApiDataCompressionMode compressionModeEnum) throws IOException
+	private static void writeWorldCompressionModeToBlob(FullDataSourceV2 dataSource, ByteArrayList outputByteArray, EDhApiDataCompressionMode compressionModeEnum) throws IOException
 	{
 		try (DhDataOutputStream compressedOut = DhDataOutputStream.create(compressionModeEnum, outputByteArray))
 		{
-			for (int i = 0; i < inputWorldCompressionModeByteArray.size(); i++)
+			for (int i = 0; i < dataSource.columnWorldCompressionMode.size(); i++)
 			{
-				compressedOut.write(inputWorldCompressionModeByteArray.getByte(i));
+				compressedOut.write(dataSource.columnWorldCompressionMode.getByte(i));
+			}
+			for (int x = 0; x < FullDataSourceV2.WIDTH; x++) {
+				for (int z = 0; z < FullDataSourceV2.WIDTH; z++) {
+					compressedOut.writeByte(dataSource.hasSemanticHorizontalUniformity(x, z) ? 1 : 0);
+				}
 			}
 		}
 	}
@@ -687,6 +700,21 @@ public class FullDataSourceV2DTO
 		catch (EOFException e)
 		{
 			throw new DataCorruptedException(e);
+		}
+	}
+
+	private static void readBlobToSemanticHorizontalUniformity(
+		ByteArrayList inputCompressedDataByteArray, FullDataSourceV2 dataSource,
+		EDhApiDataCompressionMode compressionModeEnum
+	) throws IOException, DataCorruptedException {
+		try (DhDataInputStream compressedIn = DhDataInputStream.create(inputCompressedDataByteArray, compressionModeEnum)) {
+			byte[] ignoredCompressionModes = new byte[FullDataSourceV2.WIDTH * FullDataSourceV2.WIDTH];
+			compressedIn.readFully(ignoredCompressionModes, 0, ignoredCompressionModes.length);
+			for (int x = 0; x < FullDataSourceV2.WIDTH; x++) {
+				for (int z = 0; z < FullDataSourceV2.WIDTH; z++) {
+					dataSource.setSemanticHorizontalUniformity(x, z, compressedIn.readUnsignedByte() != 0);
+				}
+			}
 		}
 	}
 	

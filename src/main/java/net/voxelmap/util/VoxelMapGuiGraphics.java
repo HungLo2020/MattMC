@@ -57,10 +57,22 @@ public class VoxelMapGuiGraphics {
     }
 
     public static void blitFloatGradient(GuiGraphics graphics, RenderPipeline pipeline, ResourceLocation texture, float x, float y, float w, float h, float minu, float maxu, float minv, float maxv, int color, int color2) {
+        if (net.vulkanic.gui.RustGalGuiRenderer.isWholeFrameVulkanActive()) {
+            if (color != color2) {
+                graphics.submitRustSemanticGradientBlit(texture, x, y, w, h, minu, maxu, minv, maxv, color, color2);
+                return;
+            }
+            graphics.submitRustSemanticBlit(texture, Math.round(x), Math.round(y), Math.round(w), Math.round(h), minu, minv, maxu, maxv, color);
+            return;
+        }
         blitFloatGradient(graphics, pipeline, Minecraft.getInstance().getTextureManager().getTexture(texture).getTextureView(), x, y, w, h, minu, maxu, minv, maxv, color, color2);
     }
 
     public static void blitFloat(GuiGraphics graphics, RenderPipeline pipeline, ResourceLocation texture, float x, float y, float w, float h, float minu, float maxu, float minv, float maxv, int color) {
+        if (net.vulkanic.gui.RustGalGuiRenderer.isWholeFrameVulkanActive()) {
+            graphics.submitRustSemanticBlit(texture, Math.round(x), Math.round(y), Math.round(w), Math.round(h), minu, minv, maxu, maxv, color);
+            return;
+        }
         blitFloatGradient(graphics, pipeline, Minecraft.getInstance().getTextureManager().getTexture(texture).getTextureView(), x, y, w, h, minu, maxu, minv, maxv, color, color);
     }
 

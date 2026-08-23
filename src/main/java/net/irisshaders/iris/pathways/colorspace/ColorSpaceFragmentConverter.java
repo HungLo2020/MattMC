@@ -45,6 +45,9 @@ public class ColorSpaceFragmentConverter implements ColorSpaceConverter {
 	private GpuTexture target;
 
 	public ColorSpaceFragmentConverter(int width, int height, ColorSpace colorSpace) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris color-space resources are unavailable while Rust owns whole-frame presentation");
+		}
 		rebuildProgram(width, height, colorSpace);
 	}
 

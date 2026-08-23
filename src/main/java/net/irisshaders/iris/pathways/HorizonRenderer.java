@@ -73,6 +73,9 @@ public class HorizonRenderer {
 	private int indexCount = -1;
 
 	public HorizonRenderer() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris horizon resources are unavailable while Rust owns whole-frame presentation");
+		}
 		currentRenderDistance = Minecraft.getInstance().options.getEffectiveRenderDistance();
 
 		rebuildBuffer();
@@ -180,6 +183,9 @@ public class HorizonRenderer {
 	}
 
 	public void renderHorizon(Matrix4fc modelView, Matrix4fc projection, Vector4f fogColor) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris horizon rendering is unavailable while Rust owns whole-frame presentation");
+		}
 		if (currentRenderDistance != Minecraft.getInstance().options.getEffectiveRenderDistance()) {
 			currentRenderDistance = Minecraft.getInstance().options.getEffectiveRenderDistance();
 			rebuildBuffer();

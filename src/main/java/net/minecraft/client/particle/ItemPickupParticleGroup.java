@@ -51,17 +51,25 @@ public class ItemPickupParticleGroup extends ParticleGroup<ItemPickupParticle> {
 		public void submit(SubmitNodeCollector submitNodeCollector, CameraRenderState cameraRenderState) {
 			PoseStack poseStack = new PoseStack();
 			EntityRenderDispatcher entityRenderDispatcher = Minecraft.getInstance().getEntityRenderDispatcher();
-
-			for (ItemPickupParticleGroup.ParticleInstance particleInstance : this.instances) {
-				entityRenderDispatcher.submit(
-					particleInstance.itemRenderState,
-					cameraRenderState,
-					particleInstance.xOffset,
-					particleInstance.yOffset,
-					particleInstance.zOffset,
-					poseStack,
-					submitNodeCollector
-				);
+			// Item-pickup particles reuse the exact ItemEntity semantic submit
+			// contract. Scope the nested item calls so the collector can copy
+			// eligible ground quads into Rust without retaining the dispatcher,
+			// item state, or a Java Vulkan fallback.
+			net.vulkanic.world.RustGalWorldPrimitiveRenderer.beginItemEntitySubmission();
+			try {
+				for (ItemPickupParticleGroup.ParticleInstance particleInstance : this.instances) {
+					entityRenderDispatcher.submit(
+						particleInstance.itemRenderState,
+						cameraRenderState,
+						particleInstance.xOffset,
+						particleInstance.yOffset,
+						particleInstance.zOffset,
+						poseStack,
+						submitNodeCollector
+					);
+				}
+			} finally {
+				net.vulkanic.world.RustGalWorldPrimitiveRenderer.endItemEntitySubmission();
 			}
 		}
 	}

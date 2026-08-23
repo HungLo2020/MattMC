@@ -40,7 +40,15 @@ public class FishingHookRenderer extends EntityRenderer<FishingHook, FishingHook
 		poseStack.pushPose();
 		poseStack.scale(0.5F, 0.5F, 0.5F);
 		poseStack.mulPose(cameraRenderState.orientation);
-		submitNodeCollector.submitCustomGeometry(poseStack, RENDER_TYPE, (pose, vertexConsumer) -> {
+		float[] billboardVertices = {-0.5F, -0.25F, 0.0F, 0.5F, -0.25F, 0.0F, 0.5F, 0.75F, 0.0F, -0.5F, 0.75F, 0.0F};
+		float[] billboardUvs = {0.0F, 1.0F, 1.0F, 1.0F, 1.0F, 0.0F, 0.0F, 0.0F};
+		boolean rustBillboard = submitNodeCollector.submitTexturedQuad(
+			poseStack, RENDER_TYPE, TEXTURE_LOCATION, billboardVertices, billboardUvs, -1, fishingHookRenderState.lightCoords
+		);
+		if (!rustBillboard && net.vulkanic.world.WorldRenderRoutePolicy.currentTexturedBillboardRoute().usesRustWholeFrameVulkan()) {
+			throw new IllegalStateException("Rust whole-frame fishing-hook route rejected semantic billboard");
+		}
+		if (!rustBillboard) submitNodeCollector.submitCustomGeometry(poseStack, RENDER_TYPE, (pose, vertexConsumer) -> {
 			vertex(vertexConsumer, pose, fishingHookRenderState.lightCoords, 0.0F, 0, 0, 1);
 			vertex(vertexConsumer, pose, fishingHookRenderState.lightCoords, 1.0F, 0, 1, 1);
 			vertex(vertexConsumer, pose, fishingHookRenderState.lightCoords, 1.0F, 1, 1, 0);
@@ -50,6 +58,25 @@ public class FishingHookRenderer extends EntityRenderer<FishingHook, FishingHook
 		float f = (float)fishingHookRenderState.lineOriginOffset.x;
 		float g = (float)fishingHookRenderState.lineOriginOffset.y;
 		float h = (float)fishingHookRenderState.lineOriginOffset.z;
+		float[] lineEndpoints = new float[96];
+		int endpointIndex = 0;
+		for (int j = 0; j < 16; j++) {
+			float k = fraction(j, 16);
+			float l = fraction(j + 1, 16);
+			for (float t : new float[] {k, l}) {
+				lineEndpoints[endpointIndex++] = f * t;
+				lineEndpoints[endpointIndex++] = g * (t * t + t) * 0.5F + 0.25F;
+				lineEndpoints[endpointIndex++] = h * t;
+			}
+		}
+		if (submitNodeCollector.submitLineSegments(poseStack, lineEndpoints, -16777216, 1.0F)) {
+			poseStack.popPose();
+			super.submit(fishingHookRenderState, poseStack, submitNodeCollector, cameraRenderState);
+			return;
+		}
+		if (net.vulkanic.world.WorldRenderRoutePolicy.currentFishingLineRoute().usesRustWholeFrameVulkan()) {
+			throw new IllegalStateException("Rust whole-frame fishing-hook route rejected semantic line segments");
+		}
 		submitNodeCollector.submitCustomGeometry(poseStack, RenderType.lines(), (pose, vertexConsumer) -> {
 			int i = 16;
 

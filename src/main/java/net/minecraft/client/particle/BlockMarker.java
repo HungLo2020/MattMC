@@ -50,6 +50,9 @@ public class BlockMarker extends SingleQuadParticle {
 		if (this.enqueueRustGal(camera, f)) {
 			return;
 		}
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Rust whole-frame block-marker semantics were rejected; Java particle extraction is not a fallback");
+		}
 		super.extract(quadParticleRenderState, camera, f);
 	}
 

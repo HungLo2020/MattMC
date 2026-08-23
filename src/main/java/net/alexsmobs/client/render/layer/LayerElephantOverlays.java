@@ -44,7 +44,7 @@ public class LayerElephantOverlays extends RenderLayer<ElephantRenderState, Mode
     public void submit(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, ElephantRenderState state, float f, float g) {
         if(state.chested){
             submitNodeCollector.order(1)
-                .submitModel(
+                .submitModelSemanticTexture(
                     this.getParentModel(),
                     state,
                     poseStack,
@@ -52,7 +52,7 @@ public class LayerElephantOverlays extends RenderLayer<ElephantRenderState, Mode
                     i,
                     OverlayTexture.NO_OVERLAY,
                     -1,
-                    null,
+                    TEXTURE_CHEST,
                     state.outlineColor,
                     null
                 );
@@ -62,7 +62,7 @@ public class LayerElephantOverlays extends RenderLayer<ElephantRenderState, Mode
             ResourceLocation texture = ELEPHANT_DECOR_TEXTURES[color.getId()];
             this.model.setupAnim(state);
             submitNodeCollector.order(1)
-                .submitModel(
+                .submitModelSemanticTexture(
                     this.model,
                     state,
                     poseStack,
@@ -70,7 +70,7 @@ public class LayerElephantOverlays extends RenderLayer<ElephantRenderState, Mode
                     i,
                     OverlayTexture.NO_OVERLAY,
                     -1,
-                    null,
+                    texture,
                     state.outlineColor,
                     null
                 );

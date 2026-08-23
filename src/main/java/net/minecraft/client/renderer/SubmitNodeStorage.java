@@ -19,6 +19,7 @@ import net.minecraft.client.renderer.item.ItemStackRenderState;
 import net.minecraft.client.renderer.state.CameraRenderState;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.level.block.state.BlockState;
@@ -32,6 +33,10 @@ import org.joml.Vector3f;
 @Environment(EnvType.CLIENT)
 public class SubmitNodeStorage implements SubmitNodeCollector, OrderedSubmitNodeCollectorExtension {
 	private final Int2ObjectAVLTreeMap<SubmitNodeCollection> submitsPerOrder = new Int2ObjectAVLTreeMap<>();
+
+	private static boolean rustWholeFrame() {
+		return net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
+	}
 
 	public SubmitNodeCollection order(int i) {
 		return this.submitsPerOrder.computeIfAbsent(i, ix -> new SubmitNodeCollection(this));
@@ -73,6 +78,46 @@ public class SubmitNodeStorage implements SubmitNodeCollector, OrderedSubmitNode
 		this.order(0).submitText(poseStack, f, g, formattedCharSequence, bl, displayMode, i, j, k, l);
 	}
 
+	@Override
+	public boolean submitGuardianBeam(PoseStack poseStack, RenderType renderType, net.minecraft.resources.ResourceLocation textureIdentity, float[] vertices, float[] uvs, int[] colors, int lightCoords) {
+		return this.order(0).submitGuardianBeam(poseStack, renderType, textureIdentity, vertices, uvs, colors, lightCoords);
+	}
+
+	@Override
+	public boolean submitCrystalBeam(PoseStack poseStack, RenderType renderType, net.minecraft.resources.ResourceLocation textureIdentity, float[] vertices, float[] uvs, int[] colors, int lightCoords) {
+		return this.order(0).submitCrystalBeam(poseStack, renderType, textureIdentity, vertices, uvs, colors, lightCoords);
+	}
+
+	@Override
+	public boolean submitTexturedQuad(PoseStack poseStack, RenderType renderType, net.minecraft.resources.ResourceLocation textureIdentity, float[] vertices, float[] uvs, int color, int lightCoords) {
+		return this.order(0).submitTexturedQuad(poseStack, renderType, textureIdentity, vertices, uvs, color, lightCoords);
+	}
+
+	@Override
+	public boolean submitTranslucentTexturedQuad(PoseStack poseStack, RenderType renderType, net.minecraft.resources.ResourceLocation textureIdentity, float[] vertices, float[] uvs, int color, int lightCoords) {
+		return this.order(0).submitTranslucentTexturedQuad(poseStack, renderType, textureIdentity, vertices, uvs, color, lightCoords);
+	}
+
+	@Override
+	public boolean submitTexturedQuads(PoseStack poseStack, RenderType renderType, net.minecraft.resources.ResourceLocation textureIdentity, float[] vertices, float[] uvs, int[] colors, int lightCoords) {
+		return this.order(0).submitTexturedQuads(poseStack, renderType, textureIdentity, vertices, uvs, colors, lightCoords);
+	}
+
+	@Override
+	public boolean submitOpticalTexturedQuads(PoseStack poseStack, RenderType renderType, net.minecraft.resources.ResourceLocation textureIdentity, float[] vertices, float[] uvs, int[] colors, int lightCoords, int materialMode) {
+		return this.order(0).submitOpticalTexturedQuads(poseStack, renderType, textureIdentity, vertices, uvs, colors, lightCoords, materialMode);
+	}
+
+	@Override
+	public boolean submitLineSegments(PoseStack poseStack, float[] endpoints, int color, float lineWidth) {
+		return this.order(0).submitLineSegments(poseStack, endpoints, color, lineWidth);
+	}
+
+	@Override
+	public boolean submitColoredQuads(PoseStack poseStack, RenderType renderType, float[] vertices, float[] uvs, int[] colors, int lightCoords) {
+		return this.order(0).submitColoredQuads(poseStack, renderType, vertices, uvs, colors, lightCoords);
+	}
+
 	/** Stores text copied from a semantic extraction callback without Iris state capture. */
 	public void submitTextSemantic(
 		int order, PoseStack poseStack, float f, float g, FormattedCharSequence formattedCharSequence, boolean bl, Font.DisplayMode displayMode, int i, int j, int k, int l
@@ -104,6 +149,17 @@ public class SubmitNodeStorage implements SubmitNodeCollector, OrderedSubmitNode
 		@Nullable ModelFeatureRenderer.CrumblingOverlay crumblingOverlay
 	) {
 		this.order(0).submitModel(model, object, poseStack, renderType, i, j, k, textureAtlasSprite, l, crumblingOverlay);
+	}
+
+	@Override
+	public <S> void submitModelSemanticTexture(
+		Model<? super S> model, S object, PoseStack poseStack, RenderType renderType,
+		int lightCoords, int overlayCoords, int tintedColor,
+		ResourceLocation textureIdentity, int outlineColor,
+		@Nullable ModelFeatureRenderer.CrumblingOverlay crumblingOverlay
+	) {
+		this.order(0).submitModelSemanticTexture(model, object, poseStack, renderType,
+			lightCoords, overlayCoords, tintedColor, textureIdentity, outlineColor, crumblingOverlay);
 	}
 
 	@Override
@@ -255,16 +311,19 @@ public class SubmitNodeStorage implements SubmitNodeCollector, OrderedSubmitNode
 		private static final java.util.WeakHashMap<CustomGeometrySubmit, ModelStorageData> STORAGE = new java.util.WeakHashMap<>();
 		
 		public CustomGeometrySubmit {
-			// Iris: Capture state on construction
-			ModelStorageData data = STORAGE.computeIfAbsent(this, k -> new ModelStorageData());
-			data.entityId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedEntity();
-			data.beId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedBlockEntity();
-			data.itemId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedItem();
-			data.isRenderingBEs = net.irisshaders.iris.vertices.ImmediateState.isRenderingBEs;
+			if (!SubmitNodeStorage.rustWholeFrame()) {
+				// Iris: Capture state on construction
+				ModelStorageData data = STORAGE.computeIfAbsent(this, k -> new ModelStorageData());
+				data.entityId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedEntity();
+				data.beId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedBlockEntity();
+				data.itemId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedItem();
+				data.isRenderingBEs = net.irisshaders.iris.vertices.ImmediateState.isRenderingBEs;
+			}
 		}
 		
 		@Override
 		public void iris$capture() {
+			if (SubmitNodeStorage.rustWholeFrame()) return;
 			ModelStorageData data = STORAGE.computeIfAbsent(this, k -> new ModelStorageData());
 			data.entityId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedEntity();
 			data.beId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedBlockEntity();
@@ -274,6 +333,7 @@ public class SubmitNodeStorage implements SubmitNodeCollector, OrderedSubmitNode
 		
 		@Override
 		public void iris$set() {
+			if (SubmitNodeStorage.rustWholeFrame()) return;
 			ModelStorageData data = STORAGE.get(this);
 			if (data != null) {
 				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentEntity(data.entityId);
@@ -319,6 +379,7 @@ public class SubmitNodeStorage implements SubmitNodeCollector, OrderedSubmitNode
 		
 		@Override
 		public void iris$capture() {
+			if (SubmitNodeStorage.rustWholeFrame()) return;
 			ModelStorageData data = STORAGE.computeIfAbsent(this, k -> new ModelStorageData());
 			data.entityId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedEntity();
 			data.beId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedBlockEntity();
@@ -328,6 +389,7 @@ public class SubmitNodeStorage implements SubmitNodeCollector, OrderedSubmitNode
 		
 		@Override
 		public void iris$set() {
+			if (SubmitNodeStorage.rustWholeFrame()) return;
 			ModelStorageData data = STORAGE.get(this);
 			if (data != null) {
 				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentEntity(data.entityId);
@@ -369,6 +431,7 @@ public class SubmitNodeStorage implements SubmitNodeCollector, OrderedSubmitNode
 		
 		@Override
 		public void iris$capture() {
+			if (SubmitNodeStorage.rustWholeFrame()) return;
 			ModelStorageData data = STORAGE.computeIfAbsent(this, k -> new ModelStorageData());
 			data.entityId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedEntity();
 			data.beId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedBlockEntity();
@@ -378,6 +441,7 @@ public class SubmitNodeStorage implements SubmitNodeCollector, OrderedSubmitNode
 		
 		@Override
 		public void iris$set() {
+			if (SubmitNodeStorage.rustWholeFrame()) return;
 			ModelStorageData data = STORAGE.get(this);
 			if (data != null) {
 				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentEntity(data.entityId);
@@ -414,6 +478,7 @@ public class SubmitNodeStorage implements SubmitNodeCollector, OrderedSubmitNode
 		
 		@Override
 		public void iris$capture() {
+			if (SubmitNodeStorage.rustWholeFrame()) return;
 			ModelStorageData data = STORAGE.computeIfAbsent(this, k -> new ModelStorageData());
 			data.entityId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedEntity();
 			data.beId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedBlockEntity();
@@ -423,6 +488,7 @@ public class SubmitNodeStorage implements SubmitNodeCollector, OrderedSubmitNode
 		
 		@Override
 		public void iris$set() {
+			if (SubmitNodeStorage.rustWholeFrame()) return;
 			ModelStorageData data = STORAGE.get(this);
 			if (data != null) {
 				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentEntity(data.entityId);
@@ -479,6 +545,7 @@ public class SubmitNodeStorage implements SubmitNodeCollector, OrderedSubmitNode
 		
 		@Override
 		public void iris$capture() {
+			if (SubmitNodeStorage.rustWholeFrame()) return;
 			ModelStorageData data = STORAGE.computeIfAbsent(this, k -> new ModelStorageData());
 			data.entityId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedEntity();
 			data.beId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedBlockEntity();
@@ -488,6 +555,7 @@ public class SubmitNodeStorage implements SubmitNodeCollector, OrderedSubmitNode
 		
 		@Override
 		public void iris$set() {
+			if (SubmitNodeStorage.rustWholeFrame()) return;
 			ModelStorageData data = STORAGE.get(this);
 			if (data != null) {
 				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentEntity(data.entityId);

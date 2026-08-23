@@ -211,7 +211,11 @@ public class SectionRenderDispatcher {
 		}
 
 		public CompletableFuture<Void> upload(Map<ChunkSectionLayer, MeshData> map, CompiledSectionMesh compiledSectionMesh) {
-			if (SectionRenderDispatcher.this.closed) {
+			if (SectionRenderDispatcher.this.closed
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+				// Rust whole-frame terrain owns semantic extraction and its explicit
+				// mesh staging. Dispose the legacy CPU result without opening a Java
+				// Vulkan upload path or retaining a hidden fallback buffer.
 				map.values().forEach(MeshData::close);
 				return CompletableFuture.completedFuture(null);
 			} else {
@@ -243,7 +247,11 @@ public class SectionRenderDispatcher {
 		public CompletableFuture<Void> uploadSectionIndexBuffer(
 			CompiledSectionMesh compiledSectionMesh, ByteBufferBuilder.Result result, ChunkSectionLayer chunkSectionLayer
 		) {
-			if (SectionRenderDispatcher.this.closed) {
+			if (SectionRenderDispatcher.this.closed
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+				// The semantic Rust terrain route does not consume Java section index
+				// buffers. Close the temporary CPU result and fail closed at this
+				// compatibility boundary.
 				result.close();
 				return CompletableFuture.completedFuture(null);
 			} else {

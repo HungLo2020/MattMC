@@ -18,18 +18,6 @@ pub(super) fn native_section_culls_quad(
         return false;
     }
 
-    if ((semantic_cull_mask(record.flags) >> quad_record.cull_face) & 1) != 0 {
-        trace_cull_decision(
-            record,
-            state,
-            quad_record,
-            None,
-            true,
-            "semantic-shape-cull-mask",
-        );
-        return true;
-    }
-
     let neighbor_id = record.neighbor_state_ids[quad_record.cull_face as usize];
     let Some(neighbor) = state_by_id(states, neighbor_id) else {
         trace_cull_decision(
@@ -43,6 +31,14 @@ pub(super) fn native_section_culls_quad(
         return false;
     };
 
+    // The copied Java mask is the block's same-shape skip mask, not an
+    // unconditional visibility mask.  Apply it only in the same skip-group
+    // comparison below; otherwise full translucent blocks such as stained
+    // glass lose every face even when surrounded by air.
+    let state = NativeMeshingState {
+        skip_mask: state.skip_mask | semantic_cull_mask(record.flags),
+        ..state
+    };
     let full_or_solid =
         (neighbor.flags & (STATE_FLAG_FULL_OCCLUSION | STATE_FLAG_SOLID_RENDER)) != 0;
     let same_skip_group = same_skip_group_culls_face(quad_record.cull_face, state, neighbor);
@@ -251,7 +247,17 @@ mod tests {
     fn semantic_snapshot_cull_mask_overrides_approximate_native_state_flags() {
         let record = NativeSectionBlockRecord {
             flags: 1 << 8,
+            neighbor_state_ids: [1, 0, 0, 0, 0, 0],
             ..NativeSectionBlockRecord::default()
+        };
+        let state = NativeMeshingState {
+            skip_group: 7,
+            ..NativeMeshingState::default()
+        };
+        let neighbor = NativeMeshingState {
+            skip_group: 7,
+            skip_mask: 1 << 1,
+            ..NativeMeshingState::default()
         };
         let quad = StaticModelQuadRecord {
             cull_face: 0,
@@ -260,9 +266,34 @@ mod tests {
 
         assert!(native_section_culls_quad(
             &record,
-            NativeMeshingState::default(),
+            state,
             quad,
-            &[]
+            &[None, Some(neighbor)]
+        ));
+    }
+
+    #[test]
+    fn semantic_same_shape_mask_does_not_cull_glass_against_air() {
+        let record = NativeSectionBlockRecord {
+            flags: 0b11_1111 << 8,
+            neighbor_state_ids: [1, 0, 0, 0, 0, 0],
+            ..NativeSectionBlockRecord::default()
+        };
+        let state = NativeMeshingState {
+            skip_group: 7,
+            ..NativeMeshingState::default()
+        };
+        let air = NativeMeshingState::default();
+        let quad = StaticModelQuadRecord {
+            cull_face: 0,
+            ..StaticModelQuadRecord::default()
+        };
+
+        assert!(!native_section_culls_quad(
+            &record,
+            state,
+            quad,
+            &[None, Some(air)]
         ));
     }
 }

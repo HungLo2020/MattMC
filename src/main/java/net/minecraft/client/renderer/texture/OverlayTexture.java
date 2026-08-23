@@ -31,8 +31,15 @@ public class OverlayTexture implements AutoCloseable {
 			}
 		}
 
-		this.texture.setClamp(true);
-		this.texture.upload();
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			// DynamicTexture is CPU-only on this route; publish the completed
+			// overlay pixels to the semantic asset registry instead of touching a
+			// Java texture or compatibility encoder.
+			net.vulkanic.gui.RustGalGuiRawImageAssets.stageDynamicTexture(this.texture);
+		} else {
+			this.texture.setClamp(true);
+			this.texture.upload();
+		}
 	}
 
 	public void close() {
@@ -40,6 +47,9 @@ public class OverlayTexture implements AutoCloseable {
 	}
 
 	public void setupOverlayColor() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			return;
+		}
 		var textureView = this.texture.getTextureView();
 		var ctx = VulkanicAPI.getCommandContext();
 		VulkanicAPI.bindTextureUnit(ctx, 1, textureView);
@@ -63,6 +73,9 @@ public class OverlayTexture implements AutoCloseable {
 	}
 
 	public void teardownOverlayColor() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			return;
+		}
 		IrisRenderSystem.bindTextureToUnit(1, 0);
 		TextureTracker.INSTANCE.onSetShaderTexture(1, null);
 	}

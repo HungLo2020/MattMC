@@ -35,13 +35,15 @@ public class EndCrystalRenderer extends EntityRenderer<EndCrystal, EndCrystalRen
 		poseStack.pushPose();
 		poseStack.scale(2.0F, 2.0F, 2.0F);
 		poseStack.translate(0.0F, -0.5F, 0.0F);
-		submitNodeCollector.submitModel(
+		submitNodeCollector.submitModelSemanticTexture(
 			this.model,
 			endCrystalRenderState,
 			poseStack,
 			RENDER_TYPE,
 			endCrystalRenderState.lightCoords,
 			OverlayTexture.NO_OVERLAY,
+			-1,
+			END_CRYSTAL_LOCATION,
 			endCrystalRenderState.outlineColor,
 			null
 		);

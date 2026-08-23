@@ -13,9 +13,11 @@ from argparse import Namespace
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "Common"))
 
 import RustMigration as harness
 import MeshingCorpus
+import capture_runner
 
 
 def write_fake_gradle(root: Path, *, sleep_seconds: int = 0, exit_code: int = 0) -> None:
@@ -91,6 +93,21 @@ def args(**overrides) -> Namespace:
 
 
 class RustMigrationHarnessTests(unittest.TestCase):
+    def test_capture_runner_quarantines_root_and_legacy_dot_capture_paths(self) -> None:
+        root = Path("/tmp/mattmc-capture-test").resolve()
+        default = capture_runner.CaptureRunner.resolve_artifact_dir(root, None)
+        self.assertEqual(default, root / "artifacts" / "graphics-captures" / "auto-capture")
+        self.assertEqual(
+            capture_runner.CaptureRunner.resolve_artifact_dir(root, str(root)),
+            root / "artifacts" / "graphics-captures" / "configured",
+        )
+        self.assertEqual(
+            capture_runner.CaptureRunner.resolve_artifact_dir(root, str(root / ".capture")),
+            root / "artifacts" / "graphics-captures" / "configured",
+        )
+        nested = capture_runner.CaptureRunner.resolve_artifact_dir(root, "captures/session")
+        self.assertEqual(nested, root / "artifacts/graphics-captures/session")
+
     def test_directory_helper_resolves_windows_config_with_spaces(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             temp_path = Path(temp)

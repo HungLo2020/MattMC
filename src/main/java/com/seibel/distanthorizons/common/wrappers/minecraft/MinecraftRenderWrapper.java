@@ -180,12 +180,20 @@ public class MinecraftRenderWrapper implements IMinecraftRenderWrapper
 	@Override
 	public boolean hasTargetRenderTarget()
 	{
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
+		{
+			throw new IllegalStateException("Java Distant Horizons render-target identity is unavailable while Rust owns whole-frame presentation");
+		}
 		return this.resolveTargetFramebufferId(this.getRenderTarget()) != -1;
 	}
 
 	@Override
 	public boolean bindTargetRenderTarget(CommandContext ctx)
 	{
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
+		{
+			throw new IllegalStateException("Java Distant Horizons render-target binding is unavailable while Rust owns whole-frame presentation");
+		}
 		RenderTarget renderTarget = this.getRenderTarget();
 		int framebufferId = this.resolveTargetFramebufferId(renderTarget);
 		if (framebufferId == -1 || renderTarget == null)
@@ -201,6 +209,10 @@ public class MinecraftRenderWrapper implements IMinecraftRenderWrapper
 	@Override
 	public int getTargetFramebuffer()
 	{
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
+		{
+			throw new IllegalStateException("Java Distant Horizons framebuffer handles are unavailable while Rust owns whole-frame presentation");
+		}
 		RenderTarget renderTarget = this.getRenderTarget();
 		this.finalLevelFrameBufferId = this.resolveTargetFramebufferId(renderTarget);
 		return this.finalLevelFrameBufferId;
@@ -223,6 +235,10 @@ public class MinecraftRenderWrapper implements IMinecraftRenderWrapper
 	@Override
 	public int getDepthTextureId()
 	{
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
+		{
+			throw new IllegalStateException("Java Distant Horizons depth-texture handles are unavailable while Rust owns whole-frame presentation");
+		}
 		RenderTarget renderTarget = this.getRenderTarget();
 		if (renderTarget == null)
 		{
@@ -246,6 +262,10 @@ public class MinecraftRenderWrapper implements IMinecraftRenderWrapper
 	@Override
 	public int getColorTextureId() 
 	{
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
+		{
+			throw new IllegalStateException("Java Distant Horizons color-texture handles are unavailable while Rust owns whole-frame presentation");
+		}
 		RenderTarget renderTarget = this.getRenderTarget();
 		if (renderTarget == null)
 		{

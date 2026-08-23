@@ -72,6 +72,9 @@ public final class CommonUniforms {
 		// the shader will always be setup (and therefore uniforms will be re-uploaded)
 		// after the texture is changed and before rendering starts.
 		uniforms.uniform2i("atlasSize", () -> {
+			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+				return ZERO_VECTOR_2i;
+			}
 			int glId = IrisRenderSystem.getTextureBinding(0);
 			if (glId <= 0) return ZERO_VECTOR_2i;
 
@@ -85,6 +88,9 @@ public final class CommonUniforms {
 		});
 
 		uniforms.uniform2i("gtextureSize", () -> {
+			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+				return ZERO_VECTOR_2i;
+			}
 			int glId = IrisRenderSystem.getTextureBinding(0);
 
 			TextureInfo info = TextureInfoCache.INSTANCE.getInfo(glId);

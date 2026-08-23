@@ -148,6 +148,29 @@ class CaptureConfig:
 
 
 class CaptureRunner:
+    @staticmethod
+    def resolve_artifact_dir(root: Path, configured: str | None) -> Path:
+        """Resolve capture output inside the one repository-local ignored subtree."""
+        artifact_root = root / "artifacts" / "graphics-captures"
+        artifact_dir = Path(configured) if configured else artifact_root / "auto-capture"
+        if not artifact_dir.is_absolute():
+            artifact_dir = root / artifact_dir
+        resolved_root = root.resolve()
+        resolved_artifact_root = artifact_root.resolve()
+        resolved_artifact_dir = artifact_dir.resolve()
+        try:
+            resolved_artifact_dir.relative_to(resolved_artifact_root)
+        except ValueError:
+            # RenderDoc and screenshot helpers can emit sidecars beside the
+            # requested path. Preserve only the requested leaf name while
+            # preventing root, external, and legacy dot-capture paths from
+            # escaping the ignored subtree.
+            leaf = resolved_artifact_dir.name
+            if not leaf or leaf.startswith(".capture") or resolved_artifact_dir == resolved_root:
+                leaf = "configured"
+            return artifact_root / leaf
+        return artifact_dir
+
     def __init__(self, config: CaptureConfig) -> None:
         self.config = config
         self.platform_info, self.normalize_platform = load_platform_detection()
@@ -161,14 +184,27 @@ class CaptureRunner:
             configured_game_dir = Path(config.game_dir)
             self.run_dir = configured_game_dir if configured_game_dir.is_absolute() else self.root / configured_game_dir
         self.options_file = self.run_dir / "options.txt"
-        self.artifact_dir = Path(config.artifact_dir) if config.artifact_dir else self.root / "logs" / "auto-capture"
-        if not self.artifact_dir.is_absolute():
-            self.artifact_dir = self.root / self.artifact_dir
+        # Keep every capture product inside the repository's single ignored
+        # graphics-artifact subtree.  A repository-root default is unsafe:
+        # RenderDoc and screenshot helpers can emit sidecars beside the
+        # requested artifact, which previously left stray ``.capture`` files
+        # contaminating the project root.
+        self.artifact_dir = self.resolve_artifact_dir(self.root, config.artifact_dir)
         self.artifact_dir.mkdir(parents=True, exist_ok=True)
-        self.lock_file = self.artifact_dir / ".capture_runner.lock"
+        # Keep the coordination lock an ordinary generated artifact.  A
+        # dot-prefixed name is easily mistaken for a RenderDoc ``.capture``
+        # product and previously left thousands of confusing files in old
+        # capture trees.
+        self.lock_file = self.artifact_dir / "capture_runner.lock"
         self.lock_handle = None
 
-        self.run_id = time.strftime("%Y%m%d_%H%M%S")
+        # Test suites and bounded capture batches can construct multiple
+        # runners within one wall-clock second.  A second-resolution id then
+        # aliases their isolated game directories and causes later runs to be
+        # rejected as unsafe reuse.  Keep the human-readable timestamp while
+        # adding a process-local monotonic suffix for collision-free ownership
+        # of every generated artifact directory.
+        self.run_id = f"{time.strftime('%Y%m%d_%H%M%S')}_{time.time_ns() % 1_000_000:06d}"
         self.start_epoch = int(time.time())
         self.git_commit = command_text(["git", "rev-parse", "HEAD"], cwd=self.root).strip() or "unknown"
 
@@ -694,17 +730,23 @@ class CaptureRunner:
         for key, value in forced_options.items():
             upsert_option(self.options_file, key, value)
         dh_file = self.run_dir / "config" / "DistantHorizons.toml"
-        if os.environ.get("MATTMC_CAPTURE_DISABLE_DH_FOR_PERF", "false").lower() == "true":
+        disable_dh_for_perf = os.environ.get("MATTMC_CAPTURE_DISABLE_DH_FOR_PERF", "false").lower() == "true"
+        disable_dh_for_ordinary_source = (
+            os.environ.get("MATTMC_CAPTURE_DISABLE_DH_FOR_ORDINARY_SOURCE", "false").lower() == "true"
+        )
+        if disable_dh_for_perf or disable_dh_for_ordinary_source:
             if upsert_toml_value(dh_file, "enableDistantGeneration", "false"):
-                self.append_meta("forced_dh_enableDistantGeneration=false")
-            if upsert_toml_value(dh_file, "rendererMode", '"DISABLED"'):
-                self.append_meta("forced_dh_rendererMode=DISABLED")
+                self.append_meta(
+                    "forced_dh_enableDistantGeneration=false"
+                    + (" reason=ordinary-selected-source" if disable_dh_for_ordinary_source else "")
+                )
         dh_opaque_only = os.environ.get("MATTMC_CAPTURE_DH_RUST_OPAQUE_ONLY", "false").lower() == "true"
         dh_non_water = os.environ.get("MATTMC_CAPTURE_DH_RUST_NON_WATER", "false").lower() == "true"
         if dh_opaque_only or dh_non_water:
-            # Both bounded routes exclude legacy auxiliary work. The legacy
-            # opaque row additionally disables transparent DH streams; the
-            # non-water row deliberately leaves them enabled for real routing.
+            # Both bounded routes exclude legacy auxiliary work. Keep DH's
+            # renderer mode DEFAULT so the real CPU render-list traversal can
+            # run; `enableRendering=false` below prevents the legacy GL draw
+            # without making the semantic collector reject the frame.
             for key, value in (
                 ("enableSsao", "false"),
                 ("enableGenericRendering", "false"),
@@ -1018,8 +1060,23 @@ class CaptureRunner:
         command = self.renderdoc_launch_command(command)
         capture_template = self.env.get("MATTMC_RENDERDOC_CAPTURE_TEMPLATE", "").strip()
         capture_path = self.env.get("MATTMC_RENDERDOC_CAPTURE_PATH", "").strip()
+        if capture_template:
+            requested_template = Path(capture_template)
+            if not requested_template.is_absolute():
+                requested_template = self.artifact_dir / requested_template
+            elif not self._is_inside_artifact_dir(requested_template):
+                requested_template = self.artifact_dir / requested_template.name
+            capture_template = str(requested_template)
         if not capture_template and capture_path:
-            capture_template = str(Path(capture_path).with_suffix(""))
+            requested_path = Path(capture_path)
+            # Relative paths belong to the ignored artifact directory.  Also
+            # repair the historical ``<repo-root>/.capture`` form so a stale
+            # environment cannot recreate root contamination.
+            if not requested_path.is_absolute():
+                requested_path = self.artifact_dir / requested_path
+            elif not self._is_inside_artifact_dir(requested_path):
+                requested_path = self.artifact_dir / requested_path.name
+            capture_template = str(requested_path.with_suffix(""))
         if not capture_template:
             capture_template = str(self.artifact_dir / f"renderdoc_{self.run_id}")
         wrapped = [
@@ -1037,6 +1094,14 @@ class CaptureRunner:
         self.append_meta(f"renderdoc_wrapped_actual_game_command={' '.join(shlex.quote(part) for part in wrapped)}")
         self.append_meta(f"renderdoc_capture_template={capture_template}")
         return wrapped
+
+    def _is_inside_artifact_dir(self, path: Path) -> bool:
+        """Return whether a capture path is contained by the ignored artifact root."""
+        try:
+            path.resolve().relative_to(self.artifact_dir.resolve())
+        except ValueError:
+            return False
+        return True
 
     def renderdoc_launch_command(self, command: list[str]) -> list[str]:
         if not command:
@@ -1114,6 +1179,15 @@ class CaptureRunner:
         self.append_meta(f"vk_layer_settings={self.env.get('VK_LAYER_SETTINGS', '')}")
 
     def configure_java_tool_options(self) -> None:
+        if self.config.backend == "rust-vulkan":
+            # build.gradle's development default is intentionally generous for
+            # interactive play (8G/4G), but a graphics capture must remain below
+            # the harness RSS budget.  Own the launch bounds here rather than
+            # accepting an over-budget client and treating its late termination
+            # as valid parity evidence.
+            self.env["MATTMC_CLIENT_XMX"] = "4G"
+            self.env["MATTMC_CLIENT_XMS"] = "2G"
+            self.append_meta("bounded_client_heap=initial:2G,max:4G")
         options = [f"-Dmattmc.dev.runCaptureId={self.run_id}"]
         if self.config.backend == "rust-vulkan":
             options.append("-Dmattmc.dev.rustGalVulkanWholeFrame=true")
@@ -1328,7 +1402,21 @@ class CaptureRunner:
             self.terminate_run_processes("timeout")
 
         if self.gradle_process.poll() is None:
-            return self.gradle_process.wait()
+            # The client/Gradle wrapper are launched in one process group, but
+            # a JVM or wrapper child can occasionally keep the wrapper pipe
+            # alive after the group termination above.  Never turn that into
+            # an unbounded harness hang: bounded capture termination is part
+            # of the artifact contract just like bounded resource retention.
+            try:
+                return self.gradle_process.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                self.append_meta("cleanup_gradle_wait_timeout=true")
+                self.terminate_run_processes("gradle_wait_timeout")
+                try:
+                    return self.gradle_process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    self.append_meta("cleanup_gradle_wait_escalation_timeout=true")
+                    return self.gradle_process.poll() or 1
         return self.gradle_process.returncode or 0
 
     def wait_for_deterministic_shutdown(self, grace_secs: int | None = None) -> bool:

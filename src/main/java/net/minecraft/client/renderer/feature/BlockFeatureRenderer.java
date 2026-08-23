@@ -36,6 +36,34 @@ public class BlockFeatureRenderer {
 		BlockRenderDispatcher blockRenderDispatcher,
 		OutlineBufferSource outlineBufferSource
 	) {
+		this.render(submitNodeCollection, bufferSource, blockRenderDispatcher, outlineBufferSource, false);
+	}
+
+	/**
+	 * Dispatches the extracted block-feature queue. The semantic-only mode is
+	 * used by the Rust frame collector: route branches copy explicit mesh data,
+	 * while Java compatibility draws remain unavailable to the presenter.
+	 */
+	public void render(
+		SubmitNodeCollection submitNodeCollection,
+		MultiBufferSource.BufferSource bufferSource,
+		BlockRenderDispatcher blockRenderDispatcher,
+		OutlineBufferSource outlineBufferSource,
+		boolean semanticOnly
+	) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() && !semanticOnly) {
+			throw new IllegalStateException("Java block-feature rendering is unavailable while Rust owns whole-frame presentation");
+		}
+		if (semanticOnly && net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			&& (!WorldRenderRoutePolicy.currentFallingBlockRoute().usesRustWholeFrameVulkan()
+				|| !WorldRenderRoutePolicy.currentPistonMovingBlockRoute().usesRustWholeFrameVulkan()
+				|| !WorldRenderRoutePolicy.currentBlockDisplayRoute().usesRustWholeFrameVulkan()
+				|| !WorldRenderRoutePolicy.currentPrimedTntRoute().usesRustWholeFrameVulkan()
+				|| !WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan())) {
+			throw new IllegalStateException(
+				"Rust semantic block-feature collection requires complete Rust ownership for every block-feature family"
+			);
+		}
 		for (SubmitNodeStorage.MovingBlockSubmit movingBlockSubmit : submitNodeCollection.getMovingBlockSubmits()) {
 			MovingBlockRenderState movingBlockRenderState = movingBlockSubmit.movingBlockRenderState();
 			BlockState blockState = movingBlockRenderState.blockState;
@@ -59,6 +87,18 @@ public class BlockFeatureRenderer {
 				pistonRoute,
 				"piston"
 			)) {
+				continue;
+			}
+			if (VulkanicAPI.isVulkanBackendSelected() && !fallingBlock && !piston) {
+				GraphicsFrameBenchmark.recordSubmittedWorkIdentity(
+					"moving-block", "rust-vulkan-unavailable:" + blockState.getBlockHolder().getRegisteredName()
+				);
+				if (WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()) {
+					throw new IllegalStateException(
+						"Rust whole-frame moving-block route has no semantic source for "
+							+ blockState.getBlockHolder().getRegisteredName()
+					);
+				}
 				continue;
 			}
 			List<BlockModelPart> list = blockRenderDispatcher.getBlockModel(blockState)
@@ -117,9 +157,28 @@ public class BlockFeatureRenderer {
 				WorldRenderRoutePolicy.Route blockDisplayRoute = WorldRenderRoutePolicy.currentBlockDisplayRoute();
 				if (blockDisplayRoute == WorldRenderRoutePolicy.Route.DISABLED) {
 					GraphicsFrameBenchmark.recordSubmittedWorkIdentity("block-display", "disabled:" + blockSubmit.state().getBlockHolder().getRegisteredName());
-				} else if (!RustGalWorldPrimitiveRenderer.enqueueBlockDisplay(blockRenderDispatcher, blockSubmit)) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+						throw new IllegalStateException("Rust whole-frame block-display route is unavailable while Rust owns presentation");
+					}
+				} else {
+					boolean rustBlockDisplayQueued = RustGalWorldPrimitiveRenderer.enqueueBlockDisplay(
+						blockRenderDispatcher, blockSubmit,
+						net.vulkanic.VulkanicAPI.isVulkanBackendSelected());
+					if (!rustBlockDisplayQueued && blockDisplayRoute.usesRustWholeFrameVulkan()) {
+						rustBlockDisplayQueued = RustGalWorldPrimitiveRenderer.enqueueBlockDisplay(
+							blockRenderDispatcher, blockSubmit, true);
+					}
+					if (!rustBlockDisplayQueued && !blockDisplayRoute.usesRustWholeFrameVulkan()) {
 					GraphicsFrameBenchmark.recordSubmittedWorkIdentity("block-display", "java-legacy:" + blockSubmit.state().getBlockHolder().getRegisteredName());
 					this.renderJavaBlockSubmit(blockRenderDispatcher, bufferSource, outlineBufferSource, blockSubmit);
+					} else if (!rustBlockDisplayQueued && blockDisplayRoute.usesRustWholeFrameVulkan()) {
+					GraphicsFrameBenchmark.recordSubmittedWorkIdentity("block-display", "rust-vulkan-unavailable:" + blockSubmit.state().getBlockHolder().getRegisteredName());
+					throw new IllegalStateException(
+						"Rust whole-frame block-display route has no semantic mesh for "
+							+ blockSubmit.state().getBlockHolder().getRegisteredName()
+							+ " (reason=" + RustGalWorldPrimitiveRenderer.lastBlockDisplayAdmissionFailure() + ")"
+					);
+				}
 				}
 			}
 
@@ -128,21 +187,31 @@ public class BlockFeatureRenderer {
 			this.renderOpenGlPendingMeshInstancesInCurrentScope("minecraft.entity.block-display");
 
 		for (SubmitNodeStorage.BlockModelSubmit blockModelSubmit : submitNodeCollection.getBlockModelSubmits()) {
-			ModelBlockRenderer.renderModel(
-				blockModelSubmit.pose(),
-				bufferSource.getBuffer(blockModelSubmit.renderType()),
-				blockModelSubmit.model(),
-				blockModelSubmit.r(),
-				blockModelSubmit.g(),
-				blockModelSubmit.b(),
-				blockModelSubmit.lightCoords(),
-				blockModelSubmit.overlayCoords()
-			);
-			if (blockModelSubmit.outlineColor() != 0) {
-				outlineBufferSource.setColor(blockModelSubmit.outlineColor());
+			WorldRenderRoutePolicy.Route blockModelRoute = WorldRenderRoutePolicy.currentMaterialRoute();
+			if (blockModelRoute.usesRustWholeFrameVulkan()) {
+				boolean queued = RustGalWorldPrimitiveRenderer.enqueueBlockModelMesh(blockModelSubmit);
+				GraphicsFrameBenchmark.recordSubmittedWorkIdentity(
+					"block-model", queued ? "rust-vulkan-whole-frame" : "rust-vulkan-unavailable"
+				);
+				if (!queued) {
+					throw new IllegalStateException("Rust whole-frame block-model route has no semantic mesh");
+				}
+				continue;
+			}
+			if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+				&& !blockModelRoute.usesJavaCompatibility()) {
+				GraphicsFrameBenchmark.recordSubmittedWorkIdentity(
+					"block-model", "rust-vulkan-unavailable"
+				);
+				if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+					throw new IllegalStateException("Rust whole-frame block-model route is unavailable while Rust owns presentation");
+				}
+				continue;
+			}
+			if (!blockModelRoute.usesRustWholeFrameVulkan()) {
 				ModelBlockRenderer.renderModel(
 					blockModelSubmit.pose(),
-					outlineBufferSource.getBuffer(blockModelSubmit.renderType()),
+					bufferSource.getBuffer(blockModelSubmit.renderType()),
 					blockModelSubmit.model(),
 					blockModelSubmit.r(),
 					blockModelSubmit.g(),
@@ -150,6 +219,19 @@ public class BlockFeatureRenderer {
 					blockModelSubmit.lightCoords(),
 					blockModelSubmit.overlayCoords()
 				);
+				if (blockModelSubmit.outlineColor() != 0) {
+					outlineBufferSource.setColor(blockModelSubmit.outlineColor());
+					ModelBlockRenderer.renderModel(
+						blockModelSubmit.pose(),
+						outlineBufferSource.getBuffer(blockModelSubmit.renderType()),
+						blockModelSubmit.model(),
+						blockModelSubmit.r(),
+						blockModelSubmit.g(),
+						blockModelSubmit.b(),
+						blockModelSubmit.lightCoords(),
+						blockModelSubmit.overlayCoords()
+					);
+				}
 			}
 		}
 	}
@@ -167,16 +249,27 @@ public class BlockFeatureRenderer {
 				"primed-tnt", "disabled", blockSubmit.state(), false, false, false
 			);
 			GraphicsFrameBenchmark.recordSubmittedWorkIdentity("primed-tnt", "disabled:" + blockIdentity);
+			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+				throw new IllegalStateException("Rust whole-frame Primed TNT route is unavailable while Rust owns presentation");
+			}
 			return;
 		}
-		if (!RustGalWorldPrimitiveRenderer.isPrimedTntMeshEligible(blockSubmit)
-			|| route == WorldRenderRoutePolicy.Route.JAVA_COMPATIBILITY) {
+		boolean eligible = RustGalWorldPrimitiveRenderer.isPrimedTntMeshEligible(blockSubmit);
+		if ((!eligible || route == WorldRenderRoutePolicy.Route.JAVA_COMPATIBILITY)
+			&& !route.usesRustWholeFrameVulkan()) {
 			RustGalWorldPrimitiveRenderer.recordMovingBlockRouteDecision(
 				"primed-tnt", "java-legacy", blockSubmit.state(), false, false, true
 			);
 			GraphicsFrameBenchmark.recordSubmittedWorkIdentity("primed-tnt", "java-legacy:" + blockIdentity);
 			this.renderJavaBlockSubmit(blockRenderDispatcher, bufferSource, outlineBufferSource, blockSubmit);
 			return;
+		}
+		if (!eligible) {
+			RustGalWorldPrimitiveRenderer.recordMovingBlockRouteDecision(
+				"primed-tnt", "rust-vulkan-unavailable", blockSubmit.state(), false, false, false
+			);
+			GraphicsFrameBenchmark.recordSubmittedWorkIdentity("primed-tnt", "rust-vulkan-unavailable:" + blockIdentity);
+			throw new IllegalStateException("Rust whole-frame Primed TNT route has no semantic mesh for " + blockIdentity);
 		}
 		if (!RustGalWorldPrimitiveRenderer.enqueuePrimedTntBlock(blockRenderDispatcher, blockSubmit)) {
 			throw new IllegalStateException("Rust Primed TNT route selected without a submitted mesh instance");
@@ -221,12 +314,31 @@ public class BlockFeatureRenderer {
 				provenance,
 				"disabled:" + this.blockIdentity(blockState)
 			);
+			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+				throw new IllegalStateException("Rust whole-frame " + provenance + " route is unavailable while Rust owns presentation");
+			}
 			return true;
 		}
 		boolean queued = "falling-block".equals(provenance)
 			? RustGalWorldPrimitiveRenderer.enqueueFallingBlock(blockRenderDispatcher, movingBlockSubmit)
 			: RustGalWorldPrimitiveRenderer.enqueuePistonMovingBlock(blockRenderDispatcher, movingBlockSubmit);
 		if (!queued) {
+			if (route.usesRustWholeFrameVulkan()) {
+				this.recordMovingBlockRoute(provenance, "rust-vulkan-unavailable", blockState, false, false, false);
+				GraphicsFrameBenchmark.recordSubmittedWorkIdentity(
+					provenance,
+					"rust-vulkan-unavailable:" + this.blockIdentity(blockState)
+				);
+				// A selected Rust whole-frame route must never claim ownership of
+				// work that failed semantic extraction. Returning true here used to
+				// omit the moving block while still presenting the frame. Abort the
+				// route explicitly; Java rendering is not a same-frame fallback.
+				throw new IllegalStateException(
+					"Rust Vulkan whole-frame " + provenance
+						+ " route selected but semantic mesh extraction was unavailable for "
+						+ this.blockIdentity(blockState)
+				);
+			}
 			return false;
 		}
 		String rustRoute = route.usesRustWholeFrameVulkan() ? "rust-vulkan-whole-frame" : "rust-opengl";

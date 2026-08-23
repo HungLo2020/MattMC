@@ -9,7 +9,6 @@ import net.blaze3d.textures.FilterMode;
 import net.blaze3d.textures.TextureFormat;
 import java.nio.file.Path;
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import net.minecraft.api.EnvType;
@@ -41,9 +40,11 @@ public class FontTexture extends AbstractTexture implements Dumpable {
 		this.colored = bl;
 		this.root = new FontTexture.Node(0, 0, 256, 256);
 		this.semanticAtlasPixels = new NativeImage(bl ? NativeImage.Format.RGBA : NativeImage.Format.LUMINANCE, SIZE, SIZE, true);
-		this.texture = net.vulkanic.VulkanicAPI.createTexture(resourceLocation::toString, 7, bl ? TextureFormat.RGBA8 : TextureFormat.RED8, 256, 256, 1, 1);
-		this.texture.setTextureFilter(FilterMode.NEAREST, false);
-		this.textureView = net.vulkanic.VulkanicAPI.createTextureView(this.texture);
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			this.texture = net.vulkanic.VulkanicAPI.createTexture(resourceLocation::toString, 7, bl ? TextureFormat.RGBA8 : TextureFormat.RED8, 256, 256, 1, 1);
+			this.texture.setTextureFilter(FilterMode.NEAREST, false);
+			this.textureView = net.vulkanic.VulkanicAPI.createTextureView(this.texture);
+		}
 		this.renderTypes = glyphRenderTypes;
 		SEMANTIC_ATLASES.put(this.semanticAtlasIdentity.toString(), this);
 	}
@@ -75,7 +76,7 @@ public class FontTexture extends AbstractTexture implements Dumpable {
 				float g = 256.0F;
 				float h = 0.01F;
 				net.blaze3d.textures.GpuTextureView glyphTextureView = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-					? Objects.requireNonNull(this.textureView, "semantic font texture view")
+					? this.textureView
 					: this.getTextureView();
 				return new BakedSheetGlyph(
 					glyphInfo,

@@ -18,15 +18,20 @@ import net.minecraft.world.level.material.Fluids;
 
 @Environment(EnvType.CLIENT)
 public class ItemBlockRenderTypes {
-	// Iris: Material mapping support
-	private static final ChunkSectionLayer[] LAYER_SET_VANILLA;
-	
-	static {
-		LAYER_SET_VANILLA = new ChunkSectionLayer[net.irisshaders.iris.shaderpack.materialmap.BlockRenderType.values().length];
-		for (int i = 0; i < net.irisshaders.iris.shaderpack.materialmap.BlockRenderType.values().length; i++) {
-			LAYER_SET_VANILLA[i] = net.irisshaders.iris.shaderpack.materialmap.BlockMaterialMapping.convertBlockToRenderType(
-				net.irisshaders.iris.shaderpack.materialmap.BlockRenderType.values()[i]
-			);
+	// Iris material mapping is compatibility-only. Keep its class loading lazy:
+	// Rust whole-frame terrain classification must not initialize Iris runtime
+	// material state just because this vanilla lookup class is loaded.
+	private static final class IrisLayerSet {
+		private static final ChunkSectionLayer[] VALUE = createIrisLayerSet();
+
+		private static ChunkSectionLayer[] createIrisLayerSet() {
+			ChunkSectionLayer[] layers = new ChunkSectionLayer[net.irisshaders.iris.shaderpack.materialmap.BlockRenderType.values().length];
+			for (int i = 0; i < layers.length; i++) {
+				layers[i] = net.irisshaders.iris.shaderpack.materialmap.BlockMaterialMapping.convertBlockToRenderType(
+					net.irisshaders.iris.shaderpack.materialmap.BlockRenderType.values()[i]
+				);
+			}
+			return layers;
 		}
 	}
 	
@@ -382,7 +387,7 @@ public class ItemBlockRenderTypes {
 			net.irisshaders.iris.shaderpack.materialmap.BlockRenderType type =
 				net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getBlockTypeIds().get(blockState.getBlock());
 			if (type != null) {
-				return LAYER_SET_VANILLA[type.ordinal()];
+				return IrisLayerSet.VALUE[type.ordinal()];
 			}
 		}
 		

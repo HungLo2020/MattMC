@@ -36,10 +36,15 @@ public abstract class ReloadableTexture extends AbstractTexture {
 		this.textureView = net.vulkanic.VulkanicAPI.createTextureView(this.texture);
 		this.setFilter(bl, false);
 		this.setClamp(bl2);
-		net.vulkanic.VulkanicAPI.createCommandEncoder().writeToTexture(this.texture, nativeImage);
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			net.vulkanic.VulkanicAPI.createCommandEncoder().writeToTexture(this.texture, nativeImage);
+		}
 		
-		// Iris: Track texture for PBR system
-		net.irisshaders.iris.pbr.TextureTracker.INSTANCE.trackTexture(net.vulkanic.VulkanicCoreAPI.textureId(this.texture), this);
+		// Iris PBR tracking is compatibility-only; semantic Rust Vulkan assets
+		// must not publish Java GPU state into the live tracker.
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			net.irisshaders.iris.pbr.TextureTracker.INSTANCE.trackTexture(net.vulkanic.VulkanicCoreAPI.textureId(this.texture), this);
+		}
 	}
 
 	public abstract TextureContents loadContents(ResourceManager resourceManager) throws IOException;

@@ -86,10 +86,16 @@ public abstract class RenderStateShard {
 	}
 
 	public void setupRenderState() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Vulkan render-state setup is unavailable while Rust owns whole-frame presentation");
+		}
 		this.setupState.run();
 	}
 
 	public void clearRenderState() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Vulkan render-state cleanup is unavailable while Rust owns whole-frame presentation");
+		}
 		this.clearState.run();
 	}
 
@@ -193,8 +199,11 @@ public abstract class RenderStateShard {
 	public static class MultiTextureStateShard extends RenderStateShard.EmptyTextureStateShard {
 		private final Optional<ResourceLocation> cutoutTexture;
 
-		MultiTextureStateShard(List<RenderStateShard.MultiTextureStateShard.Entry> list) {
-			super(() -> {
+	MultiTextureStateShard(List<RenderStateShard.MultiTextureStateShard.Entry> list) {
+		super(() -> {
+				if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+					return;
+				}
 				var ctx = VulkanicAPI.getCommandContext();
 				for (int i = 0; i < list.size(); i++) {
 					RenderStateShard.MultiTextureStateShard.Entry entry = (RenderStateShard.MultiTextureStateShard.Entry)list.get(i);
@@ -280,6 +289,9 @@ public abstract class RenderStateShard {
 
 		public TextureStateShard(ResourceLocation resourceLocation, boolean bl) {
 			super(() -> {
+				if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+					return;
+				}
 				TextureManager textureManager = Minecraft.getInstance().getTextureManager();
 				AbstractTexture abstractTexture = textureManager.getTexture(resourceLocation);
 				abstractTexture.setUseMipmaps(bl);

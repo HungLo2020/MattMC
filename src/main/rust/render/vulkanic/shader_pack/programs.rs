@@ -3905,6 +3905,43 @@ pub fn minimal_terrain_cutout_program() -> TerrainMaterialProgram {
     minimal_terrain_material_program(TerrainMaterialProgramKind::Cutout)
 }
 
+/// Rust-owned solid-color entity-outline mask program. It deliberately uses
+/// the ordinary mesh/instance storage ABI so the eventual mask writer can
+/// share copied geometry without importing a Java renderer or native handle.
+pub fn minimal_entity_outline_program() -> TerrainMaterialProgram {
+    TerrainMaterialProgram {
+        identity: ProgramIdentity::new("vulkanic:builtin/entity_outline_mask_v1"),
+        vertex: ShaderStageSource {
+            stage: ShaderStageKind::Vertex,
+            label: "minimal-entity-outline.vertex".to_string(),
+            source: MINIMAL_ENTITY_OUTLINE_VERTEX.to_string(),
+            entry_point: "main".to_string(),
+        },
+        fragment: ShaderStageSource {
+            stage: ShaderStageKind::Fragment,
+            label: "minimal-entity-outline.fragment".to_string(),
+            source: MINIMAL_ENTITY_OUTLINE_FRAGMENT.to_string(),
+            entry_point: "main".to_string(),
+        },
+        required_resources: Vec::new(),
+    }
+}
+
+/// Rust-owned fragment-only optical mask program.  The vertex ABI remains the
+/// copied world-mesh instance stream, while the fragment writes zero alpha so
+/// the optical target preserves its copied color and changes only stencil.
+pub fn minimal_optical_stencil_write_program() -> TerrainMaterialProgram {
+    let mut program = minimal_direct_terrain_cutout_program();
+    program.identity = ProgramIdentity::new("vulkanic:builtin/optical_stencil_write_v1");
+    program.fragment = ShaderStageSource {
+        stage: ShaderStageKind::Fragment,
+        label: "minimal-optical-stencil-write.fragment".to_string(),
+        source: MINIMAL_OPTICAL_STENCIL_WRITE_FRAGMENT.to_string(),
+        entry_point: "main".to_string(),
+    };
+    program
+}
+
 /// First Rust-owned material program for Distant Horizons' opaque CPU LOD
 /// stream. It is intentionally separate from Minecraft terrain: DH carries
 /// pre-resolved vertex color and packed light, not atlas UVs or sprite
@@ -4412,6 +4449,7 @@ struct MeshInstance {
     vec4 material;
     vec4 animation_region;
     vec4 animation_next_region;
+    vec4 overlay_color;
 };
 layout(set = 0, binding = 1, std430) readonly buffer WorldMeshInstances {
     mat4 view;
@@ -4428,6 +4466,7 @@ layout(location = 4) out vec2 v_light;
 layout(location = 5) out vec3 v_world_position;
 layout(location = 6) flat out vec4 v_animation_region;
 layout(location = 7) flat out vec4 v_animation_next_region;
+layout(location = 8) flat out vec4 v_overlay_color;
 void main() {
     MeshVertex vertex = vertices[gl_VertexIndex];
     MeshInstance instance = instances[gl_InstanceIndex];
@@ -4442,10 +4481,138 @@ void main() {
     v_material = instance.material;
     v_animation_region = instance.animation_region;
     v_animation_next_region = instance.animation_next_region;
+    v_overlay_color = instance.overlay_color;
     v_normal = normalize(vec3(vertex.normal_light.yz, vertex.extra_data.z));
     v_light = clamp(vertex.extra_data.xy, vec2(0.0), vec2(1.0));
     float shadow_range = max(shadow_params.w, 1.0);
     v_world_position = world.xyz / shadow_range * 0.5 + 0.5;
+}
+"#;
+
+/// Solid-color vertex contract for the Rust-owned entity-outline mask. It
+/// reuses only the copied mesh vertex/instance ABI; terrain texture/material
+/// semantics are intentionally absent from this pass.
+pub const MINIMAL_ENTITY_OUTLINE_VERTEX: &str = r#"#version 450
+struct MeshVertex {
+    vec4 position_uv;
+    vec4 color_uv;
+    vec4 normal_light;
+    vec4 extra_data;
+    vec4 shader_data;
+};
+layout(set = 0, binding = 0, std430) readonly buffer WorldMeshVertices {
+    MeshVertex vertices[];
+};
+struct MeshInstance {
+    mat4 model;
+    vec4 color;
+    vec4 material;
+    vec4 animation_region;
+    vec4 animation_next_region;
+    vec4 overlay_color;
+};
+layout(set = 0, binding = 1, std430) readonly buffer WorldMeshInstances {
+    mat4 view;
+    mat4 projection;
+    mat4 light_view_projection;
+    vec4 shadow_params;
+    MeshInstance instances[];
+};
+layout(location = 0) out vec4 v_outline_color;
+void main() {
+    MeshVertex vertex = vertices[gl_VertexIndex];
+    MeshInstance instance = instances[gl_InstanceIndex];
+    vec4 world = instance.model * vec4(vertex.position_uv.xyz, 1.0);
+    vec4 clip = projection * view * world;
+#ifdef VULKANIC_GAL_ZERO_TO_ONE_CLIP_DEPTH
+    clip.z = clip.z * 0.5 + clip.w * 0.5;
+#endif
+    gl_Position = clip;
+    v_outline_color = instance.color;
+}
+"#;
+
+/// Solid-color fragment contract for the entity-outline mask. Alpha is kept
+/// from the semantic outline color so the bundled Sobel pass can detect edges.
+pub const MINIMAL_ENTITY_OUTLINE_FRAGMENT: &str = r#"#version 450
+layout(location = 0) in vec4 v_outline_color;
+layout(location = 0) out vec4 out_outline_color;
+void main() {
+    out_outline_color = v_outline_color;
+}
+"#;
+
+/// Fragment contract for an optical stencil-write draw.  Zero alpha with
+/// alpha blending leaves the copied optical color untouched while the
+/// explicit GAL stencil replace operation records the aperture value.
+pub const MINIMAL_OPTICAL_STENCIL_WRITE_FRAGMENT: &str = r#"#version 450
+layout(location = 0) out vec4 out_optical_mask;
+void main() {
+    out_optical_mask = vec4(0.0);
+}
+"#;
+
+/// Vulkan-native fullscreen contracts for the bundled entity-outline chain.
+/// They keep the vanilla effect's semantics while making descriptor bindings
+/// explicit and avoiding a Java post-chain or implicit sampler lookup.
+pub const MINIMAL_ENTITY_OUTLINE_FULLSCREEN_VERTEX: &str = r#"#version 450
+const vec2 positions[3] = vec2[3](vec2(-1.0, -1.0), vec2(3.0, -1.0), vec2(-1.0, 3.0));
+layout(location = 0) out vec2 v_uv;
+void main() {
+    vec2 position = positions[gl_VertexIndex];
+    gl_Position = vec4(position, 0.0, 1.0);
+    v_uv = position * 0.5 + 0.5;
+#ifdef VULKANIC_GAL_FLIP_FULLSCREEN_UV_Y
+    v_uv.y = 1.0 - v_uv.y;
+#endif
+}
+"#;
+
+pub const MINIMAL_ENTITY_OUTLINE_SOBEL_FRAGMENT: &str = r#"#version 450
+layout(set = 0, binding = 0) uniform texture2D InTexture;
+layout(set = 0, binding = 1) uniform sampler InSampler;
+layout(location = 0) in vec2 v_uv;
+layout(location = 0) out vec4 out_color;
+void main() {
+    vec2 one_texel = 1.0 / vec2(textureSize(sampler2D(InTexture, InSampler), 0));
+    vec4 center = texture(sampler2D(InTexture, InSampler), v_uv);
+    vec4 left = texture(sampler2D(InTexture, InSampler), v_uv - vec2(one_texel.x, 0.0));
+    vec4 right = texture(sampler2D(InTexture, InSampler), v_uv + vec2(one_texel.x, 0.0));
+    vec4 up = texture(sampler2D(InTexture, InSampler), v_uv - vec2(0.0, one_texel.y));
+    vec4 down = texture(sampler2D(InTexture, InSampler), v_uv + vec2(0.0, one_texel.y));
+    float total = clamp(abs(center.a - left.a) + abs(center.a - right.a) + abs(center.a - up.a) + abs(center.a - down.a), 0.0, 1.0);
+    vec3 color = center.rgb * center.a + left.rgb * left.a + right.rgb * right.a + up.rgb * up.a + down.rgb * down.a;
+    out_color = vec4(color * 0.2, total);
+}
+"#;
+
+pub const MINIMAL_ENTITY_OUTLINE_BLUR_FRAGMENT: &str = r#"#version 450
+layout(set = 0, binding = 0) uniform texture2D InTexture;
+layout(set = 0, binding = 1) uniform sampler InSampler;
+layout(set = 0, binding = 2, std140) uniform BlurConfig { vec2 BlurDir; float Radius; };
+layout(location = 0) in vec2 v_uv;
+layout(location = 0) out vec4 out_color;
+void main() {
+    vec2 one_texel = 1.0 / vec2(textureSize(sampler2D(InTexture, InSampler), 0));
+    vec2 step_value = one_texel * BlurDir;
+    float radius = max(Radius, 0.0);
+    vec4 blurred = vec4(0.0);
+    for (float a = -radius + 0.5; a <= radius; a += 2.0) {
+        blurred += texture(sampler2D(InTexture, InSampler), v_uv + step_value * a);
+    }
+    blurred += texture(sampler2D(InTexture, InSampler), v_uv + step_value * radius) * 0.5;
+    out_color = blurred / (radius + 0.5);
+}
+"#;
+
+pub const MINIMAL_ENTITY_OUTLINE_BLIT_FRAGMENT: &str = r#"#version 450
+layout(set = 0, binding = 0) uniform texture2D InTexture;
+layout(set = 0, binding = 1) uniform sampler InSampler;
+layout(set = 0, binding = 2, std140) uniform BlitConfig { vec4 ColorModulate; };
+layout(location = 0) in vec2 v_uv;
+layout(location = 0) out vec4 out_color;
+void main() {
+    out_color = texture(sampler2D(InTexture, InSampler), v_uv) * ColorModulate;
 }
 "#;
 
@@ -4744,6 +4911,7 @@ layout(location = 4) in vec2 v_light;
 layout(location = 5) in vec3 v_world_position;
 layout(location = 6) flat in vec4 v_animation_region;
 layout(location = 7) flat in vec4 v_animation_next_region;
+layout(location = 8) flat in vec4 v_overlay_color;
 // These locations are implementation details. The shader-pack contract names
 // the values terrain_lit_color, terrain_view_space_normal, and
 // terrain_material_auxiliary.
@@ -4760,6 +4928,9 @@ void main() {
         color = mix(color, next_color, clamp(v_material.z, 0.0, 1.0));
     }
     color *= v_color;
+    if (v_overlay_color.a > 0.0) {
+        color.rgb = mix(color.rgb, v_overlay_color.rgb, v_overlay_color.a);
+    }
     if (v_material.x > 0.0 && color.a < v_material.x) {
         discard;
     }
@@ -4888,6 +5059,7 @@ layout(location = 1) in vec4 v_color;
 layout(location = 2) flat in vec4 v_material;
 layout(location = 6) flat in vec4 v_animation_region;
 layout(location = 7) flat in vec4 v_animation_next_region;
+layout(location = 8) flat in vec4 v_overlay_color;
 layout(location = 0) out vec4 out_color;
 void main() {
     vec2 sample_uv = v_animation_region.xy + v_uv * v_animation_region.zw;
@@ -4898,6 +5070,9 @@ void main() {
         color = mix(color, next_color, clamp(v_material.z, 0.0, 1.0));
     }
     color *= v_color;
+    if (v_overlay_color.a > 0.0) {
+        color.rgb = mix(color.rgb, v_overlay_color.rgb, v_overlay_color.a);
+    }
     if (v_material.x > 0.0 && color.a < v_material.x) {
         discard;
     }
@@ -5056,6 +5231,7 @@ struct MeshInstance {
     vec4 material;
     vec4 animation_region;
     vec4 animation_next_region;
+    vec4 overlay_color;
 };
 layout(set = 0, binding = 1, std430) readonly buffer WorldMeshInstances {
     mat4 view;
@@ -5093,6 +5269,11 @@ layout(location = 1) in vec4 v_color;
 layout(location = 2) flat in vec4 v_material;
 layout(location = 6) flat in vec4 v_animation_region;
 layout(location = 7) flat in vec4 v_animation_next_region;
+// The shadow target carries explicit color attachments as part of the
+// backend-neutral pass contract. Keep those writes explicit even though the
+// depth result is the semantic output consumed by lighting.
+layout(location = 0) out vec4 out_shadow_color;
+layout(location = 1) out vec4 out_light_shaft;
 void main() {
     vec2 sample_uv = v_animation_region.xy + v_uv * v_animation_region.zw;
     vec4 color = texture(sampler2D(Tex0, Samp0), sample_uv);
@@ -5105,6 +5286,9 @@ void main() {
     if (v_material.x > 0.0 && color.a < v_material.x) {
         discard;
     }
+    out_shadow_color = vec4(0.0);
+    out_light_shaft = vec4(0.0);
+    gl_FragDepth = gl_FragCoord.z;
 }
 "#;
 
@@ -5141,6 +5325,31 @@ mod tests {
         TerrainSourceResourceBindings, TerrainSourceResourceRole,
         TerrainSourceSampledResourceShape, TERRAIN_RESOURCE_BINDINGS_PATH,
     };
+
+    #[test]
+    fn entity_outline_shader_contract_is_solid_color_and_preserves_alpha() {
+        assert!(MINIMAL_ENTITY_OUTLINE_VERTEX.contains("WorldMeshVertices"));
+        assert!(MINIMAL_ENTITY_OUTLINE_VERTEX.contains("v_outline_color = instance.color"));
+        assert!(MINIMAL_ENTITY_OUTLINE_FRAGMENT.contains("out_outline_color = v_outline_color"));
+        assert!(!MINIMAL_ENTITY_OUTLINE_FRAGMENT.contains("sampler2D"));
+    }
+
+    #[test]
+    fn entity_outline_fullscreen_contracts_use_explicit_vulkan_bindings() {
+        assert!(MINIMAL_ENTITY_OUTLINE_FULLSCREEN_VERTEX.contains("gl_VertexIndex"));
+        assert!(MINIMAL_ENTITY_OUTLINE_SOBEL_FRAGMENT.contains("binding = 0"));
+        assert!(MINIMAL_ENTITY_OUTLINE_SOBEL_FRAGMENT.contains("textureSize"));
+        assert!(MINIMAL_ENTITY_OUTLINE_BLUR_FRAGMENT.contains("binding = 2"));
+        assert!(MINIMAL_ENTITY_OUTLINE_BLIT_FRAGMENT.contains("ColorModulate"));
+        for source in [
+            MINIMAL_ENTITY_OUTLINE_FULLSCREEN_VERTEX,
+            MINIMAL_ENTITY_OUTLINE_SOBEL_FRAGMENT,
+            MINIMAL_ENTITY_OUTLINE_BLUR_FRAGMENT,
+            MINIMAL_ENTITY_OUTLINE_BLIT_FRAGMENT,
+        ] {
+            assert!(source.starts_with("#version 450"));
+        }
+    }
 
     #[test]
     fn minimal_distant_horizons_streams_keep_compact_micro_y_non_positional() {

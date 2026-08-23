@@ -9,6 +9,7 @@ use crate::render::vulkanic::world_primitive_frontend::{
     WorldFeatureCoverageFrame, WorldFirstPersonFrame, WorldLodRenderFrame,
     WorldShaderEnvironmentFrame, WorldVoxelVolumeFrame, WORLD_LOD_MAX_SEGMENTS_PER_COLUMN,
     WORLD_LOD_MAX_VERTICES_PER_SEGMENT, WORLD_MATERIAL_SOURCE_CLOUDS,
+    WORLD_MATERIAL_SOURCE_PARTICLES,
     WORLD_MATERIAL_SOURCE_TEXTURED, WORLD_MATERIAL_SOURCE_UNSPECIFIED,
     WORLD_MATERIAL_SOURCE_UV_LOCAL_TEXTURE, WORLD_MATERIAL_SOURCE_UV_MINECRAFT_BLOCK_ATLAS,
     WORLD_MATERIAL_SOURCE_WEATHER,
@@ -433,7 +434,7 @@ pub(crate) unsafe fn decode_whole_frame_submit(
     request: *const FfiWholeFrameSubmitRequest,
     capabilities: BackendCapabilities,
 ) -> GalResult<(u64, Handle, WorldPrimitiveFrame, Vec<GuiSpriteRequest>)> {
-    let (generation, frame_target, frame, gui_sprites, _, _) =
+    let (generation, frame_target, frame, gui_sprites, _, _, _, _, _) =
         decode_whole_frame_submit_with_gui(request, capabilities)?;
     Ok((generation, frame_target, frame, gui_sprites))
 }
@@ -448,6 +449,9 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_gui(
     Vec<GuiSpriteRequest>,
     Vec<GuiAffineQuadRequest>,
     Vec<GuiMeshBatchRequest>,
+    i32,
+    i32,
+    Vec<u8>,
 )> {
     decode_whole_frame_submit_with_backend_policy(request, capabilities, true)
 }
@@ -456,12 +460,33 @@ pub(crate) unsafe fn decode_world_primitive_submit(
     request: *const FfiWholeFrameSubmitRequest,
     capabilities: BackendCapabilities,
 ) -> GalResult<(u64, Handle, WorldPrimitiveFrame)> {
-    let (generation, frame_target, frame, gui_sprites, gui_affine_quads, gui_mesh_batches) =
+    let (
+        generation,
+        frame_target,
+        frame,
+        gui_sprites,
+        gui_affine_quads,
+        gui_mesh_batches,
+        gui_blur_before_stratum,
+        gui_blur_radius,
+        _post_effect_id,
+    ) =
         decode_whole_frame_submit_with_backend_policy(request, capabilities, false)?;
     if !gui_sprites.is_empty() || !gui_affine_quads.is_empty() || !gui_mesh_batches.is_empty() {
         return Err(GalError::ffi(
             StatusCode::InvalidArgument,
             "world primitive submit does not accept GUI work",
+        ));
+    }
+    if gui_blur_before_stratum >= 0 {
+        return Err(GalError::unsupported_feature(
+            "GUI blur is unavailable on the world-only submit route",
+        ));
+    }
+    if gui_blur_radius >= 0 && gui_blur_radius > 64 {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            "GUI blur radius must be within the bounded range 0..=64",
         ));
     }
     Ok((generation, frame_target, frame))
@@ -478,6 +503,9 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
     Vec<GuiSpriteRequest>,
     Vec<GuiAffineQuadRequest>,
     Vec<GuiMeshBatchRequest>,
+    i32,
+    i32,
+    Vec<u8>,
 )> {
     let request = read_struct(request, "whole-frame submit request")?;
     validate_header::<FfiWholeFrameSubmitRequest>(request.header)?;
@@ -509,6 +537,34 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
             StatusCode::InvalidArgument,
             "whole-frame submit requires positive GUI and viewport dimensions",
         ));
+    }
+    if request.gui_blur_before_stratum < -1 {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            "GUI blur boundary must be -1 or a non-negative source stratum index",
+        ));
+    }
+    if request.gui_blur_radius < -1 || request.gui_blur_radius > 64 {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            "GUI blur radius must be -1 or within the bounded range 0..=64",
+        ));
+    }
+    let post_effect_id =
+        read_bounded_bytes(request.post_effect_id, true, 256, "whole-frame post-effect id")?;
+    if !post_effect_id.is_empty() {
+        let id = std::str::from_utf8(&post_effect_id).map_err(|_| {
+            GalError::ffi(
+                StatusCode::InvalidArgument,
+                "whole-frame post-effect id must be UTF-8",
+            )
+        })?;
+        if id.trim().is_empty() || id.chars().any(char::is_control) {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                "whole-frame post-effect id is empty or contains control characters",
+            ));
+        }
     }
     let frame_target = Handle::from(request.frame_target);
     if frame_target.is_null() || frame_target.kind() != Some(HandleKind::FrameTarget) {
@@ -879,6 +935,7 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
             quad.source_program,
             WORLD_MATERIAL_SOURCE_UNSPECIFIED
                 | WORLD_MATERIAL_SOURCE_TEXTURED
+                | WORLD_MATERIAL_SOURCE_PARTICLES
                 | WORLD_MATERIAL_SOURCE_WEATHER
                 | WORLD_MATERIAL_SOURCE_CLOUDS
         ) {
@@ -1084,6 +1141,7 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
                 record.source_program,
                 WORLD_MATERIAL_SOURCE_UNSPECIFIED
                     | WORLD_MATERIAL_SOURCE_TEXTURED
+                    | WORLD_MATERIAL_SOURCE_PARTICLES
                     | WORLD_MATERIAL_SOURCE_WEATHER
                     | WORLD_MATERIAL_SOURCE_CLOUDS
             ) {
@@ -1264,6 +1322,7 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
             entity_id: instance.entity_id,
             entity_color_argb: instance.entity_color_argb,
             transform: instance.transform,
+            outline_color_argb: instance.outline_color_argb,
             viewport_width,
             viewport_height,
         });
@@ -1443,6 +1502,9 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
         gui_sprites,
         gui_affine_quads,
         gui_mesh_batches,
+        request.gui_blur_before_stratum,
+        request.gui_blur_radius,
+        post_effect_id,
     ))
 }
 
@@ -1559,6 +1621,7 @@ unsafe fn decode_world_first_person_mesh_instances(
             entity_id: instance.entity_id,
             entity_color_argb: instance.entity_color_argb,
             transform: instance.transform,
+            outline_color_argb: instance.outline_color_argb,
             viewport_width,
             viewport_height,
         });
@@ -2387,10 +2450,16 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_whole_frame_submit(
                     gui_sprites,
                     gui_affine_quads,
                     gui_mesh_batches,
+                    gui_blur_before_stratum,
+                    gui_blur_radius,
+                    post_effect_id,
                 )| {
                     let ffi_decode_nanos =
                         crate::render::vulkanic::metrics::elapsed_nanos_u64(decode_started);
                     let gui_started = std::time::Instant::now();
+                    context
+                        .world_primitive_frontend
+                        .validate_post_effect_request(&post_effect_id)?;
                     let (mut world_stats, gui_stats) = context
                         .world_primitive_frontend
                         .submit_whole_frame_with_gui_frontend(
@@ -2402,6 +2471,9 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_whole_frame_submit(
                             gui_sprites,
                             gui_affine_quads,
                             gui_mesh_batches,
+                            post_effect_id,
+                            gui_blur_before_stratum,
+                            gui_blur_radius,
                         )?;
                     let gui_frontend_nanos =
                         crate::render::vulkanic::metrics::elapsed_nanos_u64(gui_started);

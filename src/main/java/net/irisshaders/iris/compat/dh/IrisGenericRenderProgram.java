@@ -247,6 +247,9 @@ public class IrisGenericRenderProgram implements IDhApiGenericObjectShaderProgra
 
 	// Override ShaderProgram.bind()
 	public void bind(DhApiRenderParam renderParam) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris Distant Horizons shader binding is unavailable while Rust owns whole-frame presentation");
+		}
 		CommandContext ctx = VulkanicAPI.getCommandContext();
 		VulkanicAPI.bindVertexArray(ctx, va);
 		VulkanicAPI.bindShaderProgram(ctx, id);
@@ -280,6 +283,9 @@ public class IrisGenericRenderProgram implements IDhApiGenericObjectShaderProgra
 	}
 
 	public void unbind() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris Distant Horizons shader unbinding is unavailable while Rust owns whole-frame presentation");
+		}
 		CommandContext ctx = VulkanicAPI.getCommandContext();
 		VulkanicAPI.bindVertexArray(ctx, 0);
 		VulkanicAPI.bindShaderProgram(ctx, 0);
@@ -290,6 +296,9 @@ public class IrisGenericRenderProgram implements IDhApiGenericObjectShaderProgra
 
 	@Override
 	public void bindVertexBuffer(int i) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris Distant Horizons vertex-buffer binding is unavailable while Rust owns whole-frame presentation");
+		}
 		CommandContext ctx = VulkanicAPI.getCommandContext();
 		VulkanicAPI.bindBuffer(ctx, VulkanicBufferTarget.VERTEX, i);
 		VulkanicAPI.setVertexAttribPointer(ctx, 0, 3, VulkanicVertexAttributeType.FLOAT, false, 12, 0);

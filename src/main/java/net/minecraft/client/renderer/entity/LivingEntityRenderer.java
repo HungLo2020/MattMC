@@ -9,10 +9,64 @@ import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.EntityModel;
+import net.minecraft.client.model.DrownedModel;
+import net.minecraft.client.model.BatModel;
+import net.minecraft.client.model.BeeModel;
+import net.minecraft.client.model.AxolotlModel;
+import net.minecraft.client.model.FrogModel;
+import net.minecraft.client.model.SquidModel;
+import net.minecraft.client.model.GuardianModel;
+import net.minecraft.client.model.SpiderModel;
+import net.minecraft.client.model.SnowGolemModel;
+import net.minecraft.client.model.IronGolemModel;
+import net.minecraft.client.model.RavagerModel;
+import net.minecraft.client.model.VexModel;
+import net.minecraft.client.model.AllayModel;
+import net.minecraft.client.model.WitchModel;
+import net.minecraft.client.model.FoxModel;
+import net.minecraft.client.model.IllagerModel;
+import net.minecraft.client.model.CodModel;
+import net.minecraft.client.model.PufferfishBigModel;
+import net.minecraft.client.model.PufferfishMidModel;
+import net.minecraft.client.model.PufferfishSmallModel;
+import net.minecraft.client.model.OcelotModel;
+import net.minecraft.client.model.CatModel;
+import net.minecraft.client.model.WolfModel;
+import net.minecraft.client.model.ParrotModel;
+import net.minecraft.client.model.GhastModel;
+import net.minecraft.client.model.BlazeModel;
+import net.minecraft.client.model.LavaSlimeModel;
+import net.minecraft.client.model.HorseModel;
+import net.minecraft.client.model.DonkeyModel;
+import net.minecraft.client.model.LlamaModel;
+import net.minecraft.client.model.StriderModel;
+import net.minecraft.client.model.HoglinModel;
+import net.minecraft.client.model.CamelModel;
+import net.minecraft.client.model.PiglinModel;
+import net.minecraft.client.model.ZombifiedPiglinModel;
+import net.minecraft.client.model.SkeletonModel;
+import net.minecraft.client.model.BoggedModel;
+import net.minecraft.client.model.GiantZombieModel;
+import net.minecraft.client.model.ArmadilloModel;
+import net.minecraft.client.model.SnifferModel;
+import net.minecraft.client.model.GoatModel;
+import net.minecraft.client.model.TropicalFishModelA;
+import net.minecraft.client.model.TropicalFishModelB;
+import net.minecraft.client.model.PolarBearModel;
+import net.minecraft.client.model.DolphinModel;
+import net.minecraft.client.model.TurtleModel;
+import net.minecraft.client.model.PandaModel;
 import net.minecraft.client.model.ChickenModel;
 import net.minecraft.client.model.CowModel;
+import net.minecraft.client.model.CreeperModel;
+import net.minecraft.client.model.EndermiteModel;
 import net.minecraft.client.model.PigModel;
 import net.minecraft.client.model.RabbitModel;
+import net.minecraft.client.model.SheepModel;
+import net.minecraft.client.model.SlimeModel;
+import net.minecraft.client.model.SilverfishModel;
+import net.minecraft.client.model.SalmonModel;
+import net.minecraft.client.model.TadpoleModel;
 import net.minecraft.client.model.ZombieModel;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.RenderType;
@@ -20,10 +74,60 @@ import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.layers.HumanoidArmorLayer;
 import net.minecraft.client.renderer.entity.layers.RenderLayer;
 import net.minecraft.client.renderer.entity.state.HitboxRenderState;
+import net.minecraft.client.renderer.entity.state.BatRenderState;
+import net.minecraft.client.renderer.entity.state.BeeRenderState;
+import net.minecraft.client.renderer.entity.state.AxolotlRenderState;
+import net.minecraft.client.renderer.entity.state.FrogRenderState;
+import net.minecraft.client.renderer.entity.state.SquidRenderState;
+import net.minecraft.client.renderer.entity.state.GuardianRenderState;
+import net.minecraft.client.renderer.entity.state.SnowGolemRenderState;
+import net.minecraft.client.renderer.entity.state.IronGolemRenderState;
+import net.minecraft.client.renderer.entity.state.RavagerRenderState;
+import net.minecraft.client.renderer.entity.state.VexRenderState;
+import net.minecraft.client.renderer.entity.state.AllayRenderState;
+import net.minecraft.client.renderer.entity.state.WitchRenderState;
+import net.minecraft.client.renderer.entity.state.FoxRenderState;
+import net.minecraft.client.renderer.entity.state.EvokerRenderState;
+import net.minecraft.client.renderer.entity.state.IllagerRenderState;
+import net.minecraft.client.renderer.entity.state.SalmonRenderState;
+import net.minecraft.client.renderer.entity.state.PufferfishRenderState;
+import net.minecraft.client.renderer.entity.state.FelineRenderState;
+import net.minecraft.client.renderer.entity.state.CatRenderState;
+import net.minecraft.client.renderer.entity.state.WolfRenderState;
+import net.minecraft.client.renderer.entity.state.ParrotRenderState;
+import net.minecraft.client.renderer.entity.state.GhastRenderState;
+import net.minecraft.client.renderer.entity.state.HorseRenderState;
+import net.minecraft.client.renderer.entity.state.DonkeyRenderState;
+import net.minecraft.client.renderer.entity.state.LlamaRenderState;
+import net.minecraft.client.renderer.entity.state.StriderRenderState;
+import net.minecraft.client.renderer.entity.state.HoglinRenderState;
+import net.minecraft.client.renderer.entity.state.CamelRenderState;
+import net.minecraft.client.renderer.entity.state.HumanoidRenderState;
+import net.minecraft.client.renderer.entity.state.SkeletonRenderState;
+import net.minecraft.client.renderer.entity.state.BoggedRenderState;
+import net.minecraft.client.renderer.entity.state.ArmadilloRenderState;
+import net.minecraft.client.renderer.entity.state.SnifferRenderState;
+import net.minecraft.client.renderer.entity.state.NautilusRenderState;
+import net.minecraft.client.renderer.entity.state.PhantomRenderState;
+import net.minecraft.client.renderer.entity.state.WardenRenderState;
+import net.minecraft.client.renderer.entity.state.CreakingRenderState;
+import net.minecraft.client.renderer.entity.state.BreezeRenderState;
+import net.minecraft.client.renderer.entity.state.EndermanRenderState;
+import net.minecraft.client.renderer.entity.state.CopperGolemRenderState;
+import net.minecraft.client.renderer.entity.state.WitherRenderState;
+import net.minecraft.client.renderer.entity.state.GoatRenderState;
+import net.minecraft.client.renderer.entity.state.TropicalFishRenderState;
+import net.minecraft.client.renderer.entity.state.PolarBearRenderState;
+import net.minecraft.client.renderer.entity.state.DolphinRenderState;
+import net.minecraft.client.renderer.entity.state.TurtleRenderState;
+import net.minecraft.client.renderer.entity.state.PandaRenderState;
 import net.minecraft.client.renderer.entity.state.ChickenRenderState;
 import net.minecraft.client.renderer.entity.state.CowRenderState;
+import net.minecraft.client.renderer.entity.state.CreeperRenderState;
 import net.minecraft.client.renderer.entity.state.PigRenderState;
 import net.minecraft.client.renderer.entity.state.RabbitRenderState;
+import net.minecraft.client.renderer.entity.state.SheepRenderState;
+import net.minecraft.client.renderer.entity.state.SlimeRenderState;
 import net.minecraft.client.renderer.entity.state.ZombieRenderState;
 import net.minecraft.client.renderer.entity.state.LivingEntityRenderState;
 import net.minecraft.client.renderer.item.ItemModelResolver;
@@ -75,6 +179,17 @@ public abstract class LivingEntityRenderer<T extends LivingEntity, S extends Liv
 		return this.model;
 	}
 
+	/** Applies the copied semantic model pose used by Rust GUI entity PIPs. */
+	public void applySemanticModelPose(S state, PoseStack poseStack) {
+		float scale = state.scale;
+		poseStack.scale(scale, scale, scale);
+		this.setupRotations(state, poseStack, state.bodyRot, scale);
+		poseStack.scale(-1.0F, -1.0F, 1.0F);
+		this.scale(state, poseStack);
+		poseStack.translate(0.0F, -1.501F, 0.0F);
+		this.model.setupAnim(state);
+	}
+
 	public AABB getBoundingBoxForCulling(T livingEntity) {
 		AABB aABB = super.getBoundingBoxForCulling(livingEntity);
 		if (livingEntity.getItemBySlot(EquipmentSlot.HEAD).is(Items.DRAGON_HEAD)) {
@@ -112,18 +227,228 @@ public abstract class LivingEntityRenderer<T extends LivingEntity, S extends Liv
 			ResourceLocation entityIdentity = net.vulkanic.world.RustGalWorldPrimitiveRenderer.entityIdentity(livingEntityRenderState);
 			boolean rustLivingModelFamily = this.model.getClass() == ChickenModel.class
 				&& livingEntityRenderState instanceof ChickenRenderState
+				|| this.model != null
+					&& this.model.getClass() == net.minecraft.client.model.ArmorStandModel.class
+					&& livingEntityRenderState instanceof net.minecraft.client.renderer.entity.state.ArmorStandRenderState
+				|| this.model != null
+					&& this.model.getClass() == net.minecraft.client.model.VillagerModel.class
+					&& livingEntityRenderState instanceof net.minecraft.client.renderer.entity.state.VillagerRenderState
+				|| this.model != null
+					&& this.model.getClass() == net.minecraft.client.model.ZombieVillagerModel.class
+					&& livingEntityRenderState instanceof net.minecraft.client.renderer.entity.state.ZombieVillagerRenderState
 				|| this.model instanceof CowModel
 					&& livingEntityRenderState instanceof CowRenderState
 				|| this.model != null
-					&& this.model.getClass() == PigModel.class
+					&& this.model instanceof PigModel
 					&& livingEntityRenderState instanceof PigRenderState
 				|| this.model != null
 					&& this.model.getClass() == ZombieModel.class
 					&& livingEntityRenderState instanceof ZombieRenderState
 				|| this.model != null
 					&& this.model.getClass() == RabbitModel.class
-					&& livingEntityRenderState instanceof RabbitRenderState;
-			boolean rustLivingModelEligible = entityIdentity != null && (this.model.getClass() == ChickenModel.class
+					&& livingEntityRenderState instanceof RabbitRenderState
+				|| this.model != null
+					&& this.model.getClass() == SheepModel.class
+					&& livingEntityRenderState instanceof SheepRenderState
+				|| this.model != null
+					&& this.model.getClass() == CreeperModel.class
+					&& livingEntityRenderState instanceof CreeperRenderState
+				|| this.model != null
+					&& this.model.getClass() == SlimeModel.class
+					&& livingEntityRenderState instanceof SlimeRenderState
+				|| this.model != null
+					&& this.model.getClass() == LavaSlimeModel.class
+					&& livingEntityRenderState instanceof SlimeRenderState
+				|| this.model != null
+					&& this.model.getClass() == HorseModel.class
+					&& livingEntityRenderState instanceof HorseRenderState
+				|| this.model != null
+					&& this.model.getClass() == DonkeyModel.class
+					&& livingEntityRenderState instanceof DonkeyRenderState
+				|| this.model != null
+					&& this.model.getClass() == LlamaModel.class
+					&& livingEntityRenderState instanceof LlamaRenderState
+				|| this.model != null
+					&& this.model.getClass() == StriderModel.class
+					&& livingEntityRenderState instanceof StriderRenderState
+				|| this.model != null
+					&& this.model.getClass() == HoglinModel.class
+					&& livingEntityRenderState instanceof HoglinRenderState
+				|| this.model != null
+					&& this.model.getClass() == CamelModel.class
+					&& livingEntityRenderState instanceof CamelRenderState
+				|| this.model != null
+					&& (this.model.getClass() == PiglinModel.class || this.model.getClass() == ZombifiedPiglinModel.class)
+					&& livingEntityRenderState instanceof HumanoidRenderState
+				|| this.model != null
+					&& this.model.getClass() == SkeletonModel.class
+					&& livingEntityRenderState instanceof SkeletonRenderState
+				|| this.model != null
+					&& this.model.getClass() == BoggedModel.class
+					&& livingEntityRenderState instanceof BoggedRenderState
+				|| this.model != null
+					&& this.model.getClass() == GiantZombieModel.class
+					&& livingEntityRenderState instanceof ZombieRenderState
+				|| this.model != null
+					&& this.model.getClass() == ArmadilloModel.class
+					&& livingEntityRenderState instanceof ArmadilloRenderState
+				|| this.model != null
+					&& this.model.getClass() == SnifferModel.class
+					&& livingEntityRenderState instanceof SnifferRenderState
+				|| this.model != null
+					&& this.model.getClass() == net.minecraft.client.model.animal.nautilus.NautilusModel.class
+					&& livingEntityRenderState instanceof NautilusRenderState
+				|| this.model != null
+					&& this.model.getClass() == net.minecraft.client.model.PhantomModel.class
+					&& livingEntityRenderState instanceof PhantomRenderState
+				|| this.model != null
+					&& this.model.getClass() == net.minecraft.client.model.WardenModel.class
+					&& livingEntityRenderState instanceof WardenRenderState
+				|| this.model != null
+					&& this.model.getClass() == net.minecraft.client.model.CreakingModel.class
+					&& livingEntityRenderState instanceof CreakingRenderState
+				|| this.model != null
+					&& this.model.getClass() == net.minecraft.client.model.BreezeModel.class
+					&& livingEntityRenderState instanceof BreezeRenderState
+				|| this.model != null
+					&& this.model.getClass() == net.minecraft.client.model.EndermanModel.class
+					&& livingEntityRenderState instanceof EndermanRenderState
+				|| this.model != null
+					&& this.model.getClass() == net.minecraft.client.model.CopperGolemModel.class
+					&& livingEntityRenderState instanceof CopperGolemRenderState
+				|| this.model != null
+					&& this.model.getClass() == net.minecraft.client.model.WitherBossModel.class
+					&& livingEntityRenderState instanceof WitherRenderState
+				|| this.model != null
+					&& this.model.getClass() == DrownedModel.class
+					&& livingEntityRenderState instanceof ZombieRenderState
+				|| this.model != null
+					&& this.model.getClass() == EndermiteModel.class
+				|| this.model != null
+					&& this.model.getClass() == SilverfishModel.class
+				|| this.model != null
+					&& this.model.getClass() == BatModel.class
+					&& livingEntityRenderState instanceof BatRenderState
+				|| this.model != null
+					&& this.model.getClass() == CodModel.class
+				|| this.model != null
+					&& this.model.getClass() == SalmonModel.class
+					&& livingEntityRenderState instanceof SalmonRenderState
+				|| this.model != null
+					&& (this.model.getClass() == PufferfishBigModel.class
+						|| this.model.getClass() == PufferfishMidModel.class
+						|| this.model.getClass() == PufferfishSmallModel.class)
+					&& livingEntityRenderState instanceof PufferfishRenderState
+				|| this.model != null
+					&& this.model.getClass() == TadpoleModel.class
+				|| this.model != null
+					&& this.model.getClass() == OcelotModel.class
+					&& livingEntityRenderState instanceof FelineRenderState
+				|| this.model != null
+					&& this.model.getClass() == CatModel.class
+					&& livingEntityRenderState instanceof CatRenderState
+				|| this.model != null
+					&& this.model.getClass() == WolfModel.class
+					&& livingEntityRenderState instanceof WolfRenderState
+				|| this.model != null
+					&& this.model.getClass() == ParrotModel.class
+					&& livingEntityRenderState instanceof ParrotRenderState
+				|| this.model != null
+					&& this.model.getClass() == GhastModel.class
+					&& livingEntityRenderState instanceof GhastRenderState
+				|| this.model != null
+					&& this.model.getClass() == net.minecraft.client.model.HappyGhastModel.class
+					&& livingEntityRenderState instanceof net.minecraft.client.renderer.entity.state.HappyGhastRenderState
+				|| this.model != null
+					&& this.model.getClass() == BlazeModel.class
+					&& livingEntityRenderState instanceof LivingEntityRenderState
+				|| this.model != null
+					&& this.model.getClass() == GoatModel.class
+					&& livingEntityRenderState instanceof GoatRenderState
+				|| this.model != null
+					&& (this.model.getClass() == TropicalFishModelA.class || this.model.getClass() == TropicalFishModelB.class)
+					&& livingEntityRenderState instanceof TropicalFishRenderState
+				|| this.model != null
+					&& this.model.getClass() == PolarBearModel.class
+					&& livingEntityRenderState instanceof PolarBearRenderState
+				|| this.model != null
+					&& this.model.getClass() == DolphinModel.class
+					&& livingEntityRenderState instanceof DolphinRenderState
+				|| this.model != null
+					&& this.model.getClass() == TurtleModel.class
+					&& livingEntityRenderState instanceof TurtleRenderState
+				|| this.model != null
+					&& this.model.getClass() == PandaModel.class
+					&& livingEntityRenderState instanceof PandaRenderState
+				|| this.model != null
+					&& this.model.getClass() == BeeModel.class
+					&& livingEntityRenderState instanceof BeeRenderState
+				|| this.model != null
+					&& this.model.getClass() == AxolotlModel.class
+					&& livingEntityRenderState instanceof AxolotlRenderState
+				|| this.model != null
+					&& this.model.getClass() == FrogModel.class
+					&& livingEntityRenderState instanceof FrogRenderState
+				|| this.model != null
+					&& this.model.getClass() == SquidModel.class
+					&& livingEntityRenderState instanceof SquidRenderState
+				|| this.model != null
+					&& this.model.getClass() == GuardianModel.class
+					&& livingEntityRenderState instanceof GuardianRenderState
+				|| this.model != null
+					&& this.model.getClass() == SpiderModel.class
+					&& livingEntityRenderState instanceof LivingEntityRenderState
+				|| this.model != null
+					&& this.model.getClass() == SnowGolemModel.class
+					&& livingEntityRenderState instanceof SnowGolemRenderState
+				|| this.model != null
+					&& this.model.getClass() == IronGolemModel.class
+					&& livingEntityRenderState instanceof IronGolemRenderState
+				|| this.model != null
+					&& this.model.getClass() == RavagerModel.class
+					&& livingEntityRenderState instanceof RavagerRenderState
+				|| this.model != null
+					&& this.model.getClass() == VexModel.class
+					&& livingEntityRenderState instanceof VexRenderState
+				|| this.model != null
+					&& this.model.getClass() == AllayModel.class
+					&& livingEntityRenderState instanceof AllayRenderState
+				|| this.model != null
+					&& this.model.getClass() == WitchModel.class
+					&& livingEntityRenderState instanceof WitchRenderState
+				|| this.model != null
+					&& this.model.getClass() == FoxModel.class
+					&& livingEntityRenderState instanceof FoxRenderState
+				|| this.model instanceof IllagerModel
+					&& livingEntityRenderState instanceof EvokerRenderState
+				|| this.model instanceof IllagerModel
+					&& livingEntityRenderState instanceof IllagerRenderState;
+			boolean rustLivingModelEligible = entityIdentity != null && (this.model.getClass() == net.minecraft.client.model.ArmorStandModel.class
+				&& livingEntityRenderState instanceof net.minecraft.client.renderer.entity.state.ArmorStandRenderState armorStandRenderState
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaArmorStandModelMeshEligible(
+					this.model,
+					armorStandRenderState,
+					renderType,
+					textureIdentity,
+					i,
+					livingEntityRenderState.outlineColor,
+					bl,
+					bl2,
+					livingEntityRenderState.appearsGlowing()
+				)
+				|| this.model.getClass() == net.minecraft.client.model.VillagerModel.class
+				&& livingEntityRenderState instanceof net.minecraft.client.renderer.entity.state.VillagerRenderState villagerRenderState
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaVillagerModelMeshEligible(
+					this.model, villagerRenderState, renderType, textureIdentity, i,
+					livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+				)
+				|| this.model.getClass() == net.minecraft.client.model.ZombieVillagerModel.class
+				&& livingEntityRenderState instanceof net.minecraft.client.renderer.entity.state.ZombieVillagerRenderState zombieVillagerRenderState
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaZombieVillagerModelMeshEligible(
+					this.model, zombieVillagerRenderState, renderType, textureIdentity, i,
+					livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+				)
+				|| this.model.getClass() == ChickenModel.class
 				&& livingEntityRenderState instanceof ChickenRenderState chickenRenderState
 				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaChickenModelMeshEligible(
 					this.model,
@@ -150,7 +475,7 @@ public abstract class LivingEntityRenderer<T extends LivingEntity, S extends Liv
 					livingEntityRenderState.appearsGlowing()
 				)
 				|| this.model != null
-					&& this.model.getClass() == PigModel.class
+					&& this.model instanceof PigModel
 					&& livingEntityRenderState instanceof PigRenderState pigRenderState
 					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaPigModelMeshEligible(
 						this.model,
@@ -162,6 +487,55 @@ public abstract class LivingEntityRenderer<T extends LivingEntity, S extends Liv
 						bl,
 						bl2,
 						livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == CatModel.class
+					&& livingEntityRenderState instanceof CatRenderState catRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaCatModelMeshEligible(
+						this.model, catRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == WolfModel.class
+					&& livingEntityRenderState instanceof WolfRenderState wolfRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaWolfModelMeshEligible(
+						this.model, wolfRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == ParrotModel.class
+					&& livingEntityRenderState instanceof ParrotRenderState parrotRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaParrotModelMeshEligible(
+						this.model, parrotRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == GhastModel.class
+					&& livingEntityRenderState instanceof GhastRenderState ghastRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaGhastModelMeshEligible(
+						this.model, ghastRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == net.minecraft.client.model.HappyGhastModel.class
+					&& livingEntityRenderState instanceof net.minecraft.client.renderer.entity.state.HappyGhastRenderState happyGhastRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaHappyGhastModelMeshEligible(
+						this.model, happyGhastRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == BlazeModel.class
+					&& livingEntityRenderState instanceof LivingEntityRenderState blazeRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaBlazeModelMeshEligible(
+						this.model, blazeRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == FoxModel.class
+					&& livingEntityRenderState instanceof FoxRenderState foxRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaFoxModelMeshEligible(
+						this.model, foxRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
 					)
 				|| this.model != null
 					&& this.model.getClass() == ZombieModel.class
@@ -190,6 +564,380 @@ public abstract class LivingEntityRenderer<T extends LivingEntity, S extends Liv
 						bl,
 						bl2,
 						livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == SheepModel.class
+					&& livingEntityRenderState instanceof SheepRenderState sheepRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaSheepModelMeshEligible(
+						this.model, sheepRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == CreeperModel.class
+					&& livingEntityRenderState instanceof CreeperRenderState creeperRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaCreeperModelMeshEligible(
+						this.model, creeperRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == SlimeModel.class
+					&& livingEntityRenderState instanceof SlimeRenderState slimeRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaSlimeModelMeshEligible(
+						this.model, slimeRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == LavaSlimeModel.class
+					&& livingEntityRenderState instanceof SlimeRenderState magmaCubeRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaMagmaCubeModelMeshEligible(
+						this.model, magmaCubeRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == HorseModel.class
+					&& livingEntityRenderState instanceof HorseRenderState horseRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaHorseModelMeshEligible(
+						this.model, horseRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == DonkeyModel.class
+					&& livingEntityRenderState instanceof DonkeyRenderState donkeyRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaDonkeyModelMeshEligible(
+						this.model, donkeyRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == LlamaModel.class
+					&& livingEntityRenderState instanceof LlamaRenderState llamaRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaLlamaModelMeshEligible(
+						this.model, llamaRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == StriderModel.class
+					&& livingEntityRenderState instanceof StriderRenderState striderRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaStriderModelMeshEligible(
+						this.model, striderRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == HoglinModel.class
+					&& livingEntityRenderState instanceof HoglinRenderState hoglinRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaHoglinModelMeshEligible(
+						this.model, hoglinRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == CamelModel.class
+					&& livingEntityRenderState instanceof CamelRenderState camelRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaCamelModelMeshEligible(
+						this.model, camelRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& (this.model.getClass() == PiglinModel.class || this.model.getClass() == ZombifiedPiglinModel.class)
+					&& livingEntityRenderState instanceof HumanoidRenderState piglinRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaPiglinModelMeshEligible(
+						this.model, piglinRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == SkeletonModel.class
+					&& livingEntityRenderState instanceof SkeletonRenderState skeletonRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaSkeletonModelMeshEligible(
+						this.model, skeletonRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == SkeletonModel.class
+					&& livingEntityRenderState instanceof SkeletonRenderState strayRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaStrayModelMeshEligible(
+						this.model, strayRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == BoggedModel.class
+					&& livingEntityRenderState instanceof BoggedRenderState boggedRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaBoggedModelMeshEligible(
+						this.model, boggedRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == GiantZombieModel.class
+					&& livingEntityRenderState instanceof ZombieRenderState giantRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaGiantModelMeshEligible(
+						this.model, giantRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == ArmadilloModel.class
+					&& livingEntityRenderState instanceof ArmadilloRenderState armadilloRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaArmadilloModelMeshEligible(
+						this.model, armadilloRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == SnifferModel.class
+					&& livingEntityRenderState instanceof SnifferRenderState snifferRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaSnifferModelMeshEligible(
+						this.model, snifferRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == net.minecraft.client.model.animal.nautilus.NautilusModel.class
+					&& livingEntityRenderState instanceof NautilusRenderState nautilusRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaNautilusModelMeshEligible(
+						this.model, nautilusRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == net.minecraft.client.model.PhantomModel.class
+					&& livingEntityRenderState instanceof PhantomRenderState phantomRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaPhantomModelMeshEligible(
+						this.model, phantomRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == net.minecraft.client.model.WardenModel.class
+					&& livingEntityRenderState instanceof WardenRenderState wardenRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaWardenModelMeshEligible(
+						this.model, wardenRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == net.minecraft.client.model.CreakingModel.class
+					&& livingEntityRenderState instanceof CreakingRenderState creakingRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaCreakingModelMeshEligible(
+						this.model, creakingRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == net.minecraft.client.model.BreezeModel.class
+					&& livingEntityRenderState instanceof BreezeRenderState breezeRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaBreezeModelMeshEligible(
+						this.model, breezeRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == net.minecraft.client.model.EndermanModel.class
+					&& livingEntityRenderState instanceof EndermanRenderState endermanRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaEndermanModelMeshEligible(
+						this.model, endermanRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == net.minecraft.client.model.CopperGolemModel.class
+					&& livingEntityRenderState instanceof CopperGolemRenderState copperGolemRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaCopperGolemModelMeshEligible(
+						this.model, copperGolemRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == net.minecraft.client.model.WitherBossModel.class
+					&& livingEntityRenderState instanceof WitherRenderState witherRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaWitherModelMeshEligible(
+						this.model, witherRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == DrownedModel.class
+					&& livingEntityRenderState instanceof ZombieRenderState drownedRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaDrownedModelMeshEligible(
+						this.model, drownedRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == EndermiteModel.class
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaEndermiteModelMeshEligible(
+						this.model, livingEntityRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == SilverfishModel.class
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaSilverfishModelMeshEligible(
+						this.model, livingEntityRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == BatModel.class
+					&& livingEntityRenderState instanceof BatRenderState batRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaBatModelMeshEligible(
+						this.model, batRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == CodModel.class
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaCodModelMeshEligible(
+						this.model, livingEntityRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == SalmonModel.class
+					&& livingEntityRenderState instanceof SalmonRenderState salmonRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaSalmonModelMeshEligible(
+						this.model, salmonRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& (this.model.getClass() == PufferfishBigModel.class
+						|| this.model.getClass() == PufferfishMidModel.class
+						|| this.model.getClass() == PufferfishSmallModel.class)
+					&& livingEntityRenderState instanceof PufferfishRenderState pufferfishRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaPufferfishModelMeshEligible(
+						this.model, pufferfishRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == TadpoleModel.class
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaTadpoleModelMeshEligible(
+						this.model, livingEntityRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == OcelotModel.class
+					&& livingEntityRenderState instanceof FelineRenderState felineRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaOcelotModelMeshEligible(
+						this.model, felineRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == GoatModel.class
+					&& livingEntityRenderState instanceof GoatRenderState goatRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaGoatModelMeshEligible(
+						this.model, goatRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& (this.model.getClass() == TropicalFishModelA.class || this.model.getClass() == TropicalFishModelB.class)
+					&& livingEntityRenderState instanceof TropicalFishRenderState tropicalFishRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaTropicalFishModelMeshEligible(
+						this.model, tropicalFishRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == PolarBearModel.class
+					&& livingEntityRenderState instanceof PolarBearRenderState polarBearRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaPolarBearModelMeshEligible(
+						this.model, polarBearRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == DolphinModel.class
+					&& livingEntityRenderState instanceof DolphinRenderState dolphinRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaDolphinModelMeshEligible(
+						this.model, dolphinRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == TurtleModel.class
+					&& livingEntityRenderState instanceof TurtleRenderState turtleRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaTurtleModelMeshEligible(
+						this.model, turtleRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == PandaModel.class
+					&& livingEntityRenderState instanceof PandaRenderState pandaRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaPandaModelMeshEligible(
+						this.model, pandaRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == BeeModel.class
+					&& livingEntityRenderState instanceof BeeRenderState beeRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaBeeModelMeshEligible(
+						this.model, beeRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == AxolotlModel.class
+					&& livingEntityRenderState instanceof AxolotlRenderState axolotlRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaAxolotlModelMeshEligible(
+						this.model, axolotlRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == FrogModel.class
+					&& livingEntityRenderState instanceof FrogRenderState frogRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaFrogModelMeshEligible(
+						this.model, frogRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == SquidModel.class
+					&& livingEntityRenderState instanceof SquidRenderState squidRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaSquidModelMeshEligible(
+						this.model, squidRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == GuardianModel.class
+					&& livingEntityRenderState instanceof GuardianRenderState guardianRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaGuardianModelMeshEligible(
+						this.model, guardianRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == SpiderModel.class
+					&& livingEntityRenderState instanceof LivingEntityRenderState spiderRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaSpiderModelMeshEligible(
+						this.model, spiderRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == SnowGolemModel.class
+					&& livingEntityRenderState instanceof SnowGolemRenderState snowGolemRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaSnowGolemModelMeshEligible(
+						this.model, snowGolemRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == IronGolemModel.class
+					&& livingEntityRenderState instanceof IronGolemRenderState ironGolemRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaIronGolemModelMeshEligible(
+						this.model, ironGolemRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == RavagerModel.class
+					&& livingEntityRenderState instanceof RavagerRenderState ravagerRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaRavagerModelMeshEligible(
+						this.model, ravagerRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == VexModel.class
+					&& livingEntityRenderState instanceof VexRenderState vexRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaVexModelMeshEligible(
+						this.model, vexRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == AllayModel.class
+					&& livingEntityRenderState instanceof AllayRenderState allayRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaAllayModelMeshEligible(
+						this.model, allayRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model != null
+					&& this.model.getClass() == WitchModel.class
+					&& livingEntityRenderState instanceof WitchRenderState witchRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaWitchModelMeshEligible(
+						this.model, witchRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model instanceof IllagerModel
+					&& livingEntityRenderState instanceof EvokerRenderState evokerRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaEvokerModelMeshEligible(
+						this.model, evokerRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
+					)
+				|| this.model instanceof IllagerModel
+					&& livingEntityRenderState instanceof IllagerRenderState illagerRenderState
+					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaVindicatorOrPillagerModelMeshEligible(
+						this.model, illagerRenderState, renderType, textureIdentity, i,
+						livingEntityRenderState.outlineColor, bl, bl2, livingEntityRenderState.appearsGlowing()
 					));
 			var rustLivingModelOwnership = net.vulkanic.world.LivingEntityBaseModelOwnershipPolicy.currentOwnershipRoute(rustLivingModelFamily);
 			boolean semanticSubmission = EntityRenderDispatcher.isSemanticSubmission();
@@ -199,7 +947,7 @@ public abstract class LivingEntityRenderer<T extends LivingEntity, S extends Liv
 			if (rustLivingModelDisposition == net.vulkanic.world.LivingEntityBaseModelOwnershipPolicy.Disposition.RUST_AVAILABLE) {
 				if (!net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMesh(
 					this.model, livingEntityRenderState, poseStack.last(), renderType, textureIdentity, entityIdentity,
-					livingEntityRenderState.lightCoords, i, k
+					livingEntityRenderState.lightCoords, i, k, livingEntityRenderState.outlineColor
 				)) {
 					throw new IllegalStateException("Rust whole-frame living-model route selected without a copied indexed mesh request");
 				}
@@ -210,6 +958,12 @@ public abstract class LivingEntityRenderer<T extends LivingEntity, S extends Liv
 				net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
 					"rust-vulkan-unavailable", textureIdentity, this.model.getClass().getName(), livingEntityRenderState.entityId, false, false, false
 				);
+				// Keep the explicit route fail-closed when a copied semantic asset is
+				// temporarily unavailable (for example during a resource reload). Do
+				// not fall back to Java rendering or leak a backend texture handle; the
+				// entity is simply absent from this frame until the Rust asset becomes
+				// available again.
+				return;
 			} else {
 				if (rustLivingModelFamily && !semanticSubmission) {
 					net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
@@ -222,9 +976,24 @@ public abstract class LivingEntityRenderer<T extends LivingEntity, S extends Liv
 						rustLivingModelOwnership.usesJavaCompatibility()
 					);
 				}
-				submitNodeCollector.submitModel(
-					this.model, livingEntityRenderState, poseStack, renderType, livingEntityRenderState.lightCoords, i, k, null, livingEntityRenderState.outlineColor, null
-				);
+				// Every living-entity base callsite already has an immutable direct
+				// texture identity. Preserve that semantic input for the generic Rust
+				// mesh route instead of discarding it into the atlas-only submit path;
+				// the collector still performs bounded copied-asset admission and the
+				// legacy route remains unchanged when Rust whole-frame ownership is off.
+				if (textureIdentity != null) {
+					submitNodeCollector.submitModelSemanticTexture(
+						this.model, livingEntityRenderState, poseStack, renderType,
+						livingEntityRenderState.lightCoords, i, k, textureIdentity,
+						livingEntityRenderState.outlineColor, null
+					);
+				} else {
+					submitNodeCollector.submitModel(
+						this.model, livingEntityRenderState, poseStack, renderType,
+						livingEntityRenderState.lightCoords, i, k, null,
+						livingEntityRenderState.outlineColor, null
+					);
+				}
 			}
 		}
 

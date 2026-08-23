@@ -86,11 +86,17 @@ public class TerrainParticle extends SingleQuadParticle {
 		long startNanos = System.nanoTime();
 		GraphicsFrameBenchmark.beginPhase("game.particles.terrain.extract");
 		if (Boolean.getBoolean("mattmc.dev.rustGalWorldMaterial.terrainParticle.disabled")) {
+			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+				throw new IllegalStateException("Rust whole-frame terrain particle route cannot be disabled");
+			}
 			GraphicsFrameBenchmark.endPhase("game.particles.terrain.extract");
 			GraphicsFrameBenchmark.recordTerrainParticleExtraction("disabled", this.blockState, System.nanoTime() - startNanos);
 			return;
 		}
 		if (Boolean.getBoolean("mattmc.dev.rustGalWorldMaterial.terrainParticle.legacyControl")) {
+			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+				throw new IllegalStateException("Rust whole-frame terrain particles cannot use the Java legacy control path");
+			}
 			super.extract(quadParticleRenderState, camera, f);
 			GraphicsFrameBenchmark.endPhase("game.particles.terrain.extract");
 			GraphicsFrameBenchmark.recordTerrainParticleExtraction("java-legacy", this.blockState, System.nanoTime() - startNanos);
@@ -99,6 +105,9 @@ public class TerrainParticle extends SingleQuadParticle {
 		if (this.enqueueRustGal(camera, f)) {
 			GraphicsFrameBenchmark.endPhase("game.particles.terrain.extract");
 			return;
+		}
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Rust whole-frame terrain particle semantics were rejected; Java particle extraction is not a fallback");
 		}
 		super.extract(quadParticleRenderState, camera, f);
 		GraphicsFrameBenchmark.endPhase("game.particles.terrain.extract");

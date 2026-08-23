@@ -47,6 +47,8 @@ import net.minecraft.client.renderer.RenderStateShard;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.player.AvatarRenderer;
+import net.vulkanic.VulkanicAPI;
+import net.vulkanic.world.WorldRenderRoutePolicy;
 import net.minecraft.client.tacz.TaczGlock17AnimationController;
 import net.minecraft.client.tacz.TaczGunRefitScreen;
 import net.minecraft.client.tacz.TaczKeyMappings;
@@ -78,6 +80,7 @@ import net.vulkanic.VulkanicClearBuffer;
 
 @Environment(EnvType.CLIENT)
 public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
+	private static final int MAX_SEMANTIC_BEDROCK_QUADS = 16_384;
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private static final Set<String> FUNCTIONAL_MARKER_NODES = Set.of("lefthand_pos", "righthand_pos", "muzzle_flash", "shell");
 	private static final Pattern TACZ_NUMBERED_NODE = Pattern.compile("^(.*?)(?:_(\\d+))?$");
@@ -179,7 +182,21 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 		this.applyTaczTransform(itemDisplayContext, poseStack, animationPose, itemStack);
 		RenderType gunRenderType = RenderType.entityCutoutNoCull(this.texture);
 		ScopedAttachment scopedAttachment = this.scopedAttachment(itemStack, itemDisplayContext, animationPose);
-		if (scopedAttachment != null) {
+		boolean rustWholeFrame = VulkanicAPI.isVulkanBackendSelected()
+			&& WorldRenderRoutePolicy.currentTexturedBillboardRoute().usesRustWholeFrameVulkan()
+			&& !submitNodeCollector.isSemanticCoverageOnly();
+		if (!submitNodeCollector.isSemanticCoverageOnly()
+			&& VulkanicAPI.isVulkanBackendSelected()
+			&& net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			&& !WorldRenderRoutePolicy.currentTexturedBillboardRoute().usesRustWholeFrameVulkan()) {
+			throw new IllegalStateException("Rust whole-frame TACZ route is unavailable; Java custom gun geometry is not a fallback");
+		}
+		if (rustWholeFrame) {
+			if (!this.submitSemanticBedrockRoots(poseStack, itemDisplayContext, animationPose, gunRenderContext, this.geometry.roots(), this.texture, gunRenderType, submitNodeCollector, i, j)) {
+				throw new IllegalStateException("Rust whole-frame TACZ route rejected semantic Bedrock gun mesh");
+			}
+			this.submitAttachments(itemStack, itemDisplayContext, poseStack, submitNodeCollector, i, j, animationPose, false);
+		} else if (scopedAttachment != null) {
 			submitNodeCollector.submitCustomGeometry(
 				poseStack,
 				gunRenderType,
@@ -201,6 +218,166 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 		}
 		this.submitMuzzleFlash(itemStack, itemDisplayContext, poseStack, submitNodeCollector, i, j, animationPose);
 		poseStack.popPose();
+	}
+
+	/**
+	 * Scope/sight metadata alone does not require a stencil pass. Attachments
+	 * without ocular aperture or division nodes are ordinary animated Bedrock
+	 * roots and can use the copied semantic quad ABI; retain fail-closed behavior
+	 * only for the node relationships whose masking semantics are not represented
+	 * by the current explicit first-person GAL stream.
+	 */
+	private static boolean requiresOpticalStencil(AttachmentRenderData data) {
+		return data != null
+			&& (data.scope() || data.sight())
+			&& (!data.ocularNodes().isEmpty() || !data.geometry().divisionNodeGroups().isEmpty());
+	}
+
+	private boolean submitSemanticBedrockRoots(
+		PoseStack poseStack,
+		ItemDisplayContext itemDisplayContext,
+		AnimationPose animationPose,
+		GunRenderContext gunRenderContext,
+		List<BedrockNode> roots,
+		ResourceLocation textureIdentity,
+		RenderType renderType,
+		SubmitNodeCollector submitNodeCollector,
+		int light,
+		int overlay
+	) {
+		Map<Integer, SemanticBedrockBatch> batches = new HashMap<>();
+		for (BedrockNode root : roots) {
+			collectSemanticBedrockNode(poseStack, itemDisplayContext, animationPose, null, gunRenderContext, root, light, batches);
+		}
+		if (batches.isEmpty()) return false;
+		PoseStack identityPoseStack = new PoseStack();
+		for (Map.Entry<Integer, SemanticBedrockBatch> entry : batches.entrySet()) {
+			SemanticBedrockBatch batch = entry.getValue();
+			if (!submitNodeCollector.submitTexturedQuads(identityPoseStack, renderType, textureIdentity,
+				batch.vertices(), batch.uvs(), batch.colors(), entry.getKey())) return false;
+		}
+		return true;
+	}
+
+	/**
+	 * Emits a bounded optical attachment in two semantic batches: ocular
+	 * geometry writes stencil value one, then the copied attachment roots test
+	 * that value. The Rust hand target owns the actual depth/stencil pass and
+	 * color copy boundary; Java contributes only transformed mesh data.
+	 */
+	private boolean submitSemanticOpticalAttachment(
+		PoseStack poseStack,
+		ItemDisplayContext itemDisplayContext,
+		AnimationPose animationPose,
+		AttachmentRenderData attachmentData,
+		SubmitNodeCollector submitNodeCollector,
+		int light,
+		int overlay
+	) {
+		List<OcularNode> ocularNodes = attachmentData.ocularNodes();
+		if (ocularNodes.isEmpty()) return false;
+		for (OcularNode ocularNode : ocularNodes) {
+			BedrockNode node = attachmentData.geometry().nodes().get(ocularNode.name());
+			if (node == null) return false;
+			PoseStack maskPoseStack = new PoseStack();
+			maskPoseStack.last().set(poseStack.last());
+			if (!attachmentData.geometry().applyAnimatedNodePath(ocularNode.name(), maskPoseStack, animationPose)) {
+				return false;
+			}
+			if (!this.submitSemanticBedrockRootsWithMode(maskPoseStack, itemDisplayContext, animationPose,
+				GunRenderContext.EMPTY, List.of(node), attachmentData.texture(), submitNodeCollector, light, overlay,
+				net.vulkanic.world.RustGalWorldPrimitiveRenderer.MATERIAL_MODE_OPTICAL_STENCIL_WRITE, attachmentData)) {
+				return false;
+			}
+		}
+		return this.submitSemanticBedrockRootsWithMode(poseStack, itemDisplayContext, animationPose,
+			GunRenderContext.EMPTY, attachmentData.geometry().roots(), attachmentData.texture(), submitNodeCollector,
+			light, overlay, net.vulkanic.world.RustGalWorldPrimitiveRenderer.MATERIAL_MODE_OPTICAL_STENCIL_TEST,
+			attachmentData.withSpecialNodesVisible());
+	}
+
+	private boolean submitSemanticBedrockRootsWithMode(
+		PoseStack poseStack,
+		ItemDisplayContext itemDisplayContext,
+		AnimationPose animationPose,
+		GunRenderContext gunRenderContext,
+		List<BedrockNode> roots,
+		ResourceLocation textureIdentity,
+		SubmitNodeCollector submitNodeCollector,
+		int light,
+		int overlay,
+		int materialMode,
+		AttachmentRenderData attachmentData
+	) {
+		Map<Integer, SemanticBedrockBatch> batches = new HashMap<>();
+		for (BedrockNode root : roots) {
+			collectSemanticBedrockNode(poseStack, itemDisplayContext, animationPose, attachmentData, gunRenderContext, root, light, batches);
+		}
+		if (batches.isEmpty()) return false;
+		PoseStack identityPoseStack = new PoseStack();
+		for (Map.Entry<Integer, SemanticBedrockBatch> entry : batches.entrySet()) {
+			SemanticBedrockBatch batch = entry.getValue();
+			if (!submitNodeCollector.submitOpticalTexturedQuads(identityPoseStack, RenderType.entityCutout(textureIdentity),
+				textureIdentity, batch.vertices(), batch.uvs(), batch.colors(), entry.getKey(), materialMode)) return false;
+		}
+		return true;
+	}
+
+	private static void collectSemanticBedrockNode(
+		PoseStack poseStack,
+		ItemDisplayContext itemDisplayContext,
+		AnimationPose animationPose,
+		AttachmentRenderData attachmentRenderData,
+		GunRenderContext gunRenderContext,
+		BedrockNode node,
+		int baseLight,
+		Map<Integer, SemanticBedrockBatch> batches
+	) {
+		if (node.cubes.isEmpty() && node.children.isEmpty()) return;
+		poseStack.pushPose();
+		NodePose nodePose = animationPose.node(node.name);
+		node.translateAndRotate(poseStack, nodePose);
+		if (node.hiddenByScopedFirstPerson(itemDisplayContext, attachmentRenderData, animationPose) || !gunRenderContext.visible(node)) {
+			poseStack.popPose();
+			return;
+		}
+		int childLight = baseLight;
+		if (!node.hiddenMarker && nodePose.visible()) {
+			int light = node.name != null && node.name.endsWith("_illuminated") ? LightTexture.pack(15, 15) : baseLight;
+			childLight = light;
+			SemanticBedrockBatch batch = batches.computeIfAbsent(light, ignored -> new SemanticBedrockBatch());
+			for (BedrockCube cube : node.cubes) {
+				for (BedrockPolygon polygon : cube.polygons) {
+					if (!polygon.empty) batch.append(poseStack.last().pose(), polygon);
+				}
+			}
+		}
+		for (BedrockNode child : node.children) collectSemanticBedrockNode(poseStack, itemDisplayContext, animationPose, attachmentRenderData, gunRenderContext, child, childLight, batches);
+		poseStack.popPose();
+	}
+
+	private static final class SemanticBedrockBatch {
+		private final List<Float> vertexList = new ArrayList<>();
+		private final List<Float> uvList = new ArrayList<>();
+		private final List<Integer> colorList = new ArrayList<>();
+
+		private void append(org.joml.Matrix4f transform, BedrockPolygon polygon) {
+			if (colorList.size() >= MAX_SEMANTIC_BEDROCK_QUADS) {
+				throw new IllegalStateException("Rust TACZ semantic Bedrock mesh exceeds bounded quad budget");
+			}
+			for (BedrockVertex vertex : polygon.vertices) {
+				Vector3f position = transform.transformPosition(vertex.x / 16.0F, vertex.y / 16.0F, vertex.z / 16.0F, new Vector3f());
+				vertexList.add(position.x()); vertexList.add(position.y()); vertexList.add(position.z());
+				uvList.add(vertex.u); uvList.add(vertex.v);
+			}
+			// The semantic GUI transport carries one color per vertex, matching
+			// the four Bedrock polygon vertices copied above.
+			for (int vertex = 0; vertex < 4; vertex++) colorList.add(0xFFFFFFFF);
+		}
+
+		private float[] vertices() { float[] values = new float[vertexList.size()]; for (int i = 0; i < values.length; i++) values[i] = vertexList.get(i); return values; }
+		private float[] uvs() { float[] values = new float[uvList.size()]; for (int i = 0; i < values.length; i++) values[i] = uvList.get(i); return values; }
+		private int[] colors() { int[] values = new int[colorList.size()]; for (int i = 0; i < values.length; i++) values[i] = colorList.get(i); return values; }
 	}
 
 	private void submitMuzzleFlash(
@@ -233,6 +410,23 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 		float renderScale = scale;
 		float renderAlpha = alpha;
 		RenderType renderType = RenderType.entityTranslucent(muzzleFlash.texture());
+		if (VulkanicAPI.isVulkanBackendSelected()
+			&& WorldRenderRoutePolicy.currentTexturedBillboardRoute().usesRustWholeFrameVulkan()) {
+			PoseStack flashPoseStack = new PoseStack();
+			flashPoseStack.last().set(poseStack.last());
+			if (!this.geometry.applyAnimatedNodePath("muzzle_flash", flashPoseStack, animationPose)) {
+				return;
+			}
+			flashPoseStack.mulPose(Axis.ZP.rotationDegrees(muzzleFlashRandomRotate));
+			float half = 0.4F * renderScale;
+			float[] vertices = {-half, -half, 0.0F, half, -half, 0.0F, half, half, 0.0F, -half, half, 0.0F};
+			float[] uvs = {0.0F, 1.0F, 1.0F, 1.0F, 1.0F, 0.0F, 0.0F, 0.0F};
+			int color = (Mth.clamp((int)(renderAlpha * 255.0F), 0, 255) << 24) | 0xFFFFFF;
+			if (!submitNodeCollector.submitTranslucentTexturedQuad(flashPoseStack, renderType, muzzleFlash.texture(), vertices, uvs, color, LightTexture.FULL_BRIGHT)) {
+				throw new IllegalStateException("Rust whole-frame muzzle flash route rejected semantic translucent quad");
+			}
+			return;
+		}
 		submitNodeCollector.submitCustomGeometry(poseStack, renderType, (pose, vertexConsumer) -> {
 			PoseStack flashPoseStack = new PoseStack();
 			flashPoseStack.last().set(pose);
@@ -318,6 +512,28 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 
 			String marker = attachmentMarker(type);
 			if (!this.geometry.hasNode(marker)) {
+				continue;
+			}
+			if (VulkanicAPI.isVulkanBackendSelected()
+				&& WorldRenderRoutePolicy.currentTexturedBillboardRoute().usesRustWholeFrameVulkan()) {
+				PoseStack attachmentPoseStack = new PoseStack();
+				attachmentPoseStack.last().set(poseStack.last());
+				if (!this.geometry.applyAnimatedNodePath(marker, attachmentPoseStack, animationPose)) {
+					continue;
+				}
+				attachmentPoseStack.translate(0.0F, -1.5F, 0.0F);
+				boolean optical = itemDisplayContext.firstPerson() && requiresOpticalStencil(attachmentData);
+				boolean submitted = optical
+					? this.submitSemanticOpticalAttachment(attachmentPoseStack, itemDisplayContext, animationPose, attachmentData,
+						submitNodeCollector, light, overlay)
+					: this.submitSemanticBedrockRoots(attachmentPoseStack, itemDisplayContext, animationPose, GunRenderContext.EMPTY,
+						attachmentData.geometry().roots(), attachmentData.texture(), RenderType.entityCutout(attachmentData.texture()), submitNodeCollector, light, overlay);
+				if (!submitted) {
+					if (optical) {
+						throw new IllegalStateException("Rust whole-frame TACZ optical attachment route rejected semantic stencil geometry");
+					}
+					throw new IllegalStateException("Rust whole-frame TACZ route rejected semantic attachment mesh");
+				}
 				continue;
 			}
 
@@ -997,6 +1213,9 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 	}
 
 	private static void drawMeshImmediate(RenderType renderType, MeshData meshData, Runnable beforeDraw, RenderType renderTargetRenderType) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java TACZ immediate mesh rendering is unavailable while Rust owns whole-frame presentation");
+		}
 		ensureImmediatePipelineReady(renderType.pipeline());
 		renderType.setupRenderState();
 		try {
@@ -1075,6 +1294,9 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 	}
 
 	private static void ensureImmediatePipelineReady(RenderPipeline pipeline) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			return;
+		}
 		if (VulkanicAPI.isVulkanBackendSelected()) {
 			VulkanicAPI.precompileRenderPipeline(pipeline, Minecraft.getInstance().getShaderManager()::getShader);
 		}

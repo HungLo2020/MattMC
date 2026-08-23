@@ -65,6 +65,11 @@ public class RenderSpectre extends MobRenderer<EntitySpectre, SpectreRenderState
         public RenderType renderType() {
             return RenderType.eyes(TEXTURE_EYES);
         }
+
+        @Override
+        protected ResourceLocation semanticTexture() {
+            return TEXTURE_EYES;
+        }
     }
 
     class SpectreMembraneLayer extends RenderLayer<SpectreRenderState, ModelSpectre> {
@@ -79,16 +84,16 @@ public class RenderSpectre extends MobRenderer<EntitySpectre, SpectreRenderState
             float alpha = getAlphaForRender(renderState);
             int color = AMColorUtil.packColor(1.0F, 1.0F, 1.0F, alpha);
             
-            submitNodeCollector.order(1).submitModel(
-                this.getParentModel(), renderState, poseStack, this.getRenderType(), 15728640,
-                net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, color, null, renderState.outlineColor, null
-            );
+			submitNodeCollector.order(1).submitModelSemanticTexture(
+				this.getParentModel(), renderState, poseStack, this.getRenderType(), 15728640,
+				net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, color, TEXTURE_BONE, renderState.outlineColor, null
+			);
             
             if (renderState.isLeashed) {
-                submitNodeCollector.order(1).submitModel(
-                    this.getParentModel(), renderState, poseStack, AMRenderTypes.entityCutoutNoCull(TEXTURE_LEAD), 15728640,
-                    net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, -1, null, renderState.outlineColor, null
-                );
+				submitNodeCollector.order(1).submitModelSemanticTexture(
+					this.getParentModel(), renderState, poseStack, AMRenderTypes.entityCutoutNoCull(TEXTURE_LEAD), 15728640,
+					net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, -1, TEXTURE_LEAD, renderState.outlineColor, null
+				);
             }
         }
 

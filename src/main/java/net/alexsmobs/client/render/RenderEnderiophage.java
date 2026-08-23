@@ -3,13 +3,10 @@ package net.alexsmobs.client.render;
 import net.alexsmobs.client.model.ModelEnderiophage;
 import net.alexsmobs.entity.EntityEnderiophage;
 import net.blaze3d.vertex.PoseStack;
-import net.blaze3d.vertex.VertexConsumer;
-import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.entity.MobRenderer;
 import net.minecraft.client.renderer.entity.layers.EyesLayer;
-import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.resources.ResourceLocation;
 
 import javax.annotation.Nullable;
@@ -82,22 +79,16 @@ public class RenderEnderiophage extends MobRenderer<EntityEnderiophage, Enderiop
         public EnderiophageEyesLayer(RenderEnderiophage p_i50928_1_) {
             super(p_i50928_1_);
         }
-
-
-        public void render(PoseStack matrixStackIn, MultiBufferSource bufferIn, int packedLightIn, EnderiophageRenderState state, float limbSwing, float limbSwingAmount) {
-            VertexConsumer ivertexbuilder = bufferIn.getBuffer(this.getRenderType(state));
-            this.getParentModel().renderToBuffer(matrixStackIn, ivertexbuilder, FULL_BRIGHT, OverlayTexture.NO_OVERLAY);
-        }
-
         @Override
         public RenderType renderType() {
             return AMRenderTypes.getEyesFlickering(TEXTURE_GLOW, FULL_BRIGHT);
         }
 
-        public RenderType getRenderType(EnderiophageRenderState state) {
-            ResourceLocation tex = state.variant == 2 ? TEXTURE_NETHER_GLOW : state.variant == 1 ? TEXTURE_OVERWORLD_GLOW : TEXTURE_GLOW;
-            return AMRenderTypes.getEyesFlickering(tex, FULL_BRIGHT);
+        @Override
+        protected ResourceLocation semanticTexture(EnderiophageRenderState state) {
+            return state.variant == 2 ? TEXTURE_NETHER_GLOW : state.variant == 1 ? TEXTURE_OVERWORLD_GLOW : TEXTURE_GLOW;
         }
+
     }
 
 }

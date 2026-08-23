@@ -64,6 +64,9 @@ public class TracyFrameCapture implements AutoCloseable {
 	}
 
 	public void capture(RenderTarget renderTarget) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Tracy frame capture is unavailable while Rust owns whole-frame presentation");
+		}
 		if (this.status == TracyFrameCapture.Status.WAITING_FOR_CAPTURE && !this.capturedThisFrame && renderTarget.getColorTexture() != null) {
 			this.capturedThisFrame = true;
 			if (renderTarget.width != this.targetWidth || renderTarget.height != this.targetHeight) {
@@ -87,6 +90,9 @@ public class TracyFrameCapture implements AutoCloseable {
 	}
 
 	public void upload() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Tracy frame upload is unavailable while Rust owns whole-frame presentation");
+		}
 		if (this.status == TracyFrameCapture.Status.WAITING_FOR_UPLOAD) {
 			this.status = TracyFrameCapture.Status.WAITING_FOR_CAPTURE;
 

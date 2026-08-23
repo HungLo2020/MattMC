@@ -27,7 +27,11 @@ public class TextureInfoCache {
 	}
 
 	public void onTexImage2D(int target, int level, int internalformat, int width, int height, int border,
-							 int format, int type, @Nullable ByteBuffer pixels) {
+								 int format, int type, @Nullable ByteBuffer pixels) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			// Rust owns texture creation and shader-resource metadata in whole-frame mode.
+			return;
+		}
 		if (level == 0) {
 			int id = IrisRenderSystem.getBoundTextureOnActiveUnit();
 			TextureInfo info = getInfo(id);

@@ -71,6 +71,8 @@ public class ColumnRenderSource extends AbstractPhantomArrayList
 	 */
 	private final byte[] semanticVariantStateByDataPoint;
 	private final long[] semanticVariantPositionByDataPoint;
+	/** Copied proof that a coarse cell's horizontal contributors were identical. */
+	private final boolean[] semanticHorizontalUniformByDataPoint;
 	private final List<SemanticMaterialIdentity> semanticMaterials = new ArrayList<>();
 	private final Map<SemanticMaterialIdentity, Integer> semanticMaterialIds = new HashMap<>();
 	
@@ -105,6 +107,7 @@ public class ColumnRenderSource extends AbstractPhantomArrayList
 		this.semanticMaterialByDataPoint = new int[WIDTH * WIDTH * this.verticalDataCount];
 		this.semanticVariantStateByDataPoint = new byte[WIDTH * WIDTH * this.verticalDataCount];
 		this.semanticVariantPositionByDataPoint = new long[WIDTH * WIDTH * this.verticalDataCount];
+		this.semanticHorizontalUniformByDataPoint = new boolean[WIDTH * WIDTH * this.verticalDataCount];
 		
 		this.debugSourceFlags = new DebugSourceFlag[WIDTH * WIDTH];
 	}
@@ -139,6 +142,16 @@ public class ColumnRenderSource extends AbstractPhantomArrayList
 	public long getSemanticVariantPosition(int posX, int posZ, int verticalIndex)
 	{
 		return this.semanticVariantPositionByDataPoint[dataPointIndex(posX, posZ, verticalIndex)];
+	}
+
+	public boolean hasSemanticHorizontalUniformity(int posX, int posZ, int verticalIndex)
+	{
+		return this.semanticHorizontalUniformByDataPoint[dataPointIndex(posX, posZ, verticalIndex)];
+	}
+
+	public void setSemanticHorizontalUniformity(int posX, int posZ, int verticalIndex, boolean uniform)
+	{
+		this.semanticHorizontalUniformByDataPoint[dataPointIndex(posX, posZ, verticalIndex)] = uniform;
 	}
 
 	public List<SemanticMaterialIdentity> semanticMaterials()

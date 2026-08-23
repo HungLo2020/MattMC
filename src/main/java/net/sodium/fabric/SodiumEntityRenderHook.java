@@ -28,6 +28,9 @@ public class SodiumEntityRenderHook implements EntityRenderHooks {
     @Override
     public boolean onRenderEntityShadows(SubmitNodeCollection submitNodeCollection,
                                         MultiBufferSource.BufferSource bufferSource) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+            throw new IllegalStateException("Java Sodium entity-shadow hook is unavailable while Rust owns whole-frame presentation");
+        }
         VertexConsumer vertices = bufferSource.getBuffer(SHADOW_RENDER_TYPE);
         var writer = VertexConsumerUtils.convertOrLog(vertices);
         

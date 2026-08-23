@@ -30,6 +30,10 @@ public class RenderMimicube extends MobRenderer<EntityMimicube, MimicubeRenderSt
         super.extractRenderState(entity, state, partialTick);
         state.squishFactor = entity.prevSquishFactor + (entity.squishFactor - entity.prevSquishFactor) * partialTick;
         state.squishAmount = entity.squishAmount;
+        this.itemModelResolver.updateForLiving(state.mainHandItem, entity.getMainHandItem(),
+            net.minecraft.world.item.ItemDisplayContext.THIRD_PERSON_RIGHT_HAND, entity);
+        this.itemModelResolver.updateForLiving(state.offHandItem, entity.getOffhandItem(),
+            net.minecraft.world.item.ItemDisplayContext.THIRD_PERSON_LEFT_HAND, entity);
     }
 
     protected void scale(MimicubeRenderState state, PoseStack matrixStackIn) {

@@ -77,15 +77,18 @@ public class BeaconRenderer<T extends BlockEntity & BeaconBeamOwner> implements 
 		PoseStack poseStack, SubmitNodeCollector submitNodeCollector, ResourceLocation resourceLocation, float f, float g, int i, int j, int k, float h, float l
 	) {
 		// Iris: Don't render beacon beam in shadow pass
-		if (net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
+		boolean rustWholeFrame = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			&& net.vulkanic.world.WorldRenderRoutePolicy.currentBeaconBeamRoute().usesRustWholeFrameVulkan();
+		if (!rustWholeFrame && net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
 			// TODO: Don't do this if we're doing the "Unified Entity Rendering" optimization
 			// TODO: This isn't necessary on most shaderpacks if we support blockEntityId
 			return;
 		}
-		// End-gateway beams use a separate texture and remain Java-owned until
-		// that material is explicitly admitted. Route selection happens before
-		// either producer submits custom geometry.
-		net.vulkanic.world.WorldRenderRoutePolicy.Route rustRoute = BEAM_LOCATION.equals(resourceLocation)
+		// Vanilla beacon and End Gateway beams share the same semantic geometry;
+		// Rust owns distinct copied texture assets for both resource identities.
+		net.vulkanic.world.WorldRenderRoutePolicy.Route rustRoute =
+			(BEAM_LOCATION.equals(resourceLocation)
+				|| TheEndGatewayRenderer.BEAM_LOCATION.equals(resourceLocation))
 			? net.vulkanic.world.WorldRenderRoutePolicy.currentBeaconBeamRoute()
 			: net.vulkanic.world.WorldRenderRoutePolicy.Route.JAVA_COMPATIBILITY;
 		if (rustRoute.usesRustWholeFrameVulkan() && !submitNodeCollector.isSemanticCoverageOnly()) {
@@ -116,7 +119,15 @@ public class BeaconRenderer<T extends BlockEntity & BeaconBeamOwner> implements 
 			}
 			return;
 		}
+		// Count-only source admission must acknowledge the already copied beacon
+		// primitive without retaining the Java callback as unsupported geometry.
+		if (rustRoute.usesRustWholeFrameVulkan() && submitNodeCollector.isSemanticCoverageOnly()) {
+			return;
+		}
 		if (rustRoute == net.vulkanic.world.WorldRenderRoutePolicy.Route.DISABLED) {
+			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+				throw new IllegalStateException("Rust whole-frame beacon-beam route is unavailable while Rust owns presentation");
+			}
 			return;
 		}
 		

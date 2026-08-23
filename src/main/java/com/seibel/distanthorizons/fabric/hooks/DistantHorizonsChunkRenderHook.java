@@ -17,6 +17,9 @@ public class DistantHorizonsChunkRenderHook implements ChunkRenderLayerHooks {
 
     @Override
     public void onBeforeRenderLayer(ChunkSectionLayerGroup layerGroup) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+            throw new IllegalStateException("Java Distant Horizons layer hook is unavailable while Rust owns whole-frame presentation");
+        }
         ClientApi.RENDER_STATE.clientLevelWrapper = ClientLevelWrapper.getWrapperIfDifferent(
             ClientApi.RENDER_STATE.clientLevelWrapper,
             Minecraft.getInstance().levelRenderer.level

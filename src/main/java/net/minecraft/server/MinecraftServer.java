@@ -1101,7 +1101,16 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
 
 		this.tickCount++;
 		this.tickRateManager.tick();
+		// This repository ships the minimal Fabric lifecycle API used by the
+		// bundled integrations. Emit its server-tick lifecycle at the same
+		// ownership boundary as vanilla ticking so registered semantic fixtures
+		// and integrations observe the real server clock (rather than inventing
+		// wall-clock callbacks).
+		net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents.START_SERVER_TICK
+			.invoker().onStartTick(this);
 		this.tickChildren(booleanSupplier);
+		net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents.END_SERVER_TICK
+			.invoker().onEndTick(this);
 		if (l - this.lastServerStatus >= STATUS_EXPIRE_TIME_NANOS) {
 			this.lastServerStatus = l;
 			this.status = this.buildServerStatus();

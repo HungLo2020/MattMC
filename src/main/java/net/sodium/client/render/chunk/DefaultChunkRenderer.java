@@ -43,6 +43,7 @@ import net.vulkanic.VulkanicRenderTargetDescriptor;
 import org.joml.Matrix4fc;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
+import org.jetbrains.annotations.Nullable;
 import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.system.Pointer;
 import org.lwjgl.system.MemoryStack;
@@ -71,11 +72,18 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
 
     private static int vulkanRenderProbeCount;
 
+    @Nullable
     private final SharedQuadIndexBuffer sharedIndexBuffer;
+    @Nullable
     private final GpuBuffer sodiumChunkParamsBuffer;
     public DefaultChunkRenderer(RenderDevice device, ChunkVertexType vertexType) {
         super(device, vertexType);
 
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+            this.sharedIndexBuffer = null;
+            this.sodiumChunkParamsBuffer = null;
+            return;
+        }
         this.sharedIndexBuffer = new SharedQuadIndexBuffer(device.createCommandList(), SharedQuadIndexBuffer.IndexType.INTEGER);
         this.sodiumChunkParamsBuffer = VulkanicAPI.createBuffer(
             () -> "Sodium chunk params UBO",
@@ -97,6 +105,9 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
                        CameraTransform camera,
                        FogParameters parameters,
                        boolean indexedRenderingEnabled) {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+            throw new IllegalStateException("Java Sodium chunk rendering is unavailable while Rust owns whole-frame presentation");
+        }
         if (VulkanicAPI.isVulkanBackendSelected()) {
 			this.renderWithVulkan(matrices, commandList, renderLists, renderPass, camera, parameters, indexedRenderingEnabled);
             return;
@@ -431,6 +442,9 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
     }
 
     private GpuBufferSlice writeChunkParams(CommandEncoder commandEncoder, FogParameters fogParameters) {
+        if (this.sodiumChunkParamsBuffer == null) {
+            throw new IllegalStateException("Java Sodium terrain resources are unavailable while Rust owns whole-frame presentation");
+        }
         try (MemoryStack stack = MemoryStack.stackPush()) {
             var textureAtlas = (net.minecraft.client.renderer.texture.TextureAtlas) net.minecraft.client.Minecraft.getInstance()
                 .getTextureManager()
@@ -927,7 +941,11 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
     public void delete(CommandList commandList) {
         super.delete(commandList);
 
-        this.sharedIndexBuffer.delete(commandList);
-        this.sodiumChunkParamsBuffer.close();
+        if (this.sharedIndexBuffer != null) {
+            this.sharedIndexBuffer.delete(commandList);
+        }
+        if (this.sodiumChunkParamsBuffer != null) {
+            this.sodiumChunkParamsBuffer.close();
+        }
     }
 }

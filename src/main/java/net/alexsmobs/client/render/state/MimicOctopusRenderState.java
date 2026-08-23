@@ -18,5 +18,10 @@ public class MimicOctopusRenderState extends LivingEntityRenderState {
     public BlockState mimickedBlock;
     public BlockState prevMimickedBlock;
     public boolean hasGuardianLaser;
+    public boolean guardianLaserTargetPresent;
+    public float guardianLaserTargetX;
+    public float guardianLaserTargetY;
+    public float guardianLaserTargetZ;
+    public float guardianLaserProgress;
     public float scale;
 }

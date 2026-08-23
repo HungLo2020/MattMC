@@ -365,6 +365,7 @@ fn distant_horizons_lod_opaque_pipeline_uses_explicit_two_set_gal_layout() {
         depth_bias: None,
         color_formats: vec![TextureFormat::Rgba8Unorm; 4],
         depth_format: Some(TextureFormat::Depth32Float),
+            stencil: None,
     })
     .expect("Rust-owned DH LOD pipeline must lower through OpenGL");
 }
@@ -743,6 +744,7 @@ fn selected_terrain_pipeline_layout_matches_optional_colored_voxel_interface() {
             depth_bias: None,
             color_formats: vec![TextureFormat::Rgba16Float; 4],
             depth_format: Some(TextureFormat::Depth32Float),
+            stencil: None,
         })
         .unwrap_or_else(|error| {
             panic!("selected terrain {suffix} pipeline/layout must lower for OpenGL: {error}")
@@ -1495,6 +1497,7 @@ fn run_d3_storage_write_read_test(
             depth_bias: None,
             color_formats: vec![TextureFormat::Rgba8Unorm],
             depth_format: None,
+            stencil: None,
         })
         .unwrap();
     let readback = gal
@@ -1958,6 +1961,7 @@ pub(in crate::render::vulkanic::backends) fn run_conformance(
         depth_bias: None,
         color_formats: vec![TextureFormat::Rgba8Unorm],
         depth_format: Some(TextureFormat::Depth32Float),
+            stencil: None,
     })?;
     let target = gal.create_render_target(RenderTargetDesc {
         label: "conformance.target".to_string(),

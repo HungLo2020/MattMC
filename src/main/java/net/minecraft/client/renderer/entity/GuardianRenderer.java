@@ -110,6 +110,25 @@ public class GuardianRenderer extends MobRenderer<Guardian, GuardianRenderState,
 		float ak = 0.4999F;
 		float al = -1.0F + h;
 		float am = al + i * 2.5F;
+		float beamUvOffset = Mth.floor(f) % 2 == 0 ? 0.5F : 0.0F;
+		float[] vertices = {
+			aa, i, ab, aa, 0.0F, ab, ac, 0.0F, ad, ac, i, ad,
+			ae, i, af, ae, 0.0F, af, ag, 0.0F, ah, ag, i, ah,
+			s, i, t, u, i, v, y, i, z, w, i, x
+		};
+		float[] uvs = {
+			0.4999F, am, 0.4999F, al, 0.0F, al, 0.0F, am,
+			0.4999F, am, 0.4999F, al, 0.0F, al, 0.0F, am,
+			0.5F, beamUvOffset + 0.5F, 1.0F, beamUvOffset + 0.5F, 1.0F, beamUvOffset, 0.5F, beamUvOffset
+		};
+		int beamColor = (255 << 24) | (n << 16) | (o << 8) | p;
+		int[] colors = {beamColor, beamColor, beamColor, beamColor, beamColor, beamColor, beamColor, beamColor, beamColor, beamColor, beamColor, beamColor};
+		if (submitNodeCollector.submitGuardianBeam(poseStack, BEAM_RENDER_TYPE, GUARDIAN_BEAM_LOCATION, vertices, uvs, colors, 15728880)) {
+			return;
+		}
+		if (net.vulkanic.world.WorldRenderRoutePolicy.currentGuardianBeamRoute().usesRustWholeFrameVulkan()) {
+			throw new IllegalStateException("Rust whole-frame Guardian beam route rejected semantic quads");
+		}
 		submitNodeCollector.submitCustomGeometry(poseStack, BEAM_RENDER_TYPE, (pose, vertexConsumer) -> {
 			vertex(vertexConsumer, pose, aa, i, ab, n, o, p, 0.4999F, am);
 			vertex(vertexConsumer, pose, aa, 0.0F, ab, n, o, p, 0.4999F, al);

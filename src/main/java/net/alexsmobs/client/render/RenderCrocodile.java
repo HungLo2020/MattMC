@@ -57,7 +57,7 @@ public class RenderCrocodile extends MobRenderer<EntityCrocodile, CrocodileRende
         public void submit(PoseStack matrixStackIn, net.minecraft.client.renderer.SubmitNodeCollector submitNodeCollector, int packedLightIn, CrocodileRenderState state, float f, float g) {
             if (state.isCrowned) {
                 submitNodeCollector.order(1)
-                    .submitModel(
+                    .submitModelSemanticTexture(
                         this.getParentModel(),
                         state,
                         matrixStackIn,
@@ -65,7 +65,7 @@ public class RenderCrocodile extends MobRenderer<EntityCrocodile, CrocodileRende
                         packedLightIn,
                         OverlayTexture.NO_OVERLAY,
                         -1,
-                        null,
+                        TEXTURE_CROWN,
                         state.outlineColor,
                         null
                     );

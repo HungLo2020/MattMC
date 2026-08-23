@@ -141,6 +141,9 @@ public class DebugRenderer {
 	}
 
 	public void render(PoseStack poseStack, Frustum frustum, MultiBufferSource.BufferSource bufferSource, double d, double e, double f, boolean bl) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java debug rendering is unavailable while Rust owns whole-frame presentation");
+		}
 		Minecraft minecraft = Minecraft.getInstance();
 		DebugValueAccess debugValueAccess = minecraft.getConnection().createDebugValueAccess();
 		if (minecraft.debugEntries.getCurrentlyEnabledVersion() != this.lastDebugEntriesVersion) {

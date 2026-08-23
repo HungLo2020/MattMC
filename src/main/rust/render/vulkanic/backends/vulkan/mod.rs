@@ -388,6 +388,7 @@ impl Backend for VulkanBackend {
     }
 
     fn configure_frame_surface(&mut self, desc: &FrameSurfaceDesc) -> GalResult<()> {
+        self.retire_before_surface_mutation()?;
         let Some(swapchain) = &mut self.swapchain else {
             return Err(
                 crate::render::vulkanic::error::GalError::unsupported_feature(
@@ -410,6 +411,7 @@ impl Backend for VulkanBackend {
     }
 
     fn resize_frame_surface(&mut self, desc: &FrameResizeDesc) -> GalResult<FrameResizeResult> {
+        self.retire_before_surface_mutation()?;
         let Some(swapchain) = &mut self.swapchain else {
             return Err(
                 crate::render::vulkanic::error::GalError::unsupported_feature(
@@ -430,12 +432,30 @@ impl Backend for VulkanBackend {
         };
         let presented = swapchain.present(desc)?;
         if let Ok(mut lowerer) = self.lowerer.lock() {
-            let _ = lowerer.completed_submission();
+            // `present` has already waited on this frame's timeline value.
+            // Retire the complete lowerer submission prefix now, rather than
+            // merely polling it.  A poll can lag behind the explicit wait on
+            // drivers that do not update the counter immediately; leaving
+            // those command buffers queued caused unbounded native resource
+            // growth during real whole-frame rendering.
+            lowerer.retire_all_in_flight()?;
         }
         Ok(presented)
     }
 
+    fn cancel_frame(&mut self, frame: crate::render::vulkanic::frame::FrameId) -> GalResult<()> {
+        let Some(swapchain) = &mut self.swapchain else {
+            return Err(
+                crate::render::vulkanic::error::GalError::unsupported_feature(
+                    "Vulkan backend was not created with a presentation surface",
+                ),
+            );
+        };
+        swapchain.cancel(frame)
+    }
+
     fn shutdown_frame_surface(&mut self) -> GalResult<()> {
+        self.retire_before_surface_mutation()?;
         if let Some(swapchain) = &mut self.swapchain {
             swapchain.shutdown();
         }
@@ -450,6 +470,17 @@ impl Backend for VulkanBackend {
     #[cfg(test)]
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
+    }
+}
+
+impl VulkanBackend {
+    fn retire_before_surface_mutation(&self) -> GalResult<()> {
+        let mut lowerer = self.lowerer.lock().map_err(|_| {
+            crate::render::vulkanic::error::GalError::backend(
+                "Vulkan lowerer lock poisoned before surface mutation",
+            )
+        })?;
+        lowerer.retire_all_in_flight()
     }
 }
 

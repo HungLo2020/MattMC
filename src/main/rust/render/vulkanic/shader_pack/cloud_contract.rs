@@ -173,8 +173,9 @@ pub fn derive_cloud_pass_contract(
 }
 
 /// Lowers the exact selected cloud pair after contract acceptance. This owns
-/// source text and semantic layouts only; targets, pipelines, and cloud route
-/// selection remain unavailable until a complete Rust-owned writer exists.
+/// the source text and semantic layouts consumed by the Rust-owned cloud
+/// fullscreen/material writer; target allocation and route selection happen
+/// later, after the copied cloud-cell stream has been validated.
 pub fn lower_cloud_source_pair(
     source: &ShaderPackSource,
     contract: &CloudPassContract,

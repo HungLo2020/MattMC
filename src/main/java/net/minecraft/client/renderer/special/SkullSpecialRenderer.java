@@ -23,16 +23,26 @@ public class SkullSpecialRenderer implements NoDataSpecialModelRenderer {
 	private final SkullModelBase model;
 	private final float animation;
 	private final RenderType renderType;
+	private final ResourceLocation texture;
 
 	public SkullSpecialRenderer(SkullModelBase skullModelBase, float f, RenderType renderType) {
+		this(skullModelBase, f, renderType, null);
+	}
+
+	public SkullSpecialRenderer(SkullModelBase skullModelBase, float f, RenderType renderType, @Nullable ResourceLocation texture) {
 		this.model = skullModelBase;
 		this.animation = f;
 		this.renderType = renderType;
+		this.texture = texture;
 	}
+
+	public SkullModelBase model() { return this.model; }
+	public float animation() { return this.animation; }
+	@Nullable public ResourceLocation texture() { return this.texture; }
 
 	@Override
 	public void submit(ItemDisplayContext itemDisplayContext, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, int j, boolean bl, int k) {
-		SkullBlockRenderer.submitSkull(null, 180.0F, this.animation, poseStack, submitNodeCollector, i, this.model, this.renderType, k, null);
+		SkullBlockRenderer.submitSkull(null, 180.0F, this.animation, poseStack, submitNodeCollector, i, this.model, this.renderType, k, null, null);
 	}
 
 	@Override
@@ -78,7 +88,9 @@ public class SkullSpecialRenderer implements NoDataSpecialModelRenderer {
 				return null;
 			} else {
 				RenderType renderType = SkullBlockRenderer.getSkullRenderType(this.kind, resourceLocation);
-				return new SkullSpecialRenderer(skullModelBase, this.animation, renderType);
+				ResourceLocation semanticTexture = resourceLocation != null
+					? resourceLocation : SkullBlockRenderer.defaultTexture(this.kind);
+				return new SkullSpecialRenderer(skullModelBase, this.animation, renderType, semanticTexture);
 			}
 		}
 	}

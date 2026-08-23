@@ -11,6 +11,7 @@ import net.vulkanic.VulkanicAPI;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.lwjgl.system.MemoryStack;
+import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
 public class Lighting implements AutoCloseable {
@@ -21,11 +22,18 @@ public class Lighting implements AutoCloseable {
 	private static final Vector3f INVENTORY_DIFFUSE_LIGHT_0 = new Vector3f(0.2F, -1.0F, 1.0F).normalize();
 	private static final Vector3f INVENTORY_DIFFUSE_LIGHT_1 = new Vector3f(-0.2F, -1.0F, 0.0F).normalize();
 	public static final int UBO_SIZE = new Std140SizeCalculator().putVec3().putVec3().get();
+	@Nullable
 	private final GpuBuffer buffer;
 	private final int paddedSize;
 
 	public Lighting() {
 		this.paddedSize = Mth.roundToward(UBO_SIZE, VulkanicAPI.getBackendUniformOffsetAlignment());
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			// Rust semantic world/GUI lighting is derived from copied gameplay
+			// inputs; no Java lighting UBO or encoder writes belong on this route.
+			this.buffer = null;
+			return;
+		}
 		this.buffer = VulkanicAPI.createBuffer(() -> "Lighting UBO", 136, this.paddedSize * Lighting.Entry.values().length);
 		Matrix4f matrix4fLevelUpright = new Matrix4f().scaling(1.0F, -1.0F, 1.0F);
 		this.updateBuffer(
@@ -80,6 +88,9 @@ public class Lighting implements AutoCloseable {
 	}
 
 	private void updateBuffer(Lighting.Entry entry, Vector3f vector3f, Vector3f vector3f2) {
+		if (this.buffer == null) {
+			return;
+		}
 		try (MemoryStack memoryStack = MemoryStack.stackPush()) {
 			ByteBuffer byteBuffer = Std140Builder.onStack(memoryStack, UBO_SIZE).putVec3(vector3f).putVec3(vector3f2).get();
 			VulkanicAPI.createCommandEncoder().writeToBuffer(this.buffer.slice(entry.ordinal() * this.paddedSize, this.paddedSize), byteBuffer);
@@ -87,11 +98,16 @@ public class Lighting implements AutoCloseable {
 	}
 
 	public void setupFor(Lighting.Entry entry) {
+		if (this.buffer == null) {
+			return;
+		}
 		VulkanicAPI.setShaderLights(this.buffer.slice(entry.ordinal() * this.paddedSize, UBO_SIZE));
 	}
 
 	public void close() {
-		this.buffer.close();
+		if (this.buffer != null) {
+			this.buffer.close();
+		}
 	}
 
 	@Environment(EnvType.CLIENT)

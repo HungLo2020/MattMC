@@ -41,15 +41,22 @@ public abstract class PictureInPictureRenderer<T extends PictureInPictureRenderS
 	private GpuTexture depthTexture;
 	@Nullable
 	private GpuTextureView depthTextureView;
-	private final CachedOrthoProjectionMatrixBuffer projectionMatrixBuffer = new CachedOrthoProjectionMatrixBuffer(
-		"PIP - " + this.getClass().getSimpleName(), -1000.0F, 1000.0F, true
-	);
+	@Nullable
+	private final CachedOrthoProjectionMatrixBuffer projectionMatrixBuffer;
 
 	protected PictureInPictureRenderer(MultiBufferSource.BufferSource bufferSource) {
 		this.bufferSource = bufferSource;
+		this.projectionMatrixBuffer = net.vulkanic.gui.RustGalGuiRenderer.isWholeFrameVulkanActive()
+			? null
+			: new CachedOrthoProjectionMatrixBuffer("PIP - " + this.getClass().getSimpleName(), -1000.0F, 1000.0F, true);
 	}
 
 	public void prepare(T pictureInPictureRenderState, GuiRenderState guiRenderState, int i) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException(
+				"Java GUI picture-in-picture rendering is unavailable while Rust owns whole-frame presentation"
+			);
+		}
 		int j = this.getRenderTextureWidth(pictureInPictureRenderState, i);
 		int k = this.getRenderTextureHeight(pictureInPictureRenderState, i);
 		boolean bl = this.texture == null || this.texture.getWidth(0) != j || this.texture.getHeight(0) != k;
@@ -215,7 +222,9 @@ public abstract class PictureInPictureRenderer<T extends PictureInPictureRenderS
 			this.depthTextureView.close();
 		}
 
-		this.projectionMatrixBuffer.close();
+		if (this.projectionMatrixBuffer != null) {
+			this.projectionMatrixBuffer.close();
+		}
 	}
 
 	public abstract Class<T> getRenderStateClass();

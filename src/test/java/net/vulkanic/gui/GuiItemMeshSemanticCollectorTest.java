@@ -2,6 +2,7 @@ package net.vulkanic.gui;
 
 import java.util.List;
 import net.blaze3d.vertex.PoseStack;
+import net.vulkanic.bridge.VulkanicGalBridge;
 import net.sodium.api.math.MatrixHelper;
 import org.junit.jupiter.api.Test;
 import org.joml.Matrix4f;
@@ -9,8 +10,47 @@ import org.joml.Matrix4f;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GuiItemMeshSemanticCollectorTest {
+	@Test
+	void semanticMaterialModesIncludeExplicitTranslucentItems() {
+		assertEquals(
+			List.of(
+				GuiItemMeshSemanticCollector.MaterialMode.OPAQUE,
+				GuiItemMeshSemanticCollector.MaterialMode.CUTOUT,
+				GuiItemMeshSemanticCollector.MaterialMode.TRANSLUCENT,
+				GuiItemMeshSemanticCollector.MaterialMode.GLINT
+			),
+			List.of(GuiItemMeshSemanticCollector.MaterialMode.values())
+		);
+	}
+
+	@Test
+	void bridgeBatchAdmitsTheTranslucentMaterialMode() {
+		VulkanicGalBridge.GuiMeshVertexRecord vertex = new VulkanicGalBridge.GuiMeshVertexRecord(
+			new float[] {0.0F, 0.0F, 0.0F}, new float[] {0.0F, 0.0F}, new float[] {0.0F, 0.0F},
+			0xffffffff, 0
+		);
+		new VulkanicGalBridge.GuiMeshBatchRecord(
+			1, 0, 3, 1, 7L, 0L, 0.0F, identityMatrix(),
+			new float[] {1.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F},
+			0, 0, 16, 16, 32, 32, 18, 18, 1,
+			List.of(vertex, vertex, vertex), List.of(0, 1, 2)
+		);
+	}
+
+	@Test
+	void foilCollectionOwnsAnExplicitGlintLayerAndStagesItsCopiedAsset() throws Exception {
+		String source = java.nio.file.Files.readString(java.nio.file.Path.of(
+			"src/main/java/net/vulkanic/gui/GuiItemMeshSemanticCollector.java"
+		));
+		assertTrue(source.contains("MaterialMode.GLINT"));
+		assertTrue(source.contains("RustGalGuiRawImageAssets.stage(glint)"));
+		assertTrue(source.contains("ENCHANTED_GLINT_ITEM"));
+		assertTrue(source.contains("specialFoilQuad"));
+	}
+
 	@Test
 	void standard3dVertexColorFollowsTheActiveItemEncoderPolicy() {
 		int bakedVertexColor = 0xff4080c0;

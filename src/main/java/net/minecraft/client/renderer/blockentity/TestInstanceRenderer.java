@@ -72,17 +72,39 @@ public class TestInstanceRenderer implements BlockEntityRenderer<TestInstanceBlo
 
 	private void submitErrorMarker(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, ErrorMarker errorMarker, CameraRenderState cameraRenderState) {
 		BlockPos blockPos = errorMarker.pos();
-		submitNodeCollector.order(1).submitCustomGeometry(poseStack, RenderType.debugFilledBox(), (pose, vertexConsumer) -> {
-			float fx = blockPos.getX() - 0.02F;
-			float g = blockPos.getY() - 0.02F;
-			float h = blockPos.getZ() - 0.02F;
-			float ix = blockPos.getX() + 1.0F + 0.02F;
-			float j = blockPos.getY() + 1.0F + 0.02F;
-			float k = blockPos.getZ() + 1.0F + 0.02F;
+		float fx = blockPos.getX() - ERROR_PADDING, g = blockPos.getY() - ERROR_PADDING, h = blockPos.getZ() - ERROR_PADDING;
+		float ix = blockPos.getX() + 1.0F + ERROR_PADDING, j = blockPos.getY() + 1.0F + ERROR_PADDING, k = blockPos.getZ() + 1.0F + ERROR_PADDING;
+		float[] boxVertices = {
+			fx,g,h, ix,g,h, ix,g,k, fx,g,k,
+			fx,j,k, ix,j,k, ix,j,h, fx,j,h,
+			fx,g,h, fx,j,h, ix,j,h, ix,g,h,
+			ix,g,h, ix,j,h, ix,j,k, ix,g,k,
+			ix,g,k, ix,j,k, fx,j,k, fx,g,k,
+			fx,g,k, fx,j,k, fx,j,h, fx,g,h
+		};
+		float[] boxUvs = new float[48];
+		for (int quad = 0; quad < 6; quad++) {
+			boxUvs[quad * 8] = 0.0F; boxUvs[quad * 8 + 1] = 0.0F;
+			boxUvs[quad * 8 + 2] = 1.0F; boxUvs[quad * 8 + 3] = 0.0F;
+			boxUvs[quad * 8 + 4] = 1.0F; boxUvs[quad * 8 + 5] = 1.0F;
+			boxUvs[quad * 8 + 6] = 0.0F; boxUvs[quad * 8 + 7] = 1.0F;
+		}
+	int[] boxColors = {0x60ff0000, 0x60ff0000, 0x60ff0000, 0x60ff0000, 0x60ff0000, 0x60ff0000};
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			&& net.vulkanic.world.WorldRenderRoutePolicy.currentProceduralQuadRoute().usesRustWholeFrameVulkan()) {
+			if (!submitNodeCollector.order(1).submitColoredQuads(poseStack, RenderType.debugFilledBox(), boxVertices, boxUvs, boxColors, 15728880)) {
+				throw new IllegalStateException("Rust whole-frame error-marker route rejected semantic box quads");
+			}
+		} else {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+				throw new IllegalStateException("Rust whole-frame error-marker route is unavailable; Java debug geometry is not a fallback");
+			}
+			submitNodeCollector.order(1).submitCustomGeometry(poseStack, RenderType.debugFilledBox(), (pose, vertexConsumer) -> {
 			PoseStack poseStackx = new PoseStack();
 			poseStackx.last().set(pose);
 			ShapeRenderer.addChainedFilledBoxVertices(poseStackx, vertexConsumer, fx, g, h, ix, j, k, 1.0F, 0.0F, 0.0F, 0.375F);
-		});
+			});
+		}
 		FormattedCharSequence formattedCharSequence = errorMarker.text().getVisualOrderText();
 		int i = this.font.width(formattedCharSequence);
 		float f = 0.01F;

@@ -194,7 +194,7 @@ public class ExtendedShader extends GlProgram implements IrisProgram {
 			IrisRenderSystem.uniformMatrix4fv(projectionInverse, false, MatrixSafety.invertOrIdentity(ShadowRenderingState.areShadowsCurrentlyBeingRendered() ? ShadowRenderer.PROJECTION : CapturedRenderingState.INSTANCE.getGbufferProjection(), tempMatrix4f).get(tempFloats));
 		}
 
-		if (intensitySwizzle) {
+		if (intensitySwizzle && !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			int shaderTextureId = IrisRenderSystem.getTextureBinding(0);
 			if (shaderTextureId > 0) {
 				IrisRenderSystem.addUnswizzle(shaderTextureId);

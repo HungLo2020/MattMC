@@ -409,14 +409,14 @@ class DistantHorizonsSemanticCollectorTest {
 		}
 
 		DistantHorizonsSemanticCollector.PendingAssetUpdate first = DistantHorizonsSemanticCollector.pendingUpdateForTest();
-		assertEquals(16, first.assets().size());
+		assertEquals(4, first.assets().size());
 		assertEquals(0L, first.assets().getFirst().columnKey());
-		assertEquals(15L, first.assets().getLast().columnKey());
+		assertEquals(3L, first.assets().getLast().columnKey());
 		DistantHorizonsSemanticCollector.acknowledgeForTest(first);
 
 		DistantHorizonsSemanticCollector.PendingAssetUpdate second = DistantHorizonsSemanticCollector.pendingUpdateForTest();
-		assertEquals(1, second.assets().size());
-		assertEquals(16L, second.assets().getFirst().columnKey());
+		assertEquals(4, second.assets().size());
+		assertEquals(4L, second.assets().getFirst().columnKey());
 	}
 
 	@Test
@@ -438,7 +438,8 @@ class DistantHorizonsSemanticCollectorTest {
 		DistantHorizonsSemanticCollector.beginVisibleFrameForTest();
 
 		DistantHorizonsSemanticCollector.PendingAssetUpdate update = DistantHorizonsSemanticCollector.pendingUpdateForTest();
-		assertEquals(16, update.assets().size());
+		assertEquals(1, update.assets().size(),
+			"visible-demand uploads must not spend the bounded slice on unrelated background columns");
 		assertEquals(16L, update.assets().getFirst().columnKey(),
 			"the actual visible column must not be starved behind build-order backlog");
 		assertFalse(update.assets().stream().anyMatch(asset -> asset.columnKey() == 15L),
@@ -450,7 +451,7 @@ class DistantHorizonsSemanticCollectorTest {
 			List.of(), List.of(), List.of()
 		);
 		DistantHorizonsSemanticCollector.PendingAssetUpdate concurrent = DistantHorizonsSemanticCollector.pendingUpdateForTest();
-		assertFalse(concurrent.assets().stream().anyMatch(asset -> asset.columnKey() == 16L),
+		assertTrue(concurrent == null || concurrent.assets().stream().noneMatch(asset -> asset.columnKey() == 16L),
 			"a live asset update must reserve its column until acknowledgement, even when a newer build arrives");
 		DistantHorizonsSemanticCollector.acknowledgeForTest(update);
 		DistantHorizonsSemanticCollector.beginRustOpaqueRouteFrameForTest();
@@ -1030,6 +1031,55 @@ class DistantHorizonsSemanticCollectorTest {
 		DistantHorizonsSemanticCollector.beginVisibleFrameForTest();
 		assertEquals(1, DistantHorizonsSemanticCollector.recordVisibleOpaqueColumn(111L).opaqueSegments());
 		assertFalse(DistantHorizonsSemanticCollector.hasUnpublishedVisibleColumns());
+	}
+
+	@Test
+	void provenanceOnlyRebuildPublishesANewerGenerationForRust() {
+		System.setProperty(DistantHorizonsSemanticCollector.CAPTURE_PROPERTY, "true");
+		var grass = new ColumnRenderSource.SemanticMaterialIdentity("minecraft:grass_block", "minecraft:plains");
+		var stone = new ColumnRenderSource.SemanticMaterialIdentity("minecraft:stone", "minecraft:plains");
+		var opaque = new LodQuadBuilder.VertexBufferBuild(
+			List.of(quadBuffer(1, 2, 3, 0xB7, 11, 12, 13, 255, 15, 16)), List.of(new int[] {1})
+		);
+		var empty = new LodQuadBuilder.VertexBufferBuild(List.of(), List.of());
+
+		DistantHorizonsSemanticCollector.recordBuiltColumn(113L, new DhBlockPos(0, 64, 0),
+			List.of(grass), opaque, empty, empty, empty);
+		publishPendingForTest();
+		assertEquals(1L, DistantHorizonsSemanticCollector.snapshotForTest(113L).generation());
+
+		DistantHorizonsSemanticCollector.recordBuiltColumn(113L, new DhBlockPos(0, 64, 0),
+			List.of(stone), opaque, empty, empty, empty);
+		assertEquals(2L, DistantHorizonsSemanticCollector.snapshotForTest(113L).generation());
+		assertEquals(2L, DistantHorizonsSemanticCollector.pendingUpdateForTest().assets().getFirst().columnGeneration());
+	}
+
+	@Test
+	void identicalCopiedPrimitiveSidecarsReuseThePublishedGeneration() {
+		System.setProperty(DistantHorizonsSemanticCollector.CAPTURE_PROPERTY, "true");
+		var stone = new ColumnRenderSource.SemanticMaterialIdentity("minecraft:stone", "minecraft:plains");
+		var opaque = new LodQuadBuilder.VertexBufferBuild(
+			List.of(quadBuffer(1, 2, 3, 0xB7, 11, 12, 13, 255, 15, 16)), List.of(new int[] {1})
+		);
+		var empty = new LodQuadBuilder.VertexBufferBuild(List.of(), List.of());
+
+		DistantHorizonsSemanticCollector.recordBuiltColumn(114L, new DhBlockPos(0, 64, 0),
+			List.of(stone), opaque, empty, empty, empty);
+		publishPendingForTest();
+		assertEquals(1L, DistantHorizonsSemanticCollector.snapshotForTest(114L).generation());
+
+		// Rebuild all builder-side arrays so this exercises value equality rather
+		// than reusing the same Java array instances.
+		DistantHorizonsSemanticCollector.recordBuiltColumn(114L, new DhBlockPos(0, 64, 0),
+			List.of(new ColumnRenderSource.SemanticMaterialIdentity("minecraft:stone", "minecraft:plains")),
+			new LodQuadBuilder.VertexBufferBuild(
+				List.of(quadBuffer(1, 2, 3, 0xB7, 11, 12, 13, 255, 15, 16)), List.of(new int[] {1})
+			),
+			empty, empty, empty);
+
+		assertEquals(1L, DistantHorizonsSemanticCollector.snapshotForTest(114L).generation());
+		assertNull(DistantHorizonsSemanticCollector.pendingUpdateForTest(),
+			"identical semantic sidecars must not churn a Rust asset generation");
 	}
 
 	@Test

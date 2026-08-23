@@ -21,13 +21,13 @@ final class StandaloneModelRenderOwnershipPolicyTest {
 	}
 
 	@Test
-	void compatibilityAndDisabledOwnersRemainJavaOwned() {
+	void compatibilityAndDisabledOwnersRemainExplicitlyUnavailableOnRust() {
 		assertEquals(
 			JAVA_COMPATIBILITY,
 			StandaloneModelRenderOwnershipPolicy.classify(false, false, WorldRenderRoutePolicy.Route.JAVA_COMPATIBILITY)
 		);
 		assertEquals(
-			JAVA_COMPATIBILITY,
+			RUST_UNAVAILABLE,
 			StandaloneModelRenderOwnershipPolicy.classify(false, false, WorldRenderRoutePolicy.Route.DISABLED)
 		);
 	}

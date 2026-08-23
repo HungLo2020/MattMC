@@ -17,8 +17,6 @@ public class LayerGorillaItem extends RenderLayer<GorillaRenderState, ModelGoril
 
     @Override
     public void submit(PoseStack matrixStackIn, SubmitNodeCollector submitNodeCollector, int packedLight, GorillaRenderState state, float f, float g) {
-        // Note: Halo rendering for "harambe" simplified for now
-        
         if(!state.heldItem.isEmpty()) {
             matrixStackIn.pushPose();
             if(state.isBaby){

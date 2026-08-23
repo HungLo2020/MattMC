@@ -6,10 +6,14 @@ Vulkanic is the rendering abstraction boundary for MattMC.
 
 Current migration policy is explicit:
 
-- Keep OpenGL as the active runtime backend.
-- Do **not** add user-facing Vulkan backend selection yet.
-- Do **not** treat existing Vulkan bootstrap classes as production-rendering readiness.
-- Continue readiness hardening so Vulkan implementation can happen later without large upstream churn.
+- OpenGL remains the authoritative correctness baseline and private compatibility backend.
+- The user-facing Vulkan option is admitted only when startup selects the Rust-owned
+  whole-frame route; incomplete semantic capabilities remain unavailable rather than
+  falling back to Java Vulkan or borrowed Iris state.
+- Rust Vulkan presentation and the explicit VulkanicGAL own the selected Vulkan frame;
+  the Java GPU device is limited to CPU-only startup metadata and fail-closed guards.
+- Continue expanding Rust-owned semantic coverage and parity evidence until every
+  supported rendering callsite is represented by the explicit route.
 
 For authoritative migration status and historical audit notes, see `MIGRATION-PROGRESS.md`.
 
@@ -38,12 +42,14 @@ The codebase already has backend-agnostic seams needed for pre-implementation re
 - Render-pass metadata (`VulkanicRenderPassDescriptor`).
 - Resource barrier metadata (`VulkanicResourceBarriers`).
 
-These seams are for compatibility preparation and validation; they do not imply Vulkan rendering is production-enabled.
+These seams support the active migration route and its validation; they do not grant
+legacy Java rendering permission during a Rust-owned Vulkan frame.
 
 ## Contributor Guidance
 
-- Prefer readiness hardening over feature expansion.
-- Avoid adding backend-selection UX, flags, or config paths for Vulkan at this stage.
+- Prefer concrete Rust-owned semantic feature expansion with bounded validation.
+- Keep backend-selection UX tied to the Rust whole-frame admission and fail closed when
+  a capability is not yet coherent.
 - Use scoped context handling (`withCommandContext`) instead of manual push/pop where possible.
 - Keep architecture/boundary tests passing and extend guardrails when adding new migration surfaces.
 

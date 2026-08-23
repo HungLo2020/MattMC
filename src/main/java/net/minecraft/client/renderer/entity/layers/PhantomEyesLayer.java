@@ -20,4 +20,9 @@ public class PhantomEyesLayer extends EyesLayer<PhantomRenderState, PhantomModel
 	public RenderType renderType() {
 		return PHANTOM_EYES;
 	}
+
+	@Override
+	protected ResourceLocation semanticTexture() {
+		return ResourceLocation.withDefaultNamespace("textures/entity/phantom_eyes.png");
+	}
 }

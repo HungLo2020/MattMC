@@ -84,6 +84,13 @@ public class ItemStackRenderState implements net.irisshaders.iris.mixinterface.I
 		return this.animated;
 	}
 
+	public boolean hasSpecialRenderer() {
+		for (int index = 0; index < this.activeLayerCount; index++) {
+			if (this.layers[index].specialRenderer != null) return true;
+		}
+		return false;
+	}
+
 	public void appendModelIdentityElement(Object object) {
 	}
 
@@ -120,8 +127,53 @@ public class ItemStackRenderState implements net.irisshaders.iris.mixinterface.I
 		}
 	}
 
+	/**
+	 * Visits resolved special-model producers while they are still Java-side
+	 * semantic inputs.  GUI routes use this only to select a bounded copier;
+	 * the renderer and its argument never cross the native boundary.
+	 */
+	public void forEachSpecialRenderer(Consumer<SpecialRender> consumer) {
+		for (int index = 0; index < this.activeLayerCount; index++) {
+			LayerRenderState layer = this.layers[index];
+			if (layer.specialRenderer == null) continue;
+			PoseStack.Pose transformPose = new PoseStack.Pose();
+			layer.transform.apply(this.displayContext.leftHand(), transformPose);
+			consumer.accept(new SpecialRender(layer.specialRenderer, layer.argumentForSpecialRendering, transformPose));
+		}
+	}
+
 	public ItemDisplayContext displayContext() {
 		return this.displayContext;
+	}
+
+	public record SpecialRender(SpecialModelRenderer<Object> renderer, @Nullable Object argument, PoseStack.Pose transform) {
+	}
+
+	/**
+	 * Dispatches resolved special-model producers as semantic callsites.  The
+	 * renderer object is used only during this Java call; any geometry accepted
+	 * by the active Rust route is copied by the collector immediately.
+	 */
+	public void submitSpecialRenderers(
+		PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int packedLight, int overlayCoords, int outlineColor
+	) {
+		for (int index = 0; index < this.activeLayerCount; index++) {
+			LayerRenderState layer = this.layers[index];
+			if (layer.specialRenderer == null) continue;
+			poseStack.pushPose();
+			layer.transform.apply(this.displayContext.leftHand(), poseStack.last());
+			layer.specialRenderer.submit(
+				layer.argumentForSpecialRendering,
+				this.displayContext,
+				poseStack,
+				submitNodeCollector,
+				packedLight,
+				overlayCoords,
+				layer.foilType != FoilType.NONE,
+				outlineColor
+			);
+			poseStack.popPose();
+		}
 	}
 
 	public boolean usesBlockLight() {
@@ -320,11 +372,69 @@ public class ItemStackRenderState implements net.irisshaders.iris.mixinterface.I
 		}
 
 		void submit(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, int j, int k) {
-			if (RustGalWorldPrimitiveRenderer.isItemEntitySubmissionActive()) {
+			if (RustGalWorldPrimitiveRenderer.isIndexedItemSubmissionActive()) {
 				WorldRenderRoutePolicy.Route ownership = ItemEntityRenderOwnershipPolicy.currentOwnershipRoute();
 				if (ownership.usesRustWholeFrameVulkan()) {
 					poseStack.pushPose();
 					this.transform.apply(ItemStackRenderState.this.displayContext.leftHand(), poseStack.last());
+					if ((Object)this.specialRenderer instanceof net.minecraft.client.renderer.special.TaczGlock17SpecialRenderer taczRenderer) {
+						// TACZ owns a copied Bedrock semantic producer for third-person,
+						// ground, and fixed item contexts. Dispatch it before the generic
+						// special-renderer rejection; every other special renderer remains
+						// explicitly unavailable on the Rust whole-frame route.
+						int meshCountBefore = RustGalWorldPrimitiveRenderer.pendingIndexedItemMeshCount();
+						taczRenderer.submit(
+							ItemStackRenderState.this.displayContext,
+							poseStack,
+							submitNodeCollector,
+							i,
+							j,
+							false,
+							k
+						);
+						boolean rustQueued = RustGalWorldPrimitiveRenderer.pendingIndexedItemMeshCount() > meshCountBefore;
+						RustGalWorldPrimitiveRenderer.recordItemEntityRouteDecision(
+							rustQueued ? "rust-vulkan-whole-frame" : "rust-vulkan-unavailable", rustQueued,
+							rustQueued ? null : "tacz-special-renderer-semantic-receipt", rustQueued, rustQueued, false
+						);
+						poseStack.popPose();
+						if (!rustQueued) {
+							throw new IllegalStateException("Rust whole-frame TACZ item route produced no semantic mesh");
+						}
+						return;
+					}
+					if (this.specialRenderer != null) {
+						// Vanilla special item renderers are semantic producers: their
+						// submit methods feed Model/ModelPart calls back into the same
+						// collector, where Rust admission and asset copying still apply.
+						// Measure the copied mesh receipt so an unsupported special
+						// renderer remains explicitly unavailable.
+						int meshCountBefore = RustGalWorldPrimitiveRenderer.pendingIndexedItemMeshCount();
+						this.specialRenderer.submit(
+							this.argumentForSpecialRendering,
+							ItemStackRenderState.this.displayContext,
+							poseStack,
+							submitNodeCollector,
+							i,
+							j,
+							this.foilType != FoilType.NONE,
+							k
+						);
+						boolean rustQueued = RustGalWorldPrimitiveRenderer.pendingIndexedItemMeshCount() > meshCountBefore;
+						RustGalWorldPrimitiveRenderer.recordItemEntityRouteDecision(
+							rustQueued ? "rust-vulkan-whole-frame" : "rust-vulkan-unavailable",
+							rustQueued,
+							rustQueued ? null : "special-renderer-semantic-receipt",
+							rustQueued,
+							rustQueued,
+							false
+						);
+						poseStack.popPose();
+						if (!rustQueued) {
+							throw new IllegalStateException("Rust whole-frame special-item route produced no semantic mesh");
+						}
+						return;
+					}
 
 					String unavailableReason;
 					if (this.specialRenderer != null) {
@@ -349,7 +459,7 @@ public class ItemStackRenderState implements net.irisshaders.iris.mixinterface.I
 							"rust-vulkan-unavailable", false, unavailableReason, false, false, false
 						);
 						poseStack.popPose();
-						return;
+						throw new IllegalStateException("Rust whole-frame item route has no semantic mesh: " + unavailableReason);
 					}
 
 					boolean rustQueued = RustGalWorldPrimitiveRenderer.enqueueItemEntityMesh(
@@ -374,9 +484,16 @@ public class ItemStackRenderState implements net.irisshaders.iris.mixinterface.I
 				}
 			}
 
-			// Iris: Save block entity state before rendering (from ItemStackStateLayerMixin)
-			int lastBState = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedBlockEntity();
-			iris$setupId(ItemStackRenderState.this.iris_displayStack, ItemStackRenderState.this.iris_displayModelId);
+			// Iris: Save block entity state before rendering (from ItemStackStateLayerMixin).
+			// Rust semantic/item submission owns its material identity explicitly and
+			// must not publish or read the Java/Iris captured-rendering singleton.
+			boolean captureIrisRenderState = !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
+			int lastBState = captureIrisRenderState
+				? net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedBlockEntity()
+				: 0;
+			if (captureIrisRenderState) {
+				iris$setupId(ItemStackRenderState.this.iris_displayStack, ItemStackRenderState.this.iris_displayModelId);
+			}
 			
 			poseStack.pushPose();
 			this.transform.apply(ItemStackRenderState.this.displayContext.leftHand(), poseStack.last());
@@ -407,12 +524,15 @@ public class ItemStackRenderState implements net.irisshaders.iris.mixinterface.I
 			poseStack.popPose();
 			
 			// Iris: Restore state after rendering (from ItemStackStateLayerMixin)
-			net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentBlockEntity(lastBState);
-			net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentRenderedItem(0);
+			if (captureIrisRenderState) {
+				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentBlockEntity(lastBState);
+				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentRenderedItem(0);
+			}
 		}
 		
 		// Iris: Helper method from ItemStackStateLayerMixin
 		private void iris$setupId(net.minecraft.world.item.Item item, net.minecraft.resources.ResourceLocation modelId) {
+			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) return;
 			if (net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getItemIds() == null) return;
 
 			if (item instanceof net.minecraft.world.item.BlockItem blockItem && !(item instanceof net.minecraft.world.item.SolidBucketItem)) {

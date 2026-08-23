@@ -270,7 +270,22 @@ public class AvatarRenderer<AvatarlikeEntity extends Avatar & ClientAvatarEntity
 		playerModel.rightSleeve.visible = bl;
 		playerModel.leftArm.zRot = -0.1F;
 		playerModel.rightArm.zRot = 0.1F;
-		submitNodeCollector.submitModelPart(modelPart, poseStack, RenderType.entityTranslucent(resourceLocation), i, OverlayTexture.NO_OVERLAY, null);
+		// The avatar hand is a direct-texture ModelPart, not an atlas-backed
+		// sprite. Promote it to the semantic direct-texture model contract so the
+		// Rust whole-frame route can copy the part without manufacturing a Java
+		// texture view or falling back to a Java Vulkan draw.
+		submitNodeCollector.submitModelSemanticTexture(
+			new net.minecraft.client.model.Model.Simple(modelPart, ignored -> RenderType.entityTranslucent(resourceLocation)),
+			net.minecraft.util.Unit.INSTANCE,
+			poseStack,
+			RenderType.entityTranslucent(resourceLocation),
+			i,
+			OverlayTexture.NO_OVERLAY,
+			0,
+			resourceLocation,
+			0,
+			null
+		);
 	}
 
 	protected void setupRotations(AvatarRenderState avatarRenderState, PoseStack poseStack, float f, float g) {

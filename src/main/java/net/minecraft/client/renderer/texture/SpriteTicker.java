@@ -8,5 +8,10 @@ import net.minecraft.api.Environment;
 public interface SpriteTicker extends AutoCloseable {
 	void tickAndUpload(int i, int j, GpuTexture gpuTexture);
 
+	/** Advances CPU animation state without touching a backend texture. */
+	default boolean tickSemantic() {
+		return false;
+	}
+
 	void close();
 }

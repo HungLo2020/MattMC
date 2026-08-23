@@ -17,9 +17,9 @@ final class ItemEntityRenderOwnershipPolicyTest {
 	}
 
 	@Test
-	void javaAndDiagnosticControlsRetainCompatibilityOwnership() {
+	void selectedVulkanWithoutRustAdmissionFailsClosed() {
 		assertEquals(
-			JAVA_COMPATIBILITY,
+			DISABLED,
 			ItemEntityRenderOwnershipPolicy.selectOwnershipForTests(true, false, false, false)
 		);
 		assertEquals(
@@ -27,7 +27,7 @@ final class ItemEntityRenderOwnershipPolicyTest {
 			ItemEntityRenderOwnershipPolicy.selectOwnershipForTests(false, false, false, false)
 		);
 		assertEquals(
-			JAVA_COMPATIBILITY,
+			DISABLED,
 			ItemEntityRenderOwnershipPolicy.selectOwnershipForTests(true, true, false, true)
 		);
 		assertEquals(

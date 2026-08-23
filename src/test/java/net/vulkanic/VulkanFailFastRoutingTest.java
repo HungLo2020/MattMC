@@ -43,18 +43,14 @@ public class VulkanFailFastRoutingTest {
     }
 
     @Test
-    public void testProxyRoutesPreviouslyMissingMethodsToVulkanBackend() {
+    public void testProxyRejectsJavaVulkanRenderingMethodsAfterRustSelection() {
         VulkanicAPI.initialize(GraphicsBackendType.VULKAN);
 
-        // `blitFramebuffer()` used to be absent from `VulkanBackend`, which meant the fail-fast
-        // proxy blocked it with an explicit fallback error. Now that the Vulkan contract is fully
-        // covered, the proxy must route the call through to `VulkanBackend`, which then performs
-        // its own normal argument validation.
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+        IllegalStateException exception = assertThrows(IllegalStateException.class,
             () -> VulkanicAPI.getBackend().blitFramebuffer(null, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0));
 
-        assertTrue(exception.getMessage().contains("requires VulkanCommandContext"),
-            "Implemented methods should be routed to VulkanBackend validation, but got: " + exception.getMessage());
+        assertTrue(exception.getMessage().contains("Rust Vulkan whole-frame ownership"),
+            "Java Vulkan rendering must fail at the ownership boundary, but got: " + exception.getMessage());
     }
 
     @Test
@@ -83,5 +79,7 @@ public class VulkanFailFastRoutingTest {
         Field rawVulkanBackendField = VulkanicAPI.class.getDeclaredField("rawVulkanBackend");
         rawVulkanBackendField.setAccessible(true);
         rawVulkanBackendField.set(null, null);
+        net.vulkanic.bridge.RustGalVulkanWholeFrameMode.deactivateRustPresentation();
+        net.vulkanic.bridge.RustGalVulkanWholeFrameMode.clearVulkanBackendSelection();
     }
 }

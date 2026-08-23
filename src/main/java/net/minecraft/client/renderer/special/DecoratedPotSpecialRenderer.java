@@ -23,6 +23,8 @@ public class DecoratedPotSpecialRenderer implements SpecialModelRenderer<PotDeco
 		this.decoratedPotRenderer = decoratedPotRenderer;
 	}
 
+	public DecoratedPotRenderer renderer() { return this.decoratedPotRenderer; }
+
 	@Nullable
 	public PotDecorations extractArgument(ItemStack itemStack) {
 		return (PotDecorations)itemStack.get(DataComponents.POT_DECORATIONS);

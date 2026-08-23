@@ -16,7 +16,7 @@ final class ItemStackRenderStateItemEntityOwnershipTest {
 			"src/main/java/net/minecraft/client/renderer/item/ItemStackRenderState.java"
 		));
 
-		int itemEntityScope = source.indexOf("RustGalWorldPrimitiveRenderer.isItemEntitySubmissionActive()");
+		int itemEntityScope = source.indexOf("RustGalWorldPrimitiveRenderer.isIndexedItemSubmissionActive()");
 		int ownership = source.indexOf("ItemEntityRenderOwnershipPolicy.currentOwnershipRoute()", itemEntityScope);
 		int rustBranch = source.indexOf("ownership.usesRustWholeFrameVulkan()", ownership);
 		int specialUnavailable = source.indexOf("unavailableReason = \"special-renderer\"", rustBranch);

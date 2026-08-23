@@ -28,6 +28,8 @@ public class PlayerHeadSpecialRenderer implements SpecialModelRenderer<PlayerSki
 		this.modelBase = skullModelBase;
 	}
 
+	public SkullModelBase model() { return this.modelBase; }
+
 	public void submit(
 		@Nullable PlayerSkinRenderCache.RenderInfo renderInfo,
 		ItemDisplayContext itemDisplayContext,
@@ -39,7 +41,7 @@ public class PlayerHeadSpecialRenderer implements SpecialModelRenderer<PlayerSki
 		int k
 	) {
 		RenderType renderType = renderInfo != null ? renderInfo.renderType() : PlayerSkinRenderCache.DEFAULT_PLAYER_SKIN_RENDER_TYPE;
-		SkullBlockRenderer.submitSkull(null, 180.0F, 0.0F, poseStack, submitNodeCollector, i, this.modelBase, renderType, k, null);
+		SkullBlockRenderer.submitSkull(null, 180.0F, 0.0F, poseStack, submitNodeCollector, i, this.modelBase, renderType, k, null, null);
 	}
 
 	@Override

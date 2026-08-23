@@ -15,12 +15,14 @@ import net.minecraft.network.chat.Style;
 import net.sodium.client.render.vertex.VertexConsumerUtils;
 import org.joml.Matrix4f;
 import java.util.function.Consumer;
+import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
 public class BakedSheetGlyph implements BakedGlyph, EffectGlyph {
 	public static final float Z_FIGHTER = 0.001F;
 	private final GlyphInfo info;
 	final GlyphRenderTypes renderTypes;
+	@Nullable
 	final GpuTextureView textureView;
 	private final String semanticAtlasIdentity;
 	private final boolean semanticAtlasColored;

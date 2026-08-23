@@ -20,8 +20,8 @@ public class LayerCentipedeHeadEyes extends RenderLayer<CentipedeHeadRenderState
     @Override
     public void submit(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, CentipedeHeadRenderState state, float f, float g) {
         submitNodeCollector.order(1)
-            .submitModel(
-                this.getParentModel(), state, poseStack, RenderType.eyes(TEXTURE), 15728640, OverlayTexture.NO_OVERLAY, -1, null, state.outlineColor, null
+            .submitModelSemanticTexture(
+                this.getParentModel(), state, poseStack, RenderType.eyes(TEXTURE), 15728640, OverlayTexture.NO_OVERLAY, -1, TEXTURE, state.outlineColor, null
             );
     }
 }

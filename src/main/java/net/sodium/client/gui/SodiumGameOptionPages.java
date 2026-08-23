@@ -262,7 +262,8 @@ public class SodiumGameOptionPages {
                         .setBinding((opts, value) -> {
                             opts.cloudStatus().set(value);
 
-                            if (Minecraft.useShaderTransparency()) {
+                            if (Minecraft.useShaderTransparency()
+                                && !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
                                 RenderTarget framebuffer = Minecraft.getInstance().levelRenderer.getCloudsTarget();
                                 if (framebuffer != null) {
                                                                         VulkanicAPI.createCommandEncoder().clearColorAndDepthTextures(framebuffer.getColorTexture(), 0xFFFFFFFF, framebuffer.getDepthTexture(), 1.0f);
@@ -459,7 +460,8 @@ public class SodiumGameOptionPages {
     public static OptionPage advanced() {
         List<OptionGroup> groups = new ArrayList<>();
 
-        boolean isPersistentMappingSupported = MappedStagingBuffer.isSupported(RenderDevice.instance());
+        boolean isPersistentMappingSupported = !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+                && MappedStagingBuffer.isSupported(RenderDevice.instance());
 
         groups.add(OptionGroup.createBuilder()
                 .add(OptionImpl.createBuilder(boolean.class, sodiumOpts)

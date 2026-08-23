@@ -255,8 +255,20 @@ def run_size_check(policy: RetentionPolicy, run_root: Path) -> None:
         raise RuntimeError(f"graphics artifact run exceeded quota: {size} > {policy.run_limit_bytes} ({run_root})")
 
 
+_MAX_RETENTION_JSON_BYTES = 8 * 1024 * 1024
+
+
 def _read_json(path: Path) -> dict[str, object]:
+    """Read bounded retention metadata without blocking on live diagnostics.
+
+    Capture-side diagnostic JSON is written while a run is active and may be
+    incomplete or unexpectedly large.  Retention only needs the small success
+    and profile fields, so oversized files are deliberately treated as
+    incomplete metadata instead of being read and parsed without a bound.
+    """
     try:
+        if path.stat().st_size > _MAX_RETENTION_JSON_BYTES:
+            return {}
         return json.loads(path.read_text(encoding="utf-8"))
     except Exception:
         return {}

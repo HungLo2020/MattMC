@@ -1202,6 +1202,7 @@ pub(crate) fn blend_mode(raw: u32) -> GalResult<BlendMode> {
         4 => Ok(BlendMode::Invert),
         5 => Ok(BlendMode::Multiply),
         6 => Ok(BlendMode::Overlay),
+        8 => Ok(BlendMode::Vignette),
         _ => Err(GalError::ffi(
             StatusCode::UnknownEnum,
             format!("unknown blend mode {raw}"),
@@ -1264,6 +1265,7 @@ pub(crate) fn texture_usage_state(raw: u32) -> GalResult<TextureUsageState> {
         7 => Ok(TextureUsageState::TransferDst),
         8 => Ok(TextureUsageState::Present),
         9 => Ok(TextureUsageState::IndexRead),
+        10 => Ok(TextureUsageState::ShaderStorageRead),
         _ => Err(GalError::ffi(
             StatusCode::UnknownEnum,
             format!("unknown texture usage state {raw}"),

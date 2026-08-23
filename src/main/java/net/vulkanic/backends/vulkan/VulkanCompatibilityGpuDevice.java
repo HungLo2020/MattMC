@@ -199,12 +199,12 @@ final class VulkanCompatibilityGpuDevice implements GpuDevice {
 	}
 
 	private <T> T withCompatibilityBackend(Supplier<T> action) {
-		if (this.compatibilityOnly
-			&& net.vulkanic.bridge.RustGalVulkanWholeFrameMode.isRustPresentationActive()) {
-			throw new IllegalStateException(
-				"Rust Vulkan whole-frame presentation is active; Java OpenGL compatibility device "
-					+ "cannot execute rendering work. Port this callsite to explicit VulkanicGAL semantics."
-			);
+        if (this.compatibilityOnly
+            && net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+            throw new IllegalStateException(
+                "Rust Vulkan whole-frame ownership is enabled; Java OpenGL compatibility device "
+                    + "cannot execute rendering work. Port this callsite to explicit VulkanicGAL semantics."
+            );
 		}
 		return this.withCompatibilityBackendForTeardown(action);
 	}

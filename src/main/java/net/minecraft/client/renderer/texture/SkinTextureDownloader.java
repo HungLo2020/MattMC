@@ -119,6 +119,9 @@ public class SkinTextureDownloader {
 		return CompletableFuture.supplyAsync(() -> {
 			DynamicTexture dynamicTexture = new DynamicTexture(texture.texturePath()::toString, nativeImage);
 			this.textureManager.register(texture.texturePath(), dynamicTexture);
+			// Publish only the bounded CPU image identity to semantic Rust GUI
+			// producers; the Java texture remains a compatibility backend object.
+			net.vulkanic.gui.RustGalGuiRawImageAssets.registerDynamicTexture(texture.texturePath(), dynamicTexture);
 			return texture;
 		}, this.mainThreadExecutor);
 	}

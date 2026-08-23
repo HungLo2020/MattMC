@@ -74,6 +74,7 @@ public class LightTexture implements AutoCloseable {
 	private long rustSemanticLightmapGeneration;
 	private final GameRenderer renderer;
 	private final Minecraft minecraft;
+	@Nullable
 	private final MappableRingBuffer ubo;
 
 	public LightTexture(GameRenderer gameRenderer, Minecraft minecraft) {
@@ -113,7 +114,9 @@ public class LightTexture implements AutoCloseable {
 		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			VulkanicAPI.createCommandEncoder().clearColorTexture(this.texture, -1);
 		}
-		this.ubo = new MappableRingBuffer(() -> "Lightmap UBO", 130, LIGHTMAP_UBO_SIZE);
+		this.ubo = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			? null
+			: new MappableRingBuffer(() -> "Lightmap UBO", 130, LIGHTMAP_UBO_SIZE);
 	}
 
 	public GpuTextureView getTextureView() {
@@ -178,7 +181,9 @@ public class LightTexture implements AutoCloseable {
 		}
 		this.texture.close();
 		this.textureView.close();
-		this.ubo.close();
+		if (this.ubo != null) {
+			this.ubo.close();
+		}
 	}
 
 	public void tick() {
@@ -212,8 +217,11 @@ public class LightTexture implements AutoCloseable {
 		float h = 0.45F * f;
 		float result = Math.max(0.0F, Mth.cos((livingEntity.tickCount - g) * (float) Math.PI * 0.025F) * h);
 		
-		// Iris: Store darkness value after calculation
-		net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setDarknessLightFactor((float) (result * this.minecraft.options.darknessEffectScale().get()));
+		// Iris captured state is compatibility-only; the semantic Rust route
+		// carries the darkness/lightmap inputs directly and must not publish it.
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setDarknessLightFactor((float) (result * this.minecraft.options.darknessEffectScale().get()));
+		}
 		
 		return result;
 	}

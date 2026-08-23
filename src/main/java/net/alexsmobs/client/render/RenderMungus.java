@@ -4,7 +4,6 @@ import net.alexsmobs.client.model.ModelMungus;
 import net.alexsmobs.client.render.layer.MungusBeamLayer;
 import net.alexsmobs.entity.EntityMungus;
 import net.blaze3d.vertex.PoseStack;
-import net.blaze3d.vertex.VertexConsumer;
 import net.math.Axis;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.renderer.RenderType;
@@ -15,16 +14,12 @@ import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.block.state.BlockState;
-import org.joml.Matrix3f;
-import org.joml.Matrix4f;
 
 public class RenderMungus extends MobRenderer<EntityMungus, MungusRenderState, ModelMungus> {
     private static final ResourceLocation TEXTURE = ResourceLocation.withDefaultNamespace("textures/entity/mungus.png");
-    private static final ResourceLocation BEAM_TEXTURE = ResourceLocation.withDefaultNamespace("textures/entity/mungus_beam.png");
     private static final ResourceLocation TEXTURE_BEAM_OVERLAY = ResourceLocation.withDefaultNamespace("textures/entity/mungus_beam_overlay.png");
     private static final ResourceLocation TEXTURE_SACK_OVERLAY = ResourceLocation.withDefaultNamespace("textures/entity/mungus_sack.png");
     private static final ResourceLocation TEXTURE_SHOES = ResourceLocation.withDefaultNamespace("textures/entity/mungus_shoes.png");
-    private static final RenderType beamType = RenderType.eyes(BEAM_TEXTURE);
 
     public RenderMungus(EntityRendererProvider.Context renderManagerIn) {
         super(renderManagerIn, new ModelMungus(0), 0.5F);
@@ -55,17 +50,6 @@ public class RenderMungus extends MobRenderer<EntityMungus, MungusRenderState, M
 
     protected boolean isShaking(MungusRenderState renderState) {
         return renderState.isReverting;
-    }
-
-    private static void vertex(VertexConsumer p_229108_0_, Matrix4f p_229108_1_, Matrix3f p_229108_2_,
-            float p_229108_3_, float p_229108_4_, float p_229108_5_, int p_229108_6_, int p_229108_7_, int p_229108_8_,
-            float p_229108_9_, float p_229108_10_) {
-        org.joml.Vector4f pos = new org.joml.Vector4f(p_229108_3_, p_229108_4_, p_229108_5_, 1.0F);
-        pos.mul(p_229108_1_);
-        // POSITION_TEX_COLOR format: position -> tex -> color
-        p_229108_0_.addVertex(pos.x, pos.y, pos.z)
-                .setUv(p_229108_9_, p_229108_10_)
-                .setColor(p_229108_6_, p_229108_7_, p_229108_8_, 255);
     }
 
     protected void setupRotations(MungusRenderState renderState, PoseStack matrixStackIn, float ageInTicks,
@@ -110,7 +94,7 @@ public class RenderMungus extends MobRenderer<EntityMungus, MungusRenderState, M
             // Render glowing sack overlay
             float alpha = 0.75F + (Mth.cos(renderState.ageInTicks * 0.2F) + 1F) * 0.125F;
             int color = packColor(1.0F, 1.0F, 1.0F, alpha);
-            submitNodeCollector.submitModel(
+            submitNodeCollector.submitModelSemanticTexture(
                 this.getParentModel(),
                 renderState,
                 poseStack,
@@ -118,7 +102,7 @@ public class RenderMungus extends MobRenderer<EntityMungus, MungusRenderState, M
                 240,
                 OverlayTexture.NO_OVERLAY,
                 color,
-                null,
+                TEXTURE_SACK_OVERLAY,
                 0,
                 null
             );
@@ -127,7 +111,7 @@ public class RenderMungus extends MobRenderer<EntityMungus, MungusRenderState, M
             if (renderState.beamTarget != null) {
                 float beamAlpha = 0.75F + (Mth.cos(renderState.ageInTicks * 1) + 1F) * 0.125F;
                 int beamColor = packColor(1.0F, 1.0F, 1.0F, beamAlpha);
-                submitNodeCollector.submitModel(
+                submitNodeCollector.submitModelSemanticTexture(
                     this.getParentModel(),
                     renderState,
                     poseStack,
@@ -135,7 +119,7 @@ public class RenderMungus extends MobRenderer<EntityMungus, MungusRenderState, M
                     240,
                     OverlayTexture.pack(OverlayTexture.u(0), OverlayTexture.v(false)),
                     beamColor,
-                    null,
+                    TEXTURE_BEAM_OVERLAY,
                     0,
                     null
                 );
@@ -146,7 +130,7 @@ public class RenderMungus extends MobRenderer<EntityMungus, MungusRenderState, M
             if (s != null && s.toLowerCase().contains("drip")) {
                 poseStack.pushPose();
                 this.getParentModel().renderShoes();
-                submitNodeCollector.submitModel(
+                submitNodeCollector.submitModelSemanticTexture(
                     this.getParentModel(),
                     renderState,
                     poseStack,
@@ -154,7 +138,7 @@ public class RenderMungus extends MobRenderer<EntityMungus, MungusRenderState, M
                     packedLight,
                     OverlayTexture.NO_OVERLAY,
                     -1,
-                    null,
+                    TEXTURE_SHOES,
                     0,
                     null
                 );

@@ -145,7 +145,8 @@ public class CustomTextureManager {
 				//     now.
 				return new TextureWrapper(() -> {
 					AbstractTexture texture = textureManager.getTexture(textureLocation);
-					if (texture instanceof TextureAtlas || texture instanceof PBRAtlasTexture) {
+					if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+						&& (texture instanceof TextureAtlas || texture instanceof PBRAtlasTexture)) {
 						int tex = net.irisshaders.iris.gl.IrisRenderSystem.getActiveTextureUnitIndex();
 						int binding = net.irisshaders.iris.gl.IrisRenderSystem.getTextureBinding(tex);
 						texture.setFilter(false, Minecraft.getInstance().options.mipmapLevels().get() > 0);
@@ -166,7 +167,8 @@ public class CustomTextureManager {
 
 					if (texture != null) {
 						var ctx = VulkanicAPI.getCommandContext();
-						if (texture instanceof TextureAtlas || texture instanceof PBRAtlasTexture) {
+						if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+							&& (texture instanceof TextureAtlas || texture instanceof PBRAtlasTexture)) {
 							int tex = net.irisshaders.iris.gl.IrisRenderSystem.getActiveTextureUnitIndex();
 							int binding = net.irisshaders.iris.gl.IrisRenderSystem.getTextureBinding(tex);
 							texture.setFilter(false, Minecraft.getInstance().options.mipmapLevels().get() > 0);
@@ -181,7 +183,7 @@ public class CustomTextureManager {
 						};
 
 						TextureFormat textureFormat = TextureFormatLoader.getFormat();
-						if (textureFormat != null) {
+						if (textureFormat != null && !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 							int previousBinding = net.irisshaders.iris.gl.IrisRenderSystem.getBoundTextureOnActiveUnit();
 							VulkanicAPI.bindTexture2D(ctx, VulkanicCoreAPI.textureId(pbrTexture.getTexture()));
 							textureFormat.setupTextureParameters(pbrType, pbrTexture);

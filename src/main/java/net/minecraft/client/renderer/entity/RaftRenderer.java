@@ -29,4 +29,9 @@ public class RaftRenderer extends AbstractBoatRenderer {
 	protected RenderType renderType() {
 		return this.model.renderType(this.texture);
 	}
+
+	@Override
+	protected ResourceLocation textureLocation() {
+		return this.texture;
+	}
 }

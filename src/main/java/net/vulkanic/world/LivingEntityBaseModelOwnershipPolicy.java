@@ -51,17 +51,23 @@ public final class LivingEntityBaseModelOwnershipPolicy {
 		boolean legacyControl
 	) {
 		if (!migratedFamily) {
-			return WorldRenderRoutePolicy.Route.JAVA_COMPATIBILITY;
+			return vulkanBackendSelected
+				? WorldRenderRoutePolicy.Route.DISABLED
+				: WorldRenderRoutePolicy.Route.JAVA_COMPATIBILITY;
 		}
 		if (disabled) {
 			return WorldRenderRoutePolicy.Route.DISABLED;
 		}
 		if (legacyControl) {
-			return WorldRenderRoutePolicy.Route.JAVA_COMPATIBILITY;
+			return vulkanBackendSelected
+				? WorldRenderRoutePolicy.Route.DISABLED
+				: WorldRenderRoutePolicy.Route.JAVA_COMPATIBILITY;
 		}
 		return vulkanBackendSelected && wholeFrameVulkanEnabled
 			? WorldRenderRoutePolicy.Route.RUST_VULKAN_WHOLE_FRAME
-			: WorldRenderRoutePolicy.Route.JAVA_COMPATIBILITY;
+			: vulkanBackendSelected
+				? WorldRenderRoutePolicy.Route.DISABLED
+				: WorldRenderRoutePolicy.Route.JAVA_COMPATIBILITY;
 	}
 
 	public static Disposition classify(
@@ -70,7 +76,18 @@ public final class LivingEntityBaseModelOwnershipPolicy {
 		boolean eligible,
 		WorldRenderRoutePolicy.Route ownership
 	) {
-		if (semanticSubmission || !migratedFamily || !ownership.usesRustWholeFrameVulkan()) {
+		if (semanticSubmission) {
+			return Disposition.JAVA_COMPATIBILITY;
+		}
+		if (ownership == WorldRenderRoutePolicy.Route.DISABLED) {
+			return Disposition.RUST_UNAVAILABLE;
+		}
+		if (!migratedFamily) {
+			return ownership.usesRustWholeFrameVulkan()
+				? Disposition.RUST_UNAVAILABLE
+				: Disposition.JAVA_COMPATIBILITY;
+		}
+		if (!ownership.usesRustWholeFrameVulkan()) {
 			return Disposition.JAVA_COMPATIBILITY;
 		}
 		return eligible ? Disposition.RUST_AVAILABLE : Disposition.RUST_UNAVAILABLE;

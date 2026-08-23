@@ -6,8 +6,6 @@ import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.entity.MobRenderer;
 import net.minecraft.resources.ResourceLocation;
 
-// TODO: Fix layer to work with render state system
-// this.addLayer(new SubterranodonRiderLayer(this));
 public class SubterranodonRenderer extends MobRenderer<SubterranodonEntity, SubterranodonRenderState, SubterranodonModel> {
     private static final ResourceLocation TEXTURE = ResourceLocation.withDefaultNamespace("textures/entity/subterranodon.png");
     private static final ResourceLocation TEXTURE_RETRO = ResourceLocation.withDefaultNamespace("textures/entity/subterranodon_retro.png");
@@ -55,5 +53,4 @@ public class SubterranodonRenderer extends MobRenderer<SubterranodonEntity, Subt
         return state.altSkin == 1 ? TEXTURE_RETRO : state.altSkin == 2 ? TEXTURE_TECTONIC : TEXTURE;
     }
 }
-
 

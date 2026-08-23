@@ -1358,7 +1358,10 @@ fn parse_runtime_block_state_identities(
                 )));
             }
             if properties
-                .insert(name.to_string(), property_value.to_string())
+                .insert(
+                    name.to_ascii_lowercase(),
+                    property_value.to_ascii_lowercase(),
+                )
                 .is_some()
             {
                 return Err(GalError::invalid_argument(format!(
@@ -1427,7 +1430,10 @@ fn parse_semantic_block_state_identity(value: &str) -> GalResult<RuntimeBlockSta
             )));
         }
         if properties
-            .insert(name.to_owned(), property_value.to_owned())
+            .insert(
+                name.to_ascii_lowercase(),
+                property_value.to_ascii_lowercase(),
+            )
             .is_some()
         {
             return Err(GalError::invalid_argument(format!(
@@ -1475,7 +1481,10 @@ fn parse_distant_horizons_state_properties(value: &str) -> GalResult<BTreeMap<St
             )));
         }
         if properties
-            .insert(name.to_owned(), property_value.to_owned())
+            .insert(
+                name.to_ascii_lowercase(),
+                property_value.to_ascii_lowercase(),
+            )
             .is_some()
         {
             return Err(GalError::invalid_argument(format!(
@@ -1526,7 +1535,7 @@ fn is_resource_location(value: &str) -> bool {
 fn is_property_token(value: &str) -> bool {
     !value.is_empty()
         && value.bytes().all(|byte| {
-            byte.is_ascii_lowercase() || byte.is_ascii_digit() || matches!(byte, b'_' | b'-' | b'.')
+            byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-' | b'.')
         })
 }
 
@@ -1672,6 +1681,15 @@ mod tests {
         .unwrap();
         assert_eq!(piston.properties["facing"], "east");
         assert_eq!(piston.properties["extended"], "true");
+
+        let trial_spawner = parse_semantic_block_state_identity(
+            "minecraft:trial_spawner_STATE_{trial_spawner_state:WAITING_FOR_PLAYERS}",
+        )
+        .unwrap();
+        assert_eq!(
+            trial_spawner.properties["trial_spawner_state"],
+            "waiting_for_players"
+        );
     }
 
     #[test]

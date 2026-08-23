@@ -27,6 +27,9 @@ public class PanoramaRenderer {
 		}
 
 		if (!net.vulkanic.gui.RustGalPanoramaRenderer.enqueue(this.cubeMap, 10.0F, -this.spin, i, j)) {
+			if (net.vulkanic.gui.RustGalGuiRenderer.isWholeFrameVulkanActive()) {
+				throw new IllegalStateException("Rust Vulkan whole-frame panorama asset is unavailable; Java panorama rendering is not a fallback");
+			}
 			this.cubeMap.render(this.minecraft, 10.0F, -this.spin);
 		}
 		guiGraphics.blit(RenderPipelines.GUI_TEXTURED, PANORAMA_OVERLAY, 0, 0, 0.0F, 0.0F, i, j, 16, 128, 16, 128);

@@ -4,6 +4,7 @@ import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.core.Direction;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.SkullBlock.Type;
 import net.minecraft.world.level.block.SkullBlock.Types;
 
@@ -14,4 +15,6 @@ public class SkullBlockRenderState extends BlockEntityRenderState {
 	public float rotationDegrees;
 	public Type skullType = Types.ZOMBIE;
 	public RenderType renderType;
+	/** Stable semantic texture identity for non-player vanilla skulls. */
+	public ResourceLocation textureIdentity;
 }

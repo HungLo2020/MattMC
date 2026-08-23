@@ -144,13 +144,18 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
                             fluidBlockCount++;
                         }
                         boolean builtInWater = isBuiltInWater(fluidState);
+                        boolean builtInLava = fluidState.is(Fluids.LAVA) || fluidState.is(Fluids.FLOWING_LAVA);
                         boolean nativeFluidSupported = !fluidState.isEmpty()
                                 && NativeSectionSnapshot.isNativeFluidSupported(fluidState);
-                        boolean rustWaterSupported = nativeFluidSupported && builtInWater;
+                        // The Rust fluid ABI has explicit built-in water and lava
+                        // semantics. Keep custom/overridden fluids on the Java
+                        // compatibility path, but do not discard native lava faces
+                        // before Rust can consume them as generic translucent fluid.
+                        boolean rustFluidSupported = nativeFluidSupported && (builtInWater || builtInLava);
                         boolean nativeUnsupportedFluidForRustTerrain = rustStaticTerrainRoute
                                 && !fluidState.isEmpty()
                                 && nativeFluidSupported
-                                && !rustWaterSupported;
+                                && !rustFluidSupported;
                         boolean useJavaFluid = !fluidState.isEmpty()
                                 && (forceJavaProducers || forceJavaFluids || !nativeFluidSupported);
                         boolean skipNativeFluid = useJavaFluid || nativeUnsupportedFluidForRustTerrain;
@@ -194,7 +199,7 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
                             NativeMeshingCompatibilityFallback.renderUnsupportedFluidTranslucentMetadata(cache,
                                     buffers, slice, blockState, fluidState, blockPos, modelOffset, collector);
                             unsupportedFluidBlockCount++;
-                        } else if (rustWaterSupported) {
+                        } else if (rustFluidSupported) {
                             nativeWaterBlockCount++;
                             fallbackStats.recordNativeFluidBlock(fluidState);
                         }

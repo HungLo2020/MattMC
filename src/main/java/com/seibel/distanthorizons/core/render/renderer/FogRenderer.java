@@ -102,6 +102,10 @@ public class FogRenderer
 	
 	public void render(Mat4f modelViewProjectionMatrix, float partialTicks)
 	{
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
+		{
+			throw new IllegalStateException("Java Distant Horizons fog rendering is unavailable while Rust owns whole-frame presentation");
+		}
 		// needed to preserve GL state - MC may not manually set each GL state before the next rendering step
 		CommandContext ctx = VulkanicAPI.getCommandContext();
 		GLState state = new GLState(ctx);

@@ -7,6 +7,8 @@ import net.blaze3d.vertex.PoseStack;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.entity.layers.RenderLayer;
+import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.math.Axis;
 
 public class LayerMimicubeHelmet extends RenderLayer<MimicubeRenderState, ModelMimicube> {
 
@@ -16,7 +18,13 @@ public class LayerMimicubeHelmet extends RenderLayer<MimicubeRenderState, ModelM
 
     @Override
     public void submit(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int packedLight, MimicubeRenderState renderState, float f, float g) {
-        // TODO: Implement helmet rendering in the new architecture
-        // For now, this is a stub for compilation
+        if (renderState.headItem.isEmpty()) return;
+        poseStack.pushPose();
+        this.getParentModel().root.translateAndRotate(poseStack);
+        poseStack.translate(0.0F, -1.0F, 0.0F);
+        poseStack.mulPose(Axis.XP.rotationDegrees(180.0F));
+        renderState.headItem.submit(poseStack, submitNodeCollector, packedLight,
+            OverlayTexture.NO_OVERLAY, renderState.outlineColor);
+        poseStack.popPose();
     }
 }

@@ -62,6 +62,7 @@ public class Shader
 
 	public Shader(CommandContext ctx, int type, String path, boolean absoluteFilePath)
 	{
+		rejectRustWholeFrameJavaShader();
 		LOGGER.info("Loading shader at [" + path + "]");
 		// Create an empty shader object
 		this.id = createShaderId(ctx, type);
@@ -102,6 +103,7 @@ public class Shader
 
 	public Shader(CommandContext ctx, int type, String sourceString)
 	{
+		rejectRustWholeFrameJavaShader();
 		LOGGER.info("Loading shader with type: ["+type+"]");
 		LOGGER.debug("Source: \n["+sourceString+"]");
 		if (sourceString == null || sourceString.isEmpty())
@@ -156,6 +158,16 @@ public class Shader
 	private static int createShaderId(CommandContext ctx, int type)
 	{
 		return VulkanicAPI.createShaderHandle(ctx, type).value();
+	}
+
+	private static void rejectRustWholeFrameJavaShader()
+	{
+		if (VulkanicAPI.isVulkanBackendInitializedAndSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
+		{
+			throw new IllegalStateException(
+				"Java Distant Horizons shaders are unavailable while Rust owns whole-frame presentation");
+		}
 	}
 	
 	public void free() { this.free(VulkanicAPI.getCommandContext()); }

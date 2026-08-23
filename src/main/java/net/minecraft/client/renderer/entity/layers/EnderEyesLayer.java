@@ -20,4 +20,9 @@ public class EnderEyesLayer extends EyesLayer<EndermanRenderState, EndermanModel
 	public RenderType renderType() {
 		return ENDERMAN_EYES;
 	}
+
+	@Override
+	protected ResourceLocation semanticTexture() {
+		return ResourceLocation.withDefaultNamespace("textures/entity/enderman/enderman_eyes.png");
+	}
 }

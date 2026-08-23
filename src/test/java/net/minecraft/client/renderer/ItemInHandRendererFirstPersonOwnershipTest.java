@@ -50,5 +50,16 @@ final class ItemInHandRendererFirstPersonOwnershipTest {
 			guardedRegion.contains("disposition != FirstPersonItemSubmitDisposition.JAVA_COMPATIBILITY"),
 			"Java item submission must be unreachable for submitted or unavailable Rust whole-frame outcomes"
 		);
+		assertTrue(guardedRegion.contains("Rust whole-frame first-person item route has no semantic mesh"),
+			"an unavailable Rust hand item must abort rather than present an incomplete frame");
+		assertTrue(source.contains("RustGalWorldPrimitiveRenderer.beginFirstPersonGuiCapture()"),
+			"Rust first-person hands must install the semantic textured-quad sink");
+		assertTrue(source.contains("collectFirstPersonTextSemantics"),
+			"map decoration labels must use the copied Rust text contract");
+		assertTrue(source.contains("itemStack.getItem() instanceof TaczMvpGunItem")
+			&& source.contains("renderTaczGlockFirstPerson"),
+			"TACZ hands must use their copied semantic producer on the Rust route");
+		assertTrue(!source.contains("rustWholeFrame && (itemStack.isEmpty()"),
+			"empty-hand model parts must remain admitted to the Rust semantic route");
 	}
 }

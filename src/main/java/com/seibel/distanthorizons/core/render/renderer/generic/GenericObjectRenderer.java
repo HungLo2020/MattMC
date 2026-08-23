@@ -390,6 +390,10 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 			boolean framebufferHasDepthAttachment,
 			@Nullable DhFramebuffer targetFramebuffer)
 	{
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
+		{
+			throw new IllegalStateException("Java DH generic-object rendering is unavailable while Rust owns whole-frame presentation");
+		}
 		// render setup //
 		profiler.push("setup");
 		

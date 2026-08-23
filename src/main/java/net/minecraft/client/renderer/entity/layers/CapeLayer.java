@@ -56,7 +56,9 @@ public class CapeLayer extends RenderLayer<AvatarRenderState, PlayerModel> {
 			if (playerSkin.cape() != null) {
 				if (!this.hasLayer(avatarRenderState.chestEquipment, EquipmentClientInfo.LayerType.WINGS)) {
 					// Iris: Set cape item context
-					if (WorldRenderingSettings.INSTANCE.getItemIds() != null) {
+					if (!net.minecraft.client.renderer.entity.EntityRenderDispatcher.isSemanticSubmission()
+						&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+						&& WorldRenderingSettings.INSTANCE.getItemIds() != null) {
 						CapturedRenderingState.INSTANCE.setCurrentRenderedItem(WorldRenderingSettings.INSTANCE.getItemIds().applyAsInt(CAPE_LOCATION));
 					}
 					
@@ -64,21 +66,39 @@ public class CapeLayer extends RenderLayer<AvatarRenderState, PlayerModel> {
 					if (this.hasLayer(avatarRenderState.chestEquipment, EquipmentClientInfo.LayerType.HUMANOID)) {
 						poseStack.translate(0.0F, -0.053125F, 0.06875F);
 					}
-
-					submitNodeCollector.submitModel(
-						this.model,
-						avatarRenderState,
-						poseStack,
-						RenderType.entitySolid(playerSkin.cape().texturePath()),
-						i,
-						OverlayTexture.NO_OVERLAY,
-						avatarRenderState.outlineColor,
-						null
-					);
+					var texture = playerSkin.cape().texturePath();
+					var renderType = RenderType.entitySolid(texture);
+					if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+						&& net.vulkanic.world.WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan()) {
+						boolean eligible = !avatarRenderState.isInvisible
+							&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isStandaloneModelMeshEligible(
+								this.model, renderType, texture, OverlayTexture.NO_OVERLAY, avatarRenderState.outlineColor, null);
+						if (eligible && net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMesh(
+							this.model, avatarRenderState, poseStack.last(), renderType, texture,
+							net.vulkanic.world.RustGalWorldPrimitiveRenderer.entityIdentity(avatarRenderState),
+							i, OverlayTexture.NO_OVERLAY, -1, avatarRenderState.outlineColor)) {
+							net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
+								"rust-vulkan-whole-frame", texture, this.model.getClass().getName(), avatarRenderState.entityId, true, true, false);
+						} else {
+							 net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
+								"rust-vulkan-unavailable", texture, this.model.getClass().getName(), avatarRenderState.entityId, false, false, false);
+							throw new IllegalStateException(
+								"Rust whole-frame cape route has no semantic mesh for " + texture
+							);
+						}
+					} else {
+						submitNodeCollector.submitModelSemanticTexture(
+							this.model, avatarRenderState, poseStack, renderType, i,
+							OverlayTexture.NO_OVERLAY, -1, texture,
+							avatarRenderState.outlineColor, null);
+					}
 					poseStack.popPose();
 					
 					// Iris: Clear cape item context
-					CapturedRenderingState.INSTANCE.setCurrentRenderedItem(0);
+					if (!net.minecraft.client.renderer.entity.EntityRenderDispatcher.isSemanticSubmission()
+						&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+						CapturedRenderingState.INSTANCE.setCurrentRenderedItem(0);
+					}
 				}
 			}
 		}

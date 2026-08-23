@@ -287,6 +287,9 @@ public class CompositeRenderer {
 	}
 
 	public void renderAll() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris composite rendering is unavailable while Rust owns whole-frame presentation");
+		}
 		ImmediateState.temporarilyIgnorePass = true;
 
 		GLDebug.pushGroup(20 + compositePass.ordinal(), compositePass.name().toLowerCase(Locale.ROOT));

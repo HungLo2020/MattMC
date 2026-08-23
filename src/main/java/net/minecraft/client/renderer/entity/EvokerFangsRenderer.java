@@ -48,7 +48,8 @@ public class EvokerFangsRenderer extends EntityRenderer<EvokerFangs, EvokerFangs
 				if (!RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMesh(
 					this.model, evokerFangsRenderState, poseStack.last(), renderType, TEXTURE_LOCATION,
 					EVOKER_FANGS_ENTITY_ID,
-					evokerFangsRenderState.lightCoords, OverlayTexture.NO_OVERLAY, -1
+					evokerFangsRenderState.lightCoords, OverlayTexture.NO_OVERLAY, -1,
+					evokerFangsRenderState.outlineColor
 				)) {
 					throw new IllegalStateException("Rust whole-frame EvokerFangs route selected without a copied indexed mesh request");
 				}
@@ -59,6 +60,7 @@ public class EvokerFangsRenderer extends EntityRenderer<EvokerFangs, EvokerFangs
 				RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
 					"rust-vulkan-unavailable", TEXTURE_LOCATION, false, false, false
 				);
+				throw new IllegalStateException("Rust whole-frame EvokerFangs route has no semantic mesh");
 			} else {
 				if (eligible) {
 					RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
@@ -66,13 +68,15 @@ public class EvokerFangsRenderer extends EntityRenderer<EvokerFangs, EvokerFangs
 						false, false, !submitNodeCollector.isSemanticCoverageOnly() && ownership.usesJavaCompatibility()
 					);
 				}
-				submitNodeCollector.submitModel(
+				submitNodeCollector.submitModelSemanticTexture(
 					this.model,
 					evokerFangsRenderState,
 					poseStack,
 					renderType,
 					evokerFangsRenderState.lightCoords,
 					OverlayTexture.NO_OVERLAY,
+					-1,
+					TEXTURE_LOCATION,
 					evokerFangsRenderState.outlineColor,
 					null
 				);

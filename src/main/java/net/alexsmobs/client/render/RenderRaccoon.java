@@ -48,6 +48,8 @@ public class RenderRaccoon extends MobRenderer<EntityRaccoon, RaccoonRenderState
         state.animationTick = entity.getAnimationTick();
         state.currentAnimation = entity.getAnimation();
         state.id = entity.getId();
+        this.itemModelResolver.updateForLiving(state.mainHandItem, entity.getMainHandItem(),
+                net.minecraft.world.item.ItemDisplayContext.GROUND, entity);
     }
 
     protected void scale(RaccoonRenderState state, PoseStack matrixStackIn) {
@@ -92,10 +94,10 @@ public class RenderRaccoon extends MobRenderer<EntityRaccoon, RaccoonRenderState
                     lvt_12_2_ = (float)(color >> 8 & 255) / 255.0F;
                     lvt_13_2_ = (float)(color & 255) / 255.0F;
                 }
-                submitNodeCollector.order(1).submitModel(
+                submitNodeCollector.order(1).submitModelSemanticTexture(
                     this.getParentModel(), state, poseStack, RenderType.entityCutoutNoCull(TEXTURE_BANDANA), 
                     packedLight, OverlayTexture.NO_OVERLAY, AMColorUtil.packColor(lvt_11_2_, lvt_12_2_, lvt_13_2_, 1.0F), 
-                    null, state.outlineColor, null
+                    TEXTURE_BANDANA, state.outlineColor, null
                 );
             }
         }

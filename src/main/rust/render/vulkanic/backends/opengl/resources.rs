@@ -538,6 +538,7 @@ impl OpenGlObjects {
             depth_compare: desc.depth_compare,
             depth_write: desc.depth_write,
             depth_bias: desc.depth_bias,
+            stencil: desc.stencil,
         })
     }
 
@@ -939,6 +940,7 @@ pub(super) struct GraphicsPipelineObject {
     pub(super) depth_compare: Option<CompareOp>,
     pub(super) depth_write: bool,
     pub(super) depth_bias: Option<crate::render::vulkanic::resources::DepthBias>,
+    pub(super) stencil: Option<crate::render::vulkanic::resources::StencilState>,
 }
 
 pub(super) struct ComputePipelineObject {

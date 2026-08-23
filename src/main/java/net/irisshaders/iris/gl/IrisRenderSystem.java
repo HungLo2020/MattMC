@@ -118,6 +118,7 @@ public class IrisRenderSystem {
 
 	public static void generateMipmaps(int texture, int mipmapTarget) {
 		RenderSystem.assertOnRenderThread();
+		rejectJavaGpuMutation("mipmap generation");
 		dsaState.generateMipmaps(texture, mipmapTarget);
 	}
 
@@ -131,17 +132,20 @@ public class IrisRenderSystem {
 
 	public static void bindAttributeLocation(int program, int index, CharSequence name) {
 		RenderSystem.assertOnRenderThread();
+		rejectJavaGpuMutation("program attribute update");
 		VulkanicAPI.setAttributeLocation(VulkanicAPI.getCommandContext(), program, index, name);
 	}
 
 	public static void texImage1D(int texture, int target, int level, int internalformat, int width, int border, int format, int type, @Nullable ByteBuffer pixels) {
 		RenderSystem.assertOnRenderThread();
+		rejectJavaGpuMutation("texture upload");
 		IrisRenderSystem.bindTextureForSetup(target, texture);
 		VulkanicAPI.uploadTexture1D(VulkanicAPI.getCommandContext(), target, level, internalformat, width, border, format, type, pixels);
 	}
 
 	public static void texImage2D(int texture, int target, int level, int internalformat, int width, int height, int border, int format, int type, @Nullable ByteBuffer pixels) {
 		RenderSystem.assertOnRenderThread();
+		rejectJavaGpuMutation("texture upload");
 		IrisRenderSystem.bindTextureForSetup(target, texture);
 		VulkanicAPI.uploadTexture2D(VulkanicAPI.getCommandContext(), target, level, internalformat, width, height, border, format, type, pixels);
 	}
@@ -161,6 +165,7 @@ public class IrisRenderSystem {
 		@Nullable ByteBuffer pixels
 	) {
 		RenderSystem.assertOnRenderThread();
+		rejectJavaGpuMutation("texture upload");
 		IrisRenderSystem.bindTextureForSetup(target.toLegacyGlTarget(), texture);
 		VulkanicAPI.uploadTexture2D(VulkanicAPI.getCommandContext(), target, level, uploadFormat, width, height, border, pixels);
 	}
@@ -183,67 +188,80 @@ public class IrisRenderSystem {
 
 	public static void texImage3D(int texture, int target, int level, int internalformat, int width, int height, int depth, int border, int format, int type, @Nullable ByteBuffer pixels) {
 		RenderSystem.assertOnRenderThread();
+		rejectJavaGpuMutation("texture upload");
 		IrisRenderSystem.bindTextureForSetup(target, texture);
 		VulkanicAPI.uploadTexture3D(VulkanicAPI.getCommandContext(), target, level, internalformat, width, height, depth, border, format, type, pixels);
 	}
 
 	public static void uniformMatrix4fv(int location, boolean transpose, FloatBuffer matrix) {
 		RenderSystem.assertOnRenderThread();
+		rejectJavaGpuMutation("uniform update");
 		VulkanicAPI.setUniformMatrix4fv(VulkanicAPI.getCommandContext(), location, transpose, matrix);
 	}
 
 	public static void uniformMatrix4fv(int location, boolean transpose, float[] matrix) {
 		RenderSystem.assertOnRenderThread();
+		rejectJavaGpuMutation("uniform update");
 		VulkanicAPI.setUniformMatrix4fv(VulkanicAPI.getCommandContext(), location, transpose, matrix);
 	}
 
 	public static void copyTexImage2D(int target, int level, int internalFormat, int x, int y, int width, int height, int border) {
 		RenderSystem.assertOnRenderThread();
+		rejectJavaGpuMutation("texture copy");
 		VulkanicAPI.copyTexImage2D(VulkanicAPI.getCommandContext(), target, level, internalFormat, x, y, width, height, border);
 	}
 
 	public static void copyTexImage2D(int level, int internalFormat, int x, int y, int width, int height, int border) {
 		RenderSystem.assertOnRenderThread();
+		rejectJavaGpuMutation("texture copy");
 		VulkanicAPI.copyTexImage2D(VulkanicAPI.getCommandContext(), level, internalFormat, x, y, width, height, border);
 	}
 
 	public static void uniform1f(int location, float v0) {
 		RenderSystem.assertOnRenderThread();
+		rejectJavaGpuMutation("uniform update");
 		VulkanicAPI.setUniform1f(VulkanicAPI.getCommandContext(), location, v0);
 	}
 
 	public static void uniform2f(int location, float v0, float v1) {
 		RenderSystem.assertOnRenderThread();
+		rejectJavaGpuMutation("uniform update");
 		VulkanicAPI.setUniform2f(VulkanicAPI.getCommandContext(), location, v0, v1);
 	}
 
 	public static void uniform2i(int location, int v0, int v1) {
 		RenderSystem.assertOnRenderThread();
+		rejectJavaGpuMutation("uniform update");
 		VulkanicAPI.setUniform2i(VulkanicAPI.getCommandContext(), location, v0, v1);
 	}
 
 	public static void uniform3f(int location, float v0, float v1, float v2) {
 		RenderSystem.assertOnRenderThread();
+		rejectJavaGpuMutation("uniform update");
 		VulkanicAPI.setUniform3f(VulkanicAPI.getCommandContext(), location, v0, v1, v2);
 	}
 
 	public static void uniform3i(int location, int v0, int v1, int v2) {
 		RenderSystem.assertOnRenderThread();
+		rejectJavaGpuMutation("uniform update");
 		VulkanicAPI.setUniform3i(VulkanicAPI.getCommandContext(), location, v0, v1, v2);
 	}
 
 	public static void uniform4f(int location, float v0, float v1, float v2, float v3) {
 		RenderSystem.assertOnRenderThread();
+		rejectJavaGpuMutation("uniform update");
 		VulkanicAPI.setUniform4f(VulkanicAPI.getCommandContext(), location, v0, v1, v2, v3);
 	}
 
 	public static void uniform4i(int location, int v0, int v1, int v2, int v3) {
 		RenderSystem.assertOnRenderThread();
+		rejectJavaGpuMutation("uniform update");
 		VulkanicAPI.setUniform4i(VulkanicAPI.getCommandContext(), location, v0, v1, v2, v3);
 	}
 
 	public static void texParameteriv(int texture, int target, int pname, int[] params) {
 		RenderSystem.assertOnRenderThread();
+		rejectJavaGpuMutation("texture parameter update");
 		dsaState.texParameteriv(texture, target, pname, params);
 	}
 
@@ -314,10 +332,12 @@ public class IrisRenderSystem {
 	 */
 	public static void texParameterivDirect(int target, int pname, int[] params) {
 		RenderSystem.assertOnRenderThread();
+		rejectJavaGpuMutation("texture parameter update");
 		VulkanicAPI.texParameteriv(VulkanicAPI.getCommandContext(), target, pname, params);
 	}
 
 	public static void copyTexSubImage2D(int destTexture, int target, int i, int i1, int i2, int i3, int i4, int width, int height) {
+		rejectJavaGpuMutation("texture copy");
 		dsaState.copyTexSubImage2D(destTexture, target, i, i1, i2, i3, i4, width, height);
 	}
 
@@ -331,6 +351,7 @@ public class IrisRenderSystem {
 
 	public static void texParameteri(int texture, int target, int pname, int param) {
 		RenderSystem.assertOnRenderThread();
+		rejectJavaGpuMutation("texture parameter update");
 		dsaState.texParameteri(texture, target, pname, param);
 	}
 
@@ -368,6 +389,7 @@ public class IrisRenderSystem {
 
 	public static void texParameterf(int texture, int target, int pname, float param) {
 		RenderSystem.assertOnRenderThread();
+		rejectJavaGpuMutation("texture parameter update");
 		dsaState.texParameterf(texture, target, pname, param);
 	}
 
@@ -426,26 +448,31 @@ public class IrisRenderSystem {
 
 	public static void drawBuffers(int framebuffer, int[] buffers) {
 		RenderSystem.assertOnRenderThread();
+		rejectJavaGpuMutation("draw-buffer update");
 		dsaState.drawBuffers(framebuffer, buffers);
 	}
 
 	public static void readBuffer(int framebuffer, int buffer) {
 		RenderSystem.assertOnRenderThread();
+		rejectJavaGpuMutation("read-buffer update");
 		dsaState.readBuffer(framebuffer, buffer);
 	}
 
 	public static void clearBufferfv(int framebuffer, int buffer, int drawbuffer, float[] values) {
 		VulkanicAPI.assertOnRenderThreadOrInit();
+		rejectJavaGpuMutation("buffer clear");
 		dsaState.clearBufferfv(framebuffer, buffer, drawbuffer, values);
 	}
 
 	public static void clearBufferiv(int framebuffer, int buffer, int drawbuffer, int[] values) {
 		VulkanicAPI.assertOnRenderThreadOrInit();
+		rejectJavaGpuMutation("buffer clear");
 		dsaState.clearBufferiv(framebuffer, buffer, drawbuffer, values);
 	}
 
 	public static void clearBufferuiv(int framebuffer, int buffer, int drawbuffer, int[] values) {
 		VulkanicAPI.assertOnRenderThreadOrInit();
+		rejectJavaGpuMutation("buffer clear");
 		dsaState.clearBufferuiv(framebuffer, buffer, drawbuffer, values);
 	}
 
@@ -467,32 +494,38 @@ public class IrisRenderSystem {
 
 	public static void bufferData(int target, float[] data, int usage) {
 		RenderSystem.assertOnRenderThread();
+		rejectJavaGpuMutation("buffer upload");
 		VulkanicAPI.bufferData(VulkanicAPI.getCommandContext(), target, data, usage);
 	}
 
 	public static int bufferStorage(int target, float[] data, int usage) {
 		RenderSystem.assertOnRenderThread();
+		rejectJavaGpuObjectCreation("buffer");
 		return dsaState.bufferStorage(target, data, usage);
 	}
 
 	public static void bufferStorage(int target, long size, int flags) {
 		RenderSystem.assertOnRenderThread();
+		rejectJavaGpuMutation("buffer storage");
 		// The ARB version is identical to GL44 and redirects, so this should work on ARB as well.
 		VulkanicAPI.bufferStorage(VulkanicAPI.getCommandContext(), target, size, flags);
 	}
 
 	public static void bufferStorage(VulkanicBufferTarget target, long size, int flags) {
 		RenderSystem.assertOnRenderThread();
+		rejectJavaGpuMutation("buffer storage");
 		VulkanicAPI.bufferStorage(VulkanicAPI.getCommandContext(), target, size, flags);
 	}
 
 	public static void bindBufferBase(int target, Integer index, int buffer) {
 		RenderSystem.assertOnRenderThread();
+		rejectJavaGpuMutation("buffer binding");
 		VulkanicAPI.bindBufferBase(VulkanicAPI.getCommandContext(), target, index, buffer);
 	}
 
 	public static void bindBufferBase(VulkanicBufferTarget target, Integer index, int buffer) {
 		RenderSystem.assertOnRenderThread();
+		rejectJavaGpuMutation("buffer binding");
 		VulkanicAPI.bindBufferBase(VulkanicAPI.getCommandContext(), target, index, buffer);
 	}
 
@@ -507,6 +540,7 @@ public class IrisRenderSystem {
 	}
 
 	public static void framebufferTexture2D(int fb, int fbtarget, int attachment, int target, int texture, int levels) {
+		rejectJavaGpuMutation("framebuffer attachment update");
 		dsaState.framebufferTexture2D(fb, fbtarget, attachment, target, texture, levels);
 	}
 
@@ -533,6 +567,7 @@ public class IrisRenderSystem {
 
 	public static void bindImageTexture(int unit, int texture, int level, boolean layered, int layer, int access, int format) {
 		RenderSystem.assertOnRenderThread();
+		rejectJavaGpuMutation("image binding");
 		VulkanicAPI.bindImageTexture(VulkanicAPI.getCommandContext(), unit, texture, level, layered, layer, access, format);
 	}
 
@@ -555,14 +590,17 @@ public class IrisRenderSystem {
 	}
 
 	public static void genBuffers(int[] buffers) {
+		rejectJavaGpuObjectCreation("buffer");
 		VulkanicAPI.createBuffers(VulkanicAPI.getCommandContext(), buffers);
 	}
 
 	public static void clearBufferSubData(int glShaderStorageBuffer, int glR8, long offset, long size, int glRed, int glByte, int[] ints) {
+		rejectJavaGpuMutation("buffer clear");
 		VulkanicAPI.clearBufferSubData(VulkanicAPI.getCommandContext(), glShaderStorageBuffer, glR8, offset, size, glRed, glByte, ints);
 	}
 
 	public static void clearBufferSubData(VulkanicBufferTarget target, int internalFormat, long offset, long size, int format, int type, int[] data) {
+		rejectJavaGpuMutation("buffer clear");
 		VulkanicAPI.clearBufferSubData(VulkanicAPI.getCommandContext(), target, internalFormat, offset, size, format, type, data);
 	}
 
@@ -571,15 +609,18 @@ public class IrisRenderSystem {
 	}
 
 	public static void dispatchCompute(int workX, int workY, int workZ) {
+		rejectJavaGpuMutation("compute dispatch");
 		VulkanicAPI.dispatchCompute(VulkanicAPI.getCommandContext(), workX, workY, workZ);
 	}
 
 	public static void dispatchCompute(Vector3i workGroups) {
+		rejectJavaGpuMutation("compute dispatch");
 		VulkanicAPI.dispatchCompute(VulkanicAPI.getCommandContext(), workGroups.x, workGroups.y, workGroups.z);
 	}
 
 	public static void memoryBarrier(int barriers) {
 		RenderSystem.assertOnRenderThread();
+		rejectJavaGpuMutation("memory barrier");
 
 		if (supportsCompute) {
 			VulkanicAPI.memoryBarrier(VulkanicAPI.getCommandContext(), barriers);
@@ -588,6 +629,7 @@ public class IrisRenderSystem {
 
 	public static void memoryBarrier(VulkanicResourceBarriers barriers) {
 		RenderSystem.assertOnRenderThread();
+		rejectJavaGpuMutation("memory barrier");
 
 		if (supportsCompute) {
 			VulkanicAPI.applyResourceBarriers(VulkanicAPI.getCommandContext(), barriers);
@@ -608,24 +650,32 @@ public class IrisRenderSystem {
 
 	public static void disableBufferBlend(int buffer) {
 		RenderSystem.assertOnRenderThread();
+		rejectJavaGpuMutation("blend-state update");
 		VulkanicAPI.setIndexedEnabled(VulkanicAPI.getCommandContext(), VulkanicCapability.BLEND, buffer, false);
 		BlendModeStorage.markBlendStateUnknown();
 	}
 
 	public static void enableBufferBlend(int buffer) {
 		RenderSystem.assertOnRenderThread();
+		rejectJavaGpuMutation("blend-state update");
 		VulkanicAPI.setIndexedEnabled(VulkanicAPI.getCommandContext(), VulkanicCapability.BLEND, buffer, true);
 		BlendModeStorage.markBlendStateUnknown();
 	}
 
 	public static void blendFuncSeparatei(int buffer, int srcRGB, int dstRGB, int srcAlpha, int dstAlpha) {
 		RenderSystem.assertOnRenderThread();
+		rejectJavaGpuMutation("blend-state update");
 		VulkanicAPI.blendFuncSeparatei(VulkanicAPI.getCommandContext(), buffer, srcRGB, dstRGB, srcAlpha, dstAlpha);
 	}
 
 	// These functions are deprecated and unavailable in the core profile.
 
 	public static void bindTextureToUnit(int target, int unit, int texture) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			// Rust owns the selected Vulkan frame; compatibility callers must not
+			// reconstruct or mutate Iris' Java texture-unit state.
+			return;
+		}
 		VulkanicTextureTarget.fromLegacyGlTarget(target)
 			.ifPresentOrElse(
 				typedTarget -> bindTextureToUnit(typedTarget, unit, texture),
@@ -634,6 +684,9 @@ public class IrisRenderSystem {
 	}
 
 	public static void bindTextureToUnit(VulkanicTextureTarget target, int unit, int texture) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			return;
+		}
 		dsaState.bindTextureToUnit(target.toLegacyGlTarget(), unit, texture);
 	}
 
@@ -648,10 +701,12 @@ public class IrisRenderSystem {
 
 	public static void uniformBlockBinding(int program, int uniformBlockIndex, int uniformBlockBinding) {
 		RenderSystem.assertOnRenderThread();
+		rejectJavaGpuMutation("uniform block binding");
 		VulkanicAPI.uniformBlockBinding(VulkanicAPI.getCommandContext(), program, uniformBlockIndex, uniformBlockBinding);
 	}
 
 	public static void setShadowProjection(Matrix4f shadowProjection) {
+		rejectJavaGpuMutation("shadow projection update");
 		backupProjection = VulkanicAPI.getProjectionMatrixBuffer();
 		backupProjectionType = VulkanicAPI.getProjectionType();
 		VulkanicAPI.setProjectionMatrix(perspectiveProjectionMatrixBuffer.getBuffer(shadowProjection), ProjectionType.ORTHOGRAPHIC);
@@ -664,6 +719,7 @@ public class IrisRenderSystem {
 	}
 
 	public static void blitFramebuffer(int source, int dest, int offsetX, int offsetY, int width, int height, int offsetX2, int offsetY2, int width2, int height2, int bufferChoice, int filter) {
+		rejectJavaGpuMutation("framebuffer blit");
 		dsaState.blitFramebuffer(source, dest, offsetX, offsetY, width, height, offsetX2, offsetY2, width2, height2, bufferChoice, filter);
 	}
 
@@ -680,16 +736,19 @@ public class IrisRenderSystem {
 	}
 
 	public static int createFramebuffer() {
+		rejectJavaGpuObjectCreation("framebuffer");
 		return dsaState.createFramebuffer();
 	}
 
 	public static int createTexture(int target) {
+		rejectJavaGpuObjectCreation("texture");
 		return VulkanicTextureTarget.fromLegacyGlTarget(target)
 			.map(IrisRenderSystem::createTexture)
 			.orElseGet(() -> dsaState.createTexture(target));
 	}
 
 	public static int createTexture(VulkanicTextureTarget target) {
+		rejectJavaGpuObjectCreation("texture");
 		return dsaState.createTexture(target.toLegacyGlTarget());
 	}
 
@@ -700,6 +759,9 @@ public class IrisRenderSystem {
 	private static int lastTex = -1;
 
 	public static void bindTextureForSetup(int glType, int glId) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			return;
+		}
 		VulkanicTextureTarget.fromLegacyGlTarget(glType)
 			.ifPresentOrElse(
 				typedTarget -> bindTextureForSetup(typedTarget, glId),
@@ -708,6 +770,9 @@ public class IrisRenderSystem {
 	}
 
 	public static void bindTextureForSetup(VulkanicTextureTarget target, int glId) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			return;
+		}
 		if (target == VulkanicTextureTarget.TEXTURE_2D) {
 			lastTex = getBoundTextureOnActiveUnit();
 		}
@@ -734,14 +799,17 @@ public class IrisRenderSystem {
 	}
 
 	public static int genSampler() {
+		rejectJavaGpuObjectCreation("sampler");
 		return VulkanicAPI.createSampler(VulkanicAPI.getCommandContext());
 	}
 
 	public static void destroySampler(int glId) {
+		rejectJavaGpuMutation("sampler deletion");
 		VulkanicAPI.deleteSampler(VulkanicAPI.getCommandContext(), glId);
 	}
 
 	public static void bindSamplerToUnit(int unit, int sampler) {
+		rejectJavaGpuMutation("sampler binding");
 		if (samplers[unit] == sampler) {
 			return;
 		}
@@ -752,10 +820,14 @@ public class IrisRenderSystem {
 	}
 
 	public static int getBoundSamplerOnUnit(int unit) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			return 0;
+		}
 		return samplers[unit];
 	}
 
 	public static void unbindAllSamplers() {
+		rejectJavaGpuMutation("sampler binding");
 		boolean usedASampler = false;
 		for (int i = 0; i < samplers.length; i++) {
 			if (samplers[i] != 0) {
@@ -771,22 +843,27 @@ public class IrisRenderSystem {
 
 
 	public static void samplerParameteri(int sampler, int pname, int param) {
+		rejectJavaGpuMutation("sampler parameter update");
 		VulkanicAPI.setSamplerParameteri(VulkanicAPI.getCommandContext(), sampler, pname, param);
 	}
 
 	public static void samplerParameteri(int sampler, VulkanicTextureParameterName pname, int param) {
+		rejectJavaGpuMutation("sampler parameter update");
 		VulkanicAPI.setSamplerParameteri(VulkanicAPI.getCommandContext(), sampler, pname, param);
 	}
 
 	public static void samplerParameteri(int sampler, VulkanicTextureParameterName pname, VulkanicTextureParameterValue param) {
+		rejectJavaGpuMutation("sampler parameter update");
 		VulkanicAPI.setSamplerParameteri(VulkanicAPI.getCommandContext(), sampler, pname, param);
 	}
 
 	public static void samplerParameterf(int sampler, int pname, float param) {
+		rejectJavaGpuMutation("sampler parameter update");
 		VulkanicAPI.setSamplerParameterf(VulkanicAPI.getCommandContext(), sampler, pname, param);
 	}
 
 	public static void samplerParameteriv(int sampler, int pname, int[] params) {
+		rejectJavaGpuMutation("sampler parameter update");
 		VulkanicAPI.setSamplerParameteriv(VulkanicAPI.getCommandContext(), sampler, pname, params);
 	}
 
@@ -801,10 +878,12 @@ public class IrisRenderSystem {
 
 	public static void deleteBuffers(int glId) {
 		RenderSystem.assertOnRenderThread();
+		rejectJavaGpuMutation("buffer deletion");
 		VulkanicAPI.deleteBuffer(VulkanicAPI.getCommandContext(), glId);
 	}
 
 	public static void setPolygonMode(int mode) {
+		rejectJavaGpuMutation("polygon-mode update");
 		if (mode != polygonMode) {
 			polygonMode = mode;
 			VulkanicAPI.setPolygonMode(VulkanicAPI.getCommandContext(), VulkanicPolygonFace.FRONT_AND_BACK, mode);
@@ -826,18 +905,22 @@ public class IrisRenderSystem {
 	}
 
 	public static void dispatchComputeIndirect(long offset) {
+		rejectJavaGpuMutation("indirect compute dispatch");
 		VulkanicAPI.dispatchComputeIndirect(VulkanicAPI.getCommandContext(), offset);
 	}
 
 	public static void bindBuffer(int target, int buffer) {
+		rejectJavaGpuMutation("buffer binding");
 		VulkanicAPI.bindBuffer(VulkanicAPI.getCommandContext(), target, buffer);
 	}
 
 	public static void bindBuffer(VulkanicBufferTarget target, int buffer) {
+		rejectJavaGpuMutation("buffer binding");
 		VulkanicAPI.bindBuffer(VulkanicAPI.getCommandContext(), target, buffer);
 	}
 
 	public static int createBuffers() {
+		rejectJavaGpuObjectCreation("buffer");
 		return dsaState.createBuffers();
 	}
 
@@ -846,6 +929,7 @@ public class IrisRenderSystem {
 	}
 
 	public static void copyImageSubData(int sourceTexture, int target, int mip, int srcX, int srcY, int srcZ, int destTexture, int dstTarget, int dstMip, int dstX, int dstY, int dstZ, int width, int height, int depth) {
+		rejectJavaGpuMutation("image copy");
 		VulkanicAPI.copyImageSubData(VulkanicAPI.getCommandContext(), 
 			sourceTexture, target, mip, srcX, srcY, srcZ, 
 			destTexture, dstTarget, dstMip, dstX, dstY, dstZ, 
@@ -951,6 +1035,7 @@ public class IrisRenderSystem {
 
 	public static void useProgram(int program) {
 		RenderSystem.assertOnRenderThread();
+		rejectJavaGpuMutation("program binding");
 		if (currentProgram == 0 && program == 0) {
 			return;
 		}
@@ -967,6 +1052,7 @@ public class IrisRenderSystem {
 
 	public static void setActiveTexture(int textureUnit) {
 		RenderSystem.assertOnRenderThread();
+		rejectJavaGpuMutation("texture-unit update");
 		int textureUnitIndex = VulkanicAPI.textureUnitToIndex(textureUnit);
 		validateTextureUnitIndex(textureUnitIndex);
 
@@ -978,6 +1064,7 @@ public class IrisRenderSystem {
 
 	public static void setActiveTextureUnitIndex(int textureUnitIndex) {
 		RenderSystem.assertOnRenderThread();
+		rejectJavaGpuMutation("texture-unit update");
 		validateTextureUnitIndex(textureUnitIndex);
 
 		if (activeTextureUnitIndex != textureUnitIndex) {
@@ -987,11 +1074,17 @@ public class IrisRenderSystem {
 	}
 
 	public static int getActiveTextureUnitIndex() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			return 0;
+		}
 		return activeTextureUnitIndex;
 	}
 
 	public static int getTextureBinding(int textureUnitIndex) {
 		validateTextureUnitIndex(textureUnitIndex);
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			return 0;
+		}
 		return textureBindings[textureUnitIndex];
 	}
 
@@ -1001,6 +1094,9 @@ public class IrisRenderSystem {
 
 	public static void setTextureBinding(int textureUnitIndex, int textureId) {
 		validateTextureUnitIndex(textureUnitIndex);
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			return;
+		}
 		textureBindings[textureUnitIndex] = textureId;
 	}
 
@@ -1016,8 +1112,25 @@ public class IrisRenderSystem {
 			.orElse(false);
 	}
 
+	private static void rejectJavaGpuObjectCreation(String objectType) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException(
+				"Java Iris " + objectType + " creation is unavailable while Rust owns whole-frame presentation"
+			);
+		}
+	}
+
+	private static void rejectJavaGpuMutation(String operation) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException(
+				"Java Iris " + operation + " is unavailable while Rust owns whole-frame presentation"
+			);
+		}
+	}
+
 	public static int createTextureId() {
 		RenderSystem.assertOnRenderThread();
+		rejectJavaGpuObjectCreation("texture");
 		incrementTrackedTextures();
 		return VulkanicAPI.createTexture2D(VulkanicAPI.getCommandContext());
 	}
@@ -1050,6 +1163,7 @@ public class IrisRenderSystem {
 
 	public static void deleteTextureId(int textureId) {
 		RenderSystem.assertOnRenderThread();
+		rejectJavaGpuMutation("texture deletion");
 		VulkanicAPI.deleteTexture(VulkanicAPI.getCommandContext(), textureId);
 
 		for (int textureUnitIndex = 0; textureUnitIndex < textureBindings.length; textureUnitIndex++) {
@@ -1075,16 +1189,19 @@ public class IrisRenderSystem {
 
 	public static void uniformMatrix3fv(int index, boolean b, FloatBuffer buf) {
 		RenderSystem.assertOnRenderThread();
+		rejectJavaGpuMutation("uniform update");
 		VulkanicAPI.setUniformMatrix3fv(VulkanicAPI.getCommandContext(), index, b, buf);
 	}
 
 	public static void uniformMatrix3fv(int index, boolean b, float[] buf) {
 		RenderSystem.assertOnRenderThread();
+		rejectJavaGpuMutation("uniform update");
 		VulkanicAPI.setUniformMatrix3fv(VulkanicAPI.getCommandContext(), index, b, buf);
 	}
 
 	public static void clearColor(float v, float v1, float v2, float v3) {
 		RenderSystem.assertOnRenderThread();
+		rejectJavaGpuMutation("clear-color update");
 		VulkanicAPI.setClearColor(VulkanicAPI.getCommandContext(), v, v1, v2, v3);
 	}
 

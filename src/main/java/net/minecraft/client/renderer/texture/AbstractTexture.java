@@ -58,8 +58,10 @@ public abstract class AbstractTexture implements AutoCloseable, net.irisshaders.
 		if (this.texture == null) {
 			throw new IllegalStateException("Texture does not exist, can't get it before something initializes it");
 		} else {
-			// Iris: From MixinAbstractTexture - track texture changes
-			if (lastChecked != this.texture) {
+			// Iris tracking is a compatibility-only GPU registry. Rust whole-frame
+			// semantic collectors must not publish Java texture state into it.
+			if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+				&& lastChecked != this.texture) {
 				lastChecked = this.texture;
 				net.irisshaders.iris.pbr.TextureTracker.INSTANCE.trackTexture(net.vulkanic.VulkanicCoreAPI.textureId(lastChecked), this);
 			}
@@ -72,7 +74,8 @@ public abstract class AbstractTexture implements AutoCloseable, net.irisshaders.
 		if (this.textureView == null) {
 			throw new IllegalStateException("Texture view does not exist, can't get it before something initializes it");
 		} else {
-			if (this.texture != null && lastChecked != this.texture) {
+			if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+				&& this.texture != null && lastChecked != this.texture) {
 				lastChecked = this.texture;
 				net.irisshaders.iris.pbr.TextureTracker.INSTANCE.trackTexture(net.vulkanic.VulkanicCoreAPI.textureId(lastChecked), this);
 			}

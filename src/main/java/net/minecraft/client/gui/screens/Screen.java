@@ -449,7 +449,7 @@ public abstract class Screen extends AbstractContainerEventHandler implements Re
 
 	public static void renderMenuBackgroundTexture(GuiGraphics guiGraphics, ResourceLocation resourceLocation, int i, int j, float f, float g, int k, int l) {
 		int m = 32;
-		guiGraphics.blit(RenderPipelines.GUI_TEXTURED, resourceLocation, i, j, f, g, k, l, 32, 32);
+		guiGraphics.blitTiled(RenderPipelines.GUI_TEXTURED, resourceLocation, i, j, f, g, k, l, 32, 32, -1);
 	}
 
 	public void renderTransparentBackground(GuiGraphics guiGraphics) {

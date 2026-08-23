@@ -6,11 +6,11 @@ import net.alexsmobs.client.render.UnderminerRenderState;
 import net.blaze3d.vertex.PoseStack;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.layers.RenderLayer;
+import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.math.Axis;
 
 /**
- * Render layer for underminer held items
- * Note: In the render state architecture, this would require extending the render state
- * Simplified for now as a stub for compatibility
+ * Render layer for underminer held items using copied humanoid item state.
  */
 public class LayerUnderminerItem extends RenderLayer<UnderminerRenderState, ModelUnderminerWrapper> {
 
@@ -20,7 +20,14 @@ public class LayerUnderminerItem extends RenderLayer<UnderminerRenderState, Mode
 
     @Override
     public void submit(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int packedLight, UnderminerRenderState renderState, float f, float g) {
-        // Would need item state in UnderminerRenderState to implement properly
-        // This layer is a stub for compatibility
+        if (renderState.getMainHandItem().isEmpty()) return;
+        boolean left = renderState.mainArm == net.minecraft.world.entity.HumanoidArm.LEFT;
+        poseStack.pushPose();
+        this.getParentModel().translateToHand(poseStack, renderState, left);
+        poseStack.translate(0.0F, 0.15F, -0.35F);
+        poseStack.mulPose(Axis.XP.rotationDegrees(180.0F));
+        renderState.getMainHandItem().submit(poseStack, submitNodeCollector, packedLight,
+            OverlayTexture.NO_OVERLAY, renderState.outlineColor);
+        poseStack.popPose();
     }
 }

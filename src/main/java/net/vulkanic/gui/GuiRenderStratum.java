@@ -3,6 +3,7 @@ package net.vulkanic.gui;
 public enum GuiRenderStratum {
 	/** Flat semantic GUI rectangles, kept below specialized HUD strata. */
 	GUI_RECTANGLES("gui.rectangles", 100),
+	GUI_POST_EFFECT("gui.post-effect", 80),
 	GUI_PANORAMA("gui.panorama", 50),
 	GUI_CROSSHAIR("gui.crosshair", 200),
 	GUI_HOTBAR_BASE("gui.hotbar.base", 300),
@@ -22,7 +23,14 @@ public enum GuiRenderStratum {
 	GUI_BOSS_BAR_PROGRESS("gui.boss.progress", 610),
 	GUI_ITEM("gui.item", 650),
 	GUI_TEXT("gui.text", 700),
-	GUI_FILE_BACKED_BLIT("gui.file-backed.blit", 750);
+	GUI_FILE_BACKED_BLIT("gui.file-backed.blit", 750),
+	/** Textured GUI blits whose pipeline explicitly disables blending. */
+	GUI_OPAQUE_BLIT("gui.opaque.blit", 760),
+	/** Vanilla vignette blits using inverse-source-color compositing. */
+	GUI_VIGNETTE_BLIT("gui.vignette.blit", 770),
+	/** GUI rectangles using the pipeline’s inverse-color blend. */
+	GUI_INVERT_RECTANGLE("gui.invert.rectangle", 780);
+
 
 	private final String id;
 	private final int order;

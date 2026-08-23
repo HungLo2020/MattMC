@@ -19,6 +19,7 @@ public class DHDepthTexture
 
 	public DHDepthTexture(CommandContext ctx, int width, int height, EDhDepthBufferFormat format)
 	{
+		rejectRustWholeFrameJavaTexture();
 		this.id = VulkanicAPI.createTexture2D(ctx);
 		
 		this.resize(ctx, width, height, format);
@@ -36,7 +37,20 @@ public class DHDepthTexture
 	}
 	
 	// For internal use by Iris for copying data. Do not use this in DH.
-	public DHDepthTexture(int id) { this.id = id; }
+	public DHDepthTexture(int id) {
+		rejectRustWholeFrameJavaTexture();
+		this.id = id;
+	}
+
+	private static void rejectRustWholeFrameJavaTexture()
+	{
+		if (VulkanicAPI.isVulkanBackendInitializedAndSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
+		{
+			throw new IllegalStateException(
+				"Java Distant Horizons depth textures are unavailable while Rust owns whole-frame presentation");
+		}
+	}
 	
 	public void resize(int width, int height, EDhDepthBufferFormat format)
 	{

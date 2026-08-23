@@ -6,11 +6,14 @@ import org.junit.jupiter.api.Test;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 final class DistantHorizonsRouteSelectionOwnershipTest {
 	@AfterEach
@@ -43,6 +46,20 @@ final class DistantHorizonsRouteSelectionOwnershipTest {
 			DistantHorizonsSemanticCollector.consumeVisibleSegments(),
 			"visibility discovery alone must never become submitted Rust work before explicit route selection"
 		);
+	}
+
+	@Test
+	void rustWholeFrameDhHookCannotFallThroughToJavaRenderPasses() throws Exception {
+		Path source = Path.of("src/main/java/com/seibel/distanthorizons/core/render/renderer/LodRenderer.java");
+		String lodRenderer = Files.readString(source);
+		int renderStart = lodRenderer.indexOf("public void render(RenderParams renderParams");
+		int renderBodyEnd = lodRenderer.indexOf("private void renderLodPass", renderStart);
+		String renderBody = lodRenderer.substring(renderStart, renderBodyEnd);
+		assertTrue(renderBody.contains("boolean rustWholeFrame"));
+		assertTrue(renderBody.contains("if (rustWholeFrame)"));
+		assertTrue(renderBody.indexOf("if (rustWholeFrame)") < renderBody.indexOf("this.renderLodPass(renderParams, profiler, false)"));
+		assertTrue(renderBody.contains("renderDeferred"));
+		assertTrue(renderBody.contains("Deferred DH passes are Java framebuffer/pipeline work"));
 	}
 
 	private static ByteBuffer quadBuffer() {

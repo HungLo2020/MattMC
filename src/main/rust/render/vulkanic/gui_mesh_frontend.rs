@@ -29,7 +29,7 @@ pub const GUI_MESH_MAX_VERTICES: usize = 65_536;
 pub const GUI_MESH_MAX_INDICES: usize = 196_608;
 pub const GUI_MESH_GPU_VERTEX_BYTES: usize = 3 * 4 * 4;
 const GUI_MESH_FRAME_UNIFORM_BYTES: usize = 48;
-const GUI_MESH_COMPOSITE_UNIFORM_BYTES: usize = 64;
+const GUI_MESH_COMPOSITE_UNIFORM_BYTES: usize = 80;
 /// Conservative dynamic-UBO alignment valid for both backend lowerings.
 pub const GUI_MESH_COMPOSITE_UNIFORM_STRIDE: u64 = 256;
 const GUI_MESH_MAX_COMPOSITE_UNIFORM_BYTES: u64 =
@@ -126,8 +126,10 @@ layout(std140) uniform GuiMeshComposite {
     vec4 pose_translation_viewport;
     vec4 bounds;
     vec4 uv_region;
+    vec4 clip_rect;
 };
 out vec2 v_uv;
+out vec2 v_pixel;
 const vec2 corner[6] = vec2[6](
     vec2(0.0, 0.0), vec2(1.0, 0.0), vec2(1.0, 1.0),
     vec2(1.0, 1.0), vec2(0.0, 1.0), vec2(0.0, 0.0)
@@ -144,6 +146,7 @@ void main() {
         0.0,
         1.0
     );
+    v_pixel = pixel;
     // Standard3dItemRenderer blits its private PIP target with V increasing
     // from the top edge. This owned target already has that orientation after
     // the raster pass, so applying the generic PIP V inversion here turns the
@@ -158,8 +161,10 @@ layout(set = 0, binding = 0, std140) uniform GuiMeshComposite {
     vec4 pose_translation_viewport;
     vec4 bounds;
     vec4 uv_region;
+    vec4 clip_rect;
 };
 layout(location = 0) out vec2 v_uv;
+layout(location = 1) out vec2 v_pixel;
 const vec2 corner[6] = vec2[6](
     vec2(0.0, 0.0), vec2(1.0, 0.0), vec2(1.0, 1.0),
     vec2(1.0, 1.0), vec2(0.0, 1.0), vec2(0.0, 0.0)
@@ -176,6 +181,7 @@ void main() {
         0.0,
         1.0
     );
+    v_pixel = pixel;
     // Keep the semantic Standard3dItemRenderer PIP orientation identical on
     // Vulkan and OpenGL. Backend coordinate conversion ends at rasterization;
     // the sampled owned image is not a generic GUI blit source.
@@ -185,9 +191,12 @@ void main() {
 
 const GUI_MESH_COMPOSITE_FRAGMENT_SHADER_OPENGL: &[u8] = br#"#version 430 core
 uniform sampler2D Sampler0;
+layout(std140) uniform GuiMeshComposite { vec4 pose_linear; vec4 pose_translation_viewport; vec4 bounds; vec4 uv_region; vec4 clip_rect; };
 in vec2 v_uv;
+in vec2 v_pixel;
 out vec4 out_color;
 void main() {
+    if (v_pixel.x < clip_rect.x || v_pixel.y < clip_rect.y || v_pixel.x >= clip_rect.z || v_pixel.y >= clip_rect.w) discard;
     vec4 color = texture(Sampler0, v_uv);
     if (color.a <= 0.0) discard;
     out_color = color;
@@ -197,9 +206,12 @@ void main() {
 const GUI_MESH_COMPOSITE_FRAGMENT_SHADER_VULKAN: &[u8] = br#"#version 450
 layout(set = 0, binding = 1) uniform texture2D GuiMeshColor;
 layout(set = 0, binding = 2) uniform sampler GuiMeshColorSampler;
+layout(set = 0, binding = 0, std140) uniform GuiMeshComposite { vec4 pose_linear; vec4 pose_translation_viewport; vec4 bounds; vec4 uv_region; vec4 clip_rect; };
 layout(location = 0) in vec2 v_uv;
+layout(location = 1) in vec2 v_pixel;
 layout(location = 0) out vec4 out_color;
 void main() {
+    if (v_pixel.x < clip_rect.x || v_pixel.y < clip_rect.y || v_pixel.x >= clip_rect.z || v_pixel.y >= clip_rect.w) discard;
     vec4 color = texture(sampler2D(GuiMeshColor, GuiMeshColorSampler), v_uv);
     if (color.a <= 0.0) discard;
     out_color = color;
@@ -220,6 +232,8 @@ pub(crate) fn vulkan_shader_sources_for_backend_test() -> (&'static str, &'stati
 pub enum GuiMeshMaterialMode {
     Opaque,
     Cutout,
+    Translucent,
+    Glint,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -266,6 +280,11 @@ pub struct GuiMeshBatchRequest {
     /// Copied PIP guard band. Composition excludes it from the visible GUI
     /// rectangle while rasterization retains it for filtered edge safety.
     pub guard_pixels: u32,
+    pub clip_mode: u32,
+    pub clip_left: i32,
+    pub clip_top: i32,
+    pub clip_width: i32,
+    pub clip_height: i32,
     pub vertices: Vec<GuiMeshVertex>,
     pub indices: Vec<u32>,
 }
@@ -300,6 +319,11 @@ pub struct GuiMeshPreparedDraw {
     pub gui_extent: [u32; 2],
     pub render_extent: [u32; 2],
     pub guard_pixels: u32,
+    pub clip_mode: u32,
+    pub clip_left: i32,
+    pub clip_top: i32,
+    pub clip_width: i32,
+    pub clip_height: i32,
     pub vertices: Vec<GuiMeshPreparedVertex>,
     pub indices: Vec<u32>,
 }
@@ -427,7 +451,7 @@ impl GuiMeshPassResources {
                 resource_layouts: vec![resource_layout],
             })?;
             created.push(pipeline_layout);
-            let (cull_mode, blend) = gui_mesh_raster_state(material_mode);
+            let (cull_mode, blend, depth_compare, depth_write) = gui_mesh_raster_state(material_mode);
             let pipeline = gal.create_graphics_pipeline(GraphicsPipelineDesc {
                 label: format!("{label}.pipeline"),
                 layout: pipeline_layout,
@@ -437,11 +461,12 @@ impl GuiMeshPassResources {
                 cull_mode,
                 front_face,
                 blend,
-                depth_compare: Some(CompareOp::LessOrEqual),
-                depth_write: true,
+                depth_compare: Some(depth_compare),
+                depth_write,
                 depth_bias: None,
                 color_formats: vec![color_format],
                 depth_format: Some(TextureFormat::Depth32Float),
+            stencil: None,
             })?;
             created.push(pipeline);
             Ok(Self {
@@ -478,18 +503,25 @@ impl GuiMeshPassResources {
                 "GUI mesh draw offscreen extent does not match its Rust-owned target",
             ));
         }
-        // The raster target is sampled by the preceding item's composite pass.
-        // It is cached by extent, so return it to attachment-write usage before
-        // beginning another item raster. The first use is also valid: this is a
-        // semantic ownership transition for the newly-created target.
-        operations.push(CommandOp::Barrier(ResourceBarrier {
-            resource: target.color,
-            subresources: None,
-            before: TextureUsageState::ShaderRead,
-            after: TextureUsageState::ColorAttachment,
-            src_queue: QueueClass::Graphics,
-            dst_queue: QueueClass::Graphics,
-        }));
+		// The raster target is sampled by the preceding item's composite pass.
+		// Only the first layer transitions it back to attachment-write ownership;
+		// consecutive layers remain in COLOR_ATTACHMENT_OPTIMAL until the single
+		// composite pass below. A newly staged target is still UNDEFINED, while a
+		// cached target was left in SHADER_READ_ONLY by that prior composite.
+		if clear {
+			operations.push(CommandOp::Barrier(ResourceBarrier {
+				resource: target.color,
+				subresources: None,
+				before: if target.initialized {
+					TextureUsageState::ShaderRead
+				} else {
+					TextureUsageState::Undefined
+				},
+				after: TextureUsageState::ColorAttachment,
+				src_queue: QueueClass::Graphics,
+				dst_queue: QueueClass::Graphics,
+			}));
+		}
         if stream.vertex_offset % GUI_MESH_GPU_VERTEX_BYTES as u64 != 0
             || stream.index_offset % std::mem::size_of::<u32>() as u64 != 0
         {
@@ -634,16 +666,23 @@ impl GuiMeshPassResources {
     }
 }
 
-/// The standard 3D item PIP route accepts only vanilla's SOLID and CUTOUT
-/// item layers. Their alpha threshold is explicit per draw, while their
-/// fixed-function policy is shared: opaque depth writes and back-face culling.
+/// The standard 3D item PIP route accepts vanilla's SOLID, CUTOUT, and
+/// TRANSLUCENT item layers. Their alpha threshold is explicit per draw, while their
+/// fixed-function policy is shared: depth-tested, back-face-culled draws.
+/// Translucent layers additionally use the explicit GAL alpha blend equation;
+/// depth writes remain enabled to match vanilla's item-entity translucent
+/// render type ordering inside the private PIP target.
 /// Keeping this policy here prevents a GUI texture-group blend policy from
 /// silently changing copied item-model geometry.
-fn gui_mesh_raster_state(material_mode: GuiMeshMaterialMode) -> (CullMode, BlendMode) {
+fn gui_mesh_raster_state(material_mode: GuiMeshMaterialMode) -> (CullMode, BlendMode, CompareOp, bool) {
     match material_mode {
         GuiMeshMaterialMode::Opaque | GuiMeshMaterialMode::Cutout => {
-            (CullMode::Back, BlendMode::Disabled)
+            (CullMode::Back, BlendMode::Disabled, CompareOp::LessOrEqual, true)
         }
+        GuiMeshMaterialMode::Translucent => {
+            (CullMode::Back, BlendMode::Alpha, CompareOp::LessOrEqual, true)
+        }
+        GuiMeshMaterialMode::Glint => (CullMode::None, BlendMode::Glint, CompareOp::Equal, false),
     }
 }
 
@@ -891,6 +930,7 @@ impl GuiMeshCompositeResources {
                 depth_bias: None,
                 color_formats: vec![color_format],
                 depth_format,
+                stencil: None,
             })?;
             created.push(pipeline);
             Ok(Self {
@@ -1133,6 +1173,10 @@ fn composite_uniform_bytes(draw: &GuiMeshPreparedDraw) -> Vec<u8> {
         guard / height,
         (width - guard * 2.0) / width,
         (height - guard * 2.0) / height,
+        if draw.clip_mode == 1 { draw.clip_left as f32 } else { 0.0 },
+        if draw.clip_mode == 1 { draw.clip_top as f32 } else { 0.0 },
+        if draw.clip_mode == 1 { (draw.clip_left + draw.clip_width) as f32 } else { draw.gui_extent[0] as f32 },
+        if draw.clip_mode == 1 { (draw.clip_top + draw.clip_height) as f32 } else { draw.gui_extent[1] as f32 },
     ] {
         bytes.extend_from_slice(&value.to_le_bytes());
     }
@@ -1158,6 +1202,7 @@ pub struct GuiMeshOffscreenTarget {
     pub target: Handle,
     pub pass: Handle,
     pub extent: Extent3d,
+    pub(crate) initialized: bool,
 }
 
 #[derive(Default)]
@@ -1168,6 +1213,15 @@ pub struct GuiMeshOffscreenTargetCache {
 impl GuiMeshOffscreenTargetCache {
     pub(crate) fn len(&self) -> usize {
         self.targets.len()
+    }
+
+    pub(crate) fn mark_initialized(&mut self, target: Handle) {
+        for cached in self.targets.values_mut() {
+            if cached.target == target {
+                cached.initialized = true;
+                break;
+            }
+        }
     }
 
     /// Returns an owned target for this GUI resource generation and logical
@@ -1266,6 +1320,7 @@ impl GuiMeshOffscreenTargetCache {
                 target,
                 pass,
                 extent,
+                initialized: false,
             })
         })();
         match result {
@@ -1445,6 +1500,18 @@ pub fn validate_batch(batch: &GuiMeshBatchRequest) -> GalResult<()> {
             "GUI mesh guard band must leave a non-empty offscreen raster area",
         ));
     }
+    match batch.clip_mode {
+        0 if batch.clip_left == 0 && batch.clip_top == 0 && batch.clip_width == 0 && batch.clip_height == 0 => {}
+        1 if batch.clip_left >= 0
+            && batch.clip_top >= 0
+            && batch.clip_width >= 0
+            && batch.clip_height >= 0
+            && batch.clip_left <= batch.gui_extent[0] as i32
+            && batch.clip_top <= batch.gui_extent[1] as i32
+            && batch.clip_width <= batch.gui_extent[0] as i32 - batch.clip_left
+            && batch.clip_height <= batch.gui_extent[1] as i32 - batch.clip_top => {}
+        _ => return Err(GalError::ffi(StatusCode::InvalidArgument, "GUI mesh clip must be disabled or a bounded frame-local rectangle")),
+    }
     for vertex in &batch.vertices {
         if !vertex.position.iter().all(|value| value.is_finite())
             || !vertex.atlas_uv.iter().all(|value| value.is_finite())
@@ -1509,6 +1576,11 @@ fn prepare_draw(batch: &GuiMeshBatchRequest) -> GalResult<GuiMeshPreparedDraw> {
         gui_extent: batch.gui_extent,
         render_extent: batch.render_extent,
         guard_pixels: batch.guard_pixels,
+        clip_mode: batch.clip_mode,
+        clip_left: batch.clip_left,
+        clip_top: batch.clip_top,
+        clip_width: batch.clip_width,
+        clip_height: batch.clip_height,
         vertices,
         indices: batch.indices.clone(),
     })
@@ -1612,6 +1684,11 @@ mod tests {
             gui_extent: [320, 180],
             render_extent: [34, 34],
             guard_pixels: 1,
+            clip_mode: 0,
+            clip_left: 0,
+            clip_top: 0,
+            clip_width: 0,
+            clip_height: 0,
             vertices: vec![
                 GuiMeshVertex {
                     position: [0.0, 0.0, 0.0],
@@ -1915,13 +1992,21 @@ mod tests {
     }
 
     #[test]
-    fn standard_3d_item_raster_policy_matches_vanilla_solid_and_cutout() {
+    fn standard_3d_item_raster_policy_matches_vanilla_material_modes() {
         for material_mode in [GuiMeshMaterialMode::Opaque, GuiMeshMaterialMode::Cutout] {
             assert_eq!(
                 gui_mesh_raster_state(material_mode),
-                (CullMode::Back, BlendMode::Disabled),
+                (CullMode::Back, BlendMode::Disabled, CompareOp::LessOrEqual, true),
             );
         }
+        assert_eq!(
+            gui_mesh_raster_state(GuiMeshMaterialMode::Translucent),
+            (CullMode::Back, BlendMode::Alpha, CompareOp::LessOrEqual, true),
+        );
+        assert_eq!(
+            gui_mesh_raster_state(GuiMeshMaterialMode::Glint),
+            (CullMode::None, BlendMode::Glint, CompareOp::Equal, false),
+        );
     }
 
     #[test]
@@ -1939,6 +2024,24 @@ mod tests {
                 "standard-3D item composition must not apply the generic PIP V inversion"
             );
         }
+    }
+
+    #[test]
+    fn mesh_composite_uniform_carries_bounded_clip_rectangle() {
+        let mut clipped = batch();
+        clipped.clip_mode = 1;
+        clipped.clip_left = 4;
+        clipped.clip_top = 6;
+        clipped.clip_width = 20;
+        clipped.clip_height = 24;
+        let draw = prepare_draw(&clipped).expect("bounded GUI mesh clip prepares");
+        let bytes = composite_uniform_bytes(&draw);
+        assert_eq!(GUI_MESH_COMPOSITE_UNIFORM_BYTES, bytes.len());
+        let tail = &bytes[64..80];
+        let values = (0..4)
+            .map(|index| f32::from_le_bytes(tail[index * 4..index * 4 + 4].try_into().unwrap()))
+            .collect::<Vec<_>>();
+        assert_eq!(vec![4.0, 6.0, 24.0, 30.0], values);
     }
 
     #[test]

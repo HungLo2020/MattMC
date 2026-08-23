@@ -73,6 +73,9 @@ public class CompressibleGLBufferedImage {
     }
 
     public void uploadToTexture() {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+            throw new IllegalStateException("Java VoxelMap persistent-image upload is unavailable while Rust owns whole-frame presentation");
+        }
         if (!VulkanicAPI.isOnRenderThread()) {
             VoxelConstants.getLogger().log(Level.WARN, "Texture upload call from wrong thread", new Exception());
             return;

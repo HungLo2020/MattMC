@@ -414,6 +414,7 @@ impl OpenGlLowerer {
                     pipeline.depth_compare,
                     pipeline.depth_write,
                     pipeline.depth_bias,
+                    pipeline.stencil,
                 );
                 state.pipeline = Some(*handle);
                 state.compute_pipeline = None;
@@ -536,6 +537,7 @@ impl OpenGlLowerer {
             CommandOp::Barrier(barrier) => self.apply_resource_barrier(barrier),
             CommandOp::DispatchIndirect { .. }
             | CommandOp::DrawIndirect { .. }
+            | CommandOp::CopyFrameTargetToTexture { .. }
             | CommandOp::Present { .. }
             | CommandOp::SetVertexBuffer { .. } => Err(GalError::backend(format!(
                 "OpenGL backend does not support command in isolated path: {op:?}"
@@ -1049,6 +1051,7 @@ impl OpenGlLowerer {
         depth_compare: Option<CompareOp>,
         depth_write: bool,
         depth_bias: Option<crate::render::vulkanic::resources::DepthBias>,
+        stencil: Option<crate::render::vulkanic::resources::StencilState>,
     ) {
         unsafe {
             let front_face_ccw = gl_front_face_is_counter_clockwise(front_face);
@@ -1117,6 +1120,13 @@ impl OpenGlLowerer {
                 }
                 self.cache.depth_bias = depth_bias;
                 self.cache.state_changes += 1;
+            }
+            if let Some(stencil) = stencil {
+                self.gl.enable(glow::STENCIL_TEST);
+                apply_stencil_face(&self.gl, glow::FRONT, stencil.front);
+                apply_stencil_face(&self.gl, glow::BACK, stencil.back);
+            } else {
+                self.gl.disable(glow::STENCIL_TEST);
             }
         }
     }
@@ -1430,7 +1440,30 @@ pub(super) fn compare_op(compare: CompareOp) -> u32 {
         CompareOp::Less => glow::LESS,
         CompareOp::LessOrEqual => glow::LEQUAL,
         CompareOp::Equal => glow::EQUAL,
+        CompareOp::Greater => glow::GREATER,
     }
+}
+
+fn stencil_op(operation: crate::render::vulkanic::resources::StencilOp) -> u32 {
+    match operation {
+        crate::render::vulkanic::resources::StencilOp::Keep => glow::KEEP,
+        crate::render::vulkanic::resources::StencilOp::Replace => glow::REPLACE,
+    }
+}
+
+unsafe fn apply_stencil_face(
+    gl: &glow::Context,
+    face: u32,
+    state: crate::render::vulkanic::resources::StencilFaceState,
+) {
+    gl.stencil_func_separate(face, compare_op(state.compare), state.reference as i32, state.read_mask);
+    gl.stencil_op_separate(
+        face,
+        stencil_op(state.fail_op),
+        stencil_op(state.depth_fail_op),
+        stencil_op(state.pass_op),
+    );
+    gl.stencil_mask_separate(face, state.write_mask);
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -1454,6 +1487,12 @@ fn opengl_blend_state(blend: BlendMode) -> OpenGlBlendState {
         BlendMode::Disabled => None,
         BlendMode::Alpha => Some(OpenGlBlendFactors {
             src_color: glow::SRC_ALPHA,
+            dst_color: glow::ONE_MINUS_SRC_ALPHA,
+            src_alpha: glow::ONE,
+            dst_alpha: glow::ONE_MINUS_SRC_ALPHA,
+        }),
+        BlendMode::Premultiplied => Some(OpenGlBlendFactors {
+            src_color: glow::ONE,
             dst_color: glow::ONE_MINUS_SRC_ALPHA,
             src_alpha: glow::ONE,
             dst_alpha: glow::ONE_MINUS_SRC_ALPHA,
@@ -1482,6 +1521,18 @@ fn opengl_blend_state(blend: BlendMode) -> OpenGlBlendState {
             src_alpha: glow::ONE,
             dst_alpha: glow::ZERO,
         }),
+        BlendMode::Glint => Some(OpenGlBlendFactors {
+            src_color: glow::DST_COLOR,
+            dst_color: glow::SRC_COLOR,
+            src_alpha: glow::ONE,
+            dst_alpha: glow::ZERO,
+        }),
+        BlendMode::Vignette => Some(OpenGlBlendFactors {
+            src_color: glow::ZERO,
+            dst_color: glow::ONE_MINUS_SRC_COLOR,
+            src_alpha: glow::ONE,
+            dst_alpha: glow::ZERO,
+        }),
     };
     OpenGlBlendState {
         enabled: factors.is_some(),
@@ -1503,6 +1554,10 @@ fn gl_memory_barrier_bits(before: TextureUsageState, after: TextureUsageState) -
         (TextureUsageState::ShaderWrite, TextureUsageState::ShaderRead) => {
             glow::SHADER_IMAGE_ACCESS_BARRIER_BIT | glow::TEXTURE_FETCH_BARRIER_BIT
         }
+        (TextureUsageState::ShaderWrite, TextureUsageState::ShaderStorageRead)
+        | (TextureUsageState::ShaderStorageRead, TextureUsageState::ShaderStorageRead) => {
+            glow::SHADER_IMAGE_ACCESS_BARRIER_BIT
+        }
         (TextureUsageState::ShaderWrite, TextureUsageState::ShaderWrite) => {
             glow::SHADER_IMAGE_ACCESS_BARRIER_BIT
         }
@@ -1516,6 +1571,9 @@ fn gl_memory_barrier_bits(before: TextureUsageState, after: TextureUsageState) -
         }
         (TextureUsageState::TransferDst, TextureUsageState::ShaderRead) => {
             glow::TEXTURE_FETCH_BARRIER_BIT | glow::SHADER_STORAGE_BARRIER_BIT
+        }
+        (TextureUsageState::TransferDst, TextureUsageState::ShaderStorageRead) => {
+            glow::SHADER_IMAGE_ACCESS_BARRIER_BIT | glow::SHADER_STORAGE_BARRIER_BIT
         }
         (TextureUsageState::TransferDst, TextureUsageState::IndexRead) => {
             glow::ELEMENT_ARRAY_BARRIER_BIT
@@ -1618,6 +1676,7 @@ fn copy_upload_row_index(_dimension: TextureDimension, row: usize, _height: usiz
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::render::vulkanic::resources::StencilOp;
 
     #[test]
     fn explicit_front_face_selects_the_matching_opengl_convention() {
@@ -1625,6 +1684,14 @@ mod tests {
             FrontFace::CounterClockwise
         ));
         assert!(!gl_front_face_is_counter_clockwise(FrontFace::Clockwise));
+    }
+
+    #[test]
+    fn explicit_stencil_compare_and_operations_lower_without_java_state() {
+        assert_eq!(glow::GREATER, compare_op(CompareOp::Greater));
+        assert_eq!(glow::EQUAL, compare_op(CompareOp::Equal));
+        assert_eq!(glow::KEEP, stencil_op(StencilOp::Keep));
+        assert_eq!(glow::REPLACE, stencil_op(StencilOp::Replace));
     }
 
     #[test]
@@ -1679,6 +1746,23 @@ mod tests {
                 dst_color: glow::ZERO,
                 src_alpha: glow::ONE,
                 dst_alpha: glow::ZERO,
+            }),
+            state.factors
+        );
+    }
+
+    #[test]
+    fn premultiplied_blend_lowers_to_one_times_destination_alpha() {
+        let state = opengl_blend_state(BlendMode::Premultiplied);
+        assert!(state.enabled);
+        assert_eq!(glow::FUNC_ADD, state.color_op);
+        assert_eq!(glow::FUNC_ADD, state.alpha_op);
+        assert_eq!(
+            Some(OpenGlBlendFactors {
+                src_color: glow::ONE,
+                dst_color: glow::ONE_MINUS_SRC_ALPHA,
+                src_alpha: glow::ONE,
+                dst_alpha: glow::ONE_MINUS_SRC_ALPHA,
             }),
             state.factors
         );

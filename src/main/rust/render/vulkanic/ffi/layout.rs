@@ -437,6 +437,11 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 frame_target_identity
             ]
         ),
+        100 => layout!(
+            100,
+            FfiFrameCancelRequest,
+            [header, frame_id, correlation_id]
+        ),
         43 => layout!(43, FfiDestroyDescAbi, [byte_size, handle, expected_kind]),
         44 => layout!(
             44,
@@ -561,6 +566,11 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 render_width,
                 render_height,
                 guard_pixels,
+                clip_mode,
+                clip_left,
+                clip_top,
+                clip_width,
+                clip_height,
                 vertices,
                 indices
             ]
@@ -706,7 +716,10 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 world_text_quads,
                 gui_mesh_batches,
                 world_first_person_frame,
-                world_first_person_mesh_instances
+                world_first_person_mesh_instances,
+                gui_blur_before_stratum,
+                gui_blur_radius,
+                post_effect_id
             ]
         ),
         89 => layout!(
@@ -1078,7 +1091,8 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 mesh_generation,
                 entity_id,
                 entity_color_argb,
-                transform
+                transform,
+                outline_color_argb
             ]
         ),
         70 => layout!(

@@ -159,8 +159,15 @@ public class ApiNeutralityCallsiteTest {
             "Vulkan color-only texture-view render passes should bypass the compatibility GlCommandEncoder");
         assertTrue(backendSource.contains("return new VulkanNativeCommandEncoder(this).createRenderPass(supplier, colorTextureView, clearColor, depthTextureView, clearDepth);"),
             "Vulkan color-depth texture-view render passes should bypass the compatibility GlCommandEncoder");
-        assertTrue(backendSource.contains("public CommandEncoder createCommandEncoder() {\n        return new VulkanNativeCommandEncoder(this);\n    }"),
-            "Vulkan's shared command encoder should now default to the native Vulkan encoder");
+        int sharedEncoderStart = backendSource.indexOf("public CommandEncoder createCommandEncoder() {");
+        int sharedEncoderEnd = backendSource.indexOf("\n    }", sharedEncoderStart);
+        assertTrue(sharedEncoderStart >= 0 && sharedEncoderEnd > sharedEncoderStart,
+            "Vulkan should expose a shared command-encoder seam");
+        String sharedEncoderSource = backendSource.substring(sharedEncoderStart, sharedEncoderEnd);
+        assertTrue(sharedEncoderSource.contains("return new VulkanNativeCommandEncoder(this);"),
+            "Vulkan's shared command encoder should default to the native Vulkan encoder");
+        assertTrue(sharedEncoderSource.contains("RustGalVulkanWholeFrameMode.enabled()"),
+            "Vulkan's shared command encoder must fail closed while Rust owns whole-frame presentation");
         assertTrue(backendSource.contains("CommandEncoder createCompatibilityCommandEncoder()"),
             "Vulkan should keep framebuffer/MRT compatibility fallback explicit instead of hiding it in createCommandEncoder()");
         assertFalse(backendSource.contains("createCommandEncoder().createRenderPass(supplier, colorTextureView, clearColor);"),
@@ -258,8 +265,22 @@ public class ApiNeutralityCallsiteTest {
             "VulkanicAPI should expose backend-owned command-encoder wrapper");
         assertTrue(vulkanicApiSource.contains("VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();"),
             "VulkanicAPI should bind a direct Vulkan backend target for hot implemented methods");
+        assertTrue(vulkanicApiSource.contains("Java backend dispatch is unavailable while Rust Vulkan owns whole-frame rendering"),
+            "implemented compatibility helpers must fail closed instead of invoking Java Vulkan during Rust presentation");
+        assertTrue(vulkanicApiSource.contains("scopedBackend.getBackendType() != GraphicsBackendType.OPENGL"),
+            "Rust whole-frame ownership must not allow a scoped Java Vulkan backend override");
         assertTrue(vulkanicApiSource.contains("? directVulkanBackend.createCommandEncoder()"),
             "VulkanicAPI command-encoder wrapper should use direct dispatch for hot implemented Vulkan methods while staying backend-neutral");
+        assertTrue(vulkanicApiSource.contains("RustGalVulkanWholeFrameMode.enabled()"),
+            "VulkanicAPI command-context acquisition must reject Java Vulkan access during Rust ownership");
+        assertTrue(vulkanicApiSource.contains("SCOPED_BACKEND_OVERRIDE.get() == null\n            && net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()"),
+            "command-context acquisition must fail closed for the whole Rust-enabled window");
+        assertTrue(vulkanicApiSource.contains("Java Vulkan command-encoder access is disabled while Rust owns whole-frame Vulkan rendering"),
+            "VulkanicAPI should fail closed instead of exposing a Java command encoder during Rust presentation");
+        assertTrue(vulkanCompatibilityGpuDeviceSource.contains("this.compatibilityOnly\n            && net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()"),
+            "VulkanCompatibilityGpuDevice must reject Java compatibility rendering for the entire Rust-owned window");
+        assertFalse(vulkanCompatibilityGpuDeviceSource.contains("RustGalVulkanWholeFrameMode.isRustPresentationActive()"),
+            "VulkanCompatibilityGpuDevice must not wait until first presentation before closing the Java path");
         assertTrue(graphicsBackendSource.contains("default RenderPass createRenderPass("),
             "GraphicsBackend should expose backend-owned render-pass creation seams");
         assertTrue(vulkanicApiSource.contains("public static RenderPass createRenderPass("),
@@ -521,6 +542,9 @@ public class ApiNeutralityCallsiteTest {
             "MainTarget should query max texture size through backend-owned VulkanicAPI seam");
         assertFalse(mainTargetSource.contains("VulkanicAPI.getDevice().getMaxTextureSize()"),
             "MainTarget should avoid direct getDevice().getMaxTextureSize() queries");
+        assertTrue(mainTargetSource.contains("RustGalVulkanWholeFrameMode.enabled()")
+                && mainTargetSource.contains("never allocate a second Java framebuffer"),
+            "MainTarget must not allocate Java attachments while Rust owns whole-frame presentation");
         assertTrue(guiRendererSource.contains("VulkanicAPI.getBackendMaxTextureSize()"),
             "GuiRenderer should query max texture size through backend-owned VulkanicAPI seam");
         assertFalse(guiRendererSource.contains("VulkanicAPI.getDevice().getMaxTextureSize()"),
@@ -1601,6 +1625,9 @@ public class ApiNeutralityCallsiteTest {
         // Misc cluster assertions
         assertTrue(renderTargetDescriptorSource.contains("VulkanicAPI.createCommandEncoder()"),
             "RenderTargetDescriptor should clear render target textures via backend-owned VulkanicAPI createCommandEncoder seam");
+        assertTrue(renderTargetDescriptorSource.contains("RustGalVulkanWholeFrameMode.enabled()")
+                && renderTargetDescriptorSource.contains("leave preparation to the Rust frame graph"),
+            "RenderTargetDescriptor must not submit Java clears while Rust owns whole-frame Vulkan");
         assertFalse(renderTargetDescriptorSource.contains("VulkanicAPI.getDevice()"),
             "RenderTargetDescriptor should avoid direct getDevice() usage for texture clearing");
         assertTrue(particleFeatureRendererSource.contains("VulkanicAPI.createRenderPass("),
@@ -1700,5 +1727,98 @@ public class ApiNeutralityCallsiteTest {
             "ShaderChunkRenderer should acquire a backend-owned CommandEncoder through VulkanicAPI seam");
         assertFalse(sodiumRendererSource.contains("RenderSystem.getDevice("),
             "ShaderChunkRenderer should avoid direct RenderSystem.getDevice() command encoder acquisition");
+    }
+
+    @Test
+    public void testRustWholeFrameShellRetainsSemanticGuiCallsites() throws IOException {
+        String gameRendererSource = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/GameRenderer.java"));
+        int shellStart = gameRendererSource.indexOf("public boolean renderRustVulkanWholeFrameShell");
+        assertTrue(shellStart >= 0, "Rust whole-frame shell must remain explicit");
+        String shell = gameRendererSource.substring(shellStart);
+        assertTrue(shell.contains("this.minecraft.getToastManager().render(guiGraphics)"),
+            "Rust whole-frame GUI must retain toast semantic extraction");
+        assertTrue(shell.contains("this.minecraft.gui.renderDebugOverlay(guiGraphics)"),
+            "Rust whole-frame GUI must retain debug-overlay semantic extraction");
+        assertTrue(shell.contains("this.minecraft.gui.renderDeferredSubtitles()"),
+            "Rust whole-frame GUI must retain deferred subtitle extraction");
+        assertTrue(shell.contains("hook.onBeforeGuiRender(this.minecraft, this.guiRenderState, this.renderBuffers"),
+            "Rust whole-frame GUI must retain registered semantic GUI hooks");
+        assertTrue(shell.contains("RustGalFrameCoordinator.executeWholeFrameVulkan"),
+            "Rust whole-frame GUI must submit through the Rust frame coordinator");
+    }
+
+    @Test
+    public void testRustWholeFrameRejectsJavaRenderEntrypointsBeforePresentation() throws IOException {
+        List<String> files = List.of(
+            "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java",
+            "com/seibel/distanthorizons/core/render/renderer/LodRenderer.java",
+            "net/irisshaders/iris/pipeline/IrisRenderingPipeline.java",
+            "net/irisshaders/iris/shadows/ShadowRenderer.java",
+            "net/minecraft/client/renderer/LevelRenderer.java",
+            "net/minecraft/client/renderer/PostChain.java",
+            "net/minecraft/client/renderer/feature/FeatureRenderDispatcher.java",
+            "net/minecraft/client/renderer/MapRenderer.java",
+            "net/minecraft/client/renderer/ItemInHandRenderer.java",
+            "net/minecraft/client/renderer/WeatherEffectRenderer.java",
+            "net/minecraft/client/renderer/feature/ParticleFeatureRenderer.java",
+            "net/minecraft/client/renderer/feature/TextFeatureRenderer.java",
+            "net/minecraft/client/renderer/blockentity/AbstractEndPortalRenderer.java",
+            "net/minecraft/client/renderer/blockentity/BeaconRenderer.java",
+            "net/minecraft/client/renderer/blockentity/BlockEntityWithBoundingBoxRenderer.java",
+            "net/minecraft/client/renderer/blockentity/TestInstanceRenderer.java",
+            "net/minecraft/client/renderer/blockentity/TheEndGatewayRenderer.java",
+            "net/minecraft/client/renderer/feature/BlockFeatureRenderer.java",
+            "net/minecraft/client/renderer/feature/CustomFeatureRenderer.java",
+            "net/minecraft/client/renderer/feature/FlameFeatureRenderer.java",
+            "net/minecraft/client/renderer/feature/ItemFeatureRenderer.java",
+            "net/minecraft/client/renderer/feature/ModelFeatureRenderer.java",
+            "net/minecraft/client/renderer/feature/ModelPartFeatureRenderer.java",
+            "net/minecraft/client/renderer/RenderStateShard.java",
+            "net/minecraft/client/renderer/WorldBorderRenderer.java",
+            "net/minecraft/client/renderer/SubmitNodeCollection.java",
+            "net/minecraft/client/gui/Gui.java",
+            "net/minecraft/client/renderer/debug/GameTestBlockHighlightRenderer.java",
+            "net/minecraft/client/renderer/chunk/ChunkSectionsToRender.java",
+            "net/minecraft/client/renderer/special/TaczGlock17SpecialRenderer.java",
+            "net/minecraft/client/renderer/entity/ExperienceOrbRenderer.java",
+            "net/minecraft/client/renderer/entity/EnderDragonRenderer.java",
+            "net/vulkanic/backends/vulkan/VulkanNativeCommandEncoder.java",
+            "net/irisshaders/iris/compat/dh/IrisLodRenderProgram.java",
+            "net/irisshaders/iris/compat/dh/DhFrameBufferWrapper.java",
+            "net/irisshaders/iris/compat/dh/IrisGenericRenderProgram.java",
+            "net/irisshaders/iris/pipeline/IrisVulkanRenderTargetContract.java",
+            "net/sodium/fabric/SodiumEntityRenderHook.java",
+            "com/seibel/distanthorizons/core/render/glObject/DhTextureState.java",
+            "com/seibel/distanthorizons/fabric/hooks/DistantHorizonsChunkRenderHook.java",
+            "com/seibel/distanthorizons/core/api/internal/ClientApi.java",
+            "com/seibel/distanthorizons/common/wrappers/misc/LightMapWrapper.java",
+            "com/seibel/distanthorizons/common/wrappers/minecraft/MinecraftRenderWrapper.java",
+            "net/voxelmap/util/WaypointContainer.java"
+        );
+        for (String relative : files) {
+            String source = readSource(SRC_MAIN_JAVA.resolve(relative));
+            assertFalse(source.contains("RustGalVulkanWholeFrameMode.isRustPresentationActive()"),
+                "Java render entrypoints must close at Vulkan selection, before presentation activation: " + relative);
+            assertTrue(source.contains("RustGalVulkanWholeFrameMode.enabled()")
+                    || source.contains("VulkanicAPI.isVulkanBackendSelected()"),
+                "Java render entrypoints must consult whole-frame ownership: " + relative);
+        }
+        List<String> presentationOnlyGuardOffenders = new java.util.ArrayList<>();
+        try (var paths = Files.walk(SRC_MAIN_JAVA)) {
+            paths.filter(Files::isRegularFile)
+                .filter(path -> path.toString().endsWith(".java"))
+                .filter(path -> !path.endsWith("net/vulkanic/bridge/RustGalVulkanWholeFrameMode.java"))
+                .forEach(path -> {
+                    try {
+                        if (readSource(path).contains("RustGalVulkanWholeFrameMode.isRustPresentationActive()")) {
+                            presentationOnlyGuardOffenders.add(SRC_MAIN_JAVA.relativize(path).toString());
+                        }
+                    } catch (IOException exception) {
+                        throw new RuntimeException(exception);
+                    }
+                });
+        }
+        assertTrue(presentationOnlyGuardOffenders.isEmpty(),
+            "production Java must not retain presentation-only Vulkan fallback guards: " + presentationOnlyGuardOffenders);
     }
 }

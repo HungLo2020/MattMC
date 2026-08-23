@@ -1,7 +1,7 @@
 package net.alexsmobs.client.render;
 
 import net.minecraft.client.renderer.entity.state.LivingEntityRenderState;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.client.renderer.item.ItemStackRenderState;
 
 public class MantisShrimpRenderState extends LivingEntityRenderState {
     public float rightEyePitch;
@@ -12,6 +12,6 @@ public class MantisShrimpRenderState extends LivingEntityRenderState {
     public float punchProgress;
     public boolean isBaby;
     public int variant;
-    public ItemStack mainHandItem = ItemStack.EMPTY;
+    public final ItemStackRenderState mainHandItem = new ItemStackRenderState();
     public boolean isLeftHanded;
 }

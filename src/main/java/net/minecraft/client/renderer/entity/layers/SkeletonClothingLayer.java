@@ -8,6 +8,8 @@ import net.minecraft.client.model.SkeletonModel;
 import net.minecraft.client.model.geom.EntityModelSet;
 import net.minecraft.client.model.geom.ModelLayerLocation;
 import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.entity.LivingEntityRenderer;
 import net.minecraft.client.renderer.entity.RenderLayerParent;
 import net.minecraft.client.renderer.entity.state.SkeletonRenderState;
 import net.minecraft.resources.ResourceLocation;
@@ -26,6 +28,18 @@ public class SkeletonClothingLayer<S extends SkeletonRenderState, M extends Enti
 	}
 
 	public void submit(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, S skeletonRenderState, float f, float g) {
-		coloredCutoutModelCopyLayerRender(this.layerModel, this.clothesLocation, poseStack, submitNodeCollector, i, skeletonRenderState, -1, 1);
+		submitNodeCollector.order(1)
+			.submitModelSemanticTexture(
+				this.layerModel,
+				skeletonRenderState,
+				poseStack,
+				RenderType.entityCutoutNoCull(this.clothesLocation),
+				i,
+				LivingEntityRenderer.getOverlayCoords(skeletonRenderState, 0.0F),
+				-1,
+				this.clothesLocation,
+				skeletonRenderState.outlineColor,
+				null
+			);
 	}
 }

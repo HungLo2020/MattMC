@@ -56,6 +56,9 @@ public class ScreenEffectRenderer {
 	}
 
 	public void renderScreenEffect(boolean bl, float f, SubmitNodeCollector submitNodeCollector) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java screen-effect rendering is unavailable while Rust owns whole-frame presentation");
+		}
 		PoseStack poseStack = new PoseStack();
 		Player player = this.minecraft.player;
 		if (this.minecraft.options.getCameraType().isFirstPerson() && !bl) {
@@ -83,6 +86,87 @@ public class ScreenEffectRenderer {
 		}
 	}
 
+	/**
+	 * Extracts only the item-activation semantic draw for the Rust whole-frame
+	 * route. The legacy screen-effect method also writes directly to a
+	 * MultiBufferSource for underwater/fire overlays, so it must not be called
+	 * from the Rust presenter. Item activation already has an explicit
+	 * SubmitNodeCollector contract and can therefore be admitted independently.
+	 */
+	public void renderRustVulkanItemActivation(float partialTick, SubmitNodeCollector submitNodeCollector) {
+		if (this.minecraft.options.hideGui) {
+			return;
+		}
+		// The Rust shell does not run FeatureRenderDispatcher after GUI extraction.
+		// Scope this semantic producer through the copied indexed-item family so
+		// ordinary activation layers become Rust-owned mesh instances immediately.
+		net.vulkanic.world.RustGalWorldPrimitiveRenderer.beginItemEntitySubmission();
+		try {
+			this.renderItemActivationAnimation(new PoseStack(), partialTick, submitNodeCollector);
+		} finally {
+			net.vulkanic.world.RustGalWorldPrimitiveRenderer.endItemEntitySubmission();
+		}
+	}
+
+	/** Extracts the resource-pack-backed underwater overlay through Rust GUI tiling. */
+	public void renderRustVulkanScreenEffects(net.minecraft.client.gui.GuiGraphics guiGraphics) {
+		if (guiGraphics == null || this.minecraft.player == null
+			|| !this.minecraft.options.getCameraType().isFirstPerson()
+			|| this.minecraft.player.isSpectator()) {
+			return;
+		}
+		Player player = this.minecraft.player;
+		if (player.isEyeInFluid(FluidTags.WATER)) {
+			BlockPos blockPos = BlockPos.containing(player.getX(), player.getEyeY(), player.getZ());
+			float brightness = LightTexture.getBrightness(player.level().dimensionType(), player.level().getMaxLocalRawBrightness(blockPos));
+			int color = ARGB.colorFromFloat(0.1F, brightness, brightness, brightness);
+			// Preserve vanilla's camera-scrolled four-repeat water pattern as
+			// semantic UV data. Rust splits wrapped unit intervals before upload;
+			// no Java texture or GPU state is consulted on the Vulkan route.
+			float uOffset = -player.getYRot() / 64.0F;
+			float vOffset = player.getXRot() / 64.0F;
+			int width = guiGraphics.guiWidth();
+			int height = guiGraphics.guiHeight();
+			// Vanilla spans four texture repeats in each screen axis. Tiled semantic
+			// blits preserve that repeat without requiring a Java atlas or GPU view.
+			guiGraphics.submitRustSemanticTiledBlit(
+				UNDERWATER_LOCATION,
+				0, 0, width, height,
+				Math.max(1, width / 4), Math.max(1, height / 4),
+				uOffset, vOffset, uOffset + 4.0F, vOffset + 4.0F, color
+			);
+		}
+		if (player.isOnFire()) {
+			TextureAtlasSprite fire = this.materials.get(ModelBakery.FIRE_1);
+			int width = guiGraphics.guiWidth();
+			int height = guiGraphics.guiHeight();
+			for (int side = 0; side < 2; side++) {
+				guiGraphics.pose().pushMatrix();
+				guiGraphics.pose().translate(width * 0.5F, height * 0.5F);
+				guiGraphics.pose().rotate((side * 2 - 1) * 10.0F * (float)Math.PI / 180.0F);
+				guiGraphics.pose().translate(-width * 0.5F, -height * 0.5F);
+				guiGraphics.submitRustSemanticBlit(
+					fire.atlasLocation(), 0, 0, width, height,
+					fire.getU0(), fire.getV0(), fire.getU1(), fire.getV1(), ARGB.colorFromFloat(0.9F, 1.0F, 1.0F, 1.0F)
+				);
+				guiGraphics.pose().popMatrix();
+			}
+		}
+		// Match vanilla's no-physics behavior: spectator/no-clip cameras do not
+		// acquire a block-screen overlay even when their eye intersects a solid
+		// block.  Keep this decision in the semantic producer so Rust receives
+		// the same gameplay-visible overlay eligibility as OpenGL.
+		BlockState blockingState = player.noPhysics ? null : getViewBlockingState(player);
+		if (blockingState != null) {
+			TextureAtlasSprite blocking = this.minecraft.getBlockRenderer().getBlockModelShaper().getParticleIcon(blockingState);
+			int color = ARGB.colorFromFloat(0.1F, 1.0F, 1.0F, 1.0F);
+			guiGraphics.submitRustSemanticBlit(
+				blocking.atlasLocation(), 0, 0, guiGraphics.guiWidth(), guiGraphics.guiHeight(),
+				blocking.getU0(), blocking.getV0(), blocking.getU1(), blocking.getV1(), color
+			);
+		}
+	}
+
 	private void renderItemActivationAnimation(PoseStack poseStack, float f, SubmitNodeCollector submitNodeCollector) {
 		if (this.itemActivationItem != null && this.itemActivationTicks > 0) {
 			int i = 40 - this.itemActivationTicks;
@@ -101,7 +185,14 @@ public class ScreenEffectRenderer {
 			poseStack.mulPose(Axis.YP.rotationDegrees(900.0F * Mth.abs(Mth.sin(l))));
 			poseStack.mulPose(Axis.XP.rotationDegrees(6.0F * Mth.cos(g * 8.0F)));
 			poseStack.mulPose(Axis.ZP.rotationDegrees(6.0F * Mth.cos(g * 8.0F)));
-			this.minecraft.gameRenderer.getLighting().setupFor(Lighting.Entry.ITEMS_3D);
+			boolean rustSemanticItem = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+				&& net.vulkanic.world.WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan();
+			if (!rustSemanticItem) {
+				// OpenGL compatibility owns the implicit lighting state. Rust Vulkan
+				// receives copied item/material semantics and must not borrow this Java
+				// GPU-side lighting setup while extracting the activation item.
+				this.minecraft.gameRenderer.getLighting().setupFor(Lighting.Entry.ITEMS_3D);
+			}
 			ItemStackRenderState itemStackRenderState = new ItemStackRenderState();
 			this.minecraft
 				.getItemModelResolver()

@@ -36,7 +36,7 @@ public class LlamaSpitRenderer extends EntityRenderer<LlamaSpit, LlamaSpitRender
 		poseStack.mulPose(Axis.YP.rotationDegrees(llamaSpitRenderState.yRot - 90.0F));
 		poseStack.mulPose(Axis.ZP.rotationDegrees(llamaSpitRenderState.xRot));
 		RenderType renderType = this.model.renderType(LLAMA_SPIT_LOCATION);
-		boolean eligible = RustGalWorldPrimitiveRenderer.isStandaloneModelMeshEligible(
+		boolean eligible = RustGalWorldPrimitiveRenderer.isStandaloneTranslucentModelMeshEligible(
 			this.model,
 			renderType,
 			LLAMA_SPIT_LOCATION,
@@ -49,7 +49,7 @@ public class LlamaSpitRenderer extends EntityRenderer<LlamaSpit, LlamaSpitRender
 			submitNodeCollector.isSemanticCoverageOnly(), eligible, ownership
 		);
 		if (disposition == StandaloneModelRenderOwnershipPolicy.Disposition.RUST_AVAILABLE) {
-			if (!RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMesh(
+			if (!RustGalWorldPrimitiveRenderer.enqueueStandaloneTranslucentModelMesh(
 				this.model,
 				llamaSpitRenderState,
 				poseStack.last(),
@@ -58,7 +58,8 @@ public class LlamaSpitRenderer extends EntityRenderer<LlamaSpit, LlamaSpitRender
 				LLAMA_SPIT_ENTITY_ID,
 				llamaSpitRenderState.lightCoords,
 				OverlayTexture.NO_OVERLAY,
-				-1
+				-1,
+				llamaSpitRenderState.outlineColor
 			)) {
 				throw new IllegalStateException("Rust whole-frame LlamaSpit route selected without a copied indexed mesh request");
 			}
@@ -69,6 +70,7 @@ public class LlamaSpitRenderer extends EntityRenderer<LlamaSpit, LlamaSpitRender
 			RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
 				"rust-vulkan-unavailable", LLAMA_SPIT_LOCATION, false, false, false
 			);
+			throw new IllegalStateException("Rust whole-frame LlamaSpit route has no semantic mesh");
 		} else {
 			if (eligible) {
 				RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
@@ -79,13 +81,15 @@ public class LlamaSpitRenderer extends EntityRenderer<LlamaSpit, LlamaSpitRender
 					!submitNodeCollector.isSemanticCoverageOnly() && ownership.usesJavaCompatibility()
 				);
 			}
-			submitNodeCollector.submitModel(
+			submitNodeCollector.submitModelSemanticTexture(
 				this.model,
 				llamaSpitRenderState,
 				poseStack,
 				renderType,
 				llamaSpitRenderState.lightCoords,
 				OverlayTexture.NO_OVERLAY,
+				-1,
+				LLAMA_SPIT_LOCATION,
 				llamaSpitRenderState.outlineColor,
 				null
 			);

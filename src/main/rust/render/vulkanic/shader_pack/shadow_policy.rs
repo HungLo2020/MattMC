@@ -2,8 +2,8 @@
 //!
 //! This module mirrors the documented Iris shadow matrix rules from pack
 //! directives and copied gameplay values. It owns no Java/Iris renderer state,
-//! shader object, or backend resource. The End flash variant is deliberately
-//! unavailable until its explicit gameplay semantics are transferred.
+//! shader object, or backend resource. End flash support is selected only by
+//! the pack's explicit `endFlashShadows` property and copied angle semantics.
 
 use crate::render::vulkanic::error::{GalError, GalResult};
 
@@ -28,6 +28,7 @@ pub struct ShaderPackShadowPolicy {
     far_plane: f32,
     interval_size: f32,
     sun_path_rotation_degrees: f32,
+    supports_end_flash: bool,
 }
 
 /// One complete ordinary-world shadow uniform set. Matrices use the same
@@ -62,6 +63,7 @@ impl ShaderPackShadowPolicy {
                 .unwrap_or(DEFAULT_SHADOW_INTERVAL),
             sun_path_rotation_degrees: source_float_constant(&common, "sunPathRotation")?
                 .unwrap_or(DEFAULT_SUN_PATH_ROTATION_DEGREES),
+            supports_end_flash: source_bool_property(source, "endFlashShadows")?.unwrap_or(false),
         };
         policy.validate()?;
         Ok(Some(policy))
@@ -78,20 +80,28 @@ impl ShaderPackShadowPolicy {
         self.sun_path_rotation_degrees
     }
 
-    /// Derives ordinary Overworld/Nether shadow uniforms from semantic frame
-    /// inputs. End is explicit unsupported because Iris's End flash branch is
-    /// not represented by the current semantic world frame.
+    /// Derives shadow uniforms from semantic frame inputs. End uses the
+    /// ordinary celestial transform unless the pack explicitly opts into its
+    /// copied End flash branch via `uniforms_with_end_flash`.
     pub fn uniforms(
         self,
         scope: TerrainProgramScope,
         time_of_day: f32,
         camera_world_position: [f32; 3],
     ) -> GalResult<ShaderPackShadowUniforms> {
-        if scope == TerrainProgramScope::End {
-            return Err(GalError::unsupported_feature(
-                "source shadow matrices for the End require explicit End flash semantics",
-            ));
-        }
+        self.uniforms_with_end_flash(scope, time_of_day, camera_world_position, None)
+    }
+
+    /// Derives shadow uniforms with the copied End flash angles. Packs only
+    /// enter the End branch when they explicitly opt into `endFlashShadows`;
+    /// other End packs retain Iris's ordinary celestial shadow transform.
+    pub fn uniforms_with_end_flash(
+        self,
+        scope: TerrainProgramScope,
+        time_of_day: f32,
+        camera_world_position: [f32; 3],
+        end_flash_angles: Option<[f32; 2]>,
+    ) -> GalResult<ShaderPackShadowUniforms> {
         if !time_of_day.is_finite()
             || camera_world_position
                 .iter()
@@ -101,18 +111,32 @@ impl ShaderPackShadowPolicy {
                 "source shadow matrix inputs must be finite",
             ));
         }
-        let sun_angle = source_sun_angle(time_of_day);
-        let shadow_angle = if sun_angle <= 0.5 {
-            sun_angle
+        let model_view = if scope == TerrainProgramScope::End && self.supports_end_flash {
+            let angles = end_flash_angles.ok_or_else(|| {
+                GalError::unsupported_feature(
+                    "End shadow support requires copied End flash angles",
+                )
+            })?;
+            if angles.iter().any(|value| !value.is_finite()) {
+                return Err(GalError::invalid_argument(
+                    "End flash shadow angles must be finite",
+                ));
+            }
+            end_shadow_model_view(angles[0], angles[1], self.interval_size, camera_world_position)
         } else {
-            sun_angle - 0.5
+            let sun_angle = source_sun_angle(time_of_day);
+            let shadow_angle = if sun_angle <= 0.5 {
+                sun_angle
+            } else {
+                sun_angle - 0.5
+            };
+            shadow_model_view(
+                shadow_angle,
+                self.sun_path_rotation_degrees,
+                self.interval_size,
+                camera_world_position,
+            )
         };
-        let model_view = shadow_model_view(
-            shadow_angle,
-            self.sun_path_rotation_degrees,
-            self.interval_size,
-            camera_world_position,
-        );
         let projection = shadow_ortho_projection(self.distance, self.near_plane, self.far_plane);
         Ok(ShaderPackShadowUniforms {
             model_view,
@@ -148,6 +172,32 @@ impl ShaderPackShadowPolicy {
         }
         Ok(())
     }
+}
+
+fn source_bool_property(source: &ShaderPackSource, key: &str) -> GalResult<Option<bool>> {
+    let Some(properties) = source.get("shaders.properties") else {
+        return Ok(None);
+    };
+    let mut result = None;
+    for (line_number, raw_line) in properties.lines().enumerate() {
+        let line = raw_line.split_once('#').map_or(raw_line, |(code, _)| code).trim();
+        let Some((name, value)) = line.split_once('=') else { continue; };
+        if name.trim() != key { continue; }
+        if result.is_some() {
+            return Err(GalError::invalid_argument(format!(
+                "shaders.properties declares {key} more than once"
+            )));
+        }
+        result = Some(match value.trim() {
+            "true" => true,
+            "false" => false,
+            other => return Err(GalError::invalid_argument(format!(
+                "shaders.properties {key} line {} must be true or false, got {other}",
+                line_number + 1
+            ))),
+        });
+    }
+    Ok(result)
 }
 
 fn source_float_constant(source: &str, name: &str) -> GalResult<Option<f32>> {
@@ -227,6 +277,22 @@ fn shadow_model_view(
     result
 }
 
+fn end_shadow_model_view(
+    x_angle: f32,
+    y_angle: f32,
+    interval_size: f32,
+    camera: [f32; 3],
+) -> [f32; 16] {
+    let mut result = identity();
+    result = multiply(result, rotation_x(-x_angle));
+    result = multiply(result, rotation_y(y_angle));
+    if interval_size.abs() > 0.0 {
+        let offset = camera.map(|coordinate| coordinate % interval_size - interval_size / 2.0);
+        result = multiply(result, translation(offset));
+    }
+    result
+}
+
 fn shadow_ortho_projection(distance: f32, near_plane: f32, far_plane: f32) -> [f32; 16] {
     let depth = near_plane - far_plane;
     [
@@ -273,6 +339,14 @@ fn rotation_z(degrees: f32) -> [f32; 16] {
     let (sine, cosine) = degrees.to_radians().sin_cos();
     [
         cosine, sine, 0.0, 0.0, -sine, cosine, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+    ]
+}
+
+fn rotation_y(degrees: f32) -> [f32; 16] {
+    let (sine, cosine) = degrees.to_radians().sin_cos();
+    [
+        cosine, 0.0, -sine, 0.0, 0.0, 1.0, 0.0, 0.0, sine, 0.0, cosine, 0.0, 0.0, 0.0, 0.0,
+        1.0,
     ]
 }
 
@@ -400,13 +474,44 @@ mod tests {
     }
 
     #[test]
-    fn rejects_end_without_transferred_end_flash_semantics() {
+    fn end_shadow_uses_copied_angles_only_when_pack_opts_in() {
         let policy = ShaderPackShadowPolicy::from_source(&source(""))
             .unwrap()
             .unwrap();
         assert!(policy
             .uniforms(TerrainProgramScope::End, 0.0, [0.0, 0.0, 0.0])
+            .is_ok());
+
+        let opted_in = ShaderPackSource::new(
+            "end-shadow-policy",
+            10,
+            vec![
+                ShaderSourceFile::new("lib/common.glsl", "const float shadowIntervalSize = 2.0;"),
+                ShaderSourceFile::new("shaders.properties", "endFlashShadows=true\n"),
+            ],
+        )
+        .unwrap();
+        let opted_in = ShaderPackShadowPolicy::from_source(&opted_in)
+            .unwrap()
+            .unwrap();
+        assert!(opted_in
+            .uniforms_with_end_flash(TerrainProgramScope::End, 0.0, [0.0, 0.0, 0.0], None)
             .is_err());
+        let uniforms = opted_in
+            .uniforms_with_end_flash(
+                TerrainProgramScope::End,
+                0.0,
+                [0.0, 0.0, 0.0],
+                Some([15.0, 30.0]),
+            )
+            .unwrap();
+        assert_close(
+            uniforms.model_view,
+            multiply(
+                multiply(rotation_x(-15.0), rotation_y(30.0)),
+                translation([-1.0, -1.0, -1.0]),
+            ),
+        );
     }
 
     #[test]

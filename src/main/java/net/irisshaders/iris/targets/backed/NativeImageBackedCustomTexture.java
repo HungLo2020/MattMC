@@ -16,6 +16,9 @@ import java.util.function.IntSupplier;
 public class NativeImageBackedCustomTexture extends DynamicTexture implements TextureAccess {
 	public NativeImageBackedCustomTexture(CustomTextureData.PngData textureData) throws IOException {
 		super(() -> "PNG Texture", create(textureData.getContent()));
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris custom textures are unavailable while Rust owns whole-frame presentation");
+		}
 
 		// By default, images are unblurred and not clamped.
 
@@ -42,6 +45,9 @@ public class NativeImageBackedCustomTexture extends DynamicTexture implements Te
 
 	@Override
 	public void upload() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris custom texture uploads are unavailable while Rust owns whole-frame presentation");
+		}
 		NativeImage image = Objects.requireNonNull(getPixels());
 
 		VulkanicAPI.createCommandEncoder().writeToTexture(this.texture, image);

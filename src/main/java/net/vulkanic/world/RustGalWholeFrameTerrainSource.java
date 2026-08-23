@@ -12,6 +12,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.core.SectionPos;
+import net.minecraft.core.BlockPos;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.sodium.client.render.chunk.RenderSection;
@@ -37,10 +38,13 @@ import org.joml.Vector3d;
  * copies that data through VulkanicGAL and immediately releases the CPU buffer.
  */
 public final class RustGalWholeFrameTerrainSource {
+	private static final int MAX_SEMANTIC_MESH_WORKERS = 8;
 	private static volatile boolean wholeFrameSurfaceQueueDrained;
 	private static volatile boolean wholeFrameTerrainQueueDrained;
 	/** Capture-only state explaining why the explicit CPU source is not yet complete. */
 	private static volatile String wholeFrameTerrainQueueSummary = "uninitialized";
+	private static volatile String lastWholeFrameTerrainFailure = "none";
+	private static volatile long wholeFrameTerrainFailureCount;
     private ClientLevel level;
     private ClonedChunkSectionCache sectionCache;
 	private ChunkBuilder workerBuilder;
@@ -67,7 +71,7 @@ public final class RustGalWholeFrameTerrainSource {
         this.level = level;
         if (level != null) {
             this.sectionCache = new ClonedChunkSectionCache(level);
-			this.workerBuilder = new ChunkBuilder(level, ChunkMeshFormats.COMPACT, false);
+			this.workerBuilder = new ChunkBuilder(level, ChunkMeshFormats.COMPACT, false, MAX_SEMANTIC_MESH_WORKERS);
         }
     }
 
@@ -102,6 +106,15 @@ public final class RustGalWholeFrameTerrainSource {
 		this.drainCompletedBuilds(frustum);
 		this.drainVisibilityFrontier(frustum);
 		this.scheduleBuilds(camera);
+		// A worker may finish while the first bounded scheduling pass is still
+		// assembling the frame. Consume that completion immediately so its
+		// visibility frontier can admit the next ring without waiting for a
+		// completely unrelated render frame. Keep this as one additional pass:
+		// producer work remains explicitly bounded and the settled gate still
+		// requires the queues to be empty after the pass.
+		this.drainCompletedBuilds(frustum);
+		this.drainVisibilityFrontier(frustum);
+		this.scheduleBuilds(camera);
 		this.sectionCache.cleanup();
 		wholeFrameSurfaceQueueDrained = this.pending.isEmpty() && this.inFlight.isEmpty();
 		wholeFrameTerrainQueueDrained = wholeFrameSurfaceQueueDrained
@@ -114,6 +127,8 @@ public final class RustGalWholeFrameTerrainSource {
 			+ ",completed=" + this.completedBuilds.size()
 			+ ",retained=" + this.sections.size()
 			+ ",unavailable=" + this.unavailableSections.size()
+			+ ",failureCount=" + wholeFrameTerrainFailureCount
+			+ ",lastFailure=" + lastWholeFrameTerrainFailure
 			+ ",drained=" + wholeFrameTerrainQueueDrained;
 		var visibleSections = new ArrayList<RenderSection>(this.sections.size());
 		for (RenderSection section : this.sections.values()) {
@@ -142,6 +157,31 @@ public final class RustGalWholeFrameTerrainSource {
 	/** Diagnostic companion to {@link #isWholeFrameTerrainQueueDrained()}. */
 	public static String wholeFrameTerrainQueueSummary() {
 		return wholeFrameTerrainQueueSummary;
+	}
+
+	/**
+	 * Reports readiness for the client loading gate from the Rust semantic
+	 * source itself. A section is ready only after its CPU build has been
+	 * consumed (including an explicitly empty section); queued or in-flight
+	 * sections remain unavailable. This never exposes a Java mesh or backend
+	 * handle to the loading path.
+	 */
+	public boolean isSectionReady(BlockPos blockPos) {
+		if (blockPos == null || this.level == null) {
+			return false;
+		}
+		long key = SectionPos.asLong(
+			SectionPos.blockToSectionCoord(blockPos.getX()),
+			SectionPos.blockToSectionCoord(blockPos.getY()),
+			SectionPos.blockToSectionCoord(blockPos.getZ())
+		);
+		return this.sections.containsKey(key)
+			&& !this.inFlight.contains(key)
+			&& !this.queued.contains(key)
+			&& !this.pending.contains(SectionPos.of(key))
+			&& !this.invalidatedInFlight.contains(key)
+			&& !this.invalidatedPending.contains(key)
+			&& !this.unavailableSections.contains(key);
 	}
 
     public void invalidate(int sectionX, int sectionY, int sectionZ) {
@@ -390,9 +430,10 @@ public final class RustGalWholeFrameTerrainSource {
 			return;
 		}
         ChunkRenderContext renderContext;
-        try {
-            renderContext = LevelSlice.prepare(this.level, sectionPos, this.sectionCache);
-        } catch (RuntimeException ignored) {
+		try {
+			renderContext = LevelSlice.prepare(this.level, sectionPos, this.sectionCache);
+		} catch (RuntimeException error) {
+			this.recordTerrainFailure("prepare", sectionPos, error);
 			this.completeUnavailableBuild(sectionPos);
             return;
         }
@@ -420,7 +461,8 @@ public final class RustGalWholeFrameTerrainSource {
 			ChunkBuildOutput output;
 			try {
 				output = completed.result().unwrap();
-			} catch (RuntimeException ignored) {
+			} catch (RuntimeException error) {
+				recordTerrainFailure("unwrap", completed.sectionPos(), error);
 				this.unavailableSections.add(key);
 				continue;
 			}
@@ -458,6 +500,15 @@ public final class RustGalWholeFrameTerrainSource {
 		long key = sectionPos.asLong();
 		this.inFlight.remove(key);
 		this.unavailableSections.add(key);
+	}
+
+	private void recordTerrainFailure(String phase, SectionPos sectionPos, RuntimeException error) {
+		wholeFrameTerrainFailureCount++;
+		String detail = error.getClass().getSimpleName() + ":" + String.valueOf(error.getMessage());
+		if (detail.length() > 240) {
+			detail = detail.substring(0, 240);
+		}
+		lastWholeFrameTerrainFailure = phase + "@" + sectionPos.asLong() + ":" + detail;
 	}
 
 	private void completeEmptyBuild(SectionPos sectionPos) {

@@ -18,9 +18,9 @@ public class LayerGrizzlyHoney extends RenderLayer<GrizzlyBearRenderState, Model
     @Override
     public void submit(PoseStack matrixStackIn, net.minecraft.client.renderer.SubmitNodeCollector submitNodeCollector, int packedLightIn, GrizzlyBearRenderState state, float limbSwing, float limbSwingAmount) {
         if(state.isHoneyed){
-            submitNodeCollector.order(1).submitModel(
+            submitNodeCollector.order(1).submitModelSemanticTexture(
                 this.getParentModel(), state, matrixStackIn, RenderType.entityTranslucent(TEXTURE), 
-                packedLightIn, net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, -1, null, state.outlineColor, null
+                packedLightIn, net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, -1, TEXTURE, state.outlineColor, null
             );
         }
     }

@@ -68,7 +68,8 @@ public class WitherSkullRenderer extends EntityRenderer<WitherSkull, WitherSkull
 				WITHER_SKULL_ENTITY_ID,
 				witherSkullRenderState.lightCoords,
 				OverlayTexture.NO_OVERLAY,
-				-1
+				-1,
+				witherSkullRenderState.outlineColor
 			)) {
 				throw new IllegalStateException("Rust whole-frame WitherSkull route selected without a copied indexed mesh request");
 			}
@@ -79,6 +80,7 @@ public class WitherSkullRenderer extends EntityRenderer<WitherSkull, WitherSkull
 			RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
 				"rust-vulkan-unavailable", texture, false, false, false
 			);
+			throw new IllegalStateException("Rust whole-frame WitherSkull route has no semantic mesh");
 		} else {
 			if (eligible) {
 				RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(

@@ -14,7 +14,14 @@ import org.lwjgl.system.MemoryStack;
 @Environment(EnvType.CLIENT)
 public class GlobalSettingsUniform implements AutoCloseable {
 	public static final int UBO_SIZE = new Std140SizeCalculator().putVec2().putFloat().putFloat().putInt().get();
-	private final GpuBuffer buffer = net.vulkanic.VulkanicAPI.createBuffer(() -> "Global Settings UBO", 136, UBO_SIZE);
+	private final GpuBuffer buffer;
+
+	public GlobalSettingsUniform() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java global-settings UBO is unavailable while Rust owns whole-frame presentation");
+		}
+		this.buffer = net.vulkanic.VulkanicAPI.createBuffer(() -> "Global Settings UBO", 136, UBO_SIZE);
+	}
 
 	public void update(int i, int j, double d, long l, DeltaTracker deltaTracker, int k) {
 		try (MemoryStack memoryStack = MemoryStack.stackPush()) {

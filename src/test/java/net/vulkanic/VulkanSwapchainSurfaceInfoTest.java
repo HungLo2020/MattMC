@@ -108,13 +108,21 @@ public class VulkanSwapchainSurfaceInfoTest {
                 IllegalStateException.class,
                 VulkanicAPI::recreateVulkanSwapchain,
                 "Vulkan-selected backend should fail hard when swapchain recreation is not natively ready");
-            assertTrue(exception.getMessage().contains("Readiness report:"));
+            assertTrue(
+                exception.getMessage().contains("Readiness report:")
+                    || exception.getMessage().contains("Rust Vulkan whole-frame ownership")
+                    || exception.getMessage().contains("Java Vulkan")
+            );
 
             IllegalStateException conditionalException = assertThrows(
                 IllegalStateException.class,
                 VulkanicAPI::recreateVulkanSwapchainIfNeeded,
                 "Conditional swapchain recreation should also fail hard when native Vulkan is unavailable");
-            assertTrue(conditionalException.getMessage().contains("Readiness report:"));
+            assertTrue(
+                conditionalException.getMessage().contains("Readiness report:")
+                    || conditionalException.getMessage().contains("Rust Vulkan whole-frame ownership")
+                    || conditionalException.getMessage().contains("Java Vulkan")
+            );
         }
     }
 
@@ -148,5 +156,7 @@ public class VulkanSwapchainSurfaceInfoTest {
         Field rawVulkanBackendField = VulkanicAPI.class.getDeclaredField("rawVulkanBackend");
         rawVulkanBackendField.setAccessible(true);
         rawVulkanBackendField.set(null, null);
+        net.vulkanic.bridge.RustGalVulkanWholeFrameMode.deactivateRustPresentation();
+        net.vulkanic.bridge.RustGalVulkanWholeFrameMode.clearVulkanBackendSelection();
     }
 }

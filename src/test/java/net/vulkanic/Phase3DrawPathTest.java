@@ -34,6 +34,7 @@ public class Phase3DrawPathTest {
 
     private static final Path PROJECT_ROOT = Paths.get(System.getProperty("user.dir"));
     private static final Path SRC_MAIN_JAVA = PROJECT_ROOT.resolve("src/main/java");
+    private static final Path SRC_MAIN_RUST = PROJECT_ROOT.resolve("src/main/rust");
 
     private static String readSource(Path path) throws IOException {
         return Files.readString(path).replace("\r\n", "\n").replace('\r', '\n');
@@ -53,6 +54,22 @@ public class Phase3DrawPathTest {
             }
         }
         return false;
+    }
+
+    @Test
+    public void testWholeFramePrimitiveEntryPointCannotFallThroughOnEmptySemanticFrame() throws IOException {
+        String source = readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/gui/RustGalFrameCoordinator.java"));
+        assertTrue(source.contains("Rust Vulkan whole-frame primitive submission received no semantic world frame"),
+            "empty whole-frame primitive submissions must fail closed instead of returning to Java rendering");
+        for (String family : List.of(
+            "primitiveFrame.textQuads().isEmpty()",
+            "primitiveFrame.lodInstances().isEmpty()",
+            "primitiveFrame.firstPersonMeshInstances().isEmpty()",
+            "primitiveFrame.entityFlameQuadCount() == 0",
+            "primitiveFrame.background().enabled()"
+        )) {
+            assertTrue(source.contains(family), "empty-frame admission must account for semantic family: " + family);
+        }
     }
 
     @Test
@@ -311,6 +328,10 @@ public class Phase3DrawPathTest {
         String backendSource = readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java"));
         String plannerSource = readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanDescriptorBindingPlanner.java"));
         String textureSource = readSource(SRC_MAIN_JAVA.resolve("net/blaze3d/textures/GpuTexture.java"));
+        String vulkanicApiSource = readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicAPI.java"));
+
+        assertTrue(vulkanicApiSource.contains("if (handle <= 0 || getActiveBackendType() != GraphicsBackendType.OPENGL)"),
+            "OpenGL legacy parity buffers must be rejected before any Java GL query on Vulkan");
 
         assertTrue(textureSource.contains("public FilterMode getMinFilter()"),
             "GpuTexture should expose its live min filter so Vulkan descriptor samplers can follow current texture state");
@@ -3287,6 +3308,8 @@ public class Phase3DrawPathTest {
 
         Path dhTextureStateFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/glObject/DhTextureState.java");
         String dhTextureStateSource = readSource(dhTextureStateFile);
+        assertTrue(dhTextureStateSource.contains("if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())"),
+            "Distant Horizons texture-state compatibility must fail closed for the Rust whole-frame Vulkan route");
         assertTrue(dhTextureStateSource.contains("IrisRenderSystem.setActiveTexture("),
             "DhTextureState should route active texture changes through IrisRenderSystem.setActiveTexture");
 
@@ -3473,6 +3496,10 @@ public class Phase3DrawPathTest {
             "PBRTextureManager should not read active-unit binding directly from GlStateManager");
         assertTrue(pbrTextureManagerSource.contains("IrisRenderSystem.getBoundTextureOnActiveUnit("),
             "PBRTextureManager should read active-unit binding through IrisRenderSystem helper");
+        assertTrue(pbrTextureManagerSource.contains("if (defaultNormalTexture != null)"),
+            "PBRTextureManager shutdown must tolerate Rust Vulkan runs that never initialize optional PBR defaults");
+        assertTrue(pbrTextureManagerSource.contains("if (defaultSpecularTexture != null)"),
+            "PBRTextureManager shutdown must close optional PBR defaults independently and idempotently");
 
         Path programSamplersFile2 = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/program/ProgramSamplers.java");
         String programSamplersSource2 = readSource(programSamplersFile2);
@@ -3685,6 +3712,12 @@ public class Phase3DrawPathTest {
             "VulkanicAPI should expose bindDefaultUniforms after RenderSystem uniform binding migration");
         assertTrue(vulkanicApiSource.contains("public static void setShaderFog("),
             "VulkanicAPI should expose setShaderFog after RenderSystem fog uniform migration");
+        assertFalse(vulkanicApiSource.contains("static {\n        net.irisshaders.iris.gl.state.StateUpdateNotifiers.fogStartNotifier"),
+            "VulkanicAPI must not install Iris fog callbacks during class loading; Vulkan must not mutate Iris runtime state");
+        assertTrue(vulkanicApiSource.contains("installOpenGlIrisFogNotifiers();"),
+            "Iris fog callbacks must be installed only from the selected OpenGL backend branch");
+        assertTrue(vulkanicApiSource.contains("if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())"),
+            "Rust whole-frame Vulkan must not invoke Iris fog callbacks");
         assertTrue(vulkanicApiSource.contains("public static GpuBufferSlice getShaderFog("),
             "VulkanicAPI should expose getShaderFog after RenderSystem fog uniform migration");
         assertTrue(vulkanicApiSource.contains("public static void setShaderLights("),
@@ -3870,6 +3903,8 @@ public class Phase3DrawPathTest {
 
         Path overlayTextureFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/texture/OverlayTexture.java");
         String overlayTextureSource = readSource(overlayTextureFile);
+        assertTrue(overlayTextureSource.contains("if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())"),
+            "OverlayTexture must choose the semantic Rust asset route for the whole-frame Vulkan route");
         assertFalse(overlayTextureSource.contains("RenderSystem.setupOverlayColor("),
             "OverlayTexture should not route overlay setup through RenderSystem.setupOverlayColor");
         assertFalse(overlayTextureSource.contains("RenderSystem.teardownOverlayColor("),
@@ -3892,6 +3927,10 @@ public class Phase3DrawPathTest {
             "GraphicsBackend should expose texture-view texture-unit binding seam for backend-neutral callsites");
         assertTrue(vulkanicApiSource.contains("public static void bindTextureUnit(CommandContext ctx, int unit, GpuTextureView textureView)"),
             "VulkanicAPI should expose texture-view texture-unit binding seam for shared/game rendering callsites");
+        assertTrue(vulkanicApiSource.contains("if (isVulkanBackendSelected()) {\n            throw new IllegalStateException(\"Java Vulkan texture-unit binding is unavailable; Rust owns the selected Vulkan route\")"),
+            "Texture-unit binding must fail closed for every selected Vulkan route before Java backend or Iris state is touched");
+        assertFalse(vulkanicApiSource.contains("if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {\n            throw new IllegalStateException(\"Java Vulkan texture-unit binding is unavailable while Rust owns whole-frame Vulkan\")"),
+            "Texture-unit binding must not reopen on an unadmitted selected-Vulkan route");
     }
 
     @Test
@@ -5307,9 +5346,9 @@ public class Phase3DrawPathTest {
 
         assertTrue(standard3dItemRendererSource.contains("Boolean.getBoolean(\"mattmc.gui.debugStandard3dItemPipDump\")"),
             "Standard3dItemRenderer should make its forced grass-block PIP dump opt-in behind an explicit debug flag");
-        assertTrue(guiRendererSource.contains("if (Standard3dItemRenderer.isDebugDumpEnabled())")
+        assertTrue(guiRendererSource.contains("Standard3dItemRenderer.isDebugDumpEnabled() && !RustGalGuiRenderer.isWholeFrameVulkanActive()")
                 && guiRendererSource.contains("prepareDebugStandardBlockItemDump(this.renderState, i);"),
-            "GuiRenderer should only invoke the standard 3D item PIP debug dump when that explicit debug flag is enabled");
+            "GuiRenderer should only invoke the standard 3D item PIP debug dump for OpenGL compatibility");
     }
 
     @Test
@@ -5574,6 +5613,852 @@ public class Phase3DrawPathTest {
             "ParticleFeatureRenderer should enable the light layer before iterating particle group renderers");
         assertTrue(turnOffIndex > mainLoopIndex,
             "ParticleFeatureRenderer should disable the light layer after particle group rendering completes");
+    }
+
+    @Test
+    public void testSemanticQuadParticleGroupsAreNotCountedAsUnsupportedSourceCoverage() throws IOException {
+        Path submitCollectionFile = SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/SubmitNodeCollection.java");
+        String source = readSource(submitCollectionFile);
+
+        assertTrue(source.contains("int unsupportedParticleGroupSubmits = 0;"),
+            "particle coverage should distinguish semantic quad groups from custom renderers");
+        assertTrue(source.contains("renderer instanceof QuadParticleRenderState"),
+            "QuadParticleRenderState must be admitted because it copies quads into Rust semantics");
+        assertTrue(source.contains("quad.rustGalUnsupportedLayerCount()"),
+            "particle coverage must retain an explicit gap for non-particle-atlas layers");
+        assertTrue(source.contains("unsupportedParticleGroupSubmits++")
+                || source.contains("unsupportedParticleGroupSubmits +="),
+            "only unsupported particle layers and custom callbacks should remain unavailable");
+        assertFalse(source.contains("this.particleGroupRenderers.size()\n\t\t),"),
+            "coverage must not report every semantic quad group as an unsupported renderer");
+    }
+
+    @Test
+    public void testParticleSemanticAdmissionCountsOnlyAcceptedCustomAtlasQuads() throws IOException {
+        Path particleFile = SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/state/QuadParticleRenderState.java");
+        String source = readSource(particleFile);
+
+        assertTrue(source.contains("int[] admitted = {0};"),
+            "custom particle atlases need an explicit accepted-quad counter");
+        assertTrue(source.contains("enqueueParticleQuadForAtlas("),
+            "custom particle atlas layers must use the Rust atlas admission call");
+        assertTrue(source.contains("admitted[0] +="),
+            "particle coverage must count only atlas quads accepted by Rust");
+        assertTrue(source.contains("submitted += admitted[0];"),
+            "semantic particle submission totals must use accepted, not attempted, quads");
+    }
+
+    @Test
+    public void testCustomParticleAtlasHashCollisionFailsBeforeReplacingWorldTextureAsset() throws IOException {
+        Path rendererFile = SRC_MAIN_JAVA.resolve(
+            "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String source = readSource(rendererFile);
+
+        int guard = source.indexOf("Custom particle atlas IDs are hashed semantic identities");
+        int lookup = source.indexOf("WORLD_MESH_TEXTURES.containsKey(textureId)", guard);
+        int registration = source.indexOf("registerWorldMeshTexture(", guard);
+        assertTrue(guard >= 0 && lookup > guard,
+            "custom particle atlas registration must guard hashed IDs against existing world assets");
+        assertTrue(registration > lookup,
+            "the collision guard must run before the Rust texture asset is registered");
+    }
+
+    @Test
+    public void testBlockParticleAtlasUsesDedicatedCopiedTextureIdentity() throws IOException {
+        Path rendererFile = SRC_MAIN_JAVA.resolve(
+            "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String source = readSource(rendererFile);
+
+        assertFalse(source.contains("TextureAtlas.LOCATION_BLOCKS.equals(atlasLocation)"),
+            "block-atlas particle layers must not be rejected before semantic snapshot admission");
+        assertTrue(source.contains("particleAtlasTextureId(atlasLocation)"),
+            "copied particle atlases must use a dedicated texture identity");
+        assertTrue(source.contains("particle-atlas:"),
+            "the particle texture namespace must be distinct from terrain mesh identities");
+    }
+
+    @Test
+    public void testCommonAtlasBackedEntityModelsAreAdmittedToRustMeshExtraction() throws IOException {
+        Path rendererFile = SRC_MAIN_JAVA.resolve(
+            "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String source = readSource(rendererFile);
+        int allowlist = source.indexOf("private static boolean isSupportedModelMeshModel");
+        assertTrue(allowlist >= 0, "Rust model eligibility must retain an explicit bounded allowlist");
+        String contract = source.substring(allowlist, Math.min(source.length(), allowlist + 8_000));
+        for (String model : new String[] {
+            "ShulkerModel", "ArmorStandModel", "VillagerModel", "ZombieVillagerModel",
+            "PlayerModel", "SpinAttackEffectModel"
+        }) {
+            assertTrue(contract.contains(model), model + " must be admitted by the copied atlas-backed model contract");
+        }
+    }
+
+    @Test
+    public void testLivingEntityBasesPreserveDirectTextureIdentityForGenericRustOwnership() throws IOException {
+        Path rendererFile = SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/entity/LivingEntityRenderer.java");
+        String source = readSource(rendererFile);
+        assertTrue(source.contains("submitNodeCollector.submitModelSemanticTexture("),
+            "living-entity base submissions must preserve their direct texture identity");
+        assertTrue(source.contains("livingEntityRenderState.lightCoords, i, k, textureIdentity"),
+            "generic Rust entity ownership must receive the copied semantic texture location");
+        assertTrue(source.contains("if (textureIdentity != null)"),
+            "atlas-less or absent texture identities must retain the explicit legacy submit boundary");
+    }
+
+    @Test
+    public void testCachalotEchoUsesSemanticAnimatedTexturedQuads() throws IOException {
+        Path rendererFile = SRC_MAIN_JAVA.resolve(
+            "net/alexsmobs/client/render/RenderCachalotEcho.java");
+        String source = readSource(rendererFile);
+        assertTrue(source.contains("void submit(CachalotEchoRenderState"),
+            "Cachalot Echo must expose a render-state semantic submission entrypoint");
+        assertTrue(source.contains("submitTexturedQuad"),
+            "Cachalot Echo arcs must enter the Rust-owned textured-quad ABI");
+        assertTrue(source.contains("getEntityTextureFaster"),
+            "Cachalot Echo animation must preserve its state-dependent copied texture identity");
+        assertTrue(source.contains("Rust whole-frame Cachalot Echo route rejected"),
+            "Cachalot Echo must fail closed when Rust cannot admit a semantic quad");
+        assertTrue(source.contains("Java Cachalot Echo rendering is unavailable"),
+            "the legacy Cachalot Echo helper must not become a hidden Vulkan presenter");
+    }
+
+    @Test
+    public void testGiantSquidDepressurizationUsesSemanticTranslucentModelLayer() throws IOException {
+        Path rendererFile = SRC_MAIN_JAVA.resolve(
+            "net/alexsmobs/client/render/RenderGiantSquid.java");
+        String source = readSource(rendererFile);
+        assertTrue(source.contains("depressurization"),
+            "Giant Squid depressurization state must reach the render layer");
+        assertTrue(source.contains("entityTranslucent(TEXTURE_DEPRESSURIZED)"),
+            "Giant Squid depressurization must preserve its translucent texture contract");
+        assertTrue(source.contains("submitModelSemanticTexture"),
+            "Giant Squid depressurization must be copied through the semantic model route");
+    }
+
+    @Test
+    public void testMimicubeOuterTextureUsesSemanticTranslucentLayer() throws IOException {
+        Path layerFile = SRC_MAIN_JAVA.resolve(
+            "net/alexsmobs/client/render/layer/LayerMimicubeTexture.java");
+        String source = readSource(layerFile);
+        assertTrue(source.contains("entityTranslucent(TEXTURE)"),
+            "Mimicube outer texture must retain its translucent material contract");
+        assertTrue(source.contains("submitModelSemanticTexture"),
+            "Mimicube outer texture must enter the Rust-owned semantic model route");
+        assertFalse(source.contains("stub for compilation"),
+            "Mimicube outer texture must not remain an admitted no-op layer");
+    }
+
+    @Test
+    public void testCapturedSquidUsesCopiedStateAndNestedDispatcherSubmission() throws IOException {
+        String state = readSource(SRC_MAIN_JAVA.resolve(
+            "net/alexsmobs/client/render/state/CachalotWhaleRenderState.java"));
+        String layer = readSource(SRC_MAIN_JAVA.resolve(
+            "net/alexsmobs/client/render/layer/LayerCachalotWhaleCapturedSquid.java"));
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+            "net/alexsmobs/client/render/RenderCachalotWhale.java"));
+        assertTrue(state.contains("caughtSquidState"),
+            "captured squid rendering must retain copied entity state, not a live entity reference");
+        assertTrue(renderer.contains("extractEntity(caughtSquid"),
+            "captured squid state must be extracted before semantic submission");
+        assertTrue(layer.contains("getEntityRenderDispatcher().submit"),
+            "captured squid must use the shared semantic entity dispatcher route");
+        assertFalse(layer.contains("getCaughtSquid()"),
+            "captured-squid layer must not query live entity state during rendering");
+    }
+
+    @Test
+    public void testSunbirdScorchUsesSemanticEmissiveOverlay() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+            "net/alexsmobs/client/render/RenderSunbird.java"));
+        String layer = readSource(SRC_MAIN_JAVA.resolve(
+            "net/alexsmobs/client/render/layer/LayerSunbirdScorch.java"));
+        assertTrue(renderer.contains("new LayerSunbirdScorch"),
+            "Sunbird must admit its scorch overlay as an active layer");
+        assertTrue(layer.contains("RenderType.eyes(TEXTURE)"),
+            "Sunbird scorch must preserve its emissive material");
+        assertTrue(layer.contains("submitModelSemanticTexture"),
+            "Sunbird scorch must use the Rust-owned semantic model route");
+        assertTrue(layer.contains("scorchProgress"),
+            "Sunbird scorch alpha must remain state-driven");
+    }
+
+    @Test
+    public void testCockroachMaracasRemainInTheSemanticModelStateRoute() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+            "net/alexsmobs/client/render/RenderCockroach.java"));
+        String model = readSource(SRC_MAIN_JAVA.resolve(
+            "net/alexsmobs/client/model/ModelCockroach.java"));
+        assertTrue(renderer.contains("hasMaracas"),
+            "Cockroach maraca state must be copied before model submission");
+        assertTrue(model.contains("renderState.hasMaracas"),
+            "Cockroach maracas must be driven by semantic model state");
+        assertFalse(renderer.contains("LayerCockroachMaracas"),
+            "Cockroach must not admit a Java-only maraca layer stub");
+    }
+
+    @Test
+    public void testAnteaterBabyPoseIsModelOwnedRatherThanAStubLayer() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+            "net/alexsmobs/client/render/RenderAnteater.java"));
+        String model = readSource(SRC_MAIN_JAVA.resolve(
+            "net/alexsmobs/client/model/ModelAnteater.java"));
+        assertTrue(model.contains("renderState.isBaby && renderState.isPassenger"),
+            "Anteater baby passenger pose must remain in copied model state");
+        assertFalse(renderer.contains("LayerAnteaterBaby"),
+            "Anteater must not admit a Java-only baby layer stub");
+    }
+
+    @Test
+    public void testMantisShrimpHeldItemUsesCopiedItemModelState() throws IOException {
+        String state = readSource(SRC_MAIN_JAVA.resolve(
+            "net/alexsmobs/client/render/MantisShrimpRenderState.java"));
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+            "net/alexsmobs/client/render/RenderMantisShrimp.java"));
+        String layer = readSource(SRC_MAIN_JAVA.resolve(
+            "net/alexsmobs/client/render/layer/LayerMantisShrimpItem.java"));
+        assertTrue(state.contains("ItemStackRenderState"),
+            "Mantis Shrimp held item must be copied into semantic item-model state");
+        assertTrue(renderer.contains("updateForLiving"),
+            "Mantis Shrimp extraction must resolve item models before submission");
+        assertTrue(layer.contains("mainHandItem.submit"),
+            "Mantis Shrimp held item must submit through the semantic item route");
+        assertFalse(layer.contains("TODO"),
+            "Mantis Shrimp held item must not remain an admitted stub");
+    }
+
+    @Test
+    public void testRaccoonHeldItemUsesCopiedItemModelState() throws IOException {
+        String state = readSource(SRC_MAIN_JAVA.resolve(
+            "net/alexsmobs/client/render/RaccoonRenderState.java"));
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+            "net/alexsmobs/client/render/RenderRaccoon.java"));
+        String layer = readSource(SRC_MAIN_JAVA.resolve(
+            "net/alexsmobs/client/render/layer/LayerRaccoonItem.java"));
+        assertTrue(state.contains("ItemStackRenderState"));
+        assertTrue(renderer.contains("updateForLiving"));
+        assertTrue(layer.contains("mainHandItem.submit"));
+        assertFalse(layer.contains("TODO"));
+    }
+
+    @Test
+    public void testUnderminerHeldItemUsesHumanoidCopiedItemState() throws IOException {
+        String layer = readSource(SRC_MAIN_JAVA.resolve(
+            "net/alexsmobs/client/render/layer/LayerUnderminerItem.java"));
+        String wrapper = readSource(SRC_MAIN_JAVA.resolve(
+            "net/alexsmobs/client/model/ModelUnderminerWrapper.java"));
+        assertTrue(layer.contains("getMainHandItem().submit"));
+        assertTrue(wrapper.contains("translateToHand"));
+        assertFalse(layer.contains("Would need item state"));
+    }
+
+    @Test
+    public void testMimicubeEquipmentUsesCopiedItemModelStates() throws IOException {
+        String state = readSource(SRC_MAIN_JAVA.resolve(
+            "net/alexsmobs/client/render/MimicubeRenderState.java"));
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+            "net/alexsmobs/client/render/RenderMimicube.java"));
+        String held = readSource(SRC_MAIN_JAVA.resolve(
+            "net/alexsmobs/client/render/layer/LayerMimicubeHeldItem.java"));
+        String helmet = readSource(SRC_MAIN_JAVA.resolve(
+            "net/alexsmobs/client/render/layer/LayerMimicubeHelmet.java"));
+        assertTrue(state.contains("ItemStackRenderState"));
+        assertTrue(renderer.contains("updateForLiving"));
+        assertTrue(held.contains("mainHandItem"));
+        assertTrue(helmet.contains("headItem.submit"));
+        assertFalse(held.contains("TODO"));
+        assertFalse(helmet.contains("TODO"));
+    }
+
+    @Test
+    public void testCrowBeakItemUsesCopiedItemModelState() throws IOException {
+        String state = readSource(SRC_MAIN_JAVA.resolve(
+            "net/alexsmobs/client/render/state/CrowRenderState.java"));
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+            "net/alexsmobs/client/render/RenderCrow.java"));
+        String layer = readSource(SRC_MAIN_JAVA.resolve(
+            "net/alexsmobs/client/render/layer/LayerCrowItem.java"));
+        assertTrue(state.contains("ItemStackRenderState"));
+        assertTrue(renderer.contains("updateForLiving"));
+        assertTrue(layer.contains("heldItem.submit"));
+        assertFalse(layer.contains("TODO"));
+    }
+
+    @Test
+    public void testCapuchinDoesNotAdmitUnimplementedItemLayer() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+            "net/alexsmobs/client/render/RenderCapuchinMonkey.java"));
+        String model = readSource(SRC_MAIN_JAVA.resolve(
+            "net/alexsmobs/client/model/ModelCapuchinMonkey.java"));
+        assertTrue(renderer.contains("hasDart"),
+            "Capuchin dart state remains available to the semantic model");
+        assertFalse(renderer.contains("LayerCapuchinItem"),
+            "Capuchin must not admit an unimplemented Java item layer");
+        assertFalse(model.contains("ItemStack"),
+            "Capuchin has no copied item geometry to justify an item layer");
+    }
+
+    @Test
+    public void testAnteaterTongueItemUsesCopiedItemModelState() throws IOException {
+        String state = readSource(SRC_MAIN_JAVA.resolve(
+            "net/alexsmobs/client/render/AnteaterRenderState.java"));
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+            "net/alexsmobs/client/render/RenderAnteater.java"));
+        String layer = readSource(SRC_MAIN_JAVA.resolve(
+            "net/alexsmobs/client/render/layer/LayerAnteaterTongueItem.java"));
+        assertTrue(state.contains("ItemStackRenderState"));
+        assertTrue(renderer.contains("updateForLiving"));
+        assertTrue(layer.contains("tongueItem.submit"));
+        assertFalse(layer.contains("stub"));
+    }
+
+    @Test
+    public void testCosmawHeldItemUsesSemanticItemModelSubmission() throws IOException {
+        String state = readSource(SRC_MAIN_JAVA.resolve(
+            "net/alexsmobs/client/render/CosmawRenderState.java"));
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+            "net/alexsmobs/client/render/RenderCosmaw.java"));
+        assertTrue(state.contains("ItemStackRenderState"));
+        assertTrue(renderer.contains("updateForLiving"));
+        assertTrue(renderer.contains("mainHandItem.submit"));
+        assertFalse(renderer.contains("ItemInHandRenderer"));
+        assertFalse(renderer.contains("skip item rendering"));
+    }
+
+    @Test
+    public void testAlexCavesIncompleteNestedEntityLayersAreNotAdmitted() throws IOException {
+        String relicheirus = readSource(SRC_MAIN_JAVA.resolve(
+            "net/alexscaves/client/render/entity/RelicheirusRenderer.java"));
+        String tremorsaurus = readSource(SRC_MAIN_JAVA.resolve(
+            "net/alexscaves/client/render/entity/TremorsaurusRenderer.java"));
+        assertFalse(relicheirus.contains("HeldTrilocarisLayer"),
+            "Relicheirus must not admit a Java-only held-entity stub");
+        assertFalse(tremorsaurus.contains("RiderLayer"),
+            "Tremorsaurus must not admit an unimplemented rider layer");
+        assertFalse(tremorsaurus.contains("HeldMobLayer"),
+            "Tremorsaurus must not admit an unimplemented held-mob layer");
+    }
+
+    @Test
+    public void testAtlatitanDoesNotAdmitDisabledRiderLayer() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+            "net/alexscaves/client/render/entity/AtlatitanRenderer.java"));
+        assertFalse(renderer.contains("AtlatitanRiderLayer"),
+            "Atlatitan must not admit a Java-only rider stub");
+    }
+
+    @Test
+    public void testUnregisteredKangarooAndSubterranodonStubsStayUnavailable() throws IOException {
+        String kangaroo = readSource(SRC_MAIN_JAVA.resolve(
+            "net/alexsmobs/client/render/KangarooRenderer.java"));
+        String subterranodon = readSource(SRC_MAIN_JAVA.resolve(
+            "net/alexscaves/client/render/entity/SubterranodonRenderer.java"));
+        assertFalse(kangaroo.contains("LayerKangaroo"));
+        assertFalse(subterranodon.contains("SubterranodonRiderLayer"));
+    }
+
+    @Test
+    public void testLeafcutterAttachmentTransitionUsesCopiedVerticalMotion() throws IOException {
+        String state = readSource(SRC_MAIN_JAVA.resolve(
+            "net/alexsmobs/client/render/LeafcutterAntRenderState.java"));
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+            "net/alexsmobs/client/render/RenderLeafcutterAnt.java"));
+        assertTrue(state.contains("verticalVelocity"));
+        assertTrue(renderer.contains("getDeltaMovement().y"));
+        assertTrue(renderer.contains("state.verticalVelocity"));
+        assertFalse(renderer.contains("skip transition rotation"));
+    }
+
+    @Test
+    public void testVallumraptorDoesNotAdvertiseMissingItemLayer() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+            "net/alexscaves/client/render/entity/VallumraptorRenderer.java"));
+        assertFalse(renderer.contains("ItemLayer"));
+        assertFalse(renderer.contains("TODO"));
+    }
+
+    @Test
+    public void testMimicOctopusGuardianBeamUsesCopiedTargetSemantics() throws IOException {
+        String state = readSource(SRC_MAIN_JAVA.resolve(
+            "net/alexsmobs/client/render/state/MimicOctopusRenderState.java"));
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+            "net/alexsmobs/client/render/RenderMimicOctopus.java"));
+        assertTrue(state.contains("guardianLaserTargetPresent"));
+        assertTrue(renderer.contains("getGuardianLaser()"));
+        assertTrue(renderer.contains("Mth.lerp(partialTick"));
+        assertTrue(renderer.contains("submitTranslucentTexturedQuad"));
+        assertTrue(renderer.contains("submitCustomGeometry"));
+        assertTrue(renderer.contains("vulkanSelected && !rustWholeFrame"));
+        assertTrue(renderer.contains("GUARDIAN_BEAM_TEXTURE"));
+        assertTrue(renderer.contains("submitGuardianBeam"));
+        assertFalse(renderer.contains("commenting out for now"));
+    }
+
+    @Test
+    public void testItemPickupParticlesReuseTheRustItemEntitySemanticScope() throws IOException {
+        Path particleFile = SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/particle/ItemPickupParticleGroup.java");
+        String source = readSource(particleFile);
+
+        assertTrue(source.contains("beginItemEntitySubmission()"),
+            "item-pickup particles must enter the copied item-entity semantic scope");
+        assertTrue(source.contains("endItemEntitySubmission()"),
+            "item-pickup particles must close the copied item-entity semantic scope");
+        assertTrue(source.contains("finally"),
+            "item-pickup particle scope must be exception-safe");
+    }
+
+    @Test
+	public void testBeeStingerLayersUseAnExplicitRustDirectTextureRoute() throws IOException {
+        Path submitFile = SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/SubmitNodeCollection.java");
+        String source = readSource(submitFile);
+
+        assertTrue(source.contains("model instanceof net.minecraft.client.model.BeeStingerModel"),
+            "bee-stinger layers must have an explicit semantic model admission");
+        assertTrue(source.contains("textures/entity/bee/bee_stinger.png"),
+            "bee-stinger admission must carry its direct texture identity");
+        assertTrue(source.contains("particle/bee_stinger"),
+            "bee-stinger mesh instances must carry a stable semantic identity");
+		assertTrue(source.contains("enqueueStandaloneModelMesh"),
+			"bee-stinger geometry must enter the Rust-owned indexed model mesh path");
+	}
+
+	@Test
+	public void testUnitOpaqueDirectTexturesUseTheRustModelMeshRoute() throws IOException {
+		Path submitFile = SRC_MAIN_JAVA.resolve(
+			"net/minecraft/client/renderer/SubmitNodeCollection.java");
+		Path stuckLayer = SRC_MAIN_JAVA.resolve(
+			"net/minecraft/client/renderer/entity/layers/StuckInBodyLayer.java");
+		String submitSource = readSource(submitFile);
+		String stuckSource = readSource(stuckLayer);
+
+		assertTrue(stuckSource.contains("submitModelSemanticTexture"),
+			"stuck-in-body layers must preserve direct texture identity at the semantic callsite");
+		assertTrue(submitSource.contains("Direct-texture opaque Model submissions with a Unit state"),
+			"Unit-state opaque direct textures must have an explicit Rust admission boundary");
+		assertTrue(submitSource.contains("isStandaloneModelMeshEligible"),
+			"Unit-state opaque direct textures must use copied asset and geometry eligibility");
+	}
+
+	@Test
+	public void testArrowLayerTransientStateUsesStableRustTextureIdentity() throws IOException {
+		Path submitFile = SRC_MAIN_JAVA.resolve(
+			"net/minecraft/client/renderer/SubmitNodeCollection.java");
+		Path arrowLayer = SRC_MAIN_JAVA.resolve(
+			"net/minecraft/client/renderer/entity/layers/ArrowLayer.java");
+		String submitSource = readSource(submitFile);
+		String arrowSource = readSource(arrowLayer);
+
+		assertTrue(arrowSource.contains("new ArrowRenderState()"),
+			"ArrowLayer must retain its transient semantic state contract");
+		assertTrue(submitSource.contains("model instanceof net.minecraft.client.model.ArrowModel"),
+			"transient ArrowRenderState submissions need an explicit Rust model admission");
+		assertTrue(submitSource.contains("particle/arrow"),
+			"arrow mesh instances must use a stable identity when no entity registry key exists");
+	}
+
+    @Test
+    public void testArmorStandBaseUsesTheRustLivingModelOwnershipFamily() throws IOException {
+        Path rendererFile = SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/entity/LivingEntityRenderer.java");
+        Path meshFile = SRC_MAIN_JAVA.resolve(
+            "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String renderer = readSource(rendererFile);
+        String mesh = readSource(meshFile);
+
+        assertTrue(renderer.contains("isVanillaArmorStandModelMeshEligible"),
+            "ArmorStandRenderer must resolve base-model Rust ownership before submit");
+        assertTrue(mesh.contains("model.getClass() == net.minecraft.client.model.ArmorStandModel.class"),
+            "ArmorStand admission must remain bounded to the vanilla pose-aware model");
+        assertTrue(mesh.contains("!state.isMarker"),
+            "marker armor stands must remain outside the ordinary copied body route");
+        assertTrue(mesh.contains("textures/entity/armorstand/wood.png"),
+            "ArmorStand admission must carry the copied direct texture identity");
+    }
+
+    @Test
+    public void testVillagerBasesUseExplicitRustDirectTextureOwnership() throws IOException {
+        Path rendererFile = SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/entity/LivingEntityRenderer.java");
+        Path meshFile = SRC_MAIN_JAVA.resolve(
+            "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String renderer = readSource(rendererFile);
+        String mesh = readSource(meshFile);
+
+        assertTrue(renderer.contains("isVanillaVillagerModelMeshEligible"),
+            "villager and wandering-trader bases must be classified as Rust-owned");
+        assertTrue(renderer.contains("isVanillaZombieVillagerModelMeshEligible"),
+            "zombie-villager bases must be classified as Rust-owned");
+        assertTrue(mesh.contains("textures/entity/villager/villager.png")
+                && mesh.contains("textures/entity/wandering_trader.png"),
+            "villager admission must preserve both direct base texture identities");
+        assertTrue(mesh.contains("textures/entity/zombie_villager/zombie_villager.png"),
+            "zombie-villager admission must preserve its direct base texture identity");
+        assertTrue(mesh.contains("model.getClass() == net.minecraft.client.model.VillagerModel.class")
+                && mesh.contains("model.getClass() == net.minecraft.client.model.ZombieVillagerModel.class"),
+            "admission must remain bounded to the vanilla model classes");
+    }
+
+    @Test
+    public void testGlowingInvisibleWoolAndSlimeOutlinesUseRustMeshMetadata() throws IOException {
+        Path sheepFile = SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/entity/layers/SheepWoolLayer.java");
+        Path slimeFile = SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/entity/layers/SlimeOuterLayer.java");
+        String sheep = readSource(sheepFile);
+        String slime = readSource(slimeFile);
+
+        assertTrue(sheep.contains("sheep_wool_outline")
+                && sheep.contains("RenderType.outline(SHEEP_WOOL_LOCATION)"),
+            "glowing invisible sheep wool must carry an explicit outline mesh identity");
+        assertTrue(slime.contains("slime_outer_outline")
+                && slime.contains("RenderType.outline(SlimeRenderer.SLIME_LOCATION)"),
+            "glowing invisible slime outer layers must carry an explicit outline mesh identity");
+        assertTrue(sheep.contains("outlineColor") && slime.contains("outlineColor"),
+            "outline submissions must preserve semantic instance color metadata");
+    }
+
+    @Test
+    public void testNonFoilTridentSpecialItemsUseTheSemanticDirectTextureRoute() throws IOException {
+        Path tridentFile = SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/special/TridentSpecialRenderer.java");
+        String source = readSource(tridentFile);
+
+        assertTrue(source.contains("if (!bl)"),
+            "trident special items must distinguish non-foil semantic geometry from glint");
+        assertTrue(source.contains("submitModelSemanticTexture"),
+            "non-foil trident special items must submit semantic model data");
+        assertTrue(source.contains("Unit.INSTANCE"),
+            "the direct-texture trident route must use a bounded transient semantic state");
+        assertTrue(source.contains("TridentModel.TEXTURE"),
+            "the trident route must preserve its direct texture identity");
+    }
+
+    @Test
+    public void testEnderDragonDeathDecalUsesExplicitDepthEqualSemantics() throws IOException {
+        Path rendererFile = SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/entity/EnderDragonRenderer.java");
+        Path meshFile = SRC_MAIN_JAVA.resolve(
+            "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String renderer = readSource(rendererFile);
+        String mesh = readSource(meshFile);
+
+        assertTrue(renderer.contains("if (i == OverlayTexture.NO_OVERLAY)")
+                && renderer.contains("submitModelSemanticTexture"),
+            "overlay-free dragon death decals must use the semantic direct-texture route");
+        assertTrue(renderer.contains("entityDragonRenderState") || renderer.contains("enderDragonRenderState"),
+            "dragon decal submission must retain the copied render state");
+        assertTrue(mesh.contains("entity_decal")
+                && mesh.contains("DEPTH_POLICY_TEST_NO_WRITE")
+                && mesh.contains("CULL_NONE"),
+            "entity decals must preserve equal-depth/no-write/two-sided raster semantics");
+    }
+
+    @Test
+    public void testPlayerCapeUsesRustOwnedDynamicTextureMeshRoute() throws IOException {
+        Path capeFile = SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/entity/layers/CapeLayer.java");
+        Path meshFile = SRC_MAIN_JAVA.resolve(
+            "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String capeSource = readSource(capeFile);
+        String meshSource = readSource(meshFile);
+
+        assertTrue(capeSource.contains("enqueueStandaloneModelMesh"),
+            "player capes should use the Rust-owned standalone model mesh route");
+        assertTrue(capeSource.contains("entityIdentity(avatarRenderState)"),
+            "player cape mesh instances should carry semantic entity identity");
+        assertTrue(meshSource.contains("readDynamicTexturePayload"),
+            "dynamic skin/cape assets must be copied from CPU pixels at the semantic boundary");
+        assertTrue(meshSource.contains("PlayerCapeModel"),
+            "PlayerCapeModel must be explicitly admitted by Rust model extraction");
+    }
+
+    @Test
+    public void testPlayerEarsUseRustOwnedAvatarMeshRoute() throws IOException {
+        Path earsFile = SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/entity/layers/Deadmau5EarsLayer.java");
+        Path meshFile = SRC_MAIN_JAVA.resolve(
+            "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String earsSource = readSource(earsFile);
+        String meshSource = readSource(meshFile);
+
+        assertTrue(earsSource.contains("enqueueStandaloneModelMesh"),
+            "Deadmau5 ears should use the Rust-owned avatar mesh route");
+        assertTrue(earsSource.contains("entityIdentity(avatarRenderState)"),
+            "Deadmau5 ears should retain semantic avatar identity");
+        assertTrue(meshSource.contains("PlayerEarsModel"),
+            "PlayerEarsModel must be explicitly admitted by Rust model extraction");
+    }
+
+    @Test
+    public void testGenericEmissiveLayersUseGuardedRustTranslucentMeshAdmission() throws IOException {
+        Path submitFile = SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/SubmitNodeCollection.java");
+        Path rendererFile = SRC_MAIN_JAVA.resolve(
+            "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String submitSource = readSource(submitFile);
+        String rendererSource = readSource(rendererFile);
+
+        assertTrue(submitSource.contains("isStandaloneTranslucentModelMeshEligible"),
+            "generic emissive layers must use the guarded translucent eligibility predicate");
+        assertTrue(submitSource.contains("enqueueStandaloneTranslucentModelMesh"),
+            "generic emissive layers must enqueue copied translucent meshes in Rust");
+        assertTrue(rendererSource.contains("isStandaloneTranslucentModelMeshEligible"),
+            "Rust must expose an explicit translucent model eligibility boundary");
+    }
+
+    @Test
+    public void testNonFoilArmorUsesDirectTextureSemanticSubmission() throws IOException {
+        Path equipmentFile = SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/entity/layers/EquipmentLayerRenderer.java");
+        Path submitFile = SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/SubmitNodeCollection.java");
+        String equipmentSource = readSource(equipmentFile);
+        String submitSource = readSource(submitFile);
+
+        assertTrue(equipmentSource.contains("submitModelSemanticTexture"),
+            "non-foil armor layers must preserve their direct texture identity at submission");
+        assertTrue(equipmentSource.contains("if (!bl)"),
+            "foil armor must remain separate from the non-foil semantic route");
+        assertTrue(submitSource.contains("Direct-texture opaque layers"),
+            "the collector must document the guarded opaque direct-texture route");
+    }
+
+    @Test
+    public void testElytraModelIsAdmittedThroughTheSameExplicitArmorContract() throws IOException {
+        Path meshFile = SRC_MAIN_JAVA.resolve(
+            "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        Path wingsFile = SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/entity/layers/WingsLayer.java");
+        String meshSource = readSource(meshFile);
+        String wingsSource = readSource(wingsFile);
+
+        assertTrue(meshSource.contains("model instanceof net.minecraft.client.model.ElytraModel"),
+            "elytra geometry must be explicitly admitted by Rust model extraction");
+        assertTrue(wingsSource.contains("equipmentRenderer"),
+            "elytra layers must continue through the semantic equipment renderer");
+    }
+
+    @Test
+    public void testAtlasBackedModelMeshesRequireExplicitSnapshotAndUvContract() throws IOException {
+        Path meshFile = SRC_MAIN_JAVA.resolve(
+            "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String meshSource = readSource(meshFile);
+
+        assertTrue(meshSource.contains("atlas-texture-unavailable"),
+            "atlas-backed model sprites must fail closed when their CPU snapshot is unavailable");
+        assertTrue(meshSource.contains("sprite.getU(vertex.u())")
+                && meshSource.contains("sprite.getV(vertex.v())"),
+            "atlas-backed model meshes must transform local model UVs through the copied sprite bounds");
+        assertTrue(meshSource.contains("encodeSemanticAtlasSnapshot"),
+            "atlas-backed model meshes must transport a CPU atlas snapshot rather than a Java texture handle");
+    }
+
+    @Test
+    public void testDrownedRustBodyRouteIncludesSwimmingPoseState() throws IOException {
+        Path rendererFile = SRC_MAIN_JAVA.resolve(
+            "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        Path submitFile = SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/SubmitNodeCollection.java");
+        String rendererSource = readSource(rendererFile);
+        String submitSource = readSource(submitFile);
+
+        assertTrue(rendererSource.contains("including swimming and water poses"),
+            "Drowned body admission must document the expanded semantic pose coverage");
+        assertFalse(submitSource.contains("&& !drownedState.isVisuallySwimming"),
+            "the semantic Drowned submit must preserve swimming render-state animation");
+    }
+
+    @Test
+    public void testZombieRustBodyRouteIncludesSwimmingPoseState() throws IOException {
+        Path rendererFile = SRC_MAIN_JAVA.resolve(
+            "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String source = readSource(rendererFile);
+        int methodStart = source.indexOf("isVanillaZombieModelMeshEligible");
+        int methodEnd = source.indexOf("\n\tpublic static boolean", methodStart + 1);
+        assertTrue(methodStart >= 0 && methodEnd > methodStart,
+            "Zombie semantic admission predicate must remain present and bounded");
+        String predicate = source.substring(methodStart, methodEnd);
+        assertFalse(predicate.contains("!state.isVisuallySwimming"),
+            "swimming Zombie body states must not be rejected by the copied model predicate");
+        assertFalse(predicate.contains("!state.isInWater"),
+            "water Zombie body states must preserve the copied render-state animation");
+        assertFalse(predicate.contains("!state.isCrouching"),
+            "crouched Zombie body states must preserve the copied model animation");
+        assertTrue(predicate.contains("state.isConverting"),
+            "conversion remains an explicit unsupported-state boundary");
+    }
+
+    @Test
+    public void testBoggedBodyRouteIsIndependentOfMossLayerState() throws IOException {
+        Path rendererFile = SRC_MAIN_JAVA.resolve(
+            "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String source = readSource(rendererFile);
+        int methodStart = source.indexOf("isVanillaBoggedModelMeshEligible");
+        int methodEnd = source.indexOf("\n\tpublic static boolean", methodStart + 1);
+        assertTrue(methodStart >= 0 && methodEnd > methodStart,
+            "Bogged semantic admission predicate must remain present and bounded");
+        String predicate = source.substring(methodStart, methodEnd);
+        assertFalse(predicate.contains("state.isSheared"),
+            "the Bogged base body must not be rejected when its separate moss layer is present");
+        assertTrue(predicate.contains("state.rightHandItem.isEmpty()"),
+            "held-item state remains an explicit base-body boundary");
+    }
+
+    @Test
+    public void testEquineSaddleModelUsesTheExplicitRustModelMeshFamily() throws IOException {
+        Path meshFile = SRC_MAIN_JAVA.resolve(
+            "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        Path equipmentFile = SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/entity/layers/EquipmentLayerRenderer.java");
+        String meshSource = readSource(meshFile);
+        String equipmentSource = readSource(equipmentFile);
+        assertTrue(meshSource.contains("model instanceof net.minecraft.client.model.EquineSaddleModel"),
+            "saddle geometry must be explicitly admitted by Rust model extraction");
+        assertTrue(equipmentSource.contains("submitModelSemanticTexture"),
+            "saddle/equipment textures must retain a semantic direct-texture submission boundary");
+    }
+
+    @Test
+    public void testLlamaBodyRouteCoexistsWithSemanticDecorLayers() throws IOException {
+        Path meshFile = SRC_MAIN_JAVA.resolve(
+            "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        Path decorFile = SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/entity/layers/LlamaDecorLayer.java");
+        String meshSource = readSource(meshFile);
+        String decorSource = readSource(decorFile);
+        int methodStart = meshSource.indexOf("isVanillaLlamaModelMeshEligible");
+        int methodEnd = meshSource.indexOf("\n\tpublic static boolean", methodStart + 1);
+        assertTrue(methodStart >= 0 && methodEnd > methodStart,
+            "Llama semantic admission predicate must remain present and bounded");
+        String predicate = meshSource.substring(methodStart, methodEnd);
+        assertFalse(predicate.contains("state.isTraderLlama"),
+            "trader llama base bodies must not be rejected when decor is separately submitted");
+        assertFalse(predicate.contains("state.bodyItem"),
+            "llama carpet/decor state must not suppress the base Rust body");
+        assertTrue(decorSource.contains("renderLayers"),
+            "llama decor must remain an independent equipment semantic layer");
+    }
+
+    @Test
+    public void testHorseFamilyBodiesCoexistWithSemanticArmorAndSaddleLayers() throws IOException {
+        Path meshFile = SRC_MAIN_JAVA.resolve(
+            "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        Path horseFile = SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String source = readSource(meshFile);
+        String horseSource = readSource(horseFile);
+        int horseStart = source.indexOf("isVanillaHorseModelMeshEligible");
+        int donkeyStart = source.indexOf("isVanillaDonkeyModelMeshEligible");
+        int horseEnd = source.indexOf("\n\tpublic static boolean", horseStart + 1);
+        int donkeyEnd = source.indexOf("\n\tpublic static boolean", donkeyStart + 1);
+        assertTrue(horseStart >= 0 && horseEnd > horseStart && donkeyStart >= 0 && donkeyEnd > donkeyStart,
+            "horse-family admission predicates must remain present and bounded");
+        assertFalse(source.substring(horseStart, horseEnd).contains("state.bodyArmorItem"),
+            "horse armor must not suppress the Rust base body");
+        assertFalse(source.substring(horseStart, horseEnd).contains("state.saddle"),
+            "horse saddles must not suppress the Rust base body");
+        assertFalse(source.substring(donkeyStart, donkeyEnd).contains("state.saddle"),
+            "donkey/mule saddles must not suppress the Rust base body");
+        assertTrue(horseSource.contains("SimpleEquipmentLayer"),
+            "horse armor and saddles must remain explicit equipment layers");
+    }
+
+    @Test
+    public void testStriderAndCamelBodiesCoexistWithSemanticSaddleLayers() throws IOException {
+        Path meshFile = SRC_MAIN_JAVA.resolve(
+            "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String source = readSource(meshFile);
+        int striderStart = source.indexOf("isVanillaStriderModelMeshEligible");
+        int camelStart = source.indexOf("isVanillaCamelModelMeshEligible");
+        int striderEnd = source.indexOf("\n\tpublic static boolean", striderStart + 1);
+        int camelEnd = source.indexOf("\n\tpublic static boolean", camelStart + 1);
+        assertTrue(striderStart >= 0 && striderEnd > striderStart && camelStart >= 0 && camelEnd > camelStart,
+            "Strider and Camel semantic predicates must remain present and bounded");
+        assertFalse(source.substring(striderStart, striderEnd).contains("state.saddle"),
+            "Strider saddle state must not suppress the Rust base body");
+        assertFalse(source.substring(camelStart, camelEnd).contains("state.saddle"),
+            "Camel saddle state must not suppress the Rust base body");
+    }
+
+    @Test
+    public void testNautilusArmorAndSaddleModelsUseTheRustModelFamily() throws IOException {
+        Path meshFile = SRC_MAIN_JAVA.resolve(
+            "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        Path rendererFile = SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/entity/NautilusRenderer.java");
+        String source = readSource(meshFile);
+        String renderer = readSource(rendererFile);
+        assertTrue(source.contains("NautilusArmorModel") && source.contains("NautilusSaddleModel"),
+            "Nautilus equipment models must be explicitly admitted by Rust extraction");
+        assertFalse(source.substring(source.indexOf("isVanillaNautilusModelMeshEligible"), source.indexOf("\n\tpublic static boolean", source.indexOf("isVanillaNautilusModelMeshEligible") + 1)).contains("state.saddle"),
+            "Nautilus saddles must not suppress the Rust base body");
+        assertTrue(renderer.contains("SimpleEquipmentLayer"),
+            "Nautilus armor and saddle must remain semantic equipment layers");
+    }
+
+    @Test
+    public void testWolfBodyArmorAndCollarUseSemanticTextureLayers() throws IOException {
+        Path meshFile = SRC_MAIN_JAVA.resolve(
+            "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        Path collarFile = SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/entity/layers/WolfCollarLayer.java");
+        Path armorFile = SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/entity/layers/WolfArmorLayer.java");
+        String mesh = readSource(meshFile);
+        int start = mesh.indexOf("isVanillaWolfModelMeshEligible");
+        int end = mesh.indexOf("\n\tpublic static boolean", start + 1);
+        assertTrue(start >= 0 && end > start, "Wolf semantic admission predicate must remain bounded");
+        assertFalse(mesh.substring(start, end).contains("state.collarColor"),
+            "wolf collar state must not suppress the Rust base body");
+        assertFalse(mesh.substring(start, end).contains("state.bodyArmorItem"),
+            "wolf armor state must not suppress the Rust base body");
+        assertTrue(readSource(collarFile).contains("submitModelSemanticTexture"),
+            "wolf collar must use a semantic direct-texture submission");
+        assertTrue(readSource(armorFile).contains("submitModelSemanticTexture"),
+            "wolf armor crack overlays must use a semantic direct-texture submission");
+    }
+
+    @Test
+    public void testCatCollarUsesTheSharedSemanticColoredCutoutBoundary() throws IOException {
+        Path renderLayerFile = SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/entity/layers/RenderLayer.java");
+        Path meshFile = SRC_MAIN_JAVA.resolve(
+            "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String renderLayer = readSource(renderLayerFile);
+        String mesh = readSource(meshFile);
+        int start = mesh.indexOf("isVanillaCatModelMeshEligible");
+        int end = mesh.indexOf("\n\tpublic static boolean", start + 1);
+        assertTrue(renderLayer.contains("submitModelSemanticTexture"),
+            "colored cutout feature layers must preserve direct texture identity");
+        assertTrue(start >= 0 && end > start, "Cat semantic admission predicate must remain bounded");
+        assertFalse(mesh.substring(start, end).contains("state.collarColor"),
+            "cat collar state must not suppress the Rust base body");
+    }
+
+    @Test
+    public void testCopiedEntityMeshesCarryVanillaOverlayColorSemantics() throws IOException {
+        Path meshFile = SRC_MAIN_JAVA.resolve(
+            "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        Path frontendFile = SRC_MAIN_RUST.resolve(
+            "render/vulkanic/world_primitive_frontend.rs");
+        Path shaderFile = SRC_MAIN_RUST.resolve(
+            "render/vulkanic/shader_pack/programs.rs");
+        String mesh = readSource(meshFile);
+        String frontend = readSource(frontendFile);
+        String shaders = readSource(shaderFile);
+        assertTrue(mesh.contains("private static int overlayColorArgb(int overlayCoords)"),
+            "entity extraction must derive overlay color from semantic packed overlay coordinates");
+        assertTrue(mesh.contains("overlayColorArgb(overlayCoords)"),
+            "copied entity submissions must carry the derived overlay color");
+        assertTrue(frontend.contains("argb_to_rgba(instance.entity_color_argb)"),
+            "Rust mesh instance packing must preserve the semantic overlay color payload");
+        assertTrue(shaders.contains("v_overlay_color")
+                && shaders.contains("mix(color.rgb, v_overlay_color.rgb"),
+            "Rust-owned mesh shaders must apply the overlay color without Java or GL state");
     }
 
     @Test
@@ -5894,5 +6779,242 @@ public class Phase3DrawPathTest {
             "Compatibility command encoder should not construct descriptor sampler bindings through a private resolver");
         assertFalse(nativeCommandEncoderSource.contains("new PipelineResourceBindings.SamplerBinding"),
             "Native Vulkan command encoder should not construct descriptor sampler bindings through a private resolver");
+    }
+
+    @Test
+    public void testEnderiophageEyesUseSemanticEyesLayerOnly() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+                "net/alexsmobs/client/render/RenderEnderiophage.java"));
+        assertTrue(renderer.contains("extends EyesLayer")
+                        && renderer.contains("semanticTexture(EnderiophageRenderState state)"),
+                "Enderiophage eyes must provide copied semantic texture identity through EyesLayer");
+        assertFalse(renderer.contains("void render(PoseStack matrixStackIn, MultiBufferSource bufferIn"),
+                "Enderiophage eyes must not retain a Java buffer-backed render override");
+        assertFalse(renderer.contains("bufferIn.getBuffer"),
+                "Enderiophage eyes must not acquire a Java VertexConsumer on the Rust route");
+    }
+
+    @Test
+    public void testRustScreenItemActivationDoesNotBorrowJavaLightingState() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+                "net/minecraft/client/renderer/ScreenEffectRenderer.java"));
+        int lighting = renderer.indexOf("getLighting().setupFor");
+        int rustGuard = renderer.indexOf("boolean rustSemanticItem", lighting - 500);
+        assertTrue(lighting >= 0 && rustGuard >= 0 && rustGuard < lighting,
+                "screen item activation must classify the Rust semantic route before Java lighting setup");
+        String guarded = renderer.substring(rustGuard, Math.min(renderer.length(), lighting + 180));
+        assertTrue(guarded.contains("if (!rustSemanticItem)"),
+                "Java item lighting setup must remain OpenGL-compatibility-only");
+    }
+
+    @Test
+    public void testRustScreenEffectsPreserveNoPhysicsViewBlockingEligibility() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+                "net/minecraft/client/renderer/ScreenEffectRenderer.java"));
+        assertTrue(renderer.contains("BlockState blockingState = player.noPhysics ? null : getViewBlockingState(player);"),
+                "Rust screen-effect extraction must preserve vanilla no-physics suppression for block overlays");
+    }
+
+    @Test
+    public void testRustCloudRouteFailsClosedWhenSemanticCellFieldIsMissing() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+                "net/minecraft/client/renderer/CloudRenderer.java"));
+        assertTrue(renderer.contains("Rust whole-frame cloud route requires a decoded semantic cloud-cell field"),
+                "visible Rust clouds must fail closed when their semantic cell field is unavailable");
+        assertTrue(renderer.contains("if (this.texture == null)"),
+                "Rust cloud extraction must validate its copied semantic source before lowering faces");
+    }
+
+    @Test
+    public void testRustCrackRouteFailsClosedWithoutSeededViewport() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+        assertTrue(renderer.contains("Rust whole-frame crack route requires a seeded semantic viewport"),
+                "visible Rust block cracks must not disappear when the semantic viewport was not seeded");
+    }
+
+    @Test
+    public void testRustStaticTerrainRouteFailsClosedWithoutTerrainRenderer() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+                "net/minecraft/client/renderer/LevelRenderer.java"));
+        assertTrue(renderer.contains("Rust whole-frame static terrain route requires an initialized terrain renderer"),
+                "Rust terrain extraction must not silently drop the scene while its source renderer is unavailable");
+    }
+
+    @Test
+    public void testRustBackgroundAndOutlineRoutesRequireSeededViewport() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+        assertTrue(renderer.contains("Rust whole-frame background route requires a seeded semantic viewport"),
+                "Rust background extraction must not replace a missing viewport with a diagnostic fallback");
+        assertTrue(renderer.contains("Rust whole-frame outline route requires a seeded semantic viewport"),
+                "Rust block outlines must not lower against an unseeded viewport");
+    }
+
+    @Test
+    public void testRustLoadingFramesUseSemanticBackgroundInsteadOfDiagnosticFallback() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+        assertTrue(renderer.contains("loadingBackgroundRecord"),
+                "Rust-owned loading frames need an explicit semantic clear record");
+        assertTrue(renderer.contains("pendingBackground = loadingBackgroundRecord(viewportWidth, viewportHeight)"),
+                "missing world/camera state must remain presentable through Rust semantic background data");
+    }
+
+    @Test
+    public void testRustWeatherRouteRequiresCopiedStateAndSeededViewport() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+        assertTrue(renderer.contains("Rust whole-frame weather route requires weather state and camera semantics"),
+                "Rust weather extraction must not silently continue without copied weather state");
+        assertTrue(renderer.contains("Rust whole-frame weather route requires a seeded semantic viewport"),
+                "visible Rust weather must not be lowered against an unseeded viewport");
+    }
+
+    @Test
+    public void testRustSkyRouteRequiresCopiedStateAndVisibleCamera() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+        assertTrue(renderer.contains("Rust whole-frame sky route requires copied sky state"),
+                "Rust sky extraction must not silently continue without copied sky state");
+        assertTrue(renderer.contains("Rust whole-frame sky route requires a camera for visible celestial geometry"),
+                "visible Rust celestial geometry must require camera semantics");
+    }
+
+    @Test
+    public void testRustWorldBorderRouteRequiresStateAndSeededViewport() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+        assertTrue(renderer.contains("Rust whole-frame world-border route requires border state and camera semantics"),
+                "Rust world-border extraction must reject missing copied state");
+        assertTrue(renderer.contains("Rust whole-frame world-border route requires a seeded semantic viewport"),
+                "Rust world-border extraction must not report success without a seeded viewport");
+    }
+
+    @Test
+    public void testRustWholeFrameParticlesCannotFallBackToJavaExtraction() throws IOException {
+        String terrain = readSource(SRC_MAIN_JAVA.resolve(
+                "net/minecraft/client/particle/TerrainParticle.java"));
+        String marker = readSource(SRC_MAIN_JAVA.resolve(
+                "net/minecraft/client/particle/BlockMarker.java"));
+        assertTrue(terrain.contains("Rust whole-frame terrain particle semantics were rejected; Java particle extraction is not a fallback"),
+                "terrain particles must not retain Java geometry when Rust semantic admission fails");
+        assertTrue(marker.contains("Rust whole-frame block-marker semantics were rejected; Java particle extraction is not a fallback"),
+                "block markers must not retain Java geometry when Rust semantic admission fails");
+        assertTrue(terrain.contains("Rust whole-frame terrain particle route cannot be disabled"),
+                "the diagnostic terrain-particle disable switch must not reopen Java rendering under Vulkan");
+    }
+
+    @Test
+    public void testBuiltInProceduralGeometryUsesSemanticQuadContracts() throws IOException {
+        String lightning = readSource(SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/entity/LightningBoltRenderer.java"));
+        assertTrue(lightning.contains("submitNodeCollector.submitColoredQuads"),
+            "Lightning must submit copied procedural quads through the semantic collector");
+        assertTrue(lightning.contains("Rust whole-frame lightning route rejected semantic quads"),
+            "Lightning must fail closed when its semantic quad request is rejected");
+        String testInstance = readSource(SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/blockentity/TestInstanceRenderer.java"));
+        assertTrue(testInstance.contains("submitColoredQuads"),
+            "Test-instance error boxes must use the semantic colored-quad contract");
+        assertTrue(testInstance.contains("Rust whole-frame error-marker route rejected semantic box quads"),
+            "Test-instance error boxes must not fall back to Java geometry on Rust Vulkan");
+    }
+
+    @Test
+    public void testExtensionBeamCallsitesUseSemanticTexturedQuads() throws IOException {
+        String mungus = readSource(SRC_MAIN_JAVA.resolve(
+            "net/alexsmobs/client/render/layer/MungusBeamLayer.java"));
+        assertTrue(mungus.contains("submitNodeCollector.submitTexturedQuad"),
+            "Mungus beams must provide explicit textured-quads to Rust");
+        assertTrue(mungus.contains("Rust whole-frame Mungus beam route rejected semantic textured quads"),
+            "Mungus beams must fail closed instead of retaining Java callbacks");
+        String mimic = readSource(SRC_MAIN_JAVA.resolve(
+            "net/alexsmobs/client/render/RenderMimicOctopus.java"));
+        assertTrue(mimic.contains("submitTranslucentTexturedQuad"),
+            "Mimic-octopus beams must use the explicit translucent semantic route");
+        assertTrue(mimic.contains("Mimic Octopus beam is unavailable until the Rust Vulkan billboard route is admitted"),
+            "Mimic-octopus beams must remain private when the route is not admitted");
+        String cachalot = readSource(SRC_MAIN_JAVA.resolve(
+            "net/alexsmobs/client/render/RenderCachalotEcho.java"));
+        assertTrue(cachalot.contains("submitNodeCollector.submitTexturedQuad"),
+            "Cachalot echo arcs must use semantic textured quads on Rust Vulkan");
+    }
+
+    @Test
+    public void testProductionSourceExecutionGateFollowsAdmittedRustSnapshot() throws IOException {
+        String frontend = readSource(SRC_MAIN_RUST.resolve(
+                "render/vulkanic/world_primitive_frontend.rs"));
+        int start = frontend.indexOf(
+                "#[cfg(not(test))]\n    fn candidate_lowered_source_execution_requested");
+        int end = frontend.indexOf(
+                "#[cfg(test)]\n    fn candidate_lowered_source_execution_requested", start);
+        assertTrue(start >= 0 && end > start,
+                "production source-execution gate must remain discoverable");
+        String productionGate = frontend.substring(start, end);
+        assertTrue(productionGate.contains("self.source_execution_enabled()"),
+                "production source execution must follow the copied Rust-owned source snapshot");
+        assertFalse(productionGate.contains("{\n        false\n    }"),
+                "production source execution must not remain permanently test-only");
+        assertTrue(productionGate.contains("exact-frame resource"),
+                "source execution must retain its exact-frame fail-closed admission boundary");
+    }
+
+    @Test
+    public void testSelectedSourceDistantHorizonsUsesDedicatedRustPlan() throws IOException {
+        String frontend = readSource(SRC_MAIN_RUST.resolve(
+                "render/vulkanic/world_primitive_frontend.rs"));
+        int snapshot = frontend.indexOf("fn prepare_runtime_source_snapshot");
+        int submit = frontend.indexOf("fn submit_armed_runtime_source_frame_with_gui", snapshot);
+        assertTrue(snapshot >= 0 && submit > snapshot,
+                "selected-source runtime snapshot and submit stages must remain explicit");
+        String snapshotSource = frontend.substring(snapshot, submit);
+        assertTrue(snapshotSource.contains("snapshot.lod_instances.clear()")
+                        && snapshotSource.contains("snapshot.lod_render_frame = WorldLodRenderFrame::default()"),
+                "the provisional ordinary graph must never pretend to render DH for the source route");
+        assertTrue(snapshotSource.contains("merge_active_candidate_source_distant_depth(frame)"),
+                "the exact-frame DH depth contract must be merged before source admission");
+        int plan = frontend.indexOf("prepare_named_source_distant_horizons_frame_plan");
+        int complete = frontend.indexOf("fn submit_complete_named_source_frame");
+        assertTrue(plan >= 0 && complete > snapshot,
+                "the complete selected-source submission must retain a dedicated DH source plan");
+        String completeSource = frontend.substring(complete);
+        assertTrue(completeSource.contains("plan.distant_horizons"),
+                "the complete source submission must consume the prepared DH plan");
+    }
+
+    @Test
+    public void testWholeFrameBlockFeatureDispatchUsesSemanticOnlyLowering() throws IOException {
+        String dispatcher = readSource(SRC_MAIN_JAVA.resolve(
+                "net/minecraft/client/renderer/feature/FeatureRenderDispatcher.java"));
+        String blockRenderer = readSource(SRC_MAIN_JAVA.resolve(
+                "net/minecraft/client/renderer/feature/BlockFeatureRenderer.java"));
+        assertTrue(dispatcher.contains("renderBlockFeaturesOnly()")
+                        && dispatcher.contains("blockFeatureRenderer.render(\n\t\t\t\tsubmitNodeCollection")
+                        && dispatcher.contains("true\n\t\t\t);") ,
+                "whole-frame block-feature dispatch must invoke the semantic-only renderer mode");
+        assertTrue(blockRenderer.contains("boolean semanticOnly")
+                        && blockRenderer.contains("Rust semantic block-feature collection requires complete Rust ownership"),
+                "block-feature lowering must retain an explicit semantic-only ownership boundary");
+        int semanticDispatcher = dispatcher.indexOf("renderBlockFeaturesOnly()");
+        int compatibilityDispatcher = dispatcher.indexOf(
+                "blockFeatureRenderer.render(submitNodeCollection, this.bufferSource, this.blockRenderDispatcher, this.outlineBufferSource);");
+        assertTrue(compatibilityDispatcher >= 0 && compatibilityDispatcher < semanticDispatcher,
+                "the Java block-feature overload must remain confined to the pre-existing OpenGL compatibility dispatcher");
+    }
+
+    @Test
+    public void testWholeFrameCustomLineTopologiesUseCopiedRustLineAbi() throws IOException {
+        String collector = readSource(SRC_MAIN_JAVA.resolve(
+                "net/minecraft/client/renderer/SubmitNodeCollection.java"));
+        assertTrue(collector.contains("isRustLineGeometryRenderType(renderType)"),
+                "whole-frame custom geometry must classify line callbacks before capture");
+        assertTrue(collector.contains("renderType == RenderType.lineStrip()")
+                        && collector.contains("debug_line_strip"),
+                "line-strip and debug line-strip producers must share the explicit line route");
+        assertTrue(collector.contains("int step = lineStrip ? 1 : 2"),
+                "line-strip topology must lower adjacent endpoints without retaining a Java callback");
+        assertTrue(collector.contains("customGeometryRenderer.render(poseStack.last(), capture)"),
+                "the callback must be copied into semantic endpoint data before Rust submission");
     }
 }

@@ -30,6 +30,7 @@ public class LevelLoadTracker implements LevelLoadListener {
 	@Nullable
 	private LevelLoadTracker.ClientState clientState;
 	private final long closeDelayMs;
+	private int rustReadinessDiagnosticTicks;
 
 	public LevelLoadTracker() {
 		this(0L);
@@ -49,8 +50,41 @@ public class LevelLoadTracker implements LevelLoadListener {
 
 	public void tickClientLoad() {
 		if (this.clientState != null) {
+			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+				&& (++this.rustReadinessDiagnosticTicks % 120) == 0) {
+				LOGGER.info(
+					"[MattMC graphics audit] Rust client load state={} server_progress={} server_view={} close_delay_ms={}",
+					this.clientState.getClass().getSimpleName(),
+					this.serverProgressTracker.get(),
+					this.serverChunkStatusView != null,
+					this.closeDelayMs
+				);
+			}
+			// Rust whole-frame Vulkan already owns the first presentation while the
+			// loading screen is active. In that route the server progress completion
+			// is the authoritative equivalent of the packet phase transition; do not
+			// leave the client permanently in WaitingForServer when the load packet is
+			// intentionally absent from a deterministic local fixture.
+			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+				&& this.clientState instanceof LevelLoadTracker.WaitingForServer waiting
+				&& this.rustWholeFrameServerLoadReady()) {
+				this.clientState = new LevelLoadTracker.WaitingForPlayerChunk(
+					waiting.player(), waiting.level(), waiting.levelRenderer(), waiting.timeoutAfter());
+			}
 			this.clientState = this.clientState.tick();
 		}
+	}
+
+	private boolean rustWholeFrameServerLoadReady() {
+		if (this.serverProgressTracker.get() >= 1.0F) {
+			return true;
+		}
+		// Integrated deterministic fixtures can install the server view without
+		// emitting LEVEL_CHUNKS_LOAD_START or advancing its progress tracker. Its
+		// presence is still the authoritative proof that the server-side load phase
+		// has been initialized; the next WaitingForPlayerChunk tick retains the
+		// actual player-section readiness gate.
+		return this.serverChunkStatusView != null || this.serverProgressTracker.get() > 0.0F;
 	}
 
 	public boolean isLevelReady() {

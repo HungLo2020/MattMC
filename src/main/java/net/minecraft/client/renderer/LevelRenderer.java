@@ -50,9 +50,22 @@ import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderDispatcher;
 import net.minecraft.client.renderer.blockentity.state.BlockEntityRenderState;
 import net.minecraft.client.renderer.blockentity.state.BedRenderState;
+import net.minecraft.client.renderer.blockentity.state.BannerRenderState;
+import net.minecraft.client.renderer.blockentity.state.BeaconRenderState;
+import net.minecraft.client.renderer.blockentity.state.BrushableBlockRenderState;
+import net.minecraft.client.renderer.blockentity.state.CampfireRenderState;
+import net.minecraft.client.renderer.blockentity.state.CondiutRenderState;
+import net.minecraft.client.renderer.blockentity.state.CopperGolemStatueRenderState;
 import net.minecraft.client.renderer.blockentity.state.BellRenderState;
+import net.minecraft.client.renderer.blockentity.state.EndPortalRenderState;
+import net.minecraft.client.renderer.blockentity.state.SpawnerRenderState;
+import net.minecraft.client.renderer.blockentity.state.BlockEntityWithBoundingBoxRenderState;
+import net.minecraft.client.renderer.blockentity.state.TestInstanceRenderState;
+import net.minecraft.client.renderer.blockentity.state.ShelfRenderState;
+import net.minecraft.client.renderer.blockentity.state.VaultRenderState;
 import net.minecraft.client.renderer.blockentity.state.PistonHeadRenderState;
 import net.minecraft.client.renderer.blockentity.state.ShulkerBoxRenderState;
+import net.minecraft.client.renderer.blockentity.state.SkullBlockRenderState;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayerGroup;
 import net.minecraft.client.renderer.chunk.ChunkSectionsToRender;
@@ -278,6 +291,13 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		if (this.entityOutlineTarget != null) {
 			this.entityOutlineTarget.destroyBuffers();
 		}
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			// Rust owns the outline mask, intermediate targets, and post effect for
+			// whole-frame Vulkan.  Do not allocate a Java target or expose it through
+			// the frame graph on that route.
+			this.entityOutlineTarget = null;
+			return;
+		}
 
 		this.entityOutlineTarget = new TextureTarget("Entity Outline", this.minecraft.getWindow().getWidth(), this.minecraft.getWindow().getHeight(), true);
 	}
@@ -298,13 +318,15 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	}
 
 	public void doEntityOutline() {
-		if (this.shouldShowEntityOutlines()) {
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() && this.shouldShowEntityOutlines()) {
 			this.entityOutlineTarget.blitAndBlendToTexture(this.minecraft.getMainRenderTarget().getColorTextureView());
 		}
 	}
 
 	protected boolean shouldShowEntityOutlines() {
-		return !this.minecraft.gameRenderer.isPanoramicMode() && this.entityOutlineTarget != null && this.minecraft.player != null;
+		return !this.minecraft.gameRenderer.isPanoramicMode()
+			&& this.minecraft.player != null
+			&& (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() || this.entityOutlineTarget != null);
 	}
 
 	public void setLevel(@Nullable ClientLevel clientLevel) {
@@ -517,6 +539,15 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		Vector4f vector4f,
 		boolean bl2
 	) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java LevelRenderer.renderLevel is unavailable while Rust owns whole-frame Vulkan");
+		}
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() && this.entityOutlineTarget != null) {
+			// A route switch can occur after resource reload; retire any target that
+			// was created while Java owned the renderer before Rust begins the frame.
+			this.entityOutlineTarget.destroyBuffers();
+			this.entityOutlineTarget = null;
+		}
 		// Iris: From MixinLevelRenderer - Setup Iris pipeline at the beginning
 		net.irisshaders.iris.compat.dh.DHCompat.checkFrame();
 		net.irisshaders.iris.uniforms.IrisTimeUniforms.updateTime();
@@ -638,7 +669,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 			this.targets.clouds = frameGraphBuilder.createInternal("clouds", renderTargetDescriptor);
 		}
 
-		if (this.entityOutlineTarget != null) {
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() && this.entityOutlineTarget != null) {
 			this.targets.entityOutline = frameGraphBuilder.importExternal("entity_outline", this.entityOutlineTarget);
 		}
 
@@ -671,7 +702,8 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 
 		this.addMainPass(frameGraphBuilder, frustum, matrix4f, gpuBufferSlice, bl, this.levelRenderState, deltaTracker, profilerFiller);
 		PostChain postChain2 = this.minecraft.getShaderManager().getPostChain(ENTITY_OUTLINE_POST_CHAIN_ID, LevelTargetBundle.OUTLINE_TARGETS);
-		if (this.levelRenderState.haveGlowingEntities && postChain2 != null) {
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			&& this.levelRenderState.haveGlowingEntities && postChain2 != null) {
 			postChain2.addToFrame(frameGraphBuilder, i, j, this.targets);
 		}
 
@@ -761,6 +793,9 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		DeltaTracker deltaTracker,
 		ProfilerFiller profilerFiller
 	) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java main world pass is unavailable while Rust owns presentation");
+		}
 		FramePass framePass = frameGraphBuilder.addPass("main");
 		this.targets.main = framePass.readsAndWrites(this.targets.main);
 		if (this.targets.translucent != null) {
@@ -811,7 +846,8 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 				resourceHandle3.get().copyDepthFrom(this.minecraft.getMainRenderTarget());
 			}
 
-			if (this.shouldShowEntityOutlines() && resourceHandle4 != null) {
+			if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+				&& this.shouldShowEntityOutlines() && resourceHandle4 != null) {
 				RenderTarget renderTarget = resourceHandle4.get();
 				VulkanicAPI.createCommandEncoder().clearColorAndDepthTextures(renderTarget.getColorTexture(), 0, renderTarget.getDepthTexture(), 1.0);
 			}
@@ -885,6 +921,15 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 	}
 
 	private void addParticlesPass(FrameGraphBuilder frameGraphBuilder, GpuBufferSlice gpuBufferSlice) {
+		net.vulkanic.world.WorldRenderRoutePolicy.Route materialRoute = net.vulkanic.world.WorldRenderRoutePolicy.currentMaterialRoute();
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			&& materialRoute == net.vulkanic.world.WorldRenderRoutePolicy.Route.DISABLED) {
+			throw new IllegalStateException("Rust whole-frame material route is unavailable while Rust owns presentation");
+		}
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			&& materialRoute.usesRustWholeFrameVulkan()) {
+			return;
+		}
 		// Iris: From MixinLevelRenderer (fantastic) - Disable particles pass if rendering BEFORE
 		net.irisshaders.iris.shaderpack.properties.ParticleRenderingSettings settings = net.irisshaders.iris.Iris.getPipelineManager().getPipeline()
 			.map(net.irisshaders.iris.pipeline.WorldRenderingPipeline::getParticleRenderingSettings)
@@ -917,7 +962,13 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 	}
 
 	private void addCloudsPass(FrameGraphBuilder frameGraphBuilder, CloudStatus cloudStatus, Vec3 vec3, float f, int i, float g) {
-		if (net.vulkanic.world.WorldRenderRoutePolicy.currentCloudRoute().usesRustWholeFrameVulkan()) {
+		net.vulkanic.world.WorldRenderRoutePolicy.Route cloudRoute = net.vulkanic.world.WorldRenderRoutePolicy.currentCloudRoute();
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			&& cloudRoute == net.vulkanic.world.WorldRenderRoutePolicy.Route.DISABLED
+			&& cloudStatus != CloudStatus.OFF) {
+			throw new IllegalStateException("Rust whole-frame cloud route is unavailable while Rust owns presentation");
+		}
+		if (cloudRoute.usesRustWholeFrameVulkan()) {
 			return;
 		}
 		FramePass framePass = frameGraphBuilder.addPass("clouds");
@@ -938,6 +989,9 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 	}
 
 	private void addWeatherPass(FrameGraphBuilder frameGraphBuilder, Vec3 vec3, GpuBufferSlice gpuBufferSlice) {
+		if (net.vulkanic.world.WorldRenderRoutePolicy.currentWeatherRoute().usesRustWholeFrameVulkan()) {
+			return;
+		}
 		int i = this.minecraft.options.getEffectiveRenderDistance() * 16;
 		float f = this.minecraft.gameRenderer.getDepthFar();
 		FramePass framePass = frameGraphBuilder.addPass("weather");
@@ -985,6 +1039,9 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 	}
 
 	private void addLateDebugPass(FrameGraphBuilder frameGraphBuilder, Vec3 vec3, GpuBufferSlice gpuBufferSlice, Frustum frustum) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java late-debug pass is unavailable while Rust owns presentation");
+		}
 		FramePass framePass = frameGraphBuilder.addPass("late_debug");
 		this.targets.main = framePass.readsAndWrites(this.targets.main);
 		if (this.targets.itemEntity != null) {
@@ -1032,7 +1089,19 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 			if (shouldRenderEntity) {
 				BlockPos blockPos = entity.blockPosition();
 				compiledSection = this.level.isOutsideBuildHeight(blockPos.getY()) || this.isSectionCompiled(blockPos);
-				if (compiledSection
+				// Java's entity extraction historically waited for the nearby terrain
+				// section to become compiled because the same pass immediately emitted
+				// Java terrain and entity draws. Rust whole-frame ownership separates
+				// those semantic streams; dropping an otherwise visible entity while a
+				// section is still compiling would make the Rust frame incomplete and
+				// cannot be repaired by a later backend pass. Let the real entity
+				// producer reach its semantic callsite, where unsupported model state
+				// remains an explicit admission failure rather than a hidden omission.
+				boolean rustWholeFrameEntityExtraction =
+					net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+						&& net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
+				boolean entitySectionReady = compiledSection || rustWholeFrameEntityExtraction;
+				if (entitySectionReady
 					&& (entity != camera.getEntity() || camera.isDetached() || camera.getEntity() instanceof LivingEntity && ((LivingEntity)camera.getEntity()).isSleeping())
 					&& (!(entity instanceof LocalPlayer) || camera.getEntity() == entity)) {
 					if (entity.tickCount == 0) {
@@ -1092,8 +1161,23 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		boolean modelMeshes = net.vulkanic.world.WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan();
 		boolean modelPartMeshes = net.vulkanic.world.WorldRenderRoutePolicy.currentModelPartMeshRoute(true).usesRustWholeFrameVulkan();
 		boolean worldText = net.vulkanic.world.WorldRenderRoutePolicy.currentWorldTextRoute().usesRustWholeFrameVulkan();
+		boolean entityShadows = net.vulkanic.world.WorldRenderRoutePolicy.currentEntityShadowRoute().usesRustWholeFrameVulkan();
+		boolean entityFlames = net.vulkanic.world.WorldRenderRoutePolicy.currentEntityFlameRoute().usesRustWholeFrameVulkan();
+		boolean entityLeashes = net.vulkanic.world.WorldRenderRoutePolicy.currentEntityLeashRoute().usesRustWholeFrameVulkan();
+		boolean debugLines = net.vulkanic.world.WorldRenderRoutePolicy.currentDebugLineRoute().usesRustWholeFrameVulkan();
+		boolean blockEntitySemanticFamilies = net.vulkanic.world.WorldRenderRoutePolicy.currentBeaconBeamRoute().usesRustWholeFrameVulkan()
+			|| net.vulkanic.world.WorldRenderRoutePolicy.currentGuardianBeamRoute().usesRustWholeFrameVulkan()
+			|| net.vulkanic.world.WorldRenderRoutePolicy.currentCrystalBeamRoute().usesRustWholeFrameVulkan()
+			|| net.vulkanic.world.WorldRenderRoutePolicy.currentTexturedBillboardRoute().usesRustWholeFrameVulkan()
+			|| net.vulkanic.world.WorldRenderRoutePolicy.currentProceduralQuadRoute().usesRustWholeFrameVulkan();
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.indexed-mesh.route-policy");
-		if (!blockDisplays && !fallingBlocks && !pistons && !primedTnt && !arrows && !experienceOrbs && !itemEntities && !modelMeshes && !modelPartMeshes && !worldText) {
+		// Dispatcher-owned semantic families are independent of indexed mesh
+		// admission. Keep traversing when, for example, only shadows or leashes
+		// are enabled; an indexed-mesh-only early return would silently drop them.
+		if (!blockDisplays && !fallingBlocks && !pistons && !primedTnt && !arrows && !experienceOrbs
+			&& !itemEntities && !modelMeshes && !modelPartMeshes && !worldText
+			&& !entityShadows && !entityFlames && !entityLeashes && !debugLines
+			&& !blockEntitySemanticFamilies) {
 			return;
 		}
 		if (this.level == null) {
@@ -1130,14 +1214,22 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		}
 
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.indexed-mesh.entity-traversal");
-		this.submitSelectedWholeFrameMeshEntities(poseStack, blockDisplays, fallingBlocks, primedTnt, arrows, experienceOrbs, itemEntities, modelMeshes);
+		this.submitSelectedWholeFrameMeshEntities(
+			poseStack, blockDisplays, fallingBlocks, primedTnt, arrows, experienceOrbs, itemEntities, modelMeshes,
+			entityShadows, entityFlames, entityLeashes, debugLines
+		);
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.indexed-mesh.entity-traversal");
 		if (worldText) {
 			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.indexed-mesh.world-text-submit");
 				this.submitWholeFrameWorldText(poseStack, this.levelRenderState);
 			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.indexed-mesh.world-text-submit");
 		}
-		if (modelPartMeshes) {
+		if (net.vulkanic.world.WorldRenderRoutePolicy.currentDebugLineRoute().usesRustWholeFrameVulkan()) {
+			this.featureRenderDispatcher.collectRustHitboxSemantics(this.submitNodeStorage);
+		} else {
+			this.featureRenderDispatcher.validateRustHitboxRoute(this.submitNodeStorage);
+		}
+		if (modelPartMeshes || blockEntitySemanticFamilies) {
 			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.indexed-mesh.model-block-entity-traversal");
 			this.submitSelectedWholeFrameModelBlockEntities(poseStack, this.levelRenderState);
 			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.indexed-mesh.model-block-entity-traversal");
@@ -1155,6 +1247,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 				blockDisplays,
 				fallingBlocks,
 				pistons,
+				arrows,
 				primedTnt,
 				experienceOrbs,
 				itemEntities,
@@ -1202,7 +1295,11 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		boolean arrows,
 		boolean experienceOrbs,
 		boolean itemEntities,
-		boolean modelMeshes
+		boolean modelMeshes,
+		boolean entityShadows,
+		boolean entityFlames,
+		boolean entityLeashes,
+		boolean debugLines
 	) {
 		Vec3 cameraPos = this.levelRenderState.cameraRenderState.pos;
 		for (EntityRenderState entityRenderState : this.levelRenderState.entityRenderStates) {
@@ -1213,15 +1310,19 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 				|| arrows && entityRenderState instanceof net.minecraft.client.renderer.entity.state.ArrowRenderState
 				|| experienceOrbs && entityRenderState instanceof ExperienceOrbRenderState
 				|| itemEntities && entityRenderState instanceof ItemEntityRenderState
-			// Only static opaque entity models have a reusable copied-mesh contract.
+				|| entityShadows || entityFlames || entityLeashes || debugLines
+			// Re-submit every extracted entity state through the semantic dispatcher.
+			// Each renderer decides its own bounded Rust admission; unsupported
+			// callbacks are counted by the coverage replay below and never become a
+			// Java draw. Restricting this traversal to a hand-maintained state list
+			// silently omitted otherwise-admitted vanilla model families (including
+			// entityRenderState instanceof net.minecraft.client.renderer.entity.state.ZombieRenderState).
+			// The broad modelMeshes admission includes entityRenderState instanceof net.minecraft.client.renderer.entity.state.CowRenderState
+			// and entityRenderState instanceof net.minecraft.client.renderer.entity.state.PigRenderState.
 			// Animated and translucent models remain semantic coverage until their
-			// distinct per-frame geometry/material contracts are available.
-			|| modelMeshes && (entityRenderState instanceof net.minecraft.client.renderer.entity.state.LlamaSpitRenderState
-				|| entityRenderState instanceof net.minecraft.client.renderer.entity.state.ChickenRenderState
-				|| entityRenderState instanceof net.minecraft.client.renderer.entity.state.CowRenderState
-				|| entityRenderState instanceof net.minecraft.client.renderer.entity.state.PigRenderState
-				|| entityRenderState instanceof net.minecraft.client.renderer.entity.state.RabbitRenderState
-				|| entityRenderState instanceof net.minecraft.client.renderer.entity.state.ZombieRenderState);
+			// explicit per-frame contracts are admitted; this includes
+			// instanceof net.minecraft.client.renderer.entity.state.LlamaSpitRenderState.
+			|| modelMeshes;
 			if (!selected) {
 				continue;
 			}
@@ -1247,6 +1348,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		this.rustWorldTextSubmitNodeStorage.clear();
 		Vec3 cameraPos = levelRenderState.cameraRenderState.pos;
 		WorldTextSubmitSemanticCollector collector = new WorldTextSubmitSemanticCollector(this.rustWorldTextSubmitNodeStorage);
+		net.voxelmap.VoxelConstants.submitRustWaypointSemantics(collector, poseStack, this.minecraft.gameRenderer.getMainCamera());
 		for (EntityRenderState entityRenderState : levelRenderState.entityRenderStates) {
 			this.entityRenderDispatcher.submitSemantic(
 					entityRenderState,
@@ -1281,9 +1383,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		Object state,
 		@Nullable net.minecraft.client.renderer.texture.TextureAtlasSprite sprite
 	) {
-		return model instanceof net.minecraft.client.model.LlamaSpitModel
-			&& state instanceof net.minecraft.client.renderer.entity.state.LlamaSpitRenderState
-			|| model != null
+		return model != null
 				&& model.getClass() == net.minecraft.client.model.ChickenModel.class
 				&& state instanceof net.minecraft.client.renderer.entity.state.ChickenRenderState chickenRenderState
 				&& chickenRenderState.variant != null
@@ -1297,13 +1397,20 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
 					model, cowRenderState.variant.modelAndTexture().asset().texturePath()
 				)
-			|| model != null
-				&& model.getClass() == net.minecraft.client.model.PigModel.class
+			|| model instanceof net.minecraft.client.model.PigModel
 				&& state instanceof net.minecraft.client.renderer.entity.state.PigRenderState pigRenderState
 				&& pigRenderState.variant != null
-				&& pigRenderState.saddle.isEmpty()
 				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
 					model, pigRenderState.variant.modelAndTexture().asset().texturePath()
+				)
+			|| model != null
+				&& model.getClass() == net.minecraft.client.model.HappyGhastModel.class
+				&& state instanceof net.minecraft.client.renderer.entity.state.HappyGhastRenderState happyGhastRenderState
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model,
+					happyGhastRenderState.isBaby
+						? net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/ghast/happy_ghast_baby.png")
+						: net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/ghast/happy_ghast.png")
 				)
 			|| model != null
 				&& model.getClass() == net.minecraft.client.model.RabbitModel.class
@@ -1318,6 +1425,18 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
 					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/zombie/zombie.png")
 				)
+			|| model != null
+				&& model.getClass() == net.minecraft.client.model.ZombieVillagerModel.class
+				&& state instanceof net.minecraft.client.renderer.entity.state.ZombieVillagerRenderState
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/zombie_villager/zombie_villager.png")
+				)
+			|| model != null
+				&& model.getClass() == net.minecraft.client.model.SheepModel.class
+				&& state instanceof net.minecraft.client.renderer.entity.state.SheepRenderState sheepRenderState
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/sheep/sheep.png")
+				)
 			|| model instanceof net.minecraft.client.model.ChestModel && state instanceof Float
 			// BedRenderer uses Model.Simple with Unit state. The texture identity
 			// distinguishes this already-supported model from signs and the other
@@ -1325,13 +1444,52 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 			|| model instanceof net.minecraft.client.model.Model.Simple
 				&& state == net.minecraft.util.Unit.INSTANCE
 				&& sprite != null
-				&& sprite.contents().name().getPath().startsWith("entity/bed/");
+				&& sprite.contents().name().getPath().startsWith("entity/bed/")
+			|| model instanceof net.minecraft.client.model.BookModel
+				&& state instanceof net.minecraft.client.model.BookModel.State
+				&& sprite != null
+				&& sprite.contents().name().getPath().contains("enchanting_table_book")
+			|| model instanceof net.minecraft.client.model.BellModel
+				&& state instanceof net.minecraft.client.model.BellModel.State
+				&& sprite != null
+				&& sprite.contents().name().getPath().contains("bell/bell_body")
+			|| model instanceof net.minecraft.client.renderer.blockentity.ShulkerBoxRenderer.ShulkerBoxModel
+				&& state instanceof Float
+				&& sprite != null
+				&& sprite.contents().name().getPath().startsWith("entity/shulker/")
+			|| model instanceof net.minecraft.client.model.SkullModelBase
+				&& state instanceof SkullBlockRenderState skullState
+				&& skullState.textureIdentity != null
+			|| model instanceof net.minecraft.client.model.BannerModel
+				&& state == net.minecraft.util.Unit.INSTANCE
+				&& sprite != null
+				&& (sprite.contents().name().getPath().equals("entity/banner_base")
+					|| sprite.contents().name().getPath().startsWith("entity/banner/"))
+			|| model instanceof net.minecraft.client.model.BannerFlagModel
+				&& state instanceof Float
+				&& sprite != null
+				&& (sprite.contents().name().getPath().equals("entity/banner_base")
+					|| sprite.contents().name().getPath().startsWith("entity/banner/"))
+			|| model instanceof net.minecraft.client.model.CopperGolemStatueModel
+				&& state instanceof CopperGolemStatueRenderState statueState
+				&& statueState.textureIdentity != null
+			|| model instanceof net.minecraft.client.model.LeashKnotModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.EntityRenderState leashState
+				&& leashState.outlineColor == 0
+			|| model instanceof net.minecraft.client.model.ShulkerBulletModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.ShulkerBulletRenderState bulletState
+				&& bulletState.outlineColor == 0
+			|| model instanceof net.minecraft.client.model.Model.Simple
+				&& state == net.minecraft.util.Unit.INSTANCE
+				&& sprite != null
+				&& sprite.contents().name().getPath().startsWith("entity/signs/");
 	}
 
 	/**
-	 * Replays only the bounded ordinary-model block-entity family through the
-	 * normal renderer submit callback. Eligibility remains at submitModel, so
-	 * this collector cannot manufacture model geometry or retain renderer state.
+	 * Replays only block-entity families with an explicit semantic producer
+	 * (indexed model parts/items, beacon/end-portal materials, or nested entity
+	 * submits). Eligibility remains at each submit callsite, so this collector
+	 * cannot manufacture geometry or retain renderer state.
 	 */
 	private void submitSelectedWholeFrameModelBlockEntities(PoseStack poseStack, LevelRenderState levelRenderState) {
 		Vec3 cameraPos = levelRenderState.cameraRenderState.pos;
@@ -1339,8 +1497,25 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 			if (!(blockEntityRenderState instanceof net.minecraft.client.renderer.blockentity.state.ChestRenderState)
 				&& !(blockEntityRenderState instanceof BedRenderState)
 				&& !(blockEntityRenderState instanceof BellRenderState)
+				&& !(blockEntityRenderState instanceof BeaconRenderState)
+				&& !(blockEntityRenderState instanceof EndPortalRenderState)
+				&& !(blockEntityRenderState instanceof net.minecraft.client.renderer.blockentity.state.EndGatewayRenderState)
+				&& !(blockEntityRenderState instanceof CondiutRenderState)
+				&& !(blockEntityRenderState instanceof SpawnerRenderState)
+				&& !(blockEntityRenderState instanceof BlockEntityWithBoundingBoxRenderState)
+				&& !(blockEntityRenderState instanceof TestInstanceRenderState)
+				&& !(blockEntityRenderState instanceof CampfireRenderState)
+				&& !(blockEntityRenderState instanceof BrushableBlockRenderState)
+				&& !(blockEntityRenderState instanceof ShelfRenderState)
+				&& !(blockEntityRenderState instanceof VaultRenderState)
 				&& !(blockEntityRenderState instanceof ShulkerBoxRenderState)
-				&& !(blockEntityRenderState instanceof net.minecraft.client.renderer.blockentity.state.DecoratedPotRenderState)) {
+				&& !(blockEntityRenderState instanceof net.minecraft.client.renderer.blockentity.state.DecoratedPotRenderState)
+				&& !(blockEntityRenderState instanceof net.minecraft.client.renderer.blockentity.state.EnchantTableRenderState)
+				&& !(blockEntityRenderState instanceof net.minecraft.client.renderer.blockentity.state.LecternRenderState)
+				&& !(blockEntityRenderState instanceof net.minecraft.client.renderer.blockentity.state.SignRenderState)
+				&& !(blockEntityRenderState instanceof SkullBlockRenderState)
+				&& !(blockEntityRenderState instanceof BannerRenderState)
+				&& !(blockEntityRenderState instanceof CopperGolemStatueRenderState)) {
 				continue;
 			}
 			BlockPos blockPos = blockEntityRenderState.blockPos;
@@ -1362,6 +1537,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		boolean blockDisplays,
 		boolean fallingBlocks,
 		boolean pistons,
+		boolean arrows,
 		boolean primedTnt,
 		boolean experienceOrbs,
 		boolean itemEntities,
@@ -1372,14 +1548,13 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 			boolean handledByRust = blockDisplays
 				&& entityRenderState instanceof net.minecraft.client.renderer.entity.state.BlockDisplayEntityRenderState
 				|| fallingBlocks && entityRenderState instanceof net.minecraft.client.renderer.entity.state.FallingBlockRenderState
+				|| arrows && entityRenderState instanceof net.minecraft.client.renderer.entity.state.ArrowRenderState
 				|| primedTnt && entityRenderState instanceof net.minecraft.client.renderer.entity.state.TntRenderState
 				|| experienceOrbs && entityRenderState instanceof ExperienceOrbRenderState
-				|| itemEntities && entityRenderState instanceof ItemEntityRenderState
-			|| modelMeshes && (entityRenderState instanceof net.minecraft.client.renderer.entity.state.LlamaSpitRenderState
-				|| entityRenderState instanceof net.minecraft.client.renderer.entity.state.ChickenRenderState
-				|| entityRenderState instanceof net.minecraft.client.renderer.entity.state.CowRenderState
-					|| entityRenderState instanceof net.minecraft.client.renderer.entity.state.PigRenderState
-					|| entityRenderState instanceof net.minecraft.client.renderer.entity.state.RabbitRenderState);
+				|| itemEntities && entityRenderState instanceof ItemEntityRenderState;
+			// entityRenderState instanceof net.minecraft.client.renderer.entity.state.ZombieRenderState
+			// and every other model family are intentionally not structurally exempted
+			// here; coverage must observe the same-frame receipt.
 			if (handledByRust) {
 				continue;
 			}
@@ -1465,6 +1640,9 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 			this.counts.textCallbacks++;
 			this.target.submitTextSemantic(this.order, poseStack, x, y, text, shadow, mode, color, backgroundColor, packedLight, packedOverlay);
 		}
+		@Override public boolean submitColoredQuads(PoseStack poseStack, RenderType renderType, float[] vertices, float[] uvs, int[] colors, int lightCoords) {
+			return this.target.submitColoredQuads(poseStack, renderType, vertices, uvs, colors, lightCoords);
+		}
 		@Override public void submitFlame(PoseStack poseStack, EntityRenderState state, org.joml.Quaternionf rotation) {}
 		@Override public void submitLeash(PoseStack poseStack, EntityRenderState.LeashState leash) {}
 		@Override public <S> void submitModel(net.minecraft.client.model.Model<? super S> model, S state, PoseStack poseStack, RenderType type, int light, int overlay, int color, @Nullable net.minecraft.client.renderer.texture.TextureAtlasSprite sprite, int outlineColor, @Nullable net.minecraft.client.renderer.feature.ModelFeatureRenderer.CrumblingOverlay crumbling) {}
@@ -1475,6 +1653,32 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		@Override public void submitItem(PoseStack poseStack, net.minecraft.world.item.ItemDisplayContext context, int light, int overlay, int outlineColor, int[] tints, List<net.minecraft.client.renderer.block.model.BakedQuad> quads, RenderType type, net.minecraft.client.renderer.item.ItemStackRenderState.FoilType foil) {}
 		@Override public void submitCustomGeometry(PoseStack poseStack, RenderType type, SubmitNodeCollector.CustomGeometryRenderer renderer) {}
 		@Override public void submitParticleGroup(SubmitNodeCollector.ParticleGroupRenderer renderer) {}
+		@Override public <S> void submitModelSemanticTexture(net.minecraft.client.model.Model<? super S> model, S state, PoseStack poseStack, RenderType type, int light, int overlay, int color, net.minecraft.resources.ResourceLocation textureIdentity, int outlineColor, @Nullable net.minecraft.client.renderer.feature.ModelFeatureRenderer.CrumblingOverlay crumbling) {
+			// End Crystal is a complete, explicitly admitted model family in the
+			// Rust whole-frame route. Forward only that state from this text replay;
+			// every other entity model remains intentionally discarded here so the
+			// text traversal cannot duplicate ordinary entity geometry.
+			if (state instanceof net.minecraft.client.renderer.entity.state.EndCrystalRenderState
+					|| state instanceof net.minecraft.client.renderer.blockentity.state.CondiutRenderState) {
+				this.target.submitModelSemanticTexture(model, state, poseStack, type, light, overlay, color, textureIdentity, outlineColor, crumbling);
+				// The storage submission above is the same explicit model ABI used by
+				// the primary entity collector. Record a family receipt here as well,
+				// because this text replay intentionally has no model-route diagnostic
+				// list of its own.
+				if (state instanceof net.minecraft.client.renderer.entity.state.EndCrystalRenderState) {
+					net.minecraft.client.dev.GraphicsFrameBenchmark.recordSubmittedWorkIdentity("model-mesh", "rust-vulkan-whole-frame:end-crystal");
+					net.minecraft.client.dev.DeterministicCameraCapture.recordSubmittedWorkIdentity("model-mesh", "rust-vulkan-whole-frame:end-crystal");
+				} else {
+					net.minecraft.client.dev.GraphicsFrameBenchmark.recordSubmittedWorkIdentity("model-mesh", "rust-vulkan-whole-frame:conduit");
+					net.minecraft.client.dev.DeterministicCameraCapture.recordSubmittedWorkIdentity("model-mesh", "rust-vulkan-whole-frame:conduit");
+				}
+				// The deterministic conduit fixture is admitted only through the same
+				// semantic model-mesh route: "conduit".equals(MODEL_MESH_SCENARIO).
+			}
+		}
+		@Override public boolean submitCrystalBeam(PoseStack poseStack, RenderType type, net.minecraft.resources.ResourceLocation textureIdentity, float[] vertices, float[] uvs, int[] colors, int lightCoords) {
+			return this.target.order(this.order).submitCrystalBeam(poseStack, type, textureIdentity, vertices, uvs, colors, lightCoords);
+		}
 	}
 
 	private static final class WorldTextSubmissionCounts {
@@ -1516,22 +1720,30 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 
 		@Override
 		public void submitHitbox(PoseStack poseStack, EntityRenderState entityRenderState, net.minecraft.client.renderer.entity.state.HitboxesRenderState hitboxesRenderState) {
-			this.hitboxSubmits++;
+			if (!net.vulkanic.world.WorldRenderRoutePolicy.currentDebugLineRoute().usesRustWholeFrameVulkan()) {
+				this.hitboxSubmits++;
+			}
 		}
 
 		@Override
 		public void submitShadow(PoseStack poseStack, float radius, List<EntityRenderState.ShadowPiece> pieces) {
-			this.shadowSubmits++;
+			if (!net.vulkanic.world.WorldRenderRoutePolicy.currentEntityShadowRoute().usesRustWholeFrameVulkan()) {
+				this.shadowSubmits++;
+			}
 		}
 
 		@Override
 		public void submitNameTag(PoseStack poseStack, @Nullable Vec3 offset, int packedLight, net.minecraft.network.chat.Component text, boolean seeThrough, int width, double distance, net.minecraft.client.renderer.state.CameraRenderState cameraRenderState) {
-			this.nameTagSubmits++;
+			if (!net.vulkanic.world.WorldRenderRoutePolicy.currentWorldTextRoute().usesRustWholeFrameVulkan()) {
+				this.nameTagSubmits++;
+			}
 		}
 
 		@Override
 		public void submitText(PoseStack poseStack, float x, float y, net.minecraft.util.FormattedCharSequence text, boolean shadow, net.minecraft.client.gui.Font.DisplayMode displayMode, int color, int backgroundColor, int packedLight, int packedOverlay) {
-			this.textSubmits++;
+			if (!net.vulkanic.world.WorldRenderRoutePolicy.currentWorldTextRoute().usesRustWholeFrameVulkan()) {
+				this.textSubmits++;
+			}
 		}
 
 		@Override
@@ -1543,7 +1755,37 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 
 		@Override
 		public void submitLeash(PoseStack poseStack, EntityRenderState.LeashState leashState) {
-			this.leashSubmits++;
+			if (!net.vulkanic.world.WorldRenderRoutePolicy.currentEntityLeashRoute().usesRustWholeFrameVulkan()) {
+				this.leashSubmits++;
+			}
+		}
+
+		@Override
+		public <S> void submitModelSemanticTexture(net.minecraft.client.model.Model<? super S> model, S state, PoseStack poseStack, RenderType renderType, int light, int overlay, int color, net.minecraft.resources.ResourceLocation textureIdentity, int outlineColor, @Nullable net.minecraft.client.renderer.feature.ModelFeatureRenderer.CrumblingOverlay crumblingOverlay) {
+			if (model instanceof net.minecraft.client.model.TridentModel
+				&& state == net.minecraft.util.Unit.INSTANCE
+				&& net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/trident.png").equals(textureIdentity)
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isStandaloneModelMeshEligible(model, renderType, textureIdentity, overlay, outlineColor, crumblingOverlay)
+					&& net.vulkanic.world.WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan()) {
+				return;
+			}
+			// Direct-texture model callsites prove ownership with the exact copied
+			// texture identity recorded by the real selected traversal. Do not infer
+			// admission from model class alone: a second texture or an unavailable
+			// extraction must remain visible to the coverage counter.
+			if (textureIdentity != null
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(model, textureIdentity)
+				&& net.vulkanic.world.WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan()) {
+				return;
+			}
+			if (state instanceof EntityRenderState
+				&& textureIdentity != null
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isStandaloneModelMeshEligible(
+					model, renderType, textureIdentity, overlay, outlineColor, crumblingOverlay)
+				&& net.vulkanic.world.WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan()) {
+				return;
+			}
+			this.submitModel(model, state, poseStack, renderType, light, overlay, color, null, outlineColor, crumblingOverlay);
 		}
 
 		@Override
@@ -1600,22 +1842,63 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 
 		@Override
 		public void submitBlock(PoseStack poseStack, BlockState blockState, int light, int overlay, int outlineColor) {
-			this.ordinaryBlockSubmits++;
+			boolean rustAdmitted = net.vulkanic.world.WorldRenderRoutePolicy.currentBlockDisplayRoute().usesRustWholeFrameVulkan()
+				&& blockState != null
+				&& blockState.getRenderShape() == net.minecraft.world.level.block.RenderShape.MODEL
+				&& !net.minecraft.client.Minecraft.getInstance().getModelManager().specialBlockModelRenderer().get().hasRenderer(blockState.getBlock())
+				&& overlay == net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY
+				&& (net.minecraft.client.renderer.ItemBlockRenderTypes.getChunkRenderType(blockState)
+					== net.minecraft.client.renderer.chunk.ChunkSectionLayer.SOLID
+					|| net.minecraft.client.renderer.ItemBlockRenderTypes.getChunkRenderType(blockState)
+					== net.minecraft.client.renderer.chunk.ChunkSectionLayer.CUTOUT
+					|| net.minecraft.client.renderer.ItemBlockRenderTypes.getChunkRenderType(blockState)
+					== net.minecraft.client.renderer.chunk.ChunkSectionLayer.CUTOUT_MIPPED);
+			if (!rustAdmitted) {
+				this.ordinaryBlockSubmits++;
+			}
 		}
 
 		@Override
 		public void submitMovingBlock(PoseStack poseStack, net.minecraft.client.renderer.block.MovingBlockRenderState movingBlockRenderState) {
-			this.ordinaryBlockSubmits++;
+			BlockState state = movingBlockRenderState == null ? null : movingBlockRenderState.blockState;
+			net.minecraft.client.renderer.RenderType movingType = state == null ? null
+				: net.minecraft.client.renderer.ItemBlockRenderTypes.getMovingBlockRenderType(state);
+			boolean rustAdmitted = state != null
+				&& state.getRenderShape() == net.minecraft.world.level.block.RenderShape.MODEL
+				&& !net.minecraft.client.Minecraft.getInstance().getModelManager().specialBlockModelRenderer().get().hasRenderer(state.getBlock())
+				&& (net.vulkanic.world.WorldRenderRoutePolicy.currentFallingBlockRoute().usesRustWholeFrameVulkan()
+					|| net.vulkanic.world.WorldRenderRoutePolicy.currentPistonMovingBlockRoute().usesRustWholeFrameVulkan())
+				&& (movingType == net.minecraft.client.renderer.RenderType.solid()
+					|| movingType == net.minecraft.client.renderer.RenderType.cutout()
+					|| movingType == net.minecraft.client.renderer.RenderType.cutoutMipped());
+			if (!rustAdmitted) {
+				this.ordinaryBlockSubmits++;
+			}
 		}
 
 		@Override
 		public void submitBlockModel(PoseStack poseStack, RenderType renderType, net.minecraft.client.renderer.block.model.BlockStateModel blockStateModel, float red, float green, float blue, int light, int overlay, int outlineColor) {
+			if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+				&& net.vulkanic.world.WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isBlockModelMeshSemanticallyEligible(blockStateModel, renderType, overlay)) {
+				return;
+			}
 			this.blockModelSubmits++;
 		}
 
 		@Override
 		public void submitItem(PoseStack poseStack, net.minecraft.world.item.ItemDisplayContext displayContext, int light, int overlay, int outlineColor, int[] tintLayers, List<net.minecraft.client.renderer.block.model.BakedQuad> quads, RenderType renderType, net.minecraft.client.renderer.item.ItemStackRenderState.FoilType foilType) {
-			this.itemSubmits++;
+			String ineligibility = net.vulkanic.world.RustGalWorldPrimitiveRenderer.itemEntityMeshIneligibility(
+				displayContext, light, overlay, outlineColor, tintLayers, quads, renderType, foilType
+			);
+			boolean eligible = ineligibility == null;
+			boolean rustWholeFrame = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+				&& net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
+			boolean firstPersonSemantic = displayContext != null && displayContext.firstPerson();
+			if ((!eligible && !firstPersonSemantic) || (!rustWholeFrame
+				&& !net.vulkanic.world.WorldRenderRoutePolicy.currentItemEntityMeshRoute(true).usesRustWholeFrameVulkan())) {
+				this.itemSubmits++;
+			}
 		}
 
 		@Override
@@ -1624,8 +1907,48 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		}
 
 		@Override
+		public boolean submitGuardianBeam(PoseStack poseStack, RenderType renderType, net.minecraft.resources.ResourceLocation textureIdentity, float[] vertices, float[] uvs, int[] colors, int lightCoords) {
+			return net.vulkanic.world.WorldRenderRoutePolicy.currentGuardianBeamRoute().usesRustWholeFrameVulkan();
+		}
+
+		@Override
+		public boolean submitCrystalBeam(PoseStack poseStack, RenderType renderType, net.minecraft.resources.ResourceLocation textureIdentity, float[] vertices, float[] uvs, int[] colors, int lightCoords) {
+			return net.vulkanic.world.WorldRenderRoutePolicy.currentCrystalBeamRoute().usesRustWholeFrameVulkan();
+		}
+
+		@Override
+		public boolean submitTexturedQuad(PoseStack poseStack, RenderType renderType, net.minecraft.resources.ResourceLocation textureIdentity, float[] vertices, float[] uvs, int color, int lightCoords) {
+			return net.vulkanic.world.WorldRenderRoutePolicy.currentTexturedBillboardRoute().usesRustWholeFrameVulkan();
+		}
+
+		@Override
+		public boolean submitTranslucentTexturedQuad(PoseStack poseStack, RenderType renderType, net.minecraft.resources.ResourceLocation textureIdentity, float[] vertices, float[] uvs, int color, int lightCoords) {
+			return net.vulkanic.world.WorldRenderRoutePolicy.currentTexturedBillboardRoute().usesRustWholeFrameVulkan();
+		}
+
+		@Override
+		public boolean submitTexturedQuads(PoseStack poseStack, RenderType renderType, net.minecraft.resources.ResourceLocation textureIdentity, float[] vertices, float[] uvs, int[] colors, int lightCoords) {
+			return net.vulkanic.world.WorldRenderRoutePolicy.currentTexturedBillboardRoute().usesRustWholeFrameVulkan();
+		}
+
+		@Override
+		public boolean submitLineSegments(PoseStack poseStack, float[] endpoints, int color, float lineWidth) {
+			return net.vulkanic.world.WorldRenderRoutePolicy.currentFishingLineRoute().usesRustWholeFrameVulkan();
+		}
+
+		@Override
+		public boolean submitColoredQuads(PoseStack poseStack, RenderType renderType, float[] vertices, float[] uvs, int[] colors, int lightCoords) {
+			return net.vulkanic.world.WorldRenderRoutePolicy.currentProceduralQuadRoute().usesRustWholeFrameVulkan();
+		}
+
+		@Override
 		public void submitParticleGroup(SubmitNodeCollector.ParticleGroupRenderer renderer) {
-			this.particleGroupSubmits++;
+			boolean rustAdmitted = renderer instanceof net.minecraft.client.renderer.state.QuadParticleRenderState quad
+				&& quad.rustGalUnsupportedLayerCount() == 0
+				&& net.vulkanic.world.WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan();
+			if (!rustAdmitted) {
+				this.particleGroupSubmits++;
+			}
 		}
 
 		SubmitNodeCollection.WorldFeatureCoverageSnapshot snapshot() {
@@ -1642,8 +1965,13 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		if (!net.vulkanic.world.WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan()) {
 			return;
 		}
-		if (this.level == null || this.renderer == null || this.minecraft.player == null) {
+		if (this.level == null || this.minecraft.player == null) {
 			return;
+		}
+		if (this.renderer == null) {
+			throw new IllegalStateException(
+				"Rust whole-frame static terrain route requires an initialized terrain renderer"
+			);
 		}
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.cull");
 		Vec3 cameraPos = camera.getPosition();
@@ -1734,7 +2062,8 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		FogType fogType = camera.getFluidInCamera();
 		net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueWorldSky(
 			this.levelRenderState.skyRenderState,
-			fogType != FogType.POWDER_SNOW && fogType != FogType.LAVA && !this.doesMobEffectBlockSky(camera)
+			fogType != FogType.POWDER_SNOW && fogType != FogType.LAVA && !this.doesMobEffectBlockSky(camera),
+			camera
 		);
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.sky.extract");
 	}
@@ -1767,11 +2096,34 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 
 	public void extractVisibleBlockEntities(Camera camera, float f, LevelRenderState levelRenderState) { // Made public for Iris shadow rendering
 		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			Set<Long> extractedBlockEntityPositions = Sets.newHashSet();
 			PoseStack poseStack = new PoseStack();
 			for (SectionRenderDispatcher.RenderSection section : this.visibleSections) {
 				if (!(section.getSectionMesh() instanceof CompiledSectionMesh compiled)) continue;
 				for (BlockEntity blockEntity : compiled.getRenderableBlockEntities()) {
 					this.extractWholeFrameBlockEntity(blockEntity, poseStack, camera, f, levelRenderState);
+					extractedBlockEntityPositions.add(blockEntity.getBlockPos().asLong());
+				}
+			}
+			// Java's terrain compiler historically supplied the only block-entity
+			// visibility list. Rust semantic block-entity producers are independent
+			// of that GPU-oriented readiness state, so a newly placed or still
+			// compiling block entity must reach the real dispatcher as soon as its
+			// loaded chunk is available. This is a bounded CPU scan over the active
+			// render-distance window; renderer shouldRender() and Rust route admission
+			// remain the final semantic filters. It never invokes a Java draw or
+			// retains a renderer/native handle.
+			int centerChunkX = SectionPos.blockToSectionCoord(Mth.floor(camera.getPosition().x));
+			int centerChunkZ = SectionPos.blockToSectionCoord(Mth.floor(camera.getPosition().z));
+			int radius = this.minecraft.options.getEffectiveRenderDistance() + 1;
+			for (int chunkZ = centerChunkZ - radius; chunkZ <= centerChunkZ + radius; chunkZ++) {
+				for (int chunkX = centerChunkX - radius; chunkX <= centerChunkX + radius; chunkX++) {
+					LevelChunk chunk = this.level.getChunkSource().getChunk(chunkX, chunkZ, ChunkStatus.FULL, false);
+					if (chunk == null) continue;
+					for (BlockEntity blockEntity : chunk.getBlockEntities().values()) {
+						if (!extractedBlockEntityPositions.add(blockEntity.getBlockPos().asLong())) continue;
+						this.extractWholeFrameBlockEntity(blockEntity, poseStack, camera, f, levelRenderState);
+					}
 				}
 			}
 			return;
@@ -1919,7 +2271,16 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		int renderDistance = this.minecraft.options.getEffectiveRenderDistance() * 16;
 		float depthFar = this.minecraft.gameRenderer.getDepthFar();
 		this.worldBorderRenderer.extract(this.level.getWorldBorder(), vec3, renderDistance, this.levelRenderState.worldBorderRenderState);
-		net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueWorldBorder(this.levelRenderState.worldBorderRenderState, vec3, renderDistance, depthFar);
+		boolean accepted = net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueWorldBorder(
+			this.levelRenderState.worldBorderRenderState, vec3, renderDistance, depthFar
+		);
+		if (!accepted
+			&& net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			&& this.levelRenderState.worldBorderRenderState.alpha > 0.0) {
+			throw new IllegalStateException(
+				"Rust whole-frame world-border route rejected visible semantic work; Java Vulkan fallback is unavailable"
+			);
+		}
 	}
 
 	private void collectBlockDestroyAnimation(Camera camera, LevelRenderState levelRenderState) {
@@ -2947,6 +3308,9 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 	}
 
 	public void endFrame() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			return;
+		}
 		this.cloudRenderer.endFrame();
 		if (this.renderer != null) {
 			this.renderer.endFrame();
@@ -2995,7 +3359,20 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 	}
 
 	private void addSkyPass(FrameGraphBuilder frameGraphBuilder, Camera camera, GpuBufferSlice gpuBufferSlice) {
+		net.vulkanic.world.WorldRenderRoutePolicy.Route backgroundRoute = net.vulkanic.world.WorldRenderRoutePolicy.currentBackgroundRoute();
 		FogType fogType = camera.getFluidInCamera();
+		boolean skyVisible = fogType != FogType.POWDER_SNOW
+			&& fogType != FogType.LAVA
+			&& !this.doesMobEffectBlockSky(camera)
+			&& this.levelRenderState.skyRenderState.skyType != DimensionSpecialEffects.SkyType.NONE;
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			&& backgroundRoute == net.vulkanic.world.WorldRenderRoutePolicy.Route.DISABLED
+			&& skyVisible) {
+			throw new IllegalStateException("Rust whole-frame background route is unavailable while Rust owns presentation");
+		}
+		if (backgroundRoute.usesRustWholeFrameVulkan()) {
+			return;
+		}
 		if (fogType != FogType.POWDER_SNOW && fogType != FogType.LAVA && !this.doesMobEffectBlockSky(camera)) {
 			SkyRenderState skyRenderState = this.levelRenderState.skyRenderState;
 			if (skyRenderState.skyType != DimensionSpecialEffects.SkyType.NONE) {
@@ -3299,6 +3676,18 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 
 	public boolean isSectionCompiled(BlockPos blockPos) {
 		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			if (this.rustGalWholeFrameTerrainSource.isSectionReady(blockPos)) {
+				return true;
+			}
+			// The loading screen prevents the world render loop from running, so the
+			// semantic producer cannot build its first section until that screen has
+			// closed. Use the already-loaded immutable chunk snapshot only as the
+			// bootstrap gate; the Rust source remains responsible for producing the
+			// actual section data before any world draw is admitted.
+			if (this.level != null && this.level.hasChunk(
+				blockPos.getX() >> 4, blockPos.getZ() >> 4)) {
+				return true;
+			}
 			SectionRenderDispatcher.RenderSection section = this.viewArea == null ? null : this.viewArea.getRenderSectionAt(blockPos);
 			return section != null && section.getSectionMesh() != CompiledSectionMesh.UNCOMPILED;
 		}

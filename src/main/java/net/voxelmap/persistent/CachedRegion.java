@@ -682,6 +682,9 @@ public class CachedRegion {
     }
 
     public ResourceLocation getTextureLocation() {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+            throw new IllegalStateException("Java VoxelMap persistent-region rendering is unavailable while Rust owns whole-frame presentation");
+        }
         if (this.image != null) {
             if (!this.refreshingImage) {
                 synchronized (this.image) {

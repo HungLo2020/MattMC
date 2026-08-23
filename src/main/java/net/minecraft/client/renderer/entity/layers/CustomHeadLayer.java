@@ -66,6 +66,7 @@ public class CustomHeadLayer<S extends LivingEntityRenderState, M extends Entity
 					skullModelBase,
 					renderType,
 					livingEntityRenderState.outlineColor,
+					null,
 					null
 				);
 			} else {

@@ -26,13 +26,15 @@ public class LeashKnotRenderer extends EntityRenderer<LeashFenceKnotEntity, Enti
 	public void submit(EntityRenderState entityRenderState, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, CameraRenderState cameraRenderState) {
 		poseStack.pushPose();
 		poseStack.scale(-1.0F, -1.0F, 1.0F);
-		submitNodeCollector.submitModel(
+		submitNodeCollector.submitModelSemanticTexture(
 			this.model,
 			entityRenderState,
 			poseStack,
 			this.model.renderType(KNOT_LOCATION),
 			entityRenderState.lightCoords,
 			OverlayTexture.NO_OVERLAY,
+			-1,
+			KNOT_LOCATION,
 			entityRenderState.outlineColor,
 			null
 		);

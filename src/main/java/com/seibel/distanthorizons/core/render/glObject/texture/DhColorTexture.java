@@ -32,6 +32,7 @@ public class DhColorTexture
 	
 	public DhColorTexture(Builder builder)
 	{
+		rejectRustWholeFrameJavaTexture();
 		this.isValid = true;
 		CommandContext ctx = VulkanicAPI.getCommandContext();
 		
@@ -50,6 +51,16 @@ public class DhColorTexture
 		// Clean up after ourselves
 		// This is strictly defensive to ensure that other buggy code doesn't tamper with our textures
 		VulkanicAPI.bindTexture(ctx, VulkanicTextureTarget.TEXTURE_2D, 0);
+	}
+
+	private static void rejectRustWholeFrameJavaTexture()
+	{
+		if (VulkanicAPI.isVulkanBackendInitializedAndSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
+		{
+			throw new IllegalStateException(
+				"Java Distant Horizons color textures are unavailable while Rust owns whole-frame presentation");
+		}
 	}
 	
 	

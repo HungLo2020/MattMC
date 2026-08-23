@@ -544,8 +544,10 @@ public class RenderSectionManager {
         float distance;
 
         // Vulkan terrain currently has backend-specific fog state differences, so avoid culling chunks from fog distance.
-        boolean useFogOcclusion = net.irisshaders.iris.Iris.getCurrentPack().isPresent()
-            || VulkanicAPI.isVulkanBackendSelected()
+        // Vulkan terrain does not use the Java/Iris fog-occlusion policy.  Keep the
+        // backend check first so Rust-owned Vulkan never probes Iris runtime state.
+        boolean useFogOcclusion = VulkanicAPI.isVulkanBackendSelected()
+            || net.irisshaders.iris.Iris.getCurrentPack().isPresent()
             ? false 
             : SodiumClientMod.options().performance.useFogOcclusion;
 
@@ -654,6 +656,9 @@ public class RenderSectionManager {
     }
 
     public void renderLayer(ChunkRenderMatrices matrices, TerrainRenderPass pass, double x, double y, double z, FogParameters fogParameters) {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+            throw new IllegalStateException("Java Sodium terrain pass is unavailable while Rust owns whole-frame presentation");
+        }
         RenderDevice device = RenderDevice.instance();
         CommandList commandList = device.createCommandList();
 
@@ -765,8 +770,11 @@ public class RenderSectionManager {
     private boolean processChunkBuildResults(ArrayList<BuilderTaskOutput> results) {
         var filtered = filterChunkBuildResults(results);
 
+        boolean rustWholeFrame = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
         var start = System.nanoTime();
-        this.regions.uploadResults(RenderDevice.instance().createCommandList(), filtered);
+        if (!rustWholeFrame) {
+            this.regions.uploadResults(RenderDevice.instance().createCommandList(), filtered);
+        }
         var uploadDuration = System.nanoTime() - start;
 
         boolean touchedSectionInfo = false;
@@ -778,7 +786,11 @@ public class RenderSectionManager {
             TranslucentData oldData = result.render.getTranslucentData();
             if (result instanceof ChunkBuildOutput chunkBuildOutput) {
                 net.sodium.client.render.StaticTerrainParityDiagnostics.recordChunkBuildOutput(chunkBuildOutput);
-                RustGalTerrainRenderer.acceptChunkBuildOutput(chunkBuildOutput);
+                if (rustWholeFrame) {
+                    RustGalTerrainRenderer.acceptWholeFrameChunkBuildOutput(chunkBuildOutput);
+                } else {
+                    RustGalTerrainRenderer.acceptChunkBuildOutput(chunkBuildOutput);
+                }
                 var prevFlags = result.render.getFlags();
 
                 touchedSectionInfo |= this.updateSectionInfo(result.render, chunkBuildOutput.info);

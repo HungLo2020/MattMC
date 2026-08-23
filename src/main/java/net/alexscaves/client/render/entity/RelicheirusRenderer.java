@@ -1,7 +1,6 @@
 package net.alexscaves.client.render.entity;
 
 import net.alexscaves.client.model.RelicheirusModel;
-import net.alexscaves.client.render.entity.layer.RelicheirusHeldTrilocarisLayer;
 import net.alexscaves.server.entity.living.RelicheirusEntity;
 import net.blaze3d.vertex.PoseStack;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
@@ -15,7 +14,6 @@ public class RelicheirusRenderer extends MobRenderer<RelicheirusEntity, Relichei
 
     public RelicheirusRenderer(EntityRendererProvider.Context renderManagerIn) {
         super(renderManagerIn, new RelicheirusModel(), 1.0F);
-        this.addLayer(new RelicheirusHeldTrilocarisLayer(this));
     }
 
     @Override
@@ -41,4 +39,3 @@ public class RelicheirusRenderer extends MobRenderer<RelicheirusEntity, Relichei
         return state.altSkin == 2 ? TEXTURE_TECTONIC : state.altSkin == 1 ? TEXTURE_RETRO : TEXTURE;
     }
 }
-

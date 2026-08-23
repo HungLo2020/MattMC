@@ -85,5 +85,7 @@ public class VulkanNativeInitializationInfoTest {
         Field rawVulkanBackendField = VulkanicAPI.class.getDeclaredField("rawVulkanBackend");
         rawVulkanBackendField.setAccessible(true);
         rawVulkanBackendField.set(null, null);
+        net.vulkanic.bridge.RustGalVulkanWholeFrameMode.deactivateRustPresentation();
+        net.vulkanic.bridge.RustGalVulkanWholeFrameMode.clearVulkanBackendSelection();
     }
 }

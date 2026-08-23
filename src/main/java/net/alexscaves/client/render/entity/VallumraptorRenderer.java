@@ -18,7 +18,6 @@ public class VallumraptorRenderer extends MobRenderer<VallumraptorEntity, Vallum
 
     public VallumraptorRenderer(EntityRendererProvider.Context renderManagerIn) {
         super(renderManagerIn, new VallumraptorModel(), 0.3F);
-        // TODO: Fix ItemLayer to work with render state system
     }
 
     @Override
@@ -71,4 +70,3 @@ public class VallumraptorRenderer extends MobRenderer<VallumraptorEntity, Vallum
         }
     }
 }
-

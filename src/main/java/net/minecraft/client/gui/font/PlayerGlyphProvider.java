@@ -8,6 +8,7 @@ import net.blaze3d.pipeline.RenderPipeline;
 import net.blaze3d.textures.GpuTextureView;
 import net.blaze3d.vertex.VertexConsumer;
 import java.util.function.Supplier;
+import java.util.function.Consumer;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.gui.Font;
@@ -18,6 +19,7 @@ import net.minecraft.client.renderer.RenderType;
 import net.minecraft.network.chat.Style;
 import net.minecraft.network.chat.FontDescription.PlayerSprite;
 import org.joml.Matrix4f;
+import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
 public class PlayerGlyphProvider {
@@ -39,7 +41,7 @@ public class PlayerGlyphProvider {
 
 					@Override
 					public TextRenderable createGlyph(float f, float g, int i, int j, Style style, float h, float k) {
-						return new PlayerGlyphProvider.Instance(supplier, bl, f, g, i, j, k);
+						return new PlayerGlyphProvider.Instance(supplier, bl, supplier.get().playerSkin().body().texturePath().toString(), f, g, i, j, k);
 					}
 				});
 			}
@@ -54,7 +56,7 @@ public class PlayerGlyphProvider {
 	}
 
 	@Environment(EnvType.CLIENT)
-	record Instance(Supplier<PlayerSkinRenderCache.RenderInfo> skin, boolean hat, float x, float y, int color, int shadowColor, float shadowOffset)
+	record Instance(Supplier<PlayerSkinRenderCache.RenderInfo> skin, boolean hat, String textureIdentity, float x, float y, int color, int shadowColor, float shadowOffset)
 		implements PlainTextRenderable {
 		@Override
 		public void renderSprite(Matrix4f matrix4f, VertexConsumer vertexConsumer, int i, float f, float g, float h, int j) {
@@ -66,6 +68,37 @@ public class PlayerGlyphProvider {
 			if (this.hat) {
 				renderQuad(matrix4f, vertexConsumer, i, k, l, m, n, h, j, 40.0F, 8.0F, 8, 8, 64, 64);
 			}
+		}
+
+		@Override
+		public int collectSemanticQuads(Consumer<TextGlyphQuad> consumer) {
+			int count = 0;
+			if (this.shadowColor() != 0) {
+				consumer.accept(this.semanticQuad(this.x() + this.shadowOffset(), this.y() + this.shadowOffset(), this.shadowColor(), 0.0F));
+				count++;
+				if (this.hat()) {
+					consumer.accept(this.semanticQuad(this.x() + this.shadowOffset(), this.y() + this.shadowOffset(), this.shadowColor(), 0.001F,
+						40.0F, 8.0F));
+					count++;
+				}
+			}
+			consumer.accept(this.semanticQuad(this.x(), this.y(), this.color(), this.shadowColor() == 0 ? 0.0F : 0.03F));
+			if (this.hat()) {
+				consumer.accept(this.semanticQuad(this.x(), this.y(), this.color(), this.shadowColor() == 0 ? 0.001F : 0.031F,
+					40.0F, 8.0F));
+			}
+			return count + 1 + (this.hat() ? 1 : 0);
+		}
+
+		private TextGlyphQuad semanticQuad(float x, float y, int color, float z) {
+			return semanticQuad(x, y, color, z, 8.0F, 8.0F);
+		}
+
+		private TextGlyphQuad semanticQuad(float x, float y, int color, float z, float sourceX, float sourceY) {
+			String identity = this.skin.get().playerSkin().body().texturePath().toString();
+			return new TextGlyphQuad(identity, true, x + this.left(), y + this.top(),
+				x + this.left(), y + this.bottom(), x + this.right(), y + this.bottom(), x + this.right(), y + this.top(), z,
+				sourceX / 64.0F, sourceY / 64.0F, (sourceX + 8.0F) / 64.0F, (sourceY + 8.0F) / 64.0F, color);
 		}
 
 		private static void renderQuad(
@@ -92,8 +125,11 @@ public class PlayerGlyphProvider {
 		}
 
 		@Override
+		@Nullable
 		public GpuTextureView textureView() {
-			return ((PlayerSkinRenderCache.RenderInfo)this.skin.get()).textureView();
+			return net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+				? null
+				: ((PlayerSkinRenderCache.RenderInfo)this.skin.get()).textureView();
 		}
 
 		@Override

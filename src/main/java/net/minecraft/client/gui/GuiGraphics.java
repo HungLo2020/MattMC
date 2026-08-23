@@ -586,6 +586,18 @@ public class GuiGraphics {
 		this.innerBlit(RenderPipelines.GUI_TEXTURED, resourceLocation, i, k, j, l, f, g, h, m, -1);
 	}
 
+	/** Semantic tiled image submission used by menu backgrounds whose UV span repeats. */
+	public void blitTiled(RenderPipeline renderPipeline, ResourceLocation resourceLocation,
+		int x, int y, float u, float v, int width, int height, int textureWidth, int textureHeight, int color) {
+		if (width <= 0 || height <= 0 || textureWidth <= 0 || textureHeight <= 0) return;
+		GpuTextureView gpuTextureView = net.vulkanic.gui.RustGalGuiRenderer.isWholeFrameVulkanActive()
+			? null
+			: this.minecraft.getTextureManager().getTexture(resourceLocation).getTextureView();
+		this.submitTiledBlit(renderPipeline, gpuTextureView, resourceLocation, textureWidth, textureHeight,
+			x, y, x + width, y + height, u / textureWidth, (u + width) / textureWidth,
+			v / textureHeight, (v + height) / textureHeight, color);
+	}
+
 	private void innerBlit(RenderPipeline renderPipeline, ResourceLocation resourceLocation, int i, int j, int k, int l, float f, float g, float h, float m, int n) {
 		GpuTextureView gpuTextureView = net.vulkanic.gui.RustGalGuiRenderer.isWholeFrameVulkanActive()
 			? null
@@ -635,6 +647,114 @@ public class GuiGraphics {
 					renderPipeline, textureSetup, semanticTexture, new Matrix3x2f(this.pose), i, j, k, l, m, n, f, g, h, o, p, this.scissorStack.peek()
 				)
 			);
+	}
+
+	/** Semantic tiled blit used by Rust-owned fullscreen screen effects. */
+	public void submitRustSemanticTiledBlit(
+		ResourceLocation semanticTexture,
+		int x,
+		int y,
+		int width,
+		int height,
+		int tileWidth,
+		int tileHeight,
+		float u0,
+		float v0,
+		float u1,
+		float v1,
+		int color
+	) {
+		if (semanticTexture == null || width <= 0 || height <= 0 || tileWidth <= 0 || tileHeight <= 0) {
+			throw new IllegalArgumentException("invalid Rust semantic tiled blit");
+		}
+		TextureSetup textureSetup = net.vulkanic.gui.RustGalGuiRenderer.isWholeFrameVulkanActive()
+			? TextureSetup.noTexture()
+			: TextureSetup.singleTexture(this.minecraft.getTextureManager().getTexture(semanticTexture).getTextureView());
+		this.guiRenderState.submitGuiElement(new TiledBlitRenderState(
+			RenderPipelines.GUI_TEXTURED,
+			textureSetup,
+			semanticTexture,
+			new Matrix3x2f(this.pose),
+			x,
+			y,
+			x + width,
+			y + height,
+			tileWidth,
+			tileHeight,
+			u0,
+			v0,
+			u1,
+			v1,
+			color,
+			this.scissorStack.peek()
+		));
+	}
+
+	/** Semantic affine blit for atlas-backed Rust-owned screen effects. */
+	public void submitRustSemanticBlit(
+		ResourceLocation semanticTexture,
+		int x,
+		int y,
+		int width,
+		int height,
+		float u0,
+		float v0,
+		float u1,
+		float v1,
+		int color
+	) {
+		if (semanticTexture == null || width <= 0 || height <= 0
+			|| !Float.isFinite(u0) || !Float.isFinite(v0) || !Float.isFinite(u1) || !Float.isFinite(v1)) {
+			throw new IllegalArgumentException("invalid Rust semantic blit");
+		}
+		TextureSetup textureSetup = net.vulkanic.gui.RustGalGuiRenderer.isWholeFrameVulkanActive()
+			? TextureSetup.noTexture()
+			: TextureSetup.singleTexture(this.minecraft.getTextureManager().getTexture(semanticTexture).getTextureView());
+		this.guiRenderState.submitGuiElement(new BlitRenderState(
+			RenderPipelines.GUI_TEXTURED,
+			textureSetup,
+			semanticTexture,
+			new Matrix3x2f(this.pose),
+			x,
+			y,
+			width,
+			height,
+			u0,
+			v0,
+			u1,
+			v1,
+			color,
+			this.scissorStack.peek()
+		));
+	}
+
+	/** Submits the exact copied semantic End Portal layer mesh for Rust Vulkan. */
+	public void submitRustEndPortal(float gameTime) {
+		List<net.vulkanic.gui.RustGalGuiElementRenderState> elements =
+			net.vulkanic.gui.RustGalGuiRenderer.tryEnqueueEndPortal(this.guiWidth(), this.guiHeight(), gameTime, 0);
+		if (elements == null) {
+			throw new IllegalStateException("Rust whole-frame End Portal GUI route rejected semantic layers");
+		}
+		for (net.vulkanic.gui.RustGalGuiElementRenderState element : elements) {
+			this.guiRenderState.submitGuiElement(element);
+		}
+	}
+
+	/** Submits a resource-backed vertical gradient through the Rust GUI mesh ABI. */
+	public void submitRustSemanticGradientBlit(
+		ResourceLocation semanticTexture, float x, float y, float width, float height,
+		float u0, float u1, float v0, float v1, int topColor, int bottomColor
+	) {
+		List<net.vulkanic.gui.RustGalGuiElementRenderState> elements =
+			net.vulkanic.gui.RustGalGuiRenderer.tryEnqueueGradientBlit(
+				semanticTexture, new Matrix3x2f(this.pose), x, y, width, height,
+				u0, u1, v0, v1, topColor, bottomColor, this.guiWidth(), this.guiHeight(), 0);
+		if (elements == null) {
+			throw new IllegalStateException("Rust whole-frame gradient GUI route rejected semantic mesh");
+		}
+		for (net.vulkanic.gui.RustGalGuiElementRenderState element : elements) {
+			this.guiRenderState.submitGuiElement(element);
+		}
 	}
 
 	public void renderItem(ItemStack itemStack, int i, int j) {
@@ -927,12 +1047,46 @@ public class GuiGraphics {
 
 	public void submitMapRenderState(MapRenderState mapRenderState) {
 		if (net.vulkanic.gui.RustGalGuiRenderer.isWholeFrameVulkanActive()) {
-			throw new IllegalStateException("Rust whole-frame Vulkan has no semantic map-GUI route; refusing Java texture-view rendering");
+			// Map textures are registered CPU DynamicTextures. Copy their semantic
+			// identity into the ordinary Rust GUI blit stream; no Java texture view
+			// or PIP renderer is needed on the whole-frame route.
+			this.submitRustSemanticBlit(mapRenderState.texture, 0, 0, 128, 128, 0.0F, 0.0F, 1.0F, 1.0F, -1);
+			for (MapRenderState.MapDecorationRenderState decoration : mapRenderState.decorations) {
+				if (!decoration.renderOnFrame || decoration.atlasSprite == null) continue;
+				this.pose.pushMatrix();
+				this.pose.translate(decoration.x / 2.0F + 64.0F, decoration.y / 2.0F + 64.0F);
+				this.pose.rotate((float)(Math.PI / 180.0) * decoration.rot * 360.0F / 16.0F);
+				this.pose.scale(4.0F, 4.0F);
+				this.pose.translate(-0.125F, 0.125F);
+				TextureAtlasSprite sprite = decoration.atlasSprite;
+				this.submitRustSemanticBlit(
+					sprite.atlasLocation(), -1, -1, 2, 2,
+					sprite.getU0(), sprite.getV0(), sprite.getU1(), sprite.getV1(), -1
+				);
+				this.pose.popMatrix();
+				if (decoration.name != null) {
+					Font font = this.minecraft.font;
+					float textWidth = font.width(decoration.name);
+					float scale = Mth.clamp(25.0F / textWidth, 0.0F, 6.0F / 9.0F);
+					this.pose.pushMatrix();
+					this.pose.translate(decoration.x / 2.0F + 64.0F - textWidth * scale / 2.0F, decoration.y / 2.0F + 64.0F + 4.0F);
+					this.pose.scale(scale, scale);
+					this.guiRenderState.submitText(new GuiTextRenderState(
+						font, decoration.name.getVisualOrderText(), new Matrix3x2f(this.pose),
+						0, 0, -1, Integer.MIN_VALUE, false, this.scissorStack.peek()
+					));
+					this.pose.popMatrix();
+				}
+			}
+			return;
 		}
 		Minecraft minecraft = Minecraft.getInstance();
 		TextureManager textureManager = minecraft.getTextureManager();
-		GpuTextureView gpuTextureView = textureManager.getTexture(mapRenderState.texture).getTextureView();
-		this.submitBlit(RenderPipelines.GUI_TEXTURED, gpuTextureView, 0, 0, 128, 128, 0.0F, 1.0F, 0.0F, 1.0F, -1);
+		ResourceLocation mapTexture = mapRenderState.texture;
+		GpuTextureView gpuTextureView = net.vulkanic.gui.RustGalGuiRenderer.isWholeFrameVulkanActive()
+			? null : textureManager.getTexture(mapTexture).getTextureView();
+		this.submitBlit(RenderPipelines.GUI_TEXTURED, gpuTextureView, mapTexture,
+			0, 0, 128, 128, 0.0F, 1.0F, 0.0F, 1.0F, -1);
 
 		for (MapRenderState.MapDecorationRenderState mapDecorationRenderState : mapRenderState.decorations) {
 			if (mapDecorationRenderState.renderOnFrame) {
@@ -943,10 +1097,13 @@ public class GuiGraphics {
 				this.pose.translate(-0.125F, 0.125F);
 				TextureAtlasSprite textureAtlasSprite = mapDecorationRenderState.atlasSprite;
 				if (textureAtlasSprite != null) {
-					GpuTextureView gpuTextureView2 = textureManager.getTexture(textureAtlasSprite.atlasLocation()).getTextureView();
+					ResourceLocation atlasTexture = textureAtlasSprite.atlasLocation();
+					GpuTextureView gpuTextureView2 = net.vulkanic.gui.RustGalGuiRenderer.isWholeFrameVulkanActive()
+						? null : textureManager.getTexture(atlasTexture).getTextureView();
 					this.submitBlit(
 						RenderPipelines.GUI_TEXTURED,
 						gpuTextureView2,
+						atlasTexture,
 						-1,
 						-1,
 						1,

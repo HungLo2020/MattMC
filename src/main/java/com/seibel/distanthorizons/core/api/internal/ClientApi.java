@@ -359,6 +359,10 @@ public class ClientApi
 	/** Should be called before {@link ClientApi#renderDeferredLodsForShaders} */
 	public void renderLods() 
 	{ 
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
+		{
+			throw new IllegalStateException("Java Distant Horizons LOD rendering is unavailable while Rust owns whole-frame presentation");
+		}
 		//LOGGER.debug("[DH-RENDER] renderLods() called");
 		this.renderLodLayer(false); 
 		//LOGGER.debug("[DH-RENDER] renderLods() completed");
@@ -403,10 +407,22 @@ public class ClientApi
 	 * Only necessary when Shaders are in use.
 	 * Should be called after {@link ClientApi#renderLods} 
 	 */
-	public void renderDeferredLodsForShaders() { this.renderLodLayer(true); }
+	public void renderDeferredLodsForShaders() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
+		{
+			throw new IllegalStateException("Java Distant Horizons deferred LOD rendering is unavailable while Rust owns whole-frame presentation");
+		}
+		this.renderLodLayer(true);
+	}
 	
 	private void renderLodLayer(boolean renderingDeferredLayer)
 	{
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
+		{
+			// The Rust whole-frame shell invokes the explicit DH semantic collector
+			// separately; never initialize GLProxy or drain Java upload work here.
+			return;
+		}
 		//LOGGER.debug("[DH-RENDER-LAYER] ========== RENDER LOD LAYER START ==========");
 		//LOGGER.debug("[DH-RENDER-LAYER] renderingDeferredLayer: " + renderingDeferredLayer);
 		//LOGGER.debug("[DH-RENDER-LAYER] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().getId() + ")");
@@ -616,6 +632,10 @@ public class ClientApi
 	 */
 	public void renderFadeOpaque()
 	{
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
+		{
+			throw new IllegalStateException("Java Distant Horizons opaque fade rendering is unavailable while Rust owns whole-frame presentation");
+		}
 		// only fade when DH is rendering
 		if (Config.Client.Advanced.Debugging.rendererMode.get() == EDhApiRendererMode.DEFAULT
 			&&
@@ -638,6 +658,10 @@ public class ClientApi
 	 */
 	public void renderFadeTransparent()
 	{
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
+		{
+			throw new IllegalStateException("Java Distant Horizons transparent fade rendering is unavailable while Rust owns whole-frame presentation");
+		}
 		// only fade when DH is rendering
 		if (Config.Client.Advanced.Debugging.rendererMode.get() == EDhApiRendererMode.DEFAULT)
 		{

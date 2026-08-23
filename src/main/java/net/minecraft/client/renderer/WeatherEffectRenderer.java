@@ -105,15 +105,27 @@ public class WeatherEffectRenderer {
 	}
 
 	public void render(MultiBufferSource multiBufferSource, Vec3 vec3, WeatherRenderState weatherRenderState) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java weather rendering is unavailable while Rust owns whole-frame presentation");
+		}
+		net.vulkanic.world.WorldRenderRoutePolicy.Route weatherRoute = net.vulkanic.world.WorldRenderRoutePolicy.currentWeatherRoute();
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			&& weatherRoute == net.vulkanic.world.WorldRenderRoutePolicy.Route.DISABLED
+			&& weatherRenderState != null
+			&& (!weatherRenderState.rainColumns.isEmpty() || !weatherRenderState.snowColumns.isEmpty())) {
+			throw new IllegalStateException("Rust whole-frame weather route is unavailable while Rust owns presentation");
+		}
+		boolean rustWeather = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			&& weatherRoute.usesRustWholeFrameVulkan();
 		// Iris: Allow shaders to disable weather rendering (from MixinWeatherRenderer)
-		if (!net.irisshaders.iris.Iris.getPipelineManager().getPipeline().map(net.irisshaders.iris.pipeline.WorldRenderingPipeline::shouldRenderWeather).orElse(true)) {
+		if (!rustWeather && !net.irisshaders.iris.Iris.getPipelineManager().getPipeline().map(net.irisshaders.iris.pipeline.WorldRenderingPipeline::shouldRenderWeather).orElse(true)) {
 			return;
 		}
 		
 		if (!weatherRenderState.rainColumns.isEmpty()) {
 			// Iris: Allow shaders to write to depth buffer (from MixinWeatherRenderer)
 			boolean useShaderTransparency = Minecraft.useShaderTransparency();
-			if (net.irisshaders.iris.Iris.getPipelineManager().getPipeline().map(net.irisshaders.iris.pipeline.WorldRenderingPipeline::shouldWriteRainAndSnowToDepthBuffer).orElse(false)) {
+			if (!rustWeather && net.irisshaders.iris.Iris.getPipelineManager().getPipeline().map(net.irisshaders.iris.pipeline.WorldRenderingPipeline::shouldWriteRainAndSnowToDepthBuffer).orElse(false)) {
 				useShaderTransparency = true;
 			}
 			RenderType renderType = RenderType.weather(RAIN_LOCATION, useShaderTransparency);
@@ -125,7 +137,7 @@ public class WeatherEffectRenderer {
 		if (!weatherRenderState.snowColumns.isEmpty()) {
 			// Iris: Allow shaders to write to depth buffer (from MixinWeatherRenderer)
 			boolean useShaderTransparency = Minecraft.useShaderTransparency();
-			if (net.irisshaders.iris.Iris.getPipelineManager().getPipeline().map(net.irisshaders.iris.pipeline.WorldRenderingPipeline::shouldWriteRainAndSnowToDepthBuffer).orElse(false)) {
+			if (!rustWeather && net.irisshaders.iris.Iris.getPipelineManager().getPipeline().map(net.irisshaders.iris.pipeline.WorldRenderingPipeline::shouldWriteRainAndSnowToDepthBuffer).orElse(false)) {
 				useShaderTransparency = true;
 			}
 			RenderType renderType = RenderType.weather(SNOW_LOCATION, useShaderTransparency);
@@ -181,8 +193,10 @@ public class WeatherEffectRenderer {
 	}
 
 	public void tickRainParticles(ClientLevel clientLevel, Camera camera, int i, ParticleStatus particleStatus) {
+		boolean rustWeather = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			&& net.vulkanic.world.WorldRenderRoutePolicy.currentWeatherRoute().usesRustWholeFrameVulkan();
 		// Iris: Allow shaders to disable weather particles (from MixinWeatherRenderer)
-		if (!net.irisshaders.iris.Iris.getPipelineManager().getPipeline().map(net.irisshaders.iris.pipeline.WorldRenderingPipeline::shouldRenderWeatherParticles).orElse(true)) {
+		if (!rustWeather && !net.irisshaders.iris.Iris.getPipelineManager().getPipeline().map(net.irisshaders.iris.pipeline.WorldRenderingPipeline::shouldRenderWeatherParticles).orElse(true)) {
 			particleStatus = ParticleStatus.MINIMAL;
 		}
 		

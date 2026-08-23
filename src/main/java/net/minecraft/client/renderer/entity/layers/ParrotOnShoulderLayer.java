@@ -13,6 +13,7 @@ import net.minecraft.client.renderer.entity.RenderLayerParent;
 import net.minecraft.client.renderer.entity.state.AvatarRenderState;
 import net.minecraft.client.renderer.entity.state.ParrotRenderState;
 import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.animal.Parrot.Variant;
 
 @Environment(EnvType.CLIENT)
@@ -48,13 +49,16 @@ public class ParrotOnShoulderLayer extends RenderLayer<AvatarRenderState, Player
 		parrotRenderState.walkAnimationSpeed = avatarRenderState.walkAnimationSpeed;
 		parrotRenderState.yRot = f;
 		parrotRenderState.xRot = g;
-		submitNodeCollector.submitModel(
+		ResourceLocation textureIdentity = ParrotRenderer.getVariantTexture(variant);
+		submitNodeCollector.submitModelSemanticTexture(
 			this.model,
 			parrotRenderState,
 			poseStack,
-			this.model.renderType(ParrotRenderer.getVariantTexture(variant)),
+			this.model.renderType(textureIdentity),
 			i,
 			OverlayTexture.NO_OVERLAY,
+			-1,
+			textureIdentity,
 			avatarRenderState.outlineColor,
 			null
 		);

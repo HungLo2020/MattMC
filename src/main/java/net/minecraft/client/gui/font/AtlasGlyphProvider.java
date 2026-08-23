@@ -7,6 +7,7 @@ import net.blaze3d.vertex.VertexConsumer;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
+import java.util.function.Consumer;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.gui.Font;
@@ -18,6 +19,7 @@ import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.network.chat.Style;
 import net.minecraft.resources.ResourceLocation;
 import org.joml.Matrix4f;
+import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
 public class AtlasGlyphProvider {
@@ -56,7 +58,10 @@ public class AtlasGlyphProvider {
 				@Override
 				public TextRenderable createGlyph(float f, float g, int i, int j, Style style, float h, float k) {
 					return new AtlasGlyphProvider.Instance(
-						AtlasGlyphProvider.this.renderTypes, AtlasGlyphProvider.this.atlas.getTextureView(), textureAtlasSprite, f, g, i, j, k
+						AtlasGlyphProvider.this.renderTypes,
+						net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+							? null : AtlasGlyphProvider.this.atlas.getTextureView(),
+						AtlasGlyphProvider.this.atlas.location().toString(), textureAtlasSprite, f, g, i, j, k
 					);
 				}
 			}
@@ -65,7 +70,8 @@ public class AtlasGlyphProvider {
 
 	@Environment(EnvType.CLIENT)
 	record Instance(
-		GlyphRenderTypes renderTypes, GpuTextureView textureView, TextureAtlasSprite sprite, float x, float y, int color, int shadowColor, float shadowOffset
+		GlyphRenderTypes renderTypes, @Nullable GpuTextureView textureView, String atlasIdentity, TextureAtlasSprite sprite,
+		float x, float y, int color, int shadowColor, float shadowOffset
 	) implements PlainTextRenderable {
 		@Override
 		public void renderSprite(Matrix4f matrix4f, VertexConsumer vertexConsumer, int i, float f, float g, float h, int j) {
@@ -77,6 +83,23 @@ public class AtlasGlyphProvider {
 			vertexConsumer.addVertex(matrix4f, k, n, h).setUv(this.sprite.getU0(), this.sprite.getV1()).setColor(j).setLight(i);
 			vertexConsumer.addVertex(matrix4f, l, n, h).setUv(this.sprite.getU1(), this.sprite.getV1()).setColor(j).setLight(i);
 			vertexConsumer.addVertex(matrix4f, l, m, h).setUv(this.sprite.getU1(), this.sprite.getV0()).setColor(j).setLight(i);
+		}
+
+		@Override
+		public int collectSemanticQuads(Consumer<TextGlyphQuad> consumer) {
+			int count = 0;
+			if (this.shadowColor() != 0) {
+				consumer.accept(this.semanticQuad(this.x() + this.shadowOffset(), this.y() + this.shadowOffset(), this.shadowColor(), 0.0F));
+				count++;
+			}
+			consumer.accept(this.semanticQuad(this.x(), this.y(), this.color(), this.shadowColor() == 0 ? 0.0F : 0.03F));
+			return count + 1;
+		}
+
+		private TextGlyphQuad semanticQuad(float x, float y, int color, float z) {
+			return new TextGlyphQuad(this.atlasIdentity, true, x + this.left(), y + this.top(),
+				x + this.left(), y + this.bottom(), x + this.right(), y + this.bottom(), x + this.right(), y + this.top(), z,
+				this.sprite.getU0(), this.sprite.getV0(), this.sprite.getU1(), this.sprite.getV1(), color);
 		}
 
 		@Override

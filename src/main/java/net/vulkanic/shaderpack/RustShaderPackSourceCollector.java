@@ -10,6 +10,9 @@ import net.irisshaders.iris.shaderpack.option.OptionSet;
 import net.irisshaders.iris.shaderpack.option.OptionType;
 import net.irisshaders.iris.shaderpack.option.values.OptionValues;
 import net.vulkanic.bridge.VulkanicGalBridge;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.packs.resources.Resource;
+import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
@@ -55,7 +58,37 @@ public final class RustShaderPackSourceCollector {
 			if (!wholeFrameShaderConfigEnabled()) {
 				return disabled(generation);
 			}
-			throw new IOException("configured Iris shader packs are unavailable until their Rust-owned source configuration collector is complete");
+			Optional<String> configuredName = configuredPackNameFromDisk();
+			if (configuredName.isEmpty()) {
+				Optional<String> postEffect = activeVanillaPostEffectId();
+				return postEffect.isPresent()
+					? collectVanillaPostEffect(postEffect.get(), generation)
+					: disabled(generation);
+			}
+			Path shaderpacks = net.minecraft.client.Minecraft.getInstance().gameDirectory.toPath()
+				.resolve("shaderpacks").toAbsolutePath().normalize();
+			String packName = configuredName.get();
+			Path pack = shaderpacks.resolve(packName).normalize();
+			if (!pack.startsWith(shaderpacks) || !pack.getFileName().toString().equals(packName)) {
+				throw new IOException("configured shader-pack path escapes shaderpacks directory");
+			}
+			SourceGeneration source;
+			if (Files.isDirectory(pack)) {
+				source = collectWithAssets(pack.resolve("shaders"), packName, generation);
+			} else {
+				try (FileSystem archive = FileSystems.newFileSystem(pack)) {
+					source = collectWithAssets(archive.getPath("/shaders"), packName, generation);
+				}
+			}
+			// Rust owns option/profile interpretation. Only copied source, assets,
+			// and immutable Minecraft block-state identities cross the boundary.
+			return withRuntimeEnvironmentSnapshot(
+				withRuntimeOptionSnapshot(
+					withRuntimeBlockStateIdentitySnapshot(withActiveVanillaPostEffectResources(source)),
+					readWholeFramePackOptions(shaderpacks, packName)
+				),
+				wholeFrameEnvironmentDefines()
+			);
 		}
 		if (!Iris.getIrisConfig().areShadersEnabled()) {
 			return disabled(generation);
@@ -80,7 +113,8 @@ public final class RustShaderPackSourceCollector {
 		}
 		ShaderPack resolvedPack = Iris.getCurrentPack().orElseThrow(() ->
 			new IOException("configured shader pack disappeared during source collection"));
-		return withConfiguredSemanticSnapshots(withResolvedIrisSourceSnapshot(source, resolvedPack), resolvedPack);
+		SourceGeneration merged = withActiveVanillaPostEffectResources(source);
+		return withConfiguredSemanticSnapshots(withResolvedIrisSourceSnapshot(merged, resolvedPack), resolvedPack);
 	}
 
 	/**
@@ -91,15 +125,170 @@ public final class RustShaderPackSourceCollector {
 	 */
 	public static Optional<String> activeConfiguredPackName() {
 		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			// Do not touch Iris configuration or resolved-pack objects after Rust
-			// owns presentation. A configured pack is deliberately unadmitted until
-			// the Rust-owned source configuration path can represent it completely.
-			return Optional.empty();
+			try {
+				if (!wholeFrameShaderConfigEnabled()) {
+					return Optional.empty();
+				}
+				Optional<String> configured = configuredPackNameFromDisk();
+				if (configured.isEmpty()) {
+					return activeVanillaPostEffectId();
+				}
+				Path shaderpacks = net.minecraft.client.Minecraft.getInstance().gameDirectory.toPath()
+					.resolve("shaderpacks").toAbsolutePath().normalize();
+				Path pack = shaderpacks.resolve(configured.get()).normalize();
+				if (!pack.startsWith(shaderpacks) || !Files.exists(pack)) {
+					return Optional.empty();
+				}
+				return Optional.of(sourceGenerationKey(configured.get(), activeVanillaPostEffectId()));
+			} catch (IOException error) {
+				return Optional.empty();
+			}
 		}
 		if (!Iris.getIrisConfig().areShadersEnabled() || Iris.getCurrentPack().isEmpty()) {
 			return Optional.empty();
 		}
-		return Iris.getIrisConfig().getShaderPackName().filter(name -> !name.isBlank());
+		return Iris.getIrisConfig().getShaderPackName()
+			.filter(name -> !name.isBlank())
+			.map(name -> sourceGenerationKey(name, activeVanillaPostEffectId()));
+	}
+
+	private static String sourceGenerationKey(String packName, Optional<String> postEffect) {
+		return postEffect.map(identity -> packName + "#post-effect:" + identity).orElse(packName);
+	}
+
+	/**
+	 * Returns a non-bundled active post-effect identity which needs the generic
+	 * Rust fullscreen executor. The bundled invert/creeper/spider effects have
+	 * dedicated semantic routes and must not cause a resource snapshot reload.
+	 */
+	private static Optional<String> activeVanillaPostEffectId() {
+		try {
+			ResourceLocation effect = net.minecraft.client.Minecraft.getInstance()
+				.gameRenderer.currentPostEffect();
+			if (effect == null) {
+				return Optional.empty();
+			}
+			String identity = effect.toString();
+			return switch (identity) {
+			case "minecraft:invert", "minecraft:creeper", "minecraft:spider" -> Optional.empty();
+			default -> Optional.of(identity);
+			};
+		} catch (RuntimeException ignored) {
+			return Optional.empty();
+		}
+	}
+
+	/**
+	 * Copies one active vanilla/resource-pack post-effect definition and the
+	 * bounded shader source tree into the same immutable semantic snapshot used
+	 * by Iris packs. No Resource, ResourceManager, or Java renderer object crosses
+	 * the bridge; Rust receives only copied bytes and normalized relative paths.
+	 */
+	private static SourceGeneration collectVanillaPostEffect(String identity, long generation) throws IOException {
+		ResourceManager manager = net.minecraft.client.Minecraft.getInstance().getResourceManager();
+		ResourceLocation effect = ResourceLocation.parse(identity);
+		String effectPath = effect.getPath() + ".json";
+		Resource effectResource = manager.getResource(
+			ResourceLocation.fromNamespaceAndPath(effect.getNamespace(), "post_effect/" + effectPath)
+		).orElseThrow(() -> new IOException("active post-effect definition is missing: " + identity));
+		byte[] definition = readBoundedResource(effectResource, MAX_ASSET_FILE_BYTES, "post-effect definition");
+		List<VulkanicGalBridge.ShaderPackSourceFileRecord> sources = new java.util.ArrayList<>();
+		for (var entry : manager.listResources("shaders", location -> {
+			String path = location.getPath();
+			return location.getNamespace().equals(effect.getNamespace())
+				&& (path.endsWith(".vsh") || path.endsWith(".fsh") || path.endsWith(".glsl"));
+		}).entrySet().stream().sorted(Map.Entry.comparingByKey()).toList()) {
+			String path = entry.getKey().getPath();
+			if (sources.size() >= MAX_FILES) {
+				throw new IOException("resource-pack shader source count exceeds " + MAX_FILES);
+			}
+			sources.add(new VulkanicGalBridge.ShaderPackSourceFileRecord(
+				path,
+				readBoundedResource(entry.getValue(), MAX_FILE_BYTES, "post-effect shader source")
+			));
+		}
+		return new SourceGeneration(
+			"minecraft-resource-pack:" + identity,
+			generation,
+			List.copyOf(sources),
+			sources.stream().mapToLong(file -> file.contentsUtf8().length).sum(),
+			List.of(new VulkanicGalBridge.ShaderPackAssetFileRecord("post_effect/" + effectPath, definition)),
+			definition.length
+		);
+	}
+
+	/**
+	 * Adds the active resource-pack post-effect to an existing Iris snapshot.
+	 * Iris-owned files win on path collisions; resource-pack files only fill
+	 * missing stages. This keeps pack precedence deterministic while allowing a
+	 * vanilla/resource-pack post graph to use bundled or copied fallback stages.
+	 */
+	private static SourceGeneration withActiveVanillaPostEffectResources(SourceGeneration source) throws IOException {
+		Optional<String> identity = activeVanillaPostEffectId();
+		if (identity.isEmpty()) {
+			return source;
+		}
+		ResourceManager manager = net.minecraft.client.Minecraft.getInstance().getResourceManager();
+		ResourceLocation effect = ResourceLocation.parse(identity.get());
+		String effectPath = effect.getPath() + ".json";
+		Resource effectResource = manager.getResource(
+			ResourceLocation.fromNamespaceAndPath(effect.getNamespace(), "post_effect/" + effectPath)
+		).orElseThrow(() -> new IOException("active post-effect definition is missing: " + identity.get()));
+		String assetPath = "post_effect/" + effectPath;
+		Map<String, VulkanicGalBridge.ShaderPackAssetFileRecord> assets = new TreeMap<>();
+		for (var asset : source.assets()) {
+			assets.put(asset.path(), asset);
+		}
+		if (!assets.containsKey(assetPath)) {
+			assets.put(assetPath, new VulkanicGalBridge.ShaderPackAssetFileRecord(
+				assetPath,
+				readBoundedResource(effectResource, MAX_ASSET_FILE_BYTES, "post-effect definition")
+			));
+		}
+		Map<String, VulkanicGalBridge.ShaderPackSourceFileRecord> files = new TreeMap<>();
+		for (var file : source.files()) {
+			files.put(file.path(), file);
+		}
+		for (var entry : manager.listResources("shaders", location -> {
+			String path = location.getPath();
+			return location.getNamespace().equals(effect.getNamespace())
+				&& (path.endsWith(".vsh") || path.endsWith(".fsh") || path.endsWith(".glsl"));
+		}).entrySet()) {
+			String path = entry.getKey().getPath();
+			if (files.containsKey(path)) {
+				continue;
+			}
+			if (files.size() >= MAX_FILES) {
+				throw new IOException("merged post-effect shader source count exceeds " + MAX_FILES);
+			}
+			files.put(path, new VulkanicGalBridge.ShaderPackSourceFileRecord(
+				path,
+				readBoundedResource(entry.getValue(), MAX_FILE_BYTES, "post-effect shader source")
+			));
+		}
+		long sourceBytes = files.values().stream().mapToLong(file -> file.contentsUtf8().length).sum();
+		long assetBytes = assets.values().stream().mapToLong(asset -> asset.contents().length).sum();
+		if (sourceBytes > MAX_TOTAL_BYTES || assetBytes > MAX_ASSET_TOTAL_BYTES) {
+			throw new IOException("merged resource-pack post-effect snapshot exceeds its bounded payload");
+		}
+		return new SourceGeneration(
+			source.packName(),
+			source.generation(),
+			List.copyOf(files.values()),
+			sourceBytes,
+			List.copyOf(assets.values()),
+			assetBytes
+		);
+	}
+
+	private static byte[] readBoundedResource(Resource resource, int maximumBytes, String kind) throws IOException {
+		try (var input = resource.open()) {
+			byte[] bytes = input.readNBytes(Math.addExact(maximumBytes, 1));
+			if (bytes.length > maximumBytes) {
+				throw new IOException(kind + " exceeds " + maximumBytes + " bytes");
+			}
+			return bytes;
+		}
 	}
 
 	/** Reads only the copied on-disk preference used to reject unported packs. */
@@ -114,6 +303,88 @@ public final class RustShaderPackSourceCollector {
 			values.load(input);
 		}
 		return !"false".equals(values.getProperty("enableShaders"));
+	}
+
+	private static Optional<String> configuredPackNameFromDisk() throws IOException {
+		Path config = net.minecraft.client.Minecraft.getInstance().gameDirectory.toPath()
+			.resolve("config").resolve("iris.properties");
+		return configuredPackNameFromProperties(config);
+	}
+
+	/** Stable source-environment defaults used before any pack-specific Iris option graph exists. */
+	static Map<String, String> wholeFrameEnvironmentDefines() {
+		TreeMap<String, String> defines = new TreeMap<>();
+		defines.put("IS_IRIS", "1");
+		defines.put("IRIS_VERSION", "12000");
+		// Distant Horizons is a compiled MattMC semantic capability, not an Iris
+		// renderer flag. Publishing it in the immutable source environment is
+		// required for packs such as Complementary whose dh_terrain/dh_water
+		// blend declarations are guarded by #ifdef DISTANT_HORIZONS.
+		defines.put("DISTANT_HORIZONS", "1");
+		// Minecraft's shader macro is a stable semantic engine value. Keep it in
+		// the Rust-owned source snapshot rather than reading Iris' macro table or
+		// any live renderer state.
+		defines.put("MC_VERSION", "12105");
+		// Complementary's selected MATTMC profile uses this scalar default. It is
+		// transported as source configuration, never read from Iris GPU state.
+		defines.put("SHADOW_QUALITY", "2");
+		defines.put("ENTITY_SHADOWS_DEFINE", "-1");
+		defines.put("PLAYER_SHADOW", "1");
+		defines.put("FXAA_DEFINE", "1");
+		defines.put("DETAIL_QUALITY", "2");
+		defines.put("CLOUD_QUALITY", "2");
+		defines.put("WATER_REFLECT_QUALITY", "2");
+		defines.put("BLOCK_REFLECT_QUALITY", "3");
+		defines.put("LIGHTSHAFT_QUALI_DEFINE", "2");
+		defines.put("SSAO_QUALI_DEFINE", "2");
+		defines.put("COLORED_LIGHTING", "256");
+		defines.put("RAIN_PUDDLES", "0");
+		defines.put("ANISOTROPIC_FILTER", "0");
+		defines.put("MC_RENDER_STAGE_SUN", "4");
+		defines.put("MC_RENDER_STAGE_MOON", "5");
+		defines.put("MC_RENDER_STAGE_TERRAIN_SOLID", "8");
+		defines.put("MC_RENDER_STAGE_TERRAIN_CUTOUT_MIPPED", "9");
+		defines.put("MC_RENDER_STAGE_TERRAIN_CUTOUT", "10");
+		defines.put("MC_RENDER_STAGE_TERRAIN_TRANSLUCENT", "15");
+		defines.put("MC_RENDER_STAGE_RAIN_SNOW", "19");
+		defines.put("MC_RENDER_STAGE_CLOUDS", "20");
+		defines.put("MC_RENDER_STAGE_ENTITIES", "23");
+		defines.put("MC_RENDER_STAGE_HAND", "24");
+		return defines;
+	}
+
+	static Map<String, String> readWholeFramePackOptions(Path shaderpacks, String packName) throws IOException {
+		Path options = shaderpacks.resolve(packName + ".txt").normalize();
+		if (!options.startsWith(shaderpacks) || !Files.isRegularFile(options)) {
+			return Map.of();
+		}
+		if (Files.size(options) > MAX_FILE_BYTES) {
+			throw new IOException("shader-pack option file exceeds " + MAX_FILE_BYTES + " bytes");
+		}
+		Properties values = new Properties();
+		try (var input = Files.newInputStream(options)) {
+			values.load(input);
+		}
+		TreeMap<String, String> result = new TreeMap<>();
+		for (String name : values.stringPropertyNames()) {
+			String value = values.getProperty(name);
+			if (name.matches("[A-Za-z_][A-Za-z0-9_]*") && value != null && !value.isBlank()) {
+				result.put(name, value.trim());
+			}
+		}
+		return result;
+	}
+
+	static Optional<String> configuredPackNameFromProperties(Path config) throws IOException {
+		if (!Files.isRegularFile(config)) {
+			return Optional.empty();
+		}
+		Properties values = new Properties();
+		try (var input = Files.newInputStream(config)) {
+			values.load(input);
+		}
+		String name = values.getProperty("shaderPack", "").trim();
+		return name.isEmpty() || "(internal)".equals(name) ? Optional.empty() : Optional.of(name);
 	}
 
 	public static SourceGeneration disabled(long generation) {
@@ -166,7 +437,7 @@ public final class RustShaderPackSourceCollector {
 			}
 			files.add(new VulkanicGalBridge.ShaderPackSourceFileRecord(
 				relative.toString().replace('\\', '/'),
-				Files.readAllBytes(path)
+				readBoundedFile(path, MAX_FILE_BYTES, "shader-pack source file")
 			));
 		}
 		return new SourceGeneration(packName, generation, List.copyOf(files), totalBytes, List.of(), 0L);
@@ -209,7 +480,7 @@ public final class RustShaderPackSourceCollector {
 			}
 			assets.add(new VulkanicGalBridge.ShaderPackAssetFileRecord(
 				relative.toString().replace('\\', '/'),
-				Files.readAllBytes(path)
+				readBoundedFile(path, MAX_ASSET_FILE_BYTES, "shader-pack asset file")
 			));
 		}
 		return new SourceGeneration(
@@ -220,6 +491,17 @@ public final class RustShaderPackSourceCollector {
 			List.copyOf(assets),
 			totalBytes
 		);
+	}
+
+	/** Reads one pack file with a second bound check to close size/read races. */
+	private static byte[] readBoundedFile(Path path, int maximumBytes, String kind) throws IOException {
+		try (var input = Files.newInputStream(path)) {
+			byte[] contents = input.readNBytes(Math.addExact(maximumBytes, 1));
+			if (contents.length > maximumBytes) {
+				throw new IOException(kind + " exceeds " + maximumBytes + " bytes: " + path);
+			}
+			return contents;
+		}
 	}
 
 	private static boolean isSourceFile(Path path) {

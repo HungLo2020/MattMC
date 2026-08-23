@@ -20,4 +20,9 @@ public class SpiderEyesLayer<M extends SpiderModel> extends EyesLayer<LivingEnti
 	public RenderType renderType() {
 		return SPIDER_EYES;
 	}
+
+	@Override
+	protected ResourceLocation semanticTexture() {
+		return ResourceLocation.withDefaultNamespace("textures/entity/spider_eyes.png");
+	}
 }

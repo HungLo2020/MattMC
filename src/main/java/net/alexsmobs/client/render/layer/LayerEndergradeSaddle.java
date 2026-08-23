@@ -23,8 +23,8 @@ public class LayerEndergradeSaddle extends RenderLayer<EndergadeRenderState, Mod
     public void submit(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int packedLight, EndergadeRenderState state, float netHeadYaw, float headPitch) {
         if(state.isSaddled){
             int overlay = LivingEntityRenderer.getOverlayCoords(state, 0.0F);
-            submitNodeCollector.order(0).submitModel(
-                this.getParentModel(), state, poseStack, renderType, packedLight, overlay, -1, null, state.outlineColor, null
+            submitNodeCollector.order(0).submitModelSemanticTexture(
+                this.getParentModel(), state, poseStack, renderType, packedLight, overlay, -1, TEXTURE, state.outlineColor, null
             );
         }
     }

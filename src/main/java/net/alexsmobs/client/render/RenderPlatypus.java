@@ -50,9 +50,9 @@ public class RenderPlatypus extends MobRenderer<EntityPlatypus, PlatypusRenderSt
         public void submit(PoseStack matrixStackIn, net.minecraft.client.renderer.SubmitNodeCollector submitNodeCollector, int packedLightIn,
                 PlatypusRenderState state, float limbSwing, float limbSwingAmount) {
             if(state.hasFedora){
-                submitNodeCollector.order(1).submitModel(
+                submitNodeCollector.order(1).submitModelSemanticTexture(
                     this.getParentModel(), state, matrixStackIn, net.minecraft.client.renderer.RenderType.entityCutout(TEXTURE), 
-                    packedLightIn, net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, -1, null, state.outlineColor, null
+                    packedLightIn, net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, -1, TEXTURE, state.outlineColor, null
                 );
             }
         }

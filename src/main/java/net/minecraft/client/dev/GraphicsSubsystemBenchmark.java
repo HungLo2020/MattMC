@@ -52,6 +52,19 @@ public final class GraphicsSubsystemBenchmark {
 		}
 		String backend = System.getProperty("mattmc.dev.graphicsSubsystemBenchmark.backend", "unknown");
 		boolean rustBackend = backend.equalsIgnoreCase("rust-vulkan") || backend.equalsIgnoreCase("rust-opengl");
+		// The legacy benchmark creates Java Vulkan render passes directly.  Once
+		// Rust owns the whole Vulkan frame, redirect an explicitly requested
+		// legacy-Vulkan benchmark to the isolated Rust workload instead of
+		// allowing a developer tool to reintroduce a second presenter.
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() && !rustBackend) {
+			ran = true;
+			RustGraphicsSubsystemBenchmark.run(minecraft, STATUS_PATH, ITERATIONS, "rust-vulkan");
+			if (!stopIssued) {
+				stopIssued = true;
+				minecraft.stop();
+			}
+			return;
+		}
 		if (minecraft.getMainRenderTarget() == null || (!rustBackend && VulkanicAPI.getDevice() == null)) {
 			return;
 		}

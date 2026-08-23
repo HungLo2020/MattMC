@@ -60,9 +60,9 @@ public class RenderGrizzlyBear extends MobRenderer<EntityGrizzlyBear, GrizzlyBea
         public void submit(PoseStack matrixStackIn, net.minecraft.client.renderer.SubmitNodeCollector submitNodeCollector, int packedLightIn,
                 GrizzlyBearRenderState state, float limbSwing, float limbSwingAmount) {
             if (state.isSnowy) {
-                submitNodeCollector.order(1).submitModel(
+                submitNodeCollector.order(1).submitModelSemanticTexture(
                     this.getParentModel(), state, matrixStackIn, RenderType.entityCutoutNoCull(TEXTURE_SNOWY), 
-                    packedLightIn, net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, -1, null, state.outlineColor, null
+                    packedLightIn, net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, -1, TEXTURE_SNOWY, state.outlineColor, null
                 );
             }
         }
@@ -78,10 +78,10 @@ public class RenderGrizzlyBear extends MobRenderer<EntityGrizzlyBear, GrizzlyBea
         public void submit(PoseStack matrixStackIn, net.minecraft.client.renderer.SubmitNodeCollector submitNodeCollector, int packedLightIn,
                 GrizzlyBearRenderState state, float limbSwing, float limbSwingAmount) {
             if (state.aprilFoolsFlag == 4 && state.ageInTicks % 6 <= 2) {
-                submitNodeCollector.order(1).submitModel(
+                submitNodeCollector.order(1).submitModelSemanticTexture(
                     this.getParentModel(), state, matrixStackIn, AMRenderTypes.getEyesNoFog(TEXTURE_FREDDY_EYES), 
                     packedLightIn, net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, 
-                    AMColorUtil.packColor(1.0F, 1.0F, 1.0F, 0.1F), null, state.outlineColor, null
+                    AMColorUtil.packColor(1.0F, 1.0F, 1.0F, 0.1F), TEXTURE_FREDDY_EYES, state.outlineColor, null
                 );
             }
         }

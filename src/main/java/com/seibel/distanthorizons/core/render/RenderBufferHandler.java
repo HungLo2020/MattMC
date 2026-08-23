@@ -245,14 +245,20 @@ public class RenderBufferHandler implements AutoCloseable
 					continue;
 				}
 				LodBufferContainer bufferContainer = renderSection.bufferContainer;
+				// A semantic DH build may deliberately retain the Java container as a
+				// CPU-side lifecycle object after its copied payload has been handed to
+				// Rust. Whole-frame Vulkan must prefer the semantic identity whenever it
+				// exists; checking only for a null container silently re-admits that
+				// section to the legacy buffer list and leaves Rust with no visible LOD
+				// columns.
+				if (net.vulkanic.world.DistantHorizonsSemanticCollector.usesRustWholeFrameSemanticBuild()
+					&& net.vulkanic.world.DistantHorizonsSemanticCollector.hasColumn(renderSection.pos))
+				{
+					this.semanticColumnPositionsNearToFar.add(renderSection.pos);
+					continue;
+				}
 				if (bufferContainer == null)
 				{
-					if (net.vulkanic.world.DistantHorizonsSemanticCollector.usesRustWholeFrameSemanticBuild()
-						&& net.vulkanic.world.DistantHorizonsSemanticCollector.hasColumn(renderSection.pos))
-					{
-						this.semanticColumnPositionsNearToFar.add(renderSection.pos);
-						continue;
-					}
 					nullBufferCount++;
 					continue;
 				}

@@ -20,6 +20,35 @@ class RustShaderPackSourceCollectorTest {
 	Path temporaryDirectory;
 
 	@Test
+	void diskShaderPackSelectionIsCopiedWithoutIrisRuntimeObjects() throws Exception {
+		Path config = temporaryDirectory.resolve("iris.properties");
+		Files.writeString(config, "enableShaders=true\nshaderPack=  ExamplePack  \n");
+		assertEquals("ExamplePack", RustShaderPackSourceCollector.configuredPackNameFromProperties(config).orElseThrow());
+		Files.writeString(config, "enableShaders=true\nshaderPack=(internal)\n");
+		assertTrue(RustShaderPackSourceCollector.configuredPackNameFromProperties(config).isEmpty());
+		Files.writeString(config, "enableShaders=false\n");
+		assertTrue(RustShaderPackSourceCollector.configuredPackNameFromProperties(config).isEmpty());
+	}
+
+	@Test
+	void diskPackOptionsAreBoundedAndFilteredToScalarRustOptions() throws Exception {
+		Files.writeString(temporaryDirectory.resolve("ExamplePack.txt"),
+			"shadowQuality=2\nprofile.fast=PROFILE\ninvalid.option=drop\nempty=\n");
+		assertEquals(Map.of("shadowQuality", "2"),
+			RustShaderPackSourceCollector.readWholeFramePackOptions(temporaryDirectory, "ExamplePack"));
+	}
+
+	@Test
+	void wholeFrameEnvironmentUsesStableRustOwnedStageIdentities() {
+		Map<String, String> defines = RustShaderPackSourceCollector.wholeFrameEnvironmentDefines();
+		assertEquals("1", defines.get("IS_IRIS"));
+		assertEquals("12000", defines.get("IRIS_VERSION"));
+		assertEquals("12105", defines.get("MC_VERSION"));
+		assertEquals("8", defines.get("MC_RENDER_STAGE_TERRAIN_SOLID"));
+		assertEquals("23", defines.get("MC_RENDER_STAGE_ENTITIES"));
+	}
+
+	@Test
 	void collectsOnlyOrderedShaderSourceAndConfigurationFiles() throws Exception {
 		Files.createDirectories(temporaryDirectory.resolve("lib"));
 		Files.createDirectories(temporaryDirectory.resolve("lib/antialiasing"));
@@ -64,6 +93,20 @@ class RustShaderPackSourceCollectorTest {
 			generation.assets().stream().map(file -> file.path()).toList()
 		);
 		assertEquals(21L, generation.assetTotalBytes());
+	}
+
+	@Test
+	void namespacedPackTextureDeclarationsRetainCanonicalCopiedAssetIdentity() throws Exception {
+		Files.createDirectories(temporaryDirectory.resolve("minecraft/textures"));
+		Files.writeString(temporaryDirectory.resolve("shaders.properties"),
+			"texture.noise=minecraft:textures/noise.png\n");
+		Files.write(temporaryDirectory.resolve("minecraft/textures/noise.png"), new byte[] {9, 8, 7, 6});
+
+		RustShaderPackSourceCollector.SourceGeneration generation =
+			RustShaderPackSourceCollector.collectWithAssets(temporaryDirectory, "namespaced-pack", 9L);
+
+		assertEquals(List.of("minecraft/textures/noise.png"),
+			generation.assets().stream().map(file -> file.path()).toList());
 	}
 
 	@Test
@@ -199,6 +242,11 @@ class RustShaderPackSourceCollectorTest {
 		assertTrue(RustShaderPackSourceCollector.isShaderStageSelector("VERTEX_SHADER"));
 		assertTrue(RustShaderPackSourceCollector.isShaderStageSelector("FRAGMENT_SHADER"));
 		assertFalse(RustShaderPackSourceCollector.isShaderStageSelector("POM"));
+	}
+
+	@Test
+	void wholeFrameEnvironmentPublishesDistantHorizonsAsSemanticCapability() {
+		assertEquals("1", RustShaderPackSourceCollector.wholeFrameEnvironmentDefines().get("DISTANT_HORIZONS"));
 	}
 
 	@Test

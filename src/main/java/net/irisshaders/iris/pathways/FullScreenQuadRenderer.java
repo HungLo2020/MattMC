@@ -7,6 +7,7 @@ import net.blaze3d.vertex.MeshData;
 import net.blaze3d.vertex.Tesselator;
 import net.blaze3d.vertex.VertexFormat;
 import net.vulkanic.VulkanicAPI;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Renders a full-screen textured quad to the screen. Used in composite / deferred rendering.
@@ -14,9 +15,14 @@ import net.vulkanic.VulkanicAPI;
 public class FullScreenQuadRenderer {
 	public static final FullScreenQuadRenderer INSTANCE = new FullScreenQuadRenderer();
 
+	@Nullable
 	private final GpuBuffer quad;
 
 	private FullScreenQuadRenderer() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			this.quad = null;
+			return;
+		}
 		BufferBuilder bufferBuilder = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX);
 		bufferBuilder.addVertex(0.0F, 0.0F, 0.0F).setUv(0.0F, 0.0F);
 		bufferBuilder.addVertex(1.0F, 0.0F, 0.0F).setUv(1.0F, 0.0F);
@@ -35,6 +41,9 @@ public class FullScreenQuadRenderer {
 	}
 
 	public GpuBuffer getQuad() {
+		if (this.quad == null) {
+			throw new IllegalStateException("Java Iris fullscreen quad is unavailable while Rust owns whole-frame presentation");
+		}
 		return quad;
 	}
 }

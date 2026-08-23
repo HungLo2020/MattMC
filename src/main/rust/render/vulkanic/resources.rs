@@ -41,7 +41,7 @@ pub enum TextureDimension {
 }
 
 #[repr(u32)]
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Hash)]
 pub enum TextureFormat {
     Rgba8Unorm = 1,
     Bgra8Unorm = 2,
@@ -350,6 +350,12 @@ pub enum BlendMode {
     /// Additive overlay tint: `out.rgb = src.rgb * src.a + dst.rgb`, `out.a = src.a`.
     /// This is the backend-neutral semantic used by forcefield-style world overlays.
     Overlay = 6,
+    /// Vanilla item glint: `out.rgb = src.rgb * dst.rgb + dst.rgb * src.rgb`.
+    Glint = 7,
+    /// Vignette compositing: `out = dst * (1 - src.rgb)`.
+    Vignette = 8,
+    /// Premultiplied-alpha compositing: `out.rgb = src.rgb + dst.rgb * (1-src.a)`.
+    Premultiplied = 9,
 }
 
 #[repr(u32)]
@@ -359,6 +365,61 @@ pub enum CompareOp {
     Less = 2,
     LessOrEqual = 3,
     Equal = 4,
+    Greater = 5,
+}
+
+/// Explicit stencil operation used by a graphics pipeline's front/back face
+/// state. The GAL keeps this deliberately small: optical masks need only
+/// preserve or replace a bounded stencil value, while unsupported operations
+/// remain unavailable instead of being reconstructed from Java state.
+#[repr(u32)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum StencilOp {
+    Keep = 1,
+    Replace = 2,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct StencilFaceState {
+    pub compare: CompareOp,
+    pub reference: u32,
+    pub read_mask: u32,
+    pub write_mask: u32,
+    pub fail_op: StencilOp,
+    pub depth_fail_op: StencilOp,
+    pub pass_op: StencilOp,
+}
+
+impl StencilFaceState {
+    pub const fn keep(compare: CompareOp, reference: u32, read_mask: u32) -> Self {
+        Self {
+            compare,
+            reference,
+            read_mask,
+            write_mask: 0,
+            fail_op: StencilOp::Keep,
+            depth_fail_op: StencilOp::Keep,
+            pass_op: StencilOp::Keep,
+        }
+    }
+
+    pub const fn replace(reference: u32, read_mask: u32, write_mask: u32) -> Self {
+        Self {
+            compare: CompareOp::Always,
+            reference,
+            read_mask,
+            write_mask,
+            fail_op: StencilOp::Keep,
+            depth_fail_op: StencilOp::Keep,
+            pass_op: StencilOp::Replace,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct StencilState {
+    pub front: StencilFaceState,
+    pub back: StencilFaceState,
 }
 
 #[repr(u32)]
@@ -590,6 +651,7 @@ pub struct GraphicsPipelineDesc {
     pub depth_bias: Option<DepthBias>,
     pub color_formats: Vec<ColorFormat>,
     pub depth_format: Option<TextureFormat>,
+    pub stencil: Option<StencilState>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

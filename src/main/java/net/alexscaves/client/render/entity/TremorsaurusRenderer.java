@@ -1,8 +1,6 @@
 package net.alexscaves.client.render.entity;
 
 import net.alexscaves.client.model.TremorsaurusModel;
-import net.alexscaves.client.render.entity.layer.TremorsaurusHeldMobLayer;
-import net.alexscaves.client.render.entity.layer.TremorsaurusRiderLayer;
 import net.alexscaves.server.entity.living.TremorsaurusEntity;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.entity.MobRenderer;
@@ -16,8 +14,6 @@ public class TremorsaurusRenderer extends MobRenderer<TremorsaurusEntity, Tremor
 
     public TremorsaurusRenderer(EntityRendererProvider.Context renderManagerIn) {
         super(renderManagerIn, new TremorsaurusModel(), 1.1F);
-        this.addLayer(new TremorsaurusRiderLayer(this));
-        this.addLayer(new TremorsaurusHeldMobLayer(this));
     }
 
     @Override
@@ -42,4 +38,3 @@ public class TremorsaurusRenderer extends MobRenderer<TremorsaurusEntity, Tremor
         return "princess".equalsIgnoreCase(state.customName) ? TEXTURE_PRINCESS : state.altSkin == 1 ? TEXTURE_RETRO : state.altSkin == 2 ? TEXTURE_TECTONIC : TEXTURE;
     }
 }
-

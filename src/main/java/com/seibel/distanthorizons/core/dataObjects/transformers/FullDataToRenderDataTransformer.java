@@ -202,6 +202,13 @@ public class FullDataToRenderDataTransformer
 				ARRAY_LIST_POOL.returnCheckout(checkout);
 			}
 		}
+		boolean horizontalUniform = fullDataSource.getDataDetailLevel() == 0
+			|| fullDataSource.hasSemanticHorizontalUniformity(renderSourceX, renderSourceZ);
+		for (int index = 0; index < columnArrayView.verticalSize(); index++) {
+			columnSource.setSemanticHorizontalUniformity(
+				renderSourceX, renderSourceZ, index, horizontalUniform
+			);
+		}
 	}
 
 	/**

@@ -26,12 +26,16 @@ public final class StandaloneModelRenderOwnershipPolicy {
 			return WorldRenderRoutePolicy.Route.DISABLED;
 		}
 		if (Boolean.getBoolean("mattmc.dev.rustGalWorldModelMesh.legacyControl")) {
-			return WorldRenderRoutePolicy.Route.JAVA_COMPATIBILITY;
+			return VulkanicAPI.isVulkanBackendSelected()
+				? WorldRenderRoutePolicy.Route.DISABLED
+				: WorldRenderRoutePolicy.Route.JAVA_COMPATIBILITY;
 		}
 		boolean vulkanBackendSelected = VulkanicAPI.isVulkanBackendSelected();
 		return RustGalVulkanWholeFrameMode.enabledForBackend(vulkanBackendSelected)
 			? WorldRenderRoutePolicy.Route.RUST_VULKAN_WHOLE_FRAME
-			: WorldRenderRoutePolicy.Route.JAVA_COMPATIBILITY;
+			: vulkanBackendSelected
+				? WorldRenderRoutePolicy.Route.DISABLED
+				: WorldRenderRoutePolicy.Route.JAVA_COMPATIBILITY;
 	}
 
 	public static Disposition classify(
@@ -39,7 +43,13 @@ public final class StandaloneModelRenderOwnershipPolicy {
 		boolean eligible,
 		WorldRenderRoutePolicy.Route ownership
 	) {
-		if (semanticCoverageOnly || !ownership.usesRustWholeFrameVulkan()) {
+		if (semanticCoverageOnly) {
+			return Disposition.JAVA_COMPATIBILITY;
+		}
+		if (ownership == WorldRenderRoutePolicy.Route.DISABLED) {
+			return Disposition.RUST_UNAVAILABLE;
+		}
+		if (!ownership.usesRustWholeFrameVulkan()) {
 			return Disposition.JAVA_COMPATIBILITY;
 		}
 		return eligible ? Disposition.RUST_AVAILABLE : Disposition.RUST_UNAVAILABLE;

@@ -14,10 +14,6 @@ public class KangarooRenderer extends MobRenderer<EntityKangaroo, KangarooRender
 
     public KangarooRenderer(EntityRendererProvider.Context renderManagerIn) {
         super(renderManagerIn, new KangarooModel(), 0.5F);
-        // TODO: Fix layers for render state
-        //this.addLayer(new LayerKangarooItem(this));
-        //this.addLayer(new LayerKangarooArmor(this, renderManagerIn));
-        //this.addLayer(new LayerKangarooBaby(this));
     }
 
     @Override

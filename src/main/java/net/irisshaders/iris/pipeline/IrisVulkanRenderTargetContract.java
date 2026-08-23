@@ -37,6 +37,12 @@ public final class IrisVulkanRenderTargetContract {
 		Objects.requireNonNull(descriptorSupplier, "descriptorSupplier must not be null");
 
 		boolean vulkanRecordedPass = VulkanicAPI.isVulkanBackendSelected() && !VulkanicAPI.getCommandContext().isImmediate();
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			&& (!descriptorPathEnabled || !vulkanRecordedPass)) {
+			throw new IllegalStateException(
+				"Iris framebuffer-compatible render-target fallback is unavailable while Rust owns whole-frame presentation"
+			);
+		}
 		if (!descriptorPathEnabled || !vulkanRecordedPass) {
 			return new TargetSelection(fallbackFramebuffer, fallbackHasDepthAttachment, null, false);
 		}
@@ -45,6 +51,11 @@ public final class IrisVulkanRenderTargetContract {
 		VulkanicRenderTargetCompatibility compatibility =
 			VulkanicAPI.renderTargetDescriptorCompatibilityWithFramebuffer(fallbackFramebuffer, descriptor);
 		boolean descriptorBacked = compatibility.allowsDescriptorBackedRenderPass();
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() && !descriptorBacked) {
+			throw new IllegalStateException(
+				"Iris render-target descriptor is incompatible with Rust whole-frame presentation"
+			);
+		}
 		if (TRACE_SHADER_RENDER_TARGETS) {
 			LOGGER.info(
 				"IrisShaderRenderTargetContract stage={} passName={} framebuffer={} descriptorCompatibility={} descriptorBacked={} {}",
@@ -112,6 +123,13 @@ public final class IrisVulkanRenderTargetContract {
 
 		public PipelineHandle createPipeline(PipelineDescriptor descriptor) {
 			Objects.requireNonNull(descriptor, "descriptor must not be null");
+			if (VulkanicAPI.isVulkanBackendSelected()
+				&& net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+				&& this.descriptor == null) {
+				throw new IllegalStateException(
+					"Iris Java Vulkan pipeline fallback is unavailable while Rust owns whole-frame presentation"
+				);
+			}
 			if (this.descriptor != null) {
 				return VulkanicAPI.createPipeline(descriptor, this.descriptor);
 			}
@@ -123,6 +141,13 @@ public final class IrisVulkanRenderTargetContract {
 
 		public RenderPass createRenderPass(Supplier<String> label) {
 			Objects.requireNonNull(label, "label must not be null");
+			if (VulkanicAPI.isVulkanBackendSelected()
+				&& net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+				&& this.descriptor == null) {
+				throw new IllegalStateException(
+					"Iris Java Vulkan render-pass fallback is unavailable while Rust owns whole-frame presentation"
+				);
+			}
 			return this.descriptor != null
 				? VulkanicAPI.createRenderPass(this.descriptor)
 				: VulkanicAPI.createRenderPass(label, this.fallbackFramebuffer, this.fallbackHasDepthAttachment);

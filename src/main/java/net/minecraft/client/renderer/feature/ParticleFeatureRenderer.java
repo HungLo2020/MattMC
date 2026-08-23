@@ -41,6 +41,32 @@ public class ParticleFeatureRenderer implements AutoCloseable, net.irisshaders.i
 	}
 
 	public void render(SubmitNodeCollection submitNodeCollection) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			&& !net.vulkanic.world.WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()) {
+			throw new IllegalStateException("Rust whole-frame particle route is unavailable while Rust owns presentation");
+		}
+		if (net.vulkanic.world.WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()) {
+			// Ordinary QuadParticleRenderState groups have already copied their
+			// semantics into Rust material quads. Any other callback remains
+			// explicitly unavailable; never open a Java Vulkan pass as a fallback.
+			boolean unsupportedGroup = submitNodeCollection.getParticleGroupRenderers().stream()
+				.anyMatch(renderer -> !(renderer instanceof QuadParticleRenderState quad)
+					|| quad.rustGalUnsupportedLayerCount() > 0);
+			if (unsupportedGroup) {
+				net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordUnsupportedParticleGroup();
+				net.minecraft.client.dev.GraphicsFrameBenchmark.recordSubmittedWorkIdentity(
+					"particles", "rust-vulkan-unavailable"
+				);
+				// Do not present a Rust-owned frame after silently dropping a
+				// particle callback or an atlas layer that has no explicit semantic
+				// representation. The producer remains unavailable until it supplies
+				// the bounded Rust particle ABI; Java Vulkan is never a fallback.
+				throw new IllegalStateException(
+					"Rust whole-frame particle route encountered unsupported particle-group semantics"
+				);
+			}
+			return;
+		}
 		// Iris: Set particles rendering phase (from MixinParticleEngine)
 		net.irisshaders.iris.Iris.getPipelineManager().getPipeline().ifPresent(pipeline -> {
 			lastPhase = pipeline.getPhase();
@@ -115,6 +141,9 @@ public class ParticleFeatureRenderer implements AutoCloseable, net.irisshaders.i
 	}
 
 	public void endFrame() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			return;
+		}
 		for (ParticleFeatureRenderer.ParticleBufferCache particleBufferCache : this.usedBuffers) {
 			particleBufferCache.rotate();
 		}

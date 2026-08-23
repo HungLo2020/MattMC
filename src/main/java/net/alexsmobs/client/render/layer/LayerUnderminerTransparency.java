@@ -44,7 +44,7 @@ public class LayerUnderminerTransparency extends RenderLayer<UnderminerRenderSta
         ModelUnderminerWrapper wrapperModel = this.getParentModel();
         if (renderState.isDwarf) {
             // Render dwarf model with transparency
-            submitNodeCollector.order(0).submitModel(
+            submitNodeCollector.order(0).submitModelSemanticTexture(
                 wrapperModel.getDwarfModel(), 
                 renderState, 
                 poseStack, 
@@ -52,13 +52,13 @@ public class LayerUnderminerTransparency extends RenderLayer<UnderminerRenderSta
                 packedLight,
                 OverlayTexture.NO_OVERLAY, 
                 color, 
-                null, 
+                texture,
                 renderState.outlineColor, 
                 null
             );
         } else {
             // Render tall (humanoid) model with transparency
-            submitNodeCollector.order(0).submitModel(
+            submitNodeCollector.order(0).submitModelSemanticTexture(
                 wrapperModel.getTallModel(), 
                 renderState, 
                 poseStack, 
@@ -66,7 +66,7 @@ public class LayerUnderminerTransparency extends RenderLayer<UnderminerRenderSta
                 packedLight,
                 OverlayTexture.NO_OVERLAY, 
                 color, 
-                null, 
+                texture,
                 renderState.outlineColor, 
                 null
             );

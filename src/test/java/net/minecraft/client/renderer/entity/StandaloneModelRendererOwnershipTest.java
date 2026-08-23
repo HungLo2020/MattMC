@@ -24,10 +24,16 @@ final class StandaloneModelRendererOwnershipTest {
 				"src/main/java/net/minecraft/client/renderer/entity/" + producer
 			));
 			int eligibility = source.indexOf("isStandaloneModelMeshEligible(");
+			if (eligibility < 0) {
+				eligibility = source.indexOf("isStandaloneTranslucentModelMeshEligible(");
+			}
 			int ownership = source.indexOf("StandaloneModelRenderOwnershipPolicy.currentOwnershipRoute()", eligibility);
 			int classification = source.indexOf("StandaloneModelRenderOwnershipPolicy.classify(", ownership);
 			int unavailable = source.indexOf("Disposition.RUST_UNAVAILABLE", classification);
-			int javaSubmit = source.indexOf("submitNodeCollector.submitModel(", unavailable);
+			int javaSubmit = source.indexOf("submitNodeCollector.submitModelSemanticTexture(", unavailable);
+			if (javaSubmit < 0) {
+				javaSubmit = source.indexOf("submitNodeCollector.submitModel(", unavailable);
+			}
 
 			assertTrue(eligibility >= 0, producer + " must retain bounded semantic eligibility");
 			assertTrue(ownership > eligibility, producer + " must resolve callsite ownership independently of eligibility");

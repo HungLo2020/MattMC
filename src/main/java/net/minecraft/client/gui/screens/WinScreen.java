@@ -305,6 +305,13 @@ public class WinScreen extends Screen {
 	@Override
 	public void renderBackground(GuiGraphics guiGraphics, int i, int j, float f) {
 		if (this.poem) {
+			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+				float gameTime = Minecraft.getInstance().level == null
+					? 0.0F
+					: (float)Minecraft.getInstance().level.getGameTime() + f;
+				guiGraphics.submitRustEndPortal(gameTime);
+				return;
+			}
 			TextureManager textureManager = Minecraft.getInstance().getTextureManager();
 			TextureSetup textureSetup = TextureSetup.doubleTexture(
 				textureManager.getTexture(AbstractEndPortalRenderer.END_SKY_LOCATION).getTextureView(),

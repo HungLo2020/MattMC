@@ -21,11 +21,17 @@ public class DhFrameBufferWrapper implements IDhApiFramebuffer {
 
 	@Override
 	public void bind() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris Distant Horizons framebuffer binding is unavailable while Rust owns whole-frame presentation");
+		}
 		this.framebuffer.bind();
 	}
 
 	@Override
 	public void addDepthAttachment(int i, boolean b) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris Distant Horizons framebuffer attachment mutation is unavailable while Rust owns whole-frame presentation");
+		}
 		this.framebuffer.addDepthAttachmentBypass(i, b);
 	}
 

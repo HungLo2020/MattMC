@@ -53,11 +53,13 @@ public abstract class ArrowRenderer<T extends AbstractArrow, S extends ArrowRend
 				"rust-vulkan-whole-frame", textureLocation, true, true, false
 			);
 		} else if (disposition == ArrowSubmitDisposition.RUST_UNAVAILABLE) {
-			// Rust owns this callsite, but this Arrow state is not representable yet.
-			// Fail closed for the frame: never authorize a hidden Java entity submit.
+			// Rust owns this callsite, but this frame's copied texture or semantic
+			// payload was not admitted. Fail closed: never authorize a hidden Java
+			// entity submit.
 			RustGalWorldPrimitiveRenderer.recordArrowRouteDecision(
 				"rust-vulkan-unavailable", textureLocation, false, false, false
 			);
+			throw new IllegalStateException("Rust whole-frame Arrow route has no semantic mesh for " + textureLocation);
 		} else if (disposition == ArrowSubmitDisposition.JAVA_COMPATIBILITY) {
 			submitNodeCollector.submitModel(
 				this.model,
@@ -76,8 +78,7 @@ public abstract class ArrowRenderer<T extends AbstractArrow, S extends ArrowRend
 			RustGalWorldPrimitiveRenderer.recordArrowRouteDecision("disabled", textureLocation, false, false, false);
 		}
 		poseStack.popPose();
-		if (disposition == ArrowSubmitDisposition.JAVA_COMPATIBILITY
-			|| disposition == ArrowSubmitDisposition.DISABLED) {
+		if (disposition == ArrowSubmitDisposition.JAVA_COMPATIBILITY) {
 			super.submit(arrowRenderState, poseStack, submitNodeCollector, cameraRenderState);
 		}
 	}

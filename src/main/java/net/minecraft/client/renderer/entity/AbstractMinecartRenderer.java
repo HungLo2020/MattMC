@@ -63,13 +63,15 @@ public abstract class AbstractMinecartRenderer<T extends AbstractMinecart, S ext
 		}
 
 		poseStack.scale(-1.0F, -1.0F, 1.0F);
-		submitNodeCollector.submitModel(
+		submitNodeCollector.submitModelSemanticTexture(
 			this.model,
 			minecartRenderState,
 			poseStack,
 			this.model.renderType(MINECART_LOCATION),
 			minecartRenderState.lightCoords,
 			OverlayTexture.NO_OVERLAY,
+			-1,
+			MINECART_LOCATION,
 			minecartRenderState.outlineColor,
 			null
 		);

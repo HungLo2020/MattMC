@@ -36,6 +36,7 @@ public class DhFramebuffer implements IDhApiFramebuffer
 	
 	public DhFramebuffer() 
 	{
+		rejectRustWholeFrameJavaFramebuffer();
 		CommandContext ctx = VulkanicAPI.getCommandContext();
 		this.id = VulkanicAPI.createFramebuffer(ctx);
 
@@ -51,6 +52,7 @@ public class DhFramebuffer implements IDhApiFramebuffer
 	/** For internal use by Iris, do not remove. */
 	public DhFramebuffer(int id) 
 	{
+		rejectRustWholeFrameJavaFramebuffer();
 		this.id = id;
 		
 		this.attachments = new Int2IntArrayMap();
@@ -61,6 +63,16 @@ public class DhFramebuffer implements IDhApiFramebuffer
 		this.depthAttachmentTextureId = 0;
 		this.drawBuffers = new int[0];
 		this.drawsToNoColorBuffers = false;
+	}
+
+	private static void rejectRustWholeFrameJavaFramebuffer()
+	{
+		if (VulkanicAPI.isVulkanBackendInitializedAndSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
+		{
+			throw new IllegalStateException(
+				"Java Distant Horizons framebuffers are unavailable while Rust owns whole-frame presentation");
+		}
 	}
 	
 	

@@ -82,6 +82,8 @@ public class VulkanCommandBufferLifecycleTest {
                 field.setAccessible(true);
                 field.set(null, null);
             }
+            net.vulkanic.bridge.RustGalVulkanWholeFrameMode.deactivateRustPresentation();
+            net.vulkanic.bridge.RustGalVulkanWholeFrameMode.clearVulkanBackendSelection();
         } catch (ReflectiveOperationException exception) {
             throw new RuntimeException("Failed to reset VulkanicAPI backend state", exception);
         }

@@ -5,6 +5,8 @@ import net.alexsmobs.client.render.RenderCrow;
 import net.alexsmobs.client.render.state.CrowRenderState;
 import net.blaze3d.vertex.PoseStack;
 import net.minecraft.client.renderer.entity.layers.RenderLayer;
+import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.math.Axis;
 
 public class LayerCrowItem extends RenderLayer<CrowRenderState, ModelCrow> {
 
@@ -14,7 +16,16 @@ public class LayerCrowItem extends RenderLayer<CrowRenderState, ModelCrow> {
 
     public void submit(PoseStack matrixStackIn, net.minecraft.client.renderer.SubmitNodeCollector submitNodeCollector, int packedLightIn,
             CrowRenderState renderState, float limbSwing, float limbSwingAmount) {
-        // Item rendering layer - simplified for now
-        // TODO: Implement item rendering when render state has item data
+        if (renderState.heldItem.isEmpty()) return;
+        matrixStackIn.pushPose();
+        this.getParentModel().root.translateAndRotate(matrixStackIn);
+        this.getParentModel().body.translateAndRotate(matrixStackIn);
+        this.getParentModel().head.translateAndRotate(matrixStackIn);
+        this.getParentModel().beak.translateAndRotate(matrixStackIn);
+        matrixStackIn.translate(0.0F, 0.0F, -0.25F);
+        matrixStackIn.mulPose(Axis.XP.rotationDegrees(180.0F));
+        renderState.heldItem.submit(matrixStackIn, submitNodeCollector, packedLightIn,
+            OverlayTexture.NO_OVERLAY, renderState.outlineColor);
+        matrixStackIn.popPose();
     }
 }

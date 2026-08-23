@@ -14,6 +14,7 @@ use serde_json::Value;
 use crate::render::vulkanic::error::{GalError, GalResult};
 
 use super::source::ShaderPackSource;
+use super::vanilla_post_effect_contract::{VanillaPostEffectContract, VanillaPostEffectShaderSource};
 
 pub const SHADER_PROPERTIES_PATH: &str = "shaders.properties";
 
@@ -94,9 +95,9 @@ pub struct ShaderPackResolvedRgbaAsset {
 
 /// Source-derived custom PNG bindings that apply to the terrain G-buffer
 /// stage. The mapping is semantic pack data, not an Iris sampler binding or a
-/// backend texture-unit assignment. Raw texture declarations and custom
-/// images intentionally remain unsupported until their complete resource
-/// contracts exist in Rust.
+/// backend texture-unit assignment. Both pack-relative declarations and
+/// namespaced pack-relative declarations are normalized before resource
+/// preparation; missing or unsupported images remain unavailable.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct TerrainShaderPackAssetBindings {
     sampler_paths: BTreeMap<String, String>,
@@ -281,6 +282,69 @@ impl ShaderPackAssets {
 
     pub fn paths(&self) -> impl Iterator<Item = &str> {
         self.files.keys().map(String::as_str)
+    }
+
+    /// Resolves one copied post-effect definition together with the shader
+    /// stages from the matching immutable source snapshot. This is semantic
+    /// admission only: it creates no GAL resources and retains no Java or
+    /// backend state. Missing definitions, malformed JSON, or missing stages
+    /// remain explicit errors rather than silently falling back to bundled
+    /// shaders.
+    pub fn resolve_post_effect_contract(
+        &self,
+        effect_id: &str,
+        source: &ShaderPackSource,
+    ) -> GalResult<(VanillaPostEffectContract, Vec<VanillaPostEffectShaderSource>)> {
+        let normalized = effect_id
+            .trim()
+            .strip_prefix("minecraft:")
+            .or_else(|| effect_id.trim().split_once(':').map(|(_, path)| path))
+            .unwrap_or(effect_id.trim())
+            .trim_start_matches('/');
+        if normalized.is_empty()
+            || normalized.split('/').any(|segment| {
+                segment.is_empty() || segment == "." || segment == ".." || segment.contains('\0')
+            })
+        {
+            return Err(GalError::invalid_argument(
+                "post-effect id is not a normalized relative path",
+            ));
+        }
+        let path = if normalized.ends_with(".json") {
+            normalized.to_string()
+        } else {
+            format!("{normalized}.json")
+        };
+        let asset_path = format!("post_effect/{path}");
+        let bytes = self.copy(&asset_path).ok_or_else(|| {
+            GalError::unsupported_feature(format!(
+                "post-effect definition '{asset_path}' is unavailable in the Rust asset snapshot"
+            ))
+        })?;
+        let contract = VanillaPostEffectContract::parse(effect_id, &bytes)?;
+        let sources = contract.shader_sources_from_source(source)?;
+        Ok((contract, sources))
+    }
+
+    /// Validates every copied post-effect definition in this asset generation
+    /// against the paired source snapshot. The walk is deterministic and
+    /// bounded by the asset-store file limit; unsupported graphs therefore
+    /// keep the generation unadmitted instead of falling back to Java's
+    /// post-processing chain.
+    pub fn validate_post_effect_contracts(&self, source: &ShaderPackSource) -> GalResult<usize> {
+        let mut validated = 0usize;
+        for path in self.files.keys() {
+            let Some(effect_path) = path.strip_prefix("post_effect/") else {
+                continue;
+            };
+            if !effect_path.ends_with(".json") {
+                continue;
+            }
+            let effect_id = effect_path.trim_end_matches(".json");
+            self.resolve_post_effect_contract(effect_id, source)?;
+            validated = validated.saturating_add(1);
+        }
+        Ok(validated)
     }
 
     /// Decodes a copied PNG into a caller-owned RGBA8 image. It intentionally
@@ -479,15 +543,32 @@ fn normalize_asset_path(path: &str) -> GalResult<String> {
 }
 
 /// `ShaderPack.readTexture` accepts one leading slash in shader-pack texture
-/// declarations, then resolves the remainder relative to the pack root. Keep
-/// that source syntax compatibility localized here; transported asset paths
-/// themselves remain strictly normalized relative paths.
+/// declarations, then resolves the remainder relative to the pack root. It
+/// also permits a namespaced pack-relative identity; keep both source syntax
+/// forms localized here while transported asset paths remain strictly
+/// normalized relative paths.
 fn normalize_declared_asset_path(path: &str) -> GalResult<String> {
     let path = path.trim();
-    if path.contains(':') {
-        return Err(GalError::unsupported_feature(
-            "resource-location shader-pack textures are not implemented by the Rust-owned source resource path",
-        ));
+    if let Some((namespace, resource_path)) = path.split_once(':') {
+        // Namespaced declarations are still pack-relative semantic assets. Do
+        // not resolve them through Minecraft's resource manager or retain a
+        // ResourceLocation/runtime handle; the Java collector transports the
+        // copied pack file under this canonical relative identity.
+        if namespace.is_empty()
+            || !namespace
+                .bytes()
+                .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || matches!(byte, b'_' | b'-' | b'.'))
+        {
+            return Err(GalError::invalid_argument(
+                "shader-pack resource-location texture has an invalid namespace",
+            ));
+        }
+        if resource_path.is_empty() {
+            return Err(GalError::invalid_argument(
+                "shader-pack resource-location texture has an empty path",
+            ));
+        }
+        return normalize_asset_path(&format!("{namespace}/{resource_path}"));
     }
     normalize_asset_path(path.strip_prefix('/').unwrap_or(path))
 }
@@ -561,6 +642,52 @@ mod tests {
             files: vec![ShaderPackAssetFile::new("../escape.png", Vec::new())],
         })
         .is_err());
+    }
+
+    #[test]
+    fn resolves_post_effect_definition_and_stages_from_paired_snapshots() {
+        let assets = ShaderPackAssets::new(ShaderPackAssetUpdate {
+            pack_name: "selected-pack".to_string(),
+            generation: 3,
+            files: vec![ShaderPackAssetFile::new(
+                "post_effect/custom.json",
+                br#"{"targets":{},"passes":[{"vertex_shader":"minecraft:post/custom","fragment_shader":"minecraft:post/custom","output":"minecraft:main"}]}"#.to_vec(),
+            )],
+        })
+        .unwrap();
+        let source = ShaderPackSource::new(
+            "selected-pack",
+            3,
+            vec![
+                super::super::source::ShaderSourceFile::new("post/custom.vsh", "void main(){}"),
+                super::super::source::ShaderSourceFile::new("post/custom.fsh", "void main(){}"),
+            ],
+        )
+        .unwrap();
+        let (contract, stages) = assets
+            .resolve_post_effect_contract("minecraft:custom", &source)
+            .unwrap();
+        assert_eq!(assets.validate_post_effect_contracts(&source).unwrap(), 1);
+        assert_eq!(contract.passes.len(), 1);
+        assert_eq!(stages.len(), 1);
+        assert_eq!(stages[0].vertex_shader, b"void main(){}");
+        assert_eq!(stages[0].fragment_shader, b"void main(){}");
+    }
+
+    #[test]
+    fn post_effect_validation_rejects_malformed_generation() {
+        let assets = ShaderPackAssets::new(ShaderPackAssetUpdate {
+            pack_name: "selected-pack".to_string(),
+            generation: 4,
+            files: vec![ShaderPackAssetFile::new(
+                "post_effect/broken.json",
+                br#"{"passes": ["not-a-pass"]}"#.to_vec(),
+            )],
+        })
+        .unwrap();
+        let source = ShaderPackSource::new("selected-pack", 4, Vec::new()).unwrap();
+        let error = assets.validate_post_effect_contracts(&source).unwrap_err();
+        assert!(error.to_string().contains("post-effect") || error.to_string().contains("pass"));
     }
 
     #[test]
@@ -753,11 +880,23 @@ mod tests {
             )],
         )
         .unwrap();
-        assert!(
-            TerrainShaderPackAssetBindings::from_source(&resource_location)
-                .unwrap_err()
-                .to_string()
-                .contains("resource-location")
+        let bindings = TerrainShaderPackAssetBindings::from_source(&resource_location).unwrap();
+        assert_eq!(
+            Some("minecraft/textures/atlas/blocks.png"),
+            bindings.sampler_path("noisetex")
+        );
+        let assets = ShaderPackAssets::new(ShaderPackAssetUpdate {
+            pack_name: "selected-pack".to_string(),
+            generation: 3,
+            files: vec![ShaderPackAssetFile::new(
+                "minecraft/textures/atlas/blocks.png",
+                png(1, 1, &[255, 255, 255, 255]),
+            )],
+        })
+        .unwrap();
+        assert_eq!(
+            "minecraft/textures/atlas/blocks.png",
+            bindings.resolve_rgba8(&assets, "noisetex").unwrap().path
         );
     }
 }

@@ -6,6 +6,7 @@ import net.citadel.client.model.AdvancedModelBox;
 import net.citadel.client.model.basic.BasicModelPart;
 import com.google.common.collect.ImmutableList;
 import net.minecraft.util.Mth;
+import net.blaze3d.vertex.PoseStack;
 
 public class ModelUnderminerDwarf extends AdvancedEntityModel<UnderminerRenderState> {
     private final AdvancedModelBox body;
@@ -66,6 +67,11 @@ public class ModelUnderminerDwarf extends AdvancedEntityModel<UnderminerRenderSt
     @Override
     public Iterable<BasicModelPart> parts() {
         return ImmutableList.of(body);
+    }
+
+    public void translateToHand(PoseStack poseStack, boolean left) {
+        body.translateAndRotate(poseStack);
+        (left ? leftArm : rightArm).translateAndRotate(poseStack);
     }
 
     @Override

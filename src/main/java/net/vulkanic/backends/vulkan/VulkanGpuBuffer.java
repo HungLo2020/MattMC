@@ -35,7 +35,7 @@ public final class VulkanGpuBuffer extends GpuBuffer {
 	public void close() {
 		if (!this.closed) {
 			this.closed = true;
-			net.irisshaders.iris.gl.IrisRenderSystem.decrementTrackedBuffers();
+			VulkanBufferTracker.destroyed();
 			net.vulkanic.VulkanicAPI.deleteBuffer(net.vulkanic.VulkanicAPI.getCommandContext(), this.handle);
 		}
 	}

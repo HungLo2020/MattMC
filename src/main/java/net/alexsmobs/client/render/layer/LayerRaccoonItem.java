@@ -6,6 +6,8 @@ import net.alexsmobs.client.render.RenderRaccoon;
 import net.blaze3d.vertex.PoseStack;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.layers.RenderLayer;
+import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.math.Axis;
 
 public class LayerRaccoonItem extends RenderLayer<RaccoonRenderState, ModelRaccoon> {
 
@@ -15,9 +17,14 @@ public class LayerRaccoonItem extends RenderLayer<RaccoonRenderState, ModelRacco
 
     @Override
     public void submit(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int packedLight, RaccoonRenderState state, float bob, float yRot) {
-        // Item rendering layer - simplified for now
-        // TODO: Implement item rendering when render state has item data
-        // In the new architecture, item rendering would require adding ItemStack to RaccoonRenderState
+        if (state.mainHandItem.isEmpty()) return;
+        poseStack.pushPose();
+        translateToHand(true, poseStack);
+        poseStack.translate(-0.05F, 0.2F, -0.35F);
+        poseStack.mulPose(Axis.XP.rotationDegrees(180.0F));
+        state.mainHandItem.submit(poseStack, submitNodeCollector, packedLight,
+                OverlayTexture.NO_OVERLAY, state.outlineColor);
+        poseStack.popPose();
     }
 
     protected void translateToHand(boolean inHand, PoseStack matrixStack) {

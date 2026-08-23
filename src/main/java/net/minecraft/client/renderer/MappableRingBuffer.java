@@ -16,6 +16,10 @@ public class MappableRingBuffer implements AutoCloseable {
 	private int current = 0;
 
 	public MappableRingBuffer(Supplier<String> supplier, int i, int j) {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendInitializedAndSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java GUI ring buffers are unavailable while Rust owns whole-frame presentation");
+		}
 		if ((i & 1) == 0 && (i & 2) == 0) {
 			throw new IllegalArgumentException("MappableRingBuffer requires at least one of USAGE_MAP_READ or USAGE_MAP_WRITE");
 		} else {
@@ -45,6 +49,10 @@ public class MappableRingBuffer implements AutoCloseable {
 	}
 
 	public void rotate() {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendInitializedAndSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java GUI ring-buffer rotation is unavailable while Rust owns whole-frame presentation");
+		}
 		if (this.fences[this.current] != null) {
 			this.fences[this.current].close();
 		}

@@ -98,7 +98,9 @@ public class BlockEntityRenderDispatcher implements ResourceManagerReloadListene
 	public <S extends BlockEntityRenderState> void submit(
 		S blockEntityRenderState, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, CameraRenderState cameraRenderState
 	) {
-		this.submitInternal(blockEntityRenderState, poseStack, submitNodeCollector, cameraRenderState, true);
+		boolean rustWholeFrame = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			&& net.vulkanic.world.WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan();
+		this.submitInternal(blockEntityRenderState, poseStack, submitNodeCollector, cameraRenderState, !rustWholeFrame);
 	}
 
 	/**
@@ -131,6 +133,13 @@ public class BlockEntityRenderDispatcher implements ResourceManagerReloadListene
 				int intId = blockStateIds.applyAsInt(blockEntityRenderState.blockState);
 				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentBlockEntity(intId);
 			}
+			boolean rustBlockEntityItemScope = !captureIrisRenderState
+				&& !submitNodeCollector.isSemanticCoverageOnly()
+				&& net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+				&& net.vulkanic.world.WorldRenderRoutePolicy.currentModelPartMeshRoute(true).usesRustWholeFrameVulkan();
+			if (rustBlockEntityItemScope) {
+				net.vulkanic.world.RustGalWorldPrimitiveRenderer.beginBlockEntityItemSubmission();
+			}
 			
 			try {
 				blockEntityRenderer.submit(blockEntityRenderState, poseStack, submitNodeCollector, cameraRenderState);
@@ -140,6 +149,9 @@ public class BlockEntityRenderDispatcher implements ResourceManagerReloadListene
 				blockEntityRenderState.fillCrashReportCategory(crashReportCategory);
 				throw new ReportedException(crashReport);
 			} finally {
+				if (rustBlockEntityItemScope) {
+					net.vulkanic.world.RustGalWorldPrimitiveRenderer.endBlockEntityItemSubmission();
+				}
 				// Iris: From MixinBlockEntityRenderDispatcher - end entity render tracking
 				if (captureIrisRenderState) {
 					net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentBlockEntity(0);

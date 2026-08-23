@@ -48,12 +48,16 @@ public class VoxelMap implements PreparableReloadListener {
         this.colorManager = new ColorManager();
         this.waypointManager = new WaypointManager();
         this.dimensionManager = new DimensionManager();
+        // PersistentMap/CachedRegion registers observers during the first
+        // world tick. Publish the notifier before constructing that worker;
+        // otherwise VoxelMap's map-generation thread repeatedly fails before
+        // the semantic HUD overlay can produce its copied texture state.
+        this.settingsAndLightingChangeNotifier = new SettingsAndLightingChangeNotifier();
         this.persistentMap = new PersistentMap();
         mapOptions.loadAll();
 
         VoxelConstants.getEvents().initEvents(this);
         this.map = new Map();
-        this.settingsAndLightingChangeNotifier = new SettingsAndLightingChangeNotifier();
         this.worldUpdateListener = new WorldUpdateListener();
         this.worldUpdateListener.addListener(this.map);
         this.worldUpdateListener.addListener(this.persistentMap);

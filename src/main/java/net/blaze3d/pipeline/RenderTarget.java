@@ -73,6 +73,7 @@ public abstract class RenderTarget implements net.irisshaders.iris.targets.Blaze
 	}
 
 	public void copyDepthFrom(RenderTarget renderTarget) {
+		rejectRustWholeFrameOperation("depth-copy");
 		RenderSystem.assertOnRenderThread();
 		if (this.depthTexture == null) {
 			throw new IllegalStateException("Trying to copy depth texture to a RenderTarget without a depth texture");
@@ -89,6 +90,13 @@ public abstract class RenderTarget implements net.irisshaders.iris.targets.Blaze
 		if (i > 0 && i <= k && j > 0 && j <= k) {
 			this.width = i;
 			this.height = j;
+			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+				// Rust owns the acquired color/depth attachments and presentation
+				// target. Keep dimensions for semantic extraction and layout, but do
+				// not allocate a second Java Vulkan framebuffer.
+				this.filterMode = FilterMode.NEAREST;
+				return;
+			}
 			if (this.useDepth) {
 				this.depthTexture = net.vulkanic.VulkanicAPI.createTexture(() -> this.label + " / Depth", 15, TextureFormat.DEPTH24_STENCIL8, i, j, 1, 1);
 				this.depthTextureView = net.vulkanic.VulkanicAPI.createTextureView(this.depthTexture);
@@ -121,6 +129,9 @@ public abstract class RenderTarget implements net.irisshaders.iris.targets.Blaze
 	}
 
 	public void blitToScreen() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java RenderTarget presentation is unavailable while Rust owns whole-frame presentation");
+		}
 		if (this.colorTexture == null) {
 			throw new IllegalStateException("Can't blit to screen, color texture doesn't exist yet");
 		} else {
@@ -129,6 +140,7 @@ public abstract class RenderTarget implements net.irisshaders.iris.targets.Blaze
 	}
 
 	public void blitAndBlendToTexture(GpuTextureView gpuTextureView) {
+		rejectRustWholeFrameOperation("render-target blend");
 		RenderSystem.assertOnRenderThread();
 
 		try (RenderPass renderPass = net.vulkanic.VulkanicAPI.createRenderPass(
@@ -137,6 +149,14 @@ public abstract class RenderTarget implements net.irisshaders.iris.targets.Blaze
 			net.vulkanic.VulkanicAPI.bindDefaultUniforms(renderPass);
 			renderPass.bindSampler("InSampler", this.colorTextureView);
 			renderPass.draw(0, 3);
+		}
+	}
+
+	private static void rejectRustWholeFrameOperation(String operation) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException(
+				"Java RenderTarget " + operation + " is unavailable while Rust owns whole-frame presentation"
+			);
 		}
 	}
 
@@ -174,6 +194,7 @@ public abstract class RenderTarget implements net.irisshaders.iris.targets.Blaze
 	// Iris: RenderTargetInterface implementation
 	@Override
 	public void iris$bindFramebuffer() {
+		rejectRustWholeFrameOperation("Iris framebuffer binding");
 		VulkanicAPI.bindRenderTarget(VulkanicAPI.getCommandContext(), this.colorTexture, this.depthTexture);
 	}
 }

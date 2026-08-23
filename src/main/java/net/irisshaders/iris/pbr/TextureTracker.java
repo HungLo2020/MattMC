@@ -31,6 +31,7 @@ public class TextureTracker {
 	}
 
 	public void trackTexture(int id, AbstractTexture texture) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) return;
 		textures.put(id, texture);
 		try {
 			textureViews.put(id, texture.getTextureView());
@@ -40,11 +41,13 @@ public class TextureTracker {
 
 	@Nullable
 	public AbstractTexture getTexture(int id) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) return null;
 		return textures.get(id);
 	}
 
 	@Nullable
 	public GpuTextureView getTextureView(int id) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) return null;
 		AbstractTexture texture = textures.get(id);
 		if (texture != null) {
 			try {
@@ -59,6 +62,11 @@ public class TextureTracker {
 	}
 
 	public void onSetShaderTexture(int unit, GpuTextureView id) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			// Iris shader-texture bookkeeping is Java GPU state. The Rust semantic
+			// route owns copied assets and must not publish or query this tracker.
+			return;
+		}
 		if (unit >= 0 && unit < shaderTexturesByUnit.length) {
 			shaderTexturesByUnit[unit] = id;
 		}
@@ -88,6 +96,7 @@ public class TextureTracker {
 
 	@Nullable
 	public GpuTextureView getShaderTexture(int unit) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) return null;
 		if (unit < 0 || unit >= shaderTexturesByUnit.length) {
 			return null;
 		}
@@ -96,6 +105,7 @@ public class TextureTracker {
 	}
 
 	public void onDeleteTexture(int id) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) return;
 		textures.remove(id);
 		textureViews.remove(id);
 		for (int unit = 0; unit < shaderTexturesByUnit.length; unit++) {

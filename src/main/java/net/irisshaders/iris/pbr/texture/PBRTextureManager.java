@@ -92,6 +92,11 @@ public class PBRTextureManager {
 	}
 
 	public PBRTextureHolder getOrLoadHolder(int id) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			// PBR assets are consumed by the Rust shader-pack route; do not consult
+			// Iris' texture tracker or bind Java compatibility textures here.
+			return defaultHolder;
+		}
 		PBRTextureHolder holder = holders.get(id);
 		if (holder == null) {
 			holder = loadHolder(id);
@@ -159,8 +164,18 @@ public class PBRTextureManager {
 
 	public void close() {
 		clear();
-		defaultNormalTexture.close();
-		defaultSpecularTexture.close();
+		// Rust Vulkan startup can legitimately finish without initializing Iris'
+		// optional PBR defaults. TextureManager.close() still owns the shared
+		// lifecycle, so make shutdown idempotent instead of turning that clean
+		// route into a late NPE.
+		if (defaultNormalTexture != null) {
+			closeTexture(defaultNormalTexture);
+			defaultNormalTexture = null;
+		}
+		if (defaultSpecularTexture != null) {
+			closeTexture(defaultSpecularTexture);
+			defaultSpecularTexture = null;
+		}
 	}
 
 	private void closeHolder(PBRTextureHolder holder) {

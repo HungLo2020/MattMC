@@ -30,7 +30,10 @@ public final class VulkanGpuTexture extends GpuTexture {
 	}
 
 	private void destroyImmediately() {
-		net.irisshaders.iris.gl.IrisRenderSystem.deleteTextureId(this.id);
+		// Vulkan textures are backend-owned resources.  Do not route lifecycle
+		// through Iris' GL compatibility tracker: that would make Rust/Vulkan
+		// resource ownership depend on Iris GPU state.
+		net.vulkanic.VulkanicAPI.deleteTexture(net.vulkanic.VulkanicAPI.getCommandContext(), this.id);
 	}
 
 	@Override
@@ -39,6 +42,11 @@ public final class VulkanGpuTexture extends GpuTexture {
 	}
 
 	public int getGlHandle() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException(
+				"Java Vulkan texture native handles are unavailable while Rust owns whole-frame presentation"
+			);
+		}
 		return this.id;
 	}
 
@@ -84,7 +92,9 @@ public final class VulkanGpuTexture extends GpuTexture {
 				effectiveParam = VulkanicTextureParameterValue.NEAREST_MIPMAP_NEAREST;
 			}
 		}
-		net.irisshaders.iris.gl.IrisRenderSystem.texParameteri(this.id, target, pname, effectiveParam);
+		net.vulkanic.VulkanicAPI.texParameteri(
+			net.vulkanic.VulkanicAPI.getCommandContext(), target, pname.toLegacyGlPName(), effectiveParam.toLegacyGlConstant()
+		);
 	}
 
 	private VulkanicTextureParameterValue toVulkanicTextureParameterValue(AddressMode addressMode) {

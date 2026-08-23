@@ -8,6 +8,9 @@ public class TextureUploadHelper {
 	}
 
 	public static void resetTextureUploadState() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris texture-upload state is unavailable while Rust owns whole-frame presentation");
+		}
 		// Ensure that the pixel storage mode is in a sane state, otherwise the uploaded texture data will be quite
 		// incorrect.
 		//

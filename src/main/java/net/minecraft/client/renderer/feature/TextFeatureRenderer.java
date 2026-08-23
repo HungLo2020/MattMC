@@ -11,6 +11,9 @@ import net.minecraft.client.renderer.SubmitNodeStorage;
 @Environment(EnvType.CLIENT)
 public class TextFeatureRenderer {
 	public void render(SubmitNodeCollection submitNodeCollection, MultiBufferSource.BufferSource bufferSource) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java text feature rendering is unavailable while Rust owns whole-frame presentation");
+		}
 		Font font = Minecraft.getInstance().font;
 		// Iris: Track block entity state (from MixinTextFeatureRenderer)
 		boolean hasBE = false;

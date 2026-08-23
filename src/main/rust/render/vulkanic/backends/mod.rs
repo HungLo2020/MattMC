@@ -12,7 +12,7 @@ use std::sync::{Mutex, OnceLock};
 use super::commands::ValidatedSubmissionBatch;
 use super::error::{GalError, GalResult};
 use super::frame::{
-    AcquiredFrame, FrameAcquireDesc, FrameResizeDesc, FrameResizeResult, FrameSurfaceDesc,
+    AcquiredFrame, FrameAcquireDesc, FrameId, FrameResizeDesc, FrameResizeResult, FrameSurfaceDesc,
     PresentFrameDesc, PresentedFrame,
 };
 use super::handles::{Handle, HandleKind};
@@ -184,6 +184,11 @@ pub(super) trait Backend {
     fn present_frame(&mut self, _desc: &PresentFrameDesc) -> GalResult<PresentedFrame> {
         Err(GalError::unsupported_feature(
             "backend was not created with a presentation surface",
+        ))
+    }
+    fn cancel_frame(&mut self, _frame: FrameId) -> GalResult<()> {
+        Err(GalError::unsupported_feature(
+            "backend does not support cancelling an acquired presentation frame",
         ))
     }
     fn shutdown_frame_surface(&mut self) -> GalResult<()> {
@@ -491,6 +496,17 @@ pub(super) mod mock {
                 status: FramePresentStatus::Presented,
                 completed_submission: desc.wait_for,
             })
+        }
+
+        fn cancel_frame(&mut self, frame: FrameId) -> GalResult<()> {
+            let Some(index) = self.acquired_frames.iter().position(|candidate| *candidate == frame) else {
+                return Err(GalError::submission(
+                    crate::render::vulkanic::StatusCode::InvalidArgument,
+                    "cancelled frame was not acquired",
+                ));
+            };
+            self.acquired_frames.remove(index);
+            Ok(())
         }
 
         fn shutdown_frame_surface(&mut self) -> GalResult<()> {

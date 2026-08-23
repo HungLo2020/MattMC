@@ -427,6 +427,7 @@ fn create_distant_horizons_lod_opaque_pipeline(
         depth_bias: None,
         color_formats: vec![TextureFormat::Rgba8Unorm; 4],
         depth_format: Some(TextureFormat::Depth32Float),
+            stencil: None,
     })
 }
 
@@ -818,6 +819,7 @@ fn create_lowered_source_graphics_pipeline(
         depth_bias: None,
         color_formats,
         depth_format: Some(TextureFormat::Depth32Float),
+            stencil: None,
     })
 }
 
@@ -1145,6 +1147,7 @@ fn selected_terrain_pipeline_layout_matches_optional_colored_voxel_interface() {
             depth_bias: None,
             color_formats: vec![TextureFormat::Rgba16Float; 4],
             depth_format: Some(TextureFormat::Depth32Float),
+            stencil: None,
         })
         .unwrap_or_else(|error| {
             panic!("selected terrain {suffix} pipeline/layout must lower for Vulkan: {error}")
@@ -2156,6 +2159,7 @@ fn run_dynamic_uniform_offset_conformance() -> GalResult<[u8; 4]> {
         depth_bias: None,
         color_formats: vec![TextureFormat::Rgba8Unorm],
         depth_format: None,
+            stencil: None,
     })?;
     let target = gal.create_render_target(RenderTargetDesc {
         label: "dynamic-ubo.target".to_owned(),
@@ -2490,6 +2494,7 @@ pub(in crate::render::vulkanic::backends) fn run_conformance(
         depth_bias: None,
         color_formats: vec![TextureFormat::Rgba8Unorm],
         depth_format: Some(TextureFormat::Depth32Float),
+            stencil: None,
     })?;
     let target = gal.create_render_target(RenderTargetDesc {
         label: "conformance.target".to_string(),

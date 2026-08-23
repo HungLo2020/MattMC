@@ -47,8 +47,11 @@ public class CopperGolemStatueBlockRenderer implements BlockEntityRenderer<Coppe
 		@Nullable ModelFeatureRenderer.CrumblingOverlay crumblingOverlay
 	) {
 		BlockEntityRenderer.super.extractRenderState(copperGolemStatueBlockEntity, copperGolemStatueRenderState, f, vec3, crumblingOverlay);
+		CopperGolemStatueBlock statueBlock = (CopperGolemStatueBlock)copperGolemStatueBlockEntity.getBlockState().getBlock();
 		copperGolemStatueRenderState.direction = (Direction)copperGolemStatueBlockEntity.getBlockState().getValue(CopperGolemStatueBlock.FACING);
 		copperGolemStatueRenderState.pose = (Pose)copperGolemStatueBlockEntity.getBlockState().getValue(BlockStateProperties.COPPER_GOLEM_POSE);
+		copperGolemStatueRenderState.textureIdentity = CopperGolemOxidationLevels
+			.getOxidationLevel(statueBlock.getWeatheringState()).texture();
 	}
 
 	public void submit(
@@ -60,13 +63,15 @@ public class CopperGolemStatueBlockRenderer implements BlockEntityRenderer<Coppe
 			CopperGolemStatueModel copperGolemStatueModel = (CopperGolemStatueModel)this.models.get(copperGolemStatueRenderState.pose);
 			Direction direction = copperGolemStatueRenderState.direction;
 			RenderType renderType = RenderType.entityCutoutNoCull(CopperGolemOxidationLevels.getOxidationLevel(copperGolemStatueBlock.getWeatheringState()).texture());
-			submitNodeCollector.submitModel(
+			submitNodeCollector.submitModelSemanticTexture(
 				copperGolemStatueModel,
 				direction,
 				poseStack,
 				renderType,
 				copperGolemStatueRenderState.lightCoords,
 				OverlayTexture.NO_OVERLAY,
+				0,
+				CopperGolemOxidationLevels.getOxidationLevel(copperGolemStatueBlock.getWeatheringState()).texture(),
 				0,
 				copperGolemStatueRenderState.breakProgress
 			);

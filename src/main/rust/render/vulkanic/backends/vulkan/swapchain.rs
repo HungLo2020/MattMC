@@ -131,6 +131,16 @@ impl VulkanSwapchain {
                 color_format: self.desc.color_format,
             });
         }
+        let configured_slots = usize::try_from(self.desc.max_frames_in_flight)
+            .map_err(|_| GalError::backend("configured Vulkan frame-slot count exceeds usize"))?;
+        if !frame_slot_available(self.acquired.len(), configured_slots) {
+            return Err(GalError::submission(
+                crate::render::vulkanic::StatusCode::InFlight,
+                format!(
+                    "Vulkan acquire exceeded configured frame-slot budget ({configured_slots})"
+                ),
+            ));
+        }
         let fence_info = vk::FenceCreateInfo::default();
         let acquire_fence = unsafe { self.context.device.create_fence(&fence_info, None) }
             .map_err(|error| {
@@ -252,7 +262,10 @@ impl VulkanSwapchain {
                 "Vulkan frame was not acquired before present",
             ));
         };
-        let acquired = self.acquired.remove(position);
+        // Keep the acquisition tracked until synchronization and queue presentation
+        // have succeeded.  If either operation fails, callers can still retry or
+        // explicitly tear down the surface without silently losing the in-flight image.
+        let acquired = self.acquired[position];
         let wait_started = std::time::Instant::now();
         wait_timeline(&self.context, desc.wait_for)?;
         self.metrics.present_wait_nanos = self.metrics.present_wait_nanos.saturating_add(
@@ -278,6 +291,7 @@ impl VulkanSwapchain {
                 )))
             }
         };
+        self.acquired.remove(position);
         if let Some(layout) = self.image_layouts.get_mut(acquired.image_index as usize) {
             *layout = vk::ImageLayout::PRESENT_SRC_KHR;
         }
@@ -303,6 +317,32 @@ impl VulkanSwapchain {
             status,
             completed_submission: desc.wait_for,
         })
+    }
+
+    /// Abandon an acquired image after a failed frame transaction. Vulkan does
+    /// not provide a per-image release operation, so recreate the swapchain
+    /// only when this is the sole acquired image and wait for device quiescence
+    /// before retiring the old swapchain.
+    pub(super) fn cancel(&mut self, frame: FrameId) -> GalResult<()> {
+        let Some(position) = self.acquired.iter().position(|acquired| acquired.frame == frame) else {
+            return Err(GalError::submission(
+                crate::render::vulkanic::StatusCode::InvalidArgument,
+                "Vulkan frame was not acquired before cancel",
+            ));
+        };
+        if self.acquired.len() != 1 || position != 0 {
+            return Err(GalError::submission(
+                crate::render::vulkanic::StatusCode::InFlight,
+                "cannot cancel one Vulkan frame while other swapchain images are acquired",
+            ));
+        }
+        unsafe {
+            self.context
+                .device
+                .device_wait_idle()
+                .map_err(|error| GalError::backend(format!("Vulkan cancel wait failed: {error:?}")))?;
+        }
+        self.recreate(self.swapchain)
     }
 
     pub(super) fn shutdown(&mut self) {
@@ -868,6 +908,10 @@ fn wait_timeline(context: &VulkanContext, id: SubmissionId) -> GalResult<()> {
         .map_err(|error| GalError::backend(format!("Vulkan present wait failed: {error:?}")))
 }
 
+fn frame_slot_available(acquired_slots: usize, configured_slots: usize) -> bool {
+    configured_slots != 0 && acquired_slots < configured_slots
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -881,6 +925,14 @@ mod tests {
         assert_eq!(choose_image_count(capabilities, 8), 3);
         capabilities.max_image_count = 0;
         assert_eq!(choose_image_count(capabilities, 5), 5);
+    }
+
+    #[test]
+    fn acquire_slot_budget_is_strictly_bounded() {
+        assert!(frame_slot_available(0, 2));
+        assert!(frame_slot_available(1, 2));
+        assert!(!frame_slot_available(2, 2));
+        assert!(!frame_slot_available(1, 0));
     }
 
     #[test]

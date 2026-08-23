@@ -26,6 +26,7 @@ import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.renderer.texture.AbstractTexture;
 import net.minecraft.resources.ResourceLocation;
+import org.jetbrains.annotations.Nullable;
 import org.lwjgl.system.MemoryStack;
 
 @Environment(EnvType.CLIENT)
@@ -35,6 +36,7 @@ public class PostPass implements AutoCloseable {
 	private final RenderPipeline pipeline;
 	private final ResourceLocation outputTargetId;
 	private final Map<String, GpuBuffer> customUniforms = new HashMap();
+	@Nullable
 	private final MappableRingBuffer infoUbo;
 	private final List<PostPass.Input> inputs;
 
@@ -43,6 +45,12 @@ public class PostPass implements AutoCloseable {
 		this.name = renderPipeline.getLocation().toString();
 		this.outputTargetId = resourceLocation;
 		this.inputs = list;
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			// Rust owns post-process source admission and execution for whole-frame
+			// Vulkan; Java custom uniforms and sampler metadata are not allocated.
+			this.infoUbo = null;
+			return;
+		}
 
 		for (Entry<String, List<UniformValue>> entry : map.entrySet()) {
 			List<UniformValue> list2 = (List<UniformValue>)entry.getValue();
@@ -72,6 +80,9 @@ public class PostPass implements AutoCloseable {
 	}
 
 	public void addToFrame(FrameGraphBuilder frameGraphBuilder, Map<ResourceLocation, ResourceHandle<RenderTarget>> map, GpuBufferSlice gpuBufferSlice) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java post-pass rendering is unavailable while Rust owns whole-frame presentation");
+		}
 		FramePass framePass = frameGraphBuilder.addPass(this.name);
 
 		for (PostPass.Input input : this.inputs) {
@@ -139,7 +150,9 @@ public class PostPass implements AutoCloseable {
 			gpuBuffer.close();
 		}
 
-		this.infoUbo.close();
+		if (this.infoUbo != null) {
+			this.infoUbo.close();
+		}
 	}
 
 	@Environment(EnvType.CLIENT)

@@ -7,6 +7,8 @@ import net.blaze3d.systems.CommandEncoder;
 import net.blaze3d.textures.GpuTexture;
 import net.blaze3d.textures.GpuTextureView;
 import net.blaze3d.textures.TextureFormat;
+import net.vulkanic.VulkanicAPI;
+import net.vulkanic.bridge.RustGalVulkanWholeFrameMode;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -44,5 +46,25 @@ class VulkanWholeFrameSemanticGpuDeviceTest {
 			UnsupportedOperationException.class,
 			() -> device.createCommandEncoder().createRenderPass(() -> "illegal-java-render", view, OptionalInt.empty())
 		);
+	}
+
+	@Test
+	void apiRenderPassAndNativeTerrainSeamsFailClosedForWholeFrameMode() {
+		RustGalVulkanWholeFrameMode.markVulkanBackendSelected();
+		try {
+			assertThrows(
+				IllegalStateException.class,
+				() -> VulkanicAPI.createRenderPass(() -> "bypassed-java-pass", null, OptionalInt.empty())
+			);
+			assertThrows(
+				IllegalStateException.class,
+				VulkanicAPI::createNativeTerrainCommandEncoder
+			);
+			RustGalVulkanWholeFrameMode.activateRustPresentation();
+			assertThrows(IllegalStateException.class, VulkanicAPI::getCommandContext);
+		} finally {
+			RustGalVulkanWholeFrameMode.deactivateRustPresentation();
+			RustGalVulkanWholeFrameMode.clearVulkanBackendSelection();
+		}
 	}
 }

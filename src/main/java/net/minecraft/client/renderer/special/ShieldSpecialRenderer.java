@@ -33,6 +33,9 @@ public class ShieldSpecialRenderer implements SpecialModelRenderer<DataComponent
 		this.model = shieldModel;
 	}
 
+	/** Semantic GUI copier accessors; the model/material set stay Java-transient. */
+	public ShieldModel model() { return this.model; }
+
 	@Nullable
 	public DataComponentMap extractArgument(ItemStack itemStack) {
 		return itemStack.immutableComponents();

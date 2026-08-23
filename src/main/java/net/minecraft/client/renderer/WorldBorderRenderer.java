@@ -33,6 +33,7 @@ import net.vulkanic.world.RustGalWorldPrimitiveRenderer;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
+import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
 public class WorldBorderRenderer {
@@ -44,10 +45,15 @@ public class WorldBorderRenderer {
 	private double lastBorderMaxX;
 	private double lastBorderMinZ;
 	private double lastBorderMaxZ;
-	private final GpuBuffer worldBorderBuffer = VulkanicAPI.createBuffer(
-		() -> "World border vertex buffer", 40, 16 * DefaultVertexFormat.POSITION_TEX.getVertexSize()
-	);
+	@Nullable
+	private final GpuBuffer worldBorderBuffer;
 	private final VulkanicAPI.AutoStorageIndexBuffer indices = VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS);
+
+	public WorldBorderRenderer() {
+		this.worldBorderBuffer = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			? null
+			: VulkanicAPI.createBuffer(() -> "World border vertex buffer", 40, 16 * DefaultVertexFormat.POSITION_TEX.getVertexSize());
+	}
 
 	private void rebuildWorldBorderBuffer(WorldBorderRenderState worldBorderRenderState, double d, double e, double f, float g, float h, float i) {
 		try (ByteBufferBuilder byteBufferBuilder = ByteBufferBuilder.exactlySized(DefaultVertexFormat.POSITION_TEX.getVertexSize() * 4 * 4)) {
@@ -124,7 +130,17 @@ public class WorldBorderRenderer {
 		if (RustGalWorldPrimitiveRenderer.enqueueWorldBorder(worldBorderRenderState, vec3, d, e)) {
 			return;
 		}
+		if (this.worldBorderBuffer == null) {
+			throw new IllegalStateException("Java world-border rendering is unavailable while Rust owns whole-frame presentation");
+		}
+		boolean rustWholeFrame = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			&& net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
 		if (!(worldBorderRenderState.alpha <= 0.0)) {
+			if (rustWholeFrame) {
+				throw new IllegalStateException(
+					"Rust whole-frame world border semantic route rejected an active border; Java Vulkan fallback is unavailable"
+				);
+			}
 			double f = vec3.x;
 			double g = vec3.z;
 			float h = (float)e;

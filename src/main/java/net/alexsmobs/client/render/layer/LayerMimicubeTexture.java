@@ -5,7 +5,9 @@ import net.alexsmobs.client.render.MimicubeRenderState;
 import net.alexsmobs.client.render.RenderMimicube;
 import net.blaze3d.vertex.PoseStack;
 import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.entity.layers.RenderLayer;
+import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.resources.ResourceLocation;
 
 public class LayerMimicubeTexture extends RenderLayer<MimicubeRenderState, ModelMimicube> {
@@ -17,7 +19,11 @@ public class LayerMimicubeTexture extends RenderLayer<MimicubeRenderState, Model
 
     @Override
     public void submit(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int packedLight, MimicubeRenderState renderState, float f, float g) {
-        // TODO: Implement outer texture rendering in the new architecture
-        // For now, this is a stub for compilation
+        submitNodeCollector.order(1).submitModelSemanticTexture(
+            this.getParentModel(), renderState, poseStack,
+            RenderType.entityTranslucent(TEXTURE), packedLight,
+            OverlayTexture.NO_OVERLAY, 0xFFFFFFFF, TEXTURE,
+            renderState.outlineColor, null
+        );
     }
 }

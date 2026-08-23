@@ -40,6 +40,11 @@ public class ChestSpecialRenderer implements NoDataSpecialModelRenderer {
 		this.openness = f;
 	}
 
+	/** Semantic GUI copier accessors; renderer state remains Java-transient. */
+	public ChestModel model() { return this.model; }
+	public Material material() { return this.material; }
+	public float openness() { return this.openness; }
+
 	@Override
 	public void submit(ItemDisplayContext itemDisplayContext, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, int j, boolean bl, int k) {
 		submitNodeCollector.submitModel(

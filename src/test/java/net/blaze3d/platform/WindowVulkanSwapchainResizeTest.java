@@ -46,6 +46,11 @@ class WindowVulkanSwapchainResizeTest {
     @Test
     void testResizeHookVulkanFailHardOrExecutesWhenReady() throws Exception {
         VulkanicAPI.initialize(GraphicsBackendType.VULKAN);
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+            assertFalse(Window.handleVulkanSwapchainFramebufferResize(1280, 720),
+                "Rust whole-frame Vulkan resize is consumed by RustGalFrameCoordinator, not Java swapchain control");
+            return;
+        }
         VulkanSwapchainSurfaceInfo info = VulkanicAPI.getVulkanSwapchainSurfaceInfo();
 
         if (info.isAvailable()) {

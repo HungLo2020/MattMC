@@ -291,6 +291,7 @@ impl VulkanObjects {
                 VulkanObject::ComputePipeline(self.create_compute_pipeline(handle, desc, token)?)
             }
             BackendCreateDesc::RenderTarget(desc) => {
+                self.validate_render_target_desc(desc)?;
                 VulkanObject::RenderTarget(RenderTargetObject {
                     token,
                     color_views: desc.color_views.clone(),
@@ -309,13 +310,16 @@ impl VulkanObjects {
                 image_view: vk::ImageView::null(),
                 image_layout: vk::ImageLayout::UNDEFINED,
             }),
-            BackendCreateDesc::RenderPass(desc) => VulkanObject::RenderPass(RenderPassObject {
-                token,
-                label: desc.label.clone(),
-                target: desc.target,
-                color_formats: desc.color_formats.clone(),
-                depth_format: desc.depth_format,
-            }),
+            BackendCreateDesc::RenderPass(desc) => {
+                self.validate_render_pass_desc(desc)?;
+                VulkanObject::RenderPass(RenderPassObject {
+                    token,
+                    label: desc.label.clone(),
+                    target: desc.target,
+                    color_formats: desc.color_formats.clone(),
+                    depth_format: desc.depth_format,
+                })
+            }
         };
         self.objects.insert(handle, object);
         Ok(token)
@@ -672,11 +676,7 @@ impl VulkanObjects {
         let texture = self.texture(desc.texture)?;
         let create_info = vk::ImageViewCreateInfo::default()
             .image(texture.image)
-            .view_type(match texture.dimension {
-                TextureDimension::D2 => vk::ImageViewType::TYPE_2D,
-                TextureDimension::D3 => vk::ImageViewType::TYPE_3D,
-                _ => unreachable!("GAL validated supported texture dimension"),
-            })
+            .view_type(image_view_type(texture.dimension, texture.array_layers))
             .format(texture_format(desc.format))
             .subresource_range(vk::ImageSubresourceRange {
                 aspect_mask: texture.aspect,
@@ -702,6 +702,75 @@ impl VulkanObjects {
             format: texture_format(desc.format),
             aspect: texture.aspect,
         })
+    }
+
+    fn validate_render_target_desc(&self, desc: &RenderTargetDesc) -> GalResult<()> {
+        for (index, view_handle) in desc.color_views.iter().enumerate() {
+            let view = self.texture_view(*view_handle).map_err(|_| {
+                GalError::backend(format!(
+                    "render target '{}' color attachment {} is not a texture view",
+                    desc.label, index
+                ))
+            })?;
+            let texture = self.texture(view.texture)?;
+            if texture.extent != desc.extent {
+                return Err(GalError::invalid_argument(format!(
+                    "render target '{}' color attachment {} extent {:?} does not match target {:?}",
+                    desc.label, index, texture.extent, desc.extent
+                )));
+            }
+            if !view.aspect.contains(vk::ImageAspectFlags::COLOR) {
+                return Err(GalError::invalid_argument(format!(
+                    "render target '{}' color attachment {} is not a color view",
+                    desc.label, index
+                )));
+            }
+        }
+        if let Some(depth_handle) = desc.depth_stencil_view {
+            let view = self.texture_view(depth_handle).map_err(|_| {
+                GalError::backend(format!(
+                    "render target '{}' depth attachment is not a texture view",
+                    desc.label
+                ))
+            })?;
+            let texture = self.texture(view.texture)?;
+            if texture.extent != desc.extent {
+                return Err(GalError::invalid_argument(format!(
+                    "render target '{}' depth attachment extent {:?} does not match target {:?}",
+                    desc.label, texture.extent, desc.extent
+                )));
+            }
+            if !view.aspect.contains(vk::ImageAspectFlags::DEPTH) {
+                return Err(GalError::invalid_argument(format!(
+                    "render target '{}' depth attachment is not a depth view",
+                    desc.label
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_render_pass_desc(&self, desc: &RenderPassDesc) -> GalResult<()> {
+        let Some(VulkanObject::RenderTarget(target)) = self.objects.get(&desc.target) else {
+            // Swapchain-backed frame targets have a single dynamic color view;
+            // their compatibility is checked when the frame target is refreshed.
+            return Ok(());
+        };
+        if target.color_views.len() != desc.color_formats.len() {
+            return Err(GalError::invalid_argument(format!(
+                "render pass '{}' declares {} color formats for {} target views",
+                desc.label,
+                desc.color_formats.len(),
+                target.color_views.len()
+            )));
+        }
+        if target.depth_stencil_view.is_some() != desc.depth_format.is_some() {
+            return Err(GalError::invalid_argument(format!(
+                "render pass '{}' depth attachment presence does not match target",
+                desc.label
+            )));
+        }
+        Ok(())
     }
 
     fn create_sampler(
@@ -934,13 +1003,18 @@ impl VulkanObjects {
                 ResourceBindingKind::SampledTexture | ResourceBindingKind::StorageTexture => {
                     let view = self.texture_view(binding.resource)?;
                     let info_index = image_infos.len();
+                    let sampled_layout = if view.aspect.contains(vk::ImageAspectFlags::STENCIL) {
+                        vk::ImageLayout::DEPTH_STENCIL_READ_ONLY_OPTIMAL
+                    } else {
+                        vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL
+                    };
                     image_infos.push(vk::DescriptorImageInfo {
                         sampler: vk::Sampler::null(),
                         image_view: view.view,
                         image_layout: if binding.kind == ResourceBindingKind::StorageTexture {
                             vk::ImageLayout::GENERAL
                         } else {
-                            vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL
+                            sampled_layout
                         },
                     });
                     plans.push(WritePlan::Image {
@@ -991,10 +1065,15 @@ impl VulkanObjects {
                         }
                     };
                     let info_index = image_infos.len();
+                    let sampled_layout = if view.aspect.contains(vk::ImageAspectFlags::STENCIL) {
+                        vk::ImageLayout::DEPTH_STENCIL_READ_ONLY_OPTIMAL
+                    } else {
+                        vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL
+                    };
                     image_infos.push(vk::DescriptorImageInfo {
                         sampler,
                         image_view: view.view,
-                        image_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                        image_layout: sampled_layout,
                     });
                     plans.push(WritePlan::Image {
                         binding: binding.binding,
@@ -1670,6 +1749,14 @@ pub(super) fn compare_op(compare: CompareOp) -> vk::CompareOp {
         CompareOp::Less => vk::CompareOp::LESS,
         CompareOp::LessOrEqual => vk::CompareOp::LESS_OR_EQUAL,
         CompareOp::Equal => vk::CompareOp::EQUAL,
+        CompareOp::Greater => vk::CompareOp::GREATER,
+    }
+}
+
+fn stencil_op(operation: StencilOp) -> vk::StencilOp {
+    match operation {
+        StencilOp::Keep => vk::StencilOp::KEEP,
+        StencilOp::Replace => vk::StencilOp::REPLACE,
     }
 }
 
@@ -1679,16 +1766,42 @@ pub(super) fn compare_op(compare: CompareOp) -> vk::CompareOp {
 fn depth_stencil_state(
     desc: &GraphicsPipelineDesc,
 ) -> Option<vk::PipelineDepthStencilStateCreateInfo<'static>> {
-    desc.depth_format.map(|_| {
+    if desc.depth_format.is_none() && desc.stencil.is_none() {
+        return None;
+    }
+    Some({
         let depth_test_enabled = desc.depth_compare.is_some();
-        vk::PipelineDepthStencilStateCreateInfo::default()
+        let mut state = vk::PipelineDepthStencilStateCreateInfo::default()
             .depth_test_enable(depth_test_enabled)
             .depth_write_enable(depth_test_enabled && desc.depth_write)
             .depth_compare_op(
                 desc.depth_compare
                     .map(compare_op)
                     .unwrap_or(vk::CompareOp::ALWAYS),
-            )
+            );
+        if let Some(stencil) = desc.stencil {
+            state = state
+                .stencil_test_enable(true)
+                .front(vk::StencilOpState {
+                    fail_op: stencil_op(stencil.front.fail_op),
+                    pass_op: stencil_op(stencil.front.pass_op),
+                    depth_fail_op: stencil_op(stencil.front.depth_fail_op),
+                    compare_op: compare_op(stencil.front.compare),
+                    compare_mask: stencil.front.read_mask,
+                    write_mask: stencil.front.write_mask,
+                    reference: stencil.front.reference,
+                })
+                .back(vk::StencilOpState {
+                    fail_op: stencil_op(stencil.back.fail_op),
+                    pass_op: stencil_op(stencil.back.pass_op),
+                    depth_fail_op: stencil_op(stencil.back.depth_fail_op),
+                    compare_op: compare_op(stencil.back.compare),
+                    compare_mask: stencil.back.read_mask,
+                    write_mask: stencil.back.write_mask,
+                    reference: stencil.back.reference,
+                });
+        }
+        state
     })
 }
 
@@ -1699,6 +1812,15 @@ pub(super) fn color_blend_attachment(blend: BlendMode) -> vk::PipelineColorBlend
         BlendMode::Alpha => vk::PipelineColorBlendAttachmentState::default()
             .blend_enable(true)
             .src_color_blend_factor(vk::BlendFactor::SRC_ALPHA)
+            .dst_color_blend_factor(vk::BlendFactor::ONE_MINUS_SRC_ALPHA)
+            .color_blend_op(vk::BlendOp::ADD)
+            .src_alpha_blend_factor(vk::BlendFactor::ONE)
+            .dst_alpha_blend_factor(vk::BlendFactor::ONE_MINUS_SRC_ALPHA)
+            .alpha_blend_op(vk::BlendOp::ADD)
+            .color_write_mask(vk::ColorComponentFlags::RGBA),
+        BlendMode::Premultiplied => vk::PipelineColorBlendAttachmentState::default()
+            .blend_enable(true)
+            .src_color_blend_factor(vk::BlendFactor::ONE)
             .dst_color_blend_factor(vk::BlendFactor::ONE_MINUS_SRC_ALPHA)
             .color_blend_op(vk::BlendOp::ADD)
             .src_alpha_blend_factor(vk::BlendFactor::ONE)
@@ -1741,11 +1863,41 @@ pub(super) fn color_blend_attachment(blend: BlendMode) -> vk::PipelineColorBlend
             .dst_alpha_blend_factor(vk::BlendFactor::ZERO)
             .alpha_blend_op(vk::BlendOp::ADD)
             .color_write_mask(vk::ColorComponentFlags::RGBA),
+        BlendMode::Glint => vk::PipelineColorBlendAttachmentState::default()
+            .blend_enable(true)
+            .src_color_blend_factor(vk::BlendFactor::DST_COLOR)
+            .dst_color_blend_factor(vk::BlendFactor::SRC_COLOR)
+            .color_blend_op(vk::BlendOp::ADD)
+            .src_alpha_blend_factor(vk::BlendFactor::ONE)
+            .dst_alpha_blend_factor(vk::BlendFactor::ZERO)
+            .alpha_blend_op(vk::BlendOp::ADD)
+            .color_write_mask(vk::ColorComponentFlags::RGBA),
+        BlendMode::Vignette => vk::PipelineColorBlendAttachmentState::default()
+            .blend_enable(true)
+            .src_color_blend_factor(vk::BlendFactor::ZERO)
+            .dst_color_blend_factor(vk::BlendFactor::ONE_MINUS_SRC_COLOR)
+            .color_blend_op(vk::BlendOp::ADD)
+            .src_alpha_blend_factor(vk::BlendFactor::ONE)
+            .dst_alpha_blend_factor(vk::BlendFactor::ZERO)
+            .alpha_blend_op(vk::BlendOp::ADD)
+            .color_write_mask(vk::ColorComponentFlags::RGBA),
     }
 }
 
 fn debug_name(kind: &str, handle: Handle, label: &str) -> String {
     format!("gal.{kind}.0x{:016x}.{label}", handle.raw())
+}
+
+/// Select the Vulkan view shape from the explicit GAL texture description.
+/// Layered two-dimensional images must use an array view so every layer is
+/// addressable by atlas and shader-pack consumers.
+fn image_view_type(dimension: TextureDimension, array_layers: u32) -> vk::ImageViewType {
+    match dimension {
+        TextureDimension::D2 if array_layers > 1 => vk::ImageViewType::TYPE_2D_ARRAY,
+        TextureDimension::D2 => vk::ImageViewType::TYPE_2D,
+        TextureDimension::D3 => vk::ImageViewType::TYPE_3D,
+        _ => unreachable!("GAL validated supported texture dimension"),
+    }
 }
 
 #[cfg(test)]
@@ -1851,6 +2003,15 @@ mod tests {
     }
 
     #[test]
+    fn layered_2d_textures_use_array_views() {
+        assert!(vk::ImageViewType::TYPE_2D == image_view_type(TextureDimension::D2, 1));
+        assert!(
+            vk::ImageViewType::TYPE_2D_ARRAY == image_view_type(TextureDimension::D2, 2)
+        );
+        assert!(vk::ImageViewType::TYPE_3D == image_view_type(TextureDimension::D3, 1));
+    }
+
+    #[test]
     fn overlay_blend_lowers_to_source_alpha_additive_equation() {
         let attachment = color_blend_attachment(BlendMode::Overlay);
         assert_eq!(vk::TRUE, attachment.blend_enable);
@@ -1872,6 +2033,19 @@ mod tests {
         assert!(attachment.color_blend_op == vk::BlendOp::ADD);
         assert!(attachment.src_alpha_blend_factor == vk::BlendFactor::ONE);
         assert!(attachment.dst_alpha_blend_factor == vk::BlendFactor::ZERO);
+        assert!(attachment.alpha_blend_op == vk::BlendOp::ADD);
+        assert!(attachment.color_write_mask == vk::ColorComponentFlags::RGBA);
+    }
+
+    #[test]
+    fn premultiplied_blend_lowers_to_one_times_destination_alpha() {
+        let attachment = color_blend_attachment(BlendMode::Premultiplied);
+        assert_eq!(vk::TRUE, attachment.blend_enable);
+        assert!(attachment.src_color_blend_factor == vk::BlendFactor::ONE);
+        assert!(attachment.dst_color_blend_factor == vk::BlendFactor::ONE_MINUS_SRC_ALPHA);
+        assert!(attachment.color_blend_op == vk::BlendOp::ADD);
+        assert!(attachment.src_alpha_blend_factor == vk::BlendFactor::ONE);
+        assert!(attachment.dst_alpha_blend_factor == vk::BlendFactor::ONE_MINUS_SRC_ALPHA);
         assert!(attachment.alpha_blend_op == vk::BlendOp::ADD);
         assert!(attachment.color_write_mask == vk::ColorComponentFlags::RGBA);
     }
@@ -1900,6 +2074,7 @@ mod tests {
             depth_bias: None,
             color_formats: vec![TextureFormat::Rgba8Unorm],
             depth_format: Some(TextureFormat::Depth32Float),
+            stencil: None,
         };
         let state = depth_stencil_state(&desc).expect("depth attachment has Vulkan state");
         assert_eq!(vk::FALSE, state.depth_test_enable);
@@ -1923,10 +2098,41 @@ mod tests {
             depth_bias: None,
             color_formats: vec![TextureFormat::Rgba8Unorm],
             depth_format: Some(TextureFormat::Depth32Float),
+            stencil: None,
         };
         let state = depth_stencil_state(&desc).expect("depth attachment has Vulkan state");
         assert_eq!(vk::TRUE, state.depth_test_enable);
         assert_eq!(vk::TRUE, state.depth_write_enable);
         assert!(state.depth_compare_op == vk::CompareOp::LESS_OR_EQUAL);
+    }
+
+    #[test]
+    fn explicit_stencil_mask_lowers_front_and_back_replace_state() {
+        let desc = GraphicsPipelineDesc {
+            label: "stencil-optical-mask".to_owned(),
+            layout: Handle::from_raw(1),
+            vertex_shader: Handle::from_raw(2),
+            fragment_shader: Handle::from_raw(3),
+            topology: PrimitiveTopology::Triangles,
+            cull_mode: CullMode::None,
+            front_face: crate::render::vulkanic::resources::FrontFace::CounterClockwise,
+            blend: BlendMode::Disabled,
+            depth_compare: Some(CompareOp::LessOrEqual),
+            depth_write: false,
+            depth_bias: None,
+            color_formats: vec![TextureFormat::Rgba8Unorm],
+            depth_format: Some(TextureFormat::Depth24Stencil8),
+            stencil: Some(StencilState {
+                front: StencilFaceState::replace(7, 0xff, 0xff),
+                back: StencilFaceState::keep(CompareOp::Equal, 7, 0xff),
+            }),
+        };
+        let state = depth_stencil_state(&desc).expect("stencil attachment has Vulkan state");
+        assert_eq!(vk::TRUE, state.stencil_test_enable);
+        assert!(state.front.compare_op == vk::CompareOp::ALWAYS);
+        assert!(state.front.pass_op == vk::StencilOp::REPLACE);
+        assert_eq!(7, state.front.reference);
+        assert!(state.back.compare_op == vk::CompareOp::EQUAL);
+        assert!(state.back.pass_op == vk::StencilOp::KEEP);
     }
 }

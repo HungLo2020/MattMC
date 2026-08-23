@@ -1,7 +1,6 @@
 package net.alexsmobs.client.render;
 
 import net.alexsmobs.client.model.ModelAnteater;
-import net.alexsmobs.client.render.layer.LayerAnteaterBaby;
 import net.alexsmobs.client.render.layer.LayerAnteaterTongueItem;
 import net.alexsmobs.entity.EntityAnteater;
 import net.minecraft.client.renderer.culling.Frustum;
@@ -16,7 +15,6 @@ public class RenderAnteater extends MobRenderer<EntityAnteater, AnteaterRenderSt
     public RenderAnteater(EntityRendererProvider.Context renderManagerIn) {
         super(renderManagerIn, new ModelAnteater(), 0.45F);
         this.addLayer(new LayerAnteaterTongueItem(this));
-        this.addLayer(new LayerAnteaterBaby(this));
     }
 
     @Override
@@ -38,6 +36,8 @@ public class RenderAnteater extends MobRenderer<EntityAnteater, AnteaterRenderSt
         renderState.isPassenger = anteater.isPassenger();
         renderState.animationTick = anteater.getAnimationTick();
         renderState.currentAnimation = anteater.getAnimation();
+        this.itemModelResolver.updateForLiving(renderState.tongueItem, anteater.getMainHandItem(),
+            net.minecraft.world.item.ItemDisplayContext.GROUND, anteater);
     }
 
     public boolean shouldRender(EntityAnteater anteater, Frustum p_225626_2_, double p_225626_3_, double p_225626_5_, double p_225626_7_) {

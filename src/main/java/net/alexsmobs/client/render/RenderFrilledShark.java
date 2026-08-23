@@ -55,8 +55,8 @@ public class RenderFrilledShark extends MobRenderer<EntityFrilledShark, FrilledS
 
         @Override
         public void submit(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int packedLightIn, FrilledSharkRenderState renderState, float limbSwing, float limbSwingAmount) {
-            submitNodeCollector.order(1).submitModel(
-                this.getParentModel(), renderState, poseStack, AMRenderTypes.getEyesFlickering(TEXTURE_TEETH, 240), 240, net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, -1, null, renderState.outlineColor, null
+            submitNodeCollector.order(1).submitModelSemanticTexture(
+                this.getParentModel(), renderState, poseStack, AMRenderTypes.getEyesFlickering(TEXTURE_TEETH, 240), 240, net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, -1, TEXTURE_TEETH, renderState.outlineColor, null
             );
         }
     }

@@ -32,8 +32,11 @@ public record GlyphRenderTypes(RenderType normal, RenderType seeThrough, RenderT
 			case POLYGON_OFFSET -> this.polygonOffset;
 		};
 		
-		// Iris: Wrap with block entity render type if rendering block entities (from MixinGlyphRenderType)
-		if (net.irisshaders.iris.vertices.ImmediateState.isRenderingBEs) {
+		// Iris block-entity render-state wrapping is compatibility-only. Rust
+		// semantic text carries its own producer identity and must not consult
+		// ImmediateState while selecting a glyph pipeline.
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			&& net.irisshaders.iris.vertices.ImmediateState.isRenderingBEs) {
 			renderType = net.irisshaders.iris.layer.OuterWrappedRenderType.wrapExactlyOnce("iris:block_entity", renderType, net.irisshaders.iris.layer.BlockEntityRenderStateShard.INSTANCE);
 		}
 		

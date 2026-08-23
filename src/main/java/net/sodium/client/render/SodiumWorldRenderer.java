@@ -106,6 +106,11 @@ public class SodiumWorldRenderer {
     }
 
     public void setLevel(ClientLevel level) {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+            // Rust owns terrain admission and GPU resources for this route.
+            // Do not construct or reload Sodium's Java RenderDevice graph.
+            return;
+        }
         // Check that the level is actually changing
         if (this.level == level) {
             return;
@@ -309,6 +314,9 @@ public class SodiumWorldRenderer {
      * Performs a render pass for the given {@link RenderType} and draws all visible chunks for it.
      */
 	    public void drawChunkLayer(ChunkSectionLayerGroup group, ChunkRenderMatrices matrices, double x, double y, double z) {
+	        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+	            throw new IllegalStateException("Java Sodium terrain rendering is unavailable while Rust owns whole-frame presentation");
+	        }
 	        net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("sodium.terrain.draw");
 	        try {
 	        if (group == ChunkSectionLayerGroup.OPAQUE) {
@@ -382,6 +390,9 @@ public class SodiumWorldRenderer {
     }
 
     public void reload() {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+            return;
+        }
         if (this.level == null) {
             return;
         }

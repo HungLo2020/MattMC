@@ -17,11 +17,13 @@ import net.minecraft.tags.ItemTags;
 @Environment(EnvType.CLIENT)
 public class RopesLayer<M extends HappyGhastModel> extends RenderLayer<HappyGhastRenderState, M> {
 	private final RenderType ropes;
+	private final ResourceLocation ropeTexture;
 	private final HappyGhastModel adultModel;
 	private final HappyGhastModel babyModel;
 
 	public RopesLayer(RenderLayerParent<HappyGhastRenderState, M> renderLayerParent, EntityModelSet entityModelSet, ResourceLocation resourceLocation) {
 		super(renderLayerParent);
+		this.ropeTexture = resourceLocation;
 		this.ropes = RenderType.entityCutoutNoCull(resourceLocation);
 		this.adultModel = new HappyGhastModel(entityModelSet.bakeLayer(ModelLayers.HAPPY_GHAST_ROPES));
 		this.babyModel = new HappyGhastModel(entityModelSet.bakeLayer(ModelLayers.HAPPY_GHAST_BABY_ROPES));
@@ -30,8 +32,10 @@ public class RopesLayer<M extends HappyGhastModel> extends RenderLayer<HappyGhas
 	public void submit(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, HappyGhastRenderState happyGhastRenderState, float f, float g) {
 		if (happyGhastRenderState.isLeashHolder && happyGhastRenderState.bodyItem.is(ItemTags.HARNESSES)) {
 			HappyGhastModel happyGhastModel = happyGhastRenderState.isBaby ? this.babyModel : this.adultModel;
-			submitNodeCollector.submitModel(
-				happyGhastModel, happyGhastRenderState, poseStack, this.ropes, i, OverlayTexture.NO_OVERLAY, happyGhastRenderState.outlineColor, null
+			submitNodeCollector.submitModelSemanticTexture(
+				happyGhastModel, happyGhastRenderState, poseStack, this.ropes, i,
+				OverlayTexture.NO_OVERLAY, -1, this.ropeTexture,
+				happyGhastRenderState.outlineColor, null
 			);
 		}
 	}

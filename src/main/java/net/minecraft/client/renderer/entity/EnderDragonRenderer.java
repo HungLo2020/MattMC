@@ -66,7 +66,7 @@ public class EnderDragonRenderer extends EntityRenderer<EnderDragon, EnderDragon
 		if (enderDragonRenderState.deathTime > 0.0F) {
 			int j = ARGB.white(enderDragonRenderState.deathTime / 200.0F);
 			submitNodeCollector.order(0)
-				.submitModel(
+				.submitModelSemanticTexture(
 					this.model,
 					enderDragonRenderState,
 					poseStack,
@@ -74,28 +74,45 @@ public class EnderDragonRenderer extends EntityRenderer<EnderDragon, EnderDragon
 					enderDragonRenderState.lightCoords,
 					OverlayTexture.NO_OVERLAY,
 					j,
-					null,
+					DRAGON_EXPLODING_LOCATION,
 					enderDragonRenderState.outlineColor,
 					null
 				);
-			submitNodeCollector.order(1)
-				.submitModel(
-					this.model, enderDragonRenderState, poseStack, DECAL, enderDragonRenderState.lightCoords, i, -1, null, enderDragonRenderState.outlineColor, null
-				);
+			if (i == OverlayTexture.NO_OVERLAY) {
+				submitNodeCollector.order(1)
+					.submitModelSemanticTexture(
+						this.model, enderDragonRenderState, poseStack, DECAL,
+						enderDragonRenderState.lightCoords, i, -1, DRAGON_LOCATION,
+						enderDragonRenderState.outlineColor, null
+					);
+			} else {
+				// Overlay coordinates are copied into the Rust mesh instance's
+				// explicit overlay-color metadata; retain the same direct-texture
+				// semantic route for the hurt/red-overlay state.
+				submitNodeCollector.order(1)
+					.submitModelSemanticTexture(
+						this.model, enderDragonRenderState, poseStack, DECAL,
+						enderDragonRenderState.lightCoords, i, -1, DRAGON_LOCATION,
+						enderDragonRenderState.outlineColor, null
+					);
+			}
 		} else {
 			submitNodeCollector.order(0)
-				.submitModel(
-					this.model, enderDragonRenderState, poseStack, RENDER_TYPE, enderDragonRenderState.lightCoords, i, -1, null, enderDragonRenderState.outlineColor, null
+				.submitModelSemanticTexture(
+					this.model, enderDragonRenderState, poseStack, RENDER_TYPE, enderDragonRenderState.lightCoords, i, -1,
+					DRAGON_LOCATION, enderDragonRenderState.outlineColor, null
 				);
 		}
 
-		submitNodeCollector.submitModel(
+		submitNodeCollector.submitModelSemanticTexture(
 			this.model,
 			enderDragonRenderState,
 			poseStack,
 			EYES,
 			enderDragonRenderState.lightCoords,
 			OverlayTexture.NO_OVERLAY,
+			-1,
+			DRAGON_EYES_LOCATION,
 			enderDragonRenderState.outlineColor,
 			null
 		);
@@ -125,7 +142,43 @@ public class EnderDragonRenderer extends EntityRenderer<EnderDragon, EnderDragon
 	}
 
 	private static void submitRays(PoseStack poseStack, float f, SubmitNodeCollector submitNodeCollector, RenderType renderType) {
+		boolean rustProcedural = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			&& net.vulkanic.world.WorldRenderRoutePolicy.currentProceduralQuadRoute().usesRustWholeFrameVulkan();
+		if (rustProcedural) {
+			float g = Math.min(f > 0.8F ? (f - 0.8F) / 0.2F : 0.0F, 1.0F);
+			int headColor = ARGB.colorFromFloat(1.0F - g, 1.0F, 1.0F, 1.0F);
+			RandomSource randomSource = RandomSource.create(432L);
+			Vector3f origin = new Vector3f();
+			Vector3f first = new Vector3f();
+			Vector3f second = new Vector3f();
+			Vector3f third = new Vector3f();
+			Quaternionf quaternion = new Quaternionf();
+			int rayCount = Mth.floor((f + f * f) / 2.0F * 60.0F);
+			for (int ray = 0; ray < rayCount; ray++) {
+				quaternion.rotationXYZ(randomSource.nextFloat() * (float)(Math.PI * 2), randomSource.nextFloat() * (float)(Math.PI * 2), randomSource.nextFloat() * (float)(Math.PI * 2))
+					.rotateXYZ(randomSource.nextFloat() * (float)(Math.PI * 2), randomSource.nextFloat() * (float)(Math.PI * 2), randomSource.nextFloat() * (float)(Math.PI * 2) + f * (float)(Math.PI / 2));
+				poseStack.mulPose(quaternion);
+				float length = randomSource.nextFloat() * 20.0F + 5.0F + g * 10.0F;
+				float radius = randomSource.nextFloat() * 2.0F + 1.0F + g * 2.0F;
+				first.set(-HALF_SQRT_3 * radius, length, -0.5F * radius);
+				second.set(HALF_SQRT_3 * radius, length, -0.5F * radius);
+				third.set(0.0F, length, radius);
+				float[] vertices = {
+					origin.x(), origin.y(), origin.z(), first.x(), first.y(), first.z(), second.x(), second.y(), second.z(), second.x(), second.y(), second.z(),
+					origin.x(), origin.y(), origin.z(), second.x(), second.y(), second.z(), third.x(), third.y(), third.z(), third.x(), third.y(), third.z(),
+					origin.x(), origin.y(), origin.z(), third.x(), third.y(), third.z(), first.x(), first.y(), first.z(), first.x(), first.y(), first.z()
+				};
+				float[] uvs = {0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1};
+				int[] colors = {headColor, 0xFFFF00FF, 0xFFFF00FF};
+				if (!submitNodeCollector.submitColoredQuads(poseStack, renderType, vertices, uvs, colors, 15728880)) {
+					throw new IllegalStateException("Rust procedural ray route rejected semantic quads");
+				}
+			}
+			return;
+		}
 		submitNodeCollector.submitCustomGeometry(
+			// Rust receives the same deterministic rays through semantic quads below;
+			// this Java producer is retained only for compatibility routes.
 			poseStack,
 			renderType,
 			(pose, vertexConsumer) -> {
@@ -173,9 +226,13 @@ public class EnderDragonRenderer extends EntityRenderer<EnderDragon, EnderDragon
 		float k = Mth.sqrt(f * f + h * h);
 		float l = Mth.sqrt(f * f + g * g + h * h);
 		
-		// Iris: Set entity ID for crystal beam rendering (from MixinEnderDragonRenderer)
+		boolean rustCrystalBeam = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			&& net.vulkanic.world.WorldRenderRoutePolicy.currentCrystalBeamRoute().usesRustWholeFrameVulkan();
+		boolean rustPresentation = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
+		// Iris state is consulted only by the Java compatibility route.
 		int iris$previousEntity = 0;
-		if (net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getEntityIds() != null) {
+		if (!rustPresentation && !rustCrystalBeam
+			&& net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getEntityIds() != null) {
 			iris$previousEntity = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedEntity();
 			net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentEntity(
 				net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getEntityIds().applyAsInt(
@@ -190,6 +247,29 @@ public class EnderDragonRenderer extends EntityRenderer<EnderDragon, EnderDragon
 		poseStack.mulPose(Axis.XP.rotation((float)(-Math.atan2(k, g)) - (float) (Math.PI / 2)));
 		float m = 0.0F - i * 0.01F;
 		float n = l / 32.0F - i * 0.01F;
+		float[] beamVertices = new float[96];
+		float[] beamUvs = new float[64];
+		int[] beamColors = new int[32];
+		int vertexIndex = 0;
+		int uvIndex = 0;
+		float bx = 0.0F, by = 0.75F, bu = 0.0F;
+		for (int nx = 1; nx <= 8; nx++) {
+			float o = Mth.sin(nx * (float) (Math.PI * 2) / 8.0F) * 0.75F;
+			float p = Mth.cos(nx * (float) (Math.PI * 2) / 8.0F) * 0.75F;
+			float q = nx / 8.0F;
+			float[][] quad = {{bx * 0.2F, by * 0.2F, 0.0F}, {bx, by, l}, {o, p, l}, {o * 0.2F, p * 0.2F, 0.0F}};
+			float[][] tex = {{bu, m}, {bu, n}, {q, n}, {q, m}};
+			for (int v = 0; v < 4; v++) { beamVertices[vertexIndex++] = quad[v][0]; beamVertices[vertexIndex++] = quad[v][1]; beamVertices[vertexIndex++] = quad[v][2]; beamUvs[uvIndex++] = tex[v][0]; beamUvs[uvIndex++] = tex[v][1]; }
+			beamColors[(nx - 1) * 4] = -16777216; beamColors[(nx - 1) * 4 + 1] = -1; beamColors[(nx - 1) * 4 + 2] = -1; beamColors[(nx - 1) * 4 + 3] = -16777216;
+			bx = o; by = p; bu = q;
+		}
+		if (rustCrystalBeam && submitNodeCollector.submitCrystalBeam(poseStack, BEAM, CRYSTAL_BEAM_LOCATION, beamVertices, beamUvs, beamColors, j)) {
+			poseStack.popPose();
+			return;
+		}
+		if (rustCrystalBeam) {
+			throw new IllegalStateException("Rust whole-frame End Crystal beam route rejected semantic quads");
+		}
 		submitNodeCollector.submitCustomGeometry(
 			poseStack,
 			BEAM,

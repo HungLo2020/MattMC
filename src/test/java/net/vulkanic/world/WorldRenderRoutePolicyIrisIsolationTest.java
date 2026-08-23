@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static net.vulkanic.world.WorldRenderRoutePolicy.Route.DISABLED;
 import static net.vulkanic.world.WorldRenderRoutePolicy.Route.JAVA_COMPATIBILITY;
 import static net.vulkanic.world.WorldRenderRoutePolicy.Route.RUST_OPENGL_BORROWED_CONTEXT;
 import static net.vulkanic.world.WorldRenderRoutePolicy.Route.RUST_VULKAN_WHOLE_FRAME;
@@ -27,7 +28,7 @@ final class WorldRenderRoutePolicyIrisIsolationTest {
 	}
 
 	@Test
-	void javaVulkanCompatibilityDoesNotConsultIrisRuntime() {
+	void unadmittedVulkanDoesNotConsultIrisRuntime() {
 		AtomicInteger irisQueries = new AtomicInteger();
 		WorldRenderRoutePolicy.Route route = WorldRenderRoutePolicy.selectShaderAffectedRouteForTests(
 			true,
@@ -38,7 +39,7 @@ final class WorldRenderRoutePolicyIrisIsolationTest {
 			}
 		);
 
-		assertEquals(JAVA_COMPATIBILITY, route);
+		assertEquals(DISABLED, route);
 		assertEquals(0, irisQueries.get());
 	}
 

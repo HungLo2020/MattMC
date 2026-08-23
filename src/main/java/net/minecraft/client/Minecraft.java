@@ -701,7 +701,8 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		this.quickPlayLog = QuickPlayLog.of(gameConfig.quickPlay.logPath());
 		this.framerateLimitTracker = new FramerateLimitTracker(this.options, this);
 		this.fpsPieProfiler = new ContinuousProfiler(Util.timeSource, () -> this.fpsPieRenderTicks, this.framerateLimitTracker::isHeavilyThrottled);
-		if (TracyCompat.isAvailable() && gameConfig.game.captureTracyImages) {
+		if (TracyCompat.isAvailable() && gameConfig.game.captureTracyImages
+			&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			this.tracyFrameCapture = new TracyFrameCapture();
 		} else {
 			this.tracyFrameCapture = null;
@@ -1391,7 +1392,6 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 						net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.rendering.rust-vulkan-whole-frame");
 						this.gameRenderer.renderRustVulkanWholeFrameShell(this.deltaTracker, bl);
 						net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.rendering.rust-vulkan-whole-frame");
-						net.minecraft.client.dev.DeterministicCameraCapture.afterRender(this);
 					}
 				}
 				net.minecraft.util.profiling.custom.ProfilerManager.recordRenderThreadOperation("frame.rustVulkanWholeFrame", Util.getNanos() - startTime);
@@ -2014,8 +2014,15 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 			}
 
 			ClientPacketListener clientPacketListener = this.getConnection();
-			if (clientPacketListener != null && !this.pause) {
-				clientPacketListener.send(ServerboundClientTickEndPacket.INSTANCE);
+			if (clientPacketListener != null) {
+				// Keep the client-side load tracker, deferred packets, and key-pair
+				// maintenance advancing once per client tick. This is independent of
+				// the rendering backend; Rust Vulkan only consumes the resulting
+				// semantic world state and never substitutes for network lifecycle.
+				clientPacketListener.tick();
+				if (!this.pause) {
+					clientPacketListener.send(ServerboundClientTickEndPacket.INSTANCE);
+				}
 			}
 		} else if (this.pendingConnection != null) {
 			profilerFiller.popPush("pendingConnection");
@@ -2263,7 +2270,9 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 
 	public void setLevel(ClientLevel clientLevel) {
 		// Iris: From MixinMinecraft_PipelineManagement - track last dimension on level change
-		net.irisshaders.iris.Iris.lastDimension = net.irisshaders.iris.Iris.getCurrentDimension();
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			net.irisshaders.iris.Iris.lastDimension = net.irisshaders.iris.Iris.getCurrentDimension();
+		}
 		
 		this.level = clientLevel;
 		this.updateLevelInEngines(clientLevel);
@@ -2408,15 +2417,17 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 
 	private void updateLevelInEngines(@Nullable ClientLevel clientLevel) {
 		// Iris: From MixinMinecraft_PipelineManagement - reset pipeline on dimension change
-		if (net.irisshaders.iris.Iris.getCurrentDimension() != net.irisshaders.iris.Iris.lastDimension) {
-			net.irisshaders.iris.Iris.logger.info("Reloading pipeline on dimension change: " + net.irisshaders.iris.Iris.lastDimension + " => " + net.irisshaders.iris.Iris.getCurrentDimension());
-			// Destroy pipelines when changing dimensions.
-			net.irisshaders.iris.Iris.getPipelineManager().destroyPipeline();
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			if (net.irisshaders.iris.Iris.getCurrentDimension() != net.irisshaders.iris.Iris.lastDimension) {
+				net.irisshaders.iris.Iris.logger.info("Reloading pipeline on dimension change: " + net.irisshaders.iris.Iris.lastDimension + " => " + net.irisshaders.iris.Iris.getCurrentDimension());
+				// Destroy pipelines when changing dimensions.
+				net.irisshaders.iris.Iris.getPipelineManager().destroyPipeline();
 
-			// NB: We need create the pipeline immediately, so that it is ready by the time that Sodium starts trying to
-			// initialize its world renderer.
-			if (clientLevel != null) {
-				net.irisshaders.iris.Iris.getPipelineManager().preparePipeline(net.irisshaders.iris.Iris.getCurrentDimension());
+				// NB: We need create the pipeline immediately, so that it is ready by the time that Sodium starts trying to
+				// initialize its world renderer.
+				if (clientLevel != null) {
+					net.irisshaders.iris.Iris.getPipelineManager().preparePipeline(net.irisshaders.iris.Iris.getCurrentDimension());
+				}
 			}
 		}
 		

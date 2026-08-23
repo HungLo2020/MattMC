@@ -61,16 +61,16 @@ public class RenderKomodoDragon extends MobRenderer<EntityKomodoDragon, KomodoDr
                            KomodoDragonRenderState renderState, float netHeadYaw, float headPitch) {
             if(renderState.isMaid){
                 submitNodeCollector.order(1)
-                    .submitModel(MAID_MODEL, renderState, poseStack,
+                    .submitModelSemanticTexture(MAID_MODEL, renderState, poseStack,
                         AMRenderTypes.entityCutoutNoCull(TEXTURE_MAID), packedLight,
-                        net.minecraft.client.renderer.texture.OverlayTexture.pack(0, renderState.hurtTime > 0), -1, null, renderState.outlineColor, null);
+                        net.minecraft.client.renderer.texture.OverlayTexture.pack(0, renderState.hurtTime > 0), -1, TEXTURE_MAID, renderState.outlineColor, null);
                 MAID_MODEL.setupAnim(renderState);
             }
             if(renderState.isSaddled){
                 submitNodeCollector.order(1)
-                    .submitModel(SADDLE_MODEL, renderState, poseStack,
+                    .submitModelSemanticTexture(SADDLE_MODEL, renderState, poseStack,
                         AMRenderTypes.entityCutoutNoCull(TEXTURE_SADDLE), packedLight,
-                        net.minecraft.client.renderer.texture.OverlayTexture.pack(0, renderState.hurtTime > 0), -1, null, renderState.outlineColor, null);
+                        net.minecraft.client.renderer.texture.OverlayTexture.pack(0, renderState.hurtTime > 0), -1, TEXTURE_SADDLE, renderState.outlineColor, null);
                 SADDLE_MODEL.setupAnim(renderState);
             }
         }

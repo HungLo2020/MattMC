@@ -59,6 +59,23 @@ public class RustGalTerrainRendererLightingContractTest {
 	}
 
 	@Test
+	public void copiedAtlasTracksSemanticAnimationGenerationAndSelectedFrame() throws Exception {
+		String source = java.nio.file.Files.readString(java.nio.file.Path.of(
+			"src/main/java/net/vulkanic/world/RustGalTerrainRenderer.java"
+		));
+		int method = source.indexOf("private static void ensureAtlasPayload()");
+		int nextMethod = source.indexOf("\n\tprivate static FluidSpriteAsset buildFluidSpriteAsset", method + 1);
+		String body = source.substring(method, nextMethod < 0 ? source.length() : nextMethod);
+		assertTrue(body.contains("semanticRawSnapshot()"));
+		assertTrue(body.contains("copiedAtlasSemanticGeneration == semanticGeneration"));
+		int copySprite = source.indexOf("private static void copySprite");
+		String copyBody = source.substring(copySprite, source.indexOf("\n\tprivate static long rgbaHash", copySprite));
+		assertTrue(copyBody.contains("contents.semanticFrameIndex()"));
+		assertTrue(copyBody.contains("getFrameX(frame) * contents.width()"));
+		assertTrue(copyBody.contains("getFrameY(frame) * contents.height()"));
+	}
+
+	@Test
 	public void wholeFrameShaderEnvironmentUsesFreshVanillaFogInsteadOfSodiumHookCache() throws Exception {
 		String source = java.nio.file.Files.readString(java.nio.file.Path.of(
 			"src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"
@@ -292,6 +309,21 @@ public class RustGalTerrainRendererLightingContractTest {
 		assertEquals(0, mesh.retainedIndexCount());
 		assertEquals(6, mesh.omittedIndexCount());
 		assertTrue(mesh.sections().isEmpty());
+	}
+
+	@Test
+	public void translucentPrimitiveMetadataTreatsUnknownFlatQuadAsNonFluidTranslucent() {
+		RustGalTerrainRenderer.OrderedTranslucentMesh mesh =
+			RustGalTerrainRenderer.buildOrderedTranslucentMesh(
+				sortedQuads(0),
+				primitiveMetadata(NativeSectionMeshBuilder.PRIMITIVE_KIND_UNKNOWN),
+				testVertices(1), 4);
+
+		assertEquals(1, mesh.nonFluidPrimitiveCount());
+		assertEquals(1, mesh.retainedPrimitiveCount());
+		assertEquals(0, mesh.omittedPrimitiveCount());
+		assertEquals(RustGalWorldPrimitiveRenderer.MATERIAL_ID_TRANSLUCENT_TEXTURED,
+			mesh.sections().get(0).materialId());
 	}
 
 	private static int[] primitiveMetadata(int... kinds) {

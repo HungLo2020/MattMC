@@ -28,6 +28,14 @@ public abstract class AbstractShaderRenderer
 	
 	public void render(float partialTicks)
 	{
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
+		{
+			// DH's legacy shader objects record Java command-buffer work.  The
+			// selected Vulkan route supplies DH as copied semantic geometry and
+			// Rust-owned post passes; never let an unported shader renderer reopen
+			// the Java Vulkan backend (or its shared native handles).
+			return;
+		}
 		this.init();
 		CommandContext ctx = VulkanicAPI.getCommandContext();
 

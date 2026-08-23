@@ -937,6 +937,9 @@ public abstract class RenderType extends RenderStateShard implements net.irissha
 
 		@Override
 		public void draw(MeshData meshData) {
+			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+				throw new IllegalStateException("Java immediate RenderType drawing is unavailable while Rust owns whole-frame presentation");
+			}
 			this.setupRenderState();
 			GpuBufferSlice gpuBufferSlice = VulkanicAPI.getDynamicUniforms()
 				.writeTransform(

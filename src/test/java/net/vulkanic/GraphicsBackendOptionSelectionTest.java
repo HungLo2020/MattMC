@@ -27,13 +27,14 @@ public class GraphicsBackendOptionSelectionTest {
 
     @Test
     public void testNormalizeBackendOptionValue() {
-        assertEquals("opengl", VulkanicAPI.normalizeBackendOptionValue(null));
-        assertEquals("opengl", VulkanicAPI.normalizeBackendOptionValue(""));
-        assertEquals("opengl", VulkanicAPI.normalizeBackendOptionValue("opengl"));
-        assertEquals("opengl", VulkanicAPI.normalizeBackendOptionValue("OpenGL"));
+        String defaultBackend = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() ? "vulkan" : "opengl";
+        assertEquals(defaultBackend, VulkanicAPI.normalizeBackendOptionValue(null));
+        assertEquals(defaultBackend, VulkanicAPI.normalizeBackendOptionValue(""));
+        assertEquals(defaultBackend, VulkanicAPI.normalizeBackendOptionValue("opengl"));
+        assertEquals(defaultBackend, VulkanicAPI.normalizeBackendOptionValue("OpenGL"));
         assertEquals("vulkan", VulkanicAPI.normalizeBackendOptionValue("vulkan"));
         assertEquals("vulkan", VulkanicAPI.normalizeBackendOptionValue("  VULKAN  "));
-        assertEquals("opengl", VulkanicAPI.normalizeBackendOptionValue("dx12"));
+        assertEquals(defaultBackend, VulkanicAPI.normalizeBackendOptionValue("dx12"));
     }
 
     @Test
@@ -145,6 +146,8 @@ public class GraphicsBackendOptionSelectionTest {
                 field.setAccessible(true);
                 field.set(null, null);
             }
+            net.vulkanic.bridge.RustGalVulkanWholeFrameMode.deactivateRustPresentation();
+            net.vulkanic.bridge.RustGalVulkanWholeFrameMode.clearVulkanBackendSelection();
         } catch (ReflectiveOperationException exception) {
             throw new RuntimeException("Failed to reset VulkanicAPI backend state", exception);
         }

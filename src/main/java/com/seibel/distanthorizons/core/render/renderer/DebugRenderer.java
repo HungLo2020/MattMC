@@ -176,6 +176,12 @@ public class DebugRenderer
 	
 	public void render(Mat4f transform)
 	{
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
+		{
+			// Debug wireframes have no admitted Java Vulkan presenter while Rust
+			// owns the frame; keep this optional diagnostic path fail-closed.
+			return;
+		}
 		CommandContext ctx = VulkanicAPI.getCommandContext();
 		this.transformationMatrixThisFrame = transform;
 		Vec3d camPos = MC_RENDER.getCameraExactPosition();

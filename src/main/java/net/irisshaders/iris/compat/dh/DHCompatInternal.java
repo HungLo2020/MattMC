@@ -16,6 +16,8 @@ import net.irisshaders.iris.targets.Blaze3dRenderTargetExt;
 import net.irisshaders.iris.targets.DepthTexture;
 import net.irisshaders.iris.uniforms.CapturedRenderingState;
 import net.minecraft.client.Minecraft;
+import net.vulkanic.VulkanicAPI;
+import net.vulkanic.bridge.RustGalVulkanWholeFrameMode;
 
 import java.io.IOException;
 
@@ -46,6 +48,14 @@ public class DHCompatInternal {
 
 	public DHCompatInternal(IrisRenderingPipeline pipeline, boolean dhShadowEnabled) {
 		this.pipeline = pipeline;
+		if (VulkanicAPI.isVulkanBackendInitializedAndSelected() || RustGalVulkanWholeFrameMode.enabled()) {
+			// DH's Iris compatibility implementation owns Java framebuffers,
+			// programs, and legacy depth copies. Rust Vulkan receives DH through
+			// copied semantic columns instead; constructing this object would
+			// create a second renderer even when no draw is eventually issued.
+			incompatible = true;
+			return;
+		}
 
 		//Iris.logger.info("[DH-COMPAT-INIT] ========== DHCompatInternal CONSTRUCTOR CALLED ==========");
 		//Iris.logger.info("[DH-COMPAT-INIT] pipeline: " + (pipeline != null ? "present" : "null"));

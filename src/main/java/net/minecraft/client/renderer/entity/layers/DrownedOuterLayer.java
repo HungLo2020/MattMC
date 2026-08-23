@@ -7,6 +7,8 @@ import net.minecraft.client.model.DrownedModel;
 import net.minecraft.client.model.geom.EntityModelSet;
 import net.minecraft.client.model.geom.ModelLayers;
 import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.entity.LivingEntityRenderer;
 import net.minecraft.client.renderer.entity.RenderLayerParent;
 import net.minecraft.client.renderer.entity.state.ZombieRenderState;
 import net.minecraft.resources.ResourceLocation;
@@ -25,6 +27,18 @@ public class DrownedOuterLayer extends RenderLayer<ZombieRenderState, DrownedMod
 
 	public void submit(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, ZombieRenderState zombieRenderState, float f, float g) {
 		DrownedModel drownedModel = zombieRenderState.isBaby ? this.babyModel : this.model;
-		coloredCutoutModelCopyLayerRender(drownedModel, DROWNED_OUTER_LAYER_LOCATION, poseStack, submitNodeCollector, i, zombieRenderState, -1, 1);
+			submitNodeCollector.order(1)
+				.submitModelSemanticTexture(
+					drownedModel,
+					zombieRenderState,
+					poseStack,
+					RenderType.entityCutoutNoCull(DROWNED_OUTER_LAYER_LOCATION),
+					i,
+					LivingEntityRenderer.getOverlayCoords(zombieRenderState, 0.0F),
+					-1,
+					DROWNED_OUTER_LAYER_LOCATION,
+					zombieRenderState.outlineColor,
+					null
+				);
 	}
 }

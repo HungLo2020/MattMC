@@ -73,8 +73,10 @@ public class WolfArmorLayer extends RenderLayer<WolfRenderState, WolfModel> {
 		Level level = Crackiness.WOLF_ARMOR.byDamage(itemStack);
 		if (level != Level.NONE) {
 			ResourceLocation resourceLocation = (ResourceLocation)ARMOR_CRACK_LOCATIONS.get(level);
-			submitNodeCollector.submitModel(
-				model, wolfRenderState, poseStack, RenderType.armorTranslucent(resourceLocation), i, OverlayTexture.NO_OVERLAY, wolfRenderState.outlineColor, null
+			submitNodeCollector.submitModelSemanticTexture(
+				model, wolfRenderState, poseStack, RenderType.armorTranslucent(resourceLocation), i,
+				OverlayTexture.NO_OVERLAY, wolfRenderState.outlineColor, resourceLocation,
+				wolfRenderState.outlineColor, null
 			);
 		}
 	}

@@ -110,6 +110,12 @@ public class PaintingRenderer extends EntityRenderer<Painting, PaintingRenderSta
 		TextureAtlasSprite textureAtlasSprite,
 		TextureAtlasSprite textureAtlasSprite2
 	) {
+		if (net.vulkanic.world.WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()) {
+			if (renderPaintingSemantic(poseStack, submitNodeCollector, renderType, is, i, j, textureAtlasSprite, textureAtlasSprite2)) {
+				return;
+			}
+			throw new IllegalStateException("Rust whole-frame painting route rejected semantic quads");
+		}
 		submitNodeCollector.submitCustomGeometry(poseStack, renderType, (pose, vertexConsumer) -> {
 			float f = -i / 2.0F;
 			float g = -j / 2.0F;
@@ -167,6 +173,57 @@ public class PaintingRenderer extends EntityRenderer<Painting, PaintingRenderSta
 				}
 			}
 		});
+	}
+
+	/** Copies the six painting faces as explicit atlas quads for Rust Vulkan. */
+	private boolean renderPaintingSemantic(
+		PoseStack poseStack, SubmitNodeCollector submitNodeCollector, RenderType renderType,
+		int[] light, int width, int height, TextureAtlasSprite art, TextureAtlasSprite back
+	) {
+		float originX = -width / 2.0F;
+		float originY = -height / 2.0F;
+		float depth = 0.03125F;
+		float backU0 = back.getU0(), backU1 = back.getU1(), backV0 = back.getV0(), backV1 = back.getV1();
+		float sideU0 = back.getU0(), sideU1 = back.getU(0.0625F), sideV0 = back.getV0(), sideV1 = back.getV(0.0625F);
+		for (int tileX = 0; tileX < width; tileX++) {
+			for (int tileY = 0; tileY < height; tileY++) {
+				float x1 = originX + tileX + 1.0F, x0 = originX + tileX;
+				float y1 = originY + tileY + 1.0F, y0 = originY + tileY;
+				int tileLight = light[tileX + tileY * width];
+				float uFront0 = art.getU((float)(width - tileX) / width), uFront1 = art.getU((float)(width - tileX - 1) / width);
+				float vFront0 = art.getV((float)(height - tileY) / height), vFront1 = art.getV((float)(height - tileY - 1) / height);
+				ResourceLocation artAtlas = art.atlasLocation();
+				ResourceLocation backAtlas = back.atlasLocation();
+				if (!submitPaintingQuad(submitNodeCollector, poseStack, renderType, artAtlas,
+					new float[] {x1, y0, -depth, x0, y0, -depth, x0, y1, -depth, x1, y1, -depth},
+					new float[] {uFront1, vFront0, uFront0, vFront0, uFront0, vFront1, uFront1, vFront1}, tileLight)
+					|| !submitPaintingQuad(submitNodeCollector, poseStack, renderType, backAtlas,
+					new float[] {x1, y1, depth, x0, y1, depth, x0, y0, depth, x1, y0, depth},
+					new float[] {backU1, backV0, backU0, backV0, backU0, backV1, backU1, backV1}, tileLight)
+					|| !submitPaintingQuad(submitNodeCollector, poseStack, renderType, backAtlas,
+					new float[] {x1, y1, -depth, x0, y1, -depth, x0, y1, depth, x1, y1, depth},
+					new float[] {backU0, backV0, backU1, backV0, backU1, sideV1, backU0, sideV1}, tileLight)
+					|| !submitPaintingQuad(submitNodeCollector, poseStack, renderType, backAtlas,
+					new float[] {x1, y0, depth, x0, y0, depth, x0, y0, -depth, x1, y0, -depth},
+					new float[] {backU0, backV0, backU1, backV0, backU1, sideV1, backU0, sideV1}, tileLight)
+					|| !submitPaintingQuad(submitNodeCollector, poseStack, renderType, backAtlas,
+					new float[] {x1, y1, depth, x1, y0, depth, x1, y0, -depth, x1, y1, -depth},
+					new float[] {sideU1, sideV0, sideU1, sideV1, sideU0, sideV1, sideU0, sideV0}, tileLight)
+					|| !submitPaintingQuad(submitNodeCollector, poseStack, renderType, backAtlas,
+					new float[] {x0, y1, -depth, x0, y0, -depth, x0, y0, depth, x0, y1, depth},
+					new float[] {sideU1, sideV0, sideU1, sideV1, sideU0, sideV1, sideU0, sideV0}, tileLight)) {
+					return false;
+				}
+			}
+		}
+		return true;
+	}
+
+	private static boolean submitPaintingQuad(
+		SubmitNodeCollector collector, PoseStack poseStack, RenderType renderType,
+		ResourceLocation texture, float[] vertices, float[] uvs, int light
+	) {
+		return collector.submitTexturedQuad(poseStack, renderType, texture, vertices, uvs, -1, light);
 	}
 
 	private void vertex(PoseStack.Pose pose, VertexConsumer vertexConsumer, float f, float g, float h, float i, float j, int k, int l, int m, int n) {

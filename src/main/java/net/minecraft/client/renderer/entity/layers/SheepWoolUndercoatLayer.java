@@ -9,6 +9,7 @@ import net.minecraft.client.model.SheepModel;
 import net.minecraft.client.model.geom.EntityModelSet;
 import net.minecraft.client.model.geom.ModelLayers;
 import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.entity.RenderLayerParent;
 import net.minecraft.client.renderer.entity.state.SheepRenderState;
 import net.minecraft.resources.ResourceLocation;
@@ -29,6 +30,17 @@ public class SheepWoolUndercoatLayer extends RenderLayer<SheepRenderState, Sheep
 	public void submit(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, SheepRenderState sheepRenderState, float f, float g) {
 		if (!sheepRenderState.isInvisible && (sheepRenderState.isJebSheep || sheepRenderState.woolColor != DyeColor.WHITE)) {
 			EntityModel<SheepRenderState> entityModel = sheepRenderState.isBaby ? this.babyModel : this.adultModel;
+			if (!sheepRenderState.isBaby
+				&& net.vulkanic.world.WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan()
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMesh(
+					entityModel, sheepRenderState, poseStack.last(), RenderType.entityCutoutNoCull(SHEEP_WOOL_UNDERCOAT_LOCATION),
+					SHEEP_WOOL_UNDERCOAT_LOCATION, ResourceLocation.withDefaultNamespace("sheep_wool_undercoat"), i,
+					sheepRenderState.getWoolColor(), 0, sheepRenderState.outlineColor)) {
+					return;
+				}
+				if (net.vulkanic.world.WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan()) {
+					throw new IllegalStateException("Rust whole-frame sheep-wool undercoat route has no semantic mesh");
+				}
 			coloredCutoutModelCopyLayerRender(
 				entityModel, SHEEP_WOOL_UNDERCOAT_LOCATION, poseStack, submitNodeCollector, i, sheepRenderState, sheepRenderState.getWoolColor(), 1
 			);

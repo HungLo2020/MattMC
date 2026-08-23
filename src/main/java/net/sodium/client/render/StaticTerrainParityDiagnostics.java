@@ -498,6 +498,20 @@ public final class StaticTerrainParityDiagnostics {
             return;
         }
         String normalizedLayer = normalizeLayer(layer);
+        MeshCoverage sourceCoverage = SOURCE_MESHES.get(new CoverageKey(sectionKey, normalizedLayer));
+        // The semantic receipt is derived from the same immutable CPU mesh as
+        // the source build. Keep its layout and primitive provenance so parity
+        // diagnostics do not mistake a valid Rust mesh for an opaque zero-layout
+        // asset (and retain animated-sprite identity evidence).
+        int semanticVertexStride = sourceCoverage == null ? 0 : sourceCoverage.vertexStride();
+        int semanticBufferBytes = sourceCoverage == null ? 0 : sourceCoverage.bufferBytes();
+        int semanticBufferVertexCapacity = sourceCoverage == null ? 0 : sourceCoverage.bufferVertexCapacity();
+        int semanticPrimitiveMetadataRecords = sourceCoverage == null ? 0 : sourceCoverage.primitiveMetadataRecords();
+        int semanticUnknownPrimitiveCount = sourceCoverage == null ? 0 : sourceCoverage.unknownPrimitiveCount();
+        int semanticNonFluidTranslucentPrimitiveCount = sourceCoverage == null ? 0 : sourceCoverage.nonFluidTranslucentPrimitiveCount();
+        int semanticGenericFluidPrimitiveCount = sourceCoverage == null ? 0 : sourceCoverage.genericFluidPrimitiveCount();
+        int semanticBuiltinWaterPrimitiveCount = sourceCoverage == null ? 0 : sourceCoverage.builtinWaterPrimitiveCount();
+        int semanticUnsupportedFluidPrimitiveCount = sourceCoverage == null ? 0 : sourceCoverage.unsupportedFluidPrimitiveCount();
         MeshCoverage coverage = new MeshCoverage(
                 normalizedLayer,
                 meshGeneration,
@@ -525,16 +539,16 @@ public final class StaticTerrainParityDiagnostics {
                 true,
                 materialIdentity(normalizedLayer),
                 textureIdentity(normalizedLayer),
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                "",
+                semanticVertexStride,
+                semanticBufferBytes,
+                semanticBufferVertexCapacity,
+                semanticPrimitiveMetadataRecords,
+                semanticUnknownPrimitiveCount,
+                semanticNonFluidTranslucentPrimitiveCount,
+                semanticGenericFluidPrimitiveCount,
+                semanticBuiltinWaterPrimitiveCount,
+                semanticUnsupportedFluidPrimitiveCount,
+                sourceCoverage == null ? "" : sourceCoverage.sectionAnimatedSpriteIdentities(),
                 "rust-static-terrain-asset"
         );
         RUST_ENQUEUE_MESHES.put(new CoverageKey(sectionKey, normalizedLayer), coverage);
@@ -1027,7 +1041,7 @@ public final class StaticTerrainParityDiagnostics {
         try {
             StringBuilder json = new StringBuilder(8192);
             json.append("{");
-            appendField(json, "schema", "mattmc-static-terrain-appearance-rust-copy-v1").append(", ");
+            appendField(json, "schema", "mattmc-static-terrain-appearance-rust-copy-v2").append(", ");
             appendField(json, "eventIndex", eventIndex).append(", ");
             appendField(json, "backend", backendName()).append(", ");
             appendField(json, "stage", "java-to-rust-copy").append(", ");
@@ -1071,10 +1085,55 @@ public final class StaticTerrainParityDiagnostics {
                 appendField(json, "shaderMaterialType", vertex.shaderMaterialType());
                 json.append("}");
             }
+            json.append("],\"targetBlockColorSamples\":[");
+            appendTargetBlockColorSamples(json, output, vertices);
             json.append("]}\n");
             writeLine(json.toString());
         } catch (IOException ignored) {
             // Diagnostics must never alter render behavior.
+        }
+    }
+
+    /**
+     * Copies only the semantic vertex colors whose section-local positions
+     * land in the requested probe block. This is deliberately a source-side
+     * receipt: it does not inspect a Java atlas, renderer object, or GPU
+     * resource, and it lets parity captures distinguish missing biome tint
+     * from a final-frame crop that contains neighboring faces.
+     */
+    private static void appendTargetBlockColorSamples(
+            StringBuilder json,
+            ChunkBuildOutput output,
+            List<VulkanicGalBridge.WorldMeshVertexRecord> vertices
+    ) {
+        int[] target = APPEARANCE_TRACE_BLOCK;
+        if (target == null || output == null || output.render == null || vertices == null) {
+            return;
+        }
+        double originX = output.render.getOriginX();
+        double originY = output.render.getOriginY();
+        double originZ = output.render.getOriginZ();
+        int written = 0;
+        for (int index = 0; index < vertices.size() && written < MAX_SAMPLES; index++) {
+            VulkanicGalBridge.WorldMeshVertexRecord vertex = vertices.get(index);
+            int worldX = (int) Math.floor(originX + vertex.x());
+            int worldY = (int) Math.floor(originY + vertex.y());
+            int worldZ = (int) Math.floor(originZ + vertex.z());
+            if (worldX != target[0] || worldY != target[1] || worldZ != target[2]) {
+                continue;
+            }
+            if (written > 0) {
+                json.append(",");
+            }
+            int color = vertex.colorArgb();
+            json.append("{");
+            appendField(json, "vertexIndex", index).append(", ");
+            appendField(json, "colorR", (color >>> 16) & 0xff).append(", ");
+            appendField(json, "colorG", (color >>> 8) & 0xff).append(", ");
+            appendField(json, "colorB", color & 0xff).append(", ");
+            appendField(json, "colorA", (color >>> 24) & 0xff);
+            json.append("}");
+            written++;
         }
     }
 

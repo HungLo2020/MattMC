@@ -9,6 +9,8 @@ import net.minecraft.client.model.TropicalFishModelB;
 import net.minecraft.client.model.geom.EntityModelSet;
 import net.minecraft.client.model.geom.ModelLayers;
 import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.entity.LivingEntityRenderer;
 import net.minecraft.client.renderer.entity.RenderLayerParent;
 import net.minecraft.client.renderer.entity.state.TropicalFishRenderState;
 import net.minecraft.resources.ResourceLocation;
@@ -63,6 +65,26 @@ public class TropicalFishPatternLayer extends RenderLayer<TropicalFishRenderStat
 			case CLAYFISH -> CLAYFISH_TEXTURE;
 			default -> throw new MatchException(null, null);
 		};
+		if (net.vulkanic.world.WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()) {
+			boolean eligible = net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaTropicalFishPatternModelMeshEligible(
+				entityModel, tropicalFishRenderState, RenderType.entityCutoutNoCull(resourceLocation), resourceLocation,
+				LivingEntityRenderer.getOverlayCoords(tropicalFishRenderState, 0.0F), tropicalFishRenderState.outlineColor);
+			if (eligible && net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMesh(
+				entityModel, tropicalFishRenderState, poseStack.last(), RenderType.entityCutoutNoCull(resourceLocation),
+				resourceLocation, ResourceLocation.withDefaultNamespace("tropical_fish_pattern"), i,
+				LivingEntityRenderer.getOverlayCoords(tropicalFishRenderState, 0.0F), tropicalFishRenderState.patternColor,
+				tropicalFishRenderState.outlineColor)) {
+				return;
+			}
+			// Whole-frame Vulkan owns this layer; an unavailable copied pattern is
+			// recorded as absent rather than reaching Java's renderer.
+			 net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
+				"rust-vulkan-unavailable", resourceLocation, entityModel.getClass().getName(), tropicalFishRenderState.entityId,
+				false, false, false);
+			throw new IllegalStateException(
+				"Rust whole-frame tropical-fish pattern route has no semantic mesh for " + resourceLocation
+			);
+		}
 		coloredCutoutModelCopyLayerRender(
 			entityModel, resourceLocation, poseStack, submitNodeCollector, i, tropicalFishRenderState, tropicalFishRenderState.patternColor, 1
 		);

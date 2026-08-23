@@ -120,8 +120,10 @@ public class GLProxy
 		// get Minecraft's GL context //
 		//============================//
 		
-		// get Minecraft's capabilities
-		this.glCapabilities = VulkanicAPI.getGLCapabilities();
+		// A selected Rust Vulkan route has no Java OpenGL capability object to
+		// borrow. DH's compatibility wrappers use the explicit backend flags
+		// below instead; only the OpenGL backend receives Minecraft's GL object.
+		this.glCapabilities = vulkanBackend ? null : VulkanicAPI.getGLCapabilities();
 		
 		// crash the game if the GPU doesn't support OpenGL 3.2
 		if (!vulkanBackend && !VulkanicAPI.checkOpenGL32Support())
@@ -157,19 +159,17 @@ public class GLProxy
 		// get GPU capabilities //
 		//======================//
 		
-		// UNUSED currently
-		// Check if we can use the named version of all calls, which is available in GL4.5 or after
-		this.namedObjectSupported = VulkanicAPI.getNamedBufferDataPointer() != 0L; //Nullptr
-		
-		// Check if we can use the Buffer Storage, which is available in GL4.4 or after
-		this.bufferStorageSupported = VulkanicAPI.getBufferStoragePointer() != 0L; // Nullptr
+		// These are OpenGL function-pointer probes. Never perform them while
+		// Rust owns selected Vulkan; compatibility capabilities remain unavailable.
+		this.namedObjectSupported = !vulkanBackend && VulkanicAPI.getNamedBufferDataPointer() != 0L; //Nullptr
+		this.bufferStorageSupported = !vulkanBackend && VulkanicAPI.getBufferStoragePointer() != 0L; // Nullptr
 		if (!this.bufferStorageSupported)
 		{
 			LOGGER.info("This GPU doesn't support Buffer Storage (OpenGL 4.4), falling back to using other methods.");
 		}
 		
 		// Check if we can use the make-over version of Vertex Attribute, which is available in GL4.3 or after
-		this.vertexAttributeBufferBindingSupported = VulkanicAPI.getBindVertexBufferPointer() != 0L; // Nullptr
+		this.vertexAttributeBufferBindingSupported = !vulkanBackend && VulkanicAPI.getBindVertexBufferPointer() != 0L; // Nullptr
 		
 		if (vulkanBackend)
 		{
@@ -301,6 +301,11 @@ public class GLProxy
 
 	public static void runLodUploadRenderThreadTasks()
 	{
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
+		{
+			throw new IllegalStateException(
+				"Java Distant Horizons upload-task draining is unavailable while Rust owns whole-frame presentation");
+		}
 		if (VulkanicAPI.isVulkanBackendSelected())
 		{
 			runRenderThreadTasks(VULKAN_LOD_UPLOAD_TASK_BUDGET_NANOS, VULKAN_LOD_UPLOAD_MIN_TASKS);

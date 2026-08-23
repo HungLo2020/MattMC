@@ -29,7 +29,13 @@ pub const FFI_ABI_V22_VERSION: u32 = 22;
 /// distinct transform domain in addition to its projection and cleared depth
 /// domain; it must never inherit camera-space world matrices implicitly.
 pub const FFI_ABI_V23_VERSION: u32 = 23;
-pub const FFI_ABI_VERSION: u32 = 23;
+/// v24 appends the semantic entity-outline color to mesh instances. Existing
+/// offsets remain stable; zero means no outline request.
+pub const FFI_ABI_V24_VERSION: u32 = 24;
+/// v25 appends the bounded semantic post-effect identity to whole-frame
+/// submission; Rust resolves its copied graph and shader stages.
+pub const FFI_ABI_V25_VERSION: u32 = 25;
+pub const FFI_ABI_VERSION: u32 = 25;
 pub const FFI_INITIAL_PRESENTATION_SUPPORTED: bool = false;
 pub const FFI_ABI_NAME: &str = "MattMC VulkanicGAL Java-Rust batch ABI";
 pub const FFI_MAX_LABEL_BYTES: usize = 1024;
@@ -257,6 +263,14 @@ pub struct FfiFramePresentResult {
     pub present_status: u32,
     pub completed_submission_id: u64,
     pub frame_target_identity: u64,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FfiFrameCancelRequest {
+    pub header: FfiHeader,
+    pub frame_id: u64,
+    pub correlation_id: u64,
 }
 
 impl Default for FfiFramePresentResult {
@@ -527,6 +541,11 @@ pub struct FfiGuiMeshBatchRequest {
     pub render_width: i32,
     pub render_height: i32,
     pub guard_pixels: u32,
+    pub clip_mode: u32,
+    pub clip_left: i32,
+    pub clip_top: i32,
+    pub clip_width: i32,
+    pub clip_height: i32,
     pub vertices: FfiSlice<FfiGuiMeshVertex>,
     pub indices: FfiSlice<u32>,
 }
@@ -1171,6 +1190,9 @@ pub struct FfiWorldMeshInstanceRecord {
     /// no override, matching the source-program mix contract.
     pub entity_color_argb: u32,
     pub transform: [f32; 16],
+    /// Straight ARGB semantic outline color consumed by the Rust-owned entity
+    /// mask and post-effect chain; zero means no outline request.
+    pub outline_color_argb: u32,
 }
 
 #[repr(C)]
@@ -1432,19 +1454,35 @@ pub struct FfiWholeFrameSubmitRequest {
     pub world_lod_instances: FfiSlice<FfiWorldLodColumnInstanceRecord>,
     pub world_lod_render_frame: FfiWorldLodRenderFrame,
     pub world_feature_coverage: FfiWorldFeatureCoverage,
-    /// Appended in ABI v20. The stream is semantic only and remains rejected
-    /// until the Rust world-text pass is installed.
+    /// Appended in ABI v20. The stream is semantic only and is consumed by
+    /// the Rust-owned world-text pass; Java text draw state never crosses this
+    /// boundary.
     pub world_text_quads: FfiSlice<FfiWorldTextQuadRequest>,
-    /// Appended so legacy whole-frame field offsets remain stable.
+    /// Appended so legacy whole-frame field offsets remain stable. The mesh
+    /// batch is consumed by the Rust-owned GUI mesh frontend.
     pub gui_mesh_batches: FfiSlice<FfiGuiMeshBatchRequest>,
-    /// Appended in ABI v21. It is transport-only until the Rust-owned hand
-    /// pass can consume every declared semantic input.
+    /// Appended in ABI v21. The enabled record selects the Rust-owned hand
+    /// projection and fresh depth domain; disabled is the explicit semantic
+    /// value for frames without first-person work.
     pub world_first_person_frame: FfiWorldFirstPersonFrame,
     /// Appended in ABI v22. These copied mesh references share the existing
     /// asset/cache contract, but are intentionally distinct from camera-space
-    /// world instances. The stream remains unavailable until the Rust-owned
-    /// first-person pass is installed.
+    /// world instances. When the hand record is enabled they are consumed by
+    /// the dedicated Rust first-person pass, never batched into the world.
     pub world_first_person_mesh_instances: FfiSlice<FfiWorldMeshInstanceRecord>,
+    /// Appended in ABI v23. `-1` means no GUI blur boundary; a non-negative
+    /// value identifies the source GUI stratum before which blur is requested.
+    /// The request is consumed by the Rust-owned blur graph; selected source
+    /// and normal-world composition both retain the same semantic boundary.
+    pub gui_blur_before_stratum: i32,
+    /// Appended in ABI v24. The vanilla menu-background blur radius in bounded
+    /// semantic pixels; ignored when `gui_blur_before_stratum` is `-1`.
+    pub gui_blur_radius: i32,
+    /// Appended in ABI v25. Optional copied semantic post-effect identity;
+    /// Rust resolves the definition and shader stages from its own matching
+    /// shader-pack snapshots. Java post-chain objects and backend handles are
+    /// never transported.
+    pub post_effect_id: FfiBytes,
 }
 
 #[repr(C)]

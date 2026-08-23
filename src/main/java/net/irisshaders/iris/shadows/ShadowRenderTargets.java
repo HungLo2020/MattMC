@@ -41,6 +41,9 @@ public class ShadowRenderTargets {
 	private boolean translucentDepthDirty;
 
 	public ShadowRenderTargets(WorldRenderingPipeline pipeline, int resolution, PackShadowDirectives shadowDirectives) {
+		if (VulkanicAPI.isVulkanBackendInitializedAndSelected()) {
+			throw new IllegalStateException("Selected Vulkan uses Rust-owned shadow targets; Iris GL shadow targets are unavailable");
+		}
 		this.shadowDirectives = shadowDirectives;
 		this.size = pipeline.hasFeature(FeatureFlags.HIGHER_SHADOWCOLOR) ? PackShadowDirectives.MAX_SHADOW_COLOR_BUFFERS_IRIS : PackShadowDirectives.MAX_SHADOW_COLOR_BUFFERS_OF;
 		targets = new RenderTarget[size];

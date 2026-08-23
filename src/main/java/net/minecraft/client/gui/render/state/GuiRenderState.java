@@ -44,6 +44,21 @@ public class GuiRenderState {
 		}
 	}
 
+	/** Whether this frame requested the vanilla screen-background blur boundary. */
+	public boolean hasBlurBeforeStratum() {
+		return this.firstStratumAfterBlur != Integer.MAX_VALUE;
+	}
+
+	/**
+	 * Returns the source stratum index at which the screen-background blur must
+	 * run, or {@code -1} when no blur boundary was requested. This is semantic
+	 * ordering data only; no Java framebuffer or renderer state crosses the
+	 * Vulkan boundary.
+	 */
+	public int blurBeforeStratumIndex() {
+		return this.firstStratumAfterBlur == Integer.MAX_VALUE ? -1 : this.firstStratumAfterBlur;
+	}
+
 	public void up() {
 		if (this.current.up == null) {
 			this.current.up = new GuiRenderState.Node(this.current);

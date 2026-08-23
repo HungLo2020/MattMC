@@ -173,6 +173,18 @@ public class VulkanFramePresentationLifecycleTest {
             "RenderSystem flip path should begin Vulkan frame lifecycle when Vulkan routing is selected");
         assertTrue(renderSystemSource.contains("VulkanicAPI.endFrame()"),
             "RenderSystem flip path should end Vulkan frame lifecycle when Vulkan routing is selected");
+        int wholeFrameBranch = renderSystemSource.indexOf(
+            "RustGalVulkanWholeFrameMode.enabledForBackend(");
+        if (wholeFrameBranch < 0) {
+            wholeFrameBranch = renderSystemSource.indexOf(
+                "bridge.RustGalVulkanWholeFrameMode.enabledForBackend(");
+        }
+        assertTrue(wholeFrameBranch >= 0,
+            "RenderSystem flip path should identify Rust whole-frame Vulkan ownership before Java presentation");
+        String wholeFrameFlipSource = renderSystemSource.substring(wholeFrameBranch,
+            Math.min(renderSystemSource.length(), wholeFrameBranch + 650));
+        assertTrue(wholeFrameFlipSource.contains("return;"),
+            "Rust whole-frame Vulkan flip path must return before Java beginFrame/endFrame or GLFW presentation");
         assertTrue(renderSystemSource.contains("GLFW.glfwSwapBuffers(window.handle())"),
             "RenderSystem must preserve OpenGL swap-buffers path");
         assertTrue(glCommandEncoderSource.contains("VulkanicCoreAPI.presentTextureToScreen(ctx, gpuTextureView);"),
@@ -195,5 +207,7 @@ public class VulkanFramePresentationLifecycleTest {
         Field rawVulkanBackendField = VulkanicAPI.class.getDeclaredField("rawVulkanBackend");
         rawVulkanBackendField.setAccessible(true);
         rawVulkanBackendField.set(null, null);
+        net.vulkanic.bridge.RustGalVulkanWholeFrameMode.deactivateRustPresentation();
+        net.vulkanic.bridge.RustGalVulkanWholeFrameMode.clearVulkanBackendSelection();
     }
 }

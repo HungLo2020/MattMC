@@ -286,16 +286,16 @@ impl WorldLodMaterialContract {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum WorldLodAdmissionError {
     UnknownLayer(u32),
-    WaterLayer(u32),
+    WaterLayerRequiresWaterPath(u32),
 }
 
 impl std::fmt::Display for WorldLodAdmissionError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::UnknownLayer(layer) => write!(formatter, "unknown Distant Horizons layer {layer}"),
-            Self::WaterLayer(layer) => write!(
+            Self::WaterLayerRequiresWaterPath(layer) => write!(
                 formatter,
-                "Distant Horizons water layer {layer} is unavailable until its explicit fluid material contract is implemented"
+                "Distant Horizons water layer {layer} must use the explicit water-surface admission path"
             ),
         }
     }
@@ -336,27 +336,14 @@ pub(crate) struct WorldLodWaterDraw {
     pub material_contract: WorldLodMaterialContract,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum WorldLodUnavailableReason {
-    WaterMaterial,
-}
-
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct WorldLodUnavailableDraw {
-    pub draw: WorldLodGpuDraw,
-    pub reason: WorldLodUnavailableReason,
-}
-
 /// Complete semantic classification of the DH work visible in one frame. The
 /// planner owns no rendering policy beyond the source layer contract: the
-/// caller can retain opaque candidates for the Rust pass while explicitly
-/// reporting streams whose ordering requirements are not implemented yet.
+/// caller receives one admitted stream for every visible segment.
 #[derive(Clone, Debug, Default)]
 pub(crate) struct WorldLodFramePlan {
     pub opaque_draws: Vec<WorldLodOpaqueDraw>,
     pub transparent_draws: Vec<WorldLodTransparentDraw>,
     pub water_draws: Vec<WorldLodWaterDraw>,
-    pub unavailable_draws: Vec<WorldLodUnavailableDraw>,
 }
 
 pub(crate) fn plan_world_lod_frame(
@@ -377,7 +364,6 @@ pub(crate) fn plan_world_lod_frame_with_camera(
         opaque_draws: Vec::with_capacity(draws.len()),
         transparent_draws: Vec::new(),
         water_draws: Vec::new(),
-        unavailable_draws: Vec::new(),
     };
     for &draw in draws {
         match draw.layer {
@@ -426,13 +412,6 @@ pub(crate) fn plan_world_lod_frame_with_camera(
         )
     });
     Ok(plan)
-}
-
-pub(crate) fn admit_world_lod_water_draw(
-    frame: &WorldLodRenderFrame,
-    draw: WorldLodGpuDraw,
-) -> GalResult<WorldLodWaterDraw> {
-    admit_world_lod_water_draw_with_camera(frame, draw, [0.0; 3])
 }
 
 pub(crate) fn admit_world_lod_water_draw_with_camera(
@@ -511,7 +490,7 @@ pub(crate) fn admit_world_lod_transparent_draw_with_camera(
         WORLD_LOD_LAYER_TRANSPARENT_SIDE | WORLD_LOD_LAYER_TRANSPARENT_UP => {}
         WORLD_LOD_LAYER_TRANSPARENT_WATER_UP => {
             return Err(GalError::unsupported_feature(
-                WorldLodAdmissionError::WaterLayer(draw.layer).to_string(),
+                WorldLodAdmissionError::WaterLayerRequiresWaterPath(draw.layer).to_string(),
             ));
         }
         WORLD_LOD_LAYER_OPAQUE => {
@@ -909,6 +888,7 @@ impl WorldLodPassResources {
                 depth_bias: None,
                 color_formats,
                 depth_format: Some(TextureFormat::Depth32Float),
+                stencil: None,
             })?;
             created.push(pipeline);
             Ok(WorldLodPipelineResources {
@@ -1477,6 +1457,7 @@ impl WorldLodExactAtlasOpaquePassResources {
                 depth_bias: None,
                 color_formats: vec![TextureFormat::Rgba8Unorm; 4],
                 depth_format: Some(TextureFormat::Depth32Float),
+                stencil: None,
             })?;
             created.push(pipeline);
             Ok(WorldLodExactAtlasPipelineResources {
@@ -1937,6 +1918,7 @@ impl WorldLodExactAtlasSourcePassResources {
                 depth_bias: None,
                 color_formats: vec![pipeline_key.primary_format],
                 depth_format: Some(TextureFormat::Depth32Float),
+                stencil: None,
             })?;
             created.push(pipeline);
             Ok(WorldLodExactAtlasSourcePipelineResources {
@@ -2853,6 +2835,7 @@ impl WorldLodSourcePassResources {
                 depth_bias: None,
                 color_formats: vec![key.color_format],
                 depth_format: Some(TextureFormat::Depth32Float),
+                stencil: None,
             })?;
             created.push(pipeline);
             Ok(WorldLodSourcePipelineResources {
@@ -6482,6 +6465,17 @@ mod tests {
         assert_eq!(WorldLodMaterialContract::OPAQUE, admitted.material_contract);
         assert!(admitted.material_contract.requires_vanilla_lightmap);
         assert!(admitted.material_contract.uses_vertex_color);
+        let water_error = admit_world_lod_transparent_draw(
+            &frame,
+            WorldLodGpuDraw {
+                layer: WORLD_LOD_LAYER_TRANSPARENT_WATER_UP,
+                ..draw
+            },
+        )
+        .unwrap_err();
+        assert!(water_error
+            .to_string()
+            .contains("explicit water-surface admission path"));
 
         let transparent = WorldLodGpuDraw {
             layer: WORLD_LOD_LAYER_TRANSPARENT_SIDE,
@@ -6552,7 +6546,6 @@ mod tests {
         .unwrap();
         assert_eq!(1, plan.opaque_draws.len());
         assert_eq!(2, plan.transparent_draws.len());
-        assert!(plan.unavailable_draws.is_empty());
         assert_eq!(1, plan.water_draws.len());
         assert_eq!(
             WORLD_LOD_LAYER_TRANSPARENT_WATER_UP,

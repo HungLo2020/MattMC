@@ -35,7 +35,8 @@ public class RenderMantisShrimp extends MobRenderer<EntityMantisShrimp, MantisSh
         state.punchProgress = entity.prevPunchProgress + (entity.punchProgress - entity.prevPunchProgress) * partialTick;
         state.isBaby = entity.isBaby();
         state.variant = entity.getVariant();
-        state.mainHandItem = entity.getMainHandItem().copy();
+        this.itemModelResolver.updateForLiving(state.mainHandItem, entity.getMainHandItem(),
+            net.minecraft.world.item.ItemDisplayContext.GROUND, entity);
         state.isLeftHanded = entity.isLeftHanded();
     }
 

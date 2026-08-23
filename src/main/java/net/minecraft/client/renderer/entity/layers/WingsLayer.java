@@ -49,7 +49,9 @@ public class WingsLayer<S extends HumanoidRenderState, M extends EntityModel<S>>
 			ElytraModel elytraModel = humanoidRenderState.isBaby ? this.elytraBabyModel : this.elytraModel;
 			
 			// Iris: Set elytra item context
-			if (WorldRenderingSettings.INSTANCE.getItemIds() != null) {
+			if (!net.minecraft.client.renderer.entity.EntityRenderDispatcher.isSemanticSubmission()
+				&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+				&& WorldRenderingSettings.INSTANCE.getItemIds() != null) {
 				if (humanoidRenderState instanceof AvatarRenderState state && state.skin.cape() != null && state.showCape) {
 					CapturedRenderingState.INSTANCE.setCurrentRenderedItem(WorldRenderingSettings.INSTANCE.getItemIds().applyAsInt(ELYTRA_CAPE_LOCATION));
 				} else {
@@ -77,7 +79,10 @@ public class WingsLayer<S extends HumanoidRenderState, M extends EntityModel<S>>
 			poseStack.popPose();
 			
 			// Iris: Clear elytra item context
-			CapturedRenderingState.INSTANCE.setCurrentRenderedItem(0);
+			if (!net.minecraft.client.renderer.entity.EntityRenderDispatcher.isSemanticSubmission()
+				&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+				CapturedRenderingState.INSTANCE.setCurrentRenderedItem(0);
+			}
 		}
 	}
 

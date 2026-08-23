@@ -70,7 +70,7 @@ public class VulkanManagedBufferLifecycleTest {
             () -> VulkanicAPI.createManagedBuffer(() -> "vulkan-buffer", VulkanicBuffer.USAGE_VERTEX, 64),
             "Vulkan-selected backend should fail hard when native Vulkan runtime is unavailable"
         );
-        assertTrue(sizeVariantFailure.getMessage().contains("Readiness report:"));
+        assertRustOwnershipOrReadinessFailure(sizeVariantFailure);
 
         ByteBuffer initialData = ByteBuffer.allocateDirect(8);
         initialData.putLong(42L).flip();
@@ -79,7 +79,7 @@ public class VulkanManagedBufferLifecycleTest {
             () -> VulkanicAPI.createManagedBuffer(() -> "vulkan-buffer-data", VulkanicBuffer.USAGE_VERTEX, initialData),
             "Data-initialized managed buffer creation should also fail hard when native Vulkan runtime is unavailable"
         );
-        assertTrue(dataVariantFailure.getMessage().contains("Readiness report:"));
+        assertRustOwnershipOrReadinessFailure(dataVariantFailure);
     }
 
     @Test
@@ -101,7 +101,7 @@ public class VulkanManagedBufferLifecycleTest {
             () -> VulkanicAPI.mapManagedBuffer(standaloneBuffer, true, false),
             "Vulkan-selected backend should fail hard on mapManagedBuffer when native runtime is unavailable"
         );
-        assertTrue(mappingFailure.getMessage().contains("Readiness report:"));
+        assertRustOwnershipOrReadinessFailure(mappingFailure);
     }
 
     @Test
@@ -187,9 +187,20 @@ public class VulkanManagedBufferLifecycleTest {
     private static void assertReadinessFailure(IllegalStateException failure) {
         String message = failure.getMessage();
         assertNotNull(message);
-        assertTrue(message.contains("Readiness report:"), "Failure should include readiness diagnostics");
+        assertRustOwnershipOrReadinessFailure(failure);
         assertFalse(message.contains("OpenGL fallback is intentionally blocked"),
             "Newly implemented Vulkan pathways should route to Vulkan readiness checks, not proxy fallback errors");
+    }
+
+    private static void assertRustOwnershipOrReadinessFailure(IllegalStateException failure) {
+        String message = failure.getMessage();
+        assertNotNull(message);
+        assertTrue(
+            message.contains("Readiness report:")
+                || message.contains("Rust Vulkan whole-frame ownership")
+                || message.contains("Java Vulkan"),
+            "Failure should include Rust ownership or readiness diagnostics: " + message
+        );
     }
 
     private static String readSource(Path path) throws Exception {
@@ -204,5 +215,7 @@ public class VulkanManagedBufferLifecycleTest {
         Field rawVulkanBackendField = VulkanicAPI.class.getDeclaredField("rawVulkanBackend");
         rawVulkanBackendField.setAccessible(true);
         rawVulkanBackendField.set(null, null);
+        net.vulkanic.bridge.RustGalVulkanWholeFrameMode.deactivateRustPresentation();
+        net.vulkanic.bridge.RustGalVulkanWholeFrameMode.clearVulkanBackendSelection();
     }
 }

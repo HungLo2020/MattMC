@@ -1,5 +1,5 @@
 use std::borrow::Cow;
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::sync::Arc;
 
 use ash::vk;
@@ -55,6 +55,9 @@ pub(super) struct SubmissionLowerer {
 
 const GPU_TIMESTAMP_SET_COUNT: u32 = 8;
 const GPU_TIMESTAMP_QUERIES_PER_SET: u32 = 16;
+// Whole-frame submissions are independent of swapchain acquire/present
+// slots, so bound their native command-buffer window explicitly.
+const MAX_IN_FLIGHT_SUBMISSIONS: usize = 8;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum GpuTimestampQuery {
@@ -157,95 +160,135 @@ impl SubmissionLowerer {
         batch: &ValidatedSubmissionBatch,
     ) -> GalResult<()> {
         let alloc_started = std::time::Instant::now();
-        let command_buffer = self.allocate_command_buffer()?;
         let timestamp_set = self.allocate_timestamp_set();
         self.metrics.command_buffer_alloc_nanos = self
             .metrics
             .command_buffer_alloc_nanos
             .saturating_add(elapsed_nanos_u64(alloc_started));
-        self.metrics.command_buffers_allocated += 1;
         let _zone = trace::Zone::new("vulkan.lowering.command-recording");
-        let begin_info = vk::CommandBufferBeginInfo::default()
-            .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
-        let begin_started = std::time::Instant::now();
-        unsafe {
-            self.context
-                .device
-                .begin_command_buffer(command_buffer, &begin_info)
-        }
-        .map_err(|error| {
-            GalError::backend(format!("failed to begin Vulkan command buffer: {error:?}"))
-        })?;
-        self.metrics.command_buffer_begin_nanos = self
-            .metrics
-            .command_buffer_begin_nanos
-            .saturating_add(elapsed_nanos_u64(begin_started));
-
-        let recording_started = std::time::Instant::now();
-        unsafe {
-            self.context.begin_label(
-                command_buffer,
-                &format!("gal.batch.{}", sanitize_label(&batch.label)),
-            );
-        }
         let mut state = EncodingState {
             timestamp_set,
             ..EncodingState::default()
         };
-        if let (Some(pool), true) = (self.timestamp_pool, timestamp_set.active) {
+        let mut command_buffers = Vec::with_capacity(batch.command_lists.len().max(1));
+        let result: GalResult<()> = (|| {
+            let count = batch.command_lists.len().max(1);
+            for index in 0..count {
+                // Primary command buffers do not inherit recording state from
+                // one another.  Source partitioning promises complete pass
+                // segments per list; enforce that contract here instead of
+                // allowing a later list to rely on a render pass or pipeline
+                // binding recorded in an earlier command buffer.
+                if state.in_pass || state.frame_present.is_some() {
+                    return Err(GalError::backend(
+                        "command-list partition crossed a live render pass",
+                    ));
+                }
+                state.graphics_pipeline = None;
+                state.compute_pipeline = None;
+                state.pipeline_layout = None;
+                let command_buffer = self.allocate_command_buffer()?;
+                command_buffers.push(command_buffer);
+                self.metrics.command_buffers_allocated += 1;
+                let begin_info = vk::CommandBufferBeginInfo::default()
+                    .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
+                let begin_started = std::time::Instant::now();
+                unsafe {
+                    self.context
+                        .device
+                        .begin_command_buffer(command_buffer, &begin_info)
+                }
+                .map_err(|error| {
+                    GalError::backend(format!("failed to begin Vulkan command buffer: {error:?}"))
+                })?;
+                self.metrics.command_buffer_begin_nanos = self
+                    .metrics
+                    .command_buffer_begin_nanos
+                    .saturating_add(elapsed_nanos_u64(begin_started));
+                let recording_started = std::time::Instant::now();
+                unsafe {
+                    self.context.begin_label(
+                        command_buffer,
+                        &format!("gal.batch.{}", sanitize_label(&batch.label)),
+                    )
+                };
+                if index == 0 {
+                    if let (Some(pool), true) = (self.timestamp_pool, timestamp_set.active) {
+                        unsafe {
+                            self.context.device.cmd_reset_query_pool(
+                                command_buffer,
+                                pool,
+                                timestamp_set.base_query,
+                                GPU_TIMESTAMP_QUERIES_PER_SET,
+                            );
+                            self.write_timestamp(
+                                command_buffer,
+                                &state,
+                                GpuTimestampQuery::FrameStart,
+                                vk::PipelineStageFlags::TOP_OF_PIPE,
+                            );
+                        }
+                    }
+                }
+                if let Some(list) = batch.command_lists.get(index) {
+                    unsafe {
+                        self.context.begin_label(
+                            command_buffer,
+                            &format!("gal.command-list.{}", sanitize_label(&list.label)),
+                        )
+                    };
+                    for op in &list.operations {
+                        self.encode_op(objects, command_buffer, &mut state, op)?;
+                    }
+                    unsafe { self.context.end_label(command_buffer) };
+                }
+                if state.in_pass || state.frame_present.is_some() {
+                    return Err(GalError::backend(
+                        "command-list partition ended with a live render pass",
+                    ));
+                }
+                if index + 1 == count {
+                    self.transition_pending_frame_targets_to_present(command_buffer, &mut state);
+                    if timestamp_set.active {
+                        unsafe {
+                            self.write_timestamp(
+                                command_buffer,
+                                &state,
+                                GpuTimestampQuery::FrameEnd,
+                                vk::PipelineStageFlags::BOTTOM_OF_PIPE,
+                            )
+                        };
+                    }
+                }
+                unsafe { self.context.end_label(command_buffer) };
+                self.metrics.command_recording_nanos = self
+                    .metrics
+                    .command_recording_nanos
+                    .saturating_add(elapsed_nanos_u64(recording_started));
+                let end_started = std::time::Instant::now();
+                unsafe { self.context.device.end_command_buffer(command_buffer) }.map_err(
+                    |error| {
+                        GalError::backend(format!("failed to end Vulkan command buffer: {error:?}"))
+                    },
+                )?;
+                self.metrics.command_buffer_end_nanos = self
+                    .metrics
+                    .command_buffer_end_nanos
+                    .saturating_add(elapsed_nanos_u64(end_started));
+            }
+            Ok(())
+        })();
+        if let Err(error) = result {
             unsafe {
-                self.context.device.cmd_reset_query_pool(
-                    command_buffer,
-                    pool,
-                    timestamp_set.base_query,
-                    GPU_TIMESTAMP_QUERIES_PER_SET,
-                );
-                self.write_timestamp(
-                    command_buffer,
-                    &state,
-                    GpuTimestampQuery::FrameStart,
-                    vk::PipelineStageFlags::TOP_OF_PIPE,
-                );
+                self.context
+                    .device
+                    .free_command_buffers(self.context.command_pool, &command_buffers);
             }
+            self.metrics.command_buffers_freed += command_buffers.len() as u64;
+            return Err(error);
         }
-        for list in &batch.command_lists {
-            unsafe {
-                self.context.begin_label(
-                    command_buffer,
-                    &format!("gal.command-list.{}", sanitize_label(&list.label)),
-                );
-            }
-            for op in &list.operations {
-                self.encode_op(objects, command_buffer, &mut state, op)?;
-            }
-            unsafe { self.context.end_label(command_buffer) };
-        }
-        self.transition_pending_frame_targets_to_present(command_buffer, &mut state);
-        if timestamp_set.active {
-            unsafe {
-                self.write_timestamp(
-                    command_buffer,
-                    &state,
-                    GpuTimestampQuery::FrameEnd,
-                    vk::PipelineStageFlags::BOTTOM_OF_PIPE,
-                );
-            }
-        }
-        unsafe { self.context.end_label(command_buffer) };
-        self.metrics.command_recording_nanos = self
-            .metrics
-            .command_recording_nanos
-            .saturating_add(elapsed_nanos_u64(recording_started));
-        let end_started = std::time::Instant::now();
-        unsafe { self.context.device.end_command_buffer(command_buffer) }.map_err(|error| {
-            GalError::backend(format!("failed to end Vulkan command buffer: {error:?}"))
-        })?;
-        self.metrics.command_buffer_end_nanos = self
-            .metrics
-            .command_buffer_end_nanos
-            .saturating_add(elapsed_nanos_u64(end_started));
         self.pending.push_back(EncodedSubmission {
-            command_buffer,
+            command_buffers,
             host_reads: state.host_reads,
             timestamp_set,
         });
@@ -253,20 +296,36 @@ impl SubmissionLowerer {
     }
 
     pub(super) fn submit(&mut self, id: SubmissionId) -> GalResult<()> {
+        if self.in_flight.len() >= MAX_IN_FLIGHT_SUBMISSIONS {
+            let oldest = self
+                .in_flight
+                .front()
+                .map(|submission| submission.id)
+                .expect("in-flight window is non-empty at its limit");
+            // Wait only for the oldest timeline value. This preserves
+            // explicit asynchronous ownership without allowing unbounded
+            // command buffers or descriptor-backed resources to accumulate.
+            self.retire(oldest)?;
+        }
         let Some(encoded) = self.pending.pop_front() else {
             return Err(GalError::backend(
                 "Vulkan submit called without encoded commands",
             ));
         };
         let _zone = trace::Zone::new("vulkan.backend.queue-submit");
-        let command_buffer_info =
-            [vk::CommandBufferSubmitInfo::default().command_buffer(encoded.command_buffer)];
+        let command_buffer_infos = encoded
+            .command_buffers
+            .iter()
+            .map(|command_buffer| {
+                vk::CommandBufferSubmitInfo::default().command_buffer(*command_buffer)
+            })
+            .collect::<Vec<_>>();
         let signal_info = [vk::SemaphoreSubmitInfo::default()
             .semaphore(self.context.timeline)
             .value(id.0)
             .stage_mask(vk::PipelineStageFlags2::ALL_COMMANDS)];
         let submit = vk::SubmitInfo2::default()
-            .command_buffer_infos(&command_buffer_info)
+            .command_buffer_infos(&command_buffer_infos)
             .signal_semaphore_infos(&signal_info);
         let queue_submit_started = std::time::Instant::now();
         unsafe {
@@ -281,7 +340,7 @@ impl SubmissionLowerer {
             .saturating_add(elapsed_nanos_u64(queue_submit_started));
         self.in_flight.push_back(InFlightSubmission {
             id,
-            command_buffer: encoded.command_buffer,
+            command_buffers: encoded.command_buffers,
             host_reads: encoded.host_reads,
             timestamp_set: encoded.timestamp_set,
         });
@@ -311,9 +370,9 @@ impl SubmissionLowerer {
             unsafe {
                 self.context
                     .device
-                    .free_command_buffers(self.context.command_pool, &[complete.command_buffer]);
+                    .free_command_buffers(self.context.command_pool, &complete.command_buffers);
             }
-            self.metrics.command_buffers_freed += 1;
+            self.metrics.command_buffers_freed += complete.command_buffers.len() as u64;
         }
         self.completed
     }
@@ -335,14 +394,29 @@ impl SubmissionLowerer {
             unsafe {
                 self.context
                     .device
-                    .free_command_buffers(self.context.command_pool, &[complete.command_buffer]);
+                    .free_command_buffers(self.context.command_pool, &complete.command_buffers);
             }
-            self.metrics.command_buffers_freed += 1;
+            self.metrics.command_buffers_freed += complete.command_buffers.len() as u64;
             self.complete_host_reads(&complete);
             self.complete_gpu_timestamps(&complete);
             self.completed = complete.id;
         }
         Ok(())
+    }
+
+    /// Wait for and retire every submission currently owned by this lowerer.
+    ///
+    /// Presentation is the ownership boundary for the native frame surface.
+    /// Resource-update submissions may be issued after the frontend's frame
+    /// token, so retiring only that token can leave newer command buffers and
+    /// descriptor-backed resources alive indefinitely.  Drain the explicit
+    /// in-flight queue at that boundary; this does not use device-idle and
+    /// preserves timeline-ordered synchronization.
+    pub(super) fn retire_all_in_flight(&mut self) -> GalResult<()> {
+        let Some(latest) = self.in_flight.back().map(|submission| submission.id) else {
+            return Ok(());
+        };
+        self.retire(latest)
     }
 
     pub(super) fn completed_host_reads_snapshot(&self) -> &[CompletedHostRead] {
@@ -365,17 +439,17 @@ impl SubmissionLowerer {
             unsafe {
                 self.context
                     .device
-                    .free_command_buffers(self.context.command_pool, &[encoded.command_buffer]);
+                    .free_command_buffers(self.context.command_pool, &encoded.command_buffers);
             }
-            self.metrics.command_buffers_freed += 1;
+            self.metrics.command_buffers_freed += encoded.command_buffers.len() as u64;
         }
         for complete in self.in_flight.drain(..) {
             unsafe {
                 self.context
                     .device
-                    .free_command_buffers(self.context.command_pool, &[complete.command_buffer]);
+                    .free_command_buffers(self.context.command_pool, &complete.command_buffers);
             }
-            self.metrics.command_buffers_freed += 1;
+            self.metrics.command_buffers_freed += complete.command_buffers.len() as u64;
         }
     }
 
@@ -531,17 +605,8 @@ impl SubmissionLowerer {
                             layer_count: 1,
                         };
                         let to_attachment = vk::ImageMemoryBarrier2::default()
-                            .src_stage_mask(if old_layout == vk::ImageLayout::PRESENT_SRC_KHR {
-                                vk::PipelineStageFlags2::BOTTOM_OF_PIPE
-                            } else {
-                                vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT
-                            })
-                            .src_access_mask(if old_layout == vk::ImageLayout::PRESENT_SRC_KHR {
-                                vk::AccessFlags2::empty()
-                            } else {
-                                vk::AccessFlags2::COLOR_ATTACHMENT_READ
-                                    | vk::AccessFlags2::COLOR_ATTACHMENT_WRITE
-                            })
+                            .src_stage_mask(frame_layout_stage_mask(old_layout))
+                            .src_access_mask(frame_layout_access_mask(old_layout))
                             .dst_stage_mask(vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT)
                             .dst_access_mask(
                                 vk::AccessFlags2::COLOR_ATTACHMENT_READ
@@ -934,6 +999,79 @@ impl SubmissionLowerer {
                         &[copy],
                     );
                 }
+                CommandOp::CopyFrameTargetToTexture { src, dst, extent } => {
+                    let _zone = trace::Zone::new("vulkan.lowering.copy-frame-target");
+                    if state.in_pass {
+                        return Err(GalError::backend(
+                            "frame-target sampling copy cannot be encoded inside a render pass",
+                        ));
+                    }
+                    if !state.transfer_dst_textures.contains(dst) {
+                        return Err(GalError::backend(
+                            "frame-target sampling copy requires an explicit TransferDst barrier",
+                        ));
+                    }
+                    let frame = objects.frame_target(*src)?;
+                    let destination = objects.texture(*dst)?;
+                    let old_layout = state
+                        .frame_target_layouts
+                        .get(src)
+                        .copied()
+                        .unwrap_or(frame.image_layout);
+                    let source_range = vk::ImageSubresourceRange {
+                        aspect_mask: vk::ImageAspectFlags::COLOR,
+                        base_mip_level: 0,
+                        level_count: 1,
+                        base_array_layer: 0,
+                        layer_count: 1,
+                    };
+                    let source_barrier = vk::ImageMemoryBarrier2::default()
+                        .src_stage_mask(frame_layout_stage_mask(old_layout))
+                        .src_access_mask(frame_layout_access_mask(old_layout))
+                        .dst_stage_mask(vk::PipelineStageFlags2::COPY)
+                        .dst_access_mask(vk::AccessFlags2::TRANSFER_READ)
+                        .old_layout(old_layout)
+                        .new_layout(vk::ImageLayout::TRANSFER_SRC_OPTIMAL)
+                        .image(frame.image)
+                        .subresource_range(source_range);
+                    self.context.device.cmd_pipeline_barrier2(
+                        command_buffer,
+                        &vk::DependencyInfo::default()
+                            .image_memory_barriers(std::slice::from_ref(&source_barrier)),
+                    );
+                    let copy = vk::ImageCopy {
+                        src_subresource: vk::ImageSubresourceLayers {
+                            aspect_mask: vk::ImageAspectFlags::COLOR,
+                            mip_level: 0,
+                            base_array_layer: 0,
+                            layer_count: 1,
+                        },
+                        src_offset: vk::Offset3D::default(),
+                        dst_subresource: vk::ImageSubresourceLayers {
+                            aspect_mask: destination.aspect,
+                            mip_level: 0,
+                            base_array_layer: 0,
+                            layer_count: 1,
+                        },
+                        dst_offset: vk::Offset3D::default(),
+                        extent: vk::Extent3D {
+                            width: extent.width,
+                            height: extent.height,
+                            depth: extent.depth,
+                        },
+                    };
+                    self.context.device.cmd_copy_image(
+                        command_buffer,
+                        frame.image,
+                        vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
+                        destination.image,
+                        vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+                        &[copy],
+                    );
+                    state
+                        .frame_target_layouts
+                        .insert(*src, vk::ImageLayout::TRANSFER_SRC_OPTIMAL);
+                }
                 CommandOp::GenerateMipmaps {
                     texture,
                     subresources,
@@ -1033,8 +1171,8 @@ impl SubmissionLowerer {
                             .src_access_mask(access_mask(barrier.before))
                             .dst_stage_mask(stage_mask(barrier.after))
                             .dst_access_mask(access_mask(barrier.after))
-                            .old_layout(image_layout(barrier.before))
-                            .new_layout(image_layout(barrier.after))
+                            .old_layout(image_layout_for_aspect(barrier.before, texture.aspect))
+                            .new_layout(image_layout_for_aspect(barrier.after, texture.aspect))
                             .image(texture.image)
                             .subresource_range(vk::ImageSubresourceRange {
                                 aspect_mask: texture.aspect,
@@ -1048,6 +1186,11 @@ impl SubmissionLowerer {
                         self.context
                             .device
                             .cmd_pipeline_barrier2(command_buffer, &dependency);
+                        if barrier.after == TextureUsageState::TransferDst {
+                            state.transfer_dst_textures.insert(barrier.resource);
+                        } else {
+                            state.transfer_dst_textures.remove(&barrier.resource);
+                        }
                     } else if barrier.resource.kind()
                         == Some(crate::render::vulkanic::handles::HandleKind::Buffer)
                     {
@@ -1092,6 +1235,20 @@ impl SubmissionLowerer {
                             })?;
                         self.context
                             .write_mapped_memory(buffer.memory, memory_offset, data)?;
+                        // Mapped writes happen on the host while the command
+                        // buffer is being recorded; they are not transfer
+                        // commands. Establish host-write availability before
+                        // the semantic TransferDst -> consumer barrier that
+                        // follows this operation. Without this dependency,
+                        // uniform/storage uploads could remain invisible to a
+                        // later shader read on a non-coherent execution path.
+                        let host_write =
+                            mapped_host_write_dependency(buffer.buffer, *offset, data.len() as u64);
+                        self.context.device.cmd_pipeline_barrier2(
+                            command_buffer,
+                            &vk::DependencyInfo::default()
+                                .buffer_memory_barriers(std::slice::from_ref(&host_write)),
+                        );
                     }
                 }
                 CommandOp::HostReadBuffer {
@@ -1109,7 +1266,11 @@ impl SubmissionLowerer {
                         size: *size,
                     });
                 }
-                CommandOp::Present { .. } => {}
+                CommandOp::Present { .. } => {
+                    return Err(GalError::unsupported_feature(
+                        "presentation commands are lowered by the frame coordinator",
+                    ));
+                }
             }
         }
         Ok(())
@@ -1127,11 +1288,8 @@ impl SubmissionLowerer {
                 .copied()
                 .unwrap_or(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL);
             let to_present = vk::ImageMemoryBarrier2::default()
-                .src_stage_mask(vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT)
-                .src_access_mask(
-                    vk::AccessFlags2::COLOR_ATTACHMENT_READ
-                        | vk::AccessFlags2::COLOR_ATTACHMENT_WRITE,
-                )
+                .src_stage_mask(frame_layout_stage_mask(old_layout))
+                .src_access_mask(frame_layout_access_mask(old_layout))
                 .dst_stage_mask(vk::PipelineStageFlags2::BOTTOM_OF_PIPE)
                 .old_layout(old_layout)
                 .new_layout(vk::ImageLayout::PRESENT_SRC_KHR)
@@ -1508,6 +1666,25 @@ mod timestamp_tests {
     }
 
     #[test]
+    fn depth_stencil_layouts_match_combined_aspect_ranges() {
+        let combined = vk::ImageAspectFlags::DEPTH | vk::ImageAspectFlags::STENCIL;
+        assert!(
+            image_layout_for_aspect(TextureUsageState::DepthStencilAttachment, combined)
+                == vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+        );
+        assert!(
+            image_layout_for_aspect(TextureUsageState::ShaderRead, combined)
+                == vk::ImageLayout::DEPTH_STENCIL_READ_ONLY_OPTIMAL
+        );
+        assert!(
+            image_layout_for_aspect(
+                TextureUsageState::DepthStencilAttachment,
+                vk::ImageAspectFlags::DEPTH
+            ) == vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL
+        );
+    }
+
+    #[test]
     fn timestamp_pass_labels_classify_shader_graph_passes() {
         assert_eq!(
             Some(TimestampPassKind::ShadowDepth),
@@ -1615,6 +1792,44 @@ mod timestamp_tests {
         assert_eq!(60, result.frame_total_nanos);
         assert_eq!(0, result.terrain_cutout_nanos);
     }
+
+    #[test]
+    fn frame_target_transfer_layouts_use_matching_pipeline_dependencies() {
+        assert!(
+            vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT
+                == frame_layout_stage_mask(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
+        );
+        assert!(
+            (vk::AccessFlags2::COLOR_ATTACHMENT_READ | vk::AccessFlags2::COLOR_ATTACHMENT_WRITE)
+                == frame_layout_access_mask(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
+        );
+        assert!(
+            vk::PipelineStageFlags2::COPY
+                == frame_layout_stage_mask(vk::ImageLayout::TRANSFER_SRC_OPTIMAL)
+        );
+        assert!(
+            vk::AccessFlags2::TRANSFER_READ
+                == frame_layout_access_mask(vk::ImageLayout::TRANSFER_SRC_OPTIMAL)
+        );
+        assert!(
+            vk::PipelineStageFlags2::BOTTOM_OF_PIPE
+                == frame_layout_stage_mask(vk::ImageLayout::PRESENT_SRC_KHR)
+        );
+        assert!(
+            vk::AccessFlags2::empty() == frame_layout_access_mask(vk::ImageLayout::PRESENT_SRC_KHR)
+        );
+    }
+
+    #[test]
+    fn mapped_host_writes_publish_to_the_transfer_consumer_stage() {
+        let barrier = mapped_host_write_dependency(vk::Buffer::null(), 12, 48);
+        assert!(vk::PipelineStageFlags2::HOST == barrier.src_stage_mask);
+        assert!(vk::AccessFlags2::HOST_WRITE == barrier.src_access_mask);
+        assert!(vk::PipelineStageFlags2::TRANSFER == barrier.dst_stage_mask);
+        assert!(vk::AccessFlags2::TRANSFER_WRITE == barrier.dst_access_mask);
+        assert_eq!(12, barrier.offset);
+        assert_eq!(48, barrier.size);
+    }
 }
 
 #[derive(Default)]
@@ -1626,6 +1841,7 @@ struct EncodingState {
     frame_target_touched: bool,
     frame_present: Option<FramePresentTransition>,
     frame_target_layouts: BTreeMap<Handle, vk::ImageLayout>,
+    transfer_dst_textures: BTreeSet<Handle>,
     pending_frame_presents: BTreeMap<Handle, FramePresentTransition>,
     host_reads: Vec<HostReadRequest>,
     timestamp_set: GpuTimestampSet,
@@ -1641,14 +1857,14 @@ struct FramePresentTransition {
 }
 
 struct EncodedSubmission {
-    command_buffer: vk::CommandBuffer,
+    command_buffers: Vec<vk::CommandBuffer>,
     host_reads: Vec<HostReadRequest>,
     timestamp_set: GpuTimestampSet,
 }
 
 struct InFlightSubmission {
     id: SubmissionId,
-    command_buffer: vk::CommandBuffer,
+    command_buffers: Vec<vk::CommandBuffer>,
     host_reads: Vec<HostReadRequest>,
     timestamp_set: GpuTimestampSet,
 }
@@ -1696,14 +1912,73 @@ pub(super) fn image_layout(state: TextureUsageState) -> vk::ImageLayout {
         TextureUsageState::TransferDst => vk::ImageLayout::TRANSFER_DST_OPTIMAL,
         TextureUsageState::Present => vk::ImageLayout::PRESENT_SRC_KHR,
         TextureUsageState::IndexRead => vk::ImageLayout::UNDEFINED,
+        TextureUsageState::ShaderStorageRead => vk::ImageLayout::GENERAL,
     }
+}
+
+/// Depth/stencil images need the combined Vulkan layouts whenever their
+/// stencil aspect is part of the subresource range.  Using the depth-only
+/// layouts with a D24S8 image is rejected by validation even when the GAL
+/// semantic usage is simply `DepthStencilAttachment`.
+pub(super) fn image_layout_for_aspect(
+    state: TextureUsageState,
+    aspect: vk::ImageAspectFlags,
+) -> vk::ImageLayout {
+    let has_stencil = aspect.contains(vk::ImageAspectFlags::STENCIL);
+    match (state, has_stencil) {
+        (TextureUsageState::DepthStencilAttachment, true) => {
+            vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+        }
+        (TextureUsageState::ShaderRead, true) => vk::ImageLayout::DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+        _ => image_layout(state),
+    }
+}
+
+fn frame_layout_stage_mask(layout: vk::ImageLayout) -> vk::PipelineStageFlags2 {
+    match layout {
+        vk::ImageLayout::PRESENT_SRC_KHR => vk::PipelineStageFlags2::BOTTOM_OF_PIPE,
+        vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL => {
+            vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT
+        }
+        vk::ImageLayout::TRANSFER_SRC_OPTIMAL => vk::PipelineStageFlags2::COPY,
+        _ => vk::PipelineStageFlags2::TOP_OF_PIPE,
+    }
+}
+
+fn frame_layout_access_mask(layout: vk::ImageLayout) -> vk::AccessFlags2 {
+    match layout {
+        vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL => {
+            vk::AccessFlags2::COLOR_ATTACHMENT_READ | vk::AccessFlags2::COLOR_ATTACHMENT_WRITE
+        }
+        vk::ImageLayout::TRANSFER_SRC_OPTIMAL => vk::AccessFlags2::TRANSFER_READ,
+        _ => vk::AccessFlags2::empty(),
+    }
+}
+
+fn mapped_host_write_dependency(
+    buffer: vk::Buffer,
+    offset: u64,
+    size: u64,
+) -> vk::BufferMemoryBarrier2<'static> {
+    vk::BufferMemoryBarrier2::default()
+        .src_stage_mask(vk::PipelineStageFlags2::HOST)
+        .src_access_mask(vk::AccessFlags2::HOST_WRITE)
+        .dst_stage_mask(vk::PipelineStageFlags2::TRANSFER)
+        .dst_access_mask(vk::AccessFlags2::TRANSFER_WRITE)
+        .buffer(buffer)
+        .offset(offset)
+        .size(size)
 }
 
 pub(super) fn stage_mask(state: TextureUsageState) -> vk::PipelineStageFlags2 {
     match state {
         TextureUsageState::Undefined => vk::PipelineStageFlags2::TOP_OF_PIPE,
-        TextureUsageState::ShaderRead | TextureUsageState::ShaderWrite => {
-            vk::PipelineStageFlags2::VERTEX_SHADER | vk::PipelineStageFlags2::FRAGMENT_SHADER
+        TextureUsageState::ShaderRead
+        | TextureUsageState::ShaderWrite
+        | TextureUsageState::ShaderStorageRead => {
+            vk::PipelineStageFlags2::COMPUTE_SHADER
+                | vk::PipelineStageFlags2::VERTEX_SHADER
+                | vk::PipelineStageFlags2::FRAGMENT_SHADER
         }
         TextureUsageState::ColorAttachment => vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
         TextureUsageState::DepthStencilAttachment => {
@@ -1723,6 +1998,7 @@ pub(super) fn access_mask(state: TextureUsageState) -> vk::AccessFlags2 {
         TextureUsageState::Undefined | TextureUsageState::Present => vk::AccessFlags2::empty(),
         TextureUsageState::ShaderRead => vk::AccessFlags2::SHADER_SAMPLED_READ,
         TextureUsageState::ShaderWrite => vk::AccessFlags2::SHADER_STORAGE_WRITE,
+        TextureUsageState::ShaderStorageRead => vk::AccessFlags2::SHADER_STORAGE_READ,
         TextureUsageState::ColorAttachment => {
             vk::AccessFlags2::COLOR_ATTACHMENT_READ | vk::AccessFlags2::COLOR_ATTACHMENT_WRITE
         }

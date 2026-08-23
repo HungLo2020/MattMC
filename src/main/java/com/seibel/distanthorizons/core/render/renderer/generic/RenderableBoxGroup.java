@@ -31,13 +31,17 @@ public class RenderableBoxGroup
 
 		private static int createTrackedBufferId()
 		{
-			net.irisshaders.iris.gl.IrisRenderSystem.incrementTrackedBuffers();
+			if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+				net.irisshaders.iris.gl.IrisRenderSystem.incrementTrackedBuffers();
+			}
 			return VulkanicAPI.createBuffer(VulkanicAPI.getCommandContext());
 		}
 
 		private static void deleteTrackedBufferId(int bufferId)
 		{
-			net.irisshaders.iris.gl.IrisRenderSystem.decrementTrackedBuffers();
+			if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+				net.irisshaders.iris.gl.IrisRenderSystem.decrementTrackedBuffers();
+			}
 			VulkanicAPI.deleteBuffer(VulkanicAPI.getCommandContext(), bufferId);
 		}
 		
@@ -383,4 +387,3 @@ public class RenderableBoxGroup
 		}
 		
 	}
-	

@@ -24,7 +24,9 @@ public final class WorldRenderRoutePolicy {
 		}
 
 		public boolean usesJavaCompatibility() {
-			return this == JAVA_COMPATIBILITY;
+			// Java compatibility is a private OpenGL-only lowering. A stale route
+			// value must not authorize Java rendering after Vulkan selection.
+			return this == JAVA_COMPATIBILITY && !VulkanicAPI.isVulkanBackendSelected();
 		}
 	}
 
@@ -33,7 +35,7 @@ public final class WorldRenderRoutePolicy {
 			return Route.DISABLED;
 		}
 		if (Boolean.getBoolean("mattmc.dev.rustGalWorldOutline.legacyControl")) {
-			return Route.JAVA_COMPATIBILITY;
+			return legacyCompatibilityRoute();
 		}
 		return selectShaderAffectedRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
 	}
@@ -43,7 +45,7 @@ public final class WorldRenderRoutePolicy {
 			return Route.DISABLED;
 		}
 		if (Boolean.getBoolean("mattmc.dev.rustGalWorldCrack.legacyControl")) {
-			return Route.JAVA_COMPATIBILITY;
+			return legacyCompatibilityRoute();
 		}
 		return selectShaderAffectedRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
 	}
@@ -53,7 +55,7 @@ public final class WorldRenderRoutePolicy {
 			return Route.DISABLED;
 		}
 		if (Boolean.getBoolean("mattmc.dev.rustGalWorldBorder.legacyControl")) {
-			return Route.JAVA_COMPATIBILITY;
+			return legacyCompatibilityRoute();
 		}
 		return selectWholeFrameRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
 	}
@@ -63,7 +65,7 @@ public final class WorldRenderRoutePolicy {
 			return Route.DISABLED;
 		}
 		if (Boolean.getBoolean("mattmc.dev.rustGalWorldBackground.legacyControl")) {
-			return Route.JAVA_COMPATIBILITY;
+			return legacyCompatibilityRoute();
 		}
 		return selectWholeFrameRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
 	}
@@ -73,37 +75,100 @@ public final class WorldRenderRoutePolicy {
 			return Route.DISABLED;
 		}
 		if (Boolean.getBoolean("mattmc.dev.rustGalWorldMaterial.legacyControl")) {
-			return Route.JAVA_COMPATIBILITY;
+			return legacyCompatibilityRoute();
 		}
 		return selectShaderAffectedRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
 	}
 
 	/**
 	 * Experience-orb billboards are selected only with complete Rust Vulkan frame
-	 * ownership. Java OpenGL/Iris and normal Java Vulkan retain the Java route.
+	 * ownership. Java OpenGL/Iris retain their private compatibility route;
+	 * unadmitted Vulkan remains unavailable.
 	 */
 	public static Route currentExperienceOrbRoute() {
 		if (Boolean.getBoolean("mattmc.dev.rustGalWorldExperienceOrb.disabled")) {
 			return Route.DISABLED;
 		}
 		if (Boolean.getBoolean("mattmc.dev.rustGalWorldExperienceOrb.legacyControl")) {
-			return Route.JAVA_COMPATIBILITY;
+			return legacyCompatibilityRoute();
 		}
-		return selectShaderAffectedRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
+		// The whole-frame shell is the authoritative presenter during the brief
+		// backend-selection handoff; do not let an earlier Vulkan API query turn
+		// this Rust-owned producer into a Java-fallback exception.
+		if (RustGalVulkanWholeFrameMode.enabled()) {
+			return Route.RUST_VULKAN_WHOLE_FRAME;
+		}
+		return selectWholeFrameRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
 	}
 
 	/**
 	 * Beacon beams are copied as ordinary translucent material quads only when
-	 * Rust owns the complete Vulkan frame. Java OpenGL/Iris and normal Java
-	 * Vulkan retain the existing custom-geometry producer.
+	 * Rust owns the complete Vulkan frame. Java OpenGL/Iris retain the existing
+	 * custom-geometry producer; unadmitted Vulkan remains unavailable.
 	 */
 	public static Route currentBeaconBeamRoute() {
 		if (Boolean.getBoolean("mattmc.dev.rustGalWorldBeaconBeam.disabled")) {
 			return Route.DISABLED;
 		}
 		if (Boolean.getBoolean("mattmc.dev.rustGalWorldBeaconBeam.legacyControl")) {
-			return Route.JAVA_COMPATIBILITY;
+			return legacyCompatibilityRoute();
 		}
+		return selectWholeFrameRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
+	}
+
+	/** VoxelMap beacon-only vertical beams have their own semantic producer. */
+	public static Route currentVoxelMapBeaconRoute() {
+		if (Boolean.getBoolean("mattmc.dev.rustGalVoxelMapBeacon.disabled")) return Route.DISABLED;
+		if (Boolean.getBoolean("mattmc.dev.rustGalVoxelMapBeacon.legacyControl")) return legacyCompatibilityRoute();
+		return selectWholeFrameRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
+	}
+
+	/** Guardian attack beams use Rust only with their complete copied semantic primitive. */
+	public static Route currentGuardianBeamRoute() {
+		if (Boolean.getBoolean("mattmc.dev.rustGalWorldGuardianBeam.disabled")) {
+			return Route.DISABLED;
+		}
+		if (Boolean.getBoolean("mattmc.dev.rustGalWorldGuardianBeam.legacyControl")) {
+			return legacyCompatibilityRoute();
+		}
+		return selectWholeFrameRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
+	}
+
+	/** End Crystal beams use Rust only with their complete copied semantic primitive. */
+	public static Route currentCrystalBeamRoute() {
+		if (Boolean.getBoolean("mattmc.dev.rustGalWorldCrystalBeam.disabled")) return Route.DISABLED;
+		if (Boolean.getBoolean("mattmc.dev.rustGalWorldCrystalBeam.legacyControl")) return legacyCompatibilityRoute();
+		return selectWholeFrameRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
+	}
+
+	/** Small textured billboard primitives use Rust only with their explicit copied quad ABI. */
+	public static Route currentTexturedBillboardRoute() {
+		if (Boolean.getBoolean("mattmc.dev.rustGalWorldTexturedBillboard.disabled")) {
+			return Route.DISABLED;
+		}
+		if (Boolean.getBoolean("mattmc.dev.rustGalWorldTexturedBillboard.legacyControl")) {
+			return legacyCompatibilityRoute();
+		}
+		return selectWholeFrameRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
+	}
+
+	public static Route currentFishingLineRoute() {
+		if (Boolean.getBoolean("mattmc.dev.rustGalWorldFishingLine.disabled")) return Route.DISABLED;
+		if (Boolean.getBoolean("mattmc.dev.rustGalWorldFishingLine.legacyControl")) return legacyCompatibilityRoute();
+		return selectWholeFrameRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
+	}
+
+	/** Debug hitbox lines use the same explicit Rust line primitive when enabled. */
+	public static Route currentDebugLineRoute() {
+		if (Boolean.getBoolean("mattmc.dev.rustGalWorldDebugLines.disabled")) return Route.DISABLED;
+		if (Boolean.getBoolean("mattmc.dev.rustGalWorldDebugLines.legacyControl")) return legacyCompatibilityRoute();
+		return selectWholeFrameRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
+	}
+
+	/** Procedural colored quads use Rust only with complete frame ownership. */
+	public static Route currentProceduralQuadRoute() {
+		if (Boolean.getBoolean("mattmc.dev.rustGalWorldProceduralQuads.disabled")) return Route.DISABLED;
+		if (Boolean.getBoolean("mattmc.dev.rustGalWorldProceduralQuads.legacyControl")) return legacyCompatibilityRoute();
 		return selectWholeFrameRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
 	}
 
@@ -113,7 +178,7 @@ public final class WorldRenderRoutePolicy {
 			return Route.DISABLED;
 		}
 		if (Boolean.getBoolean("mattmc.dev.rustGalWorldEntityFlame.legacyControl")) {
-			return Route.JAVA_COMPATIBILITY;
+			return legacyCompatibilityRoute();
 		}
 		return selectWholeFrameRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
 	}
@@ -129,22 +194,22 @@ public final class WorldRenderRoutePolicy {
 			return Route.DISABLED;
 		}
 		if (Boolean.getBoolean("mattmc.dev.rustGalWorldEntityShadow.legacyControl")) {
-			return Route.JAVA_COMPATIBILITY;
+			return legacyCompatibilityRoute();
 		}
 		return selectWholeFrameRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
 	}
 
 	/**
 	 * Vanilla leash ribbons are copied from the extracted endpoint/light
-	 * semantics only while Rust owns the complete Vulkan frame. Java OpenGL and
-	 * normal Java Vulkan retain the existing renderer without mixed ownership.
+	 * semantics only while Rust owns the complete Vulkan frame. Java OpenGL
+	 * retains the existing renderer; unadmitted Vulkan remains unavailable.
 	 */
 	public static Route currentEntityLeashRoute() {
 		if (Boolean.getBoolean("mattmc.dev.rustGalWorldEntityLeash.disabled")) {
 			return Route.DISABLED;
 		}
 		if (Boolean.getBoolean("mattmc.dev.rustGalWorldEntityLeash.legacyControl")) {
-			return Route.JAVA_COMPATIBILITY;
+			return legacyCompatibilityRoute();
 		}
 		return selectWholeFrameRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
 	}
@@ -152,32 +217,46 @@ public final class WorldRenderRoutePolicy {
 	/**
 	 * Ordinary dropped-item baked quads use the shared indexed entity-mesh
 	 * family only when the Rust Vulkan whole-frame presenter owns the frame.
-	 * Java OpenGL and normal Java Vulkan retain their existing item renderer.
+	 * Java OpenGL retains its existing item renderer; unadmitted Vulkan remains
+	 * unavailable.
 	 */
 	public static Route currentItemEntityMeshRoute(boolean eligible) {
 		if (Boolean.getBoolean("mattmc.dev.rustGalWorldItemEntity.disabled")) {
 			return Route.DISABLED;
 		}
-		if (Boolean.getBoolean("mattmc.dev.rustGalWorldItemEntity.legacyControl") || !eligible) {
-			return Route.JAVA_COMPATIBILITY;
+		if (Boolean.getBoolean("mattmc.dev.rustGalWorldItemEntity.legacyControl")) {
+			return legacyCompatibilityRoute();
+		}
+		Route ownership = currentItemEntityOwnershipRoute();
+		return !eligible && ownership.usesRustWholeFrameVulkan() ? Route.DISABLED : ownership;
+	}
+
+	/**
+	 * Returns the owner of dropped-item entity submissions independently of
+	 * representability or the per-family disabled admission switch. A Rust
+	 * whole-frame presenter still owns an unavailable item and must fail closed
+	 * instead of allowing the collector to silently omit it.
+	 */
+	public static Route currentItemEntityOwnershipRoute() {
+		if (Boolean.getBoolean("mattmc.dev.rustGalWorldItemEntity.legacyControl")) {
+			return legacyCompatibilityRoute();
 		}
 		return selectWholeFrameRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
 	}
 
 	/**
 	 * Returns the owner of the first-person item callsite independently of the
-	 * current item's representability or resource residency. Until the dedicated
-	 * selected-source hand executor is requested, Java remains the owner. Once
-	 * this returns Rust whole-frame ownership, per-item admission may still fail
-	 * closed but must never authorize a Java Vulkan draw in the same frame.
+	 * current item's representability or resource residency. A Rust whole-frame
+	 * presenter owns this callsite even when the selected source hand executor is
+	 * unavailable; unsupported hand variants then fail closed rather than leaking
+	 * a Java submission into the Rust frame.
 	 */
 	public static Route currentFirstPersonItemOwnershipRoute() {
 		if (Boolean.getBoolean("mattmc.dev.rustGalFirstPersonItem.disabled")) {
 			return Route.DISABLED;
 		}
-		if (Boolean.getBoolean("mattmc.dev.rustGalFirstPersonItem.legacyControl")
-			|| !RustGalWorldPrimitiveRenderer.requiresSelectedSourceFeatureCoverage()) {
-			return Route.JAVA_COMPATIBILITY;
+		if (Boolean.getBoolean("mattmc.dev.rustGalFirstPersonItem.legacyControl")) {
+			return legacyCompatibilityRoute();
 		}
 		return selectWholeFrameRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
 	}
@@ -190,39 +269,42 @@ public final class WorldRenderRoutePolicy {
 	 */
 	public static Route currentFirstPersonItemRoute(boolean eligible) {
 		Route ownership = currentFirstPersonItemOwnershipRoute();
+		if (!eligible && ownership.usesRustWholeFrameVulkan()) {
+			return Route.DISABLED;
+		}
 		if (!eligible && ownership != Route.DISABLED) {
-			return Route.JAVA_COMPATIBILITY;
+			return legacyCompatibilityRoute();
 		}
 		return ownership;
 	}
 
 	/**
 	 * Name tags use the private Rust world-text pass only when Rust owns the
-	 * complete Vulkan frame. Java OpenGL and normal Java Vulkan retain their
-	 * existing text renderer; there is no borrowed font-atlas or same-frame
-	 * fallback route.
+	 * complete Vulkan frame. Java OpenGL retains its existing text renderer;
+	 * unadmitted Vulkan remains unavailable and there is no borrowed font-atlas
+	 * or same-frame fallback route.
 	 */
 	public static Route currentWorldTextRoute() {
 		if (Boolean.getBoolean("mattmc.dev.rustGalWorldText.disabled")) {
 			return Route.DISABLED;
 		}
 		if (Boolean.getBoolean("mattmc.dev.rustGalWorldText.legacyControl")) {
-			return Route.JAVA_COMPATIBILITY;
+			return legacyCompatibilityRoute();
 		}
 		return selectWholeFrameRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
 	}
 
 	/**
 	 * Weather is a normal translucent material producer. Rust owns it whenever
-	 * it owns the complete Vulkan frame; OpenGL with Iris and normal Java Vulkan
-	 * remain Java compatibility routes through the shared shader-aware policy.
+	 * it owns the complete Vulkan frame; only OpenGL with Iris remains a Java
+	 * compatibility route through the shared shader-aware policy.
 	 */
 	public static Route currentWeatherRoute() {
 		if (Boolean.getBoolean("mattmc.dev.rustGalWeather.disabled")) {
 			return Route.DISABLED;
 		}
 		if (Boolean.getBoolean("mattmc.dev.rustGalWeather.legacyControl")) {
-			return Route.JAVA_COMPATIBILITY;
+			return legacyCompatibilityRoute();
 		}
 		return selectShaderAffectedRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
 	}
@@ -238,7 +320,7 @@ public final class WorldRenderRoutePolicy {
 			return Route.DISABLED;
 		}
 		if (Boolean.getBoolean("mattmc.dev.rustGalClouds.legacyControl")) {
-			return Route.JAVA_COMPATIBILITY;
+			return legacyCompatibilityRoute();
 		}
 		// The Rust shader runtime owns the selected pack's cloud disposition.
 		// It either submits copied vanilla cloud faces or executes the admitted
@@ -252,7 +334,7 @@ public final class WorldRenderRoutePolicy {
 			return Route.DISABLED;
 		}
 		if (Boolean.getBoolean("mattmc.dev.rustGalWorldBlockDisplay.legacyControl")) {
-			return Route.JAVA_COMPATIBILITY;
+			return legacyCompatibilityRoute();
 		}
 		return selectShaderAffectedRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
 	}
@@ -262,7 +344,7 @@ public final class WorldRenderRoutePolicy {
 			return Route.DISABLED;
 		}
 		if (Boolean.getBoolean("mattmc.dev.rustGalWorldFallingBlock.legacyControl")) {
-			return Route.JAVA_COMPATIBILITY;
+			return legacyCompatibilityRoute();
 		}
 		return selectShaderAffectedRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
 	}
@@ -272,7 +354,7 @@ public final class WorldRenderRoutePolicy {
 			return Route.DISABLED;
 		}
 		if (Boolean.getBoolean("mattmc.dev.rustGalWorldPiston.legacyControl")) {
-			return Route.JAVA_COMPATIBILITY;
+			return legacyCompatibilityRoute();
 		}
 		return selectShaderAffectedRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
 	}
@@ -288,7 +370,7 @@ public final class WorldRenderRoutePolicy {
 			return Route.DISABLED;
 		}
 		if (Boolean.getBoolean("mattmc.dev.rustGalWorldPrimedTnt.legacyControl")) {
-			return Route.JAVA_COMPATIBILITY;
+			return legacyCompatibilityRoute();
 		}
 		return selectShaderAffectedRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
 	}
@@ -304,7 +386,7 @@ public final class WorldRenderRoutePolicy {
 			return Route.DISABLED;
 		}
 		if (Boolean.getBoolean("mattmc.dev.rustGalWorldArrow.legacyControl")) {
-			return Route.JAVA_COMPATIBILITY;
+			return legacyCompatibilityRoute();
 		}
 		return selectWholeFrameRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
 	}
@@ -312,6 +394,9 @@ public final class WorldRenderRoutePolicy {
 	/** Per-Arrow admission for the Rust indexed-mesh producer. */
 	public static Route currentArrowRoute(boolean eligible) {
 		Route ownership = currentArrowOwnershipRoute();
+		if (!eligible && ownership.usesRustWholeFrameVulkan()) {
+			return Route.DISABLED;
+		}
 		if (!eligible && ownership != Route.DISABLED) {
 			return Route.JAVA_COMPATIBILITY;
 		}
@@ -320,40 +405,43 @@ public final class WorldRenderRoutePolicy {
 
 	/**
 	 * Bounded opaque/cutout {@code ModelPart} extraction for the Rust-owned
-	 * whole-frame route. Java keeps every state that cannot be represented as a
-	 * copied indexed mesh on its compatibility path before any draw is selected.
+	 * whole-frame route. States that cannot be represented as a copied indexed
+	 * mesh remain Java-compatible only outside Rust Vulkan ownership; under a
+	 * Rust-owned Vulkan frame they are unavailable rather than fallback draws.
 	 */
 	public static Route currentModelMeshRoute(boolean eligible) {
 		if (Boolean.getBoolean("mattmc.dev.rustGalWorldModelMesh.disabled")) {
 			return Route.DISABLED;
 		}
-		if (Boolean.getBoolean("mattmc.dev.rustGalWorldModelMesh.legacyControl") || !eligible) {
-			return Route.JAVA_COMPATIBILITY;
+		if (Boolean.getBoolean("mattmc.dev.rustGalWorldModelMesh.legacyControl")) {
+			return legacyCompatibilityRoute();
 		}
-		return selectWholeFrameRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
+		Route ownership = selectWholeFrameRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
+		return !eligible && ownership.usesRustWholeFrameVulkan() ? Route.DISABLED : ownership;
 	}
 
 	/**
 	 * Bounded opaque/cutout {@code ModelPart} extraction for the Rust-owned
 	 * whole-frame route. This is separate from {@link #currentModelMeshRoute}
 	 * because ModelPart submits originate from block-entity and special-model
-	 * producers rather than an EntityModel wrapper. Unsupported, animated,
-	 * foil, sheeted, outlined, or translucent parts remain entirely Java-owned
-	 * before route selection.
+	 * producers rather than an EntityModel wrapper. Unsupported, sheeted,
+	 * outlined, or translucent parts remain Java-compatible
+	 * outside Rust Vulkan ownership and fail closed once that route owns the
+	 * frame.
 	 */
 	public static Route currentModelPartMeshRoute(boolean eligible) {
 		if (Boolean.getBoolean("mattmc.dev.rustGalWorldModelPart.disabled")) {
 			return Route.DISABLED;
 		}
-		if (Boolean.getBoolean("mattmc.dev.rustGalWorldModelPart.legacyControl")
-			|| !eligible) {
-			return Route.JAVA_COMPATIBILITY;
+		if (Boolean.getBoolean("mattmc.dev.rustGalWorldModelPart.legacyControl")) {
+			return legacyCompatibilityRoute();
 		}
 		// The producer's explicit eligibility check is the admission boundary.
 		// Once a complete Rust whole-frame route is selected, do not retain a
 		// stale diagnostic opt-in that would silently leave an otherwise supported
 		// ModelPart on Java's compatibility path.
-		return selectWholeFrameRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
+		Route ownership = selectWholeFrameRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
+		return !eligible && ownership.usesRustWholeFrameVulkan() ? Route.DISABLED : ownership;
 	}
 
 	private static boolean selectedRustSourceWholeFrameRequested() {
@@ -371,7 +459,7 @@ public final class WorldRenderRoutePolicy {
 			return Route.DISABLED;
 		}
 		if (Boolean.getBoolean("mattmc.dev.rustGalStaticTerrain.legacyControl")) {
-			return Route.JAVA_COMPATIBILITY;
+			return legacyCompatibilityRoute();
 		}
 		return selectWholeFrameRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
 	}
@@ -387,7 +475,7 @@ public final class WorldRenderRoutePolicy {
 			return Route.DISABLED;
 		}
 		if (Boolean.getBoolean("mattmc.dev.rustGalDistantHorizons.legacyControl")) {
-			return Route.JAVA_COMPATIBILITY;
+			return legacyCompatibilityRoute();
 		}
 		return selectWholeFrameRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
 	}
@@ -412,7 +500,7 @@ public final class WorldRenderRoutePolicy {
 			return Route.DISABLED;
 		}
 		if (legacyControl) {
-			return Route.JAVA_COMPATIBILITY;
+			return vulkanBackendSelected ? Route.DISABLED : Route.JAVA_COMPATIBILITY;
 		}
 		return selectRoute(vulkanBackendSelected, wholeFrameVulkanEnabled);
 	}
@@ -427,7 +515,7 @@ public final class WorldRenderRoutePolicy {
 			return Route.DISABLED;
 		}
 		if (legacyControl) {
-			return Route.JAVA_COMPATIBILITY;
+			return vulkanBackendSelected ? Route.DISABLED : Route.JAVA_COMPATIBILITY;
 		}
 		return selectWholeFrameRoute(vulkanBackendSelected, wholeFrameVulkanEnabled);
 	}
@@ -443,7 +531,7 @@ public final class WorldRenderRoutePolicy {
 			return Route.DISABLED;
 		}
 		if (legacyControl) {
-			return Route.JAVA_COMPATIBILITY;
+			return vulkanBackendSelected ? Route.DISABLED : Route.JAVA_COMPATIBILITY;
 		}
 		return selectShaderAffectedRoute(vulkanBackendSelected, wholeFrameVulkanEnabled, () -> irisPackActive);
 	}
@@ -458,7 +546,10 @@ public final class WorldRenderRoutePolicy {
 
 	private static Route selectRoute(boolean vulkanBackendSelected, boolean wholeFrameVulkanEnabled) {
 		if (vulkanBackendSelected) {
-			return wholeFrameVulkanEnabled ? Route.RUST_VULKAN_WHOLE_FRAME : Route.JAVA_COMPATIBILITY;
+			// A selected Vulkan device never authorizes Java rendering. Until the
+			// explicit Rust presenter is admitted, keep the capability unavailable
+			// rather than silently reopening the legacy Java Vulkan path.
+			return wholeFrameVulkanEnabled ? Route.RUST_VULKAN_WHOLE_FRAME : Route.DISABLED;
 		}
 		return Route.RUST_OPENGL_BORROWED_CONTEXT;
 	}
@@ -466,8 +557,8 @@ public final class WorldRenderRoutePolicy {
 	/**
 	 * Iris runtime state is relevant only to the borrowed OpenGL compatibility
 	 * route. Vulkan ownership is decided entirely from Vulkanic/MattMC state and
-	 * must not consult Iris after selecting either Java Vulkan compatibility or
-	 * the Rust Vulkan whole-frame renderer.
+	 * must not consult Iris after selecting either unavailable Vulkan or the Rust
+	 * Vulkan whole-frame renderer.
 	 */
 	private static Route selectShaderAffectedRoute(boolean vulkanBackendSelected, boolean wholeFrameVulkanEnabled) {
 		return selectShaderAffectedRoute(
@@ -493,10 +584,19 @@ public final class WorldRenderRoutePolicy {
 		if (vulkanBackendSelected && wholeFrameVulkanEnabled) {
 			return Route.RUST_VULKAN_WHOLE_FRAME;
 		}
-		return Route.JAVA_COMPATIBILITY;
+		return vulkanBackendSelected ? Route.DISABLED : Route.JAVA_COMPATIBILITY;
 	}
 
 	private static boolean rustWholeFrameShellActive() {
 		return RustGalVulkanWholeFrameMode.enabledForBackend(VulkanicAPI.isVulkanBackendSelected());
+	}
+
+	/**
+	 * A diagnostic legacy switch must never reopen a Java draw once the Rust
+	 * Vulkan presenter owns the frame. Outside that shell it retains its
+	 * compatibility meaning for the separate Java/OpenGL routes.
+	 */
+	private static Route legacyCompatibilityRoute() {
+		return VulkanicAPI.isVulkanBackendSelected() ? Route.DISABLED : Route.JAVA_COMPATIBILITY;
 	}
 }

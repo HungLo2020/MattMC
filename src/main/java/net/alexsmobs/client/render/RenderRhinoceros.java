@@ -66,9 +66,9 @@ public class RenderRhinoceros extends MobRenderer<EntityRhinoceros, RhinocerosRe
                 float gb = (float) (color >> 8 & 255) / 255.0F;
                 float b = (float) (color & 255) / 255.0F;
                 submitNodeCollector.order(1)
-                    .submitModel(this.getParentModel(), state, poseStack,
+                    .submitModelSemanticTexture(this.getParentModel(), state, poseStack,
                         AMRenderTypes.entityCutoutNoCull(TEXTURE_POTION), i,
-                        OverlayTexture.NO_OVERLAY, AMColorUtil.packColor(r, gb, b, 1.0F), null, state.outlineColor, null);
+                        OverlayTexture.NO_OVERLAY, AMColorUtil.packColor(r, gb, b, 1.0F), TEXTURE_POTION, state.outlineColor, null);
             }
         }
     }

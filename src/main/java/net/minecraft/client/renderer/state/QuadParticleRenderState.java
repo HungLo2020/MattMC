@@ -28,6 +28,7 @@ import org.joml.Quaternionf;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
 import org.slf4j.Logger;
+import net.vulkanic.world.RustGalWorldPrimitiveRenderer;
 
 @Environment(EnvType.CLIENT)
 public class QuadParticleRenderState implements SubmitNodeCollector.ParticleGroupRenderer, ParticleGroupRenderState {
@@ -47,6 +48,52 @@ public class QuadParticleRenderState implements SubmitNodeCollector.ParticleGrou
 		((QuadParticleRenderState.Storage)this.particles.computeIfAbsent(layer, layerx -> new QuadParticleRenderState.Storage()))
 			.add(f, g, h, i, j, k, l, m, n, o, p, q, r, s);
 		this.particleCount++;
+	}
+
+	/** Copies the extracted particle semantics into the explicit Rust world stream. */
+	public int enqueueRustGal() {
+		int submitted = 0;
+		for (Entry<SingleQuadParticle.Layer, QuadParticleRenderState.Storage> entry : this.particles.entrySet()) {
+			SingleQuadParticle.Layer layer = entry.getKey();
+			QuadParticleRenderState.Storage storage = entry.getValue();
+			if (net.minecraft.client.renderer.texture.TextureAtlas.LOCATION_PARTICLES.equals(layer.textureAtlasLocation())) {
+				storage.forEachParticle((x, y, z, qx, qy, qz, qw, size, u0, u1, v0, v1, color, light) ->
+					RustGalWorldPrimitiveRenderer.enqueueParticleQuad(layer.translucent(), x, y, z, qx, qy, qz, qw, size, u0, u1, v0, v1, color, light));
+				submitted += storage.count();
+			} else {
+				int[] admitted = {0};
+				storage.forEachParticle((x, y, z, qx, qy, qz, qw, size, u0, u1, v0, v1, color, light) ->
+					admitted[0] += RustGalWorldPrimitiveRenderer.enqueueParticleQuadForAtlas(
+						layer.textureAtlasLocation(), layer.translucent(), x, y, z, qx, qy, qz, qw,
+						size, u0, u1, v0, v1, color, light) ? 1 : 0);
+				if (admitted[0] != storage.count()) {
+					// Atlas eligibility is only a preflight. A bounded snapshot can
+					// still fail while it is being staged; never let the successful
+					// prefix masquerade as a complete Rust particle group.
+					RustGalWorldPrimitiveRenderer.recordUnsupportedParticleGroup();
+				}
+				submitted += admitted[0];
+			}
+		}
+		return submitted;
+	}
+
+	/**
+	 * Counts extracted layers that the Rust particle material contract cannot
+	 * consume. Block-atlas layers are handled by dedicated semantic producers;
+	 * other atlas layers are admitted only when a copied semantic snapshot is
+	 * available, otherwise they remain an explicit ownership gap.
+	 */
+	public int rustGalUnsupportedLayerCount() {
+		int unsupported = 0;
+		for (Entry<SingleQuadParticle.Layer, QuadParticleRenderState.Storage> entry : this.particles.entrySet()) {
+			if (entry.getValue().count() > 0
+				&& !net.minecraft.client.renderer.texture.TextureAtlas.LOCATION_PARTICLES.equals(entry.getKey().textureAtlasLocation())
+				&& !RustGalWorldPrimitiveRenderer.canUseParticleAtlas(entry.getKey().textureAtlasLocation())) {
+				unsupported++;
+			}
+		}
+		return unsupported;
 	}
 
 	@Override

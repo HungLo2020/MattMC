@@ -406,7 +406,7 @@ fn shader_pack_runtime_owns_private_terrain_volume_resources() {
 }
 
 #[test]
-fn source_terrain_execution_is_rust_opt_in_and_never_an_ffi_or_iris_route() {
+fn source_terrain_execution_is_rust_owned_and_never_an_ffi_or_iris_route() {
     let rust_root = Path::new(RUST_ROOT);
     let world_frontend = rust_root.join("render/vulkanic/world_primitive_frontend.rs");
     let ffi_dir = rust_root.join("render/vulkanic/ffi");
@@ -418,12 +418,15 @@ fn source_terrain_execution_is_rust_opt_in_and_never_an_ffi_or_iris_route() {
     );
     assert!(
         source.contains("#[cfg(not(test))]\n    fn candidate_subset_programs_for_frame")
-            && source.contains("Lowered shader-pack source execution is intentionally unavailable")
-            && source.contains("Ok(None)"),
-        "the production internal terrain graph must not silently select the fixture path"
+            && source.contains("Ok(None)")
+            && source.contains("prepared_lowered_terrain_source_program(TerrainMaterialProgramKind::Opaque)")
+            && source.contains("prepared_lowered_shadow_source_program()?"),
+        "production must keep the fixture selector unavailable while admitting only explicitly lowered source programs"
     );
     assert!(
         source.contains("MATTMC_RUST_SELECTED_SOURCE_EXECUTION")
+            && source.contains("self.shader_pack_sources\n            .active()")
+            && source.contains("fn source_execution_enabled(&self)")
             && source.contains("source_execution_armed: bool")
             && source.contains("arm_runtime_source_execution_if_ready")
             && source.contains("prepare_runtime_source_snapshot"),

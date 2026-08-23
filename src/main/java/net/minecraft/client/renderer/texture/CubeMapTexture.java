@@ -98,6 +98,8 @@ public class CubeMapTexture extends ReloadableTexture {
 		this.textureView = net.vulkanic.VulkanicAPI.createTextureView(this.texture);
 		this.setFilter(bl, false);
 		this.setClamp(bl2);
-		net.vulkanic.VulkanicAPI.createCommandEncoder().writeToTexture(this.texture, nativeImage, 0, 0, 0, 0, i, j * 6, 0, 0);
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			net.vulkanic.VulkanicAPI.createCommandEncoder().writeToTexture(this.texture, nativeImage, 0, 0, 0, 0, i, j * 6, 0, 0);
+		}
 	}
 }

@@ -6,11 +6,14 @@ import net.alexsmobs.entity.EntityGiantSquid;
 import net.alexsmobs.entity.EntityGiantSquidPart;
 import net.blaze3d.vertex.PoseStack;
 import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.entity.MobRenderer;
 import net.minecraft.client.renderer.entity.layers.RenderLayer;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.util.Mth;
 
 public class RenderGiantSquid extends MobRenderer<EntityGiantSquid, GiantSquidRenderState, ModelGiantSquid> {
     private static final ResourceLocation TEXTURE = ResourceLocation.withDefaultNamespace("textures/entity/giant_squid.png");
@@ -81,13 +84,16 @@ public class RenderGiantSquid extends MobRenderer<EntityGiantSquid, GiantSquidRe
 
         @Override
         public void submit(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int packedLight, GiantSquidRenderState renderState, float f, float g) {
-            // Note: In 1.21 render state architecture, we need to use the submitNodeCollector
-            // The old render() method with MultiBufferSource is no longer available
-            // This is a stub for now - proper translucent rendering may require different approach
             float alpha = renderState.depressurization;
             if (alpha > 0.01F) {
-                // Translucent overlay rendering would go here
-                // In the new architecture, this might need to be handled differently
+                int alphaByte = Mth.clamp(Math.round(alpha * 255.0F), 0, 255);
+                int color = (alphaByte << 24) | 0x00FFFFFF;
+                submitNodeCollector.submitModelSemanticTexture(
+                    this.getParentModel(), renderState, poseStack,
+                    RenderType.entityTranslucent(TEXTURE_DEPRESSURIZED), packedLight,
+                    OverlayTexture.NO_OVERLAY, color, TEXTURE_DEPRESSURIZED,
+                    renderState.outlineColor, null
+                );
             }
         }
     }

@@ -20,6 +20,9 @@ import net.minecraft.client.renderer.SubmitNodeStorage;
 @Environment(EnvType.CLIENT)
 public class CustomFeatureRenderer {
 	public void render(SubmitNodeCollection submitNodeCollection, MultiBufferSource.BufferSource bufferSource) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java custom feature rendering is unavailable while Rust owns whole-frame presentation");
+		}
 		CustomFeatureRenderer.Storage storage = submitNodeCollection.getCustomGeometrySubmits();
 
 		for (Entry<RenderType, List<SubmitNodeStorage.CustomGeometrySubmit>> entry : storage.customGeometrySubmits.entrySet()) {

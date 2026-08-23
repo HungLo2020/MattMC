@@ -218,6 +218,9 @@ public class IrisLodRenderProgram {
 
 	// Override ShaderProgram.bind()
 	public void bind() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris Distant Horizons shader binding is unavailable while Rust owns whole-frame presentation");
+		}
 		CommandContext ctx = VulkanicAPI.getCommandContext();
 		VulkanicAPI.bindShaderProgram(ctx, id);
 		if (blend != null) blend.apply();
@@ -228,6 +231,9 @@ public class IrisLodRenderProgram {
 	}
 
 	public void unbind() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris Distant Horizons shader unbinding is unavailable while Rust owns whole-frame presentation");
+		}
 		CommandContext ctx = VulkanicAPI.getCommandContext();
 		VulkanicAPI.bindShaderProgram(ctx, 0);
 		ProgramUniforms.clearActiveUniforms();

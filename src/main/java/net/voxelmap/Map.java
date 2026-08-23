@@ -31,6 +31,7 @@ import net.blaze3d.ProjectionType;
 import net.blaze3d.buffers.GpuBuffer;
 import net.blaze3d.buffers.GpuBufferSlice;
 import net.blaze3d.pipeline.RenderPipeline;
+import net.blaze3d.platform.NativeImage;
 import net.blaze3d.systems.RenderPass;
 import net.blaze3d.systems.RenderSystem;
 import net.blaze3d.textures.GpuTexture;
@@ -78,6 +79,8 @@ import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicResourceBarriers;
+import net.vulkanic.bridge.RustGalVulkanWholeFrameMode;
+import net.vulkanic.gui.RustGalGuiRawImageAssets;
 import org.joml.Matrix3x2fStack;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
@@ -165,6 +168,9 @@ public class Map implements Runnable, IChangeObserver {
     private double zoomScaleAdjusted = 1.0;
     private static double minTablistOffset;
     private static float statusIconOffset = 0.0F;
+    private static final ResourceLocation RUST_SEMANTIC_MINIMAP =
+        ResourceLocation.fromNamespaceAndPath("voxelmap", "semantic/minimap");
+    private DynamicTexture rustSemanticMinimap;
     
     private final ResourceLocation[] resourceMapImageFiltered = new ResourceLocation[5];
     private final ResourceLocation[] resourceMapImageUnfiltered = new ResourceLocation[5];
@@ -247,13 +253,16 @@ public class Map implements Runnable, IChangeObserver {
         this.zoom = this.options.zoom;
         this.setZoomScale();
 
-        final int fboTextureSize = 512;
-        this.fboTexture = net.vulkanic.VulkanicAPI.createTexture("voxelmap-fbotexture", GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_COPY_SRC | GpuTexture.USAGE_TEXTURE_BINDING | GpuTexture.USAGE_RENDER_ATTACHMENT, TextureFormat.RGBA8, fboTextureSize, fboTextureSize, 1, 1);
-        this.fboTextureView = net.vulkanic.VulkanicAPI.createTextureView(this.fboTexture);
-        // DynamicTexture fboTexture = new DynamicTexture("voxelmap-fbotexture", fboTextureSize, fboTextureSize, true);
-        // minecraft.getTextureManager().register(resourceFboTexture, fboTexture);
-        // this.fboTexture = fboTexture.getTexture();
-        this.projection = new VoxelMapCachedOrthoProjectionMatrixBuffer("VoxelMap Map To Screen Proj", -256.0F, 256.0F, 256.0F, -256.0F, 1000.0F, 21000.0F, true);
+        // The legacy minimap's offscreen target and projection buffer are Java
+        // GPU state.  Rust whole-frame presentation consumes the copied
+        // semantic DynamicTexture below, so do not create these resources at
+        // all on that route (this also prevents a hidden Vulkan fallback).
+        if (!RustGalVulkanWholeFrameMode.enabled()) {
+            final int fboTextureSize = 512;
+            this.fboTexture = net.vulkanic.VulkanicAPI.createTexture("voxelmap-fbotexture", GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_COPY_SRC | GpuTexture.USAGE_TEXTURE_BINDING | GpuTexture.USAGE_RENDER_ATTACHMENT, TextureFormat.RGBA8, fboTextureSize, fboTextureSize, 1, 1);
+            this.fboTextureView = net.vulkanic.VulkanicAPI.createTextureView(this.fboTexture);
+            this.projection = new VoxelMapCachedOrthoProjectionMatrixBuffer("VoxelMap Map To Screen Proj", -256.0F, 256.0F, 256.0F, -256.0F, 1000.0F, 21000.0F, true);
+        }
 
         // VoxelMap: Load map textures - check if resources exist first before loading
         try {
@@ -376,6 +385,21 @@ public class Map implements Runnable, IChangeObserver {
     }
 
     public void onTickInGame(GuiGraphics drawContext) {
+        this.onTickInGame(drawContext, true);
+    }
+
+    /** Updates map generation/state without entering VoxelMap's Java GPU draw path. */
+    public void onTickSemantic() {
+        this.onTickInGame(null, false);
+    }
+
+    private void onTickInGame(GuiGraphics drawContext, boolean drawOverlay) {
+        // If the semantic HUD bridge is installed after a stripped boot has
+        // already joined a world, replay the world binding explicitly so the
+        // CPU map worker can populate the snapshot.
+        if (this.world == null && minecraft.level instanceof ClientLevel clientLevel) {
+            this.newWorld(clientLevel);
+        }
         this.northRotate = this.options.oldNorth ? 90 : 0;
 
         if (this.lightmapTexture == null) {
@@ -512,7 +536,7 @@ public class Map implements Runnable, IChangeObserver {
             this.error = "";
         }
 
-        if (enabled && VoxelMap.mapOptions.minimapAllowed) {
+        if (drawOverlay && enabled && VoxelMap.mapOptions.minimapAllowed) {
             this.drawMinimap(drawContext);
         }
 
@@ -685,6 +709,9 @@ public class Map implements Runnable, IChangeObserver {
     }
 
     public void drawMinimap(GuiGraphics drawContext) {
+        if (RustGalVulkanWholeFrameMode.enabled()) {
+            throw new IllegalStateException("Java VoxelMap minimap rendering is unavailable while Rust owns whole-frame presentation");
+        }
         int scScaleOrig = 1;
 
         while (minecraft.getWindow().getWidth() / (scScaleOrig + 1) >= 320 && minecraft.getWindow().getHeight() / (scScaleOrig + 1) >= 240) {
@@ -746,6 +773,190 @@ public class Map implements Runnable, IChangeObserver {
         if (this.options.coords) {
             this.showCoords(drawContext, mapX, mapY, scaleProj);
         }
+    }
+
+    /**
+     * Publishes the CPU map image through the semantic GUI route. The snapshot
+     * performs the same source-space rotation/offset transform as the legacy
+     * masked blit, so the Rust path receives an ordinary bounded image rather
+     * than a Java GPU texture view. Waypoint icons remain fail-closed until a
+     * CPU icon/label contract is available.
+     */
+	public boolean renderRustSemanticOverlay(GuiGraphics drawContext) {
+		if (!RustGalVulkanWholeFrameMode.enabled()) return false;
+		if (this.options.hide) return true;
+
+        int scScaleOrig = 1;
+        while (minecraft.getWindow().getWidth() / (scScaleOrig + 1) >= 320
+            && minecraft.getWindow().getHeight() / (scScaleOrig + 1) >= 240) {
+            ++scScaleOrig;
+        }
+        int scScale = Math.max(1, scScaleOrig + this.options.sizeModifier);
+		this.scWidth = Mth.ceil((double)minecraft.getWindow().getWidth() / scScale);
+		this.scHeight = Mth.ceil((double)minecraft.getWindow().getHeight() / scScale);
+		float scaleProj = (float)scScale / minecraft.getWindow().getGuiScale();
+		int mapX = this.options.mapCorner != 0 && this.options.mapCorner != 3 ? this.scWidth - 37 : 37;
+		int mapY = this.options.mapCorner != 0 && this.options.mapCorner != 1 ? this.scHeight - 37 : 37;
+		if (this.fullscreenMap) {
+			ResourceLocation mapTexture = this.mapResources[this.zoom];
+			if (!(this.mapImages[this.zoom] instanceof DynamicTexture dynamicMap)) return false;
+			synchronized (this.coordinateLock) {
+				if (this.imageChanged) {
+					this.imageChanged = false;
+					this.lastImageX = this.lastX;
+					this.lastImageZ = this.lastZ;
+				}
+			}
+			RustGalGuiRawImageAssets.registerDynamicTexture(mapTexture, dynamicMap);
+			Matrix3x2fStack pose = drawContext.pose();
+			pose.pushMatrix();
+			pose.scale(scaleProj, scaleProj);
+			pose.translate(this.scWidth / 2.0F, this.scHeight / 2.0F);
+			pose.rotate(this.northRotate * Mth.DEG_TO_RAD);
+			pose.translate(-(this.scWidth / 2.0F), -(this.scHeight / 2.0F));
+			int left = this.scWidth / 2 - 128;
+			int top = this.scHeight / 2 - 128;
+			drawContext.submitRustSemanticBlit(mapTexture, left, top, 256, 256, 0.0F, 1.0F, 0.0F, 1.0F, 0xFFFFFFFF);
+			pose.popMatrix();
+			this.drawArrow(drawContext, this.scWidth / 2, this.scHeight / 2, scaleProj);
+			if (this.options.coords) this.showCoords(drawContext, mapX, mapY, scaleProj);
+			return true;
+		}
+        if (this.options.moveMapDownWhileStatusEffect && this.options.mapCorner == 1
+            && !VoxelConstants.getPlayer().getActiveEffects().isEmpty()) {
+            for (MobEffectInstance effect : VoxelConstants.getPlayer().getActiveEffects()) {
+                if (effect.showIcon()) {
+                    float offset = effect.getEffect().value().isBeneficial() ? 24.0F : 50.0F;
+                    statusIconOffset = Math.max(statusIconOffset, offset);
+                }
+            }
+            mapY += (int)(statusIconOffset * this.scHeight / (float)minecraft.getWindow().getGuiScaledHeight());
+        }
+
+        synchronized (this.coordinateLock) {
+            if (this.imageChanged) {
+                this.imageChanged = false;
+                this.lastImageX = this.lastX;
+                this.lastImageZ = this.lastZ;
+            }
+            this.percentX = (float)(GameVariableAccessShim.xCoordDouble() - this.lastImageX) / (float)this.zoomScale;
+            this.percentY = (float)(GameVariableAccessShim.zCoordDouble() - this.lastImageZ) / (float)this.zoomScale;
+            if (this.rustSemanticMinimap == null) {
+                this.rustSemanticMinimap = new DynamicTexture("VoxelMap Rust semantic minimap", 64, 64, true);
+                this.rustSemanticMinimap.setFilter(true, false);
+            }
+            NativeImage source = this.mapImages[this.zoom].getPixels();
+            NativeImage target = this.rustSemanticMinimap.getPixels();
+            float angleRadians = !this.options.rotates ? -this.northRotate * Mth.DEG_TO_RAD : this.direction * Mth.DEG_TO_RAD;
+            float cos = Mth.cos(angleRadians);
+            float sin = Mth.sin(angleRadians);
+            float sourceOffsetX = this.percentX * 512.0F / 64.0F;
+            float sourceOffsetY = -this.percentY * 512.0F / 64.0F;
+            for (int py = 0; py < 64; py++) {
+                for (int px = 0; px < 64; px++) {
+                    float dx = (px + 0.5F - 32.0F) * 8.0F;
+                    float dy = (py + 0.5F - 32.0F) * 8.0F;
+                    float sourceX = cos * dx - sin * dy + sourceOffsetX;
+                    float sourceY = -sin * dx - cos * dy + sourceOffsetY;
+                    int sx = Mth.clamp((int)((sourceX + 256.0F) * source.getWidth() / 512.0F), 0, source.getWidth() - 1);
+                    int sy = Mth.clamp((int)((256.0F - sourceY) * source.getHeight() / 512.0F), 0, source.getHeight() - 1);
+                    int color = source.getPixel(sx, sy);
+                    if (!this.options.squareMap) {
+                        float radius = (px + 0.5F - 32.0F) * (px + 0.5F - 32.0F)
+                            + (py + 0.5F - 32.0F) * (py + 0.5F - 32.0F);
+                        if (radius > 32.0F * 32.0F) color &= 0x00FFFFFF;
+                    }
+                    target.setPixel(px, py, color);
+                }
+            }
+        }
+
+        RustGalGuiRawImageAssets.registerDynamicTexture(RUST_SEMANTIC_MINIMAP, this.rustSemanticMinimap);
+        drawContext.pose().pushMatrix();
+        drawContext.pose().scale(scaleProj, scaleProj);
+        drawContext.submitRustSemanticBlit(RUST_SEMANTIC_MINIMAP,
+            mapX - 32, mapY - 32, 64, 64, 0.0F, 0.0F, 1.0F, 1.0F, 0xFFFFFFFF);
+        this.drawMapFrame(drawContext, mapX, mapY, this.options.squareMap);
+        drawContext.pose().popMatrix();
+        this.drawDirections(drawContext, mapX, mapY, scaleProj);
+        this.drawArrow(drawContext, mapX, mapY, scaleProj);
+        if (this.options.coords) {
+            this.showCoords(drawContext, mapX, mapY, scaleProj);
+        }
+        if (VoxelMap.mapOptions.waypointsAllowed) {
+            double lastXDouble = GameVariableAccessShim.xCoordDouble();
+            double lastZDouble = GameVariableAccessShim.zCoordDouble();
+            Waypoint highlightedPoint = this.waypointManager.getHighlightedWaypoint();
+            for (Waypoint point : this.waypointManager.getWaypoints()) {
+                if ((point.isActive() || point == highlightedPoint)
+                    && (point.getDistanceSqToEntity(minecraft.getCameraEntity())
+                        < (this.options.maxWaypointDisplayDistance * this.options.maxWaypointDisplayDistance)
+                        || this.options.maxWaypointDisplayDistance < 0 || point == highlightedPoint)) {
+                    this.drawWaypointSemantic(drawContext, point, mapX, mapY, scScale, lastXDouble, lastZDouble, false);
+                }
+            }
+            if (highlightedPoint != null) {
+                this.drawWaypointSemantic(drawContext, highlightedPoint, mapX, mapY, scScale, lastXDouble, lastZDouble, true);
+            }
+        }
+        return true;
+    }
+
+    private void drawWaypointSemantic(
+        GuiGraphics guiGraphics, Waypoint point, int x, int y, int scScale,
+        double lastXDouble, double lastZDouble, boolean target
+    ) {
+        double wayX = lastXDouble - point.getX() - 0.5;
+        double wayY = lastZDouble - point.getZ() - 0.5;
+        float locate = (float)Math.toDegrees(Math.atan2(wayX, wayY));
+        float hypot = (float)Math.sqrt(wayX * wayX + wayY * wayY);
+        if (this.options.rotates) locate += this.direction;
+        else locate -= this.northRotate;
+        hypot /= this.zoomScaleAdjusted;
+        boolean far;
+        if (this.options.squareMap) {
+            double radians = Math.toRadians(locate);
+            double dx = hypot * Math.cos(radians);
+            double dy = hypot * Math.sin(radians);
+            far = Math.abs(dx) > 28.5 || Math.abs(dy) > 28.5;
+            if (far) hypot = (float)(hypot / Math.max(Math.abs(dx), Math.abs(dy)) * 30.0);
+        } else {
+            far = hypot >= 31.0F;
+            if (far) hypot = 34.0F;
+        }
+
+        ResourceLocation icon;
+        if (target) {
+            icon = ResourceLocation.fromNamespaceAndPath("voxelmap", "images/waypoints/target.png");
+        } else if (far) {
+            String kind = scScale >= 3 ? "marker" : "markersmall";
+            icon = ResourceLocation.fromNamespaceAndPath("voxelmap", "images/waypoints/" + kind + point.imageSuffix + ".png");
+            if (minecraft.getResourceManager().getResource(icon).isEmpty()) {
+                icon = ResourceLocation.fromNamespaceAndPath("voxelmap", "images/waypoints/" + kind + ".png");
+            }
+        } else {
+            String kind = scScale >= 3 ? "waypoint" : "waypointsmall";
+            icon = ResourceLocation.fromNamespaceAndPath("voxelmap", "images/waypoints/" + kind + point.imageSuffix + ".png");
+            if (minecraft.getResourceManager().getResource(icon).isEmpty()) {
+                icon = ResourceLocation.fromNamespaceAndPath("voxelmap", "images/waypoints/" + kind + ".png");
+            }
+        }
+        if (minecraft.getResourceManager().getResource(icon).isEmpty()) return;
+        int color = target ? 0xFFFF0000 : point.getUnifiedColor(point.enabled ? 1.0F : 0.3F);
+        guiGraphics.pose().pushMatrix();
+        guiGraphics.pose().translate(x, y);
+        guiGraphics.pose().rotate(-locate * Mth.DEG_TO_RAD);
+        if (target) {
+            guiGraphics.pose().translate(0.0F, -hypot);
+            guiGraphics.pose().rotate(locate * Mth.DEG_TO_RAD);
+            guiGraphics.pose().translate(-x, -y);
+        } else {
+            guiGraphics.pose().translate(-x, -y);
+            guiGraphics.pose().translate(0.0F, -hypot);
+        }
+        guiGraphics.submitRustSemanticBlit(icon, x - 4, y - 4, 8, 8,
+            0.0F, 0.0F, 1.0F, 1.0F, color);
+        guiGraphics.pose().popMatrix();
     }
 
     private void checkForChanges() {
@@ -1584,7 +1795,9 @@ public class Map implements Runnable, IChangeObserver {
             if (this.imageChanged) {
                 this.imageChanged = false;
                 this.mapImages[this.zoom].upload();
-                VulkanicAPI.applyResourceBarriers(VulkanicAPI.getCommandContext(), TEXTURE_UPLOAD_WRITES_VISIBLE_TO_TEXTURE_FETCH);
+                if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+                    VulkanicAPI.applyResourceBarriers(VulkanicAPI.getCommandContext(), TEXTURE_UPLOAD_WRITES_VISIBLE_TO_TEXTURE_FETCH);
+                }
                 this.lastImageX = this.lastX;
                 this.lastImageZ = this.lastZ;
             }
@@ -1776,7 +1989,8 @@ public class Map implements Runnable, IChangeObserver {
         guiGraphics.pose().rotate((this.options.rotates && !this.fullscreenMap ? 0.0F : this.direction + this.northRotate) * Mth.DEG_TO_RAD);
         guiGraphics.pose().translate(-x, -y);
 
-        guiGraphics.blit(RenderPipelines.GUI_TEXTURED, resourceArrow, x - 4, y - 4, 0, 0, 8, 8, 8, 8);
+		guiGraphics.submitRustSemanticBlit(resourceArrow, x - 4, y - 4, 8, 8,
+			0.0F, 0.0F, 1.0F, 1.0F, 0xFFFFFFFF);
 
         guiGraphics.pose().popMatrix();
     }
@@ -1786,7 +2000,9 @@ public class Map implements Runnable, IChangeObserver {
             if (this.imageChanged) {
                 this.imageChanged = false;
                 this.mapImages[this.zoom].upload();
-                VulkanicAPI.applyResourceBarriers(VulkanicAPI.getCommandContext(), TEXTURE_UPLOAD_WRITES_VISIBLE_TO_TEXTURE_FETCH);
+                if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+                    VulkanicAPI.applyResourceBarriers(VulkanicAPI.getCommandContext(), TEXTURE_UPLOAD_WRITES_VISIBLE_TO_TEXTURE_FETCH);
+                }
                 this.lastImageX = this.lastX;
                 this.lastImageZ = this.lastZ;
             }
@@ -1827,10 +2043,11 @@ public class Map implements Runnable, IChangeObserver {
         }
     }
 
-    private void drawMapFrame(GuiGraphics guiGraphics, int x, int y, boolean squaremap) {
-        ResourceLocation frameResource = squaremap ? resourceSquareMap : resourceRoundMap;
-        guiGraphics.blit(RenderPipelines.GUI_TEXTURED, frameResource, x - 32, y - 32, 0, 0, 64, 64, 64, 64);
-    }
+	private void drawMapFrame(GuiGraphics guiGraphics, int x, int y, boolean squaremap) {
+		ResourceLocation frameResource = squaremap ? resourceSquareMap : resourceRoundMap;
+		guiGraphics.submitRustSemanticBlit(frameResource, x - 32, y - 32, 64, 64,
+			0.0F, 0.0F, 1.0F, 1.0F, 0xFFFFFFFF);
+	}
 
     private void drawDirections(GuiGraphics drawContext, int x, int y, float scaleProj) {
         Matrix3x2fStack poseStack = drawContext.pose();

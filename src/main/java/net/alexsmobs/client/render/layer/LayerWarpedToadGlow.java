@@ -30,8 +30,8 @@ public class LayerWarpedToadGlow extends RenderLayer<WarpedToadRenderState, Mode
             RenderType renderType = AMRenderTypes.getEyesFlickering(texture, 0);
             final float alpha = 0.75F + (Mth.cos(state.ageInTicks * 0.2F) + 1F) * 0.125F;
             int color = AMColorUtil.packColor(1.0F, 1.0F, 1.0F, alpha);
-            submitNodeCollector.order(1).submitModel(
-                this.getParentModel(), state, poseStack, renderType, 240, OverlayTexture.NO_OVERLAY, color, null, state.outlineColor, null
+            submitNodeCollector.order(1).submitModelSemanticTexture(
+                this.getParentModel(), state, poseStack, renderType, 240, OverlayTexture.NO_OVERLAY, color, texture, state.outlineColor, null
             );
         }
     }

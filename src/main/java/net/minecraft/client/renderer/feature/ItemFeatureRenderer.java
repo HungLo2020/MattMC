@@ -20,6 +20,9 @@ public class ItemFeatureRenderer {
 	private final ItemRenderContext itemRenderContext = new ItemRenderContext();
 
 	public void render(SubmitNodeCollection submitNodeCollection, MultiBufferSource.BufferSource bufferSource, OutlineBufferSource outlineBufferSource) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java item feature rendering is unavailable while Rust owns whole-frame presentation");
+		}
 		for (SubmitNodeStorage.ItemSubmit itemSubmit : submitNodeCollection.getItemSubmits()) {
 			// Iris: Set model storage before rendering
 			((net.irisshaders.iris.mixinterface.ModelStorage) (Object) itemSubmit).iris$set();

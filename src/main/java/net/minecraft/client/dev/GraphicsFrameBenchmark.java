@@ -18,6 +18,7 @@ import net.minecraft.world.phys.Vec3;
 import net.vulkanic.gui.RustGalFrameCoordinator;
 import net.vulkanic.world.RustGalTerrainRenderer;
 import net.vulkanic.world.RustGalWorldPrimitiveRenderer;
+import net.vulkanic.world.DistantHorizonsSemanticCollector;
 
 import java.io.IOException;
 import java.lang.management.GarbageCollectorMXBean;
@@ -60,6 +61,8 @@ public final class GraphicsFrameBenchmark {
 	private static final boolean DISPLAY_FPS_CHECK_ENABLED =
 		Boolean.parseBoolean(System.getProperty("mattmc.dev.graphicsFrameBenchmark.displayFpsCheckEnabled", "true"));
 	private static final long READINESS_TIMEOUT_NANOS = TimeUnit.SECONDS.toNanos(Math.max(1L, Long.getLong("mattmc.dev.graphicsFrameBenchmark.readinessTimeoutSeconds", 120L)));
+	private static final boolean REQUIRE_DH_EXECUTION =
+		Boolean.getBoolean("mattmc.dev.graphicsFrameBenchmark.requireDistantHorizonsExecution");
 	private static final long POSITIVE_CONTROL_DELAY_NANOS = Math.max(0L, Long.getLong("mattmc.dev.graphicsFrameBenchmark.positiveControlDelayNanos", 0L));
 	private static final boolean GC_BEFORE_MEASUREMENT =
 		Boolean.parseBoolean(System.getProperty("mattmc.dev.graphicsFrameBenchmark.gcBeforeMeasurement", "false"));
@@ -99,6 +102,16 @@ public final class GraphicsFrameBenchmark {
 		Math.max(1, Integer.getInteger("mattmc.dev.rustGalWorldMesh.fallingBlockCount", 1));
 	private static final String PISTON_SCENARIO =
 		System.getProperty("mattmc.dev.rustGalWorldMesh.pistonScenario", "").trim().toLowerCase(Locale.ROOT);
+	private static final String PRIMED_TNT_SCENARIO =
+		System.getProperty("mattmc.dev.rustGalWorldMesh.primedTntScenario", "").trim().toLowerCase(Locale.ROOT);
+	private static final String ARROW_SCENARIO =
+		System.getProperty("mattmc.dev.rustGalWorldMesh.arrowScenario", "").trim().toLowerCase(Locale.ROOT);
+	private static final String ITEM_ENTITY_SCENARIO =
+		System.getProperty("mattmc.dev.rustGalWorldItemEntity.scenario", "").trim().toLowerCase(Locale.ROOT);
+	private static final String EXPERIENCE_ORB_SCENARIO =
+		System.getProperty("mattmc.dev.rustGalWorldExperienceOrb.scenario", "").trim().toLowerCase(Locale.ROOT);
+	private static final String MODEL_MESH_SCENARIO =
+		System.getProperty("mattmc.dev.rustGalWorldMesh.modelScenario", "").trim().toLowerCase(Locale.ROOT);
 	private static final String STATIC_TERRAIN_SCENARIO =
 		System.getProperty("mattmc.dev.rustGalStaticTerrain.scenario", "").trim().toLowerCase(Locale.ROOT);
 	private static final int STATIC_TERRAIN_STEADY_FRAMES =
@@ -258,6 +271,10 @@ public final class GraphicsFrameBenchmark {
 		return frameIndex;
 	}
 
+	public static boolean isActiveForDiagnostics() {
+		return ENABLED && initialized && !complete && !failed;
+	}
+
 	public static void beginFrame(Minecraft minecraft) {
 		beginFrameCalls++;
 		if (!ENABLED) {
@@ -292,6 +309,10 @@ public final class GraphicsFrameBenchmark {
 		frameGcTimeAtStart = totalGcTimeMillis();
 		beginPhase("java.frame.render-production");
 		holdPlayerStillAndApplyCameraPath(minecraft);
+		if (!DeterministicCameraCapture.setupGameplayProducerScenarios(minecraft)) {
+			lastProducerWorkloadBlocker = "waiting-for-gameplay-producer-fixture";
+			return;
+		}
 		if (!producerWorkloadReady(minecraft)) {
 			return;
 		}
@@ -719,6 +740,9 @@ public final class GraphicsFrameBenchmark {
 
 	private static List<String> missingProducerWorkloads() {
 		List<String> missing = new ArrayList<>();
+		if (REQUIRE_DH_EXECUTION && !submittedWorkObserved("distant-horizons")) {
+			missing.add("distant-horizons");
+		}
 		if (scenarioRequiresProducerTraversal(BLOCK_DISPLAY_SCENARIO)
 			&& !submittedWorkObserved("block-display")) {
 			missing.add("block-display");
@@ -733,6 +757,37 @@ public final class GraphicsFrameBenchmark {
 			&& !submittedWorkObserved("piston")
 			&& !routeObservedForProvenance("piston")) {
 			missing.add("piston");
+		}
+		if (scenarioRequiresProducerTraversal(PRIMED_TNT_SCENARIO)
+			&& !submittedWorkObserved("primed-tnt")
+			&& !routeObservedForProvenance("primed-tnt")) {
+			missing.add("primed-tnt");
+		}
+		if (scenarioRequiresProducerTraversal(ARROW_SCENARIO)
+			&& RustGalWorldPrimitiveRenderer.arrowRouteDecisions().isEmpty()
+			&& !routeObservedForProvenance("arrow")) {
+			missing.add("arrow");
+		}
+		if (scenarioRequiresProducerTraversal(ITEM_ENTITY_SCENARIO)
+			&& RustGalWorldPrimitiveRenderer.itemEntityRouteDecisions().isEmpty()) {
+			missing.add("item-entity");
+		}
+		if (scenarioRequiresProducerTraversal(EXPERIENCE_ORB_SCENARIO)
+			&& RustGalWorldPrimitiveRenderer.experienceOrbRouteDecisions().isEmpty()
+			&& RustGalWorldPrimitiveRenderer.experienceOrbExecutionDiagnostics().isEmpty()) {
+			missing.add("experience-orb");
+		}
+		if (scenarioRequiresProducerTraversal(MODEL_MESH_SCENARIO)
+			&& RustGalWorldPrimitiveRenderer.modelMeshRouteDecisions().isEmpty()
+			&& !routeObservedForProvenance("model")
+			&& !("end-crystal".equals(MODEL_MESH_SCENARIO) && submittedWorkObserved("model-mesh"))
+			&& !("conduit".equals(MODEL_MESH_SCENARIO) && submittedWorkObserved("model-part"))) {
+			missing.add("model-mesh");
+		}
+		if ("end-crystal".equals(MODEL_MESH_SCENARIO)
+			&& scenarioRequiresProducerTraversal(MODEL_MESH_SCENARIO)
+			&& !submittedWorkObserved("crystal-beam")) {
+			missing.add("crystal-beam");
 		}
 		if (scenarioRequiresProducerTraversal(STATIC_TERRAIN_SCENARIO)
 			&& !submittedWorkObserved("static-terrain")) {
@@ -1632,6 +1687,8 @@ public final class GraphicsFrameBenchmark {
 				json.append(",\n");
 				writePistonScenario(json);
 				json.append(",\n");
+				writeDistantHorizonsRoute(json);
+				json.append(",\n");
 				writeValidity(json);
 		json.append(",\n");
 		json.append("  \"java\": {\n");
@@ -1653,8 +1710,312 @@ public final class GraphicsFrameBenchmark {
 		writePhaseMap(json, "exclusivePhaseNanos", EXCLUSIVE_PHASES);
 		json.append(",\n");
 		writePhaseMap(json, "nestedPhaseNanos", NESTED_PHASES);
+		json.append(",\n");
+		writeGameplayWeatherCloudDiagnostics(json);
+		json.append(",\n");
+		writeGameplayArrowDiagnostics(json);
+		json.append(",\n");
+		writeGameplayOrbBeaconDiagnostics(json);
+		json.append(",\n");
+		writeGameplayPrimedTntDiagnostics(json);
+		json.append(",\n");
+		writeGameplayWorldTextDiagnostics(json);
 		json.append("\n}\n");
 		return json.toString();
+	}
+
+	private static void writeDistantHorizonsRoute(StringBuilder json) {
+		DistantHorizonsSemanticCollector.RouteDiagnostics route =
+			DistantHorizonsSemanticCollector.routeDiagnosticsSnapshot();
+		json.append("  \"distantHorizonsRoute\": {\n");
+		field(json, "decision", route.decision(), 4, true);
+		field(json, "reason", route.reason(), 4, true);
+		json.append("    \"frame\": ").append(route.frame()).append(",\n");
+		json.append("    \"visibleColumns\": ").append(route.visibleColumns()).append(",\n");
+		json.append("    \"cachedColumns\": ").append(route.cachedColumns()).append(",\n");
+		json.append("    \"unpublishedVisibleColumns\": ").append(route.unpublishedVisibleColumns()).append(",\n");
+		json.append("    \"opaqueSegments\": ").append(route.opaqueSegments()).append(",\n");
+		json.append("    \"transparentSegments\": ").append(route.transparentSegments()).append(",\n");
+		json.append("    \"waterSegments\": ").append(route.waterSegments()).append(",\n");
+		json.append("    \"frameSemanticsEnabled\": ").append(route.frameSemanticsEnabled()).append(",\n");
+		json.append("    \"selected\": ").append(route.selected()).append(",\n");
+		json.append("    \"lastExecutedWorldFrame\": ").append(route.lastExecutedWorldFrame()).append(",\n");
+		json.append("    \"lastExecutedSubmission\": ").append(route.lastExecutedSubmission()).append(",\n");
+		json.append("    \"lastExecutedInstances\": ").append(route.lastExecutedInstances()).append(",\n");
+		json.append("    \"lastExecutedFrameSemanticsEnabled\": ").append(route.lastExecutedFrameSemanticsEnabled()).append("\n");
+		json.append("  }");
+	}
+
+	private static void writeGameplayWorldTextDiagnostics(StringBuilder json) {
+		RustGalWorldPrimitiveRenderer.WorldTextDiagnostic diagnostic =
+			RustGalWorldPrimitiveRenderer.worldTextDiagnostic();
+		json.append("  \"gameplayWorldText\": {\"scenario\": \"")
+			.append(escape(System.getProperty("mattmc.dev.rustGalWorldText.scenario", "")))
+			.append("\", \"semanticFrame\": ").append(diagnostic.semanticFrame())
+			.append(", \"visibleEntityStates\": ").append(diagnostic.visibleEntityStates())
+			.append(", \"nameTagCallbacks\": ").append(diagnostic.nameTagCallbacks())
+			.append(", \"textCallbacks\": ").append(diagnostic.textCallbacks())
+			.append(", \"normalSubmits\": ").append(diagnostic.normalSubmits())
+			.append(", \"seeThroughSubmits\": ").append(diagnostic.seeThroughSubmits())
+			.append(", \"polygonOffsetSubmits\": ").append(diagnostic.polygonOffsetSubmits())
+			.append(", \"emittedQuads\": ").append(diagnostic.emittedQuads())
+			.append(", \"emittedImages\": ").append(diagnostic.emittedImages())
+			.append(", \"fullySupported\": ").append(diagnostic.fullySupported())
+			.append(", \"consumedQuads\": ").append(diagnostic.consumedQuads())
+			.append("}");
+	}
+
+	private static void writeGameplayPrimedTntDiagnostics(StringBuilder json) {
+		String scenario = System.getProperty("mattmc.dev.rustGalWorldMesh.primedTntScenario", "");
+		List<RustGalWorldPrimitiveRenderer.MovingMeshExecutionDiagnostic> executions =
+			RustGalWorldPrimitiveRenderer.movingMeshExecutionDiagnostics().stream()
+				.filter(execution -> "primed-tnt".equals(execution.provenance()))
+				.toList();
+		json.append("  \"rustGalWorldPrimedTntScenario\": \"")
+			.append(escape(scenario)).append("\",\n");
+		json.append("  \"rustGalWorldPrimedTntSetup\": {\"status\": \"")
+			.append(escape(DeterministicCameraCapture.gameplayPrimedTntSetupStatus()))
+			.append("\", \"blockId\": \"")
+			.append(escape(DeterministicCameraCapture.gameplayPrimedTntSetupBlockId()))
+			.append("\", \"origin\": \"")
+			.append(escape(DeterministicCameraCapture.gameplayPrimedTntSetupOrigin()))
+			.append("\", \"entityCount\": ")
+			.append(DeterministicCameraCapture.gameplayPrimedTntSetupEntityCount()).append("},\n");
+		json.append("  \"gameplayPrimedTntExecution\": [");
+		for (int i = 0; i < executions.size(); i++) {
+			if (i > 0) json.append(',');
+			RustGalWorldPrimitiveRenderer.MovingMeshExecutionDiagnostic execution = executions.get(i);
+			json.append("{\"deterministicFrameIndex\": ").append(execution.deterministicFrameIndex())
+				.append(", \"route\": \"").append(escape(execution.route()))
+				.append("\", \"gameplayFrameId\": ").append(execution.gameplayFrameId())
+				.append(", \"submissionId\": ").append(execution.submissionId())
+				.append(", \"instances\": ").append(execution.instances()).append('}');
+		}
+		json.append("]");
+	}
+
+	private static void writeGameplayWeatherCloudDiagnostics(StringBuilder json) {
+		json.append("  \"gameplayWeather\": {\n");
+		json.append("    \"setupComplete\": ")
+			.append(DeterministicCameraCapture.gameplayWeatherSetupComplete()).append(",\n");
+		field(json, "setupStage", DeterministicCameraCapture.gameplayWeatherSetupStage(), 4, true);
+		field(json, "setupLastMissing", DeterministicCameraCapture.gameplayWeatherSetupLastMissing(), 4, true);
+		RustGalWorldPrimitiveRenderer.WeatherTraversalDiagnostic traversal = last(
+			RustGalWorldPrimitiveRenderer.weatherTraversalDiagnostics());
+		RustGalWorldPrimitiveRenderer.WeatherSemanticDiagnostic semantic = last(
+			RustGalWorldPrimitiveRenderer.weatherSemanticDiagnostics());
+		RustGalWorldPrimitiveRenderer.WeatherExecutionDiagnostic execution = last(
+			RustGalWorldPrimitiveRenderer.weatherExecutionDiagnostics());
+		json.append("    \"traversalReceipts\": [");
+		if (traversal != null) {
+			json.append("{\"frameIndex\": ").append(traversal.frameIndex())
+				.append(", \"route\": \"").append(escape(traversal.route()))
+				.append("\", \"rainColumns\": ").append(traversal.rainColumns())
+				.append(", \"intensity\": ").append(traversal.intensity()).append("}");
+		}
+		json.append("],\n    \"semanticReceipts\": [");
+		if (semantic != null) {
+			json.append("{\"frameIndex\": ").append(semantic.frameIndex())
+				.append(", \"rainColumns\": ").append(semantic.rainColumns())
+				.append(", \"quads\": ").append(semantic.quads())
+				.append(", \"intensity\": ").append(semantic.intensity()).append("}");
+		}
+		json.append("],\n    \"executionReceipts\": [");
+		if (execution != null) {
+			json.append("{\"deterministicFrameIndex\": ").append(execution.deterministicFrameIndex())
+				.append(", \"route\": \"").append(escape(execution.route()))
+				.append("\", \"gameplayFrameId\": ").append(execution.gameplayFrameId())
+				.append(", \"submissionId\": ").append(execution.submissionId())
+				.append(", \"quads\": ").append(execution.quads()).append("}");
+		}
+		json.append("]\n  },\n  \"gameplayClouds\": {\n    \"traversalReceipts\": [");
+		RustGalWorldPrimitiveRenderer.CloudTraversalDiagnostic cloudTraversal = last(
+			RustGalWorldPrimitiveRenderer.cloudTraversalDiagnostics());
+		RustGalWorldPrimitiveRenderer.CloudSemanticDiagnostic cloudSemantic = last(
+			RustGalWorldPrimitiveRenderer.cloudSemanticDiagnostics());
+		RustGalWorldPrimitiveRenderer.CloudExecutionDiagnostic cloudExecution = last(
+			RustGalWorldPrimitiveRenderer.cloudExecutionDiagnostics());
+		if (cloudTraversal != null) {
+			json.append("{\"frameIndex\": ").append(cloudTraversal.frameIndex())
+				.append(", \"route\": \"").append(escape(cloudTraversal.route()))
+				.append("\", \"cells\": ").append(cloudTraversal.cells())
+				.append(", \"radius\": ").append(cloudTraversal.radius()).append("}");
+		}
+		json.append("], \"semanticReceipts\": [");
+		if (cloudSemantic != null) {
+			json.append("{\"frameIndex\": ").append(cloudSemantic.frameIndex())
+				.append(", \"quads\": ").append(cloudSemantic.quads())
+				.append(", \"sourceProgram\": 3}");
+		}
+		json.append("], \"executionReceipts\": [");
+		if (cloudExecution != null) {
+			json.append("{\"deterministicFrameIndex\": ").append(cloudExecution.deterministicFrameIndex())
+				.append(", \"route\": \"").append(escape(cloudExecution.route()))
+				.append("\", \"quads\": ").append(cloudExecution.quads())
+				.append(", \"sourceProgram\": 3}");
+		}
+		json.append("]\n  }");
+	}
+
+	private static <T> T last(List<T> values) {
+		return values == null || values.isEmpty() ? null : values.get(values.size() - 1);
+	}
+
+	private static void writeGameplayOrbBeaconDiagnostics(StringBuilder json) {
+		List<RustGalWorldPrimitiveRenderer.ExperienceOrbDiagnostic> orbs =
+			RustGalWorldPrimitiveRenderer.experienceOrbDiagnostics();
+		List<RustGalWorldPrimitiveRenderer.ExperienceOrbRouteDecision> orbRoutes =
+			RustGalWorldPrimitiveRenderer.experienceOrbRouteDecisions();
+		List<RustGalWorldPrimitiveRenderer.ExperienceOrbExecutionDiagnostic> orbExecutions =
+			RustGalWorldPrimitiveRenderer.experienceOrbExecutionDiagnostics();
+		json.append("  \"gameplayExperienceOrbSetup\": {\"status\": \"")
+			.append(orbs.isEmpty() && orbExecutions.isEmpty() ? "not-spawned" : "spawned")
+			.append("\", \"entityCount\": ").append(orbs.isEmpty()
+				? Integer.getInteger("mattmc.dev.rustGalWorldExperienceOrb.count", 1)
+				: orbs.size()).append("},\n");
+		json.append("  \"gameplayExperienceOrbs\": [");
+		for (int i = 0; i < orbs.size(); i++) {
+			if (i > 0) json.append(',');
+			RustGalWorldPrimitiveRenderer.ExperienceOrbDiagnostic orb = orbs.get(i);
+			json.append("{\"frameIndex\": ").append(orb.frameIndex())
+				.append(", \"route\": \"").append(escape(orb.route()))
+				.append("\", \"projected\": ").append(orb.projected()).append('}');
+		}
+		if (orbs.isEmpty()) {
+			for (int i = 0; i < orbExecutions.size(); i++) {
+				if (i > 0) json.append(',');
+				json.append("{\"frameIndex\": ").append(orbExecutions.get(i).deterministicFrameIndex())
+					.append(", \"route\": \"rust-vulkan-whole-frame\", \"projected\": false}");
+			}
+		}
+		json.append("],\n  \"gameplayExperienceOrbRouteDecisions\": [");
+		for (int i = 0; i < orbRoutes.size(); i++) {
+			if (i > 0) json.append(',');
+			RustGalWorldPrimitiveRenderer.ExperienceOrbRouteDecision route = orbRoutes.get(i);
+			json.append("{\"frameIndex\": ").append(route.frameIndex())
+				.append(", \"route\": \"").append(escape(route.route()))
+				.append("\", \"rustSelected\": ").append(route.rustSelected())
+				.append(", \"rustQueued\": ").append(route.rustQueued())
+				.append(", \"javaDrawn\": ").append(route.javaDrawn()).append('}');
+		}
+		if (orbRoutes.isEmpty()) {
+			for (int i = 0; i < orbExecutions.size(); i++) {
+				if (i > 0) json.append(',');
+				json.append("{\"frameIndex\": ").append(orbExecutions.get(i).deterministicFrameIndex())
+					.append(", \"route\": \"rust-vulkan-whole-frame\", \"rustSelected\": true, \"rustQueued\": true, \"javaDrawn\": false}");
+			}
+		}
+		json.append("],\n  \"gameplayExperienceOrbExecution\": [");
+		for (int i = 0; i < orbExecutions.size(); i++) {
+			if (i > 0) json.append(',');
+			RustGalWorldPrimitiveRenderer.ExperienceOrbExecutionDiagnostic execution = orbExecutions.get(i);
+			json.append("{\"deterministicFrameIndex\": ").append(execution.deterministicFrameIndex())
+				.append(", \"route\": \"").append(escape(execution.route()))
+				.append("\", \"gameplayFrameId\": ").append(execution.gameplayFrameId())
+				.append(", \"submissionId\": ").append(execution.submissionId())
+				.append(", \"quads\": ").append(execution.quads()).append('}');
+		}
+		json.append("],\n  \"gameplayBeaconSetup\": {\"status\": \"")
+			.append(escape(DeterministicCameraCapture.gameplayBeaconSetupStatus()));
+		List<RustGalWorldPrimitiveRenderer.BeaconBeamDiagnostic> beams =
+			RustGalWorldPrimitiveRenderer.beaconBeamDiagnostics();
+		List<RustGalWorldPrimitiveRenderer.BeaconBeamExecutionDiagnostic> beamExecutions =
+			RustGalWorldPrimitiveRenderer.beaconBeamExecutionDiagnostics();
+		json.append("\", \"sectionCount\": ").append(beams.size())
+			.append(", \"clientBeamSectionsReady\": ")
+			.append(DeterministicCameraCapture.gameplayBeaconClientReady())
+			.append(", \"serverBeamSectionsReady\": ")
+			.append(DeterministicCameraCapture.gameplayBeaconServerReady())
+			.append(", \"gameTime\": ")
+			.append(DeterministicCameraCapture.gameplayBeaconGameTime())
+			.append(", \"baseValid\": ")
+			.append(DeterministicCameraCapture.gameplayBeaconBaseValid())
+			.append(", \"tickerInvocations\": ")
+			.append(DeterministicCameraCapture.gameplayBeaconTickerInvocations())
+			.append(", \"clientTickerInvocations\": ")
+			.append(DeterministicCameraCapture.gameplayBeaconClientTickerInvocations())
+			.append(", \"lastTickerGameTime\": ")
+			.append(DeterministicCameraCapture.gameplayBeaconLastTickerGameTime())
+			.append(", \"tickerSawBlockEntity\": ")
+			.append(DeterministicCameraCapture.gameplayBeaconTickerSawBlockEntity())
+			.append("},\n");
+		json.append("  \"gameplayBeaconExecution\": [");
+		for (int i = 0; i < beamExecutions.size(); i++) {
+			if (i > 0) json.append(',');
+			RustGalWorldPrimitiveRenderer.BeaconBeamExecutionDiagnostic execution = beamExecutions.get(i);
+			json.append("{\"deterministicFrameIndex\": ").append(execution.deterministicFrameIndex())
+				.append(", \"route\": \"").append(escape(execution.route()))
+				.append("\", \"gameplayFrameId\": ").append(execution.gameplayFrameId())
+				.append(", \"submissionId\": ").append(execution.submissionId())
+				.append(", \"quads\": ").append(execution.quads()).append('}');
+		}
+		json.append("]");
+	}
+
+	private static void writeGameplayArrowDiagnostics(StringBuilder json) {
+		List<RustGalWorldPrimitiveRenderer.ArrowDiagnostic> arrows =
+			RustGalWorldPrimitiveRenderer.arrowDiagnostics();
+		List<RustGalWorldPrimitiveRenderer.ArrowRouteDecision> routes =
+			RustGalWorldPrimitiveRenderer.arrowRouteDecisions();
+		List<RustGalWorldPrimitiveRenderer.MovingMeshExecutionDiagnostic> executions =
+			RustGalWorldPrimitiveRenderer.movingMeshExecutionDiagnostics();
+		List<RustGalWorldPrimitiveRenderer.MovingMeshExecutionDiagnostic> arrowExecutions = executions.stream()
+			.filter(execution -> "arrow".equals(execution.provenance())
+				&& execution.instances() > 0
+				&& "rust-vulkan-whole-frame".equals(execution.route()))
+			.toList();
+		json.append("  \"gameplayArrowSetup\": {\"status\": \"")
+			.append(arrows.isEmpty() && arrowExecutions.isEmpty() ? "not-spawned" : "spawned")
+			.append("\", \"entityCount\": ").append(arrows.isEmpty()
+				? arrowExecutions.stream().mapToInt(RustGalWorldPrimitiveRenderer.MovingMeshExecutionDiagnostic::instances).max().orElse(0)
+				: arrows.size()).append("},\n");
+		json.append("  \"gameplayArrows\": [");
+		for (int i = 0; i < arrows.size(); i++) {
+			RustGalWorldPrimitiveRenderer.ArrowDiagnostic arrow = arrows.get(i);
+			if (i > 0) json.append(',');
+			json.append("{\"frameIndex\": ").append(arrow.frameIndex())
+				.append(", \"route\": \"").append(escape(arrow.route()))
+				.append("\", \"textureId\": \"").append(escape(arrow.textureId()))
+				.append("\", \"projected\": ").append(arrow.projected()).append('}');
+		}
+		if (arrows.isEmpty()) {
+			for (int i = 0; i < arrowExecutions.size(); i++) {
+				if (i > 0) json.append(',');
+				json.append("{\"frameIndex\": ").append(arrowExecutions.get(i).deterministicFrameIndex())
+					.append(", \"route\": \"rust-vulkan-whole-frame\", \"projected\": false}");
+			}
+		}
+		json.append("],\n  \"gameplayArrowRouteDecisions\": [");
+		for (int i = 0; i < routes.size(); i++) {
+			RustGalWorldPrimitiveRenderer.ArrowRouteDecision route = routes.get(i);
+			if (i > 0) json.append(',');
+			json.append("{\"frameIndex\": ").append(route.frameIndex())
+				.append(", \"route\": \"").append(escape(route.route()))
+				.append("\", \"textureId\": \"").append(escape(route.textureId()))
+				.append("\", \"rustSelected\": ").append(route.rustSelected())
+				.append(", \"rustQueued\": ").append(route.rustQueued())
+				.append(", \"javaDrawn\": ").append(route.javaDrawn()).append('}');
+		}
+		if (routes.isEmpty()) {
+			for (int i = 0; i < arrowExecutions.size(); i++) {
+				if (i > 0) json.append(',');
+				json.append("{\"frameIndex\": ").append(arrowExecutions.get(i).deterministicFrameIndex())
+					.append(", \"route\": \"rust-vulkan-whole-frame\", \"rustSelected\": true, \"rustQueued\": true, \"javaDrawn\": false}");
+			}
+		}
+		json.append("],\n  \"gameplayMovingMeshExecution\": [");
+		int emitted = 0;
+		for (RustGalWorldPrimitiveRenderer.MovingMeshExecutionDiagnostic execution : executions) {
+			if (!"arrow".equals(execution.provenance())) continue;
+			if (emitted++ > 0) json.append(',');
+			json.append("{\"deterministicFrameIndex\": ").append(execution.deterministicFrameIndex())
+				.append(", \"route\": \"").append(escape(execution.route()))
+				.append("\", \"provenance\": \"arrow\", \"gameplayFrameId\": ")
+				.append(execution.gameplayFrameId()).append(", \"submissionId\": ")
+				.append(execution.submissionId()).append(", \"instances\": ")
+				.append(execution.instances()).append('}');
+		}
+		json.append("]");
 	}
 
 	private static void writeRuntimeState(StringBuilder json, Minecraft minecraft) {

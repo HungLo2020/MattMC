@@ -26,13 +26,14 @@ class WorldTextSemanticCollectorTest {
 	void bridgeRecordKeepsGlyphCornerAndAtlasSemantics() {
 		WorldTextSemanticCollector.WorldTextQuad quad = new WorldTextSemanticCollector.WorldTextQuad(
 			"minecraft:font/ascii", 1L, 1L, false, WorldTextSemanticCollector.DEPTH_POLYGON_OFFSET,
-			0, 0.0, identityMatrix(), glyph()
+			0, 0xFFFFFFFF, 0.0, identityMatrix(), glyph()
 		);
 		var record = quad.toBridgeRecord();
 		assertArrayEquals(new float[] {0.0F, 0.0F, 0.0F, 0.0F, 8.0F, 0.0F, 8.0F, 8.0F, 0.0F, 8.0F, 0.0F, 0.0F}, record.positions());
 		assertArrayEquals(new float[] {0.0F, 0.0F, 0.0F, 1.0F, 1.0F, 1.0F, 1.0F, 0.0F}, record.uvs());
 		assertEquals(WorldTextSemanticCollector.semanticAssetId("minecraft:font/ascii", false), record.assetId());
 		assertEquals(WorldTextSemanticCollector.DEPTH_POLYGON_OFFSET, record.depthPolicy());
+		assertEquals(0xFFFFFFFF, record.colorArgb());
 	}
 
 	@Test
@@ -42,20 +43,27 @@ class WorldTextSemanticCollectorTest {
 		nonFinite[7] = Float.NaN;
 		assertThrows(IllegalArgumentException.class, () -> quad(nonFinite));
 		assertThrows(IllegalArgumentException.class, () -> new WorldTextSemanticCollector.WorldTextQuad(
-			"minecraft:font/ascii", 1L, 1L, false, 99, 0, 0.0, identityMatrix(), glyph()
+			"minecraft:font/ascii", 1L, 1L, false, 99, 0, 0xFFFFFFFF, 0.0, identityMatrix(), glyph()
 		));
 	}
 
 	@Test
-	void ordinaryTextAdmissionPreservesExplicitDepthModesAndRejectsOutline() {
+	void ordinaryTextAdmissionPreservesExplicitDepthModesIncludingOutline() {
 		assertEquals(WorldTextSemanticCollector.DEPTH_NORMAL,
 			WorldTextSemanticCollector.textSubmitDepthPolicy(textSubmit(Font.DisplayMode.NORMAL, 0)));
 		assertEquals(WorldTextSemanticCollector.DEPTH_SEE_THROUGH,
 			WorldTextSemanticCollector.textSubmitDepthPolicy(textSubmit(Font.DisplayMode.SEE_THROUGH, 0)));
 		assertEquals(WorldTextSemanticCollector.DEPTH_POLYGON_OFFSET,
 			WorldTextSemanticCollector.textSubmitDepthPolicy(textSubmit(Font.DisplayMode.POLYGON_OFFSET, 0)));
-		assertEquals(0,
+		assertEquals(WorldTextSemanticCollector.DEPTH_NORMAL,
 			WorldTextSemanticCollector.textSubmitDepthPolicy(textSubmit(Font.DisplayMode.NORMAL, 0xFF000000)));
+	}
+
+	@Test
+	void rawTextureAtlasGenerationSuppliesAStablePositiveRevision() {
+		assertEquals(7L, WorldTextSemanticCollector.rawAtlasRevision(7L));
+		assertThrows(IllegalArgumentException.class,
+			() -> WorldTextSemanticCollector.rawAtlasRevision(0L));
 	}
 
 	private static SubmitNodeStorage.TextSubmit textSubmit(Font.DisplayMode mode, int outlineColor) {
@@ -65,7 +73,7 @@ class WorldTextSemanticCollectorTest {
 	private static WorldTextSemanticCollector.WorldTextQuad quad(float[] matrix) {
 		return new WorldTextSemanticCollector.WorldTextQuad(
 			"minecraft:font/ascii", 1L, 1L, false, WorldTextSemanticCollector.DEPTH_NORMAL,
-			0, 0.0, matrix, glyph()
+			0, 0xFFFFFFFF, 0.0, matrix, glyph()
 		);
 	}
 

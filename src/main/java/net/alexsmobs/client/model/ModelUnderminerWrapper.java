@@ -6,6 +6,7 @@ import net.citadel.client.model.AdvancedModelBox;
 import net.citadel.client.model.basic.BasicModelPart;
 import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.model.geom.ModelPart;
+import net.blaze3d.vertex.PoseStack;
 
 /**
  * Wrapper model that delegates to either dwarf or tall model based on render state
@@ -53,5 +54,13 @@ public class ModelUnderminerWrapper extends AdvancedEntityModel<UnderminerRender
     
     public HumanoidModel<UnderminerRenderState> getTallModel() {
         return tallModel;
+    }
+
+    public void translateToHand(PoseStack poseStack, UnderminerRenderState state, boolean left) {
+        if (state.isDwarf) {
+            dwarfModel.translateToHand(poseStack, left);
+        } else {
+            (left ? tallModel.leftArm : tallModel.rightArm).translateAndRotate(poseStack);
+        }
     }
 }

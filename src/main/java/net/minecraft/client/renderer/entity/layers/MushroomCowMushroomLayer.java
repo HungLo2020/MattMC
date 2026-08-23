@@ -63,7 +63,12 @@ public class MushroomCowMushroomLayer extends RenderLayer<MushroomCowRenderState
 		PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, boolean bl, int j, BlockState blockState, int k, BlockStateModel blockStateModel
 	) {
 		if (bl) {
-			submitNodeCollector.submitBlockModel(poseStack, RenderType.outline(TextureAtlas.LOCATION_BLOCKS), blockStateModel, 0.0F, 0.0F, 0.0F, i, k, j);
+			if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+				&& net.vulkanic.world.WorldRenderRoutePolicy.currentBlockDisplayRoute().usesRustWholeFrameVulkan()) {
+				submitNodeCollector.submitBlockDisplay(poseStack, blockState, i, k, j);
+			} else {
+				submitNodeCollector.submitBlockModel(poseStack, RenderType.outline(TextureAtlas.LOCATION_BLOCKS), blockStateModel, 0.0F, 0.0F, 0.0F, i, k, j);
+			}
 		} else {
 			submitNodeCollector.submitBlock(poseStack, blockState, i, k, j);
 		}

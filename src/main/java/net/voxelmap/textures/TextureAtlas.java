@@ -16,9 +16,12 @@ import net.minecraft.CrashReportCategory;
 import net.minecraft.ReportedException;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.AbstractTexture;
+import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.client.renderer.texture.TextureContents;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.ResourceManager;
+import net.vulkanic.bridge.RustGalVulkanWholeFrameMode;
+import net.vulkanic.gui.RustGalGuiRawImageAssets;
 
 public class TextureAtlas extends AbstractTexture {
     private final HashMap<Object, Sprite> mapRegisteredSprites;
@@ -31,6 +34,7 @@ public class TextureAtlas extends AbstractTexture {
     private boolean linearFilter;
     private boolean mipmap;
     private ResourceLocation resourceLocation;
+    private DynamicTexture semanticTexture;
 
     public TextureAtlas(String basePath, ResourceLocation resourceLocation) {
         this(basePath, resourceLocation, null);
@@ -70,6 +74,10 @@ public class TextureAtlas extends AbstractTexture {
     }
 
     public void reset() {
+        if (this.semanticTexture != null) {
+            this.semanticTexture.close();
+            this.semanticTexture = null;
+        }
         for (Sprite e : this.mapRegisteredSprites.values()) {
             e.setTextureData(null);
         }
@@ -100,6 +108,11 @@ public class TextureAtlas extends AbstractTexture {
         this.stitcher.doStitch();
 
         VoxelConstants.getLogger().info("Created: {}x{} {}-atlas", new Object[] { this.stitcher.getCurrentImageWidth(), this.stitcher.getCurrentImageHeight(), this.basePath });
+
+        if (RustGalVulkanWholeFrameMode.enabled()) {
+            this.finishSemanticStitch();
+            return;
+        }
 
         texture = net.vulkanic.VulkanicAPI.createTexture("voxelmap-atlas", GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_COPY_SRC | GpuTexture.USAGE_TEXTURE_BINDING, TextureFormat.RGBA8, this.stitcher.getCurrentImageWidth(), this.stitcher.getCurrentImageHeight(), 1, 1);
         textureView = net.vulkanic.VulkanicAPI.createTextureView(texture);
@@ -151,6 +164,11 @@ public class TextureAtlas extends AbstractTexture {
 
         this.stitcher.doStitchNew();
 
+        if (RustGalVulkanWholeFrameMode.enabled()) {
+            this.finishSemanticStitch();
+            return;
+        }
+
         if (texture == null || oldWidth != this.stitcher.getCurrentImageWidth() || oldHeight != this.stitcher.getCurrentImageHeight()) {
             if (texture != null) {
                 texture.close();
@@ -196,6 +214,39 @@ public class TextureAtlas extends AbstractTexture {
                 saveDebugImage();
             }
         }
+    }
+
+    /** Builds a bounded CPU atlas for Rust Vulkan; no Java GPU texture is created. */
+    private void finishSemanticStitch() {
+        int width = Math.max(1, this.stitcher.getCurrentImageWidth());
+        int height = Math.max(1, this.stitcher.getCurrentImageHeight());
+        NativeImage atlas = new NativeImage(width, height, true);
+        HashMap<Object, Sprite> tempMapRegisteredSprites = Maps.newHashMap(this.mapRegisteredSprites);
+        for (Sprite icon : this.stitcher.getStitchSlots()) {
+            Object iconName = icon.getIconName();
+            tempMapRegisteredSprites.remove(iconName);
+            this.mapUploadedSprites.put(iconName, icon);
+            this.mapRegisteredSprites.remove(iconName);
+            NativeImage pixels = icon.getTextureData();
+            if (pixels == null) continue;
+            for (int y = 0; y < icon.getIconHeight(); y++) {
+                for (int x = 0; x < icon.getIconWidth(); x++) {
+                    atlas.setPixel(icon.getOriginX() + x, icon.getOriginY() + y, pixels.getPixel(x, y));
+                }
+            }
+        }
+        for (Sprite icon : tempMapRegisteredSprites.values()) {
+            if (icon.getTextureData() != null) {
+                icon.copyFrom(this.missingImage);
+                this.mapRegisteredSprites.remove(icon.getIconName());
+            }
+        }
+        this.missingImage.initSprite(height, width, 0, 0);
+        this.failedImage.initSprite(height, width, 0, 0);
+        if (this.semanticTexture != null) this.semanticTexture.close();
+        this.semanticTexture = new DynamicTexture(() -> "Rust semantic " + this.basePath + " atlas", atlas);
+        this.semanticTexture.setFilter(this.linearFilter, this.mipmap);
+        RustGalGuiRawImageAssets.registerDynamicTexture(this.resourceLocation, this.semanticTexture);
     }
 
     public void saveDebugImage() {

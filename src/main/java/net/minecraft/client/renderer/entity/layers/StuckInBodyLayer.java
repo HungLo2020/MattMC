@@ -44,7 +44,18 @@ public abstract class StuckInBodyLayer<M extends PlayerModel, S> extends RenderL
 		float m = (float)(Math.atan2(g, k) * 180.0F / (float)Math.PI);
 		poseStack.mulPose(Axis.YP.rotationDegrees(l - 90.0F));
 		poseStack.mulPose(Axis.ZP.rotationDegrees(m));
-		submitNodeCollector.submitModel(this.model, this.modelState, poseStack, this.model.renderType(this.texture), i, OverlayTexture.NO_OVERLAY, j, null);
+		submitNodeCollector.submitModelSemanticTexture(
+			this.model,
+			this.modelState,
+			poseStack,
+			this.model.renderType(this.texture),
+			i,
+			OverlayTexture.NO_OVERLAY,
+			j,
+			this.texture,
+			0,
+			null
+		);
 	}
 
 	public void submit(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, AvatarRenderState avatarRenderState, float f, float g) {

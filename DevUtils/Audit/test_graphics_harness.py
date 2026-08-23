@@ -623,6 +623,38 @@ def gameplay_artifact_for(temp: Path, mode: harness.ModeSpec, *, world: str = "O
 
 
 class GraphicsAuditHarnessTests(unittest.TestCase):
+    def test_repo_local_artifact_dir_is_quarantined_under_ignored_capture_root(self) -> None:
+        repo = Path(__file__).resolve().parents[2]
+        resolved = harness.normalize_configured_artifact_dir(repo, repo / "unsafe-captures")
+        self.assertEqual(artifact_retention.default_artifact_base(repo) / "unsafe-captures", resolved)
+        explicit_ignored = repo / "artifacts" / "graphics-captures" / "explicit"
+        self.assertEqual(explicit_ignored, harness.normalize_configured_artifact_dir(repo, explicit_ignored))
+
+        with tempfile.TemporaryDirectory() as temp:
+            external = Path(temp) / "captures"
+            self.assertEqual(external.resolve(), harness.normalize_configured_artifact_dir(repo, external))
+
+    def test_static_terrain_appearance_color_receipts_are_exposed_as_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            capture = root / "capture"
+            capture.mkdir()
+            sidecar = capture / "static_terrain_parity_diagnostics.jsonl"
+            sidecar.write_text(
+                json.dumps({
+                    "schema": "mattmc-static-terrain-appearance-rust-copy-v2",
+                    "stage": "java-to-rust-copy",
+                    "targetBlockColorSamples": [{"colorR": 12, "colorG": 200, "colorB": 34}],
+                }) + "\n",
+                encoding="utf-8",
+            )
+            receipts = harness.read_static_terrain_appearance_color_receipts(
+                root / "graphics_audit_artifact.json"
+            )
+            self.assertEqual(1, len(receipts))
+            self.assertEqual("java-to-rust-copy", receipts[0]["stage"])
+            self.assertEqual(200, receipts[0]["targetBlockColorSamples"][0]["colorG"])
+
     def test_world_text_scenario_requires_real_name_tag_semantic_and_execution_receipts(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp = Path(temp_dir)
@@ -2413,6 +2445,50 @@ class GraphicsAuditHarnessTests(unittest.TestCase):
             evidence = harness.deterministic_world_mesh_model_capture_evidence(document, "chest")
             self.assertEqual("structural_present", evidence["status"])
             self.assertEqual(4, evidence["matched_frames"])
+            conduit_document = dict(document)
+            conduit_document["rustGalWorldModelMeshScenario"] = "conduit"
+            conduit_document["rustGalWorldModelMeshSetup"] = {
+                "status": "spawned",
+                "blockId": "minecraft:conduit",
+                "clientBlockEntityPresent": True,
+            }
+            conduit_document["rustGalWorldModelMeshes"] = [
+                {**mesh, "textureId": "minecraft:textures/atlas/blocks.png"}
+                for mesh in document["rustGalWorldModelMeshes"]
+            ]
+            conduit_document["rustGalWorldModelMeshRouteDecisions"] = [
+                {**decision, "textureId": "minecraft:entity/conduit/base"}
+                for decision in document["rustGalWorldModelMeshRouteDecisions"]
+            ]
+            conduit_document["rustGalWorldMovingMeshExecution"] = [
+                {**receipt, "provenance": "model-part"}
+                for receipt in document["rustGalWorldMovingMeshExecution"]
+            ]
+            conduit = harness.deterministic_world_mesh_model_capture_evidence(conduit_document, "conduit")
+            self.assertEqual("structural_present", conduit["status"])
+            self.assertEqual("passed", conduit["setup_status"])
+            self.assertEqual("passed", conduit["execution_status"])
+            crystal_document = dict(document)
+            crystal_document["rustGalWorldModelMeshScenario"] = "end-crystal"
+            crystal_document["rustGalWorldModelMeshSetup"] = {
+                "status": "spawned",
+                "blockId": "minecraft:end_crystal",
+                "serverEntityPresent": True,
+                "clientEntityPresent": True,
+                "serverEntityId": 91,
+                "clientEntityId": 91,
+            }
+            crystal_document["rustGalWorldModelMeshes"] = [
+                {**mesh, "textureId": "minecraft:textures/entity/end_crystal/end_crystal.png", "entityId": 91}
+                for mesh in document["rustGalWorldModelMeshes"]
+            ]
+            crystal_document["rustGalWorldModelMeshRouteDecisions"] = [
+                {**decision, "textureId": "minecraft:textures/entity/end_crystal/end_crystal.png", "entityId": 91}
+                for decision in document["rustGalWorldModelMeshRouteDecisions"]
+            ]
+            crystal = harness.deterministic_world_mesh_model_capture_evidence(crystal_document, "end-crystal")
+            self.assertEqual("structural_present", crystal["status"])
+            self.assertEqual("passed", crystal["setup_status"])
             cow_document = dict(document)
             cow_document["rustGalWorldModelMeshScenario"] = "cow"
             cow_document["rustGalWorldModelMeshSetup"] = {
@@ -4118,6 +4194,27 @@ else:
             )
             self.assertNotIn("-Dmattmc.dev.rustGalWorldModelPart.v1=true", env["JAVA_TOOL_OPTIONS"])
 
+            gameplay_args = harness.parse_args(
+                [
+                    "gameplay",
+                    "--profile",
+                    "smoke",
+                    "--mode",
+                    rust_mode.name,
+                    "--rust-selected-source-execution",
+                    "--world",
+                    "Origin",
+                    "--diagnostic",
+                ]
+            )
+            _gameplay_command, gameplay_env = harness.build_capture_command(
+                target, rust_mode, root / "gameplay", "gameplay", gameplay_args, "gameplay"
+            )
+            self.assertEqual(
+                str(root / "gameplay" / "terrain_pass_contract"),
+                gameplay_env["MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR"],
+            )
+
             source_generic_model_args = harness.parse_args(
                 [
                     "capture",
@@ -4352,6 +4449,8 @@ else:
                 )
                 self.assertNotIn("MATTMC_RUST_SELECTED_SOURCE_EXECUTION", env)
                 self.assertNotIn("requiredRustSourceExecutionDir", env.get("JAVA_TOOL_OPTIONS", ""))
+                self.assertEqual("35184407740421", env.get("MATTMC_STATIC_TERRAIN_APPEARANCE_TRACE_SECTION"))
+                self.assertEqual("133,82,559", env.get("MATTMC_STATIC_TERRAIN_APPEARANCE_TRACE_BLOCK"))
 
     def test_selected_source_execution_does_not_leak_into_subsystem_rows(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -5228,6 +5327,15 @@ else:
             self.assertIn("isolated_secondary_world_status=ok", meta)
             self.assertIn('isolated_saves_listing=["Origin","SecondTerrainWorld"]', meta)
 
+    def test_capture_runner_ids_are_unique_within_one_second(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            first = capture_runner.CaptureRunner(isolated_capture_config(root))
+            second = capture_runner.CaptureRunner(isolated_capture_config(root))
+            self.assertNotEqual(first.run_id, second.run_id)
+            self.assertRegex(first.run_id, r"^\d{8}_\d{6}_\d{6}$")
+            self.assertRegex(second.run_id, r"^\d{8}_\d{6}_\d{6}$")
+
     def test_capture_runner_copies_translucent_alias_secondary_world_by_default(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -5374,6 +5482,64 @@ else:
             self.assertTrue(any("renderdoc_forced_gradle_no_daemon=true" in line for line in meta_lines))
             self.assertTrue(any("renderdoc_wrapped_actual_game_command=" in line for line in meta_lines))
 
+    def test_capture_runner_redirects_root_renderdoc_path_into_ignored_artifacts(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            runner = capture_runner.CaptureRunner.__new__(capture_runner.CaptureRunner)
+            runner.env = {
+                "MATTMC_RENDERDOC_CAPTURE": "true",
+                "MATTMC_RENDERDOC_CMD": str(root / "renderdoccmd"),
+                "MATTMC_RENDERDOC_CAPTURE_PATH": str(root / ".capture-root"),
+            }
+            runner.root = root
+            runner.artifact_dir = root / "artifacts" / "graphics-captures"
+            runner.run_id = "test"
+            meta_lines: list[str] = []
+            runner.append_meta = meta_lines.append  # type: ignore[method-assign]
+            wrapped = runner.renderdoc_wrapped_command(["./gradlew", "runClient"])
+            template = next(line for line in meta_lines if line.startswith("renderdoc_capture_template="))
+            self.assertIn("artifacts/graphics-captures/.capture-root", template)
+            self.assertNotIn(str(root) + "/.capture-root", template)
+            self.assertEqual(str(root / "renderdoccmd"), wrapped[0])
+
+    def test_capture_runner_redirects_root_renderdoc_template_into_ignored_artifacts(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            runner = capture_runner.CaptureRunner.__new__(capture_runner.CaptureRunner)
+            runner.env = {
+                "MATTMC_RENDERDOC_CAPTURE": "true",
+                "MATTMC_RENDERDOC_CMD": str(root / "renderdoccmd"),
+                "MATTMC_RENDERDOC_CAPTURE_TEMPLATE": str(root / ".capture-template"),
+            }
+            runner.root = root
+            runner.artifact_dir = root / "artifacts" / "graphics-captures"
+            runner.run_id = "test"
+            meta_lines: list[str] = []
+            runner.append_meta = meta_lines.append  # type: ignore[method-assign]
+            runner.renderdoc_wrapped_command(["./gradlew", "runClient"])
+            template = next(line for line in meta_lines if line.startswith("renderdoc_capture_template="))
+            self.assertIn("artifacts/graphics-captures/.capture-template", template)
+            self.assertNotIn(str(root) + "/.capture-template", template)
+
+    def test_capture_runner_redirects_external_renderdoc_template_into_ignored_artifacts(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            runner = capture_runner.CaptureRunner.__new__(capture_runner.CaptureRunner)
+            runner.env = {
+                "MATTMC_RENDERDOC_CAPTURE": "true",
+                "MATTMC_RENDERDOC_CMD": str(root / "renderdoccmd"),
+                "MATTMC_RENDERDOC_CAPTURE_TEMPLATE": "/tmp/outside-mattmc.capture",
+            }
+            runner.root = root
+            runner.artifact_dir = root / "artifacts" / "graphics-captures"
+            runner.run_id = "test"
+            meta_lines: list[str] = []
+            runner.append_meta = meta_lines.append  # type: ignore[method-assign]
+            runner.renderdoc_wrapped_command(["./gradlew", "runClient"])
+            template = next(line for line in meta_lines if line.startswith("renderdoc_capture_template="))
+            self.assertIn("artifacts/graphics-captures/outside-mattmc.capture", template)
+            self.assertNotIn("/tmp/outside-mattmc.capture", template)
+
     def test_capture_runner_source_probe_forces_fresh_gradle_environment(self) -> None:
         runner = capture_runner.CaptureRunner.__new__(capture_runner.CaptureRunner)
         runner.env = {
@@ -5451,6 +5617,20 @@ else:
             comparison = harness.compare_workloads(clean, diagnostic)
             self.assertFalse(comparison["comparable"])
             self.assertTrue(any(diff["path"].startswith("instrumentation") for diff in comparison["differences"]))
+
+    def test_cross_repository_comparison_ignores_backend_validation_instrumentation(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            mode = harness.MATRIX_MODES[0]
+            frozen = gameplay_artifact_for(temp, mode)
+            current = gameplay_artifact_for(temp, mode)
+            current["benchmark_fingerprint"]["instrumentation"]["run_type"] = "vulkan-validation"
+            current["benchmark_fingerprint"]["instrumentation"]["validation"] = {
+                "mode": "standard",
+                "vk_instance_layers": "VK_LAYER_KHRONOS_validation",
+            }
+            comparison = harness.compare_workloads(frozen, current, cross_repository=True)
+            self.assertTrue(comparison["comparable"], comparison)
 
     def test_renderdoc_and_tracy_incomplete_sidecars_reject(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -5806,6 +5986,12 @@ else:
             self.assertTrue(sidecar.with_name("runClient.log.gz").is_file())
             self.assertTrue(manifest.is_file())
 
+    def test_artifact_retention_ignores_oversized_incomplete_json(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "in-progress.json"
+            path.write_text("{\"success\":false," + ("x" * (8 * 1024 * 1024)) + "\n", encoding="utf-8")
+            self.assertEqual({}, artifact_retention._read_json(path))
+
     def test_artifact_retention_concurrent_preserved_runs_are_not_deleted(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir) / "artifacts"
@@ -5897,7 +6083,10 @@ else:
         forbidden = tuple(
             f"DevUtils{separator}{name}" for name in removed_dirs for separator in ("/", "\\")
         ) + retired_scripts
-        skipped_dirs = {".git", ".gradle", "build", "run", "logs", "__pycache__", ".idea"}
+        # Generated capture bundles are intentionally outside the source
+        # audit. They can preserve diagnostics from older layouts and are
+        # retained only under the ignored artifacts tree.
+        skipped_dirs = {".git", ".gradle", "build", "run", "logs", "artifacts", "__pycache__", ".idea"}
         checked_suffixes = {".py", ".sh", ".ps1", ".md", ".gradle", ".properties", ".json", ".txt"}
         offenders: list[str] = []
         self_path = Path(__file__).resolve()
@@ -6060,6 +6249,21 @@ else:
             pair = report["pairs"][0]
             self.assertFalse(pair["comparable"])
             self.assertTrue(pair["comparison"]["differences"])
+
+    def test_cross_repository_parity_report_does_not_cross_pair_tool_contracts(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            frozen_mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "frozen-opengl-shaders-on")
+            current_mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-rust-vulkan-shaders-on")
+            frozen = artifact_for(root / "frozen", frozen_mode)
+            current = gameplay_artifact_for(root / "current", current_mode)
+            frozen_path = root / "frozen.json"
+            current_path = root / "current.json"
+            harness.write_artifact(frozen_path, frozen)
+            harness.write_artifact(current_path, current)
+            report = harness.cross_repository_parity_report([frozen_path, current_path])
+            self.assertEqual(report["pair_count"], 0)
+            self.assertTrue(report["passed"])
 
     def test_cross_repository_parity_report_rejects_missing_pair_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -6719,7 +6923,7 @@ else:
                 measure_frames=300,
                 settle_frames=0,
                 max_settle_frames=120,
-                readiness_timeout_seconds=40,
+                readiness_timeout_seconds=15,
                 shutdown_timeout_seconds=10,
                 cleanup_timeout_seconds=10,
                 subsystem_iterations=120,
@@ -6728,7 +6932,8 @@ else:
                 tracy_max_size_mb=256,
                 renderdoc_capture=False,
                 renderdoc_frame=8,
-                gui_resource_pack_scenario="vanilla",
+                gui_resource_pack_scenario="priority-a-b",
+                world_static_terrain_resource_pack_scenario="priority-a-b",
             )
             mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-rust-vulkan-shaders-on")
 
@@ -6737,6 +6942,10 @@ else:
 
             self.assertEqual("standard", gameplay_command[gameplay_command.index("--validation") + 1])
             self.assertEqual("standard", capture_command[capture_command.index("--validation") + 1])
+            self.assertIn(
+                "-Dmattmc.dev.graphicsFrameBenchmark.readinessTimeoutSeconds=30",
+                harness.build_capture_command(target, mode, root / "pack-gameplay", "gameplay", args, "gameplay")[1]["JAVA_TOOL_OPTIONS"],
+            )
 
             args.validation = "off"
             clean_command, clean_env = harness.build_capture_command(
@@ -6820,6 +7029,32 @@ else:
             runner.configure_java_tool_options()
             self.assertIn("graphics_backend=vulkan", (game_dir / "options.txt").read_text(encoding="utf-8"))
             self.assertIn("-Dmattmc.dev.rustGalVulkanWholeFrame=true", runner.env["JAVA_TOOL_OPTIONS"])
+
+    def test_capture_runner_dh_semantic_route_keeps_default_renderer_mode(self) -> None:
+        """Explicit DH semantic traversal must not self-disable through rendererMode."""
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            game_dir = root / "game"
+            (game_dir / "config").mkdir(parents=True)
+            (game_dir / "options.txt").write_text("graphics_backend=vulkan\n", encoding="utf-8")
+            (game_dir / "config" / "DistantHorizons.toml").write_text("# fixture\n", encoding="utf-8")
+            config = isolated_capture_config(root, scenario="real-world")
+            config.game_dir = str(game_dir)
+            runner = capture_runner.CaptureRunner(config)
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "MATTMC_CAPTURE_DH_RUST_OPAQUE_ONLY": "true",
+                    "MATTMC_CAPTURE_DISABLE_DH_FOR_ORDINARY_SOURCE": "false",
+                },
+                clear=False,
+            ):
+                runner.configure_backend_and_validation()
+                runner.configure_java_tool_options()
+            dh_file = game_dir / "config" / "DistantHorizons.toml"
+            dh_text = dh_file.read_text(encoding="utf-8")
+            self.assertIn("enableRendering = false", dh_text)
+            self.assertNotIn("rendererMode", dh_text)
 
     def test_capture_runner_preserves_moving_mesh_pose_sequence_with_static_terrain_diagnostics(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -7999,12 +8234,14 @@ else:
                 target, rust_vulkan, root / "capture-ordinary-source", "correctness", ordinary_source, "capture"
             )
             ordinary_source_options = shlex.split(ordinary_source_env["JAVA_TOOL_OPTIONS"])
+            self.assertEqual("true", ordinary_source_env["MATTMC_CAPTURE_DISABLE_DH_FOR_ORDINARY_SOURCE"])
+            self.assertIn("-Dmattmc.dev.rustGalDistantHorizons.disabled=true", ordinary_source_options)
             self.assertIn(
-                "-Dmattmc.dev.deterministicCameraCapture.settledReadyFamilies=distant-horizons",
+                "-Dmattmc.dev.deterministicCameraCapture.settledReadyFamilies=sodium-terrain",
                 ordinary_source_options,
             )
             self.assertNotIn(
-                "-Dmattmc.dev.deterministicCameraCapture.settledReadyFamilies=sodium-terrain,distant-horizons",
+                "-Dmattmc.dev.deterministicCameraCapture.settledReadyFamilies=distant-horizons",
                 ordinary_source_options,
             )
 

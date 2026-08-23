@@ -25,6 +25,7 @@ public class BreezeEyesLayer extends RenderLayer<BreezeRenderState, BreezeModel>
 
 	public void submit(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, BreezeRenderState breezeRenderState, float f, float g) {
 		submitNodeCollector.order(1)
-			.submitModel(this.model, breezeRenderState, poseStack, BREEZE_EYES, i, OverlayTexture.NO_OVERLAY, -1, null, breezeRenderState.outlineColor, null);
+			.submitModelSemanticTexture(this.model, breezeRenderState, poseStack, BREEZE_EYES, i, OverlayTexture.NO_OVERLAY, -1,
+				ResourceLocation.withDefaultNamespace("textures/entity/breeze/breeze_eyes.png"), breezeRenderState.outlineColor, null);
 	}
 }

@@ -45,6 +45,7 @@ public class RenderLeafcutterAnt extends MobRenderer<EntityLeafcutterAnt, Leafcu
         state.leafHarvestedPos = entity.getLeafHarvestedPos().orElse(null);
         state.animationTick = entity.getAnimationTick();
         state.id = entity.getId();
+        state.verticalVelocity = entity.getDeltaMovement().y;
     }
 
 
@@ -63,7 +64,9 @@ public class RenderLeafcutterAnt extends MobRenderer<EntityLeafcutterAnt, Leafcu
             if(state.attachmentFacing == Direction.DOWN){
                 matrixStackIn.mulPose(Axis.YP.rotationDegrees (180.0F - state.yRot));
                 matrixStackIn.translate(0.0D, trans, 0.0D);
-                // Can't access yo/y in render state, skip transition rotation
+                matrixStackIn.mulPose(Axis.XP.rotationDegrees(
+                        state.verticalVelocity >= 0.0D ? 90.0F * (1.0F - progresso)
+                                : -90.0F * (1.0F - progresso)));
                 matrixStackIn.translate(0.0D, -trans, 0.0D);
 
             }else if(state.attachmentFacing == Direction.UP){

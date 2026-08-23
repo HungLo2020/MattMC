@@ -10,7 +10,7 @@ use super::commands::{
 };
 use super::error::{GalError, GalResult, StatusCode};
 use super::frame::{
-    AcquiredFrame, FrameAcquireDesc, FrameResizeDesc, FrameResizeResult, FrameSurfaceDesc,
+    AcquiredFrame, FrameAcquireDesc, FrameId, FrameResizeDesc, FrameResizeResult, FrameSurfaceDesc,
     PresentFrameDesc, PresentedFrame,
 };
 use super::handles::{Handle, HandleKind, MAX_GENERATION};
@@ -96,7 +96,10 @@ impl<T> Arena<T> {
         if slot.generation != generation {
             return Err(GalError::handle(
                 StatusCode::StaleHandle,
-                "stale handle generation",
+                format!(
+                    "stale handle generation kind={:?} index={} requested_generation={} live_generation={}",
+                    self.kind, index, generation, slot.generation
+                ),
             ));
         }
         slot.value.as_ref().ok_or_else(|| {
@@ -125,7 +128,10 @@ impl<T> Arena<T> {
             }
             return Err(GalError::handle(
                 StatusCode::StaleHandle,
-                "stale handle generation",
+                format!(
+                    "stale handle generation kind={:?} index={} requested_generation={} live_generation={}",
+                    self.kind, index, generation, slot.generation
+                ),
             ));
         }
         let value = slot.value.take().ok_or_else(|| {
@@ -460,6 +466,17 @@ impl VulkanicGal {
         Ok(presented)
     }
 
+    pub fn cancel_frame(&mut self, frame: FrameId) -> GalResult<()> {
+        let capabilities = self.capabilities();
+        if !capabilities.supports(BackendFeature::Presentation) {
+            return self.unsupported(format!(
+                "backend '{}' was not created with presentation support",
+                capabilities.name
+            ));
+        }
+        self.backend.cancel_frame(frame)
+    }
+
     pub fn shutdown_frame_surface(&mut self) -> GalResult<()> {
         self.backend.shutdown_frame_surface()
     }
@@ -564,6 +581,51 @@ impl VulkanicGal {
                 };
                 self.texture_view_info(view).map(|info| info.format)
             }
+            _ => Err(GalError::resource(
+                StatusCode::WrongHandleType,
+                "pass target must be a render target or frame target",
+            )),
+        }
+    }
+
+    /// Returns the semantic extent of a render or acquired frame target.
+    /// Frontends use this to size private intermediate resources without
+    /// reaching into backend framebuffers or native images.
+    pub(in crate::render::vulkanic) fn pass_target_extent(
+        &self,
+        handle: Handle,
+    ) -> GalResult<Extent3d> {
+        match handle.kind() {
+            Some(HandleKind::FrameTarget) => Ok(self.frame_targets.get(handle)?.desc.extent),
+            Some(HandleKind::RenderTarget) => Ok(self.render_targets.get(handle)?.desc.extent),
+            _ => Err(GalError::resource(
+                StatusCode::WrongHandleType,
+                "pass target must be a render target or frame target",
+            )),
+        }
+    }
+
+    /// Resolves the color attachment texture behind an owned render target.
+    /// This is an explicit GAL resource identity, never a backend/native
+    /// handle, and is intentionally unavailable for acquired frame targets.
+    pub(in crate::render::vulkanic) fn pass_target_color_texture(
+        &self,
+        handle: Handle,
+    ) -> GalResult<Handle> {
+        match handle.kind() {
+            Some(HandleKind::RenderTarget) => {
+                let target = self.render_targets.get(handle)?;
+                let view = target.desc.color_views.first().copied().ok_or_else(|| {
+                    GalError::resource(
+                        StatusCode::InvalidArgument,
+                        "render target must have a color attachment",
+                    )
+                })?;
+                Ok(self.texture_view_info(view)?.texture)
+            }
+            Some(HandleKind::FrameTarget) => Err(GalError::unsupported_feature(
+                "acquired frame targets are copied through the explicit frame-target operation",
+            )),
             _ => Err(GalError::resource(
                 StatusCode::WrongHandleType,
                 "pass target must be a render target or frame target",
@@ -1200,6 +1262,20 @@ impl VulkanicGal {
                 return self.validation_error(GalError::resource(
                     StatusCode::InvalidArgument,
                     "graphics pipeline depth bias requires an enabled depth attachment and test",
+                ));
+            }
+        }
+        if let Some(stencil) = desc.stencil {
+            if desc.depth_format != Some(TextureFormat::Depth24Stencil8) {
+                return self.validation_error(GalError::resource(
+                    StatusCode::InvalidArgument,
+                    "stencil state requires a Depth24Stencil8 attachment",
+                ));
+            }
+            if stencil.front.read_mask == 0 && stencil.back.read_mask == 0 {
+                return self.validation_error(GalError::resource(
+                    StatusCode::InvalidArgument,
+                    "stencil state requires a non-zero read mask",
                 ));
             }
         }
@@ -1996,7 +2072,10 @@ impl VulkanicGal {
                             let attachment = depth_stencil.as_ref().ok_or_else(|| {
                                 GalError::command(
                                     StatusCode::InvalidArgument,
-                                    "frame-target pass with depth format requires a depth attachment",
+                                    format!(
+                                        "frame-target pass '{}' with depth format requires a depth attachment",
+                                        pass_desc.label
+                                    ),
                                 )
                             })?;
                             let info = self.texture_view_info(attachment.view)?;
@@ -2275,6 +2354,12 @@ impl VulkanicGal {
                     self.validate_buffer_range(*buffer, *offset, 1, BufferUsage::Indirect)?;
                 }
                 CommandOp::CopyBuffer { src, dst, size } => {
+                    if in_pass {
+                        return self.validation_error(GalError::command(
+                            StatusCode::InvalidArgument,
+                            "buffer copy requires no active render pass",
+                        ));
+                    }
                     let src_record = self.buffers.get(*src)?;
                     let src_ok = src_record.desc.usages.contains(&BufferUsage::TransferSrc);
                     let dst_record = self.buffers.get(*dst)?;
@@ -2293,6 +2378,12 @@ impl VulkanicGal {
                     }
                 }
                 CommandOp::CopyBufferToTexture(region) => {
+                    if in_pass {
+                        return self.validation_error(GalError::command(
+                            StatusCode::InvalidArgument,
+                            "buffer-to-texture copy requires no active render pass",
+                        ));
+                    }
                     if (region.texture_mip > 0 || region.texture_layer > 0)
                         && !capabilities.supports(BackendFeature::TextureSubresourceCopies)
                     {
@@ -2308,6 +2399,12 @@ impl VulkanicGal {
                     )?;
                 }
                 CommandOp::CopyTextureToBuffer(region) => {
+                    if in_pass {
+                        return self.validation_error(GalError::command(
+                            StatusCode::InvalidArgument,
+                            "texture-to-buffer copy requires no active render pass",
+                        ));
+                    }
                     if (region.texture_mip > 0 || region.texture_layer > 0)
                         && !capabilities.supports(BackendFeature::TextureSubresourceCopies)
                     {
@@ -2323,16 +2420,31 @@ impl VulkanicGal {
                     )?;
                 }
                 CommandOp::CopyTexture(region) => {
+                    if in_pass {
+                        return self.validation_error(GalError::command(
+                            StatusCode::InvalidArgument,
+                            "texture copy requires no active render pass",
+                        ));
+                    }
                     self.validate_texture_copy_region(region)?;
+                }
+                CommandOp::CopyFrameTargetToTexture { src, dst, extent } => {
+                    if in_pass {
+                        return self.validation_error(GalError::command(
+                            StatusCode::InvalidArgument,
+                            "frame-target copy requires no active render pass",
+                        ));
+                    }
+                    self.validate_frame_target_copy(*src, *dst, *extent)?;
                 }
                 CommandOp::GenerateMipmaps {
                     texture,
                     subresources,
                 } => {
-                    if in_pass || graphics_pipeline.is_some() || compute_pipeline.is_some() {
+                    if in_pass {
                         return self.validation_error(GalError::command(
                             StatusCode::InvalidArgument,
-                            "mip generation requires no active render or compute pipeline",
+                            "mip generation requires no active render pass",
                         ));
                     }
                     if !capabilities.supports(BackendFeature::TextureMipLevels) {
@@ -2810,6 +2922,42 @@ impl VulkanicGal {
                             profile.as_deref_mut(),
                         )?;
                     }
+                    CommandOp::CopyFrameTargetToTexture { src, dst, .. } => {
+                        // An acquired frame target has no separately addressable
+                        // image handle on the explicit GAL surface. The copy
+                        // operation itself is therefore the ownership/state
+                        // transition from the preceding stored attachment to a
+                        // transfer read; requiring a synthetic barrier on the
+                        // opaque FrameTarget handle would violate that boundary.
+                        accesses.retain_non_overlapping(AccessTarget::FrameTarget { handle: *src });
+                        self.record_access(
+                            &mut accesses,
+                            AccessEvent {
+                                target: AccessTarget::FrameTarget { handle: *src },
+                                mode: AccessMode::Read,
+                                family: AccessFamily::Transfer,
+                                attachment_load_op: None,
+                                attachment_store_op: None,
+                            },
+                            profile.as_deref_mut(),
+                        )?;
+                        // The explicit copy has completed the transfer read;
+                        // the acquired target may be attached again later in
+                        // this same atomic submission without a backend handle
+                        // transition being exposed to the frontend.
+                        accesses.retain_non_overlapping(AccessTarget::FrameTarget { handle: *src });
+                        self.record_access(
+                            &mut accesses,
+                            AccessEvent {
+                                target: self.texture_image_copy_target(*dst, 0, 0)?,
+                                mode: AccessMode::Write,
+                                family: AccessFamily::Transfer,
+                                attachment_load_op: None,
+                                attachment_store_op: None,
+                            },
+                            profile.as_deref_mut(),
+                        )?;
+                    }
                     CommandOp::GenerateMipmaps {
                         texture,
                         subresources,
@@ -3009,8 +3157,8 @@ impl VulkanicGal {
                             return self.validation_error(GalError::submission(
                                 StatusCode::InvalidArgument,
                                 format!(
-                                    "overlapping {:?} {:?} access conflicts with prior {:?} {:?} access",
-                                    event.family, event.mode, previous.family, previous.mode
+                                    "overlapping {:?} {:?} access on {:?} conflicts with prior {:?} {:?} access",
+                                    event.family, event.mode, event.target, previous.family, previous.mode
                                 ),
                             ));
                         }
@@ -3051,8 +3199,8 @@ impl VulkanicGal {
                             return self.validation_error(GalError::submission(
                                 StatusCode::InvalidArgument,
                                 format!(
-                                    "overlapping {:?} {:?} access conflicts with prior {:?} {:?} access",
-                                    event.family, event.mode, previous.family, previous.mode
+                                "overlapping {:?} {:?} access on {:?} conflicts with prior {:?} {:?} access",
+                                    event.family, event.mode, event.target, previous.family, previous.mode
                                 ),
                             ));
                         }
@@ -3070,8 +3218,8 @@ impl VulkanicGal {
                             return self.validation_error(GalError::submission(
                                 StatusCode::InvalidArgument,
                                 format!(
-                                    "overlapping {:?} {:?} access conflicts with prior {:?} {:?} access",
-                                    event.family, event.mode, previous.family, previous.mode
+                                    "overlapping {:?} {:?} access on {:?} conflicts with prior {:?} {:?} access",
+                                    event.family, event.mode, event.target, previous.family, previous.mode
                                 ),
                             ));
                         }
@@ -3439,6 +3587,42 @@ impl VulkanicGal {
         Ok(())
     }
 
+    fn validate_frame_target_copy(
+        &mut self,
+        src: Handle,
+        dst: Handle,
+        extent: Extent3d,
+    ) -> GalResult<()> {
+        if src == dst || extent.width == 0 || extent.height == 0 || extent.depth == 0 {
+            return self.validation_error(GalError::command(
+                StatusCode::InvalidArgument,
+                "frame-target copy requires distinct handles and a non-zero extent",
+            ));
+        }
+        let source = self.frame_targets.get(src)?.desc.clone();
+        let destination = self.textures.get(dst)?.desc.clone();
+        if !destination.usages.contains(&TextureUsage::TransferDst) {
+            return self.validation_error(GalError::command(
+                StatusCode::InvalidArgument,
+                "frame-target copy destination requires transfer-destination usage",
+            ));
+        }
+        if destination.format != source.color_format
+            || destination.dimension != TextureDimension::D2
+            || extent.width > source.extent.width
+            || extent.height > source.extent.height
+            || extent.depth != 1
+            || extent.width > destination.extent.width
+            || extent.height > destination.extent.height
+        {
+            return self.validation_error(GalError::command(
+                StatusCode::InvalidArgument,
+                "frame-target copy requires matching 2D format and bounded extent",
+            ));
+        }
+        Ok(())
+    }
+
     fn texture_copy_target(&self, region: &BufferImageCopyRegion) -> GalResult<AccessTarget> {
         self.texture_image_copy_target(region.texture, region.texture_mip, region.texture_layer)
     }
@@ -3502,6 +3686,20 @@ impl VulkanicGal {
     }
 
     fn mark_in_flight(&mut self, handle: Handle, id: SubmissionId) -> GalResult<()> {
+        // A command references resource sets and pipelines, while their
+        // descriptor/layout dependency edges own the sampler, image view,
+        // texture, and shader handles they contain.  Retire the complete
+        // dependency closure with the submission; marking only the directly
+        // encoded set allowed a replaced sampler to be destroyed while its
+        // descriptor set was still executing on Vulkan.
+        let dependencies = self
+            .reverse_dependencies
+            .get(&handle)
+            .cloned()
+            .unwrap_or_default();
+        for dependency in dependencies {
+            self.mark_in_flight(dependency, id)?;
+        }
         match handle.kind() {
             Some(HandleKind::Buffer) => {
                 self.buffers.get_mut_record(handle)?.last_submission = Some(id)
@@ -3708,6 +3906,10 @@ fn referenced_handles(batch: &SubmissionBatch) -> BTreeSet<Handle> {
                     handles.insert(region.src_texture);
                     handles.insert(region.dst_texture);
                 }
+                CommandOp::CopyFrameTargetToTexture { src, dst, .. } => {
+                    handles.insert(*src);
+                    handles.insert(*dst);
+                }
                 CommandOp::GenerateMipmaps { texture, .. } => {
                     handles.insert(*texture);
                 }
@@ -3829,6 +4031,7 @@ pub(super) fn normalize_submission_batch(batch: &mut SubmissionBatch) -> Command
                 | CommandOp::CopyBufferToTexture(_)
                 | CommandOp::CopyTextureToBuffer(_)
                 | CommandOp::CopyTexture(_)
+                | CommandOp::CopyFrameTargetToTexture { .. }
                 | CommandOp::GenerateMipmaps { .. }
                 | CommandOp::HostWriteBuffer { .. }
                 | CommandOp::HostReadBuffer { .. }
@@ -3879,6 +4082,7 @@ fn add_command_profile(profile: &mut WholeFrameProfile, batch: &SubmissionBatch)
                 | CommandOp::CopyBufferToTexture(_)
                 | CommandOp::CopyTextureToBuffer(_)
                 | CommandOp::CopyTexture(_)
+                | CommandOp::CopyFrameTargetToTexture { .. }
                 | CommandOp::GenerateMipmaps { .. }
                 | CommandOp::HostReadBuffer { .. }
                 | CommandOp::Present { .. } => {}

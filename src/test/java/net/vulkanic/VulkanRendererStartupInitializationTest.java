@@ -56,6 +56,11 @@ public class VulkanRendererStartupInitializationTest {
         VulkanNativeInitializationInfo info = VulkanicAPI.initializeNativeVulkanRuntime();
 
         if (!info.isNativeVulkanReady()) {
+            if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+                assertDoesNotThrow(VulkanicAPI::initializeNativeVulkanRuntimeOnRendererStartupIfSelected,
+                    "Rust whole-frame startup owns explicit bring-up diagnostics and must not re-enter Java Vulkan initialization");
+                return;
+            }
             IllegalStateException failure = assertThrows(
                 IllegalStateException.class,
                 VulkanicAPI::initializeNativeVulkanRuntimeOnRendererStartupIfSelected,
@@ -266,5 +271,7 @@ public class VulkanRendererStartupInitializationTest {
         Field rawVulkanBackendField = VulkanicAPI.class.getDeclaredField("rawVulkanBackend");
         rawVulkanBackendField.setAccessible(true);
         rawVulkanBackendField.set(null, null);
+        net.vulkanic.bridge.RustGalVulkanWholeFrameMode.deactivateRustPresentation();
+        net.vulkanic.bridge.RustGalVulkanWholeFrameMode.clearVulkanBackendSelection();
     }
 }

@@ -80,8 +80,8 @@ pub enum DistantHorizonsPassDependency {
 pub struct DistantHorizonsDepthConsumer {
     pub stage_path: String,
     /// The explicit vertex/fragment source pair which owns this later
-    /// consumer. It is source identity only; source execution needs a
-    /// dedicated fullscreen/pass executor and remains unavailable until then.
+    /// consumer. It is source identity only; the world frontend later lowers
+    /// and stages it through the explicit fullscreen/pass executor.
     pub source_stages: TerrainSourceStages,
     pub reads_opaque_depth: bool,
     pub reads_depth_before_translucency: bool,
@@ -102,9 +102,8 @@ pub struct DistantHorizonsPassContract {
     pub translucent_blend: Option<TerrainTranslucentBlend>,
     pub required_resources: BTreeSet<TerrainPassRequiredResource>,
     pub dependencies: BTreeSet<DistantHorizonsPassDependency>,
-    /// Complete scoped post-terrain chain. Depth consumers below remain the
-    /// narrower executable subset until every stage's resources and final
-    /// target are Rust-owned.
+    /// Complete scoped post-terrain chain. It is admitted only after every
+    /// stage's resources and final target are Rust-owned.
     pub post_terrain_stages: Vec<FullscreenSourceStage>,
     pub distant_depth_consumers: Vec<DistantHorizonsDepthConsumer>,
 }

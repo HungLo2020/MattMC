@@ -104,7 +104,7 @@ public class RenderBaldEagle extends MobRenderer<EntityBaldEagle, BaldEagleRende
         public void submit(PoseStack poseStack, SubmitNodeCollector collector, int packedLight, BaldEagleRenderState state, float limbSwing, float limbSwingAmount) {
             if (state.hasCap) {
                 RenderType renderType = RenderType.entityTranslucent(TEXTURE_CAP);
-                collector.order(1).submitModel(this.getParentModel(), state, poseStack, renderType, packedLight, OverlayTexture.NO_OVERLAY, -1, null, state.outlineColor, null);
+                collector.order(1).submitModelSemanticTexture(this.getParentModel(), state, poseStack, renderType, packedLight, OverlayTexture.NO_OVERLAY, -1, TEXTURE_CAP, state.outlineColor, null);
             }
         }
     }

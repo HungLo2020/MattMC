@@ -1,6 +1,7 @@
 package net.alexsmobs.client.render;
 
 import net.minecraft.client.renderer.entity.state.LivingEntityRenderState;
+import net.minecraft.client.renderer.item.ItemStackRenderState;
 import net.citadel.animation.Animation;
 
 /**
@@ -8,6 +9,7 @@ import net.citadel.animation.Animation;
  * Holds animation data extracted from the entity for rendering
  */
 public class AnteaterRenderState extends LivingEntityRenderState {
+    public final ItemStackRenderState tongueItem = new ItemStackRenderState();
     public float standProgress;
     public float prevStandProgress;
     public float tongueProgress;

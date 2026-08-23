@@ -27,6 +27,15 @@ public class BannerSpecialRenderer implements SpecialModelRenderer<BannerPattern
 		this.baseColor = dyeColor;
 	}
 
+	/** Semantic accessors used by the Rust GUI capture route. */
+	public BannerRenderer bannerRenderer() {
+		return this.bannerRenderer;
+	}
+
+	public DyeColor baseColor() {
+		return this.baseColor;
+	}
+
 	@Nullable
 	public BannerPatternLayers extractArgument(ItemStack itemStack) {
 		return (BannerPatternLayers)itemStack.get(DataComponents.BANNER_PATTERNS);

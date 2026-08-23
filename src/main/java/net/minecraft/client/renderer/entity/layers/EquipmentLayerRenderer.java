@@ -82,7 +82,9 @@ public class EquipmentLayerRenderer {
 				int n = getColorForLayer(layer, l);
 				if (n != 0) {
 					// Iris: Set item context before rendering
-					if (layer.usePlayerTexture() && WorldRenderingSettings.INSTANCE.getItemIds() != null) {
+					if (!net.minecraft.client.renderer.entity.EntityRenderDispatcher.isSemanticSubmission()
+						&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+						&& layer.usePlayerTexture() && WorldRenderingSettings.INSTANCE.getItemIds() != null) {
 						ResourceLocation location = itemStack.get(DataComponents.ITEM_MODEL);
 						if (location == null) {
 							location = BuiltInRegistries.ITEM.getKey(itemStack.getItem());
@@ -93,8 +95,17 @@ public class EquipmentLayerRenderer {
 					ResourceLocation resourceLocation2 = layer.usePlayerTexture() && resourceLocation != null
 						? resourceLocation
 						: (ResourceLocation)this.layerTextureLookup.apply(new EquipmentLayerRenderer.LayerTextureKey(layerType, layer));
-					submitNodeCollector.order(m++)
-						.submitModel(model, object, poseStack, RenderType.armorCutoutNoCull(resourceLocation2), i, OverlayTexture.NO_OVERLAY, n, null, j, null);
+					if (!bl) {
+						submitNodeCollector.order(m++)
+							.submitModelSemanticTexture(
+								model, object, poseStack, RenderType.armorCutoutNoCull(resourceLocation2),
+								i, OverlayTexture.NO_OVERLAY, n, resourceLocation2, j, null);
+					} else {
+						submitNodeCollector.order(m++)
+							.submitModelSemanticTexture(
+								model, object, poseStack, RenderType.armorCutoutNoCull(resourceLocation2),
+								i, OverlayTexture.NO_OVERLAY, n, resourceLocation2, j, null);
+					}
 					if (bl) {
 						submitNodeCollector.order(m++).submitModel(model, object, poseStack, RenderType.armorEntityGlint(), i, OverlayTexture.NO_OVERLAY, n, null, j, null);
 					}
@@ -106,7 +117,9 @@ public class EquipmentLayerRenderer {
 			ArmorTrim armorTrim = (ArmorTrim)itemStack.get(DataComponents.TRIM);
 			if (armorTrim != null) {
 				// Iris: Set trim item context
-				if (WorldRenderingSettings.INSTANCE.getItemIds() != null) {
+				if (!net.minecraft.client.renderer.entity.EntityRenderDispatcher.isSemanticSubmission()
+					&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+					&& WorldRenderingSettings.INSTANCE.getItemIds() != null) {
 					EntityState.interposeItemId(WorldRenderingSettings.INSTANCE.getItemIds().applyAsInt(new NamespacedId("minecraft", "trim_" + armorTrim.material().value().assets().base().suffix())));
 				}
 				
@@ -116,11 +129,17 @@ public class EquipmentLayerRenderer {
 				submitNodeCollector.order(m++).submitModel(model, object, poseStack, renderType, i, OverlayTexture.NO_OVERLAY, -1, textureAtlasSprite, j, null);
 				
 				// Iris: Restore item context after trim
-				EntityState.restoreItemId();
+				if (!net.minecraft.client.renderer.entity.EntityRenderDispatcher.isSemanticSubmission()
+					&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+					EntityState.restoreItemId();
+				}
 			}
 			
 			// Iris: Clear item context at end
-			CapturedRenderingState.INSTANCE.setCurrentRenderedItem(0);
+			if (!net.minecraft.client.renderer.entity.EntityRenderDispatcher.isSemanticSubmission()
+				&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+				CapturedRenderingState.INSTANCE.setCurrentRenderedItem(0);
+			}
 		}
 	}
 

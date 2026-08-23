@@ -7,6 +7,7 @@ import java.util.Set;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.renderer.Sheets;
+import net.minecraft.client.model.Model;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.blockentity.BedRenderer;
 import net.minecraft.client.resources.model.Material;
@@ -24,6 +25,11 @@ public class BedSpecialRenderer implements NoDataSpecialModelRenderer {
 		this.bedRenderer = bedRenderer;
 		this.material = material;
 	}
+
+	/** Semantic GUI copier accessors; transient bed models/material stay Java-side. */
+	public Model.Simple headModel() { return this.bedRenderer.headModel(); }
+	public Model.Simple footModel() { return this.bedRenderer.footModel(); }
+	public Material material() { return this.material; }
 
 	@Override
 	public void submit(ItemDisplayContext itemDisplayContext, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, int j, boolean bl, int k) {

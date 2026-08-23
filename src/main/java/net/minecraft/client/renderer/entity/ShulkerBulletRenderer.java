@@ -41,19 +41,21 @@ public class ShulkerBulletRenderer extends EntityRenderer<ShulkerBullet, Shulker
 		poseStack.mulPose(Axis.XP.rotationDegrees(Mth.cos(f * 0.1F) * 180.0F));
 		poseStack.mulPose(Axis.ZP.rotationDegrees(Mth.sin(f * 0.15F) * 360.0F));
 		poseStack.scale(-0.5F, -0.5F, 0.5F);
-		submitNodeCollector.submitModel(
+		submitNodeCollector.submitModelSemanticTexture(
 			this.model,
 			shulkerBulletRenderState,
 			poseStack,
 			this.model.renderType(TEXTURE_LOCATION),
 			shulkerBulletRenderState.lightCoords,
 			OverlayTexture.NO_OVERLAY,
+			-1,
+			TEXTURE_LOCATION,
 			shulkerBulletRenderState.outlineColor,
 			null
 		);
 		poseStack.scale(1.5F, 1.5F, 1.5F);
 		submitNodeCollector.order(1)
-			.submitModel(
+			.submitModelSemanticTexture(
 				this.model,
 				shulkerBulletRenderState,
 				poseStack,
@@ -61,7 +63,7 @@ public class ShulkerBulletRenderer extends EntityRenderer<ShulkerBullet, Shulker
 				shulkerBulletRenderState.lightCoords,
 				OverlayTexture.NO_OVERLAY,
 				654311423,
-				null,
+				TEXTURE_LOCATION,
 				shulkerBulletRenderState.outlineColor,
 				null
 			);

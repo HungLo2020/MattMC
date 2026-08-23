@@ -7,7 +7,7 @@ import java.util.Random;
 import net.minecraft.client.multiplayer.ClientLevel;
 
 public class MapUtils {
-    private static MapSettingsManager options;
+    private static volatile MapSettingsManager options;
     private static Random slimeRandom = new Random();
     private static String lastSeed;
     private static long lastSeedLong;
@@ -20,11 +20,27 @@ public class MapUtils {
     }
 
     public static int doSlimeAndGrid(int color24, ClientLevel world, int mcX, int mcZ) {
-        if (options.slimeChunks && isSlimeChunk(mcX, mcZ)) {
+        MapSettingsManager settings = options;
+        if (settings == null) {
+            // The live-map worker can begin calculating while the world/map
+            // objects are still being connected.  A missing settings snapshot
+            // is not a rendering capability failure; keep the source pixel
+            // unchanged until the normal reset() publication completes.
+            try {
+                settings = VoxelConstants.getVoxelMapInstance().getMapOptions();
+                options = settings;
+            } catch (RuntimeException ignored) {
+                return color24;
+            }
+            if (settings == null) {
+                return color24;
+            }
+        }
+        if (settings.slimeChunks && isSlimeChunk(mcX, mcZ)) {
             color24 = ColorUtils.colorAdder(0x7D00FF00, color24);
         }
 
-        if (options.chunkGrid) {
+        if (settings.chunkGrid) {
             if (mcX % 512 != 0 && mcZ % 512 != 0) {
                 if (mcX % 16 == 0 || mcZ % 16 == 0) {
                     color24 = ColorUtils.colorAdder(0x7D000000, color24);

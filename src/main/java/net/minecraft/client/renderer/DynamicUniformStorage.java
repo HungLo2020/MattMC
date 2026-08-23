@@ -26,6 +26,11 @@ public class DynamicUniformStorage<T extends DynamicUniformStorage.DynamicUnifor
 	private final String label;
 
 	public DynamicUniformStorage(String string, int i, int j) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException(
+				"Java dynamic-uniform storage is unavailable while Rust owns whole-frame Vulkan presentation"
+			);
+		}
 		this.blockSize = Mth.roundToward(i, net.vulkanic.VulkanicAPI.getBackendUniformOffsetAlignment());
 		this.capacity = Mth.smallestEncompassingPowerOfTwo(j);
 		this.nextBlock = 0;

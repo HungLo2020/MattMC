@@ -43,10 +43,14 @@ public final class ItemEntityRenderOwnershipPolicy {
 			return WorldRenderRoutePolicy.Route.DISABLED;
 		}
 		if (legacyControl) {
-			return WorldRenderRoutePolicy.Route.JAVA_COMPATIBILITY;
+			return vulkanBackendSelected
+				? WorldRenderRoutePolicy.Route.DISABLED
+				: WorldRenderRoutePolicy.Route.JAVA_COMPATIBILITY;
 		}
 		return vulkanBackendSelected && wholeFrameVulkanEnabled
 			? WorldRenderRoutePolicy.Route.RUST_VULKAN_WHOLE_FRAME
-			: WorldRenderRoutePolicy.Route.JAVA_COMPATIBILITY;
+			: vulkanBackendSelected
+				? WorldRenderRoutePolicy.Route.DISABLED
+				: WorldRenderRoutePolicy.Route.JAVA_COMPATIBILITY;
 	}
 }

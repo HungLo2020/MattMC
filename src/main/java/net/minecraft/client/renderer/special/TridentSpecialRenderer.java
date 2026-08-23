@@ -19,11 +19,50 @@ public class TridentSpecialRenderer implements NoDataSpecialModelRenderer {
 		this.model = tridentModel;
 	}
 
+	/** Semantic GUI copier access; the model remains Java-transient. */
+	public TridentModel model() {
+		return this.model;
+	}
+
 	@Override
 	public void submit(ItemDisplayContext itemDisplayContext, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, int j, boolean bl, int k) {
 		poseStack.pushPose();
 		poseStack.scale(1.0F, -1.0F, -1.0F);
-		submitNodeCollector.submitModelPart(this.model.root(), poseStack, this.model.renderType(TridentModel.TEXTURE), i, j, null, false, bl, -1, null, k);
+		if (!bl) {
+			// The special-item path has no atlas sprite, but the copied TridentModel
+			// already carries a complete direct texture identity. Keep non-foil
+			// tridents on the shared semantic model route.
+			submitNodeCollector.submitModelSemanticTexture(
+				this.model,
+				net.minecraft.util.Unit.INSTANCE,
+				poseStack,
+				this.model.renderType(TridentModel.TEXTURE),
+				i,
+				j,
+				-1,
+				TridentModel.TEXTURE,
+				k,
+				null
+			);
+		} else if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			&& net.vulkanic.world.WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan()) {
+			// The base trident remains an ordinary copied direct-texture model; the
+			// foil overlay is a second explicit Rust glint mesh. Keeping both
+			// submissions semantic avoids the sprite-less ModelPart fallback.
+			submitNodeCollector.submitModelSemanticTexture(
+				this.model, net.minecraft.util.Unit.INSTANCE, poseStack,
+				this.model.renderType(TridentModel.TEXTURE), i, j, -1,
+				TridentModel.TEXTURE, k, null
+			);
+			if (!net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneGlintModelMesh(
+				this.model, net.minecraft.util.Unit.INSTANCE, poseStack.last(),
+				this.model.renderType(TridentModel.TEXTURE), TridentModel.TEXTURE, i, j
+			)) {
+				throw new IllegalStateException("Rust whole-frame trident foil route selected without a copied glint mesh");
+			}
+		} else {
+			submitNodeCollector.submitModelPart(this.model.root(), poseStack, this.model.renderType(TridentModel.TEXTURE), i, j, null, false, true, -1, null, k);
+		}
 		poseStack.popPose();
 	}
 

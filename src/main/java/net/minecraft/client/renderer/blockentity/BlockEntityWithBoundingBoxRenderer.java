@@ -106,7 +106,18 @@ public class BlockEntityWithBoundingBoxRenderer<T extends BlockEntity & Bounding
 					float g = 0.9F;
 					float h = 0.5F;
 					BlockPos blockPos2 = blockPos.offset(vec3i);
-					submitNodeCollector.submitCustomGeometry(
+					if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+						&& net.vulkanic.world.WorldRenderRoutePolicy.currentDebugLineRoute().usesRustWholeFrameVulkan()) {
+						if (!net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueDebugLineSegments(poseStack.last().pose(), boxEdges(
+							blockPos.getX(), blockPos.getY(), blockPos.getZ(), blockPos2.getX(), blockPos2.getY(), blockPos2.getZ()
+						), 0xffe6e6e6, 1.0F)) {
+							throw new IllegalStateException("Rust debug-line route rejected bounding-box semantic edges");
+						}
+					} else {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+							throw new IllegalStateException("Rust whole-frame bounding-box route is unavailable; Java debug geometry is not a fallback");
+						}
+						submitNodeCollector.submitCustomGeometry(
 						poseStack,
 						RenderType.lines(),
 						(pose, vertexConsumer) -> ShapeRenderer.renderLineBox(
@@ -126,7 +137,8 @@ public class BlockEntityWithBoundingBoxRenderer<T extends BlockEntity & Bounding
 							0.5F,
 							0.5F
 						)
-					);
+						);
+					}
 					this.submitInvisibleBlocks(blockEntityWithBoundingBoxRenderState, blockPos, vec3i, submitNodeCollector, poseStack);
 				}
 			}
@@ -141,8 +153,28 @@ public class BlockEntityWithBoundingBoxRenderer<T extends BlockEntity & Bounding
 		PoseStack poseStack
 	) {
 		if (blockEntityWithBoundingBoxRenderState.invisibleBlocks != null) {
+			boolean rustLines = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+				&& net.vulkanic.world.WorldRenderRoutePolicy.currentDebugLineRoute().usesRustWholeFrameVulkan();
 			BlockPos blockPos2 = blockEntityWithBoundingBoxRenderState.blockPos;
 			BlockPos blockPos3 = blockPos2.offset(blockPos);
+			if (rustLines) {
+				for (int i = 0; i < vec3i.getX(); i++) for (int j = 0; j < vec3i.getY(); j++) for (int k = 0; k < vec3i.getZ(); k++) {
+					int l = k * vec3i.getX() * vec3i.getY() + j * vec3i.getX() + i;
+					var type = blockEntityWithBoundingBoxRenderState.invisibleBlocks[l];
+					if (type == null) continue;
+					float f = type == BlockEntityWithBoundingBoxRenderState.InvisibleBlockType.AIR ? 0.05F : 0.0F;
+					double d = blockPos3.getX() + i - blockPos2.getX() + 0.45F - f, e = blockPos3.getY() + j - blockPos2.getY() + 0.45F - f, g = blockPos3.getZ() + k - blockPos2.getZ() + 0.45F - f;
+					double h = blockPos3.getX() + i - blockPos2.getX() + 0.55F + f, m = blockPos3.getY() + j - blockPos2.getY() + 0.55F + f, n = blockPos3.getZ() + k - blockPos2.getZ() + 0.55F + f;
+						int color = type == BlockEntityWithBoundingBoxRenderState.InvisibleBlockType.AIR ? 0xff8080ff
+						: type == BlockEntityWithBoundingBoxRenderState.InvisibleBlockType.STRUCUTRE_VOID ? 0xffffbfbf
+						: type == BlockEntityWithBoundingBoxRenderState.InvisibleBlockType.BARRIER ? 0xffff0000 : 0xffffff00;
+					if (!net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueDebugLineSegments(poseStack.last().pose(), boxEdges((float)d, (float)e, (float)g, (float)h, (float)m, (float)n), color, 1.0F)) throw new IllegalStateException("Rust debug-line route rejected invisible-block edges");
+				}
+				return;
+			}
+			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+				throw new IllegalStateException("Rust whole-frame invisible-block route is unavailable; Java debug geometry is not a fallback");
+			}
 			submitNodeCollector.submitCustomGeometry(poseStack, RenderType.lines(), (pose, vertexConsumer) -> {
 				for (int i = 0; i < vec3i.getX(); i++) {
 					for (int j = 0; j < vec3i.getY(); j++) {
@@ -172,6 +204,12 @@ public class BlockEntityWithBoundingBoxRenderer<T extends BlockEntity & Bounding
 				}
 			});
 		}
+	}
+
+	private static float[] boxEdges(float x0, float y0, float z0, float x1, float y1, float z1) {
+		return new float[] {x0,y0,z0,x1,y0,z0, x1,y0,z0,x1,y0,z1, x1,y0,z1,x0,y0,z1, x0,y0,z1,x0,y0,z0,
+			x0,y1,z0,x1,y1,z0, x1,y1,z0,x1,y1,z1, x1,y1,z1,x0,y1,z1, x0,y1,z1,x0,y1,z0,
+			x0,y0,z0,x0,y1,z0, x1,y0,z0,x1,y1,z0, x1,y0,z1,x1,y1,z1, x0,y0,z1,x0,y1,z1};
 	}
 
 	private void renderStructureVoids(

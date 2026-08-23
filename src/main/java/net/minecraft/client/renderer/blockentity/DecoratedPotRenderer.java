@@ -120,6 +120,16 @@ public class DecoratedPotRenderer implements BlockEntityRenderer<DecoratedPotBlo
 		return Sheets.DECORATED_POT_SIDE;
 	}
 
+	/** Semantic accessors for the bounded special-item model capture route. */
+	public ModelPart neckPart() { return this.neck; }
+	public ModelPart frontSidePart() { return this.frontSide; }
+	public ModelPart backSidePart() { return this.backSide; }
+	public ModelPart leftSidePart() { return this.leftSide; }
+	public ModelPart rightSidePart() { return this.rightSide; }
+	public ModelPart topPart() { return this.top; }
+	public ModelPart bottomPart() { return this.bottom; }
+	public Material sideMaterial(Optional<Item> item) { return getSideMaterial(item); }
+
 	public DecoratedPotRenderState createRenderState() {
 		return new DecoratedPotRenderState();
 	}

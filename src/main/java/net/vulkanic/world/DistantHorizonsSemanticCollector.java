@@ -57,8 +57,11 @@ public final class DistantHorizonsSemanticCollector {
 	 * temporary object graph for every pending column at once.  The Rust asset
 	 * cache and generation checks remain the owner of publication ordering.
 	 */
-	private static final int MAX_PENDING_ASSET_COLUMNS_PER_UPDATE = 16;
-	private static final long MAX_PENDING_ASSET_BYTES_PER_UPDATE = 4L * 1024L * 1024L;
+	// Keep each explicit Rust residency transaction short enough that DH streaming
+	// cannot monopolize the render thread while the whole-frame presenter is live.
+	// The pending queue remains lossless; later frames drain the bounded batches.
+	private static final int MAX_PENDING_ASSET_COLUMNS_PER_UPDATE = 4;
+	private static final long MAX_PENDING_ASSET_BYTES_PER_UPDATE = 1L * 1024L * 1024L;
 	private static final int MAX_VISIBLE_SEGMENTS = 16_384;
 	private static final int MAX_PUBLICATION_TRACE_EVENTS = 24;
 	/** A bounded semantic transport segment. It is intentionally below Rust's
@@ -85,6 +88,12 @@ public final class DistantHorizonsSemanticCollector {
 	private static final Map<Long, LodMaterialProvenanceSnapshot> MATERIAL_PROVENANCE = new LinkedHashMap<>();
 	/** Provenance paired with the acknowledged asset, never with a newer build. */
 	private static final Map<Long, LodMaterialProvenanceSnapshot> PUBLISHED_MATERIAL_PROVENANCE = new LinkedHashMap<>();
+	/** Exact-atlas coverage is derived solely from an immutable published column
+	 * generation. Keep a bounded cache so visibility traversal does not rescan
+	 * every copied quad on every frame. */
+	private static final int MAX_EXACT_ATLAS_COVERAGE_CACHE_ENTRIES = 2048;
+	private static final Map<Long, ExactAtlasCoverageCacheEntry> EXACT_ATLAS_COVERAGE_CACHE =
+		new LinkedHashMap<>(128, 0.75F, true);
 	private static final Map<Long, LodColumnSnapshot> PENDING_COLUMNS = new LinkedHashMap<>();
 	/** Current real render-list columns awaiting publication. These are an asset
 	 * upload priority only; they never select a route or synthesize visibility. */
@@ -307,6 +316,11 @@ public final class DistantHorizonsSemanticCollector {
 			|| Boolean.getBoolean(LEGACY_OBSERVATION_PROPERTY)
 			|| WorldRenderRoutePolicy.currentDistantHorizonsOpaqueRoute().usesRustWholeFrameVulkan()
 			|| selectedSourceExecutionRequested();
+	}
+
+	private static boolean exactAtlasCoverageRequested() {
+		return Boolean.getBoolean(CAPTURE_PROPERTY)
+			|| Boolean.getBoolean(LEGACY_OBSERVATION_PROPERTY);
 	}
 
 	private static boolean retainsLegacyObservationSnapshots() {
@@ -1226,9 +1240,14 @@ public final class DistantHorizonsSemanticCollector {
 			minY = Math.min(minY, column.originY() + vertex.localY());
 			maxY = Math.max(maxY, column.originY() + vertex.localY());
 		}
+		boolean occupiesQueriedBlock = blockY >= minY && blockY <= maxY;
+		// DH's ordinary terrain source emits a horizontal top face on the upper
+		// plane of the source block. Preserve exact-cell matching while accepting
+		// that one-block offset; arbitrary raised geometry remains rejected.
+		boolean topFaceOfQueriedBlock = blockY != Integer.MAX_VALUE && minY == maxY && minY == blockY + 1;
 		return blockX >= minX && blockX <= maxX
 			&& blockZ >= minZ && blockZ <= maxZ
-			&& (blockY == Integer.MIN_VALUE || (blockY >= minY && blockY <= maxY));
+			&& (blockY == Integer.MIN_VALUE || occupiesQueriedBlock || topFaceOfQueriedBlock);
 	}
 
 	/**
@@ -1318,21 +1337,35 @@ public final class DistantHorizonsSemanticCollector {
 				// DH can rebuild an unchanged visible column on consecutive frames.
 				// Keep its acknowledged semantic generation stable so the same Rust
 				// asset remains eligible until its copied payload actually changes.
+				LodMaterialProvenanceSnapshot previousProvenance = MATERIAL_PROVENANCE.get(columnKey);
+				if (Objects.equals(previousProvenance, provenance)) {
+					semanticColumnsBuilt++;
+					semanticColumnsReused++;
+					return;
+				}
+				// Geometry is unchanged, but its semantic material sidecar is not.
+				// Publish the newly generated snapshot so the Rust update carries a
+				// strictly newer generation; re-queuing the old snapshot would make the
+				// bridge reject it as stale while leaving Rust with old provenance.
+				COLUMNS.put(columnKey, snapshot);
 				if (provenance != null) {
 					replaceMaterialProvenanceLocked(columnKey, provenance);
-					if (retainsLegacyObservationSnapshots()) {
-						PUBLISHED_MATERIAL_PROVENANCE.put(columnKey, provenance);
-					} else {
-						// Material identities can change while the compact geometry bytes
-						// remain the same. Re-publish the acknowledged immutable column
-						// with its new copied sidecar instead of leaving Rust stale.
-						PENDING_COLUMNS.put(columnKey, replaced);
-					}
 				} else {
 					removeMaterialProvenanceLocked(columnKey);
 				}
+				if (retainsLegacyObservationSnapshots()) {
+					PUBLISHED_GENERATIONS.put(columnKey, snapshot.generation());
+					PUBLISHED_COLUMNS.put(columnKey, snapshot);
+					if (provenance != null) {
+						PUBLISHED_MATERIAL_PROVENANCE.put(columnKey, provenance);
+					} else {
+						PUBLISHED_MATERIAL_PROVENANCE.remove(columnKey);
+					}
+					PENDING_COLUMNS.remove(columnKey);
+				} else {
+					PENDING_COLUMNS.put(columnKey, snapshot);
+				}
 				semanticColumnsBuilt++;
-				semanticColumnsReused++;
 				return;
 			}
 			if (replaced != null) {
@@ -1926,30 +1959,31 @@ public final class DistantHorizonsSemanticCollector {
 				PENDING_VISIBLE_COLUMN_KEYS.add(columnKey);
 			}
 			int opaqueSegments = emittedSegmentCount(column.opaque());
-			ExactAtlasIdentityCoverage exactAtlasCoverage = exactAtlasIdentityCoverage(column);
-			routeExactAtlasIdentitySegments += exactAtlasCoverage.completeSegments();
-			routeExactAtlasIdentityQuads += exactAtlasCoverage.completeQuads();
-			routeExactAtlasMixedQuads += exactAtlasCoverage.mixedQuads();
-			routeExactAtlasUnavailableQuads += exactAtlasCoverage.unavailableQuads();
-			routeExactAtlasMissingProvenanceQuads += exactAtlasCoverage.missingProvenanceQuads();
-			routeExactAtlasMisalignedProvenanceQuads += exactAtlasCoverage.misalignedProvenanceQuads();
-			routeExactAtlasInvalidIdentityQuads += exactAtlasCoverage.invalidIdentityQuads();
-			routeExactAtlasIdentityTableEntries += exactAtlasCoverage.identityTableEntries();
-			routeExactAtlasInputKnownQuads += exactAtlasCoverage.inputKnownQuads();
-			routeExactAtlasInputMixedQuads += exactAtlasCoverage.inputMixedQuads();
-			routeExactAtlasInputUnavailableQuads += exactAtlasCoverage.inputUnavailableQuads();
-			routeExactAtlasInputOpaqueKnownQuads += exactAtlasCoverage.inputOpaqueKnownQuads();
-			routeExactAtlasInputOpaqueMixedQuads += exactAtlasCoverage.inputOpaqueMixedQuads();
-			routeExactAtlasInputOpaqueUnavailableQuads += exactAtlasCoverage.inputOpaqueUnavailableQuads();
-			routeExactAtlasOutputKnownQuads += exactAtlasCoverage.outputKnownQuads();
-			routeExactAtlasOutputMixedQuads += exactAtlasCoverage.outputMixedQuads();
-			routeExactAtlasOutputUnavailableQuads += exactAtlasCoverage.outputUnavailableQuads();
-			routeExactAtlasOutputOpaqueKnownQuads += exactAtlasCoverage.outputOpaqueKnownQuads();
-			routeExactAtlasOutputOpaqueMixedQuads += exactAtlasCoverage.outputOpaqueMixedQuads();
-			routeExactAtlasOutputOpaqueUnavailableQuads += exactAtlasCoverage.outputOpaqueUnavailableQuads();
-			if (routeExactAtlasCoverageSamples.size() < 12) {
-				routeExactAtlasCoverageSamples.add(
-					"column=" + columnKey
+			if (exactAtlasCoverageRequested()) {
+				ExactAtlasIdentityCoverage exactAtlasCoverage = exactAtlasIdentityCoverageCached(column);
+				routeExactAtlasIdentitySegments += exactAtlasCoverage.completeSegments();
+				routeExactAtlasIdentityQuads += exactAtlasCoverage.completeQuads();
+				routeExactAtlasMixedQuads += exactAtlasCoverage.mixedQuads();
+				routeExactAtlasUnavailableQuads += exactAtlasCoverage.unavailableQuads();
+				routeExactAtlasMissingProvenanceQuads += exactAtlasCoverage.missingProvenanceQuads();
+				routeExactAtlasMisalignedProvenanceQuads += exactAtlasCoverage.misalignedProvenanceQuads();
+				routeExactAtlasInvalidIdentityQuads += exactAtlasCoverage.invalidIdentityQuads();
+				routeExactAtlasIdentityTableEntries += exactAtlasCoverage.identityTableEntries();
+				routeExactAtlasInputKnownQuads += exactAtlasCoverage.inputKnownQuads();
+				routeExactAtlasInputMixedQuads += exactAtlasCoverage.inputMixedQuads();
+				routeExactAtlasInputUnavailableQuads += exactAtlasCoverage.inputUnavailableQuads();
+				routeExactAtlasInputOpaqueKnownQuads += exactAtlasCoverage.inputOpaqueKnownQuads();
+				routeExactAtlasInputOpaqueMixedQuads += exactAtlasCoverage.inputOpaqueMixedQuads();
+				routeExactAtlasInputOpaqueUnavailableQuads += exactAtlasCoverage.inputOpaqueUnavailableQuads();
+				routeExactAtlasOutputKnownQuads += exactAtlasCoverage.outputKnownQuads();
+				routeExactAtlasOutputMixedQuads += exactAtlasCoverage.outputMixedQuads();
+				routeExactAtlasOutputUnavailableQuads += exactAtlasCoverage.outputUnavailableQuads();
+				routeExactAtlasOutputOpaqueKnownQuads += exactAtlasCoverage.outputOpaqueKnownQuads();
+				routeExactAtlasOutputOpaqueMixedQuads += exactAtlasCoverage.outputOpaqueMixedQuads();
+				routeExactAtlasOutputOpaqueUnavailableQuads += exactAtlasCoverage.outputOpaqueUnavailableQuads();
+				if (routeExactAtlasCoverageSamples.size() < 12) {
+					routeExactAtlasCoverageSamples.add(
+						"column=" + columnKey
 						+ ",generation=" + column.generation()
 						+ ",inputOpaqueKnown=" + exactAtlasCoverage.inputOpaqueKnownQuads()
 						+ ",outputOpaqueKnown=" + exactAtlasCoverage.outputOpaqueKnownQuads()
@@ -1957,7 +1991,8 @@ public final class DistantHorizonsSemanticCollector {
 						+ ",copiedOpaqueQuads=" + exactAtlasCoverage.copiedOpaqueQuads()
 						+ ",copiedUnavailable=" + exactAtlasCoverage.unavailableQuads()
 						+ ",table=" + exactAtlasCoverage.identityTableEntries()
-				);
+					);
+				}
 			}
 			int transparentSideSegments = emittedSegmentCount(column.transparentSide());
 			int transparentUpSegments = emittedSegmentCount(column.transparentUp());
@@ -2079,12 +2114,23 @@ public final class DistantHorizonsSemanticCollector {
 				PENDING_RENDER_FRAME.flags() | RENDER_FLAG_RUST_NON_WATER_ROUTE_SELECTED
 			);
 			routeDecision = "selected";
-			routeReason = "all-visible-material-segments-supported";
+			routeReason = hasCompleteVisibleExactAtlasCoverage()
+			? "all-visible-material-segments-supported"
+			: "reduced-color-with-partial-exact-atlas";
 			routeOpaqueSegments = (int) PENDING_VISIBLE_SEGMENTS.stream().filter(instance -> instance.layer() == 1).count();
 			routeTransparentSegments = (int) PENDING_VISIBLE_SEGMENTS.stream()
 				.filter(instance -> instance.layer() == 2 || instance.layer() == 3).count();
 			routeWaterSegments = (int) PENDING_VISIBLE_SEGMENTS.stream().filter(instance -> instance.layer() == 4).count();
 			routeSelected = true;
+			// Capture-only semantic receipt: this proves that the real DH visible
+			// list reached Rust route admission, without retaining a Java renderer
+			// object or authorizing a fallback draw.
+			net.minecraft.client.dev.GraphicsFrameBenchmark.recordSubmittedWorkIdentity(
+				"distant-horizons-selection",
+				"selected:opaque=" + routeOpaqueSegments
+					+ ":transparent=" + routeTransparentSegments
+					+ ":water=" + routeWaterSegments
+			);
 		}
 	}
 
@@ -2199,6 +2245,10 @@ public final class DistantHorizonsSemanticCollector {
 			lastExecutedTransparentInstances = transparentInstances;
 			lastExecutedWaterInstances = waterInstances;
 			lastExecutedFrameSemanticsEnabled = true;
+			net.minecraft.client.dev.GraphicsFrameBenchmark.recordSubmittedWorkIdentity(
+				"distant-horizons",
+				"executed:world=" + worldFrame + ":submission=" + submission + ":instances=" + instances
+			);
 			List<VulkanicGalBridge.WorldLodColumnInstanceRecord> executedSegments = submittedSegments == null
 				? LAST_CONSUMED_VISIBLE_SEGMENTS
 				: List.copyOf(submittedSegments);
@@ -2268,14 +2318,15 @@ public final class DistantHorizonsSemanticCollector {
 	}
 
 	/**
-	 * Rust may select a visible DH frame only when every copied quad has an
-	 * exact owned material identity. A colored-geometry approximation is not an
-	 * acceptable whole-frame Vulkan fallback: it would make an unavailable
-	 * texture/material look like admitted Distant Horizons support.
+	 * Reports whether every copied visible quad can receive an exact atlas
+	 * overlay. Rust admission does not require this to be complete: its
+	 * explicit reduced-color stream remains authoritative for unresolved quads,
+	 * while exact atlas records are overlaid only for proven identities.
 	 */
 	public static boolean hasCompleteVisibleExactAtlasCoverage() {
 		synchronized (COLUMNS) {
-			return !PENDING_VISIBLE_SEGMENTS.isEmpty()
+			return exactAtlasCoverageRequested()
+				&& !PENDING_VISIBLE_SEGMENTS.isEmpty()
 				&& routeExactAtlasOutputMixedQuads == 0
 				&& routeExactAtlasOutputUnavailableQuads == 0
 				&& routeExactAtlasInvalidIdentityQuads == 0;
@@ -2382,6 +2433,7 @@ public final class DistantHorizonsSemanticCollector {
 			PUBLISHED_COLUMNS.clear();
 			MATERIAL_PROVENANCE.clear();
 			PUBLISHED_MATERIAL_PROVENANCE.clear();
+			EXACT_ATLAS_COVERAGE_CACHE.clear();
 			PENDING_COLUMNS.clear();
 			LAST_COLUMN_PAYLOAD_DIFFERENCES.clear();
 			PENDING_VISIBLE_SEGMENTS.clear();
@@ -2524,8 +2576,13 @@ public final class DistantHorizonsSemanticCollector {
 			LodColumnSnapshot snapshot = PENDING_COLUMNS.get(columnKey);
 			if (snapshot != null) ordered.add(snapshot);
 		}
-		for (LodColumnSnapshot snapshot : PENDING_COLUMNS.values()) {
-			if (!PENDING_VISIBLE_COLUMN_KEYS.contains(snapshot.columnKey())) ordered.add(snapshot);
+		// While visible demand exists, spend the bounded upload budget only on
+		// columns the current semantic frame can actually draw. Background DH
+		// columns remain pending and are admitted once visible demand drains;
+		// this prevents unrelated generation churn from monopolizing the render
+		// thread without changing the Rust-owned residency contract.
+		if (PENDING_VISIBLE_COLUMN_KEYS.isEmpty()) {
+			ordered.addAll(PENDING_COLUMNS.values());
 		}
 		for (LodColumnSnapshot snapshot : ordered) {
 			// The coordinator may be re-entered while native code owns the copied
@@ -2535,7 +2592,7 @@ public final class DistantHorizonsSemanticCollector {
 			if (IN_FLIGHT_ASSET_GENERATIONS.containsKey(snapshot.columnKey())) {
 				continue;
 			}
-			long snapshotBytes = snapshot.byteSize();
+			long snapshotBytes = pendingUpdateByteSize(snapshot);
 			boolean exceedsByteBudget = selectedBytes > 0L
 				&& snapshotBytes > MAX_PENDING_ASSET_BYTES_PER_UPDATE - selectedBytes;
 			if (selected.size() == MAX_PENDING_ASSET_COLUMNS_PER_UPDATE || exceedsByteBudget) {
@@ -2549,6 +2606,12 @@ public final class DistantHorizonsSemanticCollector {
 		}
 		tracePublicationLocked("select", selected);
 		return selected;
+	}
+
+	private static long pendingUpdateByteSize(LodColumnSnapshot snapshot) {
+		long bytes = snapshot.byteSize();
+		LodMaterialProvenanceSnapshot provenance = MATERIAL_PROVENANCE.get(snapshot.columnKey());
+		return provenance == null ? bytes : Math.addExact(bytes, provenance.byteSize());
 	}
 
 	private static void acknowledge(PendingAssetUpdate update) {
@@ -2833,6 +2896,7 @@ public final class DistantHorizonsSemanticCollector {
 			PUBLISHED_COLUMNS.clear();
 			MATERIAL_PROVENANCE.clear();
 			PUBLISHED_MATERIAL_PROVENANCE.clear();
+			EXACT_ATLAS_COVERAGE_CACHE.clear();
 			PENDING_COLUMNS.clear();
 			PENDING_RETIREMENTS.clear();
 			PUBLISHED_GENERATIONS.clear();
@@ -3044,6 +3108,21 @@ public final class DistantHorizonsSemanticCollector {
 		);
 	}
 
+	private static ExactAtlasIdentityCoverage exactAtlasIdentityCoverageCached(LodColumnSnapshot column) {
+		long columnKey = column.columnKey();
+		long generation = column.generation();
+		ExactAtlasCoverageCacheEntry cached = EXACT_ATLAS_COVERAGE_CACHE.get(columnKey);
+		if (cached != null && cached.generation() == generation) {
+			return cached.coverage();
+		}
+		ExactAtlasIdentityCoverage coverage = exactAtlasIdentityCoverage(column);
+		EXACT_ATLAS_COVERAGE_CACHE.put(columnKey, new ExactAtlasCoverageCacheEntry(generation, coverage));
+		if (EXACT_ATLAS_COVERAGE_CACHE.size() > MAX_EXACT_ATLAS_COVERAGE_CACHE_ENTRIES) {
+			EXACT_ATLAS_COVERAGE_CACHE.remove(EXACT_ATLAS_COVERAGE_CACHE.entrySet().iterator().next().getKey());
+		}
+		return coverage;
+	}
+
 	private static int opaqueQuadCount(LodColumnSnapshot column) {
 		int quads = 0;
 		for (LodBufferSnapshot buffer : column.opaque()) {
@@ -3075,6 +3154,9 @@ public final class DistantHorizonsSemanticCollector {
 		int outputOpaqueUnavailableQuads,
 		int copiedOpaqueQuads
 	) {
+	}
+
+	private record ExactAtlasCoverageCacheEntry(long generation, ExactAtlasIdentityCoverage coverage) {
 	}
 
 	public record VisibleColumnSegments(int opaqueSegments, int transparentSegments, int waterSegments) {
@@ -3673,7 +3755,97 @@ public final class DistantHorizonsSemanticCollector {
 			transparentUpVariantPositions = copyLongArrays(transparentUpVariantPositions, transparentUp, "transparent-up");
 			transparentWaterUp = copyArrays(transparentWaterUp);
 			transparentWaterUpVariantStates = copyByteArrays(transparentWaterUpVariantStates, transparentWaterUp, "transparent-water-up");
-			transparentWaterUpVariantPositions = copyLongArrays(transparentWaterUpVariantPositions, transparentWaterUp, "transparent-water-up");
+		transparentWaterUpVariantPositions = copyLongArrays(transparentWaterUpVariantPositions, transparentWaterUp, "transparent-water-up");
+	}
+
+	/**
+	 * Record equality must compare the copied primitive sidecars by value. The
+	 * generated record implementation compares List elements with
+	 * {@code int[]}/{@code byte[]}/{@code long[]} identity, which made every DH
+	 * rebuild look like a semantic change even when all material IDs and
+	 * variants were identical. That needlessly advanced generations, kept the
+	 * visible column unpublished, and could invalidate an otherwise coherent
+	 * Rust submission. The sidecars are immutable constructor-owned snapshots,
+	 * so deep value equality is the correct publication identity.
+	 */
+	@Override
+	public boolean equals(Object other) {
+		if (this == other) return true;
+		if (!(other instanceof LodMaterialProvenanceSnapshot that)) return false;
+		return Objects.equals(semanticMaterials, that.semanticMaterials)
+			&& Objects.equals(inputCoverage, that.inputCoverage)
+			&& Objects.equals(outputCoverage, that.outputCoverage)
+			&& intArraysEqual(opaque, that.opaque)
+			&& byteArraysEqual(opaqueVariantStates, that.opaqueVariantStates)
+			&& longArraysEqual(opaqueVariantPositions, that.opaqueVariantPositions)
+			&& intArraysEqual(transparentSide, that.transparentSide)
+			&& byteArraysEqual(transparentSideVariantStates, that.transparentSideVariantStates)
+			&& longArraysEqual(transparentSideVariantPositions, that.transparentSideVariantPositions)
+			&& intArraysEqual(transparentUp, that.transparentUp)
+			&& byteArraysEqual(transparentUpVariantStates, that.transparentUpVariantStates)
+			&& longArraysEqual(transparentUpVariantPositions, that.transparentUpVariantPositions)
+			&& intArraysEqual(transparentWaterUp, that.transparentWaterUp)
+			&& byteArraysEqual(transparentWaterUpVariantStates, that.transparentWaterUpVariantStates)
+			&& longArraysEqual(transparentWaterUpVariantPositions, that.transparentWaterUpVariantPositions);
+	}
+
+	@Override
+	public int hashCode() {
+		int result = Objects.hash(semanticMaterials, inputCoverage, outputCoverage);
+		result = 31 * result + intArraysHash(opaque);
+		result = 31 * result + byteArraysHash(opaqueVariantStates);
+		result = 31 * result + longArraysHash(opaqueVariantPositions);
+		result = 31 * result + intArraysHash(transparentSide);
+		result = 31 * result + byteArraysHash(transparentSideVariantStates);
+		result = 31 * result + longArraysHash(transparentSideVariantPositions);
+		result = 31 * result + intArraysHash(transparentUp);
+		result = 31 * result + byteArraysHash(transparentUpVariantStates);
+		result = 31 * result + longArraysHash(transparentUpVariantPositions);
+		result = 31 * result + intArraysHash(transparentWaterUp);
+		result = 31 * result + byteArraysHash(transparentWaterUpVariantStates);
+		return 31 * result + longArraysHash(transparentWaterUpVariantPositions);
+	}
+
+	private static boolean intArraysEqual(List<int[]> left, List<int[]> right) {
+		if (left.size() != right.size()) return false;
+		for (int index = 0; index < left.size(); index++) {
+			if (!java.util.Arrays.equals(left.get(index), right.get(index))) return false;
+		}
+		return true;
+	}
+
+	private static boolean byteArraysEqual(List<byte[]> left, List<byte[]> right) {
+		if (left.size() != right.size()) return false;
+		for (int index = 0; index < left.size(); index++) {
+			if (!java.util.Arrays.equals(left.get(index), right.get(index))) return false;
+		}
+		return true;
+	}
+
+	private static boolean longArraysEqual(List<long[]> left, List<long[]> right) {
+		if (left.size() != right.size()) return false;
+		for (int index = 0; index < left.size(); index++) {
+			if (!java.util.Arrays.equals(left.get(index), right.get(index))) return false;
+		}
+		return true;
+	}
+
+	private static int intArraysHash(List<int[]> values) {
+		int result = 1;
+		for (int[] value : values) result = 31 * result + java.util.Arrays.hashCode(value);
+		return result;
+	}
+
+	private static int byteArraysHash(List<byte[]> values) {
+		int result = 1;
+		for (byte[] value : values) result = 31 * result + java.util.Arrays.hashCode(value);
+		return result;
+	}
+
+	private static int longArraysHash(List<long[]> values) {
+		int result = 1;
+		for (long[] value : values) result = 31 * result + java.util.Arrays.hashCode(value);
+		return result;
 	}
 
 	LodMaterialProvenanceSnapshot(

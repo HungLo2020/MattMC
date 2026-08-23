@@ -2646,7 +2646,7 @@ impl TerrainFloodFillComputeResources {
                 target_texture,
                 None,
                 if target_initialized {
-                    TextureUsageState::ShaderRead
+                    TextureUsageState::ShaderStorageRead
                 } else {
                     TextureUsageState::Undefined
                 },
@@ -2662,7 +2662,7 @@ impl TerrainFloodFillComputeResources {
                 target_texture,
                 None,
                 TextureUsageState::ShaderWrite,
-                TextureUsageState::ShaderRead,
+                TextureUsageState::ShaderStorageRead,
             )));
         }
         self.pending_initialization = Some(frame_counter);
@@ -2811,7 +2811,7 @@ impl TerrainFloodFillComputeResources {
             target_texture,
             None,
             if target_initialized {
-                TextureUsageState::ShaderRead
+                TextureUsageState::ShaderStorageRead
             } else {
                 TextureUsageState::Undefined
             },
@@ -2827,7 +2827,7 @@ impl TerrainFloodFillComputeResources {
             target_texture,
             None,
             TextureUsageState::ShaderWrite,
-            TextureUsageState::ShaderRead,
+            TextureUsageState::ShaderStorageRead,
         )));
         self.pending_propagation = Some(frame_counter);
         self.pending_frame_mapping = Some(current_frame_mapping);
@@ -3555,7 +3555,7 @@ impl TerrainOccupancyGpuResources {
             self.texture,
             None,
             if self.initialized {
-                TextureUsageState::ShaderRead
+                TextureUsageState::ShaderStorageRead
             } else {
                 TextureUsageState::Undefined
             },
@@ -3584,7 +3584,7 @@ impl TerrainOccupancyGpuResources {
             self.texture,
             None,
             TextureUsageState::TransferDst,
-            TextureUsageState::ShaderRead,
+            TextureUsageState::ShaderStorageRead,
         )));
         self.upload_pending = true;
         Ok(())

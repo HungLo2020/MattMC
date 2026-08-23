@@ -33,12 +33,26 @@ public class MapRenderer {
 	}
 
 	public void render(MapRenderState mapRenderState, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, boolean bl, int i) {
-		submitNodeCollector.submitCustomGeometry(poseStack, RenderType.text(mapRenderState.texture), (pose, vertexConsumer) -> {
-			vertexConsumer.addVertex(pose, 0.0F, 128.0F, -0.01F).setColor(-1).setUv(0.0F, 1.0F).setLight(i);
-			vertexConsumer.addVertex(pose, 128.0F, 128.0F, -0.01F).setColor(-1).setUv(1.0F, 1.0F).setLight(i);
-			vertexConsumer.addVertex(pose, 128.0F, 0.0F, -0.01F).setColor(-1).setUv(1.0F, 0.0F).setLight(i);
-			vertexConsumer.addVertex(pose, 0.0F, 0.0F, -0.01F).setColor(-1).setUv(0.0F, 0.0F).setLight(i);
-		});
+		float[] mapVertices = {0.0F, 128.0F, -0.01F, 128.0F, 128.0F, -0.01F, 128.0F, 0.0F, -0.01F, 0.0F, 0.0F, -0.01F};
+		float[] mapUvs = {0.0F, 1.0F, 1.0F, 1.0F, 1.0F, 0.0F, 0.0F, 0.0F};
+		boolean mapAccepted = submitNodeCollector.submitTexturedQuad(
+			poseStack, RenderType.text(mapRenderState.texture), mapRenderState.texture, mapVertices, mapUvs, -1, i
+		);
+		if (!mapAccepted && net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			&& net.vulkanic.world.WorldRenderRoutePolicy.currentTexturedBillboardRoute().usesRustWholeFrameVulkan()) {
+			throw new IllegalStateException("Rust whole-frame map route rejected the copied map quad");
+		}
+		if (!mapAccepted) {
+			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+				throw new IllegalStateException("Rust whole-frame map route is unavailable; Java map geometry is not a fallback");
+			}
+			submitNodeCollector.submitCustomGeometry(poseStack, RenderType.text(mapRenderState.texture), (pose, vertexConsumer) -> {
+				vertexConsumer.addVertex(pose, 0.0F, 128.0F, -0.01F).setColor(-1).setUv(0.0F, 1.0F).setLight(i);
+				vertexConsumer.addVertex(pose, 128.0F, 128.0F, -0.01F).setColor(-1).setUv(1.0F, 1.0F).setLight(i);
+				vertexConsumer.addVertex(pose, 128.0F, 0.0F, -0.01F).setColor(-1).setUv(1.0F, 0.0F).setLight(i);
+				vertexConsumer.addVertex(pose, 0.0F, 0.0F, -0.01F).setColor(-1).setUv(0.0F, 0.0F).setLight(i);
+			});
+		}
 		int j = 0;
 
 		for (MapRenderState.MapDecorationRenderState mapDecorationRenderState : mapRenderState.decorations) {
@@ -51,12 +65,26 @@ public class MapRenderer {
 				TextureAtlasSprite textureAtlasSprite = mapDecorationRenderState.atlasSprite;
 				if (textureAtlasSprite != null) {
 					float f = j * -0.001F;
-					submitNodeCollector.submitCustomGeometry(poseStack, RenderType.text(textureAtlasSprite.atlasLocation()), (pose, vertexConsumer) -> {
+					float[] vertices = {-1.0F, 1.0F, f, 1.0F, 1.0F, f, 1.0F, -1.0F, f, -1.0F, -1.0F, f};
+					float[] uvs = {textureAtlasSprite.getU0(), textureAtlasSprite.getV0(), textureAtlasSprite.getU1(), textureAtlasSprite.getV0(), textureAtlasSprite.getU1(), textureAtlasSprite.getV1(), textureAtlasSprite.getU0(), textureAtlasSprite.getV1()};
+					boolean decorationAccepted = submitNodeCollector.submitTexturedQuad(
+						poseStack, RenderType.text(textureAtlasSprite.atlasLocation()), textureAtlasSprite.atlasLocation(), vertices, uvs, -1, i
+					);
+					if (!decorationAccepted && net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+						&& net.vulkanic.world.WorldRenderRoutePolicy.currentTexturedBillboardRoute().usesRustWholeFrameVulkan()) {
+						throw new IllegalStateException("Rust whole-frame map route rejected a copied decoration quad");
+					}
+					if (!decorationAccepted) {
+						if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+							throw new IllegalStateException("Rust whole-frame map-decoration route is unavailable; Java map geometry is not a fallback");
+						}
+						submitNodeCollector.submitCustomGeometry(poseStack, RenderType.text(textureAtlasSprite.atlasLocation()), (pose, vertexConsumer) -> {
 						vertexConsumer.addVertex(pose, -1.0F, 1.0F, f).setColor(-1).setUv(textureAtlasSprite.getU0(), textureAtlasSprite.getV0()).setLight(i);
 						vertexConsumer.addVertex(pose, 1.0F, 1.0F, f).setColor(-1).setUv(textureAtlasSprite.getU1(), textureAtlasSprite.getV0()).setLight(i);
 						vertexConsumer.addVertex(pose, 1.0F, -1.0F, f).setColor(-1).setUv(textureAtlasSprite.getU1(), textureAtlasSprite.getV1()).setLight(i);
 						vertexConsumer.addVertex(pose, -1.0F, -1.0F, f).setColor(-1).setUv(textureAtlasSprite.getU0(), textureAtlasSprite.getV1()).setLight(i);
-					});
+						});
+					}
 					poseStack.popPose();
 				}
 

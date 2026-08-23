@@ -22,18 +22,23 @@ public abstract class EnergySwirlLayer<S extends EntityRenderState, M extends En
 		if (this.isPowered(entityRenderState)) {
 			float h = entityRenderState.ageInTicks;
 			M entityModel = this.model();
+			ResourceLocation textureLocation = this.getTextureLocation();
 			submitNodeCollector.order(1)
-				.submitModel(
+				.submitAnimatedModelSemanticTexture(
 					entityModel,
 					entityRenderState,
 					poseStack,
-					RenderType.energySwirl(this.getTextureLocation(), this.xOffset(h) % 1.0F, h * 0.01F % 1.0F),
+					RenderType.energySwirl(textureLocation, this.xOffset(h) % 1.0F, h * 0.01F % 1.0F),
 					i,
 					OverlayTexture.NO_OVERLAY,
 					-8355712,
-					null,
+					textureLocation,
 					entityRenderState.outlineColor,
-					null
+					null,
+					this.xOffset(h) % 1.0F,
+					h * 0.01F % 1.0F,
+					64,
+					entityModel instanceof net.minecraft.client.model.WitherBossModel ? 64 : 32
 				);
 		}
 	}

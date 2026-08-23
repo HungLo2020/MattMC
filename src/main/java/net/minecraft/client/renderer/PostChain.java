@@ -110,6 +110,9 @@ public class PostChain implements AutoCloseable {
 	}
 
 	public void addToFrame(FrameGraphBuilder frameGraphBuilder, int i, int j, PostChain.TargetBundle targetBundle) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java post-chain admission is unavailable while Rust owns whole-frame presentation");
+		}
 		GpuBufferSlice gpuBufferSlice = this.projectionMatrixBuffer.getBuffer(i, j);
 		Map<ResourceLocation, ResourceHandle<RenderTarget>> map = new HashMap(this.internalTargets.size() + this.externalTargets.size());
 
@@ -142,6 +145,9 @@ public class PostChain implements AutoCloseable {
 
 	@Deprecated
 	public void process(RenderTarget renderTarget, GraphicsResourceAllocator graphicsResourceAllocator) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java post-chain processing is unavailable while Rust owns whole-frame presentation");
+		}
 		FrameGraphBuilder frameGraphBuilder = new FrameGraphBuilder();
 		PostChain.TargetBundle targetBundle = PostChain.TargetBundle.of(MAIN_TARGET_ID, frameGraphBuilder.importExternal("main", renderTarget));
 		this.addToFrame(frameGraphBuilder, renderTarget.width, renderTarget.height, targetBundle);

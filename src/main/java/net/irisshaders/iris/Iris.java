@@ -46,6 +46,7 @@ import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.Level;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.bridge.RustGalVulkanWholeFrameMode;
 import org.jetbrains.annotations.NotNull;
 import org.lwjgl.glfw.GLFW;
 
@@ -609,6 +610,13 @@ public class Iris {
 	}
 
 	private static WorldRenderingPipeline createPipeline(NamespacedId dimensionId) {
+		if (VulkanicAPI.isVulkanBackendInitializedAndSelected() || RustGalVulkanWholeFrameMode.enabled()) {
+			// A shader-pack pipeline owns Java/Iris programs, framebuffers, and
+			// mutable sampler state. Rust Vulkan consumes copied pack semantics
+			// through its own runtime; do not construct the Java pipeline even if
+			// a pack remains selected in Iris's configuration.
+			return new VanillaRenderingPipeline();
+		}
 		if (currentPack == null) {
 			// Completely disables shader-based rendering
 			return new VanillaRenderingPipeline();

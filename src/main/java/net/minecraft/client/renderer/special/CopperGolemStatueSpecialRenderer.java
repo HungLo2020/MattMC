@@ -40,10 +40,14 @@ public class CopperGolemStatueSpecialRenderer implements NoDataSpecialModelRende
 		this.texture = resourceLocation;
 	}
 
+	/** Semantic GUI copier accessors; transient model/texture stay Java-side. */
+	public CopperGolemStatueModel model() { return this.model; }
+	public ResourceLocation texture() { return this.texture; }
+
 	@Override
 	public void submit(ItemDisplayContext itemDisplayContext, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, int j, boolean bl, int k) {
 		this.positionModel(poseStack);
-		submitNodeCollector.submitModel(this.model, Direction.SOUTH, poseStack, RenderType.entityCutoutNoCull(this.texture), i, j, -1, null, k, null);
+		submitNodeCollector.submitModelSemanticTexture(this.model, Direction.SOUTH, poseStack, RenderType.entityCutoutNoCull(this.texture), i, j, -1, this.texture, k, null);
 	}
 
 	@Override

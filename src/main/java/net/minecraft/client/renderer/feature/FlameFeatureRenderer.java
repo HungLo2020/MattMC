@@ -22,6 +22,9 @@ public class FlameFeatureRenderer {
 	private static final NamespacedId FLAME_ID = new NamespacedId("minecraft", "entity_flame");
 	
 	public void render(SubmitNodeCollection submitNodeCollection, MultiBufferSource.BufferSource bufferSource, AtlasManager atlasManager) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java flame feature rendering is unavailable while Rust owns whole-frame presentation");
+		}
 		// Iris: Set flame entity context
 		if (WorldRenderingSettings.INSTANCE.getEntityIds() != null) {
 			CapturedRenderingState.INSTANCE.setCurrentEntity(WorldRenderingSettings.INSTANCE.getEntityIds().applyAsInt(FLAME_ID));

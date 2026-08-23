@@ -29,6 +29,12 @@ public abstract class AbstractVertexAttribute
 
 	protected AbstractVertexAttribute(CommandContext ctx)
 	{
+		if (VulkanicAPI.isVulkanBackendInitializedAndSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
+		{
+			throw new IllegalStateException(
+				"Java Distant Horizons vertex arrays are unavailable while Rust owns whole-frame presentation");
+		}
 		this.id = VulkanicAPI.createVertexArray(ctx);
 		VulkanicAPI.bindVertexArray(ctx, this.id);
 	}

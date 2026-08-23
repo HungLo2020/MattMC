@@ -26,7 +26,7 @@ public class BreezeWindLayer extends RenderLayer<BreezeRenderState, BreezeModel>
 	public void submit(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, BreezeRenderState breezeRenderState, float f, float g) {
 		RenderType renderType = RenderType.breezeWind(TEXTURE_LOCATION, this.xOffset(breezeRenderState.ageInTicks) % 1.0F, 0.0F);
 		submitNodeCollector.order(1)
-			.submitModel(this.model, breezeRenderState, poseStack, renderType, i, OverlayTexture.NO_OVERLAY, -1, null, breezeRenderState.outlineColor, null);
+			.submitModelSemanticTexture(this.model, breezeRenderState, poseStack, renderType, i, OverlayTexture.NO_OVERLAY, -1, TEXTURE_LOCATION, breezeRenderState.outlineColor, null);
 	}
 
 	private float xOffset(float f) {

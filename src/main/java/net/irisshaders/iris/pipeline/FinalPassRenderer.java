@@ -211,6 +211,9 @@ public class FinalPassRenderer {
 	}
 
 	public void renderFinalPass() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris final-pass rendering is unavailable while Rust owns whole-frame presentation");
+		}
 		final net.blaze3d.pipeline.RenderTarget main = Minecraft.getInstance().getMainRenderTarget();
 		final int baseWidth = main.width;
 		final int baseHeight = main.height;

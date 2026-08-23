@@ -268,12 +268,21 @@ public abstract class DisplayRenderer<T extends Display, S, ST extends DisplayEn
 			int n = cachedInfo.lines().size() * l - 1;
 			matrix4f.translate(1.0F - m / 2.0F, -n, 0.0F);
 			if (j != 0) {
-				submitNodeCollector.submitCustomGeometry(poseStack, bl ? RenderType.textBackgroundSeeThrough() : RenderType.textBackground(), (pose, vertexConsumer) -> {
-					vertexConsumer.addVertex(pose, -1.0F, -1.0F, 0.0F).setColor(j).setLight(i);
-					vertexConsumer.addVertex(pose, -1.0F, (float)n, 0.0F).setColor(j).setLight(i);
-					vertexConsumer.addVertex(pose, (float)m, (float)n, 0.0F).setColor(j).setLight(i);
-					vertexConsumer.addVertex(pose, (float)m, -1.0F, 0.0F).setColor(j).setLight(i);
-				});
+				float[] backgroundVertices = {-1.0F, -1.0F, 0.0F, -1.0F, n, 0.0F, m, n, 0.0F, m, -1.0F, 0.0F};
+				float[] backgroundUvs = {0.0F, 1.0F, 0.0F, 0.0F, 1.0F, 0.0F, 1.0F, 1.0F};
+				if (!submitNodeCollector.submitColoredQuads(
+					poseStack, bl ? RenderType.textBackgroundSeeThrough() : RenderType.textBackground(), backgroundVertices, backgroundUvs, new int[] {j}, i
+				)) {
+					if (net.vulkanic.world.WorldRenderRoutePolicy.currentProceduralQuadRoute().usesRustWholeFrameVulkan()) {
+						throw new IllegalStateException("Rust whole-frame display-text route rejected semantic background quad");
+					}
+					submitNodeCollector.submitCustomGeometry(poseStack, bl ? RenderType.textBackgroundSeeThrough() : RenderType.textBackground(), (pose, vertexConsumer) -> {
+						vertexConsumer.addVertex(pose, -1.0F, -1.0F, 0.0F).setColor(j).setLight(i);
+						vertexConsumer.addVertex(pose, -1.0F, (float)n, 0.0F).setColor(j).setLight(i);
+						vertexConsumer.addVertex(pose, (float)m, (float)n, 0.0F).setColor(j).setLight(i);
+						vertexConsumer.addVertex(pose, (float)m, -1.0F, 0.0F).setColor(j).setLight(i);
+					});
+				}
 			}
 
 			OrderedSubmitNodeCollector orderedSubmitNodeCollector = submitNodeCollector.order(j != 0 ? 1 : 0);

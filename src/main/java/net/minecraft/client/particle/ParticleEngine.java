@@ -12,7 +12,10 @@ import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.Camera;
 import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.renderer.SubmitNodeStorage;
 import net.minecraft.client.renderer.culling.Frustum;
+import net.minecraft.client.renderer.state.CameraRenderState;
+import net.minecraft.client.renderer.state.ParticleGroupRenderState;
 import net.minecraft.client.renderer.state.ParticlesRenderState;
 import net.minecraft.core.particles.ParticleLimit;
 import net.minecraft.core.particles.ParticleOptions;
@@ -146,6 +149,40 @@ public class ParticleEngine {
 		for (ParticleGroup<?> particleGroup : this.particles.values()) {
 			if (particleGroup instanceof QuadParticleGroup quadParticleGroup) {
 				enqueued += quadParticleGroup.enqueueRustGalTerrainParticles(camera, f);
+			}
+		}
+		return enqueued;
+	}
+
+	public int enqueueRustGalParticles() {
+		int enqueued = 0;
+		for (ParticleGroup<?> particleGroup : this.particles.values()) {
+			if (particleGroup instanceof QuadParticleGroup quadParticleGroup) {
+				enqueued += quadParticleGroup.enqueueRustGalParticles();
+			}
+		}
+		return enqueued;
+	}
+
+	/**
+	 * Extracts the non-quad particle families whose vanilla states already
+	 * submit through the semantic model collector. This is used only by the
+	 * Rust whole-frame route; the legacy renderer continues to use
+	 * {@link #extract(ParticlesRenderState, Frustum, Camera, float)}.
+	 */
+	public int enqueueRustGalModelParticles(
+		Camera camera, float partialTick, SubmitNodeStorage submitNodeStorage, CameraRenderState cameraRenderState
+	) {
+		int enqueued = 0;
+		for (ParticleGroup<?> particleGroup : this.particles.values()) {
+			if (!particleGroup.isEmpty()
+				&& (particleGroup instanceof ItemPickupParticleGroup || particleGroup instanceof ElderGuardianParticleGroup)) {
+				// These two render states do not read the frustum during extraction;
+				// they retain only copied gameplay/model data and immediately submit
+				// into the collector. No Java particle renderer crosses the boundary.
+				ParticleGroupRenderState state = particleGroup.extractRenderState(null, camera, partialTick);
+				state.submit(submitNodeStorage, cameraRenderState);
+				enqueued++;
 			}
 		}
 		return enqueued;

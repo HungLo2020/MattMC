@@ -290,6 +290,7 @@ public class BeaconBlockEntity extends BlockEntity implements MenuProvider, Name
 	@Override
 	protected void loadAdditional(ValueInput valueInput) {
 		super.loadAdditional(valueInput);
+		this.levels = valueInput.getIntOr("Levels", 0);
 		this.primaryPower = loadEffect(valueInput, "primary_effect");
 		this.secondaryPower = loadEffect(valueInput, "secondary_effect");
 		this.name = parseCustomNameSafe(valueInput, "CustomName");

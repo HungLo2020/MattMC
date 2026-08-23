@@ -1,7 +1,6 @@
 package net.alexscaves.client.render.entity;
 
 import net.alexscaves.client.model.AtlatitanModel;
-import net.alexscaves.client.render.entity.layer.AtlatitanRiderLayer;
 import net.alexscaves.server.entity.living.AtlatitanEntity;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.entity.MobRenderer;
@@ -14,7 +13,6 @@ public class AtlatitanRenderer extends MobRenderer<AtlatitanEntity, AtlatitanRen
 
     public AtlatitanRenderer(EntityRendererProvider.Context renderManagerIn) {
         super(renderManagerIn, new AtlatitanModel(), 4.0F);
-        this.addLayer(new AtlatitanRiderLayer(this));
     }
 
     @Override

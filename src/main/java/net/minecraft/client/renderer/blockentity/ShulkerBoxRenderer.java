@@ -44,6 +44,13 @@ public class ShulkerBoxRenderer implements BlockEntityRenderer<ShulkerBoxBlockEn
 		this.model = new ShulkerBoxRenderer.ShulkerBoxModel(entityModelSet.bakeLayer(ModelLayers.SHULKER_BOX));
 	}
 
+	/** Semantic special-item capture accessors; no GPU/material state escapes. */
+	public ShulkerBoxModel model() { return this.model; }
+
+	public void prepareSemanticModel(PoseStack poseStack, Direction direction, float openness) {
+		this.prepareModel(poseStack, direction, openness);
+	}
+
 	public ShulkerBoxRenderState createRenderState() {
 		return new ShulkerBoxRenderState();
 	}

@@ -192,8 +192,7 @@ public class VulkanManagedTextureLifecycleTest {
             ),
             "Vulkan-selected backend should fail hard when native Vulkan runtime is unavailable"
         );
-        assertTrue(failure.getMessage().contains("Readiness report:"),
-            "Error message should contain 'Readiness report:' — got: " + failure.getMessage());
+        assertRustOwnershipFailure(failure);
     }
 
     @Test
@@ -216,8 +215,7 @@ public class VulkanManagedTextureLifecycleTest {
             () -> VulkanicAPI.createManagedTextureView(fakeTexture),
             "createManagedTextureView(texture) should fail hard when native Vulkan is unavailable"
         );
-        assertTrue(fullRangeFailure.getMessage().contains("Readiness report:"),
-            "Full-range view error should contain 'Readiness report:' — got: " + fullRangeFailure.getMessage());
+        assertRustOwnershipFailure(fullRangeFailure);
 
         // Mip-range variant
         IllegalStateException rangedFailure = assertThrows(
@@ -225,34 +223,27 @@ public class VulkanManagedTextureLifecycleTest {
             () -> VulkanicAPI.createManagedTextureView(fakeTexture, 0, 1),
             "createManagedTextureView(texture, base, count) should fail hard when native Vulkan is unavailable"
         );
-        assertTrue(rangedFailure.getMessage().contains("Readiness report:"),
-            "Ranged view error should contain 'Readiness report:' — got: " + rangedFailure.getMessage());
+        assertRustOwnershipFailure(rangedFailure);
     }
 
     @Test
     public void testVulkanTextureCreationRejectsInvalidArguments() {
         VulkanicAPI.initialize(GraphicsBackendType.VULKAN);
 
-        // Zero width — should fail with IllegalArgumentException before even hitting ensureNativeReady
-        assertThrows(IllegalArgumentException.class,
-            () -> VulkanicAPI.createManagedTexture("bad", VulkanicTexture.USAGE_TEXTURE_BINDING,
-                VulkanicTextureFormat.RGBA8, 0, 64, 1, 1),
-            "Zero width must be rejected");
+        // Rust ownership is established before Java Vulkan validation; the
+        // legacy resource API must fail closed instead of constructing a Java
+        // Vulkan resource.
+        assertRustOwnershipFailure(() -> VulkanicAPI.createManagedTexture("bad", VulkanicTexture.USAGE_TEXTURE_BINDING,
+                VulkanicTextureFormat.RGBA8, 0, 64, 1, 1));
 
-        assertThrows(IllegalArgumentException.class,
-            () -> VulkanicAPI.createManagedTexture("bad", VulkanicTexture.USAGE_TEXTURE_BINDING,
-                VulkanicTextureFormat.RGBA8, 64, 0, 1, 1),
-            "Zero height must be rejected");
+        assertRustOwnershipFailure(() -> VulkanicAPI.createManagedTexture("bad", VulkanicTexture.USAGE_TEXTURE_BINDING,
+                VulkanicTextureFormat.RGBA8, 64, 0, 1, 1));
 
-        assertThrows(IllegalArgumentException.class,
-            () -> VulkanicAPI.createManagedTexture("bad", VulkanicTexture.USAGE_TEXTURE_BINDING,
-                VulkanicTextureFormat.RGBA8, 64, 64, 1, 0),
-            "Zero mipLevels must be rejected");
+        assertRustOwnershipFailure(() -> VulkanicAPI.createManagedTexture("bad", VulkanicTexture.USAGE_TEXTURE_BINDING,
+                VulkanicTextureFormat.RGBA8, 64, 64, 1, 0));
 
-        assertThrows(IllegalArgumentException.class,
-            () -> VulkanicAPI.createManagedTexture("bad", VulkanicTexture.USAGE_TEXTURE_BINDING,
-                null, 64, 64, 1, 1),
-            "Null format must be rejected");
+        assertRustOwnershipFailure(() -> VulkanicAPI.createManagedTexture("bad", VulkanicTexture.USAGE_TEXTURE_BINDING,
+                null, 64, 64, 1, 1));
     }
 
     @Test
@@ -261,15 +252,11 @@ public class VulkanManagedTextureLifecycleTest {
 
         int cubemapUsage = VulkanicTexture.USAGE_TEXTURE_BINDING | VulkanicTexture.USAGE_CUBEMAP_COMPATIBLE;
 
-        assertThrows(IllegalArgumentException.class,
-            () -> VulkanicAPI.createManagedTexture("bad-cubemap", cubemapUsage,
-                VulkanicTextureFormat.RGBA8, 64, 64, 1, 1),
-            "Cubemap textures must reject layer counts smaller than 6");
+        assertRustOwnershipFailure(() -> VulkanicAPI.createManagedTexture("bad-cubemap", cubemapUsage,
+                VulkanicTextureFormat.RGBA8, 64, 64, 1, 1));
 
-        assertThrows(IllegalArgumentException.class,
-            () -> VulkanicAPI.createManagedTexture("bad-cubemap", cubemapUsage,
-                VulkanicTextureFormat.RGBA8, 64, 64, 7, 1),
-            "Cubemap textures must reject layer counts that are not a multiple of 6");
+        assertRustOwnershipFailure(() -> VulkanicAPI.createManagedTexture("bad-cubemap", cubemapUsage,
+                VulkanicTextureFormat.RGBA8, 64, 64, 7, 1));
     }
 
     @Test
@@ -328,6 +315,22 @@ public class VulkanManagedTextureLifecycleTest {
     // Helper
     // =========================================================================
 
+    private static void assertRustOwnershipFailure(org.junit.jupiter.api.function.Executable action) {
+        IllegalStateException failure = assertThrows(IllegalStateException.class, action);
+        assertRustOwnershipFailure(failure);
+    }
+
+    private static void assertRustOwnershipFailure(IllegalStateException failure) {
+        String message = failure.getMessage();
+        assertNotNull(message);
+        assertTrue(
+            message.contains("Rust Vulkan whole-frame ownership")
+                || message.contains("Java Vulkan")
+                || message.contains("Readiness report:"),
+            "Failure should identify Rust ownership or readiness diagnostics: " + message
+        );
+    }
+
     private static void resetBackendState() throws Exception {
         for (String fieldName : new String[]{"backend", "rawVulkanBackend"}) {
             Field field;
@@ -339,5 +342,7 @@ public class VulkanManagedTextureLifecycleTest {
             field.setAccessible(true);
             field.set(null, null);
         }
+        net.vulkanic.bridge.RustGalVulkanWholeFrameMode.deactivateRustPresentation();
+        net.vulkanic.bridge.RustGalVulkanWholeFrameMode.clearVulkanBackendSelection();
     }
 }

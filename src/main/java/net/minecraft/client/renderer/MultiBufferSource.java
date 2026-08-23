@@ -40,6 +40,9 @@ public interface MultiBufferSource {
 
 		@Override
 		public VertexConsumer getBuffer(RenderType renderType) {
+			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+				throw new IllegalStateException("Java Vulkan buffer-source rendering is unavailable while Rust owns whole-frame presentation");
+			}
 			BufferBuilder bufferBuilder = (BufferBuilder)this.startedBuilders.get(renderType);
 			if (bufferBuilder != null && !renderType.canConsolidateConsecutiveGeometry()) {
 				this.endBatch(renderType, bufferBuilder);

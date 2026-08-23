@@ -1,7 +1,6 @@
 package net.alexsmobs.client.render;
 
 import net.alexsmobs.client.model.ModelCapuchinMonkey;
-import net.alexsmobs.client.render.layer.LayerCapuchinItem;
 import net.alexsmobs.entity.EntityCapuchinMonkey;
 import net.blaze3d.vertex.PoseStack;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
@@ -16,7 +15,6 @@ public class RenderCapuchinMonkey extends MobRenderer<EntityCapuchinMonkey, Capu
 
     public RenderCapuchinMonkey(EntityRendererProvider.Context renderManagerIn) {
         super(renderManagerIn, new ModelCapuchinMonkey(), 0.25F);
-        this.addLayer(new LayerCapuchinItem(this));
     }
 
     @Override

@@ -56,14 +56,22 @@ public class SkyRenderer implements AutoCloseable {
 	private static final int END_SKY_QUAD_COUNT = 6;
 	private static final float END_FLASH_HEIGHT = 100.0F;
 	private static final float END_FLASH_SCALE = 60.0F;
+	@Nullable
 	private final GpuBuffer starBuffer;
 	private final VulkanicAPI.AutoStorageIndexBuffer starIndices = VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS);
+	@Nullable
 	private final GpuBuffer topSkyBuffer;
+	@Nullable
 	private final GpuBuffer bottomSkyBuffer;
+	@Nullable
 	private final GpuBuffer endSkyBuffer;
+	@Nullable
 	private final GpuBuffer sunBuffer;
+	@Nullable
 	private final GpuBuffer moonBuffer;
+	@Nullable
 	private final GpuBuffer sunriseBuffer;
+	@Nullable
 	private final GpuBuffer endFlashBuffer;
 	private final VulkanicAPI.AutoStorageIndexBuffer quadIndices = VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS);
 	@Nullable
@@ -77,6 +85,19 @@ public class SkyRenderer implements AutoCloseable {
 	private int starIndexCount;
 
 	public SkyRenderer() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			// Rust owns celestial mesh lowering and source-asset copies for the
+			// whole-frame route; Java sky vertex buffers are never consumed.
+			this.starBuffer = null;
+			this.topSkyBuffer = null;
+			this.bottomSkyBuffer = null;
+			this.endSkyBuffer = null;
+			this.endFlashBuffer = null;
+			this.sunBuffer = null;
+			this.moonBuffer = null;
+			this.sunriseBuffer = null;
+			return;
+		}
 		this.starBuffer = this.buildStars();
 		this.endSkyBuffer = buildEndSky();
 		this.endFlashBuffer = this.buildEndFlashQuad();
@@ -296,6 +317,7 @@ public class SkyRenderer implements AutoCloseable {
 	}
 
 	public void renderSkyDisc(float f, float g, float h) {
+		ensureJavaSkyRenderingAvailable();
 		// Iris: Set rendering phase to SKY (from MixinSkyRenderer)
 		iris$setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.SKY);
 		
@@ -340,6 +362,7 @@ public class SkyRenderer implements AutoCloseable {
 	}
 
 	public void renderDarkDisc() {
+		ensureJavaSkyRenderingAvailable();
 		// Iris: Set rendering phase to VOID (from MixinSkyRenderer)
 		iris$setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.VOID);
 		
@@ -360,6 +383,7 @@ public class SkyRenderer implements AutoCloseable {
 	}
 
 	public void renderSunMoonAndStars(PoseStack poseStack, float f, int i, float g, float h) {
+		ensureJavaSkyRenderingAvailable();
 		poseStack.pushPose();
 		poseStack.mulPose(Axis.YP.rotationDegrees(-90.0F));
 		poseStack.mulPose(Axis.XP.rotationDegrees(f * 360.0F));
@@ -465,6 +489,7 @@ public class SkyRenderer implements AutoCloseable {
 	}
 
 	public void renderSunriseAndSunset(PoseStack poseStack, float f, int i) {
+		ensureJavaSkyRenderingAvailable();
 		// Iris: Set rendering phase to SUNSET (from MixinSkyRenderer)
 		iris$setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.SUNSET);
 		
@@ -497,6 +522,7 @@ public class SkyRenderer implements AutoCloseable {
 	}
 
 	public void renderEndSky() {
+		ensureJavaSkyRenderingAvailable();
 		if (this.endSkyTexture != null) {
 			VulkanicAPI.AutoStorageIndexBuffer autoStorageIndexBuffer = VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS);
 			GpuBuffer gpuBuffer = autoStorageIndexBuffer.getBuffer(36);
@@ -516,6 +542,7 @@ public class SkyRenderer implements AutoCloseable {
 	}
 
 	public void renderEndFlash(PoseStack poseStack, float f, float g, float h) {
+		ensureJavaSkyRenderingAvailable();
 		if (this.endFlashTexture != null) {
 			poseStack.mulPose(Axis.YP.rotationDegrees(180.0F - h));
 			poseStack.mulPose(Axis.XP.rotationDegrees(-90.0F - g));
@@ -543,14 +570,14 @@ public class SkyRenderer implements AutoCloseable {
 	}
 
 	public void close() {
-		this.sunBuffer.close();
-		this.moonBuffer.close();
-		this.starBuffer.close();
-		this.topSkyBuffer.close();
-		this.bottomSkyBuffer.close();
-		this.endSkyBuffer.close();
-		this.sunriseBuffer.close();
-		this.endFlashBuffer.close();
+		if (this.sunBuffer != null) this.sunBuffer.close();
+		if (this.moonBuffer != null) this.moonBuffer.close();
+		if (this.starBuffer != null) this.starBuffer.close();
+		if (this.topSkyBuffer != null) this.topSkyBuffer.close();
+		if (this.bottomSkyBuffer != null) this.bottomSkyBuffer.close();
+		if (this.endSkyBuffer != null) this.endSkyBuffer.close();
+		if (this.sunriseBuffer != null) this.sunriseBuffer.close();
+		if (this.endFlashBuffer != null) this.endFlashBuffer.close();
 	}
 	
 	// Iris: Helper methods from MixinSkyRenderer
@@ -562,6 +589,12 @@ public class SkyRenderer implements AutoCloseable {
 	private void iris$setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase phase) {
 		if (net.irisshaders.iris.Iris.getPipelineManager().getPipelineNullable() == null) return;
 		net.irisshaders.iris.Iris.getPipelineManager().getPipelineNullable().setPhase(phase);
+	}
+
+	private static void ensureJavaSkyRenderingAvailable() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java sky rendering is unavailable while Rust owns whole-frame presentation");
+		}
 	}
 
 	private static RenderPass createIrisAwareSkyRenderPass(Supplier<String> label, boolean includeDepth) {

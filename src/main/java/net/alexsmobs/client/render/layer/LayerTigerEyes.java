@@ -23,7 +23,7 @@ public class LayerTigerEyes extends RenderLayer<TigerRenderState, ModelTiger> {
         if (!state.isSleeping) {
             ResourceLocation texture = state.remainingPersistentAngerTime > 0 ? TEXTURE_ANGRY : (state.isWhite ? TEXTURE_WHITE : TEXTURE);
             submitNodeCollector.order(1)
-                .submitModel(
+                .submitModelSemanticTexture(
                     this.getParentModel(),
                     state,
                     matrixStackIn,
@@ -31,7 +31,7 @@ public class LayerTigerEyes extends RenderLayer<TigerRenderState, ModelTiger> {
                     packedLightIn,
                     OverlayTexture.NO_OVERLAY,
                     -1,
-                    null,
+                    texture,
                     state.outlineColor,
                     null
                 );

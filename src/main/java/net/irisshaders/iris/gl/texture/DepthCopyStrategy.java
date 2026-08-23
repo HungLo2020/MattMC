@@ -24,6 +24,11 @@ public interface DepthCopyStrategy {
 	}
 
 	static DepthCopyStrategy fastestDepthSnapshot(boolean combinedStencilRequired) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException(
+				"Java Iris depth snapshots are unavailable while Rust owns whole-frame presentation"
+			);
+		}
 		if (VulkanicAPI.isVulkanBackendSelected()) {
 			return new Gl30BlitFbDepth();
 		}
