@@ -302,6 +302,10 @@ public class VulkanDescriptorLifecycleTest {
             "Storage-compatible sampler detection should be based on the tracked per-mip image layout");
         assertTrue(plannerSource.contains("request.textureLookup().descriptorSampledImagePlan"),
             "Sampler descriptor writes should choose their image layout with storage-image compatibility in mind");
+        assertTrue(!plannerSource.contains("getLegacyTextureHandle"),
+            "Vulkan sampler descriptor planning must not recover a shared legacy texture handle");
+        assertTrue(backendSource.contains("if (texture instanceof VulkanTexture) {\n            return false;\n        }"),
+            "Explicit Vulkan textures must not probe the legacy texture registry for feedback-loop capability");
         assertTrue(imageCoordinatorSource.contains("if (storageImageCompatible) {\n            return VK10.VK_IMAGE_LAYOUT_GENERAL;\n        }"),
             "A sampled texture that is also bound as a storage image must be described with GENERAL layout");
         assertTrue(backendSource.contains("case STORAGE_IMAGE -> transitionLegacyTextureToStorageImageLayout("),

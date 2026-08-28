@@ -66,7 +66,11 @@ public class SpawnerRenderer implements BlockEntityRenderer<SpawnerBlockEntity, 
 		poseStack.translate(0.0F, -0.2F, 0.0F);
 		poseStack.mulPose(Axis.XP.rotationDegrees(-30.0F));
 		poseStack.scale(g, g, g);
-		entityRenderDispatcher.submit(entityRenderState, cameraRenderState, 0.0, 0.0, 0.0, poseStack, submitNodeCollector);
+		if (EntityRenderDispatcher.isSemanticSubmission()) {
+			entityRenderDispatcher.submitSemantic(entityRenderState, cameraRenderState, 0.0, 0.0, 0.0, poseStack, submitNodeCollector);
+		} else {
+			entityRenderDispatcher.submit(entityRenderState, cameraRenderState, 0.0, 0.0, 0.0, poseStack, submitNodeCollector);
+		}
 		poseStack.popPose();
 	}
 }

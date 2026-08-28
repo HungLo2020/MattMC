@@ -41,9 +41,10 @@ public class ParticleFeatureRenderer implements AutoCloseable, net.irisshaders.i
 	}
 
 	public void render(SubmitNodeCollection submitNodeCollection) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+		if ((net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
 			&& !net.vulkanic.world.WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()) {
-			throw new IllegalStateException("Rust whole-frame particle route is unavailable while Rust owns presentation");
+			throw new IllegalStateException("Rust whole-frame particle route is unavailable; Java particle rendering is not a fallback");
 		}
 		if (net.vulkanic.world.WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()) {
 			// Ordinary QuadParticleRenderState groups have already copied their
@@ -141,7 +142,8 @@ public class ParticleFeatureRenderer implements AutoCloseable, net.irisshaders.i
 	}
 
 	public void endFrame() {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			return;
 		}
 		for (ParticleFeatureRenderer.ParticleBufferCache particleBufferCache : this.usedBuffers) {
@@ -160,6 +162,17 @@ public class ParticleFeatureRenderer implements AutoCloseable, net.irisshaders.i
 
 	public void close() {
 		this.availableBuffers.forEach(ParticleFeatureRenderer.ParticleBufferCache::close);
+		this.usedBuffers.forEach(ParticleFeatureRenderer.ParticleBufferCache::close);
+		this.availableBuffers.clear();
+		this.usedBuffers.clear();
+	}
+
+	/** Releases cached Java particle buffers when Rust Vulkan ownership begins late. */
+	public void ensureRustSemanticRoute() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+			this.close();
+		}
 	}
 
 	@Environment(EnvType.CLIENT)

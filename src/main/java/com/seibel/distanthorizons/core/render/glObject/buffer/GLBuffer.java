@@ -64,7 +64,7 @@ public class GLBuffer implements AutoCloseable
 
 	private static int createTrackedBufferId()
 	{
-		if (VulkanicAPI.isVulkanBackendInitializedAndSelected()
+		if (VulkanicAPI.isVulkanBackendSelected()
 			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			throw new IllegalStateException(
 				"Java Distant Horizons buffers are unavailable while Rust owns whole-frame presentation");
@@ -77,7 +77,15 @@ public class GLBuffer implements AutoCloseable
 
 	private static void deleteTrackedBufferId(int id)
 	{
-		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		// Java DH buffers may be retired after Vulkan ownership begins. Their
+		// numeric names are not Rust handles and must never cross into the Rust
+		// resource domain during asynchronous teardown.
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| VulkanicAPI.isVulkanBackendSelected()) {
+			return;
+		}
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			&& !VulkanicAPI.isVulkanBackendSelected()) {
 			net.irisshaders.iris.gl.IrisRenderSystem.decrementTrackedBuffers();
 		}
 		VulkanicAPI.deleteBuffer(commandContext(), id);
@@ -158,6 +166,10 @@ public class GLBuffer implements AutoCloseable
 		
 		GLProxy.queueRunningOnRenderThread(() -> 
 		{
+			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+				|| VulkanicAPI.isVulkanBackendSelected()) {
+				return;
+			}
 			CommandContext ctx = commandContext();
 			// destroy the buffer if it exists,
 			// the buffer may not exist if the destroy method is called twice

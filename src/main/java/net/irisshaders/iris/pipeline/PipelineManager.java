@@ -80,6 +80,16 @@ public class PipelineManager {
 	 * @see <a href="https://github.com/IrisShaders/Iris/issues/1330">this GitHub issue</a>
 	 */
 	public void destroyPipeline() {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			// Rust owns shader-pack resources and synchronization on this route.
+			// Iris' Java pipeline objects are compatibility bookkeeping only; do
+			// not reset texture units or invoke their GL destruction callbacks.
+			pipelinesPerDimension.clear();
+			pipeline = null;
+			versionCounterForSodiumShaderReload++;
+			return;
+		}
 		pipelinesPerDimension.forEach((dimensionId, pipeline) -> {
 			Iris.logger.info("Destroying pipeline {}", dimensionId);
 			resetTextureState();

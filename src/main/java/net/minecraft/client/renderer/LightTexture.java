@@ -22,6 +22,7 @@ import net.minecraft.api.Environment;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.util.ARGB;
 import net.minecraft.util.Mth;
 import net.minecraft.util.profiling.Profiler;
 import net.minecraft.util.profiling.ProfilerFiller;
@@ -57,8 +58,10 @@ public class LightTexture implements AutoCloseable {
 		.putVec3()
 		.get();
 	private static final Vector3f END_FLASH_SKY_LIGHT_COLOR = new Vector3f(0.9F, 0.5F, 1.0F);
-	public final GpuTexture texture; // Made public for mod integration (was accessed via mixin)
-	private final GpuTextureView textureView;
+	@Nullable
+	public GpuTexture texture; // Made public for mod integration (was accessed via mixin)
+	@Nullable
+	private GpuTextureView textureView;
 	private boolean dumpedGpuLightmapDebug;
 	private GpuTexture shaderLightmapProbeTexture;
 	private GpuTextureView shaderLightmapProbeView;
@@ -75,17 +78,23 @@ public class LightTexture implements AutoCloseable {
 	private final GameRenderer renderer;
 	private final Minecraft minecraft;
 	@Nullable
-	private final MappableRingBuffer ubo;
+	private MappableRingBuffer ubo;
 
 	public LightTexture(GameRenderer gameRenderer, Minecraft minecraft) {
+		if (VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			this.texture = null;
+			this.textureView = null;
+			this.ubo = null;
+			this.renderer = gameRenderer;
+			this.minecraft = minecraft;
+			return;
+		}
 		this.renderer = gameRenderer;
 		this.minecraft = minecraft;
-		int textureUsage = VulkanicAPI.isVulkanBackendSelected()
-			? GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_COPY_SRC | GpuTexture.USAGE_TEXTURE_BINDING | GpuTexture.USAGE_RENDER_ATTACHMENT
-			: GpuTexture.USAGE_TEXTURE_BINDING | GpuTexture.USAGE_RENDER_ATTACHMENT;
 		this.texture = VulkanicAPI.createTexture(
 			"Light Texture",
-			textureUsage,
+			GpuTexture.USAGE_TEXTURE_BINDING | GpuTexture.USAGE_RENDER_ATTACHMENT,
 			TextureFormat.RGBA8,
 			16,
 			16,
@@ -94,7 +103,7 @@ public class LightTexture implements AutoCloseable {
 		);
 		this.texture.setTextureFilter(FilterMode.LINEAR, false);
 		this.textureView = VulkanicAPI.createTextureView(this.texture);
-		if (VulkanicAPI.isVulkanBackendSelected() && PROBE_VULKAN_SHADER_LIGHTMAP) {
+		if (PROBE_VULKAN_SHADER_LIGHTMAP) {
 			this.shaderLightmapProbeTexture = VulkanicAPI.createTexture(
 				"Light Texture Shader Probe",
 				GpuTexture.USAGE_TEXTURE_BINDING | GpuTexture.USAGE_RENDER_ATTACHMENT | GpuTexture.USAGE_COPY_SRC,
@@ -120,6 +129,15 @@ public class LightTexture implements AutoCloseable {
 	}
 
 	public GpuTextureView getTextureView() {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException(
+				"Java lightmap texture view is unavailable on the Rust Vulkan route; use semantic lightmap inputs"
+			);
+		}
+		if (this.textureView == null) {
+			throw new IllegalStateException("Java lightmap texture view is unavailable; use semantic lightmap inputs");
+		}
 		return this.textureView;
 	}
 
@@ -179,10 +197,30 @@ public class LightTexture implements AutoCloseable {
 		if (this.shaderLightmapProbeTexture != null) {
 			this.shaderLightmapProbeTexture.close();
 		}
-		this.texture.close();
-		this.textureView.close();
+		if (this.texture != null) {
+			this.texture.close();
+		}
+		if (this.textureView != null) {
+			this.textureView.close();
+		}
 		if (this.ubo != null) {
 			this.ubo.close();
+		}
+		this.shaderLightmapProbeView = null;
+		this.shaderLightmapProbeTexture = null;
+		this.texture = null;
+		this.textureView = null;
+		this.ubo = null;
+	}
+
+	/** Releases compatibility lightmap resources if Vulkan ownership starts after construction. */
+	public void ensureRustSemanticRoute() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| VulkanicAPI.isVulkanBackendSelected()) {
+			if (this.texture != null || this.textureView != null || this.ubo != null
+				|| this.shaderLightmapProbeTexture != null || this.shaderLightmapProbeView != null) {
+				this.close();
+			}
 		}
 	}
 
@@ -197,7 +235,8 @@ public class LightTexture implements AutoCloseable {
 	}
 
 	public void turnOffLightLayer() {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| VulkanicAPI.isVulkanBackendSelected()) {
 			return;
 		}
 		IrisRenderSystem.bindTextureToUnit(2, 0);
@@ -205,7 +244,8 @@ public class LightTexture implements AutoCloseable {
 	}
 
 	public void turnOnLightLayer() {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| VulkanicAPI.isVulkanBackendSelected()) {
 			return;
 		}
 		var ctx = VulkanicAPI.getCommandContext();
@@ -219,7 +259,8 @@ public class LightTexture implements AutoCloseable {
 		
 		// Iris captured state is compatibility-only; the semantic Rust route
 		// carries the darkness/lightmap inputs directly and must not publish it.
-		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			&& !VulkanicAPI.isVulkanBackendSelected()) {
 			net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setDarknessLightFactor((float) (result * this.minecraft.options.darknessEffectScale().get()));
 		}
 		
@@ -288,7 +329,18 @@ public class LightTexture implements AutoCloseable {
 				// Rust's whole-frame renderer consumes this immutable record directly.
 				// Keep the Java GPU lightmap, its UBO, and Iris runtime state entirely
 				// outside that route until each remaining texture consumer is semantic.
-				if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+				if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+					|| VulkanicAPI.isVulkanBackendSelected()) {
+					this.ensureRustSemanticRoute();
+					// The renderer can tick once while a client level exists but its
+					// player has not been attached yet.  Keep the semantic resource
+					// unavailable for that frame instead of dereferencing a null player
+					// or resurrecting the Java lightmap as a fallback.
+					if (this.minecraft.player == null) {
+						this.rustSemanticLightmapInputs = null;
+						profilerFiller.pop();
+						return;
+					}
 					this.rustSemanticLightmapInputs = this.computeRustSemanticLightmapInputs(
 						clientLevel, this.minecraft.player, f, false
 					);
@@ -340,9 +392,15 @@ public class LightTexture implements AutoCloseable {
 
 				this.ubo.rotate();
 				
-				// Call registered light texture hooks
-				for (net.minecraft.hooks.LightTextureHooks hook : net.minecraft.hooks.HookRegistry.getLightTextureHooks()) {
-					hook.onLightTextureUpdated(this, f);
+				// LightTextureHooks are a Java GPU compatibility extension point. The
+				// Rust Vulkan route publishes copied light semantics instead of a Java
+				// texture, so invoking these callbacks there could re-enter hidden Java
+				// GPU state or inspect a deliberately unavailable texture view.
+				if (!VulkanicAPI.isVulkanBackendSelected()
+					&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+					for (net.minecraft.hooks.LightTextureHooks hook : net.minecraft.hooks.HookRegistry.getLightTextureHooks()) {
+						hook.onLightTextureUpdated(this, f);
+					}
 				}
 				
 				profilerFiller.pop();
@@ -453,6 +511,70 @@ public class LightTexture implements AutoCloseable {
 		float g = i / 15.0F;
 		float h = g / (4.0F - 3.0F * g);
 		return Mth.lerp(f, h, 1.0F);
+	}
+
+	/**
+	 * Applies the copied vanilla lightmap equation to a semantic text color.
+	 * World text is lowered by Rust, so it cannot sample the Java lightmap
+	 * texture; using the same immutable inputs keeps the lighting decision
+	 * explicit without borrowing a GPU texture or Iris state.
+	 */
+	public int rustSemanticPackedLightColor(int packedLight, int argb) {
+		RustSemanticLightmapInputs inputs = this.rustSemanticLightmapInputs;
+		if (inputs == null) {
+			return argb;
+		}
+		float block = getBrightness(0.0F, block(packedLight));
+		block *= inputs.blockFactor();
+		float sky = getBrightness(0.0F, sky(packedLight));
+		sky *= inputs.skyFactor();
+		float red = block;
+		float green = block * ((block * 0.6F + 0.4F) * 0.6F + 0.4F);
+		float blue = block * (block * block * 0.6F + 0.4F);
+		red = Mth.lerp(inputs.ambientLightFactor(), red, inputs.ambientRed());
+		green = Mth.lerp(inputs.ambientLightFactor(), green, inputs.ambientGreen());
+		blue = Mth.lerp(inputs.ambientLightFactor(), blue, inputs.ambientBlue());
+		red += inputs.skyLightRed() * sky;
+		green += inputs.skyLightGreen() * sky;
+		blue += inputs.skyLightBlue() * sky;
+		red = Mth.lerp(0.04F, red, 0.75F);
+		green = Mth.lerp(0.04F, green, 0.75F);
+		blue = Mth.lerp(0.04F, blue, 0.75F);
+		if (inputs.ambientLightFactor() == 0.0F) {
+			red = Mth.lerp(inputs.darkenWorldFactor(), red, red * 0.7F);
+			green = Mth.lerp(inputs.darkenWorldFactor(), green, green * 0.6F);
+			blue = Mth.lerp(inputs.darkenWorldFactor(), blue, blue * 0.6F);
+		}
+		if (inputs.nightVisionFactor() > 0.0F) {
+			float maximum = Math.max(red, Math.max(green, blue));
+			if (maximum > 0.0F && maximum < 1.0F) {
+				red = Mth.lerp(inputs.nightVisionFactor(), red, red / maximum);
+				green = Mth.lerp(inputs.nightVisionFactor(), green, green / maximum);
+				blue = Mth.lerp(inputs.nightVisionFactor(), blue, blue / maximum);
+			}
+		}
+		if (inputs.ambientLightFactor() == 0.0F) {
+			red -= inputs.darknessScale();
+			green -= inputs.darknessScale();
+			blue -= inputs.darknessScale();
+		}
+		red = Mth.clamp(red, 0.0F, 1.0F);
+		green = Mth.clamp(green, 0.0F, 1.0F);
+		blue = Mth.clamp(blue, 0.0F, 1.0F);
+		float maxComponent = Math.max(red, Math.max(green, blue));
+		if (maxComponent > 0.0F) {
+			float maxInverted = 1.0F - maxComponent;
+			float maxScaled = 1.0F - maxInverted * maxInverted * maxInverted * maxInverted;
+			float scale = maxScaled / maxComponent;
+			red = Mth.lerp(inputs.brightnessFactor(), red, red * scale);
+			green = Mth.lerp(inputs.brightnessFactor(), green, green * scale);
+			blue = Mth.lerp(inputs.brightnessFactor(), blue, blue * scale);
+		}
+		red = Mth.lerp(0.04F, red, 0.75F);
+		green = Mth.lerp(0.04F, green, 0.75F);
+		blue = Mth.lerp(0.04F, blue, 0.75F);
+		return ARGB.colorFromFloat(ARGB.alphaFloat(argb),
+			ARGB.redFloat(argb) * red, ARGB.greenFloat(argb) * green, ARGB.blueFloat(argb) * blue);
 	}
 
 	public static int pack(int i, int j) {

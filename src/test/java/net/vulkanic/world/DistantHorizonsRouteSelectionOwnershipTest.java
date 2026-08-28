@@ -62,6 +62,50 @@ final class DistantHorizonsRouteSelectionOwnershipTest {
 		assertTrue(renderBody.contains("Deferred DH passes are Java framebuffer/pipeline work"));
 	}
 
+	@Test
+	void selectedVulkanWithoutRustAdmissionCannotFallThroughToJavaLodOrUploads() throws Exception {
+		String lod = Files.readString(Path.of("src/main/java/com/seibel/distanthorizons/core/render/renderer/LodRenderer.java"));
+		int render = lod.indexOf("public void render(RenderParams renderParams");
+		int renderGuard = lod.indexOf("boolean rustPresenterActive = VulkanicAPI.isVulkanBackendSelected()", render);
+		int renderJavaPass = lod.indexOf("this.renderLodPass(renderParams, profiler, false)", render);
+		assertTrue(render >= 0 && renderGuard > render && renderGuard < renderJavaPass,
+			"selected Vulkan must be fenced before DH can enter its Java LOD pass");
+		assertTrue(lod.indexOf("if (rustPresenterActive && !rustWholeFrame)", render) > renderGuard,
+			"DH must also fence the pre-selection Rust presenter shell before its Java LOD pass");
+
+		int deferred = lod.indexOf("public void renderDeferred(");
+		int deferredGuard = lod.indexOf("boolean rustPresenterActive = VulkanicAPI.isVulkanBackendSelected()", deferred);
+		int deferredJavaPass = lod.indexOf("this.renderLodPass(renderParams, profiler, true)", deferred);
+		assertTrue(deferred >= 0 && deferredGuard > deferred && deferredGuard < deferredJavaPass,
+			"selected Vulkan must be fenced before DH deferred Java rendering");
+		assertTrue(lod.indexOf("if (rustPresenterActive && !rustWholeFrame)", deferred) > deferredGuard,
+			"DH deferred rendering must fence the pre-selection Rust presenter shell");
+
+		String proxy = Files.readString(Path.of("src/main/java/com/seibel/distanthorizons/core/render/glObject/GLProxy.java"));
+		assertTrue(proxy.contains("boolean vulkanBackend = VulkanicAPI.isVulkanBackendSelected()")
+			&& proxy.contains("|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();"),
+			"DH GLProxy capability probing must treat the Rust presenter shell as Vulkan ownership");
+		int threadCheck = proxy.indexOf("public static boolean runningOnRenderThread()");
+		int threadVulkan = proxy.indexOf("|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()", threadCheck);
+		assertTrue(threadCheck >= 0 && threadVulkan > threadCheck,
+			"DH render-thread checks must use the backend-neutral Vulkan thread seam during handoff");
+		int upload = proxy.indexOf("public static void runLodUploadRenderThreadTasks()");
+		int uploadGuard = proxy.indexOf("VulkanicAPI.isVulkanBackendSelected()", upload);
+		int uploadTask = proxy.indexOf("runRenderThreadTasks(VULKAN_LOD_UPLOAD_TASK_BUDGET_NANOS", upload);
+		assertTrue(upload >= 0 && uploadGuard > upload && uploadTask < 0,
+			"selected Vulkan must not drain DH Java upload tasks through the compatibility backend");
+	}
+
+	@Test
+	void selectedRustDhParityTracingDoesNotRecoverJavaLightmapView() throws Exception {
+		String lod = Files.readString(Path.of("src/main/java/com/seibel/distanthorizons/core/render/renderer/LodRenderer.java"));
+		int method = lod.indexOf("private static void traceDhLodTerrainResources(");
+		int view = lod.indexOf("lightTexture().getTextureView()", method);
+		int selectedGuard = lod.indexOf("VulkanicAPI.isVulkanBackendSelected()", method);
+		assertTrue(method >= 0 && selectedGuard > method && selectedGuard < view,
+			"Rust-selected DH parity tracing must not recover a Java lightmap view");
+	}
+
 	private static ByteBuffer quadBuffer() {
 		ByteBuffer buffer = ByteBuffer.allocate(DistantHorizonsSemanticCollector.VERTEX_STRIDE_BYTES * 4)
 			.order(ByteOrder.nativeOrder());
@@ -75,7 +119,8 @@ final class DistantHorizonsRouteSelectionOwnershipTest {
 			buffer.put((byte)13);
 			buffer.put((byte)255);
 			buffer.put((byte)15);
-			buffer.put((byte)16);
+			// Rust's semantic LOD ABI admits the six canonical face normals 0..5.
+			buffer.put((byte)5);
 			buffer.putShort((short)0);
 		}
 		return buffer.flip();

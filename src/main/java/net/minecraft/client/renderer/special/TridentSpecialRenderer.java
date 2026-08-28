@@ -44,7 +44,8 @@ public class TridentSpecialRenderer implements NoDataSpecialModelRenderer {
 				k,
 				null
 			);
-		} else if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+		} else if ((net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
 			&& net.vulkanic.world.WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan()) {
 			// The base trident remains an ordinary copied direct-texture model; the
 			// foil overlay is a second explicit Rust glint mesh. Keeping both
@@ -61,7 +62,7 @@ public class TridentSpecialRenderer implements NoDataSpecialModelRenderer {
 				throw new IllegalStateException("Rust whole-frame trident foil route selected without a copied glint mesh");
 			}
 		} else {
-			submitNodeCollector.submitModelPart(this.model.root(), poseStack, this.model.renderType(TridentModel.TEXTURE), i, j, null, false, true, -1, null, k);
+			submitNodeCollector.submitModelPartSemantic(this.model.root(), poseStack, this.model.renderType(TridentModel.TEXTURE), i, j, null, false, true, -1, null, k);
 		}
 		poseStack.popPose();
 	}

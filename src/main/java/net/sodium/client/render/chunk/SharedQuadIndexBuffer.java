@@ -24,8 +24,14 @@ public class SharedQuadIndexBuffer {
 
     private int maxPrimitives;
 
-    public SharedQuadIndexBuffer(CommandList commandList, IndexType indexType) {
-        this.nativeGpuBuffer = net.vulkanic.VulkanicAPI.isVulkanBackendInitializedAndSelected();
+	public SharedQuadIndexBuffer(CommandList commandList, IndexType indexType) {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Sodium shared quad index buffers are unavailable while Rust owns Vulkan presentation");
+		}
+		// Backend selection itself owns this resource boundary. Do not create
+        // a Java/OpenGL mutable buffer during the Vulkan bootstrap handoff.
+        this.nativeGpuBuffer = net.vulkanic.VulkanicAPI.isVulkanBackendSelected();
         this.buffer = this.nativeGpuBuffer ? null : commandList.createMutableBuffer();
         this.indexType = indexType;
     }
@@ -93,7 +99,7 @@ public class SharedQuadIndexBuffer {
         if (this.gpuBuffer != null) {
             return this.gpuBuffer;
         }
-        if (net.vulkanic.VulkanicAPI.isVulkanBackendInitializedAndSelected()) {
+        if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
             throw new IllegalStateException("Selected Vulkan cannot expose a legacy shared quad index buffer");
         }
         return new LegacyHandleGlBuffer(() -> "Shared quad index buffer", usage, Math.toIntExact(this.buffer.getSize()), this.buffer.handle());

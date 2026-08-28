@@ -40,7 +40,15 @@ public class IrisSamplers {
 		// no construction allowed
 	}
 
+	private static void ensureJavaCompatibilityRoute() {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris sampler state is unavailable on the Rust Vulkan route");
+		}
+	}
+
 	public static void initRenderer() {
+		ensureJavaCompatibilityRoute();
 		SHADOW_SAMPLER_NEAREST = new GlSampler(false, false, true, true);
 		SHADOW_SAMPLER_LINEAR = new GlSampler(true, false, true, true);
 		GlSampler LINEAR_MIPMAP = new GlSampler(true, true, false, false);
@@ -48,7 +56,8 @@ public class IrisSamplers {
 	}
 
 	public static void addRenderTargetSamplers(SamplerHolder samplers, Supplier<ImmutableSet<Integer>> flipped,
-											   RenderTargets renderTargets, boolean isFullscreenPass, WorldRenderingPipeline pipeline) {
+															RenderTargets renderTargets, boolean isFullscreenPass, WorldRenderingPipeline pipeline) {
+		ensureJavaCompatibilityRoute();
 		// colortex0,1,2,3 are only able to be sampled from fullscreen passes.
 		// Iris could lift this restriction, though I'm not sure if it could cause issues.
 		int startIndex = isFullscreenPass ? 0 : 4;
@@ -99,6 +108,7 @@ public class IrisSamplers {
 	}
 
 	public static void addNoiseSampler(SamplerHolder samplers, TextureAccess sampler) {
+		ensureJavaCompatibilityRoute();
 		samplers.addDynamicSampler(sampler.getTextureId(), "noisetex");
 	}
 
@@ -124,6 +134,7 @@ public class IrisSamplers {
 	}
 
 	public static boolean addShadowSamplers(SamplerHolder samplers, ShadowRenderTargets shadowRenderTargets, ImmutableSet<Integer> flipped, boolean separateHardwareSamplers) {
+		ensureJavaCompatibilityRoute();
 		boolean usesShadows;
 
 		// TODO: figure this out from parsing the shader source code to be 100% compatible with the legacy
@@ -179,6 +190,7 @@ public class IrisSamplers {
 	}
 
 	public static void addLevelSamplers(SamplerHolder samplers, WorldRenderingPipeline pipeline, AbstractTexture whitePixel, boolean hasTexture, boolean hasLightmap, boolean hasOverlay) {
+		ensureJavaCompatibilityRoute();
 		if (hasTexture) {
 			samplers.addExternalSampler(ALBEDO_TEXTURE_UNIT, "tex", "texture", "gtexture");
 		} else {
@@ -204,11 +216,13 @@ public class IrisSamplers {
 	}
 
 	public static void addCompositePbrSamplers(SamplerHolder samplers, WorldRenderingPipeline pipeline) {
+		ensureJavaCompatibilityRoute();
 		samplers.addDynamicSampler(pipeline::getCurrentNormalTexture, StateUpdateNotifiers.normalTextureChangeNotifier, "normals");
 		samplers.addDynamicSampler(pipeline::getCurrentSpecularTexture, StateUpdateNotifiers.specularTextureChangeNotifier, "specular");
 	}
 
 	public static void addWorldDepthSamplers(SamplerHolder samplers, RenderTargets renderTargets) {
+		ensureJavaCompatibilityRoute();
 		samplers.addDynamicSampler(() -> VulkanicCoreAPI.textureId(renderTargets.getDepthTexture()), "depthtex0");
 		// TODO: Should depthtex2 be made available to gbuffer / shadow programs?
 		samplers.addDynamicSampler(() -> VulkanicCoreAPI.textureId(renderTargets.getDepthTextureNoTranslucents()), "depthtex1");
@@ -217,6 +231,7 @@ public class IrisSamplers {
 	}
 
 	public static void addCompositeSamplers(SamplerHolder samplers, RenderTargets renderTargets) {
+		ensureJavaCompatibilityRoute();
 		samplers.addDynamicSampler(() -> VulkanicCoreAPI.textureId(renderTargets.getDepthTexture()),
 			"gdepthtex", "depthtex0");
 		samplers.addDynamicSampler(() -> VulkanicCoreAPI.textureId(renderTargets.getDepthTextureNoTranslucents()),
@@ -226,10 +241,12 @@ public class IrisSamplers {
 	}
 
 	public static void addCustomTextures(SamplerHolder samplers, Object2ObjectMap<String, TextureAccess> irisCustomTextures) {
+		ensureJavaCompatibilityRoute();
 		irisCustomTextures.forEach((name, texture) -> samplers.addDynamicSampler(texture.getType(), texture.getTextureId(), null, name));
 	}
 
 	public static void addCustomImages(SamplerHolder images, Set<GlImage> customImages) {
+		ensureJavaCompatibilityRoute();
 		customImages.forEach(image -> {
 			if (image.getSamplerName() != null) {
 				images.addDynamicSampler(image.getTarget(), image::getId, null, image.getSamplerName());

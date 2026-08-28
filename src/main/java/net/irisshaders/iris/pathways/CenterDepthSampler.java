@@ -46,6 +46,9 @@ public class CenterDepthSampler {
 		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			throw new IllegalStateException("Java Iris center-depth resources are unavailable while Rust owns whole-frame presentation");
 		}
+		if (VulkanicAPI.isVulkanBackendSelected()) {
+			throw new IllegalStateException("Java Iris Vulkan center-depth resources are unavailable until the Rust whole-frame route is admitted");
+		}
 		this.texture = IrisRenderSystem.createTextureId();
 		this.altTexture = IrisRenderSystem.createTextureId();
 		this.framebuffer = new GlFramebuffer();
@@ -84,6 +87,10 @@ public class CenterDepthSampler {
 	}
 
 	public void sampleCenterDepth() {
+		if (VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris Vulkan center-depth sampling is unavailable until the Rust whole-frame route is admitted");
+		}
 		if (!smoothingProgramAvailable) {
 			return;
 		}

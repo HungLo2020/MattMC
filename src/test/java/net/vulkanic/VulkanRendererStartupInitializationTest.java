@@ -91,6 +91,68 @@ public class VulkanRendererStartupInitializationTest {
     }
 
     @Test
+    public void testSelectedVulkanGraphicsContextCannotExposeLegacyHandle() throws Exception {
+        String source = Files.readString(PROJECT_ROOT.resolve("src/main/java/net/vulkanic/VulkanicAPI.java"));
+        int method = source.indexOf("public static long getGraphicsContext()");
+        int selectedGuard = source.indexOf("isVulkanBackendSelected()", method);
+        int returnZero = source.indexOf("return 0L;", selectedGuard);
+        assertTrue(method >= 0 && selectedGuard > method && returnZero > selectedGuard,
+            "selected Vulkan graphics-context queries must remain fail-closed before backend access");
+    }
+
+    @Test
+    public void testDirectJavaVulkanBringUpIsFailClosedWhenRustOwnsPresentation() throws Exception {
+        String source = Files.readString(PROJECT_ROOT
+            .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"));
+        int method = source.indexOf("public VulkanNativeInitializationInfo initializeNativeVulkanRuntime()");
+        int guard = source.indexOf("Java Vulkan native bring-up is unavailable while Rust owns whole-frame presentation.", method);
+        int legacyBringUp = source.indexOf("attemptNativeBringUp();", method);
+        assertTrue(method >= 0 && guard > method && legacyBringUp > guard,
+            "direct Java Vulkan runtime initialization must guard Rust-owned presentation before legacy bring-up");
+    }
+
+    @Test
+    public void testRustSemanticOwnershipBoundaryDoesNotInitializeIrisClasses() throws Exception {
+        String source = Files.readString(PROJECT_ROOT
+            .resolve("src/main/java/net/vulkanic/VulkanicAPI.java"));
+        int start = source.indexOf("public static void ensureRustSemanticRoute()");
+        int end = source.indexOf("\n\t}\n\n    public static", start);
+        assertTrue(start >= 0 && end > start, "Rust semantic ownership boundary must be present");
+        String method = source.substring(start, end);
+        assertFalse(method.contains("net.irisshaders.iris.gl.IrisRenderSystem")
+                || method.contains("net.irisshaders.iris.pbr.texture.PBRTextureManager"),
+            "Rust Vulkan ownership cleanup must not initialize Iris GPU runtime classes");
+    }
+
+    @Test
+    public void testSectionOcclusionGraphToleratesPrePublicationCallbacks() throws Exception {
+        String source = Files.readString(PROJECT_ROOT
+            .resolve("src/main/java/net/minecraft/client/renderer/SectionOcclusionGraph.java"));
+        assertTrue(source.contains("GraphState graphState = this.currentGraph.get()")
+                && source.contains("if (graphState == null)"),
+            "terrain extraction must tolerate a visibility graph that has not published its first state");
+        assertTrue(source.contains("GraphEvents graphEvents2 = currentState == null ? null : currentState.events")
+                && source.contains("if (graphEvents2 != null && graphEvents2 != graphEvents)"),
+            "asynchronous chunk callbacks must not dereference a pre-publication visibility graph");
+    }
+
+    @Test
+    public void testIrisRenderSystemClassLoadingDoesNotQueryRuntimeSamplerLimits() throws Exception {
+        String source = Files.readString(PROJECT_ROOT
+            .resolve("src/main/java/net/irisshaders/iris/gl/IrisRenderSystem.java"));
+        int field = source.indexOf("private static final int[] emptyArray");
+        assertTrue(field >= 0, "Iris compatibility sampler array must remain declared");
+        int lineEnd = source.indexOf('\n', field);
+        assertTrue(lineEnd > field, "Iris sampler array declaration must be readable");
+        assertFalse(source.substring(field, lineEnd).contains("SamplerLimits.get()"),
+            "loading IrisRenderSystem must not query Java runtime sampler limits before Rust ownership is established");
+        String limits = Files.readString(PROJECT_ROOT
+            .resolve("src/main/java/net/irisshaders/iris/gl/sampler/SamplerLimits.java"));
+        assertTrue(limits.contains("Iris compatibility sampler limits are unavailable while Rust owns whole-frame Vulkan"),
+            "Iris sampler-limit queries must fail closed instead of borrowing Rust-owned Vulkan state");
+    }
+
+    @Test
     public void testRendererStartupSourceWiringInvokesStartupInitHook() throws Exception {
         String renderSystemSource = Files.readString(PROJECT_ROOT
             .resolve("src/main/java/net/blaze3d/systems/RenderSystem.java"));
@@ -138,8 +200,10 @@ public class VulkanRendererStartupInitializationTest {
             "GraphicsBackend should expose backend-owned post-device initialization hook");
         assertTrue(vulkanBackendSource.contains("getRegisteredGlfwWindowHandleForVulkanSurface"),
             "VulkanBackend should fallback to registered GLFW window handle when no current context exists");
-        assertTrue(vulkanBackendSource.contains("new VulkanCompatibilityGpuDevice(this, compatibilityDevice)"),
-            "VulkanBackend should own compatibility device creation instead of shared startup code constructing GlDevice directly");
+        assertFalse(vulkanBackendSource.contains("new VulkanCompatibilityGpuDevice(this, compatibilityDevice)"),
+            "Vulkan startup must not construct a Java compatibility device; Rust semantic startup is the only renderer device");
+        assertTrue(vulkanBackendSource.contains("requires the Rust Vulkan whole-frame route to be selected"),
+            "Vulkan renderer-device creation must fail closed if selection state was not established");
         assertTrue(vulkanicApiSource.contains("method.isDefault()"),
             "Fail-fast Vulkan proxy should recognize default interface methods");
         assertTrue(vulkanicApiSource.contains("invokeDefaultInterfaceMethod"),
@@ -151,25 +215,21 @@ public class VulkanRendererStartupInitializationTest {
     }
 
     @Test
-    public void testVulkanBackendOnRendererDeviceInitializedWiresIrisLifecycleHooks() throws Exception {
+    public void testVulkanBackendOnRendererDeviceInitializedDoesNotWireJavaIrisLifecycleHooks() throws Exception {
         String vulkanBackendSource = Files.readString(PROJECT_ROOT
             .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"));
 
-        // Iris init hooks must be called inside onRendererDeviceInitialized so that
-        // IrisRenderSystem.dsaState and related static fields are not null when the Iris
-        // shader pipeline is first created on the Vulkan path.
-        assertTrue(vulkanBackendSource.contains("IrisRenderSystem.initRenderer()"),
-            "VulkanBackend.onRendererDeviceInitialized should call IrisRenderSystem.initRenderer() "
-                + "so that dsaState and related Iris statics are not null on the Vulkan path");
-        assertTrue(vulkanBackendSource.contains("IrisSamplers.initRenderer()"),
-            "VulkanBackend.onRendererDeviceInitialized should call IrisSamplers.initRenderer() "
-                + "to initialize shadow sampler objects on the Vulkan path");
-        assertTrue(vulkanBackendSource.contains("Iris.duringRenderSystemInit()"),
-            "VulkanBackend.onRendererDeviceInitialized should call Iris.duringRenderSystemInit() "
-                + "to keep Iris lifecycle hook sequencing correct on the Vulkan path");
-        assertTrue(vulkanBackendSource.contains("Iris.onRenderSystemInit()"),
-            "VulkanBackend.onRendererDeviceInitialized should call Iris.onRenderSystemInit() "
-                + "to complete Iris renderer initialization on the Vulkan path");
+        // Rust owns shader-pack resources and execution; the Vulkan backend must
+        // never initialize Java Iris GPU state, even in a stale compatibility
+        // shell created before route selection.
+        assertFalse(vulkanBackendSource.contains("IrisRenderSystem.initRenderer()"),
+            "VulkanBackend must not initialize IrisRenderSystem on the Rust Vulkan path");
+        assertFalse(vulkanBackendSource.contains("IrisSamplers.initRenderer()"),
+            "VulkanBackend must not initialize IrisSamplers on the Rust Vulkan path");
+        assertFalse(vulkanBackendSource.contains("Iris.duringRenderSystemInit()"),
+            "VulkanBackend must not invoke Iris render-system lifecycle on the Rust Vulkan path");
+        assertFalse(vulkanBackendSource.contains("Iris.onRenderSystemInit()"),
+            "VulkanBackend must not invoke Java Iris renderer initialization on the Rust Vulkan path");
 
         int initHook = vulkanBackendSource.indexOf("public void onRendererDeviceInitialized");
         int cleanupHook = vulkanBackendSource.indexOf("public void cleanupRendererBootstrapResources", initHook);
@@ -178,6 +238,54 @@ public class VulkanRendererStartupInitializationTest {
         String initHookSource = vulkanBackendSource.substring(initHook, cleanupHook);
         assertFalse(initHookSource.contains("glfwPollEvents()"),
             "VulkanBackend.onRendererDeviceInitialized must not poll GLFW events before Minecraft finishes constructing input/framerate state");
+    }
+
+    @Test
+    public void testSelectedVulkanStartupReturnsBeforeIrisGpuLifecycleHooks() throws Exception {
+        String source = Files.readString(PROJECT_ROOT
+            .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"));
+        int method = source.indexOf("public void onRendererDeviceInitialized");
+        int selected = source.indexOf("if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected())", method);
+        int rustReturn = source.indexOf("return;", selected);
+        int irisHook = source.indexOf("IrisRenderSystem.initRenderer()", selected);
+        assertTrue(method >= 0 && selected > method && rustReturn > selected && irisHook < 0,
+            "selected Rust Vulkan startup must contain no Java Iris GPU lifecycle branch");
+    }
+
+    @Test
+    public void testWindowedVulkanBridgeConstructsNativeRustVulkanBackend() throws Exception {
+        String ffiSource = Files.readString(PROJECT_ROOT
+            .resolve("src/main/rust/render/vulkanic/ffi/context.rs"));
+        String backendSource = Files.readString(PROJECT_ROOT
+            .resolve("src/main/rust/render/vulkanic/backends/mod.rs"));
+        assertTrue(ffiSource.contains("create_native_windowed_vulkan_backend"),
+            "windowed Vulkan context creation must select the native Rust Vulkan backend");
+        assertTrue(backendSource.contains("VulkanBackend::new_native_windowed"),
+            "windowed Vulkan bridge must instantiate the Rust Vulkan presenter directly");
+        assertFalse(ffiSource.contains("create_borrowed_opengl_backend(\n"),
+            "windowed Vulkan context creation must not fall back to the borrowed OpenGL backend");
+    }
+
+    @Test
+    public void testRustFfiRegistryAdmitsOnlyOneWindowedPresenter() throws Exception {
+        String source = Files.readString(PROJECT_ROOT
+            .resolve("src/main/rust/render/vulkanic/ffi/context.rs"));
+        assertTrue(source.contains("windowed_presenter_active: bool"),
+            "the Rust bridge registry must own the single-presenter admission state");
+        assertTrue(source.contains("a Rust Vulkan windowed presenter is already active"),
+            "a second Rust Vulkan presenter must fail closed at the FFI boundary");
+        assertTrue(source.contains("registry.windowed_presenter_active = true"),
+            "windowed presenter admission must claim ownership before returning the context");
+        assertTrue(source.contains("registry.windowed_presenter_active = false"),
+            "destroying the owning context must release presenter admission");
+        assertTrue(source.contains("windowed_presenter: true"),
+            "only the native windowed Vulkan context may own presenter admission");
+        assertTrue(source.contains("MAX_BRIDGE_CONTEXTS: usize = 16"),
+            "Rust FFI context admission must have an explicit bounded live-context limit");
+        assertTrue(source.contains("LIVE_BRIDGE_CONTEXTS"),
+            "Rust FFI context admission must account for contexts across bridge registries");
+        assertTrue(source.contains("release_context_slot();"),
+            "destroying a Rust FFI context must release its bounded admission slot");
     }
 
     @Test
@@ -197,8 +305,10 @@ public class VulkanRendererStartupInitializationTest {
             "RenderSystem should not expose OpenGL-named bootstrap cleanup anymore");
         assertTrue(minecraftSource.contains("RenderSystem.cleanupRendererBootstrapResources();"),
             "Minecraft.close should invoke backend-neutral renderer bootstrap cleanup before window termination");
-        assertTrue(vulkanBackendSource.contains("Created Vulkan compatibility bootstrap window for backend-owned renderer startup"),
-            "VulkanBackend should own compatibility bootstrap window creation when Vulkan NO_API windows are used");
+        assertFalse(vulkanBackendSource.contains("Created Vulkan compatibility bootstrap window for backend-owned renderer startup"),
+            "VulkanBackend must not create a hidden OpenGL compatibility bootstrap window");
+        assertTrue(vulkanBackendSource.contains("Vulkan renderer bootstrap requires the Rust Vulkan whole-frame route to be selected"),
+            "Vulkan bootstrap-window preparation must fail closed before selection state exists");
         assertTrue(vulkanBackendSource.contains("Destroyed Vulkan compatibility bootstrap window"),
             "VulkanBackend should own compatibility bootstrap window cleanup");
         assertTrue(windowSource.contains("if (shouldRequestNoApiWindowClientForVulkanBackend())"),

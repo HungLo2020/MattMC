@@ -48,6 +48,7 @@ final class VulkanCompatibilityGpuDevice implements GpuDevice {
 
 	@Override
 	public CommandEncoder createCommandEncoder() {
+		this.ensureSelectedRustRoute();
 		if (this.compatibilityOnly) {
 			return this.withCompatibilityBackend(this.compatibilityDevice::createCommandEncoder);
 		}
@@ -56,6 +57,7 @@ final class VulkanCompatibilityGpuDevice implements GpuDevice {
 
 	@Override
 	public GpuTexture createTexture(@Nullable Supplier<String> supplier, int i, TextureFormat textureFormat, int j, int k, int l, int m) {
+		this.ensureSelectedRustRoute();
 		if (this.compatibilityOnly) {
 			return this.withCompatibilityBackend(() -> this.compatibilityDevice.createTexture(supplier, i, textureFormat, j, k, l, m));
 		}
@@ -64,6 +66,7 @@ final class VulkanCompatibilityGpuDevice implements GpuDevice {
 
 	@Override
 	public GpuTexture createTexture(@Nullable String string, int i, TextureFormat textureFormat, int j, int k, int l, int m) {
+		this.ensureSelectedRustRoute();
 		if (this.compatibilityOnly) {
 			return this.withCompatibilityBackend(() -> this.compatibilityDevice.createTexture(string, i, textureFormat, j, k, l, m));
 		}
@@ -72,6 +75,7 @@ final class VulkanCompatibilityGpuDevice implements GpuDevice {
 
 	@Override
 	public GpuTextureView createTextureView(GpuTexture gpuTexture) {
+		this.ensureSelectedRustRoute();
 		if (this.compatibilityOnly) {
 			return this.withCompatibilityBackend(() -> this.compatibilityDevice.createTextureView(gpuTexture));
 		}
@@ -80,6 +84,7 @@ final class VulkanCompatibilityGpuDevice implements GpuDevice {
 
 	@Override
 	public GpuTextureView createTextureView(GpuTexture gpuTexture, int i, int j) {
+		this.ensureSelectedRustRoute();
 		if (this.compatibilityOnly) {
 			return this.withCompatibilityBackend(() -> this.compatibilityDevice.createTextureView(gpuTexture, i, j));
 		}
@@ -88,6 +93,7 @@ final class VulkanCompatibilityGpuDevice implements GpuDevice {
 
 	@Override
 	public GpuBuffer createBuffer(@Nullable Supplier<String> supplier, int i, int j) {
+		this.ensureSelectedRustRoute();
 		if (this.compatibilityOnly) {
 			return this.withCompatibilityBackend(() -> this.compatibilityDevice.createBuffer(supplier, i, j));
 		}
@@ -96,6 +102,7 @@ final class VulkanCompatibilityGpuDevice implements GpuDevice {
 
 	@Override
 	public GpuBuffer createBuffer(@Nullable Supplier<String> supplier, int i, ByteBuffer byteBuffer) {
+		this.ensureSelectedRustRoute();
 		if (this.compatibilityOnly) {
 			return this.withCompatibilityBackend(() -> this.compatibilityDevice.createBuffer(supplier, i, byteBuffer));
 		}
@@ -207,6 +214,15 @@ final class VulkanCompatibilityGpuDevice implements GpuDevice {
             );
 		}
 		return this.withCompatibilityBackendForTeardown(action);
+	}
+
+	private void ensureSelectedRustRoute() {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+				&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException(
+				"Selected Vulkan compatibility-device rendering is unavailable; Rust Vulkan semantic device is required"
+			);
+		}
 	}
 
 	private <T> T withCompatibilityBackendForTeardown(Supplier<T> action) {

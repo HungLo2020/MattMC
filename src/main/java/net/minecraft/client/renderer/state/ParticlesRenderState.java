@@ -24,6 +24,19 @@ public class ParticlesRenderState implements net.irisshaders.iris.mixinterface.P
 			particleGroupRenderState.submit(submitNodeStorage, cameraRenderState);
 		}
 	}
+
+	/**
+	 * Submits the copied particle state through semantic collectors.  This is
+	 * deliberately separate from {@link #submit}, which remains the private
+	 * OpenGL/Iris compatibility lowering.  A Rust-owned frame must never regain
+	 * the legacy callback merely because a wrapper still owns a
+	 * {@code ParticlesRenderState}.
+	 */
+	public void submitSemantic(SubmitNodeStorage submitNodeStorage, CameraRenderState cameraRenderState) {
+		for (ParticleGroupRenderState particleGroupRenderState : this.particles) {
+			particleGroupRenderState.submitSemantic(submitNodeStorage, cameraRenderState);
+		}
+	}
 	
 	// Iris: ParticleRenderStateExtension implementation
 	@Override
@@ -34,4 +47,5 @@ public class ParticlesRenderState implements net.irisshaders.iris.mixinterface.P
 			}
 		}
 	}
+
 }

@@ -103,7 +103,7 @@ public class HangingSignRenderer extends AbstractSignRenderer {
 		poseStack.pushPose();
 		translateBase(poseStack, 0.0F);
 		poseStack.scale(1.0F, -1.0F, -1.0F);
-		submitNodeCollector.submitModel(
+		submitNodeCollector.submitModelSemantic(
 			simple, Unit.INSTANCE, poseStack, material.renderType(simple::renderType), i, j, -1, materialSet.get(material), OverlayTexture.NO_OVERLAY, null
 		);
 		poseStack.popPose();

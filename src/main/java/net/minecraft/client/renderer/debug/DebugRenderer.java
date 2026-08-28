@@ -15,6 +15,7 @@ import net.minecraft.client.gui.components.debug.DebugScreenEntries;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.ShapeRenderer;
+import net.minecraft.client.renderer.SubmitNodeStorage;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.ARGB;
@@ -33,11 +34,59 @@ import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
 public class DebugRenderer {
+	private final Minecraft minecraft;
 	private final List<DebugRenderer.SimpleDebugRenderer> opaqueRenderers = new ArrayList();
 	private final List<DebugRenderer.SimpleDebugRenderer> translucentRenderers = new ArrayList();
+	@Nullable
+	private CollisionBoxRenderer collisionBoxRenderer;
+	@Nullable
+	private SolidFaceRenderer solidFaceRenderer;
+	@Nullable
+	private SupportBlockRenderer supportBlockRenderer;
+	@Nullable
+	private StructureRenderer structureRenderer;
+	@Nullable
+	private GameEventListenerRenderer gameEventListenerRenderer;
+	@Nullable
+	private RedstoneWireOrientationsRenderer redstoneWireOrientationsRenderer;
+	@Nullable
+	private ChunkBorderRenderer chunkBorderRenderer;
+	@Nullable
+	private BreezeDebugRenderer breezeDebugRenderer;
+	@Nullable
+	private PathfindingRenderer pathfindingRenderer;
+	@Nullable
+	private LightSectionDebugRenderer lightSectionDebugRenderer;
+	@Nullable
+	private HeightMapRenderer heightMapRenderer;
+	@Nullable
+	private ChunkCullingDebugRenderer chunkCullingDebugRenderer;
+	@Nullable
+	private WaterDebugRenderer waterDebugRenderer;
+	@Nullable
+	private LightDebugRenderer lightDebugRenderer;
+	@Nullable
+	private VillageSectionsDebugRenderer villageSectionsDebugRenderer;
+	@Nullable
+	private ChunkDebugRenderer chunkDebugRenderer;
+	@Nullable
+	private EntityBlockIntersectionDebugRenderer entityBlockIntersectionDebugRenderer;
+	@Nullable
+	private GoalSelectorDebugRenderer goalSelectorDebugRenderer;
+	@Nullable
+	private RaidDebugRenderer raidDebugRenderer;
+	@Nullable
+	private BrainDebugRenderer brainDebugRenderer;
+	@Nullable
+	private PoiDebugRenderer poiDebugRenderer;
+	@Nullable
+	private BeeDebugRenderer beeDebugRenderer;
+	@Nullable
+	private OctreeDebugRenderer octreeDebugRenderer;
 	private long lastDebugEntriesVersion;
 
 	public DebugRenderer() {
+		this.minecraft = Minecraft.getInstance();
 		this.refreshRendererList();
 	}
 
@@ -46,31 +95,52 @@ public class DebugRenderer {
 		this.opaqueRenderers.clear();
 		this.translucentRenderers.clear();
 		if (minecraft.debugEntries.isCurrentlyEnabled(DebugScreenEntries.CHUNK_BORDERS) && !minecraft.showOnlyReducedInfo()) {
-			this.opaqueRenderers.add(new ChunkBorderRenderer(minecraft));
+			this.chunkBorderRenderer = new ChunkBorderRenderer(minecraft);
+			this.opaqueRenderers.add(this.chunkBorderRenderer);
+		} else {
+			this.chunkBorderRenderer = null;
 		}
 
 		if (minecraft.debugEntries.isCurrentlyEnabled(DebugScreenEntries.CHUNK_SECTION_OCTREE)) {
-			this.opaqueRenderers.add(new OctreeDebugRenderer(minecraft));
+			this.octreeDebugRenderer = new OctreeDebugRenderer(minecraft);
+			this.opaqueRenderers.add(this.octreeDebugRenderer);
+		} else {
+			this.octreeDebugRenderer = null;
 		}
 
 		if (SharedConstants.DEBUG_PATHFINDING) {
-			this.opaqueRenderers.add(new PathfindingRenderer());
+			this.pathfindingRenderer = new PathfindingRenderer();
+			this.opaqueRenderers.add(this.pathfindingRenderer);
+		} else {
+			this.pathfindingRenderer = null;
 		}
 
 		if (SharedConstants.DEBUG_WATER) {
-			this.opaqueRenderers.add(new WaterDebugRenderer(minecraft));
+			this.waterDebugRenderer = new WaterDebugRenderer(minecraft);
+			this.opaqueRenderers.add(this.waterDebugRenderer);
+		} else {
+			this.waterDebugRenderer = null;
 		}
 
 		if (SharedConstants.DEBUG_HEIGHTMAP) {
-			this.opaqueRenderers.add(new HeightMapRenderer(minecraft));
+			this.heightMapRenderer = new HeightMapRenderer(minecraft);
+			this.opaqueRenderers.add(this.heightMapRenderer);
+		} else {
+			this.heightMapRenderer = null;
 		}
 
 		if (SharedConstants.DEBUG_COLLISION) {
-			this.opaqueRenderers.add(new CollisionBoxRenderer(minecraft));
+			this.collisionBoxRenderer = new CollisionBoxRenderer(minecraft);
+			this.opaqueRenderers.add(this.collisionBoxRenderer);
+		} else {
+			this.collisionBoxRenderer = null;
 		}
 
 		if (SharedConstants.DEBUG_SUPPORT_BLOCKS) {
-			this.opaqueRenderers.add(new SupportBlockRenderer(minecraft));
+			this.supportBlockRenderer = new SupportBlockRenderer(minecraft);
+			this.opaqueRenderers.add(this.supportBlockRenderer);
+		} else {
+			this.supportBlockRenderer = null;
 		}
 
 		if (SharedConstants.DEBUG_NEIGHBORSUPDATE) {
@@ -78,70 +148,262 @@ public class DebugRenderer {
 		}
 
 		if (SharedConstants.DEBUG_EXPERIMENTAL_REDSTONEWIRE_UPDATE_ORDER) {
-			this.opaqueRenderers.add(new RedstoneWireOrientationsRenderer());
+			this.redstoneWireOrientationsRenderer = new RedstoneWireOrientationsRenderer();
+			this.opaqueRenderers.add(this.redstoneWireOrientationsRenderer);
+		} else {
+			this.redstoneWireOrientationsRenderer = null;
 		}
 
 		if (SharedConstants.DEBUG_STRUCTURES) {
-			this.opaqueRenderers.add(new StructureRenderer());
+			this.structureRenderer = new StructureRenderer();
+			this.opaqueRenderers.add(this.structureRenderer);
+		} else {
+			this.structureRenderer = null;
 		}
 
 		if (SharedConstants.DEBUG_LIGHT) {
-			this.opaqueRenderers.add(new LightDebugRenderer(minecraft));
+			this.lightDebugRenderer = new LightDebugRenderer(minecraft);
+			this.opaqueRenderers.add(this.lightDebugRenderer);
+		} else {
+			this.lightDebugRenderer = null;
 		}
 
 		if (SharedConstants.DEBUG_SOLID_FACE) {
-			this.opaqueRenderers.add(new SolidFaceRenderer(minecraft));
+			this.solidFaceRenderer = new SolidFaceRenderer(minecraft);
+			this.opaqueRenderers.add(this.solidFaceRenderer);
+		} else {
+			this.solidFaceRenderer = null;
 		}
 
 		if (SharedConstants.DEBUG_VILLAGE_SECTIONS) {
-			this.opaqueRenderers.add(new VillageSectionsDebugRenderer());
+			this.villageSectionsDebugRenderer = new VillageSectionsDebugRenderer();
+			this.opaqueRenderers.add(this.villageSectionsDebugRenderer);
+		} else {
+			this.villageSectionsDebugRenderer = null;
 		}
 
 		if (SharedConstants.DEBUG_BRAIN) {
-			this.opaqueRenderers.add(new BrainDebugRenderer(minecraft));
+			this.brainDebugRenderer = new BrainDebugRenderer(minecraft);
+			this.opaqueRenderers.add(this.brainDebugRenderer);
+		} else {
+			this.brainDebugRenderer = null;
 		}
 
 		if (SharedConstants.DEBUG_POI) {
-			this.opaqueRenderers.add(new PoiDebugRenderer(new BrainDebugRenderer(minecraft)));
+			BrainDebugRenderer brain = this.brainDebugRenderer != null ? this.brainDebugRenderer : new BrainDebugRenderer(minecraft);
+			this.poiDebugRenderer = new PoiDebugRenderer(brain);
+			this.opaqueRenderers.add(this.poiDebugRenderer);
+		} else {
+			this.poiDebugRenderer = null;
 		}
 
 		if (SharedConstants.DEBUG_BEES) {
-			this.opaqueRenderers.add(new BeeDebugRenderer(minecraft));
+			this.beeDebugRenderer = new BeeDebugRenderer(minecraft);
+			this.opaqueRenderers.add(this.beeDebugRenderer);
+		} else {
+			this.beeDebugRenderer = null;
 		}
 
 		if (SharedConstants.DEBUG_RAIDS) {
-			this.opaqueRenderers.add(new RaidDebugRenderer(minecraft));
+			this.raidDebugRenderer = new RaidDebugRenderer(minecraft);
+			this.opaqueRenderers.add(this.raidDebugRenderer);
+		} else {
+			this.raidDebugRenderer = null;
 		}
 
 		if (SharedConstants.DEBUG_GOAL_SELECTOR) {
-			this.opaqueRenderers.add(new GoalSelectorDebugRenderer(minecraft));
+			this.goalSelectorDebugRenderer = new GoalSelectorDebugRenderer(minecraft);
+			this.opaqueRenderers.add(this.goalSelectorDebugRenderer);
+		} else {
+			this.goalSelectorDebugRenderer = null;
 		}
 
 		if (SharedConstants.DEBUG_CHUNKS) {
-			this.opaqueRenderers.add(new ChunkDebugRenderer(minecraft));
+			this.chunkDebugRenderer = new ChunkDebugRenderer(minecraft);
+			this.opaqueRenderers.add(this.chunkDebugRenderer);
+		} else {
+			this.chunkDebugRenderer = null;
 		}
 
 		if (SharedConstants.DEBUG_GAME_EVENT_LISTENERS) {
-			this.opaqueRenderers.add(new GameEventListenerRenderer());
+			this.gameEventListenerRenderer = new GameEventListenerRenderer();
+			this.opaqueRenderers.add(this.gameEventListenerRenderer);
+		} else {
+			this.gameEventListenerRenderer = null;
 		}
 
 		if (SharedConstants.DEBUG_SKY_LIGHT_SECTIONS) {
-			this.opaqueRenderers.add(new LightSectionDebugRenderer(minecraft, LightLayer.SKY));
+			this.lightSectionDebugRenderer = new LightSectionDebugRenderer(minecraft, LightLayer.SKY);
+			this.opaqueRenderers.add(this.lightSectionDebugRenderer);
+		} else {
+			this.lightSectionDebugRenderer = null;
 		}
 
 		if (SharedConstants.DEBUG_BREEZE_MOB) {
-			this.opaqueRenderers.add(new BreezeDebugRenderer(minecraft));
+			this.breezeDebugRenderer = new BreezeDebugRenderer(minecraft);
+			this.opaqueRenderers.add(this.breezeDebugRenderer);
+		} else {
+			this.breezeDebugRenderer = null;
 		}
 
 		if (SharedConstants.DEBUG_ENTITY_BLOCK_INTERSECTION) {
-			this.opaqueRenderers.add(new EntityBlockIntersectionDebugRenderer());
+			this.entityBlockIntersectionDebugRenderer = new EntityBlockIntersectionDebugRenderer();
+			this.opaqueRenderers.add(this.entityBlockIntersectionDebugRenderer);
+		} else {
+			this.entityBlockIntersectionDebugRenderer = null;
 		}
 
-		this.translucentRenderers.add(new ChunkCullingDebugRenderer(minecraft));
+		this.chunkCullingDebugRenderer = new ChunkCullingDebugRenderer(minecraft);
+		this.translucentRenderers.add(this.chunkCullingDebugRenderer);
+	}
+
+	/** Collects the collision-debug family for Rust whole-frame Vulkan. */
+	public void collectRustCollisionSemantics(PoseStack poseStack, SubmitNodeStorage geometry, Camera camera) {
+		if (!SharedConstants.DEBUG_COLLISION || this.collisionBoxRenderer == null) return;
+		this.collisionBoxRenderer.collectRustSemantics(poseStack, geometry, camera);
+	}
+
+	/** Collects the solid-face debug family for Rust whole-frame Vulkan. */
+	public void collectRustSolidFaceSemantics(SubmitNodeStorage geometry, Camera camera) {
+		if (!SharedConstants.DEBUG_SOLID_FACE || this.solidFaceRenderer == null) return;
+		this.solidFaceRenderer.collectRustSemantics(geometry, camera);
+	}
+
+	/** Collects support-block debug geometry for Rust whole-frame Vulkan. */
+	public void collectRustSupportBlockSemantics(Camera camera) {
+		if (!SharedConstants.DEBUG_SUPPORT_BLOCKS || this.supportBlockRenderer == null) return;
+		this.supportBlockRenderer.collectRustSemantics(camera);
+	}
+
+	/** Collects neighbor-update debug geometry and labels for Rust Vulkan. */
+	public void collectRustNeighborUpdateSemantics(Camera camera, SubmitNodeStorage geometry, SubmitNodeStorage text) {
+		if (!SharedConstants.DEBUG_NEIGHBORSUPDATE) return;
+		new NeighborsUpdateRenderer().collectRustSemantics(camera, geometry, text);
+	}
+
+	/** Collects structure-debug boxes for Rust whole-frame Vulkan. */
+	public void collectRustStructureSemantics(Camera camera) {
+		if (!SharedConstants.DEBUG_STRUCTURES || this.structureRenderer == null) return;
+		this.structureRenderer.collectRustSemantics(camera);
+	}
+
+	/** Collects game-event listener debug geometry and text for Rust Vulkan. */
+	public void collectRustGameEventListenerSemantics(Camera camera, SubmitNodeStorage geometry, SubmitNodeStorage text) {
+		if (!SharedConstants.DEBUG_GAME_EVENT_LISTENERS || this.gameEventListenerRenderer == null) return;
+		this.gameEventListenerRenderer.collectRustSemantics(camera, geometry, text);
+	}
+
+	/** Collects redstone orientation vectors for Rust whole-frame Vulkan. */
+	public void collectRustRedstoneWireOrientationSemantics(Camera camera) {
+		if (!SharedConstants.DEBUG_EXPERIMENTAL_REDSTONEWIRE_UPDATE_ORDER || this.redstoneWireOrientationsRenderer == null) return;
+		this.redstoneWireOrientationsRenderer.collectRustSemantics(camera);
+	}
+
+	/** Collects chunk-border debug segments for Rust whole-frame Vulkan. */
+	public void collectRustChunkBorderSemantics(Camera camera) {
+		if (this.chunkBorderRenderer == null) return;
+		this.chunkBorderRenderer.collectRustSemantics(camera);
+	}
+
+	/** Collects Breeze debug primitives for Rust whole-frame Vulkan. */
+	public void collectRustBreezeSemantics(Camera camera, SubmitNodeStorage geometry) {
+		if (!SharedConstants.DEBUG_BREEZE_MOB || this.breezeDebugRenderer == null) return;
+		this.breezeDebugRenderer.collectRustSemantics(camera, geometry);
+	}
+
+	/** Collects pathfinding debug primitives for Rust whole-frame Vulkan. */
+	public void collectRustPathfindingSemantics(Camera camera, SubmitNodeStorage geometry, SubmitNodeStorage text) {
+		if (!SharedConstants.DEBUG_PATHFINDING || this.pathfindingRenderer == null) return;
+		this.pathfindingRenderer.collectRustSemantics(camera, geometry, text);
+	}
+
+	/** Collects light-section debug fields for Rust whole-frame Vulkan. */
+	public void collectRustLightSectionSemantics(Camera camera, SubmitNodeStorage geometry) {
+		if (!SharedConstants.DEBUG_SKY_LIGHT_SECTIONS || this.lightSectionDebugRenderer == null) return;
+		this.lightSectionDebugRenderer.collectRustSemantics(camera, geometry);
+	}
+
+	/** Collects height-map debug overlays for Rust whole-frame Vulkan. */
+	public void collectRustHeightMapSemantics(Camera camera, SubmitNodeStorage geometry) {
+		if (!SharedConstants.DEBUG_HEIGHTMAP || this.heightMapRenderer == null) return;
+		this.heightMapRenderer.collectRustSemantics(camera, geometry);
+	}
+
+	/** Collects chunk-culling paths, visibility, and captured-frustum diagnostics. */
+	public void collectRustChunkCullingSemantics(Camera camera, SubmitNodeStorage geometry) {
+		if (this.chunkCullingDebugRenderer == null) return;
+		this.chunkCullingDebugRenderer.collectRustSemantics(camera, geometry);
+	}
+
+	/** Collects nearby water debug levels and labels for Rust whole-frame Vulkan. */
+	public void collectRustWaterSemantics(Camera camera, SubmitNodeStorage geometry, SubmitNodeStorage text) {
+		if (!SharedConstants.DEBUG_WATER || this.waterDebugRenderer == null) return;
+		this.waterDebugRenderer.collectRustSemantics(camera, geometry, text);
+	}
+
+	/** Collects nearby light-engine diagnostics into the Rust semantic text stream. */
+	public void collectRustLightSemantics(Camera camera, SubmitNodeStorage text) {
+		if (!SharedConstants.DEBUG_LIGHT || this.lightDebugRenderer == null) return;
+		this.lightDebugRenderer.collectRustSemantics(camera, text);
+	}
+
+	/** Collects subscribed village-section markers for Rust whole-frame Vulkan. */
+	public void collectRustVillageSectionSemantics(Camera camera, SubmitNodeStorage geometry) {
+		if (!SharedConstants.DEBUG_VILLAGE_SECTIONS || this.villageSectionsDebugRenderer == null) return;
+		this.villageSectionsDebugRenderer.collectRustSemantics(this.minecraft, camera, geometry);
+	}
+
+	/** Collects periodic client/server chunk diagnostics for Rust whole-frame Vulkan. */
+	public void collectRustChunkSemantics(Camera camera, SubmitNodeStorage text) {
+		if (!SharedConstants.DEBUG_CHUNKS || this.chunkDebugRenderer == null) return;
+		this.chunkDebugRenderer.collectRustSemantics(camera, text);
+	}
+
+	/** Collects entity/block intersection subscriptions for Rust whole-frame Vulkan. */
+	public void collectRustEntityBlockIntersectionSemantics(Camera camera, SubmitNodeStorage geometry) {
+		if (!SharedConstants.DEBUG_ENTITY_BLOCK_INTERSECTION || this.entityBlockIntersectionDebugRenderer == null) return;
+		this.entityBlockIntersectionDebugRenderer.collectRustSemantics(this.minecraft, camera, geometry);
+	}
+
+	/** Collects goal-selector subscription labels for Rust whole-frame Vulkan. */
+	public void collectRustGoalSelectorSemantics(Camera camera, SubmitNodeStorage text) {
+		if (!SharedConstants.DEBUG_GOAL_SELECTOR || this.goalSelectorDebugRenderer == null) return;
+		this.goalSelectorDebugRenderer.collectRustSemantics(camera, text);
+	}
+
+	/** Collects raid-center subscriptions for Rust whole-frame Vulkan. */
+	public void collectRustRaidSemantics(Camera camera, SubmitNodeStorage geometry, SubmitNodeStorage text) {
+		if (!SharedConstants.DEBUG_RAIDS || this.raidDebugRenderer == null) return;
+		this.raidDebugRenderer.collectRustSemantics(camera, geometry, text);
+	}
+
+	/** Collects POI and ghost-POI diagnostics for Rust whole-frame Vulkan. */
+	public void collectRustPoiSemantics(Camera camera, SubmitNodeStorage geometry, SubmitNodeStorage text) {
+		if (!SharedConstants.DEBUG_POI || this.poiDebugRenderer == null) return;
+		this.poiDebugRenderer.collectRustSemantics(this.minecraft, camera, geometry, text);
+	}
+
+	/** Collects complete brain-debug labels for Rust whole-frame Vulkan. */
+	public void collectRustBrainSemantics(Camera camera, SubmitNodeStorage text) {
+		if (!SharedConstants.DEBUG_BRAIN || this.brainDebugRenderer == null) return;
+		this.brainDebugRenderer.collectRustSemantics(camera, text);
+	}
+
+	/** Collects bee, flower, hive, and ghost-hive diagnostics for Rust Vulkan. */
+	public void collectRustBeeSemantics(Camera camera, SubmitNodeStorage geometry, SubmitNodeStorage text) {
+		if (!SharedConstants.DEBUG_BEES || this.beeDebugRenderer == null) return;
+		this.beeDebugRenderer.collectRustSemantics(camera, geometry, text);
+	}
+
+	/** Collects frustum-filtered octree diagnostics for Rust whole-frame Vulkan. */
+	public void collectRustOctreeSemantics(Camera camera, SubmitNodeStorage geometry, SubmitNodeStorage text, Frustum frustum) {
+		if (!minecraft.debugEntries.isCurrentlyEnabled(DebugScreenEntries.CHUNK_SECTION_OCTREE) || this.octreeDebugRenderer == null) return;
+		this.octreeDebugRenderer.collectRustSemantics(camera, geometry, text, frustum);
 	}
 
 	public void render(PoseStack poseStack, Frustum frustum, MultiBufferSource.BufferSource bufferSource, double d, double e, double f, boolean bl) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			throw new IllegalStateException("Java debug rendering is unavailable while Rust owns whole-frame presentation");
 		}
 		Minecraft minecraft = Minecraft.getInstance();

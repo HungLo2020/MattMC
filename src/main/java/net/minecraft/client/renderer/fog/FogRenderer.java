@@ -54,14 +54,15 @@ public class FogRenderer implements AutoCloseable, FogStorage {
 	);
 	private static boolean fogEnabled = true;
 	@Nullable
-	private final GpuBuffer emptyBuffer;
+	private GpuBuffer emptyBuffer;
 	@Nullable
-	private final MappableRingBuffer regularBuffer;
+	private MappableRingBuffer regularBuffer;
 	// Sodium: FogStorage interface implementation (from FogRendererMixin)
 	private FogParameters parameters = FogParameters.NONE;
 
 	public FogRenderer() {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
 			// Rust consumes copied fog parameters; Java UBOs and shader-fog
 			// publication are compatibility-only on the whole-frame route.
 			this.regularBuffer = null;
@@ -82,15 +83,26 @@ public class FogRenderer implements AutoCloseable, FogStorage {
 	public void close() {
 		if (this.emptyBuffer != null) this.emptyBuffer.close();
 		if (this.regularBuffer != null) this.regularBuffer.close();
+		this.emptyBuffer = null;
+		this.regularBuffer = null;
+	}
+
+	public void ensureRustSemanticRoute() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) this.close();
 	}
 
 	public void endFrame() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+			return;
+		}
 		if (this.regularBuffer != null) this.regularBuffer.rotate();
 	}
 
 	public GpuBufferSlice getBuffer(FogRenderer.FogMode fogMode) {
 		if (this.emptyBuffer == null || this.regularBuffer == null) {
-			throw new IllegalStateException("Java fog UBO rendering is unavailable while Rust owns whole-frame presentation");
+			throw new IllegalStateException("Java fog UBO rendering is unavailable on selected Vulkan");
 		}
 		if (!fogEnabled) {
 			return this.emptyBuffer.slice(0, FOG_UBO_SIZE);
@@ -104,7 +116,11 @@ public class FogRenderer implements AutoCloseable, FogStorage {
 
 	// VoxelMap: Made accessible
 	public Vector4f computeFogColor(Camera camera, float f, ClientLevel clientLevel, int i, float g, boolean bl) {
-		return this.computeFogColor(camera, f, clientLevel, i, g, bl, true);
+		return this.computeFogColor(
+			camera, f, clientLevel, i, g, bl,
+			!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+				&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+		);
 	}
 
 	/** Computes the same fog color without publishing Java/Iris compatibility state. */
@@ -196,8 +212,9 @@ public class FogRenderer implements AutoCloseable, FogStorage {
 	}
 
 	public Vector4f setupFog(Camera camera, int i, boolean bl, DeltaTracker deltaTracker, float f, ClientLevel clientLevel) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			throw new IllegalStateException("Java fog UBO rendering is unavailable while Rust owns whole-frame presentation");
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+			throw new IllegalStateException("Java fog UBO rendering is unavailable on selected Vulkan");
 		}
 		FogComputation fog = this.computeFogParameters(camera, i, bl, deltaTracker, f, clientLevel, true);
 		FogParameters fogParameters = fog.parameters();

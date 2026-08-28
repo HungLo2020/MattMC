@@ -90,6 +90,7 @@ pub(crate) struct EntityOutlinePostEffectPipelines {
     pub sobel_pipeline: Handle,
     pub blur_pipeline: Handle,
     pub blit_pipeline: Handle,
+    pub blit_depthless_pipeline: Handle,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -268,6 +269,7 @@ pub(crate) fn bind_entity_outline_post_effect_passes(
     frame_pass: Handle,
     frame_target: Handle,
     frame_color_attachment: Handle,
+    blit_pipeline: Handle,
 ) -> GalResult<Vec<VanillaPostEffectPassBinding>> {
     if plan.effect.ordered_passes.len() != 4
         || targets.color_format != pipelines.color_format
@@ -291,7 +293,7 @@ pub(crate) fn bind_entity_outline_post_effect_passes(
         (pipelines.sobel_pipeline, pipelines.sobel_layout),
         (pipelines.blur_pipeline, pipelines.blur_layout),
         (pipelines.blur_pipeline, pipelines.blur_layout),
-        (pipelines.blit_pipeline, pipelines.blit_layout),
+        (blit_pipeline, pipelines.blit_layout),
     ];
     let inputs_for_pass = [
         [(targets.mask_view, false)],
@@ -341,6 +343,7 @@ pub(crate) fn lower_entity_outline_post_effect_with_resources(
     frame_pass: Handle,
     frame_target: Handle,
     frame_color_attachment: Handle,
+    blit_pipeline: Handle,
     uniform_before: TextureUsageState,
     swap_before: TextureUsageState,
     outline_before: TextureUsageState,
@@ -353,6 +356,7 @@ pub(crate) fn lower_entity_outline_post_effect_with_resources(
         frame_pass,
         frame_target,
         frame_color_attachment,
+        blit_pipeline,
     )?;
     let mut operations = Vec::with_capacity(40);
     let uniform_buffers = sets.uniform_buffers;
@@ -417,9 +421,10 @@ pub(crate) fn lower_entity_outline_post_effect_with_resources(
 }
 
 impl EntityOutlinePostEffectPipelines {
-    pub(crate) fn handles_in_destroy_order(&self) -> [Handle; 13] {
+    pub(crate) fn handles_in_destroy_order(&self) -> [Handle; 14] {
         [
             self.blit_pipeline,
+            self.blit_depthless_pipeline,
             self.blur_pipeline,
             self.sobel_pipeline,
             self.blit_layout,
@@ -533,7 +538,7 @@ pub(crate) fn create_entity_outline_post_effect_pipelines(
             resource_layouts: vec![blit_resource_layout],
         })?;
         created.push(blit_layout);
-        let mut pipeline = |label: &str, layout: Handle, fragment_shader: Handle| {
+        let mut pipeline = |label: &str, layout: Handle, fragment_shader: Handle, depth_format| {
             gal.create_graphics_pipeline(GraphicsPipelineDesc {
                 label: label.to_string(),
                 layout,
@@ -547,7 +552,7 @@ pub(crate) fn create_entity_outline_post_effect_pipelines(
                 depth_write: false,
                 depth_bias: None,
                 color_formats: vec![color_format],
-                depth_format: None,
+                depth_format,
                 stencil: None,
             })
         };
@@ -555,20 +560,30 @@ pub(crate) fn create_entity_outline_post_effect_pipelines(
             "minecraft.entity-outline.sobel.pipeline",
             sobel_layout,
             sobel_shader,
+            None,
         )?;
         created.push(sobel_pipeline);
         let blur_pipeline = pipeline(
             "minecraft.entity-outline.blur.pipeline",
             blur_layout,
             blur_shader,
+            None,
         )?;
         created.push(blur_pipeline);
         let blit_pipeline = pipeline(
             "minecraft.entity-outline.blit.pipeline",
             blit_layout,
             blit_shader,
+            Some(TextureFormat::Depth32Float),
         )?;
         created.push(blit_pipeline);
+        let blit_depthless_pipeline = pipeline(
+            "minecraft.entity-outline.blit-depthless.pipeline",
+            blit_layout,
+            blit_shader,
+            None,
+        )?;
+        created.push(blit_depthless_pipeline);
         Ok(EntityOutlinePostEffectPipelines {
             color_format,
             vertex_shader,
@@ -584,6 +599,7 @@ pub(crate) fn create_entity_outline_post_effect_pipelines(
             sobel_pipeline,
             blur_pipeline,
             blit_pipeline,
+            blit_depthless_pipeline,
         })
     })();
     match result {
@@ -1251,6 +1267,21 @@ mod tests {
     }
 
     #[test]
+    fn entity_outline_plan_retains_outline_only_instances_for_mask_execution() {
+        let mut outline_only = test_mesh_instance(7);
+        outline_only.flags = 1;
+        outline_only.outline_color_argb = 0xff_33_66_cc;
+
+        let plan = plan_entity_outline_mask(&frame_with_instances(vec![outline_only]))
+            .unwrap()
+            .expect("outline-only semantic work must remain available to the mask planner");
+
+        assert_eq!(1, plan.instances.len());
+        assert_eq!(7, plan.instances[0].mesh_key);
+        assert_eq!(0xff_33_66_cc, plan.instances[0].color_argb);
+    }
+
+    #[test]
     fn entity_outline_plan_rejects_non_entity_strata() {
         let mut instance = test_mesh_instance(3);
         instance.stratum = WORLD_STRATUM_TERRAIN;
@@ -1700,6 +1731,7 @@ mod tests {
             frame_pass,
             frame_target,
             frame_color,
+            pipelines.blit_depthless_pipeline,
         )
         .unwrap();
         assert_eq!(4, bindings.len());
@@ -1742,6 +1774,7 @@ mod tests {
             Handle::new(HandleKind::RenderPass, 90, 1).unwrap(),
             Handle::new(HandleKind::RenderTarget, 91, 1).unwrap(),
             Handle::new(HandleKind::TextureView, 92, 1).unwrap(),
+            pipelines.blit_depthless_pipeline,
             TextureUsageState::ShaderRead,
             TextureUsageState::Undefined,
             TextureUsageState::Undefined,
@@ -1836,6 +1869,8 @@ mod tests {
             entity_id: 0,
             entity_color_argb: 0,
             outline_color_argb: 0,
+            flags: 0,
+            block_entity_id: -1,
             transform: [
                 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
             ],

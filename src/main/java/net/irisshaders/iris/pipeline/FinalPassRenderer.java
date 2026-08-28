@@ -164,8 +164,11 @@ public class FinalPassRenderer {
 
 		this.swapPasses = swapPasses.build();
 
-		var ctx = VulkanicAPI.getCommandContext();
-		VulkanicAPI.bindReadFramebuffer(ctx, 0);
+		if (!net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			var ctx = VulkanicAPI.getCommandContext();
+			VulkanicAPI.bindReadFramebuffer(ctx, 0);
+		}
 	}
 
 	private static void setupMipmapping(RenderTarget target, boolean readFromAlt) {
@@ -213,6 +216,9 @@ public class FinalPassRenderer {
 	public void renderFinalPass() {
 		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			throw new IllegalStateException("Java Iris final-pass rendering is unavailable while Rust owns whole-frame presentation");
+		}
+		if (VulkanicAPI.isVulkanBackendSelected()) {
+			throw new IllegalStateException("Java Iris Vulkan final-pass rendering is unavailable until the Rust whole-frame route is admitted");
 		}
 		final net.blaze3d.pipeline.RenderTarget main = Minecraft.getInstance().getMainRenderTarget();
 		final int baseWidth = main.width;
@@ -518,6 +524,12 @@ public class FinalPassRenderer {
 	}
 
 	public void destroy() {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			// Java Iris pass objects are not Rust resources. Never invoke their
+			// GL destruction callbacks while the Rust Vulkan route owns the frame.
+			return;
+		}
 		if (finalPass != null) {
 			finalPass.destroy();
 		}

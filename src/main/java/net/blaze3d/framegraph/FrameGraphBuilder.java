@@ -54,21 +54,24 @@ public class FrameGraphBuilder {
 	}
 
 	public void execute(GraphicsResourceAllocator graphicsResourceAllocator, FrameGraphBuilder.Inspector inspector) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| VulkanicAPI.isVulkanBackendSelected()) {
 			throw new IllegalStateException("Java frame-graph execution is unavailable while Rust owns whole-frame presentation");
 		}
 		this.execute(graphicsResourceAllocator, inspector, VulkanicAPI.getCommandContext());
 	}
 
 	public void execute(GraphicsResourceAllocator graphicsResourceAllocator, CommandContext ctx) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| VulkanicAPI.isVulkanBackendSelected()) {
 			throw new IllegalStateException("Java frame-graph execution is unavailable while Rust owns whole-frame presentation");
 		}
 		this.execute(graphicsResourceAllocator, FrameGraphBuilder.Inspector.NONE, ctx);
 	}
 
 	public void execute(GraphicsResourceAllocator graphicsResourceAllocator, FrameGraphBuilder.Inspector inspector, CommandContext ctx) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| VulkanicAPI.isVulkanBackendSelected()) {
 			throw new IllegalStateException("Java frame-graph execution is unavailable while Rust owns whole-frame presentation");
 		}
 		BitSet bitSet = this.identifyPassesToKeep();

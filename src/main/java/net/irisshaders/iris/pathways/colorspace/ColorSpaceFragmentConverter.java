@@ -45,13 +45,18 @@ public class ColorSpaceFragmentConverter implements ColorSpaceConverter {
 	private GpuTexture target;
 
 	public ColorSpaceFragmentConverter(int width, int height, ColorSpace colorSpace) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			throw new IllegalStateException("Java Iris color-space resources are unavailable while Rust owns whole-frame presentation");
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris color-space resources are unavailable on selected Vulkan");
 		}
 		rebuildProgram(width, height, colorSpace);
 	}
 
 	public void rebuildProgram(int width, int height, ColorSpace colorSpace) {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris color-space resources are unavailable on selected Vulkan");
+		}
 		if (program != null) {
 			program.destroy();
 			program = null;
@@ -96,6 +101,10 @@ public class ColorSpaceFragmentConverter implements ColorSpaceConverter {
 	}
 
 	public void process(GpuTexture targetImage) {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris color-space post-processing is unavailable while Rust owns whole-frame presentation");
+		}
 		if (colorSpace == ColorSpace.SRGB) return;
 
 		this.target = targetImage;

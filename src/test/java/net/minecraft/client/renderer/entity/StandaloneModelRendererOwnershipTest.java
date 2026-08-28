@@ -30,19 +30,19 @@ final class StandaloneModelRendererOwnershipTest {
 			int ownership = source.indexOf("StandaloneModelRenderOwnershipPolicy.currentOwnershipRoute()", eligibility);
 			int classification = source.indexOf("StandaloneModelRenderOwnershipPolicy.classify(", ownership);
 			int unavailable = source.indexOf("Disposition.RUST_UNAVAILABLE", classification);
-			int javaSubmit = source.indexOf("submitNodeCollector.submitModelSemanticTexture(", unavailable);
-			if (javaSubmit < 0) {
-				javaSubmit = source.indexOf("submitNodeCollector.submitModel(", unavailable);
+			int semanticSubmit = source.indexOf("submitNodeCollector.submitModelSemanticTexture(", unavailable);
+			if (semanticSubmit < 0) {
+				semanticSubmit = source.indexOf("submitNodeCollector.submitModelSemantic(", unavailable);
 			}
 
 			assertTrue(eligibility >= 0, producer + " must retain bounded semantic eligibility");
 			assertTrue(ownership > eligibility, producer + " must resolve callsite ownership independently of eligibility");
 			assertTrue(classification > ownership, producer + " must classify availability against ownership");
 			assertTrue(unavailable > classification, producer + " must explicitly handle Rust-unavailable state");
-			assertTrue(javaSubmit > unavailable, producer + " Java submit must remain outside the Rust-unavailable branch");
+			assertTrue(semanticSubmit > unavailable, producer + " semantic model submission must remain explicit after Rust-unavailable handling");
 			assertTrue(source.contains("\"rust-vulkan-unavailable\""), producer + " must record unavailable Rust state");
 			assertFalse(
-				source.substring(unavailable, javaSubmit).contains("enqueueStandaloneModelMesh("),
+				source.substring(unavailable, semanticSubmit).contains("enqueueStandaloneModelMesh("),
 				producer + " unavailable branch must not enqueue an admitted Rust mesh"
 			);
 			assertFalse(

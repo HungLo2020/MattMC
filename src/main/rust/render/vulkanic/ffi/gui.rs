@@ -1,4 +1,10 @@
 use super::*;
+use crate::render::vulkanic::gui_frontend::{
+    GUI_MAX_RAW_IMAGE_BYTES_TOTAL, GUI_MAX_RAW_IMAGE_PIXELS, GUI_MAX_VIEWPORT_AXIS,
+};
+use crate::render::vulkanic::gui_mesh_frontend::GUI_MESH_MAX_FRAME_PAYLOAD_BYTES;
+
+const GUI_MAX_AFFINE_QUADS: usize = 65_536;
 
 pub(crate) unsafe fn decode_gui_frame_submit(
     request: *const FfiGuiFrameSubmitRequest,
@@ -55,12 +61,16 @@ pub(crate) unsafe fn decode_gui_frame_submit_with_mesh(
             "GUI frame submit requires non-zero generation and frame id",
         ));
     }
-    if request.gui_width <= 0 || request.gui_height <= 0 {
+    if request.gui_width <= 0
+        || request.gui_height <= 0
+        || request.gui_width > GUI_MAX_VIEWPORT_AXIS
+        || request.gui_height > GUI_MAX_VIEWPORT_AXIS
+    {
         return Err(GalError::ffi(
             StatusCode::InvalidArgument,
             format!(
-                "GUI frame submit requires positive GUI dimensions, got {}x{}",
-                request.gui_width, request.gui_height
+                "GUI frame submit dimensions {}x{} exceed bounded positive axis {}",
+                request.gui_width, request.gui_height, GUI_MAX_VIEWPORT_AXIS
             ),
         ));
     }
@@ -144,13 +154,13 @@ fn decode_gui_affine_quads(
     gui_height: i32,
 ) -> GalResult<Vec<GuiAffineQuadRequest>> {
     let quads = unsafe { read_slice(raw, true, "GUI affine quad requests") }?;
-    if quads.len() > FFI_MAX_BATCH_ITEMS {
+    if quads.len() > GUI_MAX_AFFINE_QUADS {
         return Err(GalError::ffi(
             StatusCode::InvalidArgument,
             format!(
                 "GUI affine quad count {} exceeds max {}",
                 quads.len(),
-                FFI_MAX_BATCH_ITEMS
+                GUI_MAX_AFFINE_QUADS
             ),
         ));
     }
@@ -219,6 +229,37 @@ pub(crate) unsafe fn decode_gui_mesh_batches(
                 GUI_MESH_MAX_BATCHES
             ),
         ));
+    }
+    // Inspect every nested slice descriptor before copying any geometry. The
+    // per-batch limits alone would otherwise allow their product to exceed a
+    // safe frame-sized allocation.
+    let mut payload_bytes = 0_u64;
+    for batch in batches {
+        let vertices = read_slice(batch.vertices, true, "GUI mesh vertices")?;
+        let indices = read_slice(batch.indices, true, "GUI mesh indices")?;
+        if vertices.len() > GUI_MESH_MAX_VERTICES || indices.len() > GUI_MESH_MAX_INDICES {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                "GUI mesh payload exceeds its bounded vertex or index capacity",
+            ));
+        }
+        payload_bytes = payload_bytes
+            .saturating_add(
+                (vertices.len() as u64)
+                    .saturating_mul(std::mem::size_of::<FfiGuiMeshVertex>() as u64),
+            )
+            .saturating_add(
+                (indices.len() as u64).saturating_mul(std::mem::size_of::<u32>() as u64),
+            );
+        if payload_bytes > GUI_MESH_MAX_FRAME_PAYLOAD_BYTES {
+            return Err(GalError::ffi(
+                StatusCode::LengthOverflow,
+                format!(
+                    "GUI mesh frame payload {} exceeds bounded limit {}",
+                    payload_bytes, GUI_MESH_MAX_FRAME_PAYLOAD_BYTES
+                ),
+            ));
+        }
     }
     let mut owned = Vec::with_capacity(batches.len());
     for batch in batches {
@@ -376,8 +417,18 @@ pub(crate) unsafe fn decode_gui_asset_update(
         ));
     }
     let assets = read_limited_slice(request.assets, true, "GUI asset payloads")?;
+    if assets.len() > GUI_MAX_RAW_IMAGES {
+        return Err(GalError::ffi(
+            StatusCode::LengthOverflow,
+            format!(
+                "GUI asset payload count {} exceeds bounded limit {GUI_MAX_RAW_IMAGES}",
+                assets.len()
+            ),
+        ));
+    }
     let mut seen = BTreeMap::new();
     let mut owned = Vec::with_capacity(assets.len());
+    let mut png_bytes_total = 0usize;
     for asset in assets {
         validate_item_size::<FfiGuiAssetPayload>(asset.byte_size, "GUI asset payload")?;
         if seen.insert(asset.sprite_id, ()).is_some() {
@@ -386,6 +437,23 @@ pub(crate) unsafe fn decode_gui_asset_update(
                 format!(
                     "duplicate GUI asset payload for sprite id {}",
                     asset.sprite_id
+                ),
+            ));
+        }
+        png_bytes_total = png_bytes_total
+            .checked_add(asset.png_bytes.len as usize)
+            .ok_or_else(|| {
+                GalError::ffi(
+                    StatusCode::LengthOverflow,
+                    "GUI asset PNG byte count overflow",
+                )
+            })?;
+        if png_bytes_total > GUI_MAX_RAW_IMAGE_BYTES_TOTAL {
+            return Err(GalError::ffi(
+                StatusCode::LengthOverflow,
+                format!(
+                    "GUI asset PNG bytes {} exceed bounded total {GUI_MAX_RAW_IMAGE_BYTES_TOTAL}",
+                    png_bytes_total
                 ),
             ));
         }
@@ -424,8 +492,18 @@ pub(crate) unsafe fn decode_gui_raw_image_update(
         ));
     }
     let assets = read_limited_slice(request.assets, true, "raw GUI image payloads")?;
+    if assets.len() > GUI_MAX_RAW_IMAGES {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            format!(
+                "raw GUI image payload count {} exceeds bounded limit {GUI_MAX_RAW_IMAGES}",
+                assets.len()
+            ),
+        ));
+    }
     let mut seen = BTreeMap::new();
     let mut owned = Vec::with_capacity(assets.len());
+    let mut total_pixels = 0usize;
     for asset in assets {
         validate_item_size::<FfiGuiRawImageAssetPayload>(asset.byte_size, "raw GUI image payload")?;
         if asset.asset_id == 0 || seen.insert(asset.asset_id, ()).is_some() {
@@ -456,6 +534,49 @@ pub(crate) unsafe fn decode_gui_raw_image_update(
                 "raw GUI image height must be positive",
             )
         })?;
+        let pixel_count = usize::try_from(width)
+            .ok()
+            .and_then(|width| usize::try_from(height).ok().and_then(|height| width.checked_mul(height)))
+            .ok_or_else(|| GalError::ffi(StatusCode::LengthOverflow, "raw GUI image pixel count overflows"))?;
+        if pixel_count == 0 || pixel_count > GUI_MAX_RAW_IMAGE_PIXELS {
+            return Err(GalError::ffi(
+                StatusCode::LengthOverflow,
+                format!(
+                    "raw GUI image {} has {} pixels; maximum is {GUI_MAX_RAW_IMAGE_PIXELS}",
+                    asset.asset_id, pixel_count
+                ),
+            ));
+        }
+        let bytes_per_pixel = match format {
+            GuiRawImageFormat::Alpha8 => 1usize,
+            GuiRawImageFormat::Rgba8 => 4usize,
+        };
+        let expected_bytes = pixel_count.checked_mul(bytes_per_pixel).ok_or_else(|| {
+            GalError::ffi(StatusCode::LengthOverflow, "raw GUI image byte count overflows")
+        })?;
+        let incoming_bytes = usize::try_from(asset.pixels.len).map_err(|_| {
+            GalError::ffi(StatusCode::LengthOverflow, "raw GUI image byte length exceeds usize")
+        })?;
+        if incoming_bytes != expected_bytes {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                format!(
+                    "raw GUI image {} has {} bytes; expected {expected_bytes}",
+                    asset.asset_id, incoming_bytes
+                ),
+            ));
+        }
+        total_pixels = total_pixels.checked_add(expected_bytes).ok_or_else(|| {
+            GalError::ffi(StatusCode::LengthOverflow, "raw GUI image aggregate byte count overflows")
+        })?;
+        if total_pixels > GUI_MAX_RAW_IMAGE_BYTES_TOTAL {
+            return Err(GalError::ffi(
+                StatusCode::LengthOverflow,
+                format!(
+                    "raw GUI image aggregate bytes {total_pixels} exceed bounded limit {GUI_MAX_RAW_IMAGE_BYTES_TOTAL}"
+                ),
+            ));
+        }
         let pixels = read_bounded_bytes(
             asset.pixels,
             true,

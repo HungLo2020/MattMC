@@ -3,6 +3,7 @@ package net.alexsmobs.client.render;
 import net.alexsmobs.client.model.ModelTarantulaHawk;
 import net.alexsmobs.client.model.ModelTarantulaHawkBaby;
 import net.alexsmobs.entity.EntityTarantulaHawk;
+import net.citadel.client.model.AdvancedEntityModel;
 import net.blaze3d.vertex.PoseStack;
 import net.math.Axis;
 import net.minecraft.client.renderer.RenderType;
@@ -12,16 +13,18 @@ import net.minecraft.resources.ResourceLocation;
 
 import javax.annotation.Nullable;
 
-public class RenderTarantulaHawk extends MobRenderer<EntityTarantulaHawk, TarantulaHawkRenderState, ModelTarantulaHawk> {
+public class RenderTarantulaHawk extends MobRenderer<EntityTarantulaHawk, TarantulaHawkRenderState, AdvancedEntityModel<TarantulaHawkRenderState>> {
     private static final ResourceLocation TEXTURE = ResourceLocation.withDefaultNamespace("textures/entity/tarantula_hawk.png");
     private static final ResourceLocation TEXTURE_ANGRY = ResourceLocation.withDefaultNamespace("textures/entity/tarantula_hawk_angry.png");
     private static final ResourceLocation TEXTURE_NETHER = ResourceLocation.withDefaultNamespace("textures/entity/tarantula_hawk_nether.png");
     private static final ResourceLocation TEXTURE_NETHER_ANGRY = ResourceLocation.withDefaultNamespace("textures/entity/tarantula_hawk_nether_angry.png");
     private static final ResourceLocation TEXTURE_BABY = ResourceLocation.withDefaultNamespace("textures/entity/tarantula_hawk_baby.png");
     private final ModelTarantulaHawkBaby modelBaby;
+    private final ModelTarantulaHawk modelAdult;
     
     public RenderTarantulaHawk(EntityRendererProvider.Context renderManagerIn) {
         super(renderManagerIn, new ModelTarantulaHawk(), 0.5F);
+        this.modelAdult = (ModelTarantulaHawk) this.model;
         this.modelBaby = new ModelTarantulaHawkBaby();
     }
 
@@ -55,6 +58,7 @@ public class RenderTarantulaHawk extends MobRenderer<EntityTarantulaHawk, Tarant
     }
 
     protected void scale(TarantulaHawkRenderState renderState, PoseStack matrixStackIn) {
+        this.model = renderState.isBaby ? modelBaby : modelAdult;
         if(!renderState.isBaby){
             matrixStackIn.scale(0.9F, 0.9F, 0.9F);
             float f = renderState.dragProgress;

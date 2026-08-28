@@ -179,7 +179,7 @@ public class RenderMungus extends MobRenderer<EntityMungus, MungusRenderState, M
                 poseStack.translate(0.2F, -1.4F, 0.15D);
                 poseStack.scale(-1.0F, -1.0F, 1.0F);
                 poseStack.translate(-0.5D, -0.5D, -0.5D);
-                submitNodeCollector.submitBlock(poseStack, blockstate, packedLight, overlay, renderState.outlineColor);
+                submitNodeCollector.submitBlockSemantic(poseStack, blockstate, packedLight, overlay, renderState.outlineColor);
                 poseStack.popPose();
             }
             if (mushroomCount == 1 && altOrder || mushroomCount >= 2) {
@@ -187,7 +187,7 @@ public class RenderMungus extends MobRenderer<EntityMungus, MungusRenderState, M
                 poseStack.translate(-0.2F, -1.5F, -0.2D);
                 poseStack.scale(-1.0F, -1.0F, 1.0F);
                 poseStack.translate(-0.5D, -0.5D, -0.5D);
-                submitNodeCollector.submitBlock(poseStack, blockstate, packedLight, overlay, renderState.outlineColor);
+                submitNodeCollector.submitBlockSemantic(poseStack, blockstate, packedLight, overlay, renderState.outlineColor);
                 poseStack.popPose();
             }
             if (mushroomCount >= 3) {
@@ -196,7 +196,7 @@ public class RenderMungus extends MobRenderer<EntityMungus, MungusRenderState, M
                 poseStack.mulPose(Axis.ZP.rotationDegrees(90F));
                 poseStack.scale(-1.0F, -1.0F, 1.0F);
                 poseStack.translate(-0.5D, -0.5D, -0.5D);
-                submitNodeCollector.submitBlock(poseStack, blockstate, packedLight, overlay, renderState.outlineColor);
+                submitNodeCollector.submitBlockSemantic(poseStack, blockstate, packedLight, overlay, renderState.outlineColor);
                 poseStack.popPose();
             }
             if (mushroomCount >= 4) {
@@ -205,7 +205,7 @@ public class RenderMungus extends MobRenderer<EntityMungus, MungusRenderState, M
                 poseStack.mulPose(Axis.ZP.rotationDegrees(-60F));
                 poseStack.scale(-1.0F, -1.0F, 1.0F);
                 poseStack.translate(-0.5D, -0.5D, -0.5D);
-                submitNodeCollector.submitBlock(poseStack, blockstate, packedLight, overlay, renderState.outlineColor);
+                submitNodeCollector.submitBlockSemantic(poseStack, blockstate, packedLight, overlay, renderState.outlineColor);
                 poseStack.popPose();
             }
             if (mushroomCount >= 5) {
@@ -214,7 +214,7 @@ public class RenderMungus extends MobRenderer<EntityMungus, MungusRenderState, M
                 poseStack.mulPose(Axis.ZP.rotationDegrees(-100F));
                 poseStack.scale(-1.0F, -1.0F, 1.0F);
                 poseStack.translate(-0.5D, -0.5D, -0.5D);
-                submitNodeCollector.submitBlock(poseStack, blockstate, packedLight, overlay, renderState.outlineColor);
+                submitNodeCollector.submitBlockSemantic(poseStack, blockstate, packedLight, overlay, renderState.outlineColor);
                 poseStack.popPose();
             }
             poseStack.popPose();

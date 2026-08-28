@@ -67,6 +67,7 @@ public class SimpleEquipmentLayer<S extends LivingEntityRenderState, RM extends 
 			
 			// Iris: Set item context
 			if (!net.minecraft.client.renderer.entity.EntityRenderDispatcher.isSemanticSubmission()
+				&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
 				&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
 				&& WorldRenderingSettings.INSTANCE.getItemIds() != null) {
 				ResourceLocation location = BuiltInRegistries.ITEM.getKey(itemStack.getItem());
@@ -90,6 +91,7 @@ public class SimpleEquipmentLayer<S extends LivingEntityRenderState, RM extends 
 			
 			// Iris: Clear item context
 			if (!net.minecraft.client.renderer.entity.EntityRenderDispatcher.isSemanticSubmission()
+				&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
 				&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 				CapturedRenderingState.INSTANCE.setCurrentRenderedItem(0);
 			}

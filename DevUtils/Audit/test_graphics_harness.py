@@ -1096,6 +1096,29 @@ class GraphicsAuditHarnessTests(unittest.TestCase):
                 distant["validation"]["messages"],
             )
 
+    def test_frozen_cloud_baseline_does_not_require_rust_receipts(self) -> None:
+        """Frozen OpenGL remains a control even when the Rust cloud fixture is requested."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "frozen-opengl-shaders-off")
+            target = fake_repo(temp, mode.target)
+            capture = temp / "capture"
+            write_capture(capture, backend=mode.backend, shaders=mode.shaders, world="Origin")
+            deterministic = capture / "deterministic_camera_capture_20260101_000000.json"
+            document = json.loads(deterministic.read_text(encoding="utf-8"))
+            document["rustGalWorldClouds"] = {"scenario": "bounded"}
+            deterministic.write_text(json.dumps(document), encoding="utf-8")
+            (capture / "runClient_20260101_000000.log").write_text(
+                "-Dmattmc.dev.rustGalClouds.scenario=bounded\n", encoding="utf-8"
+            )
+            artifact = harness.normalize_capture_artifact(
+                target, mode, capture, "correctness", True, ["fake"], 0, False, tool_kind="capture"
+            )
+            self.assertNotIn(
+                "deterministic Rust cloud scenario requires the Rust Vulkan whole-frame route",
+                artifact["validation"]["messages"],
+            )
+
     def test_selected_source_weather_requires_matching_writer_execution_receipt(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp = Path(temp_dir)
@@ -2479,7 +2502,8 @@ class GraphicsAuditHarnessTests(unittest.TestCase):
                 "clientEntityId": 91,
             }
             crystal_document["rustGalWorldModelMeshes"] = [
-                {**mesh, "textureId": "minecraft:textures/entity/end_crystal/end_crystal.png", "entityId": 91}
+                {**mesh, "textureId": "minecraft:textures/entity/end_crystal/end_crystal.png",
+                 "semanticModelIdentity": "minecraft:end_crystal", "entityId": 91}
                 for mesh in document["rustGalWorldModelMeshes"]
             ]
             crystal_document["rustGalWorldModelMeshRouteDecisions"] = [
@@ -7572,6 +7596,20 @@ else:
             self.assertIn("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=2", java_options)
             self.assertIn("MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_DIR", env)
 
+    def test_weather_pair_maps_frozen_baseline_to_legacy_route(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            target = fake_repo(root, "frozen")
+            mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "frozen-opengl-shaders-off")
+            args = harness.parse_args(
+                ["capture", "--profile", "standard", "--mode", mode.name, "--world-weather-scenario", "rain"]
+            )
+            _, env = harness.build_capture_command(target, mode, root / "capture", "correctness", args, "capture")
+            options = shlex.split(env["JAVA_TOOL_OPTIONS"])
+            self.assertIn("-Dmattmc.dev.rustGalWeather.scenario=rain", options)
+            self.assertIn("-Dmattmc.dev.rustGalWeather.legacyControl=true", options)
+            self.assertNotIn("-Dmattmc.dev.rustGalWeather.disabled=true", options)
+
     def test_static_terrain_capture_execution_uses_the_captured_submission_without_a_lifecycle(self) -> None:
         valid, evidence = harness.static_terrain_capture_execution_evidence(
             {"required": True, "requestSubmission": 270, "requestInstances": 13}, "real-world"
@@ -7695,6 +7733,29 @@ else:
 
             with self.assertRaisesRegex(ValueError, "requires current-rust-vulkan"):
                 harness.build_capture_command(target, mode, root / "capture", "correctness", args, "capture")
+
+    def test_frozen_opengl_static_terrain_capture_is_allowed_for_parity_baseline(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            target = fake_repo(root, "frozen")
+            mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "frozen-opengl-shaders-on")
+            args = harness.parse_args(
+                [
+                    "capture",
+                    "--profile",
+                    "standard",
+                    "--mode",
+                    mode.name,
+                    "--world-static-terrain-scenario",
+                    "translucent-water",
+                ]
+            )
+
+            command, _ = harness.build_capture_command(target, mode, root / "capture", "correctness", args, "capture")
+
+            self.assertIn("--world-static-terrain-scenario", command)
+            self.assertIn("translucent-water", command)
+            self.assertIn("--world-static-terrain-water-animation-capture", command)
 
     def test_rust_vulkan_gameplay_timing_does_not_request_attachment_readback(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -8244,6 +8305,25 @@ else:
                 "-Dmattmc.dev.deterministicCameraCapture.settledReadyFamilies=distant-horizons",
                 ordinary_source_options,
             )
+
+            frozen_static = harness.parse_args(
+                [
+                    "capture",
+                    "--profile",
+                    "standard",
+                    "--mode",
+                    "frozen-opengl-shaders-off",
+                    "--world",
+                    "Origin",
+                    "--world-static-terrain-scenario",
+                    "translucent-water",
+                ]
+            )
+            frozen = next(mode for mode in harness.MATRIX_MODES if mode.name == "frozen-opengl-shaders-off")
+            _, frozen_static_env = harness.build_capture_command(
+                target, frozen, root / "capture-frozen-static", "correctness", frozen_static, "capture"
+            )
+            self.assertEqual("true", frozen_static_env["MATTMC_CAPTURE_DISABLE_DH_FOR_ORDINARY_SOURCE"])
 
     def test_readiness_state_classifies_affected_world_dh_generation_timeout(self) -> None:
         text = "\n".join(
@@ -10783,6 +10863,23 @@ else:
         )
         self.assertEqual(diagnosis["root_cause"], "readiness-phase")
         self.assertIn("readiness=screen=TitleScreen", diagnosis["evidence"])
+
+    def test_renderdoc_outline_workload_accepts_reused_depth_attachment(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            capture = Path(temp) / "capture"
+            write_capture(capture, backend="vulkan")
+            (capture / "runClient_20260101_000000.log").write_text(
+                "rust_gal_world_primitive_batches_executed=1 "
+                "rust_gal_world_line_segments_executed=12 "
+                "rust_gal_world_line_vertices_executed=72 "
+                "rust_gal_world_primitive_draws_executed=1 "
+                "rust_gal_world_depth_attachment_creates=0 "
+                "rust_gal_world_depth_attachment_reuses=3\n",
+                encoding="utf-8",
+            )
+            proof = harness.renderdoc_workload_proof(capture)
+            self.assertTrue(proof["non_zero_outline_workload"])
+            self.assertTrue(proof["depth_attachment_evidence"])
 
 
 if __name__ == "__main__":

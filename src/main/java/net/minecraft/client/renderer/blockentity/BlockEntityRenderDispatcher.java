@@ -26,6 +26,7 @@ import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.server.packs.resources.ResourceManagerReloadListener;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 
@@ -98,9 +99,15 @@ public class BlockEntityRenderDispatcher implements ResourceManagerReloadListene
 	public <S extends BlockEntityRenderState> void submit(
 		S blockEntityRenderState, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, CameraRenderState cameraRenderState
 	) {
-		boolean rustWholeFrame = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			&& net.vulkanic.world.WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan();
-		this.submitInternal(blockEntityRenderState, poseStack, submitNodeCollector, cameraRenderState, !rustWholeFrame);
+		boolean selectedVulkan = net.vulkanic.VulkanicAPI.isVulkanBackendSelected();
+		boolean rustWholeFrame = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| (selectedVulkan && net.vulkanic.world.WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan());
+		// A selected Vulkan frame never borrows Iris' Java render tracking, even
+		// when this particular block-entity family is unavailable and will be
+		// rejected later by the feature dispatcher. Semantic coverage calls use
+		// submitSemantic, which already disables capture explicitly.
+		this.submitInternal(blockEntityRenderState, poseStack, submitNodeCollector, cameraRenderState,
+			!selectedVulkan && !rustWholeFrame);
 	}
 
 	/**
@@ -120,6 +127,9 @@ public class BlockEntityRenderDispatcher implements ResourceManagerReloadListene
 		CameraRenderState cameraRenderState,
 		boolean captureIrisRenderState
 	) {
+		if (blockEntityRenderState == null) {
+			throw new IllegalStateException("block-entity semantic submission requires copied render state");
+		}
 		BlockEntityRenderer<?, S> blockEntityRenderer = this.getRenderer(blockEntityRenderState);
 		if (blockEntityRenderer != null) {
 			// Iris: From MixinBlockEntityRenderDispatcher - begin entity render tracking
@@ -133,12 +143,35 @@ public class BlockEntityRenderDispatcher implements ResourceManagerReloadListene
 				int intId = blockStateIds.applyAsInt(blockEntityRenderState.blockState);
 				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentBlockEntity(intId);
 			}
+			boolean rustPresenterActive = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
 			boolean rustBlockEntityItemScope = !captureIrisRenderState
 				&& !submitNodeCollector.isSemanticCoverageOnly()
-				&& net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-				&& net.vulkanic.world.WorldRenderRoutePolicy.currentModelPartMeshRoute(true).usesRustWholeFrameVulkan();
+				&& rustPresenterActive
+				&& (net.vulkanic.world.WorldRenderRoutePolicy.currentModelPartMeshRoute(true).usesRustWholeFrameVulkan()
+					|| net.vulkanic.world.WorldRenderRoutePolicy.currentItemEntityMeshRoute(true).usesRustWholeFrameVulkan());
 			if (rustBlockEntityItemScope) {
 				net.vulkanic.world.RustGalWorldPrimitiveRenderer.beginBlockEntityItemSubmission();
+			}
+			boolean rustBlockEntitySemanticScope = !captureIrisRenderState
+				&& rustPresenterActive
+				&& net.vulkanic.world.WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan();
+			if (rustBlockEntitySemanticScope) {
+				int blockEntityId = Block.BLOCK_STATE_REGISTRY.getId(blockEntityRenderState.blockState);
+				if (blockEntityId < 0) {
+					if (rustBlockEntityItemScope) {
+						net.vulkanic.world.RustGalWorldPrimitiveRenderer.endBlockEntityItemSubmission();
+					}
+					throw new IllegalStateException("Rust whole-frame block-entity semantic scope requires a registered block-state identity");
+				}
+				try {
+					net.vulkanic.world.RustGalWorldPrimitiveRenderer.beginBlockEntitySubmission(blockEntityId);
+				} catch (Throwable failure) {
+					if (rustBlockEntityItemScope) {
+						net.vulkanic.world.RustGalWorldPrimitiveRenderer.endBlockEntityItemSubmission();
+					}
+					throw failure;
+				}
 			}
 			
 			try {
@@ -151,6 +184,9 @@ public class BlockEntityRenderDispatcher implements ResourceManagerReloadListene
 			} finally {
 				if (rustBlockEntityItemScope) {
 					net.vulkanic.world.RustGalWorldPrimitiveRenderer.endBlockEntityItemSubmission();
+				}
+				if (rustBlockEntitySemanticScope) {
+					net.vulkanic.world.RustGalWorldPrimitiveRenderer.endBlockEntitySubmission();
 				}
 				// Iris: From MixinBlockEntityRenderDispatcher - end entity render tracking
 				if (captureIrisRenderState) {

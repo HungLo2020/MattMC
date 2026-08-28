@@ -22,6 +22,13 @@ public abstract class ImageClearPass {
 
 	public abstract void execute();
 
+	protected static void ensureJavaClearPassAvailable() {
+		if (VulkanicAPI.isVulkanBackendSelected()
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris image clear passes are unavailable on the Rust Vulkan route");
+		}
+	}
+
 	public void destroy() {
 		framebuffer.destroy();
 	}
@@ -33,6 +40,7 @@ public abstract class ImageClearPass {
 
 		@Override
 		public void execute() {
+			ensureJavaClearPassAvailable();
 			IrisRenderSystem.clearBufferfv(this.framebuffer.getId(), VulkanicAPI.GL_COLOR, 0, new float[]{0.0f, 0.0f, 0.0f, 0.0f});
 		}
 	}
@@ -44,6 +52,7 @@ public abstract class ImageClearPass {
 
 		@Override
 		public void execute() {
+			ensureJavaClearPassAvailable();
 			IrisRenderSystem.clearBufferiv(this.framebuffer.getId(), VulkanicAPI.GL_COLOR, 0, new int[]{0, 0, 0, 0});
 		}
 	}
@@ -55,6 +64,7 @@ public abstract class ImageClearPass {
 
 		@Override
 		public void execute() {
+			ensureJavaClearPassAvailable();
 			IrisRenderSystem.clearBufferuiv(this.framebuffer.getId(), VulkanicAPI.GL_COLOR, 0, new int[]{0, 0, 0, 0});
 		}
 	}

@@ -84,8 +84,7 @@ public class TheEndGatewayRenderer extends AbstractEndPortalRenderer<TheEndGatew
 	protected RenderType renderType() {
 		// Iris: Use solid rendering when shaders are active
 		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			&& !(net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-				&& net.vulkanic.world.WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan())
+			&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
 			&& net.irisshaders.iris.Iris.getCurrentPack().isPresent()) {
 			return RenderType.entitySolid(TheEndPortalRenderer.END_PORTAL_LOCATION);
 		}

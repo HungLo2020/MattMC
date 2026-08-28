@@ -73,7 +73,8 @@ public class CompressibleGLBufferedImage {
     }
 
     public void uploadToTexture() {
-        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
             throw new IllegalStateException("Java VoxelMap persistent-image upload is unavailable while Rust owns whole-frame presentation");
         }
         if (!VulkanicAPI.isOnRenderThread()) {

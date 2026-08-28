@@ -63,9 +63,15 @@ public class MapTextureManager implements AutoCloseable {
 
 		MapInstance(final int i, final MapItemSavedData mapItemSavedData) {
 			this.data = mapItemSavedData;
-			this.texture = new DynamicTexture(() -> "Map " + i, 128, 128, true);
+			this.texture = semanticRustRoute()
+				? null : new DynamicTexture(() -> "Map " + i, 128, 128, true);
 			this.location = ResourceLocation.withDefaultNamespace("map/" + i);
-			MapTextureManager.this.textureManager.register(this.location, this.texture);
+			if (!semanticRustRoute()) MapTextureManager.this.textureManager.register(this.location, this.texture);
+		}
+
+		private boolean semanticRustRoute() {
+			return net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
 		}
 
 		void replaceMapData(MapItemSavedData mapItemSavedData) {
@@ -80,6 +86,27 @@ public class MapTextureManager implements AutoCloseable {
 
 		void updateTextureIfNeeded() {
 			if (this.requiresUpload) {
+				if (semanticRustRoute()) {
+					if (this.data == null || this.data.colors == null || this.data.colors.length != 128 * 128) {
+						throw new IllegalStateException("Rust semantic map image staging requires exactly 128x128 map color data");
+					}
+					byte[] pixels = new byte[128 * 128 * 4];
+					for (int i = 0; i < 128; i++) {
+						for (int j = 0; j < 128; j++) {
+							int color = net.minecraft.world.level.material.MapColor.getColorFromPackedId(this.data.colors[j + i * 128]);
+							int offset = (j + i * 128) * 4;
+							pixels[offset] = (byte) color;
+							pixels[offset + 1] = (byte) (color >>> 8);
+							pixels[offset + 2] = (byte) (color >>> 16);
+							pixels[offset + 3] = (byte) (color >>> 24);
+						}
+					}
+					if (!net.vulkanic.gui.RustGalGuiRawImageAssets.stageCpuRgba8(this.location, 128, 128, pixels)) {
+						throw new IllegalStateException("Rust semantic map image staging rejected bounded CPU pixels");
+					}
+					this.requiresUpload = false;
+					return;
+				}
 				NativeImage nativeImage = this.texture.getPixels();
 				if (nativeImage != null) {
 					for (int i = 0; i < 128; i++) {
@@ -96,7 +123,7 @@ public class MapTextureManager implements AutoCloseable {
 		}
 
 		public void close() {
-			this.texture.close();
+			if (this.texture != null) this.texture.close();
 		}
 	}
 }

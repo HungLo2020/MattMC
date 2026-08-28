@@ -94,7 +94,8 @@ public class EntityMapImageManager {
     private final Class<?>[] fullRenderModels = new Class[] { CodModel.class, LavaSlimeModel.class, SalmonModel.class, SlimeModel.class, TropicalFishModelA.class, TropicalFishModelB.class };
 
     public EntityMapImageManager() {
-        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+        if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+            || net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
             throw new IllegalStateException("Java VoxelMap entity-image rendering is unavailable while Rust owns whole-frame presentation");
         }
         this.textureAtlas = new TextureAtlas("mobsmap", resourceTextureAtlasMarker);
@@ -201,8 +202,9 @@ public class EntityMapImageManager {
 
     @SuppressWarnings("rawtypes")
     public Sprite requestImageForMob(Entity entity, int size, boolean addBorder) {
-        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-            throw new IllegalStateException("Java VoxelMap entity-image rendering is unavailable while Rust owns whole-frame presentation");
+        if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+            || net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+            throw new IllegalStateException("Java VoxelMap entity-image rendering is unavailable on selected Vulkan");
         }
         EntityRenderer<?, ?> baseRenderer = minecraft.getEntityRenderDispatcher().getRenderer(entity);
         EntityVariantData variant = getOrCreateVariantData(entity, baseRenderer, size, addBorder);

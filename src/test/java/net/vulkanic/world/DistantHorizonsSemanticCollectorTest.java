@@ -72,6 +72,22 @@ class DistantHorizonsSemanticCollectorTest {
 	}
 
 	@Test
+	void waterSourceReceiptAcceptsTheReducedSurfaceUpperBoundaryOnlyForWater() {
+		System.setProperty(DistantHorizonsSemanticCollector.CAPTURE_PROPERTY, "true");
+		long water = RenderDataPointUtil.createDataPoint(
+			162, 161, 0xFFFFFFFF, 15, 0, EDhApiBlockMaterial.WATER.index
+		);
+		int upperY = -64 + RenderDataPointUtil.getYMax(water);
+		BlockPos probe = new BlockPos(104, upperY, 529);
+		DistantHorizonsSemanticCollector.configureWaterSourceInputProbes(List.of(probe));
+		DistantHorizonsSemanticCollector.recordWaterSourceInput(
+			42L, (byte) 0, 104, -64, 529, water,
+			ColumnRenderSource.SEMANTIC_MATERIAL_UNAVAILABLE
+		);
+		assertTrue(DistantHorizonsSemanticCollector.waterSourceInputReceipt(List.of(probe)).matched());
+	}
+
+	@Test
 	void projectionInverseUsesTheCanonicalColumnMajorSemanticLayout() {
 		// The same perspective shape captured from the DH semantic boundary:
 		// it is row-major here and becomes the ABI's column-major representation.
@@ -144,7 +160,7 @@ class DistantHorizonsSemanticCollectorTest {
 		assertEquals(13, vertex.blue());
 		assertEquals(14, vertex.alpha());
 		assertEquals(15, vertex.materialId());
-		assertEquals(16, vertex.normalIndex());
+		assertEquals(5, vertex.normalIndex());
 		assertThrows(UnsupportedOperationException.class, () -> snapshot.opaque().add(null));
 		assertThrows(UnsupportedOperationException.class, () -> snapshot.opaque().getFirst().vertices().add(vertex));
 	}
@@ -194,7 +210,7 @@ class DistantHorizonsSemanticCollectorTest {
 			DistantHorizonsSemanticCollector.materialProvenanceForTest(77L);
 		assertEquals(grass, provenance.semanticMaterials().get(0));
 		assertEquals(1, provenance.opaque().get(0)[0]);
-		assertEquals(16, DistantHorizonsSemanticCollector.snapshotForTest(77L).opaque().get(0).vertices().get(0).normalIndex());
+		assertEquals(5, DistantHorizonsSemanticCollector.snapshotForTest(77L).opaque().get(0).vertices().get(0).normalIndex());
 		assertEquals(0, DistantHorizonsSemanticCollector.snapshotForTest(77L).opaque().get(0).vertices().get(0).padding());
 	}
 
@@ -1140,6 +1156,12 @@ class DistantHorizonsSemanticCollectorTest {
 		int materialId,
 		int normalIndex
 	) {
+		// These fixtures intentionally use varied legacy values at callsites, but
+		// the Rust semantic ABI admits material IDs 0..15 and face normals 0..5.
+		// Keep the production validator strict while ensuring every fixture models
+		// a value that can actually cross the Rust boundary.
+		materialId = Math.min(Math.max(materialId, 0), 15);
+		normalIndex = Math.min(Math.max(normalIndex, 0), 5);
 		ByteBuffer buffer = ByteBuffer.allocate(DistantHorizonsSemanticCollector.VERTEX_STRIDE_BYTES * 4).order(ByteOrder.nativeOrder());
 		for (int vertex = 0; vertex < 4; vertex++) {
 			buffer.putShort((short)x);

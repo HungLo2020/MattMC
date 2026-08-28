@@ -43,12 +43,20 @@ public class ModelBlockRenderer implements net.fabricmc.fabric.api.renderer.v1.r
 		this.blockColors = blockColors;
 	}
 
+	private static void rejectSelectedVulkanJavaTessellation() {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java block-model tessellation is unavailable while Rust owns Vulkan rendering");
+		}
+	}
+
 	@Override
 	public void render(net.minecraft.world.level.BlockAndTintGetter blockView, net.minecraft.client.renderer.block.model.BlockStateModel model, 
 	                   net.minecraft.world.level.block.state.BlockState state, net.minecraft.core.BlockPos pos, 
 	                   PoseStack matrices,
 	                   net.fabricmc.fabric.api.renderer.v1.render.BlockVertexConsumerProvider vertexConsumers, 
 	                   boolean cull, long seed, int overlay) {
+		rejectSelectedVulkanJavaTessellation();
 		// Override the default implementation to pass 'this' instead of null
 		net.fabricmc.fabric.api.renderer.v1.Renderer renderer = net.fabricmc.fabric.api.renderer.v1.Renderer.get();
 		if (renderer != null) {
@@ -66,6 +74,7 @@ public class ModelBlockRenderer implements net.fabricmc.fabric.api.renderer.v1.r
 		boolean bl,
 		int i
 	) {
+		rejectSelectedVulkanJavaTessellation();
 		if (!list.isEmpty()) {
 			boolean bl2 = Minecraft.useAmbientOcclusion() && blockState.getLightEmission() == 0 && ((BlockModelPart)list.getFirst()).useAmbientOcclusion();
 			poseStack.translate(blockState.getOffset(blockPos));
@@ -105,6 +114,7 @@ public class ModelBlockRenderer implements net.fabricmc.fabric.api.renderer.v1.r
 		boolean bl,
 		int i
 	) {
+		rejectSelectedVulkanJavaTessellation();
 		ModelBlockRenderer.AmbientOcclusionRenderStorage ambientOcclusionRenderStorage = new ModelBlockRenderer.AmbientOcclusionRenderStorage();
 		int j = 0;
 		int k = 0;
@@ -149,6 +159,7 @@ public class ModelBlockRenderer implements net.fabricmc.fabric.api.renderer.v1.r
 		boolean bl,
 		int i
 	) {
+		rejectSelectedVulkanJavaTessellation();
 		ModelBlockRenderer.CommonRenderStorage commonRenderStorage = new ModelBlockRenderer.CommonRenderStorage();
 		int j = 0;
 		int k = 0;
@@ -339,6 +350,7 @@ public class ModelBlockRenderer implements net.fabricmc.fabric.api.renderer.v1.r
 	}
 
 	public static void renderModel(PoseStack.Pose pose, VertexConsumer vertexConsumer, BlockStateModel blockStateModel, float f, float g, float h, int i, int j) {
+		rejectSelectedVulkanJavaTessellation();
 		// Sodium: Use optimized vertex writer intrinsics if available (merged from ModelBlockRendererMixin model.block)
 		var writer = VertexConsumerUtils.convertOrLog(vertexConsumer);
 		if (writer != null) {

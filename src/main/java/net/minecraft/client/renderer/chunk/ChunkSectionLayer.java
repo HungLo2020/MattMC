@@ -53,7 +53,8 @@ public enum ChunkSectionLayer {
 
 	@Nullable
 	public GpuTextureView textureView() {
-		if (RustGalVulkanWholeFrameMode.enabled()) {
+		if (RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
 			return null;
 		}
 		TextureManager textureManager = Minecraft.getInstance().getTextureManager();

@@ -56,7 +56,7 @@ public class BlockDecorationLayer<S extends EntityRenderState, M extends EntityM
 				poseStack.translate(-0.5, 0.0, -0.5);
 			}
 
-			submitNodeCollector.submitBlock(poseStack, blockState, i, OverlayTexture.NO_OVERLAY, entityRenderState.outlineColor);
+		submitNodeCollector.submitBlockSemantic(poseStack, blockState, i, OverlayTexture.NO_OVERLAY, entityRenderState.outlineColor);
 			poseStack.popPose();
 		}
 	}

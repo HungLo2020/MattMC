@@ -106,15 +106,18 @@ public class ConduitRenderer implements BlockEntityRenderer<ConduitBlockEntity, 
 			poseStack.pushPose();
 			poseStack.translate(0.5F, 0.5F, 0.5F);
 			poseStack.mulPose(new Quaternionf().rotationY(condiutRenderState.activeRotation * (float) (Math.PI / 180.0)));
-			submitNodeCollector.submitModelPart(
+			submitNodeCollector.submitModelPartSemantic(
 				this.shell,
 				poseStack,
 				SHELL_TEXTURE.renderType(RenderType::entitySolid),
 				condiutRenderState.lightCoords,
 				OverlayTexture.NO_OVERLAY,
 				this.materials.get(SHELL_TEXTURE),
+				false,
+				false,
 				-1,
-				condiutRenderState.breakProgress
+				condiutRenderState.breakProgress,
+				0
 			);
 			poseStack.popPose();
 		} else {
@@ -125,15 +128,18 @@ public class ConduitRenderer implements BlockEntityRenderer<ConduitBlockEntity, 
 			poseStack.translate(0.5F, 0.3F + g * 0.2F, 0.5F);
 			Vector3f vector3f = new Vector3f(0.5F, 1.0F, 0.5F).normalize();
 			poseStack.mulPose(new Quaternionf().rotationAxis(f * (float) (Math.PI / 180.0), vector3f));
-			submitNodeCollector.submitModelPart(
+			submitNodeCollector.submitModelPartSemantic(
 				this.cage,
 				poseStack,
 				ACTIVE_SHELL_TEXTURE.renderType(RenderType::entityCutoutNoCull),
 				condiutRenderState.lightCoords,
 				OverlayTexture.NO_OVERLAY,
 				this.materials.get(ACTIVE_SHELL_TEXTURE),
+				false,
+				false,
 				-1,
-				condiutRenderState.breakProgress
+				condiutRenderState.breakProgress,
+				0
 			);
 			poseStack.popPose();
 			poseStack.pushPose();
@@ -147,13 +153,13 @@ public class ConduitRenderer implements BlockEntityRenderer<ConduitBlockEntity, 
 			Material material = condiutRenderState.animationPhase == 1 ? VERTICAL_WIND_TEXTURE : WIND_TEXTURE;
 			RenderType renderType = material.renderType(RenderType::entityCutoutNoCull);
 			TextureAtlasSprite textureAtlasSprite = this.materials.get(material);
-			submitNodeCollector.submitModelPart(this.wind, poseStack, renderType, condiutRenderState.lightCoords, OverlayTexture.NO_OVERLAY, textureAtlasSprite);
+			submitNodeCollector.submitModelPartSemantic(this.wind, poseStack, renderType, condiutRenderState.lightCoords, OverlayTexture.NO_OVERLAY, textureAtlasSprite, false, false, -1, null, 0);
 			poseStack.popPose();
 			poseStack.pushPose();
 			poseStack.translate(0.5F, 0.5F, 0.5F);
 			poseStack.scale(0.875F, 0.875F, 0.875F);
 			poseStack.mulPose(new Quaternionf().rotationXYZ((float) Math.PI, 0.0F, (float) Math.PI));
-			submitNodeCollector.submitModelPart(this.wind, poseStack, renderType, condiutRenderState.lightCoords, OverlayTexture.NO_OVERLAY, textureAtlasSprite);
+			submitNodeCollector.submitModelPartSemantic(this.wind, poseStack, renderType, condiutRenderState.lightCoords, OverlayTexture.NO_OVERLAY, textureAtlasSprite, false, false, -1, null, 0);
 			poseStack.popPose();
 			poseStack.pushPose();
 			poseStack.translate(0.5F, 0.3F + g * 0.2F, 0.5F);
@@ -163,13 +169,18 @@ public class ConduitRenderer implements BlockEntityRenderer<ConduitBlockEntity, 
 			float h = 1.3333334F;
 			poseStack.scale(1.3333334F, 1.3333334F, 1.3333334F);
 			Material material2 = condiutRenderState.isHunting ? OPEN_EYE_TEXTURE : CLOSED_EYE_TEXTURE;
-			submitNodeCollector.submitModelPart(
+			submitNodeCollector.submitModelPartSemantic(
 				this.eye,
 				poseStack,
 				material2.renderType(RenderType::entityCutoutNoCull),
 				condiutRenderState.lightCoords,
 				OverlayTexture.NO_OVERLAY,
-				this.materials.get(material2)
+				this.materials.get(material2),
+				false,
+				false,
+				-1,
+				null,
+				0
 			);
 			poseStack.popPose();
 		}

@@ -5,9 +5,11 @@ import net.blaze3d.vertex.VertexConsumer;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.Camera;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.SubmitNodeStorage;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.util.ARGB;
 import net.minecraft.util.debug.DebugSubscriptions;
@@ -58,6 +60,53 @@ public class BreezeDebugRenderer implements DebugRenderer.SimpleDebugRenderer {
 					);
 			}
 		);
+	}
+
+	/** Copies Breeze target diagnostics into Rust semantic primitives. */
+	public void collectRustSemantics(Camera camera, SubmitNodeStorage geometry) {
+		if (!net.vulkanic.world.WorldRenderRoutePolicy.currentDebugLineRoute().usesRustWholeFrameVulkan()
+			|| !net.vulkanic.world.WorldRenderRoutePolicy.currentProceduralQuadRoute().usesRustWholeFrameVulkan()) {
+			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+				throw new IllegalStateException("Rust whole-frame Breeze-debug route is unavailable; Java debug geometry is not a fallback");
+			}
+			return;
+		}
+		if (camera == null || !camera.isInitialized() || minecraft.level == null) return;
+		DebugValueAccess access = minecraft.getConnection().createDebugValueAccess();
+		org.joml.Matrix4f transform = new org.joml.Matrix4f().translate(
+			(float)-camera.getPosition().x, (float)-camera.getPosition().y, (float)-camera.getPosition().z
+		);
+		access.forEachEntity(DebugSubscriptions.BREEZES, (entity, info) -> {
+			info.attackTarget().map(minecraft.level::getEntity).map(target -> target.getPosition(minecraft.getDeltaTracker().getGameTimeDeltaPartialTick(true))).ifPresent(target -> {
+				queueLine(transform, entity.position(), target, TARGET_LINE_COLOR);
+				queueCircle(transform, target.add(0.0, 0.01, 0.0), 4.0F, INNER_CIRCLE_COLOR);
+				queueCircle(transform, target.add(0.0, 0.01, 0.0), 8.0F, MIDDLE_CIRCLE_COLOR);
+				queueCircle(transform, target.add(0.0, 0.01, 0.0), 24.0F, OUTER_CIRCLE_COLOR);
+			});
+			info.jumpTarget().ifPresent(pos -> {
+				queueLine(transform, entity.position(), pos.getCenter(), JUMP_TARGET_LINE_COLOR);
+				queueFilledBox(geometry, transform, AABB.unitCubeFromLowerCorner(Vec3.atLowerCornerOf(pos)), 0xFFFF0000);
+			});
+		});
+	}
+
+	private static void queueLine(org.joml.Matrix4f transform, Vec3 a, Vec3 b, int color) {
+		if (!net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueDebugLineSegments(transform,
+			new float[] {(float)a.x,(float)a.y,(float)a.z,(float)b.x,(float)b.y,(float)b.z}, color, 2.0F))
+			throw new IllegalStateException("Rust whole-frame Breeze-debug route rejected target line");
+	}
+	private static void queueCircle(org.joml.Matrix4f transform, Vec3 center, float radius, int color) {
+		for (int i=0;i<20;i++) { float a=i*(float)(Math.PI/10), b=(i+1)*(float)(Math.PI/10);
+			if (!net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueDebugLineSegments(transform,
+				new float[] {(float)(center.x+radius*Math.cos(a)),(float)center.y,(float)(center.z+radius*Math.sin(a)),(float)(center.x+radius*Math.cos(b)),(float)center.y,(float)(center.z+radius*Math.sin(b))}, color, 2.0F))
+				throw new IllegalStateException("Rust whole-frame Breeze-debug route rejected target circle"); }
+	}
+	private static void queueFilledBox(SubmitNodeStorage geometry, org.joml.Matrix4f transform, AABB b, int color) {
+		PoseStack pose = new PoseStack(); pose.last().pose().set(transform);
+		float x0=(float)b.minX,y0=(float)b.minY,z0=(float)b.minZ,x1=(float)b.maxX,y1=(float)b.maxY,z1=(float)b.maxZ;
+		float[] uv={0,0,1,0,1,1,0,1}; int[] c={color};
+		float[][] faces={{x0,y0,z0,x1,y0,z0,x1,y1,z0,x0,y1,z0},{x1,y0,z1,x0,y0,z1,x0,y1,z1,x1,y1,z1},{x0,y0,z1,x0,y0,z0,x0,y1,z0,x0,y1,z1},{x1,y0,z0,x1,y0,z1,x1,y1,z1,x1,y1,z0},{x0,y0,z0,x0,y0,z1,x1,y0,z1,x1,y0,z0},{x0,y1,z1,x0,y1,z0,x1,y1,z0,x1,y1,z1}};
+		for (float[] face:faces) if(!geometry.submitColoredQuadsSemantic(pose,RenderType.debugFilledBox(),face,uv,c,15728880)) throw new IllegalStateException("Rust whole-frame Breeze-debug route rejected jump marker");
 	}
 
 	private static void drawLine(PoseStack poseStack, MultiBufferSource multiBufferSource, double d, double e, double f, Vec3 vec3, Vec3 vec32, int i) {

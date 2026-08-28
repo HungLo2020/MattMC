@@ -45,6 +45,21 @@ class DeterministicCameraCaptureVignetteRegressionTest {
 	}
 
 	@Test
+	void evokerFangsFixtureUsesVanillaAttackTimingAndRetriesAfterExpiry() throws Exception {
+		String source = Files.readString(Path.of("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java"));
+		assertTrue(source.contains("\"evoker-fangs\".equals(MODEL_MESH_SCENARIO)"),
+			"the deterministic model fixture must keep an explicit Evoker Fangs branch");
+		assertTrue(source.contains("modelMeshSetupServerEntityId >= 0")
+			&& source.contains("serverLevel.getEntity(modelMeshSetupServerEntityId) == null")
+			&& source.contains("modelMeshSetupStatus = \"server-fixture-expired\""),
+			"short-lived vanilla fangs must retry server tracking after their real lifecycle expires");
+		assertTrue(source.contains("Math.toRadians(player.getYRot()), 0, serverPlayer"),
+			"the fixture must use vanilla immediate warmup so attack event 4 can reach the client during capture");
+		assertTrue(source.contains("serverLevel.broadcastEntityEvent(fangs, (byte)4)"),
+			"the fixture must replicate the vanilla fangs attack event through the server level rather than mutating client state");
+	}
+
+	@Test
 	void rustWholeFrameBlockEntitiesDoNotDependOnCompiledTerrainReadiness() throws Exception {
 		String source = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/LevelRenderer.java"));
 
@@ -69,5 +84,28 @@ class DeterministicCameraCaptureVignetteRegressionTest {
 			"The palette helper must request a bounded Sodium rebuild for its changed blocks");
 		assertTrue(!paletteFixture.contains("minecraft.levelRenderer.allChanged();"),
 			"The palette fixture must not invalidate every terrain source snapshot after its local edits");
+	}
+
+	@Test
+	void waterFixtureDoesNotDeadlockRouteSelectionOnItsPostExecutionProbe() throws Exception {
+		String source = Files.readString(Path.of("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java"));
+		int cacheGate = source.indexOf("boolean fixtureSourceCached = fixtureCoverage.cachedColumns() > 0");
+		assertTrue(cacheGate >= 0,
+			"DH water readiness must start from the published column cache without requiring a water probe first");
+		int executedGate = source.indexOf("!DISTANT_HORIZONS_REQUIRE_WATER || (distantHorizonsTexturePaletteWaterSourceObserved", cacheGate);
+		assertTrue(executedGate > cacheGate,
+			"the water requirement must remain enforced at the final executed-route gate");
+	}
+
+	@Test
+	void waterFixtureStaysInsideTheInvalidatedPaletteFootprint() throws Exception {
+		String source = Files.readString(Path.of("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java"));
+		int water = source.indexOf("if (DISTANT_HORIZONS_REQUIRE_WATER)");
+		int nextBlock = source.indexOf("distantHorizonsWaterWitnesses =", water);
+		String fixture = source.substring(water, nextBlock);
+		assertTrue(fixture.contains("localX = 28; localX < 32"));
+		assertTrue(fixture.contains("localZ = 24; localZ < 28"));
+		assertTrue(fixture.contains("localZ : new int[] { 23, 28 }"));
+		assertTrue(fixture.contains("localX : new int[] { 23, 28 }"));
 	}
 }

@@ -11,6 +11,10 @@ use std::io::BufReader;
 
 use serde_json::Value;
 
+/// Keep a malformed or adversarial properties file from expanding the
+/// semantic sampler map (and later GAL resource set) without bound.
+pub const MAX_TERRAIN_SAMPLER_DECLARATIONS: usize = 1_024;
+
 use crate::render::vulkanic::error::{GalError, GalResult};
 
 use super::source::ShaderPackSource;
@@ -150,6 +154,14 @@ impl TerrainShaderPackAssetBindings {
                     "shader-pack terrain texture '{}' on line {} is not a PNG asset",
                     sampler,
                     line_number + 1
+                )));
+            }
+            if sampler_paths.len() >= MAX_TERRAIN_SAMPLER_DECLARATIONS
+                && !sampler_paths.contains_key(sampler)
+            {
+                return Err(GalError::invalid_argument(format!(
+                    "shader-pack terrain sampler declarations exceed bounded limit {}",
+                    MAX_TERRAIN_SAMPLER_DECLARATIONS
                 )));
             }
             if sampler_paths.insert(sampler.to_string(), path).is_some() {
@@ -827,6 +839,29 @@ mod tests {
                 .pixels_rgba8
         );
         assert!(bindings.resolve_rgba8(&assets, "gaux4").is_err());
+    }
+
+    #[test]
+    fn rejects_excessive_terrain_sampler_declarations_before_map_growth() {
+        let mut properties = String::new();
+        for index in 0..=MAX_TERRAIN_SAMPLER_DECLARATIONS {
+            properties.push_str(&format!(
+                "texture.gbuffers.gaux{index}=textures/{index}.png\n"
+            ));
+        }
+        let source = ShaderPackSource::new(
+            "selected-pack",
+            3,
+            vec![super::super::source::ShaderSourceFile::new(
+                SHADER_PROPERTIES_PATH,
+                properties,
+            )],
+        )
+        .unwrap();
+        let error = TerrainShaderPackAssetBindings::from_source(&source).unwrap_err();
+        assert!(error
+            .to_string()
+            .contains("sampler declarations exceed bounded limit"));
     }
 
     #[test]

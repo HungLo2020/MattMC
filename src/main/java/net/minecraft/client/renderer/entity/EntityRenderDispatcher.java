@@ -154,9 +154,14 @@ public class EntityRenderDispatcher implements ResourceManagerReloadListener {
 	public <S extends EntityRenderState> void submit(
 		S entityRenderState, CameraRenderState cameraRenderState, double d, double e, double f, PoseStack poseStack, SubmitNodeCollector submitNodeCollector
 	) {
-		boolean rustWholeFrame = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			&& net.vulkanic.world.WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan();
-		this.submitInternal(entityRenderState, cameraRenderState, d, e, f, poseStack, submitNodeCollector, !rustWholeFrame);
+		boolean selectedVulkan = net.vulkanic.VulkanicAPI.isVulkanBackendSelected();
+		boolean rustWholeFrame = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| (selectedVulkan && net.vulkanic.world.WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan());
+		// Selected Vulkan never borrows Iris' Java entity tracking. This remains
+		// true when the current material family is unavailable and will fail closed
+		// later; semantic coverage uses submitSemantic explicitly.
+		this.submitInternal(entityRenderState, cameraRenderState, d, e, f, poseStack, submitNodeCollector,
+			!selectedVulkan && !rustWholeFrame);
 	}
 
 	/**
@@ -192,6 +197,7 @@ public class EntityRenderDispatcher implements ResourceManagerReloadListener {
 		boolean captureIrisRenderState
 	) {
 		EntityRenderer<?, ? super S> entityRenderer = this.getRenderer(entityRenderState);
+		boolean posePushed = false;
 
 		try {
 			Vec3 vec3 = entityRenderer.getRenderOffset(entityRenderState);
@@ -199,6 +205,7 @@ public class EntityRenderDispatcher implements ResourceManagerReloadListener {
 			double h = e + vec3.y();
 			double i = f + vec3.z();
 			poseStack.pushPose();
+			posePushed = true;
 			poseStack.translate(g, h, i);
 			
 			// Iris: From MixinEntityRenderDispatcher - begin entity render tracking
@@ -228,7 +235,12 @@ public class EntityRenderDispatcher implements ResourceManagerReloadListener {
 			
 			entityRenderer.submit(entityRenderState, poseStack, submitNodeCollector, cameraRenderState);
 			if (entityRenderState.displayFireAnimation) {
-				submitNodeCollector.submitFlame(poseStack, entityRenderState, Mth.rotationAroundAxis(Mth.Y_AXIS, cameraRenderState.orientation, new Quaternionf()));
+				Quaternionf flameRotation = Mth.rotationAroundAxis(Mth.Y_AXIS, cameraRenderState.orientation, new Quaternionf());
+				if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+					submitNodeCollector.submitFlameSemantic(poseStack, entityRenderState, flameRotation);
+				} else {
+					submitNodeCollector.submitFlameSemantic(poseStack, entityRenderState, flameRotation);
+				}
 			}
 
 			if (entityRenderState instanceof AvatarRenderState) {
@@ -249,7 +261,11 @@ public class EntityRenderDispatcher implements ResourceManagerReloadListener {
 					&& pipeline.shouldDisableVanillaEntityShadows();
 				
 				if (!suppressShadows) {
-					submitNodeCollector.submitShadow(poseStack, entityRenderState.shadowRadius, entityRenderState.shadowPieces);
+					if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+						submitNodeCollector.submitShadowSemantic(poseStack, entityRenderState.shadowRadius, entityRenderState.shadowPieces);
+					} else {
+						submitNodeCollector.submitShadowSemantic(poseStack, entityRenderState.shadowRadius, entityRenderState.shadowPieces);
+					}
 				}
 			}
 
@@ -258,10 +274,15 @@ public class EntityRenderDispatcher implements ResourceManagerReloadListener {
 			}
 
 			if (entityRenderState.hitboxesRenderState != null) {
-				submitNodeCollector.submitHitbox(poseStack, entityRenderState, entityRenderState.hitboxesRenderState);
+				if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+					submitNodeCollector.submitHitboxSemantic(poseStack, entityRenderState, entityRenderState.hitboxesRenderState);
+				} else {
+						submitNodeCollector.submitHitboxSemantic(poseStack, entityRenderState, entityRenderState.hitboxesRenderState);
+				}
 			}
 
 			poseStack.popPose();
+			posePushed = false;
 			
 			// Iris: From MixinEntityRenderDispatcher - end entity render tracking
 			if (captureIrisRenderState) {
@@ -269,6 +290,9 @@ public class EntityRenderDispatcher implements ResourceManagerReloadListener {
 				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentRenderedItem(0);
 			}
 		} catch (Throwable var19) {
+			if (posePushed) {
+				poseStack.popPose();
+			}
 			CrashReport crashReport = CrashReport.forThrowable(var19, "Rendering entity in world");
 			CrashReportCategory crashReportCategory = crashReport.addCategory("EntityRenderState being rendered");
 			entityRenderState.fillCrashReportCategory(crashReportCategory);

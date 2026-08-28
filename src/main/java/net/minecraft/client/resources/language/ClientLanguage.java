@@ -61,7 +61,8 @@ public class ClientLanguage extends Language {
 		// Rust whole-frame GUI extraction uses the copied resource-manager
 		// language map and must not initialize or query Iris runtime classes.
 		String json = String.format(Locale.ROOT, "lang/%s.json", string);
-		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+		if (!net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
 			&& net.irisshaders.iris.Iris.class.getResource("/assets/iris/" + json) != null) {
 			Language.loadFromJson(net.irisshaders.iris.Iris.class.getResourceAsStream("/assets/iris/" + json), map::put);
 		}
@@ -115,7 +116,8 @@ public class ClientLanguage extends Language {
 	
 	// Iris: From MixinClientLanguage - lookup shaderpack language entries
 	private String iris$lookupOverriddenEntry(String key) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			return null;
 		}
 		net.irisshaders.iris.shaderpack.ShaderPack pack = net.irisshaders.iris.Iris.getCurrentPack().orElse(null);

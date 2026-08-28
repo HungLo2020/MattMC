@@ -263,7 +263,8 @@ public class SodiumGameOptionPages {
                             opts.cloudStatus().set(value);
 
                             if (Minecraft.useShaderTransparency()
-                                && !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+								&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+								&& !VulkanicAPI.isVulkanBackendSelected()) {
                                 RenderTarget framebuffer = Minecraft.getInstance().levelRenderer.getCloudsTarget();
                                 if (framebuffer != null) {
                                                                         VulkanicAPI.createCommandEncoder().clearColorAndDepthTextures(framebuffer.getColorTexture(), 0xFFFFFFFF, framebuffer.getDepthTexture(), 1.0f);

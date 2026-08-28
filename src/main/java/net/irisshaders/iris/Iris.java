@@ -118,6 +118,12 @@ public class Iris {
 	 * Called once RenderSystem#initRenderer has completed. This means that we can safely access OpenGL.
 	 */
 	public static void onRenderSystemInit() {
+		if (VulkanicAPI.isVulkanBackendSelected() || RustGalVulkanWholeFrameMode.enabled()) {
+			// Rust Vulkan owns shader-pack discovery, resources, and execution.
+			// The backend may still invoke this legacy lifecycle callback, but no
+			// Java Iris/PBR GPU initialization is permitted on that route.
+			return;
+		}
 		if (!initialized) {
 			Iris.logger.warn("Iris::onRenderSystemInit was called, but Iris::onEarlyInitialize was not called." +
 				" Trying to avoid a crash but this is an odd state.");
@@ -534,6 +540,19 @@ public class Iris {
 	}
 
 	public static void reload() throws IOException {
+		if (VulkanicAPI.isVulkanBackendSelected() || RustGalVulkanWholeFrameMode.enabled()) {
+			// Rust owns shader-pack discovery and GPU resources on this route. A
+			// keybind or resource reload may still reach Iris.reload(), but it must
+			// not dereference the skipped Java initialization or enter Java pipeline
+			// destruction/loading. Rust observes the persisted configuration on its
+			// own generation boundary.
+			if (irisConfig != null) {
+				irisConfig.initialize();
+			}
+			currentPack = null;
+			fallback = false;
+			return;
+		}
 		// allows shaderpacks to be changed at runtime
 		irisConfig.initialize();
 
@@ -610,7 +629,7 @@ public class Iris {
 	}
 
 	private static WorldRenderingPipeline createPipeline(NamespacedId dimensionId) {
-		if (VulkanicAPI.isVulkanBackendInitializedAndSelected() || RustGalVulkanWholeFrameMode.enabled()) {
+		if (VulkanicAPI.isVulkanBackendSelected() || RustGalVulkanWholeFrameMode.enabled()) {
 			// A shader-pack pipeline owns Java/Iris programs, framebuffers, and
 			// mutable sampler state. Rust Vulkan consumes copied pack semantics
 			// through its own runtime; do not construct the Java pipeline even if

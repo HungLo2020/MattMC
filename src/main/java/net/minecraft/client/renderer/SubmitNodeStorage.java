@@ -35,7 +35,8 @@ public class SubmitNodeStorage implements SubmitNodeCollector, OrderedSubmitNode
 	private final Int2ObjectAVLTreeMap<SubmitNodeCollection> submitsPerOrder = new Int2ObjectAVLTreeMap<>();
 
 	private static boolean rustWholeFrame() {
-		return net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
+		return net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected();
 	}
 
 	public SubmitNodeCollection order(int i) {
@@ -60,8 +61,18 @@ public class SubmitNodeStorage implements SubmitNodeCollector, OrderedSubmitNode
 	}
 
 	@Override
+	public void submitHitboxSemantic(PoseStack poseStack, EntityRenderState entityRenderState, HitboxesRenderState hitboxesRenderState) {
+		this.order(0).submitHitboxSemantic(poseStack, entityRenderState, hitboxesRenderState);
+	}
+
+	@Override
 	public void submitShadow(PoseStack poseStack, float f, List<EntityRenderState.ShadowPiece> list) {
 		this.order(0).submitShadow(poseStack, f, list);
+	}
+
+	@Override
+	public void submitShadowSemantic(PoseStack poseStack, float radius, List<EntityRenderState.ShadowPiece> pieces) {
+		this.order(0).submitShadowSemantic(poseStack, radius, pieces);
 	}
 
 	@Override
@@ -72,6 +83,14 @@ public class SubmitNodeStorage implements SubmitNodeCollector, OrderedSubmitNode
 	}
 
 	@Override
+	public void submitNameTagSemantic(
+		PoseStack poseStack, @Nullable Vec3 offset, int packedLight, Component text, boolean seeThrough,
+		int width, double distance, CameraRenderState cameraRenderState
+	) {
+		this.order(0).submitNameTagSemantic(poseStack, offset, packedLight, text, seeThrough, width, distance, cameraRenderState);
+	}
+
+	@Override
 	public void submitText(
 		PoseStack poseStack, float f, float g, FormattedCharSequence formattedCharSequence, boolean bl, Font.DisplayMode displayMode, int i, int j, int k, int l
 	) {
@@ -79,43 +98,75 @@ public class SubmitNodeStorage implements SubmitNodeCollector, OrderedSubmitNode
 	}
 
 	@Override
+	public void submitTextSemantic(
+		PoseStack poseStack, float x, float y, FormattedCharSequence text, boolean shadow,
+		Font.DisplayMode mode, int color, int backgroundColor, int packedLight, int packedOverlay
+	) {
+		this.order(0).submitTextSemantic(poseStack, x, y, text, shadow, mode, color, backgroundColor, packedLight, packedOverlay);
+	}
+
+	@Override
 	public boolean submitGuardianBeam(PoseStack poseStack, RenderType renderType, net.minecraft.resources.ResourceLocation textureIdentity, float[] vertices, float[] uvs, int[] colors, int lightCoords) {
 		return this.order(0).submitGuardianBeam(poseStack, renderType, textureIdentity, vertices, uvs, colors, lightCoords);
+	}
+	public boolean submitGuardianBeamSemantic(PoseStack poseStack, RenderType renderType, net.minecraft.resources.ResourceLocation textureIdentity, float[] vertices, float[] uvs, int[] colors, int lightCoords) {
+		return this.order(0).submitGuardianBeamSemantic(poseStack, renderType, textureIdentity, vertices, uvs, colors, lightCoords);
 	}
 
 	@Override
 	public boolean submitCrystalBeam(PoseStack poseStack, RenderType renderType, net.minecraft.resources.ResourceLocation textureIdentity, float[] vertices, float[] uvs, int[] colors, int lightCoords) {
 		return this.order(0).submitCrystalBeam(poseStack, renderType, textureIdentity, vertices, uvs, colors, lightCoords);
 	}
+	public boolean submitCrystalBeamSemantic(PoseStack poseStack, RenderType renderType, net.minecraft.resources.ResourceLocation textureIdentity, float[] vertices, float[] uvs, int[] colors, int lightCoords) {
+		return this.order(0).submitCrystalBeamSemantic(poseStack, renderType, textureIdentity, vertices, uvs, colors, lightCoords);
+	}
 
 	@Override
 	public boolean submitTexturedQuad(PoseStack poseStack, RenderType renderType, net.minecraft.resources.ResourceLocation textureIdentity, float[] vertices, float[] uvs, int color, int lightCoords) {
 		return this.order(0).submitTexturedQuad(poseStack, renderType, textureIdentity, vertices, uvs, color, lightCoords);
+	}
+	public boolean submitTexturedQuadSemantic(PoseStack poseStack, RenderType renderType, net.minecraft.resources.ResourceLocation textureIdentity, float[] vertices, float[] uvs, int color, int lightCoords) {
+		return this.order(0).submitTexturedQuadSemantic(poseStack, renderType, textureIdentity, vertices, uvs, color, lightCoords);
 	}
 
 	@Override
 	public boolean submitTranslucentTexturedQuad(PoseStack poseStack, RenderType renderType, net.minecraft.resources.ResourceLocation textureIdentity, float[] vertices, float[] uvs, int color, int lightCoords) {
 		return this.order(0).submitTranslucentTexturedQuad(poseStack, renderType, textureIdentity, vertices, uvs, color, lightCoords);
 	}
+	public boolean submitTranslucentTexturedQuadSemantic(PoseStack poseStack, RenderType renderType, net.minecraft.resources.ResourceLocation textureIdentity, float[] vertices, float[] uvs, int color, int lightCoords) {
+		return this.order(0).submitTranslucentTexturedQuadSemantic(poseStack, renderType, textureIdentity, vertices, uvs, color, lightCoords);
+	}
 
 	@Override
 	public boolean submitTexturedQuads(PoseStack poseStack, RenderType renderType, net.minecraft.resources.ResourceLocation textureIdentity, float[] vertices, float[] uvs, int[] colors, int lightCoords) {
 		return this.order(0).submitTexturedQuads(poseStack, renderType, textureIdentity, vertices, uvs, colors, lightCoords);
+	}
+	public boolean submitTexturedQuadsSemantic(PoseStack poseStack, RenderType renderType, net.minecraft.resources.ResourceLocation textureIdentity, float[] vertices, float[] uvs, int[] colors, int lightCoords) {
+		return this.order(0).submitTexturedQuadsSemantic(poseStack, renderType, textureIdentity, vertices, uvs, colors, lightCoords);
 	}
 
 	@Override
 	public boolean submitOpticalTexturedQuads(PoseStack poseStack, RenderType renderType, net.minecraft.resources.ResourceLocation textureIdentity, float[] vertices, float[] uvs, int[] colors, int lightCoords, int materialMode) {
 		return this.order(0).submitOpticalTexturedQuads(poseStack, renderType, textureIdentity, vertices, uvs, colors, lightCoords, materialMode);
 	}
+	public boolean submitOpticalTexturedQuadsSemantic(PoseStack poseStack, RenderType renderType, net.minecraft.resources.ResourceLocation textureIdentity, float[] vertices, float[] uvs, int[] colors, int lightCoords, int materialMode) {
+		return this.order(0).submitOpticalTexturedQuadsSemantic(poseStack, renderType, textureIdentity, vertices, uvs, colors, lightCoords, materialMode);
+	}
 
 	@Override
 	public boolean submitLineSegments(PoseStack poseStack, float[] endpoints, int color, float lineWidth) {
 		return this.order(0).submitLineSegments(poseStack, endpoints, color, lineWidth);
 	}
+	public boolean submitLineSegmentsSemantic(PoseStack poseStack, float[] endpoints, int color, float lineWidth) {
+		return this.order(0).submitLineSegmentsSemantic(poseStack, endpoints, color, lineWidth);
+	}
 
 	@Override
 	public boolean submitColoredQuads(PoseStack poseStack, RenderType renderType, float[] vertices, float[] uvs, int[] colors, int lightCoords) {
 		return this.order(0).submitColoredQuads(poseStack, renderType, vertices, uvs, colors, lightCoords);
+	}
+	public boolean submitColoredQuadsSemantic(PoseStack poseStack, RenderType renderType, float[] vertices, float[] uvs, int[] colors, int lightCoords) {
+		return this.order(0).submitColoredQuadsSemantic(poseStack, renderType, vertices, uvs, colors, lightCoords);
 	}
 
 	/** Stores text copied from a semantic extraction callback without Iris state capture. */
@@ -131,8 +182,18 @@ public class SubmitNodeStorage implements SubmitNodeCollector, OrderedSubmitNode
 	}
 
 	@Override
+	public void submitFlameSemantic(PoseStack poseStack, EntityRenderState entityRenderState, Quaternionf quaternionf) {
+		this.order(0).submitFlameSemantic(poseStack, entityRenderState, quaternionf);
+	}
+
+	@Override
 	public void submitLeash(PoseStack poseStack, EntityRenderState.LeashState leashState) {
 		this.order(0).submitLeash(poseStack, leashState);
+	}
+
+	@Override
+	public void submitLeashSemantic(PoseStack poseStack, EntityRenderState.LeashState leashState) {
+		this.order(0).submitLeashSemantic(poseStack, leashState);
 	}
 
 	@Override
@@ -149,6 +210,15 @@ public class SubmitNodeStorage implements SubmitNodeCollector, OrderedSubmitNode
 		@Nullable ModelFeatureRenderer.CrumblingOverlay crumblingOverlay
 	) {
 		this.order(0).submitModel(model, object, poseStack, renderType, i, j, k, textureAtlasSprite, l, crumblingOverlay);
+	}
+
+	@Override
+	public <S> void submitModelSemantic(
+		Model<? super S> model, S object, PoseStack poseStack, RenderType renderType,
+		int light, int overlay, int color, @Nullable TextureAtlasSprite sprite,
+		int outlineColor, @Nullable ModelFeatureRenderer.CrumblingOverlay crumblingOverlay
+	) {
+		this.order(0).submitModelSemantic(model, object, poseStack, renderType, light, overlay, color, sprite, outlineColor, crumblingOverlay);
 	}
 
 	@Override
@@ -180,8 +250,22 @@ public class SubmitNodeStorage implements SubmitNodeCollector, OrderedSubmitNode
 	}
 
 	@Override
+	public void submitModelPartSemantic(
+		ModelPart modelPart, PoseStack poseStack, RenderType renderType, int light, int overlay,
+		@Nullable TextureAtlasSprite sprite, boolean emissive, boolean glint, int color,
+		@Nullable ModelFeatureRenderer.CrumblingOverlay crumblingOverlay, int outlineColor
+	) {
+		this.order(0).submitModelPartSemantic(modelPart, poseStack, renderType, light, overlay, sprite, emissive, glint, color, crumblingOverlay, outlineColor);
+	}
+
+	@Override
 	public void submitBlock(PoseStack poseStack, BlockState blockState, int i, int j, int k) {
 		this.order(0).submitBlock(poseStack, blockState, i, j, k);
+	}
+
+	@Override
+	public void submitBlockSemantic(PoseStack poseStack, BlockState blockState, int light, int overlay, int outlineColor) {
+		this.order(0).submitBlockSemantic(poseStack, blockState, light, overlay, outlineColor);
 	}
 
 	@Override
@@ -190,8 +274,22 @@ public class SubmitNodeStorage implements SubmitNodeCollector, OrderedSubmitNode
 	}
 
 	@Override
+	public void submitBlockDisplaySemantic(PoseStack poseStack, BlockState blockState, int light, int overlay, int outlineColor) {
+		this.order(0).submitBlockDisplaySemantic(poseStack, blockState, light, overlay, outlineColor);
+	}
+
+	@Override
+	public void submitBlockDisplaySemantic(PoseStack poseStack, BlockState blockState, int light, int overlay, int outlineColor, BlockPos tintPos) {
+		this.order(0).submitBlockDisplaySemantic(poseStack, blockState, light, overlay, outlineColor, tintPos);
+	}
+
+	@Override
 	public void submitPrimedTntBlock(PoseStack poseStack, BlockState blockState, int i, int j, int k) {
 		this.order(0).submitPrimedTntBlock(poseStack, blockState, i, j, k);
+	}
+
+	public void submitPrimedTntBlockSemantic(PoseStack poseStack, BlockState blockState, int i, int j, int k) {
+		this.order(0).submitPrimedTntBlockSemantic(poseStack, blockState, i, j, k);
 	}
 
 	@Override
@@ -205,8 +303,18 @@ public class SubmitNodeStorage implements SubmitNodeCollector, OrderedSubmitNode
 	}
 
 	@Override
+	public void submitMovingBlockSemantic(PoseStack poseStack, MovingBlockRenderState movingBlockRenderState, MovingBlockSubmitSource source) {
+		this.order(0).submitMovingBlockSemantic(poseStack, movingBlockRenderState, source);
+	}
+
+	@Override
 	public void submitBlockModel(PoseStack poseStack, RenderType renderType, BlockStateModel blockStateModel, float f, float g, float h, int i, int j, int k) {
 		this.order(0).submitBlockModel(poseStack, renderType, blockStateModel, f, g, h, i, j, k);
+	}
+
+	@Override
+	public void submitBlockModelSemantic(PoseStack poseStack, RenderType renderType, BlockStateModel blockStateModel, float red, float green, float blue, int light, int overlay, int outlineColor) {
+		this.order(0).submitBlockModelSemantic(poseStack, renderType, blockStateModel, red, green, blue, light, overlay, outlineColor);
 	}
 
 	@Override
@@ -225,13 +333,30 @@ public class SubmitNodeStorage implements SubmitNodeCollector, OrderedSubmitNode
 	}
 
 	@Override
+	public void submitItemSemantic(
+		PoseStack poseStack, ItemDisplayContext itemDisplayContext, int light, int overlay, int outlineColor,
+		int[] tintLayers, List<BakedQuad> quads, RenderType renderType, ItemStackRenderState.FoilType foilType
+	) {
+		this.order(0).submitItemSemantic(poseStack, itemDisplayContext, light, overlay, outlineColor, tintLayers, quads, renderType, foilType);
+	}
+
+	@Override
 	public void submitCustomGeometry(PoseStack poseStack, RenderType renderType, SubmitNodeCollector.CustomGeometryRenderer customGeometryRenderer) {
 		this.order(0).submitCustomGeometry(poseStack, renderType, customGeometryRenderer);
+	}
+
+	public void submitCustomGeometrySemantic(PoseStack poseStack, RenderType renderType, SubmitNodeCollector.CustomGeometryRenderer customGeometryRenderer) {
+		this.order(0).submitCustomGeometrySemantic(poseStack, renderType, customGeometryRenderer);
 	}
 
 	@Override
 	public void submitParticleGroup(SubmitNodeCollector.ParticleGroupRenderer particleGroupRenderer) {
 		this.order(0).submitParticleGroup(particleGroupRenderer);
+	}
+
+	@Override
+	public void submitParticleGroupSemantic(SubmitNodeCollector.ParticleGroupRenderer particleGroupRenderer) {
+		this.order(0).submitParticleGroupSemantic(particleGroupRenderer);
 	}
 
 	public void clear() {
@@ -539,8 +664,14 @@ public class SubmitNodeStorage implements SubmitNodeCollector, OrderedSubmitNode
 		int lightCoords,
 		int color,
 		int backgroundColor,
-		int outlineColor
+		int outlineColor,
+		int blockEntityId
 	) implements net.irisshaders.iris.mixinterface.ModelStorage {
+		public TextSubmit(Matrix4f pose, float x, float y, FormattedCharSequence string, boolean dropShadow,
+			Font.DisplayMode displayMode, int lightCoords, int color, int backgroundColor, int outlineColor) {
+			this(pose, x, y, string, dropShadow, displayMode, lightCoords, color, backgroundColor, outlineColor,
+				net.vulkanic.bridge.VulkanicGalBridge.activeSemanticBlockEntityId());
+		}
 		private static final java.util.WeakHashMap<TextSubmit, ModelStorageData> STORAGE = new java.util.WeakHashMap<>();
 		
 		@Override

@@ -31,6 +31,12 @@ pub(crate) const WORLD_TEXT_DEPTH_SEE_THROUGH: u32 = 1;
 pub(crate) const WORLD_TEXT_DEPTH_NORMAL: u32 = 2;
 pub(crate) const WORLD_TEXT_DEPTH_POLYGON_OFFSET: u32 = 3;
 const MAX_WORLD_TEXT_IMAGE_BYTES: usize = 4 * 1024 * 1024;
+pub(crate) const MAX_WORLD_TEXT_IMAGES: usize = 4_096;
+pub(crate) const MAX_WORLD_TEXT_IMAGE_BYTES_TOTAL: usize = 64 * 1024 * 1024;
+// Each entry owns an upload buffer, texture, descriptors, shaders, and three
+// pipelines. Keep revision/format churn from turning the semantic frontend
+// into an unbounded GPU-object cache when a caller rotates atlas identities.
+const MAX_WORLD_TEXT_RESOURCES: usize = 8_192;
 const MAX_WORLD_TEXT_QUADS_PER_FRAME: usize = 65_536;
 const MAX_WORLD_TEXT_QUADS_PER_BATCH: usize = 256;
 const WORLD_TEXT_HEADER_BYTES: usize = 144;
@@ -172,6 +178,7 @@ pub(crate) struct WorldTextQuadRequest {
     pub positions: [[f32; 3]; 4],
     pub uvs: [[f32; 2]; 4],
     pub color_argb: u32,
+    pub block_entity_id: i32,
 }
 
 #[derive(Clone, Debug)]
@@ -186,6 +193,10 @@ pub(crate) struct WorldTextBatch {
     pub atlas_revision: u64,
     pub colored: bool,
     pub depth_policy: u32,
+    /// Kept in the batch key so distinct semantic light values cannot be
+    /// coalesced before the text shader consumes the lightmap contract.
+    pub packed_light: u32,
+    pub block_entity_id: i32,
     pub start: usize,
     pub count: usize,
 }
@@ -212,6 +223,9 @@ pub(crate) struct WorldTextFrontend {
     asset_generation: u64,
     images: BTreeMap<u64, WorldTextImageAsset>,
     resources: BTreeMap<WorldTextResourceKey, WorldTextResources>,
+    /// Multiple producers can append text into one command batch. Pending
+    /// atlas uploads therefore live for the whole batch, not one append call.
+    upload_submission_active: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -236,6 +250,12 @@ struct WorldTextResources {
     pipeline_depth_disabled: Handle,
     pipeline_depth_test_no_write: Handle,
     pipeline_depth_test_polygon_offset: Handle,
+    /// Set only when the command stream containing the initial texture upload
+    /// is admitted for execution. Source-candidate planning may construct the
+    /// resource and then discard its commands, so construction alone is not
+    /// evidence that the image reached Vulkan.
+    uploaded: bool,
+    upload_pending: bool,
 }
 
 impl WorldTextResources {
@@ -259,6 +279,28 @@ impl WorldTextResources {
 }
 
 impl WorldTextFrontend {
+    /// Commits atlas residency only after the command stream containing its
+    /// upload has been accepted by the GAL. Resource construction or command
+    /// planning alone must never suppress a required first-use upload.
+    pub(crate) fn confirm_submission(&mut self) {
+        for resources in self.resources.values_mut() {
+            if resources.upload_pending {
+                resources.uploaded = true;
+                resources.upload_pending = false;
+            }
+        }
+        self.upload_submission_active = false;
+    }
+
+    pub(crate) fn cancel_submission(&mut self) {
+        for resources in self.resources.values_mut() {
+            if !resources.uploaded {
+                resources.upload_pending = false;
+            }
+        }
+        self.upload_submission_active = false;
+    }
+
     /// Atomically installs copied, caller-independent font atlas images.
     pub(crate) fn apply_image_update(
         &mut self,
@@ -274,9 +316,38 @@ impl WorldTextFrontend {
                 ),
             ));
         }
+        if assets.len() > MAX_WORLD_TEXT_IMAGES {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                format!(
+                    "world text image asset count {} exceeds {}",
+                    assets.len(),
+                    MAX_WORLD_TEXT_IMAGES
+                ),
+            ));
+        }
         let mut next = BTreeMap::new();
+        let mut total_bytes = 0usize;
         for asset in assets {
             validate_image_asset(&asset)?;
+            total_bytes = total_bytes
+                .checked_add(asset.pixels.len())
+                .ok_or_else(|| {
+                    GalError::ffi(
+                        StatusCode::InvalidArgument,
+                        "world text image aggregate size overflows",
+                    )
+                })?;
+            if total_bytes > MAX_WORLD_TEXT_IMAGE_BYTES_TOTAL {
+                return Err(GalError::ffi(
+                    StatusCode::InvalidArgument,
+                    format!(
+                        "world text image assets use {} bytes; maximum is {}",
+                        total_bytes,
+                        MAX_WORLD_TEXT_IMAGE_BYTES_TOTAL
+                    ),
+                ));
+            }
             if next.insert(asset.asset_id, asset).is_some() {
                 return Err(GalError::ffi(
                     StatusCode::InvalidArgument,
@@ -293,6 +364,7 @@ impl WorldTextFrontend {
         self.destroy_resources(gal);
         self.images.clear();
         self.asset_generation = 0;
+        self.upload_submission_active = false;
     }
 
     /// Validates every semantic glyph and preserves Java's declared order.
@@ -318,6 +390,8 @@ impl WorldTextFrontend {
                     && batch.atlas_revision == quad.atlas_revision
                     && batch.colored == quad.colored
                     && batch.depth_policy == quad.depth_policy
+                    && batch.packed_light == quad.packed_light
+                    && batch.block_entity_id == quad.block_entity_id
                     && batch.start + batch.count == index
             });
             if can_extend {
@@ -329,6 +403,8 @@ impl WorldTextFrontend {
                     atlas_revision: quad.atlas_revision,
                     colored: quad.colored,
                     depth_policy: quad.depth_policy,
+                    packed_light: quad.packed_light,
+                    block_entity_id: quad.block_entity_id,
                     start: index,
                     count: 1,
                 });
@@ -354,9 +430,21 @@ impl WorldTextFrontend {
         projection_matrix: [f32; 16],
         quads: &[WorldTextQuadRequest],
         ops: &mut Vec<CommandOp>,
+        mark_uploaded: bool,
     ) -> GalResult<WorldTextFrameStats> {
         if quads.is_empty() {
             return Ok(WorldTextFrameStats::default());
+        }
+        // Reset abandoned markers once, at the start of a combined batch.
+        // Subsequent appenders in that batch observe the pending marker and
+        // do not duplicate the same atlas upload.
+        if !self.upload_submission_active {
+            for resources in self.resources.values_mut() {
+                if !resources.uploaded {
+                    resources.upload_pending = false;
+                }
+            }
+            self.upload_submission_active = true;
         }
         self.prune_stale_resources(gal);
         let batches = self.prepare_frame(&WorldTextFrame {
@@ -396,14 +484,37 @@ impl WorldTextFrontend {
                 atlas_revision: batch.atlas_revision,
                 color_format,
             };
-            let upload = if self.resources.contains_key(&key) {
+            let upload = if self
+                .resources
+                .get(&key)
+                .is_some_and(|resource| resource.uploaded || resource.upload_pending)
+            {
                 None
+            } else if let Some(resources) = self.resources.get_mut(&key) {
+                resources.upload_pending = true;
+                Some((None, upload_ops_for_resources(resources, &image)?))
             } else {
-                Some(self.create_resources(gal, key, &image)?)
+                if self.resources.len() >= MAX_WORLD_TEXT_RESOURCES {
+                    return Err(GalError::unsupported_feature(format!(
+                        "world text resource cache exceeds bounded limit {}",
+                        MAX_WORLD_TEXT_RESOURCES
+                    )));
+                }
+                let (resources, upload_ops) = self.create_resources(gal, key, &image)?;
+                Some((Some(resources), upload_ops))
             };
             if let Some((resources, upload_ops)) = upload {
-                self.resources.insert(key, resources);
+                if let Some(mut resources) = resources {
+                    resources.upload_pending = true;
+                    self.resources.insert(key, resources);
+                }
                 ops.extend(upload_ops);
+            }
+            if mark_uploaded {
+                if let Some(resources) = self.resources.get_mut(&key) {
+                    resources.uploaded = true;
+                    resources.upload_pending = false;
+                }
             }
             let resources = self
                 .resources
@@ -480,6 +591,12 @@ impl WorldTextFrontend {
                 stats.draw_count += 1;
                 ops.push(CommandOp::EndPass);
             }
+        }
+        if mark_uploaded {
+            // Test fixtures use this flag to model an already-admitted
+            // command stream; close the same transaction that runtime
+            // confirmation closes.
+            self.upload_submission_active = false;
         }
         Ok(stats)
     }
@@ -692,6 +809,8 @@ impl WorldTextFrontend {
                 pipeline_depth_disabled,
                 pipeline_depth_test_no_write,
                 pipeline_depth_test_polygon_offset,
+                uploaded: false,
+                upload_pending: false,
             })
         })();
         match result {
@@ -777,6 +896,53 @@ impl WorldTextFrontend {
             }
         }
     }
+}
+
+fn upload_ops_for_resources(
+    resources: &WorldTextResources,
+    image: &WorldTextImageAsset,
+) -> GalResult<Vec<CommandOp>> {
+    let bytes_per_row = image
+        .width
+        .checked_mul(image.format.bytes_per_texel() as u32)
+        .ok_or_else(|| GalError::invalid_argument("world text row pitch overflows"))?;
+    Ok(vec![
+        CommandOp::HostWriteBuffer {
+            buffer: resources.upload_buffer,
+            offset: 0,
+            data: image.pixels.clone(),
+        },
+        CommandOp::Barrier(buffer_barrier(
+            resources.upload_buffer,
+            TextureUsageState::TransferDst,
+            TextureUsageState::TransferSrc,
+        )),
+        CommandOp::Barrier(texture_barrier(
+            resources.texture,
+            TextureUsageState::Undefined,
+            TextureUsageState::TransferDst,
+        )),
+        CommandOp::CopyBufferToTexture(BufferImageCopyRegion {
+            buffer: resources.upload_buffer,
+            buffer_offset: 0,
+            bytes_per_row,
+            rows_per_image: image.height,
+            texture: resources.texture,
+            texture_mip: 0,
+            texture_layer: 0,
+            texture_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
+            extent: Extent3d {
+                width: image.width,
+                height: image.height,
+                depth: 1,
+            },
+        }),
+        CommandOp::Barrier(texture_barrier(
+            resources.texture,
+            TextureUsageState::TransferDst,
+            TextureUsageState::ShaderRead,
+        )),
+    ])
 }
 
 fn packed_uniforms(
@@ -1048,6 +1214,7 @@ mod tests {
             colored: false,
             depth_policy,
             packed_light: 0,
+            block_entity_id: -1,
             distance_to_camera_sq: 4.0,
             model_view_matrix: [
                 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
@@ -1075,6 +1242,38 @@ mod tests {
     }
 
     #[test]
+    fn rejects_excessive_world_text_image_count_before_copying_assets() {
+        let mut frontend = WorldTextFrontend::default();
+        let assets = (0..=MAX_WORLD_TEXT_IMAGES)
+            .map(|index| WorldTextImageAsset {
+                asset_id: index as u64 + 1,
+                ..asset()
+            })
+            .collect();
+        let error = frontend.apply_image_update(1, assets).unwrap_err();
+        assert!(error.to_string().contains("image asset count"));
+        assert_eq!(0, frontend.asset_generation);
+    }
+
+    #[test]
+    fn rejects_excessive_world_text_image_bytes_before_installing_generation() {
+        let mut frontend = WorldTextFrontend::default();
+        let bytes_per_asset = 1024 * 1024;
+        let assets = (0..65)
+            .map(|index| WorldTextImageAsset {
+                asset_id: index as u64 + 1,
+                width: 1024,
+                height: 1024,
+                pixels: vec![0; bytes_per_asset],
+                ..asset()
+            })
+            .collect();
+        let error = frontend.apply_image_update(1, assets).unwrap_err();
+        assert!(error.to_string().contains("image assets use"));
+        assert_eq!(0, frontend.asset_generation);
+    }
+
+    #[test]
     fn vertex_shader_preserves_semantic_left_to_right_glyph_uvs() {
         let shader = std::str::from_utf8(WORLD_TEXT_VERTEX_SHADER).unwrap();
         assert!(shader.contains("vec2 uv_top = mix(quad.uv01.xy, quad.uv23.zw, corner.x);"));
@@ -1099,6 +1298,38 @@ mod tests {
         assert_eq!(2, batches[0].count);
         assert_eq!(WORLD_TEXT_DEPTH_NORMAL, batches[1].depth_policy);
         assert_eq!(WORLD_TEXT_DEPTH_POLYGON_OFFSET, batches[2].depth_policy);
+    }
+
+    #[test]
+    fn preserves_packed_light_boundaries_when_batching() {
+        let mut frontend = WorldTextFrontend::default();
+        frontend.apply_image_update(1, vec![asset()]).unwrap();
+        let mut lit = quad(WORLD_TEXT_DEPTH_NORMAL);
+        lit.packed_light = 0x00f0_00f0;
+        let mut dim = lit.clone();
+        dim.packed_light = 0x0010_0010;
+        let batches = frontend
+            .prepare_frame(&WorldTextFrame { quads: vec![lit, dim] })
+            .unwrap();
+        assert_eq!(2, batches.len());
+        assert_eq!(0x00f0_00f0, batches[0].packed_light);
+        assert_eq!(0x0010_0010, batches[1].packed_light);
+    }
+
+    #[test]
+    fn preserves_block_entity_boundaries_when_batching() {
+        let mut frontend = WorldTextFrontend::default();
+        frontend.apply_image_update(1, vec![asset()]).unwrap();
+        let mut first = quad(WORLD_TEXT_DEPTH_NORMAL);
+        first.block_entity_id = 11;
+        let mut second = first.clone();
+        second.block_entity_id = 12;
+        let batches = frontend
+            .prepare_frame(&WorldTextFrame { quads: vec![first, second] })
+            .unwrap();
+        assert_eq!(2, batches.len());
+        assert_eq!(11, batches[0].block_entity_id);
+        assert_eq!(12, batches[1].block_entity_id);
     }
 
     #[test]
@@ -1198,6 +1429,76 @@ mod tests {
     }
 
     #[test]
+    fn atlas_upload_residency_commits_only_on_submission_confirmation() {
+        let key = WorldTextResourceKey {
+            asset_id: 7,
+            atlas_generation: 2,
+            atlas_revision: 3,
+            color_format: ColorFormat::Bgra8Unorm,
+        };
+        let pending = WorldTextResources {
+            upload_buffer: Handle::NULL,
+            uniform_buffer: Handle::NULL,
+            texture: Handle::NULL,
+            sampler: Handle::NULL,
+            vertex_shader: Handle::NULL,
+            fragment_shader: Handle::NULL,
+            texture_view: Handle::NULL,
+            resource_layout: Handle::NULL,
+            resource_set: Handle::NULL,
+            pipeline_layout: Handle::NULL,
+            pipeline_depth_disabled: Handle::NULL,
+            pipeline_depth_test_no_write: Handle::NULL,
+            pipeline_depth_test_polygon_offset: Handle::NULL,
+            uploaded: false,
+            upload_pending: true,
+        };
+        let mut frontend = WorldTextFrontend::default();
+        frontend.resources.insert(key, pending);
+
+        frontend.cancel_submission();
+        let resources = frontend.resources.get(&key).unwrap();
+        assert!(!resources.uploaded);
+        assert!(!resources.upload_pending);
+
+        frontend.resources.get_mut(&key).unwrap().upload_pending = true;
+        frontend.confirm_submission();
+        let resources = frontend.resources.get(&key).unwrap();
+        assert!(resources.uploaded);
+        assert!(!resources.upload_pending);
+
+        // A second semantic producer may append an empty text slice after the
+        // first producer has staged an upload. That append must not reopen the
+        // transaction and clear the pending marker before confirmation.
+        assert!(frontend.resources.get(&key).unwrap().uploaded);
+        frontend.resources.get_mut(&key).unwrap().uploaded = false;
+        frontend.resources.get_mut(&key).unwrap().upload_pending = true;
+        frontend.upload_submission_active = true;
+        let mut gal = super::super::tests::gal();
+        let mut ops = Vec::new();
+        frontend
+            .append_frame_ops(
+                &mut gal,
+                Handle::NULL,
+                Handle::NULL,
+                Handle::NULL,
+                Handle::NULL,
+                Handle::NULL,
+                TextureUsageState::Undefined,
+                ColorFormat::Bgra8Unorm,
+                [0.0; 16],
+                [0.0; 16],
+                &[],
+                &mut ops,
+                false,
+            )
+            .unwrap();
+        let resources = frontend.resources.get(&key).unwrap();
+        assert!(resources.upload_pending);
+        assert!(!resources.uploaded);
+    }
+
+    #[test]
     fn appends_owned_alpha_text_draws_with_explicit_depth_modes() {
         let mut capabilities = vulkan_capabilities();
         capabilities.features.presentation = true;
@@ -1277,6 +1578,7 @@ mod tests {
                     quad(WORLD_TEXT_DEPTH_POLYGON_OFFSET),
                 ],
                 &mut ops,
+                true,
             )
             .unwrap();
 
@@ -1300,6 +1602,7 @@ mod tests {
                 .count()
         );
         let resources = frontend.resources.values().next().unwrap();
+        assert!(resources.uploaded, "admitted text execution must commit atlas upload state");
         let bound_pipelines = ops
             .iter()
             .filter_map(|op| match op {
@@ -1403,6 +1706,7 @@ mod tests {
                 ],
                 &[quad(WORLD_TEXT_DEPTH_NORMAL)],
                 &mut ops,
+                true,
             )
             .unwrap();
 

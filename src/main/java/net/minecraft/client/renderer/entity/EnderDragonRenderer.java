@@ -32,6 +32,7 @@ import org.joml.Vector3f;
 
 @Environment(EnvType.CLIENT)
 public class EnderDragonRenderer extends EntityRenderer<EnderDragon, EnderDragonRenderState> {
+	private static final int SEMANTIC_CRYSTAL_BEAM_QUADS = 8;
 	public static final ResourceLocation CRYSTAL_BEAM_LOCATION = ResourceLocation.withDefaultNamespace("textures/entity/end_crystal/end_crystal_beam.png");
 	private static final ResourceLocation DRAGON_EXPLODING_LOCATION = ResourceLocation.withDefaultNamespace("textures/entity/enderdragon/dragon_exploding.png");
 	// VoxelMap: Made accessible
@@ -142,8 +143,13 @@ public class EnderDragonRenderer extends EntityRenderer<EnderDragon, EnderDragon
 	}
 
 	private static void submitRays(PoseStack poseStack, float f, SubmitNodeCollector submitNodeCollector, RenderType renderType) {
-		boolean rustProcedural = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			&& net.vulkanic.world.WorldRenderRoutePolicy.currentProceduralQuadRoute().usesRustWholeFrameVulkan();
+		boolean rustProcedural = net.vulkanic.world.WorldRenderRoutePolicy.currentProceduralQuadRoute()
+			.usesRustWholeFrameVulkan();
+		boolean rustPresentation = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
+		if (rustPresentation && (!Float.isFinite(f) || f < 0.0F || f > 1.0F)) {
+			throw new IllegalStateException("Rust whole-frame End Dragon ray route rejected non-finite or out-of-range death progress");
+		}
 		if (rustProcedural) {
 			float g = Math.min(f > 0.8F ? (f - 0.8F) / 0.2F : 0.0F, 1.0F);
 			int headColor = ARGB.colorFromFloat(1.0F - g, 1.0F, 1.0F, 1.0F);
@@ -170,13 +176,16 @@ public class EnderDragonRenderer extends EntityRenderer<EnderDragon, EnderDragon
 				};
 				float[] uvs = {0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1};
 				int[] colors = {headColor, 0xFFFF00FF, 0xFFFF00FF};
-				if (!submitNodeCollector.submitColoredQuads(poseStack, renderType, vertices, uvs, colors, 15728880)) {
+				if (!submitNodeCollector.submitColoredQuadsSemantic(poseStack, renderType, vertices, uvs, colors, 15728880)) {
 					throw new IllegalStateException("Rust procedural ray route rejected semantic quads");
 				}
 			}
 			return;
 		}
-		submitNodeCollector.submitCustomGeometry(
+		if (rustPresentation) {
+			throw new IllegalStateException("Rust whole-frame End Dragon ray route is unavailable; Java custom geometry is not a fallback");
+		}
+		submitNodeCollector.submitCustomGeometrySemantic(
 			// Rust receives the same deterministic rays through semantic quads below;
 			// this Java producer is retained only for compatibility routes.
 			poseStack,
@@ -226,9 +235,10 @@ public class EnderDragonRenderer extends EntityRenderer<EnderDragon, EnderDragon
 		float k = Mth.sqrt(f * f + h * h);
 		float l = Mth.sqrt(f * f + g * g + h * h);
 		
-		boolean rustCrystalBeam = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			&& net.vulkanic.world.WorldRenderRoutePolicy.currentCrystalBeamRoute().usesRustWholeFrameVulkan();
-		boolean rustPresentation = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
+		boolean rustCrystalBeam = net.vulkanic.world.WorldRenderRoutePolicy.currentCrystalBeamRoute()
+			.usesRustWholeFrameVulkan();
+		boolean rustPresentation = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
 		// Iris state is consulted only by the Java compatibility route.
 		int iris$previousEntity = 0;
 		if (!rustPresentation && !rustCrystalBeam
@@ -247,9 +257,9 @@ public class EnderDragonRenderer extends EntityRenderer<EnderDragon, EnderDragon
 		poseStack.mulPose(Axis.XP.rotation((float)(-Math.atan2(k, g)) - (float) (Math.PI / 2)));
 		float m = 0.0F - i * 0.01F;
 		float n = l / 32.0F - i * 0.01F;
-		float[] beamVertices = new float[96];
-		float[] beamUvs = new float[64];
-		int[] beamColors = new int[32];
+		float[] beamVertices = new float[SEMANTIC_CRYSTAL_BEAM_QUADS * 12];
+		float[] beamUvs = new float[SEMANTIC_CRYSTAL_BEAM_QUADS * 8];
+		int[] beamColors = new int[SEMANTIC_CRYSTAL_BEAM_QUADS * 4];
 		int vertexIndex = 0;
 		int uvIndex = 0;
 		float bx = 0.0F, by = 0.75F, bu = 0.0F;
@@ -263,14 +273,22 @@ public class EnderDragonRenderer extends EntityRenderer<EnderDragon, EnderDragon
 			beamColors[(nx - 1) * 4] = -16777216; beamColors[(nx - 1) * 4 + 1] = -1; beamColors[(nx - 1) * 4 + 2] = -1; beamColors[(nx - 1) * 4 + 3] = -16777216;
 			bx = o; by = p; bu = q;
 		}
-		if (rustCrystalBeam && submitNodeCollector.submitCrystalBeam(poseStack, BEAM, CRYSTAL_BEAM_LOCATION, beamVertices, beamUvs, beamColors, j)) {
+		if (vertexIndex != SEMANTIC_CRYSTAL_BEAM_QUADS * 12
+			|| uvIndex != SEMANTIC_CRYSTAL_BEAM_QUADS * 8
+			|| beamColors.length != SEMANTIC_CRYSTAL_BEAM_QUADS * 4) {
+			throw new IllegalStateException("Rust whole-frame crystal-beam semantic payload count drifted");
+		}
+				if (rustCrystalBeam && submitNodeCollector.submitCrystalBeamSemantic(poseStack, BEAM, CRYSTAL_BEAM_LOCATION, beamVertices, beamUvs, beamColors, j)) {
 			poseStack.popPose();
 			return;
 		}
 		if (rustCrystalBeam) {
 			throw new IllegalStateException("Rust whole-frame End Crystal beam route rejected semantic quads");
 		}
-		submitNodeCollector.submitCustomGeometry(
+		if (rustPresentation) {
+			throw new IllegalStateException("Rust whole-frame End Crystal beam route is unavailable; Java custom geometry is not a fallback");
+		}
+		submitNodeCollector.submitCustomGeometrySemantic(
 			poseStack,
 			BEAM,
 			(pose, vertexConsumer) -> {

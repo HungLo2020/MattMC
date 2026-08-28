@@ -20,6 +20,15 @@ public class ShadowFeatureRenderer {
 	private static final RenderType SHADOW_RENDER_TYPE = RenderType.entityShadow(ResourceLocation.withDefaultNamespace("textures/misc/shadow.png"));
 
 	public void render(SubmitNodeCollection submitNodeCollection, MultiBufferSource.BufferSource bufferSource) {
+		net.vulkanic.world.WorldRenderRoutePolicy.Route route = net.vulkanic.world.WorldRenderRoutePolicy.currentEntityShadowRoute();
+		if (route == net.vulkanic.world.WorldRenderRoutePolicy.Route.DISABLED
+			|| route == net.vulkanic.world.WorldRenderRoutePolicy.Route.RUST_VULKAN_WHOLE_FRAME
+			|| (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+				&& route != net.vulkanic.world.WorldRenderRoutePolicy.Route.RUST_VULKAN_WHOLE_FRAME)) {
+			// Rust owns the whole Vulkan frame; do not let a direct Java feature
+			// invocation become an invisible fallback draw.
+			return;
+		}
 		// Call hooks to allow mods to optimize shadow rendering
 		for (net.minecraft.hooks.EntityRenderHooks hook : net.minecraft.hooks.HookRegistry.getEntityRenderHooks()) {
 			if (hook.onRenderEntityShadows(submitNodeCollection, bufferSource)) {

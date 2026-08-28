@@ -143,18 +143,35 @@ impl VulkanContext {
             vk::PhysicalDeviceSynchronization2Features::default().synchronization2(true);
         let mut timeline_features =
             vk::PhysicalDeviceTimelineSemaphoreFeatures::default().timeline_semaphore(true);
+        // The shader compiler targets Vulkan 1.3 and may emit
+        // DemoteToHelperInvocation for discard-compatible fragment paths. Query
+        // and enable the promoted feature explicitly so validation and device
+        // execution agree about that SPIR-V capability.
+        let mut supported_demote =
+            vk::PhysicalDeviceShaderDemoteToHelperInvocationFeatures::default();
+        let mut supported_features = vk::PhysicalDeviceFeatures2::default()
+            .push_next(&mut supported_demote);
+        unsafe {
+            instance.get_physical_device_features2(physical_device, &mut supported_features);
+        }
+        if supported_demote.shader_demote_to_helper_invocation == vk::TRUE {
+            supported_demote = supported_demote.shader_demote_to_helper_invocation(true);
+        }
         let queue_infos = [queue_info];
         let device_extension_names = if surface.is_some() {
             vec![ash::khr::swapchain::NAME.as_ptr()]
         } else {
             Vec::new()
         };
-        let device_info = vk::DeviceCreateInfo::default()
+        let mut device_info = vk::DeviceCreateInfo::default()
             .queue_create_infos(&queue_infos)
             .enabled_extension_names(&device_extension_names)
             .push_next(&mut dynamic_rendering)
             .push_next(&mut synchronization2)
             .push_next(&mut timeline_features);
+        if supported_demote.shader_demote_to_helper_invocation == vk::TRUE {
+            device_info = device_info.push_next(&mut supported_demote);
+        }
         let device = unsafe { instance.create_device(physical_device, &device_info, None) }
             .map_err(|error| {
                 if let (Some(surface_loader), Some(surface)) = (&surface_loader, surface) {

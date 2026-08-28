@@ -28,7 +28,7 @@ public class GlFramebuffer extends GlResource {
 	private boolean drawsToNoColorBuffers;
 
 	public GlFramebuffer() {
-		super(IrisRenderSystem.createFramebuffer());
+		super(requireJavaFramebufferAllocation());
 
 		this.attachments = new Int2IntArrayMap();
 		this.maxDrawBuffers = VulkanicAPI.getInteger(VulkanicAPI.getCommandContext(), VulkanicIntegerQuery.MAX_DRAW_BUFFERS);
@@ -37,6 +37,14 @@ public class GlFramebuffer extends GlResource {
 		this.depthAttachmentTexture = 0;
 		this.drawBuffers = new int[0];
 		this.drawsToNoColorBuffers = false;
+	}
+
+	private static int requireJavaFramebufferAllocation() {
+		if (VulkanicAPI.isVulkanBackendSelected()
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris framebuffer allocation is unavailable on the Rust Vulkan route");
+		}
+		return IrisRenderSystem.createFramebuffer();
 	}
 
 	public void addDepthAttachment(GpuTexture texture) {

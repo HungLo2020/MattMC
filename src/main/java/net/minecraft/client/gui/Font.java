@@ -53,6 +53,14 @@ public class Font {
 		return this.provider.glyphs(fontDescription);
 	}
 
+	private static void ensureJavaTextDrawAvailable() {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException(
+				"Java Font buffer rendering is unavailable while Rust owns whole-frame Vulkan");
+		}
+	}
+
 	public String bidirectionalShaping(String string) {
 		try {
 			Bidi bidi = new Bidi(new ArabicShaping(8).shape(string), 127);
@@ -66,6 +74,7 @@ public class Font {
 	public void drawInBatch(
 		String string, float f, float g, int i, boolean bl, Matrix4f matrix4f, MultiBufferSource multiBufferSource, Font.DisplayMode displayMode, int j, int k
 	) {
+		ensureJavaTextDrawAvailable();
 		Font.PreparedText preparedText = this.prepareText(string, f, g, i, bl, j);
 		preparedText.visit(Font.GlyphVisitor.forMultiBufferSource(multiBufferSource, matrix4f, displayMode, k));
 	}
@@ -73,6 +82,7 @@ public class Font {
 	public void drawInBatch(
 		Component component, float f, float g, int i, boolean bl, Matrix4f matrix4f, MultiBufferSource multiBufferSource, Font.DisplayMode displayMode, int j, int k
 	) {
+		ensureJavaTextDrawAvailable();
 		Font.PreparedText preparedText = this.prepareText(component.getVisualOrderText(), f, g, i, bl, j);
 		preparedText.visit(Font.GlyphVisitor.forMultiBufferSource(multiBufferSource, matrix4f, displayMode, k));
 	}
@@ -89,6 +99,7 @@ public class Font {
 		int j,
 		int k
 	) {
+		ensureJavaTextDrawAvailable();
 		Font.PreparedText preparedText = this.prepareText(formattedCharSequence, f, g, i, bl, j);
 		preparedText.visit(Font.GlyphVisitor.forMultiBufferSource(multiBufferSource, matrix4f, displayMode, k));
 	}
@@ -96,6 +107,7 @@ public class Font {
 	public void drawInBatch8xOutline(
 		FormattedCharSequence formattedCharSequence, float f, float g, int i, int j, Matrix4f matrix4f, MultiBufferSource multiBufferSource, int k
 	) {
+		ensureJavaTextDrawAvailable();
 		Font.PreparedTextBuilder preparedTextBuilder = new Font.PreparedTextBuilder(0.0F, 0.0F, j, false);
 
 		for (int l = -1; l <= 1; l++) {
@@ -212,6 +224,7 @@ public class Font {
 	@Environment(EnvType.CLIENT)
 	public interface GlyphVisitor {
 		static Font.GlyphVisitor forMultiBufferSource(MultiBufferSource multiBufferSource, Matrix4f matrix4f, Font.DisplayMode displayMode, int i) {
+			Font.ensureJavaTextDrawAvailable();
 			return new Font.GlyphVisitor() {
 				@Override
 				public void acceptGlyph(TextRenderable textRenderable) {

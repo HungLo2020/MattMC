@@ -47,7 +47,12 @@ public class OminousItemSpawnerRenderer extends EntityRenderer<OminousItemSpawne
 
 			float f = Mth.wrapDegrees(itemClusterRenderState.ageInTicks * 40.0F);
 			poseStack.mulPose(Axis.YP.rotationDegrees(f));
-			ItemEntityRenderer.submitMultipleFromCount(poseStack, submitNodeCollector, 15728880, itemClusterRenderState, this.random);
+			net.vulkanic.world.RustGalWorldPrimitiveRenderer.beginItemEntitySubmission();
+			try {
+				ItemEntityRenderer.submitMultipleFromCount(poseStack, submitNodeCollector, 15728880, itemClusterRenderState, this.random);
+			} finally {
+				net.vulkanic.world.RustGalWorldPrimitiveRenderer.endItemEntitySubmission();
+			}
 			poseStack.popPose();
 		}
 	}

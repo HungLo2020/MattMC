@@ -37,15 +37,17 @@ public class TntRenderer extends EntityRenderer<PrimedTnt, TntRenderState> {
 		poseStack.mulPose(Axis.YP.rotationDegrees(90.0F));
 		if (tntRenderState.blockState != null) {
 			boolean flashingOverlay = (int)f / 5 % 2 == 0;
-			if (!flashingOverlay && tntRenderState.outlineColor == 0) {
-				submitNodeCollector.submitPrimedTntBlock(
-					poseStack, tntRenderState.blockState, tntRenderState.lightCoords, 0, 0
-				);
-			} else {
-				TntMinecartRenderer.submitWhiteSolidBlock(
-					tntRenderState.blockState, poseStack, submitNodeCollector, tntRenderState.lightCoords, flashingOverlay, tntRenderState.outlineColor
-				);
-			}
+			int overlay = flashingOverlay
+				? net.minecraft.client.renderer.texture.OverlayTexture.pack(
+					net.minecraft.client.renderer.texture.OverlayTexture.u(1.0F), 10)
+				: net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY;
+			// Keep flashing and outline metadata on the semantic PRIMED_TNT
+			// submission. Rust lowers the copied flash overlay on the ordinary mesh
+			// and emits an explicit outline-only instance when outline metadata is
+			// present; no Java feature pass is needed for either visual state.
+			submitNodeCollector.submitPrimedTntBlockSemantic(
+				poseStack, tntRenderState.blockState, tntRenderState.lightCoords, overlay, tntRenderState.outlineColor
+			);
 		}
 
 		poseStack.popPose();

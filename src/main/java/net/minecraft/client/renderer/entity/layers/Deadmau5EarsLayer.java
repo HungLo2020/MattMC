@@ -28,7 +28,8 @@ public class Deadmau5EarsLayer extends RenderLayer<AvatarRenderState, PlayerMode
 			int j = LivingEntityRenderer.getOverlayCoords(avatarRenderState, 0.0F);
 			var texture = avatarRenderState.skin.body().texturePath();
 			var renderType = RenderType.entitySolid(texture);
-			if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			if ((net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+					|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
 				&& net.vulkanic.world.WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan()) {
 				boolean eligible = j == net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY
 					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isStandaloneModelMeshEligible(

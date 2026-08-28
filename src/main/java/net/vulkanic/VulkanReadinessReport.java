@@ -51,6 +51,23 @@ public final class VulkanReadinessReport {
         );
     }
 
+    /**
+     * Diagnostics exposed while the Rust Vulkan presenter owns the route.
+     * Java Vulkan bootstrap probes are deliberately not consulted in this
+     * state; the report describes the Rust ownership boundary instead.
+     */
+    public static VulkanReadinessReport forRustWholeFrameVulkan() {
+        return new VulkanReadinessReport(
+            GraphicsBackendType.VULKAN,
+            true,
+            false,
+            false,
+            false,
+            "Rust VulkanicGAL owns device, surface, and presentation",
+            List.of("Java Vulkan runtime diagnostics are unavailable while Rust owns whole-frame presentation")
+        );
+    }
+
     public GraphicsBackendType getActiveBackendType() {
         return activeBackendType;
     }

@@ -13,6 +13,7 @@ import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.client.renderer.state.CameraRenderState;
 import net.minecraft.client.renderer.state.ParticleGroupRenderState;
 import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.client.renderer.entity.ElderGuardianRenderer;
 import net.minecraft.util.ARGB;
 import net.minecraft.util.Mth;
 import net.minecraft.util.Unit;
@@ -52,11 +53,16 @@ public class ElderGuardianParticleGroup extends ParticleGroup<ElderGuardianParti
 	}
 
 	@Environment(EnvType.CLIENT)
-	record State(List<ElderGuardianParticleGroup.ElderGuardianParticleRenderState> states) implements ParticleGroupRenderState {
+		record State(List<ElderGuardianParticleGroup.ElderGuardianParticleRenderState> states) implements ParticleGroupRenderState {
 		@Override
 		public void submit(SubmitNodeCollector submitNodeCollector, CameraRenderState cameraRenderState) {
+			this.submitSemantic(submitNodeCollector, cameraRenderState);
+		}
+
+		@Override
+		public void submitSemantic(SubmitNodeCollector submitNodeCollector, CameraRenderState cameraRenderState) {
 			for (ElderGuardianParticleGroup.ElderGuardianParticleRenderState elderGuardianParticleRenderState : this.states) {
-				submitNodeCollector.submitModel(
+				submitNodeCollector.submitModelSemanticTexture(
 					elderGuardianParticleRenderState.model,
 					Unit.INSTANCE,
 					elderGuardianParticleRenderState.poseStack,
@@ -64,7 +70,7 @@ public class ElderGuardianParticleGroup extends ParticleGroup<ElderGuardianParti
 					15728880,
 					OverlayTexture.NO_OVERLAY,
 					elderGuardianParticleRenderState.color,
-					null,
+					ElderGuardianRenderer.GUARDIAN_ELDER_LOCATION,
 					0,
 					null
 				);

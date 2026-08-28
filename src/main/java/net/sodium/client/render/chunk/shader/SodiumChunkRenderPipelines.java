@@ -89,6 +89,7 @@ public final class SodiumChunkRenderPipelines {
     }
 
     public static TerrainPipelineContract createContract(TerrainRenderPass pass, RenderPassChunkShaderInterface shaderInterface) {
+        ensureJavaSodiumPipelineAvailable();
         int shaderReloadVersion = Iris.getPipelineManager().getVersionCounterForSodiumShaderReload();
         clearStalePipelines(shaderReloadVersion);
         VertexFormat vertexFormat = createVertexFormat(WorldRenderingSettings.INSTANCE.getVertexFormat().getVertexFormat());
@@ -104,9 +105,17 @@ public final class SodiumChunkRenderPipelines {
     }
 
     public static RenderPipeline forContract(TerrainPipelineContract contract) {
+        ensureJavaSodiumPipelineAvailable();
         clearStalePipelines(contract.shaderReloadVersion());
         PipelineKey key = new PipelineKey(contract);
         return PIPELINES.computeIfAbsent(key, SodiumChunkRenderPipelines::createPipeline);
+    }
+
+    private static void ensureJavaSodiumPipelineAvailable() {
+        if (VulkanicAPI.isVulkanBackendSelected()
+                || net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+            throw new IllegalStateException("Java Sodium pipeline construction is unavailable on the Rust Vulkan route");
+        }
     }
 
     private static synchronized void clearStalePipelines(int shaderReloadVersion) {

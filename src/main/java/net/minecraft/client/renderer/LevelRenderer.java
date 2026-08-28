@@ -256,13 +256,25 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		this.skyRenderer.close();
 		this.cloudRenderer.close();
 	}
+
+	/** Retires the pre-selection Java outline target before Rust owns the frame. */
+	public void ensureRustSemanticRoute() {
+		if ((net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected())
+			&& this.entityOutlineTarget != null) {
+			this.entityOutlineTarget.destroyBuffers();
+			this.entityOutlineTarget = null;
+		}
+	}
 	
 	// Iris: Helper method to disable fabulous graphics when shaders are enabled
 	private void disableFabulousGraphicsIfNeeded() {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
 			// Rust owns shader-pack admission for whole-frame Vulkan.  Do not query
 			// Iris's Java lifecycle while resource reload is constructing semantic
-			// world state.
+			// world state. Selection is fenced too, before the whole-frame shell has
+			// necessarily been activated.
 			return;
 		}
 
@@ -291,10 +303,11 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		if (this.entityOutlineTarget != null) {
 			this.entityOutlineTarget.destroyBuffers();
 		}
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
 			// Rust owns the outline mask, intermediate targets, and post effect for
-			// whole-frame Vulkan.  Do not allocate a Java target or expose it through
-			// the frame graph on that route.
+			// whole-frame Vulkan. Do not allocate a Java target or expose it through
+			// the frame graph after Vulkan selection, even before the shell activates.
 			this.entityOutlineTarget = null;
 			return;
 		}
@@ -304,6 +317,10 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 
 	@Nullable
 	private PostChain getTransparencyChain() {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java transparency post-chain is unavailable while Vulkan is selected");
+		}
 		if (!Minecraft.useShaderTransparency()) {
 			return null;
 		} else {
@@ -318,7 +335,9 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	}
 
 	public void doEntityOutline() {
-		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() && this.shouldShowEntityOutlines()) {
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			&& this.shouldShowEntityOutlines()) {
 			this.entityOutlineTarget.blitAndBlendToTexture(this.minecraft.getMainRenderTarget().getColorTextureView());
 		}
 	}
@@ -335,7 +354,10 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		this.lastCameraSectionZ = Integer.MIN_VALUE;
 		this.level = clientLevel;
 		if (clientLevel != null) {
-			this.allChanged();
+			if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+				&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+				this.allChanged();
+			}
 		} else {
 			this.entityRenderDispatcher.resetCamera();
 			if (this.viewArea != null) {
@@ -356,6 +378,9 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		
 		// Sodium: Update renderer when world changes
 		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+				throw new IllegalStateException("Java Sodium world setup is unavailable while Vulkan is selected");
+			}
 			RenderDevice.enterManagedCode();
 			try {
 				this.renderer.setLevel(clientLevel);
@@ -373,6 +398,13 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	}
 
 	public void allChanged() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+			// Rust owns semantic world invalidation and terrain lifetime for this
+			// route.  Do not recreate Java section dispatchers or ViewArea buffers.
+			return;
+		}
+
 		// Iris: Disable fabulous graphics when shaders are enabled
 		disableFabulousGraphicsIfNeeded();
 		
@@ -404,6 +436,9 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		
 		// Sodium: Reload renderer
 		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+				throw new IllegalStateException("Java Sodium renderer reload is unavailable while Vulkan is selected");
+			}
 			RenderDevice.enterManagedCode();
 			try {
 				this.renderer.reload();
@@ -442,6 +477,10 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	}
 
 	public int countRenderedSections() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+			return 0;
+		}
 		// Sodium: Redirect to our renderer
 		return this.renderer.getVisibleChunkCount();
 	}
@@ -461,6 +500,9 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		// verified by the whole-frame execution correlation gate.
 		this.applyFrustum(frustum);
 		return;
+	}
+	if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+		throw new IllegalStateException("Java Sodium terrain visibility is unavailable while Vulkan is selected");
 	}
 
 // Sodium: Redirect terrain setup to our renderer
@@ -505,7 +547,12 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 
 	private Frustum prepareCullFrustum(Matrix4f matrix4f, Matrix4f matrix4f2, Vec3 vec3) {
 		// Iris: From MixinLevelRenderer - Disable frustum culling when Iris pipeline requests it
-		if (this.disableFrustumCulling) {
+		// Rust whole-frame Vulkan owns semantic visibility and must not inherit a
+		// stale Iris pipeline flag from a prior Java compatibility frame. Keep the
+		// Iris-controlled non-culling frustum exclusively on the OpenGL route.
+		if (this.disableFrustumCulling
+			&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			net.irisshaders.iris.shadows.frustum.fallback.NonCullingFrustum f = new net.irisshaders.iris.shadows.frustum.fallback.NonCullingFrustum();
 			f.prepare(vec3.x(), vec3.y(), vec3.z());
 			return f;
@@ -539,7 +586,8 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		Vector4f vector4f,
 		boolean bl2
 	) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
 			throw new IllegalStateException("Java LevelRenderer.renderLevel is unavailable while Rust owns whole-frame Vulkan");
 		}
 		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() && this.entityOutlineTarget != null) {
@@ -613,8 +661,11 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		this.pipeline.renderShadows(this, camera, this.levelRenderState.cameraRenderState);
 		
 		profilerFiller.popPush("cullTerrain");
-		// Iris: From MixinLevelRenderer_SkipRendering - skip terrain culling if pipeline requests
-		if (net.irisshaders.iris.Iris.getPipelineManager().getPipelineNullable() instanceof net.irisshaders.iris.pipeline.IrisRenderingPipeline pipeline) {
+		// Iris skip-all-rendering is a Java compatibility concern. Rust Vulkan
+		// owns semantic terrain admission and must not query Iris runtime state.
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			this.cullTerrain(camera, frustum, this.minecraft.player.isSpectator());
+		} else if (net.irisshaders.iris.Iris.getPipelineManager().getPipelineNullable() instanceof net.irisshaders.iris.pipeline.IrisRenderingPipeline pipeline) {
 			if (!pipeline.skipAllRendering()) {
 				this.cullTerrain(camera, frustum, this.minecraft.player.isSpectator());
 			}
@@ -701,9 +752,13 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		}
 
 		this.addMainPass(frameGraphBuilder, frustum, matrix4f, gpuBufferSlice, bl, this.levelRenderState, deltaTracker, profilerFiller);
-		PostChain postChain2 = this.minecraft.getShaderManager().getPostChain(ENTITY_OUTLINE_POST_CHAIN_ID, LevelTargetBundle.OUTLINE_TARGETS);
+		PostChain postChain2 = null;
 		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			&& this.levelRenderState.haveGlowingEntities && postChain2 != null) {
+			&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			&& this.levelRenderState.haveGlowingEntities) {
+			postChain2 = this.minecraft.getShaderManager().getPostChain(ENTITY_OUTLINE_POST_CHAIN_ID, LevelTargetBundle.OUTLINE_TARGETS);
+		}
+		if (postChain2 != null) {
 			postChain2.addToFrame(frameGraphBuilder, i, j, this.targets);
 		}
 
@@ -771,15 +826,21 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		net.irisshaders.iris.vertices.ImmediateState.isRenderingLevel = false;
 		
 		// VoxelMap: Render waypoint beacons after level rendering
-		try {
-			PoseStack voxelmap_poseStack = new PoseStack();
-			voxelmap_poseStack.pushPose();
-			voxelmap_poseStack.last().pose().set(matrix4f);
-			net.minecraft.client.renderer.MultiBufferSource.BufferSource bufferSource = this.minecraft.renderBuffers().bufferSource();
-			VoxelConstants.onRenderWaypoints(deltaTracker.getGameTimeDeltaPartialTick(false), voxelmap_poseStack, bufferSource, camera);
-			voxelmap_poseStack.popPose();
-		} catch (Exception e) {
-			// Silently catch to avoid crashes
+		// Waypoints are collected through submitRustWaypointSemantics during the
+		// Rust-owned extraction pass. Never invoke VoxelMap's Java GL presenter
+		// after that handoff; doing so would create an untracked second renderer.
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+			try {
+				PoseStack voxelmap_poseStack = new PoseStack();
+				voxelmap_poseStack.pushPose();
+				voxelmap_poseStack.last().pose().set(matrix4f);
+				net.minecraft.client.renderer.MultiBufferSource.BufferSource bufferSource = this.minecraft.renderBuffers().bufferSource();
+				VoxelConstants.onRenderWaypoints(deltaTracker.getGameTimeDeltaPartialTick(false), voxelmap_poseStack, bufferSource, camera);
+				voxelmap_poseStack.popPose();
+			} catch (Exception e) {
+				// Silently catch to avoid crashes
+			}
 		}
 	}
 
@@ -793,7 +854,8 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		DeltaTracker deltaTracker,
 		ProfilerFiller profilerFiller
 	) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
 			throw new IllegalStateException("Java main world pass is unavailable while Rust owns presentation");
 		}
 		FramePass framePass = frameGraphBuilder.addPass("main");
@@ -884,8 +946,15 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 			iris$endDebugRender();
 			bufferSource.endLastBatch();
 			profilerFiller.pop();
+		// Rust whole-frame extraction has already copied game-test markers into
+		// explicit debug/text streams above. Do not invoke the Java compatibility
+		// renderer on the selected Vulkan route (it is intentionally fail-closed
+		// and would otherwise abort the Rust frame).
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
 			this.gameTestBlockHighlightRenderer.render(poseStack, bufferSource);
 			bufferSource.endLastBatch();
+		}
 			this.checkPoseStack(poseStack);
 			bufferSource.endBatch(Sheets.translucentItemSheet());
 			bufferSource.endBatch(Sheets.bannerSheet());
@@ -930,6 +999,10 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 			&& materialRoute.usesRustWholeFrameVulkan()) {
 			return;
 		}
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Rust whole-frame particle route is unavailable while Vulkan is selected");
+		}
 		// Iris: From MixinLevelRenderer (fantastic) - Disable particles pass if rendering BEFORE
 		net.irisshaders.iris.shaderpack.properties.ParticleRenderingSettings settings = net.irisshaders.iris.Iris.getPipelineManager().getPipeline()
 			.map(net.irisshaders.iris.pipeline.WorldRenderingPipeline::getParticleRenderingSettings)
@@ -971,6 +1044,10 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		if (cloudRoute.usesRustWholeFrameVulkan()) {
 			return;
 		}
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Rust whole-frame cloud route is unavailable while Vulkan is selected");
+		}
 		FramePass framePass = frameGraphBuilder.addPass("clouds");
 		if (this.targets.clouds != null) {
 			this.targets.clouds = framePass.readsAndWrites(this.targets.clouds);
@@ -991,6 +1068,10 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 	private void addWeatherPass(FrameGraphBuilder frameGraphBuilder, Vec3 vec3, GpuBufferSlice gpuBufferSlice) {
 		if (net.vulkanic.world.WorldRenderRoutePolicy.currentWeatherRoute().usesRustWholeFrameVulkan()) {
 			return;
+		}
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Rust whole-frame weather route is unavailable while Vulkan is selected");
 		}
 		int i = this.minecraft.options.getEffectiveRenderDistance() * 16;
 		float f = this.minecraft.gameRenderer.getDepthFar();
@@ -1039,7 +1120,8 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 	}
 
 	private void addLateDebugPass(FrameGraphBuilder frameGraphBuilder, Vec3 vec3, GpuBufferSlice gpuBufferSlice, Frustum frustum) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
 			throw new IllegalStateException("Java late-debug pass is unavailable while Rust owns presentation");
 		}
 		FramePass framePass = frameGraphBuilder.addPass("late_debug");
@@ -1072,9 +1154,14 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		boolean bl = this.shouldShowEntityOutlines();
 		Entity.setViewScale(Mth.clamp(this.minecraft.options.getEffectiveRenderDistance() / 8.0, 1.0, 2.5) * this.minecraft.options.entityDistanceScaling().get());
 
-		// Iris: From MixinLevelRenderer_SkipRendering - skip entity extraction if pipeline requests
+		// Iris skip-all-rendering is compatibility-only. Rust Vulkan needs the
+		// complete semantic entity set for explicit admission and must not query
+		// Iris pipeline state while extracting the frame.
 		Iterable<Entity> entities;
-		if (net.irisshaders.iris.Iris.getPipelineManager().getPipelineNullable() instanceof net.irisshaders.iris.pipeline.IrisRenderingPipeline pipeline && pipeline.skipAllRendering()) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+			entities = this.level.entitiesForRendering();
+		} else if (net.irisshaders.iris.Iris.getPipelineManager().getPipelineNullable() instanceof net.irisshaders.iris.pipeline.IrisRenderingPipeline pipeline && pipeline.skipAllRendering()) {
 			entities = java.util.Collections.emptyList();
 		} else {
 			entities = this.level.entitiesForRendering();
@@ -1099,7 +1186,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 				// remains an explicit admission failure rather than a hidden omission.
 				boolean rustWholeFrameEntityExtraction =
 					net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-						&& net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
+					|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
 				boolean entitySectionReady = compiledSection || rustWholeFrameEntityExtraction;
 				if (entitySectionReady
 					&& (entity != camera.getEntity() || camera.isDetached() || camera.getEntity() instanceof LivingEntity && ((LivingEntity)camera.getEntity()).isSleeping())
@@ -1147,6 +1234,78 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 					submitNodeCollector
 			);
 		}
+	}
+
+	/** Collects debug subscriptions that append to the world-text semantic stream. */
+	public void collectRustNeighborUpdateSemantics(Camera camera, SubmitNodeStorage geometry) {
+		if (!VulkanicAPI.isVulkanBackendSelected() && !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) return;
+		this.debugRenderer.collectRustNeighborUpdateSemantics(camera, geometry, this.rustWorldTextSubmitNodeStorage);
+	}
+
+	/** Collects game-event debug geometry and labels into semantic streams. */
+	public void collectRustGameEventListenerSemantics(Camera camera, SubmitNodeStorage geometry) {
+		if (!VulkanicAPI.isVulkanBackendSelected() && !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) return;
+		this.debugRenderer.collectRustGameEventListenerSemantics(camera, geometry, this.rustWorldTextSubmitNodeStorage);
+	}
+
+	/** Collects pathfinding debug geometry and labels into semantic streams. */
+	public void collectRustPathfindingSemantics(Camera camera, SubmitNodeStorage geometry) {
+		if (!VulkanicAPI.isVulkanBackendSelected() && !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) return;
+		this.debugRenderer.collectRustPathfindingSemantics(camera, geometry, this.rustWorldTextSubmitNodeStorage);
+	}
+
+	/** Collects water debug geometry and amount labels into semantic streams. */
+	public void collectRustWaterSemantics(Camera camera, SubmitNodeStorage geometry) {
+		if (!VulkanicAPI.isVulkanBackendSelected() && !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) return;
+		this.debugRenderer.collectRustWaterSemantics(camera, geometry, this.rustWorldTextSubmitNodeStorage);
+	}
+
+	/** Collects light debug labels into the semantic world-text stream. */
+	public void collectRustLightSemantics(Camera camera) {
+		if (!VulkanicAPI.isVulkanBackendSelected() && !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) return;
+		this.debugRenderer.collectRustLightSemantics(camera, this.rustWorldTextSubmitNodeStorage);
+	}
+
+	/** Collects periodic chunk diagnostics into the semantic world-text stream. */
+	public void collectRustChunkSemantics(Camera camera) {
+		if (!VulkanicAPI.isVulkanBackendSelected() && !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) return;
+		this.debugRenderer.collectRustChunkSemantics(camera, this.rustWorldTextSubmitNodeStorage);
+	}
+
+	/** Collects goal-selector debug labels into the semantic world-text stream. */
+	public void collectRustGoalSelectorSemantics(Camera camera) {
+		if (!VulkanicAPI.isVulkanBackendSelected() && !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) return;
+		this.debugRenderer.collectRustGoalSelectorSemantics(camera, this.rustWorldTextSubmitNodeStorage);
+	}
+
+	/** Collects raid centers and labels into semantic world streams. */
+	public void collectRustRaidSemantics(Camera camera, SubmitNodeStorage geometry) {
+		if (!VulkanicAPI.isVulkanBackendSelected() && !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) return;
+		this.debugRenderer.collectRustRaidSemantics(camera, geometry, this.rustWorldTextSubmitNodeStorage);
+	}
+
+	/** Collects POI and ghost-POI diagnostics into semantic world streams. */
+	public void collectRustPoiSemantics(Camera camera, SubmitNodeStorage geometry) {
+		if (!VulkanicAPI.isVulkanBackendSelected() && !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) return;
+		this.debugRenderer.collectRustPoiSemantics(camera, geometry, this.rustWorldTextSubmitNodeStorage);
+	}
+
+	/** Collects brain-debug labels into the semantic world-text stream. */
+	public void collectRustBrainSemantics(Camera camera) {
+		if (!VulkanicAPI.isVulkanBackendSelected() && !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) return;
+		this.debugRenderer.collectRustBrainSemantics(camera, this.rustWorldTextSubmitNodeStorage);
+	}
+
+	/** Collects bee diagnostics into semantic world streams. */
+	public void collectRustBeeSemantics(Camera camera, SubmitNodeStorage geometry) {
+		if (!VulkanicAPI.isVulkanBackendSelected() && !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) return;
+		this.debugRenderer.collectRustBeeSemantics(camera, geometry, this.rustWorldTextSubmitNodeStorage);
+	}
+
+	/** Collects octree diagnostics using the frame's explicit frustum. */
+	public void collectRustOctreeSemantics(Camera camera, SubmitNodeStorage geometry, net.minecraft.client.renderer.culling.Frustum frustum) {
+		if (!VulkanicAPI.isVulkanBackendSelected() && !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) return;
+		this.debugRenderer.collectRustOctreeSemantics(camera, geometry, this.rustWorldTextSubmitNodeStorage, frustum);
 	}
 
 	public void enqueueRustGalIndexedMeshFeaturesForWholeFrame(Camera camera, DeltaTracker deltaTracker, Matrix4f viewMatrix, Matrix4f projectionMatrix) {
@@ -1228,6 +1387,14 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 			this.featureRenderDispatcher.collectRustHitboxSemantics(this.submitNodeStorage);
 		} else {
 			this.featureRenderDispatcher.validateRustHitboxRoute(this.submitNodeStorage);
+		}
+		// Game-test markers are debug geometry outside the entity submit lists;
+		// copy them before feature dispatch so Rust owns both their box and label.
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			&& net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			this.gameTestBlockHighlightRenderer.collectRustSemantics(
+				poseStack, this.submitNodeStorage, this.rustWorldTextSubmitNodeStorage
+			);
 		}
 		if (modelPartMeshes || blockEntitySemanticFamilies) {
 			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.indexed-mesh.model-block-entity-traversal");
@@ -1326,7 +1493,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 			if (!selected) {
 				continue;
 			}
-			this.entityRenderDispatcher.submit(
+			this.entityRenderDispatcher.submitSemantic(
 				entityRenderState,
 				this.levelRenderState.cameraRenderState,
 				entityRenderState.x - cameraPos.x,
@@ -1383,7 +1550,77 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		Object state,
 		@Nullable net.minecraft.client.renderer.texture.TextureAtlasSprite sprite
 	) {
+		// The real semantic submitter records an exact model/texture receipt for
+		// every atlas-backed family. Use that receipt before the compatibility list
+		// below so newly admitted Rust model families cannot be rejected merely
+		// because this coverage replay has not learned their Java state class yet.
+		if (model != null && sprite != null
+			&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(model, sprite)) {
+			return true;
+		}
 		return model != null
+			&& model.getClass() == net.minecraft.client.model.ArmorStandModel.class
+			&& state instanceof net.minecraft.client.renderer.entity.state.ArmorStandRenderState armorStandRenderState
+			&& !armorStandRenderState.isMarker
+			&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+				model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/armorstand/wood.png")
+			)
+			|| model instanceof net.minecraft.client.model.CatModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.CatRenderState catRenderState
+				&& catRenderState.texture != null
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, catRenderState.texture
+				)
+			|| model instanceof net.minecraft.client.model.WolfModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.WolfRenderState wolfRenderState
+				&& !wolfRenderState.isBaby
+				&& wolfRenderState.texture != null
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, wolfRenderState.texture
+				)
+			|| model instanceof net.minecraft.client.model.VillagerModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.VillagerRenderState
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/villager/villager.png")
+				)
+			|| model instanceof net.minecraft.client.model.VillagerModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.VillagerRenderState
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/wandering_trader.png")
+				)
+			|| model instanceof net.minecraft.client.model.GuardianModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.GuardianRenderState
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/guardian.png")
+				)
+			|| model instanceof net.minecraft.client.model.GuardianModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.GuardianRenderState
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/guardian/guardian_elder.png")
+				)
+			|| model instanceof net.minecraft.client.model.SnowGolemModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.SnowGolemRenderState
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/snow_golem.png")
+				)
+			|| model instanceof net.minecraft.client.model.IronGolemModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.IronGolemRenderState
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/iron_golem/iron_golem.png")
+				)
+			|| model instanceof net.minecraft.client.model.SkeletonModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.SkeletonRenderState skeletonRenderState
+				&& !skeletonRenderState.isBaby
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/skeleton/skeleton.png")
+				)
+			|| model instanceof net.minecraft.client.model.SkeletonModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.SkeletonRenderState witherSkeletonRenderState
+				&& !witherSkeletonRenderState.isBaby
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/skeleton/wither_skeleton.png")
+				)
+			|| model != null
 				&& model.getClass() == net.minecraft.client.model.ChickenModel.class
 				&& state instanceof net.minecraft.client.renderer.entity.state.ChickenRenderState chickenRenderState
 				&& chickenRenderState.variant != null
@@ -1403,6 +1640,32 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
 					model, pigRenderState.variant.modelAndTexture().asset().texturePath()
 				)
+			|| model instanceof net.minecraft.client.model.CreeperModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.CreeperRenderState creeperRenderState
+				&& !creeperRenderState.isPowered
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/creeper/creeper.png")
+				)
+			|| model instanceof net.minecraft.client.model.FoxModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.FoxRenderState foxRenderState
+				&& !foxRenderState.isBaby
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, foxRenderState.variant == net.minecraft.world.entity.animal.Fox.Variant.RED
+						? net.minecraft.resources.ResourceLocation.withDefaultNamespace(
+							foxRenderState.isSleeping ? "textures/entity/fox/fox_sleep.png" : "textures/entity/fox/fox.png")
+						: net.minecraft.resources.ResourceLocation.withDefaultNamespace(
+							foxRenderState.isSleeping ? "textures/entity/fox/snow_fox_sleep.png" : "textures/entity/fox/snow_fox.png")
+				)
+			|| model instanceof net.minecraft.client.model.SpiderModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.LivingEntityRenderState
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/spider/spider.png")
+				)
+			|| model instanceof net.minecraft.client.model.SpiderModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.LivingEntityRenderState
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/spider/cave_spider.png")
+				)
 			|| model != null
 				&& model.getClass() == net.minecraft.client.model.HappyGhastModel.class
 				&& state instanceof net.minecraft.client.renderer.entity.state.HappyGhastRenderState happyGhastRenderState
@@ -1411,6 +1674,333 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 					happyGhastRenderState.isBaby
 						? net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/ghast/happy_ghast_baby.png")
 						: net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/ghast/happy_ghast.png")
+				)
+			|| model != null
+				&& model.getClass() == net.minecraft.client.model.GhastModel.class
+				&& state instanceof net.minecraft.client.renderer.entity.state.GhastRenderState ghastRenderState
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, ghastRenderState.isCharging
+						? net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/ghast/ghast_shooting.png")
+						: net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/ghast/ghast.png")
+				)
+			|| model instanceof net.minecraft.client.model.BlazeModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.LivingEntityRenderState
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/blaze.png")
+				)
+			|| model != null
+				&& model.getClass() == net.minecraft.client.model.WitchModel.class
+				&& state instanceof net.minecraft.client.renderer.entity.state.WitchRenderState
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/witch.png")
+				)
+			|| model != null
+				&& model.getClass() == net.minecraft.client.model.EndermanModel.class
+				&& state instanceof net.minecraft.client.renderer.entity.state.EndermanRenderState
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/enderman/enderman.png")
+				)
+			|| model instanceof net.minecraft.client.model.EndermiteModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.LivingEntityRenderState
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/endermite.png")
+				)
+			|| model instanceof net.minecraft.client.model.SilverfishModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.LivingEntityRenderState
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/silverfish.png")
+				)
+			|| model instanceof net.minecraft.client.model.BatModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.BatRenderState
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/bat.png")
+				)
+			|| model instanceof net.minecraft.client.model.CodModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.LivingEntityRenderState
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/fish/cod.png")
+				)
+			|| model instanceof net.minecraft.client.model.SalmonModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.SalmonRenderState
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/fish/salmon.png")
+				)
+			|| (model instanceof net.minecraft.client.model.PufferfishBigModel
+				|| model instanceof net.minecraft.client.model.PufferfishMidModel
+				|| model instanceof net.minecraft.client.model.PufferfishSmallModel)
+				&& state instanceof net.minecraft.client.renderer.entity.state.PufferfishRenderState
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/fish/pufferfish.png")
+				)
+			|| model instanceof net.minecraft.client.model.TadpoleModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.LivingEntityRenderState
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/tadpole/tadpole.png")
+				)
+			|| model instanceof net.minecraft.client.model.OcelotModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.FelineRenderState
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/cat/ocelot.png")
+				)
+			|| model instanceof net.minecraft.client.model.PolarBearModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.PolarBearRenderState polarBearRenderState
+				&& !polarBearRenderState.isBaby
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/bear/polarbear.png")
+				)
+			|| model instanceof net.minecraft.client.model.DolphinModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.DolphinRenderState
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/dolphin.png")
+				)
+			|| model instanceof net.minecraft.client.model.TurtleModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.TurtleRenderState turtleRenderState
+				&& !turtleRenderState.isBaby
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/turtle/big_sea_turtle.png")
+				)
+			|| model instanceof net.minecraft.client.model.PandaModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.PandaRenderState pandaRenderState
+				&& !pandaRenderState.isBaby
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.vulkanic.world.RustGalWorldPrimitiveRenderer.vanillaPandaTextureIdentity(pandaRenderState)
+				)
+			|| model instanceof net.minecraft.client.model.BeeModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.BeeRenderState beeRenderState
+				&& !beeRenderState.isBaby
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.vulkanic.world.RustGalWorldPrimitiveRenderer.vanillaBeeTextureIdentity(beeRenderState)
+				)
+			|| model instanceof net.minecraft.client.model.AxolotlModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.AxolotlRenderState axolotlRenderState
+				&& !axolotlRenderState.isBaby
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.vulkanic.world.RustGalWorldPrimitiveRenderer.vanillaAxolotlTextureIdentity(axolotlRenderState)
+				)
+			|| model instanceof net.minecraft.client.model.FrogModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.FrogRenderState frogRenderState
+				&& frogRenderState.texture != null
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, frogRenderState.texture
+				)
+			|| model instanceof net.minecraft.client.model.SquidModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.SquidRenderState squidRenderState
+				&& !squidRenderState.isBaby
+				&& (net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/squid/squid.png")
+				) || net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/squid/glow_squid.png")
+				))
+			|| model instanceof net.minecraft.client.model.GoatModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.GoatRenderState goatRenderState
+				&& !goatRenderState.isBaby
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/goat/goat.png")
+				)
+			|| model instanceof net.minecraft.client.model.AllayModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.AllayRenderState
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/allay/allay.png")
+				)
+			|| model instanceof net.minecraft.client.model.IllagerModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.EvokerRenderState
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/illager/evoker.png")
+				)
+			|| model instanceof net.minecraft.client.model.IllagerModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.IllagerRenderState
+				&& (net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/illager/vindicator.png")
+				) || net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/illager/pillager.png")
+				) || net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/illager/illusioner.png")
+				))
+			|| model instanceof net.minecraft.client.model.ParrotModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.ParrotRenderState parrotRenderState
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, switch (parrotRenderState.variant) {
+						case RED_BLUE -> net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/parrot/parrot_red_blue.png");
+						case BLUE -> net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/parrot/parrot_blue.png");
+						case GREEN -> net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/parrot/parrot_green.png");
+						case YELLOW_BLUE -> net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/parrot/parrot_yellow_blue.png");
+						case GRAY -> net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/parrot/parrot_grey.png");
+					}
+				)
+			|| (model instanceof net.minecraft.client.model.TropicalFishModelA
+				|| model instanceof net.minecraft.client.model.TropicalFishModelB)
+				&& state instanceof net.minecraft.client.renderer.entity.state.TropicalFishRenderState tropicalFishRenderState
+				&& (net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.vulkanic.world.RustGalWorldPrimitiveRenderer.vanillaTropicalFishTextureIdentity(tropicalFishRenderState)
+				) || net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.vulkanic.world.RustGalWorldPrimitiveRenderer.vanillaTropicalFishPatternTextureIdentity(tropicalFishRenderState)
+				))
+			|| model instanceof net.minecraft.client.model.RavagerModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.RavagerRenderState
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/illager/ravager.png")
+				)
+			|| model instanceof net.minecraft.client.model.VexModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.VexRenderState vexRenderState
+				&& (net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/illager/vex.png")
+				) || net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/illager/vex_charging.png")
+				))
+			|| model instanceof net.minecraft.client.model.SlimeModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.SlimeRenderState slimeRenderState
+				&& slimeRenderState.size > 0
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/slime/slime.png")
+				)
+			|| model instanceof net.minecraft.client.model.LavaSlimeModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.SlimeRenderState
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/slime/magmacube.png")
+				)
+			|| model instanceof net.minecraft.client.model.PhantomModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.PhantomRenderState
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/phantom.png")
+				)
+			|| model instanceof net.minecraft.client.model.WardenModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.WardenRenderState
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/warden/warden.png")
+				)
+			|| model instanceof net.minecraft.client.model.WitherBossModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.WitherRenderState witherRenderState
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, witherRenderState.invulnerableTicks > 0.0F && !witherRenderState.isPowered
+						? net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/wither/wither_invulnerable.png")
+						: net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/wither/wither.png")
+				)
+			|| model instanceof net.minecraft.client.model.DrownedModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.ZombieRenderState
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/zombie/drowned.png")
+				)
+			|| model instanceof net.minecraft.client.model.CreakingModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.CreakingRenderState
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/creaking/creaking.png")
+				)
+			|| model instanceof net.minecraft.client.model.BreezeModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.BreezeRenderState
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/breeze/breeze.png")
+				)
+			|| model instanceof net.minecraft.client.model.CopperGolemModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.CopperGolemRenderState copperGolemRenderState
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.world.entity.animal.coppergolem.CopperGolemOxidationLevels
+						.getOxidationLevel(copperGolemRenderState.weathering).texture()
+				)
+			|| model instanceof net.minecraft.client.model.StriderModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.StriderRenderState striderRenderState
+				&& !striderRenderState.isBaby
+				&& (net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/strider/strider.png")
+				) || net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/strider/strider_cold.png")
+				))
+			|| model instanceof net.minecraft.client.model.HoglinModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.HoglinRenderState hoglinRenderState
+				&& !hoglinRenderState.isBaby
+				&& (net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/hoglin/hoglin.png")
+				) || net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/hoglin/zoglin.png")
+				))
+			|| model instanceof net.minecraft.client.model.CamelModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.CamelRenderState camelRenderState
+				&& !camelRenderState.isBaby
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/camel/camel.png")
+				)
+			|| (model instanceof net.minecraft.client.model.PiglinModel
+				|| model instanceof net.minecraft.client.model.ZombifiedPiglinModel)
+				&& state instanceof net.minecraft.client.renderer.entity.state.HumanoidRenderState
+				&& (net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/piglin/piglin.png")
+				) || net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/piglin/piglin_brute.png")
+				) || net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/piglin/zombified_piglin.png")
+				))
+			|| model instanceof net.minecraft.client.model.SkeletonModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.SkeletonRenderState strayRenderState
+				&& !strayRenderState.isBaby
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/skeleton/stray.png")
+				)
+			|| model instanceof net.minecraft.client.model.BoggedModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.BoggedRenderState boggedRenderState
+				&& !boggedRenderState.isBaby
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/skeleton/bogged.png")
+				)
+			|| model instanceof net.minecraft.client.model.GiantZombieModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.ZombieRenderState
+				&& (net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/zombie/zombie.png")
+				) || net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/zombie/husk.png")
+				))
+			|| model instanceof net.minecraft.client.model.ArmadilloModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.ArmadilloRenderState armadilloRenderState
+				&& !armadilloRenderState.isBaby
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/armadillo.png")
+				)
+			|| model instanceof net.minecraft.client.model.SnifferModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.SnifferRenderState snifferRenderState
+				&& !snifferRenderState.isBaby
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/sniffer/sniffer.png")
+				)
+			|| model != null
+				&& model.getClass() == net.minecraft.client.model.animal.nautilus.NautilusModel.class
+				&& state instanceof net.minecraft.client.renderer.entity.state.NautilusRenderState nautilusRenderState
+				&& !nautilusRenderState.isBaby
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, nautilusRenderState.variant == null
+						? net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/nautilus/nautilus.png")
+						: nautilusRenderState.variant.modelAndTexture().asset().texturePath()
+				)
+			|| model instanceof net.minecraft.client.model.HorseModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.HorseRenderState horseRenderState
+				&& !horseRenderState.isBaby
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, switch (horseRenderState.variant) {
+						case WHITE -> net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/horse/horse_white.png");
+						case CREAMY -> net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/horse/horse_creamy.png");
+						case CHESTNUT -> net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/horse/horse_chestnut.png");
+						case BROWN -> net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/horse/horse_brown.png");
+						case BLACK -> net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/horse/horse_black.png");
+						case GRAY -> net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/horse/horse_gray.png");
+						case DARK_BROWN -> net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/horse/horse_darkbrown.png");
+					}
+				)
+			|| model instanceof net.minecraft.client.model.DonkeyModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.DonkeyRenderState donkeyRenderState
+				&& !donkeyRenderState.isBaby
+				&& (net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/horse/donkey.png")
+				) || net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/horse/mule.png")
+				))
+			|| model instanceof net.minecraft.client.model.LlamaModel
+				&& state instanceof net.minecraft.client.renderer.entity.state.LlamaRenderState llamaRenderState
+				&& !llamaRenderState.isBaby
+				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasCurrentFrameRustModelMeshDecision(
+					model, switch (llamaRenderState.variant) {
+						case CREAMY -> net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/llama/creamy.png");
+						case WHITE -> net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/llama/white.png");
+						case BROWN -> net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/llama/brown.png");
+						case GRAY -> net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/llama/gray.png");
+						default -> null;
+					}
 				)
 			|| model != null
 				&& model.getClass() == net.minecraft.client.model.RabbitModel.class
@@ -1521,7 +2111,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 			BlockPos blockPos = blockEntityRenderState.blockPos;
 			poseStack.pushPose();
 			poseStack.translate(blockPos.getX() - cameraPos.x, blockPos.getY() - cameraPos.y, blockPos.getZ() - cameraPos.z);
-			this.blockEntityRenderDispatcher.submit(
+			this.blockEntityRenderDispatcher.submitSemantic(
 				blockEntityRenderState,
 				poseStack,
 				this.submitNodeStorage,
@@ -1626,6 +2216,16 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 			this.target.submitNameTag(poseStack, offset, packedLight, text, seeThrough, width, distance, cameraRenderState);
 		}
 
+		@Override
+		public void submitNameTagSemantic(
+			PoseStack poseStack, @Nullable Vec3 offset, int packedLight,
+			net.minecraft.network.chat.Component text, boolean seeThrough, int width,
+			double distance, net.minecraft.client.renderer.state.CameraRenderState cameraRenderState
+		) {
+			this.counts.nameTagCallbacks++;
+			this.target.submitNameTagSemantic(poseStack, offset, packedLight, text, seeThrough, width, distance, cameraRenderState);
+		}
+
 		private int nameTagCallbackCount() {
 			return this.counts.nameTagCallbacks;
 		}
@@ -1640,8 +2240,25 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 			this.counts.textCallbacks++;
 			this.target.submitTextSemantic(this.order, poseStack, x, y, text, shadow, mode, color, backgroundColor, packedLight, packedOverlay);
 		}
+		@Override public void submitTextSemantic(PoseStack poseStack, float x, float y, net.minecraft.util.FormattedCharSequence text, boolean shadow, net.minecraft.client.gui.Font.DisplayMode mode, int color, int backgroundColor, int packedLight, int packedOverlay) {
+			this.counts.textCallbacks++;
+			this.target.submitTextSemantic(this.order, poseStack, x, y, text, shadow, mode, color, backgroundColor, packedLight, packedOverlay);
+		}
 		@Override public boolean submitColoredQuads(PoseStack poseStack, RenderType renderType, float[] vertices, float[] uvs, int[] colors, int lightCoords) {
 			return this.target.submitColoredQuads(poseStack, renderType, vertices, uvs, colors, lightCoords);
+		}
+		@Override public boolean submitTexturedQuad(PoseStack poseStack, RenderType renderType, net.minecraft.resources.ResourceLocation textureIdentity, float[] vertices, float[] uvs, int color, int lightCoords) {
+			if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+				&& !net.vulkanic.world.WorldRenderRoutePolicy.currentTexturedBillboardRoute().usesRustWholeFrameVulkan()) return false;
+			return net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueTexturedQuad(poseStack.last().pose(), textureIdentity, vertices, uvs, color, lightCoords);
+		}
+		@Override public boolean submitTranslucentTexturedQuad(PoseStack poseStack, RenderType renderType, net.minecraft.resources.ResourceLocation textureIdentity, float[] vertices, float[] uvs, int color, int lightCoords) {
+			if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+				&& !net.vulkanic.world.WorldRenderRoutePolicy.currentTexturedBillboardRoute().usesRustWholeFrameVulkan()) return false;
+			return net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueTranslucentTexturedQuad(poseStack.last().pose(), textureIdentity, vertices, uvs, color, lightCoords);
+		}
+		@Override public boolean submitTexturedQuads(PoseStack poseStack, RenderType renderType, net.minecraft.resources.ResourceLocation textureIdentity, float[] vertices, float[] uvs, int[] colors, int lightCoords) {
+			return net.vulkanic.world.WorldRenderRoutePolicy.currentTexturedBillboardRoute().usesRustWholeFrameVulkan();
 		}
 		@Override public void submitFlame(PoseStack poseStack, EntityRenderState state, org.joml.Quaternionf rotation) {}
 		@Override public void submitLeash(PoseStack poseStack, EntityRenderState.LeashState leash) {}
@@ -1846,7 +2463,6 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 				&& blockState != null
 				&& blockState.getRenderShape() == net.minecraft.world.level.block.RenderShape.MODEL
 				&& !net.minecraft.client.Minecraft.getInstance().getModelManager().specialBlockModelRenderer().get().hasRenderer(blockState.getBlock())
-				&& overlay == net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY
 				&& (net.minecraft.client.renderer.ItemBlockRenderTypes.getChunkRenderType(blockState)
 					== net.minecraft.client.renderer.chunk.ChunkSectionLayer.SOLID
 					|| net.minecraft.client.renderer.ItemBlockRenderTypes.getChunkRenderType(blockState)
@@ -1878,7 +2494,8 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 
 		@Override
 		public void submitBlockModel(PoseStack poseStack, RenderType renderType, net.minecraft.client.renderer.block.model.BlockStateModel blockStateModel, float red, float green, float blue, int light, int overlay, int outlineColor) {
-			if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			if ((net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
 				&& net.vulkanic.world.WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()
 				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isBlockModelMeshSemanticallyEligible(blockStateModel, renderType, overlay)) {
 				return;
@@ -1893,7 +2510,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 			);
 			boolean eligible = ineligibility == null;
 			boolean rustWholeFrame = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-				&& net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
 			boolean firstPersonSemantic = displayContext != null && displayContext.firstPerson();
 			if ((!eligible && !firstPersonSemantic) || (!rustWholeFrame
 				&& !net.vulkanic.world.WorldRenderRoutePolicy.currentItemEntityMeshRoute(true).usesRustWholeFrameVulkan())) {
@@ -1903,6 +2520,17 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 
 		@Override
 		public void submitCustomGeometry(PoseStack poseStack, RenderType renderType, SubmitNodeCollector.CustomGeometryRenderer renderer) {
+			// These exact callback families are copied into Rust semantic streams by
+			// the real dispatcher. Do not count them as missing coverage during the
+			// pre-dispatch audit; arbitrary callback types remain fail-closed below.
+			if (net.vulkanic.world.WorldRenderRoutePolicy.currentDebugLineRoute().usesRustWholeFrameVulkan()
+				&& net.minecraft.client.renderer.SubmitNodeCollection.isRustLineGeometryRenderType(renderType)) {
+				return;
+			}
+			if (net.vulkanic.world.WorldRenderRoutePolicy.currentProceduralQuadRoute().usesRustWholeFrameVulkan()
+				&& net.minecraft.client.renderer.SubmitNodeCollection.isRustProceduralQuadGeometryRenderType(renderType)) {
+				return;
+			}
 			this.customGeometrySubmits++;
 		}
 
@@ -1918,12 +2546,18 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 
 		@Override
 		public boolean submitTexturedQuad(PoseStack poseStack, RenderType renderType, net.minecraft.resources.ResourceLocation textureIdentity, float[] vertices, float[] uvs, int color, int lightCoords) {
-			return net.vulkanic.world.WorldRenderRoutePolicy.currentTexturedBillboardRoute().usesRustWholeFrameVulkan();
+			if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+				&& !net.vulkanic.world.WorldRenderRoutePolicy.currentTexturedBillboardRoute().usesRustWholeFrameVulkan()) return false;
+			return net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueTexturedQuad(
+				poseStack.last().pose(), textureIdentity, vertices, uvs, color, lightCoords);
 		}
 
 		@Override
 		public boolean submitTranslucentTexturedQuad(PoseStack poseStack, RenderType renderType, net.minecraft.resources.ResourceLocation textureIdentity, float[] vertices, float[] uvs, int color, int lightCoords) {
-			return net.vulkanic.world.WorldRenderRoutePolicy.currentTexturedBillboardRoute().usesRustWholeFrameVulkan();
+			if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+				&& !net.vulkanic.world.WorldRenderRoutePolicy.currentTexturedBillboardRoute().usesRustWholeFrameVulkan()) return false;
+			return net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueTranslucentTexturedQuad(
+				poseStack.last().pose(), textureIdentity, vertices, uvs, color, lightCoords);
 		}
 
 		@Override
@@ -2158,7 +2792,19 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 			BlockPos blockPos = blockEntityRenderState.blockPos;
 			poseStack.pushPose();
 			poseStack.translate(blockPos.getX() - d, blockPos.getY() - e, blockPos.getZ() - f);
-			this.blockEntityRenderDispatcher.submit(blockEntityRenderState, poseStack, submitNodeStorage, levelRenderState.cameraRenderState);
+			// Rust whole-frame owns block-entity semantics directly. Keep the
+			// semantic callsite explicit so this route can never accidentally
+			// re-enter Iris' Java render tracking; OpenGL retains its legacy
+			// capture path unchanged.
+			if (net.vulkanic.world.WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()) {
+				this.blockEntityRenderDispatcher.submitSemantic(
+					blockEntityRenderState, poseStack, submitNodeStorage, levelRenderState.cameraRenderState
+				);
+			} else {
+				this.blockEntityRenderDispatcher.submit(
+					blockEntityRenderState, poseStack, submitNodeStorage, levelRenderState.cameraRenderState
+				);
+			}
 			poseStack.popPose();
 		}
 	}
@@ -2176,7 +2822,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 			BlockPos blockPos = blockEntityRenderState.blockPos;
 			poseStack.pushPose();
 			poseStack.translate(blockPos.getX() - d, blockPos.getY() - e, blockPos.getZ() - f);
-			this.blockEntityRenderDispatcher.submit(blockEntityRenderState, poseStack, submitNodeStorage, levelRenderState.cameraRenderState);
+			this.blockEntityRenderDispatcher.submitSemantic(blockEntityRenderState, poseStack, submitNodeStorage, levelRenderState.cameraRenderState);
 			poseStack.popPose();
 		}
 	}
@@ -2434,6 +3080,19 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 	private void renderBlockOutline(MultiBufferSource.BufferSource bufferSource, PoseStack poseStack, boolean bl, LevelRenderState levelRenderState) {
 		BlockOutlineRenderState blockOutlineRenderState = levelRenderState.blockOutlineRenderState;
 		if (blockOutlineRenderState != null) {
+			net.vulkanic.world.WorldRenderRoutePolicy.Route outlineRoute =
+				net.vulkanic.world.WorldRenderRoutePolicy.currentBlockOutlineRoute();
+			if (outlineRoute == net.vulkanic.world.WorldRenderRoutePolicy.Route.DISABLED
+				|| (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+					&& outlineRoute != net.vulkanic.world.WorldRenderRoutePolicy.Route.RUST_VULKAN_WHOLE_FRAME)) {
+				return;
+			}
+			// Rust Vulkan owns the whole frame. Until a semantic block-outline
+			// producer is admitted there, fail closed instead of letting this Java
+			// VertexConsumer path become an invisible Vulkan fallback.
+			if (outlineRoute == net.vulkanic.world.WorldRenderRoutePolicy.Route.RUST_VULKAN_WHOLE_FRAME) {
+				return;
+			}
 			if (blockOutlineRenderState.isTranslucent() == bl) {
 					Vec3 vec3 = levelRenderState.cameraRenderState.pos;
 						if (net.vulkanic.world.RustGalWorldPrimitiveRenderer.shouldUseRustOpenGlOutline()
@@ -2567,7 +3226,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		return switch (net.vulkanic.world.RustGalWorldPrimitiveRenderer.currentBlockOutlineRoute()) {
 			case RUST_OPENGL_BORROWED_CONTEXT -> "rust-opengl";
 			case RUST_VULKAN_WHOLE_FRAME -> "rust-vulkan";
-			case JAVA_COMPATIBILITY -> VulkanicAPI.isVulkanBackendSelected() ? "java-vulkan" : "java-opengl";
+			case JAVA_COMPATIBILITY -> VulkanicAPI.isVulkanBackendSelected() ? "unavailable-vulkan" : "java-opengl";
 			case DISABLED -> "disabled";
 		};
 	}
@@ -3308,7 +3967,8 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 	}
 
 	public void endFrame() {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
 			return;
 		}
 		this.cloudRenderer.endFrame();
@@ -3372,6 +4032,10 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		}
 		if (backgroundRoute.usesRustWholeFrameVulkan()) {
 			return;
+		}
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Rust whole-frame sky route is unavailable while Vulkan is selected");
 		}
 		if (fogType != FogType.POWDER_SNOW && fogType != FogType.LAVA && !this.doesMobEffectBlockSky(camera)) {
 			SkyRenderState skyRenderState = this.levelRenderState.skyRenderState;
@@ -3602,6 +4266,12 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 	}
 
 	public void onSectionBecomingNonEmpty(long l) {
+		// Real production replay fixtures can populate a client level before the
+		// camera/view-area renderer is initialized. The section will be observed by
+		// the normal dirty/source path once initialization completes.
+		if (this.viewArea == null) {
+			return;
+		}
 		SectionRenderDispatcher.RenderSection renderSection = this.viewArea.getRenderSection(l);
 		if (renderSection != null) {
 			this.sectionOcclusionGraph.schedulePropagationFrom(renderSection);
@@ -3637,6 +4307,10 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 	}
 
 	public boolean hasRenderedAllSections() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+			return false;
+		}
 		// Sodium: Redirect to our renderer
 		return this.renderer.isTerrainRenderComplete();
 	}
@@ -3648,6 +4322,12 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 	public void needsUpdate() {
 		this.sectionOcclusionGraph.invalidate();
 		this.cloudRenderer.markForRebuild();
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+			// Rust owns terrain scheduling for the whole-frame route. Keep the CPU
+			// invalidation above, but never reopen Sodium's Java terrain scheduler.
+			return;
+		}
 		// Sodium: Schedule terrain update
 		this.renderer.scheduleTerrainUpdate();
 	}
@@ -3745,6 +4425,14 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		return this.cloudRenderer;
 	}
 
+	public WorldBorderRenderer getWorldBorderRenderer() {
+		return this.worldBorderRenderer;
+	}
+
+	public SkyRenderer getSkyRenderer() {
+		return this.skyRenderer;
+	}
+
 	@FunctionalInterface
 	@Environment(EnvType.CLIENT)
 	public interface BrightnessGetter {
@@ -3761,6 +4449,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 	// These are called from the lambda bodies to provide stable mixin targets
 	
 	public void iris$renderSkyPassBody() {
+		ensureJavaIrisFeaturePassAvailable("sky pass");
 		// Iris: From MixinLevelRenderer - Set CUSTOM_SKY phase
 		if (this.pipeline != null) {
 			this.pipeline.setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.CUSTOM_SKY);
@@ -3805,6 +4494,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 	}
 	
 	public void iris$renderWeatherPassBody() {
+		ensureJavaIrisFeaturePassAvailable("weather pass");
 		// Iris: From MixinLevelRenderer - Set RAIN_SNOW phase
 		if (this.pipeline != null) {
 			this.pipeline.setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.RAIN_SNOW);
@@ -3814,6 +4504,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 	}
 	
 	public void iris$renderCloudsPassBody() {
+		ensureJavaIrisFeaturePassAvailable("clouds pass");
 		// Iris: From MixinLevelRenderer - Set CLOUDS phase
 		if (this.pipeline != null) {
 			this.pipeline.setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.CLOUDS);
@@ -3832,6 +4523,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 	}
 	
 	public void iris$renderWorldBorderBody() {
+		ensureJavaIrisFeaturePassAvailable("world-border pass");
 		// Iris: From MixinLevelRenderer - Set WORLD_BORDER phase
 		if (this.pipeline != null) {
 			this.pipeline.setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.WORLD_BORDER);
@@ -3841,6 +4533,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 	}
 	
 	public void iris$beginDebugRender() {
+		ensureJavaIrisFeaturePassAvailable("debug pass");
 		// Iris: From MixinLevelRenderer - Set DEBUG phase
 		if (this.pipeline != null) {
 			this.pipeline.setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.DEBUG);
@@ -3850,6 +4543,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 	}
 	
 	public void iris$endDebugRender() {
+		ensureJavaIrisFeaturePassAvailable("debug completion");
 		// Iris: From MixinLevelRenderer - Reset to NONE phase
 		if (this.pipeline != null) {
 			this.pipeline.setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.NONE);
@@ -3859,6 +4553,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 	}
 	
 	public void iris$beginTranslucents() {
+		ensureJavaIrisFeaturePassAvailable("translucent pass");
 		// Iris: From MixinLevelRenderer - Begin hand and translucents
 		if (this.pipeline != null) {
 			this.pipeline.beginHand();
@@ -3878,12 +4573,20 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 	
 	// Wrapper method for terrain chunk rendering - allows Iris mixins to intercept
 	public void iris$renderTerrainGroup(ChunkSectionsToRender chunkSectionsToRender, ChunkSectionLayerGroup group) {
+		// Rust-owned terrain must bypass Iris phase mutation entirely. Keep this
+		// check before even reading the compatibility pipeline so an independent
+		// hook invocation cannot borrow Iris state on selected Vulkan.
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+			chunkSectionsToRender.renderGroup(group);
+			return;
+		}
 		// Iris: From MixinLevelRenderer - Set phase based on terrain render type
 		if (this.pipeline != null) {
 			this.pipeline.setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.fromTerrainRenderType(group));
 		}
 		
-		// Iris: From MixinLevelRenderer_SkipRendering - skip chunk rendering if pipeline requests
+		// Iris skip-all-rendering is compatibility-only.
 		if (net.irisshaders.iris.Iris.getPipelineManager().getPipelineNullable() instanceof net.irisshaders.iris.pipeline.IrisRenderingPipeline pipeline) {
 			if (!pipeline.skipAllRendering()) {
 				chunkSectionsToRender.renderGroup(group);
@@ -3900,6 +4603,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 	
 	// Wrapper method for feature rendering in main pass - allows Iris mixins to intercept
 	public void iris$renderAllFeaturesMain() {
+		ensureJavaIrisFeaturePassAvailable("main feature pass");
 		// Iris: From MixinLevelRenderer (fantastic) - Handle particle rendering phases
 		net.irisshaders.iris.shaderpack.properties.ParticleRenderingSettings settings = net.irisshaders.iris.Iris.getPipelineManager().getPipeline()
 			.map(net.irisshaders.iris.pipeline.WorldRenderingPipeline::getParticleRenderingSettings)
@@ -3928,6 +4632,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 	
 	// Wrapper method for particle submission - allows Iris mixins to intercept
 	public void iris$submitParticles() {
+		ensureJavaIrisFeaturePassAvailable("particle submission");
 		// Iris: From MixinLevelRenderer (fantastic) - Redirect to avoid item pickup particles in Mixed mode
 		net.irisshaders.iris.shaderpack.properties.ParticleRenderingSettings settings = net.irisshaders.iris.Iris.getPipelineManager().getPipeline()
 			.map(net.irisshaders.iris.pipeline.WorldRenderingPipeline::getParticleRenderingSettings)
@@ -3943,6 +4648,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 	
 	// Wrapper method for feature rendering in particles pass - allows Iris mixins to intercept
 	public void iris$renderAllFeaturesParticles() {
+		ensureJavaIrisFeaturePassAvailable("particle feature pass");
 		// Iris: From MixinLevelRenderer (fantastic) - Render translucent particles with phase control
 		net.irisshaders.iris.shaderpack.properties.ParticleRenderingSettings settings = net.irisshaders.iris.Iris.getPipelineManager().getPipeline()
 			.map(net.irisshaders.iris.pipeline.WorldRenderingPipeline::getParticleRenderingSettings)
@@ -3957,6 +4663,13 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 			.setParticleRenderingPhase(net.irisshaders.iris.fantastic.ParticleRenderingPhase.EVERYTHING);
 	}
 	
+	private static void ensureJavaIrisFeaturePassAvailable(String pass) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+			throw new IllegalStateException("Java Iris " + pass + " is unavailable while Rust owns whole-frame presentation");
+		}
+	}
+
 	// Iris: From shadows.MixinLevelRenderer - implement CullingDataCache interface
 	@Override
 	public void saveState() {

@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -182,13 +183,14 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 		this.applyTaczTransform(itemDisplayContext, poseStack, animationPose, itemStack);
 		RenderType gunRenderType = RenderType.entityCutoutNoCull(this.texture);
 		ScopedAttachment scopedAttachment = this.scopedAttachment(itemStack, itemDisplayContext, animationPose);
-		boolean rustWholeFrame = VulkanicAPI.isVulkanBackendSelected()
+		boolean rustPresentation = VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
+		boolean rustWholeFrame = rustPresentation
 			&& WorldRenderRoutePolicy.currentTexturedBillboardRoute().usesRustWholeFrameVulkan()
 			&& !submitNodeCollector.isSemanticCoverageOnly();
 		if (!submitNodeCollector.isSemanticCoverageOnly()
-			&& VulkanicAPI.isVulkanBackendSelected()
-			&& net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			&& !WorldRenderRoutePolicy.currentTexturedBillboardRoute().usesRustWholeFrameVulkan()) {
+			&& rustPresentation
+			&& !rustWholeFrame) {
 			throw new IllegalStateException("Rust whole-frame TACZ route is unavailable; Java custom gun geometry is not a fallback");
 		}
 		if (rustWholeFrame) {
@@ -197,14 +199,14 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 			}
 			this.submitAttachments(itemStack, itemDisplayContext, poseStack, submitNodeCollector, i, j, animationPose, false);
 		} else if (scopedAttachment != null) {
-			submitNodeCollector.submitCustomGeometry(
+			submitNodeCollector.submitCustomGeometrySemantic(
 				poseStack,
 				gunRenderType,
 				new TaczScopedGunRenderer(this.geometry, itemDisplayContext, i, j, animationPose, gunRenderContext, scopedAttachment)
 			);
 			this.submitAttachments(itemStack, itemDisplayContext, poseStack, submitNodeCollector, i, j, animationPose, true);
 		} else {
-			submitNodeCollector.submitCustomGeometry(poseStack, gunRenderType, (pose, vertexConsumer) -> {
+			submitNodeCollector.submitCustomGeometrySemantic(poseStack, gunRenderType, (pose, vertexConsumer) -> {
 				PoseStack modelPoseStack = new PoseStack();
 				modelPoseStack.last().set(pose);
 				for (BedrockNode root : this.geometry.roots()) {
@@ -245,15 +247,16 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 		int light,
 		int overlay
 	) {
-		Map<Integer, SemanticBedrockBatch> batches = new HashMap<>();
+		Map<Integer, SemanticBedrockBatch> batches = new LinkedHashMap<>();
+		SemanticBedrockBudget budget = new SemanticBedrockBudget();
 		for (BedrockNode root : roots) {
-			collectSemanticBedrockNode(poseStack, itemDisplayContext, animationPose, null, gunRenderContext, root, light, batches);
+			collectSemanticBedrockNode(poseStack, itemDisplayContext, animationPose, null, gunRenderContext, root, light, batches, budget);
 		}
 		if (batches.isEmpty()) return false;
 		PoseStack identityPoseStack = new PoseStack();
 		for (Map.Entry<Integer, SemanticBedrockBatch> entry : batches.entrySet()) {
 			SemanticBedrockBatch batch = entry.getValue();
-			if (!submitNodeCollector.submitTexturedQuads(identityPoseStack, renderType, textureIdentity,
+			if (!submitNodeCollector.submitTexturedQuadsSemantic(identityPoseStack, renderType, textureIdentity,
 				batch.vertices(), batch.uvs(), batch.colors(), entry.getKey())) return false;
 		}
 		return true;
@@ -309,15 +312,16 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 		int materialMode,
 		AttachmentRenderData attachmentData
 	) {
-		Map<Integer, SemanticBedrockBatch> batches = new HashMap<>();
+		Map<Integer, SemanticBedrockBatch> batches = new LinkedHashMap<>();
+		SemanticBedrockBudget budget = new SemanticBedrockBudget();
 		for (BedrockNode root : roots) {
-			collectSemanticBedrockNode(poseStack, itemDisplayContext, animationPose, attachmentData, gunRenderContext, root, light, batches);
+			collectSemanticBedrockNode(poseStack, itemDisplayContext, animationPose, attachmentData, gunRenderContext, root, light, batches, budget);
 		}
 		if (batches.isEmpty()) return false;
 		PoseStack identityPoseStack = new PoseStack();
 		for (Map.Entry<Integer, SemanticBedrockBatch> entry : batches.entrySet()) {
 			SemanticBedrockBatch batch = entry.getValue();
-			if (!submitNodeCollector.submitOpticalTexturedQuads(identityPoseStack, RenderType.entityCutout(textureIdentity),
+			if (!submitNodeCollector.submitOpticalTexturedQuadsSemantic(identityPoseStack, RenderType.entityCutout(textureIdentity),
 				textureIdentity, batch.vertices(), batch.uvs(), batch.colors(), entry.getKey(), materialMode)) return false;
 		}
 		return true;
@@ -331,7 +335,8 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 		GunRenderContext gunRenderContext,
 		BedrockNode node,
 		int baseLight,
-		Map<Integer, SemanticBedrockBatch> batches
+		Map<Integer, SemanticBedrockBatch> batches,
+		SemanticBedrockBudget budget
 	) {
 		if (node.cubes.isEmpty() && node.children.isEmpty()) return;
 		poseStack.pushPose();
@@ -348,11 +353,11 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 			SemanticBedrockBatch batch = batches.computeIfAbsent(light, ignored -> new SemanticBedrockBatch());
 			for (BedrockCube cube : node.cubes) {
 				for (BedrockPolygon polygon : cube.polygons) {
-					if (!polygon.empty) batch.append(poseStack.last().pose(), polygon);
+					if (!polygon.empty) batch.append(poseStack.last().pose(), polygon, budget);
 				}
 			}
 		}
-		for (BedrockNode child : node.children) collectSemanticBedrockNode(poseStack, itemDisplayContext, animationPose, attachmentRenderData, gunRenderContext, child, childLight, batches);
+		for (BedrockNode child : node.children) collectSemanticBedrockNode(poseStack, itemDisplayContext, animationPose, attachmentRenderData, gunRenderContext, child, childLight, batches, budget);
 		poseStack.popPose();
 	}
 
@@ -361,12 +366,19 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 		private final List<Float> uvList = new ArrayList<>();
 		private final List<Integer> colorList = new ArrayList<>();
 
-		private void append(org.joml.Matrix4f transform, BedrockPolygon polygon) {
+		private void append(org.joml.Matrix4f transform, BedrockPolygon polygon, SemanticBedrockBudget budget) {
 			if (colorList.size() >= MAX_SEMANTIC_BEDROCK_QUADS) {
 				throw new IllegalStateException("Rust TACZ semantic Bedrock mesh exceeds bounded quad budget");
 			}
+			if (++budget.quadCount > MAX_SEMANTIC_BEDROCK_QUADS) {
+				throw new IllegalStateException("Rust TACZ aggregate semantic Bedrock mesh exceeds bounded quad budget");
+			}
 			for (BedrockVertex vertex : polygon.vertices) {
 				Vector3f position = transform.transformPosition(vertex.x / 16.0F, vertex.y / 16.0F, vertex.z / 16.0F, new Vector3f());
+				if (!Float.isFinite(position.x()) || !Float.isFinite(position.y()) || !Float.isFinite(position.z())
+					|| !Float.isFinite(vertex.u) || !Float.isFinite(vertex.v)) {
+					throw new IllegalStateException("Rust TACZ semantic Bedrock mesh contains non-finite transformed geometry");
+				}
 				vertexList.add(position.x()); vertexList.add(position.y()); vertexList.add(position.z());
 				uvList.add(vertex.u); uvList.add(vertex.v);
 			}
@@ -378,6 +390,10 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 		private float[] vertices() { float[] values = new float[vertexList.size()]; for (int i = 0; i < values.length; i++) values[i] = vertexList.get(i); return values; }
 		private float[] uvs() { float[] values = new float[uvList.size()]; for (int i = 0; i < values.length; i++) values[i] = uvList.get(i); return values; }
 		private int[] colors() { int[] values = new int[colorList.size()]; for (int i = 0; i < values.length; i++) values[i] = colorList.get(i); return values; }
+	}
+
+	private static final class SemanticBedrockBudget {
+		private int quadCount;
 	}
 
 	private void submitMuzzleFlash(
@@ -410,8 +426,9 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 		float renderScale = scale;
 		float renderAlpha = alpha;
 		RenderType renderType = RenderType.entityTranslucent(muzzleFlash.texture());
-		if (VulkanicAPI.isVulkanBackendSelected()
-			&& WorldRenderRoutePolicy.currentTexturedBillboardRoute().usesRustWholeFrameVulkan()) {
+		if ((VulkanicAPI.isVulkanBackendSelected()
+					|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
+					&& WorldRenderRoutePolicy.currentTexturedBillboardRoute().usesRustWholeFrameVulkan()) {
 			PoseStack flashPoseStack = new PoseStack();
 			flashPoseStack.last().set(poseStack.last());
 			if (!this.geometry.applyAnimatedNodePath("muzzle_flash", flashPoseStack, animationPose)) {
@@ -422,12 +439,16 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 			float[] vertices = {-half, -half, 0.0F, half, -half, 0.0F, half, half, 0.0F, -half, half, 0.0F};
 			float[] uvs = {0.0F, 1.0F, 1.0F, 1.0F, 1.0F, 0.0F, 0.0F, 0.0F};
 			int color = (Mth.clamp((int)(renderAlpha * 255.0F), 0, 255) << 24) | 0xFFFFFF;
-			if (!submitNodeCollector.submitTranslucentTexturedQuad(flashPoseStack, renderType, muzzleFlash.texture(), vertices, uvs, color, LightTexture.FULL_BRIGHT)) {
+			if (!submitNodeCollector.submitTranslucentTexturedQuadSemantic(flashPoseStack, renderType, muzzleFlash.texture(), vertices, uvs, color, LightTexture.FULL_BRIGHT)) {
 				throw new IllegalStateException("Rust whole-frame muzzle flash route rejected semantic translucent quad");
 			}
 			return;
 		}
-		submitNodeCollector.submitCustomGeometry(poseStack, renderType, (pose, vertexConsumer) -> {
+		if (VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Rust whole-frame TACZ muzzle flash route is unavailable; Java custom geometry is not a fallback");
+		}
+		submitNodeCollector.submitCustomGeometrySemantic(poseStack, renderType, (pose, vertexConsumer) -> {
 			PoseStack flashPoseStack = new PoseStack();
 			flashPoseStack.last().set(pose);
 			if (!this.geometry.applyAnimatedNodePath("muzzle_flash", flashPoseStack, animationPose)) {
@@ -514,7 +535,8 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 			if (!this.geometry.hasNode(marker)) {
 				continue;
 			}
-			if (VulkanicAPI.isVulkanBackendSelected()
+			if ((VulkanicAPI.isVulkanBackendSelected()
+					|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
 				&& WorldRenderRoutePolicy.currentTexturedBillboardRoute().usesRustWholeFrameVulkan()) {
 				PoseStack attachmentPoseStack = new PoseStack();
 				attachmentPoseStack.last().set(poseStack.last());
@@ -536,10 +558,14 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 				}
 				continue;
 			}
+			if (VulkanicAPI.isVulkanBackendSelected()
+					|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+				throw new IllegalStateException("Rust whole-frame TACZ attachment route is unavailable; Java custom gun geometry is not a fallback");
+			}
 
 			RenderType renderType = RenderType.entityCutout(attachmentData.texture());
 			if (itemDisplayContext.firstPerson() && (attachmentData.scope() || attachmentData.sight())) {
-				submitNodeCollector.submitCustomGeometry(
+				submitNodeCollector.submitCustomGeometrySemantic(
 					poseStack,
 					renderType,
 					new TaczScopedAttachmentRenderer(this.geometry, marker, itemDisplayContext, light, overlay, animationPose, attachmentData, null)
@@ -547,7 +573,7 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 				continue;
 			}
 
-			submitNodeCollector.submitCustomGeometry(poseStack, renderType, (pose, vertexConsumer) -> {
+			submitNodeCollector.submitCustomGeometrySemantic(poseStack, renderType, (pose, vertexConsumer) -> {
 				PoseStack attachmentPoseStack = new PoseStack();
 				attachmentPoseStack.last().set(pose);
 				if (this.geometry.applyAnimatedNodePath(marker, attachmentPoseStack, animationPose)) {
@@ -1124,6 +1150,7 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 	}
 
 	private static RenderTargetBinding renderTargetBinding(RenderType renderType) {
+		ensureJavaCompatibilityRoute();
 		RenderTarget renderTarget = renderType.iris$getRenderTarget();
 		if (renderTarget == null) {
 			renderTarget = Minecraft.getInstance().getMainRenderTarget();
@@ -1139,11 +1166,13 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 	}
 
 	private static void bindRenderTarget(RenderType renderType) {
+		ensureJavaCompatibilityRoute();
 		CommandContext ctx = VulkanicAPI.getCommandContext();
 		VulkanicAPI.bindFramebuffer(ctx, VulkanicAPI.GL_FRAMEBUFFER, renderTargetBinding(renderType).framebuffer());
 	}
 
 	private static void clearStencilForRenderType(RenderType renderType) {
+		ensureJavaCompatibilityRoute();
 		CommandContext ctx = VulkanicAPI.getCommandContext();
 		bindRenderTarget(renderType);
 		VulkanicAPI.setClearStencil(ctx, 0);
@@ -1152,8 +1181,18 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 	}
 
 	private static void logReticleDebug(String phase, RenderType drawRenderType, RenderType renderTargetRenderType, String nodeName, MeshData meshData, String details) {
+		// Reticle diagnostics inspect the compatibility command context and Iris
+		// render-state trackers.  They are strictly Java/OpenGL diagnostics and
+		// must never be reachable from the Rust Vulkan semantic route, even if a
+		// future custom-geometry caller invokes this helper unexpectedly.
+		if (VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			return;
+		}
 		long now = System.nanoTime();
-		boolean shaderPack = net.irisshaders.iris.Iris.isPackInUseQuick();
+		boolean shaderPack = !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			&& net.irisshaders.iris.Iris.isPackInUseQuick();
 		String key = phase + "|" + shaderPack + "|" + nodeName;
 		Long previous = RETICLE_DEBUG_LAST_LOG_NANOS.get(key);
 		if (previous != null && now - previous < RETICLE_DEBUG_INTERVAL_NANOS) {
@@ -1209,12 +1248,15 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 	}
 
 	private static void drawMeshImmediate(RenderType renderType, MeshData meshData, Runnable beforeDraw) {
+		ensureJavaCompatibilityRoute();
 		drawMeshImmediate(renderType, meshData, beforeDraw, renderType);
 	}
 
 	private static void drawMeshImmediate(RenderType renderType, MeshData meshData, Runnable beforeDraw, RenderType renderTargetRenderType) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			throw new IllegalStateException("Java TACZ immediate mesh rendering is unavailable while Rust owns whole-frame presentation");
+		ensureJavaCompatibilityRoute();
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| VulkanicAPI.isVulkanBackendSelected()) {
+			throw new IllegalStateException("Java TACZ immediate mesh rendering is unavailable while Rust owns whole-frame presentation or Vulkan is selected");
 		}
 		ensureImmediatePipelineReady(renderType.pipeline());
 		renderType.setupRenderState();
@@ -1294,11 +1336,24 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 	}
 
 	private static void ensureImmediatePipelineReady(RenderPipeline pipeline) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		ensureJavaCompatibilityRoute();
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| VulkanicAPI.isVulkanBackendSelected()) {
 			return;
 		}
-		if (VulkanicAPI.isVulkanBackendSelected()) {
-			VulkanicAPI.precompileRenderPipeline(pipeline, Minecraft.getInstance().getShaderManager()::getShader);
+	}
+
+	/**
+	 * Bedrock stencil/immediate rendering is strictly an OpenGL compatibility
+	 * producer. Keep the ownership fence at the lowest GPU-touching helpers so
+	 * a modded attachment or future caller cannot reopen Java Vulkan rendering.
+	 */
+	private static void ensureJavaCompatibilityRoute() {
+		if (VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException(
+				"Java TACZ immediate rendering is unavailable while Rust owns Vulkan presentation"
+			);
 		}
 	}
 
@@ -1319,6 +1374,10 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 	) implements SubmitNodeCollector.ImmediateCustomGeometryRenderer {
 		@Override
 		public void render(PoseStack.Pose pose, RenderType gunRenderType, MultiBufferSource.BufferSource bufferSource) {
+			// Immediate Bedrock/stencil rendering is an OpenGL compatibility route.
+			// Fence the callback itself so a future collector or modded caller cannot
+			// reopen Java GPU state after Rust takes Vulkan presentation ownership.
+			ensureJavaCompatibilityRoute();
 			RenderType attachmentRenderType = RenderType.entityCutout(this.scopedAttachment.attachmentData().texture());
 			try {
 				new TaczScopedAttachmentRenderer(
@@ -1401,6 +1460,7 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 	) implements SubmitNodeCollector.ImmediateCustomGeometryRenderer {
 		@Override
 		public void render(PoseStack.Pose pose, RenderType renderType, MultiBufferSource.BufferSource bufferSource) {
+			ensureJavaCompatibilityRoute();
 			PoseStack attachmentPoseStack = new PoseStack();
 			attachmentPoseStack.last().set(pose);
 			if (!this.gunGeometry.applyAnimatedNodePath(this.marker, attachmentPoseStack, this.animationPose)) {

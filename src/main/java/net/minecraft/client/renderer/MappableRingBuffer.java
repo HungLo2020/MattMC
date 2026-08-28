@@ -16,9 +16,9 @@ public class MappableRingBuffer implements AutoCloseable {
 	private int current = 0;
 
 	public MappableRingBuffer(Supplier<String> supplier, int i, int j) {
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendInitializedAndSelected()
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
 			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			throw new IllegalStateException("Java GUI ring buffers are unavailable while Rust owns whole-frame presentation");
+			throw new IllegalStateException("Java GUI ring buffers are unavailable on selected Vulkan");
 		}
 		if ((i & 1) == 0 && (i & 2) == 0) {
 			throw new IllegalArgumentException("MappableRingBuffer requires at least one of USAGE_MAP_READ or USAGE_MAP_WRITE");
@@ -38,6 +38,10 @@ public class MappableRingBuffer implements AutoCloseable {
 	}
 
 	public GpuBuffer currentBuffer() {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java ring-buffer access is unavailable on selected Vulkan");
+		}
 		GpuFence gpuFence = this.fences[this.current];
 		if (gpuFence != null) {
 			gpuFence.awaitCompletion(Long.MAX_VALUE);
@@ -49,9 +53,9 @@ public class MappableRingBuffer implements AutoCloseable {
 	}
 
 	public void rotate() {
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendInitializedAndSelected()
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
 			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			throw new IllegalStateException("Java GUI ring-buffer rotation is unavailable while Rust owns whole-frame presentation");
+			throw new IllegalStateException("Java GUI ring-buffer rotation is unavailable on selected Vulkan");
 		}
 		if (this.fences[this.current] != null) {
 			this.fences[this.current].close();

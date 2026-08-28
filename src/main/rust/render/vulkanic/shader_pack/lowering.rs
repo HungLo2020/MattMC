@@ -2011,6 +2011,10 @@ fn apply_selected_source_entity_fragment_probe_mode(
             "texture",
             "out_terrain_lit_color = color;\n    out_terrain_material_auxiliary = vec4(0.0);\n    return;",
         ),
+        "texture-center" => (
+            "texture-center",
+            "out_terrain_lit_color = texture(tex, vec2(0.5, 0.5));\n    out_terrain_material_auxiliary = vec4(0.0);\n    return;",
+        ),
         "uv" => (
             "uv",
             "out_terrain_lit_color = vec4(texCoord, 0.0, 1.0);\n    out_terrain_material_auxiliary = vec4(0.0);\n    return;",
@@ -2022,7 +2026,7 @@ fn apply_selected_source_entity_fragment_probe_mode(
         "lit" => return Ok(()),
         other => {
             return Err(GalError::invalid_argument(format!(
-                "unknown selected-source entity fragment probe '{other}'; expected texture, uv, constant-red, or lit"
+                "unknown selected-source entity fragment probe '{other}'; expected texture, texture-center, uv, constant-red, or lit"
             )));
         }
     };

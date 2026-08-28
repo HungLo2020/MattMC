@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -18,6 +19,16 @@ import net.vulkanic.VulkanicUniformReflectionType;
 import org.junit.jupiter.api.Test;
 
 class VulkanShaderProgramCoordinatorTest {
+	@Test
+	void standaloneUniformArrayReadbackRejectsOversizedReflectedArrays() {
+		VulkanShaderProgramCoordinator.StandaloneUniformField field =
+			new VulkanShaderProgramCoordinator.StandaloneUniformField(
+				"uHuge", VulkanicUniformReflectionType.FLOAT, new int[] {0}, 4_097, 16);
+		assertThrows(IllegalArgumentException.class, () ->
+			VulkanShaderProgramCoordinator.readStandaloneUniformFloats(
+				field, java.nio.ByteBuffer.allocate(16).order(ByteOrder.nativeOrder()), 0));
+	}
+
     @Test
     void shaderAndProgramLifecyclePreservesOpenGlDeletionSemantics() {
         VulkanShaderProgramCoordinator coordinator = new VulkanShaderProgramCoordinator();

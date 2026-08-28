@@ -69,7 +69,8 @@ public class WaypointContainer {
     }
 
     public void renderWaypoints(float gameTimeDeltaPartialTick, PoseStack poseStack, BufferSource bufferSource, Camera camera) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
             throw new IllegalStateException("Java VoxelMap waypoint rendering is unavailable while Rust owns whole-frame presentation");
         }
         this.renderWaypointsBeams(gameTimeDeltaPartialTick, poseStack, bufferSource, camera);
@@ -77,7 +78,8 @@ public class WaypointContainer {
     }
 
     public void renderWaypointsBeams(float gameTimeDeltaPartialTick, PoseStack poseStack, BufferSource bufferSource, Camera camera) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
             throw new IllegalStateException("Java VoxelMap waypoint beam rendering is unavailable while Rust owns whole-frame presentation");
         }
         Vec3 cameraPos = camera.getPosition();
@@ -98,7 +100,8 @@ public class WaypointContainer {
     }
 
     public void renderWaypointsLabels(float gameTimeDeltaPartialTick, PoseStack poseStack, BufferSource bufferSource, Camera camera) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
             throw new IllegalStateException("Java VoxelMap waypoint label rendering is unavailable while Rust owns whole-frame presentation");
         }
         if (!this.options.showWaypoints) return;

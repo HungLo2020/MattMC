@@ -33,7 +33,7 @@ public class FallingBlockRenderer extends EntityRenderer<FallingBlockEntity, Fal
 		if (blockState.getRenderShape() == RenderShape.MODEL) {
 			poseStack.pushPose();
 			poseStack.translate(-0.5, 0.0, -0.5);
-				submitNodeCollector.submitMovingBlock(
+				submitNodeCollector.submitMovingBlockSemantic(
 					poseStack,
 					fallingBlockRenderState.movingBlockRenderState,
 					SubmitNodeStorage.MovingBlockSubmitSource.FALLING_BLOCK

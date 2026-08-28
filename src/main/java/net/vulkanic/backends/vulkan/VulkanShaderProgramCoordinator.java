@@ -25,6 +25,8 @@ import org.lwjgl.vulkan.VK10;
  * shader/program maps directly.
  */
 final class VulkanShaderProgramCoordinator {
+	private static final int MAX_STANDALONE_UNIFORM_ARRAY_ELEMENTS = 4_096;
+	private static final int MAX_STANDALONE_UNIFORM_BACKING_BYTES = 4 * 1024 * 1024;
     private static final Pattern GLSL_STANDALONE_UNIFORM_MEMBER_PATTERN = Pattern.compile(
         "^\\s*(\\w+)\\s+(\\w+)(?:\\s*\\[\\s*(\\d+)\\s*\\])?\\s*;\\s*$"
     );
@@ -315,6 +317,9 @@ final class VulkanShaderProgramCoordinator {
 
             int typeSize = std140TypeSize(reflectionType.get());
             int arraySize = Math.max(1, reflectedUniform.arraySize());
+			if (arraySize > MAX_STANDALONE_UNIFORM_ARRAY_ELEMENTS) {
+				throw new IllegalArgumentException("Standalone uniform array exceeds " + MAX_STANDALONE_UNIFORM_ARRAY_ELEMENTS);
+			}
             int stride = arraySize > 1 ? roundUpTo(typeSize, 16) : typeSize;
             List<Integer> offsets = offsetsByName.get(name);
             if (offsets == null || offsets.isEmpty()) {
@@ -332,7 +337,11 @@ final class VulkanShaderProgramCoordinator {
                 )
             );
             for (int offset : offsets) {
-                backingSize = Math.max(backingSize, offset + (stride * arraySize));
+				long required = (long)offset + (long)stride * arraySize;
+				if (required > MAX_STANDALONE_UNIFORM_BACKING_BYTES) {
+					throw new IllegalArgumentException("Standalone uniform backing exceeds " + MAX_STANDALONE_UNIFORM_BACKING_BYTES + " bytes");
+				}
+				backingSize = Math.max(backingSize, (int)required);
             }
         }
 
@@ -760,9 +769,10 @@ final class VulkanShaderProgramCoordinator {
         int offset
     ) {
         int componentCount = standaloneUniformLogicalComponentCount(field.type());
-        float[] values = new float[Math.max(1, field.arraySize()) * componentCount];
+		int arraySize = checkedStandaloneUniformArraySize(field);
+        float[] values = new float[arraySize * componentCount];
         int writeIndex = 0;
-        for (int element = 0; element < Math.max(1, field.arraySize()); element++) {
+        for (int element = 0; element < arraySize; element++) {
             int elementOffset = offset + (element * field.stride());
             writeIndex = readStandaloneUniformFloatElement(field, backingData, elementOffset, values, writeIndex);
         }
@@ -825,9 +835,10 @@ final class VulkanShaderProgramCoordinator {
         int offset
     ) {
         int componentCount = standaloneUniformLogicalComponentCount(field.type());
-        int[] values = new int[Math.max(1, field.arraySize()) * componentCount];
+		int arraySize = checkedStandaloneUniformArraySize(field);
+        int[] values = new int[arraySize * componentCount];
         int writeIndex = 0;
-        for (int element = 0; element < Math.max(1, field.arraySize()); element++) {
+        for (int element = 0; element < arraySize; element++) {
             int elementOffset = offset + (element * field.stride());
             for (int component = 0; component < componentCount; component++) {
                 values[writeIndex++] = backingData.getInt(elementOffset + (component * 4));
@@ -835,6 +846,14 @@ final class VulkanShaderProgramCoordinator {
         }
         return values;
     }
+
+	private static int checkedStandaloneUniformArraySize(StandaloneUniformField field) {
+		int arraySize = Math.max(1, field.arraySize());
+		if (arraySize > MAX_STANDALONE_UNIFORM_ARRAY_ELEMENTS) {
+			throw new IllegalArgumentException("Standalone uniform array exceeds " + MAX_STANDALONE_UNIFORM_ARRAY_ELEMENTS);
+		}
+		return arraySize;
+	}
 
     static int roundUpTo(int value, int alignment) {
         if (alignment <= 0) {

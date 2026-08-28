@@ -45,7 +45,7 @@ public class BellRenderer implements BlockEntityRenderer<BellBlockEntity, BellRe
 		BellModel.State state = new BellModel.State(bellRenderState.ticks, bellRenderState.shakeDirection);
 		this.model.setupAnim(state);
 		RenderType renderType = BELL_RESOURCE_LOCATION.renderType(RenderType::entitySolid);
-		submitNodeCollector.submitModel(
+		submitNodeCollector.submitModelSemantic(
 			this.model,
 			state,
 			poseStack,

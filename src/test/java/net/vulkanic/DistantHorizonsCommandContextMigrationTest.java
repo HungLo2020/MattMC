@@ -284,11 +284,11 @@ public class DistantHorizonsCommandContextMigrationTest {
             "DH level render hook should still invoke the core LOD render entrypoint");
         assertTrue(chunkHookSource.contains("ClientApi.INSTANCE.renderDeferredLodsForShaders()"),
             "DH chunk render hook should still invoke deferred LOD rendering for shader pipelines");
-        String deferredModeUpdate = "DhApiRenderProxy.INSTANCE.setDeferTransparentRendering(DHCompatInternal.shouldUseShaderOverrides())";
+        String deferredModeUpdate = "DhApiRenderProxy.INSTANCE.setDeferTransparentRendering(deferTransparentRendering)";
         assertTrue(levelHookSource.contains(deferredModeUpdate),
-            "DH level render hook should publish Iris deferred mode before ClientApi chooses the DH render pass");
+            "DH level render hook should publish the route-derived deferred mode before ClientApi chooses the DH render pass");
         assertTrue(levelHookSource.indexOf(deferredModeUpdate) < levelHookSource.indexOf("ClientApi.INSTANCE.renderLods()"),
-            "DH level render hook should publish Iris deferred mode before ClientApi chooses the DH render pass");
+            "DH level render hook should publish the route-derived deferred mode before ClientApi chooses the DH render pass");
     }
 
     @Test
@@ -852,6 +852,9 @@ public class DistantHorizonsCommandContextMigrationTest {
 			assertTrue(source.contains("RustGalVulkanWholeFrameMode.enabled()")
 					&& source.indexOf("RustGalVulkanWholeFrameMode.enabled()") < source.indexOf("VulkanicAPI.getCommandContext()"),
 				renderer + " must reject Rust whole-frame Vulkan before Java command-context acquisition");
+			assertTrue(source.contains("VulkanicAPI.isVulkanBackendSelected()")
+					&& source.indexOf("VulkanicAPI.isVulkanBackendSelected()") < source.indexOf("VulkanicAPI.getCommandContext()"),
+				renderer + " must reject selected Vulkan before Java command-context acquisition");
 		}
     }
 
@@ -874,6 +877,10 @@ public class DistantHorizonsCommandContextMigrationTest {
 		assertTrue(screenQuadSource.indexOf("RustGalVulkanWholeFrameMode.enabled()")
 				< screenQuadSource.indexOf("this.render(VulkanicAPI.getCommandContext())"),
 			"screen-quad convenience rendering must reject Rust whole-frame Vulkan before acquiring context");
+		assertTrue(screenQuadSource.contains("VulkanicAPI.isVulkanBackendSelected()")
+				&& screenQuadSource.indexOf("VulkanicAPI.isVulkanBackendSelected()")
+				< screenQuadSource.indexOf("this.render(VulkanicAPI.getCommandContext())"),
+			"screen-quad convenience rendering must reject selected Vulkan before acquiring a Java context");
 		Path debug = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/DebugRenderer.java");
 		String debugSource = readSourceWithoutComments(debug);
 		assertNoImmediateContext(debug);
@@ -886,6 +893,24 @@ public class DistantHorizonsCommandContextMigrationTest {
 		assertTrue(testSource.indexOf("RustGalVulkanWholeFrameMode.enabled()")
 			< testSource.indexOf("VulkanicAPI.getCommandContext()"),
 			"diagnostic test rendering must fence Java command-context acquisition on Rust Vulkan");
+	}
+
+	@Test
+	public void testDhDebugWireframesUseRustSemanticLines() throws IOException {
+		Path debug = SRC_MAIN_JAVA.resolve(
+			"com/seibel/distanthorizons/core/render/renderer/DebugRenderer.java");
+		String source = readSourceWithoutComments(debug);
+		assertTrue(source.contains("renderBoxRust(Box box)"),
+			"DH debug wireframes should have a Rust semantic box producer");
+		assertTrue(source.contains("enqueueDebugLineSegments"),
+			"DH debug wireframes should copy box edges into Rust debug-line semantics");
+		assertTrue(source.contains("rendererLists.render(this)"),
+			"DH Rust debug collection should traverse the real registered renderables");
+		Path lod = SRC_MAIN_JAVA.resolve(
+			"com/seibel/distanthorizons/core/render/renderer/LodRenderer.java");
+		String lodSource = readSourceWithoutComments(lod);
+		assertFalse(lodSource.contains("return \"debug-wireframe\""),
+			"Rust DH admission must not reject the route merely because debug wireframes are enabled");
 	}
 
     @Test
@@ -1039,8 +1064,8 @@ public class DistantHorizonsCommandContextMigrationTest {
             "Legacy standalone program descriptors should carry explicit coordinator-planned vertex input");
         int legacyTextureLookup = backendSource.indexOf("spine.textureResources.boundLegacyTexture2D(unit)");
         int irisTextureLookup = backendSource.indexOf("IrisRenderSystem.getTextureBinding(unit)", legacyTextureLookup);
-        assertTrue(legacyTextureLookup >= 0 && irisTextureLookup > legacyTextureLookup,
-            "Legacy standalone sampler resolution should trust Vulkanic's tracked texture-unit binding before falling back to Iris' cache");
+        assertTrue(legacyTextureLookup >= 0 && irisTextureLookup < 0,
+            "Legacy standalone sampler resolution must not borrow Iris' texture-unit cache on Rust Vulkan");
         assertTrue(descriptorSource.contains("record VertexInputState"),
             "PipelineDescriptor should expose backend-neutral explicit vertex input metadata");
     }

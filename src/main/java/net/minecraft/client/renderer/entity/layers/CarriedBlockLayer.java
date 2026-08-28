@@ -34,7 +34,7 @@ public class CarriedBlockLayer extends RenderLayer<EndermanRenderState, Enderman
 			float h = 0.5F;
 			poseStack.scale(-0.5F, -0.5F, 0.5F);
 			poseStack.mulPose(Axis.YP.rotationDegrees(90.0F));
-			submitNodeCollector.submitBlock(poseStack, blockState, i, OverlayTexture.NO_OVERLAY, endermanRenderState.outlineColor);
+			submitNodeCollector.submitBlockSemantic(poseStack, blockState, i, OverlayTexture.NO_OVERLAY, endermanRenderState.outlineColor);
 			poseStack.popPose();
 		}
 	}

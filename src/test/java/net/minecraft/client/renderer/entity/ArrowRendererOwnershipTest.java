@@ -61,12 +61,12 @@ final class ArrowRendererOwnershipTest {
 		int ownershipQuery = source.indexOf("WorldRenderRoutePolicy.currentArrowOwnershipRoute()");
 		int classification = source.indexOf("classifyArrowSubmit(", ownershipQuery);
 		int unavailable = source.indexOf("ArrowSubmitDisposition.RUST_UNAVAILABLE", classification);
-		int javaSubmit = source.indexOf("submitNodeCollector.submitModel(", unavailable);
+		int semanticSubmit = source.indexOf("submitNodeCollector.submitModelSemantic(", unavailable);
 
 		assertTrue(ownershipQuery >= 0, "Arrow callsite must resolve ownership explicitly");
 		assertTrue(classification > ownershipQuery, "Arrow disposition must be classified after ownership is resolved");
 		assertTrue(unavailable > classification, "Rust-unavailable handling must be explicit");
-		assertTrue(javaSubmit > unavailable, "Java submit must remain outside the Rust-unavailable branch");
+		assertTrue(semanticSubmit > unavailable, "semantic Arrow submission must remain explicit after Rust-unavailable handling");
 		assertTrue(source.contains("Rust whole-frame Arrow route has no semantic mesh"),
 			"unsupported Rust-owned arrows must abort rather than disappear from the frame");
 		assertFalse(source.contains("|| disposition == ArrowSubmitDisposition.DISABLED"),

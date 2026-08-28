@@ -59,7 +59,8 @@ public class AtlasGlyphProvider {
 				public TextRenderable createGlyph(float f, float g, int i, int j, Style style, float h, float k) {
 					return new AtlasGlyphProvider.Instance(
 						AtlasGlyphProvider.this.renderTypes,
-						net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+						(net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+							|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected())
 							? null : AtlasGlyphProvider.this.atlas.getTextureView(),
 						AtlasGlyphProvider.this.atlas.location().toString(), textureAtlasSprite, f, g, i, j, k
 					);

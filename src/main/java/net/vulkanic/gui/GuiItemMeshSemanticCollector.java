@@ -30,6 +30,7 @@ import org.joml.Vector3f;
  * collected family is private until a Rust-owned GUI mesh pass consumes it.
  */
 public final class GuiItemMeshSemanticCollector {
+	private static final int MAX_STANDARD_3D_AXIS = 4096;
 	private GuiItemMeshSemanticCollector() {
 	}
 
@@ -39,6 +40,9 @@ public final class GuiItemMeshSemanticCollector {
 	 * reference to its renderer, target, projection buffer, or lighting state.
 	 */
 	public static CollectionResult collectStandard3d(GuiItemRenderState item, int guiScale) {
+		if (item == null || item.itemStackRenderState() == null) {
+			return CollectionResult.rejected("missing-item-state");
+		}
 		if (item.itemStackRenderState().displayContext() != net.minecraft.world.item.ItemDisplayContext.GUI) {
 			return CollectionResult.rejected("display-context");
 		}
@@ -49,6 +53,9 @@ public final class GuiItemMeshSemanticCollector {
 			return CollectionResult.rejected("gui-scale");
 		}
 		Standard3dTarget target = standard3dTarget(item, guiScale);
+		if (target == null) {
+			return CollectionResult.rejected("offscreen-extent");
+		}
 		List<GuiItemMeshLayer> layers = new ArrayList<>();
 		String[] rejection = new String[1];
 		item.itemStackRenderState().forEachSemanticLayer(layer -> {
@@ -60,6 +67,11 @@ public final class GuiItemMeshSemanticCollector {
 		if (rejection[0] != null || layers.isEmpty()) {
 			return CollectionResult.rejected(rejection[0] == null ? "empty-mesh" : rejection[0]);
 		}
+		List<RustGalGuiRawImageAssets.Asset> assets = new ArrayList<>();
+		for (GuiItemMeshLayer layer : layers) for (GuiItemMeshQuad quad : layer.quads()) {
+			RustGalGuiRawImageAssets.Asset asset = RustGalGuiRawImageAssets.resolveAssetId(quad.assetId());
+			if (asset != null && assets.stream().noneMatch(existing -> existing.assetId() == asset.assetId())) assets.add(asset);
+		}
 		ScreenRectangle bounds = item.bounds();
 		int left = bounds == null ? item.x() : bounds.left();
 		int top = bounds == null ? item.y() : bounds.top();
@@ -69,18 +81,26 @@ public final class GuiItemMeshSemanticCollector {
 			item.name(), item.x(), item.y(), left, top, right, bottom,
 			new float[] {item.pose().m00(), item.pose().m01(), item.pose().m10(), item.pose().m11(), item.pose().m20(), item.pose().m21()},
 			target.width(), target.height(), target.guardPixels(), target.modelTransform(),
-			layers
+			layers, assets
 		));
 	}
 
 	private static Standard3dTarget standard3dTarget(GuiItemRenderState item, int guiScale) {
 		AABB bounds = item.itemStackRenderState().getModelBoundingBox();
+		if (bounds == null) {
+			return null;
+		}
 		int logicalWidth = Math.max(16, Mth.ceil((float)bounds.getXsize() * 16.0F));
 		int logicalHeight = Math.max(16, Mth.ceil((float)bounds.getYsize() * 16.0F));
 		boolean expanded = logicalWidth > 16 || logicalHeight > 16;
 		int guardPixels = 1;
-		int width = Math.addExact(Math.multiplyExact(logicalWidth, guiScale), guardPixels * 2);
-		int height = Math.addExact(Math.multiplyExact(logicalHeight, guiScale), guardPixels * 2);
+		long widthLong = (long) logicalWidth * guiScale + guardPixels * 2L;
+		long heightLong = (long) logicalHeight * guiScale + guardPixels * 2L;
+		if (widthLong > MAX_STANDARD_3D_AXIS || heightLong > MAX_STANDARD_3D_AXIS) {
+			return null;
+		}
+		int width = (int) widthLong;
+		int height = (int) heightLong;
 		PoseStack pose = new PoseStack();
 		// Matches PictureInPictureRenderer + Standard3dItemRenderer exactly,
 		// while retaining only a copied matrix at this Java/Rust boundary.
@@ -97,11 +117,11 @@ public final class GuiItemMeshSemanticCollector {
 	}
 
 	private static String appendLayer(ItemStackRenderState.SemanticLayer layer, float[] standard3dTransform, List<GuiItemMeshLayer> output) {
+		if (layer == null) return "missing-layer";
 		if (layer.hasSpecialRenderer()) return "special-renderer";
 		if (layer.foilType() == ItemStackRenderState.FoilType.SPECIAL) {
 			RustGalGuiRawImageAssets.Asset glint = RustGalGuiRawImageAssets.resolve(ItemRenderer.ENCHANTED_GLINT_ITEM);
 			if (glint == null) return "glint-texture-unavailable";
-			RustGalGuiRawImageAssets.stage(glint);
 		}
 		if (layer.renderType() == null || layer.quads().isEmpty()) return "empty-or-missing-render-type";
 		MaterialMode mode = materialMode(layer.renderType());
@@ -120,7 +140,6 @@ public final class GuiItemMeshSemanticCollector {
 		if (layer.foilType() == ItemStackRenderState.FoilType.STANDARD) {
 			RustGalGuiRawImageAssets.Asset glint = RustGalGuiRawImageAssets.resolve(ItemRenderer.ENCHANTED_GLINT_ITEM);
 			if (glint == null) return "glint-texture-unavailable";
-			RustGalGuiRawImageAssets.stage(glint);
 			List<GuiItemMeshQuad> glintQuads = new ArrayList<>(quads.size());
 			for (GuiItemMeshQuad quad : quads) {
 				glintQuads.add(glintQuad(quad, glint.assetId()));
@@ -196,9 +215,20 @@ public final class GuiItemMeshSemanticCollector {
 		if (!(bakedQuad instanceof BakedQuadView quad)) return null;
 		TextureAtlasSprite sprite = quad.getSprite();
 		ResourceLocation spriteIdentity = sprite == null ? null : sprite.contents().name();
-		if (spriteIdentity == null) return null;
-		long assetId = RustGalGuiItemRenderer.stageSemanticImage(sprite);
-		if (assetId == 0L) return null;
+		if (sprite == null || spriteIdentity == null) return null;
+		RustGalGuiRawImageAssets.Asset asset = sprite.contents().isAnimated()
+			? RustGalGuiRawImageAssets.resolveAnimatedSprite(sprite)
+			: RustGalGuiRawImageAssets.resolve(spriteIdentity);
+		if (asset == null) {
+			var texture = Minecraft.getInstance().getTextureManager().getTexture(spriteIdentity);
+			if (texture instanceof net.minecraft.client.renderer.texture.DynamicTexture dynamic) {
+				RustGalGuiRawImageAssets.registerDynamicTextureUnstaged(spriteIdentity, dynamic);
+				RustGalGuiRawImageAssets.prepareDynamicTexture(dynamic);
+				asset = RustGalGuiRawImageAssets.resolve(spriteIdentity);
+			}
+		}
+		if (asset == null) return null;
+		long assetId = asset.assetId();
 		float[] positions = new float[12];
 		float[] atlasUvs = new float[8];
 		float[] localUvs = new float[8];
@@ -256,7 +286,7 @@ public final class GuiItemMeshSemanticCollector {
 	}
 
 	private static int itemTint(BakedQuad quad, int[] tintLayers) {
-		if (!quad.isTinted() || tintLayers.length == 0 || quad.tintIndex() < 0 || quad.tintIndex() >= tintLayers.length) return 0xffffffff;
+		if (!quad.isTinted() || tintLayers == null || tintLayers.length == 0 || quad.tintIndex() < 0 || quad.tintIndex() >= tintLayers.length) return 0xffffffff;
 		int tint = tintLayers[quad.tintIndex()];
 		return tint == -1 ? 0xffffffff : tint;
 	}
@@ -300,7 +330,7 @@ public final class GuiItemMeshSemanticCollector {
 	public record GuiItemMesh(
 		String itemIdentity, int itemX, int itemY, int left, int top, int right, int bottom,
 		float[] guiPose, int renderWidth, int renderHeight, int guardPixels, float[] offscreenModelTransform,
-		List<GuiItemMeshLayer> layers
+		List<GuiItemMeshLayer> layers, List<RustGalGuiRawImageAssets.Asset> assets
 	) {
 		public GuiItemMesh {
 			guiPose = checkedCopy(guiPose, 6, "GUI item pose");
@@ -309,6 +339,7 @@ public final class GuiItemMeshSemanticCollector {
 			}
 			offscreenModelTransform = checkedCopy(offscreenModelTransform, 16, "GUI item offscreen model transform");
 			layers = List.copyOf(layers);
+			assets = List.copyOf(assets);
 		}
 
 		@Override

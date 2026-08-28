@@ -51,7 +51,7 @@ public class WitherSkullRenderer extends EntityRenderer<WitherSkull, WitherSkull
 		poseStack.scale(-1.0F, -1.0F, 1.0F);
 		ResourceLocation texture = this.getTextureLocation(witherSkullRenderState);
 		var renderType = this.model.renderType(texture);
-		boolean eligible = RustGalWorldPrimitiveRenderer.isStandaloneModelMeshEligible(
+		boolean eligible = RustGalWorldPrimitiveRenderer.isStandaloneTranslucentModelMeshEligible(
 			this.model, renderType, texture, OverlayTexture.NO_OVERLAY, witherSkullRenderState.outlineColor, null
 		);
 		WorldRenderRoutePolicy.Route ownership = StandaloneModelRenderOwnershipPolicy.currentOwnershipRoute();
@@ -91,7 +91,7 @@ public class WitherSkullRenderer extends EntityRenderer<WitherSkull, WitherSkull
 					!submitNodeCollector.isSemanticCoverageOnly() && ownership.usesJavaCompatibility()
 				);
 			}
-			submitNodeCollector.submitModel(
+			submitNodeCollector.submitModelSemantic(
 				this.model,
 				witherSkullRenderState.modelState,
 				poseStack,

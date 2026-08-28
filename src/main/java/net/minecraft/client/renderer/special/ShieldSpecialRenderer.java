@@ -59,7 +59,7 @@ public class ShieldSpecialRenderer implements SpecialModelRenderer<DataComponent
 		poseStack.pushPose();
 		poseStack.scale(1.0F, -1.0F, -1.0F);
 		Material material = bl2 ? ModelBakery.SHIELD_BASE : ModelBakery.NO_PATTERN_SHIELD;
-		submitNodeCollector.submitModelPart(
+		submitNodeCollector.submitModelPartSemantic(
 			this.model.handle(), poseStack, this.model.renderType(material.atlasLocation()), i, j, this.materials.get(material), false, false, -1, null, k
 		);
 		if (bl2) {
@@ -80,7 +80,7 @@ public class ShieldSpecialRenderer implements SpecialModelRenderer<DataComponent
 				k
 			);
 		} else {
-			submitNodeCollector.submitModelPart(
+			submitNodeCollector.submitModelPartSemantic(
 				this.model.plate(), poseStack, this.model.renderType(material.atlasLocation()), i, j, this.materials.get(material), false, bl, -1, null, k
 			);
 		}

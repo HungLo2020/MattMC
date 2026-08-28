@@ -350,7 +350,8 @@ final class NativeSectionSnapshot implements AutoCloseable {
     }
 
     private static int irisBlockId(BlockState state) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			return -1;
 		}
         var ids = net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getBlockStateIds();
@@ -358,7 +359,8 @@ final class NativeSectionSnapshot implements AutoCloseable {
     }
 
     private static int irisFluidBlockId(FluidState state) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			return -1;
 		}
         var ids = net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getBlockStateIds();

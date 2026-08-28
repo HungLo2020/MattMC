@@ -11,8 +11,10 @@ import net.blaze3d.vertex.VertexConsumer;
 import net.blaze3d.vertex.VertexFormat;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.particle.SingleQuadParticle;
@@ -37,6 +39,13 @@ public class QuadParticleRenderState implements SubmitNodeCollector.ParticleGrou
 	private static int debugParticleDrawLogCount;
 	private static int debugParticleSampleLogCount;
 	private static final int INITIAL_PARTICLE_CAPACITY = 1024;
+	/**
+	 * The Rust whole-frame particle stream is a bounded semantic queue.  Keep
+	 * extraction bounded as well so a pathological particle emitter cannot build
+	 * an unbounded Java-side snapshot before the Rust queue gets a chance to
+	 * reject it.
+	 */
+	private static final int MAX_RUST_SEMANTIC_PARTICLES = 65_536;
 	private static final int FLOATS_PER_PARTICLE = 12;
 	private static final int INTS_PER_PARTICLE = 2;
 	private final Map<SingleQuadParticle.Layer, QuadParticleRenderState.Storage> particles = new HashMap();
@@ -45,6 +54,22 @@ public class QuadParticleRenderState implements SubmitNodeCollector.ParticleGrou
 	public void add(
 		SingleQuadParticle.Layer layer, float f, float g, float h, float i, float j, float k, float l, float m, float n, float o, float p, float q, int r, int s
 	) {
+		boolean rustWholeFrame = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
+		if (rustWholeFrame && (layer == null || !Float.isFinite(f) || !Float.isFinite(g) || !Float.isFinite(h)
+			|| !Float.isFinite(i) || !Float.isFinite(j) || !Float.isFinite(k) || !Float.isFinite(l)
+			|| !Float.isFinite(m) || !Float.isFinite(n) || !Float.isFinite(o) || !Float.isFinite(p)
+			|| !Float.isFinite(q) || m <= 0.0F
+			|| !Float.isFinite(i * i + j * j + k * k + l * l)
+			|| i * i + j * j + k * k + l * l <= 1.0e-8F)) {
+			throw new IllegalArgumentException("Rust whole-frame particle admission requires finite copied quad semantics");
+		}
+		if (rustWholeFrame && this.particleCount >= MAX_RUST_SEMANTIC_PARTICLES) {
+			throw new IllegalStateException(
+				"Rust whole-frame particle route exceeded bounded semantic particle capacity "
+					+ MAX_RUST_SEMANTIC_PARTICLES
+			);
+		}
 		((QuadParticleRenderState.Storage)this.particles.computeIfAbsent(layer, layerx -> new QuadParticleRenderState.Storage()))
 			.add(f, g, h, i, j, k, l, m, n, o, p, q, r, s);
 		this.particleCount++;
@@ -52,30 +77,59 @@ public class QuadParticleRenderState implements SubmitNodeCollector.ParticleGrou
 
 	/** Copies the extracted particle semantics into the explicit Rust world stream. */
 	public int enqueueRustGal() {
-		int submitted = 0;
-		for (Entry<SingleQuadParticle.Layer, QuadParticleRenderState.Storage> entry : this.particles.entrySet()) {
-			SingleQuadParticle.Layer layer = entry.getKey();
-			QuadParticleRenderState.Storage storage = entry.getValue();
-			if (net.minecraft.client.renderer.texture.TextureAtlas.LOCATION_PARTICLES.equals(layer.textureAtlasLocation())) {
-				storage.forEachParticle((x, y, z, qx, qy, qz, qw, size, u0, u1, v0, v1, color, light) ->
-					RustGalWorldPrimitiveRenderer.enqueueParticleQuad(layer.translucent(), x, y, z, qx, qy, qz, qw, size, u0, u1, v0, v1, color, light));
-				submitted += storage.count();
-			} else {
-				int[] admitted = {0};
-				storage.forEachParticle((x, y, z, qx, qy, qz, qw, size, u0, u1, v0, v1, color, light) ->
-					admitted[0] += RustGalWorldPrimitiveRenderer.enqueueParticleQuadForAtlas(
-						layer.textureAtlasLocation(), layer.translucent(), x, y, z, qx, qy, qz, qw,
-						size, u0, u1, v0, v1, color, light) ? 1 : 0);
-				if (admitted[0] != storage.count()) {
-					// Atlas eligibility is only a preflight. A bounded snapshot can
-					// still fail while it is being staged; never let the successful
-					// prefix masquerade as a complete Rust particle group.
-					RustGalWorldPrimitiveRenderer.recordUnsupportedParticleGroup();
-				}
-				submitted += admitted[0];
+		int unsupportedLayers = this.rustGalUnsupportedLayerCount();
+		if (unsupportedLayers > 0) {
+			RustGalWorldPrimitiveRenderer.recordUnsupportedParticleGroup();
+			throw new IllegalStateException(
+				"Rust whole-frame particle route encountered " + unsupportedLayers
+					+ " atlas layer(s) without a bounded copied texture snapshot"
+			);
+		}
+		if (!RustGalWorldPrimitiveRenderer.hasMaterialQuadCapacity(this.particleCount)) {
+			RustGalWorldPrimitiveRenderer.recordUnsupportedParticleGroup();
+			throw new IllegalStateException("Rust whole-frame particle route exceeded bounded material-quad capacity");
+		}
+		Set<net.minecraft.resources.ResourceLocation> atlasIdentities = new HashSet<>();
+		for (SingleQuadParticle.Layer layer : this.particles.keySet()) {
+			if (!net.minecraft.client.renderer.texture.TextureAtlas.LOCATION_PARTICLES.equals(layer.textureAtlasLocation())
+				&& !atlasIdentities.add(layer.textureAtlasLocation())) continue;
+			if (!net.minecraft.client.renderer.texture.TextureAtlas.LOCATION_PARTICLES.equals(layer.textureAtlasLocation())
+				&& !RustGalWorldPrimitiveRenderer.ensureParticleAtlasAvailable(layer.textureAtlasLocation())) {
+				RustGalWorldPrimitiveRenderer.recordUnsupportedParticleGroup();
+				throw new IllegalStateException("Rust whole-frame particle atlas preflight rejected " + layer.textureAtlasLocation());
 			}
 		}
-		return submitted;
+		int checkpoint = RustGalWorldPrimitiveRenderer.markMaterialQuadBatch();
+		try {
+			int submitted = 0;
+			for (Entry<SingleQuadParticle.Layer, QuadParticleRenderState.Storage> entry : this.particles.entrySet()) {
+				SingleQuadParticle.Layer layer = entry.getKey();
+				QuadParticleRenderState.Storage storage = entry.getValue();
+				if (net.minecraft.client.renderer.texture.TextureAtlas.LOCATION_PARTICLES.equals(layer.textureAtlasLocation())) {
+					storage.forEachParticle((x, y, z, qx, qy, qz, qw, size, u0, u1, v0, v1, color, light) ->
+						RustGalWorldPrimitiveRenderer.enqueueParticleQuad(layer.translucent(), x, y, z, qx, qy, qz, qw, size, u0, u1, v0, v1, color, light));
+					submitted += storage.count();
+				} else {
+					int[] admitted = {0};
+					storage.forEachParticle((x, y, z, qx, qy, qz, qw, size, u0, u1, v0, v1, color, light) ->
+						admitted[0] += RustGalWorldPrimitiveRenderer.enqueueParticleQuadForAtlas(
+							layer.textureAtlasLocation(), layer.translucent(), x, y, z, qx, qy, qz, qw,
+							size, u0, u1, v0, v1, color, light) ? 1 : 0);
+					if (admitted[0] != storage.count()) {
+						// Atlas eligibility is only a preflight. A bounded snapshot can
+						// still fail while it is being staged; never let the successful
+						// prefix masquerade as a complete Rust particle group.
+						RustGalWorldPrimitiveRenderer.recordUnsupportedParticleGroup();
+						throw new IllegalStateException("Rust whole-frame particle atlas admission changed while staging");
+					}
+					submitted += admitted[0];
+				}
+			}
+			return submitted;
+		} catch (RuntimeException failure) {
+			RustGalWorldPrimitiveRenderer.rollbackMaterialQuadBatch(checkpoint);
+			throw failure;
+		}
 	}
 
 	/**
@@ -105,6 +159,10 @@ public class QuadParticleRenderState implements SubmitNodeCollector.ParticleGrou
 	@Nullable
 	@Override
 	public QuadParticleRenderState.PreparedBuffers prepare(ParticleFeatureRenderer.ParticleBufferCache particleBufferCache) {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java particle buffer preparation is unavailable on Rust Vulkan");
+		}
 		int i = this.particleCount * 4;
 		net.minecraft.client.renderer.LightTexture lightTexture = net.minecraft.client.Minecraft.getInstance().gameRenderer.lightTexture();
 		if (this.particleCount > 0 && debugParticlePrepareLogCount < 32) {
@@ -185,6 +243,10 @@ public class QuadParticleRenderState implements SubmitNodeCollector.ParticleGrou
 		TextureManager textureManager,
 		boolean bl
 	) {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java particle rendering is unavailable on Rust Vulkan");
+		}
 		VulkanicAPI.AutoStorageIndexBuffer autoStorageIndexBuffer = VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS);
 		renderPass.setVertexBuffer(0, particleBufferCache.get());
 		renderPass.setIndexBuffer(autoStorageIndexBuffer.getBuffer(preparedBuffers.indexCount), autoStorageIndexBuffer.type());
@@ -277,7 +339,19 @@ public class QuadParticleRenderState implements SubmitNodeCollector.ParticleGrou
 	@Override
 	public void submit(SubmitNodeCollector submitNodeCollector, CameraRenderState cameraRenderState) {
 		if (this.particleCount > 0) {
-			submitNodeCollector.submitParticleGroup(this);
+			if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+				submitNodeCollector.submitParticleGroupSemantic(this);
+			} else {
+				submitNodeCollector.submitParticleGroup(this);
+			}
+		}
+	}
+
+	@Override
+	public void submitSemantic(SubmitNodeCollector submitNodeCollector, CameraRenderState cameraRenderState) {
+		if (this.particleCount > 0) {
+			submitNodeCollector.submitParticleGroupSemantic(this);
 		}
 	}
 

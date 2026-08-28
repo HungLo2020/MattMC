@@ -183,7 +183,8 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 	public GameRenderer(Minecraft minecraft, ItemInHandRenderer itemInHandRenderer, RenderBuffers renderBuffers, BlockRenderDispatcher blockRenderDispatcher) {
 		this.minecraft = minecraft;
 		this.itemInHandRenderer = itemInHandRenderer;
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
 			// Rust whole-frame extraction owns copied matrices and frame settings;
 			// these Java compatibility UBOs are never consumed on that route.
 			this.globalSettingsUniform = null;
@@ -194,7 +195,8 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 			this.levelProjectionMatrixBuffer = new PerspectiveProjectionMatrixBuffer("level");
 			this.handProjectionMatrixBuffer = new PerspectiveProjectionMatrixBuffer("hand");
 		}
-		this.hud3dProjectionMatrixBuffer = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+		this.hud3dProjectionMatrixBuffer = (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected())
 			? null
 			: new CachedPerspectiveProjectionMatrixBuffer("3d hud", 0.05F, 100.0F);
 		this.lightTexture = new LightTexture(this, minecraft);
@@ -229,7 +231,8 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 		
 		// Iris hardware diagnostics are compatibility-only. Whole-frame Vulkan
 		// must not touch Iris runtime state merely while constructing the renderer.
-		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
 			net.irisshaders.iris.Iris.logger.info("Hardware information:");
 			net.irisshaders.iris.Iris.logger.info("CPU: " + GLX._getCpuInfo());
 			GpuDevice.GpuDeviceInfo gpuDeviceInfo = VulkanicAPI.getBackendDeviceInfo();
@@ -354,7 +357,8 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 	}
 
 	public void processBlurEffect() {
-		if (net.vulkanic.gui.RustGalGuiRenderer.isWholeFrameVulkanActive()) {
+		if (net.vulkanic.gui.RustGalGuiRenderer.isWholeFrameVulkanEnabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
 			throw new IllegalStateException("Java GUI blur post-process is unavailable while Rust owns whole-frame Vulkan");
 		}
 		PostChain postChain = this.minecraft.getShaderManager().getPostChain(BLUR_POST_CHAIN_ID, LevelTargetBundle.MAIN_TARGETS);
@@ -716,8 +720,13 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 				&& !this.minecraft.options.hideGui
 				&& this.minecraft.gameMode.getPlayerMode() != GameType.SPECTATOR) {
 				this.lightTexture.turnOnLightLayer();
-				// Iris: From MixinGameRenderer - disable vanilla hand rendering when shaders are active
-				if (!net.irisshaders.iris.Iris.isPackInUseQuick()) {
+				// Java Iris/OpenGL keeps its existing hand ownership. Vulkan and
+				// Rust whole-frame ownership must still invoke this semantic
+				// callsite: ItemInHandRenderer routes eligible items into Rust and
+				// never performs a Java GPU draw on that path.
+				if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+					|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+					|| !javaIrisShaderPackActive()) {
 					this.itemInHandRenderer
 						.renderHandsWithItems(
 							f,
@@ -736,9 +745,22 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 	}
 
 	private boolean useTaczHandModelViewPath() {
-		return !net.irisshaders.iris.Iris.isPackInUseQuick()
+		return !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			&& !javaIrisShaderPackActive()
 			&& this.minecraft.player != null
 			&& this.minecraft.player.getMainHandItem().getItem() instanceof TaczMvpGunItem;
+	}
+
+	/**
+	 * Iris runtime state belongs only to the Java OpenGL compatibility route.
+	 * Keeping the ownership check here prevents a future first-person callsite
+	 * from borrowing Iris state after Rust has selected whole-frame Vulkan.
+	 */
+	private static boolean javaIrisShaderPackActive() {
+		return !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			&& net.irisshaders.iris.Iris.isPackInUseQuick();
 	}
 
 	public Matrix4f getProjectionMatrix(float f) {
@@ -769,6 +791,9 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 			// mod or future callsite cannot accidentally reopen Java world,
 			// PostChain, GUI, or presenter work beside the Rust frame.
 			throw new IllegalStateException("Java GameRenderer.render is unavailable while Rust Vulkan owns the whole frame");
+		}
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+			throw new IllegalStateException("Java GameRenderer.render is unavailable until the Rust Vulkan whole-frame route is admitted");
 		}
 		// Rust owns timing and frame submission in whole-frame mode. Keep the
 		// legacy Iris counters entirely out of that renderer route.
@@ -821,7 +846,11 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 				this.renderLevel(deltaTracker);
 				this.tryTakeScreenshotIfNeeded();
 				this.minecraft.levelRenderer.doEntityOutline();
-				if (this.postEffectId != null && this.effectActive) {
+				if (this.postEffectId != null && this.effectActive
+					&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+					if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+						throw new IllegalStateException("Java post-effect processing is unavailable while Vulkan is selected");
+					}
 					VulkanicAPI.resetTextureMatrix();
 					PostChain postChain = this.minecraft.getShaderManager().getPostChain(this.postEffectId, LevelTargetBundle.MAIN_TARGETS);
 					if (postChain != null) {
@@ -937,6 +966,15 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 		}
 		ProfilerFiller profilerFiller = Profiler.get();
 		boolean gameLoadFinished = this.minecraft.isGameLoadFinished();
+		if (!System.getProperty("mattmc.dev.rustGalWorldMaterial.terrainParticleScenario", "").isBlank()
+			&& this.minecraft.level instanceof net.minecraft.client.multiplayer.ClientLevel clientLevel
+			&& this.minecraft.player != null) {
+			// Seed before the shell's world predicate so the particle is available
+			// to this frame's normal semantic extraction, even when beforeRender
+			// observed the client before its level was published.
+			clientLevel.spawnDeterministicTerrainParticlesForCapture();
+			this.minecraft.particleEngine.flushPendingParticlesForCapture();
+		}
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.rust-vulkan.frame-reset");
 		this.guiRenderState.reset();
 		net.vulkanic.world.RustGalWorldPrimitiveRenderer.clearFrame();
@@ -947,9 +985,35 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 			this.minecraft.getWindow().getHeight()
 		);
 		net.vulkanic.gui.RustGalGuiRenderer.beginWholeFrameVulkanFrame();
+		// Activate any newly configured filesystem-backed shader-pack snapshot
+		// before deriving camera matrices. Rust owns this copied semantic source;
+		// the first frame must not use a stale Java/Iris readiness decision.
+		net.vulkanic.gui.RustGalFrameCoordinator.refreshConfiguredShaderPackSourcesForSemanticFrame();
+		this.overlayTexture.ensureSemanticAsset();
+		this.minecraft.getTextureManager().ensureRustSemanticRoute();
+		net.vulkanic.VulkanicAPI.ensureRustSemanticRoute();
+		this.minecraft.getFontManager().ensureRustSemanticRoute();
+		this.minecraft.levelRenderer.ensureRustSemanticRoute();
+		this.resourcePool.ensureRustSemanticRoute();
+		this.guiRenderer.ensureRustSemanticRoute();
+		if (this.globalSettingsUniform != null) this.globalSettingsUniform.ensureRustSemanticRoute();
+		if (this.levelProjectionMatrixBuffer != null) this.levelProjectionMatrixBuffer.ensureRustSemanticRoute();
+		if (this.handProjectionMatrixBuffer != null) this.handProjectionMatrixBuffer.ensureRustSemanticRoute();
+		if (this.hud3dProjectionMatrixBuffer != null) this.hud3dProjectionMatrixBuffer.ensureRustSemanticRoute();
+		this.lighting.ensureRustSemanticRoute();
+		this.cubeMap.ensureRustSemanticRoute();
+		this.fogRenderer.ensureRustSemanticRoute();
+		this.lightTexture().ensureRustSemanticRoute();
+		this.minecraft.levelRenderer.getWorldBorderRenderer().ensureRustSemanticRoute();
+		this.minecraft.levelRenderer.getSkyRenderer().ensureRustSemanticRoute();
+		this.minecraft.levelRenderer.getCloudRenderer().ensureRustSemanticRoute();
+		this.getFeatureRenderDispatcher().particleFeatureRenderer.ensureRustSemanticRoute();
+		this.minecraft.getMainRenderTarget().ensureRustSemanticRoute();
+		this.minecraft.getShaderManager().ensureRustSemanticRoute();
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.rust-vulkan.frame-reset");
 		float f = net.vulkanic.bridge.RustGalDeterministicTiming.partialTick(deltaTracker);
-		if (gameLoadFinished && bl && this.minecraft.level != null && this.minecraft.player != null) {
+		boolean captureTerrainParticleScenario = !System.getProperty("mattmc.dev.rustGalWorldMaterial.terrainParticleScenario", "").isBlank();
+		if ((gameLoadFinished || captureTerrainParticleScenario) && bl && this.minecraft.level != null && this.minecraft.player != null) {
 			net.voxelmap.VoxelConstants.assertRustWholeFrameWaypointsSupported();
 			if (this.minecraft.debugEntries.isCurrentlyEnabled(DebugScreenEntries.THREE_DIMENSIONAL_CROSSHAIR)
 				&& this.minecraft.options.getCameraType().isFirstPerson()
@@ -960,6 +1024,36 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 					throw new IllegalStateException("Rust whole-frame Vulkan 3D debug crosshair route rejected semantic line work");
 				}
 			}
+			// Collision debugging is a world-render callsite too. The legacy
+			// DebugRenderer is bypassed by the whole-frame shell, so copy its
+			// bounded shape stream into Rust's explicit line primitive here.
+			this.minecraft.levelRenderer.debugRenderer.collectRustCollisionSemantics(
+				new PoseStack(), this.submitNodeStorage, this.mainCamera
+			);
+			this.minecraft.levelRenderer.debugRenderer.collectRustSolidFaceSemantics(
+				this.submitNodeStorage, this.mainCamera
+			);
+			this.minecraft.levelRenderer.debugRenderer.collectRustSupportBlockSemantics(this.mainCamera);
+			this.minecraft.levelRenderer.collectRustNeighborUpdateSemantics(this.mainCamera, this.submitNodeStorage);
+			this.minecraft.levelRenderer.debugRenderer.collectRustStructureSemantics(this.mainCamera);
+			this.minecraft.levelRenderer.collectRustGameEventListenerSemantics(this.mainCamera, this.submitNodeStorage);
+			this.minecraft.levelRenderer.debugRenderer.collectRustRedstoneWireOrientationSemantics(this.mainCamera);
+			this.minecraft.levelRenderer.debugRenderer.collectRustChunkBorderSemantics(this.mainCamera);
+			this.minecraft.levelRenderer.debugRenderer.collectRustBreezeSemantics(this.mainCamera, this.submitNodeStorage);
+			this.minecraft.levelRenderer.collectRustPathfindingSemantics(this.mainCamera, this.submitNodeStorage);
+			this.minecraft.levelRenderer.debugRenderer.collectRustLightSectionSemantics(this.mainCamera, this.submitNodeStorage);
+			this.minecraft.levelRenderer.debugRenderer.collectRustHeightMapSemantics(this.mainCamera, this.submitNodeStorage);
+			this.minecraft.levelRenderer.debugRenderer.collectRustChunkCullingSemantics(this.mainCamera, this.submitNodeStorage);
+			this.minecraft.levelRenderer.collectRustWaterSemantics(this.mainCamera, this.submitNodeStorage);
+			this.minecraft.levelRenderer.collectRustLightSemantics(this.mainCamera);
+			this.minecraft.levelRenderer.debugRenderer.collectRustVillageSectionSemantics(this.mainCamera, this.submitNodeStorage);
+			this.minecraft.levelRenderer.collectRustChunkSemantics(this.mainCamera);
+			this.minecraft.levelRenderer.debugRenderer.collectRustEntityBlockIntersectionSemantics(this.mainCamera, this.submitNodeStorage);
+			this.minecraft.levelRenderer.collectRustGoalSelectorSemantics(this.mainCamera);
+			this.minecraft.levelRenderer.collectRustRaidSemantics(this.mainCamera, this.submitNodeStorage);
+			this.minecraft.levelRenderer.collectRustPoiSemantics(this.mainCamera, this.submitNodeStorage);
+			this.minecraft.levelRenderer.collectRustBrainSemantics(this.mainCamera);
+			this.minecraft.levelRenderer.collectRustBeeSemantics(this.mainCamera, this.submitNodeStorage);
 		// Post-effect identity is copied into the semantic whole-frame request;
 			// Rust admits bundled routes or rejects custom graphs using its own
 			// source/asset snapshots. Java never classifies or executes the effect.
@@ -1040,6 +1134,12 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 			} else {
 				view.rotation(cameraRotation);
 			}
+			net.minecraft.client.renderer.culling.Frustum rustFrameFrustum =
+				new net.minecraft.client.renderer.culling.Frustum(projection, view);
+			if (this.minecraft.debugEntries.isCurrentlyEnabled(DebugScreenEntries.CHUNK_SECTION_OCTREE)) {
+				this.minecraft.levelRenderer.collectRustOctreeSemantics(this.mainCamera, this.submitNodeStorage,
+					rustFrameFrustum);
+			}
 				net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.rust-vulkan.matrix-build");
 				net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.rust-vulkan.semantic-world-extraction");
 				net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.frame-begin");
@@ -1077,19 +1177,29 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 				net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.block-outline.enqueue");
 				net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueBlockOutline(this.minecraft, this, this.mainCamera);
 				net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.block-outline.enqueue");
-				net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.block-marker.enqueue");
+				net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.particles.enqueue");
+				if (!System.getProperty("mattmc.dev.rustGalWorldMaterial.blockMarkerScenario", "").isBlank()
+					&& this.minecraft.level instanceof net.minecraft.client.multiplayer.ClientLevel clientLevel) {
+					clientLevel.spawnDeterministicBlockMarkerParticlesForCapture();
+					this.minecraft.particleEngine.flushPendingParticlesForCapture();
+				}
+				if (!System.getProperty("mattmc.dev.rustGalWorldMaterial.terrainParticleScenario", "").isBlank()
+					&& this.minecraft.level instanceof net.minecraft.client.multiplayer.ClientLevel clientLevel) {
+					net.vulkanic.world.RustGalTerrainRenderer.ensureTerrainAtlasAssetForWorldMesh();
+					clientLevel.spawnDeterministicTerrainParticlesForCapture();
+					this.minecraft.particleEngine.flushPendingParticlesForCapture();
+				}
 				this.minecraft.particleEngine.enqueueRustGalBlockMarkers(this.mainCamera, f);
-				net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.block-marker.enqueue");
-				net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.terrain-particles.enqueue");
-				this.minecraft.particleEngine.enqueueRustGalTerrainParticles(this.mainCamera, f);
-				this.minecraft.particleEngine.enqueueRustGalParticles();
+				this.minecraft.particleEngine.enqueueRustGalParticles(
+					rustFrameFrustum, this.mainCamera, f
+				);
 				this.minecraft.particleEngine.enqueueRustGalModelParticles(
 					this.mainCamera,
 					f,
 					this.submitNodeStorage,
 					this.levelRenderState.cameraRenderState
 				);
-				net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.terrain-particles.enqueue");
+				net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.particles.enqueue");
 			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.block-crack.enqueue");
 			this.minecraft.levelRenderer.enqueueRustGalBlockBreakingCracks(this.mainCamera);
 			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.block-crack.enqueue");
@@ -1114,7 +1224,9 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 					// ItemInHandRenderer rather than reopening Java Vulkan rendering.
 					if (this.minecraft.options.getCameraType().isFirstPerson()
 						&& !this.minecraft.options.hideGui
-						&& this.minecraft.gameMode.getPlayerMode() != GameType.SPECTATOR) {
+						&& this.minecraft.gameMode.getPlayerMode() != GameType.SPECTATOR
+						&& !(this.minecraft.getCameraEntity() instanceof LivingEntity sleepingEntity
+							&& sleepingEntity.isSleeping())) {
 						float handFov = this.getFov(this.mainCamera, f, false);
 						Matrix4f handProjection = new Matrix4f().scale(1.0F, 1.0F, HAND_DEPTH_SCALE);
 						handProjection.mul(this.getProjectionMatrix(handFov));
@@ -1236,7 +1348,9 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 		net.vulkanic.gui.RustGalFrameCoordinator.executeWholeFrameVulkan(
 			this.minecraft,
 			this.guiRenderState,
-			this.effectActive && this.postEffectId != null ? this.postEffectId.toString() : null
+			this.effectActive && this.postEffectId != null
+				? this.postEffectId.toString()
+				: Minecraft.useShaderTransparency() ? "minecraft:transparency" : null
 		);
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.rust-vulkan.frame-coordinator");
 		profilerFiller.pop();
@@ -1324,7 +1438,8 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 	}
 
 	public void renderLevel(DeltaTracker deltaTracker) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
 			throw new IllegalStateException("Java GameRenderer.renderLevel is unavailable while Rust owns whole-frame presentation");
 		}
 		// Iris: Save shaders state (merged from MixinModelViewBobbing)
@@ -1467,8 +1582,12 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 			this.minecraft.getDebugOverlay().render3dCrosshair(this.mainCamera);
 		}
 		
-		// Iris: From MixinGameRenderer - finalize game rendering for color space conversion
-		net.irisshaders.iris.Iris.getPipelineManager().getPipeline().ifPresent(net.irisshaders.iris.pipeline.WorldRenderingPipeline::finalizeGameRendering);
+		// Iris finalization belongs only to the Java OpenGL compatibility route;
+		// Rust owns the selected Vulkan frame and its color-space/presentation graph.
+		if (!net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			net.irisshaders.iris.Iris.getPipelineManager().getPipeline().ifPresent(net.irisshaders.iris.pipeline.WorldRenderingPipeline::finalizeGameRendering);
+		}
 	}
 
 	private void extractCamera(float f) {

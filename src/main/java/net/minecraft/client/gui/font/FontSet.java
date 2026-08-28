@@ -81,6 +81,10 @@ public class FontSet implements AutoCloseable {
 		return this.stitcher.semanticAtlasSnapshots();
 	}
 
+	public void ensureRustSemanticRoute() {
+		this.stitcher.ensureRustSemanticRoute();
+	}
+
 	public void reload(List<GlyphProvider.Conditional> list, Set<FontOption> set) {
 		this.allProviders = list;
 		this.reload(set);

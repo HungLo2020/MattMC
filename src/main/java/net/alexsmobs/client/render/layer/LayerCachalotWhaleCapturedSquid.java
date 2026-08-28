@@ -31,8 +31,15 @@ public class LayerCachalotWhaleCapturedSquid  extends RenderLayer<CachalotWhaleR
                 poseStack.mulPose(Axis.YP.rotationDegrees(riderRot + (rightSquid ? -90F : 90F)));
                 // The nested entity is copied state and submitted through the same dispatcher
                 // route as top-level entities; no live entity, model, or Java buffer is retained.
-                Minecraft.getInstance().getEntityRenderDispatcher().submit(
-                    squid, renderState.cameraRenderState, 0, 0, 0, poseStack, submitNodeCollector);
+                var dispatcher = Minecraft.getInstance().getEntityRenderDispatcher();
+                if (net.minecraft.client.renderer.entity.EntityRenderDispatcher.isSemanticSubmission()) {
+                    dispatcher.submitSemantic(squid, renderState.cameraRenderState, 0, 0, 0, poseStack, submitNodeCollector);
+                } else {
+                    // Compatibility OpenGL keeps the ordinary dispatcher path;
+                    // the selected Rust Vulkan route always takes submitSemantic above.
+                    Minecraft.getInstance().getEntityRenderDispatcher().submit(
+                        squid, renderState.cameraRenderState, 0, 0, 0, poseStack, submitNodeCollector);
+                }
                 poseStack.popPose();
             }
         }

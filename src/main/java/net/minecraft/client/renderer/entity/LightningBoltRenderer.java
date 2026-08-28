@@ -14,6 +14,7 @@ import org.joml.Matrix4f;
 
 @Environment(EnvType.CLIENT)
 public class LightningBoltRenderer extends EntityRenderer<LightningBolt, LightningBoltRenderState> {
+	private static final int SEMANTIC_LIGHTNING_QUADS = 4 * (8 + 3 + 3) * 4;
 	public LightningBoltRenderer(EntityRendererProvider.Context context) {
 		super(context);
 	}
@@ -36,11 +37,17 @@ public class LightningBoltRenderer extends EntityRenderer<LightningBolt, Lightni
 
 		float h = f;
 		float j = g;
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			&& net.vulkanic.world.WorldRenderRoutePolicy.currentProceduralQuadRoute().usesRustWholeFrameVulkan()) {
-			float[] vertices = new float[56 * 12];
-			float[] uvs = new float[56 * 8];
-			int[] colors = new int[56];
+		boolean rustPresentation = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
+		if (net.vulkanic.world.WorldRenderRoutePolicy.currentProceduralQuadRoute()
+			.usesRustWholeFrameVulkan()) {
+			// Vanilla emits four crossed quads for each of 14 segments in each
+			// of four deterministic layers. Keep the semantic payload exactly
+			// bounded to that complete route; the old 56-quad allocation covered
+			// one layer and could overrun before Rust received the submission.
+			float[] vertices = new float[SEMANTIC_LIGHTNING_QUADS * 12];
+			float[] uvs = new float[SEMANTIC_LIGHTNING_QUADS * 8];
+			int[] colors = new int[SEMANTIC_LIGHTNING_QUADS];
 			int quadIndex = 0;
 			for (int layer = 0; layer < 4; layer++) {
 				RandomSource layerRandom = RandomSource.create(lightningBoltRenderState.seed);
@@ -61,10 +68,16 @@ public class LightningBoltRenderer extends EntityRenderer<LightningBolt, Lightni
 					}
 				}
 			}
-			if (submitNodeCollector.submitColoredQuads(poseStack, RenderType.lightning(), vertices, uvs, colors, lightningBoltRenderState.lightCoords)) return;
+			if (quadIndex != SEMANTIC_LIGHTNING_QUADS) {
+				throw new IllegalStateException("Rust whole-frame lightning semantic quad count drifted: " + quadIndex);
+			}
+			if (submitNodeCollector.submitColoredQuadsSemantic(poseStack, RenderType.lightning(), vertices, uvs, colors, lightningBoltRenderState.lightCoords)) return;
 			throw new IllegalStateException("Rust whole-frame lightning route rejected semantic quads");
 		}
-		submitNodeCollector.submitCustomGeometry(poseStack, RenderType.lightning(), (pose, vertexConsumer) -> {
+		if (rustPresentation) {
+			throw new IllegalStateException("Rust whole-frame lightning route is unavailable; Java custom geometry is not a fallback");
+		}
+		submitNodeCollector.submitCustomGeometrySemantic(poseStack, RenderType.lightning(), (pose, vertexConsumer) -> {
 			Matrix4f matrix4f = pose.pose();
 
 			for (int i = 0; i < 4; i++) {

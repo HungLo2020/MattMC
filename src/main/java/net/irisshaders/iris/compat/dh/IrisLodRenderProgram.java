@@ -155,6 +155,10 @@ public class IrisLodRenderProgram {
 	}
 
 	public static IrisLodRenderProgram createProgram(String name, boolean isShadowPass, boolean translucent, ProgramSource source, CustomUniforms uniforms, IrisRenderingPipeline pipeline) {
+		if (VulkanicAPI.isVulkanBackendSelected()
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris Distant Horizons shader programs are unavailable on the Rust Vulkan route");
+		}
 		Map<PatchShaderType, String> transformed = TransformPatcher.patchDHTerrain(
 			name,
 			source.getVertexSource().orElseThrow(RuntimeException::new),
@@ -218,7 +222,8 @@ public class IrisLodRenderProgram {
 
 	// Override ShaderProgram.bind()
 	public void bind() {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| VulkanicAPI.isVulkanBackendSelected()) {
 			throw new IllegalStateException("Java Iris Distant Horizons shader binding is unavailable while Rust owns whole-frame presentation");
 		}
 		CommandContext ctx = VulkanicAPI.getCommandContext();
@@ -231,7 +236,8 @@ public class IrisLodRenderProgram {
 	}
 
 	public void unbind() {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| VulkanicAPI.isVulkanBackendSelected()) {
 			throw new IllegalStateException("Java Iris Distant Horizons shader unbinding is unavailable while Rust owns whole-frame presentation");
 		}
 		CommandContext ctx = VulkanicAPI.getCommandContext();

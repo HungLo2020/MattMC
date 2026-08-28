@@ -9,6 +9,10 @@ public class TextureManipulationUtil {
 	private static int colorFillFBO = -1;
 
 	public static void fillWithColor(int textureId, int maxLevel, int rgba) {
+		if (VulkanicAPI.isVulkanBackendSelected()
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris PBR texture mutation is unavailable on the Rust Vulkan route");
+		}
 		CommandContext ctx = VulkanicAPI.getCommandContext();
 		if (colorFillFBO == -1) {
 			colorFillFBO = VulkanicAPI.createFramebuffer(ctx);

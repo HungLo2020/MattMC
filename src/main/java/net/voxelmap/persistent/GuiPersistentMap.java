@@ -23,6 +23,8 @@ import net.voxelmap.util.EasingUtils;
 import net.voxelmap.util.GameVariableAccessShim;
 import net.voxelmap.util.ImageUtils;
 import net.voxelmap.util.VoxelMapGuiGraphics;
+import net.vulkanic.bridge.RustGalVulkanWholeFrameMode;
+import net.vulkanic.gui.RustGalGuiRawImageAssets;
 import net.voxelmap.util.VoxelMapPipelines;
 import net.voxelmap.util.Waypoint;
 import net.blaze3d.platform.cursor.CursorTypes;
@@ -179,6 +181,14 @@ public class GuiPersistentMap extends PopupGuiScreen implements IGuiWaypoints {
         DynamicTexture texture = new DynamicTexture(() -> "Voxelmap player", ImageUtils.nativeImageFromBufferedImage(skinImage));
         texture.setFilter(true, false);
         minecraft.getTextureManager().register(voxelmapSkinLocation, texture);
+        // The persistent-map skin is synthesized from the player's live skin,
+        // so Rust cannot resolve it from a resource-pack PNG. Publish a bounded
+        // CPU snapshot for semantic GUI consumption while keeping Java texture
+        // views out of the Rust presenter path.
+        if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+                || RustGalVulkanWholeFrameMode.enabled()) {
+            RustGalGuiRawImageAssets.registerDynamicTexture(voxelmapSkinLocation, texture);
+        }
     }
 
     @Override

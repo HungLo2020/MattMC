@@ -1665,7 +1665,8 @@ public class Options {
 	}
 
 	public CloudStatus getCloudsType() {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
 			// Rust cloud semantics consume the copied gameplay setting and source
 			// pack snapshot; do not query Iris' renderer pipeline here.
 			return this.cloudStatus.get();

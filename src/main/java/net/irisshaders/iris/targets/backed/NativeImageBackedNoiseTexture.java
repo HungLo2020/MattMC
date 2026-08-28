@@ -15,8 +15,9 @@ import java.util.function.IntSupplier;
 public class NativeImageBackedNoiseTexture extends DynamicTexture implements TextureAccess {
 	public NativeImageBackedNoiseTexture(int size) {
 		super(() -> "Noise / " + size, create(size));
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			throw new IllegalStateException("Java Iris noise textures are unavailable while Rust owns whole-frame presentation");
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris noise textures are unavailable on selected Vulkan");
 		}
 		this.texture.setTextureFilter(FilterMode.LINEAR, false);
 	}
@@ -38,8 +39,9 @@ public class NativeImageBackedNoiseTexture extends DynamicTexture implements Tex
 
 	@Override
 	public void upload() {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			throw new IllegalStateException("Java Iris noise texture uploads are unavailable while Rust owns whole-frame presentation");
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris noise texture uploads are unavailable on selected Vulkan");
 		}
 		NativeImage image = Objects.requireNonNull(getPixels());
 

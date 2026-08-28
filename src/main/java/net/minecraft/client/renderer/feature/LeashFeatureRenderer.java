@@ -18,6 +18,15 @@ public class LeashFeatureRenderer {
 	private static final float LEASH_WIDTH = 0.05F;
 
 	public void render(SubmitNodeCollection submitNodeCollection, MultiBufferSource.BufferSource bufferSource) {
+		net.vulkanic.world.WorldRenderRoutePolicy.Route route = net.vulkanic.world.WorldRenderRoutePolicy.currentEntityLeashRoute();
+		if (route == net.vulkanic.world.WorldRenderRoutePolicy.Route.DISABLED
+			|| route == net.vulkanic.world.WorldRenderRoutePolicy.Route.RUST_VULKAN_WHOLE_FRAME
+			|| (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+				&& route != net.vulkanic.world.WorldRenderRoutePolicy.Route.RUST_VULKAN_WHOLE_FRAME)) {
+			// Rust owns the whole Vulkan frame; unsupported Java leash geometry is
+			// unavailable instead of silently bypassing the semantic route.
+			return;
+		}
 		for (SubmitNodeStorage.LeashSubmit leashSubmit : submitNodeCollection.getLeashSubmits()) {
 			renderLeash(leashSubmit.pose(), bufferSource, leashSubmit.leashState());
 		}

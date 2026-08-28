@@ -130,7 +130,8 @@ public class TitleScreen extends Screen {
 		
 		// Iris owns this hook only on the legacy renderer route. Rust whole-frame
 		// presentation must not initialize or borrow Iris renderer runtime state.
-		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() && !iris$hasFirstInit) {
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected() && !iris$hasFirstInit) {
 			net.irisshaders.iris.Iris.onLoadingComplete();
 			iris$hasFirstInit = true;
 		}

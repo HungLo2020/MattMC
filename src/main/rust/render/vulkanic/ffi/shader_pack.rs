@@ -50,14 +50,13 @@ pub(crate) unsafe fn decode_shader_pack_source_update(
             "shader-pack source path",
         )?;
         let path = decode_utf8(&path_bytes, "shader-pack source path")?;
-        let contents_bytes = read_bounded_bytes(
-            file.contents_utf8,
-            true,
-            FFI_MAX_SHADER_PACK_SOURCE_FILE_BYTES,
-            "shader-pack source contents",
-        )?;
-        let contents = decode_utf8(&contents_bytes, "shader-pack source contents")?;
-        total_bytes = total_bytes.checked_add(contents.len()).ok_or_else(|| {
+        let incoming_bytes = usize::try_from(file.contents_utf8.len).map_err(|_| {
+            GalError::ffi(
+                StatusCode::LengthOverflow,
+                "shader-pack source file length does not fit platform usize",
+            )
+        })?;
+        total_bytes = total_bytes.checked_add(incoming_bytes).ok_or_else(|| {
             GalError::ffi(
                 StatusCode::LengthOverflow,
                 "shader-pack source aggregate byte count overflows",
@@ -72,6 +71,13 @@ pub(crate) unsafe fn decode_shader_pack_source_update(
                 ),
             ));
         }
+        let contents_bytes = read_bounded_bytes(
+            file.contents_utf8,
+            true,
+            FFI_MAX_SHADER_PACK_SOURCE_FILE_BYTES,
+            "shader-pack source contents",
+        )?;
+        let contents = decode_utf8(&contents_bytes, "shader-pack source contents")?;
         files.push(ShaderSourceFile::new(path, contents));
     }
     Ok(ShaderPackSourceUpdate {
@@ -130,13 +136,13 @@ pub(crate) unsafe fn decode_shader_pack_asset_update(
             "shader-pack asset path",
         )?;
         let path = decode_utf8(&path_bytes, "shader-pack asset path")?;
-        let contents = read_bounded_bytes(
-            file.contents,
-            true,
-            FFI_MAX_SHADER_PACK_ASSET_FILE_BYTES,
-            "shader-pack asset contents",
-        )?;
-        total_bytes = total_bytes.checked_add(contents.len()).ok_or_else(|| {
+        let incoming_bytes = usize::try_from(file.contents.len).map_err(|_| {
+            GalError::ffi(
+                StatusCode::LengthOverflow,
+                "shader-pack asset file length does not fit platform usize",
+            )
+        })?;
+        total_bytes = total_bytes.checked_add(incoming_bytes).ok_or_else(|| {
             GalError::ffi(
                 StatusCode::LengthOverflow,
                 "shader-pack asset aggregate byte count overflows",
@@ -151,6 +157,12 @@ pub(crate) unsafe fn decode_shader_pack_asset_update(
                 ),
             ));
         }
+        let contents = read_bounded_bytes(
+            file.contents,
+            true,
+            FFI_MAX_SHADER_PACK_ASSET_FILE_BYTES,
+            "shader-pack asset contents",
+        )?;
         files.push(ShaderPackAssetFile::new(path, contents));
     }
     Ok(ShaderPackAssetUpdate {

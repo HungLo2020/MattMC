@@ -22,6 +22,10 @@ public class ClearPass {
 	}
 
 	public void execute(Vector4f defaultClearColor) {
+		if (VulkanicAPI.isVulkanBackendSelected()
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris clear passes are unavailable on the Rust Vulkan route");
+		}
 		var ctx = VulkanicAPI.getCommandContext();
 		VulkanicAPI.setDynamicViewport(ctx, 0, 0, viewportX.getAsInt(), viewportY.getAsInt());
 		framebuffer.bind();

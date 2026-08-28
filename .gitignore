@@ -25,8 +25,10 @@ crash-reports/
 /logs/graphics-audit/root-capture-archive/
 
 # Keep graphics capture artifacts in this dedicated ignored subtree; never
-# write them as dot-directories at the repository root.
-/artifacts/graphics-captures/
+# write them as dot-directories at the repository root. Ignore the parent too,
+# so the diagnostics archive itself never appears as an untracked repository
+# entry.
+/artifacts/
 # Legacy RenderDoc/capture probes must never become repository files. The
 # capture runner relocates these into the ignored artifact subtree.
 /.capture*

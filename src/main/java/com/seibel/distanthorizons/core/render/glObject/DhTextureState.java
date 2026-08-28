@@ -47,7 +47,8 @@ public final class DhTextureState
 
 	private static void ensureJavaCompatibilityTextureState()
 	{
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			throw new IllegalStateException("Java DH texture state is unavailable while Rust owns whole-frame presentation");
 		}
 	}

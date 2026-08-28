@@ -250,6 +250,16 @@ class RustShaderPackSourceCollectorTest {
 	}
 
 	@Test
+	void resourceManagerShaderPathsNormalizeToRustSnapshotRoot() {
+		assertEquals("program/custom.fsh",
+			RustShaderPackSourceCollector.normalizeShaderSourcePath("shaders/program/custom.fsh"));
+		assertEquals("program/custom.fsh",
+			RustShaderPackSourceCollector.normalizeShaderSourcePath("program/custom.fsh"));
+		assertThrows(IllegalArgumentException.class,
+			() -> RustShaderPackSourceCollector.normalizeShaderSourcePath(""));
+	}
+
+	@Test
 	void runtimeEnvironmentSnapshotUsesSeparateReservedSemanticPath() throws Exception {
 		RustShaderPackSourceCollector.SourceGeneration source = RustShaderPackSourceCollector.collect(
 			temporaryDirectory,

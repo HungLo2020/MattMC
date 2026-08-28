@@ -43,6 +43,7 @@ public class ItemRenderer {
 		RenderType renderType,
 		ItemStackRenderState.FoilType foilType
 	) {
+		ensureJavaItemRoute();
 		VertexConsumer vertexConsumer;
 		if (foilType == ItemStackRenderState.FoilType.SPECIAL) {
 			PoseStack.Pose pose = poseStack.last().copy();
@@ -61,6 +62,7 @@ public class ItemRenderer {
 	}
 
 	public static VertexConsumer getSpecialFoilBuffer(MultiBufferSource multiBufferSource, RenderType renderType, PoseStack.Pose pose) { // Made public for Sodium FRAPI integration
+		ensureJavaItemRoute();
 		return VertexMultiConsumer.create(
 			new SheetedDecalTextureGenerator(
 				multiBufferSource.getBuffer(useTransparentGlint(renderType) ? RenderType.glintTranslucent() : RenderType.glint()), pose, 0.0078125F
@@ -70,12 +72,20 @@ public class ItemRenderer {
 	}
 
 	public static VertexConsumer getFoilBuffer(MultiBufferSource multiBufferSource, RenderType renderType, boolean bl, boolean bl2) {
+		ensureJavaItemRoute();
 		if (bl2) {
 			return useTransparentGlint(renderType)
 				? VertexMultiConsumer.create(multiBufferSource.getBuffer(RenderType.glintTranslucent()), multiBufferSource.getBuffer(renderType))
 				: VertexMultiConsumer.create(multiBufferSource.getBuffer(bl ? RenderType.glint() : RenderType.entityGlint()), multiBufferSource.getBuffer(renderType));
 		} else {
 			return multiBufferSource.getBuffer(renderType);
+		}
+	}
+
+	private static void ensureJavaItemRoute() {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java item rendering is unavailable while Rust owns Vulkan presentation");
 		}
 	}
 

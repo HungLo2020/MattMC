@@ -38,6 +38,118 @@ public class ApiNeutralityCallsiteTest {
     }
 
     @Test
+    public void testGuiLightmapTextureSetupCannotBorrowJavaViewOnRustVulkan() throws IOException {
+        String source = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/render/TextureSetup.java"));
+        int method = source.indexOf("singleTextureWithLightmap");
+        int view = source.indexOf("lightTexture().getTextureView()", method);
+        int selectedGuard = source.indexOf("VulkanicAPI.isVulkanBackendSelected()", method);
+        assertTrue(method >= 0 && selectedGuard > method && selectedGuard < view,
+            "GUI lightmap setup must reject selected Rust Vulkan before reading Java GPU state");
+    }
+
+    @Test
+    public void testGuiMultiTextureSetupCannotBorrowJavaViewsOnRustVulkan() throws IOException {
+        String source = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/render/TextureSetup.java"));
+        int method = source.indexOf("doubleTexture");
+        int firstView = source.indexOf("new TextureSetup", method);
+        int selectedGuard = source.indexOf("VulkanicAPI.isVulkanBackendSelected()", method);
+        int wholeFrameGuard = source.indexOf("RustGalVulkanWholeFrameMode.enabled()", method);
+        assertTrue(method >= 0 && selectedGuard > method && selectedGuard < firstView,
+            "GUI multi-texture setup must reject selected Rust Vulkan before retaining Java GPU views");
+        assertTrue(wholeFrameGuard > method && wholeFrameGuard < firstView,
+            "GUI multi-texture setup must reject whole-frame Rust Vulkan before retaining Java GPU views");
+    }
+
+    @Test
+    public void testSodiumShaderHelpersFenceJavaLightmapViewsOnRustVulkan() throws IOException {
+        String sodium = readSource(SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/shader/DefaultShaderInterface.java"));
+        String irisSodium = readSource(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/programs/SodiumShader.java"));
+        assertTrue(sodium.contains("ensureJavaSodiumShaderAvailable();"));
+        assertTrue(irisSodium.contains("ensureJavaSodiumShaderAvailable();"));
+        assertTrue(sodium.contains("Java Sodium shader state is unavailable on the Rust Vulkan route"));
+        assertTrue(irisSodium.contains("Java Iris Sodium shader state is unavailable on the Rust Vulkan route"));
+    }
+
+    @Test
+    public void testIrisColorSpaceComputeCannotOpenJavaComputeOnRustVulkan() throws IOException {
+        String source = readSource(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pathways/colorspace/ColorSpaceComputeConverter.java"));
+        assertTrue(source.contains("ensureJavaColorSpaceComputeAvailable();"));
+        assertTrue(source.contains("Java Iris color-space compute is unavailable on the Rust Vulkan route"));
+    }
+
+    @Test
+    public void testIrisResourceConstructorsCannotAllocateJavaGpuObjectsOnRustVulkan() throws IOException {
+        String[] files = {
+            "net/irisshaders/iris/gl/texture/GlTexture.java",
+            "net/irisshaders/iris/targets/backed/SingleColorTexture.java",
+            "net/irisshaders/iris/targets/DepthTexture.java",
+            "net/irisshaders/iris/targets/RenderTarget.java",
+            "net/irisshaders/iris/gl/image/GlImage.java",
+            "net/irisshaders/iris/gl/framebuffer/GlFramebuffer.java",
+            "net/irisshaders/iris/gl/sampler/GlSampler.java",
+            "net/irisshaders/iris/targets/backed/NoiseTexture.java"
+        };
+        for (String relative : files) {
+            String source = readSource(SRC_MAIN_JAVA.resolve(relative));
+            assertTrue(source.contains("RustGalVulkanWholeFrameMode.enabled()"),
+                "Iris resource constructor must fence whole-frame Rust Vulkan: " + relative);
+            assertTrue(source.contains("requireJava"),
+                "Iris resource constructor must guard allocation before Java native creation: " + relative);
+        }
+    }
+
+    @Test
+    public void testIrisImagesFencePostConstructionJavaGpuMutationOnRustVulkan() throws IOException {
+        String source = readSource(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/image/GlImage.java"));
+        int resize = source.indexOf("public void updateNewSize(int width, int height)");
+        int guard = source.indexOf("ensureJavaCompatibilityRoute();", resize);
+        assertTrue(resize >= 0 && guard > resize,
+            "Iris image resize must reject Java GPU mutation after Rust Vulkan selection");
+        assertTrue(source.contains("Java Iris image operations are unavailable on the Rust Vulkan route"),
+            "Iris image lifecycle guard must fail closed on Rust Vulkan");
+    }
+
+    @Test
+    public void testGuiStandard3dAdmissionHonorsExplicitDisableSwitch() throws IOException {
+        String source = readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/gui/RustGalGuiItemRenderer.java"));
+        int method = source.indexOf("public static List<RustGalGuiElementRenderState> tryEnqueueStandard3dItem(");
+        int guard = source.indexOf("if (!standard3dRouteEnabled())", method);
+        assertTrue(method >= 0 && guard > method,
+            "GUI standard-3D item admission must honor the route disable switch before collecting meshes");
+    }
+
+    @Test
+    public void testPostPassInputsCannotExposeJavaViewsOnRustVulkan() throws IOException {
+        String source = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/PostPass.java"));
+        int targetTexture = source.indexOf("public GpuTextureView texture(Map<ResourceLocation, ResourceHandle<RenderTarget>> map)");
+        int targetGuard = source.indexOf("Java post-pass target textures are unavailable on the Rust Vulkan route", targetTexture);
+        int textureInput = source.indexOf("public GpuTextureView texture(Map<ResourceLocation, ResourceHandle<RenderTarget>> map)", targetTexture + 1);
+        int textureGuard = source.indexOf("Java post-pass texture inputs are unavailable on the Rust Vulkan route", textureInput);
+        assertTrue(targetTexture >= 0 && targetGuard > targetTexture);
+        assertTrue(textureInput >= 0 && textureGuard > textureInput);
+        assertTrue(source.contains("Java post-pass target cleanup is unavailable on the Rust Vulkan route"));
+    }
+
+    @Test
+    public void testIrisProgramBuilderCannotCompileJavaProgramsOnRustVulkan() throws IOException {
+        String source = readSource(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/program/ProgramBuilder.java"));
+        int begin = source.indexOf("public static ProgramBuilder begin(");
+        int compile = source.indexOf("buildShader(ShaderType.VERTEX", begin);
+        int guard = source.indexOf("ensureJavaProgramAvailable();", begin);
+        assertTrue(begin >= 0 && guard > begin && guard < compile,
+            "Iris Java program creation must be fenced before shader compilation");
+        assertTrue(source.contains("Java Iris shader-program creation is unavailable on the Rust Vulkan route"));
+    }
+
+    @Test
+    public void testCompatibilityOnlyIrisAndSodiumHelpersFenceRustVulkan() throws IOException {
+        String sodium = readSource(SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/shader/SodiumChunkRenderPipelines.java"));
+        String collector = readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/shaderpack/IrisShaderPackCompatibilityCollector.java"));
+        assertTrue(sodium.contains("Java Sodium pipeline construction is unavailable on the Rust Vulkan route"));
+        assertTrue(collector.contains("Java Iris shader-pack compatibility collection is unavailable on the Rust Vulkan route"));
+    }
+
+    @Test
     public void testSodiumChunkRenderDeviceSelectionAndTessellationUseBackendNeutralSeams() throws IOException {
         String renderDeviceSource = readSource(SRC_MAIN_JAVA.resolve("net/sodium/client/gl/device/RenderDevice.java"));
         String renderDeviceHolderSource = readSource(SRC_MAIN_JAVA.resolve("net/sodium/client/gl/device/RenderDeviceHolder.java"));
@@ -52,14 +164,16 @@ public class ApiNeutralityCallsiteTest {
             "Sodium RenderDevice should not be hardcoded to the GL adapter singleton");
         assertTrue(renderDeviceSource.contains("static RenderDevice instance()"),
             "Sodium RenderDevice should expose a selected-device accessor");
-        assertTrue(renderDeviceHolderSource.contains("VulkanicAPI.isVulkanBackendInitializedAndSelected() ? VULKAN_DEVICE : OPENGL_DEVICE"),
-            "Sodium RenderDevice selection should follow the already-initialized Vulkanic backend without forcing OpenGL bootstrap");
+        assertTrue(renderDeviceHolderSource.contains("VulkanicAPI.isVulkanBackendSelected() ? VULKAN_DEVICE : OPENGL_DEVICE"),
+            "Sodium RenderDevice selection must not silently choose the OpenGL device after Vulkan selection");
         assertTrue(renderDeviceHolderSource.contains("new VulkanicRenderDevice()"),
             "Vulkan backend selection should have a distinct render-device adapter seam");
         assertFalse(vulkanicRenderDeviceSource.contains("extends GLRenderDevice"),
             "VulkanicRenderDevice should no longer inherit the OpenGL Sodium render device implementation");
         assertTrue(vulkanicRenderDeviceSource.contains("implements RenderDevice"),
             "VulkanicRenderDevice should own the selected Sodium render-device implementation directly");
+        assertTrue(sharedQuadIndexBufferSource.contains("this.nativeGpuBuffer = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()"),
+            "shared quad indices must fence Java/OpenGL allocation at Vulkan selection, including bootstrap");
 
         assertTrue(commandListSource.contains("RenderTessellation createTessellation(VulkanicPrimitiveMode primitiveMode"),
             "CommandList should expose backend-neutral tessellation creation for terrain callsites");
@@ -79,6 +193,8 @@ public class ApiNeutralityCallsiteTest {
                 && vulkanicRenderDeviceSource.contains("primitiveMode")
                 && vulkanicRenderDeviceSource.contains("indexType"),
             "VulkanicRenderDevice should submit typed primitive and index state to VulkanicAPI");
+        assertFalse(vulkanicRenderDeviceSource.contains("ImmediateState.usingTessellation"),
+            "Rust-owned Sodium terrain draws must not reconstruct topology from Iris' borrowed Java state");
 
         assertFalse(defaultChunkRendererSource.contains("import net.sodium.client.gl.tessellation.GlTessellation;"),
             "DefaultChunkRenderer should not own GL tessellation types directly");
@@ -92,6 +208,9 @@ public class ApiNeutralityCallsiteTest {
             "DefaultChunkRenderer should describe terrain topology through VulkanicPrimitiveMode");
         assertTrue(defaultChunkRendererSource.contains("VulkanicIndexType.INT"),
             "DefaultChunkRenderer should describe terrain indices through VulkanicIndexType");
+        assertTrue(defaultChunkRendererSource.contains(
+                "Java Sodium Vulkan terrain rendering is unavailable; Rust semantic terrain owns the selected route"),
+            "The dormant Java Sodium Vulkan helper must fail closed before it can become a hidden fallback");
 
         assertFalse(renderRegionSource.contains("import net.sodium.client.gl.tessellation.GlTessellation;"),
             "RenderRegion device resources should not cache GL tessellation types directly");
@@ -512,8 +631,8 @@ public class ApiNeutralityCallsiteTest {
             "GuiRenderer should make offscreen item-atlas color writes visible before sampling them back into the GUI");
         assertTrue(guiRendererSource.contains("if (VulkanicAPI.isVulkanBackendSelected()) {"),
             "GuiRenderer should special-case Vulkan GUI items instead of always relying on the shared atlas path");
-        assertTrue(guiRendererSource.contains("this.prepareItemsViaPictureInPicture(i);"),
-            "GuiRenderer should route Vulkan GUI items through the picture-in-picture path");
+        assertTrue(guiRendererSource.contains("public void collectRustGalPictureInPictureSemantics()"),
+            "GuiRenderer should expose a semantic picture-in-picture collection path for Rust GUI items");
         assertTrue(guiRendererSource.contains("boolean bl2 = !VulkanicAPI.isVulkanBackendSelected();"),
             "GuiRenderer should bypass the atlas-only render-type scissor when Vulkan backend routing is active");
         assertTrue(guiRendererSource.contains("GpuBufferSlice previousProjectionMatrix = VulkanicAPI.getProjectionMatrixBuffer();"),
@@ -1029,6 +1148,22 @@ public class ApiNeutralityCallsiteTest {
             "VulkanicCoreAPI should expose textureId(GpuTextureView) for typed texture-view callsites: " + coreApiRelative);
         assertTrue(coreApiSource.contains("return textureId(textureView.texture());"),
             "VulkanicCoreAPI texture-view helper should delegate through typed texture helper: " + coreApiRelative);
+    }
+
+    @Test
+    public void testTextureTrackerVulkanGuardCannotPublishIrisJavaBindingState() throws IOException {
+        String source = readSource(SRC_MAIN_JAVA.resolve(
+            "net/irisshaders/iris/pbr/TextureTracker.java"));
+        int method = source.indexOf("public void onSetShaderTexture(");
+        int guard = source.indexOf("RustGalVulkanWholeFrameMode.enabled()", method);
+        int methodEnd = source.indexOf("\n\t}\n\n\t@Nullable", guard);
+        assertTrue(method >= 0 && guard > method && methodEnd > guard,
+            "TextureTracker must guard the shader-texture callback before any compatibility bookkeeping");
+        String callbackBody = source.substring(method, methodEnd);
+        assertFalse(callbackBody.contains("IrisRenderSystem.setTextureBinding"),
+            "Rust Vulkan ownership must not publish Java Iris texture bindings");
+        assertTrue(callbackBody.split("VulkanicAPI.isVulkanBackendSelected()", -1).length - 1 == 1,
+            "TextureTracker must not retain a second Vulkan branch after its fail-closed guard");
     }
 
     @Test
@@ -1646,6 +1781,432 @@ public class ApiNeutralityCallsiteTest {
     }
 
     @Test
+    public void testUnadmittedParticleSemanticAdapterCannotFallBackToJavaOnVulkan() throws IOException {
+        String source = readSource(SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/state/ParticleGroupRenderState.java"));
+        int semantic = source.indexOf("default void submitSemantic");
+        int selectedGuard = source.indexOf("VulkanicAPI.isVulkanBackendSelected()", semantic);
+        int unsupportedRecord = source.indexOf("recordUnsupportedParticleGroup()", selectedGuard);
+        int throwSite = source.indexOf("throw new IllegalStateException", unsupportedRecord);
+        int legacySubmit = source.indexOf("submit(submitNodeCollector, cameraRenderState);", throwSite);
+        assertTrue(semantic >= 0 && selectedGuard > semantic && unsupportedRecord > selectedGuard
+                && throwSite > unsupportedRecord && legacySubmit > throwSite,
+            "particle semantic adapters must reject unimplemented Rust Vulkan families before legacy submit");
+    }
+
+    @Test
+    public void testParticleStateExposesExplicitSemanticSubmissionLoop() throws IOException {
+        String state = readSource(SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/state/ParticlesRenderState.java"));
+        String quad = readSource(SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/state/QuadParticleRenderState.java"));
+        String collector = readSource(SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/OrderedSubmitNodeCollector.java"));
+        int semantic = state.indexOf("void submitSemantic");
+        int semanticCall = state.indexOf("particleGroupRenderState.submitSemantic", semantic);
+        int legacy = state.indexOf("particleGroupRenderState.submit(");
+        int quadSemantic = quad.indexOf("void submitSemantic");
+        int quadCollector = quad.indexOf("submitNodeCollector.submitParticleGroupSemantic(this)", quadSemantic);
+        assertTrue(semantic >= 0 && semanticCall > semantic && legacy >= 0 && legacy < semantic,
+            "particle state must keep legacy OpenGL submission separate from its semantic loop");
+        assertTrue(quadSemantic >= 0 && quadCollector > quadSemantic,
+            "quad particle semantic submission must use the explicit Rust collector");
+        int semanticParticle = collector.indexOf("default void submitParticleGroupSemantic");
+        int semanticParticleEnd = collector.indexOf("\n\t}", semanticParticle);
+        String semanticParticleBody = semanticParticle >= 0 && semanticParticleEnd > semanticParticle
+            ? collector.substring(semanticParticle, semanticParticleEnd)
+            : "";
+        assertTrue(semanticParticleBody.contains("throw new IllegalStateException")
+                && !semanticParticleBody.contains("submitParticleGroup(particleGroupRenderer)"),
+            "the generic semantic particle adapter must not delegate to the legacy callback");
+    }
+
+    @Test
+    public void testEntityShadowHasAnExplicitSemanticCaptureOverride() throws IOException {
+        String source = readSource(SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/SubmitNodeCollection.java"));
+        int legacy = source.indexOf("public void submitShadow(");
+        int semantic = source.indexOf("public void submitShadowSemantic(");
+        int helper = source.indexOf("submitShadowInternal(", semantic);
+        assertTrue(legacy >= 0 && semantic > legacy && helper > semantic,
+            "entity shadows must have an explicit semantic copied-state capture path");
+        assertTrue(source.contains("submitHitboxSemantic(")
+                && source.contains("submitFlameSemantic(")
+                && source.contains("submitLeashSemantic("),
+            "entity hitbox, flame, and leash families must expose explicit semantic capture overrides");
+    }
+
+    @Test
+    public void testEntityModelCompatibilityCallsitesUseSemanticModelSubmission() throws IOException {
+        String[] paths = {
+            "net/minecraft/client/renderer/entity/LivingEntityRenderer.java",
+            "net/minecraft/client/renderer/entity/ArrowRenderer.java",
+            "net/minecraft/client/renderer/entity/WitherSkullRenderer.java",
+            "net/minecraft/client/renderer/entity/WindChargeRenderer.java",
+            "net/minecraft/client/renderer/entity/layers/SlimeOuterLayer.java",
+            "net/minecraft/client/renderer/entity/layers/SheepWoolLayer.java",
+            "net/minecraft/client/renderer/entity/layers/EyesLayer.java"
+        };
+        for (String path : paths) {
+            String source = readSource(SRC_MAIN_JAVA.resolve(path));
+            assertFalse(source.contains("submitNodeCollector.submitModel("),
+                "entity model compatibility callsites must enter through submitModelSemantic: " + path);
+        }
+        String collection = readSource(SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/SubmitNodeCollection.java"));
+        int legacy = collection.indexOf("public <S> void submitModel(");
+        int semantic = collection.indexOf("public <S> void submitModelSemantic(");
+        int internal = collection.indexOf("submitModelInternal(", semantic);
+        assertTrue(legacy >= 0 && semantic > legacy && internal > semantic,
+            "Rust model capture must expose explicit semantic and legacy entrypoints over one bounded implementation");
+        int legacyPart = collection.indexOf("public void submitModelPart(");
+        int semanticPart = collection.indexOf("public void submitModelPartSemantic(");
+        int internalPart = collection.indexOf("submitModelPartInternal(", semanticPart);
+        assertTrue(legacyPart >= 0 && semanticPart > legacyPart && internalPart > semanticPart,
+            "Rust model-part capture must expose explicit semantic and legacy entrypoints over one bounded implementation");
+        int legacyBlock = collection.indexOf("public void submitBlock(");
+        int semanticBlock = collection.indexOf("public void submitBlockSemantic(");
+        int internalBlock = collection.indexOf("submitBlockInternal(", semanticBlock);
+        assertTrue(legacyBlock >= 0 && semanticBlock > legacyBlock && internalBlock > semanticBlock,
+            "Rust block capture must expose explicit semantic and legacy entrypoints over one bounded implementation");
+        assertTrue(collection.contains("public void submitBlockDisplaySemantic("),
+            "Rust block-display capture must expose an explicit semantic entrypoint");
+        int legacyMoving = collection.indexOf("public void submitMovingBlock(");
+        int semanticMoving = collection.indexOf("public void submitMovingBlockSemantic(");
+        int internalMoving = collection.indexOf("submitMovingBlockInternal(", semanticMoving);
+        assertTrue(legacyMoving >= 0 && semanticMoving > legacyMoving && internalMoving > semanticMoving,
+            "Rust moving-block capture must expose explicit semantic and legacy entrypoints over one bounded implementation");
+        assertTrue(collection.contains("public void submitBlockModelSemantic(")
+                && collection.contains("submitBlockModelInternal("),
+            "Rust block-model capture must expose an explicit semantic entrypoint over its bounded implementation");
+        assertTrue(collection.contains("public void submitItemSemantic(")
+                && collection.contains("submitItemInternal("),
+            "Rust item capture must expose an explicit semantic entrypoint over its bounded implementation");
+    }
+
+    @Test
+    public void testMapCustomGeometryUsesExplicitSemanticEntryPoint() throws IOException {
+        String map = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/MapRenderer.java"));
+        String hand = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/ItemInHandRenderer.java"));
+        assertTrue(map.contains("submitTranslucentTexturedQuadSemantic("),
+            "map paper and decoration quads must preserve RenderType.text alpha through the explicit translucent route");
+        assertTrue(hand.contains("submitTranslucentTexturedQuadSemantic("),
+            "first-person map background must preserve its alpha contract through the explicit translucent route");
+        assertTrue(map.contains("submitCustomGeometrySemantic("),
+            "map background and decoration geometry must enter through the semantic custom-geometry seam");
+        assertTrue(map.contains("MAX_RUST_MAP_DECORATIONS")
+                && map.contains("mapRenderState.decorations.size()"),
+            "map semantic extraction must bound decoration admission before staging a partial Rust frame");
+        assertFalse(map.contains("submitCustomGeometry("),
+            "map renderer must not retain a legacy custom-geometry callsite");
+        assertTrue(hand.contains("submitCustomGeometrySemantic("),
+            "first-person map fallback geometry must enter through the semantic custom-geometry seam");
+    }
+
+    @Test
+    public void testBeaconCustomGeometryUsesExplicitSemanticEntryPoint() throws IOException {
+        String source = readSource(SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/blockentity/BeaconRenderer.java"));
+        assertTrue(source.contains("submitCustomGeometrySemantic("),
+            "beacon beam geometry must enter through the semantic custom-geometry seam");
+        assertFalse(source.contains("submitCustomGeometry("),
+            "beacon renderer must not retain a legacy custom-geometry callsite");
+    }
+
+    @Test
+    public void testMimicOctopusBeamHasNoExecutableLegacyRenderer() throws IOException {
+        String source = readSource(SRC_MAIN_JAVA.resolve(
+            "net/alexsmobs/client/render/RenderMimicOctopus.java"));
+        String executable = source.replaceAll("(?s)/\\*.*?\\*/", "");
+        assertTrue(executable.contains("submitGuardianBeamSemantic("),
+            "Mimic Octopus guardian beams must enter through the copied semantic beam route");
+        assertFalse(executable.contains("public void render(EntityMimicOctopus"),
+            "Mimic Octopus must not retain an executable legacy VertexConsumer renderer");
+    }
+
+    @Test
+    public void testEndPortalFallbackUsesExplicitSemanticCustomGeometry() throws IOException {
+        String source = readSource(SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/blockentity/AbstractEndPortalRenderer.java"));
+        assertTrue(source.contains("submitCustomGeometrySemantic("),
+            "End Portal compatibility geometry must enter through the semantic custom-geometry seam");
+        assertFalse(source.contains("submitCustomGeometry("),
+            "End Portal renderer must not retain a legacy custom-geometry callsite");
+    }
+
+    @Test
+    public void testPrimitiveBlockEntityCallsitesUseExplicitSemanticEntryPoints() throws IOException {
+        String tnt = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/entity/TntRenderer.java"));
+        String portal = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/blockentity/AbstractEndPortalRenderer.java"));
+        assertTrue(tnt.contains("submitPrimedTntBlockSemantic(") && !tnt.contains("submitPrimedTntBlock("),
+            "Primed TNT must enter the Rust block route through the explicit semantic entrypoint");
+        assertTrue(portal.contains("submitEndPortalSemantic(") && !portal.contains("submitEndPortal("),
+            "End Portal must enter the Rust portal route through the explicit semantic entrypoint");
+    }
+
+    @Test
+    public void testPrimitiveEffectCallsitesUseExplicitSemanticEntryPoints() throws IOException {
+        String[] paths = {
+            "net/minecraft/client/renderer/MapRenderer.java",
+            "net/minecraft/client/renderer/ItemInHandRenderer.java",
+            "net/minecraft/client/renderer/entity/GuardianRenderer.java",
+            "net/minecraft/client/renderer/entity/DragonFireballRenderer.java",
+            "net/minecraft/client/renderer/entity/LightningBoltRenderer.java",
+            "net/minecraft/client/renderer/entity/FishingHookRenderer.java",
+            "net/minecraft/client/renderer/entity/EnderDragonRenderer.java",
+            "net/minecraft/client/renderer/entity/DisplayRenderer.java",
+            "net/minecraft/client/renderer/special/TaczGlock17SpecialRenderer.java",
+            "net/voxelmap/VoxelConstants.java",
+            "net/alexsmobs/client/render/layer/MungusBeamLayer.java",
+            "net/alexsmobs/client/render/RenderCachalotEcho.java",
+            "net/alexsmobs/client/render/RenderMimicOctopus.java",
+            "net/alexsmobs/client/render/RenderMungus.java"
+        };
+        for (String path : paths) {
+            String source = readSource(SRC_MAIN_JAVA.resolve(path));
+            assertFalse(source.contains("submitTexturedQuad(") || source.contains("submitTexturedQuads(")
+                    || source.contains("submitTranslucentTexturedQuad(") || source.contains("submitOpticalTexturedQuads(")
+                    || source.contains("submitGuardianBeam(") || source.contains("submitCrystalBeam(")
+                    || source.contains("submitLineSegments(") || source.contains("submitColoredQuads("),
+                "primitive effect callsite must not retain a legacy-named submission: " + path);
+        }
+        String mungus = readSource(SRC_MAIN_JAVA.resolve("net/alexsmobs/client/render/RenderMungus.java"));
+        assertFalse(mungus.contains("submitNodeCollector.submitBlock("),
+            "Alex's Mobs block render must use the explicit semantic block entrypoint");
+        assertTrue(readSource(SRC_MAIN_JAVA.resolve("net/voxelmap/VoxelConstants.java")).contains("submitTranslucentTexturedQuadSemantic(")
+                && readSource(SRC_MAIN_JAVA.resolve("net/voxelmap/VoxelConstants.java")).contains("submitColoredQuadsSemantic("),
+            "VoxelMap waypoint/map effects must use explicit semantic primitive entrypoints");
+        String mungusBeam = readSource(SRC_MAIN_JAVA.resolve("net/alexsmobs/client/render/layer/MungusBeamLayer.java"));
+        assertTrue(mungusBeam.contains("submitTranslucentTexturedQuadSemantic("),
+            "Mungus beam must use the explicit translucent semantic textured-quad entrypoint");
+        assertTrue(readSource(SRC_MAIN_JAVA.resolve("net/alexsmobs/client/render/RenderCachalotEcho.java")).contains("submitTexturedQuadSemantic("),
+            "Cachalot echo must use the explicit semantic textured-quad entrypoint");
+        assertTrue(readSource(SRC_MAIN_JAVA.resolve("net/alexsmobs/client/render/RenderMimicOctopus.java")).contains("submitGuardianBeamSemantic("),
+            "Mimic octopus beam must use the explicit semantic guardian-beam entrypoint");
+        assertTrue(mungus.contains("submitBlockSemantic("),
+            "Mungus block render must use the explicit semantic block entrypoint");
+    }
+
+    @Test
+    public void testDisabledVulkanFeatureRoutesCannotFallThroughToJavaVertexConsumers() throws IOException {
+        String leash = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/feature/LeashFeatureRenderer.java"));
+        String shadow = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/feature/ShadowFeatureRenderer.java"));
+        String level = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/LevelRenderer.java"));
+        assertTrue(leash.contains("isVulkanBackendSelected()")
+                && leash.contains("route != net.vulkanic.world.WorldRenderRoutePolicy.Route.RUST_VULKAN_WHOLE_FRAME"),
+            "leash Java rendering must be fenced when selected Vulkan admission is unavailable");
+        assertTrue(shadow.contains("isVulkanBackendSelected()")
+                && shadow.contains("route != net.vulkanic.world.WorldRenderRoutePolicy.Route.RUST_VULKAN_WHOLE_FRAME"),
+            "shadow Java rendering must be fenced when selected Vulkan admission is unavailable");
+        assertTrue(level.contains("outlineRoute")
+                && level.contains("isVulkanBackendSelected()")
+                && level.contains("outlineRoute != net.vulkanic.world.WorldRenderRoutePolicy.Route.RUST_VULKAN_WHOLE_FRAME"),
+            "block-outline Java rendering must be fenced when selected Vulkan admission is unavailable");
+        assertFalse(level.contains("\"java-vulkan\""),
+            "selected Vulkan diagnostics must not claim that a Java Vulkan route is executable");
+    }
+
+    @Test
+    public void testProductionSourcesDoNotAdvertiseAJavaVulkanRoute() throws IOException {
+        try (java.util.stream.Stream<Path> paths = Files.walk(SRC_MAIN_JAVA)) {
+            for (Path path : paths.filter(candidate -> candidate.toString().endsWith(".java")).toList()) {
+                assertFalse(readSource(path).contains("java-vulkan"),
+                    "production diagnostics must not advertise an executable Java Vulkan route: " + path);
+            }
+        }
+    }
+
+    @Test
+    public void testAllPrimitiveEffectProducersAvoidLegacyNamedCallsites() throws IOException {
+        try (java.util.stream.Stream<Path> paths = Files.walk(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer"))) {
+            for (Path path : paths.filter(candidate -> candidate.toString().endsWith(".java")).toList()) {
+                String fileName = path.getFileName().toString();
+                if (fileName.equals("OrderedSubmitNodeCollector.java")
+                        || fileName.equals("SubmitNodeCollector.java")
+                        || fileName.equals("SubmitNodeStorage.java")
+                        || fileName.equals("SubmitNodeCollection.java")
+                        || fileName.equals("LevelRenderer.java")) {
+                    continue;
+                }
+                String source = readSource(path);
+                assertFalse(source.contains(".submitColoredQuads(") || source.contains(".submitTexturedQuad(")
+                        || source.contains(".submitTexturedQuads(") || source.contains(".submitTranslucentTexturedQuad(")
+                        || source.contains(".submitOpticalTexturedQuads(") || source.contains(".submitGuardianBeam(")
+                        || source.contains(".submitCrystalBeam(") || source.contains(".submitLineSegments("),
+                    "renderer producer retains a legacy-named primitive callsite: " + path);
+            }
+        }
+    }
+
+    @Test
+    public void testEntityEffectsUseExplicitSemanticCustomGeometry() throws IOException {
+        String[] paths = {
+            "net/minecraft/client/renderer/entity/LightningBoltRenderer.java",
+            "net/minecraft/client/renderer/entity/DragonFireballRenderer.java",
+            "net/minecraft/client/renderer/entity/ExperienceOrbRenderer.java"
+        };
+        for (String path : paths) {
+            String source = readSource(SRC_MAIN_JAVA.resolve(path));
+            assertTrue(source.contains("submitCustomGeometrySemantic("),
+                "entity effect must enter through the semantic custom-geometry seam: " + path);
+            assertFalse(source.contains("submitCustomGeometry("),
+                "entity effect must not retain a legacy custom-geometry callsite: " + path);
+        }
+    }
+
+    @Test
+    public void testFishingHookUsesExplicitSemanticCustomGeometry() throws IOException {
+        String source = readSource(SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/entity/FishingHookRenderer.java"));
+        assertTrue(source.contains("submitCustomGeometrySemantic("),
+            "fishing-hook billboard/line compatibility geometry must use the semantic seam");
+        assertFalse(source.contains("submitCustomGeometry("),
+            "fishing-hook renderer must not retain legacy custom-geometry callsites");
+    }
+
+    @Test
+    public void testPaintingUsesExplicitSemanticCustomGeometry() throws IOException {
+        String source = readSource(SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/entity/PaintingRenderer.java"));
+        assertTrue(source.contains("submitCustomGeometrySemantic("),
+            "painting compatibility geometry must use the semantic custom-geometry seam");
+        assertFalse(source.contains("submitCustomGeometry("),
+            "painting renderer must not retain a legacy custom-geometry callsite");
+    }
+
+    @Test
+    public void testProductionRenderersDoNotInvokeLegacyCustomGeometry() throws IOException {
+        try (var paths = Files.walk(SRC_MAIN_JAVA)) {
+            for (Path path : (Iterable<Path>) paths::iterator) {
+                if (!Files.isRegularFile(path) || !path.toString().endsWith(".java")) continue;
+                String normalized = path.toString().replace('\\', '/');
+                if (normalized.endsWith("/OrderedSubmitNodeCollector.java")
+                        || normalized.endsWith("/SubmitNodeCollector.java")
+                        || normalized.endsWith("/SubmitNodeStorage.java")
+                        || normalized.endsWith("/SubmitNodeCollection.java")
+                        || normalized.endsWith("/LevelRenderer.java")) continue;
+                String source = readSource(path);
+                assertFalse(source.contains(".submitCustomGeometry("),
+                    "production renderer retains a legacy custom-geometry invocation: " + path);
+            }
+        }
+    }
+
+    @Test
+    public void testEnderDragonUsesExplicitSemanticCustomGeometry() throws IOException {
+        String source = readSource(SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/entity/EnderDragonRenderer.java"));
+        assertTrue(source.contains("submitCustomGeometrySemantic("),
+            "End Dragon compatibility geometry must use the semantic custom-geometry seam");
+        assertFalse(source.contains("submitCustomGeometry("),
+            "End Dragon renderer must not retain legacy custom-geometry callsites");
+    }
+
+    @Test
+    public void testDebugBlockEntitiesUseExplicitSemanticCustomGeometry() throws IOException {
+        String[] paths = {
+            "net/minecraft/client/renderer/blockentity/TestInstanceRenderer.java",
+            "net/minecraft/client/renderer/blockentity/BlockEntityWithBoundingBoxRenderer.java"
+        };
+        for (String path : paths) {
+            String source = readSource(SRC_MAIN_JAVA.resolve(path));
+            assertTrue(source.contains("submitCustomGeometrySemantic("),
+                "debug block-entity geometry must use the semantic seam: " + path);
+            assertFalse(source.contains("submitCustomGeometry("),
+                "debug block-entity renderer must not retain legacy custom-geometry callsites: " + path);
+        }
+    }
+
+    @Test
+    public void testGuardianUsesExplicitSemanticCustomGeometry() throws IOException {
+        String source = readSource(SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/entity/GuardianRenderer.java"));
+        assertTrue(source.contains("submitCustomGeometrySemantic("),
+            "Guardian compatibility beam geometry must use the semantic seam");
+        assertFalse(source.contains("submitCustomGeometry("),
+            "Guardian renderer must not retain a legacy custom-geometry callsite");
+    }
+
+    @Test
+    public void testDisplayTextBackgroundUsesExplicitSemanticCustomGeometry() throws IOException {
+        String source = readSource(SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/entity/DisplayRenderer.java"));
+        assertTrue(source.contains("submitCustomGeometrySemantic("),
+            "display text background geometry must use the semantic custom-geometry seam");
+        assertFalse(source.contains("submitCustomGeometry("),
+            "display renderer must not retain a legacy custom-geometry callsite");
+    }
+
+    @Test
+    public void testTaczSpecialRendererUsesExplicitSemanticCustomGeometry() throws IOException {
+        String source = readSource(SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/special/TaczGlock17SpecialRenderer.java"));
+        assertTrue(source.contains("submitCustomGeometrySemantic("),
+            "TACZ custom geometry must use the semantic custom-geometry seam");
+        assertFalse(source.contains("submitCustomGeometry("),
+            "TACZ renderer must not retain legacy custom-geometry callsites");
+        assertTrue(source.contains("submitSemanticBedrockRoots("),
+            "TACZ Rust Vulkan route must lower Bedrock gun roots into copied semantic quads");
+        assertTrue(source.contains("submitSemanticOpticalAttachment("),
+            "TACZ Rust Vulkan route must lower optical attachments into explicit semantic stencil batches");
+        assertTrue(source.contains("submitTranslucentTexturedQuadSemantic("),
+            "TACZ muzzle flash must use the semantic translucent-texture ABI on Rust Vulkan");
+        assertTrue(source.contains("ensureJavaCompatibilityRoute();"),
+            "TACZ immediate GPU-state helpers must remain fenced to the OpenGL compatibility route");
+    }
+
+    @Test
+    public void testWorldTextCompatibilityCallsitesUseExplicitSemanticSubmission() throws IOException {
+        String[] paths = {
+            "net/minecraft/client/renderer/MapRenderer.java",
+            "net/minecraft/client/renderer/blockentity/TestInstanceRenderer.java",
+            "net/minecraft/client/renderer/blockentity/AbstractSignRenderer.java",
+            "net/minecraft/client/renderer/entity/DisplayRenderer.java"
+        };
+        for (String path : paths) {
+            String source = readSource(SRC_MAIN_JAVA.resolve(path));
+            assertTrue(source.contains("submitTextSemantic("),
+                "world-text compatibility callsite must use the semantic seam: " + path);
+            assertFalse(source.contains("submitText("),
+                "world-text renderer must not retain legacy text callsites: " + path);
+        }
+    }
+
+    @Test
+    public void testEntityFeatureCompatibilityCallsitesUseExplicitSemanticSubmission() throws IOException {
+        String[] paths = {
+            "net/minecraft/client/renderer/entity/EntityRenderer.java",
+            "net/minecraft/client/renderer/entity/EntityRenderDispatcher.java",
+            "net/minecraft/client/renderer/entity/player/AvatarRenderer.java"
+        };
+        for (String path : paths) {
+            String source = readSource(SRC_MAIN_JAVA.resolve(path));
+            assertFalse(source.contains("submitNodeCollector.submitLeash(")
+                    || source.contains("submitNodeCollector.submitNameTag(")
+                    || source.contains("submitNodeCollector.submitFlame(")
+                    || source.contains("submitNodeCollector.submitShadow(")
+                    || source.contains("submitNodeCollector.submitHitbox("),
+                "entity feature callsites must not retain legacy submission methods: " + path);
+        }
+    }
+
+    @Test
+    public void testAlexsMobsGeometryUsesExplicitSemanticCustomGeometry() throws IOException {
+        String[] paths = {
+            "net/alexsmobs/client/render/layer/MungusBeamLayer.java",
+            "net/alexsmobs/client/render/RenderMimicOctopus.java",
+            "net/alexsmobs/client/render/RenderCachalotEcho.java"
+        };
+        for (String path : paths) {
+            String source = readSource(SRC_MAIN_JAVA.resolve(path));
+            assertTrue(source.contains("submitCustomGeometrySemantic("),
+                "Alex's Mobs geometry must use the semantic custom-geometry seam: " + path);
+            assertFalse(source.contains("submitCustomGeometry("),
+                "Alex's Mobs renderer must not retain a legacy custom-geometry callsite: " + path);
+        }
+    }
+
+    @Test
     public void testIrisAndSodiumRenderClusterCallsitesUseVulkanicAPISeams() throws IOException {
         String renderTargetsSource = readSource(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/targets/RenderTargets.java"));
         String customTextureSource = readSource(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/targets/backed/NativeImageBackedCustomTexture.java"));
@@ -1820,5 +2381,20 @@ public class ApiNeutralityCallsiteTest {
         }
         assertTrue(presentationOnlyGuardOffenders.isEmpty(),
             "production Java must not retain presentation-only Vulkan fallback guards: " + presentationOnlyGuardOffenders);
+    }
+
+    @Test
+    public void testPanoramaRegistrationIsFencedBeforeJavaTextureManager() throws Exception {
+        String source = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/PanoramaRenderer.java"));
+        int register = source.indexOf("public void registerTextures");
+        assertTrue(register >= 0, "PanoramaRenderer should expose its texture-registration callsite");
+        String body = source.substring(register);
+        int cubeMapRegistration = body.indexOf("this.cubeMap.registerTextures(textureManager)");
+        assertTrue(cubeMapRegistration >= 0, "PanoramaRenderer should retain the OpenGL compatibility registration path");
+        String guard = body.substring(0, cubeMapRegistration);
+        assertTrue(guard.contains("VulkanicAPI.isVulkanBackendSelected()"),
+            "panorama registration must close before Java texture allocation on selected Vulkan");
+        assertTrue(guard.contains("RustGalVulkanWholeFrameMode.enabled()"),
+            "panorama registration must remain fenced while Rust whole-frame presentation is active");
     }
 }

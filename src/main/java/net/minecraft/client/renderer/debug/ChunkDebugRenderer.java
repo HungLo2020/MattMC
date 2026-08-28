@@ -10,9 +10,12 @@ import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.Camera;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.multiplayer.ClientChunkCache;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.SubmitNodeStorage;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.core.SectionPos;
@@ -20,6 +23,7 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.debug.DebugValueAccess;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.LevelChunk;
@@ -82,6 +86,40 @@ public class ChunkDebugRenderer implements DebugRenderer.SimpleDebugRenderer {
 				}
 			}
 		}
+	}
+
+	/** Copies bounded client/server chunk diagnostics into Rust-owned semantic text. */
+	public void collectRustSemantics(Camera camera, SubmitNodeStorage text) {
+		if ((!net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
+			|| !net.vulkanic.world.WorldRenderRoutePolicy.currentWorldTextRoute().usesRustWholeFrameVulkan()) return;
+		double now = Util.getNanos();
+		if (now - this.lastUpdateTime > 3.0E9) {
+			this.lastUpdateTime = now;
+			IntegratedServer integratedServer = this.minecraft.getSingleplayerServer();
+			this.data = integratedServer == null ? null : new ChunkDebugRenderer.ChunkData(integratedServer, camera.getPosition().x, camera.getPosition().z);
+		}
+		if (this.data == null) return;
+		Map<ChunkPos, String> server = this.data.serverData.getNow(null);
+		float baseY = (float)(camera.getPosition().y * 0.85);
+		for (Entry<ChunkPos, String> entry : this.data.clientData.entrySet()) {
+			String value = entry.getValue();
+			if (server != null) value += server.getOrDefault(entry.getKey(), "");
+			int line = 0;
+			for (String part : value.split("\\n")) {
+				submitLabel(text, camera, SectionPos.sectionToBlockCoord(entry.getKey().x, 8), baseY + line, SectionPos.sectionToBlockCoord(entry.getKey().z, 8), part);
+				line -= 2;
+			}
+		}
+	}
+
+	private static void submitLabel(SubmitNodeStorage text, Camera camera, double x, double y, double z, String value) {
+		PoseStack pose = new PoseStack();
+		pose.translate(x - camera.getPosition().x, y - camera.getPosition().y, z - camera.getPosition().z);
+		pose.mulPose(camera.rotation());
+		pose.scale(0.15F, -0.15F, 0.15F);
+		text.submitTextSemantic(0, pose, 0.0F, 0.0F, Component.literal(value).getVisualOrderText(), true,
+			Font.DisplayMode.SEE_THROUGH, -1, -1, 0, 0);
 	}
 
 	@Environment(EnvType.CLIENT)

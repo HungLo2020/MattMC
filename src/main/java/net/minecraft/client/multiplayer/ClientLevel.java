@@ -23,7 +23,6 @@ import net.minecraft.Util;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.color.block.BlockTintCache;
-import net.minecraft.client.dev.DeterministicCameraCapture;
 import net.minecraft.client.gui.screens.WinScreen;
 import net.minecraft.client.multiplayer.prediction.BlockStatePredictionHandler;
 import net.minecraft.client.particle.FireworkParticles;
@@ -345,6 +344,9 @@ public class ClientLevel extends Level implements CacheSlot.Cleaner<ClientLevel>
 		if (zone != null) {
 			zone.close();
 		}
+		// Capture-only terrain particles must be present before the next render
+		// shell; animateTick can occur later than deterministic capture startup.
+		this.spawnDeterministicTerrainParticles();
 	}
 
 	private void tickTime() {
@@ -585,6 +587,11 @@ public class ClientLevel extends Level implements CacheSlot.Cleaner<ClientLevel>
 		}
 	}
 
+	/** Capture-only entry point for the real deterministic BlockMarker producer. */
+	public void spawnDeterministicBlockMarkerParticlesForCapture() {
+		this.spawnDeterministicBlockMarkerParticles();
+	}
+
 	private void auditDeterministicBlockMarkerSpawn(String scenario, int textureId, double x, double y, double z) {
 		if (deterministicBlockMarkerSpawnLogs >= 16 || !Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")) {
 			return;
@@ -602,9 +609,6 @@ public class ClientLevel extends Level implements CacheSlot.Cleaner<ClientLevel>
 	private void spawnDeterministicTerrainParticles() {
 		String scenario = System.getProperty("mattmc.dev.rustGalWorldMaterial.terrainParticleScenario", "").trim();
 		if (scenario.isEmpty() || scenario.equals("hidden")) {
-			return;
-		}
-		if (Boolean.getBoolean("mattmc.dev.deterministicCameraCapture") && !DeterministicCameraCapture.isActiveForDiagnostics()) {
 			return;
 		}
 		if (scenario.equals(this.deterministicTerrainParticleSpawnedScenario)) {
@@ -630,7 +634,7 @@ public class ClientLevel extends Level implements CacheSlot.Cleaner<ClientLevel>
 				BlockState state = states[index % states.length];
 				double offsetX = (index % 5 - 2.0) * 0.32;
 				double offsetY = (index / 5 - 1.5) * 0.32;
-				this.addParticle(new BlockParticleOption(ParticleTypes.BLOCK, state), x + offsetX, y + offsetY, z, 0.0, 0.0, 0.0);
+				this.minecraft.particleEngine.createParticle(new BlockParticleOption(ParticleTypes.BLOCK, state), x + offsetX, y + offsetY, z, 0.0, 0.0, 0.0);
 				this.auditDeterministicTerrainParticleSpawn(scenario, state, x + offsetX, y + offsetY, z);
 			}
 			this.deterministicTerrainParticleSpawnedScenario = scenario;
@@ -647,9 +651,19 @@ public class ClientLevel extends Level implements CacheSlot.Cleaner<ClientLevel>
 		if (state == null) {
 			return;
 		}
-		this.addParticle(new BlockParticleOption(ParticleTypes.BLOCK, state), x, y, z, 0.0, 0.0, 0.0);
+		this.minecraft.particleEngine.createParticle(new BlockParticleOption(ParticleTypes.BLOCK, state), x, y, z, 0.0, 0.0, 0.0);
 		this.auditDeterministicTerrainParticleSpawn(scenario, state, x, y, z);
 		this.deterministicTerrainParticleSpawnedScenario = scenario;
+	}
+
+	/**
+	 * Capture-only entry point for the real deterministic terrain-particle
+	 * producer. Static parity fixtures do not necessarily receive an ambient
+	 * animate-tick before their first screenshot, so the capture lifecycle may
+	 * request the same vanilla addParticle path explicitly.
+	 */
+	public void spawnDeterministicTerrainParticlesForCapture() {
+		this.spawnDeterministicTerrainParticles();
 	}
 
 	private void auditDeterministicTerrainParticleSpawn(String scenario, BlockState state, double x, double y, double z) {

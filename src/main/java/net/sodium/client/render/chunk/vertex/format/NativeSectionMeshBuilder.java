@@ -1713,7 +1713,8 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
         }
 
 		private static boolean activeSeparateAo() {
-			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+					|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 				return false;
 			}
 			return net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.shouldUseSeparateAo();

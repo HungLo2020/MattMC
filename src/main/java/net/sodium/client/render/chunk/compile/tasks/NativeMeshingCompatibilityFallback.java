@@ -24,6 +24,7 @@ final class NativeMeshingCompatibilityFallback {
 
     static int renderModel(BlockRenderCache cache, BlockRenderer blockRenderer, BlockState blockState,
             BlockPos blockPos, BlockPos modelOffset, NativeMeshingDiagnostics.FallbackStats fallbackStats) {
+        rejectRustWholeFrameFallback("block model");
         BlockStateModel model = cache.getBlockModels().getBlockModel(blockState);
         int quadStart = blockRenderer.getEmittedQuadCount();
         beginIrisBlock(blockRenderer, blockState, blockPos);
@@ -36,6 +37,7 @@ final class NativeMeshingCompatibilityFallback {
     static int renderFluid(BlockRenderCache cache, ChunkBuildBuffers buffers, LevelSlice slice,
             BlockState blockState, FluidState fluidState, BlockPos blockPos, BlockPos modelOffset,
             TranslucentGeometryCollector collector, NativeMeshingDiagnostics.FallbackStats fallbackStats) {
+        rejectRustWholeFrameFluidFallback();
         int quadStart = cache.getFluidRenderer().getEmittedQuadCount();
         beginIrisFluid(cache, blockState, fluidState, blockPos);
         cache.getFluidRenderer().render(slice, blockState, fluidState, blockPos, modelOffset, collector, buffers);
@@ -47,6 +49,7 @@ final class NativeMeshingCompatibilityFallback {
     static int renderUnsupportedFluidTranslucentMetadata(BlockRenderCache cache, ChunkBuildBuffers buffers,
             LevelSlice slice, BlockState blockState, FluidState fluidState, BlockPos blockPos, BlockPos modelOffset,
             TranslucentGeometryCollector collector) {
+        rejectRustWholeFrameFluidFallback();
         int quadStart = cache.getFluidRenderer().getEmittedQuadCount();
         beginIrisFluid(cache, blockState, fluidState, blockPos);
         cache.getFluidRenderer().renderUnsupportedTranslucentMetadata(slice, blockState, fluidState, blockPos,
@@ -54,8 +57,23 @@ final class NativeMeshingCompatibilityFallback {
         return cache.getFluidRenderer().getEmittedQuadCount() - quadStart;
     }
 
+    private static void rejectRustWholeFrameFluidFallback() {
+        rejectRustWholeFrameFallback("fluid");
+    }
+
+    private static void rejectRustWholeFrameFallback(String family) {
+        if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+                || net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+            throw new IllegalStateException(
+                    "Rust whole-frame terrain cannot execute a Java " + family + " fallback; "
+                            + "the work must be admitted by the explicit semantic ABI"
+            );
+        }
+    }
+
     static int runMeshAppenders(ChunkRenderContext renderContext, ChunkBuildBuffers buffers, LevelSlice slice,
             TranslucentGeometryCollector collector, NativeMeshingDiagnostics.FallbackStats fallbackStats) {
+        rejectRustWholeFrameFallback("platform mesh appender");
         int quadStart = buffers.getFallbackConsumerEmittedQuadCount();
         PlatformLevelRenderHooks.INSTANCE.runChunkMeshAppenders(renderContext.getRenderers(),
                 type -> buffers.get(DefaultMaterials.forChunkLayer(type))
@@ -67,7 +85,8 @@ final class NativeMeshingCompatibilityFallback {
     }
 
     private static void beginIrisBlock(BlockRenderer blockRenderer, BlockState blockState, BlockPos blockPos) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			return;
 		}
         var ids = net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getBlockStateIds();
@@ -80,7 +99,8 @@ final class NativeMeshingCompatibilityFallback {
 
     private static void beginIrisFluid(BlockRenderCache cache, BlockState blockState, FluidState fluidState,
             BlockPos blockPos) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			return;
 		}
         var ids = net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getBlockStateIds();

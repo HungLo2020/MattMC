@@ -67,7 +67,8 @@ public class ProgramSamplers {
 	}
 
 	public void update() {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
 			// Rust Vulkan receives copied semantic sampler bindings; Java/Iris sampler
 			// initialization must not mutate or inspect compatibility texture units.
 			return;
@@ -135,7 +136,8 @@ public class ProgramSamplers {
 
 	@SuppressWarnings("null")
 	public void bindToRenderPass(RenderPass renderPass) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
 			return;
 		}
 		for (NamedSamplerBinding binding : namedSamplerBindings) {

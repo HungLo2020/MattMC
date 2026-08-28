@@ -79,6 +79,7 @@ use super::source_targets::{
     ShaderPackColorTargetManifest, ShaderPackColorTargets, ShaderPackSourceColorResourceCache,
     TerrainSourceColorAttachment,
 };
+use super::super::world_primitive_frontend::WORLD_STRATUM_ENTITY_MESH;
 use super::source_uniforms::{
     TerrainSourceUniformRequirementSummary, TerrainSourceUniformRequirements,
 };
@@ -356,6 +357,10 @@ pub(crate) struct TerrainMeshDraw {
     pub index_type: IndexType,
     pub index_count: u32,
     pub instance_count: u32,
+    /// Semantic producer stratum.  The terrain graph uses this to keep
+    /// translucent entity meshes out of the deferred capture when Fabulous
+    /// owns their named `item_entity` attachment.
+    pub stratum: u32,
     pub material_mode: TerrainMaterialPassMode,
     /// The pass contract makes shadow participation explicit. A draw with an
     /// unavailable shadow program is skipped only when its semantic material
@@ -505,6 +510,11 @@ pub(crate) struct TerrainRuntimeTargets {
     pub deferred_lighting_resource_set: Handle,
     pub translucent_target: Handle,
     pub translucent_pass: Handle,
+    /// Optional isolated color capture for translucent terrain.  The normal
+    /// deferred path still writes `deferred_lit`; this target preserves only
+    /// the translucent draw stream for a later explicit Fabulous handoff.
+    pub translucent_capture: Option<(Handle, Handle, Handle, Handle)>,
+    pub translucent_capture_initialized: bool,
     pub composite0_texture: Handle,
     pub composite0_view: Handle,
     pub composite0_target: Handle,
@@ -739,7 +749,6 @@ pub(crate) struct TerrainRuntimeFrame {
     pub frame_target: Handle,
     pub color_attachment: Handle,
     pub background_color: ClearColor,
-    pub final_depth_view: Option<Handle>,
     pub uniforms: TerrainCompositeUniforms,
     /// Optional private source-depth history. Normal world material output is
     /// unchanged when no source stage declares a need for these snapshots.
@@ -751,6 +760,13 @@ pub(crate) struct TerrainRuntimeFrame {
     /// from Undefined; later frames begin from ShaderRead after the prior
     /// composite chain's final transition.
     pub screen_targets_initialized: bool,
+    /// The isolated translucent capture has a valid ShaderRead layout after
+    /// its first completed graph write.
+    pub translucent_capture_initialized: bool,
+    /// When true, translucent entity meshes are lowered into Fabulous's
+    /// external `item_entity` attachment by the enclosing frontend and must
+    /// not also be rasterized into the deferred translucent capture.
+    pub translucent_entity_external: bool,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -790,9 +806,10 @@ pub(crate) enum TerrainSourceCandidateState {
         textured_material_source_resource_binding_error: Option<String>,
         textured_material_source_resource_bindings: Option<TerrainSourceOpaqueResourceBindingPlan>,
         /// Entity source discovery is intentionally independent from generic
-        /// material staging. The contract is retained for diagnostics only
-        /// until a Rust-owned entity mesh stream and pass writer prove every
-        /// requested semantic input and optional vertex attribute.
+        /// material staging. The lowered contract is consumed by the
+        /// Rust-owned entity mesh stream and pass writer, which validate every
+        /// requested semantic input and optional vertex attribute at frame
+        /// admission time.
         entity_contract: Option<EntityPassContract>,
         entity_contract_error: Option<String>,
         entity_lowered_pair: Option<LoweredEntitySourcePair>,
@@ -801,9 +818,8 @@ pub(crate) enum TerrainSourceCandidateState {
         entity_source_resource_bindings: Option<TerrainSourceOpaqueResourceBindingPlan>,
         /// First-person source discovery is deliberately separate from both
         /// world entities and the generic textured-material stage. Its own
-        /// projection and cleared-depth domain are not yet executable, so
-        /// this remains provenance-only until a dedicated Rust-owned hand
-        /// writer exists.
+        /// projection and cleared-depth domain are supplied by the dedicated
+        /// Rust-owned hand writer before frame admission.
         hand_contract: Option<HandPassContract>,
         hand_contract_error: Option<String>,
         hand_lowered_pair: Option<LoweredHandSourcePair>,
@@ -819,8 +835,8 @@ pub(crate) enum TerrainSourceCandidateState {
         weather_source_resource_binding_count: Option<u32>,
         weather_source_resource_binding_error: Option<String>,
         weather_source_resource_bindings: Option<TerrainSourceOpaqueResourceBindingPlan>,
-        /// Cloud source preparation remains route-inactive until an owned
-        /// cloud writer declares compatible targets and frame resources.
+        /// Cloud source preparation is admitted only when the owned cloud
+        /// writer declares compatible targets and frame resources.
         cloud_contract: Option<CloudPassContract>,
         cloud_contract_error: Option<String>,
         cloud_lowered_pair: Option<LoweredCloudSourcePair>,
@@ -848,8 +864,8 @@ pub(crate) enum TerrainSourceCandidateState {
         source_summary: Option<PreprocessedTerrainSourceSummary>,
         source_preprocess_error: Option<String>,
         /// The semantically scoped shadow-stage pair is expanded separately
-        /// from normal terrain. It is future Rust-owned shadow-color pass
-        /// provenance only and cannot make the terrain source executable.
+        /// from normal terrain and consumed by the Rust-owned shadow-color
+        /// pass when its explicit target/resources are available.
         source_shadow_summary: Option<PreprocessedTerrainSourceSummary>,
         source_shadow_preprocess_error: Option<String>,
         /// Bounded diagnostic from lowering the scoped shadow fragment's
@@ -857,8 +873,8 @@ pub(crate) enum TerrainSourceCandidateState {
         source_shadow_output_count: Option<u32>,
         source_shadow_lowering_error: Option<String>,
         /// The exact lowered shadow pair retained with the source generation.
-        /// It stays preparation-only until the pass declares compatible
-        /// attachments and a complete source shadow resource contract.
+        /// Execution still requires the pass to declare compatible attachments
+        /// and a complete source shadow resource contract.
         source_lowered_shadow_pair: Option<LoweredShadowSourcePair>,
         /// Active resource roles for the separately lowered shadow source
         /// pair. These remain distinct from the normal terrain plan because
@@ -4043,10 +4059,10 @@ impl ShaderPackRuntimeExecutor {
         )
     }
 
-    /// Bounded provenance for the future generic textured-material source
-    /// writer. The lowered pair is retained only after its scoped source has
-    /// passed backend-neutral lowering; callers must still provide a named
-    /// target writer before a selected frame may include material quads.
+    /// Bounded provenance for the generic textured-material source writer.
+    /// The lowered pair is retained only after its scoped source has passed
+    /// backend-neutral lowering; the world frontend later binds its named
+    /// targets and appends the writer to the combined source transaction.
     pub(crate) fn candidate_textured_material_source_diagnostic(
         &self,
     ) -> (&'static str, Option<&str>) {
@@ -4233,8 +4249,9 @@ impl ShaderPackRuntimeExecutor {
     }
 
     /// Prepares the independently discovered vanilla-cloud source from one
-    /// exact pack generation. This has no draw or route effect until a
-    /// dedicated Rust-owned cloud target writer is staged.
+    /// exact pack generation. The prepared program is consumed by the
+    /// Rust-owned cloud target writer during exact-frame assembly; preparation
+    /// itself never mutates route admission or allocates backend resources.
     pub(crate) fn prepared_lowered_cloud_source_program(
         &self,
     ) -> GalResult<Option<LoweredCloudSourceProgram>> {
@@ -5642,11 +5659,10 @@ impl ShaderPackRuntimeExecutor {
         }
     }
 
-    /// Prepares the independently lowered translucent source stage. This
-    /// intentionally stops before target allocation or pass construction:
-    /// source discovery proves only the shader/program contract, while a
-    /// future stage must explicitly provide color history, depth and blend
-    /// semantics for the pass.
+    /// Prepares the independently lowered translucent source stage. Target
+    /// allocation and pass construction remain frame-scoped: the caller must
+    /// provide the current color history, depth, and blend semantics before
+    /// admitting the pass.
     pub(crate) fn prepared_lowered_translucent_terrain_source_program(
         &self,
     ) -> GalResult<Option<LoweredTerrainSourceProgram>> {
@@ -6251,6 +6267,8 @@ impl ShaderPackRuntimeExecutor {
         if draws.is_empty() {
             return Ok(());
         }
+        let mut targets = targets;
+        targets.translucent_capture_initialized = frame.translucent_capture_initialized;
         let isolation = TerrainGraphIsolation::from_env();
         let effective_draws_storage;
         let effective_draws = if isolation == TerrainGraphIsolation::FullDrawsSkipped {
@@ -6270,6 +6288,18 @@ impl ShaderPackRuntimeExecutor {
                 ops,
                 targets.into(),
                 effective_draws,
+                frame.shadow_targets_initialized,
+            )?;
+        } else if isolation == TerrainGraphIsolation::GBufferNoShadow {
+            // The deferred graph still samples the explicit shadow-depth
+            // attachment even when this diagnostic graph excludes shadow
+            // geometry.  Initialize it through the same owned pass contract
+            // with an empty draw list; leaving it Undefined would violate
+            // Vulkan's sampled-image layout requirement.
+            self.append_shadow_depth_pass(
+                ops,
+                targets.into(),
+                &[],
                 frame.shadow_targets_initialized,
             )?;
         }
@@ -7112,7 +7142,7 @@ impl ShaderPackRuntimeExecutor {
             transparent_clear(frame.background_color),
             screen_texture_before,
         );
-        self.append_translucent_pass(ops, targets, draws)?;
+        self.append_translucent_pass(ops, targets, draws, frame.translucent_entity_external)?;
         self.append_forward_material_pass(ops, targets, forward_material_draws)?;
         self.append_screen_pass(
             ops,
@@ -7148,12 +7178,11 @@ impl ShaderPackRuntimeExecutor {
                 store_op: AttachmentStoreOp::Store,
                 clear_color: None,
             }],
-            depth_stencil: frame.final_depth_view.map(|view| PassAttachment {
-                view,
-                load_op: AttachmentLoadOp::Load,
-                store_op: AttachmentStoreOp::Store,
-                clear_color: None,
-            }),
+            // Final fullscreen stages sample the main depth texture through
+            // their resource set; they do not perform depth testing. Keeping
+            // it attached here creates an illegal sampled+depth-attachment
+            // feedback layout on Vulkan.
+            depth_stencil: None,
         });
         ops.push(CommandOp::BindGraphicsPipeline(targets.final_pipeline));
         ops.push(CommandOp::BindResourceSet {
@@ -7175,12 +7204,89 @@ impl ShaderPackRuntimeExecutor {
         ops: &mut Vec<CommandOp>,
         targets: TerrainRuntimeTargets,
         draws: &[TerrainMeshDraw],
+        translucent_entity_external: bool,
     ) -> GalResult<()> {
         if !draws
             .iter()
-            .any(|draw| draw.material_mode == TerrainMaterialPassMode::Translucent)
+            .any(|draw| {
+                draw.material_mode == TerrainMaterialPassMode::Translucent
+                    && !(translucent_entity_external && draw.stratum == WORLD_STRATUM_ENTITY_MESH)
+            })
         {
             return Ok(());
+        }
+        if let Some((capture_texture, capture_view, capture_target, capture_pass)) =
+            targets.translucent_capture
+        {
+            ops.push(CommandOp::Barrier(texture_barrier(
+                capture_texture,
+                if targets.translucent_capture_initialized {
+                    TextureUsageState::ShaderRead
+                } else {
+                    TextureUsageState::Undefined
+                },
+                TextureUsageState::ColorAttachment,
+            )));
+            ops.push(CommandOp::Barrier(texture_barrier(
+                targets.depth_texture,
+                TextureUsageState::ShaderRead,
+                TextureUsageState::DepthStencilAttachment,
+            )));
+            ops.push(CommandOp::BeginPass {
+                pass: capture_pass,
+                target: capture_target,
+                colors: vec![PassAttachment {
+                    view: capture_view,
+                    load_op: AttachmentLoadOp::Clear,
+                    store_op: AttachmentStoreOp::Store,
+                    clear_color: Some(ClearColor {
+                        r: 0.0,
+                        g: 0.0,
+                        b: 0.0,
+                        a: 0.0,
+                    }),
+                }],
+                depth_stencil: Some(PassAttachment {
+                    view: targets.depth_view,
+                    load_op: AttachmentLoadOp::Load,
+                    store_op: AttachmentStoreOp::Store,
+                    clear_color: None,
+                }),
+            });
+            let mut capture_draw_state = IndexedDrawState::default();
+            for draw in draws
+                .iter()
+                .filter(|draw| {
+                    draw.material_mode == TerrainMaterialPassMode::Translucent
+                        && !(translucent_entity_external && draw.stratum == WORLD_STRATUM_ENTITY_MESH)
+                })
+            {
+                append_indexed_draw(
+                    ops,
+                    &mut capture_draw_state,
+                    draw.pipeline,
+                    draw.pipeline_layout,
+                    draw.resource_set,
+                    &draw.resource_set_dynamic_offsets,
+                    draw.shader_resource_set,
+                    draw.index_buffer,
+                    draw.index_offset,
+                    draw.index_type,
+                    draw.index_count,
+                    draw.instance_count,
+                );
+            }
+            ops.push(CommandOp::EndPass);
+            ops.push(CommandOp::Barrier(texture_barrier(
+                capture_texture,
+                TextureUsageState::ColorAttachment,
+                TextureUsageState::ShaderRead,
+            )));
+            ops.push(CommandOp::Barrier(texture_barrier(
+                targets.depth_texture,
+                TextureUsageState::DepthStencilAttachment,
+                TextureUsageState::ShaderRead,
+            )));
         }
         ops.push(CommandOp::Barrier(texture_barrier(
             targets.deferred_lit_texture,

@@ -163,6 +163,7 @@ public class SodiumShader implements RenderPassChunkShaderInterface {
 	@SuppressWarnings("null")
 	@Override
 	public void setupState(TerrainRenderPass pass, FogParameters fogParameters) {
+		ensureJavaSodiumShaderAvailable();
 		DepthColorStorage.unlockDepthColor();
 
 		applyBlendModes();
@@ -231,7 +232,15 @@ public class SodiumShader implements RenderPassChunkShaderInterface {
 
 	@Override
 	public void bindRenderPassResources(RenderPass renderPass, TerrainRenderPass pass) {
+		ensureJavaSodiumShaderAvailable();
 		samplers.bindToRenderPass(renderPass);
+	}
+
+	private static void ensureJavaSodiumShaderAvailable() {
+		if (VulkanicAPI.isVulkanBackendSelected()
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris Sodium shader state is unavailable on the Rust Vulkan route");
+		}
 	}
 
 	@Override

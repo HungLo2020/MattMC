@@ -11,7 +11,7 @@ import java.nio.ByteBuffer;
 
 public class SingleColorTexture extends GlResource {
 	public SingleColorTexture(int red, int green, int blue, int alpha) {
-		super(IrisRenderSystem.createTexture2D());
+		super(requireJavaTextureAllocation());
 		ByteBuffer pixel = BufferUtils.createByteBuffer(4);
 		pixel.put((byte) red);
 		pixel.put((byte) green);
@@ -28,6 +28,14 @@ public class SingleColorTexture extends GlResource {
 
 		TextureUploadHelper.resetTextureUploadState();
 		IrisRenderSystem.texImage2D(texture, 0, VulkanicAPI.GL_RGBA, 1, 1, 0, VulkanicAPI.GL_RGBA, VulkanicAPI.GL_UNSIGNED_BYTE, pixel);
+	}
+
+	private static int requireJavaTextureAllocation() {
+		if (VulkanicAPI.isVulkanBackendSelected()
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris single-color texture allocation is unavailable on the Rust Vulkan route");
+		}
+		return IrisRenderSystem.createTexture2D();
 	}
 
 	public int getTextureId() {

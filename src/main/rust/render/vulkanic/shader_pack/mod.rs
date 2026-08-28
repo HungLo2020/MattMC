@@ -24,9 +24,10 @@ pub(crate) mod runtime;
 pub mod shadow_policy;
 pub mod source;
 pub mod source_targets;
-// The source-selected route is intentionally production-disabled until every
-// semantic terrain resource is owned and validated. Keep its private resource
-// cache compiled and unit-tested without presenting it as an active route.
+// Source-selected shader-pack resources are private Rust-owned candidate
+// preparation state. Runtime admission remains fail-closed until the complete
+// source plan is wired into the production submit path; keep the candidate
+// implementation compiled and unit-tested without presenting it as admitted.
 #[allow(dead_code)]
 pub(crate) mod source_assets;
 pub mod source_temporal;

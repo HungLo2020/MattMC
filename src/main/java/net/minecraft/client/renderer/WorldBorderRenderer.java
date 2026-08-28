@@ -46,16 +46,36 @@ public class WorldBorderRenderer {
 	private double lastBorderMinZ;
 	private double lastBorderMaxZ;
 	@Nullable
-	private final GpuBuffer worldBorderBuffer;
-	private final VulkanicAPI.AutoStorageIndexBuffer indices = VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS);
+	private GpuBuffer worldBorderBuffer;
+	@Nullable
+	private final VulkanicAPI.AutoStorageIndexBuffer indices;
 
 	public WorldBorderRenderer() {
-		this.worldBorderBuffer = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+		this.indices = (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| VulkanicAPI.isVulkanBackendSelected())
+			? null
+			: VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS);
+		this.worldBorderBuffer = (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| VulkanicAPI.isVulkanBackendSelected())
 			? null
 			: VulkanicAPI.createBuffer(() -> "World border vertex buffer", 40, 16 * DefaultVertexFormat.POSITION_TEX.getVertexSize());
 	}
 
+	/** Releases a compatibility buffer if Vulkan ownership begins after construction. */
+	public void ensureRustSemanticRoute() {
+		if ((net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| VulkanicAPI.isVulkanBackendSelected()) && this.worldBorderBuffer != null) {
+			this.worldBorderBuffer.close();
+			this.worldBorderBuffer = null;
+		}
+	}
+
 	private void rebuildWorldBorderBuffer(WorldBorderRenderState worldBorderRenderState, double d, double e, double f, float g, float h, float i) {
+		if (this.worldBorderBuffer == null) {
+			throw new IllegalStateException(
+				"Java world-border buffer rebuild is unavailable while Rust owns whole-frame presentation"
+			);
+		}
 		try (ByteBufferBuilder byteBufferBuilder = ByteBufferBuilder.exactlySized(DefaultVertexFormat.POSITION_TEX.getVertexSize() * 4 * 4)) {
 			double j = worldBorderRenderState.minX;
 			double k = worldBorderRenderState.maxX;
@@ -130,11 +150,17 @@ public class WorldBorderRenderer {
 		if (RustGalWorldPrimitiveRenderer.enqueueWorldBorder(worldBorderRenderState, vec3, d, e)) {
 			return;
 		}
+		if (VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Vulkan world-border rendering is unavailable until the Rust semantic route is admitted");
+		}
 		if (this.worldBorderBuffer == null) {
 			throw new IllegalStateException("Java world-border rendering is unavailable while Rust owns whole-frame presentation");
 		}
-		boolean rustWholeFrame = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			&& net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
+		if (this.indices == null) {
+			throw new IllegalStateException("Java world-border index storage is unavailable on the Rust Vulkan route");
+		}
+		boolean rustWholeFrame = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
 		if (!(worldBorderRenderState.alpha <= 0.0)) {
 			if (rustWholeFrame) {
 				throw new IllegalStateException(

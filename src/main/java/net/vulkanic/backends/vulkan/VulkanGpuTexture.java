@@ -42,7 +42,8 @@ public final class VulkanGpuTexture extends GpuTexture {
 	}
 
 	public int getGlHandle() {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+				|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
 			throw new IllegalStateException(
 				"Java Vulkan texture native handles are unavailable while Rust owns whole-frame presentation"
 			);

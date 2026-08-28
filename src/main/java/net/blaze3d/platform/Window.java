@@ -310,7 +310,7 @@ public final class Window implements AutoCloseable {
 
 	static boolean shouldRequestNoApiWindowClientForVulkanBackend() {
 		return net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| net.vulkanic.VulkanicAPI.isVulkanBackendInitializedAndSelected();
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected();
 	}
 
 	private void refreshFramebufferSize() {

@@ -18,6 +18,19 @@ use super::metrics::{elapsed_nanos_u64, Metrics, WholeFrameProfile};
 use super::resources::*;
 use super::sync::{RetirementQueue, SubmissionId, SyncToken};
 
+/// Hard ceiling for one explicit handle arena. Frontend-specific residency
+/// limits remain tighter, but the GAL itself must also reject hostile/direct
+/// callers before a resource storm can grow a slot vector without bound.
+pub(crate) const MAX_ARENA_SLOTS: usize = 1_048_576;
+/// Explicit upper bound for swapchain frames retained concurrently.  The
+/// frontend normally uses two; keeping a small GAL-wide ceiling prevents a
+/// direct FFI caller from turning frame-slot configuration into unbounded
+/// synchronization/resource allocation.
+pub(crate) const MAX_FRAMES_IN_FLIGHT: u32 = 8;
+/// Maximum width/height accepted for an explicit frame surface.  This keeps
+/// malformed FFI requests from forcing an unbounded swapchain allocation.
+pub(crate) const MAX_FRAME_SURFACE_AXIS: u32 = 16_384;
+
 #[derive(Clone, Debug)]
 struct Slot<T> {
     generation: u32,
@@ -52,6 +65,12 @@ impl<T> Arena<T> {
                 return Handle::new(self.kind, index, slot.generation);
             }
         }
+        if self.slots.len() >= MAX_ARENA_SLOTS {
+            return Err(GalError::handle(
+                StatusCode::GenerationExhausted,
+                format!("{} handle arena slots exhausted", self.kind as u8),
+            ));
+        }
         let index = u32::try_from(self.slots.len()).map_err(|_| {
             GalError::handle(
                 StatusCode::GenerationExhausted,
@@ -64,6 +83,12 @@ impl<T> Arena<T> {
     fn insert_at(&mut self, handle: Handle, value: T) -> GalResult<Handle> {
         let (index, generation) = handle.require_kind(self.kind)?;
         if index == self.slots.len() {
+            if self.slots.len() >= MAX_ARENA_SLOTS {
+                return Err(GalError::handle(
+                    StatusCode::GenerationExhausted,
+                    format!("{} handle arena slots exhausted", self.kind as u8),
+                ));
+            }
             self.slots.push(Slot {
                 generation,
                 last_destroyed_generation: None,
@@ -338,6 +363,15 @@ pub struct VulkanicGal {
     compute_pipelines: Arena<ResourceRecord<ComputePipelineDesc>>,
     render_targets: Arena<ResourceRecord<RenderTargetDesc>>,
     frame_targets: Arena<ResourceRecord<FrameTargetDesc>>,
+    /// Rust-owned depth attachments reserved for acquired frame targets.
+    /// They remain private until frame-pass construction supplies them as an
+    /// explicit depth attachment.
+    frame_target_depth: BTreeMap<Handle, (Handle, Handle)>,
+    /// Acquired-frame depth becomes sampleable only after a Rust-owned world
+    /// pass has actually written it.  Allocation alone must not admit it to
+    /// post-effect inputs.
+    frame_target_depth_populated: BTreeSet<Handle>,
+    frame_target_depth_pending: BTreeSet<Handle>,
     render_passes: Arena<ResourceRecord<RenderPassDesc>>,
     dependencies: BTreeMap<Handle, BTreeSet<Handle>>,
     reverse_dependencies: BTreeMap<Handle, BTreeSet<Handle>>,
@@ -369,6 +403,9 @@ impl VulkanicGal {
             compute_pipelines: Arena::new(HandleKind::ComputePipeline),
             render_targets: Arena::new(HandleKind::RenderTarget),
             frame_targets: Arena::new(HandleKind::FrameTarget),
+            frame_target_depth: BTreeMap::new(),
+            frame_target_depth_populated: BTreeSet::new(),
+            frame_target_depth_pending: BTreeSet::new(),
             render_passes: Arena::new(HandleKind::RenderPass),
             dependencies: BTreeMap::new(),
             reverse_dependencies: BTreeMap::new(),
@@ -401,10 +438,31 @@ impl VulkanicGal {
                 "frame surface extent must be non-zero",
             ));
         }
+        if desc.extent.width > MAX_FRAME_SURFACE_AXIS
+            || desc.extent.height > MAX_FRAME_SURFACE_AXIS
+            || desc.extent.depth != 1
+        {
+            return self.validation_error(GalError::resource(
+                StatusCode::InvalidArgument,
+                format!(
+                    "frame surface extent exceeds the explicit {}x{}x1 bound",
+                    MAX_FRAME_SURFACE_AXIS, MAX_FRAME_SURFACE_AXIS
+                ),
+            ));
+        }
         if desc.max_frames_in_flight == 0 {
             return self.validation_error(GalError::resource(
                 StatusCode::InvalidArgument,
                 "frame surface must allow at least one frame in flight",
+            ));
+        }
+        if desc.max_frames_in_flight > MAX_FRAMES_IN_FLIGHT {
+            return self.validation_error(GalError::resource(
+                StatusCode::InvalidArgument,
+                format!(
+                    "frame surface exceeds the explicit {}-frame in-flight bound",
+                    MAX_FRAMES_IN_FLIGHT
+                ),
             ));
         }
         let capabilities = self.capabilities();
@@ -496,18 +554,61 @@ impl VulkanicGal {
             ));
         }
         let handle = self.frame_targets.next_handle()?;
-        let token = self
+        let depth_texture = self.create_texture(TextureDesc {
+            label: format!("{}.depth", desc.label),
+            dimension: TextureDimension::D2,
+            format: TextureFormat::Depth32Float,
+            extent: desc.extent,
+            mip_levels: 1,
+            array_layers: 1,
+            usages: vec![TextureUsage::DepthStencilAttachment, TextureUsage::Sampled],
+        })?;
+        let depth_view = match self.create_texture_view(TextureViewDesc {
+            label: format!("{}.depth-view", desc.label),
+            texture: depth_texture,
+            format: TextureFormat::Depth32Float,
+            base_mip: 0,
+            mip_count: 1,
+            base_layer: 0,
+            layer_count: 1,
+        }) {
+            Ok(view) => view,
+            Err(error) => {
+                let _ = self.destroy(depth_texture);
+                return Err(error);
+            }
+        };
+        let token = match self
             .backend
-            .create(handle, BackendCreateDesc::FrameTarget(&desc))?;
+            .create(handle, BackendCreateDesc::FrameTarget(&desc))
+        {
+            Ok(token) => token,
+            Err(error) => {
+                let _ = self.destroy(depth_view);
+                let _ = self.destroy(depth_texture);
+                return Err(error);
+            }
+        };
+        self.frame_target_depth.insert(handle, (depth_texture, depth_view));
         self.metrics.resource_creates += 1;
-        self.frame_targets.insert_at(
+        let result = self.frame_targets.insert_at(
             handle,
             ResourceRecord {
                 desc,
                 token,
                 last_submission: None,
             },
-        )
+        );
+        if let Err(error) = result {
+            self.frame_target_depth.remove(&handle);
+            let _ = self.destroy(depth_view);
+            let _ = self.destroy(depth_texture);
+            let _ = self
+                .backend
+                .destroy(handle, HandleKind::FrameTarget, token);
+            return Err(error);
+        }
+        Ok(handle)
     }
 
     pub fn create_buffer(&mut self, desc: BufferDesc) -> GalResult<Handle> {
@@ -665,7 +766,15 @@ impl VulkanicGal {
         match handle.kind() {
             Some(HandleKind::FrameTarget) => {
                 self.frame_targets.get(handle)?;
-                Ok(None)
+                if self.frame_target_depth_populated.contains(&handle)
+                    || self.frame_target_depth_pending.contains(&handle)
+                {
+                    Ok(self.frame_target_depth.get(&handle).copied())
+                } else {
+                    // Allocation alone must not expose an unpopulated depth
+                    // image to post-effects.
+                    Ok(None)
+                }
             }
             Some(HandleKind::RenderTarget) => {
                 let target = self.render_targets.get(handle)?;
@@ -683,6 +792,60 @@ impl VulkanicGal {
                 "pass target must be a render target or frame target",
             )),
         }
+    }
+
+    pub(in crate::render::vulkanic) fn frame_target_owned_depth_attachment(
+        &self,
+        handle: Handle,
+    ) -> GalResult<(Handle, Handle)> {
+        if handle.kind() != Some(HandleKind::FrameTarget) {
+            return Err(GalError::resource(
+                StatusCode::WrongHandleType,
+                "owned frame depth attachment requires a frame target",
+            ));
+        }
+        self.frame_targets.get(handle)?;
+        self.frame_target_depth.get(&handle).copied().ok_or_else(|| {
+            GalError::resource(StatusCode::StaleHandle, "frame target depth attachment is unavailable")
+        })
+    }
+
+    pub(in crate::render::vulkanic) fn begin_frame_target_depth_write(
+        &mut self,
+        handle: Handle,
+    ) -> GalResult<()> {
+        if handle.kind() != Some(HandleKind::FrameTarget) {
+            return Err(GalError::resource(
+                StatusCode::WrongHandleType,
+                "populated frame depth requires a frame target",
+            ));
+        }
+        self.frame_targets.get(handle)?;
+        if !self.frame_target_depth.contains_key(&handle) {
+            return Err(GalError::resource(
+                StatusCode::StaleHandle,
+                "frame target depth attachment is unavailable",
+            ));
+        }
+        self.frame_target_depth_pending.insert(handle);
+        Ok(())
+    }
+
+    pub(in crate::render::vulkanic) fn commit_frame_target_depth_write(
+        &mut self,
+        handle: Handle,
+    ) -> GalResult<()> {
+        self.frame_targets.get(handle)?;
+        self.frame_target_depth_pending.remove(&handle);
+        self.frame_target_depth_populated.insert(handle);
+        Ok(())
+    }
+
+    pub(in crate::render::vulkanic) fn rollback_frame_target_depth_write(
+        &mut self,
+        handle: Handle,
+    ) {
+        self.frame_target_depth_pending.remove(&handle);
     }
 
     pub fn create_texture(&mut self, desc: TextureDesc) -> GalResult<Handle> {
@@ -1489,7 +1652,14 @@ impl VulkanicGal {
                 "render pass color formats do not match target",
             ));
         }
-        if desc.depth_format != target_depth_format {
+        // A target may own a depth image while an individual pass deliberately
+        // omits it (for example a fullscreen post-process that samples the
+        // completed depth texture).  Dynamic rendering permits this subset;
+        // requiring an attachment merely because the target has one would
+        // force illegal sampled/attachment feedback on Vulkan.
+        if desc.depth_format != target_depth_format
+            && !(desc.depth_format.is_none() && target_depth_format.is_some())
+        {
             return self.validation_error(GalError::resource(
                 StatusCode::InvalidArgument,
                 "render pass depth format does not match target",
@@ -1513,6 +1683,13 @@ impl VulkanicGal {
 
     pub fn destroy(&mut self, handle: Handle) -> GalResult<()> {
         self.ensure_no_dependents(handle)?;
+        let owned_frame_depth = if handle.kind() == Some(HandleKind::FrameTarget) {
+            self.frame_target_depth_populated.remove(&handle);
+            self.frame_target_depth_pending.remove(&handle);
+            self.frame_target_depth.remove(&handle)
+        } else {
+            None
+        };
         let pending = match handle.kind() {
             Some(HandleKind::Buffer) => self.remove_record(handle, HandleKind::Buffer)?,
             Some(HandleKind::Texture) => self.remove_record(handle, HandleKind::Texture)?,
@@ -1549,6 +1726,12 @@ impl VulkanicGal {
                 ))
             }
         };
+        if let Some((depth_texture, depth_view)) = owned_frame_depth {
+            // The view owns the dependency edge to the texture, so retire it
+            // first. Both remain private Rust GAL resources.
+            let _ = self.destroy(depth_view);
+            let _ = self.destroy(depth_texture);
+        }
         self.remove_reverse_edges(handle);
         if let Some(last_submission) = pending.1 {
             if last_submission > self.completed_submission {
@@ -2116,7 +2299,7 @@ impl VulkanicGal {
                             ));
                         }
                     }
-                    if depth_stencil.is_some() != expected_depth.is_some() {
+                    if depth_stencil.is_some() && expected_depth.is_none() {
                         return self.validation_error(GalError::command(
                             StatusCode::InvalidArgument,
                             "pass depth attachment presence does not match target",
@@ -2437,6 +2620,15 @@ impl VulkanicGal {
                     }
                     self.validate_frame_target_copy(*src, *dst, *extent)?;
                 }
+                CommandOp::CopyTextureToFrameTarget { src, dst, extent } => {
+                    if in_pass {
+                        return self.validation_error(GalError::command(
+                            StatusCode::InvalidArgument,
+                            "texture-to-frame-target copy requires no active render pass",
+                        ));
+                    }
+                    self.validate_texture_to_frame_target_copy(*src, *dst, *extent)?;
+                }
                 CommandOp::GenerateMipmaps {
                     texture,
                     subresources,
@@ -2597,7 +2789,19 @@ impl VulkanicGal {
                     if barrier.src_queue == QueueClass::Present
                         || barrier.dst_queue == QueueClass::Present
                     {
-                        let texture = self.textures.get(barrier.resource)?;
+                        let texture = match barrier.resource.kind() {
+                            Some(HandleKind::Texture) => self.textures.get(barrier.resource)?,
+                            Some(HandleKind::TextureView) => {
+                                let info = self.texture_view_info(barrier.resource)?;
+                                self.textures.get(info.texture)?
+                            }
+                            _ => {
+                                return self.validation_error(GalError::command(
+                                    StatusCode::InvalidArgument,
+                                    "presentation queue ownership requires a texture or texture view",
+                                ));
+                            }
+                        };
                         if !texture.desc.usages.contains(&TextureUsage::Present) {
                             return self.validation_error(GalError::command(
                                 StatusCode::InvalidArgument,
@@ -2642,6 +2846,21 @@ impl VulkanicGal {
                 && pipeline_record.desc.depth_format == pass_record.desc.depth_format
         };
         if !compatible {
+            if std::env::var_os("MATTMC_TRACE_PIPELINE_PASS_COMPAT").is_some() {
+                let pipeline_record = self.graphics_pipelines.get(pipeline)?;
+                let pass_record = self.render_passes.get(pass)?;
+                eprintln!(
+                    "vulkan.pipeline-pass-mismatch pipeline={:?} label={} colors={:?} depth={:?} pass={:?} label={} colors={:?} depth={:?}",
+                    pipeline,
+                    pipeline_record.desc.label,
+                    pipeline_record.desc.color_formats,
+                    pipeline_record.desc.depth_format,
+                    pass,
+                    pass_record.desc.label,
+                    pass_record.desc.color_formats,
+                    pass_record.desc.depth_format,
+                );
+            }
             return self.validation_error(GalError::command(
                 StatusCode::InvalidArgument,
                 "graphics pipeline attachment formats are not compatible with render pass",
@@ -2950,6 +3169,31 @@ impl VulkanicGal {
                             &mut accesses,
                             AccessEvent {
                                 target: self.texture_image_copy_target(*dst, 0, 0)?,
+                                mode: AccessMode::Write,
+                                family: AccessFamily::Transfer,
+                                attachment_load_op: None,
+                                attachment_store_op: None,
+                            },
+                            profile.as_deref_mut(),
+                        )?;
+                    }
+                    CommandOp::CopyTextureToFrameTarget { src, dst, .. } => {
+                        accesses.retain_non_overlapping(AccessTarget::FrameTarget { handle: *dst });
+                        self.record_access(
+                            &mut accesses,
+                            AccessEvent {
+                                target: self.texture_image_copy_target(*src, 0, 0)?,
+                                mode: AccessMode::Read,
+                                family: AccessFamily::Transfer,
+                                attachment_load_op: None,
+                                attachment_store_op: None,
+                            },
+                            profile.as_deref_mut(),
+                        )?;
+                        self.record_access(
+                            &mut accesses,
+                            AccessEvent {
+                                target: AccessTarget::FrameTarget { handle: *dst },
                                 mode: AccessMode::Write,
                                 family: AccessFamily::Transfer,
                                 attachment_load_op: None,
@@ -3623,6 +3867,42 @@ impl VulkanicGal {
         Ok(())
     }
 
+    fn validate_texture_to_frame_target_copy(
+        &mut self,
+        src: Handle,
+        dst: Handle,
+        extent: Extent3d,
+    ) -> GalResult<()> {
+        if src == dst || extent.width == 0 || extent.height == 0 || extent.depth == 0 {
+            return self.validation_error(GalError::command(
+                StatusCode::InvalidArgument,
+                "texture-to-frame-target copy requires distinct handles and a non-zero extent",
+            ));
+        }
+        let source = self.textures.get(src)?.desc.clone();
+        let destination = self.frame_targets.get(dst)?.desc.clone();
+        if !source.usages.contains(&TextureUsage::TransferSrc) {
+            return self.validation_error(GalError::command(
+                StatusCode::InvalidArgument,
+                "texture-to-frame-target copy source requires transfer-source usage",
+            ));
+        }
+        if source.format != destination.color_format
+            || source.dimension != TextureDimension::D2
+            || extent.width > source.extent.width
+            || extent.height > source.extent.height
+            || extent.depth != 1
+            || extent.width > destination.extent.width
+            || extent.height > destination.extent.height
+        {
+            return self.validation_error(GalError::command(
+                StatusCode::InvalidArgument,
+                "texture-to-frame-target copy requires matching 2D format and bounded extent",
+            ));
+        }
+        Ok(())
+    }
+
     fn texture_copy_target(&self, region: &BufferImageCopyRegion) -> GalResult<AccessTarget> {
         self.texture_image_copy_target(region.texture, region.texture_mip, region.texture_layer)
     }
@@ -3910,6 +4190,10 @@ fn referenced_handles(batch: &SubmissionBatch) -> BTreeSet<Handle> {
                     handles.insert(*src);
                     handles.insert(*dst);
                 }
+                CommandOp::CopyTextureToFrameTarget { src, dst, .. } => {
+                    handles.insert(*src);
+                    handles.insert(*dst);
+                }
                 CommandOp::GenerateMipmaps { texture, .. } => {
                     handles.insert(*texture);
                 }
@@ -4032,6 +4316,7 @@ pub(super) fn normalize_submission_batch(batch: &mut SubmissionBatch) -> Command
                 | CommandOp::CopyTextureToBuffer(_)
                 | CommandOp::CopyTexture(_)
                 | CommandOp::CopyFrameTargetToTexture { .. }
+                | CommandOp::CopyTextureToFrameTarget { .. }
                 | CommandOp::GenerateMipmaps { .. }
                 | CommandOp::HostWriteBuffer { .. }
                 | CommandOp::HostReadBuffer { .. }
@@ -4083,6 +4368,7 @@ fn add_command_profile(profile: &mut WholeFrameProfile, batch: &SubmissionBatch)
                 | CommandOp::CopyTextureToBuffer(_)
                 | CommandOp::CopyTexture(_)
                 | CommandOp::CopyFrameTargetToTexture { .. }
+                | CommandOp::CopyTextureToFrameTarget { .. }
                 | CommandOp::GenerateMipmaps { .. }
                 | CommandOp::HostReadBuffer { .. }
                 | CommandOp::Present { .. } => {}
@@ -4282,4 +4568,22 @@ fn texture_range_contains(outer: TextureSubresourceRange, inner: TextureSubresou
         && inner_mip_end <= outer_mip_end
         && outer.base_layer <= inner.base_layer
         && inner_layer_end <= outer_layer_end
+}
+
+#[cfg(test)]
+mod arena_tests {
+    use super::*;
+
+    #[test]
+    fn arena_rejects_growth_at_the_explicit_slot_bound() {
+        let mut arena = Arena::<()>::new(HandleKind::Buffer);
+        arena.slots.resize_with(MAX_ARENA_SLOTS, || Slot {
+            generation: 1,
+            last_destroyed_generation: None,
+            value: Some(()),
+        });
+        let handle = Handle::new(HandleKind::Buffer, MAX_ARENA_SLOTS as u32, 1).unwrap();
+        let error = arena.insert_at(handle, ()).unwrap_err();
+        assert_eq!(StatusCode::GenerationExhausted, error.code);
+    }
 }

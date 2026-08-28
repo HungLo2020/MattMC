@@ -13,11 +13,13 @@ public record RenderTargetDescriptor(int width, int height, boolean useDepth, in
 	}
 
 	public void prepare(RenderTarget renderTarget) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			// Whole-frame Vulkan targets are consumed by the Rust semantic
 			// post-processing route.  A Java-side clear would reopen a hidden
 			// command submission path (and can race Rust's explicit resource
 			// usages), so leave preparation to the Rust frame graph.
+			renderTarget.ensureRustSemanticRoute();
 			return;
 		}
 		if (this.useDepth) {

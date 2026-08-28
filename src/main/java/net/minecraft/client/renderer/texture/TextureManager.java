@@ -68,7 +68,9 @@ public class TextureManager implements PreparableReloadListener, Tickable, AutoC
 
 	public void register(ResourceLocation resourceLocation, AbstractTexture abstractTexture) {
 		AbstractTexture abstractTexture2 = (AbstractTexture)this.byPath.put(resourceLocation, abstractTexture);
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() && abstractTexture instanceof DynamicTexture dynamicTexture) {
+		if ((net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected())
+			&& abstractTexture instanceof DynamicTexture dynamicTexture) {
 			net.vulkanic.gui.RustGalGuiRawImageAssets.registerDynamicTexture(resourceLocation, dynamicTexture);
 		}
 		if (abstractTexture2 != abstractTexture) {
@@ -84,7 +86,9 @@ public class TextureManager implements PreparableReloadListener, Tickable, AutoC
 
 	private void safeClose(ResourceLocation resourceLocation, AbstractTexture abstractTexture) {
 		this.tickableTextures.remove(abstractTexture);
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() && abstractTexture instanceof DynamicTexture dynamicTexture) {
+		if ((net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected())
+			&& abstractTexture instanceof DynamicTexture dynamicTexture) {
 			net.vulkanic.gui.RustGalGuiRawImageAssets.unregisterDynamicTexture(resourceLocation, dynamicTexture);
 		}
 
@@ -128,8 +132,20 @@ public class TextureManager implements PreparableReloadListener, Tickable, AutoC
 		// Iris PBR textures belong to the Java compatibility renderer. Rust
 		// whole-frame resource reloads publish copied asset bytes to VulkanicGAL
 		// instead of touching Iris' runtime texture registry.
-		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
 			net.irisshaders.iris.pbr.texture.PBRTextureManager.INSTANCE.close();
+		}
+	}
+
+	/**
+	 * Hands all registered textures to the semantic Rust route without closing
+	 * CPU-backed source data or unregistering identities.
+	 */
+	public void ensureRustSemanticRoute() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+			this.byPath.values().forEach(AbstractTexture::ensureRustSemanticRoute);
 		}
 	}
 
@@ -151,7 +167,8 @@ public class TextureManager implements PreparableReloadListener, Tickable, AutoC
 		
 		// PBR registry maintenance is compatibility-only; Rust owns copied
 		// resource-pack generations while it owns presentation.
-		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
 			net.irisshaders.iris.pbr.texture.PBRTextureManager.INSTANCE.clear();
 		}
 		
@@ -176,7 +193,8 @@ public class TextureManager implements PreparableReloadListener, Tickable, AutoC
 			}
 		});
 		
-		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
 			net.irisshaders.iris.pbr.texture.PBRTextureManager.INSTANCE.dumpTextures(path);
 		}
 	}

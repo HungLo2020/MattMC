@@ -124,7 +124,7 @@ public class ShaderProgram
 
 	private static void rejectRustWholeFrameJavaShaderProgram()
 	{
-		if (VulkanicAPI.isVulkanBackendInitializedAndSelected()
+		if (VulkanicAPI.isVulkanBackendSelected()
 			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
 		{
 			throw new IllegalStateException(

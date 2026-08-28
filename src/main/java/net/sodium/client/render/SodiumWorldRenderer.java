@@ -111,6 +111,9 @@ public class SodiumWorldRenderer {
             // Do not construct or reload Sodium's Java RenderDevice graph.
             return;
         }
+        if (VulkanicAPI.isVulkanBackendSelected()) {
+            throw new IllegalStateException("Java Sodium Vulkan level setup is unavailable until the Rust whole-frame terrain route is admitted");
+        }
         // Check that the level is actually changing
         if (this.level == level) {
             return;
@@ -317,6 +320,9 @@ public class SodiumWorldRenderer {
 	        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 	            throw new IllegalStateException("Java Sodium terrain rendering is unavailable while Rust owns whole-frame presentation");
 	        }
+	        if (VulkanicAPI.isVulkanBackendSelected()) {
+	            throw new IllegalStateException("Java Sodium Vulkan terrain rendering is unavailable until the Rust whole-frame terrain route is admitted");
+	        }
 	        net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("sodium.terrain.draw");
 	        try {
 	        if (group == ChunkSectionLayerGroup.OPAQUE) {
@@ -351,6 +357,9 @@ public class SodiumWorldRenderer {
 	    }
 
     public void enqueueRustGalStaticTerrain(Camera camera) {
+        if (WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan()) {
+            throw new IllegalStateException("legacy Sodium render-list terrain enqueue is unavailable while Rust owns whole-frame Vulkan");
+        }
         if (this.renderSectionManager == null) {
             return;
         }
@@ -392,6 +401,9 @@ public class SodiumWorldRenderer {
     public void reload() {
         if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
             return;
+        }
+        if (VulkanicAPI.isVulkanBackendSelected()) {
+            throw new IllegalStateException("Java Sodium Vulkan terrain reload is unavailable until the Rust whole-frame terrain route is admitted");
         }
         if (this.level == null) {
             return;

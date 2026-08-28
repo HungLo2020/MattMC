@@ -238,13 +238,15 @@ public class Gui {
 		// Vulkan receives semantic GUI elements directly and must not query Iris
 		// screen/runtime internals while assembling that frame.
 		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
 			&& this.minecraft.screen instanceof net.irisshaders.iris.gui.screen.HudHideable) {
 			return;
 		}
 		
 		// GL debug groups are legacy Iris renderer state. Whole-frame Vulkan
 		// submits semantic HUD commands directly to Rust and must not touch it.
-		boolean legacyIrisDebugGroup = !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
+		boolean legacyIrisDebugGroup = !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected();
 		if (legacyIrisDebugGroup) {
 			net.irisshaders.iris.gl.GLDebug.pushGroup(1000, "GUI");
 		}
@@ -275,7 +277,8 @@ public class Gui {
 		
 		// VoxelMap: Render minimap overlay (after boss bar, before debug overlay)
 		if (!this.minecraft.options.hideGui) {
-			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+				|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
 				// The semantic producer owns fail-closed admission on Rust Vulkan;
 				// swallowing its boundary error would make an unavailable overlay
 				// indistinguishable from a Java fallback.
@@ -1497,7 +1500,8 @@ public class Gui {
 	private void renderVignette(GuiGraphics guiGraphics, @Nullable Entity entity) {
 		// Iris: Check if vignette should be rendered
 		net.irisshaders.iris.pipeline.WorldRenderingPipeline pipeline =
-			net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			 net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+				|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
 				? null
 				: net.irisshaders.iris.Iris.getPipelineManager().getPipelineNullable();
 		

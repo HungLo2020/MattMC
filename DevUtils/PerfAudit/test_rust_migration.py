@@ -9,6 +9,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from argparse import Namespace
 from pathlib import Path
 
@@ -93,6 +94,28 @@ def args(**overrides) -> Namespace:
 
 
 class RustMigrationHarnessTests(unittest.TestCase):
+    def test_run_client_does_not_run_the_full_test_suite(self) -> None:
+        root = Path(__file__).resolve().parents[2]
+        build_script = (root / "build.gradle").read_text(encoding="utf-8")
+        self.assertNotIn(
+            "tasks.named('runClient') {\n    dependsOn test",
+            build_script,
+            "runClient must remain launchable without running the full test suite",
+        )
+        self.assertNotIn(
+            "tasks.named('compileJava') {\n    finalizedBy test",
+            build_script,
+            "compileJava must not force tests during a client launch",
+        )
+
+    def test_native_library_name_matches_gradle_platform_key(self) -> None:
+        with mock.patch.object(harness.platform, "system", return_value="Linux"), \
+             mock.patch.object(harness.platform, "machine", return_value="x86_64"):
+            self.assertEqual(harness.native_library_name(), "mattmc_rust-linux-x64.so")
+        with mock.patch.object(harness.platform, "system", return_value="Darwin"), \
+             mock.patch.object(harness.platform, "machine", return_value="arm64"):
+            self.assertEqual(harness.native_library_name(), "mattmc_rust-mac-aarch64.dylib")
+
     def test_capture_runner_quarantines_root_and_legacy_dot_capture_paths(self) -> None:
         root = Path("/tmp/mattmc-capture-test").resolve()
         default = capture_runner.CaptureRunner.resolve_artifact_dir(root, None)
@@ -107,6 +130,46 @@ class RustMigrationHarnessTests(unittest.TestCase):
         )
         nested = capture_runner.CaptureRunner.resolve_artifact_dir(root, "captures/session")
         self.assertEqual(nested, root / "artifacts/graphics-captures/session")
+        matrix = capture_runner.CaptureRunner.resolve_artifact_dir(
+            root, str(root / "logs" / "graphics-audit" / "rust-vulkan" / "run-01")
+        )
+        self.assertEqual(
+            matrix,
+            root / "logs" / "graphics-audit" / "rust-vulkan" / "run-01",
+            "the graphics matrix must retain its run-local managed artifact directory",
+        )
+
+    def test_graphics_retention_compresses_jsonl_diagnostics(self) -> None:
+        import artifact_retention
+
+        self.assertIn(
+            ".jsonl",
+            artifact_retention.COMPRESSIBLE_SUFFIXES,
+            "large line-delimited diagnostics must participate in bounded artifact retention",
+        )
+
+    def test_world_copy_ignores_only_stale_dh_snapshots(self) -> None:
+        self.assertTrue(
+            capture_runner.CaptureRunner.ignored_world_copy_name(
+                "/tmp/world/data", "DistantHorizons.sqlite.backup_before_fix"
+            )
+        )
+        self.assertFalse(
+            capture_runner.CaptureRunner.ignored_world_copy_name(
+                "/tmp/world/data", "DistantHorizons.sqlite"
+            )
+        )
+        self.assertFalse(
+            capture_runner.CaptureRunner.ignored_world_copy_name(
+                "/tmp/world/region", "DistantHorizons.sqlite.backup_before_fix"
+            )
+        )
+        with mock.patch.dict("os.environ", {"MATTMC_CAPTURE_DISABLE_DH_FOR_ORDINARY_SOURCE": "true"}):
+            self.assertTrue(
+                capture_runner.CaptureRunner.ignored_world_copy_name(
+                    "/tmp/world/data", "DistantHorizons.sqlite"
+                )
+            )
 
     def test_directory_helper_resolves_windows_config_with_spaces(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -146,6 +209,14 @@ class RustMigrationHarnessTests(unittest.TestCase):
         self.assertTrue(frozen.is_dir(), frozen)
         self.assertTrue((frozen / ".git").is_dir(), frozen)
         self.assertTrue((frozen / "gradlew").is_file() or (frozen / "gradlew.bat").is_file(), frozen)
+
+    def test_current_and_frozen_checkouts_must_be_distinct(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = fake_repo(Path(temp), "current")
+            with mock.patch.object(harness, "repo_root", return_value=root):
+                with self.assertRaises(SystemExit) as failure:
+                    harness.select_targets(args(target="both", frozen_repo=str(root)))
+            self.assertIn("separate checkout", str(failure.exception))
 
     def test_chunk_meshing_command_uses_argument_list_and_output_path_with_spaces(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -284,16 +355,27 @@ class RustMigrationHarnessTests(unittest.TestCase):
     def test_metadata_generation_records_dirty_state_and_artifact_separation(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = fake_repo(Path(temp), "current")
+            # Harness edits in either checkout are expected during parity work;
+            # record them as metadata instead of treating them as a precondition
+            # failure.  This mirrors the real Frozen checkout workflow.
+            (root / "harness-change.txt").write_text("expected dirty checkout\n", encoding="utf-8")
             artifact = Path(temp) / "artifacts"
-            result = harness.run_target(
-                harness.RepoTarget("current", root, "current"),
-                "metadata",
-                artifact,
-                args(workload="metadata"),
-            )
+            with mock.patch.object(
+                harness,
+                "dirty_status",
+                return_value={"dirty": True, "status_short": ["?? harness-change.txt"]},
+            ):
+                result = harness.run_target(
+                    harness.RepoTarget("current", root, "current"),
+                    "metadata",
+                    artifact,
+                    args(workload="metadata"),
+                )
             self.assertTrue(result.success)
             metadata = json.loads(Path(result.metadata_path).read_text(encoding="utf-8"))
             self.assertEqual(metadata["repository"]["target"], "current")
+            self.assertTrue(metadata["repository"]["dirty"])
+            self.assertTrue(any("harness-change.txt" in entry for entry in metadata["repository"]["status_short"]))
             self.assertEqual(Path(result.artifact_dir).parent, artifact)
 
     def test_timeout_kills_child_and_returns_failure(self) -> None:
@@ -346,11 +428,27 @@ class RustMigrationHarnessTests(unittest.TestCase):
                 output,
             )
             self.assertIn("runClient", command)
+            self.assertIn(
+                f"-PmattmcRunGameDir={(output.parent / 'run').resolve()}",
+                command,
+            )
             self.assertIn("-PmattmcRustProfile=release", command)
             java_options = env["JAVA_TOOL_OPTIONS"]
             self.assertIn("-Dmattmc.realMeshingReplay=true", java_options)
             self.assertIn(f"-Dmattmc.realMeshingReplay.output={output}", java_options)
             self.assertIn("-Dmattmc.realMeshingReplay.fixture=normal_surface_terrain", java_options)
+
+    def test_replay_options_pin_backend_per_target(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = fake_repo(Path(temp), "current")
+            (root / "run").mkdir()
+            (root / "run" / "options.txt").write_text("ao:true\ngraphics_backend=opengl\n", encoding="utf-8")
+            current_dir = Path(temp) / "artifacts" / "current"
+            harness.seed_replay_options(harness.RepoTarget("current", root, "current"), current_dir)
+            self.assertIn("graphics_backend=vulkan", (current_dir / "run" / "options.txt").read_text())
+            frozen_dir = Path(temp) / "artifacts" / "frozen"
+            harness.seed_replay_options(harness.RepoTarget("frozen", root, "frozen"), frozen_dir)
+            self.assertIn("graphics_backend=opengl", (frozen_dir / "run" / "options.txt").read_text())
 
     def test_real_chunk_meshing_replay_requires_output_json(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

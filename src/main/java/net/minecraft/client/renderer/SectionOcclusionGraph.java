@@ -82,7 +82,16 @@ public class SectionOcclusionGraph {
 	}
 
 	public void addSectionsInFrustum(Frustum frustum, List<SectionRenderDispatcher.RenderSection> list, List<SectionRenderDispatcher.RenderSection> list2) {
-		((SectionOcclusionGraph.GraphState)this.currentGraph.get()).storage().sectionTree.visitNodes((node, bl, i, bl2) -> {
+		SectionOcclusionGraph.GraphState graphState = this.currentGraph.get();
+		// The Rust semantic terrain route can begin extraction during world attach,
+		// before the asynchronous visibility graph has published its first state.
+		// Treat that frame as having no visible sections; the next graph update will
+		// provide the complete set without allowing a transient null dereference to
+		// abort the render thread.
+		if (graphState == null) {
+			return;
+		}
+		graphState.storage().sectionTree.visitNodes((node, bl, i, bl2) -> {
 			SectionRenderDispatcher.RenderSection renderSection = node.getSection();
 			if (renderSection != null) {
 				list.add(renderSection);
@@ -103,8 +112,9 @@ public class SectionOcclusionGraph {
 			this.addNeighbors(graphEvents, chunkPos);
 		}
 
-		SectionOcclusionGraph.GraphEvents graphEvents2 = ((SectionOcclusionGraph.GraphState)this.currentGraph.get()).events;
-		if (graphEvents2 != graphEvents) {
+		SectionOcclusionGraph.GraphState currentState = this.currentGraph.get();
+		SectionOcclusionGraph.GraphEvents graphEvents2 = currentState == null ? null : currentState.events;
+		if (graphEvents2 != null && graphEvents2 != graphEvents) {
 			this.addNeighbors(graphEvents2, chunkPos);
 		}
 	}
@@ -115,8 +125,9 @@ public class SectionOcclusionGraph {
 			graphEvents.sectionsToPropagateFrom.add(renderSection);
 		}
 
-		SectionOcclusionGraph.GraphEvents graphEvents2 = ((SectionOcclusionGraph.GraphState)this.currentGraph.get()).events;
-		if (graphEvents2 != graphEvents) {
+		SectionOcclusionGraph.GraphState currentState = this.currentGraph.get();
+		SectionOcclusionGraph.GraphEvents graphEvents2 = currentState == null ? null : currentState.events;
+		if (graphEvents2 != null && graphEvents2 != graphEvents) {
 			graphEvents2.sectionsToPropagateFrom.add(renderSection);
 		}
 	}

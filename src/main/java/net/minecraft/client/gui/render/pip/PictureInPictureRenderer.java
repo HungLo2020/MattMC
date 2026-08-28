@@ -46,15 +46,17 @@ public abstract class PictureInPictureRenderer<T extends PictureInPictureRenderS
 
 	protected PictureInPictureRenderer(MultiBufferSource.BufferSource bufferSource) {
 		this.bufferSource = bufferSource;
-		this.projectionMatrixBuffer = net.vulkanic.gui.RustGalGuiRenderer.isWholeFrameVulkanActive()
+		this.projectionMatrixBuffer = (net.vulkanic.gui.RustGalGuiRenderer.isWholeFrameVulkanEnabled()
+			|| VulkanicAPI.isVulkanBackendSelected())
 			? null
 			: new CachedOrthoProjectionMatrixBuffer("PIP - " + this.getClass().getSimpleName(), -1000.0F, 1000.0F, true);
 	}
 
 	public void prepare(T pictureInPictureRenderState, GuiRenderState guiRenderState, int i) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| VulkanicAPI.isVulkanBackendSelected()) {
 			throw new IllegalStateException(
-				"Java GUI picture-in-picture rendering is unavailable while Rust owns whole-frame presentation"
+				"Java GUI picture-in-picture rendering is unavailable on selected Vulkan"
 			);
 		}
 		int j = this.getRenderTextureWidth(pictureInPictureRenderState, i);
@@ -145,6 +147,12 @@ public abstract class PictureInPictureRenderer<T extends PictureInPictureRenderS
 	}
 
 	private void prepareTexturesAndProjection(boolean bl, int i, int j) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| VulkanicAPI.isVulkanBackendSelected()) {
+			throw new IllegalStateException(
+				"Java GUI picture-in-picture targets are unavailable while Rust owns whole-frame Vulkan"
+			);
+		}
 		if (this.texture != null && bl) {
 			this.texture.close();
 			this.texture = null;

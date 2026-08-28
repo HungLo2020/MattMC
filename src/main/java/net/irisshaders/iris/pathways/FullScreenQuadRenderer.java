@@ -19,7 +19,8 @@ public class FullScreenQuadRenderer {
 	private final GpuBuffer quad;
 
 	private FullScreenQuadRenderer() {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			this.quad = null;
 			return;
 		}
@@ -42,7 +43,7 @@ public class FullScreenQuadRenderer {
 
 	public GpuBuffer getQuad() {
 		if (this.quad == null) {
-			throw new IllegalStateException("Java Iris fullscreen quad is unavailable while Rust owns whole-frame presentation");
+			throw new IllegalStateException("Java Iris fullscreen quad is unavailable on the Rust Vulkan route");
 		}
 		return quad;
 	}

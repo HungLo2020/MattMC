@@ -538,6 +538,7 @@ impl OpenGlLowerer {
             CommandOp::DispatchIndirect { .. }
             | CommandOp::DrawIndirect { .. }
             | CommandOp::CopyFrameTargetToTexture { .. }
+            | CommandOp::CopyTextureToFrameTarget { .. }
             | CommandOp::Present { .. }
             | CommandOp::SetVertexBuffer { .. } => Err(GalError::backend(format!(
                 "OpenGL backend does not support command in isolated path: {op:?}"

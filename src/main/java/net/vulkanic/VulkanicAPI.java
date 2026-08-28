@@ -811,6 +811,11 @@ public class VulkanicAPI {
     public static <T> T withScopedBackendOverride(GraphicsBackend scopedBackend, Supplier<T> action) {
         Objects.requireNonNull(scopedBackend, "scopedBackend");
         Objects.requireNonNull(action, "action");
+        if (isVulkanBackendSelected()) {
+            throw new IllegalStateException(
+                "Selected Vulkan does not permit a scoped Java backend override; Rust Vulkan owns the route"
+            );
+        }
         if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
             && scopedBackend.getBackendType() != GraphicsBackendType.OPENGL) {
             throw new IllegalStateException(
@@ -835,13 +840,19 @@ public class VulkanicAPI {
         if (SCOPED_BACKEND_OVERRIDE.get() != null) {
             return null;
         }
-        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-            return null;
-        }
-        if (backend == null) {
-            initialize();
-        }
-        return rawVulkanBackend;
+		// rawVulkanBackend is installed atomically with Vulkan selection. Use the
+		// field directly here: calling isVulkanBackendSelected() would recurse
+		// through this helper while backend identity is being resolved. The raw
+		// Java Vulkan seam is intentionally unavailable once Vulkan is selected;
+		// Rust owns the whole-frame route and Java must not become a fallback.
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| rawVulkanBackend != null) {
+			return null;
+		}
+		if (backend == null) {
+			initialize();
+		}
+		return rawVulkanBackend;
     }
 
     private static void dispatchImplementedVoid(
@@ -906,7 +917,11 @@ public class VulkanicAPI {
         if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
             return backend != null && backend.getBackendType() == GraphicsBackendType.VULKAN;
         }
-        return getActiveBackendType() == GraphicsBackendType.VULKAN;
+        // This predicate is queried during renderer bootstrap and route
+        // fencing. It must never call getBackend()/initialize(), because an
+        // uninitialized process is not an implicit OpenGL selection.
+        return (backend != null && backend.getBackendType() == GraphicsBackendType.VULKAN)
+            || rawVulkanBackend != null;
     }
 
     /**
@@ -924,7 +939,8 @@ public class VulkanicAPI {
      * Returns true only when native Vulkan internals are active and ready.
      */
     public static boolean isNativeVulkanBackendReady() {
-        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+            || isVulkanBackendSelected()) {
             return false;
         }
         return getBackend().isNativeVulkanReady();
@@ -938,6 +954,10 @@ public class VulkanicAPI {
      * that explains why Vulkan-specific probes were skipped.</p>
      */
     public static VulkanReadinessReport getVulkanReadinessReport() {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+            || isVulkanBackendSelected()) {
+            return VulkanReadinessReport.forRustWholeFrameVulkan();
+        }
         if (rawVulkanBackend != null) {
             return rawVulkanBackend.getReadinessReport();
         }
@@ -965,7 +985,8 @@ public class VulkanicAPI {
      * currently active backend.
      */
     public static VulkanExecutionContextInfo getVulkanExecutionContextInfo() {
-        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+            || isVulkanBackendSelected()) {
             return VulkanExecutionContextInfo.unavailable(
                 GraphicsBackendType.VULKAN,
                 false,
@@ -987,7 +1008,8 @@ public class VulkanicAPI {
      * currently active backend.
      */
     public static VulkanSwapchainSurfaceInfo getVulkanSwapchainSurfaceInfo() {
-        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+            || isVulkanBackendSelected()) {
             return VulkanSwapchainSurfaceInfo.unavailable(
                 GraphicsBackendType.VULKAN,
                 false,
@@ -1010,6 +1032,12 @@ public class VulkanicAPI {
      * <p>OpenGL backends treat this as a no-op.</p>
      */
     public static void recreateVulkanSwapchain() {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+            || isVulkanBackendSelected()) {
+            throw new IllegalStateException(
+                "Java Vulkan swapchain recreation is disabled while Rust owns whole-frame Vulkan presentation"
+            );
+        }
         getBackend().recreateVulkanSwapchain();
     }
 
@@ -1020,6 +1048,12 @@ public class VulkanicAPI {
      * @return true when recreation occurred, false when no recreation was required
      */
     public static boolean recreateVulkanSwapchainIfNeeded() {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+            || isVulkanBackendSelected()) {
+            throw new IllegalStateException(
+                "Java Vulkan conditional swapchain recreation is disabled while Rust owns whole-frame Vulkan presentation"
+            );
+        }
         return getBackend().recreateVulkanSwapchainIfNeeded();
     }
 
@@ -1039,7 +1073,8 @@ public class VulkanicAPI {
         if (framebufferWidth <= 0 || framebufferHeight <= 0) {
             return false;
         }
-        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+            || isVulkanBackendSelected()) {
             return false;
         }
 
@@ -1056,7 +1091,8 @@ public class VulkanicAPI {
      * backend and returns structured diagnostics about the outcome.
      */
     public static VulkanNativeInitializationInfo initializeNativeVulkanRuntime() {
-        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+            || isVulkanBackendSelected()) {
             return VulkanNativeInitializationInfo.attempted(
                 GraphicsBackendType.VULKAN,
                 false,
@@ -1088,7 +1124,8 @@ public class VulkanicAPI {
      * an {@link IllegalStateException} containing initialization diagnostics.</p>
      */
     public static void initializeNativeVulkanRuntimeOnRendererStartupIfSelected() {
-        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+            || isVulkanBackendSelected()) {
             return;
         }
 
@@ -1183,7 +1220,8 @@ public class VulkanicAPI {
 				// explicit renderer bootstrap handshake remain legal; every other
 				// operation fails at the architectural boundary instead of becoming
 				// an invisible second backend.
-				if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+				if ((net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+					|| isVulkanBackendSelected())
 					&& !isRustWholeFrameBootstrapMethod(method.getName())) {
 					throw new IllegalStateException(
 						"Rust Vulkan whole-frame ownership is active; Java Vulkan backend method '"
@@ -1265,9 +1303,10 @@ public class VulkanicAPI {
      */
     public static CommandContext getCommandContext() {
         if (SCOPED_BACKEND_OVERRIDE.get() == null
-            && net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+            && (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+                || isVulkanBackendSelected())) {
             throw new IllegalStateException(
-                "Java Vulkan command-context access is disabled while Rust owns whole-frame Vulkan rendering"
+                "Java Vulkan command-context access is disabled on the selected Rust Vulkan route"
             );
         }
         java.util.ArrayDeque<CommandContext> stack = CONTEXT_STACK.get();
@@ -1286,6 +1325,11 @@ public class VulkanicAPI {
      */
     public static void pushCommandContext(CommandContext ctx) {
         if (ctx == null) return;
+        if (isVulkanBackendSelected()) {
+            throw new IllegalStateException(
+                "Selected Vulkan cannot install a Java command context scope"
+            );
+        }
         CONTEXT_STACK.get().push(ctx);
     }
 
@@ -1347,10 +1391,12 @@ public class VulkanicAPI {
      * Returns 0 or NULL if no context is current.
      */
     public static long getGraphicsContext() {
-        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+            || isVulkanBackendSelected()) {
             // Rust owns the Vulkan device and presentation surface. Returning
             // zero keeps this legacy OpenGL identity query from exposing a
-            // shared/native handle across the backend boundary.
+            // shared/native handle across the backend boundary, including the
+            // interval after Vulkan selection and before whole-frame admission.
             return 0L;
         }
         return getBackend().getGraphicsContext();
@@ -1614,6 +1660,7 @@ public class VulkanicAPI {
      * Returns true when the current context has the debug flag set.
      */
     public static boolean isDebugContext(CommandContext ctx) {
+        rejectJavaVulkanWholeFrameOperation("debug-context query");
         return (getBackend().getInteger(ctx, GL_CONTEXT_FLAGS) & GL_CONTEXT_FLAG_DEBUG_BIT) != 0;
     }
     
@@ -3939,7 +3986,8 @@ public class VulkanicAPI {
      * Enqueues a callback to run after all currently submitted GPU work completes.
      */
     public static void queueFencedTask(Runnable runnable) {
-        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| isVulkanBackendSelected()) {
             throw new IllegalStateException("Java GPU fenced callbacks are unavailable while Rust owns whole-frame Vulkan completion");
         }
         long syncObject = createGpuCompletionFence(getCommandContext());
@@ -3950,7 +3998,8 @@ public class VulkanicAPI {
      * Executes queued fenced callbacks whose GPU fences have signaled.
      */
     public static void executePendingFenceTasks() {
-        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| isVulkanBackendSelected()) {
             if (!PENDING_FENCED_TASKS.isEmpty()) {
                 throw new IllegalStateException("Java GPU fenced callbacks were queued while Rust owns whole-frame Vulkan completion");
             }
@@ -4015,6 +4064,12 @@ public class VulkanicAPI {
 
     public static void setDevice(GpuDevice gpuDevice) {
         assertOnRenderThread();
+        if (isVulkanBackendSelected()
+            && !(gpuDevice instanceof net.vulkanic.backends.vulkan.VulkanWholeFrameSemanticGpuDevice)) {
+            throw new IllegalStateException(
+                "Selected Vulkan accepts only the Rust Vulkan semantic device; Java GPU devices are unavailable"
+            );
+        }
         device = gpuDevice;
     }
 
@@ -4052,7 +4107,8 @@ public class VulkanicAPI {
      * callsites.
      */
     public static CommandEncoder createCommandEncoder() {
-        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+            || isVulkanBackendSelected()) {
             throw new IllegalStateException(
                 "Java Vulkan command-encoder access is disabled while Rust owns whole-frame Vulkan rendering"
             );
@@ -4083,7 +4139,8 @@ public class VulkanicAPI {
      * caller bypasses the normal semantic-device command-encoder path.
      */
     private static void rejectJavaVulkanWholeFrameOperation(String operation) {
-        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| isVulkanBackendSelected()) {
             throw new IllegalStateException(
                 "Java Vulkan " + operation
                     + " is disabled while Rust owns whole-frame Vulkan rendering"
@@ -4202,10 +4259,8 @@ public class VulkanicAPI {
         int height,
         int depthOrLayers,
         int mipLevels
-    ) {
-        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() && rawVulkanBackend != null) {
-			return getDevice().createTexture(supplier, usage, format, width, height, depthOrLayers, mipLevels);
-        }
+	) {
+		rejectJavaVulkanWholeFrameOperation("texture creation");
         VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
         return directVulkanBackend != null
             ? directVulkanBackend.createTexture(supplier, usage, format, width, height, depthOrLayers, mipLevels)
@@ -4224,9 +4279,7 @@ public class VulkanicAPI {
         int depthOrLayers,
         int mipLevels
     ) {
-        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() && rawVulkanBackend != null) {
-			return getDevice().createTexture(label, usage, format, width, height, depthOrLayers, mipLevels);
-        }
+		rejectJavaVulkanWholeFrameOperation("texture creation");
         VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
         return directVulkanBackend != null
             ? directVulkanBackend.createTexture(label, usage, format, width, height, depthOrLayers, mipLevels)
@@ -4237,9 +4290,7 @@ public class VulkanicAPI {
      * Creates a backend-owned GPU buffer with size allocation.
      */
     public static GpuBuffer createBuffer(@Nullable java.util.function.Supplier<String> supplier, int usage, int size) {
-        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() && rawVulkanBackend != null) {
-			return getDevice().createBuffer(supplier, usage, size);
-        }
+        rejectJavaVulkanWholeFrameOperation("buffer creation");
         VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
         return directVulkanBackend != null
             ? directVulkanBackend.createBuffer(supplier, usage, size)
@@ -4250,9 +4301,7 @@ public class VulkanicAPI {
      * Creates a backend-owned GPU buffer initialized from byte data.
      */
     public static GpuBuffer createBuffer(@Nullable java.util.function.Supplier<String> supplier, int usage, ByteBuffer data) {
-        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() && rawVulkanBackend != null) {
-			return getDevice().createBuffer(supplier, usage, data);
-        }
+        rejectJavaVulkanWholeFrameOperation("buffer creation");
         VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
         return directVulkanBackend != null
             ? directVulkanBackend.createBuffer(supplier, usage, data)
@@ -4263,9 +4312,7 @@ public class VulkanicAPI {
      * Creates a backend-owned texture view for a full texture range.
      */
     public static GpuTextureView createTextureView(GpuTexture texture) {
-        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() && rawVulkanBackend != null) {
-			return getDevice().createTextureView(texture);
-        }
+        rejectJavaVulkanWholeFrameOperation("texture-view creation");
         VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
         return directVulkanBackend != null
             ? directVulkanBackend.createTextureView(texture)
@@ -4276,9 +4323,7 @@ public class VulkanicAPI {
      * Creates a backend-owned texture view for an explicit mip range.
      */
     public static GpuTextureView createTextureView(GpuTexture texture, int baseMipLevel, int mipLevelCount) {
-        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() && rawVulkanBackend != null) {
-			return getDevice().createTextureView(texture, baseMipLevel, mipLevelCount);
-        }
+        rejectJavaVulkanWholeFrameOperation("texture-view creation");
         VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
         return directVulkanBackend != null
             ? directVulkanBackend.createTextureView(texture, baseMipLevel, mipLevelCount)
@@ -4359,7 +4404,8 @@ public class VulkanicAPI {
 
     public static void initializeDynamicUniforms() {
         assertOnRenderThread();
-        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() && rawVulkanBackend != null) {
+        if ((net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+                || net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) && rawVulkanBackend != null) {
 			// The whole-frame route uses only semantic CPU buffers here; DynamicUniforms
 			// constructs a MappableRingBuffer immediately.  That
 			// Java-owned GPU resource is not part of the semantic whole-frame
@@ -4381,12 +4427,41 @@ public class VulkanicAPI {
     }
 
     public static void resetDynamicUniforms() {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
 			// No Java dynamic-uniform ring is created while Rust owns the frame.
             return;
 		}
         getDynamicUniforms().reset();
     }
+
+	/** Releases Java-owned shared index buffers before Rust owns Vulkan frames. */
+	public static void ensureRustSemanticRoute() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+			if (dynamicUniforms != null) {
+				dynamicUniforms.close();
+				dynamicUniforms = null;
+			}
+			sharedSequential.releaseRustSemanticRoute();
+			sharedSequentialQuad.releaseRustSemanticRoute();
+			sharedSequentialLines.releaseRustSemanticRoute();
+			projectionMatrixBuffer = null;
+			savedProjectionMatrixBuffer = null;
+			shaderFog = null;
+			shaderLightDirections = null;
+			globalSettingsUniform = null;
+			outputColorTextureOverride = null;
+			outputDepthTextureOverride = null;
+			projectionMatrixLabels.clear();
+			// Do not touch Iris classes on this boundary.  The selected Rust Vulkan
+			// route intentionally skips Iris GPU lifecycle initialization; invoking
+			// Iris cleanup here would trigger IrisRenderSystem class initialization,
+			// whose static sampler state asks for Java Vulkan command context and
+			// crashes before the first Rust-owned frame.  Rust-owned shader-pack/PBR
+			// resources are released by their copied semantic generation instead.
+		}
+	}
 
     public static VulkanicAPI.AutoStorageIndexBuffer getSequentialBuffer(VertexFormat.Mode mode) {
         assertOnRenderThread();
@@ -4424,6 +4499,12 @@ public class VulkanicAPI {
 
         private void ensureStorage(int i) {
             if (!this.hasStorage(i)) {
+				if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+					|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+					throw new IllegalStateException(
+						"Java sequential index-buffer allocation is unavailable on the Rust Vulkan route"
+					);
+				}
                 i = Mth.roundToward(i * 2, this.indexStride);
                 int j = i / this.indexStride;
                 int k = j * this.vertexStride;
@@ -4457,8 +4538,16 @@ public class VulkanicAPI {
             return switch (this.type) {
                 case SHORT -> i -> byteBuffer.putShort((short)i);
                 case INT -> byteBuffer::putInt;
-            };
+        };
         }
+
+		private void releaseRustSemanticRoute() {
+			if (this.buffer != null) {
+				this.buffer.close();
+				this.buffer = null;
+			}
+			this.indexCount = 0;
+		}
 
         public VertexFormat.IndexType type() {
             return this.type;
@@ -4594,6 +4683,13 @@ public class VulkanicAPI {
     }
 
     public static void setOutputColorTextureOverride(@Nullable GpuTextureView gpuTextureView) {
+        if (SCOPED_BACKEND_OVERRIDE.get() == null
+            && (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+                || isVulkanBackendSelected())) {
+            throw new IllegalStateException(
+                "Java Vulkan color-target override is disabled on the selected Rust Vulkan route"
+            );
+        }
         assertOnRenderThread();
         outputColorTextureOverride = gpuTextureView;
     }
@@ -4605,6 +4701,13 @@ public class VulkanicAPI {
     }
 
     public static void setOutputDepthTextureOverride(@Nullable GpuTextureView gpuTextureView) {
+        if (SCOPED_BACKEND_OVERRIDE.get() == null
+            && (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+                || isVulkanBackendSelected())) {
+            throw new IllegalStateException(
+                "Java Vulkan depth-target override is disabled on the selected Rust Vulkan route"
+            );
+        }
         assertOnRenderThread();
         outputDepthTextureOverride = gpuTextureView;
     }
@@ -4616,7 +4719,8 @@ public class VulkanicAPI {
     }
 
     public static void setShaderFog(@Nullable GpuBufferSlice gpuBufferSlice) {
-        if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			&& !isVulkanBackendSelected()) {
             if (fogStartListener != null) {
                 fogStartListener.run();
             }
@@ -4654,6 +4758,13 @@ public class VulkanicAPI {
      * Binds shared/default per-frame uniforms expected by standard pipelines.
      */
     public static void bindDefaultUniforms(RenderPass renderPass) {
+        if (SCOPED_BACKEND_OVERRIDE.get() == null
+            && (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+                || isVulkanBackendSelected())) {
+            throw new IllegalStateException(
+                "Java Vulkan default-uniform binding is disabled on the selected Rust Vulkan route"
+            );
+        }
         GpuBufferSlice projection = getProjectionMatrixBuffer();
         if (projection != null) {
             renderPass.setUniform("Projection", projection);
@@ -4787,7 +4898,8 @@ public class VulkanicAPI {
 	 */
 	@Nullable
 	private static GpuDevice wholeFrameSemanticDevice() {
-		return net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() ? device : null;
+		return (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| isVulkanBackendSelected()) ? device : null;
 	}
 
     /**
@@ -4797,7 +4909,8 @@ public class VulkanicAPI {
      * while GL/Vulkan-specific handle semantics remain backend-owned.</p>
      */
     public static int getTextureHandle(@Nullable GpuTexture texture) {
-        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| isVulkanBackendSelected()) {
             throw new IllegalStateException("Java Vulkan texture handles are unavailable while Rust owns whole-frame presentation");
         }
         if (texture == null) {
@@ -4822,7 +4935,8 @@ public class VulkanicAPI {
      * while GL/Vulkan-specific handle semantics remain backend-owned.</p>
      */
     public static int getBufferHandle(@Nullable GpuBuffer buffer) {
-        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| isVulkanBackendSelected()) {
             throw new IllegalStateException("Java Vulkan buffer handles are unavailable while Rust owns whole-frame presentation");
         }
         if (buffer == null) {
@@ -4840,7 +4954,8 @@ public class VulkanicAPI {
      * Returns a backend-native framebuffer handle for a color/depth texture pair.
      */
     public static int resolveFramebufferForTextures(@Nullable GpuTexture colorTexture, @Nullable GpuTexture depthTexture) {
-        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| isVulkanBackendSelected()) {
             throw new IllegalStateException("Java Vulkan framebuffer handles are unavailable while Rust owns whole-frame presentation");
         }
         if (colorTexture == null) {
@@ -10971,6 +11086,9 @@ public class VulkanicAPI {
                     + "Readiness report: Rust owns frame acquisition and presentation"
             );
         }
+        if (isVulkanBackendSelected()) {
+            throw new IllegalStateException("Java Vulkan beginFrame is unavailable until the Rust whole-frame presenter is admitted");
+        }
         VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
         if (directVulkanBackend != null) {
             return directVulkanBackend.beginFrame();
@@ -10991,6 +11109,9 @@ public class VulkanicAPI {
                     + "Readiness report: Rust owns frame submission and presentation"
             );
         }
+        if (isVulkanBackendSelected()) {
+            throw new IllegalStateException("Java Vulkan endFrame is unavailable until the Rust whole-frame presenter is admitted");
+        }
         VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
         if (directVulkanBackend != null) {
             directVulkanBackend.endFrame();
@@ -11008,6 +11129,9 @@ public class VulkanicAPI {
                 "Java Vulkan presentTextureToScreen is disabled while Rust owns whole-frame Vulkan presentation\n"
                     + "Readiness report: Rust owns the sole presenter"
             );
+        }
+        if (isVulkanBackendSelected()) {
+            throw new IllegalStateException("Java Vulkan presentTextureToScreen is unavailable until the Rust whole-frame presenter is admitted");
         }
         VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
         if (directVulkanBackend != null) {

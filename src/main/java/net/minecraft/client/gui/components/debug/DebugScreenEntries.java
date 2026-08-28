@@ -42,8 +42,8 @@ public class DebugScreenEntries {
 	public static final ResourceLocation CHUNK_SECTION_VISIBILITY = register("chunk_section_visibility", new DebugEntryNoop());
 	
 	// Iris debug entries
-	public static final ResourceLocation IRIS = register(ResourceLocation.fromNamespaceAndPath("iris", "iris"), new net.irisshaders.iris.gui.debug.IrisDebugEntry());
-	public static final ResourceLocation IRIS_DEBUG = register(ResourceLocation.fromNamespaceAndPath("iris", "debug"), new net.irisshaders.iris.gui.debug.IrisTrueDebugEntry());
+	public static final ResourceLocation IRIS = register(ResourceLocation.fromNamespaceAndPath("iris", "iris"), new IrisCompatibilityDebugEntry(false));
+	public static final ResourceLocation IRIS_DEBUG = register(ResourceLocation.fromNamespaceAndPath("iris", "debug"), new IrisCompatibilityDebugEntry(true));
 	
 	public static final Map<DebugScreenProfile, Map<ResourceLocation, DebugScreenEntryStatus>> PROFILES;
 
@@ -58,6 +58,36 @@ public class DebugScreenEntries {
 
 	public static Map<ResourceLocation, DebugScreenEntry> allEntries() {
 		return Map.copyOf(ENTRIES_BY_LOCATION);
+	}
+
+	/**
+	 * Keeps Iris debug pages available for Java OpenGL while preventing their
+	 * runtime classes from being constructed or queried on Rust-owned Vulkan.
+	 */
+	private static final class IrisCompatibilityDebugEntry implements DebugScreenEntry {
+		private final boolean detailed;
+
+		private IrisCompatibilityDebugEntry(boolean detailed) {
+			this.detailed = detailed;
+		}
+
+		@Override
+		public void display(DebugScreenDisplayer displayer, @Nullable net.minecraft.world.level.Level level,
+			@Nullable net.minecraft.world.level.chunk.LevelChunk chunk, @Nullable net.minecraft.world.level.chunk.LevelChunk chunk2) {
+			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+				|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+				return;
+			}
+			DebugScreenEntry delegate = detailed
+				? new net.irisshaders.iris.gui.debug.IrisTrueDebugEntry()
+				: new net.irisshaders.iris.gui.debug.IrisDebugEntry();
+			delegate.display(displayer, level, chunk, chunk2);
+		}
+
+		@Override
+		public DebugEntryCategory category() {
+			return DebugEntryCategory.RENDERER;
+		}
 	}
 
 	@Nullable

@@ -39,6 +39,10 @@ public class AtlasPBRLoader implements PBRTextureLoader<TextureAtlas> {
 
 	@Override
 	public void load(TextureAtlas atlas, ResourceManager resourceManager, PBRTextureConsumer pbrTextureConsumer) {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris PBR atlas loading is unavailable on the Rust Vulkan route");
+		}
 		int atlasWidth = atlas.getWidth();
 		int atlasHeight = atlas.getHeight();
 		int mipLevel = atlas.mipLevel;

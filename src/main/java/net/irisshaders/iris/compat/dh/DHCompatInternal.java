@@ -48,7 +48,7 @@ public class DHCompatInternal {
 
 	public DHCompatInternal(IrisRenderingPipeline pipeline, boolean dhShadowEnabled) {
 		this.pipeline = pipeline;
-		if (VulkanicAPI.isVulkanBackendInitializedAndSelected() || RustGalVulkanWholeFrameMode.enabled()) {
+		if (VulkanicAPI.isVulkanBackendSelected() || RustGalVulkanWholeFrameMode.enabled()) {
 			// DH's Iris compatibility implementation owns Java framebuffers,
 			// programs, and legacy depth copies. Rust Vulkan receives DH through
 			// copied semantic columns instead; constructing this object would

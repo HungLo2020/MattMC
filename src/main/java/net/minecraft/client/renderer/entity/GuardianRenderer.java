@@ -123,13 +123,15 @@ public class GuardianRenderer extends MobRenderer<Guardian, GuardianRenderState,
 		};
 		int beamColor = (255 << 24) | (n << 16) | (o << 8) | p;
 		int[] colors = {beamColor, beamColor, beamColor, beamColor, beamColor, beamColor, beamColor, beamColor, beamColor, beamColor, beamColor, beamColor};
-		if (submitNodeCollector.submitGuardianBeam(poseStack, BEAM_RENDER_TYPE, GUARDIAN_BEAM_LOCATION, vertices, uvs, colors, 15728880)) {
+		if (submitNodeCollector.submitGuardianBeamSemantic(poseStack, BEAM_RENDER_TYPE, GUARDIAN_BEAM_LOCATION, vertices, uvs, colors, 15728880)) {
 			return;
 		}
-		if (net.vulkanic.world.WorldRenderRoutePolicy.currentGuardianBeamRoute().usesRustWholeFrameVulkan()) {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.world.WorldRenderRoutePolicy.currentGuardianBeamRoute().usesRustWholeFrameVulkan()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			throw new IllegalStateException("Rust whole-frame Guardian beam route rejected semantic quads");
 		}
-		submitNodeCollector.submitCustomGeometry(poseStack, BEAM_RENDER_TYPE, (pose, vertexConsumer) -> {
+		submitNodeCollector.submitCustomGeometrySemantic(poseStack, BEAM_RENDER_TYPE, (pose, vertexConsumer) -> {
 			vertex(vertexConsumer, pose, aa, i, ab, n, o, p, 0.4999F, am);
 			vertex(vertexConsumer, pose, aa, 0.0F, ab, n, o, p, 0.4999F, al);
 			vertex(vertexConsumer, pose, ac, 0.0F, ad, n, o, p, 0.0F, al);

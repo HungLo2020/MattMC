@@ -45,6 +45,9 @@ pub const FFI_MAX_INLINE_BYTES: usize = 64 * 1024 * 1024;
 /// A 16-million-pixel RGBA semantic image is the largest Java producer may
 /// publish, so the ABI must admit its 64 MiB byte representation intact.
 pub const FFI_MAX_GUI_ASSET_BYTES: usize = 64 * 1024 * 1024;
+/// Hard ceiling for one copied whole-frame semantic request.  This bounds the
+/// transient FFI decode arena before any producer-owned vectors are expanded.
+pub const FFI_MAX_WHOLE_FRAME_INPUT_BYTES: u64 = 512 * 1024 * 1024;
 pub const FFI_MAX_WORLD_BORDER_ASSET_BYTES: usize = 2 * 1024 * 1024;
 pub const FFI_MAX_WORLD_CRACK_ASSET_BYTES: usize = 4 * 1024 * 1024;
 pub const FFI_MAX_WORLD_MATERIAL_ASSET_BYTES: usize = 4 * 1024 * 1024;
@@ -856,6 +859,7 @@ pub struct FfiWorldMaterialQuadRequest {
     pub vertex1_packed_light: u32,
     pub vertex2_packed_light: u32,
     pub vertex3_packed_light: u32,
+    pub block_entity_id: i32,
 }
 
 #[repr(C)]
@@ -904,6 +908,7 @@ pub struct FfiWorldMaterialCompactQuadRequest {
     pub uv3_v: f32,
     pub source_color_argb: u32,
     pub packed_light: u32,
+    pub block_entity_id: i32,
 }
 
 #[repr(C)]
@@ -1193,6 +1198,14 @@ pub struct FfiWorldMeshInstanceRecord {
     /// Straight ARGB semantic outline color consumed by the Rust-owned entity
     /// mask and post-effect chain; zero means no outline request.
     pub outline_color_argb: u32,
+    /// Explicit semantic instance flags. Bit 0 requests outline-only drawing:
+    /// the mesh feeds the Rust outline mask but is omitted from the regular
+    /// material pass.
+    pub flags: u32,
+    /// Copied vanilla block-state registry identity for block-entity shader
+    /// semantics. -1 is the explicit non-block-entity value; this is never an
+    /// Iris map lookup or backend handle.
+    pub block_entity_id: i32,
 }
 
 #[repr(C)]
@@ -1398,6 +1411,8 @@ pub struct FfiWorldTextQuadRequest {
     pub model_view_matrix: [f32; 16],
     pub positions: [f32; 12],
     pub uvs: [f32; 8],
+    /// Scoped semantic block-entity identity; `-1` means no block entity.
+    pub block_entity_id: i32,
 }
 
 /// One copied source font-atlas image. This is an immutable semantic payload,

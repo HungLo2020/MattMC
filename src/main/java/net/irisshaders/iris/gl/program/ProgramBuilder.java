@@ -35,6 +35,7 @@ public class ProgramBuilder extends ProgramUniforms.Builder implements SamplerHo
 
 	public static ProgramBuilder begin(String name, @Nullable String vertexSource, @Nullable String geometrySource,
 									   @Nullable String fragmentSource, ImmutableSet<Integer> reservedTextureUnits) {
+			ensureJavaProgramAvailable();
 		RenderSystem.assertOnRenderThread();
 
 		GlShader vertex;
@@ -71,6 +72,7 @@ public class ProgramBuilder extends ProgramUniforms.Builder implements SamplerHo
 	}
 
 	public static ProgramBuilder beginCompute(String name, @Nullable String source, ImmutableSet<Integer> reservedTextureUnits) {
+		ensureJavaProgramAvailable();
 		RenderSystem.assertOnRenderThread();
 
 		if (!IrisRenderSystem.supportsCompute()) {
@@ -88,6 +90,7 @@ public class ProgramBuilder extends ProgramUniforms.Builder implements SamplerHo
 
 	@Nullable
 	public static ProgramBuilder beginComputeIfSupported(String name, @Nullable String source, ImmutableSet<Integer> reservedTextureUnits) {
+		ensureJavaProgramAvailable();
 		RenderSystem.assertOnRenderThread();
 
 		if (!IrisRenderSystem.supportsCompute()) {
@@ -96,6 +99,13 @@ public class ProgramBuilder extends ProgramUniforms.Builder implements SamplerHo
 		}
 
 		return beginCompute(name, source, reservedTextureUnits);
+	}
+
+	private static void ensureJavaProgramAvailable() {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris shader-program creation is unavailable on the Rust Vulkan route");
+		}
 	}
 
 	private static GlShader buildShader(ShaderType shaderType, String name, @Nullable String source) {

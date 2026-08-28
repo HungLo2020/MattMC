@@ -51,6 +51,13 @@ public class GlyphStitcher implements AutoCloseable {
 		return List.copyOf(list);
 	}
 
+	public void ensureRustSemanticRoute() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+			for (FontTexture texture : this.textures) texture.ensureRustSemanticRoute();
+		}
+	}
+
 	@Nullable
 	public BakedSheetGlyph stitch(GlyphInfo glyphInfo, GlyphBitmap glyphBitmap) {
 		for (FontTexture fontTexture : this.textures) {

@@ -61,7 +61,8 @@ public class ScreenQuad
 	
 	public void render()
 	{
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+				|| VulkanicAPI.isVulkanBackendSelected())
 		{
 			throw new IllegalStateException("Java DH screen-quad rendering is unavailable while Rust owns whole-frame presentation");
 		}
@@ -75,7 +76,8 @@ public class ScreenQuad
 
 	public void render(CommandContext ctx, @Nullable DhFramebuffer targetFramebuffer)
 	{
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+				|| VulkanicAPI.isVulkanBackendSelected())
 		{
 			throw new IllegalStateException("Java DH screen-quad rendering is unavailable while Rust owns whole-frame presentation");
 		}

@@ -123,11 +123,14 @@ public final class IrisVulkanRenderTargetContract {
 
 		public PipelineHandle createPipeline(PipelineDescriptor descriptor) {
 			Objects.requireNonNull(descriptor, "descriptor must not be null");
-			if (VulkanicAPI.isVulkanBackendSelected()
-				&& net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-				&& this.descriptor == null) {
+			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 				throw new IllegalStateException(
-					"Iris Java Vulkan pipeline fallback is unavailable while Rust owns whole-frame presentation"
+					"Iris Java Vulkan render-pass fallback is unavailable while Rust owns whole-frame presentation"
+				);
+			}
+			if (VulkanicAPI.isVulkanBackendSelected()) {
+				throw new IllegalStateException(
+					"Iris Java Vulkan pipeline construction is unavailable; Rust owns the selected Vulkan route"
 				);
 			}
 			if (this.descriptor != null) {
@@ -141,11 +144,14 @@ public final class IrisVulkanRenderTargetContract {
 
 		public RenderPass createRenderPass(Supplier<String> label) {
 			Objects.requireNonNull(label, "label must not be null");
-			if (VulkanicAPI.isVulkanBackendSelected()
-				&& net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-				&& this.descriptor == null) {
+			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 				throw new IllegalStateException(
 					"Iris Java Vulkan render-pass fallback is unavailable while Rust owns whole-frame presentation"
+				);
+			}
+			if (VulkanicAPI.isVulkanBackendSelected()) {
+				throw new IllegalStateException(
+					"Iris Java Vulkan render-pass creation is unavailable; Rust owns the selected Vulkan route"
 				);
 			}
 			return this.descriptor != null

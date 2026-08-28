@@ -37,6 +37,15 @@ class WorldTextSemanticCollectorTest {
 	}
 
 	@Test
+	void bridgeRecordPreservesScopedBlockEntityIdentity() {
+		WorldTextSemanticCollector.WorldTextQuad quad = new WorldTextSemanticCollector.WorldTextQuad(
+			"minecraft:font/ascii", 1L, 1L, false, WorldTextSemanticCollector.DEPTH_NORMAL,
+			0, 0xFFFFFFFF, 0.0, identityMatrix(), 42, glyph()
+		);
+		assertEquals(42, quad.toBridgeRecord().blockEntityId());
+	}
+
+	@Test
 	void worldTextQuadRejectsInvalidTransportState() {
 		assertThrows(IllegalArgumentException.class, () -> quad(new float[15]));
 		float[] nonFinite = identityMatrix();
@@ -45,6 +54,18 @@ class WorldTextSemanticCollectorTest {
 		assertThrows(IllegalArgumentException.class, () -> new WorldTextSemanticCollector.WorldTextQuad(
 			"minecraft:font/ascii", 1L, 1L, false, 99, 0, 0xFFFFFFFF, 0.0, identityMatrix(), glyph()
 		));
+		assertThrows(IllegalArgumentException.class, () -> quadWithDistance(Double.NaN));
+		assertThrows(IllegalArgumentException.class, () -> quadWithDistance(-1.0));
+	}
+
+	@Test
+	void worldTextImagesRequireExactRgbaPayloadExtent() {
+		assertThrows(IllegalArgumentException.class, () -> new WorldTextSemanticCollector.WorldTextImage(
+			1L, "minecraft:font/ascii", 1L, 1L, false, 2, 2, new byte[15]));
+		new WorldTextSemanticCollector.WorldTextImage(
+			2L, "minecraft:font/ascii", 1L, 1L, false, 2, 2, new byte[4]);
+		new WorldTextSemanticCollector.WorldTextImage(
+			3L, "minecraft:font/ascii", 1L, 1L, true, 2, 2, new byte[16]);
 	}
 
 	@Test
@@ -75,6 +96,12 @@ class WorldTextSemanticCollectorTest {
 			"minecraft:font/ascii", 1L, 1L, false, WorldTextSemanticCollector.DEPTH_NORMAL,
 			0, 0xFFFFFFFF, 0.0, matrix, glyph()
 		);
+	}
+
+	private static WorldTextSemanticCollector.WorldTextQuad quadWithDistance(double distance) {
+		return new WorldTextSemanticCollector.WorldTextQuad(
+			"minecraft:font/ascii", 1L, 1L, false, WorldTextSemanticCollector.DEPTH_NORMAL,
+			0, 0xFFFFFFFF, distance, identityMatrix(), glyph());
 	}
 
 	private static TextGlyphQuad glyph() {

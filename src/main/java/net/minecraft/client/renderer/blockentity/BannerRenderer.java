@@ -155,7 +155,7 @@ public class BannerRenderer implements BlockEntityRenderer<BannerBlockEntity, Ba
 		poseStack.mulPose(Axis.YP.rotationDegrees(f));
 		poseStack.scale(0.6666667F, -0.6666667F, -0.6666667F);
 		Material material = ModelBakery.BANNER_BASE;
-		submitNodeCollector.submitModel(
+		submitNodeCollector.submitModelSemantic(
 			bannerModel, Unit.INSTANCE, poseStack, material.renderType(RenderType::entitySolid), i, j, -1, materialSet.get(material), k, crumblingOverlay
 		);
 		submitPatterns(
@@ -180,11 +180,11 @@ public class BannerRenderer implements BlockEntityRenderer<BannerBlockEntity, Ba
 		@Nullable ModelFeatureRenderer.CrumblingOverlay crumblingOverlay,
 		int k
 	) {
-		submitNodeCollector.submitModel(
+		submitNodeCollector.submitModelSemantic(
 			model, object, poseStack, material.renderType(RenderType::entitySolid), i, j, -1, materialSet.get(material), k, crumblingOverlay
 		);
 		if (bl2) {
-			submitNodeCollector.submitModel(model, object, poseStack, RenderType.entityGlint(), i, j, -1, materialSet.get(material), 0, crumblingOverlay);
+			submitNodeCollector.submitModelSemantic(model, object, poseStack, RenderType.entityGlint(), i, j, -1, materialSet.get(material), 0, crumblingOverlay);
 		}
 
 		submitPatternLayer(materialSet, poseStack, submitNodeCollector, i, j, model, object, bl ? Sheets.BANNER_BASE : Sheets.SHIELD_BASE, dyeColor, crumblingOverlay);
@@ -209,7 +209,7 @@ public class BannerRenderer implements BlockEntityRenderer<BannerBlockEntity, Ba
 		@Nullable ModelFeatureRenderer.CrumblingOverlay crumblingOverlay
 	) {
 		int k = dyeColor.getTextureDiffuseColor();
-		submitNodeCollector.submitModel(
+		submitNodeCollector.submitModelSemantic(
 			model, object, poseStack, material.renderType(RenderType::entityNoOutline), i, j, k, materialSet.get(material), 0, crumblingOverlay
 		);
 	}

@@ -20,10 +20,17 @@ public final class RustGalPanoramaRenderer {
 	}
 
 	public static boolean enqueue(CubeMap cubeMap, float pitchDegrees, float yawDegrees, int guiWidth, int guiHeight) {
-		if (!RustGalGuiRenderer.isWholeFrameVulkanActive() || guiWidth <= 0 || guiHeight <= 0) return false;
+		if (!RustGalGuiRenderer.isWholeFrameVulkanEnabled()
+			|| guiWidth <= 0 || guiHeight <= 0
+			|| guiWidth > Integer.MAX_VALUE - 2 || guiHeight > Integer.MAX_VALUE - 2
+			|| !Float.isFinite(pitchDegrees) || !Float.isFinite(yawDegrees)) {
+			// Returning false is intentional: CubeMap.render converts an unavailable
+			// semantic panorama into a hard failure on the Rust route, never a Java
+			// texture/presenter fallback.
+			return false;
+		}
 		RustGalGuiRawImageAssets.Asset image = RustGalGuiRawImageAssets.resolveCubeMap(cubeMap.semanticTextureLocation());
 		if (image == null) return false;
-		RustGalGuiRawImageAssets.stageCubeMap(image);
 		int guard = 1;
 		int renderWidth = guiWidth + guard * 2;
 		int renderHeight = guiHeight + guard * 2;
@@ -57,14 +64,21 @@ public final class RustGalPanoramaRenderer {
 			guiWidth, guiHeight, renderWidth, renderHeight, guard, vertices, indices
 		);
 		RustGalFrameCoordinator.enqueueGuiMeshItemRequest(List.of(batch), GuiRenderStratum.GUI_PANORAMA, System.nanoTime());
+		// Stage only after the bounded mesh request is accepted. This keeps a
+		// rejected panorama request from retaining a Rust-owned cube-map asset.
+		RustGalGuiRawImageAssets.stageCubeMap(image);
 		return true;
 	}
 
-	private static float[] cubeUv(Matrix4f matrix, float clipX, float clipY, float projectionX, float projectionY) {
+	static float[] cubeUv(Matrix4f matrix, float clipX, float clipY, float projectionX, float projectionY) {
 		float x = clipX / projectionX, y = clipY / projectionY, z = -1.0F;
-		float dx = matrix.m00() * x + matrix.m01() * y + matrix.m02() * z;
-		float dy = matrix.m10() * x + matrix.m11() * y + matrix.m12() * z;
-		float dz = matrix.m20() * x + matrix.m21() * y + matrix.m22() * z;
+		// JOML stores matrices column-major; transform the clip-space ray by
+		// columns (m00,m10,m20), (m01,m11,m21), (m02,m12,m22). The previous
+		// row-indexed multiplication mirrored rotations and selected the wrong
+		// cube-map face for non-zero panorama yaw/pitch.
+		float dx = matrix.m00() * x + matrix.m10() * y + matrix.m20() * z;
+		float dy = matrix.m01() * x + matrix.m11() * y + matrix.m21() * z;
+		float dz = matrix.m02() * x + matrix.m12() * y + matrix.m22() * z;
 		float ax = Math.abs(dx), ay = Math.abs(dy), az = Math.abs(dz);
 		float u, v, face;
 		if (ax >= ay && ax >= az) {

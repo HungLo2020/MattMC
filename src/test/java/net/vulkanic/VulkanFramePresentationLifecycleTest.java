@@ -83,6 +83,8 @@ public class VulkanFramePresentationLifecycleTest {
             .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanFrameExecutionCoordinator.java"));
         String renderSystemSource = readSource(PROJECT_ROOT
             .resolve("src/main/java/net/blaze3d/systems/RenderSystem.java"));
+        String minecraftSource = readSource(PROJECT_ROOT
+            .resolve("src/main/java/net/minecraft/client/Minecraft.java"));
         String glCommandEncoderSource = readSource(PROJECT_ROOT
             .resolve("src/main/java/net/blaze3d/opengl/GlCommandEncoder.java"));
         String openGLBackendSource = readSource(PROJECT_ROOT
@@ -185,6 +187,17 @@ public class VulkanFramePresentationLifecycleTest {
             Math.min(renderSystemSource.length(), wholeFrameBranch + 650));
         assertTrue(wholeFrameFlipSource.contains("return;"),
             "Rust whole-frame Vulkan flip path must return before Java beginFrame/endFrame or GLFW presentation");
+        int javaSwap = renderSystemSource.indexOf("GLFW.glfwSwapBuffers(window.handle())", wholeFrameBranch);
+        int wholeFrameReturn = renderSystemSource.indexOf("return;", wholeFrameBranch);
+        assertTrue(javaSwap > wholeFrameReturn,
+            "Java GLFW swap must remain after the Rust whole-frame early return");
+        int wholeFrameLoopBranch = minecraftSource.indexOf("rustWholeFrameShell =");
+        assertTrue(wholeFrameLoopBranch >= 0,
+            "Minecraft render loop should make Rust whole-frame ownership explicit before Java blit");
+        int javaBlit = minecraftSource.indexOf("renderTarget.blitToScreen()", wholeFrameLoopBranch);
+        int loopElse = minecraftSource.indexOf("} else {", wholeFrameLoopBranch);
+        assertTrue(javaBlit > loopElse,
+            "Java RenderTarget blit must remain in the non-whole-frame branch");
         assertTrue(renderSystemSource.contains("GLFW.glfwSwapBuffers(window.handle())"),
             "RenderSystem must preserve OpenGL swap-buffers path");
         assertTrue(glCommandEncoderSource.contains("VulkanicCoreAPI.presentTextureToScreen(ctx, gpuTextureView);"),
@@ -197,6 +210,21 @@ public class VulkanFramePresentationLifecycleTest {
             "OpenGL present path should avoid hard dependency on GL45 named-framebuffer attachment calls");
         assertFalse(openGLPresentSource.contains("GL45.glBlitNamedFramebuffer"),
             "OpenGL present path should avoid hard dependency on GL45 named-framebuffer blit calls");
+    }
+
+    @Test
+    public void testRustCoordinatorPollsAndRetiresCompletedSubmissionsDuringNormalFrames() throws Exception {
+        String coordinator = readSource(PROJECT_ROOT
+            .resolve("src/main/java/net/vulkanic/gui/RustGalFrameCoordinator.java"));
+        int method = coordinator.indexOf("private static void retireOutstanding(boolean force)");
+        int nonForced = coordinator.indexOf("if (!force)", method);
+        int completion = coordinator.indexOf("bridge.completion(lastSubmitted)", nonForced);
+        int retire = coordinator.indexOf("bridge.retire(retireThrough)", nonForced);
+        assertTrue(method >= 0 && nonForced > method && completion > nonForced && retire > completion,
+            "normal Rust frames must poll completion and retire completed submissions");
+        String nonForcedBody = coordinator.substring(nonForced, retire);
+        assertFalse(nonForcedBody.matches("(?s).*if \\(\\!force\\)\\s*\\{\\s*return;\\s*\\}.*"),
+            "non-forced retirement must not remain an unconditional no-op");
     }
 
     private static void resetBackendState() throws Exception {

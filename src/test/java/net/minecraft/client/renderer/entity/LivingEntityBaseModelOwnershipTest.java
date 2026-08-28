@@ -23,8 +23,8 @@ final class LivingEntityBaseModelOwnershipTest {
 		int available = source.indexOf("Disposition.RUST_AVAILABLE", classification);
 		int enqueue = source.indexOf("RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMesh(", available);
 		int unavailable = source.indexOf("Disposition.RUST_UNAVAILABLE", enqueue);
-		int javaSubmit = source.indexOf("submitNodeCollector.submitModel(", unavailable);
-		int layerLoop = source.indexOf("if (this.shouldRenderLayers", javaSubmit);
+		int semanticSubmit = source.indexOf("submitNodeCollector.submitModelSemantic(", unavailable);
+		int layerLoop = source.indexOf("if (this.shouldRenderLayers", semanticSubmit);
 
 		assertTrue(family >= 0, "living renderer must identify the bounded migrated base-model family independently");
 		assertTrue(eligibility > family, "per-state eligibility must remain separate from family ownership");
@@ -33,11 +33,11 @@ final class LivingEntityBaseModelOwnershipTest {
 		assertTrue(available > classification, "admitted Rust base-model state must be explicit");
 		assertTrue(enqueue > available, "only admitted migrated base models may enqueue Rust mesh work");
 		assertTrue(unavailable > enqueue, "unsupported Rust-owned base-model state must be explicit");
-		assertTrue(javaSubmit > unavailable, "Java base-model submit must remain outside the Rust-unavailable branch");
-		assertTrue(layerLoop > javaSubmit, "feature layers must remain a distinct later migration surface");
+		assertTrue(semanticSubmit > unavailable, "semantic base-model submission must remain explicit after Rust-unavailable handling");
+		assertTrue(layerLoop > semanticSubmit, "feature layers must remain a distinct later migration surface");
 		assertTrue(source.contains("\"rust-vulkan-unavailable\""), "unavailable migrated base-model state must be observable");
 		assertFalse(
-			source.substring(unavailable, javaSubmit).contains("submitNodeCollector.submitModel("),
+			source.substring(unavailable, semanticSubmit).contains("submitNodeCollector.submitModel("),
 			"Rust-unavailable migrated base models must not fall through to Java base-model submission"
 		);
 		assertFalse(

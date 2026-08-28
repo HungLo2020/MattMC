@@ -57,23 +57,25 @@ public class SkyRenderer implements AutoCloseable {
 	private static final float END_FLASH_HEIGHT = 100.0F;
 	private static final float END_FLASH_SCALE = 60.0F;
 	@Nullable
-	private final GpuBuffer starBuffer;
-	private final VulkanicAPI.AutoStorageIndexBuffer starIndices = VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS);
+	private GpuBuffer starBuffer;
 	@Nullable
-	private final GpuBuffer topSkyBuffer;
+	private final VulkanicAPI.AutoStorageIndexBuffer starIndices;
 	@Nullable
-	private final GpuBuffer bottomSkyBuffer;
+	private GpuBuffer topSkyBuffer;
 	@Nullable
-	private final GpuBuffer endSkyBuffer;
+	private GpuBuffer bottomSkyBuffer;
 	@Nullable
-	private final GpuBuffer sunBuffer;
+	private GpuBuffer endSkyBuffer;
 	@Nullable
-	private final GpuBuffer moonBuffer;
+	private GpuBuffer sunBuffer;
 	@Nullable
-	private final GpuBuffer sunriseBuffer;
+	private GpuBuffer moonBuffer;
 	@Nullable
-	private final GpuBuffer endFlashBuffer;
-	private final VulkanicAPI.AutoStorageIndexBuffer quadIndices = VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS);
+	private GpuBuffer sunriseBuffer;
+	@Nullable
+	private GpuBuffer endFlashBuffer;
+	@Nullable
+	private final VulkanicAPI.AutoStorageIndexBuffer quadIndices;
 	@Nullable
 	private AbstractTexture sunTexture;
 	@Nullable
@@ -85,7 +87,11 @@ public class SkyRenderer implements AutoCloseable {
 	private int starIndexCount;
 
 	public SkyRenderer() {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		boolean rustOwned = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected();
+		this.starIndices = rustOwned ? null : VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS);
+		this.quadIndices = rustOwned ? null : VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS);
+		if (rustOwned) {
 			// Rust owns celestial mesh lowering and source-asset copies for the
 			// whole-frame route; Java sky vertex buffers are never consumed.
 			this.starBuffer = null;
@@ -123,7 +129,8 @@ public class SkyRenderer implements AutoCloseable {
 	}
 
 	protected void initTextures() {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
 			// The admitted whole-frame sky route copies its celestial source assets
 			// through RustGalWorldPrimitiveRenderer during reload.  Retaining these
 			// Java texture objects would only recreate the legacy GPU upload path.
@@ -358,6 +365,13 @@ public class SkyRenderer implements AutoCloseable {
 	}
 
 	private boolean shouldRenderDarkDisc(float f, ClientLevel clientLevel) {
+		// During client-level/player attachment there may be a level before a
+		// camera entity exists.  Sky extraction is semantic and must remain
+		// unavailable for that transient frame rather than dereferencing the
+		// missing player or entering a Java GPU fallback.
+		if (Minecraft.getInstance().player == null) {
+			return false;
+		}
 		return Minecraft.getInstance().player.getEyePosition(f).y - clientLevel.getLevelData().getHorizonHeight(clientLevel) < 0.0;
 	}
 
@@ -399,6 +413,7 @@ public class SkyRenderer implements AutoCloseable {
 	}
 
 	private void renderSun(float f, PoseStack poseStack) {
+		ensureJavaSkyRenderingAvailable();
 		// Iris: Allow shaders to disable sun rendering (from MixinSkyRenderer)
 		if (!net.irisshaders.iris.Iris.getPipelineManager().getPipeline().map(net.irisshaders.iris.pipeline.WorldRenderingPipeline::shouldRenderSun).orElse(true)) {
 			return;
@@ -431,6 +446,7 @@ public class SkyRenderer implements AutoCloseable {
 	}
 
 	private void renderMoon(int i, float f, PoseStack poseStack) {
+		ensureJavaSkyRenderingAvailable();
 		// Iris: Allow shaders to disable moon rendering (from MixinSkyRenderer)
 		if (!net.irisshaders.iris.Iris.getPipelineManager().getPipeline().map(net.irisshaders.iris.pipeline.WorldRenderingPipeline::shouldRenderMoon).orElse(true)) {
 			return;
@@ -465,6 +481,7 @@ public class SkyRenderer implements AutoCloseable {
 	}
 
 	private void renderStars(float f, PoseStack poseStack) {
+		ensureJavaSkyRenderingAvailable();
 		// Iris: Set rendering phase to STARS (from MixinSkyRenderer)
 		iris$setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.STARS);
 		
@@ -578,26 +595,49 @@ public class SkyRenderer implements AutoCloseable {
 		if (this.endSkyBuffer != null) this.endSkyBuffer.close();
 		if (this.sunriseBuffer != null) this.sunriseBuffer.close();
 		if (this.endFlashBuffer != null) this.endFlashBuffer.close();
+		this.sunBuffer = null;
+		this.moonBuffer = null;
+		this.starBuffer = null;
+		this.topSkyBuffer = null;
+		this.bottomSkyBuffer = null;
+		this.endSkyBuffer = null;
+		this.sunriseBuffer = null;
+		this.endFlashBuffer = null;
+	}
+
+	/** Releases Java celestial buffers if Rust Vulkan ownership begins after sky construction. */
+	public void ensureRustSemanticRoute() {
+		if ((net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected())
+			&& (this.starBuffer != null || this.topSkyBuffer != null || this.bottomSkyBuffer != null
+				|| this.endSkyBuffer != null || this.sunBuffer != null || this.moonBuffer != null
+				|| this.sunriseBuffer != null || this.endFlashBuffer != null)) {
+			this.close();
+		}
 	}
 	
 	// Iris: Helper methods from MixinSkyRenderer
 	private float iris$getSunPathRotation() {
+		ensureJavaSkyRenderingAvailable();
 		if (net.irisshaders.iris.Iris.getPipelineManager().getPipelineNullable() == null) return 0;
 		return net.irisshaders.iris.Iris.getPipelineManager().getPipelineNullable().getSunPathRotation();
 	}
 
 	private void iris$setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase phase) {
+		ensureJavaSkyRenderingAvailable();
 		if (net.irisshaders.iris.Iris.getPipelineManager().getPipelineNullable() == null) return;
 		net.irisshaders.iris.Iris.getPipelineManager().getPipelineNullable().setPhase(phase);
 	}
 
 	private static void ensureJavaSkyRenderingAvailable() {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
 			throw new IllegalStateException("Java sky rendering is unavailable while Rust owns whole-frame presentation");
 		}
 	}
 
 	private static RenderPass createIrisAwareSkyRenderPass(Supplier<String> label, boolean includeDepth) {
+		ensureJavaSkyRenderingAvailable();
 		WorldRenderingPipeline pipeline = Iris.getPipelineManager().getPipelineNullable();
 		RenderPass irisPass = pipeline == null ? null : pipeline.createSkyRenderPass(label, includeDepth);
 		if (irisPass != null) {

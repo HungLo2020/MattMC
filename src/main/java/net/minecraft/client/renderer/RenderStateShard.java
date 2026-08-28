@@ -86,15 +86,17 @@ public abstract class RenderStateShard {
 	}
 
 	public void setupRenderState() {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			throw new IllegalStateException("Java Vulkan render-state setup is unavailable while Rust owns whole-frame presentation");
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+			throw new IllegalStateException("Java Vulkan render-state setup is unavailable on selected Vulkan");
 		}
 		this.setupState.run();
 	}
 
 	public void clearRenderState() {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			throw new IllegalStateException("Java Vulkan render-state cleanup is unavailable while Rust owns whole-frame presentation");
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+			throw new IllegalStateException("Java Vulkan render-state cleanup is unavailable on selected Vulkan");
 		}
 		this.clearState.run();
 	}
@@ -201,7 +203,8 @@ public abstract class RenderStateShard {
 
 	MultiTextureStateShard(List<RenderStateShard.MultiTextureStateShard.Entry> list) {
 		super(() -> {
-				if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+				if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+					|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
 					return;
 				}
 				var ctx = VulkanicAPI.getCommandContext();
@@ -289,7 +292,8 @@ public abstract class RenderStateShard {
 
 		public TextureStateShard(ResourceLocation resourceLocation, boolean bl) {
 			super(() -> {
-				if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+				if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+					|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
 					return;
 				}
 				TextureManager textureManager = Minecraft.getInstance().getTextureManager();

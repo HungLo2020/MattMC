@@ -70,6 +70,20 @@ public class GraphicsBackendOptionSelectionTest {
     }
 
     @Test
+    public void testVulkanSelectionAdmissionPrecedesCompatibilityBackendConstruction() throws IOException {
+        Path apiFile = PROJECT_ROOT.resolve("src/main/java/net/vulkanic/VulkanicAPI.java");
+        String source = Files.readString(apiFile);
+        int vulkanCase = source.indexOf("case VULKAN:");
+        int marker = source.indexOf("RustGalVulkanWholeFrameMode.markVulkanBackendSelected();", vulkanCase);
+        int backendConstruction = source.indexOf("rawVulkanBackend = new VulkanBackend();", vulkanCase);
+
+        assertTrue(vulkanCase >= 0, "Vulkan backend initialization branch should remain explicit");
+        assertTrue(marker > vulkanCase, "Vulkan selection should admit the Rust whole-frame route");
+        assertTrue(backendConstruction > marker,
+            "Rust whole-frame admission must be recorded before any Java compatibility backend is constructed");
+    }
+
+    @Test
     public void testOptionsSourceWiresHiddenGraphicsBackendSetting() throws IOException {
         Path optionsFile = PROJECT_ROOT.resolve("src/main/java/net/minecraft/client/Options.java");
         String source = Files.readString(optionsFile);

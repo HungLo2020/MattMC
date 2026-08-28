@@ -112,7 +112,13 @@ pub unsafe fn decode_resource_batch(
         + render_passes.len()
         + buffer_updates.len()
         + texture_updates.len()
-        + destroys.len();
+        + destroys.len()
+        + resource_layout_bindings.len()
+        + resource_set_bindings.len()
+        + dynamic_offsets.len()
+        + pipeline_layout_resource_layouts.len()
+        + render_target_color_views.len()
+        + render_pass_color_formats.len();
     if total_items > FFI_MAX_BATCH_ITEMS {
         return Err(GalError::ffi(
             StatusCode::LengthOverflow,

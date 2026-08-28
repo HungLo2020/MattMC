@@ -11,11 +11,14 @@ import net.vulkanic.VulkanicAPI;
 @Environment(EnvType.CLIENT)
 public class OverlayTexture implements AutoCloseable {
 	private static final int SIZE = 16;
+	private static final net.minecraft.resources.ResourceLocation SEMANTIC_IDENTITY =
+		net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("mattmc", "entity_overlay");
 	public static final int NO_WHITE_U = 0;
 	public static final int RED_OVERLAY_V = 3;
 	public static final int WHITE_OVERLAY_V = 10;
 	public static final int NO_OVERLAY = pack(0, 10);
 	private final DynamicTexture texture = new DynamicTexture("Entity Color Overlay", 16, 16, false);
+	private boolean semanticPublished;
 
 	public OverlayTexture() {
 		NativeImage nativeImage = this.texture.getPixels();
@@ -31,23 +34,44 @@ public class OverlayTexture implements AutoCloseable {
 			}
 		}
 
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| VulkanicAPI.isVulkanBackendSelected()) {
 			// DynamicTexture is CPU-only on this route; publish the completed
 			// overlay pixels to the semantic asset registry instead of touching a
 			// Java texture or compatibility encoder.
-			net.vulkanic.gui.RustGalGuiRawImageAssets.stageDynamicTexture(this.texture);
+			ensureSemanticAsset();
 		} else {
 			this.texture.setClamp(true);
 			this.texture.upload();
 		}
 	}
 
+	/** Publishes the overlay after a late Vulkan selection without retaining a Java GPU image. */
+	public void ensureSemanticAsset() {
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			&& !VulkanicAPI.isVulkanBackendSelected()) {
+			return;
+		}
+		if (!this.semanticPublished) {
+			net.vulkanic.gui.RustGalGuiRawImageAssets.registerDynamicTexture(SEMANTIC_IDENTITY, this.texture);
+			this.semanticPublished = true;
+		}
+	}
+
 	public void close() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| VulkanicAPI.isVulkanBackendSelected()) {
+			if (this.semanticPublished) {
+				net.vulkanic.gui.RustGalGuiRawImageAssets.unregisterDynamicTexture(SEMANTIC_IDENTITY, this.texture);
+				this.semanticPublished = false;
+			}
+		}
 		this.texture.close();
 	}
 
 	public void setupOverlayColor() {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| VulkanicAPI.isVulkanBackendSelected()) {
 			return;
 		}
 		var textureView = this.texture.getTextureView();
@@ -73,7 +97,8 @@ public class OverlayTexture implements AutoCloseable {
 	}
 
 	public void teardownOverlayColor() {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| VulkanicAPI.isVulkanBackendSelected()) {
 			return;
 		}
 		IrisRenderSystem.bindTextureToUnit(1, 0);

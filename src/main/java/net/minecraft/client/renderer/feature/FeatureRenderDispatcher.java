@@ -14,6 +14,11 @@ import net.vulkanic.world.WorldRenderRoutePolicy;
 
 @Environment(EnvType.CLIENT)
 public class FeatureRenderDispatcher implements AutoCloseable {
+	private static boolean rustPresenterActive() {
+		return net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
+	}
+
 	private final SubmitNodeStorage submitNodeStorage;
 	private final BlockRenderDispatcher blockRenderDispatcher;
 	private final MultiBufferSource.BufferSource bufferSource;
@@ -56,6 +61,9 @@ public class FeatureRenderDispatcher implements AutoCloseable {
 		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			throw new IllegalStateException("Java feature rendering is unavailable while Rust owns whole-frame presentation");
 		}
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+			throw new IllegalStateException("Java Vulkan feature rendering is unavailable until the Rust whole-frame entity route is admitted");
+		}
 		for (SubmitNodeCollection submitNodeCollection : this.submitNodeStorage.getSubmitsPerOrder().values()) {
 			if (WorldRenderRoutePolicy.currentEntityShadowRoute().usesRustWholeFrameVulkan()) {
 				RustGalWorldPrimitiveRenderer.collectEntityShadowSemantics(submitNodeCollection.getShadowSubmits());
@@ -65,7 +73,7 @@ public class FeatureRenderDispatcher implements AutoCloseable {
 				&& !submitNodeCollection.getShadowSubmits().isEmpty()) {
 				throw new IllegalStateException("Rust whole-frame entity-shadow route is unavailable while Rust owns presentation");
 			}
-			if (!net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			if (!rustPresenterActive()
 				|| WorldRenderRoutePolicy.currentMaterialRoute().usesJavaCompatibility()) {
 				// Rust-owned model/model-part submissions have already crossed as
 				// copied indexed semantics. Do not invoke the Java feature renderers
@@ -106,7 +114,7 @@ public class FeatureRenderDispatcher implements AutoCloseable {
 				&& (submitNodeCollection.getNameTagSubmits().totalSubmitCount() != 0 || !submitNodeCollection.getTextSubmits().isEmpty())) {
 				throw new IllegalStateException("Rust whole-frame world-text route is unavailable while Rust owns presentation");
 			}
-			if (!net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			if (!rustPresenterActive()
 				|| WorldRenderRoutePolicy.currentMaterialRoute().usesJavaCompatibility()) {
 				this.hitboxFeatureRenderer.render(submitNodeCollection, this.bufferSource);
 			}
@@ -118,12 +126,12 @@ public class FeatureRenderDispatcher implements AutoCloseable {
 				&& !submitNodeCollection.getLeashSubmits().isEmpty()) {
 				throw new IllegalStateException("Rust whole-frame entity-leash route is unavailable while Rust owns presentation");
 			}
-			if (!net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			if (!rustPresenterActive()
 				|| WorldRenderRoutePolicy.currentMaterialRoute().usesJavaCompatibility()) {
 				this.itemFeatureRenderer.render(submitNodeCollection, this.bufferSource, this.outlineBufferSource);
 			}
 			this.blockFeatureRenderer.render(submitNodeCollection, this.bufferSource, this.blockRenderDispatcher, this.outlineBufferSource);
-			if (!net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			if (!rustPresenterActive()
 				|| WorldRenderRoutePolicy.currentMaterialRoute().usesJavaCompatibility()) {
 				this.customFeatureRenderer.render(submitNodeCollection, this.bufferSource);
 			}

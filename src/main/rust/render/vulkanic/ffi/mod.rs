@@ -22,7 +22,7 @@ use super::frame::{
 use super::gal::VulkanicGal;
 use super::gui_frontend::{
     GuiAffineQuadRequest, GuiAssetPayload, GuiFrontend, GuiRawImageAssetPayload, GuiRawImageFormat,
-    GuiSpriteRequest, GuiSubmitStats,
+    GuiSpriteRequest, GuiSubmitStats, GUI_MAX_RAW_IMAGES, GUI_MAX_VIEWPORT_AXIS,
 };
 use super::gui_mesh_frontend::{
     validate_batch as validate_gui_mesh_batch, validate_batches as validate_gui_mesh_batches,
@@ -55,7 +55,7 @@ use super::world_primitive_frontend::{
     WORLD_BACKGROUND_SKY_OVERWORLD, WORLD_BACKGROUND_STORE_STORE, WORLD_CULL_BACK,
     WORLD_CULL_FRONT, WORLD_CULL_NONE, WORLD_DEPTH_POLICY_DISABLED,
     WORLD_DEPTH_POLICY_TEST_NO_WRITE, WORLD_DEPTH_POLICY_TEST_WRITE,
-    WORLD_LOD_MAX_MATERIAL_IDENTITIES_PER_COLUMN, WORLD_MATERIAL_ID_OPAQUE_TEXTURED,
+    WORLD_LOD_MAX_MATERIAL_IDENTITIES_PER_COLUMN,
     WORLD_MATERIAL_MODE_CUTOUT, WORLD_MATERIAL_MODE_OPAQUE, WORLD_MATERIAL_MODE_TRANSLUCENT,
     WORLD_STRATUM_ENTITY_MESH, WORLD_STRATUM_MOVING_MESH, WORLD_STRATUM_OPAQUE_TEXTURED_GEOMETRY,
     WORLD_STRATUM_TERRAIN, WORLD_TOPOLOGY_TRIANGLES, WORLD_WINDING_CCW, WORLD_WINDING_CW,
@@ -77,11 +77,14 @@ pub(crate) mod world;
 pub use self::abi::*;
 pub(crate) use self::context::*;
 pub(crate) use self::gui::*;
+#[cfg(test)]
 pub(crate) use self::material::*;
 pub(crate) use self::memory::*;
+#[cfg(test)]
 pub(crate) use self::resources::*;
 pub(crate) use self::status::*;
 pub(crate) use self::submission::*;
+#[cfg(test)]
 pub(crate) use self::world::*;
 
 #[cfg(test)]

@@ -82,6 +82,10 @@ public abstract class ShaderChunkRenderer implements ChunkRenderer {
     }
 
     protected void begin(TerrainRenderPass pass, FogParameters parameters) {
+		if (VulkanicAPI.isVulkanBackendSelected()
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Selected Vulkan Sodium shader chunk rendering is unavailable; Rust terrain semantics are required (Rust presenter shell included)");
+		}
         // Iris: From MixinShaderChunkRenderer - reset blend mode state
         net.irisshaders.iris.gl.blending.BlendModeOverride.restore();
         

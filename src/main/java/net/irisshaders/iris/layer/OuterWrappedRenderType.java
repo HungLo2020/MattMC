@@ -66,6 +66,10 @@ public class OuterWrappedRenderType extends RenderType {
 
 	@Override
 	public void draw(MeshData meshData) {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java wrapped RenderType drawing is unavailable on the Rust Vulkan route");
+		}
 		extra.setupRenderState();
 		wrapped.draw(meshData);
 		extra.clearRenderState();

@@ -18,7 +18,8 @@ public class SodiumGpuSyncHelper {
      * This allows us to stall on ClientWaitSync for less time.
      */
     public static void beforeFrameTick() {
-        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
             // Rust owns the Vulkan queue, submission completion, and pacing.
             // Sodium's legacy Java fence queue has no semantic resource or
             // submission contract in this route, so it must remain empty.
@@ -59,7 +60,8 @@ public class SodiumGpuSyncHelper {
      * Called at the end of each frame to create a new fence for GPU synchronization.
      */
     public static void afterFrameTick() {
-        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
             fences.clear();
             return;
         }

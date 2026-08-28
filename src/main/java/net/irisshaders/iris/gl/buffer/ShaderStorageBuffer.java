@@ -16,9 +16,9 @@ public class ShaderStorageBuffer {
 	protected int id;
 
 	public ShaderStorageBuffer(int index, BuiltShaderStorageInfo info) {
-		if (VulkanicAPI.isVulkanBackendInitializedAndSelected()
+		if (VulkanicAPI.isVulkanBackendSelected()
 			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			throw new IllegalStateException("Java Iris shader-storage buffers are unavailable while Rust owns whole-frame presentation");
+			throw new IllegalStateException("Java Iris shader-storage buffers are unavailable on selected Vulkan");
 		}
 		this.id = IrisRenderSystem.createBuffers();
 		if (info.content() != null) {
@@ -54,9 +54,9 @@ public class ShaderStorageBuffer {
 
 	public void resizeIfRelative(int width, int height) {
 		if (!info.relative()) return;
-		if (VulkanicAPI.isVulkanBackendInitializedAndSelected()
+		if (VulkanicAPI.isVulkanBackendSelected()
 			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			throw new IllegalStateException("Java Iris shader-storage buffer resizing is unavailable while Rust owns whole-frame presentation");
+			throw new IllegalStateException("Java Iris shader-storage buffer resizing is unavailable on selected Vulkan");
 		}
 		net.vulkanic.CommandContext ctx = VulkanicAPI.getCommandContext();
 

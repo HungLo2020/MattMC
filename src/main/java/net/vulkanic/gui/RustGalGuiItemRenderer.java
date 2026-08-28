@@ -79,6 +79,7 @@ public final class RustGalGuiItemRenderer {
 	private static final String PRODUCER = "minecraft.gui.item.flat";
 	private static final boolean STANDARD_3D_ROUTE_DISABLED = Boolean.getBoolean("mattmc.rustGal.gui.standard3d.disabled");
 	private static final boolean DEBUG_STANDARD_3D_ITEM_ENABLED = Boolean.getBoolean("mattmc.rustGal.gui.standard3d.debugItem");
+	private static final int MAX_DIAGNOSTIC_ENTRIES = 256;
 	private static final Map<String, Boolean> DIAGNOSTICS = new HashMap<>();
 
 	private RustGalGuiItemRenderer() {
@@ -639,15 +640,13 @@ public final class RustGalGuiItemRenderer {
 			}
 			RustGalGuiRawImageAssets.Asset asset = RustGalGuiRawImageAssets.resolve(texture);
 			if (asset == null && "minecraft".equals(texture.getNamespace())) {
-				RustGalGuiRawImageAssets.stageVanillaResource(texture,
+				asset = RustGalGuiRawImageAssets.loadVanillaResource(texture,
 					Minecraft.getInstance().getVanillaPackResources().asProvider());
-				asset = RustGalGuiRawImageAssets.resolve(texture);
 			}
 			if (asset == null) {
 				recordDiagnostic("tacz-asset-missing=" + texture);
 				return false;
 			}
-			RustGalGuiRawImageAssets.stage(asset);
 			batches.add(new Batch(asset, vertices.clone(), uvs.clone(), colors.clone()));
 			return true;
 		}
@@ -670,7 +669,6 @@ public final class RustGalGuiItemRenderer {
 			if (foil) {
 				glintAsset = RustGalGuiRawImageAssets.resolve(ItemRenderer.ENCHANTED_GLINT_ITEM);
 				if (glintAsset == null) return List.of();
-				RustGalGuiRawImageAssets.stage(glintAsset);
 				int strength = Mth.clamp((int)Math.round(Minecraft.getInstance().options.glintStrength().get() * 255.0F), 0, 255);
 				glintColor = ARGB.color(strength, 255, 255, 255);
 			}
@@ -718,6 +716,11 @@ public final class RustGalGuiItemRenderer {
 			}
 			RustGalFrameScheduler.Token token = RustGalFrameCoordinator.enqueueGuiMeshItemRequest(records,
 				GuiRenderStratum.GUI_ITEM.id(), dynamicLayerOrder == null ? GuiRenderStratum.GUI_ITEM.order() : dynamicLayerOrder, System.nanoTime());
+			// Commit copied item/glint images only after the complete special-item
+			// mesh has entered the scheduler. Rejected requests must not retain
+			// texture assets without corresponding Rust GUI work.
+			for (Batch batch : batches) RustGalGuiRawImageAssets.stage(batch.asset());
+			if (glintAsset != null) RustGalGuiRawImageAssets.stage(glintAsset);
 			return List.of(new RustGalGuiElementRenderState(token, GuiRenderStratum.GUI_ITEM, "minecraft.gui.tacz-bedrock",
 				-1, -1.0F, GuiFillDirection.NONE, left, top, right - left, bottom - top, guiWidth, guiHeight));
 		}
@@ -854,7 +857,6 @@ public final class RustGalGuiItemRenderer {
 		int requestLayerOrder = dynamicLayerOrder == null ? GuiRenderStratum.GUI_ITEM.order()
 			: RustGalGuiRenderer.dynamicLayerOrder(dynamicLayerOrder);
 		for (FlatQuad quad : quads) {
-			RustGalGuiRawImageAssets.stage(quad.asset());
 			VulkanicGalBridge.GuiAffineQuadRecord request = new VulkanicGalBridge.GuiAffineQuadRecord(
 				requestLayerOrder,
 				quad.asset().assetId(),
@@ -871,6 +873,7 @@ public final class RustGalGuiItemRenderer {
 				: RustGalFrameCoordinator.enqueueGuiAffineQuadRequest(
 					request, RustGalGuiRenderer.dynamicLayerId(dynamicLayerOrder),
 					requestLayerOrder, startedNanos);
+			RustGalGuiRawImageAssets.stage(quad.asset());
 			int left = Math.max(0, (int)Math.floor(Math.min(request.x0(), Math.min(request.x1(), request.x3()))));
 			int top = Math.max(0, (int)Math.floor(Math.min(request.y0(), Math.min(request.y1(), request.y3()))));
 			int right = Math.min(guiWidth, (int)Math.ceil(Math.max(request.x0(), Math.max(request.x1(), request.x3()))));
@@ -903,7 +906,7 @@ public final class RustGalGuiItemRenderer {
 		int guiHeight,
 		@Nullable Integer dynamicLayerOrder
 	) {
-		if (RustGalGuiRenderer.currentExecutionRoute() != RustGalGuiRenderer.GuiExecutionRoute.RUST_VULKAN_WHOLE_FRAME) {
+		if (!standard3dRouteEnabled()) {
 			return List.of();
 		}
 		GuiItemMeshSemanticCollector.CollectionResult collected = GuiItemMeshSemanticCollector.collectStandard3d(
@@ -914,7 +917,8 @@ public final class RustGalGuiItemRenderer {
 		}
 		GuiItemMeshSemanticCollector.GuiItemMesh mesh = collected.mesh();
 		if (mesh.right() > guiWidth || mesh.bottom() > guiHeight || mesh.left() < 0 || mesh.top() < 0) {
-			recordDiagnostic("mesh-bounds");
+			recordDiagnostic("mesh-bounds:" + mesh.left() + "," + mesh.top() + "," + mesh.right() + "," + mesh.bottom()
+				+ "/" + guiWidth + "," + guiHeight);
 			return List.of();
 		}
 		List<VulkanicGalBridge.GuiMeshBatchRecord> batches = new ArrayList<>();
@@ -954,6 +958,7 @@ public final class RustGalGuiItemRenderer {
 			: RustGalFrameCoordinator.enqueueGuiMeshItemRequest(
 				batches, RustGalGuiRenderer.dynamicLayerId(dynamicLayerOrder),
 				requestLayerOrder, startedNanos);
+		for (RustGalGuiRawImageAssets.Asset asset : mesh.assets()) RustGalGuiRawImageAssets.stage(asset);
 		recordDiagnostic("mesh-accepted-layers=" + batches.size());
 		return List.of(new RustGalGuiElementRenderState(
 			token, GuiRenderStratum.GUI_ITEM, "minecraft.gui.item.standard3d", -1, -1.0F, GuiFillDirection.NONE,
@@ -985,7 +990,6 @@ public final class RustGalGuiItemRenderer {
 		if (layer.foilType() == ItemStackRenderState.FoilType.SPECIAL) {
 			RustGalGuiRawImageAssets.Asset glint = RustGalGuiRawImageAssets.resolve(ItemRenderer.ENCHANTED_GLINT_ITEM);
 			if (glint == null) return "glint-texture-unavailable";
-			RustGalGuiRawImageAssets.stage(glint);
 		}
 		if (layer.renderType() == null || layer.quads().isEmpty()) return "empty-or-missing-render-type";
 		if (!supportedGuiRenderType(layer.renderType())) return "render-type";
@@ -1004,11 +1008,9 @@ public final class RustGalGuiItemRenderer {
 		if (layer.foilType() == ItemStackRenderState.FoilType.STANDARD) {
 			RustGalGuiRawImageAssets.Asset glint = RustGalGuiRawImageAssets.resolve(ItemRenderer.ENCHANTED_GLINT_ITEM);
 			if (glint == null) return "glint-texture-unavailable";
-			RustGalGuiRawImageAssets.stage(glint);
 			output.add(glintQuad(quad, glint));
 		} else if (layer.foilType() == ItemStackRenderState.FoilType.SPECIAL) {
 			RustGalGuiRawImageAssets.Asset glint = RustGalGuiRawImageAssets.resolve(ItemRenderer.ENCHANTED_GLINT_ITEM);
-			RustGalGuiRawImageAssets.stage(glint);
 			output.add(specialFoilQuad(quad, glint));
 		}
 		return null;
@@ -1128,23 +1130,32 @@ public final class RustGalGuiItemRenderer {
 	}
 
 	/**
-	 * Resolves and stages a copied semantic image for a future Rust-owned mesh
+	 * Resolves and stages a copied semantic image for the Rust-owned mesh
 	 * layer. The returned key is stable across a resource generation; neither a
 	 * sprite nor an atlas object escapes this Java boundary.
 	 */
 	public static long stageSemanticImage(ResourceLocation sprite) {
+		long assetId = resolveSemanticImage(sprite);
+		if (assetId == 0L) return 0L;
+		RustGalGuiRawImageAssets.Asset asset = RustGalGuiRawImageAssets.resolve(sprite);
+		if (asset != null) RustGalGuiRawImageAssets.stage(asset);
+		return assetId;
+	}
+
+	/** Resolves a semantic image identity without publishing it to the Rust frame. */
+	public static long resolveSemanticImage(ResourceLocation sprite) {
 		RustGalGuiRawImageAssets.Asset asset = RustGalGuiRawImageAssets.resolve(sprite);
 		if (asset == null) {
 			var texture = Minecraft.getInstance().getTextureManager().getTexture(sprite);
 			if (texture instanceof DynamicTexture dynamic) {
-				RustGalGuiRawImageAssets.registerDynamicTexture(sprite, dynamic);
+				RustGalGuiRawImageAssets.registerDynamicTextureUnstaged(sprite, dynamic);
+				RustGalGuiRawImageAssets.prepareDynamicTexture(dynamic);
 				asset = RustGalGuiRawImageAssets.resolve(sprite);
 			}
 		}
 		if (asset == null) {
 			return 0L;
 		}
-		RustGalGuiRawImageAssets.stage(asset);
 		return asset.assetId();
 	}
 
@@ -1192,9 +1203,9 @@ public final class RustGalGuiItemRenderer {
 	}
 
 	private static synchronized void recordDiagnostic(String detail) {
-		if (DIAGNOSTICS.putIfAbsent(detail, Boolean.TRUE) == null) {
-			RustGalFrameCoordinator.auditMessage("gui.item.route " + detail);
-		}
+		if (DIAGNOSTICS.containsKey(detail) || DIAGNOSTICS.size() >= MAX_DIAGNOSTIC_ENTRIES) return;
+		DIAGNOSTICS.put(detail, Boolean.TRUE);
+		RustGalFrameCoordinator.auditMessage("gui.item.route " + detail);
 	}
 
 	private record FlatQuad(

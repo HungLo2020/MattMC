@@ -28,7 +28,8 @@ public class CubeMap implements AutoCloseable {
 
 	public CubeMap(ResourceLocation resourceLocation) {
 		this.location = resourceLocation;
-		this.projectionMatrixUbo = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+		this.projectionMatrixUbo = (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| VulkanicAPI.isVulkanBackendSelected())
 			? null
 			: new CachedPerspectiveProjectionMatrixBuffer("cubemap", 0.05F, 10.0F);
 	}
@@ -39,7 +40,8 @@ public class CubeMap implements AutoCloseable {
 	}
 
 	public void render(Minecraft minecraft, float f, float g) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| VulkanicAPI.isVulkanBackendSelected()) {
 			int width = minecraft.getWindow().getGuiScaledWidth();
 			int height = minecraft.getWindow().getGuiScaledHeight();
 			if (!net.vulkanic.gui.RustGalPanoramaRenderer.enqueue(this, f, g, width, height)) {
@@ -81,14 +83,16 @@ public class CubeMap implements AutoCloseable {
 	}
 
 	public void registerTextures(TextureManager textureManager) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| VulkanicAPI.isVulkanBackendSelected()) {
 			return;
 		}
 		textureManager.register(this.location, new CubeMapTexture(this.location));
 	}
 
 	public void registerAndLoadTextures(TextureManager textureManager) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| VulkanicAPI.isVulkanBackendSelected()) {
 			return;
 		}
 		textureManager.registerAndLoad(this.location, new CubeMapTexture(this.location));
@@ -98,5 +102,9 @@ public class CubeMap implements AutoCloseable {
 		if (this.projectionMatrixUbo != null) {
 			this.projectionMatrixUbo.close();
 		}
+	}
+
+	public void ensureRustSemanticRoute() {
+		if (this.projectionMatrixUbo != null) this.projectionMatrixUbo.ensureRustSemanticRoute();
 	}
 }

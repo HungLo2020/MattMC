@@ -22,6 +22,19 @@ public interface SubmitNodeCollector extends OrderedSubmitNodeCollector {
 		return false;
 	}
 
+	/**
+	 * Records copied text semantics without requiring every specialized collector
+	 * to expose a second callback. Rust-owned collectors override this entrypoint;
+	 * compatibility collectors inherit the ordinary storage callback.
+	 */
+	default void submitTextSemantic(
+		PoseStack poseStack, float x, float y, net.minecraft.util.FormattedCharSequence text,
+		boolean shadow, net.minecraft.client.gui.Font.DisplayMode mode, int color,
+		int backgroundColor, int packedLight, int packedOverlay
+	) {
+		submitText(poseStack, x, y, text, shadow, mode, color, backgroundColor, packedLight, packedOverlay);
+	}
+
 	@Environment(EnvType.CLIENT)
 	public interface CustomGeometryRenderer {
 		void render(PoseStack.Pose pose, VertexConsumer vertexConsumer);

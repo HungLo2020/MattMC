@@ -14,6 +14,11 @@ final class ItemEntityRenderOwnershipPolicyTest {
 			RUST_VULKAN_WHOLE_FRAME,
 			ItemEntityRenderOwnershipPolicy.selectOwnershipForTests(true, true, false, false)
 		);
+		assertEquals(
+			RUST_VULKAN_WHOLE_FRAME,
+			ItemEntityRenderOwnershipPolicy.selectOwnershipForTests(false, true, false, false),
+			"Rust whole-frame handoff must own dropped items before backend selection settles"
+		);
 	}
 
 	@Test

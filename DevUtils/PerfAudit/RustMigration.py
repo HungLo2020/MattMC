@@ -135,6 +135,10 @@ def select_targets(args: argparse.Namespace) -> list[RepoTarget]:
     frozen = find_frozen_repo(current, args.frozen_repo)
     validate_repo(current, "Current")
     validate_repo(frozen, "Frozen Java")
+    if current == frozen:
+        raise SystemExit(
+            "Frozen Java repository must be a separate checkout from the current MattMC repository"
+        )
     if args.target == "current":
         return [RepoTarget("current", current, "current")]
     if args.target == "frozen":
@@ -199,11 +203,18 @@ def sha256_file(path: Path) -> str:
 
 def native_library_name() -> str:
     system = platform_name()
+    machine = platform.machine().strip().lower()
+    if machine in {"x86_64", "amd64"}:
+        arch = "x64"
+    elif machine in {"aarch64", "arm64"}:
+        arch = "aarch64"
+    else:
+        arch = machine or "unknown"
     if system == "windows":
-        return "mattmc_rust-win-x64.dll"
+        return f"mattmc_rust-win-{arch}.dll"
     if system == "macos":
-        return "libmattmc_rust-macos-universal.dylib"
-    return "libmattmc_rust-linux-x64.so"
+        return f"mattmc_rust-mac-{arch}.dylib"
+    return f"mattmc_rust-linux-{arch}.so"
 
 
 def native_library_path(root: Path) -> Path:
@@ -416,6 +427,7 @@ def build_command(target: RepoTarget, workload: str, args: argparse.Namespace, o
             jvm.append(f"-Dmattmc.realMeshingReplay.rustProfile={args.rust_profile}")
         command = [
             *gradle_wrapper(target.root),
+            f"-PmattmcRunGameDir={(output_json.parent / 'run').resolve()}",
             "runClient",
             "--no-daemon",
             *args.gradle_arg,
@@ -455,6 +467,8 @@ def popen_kwargs() -> dict[str, object]:
 def run_target(target: RepoTarget, workload: str, artifact_root: Path, args: argparse.Namespace) -> CommandResult:
     target_dir = artifact_root / target.name
     target_dir.mkdir(parents=True, exist_ok=True)
+    if workload == "real-chunk-meshing-replay":
+        seed_replay_options(target, target_dir)
     output_json = target_dir / f"{workload}.json"
     command, extra_env = build_command(target, workload, args, output_json)
     metadata = base_metadata(target, workload, command, args)
@@ -529,6 +543,26 @@ def run_target(target: RepoTarget, workload: str, artifact_root: Path, args: arg
         duration_seconds=duration,
         error=error,
     )
+
+
+def seed_replay_options(target: RepoTarget, target_dir: Path) -> None:
+    """Give each replay an explicit backend while keeping all other options equivalent."""
+    source = target.root / "run" / "options.txt"
+    lines = source.read_text(encoding="utf-8").splitlines() if source.is_file() else []
+    backend = "opengl" if target.role == "frozen" else "vulkan"
+    replaced = False
+    seeded: list[str] = []
+    for line in lines:
+        if line.startswith("graphics_backend="):
+            seeded.append(f"graphics_backend={backend}")
+            replaced = True
+        else:
+            seeded.append(line)
+    if not replaced:
+        seeded.insert(0, f"graphics_backend={backend}")
+    options = target_dir / "run" / "options.txt"
+    options.parent.mkdir(parents=True, exist_ok=True)
+    options.write_text("\n".join(seeded) + "\n", encoding="utf-8")
 
 
 def clone_args(args: argparse.Namespace, **updates: object) -> argparse.Namespace:

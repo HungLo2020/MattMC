@@ -29,7 +29,13 @@ public enum GuiRenderStratum {
 	/** Vanilla vignette blits using inverse-source-color compositing. */
 	GUI_VIGNETTE_BLIT("gui.vignette.blit", 770),
 	/** GUI rectangles using the pipeline’s inverse-color blend. */
-	GUI_INVERT_RECTANGLE("gui.invert.rectangle", 780);
+	GUI_INVERT_RECTANGLE("gui.invert.rectangle", 780),
+	/** GUI image blits whose pipeline uses premultiplied-alpha blending. */
+	GUI_PREMULTIPLIED_BLIT("gui.premultiplied.blit", 790),
+	/** GUI image blits whose pipeline uses additive blending. */
+	GUI_ADDITIVE_BLIT("gui.additive.blit", 795),
+	/** VoxelMap GUI blits that explicitly compare against the Rust frame depth. */
+	GUI_LEQUAL_DEPTH_BLIT("gui.lequal-depth.blit", 805);
 
 
 	private final String id;

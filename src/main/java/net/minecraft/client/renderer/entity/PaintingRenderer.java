@@ -25,6 +25,8 @@ import net.minecraft.world.level.Level;
 @Environment(EnvType.CLIENT)
 public class PaintingRenderer extends EntityRenderer<Painting, PaintingRenderState> {
 	private static final ResourceLocation BACK_SPRITE_LOCATION = ResourceLocation.withDefaultNamespace("back");
+	/** Six explicit faces are emitted for every painting tile on the Rust route. */
+	private static final int MAX_RUST_PAINTING_QUADS = 65_536;
 	private final TextureAtlas paintingsAtlas;
 
 	public PaintingRenderer(EntityRendererProvider.Context context) {
@@ -66,8 +68,12 @@ public class PaintingRenderer extends EntityRenderer<Painting, PaintingRenderSta
 		paintingRenderState.variant = paintingVariant;
 		int i = paintingVariant.width();
 		int j = paintingVariant.height();
-		if (paintingRenderState.lightCoordsPerBlock.length != i * j) {
-			paintingRenderState.lightCoordsPerBlock = new int[i * j];
+		long tileCount = (long)i * j;
+		if (i <= 0 || j <= 0 || tileCount > MAX_RUST_PAINTING_QUADS / 6L) {
+			throw new IllegalStateException("Rust painting tile bound exceeded " + MAX_RUST_PAINTING_QUADS / 6L);
+		}
+		if (paintingRenderState.lightCoordsPerBlock.length != tileCount) {
+			paintingRenderState.lightCoordsPerBlock = new int[(int)tileCount];
 		}
 
 		float g = -i / 2.0F;
@@ -116,7 +122,11 @@ public class PaintingRenderer extends EntityRenderer<Painting, PaintingRenderSta
 			}
 			throw new IllegalStateException("Rust whole-frame painting route rejected semantic quads");
 		}
-		submitNodeCollector.submitCustomGeometry(poseStack, renderType, (pose, vertexConsumer) -> {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Rust whole-frame painting route is unavailable; Java custom geometry is not a fallback");
+		}
+		submitNodeCollector.submitCustomGeometrySemantic(poseStack, renderType, (pose, vertexConsumer) -> {
 			float f = -i / 2.0F;
 			float g = -j / 2.0F;
 			float h = 0.03125F;
@@ -180,11 +190,21 @@ public class PaintingRenderer extends EntityRenderer<Painting, PaintingRenderSta
 		PoseStack poseStack, SubmitNodeCollector submitNodeCollector, RenderType renderType,
 		int[] light, int width, int height, TextureAtlasSprite art, TextureAtlasSprite back
 	) {
+		// Preflight the complete semantic payload before enqueueing any face. A
+		// resource-pack or modded painting variant must fail closed as one unit;
+		// partial Rust material work would otherwise survive the route rejection.
+		long requiredQuads = 6L * width * height;
+		if (width <= 0 || height <= 0 || requiredQuads > MAX_RUST_PAINTING_QUADS
+			|| light == null || (long)light.length != (long)width * height) {
+			return false;
+		}
 		float originX = -width / 2.0F;
 		float originY = -height / 2.0F;
 		float depth = 0.03125F;
 		float backU0 = back.getU0(), backU1 = back.getU1(), backV0 = back.getV0(), backV1 = back.getV1();
 		float sideU0 = back.getU0(), sideU1 = back.getU(0.0625F), sideV0 = back.getV0(), sideV1 = back.getV(0.0625F);
+		int checkpoint = net.vulkanic.world.RustGalWorldPrimitiveRenderer.markMaterialQuadBatch();
+		try {
 		for (int tileX = 0; tileX < width; tileX++) {
 			for (int tileY = 0; tileY < height; tileY++) {
 				float x1 = originX + tileX + 1.0F, x0 = originX + tileX;
@@ -212,9 +232,14 @@ public class PaintingRenderer extends EntityRenderer<Painting, PaintingRenderSta
 					|| !submitPaintingQuad(submitNodeCollector, poseStack, renderType, backAtlas,
 					new float[] {x0, y1, -depth, x0, y0, -depth, x0, y0, depth, x0, y1, depth},
 					new float[] {sideU1, sideV0, sideU1, sideV1, sideU0, sideV1, sideU0, sideV0}, tileLight)) {
+					net.vulkanic.world.RustGalWorldPrimitiveRenderer.rollbackMaterialQuadBatch(checkpoint);
 					return false;
 				}
 			}
+		}
+		} catch (RuntimeException failure) {
+			net.vulkanic.world.RustGalWorldPrimitiveRenderer.rollbackMaterialQuadBatch(checkpoint);
+			throw failure;
 		}
 		return true;
 	}
@@ -223,7 +248,7 @@ public class PaintingRenderer extends EntityRenderer<Painting, PaintingRenderSta
 		SubmitNodeCollector collector, PoseStack poseStack, RenderType renderType,
 		ResourceLocation texture, float[] vertices, float[] uvs, int light
 	) {
-		return collector.submitTexturedQuad(poseStack, renderType, texture, vertices, uvs, -1, light);
+		return collector.submitTexturedQuadSemantic(poseStack, renderType, texture, vertices, uvs, -1, light);
 	}
 
 	private void vertex(PoseStack.Pose pose, VertexConsumer vertexConsumer, float f, float g, float h, float i, float j, int k, int l, int m, int n) {

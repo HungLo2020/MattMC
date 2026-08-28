@@ -87,7 +87,7 @@ public class SignRenderer extends AbstractSignRenderer {
 	) {
 		poseStack.pushPose();
 		applyInHandTransforms(poseStack);
-		submitNodeCollector.submitModel(simple, Unit.INSTANCE, poseStack, material.renderType(simple::renderType), i, j, -1, materialSet.get(material), 0, null);
+		submitNodeCollector.submitModelSemantic(simple, Unit.INSTANCE, poseStack, material.renderType(simple::renderType), i, j, -1, materialSet.get(material), 0, null);
 		poseStack.popPose();
 	}
 

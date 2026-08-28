@@ -29,7 +29,7 @@ public abstract class AbstractVertexAttribute
 
 	protected AbstractVertexAttribute(CommandContext ctx)
 	{
-		if (VulkanicAPI.isVulkanBackendInitializedAndSelected()
+		if (VulkanicAPI.isVulkanBackendSelected()
 			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
 		{
 			throw new IllegalStateException(

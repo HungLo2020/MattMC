@@ -125,6 +125,12 @@ public class LodRenderer
 	{
 		boolean rustWholeFrame = WorldRenderRoutePolicy.currentDistantHorizonsOpaqueRoute()
 			.usesRustWholeFrameVulkan();
+		boolean rustPresenterActive = VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
+		if (rustPresenterActive && !rustWholeFrame)
+		{
+			throw new IllegalStateException("Java Distant Horizons Vulkan LOD rendering is unavailable until the Rust whole-frame route is admitted");
+		}
 		if (DistantHorizonsSemanticCollector.beginVisibleFrame(renderParams)
 			&& this.trySelectRustNonWaterRoute(renderParams, profiler))
 		{
@@ -265,10 +271,10 @@ public class LodRenderer
 		 * paths around DH's terrain render list. The whole-frame route neither
 		 * invokes those Java passes nor borrows their state: its source-derived
 		 * Rust pass graph owns the submitted LOD material streams. They therefore
-		 * cannot veto semantic LOD collection. Debug wireframes are different:
-		 * they are extra geometry with no copied semantic producer yet.
+		 * cannot veto semantic LOD collection. Debug wireframes follow the same
+		 * admission rule: DebugRenderer traverses the real registry and copies
+		 * bounded box edges into the Rust-owned semantic line stream.
 		 */
-		if (Config.Client.Advanced.Debugging.DebugWireframe.enableRendering.get()) return "debug-wireframe";
 		return null;
 	}
 
@@ -293,7 +299,14 @@ public class LodRenderer
 	 */
 	public void renderDeferred(RenderParams renderParams, IProfilerWrapper profiler)
 	{
-		if (WorldRenderRoutePolicy.currentDistantHorizonsOpaqueRoute().usesRustWholeFrameVulkan())
+		boolean rustWholeFrame = WorldRenderRoutePolicy.currentDistantHorizonsOpaqueRoute().usesRustWholeFrameVulkan();
+		boolean rustPresenterActive = VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
+		if (rustPresenterActive && !rustWholeFrame)
+		{
+			throw new IllegalStateException("Java Distant Horizons Vulkan deferred LOD rendering is unavailable until the Rust whole-frame route is admitted");
+		}
+		if (rustWholeFrame)
 		{
 			// Deferred DH passes are Java framebuffer/pipeline work and are not
 			// admitted while the Rust whole-frame presenter owns Vulkan.
@@ -1257,6 +1270,14 @@ public class LodRenderer
 	{
 		if (!VulkanicAPI.isShaderInputParityTracingEnabled())
 		{
+			return;
+		}
+		if (VulkanicAPI.isVulkanBackendSelected()
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
+		{
+			// The selected Rust route must not recover the Java lightmap view merely
+			// for diagnostics. Rust-owned semantic resource tracing supplies its own
+			// bindings; this compatibility helper is OpenGL-only.
 			return;
 		}
 

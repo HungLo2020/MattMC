@@ -41,7 +41,7 @@ public class TntMinecartRenderer extends AbstractMinecartRenderer<MinecartTNT, M
 			k = OverlayTexture.NO_OVERLAY;
 		}
 
-		submitNodeCollector.submitBlock(poseStack, blockState, i, k, j);
+		submitNodeCollector.submitBlockSemantic(poseStack, blockState, i, k, j);
 	}
 
 	public MinecartTntRenderState createRenderState() {

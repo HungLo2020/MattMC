@@ -2116,14 +2116,20 @@ public class VulkanBackendSpirvPathTest {
     }
 
     @Test
-    public void testLegacyVulkanSamplerPlannerUsesFallbackTextureForUnboundSamplerSlots() throws Exception {
+    public void testSelectedRustVulkanSamplerResolutionNeverBorrowsLegacyTextureState() throws Exception {
         String source = Files.readString(PROJECT_ROOT
             .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"));
 
-        assertTrue(source.contains("createLegacyFallbackSamplerView(commandBufferHandle, binding, unit)"),
-            "Legacy Vulkan sampler resolution should bind a backend fallback texture instead of dropping reflected sampler bindings");
-        assertTrue(source.contains("createLegacyFallbackSamplerTexture"),
-            "The backend fallback sampler texture should be a real Vulkan resource owned by the native spine");
+        int resolver = source.indexOf("resolveLegacySamplerViewForProgram(");
+        int resolverEnd = source.indexOf("private static void logIncompleteLegacyResourcePlan", resolver);
+        String resolverSource = resolver >= 0 && resolverEnd > resolver
+            ? source.substring(resolver, resolverEnd) : "";
+        assertTrue(resolverSource.contains("isVulkanBackendSelected()")
+                && resolverSource.contains("borrowed Iris GPU state")
+                && resolverSource.contains("return null;"),
+            "selected Rust Vulkan sampler resolution must reject borrowed legacy/Iris texture state");
+        assertTrue(source.contains("createManagedLegacyTextureView(textureId)"),
+            "OpenGL/legacy compatibility sampler resolution should retain its private managed view seam");
     }
 
     @Test

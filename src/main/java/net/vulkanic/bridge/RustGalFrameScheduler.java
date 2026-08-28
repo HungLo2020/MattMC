@@ -13,6 +13,8 @@ public final class RustGalFrameScheduler<T> {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	/** Sequence space reserved by each token for an ordered semantic sub-batch. */
 	public static final long SEQUENCE_STRIDE = 1_000_000L;
+	/** Must stay within the Rust GUI/world semantic batch contract. */
+	private static final int MAX_PENDING_BATCHES = 65_536;
 
 	private final String label;
 	// Tokens carry the explicit sequence/stratum ordering; pending lookup is by
@@ -28,6 +30,9 @@ public final class RustGalFrameScheduler<T> {
 	}
 
 	public Token enqueue(long generation, String stratumId, int stratumOrder, T payload) {
+		if (this.pending.size() >= MAX_PENDING_BATCHES) {
+			throw new IllegalStateException(this.label + " pending semantic batch bound exceeded " + MAX_PENDING_BATCHES);
+		}
 		long batchId = this.nextBatchId++;
 		long sequence = this.nextSequence++;
 		this.nextSequence = Math.addExact(this.nextSequence - 1L, SEQUENCE_STRIDE);

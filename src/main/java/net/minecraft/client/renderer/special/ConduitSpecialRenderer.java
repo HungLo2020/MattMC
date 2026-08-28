@@ -30,7 +30,7 @@ public class ConduitSpecialRenderer implements NoDataSpecialModelRenderer {
 	public void submit(ItemDisplayContext itemDisplayContext, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, int j, boolean bl, int k) {
 		poseStack.pushPose();
 		poseStack.translate(0.5F, 0.5F, 0.5F);
-		submitNodeCollector.submitModelPart(
+		submitNodeCollector.submitModelPartSemantic(
 			this.model,
 			poseStack,
 			ConduitRenderer.SHELL_TEXTURE.renderType(RenderType::entitySolid),

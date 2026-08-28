@@ -95,7 +95,7 @@ public class ChestRenderer<T extends BlockEntity & LidBlockEntity> implements Bl
 		TextureAtlasSprite textureAtlasSprite = this.materials.get(material);
 		if (chestRenderState.type != ChestType.SINGLE) {
 			if (chestRenderState.type == ChestType.LEFT) {
-				submitNodeCollector.submitModel(
+				submitNodeCollector.submitModelSemantic(
 					this.doubleLeftModel,
 					f,
 					poseStack,
@@ -108,7 +108,7 @@ public class ChestRenderer<T extends BlockEntity & LidBlockEntity> implements Bl
 					chestRenderState.breakProgress
 				);
 			} else {
-				submitNodeCollector.submitModel(
+				submitNodeCollector.submitModelSemantic(
 					this.doubleRightModel,
 					f,
 					poseStack,
@@ -122,7 +122,7 @@ public class ChestRenderer<T extends BlockEntity & LidBlockEntity> implements Bl
 				);
 			}
 		} else {
-			submitNodeCollector.submitModel(
+			submitNodeCollector.submitModelSemantic(
 				this.singleModel,
 				f,
 				poseStack,

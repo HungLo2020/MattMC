@@ -6,6 +6,7 @@ import net.minecraft.api.Environment;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.ShapeRenderer;
+import net.minecraft.client.renderer.OrderedSubmitNodeCollector;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.blockentity.state.BeaconRenderState;
 import net.minecraft.client.renderer.blockentity.state.BlockEntityRenderState;
@@ -92,14 +93,15 @@ public class TestInstanceRenderer implements BlockEntityRenderer<TestInstanceBlo
 	int[] boxColors = {0x60ff0000, 0x60ff0000, 0x60ff0000, 0x60ff0000, 0x60ff0000, 0x60ff0000};
 		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
 			&& net.vulkanic.world.WorldRenderRoutePolicy.currentProceduralQuadRoute().usesRustWholeFrameVulkan()) {
-			if (!submitNodeCollector.order(1).submitColoredQuads(poseStack, RenderType.debugFilledBox(), boxVertices, boxUvs, boxColors, 15728880)) {
+			if (!submitNodeCollector.order(1).submitColoredQuadsSemantic(poseStack, RenderType.debugFilledBox(), boxVertices, boxUvs, boxColors, 15728880)) {
 				throw new IllegalStateException("Rust whole-frame error-marker route rejected semantic box quads");
 			}
 		} else {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 				throw new IllegalStateException("Rust whole-frame error-marker route is unavailable; Java debug geometry is not a fallback");
 			}
-			submitNodeCollector.order(1).submitCustomGeometry(poseStack, RenderType.debugFilledBox(), (pose, vertexConsumer) -> {
+			submitNodeCollector.order(1).submitCustomGeometrySemantic(poseStack, RenderType.debugFilledBox(), (pose, vertexConsumer) -> {
 			PoseStack poseStackx = new PoseStack();
 			poseStackx.last().set(pose);
 			ShapeRenderer.addChainedFilledBoxVertices(poseStackx, vertexConsumer, fx, g, h, ix, j, k, 1.0F, 0.0F, 0.0F, 0.375F);
@@ -112,7 +114,19 @@ public class TestInstanceRenderer implements BlockEntityRenderer<TestInstanceBlo
 		poseStack.translate(blockPos.getX() + 0.5F, blockPos.getY() + 1.2F, blockPos.getZ() + 0.5F);
 		poseStack.mulPose(cameraRenderState.orientation);
 		poseStack.scale(0.01F, -0.01F, 0.01F);
-		submitNodeCollector.order(2).submitText(poseStack, -i / 2.0F, 0.0F, formattedCharSequence, false, Font.DisplayMode.SEE_THROUGH, 15728880, -1, 0, 0);
+		OrderedSubmitNodeCollector ordered = submitNodeCollector.order(2);
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+			ordered.submitTextSemantic(
+				poseStack, -i / 2.0F, 0.0F, formattedCharSequence, false,
+				Font.DisplayMode.SEE_THROUGH, 15728880, -1, 0, 0
+			);
+		} else {
+			ordered.submitTextSemantic(
+				poseStack, -i / 2.0F, 0.0F, formattedCharSequence, false,
+				Font.DisplayMode.SEE_THROUGH, 15728880, -1, 0, 0
+			);
+		}
 		poseStack.popPose();
 	}
 

@@ -30,8 +30,12 @@ public class IrisButton extends Button {
 		//guiGraphics.flush();
 		// TODO 1.21.6
 		//RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, this.isHoveredOrFocused() ? this.alphaSupplier.getAsFloat() * 1.8f : this.alphaSupplier.getAsFloat());
-		BlendModeStorage.setBlendEnabled(true);
-		VulkanicAPI.setDepthTestEnabled(VulkanicAPI.getCommandContext(), true);
+		boolean rustGui = VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
+		if (!rustGui) {
+			BlendModeStorage.setBlendEnabled(true);
+			VulkanicAPI.setDepthTestEnabled(VulkanicAPI.getCommandContext(), true);
+		}
 		GuiUtil.bindIrisWidgetsTexture();
 		GuiUtil.drawButton(guiGraphics, this.getX(), this.getY(), this.getWidth(), this.getHeight(), this.isHoveredOrFocused(), !this.isActive());
 		//guiGraphics.flush();

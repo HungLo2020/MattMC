@@ -82,7 +82,8 @@ public final class VulkanicCoreAPI {
     }
 
     public static int textureId(GpuTexture texture) {
-        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+            || net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
             throw new IllegalStateException(
                 "legacy Java texture handles are unavailable while Rust owns whole-frame Vulkan presentation"
             );
@@ -91,11 +92,15 @@ public final class VulkanicCoreAPI {
     }
 
     public static int textureId(GpuTextureView textureView) {
+        if (textureView == null) {
+            throw new IllegalArgumentException("textureView must not be null");
+        }
         return textureId(textureView.texture());
     }
 
     public static int bufferId(net.blaze3d.buffers.GpuBuffer buffer) {
-        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+            || net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
             throw new IllegalStateException(
                 "legacy Java buffer handles are unavailable while Rust owns whole-frame Vulkan presentation"
             );
@@ -108,7 +113,8 @@ public final class VulkanicCoreAPI {
     }
 
     public static void presentTextureToScreen(CommandContext ctx, GpuTextureView textureView) {
-        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+            || net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
             throw new IllegalStateException(
                 "Java Vulkan presentation is unavailable while Rust owns whole-frame presentation"
             );

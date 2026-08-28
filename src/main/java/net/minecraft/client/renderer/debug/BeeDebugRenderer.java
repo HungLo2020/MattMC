@@ -15,7 +15,10 @@ import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.SubmitNodeStorage;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.protocol.game.DebugEntityNameGenerator;
@@ -25,6 +28,7 @@ import net.minecraft.util.debug.DebugHiveInfo;
 import net.minecraft.util.debug.DebugSubscriptions;
 import net.minecraft.util.debug.DebugValueAccess;
 import net.minecraft.util.debug.DebugGoalInfo.DebugGoal;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.Entity;
 import org.jetbrains.annotations.Nullable;
 
@@ -88,6 +92,50 @@ public class BeeDebugRenderer implements DebugRenderer.SimpleDebugRenderer {
 			}
 		});
 	}
+
+	/** Copies bee, flower, hive, and ghost-hive diagnostics into Rust semantic streams. */
+	public void collectRustSemantics(Camera camera, SubmitNodeStorage geometry, SubmitNodeStorage text) {
+		if ((!net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
+			|| !net.vulkanic.world.WorldRenderRoutePolicy.currentProceduralQuadRoute().usesRustWholeFrameVulkan()) return;
+		DebugValueAccess access = this.minecraft.getConnection().createDebugValueAccess();
+		if (this.minecraft.player != null && !this.minecraft.player.isSpectator()) this.updateLastLookedAtUuid();
+		BlockPos center = camera.getBlockPosition();
+		PoseStack transform = new PoseStack(); transform.translate(-camera.getPosition().x, -camera.getPosition().y, -camera.getPosition().z);
+		float[] uvs = {0,0,1,0,1,1,0,1};
+		access.forEachEntity(DebugSubscriptions.BEES, (entity, bee) -> {
+			if (this.minecraft.player == null || !this.minecraft.player.closerThan(entity, MAX_RENDER_DIST_FOR_BEE_OVERLAY)) return;
+			DebugGoalInfo goals = (DebugGoalInfo)access.getEntityValue(DebugSubscriptions.GOAL_SELECTORS, entity);
+			int line = 0;
+			line = beeLabel(text, camera, entity, line, bee.toString(), -1, 0.03F);
+			line = beeLabel(text, camera, entity, line, bee.hivePos().isEmpty() ? "No hive" : "Hive: " + getPosDescription(entity, bee.hivePos().get()), bee.hivePos().isEmpty() ? PINK : -256, TEXT_SCALE);
+			line = beeLabel(text, camera, entity, line, bee.flowerPos().isEmpty() ? "No flower" : "Flower: " + getPosDescription(entity, bee.flowerPos().get()), bee.flowerPos().isEmpty() ? PINK : -256, TEXT_SCALE);
+			if (goals != null) for (DebugGoal goal : goals.goals()) if (goal.isRunning()) line = beeLabel(text, camera, entity, line, goal.name(), -16711936, TEXT_SCALE);
+			if (bee.travelTicks() > 0) beeLabel(text, camera, entity, line, "Travelling: " + bee.travelTicks() + " ticks", bee.travelTicks() < 2400 ? GRAY : ORANGE, TEXT_SCALE);
+		});
+		Map<BlockPos, Set<UUID>> flowers = new HashMap<>();
+		access.forEachEntity(DebugSubscriptions.BEES, (entity, bee) -> bee.flowerPos().ifPresent(pos -> flowers.computeIfAbsent(pos, ignored -> new HashSet<>()).add(entity.getUUID())));
+		flowers.forEach((pos, ids) -> { if (center.closerThan(pos, MAX_RENDER_DIST_FOR_HIVE_OVERLAY)) { beeBox(geometry, transform, uvs, pos, 0x4DCCCC00); beeLabel(text, camera, pos, 1, ids.stream().map(DebugEntityNameGenerator::getEntityName).collect(Collectors.toSet()).toString(), -256); beeLabel(text, camera, pos, 2, "Flower", -1); } });
+		Map<BlockPos, Set<UUID>> blacklist = createHiveBlacklistMap(access);
+		access.forEachBlock(DebugSubscriptions.BEE_HIVES, (pos, hive) -> {
+			if (!center.closerThan(pos, MAX_RENDER_DIST_FOR_HIVE_OVERLAY)) return;
+			beeBox(geometry, transform, uvs, pos, 0x4D3333FF);
+			int line = 0;
+			Set<UUID> blocked = blacklist.getOrDefault(pos, Set.of());
+			if (!blocked.isEmpty()) beeLabel(text, camera, pos, line++, "Blacklisted by " + getBeeUuidsAsString(blocked), -65536);
+			beeLabel(text, camera, pos, line++, "Out: " + getBeeUuidsAsString(getHiveMembers(pos, access)), GRAY);
+			beeLabel(text, camera, pos, line++, hive.occupantCount() == 0 ? "In: -" : hive.occupantCount() == 1 ? "In: 1 bee" : "In: " + hive.occupantCount() + " bees", -256);
+			beeLabel(text, camera, pos, line++, "Honey: " + hive.honeyLevel(), ORANGE);
+			beeLabel(text, camera, pos, line, hive.type().getName().getString() + (hive.sedated() ? " (sedated)" : ""), -1);
+		});
+		getGhostHives(access).forEach((pos, names) -> { if (center.closerThan(pos, MAX_RENDER_DIST_FOR_HIVE_OVERLAY)) { beeBox(geometry, transform, uvs, pos, 0x4D3333FF); beeLabel(text, camera, pos, 0, names.toString(), -256); beeLabel(text, camera, pos, 1, "Ghost Hive", -65536); } });
+	}
+
+	private static int beeLabel(SubmitNodeStorage text, Camera camera, Entity entity, int line, String value, int color, float scale) {
+		PoseStack pose = new PoseStack(); pose.translate(entity.getBlockX() + 0.5 - camera.getPosition().x, entity.getY() + 2.4 + line * 0.25 - camera.getPosition().y, entity.getBlockZ() + 0.5 - camera.getPosition().z); pose.mulPose(camera.rotation()); pose.scale(scale, -scale, scale); text.submitTextSemantic(0, pose, -0.5F, 0, Component.literal(value).getVisualOrderText(), true, Font.DisplayMode.SEE_THROUGH, color, -1, 0, 0); return line + 1;
+	}
+	private static void beeLabel(SubmitNodeStorage text, Camera camera, BlockPos pos, int line, String value, int color) { PoseStack pose = new PoseStack(); pose.translate(pos.getX() + 0.5 - camera.getPosition().x, pos.getY() + 1.3 + line * 0.2 - camera.getPosition().y, pos.getZ() + 0.5 - camera.getPosition().z); pose.mulPose(camera.rotation()); pose.scale(TEXT_SCALE, -TEXT_SCALE, TEXT_SCALE); text.submitTextSemantic(0, pose, 0, 0, Component.literal(value).getVisualOrderText(), true, Font.DisplayMode.SEE_THROUGH, color, -1, 0, 0); }
+	private static void beeBox(SubmitNodeStorage geometry, PoseStack transform, float[] uvs, BlockPos pos, int color) { float p=0.05F,x0=pos.getX()-p,y0=pos.getY()-p,z0=pos.getZ()-p,x1=pos.getX()+1+p,y1=pos.getY()+1+p,z1=pos.getZ()+1+p; float[][] faces={{x0,y0,z0,x1,y0,z0,x1,y1,z0,x0,y1,z0},{x1,y0,z1,x0,y0,z1,x0,y1,z1,x1,y1,z1},{x0,y0,z1,x0,y0,z0,x0,y1,z0,x0,y1,z1},{x1,y0,z0,x1,y0,z1,x1,y1,z1,x1,y1,z0},{x0,y0,z0,x0,y0,z1,x1,y0,z1,x1,y0,z0},{x0,y1,z1,x0,y1,z0,x1,y1,z0,x1,y1,z1}}; for(float[] face:faces) if(!geometry.submitColoredQuadsSemantic(transform,RenderType.debugFilledBox(),face,uvs,new int[]{color},15728880)) throw new IllegalStateException("Rust whole-frame bee route rejected semantic marker"); }
 
 	private Map<BlockPos, Set<UUID>> createHiveBlacklistMap(DebugValueAccess debugValueAccess) {
 		Map<BlockPos, Set<UUID>> map = new HashMap();

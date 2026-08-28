@@ -11,11 +11,7 @@ public class GbufferPrograms {
 	private static boolean outline;
 	private static Runnable phaseChangeListener;
 	private static Runnable fallbackEntityListener;
-
-	static {
-		StateUpdateNotifiers.phaseChangeNotifier = listener -> phaseChangeListener = listener;
-		StateUpdateNotifiers.fallbackEntityNotifier = listener -> fallbackEntityListener = listener;
-	}
+	private static boolean initialized;
 
 	private static void checkReentrancy() {
 		if (entities || blockEntities || outline) {
@@ -25,6 +21,7 @@ public class GbufferPrograms {
 	}
 
 	public static void beginEntities() {
+		init();
 		checkReentrancy();
 		setPhase(WorldRenderingPhase.ENTITIES);
 		entities = true;
@@ -40,6 +37,7 @@ public class GbufferPrograms {
 	}
 
 	public static void beginOutline() {
+		init();
 		checkReentrancy();
 		setPhase(WorldRenderingPhase.OUTLINE);
 		outline = true;
@@ -55,6 +53,7 @@ public class GbufferPrograms {
 	}
 
 	public static void beginBlockEntities() {
+		init();
 		checkReentrancy();
 		setPhase(WorldRenderingPhase.BLOCK_ENTITIES);
 		blockEntities = true;
@@ -70,6 +69,9 @@ public class GbufferPrograms {
 	}
 
 	public static WorldRenderingPhase getCurrentPhase() {
+		if (!isRustRoute()) {
+			init();
+		}
 		WorldRenderingPipeline pipeline = Iris.getPipelineManager().getPipelineNullable();
 
 		if (pipeline != null) {
@@ -107,8 +109,17 @@ public class GbufferPrograms {
 		}
 	}
 
-	@SuppressWarnings("all")
-	public static void init() {
-		// Empty initializer to run static
+	public static synchronized void init() {
+		if (initialized || isRustRoute()) {
+			return;
+		}
+		StateUpdateNotifiers.phaseChangeNotifier = listener -> phaseChangeListener = listener;
+		StateUpdateNotifiers.fallbackEntityNotifier = listener -> fallbackEntityListener = listener;
+		initialized = true;
+	}
+
+	private static boolean isRustRoute() {
+		return net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
 	}
 }

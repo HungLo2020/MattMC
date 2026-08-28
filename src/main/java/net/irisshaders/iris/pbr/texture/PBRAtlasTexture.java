@@ -116,7 +116,8 @@ public class PBRAtlasTexture extends AbstractTexture implements PBRDumpable {
 	}
 
 	public void upload(int atlasWidth, int atlasHeight, int mipLevel) {
-		if (VulkanicAPI.isVulkanBackendInitializedAndSelected()) {
+		if (VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			throw new IllegalStateException("Selected Vulkan uses Rust-owned PBR atlases; Iris Java atlas uploads are unavailable");
 		}
 		if (this.texture != null) {

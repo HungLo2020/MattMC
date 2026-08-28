@@ -154,7 +154,7 @@ public class BedRenderer implements BlockEntityRenderer<BedBlockEntity, BedRende
 	) {
 		poseStack.pushPose();
 		preparePose(poseStack, bl, direction);
-		submitNodeCollector.submitModel(
+		submitNodeCollector.submitModelSemantic(
 			simple, Unit.INSTANCE, poseStack, material.renderType(RenderType::entitySolid), i, j, -1, this.materials.get(material), k, crumblingOverlay
 		);
 		poseStack.popPose();

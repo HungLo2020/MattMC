@@ -36,6 +36,12 @@ public class GlBufferArena implements ChunkBufferArena {
     private final int stride;
 
     public GlBufferArena(CommandList commands, int initialCapacity, int stride, StagingBuffer stagingBuffer) {
+        if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+            throw new IllegalStateException("legacy GL arena creation is unavailable while Rust owns Vulkan rendering");
+        }
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+            throw new IllegalStateException("legacy GL arena creation is unavailable while Rust owns whole-frame presentation");
+        }
         this.capacity = initialCapacity;
         this.resizeIncrement = initialCapacity / 16;
 
@@ -264,7 +270,7 @@ public class GlBufferArena implements ChunkBufferArena {
 
     @Override
     public GpuBuffer gpuBufferView(Supplier<String> label, int usage) {
-        if (net.vulkanic.VulkanicAPI.isVulkanBackendInitializedAndSelected()) {
+        if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
             throw new IllegalStateException("Selected Vulkan cannot expose Sodium's legacy GL buffer arena");
         }
         return new LegacyHandleGlBuffer(label, usage, Math.toIntExact(this.arenaBuffer.getSize()), this.arenaBuffer.handle());

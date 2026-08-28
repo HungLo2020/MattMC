@@ -30,6 +30,12 @@ from typing import Iterable
 ROOT = Path(__file__).resolve().parents[2]
 SRC_MAIN = ROOT / "src" / "main" / "java"
 AUTO_CAPTURE = ROOT / "logs" / "auto-capture"
+# CaptureRunner keeps generated products in this ignored subtree.  Retain the
+# historical log location for older runs, but discover both locations so the
+# parity auditor follows the managed artifact policy instead of requiring a
+# copy (or reintroducing root-level .capture files).
+MANAGED_CAPTURE_ROOT = ROOT / "artifacts" / "graphics-captures"
+CAPTURE_META_ROOTS = (AUTO_CAPTURE, MANAGED_CAPTURE_ROOT)
 
 GEOMETRY_SAMPLER_AWARE_PIPELINES = {
     "minecraft:pipeline/gui_text",
@@ -74,10 +80,25 @@ class CaptureMeta:
     client_args: str = ""
     enable_shaders: str = ""
     shader_pack: str = ""
+    parity_fixture_schema: str = ""
+    parity_fixture_id: str = ""
+    parity_fixture_source_save_hash: str = ""
+    world_save_state_hash: str = ""
 
     @property
-    def matching_key(self) -> tuple[str, str, str]:
-        return (self.client_args, self.enable_shaders, self.shader_pack)
+    def matching_key(self) -> tuple[str, str, str, str, str, str, str]:
+        # Settings alone are insufficient: two captures can use the same pack
+        # and command line while rendering different worlds or camera fixtures.
+        # Keep the full shared-harness identity in the pairing key.
+        return (
+            self.client_args,
+            self.enable_shaders,
+            self.shader_pack,
+            self.parity_fixture_schema,
+            self.parity_fixture_id,
+            self.parity_fixture_source_save_hash,
+            self.world_save_state_hash,
+        )
 
 
 @dataclass
@@ -2628,10 +2649,21 @@ def load_capture_meta(path: Path) -> CaptureMeta | None:
             values[key.strip()] = value.strip()
     run_id = values.get("run_id")
     backend = values.get("backend")
+    # CaptureRunner names the Rust-owned route explicitly; parity compares it
+    # as Vulkan while preserving the original label in the metadata file.
+    if backend == "rust-vulkan":
+        backend = "vulkan"
+    if backend == "rust-opengl":
+        backend = "opengl"
     if not run_id or backend not in {"opengl", "vulkan"}:
         return None
     latest = values.get("latest_log")
-    latest_log = Path(latest) if latest else AUTO_CAPTURE / f"latest_{run_id}.log"
+    if latest:
+        latest_log = Path(latest)
+        if not latest_log.is_absolute():
+            latest_log = path.parent / latest_log
+    else:
+        latest_log = path.parent / f"latest_{run_id}.log"
     if not latest_log.exists():
         latest_log = None
     return CaptureMeta(
@@ -2642,11 +2674,16 @@ def load_capture_meta(path: Path) -> CaptureMeta | None:
         client_args=values.get("client_args", ""),
         enable_shaders=values.get("effective_enable_shaders", values.get("iris_override_enable_shaders", "")),
         shader_pack=values.get("effective_shader_pack", ""),
+        parity_fixture_schema=values.get("parity_fixture_schema", ""),
+        parity_fixture_id=values.get("parity_fixture_id", ""),
+        parity_fixture_source_save_hash=values.get("parity_fixture_source_save_hash", ""),
+        world_save_state_hash=values.get("world_save_state_hash", ""),
     )
 
 
 def find_latest_matching_pair() -> tuple[CaptureMeta, CaptureMeta] | None:
-    metas = [meta for path in AUTO_CAPTURE.glob("meta_*.txt") if (meta := load_capture_meta(path))]
+    meta_paths = [path for root in CAPTURE_META_ROOTS if root.exists() for path in root.rglob("meta_*.txt")]
+    metas = [meta for path in meta_paths if (meta := load_capture_meta(path))]
     metas = [meta for meta in metas if meta.latest_log and meta.latest_log.exists()]
     by_key: dict[tuple[str, str, str], dict[str, list[CaptureMeta]]] = defaultdict(lambda: defaultdict(list))
     for meta in metas:

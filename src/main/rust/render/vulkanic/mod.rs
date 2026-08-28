@@ -20,6 +20,11 @@ pub mod sync;
 pub mod terrain;
 pub mod world_primitive_frontend;
 
+/// Maximum viewport axis admitted by semantic frame and GUI submissions.
+/// Keeping this finite prevents hostile FFI dimensions from driving unbounded
+/// staging, attachment, or uniform allocations.
+pub(crate) const SEMANTIC_MAX_VIEWPORT_AXIS: i32 = 16_384;
+
 pub use commands::{
     AttachmentLoadOp, AttachmentStoreOp, BufferImageCopyRegion, ClearColor, CommandList,
     CommandListDesc, CommandOp, PassAttachment, ResourceBarrier, SubmissionBatch, TextureOrigin3d,

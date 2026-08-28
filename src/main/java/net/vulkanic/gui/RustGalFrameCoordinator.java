@@ -4,8 +4,10 @@ import net.blaze3d.platform.Window;
 import net.logging.LogUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.dev.GraphicsFrameBenchmark;
+import net.minecraft.client.dev.DeterministicCameraCapture;
 import net.minecraft.client.dev.RenderDocCaptureHook;
 import net.minecraft.client.gui.render.state.GuiRenderState;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.util.profiling.TracyCompat;
 import net.vulkanic.VulkanicAPI;
@@ -30,6 +32,10 @@ import java.util.List;
 import java.util.Map;
 
 public final class RustGalFrameCoordinator {
+	private static final int MAX_RUST_GUI_AFFINE_QUADS = 65_536;
+	private static final int MAX_RUST_GUI_MESH_BATCHES = 1_024;
+	private static final int MAX_RUST_GUI_MESH_VERTICES = 65_536;
+	private static final int MAX_RUST_GUI_MESH_INDICES = 196_608;
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private static final Object LOCK = new Object();
 	private static VulkanicGalBridge bridge;
@@ -60,6 +66,9 @@ public final class RustGalFrameCoordinator {
 	private static long rawImageGeneration = 1L;
 	private static long uploadedRawImageGeneration;
 	private static long attemptedRawImageGeneration;
+	private static final int MAX_PENDING_RAW_IMAGES = 4_096;
+	/** Matches the Rust-owned aggregate raw GUI image payload bound. */
+	private static final long MAX_PENDING_RAW_IMAGE_BYTES = 256L * 1024L * 1024L;
 	private static final Map<Long, VulkanicGalBridge.GuiRawImageAssetRecord> pendingRawImages = new LinkedHashMap<>();
 	private static long nextShaderPackSourceGeneration = 1L;
 	private static long uploadedShaderPackSourceGeneration;
@@ -142,6 +151,7 @@ public final class RustGalFrameCoordinator {
 		GuiRenderStratum stratum,
 		long startedNanos
 	) {
+		requireRustGuiRoute();
 		long lockStartedNanos = System.nanoTime();
 		synchronized (LOCK) {
 			RustGalFrameScheduler.Token token = SCHEDULER.enqueue(
@@ -169,6 +179,7 @@ public final class RustGalFrameCoordinator {
 		int semanticLayerOrder,
 		long startedNanos
 	) {
+		requireRustGuiRoute();
 		if (semanticLayerId == null || semanticLayerId.isBlank() || semanticLayerOrder < 0) {
 			throw new IllegalArgumentException("invalid semantic GUI layer");
 		}
@@ -188,6 +199,7 @@ public final class RustGalFrameCoordinator {
 		int semanticLayerOrder,
 		long startedNanos
 	) {
+		requireRustGuiRoute();
 		if (semanticLayerId == null || semanticLayerId.isBlank() || semanticLayerOrder < 0) {
 			throw new IllegalArgumentException("invalid semantic GUI layer");
 		}
@@ -215,6 +227,7 @@ public final class RustGalFrameCoordinator {
 		int semanticLayerOrder,
 		long startedNanos
 	) {
+		requireRustGuiRoute();
 		if (semanticLayerId == null || semanticLayerId.isBlank() || semanticLayerOrder < 0) {
 			throw new IllegalArgumentException("invalid semantic GUI layer");
 		}
@@ -227,7 +240,22 @@ public final class RustGalFrameCoordinator {
 		}
 	}
 
+	/**
+	 * Semantic GUI requests are only meaningful on an admitted Rust GUI route.
+	 * Reject before taking the scheduler lock so a disabled/diagnostic route
+	 * cannot accumulate work that might later be mistaken for a frame.
+	 */
+	private static void requireRustGuiRoute() {
+		if (!RustGalGuiRenderer.currentExecutionRoute().usesRustGui()) {
+			throw new IllegalStateException(
+				"Rust GUI semantic enqueue requires an admitted Rust GUI route; current route is "
+					+ RustGalGuiRenderer.currentExecutionRoute()
+			);
+		}
+	}
+
 	static void stageGuiRawImage(VulkanicGalBridge.GuiRawImageAssetRecord asset) {
+		requireRustGuiRoute();
 		synchronized (LOCK) {
 			VulkanicGalBridge.GuiRawImageAssetRecord previous = pendingRawImages.get(asset.assetId());
 			if (previous != null
@@ -237,7 +265,34 @@ public final class RustGalFrameCoordinator {
 				&& Arrays.equals(previous.pixels(), asset.pixels())) {
 				return;
 			}
+			if (previous == null && pendingRawImages.size() >= MAX_PENDING_RAW_IMAGES) {
+				throw new IllegalStateException("semantic GUI raw-image staging bound exceeded " + MAX_PENDING_RAW_IMAGES);
+			}
+			long projectedBytes = 0L;
+			for (VulkanicGalBridge.GuiRawImageAssetRecord candidate : pendingRawImages.values()) {
+				if (candidate != previous) projectedBytes = Math.addExact(projectedBytes, candidate.pixels().length);
+			}
+			projectedBytes = Math.addExact(projectedBytes, asset.pixels().length);
+			if (projectedBytes > MAX_PENDING_RAW_IMAGE_BYTES) {
+				throw new IllegalStateException(
+					"semantic GUI raw-image byte bound exceeded " + MAX_PENDING_RAW_IMAGE_BYTES
+						+ " projected=" + projectedBytes
+				);
+			}
 			pendingRawImages.put(asset.assetId(), asset);
+			rawImageGeneration++;
+			attemptedRawImageGeneration = Math.min(attemptedRawImageGeneration, uploadedRawImageGeneration);
+		}
+	}
+
+	/**
+	 * Drops the Java-side raw-image generation together with its source caches.
+	 * The next flush publishes an explicit empty replacement generation, so Rust
+	 * cannot retain images from a resource pack that has already been invalidated.
+	 */
+	static void invalidateGuiRawImages() {
+		synchronized (LOCK) {
+			pendingRawImages.clear();
 			rawImageGeneration++;
 			attemptedRawImageGeneration = Math.min(attemptedRawImageGeneration, uploadedRawImageGeneration);
 		}
@@ -245,6 +300,16 @@ public final class RustGalFrameCoordinator {
 
 	public static void executeGuiFrame(Minecraft minecraft, List<RustGalGuiElementRenderState> elements) {
 		if (elements.isEmpty()) {
+			// A producer can enqueue semantic work before a screen decides that its
+			// current frame has no drawable elements.  Those tokens cannot be
+			// consumed by a later frame without violating ordering; discard them at
+			// the frame boundary so large loading-screen payloads do not accumulate
+			// indefinitely in the scheduler.
+			synchronized (LOCK) {
+				int cancelled = SCHEDULER.cancelAll("empty-frame");
+				METRICS.cancellations += cancelled == 0 ? 0 : 1;
+				METRICS.batchesCancelled += cancelled;
+			}
 			return;
 		}
 		RustGalGuiRenderer.GuiExecutionRoute route = RustGalGuiRenderer.currentExecutionRoute();
@@ -358,7 +423,7 @@ public final class RustGalFrameCoordinator {
 					+ " borderQuads=" + result.worldBorderQuadCount()
 					+ " materialQuads=" + result.worldMaterialQuadCount()
 					+ " meshInstances=" + result.worldMeshInstanceCount());
-				retireOutstanding(false);
+				retireOutstanding(forceDeterministicCaptureRetirement());
 				auditMessage(metricsAuditLine(0, frameId, submissionId, false));
 				METRICS.executeNanos += elapsedSince(executeStarted);
 				executeCounted = true;
@@ -385,6 +450,9 @@ public final class RustGalFrameCoordinator {
 		}
 		if (!VulkanicAPI.isVulkanBackendSelected()) {
 			throw new IllegalStateException("Rust Vulkan whole-frame shell requires Vulkan backend selection at startup");
+		}
+		if (renderState == null) {
+			throw new IllegalStateException("Rust Vulkan whole-frame shell requires copied GUI render state");
 		}
 		int unsupportedGuiElements = RustGalGuiRenderer.wholeFrameUnsupportedElementCount();
 		if (unsupportedGuiElements != 0) {
@@ -439,13 +507,36 @@ public final class RustGalFrameCoordinator {
 			requests = SCHEDULER.takeAllItems(tokens, generation);
 		}
 		// Native Vulkan execution must not monopolize the semantic producer lock.
-		executeFrameBatches(window, requests, true, window.getGuiScaledWidth(), window.getGuiScaledHeight(), renderState.blurBeforeStratumIndex(), blurRadius, postEffectId);
+		executeFrameBatches(window, requests, true, window.getGuiScaledWidth(), window.getGuiScaledHeight(), renderState.blurBeforeStratumIndex(), blurRadius,
+			normalizeSemanticPostEffectId(postEffectId));
 		// The Rust presenter is the deterministic capture boundary. Advance the
 		// capture only after executeFrameBatches has acquired, submitted, and
 		// presented this whole-frame Vulkan submission, and after the coordinator
 		// lock is released so capture/readiness diagnostics cannot participate in
 		// a backend asset-lock cycle.
 		net.minecraft.client.dev.DeterministicCameraCapture.afterRender(minecraft);
+	}
+
+	/**
+	 * Bounds the only post-effect value crossing the Java/Rust semantic
+	 * boundary. The Rust decoder repeats these checks, but rejecting malformed
+	 * identities here keeps the FFI request itself a bounded semantic value and
+	 * never transports a Java post-chain object or renderer state.
+	 */
+	private static String normalizeSemanticPostEffectId(String postEffectId) {
+		if (postEffectId == null || postEffectId.isEmpty()) return postEffectId;
+		if (postEffectId.trim().isEmpty() || postEffectId.chars().anyMatch(Character::isISOControl)) {
+			throw new IllegalArgumentException("Rust Vulkan post-effect identity must be non-empty and control-free");
+		}
+		if (postEffectId.getBytes(StandardCharsets.UTF_8).length > 256) {
+			throw new IllegalArgumentException("Rust Vulkan post-effect identity exceeds 256 UTF-8 bytes");
+		}
+		try {
+			ResourceLocation.parse(postEffectId);
+		} catch (RuntimeException error) {
+			throw new IllegalArgumentException("Rust Vulkan post-effect identity is not a valid resource location", error);
+		}
+		return postEffectId;
 	}
 
 	public static void resize(int width, int height) {
@@ -638,6 +729,14 @@ public final class RustGalFrameCoordinator {
 		if (requests.isEmpty() && !allowEmpty) {
 			return;
 		}
+		if (requests.size() > 4096 && Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")) {
+			Map<String, Integer> stratumCounts = new LinkedHashMap<>();
+			for (RustGalFrameScheduler.Item<QueuedGuiRequest> request : requests) {
+				stratumCounts.merge(request.token().stratumId(), 1, Integer::sum);
+			}
+			auditMessage("Rust GUI semantic batch pressure count=" + requests.size()
+				+ " strata=" + stratumCounts);
+		}
 		long executeStarted = System.nanoTime();
 		GraphicsFrameBenchmark.beginPhase("rust-gal.gui-frame.execute");
 		long correlationId = nextCorrelationId++;
@@ -745,12 +844,44 @@ public final class RustGalFrameCoordinator {
 			long packingStarted = submitStarted;
 			int frameGuiWidth = requests.isEmpty() ? guiWidth : requests.get(0).payload().guiWidth();
 			int frameGuiHeight = requests.isEmpty() ? guiHeight : requests.get(0).payload().guiHeight();
-			List<VulkanicGalBridge.GuiSpriteRecord> spriteRequests = new ArrayList<>();
-			List<VulkanicGalBridge.GuiAffineQuadRecord> affineQuadRequests = new ArrayList<>();
-			List<VulkanicGalBridge.GuiMeshBatchRecord> meshBatchRequests = new ArrayList<>();
+			// Loading screens can legitimately contain tens of thousands of ordered
+			// semantic items.  Reserve the bounded request cardinality up front so
+			// ArrayList growth does not retain several transient backing arrays while
+			// the FFI arena is packed; this changes no ordering or admission policy.
+			int requestCapacity = Math.min(requests.size(), RustGalFrameScheduler.SEQUENCE_STRIDE > Integer.MAX_VALUE
+				? Integer.MAX_VALUE : (int) RustGalFrameScheduler.SEQUENCE_STRIDE);
+			List<VulkanicGalBridge.GuiSpriteRecord> spriteRequests = new ArrayList<>(requestCapacity);
+			List<VulkanicGalBridge.GuiAffineQuadRecord> affineQuadRequests = new ArrayList<>(requestCapacity);
+			List<VulkanicGalBridge.GuiMeshBatchRecord> meshBatchRequests = new ArrayList<>(requestCapacity);
 			int guiTextAffineQuadCount = 0;
 			int guiItemAffineQuadCount = 0;
+			int meshVertexCount = 0;
+			int meshIndexCount = 0;
 			for (RustGalFrameScheduler.Item<QueuedGuiRequest> request : requests) {
+				int incomingAffineQuadCount = request.payload().affineQuads().size();
+				if ((long)affineQuadRequests.size() + incomingAffineQuadCount > MAX_RUST_GUI_AFFINE_QUADS) {
+					throw new IllegalStateException(
+						"Rust whole-frame GUI affine-quad capacity exceeded " + MAX_RUST_GUI_AFFINE_QUADS
+					);
+				}
+				if (!request.payload().meshBatches().isEmpty()) {
+					long incomingVertices = 0L;
+					long incomingIndices = 0L;
+					for (VulkanicGalBridge.GuiMeshBatchRecord batch : request.payload().meshBatches()) {
+						incomingVertices += batch.vertices().size();
+						incomingIndices += batch.indices().size();
+					}
+					if (meshBatchRequests.size() + request.payload().meshBatches().size() > MAX_RUST_GUI_MESH_BATCHES
+						|| (long)meshVertexCount + incomingVertices > MAX_RUST_GUI_MESH_VERTICES
+						|| (long)meshIndexCount + incomingIndices > MAX_RUST_GUI_MESH_INDICES) {
+						throw new IllegalStateException(
+							"Rust whole-frame GUI mesh capacity exceeded batches=" + MAX_RUST_GUI_MESH_BATCHES
+								+ " vertices=" + MAX_RUST_GUI_MESH_VERTICES + " indices=" + MAX_RUST_GUI_MESH_INDICES
+							);
+					}
+					meshVertexCount = Math.addExact(meshVertexCount, Math.toIntExact(incomingVertices));
+					meshIndexCount = Math.addExact(meshIndexCount, Math.toIntExact(incomingIndices));
+				}
 				request.payload().appendTo(spriteRequests, affineQuadRequests, meshBatchRequests, request.token().sequence());
 				if (!request.payload().affineQuads().isEmpty()) {
 					if (request.token().stratumId().equals(GuiRenderStratum.GUI_TEXT.id())) {
@@ -875,6 +1006,10 @@ public final class RustGalFrameCoordinator {
 					DistantHorizonsSemanticCollector.recordRustMaterialRouteExecution(
 						frameId,
 						submissionId,
+						// Use the coordinator's armed attachment correlation when a
+						// selected-source capture is active. This is the exact frame
+						// identity shared by the Rust execution and screenshot receipt;
+						// do not invent a route-specific frame offset.
 						net.minecraft.client.dev.DeterministicCameraCapture.currentCaptureCorrelationRenderedFrameIndex(),
 						primitiveFrame.lodInstances().size(),
 						opaqueInstances,
@@ -883,12 +1018,13 @@ public final class RustGalFrameCoordinator {
 						primitiveFrame.lodRenderFrame().enabled(),
 						primitiveFrame.lodInstances()
 					);
-					net.minecraft.client.dev.DeterministicCameraCapture.recordSubmittedWorkIdentity(
+					net.minecraft.client.dev.DeterministicCameraCapture.recordSubmittedWorkIdentityForCompletedFrame(
 						"distant-horizons", "rust-vulkan-whole-frame:material-lod"
 					);
 				}
 			}
 			if (wholeFrameVulkan) {
+				recordWholeFrameTerrainReadiness(primitiveFrame);
 				if (wholeFrameResult.guiMeshItemCount() > 0L) {
 					net.minecraft.client.dev.DeterministicCameraCapture.recordSubmittedWorkIdentity(
 						"gui-standard-3d",
@@ -937,6 +1073,16 @@ public final class RustGalFrameCoordinator {
 					submissionId,
 					primitiveFrame.materialQuads()
 				);
+				RustGalWorldPrimitiveRenderer.recordWholeFrameEntityModelExecution(
+					frameId,
+					submissionId,
+					primitiveFrame.materialQuads()
+				);
+				RustGalWorldPrimitiveRenderer.recordWholeFrameProceduralQuadExecution(
+					frameId,
+					submissionId,
+					primitiveFrame.materialQuads()
+				);
 				auditWholeFrameTarget(frame, primitiveFrame);
 			}
 			lastSubmitted = Math.max(lastSubmitted, submissionId);
@@ -954,7 +1100,7 @@ public final class RustGalFrameCoordinator {
 					+ " submission=" + submissionId
 					+ " status=" + presented.status());
 					net.minecraft.client.dev.DeterministicCameraCapture.recordWholeFramePresentation(
-						net.minecraft.client.dev.DeterministicCameraCapture.currentInProgressRenderedFrameIndex(),
+						net.minecraft.client.dev.DeterministicCameraCapture.currentInProgressRenderedFrameIndex() + 1L,
 						frame.frameId(),
 						correlationId,
 						submissionId,
@@ -1024,7 +1170,7 @@ public final class RustGalFrameCoordinator {
 				recordGuiMetrics(guiResult);
 			}
 			GraphicsFrameBenchmark.beginPhase("rust-gal.frame.retire-outstanding");
-			retireOutstanding(false);
+			retireOutstanding(forceDeterministicCaptureRetirement());
 			GraphicsFrameBenchmark.endPhase("rust-gal.frame.retire-outstanding");
 			auditMessage(metricsAuditLine(requests.size(), frameId, submissionId, wholeFrameResult != null));
 			METRICS.executeNanos += elapsedSince(executeStarted);
@@ -1085,7 +1231,7 @@ public final class RustGalFrameCoordinator {
 		appendCoverage(unsupported, "text", coverage.textSubmits());
 		appendCoverage(unsupported, "hitbox", coverage.hitboxSubmits());
 		appendCoverage(unsupported, "leash", coverage.leashSubmits());
-		appendCoverage(unsupported, "particle-group", coverage.particleGroupSubmits());
+		// Particle groups are admitted by the Rust semantic material coverage gate.
 		if (unsupported.length() != 0) {
 			throw new IllegalStateException(
 				"Rust whole-frame feature coverage contains unadmitted semantic families: " + unsupported
@@ -1383,6 +1529,40 @@ public final class RustGalFrameCoordinator {
 			+ " background_enabled=" + frame.background().enabled();
 	}
 
+	/**
+	 * Records the semantic terrain set that was accepted by the Rust whole-frame
+	 * submission.  The shared settled-work gate uses this identity instead of
+	 * the legacy Sodium producer, which is intentionally absent on this route.
+	 */
+	private static void recordWholeFrameTerrainReadiness(RustGalWorldPrimitiveRenderer.PrimitiveFrame frame) {
+		if (frame == null || frame.meshInstances().isEmpty()) {
+			return;
+		}
+		List<Long> terrainKeys = new ArrayList<>();
+		for (VulkanicGalBridge.WorldMeshInstanceRecord instance : frame.meshInstances()) {
+			if (instance.stratum() == RustGalWorldPrimitiveRenderer.STRATUM_WORLD_TERRAIN) {
+				terrainKeys.add(instance.meshKey() ^ Long.rotateLeft(instance.meshGeneration(), 17));
+			}
+		}
+		if (terrainKeys.isEmpty()) {
+			return;
+		}
+		terrainKeys.sort(Long::compare);
+		long fingerprint = 0xcbf29ce484222325L;
+		for (long key : terrainKeys) {
+			fingerprint ^= key;
+			fingerprint *= 0x100000001b3L;
+		}
+		String identity = "rust-vulkan-whole-frame:terrain:count=" + terrainKeys.size()
+			+ ":fingerprint=" + Long.toUnsignedString(fingerprint);
+		// Whole-frame terrain can complete before the deterministic capture hook
+		// has initialized for the first playable frame.  Associate the receipt
+		// with the frame that just completed so early valid submissions are not
+		// silently dropped by the ordinary initialized-only recorder path.
+		DeterministicCameraCapture.recordSubmittedWorkIdentityForCompletedFrame("sodium-terrain", identity);
+		DeterministicCameraCapture.recordSubmittedWorkIdentityForCompletedFrame("static-terrain", identity);
+	}
+
 	private static boolean lodRouteSelected(VulkanicGalBridge.WorldLodRenderFrameRecord frame) {
 		return frame.enabled()
 			&& (frame.flags() & DistantHorizonsSemanticCollector.RENDER_FLAG_RUST_NON_WATER_ROUTE_SELECTED) != 0;
@@ -1638,13 +1818,41 @@ public final class RustGalFrameCoordinator {
 		if (bridge == null || lastSubmitted == 0L || lastSubmitted <= lastRetiredSubmission) {
 			return;
 		}
+		long retireThrough = lastSubmitted;
 		if (!force) {
+			// Poll the Rust timeline before retiring.  The old non-forced path was
+			// intentionally a no-op, which left every submitted Vulkan command
+			// buffer in flight during a normal client session (and made RSS grow
+			// until the capture guard killed the process).  Completion polling is
+			// non-blocking; only work already completed by the GPU is retired here.
+			long completionStarted = System.nanoTime();
+			VulkanicGalBridge.Completion completion = bridge.completion(lastSubmitted);
+			METRICS.completionQueryNanos += elapsedSince(completionStarted);
+			recordFixedOperation(Operation.COMPLETION_QUERY, VulkanicGalBridge.Struct.COMPLETION_QUERY.byteSize());
+			METRICS.completionPolls++;
+			retireThrough = completion.completedSubmissionId();
+			if (!completion.complete() && retireThrough <= lastRetiredSubmission) {
+				return;
+			}
+		}
+		if (retireThrough <= lastRetiredSubmission) {
 			return;
 		}
 		long started = System.nanoTime();
-		recordStatus(Operation.RETIRE, bridge.retire(lastSubmitted));
+		recordStatus(Operation.RETIRE, bridge.retire(retireThrough));
 		METRICS.retireNanos += elapsedSince(started);
-		lastRetiredSubmission = lastSubmitted;
+		lastRetiredSubmission = retireThrough;
+	}
+
+	/**
+	 * Heavy deterministic fixtures must not accumulate native Vulkan ownership
+	 * while the driver reports no completed timeline value.  Retiring through the
+	 * submitted token uses the backend's existing explicit wait path and is
+	 * enabled only for capture diagnostics or the terrain-particle fixture.
+	 */
+	private static boolean forceDeterministicCaptureRetirement() {
+		return net.minecraft.client.dev.DeterministicCameraCapture.isEnabledForDiagnostics()
+			|| !System.getProperty("mattmc.dev.rustGalWorldMaterial.terrainParticleScenario", "").isBlank();
 	}
 
 	private static void ensureRenderThreadAndContext(Minecraft minecraft) {
@@ -1752,6 +1960,9 @@ public final class RustGalFrameCoordinator {
 				);
 			} catch (RuntimeException error) {
 				assetUpdateFailures++;
+				// The bridge did not admit this generation. Keep it retryable so a
+				// transient native/resource failure cannot strand the last valid atlas.
+				attemptedAssetGeneration = uploadedAssetGeneration;
 				LOGGER.error(
 					"Rust VulkanicGAL GUI asset update failed for generation {}; preserving last valid atlas",
 					assetGeneration,
@@ -1778,6 +1989,9 @@ public final class RustGalFrameCoordinator {
 				+ " payloads=" + assets.size());
 		} catch (RuntimeException error) {
 			assetUpdateFailures++;
+			// Preserve the last valid image set, but leave this generation retryable
+			// on the next frame after a transient native/resource failure.
+			attemptedRawImageGeneration = uploadedRawImageGeneration;
 			LOGGER.error("Rust VulkanicGAL GUI raw image update failed for generation {}; preserving last valid images", rawImageGeneration, error);
 			auditMessage("Rust VulkanicGAL GUI raw image update failed generation=" + rawImageGeneration
 				+ " uploaded_generation=" + uploadedRawImageGeneration + " preserve_last_valid=true");
@@ -1827,7 +2041,7 @@ public final class RustGalFrameCoordinator {
 	}
 
 	private static void flushPendingWorldLodAssetsLocked() {
-		if (!RustGalGuiRenderer.isWholeFrameVulkanActive()) {
+		if (!RustGalGuiRenderer.isWholeFrameVulkanEnabled()) {
 			return;
 		}
 		VulkanicGalBridge.Status status = DistantHorizonsSemanticCollector.flushPendingAssets(bridge);
@@ -1875,6 +2089,18 @@ public final class RustGalFrameCoordinator {
 			// is still changing. Leave the prior valid generation active and retry
 			// on a later frame without treating this as renderer execution.
 			LOGGER.warn("Rust VulkanicGAL shader-pack source is not ready for semantic collection yet", error);
+		}
+	}
+
+	/**
+	 * Refreshes filesystem-backed shader-pack semantics before camera extraction
+	 * for a Rust-owned frame. Keeping this ahead of matrix construction makes
+	 * the first frame after pack activation use the same source-ready state as
+	 * the Rust shader executor, without consulting Iris renderer state.
+	 */
+	public static void refreshConfiguredShaderPackSourcesForSemanticFrame() {
+		synchronized (LOCK) {
+			refreshConfiguredShaderPackSourcesLocked();
 		}
 	}
 

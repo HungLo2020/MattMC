@@ -53,7 +53,7 @@ public class LecternRenderer implements BlockEntityRenderer<LecternBlockEntity, 
 			poseStack.mulPose(Axis.YP.rotationDegrees(-lecternRenderState.yRot));
 			poseStack.mulPose(Axis.ZP.rotationDegrees(67.5F));
 			poseStack.translate(0.0F, -0.125F, 0.0F);
-			submitNodeCollector.submitModel(
+			submitNodeCollector.submitModelSemantic(
 				this.bookModel,
 				this.bookState,
 				poseStack,

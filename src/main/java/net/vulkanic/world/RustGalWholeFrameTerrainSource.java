@@ -41,10 +41,11 @@ public final class RustGalWholeFrameTerrainSource {
 	private static final int MAX_SEMANTIC_MESH_WORKERS = 8;
 	private static volatile boolean wholeFrameSurfaceQueueDrained;
 	private static volatile boolean wholeFrameTerrainQueueDrained;
-	/** Capture-only state explaining why the explicit CPU source is not yet complete. */
+	/** Capture-only state explaining the current explicit CPU-source queue state. */
 	private static volatile String wholeFrameTerrainQueueSummary = "uninitialized";
 	private static volatile String lastWholeFrameTerrainFailure = "none";
 	private static volatile long wholeFrameTerrainFailureCount;
+	private String lastLoggedQueueSummary = "";
     private ClientLevel level;
     private ClonedChunkSectionCache sectionCache;
 	private ChunkBuilder workerBuilder;
@@ -64,22 +65,46 @@ public final class RustGalWholeFrameTerrainSource {
     private int buildFrame;
 
     public void setLevel(ClientLevel level) {
-        if (this.level == level) {
+        if (this.level == level && this.workerBuilder != null && this.sectionCache != null) {
             return;
         }
         this.destroy();
         this.level = level;
         if (level != null) {
             this.sectionCache = new ClonedChunkSectionCache(level);
-			this.workerBuilder = new ChunkBuilder(level, ChunkMeshFormats.COMPACT, false, MAX_SEMANTIC_MESH_WORKERS);
-        }
-    }
+			// The compact Rust stream carries AO separately from RGB. Keep this
+			// policy explicit so Vulkan terrain does not inherit Iris state.
+			this.workerBuilder = new ChunkBuilder(level, ChunkMeshFormats.COMPACT, true, semanticMeshWorkerCount());
+		}
+	}
 
-    public void enqueue(Camera camera, Frustum frustum, int viewportWidth, int viewportHeight) {
-        if (!WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan()
-                || this.level == null || camera == null || frustum == null || this.workerBuilder == null) {
-            return;
-        }
+	/**
+	 * The terrain-particle capture is a narrow material fixture, not a terrain
+	 * throughput benchmark. Its loading transition otherwise keeps eight large
+	 * cloned-section builds resident alongside the semantic GUI grid and can
+	 * exceed the process RSS budget. Keep the same source and mesh semantics but
+	 * bound peak construction memory for that explicitly named fixture.
+	 */
+	private static int semanticMeshWorkerCount() {
+		return System.getProperty("mattmc.dev.rustGalWorldMaterial.terrainParticleScenario", "").isBlank()
+			? MAX_SEMANTIC_MESH_WORKERS
+			: 1;
+	}
+
+	public void enqueue(Camera camera, Frustum frustum, int viewportWidth, int viewportHeight) {
+		if (!WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan()
+				|| this.level == null || camera == null || frustum == null) {
+			return;
+		}
+		// Backend selection can settle after LevelRenderer's initial level-change
+		// callback. Lazily establish the CPU-only source here rather than silently
+		// presenting a Rust frame with no terrain producer attached.
+		if (this.workerBuilder == null || this.sectionCache == null) {
+			this.setLevel(this.level);
+		}
+		if (this.workerBuilder == null || this.sectionCache == null) {
+			return;
+		}
 		SectionPos cameraSection = SectionPos.of(camera.getPosition());
 		long cameraKey = cameraSection.asLong();
 		if (cameraKey != this.lastCameraSection) {
@@ -116,20 +141,33 @@ public final class RustGalWholeFrameTerrainSource {
 		this.drainVisibilityFrontier(frustum);
 		this.scheduleBuilds(camera);
 		this.sectionCache.cleanup();
-		wholeFrameSurfaceQueueDrained = this.pending.isEmpty() && this.inFlight.isEmpty();
+		wholeFrameSurfaceQueueDrained = this.pending.isEmpty()
+			&& this.inFlight.isEmpty()
+			&& this.invalidatedPending.isEmpty()
+			&& this.invalidatedInFlight.isEmpty();
 		wholeFrameTerrainQueueDrained = wholeFrameSurfaceQueueDrained
 			&& this.propagationPending.isEmpty()
 			&& this.completedBuilds.isEmpty()
 			&& this.unavailableSections.isEmpty();
 		wholeFrameTerrainQueueSummary = "pending=" + this.pending.size()
+			+ ",scheduledJobs=" + this.workerBuilder.getScheduledJobCount()
+			+ ",busyWorkers=" + this.workerBuilder.getBusyThreadCount()
+			+ ",workerThreads=" + this.workerBuilder.getTotalThreadCount()
 			+ ",frontier=" + this.propagationPending.size()
 			+ ",inFlight=" + this.inFlight.size()
+			+ ",invalidatedPending=" + this.invalidatedPending.size()
+			+ ",invalidatedInFlight=" + this.invalidatedInFlight.size()
 			+ ",completed=" + this.completedBuilds.size()
 			+ ",retained=" + this.sections.size()
 			+ ",unavailable=" + this.unavailableSections.size()
 			+ ",failureCount=" + wholeFrameTerrainFailureCount
 			+ ",lastFailure=" + lastWholeFrameTerrainFailure
 			+ ",drained=" + wholeFrameTerrainQueueDrained;
+		if (!wholeFrameTerrainQueueSummary.equals(this.lastLoggedQueueSummary)) {
+			this.lastLoggedQueueSummary = wholeFrameTerrainQueueSummary;
+			System.out.println("[MattMC graphics audit] Rust whole-frame terrain source "
+				+ wholeFrameTerrainQueueSummary);
+		}
 		var visibleSections = new ArrayList<RenderSection>(this.sections.size());
 		for (RenderSection section : this.sections.values()) {
 			if (this.isVisible(section.getPosition(), frustum)) {
@@ -243,7 +281,11 @@ public final class RustGalWholeFrameTerrainSource {
 	 * lists while avoiding the raw-frustum vertical-volume over-admission.
 	 */
 	private void admitSection(SectionPos section, int incoming, boolean origin, Frustum frustum) {
-		if (!this.isCandidate(section, frustum)) {
+		// The camera's containing section is necessarily part of the visible
+		// semantic frame.  Keep it as the bootstrap root even when a captured or
+		// numerically marginal frustum rejects its boundary AABB; propagation and
+		// all non-root sections still use the exact frustum test below.
+		if (!this.isCandidate(section, frustum, origin)) {
 			return;
 		}
 		long key = section.asLong();
@@ -265,11 +307,15 @@ public final class RustGalWholeFrameTerrainSource {
 	}
 
 	private boolean isCandidate(SectionPos section, Frustum frustum) {
+		return this.isCandidate(section, frustum, false);
+	}
+
+	private boolean isCandidate(SectionPos section, Frustum frustum, boolean bootstrapOrigin) {
 		return section != null
 			&& !this.level.isOutsideBuildHeight(section.minBlockY())
 			&& this.level.hasChunk(section.getX(), section.getZ())
 			&& this.isInsideCurrentWindow(section)
-			&& this.isVisible(section, frustum);
+			&& (bootstrapOrigin || this.isVisible(section, frustum));
 	}
 
 	private void requestPropagation(long key) {
@@ -283,7 +329,22 @@ public final class RustGalWholeFrameTerrainSource {
 		while (iterator.hasNext()) {
 			long key = iterator.nextLong();
 			SectionPos section = SectionPos.of(key);
+			// A dirty section that has left the current camera window or frustum is
+			// no longer part of this frame's readiness domain. Drop the stale
+			// invalidation here; ordinary visibility traversal will re-admit it if
+			// the camera later makes it relevant again. Retaining it forever would
+			// keep the whole-frame queue non-drained despite no pending or in-flight
+			// work.
+			if (!this.isInsideCurrentWindow(section) || !this.isVisible(section, frustum)) {
+				this.queued.remove(key);
+				iterator.remove();
+				continue;
+			}
 			if (!this.isCandidate(section, frustum)) {
+				if (!this.level.hasChunk(section.getX(), section.getZ())) {
+					this.queued.remove(key);
+					iterator.remove();
+				}
 				continue;
 			}
 			this.unavailableSections.remove(key);
@@ -397,12 +458,31 @@ public final class RustGalWholeFrameTerrainSource {
 					&& Math.abs(position.getZ() - center.getZ()) <= horizontalRadius) {
 				continue;
 			}
+			long key = entry.getLongKey();
+			// Eviction must cancel queued CPU work before it can enter a worker;
+			// in-flight work is discarded by the completion window/generation check.
+			this.queued.remove(key);
+			this.pending.removeIf(candidate -> candidate.asLong() == key);
+			if (this.inFlight.contains(key)) {
+				this.invalidatedInFlight.add(key);
+			}
 			RustGalTerrainRenderer.removeSection(position.getX(), position.getY(), position.getZ(), "cpu-source-window-evicted");
-			this.incomingDirections.remove(entry.getLongKey());
-			this.propagatedIncomingDirections.remove(entry.getLongKey());
-			this.unavailableSections.remove(entry.getLongKey());
+			this.incomingDirections.remove(key);
+			this.propagatedIncomingDirections.remove(key);
+			this.unavailableSections.remove(key);
 			iterator.remove();
 		}
+		// Sections still waiting for a first build are not in `sections`, so sweep
+		// the pending frontier separately; otherwise a camera jump can dispatch
+		// stale work after the retained-map eviction above has completed.
+		this.pending.removeIf(position -> {
+			boolean outside = Math.abs(position.getX() - center.getX()) > horizontalRadius
+					|| Math.abs(position.getZ() - center.getZ()) > horizontalRadius;
+			if (outside) {
+				this.queued.remove(position.asLong());
+			}
+			return outside;
+		});
 	}
 
 	private boolean isVisible(SectionPos section, Frustum frustum) {
@@ -446,8 +526,8 @@ public final class RustGalWholeFrameTerrainSource {
         }
         RenderSection section = new RenderSection(null, sectionPos.getX(), sectionPos.getY(), sectionPos.getZ());
         Vec3 cameraPos = camera.getPosition();
-        ChunkBuilderMeshingTask task = new ChunkBuilderMeshingTask(section, ++this.buildFrame,
-                new Vector3d(cameraPos.x(), cameraPos.y(), cameraPos.z()), renderContext, SortBehavior.OFF, false);
+		ChunkBuilderMeshingTask task = new ChunkBuilderMeshingTask(section, ++this.buildFrame,
+				new Vector3d(cameraPos.x(), cameraPos.y(), cameraPos.z()), renderContext, SortBehavior.STATIC, true);
 		this.workerBuilder.scheduleTask(task, true, result -> this.completedBuilds.add(new CompletedBuild(sectionPos, section, result)), false);
     }
 

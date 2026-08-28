@@ -26,7 +26,11 @@ public abstract class EyesLayer<S extends EntityRenderState, M extends EntityMod
 				OverlayTexture.NO_OVERLAY, -1, textureIdentity, entityRenderState.outlineColor, null
 			);
 		} else {
-			submitNodeCollector.order(1).submitModel(
+			if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+				throw new IllegalStateException("Rust whole-frame eyes layer has no semantic texture identity");
+			}
+			submitNodeCollector.order(1).submitModelSemantic(
 				this.getParentModel(), entityRenderState, poseStack, this.renderType(), i,
 				OverlayTexture.NO_OVERLAY, -1, null, entityRenderState.outlineColor, null
 			);

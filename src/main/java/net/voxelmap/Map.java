@@ -168,9 +168,6 @@ public class Map implements Runnable, IChangeObserver {
     private double zoomScaleAdjusted = 1.0;
     private static double minTablistOffset;
     private static float statusIconOffset = 0.0F;
-    private static final ResourceLocation RUST_SEMANTIC_MINIMAP =
-        ResourceLocation.fromNamespaceAndPath("voxelmap", "semantic/minimap");
-    private DynamicTexture rustSemanticMinimap;
     
     private final ResourceLocation[] resourceMapImageFiltered = new ResourceLocation[5];
     private final ResourceLocation[] resourceMapImageUnfiltered = new ResourceLocation[5];
@@ -257,7 +254,8 @@ public class Map implements Runnable, IChangeObserver {
         // GPU state.  Rust whole-frame presentation consumes the copied
         // semantic DynamicTexture below, so do not create these resources at
         // all on that route (this also prevents a hidden Vulkan fallback).
-        if (!RustGalVulkanWholeFrameMode.enabled()) {
+		if (!net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+				&& !RustGalVulkanWholeFrameMode.enabled()) {
             final int fboTextureSize = 512;
             this.fboTexture = net.vulkanic.VulkanicAPI.createTexture("voxelmap-fbotexture", GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_COPY_SRC | GpuTexture.USAGE_TEXTURE_BINDING | GpuTexture.USAGE_RENDER_ATTACHMENT, TextureFormat.RGBA8, fboTextureSize, fboTextureSize, 1, 1);
             this.fboTextureView = net.vulkanic.VulkanicAPI.createTextureView(this.fboTexture);
@@ -680,7 +678,11 @@ public class Map implements Runnable, IChangeObserver {
     private int getSkyColor() {
         this.needSkyColor = false;
         boolean aboveHorizon = this.lastAboveHorizon;
-        Vector4f color = Minecraft.getInstance().gameRenderer.fogRenderer.computeFogColor(minecraft.gameRenderer.getMainCamera(), 0.0F, this.world, minecraft.options.renderDistance().get(), minecraft.gameRenderer.getDarkenWorldAmount(0.0F), false);
+        boolean rustVulkan = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+            || net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
+        Vector4f color = rustVulkan
+            ? Minecraft.getInstance().gameRenderer.fogRenderer.computeFogColorSemantic(minecraft.gameRenderer.getMainCamera(), 0.0F, this.world, minecraft.options.renderDistance().get(), minecraft.gameRenderer.getDarkenWorldAmount(0.0F), false)
+            : Minecraft.getInstance().gameRenderer.fogRenderer.computeFogColor(minecraft.gameRenderer.getMainCamera(), 0.0F, this.world, minecraft.options.renderDistance().get(), minecraft.gameRenderer.getDarkenWorldAmount(0.0F), false);
         float r = color.x;
         float g = color.y;
         float b = color.z;
@@ -709,7 +711,8 @@ public class Map implements Runnable, IChangeObserver {
     }
 
     public void drawMinimap(GuiGraphics drawContext) {
-        if (RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| RustGalVulkanWholeFrameMode.enabled()) {
             throw new IllegalStateException("Java VoxelMap minimap rendering is unavailable while Rust owns whole-frame presentation");
         }
         int scScaleOrig = 1;
@@ -841,41 +844,24 @@ public class Map implements Runnable, IChangeObserver {
             }
             this.percentX = (float)(GameVariableAccessShim.xCoordDouble() - this.lastImageX) / (float)this.zoomScale;
             this.percentY = (float)(GameVariableAccessShim.zCoordDouble() - this.lastImageZ) / (float)this.zoomScale;
-            if (this.rustSemanticMinimap == null) {
-                this.rustSemanticMinimap = new DynamicTexture("VoxelMap Rust semantic minimap", 64, 64, true);
-                this.rustSemanticMinimap.setFilter(true, false);
-            }
-            NativeImage source = this.mapImages[this.zoom].getPixels();
-            NativeImage target = this.rustSemanticMinimap.getPixels();
-            float angleRadians = !this.options.rotates ? -this.northRotate * Mth.DEG_TO_RAD : this.direction * Mth.DEG_TO_RAD;
-            float cos = Mth.cos(angleRadians);
-            float sin = Mth.sin(angleRadians);
-            float sourceOffsetX = this.percentX * 512.0F / 64.0F;
-            float sourceOffsetY = -this.percentY * 512.0F / 64.0F;
-            for (int py = 0; py < 64; py++) {
-                for (int px = 0; px < 64; px++) {
-                    float dx = (px + 0.5F - 32.0F) * 8.0F;
-                    float dy = (py + 0.5F - 32.0F) * 8.0F;
-                    float sourceX = cos * dx - sin * dy + sourceOffsetX;
-                    float sourceY = -sin * dx - cos * dy + sourceOffsetY;
-                    int sx = Mth.clamp((int)((sourceX + 256.0F) * source.getWidth() / 512.0F), 0, source.getWidth() - 1);
-                    int sy = Mth.clamp((int)((256.0F - sourceY) * source.getHeight() / 512.0F), 0, source.getHeight() - 1);
-                    int color = source.getPixel(sx, sy);
-                    if (!this.options.squareMap) {
-                        float radius = (px + 0.5F - 32.0F) * (px + 0.5F - 32.0F)
-                            + (py + 0.5F - 32.0F) * (py + 0.5F - 32.0F);
-                        if (radius > 32.0F * 32.0F) color &= 0x00FFFFFF;
-                    }
-                    target.setPixel(px, py, color);
-                }
-            }
         }
 
-        RustGalGuiRawImageAssets.registerDynamicTexture(RUST_SEMANTIC_MINIMAP, this.rustSemanticMinimap);
-        drawContext.pose().pushMatrix();
-        drawContext.pose().scale(scaleProj, scaleProj);
-        drawContext.submitRustSemanticBlit(RUST_SEMANTIC_MINIMAP,
-            mapX - 32, mapY - 32, 64, 64, 0.0F, 0.0F, 1.0F, 1.0F, 0xFFFFFFFF);
+		ResourceLocation semanticMapTexture = this.mapResources[this.zoom];
+		if (this.mapImages[this.zoom] instanceof DynamicTexture dynamicMap) {
+			RustGalGuiRawImageAssets.registerDynamicTexture(semanticMapTexture, dynamicMap);
+		}
+		drawContext.pose().pushMatrix();
+		drawContext.pose().scale(scaleProj, scaleProj);
+		float semanticAngle = !this.options.rotates ? -this.northRotate * Mth.DEG_TO_RAD : this.direction * Mth.DEG_TO_RAD;
+		float semanticSourceOffsetX = this.percentX * 512.0F / 64.0F;
+		float semanticSourceOffsetY = -this.percentY * 512.0F / 64.0F;
+		if (net.vulkanic.gui.RustGalGuiRenderer.tryEnqueueVoxelMapMask(semanticMapTexture,
+			drawContext.guiWidth(), drawContext.guiHeight(), mapX * scaleProj, mapY * scaleProj,
+			32.0F * scaleProj, semanticAngle, 1.0F / scaleProj,
+			semanticSourceOffsetX, semanticSourceOffsetY, 0xFFFFFFFF, !this.options.squareMap,
+			drawContext.guiRenderState.currentSemanticLayerOrder(net.minecraft.client.gui.render.state.GuiRenderState.SemanticPhase.ELEMENTS)) == null) {
+			throw new IllegalStateException("Rust VoxelMap minimap semantic mesh was unavailable");
+		}
         this.drawMapFrame(drawContext, mapX, mapY, this.options.squareMap);
         drawContext.pose().popMatrix();
         this.drawDirections(drawContext, mapX, mapY, scaleProj);
@@ -1795,7 +1781,8 @@ public class Map implements Runnable, IChangeObserver {
             if (this.imageChanged) {
                 this.imageChanged = false;
                 this.mapImages[this.zoom].upload();
-                if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+				if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+					&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
                     VulkanicAPI.applyResourceBarriers(VulkanicAPI.getCommandContext(), TEXTURE_UPLOAD_WRITES_VISIBLE_TO_TEXTURE_FETCH);
                 }
                 this.lastImageX = this.lastX;
@@ -1814,8 +1801,7 @@ public class Map implements Runnable, IChangeObserver {
         if (this.options.squareMap) {
             VoxelMapGuiGraphics.blitSquareMap(
                     guiGraphics,
-                    RenderPipelines.GUI_TEXTURED,
-                    this.mapImages[this.zoom].getTextureView(),
+                    this.mapResources[this.zoom],
                     x,
                     y,
                     32.0F,
@@ -1827,8 +1813,7 @@ public class Map implements Runnable, IChangeObserver {
         } else {
             VoxelMapGuiGraphics.blitCircular(
                     guiGraphics,
-                    RenderPipelines.GUI_TEXTURED,
-                    this.mapImages[this.zoom].getTextureView(),
+                    this.mapResources[this.zoom],
                     x,
                     y,
                     32.0F,
@@ -2000,7 +1985,8 @@ public class Map implements Runnable, IChangeObserver {
             if (this.imageChanged) {
                 this.imageChanged = false;
                 this.mapImages[this.zoom].upload();
-                if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+				if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+					&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
                     VulkanicAPI.applyResourceBarriers(VulkanicAPI.getCommandContext(), TEXTURE_UPLOAD_WRITES_VISIBLE_TO_TEXTURE_FETCH);
                 }
                 this.lastImageX = this.lastX;

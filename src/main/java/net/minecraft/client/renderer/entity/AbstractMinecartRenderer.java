@@ -164,7 +164,7 @@ public abstract class AbstractMinecartRenderer<T extends AbstractMinecart, S ext
 	}
 
 	protected void submitMinecartContents(S minecartRenderState, BlockState blockState, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i) {
-		submitNodeCollector.submitBlock(poseStack, blockState, i, OverlayTexture.NO_OVERLAY, minecartRenderState.outlineColor);
+		submitNodeCollector.submitBlockSemantic(poseStack, blockState, i, OverlayTexture.NO_OVERLAY, minecartRenderState.outlineColor);
 	}
 
 	public AABB getBoundingBoxForCulling(T abstractMinecart) {

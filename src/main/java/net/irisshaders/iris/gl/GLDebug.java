@@ -20,6 +20,13 @@ public final class GLDebug {
 	 * @return 0 for failure, 1 for success, 2 for restart required.
 	 */
 	public static int setupDebugMessageCallback() {
+		if (VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			// Rust owns Vulkan diagnostics and synchronization. Iris' Java debug
+			// callback would otherwise probe the legacy backend during setup.
+			debugState = new UnsupportedDebugState();
+			return 0;
+		}
 		reloadDebugState();
 
 		return setupDebugMessageCallback(System.out);
@@ -65,6 +72,11 @@ public final class GLDebug {
 	}
 
 	public static int setupDebugMessageCallback(PrintStream stream) {
+		if (VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			debugState = new UnsupportedDebugState();
+			return 0;
+		}
 		GraphicsCapabilities caps = VulkanicAPI.getGraphicsCapabilities();
 		boolean hasCoreDebug = caps.supportsCore(GraphicsFeature.DEBUG_OUTPUT_CONTROL);
 		boolean hasKhrDebug = caps.supportsExtension(GraphicsFeature.DEBUG_OUTPUT_CONTROL);
@@ -299,6 +311,11 @@ public final class GLDebug {
 	}
 
 	public static void reloadDebugState() {
+		if (VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			debugState = new UnsupportedDebugState();
+			return;
+		}
 		GraphicsCapabilities caps = VulkanicAPI.getGraphicsCapabilities();
 		if (Iris.getIrisConfig().areDebugOptionsEnabled() && caps.supports(GraphicsFeature.DEBUG_OUTPUT_CONTROL)) {
 			debugState = new KHRDebugState();

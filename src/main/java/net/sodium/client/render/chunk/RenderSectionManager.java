@@ -19,6 +19,8 @@ import net.sodium.client.render.chunk.compile.executor.ChunkJobResult;
 import net.sodium.client.render.chunk.compile.tasks.ChunkBuilderMeshingTask;
 import net.sodium.client.render.chunk.compile.tasks.ChunkBuilderSortingTask;
 import net.sodium.client.render.chunk.compile.tasks.ChunkBuilderTask;
+import net.sodium.client.render.chunk.vertex.format.ChunkMeshFormats;
+import net.sodium.client.render.chunk.vertex.format.ChunkVertexType;
 import net.sodium.client.render.chunk.data.BuiltSectionInfo;
 import net.sodium.client.render.chunk.lists.*;
 import net.sodium.client.render.chunk.lists.*;
@@ -142,12 +144,22 @@ public class RenderSectionManager {
     public RenderSectionManager(ClientLevel level, int renderDistance, SortBehavior sortBehavior, CommandList commandList) {
         this.meshTaskSizeEstimator = new MeshTaskSizeEstimator(level);
 
-        // Iris: From MixinRenderSectionManager - use extended vertex format
-        this.chunkRenderer = new DefaultChunkRenderer(RenderDevice.instance(), net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getVertexFormat());
+        boolean rustVulkanOwned = VulkanicAPI.isVulkanBackendSelected()
+                || net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
+        // Rust semantic terrain uses an explicit compact layout and AO policy;
+        // do not borrow Iris renderer state while Vulkan is Rust-owned.
+        ChunkVertexType vertexType = rustVulkanOwned
+                ? ChunkMeshFormats.COMPACT
+                : net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getVertexFormat();
+        this.chunkRenderer = new DefaultChunkRenderer(RenderDevice.instance(), vertexType);
 
         this.level = level;
         // Iris: From MixinRenderSectionManager - use extended vertex format for builder
-        this.builder = new ChunkBuilder(level, net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getVertexFormat());
+        this.builder = rustVulkanOwned
+                // Compact Rust terrain carries AO in the alpha lane; keep the
+                // RGB material color unlit for the explicit Rust lighting stage.
+                ? new ChunkBuilder(level, vertexType, true)
+                : new ChunkBuilder(level, vertexType);
 
         this.renderDistance = renderDistance;
         this.sortBehavior = sortBehavior;
@@ -257,7 +269,8 @@ public class RenderSectionManager {
         if (net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
             this.shadowTaskLists = this.sectionCollector.getTaskLists();
         } else {
-            if (VulkanicAPI.isVulkanBackendSelected()) {
+            if (VulkanicAPI.isVulkanBackendSelected()
+                    || net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
                 this.seedCollectorIfStarved(this.sectionCollector, viewport);
                 this.logVulkanTerrainCollectorProbe(viewport, this.sectionCollector);
             }
@@ -546,8 +559,9 @@ public class RenderSectionManager {
         // Vulkan terrain currently has backend-specific fog state differences, so avoid culling chunks from fog distance.
         // Vulkan terrain does not use the Java/Iris fog-occlusion policy.  Keep the
         // backend check first so Rust-owned Vulkan never probes Iris runtime state.
-        boolean useFogOcclusion = VulkanicAPI.isVulkanBackendSelected()
-            || net.irisshaders.iris.Iris.getCurrentPack().isPresent()
+		boolean useFogOcclusion = VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.irisshaders.iris.Iris.getCurrentPack().isPresent()
             ? false 
             : SodiumClientMod.options().performance.useFogOcclusion;
 
@@ -658,6 +672,9 @@ public class RenderSectionManager {
     public void renderLayer(ChunkRenderMatrices matrices, TerrainRenderPass pass, double x, double y, double z, FogParameters fogParameters) {
         if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
             throw new IllegalStateException("Java Sodium terrain pass is unavailable while Rust owns whole-frame presentation");
+        }
+        if (VulkanicAPI.isVulkanBackendSelected()) {
+            throw new IllegalStateException("Java Sodium Vulkan terrain pass is unavailable until the Rust whole-frame terrain route is admitted");
         }
         RenderDevice device = RenderDevice.instance();
         CommandList commandList = device.createCommandList();
@@ -770,7 +787,8 @@ public class RenderSectionManager {
     private boolean processChunkBuildResults(ArrayList<BuilderTaskOutput> results) {
         var filtered = filterChunkBuildResults(results);
 
-        boolean rustWholeFrame = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
+		boolean rustWholeFrame = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| VulkanicAPI.isVulkanBackendSelected();
         var start = System.nanoTime();
         if (!rustWholeFrame) {
             this.regions.uploadResults(RenderDevice.instance().createCommandList(), filtered);
@@ -1108,7 +1126,15 @@ public class RenderSectionManager {
         this.sectionsWithGlobalEntities.clear();
         this.resetRenderLists();
 
-        try (CommandList commandList = RenderDevice.instance().createCommandList()) {
+		if (VulkanicAPI.isVulkanBackendSelected()
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			// Rust-owned terrain never opens a Java/Sodium command list during
+			// teardown; its semantic section registry and Rust resources retire via
+			// the Rust frame coordinator.
+			return;
+		}
+
+		try (CommandList commandList = RenderDevice.instance().createCommandList()) {
             this.regions.delete(commandList);
             this.chunkRenderer.delete(commandList);
         }

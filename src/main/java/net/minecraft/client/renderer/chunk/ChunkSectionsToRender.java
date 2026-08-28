@@ -35,6 +35,10 @@ public record ChunkSectionsToRender(
 	private static double z;
 	
 	public void renderGroup(ChunkSectionLayerGroup chunkSectionLayerGroup) {
+		if (VulkanicAPI.isVulkanBackendSelected()
+				&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Selected Vulkan chunk-section rendering is unavailable; Java terrain rendering is not a fallback");
+		}
 		// Sodium: Call DH hooks before Sodium rendering (from ChunkSectionsToRenderMixin)
 		for (ChunkRenderLayerHooks hook : HookRegistry.getChunkRenderLayerHooks()) {
 			hook.onBeforeRenderLayer(chunkSectionLayerGroup);

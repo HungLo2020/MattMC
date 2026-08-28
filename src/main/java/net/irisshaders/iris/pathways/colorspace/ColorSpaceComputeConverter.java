@@ -26,10 +26,12 @@ public class ColorSpaceComputeConverter implements ColorSpaceConverter {
 	private GpuTexture target;
 
 	public ColorSpaceComputeConverter(int width, int height, ColorSpace colorSpace) {
+		ensureJavaColorSpaceComputeAvailable();
 		rebuildProgram(width, height, colorSpace);
 	}
 
 	public void rebuildProgram(int width, int height, ColorSpace colorSpace) {
+		ensureJavaColorSpaceComputeAvailable();
 		if (program != null) {
 			program.destroy();
 			program = null;
@@ -61,6 +63,7 @@ public class ColorSpaceComputeConverter implements ColorSpaceConverter {
 	}
 
 	public void process(GpuTexture targetImage) {
+		ensureJavaColorSpaceComputeAvailable();
 		if (colorSpace == ColorSpace.SRGB) return;
 
 		this.target = targetImage;
@@ -68,5 +71,12 @@ public class ColorSpaceComputeConverter implements ColorSpaceConverter {
 		IrisRenderSystem.dispatchCompute(width / 8, height / 8, 1);
 		IrisRenderSystem.memoryBarrierImageWritesVisibleToTextureSampling();
 		ComputeProgram.unbind();
+	}
+
+	private static void ensureJavaColorSpaceComputeAvailable() {
+		if (VulkanicAPI.isVulkanBackendSelected()
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris color-space compute is unavailable on the Rust Vulkan route");
+		}
 	}
 }

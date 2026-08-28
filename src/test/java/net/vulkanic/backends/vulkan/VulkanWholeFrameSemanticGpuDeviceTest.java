@@ -35,6 +35,26 @@ class VulkanWholeFrameSemanticGpuDeviceTest {
 	}
 
 	@Test
+	void rejectsRunawayStartupBufferAllocationsBeforeDirectMemoryReservation() {
+		VulkanWholeFrameSemanticGpuDevice device = new VulkanWholeFrameSemanticGpuDevice();
+		assertThrows(IllegalArgumentException.class,
+			() -> device.createBuffer(() -> "runaway", 128, 64 * 1024 * 1024 + 1));
+		assertThrows(IllegalArgumentException.class,
+			() -> device.createBuffer(() -> "runaway-bytes", 128, ByteBuffer.allocate(64 * 1024 * 1024 + 1)));
+	}
+
+	@Test
+	void rejectsRunawayStartupTextureMetadataBeforePublication() {
+		VulkanWholeFrameSemanticGpuDevice device = new VulkanWholeFrameSemanticGpuDevice();
+		assertThrows(IllegalArgumentException.class,
+			() -> device.createTexture("wide", 15, TextureFormat.RGBA8, 16_385, 1, 1, 1));
+		assertThrows(IllegalArgumentException.class,
+			() -> device.createTexture("layers", 15, TextureFormat.RGBA8, 1, 1, 65, 1));
+		assertThrows(IllegalArgumentException.class,
+			() -> device.createTexture("mips", 15, TextureFormat.RGBA8, 1, 1, 1, 15));
+	}
+
+	@Test
 	void tracksTextureMetadataButRejectsJavaRendering() {
 		VulkanWholeFrameSemanticGpuDevice device = new VulkanWholeFrameSemanticGpuDevice();
 		GpuTexture texture = device.createTexture("semantic-target", 15, TextureFormat.RGBA8, 32, 16, 1, 1);

@@ -51,6 +51,10 @@ public class PostPass implements AutoCloseable {
 			this.infoUbo = null;
 			return;
 		}
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+			this.infoUbo = null;
+			return;
+		}
 
 		for (Entry<String, List<UniformValue>> entry : map.entrySet()) {
 			List<UniformValue> list2 = (List<UniformValue>)entry.getValue();
@@ -82,6 +86,9 @@ public class PostPass implements AutoCloseable {
 	public void addToFrame(FrameGraphBuilder frameGraphBuilder, Map<ResourceLocation, ResourceHandle<RenderTarget>> map, GpuBufferSlice gpuBufferSlice) {
 		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			throw new IllegalStateException("Java post-pass rendering is unavailable while Rust owns whole-frame presentation");
+		}
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+			throw new IllegalStateException("Java Vulkan post-pass rendering is unavailable until the Rust whole-frame route is admitted");
 		}
 		FramePass framePass = frameGraphBuilder.addPass(this.name);
 
@@ -185,6 +192,10 @@ public class PostPass implements AutoCloseable {
 
 		@Override
 		public void cleanup(Map<ResourceLocation, ResourceHandle<RenderTarget>> map) {
+			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+					|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+				throw new IllegalStateException("Java post-pass target cleanup is unavailable on the Rust Vulkan route");
+			}
 			if (this.bilinear) {
 				this.getHandle(map).get().setFilterMode(FilterMode.NEAREST);
 			}
@@ -192,6 +203,10 @@ public class PostPass implements AutoCloseable {
 
 		@Override
 		public GpuTextureView texture(Map<ResourceLocation, ResourceHandle<RenderTarget>> map) {
+			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+					|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+				throw new IllegalStateException("Java post-pass target textures are unavailable on the Rust Vulkan route");
+			}
 			ResourceHandle<RenderTarget> resourceHandle = this.getHandle(map);
 			RenderTarget renderTarget = resourceHandle.get();
 			renderTarget.setFilterMode(this.bilinear ? FilterMode.LINEAR : FilterMode.NEAREST);
@@ -212,6 +227,10 @@ public class PostPass implements AutoCloseable {
 
 		@Override
 		public GpuTextureView texture(Map<ResourceLocation, ResourceHandle<RenderTarget>> map) {
+			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+					|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+				throw new IllegalStateException("Java post-pass texture inputs are unavailable on the Rust Vulkan route");
+			}
 			return this.texture.getTextureView();
 		}
 	}

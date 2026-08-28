@@ -359,7 +359,8 @@ public class ClientApi
 	/** Should be called before {@link ClientApi#renderDeferredLodsForShaders} */
 	public void renderLods() 
 	{ 
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected())
 		{
 			throw new IllegalStateException("Java Distant Horizons LOD rendering is unavailable while Rust owns whole-frame presentation");
 		}
@@ -408,7 +409,8 @@ public class ClientApi
 	 * Should be called after {@link ClientApi#renderLods} 
 	 */
 	public void renderDeferredLodsForShaders() {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected())
 		{
 			throw new IllegalStateException("Java Distant Horizons deferred LOD rendering is unavailable while Rust owns whole-frame presentation");
 		}
@@ -417,7 +419,8 @@ public class ClientApi
 	
 	private void renderLodLayer(boolean renderingDeferredLayer)
 	{
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected())
 		{
 			// The Rust whole-frame shell invokes the explicit DH semantic collector
 			// separately; never initialize GLProxy or drain Java upload work here.
@@ -632,7 +635,8 @@ public class ClientApi
 	 */
 	public void renderFadeOpaque()
 	{
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected())
 		{
 			throw new IllegalStateException("Java Distant Horizons opaque fade rendering is unavailable while Rust owns whole-frame presentation");
 		}
@@ -658,7 +662,8 @@ public class ClientApi
 	 */
 	public void renderFadeTransparent()
 	{
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected())
 		{
 			throw new IllegalStateException("Java Distant Horizons transparent fade rendering is unavailable while Rust owns whole-frame presentation");
 		}

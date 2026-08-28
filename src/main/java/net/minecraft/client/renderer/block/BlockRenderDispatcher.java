@@ -53,6 +53,7 @@ public class BlockRenderDispatcher implements ResourceManagerReloadListener {
 	public void renderBreakingTexture(
 		BlockState blockState, BlockPos blockPos, BlockAndTintGetter blockAndTintGetter, PoseStack poseStack, VertexConsumer vertexConsumer
 	) {
+		ensureJavaBlockRoute();
 		if (blockState.getRenderShape() == RenderShape.MODEL) {
 			BlockStateModel blockStateModel = this.blockModelShaper.getBlockModel(blockState);
 			// FRAPI: Use Sodium FRAPI renderer for breaking texture (merged from BlockRenderDispatcherMixin)
@@ -69,6 +70,7 @@ public class BlockRenderDispatcher implements ResourceManagerReloadListener {
 		boolean bl,
 		List<BlockModelPart> list
 	) {
+		ensureJavaBlockRoute();
 		try {
 			this.modelRenderer.tesselateBlock(blockAndTintGetter, list, blockState, blockPos, poseStack, vertexConsumer, bl, OverlayTexture.NO_OVERLAY);
 		} catch (Throwable var11) {
@@ -80,6 +82,7 @@ public class BlockRenderDispatcher implements ResourceManagerReloadListener {
 	}
 
 	public void renderLiquid(BlockPos blockPos, BlockAndTintGetter blockAndTintGetter, VertexConsumer vertexConsumer, BlockState blockState, FluidState fluidState) {
+		ensureJavaBlockRoute();
 		try {
 			this.liquidBlockRenderer.tesselate(blockAndTintGetter, blockPos, vertexConsumer, blockState, fluidState);
 		} catch (Throwable var9) {
@@ -99,6 +102,7 @@ public class BlockRenderDispatcher implements ResourceManagerReloadListener {
 	}
 
 	public void renderSingleBlock(BlockState blockState, PoseStack poseStack, MultiBufferSource multiBufferSource, int i, int j) {
+		ensureJavaBlockRoute();
 		RenderShape renderShape = blockState.getRenderShape();
 		if (renderShape != RenderShape.INVISIBLE) {
 			BlockStateModel blockStateModel = this.getBlockModel(blockState);
@@ -108,6 +112,13 @@ public class BlockRenderDispatcher implements ResourceManagerReloadListener {
 			float h = (k & 0xFF) / 255.0F;
 			// FRAPI: Use Sodium FRAPI renderer (merged from BlockRenderDispatcherMixin)
 			net.fabricmc.fabric.api.renderer.v1.render.FabricBlockModelRenderer.render(poseStack.last(), layer -> multiBufferSource.getBuffer(net.fabricmc.fabric.api.renderer.v1.render.RenderLayerHelper.getEntityBlockLayer(layer)), blockStateModel, f, g, h, i, j, net.minecraft.world.level.EmptyBlockAndTintGetter.INSTANCE, BlockPos.ZERO, blockState);
+		}
+	}
+
+	private static void ensureJavaBlockRoute() {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java block geometry rendering is unavailable while Rust owns Vulkan presentation");
 		}
 	}
 

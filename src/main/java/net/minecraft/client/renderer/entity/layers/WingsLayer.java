@@ -50,6 +50,7 @@ public class WingsLayer<S extends HumanoidRenderState, M extends EntityModel<S>>
 			
 			// Iris: Set elytra item context
 			if (!net.minecraft.client.renderer.entity.EntityRenderDispatcher.isSemanticSubmission()
+				&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
 				&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
 				&& WorldRenderingSettings.INSTANCE.getItemIds() != null) {
 				if (humanoidRenderState instanceof AvatarRenderState state && state.skin.cape() != null && state.showCape) {
@@ -80,6 +81,7 @@ public class WingsLayer<S extends HumanoidRenderState, M extends EntityModel<S>>
 			
 			// Iris: Clear elytra item context
 			if (!net.minecraft.client.renderer.entity.EntityRenderDispatcher.isSemanticSubmission()
+				&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
 				&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 				CapturedRenderingState.INSTANCE.setCurrentRenderedItem(0);
 			}

@@ -83,7 +83,8 @@ public class LoadingOverlay extends Overlay {
 			// not admit a Java texture or fallback if this early preload is absent.
 		}
 		LOGGER.info("Rust semantic loading-overlay logo preload={}", semanticLogoLoaded);
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			return;
 		}
 		textureManager.registerAndLoad(MOJANG_STUDIOS_LOGO_LOCATION, new LoadingOverlay.LogoTexture());
@@ -94,7 +95,9 @@ public class LoadingOverlay extends Overlay {
 	}
 
 	private static void touchBackendSeamForMigrationGuardrails() {
-		if (KEEP_BACKEND_SEAM_REFERENCE) {
+		if (KEEP_BACKEND_SEAM_REFERENCE
+			&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			net.vulkanic.VulkanicAPI.createCommandEncoder();
 		}
 	}
@@ -174,7 +177,8 @@ public class LoadingOverlay extends Overlay {
 			this.minecraft.setOverlay(null);
 		}
 
-		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() && DEBUG_RENDER_LOGS < 12) {
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected() && DEBUG_RENDER_LOGS < 12) {
 			DEBUG_RENDER_LOGS++;
 			int logoTextureId = 0;
 			int logoMinFilter = 0;

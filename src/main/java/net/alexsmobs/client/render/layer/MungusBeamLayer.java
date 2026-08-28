@@ -89,19 +89,35 @@ public class MungusBeamLayer extends RenderLayer<MungusRenderState, ModelMungus>
         // The beam consists of three ordinary textured quads. Copy those
         // semantic vertices directly when Rust owns the whole Vulkan frame;
         // the Java callback remains available only on compatibility routes.
-        if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-                && net.vulkanic.world.WorldRenderRoutePolicy.currentTexturedBillboardRoute().usesRustWholeFrameVulkan()) {
-            boolean accepted = submitNodeCollector.submitTexturedQuad(
+        boolean rustPresentation = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+                || net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
+        boolean rustWholeFrame = rustPresentation
+                && net.vulkanic.world.WorldRenderRoutePolicy.currentTexturedBillboardRoute().usesRustWholeFrameVulkan();
+        if (rustPresentation && !rustWholeFrame) {
+            poseStack.popPose();
+            throw new IllegalStateException("Selected Vulkan Mungus beam route is unavailable; Java beam geometry is not a fallback");
+        }
+        // A coincident target produces an undefined direction after normalize()
+        // and therefore NaN angles. Keep that malformed primitive out of the
+        // explicit Rust semantic ABI; compatibility rendering retains vanilla's
+        // original behavior on the private OpenGL route.
+        if (rustWholeFrame && (!Float.isFinite(f4) || f4 <= 1.0e-6F
+                || !Float.isFinite(f5) || !Float.isFinite(f6))) {
+            poseStack.popPose();
+            throw new IllegalStateException("Rust whole-frame Mungus beam route rejected non-finite or degenerate direction");
+        }
+        if (rustWholeFrame) {
+            boolean accepted = submitNodeCollector.submitTranslucentTexturedQuadSemantic(
                     poseStack, beamType, BEAM_TEXTURE,
                     new float[] {f19, f4, f20, f19, 0.0F, f20, f21, 0.0F, f22, f21, f4, f22},
                     new float[] {0.4999F, f30, 0.4999F, f29, 0.0F, f29, 0.0F, f30},
                     0xFFFFFFFF, packedLight
-            ) && submitNodeCollector.submitTexturedQuad(
+            ) && submitNodeCollector.submitTranslucentTexturedQuadSemantic(
                     poseStack, beamType, BEAM_TEXTURE,
                     new float[] {f23, f4, f24, f23, 0.0F, f24, f25, 0.0F, f26, f25, f4, f26},
                     new float[] {0.4999F, f30, 0.4999F, f29, 0.0F, f29, 0.0F, f30},
                     0xFFFFFFFF, packedLight
-            ) && submitNodeCollector.submitTexturedQuad(
+            ) && submitNodeCollector.submitTranslucentTexturedQuadSemantic(
                     poseStack, beamType, BEAM_TEXTURE,
                     new float[] {f11, f4, f12, f13, f4, f14, f17, f4, f18, f15, f4, f16},
                     new float[] {0.5F, f31 + 0.5F, 1.0F, f31 + 0.5F, 1.0F, f31, 0.5F, f31},
@@ -115,7 +131,7 @@ public class MungusBeamLayer extends RenderLayer<MungusRenderState, ModelMungus>
         }
 
         // Compatibility routes retain the original custom-geometry producer.
-        submitNodeCollector.submitCustomGeometry(poseStack, beamType, (pose, vertexConsumer) -> {
+        submitNodeCollector.submitCustomGeometrySemantic(poseStack, beamType, (pose, vertexConsumer) -> {
             Matrix4f matrix4f = pose.pose();
             Matrix3f matrix3f = pose.normal();
             

@@ -82,7 +82,10 @@ public class DistantHorizonsLevelRenderHook implements LevelRendererHooks {
 
 		        try {
 		            net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("distant-horizons.lod-render");
-		            DhApiRenderProxy.INSTANCE.setDeferTransparentRendering(DHCompatInternal.shouldUseShaderOverrides());
+			            boolean deferTransparentRendering = !net.vulkanic.world.WorldRenderRoutePolicy
+			                .currentDistantHorizonsOpaqueRoute().usesRustWholeFrameVulkan()
+			                && DHCompatInternal.shouldUseShaderOverrides();
+		            DhApiRenderProxy.INSTANCE.setDeferTransparentRendering(deferTransparentRendering);
 		            ClientApi.INSTANCE.renderLods();
 		        } catch (Exception ex) {
 	            LOGGER.error("[DH-RENDER-HOOK] renderLods() failed: " + ex.getMessage(), ex);

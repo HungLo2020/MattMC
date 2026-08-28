@@ -108,6 +108,10 @@ public class SodiumChunkBufferContractTest {
             "net/sodium/client/render/chunk/region/RenderRegionManager.java"));
         String sharedIndex = Files.readString(SRC_MAIN_JAVA.resolve(
             "net/sodium/client/render/chunk/SharedQuadIndexBuffer.java"));
+        String renderRegion = Files.readString(SRC_MAIN_JAVA.resolve(
+            "net/sodium/client/render/chunk/region/RenderRegion.java"));
+        String glArena = Files.readString(SRC_MAIN_JAVA.resolve(
+            "net/sodium/client/gl/arena/GlBufferArena.java"));
 
         assertTrue(renderBinding.contains("@Nullable GpuBuffer gpuBuffer"),
             "Backend-neutral tessellation bindings should carry a GpuBuffer for Vulkan");
@@ -125,6 +129,9 @@ public class SodiumChunkBufferContractTest {
             "Vulkan chunk uploads should not allocate legacy GL staging buffers");
         assertTrue(sharedIndex.contains("VulkanicAPI.createBuffer"),
             "Vulkan shared quad indices should use backend-owned GpuBuffer storage");
+        assertTrue(renderRegion.contains("VulkanicAPI.isVulkanBackendSelected()")
+                && glArena.contains("if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected())"),
+            "selected Vulkan must fence legacy GL arena creation and buffer exposure during bootstrap");
     }
 
     @Test

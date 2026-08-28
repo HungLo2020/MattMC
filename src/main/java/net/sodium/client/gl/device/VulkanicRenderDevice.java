@@ -58,6 +58,11 @@ public class VulkanicRenderDevice implements RenderDevice {
 
     @Override
     public void makeActive() {
+        if (VulkanicAPI.isVulkanBackendSelected()
+                || net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+            throw new IllegalStateException(
+                    "Java Sodium Vulkan render-device activation is unavailable; Rust owns the selected Vulkan route");
+        }
         if (this.isActive) {
             return;
         }
@@ -336,9 +341,6 @@ public class VulkanicRenderDevice implements RenderDevice {
             }
 
             VulkanicPrimitiveMode primitiveMode = tessellation.getPrimitiveMode();
-            if (net.irisshaders.iris.vertices.ImmediateState.usingTessellation) {
-                primitiveMode = VulkanicPrimitiveMode.PATCHES;
-            }
 
             VulkanicAPI.multiDrawElementsBaseVertex(
                 VulkanicAPI.getCommandContext(),

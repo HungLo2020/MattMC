@@ -36,7 +36,7 @@ public class LlamaSpitRenderer extends EntityRenderer<LlamaSpit, LlamaSpitRender
 		poseStack.mulPose(Axis.YP.rotationDegrees(llamaSpitRenderState.yRot - 90.0F));
 		poseStack.mulPose(Axis.ZP.rotationDegrees(llamaSpitRenderState.xRot));
 		RenderType renderType = this.model.renderType(LLAMA_SPIT_LOCATION);
-		boolean eligible = RustGalWorldPrimitiveRenderer.isStandaloneTranslucentModelMeshEligible(
+		boolean eligible = RustGalWorldPrimitiveRenderer.isStandaloneModelMeshEligible(
 			this.model,
 			renderType,
 			LLAMA_SPIT_LOCATION,
@@ -49,7 +49,7 @@ public class LlamaSpitRenderer extends EntityRenderer<LlamaSpit, LlamaSpitRender
 			submitNodeCollector.isSemanticCoverageOnly(), eligible, ownership
 		);
 		if (disposition == StandaloneModelRenderOwnershipPolicy.Disposition.RUST_AVAILABLE) {
-			if (!RustGalWorldPrimitiveRenderer.enqueueStandaloneTranslucentModelMesh(
+			if (!RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMesh(
 				this.model,
 				llamaSpitRenderState,
 				poseStack.last(),

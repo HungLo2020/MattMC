@@ -29,6 +29,7 @@ import org.joml.Matrix4f;
 @Environment(EnvType.CLIENT)
 public class BlockEntityWithBoundingBoxRenderer<T extends BlockEntity & BoundingBoxRenderable>
 	implements BlockEntityRenderer<T, BlockEntityWithBoundingBoxRenderState> {
+	private static final long MAX_INVISIBLE_BLOCK_CELLS = 65_536L;
 	public BlockEntityWithBoundingBoxRenderState createRenderState() {
 		return new BlockEntityWithBoundingBoxRenderState();
 	}
@@ -58,9 +59,13 @@ public class BlockEntityWithBoundingBoxRenderer<T extends BlockEntity & Bounding
 		if (blockEntityWithBoundingBoxRenderState.isVisible
 			&& blockEntity.getLevel() != null
 			&& blockEntityWithBoundingBoxRenderState.mode == Mode.BOX_AND_INVISIBLE_BLOCKS) {
-			blockEntityWithBoundingBoxRenderState.invisibleBlocks = new BlockEntityWithBoundingBoxRenderState.InvisibleBlockType[vec3i.getX()
-				* vec3i.getY()
-				* vec3i.getZ()];
+			long cellCount = (long)vec3i.getX() * vec3i.getY() * vec3i.getZ();
+			if (cellCount <= 0L || cellCount > MAX_INVISIBLE_BLOCK_CELLS) {
+				throw new IllegalStateException(
+					"Rust debug bounding-box cell bound exceeded " + MAX_INVISIBLE_BLOCK_CELLS
+				);
+			}
+			blockEntityWithBoundingBoxRenderState.invisibleBlocks = new BlockEntityWithBoundingBoxRenderState.InvisibleBlockType[(int)cellCount];
 
 			for (int i = 0; i < vec3i.getX(); i++) {
 				for (int j = 0; j < vec3i.getY(); j++) {
@@ -108,16 +113,20 @@ public class BlockEntityWithBoundingBoxRenderer<T extends BlockEntity & Bounding
 					BlockPos blockPos2 = blockPos.offset(vec3i);
 					if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
 						&& net.vulkanic.world.WorldRenderRoutePolicy.currentDebugLineRoute().usesRustWholeFrameVulkan()) {
-						if (!net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueDebugLineSegments(poseStack.last().pose(), boxEdges(
+						// Coverage traversal admits this family but must not stage a
+						// second copy into the live Rust pending frame.
+						if (!submitNodeCollector.isSemanticCoverageOnly()
+							&& !net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueDebugLineSegments(poseStack.last().pose(), boxEdges(
 							blockPos.getX(), blockPos.getY(), blockPos.getZ(), blockPos2.getX(), blockPos2.getY(), blockPos2.getZ()
 						), 0xffe6e6e6, 1.0F)) {
 							throw new IllegalStateException("Rust debug-line route rejected bounding-box semantic edges");
 						}
 					} else {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+						if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+							|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 							throw new IllegalStateException("Rust whole-frame bounding-box route is unavailable; Java debug geometry is not a fallback");
 						}
-						submitNodeCollector.submitCustomGeometry(
+						submitNodeCollector.submitCustomGeometrySemantic(
 						poseStack,
 						RenderType.lines(),
 						(pose, vertexConsumer) -> ShapeRenderer.renderLineBox(
@@ -153,11 +162,15 @@ public class BlockEntityWithBoundingBoxRenderer<T extends BlockEntity & Bounding
 		PoseStack poseStack
 	) {
 		if (blockEntityWithBoundingBoxRenderState.invisibleBlocks != null) {
-			boolean rustLines = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			boolean rustLines = (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
 				&& net.vulkanic.world.WorldRenderRoutePolicy.currentDebugLineRoute().usesRustWholeFrameVulkan();
 			BlockPos blockPos2 = blockEntityWithBoundingBoxRenderState.blockPos;
 			BlockPos blockPos3 = blockPos2.offset(blockPos);
 			if (rustLines) {
+				// The coverage collector is an admission probe, not a producer;
+				// acknowledge this already-admitted line family without enqueueing.
+				if (submitNodeCollector.isSemanticCoverageOnly()) return;
 				for (int i = 0; i < vec3i.getX(); i++) for (int j = 0; j < vec3i.getY(); j++) for (int k = 0; k < vec3i.getZ(); k++) {
 					int l = k * vec3i.getX() * vec3i.getY() + j * vec3i.getX() + i;
 					var type = blockEntityWithBoundingBoxRenderState.invisibleBlocks[l];
@@ -172,10 +185,11 @@ public class BlockEntityWithBoundingBoxRenderer<T extends BlockEntity & Bounding
 				}
 				return;
 			}
-			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 				throw new IllegalStateException("Rust whole-frame invisible-block route is unavailable; Java debug geometry is not a fallback");
 			}
-			submitNodeCollector.submitCustomGeometry(poseStack, RenderType.lines(), (pose, vertexConsumer) -> {
+			submitNodeCollector.submitCustomGeometrySemantic(poseStack, RenderType.lines(), (pose, vertexConsumer) -> {
 				for (int i = 0; i < vec3i.getX(); i++) {
 					for (int j = 0; j < vec3i.getY(); j++) {
 						for (int k = 0; k < vec3i.getZ(); k++) {

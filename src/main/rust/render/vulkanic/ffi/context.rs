@@ -1,7 +1,16 @@
 use super::*;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+
+/// Maximum number of simultaneously live FFI contexts in one thread-local
+/// bridge registry. Contexts own the GAL, frontend caches, and backend state;
+/// admission is fail-closed until an existing context is explicitly destroyed.
+pub(crate) const MAX_BRIDGE_CONTEXTS: usize = 16;
+static LIVE_BRIDGE_CONTEXTS: AtomicUsize = AtomicUsize::new(0);
+static WINDOWED_PRESENTER_ACTIVE: AtomicBool = AtomicBool::new(false);
 
 pub(crate) struct BridgeContext {
     pub(crate) gal: VulkanicGal,
+    pub(crate) windowed_presenter: bool,
     pub(crate) gui_frontend: GuiFrontend,
     pub(crate) world_primitive_frontend: WorldPrimitiveFrontend,
     pub(crate) ffi_calls: u64,
@@ -63,6 +72,36 @@ pub(crate) struct BridgeRegistry {
     pub(crate) next_context_id: u64,
     pub(crate) contexts: BTreeMap<u64, BridgeContext>,
     pub(crate) last_error: String,
+    pub(crate) windowed_presenter_active: bool,
+}
+
+impl Drop for BridgeRegistry {
+    fn drop(&mut self) {
+        // The registry is thread-local, so a thread can terminate with live
+        // contexts if its owner did not reach the explicit destroy seam. Do
+        // not strand the process-wide admission counters in that case.
+        let live = self.contexts.len();
+        let presenter_active = self.windowed_presenter_active;
+        // Drop the owning GALs before releasing their admission slots. This
+        // keeps the process-wide bound meaningful during teardown: a new
+        // context cannot be admitted while the old native resources are still
+        // being destroyed as thread-local fields unwind.
+        self.contexts.clear();
+        if live != 0 {
+            let result = LIVE_BRIDGE_CONTEXTS.fetch_update(
+                Ordering::AcqRel,
+                Ordering::Acquire,
+                |count| count.checked_sub(live),
+            );
+            debug_assert!(
+                result.is_ok(),
+                "Rust VulkanicGAL context slots underflow during registry drop"
+            );
+        }
+        if presenter_active {
+            WINDOWED_PRESENTER_ACTIVE.store(false, Ordering::Release);
+        }
+    }
 }
 
 thread_local! {
@@ -70,6 +109,7 @@ thread_local! {
         next_context_id: 1,
         contexts: BTreeMap::new(),
         last_error: String::new(),
+        windowed_presenter_active: false,
     });
 }
 
@@ -79,6 +119,60 @@ pub(crate) fn with_registry_mut<T>(f: impl FnOnce(&mut BridgeRegistry) -> T) -> 
 
 pub(crate) fn with_registry<T>(f: impl FnOnce(&BridgeRegistry) -> T) -> T {
     BRIDGE_REGISTRY.with(|registry| f(&registry.borrow()))
+}
+
+fn reserve_windowed_presenter(registry: &mut BridgeRegistry) -> GalResult<()> {
+    if registry.windowed_presenter_active
+        || WINDOWED_PRESENTER_ACTIVE
+            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+            .is_err()
+    {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            "a Rust Vulkan windowed presenter is already active",
+        ));
+    }
+    registry.windowed_presenter_active = true;
+    Ok(())
+}
+
+fn release_windowed_presenter(registry: &mut BridgeRegistry) {
+    registry.windowed_presenter_active = false;
+    WINDOWED_PRESENTER_ACTIVE.store(false, Ordering::Release);
+}
+
+fn reserve_context_slot() -> GalResult<()> {
+    LIVE_BRIDGE_CONTEXTS
+        .fetch_update(Ordering::AcqRel, Ordering::Acquire, |live| {
+            (live < MAX_BRIDGE_CONTEXTS).then_some(live + 1)
+        })
+        .map(|_| ())
+        .map_err(|_| {
+            GalError::ffi(
+                StatusCode::InvalidArgument,
+                format!("live Rust VulkanicGAL context limit exceeded ({MAX_BRIDGE_CONTEXTS})"),
+            )
+        })
+}
+
+fn release_context_slot() {
+    let result = LIVE_BRIDGE_CONTEXTS.fetch_update(Ordering::AcqRel, Ordering::Acquire, |live| {
+        live.checked_sub(1)
+    });
+    debug_assert!(result.is_ok(), "Rust VulkanicGAL context slot underflow");
+}
+
+fn ensure_context_capacity() -> GalResult<()> {
+    with_registry(|registry| {
+        if registry.contexts.len() >= MAX_BRIDGE_CONTEXTS {
+            Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                format!("live Rust VulkanicGAL context limit exceeded ({MAX_BRIDGE_CONTEXTS})"),
+            ))
+        } else {
+            Ok(())
+        }
+    })
 }
 
 fn backend_kind(raw: u32) -> GalResult<BackendKind> {
@@ -99,6 +193,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_context_create(
     let result = (|| -> GalResult<FfiContextResult> {
         let request = read_struct(request, "context create request")?;
         validate_header::<FfiContextCreateRequest>(request.header)?;
+        ensure_context_capacity()?;
         let kind = backend_kind(request.backend_kind)?;
         let label = read_label(request.label, "context label")?;
         let backend = create_backend(kind, &label)?;
@@ -108,6 +203,14 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_context_create(
         );
         let capabilities = gal.capabilities();
         let context_id = with_registry_mut(|registry| -> GalResult<u64> {
+            if registry.contexts.len() >= MAX_BRIDGE_CONTEXTS {
+                return Err(GalError::ffi(
+                    StatusCode::InvalidArgument,
+                    format!(
+                        "live Rust VulkanicGAL context limit exceeded ({MAX_BRIDGE_CONTEXTS})"
+                    ),
+                ));
+            }
             let context_id = registry.next_context_id;
             registry.next_context_id =
                 registry.next_context_id.checked_add(1).ok_or_else(|| {
@@ -116,10 +219,12 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_context_create(
                         "context id space exhausted",
                     )
                 })?;
+            reserve_context_slot()?;
             registry.contexts.insert(
                 context_id,
                 BridgeContext {
                     gal,
+                    windowed_presenter: false,
                     gui_frontend: GuiFrontend::default(),
                     world_primitive_frontend: WorldPrimitiveFrontend::default(),
                     ffi_calls: 1,
@@ -175,6 +280,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_context_create_borrowed_opengl(
     let result = (|| -> GalResult<FfiContextResult> {
         let request = read_struct(request, "borrowed OpenGL context create request")?;
         validate_header::<FfiBorrowedOpenGlContextCreateRequest>(request.header)?;
+        ensure_context_capacity()?;
         if request.stable_window_id == 0 {
             return Err(GalError::ffi(
                 StatusCode::InvalidArgument,
@@ -189,6 +295,12 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_context_create_borrowed_opengl(
         );
         let capabilities = gal.capabilities();
         let context_id = with_registry_mut(|registry| -> GalResult<u64> {
+            if registry.contexts.len() >= MAX_BRIDGE_CONTEXTS {
+                return Err(GalError::ffi(
+                    StatusCode::InvalidArgument,
+                    format!("live Rust VulkanicGAL context limit exceeded ({MAX_BRIDGE_CONTEXTS})"),
+                ));
+            }
             let context_id = registry.next_context_id;
             registry.next_context_id =
                 registry.next_context_id.checked_add(1).ok_or_else(|| {
@@ -197,10 +309,12 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_context_create_borrowed_opengl(
                         "context id space exhausted",
                     )
                 })?;
+            reserve_context_slot()?;
             registry.contexts.insert(
                 context_id,
                 BridgeContext {
                     gal,
+                    windowed_presenter: false,
                     gui_frontend: GuiFrontend::default(),
                     world_primitive_frontend: WorldPrimitiveFrontend::default(),
                     ffi_calls: 1,
@@ -256,10 +370,17 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_context_create_windowed_vulkan(
     let result = (|| -> GalResult<FfiContextResult> {
         let request = read_struct(request, "windowed Vulkan context create request")?;
         validate_header::<FfiWindowedVulkanContextCreateRequest>(request.header)?;
+        ensure_context_capacity()?;
         if request.stable_window_id == 0 {
             return Err(GalError::ffi(
                 StatusCode::InvalidArgument,
                 "windowed Vulkan context requires a stable non-zero window id",
+            ));
+        }
+        if request.native_display == 0 || request.native_window == 0 {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                "windowed Vulkan context requires non-zero native display and window handles",
             ));
         }
         let label = read_label(request.label, "windowed Vulkan context label")?;
@@ -285,6 +406,12 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_context_create_windowed_vulkan(
         );
         let capabilities = gal.capabilities();
         let context_id = with_registry_mut(|registry| -> GalResult<u64> {
+            if registry.contexts.len() >= MAX_BRIDGE_CONTEXTS {
+                return Err(GalError::ffi(
+                    StatusCode::InvalidArgument,
+                    format!("live Rust VulkanicGAL context limit exceeded ({MAX_BRIDGE_CONTEXTS})"),
+                ));
+            }
             let context_id = registry.next_context_id;
             registry.next_context_id =
                 registry.next_context_id.checked_add(1).ok_or_else(|| {
@@ -293,10 +420,16 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_context_create_windowed_vulkan(
                         "context id space exhausted",
                     )
                 })?;
+            reserve_context_slot()?;
+            if let Err(error) = reserve_windowed_presenter(registry) {
+                release_context_slot();
+                return Err(error);
+            }
             registry.contexts.insert(
                 context_id,
                 BridgeContext {
                     gal,
+                    windowed_presenter: true,
                     gui_frontend: GuiFrontend::default(),
                     world_primitive_frontend: WorldPrimitiveFrontend::default(),
                     ffi_calls: 1,
@@ -358,6 +491,10 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_context_destroy(
             write_status_out(out, status_result_from_error(&error));
             return error.code as i32;
         };
+        if context.windowed_presenter {
+            release_windowed_presenter(registry);
+        }
+        release_context_slot();
         context.gui_frontend.reset(&mut context.gal);
         context.world_primitive_frontend.reset(&mut context.gal);
         let mut status = status_ok(&context);
@@ -369,6 +506,32 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_context_destroy(
         write_status_out(out, status);
         StatusCode::Ok as i32
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn windowed_presenter_reservation_is_exclusive_and_releasable() {
+        let mut registry = BridgeRegistry::default();
+        assert!(reserve_windowed_presenter(&mut registry).is_ok());
+        let second = reserve_windowed_presenter(&mut registry).expect_err("second presenter admitted");
+        assert_eq!(second.code, StatusCode::InvalidArgument);
+        release_windowed_presenter(&mut registry);
+        assert!(reserve_windowed_presenter(&mut registry).is_ok());
+    }
+
+    #[test]
+    fn registry_drop_releases_presenter_admission() {
+        {
+            let mut registry = BridgeRegistry::default();
+            reserve_windowed_presenter(&mut registry).expect("first presenter reservation");
+        }
+        let mut replacement = BridgeRegistry::default();
+        assert!(reserve_windowed_presenter(&mut replacement).is_ok());
+        release_windowed_presenter(&mut replacement);
+    }
 }
 
 #[no_mangle]

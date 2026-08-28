@@ -48,16 +48,24 @@ public final class CommonUniforms {
 	private static final Vector4i ZERO_VECTOR_4i = new Vector4i(0, 0, 0, 0);
 	private static final Vector3d ZERO_VECTOR_3d = new Vector3d();
 
-	static {
-		GbufferPrograms.init();
-	}
-
 	private CommonUniforms() {
 		// no construction allowed
 	}
 
+	private static void ensureJavaCompatibilityRoute() {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris uniform construction is unavailable on the Rust Vulkan route");
+		}
+		// Install Iris phase/fallback listeners lazily only for the OpenGL
+		// compatibility route. Class loading on Rust Vulkan must not mutate Iris
+		// runtime state as a side effect.
+		GbufferPrograms.init();
+	}
+
 	// Needs to use a LocationalUniformHolder as we need it for the common uniforms
 	public static void addDynamicUniforms(DynamicUniformHolder uniforms, FogMode fogMode) {
+		ensureJavaCompatibilityRoute();
 		ExternallyManagedUniforms.addExternallyManagedUniforms117(uniforms);
 		FogUniforms.addFogUniforms(uniforms, fogMode);
 		IrisInternalUniforms.addFogUniforms(uniforms, fogMode);
@@ -72,7 +80,8 @@ public final class CommonUniforms {
 		// the shader will always be setup (and therefore uniforms will be re-uploaded)
 		// after the texture is changed and before rendering starts.
 		uniforms.uniform2i("atlasSize", () -> {
-			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+				|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
 				return ZERO_VECTOR_2i;
 			}
 			int glId = IrisRenderSystem.getTextureBinding(0);
@@ -88,7 +97,8 @@ public final class CommonUniforms {
 		});
 
 		uniforms.uniform2i("gtextureSize", () -> {
-			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+				|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
 				return ZERO_VECTOR_2i;
 			}
 			int glId = IrisRenderSystem.getTextureBinding(0);
@@ -120,6 +130,7 @@ public final class CommonUniforms {
 	}
 
 	public static void addNonDynamicUniforms(UniformHolder uniforms, IdMap idMap, PackDirectives directives, FrameUpdateNotifier updateNotifier) {
+		ensureJavaCompatibilityRoute();
 		CameraUniforms.addCameraUniforms(uniforms, updateNotifier);
 		ViewportUniforms.addViewportUniforms(uniforms);
 		WorldTimeUniforms.addWorldTimeUniforms(uniforms);
@@ -134,6 +145,7 @@ public final class CommonUniforms {
 	}
 
 	public static void generalCommonUniforms(UniformHolder uniforms, FrameUpdateNotifier updateNotifier, PackDirectives directives) {
+		ensureJavaCompatibilityRoute();
 		ExternallyManagedUniforms.addExternallyManagedUniforms117(uniforms);
 
 		SmoothedVec2f eyeBrightnessSmooth = new SmoothedVec2f(directives.getEyeBrightnessHalfLife(), directives.getEyeBrightnessHalfLife(), CommonUniforms::getEyeBrightness, updateNotifier);

@@ -65,8 +65,13 @@ public class RenderCachalotEcho extends EntityRenderer<EntityCachalotEcho, Cacha
         poseStack.mulPose(Axis.XP.rotationDegrees(renderState.xRot));
         poseStack.translate(0.0D, 0.0D, 0.4D);
         int arcs = Mth.clamp(Mth.floor(renderState.tickCount / 5F), 1, 4);
+        boolean rustPresentation = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+                || net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
         boolean rustWholeFrame = net.vulkanic.world.WorldRenderRoutePolicy
                 .currentTexturedBillboardRoute().usesRustWholeFrameVulkan();
+        if (rustPresentation && !rustWholeFrame) {
+            throw new IllegalStateException("Selected Vulkan Cachalot Echo route is unavailable; Java entity geometry is not a fallback");
+        }
         for (int i = 0; i < arcs; i++) {
             poseStack.pushPose();
             poseStack.translate(0.0D, 0.0D, -0.5F * i);
@@ -78,11 +83,11 @@ public class RenderCachalotEcho extends EntityRenderer<EntityCachalotEcho, Cacha
             float[] uvs = new float[] {0.0F, 1.0F, 0.0F, 0.0F, 1.0F, 0.0F, 1.0F, 1.0F};
             boolean accepted;
             if (rustWholeFrame) {
-                accepted = submitNodeCollector.submitTexturedQuad(
+                accepted = submitNodeCollector.submitTexturedQuadSemantic(
                         poseStack, RenderType.entityCutoutNoCull(texture), texture,
                         vertices, uvs, 0xFFFFFFFF, 240);
             } else {
-                submitNodeCollector.submitCustomGeometry(
+                submitNodeCollector.submitCustomGeometrySemantic(
                         poseStack, RenderType.entityCutoutNoCull(texture),
                         (pose, consumer) -> emitArc(pose, consumer));
                 accepted = true;
@@ -100,7 +105,8 @@ public class RenderCachalotEcho extends EntityRenderer<EntityCachalotEcho, Cacha
 
     public void render(CachalotEchoRenderState renderState, PoseStack matrixStackIn,
             MultiBufferSource bufferIn, int packedLightIn) {
-        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+        if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+                || net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
             throw new IllegalStateException("Java Cachalot Echo rendering is unavailable while Rust owns whole-frame presentation");
         }
         matrixStackIn.pushPose();

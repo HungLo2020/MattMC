@@ -96,34 +96,20 @@ public class VulkanSwapchainSurfaceInfoTest {
 
         resetBackendState();
         VulkanicAPI.initialize(GraphicsBackendType.VULKAN);
-        VulkanSwapchainSurfaceInfo info = VulkanicAPI.getVulkanSwapchainSurfaceInfo();
 
-        if (info.isAvailable()) {
-            assertDoesNotThrow(VulkanicAPI::recreateVulkanSwapchain,
-                "Native-ready Vulkan backend should recreate swapchain without falling back to OpenGL");
-            assertDoesNotThrow(VulkanicAPI::recreateVulkanSwapchainIfNeeded,
-                "Native-ready Vulkan backend should support conditional swapchain recreation checks");
-        } else {
-            IllegalStateException exception = assertThrows(
-                IllegalStateException.class,
-                VulkanicAPI::recreateVulkanSwapchain,
-                "Vulkan-selected backend should fail hard when swapchain recreation is not natively ready");
-            assertTrue(
-                exception.getMessage().contains("Readiness report:")
-                    || exception.getMessage().contains("Rust Vulkan whole-frame ownership")
-                    || exception.getMessage().contains("Java Vulkan")
-            );
+        IllegalStateException exception = assertThrows(
+            IllegalStateException.class,
+            VulkanicAPI::recreateVulkanSwapchain,
+            "Vulkan-selected backend must never reopen Java swapchain ownership");
+        assertTrue(exception.getMessage().contains("Java Vulkan")
+            || exception.getMessage().contains("Rust whole-frame"));
 
-            IllegalStateException conditionalException = assertThrows(
-                IllegalStateException.class,
-                VulkanicAPI::recreateVulkanSwapchainIfNeeded,
-                "Conditional swapchain recreation should also fail hard when native Vulkan is unavailable");
-            assertTrue(
-                conditionalException.getMessage().contains("Readiness report:")
-                    || conditionalException.getMessage().contains("Rust Vulkan whole-frame ownership")
-                    || conditionalException.getMessage().contains("Java Vulkan")
-            );
-        }
+        IllegalStateException conditionalException = assertThrows(
+            IllegalStateException.class,
+            VulkanicAPI::recreateVulkanSwapchainIfNeeded,
+            "Conditional swapchain recreation must also remain Rust-owned after selection");
+        assertTrue(conditionalException.getMessage().contains("Java Vulkan")
+            || conditionalException.getMessage().contains("Rust whole-frame"));
     }
 
     @Test

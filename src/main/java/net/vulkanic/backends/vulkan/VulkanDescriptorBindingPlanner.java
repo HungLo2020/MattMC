@@ -327,7 +327,19 @@ final class VulkanDescriptorBindingPlanner {
         VulkanImageResourceViewCoordinator.DescriptorImagePlan imagePlan,
         String pipelineLocation
     ) {
-        int textureId = texture != null ? texture.textureId() : textureView.getLegacyTextureHandle();
+        // Vulkan descriptors must be backed by the explicit image-resource
+        // snapshot owned by this backend.  Falling back to the view's legacy
+        // handle would reintroduce the shared OpenGL/Iris handle seam that the
+        // Rust-owned route is required to avoid.  A missing snapshot is an
+        // incomplete resource declaration, so reject it before constructing a
+        // logical resource-use identity rather than admitting an alias.
+        if (texture == null) {
+            throw new IllegalStateException(
+                "Sampler binding '" + binding.name()
+                    + "' has no explicit Vulkan image-resource snapshot"
+            );
+        }
+        int textureId = texture.textureId();
         VulkanicPassResourceModel.ResourceIdentity identity = VulkanicPassResourceModel.ResourceIdentity.of(
             binding.name(),
             VulkanicPassResourceModel.ResourceKind.SAMPLED_TEXTURE,

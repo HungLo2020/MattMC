@@ -10,6 +10,6 @@ final class RenderDeviceHolder {
     }
 
     static RenderDevice instance() {
-        return VulkanicAPI.isVulkanBackendInitializedAndSelected() ? VULKAN_DEVICE : OPENGL_DEVICE;
+        return VulkanicAPI.isVulkanBackendSelected() ? VULKAN_DEVICE : OPENGL_DEVICE;
     }
 }

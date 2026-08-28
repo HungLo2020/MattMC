@@ -30,7 +30,8 @@ public class ModelPartFeatureRenderer {
 		OutlineBufferSource outlineBufferSource,
 		MultiBufferSource.BufferSource bufferSource2
 	) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			throw new IllegalStateException("Java model-part feature rendering is unavailable while Rust owns whole-frame presentation");
 		}
 		ModelPartFeatureRenderer.Storage storage = submitNodeCollection.getModelPartSubmits();

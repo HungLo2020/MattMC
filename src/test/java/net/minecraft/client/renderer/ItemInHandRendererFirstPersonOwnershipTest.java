@@ -62,4 +62,31 @@ final class ItemInHandRendererFirstPersonOwnershipTest {
 		assertTrue(!source.contains("rustWholeFrame && (itemStack.isEmpty()"),
 			"empty-hand model parts must remain admitted to the Rust semantic route");
 	}
+
+	@Test
+	void unexpectedNonFirstPersonContextCannotReopenJavaOnVulkan() throws Exception {
+		String source = Files.readString(PROJECT_ROOT.resolve(
+			"src/main/java/net/minecraft/client/renderer/ItemInHandRenderer.java"
+		));
+		int context = source.indexOf("itemDisplayContext.firstPerson()");
+		int disabled = source.indexOf("WorldRenderRoutePolicy.Route.DISABLED", context);
+		assertTrue(context >= 0 && disabled > context,
+			"non-first-person item contexts must be unavailable on selected Vulkan");
+		assertTrue(source.substring(context, Math.min(source.length(), disabled + 320))
+			.contains("isVulkanBackendSelected()"),
+			"the non-first-person ownership branch must be selected-Vulkan aware");
+	}
+
+	@Test
+	void rustFirstPersonAdmissionRejectsNullCopiedLayersBeforeExtraction() throws Exception {
+		String source = Files.readString(PROJECT_ROOT.resolve(
+			"src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"
+		));
+		int method = source.indexOf("public static boolean enqueueFirstPersonItemMesh(");
+		int loop = source.indexOf("itemState.forEachSemanticLayer(layer ->", method);
+		int guard = source.indexOf("layer == null", loop);
+		int extraction = source.indexOf("layer.renderType()", guard);
+		assertTrue(method >= 0 && loop > method && guard > loop && extraction > guard,
+			"first-person semantic layers must be null-checked before extraction");
+	}
 }

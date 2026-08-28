@@ -48,6 +48,241 @@ class NativeMeshingProductionContractTest {
     }
 
     @Test
+    void rustWholeFrameRejectsJavaMeshProductionOverrides() throws IOException {
+        String task = source("src/main/java/net/sodium/client/render/chunk/compile/tasks/ChunkBuilderMeshingTask.java");
+        int route = task.indexOf("boolean rustStaticTerrainRoute");
+        int guard = task.indexOf("Rust whole-frame terrain cannot enable Java mesh-production overrides", route);
+        int fallback = task.indexOf("NativeMeshingCompatibilityFallback.renderFluid", guard);
+        assertTrue(route >= 0 && guard > route && fallback > guard,
+            "Rust terrain must reject Java override flags before fallback producers can run");
+        assertTrue(task.substring(route, guard).contains("forceJavaProducers")
+            && task.substring(route, guard).contains("forceJavaModels")
+            && task.substring(route, guard).contains("forceJavaFluids"));
+    }
+
+    @Test
+    void vanillaClientRenderPassProducersDeclareRustOwnershipBoundary() throws IOException {
+        Path rendererRoot = ROOT.resolve("src/main/java/net/minecraft/client");
+        try (var paths = Files.walk(rendererRoot)) {
+            for (Path path : (Iterable<Path>) paths::iterator) {
+                if (!Files.isRegularFile(path) || !path.toString().endsWith(".java")) {
+                    continue;
+                }
+                String text = Files.readString(path);
+                if (text.contains("createRenderPass(")) {
+                    assertTrue(
+                        text.contains("RustGalVulkanWholeFrameMode")
+                            || text.contains("usesRustWholeFrameVulkan()")
+                            || text.contains("isVulkanBackendSelected()"),
+                        () -> "Java render-pass producer lacks Rust ownership boundary: " + path
+                    );
+                }
+            }
+        }
+    }
+
+    @Test
+    void rustWholeFrameLightmapSkipsJavaGpuEncoding() throws IOException {
+        String lightTexture = source("src/main/java/net/minecraft/client/renderer/LightTexture.java");
+        int rustBranch = lightTexture.indexOf("RustGalVulkanWholeFrameMode.enabled()");
+        int javaEncoder = lightTexture.indexOf("CommandEncoder commandEncoder = VulkanicAPI.createCommandEncoder();");
+        assertTrue(rustBranch >= 0);
+        assertTrue(javaEncoder > rustBranch);
+        assertTrue(lightTexture.indexOf("return;", rustBranch) < javaEncoder);
+    }
+
+    @Test
+    void customGeometryProducersDeclareRustWholeFrameBoundary() throws IOException {
+        Path sourceRoot = ROOT.resolve("src/main/java");
+        try (var paths = Files.walk(sourceRoot)) {
+            for (Path path : (Iterable<Path>) paths::iterator) {
+                if (!Files.isRegularFile(path) || !path.toString().endsWith(".java")) continue;
+                String normalized = path.toString().replace('\\', '/');
+                if (normalized.contains("/SubmitNodeCollector.java")
+                    || normalized.contains("/OrderedSubmitNodeCollector.java")
+                    || normalized.contains("/SubmitNodeCollection.java")
+                    || normalized.contains("/SubmitNodeStorage.java")) continue;
+                String text = Files.readString(path);
+                if (!text.contains("submitCustomGeometry(")) continue;
+                assertTrue(
+                    text.contains("RustGalVulkanWholeFrameMode")
+                        || text.contains("usesRustWholeFrameVulkan()")
+                        || text.contains("semantic capture encountered arbitrary custom geometry"),
+                    () -> "custom-geometry producer lacks Rust ownership boundary: " + path
+                );
+            }
+        }
+    }
+
+    @Test
+    void rustWorldTextNameTagsHaveBoundedSemanticStorage() throws IOException {
+        String source = source("src/main/java/net/minecraft/client/renderer/feature/NameTagFeatureRenderer.java");
+        assertTrue(source.contains("MAX_RUST_SEMANTIC_SUBMITS"));
+        assertTrue(source.contains("totalSubmitCount() + submitCount > MAX_RUST_SEMANTIC_SUBMITS"));
+        assertTrue(source.contains("Rust whole-frame world-text route exceeded bounded name-tag submit capacity"));
+    }
+
+    @Test
+    void rustWorldTextSubmitsHaveBoundedSemanticStorage() throws IOException {
+        String source = source("src/main/java/net/minecraft/client/renderer/SubmitNodeCollection.java");
+        assertTrue(source.contains("MAX_RUST_SEMANTIC_TEXT_SUBMITS"));
+        assertTrue(source.contains("Rust whole-frame world-text route exceeded bounded text submit capacity"));
+    }
+
+    @Test
+    void selectedVulkanWorldTextCannotRetainJavaOrIrisFallbackState() throws IOException {
+        String source = source("src/main/java/net/minecraft/client/renderer/SubmitNodeCollection.java");
+        assertTrue(source.contains("ensureSelectedVulkanWorldTextRoute();"));
+        assertTrue(source.contains("Rust Vulkan world-text route is unavailable; Java text and Iris capture are not fallbacks"));
+        int guard = source.indexOf("private void ensureSelectedVulkanWorldTextRoute()");
+        int irisCapture = source.indexOf("iris$capture()", source.indexOf("public void submitText("));
+        assertTrue(guard >= 0 && irisCapture > source.indexOf("public void submitText("),
+            "world-text submissions must retain the selected-Vulkan guard before Iris capture");
+    }
+
+    @Test
+    void selectedVulkanFeatureQueuesCannotRetainUnavailableJavaState() throws IOException {
+        String source = source("src/main/java/net/minecraft/client/renderer/SubmitNodeCollection.java");
+        assertTrue(source.contains("currentDebugLineRoute(), \"debug-hitbox\""));
+        assertTrue(source.contains("currentEntityShadowRoute(), \"entity-shadow\""));
+        assertTrue(source.contains("currentEntityFlameRoute(), \"entity-flame\""));
+        assertTrue(source.contains("currentEntityLeashRoute(), \"entity-leash\""));
+        assertTrue(source.contains("Java feature state is not a fallback"));
+    }
+
+    @Test
+    void selectedVulkanCannotBypassSemanticTextThroughFontBuffers() throws IOException {
+        String source = source("src/main/java/net/minecraft/client/gui/Font.java");
+        assertTrue(source.contains("ensureJavaTextDrawAvailable();"));
+        assertTrue(source.contains("Java Font buffer rendering is unavailable while Rust owns whole-frame Vulkan"));
+        assertTrue(source.contains("public void drawInBatch8xOutline("));
+    }
+
+    @Test
+    void worldTextGlyphExtractionBoundsBeforeListGrowth() throws IOException {
+        String source = source("src/main/java/net/vulkanic/world/WorldTextSemanticCollector.java");
+        assertTrue(source.contains("appendBoundedGlyph"));
+        assertTrue(source.contains("SemanticGlyphLimitExceeded"));
+        assertTrue(source.contains("collectSemanticQuads(glyph -> appendBoundedGlyph(glyphs, glyph))"));
+    }
+
+    @Test
+    void distantHorizonsPendingVisibleColumnBookkeepingIsBounded() throws IOException {
+        String source = source("src/main/java/net/vulkanic/world/DistantHorizonsSemanticCollector.java");
+        assertTrue(source.contains("MAX_PENDING_VISIBLE_COLUMN_KEYS = 16_384"));
+        assertTrue(source.contains("markPendingVisibleColumnLocked(columnKey)"));
+        assertTrue(source.contains("pending visible-column admission exceeds"));
+    }
+
+    @Test
+    void rejectedWorldCallbacksHaveBoundedPerFrameAccounting() throws IOException {
+        String source = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        assertTrue(source.contains("MAX_UNSUPPORTED_CALLBACKS_PER_FRAME = 4_096"));
+        assertTrue(source.contains("pendingUnsupportedFirstPersonItems < MAX_UNSUPPORTED_CALLBACKS_PER_FRAME"));
+        assertTrue(source.contains("pendingUnsupportedCustomGeometry < MAX_UNSUPPORTED_CALLBACKS_PER_FRAME"));
+        assertTrue(source.contains("pendingUnsupportedParticleGroups < MAX_UNSUPPORTED_CALLBACKS_PER_FRAME"));
+        assertTrue(source.contains("pendingUnsupportedWorldTextSubmits = (int)Math.min"));
+        assertTrue(source.contains("(long)pendingUnsupportedWorldTextSubmits + count"));
+        assertTrue(source.contains("MAX_UNSUPPORTED_CALLBACKS_PER_FRAME"));
+    }
+
+    @Test
+    void rustEntityFeatureSubmitsHaveBoundedSemanticStorage() throws IOException {
+        String source = source("src/main/java/net/minecraft/client/renderer/SubmitNodeCollection.java");
+        assertTrue(source.contains("MAX_RUST_SEMANTIC_FEATURE_SUBMITS"));
+        assertTrue(source.contains("Rust whole-frame entity-shadow route exceeded bounded submit capacity"));
+        assertTrue(source.contains("Rust whole-frame entity-flame route exceeded bounded submit capacity"));
+        assertTrue(source.contains("Rust whole-frame entity-leash route exceeded bounded submit capacity"));
+        assertTrue(source.contains("Rust whole-frame debug-hitbox route exceeded bounded submit capacity"));
+    }
+
+    @Test
+    void rustBlockFeatureSubmitsHaveBoundedSemanticStorage() throws IOException {
+        String source = source("src/main/java/net/minecraft/client/renderer/SubmitNodeCollection.java");
+        assertTrue(source.contains("MAX_RUST_SEMANTIC_BLOCK_SUBMITS"));
+        assertTrue(source.contains("ensureRustBlockSubmitCapacity"));
+        assertTrue(source.contains("Rust whole-frame moving-block route exceeded bounded submit capacity"));
+    }
+
+    @Test
+    void rustParticleExtractionHasBoundedSemanticStorage() throws IOException {
+        String source = source("src/main/java/net/minecraft/client/renderer/state/QuadParticleRenderState.java");
+        assertTrue(source.contains("MAX_RUST_SEMANTIC_PARTICLES"));
+        assertTrue(source.contains("Rust whole-frame particle route exceeded bounded semantic particle capacity"));
+        assertTrue(source.contains("particleCount >= MAX_RUST_SEMANTIC_PARTICLES"));
+    }
+
+    @Test
+    void rustGuiTextExtractionHasBoundedSemanticStorage() throws IOException {
+        String source = source("src/main/java/net/vulkanic/gui/RustGalGuiRenderer.java");
+        assertTrue(source.contains("MAX_RUST_GUI_TEXT_QUADS"));
+        assertTrue(source.contains("text-quad-cap="));
+        assertTrue(source.contains("direct-glyph-quad-cap="));
+    }
+
+    @Test
+    void rustGuiAffineRequestsHaveMatchingJavaAndRustBounds() throws IOException {
+        String coordinator = source("src/main/java/net/vulkanic/gui/RustGalFrameCoordinator.java");
+        String ffi = source("src/main/rust/render/vulkanic/ffi/gui.rs");
+        assertTrue(coordinator.contains("MAX_RUST_GUI_AFFINE_QUADS = 65_536"));
+        assertTrue(coordinator.contains("GUI affine-quad capacity exceeded"));
+        assertTrue(ffi.contains("GUI_MAX_AFFINE_QUADS: usize = 65_536"));
+        assertTrue(ffi.contains("quads.len() > GUI_MAX_AFFINE_QUADS"));
+    }
+
+    @Test
+    void rustGuiMeshAggregationMatchesRustResourceBounds() throws IOException {
+        String coordinator = source("src/main/java/net/vulkanic/gui/RustGalFrameCoordinator.java");
+        assertTrue(coordinator.contains("MAX_RUST_GUI_MESH_BATCHES = 1_024"));
+        assertTrue(coordinator.contains("MAX_RUST_GUI_MESH_VERTICES = 65_536"));
+        assertTrue(coordinator.contains("MAX_RUST_GUI_MESH_INDICES = 196_608"));
+        assertTrue(coordinator.contains("Rust whole-frame GUI mesh capacity exceeded"));
+    }
+
+    @Test
+    void irisJavaPassProducersFailClosedUnderRustWholeFrame() throws IOException {
+        String contract = source("src/main/java/net/irisshaders/iris/pipeline/IrisVulkanRenderTargetContract.java");
+        assertTrue(contract.contains("Iris Java Vulkan render-pass fallback is unavailable while Rust owns whole-frame presentation"));
+        assertTrue(contract.contains("Iris framebuffer-compatible render-target fallback is unavailable while Rust owns whole-frame presentation"));
+        for (String producer : new String[] {
+            "src/main/java/net/irisshaders/iris/pipeline/FinalPassRenderer.java",
+            "src/main/java/net/irisshaders/iris/pipeline/CompositeRenderer.java",
+            "src/main/java/net/irisshaders/iris/pipeline/IrisRenderingPipeline.java"
+        }) {
+            String source = source(producer);
+            assertTrue(source.contains("RustGalVulkanWholeFrameMode"),
+                () -> "Iris pass producer lacks Rust whole-frame guard: " + producer);
+        }
+    }
+
+    @Test
+    void everyEyesLayerDeclaresSemanticTextureIdentity() throws IOException {
+        Path sourceRoot = ROOT.resolve("src/main/java");
+        try (var paths = Files.walk(sourceRoot)) {
+            for (Path path : (Iterable<Path>) paths::iterator) {
+                if (!Files.isRegularFile(path) || !path.toString().endsWith(".java")) continue;
+                String text = Files.readString(path);
+                if (text.contains("extends EyesLayer")) {
+                    assertTrue(text.contains("semanticTexture"),
+                        () -> "Eyes layer lacks a Rust semantic texture identity: " + path);
+                }
+            }
+        }
+    }
+
+    @Test
+    void rustWholeFrameCannotSilentlyDropFabricItemCommands() throws IOException {
+        String source = source("src/main/java/net/minecraft/client/renderer/SubmitNodeCollection.java");
+        assertTrue(source.contains("enqueueFabricMeshItem"));
+        assertTrue(source.contains("Rust whole-frame Fabric item route rejected semantic MeshView quads"));
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        assertTrue(rust.contains("public static boolean enqueueFabricMeshItem"));
+        assertTrue(rust.contains("quad.toVanilla(vertices, 0)"));
+        assertTrue(rust.contains("vanillaQuads.size() > 4_096"));
+        assertTrue(rust.contains("meshQuadCount[0] > 4_096"));
+    }
+
+    @Test
     void unsupportedCallbacksCustomFluidsAppendersAndBlockEntitiesStayJavaOwned() throws IOException {
         String task = source("src/main/java/net/sodium/client/render/chunk/compile/tasks/ChunkBuilderMeshingTask.java");
         String fallback = source("src/main/java/net/sodium/client/render/chunk/compile/tasks/NativeMeshingCompatibilityFallback.java");
@@ -64,6 +299,14 @@ class NativeMeshingProductionContractTest {
         assertTrue(task.contains("NativeMeshingCompatibilityFallback.runMeshAppenders"));
         assertTrue(fallback.contains("PlatformLevelRenderHooks.INSTANCE.runChunkMeshAppenders"));
         assertTrue(fallback.contains("asFallbackVertexConsumer"));
+        assertTrue(fallback.contains("rejectRustWholeFrameFluidFallback"),
+                "custom fluid compatibility fallback must be unavailable on Rust whole-frame Vulkan");
+        assertTrue(fallback.contains("Rust whole-frame terrain cannot execute a Java \" + family + \" fallback"),
+                "selected Vulkan must fail closed instead of rendering custom fluids through Java");
+        assertTrue(fallback.contains("rejectRustWholeFrameFallback(\"block model\")"),
+                "unsupported block-model fallback must be unavailable on Rust whole-frame Vulkan");
+        assertTrue(fallback.contains("rejectRustWholeFrameFallback(\"platform mesh appender\")"),
+                "platform mesh appenders must be unavailable on Rust whole-frame Vulkan");
     }
 
     @Test
@@ -85,6 +328,801 @@ class NativeMeshingProductionContractTest {
         assertTrue(task.contains("boolean rustFluidSupported = nativeFluidSupported"));
         assertTrue(task.contains("builtInWater || builtInLava"));
         assertTrue(task.contains("} else if (rustFluidSupported)"));
+    }
+
+    @Test
+    void kangarooBodyUsesTheSharedRustIndexedModelAdmission() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String kangaroo = source("src/main/java/net/alexsmobs/client/render/KangarooRenderer.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.KangarooModel"));
+        assertTrue(kangaroo.contains("textures/entity/kangaroo.png"));
+        assertTrue(kangaroo.contains("extends MobRenderer<EntityKangaroo, KangarooRenderState, KangarooModel>"));
+    }
+
+    @Test
+    void alligatorSnappingTurtleBodyAndMossUseRustIndexedModelAdmission() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String alligator = source("src/main/java/net/alexsmobs/client/render/RenderAlligatorSnappingTurtle.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelAlligatorSnappingTurtle"));
+        assertTrue(alligator.contains("textures/entity/alligator_snapping_turtle.png"));
+        assertTrue(alligator.contains("textures/entity/alligator_snapping_turtle_moss.png"));
+        assertTrue(alligator.contains("submitModelSemanticTexture"));
+    }
+
+    @Test
+    void caimanBodyUsesTheSharedRustIndexedModelAdmission() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String caiman = source("src/main/java/net/alexsmobs/client/render/RenderCaiman.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelCaiman"));
+        assertTrue(caiman.contains("textures/entity/caiman.png"));
+        assertTrue(caiman.contains("extends MobRenderer<EntityCaiman, CaimanRenderState, ModelCaiman>"));
+    }
+
+    @Test
+    void anteaterBodyUsesRustIndexedAdmissionWithSemanticTongueItemState() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String anteater = source("src/main/java/net/alexsmobs/client/render/RenderAnteater.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelAnteater"));
+        assertTrue(anteater.contains("textures/entity/anteater.png"));
+        assertTrue(anteater.contains("LayerAnteaterTongueItem"));
+        assertTrue(anteater.contains("itemModelResolver.updateForLiving"));
+    }
+
+    @Test
+    void blobfishModelVariantsUseRustIndexedAdmissionWithCopiedTextureChoice() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String blobfish = source("src/main/java/net/alexsmobs/client/render/RenderBlobfish.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelBlobfish"));
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelBlobfishDepressurized"));
+        assertTrue(blobfish.contains("textures/entity/blobfish.png"));
+        assertTrue(blobfish.contains("textures/entity/blobfish_depressurized.png"));
+        assertTrue(blobfish.contains("this.model = modelDepressurized"));
+    }
+
+    @Test
+    void gazelleBodyUsesRustIndexedAdmissionWithCopiedAnimationState() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String gazelle = source("src/main/java/net/alexsmobs/client/render/RenderGazelle.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelGazelle"));
+        assertTrue(gazelle.contains("textures/entity/gazelle.png"));
+        assertTrue(gazelle.contains("renderState.currentAnimationId"));
+        assertTrue(gazelle.contains("extends MobRenderer<EntityGazelle, GazelleRenderState, ModelGazelle>"));
+    }
+
+    @Test
+    void jerboaVariantsUseRustIndexedAdmissionWithCopiedSleepingTextureChoice() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String jerboa = source("src/main/java/net/alexsmobs/client/render/RenderJerboa.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelJerboa"));
+        assertTrue(jerboa.contains("textures/entity/jerboa.png"));
+        assertTrue(jerboa.contains("textures/entity/jerboa_sleeping.png"));
+        assertTrue(jerboa.contains("return renderState.isSleeping ? TEXTURE_SLEEPING : TEXTURE"));
+    }
+
+    @Test
+    void cachalotWhaleVariantsUseRustIndexedAdmissionAndSemanticCapturedSquidDispatch() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String whale = source("src/main/java/net/alexsmobs/client/render/RenderCachalotWhale.java");
+        String squidLayer = source("src/main/java/net/alexsmobs/client/render/layer/LayerCachalotWhaleCapturedSquid.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelCachalotWhale"));
+        assertTrue(whale.contains("textures/entity/cachalot/cachalot_whale.png"));
+        assertTrue(whale.contains("textures/entity/cachalot/cachalot_whale_sleeping.png"));
+        assertTrue(whale.contains("textures/entity/cachalot/cachalot_whale_albino.png"));
+        assertTrue(whale.contains("textures/entity/cachalot/cachalot_whale_albino_sleeping.png"));
+        assertTrue(squidLayer.contains("dispatcher.submitSemantic"));
+    }
+
+    @Test
+    void crowBodyUsesRustIndexedAdmissionWithSemanticHeldItemState() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String crow = source("src/main/java/net/alexsmobs/client/render/RenderCrow.java");
+        String itemLayer = source("src/main/java/net/alexsmobs/client/render/layer/LayerCrowItem.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelCrow"));
+        assertTrue(crow.contains("textures/entity/crow.png"));
+        assertTrue(crow.contains("itemModelResolver.updateForLiving"));
+        assertTrue(itemLayer.contains("renderState.heldItem.submit"));
+    }
+
+    @Test
+    void hummingbirdVariantsUseRustIndexedAdmissionWithCopiedTextureSelection() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String hummingbird = source("src/main/java/net/alexsmobs/client/render/RenderHummingbird.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelHummingbird"));
+        assertTrue(hummingbird.contains("textures/entity/hummingbird_0.png"));
+        assertTrue(hummingbird.contains("textures/entity/hummingbird_1.png"));
+        assertTrue(hummingbird.contains("textures/entity/hummingbird_2.png"));
+        assertTrue(hummingbird.contains("renderState.variant == 0"));
+    }
+
+    @Test
+    void potooBodyUsesRustIndexedAdmissionWithCopiedTextureAndStateExtraction() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String potoo = source("src/main/java/net/alexsmobs/client/render/RenderPotoo.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelPotoo"));
+        assertTrue(potoo.contains("textures/entity/potoo.png"));
+        assertTrue(potoo.contains("renderState.flyProgress"));
+        assertTrue(potoo.contains("renderState.isSleeping = entity.isSleeping()"));
+    }
+
+    @Test
+    void mudskipperBodyUsesRustIndexedAdmissionWithCopiedMouthTextureSelection() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String mudskipper = source("src/main/java/net/alexsmobs/client/render/RenderMudskipper.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelMudskipper"));
+        assertTrue(mudskipper.contains("textures/entity/mudskipper.png"));
+        assertTrue(mudskipper.contains("textures/entity/mudskipper_spit.png"));
+        assertTrue(mudskipper.contains("renderState.mouthOpen ? TEXTURE_SPIT : TEXTURE"));
+    }
+
+    @Test
+    void combJellyBodyUsesRustIndexedAdmissionWithCopiedVariantTexturesAndScaleState() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String combJelly = source("src/main/java/net/alexsmobs/client/render/RenderCombJelly.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelCombJelly"));
+        assertTrue(combJelly.contains("textures/entity/comb_jelly_blue.png"));
+        assertTrue(combJelly.contains("textures/entity/comb_jelly_green.png"));
+        assertTrue(combJelly.contains("textures/entity/comb_jelly_red.png"));
+        assertTrue(combJelly.contains("renderState.variant = entity.getVariant()"));
+        assertTrue(combJelly.contains("matrixStackIn.scale(jellyScale, jellyScale, jellyScale)"));
+    }
+
+    @Test
+    void emuBodyUsesRustIndexedAdmissionWithCopiedVariantAndBabyTextures() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String emu = source("src/main/java/net/alexsmobs/client/render/RenderEmu.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelEmu"));
+        assertTrue(emu.contains("textures/entity/emu.png"));
+        assertTrue(emu.contains("textures/entity/emu_baby.png"));
+        assertTrue(emu.contains("textures/entity/emu_blonde.png"));
+        assertTrue(emu.contains("textures/entity/emu_baby_blonde.png"));
+        assertTrue(emu.contains("textures/entity/emu_blue.png"));
+        assertTrue(emu.contains("state.variant = entity.getVariant()"));
+    }
+
+    @Test
+    void flyingFishBodyUsesRustIndexedAdmissionWithCopiedVariantTextures() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String flyingFish = source("src/main/java/net/alexsmobs/client/render/RenderFlyingFish.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelFlyingFish"));
+        assertTrue(flyingFish.contains("textures/entity/flying_fish_0.png"));
+        assertTrue(flyingFish.contains("textures/entity/flying_fish_1.png"));
+        assertTrue(flyingFish.contains("textures/entity/flying_fish_2.png"));
+        assertTrue(flyingFish.contains("renderState.variant = entity.getVariant()"));
+    }
+
+    @Test
+    void cockroachBodyUsesRustIndexedAdmissionWithCopiedTextureAndStateFlags() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String cockroach = source("src/main/java/net/alexsmobs/client/render/RenderCockroach.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelCockroach"));
+        assertTrue(cockroach.contains("textures/entity/cockroach.png"));
+        assertTrue(cockroach.contains("renderState.hasMaracas = entity.hasMaracas()"));
+        assertTrue(cockroach.contains("renderState.isHeadless = entity.isHeadless()"));
+        assertTrue(cockroach.contains("renderState.isBaby = entity.isBaby()"));
+    }
+
+    @Test
+    void rainFrogBodyUsesRustIndexedAdmissionWithCopiedVariantTextures() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String rainFrog = source("src/main/java/net/alexsmobs/client/render/RenderRainFrog.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelRainFrog"));
+        assertTrue(rainFrog.contains("textures/entity/rain_frog_0.png"));
+        assertTrue(rainFrog.contains("textures/entity/rain_frog_1.png"));
+        assertTrue(rainFrog.contains("textures/entity/rain_frog_2.png"));
+        assertTrue(rainFrog.contains("state.variant = entity.getVariant()"));
+    }
+
+    @Test
+    void skunkBodyUsesRustIndexedAdmissionWithCopiedTextureAndSprayState() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String skunk = source("src/main/java/net/alexsmobs/client/render/RenderSkunk.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelSkunk"));
+        assertTrue(skunk.contains("textures/entity/skunk.png"));
+        assertTrue(skunk.contains("state.sprayProgress = entity.sprayProgress"));
+        assertTrue(skunk.contains("state.prevSprayProgress = entity.prevSprayProgress"));
+        assertTrue(skunk.contains("state.isBaby = entity.isBaby()"));
+    }
+
+    @Test
+    void roadrunnerBodyUsesRustIndexedAdmissionWithCopiedMeepTextureSelection() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String roadrunner = source("src/main/java/net/alexsmobs/client/render/RenderRoadrunner.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelRoadrunner"));
+        assertTrue(roadrunner.contains("textures/entity/roadrunner.png"));
+        assertTrue(roadrunner.contains("textures/entity/roadrunner_meep.png"));
+        assertTrue(roadrunner.contains("renderState.isMeep = entity.isMeep()"));
+        assertTrue(roadrunner.contains("renderState.isMeep ? TEXTURE_MEEP : TEXTURE"));
+    }
+
+    @Test
+    void rattlesnakeBodyUsesRustIndexedAdmissionWithCopiedTextureAndAnimationState() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String rattlesnake = source("src/main/java/net/alexsmobs/client/render/RenderRattlesnake.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelRattlesnake"));
+        assertTrue(rattlesnake.contains("textures/entity/rattlesnake.png"));
+        assertTrue(rattlesnake.contains("state.curlProgress = entity.curlProgress"));
+        assertTrue(rattlesnake.contains("state.isRattling = entity.isRattling()"));
+    }
+
+    @Test
+    void sugarGliderBodyUsesRustIndexedAdmissionWithCopiedTextureAndAttachmentState() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String sugarGlider = source("src/main/java/net/alexsmobs/client/render/RenderSugarGlider.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelSugarGlider"));
+        assertTrue(sugarGlider.contains("textures/entity/sugar_glider.png"));
+        assertTrue(sugarGlider.contains("state.attachmentFacing = entity.getAttachmentFacing()"));
+        assertTrue(sugarGlider.contains("state.attachChangeProgress"));
+        assertTrue(sugarGlider.contains("state.isPassenger = entity.isPassenger()"));
+    }
+
+    @Test
+    void shoebillBodyUsesRustIndexedAdmissionWithCopiedTextureAndAnimationId() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String shoebill = source("src/main/java/net/alexsmobs/client/render/RenderShoebill.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelShoebill"));
+        assertTrue(shoebill.contains("textures/entity/shoebill.png"));
+        assertTrue(shoebill.contains("state.animationTick = entity.getAnimationTick()"));
+        assertTrue(shoebill.contains("state.currentAnimationId = 1"));
+        assertTrue(shoebill.contains("state.currentAnimationId = 3"));
+    }
+
+    @Test
+    void terrapinBodyUsesRustIndexedAdmissionWithCopiedVariantTextureSelection() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String terrapin = source("src/main/java/net/alexsmobs/client/render/RenderTerrapin.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelTerrapin"));
+        assertTrue(terrapin.contains("renderState.turtleType = entity.getTurtleType()"));
+        assertTrue(terrapin.contains("renderState.isKoopa = entity.isKoopa()"));
+        assertTrue(terrapin.contains("TerrapinTypes.KOOPA.getTexture()"));
+        assertTrue(terrapin.contains("renderState.turtleType.getTexture()"));
+    }
+
+    @Test
+    void anacondaHeadAndPartModelsUseRustIndexedAdmissionWithCopiedTextureVariants() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String anaconda = source("src/main/java/net/alexsmobs/client/render/RenderAnaconda.java");
+        String part = source("src/main/java/net/alexsmobs/client/render/RenderAnacondaPart.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelAnaconda"));
+        assertTrue(anaconda.contains("AnacondaPartIndex.HEAD"));
+        assertTrue(anaconda.contains("textures/entity/anaconda.png"));
+        assertTrue(anaconda.contains("textures/entity/anaconda_shedding.png"));
+        assertTrue(anaconda.contains("textures/entity/anaconda_yellow.png"));
+        assertTrue(anaconda.contains("textures/entity/anaconda_yellow_shedding.png"));
+        assertTrue(part.contains("new ModelAnaconda(AnacondaPartIndex.NECK)"));
+        assertTrue(part.contains("new ModelAnaconda(AnacondaPartIndex.BODY)"));
+        assertTrue(part.contains("new ModelAnaconda(AnacondaPartIndex.TAIL)"));
+        assertTrue(part.contains("this.model = getModelForType(renderState.partType)"));
+    }
+
+    @Test
+    void capuchinMonkeyBodyUsesRustIndexedAdmissionWithCopiedVariantAndAnimationState() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String monkey = source("src/main/java/net/alexsmobs/client/render/RenderCapuchinMonkey.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelCapuchinMonkey"));
+        assertTrue(monkey.contains("textures/entity/capuchin_monkey_0.png"));
+        assertTrue(monkey.contains("textures/entity/capuchin_monkey_3.png"));
+        assertTrue(monkey.contains("state.variant = entity.getVariant()"));
+        assertTrue(monkey.contains("state.currentAnimation = entity.getAnimation()"));
+        assertTrue(monkey.contains("state.hasDart = entity.hasDart()"));
+    }
+
+    @Test
+    void tarantulaHawkBodyUsesRustIndexedAdmissionWithCopiedEnvironmentAndAngerTextures() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String hawk = source("src/main/java/net/alexsmobs/client/render/RenderTarantulaHawk.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelTarantulaHawk"));
+        assertTrue(hawk.contains("textures/entity/tarantula_hawk.png"));
+        assertTrue(hawk.contains("textures/entity/tarantula_hawk_angry.png"));
+        assertTrue(hawk.contains("textures/entity/tarantula_hawk_nether.png"));
+        assertTrue(hawk.contains("textures/entity/tarantula_hawk_nether_angry.png"));
+        assertTrue(hawk.contains("textures/entity/tarantula_hawk_baby.png"));
+        assertTrue(hawk.contains("renderState.isNether = entity.isNether()"));
+        assertTrue(hawk.contains("renderState.isAngry = entity.isAngry()"));
+    }
+
+    @Test
+    void geladaMonkeyBodyUsesRustIndexedAdmissionWithCopiedLeaderAndAggroTextures() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String monkey = source("src/main/java/net/alexsmobs/client/render/RenderGeladaMonkey.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelGeladaMonkey"));
+        assertTrue(monkey.contains("textures/entity/gelada_monkey.png"));
+        assertTrue(monkey.contains("textures/entity/gelada_monkey_angry.png"));
+        assertTrue(monkey.contains("textures/entity/gelada_monkey_leader.png"));
+        assertTrue(monkey.contains("textures/entity/gelada_monkey_leader_angry.png"));
+        assertTrue(monkey.contains("state.isLeader = entity.isLeader()"));
+        assertTrue(monkey.contains("state.isAggro = entity.isAggro()"));
+    }
+
+    @Test
+    void snowLeopardBodyUsesRustIndexedAdmissionWithCopiedSleepingTextureSelection() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String leopard = source("src/main/java/net/alexsmobs/client/render/RenderSnowLeopard.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelSnowLeopard"));
+        assertTrue(leopard.contains("textures/entity/snow_leopard.png"));
+        assertTrue(leopard.contains("textures/entity/snow_leopard_sleeping.png"));
+        assertTrue(leopard.contains("renderState.isSleeping = entity.isSleeping()"));
+        assertTrue(leopard.contains("renderState.isSleeping ? TEXTURE_SLEEPING : TEXTURE"));
+    }
+
+    @Test
+    void mooseBodyUsesRustIndexedAdmissionWithCopiedSnowyAndAntlerTextureSelection() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String moose = source("src/main/java/net/alexsmobs/client/render/RenderMoose.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelMoose"));
+        assertTrue(moose.contains("textures/entity/moose.png"));
+        assertTrue(moose.contains("textures/entity/moose_antlered.png"));
+        assertTrue(moose.contains("textures/entity/moose_snowy.png"));
+        assertTrue(moose.contains("textures/entity/moose_snowy_antlered.png"));
+        assertTrue(moose.contains("state.antlered = entity.isAntlered()"));
+        assertTrue(moose.contains("state.snowy = entity.isSnowy()"));
+    }
+
+    @Test
+    void hammerheadSharkBodyUsesRustIndexedAdmissionWithCopiedTexture() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String shark = source("src/main/java/net/alexsmobs/client/render/RenderHammerheadShark.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelHammerheadShark"));
+        assertTrue(shark.contains("textures/entity/hammerhead_shark.png"));
+        assertTrue(shark.contains("new ModelHammerheadShark()"));
+    }
+
+    @Test
+    void gorillaBodyUsesRustIndexedAdmissionWithSemanticHeldItemLayer() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String gorilla = source("src/main/java/net/alexsmobs/client/render/RenderGorilla.java");
+        String itemLayer = source("src/main/java/net/alexsmobs/client/render/layer/LayerGorillaItem.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelGorilla"));
+        assertTrue(gorilla.contains("textures/entity/gorilla.png"));
+        assertTrue(gorilla.contains("textures/entity/gorilla_silverback.png"));
+        assertTrue(gorilla.contains("textures/entity/gorilla_dk.png"));
+        assertTrue(gorilla.contains("textures/entity/gorilla_funky.png"));
+        assertTrue(gorilla.contains("HoldingEntityRenderState.extractHoldingEntityRenderState"));
+        assertTrue(itemLayer.contains("state.heldItem.submit"));
+        assertTrue(itemLayer.contains("OverlayTexture.NO_OVERLAY"));
+    }
+
+    @Test
+    void bisonBodyUsesRustIndexedAdmissionWithCopiedShearedAndSnowyTextures() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String bison = source("src/main/java/net/alexsmobs/client/render/RenderBison.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelBison"));
+        assertTrue(bison.contains("textures/entity/bison.png"));
+        assertTrue(bison.contains("textures/entity/bison_sheared.png"));
+        assertTrue(bison.contains("textures/entity/bison_snowy.png"));
+        assertTrue(bison.contains("textures/entity/bison_baby.png"));
+        assertTrue(bison.contains("state.isSheared = entity.isSheared()"));
+        assertTrue(bison.contains("state.isSnowy = entity.isSnowy()"));
+        assertTrue(bison.contains("state.isBaby = entity.isBaby()"));
+    }
+
+    @Test
+    void catfishSizeModelsUseRustIndexedAdmissionWithCopiedSpitTextureVariants() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String catfish = source("src/main/java/net/alexsmobs/client/render/RenderCatfish.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelCatfishSmall"));
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelCatfishMedium"));
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelCatfishLarge"));
+        assertTrue(catfish.contains("textures/entity/catfish_small.png"));
+        assertTrue(catfish.contains("textures/entity/catfish_medium.png"));
+        assertTrue(catfish.contains("textures/entity/catfish_large.png"));
+        assertTrue(catfish.contains("textures/entity/catfish_small_spit.png"));
+        assertTrue(catfish.contains("textures/entity/catfish_large_spit.png"));
+        assertTrue(catfish.contains("model = modelLarge"));
+        assertTrue(catfish.contains("renderState.isSpitting"));
+    }
+
+    @Test
+    void orcaBodyUsesRustIndexedAdmissionWithCopiedVariantTexturesAndAnimationState() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String orca = source("src/main/java/net/alexsmobs/client/render/RenderOrca.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelOrca"));
+        assertTrue(orca.contains("textures/entity/orca_ne.png"));
+        assertTrue(orca.contains("textures/entity/orca_nw.png"));
+        assertTrue(orca.contains("textures/entity/orca_se.png"));
+        assertTrue(orca.contains("textures/entity/orca_sw.png"));
+        assertTrue(orca.contains("state.variant = entity.getVariant()"));
+        assertTrue(orca.contains("state.currentAnimation = entity.getAnimation()"));
+    }
+
+    @Test
+    void crocodileBodyUsesRustIndexedAdmissionWithSemanticCrownLayer() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String crocodile = source("src/main/java/net/alexsmobs/client/render/RenderCrocodile.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelCrocodile"));
+        assertTrue(crocodile.contains("textures/entity/crocodile_0.png"));
+        assertTrue(crocodile.contains("textures/entity/crocodile_1.png"));
+        assertTrue(crocodile.contains("textures/entity/crocodile_crown.png"));
+        assertTrue(crocodile.contains("state.isDesert = entity.isDesert()"));
+        assertTrue(crocodile.contains("submitModelSemanticTexture"));
+        assertTrue(crocodile.contains("OverlayTexture.NO_OVERLAY"));
+    }
+
+    @Test
+    void seagullBodyUsesRustIndexedAdmissionWithCopiedWingullTextureSelection() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String seagull = source("src/main/java/net/alexsmobs/client/render/RenderSeagull.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelSeagull"));
+        assertTrue(seagull.contains("textures/entity/seagull.png"));
+        assertTrue(seagull.contains("textures/entity/seagull_wingull.png"));
+        assertTrue(seagull.contains("state.isWingull = entity.isWingull()"));
+        assertTrue(seagull.contains("state.isWingull ? TEXTURE_WINGULL : TEXTURE"));
+    }
+
+    @Test
+    void bunfungusBodyUsesRustIndexedAdmissionWithSemanticHeldItemAndSleepingTexture() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String bunfungus = source("src/main/java/net/alexsmobs/client/render/RenderBunfungus.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelBunfungus"));
+        assertTrue(bunfungus.contains("textures/entity/bunfungus.png"));
+        assertTrue(bunfungus.contains("textures/entity/bunfungus_sleeping.png"));
+        assertTrue(bunfungus.contains("renderState.isSleeping ? TEXTURE_SLEEPING : TEXTURE"));
+        assertTrue(bunfungus.contains("itemModelResolver.updateForLiving"));
+        assertTrue(bunfungus.contains("renderState.mainHandItem.submit"));
+        assertTrue(bunfungus.contains("OverlayTexture.NO_OVERLAY"));
+    }
+
+    @Test
+    void giantSquidBodyUsesRustIndexedAdmissionWithSemanticDepressurizationLayer() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String squid = source("src/main/java/net/alexsmobs/client/render/RenderGiantSquid.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelGiantSquid"));
+        assertTrue(squid.contains("textures/entity/giant_squid.png"));
+        assertTrue(squid.contains("textures/entity/giant_squid_blue.png"));
+        assertTrue(squid.contains("textures/entity/giant_squid_depressurized.png"));
+        assertTrue(squid.contains("renderState.isBlue = entity.isBlue()"));
+        assertTrue(squid.contains("submitModelSemanticTexture"));
+        assertTrue(squid.contains("OverlayTexture.NO_OVERLAY"));
+    }
+
+    @Test
+    void mimicOctopusBodyUsesRustIndexedAdmissionWithSemanticOverlayAndGuardianBeam() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String octopus = source("src/main/java/net/alexsmobs/client/render/RenderMimicOctopus.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelMimicOctopus"));
+        assertTrue(octopus.contains("textures/entity/mimic_octopus.png"));
+        assertTrue(octopus.contains("textures/entity/mimic_octopus_overlay.png"));
+        assertTrue(octopus.contains("textures/entity/mimic_octopus_guardian.png"));
+        assertTrue(octopus.contains("textures/entity/mimic_octopus_eyes.png"));
+        assertTrue(octopus.contains("submitModelSemanticTexture"));
+        assertTrue(octopus.contains("submitGuardianBeam"));
+        assertTrue(octopus.contains("renderState.guardianLaserTargetPresent"));
+    }
+
+    @Test
+    void mantisShrimpBodyUsesRustIndexedAdmissionWithVariantTexturesAndSemanticHeldItem() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String shrimp = source("src/main/java/net/alexsmobs/client/render/RenderMantisShrimp.java");
+        String itemLayer = source("src/main/java/net/alexsmobs/client/render/layer/LayerMantisShrimpItem.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelMantisShrimp"));
+        assertTrue(shrimp.contains("textures/entity/mantis_shrimp_0.png"));
+        assertTrue(shrimp.contains("textures/entity/mantis_shrimp_3.png"));
+        assertTrue(shrimp.contains("state.variant = entity.getVariant()"));
+        assertTrue(shrimp.contains("itemModelResolver.updateForLiving"));
+        assertTrue(itemLayer.contains("renderState.mainHandItem.submit"));
+        assertTrue(itemLayer.contains("OverlayTexture.NO_OVERLAY"));
+    }
+
+    @Test
+    void mimicubeBodyUsesRustIndexedAdmissionWithSemanticItemHelmetAndTextureLayers() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String mimicube = source("src/main/java/net/alexsmobs/client/render/RenderMimicube.java");
+        String heldItem = source("src/main/java/net/alexsmobs/client/render/layer/LayerMimicubeHeldItem.java");
+        String helmet = source("src/main/java/net/alexsmobs/client/render/layer/LayerMimicubeHelmet.java");
+        String texture = source("src/main/java/net/alexsmobs/client/render/layer/LayerMimicubeTexture.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelMimicube"));
+        assertTrue(mimicube.contains("textures/entity/mimicube.png"));
+        assertTrue(mimicube.contains("itemModelResolver.updateForLiving"));
+        assertTrue(heldItem.contains("item.submit"));
+        assertTrue(helmet.contains("headItem.submit"));
+        assertTrue(texture.contains("submitModelSemanticTexture"));
+    }
+
+    @Test
+    void cosmicCodBodyUsesRustIndexedAdmissionWithSemanticGlowLayer() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String cod = source("src/main/java/net/alexsmobs/client/render/RenderCosmicCod.java");
+        String glow = source("src/main/java/net/alexsmobs/client/render/layer/LayerBasicGlow.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelCosmicCod"));
+        assertTrue(cod.contains("textures/entity/cosmic_cod.png"));
+        assertTrue(cod.contains("textures/entity/cosmic_cod_eyes.png"));
+        assertTrue(cod.contains("new ModelCosmicCod()"));
+        assertTrue(glow.contains("submitModelSemanticTexture"));
+    }
+
+    @Test
+    void rhinocerosBodyUsesRustIndexedAdmissionWithSemanticPotionLayer() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String rhino = source("src/main/java/net/alexsmobs/client/render/RenderRhinoceros.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelRhinoceros"));
+        assertTrue(rhino.contains("textures/entity/rhinoceros.png"));
+        assertTrue(rhino.contains("textures/entity/rhinoceros_angry.png"));
+        assertTrue(rhino.contains("textures/entity/rhinoceros_potion.png"));
+        assertTrue(rhino.contains("state.isAngry = entity.isAngry()"));
+        assertTrue(rhino.contains("submitModelSemanticTexture"));
+        assertTrue(rhino.contains("state.potionColor"));
+    }
+
+    @Test
+    void komodoDragonBodyUsesRustIndexedAdmissionWithSemanticSaddleAndMaidLayers() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String komodo = source("src/main/java/net/alexsmobs/client/render/RenderKomodoDragon.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelKomodoDragon"));
+        assertTrue(komodo.contains("textures/entity/komodo_dragon.png"));
+        assertTrue(komodo.contains("textures/entity/komodo_dragon_saddle.png"));
+        assertTrue(komodo.contains("textures/entity/komodo_dragon_maid.png"));
+        assertTrue(komodo.contains("renderState.isSaddled = komodo.isSaddled()"));
+        assertTrue(komodo.contains("renderState.isMaid = komodo.isMaid()"));
+        assertTrue(komodo.contains("submitModelSemanticTexture"));
+    }
+
+    @Test
+    void elephantBodyUsesRustIndexedAdmissionWithSemanticOverlayAndHeldItemLayers() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String elephant = source("src/main/java/net/alexsmobs/client/render/RenderElephant.java");
+        String overlays = source("src/main/java/net/alexsmobs/client/render/layer/LayerElephantOverlays.java");
+        String item = source("src/main/java/net/alexsmobs/client/render/layer/LayerElephantItem.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelElephant"));
+        assertTrue(elephant.contains("textures/entity/elephant/elephant.png"));
+        assertTrue(elephant.contains("textures/entity/elephant/elephant_tusks.png"));
+        assertTrue(elephant.contains("itemModelResolver.updateForLiving"));
+        assertTrue(overlays.contains("submitModelSemanticTexture"));
+        assertTrue(item.contains("state.mainHandItem.submit"));
+        assertTrue(item.contains("OverlayTexture.NO_OVERLAY"));
+    }
+
+    @Test
+    void baldEagleBodyUsesRustIndexedAdmissionWithSemanticCapLayer() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String eagle = source("src/main/java/net/alexsmobs/client/render/RenderBaldEagle.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelBaldEagle"));
+        assertTrue(eagle.contains("textures/entity/bald_eagle.png"));
+        assertTrue(eagle.contains("textures/entity/bald_eagle_hood.png"));
+        assertTrue(eagle.contains("submitModelSemanticTexture"));
+        assertTrue(eagle.contains("state.hasCap = entity.hasCap()"));
+    }
+
+    @Test
+    void grizzlyBearBodyUsesRustIndexedAdmissionWithSemanticSnowHoneyEyesAndItemLayers() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String bear = source("src/main/java/net/alexsmobs/client/render/RenderGrizzlyBear.java");
+        String honey = source("src/main/java/net/alexsmobs/client/render/layer/LayerGrizzlyHoney.java");
+        String item = source("src/main/java/net/alexsmobs/client/render/layer/LayerGrizzlyItem.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelGrizzlyBear"));
+        assertTrue(bear.contains("textures/entity/grizzly_bear.png"));
+        assertTrue(bear.contains("textures/entity/grizzly_bear_snowy.png"));
+        assertTrue(bear.contains("textures/entity/grizzly_bear_freddy_eyes.png"));
+        assertTrue(bear.contains("submitModelSemanticTexture"));
+        assertTrue(honey.contains("submitModelSemanticTexture"));
+        assertTrue(item.contains("state.heldItem.submit"));
+        assertTrue(item.contains("OverlayTexture.NO_OVERLAY"));
+    }
+
+    @Test
+    void tigerBodyUsesRustIndexedAdmissionWithCopiedWhiteAngrySleepingTexturesAndEyes() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String tiger = source("src/main/java/net/alexsmobs/client/render/RenderTiger.java");
+        String eyes = source("src/main/java/net/alexsmobs/client/render/layer/LayerTigerEyes.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelTiger"));
+        assertTrue(tiger.contains("textures/entity/tiger/tiger.png"));
+        assertTrue(tiger.contains("textures/entity/tiger/tiger_angry.png"));
+        assertTrue(tiger.contains("textures/entity/tiger/tiger_sleeping.png"));
+        assertTrue(tiger.contains("textures/entity/tiger/tiger_white_sleeping.png"));
+        assertTrue(tiger.contains("state.isWhite = entity.isWhite()"));
+        assertTrue(eyes.contains("submitModelSemanticTexture"));
+    }
+
+    @Test
+    void caveCentipedeHeadBodyAndTailUseRustIndexedAdmissionWithSemanticEyes() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String head = source("src/main/java/net/alexsmobs/client/render/RenderCentipedeHead.java");
+        String body = source("src/main/java/net/alexsmobs/client/render/RenderCentipedeBody.java");
+        String tail = source("src/main/java/net/alexsmobs/client/render/RenderCentipedeTail.java");
+        String eyes = source("src/main/java/net/alexsmobs/client/render/layer/LayerCentipedeHeadEyes.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelCaveCentipede"));
+        assertTrue(head.contains("new ModelCaveCentipede(0)"));
+        assertTrue(body.contains("new ModelCaveCentipede(1)"));
+        assertTrue(tail.contains("new ModelCaveCentipede(2)"));
+        assertTrue(head.contains("textures/entity/cave_centipede.png"));
+        assertTrue(eyes.contains("submitModelSemanticTexture"));
+    }
+
+    @Test
+    void sunbirdBodyUsesRustIndexedAdmissionWithSemanticScorchGlowLayer() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String sunbird = source("src/main/java/net/alexsmobs/client/render/RenderSunbird.java");
+        String scorch = source("src/main/java/net/alexsmobs/client/render/layer/LayerSunbirdScorch.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelSunbird"));
+        assertTrue(sunbird.contains("textures/entity/sunbird.png"));
+        assertTrue(sunbird.contains("textures/entity/sunbird_glow.png"));
+        assertTrue(sunbird.contains("state.scorchProgress"));
+        assertTrue(scorch.contains("submitModelSemanticTexture"));
+    }
+
+    @Test
+    void skelewagBodyUsesRustIndexedAdmissionWithCopiedVariantTexturesAndAnimationId() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String skelewag = source("src/main/java/net/alexsmobs/client/render/RenderSkelewag.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelSkelewag"));
+        assertTrue(skelewag.contains("textures/entity/skelewag_0.png"));
+        assertTrue(skelewag.contains("textures/entity/skelewag_1.png"));
+        assertTrue(skelewag.contains("state.variant = entity.getVariant()"));
+        assertTrue(skelewag.contains("state.currentAnimationId"));
+    }
+
+    @Test
+    void mungusBodyUsesRustIndexedAdmissionWithSemanticOverlaysAndBeamQuads() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String mungus = source("src/main/java/net/alexsmobs/client/render/RenderMungus.java");
+        String beam = source("src/main/java/net/alexsmobs/client/render/layer/MungusBeamLayer.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelMungus"));
+        assertTrue(mungus.contains("textures/entity/mungus.png"));
+        assertTrue(mungus.contains("textures/entity/mungus_sack.png"));
+        assertTrue(mungus.contains("submitModelSemanticTexture"));
+        assertTrue(beam.contains("submitTranslucentTexturedQuadSemantic"));
+        assertTrue(beam.contains("textures/entity/mungus_beam.png"));
+    }
+
+    @Test
+    void warpedToadUsesRustIndexedAdmissionWithVariantAndGlowTextures() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String toad = source("src/main/java/net/alexsmobs/client/render/RenderWarpedToad.java");
+        String glow = source("src/main/java/net/alexsmobs/client/render/layer/LayerWarpedToadGlow.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelWarpedToad"));
+        assertTrue(toad.contains("textures/entity/warped_toad.png"));
+        assertTrue(toad.contains("textures/entity/warped_toad_blink.png"));
+        assertTrue(toad.contains("textures/entity/warped_toad_pepe.png"));
+        assertTrue(toad.contains("textures/entity/warped_toad_pepe_blink.png"));
+        assertTrue(glow.contains("submitModelSemanticTexture"));
+        assertTrue(glow.contains("textures/entity/warped_toad_glow.png"));
+        assertTrue(glow.contains("textures/entity/warped_toad_glow_blink.png"));
+    }
+
+    @Test
+    void terrapinUsesRustIndexedAdmissionWithStateDrivenTextureSelection() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String terrapin = source("src/main/java/net/alexsmobs/client/render/RenderTerrapin.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelTerrapin"));
+        assertTrue(terrapin.contains("renderState.turtleType = entity.getTurtleType()"));
+        assertTrue(terrapin.contains("renderState.isKoopa = entity.isKoopa()"));
+        assertTrue(terrapin.contains("TerrapinTypes.KOOPA.getTexture()"));
+        assertTrue(terrapin.contains("return renderState.turtleType.getTexture()"));
+    }
+
+    @Test
+    void toucanUsesRustIndexedAdmissionWithVariantAndSemanticGlint() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String toucan = source("src/main/java/net/alexsmobs/client/render/RenderToucan.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelToucan"));
+        assertTrue(toucan.contains("textures/entity/toucan/toucan_0.png"));
+        assertTrue(toucan.contains("textures/entity/toucan/toucan_3.png"));
+        assertTrue(toucan.contains("textures/entity/toucan/toucan_gold.png"));
+        assertTrue(toucan.contains("textures/entity/toucan/toucan_sam.png"));
+        assertTrue(toucan.contains("submitModelSemanticTexture"));
+        assertTrue(toucan.contains("state.isEnchanted"));
+    }
+
+    @Test
+    void leafcutterAntUsesRustIndexedAdmissionForWorkerQueenAndSemanticLeafLayer() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String ant = source("src/main/java/net/alexsmobs/client/render/RenderLeafcutterAnt.java");
+        String leaf = source("src/main/java/net/alexsmobs/client/render/layer/LayerLeafcutterAntLeaf.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelLeafcutterAnt"));
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelLeafcutterAntQueen"));
+        assertTrue(ant.contains("model = state.isQueen ? modelQueen : modelAnt"));
+        assertTrue(ant.contains("textures/entity/leafcutter_ant.png"));
+        assertTrue(ant.contains("textures/entity/leafcutter_ant_queen_angry.png"));
+        assertTrue(leaf.contains("submitModelSemanticTexture"));
+    }
+
+    @Test
+    void platypusUsesRustIndexedAdmissionWithPerryAndSemanticFedora() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String platypus = source("src/main/java/net/alexsmobs/client/render/RenderPlatypus.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelPlatypus"));
+        assertTrue(platypus.contains("textures/entity/platypus.png"));
+        assertTrue(platypus.contains("textures/entity/platypus_perry.png"));
+        assertTrue(platypus.contains("textures/entity/platypus_fedora.png"));
+        assertTrue(platypus.contains("state.hasFedora"));
+        assertTrue(platypus.contains("submitModelSemanticTexture"));
+    }
+
+    @Test
+    void cosmawUsesRustIndexedAdmissionWithSemanticGlowAndHeldItem() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String cosmaw = source("src/main/java/net/alexsmobs/client/render/RenderCosmaw.java");
+        String glow = source("src/main/java/net/alexsmobs/client/render/layer/LayerBasicGlow.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelCosmaw"));
+        assertTrue(cosmaw.contains("textures/entity/cosmaw.png"));
+        assertTrue(cosmaw.contains("textures/entity/cosmaw_glow.png"));
+        assertTrue(cosmaw.contains("state.mainHandItem.submit"));
+        assertTrue(glow.contains("submitModelSemanticTexture"));
+    }
+
+    @Test
+    void endergradeUsesRustIndexedAdmissionWithTranslucentBodyAndSemanticSaddle() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String endergrade = source("src/main/java/net/alexsmobs/client/render/RenderEndergrade.java");
+        String saddle = source("src/main/java/net/alexsmobs/client/render/layer/LayerEndergradeSaddle.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelEndergrade"));
+        assertTrue(endergrade.contains("textures/entity/endergrade.png"));
+        assertTrue(endergrade.contains("RenderType.entityTranslucent"));
+        assertTrue(endergrade.contains("state.isSaddled = entity.isSaddled()"));
+        assertTrue(saddle.contains("textures/entity/endergrade_saddle.png"));
+        assertTrue(saddle.contains("submitModelSemanticTexture"));
+    }
+
+    @Test
+    void tasmanianDevilUsesRustIndexedAdmissionWithAnimationDrivenAngryTexture() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String devil = source("src/main/java/net/alexsmobs/client/render/RenderTasmanianDevil.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelTasmanianDevil"));
+        assertTrue(devil.contains("textures/entity/tasmanian_devil.png"));
+        assertTrue(devil.contains("textures/entity/tasmanian_devil_angry.png"));
+        assertTrue(devil.contains("EntityTasmanianDevil.ANIMATION_HOWL"));
+        assertTrue(devil.contains("renderState.animationTick < 34"));
+    }
+
+    @Test
+    void blueJayUsesRustIndexedAdmissionWithSemanticShinyLayer() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String blueJay = source("src/main/java/net/alexsmobs/client/render/RenderBlueJay.java");
+        String layer = source("src/main/java/net/minecraft/client/renderer/entity/layers/RenderLayer.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelBlueJay"));
+        assertTrue(blueJay.contains("textures/entity/blue_jay.png"));
+        assertTrue(blueJay.contains("textures/entity/blue_jay_shiny.png"));
+        assertTrue(blueJay.contains("coloredCutoutModelCopyLayerRender"));
+        assertTrue(layer.contains("submitModelSemanticTexture"));
+    }
+
+    @Test
+    void underminerUsesRustIndexedDwarfAdmissionWithSemanticTransparencyAndItemLayers() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String wrapper = source("src/main/java/net/alexsmobs/client/model/ModelUnderminerWrapper.java");
+        String transparency = source("src/main/java/net/alexsmobs/client/render/layer/LayerUnderminerTransparency.java");
+        String item = source("src/main/java/net/alexsmobs/client/render/layer/LayerUnderminerItem.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelUnderminerDwarf"));
+        assertTrue(wrapper.contains("getDwarfModel()"));
+        assertTrue(wrapper.contains("getTallModel()"));
+        assertTrue(transparency.contains("submitModelSemanticTexture"));
+        assertTrue(transparency.contains("getDwarfModel()"));
+        assertTrue(transparency.contains("getTallModel()"));
+        assertTrue(item.contains("renderState.getMainHandItem().submit"));
+    }
+
+    @Test
+    void everyReachableAlexModelHasAnExplicitRustAdmission() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        Path modelRoot = ROOT.resolve("src/main/java/net/alexsmobs/client/model");
+        try (var paths = Files.list(modelRoot)) {
+            for (Path path : (Iterable<Path>) paths::iterator) {
+                if (!Files.isRegularFile(path) || !path.getFileName().toString().startsWith("Model")
+                    || !path.getFileName().toString().endsWith(".java")) {
+                    continue;
+                }
+                String modelName = path.getFileName().toString().replaceFirst("\\.java$", "");
+                // The wrapper is intentionally not a submitted mesh: RenderUnderminer's
+                // base route is null and its two semantic layers submit the concrete
+                // dwarf/humanoid models independently.
+                if (modelName.equals("ModelUnderminerWrapper")) continue;
+                assertTrue(
+                    renderer.contains("net.alexsmobs.client.model." + modelName),
+                    () -> "Alex model lacks an explicit Rust mesh admission: " + modelName
+                );
+            }
+        }
+    }
+
+    @Test
+    void bisonAndTarantulaHawkBabyModelsUseRustIndexedDynamicSelection() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String bison = source("src/main/java/net/alexsmobs/client/render/RenderBison.java");
+        String hawk = source("src/main/java/net/alexsmobs/client/render/RenderTarantulaHawk.java");
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelBisonBaby"));
+        assertTrue(renderer.contains("model instanceof net.alexsmobs.client.model.ModelTarantulaHawkBaby"));
+        assertTrue(bison.contains("this.model = state.isBaby ? modelBaby : modelBison"));
+        assertTrue(hawk.contains("this.model = renderState.isBaby ? modelBaby : modelAdult"));
+        assertTrue(bison.contains("textures/entity/bison_baby.png"));
+        assertTrue(hawk.contains("textures/entity/tarantula_hawk_baby.png"));
     }
 
     @Test
@@ -159,9 +1197,23 @@ class NativeMeshingProductionContractTest {
         assertTrue(renderer.contains("textures/entity/sheep/sheep.png"));
         assertTrue(living.contains("SheepRenderState sheepRenderState"));
         assertTrue(living.contains("isVanillaSheepModelMeshEligible"));
-        assertTrue(wool.contains("enqueueStandaloneModelMesh"));
-        assertTrue(undercoat.contains("enqueueStandaloneModelMesh"));
-    }
+		assertTrue(wool.contains("enqueueStandaloneModelMesh"));
+		assertTrue(undercoat.contains("enqueueStandaloneModelMesh"));
+		assertFalse(undercoat.contains("!sheepRenderState.isBaby"),
+			"baby sheep undercoat must use the same Rust indexed-model route as adult sheep");
+	}
+
+	@Test
+	void tropicalFishPatternFixtureAndLayerStayOnRustSemanticMeshes() throws IOException {
+		String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+		String harness = source("DevUtils/Common/graphics_harness.py");
+		String pattern = source("src/main/java/net/minecraft/client/renderer/entity/layers/TropicalFishPatternLayer.java");
+		assertTrue(capture.contains("tropical-fish"));
+		assertTrue(capture.contains("EntityType.TROPICAL_FISH"));
+		assertTrue(harness.contains("\"tropical-fish\""));
+		assertTrue(pattern.contains("isVanillaTropicalFishPatternModelMeshEligible"));
+		assertTrue(pattern.contains("tropical_fish_pattern"));
+	}
 
     @Test
     void ordinaryCreepersUseRustMeshOnlyWithoutPoweredFeatureLayer() throws IOException {
@@ -228,6 +1280,8 @@ class NativeMeshingProductionContractTest {
 
         assertTrue(gui.contains("collectRustGalPictureInPictureSemantics"));
         assertTrue(gui.contains("instanceof OversizedItemRenderState oversized"));
+        assertTrue(gui.contains("item.itemStackRenderState().hasSpecialRenderer()"));
+        assertTrue(gui.contains("tryEnqueueSpecialItem(\n\t\t\t\t\titem, guiWidth, guiHeight, dynamicLayerOrder"));
         assertTrue(gui.contains("tryEnqueueStandard3dItem(item"));
         assertTrue(gui.contains("tryEnqueueFlatItem(item"));
         assertTrue(game.contains("this.guiRenderer.collectRustGalPictureInPictureSemantics()"));
@@ -244,7 +1298,8 @@ class NativeMeshingProductionContractTest {
         assertTrue(assets.contains("semanticFrameIndex()"));
         assertTrue(assets.contains("animated-sprite:"));
         assertTrue(assets.contains("frame-independent"));
-        assertTrue(mesh.contains("stageSemanticImage(sprite)"));
+        assertTrue(mesh.contains("resolveAnimatedSprite(sprite)")
+            || mesh.contains("RustGalGuiRawImageAssets.resolve(spriteIdentity)"));
         assertTrue(!item.contains("recordDiagnostic(\"animated-item\")"));
     }
 
@@ -252,7 +1307,7 @@ class NativeMeshingProductionContractTest {
     void mungusBeamUsesSemanticTexturedQuadsOnRustWholeFrame() throws IOException {
         String beam = source("src/main/java/net/alexsmobs/client/render/layer/MungusBeamLayer.java");
         assertTrue(beam.contains("currentTexturedBillboardRoute().usesRustWholeFrameVulkan()"));
-        assertTrue(beam.contains("submitNodeCollector.submitTexturedQuad"));
+        assertTrue(beam.contains("submitNodeCollector.submitTranslucentTexturedQuadSemantic"));
         assertTrue(beam.contains("new float[] {f19, f4, f20"));
         assertTrue(beam.contains("new float[] {f11, f4, f12"));
         assertTrue(beam.contains("Rust whole-frame Mungus beam route rejected"));
@@ -354,7 +1409,8 @@ class NativeMeshingProductionContractTest {
         assertTrue(gui.contains("GuiModelPipSemanticCollector.collect"));
         assertTrue(collector.contains("model.renderToBuffer"));
         assertTrue(collector.contains("GuiMeshBatchRecord"));
-        assertTrue(collector.contains("RustGalGuiRawImageAssets.stage"));
+        assertTrue(collector.contains("List<RustGalGuiRawImageAssets.Asset> assets")
+            && collector.contains("List.of(asset)"));
         assertTrue(collector.contains("clipMode = clip == null ? 0 : 1"));
         assertTrue(renderer.contains("GuiSkinRenderState skin"));
         assertTrue(renderer.contains("GuiBookModelRenderState book"));
@@ -369,7 +1425,8 @@ class NativeMeshingProductionContractTest {
         assertTrue(gui.contains("tryEnqueueBannerPip"));
         assertTrue(gui.contains("BANNER_BASE.texture()"));
         assertTrue(gui.contains("getBannerMaterial(layer.pattern())"));
-        assertTrue(gui.contains("Math.min(16"));
+		assertTrue(gui.contains("patternCount > 16"));
+		assertTrue(gui.contains("banner-pip-rejected=pattern-cap-"));
         assertTrue(gui.contains("layer.color().getTextureDiffuseColor()"));
         assertTrue(renderer.contains("GuiBannerResultRenderState banner"));
         assertTrue(renderer.contains("RustGalGuiRenderer.tryEnqueueBannerPip"));
@@ -1314,7 +2371,13 @@ class NativeMeshingProductionContractTest {
 		assertTrue(renderer.contains("Rust whole-frame wind-charge route has no semantic mesh"));
 		assertTrue(rust.contains("enqueueWindChargeModel"));
 		assertTrue(rust.contains("uvOffsetU"));
-		assertTrue(rust.contains("enqueueTranslucentTexturedQuad"));
+		assertTrue(rust.contains("enqueueEntityModelTranslucentTexturedQuad"));
+		assertTrue(rust.contains("MATERIAL_SOURCE_ENTITY_MODEL"));
+		assertTrue(rust.contains("MATERIAL_SOURCE_ENTITY_MODEL = 5"));
+		assertTrue(source("src/main/rust/render/vulkanic/world_primitive_frontend.rs")
+			.contains("WORLD_MATERIAL_SOURCE_ENTITY_MODEL: u32 = 5"));
+		assertTrue(source("src/main/rust/render/vulkanic/world_primitive_frontend/material.rs")
+			.contains("entity-model material quads require Rust-owned local texture UV semantics"));
     }
 
     @Test
@@ -1395,6 +2458,8 @@ class NativeMeshingProductionContractTest {
         assertTrue(ordered.contains("submitGuardianBeam"));
         assertTrue(rust.contains("MATERIAL_TEXTURE_GUARDIAN_BEAM"));
         assertTrue(rust.contains("textures/entity/guardian_beam.png"));
+        assertTrue(rust.contains("vertices.length != 24 && vertices.length != 36"));
+        assertTrue(rust.contains("vertices.length / 12"));
         assertTrue(policy.contains("currentGuardianBeamRoute"));
     }
 
@@ -1405,7 +2470,7 @@ class NativeMeshingProductionContractTest {
         String ordered = source("src/main/java/net/minecraft/client/renderer/OrderedSubmitNodeCollector.java");
         String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
 
-        assertTrue(renderer.contains("submitTexturedQuad"));
+		assertTrue(renderer.contains("submitTranslucentTexturedQuadSemantic"));
         assertTrue(collector.contains("enqueueTexturedQuad"));
         assertTrue(ordered.contains("submitTexturedQuad"));
         assertTrue(rust.contains("MATERIAL_TEXTURE_DRAGON_FIREBALL"));
@@ -1439,14 +2504,13 @@ class NativeMeshingProductionContractTest {
     }
 
     @Test
-    void llamaSpitUsesRustTranslucentStandaloneMeshAdmission() throws IOException {
+    void llamaSpitUsesRustStandaloneModelMeshAdmission() throws IOException {
         String renderer = source("src/main/java/net/minecraft/client/renderer/entity/LlamaSpitRenderer.java");
         String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
-        assertTrue(renderer.contains("isStandaloneTranslucentModelMeshEligible"));
-        assertTrue(renderer.contains("enqueueStandaloneTranslucentModelMesh"));
+        assertTrue(renderer.contains("isStandaloneModelMeshEligible"));
+        assertTrue(renderer.contains("enqueueStandaloneModelMesh"));
         assertTrue(renderer.contains("LLAMA_SPIT_LOCATION"));
-        assertTrue(rust.contains("enqueueStandaloneTranslucentModelMesh"));
-        assertTrue(rust.contains("MATERIAL_MODE_TRANSLUCENT"));
+        assertTrue(rust.contains("enqueueStandaloneModelMesh"));
     }
 
     @Test
@@ -1537,7 +2601,7 @@ class NativeMeshingProductionContractTest {
 	@Test
 	void dragonFireballBillboardFailsClosedOnRustRoute() throws IOException {
 		String renderer = source("src/main/java/net/minecraft/client/renderer/entity/DragonFireballRenderer.java");
-		assertTrue(renderer.contains("submitTexturedQuad"));
+		assertTrue(renderer.contains("submitTranslucentTexturedQuadSemantic"));
 		assertTrue(renderer.contains("Rust whole-frame dragon-fireball route rejected semantic billboard"));
 	}
 
@@ -1554,6 +2618,181 @@ class NativeMeshingProductionContractTest {
         assertTrue(policy.contains("currentDebugLineRoute"));
         assertTrue(rust.contains("enqueueDebugLineSegments"));
     }
+
+	@Test
+	void directJavaHitboxRendererCannotBypassRustPresentationOwnership() throws IOException {
+		String renderer = source("src/main/java/net/minecraft/client/renderer/feature/HitboxFeatureRenderer.java");
+		int render = renderer.indexOf("public void render(");
+		int guard = renderer.indexOf("RustGalVulkanWholeFrameMode.enabled()", render);
+		int javaLoop = renderer.indexOf("getHitboxSubmits()", render);
+		assertTrue(render >= 0 && guard > render && javaLoop > guard,
+			"direct hitbox invocation must fail closed before Java line geometry while Rust owns presentation");
+	}
+
+	@Test
+	void itemRendererJavaHelpersFailClosedAfterVulkanSelection() throws IOException {
+		String renderer = source("src/main/java/net/minecraft/client/renderer/entity/ItemRenderer.java");
+		int render = renderer.indexOf("public static void renderItem(");
+		int guard = renderer.indexOf("ensureJavaItemRoute();", render);
+		int special = renderer.indexOf("public static VertexConsumer getSpecialFoilBuffer(");
+		int specialGuard = renderer.indexOf("ensureJavaItemRoute();", special);
+		int ordinary = renderer.indexOf("public static VertexConsumer getFoilBuffer(");
+		int ordinaryGuard = renderer.indexOf("ensureJavaItemRoute();", ordinary);
+		assertTrue(render >= 0 && guard > render && special >= 0 && specialGuard > special
+			&& ordinary >= 0 && ordinaryGuard > ordinary
+			&& renderer.contains("RustGalVulkanWholeFrameMode.enabled()")
+			&& renderer.contains("Java item rendering is unavailable while Rust owns Vulkan presentation"),
+			"all public Java item buffer helpers must fail closed while Rust owns Vulkan presentation");
+	}
+
+	@Test
+	void blockDispatcherJavaGeometryHelpersFailClosedAfterVulkanSelection() throws IOException {
+		String dispatcher = source("src/main/java/net/minecraft/client/renderer/block/BlockRenderDispatcher.java");
+		String[] methods = {"renderBreakingTexture(", "renderBatched(", "renderLiquid(", "renderSingleBlock("};
+		for (String method : methods) {
+			int start = dispatcher.indexOf(method);
+			assertTrue(start >= 0, "missing block dispatcher method " + method);
+			assertTrue(dispatcher.indexOf("ensureJavaBlockRoute();", start) > start,
+				"block dispatcher method must fail closed after Vulkan selection: " + method);
+		}
+		assertTrue(dispatcher.contains("RustGalVulkanWholeFrameMode.enabled()")
+			&& dispatcher.contains("Java block geometry rendering is unavailable while Rust owns Vulkan presentation"));
+	}
+
+	@Test
+	void mapRendererCannotFallThroughToJavaGeometryAfterVulkanSelection() throws IOException {
+		String renderer = source("src/main/java/net/minecraft/client/renderer/MapRenderer.java");
+		assertTrue(renderer.contains("if (!mapAccepted && net.vulkanic.VulkanicAPI.isVulkanBackendSelected())"));
+		assertTrue(renderer.contains("if (!decorationAccepted && net.vulkanic.VulkanicAPI.isVulkanBackendSelected())"));
+		assertTrue(renderer.contains("Rust whole-frame map-label route is unavailable; Java map text is not a fallback"));
+	}
+
+	@Test
+	void mapTextureManagerUsesCpuSemanticPixelsWhileRustOwnsPresentation() throws IOException {
+		String manager = source("src/main/java/net/minecraft/client/resources/MapTextureManager.java");
+		assertTrue(manager.contains("private boolean semanticRustRoute()")
+			&& manager.contains("if (semanticRustRoute())")
+			&& manager.contains("stageCpuRgba8(this.location, 128, 128, pixels)")
+			&& manager.contains("this.texture = semanticRustRoute()")
+			&& manager.contains("new DynamicTexture")
+			&& manager.contains("this.data.colors.length != 128 * 128")
+			&& manager.contains("requires exactly 128x128 map color data"),
+			"map preparation must stage bounded CPU pixels and avoid Java DynamicTexture allocation on Rust Vulkan");
+	}
+
+	@Test
+	void selectedVulkanBillboardCallsitesCannotUseJavaCustomGeometryFallbacks() throws IOException {
+		String hand = source("src/main/java/net/minecraft/client/renderer/ItemInHandRenderer.java");
+		String hook = source("src/main/java/net/minecraft/client/renderer/entity/FishingHookRenderer.java");
+		String fireball = source("src/main/java/net/minecraft/client/renderer/entity/DragonFireballRenderer.java");
+		assertTrue(hand.contains("!submitNodeCollector.submitTranslucentTexturedQuadSemantic")
+			&& hand.contains("net.vulkanic.VulkanicAPI.isVulkanBackendSelected()"));
+		assertTrue(hook.contains("!rustBillboard && (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()")
+			&& hook.contains("if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()"));
+		assertTrue(fireball.contains("net.vulkanic.VulkanicAPI.isVulkanBackendSelected()"));
+	}
+
+	@Test
+	void selectedVulkanDisplayAndGuardianCallsitesCannotUseJavaCustomGeometryFallbacks() throws IOException {
+		String display = source("src/main/java/net/minecraft/client/renderer/entity/DisplayRenderer.java");
+		String guardian = source("src/main/java/net/minecraft/client/renderer/entity/GuardianRenderer.java");
+		assertTrue(display.contains("net.vulkanic.VulkanicAPI.isVulkanBackendSelected()")
+			&& display.contains("Rust whole-frame display-text route rejected semantic background quad"));
+		assertTrue(guardian.contains("net.vulkanic.VulkanicAPI.isVulkanBackendSelected()")
+			&& guardian.contains("Rust whole-frame Guardian beam route rejected semantic quads"));
+	}
+
+	@Test
+	void selectedVulkanTaczRendererCannotUseJavaCustomGunGeometryFallback() throws IOException {
+		String renderer = source("src/main/java/net/minecraft/client/renderer/special/TaczGlock17SpecialRenderer.java");
+		assertTrue(renderer.contains("VulkanicAPI.isVulkanBackendSelected()")
+			&& renderer.contains("&& !rustWholeFrame")
+			&& renderer.contains("Rust whole-frame TACZ route is unavailable; Java custom gun geometry is not a fallback"));
+		assertTrue(renderer.contains("Rust whole-frame TACZ attachment route is unavailable; Java custom gun geometry is not a fallback"));
+	}
+
+	@Test
+	void selectedVulkanCannotEnterJavaDebugRendererDispatcher() throws IOException {
+		String renderer = source("src/main/java/net/minecraft/client/renderer/debug/DebugRenderer.java");
+		int render = renderer.indexOf("public void render(");
+		int guard = renderer.indexOf("net.vulkanic.VulkanicAPI.isVulkanBackendSelected()", render);
+		int javaLoop = renderer.indexOf("for (DebugRenderer.SimpleDebugRenderer", render);
+		assertTrue(render >= 0 && guard > render && javaLoop > guard,
+			"selected Vulkan must reject the Java debug renderer dispatcher before child buffer emission");
+	}
+
+	@Test
+	void selectedVulkanEntityEffectsCannotUseJavaCustomGeometryFallbacks() throws IOException {
+		String lightning = source("src/main/java/net/minecraft/client/renderer/entity/LightningBoltRenderer.java");
+		String dragon = source("src/main/java/net/minecraft/client/renderer/entity/EnderDragonRenderer.java");
+		assertTrue(lightning.contains("boolean rustPresentation = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()"));
+		assertTrue(dragon.contains("boolean rustPresentation = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()"));
+		assertTrue(dragon.contains("Rust whole-frame End Dragon ray route is unavailable; Java custom geometry is not a fallback"));
+		assertTrue(dragon.contains("Rust whole-frame End Crystal beam route is unavailable; Java custom geometry is not a fallback"));
+	}
+
+	@Test
+	void semanticCollectorRejectsDisabledSelectedVulkanPrimitiveRoutes() throws IOException {
+		String collection = source("src/main/java/net/minecraft/client/renderer/SubmitNodeCollection.java");
+		assertTrue(collection.contains("Rust Vulkan textured-billboard route is unavailable; Java geometry is not a fallback"));
+		assertTrue(collection.contains("Rust Vulkan translucent-billboard route is unavailable; Java geometry is not a fallback"));
+		assertTrue(collection.contains("Rust Vulkan textured-quad route is unavailable; Java geometry is not a fallback"));
+		assertTrue(collection.contains("Rust Vulkan line route is unavailable; Java geometry is not a fallback"));
+		assertTrue(collection.contains("Rust Vulkan procedural-quad route is unavailable; Java geometry is not a fallback"));
+	}
+
+	@Test
+	void selectedVulkanCannotRetainJavaParticleCallbacks() throws IOException {
+		String collection = source("src/main/java/net/minecraft/client/renderer/SubmitNodeCollection.java");
+		int method = collection.indexOf("public void submitParticleGroup(");
+		int selectedGuard = collection.indexOf("VulkanicAPI.isVulkanBackendSelected()", method);
+		int javaRetention = collection.indexOf("this.particleGroupRenderers.add", method);
+		assertTrue(method >= 0 && selectedGuard > method && javaRetention > selectedGuard,
+			"selected Vulkan particle collection must reject before retaining Java callbacks");
+		assertTrue(collection.contains("Rust Vulkan particle route is unavailable; Java particle callbacks are not a fallback"));
+	}
+
+	@Test
+	void selectedVulkanCannotRetainJavaBlockModelSubmissions() throws IOException {
+		String collection = source("src/main/java/net/minecraft/client/renderer/SubmitNodeCollection.java");
+		int method = collection.indexOf("public void submitBlockModel(");
+		int selectedGuard = collection.indexOf("VulkanicAPI.isVulkanBackendSelected()", method);
+		int javaStorage = collection.indexOf("this.blockModelSubmits.add", method);
+		assertTrue(method >= 0 && selectedGuard > method && javaStorage > selectedGuard,
+			"selected Vulkan block-model collection must reject before Java submission storage");
+		assertTrue(collection.contains("Rust Vulkan block-model route is unavailable; Java block-model storage is not a fallback"));
+	}
+
+	@Test
+	void selectedVulkanCannotRetainJavaBlockFeatureSubmissions() throws IOException {
+		String collection = source("src/main/java/net/minecraft/client/renderer/SubmitNodeCollection.java");
+		assertMethodRejectsBeforeStorage(collection, "public void submitBlock(",
+			"Rust Vulkan block-display route is unavailable; Java block geometry is not a fallback");
+		assertMethodRejectsBeforeStorage(collection, "public void submitBlockDisplay(",
+			"Rust Vulkan block-display route is unavailable; Java block geometry is not a fallback");
+		assertMethodRejectsBeforeStorage(collection, "public void submitPrimedTntBlock(",
+			"Rust Vulkan primed-TNT route is unavailable; Java block geometry is not a fallback");
+	}
+
+	private static void assertMethodRejectsBeforeStorage(String source, String signature, String message) {
+		int method = source.indexOf(signature);
+		int selectedGuard = source.indexOf("VulkanicAPI.isVulkanBackendSelected()", method);
+		int javaStorage = source.indexOf("this.blockSubmits.add", method);
+		assertTrue(method >= 0 && selectedGuard > method && javaStorage > selectedGuard,
+			"selected Vulkan " + signature + " must reject before Java block storage");
+		assertTrue(source.contains(message));
+	}
+
+	@Test
+	void selectedVulkanCannotRetainJavaMovingBlockSubmissions() throws IOException {
+		String collection = source("src/main/java/net/minecraft/client/renderer/SubmitNodeCollection.java");
+		int method = collection.indexOf("public void submitMovingBlock(PoseStack poseStack, MovingBlockRenderState movingBlockRenderState, SubmitNodeStorage.MovingBlockSubmitSource source)");
+		int selectedGuard = collection.indexOf("VulkanicAPI.isVulkanBackendSelected()", method);
+		int javaStorage = collection.indexOf("this.movingBlockSubmits.add", method);
+		assertTrue(method >= 0 && selectedGuard > method && javaStorage > selectedGuard,
+			"selected Vulkan moving-block collection must reject before Java submission storage");
+		assertTrue(collection.contains("Rust Vulkan moving-block route is unavailable; Java moving-block geometry is not a fallback"));
+	}
 
     @Test
     void sourceCoverageCollectorAcknowledgesOnlyExistingRustProceduralFrontends() throws IOException {
@@ -1601,19 +2840,175 @@ class NativeMeshingProductionContractTest {
     }
 
     @Test
-    void lightningUsesBoundedSemanticProceduralQuads() throws IOException {
+    void enderDragonNeverFallsBackToJavaGeometryWhileRustOwnsPresentation() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/EnderDragonRenderer.java");
+        assertTrue(renderer.contains("Rust whole-frame End Dragon ray route is unavailable; Java custom geometry is not a fallback"));
+        assertTrue(renderer.contains("Rust whole-frame End Crystal beam route is unavailable; Java custom geometry is not a fallback"));
+    }
+
+    @Test
+    void remainingProceduralEntityCallsitesFenceDisabledRustRoutes() throws IOException {
+        String dragonFireball = source("src/main/java/net/minecraft/client/renderer/entity/DragonFireballRenderer.java");
+        String fishingHook = source("src/main/java/net/minecraft/client/renderer/entity/FishingHookRenderer.java");
+        String guardian = source("src/main/java/net/minecraft/client/renderer/entity/GuardianRenderer.java");
+        String lightning = source("src/main/java/net/minecraft/client/renderer/entity/LightningBoltRenderer.java");
+        String display = source("src/main/java/net/minecraft/client/renderer/entity/DisplayRenderer.java");
+        assertTrue(dragonFireball.contains("RustGalVulkanWholeFrameMode.enabled()"));
+        assertTrue(fishingHook.contains("RustGalVulkanWholeFrameMode.enabled()"));
+        assertTrue(guardian.contains("RustGalVulkanWholeFrameMode.enabled()"));
+        assertTrue(lightning.contains("Rust whole-frame lightning route is unavailable; Java custom geometry is not a fallback"));
+        assertTrue(display.contains("RustGalVulkanWholeFrameMode.enabled()"));
+    }
+
+    @Test
+    void alexsMobsBeamCallsitesCannotReopenJavaGeometryOnRustWholeFrame() throws IOException {
+        String echo = source("src/main/java/net/alexsmobs/client/render/RenderCachalotEcho.java");
+        String mungus = source("src/main/java/net/alexsmobs/client/render/layer/MungusBeamLayer.java");
+        assertTrue(echo.contains("Rust whole-frame Cachalot Echo route rejected semantic textured quad"));
+        assertTrue(mungus.contains("Rust whole-frame Mungus beam route rejected semantic textured quads"));
+        assertTrue(echo.contains("if (rustWholeFrame && !accepted)"));
+        assertTrue(mungus.contains("if (!accepted)"));
+    }
+
+    @Test
+    void disabledRustModelRoutesCannotReopenWindChargeOrSheepJavaGeometry() throws IOException {
+        String windCharge = source("src/main/java/net/minecraft/client/renderer/entity/WindChargeRenderer.java");
+        String sheep = source("src/main/java/net/minecraft/client/renderer/entity/layers/SheepWoolLayer.java");
+        assertTrue(windCharge.contains("Rust whole-frame wind-charge route is unavailable; Java model geometry is not a fallback"));
+        assertTrue(sheep.contains("Rust whole-frame sheep-wool outline route is unavailable; Java model geometry is not a fallback"));
+    }
+
+    @Test
+    void glowingSheepWoolUsesRustOutlineMetadataOnTheCopiedMaterialMesh() throws IOException {
+        String sheep = source("src/main/java/net/minecraft/client/renderer/entity/layers/SheepWoolLayer.java");
+        assertTrue(sheep.contains("RenderType.entityCutoutNoCull(SHEEP_WOOL_LOCATION)"));
+        assertTrue(sheep.contains("SHEEP_WOOL_LOCATION, ResourceLocation.withDefaultNamespace(\"sheep_wool\")"));
+        assertTrue(sheep.contains("sheepRenderState.outlineColor"));
+        assertTrue(!sheep.contains("RenderType.outline(SHEEP_WOOL_LOCATION),\n\t\t\t\t\t\t\tSHEEP_WOOL_LOCATION, ResourceLocation.withDefaultNamespace(\"sheep_wool_outline\")"),
+            "selected Rust sheep wool must not use the Java outline RenderType as its semantic material");
+    }
+
+    @Test
+    void glowingSlimeOuterUsesRustOutlineMetadataOnTheTranslucentMesh() throws IOException {
+        String slime = source("src/main/java/net/minecraft/client/renderer/entity/layers/SlimeOuterLayer.java");
+        assertTrue(slime.contains("RenderType.entityTranslucent(SlimeRenderer.SLIME_LOCATION)"));
+        assertTrue(slime.contains("ResourceLocation.withDefaultNamespace(\"slime_outer\")"));
+        assertTrue(slime.contains("slimeRenderState.outlineColor"));
+        assertTrue(!slime.contains("ResourceLocation.withDefaultNamespace(\"slime_outer_outline\")"),
+            "selected Rust slime outline must use the copied translucent material, not a Java outline texture identity");
+    }
+
+    @Test
+    void genericLivingRustOutlinesUseTheCopiedModelMaterial() throws IOException {
+        String living = source("src/main/java/net/minecraft/client/renderer/entity/LivingEntityRenderer.java");
+        assertTrue(living.contains("renderType.isOutline() && textureIdentity != null"));
+        assertTrue(living.contains("RenderType semanticOutlineMaterial = this.model.renderType(textureIdentity)"));
+        assertTrue(living.contains("!semanticOutlineMaterial.isOutline()"));
+        assertTrue(living.contains("livingEntityRenderState.outlineColor"),
+            "outline color must remain explicit instance metadata after material normalization");
+    }
+
+    @Test
+    void visibleGlowingSheepAndSlimeBodiesRemainRustOwned() throws IOException {
+        String world = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        int sheepStart = world.indexOf("public static boolean isVanillaSheepModelMeshEligible(");
+        int creeperStart = world.indexOf("public static boolean isVanillaCreeperModelMeshEligible(");
+        int slimeStart = world.indexOf("public static boolean isVanillaSlimeModelMeshEligible(");
+        int magmaStart = world.indexOf("public static boolean isVanillaMagmaCubeModelMeshEligible(");
+        assertTrue(sheepStart >= 0 && creeperStart > sheepStart && slimeStart > creeperStart && magmaStart > slimeStart);
+        String sheep = world.substring(sheepStart, creeperStart);
+        String slime = world.substring(slimeStart, magmaStart);
+        assertTrue(!sheep.contains("&& !glowing"),
+            "visible glowing sheep bodies must use outline metadata on the Rust mesh");
+        assertTrue(!slime.contains("&& !glowing"),
+            "visible glowing slime bodies must use outline metadata on the Rust mesh");
+        assertTrue(!world.contains("&& !glowing") && !world.contains("&& !translucentBody && !glowing"),
+            "copied living-model predicates must not reject visible glowing bodies before Rust submission");
+    }
+
+    @Test
+    void invisibleGlowingLivingBodiesUseRustOutlineOnlyMeshInstances() throws IOException {
+        String living = source("src/main/java/net/minecraft/client/renderer/entity/LivingEntityRenderer.java");
+        String world = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String bridge = source("src/main/java/net/vulkanic/bridge/VulkanicGalBridge.java");
+        assertTrue(living.contains("rustOutlineOnlyLivingBody")
+                && living.contains("enqueueStandaloneModelMeshOutlineOnly")
+                && living.contains("Rust whole-frame invisible-glowing living model has no semantic outline mesh"));
+        assertTrue(world.contains("WORLD_MESH_INSTANCE_FLAG_OUTLINE_ONLY")
+                && world.contains("Copies an invisible glowing living body solely for Rust's outline mask"));
+        assertTrue(bridge.contains("int flags") && bridge.contains("instance.flags()"),
+            "outline-only state must cross the explicit mesh-instance ABI");
+    }
+
+    @Test
+    void disabledRustEndPortalRouteCannotReopenJavaCubeGeometry() throws IOException {
+        String portal = source("src/main/java/net/minecraft/client/renderer/blockentity/AbstractEndPortalRenderer.java");
+        assertTrue(portal.contains("Rust whole-frame End Portal route is unavailable; Java custom geometry is not a fallback"));
+    }
+
+    @Test
+    void disabledRustPaintingRouteCannotReopenJavaGeometry() throws IOException {
+        String painting = source("src/main/java/net/minecraft/client/renderer/entity/PaintingRenderer.java");
+        assertTrue(painting.contains("Rust whole-frame painting route is unavailable; Java custom geometry is not a fallback"));
+    }
+
+    @Test
+    void rustLinePrimitiveAppliesItsFrameBoundBeforeAppendingPairs() throws IOException {
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        assertTrue(rust.contains("PENDING_SEGMENTS.size(), endpoints.length / 6, MAX_WORLD_LINE_SEGMENTS, \"line-segment\""));
+    }
+
+    @Test
+    void rustFirstPersonMeshQueueAppliesItsFrameBoundBeforeAppending() throws IOException {
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        assertTrue(rust.contains("PENDING_FIRST_PERSON_MESH_INSTANCES.size(), 1, MAX_RUST_WORLD_MESH_INSTANCES, \"first-person-mesh-instance\""));
+        assertTrue(rust.contains("PENDING_FIRST_PERSON_MESH_INSTANCES.size(), extractions.size()"));
+    }
+
+    @Test
+	void lightningUsesBoundedSemanticProceduralQuads() throws IOException {
         String renderer = source("src/main/java/net/minecraft/client/renderer/entity/LightningBoltRenderer.java");
         String ordered = source("src/main/java/net/minecraft/client/renderer/OrderedSubmitNodeCollector.java");
         String collector = source("src/main/java/net/minecraft/client/renderer/SubmitNodeCollection.java");
         String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
 
         assertTrue(renderer.contains("submitColoredQuads"));
-        assertTrue(renderer.contains("new float[56 * 12]"));
+		assertTrue(renderer.contains("SEMANTIC_LIGHTNING_QUADS = 4 * (8 + 3 + 3) * 4"));
+		assertTrue(renderer.contains("new float[SEMANTIC_LIGHTNING_QUADS * 12]"));
 		assertTrue(renderer.contains("Rust whole-frame lightning route rejected semantic quads"));
         assertTrue(ordered.contains("submitColoredQuads"));
         assertTrue(collector.contains("enqueueProceduralQuads"));
-        assertTrue(rust.contains("MATERIAL_TEXTURE_GENERATED_WHITE"));
-    }
+		assertTrue(rust.contains("MATERIAL_TEXTURE_GENERATED_WHITE"));
+	}
+
+	@Test
+	void completedRustFramesRecordProceduralQuadExecutionReceipts() throws IOException {
+		String coordinator = source("src/main/java/net/vulkanic/gui/RustGalFrameCoordinator.java");
+		String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+		String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+		assertTrue(coordinator.contains("recordWholeFrameProceduralQuadExecution"),
+			"completed Rust submissions must expose generic procedural-quad execution");
+		assertTrue(capture.contains("rustGalWorldProceduralQuadExecution"),
+			"capture metadata must persist the procedural execution receipt");
+		assertTrue(renderer.contains("quad.textureId() == MATERIAL_TEXTURE_GENERATED_WHITE")
+			&& renderer.contains("ProceduralQuadExecutionDiagnostic"),
+			"procedural receipts must identify the Rust-owned generated-white material path");
+	}
+
+	@Test
+	void evokerFangsDeterministicFixtureUsesVanillaImmediateAttackReplication() throws IOException {
+		String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+		assertTrue(capture.contains("new EvokerFangs(serverLevel, origin.x, origin.y - 1.0, origin.z")
+			&& capture.contains("Math.toRadians(player.getYRot()), 0, serverPlayer")
+			&& capture.contains("Math.toRadians(playerYaw), 1000, serverPlayer"),
+			"the deterministic fangs fixture must use vanilla immediate warmup and a long-lived retry");
+		assertTrue(capture.contains("serverLevel.broadcastEntityEvent(fangs, (byte)4)"),
+			"the fixture must replicate the short-lived vanilla attack event through the server level");
+		assertTrue(capture.contains("modelMeshSetupEvokerEventSent")
+			&& capture.contains("evoker_fangs_attack_activated_after_settled")
+			&& capture.contains("serverLevel.broadcastEntityEvent(fangs, (byte)4)"),
+			"the attack event must be activated only after settled replication is ready");
+	}
 
     @Test
     void dragonDeathRaysUseSemanticDegenerateQuadsOnRustRoute() throws IOException {
@@ -1676,12 +3071,12 @@ class NativeMeshingProductionContractTest {
         String mapRenderer = source("src/main/java/net/minecraft/client/renderer/MapRenderer.java");
         String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
         assertTrue(renderer.contains("mapBackgroundVertices"));
-        assertTrue(renderer.contains("submitTexturedQuad"));
+		assertTrue(renderer.contains("submitTranslucentTexturedQuadSemantic"));
         assertTrue(renderer.contains("mapRenderer.extractRenderState"));
         assertTrue(rust.contains("MATERIAL_TEXTURE_MAP_BACKGROUND"));
         assertTrue(rust.contains("MATERIAL_TEXTURE_MAP_CHECKERBOARD"));
         assertTrue(rust.contains("textures/map/map_background_checkerboard.png"));
-        assertTrue(mapRenderer.contains("submitTexturedQuad"));
+		assertTrue(mapRenderer.contains("submitTranslucentTexturedQuadSemantic"));
         assertTrue(mapRenderer.contains("textureAtlasSprite.atlasLocation()"));
         assertTrue(rust.contains("registerDynamicTextureAsset"));
         assertTrue(rust.contains("DynamicTexture"));
@@ -1697,6 +3092,36 @@ class NativeMeshingProductionContractTest {
         assertTrue(renderer.contains("textureAtlasSprite2.atlasLocation()"));
 		assertTrue(renderer.contains("Rust whole-frame painting route rejected semantic quads"));
     }
+
+	@Test
+    void paintingsPreflightTheCompleteRustQuadPayloadBeforeEnqueueing() throws IOException {
+		String renderer = source("src/main/java/net/minecraft/client/renderer/entity/PaintingRenderer.java");
+		assertTrue(renderer.contains("MAX_RUST_PAINTING_QUADS = 65_536"));
+		assertTrue(renderer.contains("long requiredQuads = 6L * width * height"));
+		assertTrue(renderer.contains("requiredQuads > MAX_RUST_PAINTING_QUADS"));
+		assertTrue(renderer.contains("partial Rust material work"));
+	}
+
+	@Test
+	void dynamicRustBillboardAssetsBoundAtlasPixelsAndEncodedPayloads() throws IOException {
+		String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+		String rust = source("src/main/rust/render/vulkanic/world_primitive_frontend.rs");
+		assertTrue(renderer.contains("MAX_DYNAMIC_WORLD_ASSET_PIXELS = 16L * 1024L * 1024L"));
+		assertTrue(renderer.contains("pixelCount > MAX_DYNAMIC_WORLD_ASSET_PIXELS"));
+		assertTrue(renderer.contains("snapshot.pixels().length != pixelCount * 4L"));
+		assertTrue(renderer.contains("payload.length > MAX_WORLD_MESH_TEXTURE_PNG_BYTES"));
+		assertTrue(rust.contains("MAX_DECODED_TEXTURE_PIXELS: u64 = 16 * 1024 * 1024"));
+		assertTrue(rust.contains("decoded pixel count {pixel_count} exceeds"));
+	}
+
+	@Test
+	void rustGuiImageAdmissionBoundsDecodedPixelsBeforeRetention() throws IOException {
+		String gui = source("src/main/rust/render/vulkanic/gui_frontend.rs");
+		assertTrue(gui.contains("GUI_MAX_RAW_IMAGE_PIXELS: usize = 16 * 1024 * 1024"));
+		assertTrue(gui.contains("raw GUI image {} has {pixel_count} pixels; maximum is"));
+		assertTrue(gui.contains("let header = reader.info()"));
+		assertTrue(gui.contains("header.width != sprite.width || header.height != sprite.height"));
+	}
 
 	@Test
     void rustOwnedWoolLayersFailClosedWhenCopiedMeshesAreUnavailable() throws IOException {
@@ -1722,7 +3147,8 @@ class NativeMeshingProductionContractTest {
     void rustEntityDispatchSkipsIrisTrackingButRetainsRustShadowSubmission() throws IOException {
         String dispatcher = source("src/main/java/net/minecraft/client/renderer/entity/EntityRenderDispatcher.java");
         assertTrue(dispatcher.contains("currentMaterialRoute().usesRustWholeFrameVulkan()"));
-        assertTrue(dispatcher.contains("submitInternal(entityRenderState, cameraRenderState, d, e, f, poseStack, submitNodeCollector, !rustWholeFrame)"));
+        assertTrue(dispatcher.contains("submitInternal(entityRenderState, cameraRenderState, d, e, f, poseStack, submitNodeCollector,")
+            && dispatcher.contains("!selectedVulkan && !rustWholeFrame"));
         assertTrue(dispatcher.contains("captureIrisRenderState\n\t\t\t\t\t?"));
     }
 
@@ -1747,7 +3173,8 @@ class NativeMeshingProductionContractTest {
     void rustBlockEntityDispatchSkipsIrisTracking() throws IOException {
         String dispatcher = source("src/main/java/net/minecraft/client/renderer/blockentity/BlockEntityRenderDispatcher.java");
         assertTrue(dispatcher.contains("currentMaterialRoute().usesRustWholeFrameVulkan()"));
-        assertTrue(dispatcher.contains("cameraRenderState, !rustWholeFrame"));
+        assertTrue(dispatcher.contains("cameraRenderState,")
+            && dispatcher.contains("!selectedVulkan && !rustWholeFrame"));
     }
 
     @Test
@@ -1756,7 +3183,8 @@ class NativeMeshingProductionContractTest {
         String gateway = source("src/main/java/net/minecraft/client/renderer/blockentity/TheEndGatewayRenderer.java");
         assertTrue(portal.contains("rustWholeFrame"));
         assertTrue(portal.contains("currentMaterialRoute().usesRustWholeFrameVulkan()"));
-        assertTrue(gateway.contains("currentMaterialRoute().usesRustWholeFrameVulkan()"));
+        assertTrue(gateway.contains("super.submit(endGatewayRenderState")
+            && portal.contains("currentMaterialRoute().usesRustWholeFrameVulkan()"));
     }
 
     @Test
@@ -1848,7 +3276,9 @@ class NativeMeshingProductionContractTest {
         assertTrue(level.contains("Rust owns the outline mask, intermediate targets, and post effect"));
         assertTrue(level.contains("A route switch can occur after resource reload"));
         assertTrue(level.contains("!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() && this.entityOutlineTarget != null"));
-        assertTrue(level.contains("!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()\n\t\t\t&& this.levelRenderState.haveGlowingEntities && postChain2 != null"));
+        assertTrue(level.contains("!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()")
+            && level.contains("!net.vulkanic.VulkanicAPI.isVulkanBackendSelected()")
+            && level.contains("this.levelRenderState.haveGlowingEntities"));
         assertTrue(level.contains("RustGalVulkanWholeFrameMode.enabled() || this.entityOutlineTarget != null"));
     }
 
@@ -1861,6 +3291,13 @@ class NativeMeshingProductionContractTest {
         assertTrue(guiRenderer.contains("recordUnsupportedElement(\"tiled-blit\")"));
         assertTrue(guiRenderer.contains("recordUnsupportedElement(\"rectangle\")"));
         assertTrue(rustGui.contains("unsupported-element="));
+    }
+
+    @Test
+    void guiUnsupportedAdmissionDiagnosticsAreBoundedPerFrame() throws IOException {
+        String rustGui = source("src/main/java/net/vulkanic/gui/RustGalGuiRenderer.java");
+        assertTrue(rustGui.contains("MAX_GUI_UNSUPPORTED_ELEMENTS = 4_096"));
+        assertTrue(rustGui.contains("wholeFrameUnsupportedElementCount < MAX_GUI_UNSUPPORTED_ELEMENTS"));
     }
 
     @Test

@@ -46,9 +46,26 @@ class GuiItemMeshSemanticCollectorTest {
 			"src/main/java/net/vulkanic/gui/GuiItemMeshSemanticCollector.java"
 		));
 		assertTrue(source.contains("MaterialMode.GLINT"));
-		assertTrue(source.contains("RustGalGuiRawImageAssets.stage(glint)"));
+		assertTrue(source.contains("List<RustGalGuiRawImageAssets.Asset> assets"),
+			"the collector must return copied assets for post-admission staging");
+		assertTrue(source.contains("resolveAssetId(quad.assetId())"),
+			"mesh staging must preserve the exact copied asset identity, including animated frames");
 		assertTrue(source.contains("ENCHANTED_GLINT_ITEM"));
 		assertTrue(source.contains("specialFoilQuad"));
+	}
+
+	@Test
+	void dynamicItemFallbackPreparesWithoutPublishingBeforeAdmission() throws Exception {
+		String collector = java.nio.file.Files.readString(java.nio.file.Path.of(
+			"src/main/java/net/vulkanic/gui/GuiItemMeshSemanticCollector.java"));
+		int fallback = collector.indexOf("instanceof net.minecraft.client.renderer.texture.DynamicTexture dynamic");
+		assertTrue(fallback >= 0);
+		assertTrue(collector.indexOf("registerDynamicTextureUnstaged(spriteIdentity, dynamic)", fallback) > fallback,
+			"item collection must bind dynamic sources without publishing frame pixels");
+		assertTrue(collector.indexOf("prepareDynamicTexture(dynamic)", fallback) > fallback,
+			"item collection must privately prepare dynamic pixels before mesh admission");
+		assertTrue(collector.indexOf("registerDynamicTexture(spriteIdentity, dynamic)", fallback) < 0,
+			"item collection must not use the publishing lifecycle API");
 	}
 
 	@Test
@@ -118,7 +135,7 @@ class GuiItemMeshSemanticCollectorTest {
 		float[] guiPose = new float[] {1.0F, 0.0F, 0.0F, 1.0F, 4.0F, 8.0F};
 		float[] offscreen = identityMatrix();
 		GuiItemMeshSemanticCollector.GuiItemMesh mesh = new GuiItemMeshSemanticCollector.GuiItemMesh(
-			"minecraft:stone", 4, 8, 4, 8, 20, 24, guiPose, 34, 34, 1, offscreen, List.of()
+			"minecraft:stone", 4, 8, 4, 8, 20, 24, guiPose, 34, 34, 1, offscreen, List.of(), List.of()
 		);
 		guiPose[0] = 7.0F;
 		offscreen[5] = 9.0F;
@@ -128,7 +145,7 @@ class GuiItemMeshSemanticCollectorTest {
 		assertArrayEquals(new float[] {1.0F, 0.0F, 0.0F, 1.0F, 4.0F, 8.0F}, mesh.guiPose());
 		assertArrayEquals(identityMatrix(), mesh.offscreenModelTransform());
 		assertThrows(IllegalArgumentException.class, () -> new GuiItemMeshSemanticCollector.GuiItemMesh(
-			"minecraft:stone", 0, 0, 0, 0, 16, 16, new float[6], 2, 2, 1, identityMatrix(), List.of()
+			"minecraft:stone", 0, 0, 0, 0, 16, 16, new float[6], 2, 2, 1, identityMatrix(), List.of(), List.of()
 		));
 	}
 

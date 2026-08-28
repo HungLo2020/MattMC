@@ -8,6 +8,7 @@ import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.ShapeRenderer;
 import net.minecraft.client.renderer.culling.Frustum;
+import net.minecraft.client.Camera;
 import net.minecraft.util.debug.DebugStructureInfo;
 import net.minecraft.util.debug.DebugSubscriptions;
 import net.minecraft.util.debug.DebugValueAccess;
@@ -32,6 +33,52 @@ public class StructureRenderer implements DebugRenderer.SimpleDebugRenderer {
 				}
 			}
 		});
+	}
+
+	/** Copies structure and piece boxes into Rust's explicit debug-line stream. */
+	public void collectRustSemantics(Camera camera) {
+		if (!net.vulkanic.world.WorldRenderRoutePolicy.currentDebugLineRoute().usesRustWholeFrameVulkan()) {
+			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+				throw new IllegalStateException("Rust whole-frame structure-debug route is unavailable; Java debug geometry is not a fallback");
+			}
+			return;
+		}
+		if (camera == null || !camera.isInitialized()) return;
+		DebugValueAccess access = net.minecraft.client.Minecraft.getInstance().getConnection().createDebugValueAccess();
+		org.joml.Matrix4f transform = new org.joml.Matrix4f().translate(
+			(float)-camera.getPosition().x, (float)-camera.getPosition().y, (float)-camera.getPosition().z
+		);
+		access.forEachChunk(DebugSubscriptions.STRUCTURES, (chunkPos, structures) -> {
+			for (DebugStructureInfo structure : structures) {
+				if (!enqueueBox(transform, structure.boundingBox(), 0xFFFFFFFF)) {
+					throw new IllegalStateException("Rust whole-frame structure-debug route rejected structure box");
+				}
+				for (Piece piece : structure.pieces()) {
+					int color = piece.isStart() ? 0xFF00FF00 : 0xFF0000FF;
+					if (!enqueueBox(transform, piece.boundingBox(), color)) {
+						throw new IllegalStateException("Rust whole-frame structure-debug route rejected piece box");
+					}
+				}
+			}
+		});
+	}
+
+	private static boolean enqueueBox(org.joml.Matrix4f transform, BoundingBox box, int color) {
+		return net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueDebugLineSegments(transform,
+			new float[] {
+				box.minX(), box.minY(), box.minZ(), box.maxX() + 1.0F, box.minY(), box.minZ(),
+				box.maxX() + 1.0F, box.minY(), box.minZ(), box.maxX() + 1.0F, box.minY(), box.maxZ() + 1.0F,
+				box.maxX() + 1.0F, box.minY(), box.maxZ() + 1.0F, box.minX(), box.minY(), box.maxZ() + 1.0F,
+				box.minX(), box.minY(), box.maxZ() + 1.0F, box.minX(), box.minY(), box.minZ(),
+				box.minX(), box.maxY() + 1.0F, box.minZ(), box.maxX() + 1.0F, box.maxY() + 1.0F, box.minZ(),
+				box.maxX() + 1.0F, box.maxY() + 1.0F, box.minZ(), box.maxX() + 1.0F, box.maxY() + 1.0F, box.maxZ() + 1.0F,
+				box.maxX() + 1.0F, box.maxY() + 1.0F, box.maxZ() + 1.0F, box.minX(), box.maxY() + 1.0F, box.maxZ() + 1.0F,
+				box.minX(), box.maxY() + 1.0F, box.maxZ() + 1.0F, box.minX(), box.maxY() + 1.0F, box.minZ(),
+				box.minX(), box.minY(), box.minZ(), box.minX(), box.maxY() + 1.0F, box.minZ(),
+				box.maxX() + 1.0F, box.minY(), box.minZ(), box.maxX() + 1.0F, box.maxY() + 1.0F, box.minZ(),
+				box.maxX() + 1.0F, box.minY(), box.maxZ() + 1.0F, box.maxX() + 1.0F, box.maxY() + 1.0F, box.maxZ() + 1.0F,
+				box.minX(), box.minY(), box.maxZ() + 1.0F, box.minX(), box.maxY() + 1.0F, box.maxZ() + 1.0F
+			}, color, 1.0F);
 	}
 
 	private static void renderBox(

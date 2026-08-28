@@ -109,7 +109,11 @@ public class TextureAtlas extends AbstractTexture {
 
         VoxelConstants.getLogger().info("Created: {}x{} {}-atlas", new Object[] { this.stitcher.getCurrentImageWidth(), this.stitcher.getCurrentImageHeight(), this.basePath });
 
-        if (RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+			this.finishSemanticStitch();
+			return;
+		}
+		if (RustGalVulkanWholeFrameMode.enabled()) {
             this.finishSemanticStitch();
             return;
         }
@@ -164,7 +168,11 @@ public class TextureAtlas extends AbstractTexture {
 
         this.stitcher.doStitchNew();
 
-        if (RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+			this.finishSemanticStitch();
+			return;
+		}
+		if (RustGalVulkanWholeFrameMode.enabled()) {
             this.finishSemanticStitch();
             return;
         }
@@ -381,5 +389,10 @@ public class TextureAtlas extends AbstractTexture {
 
     public ResourceLocation getResourceLocation() {
         return resourceLocation;
+    }
+
+    /** CPU-owned atlas snapshot for semantic world consumers; never a GPU handle. */
+    public DynamicTexture semanticTexture() {
+        return semanticTexture;
     }
 }

@@ -105,7 +105,7 @@ public class ShulkerBoxRenderer implements BlockEntityRenderer<ShulkerBoxBlockEn
 	) {
 		poseStack.pushPose();
 		this.prepareModel(poseStack, direction, f);
-		submitNodeCollector.submitModel(
+		submitNodeCollector.submitModelSemantic(
 			this.model, f, poseStack, material.renderType(this.model::renderType), i, j, -1, this.materials.get(material), k, crumblingOverlay
 		);
 		poseStack.popPose();

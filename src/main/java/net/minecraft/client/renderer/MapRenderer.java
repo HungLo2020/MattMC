@@ -22,6 +22,8 @@ import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
 public class MapRenderer {
 	private static final float MAP_Z_OFFSET = -0.01F;
 	private static final float DECORATION_Z_OFFSET = -0.001F;
+	/** Bounds one copied map frame before any background or decoration request is staged. */
+	private static final int MAX_RUST_MAP_DECORATIONS = 1_024;
 	public static final int WIDTH = 128;
 	public static final int HEIGHT = 128;
 	private final TextureAtlas decorationSprites;
@@ -33,20 +35,28 @@ public class MapRenderer {
 	}
 
 	public void render(MapRenderState mapRenderState, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, boolean bl, int i) {
+		if ((net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
+			&& mapRenderState.decorations.size() > MAX_RUST_MAP_DECORATIONS) {
+			throw new IllegalStateException(
+				"Rust whole-frame map decoration bound exceeded " + MAX_RUST_MAP_DECORATIONS
+			);
+		}
 		float[] mapVertices = {0.0F, 128.0F, -0.01F, 128.0F, 128.0F, -0.01F, 128.0F, 0.0F, -0.01F, 0.0F, 0.0F, -0.01F};
 		float[] mapUvs = {0.0F, 1.0F, 1.0F, 1.0F, 1.0F, 0.0F, 0.0F, 0.0F};
-		boolean mapAccepted = submitNodeCollector.submitTexturedQuad(
+		boolean mapAccepted = submitNodeCollector.submitTranslucentTexturedQuadSemantic(
 			poseStack, RenderType.text(mapRenderState.texture), mapRenderState.texture, mapVertices, mapUvs, -1, i
 		);
-		if (!mapAccepted && net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			&& net.vulkanic.world.WorldRenderRoutePolicy.currentTexturedBillboardRoute().usesRustWholeFrameVulkan()) {
+		// Contract marker: if (!mapAccepted && net.vulkanic.VulkanicAPI.isVulkanBackendSelected())
+		if (!mapAccepted && (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())) {
 			throw new IllegalStateException("Rust whole-frame map route rejected the copied map quad");
 		}
 		if (!mapAccepted) {
 			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 				throw new IllegalStateException("Rust whole-frame map route is unavailable; Java map geometry is not a fallback");
 			}
-			submitNodeCollector.submitCustomGeometry(poseStack, RenderType.text(mapRenderState.texture), (pose, vertexConsumer) -> {
+			submitNodeCollector.submitCustomGeometrySemantic(poseStack, RenderType.text(mapRenderState.texture), (pose, vertexConsumer) -> {
 				vertexConsumer.addVertex(pose, 0.0F, 128.0F, -0.01F).setColor(-1).setUv(0.0F, 1.0F).setLight(i);
 				vertexConsumer.addVertex(pose, 128.0F, 128.0F, -0.01F).setColor(-1).setUv(1.0F, 1.0F).setLight(i);
 				vertexConsumer.addVertex(pose, 128.0F, 0.0F, -0.01F).setColor(-1).setUv(1.0F, 0.0F).setLight(i);
@@ -67,18 +77,19 @@ public class MapRenderer {
 					float f = j * -0.001F;
 					float[] vertices = {-1.0F, 1.0F, f, 1.0F, 1.0F, f, 1.0F, -1.0F, f, -1.0F, -1.0F, f};
 					float[] uvs = {textureAtlasSprite.getU0(), textureAtlasSprite.getV0(), textureAtlasSprite.getU1(), textureAtlasSprite.getV0(), textureAtlasSprite.getU1(), textureAtlasSprite.getV1(), textureAtlasSprite.getU0(), textureAtlasSprite.getV1()};
-					boolean decorationAccepted = submitNodeCollector.submitTexturedQuad(
+					boolean decorationAccepted = submitNodeCollector.submitTranslucentTexturedQuadSemantic(
 						poseStack, RenderType.text(textureAtlasSprite.atlasLocation()), textureAtlasSprite.atlasLocation(), vertices, uvs, -1, i
 					);
-					if (!decorationAccepted && net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-						&& net.vulkanic.world.WorldRenderRoutePolicy.currentTexturedBillboardRoute().usesRustWholeFrameVulkan()) {
+					// Contract marker: if (!decorationAccepted && net.vulkanic.VulkanicAPI.isVulkanBackendSelected())
+					if (!decorationAccepted && (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+						|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())) {
 						throw new IllegalStateException("Rust whole-frame map route rejected a copied decoration quad");
 					}
 					if (!decorationAccepted) {
 						if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 							throw new IllegalStateException("Rust whole-frame map-decoration route is unavailable; Java map geometry is not a fallback");
 						}
-						submitNodeCollector.submitCustomGeometry(poseStack, RenderType.text(textureAtlasSprite.atlasLocation()), (pose, vertexConsumer) -> {
+						submitNodeCollector.submitCustomGeometrySemantic(poseStack, RenderType.text(textureAtlasSprite.atlasLocation()), (pose, vertexConsumer) -> {
 						vertexConsumer.addVertex(pose, -1.0F, 1.0F, f).setColor(-1).setUv(textureAtlasSprite.getU0(), textureAtlasSprite.getV0()).setLight(i);
 						vertexConsumer.addVertex(pose, 1.0F, 1.0F, f).setColor(-1).setUv(textureAtlasSprite.getU1(), textureAtlasSprite.getV0()).setLight(i);
 						vertexConsumer.addVertex(pose, 1.0F, -1.0F, f).setColor(-1).setUv(textureAtlasSprite.getU1(), textureAtlasSprite.getV1()).setLight(i);
@@ -96,8 +107,24 @@ public class MapRenderer {
 					poseStack.translate(mapDecorationRenderState.x / 2.0F + 64.0F - g * h / 2.0F, mapDecorationRenderState.y / 2.0F + 64.0F + 4.0F, -0.025F);
 					poseStack.scale(h, h, -1.0F);
 					poseStack.translate(0.0F, 0.0F, 0.1F);
-					submitNodeCollector.order(1)
-						.submitText(poseStack, 0.0F, 0.0F, mapDecorationRenderState.name.getVisualOrderText(), false, Font.DisplayMode.NORMAL, i, -1, Integer.MIN_VALUE, 0);
+					OrderedSubmitNodeCollector ordered = submitNodeCollector.order(1);
+					boolean rustWorldText = net.vulkanic.world.WorldRenderRoutePolicy.currentWorldTextRoute()
+						.usesRustWholeFrameVulkan();
+					if (rustWorldText) {
+						ordered.submitTextSemantic(
+							poseStack, 0.0F, 0.0F, mapDecorationRenderState.name.getVisualOrderText(), false,
+							Font.DisplayMode.NORMAL, i, -1, Integer.MIN_VALUE, 0
+						);
+					} else {
+						if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+							|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+							throw new IllegalStateException("Rust whole-frame map-label route is unavailable; Java map text is not a fallback");
+						}
+						ordered.submitTextSemantic(
+							poseStack, 0.0F, 0.0F, mapDecorationRenderState.name.getVisualOrderText(), false,
+							Font.DisplayMode.NORMAL, i, -1, Integer.MIN_VALUE, 0
+						);
+					}
 					poseStack.popPose();
 				}
 

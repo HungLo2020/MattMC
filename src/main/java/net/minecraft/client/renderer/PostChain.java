@@ -54,6 +54,14 @@ public class PostChain implements AutoCloseable {
 		ResourceLocation resourceLocation,
 		CachedOrthoProjectionMatrixBuffer cachedOrthoProjectionMatrixBuffer
 	) throws ShaderManager.CompilationException {
+		// Keep direct callers fail-closed as well as ShaderManager: constructing a
+		// PostChain resolves resource-pack textures and Java pipeline metadata before
+		// any pass is admitted. The Rust whole-frame route must receive only the
+		// semantic post-effect identity and its copied shader sources.
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java post-chain construction is unavailable while Rust owns the selected Vulkan route");
+		}
 		Stream<ResourceLocation> stream = postChainConfig.passes().stream().flatMap(PostChainConfig.Pass::referencedTargets);
 		Set<ResourceLocation> set2 = (Set<ResourceLocation>)stream.filter(resourceLocationx -> !postChainConfig.internalTargets().containsKey(resourceLocationx))
 			.collect(Collectors.toSet());
@@ -113,6 +121,9 @@ public class PostChain implements AutoCloseable {
 		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			throw new IllegalStateException("Java post-chain admission is unavailable while Rust owns whole-frame presentation");
 		}
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+			throw new IllegalStateException("Java Vulkan post-chain admission is unavailable until the Rust whole-frame route is admitted");
+		}
 		GpuBufferSlice gpuBufferSlice = this.projectionMatrixBuffer.getBuffer(i, j);
 		Map<ResourceLocation, ResourceHandle<RenderTarget>> map = new HashMap(this.internalTargets.size() + this.externalTargets.size());
 
@@ -147,6 +158,9 @@ public class PostChain implements AutoCloseable {
 	public void process(RenderTarget renderTarget, GraphicsResourceAllocator graphicsResourceAllocator) {
 		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			throw new IllegalStateException("Java post-chain processing is unavailable while Rust owns whole-frame presentation");
+		}
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+			throw new IllegalStateException("Java Vulkan post-chain processing is unavailable until the Rust whole-frame route is admitted");
 		}
 		FrameGraphBuilder frameGraphBuilder = new FrameGraphBuilder();
 		PostChain.TargetBundle targetBundle = PostChain.TargetBundle.of(MAIN_TARGET_ID, frameGraphBuilder.importExternal("main", renderTarget));

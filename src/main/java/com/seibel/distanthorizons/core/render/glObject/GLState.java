@@ -72,7 +72,7 @@ public class GLState
 
 	public void saveState(CommandContext ctx)
 	{
-		if (VulkanicAPI.isVulkanBackendInitializedAndSelected()
+		if (VulkanicAPI.isVulkanBackendSelected()
 			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			throw new IllegalStateException(
 				"Java Distant Horizons GL state is unavailable while Rust owns whole-frame presentation");

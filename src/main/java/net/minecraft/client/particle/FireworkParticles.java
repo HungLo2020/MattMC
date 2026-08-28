@@ -127,7 +127,8 @@ public class FireworkParticles {
 		// Iris: April Fools override - use TERRAIN layer when IS_FOOL is enabled
 		@Override
 		public Layer getLayer() {
-			return !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			return !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+				&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
 				&& net.irisshaders.iris.Iris.IS_FOOL ? Layer.TERRAIN : Layer.OPAQUE;
 		}
 	}

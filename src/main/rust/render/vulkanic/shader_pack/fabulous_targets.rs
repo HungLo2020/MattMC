@@ -5,9 +5,14 @@
 //! must still route semantic draws and lower the validated post-effect before
 //! these resources can make transparency available.
 
+use std::collections::BTreeSet;
+
 use super::super::gal::VulkanicGal;
 use super::super::handles::Handle;
-use super::super::commands::{CommandOp, ResourceBarrier, TextureUsageState};
+use super::super::commands::{
+    AttachmentLoadOp, AttachmentStoreOp, ClearColor, CommandOp, PassAttachment, ResourceBarrier,
+    TextureImageCopyRegion, TextureOrigin3d, TextureUsageState,
+};
 use super::super::resources::{
     AccessFlags, BufferDesc, BufferUsage, CombinedTextureSamplerDesc, Extent3d,
     MemoryDomain, PipelineStageFlags, ResourceBinding, ResourceBindingDesc, ResourceBindingKind,
@@ -41,7 +46,8 @@ impl FabulousTargetRole {
     pub(crate) const fn for_material_source(source_program: u32) -> Option<Self> {
         match source_program {
             super::super::world_primitive_frontend::WORLD_MATERIAL_SOURCE_UNSPECIFIED
-            | super::super::world_primitive_frontend::WORLD_MATERIAL_SOURCE_TEXTURED => {
+            | super::super::world_primitive_frontend::WORLD_MATERIAL_SOURCE_TEXTURED
+            | super::super::world_primitive_frontend::WORLD_MATERIAL_SOURCE_ENTITY_MODEL => {
                 Some(Self::Translucent)
             }
             super::super::world_primitive_frontend::WORLD_MATERIAL_SOURCE_PARTICLES => {
@@ -567,7 +573,12 @@ impl FabulousAttachmentResources {
                 extent,
                 mip_levels: 1,
                 array_layers: 1,
-                usages: vec![TextureUsage::DepthStencilAttachment, TextureUsage::Sampled],
+                usages: vec![
+                    TextureUsage::DepthStencilAttachment,
+                    TextureUsage::Sampled,
+                    TextureUsage::TransferSrc,
+                    TextureUsage::TransferDst,
+                ],
             })?;
             created.push(depth_texture);
             let depth_view = gal.create_texture_view(TextureViewDesc {
@@ -651,6 +662,8 @@ pub(crate) struct FabulousAttachmentSet {
     pub(crate) particles: FabulousAttachmentResources,
     pub(crate) clouds: FabulousAttachmentResources,
     pub(crate) weather: FabulousAttachmentResources,
+    pub(crate) translucent_color_format: TextureFormat,
+    pub(crate) external_color_format: TextureFormat,
     /// Private first-person optical target. It is not part of the shader-pack
     /// external inventory and is only consumed once a semantic optical plan
     /// is admitted by the hand frontend.
@@ -662,6 +675,31 @@ impl FabulousAttachmentSet {
         gal: &mut VulkanicGal,
         extent: Extent3d,
         color_format: TextureFormat,
+    ) -> GalResult<Self> {
+        Self::create_with_external_formats(gal, extent, color_format, color_format, color_format)
+    }
+
+    pub(crate) fn create_with_translucent_format(
+        gal: &mut VulkanicGal,
+        extent: Extent3d,
+        color_format: TextureFormat,
+        translucent_color_format: TextureFormat,
+    ) -> GalResult<Self> {
+        Self::create_with_external_formats(
+            gal,
+            extent,
+            color_format,
+            translucent_color_format,
+            translucent_color_format,
+        )
+    }
+
+    pub(crate) fn create_with_external_formats(
+        gal: &mut VulkanicGal,
+        extent: Extent3d,
+        color_format: TextureFormat,
+        translucent_color_format: TextureFormat,
+        external_color_format: TextureFormat,
     ) -> GalResult<Self> {
         let mut created = Vec::new();
         let result = (|| -> GalResult<Self> {
@@ -680,9 +718,24 @@ impl FabulousAttachmentSet {
                 true,
             )?;
             created.extend(main.handles_in_destroy_order());
-            let mut create = |role| FabulousAttachmentResources::create(gal, role, extent, color_format);
-            let translucent = create("minecraft:translucent")?;
+            // The normal deferred terrain capture is an explicit RGBA8
+            // attachment. Keep the Fabulous translucent role in that same
+            // format so its transfer copy remains format-valid even when
+            // the acquired Vulkan swapchain is BGRA8. The main/final roles
+            // continue to use the acquired target format and are composed
+            // through the declared fullscreen blit pipeline.
+            let translucent = FabulousAttachmentResources::create_with_depth_format(
+                gal,
+                "minecraft:translucent",
+                extent,
+                translucent_color_format,
+                FABULOUS_DEPTH_FORMAT,
+                translucent_color_format == TextureFormat::Rgba8Unorm,
+            )?;
             created.extend(translucent.handles_in_destroy_order());
+            let mut create = |role| {
+                FabulousAttachmentResources::create(gal, role, extent, external_color_format)
+            };
             let item_entity = create("minecraft:item_entity")?;
             created.extend(item_entity.handles_in_destroy_order());
             let particles = create("minecraft:particles")?;
@@ -711,6 +764,8 @@ impl FabulousAttachmentSet {
                 clouds,
                 weather,
                 optical_hand,
+                translucent_color_format,
+                external_color_format,
             };
             let bindings = FabulousTransparencyBindings::create(gal, &provisional)?;
             let pipelines = FabulousTransparencyPipelines::create(gal, &bindings, color_format)?;
@@ -727,10 +782,13 @@ impl FabulousAttachmentSet {
     pub(crate) fn external_inventory(&self) -> FabulousExternalTargetInventory {
         fn binding(resource: &FabulousAttachmentResources) -> VanillaPostEffectExternalTargetBinding {
             VanillaPostEffectExternalTargetBinding {
+                render_pass: resource.render_pass,
                 render_target: resource.render_target,
                 color_attachment: resource.color_view,
                 depth_attachment: Some(resource.depth_view),
                 sampler: resource.sampler,
+                color_usage: TextureUsageState::ShaderRead,
+                depth_usage: Some(TextureUsageState::ShaderRead),
             }
         }
         FabulousExternalTargetInventory {
@@ -1003,6 +1061,397 @@ impl FabulousAttachmentSet {
         operations
     }
 
+    /// Copies the isolated normal-deferred translucent capture into the
+    /// Rust-owned Fabulous translucent attachment.  The source is a semantic
+    /// GAL texture; no native image or Java/Iris target is accepted.  This is
+    /// deliberately color-only until the terrain depth handoff has an
+    /// explicit depth-transfer contract.
+    pub(crate) fn append_translucent_capture_copy(
+        &self,
+        ops: &mut Vec<CommandOp>,
+        source_texture: Handle,
+        extent: Extent3d,
+        source_before: TextureUsageState,
+        destination_before: TextureUsageState,
+    ) -> GalResult<()> {
+        if extent.width == 0 || extent.height == 0 || extent.depth != 1 {
+            return Err(GalError::invalid_argument(
+                "Fabulous translucent capture copy requires a non-zero 2D extent",
+            ));
+        }
+        ops.push(CommandOp::Barrier(ResourceBarrier {
+            resource: source_texture,
+            subresources: None,
+            before: source_before,
+            after: TextureUsageState::TransferSrc,
+            src_queue: super::super::resources::QueueClass::Graphics,
+            dst_queue: super::super::resources::QueueClass::Transfer,
+        }));
+        ops.push(CommandOp::Barrier(ResourceBarrier {
+            resource: self.translucent.color_texture,
+            subresources: None,
+            before: destination_before,
+            after: TextureUsageState::TransferDst,
+            src_queue: super::super::resources::QueueClass::Graphics,
+            dst_queue: super::super::resources::QueueClass::Transfer,
+        }));
+        ops.push(CommandOp::CopyTexture(TextureImageCopyRegion {
+            src_texture: source_texture,
+            src_mip: 0,
+            src_layer: 0,
+            src_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
+            dst_texture: self.translucent.color_texture,
+            dst_mip: 0,
+            dst_layer: 0,
+            dst_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
+            extent,
+        }));
+        ops.push(CommandOp::Barrier(ResourceBarrier {
+            resource: source_texture,
+            subresources: None,
+            before: TextureUsageState::TransferSrc,
+            after: TextureUsageState::ShaderRead,
+            src_queue: super::super::resources::QueueClass::Transfer,
+            dst_queue: super::super::resources::QueueClass::Graphics,
+        }));
+        ops.push(CommandOp::Barrier(ResourceBarrier {
+            resource: self.translucent.color_texture,
+            subresources: None,
+            before: TextureUsageState::TransferDst,
+            after: TextureUsageState::ShaderRead,
+            src_queue: super::super::resources::QueueClass::Transfer,
+            dst_queue: super::super::resources::QueueClass::Graphics,
+        }));
+        Ok(())
+    }
+
+    /// Copies the normal graph's acquired frame image into the private
+    /// Fabulous main sampler before the bundled transparency pass. The frame
+    /// target remains opaque to the frontend; only the semantic GAL copy
+    /// operation crosses this boundary.
+    pub(crate) fn append_frame_target_to_main_copy(
+        &self,
+        ops: &mut Vec<CommandOp>,
+        frame_target: Handle,
+        extent: Extent3d,
+        destination_before: TextureUsageState,
+    ) -> GalResult<()> {
+        if extent.width == 0 || extent.height == 0 || extent.depth != 1 {
+            return Err(GalError::invalid_argument(
+                "Fabulous main capture copy requires a non-zero 2D extent",
+            ));
+        }
+        ops.push(CommandOp::Barrier(ResourceBarrier {
+            resource: self.main.color_texture,
+            subresources: None,
+            before: destination_before,
+            after: TextureUsageState::TransferDst,
+            src_queue: super::super::resources::QueueClass::Graphics,
+            dst_queue: super::super::resources::QueueClass::Transfer,
+        }));
+        ops.push(CommandOp::CopyFrameTargetToTexture {
+            src: frame_target,
+            dst: self.main.color_texture,
+            extent,
+        });
+        ops.push(CommandOp::Barrier(ResourceBarrier {
+            resource: self.main.color_texture,
+            subresources: None,
+            before: TextureUsageState::TransferDst,
+            after: TextureUsageState::ShaderRead,
+            src_queue: super::super::resources::QueueClass::Transfer,
+            dst_queue: super::super::resources::QueueClass::Graphics,
+        }));
+        Ok(())
+    }
+
+    /// Copies a Rust-owned depth domain into a Fabulous attachment.  The
+    /// bundled transparency shader samples every declared depth role, so the
+    /// terrain handoff must preserve the exact G-buffer depth rather than
+    /// inventing a second or borrowed depth source.
+    pub(crate) fn append_depth_capture_copy(
+        &self,
+        ops: &mut Vec<CommandOp>,
+        source_texture: Handle,
+        destination: FabulousTargetRole,
+        extent: Extent3d,
+        source_before: TextureUsageState,
+        destination_before: TextureUsageState,
+    ) -> GalResult<()> {
+        if extent.width == 0 || extent.height == 0 || extent.depth != 1 {
+            return Err(GalError::invalid_argument(
+                "Fabulous depth capture copy requires a non-zero 2D extent",
+            ));
+        }
+        let attachment = match destination {
+            FabulousTargetRole::Main => &self.main,
+            FabulousTargetRole::Translucent => &self.translucent,
+            FabulousTargetRole::ItemEntity => &self.item_entity,
+            FabulousTargetRole::Particles => &self.particles,
+            FabulousTargetRole::Clouds => &self.clouds,
+            FabulousTargetRole::Weather => &self.weather,
+        };
+        ops.push(CommandOp::Barrier(ResourceBarrier {
+            resource: source_texture,
+            subresources: None,
+            before: source_before,
+            after: TextureUsageState::TransferSrc,
+            src_queue: super::super::resources::QueueClass::Graphics,
+            dst_queue: super::super::resources::QueueClass::Transfer,
+        }));
+        ops.push(CommandOp::Barrier(ResourceBarrier {
+            resource: attachment.depth_texture,
+            subresources: None,
+            before: destination_before,
+            after: TextureUsageState::TransferDst,
+            src_queue: super::super::resources::QueueClass::Graphics,
+            dst_queue: super::super::resources::QueueClass::Transfer,
+        }));
+        ops.push(CommandOp::CopyTexture(TextureImageCopyRegion {
+            src_texture: source_texture,
+            src_mip: 0,
+            src_layer: 0,
+            src_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
+            dst_texture: attachment.depth_texture,
+            dst_mip: 0,
+            dst_layer: 0,
+            dst_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
+            extent,
+        }));
+        ops.push(CommandOp::Barrier(ResourceBarrier {
+            resource: source_texture,
+            subresources: None,
+            before: TextureUsageState::TransferSrc,
+            after: TextureUsageState::ShaderRead,
+            src_queue: super::super::resources::QueueClass::Transfer,
+            dst_queue: super::super::resources::QueueClass::Graphics,
+        }));
+        ops.push(CommandOp::Barrier(ResourceBarrier {
+            resource: attachment.depth_texture,
+            subresources: None,
+            before: TextureUsageState::TransferDst,
+            after: TextureUsageState::ShaderRead,
+            src_queue: super::super::resources::QueueClass::Transfer,
+            dst_queue: super::super::resources::QueueClass::Graphics,
+        }));
+        Ok(())
+    }
+
+    /// Clears an external family that has no semantic producer in the
+    /// current terrain handoff. This makes every declared color/depth sampler
+    /// valid without borrowing Java-side attachments.
+    pub(crate) fn append_empty_attachment_clear(
+        &self,
+        ops: &mut Vec<CommandOp>,
+        role: FabulousTargetRole,
+        color_before: TextureUsageState,
+        depth_before: TextureUsageState,
+    ) {
+        let attachment = match role {
+            FabulousTargetRole::Main => &self.main,
+            FabulousTargetRole::Translucent => &self.translucent,
+            FabulousTargetRole::ItemEntity => &self.item_entity,
+            FabulousTargetRole::Particles => &self.particles,
+            FabulousTargetRole::Clouds => &self.clouds,
+            FabulousTargetRole::Weather => &self.weather,
+        };
+        ops.push(CommandOp::Barrier(ResourceBarrier {
+            resource: attachment.color_texture,
+            subresources: None,
+            before: color_before,
+            after: TextureUsageState::ColorAttachment,
+            src_queue: super::super::resources::QueueClass::Graphics,
+            dst_queue: super::super::resources::QueueClass::Graphics,
+        }));
+        ops.push(CommandOp::Barrier(ResourceBarrier {
+            resource: attachment.depth_texture,
+            subresources: None,
+            before: depth_before,
+            after: TextureUsageState::DepthStencilAttachment,
+            src_queue: super::super::resources::QueueClass::Graphics,
+            dst_queue: super::super::resources::QueueClass::Graphics,
+        }));
+        ops.push(CommandOp::BeginPass {
+            pass: attachment.render_pass,
+            target: attachment.render_target,
+            colors: vec![PassAttachment {
+                view: attachment.color_view,
+                load_op: AttachmentLoadOp::Clear,
+                store_op: AttachmentStoreOp::Store,
+                clear_color: Some(ClearColor {
+                    r: 0.0,
+                    g: 0.0,
+                    b: 0.0,
+                    a: 0.0,
+                }),
+            }],
+            depth_stencil: Some(PassAttachment {
+                view: attachment.depth_view,
+                load_op: AttachmentLoadOp::Clear,
+                store_op: AttachmentStoreOp::Store,
+                clear_color: None,
+            }),
+        });
+        ops.push(CommandOp::EndPass);
+        ops.extend([
+            CommandOp::Barrier(ResourceBarrier {
+                resource: attachment.color_texture,
+                subresources: None,
+                before: TextureUsageState::ColorAttachment,
+                after: TextureUsageState::ShaderRead,
+                src_queue: super::super::resources::QueueClass::Graphics,
+                dst_queue: super::super::resources::QueueClass::Graphics,
+            }),
+            CommandOp::Barrier(ResourceBarrier {
+                resource: attachment.depth_texture,
+                subresources: None,
+                before: TextureUsageState::DepthStencilAttachment,
+                after: TextureUsageState::ShaderRead,
+                src_queue: super::super::resources::QueueClass::Graphics,
+                dst_queue: super::super::resources::QueueClass::Graphics,
+            }),
+        ]);
+    }
+
+    /// Lowers a complete terrain-only transparency handoff into one command
+    /// stream. This helper is private preparation: callers still decide
+    /// whether the semantic frame is eligible and must submit the returned
+    /// operations together with GUI/text composition.
+    pub(crate) fn append_terrain_handoff_to_frame_target(
+        &self,
+        gal: &mut VulkanicGal,
+        ops: &mut Vec<CommandOp>,
+        frame_target: Handle,
+        extent: Extent3d,
+        deferred_frame_color_source: Handle,
+        deferred_translucent_source: Handle,
+        deferred_depth_source: Handle,
+    ) -> GalResult<Handle> {
+        self.append_terrain_handoff_to_frame_target_with_external_ops(
+            gal,
+            ops,
+            frame_target,
+            extent,
+            deferred_frame_color_source,
+            deferred_translucent_source,
+            deferred_depth_source,
+            &[],
+            [false; 4],
+        )
+    }
+
+    pub(crate) fn append_terrain_handoff_to_frame_target_with_external_ops(
+        &self,
+        gal: &mut VulkanicGal,
+        ops: &mut Vec<CommandOp>,
+        frame_target: Handle,
+        extent: Extent3d,
+        deferred_frame_color_source: Handle,
+        deferred_translucent_source: Handle,
+        deferred_depth_source: Handle,
+        external_operations: &[CommandOp],
+        external_roles_written: [bool; 4],
+    ) -> GalResult<Handle> {
+        self.append_frame_target_to_main_copy(
+            ops,
+            deferred_frame_color_source,
+            extent,
+            TextureUsageState::Undefined,
+        )?;
+        self.append_translucent_capture_copy(
+            ops,
+            deferred_translucent_source,
+            extent,
+            TextureUsageState::ShaderRead,
+            TextureUsageState::Undefined,
+        )?;
+        self.append_depth_capture_copy(
+            ops,
+            deferred_depth_source,
+            FabulousTargetRole::Main,
+            extent,
+            TextureUsageState::ShaderRead,
+            // Fabulous depth attachments persist across frames and the
+            // preceding graph leaves them shader-readable. Treating them as
+            // Undefined causes an invalid old-layout transition on reuse.
+            TextureUsageState::ShaderRead,
+        )?;
+        self.append_depth_capture_copy(
+            ops,
+            deferred_depth_source,
+            FabulousTargetRole::Translucent,
+            extent,
+            TextureUsageState::ShaderRead,
+            TextureUsageState::ShaderRead,
+        )?;
+        for (role_index, role) in [
+            FabulousTargetRole::ItemEntity,
+            FabulousTargetRole::Particles,
+            FabulousTargetRole::Clouds,
+            FabulousTargetRole::Weather,
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            if external_roles_written[role_index] {
+                continue;
+            }
+            self.append_empty_attachment_clear(
+                ops,
+                role,
+                TextureUsageState::Undefined,
+                TextureUsageState::Undefined,
+            );
+        }
+        ops.extend(external_operations.iter().cloned());
+        ops.extend(self.external_shader_read_barriers_with_role_states(
+            TextureUsageState::ShaderRead,
+            TextureUsageState::ShaderRead,
+            TextureUsageState::ShaderRead,
+            TextureUsageState::ShaderRead,
+            if external_roles_written[0] { TextureUsageState::ColorAttachment } else { TextureUsageState::ShaderRead },
+            if external_roles_written[0] { TextureUsageState::DepthStencilAttachment } else { TextureUsageState::ShaderRead },
+            if external_roles_written[1] { TextureUsageState::ColorAttachment } else { TextureUsageState::ShaderRead },
+            if external_roles_written[1] { TextureUsageState::DepthStencilAttachment } else { TextureUsageState::ShaderRead },
+            if external_roles_written[2] { TextureUsageState::ColorAttachment } else { TextureUsageState::ShaderRead },
+            if external_roles_written[2] { TextureUsageState::DepthStencilAttachment } else { TextureUsageState::ShaderRead },
+            if external_roles_written[3] { TextureUsageState::ColorAttachment } else { TextureUsageState::ShaderRead },
+            if external_roles_written[3] { TextureUsageState::DepthStencilAttachment } else { TextureUsageState::ShaderRead },
+        ));
+        ops.push(self.final_target_color_attachment_barrier());
+        let executor = super::vanilla_post_effect_executor::bundled_transparency_executor()?;
+        // The handoff above either writes each optional external role through
+        // semantic material operations or explicitly clears it. Record that
+        // receipt before lowering the graph so allocation/type validation can
+        // never masquerade as frame population.
+        let populated_roles = BTreeSet::from([
+            "minecraft:main".to_owned(),
+            "minecraft:translucent".to_owned(),
+            "minecraft:item_entity".to_owned(),
+            "minecraft:particles".to_owned(),
+            "minecraft:clouds".to_owned(),
+            "minecraft:weather".to_owned(),
+        ]);
+        self.external_inventory()
+            .validate_populated_for_plan(executor.plan(), &populated_roles)?;
+        let (bindings, presentation_pass) =
+            self.transparency_pass_bindings_to_frame_target(gal, frame_target)?;
+        let mut post_ops = executor.lower(&bindings)?;
+        let first_end = post_ops
+            .iter()
+            .position(|operation| matches!(operation, CommandOp::EndPass))
+            .ok_or_else(|| GalError::backend("terrain Fabulous handoff omitted first pass terminator"))?;
+        post_ops.insert(
+            first_end + 1,
+            self.between_transparency_pass_barriers()
+                .into_iter()
+                .next()
+                .expect("bundled transparency has one intermediate target"),
+        );
+        ops.extend(post_ops);
+        Ok(presentation_pass)
+    }
+
     pub(crate) fn between_transparency_pass_barriers(&self) -> Vec<CommandOp> {
         vec![CommandOp::Barrier(ResourceBarrier {
             resource: self.final_target.texture,
@@ -1020,31 +1469,96 @@ impl FabulousAttachmentSet {
     /// with a clear pass and still present every declared sampler in a valid
     /// shader-readable state.
     pub(crate) fn external_shader_read_barriers(&self) -> Vec<CommandOp> {
+        self.external_shader_read_barriers_with_translucent_state(
+            TextureUsageState::ColorAttachment,
+            TextureUsageState::DepthStencilAttachment,
+        )
+    }
+
+    /// Variant used when an external producer already left the translucent
+    /// color/depth resources in explicit states (for example a transfer copy
+    /// from the normal deferred graph). Other Fabulous roles retain the
+    /// ordinary raster-to-sample transition contract.
+    pub(crate) fn external_shader_read_barriers_with_translucent_state(
+        &self,
+        translucent_color_before: TextureUsageState,
+        translucent_depth_before: TextureUsageState,
+    ) -> Vec<CommandOp> {
+        self.external_shader_read_barriers_with_input_states(
+            TextureUsageState::ColorAttachment,
+            TextureUsageState::DepthStencilAttachment,
+            translucent_color_before,
+            translucent_depth_before,
+        )
+    }
+
+    pub(crate) fn external_shader_read_barriers_with_input_states(
+        &self,
+        main_color_before: TextureUsageState,
+        main_depth_before: TextureUsageState,
+        translucent_color_before: TextureUsageState,
+        translucent_depth_before: TextureUsageState,
+    ) -> Vec<CommandOp> {
+        self.external_shader_read_barriers_with_role_states(
+            main_color_before,
+            main_depth_before,
+            translucent_color_before,
+            translucent_depth_before,
+            TextureUsageState::ColorAttachment,
+            TextureUsageState::DepthStencilAttachment,
+            TextureUsageState::ColorAttachment,
+            TextureUsageState::DepthStencilAttachment,
+            TextureUsageState::ColorAttachment,
+            TextureUsageState::DepthStencilAttachment,
+            TextureUsageState::ColorAttachment,
+            TextureUsageState::DepthStencilAttachment,
+        )
+    }
+
+    pub(crate) fn external_shader_read_barriers_with_role_states(
+        &self,
+        main_color_before: TextureUsageState,
+        main_depth_before: TextureUsageState,
+        translucent_color_before: TextureUsageState,
+        translucent_depth_before: TextureUsageState,
+        item_entity_color_before: TextureUsageState,
+        item_entity_depth_before: TextureUsageState,
+        particles_color_before: TextureUsageState,
+        particles_depth_before: TextureUsageState,
+        clouds_color_before: TextureUsageState,
+        clouds_depth_before: TextureUsageState,
+        weather_color_before: TextureUsageState,
+        weather_depth_before: TextureUsageState,
+    ) -> Vec<CommandOp> {
         let mut operations = Vec::with_capacity(12);
-        for attachment in [
-            &self.main,
-            &self.translucent,
-            &self.item_entity,
-            &self.particles,
-            &self.clouds,
-            &self.weather,
+        for (attachment, color_before, depth_before) in [
+            (&self.main, main_color_before, main_depth_before),
+            (&self.translucent, translucent_color_before, translucent_depth_before),
+            (&self.item_entity, item_entity_color_before, item_entity_depth_before),
+            (&self.particles, particles_color_before, particles_depth_before),
+            (&self.clouds, clouds_color_before, clouds_depth_before),
+            (&self.weather, weather_color_before, weather_depth_before),
         ] {
-            operations.push(CommandOp::Barrier(ResourceBarrier {
-                resource: attachment.color_texture,
-                subresources: None,
-                before: TextureUsageState::ColorAttachment,
-                after: TextureUsageState::ShaderRead,
-                src_queue: super::super::resources::QueueClass::Graphics,
-                dst_queue: super::super::resources::QueueClass::Graphics,
-            }));
-            operations.push(CommandOp::Barrier(ResourceBarrier {
-                resource: attachment.depth_texture,
-                subresources: None,
-                before: TextureUsageState::DepthStencilAttachment,
-                after: TextureUsageState::ShaderRead,
-                src_queue: super::super::resources::QueueClass::Graphics,
-                dst_queue: super::super::resources::QueueClass::Graphics,
-            }));
+            if color_before != TextureUsageState::ShaderRead {
+                operations.push(CommandOp::Barrier(ResourceBarrier {
+                    resource: attachment.color_texture,
+                    subresources: None,
+                    before: color_before,
+                    after: TextureUsageState::ShaderRead,
+                    src_queue: super::super::resources::QueueClass::Graphics,
+                    dst_queue: super::super::resources::QueueClass::Graphics,
+                }));
+            }
+            if depth_before != TextureUsageState::ShaderRead {
+                operations.push(CommandOp::Barrier(ResourceBarrier {
+                    resource: attachment.depth_texture,
+                    subresources: None,
+                    before: depth_before,
+                    after: TextureUsageState::ShaderRead,
+                    src_queue: super::super::resources::QueueClass::Graphics,
+                    dst_queue: super::super::resources::QueueClass::Graphics,
+                }));
+            }
         }
         operations
     }
@@ -1196,6 +1710,7 @@ impl FabulousAttachmentSet {
 mod tests {
     use super::*;
     use crate::render::vulkanic::backends::mock::MockBackend;
+    use crate::render::vulkanic::handles::HandleKind;
     use crate::render::vulkanic::gal::VulkanicGal;
     use crate::render::vulkanic::backends::vulkan_capabilities;
     use crate::render::vulkanic::frame::{FrameRenderTargetId, FrameSurfaceDesc, PresentMode};
@@ -1212,9 +1727,14 @@ mod tests {
         use super::super::super::world_primitive_frontend::{
             WORLD_MATERIAL_SOURCE_CLOUDS, WORLD_MATERIAL_SOURCE_PARTICLES,
             WORLD_MATERIAL_SOURCE_TEXTURED, WORLD_MATERIAL_SOURCE_WEATHER,
+            WORLD_MATERIAL_SOURCE_ENTITY_MODEL,
         };
         assert_eq!(
             FabulousTargetRole::for_material_source(WORLD_MATERIAL_SOURCE_TEXTURED),
+            Some(FabulousTargetRole::Translucent)
+        );
+        assert_eq!(
+            FabulousTargetRole::for_material_source(WORLD_MATERIAL_SOURCE_ENTITY_MODEL),
             Some(FabulousTargetRole::Translucent)
         );
         assert_eq!(
@@ -1263,6 +1783,76 @@ mod tests {
             .validate_against(executor.plan())
             .unwrap();
         assert_eq!(13, set.pre_transparency_barriers().len());
+        let mut capture_copy = Vec::new();
+        set.append_translucent_capture_copy(
+            &mut capture_copy,
+            set.main.color_texture,
+            Extent3d {
+                width: 64,
+                height: 64,
+                depth: 1,
+            },
+            TextureUsageState::ShaderRead,
+            TextureUsageState::Undefined,
+        )
+        .unwrap();
+        assert!(capture_copy.iter().any(|operation| matches!(
+            operation,
+            super::super::super::commands::CommandOp::CopyTexture(copy)
+                if copy.src_texture == set.main.color_texture
+                    && copy.dst_texture == set.translucent.color_texture
+        )));
+        let stateful_barriers = set.external_shader_read_barriers_with_translucent_state(
+            TextureUsageState::ShaderRead,
+            TextureUsageState::Undefined,
+        );
+        assert!(!stateful_barriers.iter().any(|operation| matches!(
+            operation,
+            super::super::super::commands::CommandOp::Barrier(barrier)
+                if barrier.resource == set.translucent.color_texture
+                    && barrier.before == TextureUsageState::ShaderRead
+        )));
+        let mut main_copy = Vec::new();
+        set.append_frame_target_to_main_copy(
+            &mut main_copy,
+            Handle::new(HandleKind::FrameTarget, 99, 1).unwrap(),
+            Extent3d {
+                width: 64,
+                height: 64,
+                depth: 1,
+            },
+            TextureUsageState::Undefined,
+        )
+        .unwrap();
+        assert!(main_copy.iter().any(|operation| matches!(
+            operation,
+            super::super::super::commands::CommandOp::CopyFrameTargetToTexture {
+                src,
+                dst,
+                ..
+            } if *src == Handle::new(HandleKind::FrameTarget, 99, 1).unwrap()
+                && *dst == set.main.color_texture
+        )));
+        let mut depth_copy = Vec::new();
+        set.append_depth_capture_copy(
+            &mut depth_copy,
+            set.main.depth_texture,
+            FabulousTargetRole::Translucent,
+            Extent3d {
+                width: 64,
+                height: 64,
+                depth: 1,
+            },
+            TextureUsageState::ShaderRead,
+            TextureUsageState::Undefined,
+        )
+        .unwrap();
+        assert!(depth_copy.iter().any(|operation| matches!(
+            operation,
+            super::super::super::commands::CommandOp::CopyTexture(copy)
+                if copy.src_texture == set.main.depth_texture
+                    && copy.dst_texture == set.translucent.depth_texture
+        )));
         assert_eq!(1, set.between_transparency_pass_barriers().len());
         let copy_in = set.optical_hand_copy_from_main(Extent3d { width: 64, height: 64, depth: 1 });
         assert_eq!(5, copy_in.len());
@@ -1309,6 +1899,27 @@ mod tests {
                 color_format: TextureFormat::Rgba8Unorm,
             })
             .unwrap();
+        let mut terrain_handoff = Vec::new();
+        let presentation_pass = set
+            .append_terrain_handoff_to_frame_target(
+                &mut gal,
+                &mut terrain_handoff,
+                frame_target,
+                Extent3d {
+                    width: 64,
+                    height: 64,
+                    depth: 1,
+                },
+                frame_target,
+                set.main.color_texture,
+                set.main.depth_texture,
+            )
+            .unwrap();
+        assert!(terrain_handoff.iter().any(|operation| matches!(
+            operation,
+            super::super::super::commands::CommandOp::CopyFrameTargetToTexture { .. }
+        )));
+        gal.destroy(presentation_pass).unwrap();
         let (frame_bindings, present_pass) = set
             .transparency_pass_bindings_to_frame_target(&mut gal, frame_target)
             .unwrap();
@@ -1322,6 +1933,84 @@ mod tests {
         })
         .unwrap();
         gal.destroy(present_pass).unwrap();
+        set.destroy(&mut gal);
+    }
+
+    #[test]
+    fn terrain_handoff_accepts_bgra_frame_with_rgba_translucent_capture() {
+        let mut capabilities = vulkan_capabilities();
+        capabilities.features.presentation = true;
+        let mut gal = VulkanicGal::new_with_backend(
+            Box::new(MockBackend::with_capabilities(capabilities)),
+            false,
+        );
+        let set = FabulousAttachmentSet::create_with_translucent_format(
+            &mut gal,
+            Extent3d { width: 32, height: 32, depth: 1 },
+            TextureFormat::Bgra8Unorm,
+            TextureFormat::Rgba8Unorm,
+        )
+        .unwrap();
+        assert_eq!(TextureFormat::Rgba8Unorm, set.translucent_color_format);
+        gal.configure_frame_surface(FrameSurfaceDesc {
+            label: "terrain-bgra-surface".to_string(),
+            extent: Extent3d { width: 32, height: 32, depth: 1 },
+            color_format: TextureFormat::Bgra8Unorm,
+            present_mode: PresentMode::Fifo,
+            max_frames_in_flight: 2,
+        })
+        .unwrap();
+        let frame_target = gal
+            .create_frame_target(FrameTargetDesc {
+                label: "terrain-bgra-target".to_string(),
+                frame_id: 7,
+                render_target: FrameRenderTargetId(7),
+                extent: Extent3d { width: 32, height: 32, depth: 1 },
+                color_format: TextureFormat::Bgra8Unorm,
+            })
+            .unwrap();
+        let capture_source = gal
+            .create_texture(TextureDesc {
+                label: "terrain-bgra-capture-source".to_string(),
+                dimension: TextureDimension::D2,
+                format: TextureFormat::Rgba8Unorm,
+                extent: Extent3d { width: 32, height: 32, depth: 1 },
+                mip_levels: 1,
+                array_layers: 1,
+                usages: vec![TextureUsage::TransferSrc, TextureUsage::Sampled],
+            })
+            .unwrap();
+        let capture_depth = gal
+            .create_texture(TextureDesc {
+                label: "terrain-bgra-depth-source".to_string(),
+                dimension: TextureDimension::D2,
+                format: TextureFormat::Depth32Float,
+                extent: Extent3d { width: 32, height: 32, depth: 1 },
+                mip_levels: 1,
+                array_layers: 1,
+                usages: vec![TextureUsage::TransferSrc, TextureUsage::Sampled],
+            })
+            .unwrap();
+        let mut operations = Vec::new();
+        let presentation_pass = set
+            .append_terrain_handoff_to_frame_target(
+                &mut gal,
+                &mut operations,
+                frame_target,
+                Extent3d { width: 32, height: 32, depth: 1 },
+                frame_target,
+                capture_source,
+                capture_depth,
+            )
+            .unwrap();
+        gal.create_command_list(super::super::super::commands::CommandListDesc {
+            label: "terrain-bgra-handoff-test".to_string(),
+            operations,
+        })
+        .unwrap();
+        gal.destroy(presentation_pass).unwrap();
+        gal.destroy(capture_source).unwrap();
+        gal.destroy(capture_depth).unwrap();
         set.destroy(&mut gal);
     }
 }

@@ -6,11 +6,14 @@
 //! not part of this boundary.
 
 use std::collections::{BTreeMap, BTreeSet};
+use core::{hash as ch};
+use ch::Hasher;
 
 use super::commands::{
     AttachmentLoadOp, AttachmentStoreOp, ClearColor, CommandOp, PassAttachment, ResourceBarrier,
     TextureUsageState,
 };
+use super::gui_frontend::GUI_MAX_VIEWPORT_AXIS;
 use super::error::{GalError, GalResult, StatusCode};
 use super::gal::VulkanicGal;
 use super::handles::Handle;
@@ -28,14 +31,20 @@ pub const GUI_MESH_MAX_BATCHES: usize = 1_024;
 pub const GUI_MESH_MAX_VERTICES: usize = 65_536;
 pub const GUI_MESH_MAX_INDICES: usize = 196_608;
 pub const GUI_MESH_GPU_VERTEX_BYTES: usize = 3 * 4 * 4;
+/// Aggregate copied GUI geometry admitted for one semantic frame. This keeps
+/// nested mesh slices from multiplying the per-batch limits into an
+/// unbounded allocation before command generation.
+pub const GUI_MESH_MAX_FRAME_PAYLOAD_BYTES: u64 = 128 * 1024 * 1024;
+/// Maximum dimension of a Rust-owned GUI item offscreen raster.
+pub const GUI_MESH_MAX_OFFSCREEN_AXIS: u32 = 4096;
 const GUI_MESH_FRAME_UNIFORM_BYTES: usize = 48;
 const GUI_MESH_COMPOSITE_UNIFORM_BYTES: usize = 80;
 /// Conservative dynamic-UBO alignment valid for both backend lowerings.
 pub const GUI_MESH_COMPOSITE_UNIFORM_STRIDE: u64 = 256;
 const GUI_MESH_MAX_COMPOSITE_UNIFORM_BYTES: u64 =
     GUI_MESH_MAX_BATCHES as u64 * GUI_MESH_COMPOSITE_UNIFORM_STRIDE;
-const GUI_MESH_MAX_VERTEX_BYTES: u64 = (GUI_MESH_MAX_VERTICES * GUI_MESH_GPU_VERTEX_BYTES) as u64;
-const GUI_MESH_MAX_INDEX_BYTES: u64 = (GUI_MESH_MAX_INDICES * std::mem::size_of::<u32>()) as u64;
+pub(crate) const GUI_MESH_MAX_VERTEX_BYTES: u64 = (GUI_MESH_MAX_VERTICES * GUI_MESH_GPU_VERTEX_BYTES) as u64;
+pub(crate) const GUI_MESH_MAX_INDEX_BYTES: u64 = (GUI_MESH_MAX_INDICES * std::mem::size_of::<u32>()) as u64;
 
 const GUI_MESH_VERTEX_SHADER_OPENGL: &[u8] = br#"#version 430 core
 layout(std430) readonly buffer GuiMeshVertices { vec4 vertex_words[]; };
@@ -328,6 +337,34 @@ pub struct GuiMeshPreparedDraw {
     pub indices: Vec<u32>,
 }
 
+/// Stable process-local identity for copied GUI geometry. Transform, clip,
+/// and layer fields are intentionally excluded: those remain per-draw
+/// uniforms, while this key permits immutable vertex/index residency across
+/// frames without retaining Java objects or native pointers.
+pub fn geometry_fingerprint(draw: &GuiMeshPreparedDraw) -> u64 {
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    hasher.write_u64(draw.vertices.len() as u64);
+    for vertex in &draw.vertices {
+        for value in vertex.position {
+            hasher.write_u32(value.to_bits());
+        }
+        for value in vertex.local_uv {
+            hasher.write_u32(value.to_bits());
+        }
+        for value in vertex.color {
+            hasher.write_u32(value.to_bits());
+        }
+        for value in vertex.normal {
+            hasher.write_u32(value.to_bits());
+        }
+    }
+    hasher.write_u64(draw.indices.len() as u64);
+    for index in &draw.indices {
+        hasher.write_u32(*index);
+    }
+    hasher.finish()
+}
+
 /// One non-overlapping range in a persistent GUI-mesh stream. A command list
 /// may rasterize several quads that use the same texture; every draw must
 /// retain its own bytes until GPU execution instead of overwriting offset zero
@@ -497,6 +534,32 @@ impl GuiMeshPassResources {
         clear: bool,
         operations: &mut Vec<CommandOp>,
     ) -> GalResult<()> {
+        self.append_draw_internal(target, draw, stream, clear, true, operations)
+    }
+
+    /// Appends a draw that reuses an already uploaded immutable geometry range.
+    /// Uniforms and raster/composite state remain explicit per draw; only the
+    /// redundant vertex/index host writes are omitted.
+    pub fn append_draw_reusing_geometry(
+        &self,
+        target: GuiMeshOffscreenTarget,
+        draw: &GuiMeshPreparedDraw,
+        stream: GuiMeshStreamRange,
+        clear: bool,
+        operations: &mut Vec<CommandOp>,
+    ) -> GalResult<()> {
+        self.append_draw_internal(target, draw, stream, clear, false, operations)
+    }
+
+    fn append_draw_internal(
+        &self,
+        target: GuiMeshOffscreenTarget,
+        draw: &GuiMeshPreparedDraw,
+        stream: GuiMeshStreamRange,
+        clear: bool,
+        write_geometry: bool,
+        operations: &mut Vec<CommandOp>,
+    ) -> GalResult<()> {
         if draw.render_extent != [target.extent.width, target.extent.height] {
             return Err(GalError::ffi(
                 StatusCode::InvalidArgument,
@@ -563,23 +626,33 @@ impl GuiMeshPassResources {
                 "GUI mesh draws exceed their persistent stream capacity",
             ));
         }
-        for buffer in [self.vertex_buffer, self.index_buffer, self.uniform_buffer] {
+        let mut buffers = vec![(self.uniform_buffer, TextureUsageState::ShaderRead)];
+        if write_geometry {
+            buffers.insert(0, (self.vertex_buffer, TextureUsageState::ShaderRead));
+            // Persistent GUI index storage was last consumed by the index
+            // input stage, not by a shader. Preserve that explicit state so
+            // the upload barrier also synchronizes the prior indexed draw.
+            buffers.insert(1, (self.index_buffer, TextureUsageState::IndexRead));
+        }
+        for (buffer, before) in buffers {
             operations.push(CommandOp::Barrier(buffer_barrier(
                 buffer,
-                TextureUsageState::ShaderRead,
+                before,
                 TextureUsageState::TransferDst,
             )));
         }
-        operations.push(CommandOp::HostWriteBuffer {
-            buffer: self.vertex_buffer,
-            offset: stream.vertex_offset,
-            data: vertex_bytes,
-        });
-        operations.push(CommandOp::HostWriteBuffer {
-            buffer: self.index_buffer,
-            offset: stream.index_offset,
-            data: index_bytes,
-        });
+        if write_geometry {
+            operations.push(CommandOp::HostWriteBuffer {
+                buffer: self.vertex_buffer,
+                offset: stream.vertex_offset,
+                data: vertex_bytes,
+            });
+            operations.push(CommandOp::HostWriteBuffer {
+                buffer: self.index_buffer,
+                offset: stream.index_offset,
+                data: index_bytes,
+            });
+        }
         operations.push(CommandOp::HostWriteBuffer {
             buffer: self.uniform_buffer,
             offset: 0,
@@ -1210,6 +1283,8 @@ pub struct GuiMeshOffscreenTargetCache {
     targets: BTreeMap<OffscreenTargetKey, GuiMeshOffscreenTarget>,
 }
 
+const GUI_MESH_MAX_OFFSCREEN_TARGETS_PER_GENERATION: usize = 64;
+
 impl GuiMeshOffscreenTargetCache {
     pub(crate) fn len(&self) -> usize {
         self.targets.len()
@@ -1239,6 +1314,12 @@ impl GuiMeshOffscreenTargetCache {
                 "GUI mesh offscreen target requires a non-zero generation and D2 extent",
             ));
         }
+        if extent.width > GUI_MESH_MAX_OFFSCREEN_AXIS || extent.height > GUI_MESH_MAX_OFFSCREEN_AXIS {
+            return Err(GalError::unsupported_feature(format!(
+                "GUI mesh offscreen extent {}x{} exceeds bounded axis {}",
+                extent.width, extent.height, GUI_MESH_MAX_OFFSCREEN_AXIS
+            )));
+        }
         let key = OffscreenTargetKey {
             generation,
             width: extent.width,
@@ -1248,6 +1329,11 @@ impl GuiMeshOffscreenTargetCache {
             return Ok(target);
         }
         self.destroy_other_generations(gal, generation);
+        if self.targets.len() >= GUI_MESH_MAX_OFFSCREEN_TARGETS_PER_GENERATION {
+            return Err(GalError::unsupported_feature(format!(
+                "GUI mesh offscreen target cache exceeds bounded limit {GUI_MESH_MAX_OFFSCREEN_TARGETS_PER_GENERATION}"
+            )));
+        }
         let label = format!(
             "minecraft.gui.mesh.gen{generation}.{}x{}",
             extent.width, extent.height
@@ -1438,11 +1524,27 @@ pub fn validate_batch(batch: &GuiMeshBatchRequest) -> GalResult<()> {
             "GUI mesh batch requires a positive GUI extent",
         ));
     }
+    if batch.gui_extent[0] > GUI_MAX_VIEWPORT_AXIS as u32
+        || batch.gui_extent[1] > GUI_MAX_VIEWPORT_AXIS as u32
+    {
+        return Err(GalError::unsupported_feature(format!(
+            "GUI mesh logical extent {}x{} exceeds bounded axis {}",
+            batch.gui_extent[0], batch.gui_extent[1], GUI_MAX_VIEWPORT_AXIS
+        )));
+    }
     if batch.render_extent[0] == 0 || batch.render_extent[1] == 0 {
         return Err(GalError::ffi(
             StatusCode::InvalidArgument,
             "GUI mesh batch requires a positive offscreen raster extent",
         ));
+    }
+    if batch.render_extent[0] > GUI_MESH_MAX_OFFSCREEN_AXIS
+        || batch.render_extent[1] > GUI_MESH_MAX_OFFSCREEN_AXIS
+    {
+        return Err(GalError::unsupported_feature(format!(
+            "GUI mesh offscreen extent {}x{} exceeds bounded axis {}",
+            batch.render_extent[0], batch.render_extent[1], GUI_MESH_MAX_OFFSCREEN_AXIS
+        )));
     }
     if batch.bounds[0] >= batch.bounds[2] || batch.bounds[1] >= batch.bounds[3] {
         return Err(GalError::ffi(
@@ -1735,6 +1837,14 @@ mod tests {
         guard_consumes_target.guard_pixels = 17;
         assert!(validate_batch(&guard_consumes_target).is_err());
 
+        let mut oversized_target = batch();
+        oversized_target.render_extent = [GUI_MESH_MAX_OFFSCREEN_AXIS + 1, 32];
+        assert!(validate_batch(&oversized_target).is_err());
+
+        let mut oversized_gui = batch();
+        oversized_gui.gui_extent = [GUI_MAX_VIEWPORT_AXIS as u32 + 1, 32];
+        assert!(validate_batch(&oversized_gui).is_err());
+
         let mut second_layer = batch();
         second_layer.layer_index = 1;
         validate_batches(&[batch(), second_layer])
@@ -1830,6 +1940,32 @@ mod tests {
             )
             .expect("replace target generation");
         assert_ne!(first.target, replacement.target);
+        cache.clear(&mut gal);
+    }
+
+    #[test]
+    fn offscreen_target_cache_rejects_unbounded_extent_variants() {
+        let mut gal = VulkanicGal::new_with_backend(
+            Box::new(MockBackend::with_capabilities(vulkan_capabilities())),
+            false,
+        );
+        let mut cache = GuiMeshOffscreenTargetCache::default();
+        for width in 1..=GUI_MESH_MAX_OFFSCREEN_TARGETS_PER_GENERATION as u32 {
+            cache
+                .stage(&mut gal, 7, Extent3d { width, height: 1, depth: 1 })
+                .expect("bounded GUI mesh target variant");
+        }
+        let rejected = cache.stage(
+            &mut gal,
+            7,
+            Extent3d {
+                width: GUI_MESH_MAX_OFFSCREEN_TARGETS_PER_GENERATION as u32 + 1,
+                height: 1,
+                depth: 1,
+            },
+        );
+        assert!(rejected.is_err());
+        assert_eq!(GUI_MESH_MAX_OFFSCREEN_TARGETS_PER_GENERATION, cache.len());
         cache.clear(&mut gal);
     }
 

@@ -71,7 +71,7 @@ public class EnchantTableRenderer implements BlockEntityRenderer<EnchantingTable
 		float g = Mth.frac(enchantTableRenderState.flip + 0.25F) * 1.6F - 0.3F;
 		float h = Mth.frac(enchantTableRenderState.flip + 0.75F) * 1.6F - 0.3F;
 		BookModel.State state = new BookModel.State(enchantTableRenderState.time, Mth.clamp(g, 0.0F, 1.0F), Mth.clamp(h, 0.0F, 1.0F), enchantTableRenderState.open);
-		submitNodeCollector.submitModel(
+		submitNodeCollector.submitModelSemantic(
 			this.bookModel,
 			state,
 			poseStack,

@@ -1,11 +1,16 @@
 package net.vulkanic.world;
 
 import net.sodium.client.render.chunk.vertex.format.NativeSectionMeshBuilder;
+import net.sodium.client.render.chunk.RenderSection;
+import net.sodium.client.render.chunk.data.BuiltSectionInfo;
 import net.vulkanic.bridge.VulkanicGalBridge;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -49,6 +54,23 @@ public class RustGalTerrainRendererLightingContractTest {
 	}
 
 	@Test
+	void wholeFrameTerrainSnapshotDeduplicatesCanonicalSectionPositions() {
+		RenderSection built = new RenderSection(null, 3, 4, 5);
+		built.setInfo(BuiltSectionInfo.EMPTY);
+		RenderSection duplicatePosition = new RenderSection(null, 3, 4, 5);
+		duplicatePosition.setInfo(BuiltSectionInfo.EMPTY);
+		RenderSection unbuilt = new RenderSection(null, 9, 9, 9);
+
+		List<RenderSection> snapshot = RustGalTerrainRenderer.snapshotBuiltTerrainSections(
+			Arrays.asList(null, built, duplicatePosition, built, unbuilt, null)
+		);
+
+		assertEquals(List.of(built), snapshot,
+			"semantic terrain extraction must submit each canonical section position once");
+		assertEquals(List.of(), RustGalTerrainRenderer.snapshotBuiltTerrainSections(null));
+	}
+
+	@Test
 	public void compactTerrainAtlasCoordinatesRemainTopOriginForCopiedAtlas() {
 		int copiedAtlasV = Math.round(0.710938F * (1 << 15));
 		float decoded = RustGalTerrainRenderer.decodeTexture(copiedAtlasV);
@@ -73,6 +95,24 @@ public class RustGalTerrainRendererLightingContractTest {
 		assertTrue(copyBody.contains("contents.semanticFrameIndex()"));
 		assertTrue(copyBody.contains("getFrameX(frame) * contents.width()"));
 		assertTrue(copyBody.contains("getFrameY(frame) * contents.height()"));
+	}
+
+	@Test
+	public void copiedPbrAtlasIsBoundedBeforeBaseAndDerivedImageAllocation() throws Exception {
+		String source = java.nio.file.Files.readString(java.nio.file.Path.of(
+			"src/main/java/net/vulkanic/world/RustGalTerrainRenderer.java"
+		));
+		assertTrue(source.contains("MAX_RUST_ATLAS_PIXELS = 16_777_216L"));
+		int ensure = source.indexOf("private static void ensureAtlasPayload()");
+		int ensureImage = source.indexOf("new BufferedImage(atlas.width, atlas.height", ensure);
+		assertTrue(ensure >= 0 && ensureImage > ensure);
+		assertTrue(source.substring(ensure, ensureImage).contains("atlas pixel bound exceeded"));
+		int pbr = source.indexOf("private static byte[] buildPbrAtlasPayload");
+		int pbrImage = source.indexOf("new BufferedImage(atlas.width, atlas.height", pbr);
+		assertTrue(pbr >= 0 && pbrImage > pbr);
+		assertTrue(source.substring(pbr, pbrImage).contains("Rust PBR atlas pixel bound exceeded"));
+		assertTrue(source.substring(ensure, pbr).contains("hasPbrResources(atlas, \"_n\")"));
+		assertTrue(source.substring(ensure, pbr).contains("hasPbrResources(atlas, \"_s\")"));
 	}
 
 	@Test
@@ -324,6 +364,37 @@ public class RustGalTerrainRendererLightingContractTest {
 		assertEquals(0, mesh.omittedPrimitiveCount());
 		assertEquals(RustGalWorldPrimitiveRenderer.MATERIAL_ID_TRANSLUCENT_TEXTURED,
 			mesh.sections().get(0).materialId());
+	}
+
+	@Test
+	void terrainSectionIndexPublishesOnlyAfterRustMeshRegistryAdmission() throws Exception {
+		String source = Files.readString(Path.of(
+			"src/main/java/net/vulkanic/world/RustGalTerrainRenderer.java"));
+		int register = source.indexOf("RustGalWorldPrimitiveRenderer.registerStaticTerrainMeshAsset");
+		int publish = source.indexOf("SECTION_ASSETS.put(new LayerKey", register);
+		assertTrue(register >= 0 && publish > register,
+			"terrain section index must publish only after Rust mesh admission");
+	}
+
+	@Test
+	void atlasGenerationCommitsOnlyAfterRustMeshAdmission() throws Exception {
+		String source = Files.readString(Path.of(
+			"src/main/java/net/vulkanic/world/RustGalTerrainRenderer.java"));
+		int register = source.indexOf("RustGalWorldPrimitiveRenderer.registerStaticTerrainMeshAsset");
+		int confirm = source.indexOf("confirmAtlasPayloadRegistered(atlasGenerationForRegistration)", register);
+		assertTrue(register >= 0 && confirm > register,
+			"atlas generation must commit only after Rust mesh registration succeeds");
+	}
+
+	@Test
+	void staleInvalidatedTerrainSectionsLeaveTheReadinessDomain() throws Exception {
+		String source = Files.readString(Path.of(
+			"src/main/java/net/vulkanic/world/RustGalWholeFrameTerrainSource.java"));
+		int method = source.indexOf("private void admitInvalidatedSections");
+		int visibility = source.indexOf("!this.isInsideCurrentWindow(section) || !this.isVisible(section, frustum)", method);
+		int remove = source.indexOf("iterator.remove()", visibility);
+		assertTrue(method >= 0 && visibility > method && remove > visibility,
+			"stale terrain invalidations must not keep Rust whole-frame readiness blocked forever");
 	}
 
 	private static int[] primitiveMetadata(int... kinds) {

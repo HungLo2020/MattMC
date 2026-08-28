@@ -7,6 +7,11 @@
 
 use super::*;
 
+#[inline]
+pub(super) fn is_supported_native_fluid_type(fluid_type: i32) -> bool {
+    matches!(fluid_type, FLUID_WATER | FLUID_LAVA)
+}
+
 fn mark_renderable_fluid_sprite<S: NativeFluidFaceSink>(
     sink: &mut S,
     state: NativeMeshingState,
@@ -77,7 +82,7 @@ pub(in crate::render::chunk::meshing) fn native_section_fluid_faces_to_sink<
         state.fluid_material_bits,
         state.fluid_block_id,
     );
-    if state.fluid_type != FLUID_WATER && state.fluid_type != FLUID_LAVA {
+    if !is_supported_native_fluid_type(state.fluid_type) {
         sink.profile()
             .add_stage(PROFILE_FLUID_VIS_HEIGHT, visibility_started);
         fluid_log!(

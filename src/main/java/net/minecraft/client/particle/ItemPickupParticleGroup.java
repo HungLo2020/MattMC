@@ -49,6 +49,11 @@ public class ItemPickupParticleGroup extends ParticleGroup<ItemPickupParticle> {
 	public record State(List<ItemPickupParticleGroup.ParticleInstance> instances) implements ParticleGroupRenderState {
 		@Override
 		public void submit(SubmitNodeCollector submitNodeCollector, CameraRenderState cameraRenderState) {
+			this.submitSemantic(submitNodeCollector, cameraRenderState);
+		}
+
+		@Override
+		public void submitSemantic(SubmitNodeCollector submitNodeCollector, CameraRenderState cameraRenderState) {
 			PoseStack poseStack = new PoseStack();
 			EntityRenderDispatcher entityRenderDispatcher = Minecraft.getInstance().getEntityRenderDispatcher();
 			// Item-pickup particles reuse the exact ItemEntity semantic submit
@@ -58,7 +63,7 @@ public class ItemPickupParticleGroup extends ParticleGroup<ItemPickupParticle> {
 			net.vulkanic.world.RustGalWorldPrimitiveRenderer.beginItemEntitySubmission();
 			try {
 				for (ItemPickupParticleGroup.ParticleInstance particleInstance : this.instances) {
-					entityRenderDispatcher.submit(
+					entityRenderDispatcher.submitSemantic(
 						particleInstance.itemRenderState,
 						cameraRenderState,
 						particleInstance.xOffset,

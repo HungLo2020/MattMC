@@ -24,7 +24,7 @@ import java.util.Objects;
 
 /**
  * Converts an already selected Minecraft model into a small, copied face
- * material table for a future Rust-owned Distant Horizons texture pass.
+ * material table for the Rust-owned Distant Horizons texture pass.
  *
  * <p>The output contains no {@link TextureAtlasSprite}, model, renderer, or
  * backend object. It is deliberately strict: a reduced LOD quad may use a

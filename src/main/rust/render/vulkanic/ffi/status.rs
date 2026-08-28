@@ -599,6 +599,25 @@ pub(crate) fn input_bytes_for_whole_frame(request: &FfiWholeFrameSubmitRequest) 
                 .count
                 .saturating_mul(size_of::<FfiGuiAffineQuadRequest>() as u64),
         )
+        .saturating_add(
+            request
+                .world_text_quads
+                .count
+                .saturating_mul(size_of::<FfiWorldTextQuadRequest>() as u64),
+        )
+        .saturating_add(
+            request
+                .gui_mesh_batches
+                .count
+                .saturating_mul(size_of::<FfiGuiMeshBatchRequest>() as u64),
+        )
+        .saturating_add(
+            request
+                .world_first_person_mesh_instances
+                .count
+                .saturating_mul(size_of::<FfiWorldMeshInstanceRecord>() as u64),
+        )
+        .saturating_add(request.post_effect_id.len)
 }
 
 pub(crate) fn input_bytes_for_gui_asset_update(request: &FfiGuiAssetUpdateRequest) -> u64 {

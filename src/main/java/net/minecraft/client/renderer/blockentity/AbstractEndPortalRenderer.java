@@ -36,8 +36,12 @@ public abstract class AbstractEndPortalRenderer<T extends TheEndPortalBlockEntit
 	}
 
 	public void submit(S endPortalRenderState, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, CameraRenderState cameraRenderState) {
-		boolean rustWholeFrame = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+		boolean rustWholeFrame = (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
 			&& net.vulkanic.world.WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan();
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected() && !rustWholeFrame) {
+			throw new IllegalStateException("Selected Vulkan cannot execute Java End Portal geometry while the Rust portal route is unavailable");
+		}
 		if (rustWholeFrame && submitNodeCollector.isSemanticCoverageOnly()) {
 			// The whole-frame route keeps end-portal custom geometry unavailable
 			// until its copied material primitive is admitted; do not count this
@@ -51,8 +55,11 @@ public abstract class AbstractEndPortalRenderer<T extends TheEndPortalBlockEntit
 				+ net.vulkanic.bridge.RustGalDeterministicTiming.partialTick(
 					net.minecraft.client.Minecraft.getInstance().getDeltaTracker()
 				);
-			if (submitNodeCollector.submitEndPortal(poseStack, faces, gameTime, 15728880)) return;
+			if (submitNodeCollector.submitEndPortalSemantic(poseStack, faces, gameTime, 15728880)) return;
 			throw new IllegalStateException("Rust whole-frame End Portal route unavailable for semantic cube");
+		}
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Rust whole-frame End Portal route is unavailable; Java custom geometry is not a fallback");
 		}
 		// Iris: Cancel default rendering when shader pack is loaded (from MixinTheEndPortalRenderer)
 		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
@@ -61,7 +68,7 @@ public abstract class AbstractEndPortalRenderer<T extends TheEndPortalBlockEntit
 			return;
 		}
 		
-		submitNodeCollector.submitCustomGeometry(
+		submitNodeCollector.submitCustomGeometrySemantic(
 			poseStack, this.renderType(), (pose, vertexConsumer) -> this.renderCube(endPortalRenderState.facesToShow, pose.pose(), vertexConsumer)
 		);
 	}
@@ -110,8 +117,7 @@ public abstract class AbstractEndPortalRenderer<T extends TheEndPortalBlockEntit
 	protected RenderType renderType() {
 		// Iris: Use entitySolid render type when shader pack is loaded (from MixinTheEndPortalRenderer)
 		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			&& !(net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			&& net.vulkanic.world.WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan())
+			&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
 			&& net.irisshaders.iris.Iris.getCurrentPack().isPresent()) {
 			return net.minecraft.client.renderer.RenderType.entitySolid(net.minecraft.client.renderer.blockentity.TheEndPortalRenderer.END_PORTAL_LOCATION);
 		}

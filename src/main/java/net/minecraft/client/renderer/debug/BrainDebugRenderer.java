@@ -12,12 +12,16 @@ import java.util.UUID;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.Camera;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.SubmitNodeStorage;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.debug.DebugBrainDump;
 import net.minecraft.util.debug.DebugSubscriptions;
 import net.minecraft.util.debug.DebugValueAccess;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.Entity;
 import org.jetbrains.annotations.Nullable;
 
@@ -71,6 +75,43 @@ public class BrainDebugRenderer implements DebugRenderer.SimpleDebugRenderer {
 				this.renderBrainInfo(poseStack, multiBufferSource, entity, debugBrainDump, d, e, f);
 			}
 		});
+	}
+
+	/** Copies the complete brain-debug label set into Rust-owned semantic text. */
+	public void collectRustSemantics(Camera camera, SubmitNodeStorage text) {
+		if ((!net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
+			|| !net.vulkanic.world.WorldRenderRoutePolicy.currentWorldTextRoute().usesRustWholeFrameVulkan()) return;
+		DebugValueAccess access = this.minecraft.getConnection().createDebugValueAccess();
+		if (this.minecraft.player != null && !this.minecraft.player.isSpectator()) this.updateLastLookedAtUuid();
+		access.forEachEntity(DebugSubscriptions.BRAINS, (entity, dump) -> {
+			if (this.minecraft.player == null || !this.minecraft.player.closerThan(entity, MAX_RENDER_DIST_FOR_BRAIN_INFO)) return;
+			boolean selected = this.isMobSelected(entity);
+			int line = 0;
+			line = submitBrainLabel(text, camera, entity, line, dump.name(), -1, 0.03F);
+			if (selected) {
+				line = submitBrainLabel(text, camera, entity, line, dump.profession() + " " + dump.xp() + " xp", -1, TEXT_SCALE);
+				int healthColor = dump.health() < dump.maxHealth() ? ORANGE : -1;
+				line = submitBrainLabel(text, camera, entity, line, "health: " + String.format(Locale.ROOT, "%.1f", dump.health()) + " / " + String.format(Locale.ROOT, "%.1f", dump.maxHealth()), healthColor, TEXT_SCALE);
+				if (!dump.inventory().equals("")) line = submitBrainLabel(text, camera, entity, line, dump.inventory(), PINK, TEXT_SCALE);
+				for (String value : dump.behaviors()) line = submitBrainLabel(text, camera, entity, line, value, CYAN, TEXT_SCALE);
+				for (String value : dump.activities()) line = submitBrainLabel(text, camera, entity, line, value, -16711936, TEXT_SCALE);
+			}
+			if (dump.wantsGolem()) line = submitBrainLabel(text, camera, entity, line, "Wants Golem", ORANGE, TEXT_SCALE);
+			if (selected && dump.angerLevel() != -1) line = submitBrainLabel(text, camera, entity, line, "Anger Level: " + dump.angerLevel(), PINK, TEXT_SCALE);
+			if (selected) {
+				for (String value : dump.gossips()) line = submitBrainLabel(text, camera, entity, line, value, value.startsWith(dump.name()) ? -1 : ORANGE, TEXT_SCALE);
+				for (String value : Lists.reverse(dump.memories())) line = submitBrainLabel(text, camera, entity, line, value, GRAY, TEXT_SCALE);
+			}
+		});
+	}
+
+	private static int submitBrainLabel(SubmitNodeStorage text, Camera camera, Entity entity, int line, String value, int color, float scale) {
+		PoseStack pose = new PoseStack();
+		pose.translate(entity.getBlockX() + 0.5 - camera.getPosition().x, entity.getY() + 2.4 + line * 0.25 - camera.getPosition().y, entity.getBlockZ() + 0.5 - camera.getPosition().z);
+		pose.mulPose(camera.rotation()); pose.scale(scale, -scale, scale);
+		text.submitTextSemantic(0, pose, -0.5F, 0.0F, Component.literal(value).getVisualOrderText(), true, Font.DisplayMode.SEE_THROUGH, color, -1, 0, 0);
+		return line + 1;
 	}
 
 	private void renderBrainInfo(

@@ -15,6 +15,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.ArrayDeque;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -23,11 +24,38 @@ import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public final class VulkanicGalBridge implements AutoCloseable {
+	private static final ThreadLocal<ArrayDeque<Integer>> ACTIVE_BLOCK_ENTITY_IDS =
+		ThreadLocal.withInitial(ArrayDeque::new);
+
+	public static void beginSemanticBlockEntity(int blockEntityId) {
+		ACTIVE_BLOCK_ENTITY_IDS.get().addLast(blockEntityId);
+	}
+
+	public static void endSemanticBlockEntity() {
+		ArrayDeque<Integer> ids = ACTIVE_BLOCK_ENTITY_IDS.get();
+		if (ids.isEmpty()) {
+			ACTIVE_BLOCK_ENTITY_IDS.remove();
+			throw new IllegalStateException("semantic block-entity scope ended without a matching begin");
+		}
+		ids.removeLast();
+		if (ids.isEmpty()) {
+			ACTIVE_BLOCK_ENTITY_IDS.remove();
+		}
+	}
+
+	public static int activeSemanticBlockEntityId() {
+		ArrayDeque<Integer> ids = ACTIVE_BLOCK_ENTITY_IDS.get();
+		return ids.isEmpty() ? -1 : ids.peekLast();
+	}
 	private static final float GUI_UV_OVERLAP_LIMIT = 1.0F / 16.0F;
 	/** Texture bytes already use VulkanicGAL's sampler-row convention. */
 	public static final int WORLD_MESH_TEXTURE_COORDINATE_ORIGIN_VULKANIC = 0;
 	/** PNG rows use Minecraft model UVs, whose V origin is the image top edge. */
 	public static final int WORLD_MESH_TEXTURE_COORDINATE_ORIGIN_MINECRAFT_TOP_LEFT = 1;
+	/** Stable semantic stratum used by Rust for indexed entity/model meshes. */
+	public static final int WORLD_MESH_ENTITY_STRATUM = 67;
+	/** Stable semantic stratum for ordinary block-display mesh producers. */
+	public static final int WORLD_MESH_ORDINARY_BLOCK_STRATUM = 71;
 	private static final boolean TRACE_WORLD_MATERIAL_FRAME =
 		Boolean.getBoolean("mattmc.dev.graphicsAuditMaterialFrameTrace");
 	private static final int TRACE_WORLD_MATERIAL_FRAME_MAX_LOGS =
@@ -1093,7 +1121,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	}
 
 	/**
-	 * Combined-frame transport for the future Rust-owned first-person pass.
+	 * Combined-frame transport for the Rust-owned first-person pass.
 	 * The record is semantic only: no Java renderer, Iris object, or native
 	 * resource can enter this method. Existing callers delegate with explicit
 	 * zero work until extraction and Rust execution are selected together.
@@ -1280,6 +1308,16 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		if (viewMatrix.length != 16 || projectionMatrix.length != 16) {
 			throw new IllegalArgumentException("whole-frame matrices must contain 16 floats");
 		}
+		for (float value : viewMatrix) {
+			if (!Float.isFinite(value)) {
+				throw new IllegalArgumentException("whole-frame view matrix must contain finite values");
+			}
+		}
+		for (float value : projectionMatrix) {
+			if (!Float.isFinite(value)) {
+				throw new IllegalArgumentException("whole-frame projection matrix must contain finite values");
+			}
+		}
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("rust-gal.whole-frame.java-record-packing");
 		MemorySegment segmentArray = Struct.WORLD_LINE_SEGMENT_REQUEST.array(arena, worldSegments.size());
 		for (int i = 0; i < worldSegments.size(); i++) {
@@ -1405,6 +1443,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 41, quad.vertex1PackedLight());
 			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 42, quad.vertex2PackedLight());
 			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 43, quad.vertex3PackedLight());
+			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 44, quad.blockEntityId());
 		}
 		LinkedHashMap<WorldMaterialKeyRecord, Integer> materialTable = new LinkedHashMap<>();
 		int[] materialIndexes = new int[compactMaterialQuads.size()];
@@ -1465,6 +1504,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			Struct.WORLD_MATERIAL_COMPACT_QUAD_REQUEST.setFloat(item, 23, quad.uv3V());
 			Struct.WORLD_MATERIAL_COMPACT_QUAD_REQUEST.setInt(item, 24, quad.sourceColorArgb());
 			Struct.WORLD_MATERIAL_COMPACT_QUAD_REQUEST.setInt(item, 25, quad.packedLight());
+			Struct.WORLD_MATERIAL_COMPACT_QUAD_REQUEST.setInt(item, 26, quad.blockEntityId());
 		}
 		MemorySegment meshInstanceArray = Struct.WORLD_MESH_INSTANCE_RECORD.array(arena, worldMeshInstances.size());
 		for (int i = 0; i < worldMeshInstances.size(); i++) {
@@ -1487,6 +1527,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			float[] transform = instance.transform();
 			MemorySegment.copy(transform, 0, item, ValueLayout.JAVA_FLOAT, transformOffset, 16);
 			Struct.WORLD_MESH_INSTANCE_RECORD.setInt(item, 14, instance.outlineColorArgb());
+			Struct.WORLD_MESH_INSTANCE_RECORD.setInt(item, 15, instance.flags());
+			Struct.WORLD_MESH_INSTANCE_RECORD.setInt(item, 16, instance.blockEntityId());
 		}
 		MemorySegment firstPersonMeshInstanceArray = Struct.WORLD_MESH_INSTANCE_RECORD.array(arena, firstPersonMeshInstances.size());
 		for (int i = 0; i < firstPersonMeshInstances.size(); i++) {
@@ -1509,6 +1551,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			float[] transform = instance.transform();
 			MemorySegment.copy(transform, 0, item, ValueLayout.JAVA_FLOAT, transformOffset, 16);
 			Struct.WORLD_MESH_INSTANCE_RECORD.setInt(item, 14, instance.outlineColorArgb());
+			Struct.WORLD_MESH_INSTANCE_RECORD.setInt(item, 15, instance.flags());
+			Struct.WORLD_MESH_INSTANCE_RECORD.setInt(item, 16, instance.blockEntityId());
 		}
 		MemorySegment worldTextQuadArray = Struct.WORLD_TEXT_QUAD_REQUEST.array(arena, worldTextQuads.size());
 		for (int i = 0; i < worldTextQuads.size(); i++) {
@@ -1530,6 +1574,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			MemorySegment.copy(modelView, 0, item, ValueLayout.JAVA_FLOAT, Struct.WORLD_TEXT_QUAD_REQUEST.offset(10), 16);
 			MemorySegment.copy(positions, 0, item, ValueLayout.JAVA_FLOAT, Struct.WORLD_TEXT_QUAD_REQUEST.offset(11), 12);
 			MemorySegment.copy(uvs, 0, item, ValueLayout.JAVA_FLOAT, Struct.WORLD_TEXT_QUAD_REQUEST.offset(12), 8);
+			Struct.WORLD_TEXT_QUAD_REQUEST.setInt(item, 13, quad.blockEntityId());
 		}
 		MemorySegment lodInstanceArray = Struct.WORLD_LOD_COLUMN_INSTANCE_RECORD.array(arena, worldLodInstances.size());
 		for (int i = 0; i < worldLodInstances.size(); i++) {
@@ -2183,8 +2228,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	/**
 	 * Copies Distant Horizons CPU LOD column semantics into the private Rust
 	 * registry. This does not select a route or issue a draw; callers remain
-	 * responsible for keeping the legacy renderer active until a complete Rust
-	 * LOD material/pass path is admitted.
+	 * responsible for admitting the copied assets before the Rust LOD material
+	 * and pass path consumes them.
 	 */
 	public Status updateWorldLodAssets(
 		long generation,
@@ -2345,18 +2390,34 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	public record GuiAssetRecord(int spriteId, byte[] pngBytes) {
 		public GuiAssetRecord {
 			Objects.requireNonNull(pngBytes, "pngBytes");
+			pngBytes = pngBytes.clone();
+		}
+
+		@Override
+		public byte[] pngBytes() {
+			return this.pngBytes.clone();
 		}
 	}
 
 	/** Format values deliberately match the semantic Rust image contract. */
 	public record GuiRawImageAssetRecord(long assetId, int format, int width, int height, byte[] pixels) {
 		private static final int MAX_RAW_IMAGE_BYTES = 64 * 1024 * 1024;
+		private static final int MAX_RAW_IMAGE_DIMENSION = 8192;
+		private static final int MAX_RAW_IMAGE_PIXELS = 16 * 1024 * 1024;
 
 		public GuiRawImageAssetRecord {
-			if (assetId == 0L || format < 1 || format > 2 || width <= 0 || height <= 0) {
+			if (assetId == 0L || format < 1 || format > 2 || width <= 0 || height <= 0
+				|| width > MAX_RAW_IMAGE_DIMENSION || height > MAX_RAW_IMAGE_DIMENSION) {
 				throw new IllegalArgumentException("invalid semantic GUI raw image asset");
 			}
 			Objects.requireNonNull(pixels, "pixels");
+			long pixelCount = (long) width * height;
+			int bytesPerPixel = format == 1 ? 1 : 4;
+			long expectedBytes = pixelCount * bytesPerPixel;
+			if (pixelCount > MAX_RAW_IMAGE_PIXELS || expectedBytes > MAX_RAW_IMAGE_BYTES
+				|| pixels.length != expectedBytes) {
+				throw new IllegalArgumentException("semantic GUI raw image pixels must exactly match its bounded format and dimensions");
+			}
 			if (pixels.length > MAX_RAW_IMAGE_BYTES) {
 				throw new IllegalArgumentException("semantic GUI raw image exceeds the 64 MiB ABI bound");
 			}
@@ -2379,12 +2440,17 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		int height,
 		byte[] pixels
 	) {
+		private static final int MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 		public WorldTextImageAssetRecord {
 			if (assetId == 0L || atlasGeneration <= 0L || atlasRevision <= 0L
 				|| format < 1 || format > 2 || width <= 0 || height <= 0) {
 				throw new IllegalArgumentException("invalid semantic world text image asset");
 			}
 			Objects.requireNonNull(pixels, "pixels");
+			long expectedBytes = (long) width * height * (format == 1 ? 1L : 4L);
+			if (expectedBytes <= 0L || expectedBytes > MAX_IMAGE_BYTES || pixels.length != expectedBytes) {
+				throw new IllegalArgumentException("semantic world text image pixels must exactly match its bounded format and dimensions");
+			}
 			pixels = pixels.clone();
 		}
 
@@ -2395,20 +2461,50 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	}
 
 	public record WorldBorderAssetRecord(int textureId, byte[] pngBytes) {
+		private static final int MAX_PNG_BYTES = 2 * 1024 * 1024;
 		public WorldBorderAssetRecord {
 			Objects.requireNonNull(pngBytes, "pngBytes");
+			if (pngBytes.length > MAX_PNG_BYTES) {
+				throw new IllegalArgumentException("world-border PNG exceeds the 2 MiB ABI bound");
+			}
+			pngBytes = pngBytes.clone();
+		}
+
+		@Override
+		public byte[] pngBytes() {
+			return this.pngBytes.clone();
 		}
 	}
 
 	public record WorldCrackAssetRecord(int stage, byte[] pngBytes) {
+		private static final int MAX_PNG_BYTES = 4 * 1024 * 1024;
 		public WorldCrackAssetRecord {
 			Objects.requireNonNull(pngBytes, "pngBytes");
+			if (stage < 0 || stage >= 10 || pngBytes.length > MAX_PNG_BYTES) {
+				throw new IllegalArgumentException("invalid or oversized world-crack asset");
+			}
+			pngBytes = pngBytes.clone();
+		}
+
+		@Override
+		public byte[] pngBytes() {
+			return this.pngBytes.clone();
 		}
 	}
 
 	public record WorldMaterialAssetRecord(int textureId, byte[] pngBytes) {
+		private static final int MAX_PNG_BYTES = 4 * 1024 * 1024;
 		public WorldMaterialAssetRecord {
 			Objects.requireNonNull(pngBytes, "pngBytes");
+			if (pngBytes.length > MAX_PNG_BYTES) {
+				throw new IllegalArgumentException("world-material PNG exceeds the 4 MiB ABI bound");
+			}
+			pngBytes = pngBytes.clone();
+		}
+
+		@Override
+		public byte[] pngBytes() {
+			return this.pngBytes.clone();
 		}
 	}
 
@@ -2416,6 +2512,12 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		public ShaderPackSourceFileRecord {
 			Objects.requireNonNull(path, "path");
 			Objects.requireNonNull(contentsUtf8, "contentsUtf8");
+			contentsUtf8 = contentsUtf8.clone();
+		}
+
+		@Override
+		public byte[] contentsUtf8() {
+			return this.contentsUtf8.clone();
 		}
 	}
 
@@ -2423,6 +2525,12 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		public ShaderPackAssetFileRecord {
 			Objects.requireNonNull(path, "path");
 			Objects.requireNonNull(contents, "contents");
+			contents = contents.clone();
+		}
+
+		@Override
+		public byte[] contents() {
+			return this.contents.clone();
 		}
 	}
 
@@ -2483,6 +2591,11 @@ public final class VulkanicGalBridge implements AutoCloseable {
 				throw new IllegalArgumentException("unknown world mesh texture coordinate origin " + coordinateOrigin);
 			}
 		}
+
+		@Override
+		public byte[] pngBytes() {
+			return pngBytes.clone();
+		}
 	}
 
 	public record WorldMeshAnimationFrameRecord(int frameIndex, int durationTicks) {
@@ -2503,6 +2616,11 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		public WorldMeshSortedIndexRecord {
 			Objects.requireNonNull(indexBytes, "indexBytes");
 			indexBytes = indexBytes.clone();
+		}
+
+		@Override
+		public byte[] indexBytes() {
+			return indexBytes.clone();
 		}
 	}
 
@@ -2565,6 +2683,11 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		) {
 			this(meshKey, meshGeneration, vertexLayoutVersion, indexType, vertices, indexBytes, sections, "");
 		}
+
+		@Override
+		public byte[] indexBytes() {
+			return indexBytes.clone();
+		}
 	}
 
 	/** Semantic DH LOD vertex, independent of the producer's legacy GL VAO. */
@@ -2580,7 +2703,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		public WorldLodVertexRecord {
 			if (localX < 0 || localX > 0xFFFF || localY < 0 || localY > 0xFFFF || localZ < 0 || localZ > 0xFFFF
 				|| packedLightAndMicroOffset < 0 || packedLightAndMicroOffset > 0xFFFF
-				|| materialId < 0 || materialId > 0xFF || normalIndex < 0 || normalIndex > 0xFF) {
+				|| materialId < 0 || materialId > 15 || normalIndex < 0 || normalIndex > 5) {
 				throw new IllegalArgumentException("world LOD vertex field outside its semantic range");
 			}
 		}
@@ -2634,7 +2757,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		}
 
 		public WorldLodSegmentMaterialProvenanceRecord {
-			if (layer <= 0 || segmentIndex < 0) {
+			if (layer <= 0 || layer > 4 || segmentIndex < 0) {
 				throw new IllegalArgumentException("world LOD segment provenance has an invalid layer or index");
 			}
 			Objects.requireNonNull(quadMaterialIds, "quadMaterialIds");
@@ -2647,6 +2770,21 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			quadMaterialIds = quadMaterialIds.clone();
 			quadVariantStates = quadVariantStates.clone();
 			quadVariantPositions = quadVariantPositions.clone();
+		}
+
+		@Override
+		public int[] quadMaterialIds() {
+			return quadMaterialIds.clone();
+		}
+
+		@Override
+		public byte[] quadVariantStates() {
+			return quadVariantStates.clone();
+		}
+
+		@Override
+		public long[] quadVariantPositions() {
+			return quadVariantPositions.clone();
 		}
 	}
 
@@ -2753,7 +2891,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		int order
 	) {
 		public WorldLodColumnInstanceRecord {
-			if (columnGeneration <= 0L || layer <= 0 || segmentIndex < 0 || order < 0) {
+			if (columnGeneration <= 0L || layer <= 0 || layer > 4 || segmentIndex < 0 || order < 0) {
 				throw new IllegalArgumentException("world LOD instance has an invalid semantic field");
 			}
 		}
@@ -3098,6 +3236,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 				this.colorArgb, this.x, this.y, this.width, this.height, this.guiWidth, this.guiHeight, value
 			);
 		}
+
 	}
 
 	/** Backend-neutral affine glyph/image primitive in GUI logical coordinates. */
@@ -3307,6 +3446,14 @@ public final class VulkanicGalBridge implements AutoCloseable {
 				0
 			);
 		}
+
+		public WorldLineSegmentRecord {
+			if (viewportWidth <= 0 || viewportHeight <= 0 || !Float.isFinite(lineWidth) || lineWidth <= 0.0F
+				|| !Float.isFinite(startX) || !Float.isFinite(startY) || !Float.isFinite(startZ)
+				|| !Float.isFinite(endX) || !Float.isFinite(endY) || !Float.isFinite(endZ)) {
+				throw new IllegalArgumentException("world line segment contains invalid copied geometry");
+			}
+		}
 	}
 
 	public record WorldCrackQuadRecord(
@@ -3321,10 +3468,14 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		int viewportHeight
 	) {
 		public WorldCrackQuadRecord {
-			Objects.requireNonNull(vertices, "vertices");
-			if (vertices.length != 12) {
-				throw new IllegalArgumentException("world crack quad requires four xyz vertices");
-			}
+			if (viewportWidth <= 0 || viewportHeight <= 0) throw new IllegalArgumentException("world crack quad viewport");
+			vertices = checkedFiniteCopy(vertices, 12, "world crack quad vertices");
+			vertices = vertices.clone();
+		}
+
+		@Override
+		public float[] vertices() {
+			return vertices.clone();
 		}
 	}
 
@@ -3348,10 +3499,18 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		int viewportHeight
 	) {
 		public WorldBorderQuadRecord {
-			Objects.requireNonNull(vertices, "vertices");
-			if (vertices.length != 12) {
-				throw new IllegalArgumentException("world border quad requires four xyz vertices");
+			if (viewportWidth <= 0 || viewportHeight <= 0 || !Float.isFinite(borderSize)
+				|| !Float.isFinite(distanceToBorder) || !Float.isFinite(scrollU) || !Float.isFinite(scrollV)
+				|| !Float.isFinite(uvU) || !Float.isFinite(uvV) || !Float.isFinite(uvWidth) || !Float.isFinite(uvHeight)) {
+				throw new IllegalArgumentException("world border quad contains invalid copied state");
 			}
+			vertices = checkedFiniteCopy(vertices, 12, "world border quad vertices");
+			vertices = vertices.clone();
+		}
+
+		@Override
+		public float[] vertices() {
+			return vertices.clone();
 		}
 	}
 
@@ -3398,24 +3557,65 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		int vertex0PackedLight,
 		int vertex1PackedLight,
 		int vertex2PackedLight,
-		int vertex3PackedLight
+		int vertex3PackedLight,
+		int blockEntityId
 	) {
+		public WorldMaterialQuadRecord {
+			if (blockEntityId < -1 || viewportWidth <= 0 || viewportHeight <= 0
+				|| viewportWidth > 16384 || viewportHeight > 16384
+				|| !Float.isFinite(p0X) || !Float.isFinite(p0Y) || !Float.isFinite(p0Z)
+				|| !Float.isFinite(p1X) || !Float.isFinite(p1Y) || !Float.isFinite(p1Z)
+				|| !Float.isFinite(p2X) || !Float.isFinite(p2Y) || !Float.isFinite(p2Z)
+				|| !Float.isFinite(p3X) || !Float.isFinite(p3Y) || !Float.isFinite(p3Z)
+				|| !Float.isFinite(uv0U) || !Float.isFinite(uv0V)
+				|| !Float.isFinite(uv1U) || !Float.isFinite(uv1V)
+				|| !Float.isFinite(uv2U) || !Float.isFinite(uv2V)
+				|| !Float.isFinite(uv3U) || !Float.isFinite(uv3V)) {
+				throw new IllegalArgumentException("world material quad contains invalid copied geometry");
+			}
+			if (blockEntityId < -1) {
+				throw new IllegalArgumentException("world material quad block entity id must be >= -1");
+			}
+		}
+
 		public WorldMaterialQuadRecord(
 			int stratum, int materialId, int textureId, int materialMode, int depthPolicy, int cullPolicy,
 			int topology, int winding, int colorArgb,
 			float p0X, float p0Y, float p0Z, float p1X, float p1Y, float p1Z,
 			float p2X, float p2Y, float p2Z, float p3X, float p3Y, float p3Z,
 			float uv0U, float uv0V, float uv1U, float uv1V, float uv2U, float uv2V, float uv3U, float uv3V,
-			int viewportWidth, int viewportHeight, int sourceProgram, int sourceUvSpace, int sourceColorArgb, int packedLight
+		int viewportWidth, int viewportHeight, int sourceProgram, int sourceUvSpace, int sourceColorArgb, int packedLight
 		) {
 			this(
 				stratum, materialId, textureId, materialMode, depthPolicy, cullPolicy, topology, winding, colorArgb,
 				p0X, p0Y, p0Z, p1X, p1Y, p1Z, p2X, p2Y, p2Z, p3X, p3Y, p3Z,
 				uv0U, uv0V, uv1U, uv1V, uv2U, uv2V, uv3U, uv3V,
 				viewportWidth, viewportHeight, sourceProgram, sourceUvSpace, sourceColorArgb, packedLight,
-				sourceColorArgb, sourceColorArgb, sourceColorArgb, sourceColorArgb,
-				packedLight, packedLight, packedLight, packedLight
+				 sourceColorArgb, sourceColorArgb, sourceColorArgb, sourceColorArgb,
+				 packedLight, packedLight, packedLight, packedLight,
+				 activeSemanticBlockEntityId()
 			);
+		}
+
+		/** Backward-compatible vertex-modulated constructor; captures only the
+		 * active copied semantic block-entity scope. */
+		public WorldMaterialQuadRecord(
+			int stratum, int materialId, int textureId, int materialMode, int depthPolicy, int cullPolicy,
+			int topology, int winding, int colorArgb,
+			float p0X, float p0Y, float p0Z, float p1X, float p1Y, float p1Z,
+			float p2X, float p2Y, float p2Z, float p3X, float p3Y, float p3Z,
+			float uv0U, float uv0V, float uv1U, float uv1V, float uv2U, float uv2V, float uv3U, float uv3V,
+			int viewportWidth, int viewportHeight, int sourceProgram, int sourceUvSpace, int sourceColorArgb, int packedLight,
+			int vertex0ColorArgb, int vertex1ColorArgb, int vertex2ColorArgb, int vertex3ColorArgb,
+			int vertex0PackedLight, int vertex1PackedLight, int vertex2PackedLight, int vertex3PackedLight
+		) {
+			this(stratum, materialId, textureId, materialMode, depthPolicy, cullPolicy, topology, winding, colorArgb,
+				p0X, p0Y, p0Z, p1X, p1Y, p1Z, p2X, p2Y, p2Z, p3X, p3Y, p3Z,
+				uv0U, uv0V, uv1U, uv1V, uv2U, uv2V, uv3U, uv3V,
+				viewportWidth, viewportHeight, sourceProgram, sourceUvSpace, sourceColorArgb, packedLight,
+				vertex0ColorArgb, vertex1ColorArgb, vertex2ColorArgb, vertex3ColorArgb,
+				vertex0PackedLight, vertex1PackedLight, vertex2PackedLight, vertex3PackedLight,
+				activeSemanticBlockEntityId());
 		}
 
 		public boolean hasVertexModulation() {
@@ -3436,6 +3636,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		int topology,
 		int winding,
 		int sourceProgram
+		,
+		int blockEntityId
 	) {
 		static WorldMaterialKeyRecord from(WorldMaterialQuadRecord quad) {
 			return new WorldMaterialKeyRecord(
@@ -3447,7 +3649,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 				quad.cullPolicy(),
 				quad.topology(),
 				quad.winding(),
-				quad.sourceProgram()
+				quad.sourceProgram(),
+				quad.blockEntityId()
 			);
 		}
 	}
@@ -3466,8 +3669,44 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		int viewportHeight,
 		int entityId,
 		int entityColorArgb,
-		int outlineColorArgb
+		int outlineColorArgb,
+		int flags,
+		int blockEntityId
 	) {
+		public WorldMeshInstanceRecord(
+			int stratum,
+			long meshKey,
+			long meshGeneration,
+			int meshSectionIndex,
+			int depthPolicy,
+			int cullPolicy,
+			int winding,
+			int colorArgb,
+			float[] transform,
+			int viewportWidth,
+			int viewportHeight,
+			int entityId,
+			int entityColorArgb,
+			int outlineColorArgb
+		) {
+			this(stratum, meshKey, meshGeneration, meshSectionIndex, depthPolicy, cullPolicy, winding,
+				colorArgb, transform, viewportWidth, viewportHeight, entityId, entityColorArgb, outlineColorArgb, 0,
+				activeSemanticBlockEntityId());
+		}
+
+		/** Backward-compatible explicit-flags constructor; block identity is the
+		 * active copied semantic scope, never an Iris lookup. */
+		public WorldMeshInstanceRecord(
+			int stratum, long meshKey, long meshGeneration, int meshSectionIndex,
+			int depthPolicy, int cullPolicy, int winding, int colorArgb, float[] transform,
+			int viewportWidth, int viewportHeight, int entityId, int entityColorArgb,
+			int outlineColorArgb, int flags
+		) {
+			this(stratum, meshKey, meshGeneration, meshSectionIndex, depthPolicy, cullPolicy, winding,
+				colorArgb, transform, viewportWidth, viewportHeight, entityId, entityColorArgb,
+				outlineColorArgb, flags, activeSemanticBlockEntityId());
+		}
+
 		public WorldMeshInstanceRecord(
 			int stratum,
 			long meshKey,
@@ -3495,16 +3734,35 @@ public final class VulkanicGalBridge implements AutoCloseable {
 				viewportHeight,
 				0,
 				0,
-				0
+				0,
+				0,
+				-1
 			);
 		}
 
 		public WorldMeshInstanceRecord {
 			Objects.requireNonNull(transform, "transform");
+			if (meshKey == 0L || meshGeneration == 0L) {
+				throw new IllegalArgumentException("world mesh instance key and generation must be non-zero");
+			}
+			if (flags < 0 || (flags & ~1) != 0) {
+				throw new IllegalArgumentException("world mesh instance contains unknown semantic flags");
+			}
+			if (blockEntityId < -1) {
+				throw new IllegalArgumentException("world mesh instance block entity id must be >= -1");
+			}
+			if ((flags & 1) != 0 && (stratum != WORLD_MESH_ENTITY_STRATUM || outlineColorArgb == 0)) {
+				throw new IllegalArgumentException("outline-only mesh instances require an entity stratum and outline color");
+			}
 			if (transform.length != 16) {
 				throw new IllegalArgumentException("world mesh instance transform must contain 16 floats");
 			}
 			transform = transform.clone();
+		}
+
+		@Override
+		public float[] transform() {
+			return transform.clone();
 		}
 	}
 
@@ -3520,12 +3778,22 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		double distanceToCameraSq,
 		float[] modelViewMatrix,
 		float[] positions,
-		float[] uvs
+		float[] uvs,
+		int blockEntityId
 	) {
+		public WorldTextQuadRecord(long assetId, long atlasGeneration, long atlasRevision, boolean colored,
+			int depthPolicy, int packedLight, int colorArgb, double distanceToCameraSq,
+			float[] modelViewMatrix, float[] positions, float[] uvs) {
+			this(assetId, atlasGeneration, atlasRevision, colored, depthPolicy, packedLight, colorArgb,
+				distanceToCameraSq, modelViewMatrix, positions, uvs, -1);
+		}
 		public WorldTextQuadRecord {
 			Objects.requireNonNull(modelViewMatrix, "modelViewMatrix");
 			Objects.requireNonNull(positions, "positions");
 			Objects.requireNonNull(uvs, "uvs");
+			if (blockEntityId < -1) {
+				throw new IllegalArgumentException("world text quad block entity id must be >= -1");
+			}
 			if (assetId == 0L || atlasGeneration <= 0L || atlasRevision <= 0L
 				|| (depthPolicy != 1 && depthPolicy != 2 && depthPolicy != 3) || !Double.isFinite(distanceToCameraSq)
 				|| distanceToCameraSq < 0.0 || modelViewMatrix.length != 16
@@ -3637,7 +3905,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		}
 	}
 
-	/** Coarse world/camera semantic input for a future Rust-owned volume mapping. */
+	/** Copied world/camera semantic input consumed by the Rust-owned volume mapping. */
 	public record WorldVoxelVolumeFrameRecord(
 		boolean enabled,
 		long worldGeneration,
@@ -3646,13 +3914,19 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		float cameraY,
 		float cameraZ
 	) {
+		public WorldVoxelVolumeFrameRecord {
+			if (!Float.isFinite(cameraX) || !Float.isFinite(cameraY) || !Float.isFinite(cameraZ)) {
+				throw new IllegalArgumentException("voxel-volume camera coordinates must be finite");
+			}
+		}
+
 		public static WorldVoxelVolumeFrameRecord disabled() {
 			return new WorldVoxelVolumeFrameRecord(false, 0L, 0L, 0.0F, 0.0F, 0.0F);
 		}
 	}
 
 	/**
-	 * Coarse first-person projection/depth semantics for the future Rust-owned
+	 * Coarse first-person projection/depth semantics for the Rust-owned
 	 * held-item pass. This contains no Java renderer, Iris state, native object,
 	 * or backend policy. Per-item transforms remain mesh-instance data while
 	 * the frame supplies the distinct hand model-view and projection domains.
@@ -3676,8 +3950,28 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			if (mainHandInstanceCount < 0) {
 				throw new IllegalArgumentException("first-person main-hand instance count must be non-negative");
 			}
+			for (float value : projectionMatrix) {
+				if (!Float.isFinite(value)) {
+					throw new IllegalArgumentException("first-person projection matrix must contain finite values");
+				}
+			}
+			for (float value : modelViewMatrix) {
+				if (!Float.isFinite(value)) {
+					throw new IllegalArgumentException("first-person model-view matrix must contain finite values");
+				}
+			}
 			projectionMatrix = projectionMatrix.clone();
 			modelViewMatrix = modelViewMatrix.clone();
+		}
+
+		@Override
+		public float[] projectionMatrix() {
+			return projectionMatrix.clone();
+		}
+
+		@Override
+		public float[] modelViewMatrix() {
+			return modelViewMatrix.clone();
 		}
 
 		public static WorldFirstPersonFrameRecord disabled() {
@@ -3685,7 +3979,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		}
 	}
 
-	/** Copied vanilla environment semantics for future Rust-owned shader work. */
+	/** Copied vanilla environment semantics consumed by Rust-owned shader work. */
 	public record WorldShaderEnvironmentFrameRecord(
 		boolean enabled,
 		long worldGeneration,

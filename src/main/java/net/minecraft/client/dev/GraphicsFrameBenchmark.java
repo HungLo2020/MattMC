@@ -525,6 +525,15 @@ public final class GraphicsFrameBenchmark {
 		SUBMITTED_WORK_COUNTS.merge(normalizedFamily, 1, Integer::sum);
 	}
 
+	/** Capture-only count used by deterministic settling when an explicit backend
+	 * reports its completion on a different render-hook thread. */
+	public static int submittedWorkCount(String family) {
+		if (family == null) {
+			return 0;
+		}
+		return SUBMITTED_WORK_COUNTS.getOrDefault(family.trim(), 0);
+	}
+
 	public static void recordFallingBlockRouteDecision(String route, BlockState blockState) {
 		recordMovingBlockRouteDecision("falling-block", route, blockState);
 	}

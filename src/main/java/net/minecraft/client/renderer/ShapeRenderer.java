@@ -16,6 +16,7 @@ import org.joml.Vector3f;
 @Environment(EnvType.CLIENT)
 public class ShapeRenderer {
 	public static void renderShape(PoseStack poseStack, VertexConsumer vertexConsumer, VoxelShape voxelShape, double d, double e, double f, int i) {
+		rejectSelectedVulkanJavaGeometry();
 		PoseStack.Pose pose = poseStack.last();
 		voxelShape.forAllEdges((g, h, j, k, l, m) -> {
 			Vector3f vector3f = new Vector3f((float)(k - g), (float)(l - h), (float)(m - j)).normalize();
@@ -51,6 +52,7 @@ public class ShapeRenderer {
 		float o,
 		float p
 	) {
+		rejectSelectedVulkanJavaGeometry();
 		// Sodium: Use fast intrinsics path if available (merged from LevelRendererMixin outlines)
 		var writer = VertexConsumerUtils.convertOrLog(vertexConsumer);
 
@@ -92,6 +94,21 @@ public class ShapeRenderer {
 		vertexConsumer.addVertex(pose, t, u, v).setColor(j, k, l, m).setNormal(pose, 0.0F, 0.0F, 1.0F);
 	}
 
+	/**
+	 * ShapeRenderer is a Java VertexConsumer compatibility helper.  Selected
+	 * Vulkan frames must reach the semantic Rust collectors before this layer;
+	 * retaining this boundary prevents an accidental caller from silently
+	 * appending Java geometry to a Rust-owned presentation frame.
+	 */
+	private static void rejectSelectedVulkanJavaGeometry() {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException(
+				"Java ShapeRenderer geometry is unavailable while Rust owns whole-frame Vulkan presentation"
+			);
+		}
+	}
+
 	public static void addChainedFilledBoxVertices(
 		PoseStack poseStack, VertexConsumer vertexConsumer, double d, double e, double f, double g, double h, double i, float j, float k, float l, float m
 	) {
@@ -101,6 +118,7 @@ public class ShapeRenderer {
 	public static void addChainedFilledBoxVertices(
 		PoseStack poseStack, VertexConsumer vertexConsumer, float f, float g, float h, float i, float j, float k, float l, float m, float n, float o
 	) {
+		rejectSelectedVulkanJavaGeometry();
 		Matrix4f matrix4f = poseStack.last().pose();
 		vertexConsumer.addVertex(matrix4f, f, g, h).setColor(l, m, n, o);
 		vertexConsumer.addVertex(matrix4f, f, g, h).setColor(l, m, n, o);
@@ -149,6 +167,7 @@ public class ShapeRenderer {
 		float n,
 		float o
 	) {
+		rejectSelectedVulkanJavaGeometry();
 		switch (direction) {
 			case DOWN:
 				vertexConsumer.addVertex(matrix4f, f, g, h).setColor(l, m, n, o);
@@ -189,6 +208,7 @@ public class ShapeRenderer {
 	}
 
 	public static void renderVector(PoseStack poseStack, VertexConsumer vertexConsumer, Vector3f vector3f, Vec3 vec3, int i) {
+		rejectSelectedVulkanJavaGeometry();
 		PoseStack.Pose pose = poseStack.last();
 		vertexConsumer.addVertex(pose, vector3f).setColor(i).setNormal(pose, (float)vec3.x, (float)vec3.y, (float)vec3.z);
 		vertexConsumer.addVertex(pose, (float)(vector3f.x() + vec3.x), (float)(vector3f.y() + vec3.y), (float)(vector3f.z() + vec3.z))

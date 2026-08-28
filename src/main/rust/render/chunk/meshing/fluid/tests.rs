@@ -1,6 +1,14 @@
 use super::*;
 
 #[test]
+fn native_fluid_admission_is_explicitly_bounded_to_water_and_lava() {
+    assert!(is_supported_native_fluid_type(FLUID_WATER));
+    assert!(is_supported_native_fluid_type(FLUID_LAVA));
+    assert!(!is_supported_native_fluid_type(0));
+    assert!(!is_supported_native_fluid_type(99));
+}
+
+#[test]
 fn fluid_face_record_expands_semantic_side_face_to_quad() {
     let mut record = FluidFaceRecord {
         packed_normal: 0,

@@ -1,5 +1,5 @@
 use std::borrow::Cow;
-use std::collections::{BTreeMap, BTreeSet, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, HashSet, VecDeque};
 use std::sync::Arc;
 
 use ash::vk;
@@ -51,6 +51,8 @@ pub(super) struct SubmissionLowerer {
     metrics: VulkanLoweringMetrics,
     timestamp_pool: Option<vk::QueryPool>,
     next_timestamp_set: u32,
+    live_command_buffers: HashSet<vk::CommandBuffer>,
+    recycled_command_buffers: Vec<vk::CommandBuffer>,
 }
 
 const GPU_TIMESTAMP_SET_COUNT: u32 = 8;
@@ -151,6 +153,8 @@ impl SubmissionLowerer {
             metrics: VulkanLoweringMetrics::default(),
             timestamp_pool,
             next_timestamp_set: 0,
+            live_command_buffers: HashSet::new(),
+            recycled_command_buffers: Vec::new(),
         }
     }
 
@@ -159,6 +163,11 @@ impl SubmissionLowerer {
         objects: &VulkanObjects,
         batch: &ValidatedSubmissionBatch,
     ) -> GalResult<()> {
+        stdout_trace(&format!(
+            "vulkan.encode.batch label={} lists={}",
+            sanitize_label(&batch.label),
+            batch.command_lists.len()
+        ));
         let alloc_started = std::time::Instant::now();
         let timestamp_set = self.allocate_timestamp_set();
         self.metrics.command_buffer_alloc_nanos = self
@@ -188,6 +197,9 @@ impl SubmissionLowerer {
                 state.compute_pipeline = None;
                 state.pipeline_layout = None;
                 let command_buffer = self.allocate_command_buffer()?;
+                if !self.live_command_buffers.insert(command_buffer) {
+                    return Err(GalError::backend("Vulkan allocated a duplicate live command buffer"));
+                }
                 command_buffers.push(command_buffer);
                 self.metrics.command_buffers_allocated += 1;
                 let begin_info = vk::CommandBufferBeginInfo::default()
@@ -231,6 +243,11 @@ impl SubmissionLowerer {
                     }
                 }
                 if let Some(list) = batch.command_lists.get(index) {
+                    stdout_trace(&format!(
+                        "vulkan.encode.list label={} ops={}",
+                        sanitize_label(&list.label),
+                        list.operations.len()
+                    ));
                     unsafe {
                         self.context.begin_label(
                             command_buffer,
@@ -238,7 +255,9 @@ impl SubmissionLowerer {
                         )
                     };
                     for op in &list.operations {
+                        stdout_trace(&format!("vulkan.encode.begin cb=0x{:016x} op={}", command_buffer.as_raw(), command_op_kind(op)));
                         self.encode_op(objects, command_buffer, &mut state, op)?;
+                        stdout_trace(&format!("vulkan.encode.end cb=0x{:016x} op={}", command_buffer.as_raw(), command_op_kind(op)));
                     }
                     unsafe { self.context.end_label(command_buffer) };
                 }
@@ -279,11 +298,7 @@ impl SubmissionLowerer {
             Ok(())
         })();
         if let Err(error) = result {
-            unsafe {
-                self.context
-                    .device
-                    .free_command_buffers(self.context.command_pool, &command_buffers);
-            }
+            self.free_command_buffers(&command_buffers)?;
             self.metrics.command_buffers_freed += command_buffers.len() as u64;
             return Err(error);
         }
@@ -328,22 +343,57 @@ impl SubmissionLowerer {
             .command_buffer_infos(&command_buffer_infos)
             .signal_semaphore_infos(&signal_info);
         let queue_submit_started = std::time::Instant::now();
-        unsafe {
+        let submit_result = unsafe {
             self.context
                 .device
                 .queue_submit2(self.context.queue, &[submit], vk::Fence::null())
-        }
-        .map_err(|error| GalError::backend(format!("Vulkan queue submit failed: {error:?}")))?;
+        };
         self.metrics.queue_submit_nanos = self
             .metrics
             .queue_submit_nanos
             .saturating_add(elapsed_nanos_u64(queue_submit_started));
+        if let Err(error) = submit_result {
+            // queue_submit2 did not take ownership of these command buffers.
+            // Release them immediately so a failed submission cannot leak
+            // live ownership or exhaust the bounded command-buffer pool.
+            let failure_bytes = format!("Vulkan queue submit failed: {error:?}").into_bytes();
+            for request in &encoded.host_reads {
+                self.completed_host_reads.push(CompletedHostRead {
+                    submission: id,
+                    buffer: request.buffer,
+                    offset: request.offset,
+                    bytes: failure_bytes.clone(),
+                });
+            }
+            let command_buffer_count = encoded.command_buffers.len() as u64;
+            self.free_command_buffers(&encoded.command_buffers)?;
+            self.metrics.command_buffers_freed = self
+                .metrics
+                .command_buffers_freed
+                .saturating_add(command_buffer_count);
+            return Err(GalError::backend(String::from_utf8_lossy(&failure_bytes).into_owned()));
+        }
         self.in_flight.push_back(InFlightSubmission {
             id,
             command_buffers: encoded.command_buffers,
             host_reads: encoded.host_reads,
             timestamp_set: encoded.timestamp_set,
         });
+        debug_assert!(
+            self.in_flight.len() <= MAX_IN_FLIGHT_SUBMISSIONS,
+            "Vulkan lowerer exceeded its bounded in-flight submission window"
+        );
+        if std::env::var_os("MATTMC_TRACE_SUBMISSIONS").is_some() {
+            println!(
+                "vulkan.submission.ownership id={} pending={} in_flight={} live_command_buffers={} allocated={} freed={}",
+                id.0,
+                self.pending.len(),
+                self.in_flight.len(),
+                self.live_command_buffers.len(),
+                self.metrics.command_buffers_allocated,
+                self.metrics.command_buffers_freed,
+            );
+        }
         Ok(())
     }
 
@@ -367,11 +417,8 @@ impl SubmissionLowerer {
             let complete = self.in_flight.pop_front().expect("front existed");
             self.complete_host_reads(&complete);
             self.complete_gpu_timestamps(&complete);
-            unsafe {
-                self.context
-                    .device
-                    .free_command_buffers(self.context.command_pool, &complete.command_buffers);
-            }
+            self.free_command_buffers(&complete.command_buffers)
+                .expect("retiring a Vulkan submission must own its command buffers");
             self.metrics.command_buffers_freed += complete.command_buffers.len() as u64;
         }
         self.completed
@@ -391,11 +438,7 @@ impl SubmissionLowerer {
                 .timeline_wait_nanos
                 .saturating_add(elapsed_nanos_u64(wait_started));
             self.metrics.wait_count += 1;
-            unsafe {
-                self.context
-                    .device
-                    .free_command_buffers(self.context.command_pool, &complete.command_buffers);
-            }
+            self.free_command_buffers(&complete.command_buffers)?;
             self.metrics.command_buffers_freed += complete.command_buffers.len() as u64;
             self.complete_host_reads(&complete);
             self.complete_gpu_timestamps(&complete);
@@ -435,21 +478,25 @@ impl SubmissionLowerer {
             .device_wait_idle_nanos
             .saturating_add(elapsed_nanos_u64(wait_started));
         self.metrics.device_wait_idle_count += 1;
-        for encoded in self.pending.drain(..) {
-            unsafe {
-                self.context
-                    .device
-                    .free_command_buffers(self.context.command_pool, &encoded.command_buffers);
-            }
+        let pending = self.pending.drain(..).collect::<Vec<_>>();
+        for encoded in pending {
+            self.free_command_buffers(&encoded.command_buffers)
+                .expect("clearing pending Vulkan commands must own their command buffers");
             self.metrics.command_buffers_freed += encoded.command_buffers.len() as u64;
         }
-        for complete in self.in_flight.drain(..) {
+        let in_flight = self.in_flight.drain(..).collect::<Vec<_>>();
+        for complete in in_flight {
+            self.free_command_buffers(&complete.command_buffers)
+                .expect("clearing in-flight Vulkan commands must own their command buffers");
+            self.metrics.command_buffers_freed += complete.command_buffers.len() as u64;
+        }
+        if !self.recycled_command_buffers.is_empty() {
             unsafe {
                 self.context
                     .device
-                    .free_command_buffers(self.context.command_pool, &complete.command_buffers);
+                    .free_command_buffers(self.context.command_pool, &self.recycled_command_buffers);
             }
-            self.metrics.command_buffers_freed += complete.command_buffers.len() as u64;
+            self.recycled_command_buffers.clear();
         }
     }
 
@@ -537,7 +584,20 @@ impl SubmissionLowerer {
         }
     }
 
-    fn allocate_command_buffer(&self) -> GalResult<vk::CommandBuffer> {
+    fn allocate_command_buffer(&mut self) -> GalResult<vk::CommandBuffer> {
+        if let Some(command_buffer) = self.recycled_command_buffers.pop() {
+            unsafe {
+                self.context
+                    .device
+                    .reset_command_buffer(command_buffer, vk::CommandBufferResetFlags::empty())
+            }
+            .map_err(|error| {
+                GalError::backend(format!(
+                    "failed to reset recycled Vulkan command buffer: {error:?}"
+                ))
+            })?;
+            return Ok(command_buffer);
+        }
         let allocate_info = vk::CommandBufferAllocateInfo::default()
             .command_pool(self.context.command_pool)
             .level(vk::CommandBufferLevel::PRIMARY)
@@ -551,6 +611,38 @@ impl SubmissionLowerer {
             .into_iter()
             .next()
             .ok_or_else(|| GalError::backend("Vulkan returned no command buffer"))
+    }
+
+    fn free_command_buffers(&mut self, command_buffers: &[vk::CommandBuffer]) -> GalResult<()> {
+        let requested = command_buffers.iter().copied().collect::<HashSet<_>>();
+        if requested.len() != command_buffers.len()
+            || requested
+                .iter()
+                .any(|command_buffer| !self.live_command_buffers.contains(command_buffer))
+        {
+            return Err(GalError::backend(
+                "Vulkan command buffer retired more than once or was never owned",
+            ));
+        }
+        for command_buffer in command_buffers {
+            if !self.live_command_buffers.remove(command_buffer) {
+                return Err(GalError::backend("Vulkan command buffer retired more than once or was never owned"));
+            }
+        }
+        for command_buffer in command_buffers {
+            unsafe {
+                self.context
+                    .device
+                    .reset_command_buffer(*command_buffer, vk::CommandBufferResetFlags::empty())
+            }
+            .map_err(|error| {
+                GalError::backend(format!(
+                    "failed to reset retired Vulkan command buffer: {error:?}"
+                ))
+            })?;
+            self.recycled_command_buffers.push(*command_buffer);
+        }
+        Ok(())
     }
 
     fn encode_op(
@@ -568,6 +660,7 @@ impl SubmissionLowerer {
                     colors,
                     depth_stencil,
                 } => {
+                    stdout_trace(&format!("vulkan.begin-pass target=0x{:016x} colors={} depth={}", target.raw(), colors.len(), depth_stencil.is_some()));
                     let pass_object = objects.render_pass(*pass)?;
                     let timestamp_pass = timestamp_pass_kind(&pass_object.label);
                     if let Some(pass_kind) = timestamp_pass {
@@ -621,6 +714,7 @@ impl SubmissionLowerer {
                             &vk::DependencyInfo::default()
                                 .image_memory_barriers(std::slice::from_ref(&to_attachment)),
                         );
+                        stdout_trace("vulkan.begin-pass.frame-barrier");
                         state
                             .frame_target_layouts
                             .insert(*target, vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL);
@@ -752,6 +846,7 @@ impl SubmissionLowerer {
                     self.context
                         .device
                         .cmd_begin_rendering(command_buffer, &rendering);
+                    stdout_trace("vulkan.begin-pass.cmd-begin-rendering");
                     let viewport = vk::Viewport {
                         x: 0.0,
                         y: extent.height as f32,
@@ -832,6 +927,15 @@ impl SubmissionLowerer {
                     set,
                     dynamic_offsets,
                 } => {
+                    if std::env::var_os("MATTMC_TRACE_ENTITY_TEXTURE_OPS").is_some() {
+                        eprintln!(
+                            "vulkan.bind-resource-set layout={:?} set_index={} set={:?} dynamic_offsets={:?}",
+                            pipeline_layout,
+                            set_index,
+                            set,
+                            dynamic_offsets,
+                        );
+                    }
                     let layout = objects.pipeline_layout(*pipeline_layout)?;
                     let set = objects.resource_set(*set)?;
                     let bind_dynamic_offsets = if dynamic_offsets.is_empty() {
@@ -961,6 +1065,20 @@ impl SubmissionLowerer {
                     let _zone = trace::Zone::new("vulkan.lowering.copy-buffer-to-texture");
                     let buffer = objects.buffer(region.buffer)?;
                     let texture = objects.texture(region.texture)?;
+                    if std::env::var_os("MATTMC_TRACE_ENTITY_TEXTURE_OPS").is_some() {
+                        eprintln!(
+                            "vulkan.copy-buffer-to-texture buffer={:?} texture={:?} label={} offset={} row={} rows={} extent={}x{}x{}",
+                            region.buffer,
+                            region.texture,
+                            texture.label,
+                            region.buffer_offset,
+                            region.bytes_per_row,
+                            region.rows_per_image,
+                            region.extent.width,
+                            region.extent.height,
+                            region.extent.depth,
+                        );
+                    }
                     let copy =
                         buffer_image_copy(region, texture.aspect, texture.copy_bytes_per_texel);
                     self.context.device.cmd_copy_buffer_to_image(
@@ -1072,6 +1190,77 @@ impl SubmissionLowerer {
                         .frame_target_layouts
                         .insert(*src, vk::ImageLayout::TRANSFER_SRC_OPTIMAL);
                 }
+                CommandOp::CopyTextureToFrameTarget { src, dst, extent } => {
+                    let _zone = trace::Zone::new("vulkan.lowering.copy-to-frame-target");
+                    if state.in_pass {
+                        return Err(GalError::backend(
+                            "frame-target presentation copy cannot be encoded inside a render pass",
+                        ));
+                    }
+                    // The GAL validator requires the source texture to carry
+                    // TransferSrc usage; Vulkan lowering accepts the explicit
+                    // source layout established by the preceding barrier.
+                    let source = objects.texture(*src)?;
+                    let frame = objects.frame_target(*dst)?;
+                    let old_layout = state
+                        .frame_target_layouts
+                        .get(dst)
+                        .copied()
+                        .unwrap_or(frame.image_layout);
+                    let range = vk::ImageSubresourceRange {
+                        aspect_mask: vk::ImageAspectFlags::COLOR,
+                        base_mip_level: 0,
+                        level_count: 1,
+                        base_array_layer: 0,
+                        layer_count: 1,
+                    };
+                    let to_transfer = vk::ImageMemoryBarrier2::default()
+                        .src_stage_mask(frame_layout_stage_mask(old_layout))
+                        .src_access_mask(frame_layout_access_mask(old_layout))
+                        .dst_stage_mask(vk::PipelineStageFlags2::COPY)
+                        .dst_access_mask(vk::AccessFlags2::TRANSFER_WRITE)
+                        .old_layout(old_layout)
+                        .new_layout(vk::ImageLayout::TRANSFER_DST_OPTIMAL)
+                        .image(frame.image)
+                        .subresource_range(range);
+                    self.context.device.cmd_pipeline_barrier2(
+                        command_buffer,
+                        &vk::DependencyInfo::default()
+                            .image_memory_barriers(std::slice::from_ref(&to_transfer)),
+                    );
+                    let copy = vk::ImageCopy {
+                        src_subresource: vk::ImageSubresourceLayers {
+                            aspect_mask: source.aspect,
+                            mip_level: 0,
+                            base_array_layer: 0,
+                            layer_count: 1,
+                        },
+                        src_offset: vk::Offset3D::default(),
+                        dst_subresource: vk::ImageSubresourceLayers {
+                            aspect_mask: vk::ImageAspectFlags::COLOR,
+                            mip_level: 0,
+                            base_array_layer: 0,
+                            layer_count: 1,
+                        },
+                        dst_offset: vk::Offset3D::default(),
+                        extent: vk::Extent3D {
+                            width: extent.width,
+                            height: extent.height,
+                            depth: extent.depth,
+                        },
+                    };
+                    self.context.device.cmd_copy_image(
+                        command_buffer,
+                        source.image,
+                        vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
+                        frame.image,
+                        vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+                        &[copy],
+                    );
+                    state
+                        .frame_target_layouts
+                        .insert(*dst, vk::ImageLayout::TRANSFER_DST_OPTIMAL);
+                }
                 CommandOp::GenerateMipmaps {
                     texture,
                     subresources,
@@ -1154,18 +1343,52 @@ impl SubmissionLowerer {
                 }
                 CommandOp::Barrier(barrier) => {
                     let _zone = trace::Zone::new("vulkan.lowering.barrier");
-                    if barrier.resource.kind()
-                        == Some(crate::render::vulkanic::handles::HandleKind::Texture)
+                    if barrier.resource.kind() == Some(crate::render::vulkanic::handles::HandleKind::Texture)
+                        || barrier.resource.kind() == Some(crate::render::vulkanic::handles::HandleKind::TextureView)
                     {
-                        let texture = objects.texture(barrier.resource)?;
-                        let range = barrier.subresources.unwrap_or(
-                            crate::render::vulkanic::resources::TextureSubresourceRange {
-                                base_mip: 0,
-                                mip_count: texture.mip_levels,
-                                base_layer: 0,
-                                layer_count: texture.array_layers,
-                            },
-                        );
+                        let (texture_handle, view_range) = if barrier.resource.kind()
+                            == Some(crate::render::vulkanic::handles::HandleKind::TextureView)
+                        {
+                            let view = objects.texture_view(barrier.resource)?;
+                            (
+                                view.texture,
+                                crate::render::vulkanic::resources::TextureSubresourceRange {
+                                    base_mip: view.base_mip,
+                                    mip_count: view.mip_levels,
+                                    base_layer: view.base_layer,
+                                    layer_count: view.array_layers,
+                                },
+                            )
+                        } else {
+                            let texture = objects.texture(barrier.resource)?;
+                            (
+                                barrier.resource,
+                                crate::render::vulkanic::resources::TextureSubresourceRange {
+                                    base_mip: 0,
+                                    mip_count: texture.mip_levels,
+                                    base_layer: 0,
+                                    layer_count: texture.array_layers,
+                                },
+                            )
+                        };
+                        let texture = objects.texture(texture_handle)?;
+                        let range = barrier.subresources.unwrap_or(view_range);
+                        if std::env::var_os("MATTMC_TRACE_SUBMISSIONS").is_some()
+                            && texture.label.contains("source-final-output")
+                        {
+                            stdout_trace(&format!(
+                                "vulkan.barrier source-final-output resource=0x{:016x} texture=0x{:016x} label={} before={:?} after={:?} mip={}..{} layer={}..{}",
+                                barrier.resource.raw(),
+                                texture_handle.raw(),
+                                sanitize_label(&texture.label),
+                                barrier.before,
+                                barrier.after,
+                                range.base_mip,
+                                range.mip_count,
+                                range.base_layer,
+                                range.layer_count,
+                            ));
+                        }
                         let image_barrier = vk::ImageMemoryBarrier2::default()
                             .src_stage_mask(stage_mask(barrier.before))
                             .src_access_mask(access_mask(barrier.before))
@@ -1227,6 +1450,26 @@ impl SubmissionLowerer {
                             buffer.buffer,
                             *offset,
                             data,
+                        );
+                        // `cmd_update_buffer` is a transfer operation, not a
+                        // host write.  Describe that actual dependency before
+                        // the staging buffer is consumed by a copy-to-image.
+                        // Using HOST/HOST_WRITE here leaves the transfer write
+                        // unsynchronized on implementations that do not make
+                        // same-queue command ordering a memory dependency,
+                        // which manifests as black sampled textures.
+                        let transfer_write = vk::BufferMemoryBarrier2::default()
+                            .src_stage_mask(vk::PipelineStageFlags2::TRANSFER)
+                            .src_access_mask(vk::AccessFlags2::TRANSFER_WRITE)
+                            .dst_stage_mask(vk::PipelineStageFlags2::TRANSFER)
+                            .dst_access_mask(vk::AccessFlags2::TRANSFER_READ)
+                            .buffer(buffer.buffer)
+                            .offset(*offset)
+                            .size(data.len() as u64);
+                        self.context.device.cmd_pipeline_barrier2(
+                            command_buffer,
+                            &vk::DependencyInfo::default()
+                                .buffer_memory_barriers(std::slice::from_ref(&transfer_write)),
                         );
                     } else {
                         let memory_offset =
@@ -1290,7 +1533,9 @@ impl SubmissionLowerer {
             let to_present = vk::ImageMemoryBarrier2::default()
                 .src_stage_mask(frame_layout_stage_mask(old_layout))
                 .src_access_mask(frame_layout_access_mask(old_layout))
-                .dst_stage_mask(vk::PipelineStageFlags2::BOTTOM_OF_PIPE)
+                // Presentation is an external queue operation; there is no
+                // in-queue destination access to synchronize here.
+                .dst_stage_mask(vk::PipelineStageFlags2::NONE)
                 .old_layout(old_layout)
                 .new_layout(vk::ImageLayout::PRESENT_SRC_KHR)
                 .image(present.image)
@@ -1812,7 +2057,7 @@ mod timestamp_tests {
                 == frame_layout_access_mask(vk::ImageLayout::TRANSFER_SRC_OPTIMAL)
         );
         assert!(
-            vk::PipelineStageFlags2::BOTTOM_OF_PIPE
+            vk::PipelineStageFlags2::NONE
                 == frame_layout_stage_mask(vk::ImageLayout::PRESENT_SRC_KHR)
         );
         assert!(
@@ -1936,7 +2181,10 @@ pub(super) fn image_layout_for_aspect(
 
 fn frame_layout_stage_mask(layout: vk::ImageLayout) -> vk::PipelineStageFlags2 {
     match layout {
-        vk::ImageLayout::PRESENT_SRC_KHR => vk::PipelineStageFlags2::BOTTOM_OF_PIPE,
+        // PRESENT_SRC_KHR is owned by the presentation engine rather than a
+        // shader/transfer stage in this queue.  NONE is the explicit
+        // synchronization2 representation for that external dependency.
+        vk::ImageLayout::PRESENT_SRC_KHR => vk::PipelineStageFlags2::NONE,
         vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL => {
             vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT
         }
@@ -1989,7 +2237,7 @@ pub(super) fn stage_mask(state: TextureUsageState) -> vk::PipelineStageFlags2 {
             vk::PipelineStageFlags2::TRANSFER
         }
         TextureUsageState::IndexRead => vk::PipelineStageFlags2::INDEX_INPUT,
-        TextureUsageState::Present => vk::PipelineStageFlags2::BOTTOM_OF_PIPE,
+        TextureUsageState::Present => vk::PipelineStageFlags2::NONE,
     }
 }
 
@@ -2089,4 +2337,38 @@ fn wait_timeline(context: &VulkanContext, id: SubmissionId) -> GalResult<()> {
         .values(&values);
     unsafe { context.device.wait_semaphores(&wait_info, 30_000_000_000) }
         .map_err(|error| GalError::backend(format!("Vulkan timeline wait failed: {error:?}")))
+}
+
+fn stdout_trace(message: &str) {
+    if std::env::var_os("MATTMC_TRACE_SUBMISSIONS").is_some() {
+        println!("{message}");
+    }
+}
+
+fn command_op_kind(op: &CommandOp) -> &'static str {
+    match op {
+        CommandOp::BeginPass { .. } => "BeginPass",
+        CommandOp::BindGraphicsPipeline(_) => "BindGraphicsPipeline",
+        CommandOp::BindComputePipeline(_) => "BindComputePipeline",
+        CommandOp::BindResourceSet { .. } => "BindResourceSet",
+        CommandOp::SetVertexBuffer { .. } => "SetVertexBuffer",
+        CommandOp::SetIndexBuffer { .. } => "SetIndexBuffer",
+        CommandOp::Draw { .. } => "Draw",
+        CommandOp::DrawIndexed { .. } => "DrawIndexed",
+        CommandOp::DrawIndirect { .. } => "DrawIndirect",
+        CommandOp::Dispatch { .. } => "Dispatch",
+        CommandOp::DispatchIndirect { .. } => "DispatchIndirect",
+        CommandOp::CopyBuffer { .. } => "CopyBuffer",
+        CommandOp::CopyBufferToTexture(_) => "CopyBufferToTexture",
+        CommandOp::CopyTextureToBuffer(_) => "CopyTextureToBuffer",
+        CommandOp::CopyTexture(_) => "CopyTexture",
+        CommandOp::CopyFrameTargetToTexture { .. } => "CopyFrameTargetToTexture",
+        CommandOp::CopyTextureToFrameTarget { .. } => "CopyTextureToFrameTarget",
+        CommandOp::GenerateMipmaps { .. } => "GenerateMipmaps",
+        CommandOp::HostWriteBuffer { .. } => "HostWriteBuffer",
+        CommandOp::HostReadBuffer { .. } => "HostReadBuffer",
+        CommandOp::Present { .. } => "Present",
+        CommandOp::Barrier(_) => "Barrier",
+        CommandOp::EndPass => "EndPass",
+    }
 }

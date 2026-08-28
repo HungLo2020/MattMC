@@ -71,7 +71,7 @@ public class ExperienceOrbRenderer extends EntityRenderer<ExperienceOrb, Experie
 			}
 			RustGalWorldPrimitiveRenderer.recordExperienceOrbRouteDecision("rust-vulkan-whole-frame", true, true, false);
 		} else if (!rustWholeFrame && route != WorldRenderRoutePolicy.Route.DISABLED) {
-			submitNodeCollector.submitCustomGeometry(poseStack, RENDER_TYPE, (pose, vertexConsumer) -> {
+			submitNodeCollector.submitCustomGeometrySemantic(poseStack, RENDER_TYPE, (pose, vertexConsumer) -> {
 				vertex(vertexConsumer, pose, -0.5F, -0.25F, p, 255, r, f, j, experienceOrbRenderState.lightCoords);
 				vertex(vertexConsumer, pose, 0.5F, -0.25F, p, 255, r, g, j, experienceOrbRenderState.lightCoords);
 				vertex(vertexConsumer, pose, 0.5F, 0.75F, p, 255, r, g, h, experienceOrbRenderState.lightCoords);
@@ -81,7 +81,8 @@ public class ExperienceOrbRenderer extends EntityRenderer<ExperienceOrb, Experie
 		} else {
 			RustGalWorldPrimitiveRenderer.recordExperienceOrbRouteDecision("disabled", false, false, false);
 			if (!submitNodeCollector.isSemanticCoverageOnly()
-				&& net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+				&& (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+					|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())) {
 				throw new IllegalStateException("Rust whole-frame experience-orb route is unavailable while Rust owns presentation");
 			}
 		}

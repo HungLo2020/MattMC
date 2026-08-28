@@ -13,6 +13,24 @@ pub unsafe fn decode_submission_batch(
     let attachments = read_limited_slice(batch.pass_attachments, true, "pass attachments")?;
     let copy_regions = read_limited_slice(batch.copy_regions, true, "copy regions")?;
     let barriers = read_limited_slice(batch.barriers, true, "barriers")?;
+    let input_items = lists
+        .len()
+        .checked_add(ops.len())
+        .and_then(|count| count.checked_add(attachments.len()))
+        .and_then(|count| count.checked_add(copy_regions.len()))
+        .and_then(|count| count.checked_add(barriers.len()))
+        .ok_or_else(|| {
+            GalError::ffi(
+                StatusCode::LengthOverflow,
+                "submission input table count overflows",
+            )
+        })?;
+    if input_items > FFI_MAX_BATCH_ITEMS {
+        return Err(GalError::ffi(
+            StatusCode::LengthOverflow,
+            "submission input table count exceeds ABI maximum",
+        ));
+    }
     if lists.is_empty() {
         return Err(GalError::ffi(
             StatusCode::InvalidArgument,
@@ -836,6 +854,9 @@ pub(crate) fn serialize_command_op(out: &mut Vec<u8>, op: &CommandOp) {
         ),
         CommandOp::CopyFrameTargetToTexture { .. } => unreachable!(
             "frame-target sampling copies are Rust-owned post-processing commands, not Java FFI submission commands"
+        ),
+        CommandOp::CopyTextureToFrameTarget { .. } => unreachable!(
+            "texture-to-frame-target presentation copies are Rust-owned post-processing commands, not Java FFI submission commands"
         ),
         CommandOp::GenerateMipmaps { .. } => {
             unreachable!(

@@ -1,7 +1,13 @@
 use super::*;
 use crate::render::vulkanic::world_primitive_frontend::{
     material as world_material_semantics, WorldMeshAnimationFrame, WORLD_MAX_MESH_ANIMATION_FRAMES,
+    WORLD_MAX_MESH_INDEX_BYTES, WORLD_MAX_MESH_SECTIONS, WORLD_MAX_MESH_VERTICES,
+    WORLD_MAX_MESH_TEXTURE_ASSETS, WORLD_MESH_ASSET_RESIDENCY,
+    WORLD_MAX_MESH_TEXTURE_DECODED_BYTES, WORLD_MESH_TEXTURE_RESIDENCY,
 };
+
+const MAX_WORLD_MESH_TEXTURE_PNG_BYTES_TOTAL: usize = WORLD_MAX_MESH_TEXTURE_DECODED_BYTES;
+const MAX_WORLD_MATERIAL_ASSET_COUNT: usize = WORLD_MAX_MESH_TEXTURE_ASSETS;
 
 pub(crate) unsafe fn decode_world_material_asset_update(
     request: *const FfiWorldMaterialAssetUpdateRequest,
@@ -24,8 +30,18 @@ pub(crate) unsafe fn decode_world_material_asset_update(
         ));
     }
     let raw_assets = read_limited_slice(request.assets, true, "world material asset payloads")?;
+    if raw_assets.len() > MAX_WORLD_MATERIAL_ASSET_COUNT {
+        return Err(GalError::ffi(
+            StatusCode::LengthOverflow,
+            format!(
+                "world material asset payload count {} exceeds bounded limit {MAX_WORLD_MATERIAL_ASSET_COUNT}",
+                raw_assets.len()
+            ),
+        ));
+    }
     let mut seen = BTreeMap::new();
     let mut assets = Vec::with_capacity(raw_assets.len());
+    let mut png_bytes_total = 0usize;
     for asset in raw_assets {
         validate_item_size::<FfiWorldMaterialAssetPayload>(
             asset.byte_size,
@@ -47,6 +63,23 @@ pub(crate) unsafe fn decode_world_material_asset_update(
                 format!(
                     "duplicate world material asset payload for texture {}",
                     texture_id
+                ),
+            ));
+        }
+        png_bytes_total = png_bytes_total
+            .checked_add(asset.png_bytes.len as usize)
+            .ok_or_else(|| {
+                GalError::ffi(
+                    StatusCode::LengthOverflow,
+                    "world material asset PNG byte count overflow",
+                )
+            })?;
+        if png_bytes_total > MAX_WORLD_MESH_TEXTURE_PNG_BYTES_TOTAL {
+            return Err(GalError::ffi(
+                StatusCode::LengthOverflow,
+                format!(
+                    "world material asset PNG bytes {} exceed bounded total {MAX_WORLD_MESH_TEXTURE_PNG_BYTES_TOTAL}",
+                    png_bytes_total
                 ),
             ));
         }
@@ -96,8 +129,18 @@ pub(crate) unsafe fn decode_world_mesh_asset_update(
         ));
     }
     let raw_textures = read_limited_slice(request.textures, true, "world mesh texture payloads")?;
+    if raw_textures.len() > WORLD_MESH_TEXTURE_RESIDENCY {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            format!(
+                "world mesh texture payload count {} exceeds bounded limit {WORLD_MESH_TEXTURE_RESIDENCY}",
+                raw_textures.len()
+            ),
+        ));
+    }
     let mut seen_textures = BTreeMap::new();
     let mut textures = Vec::with_capacity(raw_textures.len());
+    let mut texture_png_bytes_total = 0usize;
     for texture in raw_textures {
         validate_item_size::<FfiWorldMeshTextureAssetPayload>(
             texture.byte_size,
@@ -113,6 +156,23 @@ pub(crate) unsafe fn decode_world_mesh_asset_update(
             return Err(GalError::ffi(
                 StatusCode::InvalidArgument,
                 format!("duplicate world mesh texture {}", texture.texture_id),
+            ));
+        }
+        texture_png_bytes_total = texture_png_bytes_total
+            .checked_add(texture.png_bytes.len as usize)
+            .ok_or_else(|| {
+                GalError::ffi(
+                    StatusCode::LengthOverflow,
+                    "world mesh texture PNG byte count overflow",
+                )
+            })?;
+        if texture_png_bytes_total > MAX_WORLD_MESH_TEXTURE_PNG_BYTES_TOTAL {
+            return Err(GalError::ffi(
+                StatusCode::LengthOverflow,
+                format!(
+                    "world mesh texture PNG bytes {} exceed bounded total {MAX_WORLD_MESH_TEXTURE_PNG_BYTES_TOTAL}",
+                    texture_png_bytes_total
+                ),
             ));
         }
         let png_bytes = read_bounded_bytes(
@@ -162,6 +222,15 @@ pub(crate) unsafe fn decode_world_mesh_asset_update(
         });
     }
     let raw_meshes = read_limited_slice(request.meshes, true, "world mesh assets")?;
+    if raw_meshes.len() > WORLD_MESH_ASSET_RESIDENCY {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            format!(
+                "world mesh asset payload count {} exceeds bounded limit {WORLD_MESH_ASSET_RESIDENCY}",
+                raw_meshes.len()
+            ),
+        ));
+    }
     let mut seen_meshes = BTreeMap::new();
     let mut meshes = Vec::with_capacity(raw_meshes.len());
     for mesh in raw_meshes {
@@ -180,6 +249,15 @@ pub(crate) unsafe fn decode_world_mesh_asset_update(
         }
         let index_type = ffi_index_type(mesh.index_type)?;
         let raw_vertices = read_limited_slice(mesh.vertices, false, "world mesh vertices")?;
+        if raw_vertices.len() > WORLD_MAX_MESH_VERTICES {
+            return Err(GalError::ffi(
+                StatusCode::LengthOverflow,
+                format!(
+                    "world mesh vertex count {} exceeds bounded limit {WORLD_MAX_MESH_VERTICES}",
+                    raw_vertices.len()
+                ),
+            ));
+        }
         let mut vertices = Vec::with_capacity(raw_vertices.len());
         for vertex in raw_vertices {
             validate_item_size::<FfiWorldMeshVertex>(vertex.byte_size, "world mesh vertex")?;
@@ -198,10 +276,19 @@ pub(crate) unsafe fn decode_world_mesh_asset_update(
         let index_bytes = read_bounded_bytes(
             mesh.index_bytes,
             false,
-            FFI_MAX_WORLD_MESH_INDEX_BYTES,
+            WORLD_MAX_MESH_INDEX_BYTES,
             "world mesh index bytes",
         )?;
         let raw_sections = read_limited_slice(mesh.sections, false, "world mesh sections")?;
+        if raw_sections.len() > WORLD_MAX_MESH_SECTIONS {
+            return Err(GalError::ffi(
+                StatusCode::LengthOverflow,
+                format!(
+                    "world mesh section count {} exceeds bounded limit {WORLD_MAX_MESH_SECTIONS}",
+                    raw_sections.len()
+                ),
+            ));
+        }
         let mut sections = Vec::with_capacity(raw_sections.len());
         for section in raw_sections {
             validate_item_size::<FfiWorldMeshSectionRecord>(
@@ -253,6 +340,15 @@ pub(crate) unsafe fn decode_world_mesh_asset_update(
         true,
         "world mesh sorted index updates",
     )?;
+    if raw_sorted_indices.len() > WORLD_MESH_ASSET_RESIDENCY {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            format!(
+                "world mesh sorted index update count {} exceeds bounded limit {WORLD_MESH_ASSET_RESIDENCY}",
+                raw_sorted_indices.len()
+            ),
+        ));
+    }
     let mut sorted_indices = Vec::with_capacity(raw_sorted_indices.len());
     for update in raw_sorted_indices {
         validate_item_size::<FfiWorldMeshSortedIndexRecord>(

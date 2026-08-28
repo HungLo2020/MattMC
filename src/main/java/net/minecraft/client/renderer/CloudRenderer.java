@@ -42,6 +42,7 @@ public class CloudRenderer extends SimplePreparableReloadListener<Optional<Cloud
 	private static final int FLAG_INSIDE_FACE = 16;
 	private static final int FLAG_USE_TOP_COLOR = 32;
 	private static final int MAX_RADIUS_CHUNKS = 128;
+	private static final long MAX_SEMANTIC_CLOUD_CELLS = 1_048_576L;
 	private static final float CELL_SIZE_IN_BLOCKS = 12.0F;
 	private static final int UBO_SIZE = new Std140SizeCalculator().putVec4().putVec3().putVec3().get();
 	private static final Logger LOGGER = LogUtils.getLogger();
@@ -67,14 +68,20 @@ public class CloudRenderer extends SimplePreparableReloadListener<Optional<Cloud
 	@Nullable
 	private CloudRenderer.TextureData texture;
 	private int quadCount = 0;
-	private final VulkanicAPI.AutoStorageIndexBuffer indices = VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS);
 	@Nullable
-	private final MappableRingBuffer ubo;
+	private final VulkanicAPI.AutoStorageIndexBuffer indices;
+	@Nullable
+	private MappableRingBuffer ubo;
 	@Nullable
 	private MappableRingBuffer utb;
 
 	public CloudRenderer() {
-		this.ubo = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+		this.indices = (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected())
+			? null
+			: VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS);
+		this.ubo = (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected())
 			? null
 			: new MappableRingBuffer(() -> "Cloud UBO", 130, UBO_SIZE);
 	}
@@ -87,7 +94,11 @@ public class CloudRenderer extends SimplePreparableReloadListener<Optional<Cloud
 			try (NativeImage nativeImage = NativeImage.read(inputStream)) {
 				int i = nativeImage.getWidth();
 				int j = nativeImage.getHeight();
-				long[] ls = new long[i * j];
+				long cellCount = (long)i * j;
+				if (i <= 0 || j <= 0 || cellCount > MAX_SEMANTIC_CLOUD_CELLS) {
+					return Optional.empty();
+				}
+				long[] ls = new long[(int)cellCount];
 
 				for (int k = 0; k < j; k++) {
 					for (int l = 0; l < i; l++) {
@@ -165,7 +176,8 @@ public class CloudRenderer extends SimplePreparableReloadListener<Optional<Cloud
 	}
 
 	public void render(int i, CloudStatus cloudStatus, float f, Vec3 vec3, float g) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
 			throw new IllegalStateException("Java cloud rendering is unavailable while Rust owns whole-frame presentation");
 		}
 		if (this.texture != null) {
@@ -263,12 +275,28 @@ public class CloudRenderer extends SimplePreparableReloadListener<Optional<Cloud
 		if (!net.vulkanic.world.WorldRenderRoutePolicy.currentCloudRoute().usesRustWholeFrameVulkan()) {
 			return;
 		}
-		if (cloudStatus == CloudStatus.OFF || cameraPos == null) {
+		if (cloudStatus == CloudStatus.OFF) {
 			return;
+		}
+		if (cameraPos == null) {
+			throw new IllegalArgumentException("Rust cloud semantics require a camera position");
+		}
+		if (!Double.isFinite(cameraPos.x) || !Double.isFinite(cameraPos.y) || !Double.isFinite(cameraPos.z)
+			|| !Float.isFinite(cloudHeight) || !Float.isFinite(partialTick)) {
+			throw new IllegalArgumentException("Rust cloud semantics require finite camera, height, and partial tick");
 		}
 		if (this.texture == null) {
 			throw new IllegalStateException(
 				"Rust whole-frame cloud route requires a decoded semantic cloud-cell field"
+			);
+		}
+		long semanticCellCount = (long)this.texture.width() * this.texture.height();
+		if (this.texture.width() <= 0 || this.texture.height() <= 0
+			|| semanticCellCount > MAX_SEMANTIC_CLOUD_CELLS
+			|| this.texture.cells() == null
+			|| this.texture.cells().length != semanticCellCount) {
+			throw new IllegalStateException(
+				"Rust whole-frame cloud route requires a bounded, dimensionally complete cloud-cell field"
 			);
 		}
 		int distance = Math.min(Minecraft.getInstance().options.cloudRange().get(), MAX_RADIUS_CHUNKS) * 16;
@@ -398,7 +426,8 @@ public class CloudRenderer extends SimplePreparableReloadListener<Optional<Cloud
 	}
 
 	public void endFrame() {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
 			return;
 		}
 		this.ubo.rotate();
@@ -410,6 +439,17 @@ public class CloudRenderer extends SimplePreparableReloadListener<Optional<Cloud
 		}
 		if (this.utb != null) {
 			this.utb.close();
+		}
+		this.ubo = null;
+		this.utb = null;
+	}
+
+	/** Releases Java cloud UBOs if Rust Vulkan ownership begins after construction. */
+	public void ensureRustSemanticRoute() {
+		if ((net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected())
+			&& (this.ubo != null || this.utb != null)) {
+			this.close();
 		}
 	}
 

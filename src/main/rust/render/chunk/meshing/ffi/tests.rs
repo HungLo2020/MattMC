@@ -537,7 +537,7 @@ fn translucent_encoded_append_stamps_non_fluid_primitive_metadata() {
 }
 
 #[test]
-fn compact_native_lava_fluid_stamps_unsupported_primitive_metadata() {
+fn compact_native_lava_fluid_stamps_generic_fluid_primitive_metadata() {
     let _guard = native_cache_test_lock();
     unsafe {
         assert_eq!(OK, mattmc_sodium_static_model_cache_clear());

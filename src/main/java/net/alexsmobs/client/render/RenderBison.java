@@ -3,11 +3,13 @@ package net.alexsmobs.client.render;
 import net.alexsmobs.client.model.ModelBison;
 import net.alexsmobs.client.model.ModelBisonBaby;
 import net.alexsmobs.entity.EntityBison;
+import net.citadel.client.model.AdvancedEntityModel;
+import net.blaze3d.vertex.PoseStack;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.entity.MobRenderer;
 import net.minecraft.resources.ResourceLocation;
 
-public class RenderBison extends MobRenderer<EntityBison, BisonRenderState, ModelBison> {
+public class RenderBison extends MobRenderer<EntityBison, BisonRenderState, AdvancedEntityModel<BisonRenderState>> {
     private static final ResourceLocation TEXTURE_BABY = ResourceLocation.withDefaultNamespace("textures/entity/bison_baby.png");
     private static final ResourceLocation TEXTURE_BABY_SNOWY = ResourceLocation.withDefaultNamespace("textures/entity/bison_baby_snowy.png");
     private static final ResourceLocation TEXTURE_SNOWY = ResourceLocation.withDefaultNamespace("textures/entity/bison_snowy.png");
@@ -46,5 +48,10 @@ public class RenderBison extends MobRenderer<EntityBison, BisonRenderState, Mode
                 return state.isSnowy ? TEXTURE_SNOWY : TEXTURE;
             }
         }
+    }
+
+    @Override
+    protected void scale(BisonRenderState state, PoseStack poseStack) {
+        this.model = state.isBaby ? modelBaby : modelBison;
     }
 }

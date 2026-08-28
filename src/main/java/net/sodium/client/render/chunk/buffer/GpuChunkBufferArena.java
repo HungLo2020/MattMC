@@ -51,6 +51,10 @@ public class GpuChunkBufferArena implements ChunkBufferArena {
         this.stride = stride;
         this.head = new Segment(this, 0, initialCapacity);
         this.head.setFree(true);
+        if (VulkanicAPI.isVulkanBackendSelected()
+                && !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+            throw new IllegalStateException("Selected Vulkan Sodium chunk arena is unavailable; Java chunk buffers are not a fallback");
+        }
         if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
             this.arenaBuffer = createBuffer(this.label, this.usage, this.capacity * this.stride);
         } else {
@@ -61,6 +65,10 @@ public class GpuChunkBufferArena implements ChunkBufferArena {
 
     @Override
     public boolean upload(CommandList commandList, Stream<PendingUpload> stream) {
+        if (VulkanicAPI.isVulkanBackendSelected()
+                && !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+            throw new IllegalStateException("Selected Vulkan Sodium chunk uploads are unavailable; Java chunk buffers are not a fallback");
+        }
         if (this.arenaBuffer == null) {
             throw new IllegalStateException("Java Sodium chunk arena is unavailable while Rust owns whole-frame presentation");
         }

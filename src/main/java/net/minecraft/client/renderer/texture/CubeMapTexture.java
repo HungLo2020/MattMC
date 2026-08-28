@@ -27,6 +27,12 @@ public class CubeMapTexture extends ReloadableTexture {
 		try {
 			int i = textureContents.image().getWidth();
 			int j = textureContents.image().getHeight();
+			boolean rustSemantic = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
+			if (rustSemantic && !net.vulkanic.gui.RustGalGuiRawImageAssets.stageNativeImage(
+				resourceLocation.withSuffix(SUFFIXES[0]), textureContents.image())) {
+				throw new IOException("Rust semantic cubemap staging rejected face " + resourceLocation.withSuffix(SUFFIXES[0]));
+			}
 			NativeImage nativeImage = new NativeImage(i, j * 6, false);
 			textureContents.image().copyRect(nativeImage, 0, 0, 0, 0, i, j, false, true);
 
@@ -49,6 +55,10 @@ public class CubeMapTexture extends ReloadableTexture {
 								+ "x"
 								+ textureContents2.image().getHeight()
 						);
+					}
+					if (rustSemantic && !net.vulkanic.gui.RustGalGuiRawImageAssets.stageNativeImage(
+						resourceLocation.withSuffix(SUFFIXES[k]), textureContents2.image())) {
+						throw new IOException("Rust semantic cubemap staging rejected face " + resourceLocation.withSuffix(SUFFIXES[k]));
 					}
 
 					textureContents2.image().copyRect(nativeImage, 0, 0, 0, k * j, i, j, false, true);
@@ -94,6 +104,14 @@ public class CubeMapTexture extends ReloadableTexture {
 		int i = nativeImage.getWidth();
 		int j = nativeImage.getHeight() / 6;
 		this.close();
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			// Rust owns cubemap admission for Vulkan panoramas; do not reopen a
+			// Java texture just because this subclass bypasses ReloadableTexture.
+			this.texture = null;
+			this.textureView = null;
+			return;
+		}
 		this.texture = net.vulkanic.VulkanicAPI.createTexture(this.resourceId()::toString, 5, TextureFormat.RGBA8, i, j * 6, 1, 1);
 		this.textureView = net.vulkanic.VulkanicAPI.createTextureView(this.texture);
 		this.setFilter(bl, false);

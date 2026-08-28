@@ -78,7 +78,8 @@ public class DebugScreenOverlay {
 	private final Font font;
 	@Nullable
 	private final GpuBuffer crosshairBuffer;
-	private final VulkanicAPI.AutoStorageIndexBuffer crosshairIndicies = VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.LINES);
+	@Nullable
+	private final VulkanicAPI.AutoStorageIndexBuffer crosshairIndicies;
 	@Nullable
 	private ChunkPos lastPos;
 	@Nullable
@@ -102,6 +103,10 @@ public class DebugScreenOverlay {
 	public DebugScreenOverlay(Minecraft minecraft) {
 		this.minecraft = minecraft;
 		this.font = minecraft.font;
+		this.crosshairIndicies = (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected())
+			? null
+			: VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.LINES);
 		this.fpsChart = new FpsDebugChart(this.font, this.frameTimeLogger);
 		this.tpsChart = new TpsDebugChart(
 			this.font, this.tickTimeLogger, () -> minecraft.level == null ? 0.0F : minecraft.level.tickRateManager().millisecondsPerTick()
@@ -109,7 +114,8 @@ public class DebugScreenOverlay {
 		this.pingChart = new PingDebugChart(this.font, this.pingLogger);
 		this.bandwidthChart = new BandwidthDebugChart(this.font, this.bandwidthLogger);
 		this.profilerPieChart = new ProfilerPieChart(this.font);
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
 			// Rust owns semantic 3D-crosshair extraction and drawing. Keep the
 			// legacy Java vertex buffer absent on the whole-frame route; the Java
 			// draw entrypoint already fails closed when called accidentally.
@@ -467,8 +473,20 @@ public class DebugScreenOverlay {
 	}
 
 	public void render3dCrosshair(Camera camera) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			throw new IllegalStateException("Java 3D crosshair rendering is unavailable while Rust owns whole-frame presentation");
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+			if (!net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueThreeDimensionalDebugCrosshair(
+				camera, this.minecraft.getWindow().getGuiScale())) {
+				throw new IllegalStateException(
+					"Rust whole-frame 3D crosshair route rejected semantic line segments; "
+						+ "Java 3D crosshair rendering is unavailable while Rust owns whole-frame presentation; "
+						+ "Java 3D crosshair rendering is unavailable on selected Vulkan"
+				);
+			}
+			return;
+		}
+		if (this.crosshairBuffer == null || this.crosshairIndicies == null) {
+			throw new IllegalStateException("Java 3D crosshair buffers are unavailable on the active route");
 		}
 		Matrix4fStack matrix4fStack = VulkanicAPI.getModelViewStack();
 		matrix4fStack.pushMatrix();

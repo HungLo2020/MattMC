@@ -14,9 +14,9 @@ import org.jetbrains.annotations.Nullable;
 @Environment(EnvType.CLIENT)
 public class CachedOrthoProjectionMatrixBuffer implements AutoCloseable {
 	@Nullable
-	private final GpuBuffer buffer;
+	private GpuBuffer buffer;
 	@Nullable
-	private final GpuBufferSlice bufferSlice;
+	private GpuBufferSlice bufferSlice;
 	private final String label;
 	private final float zNear;
 	private final float zFar;
@@ -35,7 +35,8 @@ public class CachedOrthoProjectionMatrixBuffer implements AutoCloseable {
 		this.zFar = g;
 		this.invertY = bl;
 		this.useZeroToOneDepthWhenVulkan = bl2;
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			this.buffer = null;
 			this.bufferSlice = null;
 			return;
@@ -47,7 +48,7 @@ public class CachedOrthoProjectionMatrixBuffer implements AutoCloseable {
 
 	public GpuBufferSlice getBuffer(float f, float g) {
 		if (this.buffer == null || this.bufferSlice == null) {
-			throw new IllegalStateException("Java cached orthographic UBO rendering is unavailable while Rust owns whole-frame presentation");
+			throw new IllegalStateException("Java cached orthographic UBO rendering is unavailable on selected Vulkan");
 		}
 		if (this.width != f || this.height != g) {
 			Matrix4f matrix4f = this.createProjectionMatrix(f, g);
@@ -80,6 +81,16 @@ public class CachedOrthoProjectionMatrixBuffer implements AutoCloseable {
 	public void close() {
 		if (this.buffer != null) {
 			this.buffer.close();
+		}
+		this.buffer = null;
+		this.bufferSlice = null;
+	}
+
+	/** Releases a compatibility projection UBO if Rust Vulkan ownership starts late. */
+	public void ensureRustSemanticRoute() {
+		if ((net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) && this.buffer != null) {
+			this.close();
 		}
 	}
 }

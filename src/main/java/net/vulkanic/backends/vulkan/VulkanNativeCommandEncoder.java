@@ -127,7 +127,8 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
 
     @Nullable
     private static GlProgram resolveIrisOverrideProgram(RenderPipeline renderPipeline) {
-        if (RustGalVulkanWholeFrameMode.enabled()) {
+        if (RustGalVulkanWholeFrameMode.enabled()
+            || VulkanicAPI.isVulkanBackendSelected()) {
             // Rust Vulkan consumes explicit semantic pipeline descriptors; do not
             // inspect Iris' live pipeline manager from the Java compatibility encoder.
             return null;
@@ -658,9 +659,10 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
 
     @Override
     public void presentTexture(GpuTextureView textureView) {
-        if (RustGalVulkanWholeFrameMode.enabled()) {
+        if (RustGalVulkanWholeFrameMode.enabled()
+                || net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
             throw new IllegalStateException(
-                "Java Vulkan command-encoder presentation is unavailable while Rust owns whole-frame presentation"
+                "Java Vulkan command-encoder presentation is unavailable while Rust owns the selected Vulkan presentation route"
             );
         }
         this.ensureNoRenderPass();
@@ -717,6 +719,12 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
 
     /** Java Vulkan render passes are never a fallback once Rust owns presentation. */
     private void ensureJavaVulkanRenderingAvailable() {
+        if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+                && !RustGalVulkanWholeFrameMode.enabled()) {
+            throw new IllegalStateException(
+                "Selected Vulkan Java render passes are unavailable; Rust semantic rendering is not a fallback"
+            );
+        }
         if (RustGalVulkanWholeFrameMode.enabled()) {
             throw new IllegalStateException(
                 "Java Vulkan render passes are unavailable while Rust owns whole-frame presentation"
@@ -2022,7 +2030,8 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
 
         @Nullable
         private GpuTextureView recoverSamplerView(String name, @Nullable Integer textureUnit) {
-            if (RustGalVulkanWholeFrameMode.enabled()) {
+            if (RustGalVulkanWholeFrameMode.enabled()
+                || VulkanicAPI.isVulkanBackendSelected()) {
                 // This compatibility encoder is not admitted on the Rust-owned route;
                 // never recover bindings from Iris' runtime texture cache there.
                 return null;
@@ -2108,7 +2117,8 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
 
     @Nullable
     private static Integer currentBoundSamplerObject(int samplerUnit) {
-        if (RustGalVulkanWholeFrameMode.enabled()) {
+        if (RustGalVulkanWholeFrameMode.enabled()
+            || VulkanicAPI.isVulkanBackendSelected()) {
             return null;
         }
         int samplerObject = IrisRenderSystem.getBoundSamplerOnUnit(samplerUnit);
@@ -2123,6 +2133,7 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
      */
     private static boolean legacyImmediatePassIgnored() {
         return !RustGalVulkanWholeFrameMode.enabled()
+            && !VulkanicAPI.isVulkanBackendSelected()
             && net.irisshaders.iris.vertices.ImmediateState.temporarilyIgnorePass;
     }
 

@@ -8,7 +8,7 @@ import net.vulkanic.VulkanicAPI;
 
 public class DepthTexture extends GlResource {
 	public DepthTexture(String name, int width, int height, DepthBufferFormat format) {
-		super(IrisRenderSystem.createTexture2D());
+		super(requireJavaTextureAllocation());
 		int texture = getGlId();
 
 		resize(width, height, format);
@@ -19,6 +19,14 @@ public class DepthTexture extends GlResource {
 
 		var ctx = VulkanicAPI.getCommandContext();
 		VulkanicAPI.bindTexture2D(ctx, 0);
+	}
+
+	private static int requireJavaTextureAllocation() {
+		if (VulkanicAPI.isVulkanBackendSelected()
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris depth texture allocation is unavailable on the Rust Vulkan route");
+		}
+		return IrisRenderSystem.createTexture2D();
 	}
 
 	void resize(int width, int height, DepthBufferFormat format) {

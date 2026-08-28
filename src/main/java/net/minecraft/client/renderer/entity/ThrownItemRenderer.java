@@ -41,8 +41,18 @@ public class ThrownItemRenderer<T extends Entity & ItemSupplier> extends EntityR
 		poseStack.pushPose();
 		poseStack.scale(this.scale, this.scale, this.scale);
 		poseStack.mulPose(cameraRenderState.orientation);
-		thrownItemRenderState.item
-			.submit(poseStack, submitNodeCollector, thrownItemRenderState.lightCoords, OverlayTexture.NO_OVERLAY, thrownItemRenderState.outlineColor);
+		net.vulkanic.world.RustGalWorldPrimitiveRenderer.beginItemEntitySubmission();
+		try {
+			thrownItemRenderState.item.submit(
+				poseStack,
+				submitNodeCollector,
+				thrownItemRenderState.lightCoords,
+				OverlayTexture.NO_OVERLAY,
+				thrownItemRenderState.outlineColor
+			);
+		} finally {
+			net.vulkanic.world.RustGalWorldPrimitiveRenderer.endItemEntitySubmission();
+		}
 		poseStack.popPose();
 		super.submit(thrownItemRenderState, poseStack, submitNodeCollector, cameraRenderState);
 	}

@@ -3,16 +3,18 @@ use crate::render::vulkanic::shader_pack::lightmap::{VanillaLightmapFrame, Vanil
 use crate::render::vulkanic::world_primitive_frontend::material as world_material_semantics;
 use crate::render::vulkanic::world_primitive_frontend::world_text::{
     WorldTextImageAsset, WorldTextImageFormat, WorldTextQuadRequest, WORLD_TEXT_DEPTH_NORMAL,
-    WORLD_TEXT_DEPTH_POLYGON_OFFSET, WORLD_TEXT_DEPTH_SEE_THROUGH,
+    WORLD_TEXT_DEPTH_POLYGON_OFFSET, WORLD_TEXT_DEPTH_SEE_THROUGH, MAX_WORLD_TEXT_IMAGES,
+    MAX_WORLD_TEXT_IMAGE_BYTES_TOTAL,
 };
 use crate::render::vulkanic::world_primitive_frontend::{
     WorldFeatureCoverageFrame, WorldFirstPersonFrame, WorldLodRenderFrame,
     WorldShaderEnvironmentFrame, WorldVoxelVolumeFrame, WORLD_LOD_MAX_SEGMENTS_PER_COLUMN,
-    WORLD_LOD_MAX_VERTICES_PER_SEGMENT, WORLD_MATERIAL_SOURCE_CLOUDS,
+    WORLD_LOD_MAX_COLUMNS, WORLD_LOD_MAX_VISIBLE_SEGMENTS, WORLD_LOD_MAX_VERTICES_PER_SEGMENT,
+    WORLD_MATERIAL_SOURCE_CLOUDS, WORLD_MATERIAL_SOURCE_ENTITY_MODEL,
     WORLD_MATERIAL_SOURCE_PARTICLES,
     WORLD_MATERIAL_SOURCE_TEXTURED, WORLD_MATERIAL_SOURCE_UNSPECIFIED,
     WORLD_MATERIAL_SOURCE_UV_LOCAL_TEXTURE, WORLD_MATERIAL_SOURCE_UV_MINECRAFT_BLOCK_ATLAS,
-    WORLD_MATERIAL_SOURCE_WEATHER,
+    WORLD_MATERIAL_SOURCE_WEATHER, WORLD_MESH_INSTANCE_FLAG_OUTLINE_ONLY,
 };
 use std::collections::BTreeSet;
 
@@ -24,6 +26,53 @@ fn is_world_mesh_stratum(stratum: u32) -> bool {
             | WORLD_STRATUM_MOVING_MESH
             | WORLD_STRATUM_ENTITY_MESH
     )
+}
+
+fn decode_world_viewport_axis(value: i32, label: &str) -> GalResult<u32> {
+    if value <= 0 || value > GUI_MAX_VIEWPORT_AXIS {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            format!(
+                "{label} must be within bounded positive range 1..={GUI_MAX_VIEWPORT_AXIS}, got {value}"
+            ),
+        ));
+    }
+    Ok(value as u32)
+}
+
+fn validate_mesh_instance_semantic_identity(
+    instance: &FfiWorldMeshInstanceRecord,
+    label: &str,
+) -> GalResult<()> {
+    if instance.mesh_key == 0 || instance.mesh_generation == 0 {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            format!("{label} key and generation must be non-zero"),
+        ));
+    }
+    if instance.flags & !WORLD_MESH_INSTANCE_FLAG_OUTLINE_ONLY != 0 {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            format!("{label} contains unknown semantic flags"),
+        ));
+    }
+    if instance.flags & WORLD_MESH_INSTANCE_FLAG_OUTLINE_ONLY != 0
+        && (instance.stratum != WORLD_STRATUM_ENTITY_MESH || instance.outline_color_argb == 0)
+    {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            format!(
+                "{label} outline-only flag requires entity stratum and outline color"
+            ),
+        ));
+    }
+    if instance.block_entity_id < -1 {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            format!("{label} block entity id must be >= -1"),
+        ));
+    }
+    Ok(())
 }
 
 pub(crate) unsafe fn decode_world_text_image_update(
@@ -45,12 +94,43 @@ pub(crate) unsafe fn decode_world_text_image_update(
         ));
     }
     let raw_assets = read_limited_slice(request.assets, true, "world text image assets")?;
+    if raw_assets.len() > MAX_WORLD_TEXT_IMAGES {
+        return Err(GalError::ffi(
+            StatusCode::LengthOverflow,
+            format!(
+                "world text image asset count {} exceeds bounded limit {MAX_WORLD_TEXT_IMAGES}",
+                raw_assets.len()
+            ),
+        ));
+    }
     let mut assets = Vec::with_capacity(raw_assets.len());
+    let mut total_bytes = 0usize;
     for asset in raw_assets {
         validate_item_size::<FfiWorldTextImageAssetPayload>(
             asset.byte_size,
             "world text image asset",
         )?;
+        let pixels = read_bounded_bytes(
+            asset.pixels,
+            true,
+            4 * 1024 * 1024,
+            "world text image pixels",
+        )?;
+        total_bytes = total_bytes.checked_add(pixels.len()).ok_or_else(|| {
+            GalError::ffi(
+                StatusCode::LengthOverflow,
+                "world text image pixel byte count overflow",
+            )
+        })?;
+        if total_bytes > MAX_WORLD_TEXT_IMAGE_BYTES_TOTAL {
+            return Err(GalError::ffi(
+                StatusCode::LengthOverflow,
+                format!(
+                    "world text image pixels {} exceed bounded total {MAX_WORLD_TEXT_IMAGE_BYTES_TOTAL}",
+                    total_bytes
+                ),
+            ));
+        }
         assets.push(WorldTextImageAsset {
             asset_id: asset.asset_id,
             atlas_generation: asset.atlas_generation,
@@ -58,12 +138,7 @@ pub(crate) unsafe fn decode_world_text_image_update(
             format: WorldTextImageFormat::try_from(asset.format)?,
             width: asset.width,
             height: asset.height,
-            pixels: read_bounded_bytes(
-                asset.pixels,
-                true,
-                4 * 1024 * 1024,
-                "world text image pixels",
-            )?,
+            pixels,
         });
     }
     Ok((request.generation, assets))
@@ -98,6 +173,15 @@ pub(crate) unsafe fn decode_world_lod_asset_update(
         ));
     }
     let raw_assets = read_limited_slice(request.assets, true, "world LOD column assets")?;
+    if raw_assets.len() > WORLD_LOD_MAX_COLUMNS {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            format!(
+                "world LOD column asset count {} exceeds bounded limit {WORLD_LOD_MAX_COLUMNS}",
+                raw_assets.len()
+            ),
+        ));
+    }
     let mut assets = Vec::with_capacity(raw_assets.len());
     let mut asset_keys = BTreeMap::new();
     for asset in raw_assets {
@@ -189,6 +273,15 @@ pub(crate) unsafe fn decode_world_lod_asset_update(
         });
     }
     let raw_retirements = read_limited_slice(request.retirements, true, "world LOD retirements")?;
+    if raw_retirements.len() > WORLD_LOD_MAX_COLUMNS {
+        return Err(GalError::ffi(
+            StatusCode::LengthOverflow,
+            format!(
+                "world LOD retirement count {} exceeds bounded limit {WORLD_LOD_MAX_COLUMNS}",
+                raw_retirements.len()
+            ),
+        ));
+    }
     let mut retirements = Vec::with_capacity(raw_retirements.len());
     let mut retirement_keys = BTreeMap::new();
     for retirement in raw_retirements {
@@ -223,6 +316,15 @@ pub(crate) unsafe fn decode_world_lod_asset_update(
         true,
         "world LOD material provenance columns",
     )?;
+    if raw_provenance.len() > WORLD_LOD_MAX_COLUMNS {
+        return Err(GalError::ffi(
+            StatusCode::LengthOverflow,
+            format!(
+                "world LOD material provenance column count {} exceeds bounded limit {WORLD_LOD_MAX_COLUMNS}",
+                raw_provenance.len()
+            ),
+        ));
+    }
     let mut provenance = Vec::with_capacity(raw_provenance.len());
     for column in raw_provenance {
         validate_item_size::<FfiWorldLodColumnMaterialProvenanceRecord>(
@@ -282,6 +384,15 @@ pub(crate) unsafe fn decode_world_lod_asset_update(
             true,
             "world LOD segment material provenance",
         )?;
+        if raw_segments.len() > WORLD_LOD_MAX_SEGMENTS_PER_COLUMN {
+            return Err(GalError::ffi(
+                StatusCode::LengthOverflow,
+                format!(
+                    "world LOD material provenance segment count {} exceeds bounded limit {WORLD_LOD_MAX_SEGMENTS_PER_COLUMN}",
+                    raw_segments.len()
+                ),
+            ));
+        }
         let mut segments = Vec::with_capacity(raw_segments.len());
         for segment in raw_segments {
             validate_item_size::<FfiWorldLodSegmentMaterialProvenanceRecord>(
@@ -507,6 +618,22 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
     i32,
     Vec<u8>,
 )> {
+    if request.is_null() {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            "whole-frame submit request is null",
+        ));
+    }
+    let input_bytes = input_bytes_for_whole_frame(&*request);
+    if input_bytes > FFI_MAX_WHOLE_FRAME_INPUT_BYTES {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            format!(
+                "whole-frame semantic request exceeds bounded input size {} bytes (got {})",
+                FFI_MAX_WHOLE_FRAME_INPUT_BYTES, input_bytes
+            ),
+        ));
+    }
     let request = read_struct(request, "whole-frame submit request")?;
     validate_header::<FfiWholeFrameSubmitRequest>(request.header)?;
     reject_unknown_feature_bits(request.negotiated_feature_bits)?;
@@ -536,6 +663,18 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
         return Err(GalError::ffi(
             StatusCode::InvalidArgument,
             "whole-frame submit requires positive GUI and viewport dimensions",
+        ));
+    }
+    if request.gui_width > GUI_MAX_VIEWPORT_AXIS
+        || request.gui_height > GUI_MAX_VIEWPORT_AXIS
+        || request.viewport_width > GUI_MAX_VIEWPORT_AXIS
+        || request.viewport_height > GUI_MAX_VIEWPORT_AXIS
+    {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            format!(
+                "whole-frame GUI and viewport dimensions exceed bounded axis {GUI_MAX_VIEWPORT_AXIS}"
+            ),
         ));
     }
     if request.gui_blur_before_stratum < -1 {
@@ -615,24 +754,14 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
             segment.byte_size,
             "world primitive line segment",
         )?;
-        let viewport_width = u32::try_from(segment.viewport_width).map_err(|_| {
-            GalError::ffi(
-                StatusCode::InvalidArgument,
-                format!(
-                    "world primitive segment viewport width must be non-negative, got {}",
-                    segment.viewport_width
-                ),
-            )
-        })?;
-        let viewport_height = u32::try_from(segment.viewport_height).map_err(|_| {
-            GalError::ffi(
-                StatusCode::InvalidArgument,
-                format!(
-                    "world primitive segment viewport height must be non-negative, got {}",
-                    segment.viewport_height
-                ),
-            )
-        })?;
+        let viewport_width = decode_world_viewport_axis(
+            segment.viewport_width,
+            "world primitive segment viewport width",
+        )?;
+        let viewport_height = decode_world_viewport_axis(
+            segment.viewport_height,
+            "world primitive segment viewport height",
+        )?;
         segments.push(WorldLineSegmentRequest {
             stratum: segment.stratum,
             style: segment.style,
@@ -678,24 +807,14 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
                 format!("unknown world crack cull policy {}", quad.cull_policy),
             ));
         }
-        let viewport_width = u32::try_from(quad.viewport_width).map_err(|_| {
-            GalError::ffi(
-                StatusCode::InvalidArgument,
-                format!(
-                    "world crack quad viewport width must be non-negative, got {}",
-                    quad.viewport_width
-                ),
-            )
-        })?;
-        let viewport_height = u32::try_from(quad.viewport_height).map_err(|_| {
-            GalError::ffi(
-                StatusCode::InvalidArgument,
-                format!(
-                    "world crack quad viewport height must be non-negative, got {}",
-                    quad.viewport_height
-                ),
-            )
-        })?;
+        let viewport_width = decode_world_viewport_axis(
+            quad.viewport_width,
+            "world crack quad viewport width",
+        )?;
+        let viewport_height = decode_world_viewport_axis(
+            quad.viewport_height,
+            "world crack quad viewport height",
+        )?;
         crack_quads.push(WorldCrackQuadRequest {
             stratum: quad.stratum,
             stage: quad.stage,
@@ -750,24 +869,14 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
                 format!("unknown world border cull policy {}", quad.cull_policy),
             ));
         }
-        let viewport_width = u32::try_from(quad.viewport_width).map_err(|_| {
-            GalError::ffi(
-                StatusCode::InvalidArgument,
-                format!(
-                    "world border quad viewport width must be non-negative, got {}",
-                    quad.viewport_width
-                ),
-            )
-        })?;
-        let viewport_height = u32::try_from(quad.viewport_height).map_err(|_| {
-            GalError::ffi(
-                StatusCode::InvalidArgument,
-                format!(
-                    "world border quad viewport height must be non-negative, got {}",
-                    quad.viewport_height
-                ),
-            )
-        })?;
+        let viewport_width = decode_world_viewport_axis(
+            quad.viewport_width,
+            "world border quad viewport width",
+        )?;
+        let viewport_height = decode_world_viewport_axis(
+            quad.viewport_height,
+            "world border quad viewport height",
+        )?;
         border_quads.push(WorldBorderQuadRequest {
             stratum: quad.stratum,
             texture_id: quad.texture_id,
@@ -831,6 +940,24 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
                 "world primitive compact material quad count {} exceeds max {}",
                 raw_compact_materials.len(),
                 FFI_MAX_BATCH_ITEMS
+            ),
+        ));
+    }
+    let material_quad_count = raw_materials
+        .len()
+        .checked_add(raw_compact_materials.len())
+        .ok_or_else(|| {
+            GalError::ffi(
+                StatusCode::LengthOverflow,
+                "world material quad count overflows",
+            )
+        })?;
+    if material_quad_count > FFI_MAX_BATCH_ITEMS {
+        return Err(GalError::ffi(
+            StatusCode::LengthOverflow,
+            format!(
+                "world material quad count {} exceeds max {}",
+                material_quad_count, FFI_MAX_BATCH_ITEMS
             ),
         ));
     }
@@ -935,6 +1062,7 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
             quad.source_program,
             WORLD_MATERIAL_SOURCE_UNSPECIFIED
                 | WORLD_MATERIAL_SOURCE_TEXTURED
+                | WORLD_MATERIAL_SOURCE_ENTITY_MODEL
                 | WORLD_MATERIAL_SOURCE_PARTICLES
                 | WORLD_MATERIAL_SOURCE_WEATHER
                 | WORLD_MATERIAL_SOURCE_CLOUDS
@@ -959,6 +1087,14 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
                 ),
             ));
         }
+        if !world_material_semantics::source_program_supports_uv_space(
+            quad.source_program,
+            quad.source_uv_space,
+        ) {
+            return Err(GalError::unsupported_feature(
+                "weather and cloud material quads require Rust-owned local texture UV semantics",
+            ));
+        }
         if !world_material_semantics::texture_supports_uv_space(texture_id, quad.source_uv_space) {
             return Err(GalError::ffi(
                 StatusCode::InvalidArgument,
@@ -968,24 +1104,14 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
                 ),
             ));
         }
-        let viewport_width = u32::try_from(quad.viewport_width).map_err(|_| {
-            GalError::ffi(
-                StatusCode::InvalidArgument,
-                format!(
-                    "world material quad viewport width must be non-negative, got {}",
-                    quad.viewport_width
-                ),
-            )
-        })?;
-        let viewport_height = u32::try_from(quad.viewport_height).map_err(|_| {
-            GalError::ffi(
-                StatusCode::InvalidArgument,
-                format!(
-                    "world material quad viewport height must be non-negative, got {}",
-                    quad.viewport_height
-                ),
-            )
-        })?;
+        let viewport_width = decode_world_viewport_axis(
+            quad.viewport_width,
+            "world material quad viewport width",
+        )?;
+        let viewport_height = decode_world_viewport_axis(
+            quad.viewport_height,
+            "world material quad viewport height",
+        )?;
         material_quads.push(WorldMaterialQuadRequest {
             stratum: quad.stratum,
             material_id,
@@ -1026,6 +1152,7 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
                 quad.vertex2_packed_light,
                 quad.vertex3_packed_light,
             ],
+            block_entity_id: quad.block_entity_id,
         });
     }
     if !raw_compact_materials.is_empty() {
@@ -1141,6 +1268,7 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
                 record.source_program,
                 WORLD_MATERIAL_SOURCE_UNSPECIFIED
                     | WORLD_MATERIAL_SOURCE_TEXTURED
+                    | WORLD_MATERIAL_SOURCE_ENTITY_MODEL
                     | WORLD_MATERIAL_SOURCE_PARTICLES
                     | WORLD_MATERIAL_SOURCE_WEATHER
                     | WORLD_MATERIAL_SOURCE_CLOUDS
@@ -1196,6 +1324,14 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
                     ),
                 ));
             }
+            if !world_material_semantics::source_program_supports_uv_space(
+                key.source_program,
+                quad.source_uv_space,
+            ) {
+                return Err(GalError::unsupported_feature(
+                    "weather and cloud material quads require Rust-owned local texture UV semantics",
+                ));
+            }
             if !world_material_semantics::texture_supports_uv_space(
                 key.texture_id,
                 quad.source_uv_space,
@@ -1206,6 +1342,12 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
                         "compact world material texture {} requires Minecraft atlas UV semantics",
                         key.texture_id
                     ),
+                ));
+            }
+            if quad.block_entity_id < -1 {
+                return Err(GalError::ffi(
+                    StatusCode::InvalidArgument,
+                    format!("compact world material quad block entity id must be >= -1, got {}", quad.block_entity_id),
                 ));
             }
             material_quads.push(WorldMaterialQuadRequest {
@@ -1238,6 +1380,7 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
                 packed_light: quad.packed_light,
                 vertex_color_argb: [quad.source_color_argb; 4],
                 vertex_packed_light: [quad.packed_light; 4],
+                block_entity_id: quad.block_entity_id,
             });
         }
     }
@@ -1262,6 +1405,7 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
             instance.byte_size,
             "world primitive mesh instance",
         )?;
+        validate_mesh_instance_semantic_identity(instance, "world primitive mesh instance")?;
         if !is_world_mesh_stratum(instance.stratum) {
             return Err(GalError::ffi(
                 StatusCode::UnknownEnum,
@@ -1292,24 +1436,14 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
                 format!("unknown world mesh winding {}", instance.winding),
             ));
         }
-        let viewport_width = u32::try_from(instance.viewport_width).map_err(|_| {
-            GalError::ffi(
-                StatusCode::InvalidArgument,
-                format!(
-                    "world mesh viewport width must be non-negative, got {}",
-                    instance.viewport_width
-                ),
-            )
-        })?;
-        let viewport_height = u32::try_from(instance.viewport_height).map_err(|_| {
-            GalError::ffi(
-                StatusCode::InvalidArgument,
-                format!(
-                    "world mesh viewport height must be non-negative, got {}",
-                    instance.viewport_height
-                ),
-            )
-        })?;
+        let viewport_width = decode_world_viewport_axis(
+            instance.viewport_width,
+            "world mesh viewport width",
+        )?;
+        let viewport_height = decode_world_viewport_axis(
+            instance.viewport_height,
+            "world mesh viewport height",
+        )?;
         mesh_instances.push(WorldMeshInstanceRequest {
             stratum: instance.stratum,
             mesh_key: instance.mesh_key,
@@ -1323,6 +1457,8 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
             entity_color_argb: instance.entity_color_argb,
             transform: instance.transform,
             outline_color_argb: instance.outline_color_argb,
+            flags: instance.flags,
+            block_entity_id: instance.block_entity_id,
             viewport_width,
             viewport_height,
         });
@@ -1378,6 +1514,12 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
                 "world text quad contains invalid geometry",
             ));
         }
+        if quad.block_entity_id < -1 {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                format!("world text quad block entity id must be >= -1, got {}", quad.block_entity_id),
+            ));
+        }
         text_quads.push(WorldTextQuadRequest {
             asset_id: quad.asset_id,
             atlas_generation: quad.atlas_generation,
@@ -1400,6 +1542,7 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
                 [quad.uvs[6], quad.uvs[7]],
             ],
             color_argb: quad.color_argb,
+            block_entity_id: quad.block_entity_id,
         });
     }
     let raw_lod_instances = read_slice(
@@ -1407,13 +1550,13 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
         true,
         "world primitive LOD instances",
     )?;
-    if raw_lod_instances.len() > FFI_MAX_BATCH_ITEMS {
+    if raw_lod_instances.len() > WORLD_LOD_MAX_VISIBLE_SEGMENTS {
         return Err(GalError::ffi(
             StatusCode::InvalidArgument,
             format!(
                 "world primitive LOD instance count {} exceeds max {}",
                 raw_lod_instances.len(),
-                FFI_MAX_BATCH_ITEMS
+                WORLD_LOD_MAX_VISIBLE_SEGMENTS
             ),
         ));
     }
@@ -1552,6 +1695,25 @@ unsafe fn decode_world_first_person_mesh_instances(
             instance.byte_size,
             "world first-person mesh instance",
         )?;
+        validate_mesh_instance_semantic_identity(instance, "world first-person mesh instance")?;
+        if instance.flags & WORLD_MESH_INSTANCE_FLAG_OUTLINE_ONLY != 0 {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                "world first-person mesh instances cannot be outline-only",
+            ));
+        }
+        if instance.block_entity_id != -1 {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                "world first-person mesh instances cannot carry block-entity identity",
+            ));
+        }
+        if instance.entity_id != 0 {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                "world first-person mesh instances cannot carry shader-pack entity identity",
+            ));
+        }
         if instance.stratum != WORLD_STRATUM_ENTITY_MESH {
             return Err(GalError::ffi(
                 StatusCode::InvalidArgument,
@@ -1591,24 +1753,14 @@ unsafe fn decode_world_first_person_mesh_instances(
                 ),
             ));
         }
-        let viewport_width = u32::try_from(instance.viewport_width).map_err(|_| {
-            GalError::ffi(
-                StatusCode::InvalidArgument,
-                format!(
-                    "world first-person mesh viewport width must be non-negative, got {}",
-                    instance.viewport_width
-                ),
-            )
-        })?;
-        let viewport_height = u32::try_from(instance.viewport_height).map_err(|_| {
-            GalError::ffi(
-                StatusCode::InvalidArgument,
-                format!(
-                    "world first-person mesh viewport height must be non-negative, got {}",
-                    instance.viewport_height
-                ),
-            )
-        })?;
+        let viewport_width = decode_world_viewport_axis(
+            instance.viewport_width,
+            "world first-person mesh viewport width",
+        )?;
+        let viewport_height = decode_world_viewport_axis(
+            instance.viewport_height,
+            "world first-person mesh viewport height",
+        )?;
         instances.push(WorldMeshInstanceRequest {
             stratum: instance.stratum,
             mesh_key: instance.mesh_key,
@@ -1622,6 +1774,8 @@ unsafe fn decode_world_first_person_mesh_instances(
             entity_color_argb: instance.entity_color_argb,
             transform: instance.transform,
             outline_color_argb: instance.outline_color_argb,
+            flags: instance.flags,
+            block_entity_id: instance.block_entity_id,
             viewport_width,
             viewport_height,
         });

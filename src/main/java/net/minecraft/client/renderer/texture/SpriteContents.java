@@ -86,6 +86,7 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable, SpriteCont
 			// Iris: From MixinSpriteContents - redirect mipmap generation to custom generator if available
 			NativeImage[] result;
 			if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+				&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
 				&& this instanceof net.irisshaders.iris.pbr.mipmap.CustomMipmapGenerator.Provider provider) {
 				net.irisshaders.iris.pbr.mipmap.CustomMipmapGenerator generator = provider.getMipmapGenerator();
 				if (generator != null) {
@@ -176,7 +177,8 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable, SpriteCont
 	}
 
 	public void upload(int i, int j, int k, int l, NativeImage[] nativeImages, GpuTexture gpuTexture) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
 			// Rust consumes the copied atlas/resource-pack pixels; Java texture
 			// uploads are unavailable on the semantic whole-frame device.
 			return;
@@ -245,7 +247,8 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable, SpriteCont
 		// Iris PBR holders belong to the Java compatibility texture path. Rust
 		// whole-frame assets are copied from CPU resource data and must not
 		// retain or mutate Iris PBR runtime state during reload.
-		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() && iris$pbrHolder != null) {
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected() && iris$pbrHolder != null) {
 			iris$pbrHolder.close();
 		}
 	}
@@ -595,6 +598,10 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable, SpriteCont
 	
 	@Override
 	public net.irisshaders.iris.pbr.texture.PBRSpriteHolder getOrCreatePBRHolder() {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris PBR sprite state is unavailable on the Rust Vulkan route");
+		}
 		if (iris$pbrHolder == null) {
 			iris$pbrHolder = new net.irisshaders.iris.pbr.texture.PBRSpriteHolder();
 		}
@@ -603,7 +610,8 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable, SpriteCont
 	
 	// Iris PBR: From texture.pbr.MixinSpriteContents - Sodium active tracking hook
 	public void sodium$setActive(boolean active) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
 			return;
 		}
 		// Mark PBR sprites active when main sprite is active

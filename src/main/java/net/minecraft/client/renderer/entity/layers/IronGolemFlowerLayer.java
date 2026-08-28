@@ -33,7 +33,7 @@ public class IronGolemFlowerLayer extends RenderLayer<IronGolemRenderState, Iron
 			poseStack.scale(0.5F, 0.5F, 0.5F);
 			poseStack.mulPose(Axis.XP.rotationDegrees(-90.0F));
 			poseStack.translate(-0.5F, -0.5F, -0.5F);
-			submitNodeCollector.submitBlock(poseStack, Blocks.POPPY.defaultBlockState(), i, OverlayTexture.NO_OVERLAY, ironGolemRenderState.outlineColor);
+			submitNodeCollector.submitBlockSemantic(poseStack, Blocks.POPPY.defaultBlockState(), i, OverlayTexture.NO_OVERLAY, ironGolemRenderState.outlineColor);
 			poseStack.popPose();
 		}
 	}

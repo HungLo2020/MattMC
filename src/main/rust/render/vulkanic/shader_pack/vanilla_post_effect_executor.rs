@@ -11,7 +11,7 @@ use super::vanilla_post_effect_contract::{
     VanillaPostEffectUniform,
 };
 use crate::render::vulkanic::commands::{
-    AttachmentLoadOp, AttachmentStoreOp, CommandOp, PassAttachment,
+    AttachmentLoadOp, AttachmentStoreOp, CommandOp, PassAttachment, TextureUsageState,
 };
 use crate::render::vulkanic::error::{GalError, GalResult};
 use crate::render::vulkanic::resources::BackendApi;
@@ -45,10 +45,20 @@ pub struct VanillaPostEffectPassBinding {
 /// and never Java/Iris/native backend identities.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct VanillaPostEffectExternalTargetBinding {
+    /// Rust-owned pass compatible with the target's attachment layout.  A
+    /// target/view pair without its pass is not executable: requiring the
+    /// pass here prevents callers from reconstructing implicit framebuffer
+    /// state at the last lowering step.
+    pub render_pass: Handle,
     pub render_target: Handle,
     pub color_attachment: Handle,
     pub depth_attachment: Option<Handle>,
     pub sampler: Handle,
+    /// Current semantic usage at the point this graph is lowered.  The
+    /// coordinator supplies this state; the executor never guesses from a
+    /// backend framebuffer.
+    pub color_usage: TextureUsageState,
+    pub depth_usage: Option<TextureUsageState>,
 }
 
 /// Validated external attachment set for one effect plan.  Intermediate
@@ -112,6 +122,60 @@ impl FabulousExternalTargetInventory {
         }
         VanillaPostEffectExternalTargetBindings::new(plan, self.bindings())
     }
+
+    /// Projects the typed Fabulous inventory down to exactly the roles a
+    /// copied shader-pack graph declares.  The full inventory is appropriate
+    /// for the bundled transparency graph, but passing all six roles to a
+    /// smaller graph would (correctly) look like undeclared external state.
+    /// This projection keeps validation graph-driven and prevents accidental
+    /// attachment aliasing or Java target substitution.
+    pub fn validate_for_plan(
+        self,
+        plan: &VanillaPostEffectExecutionPlan,
+    ) -> GalResult<VanillaPostEffectExternalTargetBindings> {
+        let all = self.bindings();
+        let required = plan.required_external_targets();
+        let selected = required
+            .iter()
+            .map(|name| {
+                all.get(name)
+                    .copied()
+                    .map(|binding| (name.clone(), binding))
+                    .ok_or_else(|| {
+                        GalError::unsupported_feature(format!(
+                            "vanilla post effect {} has no Rust-owned Fabulous role for {name}",
+                            plan.effect_name
+                        ))
+                    })
+            })
+            .collect::<GalResult<BTreeMap<_, _>>>()?;
+        VanillaPostEffectExternalTargetBindings::new(plan, selected)
+    }
+
+    /// Validates both the Rust-owned resource inventory and the frame-local
+    /// write receipt. Allocation alone is not enough: sampling an attachment
+    /// that was not populated by this frame would create a silent visual
+    /// fallback. The coordinator supplies semantic role names, never backend
+    /// or Java target handles.
+    pub fn validate_populated_for_plan(
+        self,
+        plan: &VanillaPostEffectExecutionPlan,
+        populated_roles: &BTreeSet<String>,
+    ) -> GalResult<VanillaPostEffectExternalTargetBindings> {
+        let required = plan.required_external_targets();
+        let missing = required
+            .difference(populated_roles)
+            .cloned()
+            .collect::<Vec<_>>();
+        if !missing.is_empty() {
+            return Err(GalError::unsupported_feature(format!(
+                "vanilla post effect {} has unpopulated Rust external targets: {}",
+                plan.effect_name,
+                missing.join(", ")
+            )));
+        }
+        self.validate_for_plan(plan)
+    }
 }
 
 impl VanillaPostEffectExternalTargetBindings {
@@ -122,6 +186,12 @@ impl VanillaPostEffectExternalTargetBindings {
         let provided = bindings.keys().cloned().collect();
         plan.validate_external_targets(&provided)?;
         for (name, binding) in &bindings {
+            binding.render_pass.require_kind(HandleKind::RenderPass).map_err(|error| {
+                GalError::invalid_argument(format!(
+                    "vanilla post effect {} external target {name} has invalid render pass: {error}",
+                    plan.effect_name
+                ))
+            })?;
             let target_kind = binding.render_target.kind();
             if target_kind != Some(HandleKind::RenderTarget)
                 && target_kind != Some(HandleKind::FrameTarget)
@@ -151,6 +221,12 @@ impl VanillaPostEffectExternalTargetBindings {
                     ))
                 })?;
             }
+            if binding.depth_attachment.is_some() != binding.depth_usage.is_some() {
+                return Err(GalError::invalid_argument(format!(
+                    "vanilla post effect {} external target {name} depth usage does not match its depth attachment",
+                    plan.effect_name
+                )));
+            }
         }
         for pass in &plan.ordered_passes {
             for input in &pass.inputs {
@@ -172,6 +248,10 @@ impl VanillaPostEffectExternalTargetBindings {
 
     pub fn get(&self, name: &str) -> Option<VanillaPostEffectExternalTargetBinding> {
         self.bindings.get(name).copied()
+    }
+
+    pub fn names(&self) -> impl Iterator<Item = &str> {
+        self.bindings.keys().map(String::as_str)
     }
 }
 
@@ -278,9 +358,9 @@ pub fn bundled_transparency_shader_sources(
 }
 
 /// Lowers copied vanilla fullscreen GLSL into the explicit Vulkan descriptor
-/// ABI used by the future Rust post-effect resource writer.  The source graph
-/// remains semantic input: sampler and uniform binding numbers are derived
-/// from the validated pass order, never from Java's runtime shader objects.
+/// ABI used by the Rust post-effect resource writer. The source graph remains
+/// semantic input: sampler and uniform binding numbers are derived from the
+/// validated pass order, never from Java's runtime shader objects.
 pub fn bundled_transparency_vulkan_shader_sources() -> GalResult<Vec<(Vec<u8>, Vec<u8>)>> {
     let contract = super::vanilla_post_effect_contract::VanillaPostEffectContract::parse(
         "minecraft:transparency",
@@ -390,10 +470,13 @@ pub fn pack_uniform_block(
     let mut bytes = Vec::new();
     for uniform in uniforms {
         let (alignment, padded_size, expected_values) = match uniform.value_type.as_str() {
-            "float" => (4usize, 4usize, 1usize),
-            "vec2" => (8usize, 8usize, 2usize),
-            "vec3" => (16usize, 16usize, 3usize),
-            "vec4" => (16usize, 16usize, 4usize),
+            "float" | "int" => (4usize, 4usize, 1usize),
+            "vec2" | "ivec2" => (8usize, 8usize, 2usize),
+            "vec3" | "ivec3" => (16usize, 16usize, 3usize),
+            "vec4" | "ivec4" => (16usize, 16usize, 4usize),
+            // A mat4 is four std140 vec4 columns, with a 16-byte base
+            // alignment and a 64-byte occupied range.
+            "matrix4x4" => (16usize, 64usize, 16usize),
             value_type => {
                 return Err(GalError::unsupported_feature(format!(
                     "vanilla post effect uniform block {block_name} uses unsupported type {value_type}"
@@ -414,10 +497,23 @@ pub fn pack_uniform_block(
                 uniform.name
             )));
         }
+        let integer = matches!(uniform.value_type.as_str(), "int" | "ivec2" | "ivec3" | "ivec4");
+        if integer && uniform.values.iter().any(|value| {
+            value.fract() != 0.0 || *value < i32::MIN as f32 || *value > i32::MAX as f32
+        }) {
+            return Err(GalError::invalid_argument(format!(
+                "vanilla post effect integer uniform {} must contain finite 32-bit integral values",
+                uniform.name
+            )));
+        }
         let aligned = align_uniform_offset(bytes.len(), alignment);
         bytes.resize(aligned, 0);
         for value in &uniform.values {
-            bytes.extend_from_slice(&value.to_le_bytes());
+            if integer {
+                bytes.extend_from_slice(&(*value as i32).to_le_bytes());
+            } else {
+                bytes.extend_from_slice(&value.to_le_bytes());
+            }
         }
         bytes.resize(aligned + padded_size, 0);
     }
@@ -771,6 +867,59 @@ mod tests {
     }
 
     #[test]
+    fn packs_integer_uniforms_as_four_byte_components() {
+        let pass = VanillaPostEffectPass {
+            vertex_shader: "v".to_owned(),
+            fragment_shader: "f".to_owned(),
+            inputs: Vec::new(),
+            output: "minecraft:main".to_owned(),
+            uniform_blocks: BTreeSet::from(["Config".to_owned()]),
+            uniform_values: BTreeMap::from([(
+                "Config".to_owned(),
+                vec![
+                    VanillaPostEffectUniform {
+                        name: "Mode".to_owned(),
+                        value_type: "int".to_owned(),
+                        values: vec![3.0],
+                    },
+                    VanillaPostEffectUniform {
+                        name: "Mask".to_owned(),
+                        value_type: "ivec3".to_owned(),
+                        values: vec![1.0, 2.0, 4.0],
+                    },
+                ],
+            )]),
+        };
+        let bytes = pack_uniform_block(&pass, "Config").unwrap();
+        assert_eq!(32, bytes.len());
+        assert_eq!(&bytes[0..4], &3i32.to_le_bytes());
+        assert_eq!(&bytes[16..28], &[1, 0, 0, 0, 2, 0, 0, 0, 4, 0, 0, 0]);
+    }
+
+    #[test]
+    fn packs_matrix4x4_as_four_std140_columns() {
+        let pass = VanillaPostEffectPass {
+            vertex_shader: "v".to_owned(),
+            fragment_shader: "f".to_owned(),
+            inputs: Vec::new(),
+            output: "minecraft:main".to_owned(),
+            uniform_blocks: BTreeSet::from(["Transform".to_owned()]),
+            uniform_values: BTreeMap::from([(
+                "Transform".to_owned(),
+                vec![VanillaPostEffectUniform {
+                    name: "Model".to_owned(),
+                    value_type: "matrix4x4".to_owned(),
+                    values: (0..16).map(|value| value as f32).collect(),
+                }],
+            )]),
+        };
+        let bytes = pack_uniform_block(&pass, "Transform").unwrap();
+        assert_eq!(64, bytes.len());
+        assert_eq!(&bytes[0..4], &0.0f32.to_le_bytes());
+        assert_eq!(&bytes[60..64], &15.0f32.to_le_bytes());
+    }
+
+    #[test]
     fn normalizes_multiple_static_uniform_blocks_to_distinct_vulkan_bindings() {
         let mut pass = VanillaPostEffectPass {
             vertex_shader: "fullscreen.vsh".to_owned(),
@@ -778,6 +927,9 @@ mod tests {
             inputs: vec![VanillaPostEffectInput {
                 sampler_name: "In".to_owned(),
                 target: "minecraft:main".to_owned(),
+                texture_path: None,
+                texture_width: None,
+                texture_height: None,
                 bilinear: true,
                 use_depth_buffer: false,
             }],
@@ -873,48 +1025,86 @@ mod tests {
 
         let inventory = FabulousExternalTargetInventory {
             main: VanillaPostEffectExternalTargetBinding {
+                render_pass: handle(HandleKind::RenderPass, 1),
                 render_target: handle(HandleKind::RenderTarget, 1),
                 color_attachment: handle(HandleKind::TextureView, 1),
                 depth_attachment: Some(handle(HandleKind::TextureView, 1)),
                 sampler: handle(HandleKind::Sampler, 1),
+                color_usage: TextureUsageState::ShaderRead,
+                depth_usage: Some(TextureUsageState::ShaderRead),
             },
             translucent: VanillaPostEffectExternalTargetBinding {
+                render_pass: handle(HandleKind::RenderPass, 2),
                 render_target: handle(HandleKind::RenderTarget, 2),
                 color_attachment: handle(HandleKind::TextureView, 2),
                 depth_attachment: Some(handle(HandleKind::TextureView, 2)),
                 sampler: handle(HandleKind::Sampler, 2),
+                color_usage: TextureUsageState::ShaderRead,
+                depth_usage: Some(TextureUsageState::ShaderRead),
             },
             item_entity: VanillaPostEffectExternalTargetBinding {
+                render_pass: handle(HandleKind::RenderPass, 3),
                 render_target: handle(HandleKind::RenderTarget, 3),
                 color_attachment: handle(HandleKind::TextureView, 3),
                 depth_attachment: Some(handle(HandleKind::TextureView, 3)),
                 sampler: handle(HandleKind::Sampler, 3),
+                color_usage: TextureUsageState::ShaderRead,
+                depth_usage: Some(TextureUsageState::ShaderRead),
             },
             particles: VanillaPostEffectExternalTargetBinding {
+                render_pass: handle(HandleKind::RenderPass, 4),
                 render_target: handle(HandleKind::RenderTarget, 4),
                 color_attachment: handle(HandleKind::TextureView, 4),
                 depth_attachment: Some(handle(HandleKind::TextureView, 4)),
                 sampler: handle(HandleKind::Sampler, 4),
+                color_usage: TextureUsageState::ShaderRead,
+                depth_usage: Some(TextureUsageState::ShaderRead),
             },
             clouds: VanillaPostEffectExternalTargetBinding {
+                render_pass: handle(HandleKind::RenderPass, 5),
                 render_target: handle(HandleKind::RenderTarget, 5),
                 color_attachment: handle(HandleKind::TextureView, 5),
                 depth_attachment: Some(handle(HandleKind::TextureView, 5)),
                 sampler: handle(HandleKind::Sampler, 5),
+                color_usage: TextureUsageState::ShaderRead,
+                depth_usage: Some(TextureUsageState::ShaderRead),
             },
             weather: VanillaPostEffectExternalTargetBinding {
+                render_pass: handle(HandleKind::RenderPass, 6),
                 render_target: handle(HandleKind::RenderTarget, 6),
                 color_attachment: handle(HandleKind::TextureView, 6),
                 depth_attachment: Some(handle(HandleKind::TextureView, 6)),
                 sampler: handle(HandleKind::Sampler, 6),
+                color_usage: TextureUsageState::ShaderRead,
+                depth_usage: Some(TextureUsageState::ShaderRead),
             },
         };
         let external = inventory.validate_against(executor.plan()).unwrap();
         assert!(external.get("minecraft:particles").is_some());
+        let populated = BTreeSet::from([
+            "minecraft:main".to_owned(),
+            "minecraft:translucent".to_owned(),
+            "minecraft:item_entity".to_owned(),
+            "minecraft:particles".to_owned(),
+            "minecraft:clouds".to_owned(),
+            "minecraft:weather".to_owned(),
+        ]);
+        assert!(inventory
+            .validate_populated_for_plan(executor.plan(), &populated)
+            .is_ok());
+        let missing_weather = populated
+            .iter()
+            .filter(|role| role.as_str() != "minecraft:weather")
+            .cloned()
+            .collect::<BTreeSet<_>>();
+        let error = inventory
+            .validate_populated_for_plan(executor.plan(), &missing_weather)
+            .unwrap_err();
+        assert!(error.to_string().contains("unpopulated Rust external targets"));
 
         let error = FabulousExternalTargetInventory {
             main: inventory.main,
-            translucent: VanillaPostEffectExternalTargetBinding { depth_attachment: None, ..inventory.translucent },
+            translucent: VanillaPostEffectExternalTargetBinding { depth_attachment: None, depth_usage: None, ..inventory.translucent },
             item_entity: inventory.item_entity,
             particles: inventory.particles,
             clouds: inventory.clouds,

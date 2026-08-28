@@ -51,6 +51,10 @@ public class TextureUtil {
 
 	public static void writeAsPNG(Path path, String string, GpuTexture gpuTexture, int i, IntUnaryOperator intUnaryOperator) {
 		RenderSystem.assertOnRenderThread();
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java texture readback is unavailable on the Rust Vulkan route");
+		}
 		int j = 0;
 
 		for (int k = 0; k <= i; k++) {

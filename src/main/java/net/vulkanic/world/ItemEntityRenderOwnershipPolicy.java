@@ -18,7 +18,7 @@ public final class ItemEntityRenderOwnershipPolicy {
 	public static WorldRenderRoutePolicy.Route currentOwnershipRoute() {
 		return selectOwnership(
 			VulkanicAPI.isVulkanBackendSelected(),
-			RustGalVulkanWholeFrameMode.enabledForBackend(VulkanicAPI.isVulkanBackendSelected()),
+			RustGalVulkanWholeFrameMode.enabled(),
 			Boolean.getBoolean("mattmc.dev.rustGalWorldItemEntity.disabled"),
 			Boolean.getBoolean("mattmc.dev.rustGalWorldItemEntity.legacyControl")
 		);
@@ -47,7 +47,7 @@ public final class ItemEntityRenderOwnershipPolicy {
 				? WorldRenderRoutePolicy.Route.DISABLED
 				: WorldRenderRoutePolicy.Route.JAVA_COMPATIBILITY;
 		}
-		return vulkanBackendSelected && wholeFrameVulkanEnabled
+		return wholeFrameVulkanEnabled
 			? WorldRenderRoutePolicy.Route.RUST_VULKAN_WHOLE_FRAME
 			: vulkanBackendSelected
 				? WorldRenderRoutePolicy.Route.DISABLED

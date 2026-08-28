@@ -31,7 +31,7 @@ public final class StandaloneModelRenderOwnershipPolicy {
 				: WorldRenderRoutePolicy.Route.JAVA_COMPATIBILITY;
 		}
 		boolean vulkanBackendSelected = VulkanicAPI.isVulkanBackendSelected();
-		return RustGalVulkanWholeFrameMode.enabledForBackend(vulkanBackendSelected)
+		return RustGalVulkanWholeFrameMode.enabled()
 			? WorldRenderRoutePolicy.Route.RUST_VULKAN_WHOLE_FRAME
 			: vulkanBackendSelected
 				? WorldRenderRoutePolicy.Route.DISABLED

@@ -162,7 +162,7 @@ public abstract class DisplayRenderer<T extends Display, S, ST extends DisplayEn
 		public void submitInner(
 			BlockDisplayEntityRenderState blockDisplayEntityRenderState, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, float f
 		) {
-			submitNodeCollector.submitBlockDisplay(
+			submitNodeCollector.submitBlockDisplaySemantic(
 				poseStack,
 				blockDisplayEntityRenderState.blockRenderState.blockState(),
 				i,
@@ -201,7 +201,18 @@ public abstract class DisplayRenderer<T extends Display, S, ST extends DisplayEn
 		) {
 			if (!itemDisplayEntityRenderState.item.isEmpty()) {
 				poseStack.mulPose(Axis.YP.rotation((float) Math.PI));
-				itemDisplayEntityRenderState.item.submit(poseStack, submitNodeCollector, i, OverlayTexture.NO_OVERLAY, itemDisplayEntityRenderState.outlineColor);
+				net.vulkanic.world.RustGalWorldPrimitiveRenderer.beginItemEntitySubmission();
+				try {
+					itemDisplayEntityRenderState.item.submit(
+						poseStack,
+						submitNodeCollector,
+						i,
+						OverlayTexture.NO_OVERLAY,
+						itemDisplayEntityRenderState.outlineColor
+					);
+				} finally {
+					net.vulkanic.world.RustGalWorldPrimitiveRenderer.endItemEntitySubmission();
+				}
 			}
 		}
 	}
@@ -270,13 +281,15 @@ public abstract class DisplayRenderer<T extends Display, S, ST extends DisplayEn
 			if (j != 0) {
 				float[] backgroundVertices = {-1.0F, -1.0F, 0.0F, -1.0F, n, 0.0F, m, n, 0.0F, m, -1.0F, 0.0F};
 				float[] backgroundUvs = {0.0F, 1.0F, 0.0F, 0.0F, 1.0F, 0.0F, 1.0F, 1.0F};
-				if (!submitNodeCollector.submitColoredQuads(
+				if (!submitNodeCollector.submitColoredQuadsSemantic(
 					poseStack, bl ? RenderType.textBackgroundSeeThrough() : RenderType.textBackground(), backgroundVertices, backgroundUvs, new int[] {j}, i
 				)) {
-					if (net.vulkanic.world.WorldRenderRoutePolicy.currentProceduralQuadRoute().usesRustWholeFrameVulkan()) {
+					if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+						|| net.vulkanic.world.WorldRenderRoutePolicy.currentProceduralQuadRoute().usesRustWholeFrameVulkan()
+						|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 						throw new IllegalStateException("Rust whole-frame display-text route rejected semantic background quad");
 					}
-					submitNodeCollector.submitCustomGeometry(poseStack, bl ? RenderType.textBackgroundSeeThrough() : RenderType.textBackground(), (pose, vertexConsumer) -> {
+					submitNodeCollector.submitCustomGeometrySemantic(poseStack, bl ? RenderType.textBackgroundSeeThrough() : RenderType.textBackground(), (pose, vertexConsumer) -> {
 						vertexConsumer.addVertex(pose, -1.0F, -1.0F, 0.0F).setColor(j).setLight(i);
 						vertexConsumer.addVertex(pose, -1.0F, (float)n, 0.0F).setColor(j).setLight(i);
 						vertexConsumer.addVertex(pose, (float)m, (float)n, 0.0F).setColor(j).setLight(i);
@@ -294,9 +307,18 @@ public abstract class DisplayRenderer<T extends Display, S, ST extends DisplayEn
 					case CENTER -> m / 2.0F - cachedLine.width() / 2.0F;
 					default -> throw new MatchException(null, null);
 				};
-				orderedSubmitNodeCollector.submitText(
-					poseStack, h, g, cachedLine.contents(), bl3, bl ? Font.DisplayMode.SEE_THROUGH : Font.DisplayMode.POLYGON_OFFSET, i, c << 24 | 16777215, 0, 0
-				);
+				Font.DisplayMode displayMode = bl ? Font.DisplayMode.SEE_THROUGH : Font.DisplayMode.POLYGON_OFFSET;
+				int textColor = c << 24 | 16777215;
+				if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+					|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+					orderedSubmitNodeCollector.submitTextSemantic(
+						poseStack, h, g, cachedLine.contents(), bl3, displayMode, i, textColor, 0, 0
+					);
+				} else {
+					orderedSubmitNodeCollector.submitTextSemantic(
+						poseStack, h, g, cachedLine.contents(), bl3, displayMode, i, textColor, 0, 0
+					);
+				}
 				g += l;
 			}
 		}

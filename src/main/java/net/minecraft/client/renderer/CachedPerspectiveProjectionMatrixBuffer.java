@@ -14,7 +14,7 @@ import org.jetbrains.annotations.Nullable;
 @Environment(EnvType.CLIENT)
 public class CachedPerspectiveProjectionMatrixBuffer implements AutoCloseable {
 	@Nullable
-	private final GpuBuffer buffer;
+	private GpuBuffer buffer;
 	@Nullable
 	private final GpuBufferSlice bufferSlice;
 	private final String label;
@@ -28,7 +28,8 @@ public class CachedPerspectiveProjectionMatrixBuffer implements AutoCloseable {
 		this.label = "cached-perspective:" + string;
 		this.zNear = f;
 		this.zFar = g;
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			this.buffer = null;
 			this.bufferSlice = null;
 			return;
@@ -40,7 +41,7 @@ public class CachedPerspectiveProjectionMatrixBuffer implements AutoCloseable {
 
 	public GpuBufferSlice getBuffer(int i, int j, float f) {
 		if (this.buffer == null || this.bufferSlice == null) {
-			throw new IllegalStateException("Java cached projection UBO rendering is unavailable while Rust owns whole-frame presentation");
+			throw new IllegalStateException("Java cached projection UBO rendering is unavailable on selected Vulkan");
 		}
 		if (this.width != i || this.height != j || this.fov != f) {
 			Matrix4f matrix4f = this.createProjectionMatrix(i, j, f);
@@ -66,6 +67,12 @@ public class CachedPerspectiveProjectionMatrixBuffer implements AutoCloseable {
 	public void close() {
 		if (this.buffer != null) {
 			this.buffer.close();
+			this.buffer = null;
 		}
+	}
+
+	public void ensureRustSemanticRoute() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) this.close();
 	}
 }

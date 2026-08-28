@@ -32,8 +32,18 @@ public class FireworkEntityRenderer extends EntityRenderer<FireworkRocketEntity,
 			poseStack.mulPose(Axis.XP.rotationDegrees(90.0F));
 		}
 
-		fireworkRocketRenderState.item
-			.submit(poseStack, submitNodeCollector, fireworkRocketRenderState.lightCoords, OverlayTexture.NO_OVERLAY, fireworkRocketRenderState.outlineColor);
+		net.vulkanic.world.RustGalWorldPrimitiveRenderer.beginItemEntitySubmission();
+		try {
+			fireworkRocketRenderState.item.submit(
+				poseStack,
+				submitNodeCollector,
+				fireworkRocketRenderState.lightCoords,
+				OverlayTexture.NO_OVERLAY,
+				fireworkRocketRenderState.outlineColor
+			);
+		} finally {
+			net.vulkanic.world.RustGalWorldPrimitiveRenderer.endItemEntitySubmission();
+		}
 		poseStack.popPose();
 		super.submit(fireworkRocketRenderState, poseStack, submitNodeCollector, cameraRenderState);
 	}

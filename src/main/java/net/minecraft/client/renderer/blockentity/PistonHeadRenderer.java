@@ -71,10 +71,10 @@ public class PistonHeadRenderer implements BlockEntityRenderer<PistonMovingBlock
 		if (pistonHeadRenderState.block != null) {
 			poseStack.pushPose();
 			poseStack.translate(pistonHeadRenderState.xOffset, pistonHeadRenderState.yOffset, pistonHeadRenderState.zOffset);
-				submitNodeCollector.submitMovingBlock(poseStack, pistonHeadRenderState.block, SubmitNodeStorage.MovingBlockSubmitSource.PISTON);
+				submitNodeCollector.submitMovingBlockSemantic(poseStack, pistonHeadRenderState.block, SubmitNodeStorage.MovingBlockSubmitSource.PISTON);
 			poseStack.popPose();
 			if (pistonHeadRenderState.base != null) {
-					submitNodeCollector.submitMovingBlock(poseStack, pistonHeadRenderState.base, SubmitNodeStorage.MovingBlockSubmitSource.PISTON);
+					submitNodeCollector.submitMovingBlockSemantic(poseStack, pistonHeadRenderState.base, SubmitNodeStorage.MovingBlockSubmitSource.PISTON);
 			}
 		}
 	}

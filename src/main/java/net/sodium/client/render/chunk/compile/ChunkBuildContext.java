@@ -10,8 +10,12 @@ public class ChunkBuildContext {
     public final BlockRenderCache cache;
 
     public ChunkBuildContext(ClientLevel level, ChunkVertexType vertexType) {
-        this(level, vertexType, net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.shouldUseSeparateAo());
-    }
+		this(level, vertexType,
+			net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+					? false
+					: net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.shouldUseSeparateAo());
+	}
 
 	/**
 	 * Creates a CPU meshing context with an explicitly selected vertex layout.

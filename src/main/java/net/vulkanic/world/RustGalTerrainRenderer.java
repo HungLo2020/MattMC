@@ -67,6 +67,8 @@ public final class RustGalTerrainRenderer {
 	private static final int MAX_RECENT_EVENTS = 8192;
 	private static final int MAX_LIFECYCLE_EVENTS = 256;
 	private static final int MAX_TRANSLUCENT_EVENTS = 4096;
+	/** Bounds each copied atlas before base/normal/specular expansion. */
+	private static final long MAX_RUST_ATLAS_PIXELS = 16_777_216L;
 	private static final String STATIC_TERRAIN_SCENARIO_PROPERTY = "mattmc.dev.rustGalStaticTerrain.scenario";
 	private static final String FAULT_PROPERTY = "mattmc.dev.rustGalStaticTerrain.fault";
 	private static final Map<LayerKey, TerrainSectionAsset> SECTION_ASSETS = new ConcurrentHashMap<>();
@@ -799,12 +801,7 @@ public final class RustGalTerrainRenderer {
 			|| sections == null || camera == null) {
 			return;
 		}
-		List<RenderSection> sectionSnapshot = new ArrayList<>();
-		for (RenderSection section : sections) {
-			if (section != null && section.isBuilt()) {
-				sectionSnapshot.add(section);
-			}
-		}
+		List<RenderSection> sectionSnapshot = snapshotBuiltTerrainSections(sections);
 		Set<VisibleSubmitKey> visibleSubmissions = new HashSet<>();
 		int translucentDrawOrder = 0;
 		for (RenderSection section : sectionSnapshot) {
@@ -830,8 +827,6 @@ public final class RustGalTerrainRenderer {
 		if (!sectionSnapshot.isEmpty()) {
 			net.minecraft.client.dev.GraphicsFrameBenchmark.recordPhaseSample("sodium.terrain.setup", 1L);
 			net.minecraft.client.dev.GraphicsFrameBenchmark.recordPhaseSample("sodium.terrain.draw", 1L);
-			net.minecraft.client.dev.GraphicsFrameBenchmark.recordPhaseSample("sodium.terrain.draw", 1L);
-			net.minecraft.client.dev.GraphicsFrameBenchmark.recordPhaseSample("sodium.terrain.draw", 1L);
 		}
 		// The companion receipt is built from the same CPU-owned RenderSection
 		// values that this semantic callsite submitted. It deliberately contains
@@ -847,8 +842,33 @@ public final class RustGalTerrainRenderer {
 		);
 	}
 
+	/**
+	 * Copies the unique built section identities for the Rust semantic route.
+	 * Upstream visibility iterables may contain repeated entries; canonical
+	 * packed positions are the stable section identity and prevent duplicate
+	 * mesh instances without retaining Sodium render-list state.
+	 */
+	static List<RenderSection> snapshotBuiltTerrainSections(Iterable<RenderSection> sections) {
+		if (sections == null) {
+			return List.of();
+		}
+		List<RenderSection> snapshot = new ArrayList<>();
+		Set<Long> seenPositions = new HashSet<>();
+		for (RenderSection section : sections) {
+			if (section != null && section.isBuilt()
+				&& seenPositions.add(section.getPosition().asLong())) {
+				snapshot.add(section);
+			}
+		}
+		return snapshot;
+	}
+
 	public static void invalidateForResourceReload() {
-		SECTION_ASSETS.clear();
+		// Retain the last accepted section generation while the replacement
+		// atlas/meshes are rebuilt.  Clearing this map first made a resource-pack
+		// reload produce an empty Rust frame and could not be repaired within the
+		// bounded deterministic lifecycle window.  New registrations replace these
+		// records atomically once their complete semantic payload is accepted.
 		LAST_DYNAMIC_SORT_CAMERA.clear();
 		TRANSLUCENT_EXECUTION_METADATA.clear();
 		synchronized (RustGalTerrainRenderer.class) {
@@ -1646,11 +1666,17 @@ public final class RustGalTerrainRenderer {
 					unsupportedFluidRejectedSections.incrementAndGet();
 					throw new IllegalStateException("Rust whole-frame Vulkan encountered translucent fluid metadata without a semantic material route");
 				}
+				// Publish the section index only after the Rust-owned mesh registry has
+				// accepted the complete asset transaction. If registry admission rejects
+				// the copied mesh, SECTION_ASSETS must not advertise a drawable section
+				// that the Rust frontend cannot consume.
+				long atlasGenerationForRegistration = atlasGeneration;
+				RustGalWorldPrimitiveRenderer.registerStaticTerrainMeshAsset(asset.asset(), atlasTextureUpdatePayload());
+				confirmAtlasPayloadRegistered(atlasGenerationForRegistration);
 				SECTION_ASSETS.put(new LayerKey(output.render.getPosition().asLong(), layer), asset);
 				net.sodium.client.render.StaticTerrainParityDiagnostics.recordRustStaticTerrainAdmission(
 					output, layer.name(), "asset-registered"
 				);
-				RustGalWorldPrimitiveRenderer.registerStaticTerrainMeshAsset(asset.asset(), atlasTextureUpdatePayload());
 				registeredMeshes.incrementAndGet();
 				recordEvent(
 					output.render.getPosition().asLong(),
@@ -2977,7 +3003,9 @@ public final class RustGalTerrainRenderer {
 
 	private record TerrainMeshLayout(int vertexStride, boolean separateAo, int shaderBlockIdOffset, int midBlockOffset) {
 		private static TerrainMeshLayout compact() {
-			return new TerrainMeshLayout(COMPACT_PREFIX_STRIDE, false, 0, 0);
+			// Rust-owned compact terrain uses the explicit separate-AO ABI. This
+			// avoids borrowing Iris's live vertex-format state on the Vulkan route.
+			return new TerrainMeshLayout(COMPACT_PREFIX_STRIDE, true, 0, 0);
 		}
 
 		private static TerrainMeshLayout activeIrisCompatible() {
@@ -3463,7 +3491,6 @@ public final class RustGalTerrainRenderer {
 			if (atlasPayload == null || registeredAtlasGeneration == atlasGeneration) {
 				return List.of();
 			}
-			registeredAtlasGeneration = atlasGeneration;
 			texturePayloadUpdates.incrementAndGet();
 			texturePayloadUpdateBytes.addAndGet(atlasPayload.length);
 			ArrayList<VulkanicGalBridge.WorldMeshTextureAssetRecord> records = new ArrayList<>(4);
@@ -3490,6 +3517,15 @@ public final class RustGalTerrainRenderer {
 				records.add(waterOverlayAsset.textureRecord());
 			}
 			return records;
+		}
+	}
+
+	/** Commits atlas-generation residency only after Rust accepted a mesh batch. */
+	private static void confirmAtlasPayloadRegistered(long generation) {
+		synchronized (RustGalTerrainRenderer.class) {
+			if (atlasGeneration == generation) {
+				registeredAtlasGeneration = generation;
+			}
 		}
 	}
 
@@ -3523,9 +3559,12 @@ public final class RustGalTerrainRenderer {
 
 	private static void ensureAtlasPayload() {
 		TextureAtlas atlas = Minecraft.getInstance().getAtlasManager().getAtlasOrThrow(AtlasIds.BLOCKS);
-		TextureAtlas.SemanticRawSnapshot semanticSnapshot = atlas.semanticRawSnapshot();
-		if (semanticSnapshot == null) return;
-		long semanticGeneration = semanticSnapshot.generation();
+		long atlasPixels = (long) atlas.width * atlas.height;
+		if (atlas.width <= 0 || atlas.height <= 0 || atlasPixels > MAX_RUST_ATLAS_PIXELS) {
+			throw new IllegalStateException("Rust terrain atlas pixel bound exceeded " + MAX_RUST_ATLAS_PIXELS);
+		}
+		long semanticGeneration = atlas.semanticReloadGeneration();
+		if (semanticGeneration <= 0L) return;
 		if (atlasPayload != null && copiedAtlasSemanticGeneration == semanticGeneration) return;
 		synchronized (RustGalTerrainRenderer.class) {
 			// Animation ticks advance TextureAtlas' semantic generation. Rebuild the
@@ -3533,12 +3572,20 @@ public final class RustGalTerrainRenderer {
 			// Java atlas has moved on.
 			if (atlasPayload != null && copiedAtlasSemanticGeneration == semanticGeneration) return;
 				try {
-					BufferedImage image = new BufferedImage(atlas.width, atlas.height, BufferedImage.TYPE_INT_ARGB);
-					for (TextureAtlasSprite sprite : atlas.texturesByName.values()) {
-						copySprite(image, sprite);
-					}
-					byte[] nextNormalAtlasPayload = buildPbrAtlasPayload(atlas, "_n", 0x7F7FFFFF);
-					byte[] nextSpecularAtlasPayload = buildPbrAtlasPayload(atlas, "_s", 0x00000000);
+					// Keep the large base image's lifetime confined to this helper.  The
+					// derived PBR atlases are independently bounded images; retaining the
+					// base BufferedImage across their allocations can exhaust a small
+					// capture heap even when each individual atlas is within its limit.
+					byte[] nextAtlasPayload = buildBaseAtlasPayload(atlas);
+					// Do not allocate full atlas-sized PBR images unless the active
+					// resource manager actually exposes that semantic map.  A missing
+					// map is a valid Rust resource state; constructing a default image
+					// for every atlas needlessly duplicates tens of megabytes and can
+					// exhaust the bounded capture heap during first world entry.
+					byte[] nextNormalAtlasPayload = hasPbrResources(atlas, "_n")
+						? buildPbrAtlasPayload(atlas, "_n", 0x7F7FFFFF) : null;
+					byte[] nextSpecularAtlasPayload = hasPbrResources(atlas, "_s")
+						? buildPbrAtlasPayload(atlas, "_s", 0x00000000) : null;
 					FluidSpriteAsset nextWaterStillAsset = buildFluidSpriteAsset(
 						atlas,
 						"block/water_still",
@@ -3554,20 +3601,26 @@ public final class RustGalTerrainRenderer {
 						"block/water_overlay",
 						RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_WATER_OVERLAY
 					);
-					try (ByteArrayOutputStream output = new ByteArrayOutputStream()) {
-						ImageIO.write(image, "png", output);
-						atlasPayload = output.toByteArray();
-						normalAtlasPayload = nextNormalAtlasPayload;
-						specularAtlasPayload = nextSpecularAtlasPayload;
-						waterStillAsset = nextWaterStillAsset;
-						waterFlowAsset = nextWaterFlowAsset;
-						waterOverlayAsset = nextWaterOverlayAsset;
-						copiedAtlasSemanticGeneration = semanticGeneration;
-						atlasGeneration++;
-					}
+					atlasPayload = nextAtlasPayload;
+					normalAtlasPayload = nextNormalAtlasPayload;
+					specularAtlasPayload = nextSpecularAtlasPayload;
+					waterStillAsset = nextWaterStillAsset;
+					waterFlowAsset = nextWaterFlowAsset;
+					waterOverlayAsset = nextWaterOverlayAsset;
+					copiedAtlasSemanticGeneration = semanticGeneration;
+					atlasGeneration++;
 			} catch (RuntimeException | IOException error) {
 				throw new IllegalStateException("Failed to build Rust-owned block atlas payload for static terrain", error);
 			}
+		}
+	}
+
+	private static byte[] buildBaseAtlasPayload(TextureAtlas atlas) throws IOException {
+		BufferedImage image = new BufferedImage(atlas.width, atlas.height, BufferedImage.TYPE_INT_ARGB);
+		for (TextureAtlasSprite sprite : atlas.texturesByName.values()) copySprite(image, sprite);
+		try (ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+			ImageIO.write(image, "png", output);
+			return output.toByteArray();
 		}
 	}
 
@@ -3676,6 +3729,10 @@ public final class RustGalTerrainRenderer {
 	 * default value for the requested semantic map.
 	 */
 	private static byte[] buildPbrAtlasPayload(TextureAtlas atlas, String suffix, int defaultArgb) throws IOException {
+		long pixels = (long) atlas.width * atlas.height;
+		if (atlas.width <= 0 || atlas.height <= 0 || pixels > MAX_RUST_ATLAS_PIXELS) {
+			throw new IOException("Rust PBR atlas pixel bound exceeded " + MAX_RUST_ATLAS_PIXELS);
+		}
 		BufferedImage image = new BufferedImage(atlas.width, atlas.height, BufferedImage.TYPE_INT_ARGB);
 		if (defaultArgb != 0) {
 			java.awt.Graphics2D graphics = image.createGraphics();
@@ -3693,6 +3750,18 @@ public final class RustGalTerrainRenderer {
 			ImageIO.write(image, "png", output);
 			return output.toByteArray();
 		}
+	}
+
+	private static boolean hasPbrResources(TextureAtlas atlas, String suffix) {
+		for (TextureAtlasSprite sprite : atlas.texturesByName.values()) {
+			ResourceLocation spriteName = sprite.contents().name();
+			String pbrPath = appendPbrSuffix(spriteName.getPath(), suffix);
+			ResourceLocation pbrLocation = pbrPath.startsWith("optifine/cit/")
+				? ResourceLocation.fromNamespaceAndPath(spriteName.getNamespace(), pbrPath + ".png")
+				: ResourceLocation.fromNamespaceAndPath(spriteName.getNamespace(), "textures/" + pbrPath + ".png");
+			if (Minecraft.getInstance().getResourceManager().getResource(pbrLocation).isPresent()) return true;
+		}
+		return false;
 	}
 
 	private static void copyPbrSprite(BufferedImage atlasImage, TextureAtlasSprite sprite, String suffix) throws IOException {

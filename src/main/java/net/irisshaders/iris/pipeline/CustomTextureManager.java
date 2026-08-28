@@ -145,7 +145,8 @@ public class CustomTextureManager {
 				//     now.
 				return new TextureWrapper(() -> {
 					AbstractTexture texture = textureManager.getTexture(textureLocation);
-					if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+					if (!net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+						&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
 						&& (texture instanceof TextureAtlas || texture instanceof PBRAtlasTexture)) {
 						int tex = net.irisshaders.iris.gl.IrisRenderSystem.getActiveTextureUnitIndex();
 						int binding = net.irisshaders.iris.gl.IrisRenderSystem.getTextureBinding(tex);
@@ -167,7 +168,8 @@ public class CustomTextureManager {
 
 					if (texture != null) {
 						var ctx = VulkanicAPI.getCommandContext();
-						if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+						if (!net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+							&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
 							&& (texture instanceof TextureAtlas || texture instanceof PBRAtlasTexture)) {
 							int tex = net.irisshaders.iris.gl.IrisRenderSystem.getActiveTextureUnitIndex();
 							int binding = net.irisshaders.iris.gl.IrisRenderSystem.getTextureBinding(tex);
@@ -183,7 +185,8 @@ public class CustomTextureManager {
 						};
 
 						TextureFormat textureFormat = TextureFormatLoader.getFormat();
-						if (textureFormat != null && !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+						if (textureFormat != null && !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+							&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 							int previousBinding = net.irisshaders.iris.gl.IrisRenderSystem.getBoundTextureOnActiveUnit();
 							VulkanicAPI.bindTexture2D(ctx, VulkanicCoreAPI.textureId(pbrTexture.getTexture()));
 							textureFormat.setupTextureParameters(pbrType, pbrTexture);

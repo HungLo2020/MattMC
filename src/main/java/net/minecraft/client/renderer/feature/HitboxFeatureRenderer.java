@@ -19,6 +19,15 @@ import org.joml.Vector3f;
 @Environment(EnvType.CLIENT)
 public class HitboxFeatureRenderer {
 	public void render(SubmitNodeCollection submitNodeCollection, MultiBufferSource.BufferSource bufferSource) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+			if (submitNodeCollection != null && !submitNodeCollection.getHitboxSubmits().isEmpty()) {
+				throw new IllegalStateException(
+					"Java hitbox rendering is unavailable while Rust Vulkan owns presentation"
+				);
+			}
+			return;
+		}
 		for (SubmitNodeStorage.HitboxSubmit hitboxSubmit : submitNodeCollection.getHitboxSubmits()) {
 			VertexConsumer vertexConsumer = bufferSource.getBuffer(RenderType.lines());
 			PoseStack poseStack = new PoseStack();

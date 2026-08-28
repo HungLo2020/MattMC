@@ -18,7 +18,7 @@ public class NoiseTexture extends GlResource {
 	int height;
 
 	public NoiseTexture(int width, int height) {
-		super(IrisRenderSystem.createTexture2D());
+		super(requireJavaTextureAllocation());
 		net.vulkanic.CommandContext ctx = VulkanicAPI.getCommandContext();
 
 		int texture = getGlId();
@@ -30,6 +30,14 @@ public class NoiseTexture extends GlResource {
 		GLDebug.nameObject(VulkanicAPI.GL_TEXTURE, texture, "noise texture");
 
 		VulkanicAPI.bindTexture2D(ctx, 0);
+	}
+
+	private static int requireJavaTextureAllocation() {
+		if (VulkanicAPI.isVulkanBackendSelected()
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris noise texture allocation is unavailable on the Rust Vulkan route");
+		}
+		return IrisRenderSystem.createTexture2D();
 	}
 
 	void resize(int texture, int width, int height) {

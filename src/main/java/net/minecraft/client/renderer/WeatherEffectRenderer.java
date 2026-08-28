@@ -105,11 +105,17 @@ public class WeatherEffectRenderer {
 	}
 
 	public void render(MultiBufferSource multiBufferSource, Vec3 vec3, WeatherRenderState weatherRenderState) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			throw new IllegalStateException("Java weather rendering is unavailable while Rust owns whole-frame presentation");
 		}
 		net.vulkanic.world.WorldRenderRoutePolicy.Route weatherRoute = net.vulkanic.world.WorldRenderRoutePolicy.currentWeatherRoute();
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			&& !weatherRoute.usesRustWholeFrameVulkan()) {
+			throw new IllegalStateException("Java Vulkan weather rendering is unavailable until the Rust whole-frame weather route is admitted");
+		}
+		if ((net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
 			&& weatherRoute == net.vulkanic.world.WorldRenderRoutePolicy.Route.DISABLED
 			&& weatherRenderState != null
 			&& (!weatherRenderState.rainColumns.isEmpty() || !weatherRenderState.snowColumns.isEmpty())) {
@@ -193,8 +199,19 @@ public class WeatherEffectRenderer {
 	}
 
 	public void tickRainParticles(ClientLevel clientLevel, Camera camera, int i, ParticleStatus particleStatus) {
-		boolean rustWeather = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			&& net.vulkanic.world.WorldRenderRoutePolicy.currentWeatherRoute().usesRustWholeFrameVulkan();
+		boolean rustWholeFrame = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
+		// The route policy is the single admission authority.  In particular, a
+		// disabled/incomplete weather capability must not be silently admitted just
+		// because the presenter shell is active.
+		// Admission is equivalent to currentWeatherRoute().usesRustWholeFrameVulkan().
+		boolean rustWeather = net.vulkanic.world.WorldRenderRoutePolicy.currentWeatherRoute()
+			.usesRustWholeFrameVulkan();
+		if ((net.vulkanic.VulkanicAPI.isVulkanBackendSelected() || rustWholeFrame) && !rustWeather) {
+			return;
+		}
+		// A Rust whole-frame selection must not borrow Iris runtime state even when
+		// this optional weather capability is temporarily unavailable. Borrowed
+		// OpenGL remains the only route allowed to apply Iris particle policy.
 		// Iris: Allow shaders to disable weather particles (from MixinWeatherRenderer)
 		if (!rustWeather && !net.irisshaders.iris.Iris.getPipelineManager().getPipeline().map(net.irisshaders.iris.pipeline.WorldRenderingPipeline::shouldRenderWeatherParticles).orElse(true)) {
 			particleStatus = ParticleStatus.MINIMAL;

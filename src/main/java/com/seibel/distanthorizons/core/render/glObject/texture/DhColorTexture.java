@@ -55,7 +55,7 @@ public class DhColorTexture
 
 	private static void rejectRustWholeFrameJavaTexture()
 	{
-		if (VulkanicAPI.isVulkanBackendInitializedAndSelected()
+		if (VulkanicAPI.isVulkanBackendSelected()
 			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
 		{
 			throw new IllegalStateException(
@@ -120,7 +120,10 @@ public class DhColorTexture
 		this.throwIfInvalid();
 		this.isValid = false;
 		
-		VulkanicAPI.deleteTexture(VulkanicAPI.getCommandContext(), this.id);
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			&& !VulkanicAPI.isVulkanBackendSelected()) {
+			VulkanicAPI.deleteTexture(VulkanicAPI.getCommandContext(), this.id);
+		}
 	}
 	
 	/** @throws IllegalStateException if the texture isn't valid */

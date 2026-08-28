@@ -305,7 +305,8 @@ public class WinScreen extends Screen {
 	@Override
 	public void renderBackground(GuiGraphics guiGraphics, int i, int j, float f) {
 		if (this.poem) {
-			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+				|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
 				float gameTime = Minecraft.getInstance().level == null
 					? 0.0F
 					: (float)Minecraft.getInstance().level.getGameTime() + f;

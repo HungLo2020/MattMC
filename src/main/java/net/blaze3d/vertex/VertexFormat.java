@@ -120,6 +120,10 @@ public class VertexFormat implements net.irisshaders.iris.pipeline.programs.Vert
 	}
 
 	private static GpuBuffer uploadToBuffer(@Nullable GpuBuffer gpuBuffer, ByteBuffer byteBuffer, int i, Supplier<String> supplier) {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java immediate vertex uploads are unavailable on selected Vulkan");
+		}
 		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
 			|| GraphicsWorkarounds.get(net.vulkanic.VulkanicAPI.getDevice()).alwaysCreateFreshImmediateBuffer()) {
 			if (gpuBuffer != null) {

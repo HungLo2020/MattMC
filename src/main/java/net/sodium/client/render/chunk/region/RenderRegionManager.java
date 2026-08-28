@@ -39,6 +39,13 @@ public class RenderRegionManager {
     }
 
     public void update() {
+        if (VulkanicAPI.isVulkanBackendSelected()
+                || net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+            // Rust-owned terrain keeps region lifetime and synchronization in the
+            // explicit frame coordinator; never open a Java command list here.
+            return;
+        }
+
         this.stagingBuffer.flip();
 
         try (CommandList commandList = RenderDevice.instance().createCommandList()) {
@@ -247,7 +254,8 @@ public class RenderRegionManager {
     }
 
     private static StagingBuffer createStagingBuffer(CommandList commandList) {
-        if (VulkanicAPI.isVulkanBackendInitializedAndSelected()) {
+        if (VulkanicAPI.isVulkanBackendSelected()
+                || net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
             return new NoopStagingBuffer();
         }
 

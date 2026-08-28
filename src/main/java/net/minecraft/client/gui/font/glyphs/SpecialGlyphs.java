@@ -68,7 +68,8 @@ public enum SpecialGlyphs implements GlyphInfo {
 
 				@Override
 				public void upload(int i, int j, GpuTexture gpuTexture) {
-					if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+					if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+						&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
 						net.vulkanic.VulkanicAPI.createCommandEncoder()
 							.writeToTexture(gpuTexture, SpecialGlyphs.this.image, 0, 0, i, j, SpecialGlyphs.this.image.getWidth(), SpecialGlyphs.this.image.getHeight(), 0, 0);
 					}

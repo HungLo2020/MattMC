@@ -27,7 +27,7 @@ HEAVY_SUFFIXES = {".rdc", ".tracy"}
 COPIED_GAME_DIR_PREFIXES = ("game_dir_", "region_validation_game_")
 CAPTURE_RUN_ID_PATTERN = re.compile(r"_(20[0-9]{6}_[0-9]{6})(?:[_.]|$)")
 TEMP_RUN_ID_PATTERN = re.compile(r"^20[0-9]{6}_[0-9]{6}$")
-COMPRESSIBLE_SUFFIXES = {".log", ".txt", ".csv", ".json"}
+COMPRESSIBLE_SUFFIXES = {".log", ".txt", ".csv", ".json", ".jsonl"}
 NEVER_COMPRESS_NAMES = {
     "graphics_audit_artifact.json",
     "graphics_audit_manifest.json",

@@ -23,6 +23,7 @@ import org.lwjgl.system.MemoryUtil;
 @Environment(EnvType.CLIENT)
 public class FontTexture extends AbstractTexture implements Dumpable {
 	private static final int SIZE = 256;
+	private static final int MAX_SEMANTIC_ATLASES = 4096;
 	private static final Map<String, FontTexture> SEMANTIC_ATLASES = new ConcurrentHashMap<>();
 	private static final AtomicLong NEXT_SEMANTIC_GENERATION = new AtomicLong(1L);
 	private final ResourceLocation semanticAtlasIdentity;
@@ -30,6 +31,8 @@ public class FontTexture extends AbstractTexture implements Dumpable {
 	private final NativeImage semanticAtlasPixels;
 	private boolean semanticAtlasComplete = true;
 	private long semanticAtlasRevision;
+	@Nullable
+	private SemanticAtlasSnapshot semanticAtlasSnapshotCache;
 	private final GlyphRenderTypes renderTypes;
 	private final boolean colored;
 	private final FontTexture.Node root;
@@ -40,13 +43,28 @@ public class FontTexture extends AbstractTexture implements Dumpable {
 		this.colored = bl;
 		this.root = new FontTexture.Node(0, 0, 256, 256);
 		this.semanticAtlasPixels = new NativeImage(bl ? NativeImage.Format.RGBA : NativeImage.Format.LUMINANCE, SIZE, SIZE, true);
-		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		FontTexture previousAtlas;
+		synchronized (SEMANTIC_ATLASES) {
+			String identity = this.semanticAtlasIdentity.toString();
+			if (!SEMANTIC_ATLASES.containsKey(identity) && SEMANTIC_ATLASES.size() >= MAX_SEMANTIC_ATLASES) {
+				this.semanticAtlasPixels.close();
+				throw new IllegalStateException("semantic font-atlas registry bound exceeded " + MAX_SEMANTIC_ATLASES);
+			}
+			previousAtlas = SEMANTIC_ATLASES.put(identity, this);
+		}
+		if (previousAtlas != null) {
+			// Resource reloads reuse atlas identities. Retire the old semantic
+			// pixels (and any OpenGL-only allocation) instead of leaking one per
+			// generation; close() cannot remove this newly-installed entry.
+			previousAtlas.close();
+		}
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
 			this.texture = net.vulkanic.VulkanicAPI.createTexture(resourceLocation::toString, 7, bl ? TextureFormat.RGBA8 : TextureFormat.RED8, 256, 256, 1, 1);
 			this.texture.setTextureFilter(FilterMode.NEAREST, false);
 			this.textureView = net.vulkanic.VulkanicAPI.createTextureView(this.texture);
 		}
 		this.renderTypes = glyphRenderTypes;
-		SEMANTIC_ATLASES.put(this.semanticAtlasIdentity.toString(), this);
 	}
 
 	@Nullable
@@ -56,7 +74,8 @@ public class FontTexture extends AbstractTexture implements Dumpable {
 		} else {
 			FontTexture.Node node = this.root.insert(glyphBitmap);
 			if (node != null) {
-				if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+				if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+					&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
 					glyphBitmap.upload(node.x, node.y, this.getTexture());
 				}
 				// The whole-frame Vulkan route owns a copied atlas image, not this
@@ -72,10 +91,12 @@ public class FontTexture extends AbstractTexture implements Dumpable {
 					}
 				}
 				this.semanticAtlasRevision++;
+				this.semanticAtlasSnapshotCache = null;
 				float f = 256.0F;
 				float g = 256.0F;
 				float h = 0.01F;
-				net.blaze3d.textures.GpuTextureView glyphTextureView = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+				net.blaze3d.textures.GpuTextureView glyphTextureView = (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+					|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected())
 					? this.textureView
 					: this.getTextureView();
 				return new BakedSheetGlyph(
@@ -104,26 +125,53 @@ public class FontTexture extends AbstractTexture implements Dumpable {
 		if (!this.semanticAtlasComplete) {
 			return null;
 		}
+		SemanticAtlasSnapshot cached = this.semanticAtlasSnapshotCache;
+		if (cached != null && cached.revision() == this.semanticAtlasRevision) {
+			return cached;
+		}
 		int i = SIZE * SIZE * this.semanticAtlasPixels.format().components();
 		byte[] bytes = new byte[i];
 		MemoryUtil.memByteBuffer(this.semanticAtlasPixels.getPointer(), i).get(bytes);
-		return new SemanticAtlasSnapshot(
+		SemanticAtlasSnapshot snapshot = new SemanticAtlasSnapshot(
 			this.semanticAtlasIdentity.toString(), this.colored, SIZE, SIZE,
 			this.semanticAtlasGeneration, this.semanticAtlasRevision, bytes
 		);
+		this.semanticAtlasSnapshotCache = snapshot;
+		return snapshot;
 	}
 
 	@Nullable
 	public static SemanticAtlasSnapshot semanticAtlasSnapshot(String identity) {
-		FontTexture fontTexture = SEMANTIC_ATLASES.get(identity);
+		FontTexture fontTexture;
+		synchronized (SEMANTIC_ATLASES) {
+			fontTexture = SEMANTIC_ATLASES.get(identity);
+		}
 		return fontTexture == null ? null : fontTexture.semanticAtlasSnapshot();
 	}
 
 	@Override
 	public void close() {
-		SEMANTIC_ATLASES.remove(this.semanticAtlasIdentity.toString(), this);
+		synchronized (SEMANTIC_ATLASES) {
+			SEMANTIC_ATLASES.remove(this.semanticAtlasIdentity.toString(), this);
+		}
+		this.semanticAtlasSnapshotCache = null;
 		super.close();
 		this.semanticAtlasPixels.close();
+	}
+
+	/**
+	 * Releases only a legacy Java GPU allocation after Vulkan selection. The
+	 * copied semantic atlas remains live for Rust text extraction and staging.
+	 */
+	public void ensureRustSemanticRoute() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+			// Keep the CPU atlas and semantic registry alive for Rust text
+			// extraction.  Only the legacy Java GPU allocation crosses this
+			// ownership boundary; full close() remains responsible for destroying
+			// the semantic source during resource teardown.
+			closeGpuAllocation();
+		}
 	}
 
 	public record SemanticAtlasSnapshot(

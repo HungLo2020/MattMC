@@ -73,6 +73,40 @@ public class Phase3DrawPathTest {
     }
 
     @Test
+    public void testWholeFrameGuiTraversalRejectsUnclassifiedStatesInsteadOfDroppingThem() throws IOException {
+        String source = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/render/GuiRenderer.java"));
+        int collector = source.indexOf("collectRustGalCopiedBlitSemantics");
+        int guard = source.indexOf("unclassified-gui-state", collector);
+        int rustTokenExemption = source.indexOf("RustGalGuiElementRenderState", collector);
+        assertTrue(collector >= 0 && guard > collector,
+            "whole-frame GUI traversal must diagnose states outside its admitted blit families");
+        assertTrue(rustTokenExemption > collector && rustTokenExemption < guard,
+            "Rust scheduler tokens must be exempt from the unclassified GUI-state diagnostic");
+        int rectangleExemption = source.indexOf("ColoredRectangleRenderState", collector);
+        assertTrue(rectangleExemption > collector && rectangleExemption < guard,
+            "already-collected semantic rectangles must not be counted as unclassified GUI states");
+        int fourColorRectangleExemption = source.indexOf("FourColoredRectangleRenderState", rectangleExemption + 1);
+        assertTrue(fourColorRectangleExemption > rectangleExemption && fourColorRectangleExemption < guard,
+            "already-collected four-color semantic rectangles must not be counted as unclassified GUI states");
+        assertTrue(source.indexOf("gui-state-class:", guard) > guard,
+            "the rejected GUI state class must remain observable for the next semantic slice");
+    }
+
+    @Test
+    public void testWholeFrameDirectGlyphStatesUseCopiedSemanticTextRoute() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/gui/RustGalGuiRenderer.java"));
+        String guiRenderer = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/render/GuiRenderer.java"));
+        assertTrue(renderer.contains("tryEnqueueGlyph(")
+                && renderer.contains("collectSemanticQuads(\n\t\t\t\tquad -> appendBoundedTextQuad(quads, quad)")
+                && renderer.contains("direct-glyph-renderable-unavailable"),
+            "direct glyph elements must use bounded copied semantic quads and remain unavailable when extraction is absent");
+        assertTrue(guiRenderer.contains("instanceof GlyphRenderState glyph")
+                && guiRenderer.contains("RustGalGuiRenderer.tryEnqueueGlyph")
+                && guiRenderer.contains("recordUnsupportedElement(\"glyph\")"),
+            "whole-frame GUI traversal must admit direct glyphs or fail closed without Java rendering");
+    }
+
+    @Test
     public void testImmediateContextUsageRestrictedToLegacySeam() throws IOException {
         Path legacyFile = SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicAPI.java");
         Path legacyRelative = Paths.get("net/vulkanic/VulkanicAPI.java");
@@ -354,15 +388,10 @@ public class Phase3DrawPathTest {
         int legacySamplerResolver = backendSource.indexOf("VulkanicTextureView resolveLegacySamplerViewForProgram(");
         assertTrue(legacySamplerResolver >= 0,
             "Vulkan backend should expose the legacy shader sampler resolver");
-        int trackedViewLookup = backendSource.indexOf("TextureTracker.INSTANCE.getTextureView(textureId)", legacySamplerResolver);
         int anonymousLegacyViewFallback = backendSource.indexOf("createManagedLegacyTextureView(textureId)", legacySamplerResolver);
-        assertTrue(trackedViewLookup >= 0
-                && backendSource.contains("trackedTextureView.texture() instanceof VulkanicTexture trackedTexture")
-                && backendSource.contains("trackedTextureView.baseMipLevel()")
-                && backendSource.contains("trackedTextureView.mipLevels()")
-                && anonymousLegacyViewFallback >= 0
-                && trackedViewLookup < anonymousLegacyViewFallback,
-            "Vulkan legacy shader sampler resolution should prefer the tracked GpuTextureView so descriptor samplers keep live atlas filter/wrap state");
+        assertTrue(anonymousLegacyViewFallback >= 0
+                && backendSource.indexOf("TextureTracker.INSTANCE.getTextureView(textureId)", legacySamplerResolver) < 0,
+            "Vulkan legacy shader sampler resolution must not borrow Iris texture views or fallback state");
     }
 
     @Test
@@ -538,6 +567,9 @@ public class Phase3DrawPathTest {
             "VulkanicAPI should route Vulkan backend calls through fail-fast proxy protection");
         assertTrue(apiSource.contains("directVulkanBackendForImplementedMethods()"),
             "VulkanicAPI should expose a direct-dispatch helper for hot implemented Vulkan methods");
+        assertTrue(apiSource.contains("|| isVulkanBackendSelected()")
+                && apiSource.contains("|| isVulkanBackendSelected())\n\t\t\t\t\t&& !isRustWholeFrameBootstrapMethod"),
+            "selected Vulkan must fence direct Java Vulkan dispatch and proxy calls before Rust presentation activates");
         assertFalse(apiSource.contains("methodCache.computeIfAbsent(method"),
             "Vulkan fail-fast proxy should precompute backend method routing instead of paying per-call computeIfAbsent overhead on the render thread");
         assertFalse(apiSource.contains("throw new UnsupportedOperationException(\"Vulkan backend not yet implemented\")"),
@@ -1205,6 +1237,18 @@ public class Phase3DrawPathTest {
     }
 
     @Test
+    public void testSodiumDiagnosticSamplerCollectorDoesNotBorrowIrisOnRustVulkan() throws IOException {
+        Path file = SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/DefaultChunkRenderer.java");
+        String source = readSource(file);
+
+        assertTrue(source.contains("VulkanicAPI.isVulkanBackendSelected()")
+                && source.contains("RustGalVulkanWholeFrameMode.enabled()"),
+            "Sodium diagnostic sampler collection should recognize the Rust-owned Vulkan route");
+        assertTrue(source.contains("recover a missing binding from Iris' Java GPU-state cache"),
+            "Sodium diagnostics must fail closed instead of borrowing Iris GPU state on Rust Vulkan");
+    }
+
+    @Test
     public void testSodiumGlProgramUsesBackendNeutralContext() throws IOException {
         Path file = SRC_MAIN_JAVA.resolve("net/sodium/client/gl/shader/GlProgram.java");
         String source = readSource(file);
@@ -1811,6 +1855,9 @@ public class Phase3DrawPathTest {
             "GLDebug should control ARB debug filtering via setDebugMessageControlAllARB helper");
         assertTrue(source.contains("VulkanicAPI.isDebugContext("),
             "GLDebug should check context debug status via VulkanicAPI.isDebugContext");
+        assertTrue(source.contains("debugState = new UnsupportedDebugState();")
+                && source.contains("RustGalVulkanWholeFrameMode.enabled()"),
+            "GLDebug must remain a no-op without probing Iris or Java GPU state on Rust Vulkan");
     }
 
     @Test
@@ -3082,6 +3129,34 @@ public class Phase3DrawPathTest {
             "CommonUniforms should read blend enabled state through BlendModeStorage helper");
         assertTrue(commonUniformsSource.contains("BlendModeStorage.getBlendSrcRgb("),
             "CommonUniforms should read blend factors through BlendModeStorage helpers");
+        assertTrue(commonUniformsSource.contains("Java Iris uniform construction is unavailable on the Rust Vulkan route"),
+            "CommonUniforms must fail closed before constructing Java Iris uniform state on Rust Vulkan");
+        assertFalse(commonUniformsSource.contains("static {\n\t\tGbufferPrograms.init();"),
+            "CommonUniforms must not install Iris listeners during class loading on Rust Vulkan");
+        Path gbufferProgramsFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/layer/GbufferPrograms.java");
+        String gbufferProgramsSource = readSource(gbufferProgramsFile);
+        assertFalse(gbufferProgramsSource.contains("static {\n\t\tStateUpdateNotifiers.phaseChangeNotifier"),
+            "GbufferPrograms must not install Iris listeners during class loading on Rust Vulkan");
+        assertTrue(gbufferProgramsSource.contains("if (initialized || isRustRoute())"),
+            "GbufferPrograms listener installation must be lazy and compatibility-route-only");
+        Path irisRenderSystemListenerFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/IrisRenderSystem.java");
+        String irisRenderSystemListenerSource = readSource(irisRenderSystemListenerFile);
+        assertFalse(irisRenderSystemListenerSource.contains("static {\n\t\tStateUpdateNotifiers.blendFuncNotifier"),
+            "IrisRenderSystem must not install blend listeners during Rust Vulkan class loading");
+        assertTrue(irisRenderSystemListenerSource.contains("installCompatibilityListeners();"),
+            "IrisRenderSystem blend listener installation must remain OpenGL-init owned");
+        Path textureTrackerListenerFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pbr/TextureTracker.java");
+        String textureTrackerListenerSource = readSource(textureTrackerListenerFile);
+        assertFalse(textureTrackerListenerSource.contains("static {\n\t\tStateUpdateNotifiers.bindTextureNotifier"),
+            "TextureTracker must not install bind listeners during Rust Vulkan class loading");
+        assertTrue(textureTrackerListenerSource.contains("installCompatibilityListener();"),
+            "TextureTracker bind listener installation must remain compatibility-only");
+        Path pbrManagerFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pbr/texture/PBRTextureManager.java");
+        String pbrManagerSource = readSource(pbrManagerFile);
+        assertFalse(pbrManagerSource.contains("static {\n\t\tStateUpdateNotifiers.normalTextureChangeNotifier"),
+            "PBRTextureManager must not install PBR listeners during Rust Vulkan class loading");
+        assertTrue(pbrManagerSource.contains("installCompatibilityListeners();"),
+            "PBRTextureManager listener installation must remain OpenGL-init owned");
 
         Path dhWrapperFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/common/wrappers/minecraft/MinecraftGLWrapper.java");
         String dhWrapperSource = readSourceIfExists(dhWrapperFile);
@@ -3308,7 +3383,8 @@ public class Phase3DrawPathTest {
 
         Path dhTextureStateFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/glObject/DhTextureState.java");
         String dhTextureStateSource = readSource(dhTextureStateFile);
-        assertTrue(dhTextureStateSource.contains("if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())"),
+        assertTrue(dhTextureStateSource.contains("VulkanicAPI.isVulkanBackendSelected()")
+                && dhTextureStateSource.contains("RustGalVulkanWholeFrameMode.enabled()"),
             "Distant Horizons texture-state compatibility must fail closed for the Rust whole-frame Vulkan route");
         assertTrue(dhTextureStateSource.contains("IrisRenderSystem.setActiveTexture("),
             "DhTextureState should route active texture changes through IrisRenderSystem.setActiveTexture");
@@ -3514,6 +3590,10 @@ public class Phase3DrawPathTest {
             "PipelineManager should not compute GL_TEXTURE0 offsets directly in texture unit loops");
         assertTrue(pipelineManagerSource.contains("IrisRenderSystem.setActiveTextureUnitIndex("),
             "PipelineManager should switch texture units through IrisRenderSystem index helper");
+        assertTrue(pipelineManagerSource.contains("VulkanicAPI.isVulkanBackendSelected()")
+                && pipelineManagerSource.contains("RustGalVulkanWholeFrameMode.enabled()")
+                && pipelineManagerSource.contains("pipelinesPerDimension.clear();"),
+            "PipelineManager destruction must discard Java compatibility bookkeeping without touching GL on Rust Vulkan");
 
         Path encoderFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java");
         String encoderSource = readSource(encoderFile);
@@ -3567,6 +3647,9 @@ public class Phase3DrawPathTest {
             "GuiUtil should not bind widget texture through RenderSystem.setShaderTexture after Iris texture-state migration");
         assertTrue(guiUtilSource.contains("TextureTracker.INSTANCE.onSetShaderTexture(0, textureView)"),
             "GuiUtil should notify Iris texture tracking directly when binding widget texture");
+        assertTrue(guiUtilSource.contains("RustGalVulkanWholeFrameMode.enabled()")
+                && guiUtilSource.contains("VulkanicAPI.isVulkanBackendSelected()"),
+            "GuiUtil should fence Iris blend capability mutation while Rust owns Vulkan GUI presentation");
 
         Path horizonRendererFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pathways/HorizonRenderer.java");
         String horizonRendererSource = readSource(horizonRendererFile);
@@ -3583,6 +3666,17 @@ public class Phase3DrawPathTest {
             "IrisRenderingPipeline destroy path should not clear shader textures through RenderSystem.setShaderTexture");
         assertTrue(irisPipelineSource.contains("IrisRenderSystem.setTextureBinding(i, 0)"),
             "IrisRenderingPipeline destroy path should clear cached texture bindings through IrisRenderSystem.setTextureBinding");
+        assertTrue(irisPipelineSource.contains("Java Iris shader-pack pipeline construction is unavailable")
+                && irisPipelineSource.contains("RustGalVulkanWholeFrameMode.enabled()"),
+            "IrisRenderingPipeline construction must fail before Java shader-pack GPU setup on Rust Vulkan");
+        String irisSource = readSource(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/Iris.java"));
+        assertTrue(irisSource.contains("Rust observes the persisted configuration")
+                && irisSource.contains("currentPack = null")
+                && irisSource.contains("return;"),
+            "Iris reload must not enter Java pipeline teardown/loading when Rust owns Vulkan");
+        assertTrue(irisSource.contains("Java Iris/PBR GPU initialization is permitted")
+                && irisSource.contains("VulkanicAPI.isVulkanBackendSelected()"),
+            "Iris render-system initialization must be fenced when Rust owns Vulkan");
 
         Path renderStateShardFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/RenderStateShard.java");
         String renderStateShardSource = readSource(renderStateShardFile);
@@ -3716,8 +3810,9 @@ public class Phase3DrawPathTest {
             "VulkanicAPI must not install Iris fog callbacks during class loading; Vulkan must not mutate Iris runtime state");
         assertTrue(vulkanicApiSource.contains("installOpenGlIrisFogNotifiers();"),
             "Iris fog callbacks must be installed only from the selected OpenGL backend branch");
-        assertTrue(vulkanicApiSource.contains("if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())"),
-            "Rust whole-frame Vulkan must not invoke Iris fog callbacks");
+        assertTrue(vulkanicApiSource.contains("!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()")
+                && vulkanicApiSource.contains("!isVulkanBackendSelected()"),
+            "selected Vulkan must not invoke Iris fog callbacks");
         assertTrue(vulkanicApiSource.contains("public static GpuBufferSlice getShaderFog("),
             "VulkanicAPI should expose getShaderFog after RenderSystem fog uniform migration");
         assertTrue(vulkanicApiSource.contains("public static void setShaderLights("),
@@ -3903,7 +3998,8 @@ public class Phase3DrawPathTest {
 
         Path overlayTextureFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/texture/OverlayTexture.java");
         String overlayTextureSource = readSource(overlayTextureFile);
-        assertTrue(overlayTextureSource.contains("if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())"),
+        assertTrue(overlayTextureSource.contains("RustGalVulkanWholeFrameMode.enabled()")
+                && overlayTextureSource.contains("VulkanicAPI.isVulkanBackendSelected()"),
             "OverlayTexture must choose the semantic Rust asset route for the whole-frame Vulkan route");
         assertFalse(overlayTextureSource.contains("RenderSystem.setupOverlayColor("),
             "OverlayTexture should not route overlay setup through RenderSystem.setupOverlayColor");
@@ -3971,6 +4067,12 @@ public class Phase3DrawPathTest {
             assertTrue(source.contains("IrisRenderSystem.setActiveTextureUnitIndex("),
                 file.getFileName() + " should select texture units through index-based helper");
         }
+        String irisRenderingPipelineSource = readSource(SRC_MAIN_JAVA.resolve(
+            "net/irisshaders/iris/pipeline/IrisRenderingPipeline.java"));
+        assertTrue(irisRenderingPipelineSource.contains("VulkanicAPI.isVulkanBackendSelected()")
+                && irisRenderingPipelineSource.contains("RustGalVulkanWholeFrameMode.enabled()")
+                && irisRenderingPipelineSource.contains("destroyed = true;"),
+            "Iris pipeline teardown must fence Java GL destruction when Rust owns Vulkan");
 
         Path defaultShaderInterfaceFile = SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/shader/DefaultShaderInterface.java");
         String defaultShaderInterfaceSource = readSource(defaultShaderInterfaceFile);
@@ -5346,9 +5448,9 @@ public class Phase3DrawPathTest {
 
         assertTrue(standard3dItemRendererSource.contains("Boolean.getBoolean(\"mattmc.gui.debugStandard3dItemPipDump\")"),
             "Standard3dItemRenderer should make its forced grass-block PIP dump opt-in behind an explicit debug flag");
-        assertTrue(guiRendererSource.contains("Standard3dItemRenderer.isDebugDumpEnabled() && !RustGalGuiRenderer.isWholeFrameVulkanActive()")
-                && guiRendererSource.contains("prepareDebugStandardBlockItemDump(this.renderState, i);"),
-            "GuiRenderer should only invoke the standard 3D item PIP debug dump for OpenGL compatibility");
+		assertTrue(guiRendererSource.contains("Standard3dItemRenderer.isDebugDumpEnabled() && !RustGalGuiRenderer.isWholeFrameVulkanEnabled()")
+				&& guiRendererSource.contains("prepareDebugStandardBlockItemDump(this.renderState, i);"),
+				"GuiRenderer should only invoke the standard 3D item PIP debug dump outside Rust whole-frame ownership");
     }
 
     @Test
@@ -5651,6 +5753,23 @@ public class Phase3DrawPathTest {
     }
 
     @Test
+    public void testParticleSemanticQuadInputsAreFiniteAndBoundedBeforeStaging() throws IOException {
+        Path rendererFile = SRC_MAIN_JAVA.resolve(
+            "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String source = readSource(rendererFile);
+        int helper = source.indexOf("private static void validateParticleQuadSemantics(");
+        assertTrue(helper >= 0,
+            "particle routes must validate copied semantics before atlas staging");
+        String body = source.substring(helper, source.indexOf("private static void ensureParticleAtlasAssetLocked", helper));
+        assertTrue(body.contains("Float.isFinite(value)"),
+            "particle positions, rotations, size, and UVs must reject non-finite values");
+        assertTrue(body.contains("quadSize <= 0.0F"),
+            "particle quad size must be positive before geometry emission");
+        assertTrue(body.contains("quaternionLengthSquared"),
+            "particle billboard rotation must reject a zero quaternion");
+    }
+
+    @Test
     public void testCustomParticleAtlasHashCollisionFailsBeforeReplacingWorldTextureAsset() throws IOException {
         Path rendererFile = SRC_MAIN_JAVA.resolve(
             "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
@@ -5663,6 +5782,18 @@ public class Phase3DrawPathTest {
             "custom particle atlas registration must guard hashed IDs against existing world assets");
         assertTrue(registration > lookup,
             "the collision guard must run before the Rust texture asset is registered");
+    }
+
+    @Test
+    public void testCustomParticleAtlasBudgetFailsBeforePublishingCopiedTexture() throws IOException {
+        Path rendererFile = SRC_MAIN_JAVA.resolve(
+            "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String source = readSource(rendererFile);
+        int atlasBranch = source.indexOf("byte[] pngBytes = output.toByteArray();");
+        int budget = source.indexOf("ensureWorldMeshRegistryCapacityLocked(PARTICLE_ATLAS_TEXTURE_IDENTITIES", atlasBranch);
+        int registration = source.indexOf("registerWorldMeshTexture(", atlasBranch);
+        assertTrue(atlasBranch >= 0 && budget > atlasBranch && registration > budget,
+            "particle atlas identity capacity must be checked before publishing its copied texture asset");
     }
 
     @Test
@@ -5723,6 +5854,8 @@ public class Phase3DrawPathTest {
             "Cachalot Echo must fail closed when Rust cannot admit a semantic quad");
         assertTrue(source.contains("Java Cachalot Echo rendering is unavailable"),
             "the legacy Cachalot Echo helper must not become a hidden Vulkan presenter");
+        assertTrue(source.contains("Selected Vulkan Cachalot Echo route is unavailable"),
+            "selected Vulkan must not submit Cachalot Echo Java geometry before Rust route admission");
     }
 
     @Test
@@ -5988,7 +6121,7 @@ public class Phase3DrawPathTest {
         assertTrue(state.contains("guardianLaserTargetPresent"));
         assertTrue(renderer.contains("getGuardianLaser()"));
         assertTrue(renderer.contains("Mth.lerp(partialTick"));
-        assertTrue(renderer.contains("submitTranslucentTexturedQuad"));
+        assertTrue(renderer.contains("submitGuardianBeam"));
         assertTrue(renderer.contains("submitCustomGeometry"));
         assertTrue(renderer.contains("vulkanSelected && !rustWholeFrame"));
         assertTrue(renderer.contains("GUARDIAN_BEAM_TEXTURE"));
@@ -6041,6 +6174,19 @@ public class Phase3DrawPathTest {
 			"Unit-state opaque direct textures must have an explicit Rust admission boundary");
 		assertTrue(submitSource.contains("isStandaloneModelMeshEligible"),
 			"Unit-state opaque direct textures must use copied asset and geometry eligibility");
+	}
+
+	@Test
+	public void testUnadmittedDirectTextureCannotLoseIdentityOnRustRoute() throws IOException {
+		Path submitFile = SRC_MAIN_JAVA.resolve(
+			"net/minecraft/client/renderer/SubmitNodeCollection.java");
+		String source = readSource(submitFile);
+		int guard = source.indexOf("A direct texture identity must not be erased");
+		int fallback = source.indexOf("this.submitModelSemantic(model, object, poseStack, renderType, i, j, k, null, l, crumblingOverlay)", guard);
+		assertTrue(guard >= 0, "direct-texture semantic submissions need a Rust fail-closed identity guard");
+		assertTrue(fallback > guard, "OpenGL compatibility fallback must remain after the Rust direct-texture guard");
+		assertTrue(source.indexOf("Rust whole-frame direct-texture model has no admitted semantic mesh", guard) > guard,
+			"unadmitted direct textures must report an explicit Rust semantic rejection");
 	}
 
 	@Test
@@ -6111,14 +6257,38 @@ public class Phase3DrawPathTest {
         String sheep = readSource(sheepFile);
         String slime = readSource(slimeFile);
 
-        assertTrue(sheep.contains("sheep_wool_outline")
-                && sheep.contains("RenderType.outline(SHEEP_WOOL_LOCATION)"),
-            "glowing invisible sheep wool must carry an explicit outline mesh identity");
-        assertTrue(slime.contains("slime_outer_outline")
-                && slime.contains("RenderType.outline(SlimeRenderer.SLIME_LOCATION)"),
-            "glowing invisible slime outer layers must carry an explicit outline mesh identity");
+        assertTrue(sheep.contains("RenderType.entityCutoutNoCull(SHEEP_WOOL_LOCATION)")
+                && sheep.contains("ResourceLocation.withDefaultNamespace(\"sheep_wool\")"),
+            "glowing invisible sheep wool must use the copied semantic material mesh");
+        assertTrue(slime.contains("RenderType.entityTranslucent(SlimeRenderer.SLIME_LOCATION)")
+                && slime.contains("ResourceLocation.withDefaultNamespace(\"slime_outer\")"),
+            "glowing invisible slime outer layers must use the copied semantic material mesh");
         assertTrue(sheep.contains("outlineColor") && slime.contains("outlineColor"),
             "outline submissions must preserve semantic instance color metadata");
+    }
+
+    @Test
+    public void testFirstPersonEmptyHandsUseRustStandaloneSkinMeshes() throws IOException {
+        Path avatarFile = SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/entity/player/AvatarRenderer.java");
+        Path gameRendererFile = SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/GameRenderer.java");
+        String avatar = readSource(avatarFile);
+        String gameRenderer = readSource(gameRendererFile);
+        assertTrue(avatar.contains("currentModelMeshRoute(true).usesRustWholeFrameVulkan()")
+                && avatar.contains("enqueueStandaloneModelMesh(")
+                && avatar.contains("ResourceLocation.withDefaultNamespace(\"player_hand\")")
+                && avatar.contains("ResourceLocation.withDefaultNamespace(\"player_hand_sleeve\")"),
+            "first-person empty hands and visible sleeves must enter the explicit Rust standalone skin-mesh route");
+        assertTrue(avatar.contains("Rust whole-frame player-hand route rejected the semantic skin mesh"),
+            "first-person hands must fail closed when their copied skin mesh is unavailable");
+		int rustHandBranch = avatar.indexOf("enqueueStandaloneModelMesh(");
+		int javaHandBranch = avatar.indexOf("submitNodeCollector.submitModelPart(", rustHandBranch);
+		assertTrue(rustHandBranch >= 0 && javaHandBranch > rustHandBranch
+				&& avatar.contains("Iris captures and\n\t\t// replays the former in its hand pipeline"),
+			"the Java OpenGL/Iris compatibility path must retain Frozen's ModelPart hand submission while Rust whole-frame keeps its separate copied skin-mesh branch");
+        assertTrue(gameRenderer.contains("sleepingEntity.isSleeping()"),
+            "Rust first-person hand extraction must preserve vanilla sleeping-camera suppression");
     }
 
     @Test
@@ -6131,10 +6301,15 @@ public class Phase3DrawPathTest {
             "trident special items must distinguish non-foil semantic geometry from glint");
         assertTrue(source.contains("submitModelSemanticTexture"),
             "non-foil trident special items must submit semantic model data");
+        assertTrue(source.contains("submitModelPartSemantic("),
+            "foil trident compatibility geometry must retain the semantic model-part boundary");
         assertTrue(source.contains("Unit.INSTANCE"),
             "the direct-texture trident route must use a bounded transient semantic state");
         assertTrue(source.contains("TridentModel.TEXTURE"),
             "the trident route must preserve its direct texture identity");
+        assertTrue(source.contains("RustGalVulkanWholeFrameMode.enabled()")
+                && source.contains("submitModelSemanticTexture"),
+            "foil tridents must keep the Rust presenter shell on the explicit glint/model route");
     }
 
     @Test
@@ -6155,6 +6330,13 @@ public class Phase3DrawPathTest {
                 && mesh.contains("DEPTH_POLICY_TEST_NO_WRITE")
                 && mesh.contains("CULL_NONE"),
             "entity decals must preserve equal-depth/no-write/two-sided raster semantics");
+        assertTrue(renderer.contains("SEMANTIC_CRYSTAL_BEAM_QUADS = 8")
+                && renderer.contains("new float[SEMANTIC_CRYSTAL_BEAM_QUADS * 12]")
+                && renderer.contains("new float[SEMANTIC_CRYSTAL_BEAM_QUADS * 8]")
+                && renderer.contains("new int[SEMANTIC_CRYSTAL_BEAM_QUADS * 4]")
+                && renderer.contains("vertexIndex != SEMANTIC_CRYSTAL_BEAM_QUADS * 12")
+                && renderer.contains("uvIndex != SEMANTIC_CRYSTAL_BEAM_QUADS * 8"),
+            "crystal-beam semantic arrays must remain aligned with all eight generated quads");
     }
 
     @Test
@@ -6221,10 +6403,22 @@ public class Phase3DrawPathTest {
 
         assertTrue(equipmentSource.contains("submitModelSemanticTexture"),
             "non-foil armor layers must preserve their direct texture identity at submission");
+        assertTrue(equipmentSource.contains("submitModelSemantic(model, object, poseStack, RenderType.armorEntityGlint()")
+                && equipmentSource.contains("submitModelSemantic(model, object, poseStack, renderType, i, OverlayTexture.NO_OVERLAY, -1, textureAtlasSprite"),
+            "foil and trim armor layers must use the explicit semantic model callback too");
         assertTrue(equipmentSource.contains("if (!bl)"),
             "foil armor must remain separate from the non-foil semantic route");
         assertTrue(submitSource.contains("Direct-texture opaque layers"),
             "the collector must document the guarded opaque direct-texture route");
+    }
+
+    @Test
+    public void testEyesLayerCannotFallBackToJavaModelSubmissionUnderRustWholeFrame() throws IOException {
+        String eyesSource = readSource(SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/entity/layers/EyesLayer.java"));
+        assertTrue(eyesSource.contains("RustGalVulkanWholeFrameMode.enabled()")
+                && eyesSource.contains("has no semantic texture identity"),
+            "unclassified eyes layers must remain unavailable rather than reopening Java model submission");
     }
 
     @Test
@@ -6816,6 +7010,491 @@ public class Phase3DrawPathTest {
     }
 
     @Test
+    public void testWholeFrameVulkanCannotFallBackToJavaScreenEffects() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+                "net/minecraft/client/renderer/ScreenEffectRenderer.java"));
+        assertTrue(renderer.contains(
+                "RustGalVulkanWholeFrameMode.enabled()"),
+                "legacy screen effects must check Rust whole-frame ownership");
+        assertTrue(renderer.contains(
+                "Java screen-effect rendering is unavailable on selected Vulkan")
+                || renderer.contains("Java screen-effect rendering is unavailable while Rust owns whole-frame presentation"),
+                "legacy Java screen effects must fail closed under Rust Vulkan ownership");
+        assertTrue(renderer.contains("renderRustVulkanScreenEffects"),
+                "Rust Vulkan must retain an explicit semantic screen-effects producer");
+    }
+
+    @Test
+    public void testGameTestHighlightsUseRustSemanticStreamsUnderWholeFrameVulkan() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/debug/GameTestBlockHighlightRenderer.java"));
+        String level = readSource(SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/LevelRenderer.java"));
+        assertTrue(renderer.contains("collectRustSemantics"),
+            "game-test markers must expose an explicit semantic producer");
+        assertTrue(renderer.contains("submitColoredQuads")
+                && renderer.contains("submitTextSemantic"),
+            "game-test boxes and labels must use Rust procedural/world-text streams");
+        assertTrue(level.contains("gameTestBlockHighlightRenderer.collectRustSemantics"),
+            "whole-frame extraction must collect game-test markers before feature dispatch");
+        assertTrue(level.contains("VoxelConstants.submitRustWaypointSemantics")
+                && level.contains("VoxelConstants.onRenderWaypoints(deltaTracker.getGameTimeDeltaPartialTick(false)"),
+            "waypoint collection and legacy rendering must remain distinct callsites");
+        assertTrue(level.contains("if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()")
+                && level.contains("this.gameTestBlockHighlightRenderer.render(poseStack, bufferSource);"),
+            "the Java game-test renderer must be fenced off after Rust semantic extraction");
+        assertTrue(renderer.contains(
+                "Rust whole-frame game-test highlight route is unavailable while Rust owns presentation"),
+            "disabled game-test routes must fail closed instead of drawing Java geometry");
+        assertTrue(renderer.contains("MAX_MARKERS = 4096")
+                && renderer.contains("game-test highlight marker capacity exceeded"),
+            "game-test marker bookkeeping must remain bounded before semantic collection");
+    }
+
+    @Test
+    public void testCollisionDebugUsesRustSemanticLineStreamUnderWholeFrameVulkan() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/debug/CollisionBoxRenderer.java"));
+        String dispatcher = readSource(SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/debug/DebugRenderer.java"));
+        String game = readSource(SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/GameRenderer.java"));
+        assertTrue(renderer.contains("collectRustSemantics")
+                && renderer.contains("enqueueDebugLineSegments"),
+            "collision shapes must be copied into Rust's explicit debug-line stream");
+        assertTrue(renderer.contains(
+                "Rust whole-frame collision-debug route is unavailable; Java debug geometry is not a fallback"),
+            "collision debugging must fail closed when its Rust route is disabled");
+        assertTrue(dispatcher.contains("collectRustCollisionSemantics")
+                && game.contains("collectRustCollisionSemantics"),
+            "the whole-frame shell must invoke collision semantic extraction instead of Java DebugRenderer");
+    }
+
+    @Test
+    public void testSolidFaceDebugUsesRustSemanticQuadStreamUnderWholeFrameVulkan() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/debug/SolidFaceRenderer.java"));
+        String dispatcher = readSource(SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/debug/DebugRenderer.java"));
+        String game = readSource(SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/GameRenderer.java"));
+        assertTrue(renderer.contains("collectRustSemantics")
+                && renderer.contains("submitColoredQuads"),
+            "solid-face debug geometry must use Rust's explicit colored-quad stream");
+        assertTrue(renderer.contains(
+                "Rust whole-frame solid-face debug route is unavailable; Java debug geometry is not a fallback"),
+            "solid-face debugging must fail closed when its Rust route is disabled");
+        assertTrue(dispatcher.contains("collectRustSolidFaceSemantics")
+                && game.contains("collectRustSolidFaceSemantics"),
+            "the whole-frame shell must invoke solid-face semantic extraction");
+    }
+
+    @Test
+    public void testSupportBlockDebugUsesRustSemanticLineStreamUnderWholeFrameVulkan() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/debug/SupportBlockRenderer.java"));
+        String dispatcher = readSource(SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/debug/DebugRenderer.java"));
+        String game = readSource(SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/GameRenderer.java"));
+        assertTrue(renderer.contains("collectRustSemantics")
+                && renderer.contains("enqueueDebugLineSegments"),
+            "support-block highlights must use Rust's explicit debug-line stream");
+        assertTrue(renderer.contains(
+                "Rust whole-frame support-block debug route is unavailable; Java debug geometry is not a fallback"),
+            "support-block debugging must fail closed when its Rust route is disabled");
+        assertTrue(dispatcher.contains("collectRustSupportBlockSemantics")
+                && game.contains("collectRustSupportBlockSemantics"),
+            "the whole-frame shell must invoke support-block semantic extraction");
+    }
+
+    @Test
+    public void testNeighborUpdateDebugUsesRustSemanticGeometryAndTextUnderWholeFrameVulkan() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/debug/NeighborsUpdateRenderer.java"));
+        String dispatcher = readSource(SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/debug/DebugRenderer.java"));
+        String game = readSource(SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/GameRenderer.java"));
+        assertTrue(renderer.contains("collectRustSemantics")
+                && renderer.contains("enqueueDebugLineSegments")
+                && renderer.contains("submitTextSemantic"),
+            "neighbor updates must preserve both Rust line and world-text semantics");
+        assertTrue(renderer.contains(
+                "Rust whole-frame neighbor-update debug route is unavailable; Java debug geometry is not a fallback"),
+            "neighbor-update debugging must fail closed when either Rust route is disabled");
+        assertTrue(dispatcher.contains("collectRustNeighborUpdateSemantics")
+                && game.contains("collectRustNeighborUpdateSemantics"),
+            "the whole-frame shell must invoke neighbor-update semantic extraction");
+    }
+
+    @Test
+    public void testStructureDebugUsesRustSemanticLineStreamUnderWholeFrameVulkan() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/debug/StructureRenderer.java"));
+        String dispatcher = readSource(SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/debug/DebugRenderer.java"));
+        String game = readSource(SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/GameRenderer.java"));
+        assertTrue(renderer.contains("collectRustSemantics")
+                && renderer.contains("enqueueDebugLineSegments"),
+            "structure and piece bounds must use Rust's explicit debug-line stream");
+        assertTrue(renderer.contains(
+                "Rust whole-frame structure-debug route is unavailable; Java debug geometry is not a fallback"),
+            "structure debugging must fail closed when its Rust route is disabled");
+        assertTrue(dispatcher.contains("collectRustStructureSemantics")
+                && game.contains("collectRustStructureSemantics"),
+            "the whole-frame shell must invoke structure semantic extraction");
+    }
+
+    @Test
+    public void testGameEventDebugUsesRustSemanticGeometryAndTextUnderWholeFrameVulkan() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/debug/GameEventListenerRenderer.java"));
+        String dispatcher = readSource(SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/debug/DebugRenderer.java"));
+        String game = readSource(SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/GameRenderer.java"));
+        assertTrue(renderer.contains("collectRustSemantics")
+                && renderer.contains("enqueueDebugLineSegments")
+                && renderer.contains("submitColoredQuads")
+                && renderer.contains("submitTextSemantic"),
+            "game-event listeners must preserve Rust line, quad, and text semantics");
+        assertTrue(renderer.contains(
+                "Rust whole-frame game-event debug route is unavailable; Java debug geometry is not a fallback"),
+            "game-event debugging must fail closed when a required Rust route is disabled");
+        assertTrue(dispatcher.contains("collectRustGameEventListenerSemantics")
+                && game.contains("collectRustGameEventListenerSemantics"),
+            "the whole-frame shell must invoke game-event semantic extraction");
+    }
+
+    @Test
+    public void testRedstoneOrientationDebugUsesRustSemanticLineStreamUnderWholeFrameVulkan() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/debug/RedstoneWireOrientationsRenderer.java"));
+        String dispatcher = readSource(SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/debug/DebugRenderer.java"));
+        String game = readSource(SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/GameRenderer.java"));
+        assertTrue(renderer.contains("collectRustSemantics")
+                && renderer.contains("enqueueDebugLineSegments"),
+            "redstone orientation vectors must use Rust's explicit debug-line stream");
+        assertTrue(renderer.contains(
+                "Rust whole-frame redstone-orientation route is unavailable; Java debug geometry is not a fallback"),
+            "redstone orientation debugging must fail closed when its Rust route is disabled");
+        assertTrue(dispatcher.contains("collectRustRedstoneWireOrientationSemantics")
+                && game.contains("collectRustRedstoneWireOrientationSemantics"),
+            "the whole-frame shell must invoke redstone orientation semantic extraction");
+    }
+
+    @Test
+    public void testChunkBorderDebugUsesRustSemanticLineStreamUnderWholeFrameVulkan() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/debug/ChunkBorderRenderer.java"));
+        String dispatcher = readSource(SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/debug/DebugRenderer.java"));
+        String game = readSource(SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/GameRenderer.java"));
+        assertTrue(renderer.contains("collectRustSemantics")
+                && renderer.contains("enqueueDebugLineSegments"),
+            "chunk borders and grids must use Rust's explicit debug-line stream");
+        assertTrue(renderer.contains(
+                "Rust whole-frame chunk-border route is unavailable; Java debug geometry is not a fallback"),
+            "chunk-border debugging must fail closed when its Rust route is disabled");
+        assertTrue(dispatcher.contains("collectRustChunkBorderSemantics")
+                && game.contains("collectRustChunkBorderSemantics"),
+            "the whole-frame shell must invoke chunk-border semantic extraction");
+    }
+
+    @Test
+    public void testBreezeDebugUsesRustSemanticLinesAndQuadsUnderWholeFrameVulkan() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/debug/BreezeDebugRenderer.java"));
+        String dispatcher = readSource(SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/debug/DebugRenderer.java"));
+        String game = readSource(SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/GameRenderer.java"));
+        assertTrue(renderer.contains("collectRustSemantics")
+                && renderer.contains("enqueueDebugLineSegments")
+                && renderer.contains("submitColoredQuads"),
+            "Breeze diagnostics must use Rust semantic lines and marker quads");
+        assertTrue(renderer.contains(
+                "Rust whole-frame Breeze-debug route is unavailable; Java debug geometry is not a fallback"),
+            "Breeze debugging must fail closed when a required Rust route is disabled");
+        assertTrue(dispatcher.contains("collectRustBreezeSemantics")
+                && game.contains("collectRustBreezeSemantics"),
+            "the whole-frame shell must invoke Breeze semantic extraction");
+    }
+
+    @Test
+    public void testPathfindingDebugUsesRustSemanticLinesQuadsAndTextUnderWholeFrameVulkan() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/debug/PathfindingRenderer.java"));
+        String dispatcher = readSource(SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/debug/DebugRenderer.java"));
+        String game = readSource(SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/GameRenderer.java"));
+        assertTrue(renderer.contains("collectRustSemantics")
+                && renderer.contains("enqueueDebugLineSegments")
+                && renderer.contains("submitColoredQuads")
+                && renderer.contains("submitTextSemantic"),
+            "pathfinding diagnostics must use Rust semantic lines, boxes, and labels");
+        assertTrue(renderer.contains(
+                "Rust whole-frame pathfinding-debug route is unavailable; Java debug geometry is not a fallback"),
+            "pathfinding debugging must fail closed when a required Rust route is disabled");
+        assertTrue(dispatcher.contains("collectRustPathfindingSemantics")
+                && game.contains("collectRustPathfindingSemantics"),
+            "the whole-frame shell must invoke pathfinding semantic extraction");
+    }
+
+    @Test
+    public void testLightSectionDebugUsesRustSemanticEdgesAndFacesUnderWholeFrameVulkan() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/debug/LightSectionDebugRenderer.java"));
+        String dispatcher = readSource(SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/debug/DebugRenderer.java"));
+        String game = readSource(SRC_MAIN_JAVA.resolve(
+            "net/minecraft/client/renderer/GameRenderer.java"));
+        assertTrue(renderer.contains("collectRustSemantics")
+                && renderer.contains("enqueueDebugLineSegments")
+                && renderer.contains("submitColoredQuads"),
+            "light-section debug fields must use Rust semantic edges and faces");
+        assertTrue(renderer.contains(
+                "Rust whole-frame light-section debug route is unavailable; Java debug geometry is not a fallback"),
+            "light-section debugging must fail closed when a required Rust route is disabled");
+        assertTrue(dispatcher.contains("collectRustLightSectionSemantics")
+                && game.contains("collectRustLightSectionSemantics"),
+            "the whole-frame shell must invoke light-section semantic extraction");
+    }
+
+    @Test
+    public void testHeightMapDebugUsesRustSemanticQuadsUnderWholeFrameVulkan() throws IOException {
+        String renderer = Files.readString(Path.of(
+            "src/main/java/net/minecraft/client/renderer/debug/HeightMapRenderer.java"));
+        String dispatcher = Files.readString(Path.of(
+            "src/main/java/net/minecraft/client/renderer/debug/DebugRenderer.java"));
+        String game = Files.readString(Path.of(
+            "src/main/java/net/minecraft/client/renderer/GameRenderer.java"));
+        assertTrue(renderer.contains("collectRustSemantics")
+                && renderer.contains("submitColoredQuads")
+                && renderer.contains("height-map route rejected semantic quads"),
+            "height-map debugging must copy bounded voxel overlays into Rust semantic quads");
+        assertTrue(dispatcher.contains("collectRustHeightMapSemantics")
+                && game.contains("collectRustHeightMapSemantics"),
+            "the whole-frame shell must invoke height-map semantic extraction");
+    }
+
+    @Test
+    public void testChunkCullingDebugUsesRustSemanticLinesAndQuadsUnderWholeFrameVulkan() throws IOException {
+        String renderer = Files.readString(Path.of(
+            "src/main/java/net/minecraft/client/renderer/debug/ChunkCullingDebugRenderer.java"));
+        String dispatcher = Files.readString(Path.of(
+            "src/main/java/net/minecraft/client/renderer/debug/DebugRenderer.java"));
+        String game = Files.readString(Path.of(
+            "src/main/java/net/minecraft/client/renderer/GameRenderer.java"));
+        assertTrue(renderer.contains("collectRustSemantics")
+                && renderer.contains("enqueueDebugLineSegments")
+                && renderer.contains("chunk-culling route rejected semantic visibility quads"),
+            "chunk-culling diagnostics must be copied into Rust semantic lines and quads");
+        assertTrue(dispatcher.contains("collectRustChunkCullingSemantics")
+                && game.contains("collectRustChunkCullingSemantics"),
+            "the whole-frame shell must invoke chunk-culling semantic extraction");
+    }
+
+    @Test
+    public void testWaterDebugUsesRustSemanticBoxesAndLabelsUnderWholeFrameVulkan() throws IOException {
+        String renderer = Files.readString(Path.of(
+            "src/main/java/net/minecraft/client/renderer/debug/WaterDebugRenderer.java"));
+        String level = Files.readString(Path.of(
+            "src/main/java/net/minecraft/client/renderer/LevelRenderer.java"));
+        String game = Files.readString(Path.of(
+            "src/main/java/net/minecraft/client/renderer/GameRenderer.java"));
+        assertTrue(renderer.contains("collectRustSemantics")
+                && renderer.contains("submitColoredQuads")
+                && renderer.contains("submitTextSemantic"),
+            "water debugging must copy nearby fluid levels and labels into Rust semantic streams");
+        assertTrue(level.contains("collectRustWaterSemantics")
+                && game.contains("collectRustWaterSemantics"),
+            "the whole-frame shell must invoke water semantic extraction through LevelRenderer");
+    }
+
+    @Test
+    public void testLightDebugUsesRustSemanticTextUnderWholeFrameVulkan() throws IOException {
+        String renderer = Files.readString(Path.of(
+            "src/main/java/net/minecraft/client/renderer/debug/LightDebugRenderer.java"));
+        String level = Files.readString(Path.of(
+            "src/main/java/net/minecraft/client/renderer/LevelRenderer.java"));
+        String game = Files.readString(Path.of(
+            "src/main/java/net/minecraft/client/renderer/GameRenderer.java"));
+        assertTrue(renderer.contains("collectRustSemantics")
+                && renderer.contains("submitTextSemantic")
+                && renderer.contains("getDebugData"),
+            "light debugging must copy section and block diagnostics into Rust semantic text");
+        assertTrue(level.contains("collectRustLightSemantics")
+                && game.contains("collectRustLightSemantics"),
+            "the whole-frame shell must invoke light semantic extraction through LevelRenderer");
+    }
+
+    @Test
+    public void testVillageSectionsDebugUsesRustSemanticMarkersUnderWholeFrameVulkan() throws IOException {
+        String renderer = Files.readString(Path.of(
+            "src/main/java/net/minecraft/client/renderer/debug/VillageSectionsDebugRenderer.java"));
+        String dispatcher = Files.readString(Path.of(
+            "src/main/java/net/minecraft/client/renderer/debug/DebugRenderer.java"));
+        String game = Files.readString(Path.of(
+            "src/main/java/net/minecraft/client/renderer/GameRenderer.java"));
+        assertTrue(renderer.contains("collectRustSemantics")
+                && renderer.contains("VILLAGE_SECTIONS")
+                && renderer.contains("submitColoredQuads"),
+            "village-section subscriptions must be copied into Rust semantic markers");
+        assertTrue(dispatcher.contains("collectRustVillageSectionSemantics")
+                && game.contains("collectRustVillageSectionSemantics"),
+            "the whole-frame shell must invoke village-section semantic extraction");
+    }
+
+    @Test
+    public void testChunkDebugUsesRustSemanticTextUnderWholeFrameVulkan() throws IOException {
+        String renderer = Files.readString(Path.of(
+            "src/main/java/net/minecraft/client/renderer/debug/ChunkDebugRenderer.java"));
+        String level = Files.readString(Path.of(
+            "src/main/java/net/minecraft/client/renderer/LevelRenderer.java"));
+        String game = Files.readString(Path.of(
+            "src/main/java/net/minecraft/client/renderer/GameRenderer.java"));
+        assertTrue(renderer.contains("collectRustSemantics")
+                && renderer.contains("serverData.getNow")
+                && renderer.contains("submitTextSemantic"),
+            "chunk client/server diagnostics must be copied into Rust semantic text");
+        assertTrue(level.contains("collectRustChunkSemantics")
+                && game.contains("collectRustChunkSemantics"),
+            "the whole-frame shell must invoke chunk diagnostic semantic extraction");
+    }
+
+    @Test
+    public void testEntityBlockIntersectionDebugUsesRustSemanticBoxesUnderWholeFrameVulkan() throws IOException {
+        String renderer = Files.readString(Path.of(
+            "src/main/java/net/minecraft/client/renderer/debug/EntityBlockIntersectionDebugRenderer.java"));
+        String dispatcher = Files.readString(Path.of(
+            "src/main/java/net/minecraft/client/renderer/debug/DebugRenderer.java"));
+        String game = Files.readString(Path.of(
+            "src/main/java/net/minecraft/client/renderer/GameRenderer.java"));
+        assertTrue(renderer.contains("collectRustSemantics")
+                && renderer.contains("ENTITY_BLOCK_INTERSECTIONS")
+                && renderer.contains("submitColoredQuads"),
+            "entity/block intersections must be copied into Rust semantic boxes");
+        assertTrue(dispatcher.contains("collectRustEntityBlockIntersectionSemantics")
+                && game.contains("collectRustEntityBlockIntersectionSemantics"),
+            "the whole-frame shell must invoke entity/block intersection extraction");
+    }
+
+    @Test
+    public void testGoalSelectorDebugUsesRustSemanticTextUnderWholeFrameVulkan() throws IOException {
+        String renderer = Files.readString(Path.of(
+            "src/main/java/net/minecraft/client/renderer/debug/GoalSelectorDebugRenderer.java"));
+        String level = Files.readString(Path.of(
+            "src/main/java/net/minecraft/client/renderer/LevelRenderer.java"));
+        String game = Files.readString(Path.of(
+            "src/main/java/net/minecraft/client/renderer/GameRenderer.java"));
+        assertTrue(renderer.contains("collectRustSemantics")
+                && renderer.contains("GOAL_SELECTORS")
+                && renderer.contains("submitTextSemantic"),
+            "goal-selector subscriptions must be copied into Rust semantic text");
+        assertTrue(level.contains("collectRustGoalSelectorSemantics")
+                && game.contains("collectRustGoalSelectorSemantics"),
+            "the whole-frame shell must invoke goal-selector semantic extraction");
+    }
+
+    @Test
+    public void testRaidDebugUsesRustSemanticBoxesAndLabelsUnderWholeFrameVulkan() throws IOException {
+        String renderer = Files.readString(Path.of(
+            "src/main/java/net/minecraft/client/renderer/debug/RaidDebugRenderer.java"));
+        String level = Files.readString(Path.of(
+            "src/main/java/net/minecraft/client/renderer/LevelRenderer.java"));
+        String game = Files.readString(Path.of(
+            "src/main/java/net/minecraft/client/renderer/GameRenderer.java"));
+        assertTrue(renderer.contains("collectRustSemantics")
+                && renderer.contains("RAIDS")
+                && renderer.contains("submitColoredQuads")
+                && renderer.contains("submitTextSemantic"),
+            "raid subscriptions must be copied into Rust semantic center boxes and labels");
+        assertTrue(level.contains("collectRustRaidSemantics")
+                && game.contains("collectRustRaidSemantics"),
+            "the whole-frame shell must invoke raid semantic extraction");
+    }
+
+    @Test
+    public void testPoiDebugUsesRustSemanticBoxesAndLabelsUnderWholeFrameVulkan() throws IOException {
+        String renderer = Files.readString(Path.of(
+            "src/main/java/net/minecraft/client/renderer/debug/PoiDebugRenderer.java"));
+        String level = Files.readString(Path.of(
+            "src/main/java/net/minecraft/client/renderer/LevelRenderer.java"));
+        String game = Files.readString(Path.of(
+            "src/main/java/net/minecraft/client/renderer/GameRenderer.java"));
+        assertTrue(renderer.contains("collectRustSemantics")
+                && renderer.contains("POIS")
+                && renderer.contains("submitColoredQuads")
+                && renderer.contains("submitTextSemantic"),
+            "POI and ghost-POI subscriptions must be copied into Rust semantic streams");
+        assertTrue(level.contains("collectRustPoiSemantics")
+                && game.contains("collectRustPoiSemantics"),
+            "the whole-frame shell must invoke POI semantic extraction");
+    }
+
+    @Test
+    public void testBrainDebugUsesRustSemanticTextUnderWholeFrameVulkan() throws IOException {
+        String renderer = Files.readString(Path.of(
+            "src/main/java/net/minecraft/client/renderer/debug/BrainDebugRenderer.java"));
+        String level = Files.readString(Path.of(
+            "src/main/java/net/minecraft/client/renderer/LevelRenderer.java"));
+        String game = Files.readString(Path.of(
+            "src/main/java/net/minecraft/client/renderer/GameRenderer.java"));
+        assertTrue(renderer.contains("collectRustSemantics")
+                && renderer.contains("BRAINS")
+                && renderer.contains("submitTextSemantic")
+                && renderer.contains("memories"),
+            "brain subscriptions must preserve the complete semantic label set");
+        assertTrue(level.contains("collectRustBrainSemantics")
+                && game.contains("collectRustBrainSemantics"),
+            "the whole-frame shell must invoke brain semantic extraction");
+    }
+
+    @Test
+    public void testBeeDebugUsesRustSemanticBoxesAndTextUnderWholeFrameVulkan() throws IOException {
+        String renderer = Files.readString(Path.of(
+            "src/main/java/net/minecraft/client/renderer/debug/BeeDebugRenderer.java"));
+        String level = Files.readString(Path.of(
+            "src/main/java/net/minecraft/client/renderer/LevelRenderer.java"));
+        String game = Files.readString(Path.of(
+            "src/main/java/net/minecraft/client/renderer/GameRenderer.java"));
+        assertTrue(renderer.contains("collectRustSemantics")
+                && renderer.contains("BEES")
+                && renderer.contains("BEE_HIVES")
+                && renderer.contains("submitColoredQuads")
+                && renderer.contains("submitTextSemantic"),
+            "bee, flower, hive, and ghost-hive diagnostics must use Rust semantic streams");
+        assertTrue(level.contains("collectRustBeeSemantics")
+                && game.contains("collectRustBeeSemantics"),
+            "the whole-frame shell must invoke bee semantic extraction");
+    }
+
+    @Test
+    public void testOctreeDebugUsesRustSemanticEdgesAndLabelsUnderWholeFrameVulkan() throws IOException {
+        String renderer = Files.readString(Path.of(
+            "src/main/java/net/minecraft/client/renderer/debug/OctreeDebugRenderer.java"));
+        String level = Files.readString(Path.of(
+            "src/main/java/net/minecraft/client/renderer/LevelRenderer.java"));
+        String game = Files.readString(Path.of(
+            "src/main/java/net/minecraft/client/renderer/GameRenderer.java"));
+        assertTrue(renderer.contains("collectRustSemantics")
+                && renderer.contains("visitNodes")
+                && renderer.contains("enqueueDebugLineSegments")
+                && renderer.contains("submitTextSemantic"),
+            "octree traversal must use the frame frustum and Rust semantic edges/labels");
+        assertTrue(level.contains("collectRustOctreeSemantics")
+                && game.contains("collectRustOctreeSemantics"),
+            "the whole-frame shell must invoke octree semantic extraction at matrix setup");
+    }
+
+    @Test
     public void testRustCloudRouteFailsClosedWhenSemanticCellFieldIsMissing() throws IOException {
         String renderer = readSource(SRC_MAIN_JAVA.resolve(
                 "net/minecraft/client/renderer/CloudRenderer.java"));
@@ -6823,6 +7502,212 @@ public class Phase3DrawPathTest {
                 "visible Rust clouds must fail closed when their semantic cell field is unavailable");
         assertTrue(renderer.contains("if (this.texture == null)"),
                 "Rust cloud extraction must validate its copied semantic source before lowering faces");
+        assertTrue(renderer.contains("Rust cloud semantics require finite camera, height, and partial tick"),
+                "Rust cloud extraction must reject non-finite frame inputs before computing cell coordinates");
+        assertTrue(renderer.contains("Rust cloud semantics require a camera position"),
+                "Rust cloud extraction must not silently omit visible clouds when the camera is missing");
+        assertTrue(renderer.contains("bounded, dimensionally complete cloud-cell field"),
+                "Rust cloud extraction must fail closed before coordinate math when copied cell dimensions or payload are malformed");
+    }
+
+    @Test
+    public void testRustCloudSemanticCellFieldUsesOverflowSafeAndBoundedDimensions() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+        assertTrue(renderer.contains("long expectedCells"),
+                "cloud-cell dimensions must be multiplied in a widened type");
+        assertTrue(renderer.contains("MAX_RUST_CLOUD_CELLS"),
+                "cloud-cell snapshots must have an explicit bounded capacity");
+        assertTrue(renderer.contains("radius > MAX_RUST_CLOUD_RADIUS"),
+                "cloud traversal radius must be bounded before nested iteration");
+    }
+
+    @Test
+    public void testRustEntityFlameRejectsNonPositiveCopiedBoundsBeforeLayerExpansion() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+        int flame = renderer.indexOf("collectEntityFlameSemantics(");
+        int height = renderer.indexOf("state.boundingBoxHeight <= 0.0F", flame);
+        int layers = renderer.indexOf("float remainingLayers = state.boundingBoxHeight / scale", height);
+        assertTrue(flame >= 0 && height > flame && layers > height,
+                "entity flame bounds must reject non-positive copied heights before layer expansion");
+    }
+
+    @Test
+    public void testRustEntityShadowRejectsNonFiniteOrOutOfRangeCopiedPieces() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+        int shadow = renderer.indexOf("collectEntityShadowSemantics(");
+        int piece = renderer.indexOf("!Float.isFinite(shadowPiece.relativeX())", shadow);
+        int bounds = renderer.indexOf("!Double.isFinite(bounds.minX)", piece);
+        assertTrue(shadow >= 0 && piece > shadow && bounds > piece,
+                "entity shadows must validate copied piece coordinates and AABB bounds before vertex expansion");
+        assertTrue(renderer.indexOf("shadowPiece.alpha() < 0.0F", piece) > piece,
+                "entity shadow alpha must remain within the semantic normalized range");
+    }
+
+    @Test
+    public void testRustEntityLeashRejectsFloatOverflowBeforeStripExpansion() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+        int leash = renderer.indexOf("collectEntityLeashSemantics(");
+        int dx = renderer.indexOf("!Float.isFinite(dx)", leash);
+        int offset = renderer.indexOf("!Float.isFinite((float)leash.offset.x)", dx);
+        int expand = renderer.indexOf("appendLeashStripLocked", offset);
+        assertTrue(leash >= 0 && dx > leash && offset > dx && expand > offset,
+                "entity leash endpoint deltas and offsets must remain finite after float conversion before strip expansion");
+    }
+
+    @Test
+    public void testRustEntityMaterialCollectorsRejectNonFinitePoseMatrices() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+        assertTrue(renderer.contains("!flameSubmit.pose().pose().isFinite()")
+                        && renderer.contains("!shadowSubmit.pose().isFinite()")
+                        && renderer.contains("!leashSubmit.pose().isFinite()"),
+                "entity material collectors must reject non-finite copied pose matrices before expansion");
+    }
+
+    @Test
+    public void testRustIndexedModelExtractorsRejectNonFiniteCopiedGeometry() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+        int arrow = renderer.indexOf("extractArrowModelMesh(");
+        int arrowGuard = renderer.indexOf("ensureFiniteModelVector(transformedNormal", arrow);
+        int model = renderer.indexOf("extractModelPartMesh(", arrowGuard);
+        int modelGuard = renderer.indexOf("ensureFiniteModelVector(transformedNormal", model);
+        int uvGuard = renderer.indexOf("contains non-finite vertex UV", modelGuard);
+        assertTrue(arrow >= 0 && arrowGuard > arrow && model > arrowGuard && modelGuard > model && uvGuard > modelGuard,
+                "Rust indexed arrow and ModelPart extractors must reject non-finite copied positions, normals, and UVs");
+        assertTrue(renderer.contains("entityPose == null || !entityPose.pose().isFinite()"),
+                "indexed model instance admission must reject non-finite copied pose matrices");
+    }
+
+    @Test
+    public void testRustBlockFeatureRoutesRejectNullOrNonFiniteSemanticPoses() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+        int block = renderer.indexOf("public static boolean enqueueBlockDisplay(");
+        int nullGuard = renderer.indexOf("blockSubmit == null", block);
+        int poseGuard = renderer.indexOf("blockSubmit.pose() == null || !blockSubmit.pose().pose().isFinite()", nullGuard);
+        int moving = renderer.indexOf("private static boolean enqueueMovingBlockMesh(", poseGuard);
+        int movingGuard = renderer.indexOf("movingBlockSubmit == null || movingBlockSubmit.pose() == null || !movingBlockSubmit.pose().isFinite()", moving);
+        assertTrue(block >= 0 && nullGuard > block && poseGuard > nullGuard && moving > poseGuard && movingGuard > moving,
+                "Rust block-display and moving-block routes must reject malformed semantic submissions before extraction");
+        int baked = renderer.indexOf("contains non-finite baked vertex data", movingGuard);
+        int shade = renderer.indexOf("contains non-finite tint shade", movingGuard);
+        assertTrue(baked > movingGuard && shade > movingGuard,
+                "Rust baked block extraction must reject non-finite copied vertex and shading inputs");
+    }
+
+    @Test
+    public void testRustBlockModelFeatureRejectsNonFiniteSemanticState() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+        int enqueue = renderer.indexOf("public static boolean enqueueBlockModelMesh(");
+        int pose = renderer.indexOf("submit.pose() == null || !submit.pose().pose().isFinite()", enqueue);
+        int color = renderer.indexOf("!Float.isFinite(submit.r())", pose);
+        int extraction = renderer.indexOf("extractStandaloneBlockModelMesh(", color);
+        assertTrue(enqueue >= 0 && pose > enqueue && color > pose && extraction > color,
+                "Rust block-model feature submissions must validate copied pose and tint state before extraction");
+    }
+
+    @Test
+    public void testRustItemEntityAdmissionBoundsTintIndicesAndPose() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+        int eligibility = renderer.indexOf("public static String itemEntityMeshIneligibility(");
+        int tint = renderer.indexOf("bakedQuad.tintIndex() >= tintLayers.length", eligibility);
+        int enqueue = renderer.indexOf("public static boolean enqueueItemEntityMesh(", tint);
+        int pose = renderer.indexOf("!itemPose.pose().isFinite()", enqueue);
+        assertTrue(eligibility >= 0 && tint > eligibility && enqueue > tint && pose > enqueue,
+                "Rust item-entity admission must bound copied tint indices and reject non-finite transforms");
+        int extraction = renderer.indexOf("contains non-finite baked vertex data", pose);
+        int uv = renderer.indexOf("contains non-finite UV data", extraction);
+        assertTrue(extraction > pose && uv > extraction,
+                "Rust item mesh extraction must reject non-finite copied geometry and generated UVs");
+    }
+
+    @Test
+    public void testRustFirstPersonItemAdmissionBoundsPoseAndTintState() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+        int enqueue = renderer.indexOf("public static boolean enqueueFirstPersonItemMesh(");
+        int pose = renderer.indexOf("!outerPose.pose().isFinite()", enqueue);
+        int eligibility = renderer.indexOf("private static String firstPersonItemMeshIneligibility(", pose);
+        int tint = renderer.indexOf("quad.tintIndex() >= layer.tintLayers().length", eligibility);
+        assertTrue(enqueue >= 0 && pose > enqueue && eligibility > pose && tint > eligibility,
+                "Rust first-person item admission must reject non-finite outer poses and out-of-range tints");
+    }
+
+    @Test
+    public void testRustEndDragonRaysBoundDeathProgressBeforeExpansion() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+                "net/minecraft/client/renderer/entity/EnderDragonRenderer.java"));
+        int rays = renderer.indexOf("private static void submitRays(");
+        int routeStart = renderer.indexOf("currentProceduralQuadRoute()", rays);
+        int route = renderer.indexOf("usesRustWholeFrameVulkan()", routeStart);
+        int guard = renderer.indexOf("!Float.isFinite(f) || f < 0.0F || f > 1.0F", rays);
+        int count = renderer.indexOf("rayCount = Mth.floor", guard);
+        assertTrue(rays >= 0 && route > rays && guard > route && count > guard,
+                "Rust End Dragon ray expansion must bound copied death progress before allocating semantic rays");
+    }
+
+    @Test
+    public void testRustCrystalBeamRejectsNonFiniteTransformAfterSemanticCopy() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+        int beam = renderer.indexOf("public static boolean enqueueCrystalBeam(");
+        int transform = renderer.indexOf("!transform.isFinite()", beam);
+        int output = renderer.indexOf("Rust crystal beam transformed vertices must be finite", transform);
+        assertTrue(beam >= 0 && transform > beam && output > transform,
+                "Rust crystal beam admission must validate copied transforms and transformed material vertices");
+    }
+
+    @Test
+    public void testRustExperienceOrbRejectsNonFiniteBillboardTransform() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+        int orb = renderer.indexOf("public static boolean enqueueExperienceOrb(");
+        int pose = renderer.indexOf("!pose.pose().isFinite()", orb);
+        int transformed = renderer.indexOf("Rust experience-orb transformed billboard vertices must be finite", pose);
+        assertTrue(orb >= 0 && pose > orb && transformed > pose,
+                "Rust experience-orb semantic publication must validate copied transforms and transformed vertices");
+    }
+
+    @Test
+    public void testRustLineRoutesRejectNonFiniteCopiedTransforms() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+        int line = renderer.indexOf("private static boolean enqueueLineSegmentsForRoute(");
+        int guard = renderer.indexOf("!transform.isFinite()", line);
+        int transformed = renderer.indexOf("Rust line transform produced non-finite endpoint coordinates", guard);
+        assertTrue(line >= 0 && guard > line && transformed > guard,
+                "Rust fishing/debug line routes must validate copied transforms before endpoint expansion");
+    }
+
+    @Test
+    public void testRustBlockEntityScopeRejectsUnregisteredBlockStateIdentity() throws IOException {
+        String dispatcher = readSource(SRC_MAIN_JAVA.resolve(
+                "net/minecraft/client/renderer/blockentity/BlockEntityRenderDispatcher.java"));
+        int scope = dispatcher.indexOf("boolean rustBlockEntitySemanticScope");
+        int id = dispatcher.indexOf("int blockEntityId = Block.BLOCK_STATE_REGISTRY.getId", scope);
+        int guard = dispatcher.indexOf("blockEntityId < 0", id);
+        int begin = dispatcher.indexOf("beginBlockEntitySubmission(blockEntityId)", guard);
+        assertTrue(scope >= 0 && id > scope && guard > id && begin > guard,
+                "Rust block-entity semantic scopes must reject missing registry identities before begin");
+    }
+
+    @Test
+    public void testWholeFrameBlockEntityCallsiteUsesExplicitSemanticSubmission() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+                "net/minecraft/client/renderer/LevelRenderer.java"));
+        int loop = renderer.indexOf("private void submitBlockEntities(");
+        int route = renderer.indexOf("currentMaterialRoute().usesRustWholeFrameVulkan()", loop);
+        int semantic = renderer.indexOf("this.blockEntityRenderDispatcher.submitSemantic(", route);
+        int legacy = renderer.indexOf("this.blockEntityRenderDispatcher.submit(", semantic);
+        assertTrue(loop >= 0 && route > loop && semantic > route && legacy > semantic,
+                "whole-frame block entities must use an explicit semantic callsite while preserving the OpenGL compatibility branch");
     }
 
     @Test
@@ -6839,6 +7724,86 @@ public class Phase3DrawPathTest {
                 "net/minecraft/client/renderer/LevelRenderer.java"));
         assertTrue(renderer.contains("Rust whole-frame static terrain route requires an initialized terrain renderer"),
                 "Rust terrain extraction must not silently drop the scene while its source renderer is unavailable");
+    }
+
+    @Test
+    public void testStaticTerrainTextureBatchPreflightsResidencyBeforePublication() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+        int method = renderer.indexOf("public static void registerStaticTerrainMeshAsset");
+        int preflight = renderer.indexOf("projectedTextureResidency", method);
+        int publish = renderer.indexOf("WORLD_MESH_TEXTURES.put", method);
+        int meshBudget = renderer.indexOf("MAX_WORLD_MESH_ASSET_RESIDENCY", method);
+        assertTrue(method >= 0 && preflight > method && publish > preflight
+                        && renderer.indexOf("batchTexturePayloads", method) > preflight
+                        && renderer.indexOf("conflicting payloads for texture", method) > preflight
+                        && renderer.indexOf("validateWorldMeshTextureAsset", method) > method
+                        && meshBudget > method && meshBudget < publish,
+                "static terrain batches must preflight mesh/texture residency and reject conflicting duplicate IDs before publication");
+    }
+
+    @Test
+    public void testGeneralMeshAdmissionPreflightsBothRegistriesBeforePublication() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+        int method = renderer.indexOf("private static void ensureMeshAssetLocked");
+        int texturePreflight = renderer.indexOf("projectedTextureResidency", method);
+        int meshPreflight = renderer.indexOf("MAX_WORLD_MESH_ASSET_RESIDENCY", method);
+        int publish = renderer.indexOf("WORLD_MESH_TEXTURES.put", method);
+        int meshPublish = renderer.indexOf("WORLD_MESH_ASSETS.put", method);
+        assertTrue(method >= 0 && texturePreflight > method && meshPreflight > method
+                        && publish > texturePreflight && meshPublish > publish
+                        && renderer.indexOf("batchTexturePayloads", method) > method
+                        && renderer.indexOf("validateWorldMeshTextureAsset", method) > method
+                        && renderer.indexOf("validateWorldMeshAsset(extraction.asset(), \"mesh\")", method) > method
+                        && renderer.indexOf("conflicting payloads for texture", method) > method,
+                "entity/item mesh admission must preflight both bounded registries and duplicate payloads before publishing either resource family");
+    }
+
+    @Test
+    public void testStaticTerrainMeshAdmissionMirrorsRustMeshBoundsBeforePublication() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+        int method = renderer.indexOf("public static void registerStaticTerrainMeshAsset");
+        int validation = renderer.indexOf("private static void validateWorldMeshAsset");
+        int publish = renderer.indexOf("WORLD_MESH_TEXTURES.put", method);
+        assertTrue(method >= 0 && validation >= 0 && validation < method && publish > method
+                        && renderer.indexOf("MAX_WORLD_MESH_VERTICES", validation) > validation
+                        && renderer.indexOf("MAX_WORLD_MESH_FRONTEND_INDEX_BYTES", validation) > validation
+                        && renderer.indexOf("MAX_WORLD_MESH_SECTIONS", validation) > validation
+                        && renderer.indexOf("mesh index references vertex", validation) > validation
+                        && renderer.indexOf("materialMatchesMode", validation) > validation
+                        && renderer.indexOf("section.cullPolicy()", validation) > validation
+                        && renderer.indexOf("section.winding()", validation) > validation
+                        && renderer.indexOf("validateWorldMeshAsset(asset, \"static terrain\")", method) > method,
+                "static terrain mesh admission must enforce Rust's bounded finite mesh contract before publishing textures");
+    }
+
+    @Test
+    public void testGenericWorldTextureRegistrationRejectsMalformedPayloadsBeforePublication() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+        int method = renderer.indexOf("public static void registerWorldMeshTexture");
+        int validation = renderer.indexOf("private static void validateWorldMeshTextureAsset");
+        int payloadCheck = renderer.indexOf("payloadBytes", validation);
+        int publish = renderer.indexOf("WORLD_MESH_TEXTURES.put", method);
+        assertTrue(method >= 0 && validation >= 0 && validation < method && payloadCheck > validation && publish > method
+                        && renderer.indexOf("payload must contain 1..") > payloadCheck,
+                "generic Rust texture registration must reject empty/oversized semantic payloads before registry publication");
+    }
+
+    @Test
+    public void testStaticTerrainSortedIndexAdmissionMirrorsRustBoundBeforePublication() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+        int method = renderer.indexOf("public static void registerStaticTerrainSortedIndex");
+        int validation = renderer.indexOf("private static void validateWorldMeshSortedIndex");
+        int publish = renderer.indexOf("WORLD_MESH_SORTED_INDICES.put", method);
+        assertTrue(method >= 0 && validation >= 0 && validation < method && publish > method
+                        && renderer.indexOf("MAX_WORLD_MESH_INDEX_BYTES", validation) > validation
+                        && renderer.indexOf("bytes % stride", validation) > validation
+                        && renderer.indexOf("validateWorldMeshSortedIndex(sortedIndex)", method) > method,
+                "static terrain sorted-index admission must mirror Rust's bounded, aligned payload contract before publication");
     }
 
     @Test
@@ -6872,13 +7837,15 @@ public class Phase3DrawPathTest {
     }
 
     @Test
-    public void testRustSkyRouteRequiresCopiedStateAndVisibleCamera() throws IOException {
+    public void testRustSkyRouteDefersCameraRelativeGeometryUntilVisibleCameraIsAvailable() throws IOException {
         String renderer = readSource(SRC_MAIN_JAVA.resolve(
                 "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
         assertTrue(renderer.contains("Rust whole-frame sky route requires copied sky state"),
                 "Rust sky extraction must not silently continue without copied sky state");
-        assertTrue(renderer.contains("Rust whole-frame sky route requires a camera for visible celestial geometry"),
-                "visible Rust celestial geometry must require camera semantics");
+        assertTrue(renderer.contains("if (skyVisible && camera == null)"),
+                "the extraction-only sky producer must defer camera-relative celestial geometry");
+        assertTrue(renderer.contains("defer camera-relative celestial geometry"),
+                "the deferred sky handoff must remain explicit rather than opening a Java fallback");
     }
 
     @Test
@@ -6889,6 +7856,67 @@ public class Phase3DrawPathTest {
                 "Rust world-border extraction must reject missing copied state");
         assertTrue(renderer.contains("Rust whole-frame world-border route requires a seeded semantic viewport"),
                 "Rust world-border extraction must not report success without a seeded viewport");
+    }
+
+    @Test
+    public void testRustWorldBorderRouteRejectsInvalidCopiedSemantics() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+        int method = renderer.indexOf("public static boolean enqueueWorldBorder(");
+        int validation = renderer.indexOf("invalid copied border semantics", method);
+        int lock = renderer.indexOf("synchronized (LOCK)", method);
+        assertTrue(method >= 0 && validation > method && lock > validation,
+                "world-border semantic bounds must be validated before publishing Rust work");
+        String guarded = renderer.substring(method, lock);
+        assertTrue(guarded.contains("Double.isFinite(cameraPosition.x())")
+                        && guarded.contains("state.minX > state.maxX")
+                        && guarded.contains("state.alpha < 0.0 || state.alpha > 1.0"),
+                "world-border admission must reject non-finite, inverted, and out-of-range copied state");
+    }
+
+    @Test
+    public void testRustSkyRouteRejectsInvalidCopiedCelestialSemantics() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+        int method = renderer.indexOf("public static void enqueueWorldSky(");
+        int validation = renderer.indexOf("invalid copied celestial semantics", method);
+        int background = renderer.indexOf("pendingBackground = pendingBackground.withSky", method);
+        assertTrue(method >= 0 && validation > method && validation < background,
+                "visible sky state must be validated before publishing scalar or camera-relative semantics");
+        String guarded = renderer.substring(method, background);
+        assertTrue(guarded.contains("Float.isFinite(state.timeOfDay)")
+                        && guarded.contains("Float.isFinite(state.starBrightness)")
+                        && guarded.contains("Double.isFinite(camera.getPosition().x())"),
+                "sky admission must reject non-finite copied celestial and camera values");
+    }
+
+    @Test
+    public void testRustWeatherRouteRejectsMalformedCopiedColumns() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+        int method = renderer.indexOf("public static void enqueueWorldWeather(");
+        int cameraValidation = renderer.indexOf("invalid copied camera/column semantics", method);
+        int rainValidation = renderer.indexOf("malformed rain column semantics", method);
+        int weatherColumns = renderer.indexOf("List<VulkanicGalBridge.WorldMaterialQuadRecord> quads = weatherColumns(", method);
+        assertTrue(method >= 0 && cameraValidation > method && rainValidation > cameraValidation
+                        && weatherColumns > rainValidation,
+                "weather columns must be validated before Rust material-quad construction");
+        String guarded = renderer.substring(method, weatherColumns);
+        assertTrue(guarded.contains("Float.isFinite(column.uOffset())")
+                        && guarded.contains("column.topY() < column.bottomY()")
+                        && guarded.contains("MAX_RUST_WEATHER_COLUMNS"),
+                "weather admission must reject malformed UVs, inverted heights, and oversized copied columns");
+    }
+
+    @Test
+    public void testWorldMaterialQuadBoundsCopiedViewport() throws IOException {
+        String bridge = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/bridge/VulkanicGalBridge.java"));
+        int record = bridge.indexOf("public record WorldMaterialQuadRecord(");
+        int validation = bridge.indexOf("viewportWidth > 16384", record);
+        int geometry = bridge.indexOf("world material quad contains invalid copied geometry", validation);
+        assertTrue(record >= 0 && validation > record && geometry > validation,
+                "shared material quads must bound copied viewport dimensions before FFI publication");
     }
 
     @Test
@@ -6906,11 +7934,82 @@ public class Phase3DrawPathTest {
     }
 
     @Test
+    public void testTerrainParticlesUseTheCopiedBlockAtlasForEveryBlockState() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+        int helper = renderer.indexOf("private static int terrainParticleTextureId(BlockState blockState)");
+        int enqueue = renderer.indexOf("public static boolean enqueueTerrainParticle(");
+        int preflight = renderer.indexOf("copied terrain atlas was registered", enqueue);
+        assertTrue(helper >= 0 && renderer.indexOf("return MATERIAL_TEXTURE_TERRAIN_BLOCK_ATLAS;", helper) > helper,
+                "terrain particles must use the copied block atlas rather than a fixed five-block whitelist");
+        assertTrue(enqueue >= 0 && preflight > enqueue
+                        && renderer.indexOf("WORLD_MESH_TEXTURES.containsKey(MATERIAL_TEXTURE_TERRAIN_BLOCK_ATLAS)", enqueue) > enqueue,
+                "terrain particle admission must preflight Rust terrain-atlas residency before emitting quads");
+        int validation = renderer.indexOf("validateParticleQuadSemantics(", enqueue);
+        assertTrue(validation > enqueue && validation < renderer.indexOf("billboardVertices(rotation", validation),
+                "terrain particles must validate copied billboard semantics before Rust geometry emission");
+    }
+
+    @Test
+    public void testBlockMarkersUseDedicatedAssetsOnlyForSpecialMarkersAndAtlasUvsOtherwise() throws IOException {
+        String marker = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/particle/BlockMarker.java"));
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+        assertTrue(marker.contains("this.sprite.contents().name()")
+                        && marker.contains("this.getU0()")
+                        && marker.contains("this.getV1()"),
+                "block markers must copy sprite identity and atlas UVs as semantic data");
+        int helper = renderer.indexOf("private static int blockMarkerTextureId(BlockState blockState)");
+        int enqueue = renderer.indexOf("public static boolean enqueueBlockMarker(");
+        int terrainReturn = renderer.indexOf("return MATERIAL_TEXTURE_TERRAIN_BLOCK_ATLAS;", helper);
+        int barrier = renderer.indexOf("blockState.is(Blocks.BARRIER)", helper);
+        int light = renderer.indexOf("blockState.is(Blocks.LIGHT)", helper);
+        int preflight = renderer.indexOf("BlockMarker route selected before the copied terrain atlas was registered");
+        assertTrue(helper >= 0 && barrier > helper && light > barrier && terrainReturn > light,
+                "barrier/light markers must retain dedicated textures while other blocks use the copied terrain atlas");
+        assertTrue(enqueue >= 0 && preflight > enqueue,
+                "generic block-marker admission must preflight copied terrain-atlas residency");
+        int center = renderer.indexOf("float centerX", enqueue);
+        int validation = renderer.indexOf("validateParticleQuadSemantics(spriteId, centerX", enqueue);
+        int billboard = renderer.indexOf("billboardVertices(markerRotation", enqueue);
+        assertTrue(center > enqueue && validation > center && billboard > validation,
+                "generic atlas block markers must validate the actual camera-relative billboard before emission");
+    }
+
+    @Test
+    public void testRustWholeFrameQuadParticlesRefreshVisibleSemanticStateBeforeEnqueue() throws IOException {
+        String gameRenderer = readSource(SRC_MAIN_JAVA.resolve(
+                "net/minecraft/client/renderer/GameRenderer.java"));
+        String engine = readSource(SRC_MAIN_JAVA.resolve(
+                "net/minecraft/client/particle/ParticleEngine.java"));
+        String group = readSource(SRC_MAIN_JAVA.resolve(
+                "net/minecraft/client/particle/QuadParticleGroup.java"));
+        assertTrue(gameRenderer.contains("rustFrameFrustum")
+                        && gameRenderer.contains("enqueueRustGalParticles(\n\t\t\t\t\trustFrameFrustum"),
+                "whole-frame particle extraction must pass the current camera frustum into the semantic producer");
+        assertTrue(engine.contains("enqueueRustGalParticles(Frustum frustum, Camera camera, float partialTick)"),
+                "ParticleEngine must expose a current-frame semantic extraction entrypoint");
+        assertTrue(group.contains("this.particleTypeRenderState.clear()")
+                        && group.contains("this.extractRenderState(frustum, camera, partialTick)"),
+                "quad particle semantic extraction must rebuild visible state instead of replaying a stale snapshot");
+        int unified = gameRenderer.indexOf("enqueueRustGalParticles(\n\t\t\t\t\trustFrameFrustum");
+        assertTrue(unified >= 0 && gameRenderer.indexOf("enqueueRustGalTerrainParticles(this.mainCamera, f)", unified) < 0
+                        && gameRenderer.indexOf("enqueueRustGalBlockMarkers(this.mainCamera, f)", unified) < 0,
+                "specialized particle producers must not duplicate the unified visible semantic extraction");
+    }
+
+    @Test
     public void testBuiltInProceduralGeometryUsesSemanticQuadContracts() throws IOException {
         String lightning = readSource(SRC_MAIN_JAVA.resolve(
             "net/minecraft/client/renderer/entity/LightningBoltRenderer.java"));
         assertTrue(lightning.contains("submitNodeCollector.submitColoredQuads"),
             "Lightning must submit copied procedural quads through the semantic collector");
+        assertTrue(lightning.contains("SEMANTIC_LIGHTNING_QUADS = 4 * (8 + 3 + 3) * 4")
+                && lightning.contains("new float[SEMANTIC_LIGHTNING_QUADS * 12]")
+                && lightning.contains("new float[SEMANTIC_LIGHTNING_QUADS * 8]")
+                && lightning.contains("new int[SEMANTIC_LIGHTNING_QUADS]")
+                && lightning.contains("quadIndex != SEMANTIC_LIGHTNING_QUADS"),
+            "Lightning semantic storage must cover every generated layer, segment, and crossed face");
         assertTrue(lightning.contains("Rust whole-frame lightning route rejected semantic quads"),
             "Lightning must fail closed when its semantic quad request is rejected");
         String testInstance = readSource(SRC_MAIN_JAVA.resolve(
@@ -6919,26 +8018,424 @@ public class Phase3DrawPathTest {
             "Test-instance error boxes must use the semantic colored-quad contract");
         assertTrue(testInstance.contains("Rust whole-frame error-marker route rejected semantic box quads"),
             "Test-instance error boxes must not fall back to Java geometry on Rust Vulkan");
+        assertTrue(testInstance.contains("|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()"),
+            "selected Vulkan test-instance text must stay on the semantic submission path");
     }
 
     @Test
     public void testExtensionBeamCallsitesUseSemanticTexturedQuads() throws IOException {
         String mungus = readSource(SRC_MAIN_JAVA.resolve(
             "net/alexsmobs/client/render/layer/MungusBeamLayer.java"));
-        assertTrue(mungus.contains("submitNodeCollector.submitTexturedQuad"),
-            "Mungus beams must provide explicit textured-quads to Rust");
+        assertTrue(mungus.contains("submitNodeCollector.submitTranslucentTexturedQuadSemantic"),
+            "Mungus beams must provide explicit translucent textured-quads to Rust");
         assertTrue(mungus.contains("Rust whole-frame Mungus beam route rejected semantic textured quads"),
             "Mungus beams must fail closed instead of retaining Java callbacks");
+        assertTrue(mungus.contains("Selected Vulkan Mungus beam route is unavailable"),
+            "selected Vulkan Mungus beams must not reopen Java geometry before Rust admission");
+        assertTrue(mungus.contains("boolean rustPresentation")
+                && mungus.contains("RustGalVulkanWholeFrameMode.enabled()")
+                && mungus.contains("if (rustPresentation && !rustWholeFrame)"),
+            "Mungus beams must treat the Rust presenter shell as ownership during handoff");
+        assertTrue(mungus.contains("f4 <= 1.0e-6F")
+                && mungus.contains("Rust whole-frame Mungus beam route rejected non-finite or degenerate direction"),
+            "Mungus semantic admission must reject degenerate or non-finite beam directions");
         String mimic = readSource(SRC_MAIN_JAVA.resolve(
             "net/alexsmobs/client/render/RenderMimicOctopus.java"));
-        assertTrue(mimic.contains("submitTranslucentTexturedQuad"),
-            "Mimic-octopus beams must use the explicit translucent semantic route");
+        assertTrue(mimic.contains("submitGuardianBeam"),
+            "Mimic-octopus beams must use the dedicated copied Guardian-beam semantic route");
         assertTrue(mimic.contains("Mimic Octopus beam is unavailable until the Rust Vulkan billboard route is admitted"),
             "Mimic-octopus beams must remain private when the route is not admitted");
+        assertTrue(mimic.contains("boolean rustPresentation")
+                && mimic.contains("RustGalVulkanWholeFrameMode.enabled()")
+                && mimic.contains("if (rustPresentation && !rustWholeFrame)"),
+            "Mimic-octopus beams must treat the Rust presenter shell as ownership during handoff");
         String cachalot = readSource(SRC_MAIN_JAVA.resolve(
             "net/alexsmobs/client/render/RenderCachalotEcho.java"));
         assertTrue(cachalot.contains("submitNodeCollector.submitTexturedQuad"),
             "Cachalot echo arcs must use semantic textured quads on Rust Vulkan");
+        assertTrue(cachalot.contains("boolean rustPresentation")
+                && cachalot.contains("RustGalVulkanWholeFrameMode.enabled()"),
+            "Cachalot echo must treat the Rust presenter shell as ownership during handoff");
+    }
+
+    @Test
+    public void testDragonFireballUsesTheAdmittedSemanticBillboardRoute() throws IOException {
+        String fireball = readSource(SRC_MAIN_JAVA.resolve(
+                "net/minecraft/client/renderer/entity/DragonFireballRenderer.java"));
+        assertTrue(fireball.contains("submitNodeCollector.submitTranslucentTexturedQuadSemantic"),
+                "dragon fireballs must enter the explicit translucent textured-billboard ABI");
+        assertTrue(fireball.contains("dragon-fireball route rejected semantic billboard"),
+                "dragon fireballs must fail closed when Rust rejects their copied quad");
+        int semanticSubmission = fireball.indexOf("submitNodeCollector.submitTranslucentTexturedQuadSemantic");
+        int javaCallback = fireball.indexOf("submitNodeCollector.submitCustomGeometry");
+        assertTrue(semanticSubmission >= 0 && javaCallback > semanticSubmission,
+                "the compatibility callback must remain after semantic admission");
+        String callbackGate = fireball.substring(semanticSubmission, javaCallback);
+        assertTrue(callbackGate.contains("usesRustWholeFrameVulkan()")
+                        && callbackGate.contains("RustGalVulkanWholeFrameMode.enabled()"),
+                "Rust presentation must reject the Java callback instead of silently falling through");
+    }
+
+    @Test
+    public void testPaintingSemanticBatchRollsBackPartialMaterialAdmission() throws IOException {
+        String painting = readSource(SRC_MAIN_JAVA.resolve(
+                "net/minecraft/client/renderer/entity/PaintingRenderer.java"));
+        assertTrue(painting.contains("markMaterialQuadBatch"),
+                "painting extraction must checkpoint its multi-face semantic material batch");
+        assertTrue(painting.contains("rollbackMaterialQuadBatch(checkpoint)"),
+                "painting extraction must discard partial material work on rejection");
+        assertTrue(painting.contains("catch (RuntimeException failure)"),
+                "painting extraction must also roll back when copied resource admission throws");
+    }
+
+    @Test
+    public void testMultiQuadWorldPrimitivesPreflightMaterialCapacity() throws IOException {
+        String primitives = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+        assertTrue(primitives.contains("PENDING_MATERIAL_QUADS.ensureCapacityFor(8)"),
+                "fixed-size beam primitives must reserve their complete material batch before expansion");
+        assertTrue(primitives.contains("PENDING_MATERIAL_QUADS.ensureCapacityFor(vertices.length / 12)"),
+                "guardian beams must reserve all copied quads before appending");
+        assertTrue(primitives.contains("PENDING_MATERIAL_QUADS.ensureCapacityFor(colors.length)"),
+                "procedural quad batches must reserve their complete bounded payload before appending");
+        int batch = primitives.indexOf("public static boolean enqueueTexturedQuads(");
+        int reservation = primitives.indexOf("PENDING_MATERIAL_QUADS.ensureCapacityFor(colors.length)", batch);
+        int loop = primitives.indexOf("for (int quad = 0; quad < colors.length; quad++)", batch);
+        assertTrue(batch >= 0 && reservation > batch && loop > reservation,
+                "textured quad batches must reserve capacity before staging any copied texture asset");
+    }
+
+    @Test
+    public void testGuardianBeamKeepsTranslucentNoDepthWriteMaterialSemantics() throws IOException {
+        String primitives = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+        int method = primitives.indexOf("private static void appendGuardianQuadLocked(");
+        int material = primitives.indexOf("MATERIAL_ID_TRANSLUCENT_TEXTURED, MATERIAL_TEXTURE_GUARDIAN_BEAM", method);
+        int mode = primitives.indexOf("MATERIAL_MODE_TRANSLUCENT", material);
+        int depth = primitives.indexOf("DEPTH_POLICY_TEST_NO_WRITE", mode);
+        assertTrue(method >= 0 && material > method && mode > material && depth > mode,
+                "Guardian beam lowering must preserve translucent/no-depth-write semantics");
+    }
+
+    @Test
+    public void testWeatherColumnExpansionHasAnExplicitProducerBound() throws IOException {
+        String primitives = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+        assertTrue(primitives.contains("MAX_RUST_WEATHER_COLUMNS = MAX_RUST_WORLD_MATERIAL_QUADS"),
+                "weather expansion must share the bounded Rust material-frame budget");
+        int method = primitives.indexOf("private static List<VulkanicGalBridge.WorldMaterialQuadRecord> weatherColumns(");
+        int bound = primitives.indexOf("requestedColumns > MAX_RUST_WEATHER_COLUMNS", method);
+        int allocation = primitives.indexOf("new ArrayList<>((int)requestedColumns)", method);
+        assertTrue(method >= 0 && bound > method && allocation > bound,
+                "weather must reject oversized copied column state before allocating the temporary quad list");
+    }
+
+    @Test
+    public void testWeatherSemanticProducerRejectsInvalidCopiedIntensityAndRadius() throws IOException {
+        String primitives = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+        assertTrue(primitives.contains("MAX_RUST_WEATHER_RADIUS = 10"),
+                "weather admission must retain the vanilla bounded ring-radius contract");
+        assertTrue(primitives.contains("!Float.isFinite(state.intensity) || state.intensity > 1.0F"),
+                "weather admission must reject non-finite or over-range copied intensity");
+        assertTrue(primitives.contains("state.radius <= 0 || state.radius > MAX_RUST_WEATHER_RADIUS"),
+                "weather admission must not silently drop visible columns with invalid radius semantics");
+    }
+
+    @Test
+    public void testFirstPersonSemanticLayersAreBoundedBeforeMeshExtraction() throws IOException {
+        String primitives = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+        assertTrue(primitives.contains("MAX_FIRST_PERSON_SEMANTIC_LAYERS = 64"),
+                "first-person semantic layer aggregation must have an explicit bound");
+        int collection = primitives.indexOf("itemState.forEachSemanticLayer(layer ->");
+        int guard = primitives.indexOf("layers.size() >= MAX_FIRST_PERSON_SEMANTIC_LAYERS", collection);
+        int append = primitives.indexOf("layers.add(layer)", collection);
+        assertTrue(collection >= 0 && guard > collection && append > guard,
+                "first-person layers must be rejected before entering the extraction list");
+        int eligibility = primitives.indexOf("private static String firstPersonItemMeshIneligibility(");
+        int aggregate = primitives.indexOf("aggregateQuadCount", eligibility);
+        int aggregateBound = primitives.indexOf("MAX_FIRST_PERSON_SEMANTIC_QUADS", aggregate);
+        assertTrue(eligibility >= 0 && aggregate > eligibility && aggregateBound > aggregate,
+                "first-person eligibility must enforce the aggregate quad budget before extraction");
+    }
+
+    @Test
+    public void testFirstPersonTextureAdmissionPreflightsFrameBeforeAssetCopy() throws IOException {
+        String primitives = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+        int method = primitives.indexOf("private static boolean enqueueFirstPersonTexturedQuadsWithMaterialMode(");
+        int preflight = primitives.indexOf("if (!pendingFirstPersonFrame", method);
+        int textureCopy = primitives.indexOf("readTexturePayloadForResource(textureIdentity)", method);
+        assertTrue(method >= 0 && preflight > method && textureCopy > preflight,
+                "first-person texture assets must be copied only after frame and instance admission");
+        assertTrue(primitives.indexOf("PENDING_FIRST_PERSON_MESH_INSTANCES.size() >= MAX_RUST_WORLD_MESH_INSTANCES", preflight) > preflight,
+                "first-person texture admission must reserve a bounded mesh-instance slot before publishing assets");
+    }
+
+    @Test
+    public void testIndexedWorldProducersReserveInstanceCapacityBeforeAssetPublish() throws IOException {
+        String primitives = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+		for (String methodName : new String[] {"enqueueBlockDisplay(", "enqueueBlockModelMesh(", "enqueueArrowModel(",
+				"enqueueItemEntityMesh(", "enqueueModelPartMesh(", "enqueueStandaloneGlintModelMesh(",
+				"enqueueEligibleModelMesh(", "enqueuePrimedTnt(", "enqueueMovingBlock("}) {
+            int method = primitives.indexOf(methodName);
+            if (method < 0) continue;
+            int asset = primitives.indexOf("ensureMeshAssetLocked(extraction)", method);
+            int capacity = primitives.lastIndexOf("ensureWorldQueueCapacityLocked(", asset);
+            assertTrue(asset >= 0 && capacity > method && capacity < asset,
+                    methodName + " must reserve bounded mesh-instance capacity before publishing its mesh asset");
+        }
+    }
+
+    @Test
+    public void testWorldAssetUploadFailuresRemainRetryable() throws IOException {
+        String primitives = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+        for (String generation : new String[] {"WorldBorder", "WorldCrack", "WorldMaterial", "WorldMesh"}) {
+            // Locate the concrete failure counter, then require its attempted
+            // generation to roll back to the last uploaded generation.
+            String counter = switch (generation) {
+                case "WorldBorder" -> "worldBorderAssetUpdateFailures++";
+                case "WorldCrack" -> "worldCrackAssetUpdateFailures++";
+                case "WorldMaterial" -> "worldMaterialAssetUpdateFailures++";
+                default -> "worldMeshAssetUpdateFailures++";
+            };
+            int failure = primitives.indexOf(counter);
+            assertTrue(failure >= 0, generation + " upload must expose a bounded failure path");
+            String attempted = switch (generation) {
+                case "WorldBorder" -> "attemptedWorldBorderAssetGeneration = uploadedWorldBorderAssetGeneration";
+                case "WorldCrack" -> "attemptedWorldCrackAssetGeneration = uploadedWorldCrackAssetGeneration";
+                case "WorldMaterial" -> "attemptedWorldMaterialAssetGeneration = uploadedWorldMaterialAssetGeneration";
+                default -> "attemptedWorldMeshAssetGeneration = uploadedWorldMeshAssetGeneration";
+            };
+            assertTrue(primitives.indexOf(attempted, failure) > failure,
+                    generation + " upload failures must remain retryable");
+        }
+    }
+
+    @Test
+    public void testWorldTextUploadFailurePreservesDirtyRetryableGeneration() throws IOException {
+        String primitives = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+        int method = primitives.indexOf("flushPendingWorldTextImages(");
+        int update = primitives.indexOf("bridge.updateWorldTextImages(", method);
+        int catchBlock = primitives.indexOf("catch (RuntimeException error)", update);
+        int retry = primitives.indexOf("attemptedWorldTextImageGeneration = uploadedWorldTextImageGeneration", catchBlock);
+        assertTrue(method >= 0 && update > method && catchBlock > update && retry > catchBlock,
+                "world-text image failures must preserve the prior generation and remain retryable");
+        assertTrue(primitives.indexOf("DIRTY_WORLD_TEXT_IMAGES.clear()", update) < catchBlock,
+                "world-text dirty images must only be cleared after native admission succeeds");
+    }
+
+    @Test
+    public void testStaticTerrainInstanceAdmissionPreflightsBeforeRetention() throws IOException {
+        String primitives = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+        int method = primitives.indexOf("public static boolean enqueueStaticTerrainMeshInstance(");
+        int remember = primitives.indexOf("rememberActiveStaticTerrainInstanceLocked(instance)", method);
+        int capacity = primitives.lastIndexOf("ensureWorldQueueCapacityLocked(", remember);
+        assertTrue(method >= 0 && capacity > method && capacity < remember,
+                "static terrain visibility must reserve queue capacity before retaining an active instance");
+        assertTrue(primitives.indexOf("MAX_SEMANTIC_VIEWPORT_AXIS", method) < remember,
+                "static terrain visibility must validate its copied viewport before retention");
+    }
+
+    @Test
+    public void testStaticTerrainRemovalKeepsMeshProducerMetadataAligned() throws IOException {
+        String primitives = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+        int removal = primitives.indexOf("public static void removeStaticTerrainMeshAsset");
+        int instanceLoop = primitives.indexOf("for (int index = PENDING_MESH_INSTANCES.size() - 1", removal);
+        int producerRemoval = primitives.indexOf("PENDING_MESH_PRODUCERS.remove(index)", instanceLoop);
+        assertTrue(removal >= 0 && instanceLoop > removal && producerRemoval > instanceLoop,
+                "static terrain removal must remove paired producer metadata with each pending instance");
+    }
+
+    @Test
+    public void testStaticTerrainFirstAdmissionIsNotReplayedInSameFrame() throws IOException {
+        String primitives = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+        int consume = primitives.indexOf("public static PrimitiveFrame consumeFrame()");
+        int pending = primitives.indexOf("newlyAdmittedStaticTerrainKeys", consume);
+        int admitted = primitives.indexOf("admittedMeshInstances.add(instance)", pending);
+        int replay = primitives.indexOf("for (VulkanicGalBridge.WorldMeshInstanceRecord instance : ACTIVE_STATIC_TERRAIN_INSTANCES.values())", admitted);
+        int skip = primitives.indexOf("newlyAdmittedStaticTerrainKeys.contains(instance.meshKey())", replay);
+        assertTrue(consume >= 0 && pending > consume && admitted > pending && replay > admitted && skip > replay,
+                "static terrain first admission must be tracked and excluded from the active replay loop");
+    }
+
+    @Test
+    public void testBlockOutlinePreflightsAllEdgePassesBeforeAppending() throws IOException {
+        String primitives = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+        int method = primitives.indexOf("public static void enqueueBlockOutline(");
+        int preflight = primitives.indexOf("ensureOutlineCapacityLocked(shape, highContrast ? 2 : 1)", method);
+        int append = primitives.indexOf("appendShapeEdges(shape, blockPos", method);
+        assertTrue(method >= 0 && preflight > method && append > preflight,
+                "block outlines must reserve all edge passes before appending bounded line segments");
+    }
+
+    @Test
+    public void testBlockCrackPreflightsAllShapeFacesBeforeAppending() throws IOException {
+        String primitives = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+        int method = primitives.indexOf("public static void enqueueBlockBreakingCracks(");
+        int preflight = primitives.indexOf("ensureCrackCapacityLocked(shape)", method);
+        int append = primitives.indexOf("appendCrackShape(shape", method);
+        assertTrue(method >= 0 && preflight > method && append > preflight,
+                "block cracks must reserve all six faces per shape box before appending bounded quads");
+    }
+
+    @Test
+    public void testWorldBorderPreflightsVisibleSidesBeforeAppending() throws IOException {
+        String primitives = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+        int method = primitives.indexOf("private static void appendVisibleWorldBorderSides(");
+        int count = primitives.indexOf("int visibleSides = 0", method);
+        int capacity = primitives.indexOf("ensureWorldQueueCapacityLocked(PENDING_BORDER_QUADS.size(), visibleSides", count);
+        int append = primitives.indexOf("appendWorldBorderSide(", capacity);
+        assertTrue(method >= 0 && count > method && capacity > count && append > capacity,
+                "world-border rendering must reserve all visible side quads before appending");
+    }
+
+    @Test
+    public void testWorldBorderRejectsNonFiniteDerivedQuadGeometryBeforeQueueing() throws IOException {
+        String primitives = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+        int method = primitives.indexOf("private static void appendWorldBorderQuad(");
+        int finite = primitives.indexOf("produced non-finite copied geometry", method);
+        int queue = primitives.indexOf("PENDING_BORDER_QUADS.add", finite);
+        assertTrue(method >= 0 && finite > method && queue > finite,
+                "world-border derived quads must reject non-finite geometry before Rust queue insertion");
+    }
+
+    @Test
+    public void testRustCrackQuadsRejectNonFiniteDerivedGeometryBeforeQueueing() throws IOException {
+        String primitives = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+        int method = primitives.indexOf("private static void appendCrackQuad(");
+        int finite = primitives.indexOf("produced non-finite copied geometry", method);
+        int queue = primitives.indexOf("PENDING_CRACK_QUADS.add", finite);
+        assertTrue(method >= 0 && finite > method && queue > finite,
+                "Rust crack quads must reject non-finite geometry before queue insertion");
+    }
+
+    @Test
+    public void testRustLineSegmentsRejectNonFiniteDerivedGeometryBeforeQueueing() throws IOException {
+        String primitives = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+        int helper = primitives.indexOf("private static boolean finiteSegment(");
+        int camera = primitives.indexOf("if (!finiteSegment(start.x()");
+        int queue = primitives.indexOf("PENDING_SEGMENTS.add", camera);
+        assertTrue(helper >= 0 && camera >= 0 && queue > camera,
+                "Rust line segments must reject non-finite derived geometry before queue insertion");
+    }
+
+    @Test
+    public void testRustMaterialVertexTransformRejectsNonFiniteCopiedGeometry() throws IOException {
+        String primitives = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+        int method = primitives.indexOf("private static void transformMaterialVertex(");
+        int input = primitives.indexOf("invalid copied vertex input", method);
+        int output = primitives.indexOf("non-finite transformed vertex", input);
+        assertTrue(method >= 0 && input > method && output > input,
+                "Rust material vertex transforms must reject non-finite copied inputs and outputs");
+    }
+
+    @Test
+    public void testWorldMaterialBridgeRecordRejectsNonFiniteCopiedGeometry() throws IOException {
+        String bridge = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/bridge/VulkanicGalBridge.java"));
+        int record = bridge.indexOf("public record WorldMaterialQuadRecord(");
+        int guard = bridge.indexOf("contains invalid copied geometry", record);
+        assertTrue(record >= 0 && guard > record,
+                "world material bridge records must reject non-finite copied geometry before FFI");
+    }
+
+    @Test
+    public void testWorldTextBoundsSubmitMetadataBeforeGlyphPreparation() throws IOException {
+        String collector = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/WorldTextSemanticCollector.java"));
+        assertTrue(collector.contains("MAX_SEMANTIC_SUBMITS_PER_COLLECTION = 8_192"),
+                "world text must bound submit metadata before sorting or glyph preparation");
+        assertTrue(collector.contains("snapshot.seeThrough().size() > MAX_SEMANTIC_SUBMITS_PER_COLLECTION"),
+                "name-tag extraction must reject oversized see-through submit collections");
+        assertTrue(collector.contains("submits.size() > MAX_SEMANTIC_SUBMITS_PER_COLLECTION"),
+                "ordinary text extraction must reject oversized submit collections");
+        assertTrue(collector.contains("quads.size() >= MAX_SEMANTIC_QUADS_PER_COLLECTION"),
+                "ordinary text extraction must stop once the bounded quad budget is reached");
+    }
+
+    @Test
+    public void testDebugBoundingBoxExtractionBoundsInvisibleCellAllocation() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+                "net/minecraft/client/renderer/blockentity/BlockEntityWithBoundingBoxRenderer.java"));
+        assertTrue(renderer.contains("MAX_INVISIBLE_BLOCK_CELLS = 65_536L"),
+                "debug invisible-block extraction must have an explicit cell-volume bound");
+        assertTrue(renderer.contains("cellCount > MAX_INVISIBLE_BLOCK_CELLS"),
+                "debug invisible-block extraction must reject oversized volumes before allocation");
+        assertTrue(renderer.contains("new BlockEntityWithBoundingBoxRenderState.InvisibleBlockType[(int)cellCount]"),
+                "the bounded cell count must control the backing allocation");
+    }
+
+    @Test
+    public void testCloudTexturePreparationBoundsCellAllocation() throws IOException {
+        String cloud = readSource(SRC_MAIN_JAVA.resolve(
+                "net/minecraft/client/renderer/CloudRenderer.java"));
+        assertTrue(cloud.contains("MAX_SEMANTIC_CLOUD_CELLS = 1_048_576L"),
+                "cloud texture preparation must share an explicit semantic cell bound");
+        assertTrue(cloud.contains("cellCount > MAX_SEMANTIC_CLOUD_CELLS"),
+                "cloud texture preparation must reject oversized resource-pack images before allocation");
+        assertTrue(cloud.contains("new long[(int)cellCount]"),
+                "the bounded cloud cell count must control the backing allocation");
+    }
+
+    @Test
+    public void testTaczBedrockUsesOneAggregateSemanticQuadBudget() throws IOException {
+        String tacz = readSource(SRC_MAIN_JAVA.resolve(
+                "net/minecraft/client/renderer/special/TaczGlock17SpecialRenderer.java"));
+        assertTrue(tacz.contains("SemanticBedrockBudget budget = new SemanticBedrockBudget()"),
+                "TACZ semantic walks must share one aggregate budget across light batches");
+        assertTrue(tacz.contains("++budget.quadCount > MAX_SEMANTIC_BEDROCK_QUADS"),
+                "TACZ semantic polygon admission must enforce the aggregate quad limit");
+    }
+
+    @Test
+    public void testPaintingStateExtractionBoundsLightGridAllocation() throws IOException {
+        String painting = readSource(SRC_MAIN_JAVA.resolve(
+                "net/minecraft/client/renderer/entity/PaintingRenderer.java"));
+        assertTrue(painting.contains("tileCount > MAX_RUST_PAINTING_QUADS / 6L"),
+                "painting state extraction must reject oversized tile grids before allocation");
+        assertTrue(painting.contains("new int[(int)tileCount]"),
+                "the bounded painting tile count must control the light-grid allocation");
+    }
+
+    @Test
+    public void testStandaloneUniformReflectionBoundsShaderPackArrays() throws IOException {
+        String coordinator = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/backends/vulkan/VulkanShaderProgramCoordinator.java"));
+        assertTrue(coordinator.contains("MAX_STANDALONE_UNIFORM_ARRAY_ELEMENTS = 4_096"),
+                "standalone shader uniform arrays must have an explicit element bound");
+        assertTrue(coordinator.contains("MAX_STANDALONE_UNIFORM_BACKING_BYTES = 4 * 1024 * 1024"),
+                "standalone shader uniform backing must have an explicit byte bound");
+        assertTrue(coordinator.contains("checkedStandaloneUniformArraySize(field)"),
+                "uniform readback arrays must revalidate reflected array sizes before allocation");
+    }
+
+    @Test
+    public void testCopiedWorldMeshExtractionBoundsTransientLists() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+        assertTrue(renderer.contains("MAX_WORLD_MESH_VERTICES = 65_536"),
+                "copied world meshes must retain an explicit vertex bound");
+        assertTrue(renderer.contains("ensureWorldMeshExtractionCapacity(vertices, indices, sections)"),
+                "mesh extraction must check transient list capacity before copying each polygon");
+        assertTrue(renderer.contains("MAX_WORLD_MESH_FRONTEND_INDEX_BYTES / 2 - 6"),
+                "mesh extraction must bound index growth before the byte-array conversion");
+        assertTrue(renderer.contains("sections.size() >= MAX_WORLD_MESH_SECTIONS"),
+                "mesh extraction must bound section metadata before temporary allocation grows");
     }
 
     @Test
@@ -6984,6 +8481,146 @@ public class Phase3DrawPathTest {
     }
 
     @Test
+    public void testDistantHorizonsJavaSnapshotsMirrorRustLodBounds() throws IOException {
+        String collector = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/DistantHorizonsSemanticCollector.java"));
+        String bridge = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/bridge/VulkanicGalBridge.java"));
+        int snapshot = collector.indexOf("public record LodColumnSnapshot");
+        int validation = collector.indexOf("private static void validateBuffers", snapshot);
+        assertTrue(snapshot >= 0 && validation > snapshot
+                        && collector.contains("MAX_LOD_SEGMENTS_PER_COLUMN = 512")
+                        && collector.contains("MAX_LOD_VERTICES_PER_SEGMENT = 2_097_152")
+                        && collector.contains("MAX_LOD_MATERIAL_ID = 15")
+                        && collector.contains("MAX_LOD_NORMAL_INDEX = 5")
+                        && collector.contains("MAX_LOD_MATERIAL_IDENTITIES_PER_COLUMN = 4_096")
+                        && collector.substring(validation).contains("packedLightAndMicroOffset()")
+                        && collector.substring(validation).contains("materialId()")
+                        && collector.substring(validation).contains("normalIndex()")
+                        && bridge.contains("materialId < 0 || materialId > 15")
+                        && bridge.contains("normalIndex < 0 || normalIndex > 5")
+                        && bridge.contains("layer <= 0 || layer > 4"),
+                "Distant Horizons Java snapshots must enforce Rust's bounded LOD segment and vertex semantics before upload");
+    }
+
+    @Test
+    public void testGuiRawImageRecordMirrorsRustDimensionsAndExactPixelContract() throws IOException {
+        String bridge = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/bridge/VulkanicGalBridge.java"));
+        int record = bridge.indexOf("public record GuiRawImageAssetRecord");
+        int constructor = bridge.indexOf("public GuiRawImageAssetRecord {", record);
+        assertTrue(record >= 0 && constructor > record
+                        && bridge.substring(record).contains("MAX_RAW_IMAGE_DIMENSION = 8192")
+                        && bridge.substring(record).contains("MAX_RAW_IMAGE_PIXELS = 16 * 1024 * 1024")
+                        && bridge.substring(constructor).contains("expectedBytes")
+                        && bridge.substring(constructor).contains("pixels.length != expectedBytes"),
+                "GUI raw-image Java admission must mirror Rust's bounded dimensions, pixel count, and exact byte contract");
+    }
+
+    @Test
+    public void testWorldTextImageRecordMirrorsRustExactPixelContract() throws IOException {
+        String bridge = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/bridge/VulkanicGalBridge.java"));
+        int record = bridge.indexOf("public record WorldTextImageAssetRecord");
+        int constructor = bridge.indexOf("public WorldTextImageAssetRecord {", record);
+        assertTrue(record >= 0 && constructor > record
+                        && bridge.substring(record).contains("MAX_IMAGE_BYTES = 4 * 1024 * 1024")
+                        && bridge.substring(constructor).contains("expectedBytes")
+                        && bridge.substring(constructor).contains("pixels.length != expectedBytes"),
+                "world text image Java admission must mirror Rust's exact bounded format/extent payload contract");
+    }
+
+    @Test
+    public void testWorldAssetRecordsMirrorRustPngBounds() throws IOException {
+        String bridge = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/bridge/VulkanicGalBridge.java"));
+        assertTrue(bridge.contains("MAX_PNG_BYTES = 2 * 1024 * 1024")
+                        && bridge.contains("MAX_PNG_BYTES = 4 * 1024 * 1024")
+                        && bridge.contains("stage < 0 || stage >= 10"),
+                "world border, crack, and material asset records must reject payloads Rust cannot admit");
+    }
+
+    @Test
+    public void testWorldTextStagingPreflightsAggregateBytesAndDuplicateIds() throws IOException {
+        String renderer = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+        int method = renderer.indexOf("private static void stageWorldTextSemantics");
+        int preflight = renderer.indexOf("projectedImageBytes", method);
+        int publish = renderer.indexOf("WORLD_TEXT_IMAGES.put", method);
+        assertTrue(method >= 0 && preflight > method && publish > preflight
+                        && renderer.contains("MAX_WORLD_TEXT_IMAGE_BYTES_TOTAL = 64L * 1024L * 1024L")
+                        && renderer.indexOf("duplicate image id", method) > preflight
+                        && renderer.indexOf("aggregate bound exceeded", method) > preflight,
+                "world text staging must reject duplicate IDs and aggregate image bytes before publishing images");
+    }
+
+    @Test
+    public void testSemanticPngRecordsSnapshotCallerArrays() throws IOException {
+        String bridge = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/bridge/VulkanicGalBridge.java"));
+        int gui = bridge.indexOf("public record GuiAssetRecord");
+        int border = bridge.indexOf("public record WorldBorderAssetRecord");
+        int material = bridge.indexOf("public record WorldMaterialAssetRecord");
+        assertTrue(gui >= 0 && border > gui && material > border
+                        && bridge.substring(gui).contains("pngBytes = pngBytes.clone()")
+                        && bridge.substring(border).contains("public byte[] pngBytes()")
+                        && bridge.substring(material).contains("public byte[] pngBytes()"),
+                "semantic PNG records must own immutable byte snapshots rather than caller-owned arrays");
+    }
+
+    @Test
+    public void testShaderPackFileRecordsSnapshotCallerArrays() throws IOException {
+        String bridge = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/bridge/VulkanicGalBridge.java"));
+        int source = bridge.indexOf("public record ShaderPackSourceFileRecord");
+        int asset = bridge.indexOf("public record ShaderPackAssetFileRecord");
+        assertTrue(source >= 0 && asset > source
+                        && bridge.substring(source).contains("contentsUtf8 = contentsUtf8.clone()")
+                        && bridge.substring(asset).contains("contents = contents.clone()")
+                        && bridge.substring(source).contains("public byte[] contentsUtf8()")
+                        && bridge.substring(asset).contains("public byte[] contents()"),
+                "shader-pack source and asset records must own immutable copied bytes across the Rust boundary");
+    }
+
+    @Test
+    public void testWorldGeometryRecordsSnapshotCallerFloatArrays() throws IOException {
+        String bridge = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/bridge/VulkanicGalBridge.java"));
+        int crack = bridge.indexOf("public record WorldCrackQuadRecord");
+        int border = bridge.indexOf("public record WorldBorderQuadRecord");
+        int instance = bridge.indexOf("public record WorldMeshInstanceRecord");
+        assertTrue(crack >= 0 && border > crack && instance > border
+                        && bridge.substring(crack).contains("vertices = vertices.clone()")
+                        && bridge.substring(crack).contains("public float[] vertices()")
+                        && bridge.substring(border).contains("vertices = vertices.clone()")
+                        && bridge.substring(border).contains("public float[] vertices()")
+                        && bridge.substring(instance).contains("transform = transform.clone()")
+                        && bridge.substring(instance).contains("public float[] transform()"),
+                "world geometry records must own immutable copied float arrays across the Rust boundary");
+    }
+
+    @Test
+    public void testMeshAndLodAssetRecordsSnapshotCallerArraysOnRead() throws IOException {
+        String bridge = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/bridge/VulkanicGalBridge.java"));
+        int texture = bridge.indexOf("public record WorldMeshTextureAssetRecord");
+        int sorted = bridge.indexOf("public record WorldMeshSortedIndexRecord");
+        int asset = bridge.indexOf("public record WorldMeshAssetRecord");
+        int lod = bridge.indexOf("public record WorldLodSegmentMaterialProvenanceRecord");
+        int hand = bridge.indexOf("public record WorldFirstPersonFrameRecord");
+        assertTrue(texture >= 0 && sorted > texture && asset > sorted && lod > asset && hand > lod
+                        && bridge.substring(texture).contains("public byte[] pngBytes()")
+                        && bridge.substring(sorted).contains("public byte[] indexBytes()")
+                        && bridge.substring(asset).contains("public byte[] indexBytes()")
+                        && bridge.substring(lod).contains("public int[] quadMaterialIds()")
+                        && bridge.substring(lod).contains("public byte[] quadVariantStates()")
+                        && bridge.substring(lod).contains("public long[] quadVariantPositions()")
+                        && bridge.substring(hand).contains("public float[] projectionMatrix()")
+                        && bridge.substring(hand).contains("public float[] modelViewMatrix()"),
+                "mesh and DH provenance records must not expose mutable array storage through generated accessors");
+    }
+
+    @Test
     public void testWholeFrameBlockFeatureDispatchUsesSemanticOnlyLowering() throws IOException {
         String dispatcher = readSource(SRC_MAIN_JAVA.resolve(
                 "net/minecraft/client/renderer/feature/FeatureRenderDispatcher.java"));
@@ -7001,6 +8638,9 @@ public class Phase3DrawPathTest {
                 "blockFeatureRenderer.render(submitNodeCollection, this.bufferSource, this.blockRenderDispatcher, this.outlineBufferSource);");
         assertTrue(compatibilityDispatcher >= 0 && compatibilityDispatcher < semanticDispatcher,
                 "the Java block-feature overload must remain confined to the pre-existing OpenGL compatibility dispatcher");
+		assertFalse(readSource(SRC_MAIN_JAVA.resolve(
+				"net/minecraft/client/renderer/LevelRenderer.java")).contains("overlay == net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY"),
+				"Rust block coverage must not reject overlays already carried by semantic mesh-instance color lanes");
     }
 
     @Test
@@ -7016,5 +8656,45 @@ public class Phase3DrawPathTest {
                 "line-strip topology must lower adjacent endpoints without retaining a Java callback");
         assertTrue(collector.contains("customGeometryRenderer.render(poseStack.last(), capture)"),
                 "the callback must be copied into semantic endpoint data before Rust submission");
+        assertTrue(collector.contains("capture.finish()")
+                        && collector.contains("finishPending()")
+                        && collector.contains("private boolean pendingVertex"),
+                "line capture must finalize callbacks that omit an optional normal attribute");
+    }
+
+    @Test
+    public void testWholeFrameDebugQuadCallbacksUseCopiedProceduralQuadAbi() throws IOException {
+        String collector = readSource(SRC_MAIN_JAVA.resolve(
+                "net/minecraft/client/renderer/SubmitNodeCollection.java"));
+        assertTrue(collector.contains("isRustProceduralQuadGeometryRenderType(renderType)"),
+                "debug quad callbacks must be classified before the arbitrary-callback rejection");
+        assertTrue(collector.contains("RenderType.debugFilledBox()")
+                        && collector.contains("RenderType.debugQuads()"),
+                "only the bounded colored debug quad topologies may use this route");
+        assertTrue(collector.contains("enqueueProceduralQuads(")
+                        && collector.contains("capture.vertices.size() % 4 != 0"),
+                "debug quad vertices must be copied as complete four-vertex semantic quads");
+        assertTrue(collector.contains("ProceduralGeometryCapture"),
+                "debug quad callbacks must not retain a Java VertexConsumer");
+        assertTrue(collector.contains("quadLightInitialized")
+                        && collector.contains("this.lightCoords != quadLightCoords"),
+                "procedural quad capture must reject per-vertex light disagreement instead of silently using the first light value");
+
+		String levelRenderer = readSource(SRC_MAIN_JAVA.resolve(
+				"net/minecraft/client/renderer/LevelRenderer.java"));
+		assertTrue(levelRenderer.contains("isRustLineGeometryRenderType(renderType)")
+				&& levelRenderer.contains("isRustProceduralQuadGeometryRenderType(renderType)"),
+				"coverage-only custom geometry must exempt only the two admitted Rust semantic callback families");
+    }
+
+    @Test
+    public void testWholeFramePostEffectIdentityIsBoundedBeforeFfi() throws IOException {
+        String coordinator = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/gui/RustGalFrameCoordinator.java"));
+        assertTrue(coordinator.contains("normalizeSemanticPostEffectId(postEffectId)"),
+                "whole-frame post-effect identity must be validated before the FFI request is built");
+        assertTrue(coordinator.contains("Character::isISOControl")
+                        && coordinator.contains("getBytes(StandardCharsets.UTF_8).length > 256"),
+                "post-effect identity validation must reject controls and bound UTF-8 payload size");
     }
 }

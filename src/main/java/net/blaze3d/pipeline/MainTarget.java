@@ -30,9 +30,10 @@ public class MainTarget extends RenderTarget {
 	}
 
 	private void createFrameBuffer(int i, int j) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			// MainTarget overrides RenderTarget.createBuffers, so the base
-			// whole-frame guard cannot protect this entry point. Rust owns the
+			// selected-Vulkan guard must protect this entry point. Rust owns the
 			// acquired presentation images; retain only dimensions for semantic
 			// extraction and never allocate a second Java framebuffer.
 			MainTarget.Dimension dimension = this.listWithFallbackDimensions(i, j);

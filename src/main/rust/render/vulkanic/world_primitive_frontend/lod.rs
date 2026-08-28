@@ -2145,7 +2145,6 @@ pub(crate) struct WorldLodPreparedSourceTarget {
     pub primary_color_view: Handle,
     pub primary_color_format: TextureFormat,
     pub primary_color_clears_each_frame: bool,
-    pub primary_color_clear_color_bits: Option<[u32; 4]>,
     pub distant_depth_texture: Handle,
     pub distant_depth_view: Handle,
 }
@@ -2320,7 +2319,6 @@ impl WorldLodSourcePassResources {
             primary_color_view: primary.view,
             primary_color_format: primary.format,
             primary_color_clears_each_frame: primary.clear_each_frame,
-            primary_color_clear_color_bits: primary.clear_color_bits,
             distant_depth_texture: depth_targets.distant_depth_texture,
             distant_depth_view: depth_targets.distant_depth_view,
         })

@@ -13,7 +13,7 @@ public class GlTexture extends GlResource implements TextureAccess {
 	private final TextureType target;
 
 	public GlTexture(TextureType target, int sizeX, int sizeY, int sizeZ, int internalFormat, int format, int pixelType, byte[] pixels, TextureFilteringData filteringData) {
-		super(net.irisshaders.iris.gl.IrisRenderSystem.createTextureId());
+		super(requireJavaTextureAllocation());
 		target.bindForSetup(getGlId());
 
 		TextureUploadHelper.resetTextureUploadState();
@@ -38,6 +38,14 @@ public class GlTexture extends GlResource implements TextureAccess {
 		target.bindForSetup(0);
 
 		this.target = target;
+	}
+
+	private static int requireJavaTextureAllocation() {
+		if (VulkanicAPI.isVulkanBackendSelected()
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris texture allocation is unavailable on the Rust Vulkan route");
+		}
+		return net.irisshaders.iris.gl.IrisRenderSystem.createTextureId();
 	}
 
 	public TextureType getTarget() {

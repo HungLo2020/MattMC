@@ -60,6 +60,9 @@ public class RenderSystem {
 			net.vulkanic.VulkanicAPI.pollEvents();
 			return;
 		}
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+			throw new IllegalStateException("Java Vulkan frame presentation is unavailable until the Rust whole-frame presenter is admitted");
+		}
 
 		boolean vulkanBackendSelected = net.vulkanic.VulkanicAPI.isVulkanBackendSelected();
 		boolean vulkanFrameAcquired = false;

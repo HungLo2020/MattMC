@@ -62,4 +62,26 @@ public class QuadParticleGroup extends ParticleGroup<SingleQuadParticle> {
 	public int enqueueRustGalParticles() {
 		return this.particleTypeRenderState.enqueueRustGal();
 	}
+
+	/**
+	 * Extracts the current visible quad particles before copying them into the
+	 * Rust semantic stream. The whole-frame presenter bypasses vanilla's
+	 * ParticlesRenderState extraction, so enqueueing the reusable state directly
+	 * would otherwise replay a stale snapshot (or submit nothing on the first
+	 * frame).
+	 */
+	public int enqueueRustGalParticles(Frustum frustum, Camera camera, float partialTick) {
+		this.particleTypeRenderState.clear();
+		if (System.getProperty("mattmc.dev.rustGalWorldMaterial.terrainParticleScenario", "").isBlank()) {
+			this.extractRenderState(frustum, camera, partialTick);
+		} else {
+			for (SingleQuadParticle particle : this.particles) {
+				if (!(particle instanceof TerrainParticle)
+					&& frustum.pointInFrustum(particle.x, particle.y, particle.z)) {
+					particle.extract(this.particleTypeRenderState, camera, partialTick);
+				}
+			}
+		}
+		return this.particleTypeRenderState.enqueueRustGal();
+	}
 }

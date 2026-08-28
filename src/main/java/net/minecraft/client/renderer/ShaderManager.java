@@ -204,7 +204,8 @@ public class ShaderManager extends SimplePreparableReloadListener<ShaderManager.
 
 	protected void apply(ShaderManager.Configs configs, ResourceManager resourceManager, ProfilerFiller profilerFiller) {
 		ShaderManager.CompilationCache compilationCache = new ShaderManager.CompilationCache(configs);
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
 			// Java render-pipeline compilation/cache ownership ends at the
 			// whole-frame handoff. Keep the parsed source cache for ordinary
 			// resource bookkeeping, but do not ask the Java backend to compile,
@@ -251,6 +252,10 @@ public class ShaderManager extends SimplePreparableReloadListener<ShaderManager.
 
 	@Nullable
 	public PostChain getPostChain(ResourceLocation resourceLocation, Set<ResourceLocation> set) {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java post-chain loading is unavailable while Rust owns the selected Vulkan route");
+		}
 		try {
 			return this.compilationCache.getOrLoadPostChain(resourceLocation, set);
 		} catch (ShaderManager.CompilationException var4) {
@@ -264,6 +269,15 @@ public class ShaderManager extends SimplePreparableReloadListener<ShaderManager.
 	public void close() {
 		this.compilationCache.close();
 		this.postChainProjectionMatrixBuffer.close();
+	}
+
+	/** Releases Java post-chain resources when Rust Vulkan takes ownership late. */
+	public void ensureRustSemanticRoute() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+			this.compilationCache.close();
+			this.postChainProjectionMatrixBuffer.ensureRustSemanticRoute();
+		}
 	}
 
 	public String getShader(ResourceLocation resourceLocation, ShaderType shaderType) {

@@ -57,6 +57,7 @@ public class NameTagFeatureRenderer {
 
 	@Environment(EnvType.CLIENT)
 	public static class Storage {
+		private static final int MAX_RUST_SEMANTIC_SUBMITS = 4_096;
 		final List<SubmitNodeStorage.NameTagSubmit> nameTagSubmitsSeethrough = new ArrayList();
 		final List<SubmitNodeStorage.NameTagSubmit> nameTagSubmitsNormal = new ArrayList();
 
@@ -75,6 +76,15 @@ public class NameTagFeatureRenderer {
 
 		public void add(PoseStack poseStack, @Nullable Vec3 vec3, int i, Component component, boolean bl, int j, double d, CameraRenderState cameraRenderState) {
 			if (vec3 != null) {
+				int submitCount = bl ? 2 : 1;
+				if ((net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+					|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
+					&& totalSubmitCount() + submitCount > MAX_RUST_SEMANTIC_SUBMITS) {
+					throw new IllegalStateException(
+						"Rust whole-frame world-text route exceeded bounded name-tag submit capacity "
+							+ MAX_RUST_SEMANTIC_SUBMITS
+					);
+				}
 				Minecraft minecraft = Minecraft.getInstance();
 				poseStack.pushPose();
 				poseStack.translate(vec3.x, vec3.y + 0.5, vec3.z);

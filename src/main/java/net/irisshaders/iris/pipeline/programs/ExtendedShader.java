@@ -168,6 +168,10 @@ public class ExtendedShader extends GlProgram implements IrisProgram {
 
 	@Override
 	public void iris$setupState() {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris shader state is unavailable while Rust owns Vulkan rendering");
+		}
 		isSetup = true;
 		DepthColorStorage.unlockDepthColor();
 

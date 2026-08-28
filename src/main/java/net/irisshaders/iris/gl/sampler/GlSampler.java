@@ -16,7 +16,7 @@ public class GlSampler extends GlResource {
 	public static final GlSampler NEAREST = new GlSampler(false, false, false, false);
 	
 	public GlSampler(boolean linear, boolean mipmapped, boolean shadow, boolean hardwareShadow) {
-		super(IrisRenderSystem.genSampler());
+		super(requireJavaSamplerAllocation());
 
 		VulkanicTextureParameterValue baseFilter = linear
 			? VulkanicTextureParameterValue.LINEAR
@@ -40,6 +40,14 @@ public class GlSampler extends GlResource {
 				VulkanicTextureParameterValue.COMPARE_REF_TO_TEXTURE
 			);
 		}
+	}
+
+	private static int requireJavaSamplerAllocation() {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris sampler allocation is unavailable on the Rust Vulkan route");
+		}
+		return IrisRenderSystem.genSampler();
 	}
 
 	@Override

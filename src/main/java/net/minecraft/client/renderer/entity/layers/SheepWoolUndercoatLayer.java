@@ -30,8 +30,7 @@ public class SheepWoolUndercoatLayer extends RenderLayer<SheepRenderState, Sheep
 	public void submit(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, SheepRenderState sheepRenderState, float f, float g) {
 		if (!sheepRenderState.isInvisible && (sheepRenderState.isJebSheep || sheepRenderState.woolColor != DyeColor.WHITE)) {
 			EntityModel<SheepRenderState> entityModel = sheepRenderState.isBaby ? this.babyModel : this.adultModel;
-			if (!sheepRenderState.isBaby
-				&& net.vulkanic.world.WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan()
+			if (net.vulkanic.world.WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan()
 				&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMesh(
 					entityModel, sheepRenderState, poseStack.last(), RenderType.entityCutoutNoCull(SHEEP_WOOL_UNDERCOAT_LOCATION),
 					SHEEP_WOOL_UNDERCOAT_LOCATION, ResourceLocation.withDefaultNamespace("sheep_wool_undercoat"), i,

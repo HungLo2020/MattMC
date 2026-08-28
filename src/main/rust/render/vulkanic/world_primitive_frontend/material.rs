@@ -39,8 +39,9 @@ pub(super) fn validate_quad(
     }
     if !matches!(
         quad.source_program,
-        WORLD_MATERIAL_SOURCE_UNSPECIFIED
+            WORLD_MATERIAL_SOURCE_UNSPECIFIED
             | WORLD_MATERIAL_SOURCE_TEXTURED
+            | WORLD_MATERIAL_SOURCE_ENTITY_MODEL
             | WORLD_MATERIAL_SOURCE_PARTICLES
             | WORLD_MATERIAL_SOURCE_WEATHER
             | WORLD_MATERIAL_SOURCE_CLOUDS
@@ -63,6 +64,18 @@ pub(super) fn validate_quad(
                 "unknown world material source UV space {}",
                 quad.source_uv_space
             ),
+        ));
+    }
+    if quad.source_program == WORLD_MATERIAL_SOURCE_ENTITY_MODEL
+        && quad.source_uv_space != WORLD_MATERIAL_SOURCE_UV_LOCAL_TEXTURE
+    {
+        return Err(GalError::unsupported_feature(
+            "entity-model material quads require Rust-owned local texture UV semantics",
+        ));
+    }
+    if !source_program_supports_uv_space(quad.source_program, quad.source_uv_space) {
+        return Err(GalError::unsupported_feature(
+            "weather and cloud material quads require Rust-owned local texture UV semantics",
         ));
     }
     if !texture_supports_uv_space(quad.texture_id, quad.source_uv_space) {
@@ -153,10 +166,10 @@ pub(crate) fn canonical_texture_id(texture_id: u32) -> Option<u32> {
 /// The copied Minecraft atlas is a Rust-owned runtime asset, not a bundled
 /// standalone texture. It is admitted only with its original atlas UV space.
 pub(crate) fn is_runtime_mesh_texture_id(texture_id: u32) -> bool {
-    matches!(
-        texture_id,
-        WORLD_MESH_TEXTURE_TERRAIN_BLOCK_ATLAS | WORLD_MATERIAL_TEXTURE_PARTICLE_ATLAS
-    )
+	matches!(
+		texture_id,
+		WORLD_MESH_TEXTURE_TERRAIN_BLOCK_ATLAS | WORLD_MATERIAL_TEXTURE_PARTICLE_ATLAS
+	) || (texture_id & 0xf000_0000) == 0xf000_0000
 }
 
 pub(crate) fn texture_supports_uv_space(texture_id: u32, uv_space: u32) -> bool {
@@ -167,6 +180,13 @@ pub(crate) fn texture_supports_uv_space(texture_id: u32, uv_space: u32) -> bool 
         WORLD_MATERIAL_TEXTURE_PARTICLE_ATLAS => uv_space == WORLD_MATERIAL_SOURCE_UV_LOCAL_TEXTURE,
         _ => true,
     }
+}
+
+pub(crate) fn source_program_supports_uv_space(source_program: u32, uv_space: u32) -> bool {
+    !matches!(
+        source_program,
+        WORLD_MATERIAL_SOURCE_WEATHER | WORLD_MATERIAL_SOURCE_CLOUDS
+    ) || uv_space == WORLD_MATERIAL_SOURCE_UV_LOCAL_TEXTURE
 }
 
 pub(crate) fn material_matches_mode(material_id: u32, mode: u32) -> bool {
@@ -205,5 +225,13 @@ mod tests {
             WORLD_MATERIAL_TEXTURE_PARTICLE_ATLAS,
             WORLD_MATERIAL_SOURCE_UV_LOCAL_TEXTURE
         ));
+    }
+
+    #[test]
+    fn copied_resource_pack_texture_uses_only_reserved_runtime_namespace() {
+        let dynamic = 0xf123_4567;
+        assert_eq!(Some(dynamic), canonical_texture_id(dynamic));
+        assert!(texture_supports_uv_space(dynamic, WORLD_MATERIAL_SOURCE_UV_LOCAL_TEXTURE));
+        assert!(!is_known_texture_id(0xdead_beef));
     }
 }

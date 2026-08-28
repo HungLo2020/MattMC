@@ -14,14 +14,15 @@ import org.jetbrains.annotations.Nullable;
 @Environment(EnvType.CLIENT)
 public class PerspectiveProjectionMatrixBuffer implements AutoCloseable {
 	@Nullable
-	private final GpuBuffer buffer;
+	private GpuBuffer buffer;
 	@Nullable
 	private final GpuBufferSlice bufferSlice;
 	private final String label;
 
 	public PerspectiveProjectionMatrixBuffer(String string) {
 		this.label = "perspective:" + string;
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			this.buffer = null;
 			this.bufferSlice = null;
 			return;
@@ -33,7 +34,7 @@ public class PerspectiveProjectionMatrixBuffer implements AutoCloseable {
 
 	public GpuBufferSlice getBuffer(Matrix4f matrix4f) {
 		if (this.buffer == null || this.bufferSlice == null) {
-			throw new IllegalStateException("Java projection UBO rendering is unavailable while Rust owns whole-frame presentation");
+			throw new IllegalStateException("Java projection UBO rendering is unavailable on selected Vulkan");
 		}
 		try (MemoryStack memoryStack = MemoryStack.stackPush()) {
 			ByteBuffer byteBuffer = Std140Builder.onStack(memoryStack, RenderSystem.PROJECTION_MATRIX_UBO_SIZE).putMat4f(matrix4f).get();
@@ -47,6 +48,12 @@ public class PerspectiveProjectionMatrixBuffer implements AutoCloseable {
 	public void close() {
 		if (this.buffer != null) {
 			this.buffer.close();
+			this.buffer = null;
 		}
+	}
+
+	public void ensureRustSemanticRoute() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) this.close();
 	}
 }

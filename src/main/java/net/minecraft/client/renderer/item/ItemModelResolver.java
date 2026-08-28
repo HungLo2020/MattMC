@@ -60,7 +60,8 @@ public class ItemModelResolver {
 	) {
 		// Iris display-item context is compatibility metadata only. Rust semantic
 		// item extraction must not publish into that runtime state.
-		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
 			if (itemStack != null) {
 				((net.irisshaders.iris.mixinterface.ItemContextState) itemStackRenderState).setDisplayItem(itemStack.getItem(), itemStack.get(DataComponents.ITEM_MODEL));
 			} else {

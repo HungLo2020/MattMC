@@ -47,7 +47,7 @@ public class ChestSpecialRenderer implements NoDataSpecialModelRenderer {
 
 	@Override
 	public void submit(ItemDisplayContext itemDisplayContext, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, int j, boolean bl, int k) {
-		submitNodeCollector.submitModel(
+		submitNodeCollector.submitModelSemantic(
 			this.model, this.openness, poseStack, this.material.renderType(RenderType::entitySolid), i, j, -1, this.materials.get(this.material), k, null
 		);
 	}

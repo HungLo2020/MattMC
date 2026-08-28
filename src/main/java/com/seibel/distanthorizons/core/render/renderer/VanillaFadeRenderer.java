@@ -112,7 +112,8 @@ public class VanillaFadeRenderer
 	
 	public void render(Mat4f mcModelViewMatrix, Mat4f mcProjectionMatrix, float partialTicks, IClientLevelWrapper level)
 	{
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+				|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected())
 		{
 			throw new IllegalStateException("Java Distant Horizons vanilla fade rendering is unavailable while Rust owns whole-frame presentation");
 		}

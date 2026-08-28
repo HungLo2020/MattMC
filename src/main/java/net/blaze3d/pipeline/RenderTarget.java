@@ -72,6 +72,17 @@ public abstract class RenderTarget implements net.irisshaders.iris.targets.Blaze
 		}
 	}
 
+	/** Releases compatibility attachments if Rust Vulkan ownership begins after target construction. */
+	public void ensureRustSemanticRoute() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+			if (this.colorTexture != null || this.colorTextureView != null
+				|| this.depthTexture != null || this.depthTextureView != null) {
+				this.destroyBuffers();
+			}
+		}
+	}
+
 	public void copyDepthFrom(RenderTarget renderTarget) {
 		rejectRustWholeFrameOperation("depth-copy");
 		RenderSystem.assertOnRenderThread();
@@ -90,7 +101,8 @@ public abstract class RenderTarget implements net.irisshaders.iris.targets.Blaze
 		if (i > 0 && i <= k && j > 0 && j <= k) {
 			this.width = i;
 			this.height = j;
-			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 				// Rust owns the acquired color/depth attachments and presentation
 				// target. Keep dimensions for semantic extraction and layout, but do
 				// not allocate a second Java Vulkan framebuffer.
@@ -132,6 +144,9 @@ public abstract class RenderTarget implements net.irisshaders.iris.targets.Blaze
 		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			throw new IllegalStateException("Java RenderTarget presentation is unavailable while Rust owns whole-frame presentation");
 		}
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+			throw new IllegalStateException("Java Vulkan RenderTarget presentation is unavailable until the Rust whole-frame presenter is admitted");
+		}
 		if (this.colorTexture == null) {
 			throw new IllegalStateException("Can't blit to screen, color texture doesn't exist yet");
 		} else {
@@ -153,9 +168,10 @@ public abstract class RenderTarget implements net.irisshaders.iris.targets.Blaze
 	}
 
 	private static void rejectRustWholeFrameOperation(String operation) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
 			throw new IllegalStateException(
-				"Java RenderTarget " + operation + " is unavailable while Rust owns whole-frame presentation"
+				"Java Vulkan RenderTarget " + operation + " is unavailable; Rust owns the selected Vulkan route"
 			);
 		}
 	}

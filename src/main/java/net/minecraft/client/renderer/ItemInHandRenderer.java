@@ -162,7 +162,13 @@ public class ItemInHandRenderer {
 				);
 			WorldRenderRoutePolicy.Route firstPersonRoute = itemDisplayContext.firstPerson()
 				? WorldRenderRoutePolicy.currentFirstPersonItemOwnershipRoute()
-				: WorldRenderRoutePolicy.Route.JAVA_COMPATIBILITY;
+				// ItemInHandRenderer is a first-person callsite. A non-first-person
+				// context may be supplied by an extension, but selected Vulkan must
+				// never turn that unexpected context into a Java item draw.
+				: (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+					|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+					? WorldRenderRoutePolicy.Route.DISABLED
+					: WorldRenderRoutePolicy.Route.JAVA_COMPATIBILITY);
 			boolean rustSubmitted = RustGalWorldPrimitiveRenderer.enqueueFirstPersonItemMesh(
 				poseStack.last(), itemStackRenderState, itemStack, i, mainHand,
 				firstPersonRoute.usesRustWholeFrameVulkan()
@@ -191,7 +197,8 @@ public class ItemInHandRenderer {
 				rustSubmitted,
 				firstPersonRoute.usesRustWholeFrameVulkan()
 			);
-			if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			if ((net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+					|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
 				&& firstPersonRoute == WorldRenderRoutePolicy.Route.DISABLED
 				&& !rustSubmitted) {
 				RustGalWorldPrimitiveRenderer.recordUnsupportedFirstPersonItem();
@@ -323,14 +330,15 @@ public class ItemInHandRenderer {
 		float[] mapBackgroundVertices = {-7.0F, 135.0F, 0.0F, 135.0F, 135.0F, 0.0F, 135.0F, -7.0F, 0.0F, -7.0F, -7.0F, 0.0F};
 		float[] mapBackgroundUvs = {0.0F, 1.0F, 1.0F, 1.0F, 1.0F, 0.0F, 0.0F, 0.0F};
 		ResourceLocation mapBackgroundTexture = mapItemSavedData == null ? MAP_BACKGROUND_TEXTURE : MAP_CHECKERBOARD_TEXTURE;
-		if (!submitNodeCollector.submitTexturedQuad(poseStack, renderType, mapBackgroundTexture, mapBackgroundVertices, mapBackgroundUvs, -1, i)) {
-			if (net.vulkanic.world.WorldRenderRoutePolicy.currentTexturedBillboardRoute().usesRustWholeFrameVulkan()) {
+		if (!submitNodeCollector.submitTranslucentTexturedQuadSemantic(poseStack, renderType, mapBackgroundTexture, mapBackgroundVertices, mapBackgroundUvs, -1, i)) {
+			if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+				|| net.vulkanic.world.WorldRenderRoutePolicy.currentTexturedBillboardRoute().usesRustWholeFrameVulkan()) {
 				throw new IllegalStateException("Rust whole-frame first-person map route rejected semantic background quad");
 			}
 			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 				throw new IllegalStateException("Rust whole-frame first-person map route is unavailable; Java map geometry is not a fallback");
 			}
-			submitNodeCollector.submitCustomGeometry(poseStack, renderType, (pose, vertexConsumer) -> {
+			submitNodeCollector.submitCustomGeometrySemantic(poseStack, renderType, (pose, vertexConsumer) -> {
 				vertexConsumer.addVertex(pose, -7.0F, 135.0F, 0.0F).setColor(-1).setUv(0.0F, 1.0F).setLight(i);
 				vertexConsumer.addVertex(pose, 135.0F, 135.0F, 0.0F).setColor(-1).setUv(1.0F, 1.0F).setLight(i);
 				vertexConsumer.addVertex(pose, 135.0F, -7.0F, 0.0F).setColor(-1).setUv(1.0F, 0.0F).setLight(i);
@@ -430,8 +438,9 @@ public class ItemInHandRenderer {
 	}
 
 	public void renderHandsWithItems(float f, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, LocalPlayer localPlayer, int i) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			throw new IllegalStateException("Java first-person hand rendering is unavailable while Rust owns whole-frame presentation");
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+			throw new IllegalStateException("Java first-person hand rendering is unavailable while Rust owns whole-frame presentation or Vulkan is selected");
 		}
 		float g = localPlayer.getAttackAnim(f);
 		InteractionHand interactionHand = MoreObjects.firstNonNull(localPlayer.swingingArm, InteractionHand.MAIN_HAND);
@@ -543,9 +552,13 @@ public class ItemInHandRenderer {
 		int j
 	) {
 		// Iris: Skip translucent hands in solid pass and vice versa
-		boolean rustWholeFrame = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+		boolean rustWholeFrame = (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
 			&& net.vulkanic.world.WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan();
 		boolean rustPresentation = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
+		if ((net.vulkanic.VulkanicAPI.isVulkanBackendSelected() || rustPresentation) && !rustWholeFrame) {
+			throw new IllegalStateException("Rust Vulkan first-person item route is unavailable; Java hand geometry is not a fallback");
+		}
 		if (!rustPresentation && !rustWholeFrame && net.irisshaders.iris.Iris.isPackInUseQuick() && net.irisshaders.iris.pathways.HandRenderer.INSTANCE.isActive()) {
 			if (net.irisshaders.iris.pathways.HandRenderer.INSTANCE.isRenderingSolid() && 
 				net.irisshaders.iris.pathways.HandRenderer.INSTANCE.isHandTranslucent(interactionHand)) {

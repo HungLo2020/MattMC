@@ -11,6 +11,10 @@ import net.minecraft.util.ARGB;
 public class GLUtils {
     public static void readTextureContentsToBufferedImage(GpuTexture gpuTexture, Consumer<BufferedImage> resultConsumer) {
         RenderSystem.assertOnRenderThread();
+        if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+                || net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+            throw new IllegalStateException("Java VoxelMap texture readback is unavailable on the Rust Vulkan route");
+        }
         int bytePerPixel = gpuTexture.getFormat().pixelSize();
         int width = gpuTexture.getWidth(0);
         int height = gpuTexture.getHeight(0);

@@ -76,17 +76,18 @@ public class ItemFrameRenderer<T extends ItemFrame> extends EntityRenderer<T, It
 			BlockStateModel blockStateModel = this.blockRenderer.getBlockModel(blockState);
 			poseStack.pushPose();
 			poseStack.translate(-0.5F, -0.5F, -0.5F);
-			if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			if ((net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+					|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
 				&& net.vulkanic.world.WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()) {
 				// The Rust block-display producer owns copied quads and texture
 				// identities; do not leave this ordinary frame backing in the Java
 				// block-model storage that the whole-frame route never replays.
-				submitNodeCollector.submitBlockDisplay(
+				submitNodeCollector.submitBlockDisplaySemantic(
 					poseStack, blockState, itemFrameRenderState.lightCoords,
 					OverlayTexture.NO_OVERLAY, itemFrameRenderState.outlineColor
 				);
 			} else {
-				submitNodeCollector.submitBlockModel(
+				submitNodeCollector.submitBlockModelSemantic(
 					poseStack,
 					RenderType.entitySolidZOffsetForward(TextureAtlas.LOCATION_BLOCKS),
 					blockStateModel,
@@ -121,7 +122,18 @@ public class ItemFrameRenderer<T extends ItemFrame> extends EntityRenderer<T, It
 			poseStack.mulPose(Axis.ZP.rotationDegrees(itemFrameRenderState.rotation * 360.0F / 8.0F));
 			int i = this.getLightCoords(itemFrameRenderState.isGlowFrame, 15728880, itemFrameRenderState.lightCoords);
 			poseStack.scale(0.5F, 0.5F, 0.5F);
-			itemFrameRenderState.item.submit(poseStack, submitNodeCollector, i, OverlayTexture.NO_OVERLAY, itemFrameRenderState.outlineColor);
+			net.vulkanic.world.RustGalWorldPrimitiveRenderer.beginItemEntitySubmission();
+			try {
+				itemFrameRenderState.item.submit(
+					poseStack,
+					submitNodeCollector,
+					i,
+					OverlayTexture.NO_OVERLAY,
+					itemFrameRenderState.outlineColor
+				);
+			} finally {
+				net.vulkanic.world.RustGalWorldPrimitiveRenderer.endItemEntitySubmission();
+			}
 		}
 
 		poseStack.popPose();

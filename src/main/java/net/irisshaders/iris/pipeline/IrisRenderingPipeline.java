@@ -199,6 +199,12 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 	private final boolean supportsEndFlash;
 
 	public IrisRenderingPipeline(ProgramSet programSet) {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException(
+				"Java Iris shader-pack pipeline construction is unavailable while Rust owns Vulkan presentation"
+			);
+		}
 		ShaderPrinter.resetPrintState();
 
 		this.shouldRenderUnderwaterOverlay = programSet.getPackDirectives().underwaterOverlay();
@@ -860,6 +866,7 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			throw new IllegalStateException("Java Iris level begin/clear passes are unavailable while Rust owns whole-frame presentation");
 		}
+		rejectSelectedVulkanJavaPass("level begin/clear");
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("iris.begin-level");
 		try {
 		isRenderingWorld = true;
@@ -1022,6 +1029,7 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			throw new IllegalStateException("Java Iris shadow rendering is unavailable while Rust owns whole-frame presentation");
 		}
+		rejectSelectedVulkanJavaPass("shadow rendering");
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("iris.shadows");
 		try {
 		if (shadowRenderer != null) {
@@ -1054,6 +1062,7 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			throw new IllegalStateException("Java Iris depth-copy hand prepass is unavailable while Rust owns whole-frame presentation");
 		}
+		rejectSelectedVulkanJavaPass("depth-copy hand prepass");
 		centerDepthSampler.sampleCenterDepth();
 
 		// We need to copy the current depth texture so that depthtex2 can contain the depth values for
@@ -1066,6 +1075,7 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			throw new IllegalStateException("Java Iris deferred rendering is unavailable while Rust owns whole-frame presentation");
 		}
+		rejectSelectedVulkanJavaPass("deferred rendering");
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("iris.deferred-translucents");
 		try {
 		if (destroyed) {
@@ -1104,6 +1114,7 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			throw new IllegalStateException("Java Iris composite/final rendering is unavailable while Rust owns whole-frame presentation");
 		}
+		rejectSelectedVulkanJavaPass("composite/final rendering");
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("iris.composite-final");
 		try {
 		isRenderingWorld = false;
@@ -1121,6 +1132,7 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			throw new IllegalStateException("Java Iris color-space post-processing is unavailable while Rust owns whole-frame presentation");
 		}
+		rejectSelectedVulkanJavaPass("color-space post-processing");
 		colorSpaceConverter.process(Minecraft.getInstance().getMainRenderTarget().getColorTexture());
 	}
 
@@ -1225,6 +1237,14 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 	@Override
 	public void destroy() {
 		destroyed = true;
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			// Rust owns shader-pack resources, synchronization, and presentation on
+			// this route. Stale Java Iris objects may still be present after a
+			// reload, but must not unbind texture units, touch the default
+			// framebuffer, or invoke Java GL destruction callbacks.
+			return;
+		}
 
 		destroyShaders();
 
@@ -1324,6 +1344,7 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			throw new IllegalStateException("Java Iris sky clear/horizon rendering is unavailable while Rust owns whole-frame presentation");
 		}
+		rejectSelectedVulkanJavaPass("sky clear/horizon rendering");
 		setPhase(WorldRenderingPhase.SKY);
 
 		// Render our horizon box before actual sky rendering to avoid being broken by mods that do weird things
@@ -1406,6 +1427,7 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			throw new IllegalStateException("Java Iris default framebuffer binding is unavailable while Rust owns whole-frame presentation");
 		}
+		rejectSelectedVulkanJavaPass("default framebuffer binding");
 		if (isBeforeTranslucent) {
 			defaultFB.bind();
 		} else {
@@ -1418,6 +1440,7 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			throw new IllegalStateException("Java Iris sky render-pass creation is unavailable while Rust owns whole-frame presentation");
 		}
+		rejectSelectedVulkanJavaPass("sky render-pass creation");
 		GlFramebuffer framebuffer = isBeforeTranslucent ? defaultFB : defaultFBAlt;
 		if (USE_IRIS_SKY_RENDER_TARGET_CONTRACT && VulkanicAPI.isVulkanBackendSelected() && !VulkanicAPI.getCommandContext().isImmediate()) {
 			return VulkanicAPI.createRenderPass(framebuffer.createRenderTargetDescriptor(label, renderTargets.getCurrentWidth(), renderTargets.getCurrentHeight(), includeDepth));
@@ -1434,7 +1457,15 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			throw new IllegalStateException("Java Iris shadow framebuffer binding is unavailable while Rust owns whole-frame presentation");
 		}
+		rejectSelectedVulkanJavaPass("shadow framebuffer binding");
 		defaultFBShadow.bind();
+	}
+
+	private static void rejectSelectedVulkanJavaPass(String operation) {
+		if (VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris Vulkan " + operation + " is unavailable until the Rust whole-frame route is admitted");
+		}
 	}
 
 	private void traceColortex0Phase(String phase) {

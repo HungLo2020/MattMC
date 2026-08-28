@@ -27,7 +27,7 @@ public final class LivingEntityBaseModelOwnershipPolicy {
 		return selectOwnership(
 			migratedFamily,
 			vulkanBackendSelected,
-			RustGalVulkanWholeFrameMode.enabledForBackend(vulkanBackendSelected),
+			RustGalVulkanWholeFrameMode.enabled(),
 			Boolean.getBoolean("mattmc.dev.rustGalWorldModelMesh.disabled"),
 			Boolean.getBoolean("mattmc.dev.rustGalWorldModelMesh.legacyControl")
 		);
@@ -63,7 +63,7 @@ public final class LivingEntityBaseModelOwnershipPolicy {
 				? WorldRenderRoutePolicy.Route.DISABLED
 				: WorldRenderRoutePolicy.Route.JAVA_COMPATIBILITY;
 		}
-		return vulkanBackendSelected && wholeFrameVulkanEnabled
+		return wholeFrameVulkanEnabled
 			? WorldRenderRoutePolicy.Route.RUST_VULKAN_WHOLE_FRAME
 			: vulkanBackendSelected
 				? WorldRenderRoutePolicy.Route.DISABLED

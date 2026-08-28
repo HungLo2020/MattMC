@@ -42,6 +42,7 @@ public class RenderTargets {
 	private boolean destroyed;
 
 	public RenderTargets(int width, int height, GpuTexture depthTexture, int depthBufferVersion, DepthBufferFormat depthFormat, Map<Integer, PackRenderTargetDirectives.RenderTargetSettings> renderTargets, PackDirectives packDirectives) {
+		ensureJavaRenderTargetsAvailable();
 		targets = new RenderTarget[renderTargets.size()];
 
 		targetSettingsMap = renderTargets;
@@ -153,6 +154,7 @@ public class RenderTargets {
 	}
 
 	public boolean resizeIfNeeded(int newDepthBufferVersion, GpuTexture newDepthTextureId, int newWidth, int newHeight, DepthBufferFormat newDepthFormat, PackDirectives packDirectives) {
+		ensureJavaRenderTargetsAvailable();
 		boolean recreateDepth = false;
 		if (cachedDepthBufferVersion != newDepthBufferVersion) {
 			recreateDepth = true;
@@ -218,6 +220,13 @@ public class RenderTargets {
 		}
 
 		return sizeChanged;
+	}
+
+	private static void ensureJavaRenderTargetsAvailable() {
+		if (VulkanicAPI.isVulkanBackendSelected()
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris render-target resources are unavailable on the Rust Vulkan route");
+		}
 	}
 
 	private static TextureFormat snapshotDepthFormat(DepthBufferFormat sourceDepthFormat) {

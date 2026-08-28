@@ -33,15 +33,17 @@ public class DragonFireballRenderer extends EntityRenderer<DragonFireball, Entit
 		poseStack.mulPose(cameraRenderState.orientation);
 		float[] vertices = {-0.5F, -0.25F, 0.0F, 0.5F, -0.25F, 0.0F, 0.5F, 0.75F, 0.0F, -0.5F, 0.75F, 0.0F};
 		float[] uvs = {0.0F, 1.0F, 1.0F, 1.0F, 1.0F, 0.0F, 0.0F, 0.0F};
-		if (submitNodeCollector.submitTexturedQuad(poseStack, RENDER_TYPE, TEXTURE_LOCATION, vertices, uvs, -1, entityRenderState.lightCoords)) {
+		if (submitNodeCollector.submitTranslucentTexturedQuadSemantic(poseStack, RENDER_TYPE, TEXTURE_LOCATION, vertices, uvs, -1, entityRenderState.lightCoords)) {
 			poseStack.popPose();
 			super.submit(entityRenderState, poseStack, submitNodeCollector, cameraRenderState);
 			return;
 		}
-		if (net.vulkanic.world.WorldRenderRoutePolicy.currentTexturedBillboardRoute().usesRustWholeFrameVulkan()) {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.world.WorldRenderRoutePolicy.currentTexturedBillboardRoute().usesRustWholeFrameVulkan()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			throw new IllegalStateException("Rust whole-frame dragon-fireball route rejected semantic billboard");
 		}
-		submitNodeCollector.submitCustomGeometry(poseStack, RENDER_TYPE, (pose, vertexConsumer) -> {
+		submitNodeCollector.submitCustomGeometrySemantic(poseStack, RENDER_TYPE, (pose, vertexConsumer) -> {
 			vertex(vertexConsumer, pose, entityRenderState.lightCoords, 0.0F, 0, 0, 1);
 			vertex(vertexConsumer, pose, entityRenderState.lightCoords, 1.0F, 0, 1, 1);
 			vertex(vertexConsumer, pose, entityRenderState.lightCoords, 1.0F, 1, 1, 0);

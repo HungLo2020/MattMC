@@ -11,6 +11,7 @@ import net.minecraft.client.gui.font.TextGlyphQuad;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.LightTexture;
 import net.vulkanic.gui.RustGalGuiRawImageAssets;
 import net.minecraft.client.renderer.SubmitNodeStorage;
 import net.minecraft.client.renderer.feature.NameTagFeatureRenderer;
@@ -27,8 +28,16 @@ import net.vulkanic.bridge.VulkanicGalBridge;
  */
 public final class WorldTextSemanticCollector {
 	private static final int MAX_SEMANTIC_GLYPHS_PER_SUBMIT = 8_192;
+	/** Bounds submit metadata before sorting or preparing glyphs. */
+	private static final int MAX_SEMANTIC_SUBMITS_PER_COLLECTION = 8_192;
+	/** Must match Rust's whole-frame world-text quad admission bound. */
+	private static final int MAX_SEMANTIC_QUADS_PER_COLLECTION = 65_536;
+	/** Must match Rust's bounded world-text image residency. */
+	private static final int MAX_SEMANTIC_IMAGES_PER_COLLECTION = 4_096;
 	/** Must match Rust's world-text image pixel bound. */
 	private static final int MAX_SEMANTIC_ATLAS_BYTES = 4 * 1024 * 1024;
+	/** Must match Rust's aggregate world-text image residency bound. */
+	private static final long MAX_SEMANTIC_ATLAS_BYTES_TOTAL = 64L * 1024 * 1024;
 	public static final int DEPTH_SEE_THROUGH = 1;
 	public static final int DEPTH_NORMAL = 2;
 	public static final int DEPTH_POLYGON_OFFSET = 3;
@@ -36,16 +45,42 @@ public final class WorldTextSemanticCollector {
 	private WorldTextSemanticCollector() {
 	}
 
+	private static void appendBoundedGlyph(List<TextGlyphQuad> glyphs, TextGlyphQuad glyph) {
+		if (glyphs.size() >= MAX_SEMANTIC_GLYPHS_PER_SUBMIT) {
+			throw new SemanticGlyphLimitExceeded();
+		}
+		glyphs.add(glyph);
+	}
+
+	private static final class SemanticGlyphLimitExceeded extends RuntimeException {
+		private SemanticGlyphLimitExceeded() {
+		}
+	}
+
 	public static Result collectNameTags(NameTagFeatureRenderer.Storage.SemanticSnapshot snapshot, Font font) {
+		if (snapshot == null
+			|| font == null
+			|| snapshot.seeThrough().size() > MAX_SEMANTIC_SUBMITS_PER_COLLECTION
+			|| snapshot.normal().size() > MAX_SEMANTIC_SUBMITS_PER_COLLECTION) {
+			return new Result(List.of(), List.of(), 1);
+		}
 		List<WorldTextQuad> quads = new ArrayList<>();
 		LinkedHashMap<Long, WorldTextImage> images = new LinkedHashMap<>();
 		int unsupportedSubmits = 0;
 		for (SubmitNodeStorage.NameTagSubmit submit : snapshot.seeThrough().stream()
-			.sorted(Comparator.comparing(SubmitNodeStorage.NameTagSubmit::distanceToCameraSq).reversed())
+			.sorted(Comparator.nullsLast(Comparator.comparing(SubmitNodeStorage.NameTagSubmit::distanceToCameraSq).reversed()))
 			.toList()) {
+			if (submit == null || submit.text() == null || submit.pose() == null) {
+				unsupportedSubmits++;
+				continue;
+			}
 			unsupportedSubmits += collect(submit, DEPTH_SEE_THROUGH, 0, font, quads, images);
 		}
 		for (SubmitNodeStorage.NameTagSubmit submit : snapshot.normal()) {
+			if (submit == null || submit.text() == null || submit.pose() == null) {
+				unsupportedSubmits++;
+				continue;
+			}
 			unsupportedSubmits += collect(submit, DEPTH_NORMAL, 0, font, quads, images);
 		}
 		return new Result(List.copyOf(quads), List.copyOf(images.values()), unsupportedSubmits);
@@ -58,15 +93,26 @@ public final class WorldTextSemanticCollector {
 	 * font draw or backend texture state crosses the route boundary.
 	 */
 	public static Result collectTextSubmits(List<SubmitNodeStorage.TextSubmit> submits, Font font) {
+		if (submits == null || font == null || submits.size() > MAX_SEMANTIC_SUBMITS_PER_COLLECTION) {
+			return new Result(List.of(), List.of(), 1);
+		}
 		List<WorldTextQuad> quads = new ArrayList<>();
 		LinkedHashMap<Long, WorldTextImage> images = new LinkedHashMap<>();
 		int unsupportedSubmits = 0;
 		for (SubmitNodeStorage.TextSubmit submit : submits) {
+			if (submit == null || submit.string() == null || submit.displayMode() == null || submit.pose() == null) {
+				unsupportedSubmits++;
+				continue;
+			}
+			if (quads.size() >= MAX_SEMANTIC_QUADS_PER_COLLECTION) {
+				unsupportedSubmits++;
+				break;
+			}
 			int depthPolicy = textSubmitDepthPolicy(submit);
 			unsupportedSubmits += collect(
 				submit.string(), submit.x(), submit.y(), submit.color(), submit.dropShadow(),
 				submit.backgroundColor(), submit.lightCoords(), 0.0, submit.pose(), depthPolicy,
-				submit.outlineColor(), font, quads, images
+				submit.outlineColor(), submit.blockEntityId(), font, quads, images
 			);
 		}
 		return new Result(List.copyOf(quads), List.copyOf(images.values()), unsupportedSubmits);
@@ -92,19 +138,27 @@ public final class WorldTextSemanticCollector {
 		return collect(
 			submit.text().getVisualOrderText(), submit.x(), submit.y(), submit.color(), false,
 			 submit.backgroundColor(), submit.lightCoords(), submit.distanceToCameraSq(), submit.pose(), depthPolicy,
-			outlineColor, font, output, images
+			outlineColor, -1, font, output, images
 		);
 	}
 
 	private static int collect(
 		net.minecraft.util.FormattedCharSequence text, float x, float y, int color, boolean dropShadow,
 		int backgroundColor, int packedLight, double distanceToCameraSq, org.joml.Matrix4f pose,
-		int depthPolicy, int outlineColor, Font font, List<WorldTextQuad> output, LinkedHashMap<Long, WorldTextImage> images
+		int depthPolicy, int outlineColor, int blockEntityId, Font font, List<WorldTextQuad> output, LinkedHashMap<Long, WorldTextImage> images
 	) {
-		List<TextGlyphQuad> glyphs = new ArrayList<>();
-		Font.SemanticTextExtraction extraction = font
-			.prepareText(text, x, y, color, dropShadow, backgroundColor)
-			.collectSemanticQuads(glyphs::add);
+		if (font == null || pose == null || !finiteMatrix(pose) || !Double.isFinite(distanceToCameraSq)) {
+			return 1;
+		}
+		List<TextGlyphQuad> glyphs = new ArrayList<>(Math.min(MAX_SEMANTIC_GLYPHS_PER_SUBMIT, 128));
+		Font.SemanticTextExtraction extraction;
+		try {
+			extraction = font
+				.prepareText(text, x, y, color, dropShadow, backgroundColor)
+				.collectSemanticQuads(glyph -> appendBoundedGlyph(glyphs, glyph));
+		} catch (SemanticGlyphLimitExceeded limit) {
+			return 1;
+		}
 		if (extraction.unsupportedRenderableCount() != 0) {
 			return 1;
 		}
@@ -112,7 +166,15 @@ public final class WorldTextSemanticCollector {
 		if (glyphs.size() > MAX_SEMANTIC_GLYPHS_PER_SUBMIT / glyphMultiplier) {
 			return 1;
 		}
+		if ((long) output.size() + (long) glyphs.size() * glyphMultiplier > MAX_SEMANTIC_QUADS_PER_COLLECTION) {
+			return 1;
+		}
+		LightTexture lightTexture = Minecraft.getInstance().gameRenderer.lightTexture();
+		// Account residency without invoking the defensive-copy accessor; world
+		// text collections can contain many glyphs sharing one atlas snapshot.
+		long imageBytesTotal = images.values().stream().mapToLong(WorldTextImage::pixelByteCount).sum();
 		for (TextGlyphQuad glyph : glyphs) {
+			int semanticColor = lightTexture.rustSemanticPackedLightColor(packedLight, glyph.colorArgb());
 			FontTexture.SemanticAtlasSnapshot atlas = FontTexture.semanticAtlasSnapshot(glyph.atlasIdentity());
 			String imageIdentity = glyph.atlasIdentity();
 			long imageGeneration;
@@ -156,21 +218,54 @@ public final class WorldTextSemanticCollector {
 				return 1;
 			}
 			long assetId = semanticAssetId(imageIdentity, imageColored);
+			WorldTextImage previous = images.get(assetId);
+			if (previous != null) {
+				if (!previous.matchesGeneration(imageGeneration, imageRevision, imageColored, imageWidth, imageHeight)) {
+					return 1;
+				}
+				// The atlas is already owned by this collection. Avoid constructing a
+				// defensive-copy record for every glyph that references it.
+				if (outlineColor != 0) {
+					for (int dx = -1; dx <= 1; dx++) {
+						for (int dy = -1; dy <= 1; dy++) {
+							if (dx == 0 && dy == 0) continue;
+							output.add(new WorldTextQuad(
+								glyph.atlasIdentity(), imageGeneration, imageRevision, imageColored, depthPolicy,
+								packedLight, lightTexture.rustSemanticPackedLightColor(packedLight, outlineColor),
+								distanceToCameraSq, matrixValues(pose), blockEntityId,
+								shiftGlyph(glyph, dx, dy, outlineColor)
+							));
+						}
+					}
+				}
+				output.add(new WorldTextQuad(
+					glyph.atlasIdentity(), imageGeneration, imageRevision, imageColored, depthPolicy,
+					packedLight, semanticColor, distanceToCameraSq, matrixValues(pose), blockEntityId, glyph
+				));
+				continue;
+			}
 			WorldTextImage image = new WorldTextImage(
 				assetId, imageIdentity, imageGeneration, imageRevision, imageColored,
 				imageWidth, imageHeight, atlasPixels
 			);
-			WorldTextImage previous = images.putIfAbsent(assetId, image);
-			if (previous != null && !previous.matchesGeneration(image)) {
+			if (imageBytesTotal + atlasPixels.length > MAX_SEMANTIC_ATLAS_BYTES_TOTAL) {
+				images.remove(assetId);
 				return 1;
 			}
+			if (images.size() >= MAX_SEMANTIC_IMAGES_PER_COLLECTION) {
+				images.remove(assetId);
+				return 1;
+			}
+			images.put(assetId, image);
+			imageBytesTotal += atlasPixels.length;
 			if (outlineColor != 0) {
 				for (int dx = -1; dx <= 1; dx++) {
 					for (int dy = -1; dy <= 1; dy++) {
 						if (dx == 0 && dy == 0) continue;
 						output.add(new WorldTextQuad(
 							glyph.atlasIdentity(), imageGeneration, imageRevision, imageColored, depthPolicy,
-							packedLight, outlineColor, distanceToCameraSq, matrixValues(pose),
+							packedLight, lightTexture.rustSemanticPackedLightColor(packedLight, outlineColor),
+							distanceToCameraSq, matrixValues(pose), blockEntityId,
 							shiftGlyph(glyph, dx, dy, outlineColor)
 						));
 					}
@@ -178,7 +273,7 @@ public final class WorldTextSemanticCollector {
 			}
 			output.add(new WorldTextQuad(
 				glyph.atlasIdentity(), imageGeneration, imageRevision, imageColored, depthPolicy,
-				packedLight, glyph.colorArgb(), distanceToCameraSq, matrixValues(pose), glyph
+				packedLight, semanticColor, distanceToCameraSq, matrixValues(pose), blockEntityId, glyph
 			));
 		}
 		return 0;
@@ -206,7 +301,7 @@ public final class WorldTextSemanticCollector {
 
 	private static RustGalGuiRawImageAssets.SemanticRawImageSnapshot semanticRawImageSnapshot(String identity) {
 		try {
-			return RustGalGuiRawImageAssets.semanticSnapshot(ResourceLocation.parse(identity));
+			return RustGalGuiRawImageAssets.semanticSnapshotUnstaged(ResourceLocation.parse(identity));
 		} catch (RuntimeException error) {
 			return null;
 		}
@@ -241,6 +336,17 @@ public final class WorldTextSemanticCollector {
 		};
 	}
 
+	private static boolean finiteMatrix(org.joml.Matrix4f matrix) {
+		return Float.isFinite(matrix.m00()) && Float.isFinite(matrix.m01())
+			&& Float.isFinite(matrix.m02()) && Float.isFinite(matrix.m03())
+			&& Float.isFinite(matrix.m10()) && Float.isFinite(matrix.m11())
+			&& Float.isFinite(matrix.m12()) && Float.isFinite(matrix.m13())
+			&& Float.isFinite(matrix.m20()) && Float.isFinite(matrix.m21())
+			&& Float.isFinite(matrix.m22()) && Float.isFinite(matrix.m23())
+			&& Float.isFinite(matrix.m30()) && Float.isFinite(matrix.m31())
+			&& Float.isFinite(matrix.m32()) && Float.isFinite(matrix.m33());
+	}
+
 	public record Result(List<WorldTextQuad> quads, List<WorldTextImage> images, int unsupportedSubmits) {
 		public Result {
 			quads = List.copyOf(quads);
@@ -270,6 +376,15 @@ public final class WorldTextSemanticCollector {
 				|| width <= 0 || height <= 0) {
 				throw new IllegalArgumentException("invalid world text image semantics");
 			}
+			long expectedBytes;
+			try {
+				expectedBytes = Math.multiplyExact(Math.multiplyExact((long) width, (long) height), colored ? 4L : 1L);
+			} catch (ArithmeticException error) {
+				throw new IllegalArgumentException("world text image extent overflows RGBA byte count", error);
+			}
+			if (pixels.length != expectedBytes) {
+				throw new IllegalArgumentException("world text image must contain exactly width*height format bytes");
+			}
 			pixels = pixels.clone();
 		}
 
@@ -278,12 +393,21 @@ public final class WorldTextSemanticCollector {
 			return this.pixels.clone();
 		}
 
+		/** Internal bounded-residency accounting without cloning atlas pixels. */
+		private int pixelByteCount() {
+			return this.pixels.length;
+		}
+
 		boolean matchesGeneration(WorldTextImage other) {
-			return this.atlasGeneration == other.atlasGeneration
-				&& this.atlasRevision == other.atlasRevision
-				&& this.colored == other.colored
-				&& this.width == other.width
-				&& this.height == other.height;
+			return matchesGeneration(other.atlasGeneration, other.atlasRevision, other.colored, other.width, other.height);
+		}
+
+		boolean matchesGeneration(long generation, long revision, boolean colored, int width, int height) {
+			return this.atlasGeneration == generation
+				&& this.atlasRevision == revision
+				&& this.colored == colored
+				&& this.width == width
+				&& this.height == height;
 		}
 	}
 
@@ -297,8 +421,15 @@ public final class WorldTextSemanticCollector {
 		int colorArgb,
 		double distanceToCameraSq,
 		float[] modelViewMatrix,
+		int blockEntityId,
 		TextGlyphQuad glyph
 	) {
+		public WorldTextQuad(String atlasIdentity, long atlasGeneration, long atlasRevision, boolean colored,
+			int depthPolicy, int packedLight, int colorArgb, double distanceToCameraSq,
+			float[] modelViewMatrix, TextGlyphQuad glyph) {
+			this(atlasIdentity, atlasGeneration, atlasRevision, colored, depthPolicy, packedLight, colorArgb,
+				distanceToCameraSq, modelViewMatrix, -1, glyph);
+		}
 		public WorldTextQuad {
 			Objects.requireNonNull(atlasIdentity, "atlasIdentity");
 			Objects.requireNonNull(modelViewMatrix, "modelViewMatrix");
@@ -308,6 +439,9 @@ public final class WorldTextSemanticCollector {
 			}
 			if (depthPolicy != DEPTH_SEE_THROUGH && depthPolicy != DEPTH_NORMAL && depthPolicy != DEPTH_POLYGON_OFFSET) {
 				throw new IllegalArgumentException("unknown world text depth policy " + depthPolicy);
+			}
+			if (!Double.isFinite(distanceToCameraSq) || distanceToCameraSq < 0.0) {
+				throw new IllegalArgumentException("world text camera distance must be finite and non-negative");
 			}
 			if (modelViewMatrix.length != 16) {
 				throw new IllegalArgumentException("world text model-view matrix must contain 16 floats");
@@ -359,7 +493,8 @@ public final class WorldTextSemanticCollector {
 					this.glyph.u0(), this.glyph.v1(),
 					this.glyph.u1(), this.glyph.v1(),
 					this.glyph.u1(), this.glyph.v0()
-				}
+				},
+				this.blockEntityId
 			);
 		}
 	}

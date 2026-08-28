@@ -89,6 +89,7 @@ public class BufferBuilder implements VertexConsumer, BufferBuilderExtension, Bl
 		if (ImmediateState.skipExtension.get()
 			|| !ImmediateState.isRenderingLevel
 			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
 			|| !Iris.isPackInUseQuick()) {
 			return format;
 		}

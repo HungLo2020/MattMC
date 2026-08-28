@@ -30,6 +30,10 @@ public class TracyFrameCapture implements AutoCloseable {
 	private TracyFrameCapture.Status status = TracyFrameCapture.Status.WAITING_FOR_CAPTURE;
 
 	public TracyFrameCapture() {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Tracy frame capture is unavailable on selected Vulkan");
+		}
 		this.width = 320;
 		this.height = 180;
 		this.frameBuffer = net.vulkanic.VulkanicAPI.createTexture("Tracy Frame Capture", 10, TextureFormat.RGBA8, this.width, this.height, 1, 1);
@@ -64,8 +68,9 @@ public class TracyFrameCapture implements AutoCloseable {
 	}
 
 	public void capture(RenderTarget renderTarget) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			throw new IllegalStateException("Java Tracy frame capture is unavailable while Rust owns whole-frame presentation");
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Tracy frame capture is unavailable on selected Vulkan");
 		}
 		if (this.status == TracyFrameCapture.Status.WAITING_FOR_CAPTURE && !this.capturedThisFrame && renderTarget.getColorTexture() != null) {
 			this.capturedThisFrame = true;
@@ -90,8 +95,9 @@ public class TracyFrameCapture implements AutoCloseable {
 	}
 
 	public void upload() {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			throw new IllegalStateException("Java Tracy frame upload is unavailable while Rust owns whole-frame presentation");
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Tracy frame upload is unavailable on selected Vulkan");
 		}
 		if (this.status == TracyFrameCapture.Status.WAITING_FOR_UPLOAD) {
 			this.status = TracyFrameCapture.Status.WAITING_FOR_CAPTURE;

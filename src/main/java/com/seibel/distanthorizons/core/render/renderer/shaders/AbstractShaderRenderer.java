@@ -28,7 +28,8 @@ public abstract class AbstractShaderRenderer
 	
 	public void render(float partialTicks)
 	{
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
 		{
 			// DH's legacy shader objects record Java command-buffer work.  The
 			// selected Vulkan route supplies DH as copied semantic geometry and

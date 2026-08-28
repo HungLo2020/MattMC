@@ -758,7 +758,8 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 distance_to_camera_sq,
                 model_view_matrix,
                 positions,
-                uvs
+                uvs,
+                block_entity_id
             ]
         ),
         94 => layout!(
@@ -928,7 +929,8 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 vertex0_packed_light,
                 vertex1_packed_light,
                 vertex2_packed_light,
-                vertex3_packed_light
+                vertex3_packed_light,
+                block_entity_id
             ]
         ),
         60 => layout!(
@@ -986,7 +988,8 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 uv3_u,
                 uv3_v,
                 source_color_argb,
-                packed_light
+                packed_light,
+                block_entity_id
             ]
         ),
         64 => layout!(
@@ -1092,7 +1095,9 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 entity_id,
                 entity_color_argb,
                 transform,
-                outline_color_argb
+                outline_color_argb,
+                flags,
+                block_entity_id
             ]
         ),
         70 => layout!(

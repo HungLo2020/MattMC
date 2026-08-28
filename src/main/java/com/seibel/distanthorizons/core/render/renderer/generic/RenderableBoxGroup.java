@@ -31,7 +31,13 @@ public class RenderableBoxGroup
 
 		private static int createTrackedBufferId()
 		{
-			if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+					|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+				throw new IllegalStateException(
+					"Java Distant Horizons renderable-box buffers are unavailable while Rust owns whole-frame presentation");
+			}
+			if (!net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+					&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 				net.irisshaders.iris.gl.IrisRenderSystem.incrementTrackedBuffers();
 			}
 			return VulkanicAPI.createBuffer(VulkanicAPI.getCommandContext());
@@ -39,7 +45,15 @@ public class RenderableBoxGroup
 
 		private static void deleteTrackedBufferId(int bufferId)
 		{
-			if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			// A DH Java buffer can outlive the OpenGL compatibility route during a
+			// backend switch. Rust Vulkan owns a separate resource domain, so never
+			// pass the stale Java name through the VulkanicGAL deletion seam.
+			if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+					|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+				return;
+			}
+			if (!net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+					&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 				net.irisshaders.iris.gl.IrisRenderSystem.decrementTrackedBuffers();
 			}
 			VulkanicAPI.deleteBuffer(VulkanicAPI.getCommandContext(), bufferId);
@@ -252,6 +266,10 @@ public class RenderableBoxGroup
 		/** Does nothing if the vertex data is already up-to-date */
 		public void updateVertexAttributeData()
 		{
+			if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+					|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+				throw new IllegalStateException("Java DH box-group buffer uploads are unavailable on the Rust Vulkan route");
+			}
 			if (!this.vertexDataDirty)
 			{
 				return;

@@ -53,6 +53,12 @@ public class SectionCompiler {
 		Map<ChunkSectionLayer, BufferBuilder> map = new EnumMap(ChunkSectionLayer.class);
 		RandomSource randomSource = RandomSource.create();
 		List<BlockModelPart> list = new ObjectArrayList<>();
+		// Rust's whole-frame Vulkan terrain source performs the authoritative
+		// semantic block/fluid extraction.  The legacy compiler still runs for
+		// visibility and block-entity bookkeeping, but must not build a second
+		// Java terrain mesh that is discarded at the upload boundary.
+		boolean rustWholeFrameTerrain = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
 
 		for (BlockPos blockPos3 : BlockPos.betweenClosed(blockPos, blockPos2)) {
 			BlockState blockState = renderSectionRegion.getBlockState(blockPos3);
@@ -68,13 +74,13 @@ public class SectionCompiler {
 			}
 
 			FluidState fluidState = blockState.getFluidState();
-			if (!fluidState.isEmpty()) {
+			if (!rustWholeFrameTerrain && !fluidState.isEmpty()) {
 				ChunkSectionLayer chunkSectionLayer = ItemBlockRenderTypes.getRenderLayer(fluidState);
 				BufferBuilder bufferBuilder = this.getOrBeginLayer(map, sectionBufferBuilderPack, chunkSectionLayer);
 				this.blockRenderer.renderLiquid(blockPos3, renderSectionRegion, bufferBuilder, blockState, fluidState);
 			}
 
-			if (blockState.getRenderShape() == RenderShape.MODEL) {
+			if (!rustWholeFrameTerrain && blockState.getRenderShape() == RenderShape.MODEL) {
 				ChunkSectionLayer chunkSectionLayer = ItemBlockRenderTypes.getChunkRenderType(blockState);
 				BufferBuilder bufferBuilder = this.getOrBeginLayer(map, sectionBufferBuilderPack, chunkSectionLayer);
 				randomSource.setSeed(blockState.getSeed(blockPos3));

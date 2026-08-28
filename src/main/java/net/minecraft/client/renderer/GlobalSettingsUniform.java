@@ -14,16 +14,22 @@ import org.lwjgl.system.MemoryStack;
 @Environment(EnvType.CLIENT)
 public class GlobalSettingsUniform implements AutoCloseable {
 	public static final int UBO_SIZE = new Std140SizeCalculator().putVec2().putFloat().putFloat().putInt().get();
-	private final GpuBuffer buffer;
+	private GpuBuffer buffer;
 
 	public GlobalSettingsUniform() {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			throw new IllegalStateException("Java global-settings UBO is unavailable while Rust owns whole-frame presentation");
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java global-settings UBO is unavailable on selected Vulkan");
 		}
 		this.buffer = net.vulkanic.VulkanicAPI.createBuffer(() -> "Global Settings UBO", 136, UBO_SIZE);
 	}
 
 	public void update(int i, int j, double d, long l, DeltaTracker deltaTracker, int k) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+			this.ensureRustSemanticRoute();
+			return;
+		}
 		try (MemoryStack memoryStack = MemoryStack.stackPush()) {
 			ByteBuffer byteBuffer = Std140Builder.onStack(memoryStack, UBO_SIZE)
 				.putVec2(i, j)
@@ -38,6 +44,14 @@ public class GlobalSettingsUniform implements AutoCloseable {
 	}
 
 	public void close() {
-		this.buffer.close();
+		if (this.buffer != null) {
+			this.buffer.close();
+			this.buffer = null;
+		}
+	}
+
+	public void ensureRustSemanticRoute() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) this.close();
 	}
 }

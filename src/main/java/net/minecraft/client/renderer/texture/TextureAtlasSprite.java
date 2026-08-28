@@ -66,6 +66,7 @@ public class TextureAtlasSprite implements TextureAtlasSpriteExtension {
 		return spriteTicker != null ? new TextureAtlasSprite.Ticker() {
 			@Override
 			public void tickAndUpload(GpuTexture gpuTexture) {
+				TextureAtlasSprite.this.rejectSelectedVulkanJavaUpload();
 				spriteTicker.tickAndUpload(TextureAtlasSprite.this.x, TextureAtlasSprite.this.y, gpuTexture);
 			}
 
@@ -118,7 +119,15 @@ public class TextureAtlasSprite implements TextureAtlasSpriteExtension {
 	}
 
 	public void uploadFirstFrame(GpuTexture gpuTexture) {
+		rejectSelectedVulkanJavaUpload();
 		this.contents.uploadFirstFrame(this.x, this.y, gpuTexture);
+	}
+
+	private void rejectSelectedVulkanJavaUpload() {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java texture-atlas sprite upload is unavailable while Rust owns Vulkan rendering");
+		}
 	}
 
 	private float atlasSize() {
@@ -142,6 +151,7 @@ public class TextureAtlasSprite implements TextureAtlasSpriteExtension {
 	}
 
 	public VertexConsumer wrap(VertexConsumer vertexConsumer) {
+		rejectSelectedVulkanJavaUpload();
 		// Call hooks when sprite wraps a vertex consumer
 		for (TextureAtlasSpriteHooks hook : HookRegistry.getTextureAtlasSpriteHooks()) {
 			hook.onSpriteWrap(this, vertexConsumer);

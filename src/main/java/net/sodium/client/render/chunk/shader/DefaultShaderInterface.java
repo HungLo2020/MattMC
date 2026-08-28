@@ -58,6 +58,7 @@ public class DefaultShaderInterface implements RenderPassChunkShaderInterface {
 	@SuppressWarnings("null")
     @Override // the shader interface should not modify pipeline state
     public void setupState(TerrainRenderPass pass, FogParameters parameters) {
+        ensureJavaSodiumShaderAvailable();
         this.bindTexture(ChunkShaderTextureSlot.BLOCK, pass.getAtlas());
         this.bindTexture(ChunkShaderTextureSlot.LIGHT, Minecraft.getInstance().gameRenderer.lightTexture().getTextureView());
 
@@ -121,8 +122,16 @@ public class DefaultShaderInterface implements RenderPassChunkShaderInterface {
 	@SuppressWarnings("null")
     @Override
     public void bindRenderPassResources(RenderPass renderPass, TerrainRenderPass pass) {
+        ensureJavaSodiumShaderAvailable();
         renderPass.bindSampler("u_BlockTex", Objects.requireNonNull(pass.getAtlas(), "chunk atlas view"));
         renderPass.bindSampler("u_LightTex", Objects.requireNonNull(Minecraft.getInstance().gameRenderer.lightTexture().getTextureView(), "light texture view"));
+    }
+
+    private static void ensureJavaSodiumShaderAvailable() {
+        if (VulkanicAPI.isVulkanBackendSelected()
+                || net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+            throw new IllegalStateException("Java Sodium shader state is unavailable on the Rust Vulkan route");
+        }
     }
 
     @Override

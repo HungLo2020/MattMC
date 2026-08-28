@@ -19,7 +19,7 @@ public class GlImage extends GlResource {
 	private final boolean clear;
 
 	public GlImage(String name, String samplerName, TextureType target, PixelFormat format, InternalTextureFormat internalFormat, PixelType pixelType, boolean clear, int width, int height, int depth) {
-		super(target.createTexture());
+		super(requireJavaTextureAllocation(target));
 
 		this.name = name;
 		this.samplerName = samplerName;
@@ -41,7 +41,16 @@ public class GlImage extends GlResource {
 		target.bindForSetup(0);
 	}
 
+	private static int requireJavaTextureAllocation(TextureType target) {
+		if (VulkanicAPI.isVulkanBackendSelected()
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris image allocation is unavailable on the Rust Vulkan route");
+		}
+		return target.createTexture();
+	}
+
 	protected void setup(int texture, int width, int height, int depth) {
+		ensureJavaCompatibilityRoute();
 		boolean isInteger = internalTextureFormat.getPixelFormat().isInteger();
 		var ctx = VulkanicAPI.getCommandContext();
 		if (isInteger) {
@@ -83,7 +92,14 @@ public class GlImage extends GlResource {
 	 * @param height The height of the main render target.
 	 */
 	public void updateNewSize(int width, int height) {
+		ensureJavaCompatibilityRoute();
+	}
 
+	protected static void ensureJavaCompatibilityRoute() {
+		if (VulkanicAPI.isVulkanBackendSelected()
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris image operations are unavailable on the Rust Vulkan route");
+		}
 	}
 
 	@Override
@@ -122,6 +138,7 @@ public class GlImage extends GlResource {
 
 		@Override
 		public void updateNewSize(int width, int height) {
+			ensureJavaCompatibilityRoute();
 			target.bindForSetup(getGlId());
 			target.apply(getGlId(), (int) (width * relativeWidth), (int) (height * relativeHeight), 0, internalTextureFormat.getGlFormat(), format.getGlFormat(), pixelType.getGlFormat(), null);
 

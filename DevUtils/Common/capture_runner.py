@@ -150,17 +150,28 @@ class CaptureConfig:
 class CaptureRunner:
     @staticmethod
     def resolve_artifact_dir(root: Path, configured: str | None) -> Path:
-        """Resolve capture output inside the one repository-local ignored subtree."""
+        """Resolve capture output inside a repository-local managed ignored subtree.
+
+        The standalone runner defaults to ``artifacts/graphics-captures`` while
+        the cross-repository graphics matrix supplies a retention-managed
+        ``logs/graphics-audit`` child.  Both are intentionally ignored and
+        bounded; accepting the latter keeps matrix artifacts associated with
+        their run instead of silently redirecting them to the global capture
+        directory.
+        """
         artifact_root = root / "artifacts" / "graphics-captures"
+        graphics_audit_root = root / "logs" / "graphics-audit"
         artifact_dir = Path(configured) if configured else artifact_root / "auto-capture"
         if not artifact_dir.is_absolute():
             artifact_dir = root / artifact_dir
         resolved_root = root.resolve()
-        resolved_artifact_root = artifact_root.resolve()
         resolved_artifact_dir = artifact_dir.resolve()
-        try:
-            resolved_artifact_dir.relative_to(resolved_artifact_root)
-        except ValueError:
+        managed_roots = (artifact_root.resolve(), graphics_audit_root.resolve())
+        if not any(
+            resolved_artifact_dir == managed_root
+            or managed_root in resolved_artifact_dir.parents
+            for managed_root in managed_roots
+        ):
             # RenderDoc and screenshot helpers can emit sidecars beside the
             # requested path. Preserve only the requested leaf name while
             # preventing root, external, and legacy dot-capture paths from
@@ -513,6 +524,43 @@ class CaptureRunner:
                 total_bytes += entry.stat().st_size
         return file_count, total_bytes
 
+    @staticmethod
+    def ignored_world_copy_name(directory: str, name: str) -> bool:
+        """Exclude stale DH snapshots, or all DH state for explicit no-DH rows.
+
+        Development captures sometimes leave multi-hundred-megabyte SQLite
+        backups beside the active ``DistantHorizons.sqlite``.  They are not
+        part of the world state and copying them needlessly delays quick-play
+        startup (or exhausts the bounded capture budget).  The live database is
+        excluded only when the caller explicitly disables DH for an ordinary
+        source capture; dedicated DH rows retain it.
+        """
+        if Path(directory).name != "data":
+            return False
+        if (
+            os.environ.get("MATTMC_CAPTURE_DISABLE_DH_FOR_ORDINARY_SOURCE", "false").lower() == "true"
+            and name == "DistantHorizons.sqlite"
+        ):
+            return True
+        return name.startswith("DistantHorizons.sqlite.") and (
+            ".backup_" in name or ".generated_" in name or ".corrupt_" in name
+        )
+
+    @classmethod
+    def tree_file_count_and_bytes_for_copy(cls, path: Path) -> tuple[int, int, int]:
+        file_count = 0
+        total_bytes = 0
+        ignored_count = 0
+        for entry in path.rglob("*"):
+            if not entry.is_file():
+                continue
+            if cls.ignored_world_copy_name(str(entry.parent), entry.name):
+                ignored_count += 1
+            else:
+                file_count += 1
+                total_bytes += entry.stat().st_size
+        return file_count, total_bytes, ignored_count
+
     def copy_isolated_world(self, source: Path, saves_dir: Path, destination_name: str, label: str) -> tuple[Path, int, int]:
         self.validate_world_copy_name(destination_name, label)
         if not source.is_dir():
@@ -521,18 +569,26 @@ class CaptureRunner:
         if destination.exists():
             raise SystemExit(f"Refusing to overwrite existing {label} copied world: {destination}")
         max_copy_bytes = int(os.environ.get("MATTMC_CAPTURE_WORLD_COPY_MAX_BYTES", str(8 * 1024 * 1024 * 1024)))
-        source_file_count, source_bytes = self.tree_file_count_and_bytes(source)
+        source_file_count, source_bytes, ignored_file_count = self.tree_file_count_and_bytes_for_copy(source)
         if source_bytes > max_copy_bytes:
             raise SystemExit(
                 f"Refusing to copy oversized {label} world: {source_bytes} bytes exceeds {max_copy_bytes} byte limit"
             )
-        shutil.copytree(source, destination)
+        shutil.copytree(
+            source,
+            destination,
+            ignore=lambda directory, names: [
+                name for name in names if self.ignored_world_copy_name(directory, name)
+            ],
+        )
         copied_file_count, copied_bytes = self.tree_file_count_and_bytes(destination)
         if copied_file_count != source_file_count or copied_bytes != source_bytes:
             raise SystemExit(
                 f"Incomplete {label} world copy: source files/bytes={source_file_count}/{source_bytes} "
                 f"copied files/bytes={copied_file_count}/{copied_bytes}"
             )
+        if ignored_file_count:
+            self.append_isolated_world_copy_meta(f"isolated_{label}_world_ignored_stale_dh_files={ignored_file_count}")
         self.append_isolated_world_copy_meta(f"isolated_{label}_world_source={source}")
         self.append_isolated_world_copy_meta(f"isolated_{label}_world_name={destination_name}")
         self.append_isolated_world_copy_meta(f"isolated_{label}_world_copy={destination}")
@@ -740,8 +796,25 @@ class CaptureRunner:
                     "forced_dh_enableDistantGeneration=false"
                     + (" reason=ordinary-selected-source" if disable_dh_for_ordinary_source else "")
                 )
+            # Ordinary Rust-Vulkan captures validate near-world semantic
+            # terrain; do not let DH's background sync queues consume that
+            # capture's bounded heap. Dedicated DH rows do not set this flag
+            # and retain their full synchronization/rendering configuration.
+            if disable_dh_for_ordinary_source:
+                for key, value in (
+                    ("synchronizeOnLoad", "false"),
+                    ("enableRealTimeUpdates", "false"),
+                    ("maxSyncOnLoadRequestDistance", "0"),
+                    ("maxGenerationRequestDistance", "0"),
+                    ("numberOfThreads", "1"),
+                    ("threadRunTimeRatio", '"0.0"'),
+                    ("lodChunkRenderDistanceRadius", "2"),
+                ):
+                    if upsert_toml_value(dh_file, key, value):
+                        self.append_meta(f"forced_dh_ordinary_{key}={value}")
         dh_opaque_only = os.environ.get("MATTMC_CAPTURE_DH_RUST_OPAQUE_ONLY", "false").lower() == "true"
         dh_non_water = os.environ.get("MATTMC_CAPTURE_DH_RUST_NON_WATER", "false").lower() == "true"
+        dh_water = os.environ.get("MATTMC_CAPTURE_DH_RUST_WATER", "false").lower() == "true"
         if dh_opaque_only or dh_non_water:
             # Both bounded routes exclude legacy auxiliary work. Keep DH's
             # renderer mode DEFAULT so the real CPU render-list traversal can
@@ -765,6 +838,10 @@ class CaptureRunner:
                 # deterministic coverage row; normal captures retain the
                 # copied configuration.
                 self.append_meta('forced_dh_non_water_transparency="COMPLETE"')
+        if dh_water and upsert_toml_value(dh_file, "numberOfThreads", "1"):
+            self.append_meta("forced_dh_water_numberOfThreads=1")
+        if dh_water and upsert_toml_value(dh_file, "lodChunkRenderDistanceRadius", "2"):
+            self.append_meta("forced_dh_water_lodChunkRenderDistanceRadius=2")
         voxelmap_file = self.run_dir / "config" / "voxelmap.properties"
         if voxelmap_file.is_file():
             upsert_option(voxelmap_file, "Welcome Message", "false")
@@ -1129,17 +1206,18 @@ class CaptureRunner:
         }
         launcher = Path(command[0]).name
         if (
-            diagnostic_inputs
+            (diagnostic_inputs or getattr(getattr(self, "config", None), "deterministic_camera_capture", False))
             and launcher in {"gradlew", "gradlew.bat"}
             and "--no-daemon" not in command
         ):
-            self.append_meta(
-                "native_diagnostic_forced_gradle_no_daemon=true"
-            )
-            self.append_meta(
-                "native_diagnostic_inputs="
-                + ",".join(sorted(diagnostic_inputs))
-            )
+            if diagnostic_inputs:
+                self.append_meta("native_diagnostic_forced_gradle_no_daemon=true")
+                self.append_meta(
+                    "native_diagnostic_inputs="
+                    + ",".join(sorted(diagnostic_inputs))
+                )
+            if getattr(getattr(self, "config", None), "deterministic_camera_capture", False):
+                self.append_meta("deterministic_capture_forced_gradle_no_daemon=true")
             return [command[0], "--no-daemon", *command[1:]]
         return command
 
@@ -1185,9 +1263,29 @@ class CaptureRunner:
             # the harness RSS budget.  Own the launch bounds here rather than
             # accepting an over-budget client and treating its late termination
             # as valid parity evidence.
-            self.env["MATTMC_CLIENT_XMX"] = "4G"
-            self.env["MATTMC_CLIENT_XMS"] = "2G"
-            self.append_meta("bounded_client_heap=initial:2G,max:4G")
+            # Leave headroom for native Vulkan allocations, driver mappings, and
+            # the JVM's non-heap regions.  With the normal 6144 MiB guard this
+            # preserves the historical 4G/2G bounds; smaller diagnostic guards
+            # now actually constrain the Java heap instead of being defeated by
+            # the build's environment override.
+            rss_limit_mb = self.config.client_rss_limit_mb
+            # Vulkan command recording, shader compilation, driver mappings,
+            # and the loader can consume substantial native RSS during startup.
+            # Keep the Java heap to roughly one quarter of a strict capture
+            # budget so the guard measures the complete process rather than
+            # allowing the heap to crowd out the Rust/Vulkan side of the route.
+            heap_xmx_mb = 4096 if rss_limit_mb <= 0 else min(4096, max(512, int(rss_limit_mb * 0.25)))
+            heap_xms_mb = min(2048, max(512, heap_xmx_mb // 2))
+            self.env["MATTMC_CLIENT_XMX"] = f"{heap_xmx_mb}m"
+            self.env["MATTMC_CLIENT_XMS"] = f"{heap_xms_mb}m"
+            # ZGC is useful for interactive runs but carries substantial native
+            # bookkeeping during shader/resource startup. Capture runs use G1
+            # explicitly so the RSS guard measures the client rather than a
+            # collector's largely-reserved address space.
+            self.env["MATTMC_CLIENT_GC"] = "G1"
+            self.append_meta(
+                f"bounded_client_heap=initial:{heap_xms_mb}m,max:{heap_xmx_mb}m,gc:G1"
+            )
         options = [f"-Dmattmc.dev.runCaptureId={self.run_id}"]
         if self.config.backend == "rust-vulkan":
             options.append("-Dmattmc.dev.rustGalVulkanWholeFrame=true")
@@ -1353,7 +1451,11 @@ class CaptureRunner:
                 self.deterministic_completed = True
                 self.intentional_deterministic_shutdown = True
                 self.append_meta(f"deterministic_capture_complete_elapsed={elapsed}")
-                if not self.wait_for_deterministic_shutdown():
+                force_capture_stop = os.environ.get("MATTMC_CAPTURE_KILL_AFTER_DETERMINISTIC", "false").lower() == "true"
+                if force_capture_stop:
+                    self.append_meta("deterministic_shutdown_mode=immediate-process-termination")
+                    self.terminate_run_processes("deterministic_complete_immediate")
+                elif not self.wait_for_deterministic_shutdown():
                     self.terminate_run_processes("deterministic_complete")
                 break
             subsystem_status = self.subsystem_benchmark_status()
@@ -1659,6 +1761,25 @@ class CaptureRunner:
                 self.append_meta("cleanup_gradle_kill=true")
                 subprocess.run(["taskkill", "/PID", str(self.gradle_process.pid), "/T", "/F"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         else:
+            immediate_capture_kill = (
+                os.environ.get("MATTMC_CAPTURE_KILL_AFTER_DETERMINISTIC", "false").lower() == "true"
+                and reason == "deterministic_complete_immediate"
+            )
+            if immediate_capture_kill:
+                # Deterministic capture has already acknowledged its frame.
+                # Avoid Minecraft/DH graceful world-save teardown, which can
+                # allocate an unbounded lighting/NBT graph and invalidate the
+                # artifact after the required frame is safely on disk.
+                self.append_meta("cleanup_mode=immediate_sigkill")
+                if client_pid:
+                    safe_kill(client_pid, signal.SIGKILL)
+                try:
+                    os.killpg(self.gradle_process.pid, signal.SIGKILL)
+                except OSError:
+                    pass
+                safe_kill(self.gradle_process.pid, signal.SIGKILL)
+                self.run_client_active = False
+                return
             if client_pid:
                 safe_kill(client_pid, signal.SIGTERM)
             try:
@@ -3094,9 +3215,8 @@ def parse_args() -> CaptureConfig:
         "--skip-tests",
         action="store_true",
         help=(
-            "Skip the Gradle test task before runClient. By default the graphics capture runner runs tests, "
-            "matching RunDev.py/build-gate behavior; use this only for fast local capture loops "
-            "when the current test status is already known."
+            "Exclude the Gradle test task from the launch command. runClient does not depend on the test suite; "
+            "this option is retained for capture configurations that explicitly add verification tasks."
         ),
     )
     parser.add_argument("--client-args", default=os.environ.get("CLIENT_ARGS", ""))

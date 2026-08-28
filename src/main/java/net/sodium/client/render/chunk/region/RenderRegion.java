@@ -288,9 +288,14 @@ public class RenderRegion implements net.irisshaders.iris.mixinterface.ShadowRen
          */
         public DeviceResources(CommandList commandList, StagingBuffer stagingBuffer) {
             // Iris: From MixinRenderRegionArenas - use extended vertex format from WorldRenderingSettings
-            int stride = net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getVertexFormat().getVertexFormat().getStride();
+            boolean rustVulkanOwned = VulkanicAPI.isVulkanBackendSelected()
+                    || net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
+            int stride = rustVulkanOwned
+                    ? ChunkMeshFormats.COMPACT.getVertexFormat().getStride()
+                    : net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getVertexFormat().getVertexFormat().getStride();
 
-            if (VulkanicAPI.isVulkanBackendInitializedAndSelected()) {
+            if (VulkanicAPI.isVulkanBackendSelected()
+                    || net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
                 this.geometryArena = new GpuChunkBufferArena(
                     () -> "Sodium chunk geometry arena",
                     GpuBuffer.USAGE_VERTEX,

@@ -55,7 +55,7 @@ pub enum CloudFaceDisposition {
     SuppressVanillaFaces,
 }
 
-/// One source-defined cloud stage suitable for a future owned writer.
+/// One source-defined cloud stage consumed by the Rust-owned cloud writer.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudPassContract {
     pub pack_name: String,

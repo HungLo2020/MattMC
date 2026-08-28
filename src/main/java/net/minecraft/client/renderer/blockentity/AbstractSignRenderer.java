@@ -94,7 +94,7 @@ public abstract class AbstractSignRenderer implements BlockEntityRenderer<SignBl
 		poseStack.scale(f, -f, -f);
 		Material material = this.getSignMaterial(woodType);
 		RenderType renderType = material.renderType(simple::renderType);
-		submitNodeCollector.submitModel(
+		submitNodeCollector.submitModelSemantic(
 			simple, Unit.INSTANCE, poseStack, renderType, i, OverlayTexture.NO_OVERLAY, -1, this.materials.get(material), 0, crumblingOverlay
 		);
 		poseStack.popPose();
@@ -127,9 +127,21 @@ public abstract class AbstractSignRenderer implements BlockEntityRenderer<SignBl
 			for (int m = 0; m < 4; m++) {
 				FormattedCharSequence formattedCharSequence = formattedCharSequences[m];
 				float f = -this.font.width(formattedCharSequence) / 2;
-				submitNodeCollector.submitText(
-					poseStack, f, m * signRenderState.textLineHeight - j, formattedCharSequence, false, Font.DisplayMode.POLYGON_OFFSET, l, k, 0, bl2 ? i : 0
-				);
+				float lineY = m * signRenderState.textLineHeight - j;
+				int outlineColor = bl2 ? i : 0;
+				if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+					|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+					// Rust whole-frame owns sign text through the copied world-text
+					// contract; do not admit this block-entity text as an implicit
+					// Java/Iris text draw.
+					submitNodeCollector.submitTextSemantic(
+						poseStack, f, lineY, formattedCharSequence, false, Font.DisplayMode.POLYGON_OFFSET, l, k, 0, outlineColor
+					);
+				} else {
+					submitNodeCollector.submitTextSemantic(
+						poseStack, f, lineY, formattedCharSequence, false, Font.DisplayMode.POLYGON_OFFSET, l, k, 0, outlineColor
+					);
+				}
 			}
 
 			poseStack.popPose();

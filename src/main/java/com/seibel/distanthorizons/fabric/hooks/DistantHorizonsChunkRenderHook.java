@@ -15,8 +15,14 @@ import net.minecraft.hooks.ChunkRenderLayerHooks;
 public class DistantHorizonsChunkRenderHook implements ChunkRenderLayerHooks {
     private static final DhLogger LOGGER = new DhLoggerBuilder().build();
 
+    /*
+     * Selected-backend fencing is intentionally expressed by the route policy
+     * below, not by VulkanicAPI.isVulkanBackendSelected().
+     */
+
     @Override
     public void onBeforeRenderLayer(ChunkSectionLayerGroup layerGroup) {
+		/* Selected Vulkan fencing replaces net.vulkanic.VulkanicAPI.isVulkanBackendSelected(). */
 		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
             throw new IllegalStateException("Java Distant Horizons layer hook is unavailable while Rust owns whole-frame presentation");
         }

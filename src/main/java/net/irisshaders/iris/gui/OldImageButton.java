@@ -112,7 +112,10 @@ public class OldImageButton extends Button {
 			lvInt12 = pInt5 + pInt6;
 		}
 
-		VulkanicAPI.setDepthTestEnabled(VulkanicAPI.getCommandContext(), true);
+		if (!VulkanicAPI.isVulkanBackendSelected()
+			&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			VulkanicAPI.setDepthTestEnabled(VulkanicAPI.getCommandContext(), true);
+		}
 		pAbstractWidget0.blit(RenderPipelines.GUI_TEXTURED, pResourceLocation1, pInt2, pInt3, (float) pInt4, (float) lvInt12, pInt7, pInt8, pInt9, pInt10);
 	}
 }

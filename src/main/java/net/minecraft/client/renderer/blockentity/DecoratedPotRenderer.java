@@ -183,23 +183,23 @@ public class DecoratedPotRenderer implements BlockEntityRenderer<DecoratedPotBlo
 	public void submit(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, int j, PotDecorations potDecorations, int k) {
 		RenderType renderType = Sheets.DECORATED_POT_BASE.renderType(RenderType::entitySolid);
 		TextureAtlasSprite textureAtlasSprite = this.materials.get(Sheets.DECORATED_POT_BASE);
-		submitNodeCollector.submitModelPart(this.neck, poseStack, renderType, i, j, textureAtlasSprite, false, false, -1, null, k);
-		submitNodeCollector.submitModelPart(this.top, poseStack, renderType, i, j, textureAtlasSprite, false, false, -1, null, k);
-		submitNodeCollector.submitModelPart(this.bottom, poseStack, renderType, i, j, textureAtlasSprite, false, false, -1, null, k);
+		submitNodeCollector.submitModelPartSemantic(this.neck, poseStack, renderType, i, j, textureAtlasSprite, false, false, -1, null, k);
+		submitNodeCollector.submitModelPartSemantic(this.top, poseStack, renderType, i, j, textureAtlasSprite, false, false, -1, null, k);
+		submitNodeCollector.submitModelPartSemantic(this.bottom, poseStack, renderType, i, j, textureAtlasSprite, false, false, -1, null, k);
 		Material material = getSideMaterial(potDecorations.front());
-		submitNodeCollector.submitModelPart(
+		submitNodeCollector.submitModelPartSemantic(
 			this.frontSide, poseStack, material.renderType(RenderType::entitySolid), i, j, this.materials.get(material), false, false, -1, null, k
 		);
 		Material material2 = getSideMaterial(potDecorations.back());
-		submitNodeCollector.submitModelPart(
+		submitNodeCollector.submitModelPartSemantic(
 			this.backSide, poseStack, material2.renderType(RenderType::entitySolid), i, j, this.materials.get(material2), false, false, -1, null, k
 		);
 		Material material3 = getSideMaterial(potDecorations.left());
-		submitNodeCollector.submitModelPart(
+		submitNodeCollector.submitModelPartSemantic(
 			this.leftSide, poseStack, material3.renderType(RenderType::entitySolid), i, j, this.materials.get(material3), false, false, -1, null, k
 		);
 		Material material4 = getSideMaterial(potDecorations.right());
-		submitNodeCollector.submitModelPart(
+		submitNodeCollector.submitModelPartSemantic(
 			this.rightSide, poseStack, material4.renderType(RenderType::entitySolid), i, j, this.materials.get(material4), false, false, -1, null, k
 		);
 	}

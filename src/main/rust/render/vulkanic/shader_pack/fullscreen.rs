@@ -64,6 +64,10 @@ impl SourceFinalOutputReservation {
     pub(crate) fn identity(&self) -> &SourceFinalOutputIdentity {
         &self.identity
     }
+
+    pub(crate) fn newly_staged(&self) -> bool {
+        self.newly_staged
+    }
 }
 
 impl SourceFinalOutputIdentity {
@@ -651,6 +655,29 @@ impl SourceFinalOutputPlan {
         operations.push(CommandOp::Barrier(texture_barrier(
             self.overlay.depth_view(),
             TextureUsageState::ShaderRead,
+            TextureUsageState::DepthStencilAttachment,
+        )));
+        self.source_copy.append_draw(operations);
+    }
+
+    /// Same source copy with the actual prior semantic state of a cached
+    /// frame-slot overlay. Newly staged plans begin Undefined; confirmed
+    /// plans return from the prior present copy in ShaderRead. Keeping that
+    /// distinction explicit prevents an alternating swapchain slot from
+    /// being reattached through an invalid Undefined transition.
+    pub(crate) fn append_source_copy_from_state(
+        &self,
+        operations: &mut Vec<CommandOp>,
+        overlay_before: TextureUsageState,
+    ) {
+        operations.push(CommandOp::Barrier(texture_barrier(
+            self.overlay.color_texture(),
+            overlay_before,
+            TextureUsageState::ColorAttachment,
+        )));
+        operations.push(CommandOp::Barrier(texture_barrier(
+            self.overlay.depth_view(),
+            overlay_before,
             TextureUsageState::DepthStencilAttachment,
         )));
         self.source_copy.append_draw(operations);

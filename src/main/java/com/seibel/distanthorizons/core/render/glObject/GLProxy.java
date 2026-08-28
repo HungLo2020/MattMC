@@ -96,7 +96,11 @@ public class GLProxy
 	
 	private GLProxy() throws IllegalStateException
 	{
-		boolean vulkanBackend = VulkanicAPI.isVulkanBackendSelected();
+		// Treat the Rust presenter shell as Vulkan ownership before backend
+		// selection is finalized; this prevents DH from probing or retaining
+		// Java/OpenGL capability state during the handoff.
+		boolean vulkanBackend = VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
 		// this must be created on minecraft's render context to work correctly
 		if (!vulkanBackend && GLFW.glfwGetCurrentContext() == 0L)
 		{
@@ -256,7 +260,8 @@ public class GLProxy
 	
 	public static boolean runningOnRenderThread()
 	{
-		if (VulkanicAPI.isVulkanBackendSelected())
+		if (VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
 		{
 			return VulkanicAPI.isOnRenderThread();
 		}
@@ -308,8 +313,8 @@ public class GLProxy
 		}
 		if (VulkanicAPI.isVulkanBackendSelected())
 		{
-			runRenderThreadTasks(VULKAN_LOD_UPLOAD_TASK_BUDGET_NANOS, VULKAN_LOD_UPLOAD_MIN_TASKS);
-			return;
+			throw new IllegalStateException(
+				"Java Distant Horizons Vulkan upload-task draining is unavailable until the Rust whole-frame route is admitted");
 		}
 		runRenderThreadTasks();
 	}

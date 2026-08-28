@@ -26,9 +26,10 @@ public class DynamicUniformStorage<T extends DynamicUniformStorage.DynamicUnifor
 	private final String label;
 
 	public DynamicUniformStorage(String string, int i, int j) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			throw new IllegalStateException(
-				"Java dynamic-uniform storage is unavailable while Rust owns whole-frame Vulkan presentation"
+				"Java dynamic-uniform storage is unavailable on selected Vulkan"
 			);
 		}
 		this.blockSize = Mth.roundToward(i, net.vulkanic.VulkanicAPI.getBackendUniformOffsetAlignment());
@@ -39,6 +40,7 @@ public class DynamicUniformStorage<T extends DynamicUniformStorage.DynamicUnifor
 	}
 
 	public void endFrame() {
+		ensureJavaRoute();
 		this.nextBlock = 0;
 		this.lastUniform = null;
 		this.ringBuffer.rotate();
@@ -60,6 +62,7 @@ public class DynamicUniformStorage<T extends DynamicUniformStorage.DynamicUnifor
 	}
 
 	public GpuBufferSlice writeUniform(T dynamicUniform) {
+		ensureJavaRoute();
 		if (this.lastUniform != null && this.lastUniform.equals(dynamicUniform)) {
 			return this.ringBuffer.currentBuffer().slice((this.nextBlock - 1) * this.blockSize, this.blockSize);
 		} else {
@@ -83,6 +86,7 @@ public class DynamicUniformStorage<T extends DynamicUniformStorage.DynamicUnifor
 	}
 
 	public GpuBufferSlice[] writeUniforms(T[] dynamicUniforms) {
+		ensureJavaRoute();
 		if (dynamicUniforms.length == 0) {
 			return new GpuBufferSlice[0];
 		} else {
@@ -119,6 +123,13 @@ public class DynamicUniformStorage<T extends DynamicUniformStorage.DynamicUnifor
 		}
 
 		this.ringBuffer.close();
+	}
+
+	private static void ensureJavaRoute() {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java dynamic-uniform writes are unavailable on selected Vulkan");
+		}
 	}
 
 	@Environment(EnvType.CLIENT)

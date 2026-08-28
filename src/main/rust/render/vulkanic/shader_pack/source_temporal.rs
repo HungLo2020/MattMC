@@ -95,6 +95,13 @@ pub struct TerrainSourceTemporalUniforms {
 }
 
 impl TerrainSourceTemporalUniforms {
+    /// Evaluates the source-pack biome predicate from the copied gameplay
+    /// identity. This is the semantic equivalent of Iris' `inPaleGarden`
+    /// custom uniform and never consults a Java biome object or registry ID.
+    pub fn pale_garden_biome(biome_resource_location: &str) -> f32 {
+        f32::from(biome_resource_location == "minecraft:pale_garden")
+    }
+
     pub fn rain_factor(
         &mut self,
         key: TerrainSourceTemporalKey,
@@ -680,6 +687,22 @@ mod tests {
         assert!(uniforms
             .nether_biomes(KEY, 2, f32::NAN, "minecraft:plains")
             .is_err());
+    }
+
+    #[test]
+    fn pale_garden_biome_uses_only_the_copied_canonical_identity() {
+        assert_eq!(
+            1.0,
+            TerrainSourceTemporalUniforms::pale_garden_biome("minecraft:pale_garden")
+        );
+        assert_eq!(
+            0.0,
+            TerrainSourceTemporalUniforms::pale_garden_biome("minecraft:plains")
+        );
+        assert_eq!(
+            0.0,
+            TerrainSourceTemporalUniforms::pale_garden_biome("other:pale_garden")
+        );
     }
 
     #[test]

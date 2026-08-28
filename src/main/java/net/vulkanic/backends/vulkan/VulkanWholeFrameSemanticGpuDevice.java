@@ -33,10 +33,17 @@ import org.jetbrains.annotations.Nullable;
  */
 public final class VulkanWholeFrameSemanticGpuDevice implements GpuDevice {
 	private static final int MAX_TEXTURE_SIZE = 16_384;
+	private static final int MAX_TEXTURE_LAYERS = 64;
+	private static final int MAX_TEXTURE_MIP_LEVELS = 14;
+	/** Keep accidental Java bootstrap allocations bounded before Rust owns the frame. */
+	private static final int MAX_BUFFER_SIZE = 64 * 1024 * 1024;
+	/** Bound aggregate CPU-only bootstrap storage, not just one allocation. */
+	private static final long MAX_BUFFER_BYTES = 256L * 1024L * 1024L;
 	private static final int UNIFORM_ALIGNMENT = 256;
 	private static final String RENDERING_UNAVAILABLE =
 		"Rust Vulkan whole-frame startup device is semantic-only; port this callsite to explicit VulkanicGAL semantics.";
 	private final CommandEncoder encoder = new SemanticCommandEncoder();
+	private long allocatedBufferBytes;
 
 	@Override
 	public CommandEncoder createCommandEncoder() {
@@ -50,8 +57,15 @@ public final class VulkanWholeFrameSemanticGpuDevice implements GpuDevice {
 
 	@Override
 	public GpuTexture createTexture(@Nullable String label, int usage, TextureFormat format, int width, int height, int depthOrLayers, int mipLevels) {
-		if (width < 1 || height < 1 || depthOrLayers < 1 || mipLevels < 1) {
-			throw new IllegalArgumentException("semantic texture dimensions and mip levels must be positive");
+		if (width < 1 || width > MAX_TEXTURE_SIZE
+			|| height < 1 || height > MAX_TEXTURE_SIZE
+			|| depthOrLayers < 1 || depthOrLayers > MAX_TEXTURE_LAYERS
+			|| mipLevels < 1 || mipLevels > MAX_TEXTURE_MIP_LEVELS) {
+			throw new IllegalArgumentException(
+				"semantic texture dimensions/layers/mip levels exceed startup bounds "
+					+ MAX_TEXTURE_SIZE + "x" + MAX_TEXTURE_SIZE + ", layers="
+					+ MAX_TEXTURE_LAYERS + ", mips=" + MAX_TEXTURE_MIP_LEVELS
+			);
 		}
 		return new SemanticTexture(usage, label == null ? "semantic-texture" : label, format, width, height, depthOrLayers, mipLevels);
 	}
@@ -71,12 +85,19 @@ public final class VulkanWholeFrameSemanticGpuDevice implements GpuDevice {
 
 	@Override
 	public GpuBuffer createBuffer(@Nullable Supplier<String> label, int usage, int size) {
-		return new SemanticBuffer(usage, size);
+		if (size > MAX_BUFFER_SIZE) {
+			throw new IllegalArgumentException("semantic buffer exceeds the " + MAX_BUFFER_SIZE + " byte startup bound");
+		}
+		if (size < 0 || this.allocatedBufferBytes > MAX_BUFFER_BYTES - size) {
+			throw new IllegalArgumentException("semantic startup buffers exceed the " + MAX_BUFFER_BYTES + " byte aggregate bound");
+		}
+		this.allocatedBufferBytes += size;
+		return new SemanticBuffer(usage, size, () -> this.allocatedBufferBytes -= size);
 	}
 
 	@Override
 	public GpuBuffer createBuffer(@Nullable Supplier<String> label, int usage, ByteBuffer data) {
-		SemanticBuffer buffer = new SemanticBuffer(usage, data.remaining());
+		SemanticBuffer buffer = (SemanticBuffer)this.createBuffer(label, usage, data.remaining());
 		buffer.write(0, data.duplicate());
 		return buffer;
 	}
@@ -102,10 +123,12 @@ public final class VulkanWholeFrameSemanticGpuDevice implements GpuDevice {
 	private static final class SemanticBuffer extends GpuBuffer {
 		private final ByteBuffer bytes;
 		private boolean closed;
-		SemanticBuffer(int usage, int size) {
+		private final Runnable release;
+		SemanticBuffer(int usage, int size, Runnable release) {
 			super(usage, size);
 			if (size < 0) throw new IllegalArgumentException("semantic buffer size must not be negative");
 			this.bytes = ByteBuffer.allocateDirect(size);
+			this.release = release;
 		}
 		void write(int offset, ByteBuffer source) {
 			if (this.closed) throw new IllegalStateException("semantic buffer is closed");
@@ -118,7 +141,7 @@ public final class VulkanWholeFrameSemanticGpuDevice implements GpuDevice {
 			ByteBuffer result = this.bytes.duplicate(); result.position(offset); result.limit(offset + length); return result.slice();
 		}
 		@Override public boolean isClosed() { return this.closed; }
-		@Override public void close() { this.closed = true; }
+		@Override public void close() { if (!this.closed) { this.closed = true; this.release.run(); } }
 	}
 
 	private static final class SemanticTexture extends GpuTexture {

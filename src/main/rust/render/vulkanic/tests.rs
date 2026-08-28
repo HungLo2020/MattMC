@@ -454,6 +454,35 @@ fn frame_lifecycle_requires_presentation_capability() {
 }
 
 #[test]
+fn frame_surface_rejects_excessive_in_flight_slots() {
+    let mut gal = gal_with_capabilities(presentation_capabilities());
+    let mut surface = frame_surface("bounded-slots");
+    surface.max_frames_in_flight = super::gal::MAX_FRAMES_IN_FLIGHT + 1;
+    assert_code(
+        gal.configure_frame_surface(surface),
+        StatusCode::InvalidArgument,
+    );
+}
+
+#[test]
+fn frame_surface_rejects_oversized_or_non_2d_extent() {
+    let mut gal = gal_with_capabilities(presentation_capabilities());
+    let mut oversized = frame_surface("oversized-surface");
+    oversized.extent.width = super::gal::MAX_FRAME_SURFACE_AXIS + 1;
+    assert_code(
+        gal.configure_frame_surface(oversized),
+        StatusCode::InvalidArgument,
+    );
+
+    let mut three_dimensional = frame_surface("3d-surface");
+    three_dimensional.extent.depth = 2;
+    assert_code(
+        gal.configure_frame_surface(three_dimensional),
+        StatusCode::InvalidArgument,
+    );
+}
+
+#[test]
 fn frame_lifecycle_preserves_correlation_and_submission_ids() {
     let mut gal = gal_with_capabilities(presentation_capabilities());
     gal.configure_frame_surface(frame_surface("window"))
@@ -702,11 +731,30 @@ fn frame_target_descriptor_exposes_only_semantic_swapchain_identity() {
     assert_eq!(acquired.render_target, descriptor.render_target);
     assert_eq!(acquired.extent, descriptor.extent);
     assert_eq!(TextureFormat::Rgba8Unorm, descriptor.color_format);
+    let (depth_texture, depth_view) = gal
+        .frame_target_owned_depth_attachment(frame_target)
+        .unwrap();
+    assert_ne!(depth_texture, depth_view);
+    assert!(gal.pass_target_depth_attachment(frame_target).unwrap().is_none());
+    gal.begin_frame_target_depth_write(frame_target).unwrap();
+    assert_eq!(
+        Some((depth_texture, depth_view)),
+        gal.pass_target_depth_attachment(frame_target).unwrap()
+    );
+    gal.rollback_frame_target_depth_write(frame_target);
+    assert!(gal.pass_target_depth_attachment(frame_target).unwrap().is_none());
+    gal.begin_frame_target_depth_write(frame_target).unwrap();
+    gal.commit_frame_target_depth_write(frame_target).unwrap();
+    assert_eq!(
+        Some((depth_texture, depth_view)),
+        gal.pass_target_depth_attachment(frame_target).unwrap()
+    );
     gal.destroy(frame_target).unwrap();
     assert_code(
         gal.frame_target_desc(frame_target),
         super::StatusCode::StaleHandle,
     );
+    assert_code(gal.frame_target_owned_depth_attachment(frame_target), super::StatusCode::StaleHandle);
 }
 
 #[test]
@@ -798,6 +846,72 @@ fn frame_target_copy_requires_explicit_owned_destination_and_matching_extent() {
                     height: 72,
                     depth: 1,
                 },
+            }],
+        }),
+        super::StatusCode::InvalidArgument,
+    );
+}
+
+#[test]
+fn texture_to_frame_target_copy_requires_explicit_owned_source_and_matching_extent() {
+    let mut gal = gal_with_capabilities(presentation_capabilities());
+    gal.configure_frame_surface(frame_surface("frame-copy-reverse-contract"))
+        .unwrap();
+    let acquired = gal
+        .acquire_frame(FrameAcquireDesc {
+            correlation_id: FrameCorrelationId(104),
+            expected_extent: Extent3d { width: 128, height: 72, depth: 1 },
+        })
+        .unwrap();
+    let frame_target = gal
+        .create_frame_target(FrameTargetDesc {
+            label: "frame-copy-reverse-destination".to_owned(),
+            frame_id: acquired.frame.0,
+            render_target: acquired.render_target,
+            extent: acquired.extent,
+            color_format: TextureFormat::Rgba8Unorm,
+        })
+        .unwrap();
+    let source = gal
+        .create_texture(texture(
+            "frame-copy-reverse-source",
+            TextureFormat::Rgba8Unorm,
+            vec![TextureUsage::TransferSrc],
+        ))
+        .unwrap();
+    gal.create_command_list(CommandListDesc {
+        label: "valid-reverse-frame-copy".to_owned(),
+        operations: vec![
+            CommandOp::Barrier(ResourceBarrier {
+                resource: source,
+                subresources: None,
+                before: TextureUsageState::Undefined,
+                after: TextureUsageState::TransferSrc,
+                src_queue: QueueClass::Graphics,
+                dst_queue: QueueClass::Transfer,
+            }),
+            CommandOp::CopyTextureToFrameTarget {
+                src: source,
+                dst: frame_target,
+                extent: Extent3d { width: 128, height: 72, depth: 1 },
+            },
+        ],
+    })
+    .unwrap();
+    let invalid_source = gal
+        .create_texture(texture(
+            "frame-copy-reverse-invalid-source",
+            TextureFormat::Rgba8Unorm,
+            vec![TextureUsage::Sampled],
+        ))
+        .unwrap();
+    assert_code(
+        gal.create_command_list(CommandListDesc {
+            label: "reverse-frame-copy-without-transfer-src".to_owned(),
+            operations: vec![CommandOp::CopyTextureToFrameTarget {
+                src: invalid_source,
+                dst: frame_target,
+                extent: Extent3d { width: 64, height: 36, depth: 1 },
             }],
         }),
         super::StatusCode::InvalidArgument,
@@ -2048,6 +2162,31 @@ fn attachment_and_presentation_hazards_require_semantic_separation() {
     gal.submit(SubmissionBatch {
         label: "present-separated".to_owned(),
         command_lists: vec![present_with_barrier],
+    })
+    .unwrap();
+
+    let present_with_view_barrier = gal
+        .create_command_list(CommandListDesc {
+            label: "present-with-view-barrier".to_owned(),
+            operations: vec![
+                CommandOp::Barrier(ResourceBarrier {
+                    resource: first_view,
+                    subresources: Some(full_range),
+                    before: TextureUsageState::ColorAttachment,
+                    after: TextureUsageState::Present,
+                    src_queue: QueueClass::Graphics,
+                    dst_queue: QueueClass::Present,
+                }),
+                CommandOp::Present {
+                    texture,
+                    subresources: full_range,
+                },
+            ],
+        })
+        .unwrap();
+    gal.submit(SubmissionBatch {
+        label: "present-view-separated".to_owned(),
+        command_lists: vec![present_with_view_barrier],
     })
     .unwrap();
 }
@@ -4242,6 +4381,18 @@ fn ffi_resource_batch_covers_layout_sets_pipelines_targets_and_passes() {
         owned.render_passes[0].desc.depth_format,
         Some(TextureFormat::Depth32Float)
     );
+}
+
+#[test]
+fn ffi_resource_batch_counts_binding_tables_in_aggregate_limit() {
+    let dynamic_offsets = vec![0u64; FFI_MAX_BATCH_ITEMS / 2];
+    let pipeline_layout_resources = vec![FfiHandle { raw: 0 }; FFI_MAX_BATCH_ITEMS / 2 + 1];
+    let mut batch = empty_resource_batch();
+    batch.dynamic_offsets = ffi_slice(&dynamic_offsets);
+    batch.pipeline_layout_resource_layouts = ffi_slice(&pipeline_layout_resources);
+    let error = unsafe { decode_resource_batch(&batch, opengl_capabilities()) }
+        .expect_err("resource binding tables must share the aggregate batch bound");
+    assert_eq!(super::StatusCode::LengthOverflow, error.code);
 }
 
 #[test]

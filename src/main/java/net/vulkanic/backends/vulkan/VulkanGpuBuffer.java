@@ -17,7 +17,8 @@ public final class VulkanGpuBuffer extends GpuBuffer {
 		this.handle = handle;
 	}
 
-	public int getHandle() {
+	/** Backend-internal lookup; native buffer handles never cross the Rust semantic boundary. */
+	int getHandle() {
 		return this.handle;
 	}
 

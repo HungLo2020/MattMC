@@ -82,7 +82,8 @@ public class CompiledSectionMesh implements SectionMesh {
 	}
 
 	public void uploadMeshLayer(ChunkSectionLayer chunkSectionLayer, MeshData meshData, long l) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			throw new IllegalStateException("Java terrain mesh uploads are unavailable while Rust owns whole-frame presentation");
 		}
 		CommandEncoder commandEncoder = VulkanicAPI.createCommandEncoder();
@@ -147,7 +148,8 @@ public class CompiledSectionMesh implements SectionMesh {
 	}
 
 	public void uploadLayerIndexBuffer(ChunkSectionLayer chunkSectionLayer, ByteBufferBuilder.Result result, long l) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			throw new IllegalStateException("Java terrain index uploads are unavailable while Rust owns whole-frame presentation");
 		}
 		SectionBuffers sectionBuffers = this.getBuffers(chunkSectionLayer);

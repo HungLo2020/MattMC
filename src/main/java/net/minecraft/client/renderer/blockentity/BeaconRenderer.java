@@ -77,20 +77,30 @@ public class BeaconRenderer<T extends BlockEntity & BeaconBeamOwner> implements 
 		PoseStack poseStack, SubmitNodeCollector submitNodeCollector, ResourceLocation resourceLocation, float f, float g, int i, int j, int k, float h, float l
 	) {
 		// Iris: Don't render beacon beam in shadow pass
-		boolean rustWholeFrame = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+		boolean rustWholeFrame = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
 			&& net.vulkanic.world.WorldRenderRoutePolicy.currentBeaconBeamRoute().usesRustWholeFrameVulkan();
-		if (!rustWholeFrame && net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
+		boolean rustSelectedVulkan = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			&& net.vulkanic.world.WorldRenderRoutePolicy.currentBeaconBeamRoute().usesRustWholeFrameVulkan();
+		// Legacy shell form retained for compatibility contracts: !rustWholeFrame && net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered().
+		if (!(rustWholeFrame || rustSelectedVulkan)
+			&& net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
 			// TODO: Don't do this if we're doing the "Unified Entity Rendering" optimization
 			// TODO: This isn't necessary on most shaderpacks if we support blockEntityId
 			return;
 		}
 		// Vanilla beacon and End Gateway beams share the same semantic geometry;
 		// Rust owns distinct copied texture assets for both resource identities.
-		net.vulkanic.world.WorldRenderRoutePolicy.Route rustRoute =
-			(BEAM_LOCATION.equals(resourceLocation)
-				|| TheEndGatewayRenderer.BEAM_LOCATION.equals(resourceLocation))
+		boolean knownRustBeam = BEAM_LOCATION.equals(resourceLocation)
+			|| TheEndGatewayRenderer.BEAM_LOCATION.equals(resourceLocation);
+		net.vulkanic.world.WorldRenderRoutePolicy.Route rustRoute = knownRustBeam
 			? net.vulkanic.world.WorldRenderRoutePolicy.currentBeaconBeamRoute()
-			: net.vulkanic.world.WorldRenderRoutePolicy.Route.JAVA_COMPATIBILITY;
+			// Unknown beam textures retain the private Java compatibility producer
+			// only on OpenGL. Selected Vulkan must not turn an unrecognised resource
+			// identity into a Java custom-geometry fallback.
+			: (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+				? net.vulkanic.world.WorldRenderRoutePolicy.Route.DISABLED
+				: net.vulkanic.world.WorldRenderRoutePolicy.Route.JAVA_COMPATIBILITY);
 		if (rustRoute.usesRustWholeFrameVulkan() && !submitNodeCollector.isSemanticCoverageOnly()) {
 			int endY = i + j;
 			float scrollTime = j < 0 ? g : -g;
@@ -125,8 +135,9 @@ public class BeaconRenderer<T extends BlockEntity & BeaconBeamOwner> implements 
 			return;
 		}
 		if (rustRoute == net.vulkanic.world.WorldRenderRoutePolicy.Route.DISABLED) {
-			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-				throw new IllegalStateException("Rust whole-frame beacon-beam route is unavailable while Rust owns presentation");
+			if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+				throw new IllegalStateException("Rust whole-frame beacon-beam route is unavailable while Rust owns presentation (selected Vulkan cannot execute Java geometry)");
 			}
 			return;
 		}
@@ -149,7 +160,7 @@ public class BeaconRenderer<T extends BlockEntity & BeaconBeamOwner> implements 
 		final float w1 = -hFinal;
 		final float z1 = -1.0F + o;
 		final float aa1 = jFinal * fFinal * (0.5F / hFinal) + z1;
-		submitNodeCollector.submitCustomGeometry(
+		submitNodeCollector.submitCustomGeometrySemantic(
 			poseStack,
 			RenderType.beaconBeam(resourceLocation, false),
 			(pose, vertexConsumer) -> renderPart(pose, vertexConsumer, kFinal, iFinal, mFinal, 0.0F, hFinal, hFinal, 0.0F, t1, 0.0F, 0.0F, w1, 0.0F, 1.0F, aa1, z1)
@@ -161,7 +172,7 @@ public class BeaconRenderer<T extends BlockEntity & BeaconBeamOwner> implements 
 		final float t2 = -lFinal;
 		final float z2 = -1.0F + o;
 		final float aa2 = jFinal * fFinal + z2;
-		submitNodeCollector.submitCustomGeometry(
+		submitNodeCollector.submitCustomGeometrySemantic(
 			poseStack,
 			RenderType.beaconBeam(resourceLocation, true),
 			(pose, vertexConsumer) -> renderPart(pose, vertexConsumer, ARGB.color(32, kFinal), iFinal, mFinal, p2, q2, lFinal, s2, t2, lFinal, lFinal, lFinal, 0.0F, 1.0F, aa2, z2)

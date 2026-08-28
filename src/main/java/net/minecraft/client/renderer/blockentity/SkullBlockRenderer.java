@@ -147,7 +147,9 @@ public class SkullBlockRenderer implements BlockEntityRenderer<SkullBlockEntity,
 				skullModelBase, state, poseStack, renderType, i, OverlayTexture.NO_OVERLAY, -1, semanticTexture, j, crumblingOverlay
 			);
 		} else {
-			submitNodeCollector.submitModel(skullModelBase, state, poseStack, renderType, i, OverlayTexture.NO_OVERLAY, j, crumblingOverlay);
+			submitNodeCollector.submitModelSemantic(
+				skullModelBase, state, poseStack, renderType, i, OverlayTexture.NO_OVERLAY, -1, null, j, crumblingOverlay
+			);
 		}
 		poseStack.popPose();
 	}

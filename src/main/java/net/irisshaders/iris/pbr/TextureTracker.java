@@ -16,10 +16,7 @@ public class TextureTracker {
 	public static final TextureTracker INSTANCE = new TextureTracker();
 
 	private static Runnable bindTextureListener;
-
-	static {
-		StateUpdateNotifiers.bindTextureNotifier = listener -> bindTextureListener = listener;
-	}
+	private static boolean compatibilityListenerInstalled;
 
 	private final Int2ObjectMap<AbstractTexture> textures = new Int2ObjectOpenHashMap<>();
 	private final Int2ObjectMap<GpuTextureView> textureViews = new Int2ObjectOpenHashMap<>();
@@ -30,8 +27,20 @@ public class TextureTracker {
 	private TextureTracker() {
 	}
 
+	private static synchronized void installCompatibilityListener() {
+		if (compatibilityListenerInstalled
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			return;
+		}
+		StateUpdateNotifiers.bindTextureNotifier = listener -> bindTextureListener = listener;
+		compatibilityListenerInstalled = true;
+	}
+
 	public void trackTexture(int id, AbstractTexture texture) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) return;
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| VulkanicAPI.isVulkanBackendSelected()) return;
+		installCompatibilityListener();
 		textures.put(id, texture);
 		try {
 			textureViews.put(id, texture.getTextureView());
@@ -41,13 +50,15 @@ public class TextureTracker {
 
 	@Nullable
 	public AbstractTexture getTexture(int id) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) return null;
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| VulkanicAPI.isVulkanBackendSelected()) return null;
 		return textures.get(id);
 	}
 
 	@Nullable
 	public GpuTextureView getTextureView(int id) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) return null;
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| VulkanicAPI.isVulkanBackendSelected()) return null;
 		AbstractTexture texture = textures.get(id);
 		if (texture != null) {
 			try {
@@ -62,16 +73,15 @@ public class TextureTracker {
 	}
 
 	public void onSetShaderTexture(int unit, GpuTextureView id) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| VulkanicAPI.isVulkanBackendSelected()) {
 			// Iris shader-texture bookkeeping is Java GPU state. The Rust semantic
 			// route owns copied assets and must not publish or query this tracker.
 			return;
 		}
+		installCompatibilityListener();
 		if (unit >= 0 && unit < shaderTexturesByUnit.length) {
 			shaderTexturesByUnit[unit] = id;
-		}
-		if (VulkanicAPI.isVulkanBackendSelected()) {
-			IrisRenderSystem.setTextureBinding(unit, id == null ? 0 : VulkanicCoreAPI.textureId(id));
 		}
 		if (id != null) {
 			textureViews.put(VulkanicCoreAPI.textureId(id), id);
@@ -96,7 +106,8 @@ public class TextureTracker {
 
 	@Nullable
 	public GpuTextureView getShaderTexture(int unit) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) return null;
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| VulkanicAPI.isVulkanBackendSelected()) return null;
 		if (unit < 0 || unit >= shaderTexturesByUnit.length) {
 			return null;
 		}
@@ -105,7 +116,8 @@ public class TextureTracker {
 	}
 
 	public void onDeleteTexture(int id) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) return;
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| VulkanicAPI.isVulkanBackendSelected()) return;
 		textures.remove(id);
 		textureViews.remove(id);
 		for (int unit = 0; unit < shaderTexturesByUnit.length; unit++) {

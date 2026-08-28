@@ -381,7 +381,8 @@ public class ItemBlockRenderTypes {
 	private static boolean renderCutout;
 
 	public static ChunkSectionLayer getChunkRenderType(BlockState blockState) {
-		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
 			// Iris: Custom material mapping belongs to Iris's Java runtime. Rust
 			// whole-frame terrain receives the ordinary semantic layer below.
 			net.irisshaders.iris.shaderpack.materialmap.BlockRenderType type =

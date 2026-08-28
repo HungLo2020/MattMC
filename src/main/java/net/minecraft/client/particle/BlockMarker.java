@@ -50,7 +50,8 @@ public class BlockMarker extends SingleQuadParticle {
 		if (this.enqueueRustGal(camera, f)) {
 			return;
 		}
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			throw new IllegalStateException("Rust whole-frame block-marker semantics were rejected; Java particle extraction is not a fallback");
 		}
 		super.extract(quadParticleRenderState, camera, f);
@@ -68,7 +69,12 @@ public class BlockMarker extends SingleQuadParticle {
 			this.z,
 			f,
 			this.getQuadSize(f),
-			0xFFFFFFFF
+			0xFFFFFFFF,
+			this.sprite == null ? null : this.sprite.contents().name(),
+			this.getU0(),
+			this.getU1(),
+			this.getV0(),
+			this.getV1()
 		);
 	}
 

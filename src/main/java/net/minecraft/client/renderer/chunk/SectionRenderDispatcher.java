@@ -212,6 +212,7 @@ public class SectionRenderDispatcher {
 
 		public CompletableFuture<Void> upload(Map<ChunkSectionLayer, MeshData> map, CompiledSectionMesh compiledSectionMesh) {
 			if (SectionRenderDispatcher.this.closed
+				|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
 				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 				// Rust whole-frame terrain owns semantic extraction and its explicit
 				// mesh staging. Dispose the legacy CPU result without opening a Java
@@ -248,6 +249,7 @@ public class SectionRenderDispatcher {
 			CompiledSectionMesh compiledSectionMesh, ByteBufferBuilder.Result result, ChunkSectionLayer chunkSectionLayer
 		) {
 			if (SectionRenderDispatcher.this.closed
+				|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
 				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 				// The semantic Rust terrain route does not consume Java section index
 				// buffers. Close the temporary CPU result and fail closed at this

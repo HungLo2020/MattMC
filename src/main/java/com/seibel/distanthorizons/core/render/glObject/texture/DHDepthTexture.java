@@ -44,7 +44,7 @@ public class DHDepthTexture
 
 	private static void rejectRustWholeFrameJavaTexture()
 	{
-		if (VulkanicAPI.isVulkanBackendInitializedAndSelected()
+		if (VulkanicAPI.isVulkanBackendSelected()
 			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
 		{
 			throw new IllegalStateException(
@@ -81,7 +81,11 @@ public class DHDepthTexture
 
 	public void destroy(CommandContext ctx)
 	{
-		VulkanicAPI.deleteTexture(ctx, this.getTextureId());
+		int textureId = this.getTextureId();
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			&& !VulkanicAPI.isVulkanBackendSelected()) {
+			VulkanicAPI.deleteTexture(ctx, textureId);
+		}
 		this.id = -1;
 	}
 	

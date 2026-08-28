@@ -17,6 +17,7 @@ const MAX_INPUTS_PER_PASS: usize = 32;
 const MAX_UNIFORM_BLOCKS_PER_PASS: usize = 16;
 const MAX_UNIFORMS_PER_BLOCK: usize = 64;
 const MAX_UNIFORM_NAME_LENGTH: usize = 128;
+const MAX_TEXTURE_INPUT_DIMENSION: u32 = 16_384;
 const MAIN_TARGET: &str = "minecraft:main";
 
 /// Targets supplied by the Rust frame coordinator rather than allocated by the
@@ -56,7 +57,13 @@ pub struct VanillaPostEffectUniform {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct VanillaPostEffectInput {
     pub sampler_name: String,
+    /// A target input is represented by `target`; a resource-pack texture
+    /// input is represented by `texture_path` and is deliberately kept
+    /// separate so it can never be mistaken for an external attachment.
     pub target: String,
+    pub texture_path: Option<String>,
+    pub texture_width: Option<u32>,
+    pub texture_height: Option<u32>,
     pub bilinear: bool,
     pub use_depth_buffer: bool,
 }
@@ -196,7 +203,7 @@ impl VanillaPostEffectContract {
                         "vanilla post effect {effect_name} pass {index} exceeds input budget {MAX_INPUTS_PER_PASS}"
                     )));
                 }
-                for input in input_values {
+            for input in input_values {
                     let input = input.as_object().ok_or_else(|| {
                         GalError::invalid_argument(format!(
                             "vanilla post effect {effect_name} pass {index} input must be an object"
@@ -212,21 +219,47 @@ impl VanillaPostEffectContract {
                             "vanilla post effect {effect_name} pass {index} input sampler_name has invalid length"
                         )));
                     }
-                    let target = input.get("target").and_then(Value::as_str).ok_or_else(|| {
-                        GalError::invalid_argument(format!(
-                            "vanilla post effect {effect_name} pass {index} input lacks target"
-                        ))
-                    })?;
-                    if !is_external_target(target) && !targets.contains(target) {
-                        return Err(GalError::invalid_argument(format!(
-                            "vanilla post effect {effect_name} pass {index} reads undeclared target {target}"
-                        )));
-                    }
-                    if !is_external_target(target) && !produced_targets.contains(target) {
-                        return Err(GalError::invalid_argument(format!(
-                            "vanilla post effect {effect_name} pass {index} reads target {target} before it is produced"
-                        )));
-                    }
+                    let (target, texture_path, texture_width, texture_height) =
+                        if let Some(target) = input.get("target").and_then(Value::as_str) {
+                            if !is_external_target(target) && !targets.contains(target) {
+                                return Err(GalError::invalid_argument(format!(
+                                    "vanilla post effect {effect_name} pass {index} reads undeclared target {target}"
+                                )));
+                            }
+                            if !is_external_target(target) && !produced_targets.contains(target) {
+                                return Err(GalError::invalid_argument(format!(
+                                    "vanilla post effect {effect_name} pass {index} reads target {target} before it is produced"
+                                )));
+                            }
+                            (target.to_owned(), None, None, None)
+                        } else {
+                            let location = input.get("location").and_then(Value::as_str).ok_or_else(|| {
+                                GalError::invalid_argument(format!(
+                                    "vanilla post effect {effect_name} pass {index} input lacks target or location"
+                                ))
+                            })?;
+                            if location.is_empty() || location.len() > 512 || location.contains('\0') {
+                                return Err(GalError::invalid_argument(format!(
+                                    "vanilla post effect {effect_name} pass {index} texture location is invalid"
+                                )));
+                            }
+                            let width = input.get("width").and_then(Value::as_u64).and_then(|v| u32::try_from(v).ok()).ok_or_else(|| {
+                                GalError::invalid_argument(format!(
+                                    "vanilla post effect {effect_name} pass {index} texture width is invalid"
+                                ))
+                            })?;
+                            let height = input.get("height").and_then(Value::as_u64).and_then(|v| u32::try_from(v).ok()).ok_or_else(|| {
+                                GalError::invalid_argument(format!(
+                                    "vanilla post effect {effect_name} pass {index} texture height is invalid"
+                                ))
+                            })?;
+                            if width == 0 || height == 0 || width > MAX_TEXTURE_INPUT_DIMENSION || height > MAX_TEXTURE_INPUT_DIMENSION {
+                                return Err(GalError::invalid_argument(format!(
+                                    "vanilla post effect {effect_name} pass {index} texture dimensions exceed {MAX_TEXTURE_INPUT_DIMENSION}"
+                                )));
+                            }
+                            (String::new(), Some(location.to_owned()), Some(width), Some(height))
+                        };
                     let bilinear = input.get("bilinear").and_then(Value::as_bool).unwrap_or(false);
                     let use_depth_buffer = input
                         .get("use_depth_buffer")
@@ -234,7 +267,10 @@ impl VanillaPostEffectContract {
                         .unwrap_or(false);
                     inputs.push(VanillaPostEffectInput {
                         sampler_name: sampler_name.to_owned(),
-                        target: target.to_owned(),
+                        target,
+                        texture_path,
+                        texture_width,
+                        texture_height,
                         bilinear,
                         use_depth_buffer,
                     });
@@ -289,10 +325,11 @@ impl VanillaPostEffectContract {
                             )));
                         }
                         let expected_len = match value_type {
-                            "float" => 1,
-                            "vec2" => 2,
-                            "vec3" => 3,
-                            "vec4" => 4,
+                            "float" | "int" => 1,
+                            "vec2" | "ivec2" => 2,
+                            "vec3" | "ivec3" => 3,
+                            "vec4" | "ivec4" => 4,
+                            "matrix4x4" => 16,
                             _ => {
                                 return Err(GalError::unsupported_feature(format!(
                                     "vanilla post effect {effect_name} uses unsupported uniform type {value_type}"
@@ -326,6 +363,19 @@ impl VanillaPostEffectContract {
                             return Err(GalError::invalid_argument(format!(
                                 "vanilla post effect {effect_name} uniform {name} has the wrong or non-finite value count"
                             )));
+                        }
+                        if value_type == "int"
+                            || matches!(value_type, "ivec2" | "ivec3" | "ivec4")
+                        {
+                            if values.iter().any(|value| {
+                                value.fract() != 0.0
+                                    || *value < i32::MIN as f32
+                                    || *value > i32::MAX as f32
+                            }) {
+                                return Err(GalError::invalid_argument(format!(
+                                    "vanilla post effect {effect_name} integer uniform {name} must contain finite 32-bit integral values"
+                                )));
+                            }
                         }
                         parsed.push(VanillaPostEffectUniform {
                             name: name.to_owned(),
@@ -655,6 +705,59 @@ mod tests {
     }
 
     #[test]
+    fn integer_uniform_vectors_are_copied_with_bounded_integral_values() {
+        let json = br#"{
+            "targets": {},
+            "passes": [{
+                "vertex_shader":"v",
+                "fragment_shader":"f",
+                "inputs":[{"sampler_name":"In", "target":"minecraft:main"}],
+                "output":"minecraft:main",
+                "uniforms":{"Config":[
+                    {"name":"Mode","type":"int","value":3},
+                    {"name":"Mask","type":"ivec3","value":[1,2,4]}
+                ]}
+            }]
+        }"#;
+        let contract = VanillaPostEffectContract::parse("integer-uniforms", json).unwrap();
+        let values = &contract.passes[0].uniform_values["Config"];
+        assert_eq!(values[0].value_type, "int");
+        assert_eq!(values[1].values, vec![1.0, 2.0, 4.0]);
+    }
+
+    #[test]
+    fn fractional_integer_uniforms_are_rejected() {
+        let json = br#"{
+            "targets": {},
+            "passes": [{
+                "vertex_shader":"v", "fragment_shader":"f",
+                "inputs":[{"sampler_name":"In", "target":"minecraft:main"}],
+                "output":"minecraft:main",
+                "uniforms":{"Config":[{"name":"Mode","type":"int","value":1.5}]}
+            }]
+        }"#;
+        let error = VanillaPostEffectContract::parse("fractional-integer", json).unwrap_err();
+        assert!(error.to_string().contains("32-bit integral values"));
+    }
+
+    #[test]
+    fn matrix4x4_uniforms_require_sixteen_finite_values() {
+        let json = br#"{
+            "targets": {},
+            "passes": [{
+                "vertex_shader":"v", "fragment_shader":"f",
+                "inputs":[{"sampler_name":"In", "target":"minecraft:main"}],
+                "output":"minecraft:main",
+                "uniforms":{"Transform":[{"name":"Model","type":"matrix4x4","value":[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]}]}
+            }]
+        }"#;
+        let contract = VanillaPostEffectContract::parse("matrix-uniform", json).unwrap();
+        let uniform = &contract.passes[0].uniform_values["Transform"][0];
+        assert_eq!(uniform.value_type, "matrix4x4");
+        assert_eq!(uniform.values.len(), 16);
+    }
+
+    #[test]
     fn input_sampling_semantics_are_retained_for_multi_target_effects() {
         let transparency = VanillaPostEffectContract::parse(
             "transparency",
@@ -680,6 +783,29 @@ mod tests {
         assert_eq!(blur_config[0].values, vec![1.0, 0.0]);
         assert_eq!(blur_config[1].value_type, "float");
         assert_eq!(blur_config[1].values, vec![0.0]);
+    }
+
+    #[test]
+    fn texture_inputs_are_copied_as_explicit_unadmitted_assets() {
+        let json = br#"{
+            "targets": {},
+            "passes": [{
+                "vertex_shader":"v",
+                "fragment_shader":"f",
+                "inputs":[{"sampler_name":"Mask","location":"minecraft:textures/effect/mask.png","width":64,"height":32,"bilinear":true}],
+                "output":"minecraft:main"
+            }]
+        }"#;
+        let contract = VanillaPostEffectContract::parse("texture-input", json).unwrap();
+        let input = &contract.passes[0].inputs[0];
+        assert!(input.target.is_empty());
+        assert_eq!(input.texture_path.as_deref(), Some("minecraft:textures/effect/mask.png"));
+        assert_eq!(input.texture_width, Some(64));
+        assert_eq!(input.texture_height, Some(32));
+        assert_eq!(
+            contract.execution_plan().required_external_targets(),
+            BTreeSet::from(["minecraft:main".to_owned()])
+        );
     }
 
     #[test]

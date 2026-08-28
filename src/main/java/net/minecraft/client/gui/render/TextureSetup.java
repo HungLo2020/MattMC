@@ -17,10 +17,18 @@ public record TextureSetup(@Nullable GpuTextureView texure0, @Nullable GpuTextur
 	}
 
 	public static TextureSetup singleTextureWithLightmap(GpuTextureView gpuTextureView) {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java GUI lightmap texture setup is unavailable on the Rust Vulkan route");
+		}
 		return new TextureSetup(gpuTextureView, null, Minecraft.getInstance().gameRenderer.lightTexture().getTextureView());
 	}
 
 	public static TextureSetup doubleTexture(GpuTextureView gpuTextureView, GpuTextureView gpuTextureView2) {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java GUI multi-texture setup is unavailable on the Rust Vulkan route");
+		}
 		return new TextureSetup(gpuTextureView, gpuTextureView2, null);
 	}
 

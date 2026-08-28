@@ -84,7 +84,8 @@ public class TestRenderer
 	
 	public void render()
 	{
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
 		{
 			// This diagnostic square is a legacy Java draw path, not a semantic
 			// world feature. Never let it acquire a command context on Rust Vulkan.

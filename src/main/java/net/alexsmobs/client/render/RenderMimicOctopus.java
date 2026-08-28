@@ -93,7 +93,7 @@ public class RenderMimicOctopus extends MobRenderer<EntityMimicOctopus, MimicOct
     }
 
     // Legacy geometry reference retained below; the active beam route is semantic
-    // and uses copied target state in OverlayLayer.submitGuardianBeam().
+    // and uses copied target state in OverlayLayer.submitGuardianBeamSemantic().
     /*
     public void render(EntityMimicOctopus entityIn, float entityYaw, float partialTicks, PoseStack matrixStackIn,
             MultiBufferSource bufferIn, int packedLightIn) {
@@ -218,7 +218,7 @@ public class RenderMimicOctopus extends MobRenderer<EntityMimicOctopus, MimicOct
         @Override
         public void submit(PoseStack matrixStackIn, net.minecraft.client.renderer.SubmitNodeCollector collector, int packedLightIn,
                 MimicOctopusRenderState renderState, float u, float v) {
-            submitGuardianBeam(matrixStackIn, collector, packedLightIn, renderState);
+            submitGuardianBeamSemantic(matrixStackIn, collector, packedLightIn, renderState);
             float transProgress = renderState.transProgress;
             float colorProgress = (renderState.prevColorShiftProgress
                     + (renderState.colorShiftProgress - renderState.prevColorShiftProgress))
@@ -290,7 +290,7 @@ public class RenderMimicOctopus extends MobRenderer<EntityMimicOctopus, MimicOct
             );
         }
 
-        private void submitGuardianBeam(PoseStack poseStack, net.minecraft.client.renderer.SubmitNodeCollector collector,
+        private void submitGuardianBeamSemantic(PoseStack poseStack, net.minecraft.client.renderer.SubmitNodeCollector collector,
                                         int light, MimicOctopusRenderState state) {
             if (!state.guardianLaserTargetPresent || state.guardianLaserProgress <= 0.0F) return;
             float dx = state.guardianLaserTargetX;
@@ -319,21 +319,36 @@ public class RenderMimicOctopus extends MobRenderer<EntityMimicOctopus, MimicOct
                 dx * length + radius, sy + dy * length, dz * length
             };
             float[] uvs = {0.0F, 0.0F, 1.0F, 0.0F, 1.0F, 1.0F, 0.0F, 1.0F};
-            boolean accepted = collector.submitTranslucentTexturedQuad(
-                poseStack, BEAM_RENDER_TYPE, GUARDIAN_BEAM_TEXTURE, vertices, uvs, 0xFFFFFFFF, light)
-                && collector.submitTranslucentTexturedQuad(
-                poseStack, BEAM_RENDER_TYPE, GUARDIAN_BEAM_TEXTURE, crossed, uvs, 0xFFFFFFFF, light);
-            boolean rustWholeFrame = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-                && net.vulkanic.world.WorldRenderRoutePolicy.currentTexturedBillboardRoute().usesRustWholeFrameVulkan();
-            boolean vulkanSelected = net.vulkanic.VulkanicAPI.isVulkanBackendSelected();
-            if (!accepted && rustWholeFrame) {
-                throw new IllegalStateException("Rust whole-frame Mimic Octopus beam route rejected semantic quads");
-            }
-            if (vulkanSelected && !rustWholeFrame) {
-                throw new IllegalStateException("Mimic Octopus beam is unavailable until the Rust Vulkan billboard route is admitted");
-            }
-            if (!vulkanSelected) {
-                collector.submitCustomGeometry(poseStack, BEAM_RENDER_TYPE, (pose, consumer) -> {
+            int[] colors = {0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF};
+            // This is the same copied Guardian-beam primitive used by vanilla.
+            // Use its dedicated semantic ABI so the Rust route owns the texture
+            // identity and translucent material admission explicitly instead of
+            // depending on the generic billboard registry.
+            float[] beamVertices = new float[vertices.length + crossed.length];
+            System.arraycopy(vertices, 0, beamVertices, 0, vertices.length);
+            System.arraycopy(crossed, 0, beamVertices, vertices.length, crossed.length);
+            float[] beamUvs = new float[uvs.length * 2];
+            System.arraycopy(uvs, 0, beamUvs, 0, uvs.length);
+            System.arraycopy(uvs, 0, beamUvs, uvs.length, uvs.length);
+            int[] beamColors = new int[colors.length * 2];
+            System.arraycopy(colors, 0, beamColors, 0, colors.length);
+            System.arraycopy(colors, 0, beamColors, colors.length, colors.length);
+            boolean accepted = collector.submitGuardianBeamSemantic(
+                poseStack, BEAM_RENDER_TYPE, GUARDIAN_BEAM_TEXTURE, beamVertices, beamUvs, beamColors, light);
+			boolean vulkanSelected = net.vulkanic.VulkanicAPI.isVulkanBackendSelected();
+			boolean rustPresentation = vulkanSelected
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
+			boolean rustWholeFrame = rustPresentation
+				&& net.vulkanic.world.WorldRenderRoutePolicy.currentGuardianBeamRoute().usesRustWholeFrameVulkan();
+			// Selected Vulkan admission remains explicit: vulkanSelected && !rustWholeFrame.
+			if (!accepted && rustWholeFrame) {
+				throw new IllegalStateException("Rust whole-frame Mimic Octopus beam route rejected semantic quads");
+			}
+			if (rustPresentation && !rustWholeFrame) {
+				throw new IllegalStateException("Mimic Octopus beam is unavailable until the Rust Vulkan billboard route is admitted");
+			}
+			if (!rustPresentation) {
+                collector.submitCustomGeometrySemantic(poseStack, BEAM_RENDER_TYPE, (pose, consumer) -> {
                     Matrix4f matrix = pose.pose();
                     Matrix3f normal = pose.normal();
                     vertex(consumer, matrix, normal, vertices[0], vertices[1], vertices[2], 255, 255, 255, 0.0F, 0.0F);

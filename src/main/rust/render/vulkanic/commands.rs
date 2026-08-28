@@ -163,6 +163,14 @@ pub enum CommandOp {
         dst: Handle,
         extent: Extent3d,
     },
+    /// Copies a Rust-owned texture into the acquired presentation image.
+    /// The frame target remains opaque; this is the only legal presentation
+    /// write path for offscreen Rust post-processing.
+    CopyTextureToFrameTarget {
+        src: Handle,
+        dst: Handle,
+        extent: Extent3d,
+    },
     /// Generates the descendant mip levels in one explicit texture range.
     /// The first level is the source; every following level is written by the
     /// operation. Backends choose their native implementation privately.

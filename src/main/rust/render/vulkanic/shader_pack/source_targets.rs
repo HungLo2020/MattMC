@@ -67,20 +67,18 @@ impl ShaderPackColorFormat {
         }
     }
 
-    /// The exact generic GAL format declared by this source target. This is
-    /// intentionally only schema-level: native device/driver image-format
-    /// support is checked when the Rust-owned target cache stages resources.
-    /// Returning `None` is never permission to substitute a nearby format or
-    /// reuse a Java/Iris target.
-    pub const fn gal_schema_color_format(self) -> Option<TextureFormat> {
+    /// The exact generic GAL format declared by this source target. Native
+    /// device/driver image-format support is checked when the Rust-owned
+    /// target cache stages resources; there is no optional schema fallback.
+    pub const fn gal_schema_color_format(self) -> TextureFormat {
         match self {
-            Self::R11fG11fB10f => Some(TextureFormat::R11fG11fB10f),
-            Self::R32f => Some(TextureFormat::R32Float),
-            Self::Rgb16f => Some(TextureFormat::Rgb16Float),
-            Self::Rgba8 => Some(TextureFormat::Rgba8Unorm),
-            Self::R8 => Some(TextureFormat::R8Unorm),
-            Self::Rgba8Snorm => Some(TextureFormat::Rgba8Snorm),
-            Self::Rgba16f => Some(TextureFormat::Rgba16Float),
+            Self::R11fG11fB10f => TextureFormat::R11fG11fB10f,
+            Self::R32f => TextureFormat::R32Float,
+            Self::Rgb16f => TextureFormat::Rgb16Float,
+            Self::Rgba8 => TextureFormat::Rgba8Unorm,
+            Self::R8 => TextureFormat::R8Unorm,
+            Self::Rgba8Snorm => TextureFormat::Rgba8Snorm,
+            Self::Rgba16f => TextureFormat::Rgba16Float,
         }
     }
 
@@ -107,7 +105,7 @@ impl ShaderPackColorFormat {
                 format,
                 TextureFormat::Rgb16Float | TextureFormat::Rgba16Float
             ),
-            _ => matches!(self.gal_schema_color_format(), Some(expected) if expected == format),
+            _ => self.gal_schema_color_format() == format,
         }
     }
 }
@@ -139,7 +137,7 @@ impl ShaderPackColorTargetDecl {
         self.source_slot
     }
 
-    pub const fn gal_schema_color_format(&self) -> Option<TextureFormat> {
+    pub const fn gal_schema_color_format(&self) -> TextureFormat {
         self.format.gal_schema_color_format()
     }
 
@@ -851,11 +849,7 @@ pub(crate) fn resolve_fullscreen_source_color_attachments(
                 "fullscreen source output semantic color '{name}' has no staged Rust-owned target"
             ))
         })?;
-        let expected_format = declaration.gal_schema_color_format().ok_or_else(|| {
-            GalError::unsupported_feature(format!(
-                "fullscreen source output semantic color '{name}' has no exact VulkanicGAL format"
-            ))
-        })?;
+        let expected_format = declaration.gal_schema_color_format();
         if !declaration.accepts_storage_format(target.format) {
             return Err(GalError::invalid_argument(format!(
                 "fullscreen source output semantic color '{name}' staged storage format {:?} is incompatible with manifest {:?}",
@@ -945,12 +939,7 @@ pub(crate) fn resolve_terrain_source_color_attachments(
                 output.semantic_name()
             ))
         })?;
-        let format = declaration.gal_schema_color_format().ok_or_else(|| {
-            GalError::unsupported_feature(format!(
-                "terrain source output '{}' semantic color '{name}' has no exact VulkanicGAL format",
-                output.semantic_name()
-            ))
-        })?;
+        let format = declaration.gal_schema_color_format();
         if !declaration.accepts_storage_format(target.format) {
             return Err(GalError::invalid_argument(format!(
                 "terrain source output '{}' staged storage format {:?} is incompatible with source manifest {:?}",
@@ -1000,11 +989,7 @@ pub(crate) fn source_color_attachments_by_slot(
                 "shader-pack color source slot {slot} ('{name}') has no staged Rust-owned target"
             ))
         })?;
-        let format = declaration.gal_schema_color_format().ok_or_else(|| {
-            GalError::unsupported_feature(format!(
-                "shader-pack color source slot {slot} ('{name}') has no exact VulkanicGAL format"
-            ))
-        })?;
+        let format = declaration.gal_schema_color_format();
         if !declaration.accepts_storage_format(target.format) {
             return Err(GalError::invalid_argument(format!(
                 "shader-pack color source slot {slot} ('{name}') staged storage format {:?} is incompatible with manifest {:?}",
@@ -1125,11 +1110,7 @@ impl ShaderPackColorTargets {
             let mut targets = BTreeMap::new();
             for declaration in manifest.targets() {
                 let name = declaration.name();
-                declaration.gal_schema_color_format().ok_or_else(|| {
-                    GalError::unsupported_feature(format!(
-                        "shader-pack color target '{name}' lacks an exact VulkanicGAL format"
-                    ))
-                })?;
+                let _ = declaration.gal_schema_color_format();
                 let mip_levels = if identity
                     .mipmapped_target_names
                     .binary_search_by(|candidate| candidate.as_str().cmp(name))
@@ -2401,18 +2382,8 @@ impl ShaderPackColorTargetManifest {
     /// target, never an underlying image, attachment, or API handle. Native
     /// support remains a separate cache-staging check, before route admission.
     pub fn require_gal_schema_formats(&self) -> GalResult<()> {
-        let unavailable = self
-            .targets
-            .values()
-            .filter(|target| target.gal_schema_color_format().is_none())
-            .map(|target| format!("{}:{:?}", target.name(), target.format))
-            .collect::<Vec<_>>();
-        if !unavailable.is_empty() {
-            return Err(GalError::unsupported_feature(format!(
-                "VulkanicGAL lacks exact semantic shader-pack color format definitions: {}",
-                unavailable.join(", ")
-            )));
-        }
+        // Every parsed source format has an exact schema mapping. Native
+        // image support is checked during Rust-owned target staging.
         Ok(())
     }
 }
@@ -2723,12 +2694,9 @@ mod tests {
         assert_eq!(0, primary.source_slot());
         assert_eq!(ShaderPackColorFormat::R11fG11fB10f, primary.format);
         assert!(primary.clear_each_frame);
+        assert_eq!(TextureFormat::R11fG11fB10f, primary.gal_schema_color_format());
         assert_eq!(
-            Some(TextureFormat::R11fG11fB10f),
-            primary.gal_schema_color_format()
-        );
-        assert_eq!(
-            Some(TextureFormat::Rgba16Float),
+            TextureFormat::Rgba16Float,
             manifest
                 .target("temporal_reflection")
                 .unwrap()

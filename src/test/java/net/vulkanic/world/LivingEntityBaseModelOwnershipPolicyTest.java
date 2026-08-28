@@ -19,6 +19,14 @@ final class LivingEntityBaseModelOwnershipPolicyTest {
 	}
 
 	@Test
+	void rustWholeFrameHandoffOwnsMigratedFamilyBeforeBackendSelection() {
+		assertEquals(
+			RUST_VULKAN_WHOLE_FRAME,
+			LivingEntityBaseModelOwnershipPolicy.selectOwnershipForTests(true, false, true, false, false)
+		);
+	}
+
+	@Test
 	void unportedFamilyNeverClaimsRustOwnership() {
 		assertEquals(
 			DISABLED,

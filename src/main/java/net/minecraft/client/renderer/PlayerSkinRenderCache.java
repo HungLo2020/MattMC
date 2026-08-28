@@ -118,7 +118,8 @@ public class PlayerSkinRenderCache {
 
 		@Nullable
 		public GpuTextureView textureView() {
-			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+				|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
 				return null;
 			}
 

@@ -128,6 +128,7 @@ public class PlayerGlyphProvider {
 		@Nullable
 		public GpuTextureView textureView() {
 			return net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+				|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
 				? null
 				: ((PlayerSkinRenderCache.RenderInfo)this.skin.get()).textureView();
 		}

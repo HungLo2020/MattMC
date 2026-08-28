@@ -51,8 +51,14 @@ public class BlockFeatureRenderer {
 		OutlineBufferSource outlineBufferSource,
 		boolean semanticOnly
 	) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() && !semanticOnly) {
-			throw new IllegalStateException("Java block-feature rendering is unavailable while Rust owns whole-frame presentation");
+		boolean vulkanSelected = net.vulkanic.VulkanicAPI.isVulkanBackendSelected();
+		boolean rustWholeFrame = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
+		if ((vulkanSelected && !rustWholeFrame) || ((vulkanSelected || rustWholeFrame) && !semanticOnly)) {
+			throw new IllegalStateException(
+				vulkanSelected && !rustWholeFrame
+					? "Java block-feature rendering is unavailable while Rust owns whole-frame presentation; selected Vulkan route is unavailable until Rust whole-frame admission"
+					: "Java block-feature rendering is unavailable while Rust owns whole-frame presentation"
+			);
 		}
 		if (semanticOnly && net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
 			&& (!WorldRenderRoutePolicy.currentFallingBlockRoute().usesRustWholeFrameVulkan()
@@ -89,7 +95,14 @@ public class BlockFeatureRenderer {
 			)) {
 				continue;
 			}
-			if (VulkanicAPI.isVulkanBackendSelected() && !fallingBlock && !piston) {
+			if ((VulkanicAPI.isVulkanBackendSelected()
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) && !fallingBlock && !piston) {
+				WorldRenderRoutePolicy.Route unknownRoute = WorldRenderRoutePolicy.currentMaterialRoute();
+				if (unknownRoute.usesRustWholeFrameVulkan()
+					&& RustGalWorldPrimitiveRenderer.enqueueUnknownMovingBlock(blockRenderDispatcher, movingBlockSubmit)) {
+					this.recordMovingBlockRoute("moving-block", "rust-vulkan-whole-frame", blockState, true, true, false);
+					continue;
+				}
 				GraphicsFrameBenchmark.recordSubmittedWorkIdentity(
 					"moving-block", "rust-vulkan-unavailable:" + blockState.getBlockHolder().getRegisteredName()
 				);
@@ -157,7 +170,8 @@ public class BlockFeatureRenderer {
 				WorldRenderRoutePolicy.Route blockDisplayRoute = WorldRenderRoutePolicy.currentBlockDisplayRoute();
 				if (blockDisplayRoute == WorldRenderRoutePolicy.Route.DISABLED) {
 					GraphicsFrameBenchmark.recordSubmittedWorkIdentity("block-display", "disabled:" + blockSubmit.state().getBlockHolder().getRegisteredName());
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 						throw new IllegalStateException("Rust whole-frame block-display route is unavailable while Rust owns presentation");
 					}
 				} else {
@@ -203,7 +217,8 @@ public class BlockFeatureRenderer {
 				GraphicsFrameBenchmark.recordSubmittedWorkIdentity(
 					"block-model", "rust-vulkan-unavailable"
 				);
-				if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+				if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+					|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 					throw new IllegalStateException("Rust whole-frame block-model route is unavailable while Rust owns presentation");
 				}
 				continue;
@@ -249,7 +264,8 @@ public class BlockFeatureRenderer {
 				"primed-tnt", "disabled", blockSubmit.state(), false, false, false
 			);
 			GraphicsFrameBenchmark.recordSubmittedWorkIdentity("primed-tnt", "disabled:" + blockIdentity);
-			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 				throw new IllegalStateException("Rust whole-frame Primed TNT route is unavailable while Rust owns presentation");
 			}
 			return;
@@ -314,7 +330,8 @@ public class BlockFeatureRenderer {
 				provenance,
 				"disabled:" + this.blockIdentity(blockState)
 			);
-			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 				throw new IllegalStateException("Rust whole-frame " + provenance + " route is unavailable while Rust owns presentation");
 			}
 			return true;

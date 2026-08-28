@@ -1348,9 +1348,9 @@ impl LoweredTerrainSourceProgram {
     }
 
     /// Packs only the named source semantics admitted by this prepared
-    /// program. It cannot accept arbitrary bytes or backend state, and is
-    /// still preparation-only until a future runtime owns the corresponding
-    /// GAL buffer/resource-set lifecycle.
+    /// program. It cannot accept arbitrary bytes or backend state. The
+    /// world frontend couples the returned bytes to the explicit GAL
+    /// buffer/resource-set lifecycle in the selected Rust submission.
     pub fn pack_scalar_uniforms(&self, frame: &TerrainSourceUniformFrame) -> GalResult<Vec<u8>> {
         let bytes = frame.pack_std140(&self.scalar_uniform_requirements)?;
         if bytes.len() != self.execution_interface.scalar_uniform_bytes as usize {
@@ -3262,8 +3262,8 @@ fn hand_output_to_terrain_output(output: HandSourceOutput) -> TerrainPassOutput 
 /// Prepares one source-derived `gbuffers_textured` program only after its
 /// shader-pack generation, source lowering, scalar uniforms, and pass-local
 /// semantic resource plan agree. This intentionally stops before pipeline and
-/// stream construction: a future writer must provide a dedicated Rust-owned
-/// material stream and named target pass rather than reusing the final-output
+/// stream construction: the Rust-owned material stream and named-target pass
+/// are constructed by the world frontend rather than reusing the final-output
 /// overlay path.
 pub fn prepare_lowered_textured_material_source_program(
     contract: &TexturedMaterialPassContract,
@@ -3970,7 +3970,8 @@ pub fn minimal_distant_horizons_lod_opaque_program() -> TerrainMaterialProgram {
 /// transparent CPU LOD streams. It shares the copied DH vertex and semantic
 /// lightmap contract with the opaque program, but writes one composited color
 /// attachment and deliberately does not participate in the G-buffer or shadow
-/// pass. Water remains a distinct, explicitly unavailable material contract.
+/// pass. Water is intentionally resolved by the separate Rust water-surface
+/// pass, whose depth/cull/blend policy is not conflated with this generic lane.
 pub fn minimal_distant_horizons_lod_transparent_program() -> TerrainMaterialProgram {
     TerrainMaterialProgram {
         identity: ProgramIdentity::new("vulkanic:builtin/distant_horizons_lod_transparent_v1"),

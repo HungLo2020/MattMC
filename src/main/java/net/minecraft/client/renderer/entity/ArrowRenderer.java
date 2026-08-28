@@ -61,7 +61,7 @@ public abstract class ArrowRenderer<T extends AbstractArrow, S extends ArrowRend
 			);
 			throw new IllegalStateException("Rust whole-frame Arrow route has no semantic mesh for " + textureLocation);
 		} else if (disposition == ArrowSubmitDisposition.JAVA_COMPATIBILITY) {
-			submitNodeCollector.submitModel(
+			submitNodeCollector.submitModelSemantic(
 				this.model,
 				arrowRenderState,
 				poseStack,

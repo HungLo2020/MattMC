@@ -27,7 +27,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Private CPU-side boundary for a future Rust-owned Distant Horizons route.
+ * Private CPU-side boundary for the Rust-owned Distant Horizons route.
  *
  * <p>The collector is deliberately disabled unless its diagnostic switch is
  * selected. It copies builder output before the legacy renderer uploads and
@@ -63,6 +63,13 @@ public final class DistantHorizonsSemanticCollector {
 	private static final int MAX_PENDING_ASSET_COLUMNS_PER_UPDATE = 4;
 	private static final long MAX_PENDING_ASSET_BYTES_PER_UPDATE = 1L * 1024L * 1024L;
 	private static final int MAX_VISIBLE_SEGMENTS = 16_384;
+	private static final int MAX_LOD_SEGMENTS_PER_COLUMN = 512;
+	private static final int MAX_LOD_VERTICES_PER_SEGMENT = 2_097_152;
+	private static final int MAX_LOD_MATERIAL_ID = 15;
+	private static final int MAX_LOD_NORMAL_INDEX = 5;
+	private static final int MAX_LOD_MATERIAL_IDENTITIES_PER_COLUMN = 4_096;
+	/** A not-yet-published column still consumes visibility bookkeeping. */
+	private static final int MAX_PENDING_VISIBLE_COLUMN_KEYS = 16_384;
 	private static final int MAX_PUBLICATION_TRACE_EVENTS = 24;
 	/** A bounded semantic transport segment. It is intentionally below Rust's
 	 * ABI maximum so a single legacy CPU buffer cannot make the entire coarse
@@ -178,6 +185,7 @@ public final class DistantHorizonsSemanticCollector {
 	 * deliberately records semantic values rather than renderer state. */
 	private static String routeMatrixDetail = "not-observed";
 	private static boolean routeSelected;
+	private static int routeExecutionCount;
 	private static long lastExecutedRouteFrame;
 	private static long lastExecutedWorldFrame;
 	private static long lastExecutedSubmission;
@@ -238,10 +246,16 @@ public final class DistantHorizonsSemanticCollector {
 			int minY = sourceOriginY + RenderDataPointUtil.getYMin(data);
 			int maxY = sourceOriginY + RenderDataPointUtil.getYMax(data);
 			int materialId = RenderDataPointUtil.getBlockMaterialId(data);
+			// DH's reduced water surface can place the fixture probe exactly on
+			// the source interval's upper boundary.  Preserve the normal half-open
+			// interval for every other material; only WATER may use that boundary,
+			// and it is still required to match the configured x/z cell.
+			boolean waterUpperSurface = materialId == EDhApiBlockMaterial.WATER.index;
 			for (BlockPos probe : waterSourceInputProbes) {
 				if (probe.getX() < sourceMinX || probe.getX() >= sourceMaxX
 					|| probe.getZ() < sourceMinZ || probe.getZ() >= sourceMaxZ
-					|| probe.getY() < minY || probe.getY() >= maxY) {
+					|| probe.getY() < minY
+					|| (probe.getY() >= maxY && !(waterUpperSurface && probe.getY() == maxY))) {
 					continue;
 				}
 				WATER_SOURCE_INPUT_TRACES.put(probe, new WaterSourceInputTrace(
@@ -1079,6 +1093,7 @@ public final class DistantHorizonsSemanticCollector {
 	}
 
 	private static DistantHorizonsWaterProbeResult waterSourceProbeResultLocked(BlockPos probe) {
+		String firstWaterBounds = "";
 		for (Map.Entry<Long, LodColumnSnapshot> entry : PUBLISHED_COLUMNS.entrySet()) {
 			long columnKey = entry.getKey();
 			LodColumnSnapshot column = publishedColumnLocked(columnKey);
@@ -1094,6 +1109,9 @@ public final class DistantHorizonsSemanticCollector {
 					continue;
 				}
 				for (OpaqueSegmentQuad quad : segmentQuads(column, provenance, waterSegmentIndex, 4)) {
+					if (firstWaterBounds.isEmpty()) {
+						firstWaterBounds = waterQuadBounds(column, quad.vertices(), quad.quadIndex());
+					}
 					if (!waterTopQuadCoversBlock(column, quad.vertices(), quad.quadIndex(), probe)) {
 						continue;
 					}
@@ -1114,9 +1132,28 @@ public final class DistantHorizonsSemanticCollector {
 			}
 		}
 		return new DistantHorizonsWaterProbeResult(
-			probe.getX(), probe.getY(), probe.getZ(), false, "no-spatial-published-water-quad",
+			probe.getX(), probe.getY(), probe.getZ(), false,
+			firstWaterBounds.isEmpty() ? "no-spatial-published-water-quad" : "no-spatial-published-water-quad:first=" + firstWaterBounds,
 			0L, 0L, -1, -1, 0, 0, 0, ""
 		);
+	}
+
+	private static String waterQuadBounds(LodColumnSnapshot column, List<LodVertex> vertices, int quadIndex) {
+		int first = Math.multiplyExact(quadIndex, 4);
+		if (first < 0 || first + 4 > vertices.size()) return "invalid";
+		int minX = Integer.MAX_VALUE, maxX = Integer.MIN_VALUE;
+		int minY = Integer.MAX_VALUE, maxY = Integer.MIN_VALUE;
+		int minZ = Integer.MAX_VALUE, maxZ = Integer.MIN_VALUE;
+		for (int i = first; i < first + 4; i++) {
+			LodVertex vertex = vertices.get(i);
+			minX = Math.min(minX, column.originX() + vertex.localX());
+			maxX = Math.max(maxX, column.originX() + vertex.localX());
+			minY = Math.min(minY, column.originY() + vertex.localY());
+			maxY = Math.max(maxY, column.originY() + vertex.localY());
+			minZ = Math.min(minZ, column.originZ() + vertex.localZ());
+			maxZ = Math.max(maxZ, column.originZ() + vertex.localZ());
+		}
+		return minX + ".." + maxX + "," + minY + ".." + maxY + "," + minZ + ".." + maxZ;
 	}
 
 	private static DistantHorizonsWaterProbeResult waterCachedProbeResultLocked(BlockPos probe) {
@@ -1283,7 +1320,10 @@ public final class DistantHorizonsSemanticCollector {
 		}
 		return probe.getX() >= minX && probe.getX() <= maxX
 			&& probe.getZ() >= minZ && probe.getZ() <= maxZ
-			&& minY == maxY && minY == probe.getY() + 1;
+			// Depending on DH's reduction level, the copied water cell is
+			// represented either by its top plane (y + 1) or by the collapsed
+			// surface plane itself (y). Accept only those two exact planes.
+			&& minY == maxY && (minY == probe.getY() || minY == probe.getY() + 1);
 	}
 
 	public static void recordBuiltColumn(
@@ -1949,14 +1989,14 @@ public final class DistantHorizonsSemanticCollector {
 			}
 			LodColumnSnapshot column = publishedColumnLocked(columnKey);
 			if (column == null) {
-				PENDING_VISIBLE_COLUMN_KEYS.add(columnKey);
+				markPendingVisibleColumnLocked(columnKey);
 				routeUnpublishedVisibleColumns++;
 				return VisibleColumnSegments.EMPTY;
 			}
 			if (column.generation() != current.generation()) {
 				// Preserve one acknowledged Rust asset during asynchronous rebuilds;
 				// switch to the replacement only after its asset update is acknowledged.
-				PENDING_VISIBLE_COLUMN_KEYS.add(columnKey);
+				markPendingVisibleColumnLocked(columnKey);
 			}
 			int opaqueSegments = emittedSegmentCount(column.opaque());
 			if (exactAtlasCoverageRequested()) {
@@ -2047,6 +2087,16 @@ public final class DistantHorizonsSemanticCollector {
 		}
 	}
 
+	private static void markPendingVisibleColumnLocked(long columnKey) {
+		if (PENDING_VISIBLE_COLUMN_KEYS.contains(columnKey)) return;
+		if (PENDING_VISIBLE_COLUMN_KEYS.size() >= MAX_PENDING_VISIBLE_COLUMN_KEYS) {
+			throw new IllegalStateException(
+				"Distant Horizons pending visible-column admission exceeds " + MAX_PENDING_VISIBLE_COLUMN_KEYS
+			);
+		}
+		PENDING_VISIBLE_COLUMN_KEYS.add(columnKey);
+	}
+
 	/** Compatibility entrypoint retained for existing callers. */
 	public static VisibleColumnSegments recordVisibleOpaqueColumn(long columnKey) {
 		return recordVisibleMaterialColumn(columnKey);
@@ -2125,11 +2175,12 @@ public final class DistantHorizonsSemanticCollector {
 			// Capture-only semantic receipt: this proves that the real DH visible
 			// list reached Rust route admission, without retaining a Java renderer
 			// object or authorizing a fallback draw.
+			String selectionIdentity = "selected:rust-material-route";
 			net.minecraft.client.dev.GraphicsFrameBenchmark.recordSubmittedWorkIdentity(
-				"distant-horizons-selection",
-				"selected:opaque=" + routeOpaqueSegments
-					+ ":transparent=" + routeTransparentSegments
-					+ ":water=" + routeWaterSegments
+				"distant-horizons-selection", selectionIdentity
+			);
+			net.minecraft.client.dev.DeterministicCameraCapture.recordSubmittedWorkIdentityForCompletedFrame(
+				"distant-horizons-selection", selectionIdentity
 			);
 		}
 	}
@@ -2245,9 +2296,13 @@ public final class DistantHorizonsSemanticCollector {
 			lastExecutedTransparentInstances = transparentInstances;
 			lastExecutedWaterInstances = waterInstances;
 			lastExecutedFrameSemanticsEnabled = true;
+			routeExecutionCount++;
+			String executionIdentity = "executed:rust-material-route";
 			net.minecraft.client.dev.GraphicsFrameBenchmark.recordSubmittedWorkIdentity(
-				"distant-horizons",
-				"executed:world=" + worldFrame + ":submission=" + submission + ":instances=" + instances
+				"distant-horizons", executionIdentity
+			);
+			net.minecraft.client.dev.DeterministicCameraCapture.recordSubmittedWorkIdentityForCompletedFrame(
+				"distant-horizons", executionIdentity
 			);
 			List<VulkanicGalBridge.WorldLodColumnInstanceRecord> executedSegments = submittedSegments == null
 				? LAST_CONSUMED_VISIBLE_SEGMENTS
@@ -2334,6 +2389,12 @@ public final class DistantHorizonsSemanticCollector {
 	}
 
 	/** Bounded route evidence for deterministic captures and regression tests. */
+	public static int routeExecutionCount() {
+		synchronized (COLUMNS) {
+			return routeExecutionCount;
+		}
+	}
+
 	public static RouteDiagnostics routeDiagnosticsSnapshot() {
 		synchronized (COLUMNS) {
 			return new RouteDiagnostics(
@@ -2461,6 +2522,7 @@ public final class DistantHorizonsSemanticCollector {
 			routeExactAtlasResolutionStatusCounts.clear();
 			routeExactAtlasResolutionSamples.clear();
 			routeSelected = false;
+			routeExecutionCount = 0;
 			lastExecutedRouteFrame = 0L;
 			lastExecutedWorldFrame = 0L;
 			lastExecutedSubmission = 0L;
@@ -2514,8 +2576,8 @@ public final class DistantHorizonsSemanticCollector {
 	/**
 	 * Flushes immutable CPU LOD assets only while the caller has already
 	 * selected the Rust Vulkan whole-frame route. This performs no rendering;
-	 * legacy Distant Horizons remains the sole renderer until a later LOD pass
-	 * is explicitly admitted.
+	 * the Rust world frontend consumes the resulting generation after explicit
+	 * asset admission and confirmation.
 	 */
 	public static VulkanicGalBridge.Status flushPendingAssets(VulkanicGalBridge bridge) {
 		if (!enabled() || bridge == null) {
@@ -3422,6 +3484,17 @@ public final class DistantHorizonsSemanticCollector {
 			transparentSide = immutableBuffers(transparentSide);
 			transparentUp = immutableBuffers(transparentUp);
 			transparentWaterUp = immutableBuffers(transparentWaterUp);
+			int segmentCount = opaque.size() + transparentSide.size() + transparentUp.size() + transparentWaterUp.size();
+			if (segmentCount > MAX_LOD_SEGMENTS_PER_COLUMN) {
+				throw new IllegalArgumentException("Distant Horizons LOD segment count must be <= "
+					+ MAX_LOD_SEGMENTS_PER_COLUMN);
+			}
+		if (segmentCount > 0) {
+				validateBuffers(opaque);
+				validateBuffers(transparentSide);
+				validateBuffers(transparentUp);
+				validateBuffers(transparentWaterUp);
+			}
 		}
 
 		private static List<LodBufferSnapshot> immutableBuffers(List<LodBufferSnapshot> buffers) {
@@ -3430,6 +3503,24 @@ public final class DistantHorizonsSemanticCollector {
 				Objects.requireNonNull(buffer, "buffer");
 			}
 			return List.copyOf(buffers);
+		}
+
+		private static void validateBuffers(List<LodBufferSnapshot> buffers) {
+			for (LodBufferSnapshot buffer : buffers) {
+				if (buffer.vertices().isEmpty() || buffer.vertices().size() > MAX_LOD_VERTICES_PER_SEGMENT) {
+					throw new IllegalArgumentException("Distant Horizons LOD segment vertex count exceeds Rust bound");
+				}
+				for (LodVertex vertex : buffer.vertices()) {
+					if (vertex.localX() < 0 || vertex.localX() > 0xFFFF
+						|| vertex.localY() < 0 || vertex.localY() > 0xFFFF
+						|| vertex.localZ() < 0 || vertex.localZ() > 0xFFFF
+						|| vertex.packedLightAndMicroOffset() < 0 || vertex.packedLightAndMicroOffset() > 0xFFFF
+						|| vertex.materialId() < 0 || vertex.materialId() > MAX_LOD_MATERIAL_ID
+						|| vertex.normalIndex() < 0 || vertex.normalIndex() > MAX_LOD_NORMAL_INDEX) {
+						throw new IllegalArgumentException("Distant Horizons LOD vertex is outside Rust semantic bounds");
+					}
+				}
+			}
 		}
 
 		long byteSize() {
@@ -3742,6 +3833,9 @@ public final class DistantHorizonsSemanticCollector {
 	) {
 		LodMaterialProvenanceSnapshot {
 		semanticMaterials = List.copyOf(Objects.requireNonNull(semanticMaterials, "semanticMaterials"));
+		if (semanticMaterials.size() > MAX_LOD_MATERIAL_IDENTITIES_PER_COLUMN) {
+			throw new IllegalArgumentException("Distant Horizons LOD material identity table exceeds Rust bound");
+		}
 		Objects.requireNonNull(inputCoverage, "inputCoverage");
 		Objects.requireNonNull(outputCoverage, "outputCoverage");
 			opaque = copyArrays(opaque);

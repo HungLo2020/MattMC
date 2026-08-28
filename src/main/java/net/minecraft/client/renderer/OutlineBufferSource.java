@@ -19,6 +19,10 @@ public class OutlineBufferSource implements MultiBufferSource {
 
 	@Override
 	public VertexConsumer getBuffer(RenderType renderType) {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java entity-outline buffers are unavailable on selected Vulkan");
+		}
 		if (renderType.isOutline()) {
 			VertexConsumer vertexConsumer = this.outlineBufferSource.getBuffer(renderType);
 			return new OutlineBufferSource.EntityOutlineGenerator(vertexConsumer, this.outlineColor);
@@ -38,6 +42,12 @@ public class OutlineBufferSource implements MultiBufferSource {
 	}
 
 	public void endOutlineBatch() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+			// Entity-outline masks are Rust-owned in whole-frame Vulkan. Do not
+			// flush a Java outline buffer into the presentation path.
+			return;
+		}
 		this.outlineBufferSource.endBatch();
 	}
 

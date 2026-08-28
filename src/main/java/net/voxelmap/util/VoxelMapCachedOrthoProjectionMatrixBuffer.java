@@ -22,7 +22,8 @@ public class VoxelMapCachedOrthoProjectionMatrixBuffer implements AutoCloseable 
     }
 
     public VoxelMapCachedOrthoProjectionMatrixBuffer(String string, float left, float right, float bottom, float top, float zNear, float zFar, boolean useZeroToOneDepthWhenVulkan) {
-        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+        if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+            || net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
             throw new IllegalStateException("Java VoxelMap projection UBO rendering is unavailable while Rust owns whole-frame presentation");
         }
         this.label = "voxelmap-ortho:" + string;

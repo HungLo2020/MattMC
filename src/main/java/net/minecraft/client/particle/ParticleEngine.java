@@ -27,6 +27,9 @@ import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
 public class ParticleEngine {
+	private static int rustGalTerrainParticleDiagnostics;
+	private static final int MAX_RUST_MODEL_PARTICLE_GROUPS = 1_024;
+	private static final int MAX_RUST_MODEL_PARTICLE_INSTANCES = 4_096;
 	private static final List<ParticleRenderType> RENDER_ORDER = List.of(
 		ParticleRenderType.SINGLE_QUADS, ParticleRenderType.ITEM_PICKUP, ParticleRenderType.ELDER_GUARDIANS
 	);
@@ -121,6 +124,17 @@ public class ParticleEngine {
 		}
 	}
 
+	/** Drains capture-seeded particles through the normal render-group path. */
+	public void flushPendingParticlesForCapture() {
+		if (!Boolean.getBoolean("mattmc.dev.deterministicCameraCapture")) {
+			return;
+		}
+		Particle particle;
+		while ((particle = this.particlesToAdd.poll()) != null) {
+			((ParticleGroup)this.particles.computeIfAbsent(particle.getGroup(), this::createParticleGroup)).add(particle);
+		}
+	}
+
 	protected void updateCount(ParticleLimit particleLimit, int i) {
 		this.trackedParticleCounts.addTo(particleLimit, i);
 	}
@@ -135,6 +149,7 @@ public class ParticleEngine {
 	}
 
 	public int enqueueRustGalBlockMarkers(Camera camera, float f) {
+		if (!net.vulkanic.world.WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()) return 0;
 		int enqueued = 0;
 		for (ParticleGroup<?> particleGroup : this.particles.values()) {
 			if (particleGroup instanceof QuadParticleGroup quadParticleGroup) {
@@ -145,21 +160,60 @@ public class ParticleEngine {
 	}
 
 	public int enqueueRustGalTerrainParticles(Camera camera, float f) {
+		if (!net.vulkanic.world.WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()) return 0;
 		int enqueued = 0;
+		int terrainParticles = 0;
 		for (ParticleGroup<?> particleGroup : this.particles.values()) {
 			if (particleGroup instanceof QuadParticleGroup quadParticleGroup) {
+				for (Object particle : quadParticleGroup.getAll()) {
+					if (particle instanceof TerrainParticle) terrainParticles++;
+				}
 				enqueued += quadParticleGroup.enqueueRustGalTerrainParticles(camera, f);
 			}
+		}
+		if (terrainParticles > 0 && Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics") && rustGalTerrainParticleDiagnostics++ < 8) {
+			System.out.println("[MattMC graphics audit] TerrainParticle group drain particles=" + terrainParticles + " enqueued=" + enqueued);
 		}
 		return enqueued;
 	}
 
 	public int enqueueRustGalParticles() {
+		if (!net.vulkanic.world.WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()) return 0;
 		int enqueued = 0;
 		for (ParticleGroup<?> particleGroup : this.particles.values()) {
 			if (particleGroup instanceof QuadParticleGroup quadParticleGroup) {
 				enqueued += quadParticleGroup.enqueueRustGalParticles();
 			}
+		}
+		return enqueued;
+	}
+
+	/**
+	 * Whole-frame extraction entrypoint. Unlike the compatibility renderer, the
+	 * Rust route does not run {@link #extract}; rebuild each quad group's copied
+	 * state from the current camera/frustum before handing it to Rust.
+	 */
+	public int enqueueRustGalParticles(Frustum frustum, Camera camera, float partialTick) {
+		if (!net.vulkanic.world.WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()) return 0;
+		int enqueued = 0;
+		int terrainParticles = 0;
+		for (ParticleGroup<?> particleGroup : this.particles.values()) {
+			if (particleGroup instanceof QuadParticleGroup quadParticleGroup) {
+				if (!System.getProperty("mattmc.dev.rustGalWorldMaterial.terrainParticleScenario", "").isBlank()) {
+					for (Object particle : quadParticleGroup.getAll()) {
+						if (particle instanceof TerrainParticle) terrainParticles++;
+					}
+					if (!net.vulkanic.world.RustGalWorldPrimitiveRenderer.ensureParticleAtlasAvailable(
+						net.minecraft.client.renderer.texture.TextureAtlas.LOCATION_BLOCKS)) {
+						throw new IllegalStateException("Rust whole-frame terrain particle atlas preflight rejected the block atlas");
+					}
+					enqueued += quadParticleGroup.enqueueRustGalTerrainParticles(camera, partialTick);
+				}
+				enqueued += quadParticleGroup.enqueueRustGalParticles(frustum, camera, partialTick);
+			}
+		}
+		if (terrainParticles > 0 && Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")) {
+			System.out.println("[MattMC graphics audit] TerrainParticle whole-frame collector particles=" + terrainParticles + " enqueued=" + enqueued);
 		}
 		return enqueued;
 	}
@@ -173,17 +227,54 @@ public class ParticleEngine {
 	public int enqueueRustGalModelParticles(
 		Camera camera, float partialTick, SubmitNodeStorage submitNodeStorage, CameraRenderState cameraRenderState
 	) {
+		if (!net.vulkanic.world.WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()) return 0;
 		int enqueued = 0;
-		for (ParticleGroup<?> particleGroup : this.particles.values()) {
-			if (!particleGroup.isEmpty()
-				&& (particleGroup instanceof ItemPickupParticleGroup || particleGroup instanceof ElderGuardianParticleGroup)) {
-				// These two render states do not read the frustum during extraction;
-				// they retain only copied gameplay/model data and immediately submit
-				// into the collector. No Java particle renderer crosses the boundary.
-				ParticleGroupRenderState state = particleGroup.extractRenderState(null, camera, partialTick);
-				state.submit(submitNodeStorage, cameraRenderState);
-				enqueued++;
+		net.vulkanic.world.RustGalWorldPrimitiveRenderer.ModelMeshBatchCheckpoint checkpoint =
+			net.vulkanic.world.RustGalWorldPrimitiveRenderer.markModelMeshBatch();
+		try {
+			for (ParticleGroup<?> particleGroup : this.particles.values()) {
+				if (particleGroup.isEmpty() || particleGroup instanceof NoRenderParticleGroup
+					|| particleGroup instanceof QuadParticleGroup) {
+					continue;
+				}
+				if (particleGroup instanceof ItemPickupParticleGroup || particleGroup instanceof ElderGuardianParticleGroup) {
+					if (enqueued >= MAX_RUST_MODEL_PARTICLE_GROUPS) {
+						throw new IllegalStateException(
+							"Rust whole-frame model-particle group bound exceeded " + MAX_RUST_MODEL_PARTICLE_GROUPS
+						);
+					}
+					// These two render states do not read the frustum during extraction;
+					// they retain only copied gameplay/model data and immediately submit
+					// into the collector. No Java particle renderer crosses the boundary.
+					ParticleGroupRenderState state = particleGroup.extractRenderState(null, camera, partialTick);
+					int instanceCount = state instanceof ItemPickupParticleGroup.State itemState
+						? itemState.instances().size()
+						: state instanceof ElderGuardianParticleGroup.State elderState
+							? elderState.states().size()
+							: 0;
+					if (instanceCount > MAX_RUST_MODEL_PARTICLE_INSTANCES) {
+						throw new IllegalStateException(
+							"Rust whole-frame model-particle instance bound exceeded " + MAX_RUST_MODEL_PARTICLE_INSTANCES
+						);
+					}
+					state.submitSemantic(submitNodeStorage, cameraRenderState);
+					enqueued++;
+					continue;
+				}
+				// This method runs outside the ordinary QuadParticleRenderState path.
+				// Do not let a newly introduced or mod-provided model particle family
+				// disappear merely because it has no explicit Rust semantic collector.
+				// The selected Vulkan presenter will fail closed before submission, with
+				// no Java callback retained as a hidden fallback.
+				net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordUnsupportedParticleGroup();
+				throw new IllegalStateException(
+					"Rust whole-frame particle route has no semantic collector for "
+						+ particleGroup.getClass().getName()
+				);
 			}
+		} catch (RuntimeException failure) {
+			net.vulkanic.world.RustGalWorldPrimitiveRenderer.rollbackModelMeshBatch(checkpoint);
+			throw failure;
 		}
 		return enqueued;
 	}

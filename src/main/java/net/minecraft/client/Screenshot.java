@@ -85,9 +85,10 @@ public class Screenshot {
 	}
 
 	public static void takeScreenshot(RenderTarget renderTarget, int i, Consumer<NativeImage> consumer) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			throw new IllegalStateException(
-				"Java screenshot readback is unavailable while Rust owns whole-frame Vulkan presentation"
+				"Java screenshot readback is unavailable on selected Vulkan"
 			);
 		}
 		int j = renderTarget.width;

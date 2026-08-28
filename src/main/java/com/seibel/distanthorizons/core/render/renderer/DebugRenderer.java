@@ -176,10 +176,20 @@ public class DebugRenderer
 	
 	public void render(Mat4f transform)
 	{
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
 		{
-			// Debug wireframes have no admitted Java Vulkan presenter while Rust
-			// owns the frame; keep this optional diagnostic path fail-closed.
+			// The Rust route still traverses the real DH debug registry, but copies
+			// each bounded box into the explicit world line stream below. It must
+			// never initialize or acquire the legacy Java command context.
+			this.transformationMatrixThisFrame = transform;
+			Vec3d camPos = MC_RENDER.getCameraExactPosition();
+			this.camPosFloatThisFrame = new Vec3f((float) camPos.x, (float) camPos.y, (float) camPos.z);
+			this.rendererLists.render(this);
+			for (BoxParticle particle : this.particles)
+			{
+				if (!particle.isDead()) this.renderBox(particle.getBox());
+			}
 			return;
 		}
 		CommandContext ctx = VulkanicAPI.getCommandContext();
@@ -222,7 +232,40 @@ public class DebugRenderer
 	
 	public void renderBox(Box box)
 	{
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
+		{
+				this.renderBoxRust(box);
+				return;
+		}
 		this.renderBox(box, VulkanicAPI.getCommandContext());
+	}
+
+	private void renderBoxRust(Box box)
+	{
+		if (box == null || this.transformationMatrixThisFrame == null || this.camPosFloatThisFrame == null) return;
+		float minX = box.minPos.x - this.camPosFloatThisFrame.x;
+		float minY = box.minPos.y - this.camPosFloatThisFrame.y;
+		float minZ = box.minPos.z - this.camPosFloatThisFrame.z;
+		float sizeX = box.maxPos.x - box.minPos.x;
+		float sizeY = box.maxPos.y - box.minPos.y;
+		float sizeZ = box.maxPos.z - box.minPos.z;
+		if (!Float.isFinite(minX) || !Float.isFinite(minY) || !Float.isFinite(minZ)
+				|| !Float.isFinite(sizeX) || !Float.isFinite(sizeY) || !Float.isFinite(sizeZ)
+				|| sizeX < 0.0F || sizeY < 0.0F || sizeZ < 0.0F) return;
+		org.joml.Matrix4f transform = com.seibel.distanthorizons.core.util.math.Mat4f
+			.createJomlMatrix(this.transformationMatrixThisFrame)
+			.translate(minX, minY, minZ)
+			.scale(sizeX, sizeY, sizeZ);
+		float[] endpoints = {
+			0,0,0, 1,0,0, 1,0,0, 1,1,0, 1,1,0, 0,1,0, 0,1,0, 0,0,0,
+			0,0,1, 1,0,1, 1,0,1, 1,1,1, 1,1,1, 0,1,1, 0,1,1, 0,0,1,
+			0,0,0, 0,0,1, 1,0,0, 1,0,1, 1,1,0, 1,1,1, 0,1,0, 0,1,1
+		};
+		if (!net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueDebugLineSegments(
+				transform, endpoints, box.color.getRGB(), 1.0F)) {
+			throw new IllegalStateException("Rust DH debug-wireframe route rejected semantic box lines");
+		}
 	}
 
 	private void renderBox(Box box, CommandContext ctx)

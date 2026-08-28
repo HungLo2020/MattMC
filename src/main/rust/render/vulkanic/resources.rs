@@ -175,7 +175,7 @@ pub struct CombinedTextureSamplerDesc {
 }
 
 #[repr(u32)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum ShaderStage {
     Vertex = 1,
     Fragment = 2,

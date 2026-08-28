@@ -7,6 +7,10 @@ import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.SubmitNodeStorage;
+import net.minecraft.client.Camera;
+import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.Component;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.ARGB;
@@ -17,6 +21,7 @@ import net.minecraft.world.level.pathfinder.Node;
 import net.minecraft.world.level.pathfinder.Path;
 import net.minecraft.world.level.pathfinder.Path.DebugData;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 
 @Environment(EnvType.CLIENT)
 public class PathfindingRenderer implements DebugRenderer.SimpleDebugRenderer {
@@ -37,6 +42,38 @@ public class PathfindingRenderer implements DebugRenderer.SimpleDebugRenderer {
 			(entity, debugPathInfo) -> renderPath(poseStack, multiBufferSource, d, e, f, debugPathInfo.path(), debugPathInfo.maxNodeDistance())
 		);
 	}
+
+	/** Copies path lines, node markers, and labels into Rust semantic streams. */
+	public void collectRustSemantics(Camera camera, SubmitNodeStorage geometry, SubmitNodeStorage text) {
+		if (!net.vulkanic.world.WorldRenderRoutePolicy.currentDebugLineRoute().usesRustWholeFrameVulkan()
+			|| !net.vulkanic.world.WorldRenderRoutePolicy.currentProceduralQuadRoute().usesRustWholeFrameVulkan()
+			|| !net.vulkanic.world.WorldRenderRoutePolicy.currentWorldTextRoute().usesRustWholeFrameVulkan()) {
+			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+				throw new IllegalStateException("Rust whole-frame pathfinding-debug route is unavailable; Java debug geometry is not a fallback");
+			}
+			return;
+		}
+		if (camera == null || !camera.isInitialized()) return;
+		DebugValueAccess access = Minecraft.getInstance().getConnection().createDebugValueAccess();
+		org.joml.Matrix4f transform = new org.joml.Matrix4f().translate(
+			(float)-camera.getPosition().x, (float)-camera.getPosition().y, (float)-camera.getPosition().z
+		);
+		access.forEachEntity(DebugSubscriptions.ENTITY_PATHS, (entity, info) -> collectPath(transform, camera, geometry, text, info.path(), info.maxNodeDistance()));
+	}
+
+	private static void collectPath(org.joml.Matrix4f transform, Camera camera, SubmitNodeStorage geometry, SubmitNodeStorage text, Path path, float radius) {
+		Node previous = null;
+		for (int i=0;i<path.getNodeCount();i++) { Node node=path.getNode(i); if (previous!=null && distanceToCamera(node.asBlockPos(),camera.getPosition().x,camera.getPosition().y,camera.getPosition().z)<=80.0F) {
+			int color=i==1?0xFF000000:ARGB.opaque(Mth.hsvToRgb((float)i/path.getNodeCount()*0.33F,0.9F,0.9F));
+			line(transform, previous.x+0.5F,previous.y+0.5F,previous.z+0.5F,node.x+0.5F,node.y+0.5F,node.z+0.5F,color,6.0F); } previous=node; }
+		BlockPos target=path.getTarget(); if(distanceToCamera(target,camera.getPosition().x,camera.getPosition().y,camera.getPosition().z)<=80.0F) box(geometry,transform,new AABB(target.getX()+.25,target.getY()+.25,target.getZ()+.25,target.getX()+.75,target.getY()+.75,target.getZ()+.75),0x8000FF00);
+		for(int i=0;i<path.getNodeCount();i++){Node n=path.getNode(i); if(distanceToCamera(n.asBlockPos(),camera.getPosition().x,camera.getPosition().y,camera.getPosition().z)>80.0F)continue; float x=n.x+.5F,y=n.y+.01F*i,z=n.z+.5F; float half=radius; box(geometry,transform,new AABB(x-half,y,z-half,x+half,y+.24F,z+half),i==path.getNextNodeIndex()?0x8000FF00:0x80FFFF00); label(text,camera,new Vec3(x,n.y+.75,z),String.valueOf(n.type),-1,.02F); label(text,camera,new Vec3(x,n.y+.25,z),String.format(Locale.ROOT,"%.2f",n.costMalus),-1,.02F); }
+		DebugData data=path.debugData(); if(data!=null){for(Node n:data.closedSet()) if(distanceToCamera(n.asBlockPos(),camera.getPosition().x,camera.getPosition().y,camera.getPosition().z)<=80)box(geometry,transform,new AABB(n.x+.5-radius/2,n.y+.01,n.z+.5-radius/2,n.x+.5+radius/2,n.y+.1,n.z+.5+radius/2),0x80FFCCCC); for(Node n:data.openSet()) if(distanceToCamera(n.asBlockPos(),camera.getPosition().x,camera.getPosition().y,camera.getPosition().z)<=80)box(geometry,transform,new AABB(n.x+.5-radius/2,n.y+.01,n.z+.5-radius/2,n.x+.5+radius/2,n.y+.1,n.z+.5+radius/2),0x80CCFFFF);}
+	}
+
+	private static void line(org.joml.Matrix4f t,float x0,float y0,float z0,float x1,float y1,float z1,int c,float w){if(!net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueDebugLineSegments(t,new float[]{x0,y0,z0,x1,y1,z1},c,w))throw new IllegalStateException("Rust whole-frame pathfinding-debug route rejected node line");}
+	private static void box(SubmitNodeStorage g,org.joml.Matrix4f t,AABB b,int c){PoseStack p=new PoseStack();p.last().pose().set(t);float x0=(float)b.minX,y0=(float)b.minY,z0=(float)b.minZ,x1=(float)b.maxX,y1=(float)b.maxY,z1=(float)b.maxZ;float[]u={0,0,1,0,1,1,0,1};int[]col={c};float[][]f={{x0,y0,z0,x1,y0,z0,x1,y1,z0,x0,y1,z0},{x1,y0,z1,x0,y0,z1,x0,y1,z1,x1,y1,z1},{x0,y0,z1,x0,y0,z0,x0,y1,z0,x0,y1,z1},{x1,y0,z0,x1,y0,z1,x1,y1,z1,x1,y1,z0},{x0,y0,z0,x0,y0,z1,x1,y0,z1,x1,y0,z0},{x0,y1,z1,x0,y1,z0,x1,y1,z0,x1,y1,z1}};for(float[]q:f)if(!g.submitColoredQuadsSemantic(p,RenderType.debugFilledBox(),q,u,col,15728880))throw new IllegalStateException("Rust whole-frame pathfinding-debug route rejected node box");}
+	private static void label(SubmitNodeStorage text,Camera camera,Vec3 pos,String s,int c,float scale){PoseStack p=new PoseStack();p.translate(pos.x,pos.y,pos.z);p.mulPose(camera.rotation());p.scale(scale,-scale,scale);var v=Component.literal(s).getVisualOrderText();text.submitTextSemantic(0,p,-Minecraft.getInstance().font.width(v)/2F,0,v,false,net.minecraft.client.gui.Font.DisplayMode.SEE_THROUGH,c,0,15728880,0);}
 
 	private static void renderPath(PoseStack poseStack, MultiBufferSource multiBufferSource, double d, double e, double f, Path path, float g) {
 		renderPath(poseStack, multiBufferSource, path, g, true, true, d, e, f);

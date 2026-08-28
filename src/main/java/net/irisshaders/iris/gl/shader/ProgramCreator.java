@@ -12,6 +12,10 @@ public class ProgramCreator {
 	private static final Logger LOGGER = LogManager.getLogger(ProgramCreator.class);
 
 	public static int create(String name, GlShader... shaders) {
+		if (VulkanicAPI.isVulkanBackendSelected()
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris shader-program creation is unavailable on the Rust Vulkan route");
+		}
 		CommandContext ctx = VulkanicAPI.getCommandContext();
 		VulkanicProgramHandle program = VulkanicAPI.createShaderProgramHandle(ctx);
 		int programId = program.value();

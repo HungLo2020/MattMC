@@ -53,6 +53,8 @@ public class EvokerFangsRenderer extends EntityRenderer<EvokerFangs, EvokerFangs
 				)) {
 					throw new IllegalStateException("Rust whole-frame EvokerFangs route selected without a copied indexed mesh request");
 				}
+				net.minecraft.client.dev.DeterministicCameraCapture.noteModelMeshClientSemanticSubmission(
+					evokerFangsRenderState.entityId);
 				RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
 					"rust-vulkan-whole-frame", TEXTURE_LOCATION, true, true, false
 				);

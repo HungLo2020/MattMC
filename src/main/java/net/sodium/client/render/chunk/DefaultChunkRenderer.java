@@ -79,7 +79,8 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
     public DefaultChunkRenderer(RenderDevice device, ChunkVertexType vertexType) {
         super(device, vertexType);
 
-        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| VulkanicAPI.isVulkanBackendSelected()) {
             this.sharedIndexBuffer = null;
             this.sodiumChunkParamsBuffer = null;
             return;
@@ -109,8 +110,7 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
             throw new IllegalStateException("Java Sodium chunk rendering is unavailable while Rust owns whole-frame presentation");
         }
         if (VulkanicAPI.isVulkanBackendSelected()) {
-			this.renderWithVulkan(matrices, commandList, renderLists, renderPass, camera, parameters, indexedRenderingEnabled);
-            return;
+            throw new IllegalStateException("Java Sodium Vulkan chunk rendering is unavailable until the Rust whole-frame terrain route is admitted");
         }
 
         super.begin(renderPass, parameters);
@@ -190,9 +190,15 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
         ChunkRenderListIterable renderLists,
         TerrainRenderPass terrainPass,
         CameraTransform camera,
-		FogParameters parameters,
+        FogParameters parameters,
         boolean indexedRenderingEnabled
     ) {
+		if (VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException(
+				"Java Sodium Vulkan terrain rendering is unavailable; Rust semantic terrain owns the selected route"
+			);
+		}
 		super.begin(terrainPass, parameters);
         boolean shadersEnabled = Iris.getIrisConfig().areShadersEnabled();
         if (shadersEnabled) {
@@ -730,6 +736,12 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
                 this.resources.add(VulkanicAPI.shaderInputParitySamplerResource(name, textureUnit, legacyView));
                 return true;
             }
+            if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+                || net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+                // Rust-owned frames carry semantic sampler resources directly. Never
+                // recover a missing binding from Iris' Java GPU-state cache.
+                return false;
+            }
             GpuTextureView view = TextureTracker.INSTANCE.getTextureView(textureId);
             if (view == null) {
                 view = TextureTracker.INSTANCE.getShaderTexture(textureUnit);
@@ -911,7 +923,7 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
         RenderTessellationBinding vertexBinding;
         RenderTessellationBinding indexBinding;
 
-        if (VulkanicAPI.isVulkanBackendInitializedAndSelected()) {
+        if (VulkanicAPI.isVulkanBackendSelected()) {
             vertexBinding = RenderTessellationBinding.forVertexBuffer(
                     resources.getGeometryGpuBuffer(GpuBuffer.USAGE_VERTEX | GpuBuffer.USAGE_COPY_DST),
                     this.vertexFormat.getShaderBindings());

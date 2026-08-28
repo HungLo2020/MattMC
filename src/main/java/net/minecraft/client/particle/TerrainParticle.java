@@ -86,7 +86,8 @@ public class TerrainParticle extends SingleQuadParticle {
 		long startNanos = System.nanoTime();
 		GraphicsFrameBenchmark.beginPhase("game.particles.terrain.extract");
 		if (Boolean.getBoolean("mattmc.dev.rustGalWorldMaterial.terrainParticle.disabled")) {
-			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 				throw new IllegalStateException("Rust whole-frame terrain particle route cannot be disabled");
 			}
 			GraphicsFrameBenchmark.endPhase("game.particles.terrain.extract");
@@ -94,7 +95,8 @@ public class TerrainParticle extends SingleQuadParticle {
 			return;
 		}
 		if (Boolean.getBoolean("mattmc.dev.rustGalWorldMaterial.terrainParticle.legacyControl")) {
-			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 				throw new IllegalStateException("Rust whole-frame terrain particles cannot use the Java legacy control path");
 			}
 			super.extract(quadParticleRenderState, camera, f);
@@ -106,7 +108,8 @@ public class TerrainParticle extends SingleQuadParticle {
 			GraphicsFrameBenchmark.endPhase("game.particles.terrain.extract");
 			return;
 		}
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			throw new IllegalStateException("Rust whole-frame terrain particle semantics were rejected; Java particle extraction is not a fallback");
 		}
 		super.extract(quadParticleRenderState, camera, f);
@@ -137,10 +140,10 @@ public class TerrainParticle extends SingleQuadParticle {
 			quaternionf,
 			f,
 			this.getQuadSize(f),
-			this.sprite.getUOffset(this.getU0()),
-			this.sprite.getUOffset(this.getU1()),
-			this.sprite.getVOffset(this.getV0()),
-			this.sprite.getVOffset(this.getV1()),
+				Math.min(this.sprite.getUOffset(this.getU0()), this.sprite.getUOffset(this.getU1())),
+				Math.max(this.sprite.getUOffset(this.getU0()), this.sprite.getUOffset(this.getU1())),
+				Math.min(this.sprite.getVOffset(this.getV0()), this.sprite.getVOffset(this.getV1())),
+				Math.max(this.sprite.getVOffset(this.getV0()), this.sprite.getVOffset(this.getV1())),
 				ARGB.colorFromFloat(this.alpha, this.rCol, this.gCol, this.bCol),
 			this.getLightColor(f),
 			!this.alphaTested

@@ -524,6 +524,7 @@ void main() {
         RenderPipeline renderPipeline,
         @Nullable BiFunction<net.minecraft.resources.ResourceLocation, ShaderType, String> sourceProvider
     ) {
+        rejectJavaWholeFramePass("precompileRenderPipeline");
         if (renderPipeline == null) {
             throw new IllegalArgumentException("renderPipeline must not be null");
         }
@@ -662,6 +663,20 @@ void main() {
     }
 
     public VulkanNativeInitializationInfo initializeNativeVulkanRuntime() {
+		// The selected Vulkan route is Rust-owned end to end.  Keep this legacy
+		// Java bring-up entry point fail-closed even when an integration calls it
+		// directly instead of going through RenderSystem's startup gate; otherwise
+		// it could create a second native Vulkan spine behind the Rust presenter.
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+				|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+			return VulkanNativeInitializationInfo.attempted(
+					GraphicsBackendType.VULKAN,
+					false,
+					false,
+					"Java Vulkan native bring-up is unavailable while Rust owns whole-frame presentation.",
+					"Rust Vulkan presenter owns native initialization."
+			);
+		}
         attemptNativeBringUp();
         VulkanReadinessReport report = refreshReadinessReport();
 
@@ -694,31 +709,15 @@ void main() {
     }
 
     public long prepareRendererBootstrapWindow(long mainWindowHandle) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			// The Rust presenter creates its own Vulkan context later from the
-			// actual game window.  Whole-frame startup must not create a hidden GL
-			// window merely to satisfy legacy renderer allocation APIs.
-			return mainWindowHandle;
+		if (!net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+			throw new IllegalStateException(
+				"Vulkan renderer bootstrap requires the Rust Vulkan whole-frame route to be selected"
+			);
 		}
-        if (auxiliaryOpenGlContextWindow != MemoryUtil.NULL) {
-            return auxiliaryOpenGlContextWindow;
-        }
-
-        GLFW.glfwDefaultWindowHints();
-        GLFW.glfwWindowHint(GLFW.GLFW_VISIBLE, GLFW.GLFW_FALSE);
-        GLFW.glfwWindowHint(GLFW.GLFW_CLIENT_API, GLFW.GLFW_OPENGL_API);
-        GLFW.glfwWindowHint(GLFW.GLFW_CONTEXT_VERSION_MAJOR, 3);
-        GLFW.glfwWindowHint(GLFW.GLFW_CONTEXT_VERSION_MINOR, 3);
-        GLFW.glfwWindowHint(GLFW.GLFW_OPENGL_PROFILE, GLFW.GLFW_OPENGL_CORE_PROFILE);
-        GLFW.glfwWindowHint(GLFW.GLFW_OPENGL_FORWARD_COMPAT, GLFW.GLFW_TRUE);
-
-        auxiliaryOpenGlContextWindow = GLFW.glfwCreateWindow(1, 1, "MattMC Vulkan Compatibility Bootstrap", 0L, 0L);
-        if (auxiliaryOpenGlContextWindow == MemoryUtil.NULL) {
-            throw new IllegalStateException("Failed to create Vulkan compatibility bootstrap window for renderer startup");
-        }
-
-        LOGGER.info("Created Vulkan compatibility bootstrap window for backend-owned renderer startup");
-        return auxiliaryOpenGlContextWindow;
+		// The Rust presenter owns the real game window and creates its explicit
+		// Vulkan context there. Never create a hidden OpenGL window as a Java
+		// compatibility bootstrap or second presenter.
+		return mainWindowHandle;
     }
 
     public GpuDevice createRendererDevice(
@@ -728,32 +727,27 @@ void main() {
         BiFunction<net.minecraft.resources.ResourceLocation, ShaderType, String> defaultShaderSource,
         boolean debugLabelsEnabled
     ) {
-        boolean compatibilityOnly = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
-		if (compatibilityOnly) {
-			this.compatibilityDevice = null;
-			this.compatibilityBackend = null;
-			this.rendererDebuggingEnabled = false;
-			return new VulkanWholeFrameSemanticGpuDevice();
+		if (!net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+			throw new IllegalStateException(
+				"Vulkan renderer device creation requires the Rust Vulkan whole-frame route to be selected"
+			);
 		}
-        GraphicsBackend compatibilityBackend = null;
-        net.blaze3d.opengl.GlDevice compatibilityDevice = new net.blaze3d.opengl.GlDevice(
-            rendererBootstrapWindowHandle,
-            debugVerbosity,
-            debugEnabled,
-            defaultShaderSource,
-            debugLabelsEnabled
-        );
-        this.compatibilityDevice = compatibilityDevice;
-        this.compatibilityBackend = compatibilityBackend;
-        this.rendererDebuggingEnabled = debugEnabled;
-        return new VulkanCompatibilityGpuDevice(this, compatibilityDevice);
+		// Vulkan startup has one renderer device: the bounded semantic bootstrap
+		// device used while Rust establishes its explicit GAL presenter.  The Java
+		// GlDevice compatibility adapter remains available only as an isolated,
+		// explicitly fail-closed test seam; it is never constructed by startup.
+		this.compatibilityDevice = null;
+		this.compatibilityBackend = null;
+		this.rendererDebuggingEnabled = false;
+		return new VulkanWholeFrameSemanticGpuDevice();
     }
 
     public <T> T withCompatibilityBackend(java.util.function.Supplier<T> action) {
         if (action == null) {
             throw new IllegalArgumentException("compatibility action must not be null");
         }
-        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+                || net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
             throw new IllegalStateException(
                 "Java Vulkan compatibility backend access is unavailable while Rust owns whole-frame presentation"
             );
@@ -766,9 +760,10 @@ void main() {
     }
 
     public CommandEncoder createCommandEncoder() {
-        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+                || net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
             throw new IllegalStateException(
-                "Java Vulkan command encoder creation is unavailable while Rust owns whole-frame presentation"
+                "Java Vulkan command encoder creation is unavailable on the selected Rust Vulkan route"
             );
         }
         return new VulkanNativeCommandEncoder(this);
@@ -786,9 +781,10 @@ void main() {
     }
 
     public CommandEncoder createNativeTerrainCommandEncoder() {
-        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+                || net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
             throw new IllegalStateException(
-                "Java Vulkan terrain command encoder creation is unavailable while Rust owns whole-frame presentation"
+                "Java Vulkan terrain command encoder creation is unavailable on the selected Rust Vulkan route"
             );
         }
         return new VulkanNativeTerrainCommandEncoder(this);
@@ -846,7 +842,8 @@ void main() {
     }
 
     private static void rejectJavaWholeFramePass(String operation) {
-        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+                || net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
             throw new IllegalStateException(
                 "Java Vulkan " + operation + " is unavailable while Rust owns whole-frame presentation"
             );
@@ -1137,22 +1134,6 @@ void main() {
             return;
         }
 
-        LOGGER.info("Vulkan renderer startup now uses backend-owned device creation instead of shared GlDevice construction");
-        LOGGER.info("Vulkan readiness: {}", getReadinessReport().summaryLine());
-        LOGGER.info("Vulkan execution context: {}", getVulkanExecutionContextInfo().summaryLine());
-        LOGGER.info("Vulkan surface/swapchain: {}", getVulkanSwapchainSurfaceInfo().summaryLine());
-
-        // Iris subsystems must be initialized on the Vulkan path exactly as they are on the OpenGL path.
-        // IrisRenderSystem.dsaState (and several other static fields) is set here; without this call those
-        // fields remain null and any Iris shader-pipeline creation will throw a NullPointerException.
-        // The Vulkan capabilities object reports all-false for DSA/multibind/etc., so DSAUnsupported is
-        // selected — all of its methods route through VulkanicAPI and are fully backend-neutral.
-        net.irisshaders.iris.Iris.duringRenderSystemInit();
-        net.irisshaders.iris.gl.GLDebug.reloadDebugState();
-        net.irisshaders.iris.gl.IrisRenderSystem.initRenderer();
-        net.irisshaders.iris.samplers.IrisSamplers.initRenderer();
-        net.irisshaders.iris.Iris.onRenderSystemInit();
-
         if (mainWindowHandle != MemoryUtil.NULL) {
             LOGGER.info("Reasserting GLFW main window visibility/focus after Vulkan renderer startup: 0x{}",
                 Long.toHexString(mainWindowHandle));
@@ -1182,6 +1163,14 @@ void main() {
     }
 
     public VulkanExecutionContextInfo getVulkanExecutionContextInfo() {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+                || net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+            return VulkanExecutionContextInfo.unavailable(
+                GraphicsBackendType.VULKAN,
+                false,
+                "Java Vulkan execution-context handles are unavailable while Rust owns whole-frame presentation."
+            );
+        }
         attemptNativeBringUp();
 
         NativeSpine spine = nativeSpine;
@@ -1219,6 +1208,14 @@ void main() {
     }
 
     public VulkanSwapchainSurfaceInfo getVulkanSwapchainSurfaceInfo() {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+                || net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+            return VulkanSwapchainSurfaceInfo.unavailable(
+                GraphicsBackendType.VULKAN,
+                false,
+                "Java Vulkan surface/swapchain handles are unavailable while Rust owns whole-frame presentation."
+            );
+        }
         attemptNativeBringUp();
 
         NativeSpine spine = nativeSpine;
@@ -1254,6 +1251,7 @@ void main() {
     }
 
     public void recreateVulkanSwapchain() {
+        rejectJavaWholeFramePass("recreateVulkanSwapchain");
         ensureNativeReady("recreateVulkanSwapchain");
         NativeSpine spine = nativeSpine;
         if (spine == null) {
@@ -1263,6 +1261,7 @@ void main() {
     }
 
     public boolean recreateVulkanSwapchainIfNeeded() {
+        rejectJavaWholeFramePass("recreateVulkanSwapchainIfNeeded");
         ensureNativeReady("recreateVulkanSwapchainIfNeeded");
         NativeSpine spine = nativeSpine;
         if (spine == null) {
@@ -1425,7 +1424,8 @@ void main() {
     }
 
     private void attemptNativeBringUp() {
-        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+                || net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
             nativeBringUpAttempted = true;
             nativeBringUpFailure = "Java Vulkan native bring-up is disabled while Rust owns whole-frame Vulkan presentation.";
             nativeSpine = null;
@@ -1716,14 +1716,17 @@ void main() {
     }
 
     public void uploadShaderSource(CommandContext ctx, int shader, CharSequence source) {
+        rejectJavaWholeFramePass("uploadShaderSource");
         shaderPrograms.uploadShaderSource(shader, source, this::releaseVirtualShaderNativeModule);
     }
 
     public void uploadShaderSource(CommandContext ctx, int shader, long pointerBufferAddress, int stringCount, long lengthsPointer) {
+        rejectJavaWholeFramePass("uploadShaderSource");
         uploadShaderSource(ctx, shader, decodeShaderSource(pointerBufferAddress, stringCount, lengthsPointer));
     }
 
     public void compileShader(CommandContext ctx, int shader) {
+        rejectJavaWholeFramePass("compileShader");
         VirtualShader virtualShader = shaderPrograms.beginCompile(shader, this::releaseVirtualShaderNativeModule);
 
         if (virtualShader.source == null || virtualShader.source.isBlank()) {
@@ -2164,6 +2167,7 @@ void main() {
     }
 
     public void bindBuffer(CommandContext ctx, int target, int buffer) {
+        rejectJavaWholeFramePass("bindBuffer");
         ensureNativeReady("bindBuffer");
         NativeSpine spine = nativeSpine;
         if (spine == null) {
@@ -2173,6 +2177,7 @@ void main() {
     }
 
     public void bindBuffer(CommandContext ctx, VulkanicBufferTarget target, int buffer) {
+        rejectJavaWholeFramePass("bindBuffer");
         if (target == null) {
             throw new IllegalArgumentException("target must not be null");
         }
@@ -2180,6 +2185,7 @@ void main() {
     }
 
     public void bufferData(CommandContext ctx, int target, java.nio.ByteBuffer data, int usage) {
+        rejectJavaWholeFramePass("bufferData");
         if (data == null) {
             throw new IllegalArgumentException("data must not be null");
         }
@@ -2192,6 +2198,7 @@ void main() {
     }
 
     public void bufferData(CommandContext ctx, int target, long size, int usage) {
+        rejectJavaWholeFramePass("bufferData");
         if (size < 0L || size > Integer.MAX_VALUE) {
             throw new IllegalArgumentException("size must be in [0, " + Integer.MAX_VALUE + "], got: " + size);
         }
@@ -2204,6 +2211,7 @@ void main() {
     }
 
     public void bufferData(CommandContext ctx, int target, float[] data, int usage) {
+        rejectJavaWholeFramePass("bufferData");
         if (data == null) {
             throw new IllegalArgumentException("data must not be null");
         }
@@ -2214,6 +2222,7 @@ void main() {
     }
 
     public void bufferData(CommandContext ctx, int target, int[] data, int usage) {
+        rejectJavaWholeFramePass("bufferData");
         if (data == null) {
             throw new IllegalArgumentException("data must not be null");
         }
@@ -2224,6 +2233,7 @@ void main() {
     }
 
     public void bufferSubData(CommandContext ctx, int target, long offset, java.nio.ByteBuffer data) {
+        rejectJavaWholeFramePass("bufferSubData");
         if (data == null) {
             throw new IllegalArgumentException("data must not be null");
         }
@@ -2236,6 +2246,7 @@ void main() {
     }
 
     public void bufferStorage(CommandContext ctx, int target, long size, int flags) {
+        rejectJavaWholeFramePass("bufferStorage");
         if (size < 0L || size > Integer.MAX_VALUE) {
             throw new IllegalArgumentException("size must be in [0, " + Integer.MAX_VALUE + "], got: " + size);
         }
@@ -2248,6 +2259,7 @@ void main() {
     }
 
     public void bufferStorage(CommandContext ctx, int target, java.nio.ByteBuffer data, int flags) {
+        rejectJavaWholeFramePass("bufferStorage");
         if (data == null) {
             throw new IllegalArgumentException("data must not be null");
         }
@@ -2260,6 +2272,7 @@ void main() {
     }
 
     public void copyBufferSubData(CommandContext ctx, int readTarget, int writeTarget, long readOffset, long writeOffset, long size) {
+        rejectJavaWholeFramePass("copyBufferSubData");
         ensureNativeReady("copyBufferSubData");
         NativeSpine spine = nativeSpine;
         if (spine == null) {
@@ -2269,6 +2282,7 @@ void main() {
     }
 
     public java.nio.ByteBuffer mapBuffer(CommandContext ctx, int target, long offset, long length, int access) {
+        rejectJavaWholeFramePass("mapBuffer");
         ensureNativeReady("mapBuffer");
         NativeSpine spine = nativeSpine;
         if (spine == null) {
@@ -2278,6 +2292,7 @@ void main() {
     }
 
     public void unmapBuffer(CommandContext ctx, int target) {
+        rejectJavaWholeFramePass("unmapBuffer");
         ensureNativeReady("unmapBuffer");
         NativeSpine spine = nativeSpine;
         if (spine == null) {
@@ -2287,6 +2302,7 @@ void main() {
     }
 
     public void flushMappedBufferRange(CommandContext ctx, int target, long offset, long length) {
+        rejectJavaWholeFramePass("flushMappedBufferRange");
         ensureNativeReady("flushMappedBufferRange");
         NativeSpine spine = nativeSpine;
         if (spine == null) {
@@ -2300,6 +2316,7 @@ void main() {
     }
 
     public void namedBufferDataDSA(CommandContext ctx, int buffer, long size, int usage) {
+        rejectJavaWholeFramePass("namedBufferDataDSA");
         if (size < 0L || size > Integer.MAX_VALUE) {
             throw new IllegalArgumentException("size must be in [0, " + Integer.MAX_VALUE + "], got: " + size);
         }
@@ -2312,6 +2329,7 @@ void main() {
     }
 
     public void namedBufferDataDSA(CommandContext ctx, int buffer, java.nio.ByteBuffer data, int usage) {
+        rejectJavaWholeFramePass("namedBufferDataDSA");
         if (data == null) {
             throw new IllegalArgumentException("data must not be null");
         }
@@ -2330,6 +2348,7 @@ void main() {
      * without exposing Java-side buffer storage or Iris state to Rust.
      */
     public void namedBufferData(CommandContext ctx, int buffer, float[] data, int usage) {
+        rejectJavaWholeFramePass("namedBufferData");
         if (data == null) {
             throw new IllegalArgumentException("data must not be null");
         }
@@ -2350,6 +2369,7 @@ void main() {
     }
 
     public void namedBufferSubDataDSA(CommandContext ctx, int buffer, long offset, java.nio.ByteBuffer data) {
+        rejectJavaWholeFramePass("namedBufferSubDataDSA");
         if (data == null) {
             throw new IllegalArgumentException("data must not be null");
         }
@@ -2362,6 +2382,7 @@ void main() {
     }
 
     public void namedBufferStorageDSA(CommandContext ctx, int buffer, long size, int flags) {
+        rejectJavaWholeFramePass("namedBufferStorageDSA");
         if (size < 0L || size > Integer.MAX_VALUE) {
             throw new IllegalArgumentException("size must be in [0, " + Integer.MAX_VALUE + "], got: " + size);
         }
@@ -2374,6 +2395,7 @@ void main() {
     }
 
     public void namedBufferStorageDSA(CommandContext ctx, int buffer, java.nio.ByteBuffer data, int flags) {
+        rejectJavaWholeFramePass("namedBufferStorageDSA");
         if (data == null) {
             throw new IllegalArgumentException("data must not be null");
         }
@@ -2386,6 +2408,7 @@ void main() {
     }
 
     public java.nio.ByteBuffer mapNamedBufferRangeDSA(CommandContext ctx, int buffer, long offset, long length, int access) {
+        rejectJavaWholeFramePass("mapNamedBufferRangeDSA");
         ensureNativeReady("mapNamedBufferRangeDSA");
         NativeSpine spine = nativeSpine;
         if (spine == null) {
@@ -2395,6 +2418,7 @@ void main() {
     }
 
     public void unmapNamedBufferDSA(CommandContext ctx, int buffer) {
+        rejectJavaWholeFramePass("unmapNamedBufferDSA");
         ensureNativeReady("unmapNamedBufferDSA");
         NativeSpine spine = nativeSpine;
         if (spine == null) {
@@ -2404,6 +2428,7 @@ void main() {
     }
 
     public void flushMappedNamedBufferRangeDSA(CommandContext ctx, int buffer, long offset, long length) {
+        rejectJavaWholeFramePass("flushMappedNamedBufferRangeDSA");
         ensureNativeReady("flushMappedNamedBufferRangeDSA");
         NativeSpine spine = nativeSpine;
         if (spine == null) {
@@ -2413,6 +2438,7 @@ void main() {
     }
 
     public void copyNamedBufferSubDataDSA(CommandContext ctx, int readBuffer, int writeBuffer, long readOffset, long writeOffset, long size) {
+        rejectJavaWholeFramePass("copyNamedBufferSubDataDSA");
         ensureNativeReady("copyNamedBufferSubDataDSA");
         NativeSpine spine = nativeSpine;
         if (spine == null) {
@@ -2632,6 +2658,7 @@ void main() {
     }
 
     public void setActiveTextureUnit(CommandContext ctx, int unit) {
+        rejectJavaWholeFramePass("setActiveTextureUnit");
         requireVulkanCommandBufferHandle("setActiveTextureUnit", ctx);
         ensureNativeReady("setActiveTextureUnit");
         NativeSpine spine = nativeSpine;
@@ -2698,6 +2725,7 @@ void main() {
     }
 
     public void bindTexture(CommandContext ctx, int target, int textureId) {
+        rejectJavaWholeFramePass("bindTexture");
         requireVulkanCommandBufferHandle("bindTexture", ctx);
         if (!isSupportedLegacyTextureBindTarget(target)) {
             throw new IllegalArgumentException(
@@ -2719,6 +2747,7 @@ void main() {
     }
 
     public void bindTexture(CommandContext ctx, net.vulkanic.VulkanicTextureTarget target, int textureId) {
+        rejectJavaWholeFramePass("bindTexture");
         if (target == null) {
             throw new IllegalArgumentException("target must not be null");
         }
@@ -2726,6 +2755,7 @@ void main() {
     }
 
     public void bindTextureUnit(CommandContext ctx, int unit, int texture) {
+        rejectJavaWholeFramePass("bindTextureUnit");
         requireVulkanCommandBufferHandle("bindTextureUnit", ctx);
         if (unit < 0) {
             throw new IllegalArgumentException("unit must be >= 0, got: " + unit);
@@ -2787,10 +2817,12 @@ void main() {
     }
 
     public void setTextureParameter(CommandContext ctx, int target, int pname, int param) {
+        rejectJavaWholeFramePass("setTextureParameter");
         texParameteri(ctx, target, pname, param);
     }
 
     public int getTexParameteri(CommandContext ctx, int target, int pname) {
+        rejectJavaWholeFramePass("getTexParameteri");
         requireVulkanCommandBufferHandle("getTexParameteri", ctx);
         if (!isSupportedLegacyTextureTarget(target)) {
             throw new IllegalArgumentException("Unsupported legacy Vulkan texture target for getTexParameteri: " + target);
@@ -2805,10 +2837,12 @@ void main() {
     }
 
     public void texParameterf(CommandContext ctx, int target, int pname, float param) {
+        rejectJavaWholeFramePass("texParameterf");
         texParameteri(ctx, target, pname, Math.round(param));
     }
 
     public void texParameteri(CommandContext ctx, int target, int pname, int param) {
+        rejectJavaWholeFramePass("texParameteri");
         requireVulkanCommandBufferHandle("texParameteri", ctx);
         if (!isSupportedLegacyTextureTarget(target)) {
             throw new IllegalArgumentException("Unsupported legacy Vulkan texture target for texParameteri: " + target);
@@ -2836,6 +2870,7 @@ void main() {
     }
 
     public void setPixelStore(CommandContext ctx, int pname, int value) {
+        rejectJavaWholeFramePass("setPixelStore");
         requireVulkanCommandBufferHandle("setPixelStore", ctx);
         ensureNativeReady("setPixelStore");
         NativeSpine spine = nativeSpine;
@@ -2846,6 +2881,7 @@ void main() {
     }
 
     public int getTextureLevelParameter(CommandContext ctx, int target, int level, int pname) {
+        rejectJavaWholeFramePass("getTextureLevelParameter");
         requireVulkanCommandBufferHandle("getTextureLevelParameter", ctx);
         if (!isSupportedLegacyTextureTarget(target)) {
             throw new IllegalArgumentException("Unsupported legacy Vulkan texture target for getTextureLevelParameter: " + target);
@@ -2872,6 +2908,7 @@ void main() {
                                 int format,
                                 int type,
                                 java.nio.ByteBuffer pixels) {
+        rejectJavaWholeFramePass("uploadTexture2D");
         long commandBufferHandle = requireVulkanCommandBufferHandle("uploadTexture2D", ctx);
         if (!isSupportedLegacyTextureTarget(target)) {
             throw new IllegalArgumentException(
@@ -2920,6 +2957,7 @@ void main() {
         int border,
         java.nio.ByteBuffer pixels
     ) {
+        rejectJavaWholeFramePass("uploadTexture2D");
         if (target == null) {
             throw new IllegalArgumentException("target must not be null");
         }
@@ -2951,6 +2989,7 @@ void main() {
                                         int format,
                                         int type,
                                         long pixels) {
+        rejectJavaWholeFramePass("uploadTexture2DSubImage");
         long commandBufferHandle = requireVulkanCommandBufferHandle("uploadTexture2DSubImage", ctx);
         if (!isSupportedLegacyTextureTarget(target)) {
             throw new IllegalArgumentException("Unsupported legacy Vulkan texture upload target: " + target);
@@ -2989,6 +3028,7 @@ void main() {
                                         int format,
                                         int type,
                                         java.nio.ByteBuffer pixels) {
+        rejectJavaWholeFramePass("uploadTexture2DSubImage");
         long commandBufferHandle = requireVulkanCommandBufferHandle("uploadTexture2DSubImage", ctx);
         if (!isSupportedLegacyTextureTarget(target)) {
             throw new IllegalArgumentException("Unsupported legacy Vulkan texture upload target: " + target);
@@ -3447,6 +3487,7 @@ void main() {
     }
 
     public List<VulkanicSpirvModule> getLinkedProgramSpirvModules(CommandContext ctx, int program) {
+        rejectJavaWholeFramePass("getLinkedProgramSpirvModules");
         requireVulkanCommandBufferHandle("getLinkedProgramSpirvModules", ctx);
         VirtualProgram virtualProgram = shaderPrograms.program(program);
         return virtualProgram == null ? List.of() : virtualProgram.linkedSpirvModules;
@@ -3458,6 +3499,7 @@ void main() {
         int program,
         java.util.Set<VulkanicShaderStage> stages
     ) {
+        rejectJavaWholeFramePass("getLinkedProgramResourceLayout");
         requireVulkanCommandBufferHandle("getLinkedProgramResourceLayout", ctx);
         LinkedProgramExecutionSnapshot snapshot = shaderPrograms.linkedExecutionSnapshot(program, stages);
         return snapshot == null ? null : snapshot.resourceLayout();
@@ -3606,13 +3648,10 @@ void main() {
                     if (spine != null) {
                         textureId = spine.textureResources.boundLegacyTexture2D(unit);
                     }
-                    if (textureId <= 0) {
-                        textureId = net.irisshaders.iris.gl.IrisRenderSystem.getTextureBinding(unit);
-                    }
-                    VulkanicTextureView textureView = textureId > 0 ? createManagedLegacyTextureView(textureId) : null;
-                    return textureView != null
-                        ? textureView
-                        : createLegacyFallbackSamplerView(commandBufferHandle, binding, unit);
+                    // A selected Rust Vulkan frame has no legacy Iris sampler
+                    // state and no Java fallback texture. Missing explicit
+                    // bindings remain unavailable and are rejected by planning.
+                    return textureId > 0 ? createManagedLegacyTextureView(textureId) : null;
                 }
 
                 @Override
@@ -3694,9 +3733,7 @@ void main() {
                     }
                     int textureId = sharedTextureIdForSampler(sharedSnapshot.textureBindingsByKey(), binding, unit);
                     VulkanicTextureView textureView = textureId > 0 ? createManagedLegacyTextureView(textureId) : null;
-                    return textureView != null
-                        ? textureView
-                        : createLegacyFallbackSamplerView(commandBufferHandle, binding, unit);
+                    return textureView;
                 }
 
                 @Override
@@ -3778,9 +3815,7 @@ void main() {
                     }
                     int textureId = sharedTextureIdForSampler(sharedSnapshot.textureBindingsByKey(), binding, unit);
                     VulkanicTextureView textureView = textureId > 0 ? createManagedLegacyTextureView(textureId) : null;
-                    return textureView != null
-                        ? textureView
-                        : createLegacyFallbackSamplerView(commandBufferHandle, binding, unit);
+                    return textureView;
                 }
 
                 @Override
@@ -3999,6 +4034,7 @@ void main() {
         PipelineDescriptor.ResourceBinding binding,
         int programId
     ) {
+        rejectJavaWholeFramePass("resolveLegacySamplerViewForProgram");
         if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
             // Rust Vulkan consumes explicit resource bindings; borrowed Iris GPU state is
             // unavailable for the selected Rust-owned route.
@@ -4015,56 +4051,11 @@ void main() {
         if (spine != null) {
             textureId = spine.textureResources.boundLegacyTexture2D(unit);
         }
-        if (textureId <= 0) {
-            textureId = net.irisshaders.iris.gl.IrisRenderSystem.getTextureBinding(unit);
-        }
         VulkanicTextureView textureView = null;
         if (textureId > 0) {
-            net.blaze3d.textures.GpuTextureView trackedTextureView =
-                net.irisshaders.iris.pbr.TextureTracker.INSTANCE.getTextureView(textureId);
-            if (trackedTextureView != null && trackedTextureView.texture() instanceof VulkanicTexture trackedTexture) {
-                textureView = createManagedTextureView(
-                    trackedTexture,
-                    trackedTextureView.baseMipLevel(),
-                    trackedTextureView.mipLevels()
-                );
-            }
-            if (textureView == null) {
-                textureView = createManagedLegacyTextureView(textureId);
-            }
+            textureView = createManagedLegacyTextureView(textureId);
         }
-        return textureView != null
-            ? textureView
-            : createLegacyFallbackSamplerView(commandBufferHandle, binding, unit);
-    }
-
-    @Nullable
-    private VulkanicTextureView createLegacyFallbackSamplerView(
-        long commandBufferHandle,
-        PipelineDescriptor.ResourceBinding binding,
-        int samplerUnit
-    ) {
-        NativeSpine spine = nativeSpine;
-        if (spine == null) {
-            return null;
-        }
-        if (!spine.canEnsureLegacyFallbackSamplerTexture(commandBufferHandle)) {
-            return null;
-        }
-
-        int fallbackTextureId = spine.ensureLegacyFallbackSamplerTexture(commandBufferHandle);
-        VulkanicTextureView fallbackView = createManagedLegacyTextureView(fallbackTextureId);
-        if (fallbackView != null) {
-            String key = binding.name() + '|' + samplerUnit;
-            if (LEGACY_FALLBACK_SAMPLER_LOGS.add(key)) {
-                LOGGER.warn(
-                    "Binding Vulkan legacy sampler '{}' on unit {} to the backend fallback black texture because no legacy texture is bound.",
-                    binding.name(),
-                    samplerUnit
-                );
-            }
-        }
-        return fallbackView;
+        return textureView;
     }
 
     private static void logIncompleteLegacyResourcePlan(
@@ -4364,6 +4355,7 @@ void main() {
     public net.vulkanic.PipelineHandle resolvePipelineHandle(
             net.blaze3d.pipeline.RenderPipeline renderPipeline,
             net.vulkanic.PipelineDescriptor descriptor) {
+        rejectJavaWholeFramePass("resolvePipelineHandle");
         if (renderPipeline == null) {
             return null;
         }
@@ -4419,6 +4411,7 @@ void main() {
             net.blaze3d.pipeline.RenderPipeline renderPipeline,
             net.vulkanic.PipelineDescriptor descriptor,
             int framebuffer) {
+        rejectJavaWholeFramePass("resolvePipelineHandle(framebuffer)");
         if (framebuffer == 0) {
             return resolvePipelineHandle(renderPipeline, descriptor);
         }
@@ -4433,6 +4426,7 @@ void main() {
             net.blaze3d.pipeline.RenderPipeline renderPipeline,
             net.vulkanic.PipelineDescriptor descriptor,
             VulkanicRenderTargetDescriptor renderTarget) {
+        rejectJavaWholeFramePass("resolvePipelineHandle(renderTarget)");
         if (renderPipeline == null) {
             return null;
         }
@@ -4445,6 +4439,7 @@ void main() {
             net.vulkanic.PipelineDescriptor descriptor,
             VulkanicTextureView colorTarget,
             @Nullable VulkanicTextureView depthTarget) {
+        rejectJavaWholeFramePass("resolvePipelineHandle(textureViews)");
         if (renderPipeline == null) {
             return null;
         }
@@ -4925,6 +4920,7 @@ void main() {
             PipelineHandle pipeline,
             PipelineDescriptor descriptor,
             net.vulkanic.PipelineResourceBindings bindings) {
+        rejectJavaWholeFramePass("bindPipelineResources");
         long commandBufferHandle = requireVulkanCommandBufferHandle("bindPipelineResources", ctx);
 
         if (pipeline != null && !pipeline.isValid()) {
@@ -5022,6 +5018,7 @@ void main() {
 
     public void applyResourceBarriers(CommandContext ctx,
             VulkanicResourceBarriers barriers) {
+        rejectJavaWholeFramePass("applyResourceBarriers");
         long commandBufferHandle = requireVulkanCommandBufferHandle("applyResourceBarriers", ctx);
 
         VulkanicResourceBarriers safeBarriers = Objects.requireNonNull(barriers, "barriers must not be null");
@@ -5739,6 +5736,13 @@ void main() {
     }
 
     private boolean isFeedbackLoopCapable(VulkanicTexture texture) {
+        // Explicit Vulkan textures carry no legacy GL identity.  Do not probe
+        // the compatibility registry for them: the Rust-owned route must make
+        // feedback-loop capability part of its explicit pass/resource state,
+        // never infer it from a shared native handle.
+        if (texture instanceof VulkanTexture) {
+            return false;
+        }
         NativeSpine spine = nativeSpine;
         if (spine == null) {
             return false;
@@ -6227,6 +6231,7 @@ void main() {
         }
 
         private void ensureOpen(String operation) {
+            rejectJavaWholeFramePass("renderPass." + operation);
             if (closed) {
                 throw new IllegalStateException(operation + " called after render pass was closed");
             }
@@ -6336,6 +6341,7 @@ void main() {
 
         @Override
         public void close() {
+            rejectJavaWholeFramePass("renderPass.close");
             if (closed) {
                 return;
             }
@@ -6437,7 +6443,8 @@ void main() {
     }
 
     public void presentTextureToScreen(CommandContext ctx, GpuTextureView textureView) {
-        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+                || net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
             throw new IllegalStateException(
                 "Java Vulkan backend presentation is unavailable while Rust owns whole-frame presentation"
             );
@@ -6522,6 +6529,7 @@ void main() {
         CommandContext ctx,
         VulkanicGalExecutionRequest.GraphicsDrawRequest request
     ) {
+        rejectJavaWholeFramePass("captureGraphicsRequest");
         Objects.requireNonNull(request, "request");
         if (request.compatibilitySnapshot().source().equals("frontend-captured-vulkan-legacy-draw")
             || pendingCapturedGalDraws.containsKey(request)) {
@@ -7127,6 +7135,7 @@ void main() {
      * called outside a command buffer.  Equivalent to {@link #setViewport}.
      */
     public void setDynamicViewport(CommandContext ctx, int x, int y, int width, int height) {
+        rejectJavaWholeFramePass("setDynamicViewport");
         long commandBufferHandle = requireVulkanCommandBufferHandle("setDynamicViewport", ctx);
         ensureNativeReady("setDynamicViewport");
         NativeSpine spine = requireNativeSpineForCommandOp("setDynamicViewport");
@@ -7143,6 +7152,7 @@ void main() {
      * buffer is actively recording.
      */
     public void setDynamicScissor(CommandContext ctx, int x, int y, int width, int height) {
+        rejectJavaWholeFramePass("setDynamicScissor");
         long commandBufferHandle = requireVulkanCommandBufferHandle("setDynamicScissor", ctx);
         ensureNativeReady("setDynamicScissor");
         NativeSpine spine = requireNativeSpineForCommandOp("setDynamicScissor");
@@ -7157,6 +7167,12 @@ void main() {
      * render-pass begin via the load-op).
      */
     public void clearBuffers(CommandContext ctx, int mask) {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+                || net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+            throw new IllegalStateException(
+                "Java Vulkan clearBuffers is unavailable while Rust owns whole-frame presentation"
+            );
+        }
         long commandBufferHandle = requireVulkanCommandBufferHandle("clearBuffers", ctx);
         VulkanFramebufferRenderTargetManager.ClearOperationRequest clearRequest =
             framebufferRenderTargets.clearRequestForBoundDrawFramebuffer(mask);
@@ -7186,6 +7202,7 @@ void main() {
 
     /** Caches blend-enabled flag (applied at pipeline creation). */
     public void setBlendEnabled(CommandContext ctx, boolean enabled) {
+        rejectJavaWholeFramePass("setBlendEnabled");
         requireVulkanCommandBufferHandle("setBlendEnabled", ctx);
         this.pendingBlendEnabled = enabled;
         updateIndexedBlendEnabled(0, enabled);
@@ -7193,6 +7210,7 @@ void main() {
 
     /** Caches blend function (applied at pipeline creation). */
     public void setBlendFunction(CommandContext ctx, int srcRgb, int dstRgb, int srcAlpha, int dstAlpha) {
+        rejectJavaWholeFramePass("setBlendFunction");
         requireVulkanCommandBufferHandle("setBlendFunction", ctx);
         this.pendingBlendSrcRgb   = srcRgb;
         this.pendingBlendDstRgb   = dstRgb;
@@ -7218,6 +7236,7 @@ void main() {
 
     /** Caches blend equation (applied at pipeline creation). */
     public void setBlendEquation(CommandContext ctx, int mode) {
+        rejectJavaWholeFramePass("setBlendEquation");
         requireVulkanCommandBufferHandle("setBlendEquation", ctx);
         this.pendingBlendEquation = mode;
         this.pendingBlendEquationAlpha = mode;
@@ -7225,6 +7244,7 @@ void main() {
 
     /** Caches blend equation — typed overload. */
     public void setBlendEquation(CommandContext ctx, net.vulkanic.VulkanicBlendEquation mode) {
+        rejectJavaWholeFramePass("setBlendEquation");
         requireVulkanCommandBufferHandle("setBlendEquation", ctx);
         this.pendingBlendEquation = mode.ordinal();
         this.pendingBlendEquationAlpha = mode.ordinal();
@@ -7232,6 +7252,7 @@ void main() {
 
     /** Caches separate blend equations (applied at pipeline creation). */
     public void setBlendEquationSeparate(CommandContext ctx, int modeRGB, int modeAlpha) {
+        rejectJavaWholeFramePass("setBlendEquationSeparate");
         requireVulkanCommandBufferHandle("setBlendEquationSeparate", ctx);
         this.pendingBlendEquation      = modeRGB;
         this.pendingBlendEquationAlpha = modeAlpha;
@@ -7241,6 +7262,7 @@ void main() {
     public void setBlendEquationSeparate(CommandContext ctx,
                                          net.vulkanic.VulkanicBlendEquation modeRGB,
                                          net.vulkanic.VulkanicBlendEquation modeAlpha) {
+        rejectJavaWholeFramePass("setBlendEquationSeparate");
         requireVulkanCommandBufferHandle("setBlendEquationSeparate", ctx);
         this.pendingBlendEquation      = modeRGB.ordinal();
         this.pendingBlendEquationAlpha = modeAlpha.ordinal();
@@ -7252,6 +7274,7 @@ void main() {
 
     /** Caches depth test function (applied at pipeline creation). */
     public void setDepthTest(CommandContext ctx, int func) {
+        rejectJavaWholeFramePass("setDepthTest");
         requireVulkanCommandBufferHandle("setDepthTest", ctx);
         this.pendingDepthTestEnabled = true;
         this.pendingDepthFunc = func;
@@ -7259,6 +7282,7 @@ void main() {
 
     /** Caches depth test function — typed overload. */
     public void setDepthTest(CommandContext ctx, net.vulkanic.VulkanicDepthCompareOp func) {
+        rejectJavaWholeFramePass("setDepthTest");
         requireVulkanCommandBufferHandle("setDepthTest", ctx);
         this.pendingDepthTestEnabled = true;
         this.pendingDepthFunc = switch (func) {
@@ -7285,6 +7309,7 @@ void main() {
 
     /** Caches depth write mask (applied at pipeline creation). */
     public void setDepthWriteMask(CommandContext ctx, boolean enabled) {
+        rejectJavaWholeFramePass("setDepthWriteMask");
         requireVulkanCommandBufferHandle("setDepthWriteMask", ctx);
         this.pendingDepthWriteMask = enabled;
     }
@@ -7295,6 +7320,7 @@ void main() {
 
     /** Caches color write mask (applied at pipeline creation). */
     public void setColorMask(CommandContext ctx, boolean r, boolean g, boolean b, boolean a) {
+        rejectJavaWholeFramePass("setColorMask");
         requireVulkanCommandBufferHandle("setColorMask", ctx);
         this.pendingColorMaskR = r;
         this.pendingColorMaskG = g;
@@ -7308,12 +7334,14 @@ void main() {
 
     /** Caches cull face mode — raw GL constant (applied at pipeline creation). */
     public void setCullFaceMode(CommandContext ctx, int mode) {
+        rejectJavaWholeFramePass("setCullFaceMode");
         requireVulkanCommandBufferHandle("setCullFaceMode", ctx);
         this.pendingCullFaceMode = mode;
     }
 
     /** Caches cull face mode — typed overload. */
     public void setCullFaceMode(CommandContext ctx, net.vulkanic.VulkanicCullFaceMode mode) {
+        rejectJavaWholeFramePass("setCullFaceMode");
         requireVulkanCommandBufferHandle("setCullFaceMode", ctx);
         this.pendingCullFaceMode = switch (mode) {
             case FRONT -> VulkanicAPI.GL_FRONT;
@@ -7324,6 +7352,7 @@ void main() {
 
     /** Caches polygon rasterization mode (applied at pipeline creation). */
     public void setPolygonMode(CommandContext ctx, int face, int mode) {
+        rejectJavaWholeFramePass("setPolygonMode");
         requireVulkanCommandBufferHandle("setPolygonMode", ctx);
         this.pendingPolygonFace = face;
         this.pendingPolygonMode = mode;
@@ -7331,6 +7360,7 @@ void main() {
 
     /** Caches polygon offset parameters (applied at pipeline creation). */
     public void setPolygonOffset(CommandContext ctx, float factor, float units) {
+        rejectJavaWholeFramePass("setPolygonOffset");
         requireVulkanCommandBufferHandle("setPolygonOffset", ctx);
         this.pendingPolygonOffsetFactor = factor;
         this.pendingPolygonOffsetUnits  = units;
@@ -7345,6 +7375,7 @@ void main() {
      * The virtual shader graph is still consulted at pipeline creation time, not here.
      */
     public void bindShaderProgram(CommandContext ctx, int programId) {
+        rejectJavaWholeFramePass("bindShaderProgram");
         requireVulkanCommandBufferHandle("bindShaderProgram", ctx);
         shaderPrograms.bindProgram(programId);
     }
@@ -7358,6 +7389,7 @@ void main() {
      * CULL_FACE, POLYGON_OFFSET_FILL) are mapped to Vulkan pipeline state.
      */
     public void setCapabilityEnabled(CommandContext ctx, int cap, boolean enabled) {
+        rejectJavaWholeFramePass("setCapabilityEnabled");
         long commandBufferHandle = requireVulkanCommandBufferHandle("setCapabilityEnabled", ctx);
         final int GL_BLEND        = 0x0BE2;
         final int GL_DEPTH_TEST   = 0x0B71;
@@ -7388,6 +7420,7 @@ void main() {
 
     /** Indexed capability enable/disable — caches per-buffer blend enable state. */
     public void setIndexedEnabled(CommandContext ctx, int capability, int index, boolean enabled) {
+        rejectJavaWholeFramePass("setIndexedEnabled");
         requireVulkanCommandBufferHandle("setIndexedEnabled", ctx);
         final int GL_BLEND = 0x0BE2;
         if (capability == GL_BLEND) {
@@ -7415,18 +7448,21 @@ void main() {
 
     /** Caches clear colour (used at render-pass begin / vkCmdClearAttachments). */
     public void setClearColor(CommandContext ctx, float r, float g, float b, float a) {
+        rejectJavaWholeFramePass("setClearColor");
         requireVulkanCommandBufferHandle("setClearColor", ctx);
         framebufferRenderTargets.setClearColor(r, g, b, a);
     }
 
     /** Caches clear depth value (used at render-pass begin). */
     public void setClearDepth(CommandContext ctx, double depth) {
+        rejectJavaWholeFramePass("setClearDepth");
         requireVulkanCommandBufferHandle("setClearDepth", ctx);
         framebufferRenderTargets.setClearDepth(depth);
     }
 
     /** Caches clear stencil value (used by stencil clear operations). */
     public void setClearStencil(CommandContext ctx, int stencil) {
+        rejectJavaWholeFramePass("setClearStencil");
         requireVulkanCommandBufferHandle("setClearStencil", ctx);
         framebufferRenderTargets.setClearStencil(stencil);
     }
@@ -7437,6 +7473,7 @@ void main() {
 
     /** Caches logic op (applied at pipeline creation; no direct Vulkan dynamic equivalent). */
     public void setLogicOp(CommandContext ctx, int opcode) {
+        rejectJavaWholeFramePass("setLogicOp");
         requireVulkanCommandBufferHandle("setLogicOp", ctx);
         this.pendingLogicOp = opcode;
     }
@@ -7450,6 +7487,7 @@ void main() {
      * buffer routing is handled at render-pass / blit level.
      */
     public void setReadBuffer(CommandContext ctx, int buffer) {
+        rejectJavaWholeFramePass("setReadBuffer");
         requireVulkanCommandBufferHandle("setReadBuffer", ctx);
         framebufferRenderTargets.setReadBuffer(buffer);
     }
@@ -7459,6 +7497,7 @@ void main() {
      * at render-pass / pipeline creation time; this cache is consulted there.
      */
     public void setDrawBuffer(CommandContext ctx, int mode) {
+        rejectJavaWholeFramePass("setDrawBuffer");
         requireVulkanCommandBufferHandle("setDrawBuffer", ctx);
         framebufferRenderTargets.setDrawBuffer(mode);
     }
@@ -7472,6 +7511,7 @@ void main() {
      * descriptor and there is no equivalent to a VAO object.
      */
     public void bindVertexArray(CommandContext ctx, int vao) {
+        rejectJavaWholeFramePass("bindVertexArray");
         requireVulkanCommandBufferHandle("bindVertexArray", ctx);
         bufferVertexResources.bindVertexArray(vao);
     }
@@ -7517,11 +7557,13 @@ void main() {
      * this call only updates the cached binding for diagnostic / compatibility use.
      */
     public void bindFramebuffer(CommandContext ctx, int target, int fbo) {
+        rejectJavaWholeFramePass("bindFramebuffer");
         requireVulkanCommandBufferHandle("bindFramebuffer", ctx);
         framebufferRenderTargets.bindFramebuffer(target, fbo);
     }
 
     public void bindRenderTarget(CommandContext ctx, net.vulkanic.VulkanicTexture colorTexture, net.vulkanic.VulkanicTexture depthTexture) {
+        rejectJavaWholeFramePass("bindRenderTarget");
         requireVulkanCommandBufferHandle("bindRenderTarget", ctx);
         int framebuffer = resolveFramebufferForTextures(ctx, colorTexture, depthTexture);
         bindFramebuffer(ctx, VulkanicAPI.GL_FRAMEBUFFER, framebuffer);
@@ -7893,46 +7935,55 @@ void main() {
     }
 
     public void setUniform1i(CommandContext ctx, int location, int value) {
+        rejectJavaWholeFramePass("setUniform1i");
         requireVulkanCommandBufferHandle("setUniform1i", ctx);
         captureStandaloneUniformInts(location, new int[] {value});
     }
 
     public void setUniform1f(CommandContext ctx, int location, float value) {
+        rejectJavaWholeFramePass("setUniform1f");
         requireVulkanCommandBufferHandle("setUniform1f", ctx);
         captureStandaloneUniformFloats(location, new float[] {value});
     }
 
     public void setUniform2f(CommandContext ctx, int location, float v0, float v1) {
+        rejectJavaWholeFramePass("setUniform2f");
         requireVulkanCommandBufferHandle("setUniform2f", ctx);
         captureStandaloneUniformFloats(location, new float[] {v0, v1});
     }
 
     public void setUniform2i(CommandContext ctx, int location, int v0, int v1) {
+        rejectJavaWholeFramePass("setUniform2i");
         requireVulkanCommandBufferHandle("setUniform2i", ctx);
         captureStandaloneUniformInts(location, new int[] {v0, v1});
     }
 
     public void setUniform3f(CommandContext ctx, int location, float v0, float v1, float v2) {
+        rejectJavaWholeFramePass("setUniform3f");
         requireVulkanCommandBufferHandle("setUniform3f", ctx);
         captureStandaloneUniformFloats(location, new float[] {v0, v1, v2});
     }
 
     public void setUniform3i(CommandContext ctx, int location, int v0, int v1, int v2) {
+        rejectJavaWholeFramePass("setUniform3i");
         requireVulkanCommandBufferHandle("setUniform3i", ctx);
         captureStandaloneUniformInts(location, new int[] {v0, v1, v2});
     }
 
     public void setUniform4f(CommandContext ctx, int location, float v0, float v1, float v2, float v3) {
+        rejectJavaWholeFramePass("setUniform4f");
         requireVulkanCommandBufferHandle("setUniform4f", ctx);
         captureStandaloneUniformFloats(location, new float[] {v0, v1, v2, v3});
     }
 
     public void setUniform4i(CommandContext ctx, int location, int v0, int v1, int v2, int v3) {
+        rejectJavaWholeFramePass("setUniform4i");
         requireVulkanCommandBufferHandle("setUniform4i", ctx);
         captureStandaloneUniformInts(location, new int[] {v0, v1, v2, v3});
     }
 
     public void setUniformMatrix3fv(CommandContext ctx, int location, boolean transpose, java.nio.FloatBuffer matrix) {
+        rejectJavaWholeFramePass("setUniformMatrix3fv");
         requireVulkanCommandBufferHandle("setUniformMatrix3fv", ctx);
         java.nio.FloatBuffer duplicate = matrix.duplicate();
         float[] values = new float[Math.min(duplicate.remaining(), 9)];
@@ -7946,6 +7997,7 @@ void main() {
     }
 
     public void setUniformMatrix3fv(CommandContext ctx, int location, boolean transpose, float[] matrix) {
+        rejectJavaWholeFramePass("setUniformMatrix3fv");
         requireVulkanCommandBufferHandle("setUniformMatrix3fv", ctx);
         if (matrix == null || matrix.length == 0) {
             return;
@@ -7958,6 +8010,7 @@ void main() {
     }
 
     public void setUniformMatrix4fv(CommandContext ctx, int location, boolean transpose, java.nio.FloatBuffer matrix) {
+        rejectJavaWholeFramePass("setUniformMatrix4fv");
         requireVulkanCommandBufferHandle("setUniformMatrix4fv", ctx);
         java.nio.FloatBuffer duplicate = matrix.duplicate();
         float[] values = new float[Math.min(duplicate.remaining(), 16)];
@@ -7971,6 +8024,7 @@ void main() {
     }
 
     public void setUniformMatrix4fv(CommandContext ctx, int location, boolean transpose, float[] matrix) {
+        rejectJavaWholeFramePass("setUniformMatrix4fv");
         requireVulkanCommandBufferHandle("setUniformMatrix4fv", ctx);
         if (matrix == null || matrix.length == 0) {
             return;
@@ -7983,6 +8037,7 @@ void main() {
     }
 
     public void setUniform2fv(CommandContext ctx, int location, float[] value) {
+        rejectJavaWholeFramePass("setUniform2fv");
         requireVulkanCommandBufferHandle("setUniform2fv", ctx);
         if (value != null && value.length > 0) {
             captureStandaloneUniformFloats(location, java.util.Arrays.copyOf(value, value.length));
@@ -7990,6 +8045,7 @@ void main() {
     }
 
     public void setUniform3fv(CommandContext ctx, int location, float[] value) {
+        rejectJavaWholeFramePass("setUniform3fv");
         requireVulkanCommandBufferHandle("setUniform3fv", ctx);
         if (value != null && value.length > 0) {
             captureStandaloneUniformFloats(location, java.util.Arrays.copyOf(value, value.length));
@@ -7997,6 +8053,7 @@ void main() {
     }
 
     public void setUniform4fv(CommandContext ctx, int location, float[] value) {
+        rejectJavaWholeFramePass("setUniform4fv");
         requireVulkanCommandBufferHandle("setUniform4fv", ctx);
         if (value != null && value.length > 0) {
             captureStandaloneUniformFloats(location, java.util.Arrays.copyOf(value, value.length));
@@ -8033,17 +8090,20 @@ void main() {
     // =====================================================================
 
     public void blendFunc(CommandContext ctx, int sfactor, int dfactor) {
+        rejectJavaWholeFramePass("blendFunc");
         requireVulkanCommandBufferHandle("blendFunc", ctx);
         setBlendFunction(ctx, sfactor, dfactor, sfactor, dfactor);
     }
 
     public void blendFunc(CommandContext ctx, net.vulkanic.VulkanicBlendFactor sfactor,
                           net.vulkanic.VulkanicBlendFactor dfactor) {
+        rejectJavaWholeFramePass("blendFunc");
         requireVulkanCommandBufferHandle("blendFunc", ctx);
         blendFunc(ctx, toLegacyGlBlendFactor(sfactor), toLegacyGlBlendFactor(dfactor));
     }
 
     public void blendFuncSeparatei(CommandContext ctx, int buffer, int srcRGB, int dstRGB, int srcAlpha, int dstAlpha) {
+        rejectJavaWholeFramePass("blendFuncSeparatei");
         requireVulkanCommandBufferHandle("blendFuncSeparatei", ctx);
         if (buffer == 0) {
             setBlendFunction(ctx, srcRGB, dstRGB, srcAlpha, dstAlpha);
@@ -8059,6 +8119,7 @@ void main() {
                                    net.vulkanic.VulkanicBlendFactor dstRGB,
                                    net.vulkanic.VulkanicBlendFactor srcAlpha,
                                    net.vulkanic.VulkanicBlendFactor dstAlpha) {
+        rejectJavaWholeFramePass("blendFuncSeparatei");
         requireVulkanCommandBufferHandle("blendFuncSeparatei", ctx);
         blendFuncSeparatei(
             ctx,
@@ -8072,6 +8133,7 @@ void main() {
 
     public void blitFramebuffer(CommandContext ctx, int srcX0, int srcY0, int srcX1, int srcY1,
                                 int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
+        rejectJavaWholeFramePass("blitFramebuffer");
         long commandBufferHandle = requireVulkanCommandBufferHandle("blitFramebuffer", ctx);
         if (filter != GL_NEAREST) {
             return;
@@ -8112,6 +8174,7 @@ void main() {
     public void blitNamedFramebuffer(CommandContext ctx, int readFramebuffer, int drawFramebuffer,
                                      int srcX0, int srcY0, int srcX1, int srcY1,
                                      int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
+        rejectJavaWholeFramePass("blitNamedFramebuffer");
         long commandBufferHandle = requireVulkanCommandBufferHandle("blitNamedFramebuffer", ctx);
         if (filter != GL_NEAREST) {
             return;
@@ -8152,6 +8215,7 @@ void main() {
     public void blitNamedFramebufferDSA(CommandContext ctx, int readFramebuffer, int drawFramebuffer,
                                         int srcX0, int srcY0, int srcX1, int srcY1,
                                         int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
+        rejectJavaWholeFramePass("blitNamedFramebufferDSA");
         requireVulkanCommandBufferHandle("blitNamedFramebufferDSA", ctx);
         blitNamedFramebuffer(ctx, readFramebuffer, drawFramebuffer,
             srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
@@ -8181,10 +8245,12 @@ void main() {
 
     public void clearBufferSubData(CommandContext ctx, int target, int internalformat,
                                    long offset, long size, int format, int type, int[] data) {
+        rejectJavaWholeFramePass("clearBufferSubData");
         requireVulkanCommandBufferHandle("clearBufferSubData", ctx);
     }
 
     public void clearBufferfv(CommandContext ctx, int buffer, int drawbuffer, float[] values) {
+        rejectJavaWholeFramePass("clearBufferfv");
         requireVulkanCommandBufferHandle("clearBufferfv", ctx);
         if (buffer == GL_COLOR) {
             clearNamedFramebufferfv(ctx, framebufferRenderTargets.boundDrawFramebuffer(), buffer, drawbuffer, values);
@@ -8194,6 +8260,7 @@ void main() {
     }
 
     public void clearBufferiv(CommandContext ctx, int buffer, int drawbuffer, int[] values) {
+        rejectJavaWholeFramePass("clearBufferiv");
         requireVulkanCommandBufferHandle("clearBufferiv", ctx);
         if (buffer == GL_COLOR && values != null && values.length >= 4) {
             clearNamedFramebufferfv(ctx, framebufferRenderTargets.boundDrawFramebuffer(), buffer, drawbuffer, new float[] {
@@ -8203,6 +8270,7 @@ void main() {
     }
 
     public void clearBufferuiv(CommandContext ctx, int buffer, int drawbuffer, int[] values) {
+        rejectJavaWholeFramePass("clearBufferuiv");
         requireVulkanCommandBufferHandle("clearBufferuiv", ctx);
         if (buffer == GL_COLOR && values != null && values.length >= 4) {
             clearNamedFramebufferfv(ctx, framebufferRenderTargets.boundDrawFramebuffer(), buffer, drawbuffer, new float[] {
@@ -8224,6 +8292,7 @@ void main() {
     }
 
     public void clearNamedFramebufferfv(CommandContext ctx, int framebuffer, int buffer, int drawbuffer, float[] value) {
+        rejectJavaWholeFramePass("clearNamedFramebufferfv");
         requireVulkanCommandBufferHandle("clearNamedFramebufferfv", ctx);
         if (buffer == GL_COLOR) {
             clearFramebufferColorAttachment(ctx, framebuffer, GL_COLOR_ATTACHMENT0 + drawbuffer, value);
@@ -8233,6 +8302,7 @@ void main() {
     }
 
     public void clearNamedFramebufferiv(CommandContext ctx, int framebuffer, int buffer, int drawbuffer, int[] value) {
+        rejectJavaWholeFramePass("clearNamedFramebufferiv");
         requireVulkanCommandBufferHandle("clearNamedFramebufferiv", ctx);
         if (buffer == GL_COLOR && value != null && value.length >= 4) {
             clearFramebufferColorAttachment(ctx, framebuffer, GL_COLOR_ATTACHMENT0 + drawbuffer, new float[] {
@@ -8242,6 +8312,7 @@ void main() {
     }
 
     public void clearNamedFramebufferuiv(CommandContext ctx, int framebuffer, int buffer, int drawbuffer, int[] value) {
+        rejectJavaWholeFramePass("clearNamedFramebufferuiv");
         requireVulkanCommandBufferHandle("clearNamedFramebufferuiv", ctx);
         if (buffer == GL_COLOR && value != null && value.length >= 4) {
             clearFramebufferColorAttachment(ctx, framebuffer, GL_COLOR_ATTACHMENT0 + drawbuffer, new float[] {
@@ -8294,6 +8365,7 @@ void main() {
     }
 
     public void clearTexImage(CommandContext ctx, int texture, int level, int format, int type, int[] data) {
+        rejectJavaWholeFramePass("clearTexImage");
         requireVulkanCommandBufferHandle("clearTexImage", ctx);
     }
 
@@ -8331,6 +8403,7 @@ void main() {
     public void copyImageSubData(CommandContext ctx, int srcName, int srcTarget, int srcLevel, int srcX, int srcY, int srcZ,
                                  int dstName, int dstTarget, int dstLevel, int dstX, int dstY, int dstZ,
                                  int width, int height, int depth) {
+        rejectJavaWholeFramePass("copyImageSubData");
         long commandBufferHandle = requireVulkanCommandBufferHandle("copyImageSubData", ctx);
         ensureNativeReady("copyImageSubData");
         NativeSpine spine = nativeSpine;
@@ -8359,6 +8432,7 @@ void main() {
 
     public void copyTexImage2D(CommandContext ctx, int target, int level, int internalFormat,
                                int x, int y, int width, int height, int border) {
+        rejectJavaWholeFramePass("copyTexImage2D");
         long commandBufferHandle = requireVulkanCommandBufferHandle("copyTexImage2D", ctx);
         if (border != 0) {
             throw new IllegalArgumentException("copyTexImage2D does not support non-zero border on Vulkan backend");
@@ -8391,6 +8465,7 @@ void main() {
 
     public void copyTexSubImage2D(CommandContext ctx, int target, int level,
                                   int xoffset, int yoffset, int x, int y, int width, int height) {
+        rejectJavaWholeFramePass("copyTexSubImage2D");
         long commandBufferHandle = requireVulkanCommandBufferHandle("copyTexSubImage2D", ctx);
         Integer sourceTexture = framebufferRenderTargets.boundReadColorTextureForCopy();
         if (sourceTexture == null) {
@@ -8420,6 +8495,7 @@ void main() {
 
     public void copyTextureSubImage2D(CommandContext ctx, int texture, int level,
                                       int xoffset, int yoffset, int x, int y, int width, int height) {
+        rejectJavaWholeFramePass("copyTextureSubImage2D");
         long commandBufferHandle = requireVulkanCommandBufferHandle("copyTextureSubImage2D", ctx);
         Integer sourceTexture = framebufferRenderTargets.boundReadColorTextureForCopy();
         if (sourceTexture == null || texture == 0) {
@@ -8475,22 +8551,27 @@ void main() {
     }
 
     public void debugMessageControl(CommandContext ctx, int source, int type, int severity, int[] ids, boolean enabled) {
+        rejectJavaWholeFramePass("debugMessageControl");
         requireVulkanCommandBufferHandle("debugMessageControl", ctx);
     }
 
     public void debugMessageControlARB(CommandContext ctx, int source, int type, int severity, int[] ids, boolean enabled) {
+        rejectJavaWholeFramePass("debugMessageControlARB");
         requireVulkanCommandBufferHandle("debugMessageControlARB", ctx);
     }
 
     public void debugMessageControlKHR(CommandContext ctx, int source, int type, int severity, int[] ids, boolean enabled) {
+        rejectJavaWholeFramePass("debugMessageControlKHR");
         requireVulkanCommandBufferHandle("debugMessageControlKHR", ctx);
     }
 
     public void debugMessageEnableAMD(CommandContext ctx, int category, int severity, int[] ids, boolean enabled) {
+        rejectJavaWholeFramePass("debugMessageEnableAMD");
         requireVulkanCommandBufferHandle("debugMessageEnableAMD", ctx);
     }
 
     public void destroySync(CommandContext ctx, long sync) {
+        rejectJavaWholeFramePass("destroySync");
         requireVulkanCommandBufferHandle("destroySync", ctx);
         virtualSyncs.remove(sync);
     }
@@ -8520,6 +8601,7 @@ void main() {
         CommandContext ctx,
         VulkanicGalExecutionRequest.ComputeDispatchRequest request
     ) {
+        rejectJavaWholeFramePass("captureComputeDispatchRequest");
         Objects.requireNonNull(request, "request");
         if (request.resourceBindingPlan().isPresent()) {
             return request;
@@ -8641,6 +8723,7 @@ void main() {
     }
 
     public void framebufferTexture(CommandContext ctx, int target, int attachment, int textarget, int texture, int level) {
+        rejectJavaWholeFramePass("framebufferTexture");
         requireVulkanCommandBufferHandle("framebufferTexture", ctx);
         int framebuffer = framebufferRenderTargets.resolveBinding(target);
         if (framebuffer != 0) {
@@ -8649,6 +8732,7 @@ void main() {
     }
 
     public void framebufferTexture2D(CommandContext ctx, int target, int attachment, int textarget, int texture, int level) {
+        rejectJavaWholeFramePass("framebufferTexture2D");
         requireVulkanCommandBufferHandle("framebufferTexture2D", ctx);
         int framebuffer = framebufferRenderTargets.resolveBinding(target);
         if (framebuffer != 0) {
@@ -8657,6 +8741,7 @@ void main() {
     }
 
     public void generateMipmap(CommandContext ctx, int target) {
+        rejectJavaWholeFramePass("generateMipmap");
         long commandBufferHandle = requireVulkanCommandBufferHandle("generateMipmap", ctx);
         if (!isSupportedLegacyTextureTarget(target)) {
             throw new IllegalArgumentException("Unsupported legacy Vulkan texture target for generateMipmap: " + target);
@@ -8679,11 +8764,13 @@ void main() {
     }
 
     public void generateTextureMipmap(CommandContext ctx, int target) {
+        rejectJavaWholeFramePass("generateTextureMipmap");
         requireVulkanCommandBufferHandle("generateTextureMipmap", ctx);
         generateMipmap(ctx, target);
     }
 
     public void generateTextureMipmapDSA(CommandContext ctx, int texture) {
+        rejectJavaWholeFramePass("generateTextureMipmapDSA");
         requireVulkanCommandBufferHandle("generateTextureMipmapDSA", ctx);
 
         ensureNativeReady("generateTextureMipmapDSA");
@@ -8999,6 +9086,7 @@ void main() {
     }
 
         public void memoryBarrier(CommandContext ctx, int barriers) {
+            rejectJavaWholeFramePass("memoryBarrier");
             long commandBufferHandle = requireVulkanCommandBufferHandle("memoryBarrier", ctx);
             if (barriers == 0) {
                 return;
@@ -9021,6 +9109,7 @@ void main() {
 
     public void multiDrawElementsBaseVertex(CommandContext ctx, int mode, long pCount, int type,
                                             long pIndices, int drawCount, long pBaseVertex) {
+        rejectJavaWholeFramePass("multiDrawElementsBaseVertex");
         VulkanicIndexType indexType = VulkanicIndexType.fromLegacyGlConstant(type)
             .orElseThrow(() -> new IllegalArgumentException(
                 "Unsupported multiDrawElementsBaseVertex index type constant: " + type));
@@ -9041,6 +9130,7 @@ void main() {
     public void multiDrawElementsBaseVertex(CommandContext ctx, VulkanicPrimitiveMode mode, long pCount,
                                             VulkanicIndexType indexType, long pIndices, int drawCount,
                                             long pBaseVertex) {
+        rejectJavaWholeFramePass("multiDrawElementsBaseVertex");
         long commandBufferHandle = requireVulkanCommandBufferHandle("multiDrawElementsBaseVertex", ctx);
 
         if (drawCount < 0 || pCount == 0L || pIndices == 0L || pBaseVertex == 0L) {
@@ -9111,26 +9201,31 @@ void main() {
     }
 
     public void namedFramebufferDrawBuffers(CommandContext ctx, int framebuffer, int[] bufs) {
+        rejectJavaWholeFramePass("namedFramebufferDrawBuffers");
         requireVulkanCommandBufferHandle("namedFramebufferDrawBuffers", ctx);
         framebufferRenderTargets.setNamedDrawBuffers(framebuffer, bufs);
     }
 
     public void namedFramebufferReadBuffer(CommandContext ctx, int framebuffer, int mode) {
+        rejectJavaWholeFramePass("namedFramebufferReadBuffer");
         requireVulkanCommandBufferHandle("namedFramebufferReadBuffer", ctx);
         framebufferRenderTargets.setNamedReadBuffer(framebuffer, mode);
     }
 
     public void namedFramebufferTexture(CommandContext ctx, int framebuffer, int attachment, int texture, int level) {
+        rejectJavaWholeFramePass("namedFramebufferTexture");
         requireVulkanCommandBufferHandle("namedFramebufferTexture", ctx);
         framebufferRenderTargets.recordAttachment(framebuffer, attachment, texture);
     }
 
     public void namedFramebufferTextureDSA(CommandContext ctx, int framebuffer, int attachment, int texture, int level) {
+        rejectJavaWholeFramePass("namedFramebufferTextureDSA");
         requireVulkanCommandBufferHandle("namedFramebufferTextureDSA", ctx);
         framebufferRenderTargets.recordAttachment(framebuffer, attachment, texture);
     }
 
     public void readPixels(CommandContext ctx, int x, int y, int width, int height, int format, int type, float[] pixels) {
+        rejectJavaWholeFramePass("readPixels");
         requireVulkanCommandBufferHandle("readPixels", ctx);
         if (pixels != null) {
             java.util.Arrays.fill(pixels, 0.0f);
@@ -9138,6 +9233,7 @@ void main() {
     }
 
     public void readPixels(CommandContext ctx, int x, int y, int width, int height, int format, int type, long pixels) {
+        rejectJavaWholeFramePass("readPixels");
         long commandBufferHandle = requireVulkanCommandBufferHandle("readPixels", ctx);
         if (width <= 0 || height <= 0) {
             return;
@@ -9159,6 +9255,12 @@ void main() {
 
     public int resolveFramebufferForTextures(CommandContext ctx, net.vulkanic.VulkanicTexture colorTexture,
                                              net.vulkanic.VulkanicTexture depthTexture) {
+        // Framebuffer resolution is a Java Vulkan compatibility operation.  It
+        // must not be reachable after Rust has taken whole-frame ownership,
+        // even when a caller happens to provide a command context that looks
+        // valid.  Otherwise this helper can indirectly resolve Java texture
+        // handles and reopen the legacy presenter boundary.
+        rejectJavaWholeFramePass("resolveFramebufferForTextures");
         requireVulkanCommandBufferHandle("resolveFramebufferForTextures", ctx);
         int colorHandle = resolveTextureHandle(ctx, colorTexture);
         if (colorHandle == 0) {
@@ -9261,11 +9363,13 @@ void main() {
     }
 
     public net.vulkanic.VulkanicUniformLocation resolveUniformLocation(CommandContext ctx, int program, CharSequence name) {
+        rejectJavaWholeFramePass("resolveUniformLocation");
         requireVulkanCommandBufferHandle("resolveUniformLocation", ctx);
         return net.vulkanic.VulkanicUniformLocation.of(getUniformLocation(ctx, program, name));
     }
 
     public String retrieveActiveUniformBlockName(CommandContext ctx, int program, int uniformBlockIndex) {
+        rejectJavaWholeFramePass("retrieveActiveUniformBlockName");
         requireVulkanCommandBufferHandle("retrieveActiveUniformBlockName", ctx);
         VirtualProgram virtualProgram = shaderPrograms.program(program);
         if (virtualProgram == null || uniformBlockIndex < 0 || uniformBlockIndex >= virtualProgram.activeUniformBlocks.size()) {
@@ -9275,11 +9379,13 @@ void main() {
     }
 
     public int retrieveQueryObjectInt(CommandContext ctx, int id, int pname) {
+        rejectJavaWholeFramePass("retrieveQueryObjectInt");
         requireVulkanCommandBufferHandle("retrieveQueryObjectInt", ctx);
         return virtualQueries.contains(id) ? 0 : 0;
     }
 
     public long retrieveQueryObjectInt64(CommandContext ctx, int id, int pname) {
+        rejectJavaWholeFramePass("retrieveQueryObjectInt64");
         requireVulkanCommandBufferHandle("retrieveQueryObjectInt64", ctx);
         return 0L;
     }
@@ -9322,6 +9428,7 @@ void main() {
     }
 
     public void texBuffer(CommandContext ctx, int target, int internalFormat, int buffer) {
+        rejectJavaWholeFramePass("texBuffer");
         requireVulkanCommandBufferHandle("texBuffer", ctx);
 
         if (target != VulkanicAPI.GL_TEXTURE_BUFFER) {
@@ -9334,12 +9441,13 @@ void main() {
 
         NativeSpine spine = nativeSpine;
         if (spine == null) {
-            return; // Native spine not yet ready; silently defer (matches other compatibility paths)
+            return; // Native spine not yet ready; compatibility operation is a safe no-op.
         }
         spine.bindLegacyTexelBufferForActiveUnit(internalFormat, buffer);
     }
 
     public void texParameteriv(CommandContext ctx, int target, int pname, int[] params) {
+        rejectJavaWholeFramePass("texParameteriv");
         requireVulkanCommandBufferHandle("texParameteriv", ctx);
         if (params != null && params.length > 0) {
             texParameteri(ctx, target, pname, params[0]);
@@ -9347,11 +9455,13 @@ void main() {
     }
 
     public void textureParameterf(CommandContext ctx, int texture, int pname, float param) {
+        rejectJavaWholeFramePass("textureParameterf");
         requireVulkanCommandBufferHandle("textureParameterf", ctx);
         textureParameteri(ctx, texture, pname, Math.round(param));
     }
 
     public void textureParameteri(CommandContext ctx, int texture, int pname, int param) {
+        rejectJavaWholeFramePass("textureParameteri");
         requireVulkanCommandBufferHandle("textureParameteri", ctx);
         NativeSpine spine = nativeSpine;
         if (spine == null) {
@@ -9364,6 +9474,7 @@ void main() {
     }
 
     public void textureParameteriv(CommandContext ctx, int texture, int pname, int[] params) {
+        rejectJavaWholeFramePass("textureParameteriv");
         requireVulkanCommandBufferHandle("textureParameteriv", ctx);
         if (params != null && params.length > 0) {
             textureParameteri(ctx, texture, pname, params[0]);
@@ -9372,12 +9483,14 @@ void main() {
 
     public void uploadTexture1D(CommandContext ctx, int target, int level, int internalformat,
                                 int width, int border, int format, int type, java.nio.ByteBuffer pixels) {
+        rejectJavaWholeFramePass("uploadTexture1D");
         requireVulkanCommandBufferHandle("uploadTexture1D", ctx);
     }
 
     public void uploadTexture3D(CommandContext ctx, int target, int level, int internalformat,
                                 int width, int height, int depth, int border,
                                 int format, int type, java.nio.ByteBuffer pixels) {
+        rejectJavaWholeFramePass("uploadTexture3D");
         long commandBufferHandle = requireVulkanCommandBufferHandle("uploadTexture3D", ctx);
         if (target != VulkanicAPI.GL_TEXTURE_3D) {
             throw new IllegalArgumentException("uploadTexture3D requires GL_TEXTURE_3D, got: " + target);
@@ -9434,6 +9547,7 @@ void main() {
     }
 
     public void setAttributeLocation(CommandContext ctx, int program, int index, CharSequence name) {
+        rejectJavaWholeFramePass("setAttributeLocation");
         requireVulkanCommandBufferHandle("setAttributeLocation", ctx);
         VirtualProgram virtualProgram = shaderPrograms.program(program);
         if (virtualProgram == null || name == null) {
@@ -9459,6 +9573,7 @@ void main() {
      */
     public void uniformBlockBinding(CommandContext ctx, int program,
                                     int uniformBlockIndex, int uniformBlockBindingPoint) {
+        rejectJavaWholeFramePass("uniformBlockBinding");
         requireVulkanCommandBufferHandle("uniformBlockBinding", ctx);
     }
 
@@ -9490,15 +9605,18 @@ void main() {
     // =====================================================================
 
     public void bindBufferBase(CommandContext ctx, int target, int index, int buffer) {
+        rejectJavaWholeFramePass("bindBufferBase");
         requireVulkanCommandBufferHandle("bindBufferBase", ctx);
     }
 
     public void bindUniformBufferBase(CommandContext ctx, int bindingPoint, int bufferId) {
+        rejectJavaWholeFramePass("bindUniformBufferBase");
         requireVulkanCommandBufferHandle("bindUniformBufferBase", ctx);
     }
 
     public void bindUniformBufferRange(CommandContext ctx, int target, int index,
                                        int buffer, long offset, long size) {
+        rejectJavaWholeFramePass("bindUniformBufferRange");
         requireVulkanCommandBufferHandle("bindUniformBufferRange", ctx);
     }
 
@@ -9508,6 +9626,7 @@ void main() {
      */
     public void bindFragDataLocation(CommandContext ctx, int program,
                                      int colorNumber, CharSequence name) {
+        rejectJavaWholeFramePass("bindFragDataLocation");
         requireVulkanCommandBufferHandle("bindFragDataLocation", ctx);
     }
 
@@ -9521,6 +9640,7 @@ void main() {
      */
     public void bindImageTexture(CommandContext ctx, int unit, int texture, int level,
                                  boolean layered, int layer, int access, int format) {
+        rejectJavaWholeFramePass("bindImageTexture");
         requireVulkanCommandBufferHandle("bindImageTexture", ctx);
         if (unit < 0) {
             throw new IllegalArgumentException("Image unit must be >= 0");
@@ -9552,6 +9672,7 @@ void main() {
      * framebuffer-backed render passes can resolve the intended color outputs.
      */
     public void drawBuffers(CommandContext ctx, int[] buffers) {
+        rejectJavaWholeFramePass("drawBuffers");
         requireVulkanCommandBufferHandle("drawBuffers", ctx);
         framebufferRenderTargets.setDrawBuffers(buffers);
     }
@@ -9589,12 +9710,14 @@ void main() {
      * at the next pipeline build.
      */
     public void enableVertexAttribArray(CommandContext ctx, int index) {
+        rejectJavaWholeFramePass("enableVertexAttribArray");
         requireVulkanCommandBufferHandle("enableVertexAttribArray", ctx);
         bufferVertexResources.enableVertexAttribute(index);
     }
 
     /** Marks vertex attribute {@code index} as disabled. */
     public void disableVertexAttribArray(CommandContext ctx, int index) {
+        rejectJavaWholeFramePass("disableVertexAttribArray");
         requireVulkanCommandBufferHandle("disableVertexAttribArray", ctx);
         bufferVertexResources.disableVertexAttribute(index);
     }
@@ -9605,18 +9728,21 @@ void main() {
      */
     public void setVertexAttribPointer(CommandContext ctx, int index, int size, int type,
                                        boolean normalized, int stride, long pointer) {
+        rejectJavaWholeFramePass("setVertexAttribPointer");
         requireVulkanCommandBufferHandle("setVertexAttribPointer", ctx);
         bufferVertexResources.setVertexAttributePointer(index, size, type, normalized, false, stride, pointer);
     }
 
     public void setVertexAttribIPointer(CommandContext ctx, int index, int size, int type,
                                         int stride, long pointer) {
+        rejectJavaWholeFramePass("setVertexAttribIPointer");
         requireVulkanCommandBufferHandle("setVertexAttribIPointer", ctx);
         bufferVertexResources.setVertexAttributePointer(index, size, type, false, true, stride, pointer);
     }
 
     /** Sets the per-instance divisor for vertex attribute {@code index}. */
     public void setVertexAttribDivisor(CommandContext ctx, int index, int divisor) {
+        rejectJavaWholeFramePass("setVertexAttribDivisor");
         requireVulkanCommandBufferHandle("setVertexAttribDivisor", ctx);
         bufferVertexResources.setVertexAttributeDivisor(index, divisor);
     }
@@ -9628,27 +9754,32 @@ void main() {
      */
     public void setVertexAttrib4f(CommandContext ctx, int index,
                                   float v0, float v1, float v2, float v3) {
+        rejectJavaWholeFramePass("setVertexAttrib4f");
         requireVulkanCommandBufferHandle("setVertexAttrib4f", ctx);
     }
 
     public void setVertexAttribFormat(CommandContext ctx, int attribindex, int size, int type,
                                       boolean normalized, int relativeoffset) {
+        rejectJavaWholeFramePass("setVertexAttribFormat");
         requireVulkanCommandBufferHandle("setVertexAttribFormat", ctx);
         bufferVertexResources.setVertexAttributeFormat(attribindex, size, type, normalized, false, relativeoffset);
     }
 
     public void setVertexAttribIFormat(CommandContext ctx, int attribindex, int size, int type,
                                        int relativeoffset) {
+        rejectJavaWholeFramePass("setVertexAttribIFormat");
         requireVulkanCommandBufferHandle("setVertexAttribIFormat", ctx);
         bufferVertexResources.setVertexAttributeFormat(attribindex, size, type, false, true, relativeoffset);
     }
 
     public void setVertexAttribBinding(CommandContext ctx, int attribindex, int bindingindex) {
+        rejectJavaWholeFramePass("setVertexAttribBinding");
         requireVulkanCommandBufferHandle("setVertexAttribBinding", ctx);
         bufferVertexResources.setVertexAttributeBinding(attribindex, bindingindex);
     }
 
     public void bindVertexBuffer(CommandContext ctx, int bindingindex, int buffer, long offset, int stride) {
+        rejectJavaWholeFramePass("bindVertexBuffer");
         long commandBufferHandle = requireVulkanCommandBufferHandle("bindVertexBuffer", ctx);
         bufferVertexResources.setVertexBinding(bindingindex, stride, offset, buffer);
         if (buffer <= 0) {
@@ -9689,6 +9820,7 @@ void main() {
 
     /** Releases a virtual sampler handle and removes any per-unit bindings. */
     public void deleteSampler(CommandContext ctx, int sampler) {
+        rejectJavaWholeFramePass("deleteSampler");
         requireVulkanCommandBufferHandle("deleteSampler", ctx);
         textureResources.deleteSampler(sampler);
     }
@@ -9699,12 +9831,14 @@ void main() {
      * interrogate it when building a Vulkan descriptor set.
      */
     public void bindSampler(CommandContext ctx, int unit, int sampler) {
+        rejectJavaWholeFramePass("bindSampler");
         requireVulkanCommandBufferHandle("bindSampler", ctx);
         textureResources.bindSampler(unit, sampler);
     }
 
     /** Bulk-binds an array of samplers starting from texture unit {@code first}. */
     public void bindSamplers(CommandContext ctx, int first, int[] samplers) {
+        rejectJavaWholeFramePass("bindSamplers");
         requireVulkanCommandBufferHandle("bindSamplers", ctx);
         for (int i = 0; i < samplers.length; i++) {
             textureResources.bindSampler(first + i, samplers[i]);
@@ -9717,16 +9851,19 @@ void main() {
      * mutation is not supported.
      */
     public void setSamplerParameteri(CommandContext ctx, int sampler, int pname, int param) {
+        rejectJavaWholeFramePass("setSamplerParameteri");
         requireVulkanCommandBufferHandle("setSamplerParameteri", ctx);
         textureResources.setSamplerParameteri(sampler, pname, param);
     }
 
     public void setSamplerParameterf(CommandContext ctx, int sampler, int pname, float param) {
+        rejectJavaWholeFramePass("setSamplerParameterf");
         requireVulkanCommandBufferHandle("setSamplerParameterf", ctx);
         textureResources.setSamplerParameterf(sampler, pname, param);
     }
 
     public void setSamplerParameteriv(CommandContext ctx, int sampler, int pname, int[] params) {
+        rejectJavaWholeFramePass("setSamplerParameteriv");
         requireVulkanCommandBufferHandle("setSamplerParameteriv", ctx);
         if (params == null || params.length == 0) {
             return;
@@ -9745,6 +9882,7 @@ void main() {
      * the values are cached here and applied at the next pipeline creation.
      */
     public void setStencilFunc(CommandContext ctx, int func, int ref, int mask) {
+        rejectJavaWholeFramePass("setStencilFunc");
         requireVulkanCommandBufferHandle("setStencilFunc", ctx);
         pendingStencilFunc = func;
         pendingStencilRef  = ref;
@@ -9755,6 +9893,7 @@ void main() {
     }
 
     public void setStencilFuncSeparate(CommandContext ctx, int face, int func, int ref, int mask) {
+        rejectJavaWholeFramePass("setStencilFuncSeparate");
         requireVulkanCommandBufferHandle("setStencilFuncSeparate", ctx);
         if (appliesToFrontFace(face)) {
             pendingStencilFunc = func;
@@ -9773,6 +9912,7 @@ void main() {
      * depth fail, depth pass).
      */
     public void setStencilOp(CommandContext ctx, int sfail, int dpfail, int dppass) {
+        rejectJavaWholeFramePass("setStencilOp");
         requireVulkanCommandBufferHandle("setStencilOp", ctx);
         pendingStencilFail   = sfail;
         pendingStencilDpFail = dpfail;
@@ -9783,6 +9923,7 @@ void main() {
     }
 
     public void setStencilOpSeparate(CommandContext ctx, int face, int sfail, int dpfail, int dppass) {
+        rejectJavaWholeFramePass("setStencilOpSeparate");
         requireVulkanCommandBufferHandle("setStencilOpSeparate", ctx);
         if (appliesToFrontFace(face)) {
             pendingStencilFail   = sfail;
@@ -9798,12 +9939,14 @@ void main() {
 
     /** Sets the stencil write mask. */
     public void setStencilWriteMask(CommandContext ctx, int mask) {
+        rejectJavaWholeFramePass("setStencilWriteMask");
         requireVulkanCommandBufferHandle("setStencilWriteMask", ctx);
         pendingStencilWriteMask = mask;
         pendingBackStencilWriteMask = mask;
     }
 
     public void setStencilWriteMaskSeparate(CommandContext ctx, int face, int mask) {
+        rejectJavaWholeFramePass("setStencilWriteMaskSeparate");
         requireVulkanCommandBufferHandle("setStencilWriteMaskSeparate", ctx);
         if (appliesToFrontFace(face)) {
             pendingStencilWriteMask = mask;
@@ -11374,8 +11517,8 @@ void main() {
 
             texture.target = VulkanicAPI.GL_TEXTURE_CUBE_MAP;
 
-            // Texture names are created as 2D by IrisRenderSystem.createTextureId().
-            // If the name is later first used for a cubemap, any 2D Vulkan image/view
+            // If a texture name is first used as a 2D placeholder and later as a
+            // cubemap, any 2D Vulkan image/view
             // allocation tied to that placeholder target is invalid and must be dropped.
             if (texture.imageHandle != VK10.VK_NULL_HANDLE) {
                 destroyLegacyTextureStorage(texture);

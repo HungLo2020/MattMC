@@ -67,7 +67,7 @@ public class DhFramebuffer implements IDhApiFramebuffer
 
 	private static void rejectRustWholeFrameJavaFramebuffer()
 	{
-		if (VulkanicAPI.isVulkanBackendInitializedAndSelected()
+		if (VulkanicAPI.isVulkanBackendSelected()
 			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
 		{
 			throw new IllegalStateException(
@@ -277,7 +277,12 @@ public class DhFramebuffer implements IDhApiFramebuffer
 
 	public void destroy(CommandContext ctx)
 	{
-		VulkanicAPI.deleteFramebuffer(ctx, this.id); 
+		// Java DH framebuffers can be retired after Rust takes presentation
+		// ownership. Their numeric names are not Rust handles.
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			&& !VulkanicAPI.isVulkanBackendSelected()) {
+			VulkanicAPI.deleteFramebuffer(ctx, this.id);
+		}
 		this.id = -1;
 	}
 	

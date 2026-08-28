@@ -25,11 +25,7 @@ public class PBRTextureManager {
 
 	private static Runnable normalTextureChangeListener;
 	private static Runnable specularTextureChangeListener;
-
-	static {
-		StateUpdateNotifiers.normalTextureChangeNotifier = listener -> normalTextureChangeListener = listener;
-		StateUpdateNotifiers.specularTextureChangeNotifier = listener -> specularTextureChangeListener = listener;
-	}
+	private static boolean compatibilityListenersInstalled;
 
 	private final Int2ObjectMap<PBRTextureHolder> holders = new Int2ObjectOpenHashMap<>();
 	private final PBRTextureConsumerImpl consumer = new PBRTextureConsumerImpl();
@@ -79,8 +75,26 @@ public class PBRTextureManager {
 	}
 
 	public void init() {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			// Rust owns shader-pack/PBR assets on this route. Do not create even
+			// compatibility DynamicTexture objects that could be mistaken for Iris
+			// GPU state; the Rust asset snapshot owns the semantic images instead.
+			close();
+			return;
+		}
+		installCompatibilityListeners();
 		defaultNormalTexture = new NativeImageBackedSingleColorTexture(PBRType.NORMAL.getDefaultValue());
 		defaultSpecularTexture = new NativeImageBackedSingleColorTexture(PBRType.SPECULAR.getDefaultValue());
+	}
+
+	private static synchronized void installCompatibilityListeners() {
+		if (compatibilityListenersInstalled) {
+			return;
+		}
+		StateUpdateNotifiers.normalTextureChangeNotifier = listener -> normalTextureChangeListener = listener;
+		StateUpdateNotifiers.specularTextureChangeNotifier = listener -> specularTextureChangeListener = listener;
+		compatibilityListenersInstalled = true;
 	}
 
 	public PBRTextureHolder getHolder(int id) {
@@ -92,7 +106,8 @@ public class PBRTextureManager {
 	}
 
 	public PBRTextureHolder getOrLoadHolder(int id) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			// PBR assets are consumed by the Rust shader-pack route; do not consult
 			// Iris' texture tracker or bind Java compatibility textures here.
 			return defaultHolder;

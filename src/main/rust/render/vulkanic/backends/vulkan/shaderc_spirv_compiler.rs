@@ -90,7 +90,10 @@ unsafe fn compile_inner(
     options.set_source_language(shaderc::SourceLanguage::GLSL);
     options.set_target_env(
         shaderc::TargetEnv::Vulkan,
-        shaderc::EnvVersion::Vulkan1_0 as u32,
+        // The native Vulkan context is created at 1.3. Emit modules against
+        // that same contract so shader-pack features are not silently
+        // lowered through a stale Vulkan 1.0 capability model.
+        shaderc::EnvVersion::Vulkan1_3 as u32,
     );
     options.set_auto_bind_uniforms(true);
     options.set_auto_map_locations(true);

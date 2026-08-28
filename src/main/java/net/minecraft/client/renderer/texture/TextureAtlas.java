@@ -24,8 +24,6 @@ import net.minecraft.ReportedException;
 import net.minecraft.SharedConstants;
 import net.minecraft.resources.ResourceLocation;
 import net.vulkanic.VulkanicAPI;
-import net.vulkanic.VulkanicCoreAPI;
-import net.irisshaders.iris.gl.IrisRenderSystem;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
@@ -47,6 +45,9 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable,
 	public int height;
 	public int mipLevel;
 	private long semanticSnapshotGeneration;
+	private long semanticReloadGeneration;
+	/** Frame selection used to build the cached CPU semantic atlas snapshot. */
+	private long semanticSnapshotFrameKey = Long.MIN_VALUE;
 	@Nullable
 	private TextureAtlas.SemanticRawSnapshot semanticRawSnapshot;
 	
@@ -71,15 +72,20 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable,
 
 	private void refreshVulkanMipmaps() {
 		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| this.texture == null || this.texture.getMipLevels() <= 1 || !VulkanicAPI.isVulkanBackendSelected()) {
+			|| VulkanicAPI.isVulkanBackendSelected()) {
+			// Selected Vulkan atlases are CPU-owned semantic snapshots. Never
+			// re-enter Iris' legacy texture/mipmap state, even if a stale Java
+			// texture survived a resource reload race.
 			return;
 		}
-
-		IrisRenderSystem.generateMipmaps(VulkanicCoreAPI.textureId(this.texture));
+		if (this.texture == null || this.texture.getMipLevels() <= 1) {
+			return;
+		}
 	}
 
 	public void upload(SpriteLoader.Preparations preparations) {
-		boolean rustWholeFrame = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
+		boolean rustWholeFrame = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected();
 		if (rustWholeFrame) {
 			// Semantic GUI consumers retain only the stitched CPU source. Do not
 			// allocate a Java texture/view merely to provide metadata that Rust
@@ -97,6 +103,8 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable,
 		}
 		this.texturesByName = Map.copyOf(preparations.regions());
 		this.semanticSnapshotGeneration++;
+		this.semanticReloadGeneration++;
+		this.semanticSnapshotFrameKey = Long.MIN_VALUE;
 		this.semanticRawSnapshot = null;
 		this.missingSprite = (TextureAtlasSprite)this.texturesByName.get(MissingTextureAtlasSprite.getLocation());
 		if (this.missingSprite == null) {
@@ -155,6 +163,13 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable,
 	@Override
 	public void dumpContents(ResourceLocation resourceLocation, Path path) throws IOException {
 		String string = resourceLocation.toDebugFileName();
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+			// Rust-owned atlases have no Java GPU image to read back. Preserve the
+			// useful CPU diagnostic (sprite placement) without reopening a Java view.
+			dumpSpriteNames(path, string, this.texturesByName);
+			return;
+		}
 		TextureUtil.writeAsPNG(path, string, this.getTexture(), this.mipLevel, i -> i);
 		dumpSpriteNames(path, string, this.texturesByName);
 	}
@@ -201,7 +216,8 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable,
 	}
 
 	public void cycleAnimationFrames() {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
 			boolean advancedSemanticFrame = false;
 			if (!this.animatedTextures.isEmpty()) {
 				for (TextureAtlasSprite.Ticker ticker : this.animatedTextures) {
@@ -259,6 +275,7 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable,
 		this.texturesByName = Map.of();
 		this.missingSprite = null;
 		this.semanticSnapshotGeneration++;
+		this.semanticReloadGeneration++;
 		this.semanticRawSnapshot = null;
 	}
 
@@ -273,7 +290,19 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable,
 			|| (long)this.width * this.height > 16L * 1024L * 1024L) {
 			return null;
 		}
-		if (this.semanticRawSnapshot != null && this.semanticRawSnapshot.generation() == this.semanticSnapshotGeneration) {
+		// The reload generation is not sufficient for animated sprites: the
+		// semantic CPU snapshot must track the currently selected frame even when
+		// the Java GPU atlas is not involved in the Rust route.  The atlas contents
+		// map is immutable between reloads, so an ordered bounded hash is enough to
+		// distinguish frame selections without retaining Java texture state.
+		long frameKey = 0xcbf29ce484222325L;
+		for (TextureAtlasSprite sprite : this.texturesByName.values()) {
+			frameKey ^= sprite.contents().semanticFrameIndex() & 0xffffffffL;
+			frameKey *= 0x100000001b3L;
+		}
+		if (this.semanticRawSnapshot != null
+			&& this.semanticRawSnapshot.generation() == this.semanticSnapshotGeneration
+			&& this.semanticSnapshotFrameKey == frameKey) {
 			return this.semanticRawSnapshot;
 		}
 		byte[] pixels;
@@ -314,7 +343,18 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable,
 		this.semanticRawSnapshot = new TextureAtlas.SemanticRawSnapshot(
 			this.location, this.semanticSnapshotGeneration, this.width, this.height, pixels
 		);
+		this.semanticSnapshotFrameKey = frameKey;
 		return this.semanticRawSnapshot;
+	}
+
+	/** Returns the reload generation without allocating a CPU pixel snapshot. */
+	public synchronized long semanticSnapshotGeneration() {
+		return this.semanticSnapshotGeneration;
+	}
+
+	/** Returns the resource-reload generation, excluding animation-frame ticks. */
+	public synchronized long semanticReloadGeneration() {
+		return this.semanticReloadGeneration;
 	}
 
 	public record SemanticRawSnapshot(ResourceLocation atlasLocation, long generation, int width, int height, byte[] pixels) {
@@ -353,6 +393,10 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable,
 	
 	@Override
 	public net.irisshaders.iris.pbr.texture.PBRAtlasHolder getOrCreatePBRHolder() {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			throw new IllegalStateException("Java Iris PBR atlas state is unavailable on the Rust Vulkan route");
+		}
 		if (iris$pbrHolder == null) {
 			iris$pbrHolder = new net.irisshaders.iris.pbr.texture.PBRAtlasHolder();
 		}

@@ -226,6 +226,14 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_frame_present(
             // introducing a second presenter or borrowing Java/Iris state.
             let latest_submission = context.gal.latest_submission_id();
             context.gal.retire_through(latest_submission)?;
+            if std::env::var_os("MATTMC_TRACE_SUBMISSIONS").is_some() {
+                println!(
+                    "vulkan.submission.present-retire frame={} waited={} retired_through={}",
+                    presented.frame.0,
+                    request.wait_submission_id,
+                    latest_submission.0,
+                );
+            }
             Ok(FfiFramePresentResult {
                 status: StatusCode::Ok as i32,
                 frame_id: presented.frame.0,

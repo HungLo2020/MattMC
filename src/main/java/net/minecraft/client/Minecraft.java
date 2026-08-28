@@ -449,7 +449,8 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		
 		// Whole-frame Vulkan does not borrow Iris's renderer lifecycle or GPU
 		// initialization. The normal Java route retains its original ordering.
-		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() && !iris$initialized) {
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected() && !iris$initialized) {
 			iris$initialized = true;
 			new net.irisshaders.iris.Iris().onEarlyInitialize();
 		}
@@ -671,7 +672,8 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		this.window.setAllowCursorChanges(this.options.allowCursorChanges().get());
 		this.window.setDefaultErrorCallback();
 		this.resizeDisplay();
-		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
 			this.gameRenderer.preloadUiShader(this.vanillaPackResources.asProvider());
 		}
 		this.profileKeyPairManager = this.offlineDeveloperMode
@@ -702,6 +704,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		this.framerateLimitTracker = new FramerateLimitTracker(this.options, this);
 		this.fpsPieProfiler = new ContinuousProfiler(Util.timeSource, () -> this.fpsPieRenderTicks, this.framerateLimitTracker::isHeavilyThrottled);
 		if (TracyCompat.isAvailable() && gameConfig.game.captureTracyImages
+			&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
 			&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			this.tracyFrameCapture = new TracyFrameCapture();
 		} else {
@@ -712,6 +715,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		
 		// These are Java/Iris texture objects, not Rust semantic assets.
 		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
 			&& !net.irisshaders.iris.platform.IrisPlatformHelpers.getInstance().isModLoaded("fabric-resource-loader-v0")) {
 			try {
 				this.textureManager.register(net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("iris", "textures/gui/widgets.png"), new net.irisshaders.iris.targets.backed.NativeImageBackedCustomTexture(new net.irisshaders.iris.shaderpack.texture.CustomTextureData.PngData(new net.irisshaders.iris.shaderpack.texture.TextureFilteringData(false, false), org.apache.commons.io.IOUtils.toByteArray(net.irisshaders.iris.Iris.class.getResourceAsStream("/assets/iris/textures/gui/widgets.png")))));
@@ -722,7 +726,8 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		
 		// VoxelMap still owns Java offscreen textures and render passes. Keep it
 		// unavailable in a Rust-owned frame until it emits explicit semantics.
-		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
 			try {
 				VoxelMapInitializer.initialize();
 			} catch (Exception e) {
@@ -1390,8 +1395,17 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 					net.minecraft.client.dev.DeterministicCameraCapture.beforeRender(this);
 					if (!net.minecraft.client.dev.DeterministicCameraCapture.holdPresentedFrameForExternalScreenshot(this)) {
 						net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.rendering.rust-vulkan-whole-frame");
-						this.gameRenderer.renderRustVulkanWholeFrameShell(this.deltaTracker, bl);
+						boolean rendered = this.gameRenderer.renderRustVulkanWholeFrameShell(this.deltaTracker, bl);
 						net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.rendering.rust-vulkan-whole-frame");
+						if (!rendered) {
+							throw new IllegalStateException(
+								"Rust Vulkan whole-frame presentation was selected but its semantic shell was not admitted"
+							);
+						}
+						// The Rust coordinator has already presented the semantic frame;
+						// advance deterministic capture state at the same post-present
+						// boundary used by the legacy renderer.
+						net.minecraft.client.dev.DeterministicCameraCapture.afterRender(this);
 					}
 				}
 				net.minecraft.util.profiling.custom.ProfilerManager.recordRenderThreadOperation("frame.rustVulkanWholeFrame", Util.getNanos() - startTime);
@@ -1443,7 +1457,8 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 			if (DEBUG_FPS_LIMIT_LOGS < 20) {
 				DEBUG_FPS_LIMIT_LOGS++;
 				net.blaze3d.textures.GpuTexture mainColorTexture = renderTarget.getColorTexture();
-				boolean rustWholeFrame = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
+				boolean rustWholeFrame = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+					|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected();
 				int mainColorTextureId = mainColorTexture == null || rustWholeFrame
 					? 0 : net.vulkanic.VulkanicCoreAPI.textureId(mainColorTexture);
 				String mainColorTextureLabel = mainColorTexture == null ? "null"
@@ -2036,8 +2051,9 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		// Iris owns Java shader-pack state.  Whole-frame Vulkan has no Iris
 		// renderer/runtime to toggle, so leave those controls unavailable rather
 		// than constructing or borrowing its GPU state.
-		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			profilerFiller.push("iris_keybinds");
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+				profilerFiller.push("iris_keybinds");
 			net.irisshaders.iris.Iris.handleKeybinds(this);
 			profilerFiller.pop();
 		}
@@ -2270,7 +2286,8 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 
 	public void setLevel(ClientLevel clientLevel) {
 		// Iris: From MixinMinecraft_PipelineManagement - track last dimension on level change
-		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
 			net.irisshaders.iris.Iris.lastDimension = net.irisshaders.iris.Iris.getCurrentDimension();
 		}
 		
@@ -2366,7 +2383,10 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		net.vulkanic.gui.RustGalFrameCoordinator.cancelPending("world-unload");
 		net.vulkanic.world.RustGalTerrainRenderer.invalidateForWorldUnload();
 		// Iris: From MixinMinecraft_PipelineManagement - track last dimension on leave
-		net.irisshaders.iris.Iris.lastDimension = net.irisshaders.iris.Iris.getCurrentDimension();
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+			net.irisshaders.iris.Iris.lastDimension = net.irisshaders.iris.Iris.getCurrentDimension();
+		}
 		
 		ClientPacketListener clientPacketListener = this.getConnection();
 		if (clientPacketListener != null) {
@@ -2417,7 +2437,8 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 
 	private void updateLevelInEngines(@Nullable ClientLevel clientLevel) {
 		// Iris: From MixinMinecraft_PipelineManagement - reset pipeline on dimension change
-		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
 			if (net.irisshaders.iris.Iris.getCurrentDimension() != net.irisshaders.iris.Iris.lastDimension) {
 				net.irisshaders.iris.Iris.logger.info("Reloading pipeline on dimension change: " + net.irisshaders.iris.Iris.lastDimension + " => " + net.irisshaders.iris.Iris.getCurrentDimension());
 				// Destroy pipelines when changing dimensions.
@@ -2665,6 +2686,10 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 
 	public TextureManager getTextureManager() {
 		return this.textureManager;
+	}
+
+	public FontManager getFontManager() {
+		return this.fontManager;
 	}
 
 	public ShaderManager getShaderManager() {

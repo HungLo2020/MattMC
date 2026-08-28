@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::ffi::{CStr, CString};
 use std::io::Cursor;
 use std::sync::Arc;
@@ -18,6 +18,14 @@ use crate::render::vulkanic::resources::*;
 /// still owns individually addressable buffers, lifetimes, and barriers.
 const HOST_VISIBLE_BUFFER_PAGE_SIZE: u64 = 16 * 1024 * 1024;
 const DEVICE_LOCAL_BUFFER_PAGE_SIZE: u64 = 64 * 1024 * 1024;
+const MAX_COMPILED_SHADER_CACHE_ENTRIES: usize = 512;
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+struct ShaderCompileKey {
+    stage: ShaderStage,
+    entry_point: String,
+    code: Vec<u8>,
+}
 
 #[derive(Clone, Copy)]
 struct BufferMemoryAllocation {
@@ -232,6 +240,10 @@ pub(super) struct VulkanObjects {
     buffer_memory: BufferMemoryAllocator,
     objects: BTreeMap<Handle, VulkanObject>,
     next_token: u64,
+    /// Backend-private compiler output cache.  GAL shader handles remain
+    /// distinct resources; only the expensive GLSL-to-SPIR-V translation is
+    /// shared, and the bounded cache owns no Vulkan handles.
+    compiled_shader_cache: HashMap<ShaderCompileKey, Vec<u8>>,
 }
 
 impl VulkanObjects {
@@ -241,6 +253,7 @@ impl VulkanObjects {
             context,
             objects: BTreeMap::new(),
             next_token: 1,
+            compiled_shader_cache: HashMap::new(),
         }
     }
 
@@ -655,6 +668,7 @@ impl VulkanObjects {
             .set_object_name(image, &debug_name("texture", handle, &desc.label));
         Ok(TextureObject {
             token,
+            label: desc.label.clone(),
             image,
             memory,
             format,
@@ -697,10 +711,15 @@ impl VulkanObjects {
             .set_object_name(view, &debug_name("texture-view", handle, &desc.label));
         Ok(TextureViewObject {
             token,
+            label: desc.label.clone(),
             view,
             texture: desc.texture,
             format: texture_format(desc.format),
             aspect: texture.aspect,
+            base_mip: desc.base_mip,
+            mip_levels: desc.mip_count,
+            base_layer: desc.base_layer,
+            array_layers: desc.layer_count,
         })
     }
 
@@ -764,7 +783,7 @@ impl VulkanObjects {
                 target.color_views.len()
             )));
         }
-        if target.depth_stencil_view.is_some() != desc.depth_format.is_some() {
+        if target.depth_stencil_view.is_none() && desc.depth_format.is_some() {
             return Err(GalError::invalid_argument(format!(
                 "render pass '{}' depth attachment presence does not match target",
                 desc.label
@@ -806,7 +825,7 @@ impl VulkanObjects {
     }
 
     fn create_shader_module(
-        &self,
+        &mut self,
         handle: Handle,
         desc: &ShaderModuleDesc,
         token: BackendToken,
@@ -818,21 +837,51 @@ impl VulkanObjects {
                     desc.label
                 ))
             })?;
-            compile_glsl_for_backend(
-                shaderc_kind(desc.stage)?,
-                source,
-                &desc.label,
-                &desc.entry_point,
-            )
-            .map_err(|error| {
-                GalError::backend(format!(
-                    "failed to compile GLSL shader '{}' for Vulkan backend: {error}",
-                    desc.label
-                ))
-            })?
+            let cache_key = ShaderCompileKey {
+                stage: desc.stage,
+                entry_point: desc.entry_point.clone(),
+                code: desc.code.clone(),
+            };
+            if let Some(cached) = self.compiled_shader_cache.get(&cache_key) {
+                if std::env::var_os("MATTMC_TRACE_VK_SHADER_COMPILE").is_some() {
+                    println!("vulkan.shader.compile.cache_hit label={}", desc.label);
+                }
+                cached.clone()
+            } else {
+                if std::env::var_os("MATTMC_TRACE_VK_SHADER_COMPILE").is_some() {
+                    println!(
+                        "vulkan.shader.compile.begin label={} stage={:?} bytes={}",
+                        desc.label,
+                        desc.stage,
+                        source.len()
+                    );
+                }
+                let compiled = compile_glsl_for_backend(
+                    shaderc_kind(desc.stage)?,
+                    source,
+                    &desc.label,
+                    &desc.entry_point,
+                )
+                .map_err(|error| {
+                    GalError::backend(format!(
+                        "failed to compile GLSL shader '{}' for Vulkan backend: {error}",
+                        desc.label
+                    ))
+                })?;
+                if self.compiled_shader_cache.len() >= MAX_COMPILED_SHADER_CACHE_ENTRIES {
+                    self.compiled_shader_cache.clear();
+                }
+                self.compiled_shader_cache.insert(cache_key, compiled.clone());
+                compiled
+            }
         } else {
             desc.code.clone()
         };
+        if desc.code_format == ShaderCodeFormat::Glsl
+            && std::env::var_os("MATTMC_TRACE_VK_SHADER_COMPILE").is_some()
+        {
+            println!("vulkan.shader.compile.end label={}", desc.label);
+        }
         if desc.code_format != ShaderCodeFormat::Spirv && desc.code_format != ShaderCodeFormat::Glsl
             || code.len() % 4 != 0
         {
@@ -1070,6 +1119,18 @@ impl VulkanObjects {
                     } else {
                         vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL
                     };
+                    if std::env::var_os("MATTMC_TRACE_DESCRIPTOR_REALIZATION").is_some() {
+                        eprintln!(
+                            "vulkan.descriptor.combined resource={:?} texture_view={:?} texture={:?} label={} image_view={:?} sampler={:?} layout={}",
+                            binding.resource,
+                            combined.texture_view,
+                            view.texture,
+                            view.label,
+                            view.view,
+                            sampler,
+                            sampled_layout.as_raw(),
+                        );
+                    }
                     image_infos.push(vk::DescriptorImageInfo {
                         sampler,
                         image_view: view.view,
@@ -1456,6 +1517,7 @@ pub(super) struct BufferObject {
 #[allow(dead_code)]
 pub(super) struct TextureObject {
     pub(super) token: BackendToken,
+    pub(super) label: String,
     pub(super) image: vk::Image,
     pub(super) memory: vk::DeviceMemory,
     pub(super) format: vk::Format,
@@ -1470,10 +1532,15 @@ pub(super) struct TextureObject {
 #[allow(dead_code)]
 pub(super) struct TextureViewObject {
     pub(super) token: BackendToken,
+    pub(super) label: String,
     pub(super) view: vk::ImageView,
     pub(super) texture: Handle,
     pub(super) format: vk::Format,
     pub(super) aspect: vk::ImageAspectFlags,
+    pub(super) base_mip: u32,
+    pub(super) mip_levels: u32,
+    pub(super) base_layer: u32,
+    pub(super) array_layers: u32,
 }
 
 pub(super) struct SamplerObject {
@@ -1903,6 +1970,33 @@ fn image_view_type(dimension: TextureDimension, array_layers: u32) -> vk::ImageV
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn shader_compile_cache_key_preserves_exact_stage_entry_point_and_source() {
+        let vertex = ShaderCompileKey {
+            stage: ShaderStage::Vertex,
+            entry_point: "main".to_owned(),
+            code: b"void main(){}".to_vec(),
+        };
+        let fragment = ShaderCompileKey {
+            stage: ShaderStage::Fragment,
+            entry_point: "main".to_owned(),
+            code: b"void main(){}".to_vec(),
+        };
+        let changed_source = ShaderCompileKey {
+            stage: ShaderStage::Vertex,
+            entry_point: "main".to_owned(),
+            code: b"void main(){gl_Position=vec4(0.0);}".to_vec(),
+        };
+        let mut cache = HashMap::new();
+        cache.insert(vertex.clone(), vec![1]);
+        cache.insert(fragment.clone(), vec![2]);
+        cache.insert(changed_source.clone(), vec![3]);
+        assert_eq!(cache.len(), 3);
+        assert_eq!(cache.get(&vertex), Some(&vec![1]));
+        assert_eq!(cache.get(&fragment), Some(&vec![2]));
+        assert_eq!(cache.get(&changed_source), Some(&vec![3]));
+    }
 
     #[test]
     fn buffer_memory_block_reuses_aligned_ranges_after_destroy() {

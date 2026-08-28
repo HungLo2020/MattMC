@@ -40,8 +40,9 @@ public interface MultiBufferSource {
 
 		@Override
 		public VertexConsumer getBuffer(RenderType renderType) {
-			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-				throw new IllegalStateException("Java Vulkan buffer-source rendering is unavailable while Rust owns whole-frame presentation");
+			if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+				throw new IllegalStateException("Java Vulkan buffer-source rendering is unavailable on selected Vulkan");
 			}
 			BufferBuilder bufferBuilder = (BufferBuilder)this.startedBuilders.get(renderType);
 			if (bufferBuilder != null && !renderType.canConsolidateConsecutiveGeometry()) {
@@ -100,6 +101,16 @@ public interface MultiBufferSource {
 		private void endBatch(RenderType renderType, BufferBuilder bufferBuilder) {
 			MeshData meshData = bufferBuilder.build();
 			if (meshData != null) {
+				if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+					|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+					// A compatibility builder can outlive the ownership handoff. Retire
+					// its copied mesh without reopening Java Vulkan draw submission.
+					meshData.close();
+					if (renderType.equals(this.lastSharedType)) {
+						this.lastSharedType = null;
+					}
+					return;
+				}
 				if (renderType.sortOnUpload()) {
 					ByteBufferBuilder byteBufferBuilder = (ByteBufferBuilder)this.fixedBuffers.getOrDefault(renderType, this.sharedBuffer);
 					

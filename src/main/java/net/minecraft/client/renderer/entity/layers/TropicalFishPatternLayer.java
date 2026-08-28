@@ -42,6 +42,12 @@ public class TropicalFishPatternLayer extends RenderLayer<TropicalFishRenderStat
 	}
 
 	public void submit(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, TropicalFishRenderState tropicalFishRenderState, float f, float g) {
+		if (tropicalFishRenderState == null || tropicalFishRenderState.pattern == null) {
+			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+				throw new IllegalStateException("Rust whole-frame tropical-fish pattern route requires copied pattern semantics");
+			}
+			return;
+		}
 		Pattern pattern = tropicalFishRenderState.pattern;
 
 		EntityModel<TropicalFishRenderState> entityModel = (EntityModel<TropicalFishRenderState>)(switch (pattern.base()) {

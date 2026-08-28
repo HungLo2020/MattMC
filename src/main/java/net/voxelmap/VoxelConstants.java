@@ -142,6 +142,10 @@ public final class VoxelConstants {
             return; // Failed to initialize, skip rendering
         }
 
+        if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+            && !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+            throw new IllegalStateException("Selected Vulkan VoxelMap overlay is unavailable before Rust whole-frame admission");
+        }
         if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
             if (getVoxelMapInstance().getMap() == null) {
                 return;
@@ -183,6 +187,10 @@ public final class VoxelConstants {
         
         try {
             WaypointManager manager = VoxelConstants.getVoxelMapInstance().getWaypointManager();
+            if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+                && !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+                throw new IllegalStateException("Selected Vulkan VoxelMap waypoint rendering is unavailable before Rust whole-frame admission");
+            }
             if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
                 // Beacon-only mode has a bounded semantic representation today:
                 // world-space vertical line segments. Sign/icon/text semantics
@@ -208,7 +216,8 @@ public final class VoxelConstants {
             }
             manager.renderWaypoints(gameTimeDeltaPartialTick, poseStack, bufferSource, camera);
         } catch (RuntimeException e) {
-            if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+            if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+                || net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
                 // Whole-frame Vulkan has no Java BufferSource fallback. Preserve
                 // the failure so admission cannot turn into a silent omission.
                 throw e;
@@ -229,7 +238,11 @@ public final class VoxelConstants {
 
     /** Submits copied VoxelMap 3D icon/background/text semantics before Rust world-text extraction. */
     public static void submitRustWaypointSemantics(SubmitNodeCollector collector, PoseStack poseStack, Camera camera) {
-        if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() || !initialized || collector == null || camera == null) return;
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() || !initialized || collector == null || camera == null) return;
+		// During backend bootstrap the presenter may not yet have admitted the
+		// textured-billboard route. Defer this semantic producer to the next frame
+		// rather than manufacturing a Java fallback or rejecting the whole client.
+		if (!net.vulkanic.world.WorldRenderRoutePolicy.currentTexturedBillboardRoute().usesRustWholeFrameVulkan()) return;
         WaypointManager manager = getVoxelMapInstance().getWaypointManager();
         if (!manager.options.waypointsAllowed || !manager.options.showWaypoints) return;
         net.minecraft.world.phys.Vec3 cameraPos = camera.getPosition();
@@ -245,22 +258,33 @@ public final class VoxelConstants {
             poseStack.mulPose(net.math.Axis.YP.rotationDegrees(-camera.getYRot()));
             poseStack.mulPose(net.math.Axis.XP.rotationDegrees(camera.getXRot()));
             poseStack.scale(-scale, -scale, -scale);
-            Sprite icon = manager.getTextureAtlas().getAtlasSprite("voxelmap:images/waypoints/waypoint" + waypoint.imageSuffix + ".png");
-            if (icon == manager.getTextureAtlas().getMissingImage()) icon = manager.getTextureAtlas().getAtlasSprite("voxelmap:images/waypoints/waypoint.png");
-            float[] iconVertices = {-10, -10, 0, -10, 10, 0, 10, 10, 0, 10, -10, 0};
-            float[] iconUvs = {icon.getMinU(), icon.getMinV(), icon.getMinU(), icon.getMaxV(), icon.getMaxU(), icon.getMaxV(), icon.getMaxU(), icon.getMinV()};
-            if (!collector.submitTexturedQuad(poseStack, (RenderType)null, icon.getResourceLocation(), iconVertices, iconUvs, waypoint.getUnifiedColor(), 0x00F000F0)) {
-                throw new IllegalStateException("Rust whole-frame waypoint icon route rejected semantic quad");
+			Sprite icon = manager.getTextureAtlas().getAtlasSprite("voxelmap:images/waypoints/waypoint" + waypoint.imageSuffix + ".png");
+			if (icon == manager.getTextureAtlas().getMissingImage()) icon = manager.getTextureAtlas().getAtlasSprite("voxelmap:images/waypoints/waypoint.png");
+			float[] iconVertices = {-10, -10, 0, -10, 10, 0, 10, 10, 0, 10, -10, 0};
+			// Submit the source PNG as a semantic asset rather than the mod-owned
+			// stitched atlas. This preserves the icon pixels while avoiding any
+			// dependency on VoxelMap's Java atlas texture or native handle.
+			String iconPath = "images/waypoints/waypoint" + waypoint.imageSuffix + ".png";
+			if (icon == manager.getTextureAtlas().getMissingImage()) iconPath = "images/waypoints/waypoint.png";
+			ResourceLocation iconSource = ResourceLocation.fromNamespaceAndPath("voxelmap", iconPath);
+			float[] iconUvs = {0, 0, 0, 1, 1, 1, 1, 0};
+			if (!collector.submitTranslucentTexturedQuadSemantic(poseStack, (RenderType)null, iconSource, iconVertices, iconUvs, waypoint.getUnifiedColor(), 0x00F000F0)) {
+                throw new IllegalStateException("Rust whole-frame waypoint icon route rejected semantic quad (mode="
+					+ net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+					+ ", route=" + net.vulkanic.world.WorldRenderRoutePolicy.currentTexturedBillboardRoute() + ")");
             }
             int halfWidth = Minecraft.getInstance().font.width(name) / 2;
             float[] backgroundVertices = {-halfWidth - 2, 8, 0, -halfWidth - 2, 19, 0, halfWidth + 2, 19, 0, halfWidth + 2, 8, 0};
             float[] backgroundUvs = {0, 0, 0, 1, 1, 1, 1, 0};
             int background = (0x99 << 24) | ((int)(waypoint.red * 255) << 16) | ((int)(waypoint.green * 255) << 8) | (int)(waypoint.blue * 255);
-            if (!collector.submitColoredQuads(poseStack, (RenderType)null, backgroundVertices, backgroundUvs,
-                new int[] {background, background, background, background}, 0x00F000F0)) {
+            if (!collector.submitColoredQuadsSemantic(poseStack, (RenderType)null, backgroundVertices, backgroundUvs,
+				new int[] {background}, 0x00F000F0)) {
                 throw new IllegalStateException("Rust whole-frame waypoint label route rejected semantic background");
             }
-            collector.submitText(poseStack, -halfWidth, 10, Component.literal(name).getVisualOrderText(), false, Font.DisplayMode.SEE_THROUGH, 0xFFFFFFFF, 0, 0x00F000F0, 0);
+            collector.submitTextSemantic(
+                poseStack, -halfWidth, 10, Component.literal(name).getVisualOrderText(), false,
+                Font.DisplayMode.SEE_THROUGH, 0xFFFFFFFF, 0, 0x00F000F0, 0
+            );
             poseStack.popPose();
         }
     }

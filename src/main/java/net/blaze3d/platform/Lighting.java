@@ -23,12 +23,13 @@ public class Lighting implements AutoCloseable {
 	private static final Vector3f INVENTORY_DIFFUSE_LIGHT_1 = new Vector3f(-0.2F, -1.0F, 0.0F).normalize();
 	public static final int UBO_SIZE = new Std140SizeCalculator().putVec3().putVec3().get();
 	@Nullable
-	private final GpuBuffer buffer;
+	private GpuBuffer buffer;
 	private final int paddedSize;
 
 	public Lighting() {
 		this.paddedSize = Mth.roundToward(UBO_SIZE, VulkanicAPI.getBackendUniformOffsetAlignment());
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			// Rust semantic world/GUI lighting is derived from copied gameplay
 			// inputs; no Java lighting UBO or encoder writes belong on this route.
 			this.buffer = null;
@@ -107,7 +108,13 @@ public class Lighting implements AutoCloseable {
 	public void close() {
 		if (this.buffer != null) {
 			this.buffer.close();
+			this.buffer = null;
 		}
+	}
+
+	public void ensureRustSemanticRoute() {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) this.close();
 	}
 
 	@Environment(EnvType.CLIENT)

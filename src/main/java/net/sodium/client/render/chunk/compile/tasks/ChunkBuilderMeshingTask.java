@@ -108,6 +108,10 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
         boolean forceJavaProducers = NativeMeshingDiagnostics.forceJavaProducers();
         boolean forceJavaModels = NativeMeshingDiagnostics.forceJavaModels();
         boolean forceJavaFluids = NativeMeshingDiagnostics.forceJavaFluids();
+        if (rustStaticTerrainRoute && (forceJavaProducers || forceJavaModels || forceJavaFluids)) {
+            throw new IllegalStateException(
+                    "Rust whole-frame terrain cannot enable Java mesh-production overrides");
+        }
         StaticTerrainParityDiagnostics.SourceBlockClassification sourceBlockClassification =
                 StaticTerrainParityDiagnostics.beginSourceBlockClassification();
         int fallbackBlockCount = 0;
@@ -233,8 +237,13 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
         }
         profiler.popPush("mesh appenders");
 
-        NativeMeshingCompatibilityFallback.runMeshAppenders(this.renderContext, buffers, slice, collector,
-                fallbackStats);
+		// Fabric currently supplies no platform mesh appenders. Avoid entering the
+		// compatibility boundary for an empty list; a non-empty list remains
+		// explicitly rejected on Rust Vulkan until its semantic ABI is implemented.
+		if (!this.renderContext.getRenderers().isEmpty()) {
+			NativeMeshingCompatibilityFallback.runMeshAppenders(this.renderContext, buffers, slice, collector,
+					fallbackStats);
+		}
         int fallbackQuadCount = (blockRenderer.getEmittedQuadCount() - fallbackQuadStart)
                 + cache.getFluidRenderer().getEmittedQuadCount()
                 + buffers.getFallbackConsumerEmittedQuadCount();
