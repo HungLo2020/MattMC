@@ -36,6 +36,10 @@ pub struct WholeFrameProfile {
     pub vulkan_timeline_poll_nanos: u64,
     pub vulkan_timeline_wait_nanos: u64,
     pub vulkan_device_wait_idle_nanos: u64,
+    // These are per-submission deltas.  Allocation is recorded while encoding
+    // and retirement normally happens at presentation (after this profile is
+    // sampled), so `freed == 0` in a frame profile is expected and does not
+    // represent the number of command buffers still owned by the backend.
     pub vulkan_command_buffers_allocated: u64,
     pub vulkan_command_buffers_freed: u64,
     pub vulkan_wait_count: u64,

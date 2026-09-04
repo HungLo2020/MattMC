@@ -48,6 +48,21 @@ class NativeMeshingProductionContractTest {
     }
 
     @Test
+    void bambooTintIndexedMultipartModelsUseExplicitUntintedRustSemantics() throws IOException {
+        String registry = source("src/main/java/net/sodium/client/render/chunk/compile/pipeline/NativeStaticBlockModelRegistry.java");
+        assertTrue(registry.contains("Blocks.BAMBOO || block == Blocks.POTTED_BAMBOO"));
+        assertTrue(registry.contains("explicit constant/no-tint state"));
+    }
+
+    @Test
+    void azaleaLeafTintedWeightedModelsUseRustFoliageSemantics() throws IOException {
+        String registry = source("src/main/java/net/sodium/client/render/chunk/compile/pipeline/NativeStaticBlockModelRegistry.java");
+        assertTrue(registry.contains("Blocks.AZALEA_LEAVES"));
+        assertTrue(registry.contains("Blocks.FLOWERING_AZALEA_LEAVES"));
+        assertTrue(registry.contains("return TINT_FOLIAGE"));
+    }
+
+    @Test
     void rustWholeFrameRejectsJavaMeshProductionOverrides() throws IOException {
         String task = source("src/main/java/net/sodium/client/render/chunk/compile/tasks/ChunkBuilderMeshingTask.java");
         int route = task.indexOf("boolean rustStaticTerrainRoute");
@@ -303,7 +318,8 @@ class NativeMeshingProductionContractTest {
                 "custom fluid compatibility fallback must be unavailable on Rust whole-frame Vulkan");
         assertTrue(fallback.contains("Rust whole-frame terrain cannot execute a Java \" + family + \" fallback"),
                 "selected Vulkan must fail closed instead of rendering custom fluids through Java");
-        assertTrue(fallback.contains("rejectRustWholeFrameFallback(\"block model\")"),
+        assertTrue(fallback.contains("rejectRustWholeFrameFallback(\"block model state=\"")
+                        && fallback.contains("model.getClass().getName()"),
                 "unsupported block-model fallback must be unavailable on Rust whole-frame Vulkan");
         assertTrue(fallback.contains("rejectRustWholeFrameFallback(\"platform mesh appender\")"),
                 "platform mesh appenders must be unavailable on Rust whole-frame Vulkan");
@@ -410,6 +426,17 @@ class NativeMeshingProductionContractTest {
         assertTrue(whale.contains("textures/entity/cachalot/cachalot_whale_albino.png"));
         assertTrue(whale.contains("textures/entity/cachalot/cachalot_whale_albino_sleeping.png"));
         assertTrue(squidLayer.contains("dispatcher.submitSemantic"));
+    }
+
+    @Test
+    void shaderPackDepthFarMatchesVanillaProjectionContract() throws IOException {
+        String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        assertTrue(renderer.contains("shaderPackDepthFar(),"));
+        assertTrue(renderer.contains("shaderPackDepthFarForRenderDistance("));
+        assertTrue(renderer.contains("effectiveRenderDistance * 16.0F"));
+        assertFalse(renderer.contains("gameRenderer.getDepthFar()"),
+                "shader-pack far must not silently substitute the projection clip far plane");
+        assertTrue(renderer.contains("shader-pack {@code far} semantic is the projection depth-far value"));
     }
 
     @Test
@@ -1133,6 +1160,33 @@ class NativeMeshingProductionContractTest {
                 "MeshCoverage sourceCoverage = SOURCE_MESHES.get(new CoverageKey(sectionKey, normalizedLayer))"));
         assertTrue(diagnostics.contains(
                 "sourceCoverage == null ? \"\" : sourceCoverage.sectionAnimatedSpriteIdentities()"));
+    }
+
+    @Test
+    void staticTerrainParityReadinessUsesStableRenderedFramesWhenTimeIsFrozen() throws IOException {
+        String diagnostics = source("src/main/java/net/sodium/client/render/StaticTerrainParityDiagnostics.java");
+
+        assertTrue(diagnostics.contains("stableSolidFrames >= Math.max(1, requiredFrames)"));
+        assertFalse(diagnostics.contains("readySolidGameFrames"));
+        assertFalse(diagnostics.contains("readySolidLastGameTime"));
+    }
+
+    @Test
+    void staticTerrainParityReadinessContinuesAfterBoundedReceiptOutput() throws IOException {
+        String diagnostics = source("src/main/java/net/sodium/client/render/StaticTerrainParityDiagnostics.java");
+
+        assertTrue(diagnostics.contains("maxVisibleListEvents"));
+        assertTrue(diagnostics.contains("boolean writeEvent = eventIndex <= MAX_VISIBLE_LIST_EVENTS"));
+        assertTrue(diagnostics.indexOf("latestSolidGameTime = gameTime;")
+                < diagnostics.indexOf("if (!writeEvent)"));
+    }
+
+    @Test
+    void staticTerrainParityCoverageUsesTheInProgressCaptureCorrelation() throws IOException {
+        String diagnostics = source("src/main/java/net/sodium/client/render/StaticTerrainParityDiagnostics.java");
+
+        assertTrue(diagnostics.contains("currentCaptureCorrelationRenderedFrameIndex()"));
+        assertFalse(diagnostics.contains("currentRenderedFrameIndex()).append(\", \")"));
     }
 
     @Test
@@ -2252,7 +2306,7 @@ class NativeMeshingProductionContractTest {
         assertTrue(renderer.contains("SKIN_BY_TYPE.get"));
         assertTrue(submit.contains("SkullModelBase"));
         assertTrue(submit.contains("crumblingOverlay == null"));
-        assertTrue(submit.contains("block_entity/skull/"));
+        assertTrue(submit.contains("block_entity/skull"));
         assertTrue(level.contains("SkullBlockRenderState"));
         assertTrue(rust.contains("model instanceof net.minecraft.client.model.SkullModelBase"));
     }

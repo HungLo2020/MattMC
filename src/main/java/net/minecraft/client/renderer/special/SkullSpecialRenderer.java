@@ -42,7 +42,7 @@ public class SkullSpecialRenderer implements NoDataSpecialModelRenderer {
 
 	@Override
 	public void submit(ItemDisplayContext itemDisplayContext, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, int j, boolean bl, int k) {
-		SkullBlockRenderer.submitSkull(null, 180.0F, this.animation, poseStack, submitNodeCollector, i, this.model, this.renderType, k, null, null);
+		SkullBlockRenderer.submitSkull(null, 180.0F, this.animation, poseStack, submitNodeCollector, i, this.model, this.renderType, k, null, this.texture);
 	}
 
 	@Override

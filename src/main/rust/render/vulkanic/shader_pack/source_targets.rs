@@ -2694,7 +2694,10 @@ mod tests {
         assert_eq!(0, primary.source_slot());
         assert_eq!(ShaderPackColorFormat::R11fG11fB10f, primary.format);
         assert!(primary.clear_each_frame);
-        assert_eq!(TextureFormat::R11fG11fB10f, primary.gal_schema_color_format());
+        assert_eq!(
+            TextureFormat::R11fG11fB10f,
+            primary.gal_schema_color_format()
+        );
         assert_eq!(
             TextureFormat::Rgba16Float,
             manifest

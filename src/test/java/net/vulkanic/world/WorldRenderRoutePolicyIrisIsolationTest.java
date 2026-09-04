@@ -44,6 +44,16 @@ final class WorldRenderRoutePolicyIrisIsolationTest {
 	}
 
 	@Test
+	void distantHorizonsIsUnavailableForEveryVulkanRoute() {
+		assertEquals(DISABLED, WorldRenderRoutePolicy.selectDistantHorizonsRouteForTests(
+			true, false, false, false
+		));
+		assertEquals(DISABLED, WorldRenderRoutePolicy.selectDistantHorizonsRouteForTests(
+			false, true, false, false
+		));
+	}
+
+	@Test
 	void borrowedRustOpenGlStillUsesIrisPackState() {
 		AtomicInteger irisQueries = new AtomicInteger();
 

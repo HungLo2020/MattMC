@@ -42,14 +42,10 @@ public class CubeMap implements AutoCloseable {
 	public void render(Minecraft minecraft, float f, float g) {
 		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
 			|| VulkanicAPI.isVulkanBackendSelected()) {
-			int width = minecraft.getWindow().getGuiScaledWidth();
-			int height = minecraft.getWindow().getGuiScaledHeight();
-			if (!net.vulkanic.gui.RustGalPanoramaRenderer.enqueue(this, f, g, width, height)) {
-				throw new IllegalStateException(
-					"Rust Vulkan whole-frame panorama asset is unavailable; Java cube-map rendering is not a fallback"
-				);
-			}
-			return;
+			throw new IllegalStateException(
+				"Rust Vulkan panorama requires PanoramaRenderer to attach its semantic command to the active GuiRenderState; "
+					+ "Java cube-map rendering is not a fallback"
+			);
 		}
 		net.vulkanic.VulkanicAPI.setProjectionMatrix(
 			this.projectionMatrixUbo.getBuffer(minecraft.getWindow().getWidth(), minecraft.getWindow().getHeight(), 85.0F), ProjectionType.PERSPECTIVE

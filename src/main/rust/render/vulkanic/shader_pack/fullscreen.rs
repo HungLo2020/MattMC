@@ -1402,7 +1402,7 @@ impl PreparedFullscreenSourcePass {
                 depth_bias: None,
                 color_formats,
                 depth_format: None,
-            stencil: None,
+                stencil: None,
             })?;
             created.push(pipeline);
             Ok(CompiledFullscreenSourcePass {

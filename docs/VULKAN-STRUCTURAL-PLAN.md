@@ -71,7 +71,7 @@ This is the baseline all future comparisons should be judged against unless it i
 ### Standard Performance Harness
 
 ```bash
-python3 DevUtils/PerfAudit/Matrix.py --profile standard --modes current-opengl-shaders-off current-java-vulkan-shaders-off --world Origin
+python3 DevUtils/PerfAudit/Matrix.py --profile standard --modes current-opengl-shaders-off current-rust-vulkan-shaders-off --world Origin
 ```
 
 ## Summary of the Structural Problem

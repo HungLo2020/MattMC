@@ -245,8 +245,14 @@ class RustShaderPackSourceCollectorTest {
 	}
 
 	@Test
-	void wholeFrameEnvironmentPublishesDistantHorizonsAsSemanticCapability() {
-		assertEquals("1", RustShaderPackSourceCollector.wholeFrameEnvironmentDefines().get("DISTANT_HORIZONS"));
+	void vanillaWholeFrameEnvironmentDoesNotPublishDistantHorizons() {
+		assertFalse(RustShaderPackSourceCollector.wholeFrameEnvironmentDefines().containsKey("DISTANT_HORIZONS"));
+	}
+
+	@Test
+	void ordinaryWholeFrameEnvironmentOmitsDistantHorizonsWithoutAnOwnedWriter() {
+		assertFalse(RustShaderPackSourceCollector.wholeFrameEnvironmentDefines(false).containsKey("DISTANT_HORIZONS"));
+		assertEquals("1", RustShaderPackSourceCollector.wholeFrameEnvironmentDefines(true).get("DISTANT_HORIZONS"));
 	}
 
 	@Test

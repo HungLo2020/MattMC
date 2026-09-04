@@ -121,6 +121,16 @@ public final class DeterministicCameraCapture {
 	private static final boolean STOP_AFTER_COMPLETE = Boolean.parseBoolean(System.getProperty("mattmc.dev.deterministicCameraCapture.stopAfterComplete", "true"));
 	private static final boolean INTERNAL_SCREENSHOTS = Boolean.parseBoolean(System.getProperty("mattmc.dev.deterministicCameraCapture.internalScreenshots", "false"));
 	/**
+	 * An opt-in, capture-only simulation clock.  The shared parity harness sets
+	 * this on both the Frozen OpenGL baseline and the candidate route so a
+	 * screenshot cannot compare two separately advancing copied-world clocks.
+	 * Ordinary launches leave it unset and retain vanilla time progression.
+	 */
+	private static final long FIXED_CAPTURE_TIME = Long.getLong(
+		"mattmc.dev.deterministicCameraCapture.fixedTime",
+		Long.MIN_VALUE
+	);
+	/**
 	 * Selected-source Vulkan captures retain the Rust submission's final image,
 	 * not an asynchronously sampled desktop window.  Enable this diagnostic
 	 * switch when every deterministic pose needs that same correlated proof.
@@ -147,6 +157,7 @@ public final class DeterministicCameraCapture {
 	private static final String FORCED_CAMERA_TYPE = System.getProperty("mattmc.dev.deterministicCameraCapture.cameraType", "").trim();
 	private static final String FORCED_GAME_MODE = System.getProperty("mattmc.dev.deterministicCameraCapture.gameMode", "").trim();
 	private static final int FORCED_SELECTED_HOTBAR_SLOT = Integer.getInteger("mattmc.dev.deterministicCameraCapture.selectedHotbarSlot", 0);
+	private static final boolean FORCE_EMPTY_SELECTED_HAND = Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.emptySelectedHand");
 	/**
 	 * Capture-only inventory fixture for validating the Rust-owned standard-3D
 	 * GUI-item route with known, non-flat vanilla block models. It is inactive
@@ -256,6 +267,9 @@ public final class DeterministicCameraCapture {
 	/** Copied-world fixture switch for the real DH water-surface stream. */
 	private static final boolean DISTANT_HORIZONS_REQUIRE_WATER =
 		Boolean.getBoolean("mattmc.dev.rustGalDistantHorizons.requireWater");
+	/** Harness-materialized DH fixture shared byte-for-byte with Frozen. */
+	private static final boolean DISTANT_HORIZONS_EXTERNAL_FIXTURE =
+		Boolean.getBoolean("mattmc.dev.rustGalDistantHorizons.externalFixture");
 	private static final boolean DISTANT_HORIZONS_LEGACY_OBSERVATION =
 		Boolean.getBoolean("mattmc.dev.rustGalDistantHorizons.legacyObservation");
 	private static final int DISTANT_HORIZONS_TEXTURE_PALETTE_SIDE = 32;
@@ -314,8 +328,6 @@ public final class DeterministicCameraCapture {
 		System.getProperty("mattmc.dev.deterministicCameraCapture.bossProgress", "").trim();
 	private static final String FORCED_BOSS_BAR_OVERLAY =
 		System.getProperty("mattmc.dev.deterministicCameraCapture.bossOverlay", "").trim();
-	private static final float FIXED_VIGNETTE_BRIGHTNESS =
-		Float.parseFloat(System.getProperty("mattmc.dev.deterministicCameraCapture.vignetteBrightness", "1.0"));
 	private static final double FIXED_CAMERA_X =
 		Double.parseDouble(System.getProperty("mattmc.dev.deterministicCameraCapture.fixedX", "NaN"));
 	private static final double FIXED_CAMERA_Y =
@@ -371,6 +383,14 @@ public final class DeterministicCameraCapture {
 	private static Vec3 initialPosition;
 	private static String initialDimension;
 	private static int poseIndex;
+	private static int translucentWarmupPoseIndex = -1;
+	private static int translucentWarmupFramesAtPose;
+	private static boolean translucentWarmupComplete;
+	// The warm-up only kicks asynchronous visibility/build work at each pose;
+	// captured poses still pass the full settled-readiness window below. Keeping
+	// this producer kick short prevents the seven-pose path from consuming the
+	// entire startup budget on expensive real Vulkan frames.
+	private static final int TRANSLUCENT_WARMUP_FRAMES_PER_POSE = 2;
 	private static int renderedFramesAtPose;
 	/**
 	 * Armed on the penultimate settled pose frame so the whole-frame coordinator
@@ -428,6 +448,8 @@ public final class DeterministicCameraCapture {
 	private static int windowWidth;
 	private static int windowHeight;
 	private static boolean settledReadyGateSatisfied;
+	/** Pose for which the submitted-work settling gate was last established. */
+	private static int settledReadyPoseIndex = Integer.MIN_VALUE;
 	/** Consecutive drained Rust terrain frames used for whole-frame readiness. */
 	private static int settledRustTerrainFrames;
 	/**
@@ -714,6 +736,10 @@ public final class DeterministicCameraCapture {
 	private static int rustGalGuiScreenCycleFramesInStage;
 	private static int rustGalGuiScreenCyclesCompleted;
 	private static boolean rustGalGuiScreenCycleComplete = !RUST_GAL_GUI_SCREEN_CYCLE;
+	private static boolean rustGalGuiScreenCycleInventoryCaptureRequested;
+	private static boolean rustGalGuiScreenCycleInventoryCaptureComplete;
+	private static Path rustGalGuiScreenCycleInventoryAckPath;
+	private static Path rustGalGuiScreenCycleInventoryCapturePath;
 	private static int pendingTerrainParticleFinishFrames;
 
 	private DeterministicCameraCapture() {
@@ -721,6 +747,14 @@ public final class DeterministicCameraCapture {
 
 	public static long currentRenderedFrameIndex() {
 		return ENABLED ? renderedFrameIndex : GraphicsFrameBenchmark.currentFrameIndex();
+	}
+
+	/**
+	 * Lets a completed benchmark keep the ordinary client loop alive until an
+	 * enabled deterministic screenshot has been acknowledged.
+	 */
+	public static boolean isAwaitingCompletion() {
+		return ENABLED && !complete && !failed;
 	}
 
 	/**
@@ -763,6 +797,16 @@ public final class DeterministicCameraCapture {
 	}
 
 	/**
+	 * Capture-only route for retaining a normal Rust whole-frame final image.
+	 * It neither changes route selection nor asks Rust to execute a selected
+	 * source graph; the coordinator uses it solely to acknowledge the already
+	 * presented normal submission.
+	 */
+	public static boolean normalRouteFinalOutputCaptureRequested() {
+		return ENABLED && RUST_FINAL_OUTPUT_EVERY_POSE && !selectedSourceCaptureRequested();
+	}
+
+	/**
 	 * The coordinator calls this only after Rust has promoted a pending
 	 * selected-source request, submitted its matching attachments, and
 	 * presented the same frame. It is capture synchronization, never route
@@ -781,14 +825,19 @@ public final class DeterministicCameraCapture {
 			return;
 		}
 		var distantHorizonsRoute = net.vulkanic.world.DistantHorizonsSemanticCollector.routeDiagnosticsSnapshot();
+		long executedCaptureFrame = distantHorizonsRoute.lastExecutedCaptureFrame();
+		boolean captureFrameAligned = executedCaptureFrame == deterministicRenderedFrameIndex
+			|| executedCaptureFrame + 1L == deterministicRenderedFrameIndex;
 		if (distantHorizonsFixtureRequested()
-			&& (distantHorizonsRoute.lastExecutedSubmission() != submissionId
-				|| distantHorizonsRoute.lastExecutedCaptureFrame() != deterministicRenderedFrameIndex)) {
+			&& (distantHorizonsRoute.lastExecutedSubmission() != submissionId || !captureFrameAligned)) {
 			// The attachment readback and the selected DH execution are produced by
 			// adjacent whole-frame submissions on some frames. Do not acknowledge a
 			// screenshot whose image/correlation pair can be one submission apart;
 			// release the request so the next matching frame can claim it again.
-			wholeFrameAttachmentCaptureRequestIssued = false;
+			// Preserve the originally claimed deterministic identity while waiting
+			// for the selected DH submission to become visible. Re-claiming here
+			// would advance the correlation frame and make a valid submission look
+			// mismatched by one frame forever.
 			System.out.println("[MattMC graphics audit] deterministic source capture deferred"
 				+ " gameplayFrame=" + gameplayFrameId
 				+ " reason=dh-execution-presentation-mismatch"
@@ -798,7 +847,12 @@ public final class DeterministicCameraCapture {
 				+ " presentationCaptureFrame=" + deterministicRenderedFrameIndex);
 			return;
 		}
-		boolean requiredProducerReceipt = requiredRustSourceExecutionObservedForGameplayFrame(gameplayFrameId);
+		// A normal-route final-output diagnostic retains the exact Rust-presented
+		// image for a parity pose. It is not selected-source execution and must
+		// not wait for an unrelated selected-source producer receipt.
+		boolean normalRouteFinalOutputCapture = normalRouteFinalOutputCaptureRequested();
+		boolean requiredProducerReceipt = normalRouteFinalOutputCapture
+			|| requiredRustSourceExecutionObservedForGameplayFrame(gameplayFrameId);
 		if (!requiredProducerReceipt && !CLOUD_SCENARIO.isEmpty()) {
 			// Cloud captures must be promoted from the same whole-frame submission
 			// that executed the semantic cloud quads.  The ordinary external-window
@@ -845,7 +899,8 @@ public final class DeterministicCameraCapture {
 				+ " reason=wind-charge-execution-submission-mismatch");
 			return;
 		}
-		boolean movingProducerReady = movingMeshProducerReady(deterministicRenderedFrameIndex);
+		boolean movingProducerReady = normalRouteFinalOutputCapture
+			|| movingMeshProducerReady(deterministicRenderedFrameIndex);
 		if (!movingProducerReady && "wind-charge".equals(MODEL_MESH_SCENARIO)) {
 			// Wind Charge is a material-quad entity-model producer rather than an
 			// indexed moving-mesh instance. Its exact selected-source receipt is the
@@ -909,20 +964,28 @@ public final class DeterministicCameraCapture {
 			fail("selected-source final-output capture is missing " + source);
 			return false;
 		}
+		Path skyFogSource = Path.of(attachmentDirectory).resolve("attachment-sky-fog.json");
+		if (!Files.isRegularFile(skyFogSource)) {
+			fail("selected-source final-output capture is missing " + skyFogSource);
+			return false;
+		}
 		Pose pose = poses[poseIndex];
 		int captureIndex = poseIndex + 1;
 		String fileName = String.format(Locale.ROOT, "%02d_%s.png", captureIndex, pose.name());
 		String ackName = String.format(Locale.ROOT, "capture_request_%02d_%s.ack.json", captureIndex, pose.name());
 		currentScreenshotPath = SCREENSHOT_DIR.resolve(fileName);
+		Path skyFogReceiptPath = SCREENSHOT_DIR.resolve(String.format(Locale.ROOT, "%02d_%s.sky-fog.json", captureIndex, pose.name()));
 		currentAckPath = SCREENSHOT_DIR.resolve(ackName);
 		try {
 			Files.createDirectories(SCREENSHOT_DIR);
 			Files.copy(source, currentScreenshotPath, StandardCopyOption.REPLACE_EXISTING);
+			Files.copy(skyFogSource, skyFogReceiptPath, StandardCopyOption.REPLACE_EXISTING);
 			StringBuilder json = new StringBuilder(768);
 			json.append("{\n");
 			json.append("  \"index\": ").append(captureIndex).append(",\n");
 			appendField(json, "poseName", pose.name()).append(",\n");
 			appendField(json, "screenshot", currentScreenshotPath.toAbsolutePath().toString()).append(",\n");
+			appendField(json, "skyFogReceipt", skyFogReceiptPath.toAbsolutePath().toString()).append(",\n");
 			appendField(json, "ack", currentAckPath.toAbsolutePath().toString()).append(",\n");
 			json.append("  \"renderedFrameIndex\": ").append(wholeFrameAttachmentCaptureDeterministicFrame).append(",\n");
 			json.append("  \"wholeFramePresentationCorrelation\":{\"gameplayFrameId\":")
@@ -961,7 +1024,19 @@ public final class DeterministicCameraCapture {
 	}
 
 	public static void beforeTick(Minecraft minecraft) {
-		if (ENABLED && (complete || failed) && STOP_AFTER_COMPLETE && !stopIssued) {
+		if (ENABLED && failed && STOP_AFTER_COMPLETE && !stopIssued) {
+			stopIssued = true;
+			minecraft.stop();
+			return;
+		}
+		if (ENABLED && complete && STOP_AFTER_COMPLETE && !stopIssued) {
+			// Preserve the deterministic screenshot while allowing the independent
+			// benchmark to finish its full configured sample window. This keeps
+			// correctness captures and timing validation correlated without
+			// weakening either contract.
+			if (GraphicsFrameBenchmark.isAwaitingCompletion()) {
+				return;
+			}
 			stopIssued = true;
 			minecraft.stop();
 			return;
@@ -969,6 +1044,7 @@ public final class DeterministicCameraCapture {
 		if (!ENABLED || complete || failed) {
 			return;
 		}
+		applyFixedCaptureTime(minecraft);
 
 		LocalPlayer player = minecraft.player;
 		if (player == null) {
@@ -1009,6 +1085,7 @@ public final class DeterministicCameraCapture {
 		if (!ensureInitialized(minecraft)) {
 			return;
 		}
+		applyFixedCaptureTime(minecraft);
 		applyRuntimeOverrides(minecraft, minecraft.player);
 		if (poseIndex >= poses.length) {
 			// External screenshot acknowledgement can advance the final pose just
@@ -1017,15 +1094,22 @@ public final class DeterministicCameraCapture {
 			if (!complete && !failed) {
 				finish(minecraft);
 			}
-			stabilizeGuiState(minecraft);
 			applyPauseParityScreen(minecraft);
 			applyPose(minecraft.player, initialPose);
 			return;
 		}
 
-		stabilizeGuiState(minecraft);
 		applyPauseParityScreen(minecraft);
-		applyPose(minecraft.player, poses[poseIndex]);
+		Pose activePose = translucentWarmupPoseIndex >= 0
+			? poses[translucentWarmupPoseIndex]
+			: poses[poseIndex];
+		applyPose(minecraft.player, activePose);
+	}
+
+	private static void applyFixedCaptureTime(Minecraft minecraft) {
+		if (FIXED_CAPTURE_TIME != Long.MIN_VALUE && minecraft.level != null) {
+			minecraft.level.setTimeFromServer(FIXED_CAPTURE_TIME, FIXED_CAPTURE_TIME, false);
+		}
 	}
 
 	private static void prepareSourceEntityIsolationBeforeFrame(Minecraft minecraft) {
@@ -1124,15 +1208,27 @@ public final class DeterministicCameraCapture {
 			updateModelMeshClientEntityReceipt(minecraft);
 		}
 		if (poseIndex >= poses.length) {
-			stabilizeGuiState(minecraft);
 			applyPauseParityScreen(minecraft);
 			applyPose(minecraft.player, initialPose);
 			return;
 		}
 
-		stabilizeGuiState(minecraft);
 		applyPauseParityScreen(minecraft);
-		applyPose(minecraft.player, poses[poseIndex]);
+		Pose activePose = translucentWarmupPoseIndex >= 0
+			? poses[translucentWarmupPoseIndex]
+			: poses[poseIndex];
+		applyPose(minecraft.player, activePose);
+		// Camera relocation invalidates the previous pose's visibility and upload
+		// identities.  Whole-frame Rust terrain must prove a fresh drained/stable
+		// window before the new pose is captured; retaining the global boolean here
+		// allowed async chunk work to change the return image after the gate passed.
+		if (settledReadyPoseIndex != poseIndex) {
+			settledReadyPoseIndex = poseIndex;
+			settledReadyGateSatisfied = false;
+			settledRustTerrainFrames = 0;
+			settledLegacyDistantHorizonsObservationFrames = 0;
+			framesWaitingForSettledReady = 0;
+		}
 		renderedFrameIndex++;
 		// The DH palette changes one copied-world source column. Place it before
 		// the DH-ready window so the real selected-source frames that satisfy
@@ -1182,9 +1278,39 @@ public final class DeterministicCameraCapture {
 			}
 			return;
 		}
+		if (!minecraft.gui.vignetteBrightnessSettledForDeterministicCapture(minecraft.getCameraEntity())) {
+			renderedFramesAtPose = 0;
+			return;
+		}
 		if (!setupStaticTerrainLifecycleScenarioAfterSettledReady(minecraft)) {
 			afterRenderLifecycleGateReturns++;
 			renderedFramesAtPose = 0;
+			return;
+		}
+		if (staticTerrainRequiresTranslucentCameraSequence() && !translucentWarmupComplete) {
+			if (translucentWarmupPoseIndex < 0) {
+				translucentWarmupPoseIndex = 0;
+				translucentWarmupFramesAtPose = 0;
+			}
+			// Keep the warm-up pose active for several complete producer frames;
+			// this allows newly visible sections to be built and submitted before
+			// any captured image is compared.
+			translucentWarmupFramesAtPose++;
+			if (translucentWarmupFramesAtPose >= TRANSLUCENT_WARMUP_FRAMES_PER_POSE) {
+				translucentWarmupPoseIndex++;
+				translucentWarmupFramesAtPose = 0;
+				if (translucentWarmupPoseIndex >= poses.length) {
+					translucentWarmupPoseIndex = -1;
+					translucentWarmupComplete = true;
+					// The capture sequence starts at pose zero after the warm-up.
+					// Force a fresh readiness window so its first image is as settled
+					// as every subsequently revisited pose.
+					settledReadyPoseIndex = Integer.MIN_VALUE;
+					settledReadyGateSatisfied = false;
+					settledRustTerrainFrames = 0;
+					framesWaitingForSettledReady = 0;
+				}
+			}
 			return;
 		}
 		if (!setupMovingMeshScenarioAfterSettledReady(minecraft)) {
@@ -1249,7 +1375,8 @@ public final class DeterministicCameraCapture {
 		if (renderedFramesAtPose < FRAMES_PER_POSE) {
 			return;
 		}
-		if (captureWholeFrameAttachmentsForPose && selectedSourceCaptureRequested()
+		if (captureWholeFrameAttachmentsForPose
+			&& (selectedSourceCaptureRequested() || RUST_FINAL_OUTPUT_EVERY_POSE)
 			&& !wholeFrameAttachmentCaptureReady) {
 			// A deferred source-selected request must hold the settled pose until a
 			// later render both executes the required producer and promotes its
@@ -1979,27 +2106,112 @@ public final class DeterministicCameraCapture {
 			distantHorizonsTexturePaletteStage = "waiting-for-server-level";
 			return false;
 		}
+			if (DISTANT_HORIZONS_REQUIRE_WATER) {
+				List<BlockPos> waterWitnesses = new ArrayList<>(16);
+				for (int localX = 28; localX < 32; localX++) {
+					for (int localZ = 24; localZ < 28; localZ++) {
+						waterWitnesses.add(new BlockPos(64 + localX, 82, 512 + localZ));
+					}
+				}
+				distantHorizonsWaterWitnesses = List.copyOf(waterWitnesses);
+				DistantHorizonsSemanticCollector.ensureWaterSourceInputProbes(List.of(
+					new BlockPos(93, 82, 537)
+				));
+		}
+		if (DISTANT_HORIZONS_EXTERNAL_FIXTURE && !distantHorizonsTexturePaletteSetup) {
+			// The external fixture is authored by the shared datapack so Current and
+			// Frozen observe identical server state. Keep DH's initial source scan
+			// bounded before requesting the four fixture chunks; the previous order
+			// allowed the default render distance to start a broad generation pass.
+			// This changes only the copied capture run's client option, not either
+			// repository's rendering behavior.
+			if (distantHorizonsTexturePaletteOriginalRenderDistance <= 0) {
+				distantHorizonsTexturePaletteOriginalRenderDistance = minecraft.options.renderDistance().get();
+			}
+			// The canonical external panel is deliberately outside the player's
+			// near-terrain radius.  It still has to be streamed once so DH can ingest
+			// the ordinary source chunks; clamping to two chunks here leaves DH with
+			// only unrelated cached columns and makes the palette gate wait forever.
+			// The radius is reduced to two after the source column is proven below.
+			minecraft.options.renderDistance().set(8);
+			BlockPos panelOrigin = new BlockPos(64, 81, 512);
+			// Keep the target center aligned with the datapack-authored panel.  The
+			// invalidation helpers derive their 32x32 footprint from this point; using
+			// (96,544) notified a neighboring area and left the real four palette
+			// chunks outside DH's source update set.
+			BlockPos center = new BlockPos(96, 81, 544);
+			distantHorizonsTexturePaletteTarget = center;
+			distantHorizonsTexturePaletteProbes = List.of(
+					new DistantHorizonsTexturePaletteProbe(
+						new BlockPos(77, 81, 537), "minecraft:lapis_block",
+					List.of("minecraft:block/lapis_block"), List.of("minecraft:block/lapis_block")
+				),
+				new DistantHorizonsTexturePaletteProbe(
+						new BlockPos(88, 81, 536), "minecraft:redstone_ore",
+					List.of("minecraft:block/redstone_ore"), List.of("minecraft:block/redstone_ore")
+				),
+				new DistantHorizonsTexturePaletteProbe(
+						new BlockPos(72, 81, 520), "minecraft:yellow_terracotta",
+					List.of("minecraft:block/yellow_terracotta"), List.of("minecraft:block/yellow_terracotta")
+				),
+				new DistantHorizonsTexturePaletteProbe(
+						new BlockPos(88, 81, 520), "minecraft:diamond_block",
+					List.of("minecraft:block/diamond_block"), List.of("minecraft:block/diamond_block")
+				)
+			);
+			if (DISTANT_HORIZONS_REQUIRE_WATER) {
+				DistantHorizonsSemanticCollector.configureWaterSourceInputProbes(List.of(
+					new BlockPos(panelOrigin.getX() + 29, panelOrigin.getY() + 1, panelOrigin.getZ() + 25)
+				));
+			}
+			// Request residency for the shared fixture's four source chunks. This is
+			// scheduling only; the datapack remains the sole author of block state.
+			runOnServerThreadAndWait(minecraft.getSingleplayerServer(), () ->
+				forceDistantHorizonsTexturePaletteChunks(serverLevel, panelOrigin.getX(), panelOrigin.getZ()));
+			writeDistantHorizonsTexturePaletteTargetManifest();
+			distantHorizonsTexturePaletteSetup = true;
+			distantHorizonsTexturePaletteStage = "external-fixture-observation-only";
+			writeMetadata(minecraft, "distant_horizons_external_fixture_observation_only");
+			return false;
+		}
 		if (!distantHorizonsTexturePaletteSetup) {
-			Direction forward = minecraft.player.getDirection();
-			BlockPos desiredCenter = BlockPos.containing(minecraft.player.getEyePosition())
-				.relative(forward, DISTANT_HORIZONS_TEXTURE_PALETTE_DISTANCE)
-				.below(1);
+			// Place the panel along the camera's horizontal look vector rather than
+			// snapping to a cardinal direction. This keeps the real source column in
+			// the same view frustum as the canonical fixed camera used by Frozen.
+			Vec3 look = minecraft.player.getLookAngle();
+			double horizontalLookLength = Math.sqrt(look.x * look.x + look.z * look.z);
+			if (horizontalLookLength < 0.001D) {
+				horizontalLookLength = 1.0D;
+			}
+			BlockPos desiredCenter = BlockPos.containing(
+				minecraft.player.getEyePosition().add(
+					look.x / horizontalLookLength * DISTANT_HORIZONS_TEXTURE_PALETTE_DISTANCE,
+					0.0D,
+					look.z / horizontalLookLength * DISTANT_HORIZONS_TEXTURE_PALETTE_DISTANCE
+				)
+			).below(1);
 			// Keep all four material quadrants inside exactly one lowest-detail DH
 			// source column. A palette spread across column boundaries can be
 			// accidentally certified by unrelated visible terrain.
-			int columnMinX = Math.floorDiv(desiredCenter.getX(), 64) * 64;
-			int columnMinZ = Math.floorDiv(desiredCenter.getZ(), 64) * 64;
+			int columnMinX = DISTANT_HORIZONS_EXTERNAL_FIXTURE
+				? 0 : Math.floorDiv(desiredCenter.getX(), 64) * 64;
+			int columnMinZ = DISTANT_HORIZONS_EXTERNAL_FIXTURE
+				? 448 : Math.floorDiv(desiredCenter.getZ(), 64) * 64;
 			// DH reduces column surfaces. Use a horizontal terrain patch rather than
 			// a vertical wall so its semantic source and visible geometry are the same
 			// kind of terrain DH actually builds and submits. Put it one layer above
 			// the highest real surface in the patch: otherwise DH correctly keeps an
 			// existing roof as the visible surface and never sees the palette.
-			int panelMinX = columnMinX + (64 - DISTANT_HORIZONS_TEXTURE_PALETTE_SIDE) / 2;
-			int panelMinZ = columnMinZ + (64 - DISTANT_HORIZONS_TEXTURE_PALETTE_SIDE) / 2;
-			int terrainSurfaceY = Integer.MIN_VALUE;
-			for (int localX = 0; localX < DISTANT_HORIZONS_TEXTURE_PALETTE_SIDE; localX++) {
-				for (int localZ = 0; localZ < DISTANT_HORIZONS_TEXTURE_PALETTE_SIDE; localZ++) {
-					terrainSurfaceY = Math.max(terrainSurfaceY, serverLevel.getHeight(Heightmap.Types.WORLD_SURFACE, panelMinX + localX, panelMinZ + localZ));
+			int panelMinX = DISTANT_HORIZONS_EXTERNAL_FIXTURE
+				? 32 : columnMinX + (64 - DISTANT_HORIZONS_TEXTURE_PALETTE_SIDE) / 2;
+			int panelMinZ = DISTANT_HORIZONS_EXTERNAL_FIXTURE
+				? 480 : columnMinZ + (64 - DISTANT_HORIZONS_TEXTURE_PALETTE_SIDE) / 2;
+			int terrainSurfaceY = DISTANT_HORIZONS_EXTERNAL_FIXTURE ? 80 : Integer.MIN_VALUE;
+			if (!DISTANT_HORIZONS_EXTERNAL_FIXTURE) {
+				for (int localX = 0; localX < DISTANT_HORIZONS_TEXTURE_PALETTE_SIDE; localX++) {
+					for (int localZ = 0; localZ < DISTANT_HORIZONS_TEXTURE_PALETTE_SIDE; localZ++) {
+						terrainSurfaceY = Math.max(terrainSurfaceY, serverLevel.getHeight(Heightmap.Types.WORLD_SURFACE, panelMinX + localX, panelMinZ + localZ));
+					}
 				}
 			}
 			if (terrainSurfaceY == Integer.MIN_VALUE) {
@@ -2011,32 +2223,39 @@ public final class DeterministicCameraCapture {
 			// consumed by DH; using the minimum elevation keeps the fixture's update
 			// footprint bounded so DH can publish a stable generation instead of
 			// rebuilding a tall synthetic column throughout the capture window.
-			int panelY = terrainSurfaceY + 1;
+			int panelY = DISTANT_HORIZONS_EXTERNAL_FIXTURE ? 81 : terrainSurfaceY + 1;
 			if (panelY >= serverLevel.getMaxY() - 2) {
 				fail("DH palette surface exceeds the copied-world build height");
 				return false;
 			}
 			BlockPos center = new BlockPos(columnMinX + 32, panelY, columnMinZ + 32);
-			forceDistantHorizonsTexturePaletteChunks(serverLevel, panelMinX, panelMinZ);
+			runOnServerThreadAndWait(minecraft.getSingleplayerServer(), () -> {
+				forceDistantHorizonsTexturePaletteChunks(serverLevel, panelMinX, panelMinZ);
+			});
 			// View the ordinary copied-world surface from high enough above it that
 			// the far-LOD reduction exposes the panel's top faces in the game frame.
 			// The harness freezes this diagnostic camera without placing any geometry.
 			// Keep an oblique view of the palette so all ordinary surface quadrants
 			// remain visible in the final game frame.
-			Vec3 capturePosition = new Vec3(initialPosition.x, panelY + 10.0, initialPosition.z);
+			Vec3 capturePosition = DISTANT_HORIZONS_EXTERNAL_FIXTURE
+				? initialPosition
+				: new Vec3(initialPosition.x, panelY + 10.0, initialPosition.z);
 			initialPosition = capturePosition;
 			minecraft.player.setPos(capturePosition);
 			minecraft.player.setDeltaMovement(Vec3.ZERO);
 			minecraft.player.setOldPosAndRot(capturePosition, minecraft.player.getYRot(), minecraft.player.getXRot());
 			ServerPlayer serverPlayer = minecraft.getSingleplayerServer().getPlayerList().getPlayer(minecraft.player.getUUID());
 			if (serverPlayer != null) {
-				serverPlayer.setPos(capturePosition);
-				serverPlayer.setDeltaMovement(Vec3.ZERO);
+				runOnServerThreadAndWait(minecraft.getSingleplayerServer(), () -> {
+					serverPlayer.setPos(capturePosition);
+					serverPlayer.setDeltaMovement(Vec3.ZERO);
+				});
 			}
 			// Deterministic capture already freezes the player with diagnostic
 			// no-gravity. Do not place a local support platform here: at this
 			// elevated palette-camera pose it becomes a foreground occluder and
 			// invalidates the final-frame texture evidence.
+			runOnServerThreadAndWait(minecraft.getSingleplayerServer(), () -> {
 			for (int localX = 0; localX < DISTANT_HORIZONS_TEXTURE_PALETTE_SIDE; localX++) {
 				for (int localZ = 0; localZ < DISTANT_HORIZONS_TEXTURE_PALETTE_SIDE; localZ++) {
 					BlockPos position = new BlockPos(panelMinX + localX, center.getY(), panelMinZ + localZ);
@@ -2096,7 +2315,7 @@ public final class DeterministicCameraCapture {
 				}
 				distantHorizonsTransparentWitnesses = List.copyOf(witnesses);
 			}
-			if (DISTANT_HORIZONS_REQUIRE_WATER) {
+				if (DISTANT_HORIZONS_REQUIRE_WATER) {
 				// Keep the real water plate disjoint from the opaque material witnesses.
 				// The normal DH column build must classify its exposed top faces into
 				// the transparent-water-up stream.
@@ -2143,7 +2362,8 @@ public final class DeterministicCameraCapture {
 					// neighboring terrain closes the fluid boundary.
 					new BlockPos(panelMinX + 29, center.getY() + 1, panelMinZ + 25)
 				));
-			}
+				}
+			});
 			BlockPos lapisWitness = new BlockPos(
 				panelMinX + DISTANT_HORIZONS_TEXTURE_PALETTE_QUADRANT - 3,
 				center.getY(),
@@ -2173,7 +2393,7 @@ public final class DeterministicCameraCapture {
 			// This is a far-LOD-only fixture. Keep ordinary client terrain out of
 			// the source-update queue after the server-side panel exists; the real
 			// DH source column remains responsible for every visible palette pixel.
-			minecraft.options.renderDistance().set(2);
+			minecraft.options.renderDistance().set(DISTANT_HORIZONS_EXTERNAL_FIXTURE ? 8 : 2);
 			Vec3 panelCenter = Vec3.atCenterOf(center);
 			Vec3 delta = panelCenter.subtract(minecraft.player.getEyePosition());
 			double horizontal = Math.sqrt(delta.x * delta.x + delta.z * delta.z);
@@ -2183,7 +2403,9 @@ public final class DeterministicCameraCapture {
 			}
 			float yaw = (float)(Math.toDegrees(Math.atan2(delta.z, delta.x)) - 90.0);
 			float pitch = (float)(-Math.toDegrees(Math.atan2(delta.y, horizontal)));
-			initialPose = new Pose("distant-horizons-texture-palette", yaw, pitch);
+			initialPose = DISTANT_HORIZONS_EXTERNAL_FIXTURE && HAS_FIXED_CAMERA_POSE
+				? new Pose("initial", FIXED_CAMERA_YAW, FIXED_CAMERA_PITCH)
+				: new Pose("distant-horizons-texture-palette", yaw, pitch);
 			poses = new Pose[] { initialPose };
 			poseIndex = 0;
 			applyPose(minecraft.player, initialPose);
@@ -2267,6 +2489,11 @@ public final class DeterministicCameraCapture {
 			writeDistantHorizonsTexturePaletteWaitMetadata(minecraft);
 			return false;
 		}
+		if (DISTANT_HORIZONS_EXTERNAL_FIXTURE) {
+			// Keep the source stream alive until DH has cached the panel; only then
+			// shrink near terrain so the retained LOD becomes the visible producer.
+			minecraft.options.renderDistance().set(3);
+		}
 		// Texture identity is valid only when every displayed palette target has
 		// both spatially matching semantic provenance and the expected exact atlas
 		// footprint. A column that merely overlaps the panel, or a matching sprite
@@ -2278,7 +2505,9 @@ public final class DeterministicCameraCapture {
 		if (exactAtlasStatus.targetsMatched()) {
 			distantHorizonsTexturePaletteExactAtlasObserved = true;
 		}
-		boolean sourceColumnReady = DISTANT_HORIZONS_LEGACY_OBSERVATION
+		boolean sourceColumnReady = (DISTANT_HORIZONS_REQUIRE_WATER && !DISTANT_HORIZONS_TEXTURE_PALETTE)
+			? distantHorizonsWaterSourceProbeReceipt().matched()
+			: DISTANT_HORIZONS_LEGACY_OBSERVATION
 			? distantHorizonsTexturePaletteProbes.stream().allMatch(probe ->
 				DistantHorizonsSemanticCollector.hasObservedVisibleOpaqueColumnCoveringBlock(
 					probe.position().getX(), probe.position().getZ()
@@ -2309,6 +2538,11 @@ public final class DeterministicCameraCapture {
 			|| distantHorizonsTexturePaletteExactAtlasObserved;
 		boolean exactAtlasReady = exactAtlasStatus.targetsMatched()
 			|| distantHorizonsTexturePaletteExactAtlasObserved;
+		// Exact-atlas target correlation belongs to the texture-palette workload.
+		// Water-only captures still require spatial source and executed-water
+		// receipts, but must not be rejected because no opaque palette witness was
+		// requested or admitted in that run.
+		boolean exactAtlasRequired = DISTANT_HORIZONS_TEXTURE_PALETTE;
 		DistantHorizonsSemanticCollector.RouteDiagnostics diagnostics =
 			DistantHorizonsSemanticCollector.routeDiagnosticsSnapshot();
 		DistantHorizonsSemanticCollector.DistantHorizonsWaterProbeReceipt waterReceipt =
@@ -2359,7 +2593,7 @@ public final class DeterministicCameraCapture {
 			&& (!DISTANT_HORIZONS_REQUIRE_TRANSPARENT || transparentExecuted)
 			&& (!DISTANT_HORIZONS_REQUIRE_WATER || (distantHorizonsTexturePaletteWaterSourceObserved
 				&& waterExecuted && distantHorizonsTexturePaletteWaterExecutedObserved))
-			&& textureIdentityReady && exactAtlasReady) {
+			&& (!exactAtlasRequired || (textureIdentityReady && exactAtlasReady))) {
 			distantHorizonsTexturePaletteStage = "dh-palette-executed";
 			writeMetadata(minecraft, "distant_horizons_texture_palette_executed");
 			return true;
@@ -2564,8 +2798,10 @@ public final class DeterministicCameraCapture {
 				return false;
 			}
 		}
-		int panelMinX = distantHorizonsTexturePaletteTarget.getX() - DISTANT_HORIZONS_TEXTURE_PALETTE_SIDE / 2;
-		int panelMinZ = distantHorizonsTexturePaletteTarget.getZ() - DISTANT_HORIZONS_TEXTURE_PALETTE_SIDE / 2;
+		int panelMinX = DISTANT_HORIZONS_EXTERNAL_FIXTURE ? 64
+			: distantHorizonsTexturePaletteTarget.getX() - DISTANT_HORIZONS_TEXTURE_PALETTE_SIDE / 2;
+		int panelMinZ = DISTANT_HORIZONS_EXTERNAL_FIXTURE ? 512
+			: distantHorizonsTexturePaletteTarget.getZ() - DISTANT_HORIZONS_TEXTURE_PALETTE_SIDE / 2;
 		for (int chunkX = panelMinX >> 4; chunkX < (panelMinX + DISTANT_HORIZONS_TEXTURE_PALETTE_SIDE) >> 4; chunkX++) {
 			for (int chunkZ = panelMinZ >> 4; chunkZ < (panelMinZ + DISTANT_HORIZONS_TEXTURE_PALETTE_SIDE) >> 4; chunkZ++) {
 				if (!serverLevel.hasChunk(chunkX, chunkZ)) {
@@ -2630,8 +2866,10 @@ public final class DeterministicCameraCapture {
 		if (distantHorizonsTexturePaletteTarget == null) {
 			return false;
 		}
-		int panelMinX = distantHorizonsTexturePaletteTarget.getX() - DISTANT_HORIZONS_TEXTURE_PALETTE_SIDE / 2;
-		int panelMinZ = distantHorizonsTexturePaletteTarget.getZ() - DISTANT_HORIZONS_TEXTURE_PALETTE_SIDE / 2;
+		int panelMinX = DISTANT_HORIZONS_EXTERNAL_FIXTURE ? 64
+			: distantHorizonsTexturePaletteTarget.getX() - DISTANT_HORIZONS_TEXTURE_PALETTE_SIDE / 2;
+		int panelMinZ = DISTANT_HORIZONS_EXTERNAL_FIXTURE ? 512
+			: distantHorizonsTexturePaletteTarget.getZ() - DISTANT_HORIZONS_TEXTURE_PALETTE_SIDE / 2;
 		int lightCorrectChunks = 0;
 		for (int chunkX = panelMinX >> 4; chunkX < (panelMinX + DISTANT_HORIZONS_TEXTURE_PALETTE_SIDE) >> 4; chunkX++) {
 			for (int chunkZ = panelMinZ >> 4; chunkZ < (panelMinZ + DISTANT_HORIZONS_TEXTURE_PALETTE_SIDE) >> 4; chunkZ++) {
@@ -2680,17 +2918,30 @@ public final class DeterministicCameraCapture {
 			return 0;
 		}
 		ServerLevelWrapper wrappedLevel = ServerLevelWrapper.getWrapper(serverLevel);
-		int panelMinX = distantHorizonsTexturePaletteTarget.getX() - DISTANT_HORIZONS_TEXTURE_PALETTE_SIDE / 2;
-		int panelMinZ = distantHorizonsTexturePaletteTarget.getZ() - DISTANT_HORIZONS_TEXTURE_PALETTE_SIDE / 2;
+		int panelMinX = DISTANT_HORIZONS_EXTERNAL_FIXTURE ? 64
+			: distantHorizonsTexturePaletteTarget.getX() - DISTANT_HORIZONS_TEXTURE_PALETTE_SIDE / 2;
+		int panelMinZ = DISTANT_HORIZONS_EXTERNAL_FIXTURE ? 512
+			: distantHorizonsTexturePaletteTarget.getZ() - DISTANT_HORIZONS_TEXTURE_PALETTE_SIDE / 2;
 		int notified = 0;
 		for (int chunkX = panelMinX >> 4; chunkX < (panelMinX + DISTANT_HORIZONS_TEXTURE_PALETTE_SIDE) >> 4; chunkX++) {
 			for (int chunkZ = panelMinZ >> 4; chunkZ < (panelMinZ + DISTANT_HORIZONS_TEXTURE_PALETTE_SIDE) >> 4; chunkZ++) {
+				// Re-emit one real block update in each source chunk. This preserves the
+				// normal LevelChunk dirty/hash path when the copied fixture's datapack
+				// update occurred before the capture notification was installed.
+				BlockPos dirtyMarker = new BlockPos(chunkX << 4, 80, chunkZ << 4);
+				BlockState dirtyState = serverLevel.getBlockState(dirtyMarker);
+				serverLevel.setBlock(dirtyMarker, Blocks.AIR.defaultBlockState(), 3);
+				serverLevel.setBlock(dirtyMarker, dirtyState, 3);
 				// The palette deliberately lives outside the temporary vanilla render
 				// radius.  DH consumes the integrated-server chunk wrapper here, just
 				// as it does after ChunkMap saves a chunk; requiring a client chunk at
 				// this point made the far fixture publish unrelated cached columns.
 				// This is capture-only source invalidation, not a rendering path.
-				ServerApi.INSTANCE.serverChunkSaveEvent(
+				// The panel is intentionally outside the near-terrain radius.  A save
+				// event requires all nine client-side neighbor wrappers and is discarded
+				// at the edge of that radius; the load-event contract queues this real
+				// center chunk directly, allowing DH to consume its server-authored data.
+				ServerApi.INSTANCE.serverChunkLoadEvent(
 					new ChunkWrapper(serverLevel.getChunk(chunkX, chunkZ), wrappedLevel),
 					wrappedLevel
 				);
@@ -2818,6 +3069,15 @@ public final class DeterministicCameraCapture {
 					);
 					staticTerrainLifecycleAfterRecorded = true;
 					staticTerrainLifecycleStage = "fixture-visible";
+					// The lifecycle edit itself invalidates the readiness window that
+					// admitted the pre-edit terrain.  Require a fresh drained window
+					// before the first translucent-overlap screenshot so later return
+					// captures cannot contain more settled geometry than the initial one.
+					if (staticTerrainRequiresTranslucentCameraSequence()) {
+						settledReadyGateSatisfied = false;
+						settledRustTerrainFrames = 0;
+						framesWaitingForSettledReady = 0;
+					}
 					writeMetadata(minecraft, "static_terrain_translucent_fixture_visible");
 				}
 				return true;
@@ -2899,6 +3159,10 @@ public final class DeterministicCameraCapture {
 		if (minecraft.player == null || minecraft.level == null) {
 			return null;
 		}
+		BlockPos fixedTarget = staticTerrainFixtureTarget();
+		if (fixedTarget != null && isLoadedAirBlock(minecraft.level, serverLevel, fixedTarget)) {
+			return fixedTarget;
+		}
 		Direction forward = minecraft.player.getDirection();
 		Direction right = forward.getClockWise();
 		BlockPos eye = BlockPos.containing(minecraft.player.getEyePosition());
@@ -2922,6 +3186,18 @@ public final class DeterministicCameraCapture {
 			}
 		}
 		return fallback;
+	}
+
+	private static BlockPos staticTerrainFixtureTarget() {
+		String[] parts = System.getProperty("mattmc.dev.deterministicCameraCapture.staticTerrainFixtureTarget", "").split(",");
+		if (parts.length != 3) {
+			return null;
+		}
+		try {
+			return new BlockPos(Integer.parseInt(parts[0].trim()), Integer.parseInt(parts[1].trim()), Integer.parseInt(parts[2].trim()));
+		} catch (NumberFormatException ignored) {
+			return null;
+		}
 	}
 
 	private static BlockPos chooseStaticTerrainTexturePaletteTarget(Minecraft minecraft, ServerLevel serverLevel) {
@@ -3778,6 +4054,7 @@ public final class DeterministicCameraCapture {
 				ResourceLocation.fromNamespaceAndPath("minecraft", "block/oak_leaves_bushy1")
 			))
 		);
+		RustGalTerrainRenderer.setActiveTextureProbes(staticTerrainTexturePaletteProbes);
 		boolean changed = false;
 		for (int index = 0; index < positions.length; index++) {
 			if (serverLevel.isLoaded(positions[index]) && minecraft.level.isLoaded(positions[index])) {
@@ -4306,6 +4583,21 @@ public final class DeterministicCameraCapture {
 		return !ENABLED || !initialized || SETTLED_READY_FRAMES <= 0 || settledReadyGateSatisfied || poseIndex > 0;
 	}
 
+	/**
+	 * Capture-only readiness invalidation from the independent Rust terrain
+	 * source. A settled receipt belongs to a particular immutable terrain
+	 * generation; it must not survive a later dirty-section notification.
+	 */
+	public static void invalidateRustWholeFrameTerrainReadiness() {
+		if (!ENABLED || !settledReadyGateSatisfied) {
+			return;
+		}
+		settledReadyGateSatisfied = false;
+		settledRustTerrainFrames = 0;
+		staticTerrainSettledFrames = 0;
+		staticTerrainSettledSignature = "rust-whole-frame-terrain-invalidated";
+	}
+
 	public static boolean isActiveForDiagnostics() {
 		return (ENABLED && initialized && !complete && !failed)
 			|| GraphicsFrameBenchmark.isActiveForDiagnostics();
@@ -4327,6 +4619,47 @@ public final class DeterministicCameraCapture {
 			throw new IllegalArgumentException("invalid deterministic diagnostic artifact name");
 		}
 		return SCREENSHOT_DIR.resolve(filename);
+	}
+
+	/** Capture-only receipt of the immutable semantic matrices supplied to the
+	 * Rust-owned world frame. It neither selects a render route nor exposes a
+	 * Java GPU object. */
+	public static void recordRustSkyMatrices(float[] view, float[] projection) {
+		if (!ENABLED || complete || failed || view == null || projection == null
+			|| view.length != 16 || projection.length != 16) {
+			return;
+		}
+		try {
+			Files.createDirectories(SCREENSHOT_DIR);
+			Files.writeString(
+				SCREENSHOT_DIR.resolve("rust-sky-matrices-last.json"),
+				"{\"view\":" + Arrays.toString(view)
+					+ ",\"projection\":" + Arrays.toString(projection)
+					+ ",\"rendered_frame_index\":" + renderedFrameIndex + "}\n",
+				StandardCharsets.UTF_8
+			);
+		} catch (IOException ignored) {
+			// Diagnostics must never affect the selected renderer.
+		}
+	}
+
+	/** Capture-only receipt of the display-encoded sky color copied into the
+	 * immutable Rust background semantic record. */
+	public static void recordRustSkyColor(int skyColorArgb) {
+		if (!ENABLED || complete || failed) {
+			return;
+		}
+		try {
+			Files.createDirectories(SCREENSHOT_DIR);
+			Files.writeString(
+				SCREENSHOT_DIR.resolve("rust-sky-last.json"),
+				"{\"sky_color_argb\":" + Integer.toUnsignedLong(skyColorArgb)
+					+ ",\"rendered_frame_index\":" + renderedFrameIndex + "}\n",
+				StandardCharsets.UTF_8
+			);
+		} catch (IOException ignored) {
+			// Diagnostics must never affect the selected renderer.
+		}
 	}
 
 	public static String shaderInputParityContextFields() {
@@ -4508,7 +4841,6 @@ public final class DeterministicCameraCapture {
 				return false;
 			}
 		}
-		stabilizeGuiState(minecraft);
 		Pose[] fullSequence = new Pose[] {
 			initialPose,
 			new Pose("right", initialPose.yaw() + YAW_DELTA, initialPose.pitch()),
@@ -4696,13 +5028,27 @@ public final class DeterministicCameraCapture {
 				}
 			}
 		}
+		// The DH texture-palette witness is populated asynchronously.  A route
+		// execution receipt alone can arrive while later visible columns are still
+		// unpublished, causing the screenshot handshake to sample a frame that has
+		// no matching exact-atlas plan.  Keep the capture pending until the
+		// Rust-owned visible set is published; the bounded ready timeout remains
+		// the failure path if the producer never quiesces.
+		if (DISTANT_HORIZONS_TEXTURE_PALETTE
+			&& net.vulkanic.world.DistantHorizonsSemanticCollector.hasUnpublishedVisibleColumns()) {
+			return false;
+		}
+		if (DISTANT_HORIZONS_TEXTURE_PALETTE
+			&& !net.vulkanic.world.DistantHorizonsSemanticCollector.exactAtlasCoverageStableForCapture()) {
+			return false;
+		}
 		if (!staticTerrainAssetsSettled()) {
 			return false;
 		}
 		if ((Boolean.getBoolean("mattmc.dev.rustGalVulkanWholeFrame")
 			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
 			&& (net.vulkanic.gui.RustGalFrameCoordinator.lastRenderableWholeFrameWorldFrame() <= 0
-				|| renderedFrameIndex
+				|| net.vulkanic.gui.RustGalFrameCoordinator.lastAcquiredWholeFrameFrame()
 					- net.vulkanic.gui.RustGalFrameCoordinator.lastRenderableWholeFrameWorldFrame() > 1)) {
 			return false;
 		}
@@ -4999,6 +5345,13 @@ public final class DeterministicCameraCapture {
 	private static Set<String> parseSettledReadyFamilies() {
 		String raw = System.getProperty("mattmc.dev.deterministicCameraCapture.settledReadyFamilies", "sodium-terrain,distant-horizons");
 		LinkedHashSet<String> families = new LinkedHashSet<>();
+		// Some Rust-owned routes (notably the Rust OpenGL lowering) do not expose
+		// the Sodium/DH whole-frame readiness receipts.  The harness may select an
+		// explicit fixed-warmup mode for those routes; an empty value must not be
+		// treated as an accidental request for the default Sodium gate.
+		if ("none".equalsIgnoreCase(raw.trim())) {
+			return Set.of();
+		}
 		Arrays.stream(raw.split(","))
 			.map(String::trim)
 			.filter(value -> !value.isEmpty())
@@ -5007,10 +5360,6 @@ public final class DeterministicCameraCapture {
 			families.add("sodium-terrain");
 		}
 		return Set.copyOf(families);
-	}
-
-	private static void stabilizeGuiState(Minecraft minecraft) {
-		minecraft.gui.vignetteBrightness = FIXED_VIGNETTE_BRIGHTNESS;
 	}
 
 	private static void applyPauseParityScreen(Minecraft minecraft) {
@@ -5061,6 +5410,21 @@ public final class DeterministicCameraCapture {
 					return false;
 				}
 				if (rustGalGuiScreenCycleFramesInStage >= RUST_GAL_GUI_SCREEN_CYCLE_HOLD_FRAMES) {
+					if (!rustGalGuiScreenCycleInventoryCaptureRequested) {
+						requestRustGalGuiScreenCycleInventoryCapture(minecraft);
+						return false;
+					}
+					if (!rustGalGuiScreenCycleInventoryCaptureComplete) {
+						if (rustGalGuiScreenCycleInventoryCaptureAcknowledged()) {
+							rustGalGuiScreenCycleInventoryCaptureComplete = true;
+							writeMetadata(minecraft, "rust_gal_gui_screen_cycle_inventory_captured");
+						} else if (rustGalGuiScreenCycleFramesInStage > ACK_TIMEOUT_FRAMES) {
+							fail("timed out waiting for Rust GAL inventory-cycle presentation capture acknowledgement");
+							return false;
+						} else {
+							return false;
+						}
+					}
 					minecraft.setScreen(null);
 					rustGalGuiScreenCycleStage = 2;
 					rustGalGuiScreenCycleFramesInStage = 0;
@@ -5092,7 +5456,50 @@ public final class DeterministicCameraCapture {
 		}
 	}
 
+	/**
+	 * Requests a desktop capture of the already presented Rust-owned frame.  The
+	 * shared capture runner writes the acknowledgement; this deliberately never
+	 * reads Java's main render target, which has no valid image on selected
+	 * Vulkan.
+	 */
+	private static void requestRustGalGuiScreenCycleInventoryCapture(Minecraft minecraft) {
+		rustGalGuiScreenCycleInventoryCaptureRequested = true;
+		rustGalGuiScreenCycleInventoryCapturePath = SCREENSHOT_DIR.resolve("rust_gal_gui_screen_cycle_inventory.png");
+		rustGalGuiScreenCycleInventoryAckPath = SCREENSHOT_DIR.resolve("capture_request_rust_gal_gui_screen_cycle_inventory.ack.json");
+		Path requestPath = SCREENSHOT_DIR.resolve("capture_request_rust_gal_gui_screen_cycle_inventory.json");
+		String json = "{\n"
+			+ "  \"captureKind\": \"rust-gal-gui-screen-cycle-inventory\",\n"
+			+ "  \"screenshot\": \"" + escape(rustGalGuiScreenCycleInventoryCapturePath.toAbsolutePath().toString()) + "\",\n"
+			+ "  \"renderedFrameIndex\": " + renderedFrameIndex + "\n"
+			+ "}\n";
+		try {
+			Files.createDirectories(SCREENSHOT_DIR);
+			Files.writeString(requestPath, json, StandardCharsets.UTF_8);
+			writeMetadata(minecraft, "waiting_for_rust_gal_gui_screen_cycle_inventory_capture");
+		} catch (IOException exception) {
+			fail("failed to request Rust GAL inventory-cycle presentation capture: " + exception.getMessage());
+		}
+	}
+
+	private static boolean rustGalGuiScreenCycleInventoryCaptureAcknowledged() {
+		if (rustGalGuiScreenCycleInventoryAckPath == null || rustGalGuiScreenCycleInventoryCapturePath == null
+			|| !Files.isRegularFile(rustGalGuiScreenCycleInventoryAckPath)
+			|| !Files.isRegularFile(rustGalGuiScreenCycleInventoryCapturePath)) {
+			return false;
+		}
+		try {
+			return Files.readString(rustGalGuiScreenCycleInventoryAckPath, StandardCharsets.UTF_8).contains("\"status\": \"captured\"");
+		} catch (IOException exception) {
+			return false;
+		}
+	}
+
 	private static void requestCurrentPoseScreenshot(Minecraft minecraft) {
+		// Correlate the copied Rust semantic source with the ordinary screenshot
+		// request after this pose's rendering completed. This has no route or
+		// renderer effect; it only writes bounded diagnostic evidence.
+		net.sodium.client.render.StaticTerrainParityDiagnostics.recordRustSourceCaptureCoverage(renderedFrameIndex);
+		net.sodium.client.render.StaticTerrainParityDiagnostics.recordRustExecutionCaptureCoverage(renderedFrameIndex);
 		Pose pose = poses[poseIndex];
 		int captureIndex = poseIndex + 1;
 		String fileName = String.format(Locale.ROOT, "%02d_%s.png", captureIndex, pose.name());
@@ -5123,7 +5530,8 @@ public final class DeterministicCameraCapture {
 		appendStaticTerrainExecutionCorrelation(json, 2).append(",\n");
 		appendStaticTerrainAtlasReceipt(json, 2).append(",\n");
 		appendStaticTerrainTextureProbeReceipt(json, 2).append(",\n");
-		json.append("  \"gameTime\": ").append(minecraft.level == null ? -1L : minecraft.level.getGameTime()).append("\n");
+		json.append("  \"gameTime\": ").append(minecraft.level == null ? -1L : minecraft.level.getGameTime()).append(",\n");
+		json.append("  \"vignetteBrightness\": ").append(format(minecraft.gui.vignetteBrightnessForDeterministicCapture())).append("\n");
 		json.append("}\n");
 
 		try {
@@ -5413,6 +5821,9 @@ public final class DeterministicCameraCapture {
 			}
 		}
 		applyHotbarItemFixture(player);
+		if (FORCE_EMPTY_SELECTED_HAND) {
+			player.getInventory().setItem(player.getInventory().getSelectedSlot(), ItemStack.EMPTY);
+		}
 		if (!Float.isNaN(FORCED_EXPERIENCE_PROGRESS)) {
 			float progress = Math.max(0.0F, Math.min(1.0F, FORCED_EXPERIENCE_PROGRESS));
 			if (player.experienceProgress != progress) {
@@ -6001,6 +6412,7 @@ public final class DeterministicCameraCapture {
 		);
 	}
 
+
 	/**
 	 * A compatibility control must prove that the ordinary model producer was
 	 * traversed, but must never wait for Rust work it is explicitly not allowed
@@ -6465,6 +6877,23 @@ public final class DeterministicCameraCapture {
 	 * render path remains {@code BeaconRenderer.submit}; this setup never writes
 	 * material quads or invokes renderer code itself.
 	 */
+	private static void runOnServerThreadAndWait(MinecraftServer server, Runnable action) {
+		if (server.isSameThread()) {
+			action.run();
+			return;
+		}
+		CompletableFuture<Void> completion = new CompletableFuture<>();
+		server.execute(() -> {
+			try {
+				action.run();
+				completion.complete(null);
+			} catch (Throwable throwable) {
+				completion.completeExceptionally(throwable);
+			}
+		});
+		completion.join();
+	}
+
 	private static void setupBeaconBeamScenario(Minecraft minecraft, LocalPlayer player) {
 		if (BEACON_BEAM_SCENARIO.isEmpty() || "hidden".equals(BEACON_BEAM_SCENARIO)
 			|| player == null || minecraft.level == null || minecraft.getSingleplayerServer() == null) {
@@ -6562,31 +6991,31 @@ public final class DeterministicCameraCapture {
 		// report distant-horizon surface heights far above the player, which
 		// would make a valid beam impossible to project in this capture.
 		BlockPos position = new BlockPos(horizontalTarget.getX(), player.blockPosition().getY() + 2, horizontalTarget.getZ());
-		// Build the complete ordinary four-level beacon pyramid so the vanilla
-		// block entity can deterministically publish beam sections on the server.
-		for (int level = 0; level < 4; level++) {
-			int radius = level + 1;
-			for (int localX = -radius; localX <= radius; localX++) {
-				for (int localZ = -radius; localZ <= radius; localZ++) {
-					serverLevel.setBlock(position.offset(localX, -level - 1, localZ), Blocks.IRON_BLOCK.defaultBlockState(), 3);
+		// The render thread owns this hook, but every ServerLevel mutation must
+		// execute on the integrated server thread. Otherwise this fixture races
+		// ServerChunkCache's chunk-broadcast iterator and corrupts vanilla state.
+		final BlockState[] previousBeaconState = new BlockState[1];
+		runOnServerThreadAndWait(minecraft.getSingleplayerServer(), () -> {
+			// Build the complete ordinary four-level beacon pyramid so the vanilla
+			// block entity can deterministically publish beam sections on the server.
+			for (int level = 0; level < 4; level++) {
+				int radius = level + 1;
+				for (int localX = -radius; localX <= radius; localX++) {
+					for (int localZ = -radius; localZ <= radius; localZ++) {
+						serverLevel.setBlock(position.offset(localX, -level - 1, localZ), Blocks.IRON_BLOCK.defaultBlockState(), 3);
+					}
 				}
 			}
-		}
-		int beamClearTop = Math.max(
-			position.getY() + 12,
-			serverLevel.getHeight(Heightmap.Types.WORLD_SURFACE, position.getX(), position.getZ()) + 1);
-		for (int localY = 0; position.getY() + localY <= beamClearTop; localY++) {
-			serverLevel.setBlock(position.above(localY), Blocks.AIR.defaultBlockState(), 3);
-		}
-		BlockState previousBeaconState = serverLevel.getBlockState(position);
-		serverLevel.setBlock(position, Blocks.BEACON.defaultBlockState(), 3);
-		serverLevel.setBlock(position.above(), Blocks.RED_STAINED_GLASS.defaultBlockState(), 3);
-		// Force the ordinary server block-entity update through the copied
-		// singleplayer connection. The fixture must become client-visible via
-		// normal beacon synchronization before BeaconRenderer can emit any
-		// semantic beam work; it must not inspect or synthesize beam sections.
-		serverLevel.getChunkAt(position);
-		serverLevel.getServer().execute(() -> {
+			int beamClearTop = Math.max(
+				position.getY() + 12,
+				serverLevel.getHeight(Heightmap.Types.WORLD_SURFACE, position.getX(), position.getZ()) + 1);
+			for (int localY = 0; position.getY() + localY <= beamClearTop; localY++) {
+				serverLevel.setBlock(position.above(localY), Blocks.AIR.defaultBlockState(), 3);
+			}
+			previousBeaconState[0] = serverLevel.getBlockState(position);
+			serverLevel.setBlock(position, Blocks.BEACON.defaultBlockState(), 3);
+			serverLevel.setBlock(position.above(), Blocks.RED_STAINED_GLASS.defaultBlockState(), 3);
+			serverLevel.getChunkAt(position);
 			if (serverLevel.getBlockEntity(position)
 				instanceof net.minecraft.world.level.block.entity.BeaconBlockEntity beacon) {
 				// Run the ordinary vanilla ticker once on its owning thread so the
@@ -6595,10 +7024,10 @@ public final class DeterministicCameraCapture {
 					serverLevel, position, Blocks.BEACON.defaultBlockState(), beacon);
 				beacon.setChanged();
 			}
+			serverLevel.sendBlockUpdated(position, previousBeaconState[0],
+				Blocks.BEACON.defaultBlockState(), 3);
+			serverLevel.getChunkSource().blockChanged(position);
 		});
-		serverLevel.sendBlockUpdated(position, previousBeaconState,
-			Blocks.BEACON.defaultBlockState(), 3);
-		serverLevel.getChunkSource().blockChanged(position);
 		// The deterministic client is the render owner of this copied level. Keep
 		// the complete ordinary pyramid and clear beam column coherent with the
 		// server fixture so the client-side vanilla ticker can perform its normal
@@ -7009,6 +7438,10 @@ public final class DeterministicCameraCapture {
 				serverLevel.getChunkAt(BlockPos.containing(origin));
 				// Use vanilla's immediate warmup so the replicated attack event can
 				// reach the client during the bounded capture window.
+				// Keep the replicated fixture dormant until the settled pose has
+				// been established and the real server event below activates it.
+				// An immediate attack can finish between the two required capture
+				// frames, leaving the second frame without the vanilla producer.
 				EvokerFangs fangs = new EvokerFangs(serverLevel, origin.x, origin.y - 1.0, origin.z,
 					(float)Math.toRadians(player.getYRot()), 0, serverPlayer);
 				serverLevel.addFreshEntity(fangs);
@@ -7105,7 +7538,12 @@ public final class DeterministicCameraCapture {
 				serverLevel.addFreshEntity(windCharge);
 				modelMeshSetupServerEntityId = windCharge.getId();
 			} else {
-				WitherSkull skull = new WitherSkull(EntityType.WITHER_SKULL, serverLevel);
+				ServerPlayer serverPlayer = minecraft.getSingleplayerServer().getPlayerList().getPlayer(player.getUUID());
+				if (serverPlayer == null) {
+					modelMeshSetupStatus = "waiting-server-player";
+					return;
+				}
+				WitherSkull skull = new WitherSkull(serverLevel, serverPlayer, Vec3.ZERO);
 				skull.setPos(origin.x, origin.y, origin.z);
 				skull.setYRot(player.getYRot());
 				skull.setXRot(player.getXRot());
@@ -7290,7 +7728,13 @@ public final class DeterministicCameraCapture {
 					entity = zombie;
 				}
 				case "wither-skull" -> {
-					WitherSkull skull = new WitherSkull(EntityType.WITHER_SKULL, serverLevel);
+					ServerPlayer serverPlayer = server.getPlayerList().getPlayer(playerId);
+					if (serverPlayer == null) {
+						modelMeshSetupServerSpawnFailure = "missing-server-player";
+						modelMeshSetupStatus = "waiting-server-player";
+						return;
+					}
+					WitherSkull skull = new WitherSkull(serverLevel, serverPlayer, Vec3.ZERO);
 					skull.setPos(origin.x, origin.y, origin.z);
 					skull.setNoGravity(true);
 					entity = skull;
@@ -8067,6 +8511,7 @@ public final class DeterministicCameraCapture {
 		appendExperienceOrbExecutionDiagnostics(json).append(",\n");
 		appendBeaconBeamDiagnostics(json).append(",\n");
 		appendBeaconBeamExecutionDiagnostics(json).append(",\n");
+		appendCrystalBeamExecutionDiagnostics(json).append(",\n");
 		appendWeatherDiagnostics(json).append(",\n");
 		appendCloudDiagnostics(json).append(",\n");
 		appendDistantHorizonsRouteDiagnostics(json).append(",\n");
@@ -8237,6 +8682,7 @@ public final class DeterministicCameraCapture {
 		appendExperienceOrbExecutionDiagnostics(json).append(",\n");
 		appendBeaconBeamDiagnostics(json).append(",\n");
 		appendBeaconBeamExecutionDiagnostics(json).append(",\n");
+		appendCrystalBeamExecutionDiagnostics(json).append(",\n");
 		appendModelMeshDiagnostics(json).append(",\n");
 		appendModelMeshRouteDecisions(json).append(",\n");
 		appendModelPartMeshTraversalDiagnostics(json).append(",\n");
@@ -8326,7 +8772,10 @@ public final class DeterministicCameraCapture {
 			.append(", \"framesInStage\": ").append(rustGalGuiScreenCycleFramesInStage)
 			.append(", \"cyclesCompleted\": ").append(rustGalGuiScreenCyclesCompleted)
 			.append(", \"repeatCount\": ").append(RUST_GAL_GUI_SCREEN_CYCLE_REPEATS)
-			.append(" },\n");
+			.append(", \"inventoryScreenshotCaptured\": ").append(rustGalGuiScreenCycleInventoryCaptureComplete)
+			.append(", \"inventoryScreenshot\": \"")
+			.append(escape(rustGalGuiScreenCycleInventoryCapturePath == null ? "" : rustGalGuiScreenCycleInventoryCapturePath.toAbsolutePath().toString()))
+			.append("\" },\n");
 		json.append("  \"ackTimeoutFrames\": ").append(ACK_TIMEOUT_FRAMES).append(",\n");
 			json.append("  \"poseCount\": ").append(poses == null ? POSE_COUNT : poses.length).append(",\n");
 			json.append("  \"poseSequence\": [");
@@ -9541,6 +9990,26 @@ public final class DeterministicCameraCapture {
 		if (!diagnostics.isEmpty()) {
 			json.append("\n  ");
 		}
+		json.append("]");
+		return json;
+	}
+
+	private static StringBuilder appendCrystalBeamExecutionDiagnostics(StringBuilder json) {
+		List<RustGalWorldPrimitiveRenderer.CrystalBeamExecutionDiagnostic> diagnostics =
+			RustGalWorldPrimitiveRenderer.crystalBeamExecutionDiagnostics();
+		json.append("  \"rustGalWorldCrystalBeamExecution\": [");
+		for (int index = 0; index < diagnostics.size(); index++) {
+			RustGalWorldPrimitiveRenderer.CrystalBeamExecutionDiagnostic diagnostic = diagnostics.get(index);
+			if (index > 0) json.append(",");
+			json.append("\n    { ");
+			json.append("\"deterministicFrameIndex\": ").append(diagnostic.deterministicFrameIndex()).append(", ");
+			appendField(json, "route", diagnostic.route(), 0).append(", ");
+			json.append("\"gameplayFrameId\": ").append(diagnostic.gameplayFrameId()).append(", ");
+			json.append("\"submissionId\": ").append(diagnostic.submissionId()).append(", ");
+			json.append("\"quads\": ").append(diagnostic.quads());
+			json.append(" }");
+		}
+		if (!diagnostics.isEmpty()) json.append("\n  ");
 		json.append("]");
 		return json;
 	}

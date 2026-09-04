@@ -10353,7 +10353,13 @@ public class VulkanicAPI {
 
     private static String shaderInputParityFloatSample(float[] values) {
         StringBuilder builder = new StringBuilder("[");
-        int limit = Math.min(values.length, 4);
+        // Full matrix payloads are opt-in diagnostic evidence only. They pair
+        // Frozen OpenGL uniforms with Rust-owned receipts without changing a
+        // rendering route or retaining GPU state; normal logs stay compact.
+        int limit = Math.min(
+            values.length,
+            Boolean.getBoolean("mattmc.vulkan.traceShaderInputParity.fullUniforms") ? values.length : 4
+        );
         for (int index = 0; index < limit; index++) {
             if (index > 0) {
                 builder.append(',');

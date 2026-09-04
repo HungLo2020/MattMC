@@ -11,11 +11,13 @@ import com.seibel.distanthorizons.core.render.renderer.RenderParams;
 import com.seibel.distanthorizons.core.util.RenderUtil;
 import com.seibel.distanthorizons.core.util.RenderDataPointUtil;
 import com.seibel.distanthorizons.core.util.math.Mat4f;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import net.minecraft.core.BlockPos;
 import net.vulkanic.bridge.VulkanicGalBridge;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.AbstractList;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
@@ -60,7 +62,11 @@ public final class DistantHorizonsSemanticCollector {
 	// Keep each explicit Rust residency transaction short enough that DH streaming
 	// cannot monopolize the render thread while the whole-frame presenter is live.
 	// The pending queue remains lossless; later frames drain the bounded batches.
-	private static final int MAX_PENDING_ASSET_COLUMNS_PER_UPDATE = 4;
+	// Resolving exact face provenance performs bounded vanilla model extraction
+	// for each material identity.  Admit one column at a time so that temporary
+	// Java objects remain bounded even for a dense modded DH palette; the queue
+	// remains lossless and later whole-frame submissions drain it in order.
+	private static final int MAX_PENDING_ASSET_COLUMNS_PER_UPDATE = 1;
 	private static final long MAX_PENDING_ASSET_BYTES_PER_UPDATE = 1L * 1024L * 1024L;
 	private static final int MAX_VISIBLE_SEGMENTS = 16_384;
 	private static final int MAX_LOD_SEGMENTS_PER_COLUMN = 512;
@@ -76,6 +82,12 @@ public final class DistantHorizonsSemanticCollector {
 	 * asset update malformed. The boundary is quad aligned and has no native
 	 * VBO meaning. */
 	private static final int MAX_TRANSPORT_VERTICES_PER_SEGMENT = 65_536;
+
+	/** Package-independent producer boundary for exact-size Rust semantic
+	 * packets. Four vertices form one DH quad. */
+	public static int maxRustSemanticQuadsPerPacket() {
+		return MAX_TRANSPORT_VERTICES_PER_SEGMENT / 4;
+	}
 	public static final int RENDER_FLAG_WHITE_WORLD = 1;
 	public static final int RENDER_FLAG_DITHER_FADE = 1 << 1;
 	public static final int RENDER_FLAG_NOISE = 1 << 2;
@@ -88,6 +100,10 @@ public final class DistantHorizonsSemanticCollector {
 	private static final AtomicLong NEXT_GENERATION = new AtomicLong(1L);
 	private static final AtomicLong NEXT_UPDATE_GENERATION = new AtomicLong(1L);
 	private static final Map<Long, LodColumnSnapshot> COLUMNS = new LinkedHashMap<>(16, 0.75F, true);
+	/** Primitive mirror for the DH quadtree's very hot readiness lookup. The
+	 * semantic snapshot map remains the sole data owner; this prevents a Long
+	 * allocation for every recursive {@code LodRenderSection.canRender} probe. */
+	private static final LongOpenHashSet COLUMN_KEYS = new LongOpenHashSet();
 	/** Last acknowledged immutable asset per live column. The visible render list
 	 * may keep using it while DH builds a replacement generation. */
 	private static final Map<Long, LodColumnSnapshot> PUBLISHED_COLUMNS = new LinkedHashMap<>();
@@ -163,6 +179,9 @@ public final class DistantHorizonsSemanticCollector {
 	private static int routeExactAtlasOutputOpaqueKnownQuads;
 	private static int routeExactAtlasOutputOpaqueMixedQuads;
 	private static int routeExactAtlasOutputOpaqueUnavailableQuads;
+	private static long exactAtlasCoverageStableSignature;
+	private static long exactAtlasCoverageStableFrame = Long.MIN_VALUE;
+	private static int exactAtlasCoverageStableFrames;
 	/** Bounded per-visible-column reconciliation; never a rendering decision. */
 	private static final List<String> routeExactAtlasCoverageSamples = new ArrayList<>();
 	/** Bounded evidence for why a copied semantic material did or did not
@@ -204,6 +223,7 @@ public final class DistantHorizonsSemanticCollector {
 	 * generation. They are configured solely by the deterministic fixture and
 	 * never affect source conversion, mesh construction, or route selection. */
 	private static List<BlockPos> waterSourceInputProbes = List.of();
+	private static List<BlockPos> configuredWaterSourceInputProbes = List.of();
 	private static final Map<BlockPos, WaterSourceInputTrace> WATER_SOURCE_INPUT_TRACES = new LinkedHashMap<>();
 
 	private DistantHorizonsSemanticCollector() {
@@ -216,8 +236,25 @@ public final class DistantHorizonsSemanticCollector {
 	 */
 	public static void configureWaterSourceInputProbes(List<BlockPos> probes) {
 		synchronized (COLUMNS) {
-			waterSourceInputProbes = probes == null ? List.of() : List.copyOf(probes.stream().limit(8).toList());
+			configuredWaterSourceInputProbes = probes == null ? List.of() : List.copyOf(probes.stream().limit(8).toList());
+			waterSourceInputProbes = configuredWaterSourceInputProbes;
 			WATER_SOURCE_INPUT_TRACES.clear();
+		}
+	}
+
+	/**
+	 * Re-arms capture-only probes after a DH world reset without discarding an
+	 * observation that is already in flight. This is intentionally idempotent:
+	 * fixture orchestration may call it once per frame while the real producer
+	 * initializes, but it never changes semantic conversion or submitted data.
+	 */
+	public static void ensureWaterSourceInputProbes(List<BlockPos> probes) {
+		synchronized (COLUMNS) {
+			if (waterSourceInputProbes.isEmpty() && probes != null && !probes.isEmpty()) {
+				configuredWaterSourceInputProbes = List.copyOf(probes.stream().limit(8).toList());
+				waterSourceInputProbes = configuredWaterSourceInputProbes;
+				WATER_SOURCE_INPUT_TRACES.clear();
+			}
 		}
 	}
 
@@ -364,11 +401,21 @@ public final class DistantHorizonsSemanticCollector {
 		return WorldRenderRoutePolicy.currentDistantHorizonsOpaqueRoute().usesRustWholeFrameVulkan();
 	}
 
-	/** Whether copied CPU geometry for this real DH quadtree section is ready
-	 * for semantic visibility selection. No legacy VBO is implied. */
+	/** Whether copied CPU geometry exists for this real DH quadtree section.
+	 * This is quadtree bookkeeping only: it stops DH from indefinitely queuing
+	 * the same source work while Rust owns the eventual presentation. */
 	public static boolean hasColumn(long columnKey) {
 		synchronized (COLUMNS) {
-			return COLUMNS.containsKey(columnKey);
+			return COLUMN_KEYS.contains(columnKey);
+		}
+	}
+
+	/** True only once a copied column has completed its explicit Rust asset
+	 * transaction. Callers that construct a visible Rust render list must use
+	 * this boundary, never the merely-collected quadtree state above. */
+	public static boolean hasPublishedColumn(long columnKey) {
+		synchronized (COLUMNS) {
+			return PUBLISHED_COLUMNS.containsKey(columnKey);
 		}
 	}
 
@@ -1338,6 +1385,73 @@ public final class DistantHorizonsSemanticCollector {
 	}
 
 	/**
+	 * Takes ownership of exact-size Java packets produced exclusively for the
+	 * Rust whole-frame route.  The packets are already bounded to the semantic
+	 * transport granularity, so copying them through legacy native VBO staging
+	 * would add allocation pressure without adding information.
+	 */
+	public static void recordRustSemanticBuiltColumn(
+		long columnKey,
+		DhBlockPos origin,
+		List<ColumnRenderSource.SemanticMaterialIdentity> semanticMaterials,
+		LodQuadBuilder.SemanticQuadCoverage inputCoverage,
+		LodQuadBuilder.SemanticQuadCoverage outputCoverage,
+		LodQuadBuilder.SemanticVertexBufferBuild opaque,
+		LodQuadBuilder.SemanticVertexBufferBuild transparentSide,
+		LodQuadBuilder.SemanticVertexBufferBuild transparentUp,
+		LodQuadBuilder.SemanticVertexBufferBuild transparentWaterUp
+	) {
+		if (!enabled()) return;
+		Objects.requireNonNull(semanticMaterials, "semanticMaterials");
+		LodMaterialProvenanceSnapshot provenance = new LodMaterialProvenanceSnapshot(
+			semanticMaterials, inputCoverage, outputCoverage,
+			validateOwnedMaterialIds(opaque, semanticMaterials.size()), opaque.semanticVariantStates(), opaque.semanticVariantPositions(),
+			validateOwnedMaterialIds(transparentSide, semanticMaterials.size()), transparentSide.semanticVariantStates(), transparentSide.semanticVariantPositions(),
+			validateOwnedMaterialIds(transparentUp, semanticMaterials.size()), transparentUp.semanticVariantStates(), transparentUp.semanticVariantPositions(),
+			validateOwnedMaterialIds(transparentWaterUp, semanticMaterials.size()), transparentWaterUp.semanticVariantStates(), transparentWaterUp.semanticVariantPositions()
+		);
+		recordOwnedPackedColumnSnapshot(
+			columnKey, origin, opaque.packedVertexBuffers(), transparentSide.packedVertexBuffers(),
+			transparentUp.packedVertexBuffers(), transparentWaterUp.packedVertexBuffers(), provenance
+		);
+	}
+
+	private static List<int[]> validateOwnedMaterialIds(
+		LodQuadBuilder.SemanticVertexBufferBuild build,
+		int semanticMaterialCount
+	) {
+		for (int[] source : build.semanticMaterialIds()) {
+			for (int materialId : source) {
+				if (materialId < ColumnRenderSource.SEMANTIC_MATERIAL_MIXED || materialId > semanticMaterialCount) {
+					throw new IllegalArgumentException("Distant Horizons semantic material ID is outside its builder-local table: " + materialId);
+				}
+			}
+		}
+		return build.semanticMaterialIds();
+	}
+
+	private static void recordOwnedPackedColumnSnapshot(
+		long columnKey,
+		DhBlockPos origin,
+		List<byte[]> opaque,
+		List<byte[]> transparentSide,
+		List<byte[]> transparentUp,
+		List<byte[]> transparentWaterUp,
+		LodMaterialProvenanceSnapshot provenance
+	) {
+		if (!enabled()) return;
+		Objects.requireNonNull(origin, "origin");
+		LodColumnSnapshot snapshot = new LodColumnSnapshot(
+			columnKey, NEXT_GENERATION.getAndIncrement(), origin.getX(), origin.getY(), origin.getZ(),
+			ownedPackedBuffers(opaque), ownedPackedBuffers(transparentSide),
+			ownedPackedBuffers(transparentUp), ownedPackedBuffers(transparentWaterUp)
+		);
+		synchronized (COLUMNS) {
+			recordBuiltSnapshotLocked(columnKey, snapshot, provenance);
+		}
+	}
+
+	/**
 	 * Publishes geometry and its optional material provenance as one immutable
 	 * transaction. The frame coordinator may flush pending columns immediately
 	 * after this method returns, so installing provenance in a second lock scope
@@ -1368,6 +1482,16 @@ public final class DistantHorizonsSemanticCollector {
 			copyBuffers(transparentWaterUp)
 		);
 		synchronized (COLUMNS) {
+			recordBuiltSnapshotLocked(columnKey, snapshot, provenance);
+		}
+	}
+
+	/** Installs one already immutable snapshot while holding {@link #COLUMNS}. */
+	private static void recordBuiltSnapshotLocked(
+		long columnKey,
+		LodColumnSnapshot snapshot,
+		LodMaterialProvenanceSnapshot provenance
+	) {
 			if (!snapshot.hasSegments()) {
 				removeColumnLocked(columnKey);
 				return;
@@ -1388,6 +1512,7 @@ public final class DistantHorizonsSemanticCollector {
 				// strictly newer generation; re-queuing the old snapshot would make the
 				// bridge reject it as stale while leaving Rust with old provenance.
 				COLUMNS.put(columnKey, snapshot);
+				COLUMN_KEYS.add(columnKey);
 				if (provenance != null) {
 					replaceMaterialProvenanceLocked(columnKey, provenance);
 				} else {
@@ -1414,6 +1539,7 @@ public final class DistantHorizonsSemanticCollector {
 				LAST_COLUMN_PAYLOAD_DIFFERENCES.put(columnKey, lastPayloadDifference);
 			}
 			COLUMNS.put(columnKey, snapshot);
+			COLUMN_KEYS.add(columnKey);
 			if (provenance == null) {
 				removeMaterialProvenanceLocked(columnKey);
 			} else {
@@ -1439,7 +1565,6 @@ public final class DistantHorizonsSemanticCollector {
 			}
 			trimRetainedColumnsLocked(MAX_RETAINED_COLUMNS, MAX_RETAINED_BYTES);
 			semanticColumnsBuilt++;
-		}
 	}
 
 	/**
@@ -2297,6 +2422,23 @@ public final class DistantHorizonsSemanticCollector {
 			lastExecutedWaterInstances = waterInstances;
 			lastExecutedFrameSemanticsEnabled = true;
 			routeExecutionCount++;
+			if (exactAtlasCoverageRequested()) {
+				long signature = 17L;
+				signature = 31L * signature + routeExactAtlasOutputKnownQuads;
+				signature = 31L * signature + routeExactAtlasOutputMixedQuads;
+				signature = 31L * signature + routeExactAtlasOutputUnavailableQuads;
+				signature = 31L * signature + routeExactAtlasInvalidIdentityQuads;
+				signature = 31L * signature + routeExactAtlasIdentityTableEntries;
+				signature = 31L * signature + instances;
+				if (signature == exactAtlasCoverageStableSignature
+					&& routeFrame == exactAtlasCoverageStableFrame + 1L) {
+					exactAtlasCoverageStableFrames = Math.min(3, exactAtlasCoverageStableFrames + 1);
+				} else {
+					exactAtlasCoverageStableFrames = 1;
+				}
+				exactAtlasCoverageStableSignature = signature;
+				exactAtlasCoverageStableFrame = routeFrame;
+			}
 			String executionIdentity = "executed:rust-material-route";
 			net.minecraft.client.dev.GraphicsFrameBenchmark.recordSubmittedWorkIdentity(
 				"distant-horizons", executionIdentity
@@ -2385,6 +2527,20 @@ public final class DistantHorizonsSemanticCollector {
 				&& routeExactAtlasOutputMixedQuads == 0
 				&& routeExactAtlasOutputUnavailableQuads == 0
 				&& routeExactAtlasInvalidIdentityQuads == 0;
+		}
+	}
+
+	/**
+	 * Returns true only after the exact-atlas accounting has described the same
+	 * visible Rust-owned DH set for several consecutive route frames.  A single
+	 * successful submission is not sufficient: DH may publish replacement
+	 * generations immediately afterward, invalidating the screenshot's plan.
+	 */
+	public static boolean exactAtlasCoverageStableForCapture() {
+		synchronized (COLUMNS) {
+			return exactAtlasCoverageStableFrames >= 3
+				&& routeExactAtlasOutputKnownQuads > 0
+				&& routeExactAtlasOutputMixedQuads == 0;
 		}
 	}
 
@@ -2487,10 +2643,12 @@ public final class DistantHorizonsSemanticCollector {
 
 	public static void clear() {
 		synchronized (COLUMNS) {
+			DistantHorizonsFaceMaterialResolver.clearCachedStateResolutions();
 			for (Map.Entry<Long, Long> published : PUBLISHED_GENERATIONS.entrySet()) {
 				PENDING_RETIREMENTS.put(published.getKey(), published.getValue());
 			}
 			COLUMNS.clear();
+			COLUMN_KEYS.clear();
 			PUBLISHED_COLUMNS.clear();
 			MATERIAL_PROVENANCE.clear();
 			PUBLISHED_MATERIAL_PROVENANCE.clear();
@@ -2841,6 +2999,7 @@ public final class DistantHorizonsSemanticCollector {
 
 	private static void removeColumnLocked(long columnKey) {
 		LodColumnSnapshot removed = COLUMNS.remove(columnKey);
+		COLUMN_KEYS.remove(columnKey);
 		removeMaterialProvenanceLocked(columnKey);
 		if (removed != null) {
 			retainedBytes -= removed.byteSize();
@@ -2954,7 +3113,9 @@ public final class DistantHorizonsSemanticCollector {
 
 	static void resetForTest() {
 		synchronized (COLUMNS) {
+			DistantHorizonsFaceMaterialResolver.clearCachedStateResolutions();
 			COLUMNS.clear();
+			COLUMN_KEYS.clear();
 			PUBLISHED_COLUMNS.clear();
 			MATERIAL_PROVENANCE.clear();
 			PUBLISHED_MATERIAL_PROVENANCE.clear();
@@ -3003,7 +3164,7 @@ public final class DistantHorizonsSemanticCollector {
 			lastExecutedTransparentInstances = 0;
 			lastExecutedWaterInstances = 0;
 			lastExecutedFrameSemanticsEnabled = false;
-			waterSourceInputProbes = List.of();
+			waterSourceInputProbes = configuredWaterSourceInputProbes;
 			WATER_SOURCE_INPUT_TRACES.clear();
 		}
 	}
@@ -3321,6 +3482,31 @@ public final class DistantHorizonsSemanticCollector {
 		return copyBuffers(buffers, MAX_TRANSPORT_VERTICES_PER_SEGMENT);
 	}
 
+	/** Transfers producer-owned, already bounded packets into the immutable
+	 * semantic snapshot. No clone is made: this method is the sole ownership
+	 * handoff and the packet record exposes only immutable list structure. */
+	private static List<LodBufferSnapshot> ownedPackedBuffers(List<byte[]> buffers) {
+		Objects.requireNonNull(buffers, "buffers");
+		List<LodBufferSnapshot> snapshots = new ArrayList<>(buffers.size());
+		for (int sourceBufferIndex = 0; sourceBufferIndex < buffers.size(); sourceBufferIndex++) {
+			byte[] bytes = Objects.requireNonNull(buffers.get(sourceBufferIndex), "packed semantic buffer");
+			if (bytes.length == 0 || bytes.length % VERTEX_STRIDE_BYTES != 0
+				|| (bytes.length / VERTEX_STRIDE_BYTES) % 4 != 0
+				|| bytes.length > MAX_TRANSPORT_VERTICES_PER_SEGMENT * VERTEX_STRIDE_BYTES) {
+				throw new IllegalArgumentException("Distant Horizons owned semantic packet is not a bounded quad-aligned vertex stream");
+			}
+			ByteBuffer packet = ByteBuffer.wrap(bytes).order(ByteOrder.nativeOrder());
+			for (int vertexOffset = 0; vertexOffset < bytes.length; vertexOffset += VERTEX_STRIDE_BYTES) {
+				packet.position(vertexOffset + 14);
+				if (Short.toUnsignedInt(packet.getShort()) != 0) {
+					throw new IllegalArgumentException("Distant Horizons owned semantic packet has non-zero reserved padding");
+				}
+			}
+			snapshots.add(LodBufferSnapshot.fromPacked(sourceBufferIndex, bytes));
+		}
+		return List.copyOf(snapshots);
+	}
+
 	static List<LodBufferSnapshot> copyBuffersForTest(List<ByteBuffer> buffers, int maximumVerticesPerSegment) {
 		return copyBuffers(buffers, maximumVerticesPerSegment);
 	}
@@ -3359,41 +3545,21 @@ public final class DistantHorizonsSemanticCollector {
 				}
 			for (int copiedVertices = 0; copiedVertices < vertexCount; ) {
 				int chunkVertexCount = Math.min(maximumVerticesPerSegment, vertexCount - copiedVertices);
-				List<LodVertex> vertices = new ArrayList<>(chunkVertexCount);
+				byte[] packedVertices = new byte[Math.multiplyExact(chunkVertexCount, VERTEX_STRIDE_BYTES)];
+				source.get(packedVertices);
+				ByteBuffer packedSource = ByteBuffer.wrap(packedVertices).order(ByteOrder.nativeOrder());
 				for (int chunkVertexIndex = 0; chunkVertexIndex < chunkVertexCount; chunkVertexIndex++) {
 					int vertexIndex = copiedVertices + chunkVertexIndex;
-				int localX = Short.toUnsignedInt(source.getShort());
-				int localY = Short.toUnsignedInt(source.getShort());
-				int localZ = Short.toUnsignedInt(source.getShort());
-				int packedLightAndMicroOffset = Short.toUnsignedInt(source.getShort());
-				int red = Byte.toUnsignedInt(source.get());
-				int green = Byte.toUnsignedInt(source.get());
-				int blue = Byte.toUnsignedInt(source.get());
-				int alpha = Byte.toUnsignedInt(source.get());
-				int materialId = Byte.toUnsignedInt(source.get());
-				int normalIndex = Byte.toUnsignedInt(source.get());
-				int padding = Short.toUnsignedInt(source.getShort());
+					packedSource.position(Math.multiplyExact(chunkVertexIndex, VERTEX_STRIDE_BYTES) + 14);
+					int padding = Short.toUnsignedInt(packedSource.getShort());
 				if (padding != 0) {
 					throw new IllegalArgumentException(
 						"Distant Horizons semantic vertex " + vertexIndex
 							+ " has non-zero reserved padding"
 					);
 				}
-				vertices.add(new LodVertex(
-					localX,
-					localY,
-					localZ,
-					packedLightAndMicroOffset,
-					red,
-					green,
-					blue,
-					alpha,
-					materialId,
-					normalIndex,
-					padding
-				));
 				}
-				copies.add(new LodBufferSnapshot(sourceBufferIndex, vertices));
+				copies.add(LodBufferSnapshot.fromPacked(sourceBufferIndex, packedVertices));
 				copiedVertices += chunkVertexCount;
 			}
 		}
@@ -3661,15 +3827,7 @@ public final class DistantHorizonsSemanticCollector {
 				if (buffer.vertices().isEmpty()) {
 					continue;
 				}
-				List<VulkanicGalBridge.WorldLodVertexRecord> vertices = buffer.vertices().stream()
-					.map(vertex -> new VulkanicGalBridge.WorldLodVertexRecord(
-						vertex.localX(), vertex.localY(), vertex.localZ(), vertex.packedLightAndMicroOffset(),
-						(vertex.red() & 0xFF) | ((vertex.green() & 0xFF) << 8)
-							| ((vertex.blue() & 0xFF) << 16) | ((vertex.alpha() & 0xFF) << 24),
-						vertex.materialId(), vertex.normalIndex()
-					))
-					.toList();
-				target.add(new VulkanicGalBridge.WorldLodSegmentRecord(layer, vertices));
+				target.add(VulkanicGalBridge.WorldLodSegmentRecord.packed(layer, buffer.packedVerticesForRust()));
 			}
 		}
 
@@ -3745,7 +3903,13 @@ public final class DistantHorizonsSemanticCollector {
 			List<VulkanicGalBridge.WorldLodFaceMaterialRecord> target,
 			int materialId, long variantPosition, DistantHorizonsFaceMaterialResolver.Resolution resolution
 		) {
-			if (!resolution.hasResolvedFaces()) return;
+			// Exact-atlas provenance is an all-faces contract. A partial model
+			// mapping may still expose safe face records for diagnostics/color-only
+			// paths, but admitting those records here would make the missing faces
+			// look complete to Rust and silently stretch a texture over geometry it
+			// does not describe. Keep the exact route fail-closed until every face
+			// emitted by the source model is representable.
+			if (!resolution.isExactAtlasAdmissible()) return;
 			for (Map.Entry<net.minecraft.core.Direction, List<DistantHorizonsFaceMaterialResolver.FaceMaterial>> entry : resolution.faceLayers().entrySet()) {
 				for (DistantHorizonsFaceMaterialResolver.FaceMaterial material : entry.getValue()) {
 					target.add(new VulkanicGalBridge.WorldLodFaceMaterialRecord(
@@ -4026,6 +4190,10 @@ public final class DistantHorizonsSemanticCollector {
 
 	/** One copied DH draw segment. Its vertices remain quad aligned. */
 	public record LodBufferSnapshot(int sourceBufferIndex, List<LodVertex> vertices) {
+		static LodBufferSnapshot fromPacked(int sourceBufferIndex, byte[] packedVertices) {
+			return new LodBufferSnapshot(sourceBufferIndex, new PackedLodVertexList(packedVertices));
+		}
+
 		public LodBufferSnapshot {
 			if (sourceBufferIndex < 0) {
 				throw new IllegalArgumentException("Distant Horizons semantic segment source buffer index must be non-negative");
@@ -4034,7 +4202,75 @@ public final class DistantHorizonsSemanticCollector {
 			if (vertices.size() % 4 != 0) {
 				throw new IllegalArgumentException("Distant Horizons semantic segment must contain complete quads");
 			}
-			vertices = List.copyOf(vertices);
+			// Real DH capture keeps the exact fixed-layout vertex bytes in one
+			// compact semantic stream.  Retaining one Java record per vertex made
+			// world entry allocate millions of objects before Rust could consume a
+			// single explicit LOD asset.  Tests and external semantic producers may
+			// still provide records; pack those at this boundary as well.
+			vertices = vertices instanceof PackedLodVertexList
+				? vertices
+				: new PackedLodVertexList(packVertices(vertices));
+		}
+
+		private static byte[] packVertices(List<LodVertex> vertices) {
+			byte[] packed = new byte[Math.multiplyExact(vertices.size(), VERTEX_STRIDE_BYTES)];
+			ByteBuffer output = ByteBuffer.wrap(packed).order(ByteOrder.nativeOrder());
+			for (LodVertex vertex : vertices) {
+				output.putShort((short)vertex.localX());
+				output.putShort((short)vertex.localY());
+				output.putShort((short)vertex.localZ());
+				output.putShort((short)vertex.packedLightAndMicroOffset());
+				output.put((byte)vertex.red());
+				output.put((byte)vertex.green());
+				output.put((byte)vertex.blue());
+				output.put((byte)vertex.alpha());
+				output.put((byte)vertex.materialId());
+				output.put((byte)vertex.normalIndex());
+				output.putShort((short)vertex.padding());
+			}
+			return packed;
+		}
+
+		/** Internal one-way transport view. The enclosing immutable snapshot owns
+		 * these bytes; the bridge reads them synchronously and never retains a
+		 * Java GPU or renderer object. */
+		public byte[] packedVerticesForRust() {
+			return ((PackedLodVertexList) vertices).bytes;
+		}
+	}
+
+	/**
+	 * Read-only view of the fixed DH semantic layout.  It creates a vertex
+	 * value only for a consumer that asks for one, while the retained collector
+	 * state stays a contiguous 16-byte-per-vertex stream.
+	 */
+	private static final class PackedLodVertexList extends AbstractList<LodVertex> {
+		private final byte[] bytes;
+
+		private PackedLodVertexList(byte[] bytes) {
+			this.bytes = Objects.requireNonNull(bytes, "bytes");
+			if (bytes.length % VERTEX_STRIDE_BYTES != 0) {
+				throw new IllegalArgumentException("packed Distant Horizons vertices are not stride aligned");
+			}
+		}
+
+		@Override
+		public LodVertex get(int index) {
+			if (index < 0 || index >= size()) throw new IndexOutOfBoundsException(index);
+			ByteBuffer input = ByteBuffer.wrap(bytes).order(ByteOrder.nativeOrder());
+			input.position(Math.multiplyExact(index, VERTEX_STRIDE_BYTES));
+			return new LodVertex(
+				Short.toUnsignedInt(input.getShort()), Short.toUnsignedInt(input.getShort()),
+				Short.toUnsignedInt(input.getShort()), Short.toUnsignedInt(input.getShort()),
+				Byte.toUnsignedInt(input.get()), Byte.toUnsignedInt(input.get()),
+				Byte.toUnsignedInt(input.get()), Byte.toUnsignedInt(input.get()),
+				Byte.toUnsignedInt(input.get()), Byte.toUnsignedInt(input.get()), Short.toUnsignedInt(input.getShort())
+			);
+		}
+
+		@Override
+		public int size() {
+			return bytes.length / VERTEX_STRIDE_BYTES;
 		}
 	}
 

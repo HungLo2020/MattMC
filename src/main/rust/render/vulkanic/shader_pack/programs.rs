@@ -4170,7 +4170,7 @@ pub fn distant_horizons_exact_atlas_source_resource_layout(label: &str) -> Resou
 }
 
 pub fn minimal_terrain_translucent_program() -> TerrainMaterialProgram {
-    minimal_direct_terrain_material_program(TerrainMaterialProgramKind::Translucent)
+    minimal_terrain_material_program(TerrainMaterialProgramKind::Translucent)
 }
 
 pub fn minimal_direct_terrain_solid_program() -> TerrainMaterialProgram {
@@ -4179,6 +4179,14 @@ pub fn minimal_direct_terrain_solid_program() -> TerrainMaterialProgram {
 
 pub fn minimal_direct_terrain_cutout_program() -> TerrainMaterialProgram {
     minimal_direct_terrain_material_program(TerrainMaterialProgramKind::Cutout)
+}
+
+/// Direct forward counterpart of the deferred translucent terrain program.
+/// Vanilla's non-source route has one color attachment, so it must never bind
+/// the multi-output G-buffer fragment merely because the material is water or
+/// another translucent block.
+pub fn minimal_direct_terrain_translucent_program() -> TerrainMaterialProgram {
+    minimal_direct_terrain_material_program(TerrainMaterialProgramKind::Translucent)
 }
 
 pub fn minimal_terrain_material_program(
@@ -4195,7 +4203,13 @@ pub fn minimal_terrain_material_program(
         fragment: ShaderStageSource {
             stage: ShaderStageKind::Fragment,
             label: format!("minimal-terrain-{}.fragment", kind.label_suffix()),
-            source: MINIMAL_TERRAIN_MATERIAL_FRAGMENT.to_string(),
+            // Frozen Sodium compiles `USE_FRAGMENT_DISCARD` exclusively for
+            // the cutout pass.  Fabulous opaque terrain shares this deferred
+            // program, so it must not accidentally inherit cutout's
+            // front-face/alpha rejection before deferred lighting.  The
+            // semantic pass kind selects the source-equivalent define here;
+            // no backend state or Java renderer policy is involved.
+            source: minimal_deferred_terrain_fragment_source(kind),
             entry_point: "main".to_string(),
         },
         required_resources: Vec::new(),
@@ -4282,22 +4296,64 @@ pub fn minimal_direct_terrain_material_program(
         identity: ProgramIdentity::new(match kind {
             TerrainMaterialProgramKind::Opaque => "vulkanic:builtin/direct_terrain_opaque_v1",
             TerrainMaterialProgramKind::Cutout => "vulkanic:builtin/direct_terrain_cutout_v1",
-            TerrainMaterialProgramKind::Translucent => "vulkanic:builtin/terrain_translucent_v1",
+            TerrainMaterialProgramKind::Translucent => {
+                "vulkanic:builtin/direct_terrain_translucent_v1"
+            }
         }),
         vertex: ShaderStageSource {
             stage: ShaderStageKind::Vertex,
             label: format!("minimal-direct-terrain-{}.vertex", kind.label_suffix()),
-            source: MINIMAL_TERRAIN_MATERIAL_VERTEX.to_string(),
+            source: minimal_direct_terrain_vertex_source(),
             entry_point: "main".to_string(),
         },
         fragment: ShaderStageSource {
             stage: ShaderStageKind::Fragment,
             label: format!("minimal-direct-terrain-{}.fragment", kind.label_suffix()),
-            source: MINIMAL_TERRAIN_MATERIAL_FRAGMENT_DIRECT.to_string(),
+            // Frozen Sodium compiles `USE_FRAGMENT_DISCARD` only for the
+            // cutout terrain pass.  In particular, translucent terrain must
+            // retain both faces and its source alpha for the later Fabulous
+            // composition; applying the cutout discard rule there changes
+            // glass and fluid coverage before the compositor ever sees it.
+            source: minimal_direct_terrain_fragment_source(kind),
             entry_point: "main".to_string(),
         },
         required_resources: Vec::new(),
     }
+}
+
+fn minimal_direct_terrain_fragment_source(kind: TerrainMaterialProgramKind) -> String {
+    terrain_fragment_source_with_pass_define(MINIMAL_TERRAIN_MATERIAL_FRAGMENT_DIRECT, kind)
+}
+
+fn minimal_deferred_terrain_fragment_source(kind: TerrainMaterialProgramKind) -> String {
+    terrain_fragment_source_with_pass_define(MINIMAL_TERRAIN_MATERIAL_FRAGMENT, kind)
+}
+
+fn terrain_fragment_source_with_pass_define(
+    source: &str,
+    kind: TerrainMaterialProgramKind,
+) -> String {
+    let discard_define = terrain_fragment_discard_define(kind);
+    source.replacen("#version 450\n", &format!("#version 450\n{discard_define}"), 1)
+}
+
+fn terrain_fragment_discard_define(kind: TerrainMaterialProgramKind) -> &'static str {
+    matches!(kind, TerrainMaterialProgramKind::Cutout)
+        .then_some("#define VULKANIC_TERRAIN_FRAGMENT_DISCARD 1\n")
+        .unwrap_or_default()
+}
+
+/// Frozen's active OpenGL Sodium terrain program samples the 16×16 lightmap at each
+/// vertex from its packed `a_LightAndData.xy / 256` coordinate, then lets
+/// normal varying interpolation carry the lit vertex colour across the
+/// triangle. Sodium's CPU encoder writes each packed 0..15 light level as a
+/// byte coordinate `level * 16`, and its OpenGL block-layer vertex shader divides that byte by
+/// 256 before sampling it with LightTexture's linear sampler. The semantic
+/// level/15 representation therefore converts to `level * 15 / 16`, not a
+/// texel-centre coordinate.
+/// Both direct and deferred builtin terrain use this exact vertex contract.
+fn minimal_direct_terrain_vertex_source() -> String {
+    MINIMAL_TERRAIN_MATERIAL_VERTEX.to_string()
 }
 
 pub fn minimal_g_buffer_composite_program() -> CompositeProgram {
@@ -4434,6 +4490,8 @@ mod shader_stage_code_tests {
 }
 
 pub const MINIMAL_TERRAIN_MATERIAL_VERTEX: &str = r#"#version 450
+layout(set = 1, binding = 0) uniform texture2D LightmapTexture;
+layout(set = 1, binding = 1) uniform sampler LightmapSampler;
 struct MeshVertex {
     vec4 position_uv;
     vec4 color_uv;
@@ -4457,6 +4515,8 @@ layout(set = 0, binding = 1, std430) readonly buffer WorldMeshInstances {
     mat4 projection;
     mat4 light_view_projection;
     vec4 shadow_params;
+    vec4 fog_color_and_environmental_start;
+    vec4 fog_ranges;
     MeshInstance instances[];
 };
 layout(location = 0) out vec2 v_uv;
@@ -4468,6 +4528,14 @@ layout(location = 5) out vec3 v_world_position;
 layout(location = 6) flat out vec4 v_animation_region;
 layout(location = 7) flat out vec4 v_animation_next_region;
 layout(location = 8) flat out vec4 v_overlay_color;
+// Frozen's terrain shader interpolates distances and resolves the non-linear
+// clamped fog function in the fragment shader.  Never interpolate the final
+// fog factor: that changes the ramp across large (especially translucent)
+// terrain triangles.
+layout(location = 9) out vec2 v_fog_distances;
+layout(location = 10) flat out vec4 v_fog_color_and_environmental_start;
+layout(location = 11) flat out vec4 v_fog_ranges;
+layout(location = 12) flat out uint v_terrain_material_bits;
 void main() {
     MeshVertex vertex = vertices[gl_VertexIndex];
     MeshInstance instance = instances[gl_InstanceIndex];
@@ -4477,14 +4545,43 @@ void main() {
     clip.z = clip.z * 0.5 + clip.w * 0.5;
 #endif
     gl_Position = clip;
-    v_uv = vec2(vertex.position_uv.w, vertex.color_uv.w);
-    v_color = vec4(vertex.color_uv.rgb * vertex.normal_light.x, vertex.normal_light.w) * instance.color;
+    // A copied world-mesh vertex carries both its local sprite coordinate and
+    // its resolved terrain-atlas coordinate.  The submitted semantic section
+    // declares which coordinate space its owned texture uses; do not make a
+    // backend infer that from a native texture object.  This keeps standalone
+    // water sprites local while atlas-backed terrain (including glass) samples
+    // its resolved atlas region.
+    v_uv = instance.material.w > 0.5
+        ? vertex.shader_data.xy
+        : vec2(vertex.position_uv.w, vertex.color_uv.w);
+    // Frozen OpenGL Sodium encodes each 0..15 light level as `level * 16`
+    // and divides it by 256 in `chunk_vertex.glsl`. LightTexture is linear,
+    // so this deliberately samples at `level / 16`, including the boundary
+    // interpolation between neighbouring lightmap texels. Do not replace it
+    // with texel-centre coordinates: that is a different lighting contract.
+    // The resulting lit vertex color is then interpolated across the triangle.
+    vec2 light_uv = clamp(vertex.extra_data.xy, vec2(0.0), vec2(1.0)) * (15.0 / 16.0);
+    v_color = vec4(vertex.color_uv.rgb, vertex.normal_light.w) * instance.color
+        * texture(sampler2D(LightmapTexture, LightmapSampler), light_uv);
     v_material = instance.material;
     v_animation_region = instance.animation_region;
     v_animation_next_region = instance.animation_next_region;
     v_overlay_color = instance.overlay_color;
     v_normal = normalize(vec3(vertex.normal_light.yz, vertex.extra_data.z));
     v_light = clamp(vertex.extra_data.xy, vec2(0.0), vec2(1.0));
+    v_terrain_material_bits = uint(clamp(vertex.extra_data.w, 0.0, 255.0));
+    // Frozen's terrain vertex shader resolves both fog distances from
+    // `Position + ModelOffset` before applying ModelViewMat.  `world` is this
+    // explicit camera-relative semantic position.  Euclidean distance would
+    // survive a view rotation, but Sodium's cylindrical distance would not;
+    // using `view * world` here makes camera pitch alter the fog ramp.
+    vec3 fog_position = world.xyz;
+    v_fog_distances = vec2(
+        length(fog_position),
+        max(length(fog_position.xz), abs(fog_position.y))
+    );
+    v_fog_color_and_environmental_start = fog_color_and_environmental_start;
+    v_fog_ranges = fog_ranges;
     float shadow_range = max(shadow_params.w, 1.0);
     v_world_position = world.xyz / shadow_range * 0.5 + 0.5;
 }
@@ -4913,6 +5010,10 @@ layout(location = 5) in vec3 v_world_position;
 layout(location = 6) flat in vec4 v_animation_region;
 layout(location = 7) flat in vec4 v_animation_next_region;
 layout(location = 8) flat in vec4 v_overlay_color;
+layout(location = 9) in vec2 v_fog_distances;
+layout(location = 10) flat in vec4 v_fog_color_and_environmental_start;
+layout(location = 11) flat in vec4 v_fog_ranges;
+layout(location = 12) flat in uint v_terrain_material_bits;
 // These locations are implementation details. The shader-pack contract names
 // the values terrain_lit_color, terrain_view_space_normal, and
 // terrain_material_auxiliary.
@@ -4920,9 +5021,46 @@ layout(location = 0) out vec4 out_terrain_lit_color;
 layout(location = 1) out vec4 out_terrain_view_space_normal;
 layout(location = 2) out vec4 out_terrain_material_auxiliary;
 layout(location = 3) out vec4 out_world_position;
+// Frozen Java OpenGL reported GL_MAX_TEXTURE_LOD_BIAS = 15 for the paired
+// baseline device. Sodium applies its negative counterpart only to materials
+// whose compact material byte disables mipmaps. Preserve derivative-selected
+// sampling; `textureLod(..., 0.0)` would incorrectly force the base mip.
+const float FROZEN_MAX_TEXTURE_LOD_BIAS = 15.0;
+// Keep the copied Frozen fog behavior intact even for disabled or degenerate
+// ranges. In particular, `end <= start` is a hard transition, not a disabled
+// fog range; only its explicit sentinel disables fog.
+const float FROZEN_FOG_DISABLED_SENTINEL_THRESHOLD = 1.0e12;
+bool frozen_fog_range_disabled(float start, float end) {
+    return max(abs(start), abs(end)) >= FROZEN_FOG_DISABLED_SENTINEL_THRESHOLD;
+}
+bool frozen_fog_distance_invalid(float distance) {
+    return distance != distance || abs(distance) >= FROZEN_FOG_DISABLED_SENTINEL_THRESHOLD;
+}
+float frozen_linear_fog_value(float distance, float start, float end) {
+    if (frozen_fog_distance_invalid(distance) || frozen_fog_range_disabled(start, end)) {
+        return 0.0;
+    }
+    if (end <= start) {
+        return distance > start ? 1.0 : 0.0;
+    }
+    if (distance <= start) {
+        return 0.0;
+    }
+    if (distance >= end) {
+        return 1.0;
+    }
+    return clamp((distance - start) / (end - start), 0.0, 1.0);
+}
 void main() {
     vec2 sample_uv = v_animation_region.xy + v_uv * v_animation_region.zw;
-    vec4 color = texture(sampler2D(Tex0, Samp0), sample_uv);
+    // Keep the deferred Fabulous material path on the same compact Sodium
+    // material contract as the direct path.  These bits are semantic mesh
+    // data, not a backend sampler workaround: they control whether a sprite
+    // may use its mip chain and which alpha/cull rule its fragment receives.
+    bool use_mipmaps = (v_terrain_material_bits & 1u) != 0u;
+    vec4 color = use_mipmaps
+        ? texture(sampler2D(Tex0, Samp0), sample_uv)
+        : texture(sampler2D(Tex0, Samp0), sample_uv, -FROZEN_MAX_TEXTURE_LOD_BIAS);
     if (v_material.y > 0.5) {
         vec2 next_uv = v_animation_next_region.xy + v_uv * v_animation_next_region.zw;
         vec4 next_color = texture(sampler2D(Tex0, Samp0), next_uv);
@@ -4932,14 +5070,36 @@ void main() {
     if (v_overlay_color.a > 0.0) {
         color.rgb = mix(color.rgb, v_overlay_color.rgb, v_overlay_color.a);
     }
-    if (v_material.x > 0.0 && color.a < v_material.x) {
+    uint alpha_cutoff_class = (v_terrain_material_bits >> 1u) & 3u;
+    float alpha_cutoff = float[4](0.0, 0.1, 0.1, 1.0)[alpha_cutoff_class];
+#ifdef VULKANIC_TERRAIN_FRAGMENT_DISCARD
+    // Match Sodium: pass culling is explicit pipeline state, never a
+    // material-dependent fragment-side back-face discard.
+    if (color.a < max(v_material.x, alpha_cutoff)) {
         discard;
     }
+#endif
+    float environmental_fog = frozen_linear_fog_value(
+        v_fog_distances.x,
+        v_fog_color_and_environmental_start.w,
+        v_fog_ranges.x
+    );
+    float render_distance_fog = frozen_linear_fog_value(
+        v_fog_distances.y,
+        v_fog_ranges.y,
+        v_fog_ranges.z
+    );
     vec3 n = normalize(v_normal) * 0.5 + 0.5;
     out_terrain_lit_color = color;
-    out_terrain_view_space_normal = vec4(n, color.a);
-    out_terrain_material_auxiliary = vec4(v_material.x, v_light.x, v_light.y, color.a);
-    out_world_position = vec4(v_world_position, color.a);
+    // Keep Fog's copied per-vertex distances semantic through deferred work.
+    // The normal alpha is otherwise unused by this admitted deferred path.
+    out_terrain_view_space_normal = vec4(n, max(environmental_fog, render_distance_fog));
+    // This deferred route only receives opaque/cutout terrain after its
+    // material-specific discard. Sodium's compact vertex alpha may be baked
+    // AO, so it is not an existence bit.  Carry explicit coverage separately
+    // instead of allowing dark AO vertices to disappear in deferred lighting.
+    out_terrain_material_auxiliary = vec4(v_material.x, v_light.x, v_light.y, 1.0);
+    out_world_position = vec4(v_world_position, 1.0);
 }
 "#;
 
@@ -5061,10 +5221,46 @@ layout(location = 2) flat in vec4 v_material;
 layout(location = 6) flat in vec4 v_animation_region;
 layout(location = 7) flat in vec4 v_animation_next_region;
 layout(location = 8) flat in vec4 v_overlay_color;
+layout(location = 9) in vec2 v_fog_distances;
+layout(location = 10) flat in vec4 v_fog_color_and_environmental_start;
+layout(location = 11) flat in vec4 v_fog_ranges;
+layout(location = 12) flat in uint v_terrain_material_bits;
 layout(location = 0) out vec4 out_color;
+// Frozen Java OpenGL reported GL_MAX_TEXTURE_LOD_BIAS = 15 for the paired
+// baseline device. Keep Sodium's derivative-selected negative-bias sample;
+// forcing level zero is not equivalent for distant terrain.
+const float FROZEN_MAX_TEXTURE_LOD_BIAS = 15.0;
+const float FROZEN_FOG_DISABLED_SENTINEL_THRESHOLD = 1.0e12;
+bool frozen_fog_range_disabled(float start, float end) {
+    return max(abs(start), abs(end)) >= FROZEN_FOG_DISABLED_SENTINEL_THRESHOLD;
+}
+bool frozen_fog_distance_invalid(float distance) {
+    return distance != distance || abs(distance) >= FROZEN_FOG_DISABLED_SENTINEL_THRESHOLD;
+}
+float frozen_linear_fog_value(float distance, float start, float end) {
+    if (frozen_fog_distance_invalid(distance) || frozen_fog_range_disabled(start, end)) {
+        return 0.0;
+    }
+    if (end <= start) {
+        return distance > start ? 1.0 : 0.0;
+    }
+    if (distance <= start) {
+        return 0.0;
+    }
+    if (distance >= end) {
+        return 1.0;
+    }
+    return clamp((distance - start) / (end - start), 0.0, 1.0);
+}
 void main() {
     vec2 sample_uv = v_animation_region.xy + v_uv * v_animation_region.zw;
-    vec4 color = texture(sampler2D(Tex0, Samp0), sample_uv);
+    // Frozen Sodium's compact material byte controls both this exact choice
+    // and alpha cutoff. A non-mipped material asks for a negative LOD bias
+    // while retaining derivative-selected mip sampling.
+    bool use_mipmaps = (v_terrain_material_bits & 1u) != 0u;
+    vec4 color = use_mipmaps
+        ? texture(sampler2D(Tex0, Samp0), sample_uv)
+        : texture(sampler2D(Tex0, Samp0), sample_uv, -FROZEN_MAX_TEXTURE_LOD_BIAS);
     if (v_material.y > 0.5) {
         vec2 next_uv = v_animation_next_region.xy + v_uv * v_animation_next_region.zw;
         vec4 next_color = texture(sampler2D(Tex0, Samp0), next_uv);
@@ -5074,9 +5270,23 @@ void main() {
     if (v_overlay_color.a > 0.0) {
         color.rgb = mix(color.rgb, v_overlay_color.rgb, v_overlay_color.a);
     }
-    if (v_material.x > 0.0 && color.a < v_material.x) {
+    uint alpha_cutoff_class = (v_terrain_material_bits >> 1u) & 3u;
+    float alpha_cutoff = float[4](0.0, 0.1, 0.1, 1.0)[alpha_cutoff_class];
+#ifdef VULKANIC_TERRAIN_FRAGMENT_DISCARD
+    // Frozen Sodium's `block_layer_*.fsh` applies only the compact material
+    // alpha cutoff here. Cull state belongs to the explicit pass pipeline;
+    // a fragment-side back-face discard would remove valid cutout geometry
+    // (for example foliage planes) that the baseline still draws.
+    if (alpha_cutoff > 0.0 && color.a < alpha_cutoff) {
         discard;
     }
+#endif
+    float fog_value = max(
+        frozen_linear_fog_value(v_fog_distances.x, v_fog_color_and_environmental_start.w, v_fog_ranges.x),
+        frozen_linear_fog_value(v_fog_distances.y, v_fog_ranges.y, v_fog_ranges.z)
+    );
+    float fog_alpha = clamp(fog_value * v_fog_ranges.w, 0.0, 1.0);
+    color.rgb = mix(color.rgb, v_fog_color_and_environmental_start.rgb, fog_alpha);
     out_color = color;
 }
 "#;
@@ -5117,7 +5327,9 @@ layout(set = 0, binding = 6, std430) readonly buffer ShaderCompositeUniforms {
     mat4 light_view_projection;
     vec4 shadow_params;
     vec4 color_grade_params;
-    vec4 fog_params;
+    mat4 projection_inverse;
+    vec4 fog_color_and_environmental_start;
+    vec4 fog_ranges;
 };
 layout(location = 0) in vec2 v_uv;
 layout(location = 0) out vec4 out_color;
@@ -5160,7 +5372,9 @@ layout(set = 0, binding = 6, std430) readonly buffer ShaderCompositeUniforms {
     mat4 light_view_projection;
     vec4 shadow_params;
     vec4 color_grade_params;
-    vec4 fog_params;
+    mat4 projection_inverse;
+    vec4 fog_color_and_environmental_start;
+    vec4 fog_ranges;
 };
 layout(location = 0) in vec2 v_uv;
 layout(location = 0) out vec4 out_color;
@@ -5179,22 +5393,41 @@ void main() {
 
 pub const MINIMAL_COMPOSITE_DEPTH_FOG_FRAGMENT: &str = r#"#version 450
 layout(set = 0, binding = 0) uniform texture2D Tex0;
-layout(set = 0, binding = 3) uniform texture2D WorldPositionTex;
+layout(set = 0, binding = 1) uniform texture2D NormalTex;
+layout(set = 0, binding = 4) uniform texture2D MainDepthTex;
 layout(set = 0, binding = 5) uniform sampler Samp0;
 layout(set = 0, binding = 6, std430) readonly buffer ShaderCompositeUniforms {
     mat4 light_view_projection;
     vec4 shadow_params;
     vec4 color_grade_params;
-    vec4 fog_params;
+    mat4 projection_inverse;
+    vec4 fog_color_and_environmental_start;
+    vec4 fog_ranges;
 };
 layout(location = 0) in vec2 v_uv;
 layout(location = 0) out vec4 out_color;
 void main() {
     vec4 color = texture(sampler2D(Tex0, Samp0), v_uv);
-    vec3 world_position = texture(sampler2D(WorldPositionTex, Samp0), v_uv).xyz * 2.0 - 1.0;
-    float height_fog = clamp((world_position.y + 0.45) * fog_params.w, 0.0, 1.0);
-    vec3 fog_color = fog_params.xyz;
-    out_color = vec4(mix(color.rgb, fog_color, height_fog * color.a), color.a);
+    float device_depth = texture(sampler2D(MainDepthTex, Samp0), v_uv).r;
+    // `v_uv` deliberately addresses Vulkan attachments with the opposite row
+    // origin from the fullscreen raster position.  It is therefore correct
+    // for sampling, but not for rebuilding the game's view-space ray: that
+    // reconstruction must use the unflipped clip-space Y coordinate.
+    vec2 reconstruction_uv = v_uv;
+#ifdef VULKANIC_GAL_FLIP_FULLSCREEN_UV_Y
+    reconstruction_uv.y = 1.0 - reconstruction_uv.y;
+#endif
+    // Deferred work preserves Frozen's interpolated vertex fog factor in the
+    // normal alpha channel. Do not reconstruct a different distance from
+    // depth: perspective reconstruction changes the fog ramp over terrain
+    // and translucent triangles.
+    float fog_factor = texture(sampler2D(NormalTex, Samp0), v_uv).a;
+    // `color.a` is not a fog-opacity channel. Sodium's compact terrain
+    // vertices use it for separate ambient occlusion, and the deferred
+    // G-buffer must preserve that semantic for lighting. Frozen resolves fog
+    // with the copied fog-color alpha instead.
+    float fog_alpha = clamp(fog_factor * fog_ranges.w, 0.0, 1.0);
+    out_color = vec4(mix(color.rgb, fog_color_and_environmental_start.rgb, fog_alpha), color.a);
 }
 "#;
 
@@ -5205,7 +5438,9 @@ layout(set = 0, binding = 6, std430) readonly buffer ShaderCompositeUniforms {
     mat4 light_view_projection;
     vec4 shadow_params;
     vec4 color_grade_params;
-    vec4 fog_params;
+    mat4 projection_inverse;
+    vec4 fog_color_and_environmental_start;
+    vec4 fog_ranges;
 };
 layout(location = 0) in vec2 v_uv;
 layout(location = 0) out vec4 out_color;
@@ -5494,6 +5729,201 @@ mod tests {
             .contains("out_color = vec4(albedo.rgb * shadow_factor, albedo.a);"));
         assert!(!MINIMAL_DEFERRED_LIGHTING_FRAGMENT.contains("float face ="));
         assert!(!MINIMAL_DEFERRED_LIGHTING_FRAGMENT.contains("float light ="));
+    }
+
+    #[test]
+    fn vanilla_fog_uses_sodium_cylindrical_distance_once_after_deferred_lighting() {
+        // Frozen Java OpenGL's Sodium shader resolves its fog factor from the
+        // interpolated spherical/cylindrical vertex distances before the
+        // model-view transform. The deferred Rust route transports that
+        // immutable factor through the explicit G-buffer and applies it once
+        // after deferred lighting.
+        assert!(MINIMAL_TERRAIN_MATERIAL_VERTEX
+            .contains("vec3 fog_position = world.xyz;"));
+        assert!(MINIMAL_TERRAIN_MATERIAL_VERTEX.contains("v_fog_distances = vec2("));
+        assert!(MINIMAL_TERRAIN_MATERIAL_VERTEX.contains(
+            "max(length(fog_position.xz), abs(fog_position.y))"
+        ));
+        assert!(!MINIMAL_TERRAIN_MATERIAL_VERTEX.contains("view_position"));
+        assert!(!MINIMAL_TERRAIN_MATERIAL_FRAGMENT.contains("v_fog_factor"));
+        assert!(MINIMAL_TERRAIN_MATERIAL_FRAGMENT_DIRECT.contains(
+            "frozen_linear_fog_value(v_fog_distances.x, v_fog_color_and_environmental_start.w, v_fog_ranges.x)"
+        ));
+        assert!(MINIMAL_TERRAIN_MATERIAL_FRAGMENT_DIRECT.contains(
+            "frozen_linear_fog_value(v_fog_distances.y, v_fog_ranges.y, v_fog_ranges.z)"
+        ));
+        assert!(MINIMAL_TERRAIN_MATERIAL_FRAGMENT_DIRECT.contains(
+            "clamp(fog_value * v_fog_ranges.w, 0.0, 1.0)"
+        ));
+        assert!(!MINIMAL_TERRAIN_MATERIAL_FRAGMENT_DIRECT.contains("v_fog_factor"));
+        for source in [
+            MINIMAL_TERRAIN_MATERIAL_FRAGMENT,
+            MINIMAL_TERRAIN_MATERIAL_FRAGMENT_DIRECT,
+        ] {
+            assert!(source.contains("const float FROZEN_FOG_DISABLED_SENTINEL_THRESHOLD = 1.0e12;"));
+            assert!(source.contains("distance != distance"));
+            assert!(source.contains("return distance > start ? 1.0 : 0.0;"));
+            assert!(source.contains("frozen_fog_range_disabled(start, end)"));
+        }
+        assert!(MINIMAL_TERRAIN_MATERIAL_FRAGMENT
+            .contains("out_terrain_view_space_normal = vec4(n, max(environmental_fog, render_distance_fog));"));
+        assert!(MINIMAL_COMPOSITE_DEPTH_FOG_FRAGMENT
+            .contains("uniform texture2D NormalTex"));
+        assert!(MINIMAL_COMPOSITE_DEPTH_FOG_FRAGMENT
+            .contains("texture(sampler2D(NormalTex, Samp0), v_uv).a"));
+        assert!(MINIMAL_COMPOSITE_DEPTH_FOG_FRAGMENT
+            .contains("clamp(fog_factor * fog_ranges.w, 0.0, 1.0)"));
+        assert!(!MINIMAL_COMPOSITE_DEPTH_FOG_FRAGMENT
+            .contains("fog_factor * color.a"));
+    }
+
+    #[test]
+    fn direct_terrain_preserves_the_explicit_atlas_or_local_uv_semantic() {
+        assert!(MINIMAL_TERRAIN_MATERIAL_VERTEX
+            .contains("instance.material.w > 0.5\n        ? vertex.shader_data.xy"));
+        assert!(MINIMAL_TERRAIN_MATERIAL_VERTEX
+            .contains(": vec2(vertex.position_uv.w, vertex.color_uv.w);"));
+    }
+
+    #[test]
+    fn builtin_material_programs_sample_the_explicit_vanilla_lightmap() {
+        for source in [MINIMAL_TERRAIN_MATERIAL_VERTEX] {
+            assert!(
+                source.contains("layout(set = 1, binding = 0) uniform texture2D LightmapTexture")
+            );
+            assert!(source.contains("layout(set = 1, binding = 1) uniform sampler LightmapSampler"));
+            assert!(source.contains(
+                "clamp(vertex.extra_data.xy, vec2(0.0), vec2(1.0)) * (15.0 / 16.0);"
+            ));
+            assert!(source.contains("texture(sampler2D(LightmapTexture, LightmapSampler), light_uv)"));
+        }
+        assert!(!MINIMAL_TERRAIN_MATERIAL_FRAGMENT.contains("LightmapTexture"));
+    }
+
+    #[test]
+    fn direct_vanilla_terrain_matches_frozen_sodium_lightmap_vertex_sampling() {
+        let vertex = minimal_direct_terrain_vertex_source();
+        // Frozen OpenGL Sodium `block_layer_opaque.vsh` samples its linear
+        // LightTexture directly at `a_LightAndData.xy / 256`. The semantic
+        // stream holds each packed level as level / 15, while Sodium's CPU
+        // encoder stores it as level * 16, producing level / 16 exactly.
+        // Sampling here—not
+        // the fragment—
+        // also preserves Frozen's interpolation of already-lit vertex color.
+        assert!(vertex.contains("layout(set = 1, binding = 0) uniform texture2D LightmapTexture"));
+        assert!(vertex.contains(
+            "clamp(vertex.extra_data.xy, vec2(0.0), vec2(1.0)) * (15.0 / 16.0);"
+        ));
+        assert!(vertex.contains("v_color = vec4(vertex.color_uv.rgb, vertex.normal_light.w) * instance.color"));
+        assert!(vertex.contains("texture(sampler2D(LightmapTexture, LightmapSampler), light_uv)"));
+        // Frozen carries the blend alpha independently in `a_Color`; it never
+        // multiplies the AO-baked RGB vertex color by that alpha or derives it
+        // from packed light.
+        assert!(vertex.contains("vec4(vertex.color_uv.rgb, vertex.normal_light.w)"));
+        assert!(!vertex.contains("vertex.color_uv.rgb * vertex.normal_light.w"));
+        assert!(!MINIMAL_TERRAIN_MATERIAL_FRAGMENT_DIRECT.contains("LightmapTexture"));
+        assert!(!MINIMAL_TERRAIN_MATERIAL_FRAGMENT_DIRECT.contains("v_light"));
+    }
+
+    #[test]
+    fn builtin_terrain_paths_preserve_sodium_mip_and_cutout_material_bits() {
+        assert!(MINIMAL_TERRAIN_MATERIAL_VERTEX
+            .contains("v_terrain_material_bits = uint(clamp(vertex.extra_data.w, 0.0, 255.0));"));
+        for fragment in [
+            MINIMAL_TERRAIN_MATERIAL_FRAGMENT,
+            MINIMAL_TERRAIN_MATERIAL_FRAGMENT_DIRECT,
+        ] {
+            assert!(fragment.contains("bool use_mipmaps = (v_terrain_material_bits & 1u) != 0u;"));
+            assert!(fragment.contains("const float FROZEN_MAX_TEXTURE_LOD_BIAS = 15.0;"));
+            assert!(fragment.contains(
+                "texture(sampler2D(Tex0, Samp0), sample_uv, -FROZEN_MAX_TEXTURE_LOD_BIAS)"
+            ));
+            assert!(!fragment.contains("textureLod(sampler2D(Tex0, Samp0), sample_uv, 0.0)"));
+            assert!(fragment.contains("uint alpha_cutoff_class = (v_terrain_material_bits >> 1u) & 3u;"));
+            // Frozen Sodium leaves face selection to the raster pipeline and
+            // performs no fragment-side `gl_FrontFacing` discard.
+            assert!(!fragment.contains("gl_FrontFacing"));
+        }
+    }
+
+    #[test]
+    fn deferred_opaque_coverage_does_not_reinterpret_compact_vertex_alpha_as_visibility() {
+        // Sodium stores baked AO in compact vertex alpha for the normal
+        // terrain stream. The forward translucent route needs that alpha;
+        // the deferred opaque/cutout route instead has a binary post-discard
+        // coverage contract for its lighting pass.
+        assert!(MINIMAL_TERRAIN_MATERIAL_FRAGMENT.contains(
+            "out_terrain_material_auxiliary = vec4(v_material.x, v_light.x, v_light.y, 1.0);"
+        ));
+        assert!(MINIMAL_TERRAIN_MATERIAL_FRAGMENT
+            .contains("out_world_position = vec4(v_world_position, 1.0);"));
+        assert!(MINIMAL_DEFERRED_LIGHTING_FRAGMENT.contains("if (material_light.a < 0.5)"));
+    }
+
+    #[test]
+    fn direct_translucent_terrain_uses_the_single_target_forward_contract() {
+        let program = minimal_direct_terrain_translucent_program();
+        assert_eq!(
+            ProgramIdentity::new("vulkanic:builtin/direct_terrain_translucent_v1"),
+            program.identity
+        );
+        assert_eq!(
+            MINIMAL_TERRAIN_MATERIAL_FRAGMENT_DIRECT,
+            program.fragment.source
+        );
+        assert!(program
+            .fragment
+            .source
+            .contains("layout(location = 0) out vec4 out_color;"));
+        assert!(!program.fragment.source.contains("out_terrain_lit_color"));
+    }
+
+    #[test]
+    fn direct_terrain_fragment_discard_is_cutout_only_like_frozen_sodium() {
+        let cutout = minimal_direct_terrain_cutout_program();
+        let opaque = minimal_direct_terrain_solid_program();
+        let translucent = minimal_direct_terrain_translucent_program();
+
+        assert!(MINIMAL_TERRAIN_MATERIAL_FRAGMENT_DIRECT
+            .contains("#ifdef VULKANIC_TERRAIN_FRAGMENT_DISCARD"));
+        assert!(cutout
+            .fragment
+            .source
+            .starts_with("#version 450\n#define VULKANIC_TERRAIN_FRAGMENT_DISCARD 1\n"));
+        assert!(!opaque
+            .fragment
+            .source
+            .contains("#define VULKANIC_TERRAIN_FRAGMENT_DISCARD"));
+        assert!(!translucent
+            .fragment
+            .source
+            .contains("#define VULKANIC_TERRAIN_FRAGMENT_DISCARD"));
+    }
+
+    #[test]
+    fn deferred_fabulous_terrain_discard_is_cutout_only_like_frozen_sodium() {
+        // Fabulous routes opaque/cutout terrain through the deferred
+        // material shader. Keep its pass-local discard admission identical
+        // to Frozen's `USE_FRAGMENT_DISCARD` policy, rather than allowing
+        // the shared source body to make opaque terrain disappear.
+        let cutout = minimal_terrain_cutout_program();
+        let opaque = minimal_terrain_solid_program();
+        let translucent = minimal_terrain_material_program(TerrainMaterialProgramKind::Translucent);
+
+        assert!(MINIMAL_TERRAIN_MATERIAL_FRAGMENT
+            .contains("#ifdef VULKANIC_TERRAIN_FRAGMENT_DISCARD"));
+        assert!(cutout
+            .fragment
+            .source
+            .starts_with("#version 450\n#define VULKANIC_TERRAIN_FRAGMENT_DISCARD 1\n"));
+        assert!(!opaque
+            .fragment
+            .source
+            .contains("#define VULKANIC_TERRAIN_FRAGMENT_DISCARD"));
+        assert!(!translucent
+            .fragment
+            .source
+            .contains("#define VULKANIC_TERRAIN_FRAGMENT_DISCARD"));
     }
 
     #[test]

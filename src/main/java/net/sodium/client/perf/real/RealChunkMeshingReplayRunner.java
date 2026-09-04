@@ -812,14 +812,15 @@ public final class RealChunkMeshingReplayRunner implements GameHooks {
         if (block == Blocks.LARGE_FERN || block == Blocks.TALL_GRASS) return 7;
         if (block == Blocks.OAK_LEAVES || block == Blocks.JUNGLE_LEAVES || block == Blocks.ACACIA_LEAVES
                 || block == Blocks.DARK_OAK_LEAVES || block == Blocks.VINE || block == Blocks.MANGROVE_LEAVES
-                || block == Blocks.LEAF_LITTER) return 2;
+                || block == Blocks.LEAF_LITTER || block == Blocks.AZALEA_LEAVES
+                || block == Blocks.FLOWERING_AZALEA_LEAVES) return 2;
         if (block == Blocks.WATER || block == Blocks.BUBBLE_COLUMN || block == Blocks.WATER_CAULDRON) return 3;
         if (block == Blocks.REDSTONE_WIRE) return 4;
         if (block == Blocks.MELON_STEM || block == Blocks.PUMPKIN_STEM) return 6;
         if (block == Blocks.SPRUCE_LEAVES) return 8;
         if (block == Blocks.BIRCH_LEAVES) return 9;
         if (block == Blocks.ATTACHED_MELON_STEM || block == Blocks.ATTACHED_PUMPKIN_STEM
-                || block == Blocks.LILY_PAD) return 5;
+                || block == Blocks.LILY_PAD || block == Blocks.BAMBOO || block == Blocks.POTTED_BAMBOO) return 5;
         return 0;
     }
 

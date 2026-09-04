@@ -150,7 +150,7 @@ public final class VoxelConstants {
             if (getVoxelMapInstance().getMap() == null) {
                 return;
             }
-            getVoxelMapInstance().getMap().onTickSemantic();
+            getVoxelMapInstance().onTickSemantic();
             if (!getVoxelMapInstance().getMap().renderRustSemanticOverlay(guiGraphics)) {
                 throw new IllegalStateException("Rust whole-frame Vulkan VoxelMap overlay is unavailable for the current waypoint/settings state");
             }

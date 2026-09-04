@@ -18,7 +18,7 @@ mod smooth;
 mod types;
 
 use flat::flat_lighting;
-pub(super) use parity::{get_emissive_lightmap, max_brightness};
+pub(super) use parity::{ambient_shade, get_emissive_lightmap, max_brightness};
 #[cfg(test)]
 pub(super) use sampling::neighborhood_index;
 pub(super) use sampling::{dir_step, neighborhood_state_id};
@@ -35,10 +35,9 @@ pub(super) fn native_quad_lighting(
 
 /// Computes model lighting for a concrete terrain vertex contract.
 ///
-/// Extended terrain formats carry AO independently in alpha. Their shader path
-/// applies directional face shade after vertex decoding, so baking that factor
-/// here would apply it twice. Legacy compact formats retain the historical
-/// baked-color convention.
+/// Extended terrain formats carry AO independently in alpha. The caller keeps
+/// the directional shade as an explicit color operation in that case: alpha is
+/// still raw AO, while RGB retains Frozen Sodium's baked face shade.
 pub(super) fn native_quad_lighting_for_vertex_format(
     block: &NativeSectionBlockRecord,
     quad: &StaticModelQuadRecord,
@@ -59,6 +58,22 @@ pub(super) fn native_quad_lighting_for_vertex_format(
     } else {
         flat_lighting(block, quad, state, light_face, apply_directional_shade)
     }
+}
+
+/// Frozen Sodium bakes directional face shade into RGB even when its extended
+/// vertex contract stores ambient occlusion independently in alpha. Rust's
+/// direct terrain program deliberately consumes that same already-lit color,
+/// so preserve this source semantic at mesh construction rather than adding a
+/// backend-specific lighting rule to the shader.
+pub(super) fn native_quad_directional_shade(quad: &StaticModelQuadRecord) -> f32 {
+    let light_face = if (0..6).contains(&quad.light_face) {
+        quad.light_face
+    } else if (0..6).contains(&quad.cull_face) {
+        quad.cull_face
+    } else {
+        1
+    };
+    ambient_shade(light_face, quad.shade != 0)
 }
 
 #[cfg(test)]

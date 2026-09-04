@@ -91,13 +91,15 @@ public class WitherSkullRenderer extends EntityRenderer<WitherSkull, WitherSkull
 					!submitNodeCollector.isSemanticCoverageOnly() && ownership.usesJavaCompatibility()
 				);
 			}
-			submitNodeCollector.submitModelSemantic(
+			submitNodeCollector.submitModelSemanticTexture(
 				this.model,
 				witherSkullRenderState.modelState,
 				poseStack,
 				renderType,
 				witherSkullRenderState.lightCoords,
 				OverlayTexture.NO_OVERLAY,
+				-1,
+				texture,
 				witherSkullRenderState.outlineColor,
 				null
 			);

@@ -294,6 +294,10 @@ pub enum PrimitiveTopology {
     Points = 1,
     Lines = 2,
     Triangles = 3,
+    /// Ordered fan sharing vertex zero, preserving the producer's primitive
+    /// assembly through clipping and interpolation.  This is distinct from
+    /// an application-side rewrite to a triangle list.
+    TriangleFan = 4,
 }
 
 #[repr(u32)]
@@ -356,6 +360,11 @@ pub enum BlendMode {
     Vignette = 8,
     /// Premultiplied-alpha compositing: `out.rgb = src.rgb + dst.rgb * (1-src.a)`.
     Premultiplied = 9,
+    /// Terrain translucency writes alpha-blended color to attachment zero while
+    /// its auxiliary revealage/multiplier attachments are replacement writes.
+    /// Vulkan lowers this as per-attachment blend state; OpenGL treats it as
+    /// ordinary alpha because its legacy path has a single blend state.
+    TerrainTranslucent = 10,
 }
 
 #[repr(u32)]

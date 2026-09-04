@@ -1832,6 +1832,11 @@ pub fn lower_terrain_source_pair(
         &opaque_resource_contract,
     )?;
     apply_selected_source_fragment_probe(&mut lowered_fragment)?;
+    dump_selected_source_lowered_shader(
+        lowered_fragment.entry_path(),
+        "fragment",
+        lowered_fragment.source(),
+    );
     Ok(LoweredTerrainSourcePair {
         vertex: lower_source_vertex_surface_with_contracts(
             &vertex,
@@ -1946,19 +1951,34 @@ pub fn lower_hand_source_pair(
     )?;
     install_entity_alpha_cutout_hook(&mut lowered_fragment)?;
     apply_selected_source_entity_fragment_probe(&mut lowered_fragment)?;
+    let mut lowered_vertex = lower_source_vertex_surface_with_contracts(
+        &vertex,
+        &uniform_contract,
+        &varying_contract,
+        &opaque_resource_contract,
+        SourceTransformSemantics::Hand,
+    )?;
+    apply_selected_source_hand_vertex_probe(&mut lowered_vertex)?;
     Ok(LoweredHandSourcePair {
-        vertex: lower_source_vertex_surface_with_contracts(
-            &vertex,
-            &uniform_contract,
-            &varying_contract,
-            &opaque_resource_contract,
-            SourceTransformSemantics::Hand,
-        )?,
+        vertex: lowered_vertex,
         fragment: lowered_fragment,
         uniform_contract,
         varying_contract,
         opaque_resource_contract,
     })
+}
+
+/// Capture-only probe for the first-person hand vertex boundary. Hand meshes
+/// use a distinct projection/model-view transport, so the ordinary terrain
+/// probe must not silently alter them during diagnostics.
+fn apply_selected_source_hand_vertex_probe(
+    source: &mut LoweredTerrainVertexSource,
+) -> GalResult<()> {
+    let mode = std::env::var("MATTMC_RUST_SELECTED_SOURCE_HAND_VERTEX_PROBE").ok();
+    apply_selected_source_vertex_position_probe_mode(
+        &mut source.source,
+        mode.as_deref().map(str::trim),
+    )
 }
 
 /// Minecraft's entity-cutout pipeline applies its alpha test before a
@@ -2015,6 +2035,14 @@ fn apply_selected_source_entity_fragment_probe_mode(
             "texture-center",
             "out_terrain_lit_color = texture(tex, vec2(0.5, 0.5));\n    out_terrain_material_auxiliary = vec4(0.0);\n    return;",
         ),
+        "texture-arm" => (
+            "texture-arm",
+            "out_terrain_lit_color = texture(tex, vec2(0.6875, 0.375));\n    out_terrain_material_auxiliary = vec4(0.0);\n    return;",
+        ),
+        "texture-arm-opaque" => (
+            "texture-arm-opaque",
+            "out_terrain_lit_color = vec4(texture(tex, vec2(0.6875, 0.375)).rgb, 1.0);\n    out_terrain_material_auxiliary = vec4(0.0);\n    return;",
+        ),
         "uv" => (
             "uv",
             "out_terrain_lit_color = vec4(texCoord, 0.0, 1.0);\n    out_terrain_material_auxiliary = vec4(0.0);\n    return;",
@@ -2026,7 +2054,7 @@ fn apply_selected_source_entity_fragment_probe_mode(
         "lit" => return Ok(()),
         other => {
             return Err(GalError::invalid_argument(format!(
-                "unknown selected-source entity fragment probe '{other}'; expected texture, texture-center, uv, constant-red, or lit"
+                "unknown selected-source entity fragment probe '{other}'; expected texture, texture-center, texture-arm, texture-arm-opaque, uv, constant-red, or lit"
             )));
         }
     };
@@ -2115,34 +2143,76 @@ pub fn lower_cloud_source_pair(
     })
 }
 
+trait SelectedSourceFragmentTarget {
+    fn entry_path(&self) -> &str;
+    fn source_text(&self) -> &str;
+    fn source_text_mut(&mut self) -> &mut String;
+    fn diagnostic_auxiliary_output(&self) -> &'static str;
+}
+
+impl SelectedSourceFragmentTarget for LoweredTerrainFragmentSource {
+    fn entry_path(&self) -> &str {
+        &self.entry_path
+    }
+    fn source_text(&self) -> &str {
+        &self.source
+    }
+    fn source_text_mut(&mut self) -> &mut String {
+        &mut self.source
+    }
+    fn diagnostic_auxiliary_output(&self) -> &'static str {
+        "out_terrain_material_auxiliary"
+    }
+}
+
+impl SelectedSourceFragmentTarget for LoweredTranslucentTerrainFragmentSource {
+    fn entry_path(&self) -> &str {
+        &self.entry_path
+    }
+    fn source_text(&self) -> &str {
+        &self.source
+    }
+    fn source_text_mut(&mut self) -> &mut String {
+        &mut self.source
+    }
+    fn diagnostic_auxiliary_output(&self) -> &'static str {
+        "out_terrain_translucency_auxiliary"
+    }
+}
+
 /// Replaces the selected-source terrain color only for an explicitly opted-in
 /// diagnostic capture. The probe is deliberately applied after normal source
 /// lowering, so it retains the identical semantic mesh, target, resource set,
 /// and backend pipeline contract while isolating the first fragment stage that
 /// loses visible color. Normal execution never observes this environment key.
-fn apply_selected_source_fragment_probe(
-    fragment: &mut LoweredTerrainFragmentSource,
+fn apply_selected_source_fragment_probe<T: SelectedSourceFragmentTarget>(
+    fragment: &mut T,
 ) -> GalResult<()> {
     let mode = std::env::var("MATTMC_RUST_SELECTED_SOURCE_FRAGMENT_PROBE").ok();
     apply_selected_source_fragment_probe_mode(fragment, mode.as_deref())
 }
 
-fn apply_selected_source_fragment_probe_mode(
-    fragment: &mut LoweredTerrainFragmentSource,
+fn apply_selected_source_fragment_probe_mode<T: SelectedSourceFragmentTarget>(
+    fragment: &mut T,
     mode: Option<&str>,
 ) -> GalResult<()> {
     let mode = match mode {
         Some(mode) => mode,
         None => return Ok(()),
     };
-    if mode.trim() == "shadow-primary" {
+    let water_only = mode.trim().ends_with("-water");
+    let mode = mode.trim().strip_suffix("-water").unwrap_or(mode.trim());
+    if water_only && !fragment.entry_path().to_ascii_lowercase().contains("water") {
+        return Ok(());
+    }
+    if mode == "shadow-primary" {
         const SHADOW_RETURN: &str = "return shadowcol * (1.0 - shadow0) + shadow0;";
-        if !fragment.source.contains(SHADOW_RETURN) {
+        if !fragment.source_text().contains(SHADOW_RETURN) {
             return Err(GalError::invalid_argument(
                 "selected-source shadow-primary probe could not locate SampleShadow return",
             ));
         }
-        fragment.source = fragment.source.replacen(
+        *fragment.source_text_mut() = fragment.source_text().replacen(
             SHADOW_RETURN,
             "return vec3(shadow0); // selected-source diagnostic probe: shadow-primary",
             1,
@@ -2153,10 +2223,15 @@ fn apply_selected_source_fragment_probe_mode(
     // its source initializes color differently from normal terrain.  Accept
     // it here so a bounded DH diagnostic does not prevent the paired normal
     // terrain program from preparing; the normal fragment remains unchanged.
-    if mode.trim() == "pre-lighting" {
+    if mode == "pre-lighting" {
         return Ok(());
     }
-    let (label, anchor, injected) = match mode.trim() {
+    let (label, anchor, injected) = match mode {
+        "force-opaque" => (
+            "force-opaque",
+            "if (color.a <= 0.00001) discard;",
+            "if (false) discard; // selected-source diagnostic probe: force-opaque",
+        ),
         "atlas" => (
             "atlas",
             "vec4 color = texture(tex, texCoord);",
@@ -2341,17 +2416,39 @@ fn apply_selected_source_fragment_probe_mode(
         "" | "lit" => return Ok(()),
         other => {
             return Err(GalError::invalid_argument(format!(
-                "unknown selected-source fragment probe '{other}'; expected atlas, atlas-uv, atlas-alpha, atlas-alpha-flipped-v, tint, vertex-color, vertex-color-opaque, vertex-color-raw, lightmap, scene-light, light-color, ambient-color, shadow-mult, shadow-primary, pre-lighting, final-diffuse, lighting-factors, lighting-components-a, lighting-components-b, darkness-scale, player-position, reconstruction, view-reconstruction-components, screen-reconstruction-input, viewport-uniforms, matrix-basis, shadow-coordinate, shadow-coordinate-centered, shadow-compare, constant-red, or lit"
+                "unknown selected-source fragment probe '{other}'; expected force-opaque, atlas, atlas-uv, atlas-alpha, atlas-alpha-flipped-v, tint, vertex-color, vertex-color-opaque, vertex-color-raw, lightmap, scene-light, light-color, ambient-color, shadow-mult, shadow-primary, pre-lighting, final-diffuse, lighting-factors, lighting-components-a, lighting-components-b, darkness-scale, player-position, reconstruction, view-reconstruction-components, screen-reconstruction-input, viewport-uniforms, matrix-basis, shadow-coordinate, shadow-coordinate-centered, shadow-compare, constant-red, or lit"
             )));
         }
     };
-    let injected = format!("{anchor}\n    {injected} // selected-source diagnostic probe: {label}");
-    if !fragment.source.contains(anchor) {
+    // Terrain and water source programs use different semantic names for
+    // the first atlas sample (`color` versus `colorP`). Keep the probe at
+    // the same source boundary for both programs; otherwise an atlas probe
+    // silently exercises only opaque terrain and provides no evidence for
+    // the translucent writer that owns the failing fixture.
+    let (anchor, sample_variable) = if fragment.source_text().contains(anchor) {
+        (anchor, "color")
+    } else if anchor == "vec4 color = texture(tex, texCoord);"
+        && fragment
+            .source_text()
+            .contains("vec4 colorP = texture(tex, texCoord);")
+    {
+        ("vec4 colorP = texture(tex, texCoord);", "colorP")
+    } else {
         return Err(GalError::invalid_argument(
             "selected-source fragment probe could not locate the lowered atlas sample",
         ));
-    }
-    fragment.source = fragment.source.replacen(anchor, &injected, 1);
+    };
+    let injected = if sample_variable == "colorP" {
+        injected.replace("color.", "colorP.")
+    } else {
+        injected.to_string()
+    };
+    let injected = injected.replace(
+        "out_terrain_material_auxiliary",
+        fragment.diagnostic_auxiliary_output(),
+    );
+    let injected = format!("{anchor}\n    {injected} // selected-source diagnostic probe: {label}");
+    *fragment.source_text_mut() = fragment.source_text().replacen(anchor, &injected, 1);
     Ok(())
 }
 
@@ -2424,6 +2521,21 @@ pub fn lower_translucent_terrain_source_pair(
     let varying_contract = derive_terrain_source_varying_contract(&vertex, &fragment)?;
     let opaque_resource_contract =
         derive_terrain_source_opaque_resource_contract(&vertex, &fragment)?;
+    let mut lowered_fragment = lower_translucent_terrain_fragment_surface_with_contracts(
+        &fragment,
+        &uniform_contract,
+        &varying_contract,
+        &opaque_resource_contract,
+    )?;
+    // Keep selected-source diagnostics symmetric with opaque terrain. The
+    // translucent writer has a distinct lowering function, so it must opt in
+    // explicitly or atlas/output probes silently exercise only gbuffers_terrain.
+    apply_selected_source_fragment_probe(&mut lowered_fragment)?;
+    dump_selected_source_lowered_shader(
+        lowered_fragment.entry_path(),
+        "fragment",
+        lowered_fragment.source(),
+    );
     Ok(LoweredTranslucentTerrainSourcePair {
         vertex: lower_source_vertex_surface_with_contracts(
             &vertex,
@@ -2432,12 +2544,7 @@ pub fn lower_translucent_terrain_source_pair(
             &opaque_resource_contract,
             SourceTransformSemantics::Terrain,
         )?,
-        fragment: lower_translucent_terrain_fragment_surface_with_contracts(
-            &fragment,
-            &uniform_contract,
-            &varying_contract,
-            &opaque_resource_contract,
-        )?,
+        fragment: lowered_fragment,
         uniform_contract,
         varying_contract,
         opaque_resource_contract,
@@ -3370,6 +3477,21 @@ enum SourceTransformSemantics {
 }
 
 impl SourceTransformSemantics {
+    fn model_view_expression(self) -> &'static str {
+        match self {
+            // First-person ModelPart poses are already expressed in the
+            // camera's hand space; compose the copied pose before the camera
+            // matrix so the hand remains in the HUD-side viewport.
+            Self::Hand => "(vulkanic_source_model_transform * gbufferModelView)",
+            Self::Terrain | Self::Entity => "(gbufferModelView * vulkanic_source_model_transform)",
+            Self::Shadow => "(shadowModelView * vulkanic_source_model_transform)",
+            Self::DistantHorizons => "(dhModelView * vulkanic_source_model_transform)",
+            Self::TexturedMaterial | Self::Weather | Self::Cloud | Self::Fullscreen => {
+                "gbufferModelView"
+            }
+        }
+    }
+
     fn model_view_uniform(self) -> &'static str {
         match self {
             Self::Terrain => "gbufferModelView",
@@ -3440,6 +3562,25 @@ fn lower_source_vertex_surface_with_contracts(
     ] {
         lowered = replace_identifier(&lowered, legacy, explicit);
     }
+    // The OpenGL pack reconstructs player-space geometry with
+    // `gbufferModelViewInverse * gl_ModelViewMatrix * gl_Vertex`.  A Rust
+    // source instance already carries the camera-relative model transform;
+    // applying that legacy inverse/re-application sequence would feed a
+    // camera-relative position through a second, incompatible reconstruction
+    // path.  Preserve the pack's final camera projection while making the
+    // semantic world-position step explicit.  This is limited to terrain and
+    // entity meshes; hand/material families have distinct pose contracts.
+    if matches!(
+        transforms,
+        SourceTransformSemantics::Terrain | SourceTransformSemantics::Entity
+    ) {
+        lowered = lowered.replace(
+            "gbufferModelViewInverse * vulkanic_source_model_view * vulkanic_source_position",
+            "vulkanic_source_model_transform * vulkanic_source_position",
+        );
+    }
+    apply_selected_source_wave_probe(&mut lowered)?;
+    apply_selected_source_taa_probe(&mut lowered)?;
     apply_selected_source_vertex_probe(&mut lowered)?;
     lowered = apply_varying_locations(&lowered, VaryingStorage::Out, varying_contract)?;
     lowered = apply_opaque_resource_bindings(&lowered, opaque_resource_contract)?;
@@ -3454,7 +3595,8 @@ fn lower_source_vertex_surface_with_contracts(
     // Keeping it in lowered source leaves GAL state backend-neutral and keeps
     // the OpenGL source byte-for-byte equivalent at runtime.
     lowered = append_vulkan_clip_depth_finalizer(&lowered)?;
-    apply_selected_source_vertex_position_probe(&mut lowered)?;
+    apply_selected_source_vertex_probe_for_entry(&mut lowered, source.entry_path())?;
+    dump_selected_source_lowered_shader(source.entry_path(), "vertex", &lowered);
     let remaining_dialect = analyze_glsl_text(source.entry_path(), &lowered);
     Ok(LoweredTerrainVertexSource {
         entry_path: source.entry_path().to_string(),
@@ -3463,24 +3605,97 @@ fn lower_source_vertex_surface_with_contracts(
     })
 }
 
+fn dump_selected_source_lowered_shader(entry_path: &str, stage: &str, source: &str) {
+    let Ok(dir) = std::env::var("MATTMC_RUST_SHADER_DUMP_DIR") else {
+        return;
+    };
+    let safe_name = entry_path
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+        .collect::<String>();
+    let path = std::path::Path::new(&dir).join(format!("{stage}_{safe_name}.glsl"));
+    if std::fs::create_dir_all(&dir).is_ok() {
+        let _ = std::fs::write(path, source);
+    }
+}
+
+/// Capture-only probe for isolating invalid TAA frame-modulo semantics.  The
+/// normal source route retains the pack's jitter; this replacement is never
+/// admitted by route selection.
+fn apply_selected_source_taa_probe(source: &mut String) -> GalResult<()> {
+    let Some(mode) = std::env::var("MATTMC_RUST_SELECTED_SOURCE_TAA_PROBE")
+        .ok()
+        .map(|value| value.trim().to_owned())
+        .filter(|value| !value.is_empty())
+    else {
+        return Ok(());
+    };
+    if mode != "disable" {
+        return Err(GalError::invalid_argument(format!(
+            "unknown selected-source TAA probe '{mode}'; expected disable"
+        )));
+    }
+    const ASSIGNMENT: &str = "gl_Position.xy = TAAJitter(gl_Position.xy, gl_Position.w);";
+    if source.contains("selected-source diagnostic probe: TAA disabled") {
+        return Ok(());
+    }
+    if source.contains(ASSIGNMENT) {
+        *source = source.replacen(
+            ASSIGNMENT,
+            "// selected-source diagnostic probe: TAA disabled",
+            1,
+        );
+    }
+    Ok(())
+}
+
 /// Test-only selected-source vertex probe. It modifies one semantic varying
 /// assignment before source compilation so the matching fragment probe can
 /// distinguish a vertex-buffer field failure from a stage-interface failure.
 /// Normal source execution never observes this opt-in environment key.
 fn apply_selected_source_vertex_probe(source: &mut String) -> GalResult<()> {
     let mode = std::env::var("MATTMC_RUST_SELECTED_SOURCE_VERTEX_PROBE").ok();
-    apply_selected_source_vertex_probe_mode(source, mode.as_deref())
+    if matches!(
+        mode.as_deref().map(str::trim),
+        Some("direct-model-transform-water") | Some("clip-quad-water")
+    ) {
+        return Ok(());
+    }
+    apply_selected_source_vertex_position_probe_mode(source, mode.as_deref())
 }
 
-fn apply_selected_source_vertex_probe_mode(
+fn apply_selected_source_vertex_probe_for_entry(
+    source: &mut String,
+    entry_path: &str,
+) -> GalResult<()> {
+    let mode = std::env::var("MATTMC_RUST_SELECTED_SOURCE_VERTEX_PROBE").ok();
+    if matches!(
+        mode.as_deref().map(str::trim),
+        Some("direct-model-transform-water") | Some("clip-quad-water")
+    ) && !entry_path.contains("water")
+    {
+        return Ok(());
+    }
+    apply_selected_source_vertex_position_probe_mode(source, mode.as_deref())
+}
+
+/// Capture-only position isolation. Every copied terrain quad has the stable
+/// `[a,b,c,c,d,a]` source index grammar, so replacing the first quad of each
+/// mesh asset by a small centered clip-space quad makes the existing indexed
+/// draws cover a bounded diagnostic footprint without changing their fragment
+/// program, resource sets, or attachments. Keeping both the footprint and
+/// primitive count small is important: a quad per terrain primitive can turn
+/// the diagnostic into a GPU-bound stress test and hide the result behind
+/// presentation timeouts.
+/// It distinguishes a transform/clip rejection from a color-output failure;
+/// normal source execution never observes this environment key.
+fn apply_selected_source_vertex_position_probe_mode(
     source: &mut String,
     mode: Option<&str>,
 ) -> GalResult<()> {
-    let Some(mode) = mode.map(str::trim).filter(|mode| !mode.is_empty()) else {
-        return Ok(());
-    };
     match mode {
-        "constant-red" => {
+        None | Some("") => Ok(()),
+        Some("constant-red") => {
             const ASSIGNMENT: &str = "glColorRaw = vulkanic_source_vertex_color;";
             if !source.contains(ASSIGNMENT) {
                 return Err(GalError::invalid_argument(
@@ -3494,55 +3709,235 @@ fn apply_selected_source_vertex_probe_mode(
             );
             Ok(())
         }
-        // Position replacement happens after the source has finished writing
-        // `gl_Position`, so it cannot share this varying-assignment hook.
-        "clip-quad" => Ok(()),
-        other => Err(GalError::invalid_argument(format!(
-            "unknown selected-source vertex probe '{other}'; expected constant-red or clip-quad"
-        ))),
-    }
-}
-
-/// Capture-only position isolation. Every copied terrain quad has the stable
-/// `[a,b,c,c,d,a]` source index grammar, so replacing the first quad of each
-/// mesh asset by a small centered clip-space quad makes the existing indexed
-/// draws cover a bounded diagnostic footprint without changing their fragment
-/// program, resource sets, or attachments. Keeping both the footprint and
-/// primitive count small is important: a quad per terrain primitive can turn
-/// the diagnostic into a GPU-bound stress test and hide the result behind
-/// presentation timeouts.
-/// It distinguishes a transform/clip rejection from a color-output failure;
-/// normal source execution never observes this environment key.
-fn apply_selected_source_vertex_position_probe(source: &mut String) -> GalResult<()> {
-    match std::env::var("MATTMC_RUST_SELECTED_SOURCE_VERTEX_PROBE")
-        .ok()
-        .as_deref()
-        .map(str::trim)
-    {
-        None | Some("") | Some("constant-red") => Ok(()),
-        Some("clip-quad") => {
+        Some("clip-quad" | "clip-quad-water") => {
             let closing_brace = main_function_closing_brace(source).ok_or_else(|| {
                 GalError::invalid_argument(
                     "selected-source vertex position probe requires a brace-balanced void main() body",
                 )
             })?;
             let probe = r#"
+#ifndef VULKANIC_SOURCE_PROBE_CORNERS_DEFINED
+#define VULKANIC_SOURCE_PROBE_CORNERS_DEFINED
     const vec2 vulkanic_source_probe_corners[4] = vec2[4](
         vec2(-0.15, -0.15), vec2(0.15, -0.15), vec2(0.15, 0.15), vec2(-0.15, 0.15)
     );
-    if (gl_VertexIndex < 4) {
-        gl_Position = vec4(vulkanic_source_probe_corners[gl_VertexIndex], 0.0, 1.0);
-    } else {
-        gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
-    }
+#endif
+    int vulkanic_source_probe_corner = gl_VertexIndex % 4;
+    gl_Position = vec4(vulkanic_source_probe_corners[vulkanic_source_probe_corner], 0.0, 1.0);
 "#;
             source.insert_str(closing_brace, probe);
             Ok(())
         }
+        Some("raw-position") => {
+            let closing_brace = main_function_closing_brace(source).ok_or_else(|| {
+                GalError::invalid_argument(
+                    "selected-source raw-position probe requires a brace-balanced void main() body",
+                )
+            })?;
+            source.insert_str(
+                closing_brace,
+                "\n    // selected-source diagnostic probe: raw-position\n    gl_Position = vec4(vulkanic_source_position.xyz / 16.0, 1.0);\n",
+            );
+            Ok(())
+        }
+        Some("instance-translation") => {
+            // Lowering may revisit an already-lowered module while rebuilding
+            // the source pipeline cache.  Keep this capture-only probe
+            // idempotent so a second pass cannot produce duplicate GLSL
+            // declarations and turn a diagnostic run into a client crash.
+            if source.contains("selected-source diagnostic probe: instance-translation") {
+                return Ok(());
+            }
+            // Only the terrain/entity source families expose the instance
+            // transform semantic.  Other source vertex modules (for example
+            // gbuffers_textured) must remain untouched by this diagnostic.
+            if !source.contains("vulkanic_source_model_transform") {
+                return Ok(());
+            }
+            let closing_brace = main_function_closing_brace(source).ok_or_else(|| {
+                GalError::invalid_argument(
+                    "selected-source instance-translation probe requires a brace-balanced void main() body",
+                )
+            })?;
+            let probe = r#"
+    // selected-source diagnostic probe: instance-translation
+    vec2 vulkanic_instance_probe_origin = vulkanic_source_model_transform[3].xy / 100.0;
+    vec2 vulkanic_instance_probe_corner = vec2(
+        (gl_VertexIndex & 1) != 0 ? 0.08 : -0.08,
+        (gl_VertexIndex & 2) != 0 ? 0.08 : -0.08
+    );
+    gl_Position = vec4(vulkanic_instance_probe_origin + vulkanic_instance_probe_corner, 0.0, 1.0);
+"#;
+            source.insert_str(closing_brace, probe);
+            Ok(())
+        }
+        Some("direct-transform") => {
+            // This probe is meaningful only for the indexed terrain stream;
+            // other source vertex families intentionally do not expose a
+            // per-instance model-transform semantic.
+            if !source.contains("vulkanic_source_model_transform")
+                || !source.contains("gbufferProjection")
+                || source.contains("shadowProjection *")
+            {
+                return Ok(());
+            }
+            let closing_brace = main_function_closing_brace(source).ok_or_else(|| {
+                GalError::invalid_argument(
+                    "selected-source direct-transform probe requires a brace-balanced void main() body",
+                )
+            })?;
+            source.insert_str(
+                closing_brace,
+                "\n    gl_Position = gbufferProjection * vulkanic_source_model_view * vulkanic_source_position; // selected-source diagnostic probe: direct-transform\n",
+            );
+            Ok(())
+        }
+        Some("direct-model-transform") => {
+            // Bypass the pack's legacy world-position reconstruction entirely
+            // while retaining the explicit Rust-owned model/view/projection
+            // matrices. This isolates a bad inverse/legacy expression from
+            // the semantic instance and vertex streams.
+            if !source.contains("vulkanic_source_model_transform")
+                || !source.contains("gbufferProjection")
+                || source.contains("shadowProjection *")
+            {
+                return Ok(());
+            }
+            let closing_brace = main_function_closing_brace(source).ok_or_else(|| {
+                GalError::invalid_argument(
+                    "selected-source direct-model-transform probe requires a brace-balanced void main() body",
+                )
+            })?;
+            source.insert_str(
+                closing_brace,
+                "\n    gl_Position = gbufferProjection * gbufferModelView * vulkanic_source_model_transform * vulkanic_source_position; // selected-source diagnostic probe: direct-model-transform\n",
+            );
+            Ok(())
+        }
+        Some("direct-model-transform-water") => {
+            if !source.contains("vulkanic_source_model_transform")
+                || !source.contains("gbufferProjection")
+            {
+                return Ok(());
+            }
+            let closing_brace = main_function_closing_brace(source).ok_or_else(|| {
+                GalError::invalid_argument(
+                    "selected-source water transform probe requires a brace-balanced void main() body",
+                )
+            })?;
+            source.insert_str(
+                closing_brace,
+                "\n    gl_Position = gbufferProjection * gbufferModelView * vulkanic_source_model_transform * vulkanic_source_position; // selected-source diagnostic probe: direct-model-transform-water\n",
+            );
+            Ok(())
+        }
+        Some("direct-model-transform-inline") => {
+            // Replace only the source body's final projection assignment.
+            // Unlike the ordinary direct-model probe (which appends after
+            // the source body), this preserves source-side jitter and any
+            // later semantic work while isolating the legacy position chain.
+            if !source.contains("vulkanic_source_model_transform")
+                || !source.contains("gbufferProjection")
+                || source.contains("shadowProjection *")
+            {
+                return Ok(());
+            }
+            const LEGACY: &str =
+                "gl_Position = gbufferProjection * gbufferModelView * position;";
+            if source.contains(LEGACY) {
+                *source = source.replacen(
+                    LEGACY,
+                    "gl_Position = gbufferProjection * gbufferModelView * vulkanic_source_model_transform * vulkanic_source_position; // selected-source diagnostic probe: direct-model-transform-inline",
+                    1,
+                );
+            }
+            Ok(())
+        }
+        Some("force-depth") => {
+            let closing_brace = main_function_closing_brace(source).ok_or_else(|| {
+                GalError::invalid_argument(
+                    "selected-source hand depth probe requires a brace-balanced void main() body",
+                )
+            })?;
+            source.insert_str(
+                closing_brace,
+                "\n    gl_Position.z = 0.0; // selected-source hand diagnostic probe: force-depth\n",
+            );
+            Ok(())
+        }
+        Some("clip-depth") => {
+            if !source.contains("glColorRaw") {
+                return Ok(());
+            }
+            let closing_brace = main_function_closing_brace(source).ok_or_else(|| {
+                GalError::invalid_argument(
+                    "selected-source clip-depth probe requires a brace-balanced void main() body",
+                )
+            })?;
+            source.insert_str(
+                closing_brace,
+                "\n    // selected-source diagnostic probe: clip-depth\n    glColorRaw = vec4(clamp(gl_Position.z / max(abs(gl_Position.w), 0.0001), -1.0, 1.0) * 0.5 + 0.5, 0.0, 0.0, 1.0);\n",
+            );
+            Ok(())
+        }
+        Some("no-instance-transform") => {
+            const NEEDLE: &str = "#define vulkanic_source_model_view (gbufferModelView * vulkanic_source_model_transform)";
+            if source.contains(NEEDLE) {
+                *source = source.replacen(
+                    NEEDLE,
+                    "#define vulkanic_source_model_view gbufferModelView // selected-source hand diagnostic probe: no-instance-transform",
+                    1,
+                );
+            }
+            Ok(())
+        }
+        Some("reverse-transform-order") => {
+            const NEEDLE: &str = "#define vulkanic_source_model_view (gbufferModelView * vulkanic_source_model_transform)";
+            if source.contains(NEEDLE) {
+                *source = source.replacen(
+                    NEEDLE,
+                    "#define vulkanic_source_model_view (vulkanic_source_model_transform * gbufferModelView) // selected-source hand diagnostic probe: reverse-transform-order",
+                    1,
+                );
+            }
+            Ok(())
+        }
         Some(other) => Err(GalError::invalid_argument(format!(
-            "unknown selected-source vertex probe '{other}'; expected constant-red or clip-quad"
+            "unknown selected-source vertex probe '{other}'; expected constant-red, clip-quad, raw-position, instance-translation, direct-transform, direct-model-transform, force-depth, clip-depth, no-instance-transform, or reverse-transform-order"
         ))),
     }
+}
+
+/// Capture-only shader-pack wave isolation. The Complementary terrain vertex
+/// source mutates the reconstructed position through `DoWave`; replacing that
+/// call with a no-op distinguishes pack animation semantics from the explicit
+/// transform/attachment path. This is never enabled by normal execution.
+fn apply_selected_source_wave_probe(source: &mut String) -> GalResult<()> {
+    let Some(mode) = std::env::var("MATTMC_RUST_SELECTED_SOURCE_WAVE_PROBE")
+        .ok()
+        .map(|value| value.trim().to_owned())
+        .filter(|value| !value.is_empty())
+    else {
+        return Ok(());
+    };
+    if mode != "disable" {
+        return Err(GalError::invalid_argument(format!(
+            "unknown selected-source wave probe '{mode}'; expected disable"
+        )));
+    }
+    let assignment = "DoWave(position.xyz, mat);";
+    if !source.contains(assignment) {
+        // The selected profile may preprocess the waving branch away. In
+        // that case there is no mutation to disable and the probe is a
+        // semantic no-op; source admission must remain private and coherent.
+        return Ok(());
+    }
+    *source = source.replacen(
+        assignment,
+        "// selected-source diagnostic probe: DoWave disabled",
+        1,
+    );
+    Ok(())
 }
 
 fn lower_fullscreen_source_vertex_with_contracts(
@@ -3688,11 +4083,16 @@ fn lower_fullscreen_source_fragment_with_contracts(
     }
     // Fullscreen source stages need two explicit coordinate domains. Source
     // math (fog, reconstruction, dithering) is authored around OpenGL's
-    // lower-left gl_FragCoord, while source target texelFetch calls must keep
-    // naming Rust-owned image storage in its native address space. Leaving
-    // gl_FragCoord native made deferred stages fetch one pixel and reconstruct
-    // the vertically opposite view ray on Vulkan.
+    // lower-left gl_FragCoord, while source target texelFetch calls keep
+    // naming Rust-owned image storage in its native address space. Depth
+    // textures are the one exception: their readback row order is top-left,
+    // so the depth fetches below are explicitly row-normalized.
     lowered = lower_fullscreen_fragment_coordinates(lowered, uniform_contract)?;
+    // Fullscreen shader-pack stages commonly reconstruct view space from a
+    // sampled depth value using the legacy OpenGL clip-depth mapping.  The
+    // Vulkan depth attachment is zero-to-one, so normalize these source
+    // reconstruction forms at the semantic lowering boundary while keeping
+    // the OpenGL source expression intact behind the backend define.
     lowered = insert_after_version(&lowered, FRAGMENT_SEMANTIC_PREAMBLE)?;
     lowered = insert_after_version(&lowered, &uniform_block(uniform_contract))?;
     lowered = insert_after_version(&lowered, &declarations)?;
@@ -3741,19 +4141,36 @@ fn lower_fullscreen_fragment_coordinates(
         "ivec2 texelCoord = ivec2(vulkanic_source_fullscreen_fragment_coord().xy);",
         "// Source texelCoord addresses the Rust-owned target storage, not the source-space screen direction.\n        ivec2 texelCoord = ivec2(gl_FragCoord.xy);",
     );
-    // Source fullscreen programs conventionally use `vec[34](texCoord, ...)`
-    // as an NDC/reprojection input. Leave `texCoord` itself in the native
-    // image-sampling domain and convert only the explicitly constructed
-    // screen-space vectors. This covers the common deferred, composite, TAA,
-    // and Distant Horizons reconstruction form without changing sampler calls.
-    source = source.replace(
-        "vec4(texCoord,",
-        "vec4(vulkanic_source_fullscreen_screen_uv(texCoord),",
-    );
-    source = source.replace(
-        "vec3(texCoord,",
-        "vec3(vulkanic_source_fullscreen_screen_uv(texCoord),",
-    );
+    for depth_texture in ["depthtex0", "depthtex1", "dhDepthTex"] {
+        let native_fetch = format!("texelFetch({depth_texture}, texelCoord, 0)");
+        let normalized_fetch = format!(
+            "texelFetch({depth_texture}, ivec2(texelCoord.x, int(viewHeight) - 1 - texelCoord.y), 0)"
+        );
+        source = source.replace(&native_fetch, &normalized_fetch);
+    }
+    // `texCoord` intentionally retains the source sampler convention: V=0 is
+    // the lower edge in the legacy OpenGL shader.  Position reconstruction is
+    // a different semantic domain, however.  Convert only the screen-space
+    // inputs used to rebuild view rays; otherwise deferred sky/cloud code sees
+    // a vertically mirrored camera while texture sampling remains correct.
+    for anchor in [
+        "vec4 screenPos = vec4(texCoord,",
+        "vec4 screenPosDH = vec4(texCoord,",
+    ] {
+        source = source.replace(
+            anchor,
+            &anchor.replace(
+                "vec4(texCoord,",
+                "vec4(vulkanic_source_fullscreen_screen_uv(texCoord),",
+            ),
+        );
+    }
+    // The fullscreen vertex semantic preamble has already converted the
+    // interpolated UV into the source pack's screen domain. Re-flipping it
+    // here would invert deferred reconstruction a second time while integer
+    // texelFetch still addressed the correct target pixel. Preserve texCoord
+    // for vec[34] reconstruction and leave sampler-specific lowering to the
+    // explicit source-target sampling helpers.
     insert_after_version(
         &source,
         r#"vec4 vulkanic_source_fullscreen_fragment_coord() {
@@ -3841,10 +4258,16 @@ fn apply_selected_source_fullscreen_probe(
         && mode != "distant-horizons-depth-coordinate"
         && mode != "distant-horizons-fog-inputs"
         && mode != "distant-horizons-fog-effect"
+        && mode != "gbuffer-inputs"
+        && mode != "gbuffer-primary"
+        && mode != "depth-input"
+        && mode != "depth-input-flipped"
+        && mode != "depth-input-amplified"
+        && mode != "deferred-fog-inputs"
         && mode != "composite7-without-fxaa"
     {
         return Err(GalError::invalid_argument(format!(
-            "unknown selected-source fullscreen probe '{mode}'; expected distant-horizons-depth, distant-horizons-depth-routing, distant-horizons-depth-coordinate, distant-horizons-fog-inputs, distant-horizons-fog-effect, or composite7-without-fxaa"
+            "unknown selected-source fullscreen probe '{mode}'; expected distant-horizons-depth, distant-horizons-depth-routing, distant-horizons-depth-coordinate, distant-horizons-fog-inputs, distant-horizons-fog-effect, gbuffer-inputs, gbuffer-primary, depth-input, depth-input-flipped, depth-input-amplified, deferred-fog-inputs, or composite7-without-fxaa"
         )));
     }
     if mode == "composite7-without-fxaa" {
@@ -3875,6 +4298,125 @@ fn apply_selected_source_fullscreen_probe(
         .replace('\\', "/")
         .ends_with("world0/deferred1.fsh")
     {
+        return Ok(());
+    }
+    if mode == "gbuffer-inputs" || mode == "gbuffer-primary" {
+        let Some(primary) = outputs
+            .iter()
+            .find(|output| output.role.shader_pack_color_name() == Some("primary"))
+        else {
+            return Err(GalError::invalid_argument(
+                "gbuffer input probe requires a primary color output",
+            ));
+        };
+        const ASSIGNMENT: &str = "{} = vec4(color, 1.0);";
+        let assignment = ASSIGNMENT.replacen("{}", &primary.semantic_name, 1);
+        if !source.contains(&assignment) {
+            return Err(GalError::invalid_argument(
+                "gbuffer input probe could not locate the primary color assignment",
+            ));
+        }
+        let replacement = if mode == "gbuffer-inputs" {
+            format!("{} = vec4(texelFetch(colortex5, texelCoord, 0).rgb, texelFetch(colortex6, texelCoord, 0).r); // selected-source fullscreen diagnostic probe: gbuffer-inputs", primary.semantic_name)
+        } else {
+            format!("{} = vec4(texelFetch(colortex0, texelCoord, 0).rgb, 1.0); // selected-source fullscreen diagnostic probe: gbuffer-primary", primary.semantic_name)
+        };
+        *source = source.replacen(&assignment, &replacement, 1);
+        return Ok(());
+    }
+    if mode == "depth-input" || mode == "depth-input-flipped" || mode == "depth-input-amplified" {
+        let Some(primary) = outputs
+            .iter()
+            .find(|output| output.role.shader_pack_color_name() == Some("primary"))
+        else {
+            return Err(GalError::invalid_argument(
+                "depth input probe requires a primary color output",
+            ));
+        };
+        let assignment = format!("{} = vec4(color, 1.0);", primary.semantic_name);
+        if !source.contains(&assignment) || !source.contains("float z0 =") {
+            return Err(GalError::invalid_argument(
+                "depth input probe could not locate deferred depth or primary output",
+            ));
+        }
+        let expression = if mode == "depth-input-flipped" {
+            "texelFetch(depthtex0, ivec2(texelCoord.x, int(viewHeight) - 1 - texelCoord.y), 0).r"
+        } else if mode == "depth-input-amplified" {
+            "fract(z0 * 1024.0)"
+        } else {
+            "z0"
+        };
+        *source = source.replacen(
+            &assignment,
+            &format!(
+                "{} = vec4(vec3({expression}), 1.0); // selected-source fullscreen diagnostic probe: {mode}",
+                primary.semantic_name
+            ),
+            1,
+        );
+        return Ok(());
+    }
+    if mode == "deferred-fog-inputs" {
+        let Some(primary) = outputs
+            .iter()
+            .find(|output| output.role.shader_pack_color_name() == Some("primary"))
+        else {
+            return Err(GalError::invalid_argument(
+                "deferred fog probe requires a primary color output",
+            ));
+        };
+        const MAIN_DEPTH_DECLARATION: &str = "float z0 = texelFetch(depthtex0, texelCoord, 0).r;";
+        if !source.contains(MAIN_DEPTH_DECLARATION) {
+            return Err(GalError::invalid_argument(
+                "deferred fog probe could not locate deferred depth declaration",
+            ));
+        }
+        let assignment = format!("{} = vec4(color, 1.0);", primary.semantic_name);
+        if !source.contains(&assignment) {
+            return Err(GalError::invalid_argument(
+                "deferred fog probe could not locate primary color assignment",
+            ));
+        }
+        *source = source.replacen(
+            MAIN_DEPTH_DECLARATION,
+            "float z0 = texelFetch(depthtex0, texelCoord, 0).r; vec3 vulkanicDeferredFogInputs = vec3(z0, 0.0, 0.0);",
+            1,
+        );
+        // Initialize the distance channel before the depth branch so a
+        // far-plane sample (z0 == 1) still reports the reconstructed distance
+        // instead of looking indistinguishable from an unexecuted probe.
+        let view_distance = "float lViewPos = length(viewPos);";
+        if !source.contains(view_distance) {
+            return Err(GalError::invalid_argument(
+                "deferred fog probe could not locate reconstructed view distance",
+            ));
+        }
+        *source = source.replacen(
+            view_distance,
+            "float lViewPos = length(viewPos); vulkanicDeferredFogInputs = vec3(z0, clamp(lViewPos / max(far, 1.0), 0.0, 1.0), 0.0);",
+            1,
+        );
+        // Capture the values after the ordinary-world fog path has established
+        // skyFade and color; the probe does not alter the normal route.
+        let fog_call = "DoFog(color.rgb, skyFade, lViewPos, playerPos, VdotU, VdotS, dither);";
+        if !source.contains(fog_call) {
+            return Err(GalError::invalid_argument(
+                "deferred fog probe could not locate fog call",
+            ));
+        }
+        *source = source.replacen(
+            fog_call,
+            "DoFog(color.rgb, skyFade, lViewPos, playerPos, VdotU, VdotS, dither); vulkanicDeferredFogInputs = vec3(z0, clamp(lViewPos / max(far, 1.0), 0.0, 1.0), clamp(skyFade, 0.0, 1.0));",
+            1,
+        );
+        *source = source.replacen(
+            &assignment,
+            &format!(
+                "{} = vec4(vulkanicDeferredFogInputs, 1.0); // selected-source fullscreen diagnostic probe: deferred-fog-inputs",
+                primary.semantic_name
+            ),
+            1,
+        );
         return Ok(());
     }
     if !source.contains("dhDepthTex") || !source.contains("texelCoord") {
@@ -4089,6 +4631,7 @@ fn vertex_semantic_preamble(transforms: SourceTransformSemantics) -> String {
     }
     VERTEX_SEMANTIC_PREAMBLE_TEMPLATE
         .replace("{model_view}", transforms.model_view_uniform())
+        .replace("{model_view_expr}", transforms.model_view_expression())
         .replace("{projection}", transforms.projection_uniform())
 }
 
@@ -4118,7 +4661,7 @@ layout(set = 0, binding = 3, std430) readonly buffer VulkanicSourceTerrainInstan
 #define vulkanic_source_vertex vulkanic_source_vertices[gl_VertexIndex]
 #define vulkanic_source_instance vulkanic_source_instances[gl_InstanceIndex]
 #define vulkanic_source_model_transform vulkanic_source_instance.model_transform
-#define vulkanic_source_model_view ({model_view} * vulkanic_source_model_transform)
+#define vulkanic_source_model_view {model_view_expr}
 #define vulkanic_source_normal_matrix transpose(inverse(mat3(vulkanic_source_model_view)))
 #define vulkanic_source_position vulkanic_source_vertex.position
 #define vulkanic_source_vertex_color (vulkanic_source_vertex.color * vulkanic_source_instance.color_modulation)
@@ -4268,13 +4811,13 @@ vec2 vulkanic_source_fullscreen_uv_coordinates() {
     // Vulkan images are sampled with the opposite vertical convention, while
     // integer texelFetch keeps its native image addressing. Preserve the
     // source sampler contract here, at the owned fullscreen vertex boundary.
-#ifdef VULKANIC_GAL_ZERO_TO_ONE_CLIP_DEPTH
-    coordinate.y = 1.0 - coordinate.y;
-#endif
+    #ifdef VULKANIC_GAL_ZERO_TO_ONE_CLIP_DEPTH
+        coordinate.y = 1.0 - coordinate.y;
+    #endif
     return coordinate;
 }
 #define vulkanic_source_fullscreen_transform() vec4(vulkanic_source_fullscreen_position(), 0.0, 1.0)
-"#
+"#.to_string()
         }
         FullscreenSourceRasterPrimitive::VanillaSkyDisc => {
             r#"
@@ -4302,7 +4845,7 @@ vec4 vulkanic_source_fullscreen_sky_position() {
 }
 vec2 vulkanic_source_fullscreen_uv_coordinates() { return vec2(0.0); }
 #define vulkanic_source_fullscreen_transform() (gbufferProjection * gbufferModelView * vulkanic_source_fullscreen_sky_position())
-"#
+"#.to_string()
         }
         FullscreenSourceRasterPrimitive::VanillaCelestialQuad => {
             r#"
@@ -4370,7 +4913,7 @@ vec2 vulkanic_source_fullscreen_uv_coordinates() {
     return coordinate;
 }
 #define vulkanic_source_fullscreen_transform() (gbufferProjection * gbufferModelView * vulkanic_source_fullscreen_celestial_position())
-"#
+"#.to_string()
         }
     };
     let vertex_color = match raster_primitive {
@@ -4406,7 +4949,7 @@ VULKANIC_SOURCE_FULLSCREEN_GEOMETRY
 #define vulkanic_source_fullscreen_secondary_uv vec4(vulkanic_source_fullscreen_uv_coordinates(), 0.0, 1.0)
 VULKANIC_SOURCE_FULLSCREEN_VERTEX_COLOR
 "#
-    .replace("VULKANIC_SOURCE_FULLSCREEN_GEOMETRY", geometry)
+    .replace("VULKANIC_SOURCE_FULLSCREEN_GEOMETRY", &geometry)
     .replace("VULKANIC_SOURCE_FULLSCREEN_VERTEX_COLOR", vertex_color)
 }
 
@@ -5725,11 +6268,150 @@ mod tests {
     }
 
     #[test]
+    fn selected_source_atlas_probe_reaches_water_style_colorp_sample() {
+        let mut lowered = lower_terrain_fragment_surface(&artifact(
+            "#version 130\nuniform sampler2D tex; varying vec2 texCoord; void main() { vec4 colorP = texture2D(tex, texCoord); gl_FragData[0] = colorP; gl_FragData[1] = vec4(1.0); }",
+        ))
+        .unwrap();
+        apply_selected_source_fragment_probe_mode(&mut lowered, Some("atlas-alpha")).unwrap();
+        assert!(lowered
+            .source()
+            .contains("out_terrain_lit_color = vec4(vec3(colorP.a), 1.0);"));
+        assert!(!lowered
+            .source()
+            .contains("out_terrain_lit_color = vec4(vec3(color.a), 1.0);"));
+    }
+
+    #[test]
+    fn selected_source_atlas_probe_uses_translucent_auxiliary_output() {
+        let mut lowered = LoweredTranslucentTerrainFragmentSource {
+            entry_path: "gbuffers_water.fsh".to_string(),
+            source: "vec4 colorP = texture(tex, texCoord);".to_string(),
+            outputs: Vec::new(),
+            remaining_dialect: analyze_glsl_text("gbuffers_water.fsh", ""),
+        };
+        apply_selected_source_fragment_probe_mode(&mut lowered, Some("atlas-alpha")).unwrap();
+        assert!(lowered
+            .source
+            .contains("out_terrain_translucency_auxiliary"));
+        assert!(!lowered.source.contains("out_terrain_material_auxiliary"));
+    }
+
+    #[test]
+    fn selected_source_water_only_probe_skips_opaque_entries() {
+        let mut lowered = lower_terrain_fragment_surface(&artifact(
+            "#version 130\nuniform sampler2D tex; varying vec2 texCoord; void main() { vec4 color = texture2D(tex, texCoord); gl_FragData[0] = color; }",
+        ))
+        .unwrap();
+        apply_selected_source_fragment_probe_mode(&mut lowered, Some("constant-red-water"))
+            .unwrap();
+        assert!(!lowered
+            .source()
+            .contains("selected-source diagnostic probe"));
+    }
+
+    #[test]
     fn selected_source_vertex_probe_replaces_only_the_color_varying_assignment() {
         let mut source = "void main() { glColorRaw = vulkanic_source_vertex_color; }".to_string();
-        apply_selected_source_vertex_probe_mode(&mut source, Some("constant-red")).unwrap();
+        apply_selected_source_vertex_position_probe_mode(&mut source, Some("constant-red"))
+            .unwrap();
         assert!(source.contains("glColorRaw = vec4(1.0, 0.0, 0.0, 1.0);"));
         assert!(!source.contains("glColorRaw = vulkanic_source_vertex_color;"));
+    }
+
+    #[test]
+    fn selected_source_direct_transform_probe_overrides_pack_position_after_main() {
+        let mut source =
+            "mat4 vulkanic_source_model_transform; mat4 gbufferProjection; void main() { gl_Position = ftransform(); }"
+                .to_string();
+        apply_selected_source_vertex_position_probe_mode(&mut source, Some("direct-transform"))
+            .unwrap();
+        assert!(source.contains(
+            "gl_Position = gbufferProjection * vulkanic_source_model_view * vulkanic_source_position"
+        ));
+    }
+
+    #[test]
+    fn selected_source_instance_translation_probe_is_idempotent_and_semantic_guarded() {
+        let mut source =
+            "mat4 vulkanic_source_model_transform; void main() { gl_Position = vec4(0.0); }"
+                .to_string();
+        apply_selected_source_vertex_position_probe_mode(&mut source, Some("instance-translation"))
+            .unwrap();
+        let once = source.clone();
+        apply_selected_source_vertex_position_probe_mode(&mut source, Some("instance-translation"))
+            .unwrap();
+        assert_eq!(once, source);
+
+        let mut unrelated = "void main() { gl_Position = vec4(0.0); }".to_string();
+        apply_selected_source_vertex_position_probe_mode(
+            &mut unrelated,
+            Some("instance-translation"),
+        )
+        .unwrap();
+        assert_eq!(unrelated, "void main() { gl_Position = vec4(0.0); }");
+    }
+
+    #[test]
+    fn selected_source_wave_probe_removes_only_the_pack_position_mutation() {
+        let mut source =
+            "void main() { DoWave(position.xyz, mat); gl_Position = ftransform(); }".to_string();
+        std::env::set_var("MATTMC_RUST_SELECTED_SOURCE_WAVE_PROBE", "disable");
+        apply_selected_source_wave_probe(&mut source).unwrap();
+        std::env::remove_var("MATTMC_RUST_SELECTED_SOURCE_WAVE_PROBE");
+        assert!(!source.contains("DoWave(position.xyz, mat);"));
+        assert!(source.contains("gl_Position = ftransform();"));
+    }
+
+    #[test]
+    fn selected_source_taa_probe_is_idempotent_and_only_replaces_jitter_assignment() {
+        let mut source =
+            "void main() { gl_Position.xy = TAAJitter(gl_Position.xy, gl_Position.w); }"
+                .to_string();
+        std::env::set_var("MATTMC_RUST_SELECTED_SOURCE_TAA_PROBE", "disable");
+        apply_selected_source_taa_probe(&mut source).unwrap();
+        let once = source.clone();
+        apply_selected_source_taa_probe(&mut source).unwrap();
+        std::env::remove_var("MATTMC_RUST_SELECTED_SOURCE_TAA_PROBE");
+        assert_eq!(once, source);
+        assert!(source.contains("selected-source diagnostic probe: TAA disabled"));
+        assert!(!source.contains("TAAJitter(gl_Position.xy"));
+    }
+
+    #[test]
+    fn selected_source_direct_model_transform_probe_uses_explicit_semantic_chain() {
+        let mut source = "#version 130\nmat4 gbufferProjection;\nvec4 vulkanic_source_position;\nmat4 vulkanic_source_model_transform;\nmat4 gbufferModelView;\nvoid main() { gl_Position = ftransform(); }\n".to_string();
+        apply_selected_source_vertex_position_probe_mode(
+            &mut source,
+            Some("direct-model-transform"),
+        )
+        .unwrap();
+        assert!(source.contains(
+            "gbufferProjection * gbufferModelView * vulkanic_source_model_transform * vulkanic_source_position"
+        ));
+    }
+
+    #[test]
+    fn selected_source_direct_model_transform_inline_replaces_source_assignment() {
+        let mut source = "mat4 gbufferProjection; mat4 gbufferModelView; mat4 vulkanic_source_model_transform; vec4 vulkanic_source_position; void main() { vec4 position = vulkanic_source_model_transform * vulkanic_source_position; gl_Position = gbufferProjection * gbufferModelView * position; }".to_string();
+        apply_selected_source_vertex_position_probe_mode(
+            &mut source,
+            Some("direct-model-transform-inline"),
+        )
+        .unwrap();
+        assert!(source.contains(
+            "gbufferProjection * gbufferModelView * vulkanic_source_model_transform * vulkanic_source_position"
+        ));
+        assert!(!source.contains("* position;"));
+    }
+
+    #[test]
+    fn selected_source_direct_transform_probe_does_not_touch_shadow_projection() {
+        let mut source = "mat4 gbufferProjection; mat4 shadowProjection; mat4 vulkanic_source_model_transform; void main() { gl_Position = shadowProjection * vulkanic_source_model_transform * vulkanic_source_position; }".to_string();
+        let before = source.clone();
+        apply_selected_source_vertex_position_probe_mode(&mut source, Some("direct-transform"))
+            .unwrap();
+        assert_eq!(before, source);
     }
 
     #[test]
@@ -6102,6 +6784,132 @@ mod tests {
     }
 
     #[test]
+    fn fullscreen_gbuffer_input_probe_exposes_normal_and_material_targets() {
+        let _guard = fullscreen_probe_test_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut lowered =
+            "void main() { out_vulkanic_source_color_primary = vec4(color, 1.0); }".to_string();
+        let outputs = vec![FullscreenSourceFragmentOutput {
+            source_location: 0,
+            source_slot: 0,
+            role: TerrainSourceResourceRole::ShaderPackColor("primary".to_string()),
+            semantic_name: "out_vulkanic_source_color_primary".to_string(),
+        }];
+        std::env::set_var(
+            "MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE",
+            "gbuffer-inputs",
+        );
+        let result =
+            apply_selected_source_fullscreen_probe(&mut lowered, &outputs, "world0/deferred1.fsh");
+        std::env::remove_var("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE");
+        result.unwrap();
+        assert!(lowered.contains(
+            "texelFetch(colortex5, texelCoord, 0).rgb, texelFetch(colortex6, texelCoord, 0).r"
+        ));
+    }
+
+    #[test]
+    fn fullscreen_gbuffer_primary_probe_exposes_current_primary_target() {
+        let _guard = fullscreen_probe_test_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut lowered =
+            "void main() { out_vulkanic_source_color_primary = vec4(color, 1.0); }".to_string();
+        let outputs = vec![FullscreenSourceFragmentOutput {
+            source_location: 0,
+            source_slot: 0,
+            role: TerrainSourceResourceRole::ShaderPackColor("primary".to_string()),
+            semantic_name: "out_vulkanic_source_color_primary".to_string(),
+        }];
+        std::env::set_var(
+            "MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE",
+            "gbuffer-primary",
+        );
+        let result =
+            apply_selected_source_fullscreen_probe(&mut lowered, &outputs, "world0/deferred1.fsh");
+        std::env::remove_var("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE");
+        result.unwrap();
+        assert!(lowered.contains(
+            "vec4(texelFetch(colortex0, texelCoord, 0).rgb, 1.0); // selected-source fullscreen diagnostic probe: gbuffer-primary"
+        ));
+    }
+
+    #[test]
+    fn fullscreen_depth_input_probe_exposes_deferred_depth() {
+        let _guard = fullscreen_probe_test_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut lowered = "void main() { float z0 = texelFetch(depthtex0, texelCoord, 0).r; out_vulkanic_source_color_primary = vec4(color, 1.0); }".to_string();
+        let outputs = vec![FullscreenSourceFragmentOutput {
+            source_location: 0,
+            source_slot: 0,
+            role: TerrainSourceResourceRole::ShaderPackColor("primary".to_string()),
+            semantic_name: "out_vulkanic_source_color_primary".to_string(),
+        }];
+        std::env::set_var(
+            "MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE",
+            "depth-input",
+        );
+        let result =
+            apply_selected_source_fullscreen_probe(&mut lowered, &outputs, "world0/deferred1.fsh");
+        std::env::remove_var("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE");
+        result.unwrap();
+        assert!(lowered.contains(
+            "vec4(vec3(z0), 1.0); // selected-source fullscreen diagnostic probe: depth-input"
+        ));
+    }
+
+    #[test]
+    fn fullscreen_depth_input_flipped_probe_uses_explicit_mirrored_texel() {
+        let _guard = fullscreen_probe_test_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut lowered = "void main() { float z0 = texelFetch(depthtex0, texelCoord, 0).r; out_vulkanic_source_color_primary = vec4(color, 1.0); }".to_string();
+        let outputs = vec![FullscreenSourceFragmentOutput {
+            source_location: 0,
+            source_slot: 0,
+            role: TerrainSourceResourceRole::ShaderPackColor("primary".to_string()),
+            semantic_name: "out_vulkanic_source_color_primary".to_string(),
+        }];
+        std::env::set_var(
+            "MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE",
+            "depth-input-flipped",
+        );
+        let result =
+            apply_selected_source_fullscreen_probe(&mut lowered, &outputs, "world0/deferred1.fsh");
+        std::env::remove_var("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE");
+        result.unwrap();
+        assert!(lowered.contains("ivec2(texelCoord.x, int(viewHeight) - 1 - texelCoord.y)"));
+    }
+
+    #[test]
+    fn fullscreen_deferred_fog_probe_exposes_depth_distance_and_sky_fade() {
+        let _guard = fullscreen_probe_test_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut lowered = "void main() { float z0 = texelFetch(depthtex0, texelCoord, 0).r; vec4 viewPos = vec4(0.0); float lViewPos = length(viewPos); DoFog(color.rgb, skyFade, lViewPos, playerPos, VdotU, VdotS, dither); out_vulkanic_source_color_primary = vec4(color, 1.0); }".to_string();
+        let outputs = vec![FullscreenSourceFragmentOutput {
+            source_location: 0,
+            source_slot: 0,
+            role: TerrainSourceResourceRole::ShaderPackColor("primary".to_string()),
+            semantic_name: "out_vulkanic_source_color_primary".to_string(),
+        }];
+        std::env::set_var(
+            "MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE",
+            "deferred-fog-inputs",
+        );
+        let result =
+            apply_selected_source_fullscreen_probe(&mut lowered, &outputs, "world0/deferred1.fsh");
+        std::env::remove_var("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE");
+        result.unwrap();
+        assert!(lowered.contains("vec3 vulkanicDeferredFogInputs"));
+        assert!(
+            lowered.contains("selected-source fullscreen diagnostic probe: deferred-fog-inputs")
+        );
+    }
+
+    #[test]
     fn fullscreen_depth_probe_leaves_unrelated_source_stages_unchanged() {
         let _guard = fullscreen_probe_test_lock()
             .lock()
@@ -6215,7 +7023,7 @@ mod tests {
                 ),
                 ShaderSourceFile::new(
                     "world0/deferred.fsh",
-                    "#version 130\n/* DRAWBUFFERS:0 */\nin vec2 texCoord;\nuniform float viewHeight;\nuniform sampler2D colortex0;\nvoid main() { ivec2 texelCoord = ivec2(gl_FragCoord.xy); vec2 sourceScreen = gl_FragCoord.xy / vec2(1.0, viewHeight); vec4 reconstructed = vec4(texCoord, texelFetch(colortex0, texelCoord, 0).r, 1.0); gl_FragData[0] = texelFetch(colortex0, texelCoord, 0) + vec4(sourceScreen, 0.0, 0.0) + reconstructed; }",
+                    "#version 130\n/* DRAWBUFFERS:0 */\nin vec2 texCoord;\nuniform float viewHeight;\nuniform sampler2D colortex0;\nuniform sampler2D depthtex0;\nvoid main() { ivec2 texelCoord = ivec2(gl_FragCoord.xy); vec2 sourceScreen = gl_FragCoord.xy / vec2(1.0, viewHeight); vec4 screenPos = vec4(texCoord, 0.5, 1.0); vec4 screenPosDH = vec4(texCoord, 0.75, 1.0); vec4 reconstructed = vec4(texCoord, texelFetch(colortex0, texelCoord, 0).r + texelFetch(depthtex0, texelCoord, 0).r, 1.0); gl_FragData[0] = texelFetch(colortex0, texelCoord, 0) + vec4(sourceScreen, 0.0, 0.0) + reconstructed + screenPos + screenPosDH; }",
                 ),
                 ShaderSourceFile::new(
                     super::super::terrain_source_resources::TERRAIN_RESOURCE_BINDINGS_PATH,
@@ -6245,10 +7053,18 @@ mod tests {
         assert!(fragment.contains("vec2 vulkanic_source_fullscreen_screen_uv(vec2 image_uv)"));
         assert!(fragment.contains("ivec2 texelCoord = ivec2(gl_FragCoord.xy);"));
         assert!(fragment.contains(
+            "texelFetch(depthtex0, ivec2(texelCoord.x, int(viewHeight) - 1 - texelCoord.y), 0)"
+        ));
+        assert!(fragment.contains("texelFetch(colortex0, texelCoord, 0)"));
+        assert!(fragment.contains(
             "vec2 sourceScreen = vulkanic_source_fullscreen_fragment_coord().xy / vec2(1.0, viewHeight);"
         ));
+        assert!(fragment.contains("texelFetch(colortex0, texelCoord, 0)"));
         assert!(fragment.contains(
-            "vec4 reconstructed = vec4(vulkanic_source_fullscreen_screen_uv(texCoord), texelFetch(colortex0, texelCoord, 0).r, 1.0);"
+            "vec4 screenPos = vec4(vulkanic_source_fullscreen_screen_uv(texCoord), 0.5, 1.0);"
+        ));
+        assert!(fragment.contains(
+            "vec4 screenPosDH = vec4(vulkanic_source_fullscreen_screen_uv(texCoord), 0.75, 1.0);"
         ));
         assert!(
             fragment.find("uniform float viewHeight;")
@@ -6259,6 +7075,9 @@ mod tests {
 
     #[test]
     fn fullscreen_source_composite7_fxaa_probe_only_suppresses_the_targeted_call() {
+        let _guard = fullscreen_probe_test_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let prior = std::env::var_os("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE");
         std::env::set_var(
             "MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE",
@@ -6698,6 +7517,20 @@ mod tests {
     }
 
     #[test]
+    fn terrain_lowering_replaces_legacy_camera_relative_world_reconstruction() {
+        let lowered = lower_terrain_vertex_surface(&artifact(
+            "#version 130\nvoid main() { vec4 position = gbufferModelViewInverse * gl_ModelViewMatrix * gl_Vertex; gl_Position = gl_ProjectionMatrix * gbufferModelView * position; }",
+        ))
+        .unwrap();
+        assert!(!lowered.source().contains(
+            "gbufferModelViewInverse * vulkanic_source_model_view * vulkanic_source_position"
+        ));
+        assert!(lowered
+            .source()
+            .contains("vulkanic_source_model_transform * vulkanic_source_position"));
+    }
+
+    #[test]
     fn textured_material_lowering_expands_quad_triangles_from_owned_vertex_indices() {
         let vertex = artifact(
             "#version 130\nvarying vec2 uv; void main() { uv = gl_MultiTexCoord0.xy; gl_Position = ftransform(); }",
@@ -6732,6 +7565,21 @@ mod tests {
             .unwrap();
         assert!(modulation < discard);
         assert!(source.contains("#define VULKANIC_SOURCE_ENTITY_ALPHA_CUTOFF -1.0"));
+    }
+
+    #[test]
+    fn hand_lowering_composes_pose_before_camera_model_view() {
+        let vertex = artifact(
+            "#version 130\nvarying vec2 texCoord; varying vec4 glColor; void main() { texCoord = gl_MultiTexCoord0.xy; glColor = gl_Color; gl_Position = ftransform(); }",
+        );
+        let fragment = artifact(
+            "#version 130\nvarying vec2 texCoord; varying vec4 glColor; uniform sampler2D tex; void main() { vec4 color = texture2D(tex, texCoord); color *= glColor; gl_FragData[0] = color; }",
+        );
+        let lowered = lower_hand_source_pair(&vertex, &fragment).unwrap();
+        assert!(lowered
+            .vertex()
+            .source()
+            .contains("#define vulkanic_source_model_view (vulkanic_source_model_transform * gbufferModelView)"));
     }
 
     #[test]

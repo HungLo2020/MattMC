@@ -125,6 +125,9 @@ public class Map implements Runnable, IChangeObserver {
     private BlockState transparentBlockState;
     private BlockState surfaceBlockState;
     private boolean imageChanged = true;
+    /** True after the semantic route has synchronously published its first map. */
+    private boolean semanticBootstrapComplete;
+    private boolean semanticPixelDiagnosticLogged;
     private LightTexture lightmapTexture;
     private boolean needLightmapRefresh = true;
     private int tickWithLightChange;
@@ -364,6 +367,8 @@ public class Map implements Runnable, IChangeObserver {
 
     public void newWorld(ClientLevel world) {
         this.world = world;
+        this.semanticBootstrapComplete = false;
+        this.semanticPixelDiagnosticLogged = false;
         this.lightmapTexture = this.getLightmapTexture();
         this.mapData[this.zoom].blank();
         this.doFullRender = true;
@@ -470,6 +475,27 @@ public class Map implements Runnable, IChangeObserver {
         }
 
         this.checkForChanges();
+		if (!drawOverlay && this.threading && !this.semanticBootstrapComplete && this.world != null
+			&& !this.options.hide && this.options.minimapAllowed && BlockRepository.biomeBlocks != null
+			&& BlockRepository.shapedBlocks != null && this.colorManager.semanticColorsReady()) {
+			// The normal tick performs this later, but the semantic first-map build
+			// needs the CPU lightmap initialized before getLight() samples it.
+			// Force the initial refresh even when the world tick counter is still zero.
+			this.tickWithLightChange = Integer.MIN_VALUE;
+			this.needLightmapRefresh = true;
+			this.calculateCurrentLightAndSkyColor();
+			this.mapCalc(true);
+			this.semanticBootstrapComplete = true;
+			if (!this.semanticPixelDiagnosticLogged) {
+				int sample = 16 * (1 << this.zoom);
+				VoxelConstants.getLogger().info("Rust semantic VoxelMap sample height={} light={} surfaceId={} transparentId={} worldBlock={}",
+					this.mapData[this.zoom].getHeight(sample, sample),
+					this.mapData[this.zoom].getLight(sample, sample),
+					this.mapData[this.zoom].getBlockstateID(sample, sample),
+					this.mapData[this.zoom].getTransparentBlockstateID(sample, sample),
+					this.world.getBlockState(new net.minecraft.core.BlockPos(GameVariableAccessShim.xCoord(), GameVariableAccessShim.yCoord(), GameVariableAccessShim.zCoord())).getBlock());
+			}
+		}
         if (VoxelMap.mapOptions.deathWaypointAllowed && minecraft.screen instanceof DeathScreen && !(this.lastGuiScreen instanceof DeathScreen)) {
             this.waypointManager.handleDeath();
         }
@@ -583,7 +609,10 @@ public class Map implements Runnable, IChangeObserver {
     public void calculateCurrentLightAndSkyColor() {
         try {
             if (this.world != null) {
-                if (this.needLightmapRefresh && VoxelConstants.getElapsedTicks() != this.tickWithLightChange && !minecraft.isPaused() || this.options.realTimeTorches) {
+				if (this.needLightmapRefresh
+					&& VoxelConstants.getElapsedTicks() != this.tickWithLightChange
+					&& (!minecraft.isPaused() || !this.semanticBootstrapComplete)
+					|| this.options.realTimeTorches) {
                     this.needLightmapRefresh = false;
                     CPULightmap lightmap = CPULightmap.getInstance();
                     lightmap.setup();
@@ -788,6 +817,10 @@ public class Map implements Runnable, IChangeObserver {
 	public boolean renderRustSemanticOverlay(GuiGraphics drawContext) {
 		if (!RustGalVulkanWholeFrameMode.enabled()) return false;
 		if (this.options.hide) return true;
+		// Keep an uninitialized/black CPU snapshot out of the presented frame;
+		// the semantic producer will publish the overlay once resource-pack
+		// terrain colors and the first full map calculation are ready.
+		if (this.colorManager == null || !this.colorManager.semanticColorsReady()) return true;
 
         int scScaleOrig = 1;
         while (minecraft.getWindow().getWidth() / (scScaleOrig + 1) >= 320
@@ -848,20 +881,32 @@ public class Map implements Runnable, IChangeObserver {
 
 		ResourceLocation semanticMapTexture = this.mapResources[this.zoom];
 		if (this.mapImages[this.zoom] instanceof DynamicTexture dynamicMap) {
+			if (!this.semanticPixelDiagnosticLogged) {
+				NativeImage pixels = dynamicMap.getPixels();
+				int center = pixels.getPixel(pixels.getWidth() / 2, pixels.getHeight() / 2);
+				int corner = pixels.getPixel(0, 0);
+				VoxelConstants.getLogger().info("Rust semantic VoxelMap CPU snapshot {}x{} center={} corner={} zoom={} filtered={} minimapAllowed={} hidden={} worldPresent={} bootstrap={}",
+					pixels.getWidth(), pixels.getHeight(), Integer.toHexString(center), Integer.toHexString(corner), this.zoom, this.options.filtering,
+					this.options.minimapAllowed, this.options.hide, this.world != null, this.semanticBootstrapComplete);
+				this.semanticPixelDiagnosticLogged = true;
+			}
 			RustGalGuiRawImageAssets.registerDynamicTexture(semanticMapTexture, dynamicMap);
 		}
+		// These immutable frame images are ordinary resource-pack assets. Stage
+		// their CPU bytes directly so semantic resolution does not depend on the
+		// DynamicTexture objects VoxelMap creates for its legacy renderer.
+		RustGalGuiRawImageAssets.stageVanillaResource(resourceSquareMap, minecraft.getResourceManager());
+		RustGalGuiRawImageAssets.stageVanillaResource(resourceRoundMap, minecraft.getResourceManager());
 		drawContext.pose().pushMatrix();
 		drawContext.pose().scale(scaleProj, scaleProj);
 		float semanticAngle = !this.options.rotates ? -this.northRotate * Mth.DEG_TO_RAD : this.direction * Mth.DEG_TO_RAD;
-		float semanticSourceOffsetX = this.percentX * 512.0F / 64.0F;
-		float semanticSourceOffsetY = -this.percentY * 512.0F / 64.0F;
-		if (net.vulkanic.gui.RustGalGuiRenderer.tryEnqueueVoxelMapMask(semanticMapTexture,
-			drawContext.guiWidth(), drawContext.guiHeight(), mapX * scaleProj, mapY * scaleProj,
+		float semanticSourceSize = this.mapImages[this.zoom] instanceof DynamicTexture dynamicSource
+			? dynamicSource.getPixels().getWidth() : 32.0F * (1 << this.zoom);
+		float semanticSourceOffsetX = this.percentX * semanticSourceSize / 64.0F;
+		float semanticSourceOffsetY = -this.percentY * semanticSourceSize / 64.0F;
+		drawContext.submitRustVoxelMapMask(semanticMapTexture, mapX * scaleProj, mapY * scaleProj,
 			32.0F * scaleProj, semanticAngle, 1.0F / scaleProj,
-			semanticSourceOffsetX, semanticSourceOffsetY, 0xFFFFFFFF, !this.options.squareMap,
-			drawContext.guiRenderState.currentSemanticLayerOrder(net.minecraft.client.gui.render.state.GuiRenderState.SemanticPhase.ELEMENTS)) == null) {
-			throw new IllegalStateException("Rust VoxelMap minimap semantic mesh was unavailable");
-		}
+			semanticSourceOffsetX, semanticSourceOffsetY, 0xFFFFFFFF, !this.options.squareMap);
         this.drawMapFrame(drawContext, mapX, mapY, this.options.squareMap);
         drawContext.pose().popMatrix();
         this.drawDirections(drawContext, mapX, mapY, scaleProj);
@@ -983,7 +1028,10 @@ public class Map implements Runnable, IChangeObserver {
         ClientLevel world = this.world;
         boolean needHeightAndID;
         boolean needHeightMap = false;
-        boolean needLight = false;
+        // A newly created semantic map has no cached light values.  Force the
+        // first full pass to populate them; otherwise light==0 makes every
+        // surface pixel black even though terrain colors are ready.
+        boolean needLight = full && this.options.lightmap;
         boolean skyColorChanged = false;
         int skyColor = this.colorManager.getAirColor();
         if (this.lastSkyColor != skyColor) {
@@ -1009,9 +1057,9 @@ public class Map implements Runnable, IChangeObserver {
         }
 
         if (full || Math.abs(offsetY) >= this.heightMapResetHeight || this.heightMapFudge > this.heightMapResetTime) {
-            if (this.lastY != currentY) {
-                needHeightMap = true;
-            }
+            // A full rebuild must repopulate a fresh/invalid map even when the
+            // asynchronous worker has already advanced lastY to currentY.
+            needHeightMap = full || this.lastY != currentY;
 
             this.lastY = currentY;
             this.heightMapFudge = 0;
@@ -1049,7 +1097,11 @@ public class Map implements Runnable, IChangeObserver {
         }
 
         this.lastBeneathRendering = beneathRendering;
-        needHeightAndID = needHeightMap && (nether || caves);
+        // A fresh semantic map has no cached surface/block IDs in any
+        // dimension.  Restricting this to Nether/caves leaves overworld full
+        // renders with surfaceHeight=MIN_VALUE (solid=true), which forces
+        // their light to zero and publishes an all-black map.
+        needHeightAndID = needHeightMap;
         int color24;
         synchronized (this.coordinateLock) {
             if (!full) {

@@ -128,6 +128,8 @@ public final class RustGalGuiRenderer {
 	private static final String PROFILER_CHART_PRODUCER = "minecraft.gui.profiler-chart";
 	private static final String LOADING_GRID_PRODUCER = "minecraft.gui.loading-grid";
 	private static final long LOADING_GRID_ASSET_ID = 0x52475F4C4F414447L;
+	/** Hard cap for the optional packed loading-grid image (16 MiB RGBA). */
+	private static final int MAX_LOADING_GRID_TEXTURE_EDGE = 2_048;
 	private static int loadingGridAssetHash;
 	private static int loadingGridAssetWidth;
 	private static int loadingGridAssetHeight;
@@ -135,6 +137,20 @@ public final class RustGalGuiRenderer {
 	private static int loadingGridFramesSinceUpload;
 
 	private RustGalGuiRenderer() {
+	}
+
+	/**
+	 * Drops the local loading-grid residency hint when the Rust GUI frontend is
+	 * rebuilt.  The next loading-screen frame must stage the image again; keeping
+	 * this hint across a frontend/resource-generation reset would submit a mesh
+	 * that references an already-retired Rust asset.
+	 */
+	public static void invalidateLoadingGridAsset() {
+		loadingGridAssetResident = false;
+		loadingGridAssetHash = 0;
+		loadingGridAssetWidth = 0;
+		loadingGridAssetHeight = 0;
+		loadingGridFramesSinceUpload = 0;
 	}
 
 	/**
@@ -226,7 +242,7 @@ public final class RustGalGuiRenderer {
 			requests.add(new VulkanicGalBridge.GuiAffineQuadRecord(
 				GuiRenderStratum.GUI_RECTANGLES.order(), SOLID_WHITE_ASSET_ID,
 				x, y, x + cellSize, y, x, y + cellSize,
-				0.0F, 0.0F, 0.0F, 1.0F, 1.0F, ARGB.opaque(colors[column * gridSize + row]),
+				0.0F, 0.0F, 0.0F, 1.0F, 1.0F, ARGB.opaque(colors[row * gridSize + column]),
 				guiWidth, guiHeight));
 		}
 		RustGalFrameScheduler.Token token = RustGalFrameCoordinator.enqueueGuiAffineQuadRequests(
@@ -238,6 +254,11 @@ public final class RustGalGuiRenderer {
 			left, top, right - left, bottom - top, guiWidth, guiHeight));
 	}
 		if (Boolean.parseBoolean(System.getProperty("mattmc.dev.rustGalGui.loadingGridTexture", "true"))) {
+			// The packed-image variant is an optimization, never an unbounded
+			// allocation request. Reject pathological producer strides before the
+			// byte[] multiplication below. The borrowed OpenGL affine path above
+			// remains available for the same semantic grid.
+			if (extent > MAX_LOADING_GRID_TEXTURE_EDGE) return null;
 			int imageWidth = Math.max(1, (int) extent), imageHeight = imageWidth;
 			byte[] pixels = new byte[Math.multiplyExact(Math.multiplyExact(imageWidth, imageHeight), 4)];
 			for (int row = 0; row < gridSize; row++) for (int col = 0; col < gridSize; col++) {
@@ -260,7 +281,11 @@ public final class RustGalGuiRenderer {
 			RustGalFrameScheduler.Token token = RustGalFrameCoordinator.enqueueGuiMeshItemRequest(List.of(batch), GuiRenderStratum.GUI_RECTANGLES, System.nanoTime());
 			int assetHash = 31 * (31 * imageWidth + imageHeight) + Arrays.hashCode(pixels);
 			loadingGridFramesSinceUpload++;
-			if (!loadingGridAssetResident || (loadingGridAssetHash != assetHash && loadingGridFramesSinceUpload >= 120) || loadingGridAssetWidth != imageWidth || loadingGridAssetHeight != imageHeight) {
+			// A changed status color is visible gameplay state, not a cache hint.
+			// Publish the new packed image on the first frame that observes its hash;
+			// the resident/hash check still prevents repeated uploads while the grid
+			// is unchanged.
+			if (!loadingGridAssetResident || loadingGridAssetHash != assetHash || loadingGridAssetWidth != imageWidth || loadingGridAssetHeight != imageHeight) {
 				RustGalFrameCoordinator.stageGuiRawImage(new VulkanicGalBridge.GuiRawImageAssetRecord(LOADING_GRID_ASSET_ID, 2, imageWidth, imageHeight, pixels));
 				loadingGridAssetHash = assetHash;
 				loadingGridAssetWidth = imageWidth;
@@ -650,19 +675,37 @@ public final class RustGalGuiRenderer {
 		if (asset == null) return null;
 		int pixelRadius = Math.max(1, Mth.ceil(radius));
 		if (circular && pixelRadius > 256) return null;
+		// VoxelMap's selected dynamic image is 32 * 2^zoom pixels wide, not
+		// always the legacy 512px FBO.  Derive the source-space center and scale
+		// from the copied asset so lower zoom levels sample the generated map
+		// instead of clamping to its dark edge texel.
+		float sourceWidth = asset.width();
+		float sourceHeight = asset.height();
+		if (sourceWidth <= 0.0F || sourceHeight <= 0.0F || sourceWidth != sourceHeight) return null;
+		// Preserve the legacy transform's bounded-input contract even though the
+		// final-coordinate semantic mesh does not multiply UVs by mapScale.
+		if (!Float.isFinite(radius * mapScale)) return null;
 		float cos = Mth.cos(angleRadians), sin = Mth.sin(angleRadians);
-		float sourceScale = 256.0F / radius / mapScale;
+		// The semantic mesh is already expressed in final GUI/frame coordinates;
+		// the legacy pose scale is not applied a second time by Rust.  Applying
+		// mapScale here would expand the UV span by scaleProj and clamp the map to
+		// one edge texel (a uniform square in the presented frame).
+		float sourceScale = sourceWidth * 0.5F / radius;
 		if (!Float.isFinite(sourceScale)) return null;
 		List<VulkanicGalBridge.GuiMeshVertexRecord> vertices = new ArrayList<>();
 		List<Integer> indices = new ArrayList<>();
 		if (!circular) {
 			float left = centerX - radius, top = centerY - radius;
 			float right = centerX + radius, bottom = centerY + radius;
-			float[][] corners = {{left, top}, {left, bottom}, {right, bottom}, {right, top}};
+			// GUI mesh rasterization reflects Y into clip space and the identity
+			// semantic transform therefore uses clockwise front faces. Emit the
+			// source quad clockwise in top-left GUI coordinates so it remains
+			// front-facing after that required reflection.
+			float[][] corners = {{left, top}, {right, top}, {right, bottom}, {left, bottom}};
 			for (float[] corner : corners) {
 				float dx = (corner[0] - centerX) * sourceScale, dy = (corner[1] - centerY) * sourceScale;
-				float u = (cos * dx - sin * dy + sourceOffsetX + 256.0F) / 512.0F;
-				float v = (256.0F - (-sin * dx - cos * dy + sourceOffsetY)) / 512.0F;
+				float u = (cos * dx - sin * dy + sourceOffsetX + sourceWidth * 0.5F) / sourceWidth;
+				float v = (sourceHeight * 0.5F - (-sin * dx - cos * dy + sourceOffsetY)) / sourceHeight;
 				vertices.add(new VulkanicGalBridge.GuiMeshVertexRecord(new float[] {corner[0], corner[1], 0},
 					new float[] {u, v}, new float[] {u, v}, color, 0x007F0000));
 			}
@@ -675,11 +718,11 @@ public final class RustGalGuiRenderer {
 				float left = centerX - halfWidth, right = centerX + halfWidth + 1.0F;
 				float top = centerY + row, bottom = top + 1.0F;
 				int base = vertices.size();
-				float[][] corners = {{left, top}, {left, bottom}, {right, bottom}, {right, top}};
+				float[][] corners = {{left, top}, {right, top}, {right, bottom}, {left, bottom}};
 				for (float[] corner : corners) {
 					float dx = (corner[0] - centerX) * sourceScale, dy = (corner[1] - centerY) * sourceScale;
-					float u = (cos * dx - sin * dy + sourceOffsetX + 256.0F) / 512.0F;
-					float v = (256.0F - (-sin * dx - cos * dy + sourceOffsetY)) / 512.0F;
+					float u = (cos * dx - sin * dy + sourceOffsetX + sourceWidth * 0.5F) / sourceWidth;
+					float v = (sourceHeight * 0.5F - (-sin * dx - cos * dy + sourceOffsetY)) / sourceHeight;
 					vertices.add(new VulkanicGalBridge.GuiMeshVertexRecord(new float[] {corner[0], corner[1], 0},
 						new float[] {u, v}, new float[] {u, v}, color, 0x007F0000));
 				}
@@ -689,14 +732,37 @@ public final class RustGalGuiRenderer {
 		int left = (int)Math.floor(centerX - radius), top = (int)Math.floor(centerY - radius);
 		int size = Math.max(1, (int)Math.ceil(radius * 2.0F));
 		if (left < 0 || top < 0 || left + size > guiWidth || top + size > guiHeight) return null;
+		// Mesh batches rasterize into a small Rust-owned offscreen target before
+		// compositing at (left, top).  Their vertex positions are therefore
+		// target-local, unlike affine GUI quads which rasterize directly against
+		// the full frame.  Keep the semantic map geometry in frame coordinates
+		// while translating the copied vertices exactly once at this boundary.
+		List<VulkanicGalBridge.GuiMeshVertexRecord> localVertices = new ArrayList<>(vertices.size());
+		for (VulkanicGalBridge.GuiMeshVertexRecord vertex : vertices) {
+			float[] position = vertex.position();
+			// Raster coordinates are local to the compact offscreen target. Keep
+			// one pixel of guard band on every side for the later composite UVs.
+			position[0] -= left - 1.0F;
+			position[1] -= top - 1.0F;
+			localVertices.add(new VulkanicGalBridge.GuiMeshVertexRecord(position, vertex.atlasUv(), vertex.localUv(), vertex.colorArgb(), vertex.normalPacked()));
+		}
 		VulkanicGalBridge.GuiMeshBatchRecord batch = new VulkanicGalBridge.GuiMeshBatchRecord(
-			dynamicLayerOrder(sourceLayerOrder), 0, 1, 1, asset.assetId(), 0L, 0.0F,
+			// The map image and frame both contain meaningful transparent pixels;
+			// use the explicit translucent material so Rust preserves their alpha
+			// instead of filling the entire offscreen target opaquely.
+			// The map is already color- and light-baked on the CPU.  Use the
+			// explicit translucent mesh mode (ABI value 3) so transparent pixels
+			// composite over the world; lighting mode 1 is flat.
+			dynamicLayerOrder(sourceLayerOrder), 0, 3, 1, asset.assetId(), 0L, 0.0F,
 			new float[] {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1},
 			new float[] {1, 0, 0, 1, 0, 0}, left, top, left + size, top + size, guiWidth, guiHeight,
-			size + 2, size + 2, 1, 0, 0, 0, 0, 0, vertices, indices);
+			size + 2, size + 2, 1, 0, 0, 0, 0, 0, localVertices, indices);
+		// Publish the immutable CPU snapshot before freezing the request so the
+		// coordinator cannot consume a mesh against a previous dynamic-image
+		// generation.
+		RustGalGuiRawImageAssets.stage(asset);
 		RustGalFrameScheduler.Token token = RustGalFrameCoordinator.enqueueGuiMeshItemRequest(
 			List.of(batch), dynamicLayerId(sourceLayerOrder), dynamicLayerOrder(sourceLayerOrder), System.nanoTime());
-		RustGalGuiRawImageAssets.stage(asset);
 		return List.of(new RustGalGuiElementRenderState(token, GuiRenderStratum.GUI_FILE_BACKED_BLIT,
 			"voxelmap.gui." + (circular ? "circular-map" : "square-map"), -1, -1.0F, GuiFillDirection.NONE,
 			left, top, size, size, guiWidth, guiHeight));
@@ -1628,6 +1694,18 @@ public final class RustGalGuiRenderer {
 		boolean invertBlend = blit.pipeline() == RenderPipelines.CROSSHAIR;
 		boolean premultipliedBlend = blit.pipeline() == RenderPipelines.GUI_TEXTURED_PREMULTIPLIED_ALPHA;
 		boolean additiveBlend = blit.pipeline() == RenderPipelines.GUI_NAUSEA_OVERLAY;
+		int semanticStratum = invertBlend ? GuiRenderStratum.GUI_CROSSHAIR.order()
+			: (premultipliedBlend ? GuiRenderStratum.GUI_PREMULTIPLIED_BLIT.order()
+				: (additiveBlend ? GuiRenderStratum.GUI_ADDITIVE_BLIT.order() : requestLayerOrder));
+		if (u0 < -GUI_UV_OVERLAP_LIMIT || u1 > 1.0F + GUI_UV_OVERLAP_LIMIT
+			|| v0 < -GUI_UV_OVERLAP_LIMIT || v1 > 1.0F + GUI_UV_OVERLAP_LIMIT) {
+			// Vanilla's regular BlitRenderState is also used for repeated separator
+			// and list-background images. Preserve those repeated UV semantics by
+			// splitting them into bounded unit-UV affine quads; do not inherit a
+			// Java sampler wrap mode or reject valid title/menu geometry.
+			return enqueueWrappedAffineAsset(asset, semanticStratum, requestLayerOrder, x0, y0, x1, y1, x3, y3,
+				u0, v0, u1, v1, blit.color(), guiWidth, guiHeight, dynamicLayerOrder, blit.scissorArea());
+		}
 		if (!admissibleAffineQuad(requestLayerOrder, asset.assetId(), x0, y0, x1, y1, x3, y3,
 			u0, v0, u1, v1, guiWidth, guiHeight, blit.scissorArea())) {
 			// Do not coerce UVs, clips, or non-finite coordinates into a different
@@ -1637,9 +1715,7 @@ public final class RustGalGuiRenderer {
 			return null;
 		}
 		VulkanicGalBridge.GuiAffineQuadRecord request = new VulkanicGalBridge.GuiAffineQuadRecord(
-			invertBlend ? GuiRenderStratum.GUI_CROSSHAIR.order()
-				: (premultipliedBlend ? GuiRenderStratum.GUI_PREMULTIPLIED_BLIT.order()
-					: (additiveBlend ? GuiRenderStratum.GUI_ADDITIVE_BLIT.order() : requestLayerOrder)),
+			semanticStratum,
 			asset.assetId(), x0, y0, x1, y1, x3, y3,
 			0.0F, u0, v0, u1, v1, blit.color(), guiWidth, guiHeight
 		);
@@ -1660,6 +1736,82 @@ public final class RustGalGuiRenderer {
 			token, GuiRenderStratum.GUI_FILE_BACKED_BLIT, "minecraft.gui.file-backed-blit", -1, -1.0F, GuiFillDirection.NONE,
 			left, top, width, height, guiWidth, guiHeight
 		));
+	}
+
+	/**
+	 * Converts one repeated affine image into independently bounded unit-UV
+	 * quads. This is semantic geometry expansion: Rust still owns the image,
+	 * pipeline, synchronization, and draw execution.
+	 */
+	@Nullable
+	private static List<RustGalGuiElementRenderState> enqueueWrappedAffineAsset(
+		RustGalGuiRawImageAssets.Asset asset, int stratum, int semanticLayerOrder,
+		float x0, float y0, float x1, float y1, float x3, float y3,
+		float u0, float v0, float u1, float v1, int color, int guiWidth, int guiHeight, int dynamicLayerOrder,
+		@Nullable ScreenRectangle clip
+	) {
+		float uSpan = u1 - u0;
+		float vSpan = v1 - v0;
+		if (asset == null || stratum < 0 || semanticLayerOrder < 0 || dynamicLayerOrder < 0
+			|| !Float.isFinite(uSpan) || !Float.isFinite(vSpan) || uSpan <= 0.0F || vSpan <= 0.0F
+			|| uSpan > 4096.0F || vSpan > 4096.0F) return null;
+		List<float[]> uSegments = wrappedUnitIntervalSegments(u0, uSpan);
+		List<float[]> vSegments = wrappedUnitIntervalSegments(v0, vSpan);
+		if (uSegments.isEmpty() || vSegments.isEmpty()
+			|| (long)uSegments.size() * vSegments.size() > MAX_GUI_TILED_SEGMENTS) return null;
+		float axisXx = x1 - x0;
+		float axisXy = y1 - y0;
+		float axisYx = x3 - x0;
+		float axisYy = y3 - y0;
+		// Fully preflight all expanded records before queueing or staging anything.
+		for (float[] u : uSegments) for (float[] v : vSegments) {
+			float[] corners = wrappedAffineCorners(x0, y0, axisXx, axisXy, axisYx, axisYy, u, v);
+			if (!admissibleAffineQuad(stratum, asset.assetId(), corners[0], corners[1], corners[2], corners[3], corners[4], corners[5],
+				u[2], v[2], u[3], v[3], guiWidth, guiHeight, clip)) return null;
+		}
+		List<VulkanicGalBridge.GuiAffineQuadRecord> requests = new ArrayList<>(uSegments.size() * vSegments.size());
+		List<float[]> cornersByRequest = new ArrayList<>(uSegments.size() * vSegments.size());
+		for (float[] u : uSegments) for (float[] v : vSegments) {
+			float[] corners = wrappedAffineCorners(x0, y0, axisXx, axisXy, axisYx, axisYy, u, v);
+			VulkanicGalBridge.GuiAffineQuadRecord request = new VulkanicGalBridge.GuiAffineQuadRecord(
+				stratum, asset.assetId(), corners[0], corners[1], corners[2], corners[3], corners[4], corners[5],
+				0.0F, u[2], v[2], u[3], v[3], color, guiWidth, guiHeight
+			);
+			if (clip != null) request = request.withClip(clip.left(), clip.top(), clip.width(), clip.height());
+			requests.add(request);
+			cornersByRequest.add(corners);
+		}
+		// One complete repeated image is one semantic operation. Submit it atomically
+		// after every expanded quad passed preflight, so it cannot leave a partial
+		// prefix in the scheduler if a later quad would be rejected.
+		long startedNanos = System.nanoTime();
+		RustGalFrameScheduler.Token token = RustGalFrameCoordinator.enqueueGuiAffineQuadRequests(
+			requests, dynamicLayerId(dynamicLayerOrder), semanticLayerOrder, startedNanos
+		);
+		RustGalGuiRawImageAssets.stage(asset);
+		List<RustGalGuiElementRenderState> elements = new ArrayList<>(cornersByRequest.size());
+		for (float[] corners : cornersByRequest) {
+			float x2 = corners[2] + corners[4] - corners[0];
+			float y2 = corners[3] + corners[5] - corners[1];
+			int left = (int)Math.floor(Math.min(Math.min(corners[0], corners[2]), Math.min(x2, corners[4])));
+			int top = (int)Math.floor(Math.min(Math.min(corners[1], corners[3]), Math.min(y2, corners[5])));
+			int width = Math.max(1, (int)Math.ceil(Math.max(Math.max(corners[0], corners[2]), Math.max(x2, corners[4])) - left));
+			int height = Math.max(1, (int)Math.ceil(Math.max(Math.max(corners[1], corners[3]), Math.max(y2, corners[5])) - top));
+			elements.add(new RustGalGuiElementRenderState(token, GuiRenderStratum.GUI_FILE_BACKED_BLIT,
+				"minecraft.gui.wrapped-blit", -1, -1.0F, GuiFillDirection.NONE, left, top, width, height, guiWidth, guiHeight));
+		}
+		return List.copyOf(elements);
+	}
+
+	private static float[] wrappedAffineCorners(
+		float x0, float y0, float axisXx, float axisXy, float axisYx, float axisYy, float[] u, float[] v
+	) {
+		float left = u[0], right = u[1], top = v[0], bottom = v[1];
+		return new float[] {
+			x0 + axisXx * left + axisYx * top, y0 + axisXy * left + axisYy * top,
+			x0 + axisXx * right + axisYx * top, y0 + axisXy * right + axisYy * top,
+			x0 + axisXx * left + axisYx * bottom, y0 + axisXy * left + axisYy * bottom
+		};
 	}
 
 	/** Bounded diagnostics for a copied blit that was deliberately not admitted. */
@@ -1830,9 +1982,8 @@ public final class RustGalGuiRenderer {
 		} else if (blit.pipeline() == RenderPipelines.GUI_NAUSEA_OVERLAY) {
 			requestLayerOrder = GuiRenderStratum.GUI_ADDITIVE_BLIT.order();
 		}
-		long startedNanos = System.nanoTime();
-		List<RustGalGuiElementRenderState> elements = new ArrayList<>();
-		boolean assetCommitted = false;
+		List<VulkanicGalBridge.GuiAffineQuadRecord> requests = new ArrayList<>((int)estimatedSegments);
+		List<int[]> elementBounds = new ArrayList<>((int)estimatedSegments);
 		Matrix3x2f pose = blit.pose();
 		for (int offsetX = 0; offsetX < width; offsetX += blit.tileWidth()) {
 			int tileWidth = Math.min(blit.tileWidth(), width - offsetX);
@@ -1866,21 +2017,29 @@ public final class RustGalGuiRenderer {
 							ScreenRectangle scissor = blit.scissorArea();
 							request = request.withClip(scissor.left(), scissor.top(), scissor.width(), scissor.height());
 						}
-						RustGalFrameScheduler.Token token = RustGalFrameCoordinator.enqueueGuiAffineQuadRequest(
-							request, dynamicLayerId(dynamicLayerOrder), requestLayerOrder, startedNanos
-						);
-						if (!assetCommitted) {
-							RustGalGuiRawImageAssets.stage(asset);
-							assetCommitted = true;
-						}
-						elements.add(new RustGalGuiElementRenderState(token, GuiRenderStratum.GUI_FILE_BACKED_BLIT,
-							"minecraft.gui.tiled-blit", -1, -1.0F, GuiFillDirection.NONE,
+						requests.add(request);
+						elementBounds.add(new int[] {
 							(int)Math.floor(segmentLeft), (int)Math.floor(segmentTop),
 							Math.max(1, (int)Math.ceil(segmentRight - segmentLeft)),
-							Math.max(1, (int)Math.ceil(segmentBottom - segmentTop)), guiWidth, guiHeight));
+							Math.max(1, (int)Math.ceil(segmentBottom - segmentTop))
+						});
 					}
 				}
 			}
+		}
+		// The prior count-and-geometry preflight covers the complete expanded
+		// request. Submit it as one semantic operation so a tiled image cannot
+		// leave an accepted prefix behind and its asset stages only after admission.
+		long startedNanos = System.nanoTime();
+		RustGalFrameScheduler.Token token = RustGalFrameCoordinator.enqueueGuiAffineQuadRequests(
+			requests, dynamicLayerId(dynamicLayerOrder), requestLayerOrder, startedNanos
+		);
+		RustGalGuiRawImageAssets.stage(asset);
+		List<RustGalGuiElementRenderState> elements = new ArrayList<>(elementBounds.size());
+		for (int[] bounds : elementBounds) {
+			elements.add(new RustGalGuiElementRenderState(token, GuiRenderStratum.GUI_FILE_BACKED_BLIT,
+				"minecraft.gui.tiled-blit", -1, -1.0F, GuiFillDirection.NONE,
+				bounds[0], bounds[1], bounds[2], bounds[3], guiWidth, guiHeight));
 		}
 		return List.copyOf(elements);
 	}
@@ -1898,7 +2057,7 @@ public final class RustGalGuiRenderer {
 	 * two pieces when necessary. Returned values are geometry fractions followed by normalized UV bounds:
 	 * {@code geometryStart, geometryEnd, uvStart, uvEnd}.
 	 */
-	private static List<float[]> wrappedUnitIntervalSegments(float start, float span) {
+	static List<float[]> wrappedUnitIntervalSegments(float start, float span) {
 		if (!Float.isFinite(start) || !Float.isFinite(span) || span <= 0.0F || span > 4096.0F) {
 			return List.of();
 		}

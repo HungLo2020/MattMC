@@ -32,6 +32,7 @@ import org.lwjgl.system.MemoryUtil;
  * atlas objects never cross the VulkanicGAL boundary.
  */
 public final class RustGalGuiRawImageAssets {
+	/** Frozen uploads ordinary GUI PNGs as RGBA8, retaining stored channels. */
 	private static final int RAW_RGBA8 = 2;
 	private static final int MAX_ENCODED_BYTES = 32 * 1024 * 1024;
 	private static final int MAX_DECODED_PIXELS = 16 * 1024 * 1024;
@@ -235,7 +236,6 @@ public final class RustGalGuiRawImageAssets {
 		}
 		return null;
 	}
-
 	/** Resolves an already-copied asset by its stable semantic identity. */
 	static Asset resolveAssetId(long assetId) {
 		if (assetId == 0L) return null;
@@ -396,6 +396,28 @@ public final class RustGalGuiRawImageAssets {
 			Asset cached = CACHE.get(source);
 			if (cached != null) {
 				return (long)cached.width() * cached.height() <= MAX_DECODED_PIXELS / 6L ? cached : null;
+			}
+		}
+		// On the first title-screen frame the reload manager may not yet have
+		// published vanilla resources even though the bundled assets are available.
+		// Preserve resource-pack precedence above, then use the same bounded
+		// classpath fallback as ordinary semantic GUI images for vanilla faces only.
+		if (source != null && "minecraft".equals(source.getNamespace())) {
+			String classpathName = "/assets/" + source.getNamespace() + "/" + source.getPath();
+			try (InputStream input = RustGalGuiRawImageAssets.class.getResourceAsStream(classpathName)) {
+				if (input != null) {
+					byte[] encoded = input.readNBytes(MAX_ENCODED_BYTES + 1);
+					if (encoded.length > MAX_ENCODED_BYTES) return null;
+					Asset decoded = decode(source, encoded, MAX_DECODED_PIXELS / 6);
+					if (decoded != null) {
+						synchronized (LOCK) {
+							if (!cachePutLocked(CACHE, source, decoded)) return null;
+						}
+						return decoded;
+					}
+				}
+			} catch (IOException error) {
+				return null;
 			}
 		}
 		return null;

@@ -1009,6 +1009,7 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 atlas_v,
                 shader_block_id,
                 shader_material_type,
+                terrain_material_bits,
                 mid_block_packed
             ]
         ),
@@ -1057,7 +1058,8 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 frame_row_size,
                 interpolation_policy,
                 reserved0,
-                animation_frames
+                animation_frames,
+                mip_png_bytes
             ]
         ),
         71 => layout!(
@@ -1074,7 +1076,8 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 meshes,
                 textures,
                 sorted_indices,
-                negotiated_feature_bits
+                negotiated_feature_bits,
+                retirements
             ]
         ),
         69 => layout!(
@@ -1112,6 +1115,11 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 index_generation,
                 index_bytes
             ]
+        ),
+        99 => layout!(
+            99,
+            FfiWorldMeshAssetRetirementRecord,
+            [byte_size, reserved0, mesh_key, mesh_generation]
         ),
         72 => layout!(
             72,
@@ -1163,7 +1171,11 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 normal_index
             ]
         ),
-        79 => layout!(79, FfiWorldLodSegmentRecord, [byte_size, layer, vertices]),
+        79 => layout!(
+            79,
+            FfiWorldLodSegmentRecord,
+            [byte_size, layer, vertices, packed_vertices]
+        ),
         80 => layout!(
             80,
             FfiWorldLodColumnAssetRecord,
@@ -1351,7 +1363,8 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 fog_environmental_end,
                 fog_render_distance_start,
                 fog_render_distance_end,
-                distant_horizons_render_distance
+                distant_horizons_render_distance,
+                fog_sky_end
             ]
         ),
         98 => layout!(

@@ -174,22 +174,28 @@ public class FullDataToRenderDataTransformer
 				);
 				for (int index = 0; index < columnArrayView.verticalSize(); index++)
 				{
-					columnSource.setSemanticMaterialId(
-						renderSourceX, renderSourceZ, index, reducedSemanticMaterials[index]
-					);
-					// Reduction may combine source intervals whose weighted-model seeds
-					// differ. Keep the material sidecar but make variant provenance
-					// explicitly unavailable rather than inventing a representative seed.
-					columnSource.setSemanticVariantProvenance(
-						renderSourceX, renderSourceZ, index,
-						ColumnRenderSource.SEMANTIC_VARIANT_UNAVAILABLE, 0L
-					);
 					List<ColumnRenderSource.SemanticMaterialSpan> spans = reducedSemanticMaterialSpans(
 						newColumnArrayView,
 						expandedSemanticMaterials,
 						expandedVariantStates,
 						expandedVariantPositions,
 						columnArrayView.get(index)
+					);
+					columnSource.setSemanticMaterialId(
+						renderSourceX, renderSourceZ, index, reducedSemanticMaterials[index]
+					);
+					// Preserve a model-selection position when the complete reduced
+					// interval agrees on one exact source. Reduction may still combine
+					// different positions or unavailable sources; those remain explicit
+					// mixed/unavailable states rather than receiving a guessed seed.
+					byte reducedVariantState = reducedSemanticVariantState(
+						reducedSemanticMaterials[index], spans
+					);
+					long reducedVariantPosition = reducedVariantState == ColumnRenderSource.SEMANTIC_VARIANT_EXACT
+						? spans.getFirst().variantPosition() : 0L;
+					columnSource.setSemanticVariantProvenance(
+						renderSourceX, renderSourceZ, index,
+						reducedVariantState, reducedVariantPosition
 					);
 					if (spans.size() > 1)
 					{
@@ -204,11 +210,65 @@ public class FullDataToRenderDataTransformer
 		}
 		boolean horizontalUniform = fullDataSource.getDataDetailLevel() == 0
 			|| fullDataSource.hasSemanticHorizontalUniformity(renderSourceX, renderSourceZ);
+		columnSource.setSemanticHorizontalContributors(
+			renderSourceX, renderSourceZ,
+			fullDataSource.getSemanticHorizontalContributors(renderSourceX, renderSourceZ)
+		);
+		LongArrayList[] horizontalContributors = fullDataSource.getSemanticHorizontalContributors(renderSourceX, renderSourceZ);
 		for (int index = 0; index < columnArrayView.verticalSize(); index++) {
 			columnSource.setSemanticHorizontalUniformity(
 				renderSourceX, renderSourceZ, index, horizontalUniform
 			);
+			if (horizontalContributors != null && !horizontalUniform) {
+				columnSource.setSemanticHorizontalContributorSpans(
+					renderSourceX, renderSourceZ, index,
+					resolveHorizontalContributorSpans(
+						fullDataSource, columnSource, horizontalContributors,
+						blockX, blockZ, fullDataSource.getDataDetailLevel(), columnArrayView.get(index)
+					)
+				);
+			}
 		}
+	}
+
+	private static ColumnRenderSource.SemanticHorizontalContributor[] resolveHorizontalContributorSpans(
+		FullDataSourceV2 fullDataSource, ColumnRenderSource columnSource,
+		LongArrayList[] contributors, int blockX, int blockZ, byte dataDetail, long reducedData
+	)
+	{
+		if (contributors.length != 4 || !RenderDataPointUtil.doesDataPointExist(reducedData)) return null;
+		int childWidth = dataDetail <= 0 ? 1 : BitShiftUtil.pow(1, dataDetail - 1);
+		ColumnRenderSource.SemanticHorizontalContributor[] result =
+			new ColumnRenderSource.SemanticHorizontalContributor[4];
+		for (int contributorIndex = 0; contributorIndex < 4; contributorIndex++) {
+			LongArrayList column = contributors[contributorIndex];
+			if (column == null || column.isEmpty()) continue;
+			int childX = blockX + (contributorIndex / 2) * childWidth;
+			int childZ = blockZ + (contributorIndex % 2) * childWidth;
+			java.util.ArrayList<ColumnRenderSource.SemanticMaterialSpan> spans = new java.util.ArrayList<>();
+			for (int point = 0; point < column.size(); point++) {
+				long data = column.getLong(point);
+				if (!RenderDataPointUtil.doesDataPointExist(data)) continue;
+				int id = FullDataPointUtil.getId(data);
+				try {
+					String block = fullDataSource.mapping.getBlockStateWrapper(id).getSerialString();
+					String biome = fullDataSource.mapping.getBiomeWrapper(id).getSerialString();
+					int materialId = columnSource.internSemanticMaterial(block, biome);
+					int minY = FullDataPointUtil.getBottomY(data);
+					int maxY = minY + FullDataPointUtil.getHeight(data);
+					spans.add(new ColumnRenderSource.SemanticMaterialSpan(
+						minY, maxY, materialId,
+						ColumnRenderSource.SEMANTIC_VARIANT_EXACT,
+						ColumnRenderSource.packSemanticVariantPosition(childX, minY + columnSource.yOffset, childZ)
+					));
+				} catch (RuntimeException ignored) {
+					// An invalid source ID is unavailable, never a guessed identity.
+				}
+			}
+			if (!spans.isEmpty()) result[contributorIndex] =
+				new ColumnRenderSource.SemanticHorizontalContributor(spans);
+		}
+		return result;
 	}
 
 	/**
@@ -272,6 +332,47 @@ public class FullDataToRenderDataTransformer
 		}
 		spans.sort(java.util.Comparator.comparingInt(ColumnRenderSource.SemanticMaterialSpan::minY));
 		return List.copyOf(spans);
+	}
+
+	/**
+	 * Derives the only variant state that is safe to publish for a reduced
+	 * render-data point. A position is exact only when the reduced material and
+	 * every contributing source span agree on both identity and model seed.
+	 */
+	static byte reducedSemanticVariantState(
+		int reducedMaterialId,
+		List<ColumnRenderSource.SemanticMaterialSpan> spans
+	)
+	{
+		if (spans == null || spans.isEmpty() || reducedMaterialId <= ColumnRenderSource.SEMANTIC_MATERIAL_UNAVAILABLE)
+		{
+			return ColumnRenderSource.SEMANTIC_VARIANT_UNAVAILABLE;
+		}
+		ColumnRenderSource.SemanticMaterialSpan first = spans.getFirst();
+		if (first.materialId() <= ColumnRenderSource.SEMANTIC_MATERIAL_UNAVAILABLE
+			|| first.variantState() != ColumnRenderSource.SEMANTIC_VARIANT_EXACT)
+		{
+			return first.variantState() == ColumnRenderSource.SEMANTIC_VARIANT_MIXED
+				? ColumnRenderSource.SEMANTIC_VARIANT_MIXED
+				: ColumnRenderSource.SEMANTIC_VARIANT_UNAVAILABLE;
+		}
+		for (ColumnRenderSource.SemanticMaterialSpan span : spans)
+		{
+			if (span.materialId() <= ColumnRenderSource.SEMANTIC_MATERIAL_UNAVAILABLE)
+			{
+				return ColumnRenderSource.SEMANTIC_VARIANT_UNAVAILABLE;
+			}
+			if (span.materialId() != reducedMaterialId
+				|| span.variantState() != ColumnRenderSource.SEMANTIC_VARIANT_EXACT)
+			{
+				return ColumnRenderSource.SEMANTIC_VARIANT_MIXED;
+			}
+			if (span.variantPosition() != first.variantPosition())
+			{
+				return ColumnRenderSource.SEMANTIC_VARIANT_MIXED;
+			}
+		}
+		return ColumnRenderSource.SEMANTIC_VARIANT_EXACT;
 	}
 	private static void setRenderColumnView(
 			IClientLevelWrapper levelWrapper, FullDataSourceV2 fullDataSource,

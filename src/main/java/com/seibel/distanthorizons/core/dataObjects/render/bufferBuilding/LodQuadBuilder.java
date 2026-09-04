@@ -439,6 +439,17 @@ public class LodQuadBuilder
 	public VertexBufferBuild makeTransparentUpVertexBuffersWithSemanticMaterials() { return this.makeVertexBufferBuild(this.transparentQuads, TRANSPARENT_UP_DIRECTION_RENDER_ORDER, quad -> !isWater(quad)); }
 	public VertexBufferBuild makeTransparentWaterUpVertexBuffersWithSemanticMaterials() { return this.makeVertexBufferBuild(this.transparentQuads, TRANSPARENT_UP_DIRECTION_RENDER_ORDER, LodQuadBuilder::isWater); }
 
+	/**
+	 * Builds the Rust semantic transport directly into exact-size Java-owned
+	 * packets.  This route deliberately never creates DH's legacy native VBO
+	 * staging buffers: Rust owns the eventual GPU asset and the fixed-layout
+	 * bytes are the semantic boundary, not an OpenGL upload source.
+	 */
+	public SemanticVertexBufferBuild makeOpaqueRustSemanticBuffers() { return this.makeSemanticVertexBufferBuild(this.opaqueQuads, DEFAULT_DIRECTION_RENDER_ORDER, quad -> true); }
+	public SemanticVertexBufferBuild makeTransparentRustSemanticBuffers() { return this.makeSemanticVertexBufferBuild(this.transparentQuads, TRANSPARENT_NON_UP_DIRECTION_RENDER_ORDER, quad -> true); }
+	public SemanticVertexBufferBuild makeTransparentUpRustSemanticBuffers() { return this.makeSemanticVertexBufferBuild(this.transparentQuads, TRANSPARENT_UP_DIRECTION_RENDER_ORDER, quad -> !isWater(quad)); }
+	public SemanticVertexBufferBuild makeTransparentWaterUpRustSemanticBuffers() { return this.makeSemanticVertexBufferBuild(this.transparentQuads, TRANSPARENT_UP_DIRECTION_RENDER_ORDER, LodQuadBuilder::isWater); }
+
 	private ArrayList<ByteBuffer> makeVertexBuffers(ArrayList<BufferQuad>[] quadList, int[] directionRenderOrder)
 	{
 		return this.makeVertexBuffers(quadList, directionRenderOrder, quad -> true);
@@ -542,6 +553,70 @@ public class LodQuadBuilder
 		return new VertexBufferBuild(vertexBuffers, semanticMaterialIds, semanticVariantStates, semanticVariantPositions);
 	}
 
+	private SemanticVertexBufferBuild makeSemanticVertexBufferBuild(
+		ArrayList<BufferQuad>[] quadList,
+		int[] directionRenderOrder,
+		Predicate<BufferQuad> quadFilter
+	) {
+		// Keep a packet within the collector's transport limit.  Unlike the old
+		// 10 MiB native chunks, every allocation is exact-size and becomes the
+		// immutable Java-to-Rust semantic payload without a second copy.
+		final int maxQuadsPerPacket = DistantHorizonsSemanticCollector.maxRustSemanticQuadsPerPacket();
+		final int totalQuadCount = countMatchingQuads(quadList, directionRenderOrder, quadFilter);
+		ArrayList<byte[]> vertexPackets = new ArrayList<>(3);
+		ArrayList<int[]> materialIds = new ArrayList<>(3);
+		ArrayList<byte[]> variantStates = new ArrayList<>(3);
+		ArrayList<long[]> variantPositions = new ArrayList<>(3);
+		int remainingInPacket = 0;
+		ByteBuffer packet = null;
+		int[] packetMaterialIds = null;
+		byte[] packetVariantStates = null;
+		long[] packetVariantPositions = null;
+		int packedQuadCount = 0;
+		for (int directionIndex : directionRenderOrder) {
+			for (BufferQuad quad : quadList[directionIndex]) {
+				if (!quadFilter.test(quad)) continue;
+				if (remainingInPacket == 0) {
+					int packetQuadCount = Math.min(maxQuadsPerPacket, totalQuadCount - packedQuadCount);
+					if (packetQuadCount <= 0) throw new IllegalStateException("Distant Horizons semantic packet count underflow");
+					byte[] vertices = new byte[Math.multiplyExact(packetQuadCount, LodBufferContainer.QUADS_BYTE_SIZE)];
+					vertexPackets.add(vertices);
+					packet = ByteBuffer.wrap(vertices).order(java.nio.ByteOrder.nativeOrder());
+					packetMaterialIds = new int[packetQuadCount];
+					packetVariantStates = new byte[packetQuadCount];
+					packetVariantPositions = new long[packetQuadCount];
+					materialIds.add(packetMaterialIds);
+					variantStates.add(packetVariantStates);
+					variantPositions.add(packetVariantPositions);
+					remainingInPacket = packetQuadCount;
+				}
+				int quadIndex = packet.position() / LodBufferContainer.QUADS_BYTE_SIZE;
+				packetMaterialIds[quadIndex] = quad.semanticMaterialId;
+				packetVariantStates[quadIndex] = quad.semanticVariantState;
+				packetVariantPositions[quadIndex] = quad.semanticVariantPosition;
+				this.putQuad(packet, quad);
+				remainingInPacket--;
+				packedQuadCount++;
+			}
+		}
+		return new SemanticVertexBufferBuild(vertexPackets, materialIds, variantStates, variantPositions);
+	}
+
+	private static int countMatchingQuads(
+		ArrayList<BufferQuad>[] quadList,
+		int[] directionRenderOrder,
+		Predicate<BufferQuad> quadFilter
+	) {
+		int count = 0;
+		for (int directionIndex : directionRenderOrder) {
+			for (BufferQuad quad : quadList[directionIndex]) {
+				if (!quadFilter.test(quad)) continue;
+				count = Math.incrementExact(count);
+			}
+		}
+		return count;
+	}
+
 	/** CPU-owned sidecar; it intentionally contains no GL/Vulkan object. */
 	public record VertexBufferBuild(
 		List<ByteBuffer> vertexBuffers,
@@ -582,6 +657,43 @@ public class LodQuadBuilder
 		}
 	}
 
+	/** Exact-size, Java-owned packets transferred once into the Rust semantic
+	 * collector. They cannot be submitted to a Java GL buffer. */
+	public record SemanticVertexBufferBuild(
+		List<byte[]> packedVertexBuffers,
+		List<int[]> semanticMaterialIds,
+		List<byte[]> semanticVariantStates,
+		List<long[]> semanticVariantPositions
+	) {
+		public SemanticVertexBufferBuild {
+			Objects.requireNonNull(packedVertexBuffers, "packedVertexBuffers");
+			Objects.requireNonNull(semanticMaterialIds, "semanticMaterialIds");
+			Objects.requireNonNull(semanticVariantStates, "semanticVariantStates");
+			Objects.requireNonNull(semanticVariantPositions, "semanticVariantPositions");
+			if (packedVertexBuffers.size() != semanticMaterialIds.size()
+				|| packedVertexBuffers.size() != semanticVariantStates.size()
+				|| packedVertexBuffers.size() != semanticVariantPositions.size()) {
+				throw new IllegalArgumentException("DH Rust semantic packets and sidecars must align");
+			}
+			for (int index = 0; index < packedVertexBuffers.size(); index++) {
+				byte[] vertices = Objects.requireNonNull(packedVertexBuffers.get(index), "packedVertexBuffer");
+				if (vertices.length == 0 || vertices.length % LodBufferContainer.QUADS_BYTE_SIZE != 0) {
+					throw new IllegalArgumentException("DH Rust semantic packet must contain complete quads");
+				}
+				int quadCount = vertices.length / LodBufferContainer.QUADS_BYTE_SIZE;
+				if (semanticMaterialIds.get(index).length != quadCount
+					|| semanticVariantStates.get(index).length != quadCount
+					|| semanticVariantPositions.get(index).length != quadCount) {
+					throw new IllegalArgumentException("DH Rust semantic packet sidecars must contain one value per quad");
+				}
+			}
+			packedVertexBuffers = List.copyOf(packedVertexBuffers);
+			semanticMaterialIds = List.copyOf(semanticMaterialIds);
+			semanticVariantStates = List.copyOf(semanticVariantStates);
+			semanticVariantPositions = List.copyOf(semanticVariantPositions);
+		}
+	}
+
 	/**
 	 * Counts IDs from the completed sidecars rather than from source quad
 	 * construction. This is diagnostic-only: it lets the capture harness
@@ -598,7 +710,29 @@ public class LodQuadBuilder
 		));
 	}
 
+	/** Coverage counterpart for the exact-size Rust semantic packets. */
+	public static SemanticQuadCoverage semanticQuadCoverage(
+		SemanticVertexBufferBuild opaque,
+		SemanticVertexBufferBuild transparentSide,
+		SemanticVertexBufferBuild transparentUp,
+		SemanticVertexBufferBuild transparentWaterUp
+	) {
+		return semanticQuadCoverageFromMaterialIds(List.of(
+			new SemanticMaterialLayer(Objects.requireNonNull(opaque, "opaque").semanticMaterialIds(), true),
+			new SemanticMaterialLayer(Objects.requireNonNull(transparentSide, "transparentSide").semanticMaterialIds(), false),
+			new SemanticMaterialLayer(Objects.requireNonNull(transparentUp, "transparentUp").semanticMaterialIds(), false),
+			new SemanticMaterialLayer(Objects.requireNonNull(transparentWaterUp, "transparentWaterUp").semanticMaterialIds(), false)
+		));
+	}
+
 	private static SemanticQuadCoverage semanticQuadCoverage(List<SemanticBuildLayer> layers)
+	{
+		return semanticQuadCoverageFromMaterialIds(layers.stream()
+			.map(layer -> new SemanticMaterialLayer(layer.build().semanticMaterialIds(), layer.opaque()))
+			.toList());
+	}
+
+	private static SemanticQuadCoverage semanticQuadCoverageFromMaterialIds(List<SemanticMaterialLayer> layers)
 	{
 		int known = 0;
 		int mixed = 0;
@@ -606,9 +740,9 @@ public class LodQuadBuilder
 		int opaqueKnown = 0;
 		int opaqueMixed = 0;
 		int opaqueUnavailable = 0;
-		for (SemanticBuildLayer layer : layers)
+		for (SemanticMaterialLayer layer : layers)
 		{
-			for (int[] materialIds : layer.build().semanticMaterialIds())
+			for (int[] materialIds : layer.materialIds())
 			{
 				for (int materialId : materialIds)
 				{
@@ -632,6 +766,8 @@ public class LodQuadBuilder
 		}
 		return new SemanticQuadCoverage(known, mixed, unavailable, opaqueKnown, opaqueMixed, opaqueUnavailable);
 	}
+
+	private record SemanticMaterialLayer(List<int[]> materialIds, boolean opaque) { }
 
 	private record SemanticBuildLayer(VertexBufferBuild build, boolean opaque) { }
 

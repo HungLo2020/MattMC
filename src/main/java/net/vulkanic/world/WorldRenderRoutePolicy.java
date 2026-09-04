@@ -511,20 +511,40 @@ public final class WorldRenderRoutePolicy {
 	}
 
 	/**
-	 * The DH route is deliberately narrower than the ordinary whole-frame world
-	 * route. The real DH render-list preflight selects Rust only after it proves
-	 * every visible segment is representable. Rejected frames remain wholly Java
-	 * owned before drawing; this method never authorizes a same-frame fallback.
+	 * Distant Horizons is outside the vanilla Rust Vulkan migration slice.  It
+	 * must therefore remain unavailable while the Rust whole-frame route owns a
+	 * vanilla frame: admitting it here would make an ordinary Vulkan run depend
+	 * on a separate, incomplete renderer family.  This is deliberately a route
+	 * decision rather than a Java fallback; callers receive {@link Route#DISABLED}
+	 * and no DH draw is authorized.
 	 */
 	public static Route currentDistantHorizonsOpaqueRoute() {
-		if (Boolean.getBoolean("mattmc.dev.rustGalDistantHorizons.disabled")) {
+		return selectDistantHorizonsRoute(
+			VulkanicAPI.isVulkanBackendSelected(),
+			RustGalVulkanWholeFrameMode.enabled(),
+			Boolean.getBoolean("mattmc.dev.rustGalDistantHorizons.disabled"),
+			Boolean.getBoolean("mattmc.dev.rustGalDistantHorizons.legacyControl")
+		);
+	}
+
+	static Route selectDistantHorizonsRouteForTests(
+		boolean vulkanBackendSelected, boolean wholeFrameVulkanEnabled,
+		boolean diagnosticsDisabled, boolean legacyControl
+	) {
+		return selectDistantHorizonsRoute(
+			vulkanBackendSelected, wholeFrameVulkanEnabled, diagnosticsDisabled, legacyControl
+		);
+	}
+
+	private static Route selectDistantHorizonsRoute(
+		boolean vulkanBackendSelected, boolean wholeFrameVulkanEnabled,
+		boolean diagnosticsDisabled, boolean legacyControl
+	) {
+		if (wholeFrameVulkanEnabled || vulkanBackendSelected || diagnosticsDisabled) {
 			return Route.DISABLED;
 		}
-		if (RustGalVulkanWholeFrameMode.enabled()) return Route.RUST_VULKAN_WHOLE_FRAME;
-		if (Boolean.getBoolean("mattmc.dev.rustGalDistantHorizons.legacyControl")) {
-			return legacyCompatibilityRoute();
-		}
-		return selectWholeFrameRoute(VulkanicAPI.isVulkanBackendSelected(), rustWholeFrameShellActive());
+		return legacyControl ? legacyCompatibilityRoute()
+			: selectWholeFrameRoute(false, false);
 	}
 
 	public static boolean staticTerrainBuildRequiresRustWholeFrameMetadata() {

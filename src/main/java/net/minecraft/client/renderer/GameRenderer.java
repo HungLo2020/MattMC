@@ -117,6 +117,7 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 	private static final ResourceLocation BLUR_POST_CHAIN_ID = ResourceLocation.withDefaultNamespace("blur");
 	public static final int MAX_BLUR_RADIUS = 10;
 	private static final Logger LOGGER = LogUtils.getLogger();
+	private static boolean rustHandPredicateLogged;
 	private static final boolean BLOCK_OUTLINE_PICK_DIAGNOSTICS = Boolean.getBoolean("mattmc.dev.blockOutlinePickDiagnostics");
 	private static final int BLOCK_OUTLINE_PICK_DIAGNOSTIC_LIMIT = Math.max(0, Integer.getInteger("mattmc.dev.blockOutlinePickDiagnostics.maxLogs", 160));
 	private static int blockOutlinePickDiagnosticLogs;
@@ -541,19 +542,6 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 	}
 
 	private void tickFov() {
-		boolean rustWholeFrame = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
-		boolean deterministicTiming = rustWholeFrame
-			? net.vulkanic.bridge.RustGalDeterministicTiming.enabled()
-			: SystemTimeUniforms.isDeterministicTemporalParityEnabled();
-		if (deterministicTiming) {
-			float modifier = rustWholeFrame
-				? net.vulkanic.bridge.RustGalDeterministicTiming.fovModifier()
-				: SystemTimeUniforms.deterministicTemporalFovModifier();
-			this.oldFovModifier = modifier;
-			this.fovModifier = modifier;
-			return;
-		}
-
 		float g;
 		if (this.minecraft.getCameraEntity() instanceof AbstractClientPlayer abstractClientPlayer) {
 			Options options = this.minecraft.options;
@@ -573,13 +561,6 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 		if (this.panoramicMode) {
 			return 90.0F;
 		} else {
-			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-				&& net.vulkanic.bridge.RustGalDeterministicTiming.enabled()) {
-				f = net.vulkanic.bridge.RustGalDeterministicTiming.deterministicPartialTick();
-			} else if (SystemTimeUniforms.isDeterministicTemporalParityEnabled()) {
-				f = SystemTimeUniforms.deterministicTemporalPartialTick();
-			}
-
 			float g = 70.0F;
 			if (bl) {
 				g = this.minecraft.options.fov().get().intValue();
@@ -869,6 +850,12 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 			profilerFiller.push("guiExtraction");
 			GuiGraphics guiGraphics = new GuiGraphics(this.minecraft, this.guiRenderState);
 			if (bl2 && bl && this.minecraft.level != null) {
+				// VoxelMap may queue chat status from its world-loading callback.
+				// Flush it before Gui.renderChat collects semantic text so Rust's
+				// exclusive presenter sees the message in this frame.
+				if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+					net.voxelmap.VoxelConstants.getVoxelMapInstance().flushPendingPlayerMessage();
+				}
 				this.minecraft.gui.render(guiGraphics, deltaTracker);
 			}
 
@@ -1012,7 +999,20 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 		this.minecraft.getShaderManager().ensureRustSemanticRoute();
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.rust-vulkan.frame-reset");
 		float f = net.vulkanic.bridge.RustGalDeterministicTiming.partialTick(deltaTracker);
+		// Match the baseline world's CPU light-update ordering before copying any
+		// terrain semantics. The selected Rust route owns rendering, while this
+		// only publishes authoritative client world state for its source snapshot.
+		this.minecraft.levelRenderer.advanceRustWholeFrameLightState();
 		boolean captureTerrainParticleScenario = !System.getProperty("mattmc.dev.rustGalWorldMaterial.terrainParticleScenario", "").isBlank();
+		if (!rustHandPredicateLogged && Boolean.getBoolean("mattmc.dev.deterministicCameraCapture")
+			&& this.minecraft.level != null && this.minecraft.player != null) {
+			rustHandPredicateLogged = true;
+			LOGGER.info("Rust Vulkan first-person predicate: gameLoadFinished={} blockOutline={} level={} player={} cameraType={} hideGui={} mode={} invisible={}",
+				gameLoadFinished, bl, this.minecraft.level != null, this.minecraft.player != null,
+				this.minecraft.options.getCameraType(), this.minecraft.options.hideGui,
+				this.minecraft.gameMode == null ? "null" : this.minecraft.gameMode.getPlayerMode(),
+				this.minecraft.player != null && this.minecraft.player.isInvisible());
+		}
 		if ((gameLoadFinished || captureTerrainParticleScenario) && bl && this.minecraft.level != null && this.minecraft.player != null) {
 			net.voxelmap.VoxelConstants.assertRustWholeFrameWaypointsSupported();
 			if (this.minecraft.debugEntries.isCurrentlyEnabled(DebugScreenEntries.THREE_DIMENSIONAL_CROSSHAIR)
@@ -1163,7 +1163,18 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 				);
 				net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.background.enqueue");
 				net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.enqueue");
-				this.minecraft.levelRenderer.enqueueRustGalStaticTerrainForWholeFrame(this.mainCamera, view, projection);
+				// Publish the semantic block atlas before any terrain mesh is submitted.
+				// Shader-pack terrain samples the explicit Rust-owned atlas; relying on a
+				// nearby chunk build to publish it leaves source execution with valid draws
+				// but an unbound/empty terrain texture.
+				net.vulkanic.world.RustGalTerrainRenderer.ensureTerrainAtlasAssetForWorldMesh();
+				this.minecraft.levelRenderer.enqueueRustGalStaticTerrainForWholeFrame(
+					this.mainCamera,
+					view,
+					projection,
+					wholeFrameFog,
+					net.sodium.client.SodiumClientMod.options().performance.useFogOcclusion
+				);
 				net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.enqueue");
 				net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.weather.enqueue");
 				this.minecraft.levelRenderer.enqueueRustGalWeatherForWholeFrame(this.mainCamera, f);
@@ -1231,9 +1242,24 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 						Matrix4f handProjection = new Matrix4f().scale(1.0F, 1.0F, HAND_DEPTH_SCALE);
 						handProjection.mul(this.getProjectionMatrix(handFov));
 						net.vulkanic.world.RustGalWorldPrimitiveRenderer.beginFirstPersonFrame(handProjection, view);
+						// The vanilla hand model is authored in camera space, but its
+						// semantic PoseStack still carries the inverse of the world
+						// model-view transform.  Keep that same explicit transform here:
+						// Rust receives view * (view^-1 * handModel), rather than an
+						// identity-pose model that is projected as world geometry.
+						PoseStack handPoseStack = new PoseStack();
+						handPoseStack.last().pose().set(view).invert();
+						// Match Frozen's first-person pose domain exactly: the ordinary
+						// hand path applies view bobbing after cancelling the world view
+						// and before ItemInHandRenderer applies its hand/item transforms.
+						// These are copied gameplay transforms, not Java renderer state.
+						this.bobHurt(handPoseStack, f);
+						if (this.minecraft.options.bobView().get()) {
+							this.bobView(handPoseStack, f);
+						}
 						this.itemInHandRenderer.renderRustVulkanHands(
 							f,
-							new PoseStack(),
+							handPoseStack,
 							this.minecraft.player,
 							this.minecraft.getEntityRenderDispatcher().getPackedLightCoords(this.minecraft.player, f),
 							view,

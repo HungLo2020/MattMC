@@ -898,7 +898,7 @@ fn submit_d3_sampled_texel(gal: &mut VulkanicGal, backend_name: &str) -> Result<
         depth_bias: None,
         color_formats: vec![TextureFormat::Rgba8Unorm],
         depth_format: None,
-            stencil: None,
+        stencil: None,
     })?;
     let upload_region = BufferImageCopyRegion {
         buffer: upload,

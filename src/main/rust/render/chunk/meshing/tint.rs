@@ -28,6 +28,50 @@ pub(super) fn native_tint_color(
     }
 }
 
+pub(super) fn native_vertex_tint_color(
+    block: &NativeSectionBlockRecord,
+    state: NativeMeshingState,
+    x: f32,
+    y: f32,
+    z: f32,
+) -> i32 {
+    let base = native_tint_color(block, state, false);
+    if base == -1 || matches!(state.tint_type, TINT_NONE | TINT_SPRUCE | TINT_BIRCH | TINT_CONSTANT | TINT_STEM | TINT_REDSTONE) {
+        return base;
+    }
+    // Exact Java BlendedColorProvider domain: floor(vertex - 0.5), then the
+    // fractional remainder. The 4x4x4 snapshot covers source-model vertices
+    // through [-0.5, 1.5], including resource-pack geometry beyond a block.
+    let lattice_coordinate = |value: f32| {
+        let shifted = value - 0.5;
+        let base = shifted.floor() as i32;
+        ((base + 1) as usize, shifted - base as f32)
+    };
+    let (ix, fx) = lattice_coordinate(x);
+    let (iy, _) = lattice_coordinate(y);
+    let (iz, fz) = lattice_coordinate(z);
+    const TINT_LATTICE_FLAG: i32 = 1 << 1;
+    if block.flags & TINT_LATTICE_FLAG == 0 {
+        return base;
+    }
+    if ix + 1 >= 4 || iy >= 4 || iz + 1 >= 4 {
+        // A model outside the explicit semantic lattice is not admissible:
+        // guessing a biome cell would violate parity. The route keeps this
+        // capability private until a wider extractor is supplied.
+        return -1;
+    }
+    let sample = |x: usize, z: usize| block.tint_lattice[iy][z][x] as u32;
+    let x1 = (fx * 255.0) as u32;
+    let z1 = (fz * 255.0) as u32;
+    let mix = |a: u32, b: u32, weight: u32| ((a * (255 - weight) + b * weight + 255) >> 8) & 255;
+    let channel = |shift| {
+        let a = mix((sample(ix, iz) >> shift) & 255u32, (sample(ix + 1, iz) >> shift) & 255u32, x1);
+        let b = mix((sample(ix, iz + 1) >> shift) & 255u32, (sample(ix + 1, iz + 1) >> shift) & 255u32, x1);
+        mix(a, b, z1)
+    };
+    (0xff00_0000 | (channel(16) << 16) | (channel(8) << 8) | channel(0)) as i32
+}
+
 pub(super) fn multiply_argb(color: i32, tint: i32) -> i32 {
     if tint == -1 {
         return color;
@@ -39,7 +83,16 @@ pub(super) fn multiply_argb(color: i32, tint: i32) -> i32 {
     let tr = (tint as u32 >> 16) & 0xff;
     let tg = (tint as u32 >> 8) & 0xff;
     let tb = tint as u32 & 0xff;
-    ((ca << 24) | ((cr * tr / 255) << 16) | ((cg * tg / 255) << 8) | (cb * tb / 255)) as i32
+    // This is Sodium's ColorMixer.mulComponentWise contract.  In particular,
+    // it is *not* division by 255: Sodium rounds the Q8.8 product with an
+    // added 0xff and then shifts by eight.  Native section colors are hashed
+    // and consumed as compact bytes, so even its one-value rounding boundary
+    // must agree with the Java OpenGL baseline.
+    let multiply = |left: u32, right: u32| ((left * right + 0xff) >> 8) & 0xff;
+    ((multiply(ca, (tint as u32 >> 24) & 0xff) << 24)
+        | (multiply(cr, tr) << 16)
+        | (multiply(cg, tg) << 8)
+        | multiply(cb, tb)) as i32
 }
 
 pub(super) fn argb_to_abgr(color: i32) -> i32 {

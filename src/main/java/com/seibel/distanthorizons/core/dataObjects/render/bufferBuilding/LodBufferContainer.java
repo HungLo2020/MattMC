@@ -23,6 +23,14 @@ import java.util.concurrent.*;
 public class LodBufferContainer implements AutoCloseable
 {
 	private static final DhLogger LOGGER = new DhLoggerBuilder().build();
+	/**
+	 * The Rust semantic route copies a column's CPU data and immediately releases
+	 * DH's temporary native staging buffers.  Unlike the legacy GL upload queue,
+	 * there is no renderer-side backpressure between those two steps, so bound
+	 * this explicit transaction globally rather than letting every DH worker
+	 * retain several 10 MiB staging chunks at once.
+	 */
+	private static final Semaphore RUST_SEMANTIC_BUILD_PERMIT = new Semaphore(1, true);
 	
 	/** number of bytes a single quad takes */
 	public static final int QUADS_BYTE_SIZE = LodUtil.LOD_VERTEX_FORMAT.getByteSize() * 4;
@@ -82,8 +90,16 @@ public class LodBufferContainer implements AutoCloseable
 		future = new CompletableFuture<>();
 		this.uploadFuture = future;
 		
-		
-		
+		boolean rustWholeFrameSemanticBuild = net.vulkanic.world.DistantHorizonsSemanticCollector.usesRustWholeFrameSemanticBuild();
+		if (rustWholeFrameSemanticBuild)
+		{
+			return makeAndPublishRustSemanticBuffers(builder, future);
+		}
+		ArrayList<ByteBuffer> opaqueBuffers;
+		ArrayList<ByteBuffer> transparentBuffers;
+		ArrayList<ByteBuffer> transparentUpBuffers;
+		ArrayList<ByteBuffer> transparentWaterUpBuffers;
+		{
 			// make the buffers
 			boolean captureSemanticMaterials = net.vulkanic.world.DistantHorizonsSemanticCollector.enabled();
 			LodQuadBuilder.VertexBufferBuild opaqueBuild = captureSemanticMaterials
@@ -98,10 +114,10 @@ public class LodBufferContainer implements AutoCloseable
 			LodQuadBuilder.VertexBufferBuild transparentWaterUpBuild = captureSemanticMaterials
 				? builder.makeTransparentWaterUpVertexBuffersWithSemanticMaterials()
 				: new LodQuadBuilder.VertexBufferBuild(builder.makeTransparentWaterUpVertexBuffers(), List.of());
-			ArrayList<ByteBuffer> opaqueBuffers = new ArrayList<>(opaqueBuild.vertexBuffers());
-			ArrayList<ByteBuffer> transparentBuffers = new ArrayList<>(transparentBuild.vertexBuffers());
-			ArrayList<ByteBuffer> transparentUpBuffers = new ArrayList<>(transparentUpBuild.vertexBuffers());
-			ArrayList<ByteBuffer> transparentWaterUpBuffers = new ArrayList<>(transparentWaterUpBuild.vertexBuffers());
+			opaqueBuffers = new ArrayList<>(opaqueBuild.vertexBuffers());
+			transparentBuffers = new ArrayList<>(transparentBuild.vertexBuffers());
+			transparentUpBuffers = new ArrayList<>(transparentUpBuild.vertexBuffers());
+			transparentWaterUpBuffers = new ArrayList<>(transparentWaterUpBuild.vertexBuffers());
 			// Capture only copied CPU semantics before the legacy path uploads and
 			// frees these direct buffers. This is private diagnostic groundwork for
 			// a future Rust LOD route, never a GL/Vulkan handle bridge.
@@ -118,16 +134,7 @@ public class LodBufferContainer implements AutoCloseable
 				transparentUpBuild,
 				transparentWaterUpBuild
 			);
-			if (net.vulkanic.world.DistantHorizonsSemanticCollector.usesRustWholeFrameSemanticBuild())
-			{
-				// The Rust whole-frame route owns the GPU asset. Completing this
-				// CPU stage releases DH's temporary buffers without creating a Java
-				// VBO or queuing a GL upload.
-				freeBuffers(opaqueBuffers, transparentBuffers, transparentUpBuffers, transparentWaterUpBuffers);
-				this.uploadFuture = null;
-				future.complete(this);
-				return future;
-			}
+		}
 		
 		this.vbos = resizeBuffer(this.vbos, opaqueBuffers.size());
 		this.vbosTransparent = resizeBuffer(this.vbosTransparent, transparentBuffers.size());
@@ -180,6 +187,38 @@ public class LodBufferContainer implements AutoCloseable
 			}
 		});
 		
+		return future;
+	}
+
+	private CompletableFuture<LodBufferContainer> makeAndPublishRustSemanticBuffers(
+		LodQuadBuilder builder,
+		CompletableFuture<LodBufferContainer> future
+	) {
+		RUST_SEMANTIC_BUILD_PERMIT.acquireUninterruptibly();
+		try {
+			if (!net.vulkanic.world.DistantHorizonsSemanticCollector.enabled()) {
+				throw new IllegalStateException("Rust whole-frame DH route selected without semantic collection");
+			}
+			LodQuadBuilder.SemanticVertexBufferBuild opaque = builder.makeOpaqueRustSemanticBuffers();
+			LodQuadBuilder.SemanticVertexBufferBuild transparent = builder.makeTransparentRustSemanticBuffers();
+			LodQuadBuilder.SemanticVertexBufferBuild transparentUp = builder.makeTransparentUpRustSemanticBuffers();
+			LodQuadBuilder.SemanticVertexBufferBuild transparentWaterUp = builder.makeTransparentWaterUpRustSemanticBuffers();
+			net.vulkanic.world.DistantHorizonsSemanticCollector.recordRustSemanticBuiltColumn(
+				this.pos, this.minCornerBlockPos, builder.semanticMaterials(), builder.semanticQuadCoverage(),
+				LodQuadBuilder.semanticQuadCoverage(opaque, transparent, transparentUp, transparentWaterUp),
+				opaque, transparent, transparentUp, transparentWaterUp
+			);
+			// This route intentionally owns no Java GL VBO and schedules no Java GL
+			// upload. The immutable semantic packets now belong to the collector.
+			this.uploadFuture = null;
+			future.complete(this);
+		} catch (Exception error) {
+			this.uploadFuture = null;
+			future.completeExceptionally(error);
+			LOGGER.error("Unexpected issue building Rust semantic buffer [" + this.minCornerBlockPos + "]", error);
+		} finally {
+			RUST_SEMANTIC_BUILD_PERMIT.release();
+		}
 		return future;
 	}
 

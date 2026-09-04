@@ -4,6 +4,7 @@ use std::io::Write;
 use std::sync::atomic::{AtomicU8, Ordering};
 
 static STATIC_TERRAIN_NATIVE_LIGHT_TRACE_COUNT: AtomicU8 = AtomicU8::new(0);
+static STATIC_TERRAIN_NATIVE_TINT_TRACE_COUNT: AtomicU8 = AtomicU8::new(0);
 
 pub(super) fn light_block_record_to_quad(record: LightBlockRecord) -> NativeQuad {
     let emission = record.block_emission.clamp(0, 255);
@@ -167,6 +168,11 @@ pub(super) unsafe fn append_direct_compact_static_model_quad(
     let scan_lighting_started = profile_start(profile_scan_substages);
     let light =
         native_quad_lighting_for_vertex_format(&block, &quad_record, state, format.separate_ao);
+    let directional_shade = if format.separate_ao {
+        native_quad_directional_shade(&quad_record)
+    } else {
+        1.0
+    };
     builder
         .profile
         .add_optional_stage(PROFILE_STATIC_LIGHTING_AO, lighting_started);
@@ -177,11 +183,7 @@ pub(super) unsafe fn append_direct_compact_static_model_quad(
     let tint_started = profile_start(profile_static_substages);
     let scan_tint_started = profile_start(profile_scan_substages);
     let applies_tint = static_quad_applies_tint(quad_record, state);
-    let tint = if applies_tint {
-        native_tint_color(&block, state, false)
-    } else {
-        -1
-    };
+    trace_static_terrain_native_tint(block, state, quad_record, applies_tint);
     builder
         .profile
         .add_optional_stage(PROFILE_STATIC_TINT, tint_started);
@@ -245,7 +247,10 @@ pub(super) unsafe fn append_direct_compact_static_model_quad(
         let source = vertices[index];
         let mut color = source.color;
         if applies_tint {
-            color = multiply_argb(color, tint);
+            color = multiply_argb(color, native_vertex_tint_color(&block, state, source.x, source.y, source.z));
+        }
+        if format.separate_ao {
+            color = color_mul_rgb(color, directional_shade);
         }
         encode_compact_vertex_values(
             block.local_x as f32 + offset.0 + source.x,
@@ -288,6 +293,28 @@ pub(super) fn resolve_selector_model_ids(
     output: &mut Vec<i32>,
     profile: &mut NativeMeshingProfile,
 ) -> Result<(), i32> {
+    // BlockStateModel.collectParts starts with RandomSource.create(seed), then
+    // passes that same mutable source into a selected weighted child.  Keeping
+    // the RNG state is essential for nested weighted foliage/plant models:
+    // restarting from `seed` after the parent choice selects a different child
+    // while preserving plausible vertex counts and light words.
+    let mut random_state = legacy_set_seed(seed);
+    resolve_selector_model_ids_with_random_state(
+        selector_id,
+        &mut random_state,
+        selectors,
+        output,
+        profile,
+    )
+}
+
+fn resolve_selector_model_ids_with_random_state(
+    selector_id: i32,
+    random_state: &mut u64,
+    selectors: &[Option<NativeModelSelector>],
+    output: &mut Vec<i32>,
+    profile: &mut NativeMeshingProfile,
+) -> Result<(), i32> {
     profile.add_count(PROFILE_COUNT_SELECTOR_RESOLUTIONS, 1);
     let Some(selector) = selector_by_id(selectors, selector_id) else {
         return Ok(());
@@ -303,27 +330,36 @@ pub(super) fn resolve_selector_model_ids(
             if selector.total_weight <= 0 {
                 return Ok(());
             }
-            let mut choice = legacy_next_int(seed, selector.total_weight);
+            let mut choice = legacy_next_int_from_state(random_state, selector.total_weight);
             for entry in &selector.entries {
                 profile.add_count(PROFILE_COUNT_WEIGHTED_ENTRIES_VISITED, 1);
                 choice -= entry.weight;
                 if choice < 0 {
-                    resolve_selector_model_ids(entry.target_id, seed, selectors, output, profile)?;
+                    resolve_selector_model_ids_with_random_state(
+                        entry.target_id,
+                        random_state,
+                        selectors,
+                        output,
+                        profile,
+                    )?;
                     break;
                 }
             }
         }
         SELECTOR_GROUP => {
-            let child_seed = legacy_next_long(seed);
+            // MultiPartModel consumes one long, then resets its shared Java
+            // RandomSource to that value before each child model.
+            let child_seed = legacy_next_long_from_state(random_state);
             profile.add_count(
                 PROFILE_COUNT_MULTIPART_CHILDREN_TESTED,
                 selector.entries.len(),
             );
             for entry in &selector.entries {
                 let before = output.len();
-                resolve_selector_model_ids(
+                let mut child_random_state = legacy_set_seed(child_seed);
+                resolve_selector_model_ids_with_random_state(
                     entry.target_id,
-                    child_seed,
+                    &mut child_random_state,
                     selectors,
                     output,
                     profile,
@@ -339,18 +375,17 @@ pub(super) fn resolve_selector_model_ids(
     Ok(())
 }
 
-pub(super) fn legacy_next_int(seed: u64, bound: i32) -> i32 {
+fn legacy_next_int_from_state(state: &mut u64, bound: i32) -> i32 {
     if bound <= 0 {
         return 0;
     }
 
-    let mut state = legacy_set_seed(seed);
     if (bound & (bound - 1)) == 0 {
-        return (((bound as i64) * (legacy_next(&mut state, 31) as i64)) >> 31) as i32;
+        return (((bound as i64) * (legacy_next(state, 31) as i64)) >> 31) as i32;
     }
 
     loop {
-        let value = legacy_next(&mut state, 31) as i32;
+        let value = legacy_next(state, 31) as i32;
         let result = value % bound;
         if value - result + (bound - 1) >= 0 {
             return result;
@@ -358,10 +393,9 @@ pub(super) fn legacy_next_int(seed: u64, bound: i32) -> i32 {
     }
 }
 
-pub(super) fn legacy_next_long(seed: u64) -> u64 {
-    let mut state = legacy_set_seed(seed);
-    let high = legacy_next(&mut state, 32) as u64;
-    let low = legacy_next(&mut state, 32) as u64;
+fn legacy_next_long_from_state(state: &mut u64) -> u64 {
+    let high = legacy_next(state, 32) as u64;
+    let low = legacy_next(state, 32) as u64;
     (high << 32).wrapping_add(low)
 }
 
@@ -402,6 +436,11 @@ pub(super) fn static_model_quad_to_native_section(
     let lighting_started = profile_start(profile_static_substages);
     let scan_lighting_started = profile_start(profile_scan_substages);
     let light = native_quad_lighting_for_vertex_format(&block, &quad_record, state, separate_ao);
+    let directional_shade = if separate_ao {
+        native_quad_directional_shade(&quad_record)
+    } else {
+        1.0
+    };
     profile.add_optional_stage(PROFILE_STATIC_LIGHTING_AO, lighting_started);
     profile.add_optional_stage(PROFILE_SCAN_LIGHTING_AO, scan_lighting_started);
 
@@ -428,6 +467,9 @@ pub(super) fn static_model_quad_to_native_section(
         let mut color = source.color;
         if applies_tint {
             color = multiply_argb(color, tint);
+        }
+        if separate_ao {
+            color = color_mul_rgb(color, directional_shade);
         }
         *vertex = QuadVertex {
             x: block.local_x as f32 + offset.0 + source.x,
@@ -497,10 +539,22 @@ fn trace_static_terrain_native_lighting(
         .map(|vertex| format!("\"{:08x}\"", vertex.light))
         .collect::<Vec<_>>()
         .join(",");
+    let source_color = source
+        .vertices
+        .iter()
+        .map(|vertex| format!("\"{:08x}\"", vertex.color))
+        .collect::<Vec<_>>()
+        .join(",");
     let output_light = output
         .vertices
         .iter()
         .map(|vertex| format!("\"{:08x}\"", vertex.light))
+        .collect::<Vec<_>>()
+        .join(",");
+    let output_color = output
+        .vertices
+        .iter()
+        .map(|vertex| format!("\"{:08x}\"", vertex.color))
         .collect::<Vec<_>>()
         .join(",");
     let output_ao = output
@@ -514,7 +568,8 @@ fn trace_static_terrain_native_lighting(
             "{{\"schema\":\"mattmc-static-terrain-native-light-v1\",",
             "\"block\":[{},{},{}],\"blockId\":{},\"lightFace\":{},",
             "\"cullFace\":{},\"shade\":{},\"hasAo\":{},\"flags\":{},",
-            "\"snapshotLightWords\":[{}],\"sourceVertexLight\":[{}],",
+            "\"snapshotLightWords\":[{}],\"sourceVertexColor\":[{}],",
+            "\"sourceVertexLight\":[{}],\"nativeColor\":[{}],",
             "\"nativeAo\":[{}],\"nativeLight\":[{}]}}\n"
         ),
         block.absolute_x,
@@ -527,7 +582,9 @@ fn trace_static_terrain_native_lighting(
         source.has_ao,
         source.flags,
         words,
+        source_color,
         source_light,
+        output_color,
         output_ao,
         output_light,
     );
@@ -536,6 +593,75 @@ fn trace_static_terrain_native_lighting(
         .create(true)
         .append(true)
         .open(std::path::Path::new(&root).join("native-light.jsonl"))
+    {
+        let _ = file.write_all(payload.as_bytes());
+    }
+}
+
+// Test-only semantic receipt for a bounded, explicitly selected block. It
+// reads the immutable section snapshot after Java extraction and before Rust
+// color interpolation/encoding; it cannot alter terrain admission or draws.
+fn trace_static_terrain_native_tint(
+    block: NativeSectionBlockRecord,
+    state: NativeMeshingState,
+    source: StaticModelQuadRecord,
+    applies_tint: bool,
+) {
+    let Some(root) = std::env::var_os("MATTMC_STATIC_TERRAIN_NATIVE_LIGHT_TRACE_DIR") else {
+        return;
+    };
+    let Some(target) = std::env::var("MATTMC_STATIC_TERRAIN_NATIVE_LIGHT_TRACE_BLOCK").ok() else {
+        return;
+    };
+    let expected = target
+        .split(',')
+        .map(str::trim)
+        .map(str::parse::<i32>)
+        .collect::<Result<Vec<_>, _>>();
+    let Ok(expected) = expected else {
+        return;
+    };
+    if expected.as_slice() != [block.absolute_x, block.absolute_y, block.absolute_z]
+        || STATIC_TERRAIN_NATIVE_TINT_TRACE_COUNT.fetch_add(1, Ordering::Relaxed) >= 8
+    {
+        return;
+    }
+    let lattice = block
+        .tint_lattice
+        .iter()
+        .flatten()
+        .flatten()
+        .map(|color| format!("\"{:08x}\"", *color as u32))
+        .collect::<Vec<_>>()
+        .join(",");
+    let vertices = source
+        .vertices
+        .iter()
+        .map(|vertex| format!("[{:.6},{:.6},{:.6}]", vertex.x, vertex.y, vertex.z))
+        .collect::<Vec<_>>()
+        .join(",");
+    let payload = format!(
+        concat!(
+            "{{\"schema\":\"mattmc-static-terrain-native-tint-v1\",",
+            "\"block\":[{},{},{}],\"blockTint\":\"{:08x}\",",
+            "\"tintType\":{},\"quadTintIndex\":{},\"appliesTint\":{},",
+            "\"vertices\":[{}],\"tintLattice\":[{}]}}\n"
+        ),
+        block.absolute_x,
+        block.absolute_y,
+        block.absolute_z,
+        block.tint as u32,
+        state.tint_type,
+        source.tint_index,
+        applies_tint,
+        vertices,
+        lattice,
+    );
+    let _ = std::fs::create_dir_all(&root);
+    if let Ok(mut file) = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(std::path::Path::new(&root).join("native-tint.jsonl"))
     {
         let _ = file.write_all(payload.as_bytes());
     }

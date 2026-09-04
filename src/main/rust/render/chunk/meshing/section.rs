@@ -52,6 +52,7 @@ pub(super) struct CompactSectionSnapshot<'a> {
     seed_los: &'a [i32],
     seed_his: &'a [i32],
     tints: &'a [i32],
+    tint_lattices: &'a [i32],
     fluid_tints: &'a [i32],
     fluid_flow_x: &'a [f32],
     fluid_flow_z: &'a [f32],
@@ -79,6 +80,7 @@ impl<'a> CompactSectionSnapshot<'a> {
             || header.seed_los_address == 0
             || header.seed_his_address == 0
             || header.tints_address == 0
+            || header.tint_lattices_address == 0
             || header.fluid_tints_address == 0
             || header.fluid_flow_x_address == 0
             || header.fluid_flow_z_address == 0
@@ -119,6 +121,10 @@ impl<'a> CompactSectionSnapshot<'a> {
             tints: slice::from_raw_parts(
                 header.tints_address as *const i32,
                 COMPACT_SECTION_BLOCK_COUNT,
+            ),
+            tint_lattices: slice::from_raw_parts(
+                header.tint_lattices_address as *const i32,
+                COMPACT_SECTION_BLOCK_COUNT * 64,
             ),
             fluid_tints: slice::from_raw_parts(
                 header.fluid_tints_address as *const i32,
@@ -296,6 +302,15 @@ impl NativeSectionRecordSource for CompactSectionSnapshot<'_> {
             }
         }
 
+        let lattice_start = local_index * 64;
+        for y in 0..4 {
+            for z in 0..4 {
+                for x in 0..4 {
+                    record.tint_lattice[y][z][x] = self.tint_lattices[lattice_start + (y * 4 + z) * 4 + x];
+                }
+            }
+        }
+
         Ok(record)
     }
 
@@ -352,6 +367,7 @@ impl NativeSectionRecordSource for CompactSectionSnapshot<'_> {
 
         Ok(record)
     }
+
 }
 
 #[cfg(test)]

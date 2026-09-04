@@ -1,9 +1,9 @@
 use super::*;
 use crate::render::vulkanic::world_primitive_frontend::{
     material as world_material_semantics, WorldMeshAnimationFrame, WORLD_MAX_MESH_ANIMATION_FRAMES,
-    WORLD_MAX_MESH_INDEX_BYTES, WORLD_MAX_MESH_SECTIONS, WORLD_MAX_MESH_VERTICES,
-    WORLD_MAX_MESH_TEXTURE_ASSETS, WORLD_MESH_ASSET_RESIDENCY,
-    WORLD_MAX_MESH_TEXTURE_DECODED_BYTES, WORLD_MESH_TEXTURE_RESIDENCY,
+    WORLD_MAX_MESH_INDEX_BYTES, WORLD_MAX_MESH_SECTIONS, WORLD_MAX_MESH_TEXTURE_ASSETS,
+    WORLD_MAX_MESH_TEXTURE_DECODED_BYTES, WORLD_MAX_MESH_VERTICES, WORLD_MESH_ASSET_RESIDENCY,
+    WORLD_MESH_TEXTURE_RESIDENCY,
 };
 
 const MAX_WORLD_MESH_TEXTURE_PNG_BYTES_TOTAL: usize = WORLD_MAX_MESH_TEXTURE_DECODED_BYTES;
@@ -105,6 +105,7 @@ pub(crate) unsafe fn decode_world_mesh_asset_update(
     Vec<WorldMeshAsset>,
     Vec<WorldMeshTextureAssetPayload>,
     Vec<WorldMeshSortedIndexUpdate>,
+    Vec<(u64, u64)>,
 )> {
     let request = read_struct(request, "world mesh asset update request")?;
     validate_header::<FfiWorldMeshAssetUpdateRequest>(request.header)?;
@@ -158,8 +159,15 @@ pub(crate) unsafe fn decode_world_mesh_asset_update(
                 format!("duplicate world mesh texture {}", texture.texture_id),
             ));
         }
+        let raw_mip_pngs = read_limited_slice(texture.mip_png_bytes, true, "world mesh texture mip PNGs")?;
+        let mip_png_byte_count = raw_mip_pngs.iter().try_fold(0usize, |total, mip| {
+            total.checked_add(mip.len as usize).ok_or_else(|| {
+                GalError::ffi(StatusCode::LengthOverflow, "world mesh texture mip PNG byte count overflow")
+            })
+        })?;
         texture_png_bytes_total = texture_png_bytes_total
             .checked_add(texture.png_bytes.len as usize)
+            .and_then(|total| total.checked_add(mip_png_byte_count))
             .ok_or_else(|| {
                 GalError::ffi(
                     StatusCode::LengthOverflow,
@@ -181,6 +189,16 @@ pub(crate) unsafe fn decode_world_mesh_asset_update(
             FFI_MAX_WORLD_MESH_TEXTURE_ASSET_BYTES,
             "world mesh texture PNG bytes",
         )?;
+        let mip_png_bytes = raw_mip_pngs
+            .iter()
+            .enumerate()
+            .map(|(mip, bytes)| read_bounded_bytes(
+                *bytes,
+                true,
+                FFI_MAX_WORLD_MESH_TEXTURE_ASSET_BYTES,
+                &format!("world mesh texture mip {} PNG bytes", mip + 1),
+            ))
+            .collect::<GalResult<Vec<_>>>()?;
         let raw_frames = read_limited_slice(
             texture.animation_frames,
             true,
@@ -210,6 +228,7 @@ pub(crate) unsafe fn decode_world_mesh_asset_update(
         textures.push(WorldMeshTextureAssetPayload {
             texture_id: texture.texture_id,
             png_bytes,
+            mip_png_bytes,
             frame_width: texture.frame_width,
             frame_height: texture.frame_height,
             frame_count: texture.frame_count,
@@ -267,6 +286,7 @@ pub(crate) unsafe fn decode_world_mesh_asset_update(
                 shader_atlas_uv: [vertex.atlas_u, vertex.atlas_v],
                 shader_block_id: vertex.shader_block_id,
                 shader_material_type: vertex.shader_material_type,
+                terrain_material_bits: vertex.terrain_material_bits,
                 mid_block_packed: vertex.mid_block_packed,
                 color_argb: vertex.color_argb,
                 normal_packed: vertex.normal_packed,
@@ -374,7 +394,45 @@ pub(crate) unsafe fn decode_world_mesh_asset_update(
             )?,
         });
     }
-    Ok((request.generation, meshes, textures, sorted_indices))
+    let raw_retirements =
+        read_limited_slice(request.retirements, true, "world mesh asset retirements")?;
+    if raw_retirements.len() > WORLD_MESH_ASSET_RESIDENCY {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            format!(
+                "world mesh asset retirement count {} exceeds bounded limit {WORLD_MESH_ASSET_RESIDENCY}",
+                raw_retirements.len()
+            ),
+        ));
+    }
+    let mut seen_retirements = BTreeMap::new();
+    let mut retirements = Vec::with_capacity(raw_retirements.len());
+    for retirement in raw_retirements {
+        validate_item_size::<FfiWorldMeshAssetRetirementRecord>(
+            retirement.byte_size,
+            "world mesh asset retirement",
+        )?;
+        if retirement.mesh_key == 0 || retirement.mesh_generation == 0 {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                "world mesh retirement key and generation must be non-zero",
+            ));
+        }
+        if seen_retirements.insert(retirement.mesh_key, ()).is_some() {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                format!("duplicate world mesh retirement {}", retirement.mesh_key),
+            ));
+        }
+        retirements.push((retirement.mesh_key, retirement.mesh_generation));
+    }
+    Ok((
+        request.generation,
+        meshes,
+        textures,
+        sorted_indices,
+        retirements,
+    ))
 }
 
 #[no_mangle]
@@ -448,15 +506,16 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_world_mesh_update_assets(
             .ffi_output_bytes
             .saturating_add(size_of::<FfiStatusResult>() as u64);
         let result = decode_world_mesh_asset_update(request, context.gal.capabilities()).and_then(
-            |(generation, meshes, textures, sorted_indices)| {
+            |(generation, meshes, textures, sorted_indices, retirements)| {
                 context
                     .world_primitive_frontend
-                    .apply_world_mesh_asset_update_with_sorted(
+                    .apply_world_mesh_asset_update_with_sorted_and_retirements(
                         &mut context.gal,
                         generation,
                         meshes,
                         textures,
                         sorted_indices,
+                        retirements,
                     )
             },
         );

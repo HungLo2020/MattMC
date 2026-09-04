@@ -22,6 +22,11 @@ pub(super) struct VulkanContext {
     pub(super) timestamp_valid_bits: u32,
     pub(super) command_pool: vk::CommandPool,
     pub(super) timeline: vk::Semaphore,
+    /// Whether the device was created with Vulkan's core independent MRT
+    /// blending feature. Source translucent passes rely on distinct primary
+    /// and auxiliary attachment blend semantics; callers must keep that
+    /// capability unavailable when the physical device cannot provide it.
+    pub(super) independent_blend: bool,
     pub(super) surface_loader: Option<ash::khr::surface::Instance>,
     pub(super) surface: Option<vk::SurfaceKHR>,
     pub(super) swapchain_loader: Option<ash::khr::swapchain::Device>,
@@ -149,11 +154,20 @@ impl VulkanContext {
         // execution agree about that SPIR-V capability.
         let mut supported_demote =
             vk::PhysicalDeviceShaderDemoteToHelperInvocationFeatures::default();
-        let mut supported_features = vk::PhysicalDeviceFeatures2::default()
-            .push_next(&mut supported_demote);
+        let mut supported_features =
+            vk::PhysicalDeviceFeatures2::default().push_next(&mut supported_demote);
         unsafe {
             instance.get_physical_device_features2(physical_device, &mut supported_features);
         }
+        // Terrain-translucent source passes use an explicit MRT blend
+        // contract: the primary color target is alpha-blended while the
+        // auxiliary targets are written without blending. Vulkan requires
+        // `independentBlend` whenever color-attachment blend state differs,
+        // so negotiate that core feature instead of silently creating an
+        // invalid pipeline and relying on validation to catch it later.
+        let independent_blend_supported = supported_features.features.independent_blend == vk::TRUE;
+        let core_features =
+            vk::PhysicalDeviceFeatures::default().independent_blend(independent_blend_supported);
         if supported_demote.shader_demote_to_helper_invocation == vk::TRUE {
             supported_demote = supported_demote.shader_demote_to_helper_invocation(true);
         }
@@ -166,6 +180,7 @@ impl VulkanContext {
         let mut device_info = vk::DeviceCreateInfo::default()
             .queue_create_infos(&queue_infos)
             .enabled_extension_names(&device_extension_names)
+            .enabled_features(&core_features)
             .push_next(&mut dynamic_rendering)
             .push_next(&mut synchronization2)
             .push_next(&mut timeline_features);
@@ -219,6 +234,7 @@ impl VulkanContext {
             timestamp_valid_bits,
             command_pool,
             timeline,
+            independent_blend: independent_blend_supported,
             surface_loader,
             surface,
             swapchain_loader,

@@ -121,6 +121,11 @@ public class ColorManager {
         return this.blockColors[BlockRepository.airID];
     }
 
+    /** True only after resource-pack terrain colors are available to mapCalc. */
+    public boolean semanticColorsReady() {
+        return this.loaded && this.loadedTerrainImage && BlockRepository.biomeBlocks != null;
+    }
+
     public BufferedImage getColorPicker() {
         return this.colorPicker;
     }

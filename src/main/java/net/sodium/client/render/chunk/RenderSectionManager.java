@@ -156,9 +156,16 @@ public class RenderSectionManager {
         this.level = level;
         // Iris: From MixinRenderSectionManager - use extended vertex format for builder
         this.builder = rustVulkanOwned
-                // Compact Rust terrain carries AO in the alpha lane; keep the
-                // RGB material color unlit for the explicit Rust lighting stage.
-                ? new ChunkBuilder(level, vertexType, true)
+                // The direct vanilla Rust material path consumes the compact
+                // baked-color contract.  It has no shader-pack stage that can
+                // restore separate AO or directional face shade, so retain
+                // Sodium's historical RGB baking here.
+                // The whole-frame semantic producer owns the scalable worker
+                // pool. Keep this compatibility-side manager pool to one worker
+                // so Vulkan does not construct a second set of large native
+                // scratch arenas (the manager still needs its queue for section
+                // lifecycle and sorting notifications).
+                ? new ChunkBuilder(level, vertexType, false, 1)
                 : new ChunkBuilder(level, vertexType);
 
         this.renderDistance = renderDistance;
@@ -803,11 +810,18 @@ public class RenderSectionManager {
 
             TranslucentData oldData = result.render.getTranslucentData();
             if (result instanceof ChunkBuildOutput chunkBuildOutput) {
-                net.sodium.client.render.StaticTerrainParityDiagnostics.recordChunkBuildOutput(chunkBuildOutput);
-                if (rustWholeFrame) {
-                    RustGalTerrainRenderer.acceptWholeFrameChunkBuildOutput(chunkBuildOutput);
-                } else {
+                if (!rustWholeFrame) {
+                    net.sodium.client.render.StaticTerrainParityDiagnostics.recordChunkBuildOutput(chunkBuildOutput);
                     RustGalTerrainRenderer.acceptChunkBuildOutput(chunkBuildOutput);
+                } else {
+                    // Rust whole-frame terrain has one semantic producer:
+                    // RustGalWholeFrameTerrainSource. It meshes immutable level
+                    // snapshots, records their provenance, and owns admission to
+                    // VulkanicGAL. Forwarding this manager's independently timed
+                    // build here would race that producer on the same section key
+                    // and makes Rust-visible terrain depend on a Java renderer
+                    // scheduling path. Keep this result solely for the manager's
+                    // local CPU bookkeeping below.
                 }
                 var prevFlags = result.render.getFlags();
 

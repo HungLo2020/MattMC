@@ -105,6 +105,7 @@ public class FullDataSourceV2Repo extends AbstractDhRepo<Long, FullDataSourceV2D
 		dto.compressedColumnGenStepByteArray = putAllBytes(resultSet.getBinaryStream("ColumnGenerationStep"), dto.compressedColumnGenStepByteArray);
 		dto.compressedWorldCompressionModeByteArray = putAllBytes(resultSet.getBinaryStream("ColumnWorldCompressionMode"), dto.compressedWorldCompressionModeByteArray);
 		dto.compressedMappingByteArray = putAllBytes(resultSet.getBinaryStream("Mapping"), dto.compressedMappingByteArray);
+		dto.compressedSemanticHorizontalContributorByteArray = putAllBytes(resultSet.getBinaryStream("SemanticHorizontalContributorData"), dto.compressedSemanticHorizontalContributorByteArray);
 		
 		// adjacent full data
 		if (includeAdjacent)
@@ -182,6 +183,7 @@ public class FullDataSourceV2Repo extends AbstractDhRepo<Long, FullDataSourceV2D
 		"   DetailLevel, PosX, PosZ, \n" +
 		"   MinY, DataChecksum, \n" +
 		"   Data, ColumnGenerationStep, ColumnWorldCompressionMode, Mapping, \n" +
+		"   SemanticHorizontalContributorData, \n" +
 		"   NorthAdjData, SouthAdjData, EastAdjData, WestAdjData, \n" +
 		"   DataFormatVersion, CompressionMode, ApplyToParent, ApplyToChildren, \n" +
 		"   LastModifiedUnixDateTime, CreatedUnixDateTime) \n" +
@@ -189,6 +191,7 @@ public class FullDataSourceV2Repo extends AbstractDhRepo<Long, FullDataSourceV2D
 		"    ?, ?, ?, \n" +
 		"    ?, ?, \n" +
 		"    ?, ?, ?, ?, \n" +
+		"    ?, \n" +
 		"    ?, ?, ?, ?, \n" +
 		"    ?, ?, ?, ?, \n" +
 		"    ?, ? \n" +
@@ -218,6 +221,7 @@ public class FullDataSourceV2Repo extends AbstractDhRepo<Long, FullDataSourceV2D
 		statement.setBinaryStream(i++, new ByteArrayInputStream(dto.compressedColumnGenStepByteArray.elements()), dto.compressedColumnGenStepByteArray.size());
 		statement.setBinaryStream(i++, new ByteArrayInputStream(dto.compressedWorldCompressionModeByteArray.elements()), dto.compressedWorldCompressionModeByteArray.size());
 		statement.setBinaryStream(i++, new ByteArrayInputStream(dto.compressedMappingByteArray.elements()), dto.compressedMappingByteArray.size());
+		statement.setBinaryStream(i++, new ByteArrayInputStream(dto.compressedSemanticHorizontalContributorByteArray.elements()), dto.compressedSemanticHorizontalContributorByteArray.size());
 		// adjacent full data
 		statement.setBinaryStream(i++, new ByteArrayInputStream(dto.compressedNorthAdjDataByteArray.elements()), dto.compressedNorthAdjDataByteArray.size());
 		statement.setBinaryStream(i++, new ByteArrayInputStream(dto.compressedSouthAdjDataByteArray.elements()), dto.compressedSouthAdjDataByteArray.size());
@@ -252,6 +256,7 @@ public class FullDataSourceV2Repo extends AbstractDhRepo<Long, FullDataSourceV2D
 				"   ,ColumnGenerationStep = ? \n" +
 				"   ,ColumnWorldCompressionMode = ? \n" +
 				"   ,Mapping = ? \n" +
+				"   ,SemanticHorizontalContributorData = ? \n" +
 				"   ,NorthAdjData = ?, SouthAdjData = ?, EastAdjData = ?, WestAdjData = ? \n" +
 				
 				"   ,DataFormatVersion = ? \n" +
@@ -282,6 +287,7 @@ public class FullDataSourceV2Repo extends AbstractDhRepo<Long, FullDataSourceV2D
 		statement.setBinaryStream(i++, new ByteArrayInputStream(dto.compressedColumnGenStepByteArray.elements()), dto.compressedColumnGenStepByteArray.size());
 		statement.setBinaryStream(i++, new ByteArrayInputStream(dto.compressedWorldCompressionModeByteArray.elements()), dto.compressedWorldCompressionModeByteArray.size());
 		statement.setBinaryStream(i++, new ByteArrayInputStream(dto.compressedMappingByteArray.elements()), dto.compressedMappingByteArray.size());
+		statement.setBinaryStream(i++, new ByteArrayInputStream(dto.compressedSemanticHorizontalContributorByteArray.elements()), dto.compressedSemanticHorizontalContributorByteArray.size());
 		// adjacent full data
 		statement.setBinaryStream(i++, new ByteArrayInputStream(dto.compressedNorthAdjDataByteArray.elements()), dto.compressedNorthAdjDataByteArray.size());
 		statement.setBinaryStream(i++, new ByteArrayInputStream(dto.compressedSouthAdjDataByteArray.elements()), dto.compressedSouthAdjDataByteArray.size());

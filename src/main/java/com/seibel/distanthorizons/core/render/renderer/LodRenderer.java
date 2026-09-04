@@ -206,6 +206,12 @@ public class LodRenderer
 		profiler.push("LOD Rust semantic extraction");
 		try
 		{
+			// Quadtree readiness tracks copied CPU columns so DH does not continue
+			// requesting the same work.  Visibility, however, is restricted to
+			// acknowledged Rust assets. Advance one bounded explicit transaction
+			// before building that visible list to make progress without admitting
+			// an unacknowledged column or a Java draw.
+			net.vulkanic.gui.RustGalFrameCoordinator.flushPendingWorldLodAssetsForSemanticPreflight();
 			buffers.buildRenderList(renderParams);
 			List<Long> semanticColumns = buffers.getSemanticColumnRenderPositions();
 			if (semanticColumns.isEmpty())

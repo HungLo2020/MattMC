@@ -82,6 +82,16 @@ unsafe fn compile_inner(
     if entry_point.trim().is_empty() {
         return Err(format!("shader entry point is blank for {source_name}"));
     }
+    if let Ok(dir) = std::env::var("MATTMC_RUST_SHADER_DUMP_DIR") {
+        let safe_name = source_name
+            .chars()
+            .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+            .collect::<String>();
+        let path = std::path::Path::new(&dir).join(format!("{stage}_{safe_name}.glsl"));
+        if std::fs::create_dir_all(&dir).is_ok() {
+            let _ = std::fs::write(path, source);
+        }
+    }
 
     let compiler = shaderc::Compiler::new()
         .map_err(|error| format!("failed to create Shaderc compiler: {error}"))?;

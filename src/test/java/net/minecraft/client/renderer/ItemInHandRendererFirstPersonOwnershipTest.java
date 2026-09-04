@@ -89,4 +89,28 @@ final class ItemInHandRendererFirstPersonOwnershipTest {
 		assertTrue(method >= 0 && loop > method && guard > loop && extraction > guard,
 			"first-person semantic layers must be null-checked before extraction");
 	}
+
+	@Test
+	void rustWholeFrameHandsPreserveVanillaCameraSpacePoseContract() throws Exception {
+		String source = Files.readString(PROJECT_ROOT.resolve(
+			"src/main/java/net/minecraft/client/renderer/GameRenderer.java"
+		));
+		int begin = source.indexOf("RustGalWorldPrimitiveRenderer.beginFirstPersonFrame(handProjection, view);");
+		int render = source.indexOf("this.itemInHandRenderer.renderRustVulkanHands(", begin);
+		assertTrue(begin >= 0 && render > begin,
+			"Rust whole-frame hand extraction must run from the first-person semantic callsite");
+		String region = source.substring(begin, Math.min(source.length(), render + 420));
+		assertTrue(region.contains("PoseStack handPoseStack = new PoseStack()")
+			&& region.contains("handPoseStack.last().pose().set(view).invert()"),
+			"the semantic hand writer must receive the explicit inverse camera-space pose used by vanilla");
+		int inverse = region.indexOf("handPoseStack.last().pose().set(view).invert()");
+		int hurtBob = region.indexOf("this.bobHurt(handPoseStack, f)");
+		int viewBob = region.indexOf("this.bobView(handPoseStack, f)");
+		assertTrue(inverse >= 0 && hurtBob > inverse && viewBob > hurtBob,
+			"Rust first-person extraction must preserve Frozen's inverse-view, hurt-bob, then view-bob pose ordering");
+		assertTrue(region.contains("view,") && region.contains("projection"),
+			"the explicit frame view and projection must be passed to Rust hand extraction");
+		assertTrue(region.contains("handPoseStack"),
+			"Rust hand extraction must use the prepared semantic hand pose rather than an unrelated identity pose");
+	}
 }

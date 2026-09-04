@@ -74,9 +74,19 @@ public class ClientPackSource extends BuiltInPackSource {
 		VanillaPackResourcesBuilder vanillaPackResourcesBuilder = new VanillaPackResourcesBuilder()
 			.setMetadata(BUILT_IN_METADATA)
 			.exposeNamespace(new String[]{"minecraft", "voxelmap", "sodium", "iris", "distanthorizons", "tacz"});
-		// Load assets from JAR only - no external filesystem path needed
-		// This eliminates the need to copy 407MB of assets to the filesystem
-		return vanillaPackResourcesBuilder.applyDevelopmentConfig().pushJarResources().build(VANILLA_PACK_INFO);
+		vanillaPackResourcesBuilder.applyDevelopmentConfig().pushJarResources();
+		// The development distribution keeps the downloaded vanilla payload in
+		// run/assets/files while the JAR contains bounded placeholder resources.
+		// Add that exploded asset root after the JAR so VanillaPackResources' path
+		// precedence selects the real payload without bypassing resource-pack
+		// resolution or creating a Java-owned texture path.
+		if (SharedConstants.IS_RUNNING_IN_IDE && path.getFileSystem() == FileSystems.getDefault()) {
+			Path explodedAssets = path.resolve("files");
+			if (Files.isDirectory(explodedAssets, new LinkOption[0])) {
+				vanillaPackResourcesBuilder.pushAssetPath(PackType.CLIENT_RESOURCES, explodedAssets);
+			}
+		}
+		return vanillaPackResourcesBuilder.build(VANILLA_PACK_INFO);
 	}
 
 	protected Component getPackTitle(String string) {

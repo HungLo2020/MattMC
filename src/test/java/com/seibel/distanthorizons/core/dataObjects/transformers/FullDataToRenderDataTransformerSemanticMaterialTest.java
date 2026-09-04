@@ -41,4 +41,23 @@ class FullDataToRenderDataTransformerSemanticMaterialTest {
 		assertEquals(new ColumnRenderSource.SemanticMaterialSpan(4, 8, 12,
 			ColumnRenderSource.SEMANTIC_VARIANT_EXACT, 200L), spans.get(1));
 	}
+
+	@Test
+	void reducedVariantIsExactOnlyWhenEverySourceAgreesOnIdentityAndPosition() {
+		var exact = new ColumnRenderSource.SemanticMaterialSpan(0, 8, 9,
+			ColumnRenderSource.SEMANTIC_VARIANT_EXACT, 100L);
+		assertEquals(ColumnRenderSource.SEMANTIC_VARIANT_EXACT,
+			FullDataToRenderDataTransformer.reducedSemanticVariantState(9, List.of(exact)));
+		assertEquals(ColumnRenderSource.SEMANTIC_VARIANT_MIXED,
+			FullDataToRenderDataTransformer.reducedSemanticVariantState(9, List.of(
+				exact,
+				new ColumnRenderSource.SemanticMaterialSpan(8, 16, 9,
+					ColumnRenderSource.SEMANTIC_VARIANT_EXACT, 200L)
+			)));
+		assertEquals(ColumnRenderSource.SEMANTIC_VARIANT_UNAVAILABLE,
+			FullDataToRenderDataTransformer.reducedSemanticVariantState(9, List.of(
+				new ColumnRenderSource.SemanticMaterialSpan(0, 8, 9,
+					ColumnRenderSource.SEMANTIC_VARIANT_UNAVAILABLE, 0L)
+			)));
+	}
 }

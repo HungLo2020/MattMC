@@ -295,53 +295,69 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable,
 		// the Java GPU atlas is not involved in the Rust route.  The atlas contents
 		// map is immutable between reloads, so an ordered bounded hash is enough to
 		// distinguish frame selections without retaining Java texture state.
-		long frameKey = 0xcbf29ce484222325L;
-		for (TextureAtlasSprite sprite : this.texturesByName.values()) {
-			frameKey ^= sprite.contents().semanticFrameIndex() & 0xffffffffL;
-			frameKey *= 0x100000001b3L;
-		}
+		long frameKey = semanticFrameKey();
 		if (this.semanticRawSnapshot != null
 			&& this.semanticRawSnapshot.generation() == this.semanticSnapshotGeneration
 			&& this.semanticSnapshotFrameKey == frameKey) {
 			return this.semanticRawSnapshot;
 		}
-		byte[] pixels;
-		try {
-			pixels = new byte[Math.multiplyExact(Math.multiplyExact(this.width, this.height), 4)];
-		} catch (ArithmeticException error) {
-			return null;
-		}
-		for (TextureAtlasSprite sprite : this.texturesByName.values()) {
-			SpriteContents contents = sprite.contents();
-			int sourceX = 0;
-			int sourceY = 0;
-			if (contents.animatedTexture != null) {
-				if (contents.animatedTexture.frames.isEmpty()) {
-					return null;
-				}
-				int frame = contents.semanticFrameIndex();
-				sourceX = contents.animatedTexture.getFrameX(frame) * contents.width();
-				sourceY = contents.animatedTexture.getFrameY(frame) * contents.height();
-			}
-			if (sprite.getX() < 0 || sprite.getY() < 0 || sprite.getX() + contents.width() > this.width
-				|| sprite.getY() + contents.height() > this.height
-				|| sourceX + contents.width() > contents.originalImage.getWidth()
-				|| sourceY + contents.height() > contents.originalImage.getHeight()) {
+		// Frozen samples the per-sprite CPU mip chain built by SpriteContents,
+		// then uploads each level into the matching atlas level.  A whole-atlas
+		// mip generator would blur unrelated neighbouring sprites together. Copy
+		// the same immutable CPU mip pixels for Rust-owned sampling; this neither
+		// reads nor retains a Java GPU texture.
+		int mipCount = Math.max(1, this.mipLevel + 1);
+		List<byte[]> mipPixels = new ArrayList<>(mipCount);
+		for (int mip = 0; mip < mipCount; mip++) {
+			int mipWidth = Math.max(1, this.width >> mip);
+			int mipHeight = Math.max(1, this.height >> mip);
+			byte[] pixels;
+			try {
+				pixels = new byte[Math.multiplyExact(Math.multiplyExact(mipWidth, mipHeight), 4)];
+			} catch (ArithmeticException error) {
 				return null;
 			}
-			for (int y = 0; y < contents.height(); y++) {
-				for (int x = 0; x < contents.width(); x++) {
-					int argb = contents.originalImage.getPixel(sourceX + x, sourceY + y);
-					int offset = ((sprite.getY() + y) * this.width + sprite.getX() + x) * 4;
-					pixels[offset] = (byte)net.minecraft.util.ARGB.red(argb);
-					pixels[offset + 1] = (byte)net.minecraft.util.ARGB.green(argb);
-					pixels[offset + 2] = (byte)net.minecraft.util.ARGB.blue(argb);
-					pixels[offset + 3] = (byte)net.minecraft.util.ARGB.alpha(argb);
+			for (TextureAtlasSprite sprite : this.texturesByName.values()) {
+				SpriteContents contents = sprite.contents();
+				if (mip >= contents.byMipLevel.length || contents.byMipLevel[mip] == null) {
+					return null;
+				}
+				var sourceImage = contents.byMipLevel[mip];
+				int spriteWidth = Math.max(1, contents.width() >> mip);
+				int spriteHeight = Math.max(1, contents.height() >> mip);
+				int sourceX = 0;
+				int sourceY = 0;
+				if (contents.animatedTexture != null) {
+					if (contents.animatedTexture.frames.isEmpty()) {
+						return null;
+					}
+					int frame = contents.semanticFrameIndex();
+					sourceX = contents.animatedTexture.getFrameX(frame) * spriteWidth;
+					sourceY = contents.animatedTexture.getFrameY(frame) * spriteHeight;
+				}
+				int targetX = sprite.getX() >> mip;
+				int targetY = sprite.getY() >> mip;
+				if (targetX < 0 || targetY < 0 || targetX + spriteWidth > mipWidth
+					|| targetY + spriteHeight > mipHeight
+					|| sourceX + spriteWidth > sourceImage.getWidth()
+					|| sourceY + spriteHeight > sourceImage.getHeight()) {
+					return null;
+				}
+				for (int y = 0; y < spriteHeight; y++) {
+					for (int x = 0; x < spriteWidth; x++) {
+						int argb = sourceImage.getPixel(sourceX + x, sourceY + y);
+						int offset = ((targetY + y) * mipWidth + targetX + x) * 4;
+						pixels[offset] = (byte)net.minecraft.util.ARGB.red(argb);
+						pixels[offset + 1] = (byte)net.minecraft.util.ARGB.green(argb);
+						pixels[offset + 2] = (byte)net.minecraft.util.ARGB.blue(argb);
+						pixels[offset + 3] = (byte)net.minecraft.util.ARGB.alpha(argb);
+					}
 				}
 			}
+			mipPixels.add(pixels);
 		}
 		this.semanticRawSnapshot = new TextureAtlas.SemanticRawSnapshot(
-			this.location, this.semanticSnapshotGeneration, this.width, this.height, pixels
+			this.location, this.semanticSnapshotGeneration, this.width, this.height, mipPixels.getFirst(), mipPixels
 		);
 		this.semanticSnapshotFrameKey = frameKey;
 		return this.semanticRawSnapshot;
@@ -357,14 +373,34 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable,
 		return this.semanticReloadGeneration;
 	}
 
-	public record SemanticRawSnapshot(ResourceLocation atlasLocation, long generation, int width, int height, byte[] pixels) {
+	/** Returns the currently selected animation-frame key without allocating pixels. */
+	public synchronized long semanticSnapshotFrameKey() {
+		return semanticFrameKey();
+	}
+
+	private long semanticFrameKey() {
+		long frameKey = 0xcbf29ce484222325L;
+		for (TextureAtlasSprite sprite : this.texturesByName.values()) {
+			frameKey ^= sprite.contents().semanticFrameIndex() & 0xffffffffL;
+			frameKey *= 0x100000001b3L;
+		}
+		return frameKey;
+	}
+
+	public record SemanticRawSnapshot(ResourceLocation atlasLocation, long generation, int width, int height, byte[] pixels, List<byte[]> mipPixels) {
 		public SemanticRawSnapshot {
 			pixels = pixels.clone();
+			mipPixels = mipPixels.stream().map(byte[]::clone).toList();
 		}
 
 		@Override
 		public byte[] pixels() {
 			return this.pixels.clone();
+		}
+
+		@Override
+		public List<byte[]> mipPixels() {
+			return this.mipPixels.stream().map(byte[]::clone).toList();
 		}
 	}
 

@@ -139,6 +139,23 @@ pub extern "C" fn mattmc_sodium_occlusion_connections(
 }
 
 #[no_mangle]
+pub extern "C" fn mattmc_sodium_occlusion_connections_for_camera(
+    visibility_data: u64,
+    incoming: i32,
+    camera_delta_x: f64,
+    camera_delta_y: f64,
+    camera_delta_z: f64,
+) -> i32 {
+    connections_for_section(
+        visibility_data,
+        incoming,
+        camera_delta_x,
+        camera_delta_y,
+        camera_delta_z,
+    )
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn mattmc_sodium_occlusion_connections_batch(
     visibility_data_ptr: *const u64,
     visibility_data_len: i32,
@@ -247,6 +264,15 @@ mod tests {
         assert_eq!(
             1 << NORTH,
             connections_for_section(encoded, incoming, 20.0, 1.0, 0.0)
+        );
+    }
+
+    #[test]
+    fn camera_aware_ffi_matches_the_portal_angle_contract() {
+        let encoded = encode_visibility_matrix(&matrix(&[(DOWN, UP), (DOWN, NORTH)])).unwrap();
+        assert_eq!(
+            1 << NORTH,
+            mattmc_sodium_occlusion_connections_for_camera(encoded, 1 << DOWN, 20.0, 1.0, 0.0)
         );
     }
 

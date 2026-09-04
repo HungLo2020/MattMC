@@ -1,6 +1,7 @@
 package com.seibel.distanthorizons.core.dataObjects.render;
 
 import org.junit.jupiter.api.Test;
+import com.seibel.distanthorizons.core.util.RenderDataPointUtil;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -60,5 +61,49 @@ class ColumnRenderSourceSemanticMaterialTest {
 
 		source.clearSemanticMaterialsForColumn(0, 0);
 		assertTrue(source.getSemanticMaterialSpans(0, 0, 0).isEmpty());
+	}
+
+	@Test
+	void compactSemanticSidecarReconstructsExactSeedAndStoresUniformityPerColumn() {
+		ColumnRenderSource source = ColumnRenderSource.createEmpty(0L, 2, -64);
+		source.renderDataContainer.set(1, RenderDataPointUtil.createDataPoint(8, 7, 0xffffffff, (byte) 0, (byte) 0, (byte) 0));
+		source.setSemanticVariantProvenance(0, 0, 1, ColumnRenderSource.SEMANTIC_VARIANT_EXACT, 123L);
+		source.setSemanticHorizontalUniformity(0, 0, 1, true);
+
+		assertEquals(ColumnRenderSource.packSemanticVariantPosition(0, -57, 0),
+			source.getSemanticVariantPosition(0, 0, 1));
+		assertTrue(source.hasSemanticHorizontalUniformity(0, 0, 0));
+		source.clearSemanticMaterialsForColumn(0, 0);
+		assertEquals(ColumnRenderSource.SEMANTIC_VARIANT_UNAVAILABLE, source.getSemanticVariantState(0, 0, 1));
+		assertTrue(!source.hasSemanticHorizontalUniformity(0, 0, 1));
+	}
+
+	@Test
+	void horizontalContributorTransportIsDefensiveAndClearedWithColumn() {
+		ColumnRenderSource source = ColumnRenderSource.createEmpty(0L, 1, 0);
+		it.unimi.dsi.fastutil.longs.LongArrayList first = new it.unimi.dsi.fastutil.longs.LongArrayList(new long[] { 11L });
+		it.unimi.dsi.fastutil.longs.LongArrayList[] contributors = new it.unimi.dsi.fastutil.longs.LongArrayList[] {
+			first, null, new it.unimi.dsi.fastutil.longs.LongArrayList(new long[] { 22L }), null
+		};
+		source.setSemanticHorizontalContributors(2, 3, contributors);
+		first.set(0, 99L);
+		assertEquals(11L, source.getSemanticHorizontalContributors(2, 3)[0].getLong(0));
+		source.clearSemanticMaterialsForColumn(2, 3);
+		assertNull(source.getSemanticHorizontalContributors(2, 3));
+	}
+
+	@Test
+	void horizontalContributorSpansReturnAClonedContributorArray() {
+		ColumnRenderSource source = ColumnRenderSource.createEmpty(0L, 1, 0);
+		int stone = source.internSemanticMaterial("minecraft:stone", "minecraft:plains");
+		ColumnRenderSource.SemanticHorizontalContributor[] contributors = new ColumnRenderSource.SemanticHorizontalContributor[4];
+		contributors[0] = new ColumnRenderSource.SemanticHorizontalContributor(
+			java.util.List.of(new ColumnRenderSource.SemanticMaterialSpan(0, 4, stone,
+				ColumnRenderSource.SEMANTIC_VARIANT_UNAVAILABLE, 0L)));
+		source.setSemanticHorizontalContributorSpans(1, 1, 0, contributors);
+		ColumnRenderSource.SemanticHorizontalContributor[] returned = source.getSemanticHorizontalContributorSpans(1, 1, 0);
+		assertEquals(4, returned.length);
+		returned[0] = null;
+		assertTrue(source.getSemanticHorizontalContributorSpans(1, 1, 0)[0] != null);
 	}
 }

@@ -18,8 +18,10 @@ import com.seibel.distanthorizons.core.wrapperInterfaces.block.IBlockStateWrappe
 
 import java.util.EnumMap;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -40,6 +42,15 @@ final class DistantHorizonsFaceMaterialResolver {
 	}
 
 	private static final int MAX_FACE_LAYERS = 4;
+	/**
+	 * Reusing a resolution is safe because it retains only copied semantic atlas
+	 * values, never a Minecraft model, sprite, or renderer object.  Bound it so
+	 * a modded world's state vocabulary cannot turn the exact-atlas path into an
+	 * unbounded Java heap cache.
+	 */
+	private static final int MAX_CACHED_STATE_RESOLUTIONS = 2_048;
+	private static final Map<String, Resolution> CACHED_STATE_RESOLUTIONS =
+		new LinkedHashMap<>(128, 0.75F, true);
 
 	enum Status {
 		COMPLETE,
@@ -146,6 +157,11 @@ final class DistantHorizonsFaceMaterialResolver {
 		boolean hasResolvedFaces() {
 			return !this.faceLayers.isEmpty();
 		}
+
+		/** Exact-atlas provenance may only advertise a complete model-face map. */
+		boolean isExactAtlasAdmissible() {
+			return this.status == Status.COMPLETE && hasResolvedFaces();
+		}
 	}
 
 	/**
@@ -251,11 +267,19 @@ final class DistantHorizonsFaceMaterialResolver {
 			return new FaceResolution(List.of(), null);
 		}
 		LinkedHashSet<FaceMaterial> materials = new LinkedHashSet<>();
+		boolean skippedInvalidQuad = false;
 		for (BakedQuad quad : quads) {
 			TextureAtlasSprite sprite = quad.sprite();
 			int uvCornerOrder = canonicalUvCornerOrder((BakedQuadView)(Object)quad, direction, sprite);
 			if (uvCornerOrder < 0) {
-				return new FaceResolution(List.of(), Status.UNSUPPORTED_FACE_MAPPING);
+				// A model face may contain several geometric quads (stairs are a
+				// common example). Keep independently valid records instead of
+				// discarding the entire face because one inset/diagonal quad cannot
+				// be represented by the bounded reduced-face contract. The caller
+				// still receives a partial status and the invalid geometry remains
+				// explicitly unavailable in Rust.
+				skippedInvalidQuad = true;
+				continue;
 			}
 			int tintArgb = 0xffffffff;
 			if (quad.isTinted() && tintPosition != null) {
@@ -273,7 +297,8 @@ final class DistantHorizonsFaceMaterialResolver {
 				return new FaceResolution(List.of(), Status.MULTIPLE_FACE_QUADS);
 			}
 		}
-		return new FaceResolution(numberedLayers(materials), null);
+		return new FaceResolution(numberedLayers(materials),
+			skippedInvalidQuad ? Status.UNSUPPORTED_FACE_MAPPING : null);
 	}
 
 	private static List<FaceMaterial> numberedLayers(LinkedHashSet<FaceMaterial> materials) {
@@ -301,6 +326,27 @@ final class DistantHorizonsFaceMaterialResolver {
 	 */
 	static Resolution resolveCurrentClientState(String blockStateIdentity) {
 		Objects.requireNonNull(blockStateIdentity, "blockStateIdentity");
+		synchronized (CACHED_STATE_RESOLUTIONS) {
+			Resolution cached = CACHED_STATE_RESOLUTIONS.get(blockStateIdentity);
+			if (cached != null) {
+				return cached;
+			}
+		}
+		Resolution resolved = resolveCurrentClientStateUncached(blockStateIdentity);
+		synchronized (CACHED_STATE_RESOLUTIONS) {
+			Resolution cached = CACHED_STATE_RESOLUTIONS.get(blockStateIdentity);
+			if (cached != null) {
+				return cached;
+			}
+			CACHED_STATE_RESOLUTIONS.put(blockStateIdentity, resolved);
+			if (CACHED_STATE_RESOLUTIONS.size() > MAX_CACHED_STATE_RESOLUTIONS) {
+				CACHED_STATE_RESOLUTIONS.remove(CACHED_STATE_RESOLUTIONS.entrySet().iterator().next().getKey());
+			}
+		}
+		return resolved;
+	}
+
+	private static Resolution resolveCurrentClientStateUncached(String blockStateIdentity) {
 		Minecraft minecraft = Minecraft.getInstance();
 		if (minecraft == null) {
 			return unavailable();
@@ -332,6 +378,29 @@ final class DistantHorizonsFaceMaterialResolver {
 			}
 		}
 		return first;
+	}
+
+	static void clearCachedStateResolutions() {
+		synchronized (CACHED_STATE_RESOLUTIONS) {
+			CACHED_STATE_RESOLUTIONS.clear();
+		}
+	}
+
+	static int cachedStateResolutionCountForTest() {
+		synchronized (CACHED_STATE_RESOLUTIONS) {
+			return CACHED_STATE_RESOLUTIONS.size();
+		}
+	}
+
+	static void cacheStateResolutionForTest(String blockStateIdentity, Resolution resolution) {
+		Objects.requireNonNull(blockStateIdentity, "blockStateIdentity");
+		Objects.requireNonNull(resolution, "resolution");
+		synchronized (CACHED_STATE_RESOLUTIONS) {
+			CACHED_STATE_RESOLUTIONS.put(blockStateIdentity, resolution);
+			if (CACHED_STATE_RESOLUTIONS.size() > MAX_CACHED_STATE_RESOLUTIONS) {
+				CACHED_STATE_RESOLUTIONS.remove(CACHED_STATE_RESOLUTIONS.entrySet().iterator().next().getKey());
+			}
+		}
 	}
 
 	/**

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import ctypes
 import csv
 import gzip
 from collections import Counter
@@ -36,6 +37,10 @@ MANIFEST_NAME = "graphics_audit_manifest.json"
 BASELINE_INDEX_NAME = "graphics_audit_baselines.json"
 DEFAULT_TIMEOUT_SECONDS = 900
 NORMALIZED_LOG_TAIL_BYTES = 2_000_000
+DEFAULT_STATIC_TERRAIN_PARITY_MAX_SAMPLES = 512
+MAX_STATIC_TERRAIN_PARITY_MAX_SAMPLES = 2_048
+DEFAULT_STATIC_TERRAIN_PARITY_MAX_EVENTS = 512
+MAX_STATIC_TERRAIN_PARITY_MAX_EVENTS = 8
 HARNESS_REPO_ROOT = Path(__file__).resolve().parents[2]
 CURRENT_REPO_ROOT = HARNESS_REPO_ROOT
 DEVUTILS_CACHE_ROOT = HARNESS_REPO_ROOT / "DevUtils" / ".cache"
@@ -73,7 +78,7 @@ WORLD_PROFILE_NAMES = ("migration-gate", "stress-diagnostic")
 PISTON_SHELL_SCAN_BUDGET_NANOS = 5_000_000
 FALLING_BLOCK_MIN_CAPTURE_FRAMES = 4
 EXPECTED_SHADER_PACK = "ComplementaryHungLoIfied.zip"
-PARITY_FIXTURE_SCHEMA = "mattmc-cross-repo-fixture-v1"
+PARITY_FIXTURE_SCHEMA = "mattmc-cross-repo-fixture-v2"
 PARITY_CONFIG_SCHEMA = "mattmc-cross-repo-parity-config-v1"
 DEFAULT_PARITY_CAMERA = {
     "x": 150.5,
@@ -83,6 +88,77 @@ DEFAULT_PARITY_CAMERA = {
     "pitch": 10.0,
     "pose_sequence": "single-static-v1",
 }
+
+
+def static_terrain_parity_max_samples() -> int:
+    """Return the explicitly requested, bounded terrain-source receipt size."""
+    raw_value = os.environ.get(
+        "MATTMC_STATIC_TERRAIN_PARITY_MAX_SAMPLES",
+        str(DEFAULT_STATIC_TERRAIN_PARITY_MAX_SAMPLES),
+    )
+    try:
+        requested = int(raw_value)
+    except ValueError:
+        return DEFAULT_STATIC_TERRAIN_PARITY_MAX_SAMPLES
+    return max(0, min(requested, MAX_STATIC_TERRAIN_PARITY_MAX_SAMPLES))
+
+
+def static_terrain_parity_max_events() -> int:
+    """Bound repeated diagnostic receipts without changing the normal default."""
+    raw_value = os.environ.get(
+        "MATTMC_STATIC_TERRAIN_PARITY_MAX_EVENTS",
+        str(DEFAULT_STATIC_TERRAIN_PARITY_MAX_EVENTS),
+    )
+    try:
+        requested = int(raw_value)
+    except ValueError:
+        return DEFAULT_STATIC_TERRAIN_PARITY_MAX_EVENTS
+    return max(1, min(requested, MAX_STATIC_TERRAIN_PARITY_MAX_EVENTS))
+
+
+def static_terrain_parity_max_visible_list_events() -> int:
+    return static_terrain_parity_diagnostic_limit(
+        "MATTMC_STATIC_TERRAIN_PARITY_MAX_VISIBLE_LIST_EVENTS", 8, 32
+    )
+
+
+def static_terrain_parity_diagnostic_limit(name: str, default: int, maximum: int, minimum: int = 1) -> int:
+    """Read a bounded optional diagnostic budget shared by paired captures."""
+    try:
+        requested = int(os.environ.get(name, str(default)))
+    except ValueError:
+        return default
+    return max(minimum, min(requested, maximum))
+
+
+def static_terrain_parity_max_coverage_samples() -> int:
+    return static_terrain_parity_diagnostic_limit(
+        "MATTMC_STATIC_TERRAIN_PARITY_MAX_COVERAGE_SAMPLES", 128, 1_024, 0
+    )
+
+
+def static_terrain_parity_max_coverage_events() -> int:
+    return static_terrain_parity_diagnostic_limit(
+        "MATTMC_STATIC_TERRAIN_PARITY_MAX_COVERAGE_EVENTS", 8, 32
+    )
+
+
+def static_terrain_parity_max_whole_frame_coverage_events() -> int:
+    return static_terrain_parity_diagnostic_limit(
+        "MATTMC_STATIC_TERRAIN_PARITY_MAX_WHOLE_FRAME_COVERAGE_EVENTS", 8, 32
+    )
+
+
+def static_terrain_parity_max_portal_trace_events() -> int:
+    return static_terrain_parity_diagnostic_limit(
+        "MATTMC_STATIC_TERRAIN_PARITY_MAX_PORTAL_TRACE_EVENTS", 32, 128
+    )
+
+
+def static_terrain_parity_max_face_cull_trace_events() -> int:
+    return static_terrain_parity_diagnostic_limit(
+        "MATTMC_STATIC_TERRAIN_PARITY_MAX_FACE_CULL_TRACE_EVENTS", 32, 128
+    )
 
 
 @dataclass(frozen=True)
@@ -179,6 +255,26 @@ SELECTED_SOURCE_ADMISSION_GRACE_SECONDS = 180
 # proves that this producer has started; readiness and parity gates remain
 # unchanged.
 WHOLE_FRAME_TERRAIN_ADMISSION_GRACE_SECONDS = 180
+# Generated resource packs force a real client reload and rebuild every
+# visible section.  Keep the normal safety bound for ordinary workloads, but
+# give this explicitly selected Rust Vulkan workload enough bounded time to
+# finish its real admission window.  This is a process-time safety budget, not
+# a parity/readiness relaxation; the same fixture and evidence gates still
+# apply after the window completes.
+RESOURCE_PACK_TERRAIN_ADMISSION_GRACE_SECONDS = 360
+
+
+def terrain_admission_grace_seconds(args: argparse.Namespace, mode: "ModeSpec", tool_kind: str) -> int:
+    if (
+        tool_kind == "gameplay"
+        and mode.backend == "rust-vulkan"
+        and (
+            bool(getattr(args, "gui_resource_pack_scenario", ""))
+            or bool(getattr(args, "world_static_terrain_resource_pack_scenario", ""))
+        )
+    ):
+        return RESOURCE_PACK_TERRAIN_ADMISSION_GRACE_SECONDS
+    return WHOLE_FRAME_TERRAIN_ADMISSION_GRACE_SECONDS
 
 WORLD_PROFILES = {
     "migration-gate": WorldProfile(
@@ -208,8 +304,6 @@ WORLD_PROFILES = {
 MATRIX_MODES = (
     ModeSpec("current-opengl-shaders-off", "current", "opengl", "off", "java-opengl", False),
     ModeSpec("current-opengl-shaders-on", "current", "opengl", "on", "java-opengl", False),
-    ModeSpec("current-java-vulkan-shaders-off", "current", "vulkan", "off", "java-vulkan", True),
-    ModeSpec("current-java-vulkan-shaders-on", "current", "vulkan", "on", "java-vulkan", True),
     ModeSpec("current-rust-opengl-shaders-off", "current", "rust-opengl", "off", "rust-opengl", False),
     ModeSpec("current-rust-opengl-shaders-on", "current", "rust-opengl", "on", "rust-opengl", False),
     ModeSpec("current-rust-vulkan-shaders-off", "current", "rust-vulkan", "off", "rust-vulkan", True),
@@ -1177,7 +1271,141 @@ def canonical_fixture_id(args: argparse.Namespace) -> str:
     scenario = getattr(args, "world_static_terrain_scenario", "") or "real-world"
     world = getattr(args, "world", "") or WORLD_PROFILES[getattr(args, "world_profile", "migration-gate")].world
     resource_pack = getattr(args, "world_static_terrain_resource_pack_scenario", "") or "vanilla"
-    return f"{world}-{scenario}-{resource_pack}-{PARITY_FIXTURE_SCHEMA}".replace("/", "_").replace(" ", "_")
+    model_scenario = getattr(args, "world_mesh_model_scenario", "") or "hidden"
+    text_scenario = getattr(args, "world_text_scenario", "") or "hidden"
+    terrain_particle_scenario = getattr(args, "world_material_terrain_particle_scenario", "") or "hidden"
+    weather_scenario = getattr(args, "world_weather_scenario", "") or "hidden"
+    cloud_scenario = getattr(args, "world_cloud_scenario", "") or "hidden"
+    background_scenario = getattr(args, "world_background_scenario", "") or "auto"
+    dh_flags = "-".join(
+        name
+        for name, flag in (
+            ("dh-opaque", "world_distant_horizons_opaque"),
+            ("dh-non-water", "world_distant_horizons_non_water"),
+            ("dh-water", "world_distant_horizons_water"),
+            ("dh-texture-palette", "world_distant_horizons_texture_palette"),
+        )
+        if getattr(args, flag, False)
+    ) or "dh-none"
+    world_profile = getattr(args, "world_profile", "migration-gate")
+    return f"{world}-{world_profile}-{scenario}-{resource_pack}-{model_scenario}-{text_scenario}-{terrain_particle_scenario}-{weather_scenario}-{cloud_scenario}-{background_scenario}-{dh_flags}-{PARITY_FIXTURE_SCHEMA}".replace("/", "_").replace(" ", "_")
+
+
+def materialize_external_dh_fixture(args: argparse.Namespace, world_root: Path) -> None:
+    """Install one bounded, ordinary world fixture shared by Current and Frozen.
+
+    The fixture is a datapack rather than a renderer-side injection: both
+    repositories load the same blocks through vanilla server ticking, while
+    Current's semantic collector remains the only route-specific observer.
+    """
+    if not any(
+        getattr(args, flag, False)
+        for flag in (
+            "world_distant_horizons_opaque",
+            "world_distant_horizons_non_water",
+            "world_distant_horizons_water",
+            "world_distant_horizons_texture_palette",
+        )
+    ):
+        return
+    datapack = world_root / "datapacks" / "mattmc_dh_fixture"
+    function_dir = datapack / "data" / "mattmc" / "function"
+    tag_dir = datapack / "data" / "minecraft" / "tags" / "function"
+    function_dir.mkdir(parents=True, exist_ok=True)
+    tag_dir.mkdir(parents=True, exist_ok=True)
+    # One 32x32 panel in the canonical camera's forward cone. The coordinates
+    # are also consumed by DeterministicCameraCapture's external-fixture path.
+    # Keep the 32x32 witness panel inside one lowest-detail DH section.  The
+    # previous 42/489 origin crossed both the x=64 and z=512 section seams,
+    # allowing different source generations to be correlated as one palette.
+    panel_min_x, panel_min_z, panel_y = 64, 512, 81
+    lines = [
+        'tellraw @a {"text":"MattMC GUI text parity probe","color":"gold"}',
+        f"forceload add {panel_min_x} {panel_min_z} {panel_min_x + 31} {panel_min_z + 31}",
+        f"fill {panel_min_x} {panel_y - 1} {panel_min_z} {panel_min_x + 31} {panel_y - 1} {panel_min_z + 31} minecraft:stone",
+        f"fill {panel_min_x} {panel_y} {panel_min_z} {panel_min_x + 15} {panel_y} {panel_min_z + 15} minecraft:yellow_terracotta",
+        f"fill {panel_min_x + 16} {panel_y} {panel_min_z} {panel_min_x + 31} {panel_y} {panel_min_z + 15} minecraft:diamond_block",
+        f"fill {panel_min_x} {panel_y} {panel_min_z + 16} {panel_min_x + 15} {panel_y} {panel_min_z + 31} minecraft:lapis_block",
+        f"fill {panel_min_x + 16} {panel_y} {panel_min_z + 16} {panel_min_x + 31} {panel_y} {panel_min_z + 31} minecraft:redstone_ore",
+        f"fill {panel_min_x} {panel_y + 1} {panel_min_z} {panel_min_x + 31} {panel_y + 4} {panel_min_z + 31} minecraft:air",
+    ]
+    if getattr(args, "world_distant_horizons_water", False):
+        lines.extend(
+            [
+                f"fill {panel_min_x + 28} {panel_y} {panel_min_z + 24} {panel_min_x + 31} {panel_y} {panel_min_z + 27} minecraft:stone",
+                f"fill {panel_min_x + 28} {panel_y + 1} {panel_min_z + 24} {panel_min_x + 31} {panel_y + 1} {panel_min_z + 27} minecraft:water",
+            ]
+        )
+    # Run one tick after the load tag fires.  Integrated-server world loading
+    # can invoke the load tag before the copied save's chunks/tickers are
+    # attached; scheduling the same server-authored commands avoids a silent
+    # no-op while remaining identical in Current and Frozen.
+    (function_dir / "load.mcfunction").write_text(
+        "schedule function mattmc:fixture 1t replace\n", encoding="utf-8"
+    )
+    (function_dir / "fixture.mcfunction").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    # Some copied saves are entered after the load tag has already fired. A
+    # self-disabling tick hook makes the fixture lifecycle-independent: it
+    # executes once after the world is live, then becomes a no-op once the
+    # lapis witness exists.
+    (function_dir / "tick.mcfunction").write_text(
+        f"execute unless block {panel_min_x + 13} {panel_y} {panel_min_z + 25} minecraft:lapis_block run function mattmc:fixture\n",
+        encoding="utf-8",
+    )
+    (tag_dir / "load.json").write_text(
+        json.dumps({"values": ["mattmc:load"]}, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    (tag_dir / "tick.json").write_text(
+        json.dumps({"values": ["mattmc:tick"]}, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    (world_root / "datapacks" / "mattmc_dh_fixture" / "pack.mcmeta").write_text(
+        json.dumps(
+            {"pack": {"pack_format": 71, "description": "MattMC shared DH parity fixture"}},
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+def materialize_external_model_fixture(args: argparse.Namespace, world_root: Path) -> None:
+    """Install block-model witnesses into the shared copied world.
+
+    Model scenarios must be present in both Current and Frozen copies. The
+    Current client may reassert the same block through diagnostic setup, but
+    this datapack is the authoritative cross-repository fixture.
+    """
+    scenario = str(getattr(args, "world_mesh_model_scenario", "") or "").strip().lower()
+    blocks = {
+        "chest": "minecraft:chest[facing=south]",
+        "bed": "minecraft:red_bed[facing=south,part=foot,occupied=false]",
+        "bell": "minecraft:bell[facing=south,attachment=floor]",
+        "shulker": "minecraft:purple_shulker_box[facing=up]",
+        "decorated-pot": "minecraft:decorated_pot",
+        "conduit": "minecraft:conduit",
+    }
+    block = blocks.get(scenario)
+    if block is None:
+        return
+    datapack = world_root / "datapacks" / "mattmc_model_fixture"
+    function_dir = datapack / "data" / "mattmc_model_fixture" / "function"
+    tag_dir = datapack / "data" / "minecraft" / "tags" / "function"
+    function_dir.mkdir(parents=True, exist_ok=True)
+    tag_dir.mkdir(parents=True, exist_ok=True)
+    # Position produced by DEFAULT_PARITY_CAMERA and the model capture's
+    # four-block sightline.
+    lines = [
+        "fill 145 98 528 147 98 530 minecraft:stone",
+        "fill 145 99 528 147 101 530 minecraft:air",
+        f"setblock 146 99 529 {block}",
+    ]
+    (function_dir / "load.mcfunction").write_text("schedule function mattmc_model_fixture:model_fixture 1t replace\n", encoding="utf-8")
+    (function_dir / "model_fixture.mcfunction").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    (tag_dir / "load.json").write_text(json.dumps({"values": ["mattmc_model_fixture:load"]}, sort_keys=True) + "\n", encoding="utf-8")
+    (datapack / "pack.mcmeta").write_text(
+        json.dumps({"pack": {"pack_format": 71, "description": "MattMC shared model parity fixture"}}, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
 
 
 def materialize_canonical_fixture(args: argparse.Namespace, targets: Mapping[str, RepoTarget], artifact_root: Path) -> Path:
@@ -1193,10 +1421,26 @@ def materialize_canonical_fixture(args: argparse.Namespace, targets: Mapping[str
     run_root = fixture_root / "run"
     if not run_root.exists():
         run_root.mkdir(parents=True, exist_ok=True)
-        for name in ("options.txt", "config", "resourcepacks", "shaderpacks", "Distant_Horizons_server_data", "voxelmap"):
+        for name in ("options.txt", "config", "resourcepacks", "assets", "Distant_Horizons_server_data", "voxelmap"):
             copy_optional_tree(source_run / name, run_root / name)
+        apply_canonical_graphics_mode(run_root / "options.txt", getattr(args, "graphics_mode", "fancy"))
+        # Shader-enabled parity must use byte-identical source inputs. Frozen
+        # Java OpenGL is the authoritative baseline, so prefer its selected
+        # pack when available; this does not modify Frozen or alter the Rust
+        # lowering path, it only prevents Current from staging a different
+        # shader archive into an allegedly equivalent fixture.
+        frozen_shader = targets.get("frozen", targets["current"]).root / "run" / "shaderpacks" / EXPECTED_SHADER_PACK
+        shader_source = frozen_shader if frozen_shader.is_file() else source_run / "shaderpacks"
+        shader_destination = (
+            run_root / "shaderpacks" / EXPECTED_SHADER_PACK
+            if shader_source.is_file()
+            else run_root / "shaderpacks"
+        )
+        copy_optional_tree(shader_source, shader_destination)
         (run_root / "saves").mkdir(parents=True, exist_ok=True)
         copy_optional_tree(source_world, run_root / "saves" / world)
+        materialize_external_dh_fixture(args, run_root / "saves" / world)
+        materialize_external_model_fixture(args, run_root / "saves" / world)
     manifest = {
         "schema": PARITY_FIXTURE_SCHEMA,
         "fixture_id": canonical_fixture_id(args),
@@ -1208,8 +1452,12 @@ def materialize_canonical_fixture(args: argparse.Namespace, targets: Mapping[str
         "world": world,
         "world_static_terrain_scenario": getattr(args, "world_static_terrain_scenario", "") or "",
         "resource_pack_scenario": getattr(args, "world_static_terrain_resource_pack_scenario", "") or "",
+        "model_scenario": getattr(args, "world_mesh_model_scenario", "") or "",
+        "world_text_scenario": getattr(args, "world_text_scenario", "") or "",
+        "terrain_particle_scenario": getattr(args, "world_material_terrain_particle_scenario", "") or "",
+        "graphics_mode": getattr(args, "graphics_mode", "fancy"),
         "shader_pack": EXPECTED_SHADER_PACK,
-        "camera": DEFAULT_PARITY_CAMERA,
+        "camera": canonical_camera_options(args),
         "source_save_hash": directory_file_hash(source_world, suffixes={".mca"}),
         "canonical_save_hash": directory_file_hash(run_root / "saves" / world, suffixes={".mca"}),
         "canonical_config_hash": directory_file_hash(run_root / "config"),
@@ -1223,10 +1471,81 @@ def materialize_canonical_fixture(args: argparse.Namespace, targets: Mapping[str
     return run_root
 
 
+def apply_canonical_graphics_mode(options_path: Path, graphics_mode: str) -> None:
+    """Set the copied fixture's graphics mode without touching either live run.
+
+    The option is a deterministic input to both Current Rust Vulkan and Frozen
+    OpenGL. Fabulous is needed to exercise the explicit Rust terrain-
+    transparency handoff, so it must never be inferred from the backend or
+    from a user's mutable options file.
+    """
+    mode_ids = {"fast": "0", "fancy": "1", "fabulous": "2"}
+    try:
+        mode_id = mode_ids[graphics_mode]
+    except KeyError as error:
+        raise ValueError(f"unsupported canonical graphics mode: {graphics_mode}") from error
+    if not options_path.is_file():
+        raise FileNotFoundError(f"canonical fixture options are missing: {options_path}")
+    source = options_path.read_text(encoding="utf-8")
+    rewritten, replacements = re.subn(
+        r"(?m)^graphicsMode:[^\\n]*$",
+        f"graphicsMode:{mode_id}",
+        source,
+        count=1,
+    )
+    if replacements != 1:
+        raise ValueError("canonical fixture options must declare exactly one graphicsMode entry")
+    options_path.write_text(rewritten, encoding="utf-8")
+
+
 def canonical_parity_requested(modes: Sequence[ModeSpec]) -> bool:
     has_frozen_opengl = any(mode.target == "frozen" and mode.backend == "opengl" for mode in modes)
     has_current_rust_vulkan = any(mode.target == "current" and mode.backend == "rust-vulkan" for mode in modes)
     return has_frozen_opengl and has_current_rust_vulkan
+
+
+def canonical_fixture_requested(args: argparse.Namespace, modes: Sequence[ModeSpec]) -> bool:
+    """Return whether this run needs the shared world/camera fixture.
+
+    Matrix parity naturally requests it through the paired Frozen/Current
+    modes.  A focused Current-only terrain/resource-pack capture must use the
+    same fixture as well; otherwise it silently runs the user's live world and
+    has no canonical camera metadata, making the result non-comparable.
+    """
+    if canonical_parity_requested(modes):
+        return True
+    return any(
+        bool(getattr(args, name, ""))
+        for name in (
+            "world_static_terrain_scenario",
+            "world_static_terrain_resource_pack_scenario",
+            "world_static_terrain_water_animation_capture",
+            "world_distant_horizons_opaque",
+            "world_distant_horizons_non_water",
+            "world_distant_horizons_water",
+            "world_distant_horizons_texture_palette",
+            "world_mesh_model_scenario",
+            "world_mesh_falling_block_scenario",
+            "world_mesh_arrow_scenario",
+            "world_item_entity_scenario",
+            "world_experience_orb_scenario",
+            "world_beacon_beam_scenario",
+            "world_entity_flame_scenario",
+            "world_entity_shadow_scenario",
+            "world_entity_leash_scenario",
+            "world_text_scenario",
+            "world_material_terrain_particle_scenario",
+            "world_mesh_primed_tnt_scenario",
+            "world_mesh_piston_scenario",
+            "world_weather_scenario",
+            "world_cloud_scenario",
+            "world_background_scenario",
+            "world_border_scenario",
+            "world_outline_scenario",
+            "world_crack_scenario",
+            "gui_resource_pack_scenario",
+        )
+    )
 
 
 def canonical_camera_options(args: argparse.Namespace) -> dict[str, float | str]:
@@ -1246,6 +1565,54 @@ def append_fixed_camera_jvm_options(args: argparse.Namespace, java_options: list
             f"-Dmattmc.dev.deterministicCameraCapture.fixedPitch={camera['pitch']}",
             f"-Dmattmc.dev.deterministicCameraCapture.cameraPathId={camera['pose_sequence']}",
         ]
+    )
+
+
+def canonical_fixture_uses_static_capture_schedule(args: argparse.Namespace) -> bool:
+    """Whether this is the ordinary one-pose cross-repository fixture.
+
+    Feature fixtures which need motion (translucency sorting, moving entities,
+    weather, etc.) declare and validate their own capture schedule below.  The
+    unscoped canonical Origin fixture, however, is explicitly named
+    ``single-static-v1``.  Both launchers must receive that fact as JVM
+    properties: the Current Python runner otherwise defaults to a four-pose
+    sweep while Frozen's shell runner uses one pose.
+    """
+    if not getattr(args, "_canonical_fixture_run_source", None):
+        return False
+    if canonical_camera_options(args)["pose_sequence"] != "single-static-v1":
+        return False
+    return not any(
+        bool(getattr(args, name, ""))
+        for name in (
+            "world_static_terrain_scenario",
+            "world_static_terrain_resource_pack_scenario",
+            "world_static_terrain_water_animation_capture",
+            "world_distant_horizons_opaque",
+            "world_distant_horizons_non_water",
+            "world_distant_horizons_water",
+            "world_distant_horizons_texture_palette",
+            "world_mesh_model_scenario",
+            "world_mesh_falling_block_scenario",
+            "world_mesh_arrow_scenario",
+            "world_item_entity_scenario",
+            "world_experience_orb_scenario",
+            "world_beacon_beam_scenario",
+            "world_entity_flame_scenario",
+            "world_entity_shadow_scenario",
+            "world_entity_leash_scenario",
+            "world_text_scenario",
+            "world_material_terrain_particle_scenario",
+            "world_mesh_primed_tnt_scenario",
+            "world_mesh_piston_scenario",
+            "world_weather_scenario",
+            "world_cloud_scenario",
+            "world_background_scenario",
+            "world_border_scenario",
+            "world_outline_scenario",
+            "world_crack_scenario",
+            "gui_resource_pack_scenario",
+        )
     )
 
 
@@ -1324,6 +1691,25 @@ def rust_whole_frame_terrain_progress_observed(capture_dir: Path) -> bool:
         except (OSError, ValueError):
             continue
         if "Rust whole-frame terrain source " in tail and "inFlight=" in tail:
+            return True
+    # The Gradle-backed client runner can redirect its native log away from the
+    # capture directory. Its bounded benchmark snapshot still carries the
+    # producer counters, so use those as equivalent live progress evidence.
+    for benchmark_path in sorted(
+        capture_dir.rglob("graphics_frame_benchmark_*.json"),
+        key=lambda path: path.stat().st_mtime if path.exists() else 0,
+        reverse=True,
+    )[:2]:
+        benchmark = read_json(benchmark_path)
+        if not isinstance(benchmark, dict):
+            continue
+        terrain = benchmark.get("staticTerrainScenario")
+        if not isinstance(terrain, dict):
+            continue
+        accepted = int(parse_number(terrain.get("acceptedBuildOutputs")) or 0)
+        visible = int(parse_number(terrain.get("visibleLayerSubmissions")) or 0)
+        registered = int(parse_number(terrain.get("registeredMeshes")) or 0)
+        if accepted > 0 or visible > 0 or registered > 0:
             return True
     return False
 
@@ -2449,6 +2835,14 @@ def static_terrain_translucent_final_order_evidence(doc: dict[str, object] | Non
 
 
 def color_ratio_vector(stats: dict[str, object]) -> tuple[float, float, float]:
+    dominant = [
+        float(stats.get("dominant_red_pixels") or 0),
+        float(stats.get("dominant_green_pixels") or 0),
+        float(stats.get("dominant_blue_pixels") or 0),
+    ]
+    if sum(dominant) > 0:
+        total = sum(dominant)
+        return tuple(value / total for value in dominant)
     total = max(1.0, float(stats.get("red_sum") or 0) + float(stats.get("green_sum") or 0) + float(stats.get("blue_sum") or 0))
     return (
         float(stats.get("red_sum") or 0) / total,
@@ -2463,6 +2857,9 @@ def translucent_overlap_crop_stats(rgb: Any) -> dict[str, object]:
     red_sum = 0
     green_sum = 0
     blue_sum = 0
+    dominant_red_pixels = 0
+    dominant_green_pixels = 0
+    dominant_blue_pixels = 0
     edge_like = 0
     for y in range(0, int(height * 0.82)):
         for x in range(0, width):
@@ -2485,6 +2882,13 @@ def translucent_overlap_crop_stats(rgb: Any) -> dict[str, object]:
             red_sum += red
             green_sum += green
             blue_sum += blue
+            dominant = max(range(3), key=lambda channel: (red, green, blue)[channel])
+            if dominant == 0:
+                dominant_red_pixels += 1
+            elif dominant == 1:
+                dominant_green_pixels += 1
+            else:
+                dominant_blue_pixels += 1
             if chroma > 80:
                 edge_like += 1
     if len(candidates) < 900:
@@ -2503,6 +2907,9 @@ def translucent_overlap_crop_stats(rgb: Any) -> dict[str, object]:
         "red_sum": red_sum,
         "green_sum": green_sum,
         "blue_sum": blue_sum,
+        "dominant_red_pixels": dominant_red_pixels,
+        "dominant_green_pixels": dominant_green_pixels,
+        "dominant_blue_pixels": dominant_blue_pixels,
         "edge_ratio": edge_like / max(1, len(candidates)),
         "crop": (left, top, right, bottom),
     }
@@ -3171,6 +3578,20 @@ def file_text(path: Path | None, max_tail_bytes: int = NORMALIZED_LOG_TAIL_BYTES
             + data.decode("utf-8", errors="replace")
         )
     return path.read_text(encoding="utf-8", errors="replace")
+
+
+def file_contains_regex(path: Path | None, pattern: re.Pattern[str], *, chunk_bytes: int = 256 * 1024) -> bool:
+    """Search a potentially large log without retaining the whole file."""
+    if path is None or not path.is_file():
+        return False
+    carry = ""
+    with path.open("rb") as handle:
+        while chunk := handle.read(chunk_bytes):
+            text = carry + chunk.decode("utf-8", errors="replace")
+            if pattern.search(text):
+                return True
+            carry = text[-1024:]
+    return bool(carry and pattern.search(carry))
 
 
 def count_pattern(paths: Iterable[Path | None], pattern: re.Pattern[str]) -> int:
@@ -6121,9 +6542,27 @@ def deterministic_world_mesh_model_capture_evidence(
         scenario_name in {"chicken", "cow", "pig", "rabbit", "zombie"}
         and len(present_crops) >= required_capture_frames
     )
+    # A capture request can race the producer's final diagnostic publication:
+    # in that case a trailing screenshot may legitimately arrive after the
+    # last correlated mesh/receipt.  Keep the required frame count strict and
+    # accept this only when every required frame is present and all unmatched
+    # captures are strictly trailing (never a gap in the observed sequence).
+    trailing_capture_lag = False
+    if len(present_crops) >= required_capture_frames and present_crops:
+        last_present_index = max(
+            int(crop.get("capture_index"))
+            for crop in present_crops
+            if parse_number(crop.get("capture_index")) is not None
+        )
+        trailing_capture_lag = all(
+            crop.get("status") == "present"
+            or int(parse_number(crop.get("capture_index")) or -1) > last_present_index
+            for crop in crops
+        )
     if len(crops) < required_capture_frames or (
         any(crop.get("status") != "present" for crop in crops)
         and not entity_visibility_sequence
+        and not trailing_capture_lag
     ):
         evidence.update({"checked": True, "status": "incomplete_frame_correlation", "frame_sequence_status": "failed"})
         return evidence
@@ -6149,9 +6588,16 @@ def deterministic_world_mesh_model_capture_evidence(
             "checked": True,
             "status": "structural_present",
             "game_window_status": "passed",
-            "frame_sequence_status": "passed" if not entity_visibility_sequence else "passed_bounded_visible_frames",
+            "frame_sequence_status": (
+                "passed_bounded_visible_frames"
+                if entity_visibility_sequence or trailing_capture_lag
+                else "passed"
+            ),
             "projected_bounds_status": "passed",
-            "matched_frames": len(crops),
+            # Report only captures with a correlated model/receipt.  Trailing
+            # capture lag is retained in `crops` for diagnosis but must not be
+            # counted as matched evidence.
+            "matched_frames": len(present_crops),
         }
     )
     return evidence
@@ -7368,10 +7814,23 @@ def dh_state_from_text(text: str, meta: dict[str, str]) -> dict[str, object]:
     generating = bool(
         re.search(r"Batch Chunk Generator initialized|Set world gen queue|WorldGen requiring|DH-World Gen Thread", text)
     )
+    ordinary_dh_disabled = (
+        meta.get("forced_dh_ordinary_enableRendering") == "false"
+        or "reason=ordinary-selected-source" in meta.get("forced_dh_enableDistantGeneration", "")
+        or "dh-none" in meta.get("parity_fixture_id", "").lower()
+    )
+    if ordinary_dh_disabled:
+        # Optional DH lifecycle banners can still appear during startup after
+        # the ordinary fixture has explicitly disabled DH rendering/generation;
+        # they must not become workload identity or parity differences.
+        generating = False
+    state = meta.get("dh_state") or ("generating" if generating else ("logged" if dh_enabled else "unknown"))
+    if ordinary_dh_disabled and state == "generating":
+        state = "logged" if dh_enabled else "unknown"
     return {
         "present_or_logged": dh_enabled,
         "render_distance": meta.get("dh_render_distance") or meta.get("distant_horizons_render_distance"),
-        "state": meta.get("dh_state") or ("generating" if generating else ("logged" if dh_enabled else "unknown")),
+        "state": state,
         "generating": generating,
         "world_gen_thread_mentions": world_gen_threads,
         "runnable_world_gen_thread_mentions": runnable_world_gen_threads,
@@ -7631,7 +8090,12 @@ def workload_family_record(
     }
 
 
-def stable_workload_family_summary(frame_doc: dict[str, object] | None, combined_logs: str = "") -> dict[str, object]:
+def stable_workload_family_summary(
+    frame_doc: dict[str, object] | None,
+    combined_logs: str = "",
+    *,
+    ordinary_dh_disabled: bool = False,
+) -> dict[str, object]:
     del combined_logs
     measured = parse_number(frame_doc.get("measuredFrameCount")) if isinstance(frame_doc, dict) else None
     measured_frames = measured if measured and measured > 0 else 1.0
@@ -7639,8 +8103,14 @@ def stable_workload_family_summary(frame_doc: dict[str, object] | None, combined
     runtime = frame_doc.get("runtimeState") if isinstance(frame_doc, dict) and isinstance(frame_doc.get("runtimeState"), dict) else {}
     families: dict[str, dict[str, object]] = {}
     for family, labels in WORKLOAD_PHASE_FAMILIES.items():
+        # Frozen's Java instrumentation can still time DH lifecycle callbacks
+        # after the ordinary fixture has disabled DH rendering. Those callbacks
+        # are not rendered workload and must not make an otherwise identical
+        # Current/Frozen gameplay pair incomparable. Dedicated DH fixtures do
+        # not set this flag and retain their measured semantic phases.
+        count = 0 if ordinary_dh_disabled and family in {"dh-lod", "dh-fade"} else phase_count(exclusive_phases, labels)
         families[family] = workload_family_record(
-            count=phase_count(exclusive_phases, labels),
+            count=count,
             measured_frames=measured_frames,
             source="exclusive-phase",
             definition="+".join(labels),
@@ -7746,7 +8216,16 @@ def workload_signature(
     shaderpack_text: str,
 ) -> dict[str, object]:
     runtime = frame_runtime_state(frame_doc)
-    camera = runtime.get("camera_path") or deterministic_camera_signature(deterministic_doc)
+    deterministic_camera = deterministic_camera_signature(deterministic_doc)
+    # A capture row's retained image is produced by the deterministic camera,
+    # while its optional benchmark deliberately uses a moving workload camera.
+    # Prefer the completed capture receipt so Current/Frozen image parity is
+    # proved against the camera that actually made the screenshots.
+    camera = (
+        deterministic_camera
+        if deterministic_camera.get("status") == "complete" and deterministic_camera.get("poses")
+        else runtime.get("camera_path") or deterministic_camera
+    )
     return {
         "workload_profile": workload_profile,
         "world": meta.get("world", "Origin"),
@@ -7790,7 +8269,14 @@ def workload_signature(
             "expected_version": WORKLOAD_COUNTER_DEFINITION_VERSION,
             "sampler_version": frame_doc.get("workloadCounterDefinitionVersion") if isinstance(frame_doc, dict) else None,
         },
-        "workload_families": stable_workload_family_summary(frame_doc, combined_logs),
+        "workload_families": stable_workload_family_summary(
+            frame_doc,
+            combined_logs,
+            ordinary_dh_disabled=(
+                "reason=ordinary-selected-source" in meta.get("forced_dh_enableDistantGeneration", "")
+                or meta.get("forced_dh_ordinary_enableRendering") == "false"
+            ),
+        ),
         "backend_work_counters": backend_work_counter_summary(frame_doc),
     }
 
@@ -7817,7 +8303,14 @@ def normalized_parity_config(mode: ModeSpec, meta: Mapping[str, str]) -> dict[st
             "schema": meta.get("parity_fixture_schema") or PARITY_FIXTURE_SCHEMA,
             "id": meta.get("parity_fixture_id") or "",
             "source_save_hash": meta.get("parity_fixture_source_save_hash") or meta.get("world_save_state_hash"),
-            "scenario": meta.get("world_static_terrain_scenario") or "",
+            # The fixture scenario is shared across all rendering families.
+            # Prefer the selected text workload over a supporting entity model
+            # (name-tag fixtures inject a cow only to host the label).
+            "scenario": meta.get("world_static_terrain_scenario")
+            or meta.get("world_text_scenario")
+            or meta.get("terrain_particle_scenario")
+            or meta.get("world_mesh_model_scenario")
+            or "",
         },
         "camera": {
             "x": parse_number(meta.get("parity_camera_x")),
@@ -7846,6 +8339,21 @@ def normalized_parity_config(mode: ModeSpec, meta: Mapping[str, str]) -> dict[st
     manifest["missing_parity_critical_values"] = missing
     manifest["hash"] = stable_json_hash({key: value for key, value in manifest.items() if key != "hash"})
     return manifest
+
+
+def canonical_fixture_model_scenario(capture_dir: Path) -> str:
+    """Recover model fixture identity for both Current and Frozen artifacts."""
+    for parent in capture_dir.resolve().parents:
+        fixture_root = parent / ".canonical-fixtures"
+        if not fixture_root.is_dir():
+            continue
+        for manifest_path in sorted(fixture_root.glob("*/fixture_manifest.json")):
+            document = read_json(manifest_path)
+            if isinstance(document, dict):
+                scenario = str(document.get("model_scenario") or "").strip()
+                if scenario:
+                    return scenario
+    return ""
 
 
 def instrumentation_signature(meta: dict[str, str], command: Sequence[str]) -> dict[str, object]:
@@ -8059,6 +8567,13 @@ def cross_repository_parity_report(artifact_paths: Sequence[Path]) -> dict[str, 
             # can make an incomplete tool look like a rendering regression.
             if baseline.get("tool") != candidate.get("tool"):
                 continue
+            # Cross-repository rendering parity is evaluated from the one
+            # deterministic capture contract. Gameplay is timing evidence and
+            # subsystem is an isolated diagnostic; neither owns a matched
+            # presented camera frame, so pairing either here manufactures
+            # missing-camera failures instead of testing renderer parity.
+            if baseline.get("tool") != "capture":
+                continue
             comparison = compare_workloads(baseline, candidate, cross_repository=True)
             evidence_failures = parity_evidence_failures(baseline, candidate)
             comparable = bool(comparison["comparable"]) and not evidence_failures
@@ -8086,8 +8601,139 @@ def cross_repository_parity_report(artifact_paths: Sequence[Path]) -> dict[str, 
 
 def deterministic_initial_frame_path(artifact_path: Path) -> Path | None:
     capture_dir = artifact_path.parent / "capture"
+    # Most controls name their first pose `01_initial.png`; producer-specific
+    # Rust captures may use a semantic pose name (for example
+    # `01_distant-horizons-texture-palette.png`). Read the deterministic
+    # manifest first so visual pairing follows the actual captured pose rather
+    # than requiring a particular filename. Shell-scene diagnostic crops are
+    # deliberately excluded because they are not the presented game frame.
+    manifests = sorted(capture_dir.glob("deterministic_camera_capture_*.json"))
+    for manifest in manifests:
+        document = read_json(manifest)
+        captures = document.get("captures") if isinstance(document, dict) else None
+        if not isinstance(captures, list):
+            continue
+        for capture in captures:
+            if not isinstance(capture, dict):
+                continue
+            screenshot = capture.get("screenshot")
+            if not isinstance(screenshot, str) or not screenshot:
+                continue
+            candidate = Path(screenshot)
+            if candidate.is_file() and not candidate.name.startswith("rust_vulkan_shell_scene_crop_"):
+                return candidate
     matches = sorted(capture_dir.glob("deterministic_camera_capture_*/*01_initial.png"))
     return matches[0] if matches else None
+
+
+def deterministic_inventory_frame_path(artifact_path: Path) -> Path | None:
+    """Resolve the acknowledged inventory image for the cross-route GUI slice."""
+    capture_dir = artifact_path.parent / "capture"
+    for manifest in sorted(capture_dir.glob("deterministic_camera_capture_*.json")):
+        document = read_json(manifest)
+        cycle = document.get("rustGalGuiScreenCycle") if isinstance(document, dict) else None
+        if not isinstance(cycle, dict) or cycle.get("inventoryScreenshotCaptured") is not True:
+            continue
+        candidate = Path(str(cycle.get("inventoryScreenshot", "")))
+        if candidate.is_file():
+            return candidate
+    interaction = read_json(capture_dir / "inventory_screen_interaction.json")
+    presented = Path(str(interaction.get("screenshot", ""))) if isinstance(interaction, dict) else None
+    if presented is not None and presented.is_file():
+        return presented
+    request = Path(str(interaction.get("request", ""))) if isinstance(interaction, dict) else None
+    request_document = read_json(request) if request is not None and request.is_file() else None
+    candidate = Path(str(request_document.get("screenshot", ""))) if isinstance(request_document, dict) else None
+    return candidate if candidate is not None and candidate.is_file() else None
+
+
+def deterministic_capture_document(artifact_path: Path) -> dict[str, object] | None:
+    """Returns the authoritative deterministic-capture manifest for one run.
+
+    The screenshot alone is not parity evidence.  A visual pair is meaningful
+    only when both runners acknowledge the same fixed world pose and timing.
+    Keep this lookup beside the image selection so a later runner cannot make
+    an image pair without its semantic capture receipt.
+    """
+    capture_dir = artifact_path.parent / "capture"
+    manifests = sorted(capture_dir.glob("deterministic_camera_capture_*.json"))
+    for manifest in reversed(manifests):
+        document = read_json(manifest)
+        if isinstance(document, dict):
+            return document
+    return None
+
+
+def _deterministic_initial_capture(document: Mapping[str, object] | None) -> dict[str, object] | None:
+    if not isinstance(document, Mapping):
+        return None
+    captures = document.get("captures")
+    if not isinstance(captures, list):
+        return None
+    for capture in captures:
+        if isinstance(capture, dict) and capture.get("poseName") == "initial":
+            return capture
+    return next((capture for capture in captures if isinstance(capture, dict)), None)
+
+
+def deterministic_visual_fixture_equivalence(
+    baseline: Mapping[str, object] | None,
+    current: Mapping[str, object] | None,
+) -> dict[str, object]:
+    """Validates the semantic state required before pixel comparison.
+
+    This deliberately does not compare backend identity or git revisions: the
+    pair is supposed to cross those boundaries.  It does reject absent or
+    diverging fixed world/camera/timing inputs rather than reporting a
+    numerical image difference as renderer parity.
+    """
+    baseline_capture = _deterministic_initial_capture(baseline)
+    current_capture = _deterministic_initial_capture(current)
+    mismatches: list[str] = []
+    if not isinstance(baseline, Mapping) or not isinstance(current, Mapping):
+        mismatches.append("deterministic-manifest-missing")
+    if baseline_capture is None or current_capture is None:
+        mismatches.append("initial-capture-missing")
+
+    def equal_value(name: str, left: object, right: object) -> None:
+        if left != right:
+            mismatches.append(name)
+
+    def equal_number(name: str, left: object, right: object) -> None:
+        left_number = parse_number(left)
+        right_number = parse_number(right)
+        if left_number is None or right_number is None or abs(left_number - right_number) > 0.0001:
+            mismatches.append(name)
+
+    if baseline_capture is not None and current_capture is not None:
+        equal_value("dimension", baseline_capture.get("dimension"), current_capture.get("dimension"))
+        equal_value("shaderEnabled", baseline_capture.get("shaderEnabled"), current_capture.get("shaderEnabled"))
+        equal_number("gameTime", baseline_capture.get("gameTime"), current_capture.get("gameTime"))
+        for field in ("requestedYaw", "requestedPitch", "observedYaw", "observedPitch"):
+            equal_number(field, baseline_capture.get(field), current_capture.get(field))
+        for axis in ("x", "y", "z"):
+            baseline_position = baseline_capture.get("position")
+            current_position = current_capture.get("position")
+            equal_number(
+                f"position.{axis}",
+                baseline_position.get(axis) if isinstance(baseline_position, Mapping) else None,
+                current_position.get(axis) if isinstance(current_position, Mapping) else None,
+            )
+        for axis in ("width", "height"):
+            baseline_window = baseline_capture.get("window")
+            current_window = current_capture.get("window")
+            equal_number(
+                f"window.{axis}",
+                baseline_window.get(axis) if isinstance(baseline_window, Mapping) else None,
+                current_window.get(axis) if isinstance(current_window, Mapping) else None,
+            )
+
+    return {
+        "status": "passed" if not mismatches else "failed",
+        "mismatches": mismatches,
+        "baseline": deterministic_camera_signature(dict(baseline) if isinstance(baseline, Mapping) else None),
+        "current": deterministic_camera_signature(dict(current) if isinstance(current, Mapping) else None),
+    }
 
 
 def sha256_file(path: Path) -> str:
@@ -8098,10 +8744,22 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def write_cross_repo_visual_pairs(artifact_root: Path, cross_repo_parity: Mapping[str, object]) -> dict[str, object]:
+def write_cross_repo_visual_pairs(
+    artifact_root: Path,
+    cross_repo_parity: Mapping[str, object],
+    mean_rgb_abs_tolerance: float,
+) -> dict[str, object]:
+    if not math.isfinite(mean_rgb_abs_tolerance) or mean_rgb_abs_tolerance < 0.0:
+        raise ValueError("visual mean RGB absolute-error tolerance must be finite and non-negative")
     pairs = cross_repo_parity.get("pairs")
     if not isinstance(pairs, list):
-        return {"schema": "mattmc-cross-repo-visual-parity-report-v1", "pair_count": 0, "pairs": []}
+        return {
+            "schema": "mattmc-cross-repo-visual-parity-report-v1",
+            "pair_count": 0,
+            "mean_rgb_abs_tolerance": mean_rgb_abs_tolerance,
+            "passed": True,
+            "pairs": [],
+        }
     output_root = artifact_root / "paired_visual_static_terrain"
     report_pairs: list[dict[str, object]] = []
     try:
@@ -8110,21 +8768,36 @@ def write_cross_repo_visual_pairs(artifact_root: Path, cross_repo_parity: Mappin
         return {
             "schema": "mattmc-cross-repo-visual-parity-report-v1",
             "pair_count": 0,
+            "mean_rgb_abs_tolerance": mean_rgb_abs_tolerance,
+            "passed": False,
             "error": f"pillow-unavailable: {exc}",
             "pairs": [],
         }
     for index, pair in enumerate(pairs, start=1):
         baseline_path = Path(str(pair.get("baseline_artifact", "")))
         current_path = Path(str(pair.get("current_artifact", "")))
-        baseline_image = deterministic_initial_frame_path(baseline_path)
-        current_image = deterministic_initial_frame_path(current_path)
+        baseline_inventory = deterministic_inventory_frame_path(baseline_path)
+        current_inventory = deterministic_inventory_frame_path(current_path)
+        inventory_pair = baseline_inventory is not None or current_inventory is not None
+        baseline_image = baseline_inventory or deterministic_initial_frame_path(baseline_path)
+        current_image = current_inventory or deterministic_initial_frame_path(current_path)
         entry: dict[str, object] = {
             "schema": "mattmc-cross-repo-static-terrain-visual-pair-v1",
             "baseline_artifact": str(baseline_path),
             "current_artifact": str(current_path),
             "baseline_image": str(baseline_image) if baseline_image else "",
             "current_image": str(current_image) if current_image else "",
+            "visual_fixture": "inventory-screen" if inventory_pair else "initial-world-frame",
         }
+        fixture_equivalence = deterministic_visual_fixture_equivalence(
+            deterministic_capture_document(baseline_path),
+            deterministic_capture_document(current_path),
+        )
+        entry["fixture_equivalence"] = fixture_equivalence
+        if fixture_equivalence["status"] != "passed":
+            entry["status"] = "incomparable-fixture-state"
+            report_pairs.append(entry)
+            continue
         if baseline_image is None or current_image is None:
             entry["status"] = "missing-image"
             report_pairs.append(entry)
@@ -8152,9 +8825,10 @@ def write_cross_repo_visual_pairs(artifact_root: Path, cross_repo_parity: Mappin
         right.save(current_copy)
         amplified.save(diff_path)
         side_by_side.save(side_by_side_path)
+        mean_rgb_abs = [round(value, 3) for value in stat.mean]
         entry.update(
             {
-                "status": "complete",
+                "status": "complete" if all(value <= mean_rgb_abs_tolerance for value in stat.mean) else "visual-mismatch",
                 "image_size": {"width": left.width, "height": left.height},
                 "outputs": {
                     "baseline_copy": str(baseline_copy),
@@ -8169,7 +8843,7 @@ def write_cross_repo_visual_pairs(artifact_root: Path, cross_repo_parity: Mappin
                     "side_by_side": sha256_file(side_by_side_path),
                 },
                 "diff": {
-                    "mean_rgb_abs": [round(value, 3) for value in stat.mean],
+                    "mean_rgb_abs": mean_rgb_abs,
                     "rms_rgb_abs": [round(value, 3) for value in stat.rms],
                     "max_channel_abs": max(max(pixel) for pixel in diff.getdata()),
                     "nonzero_pixels": nonzero_pixels,
@@ -8185,6 +8859,8 @@ def write_cross_repo_visual_pairs(artifact_root: Path, cross_repo_parity: Mappin
     report = {
         "schema": "mattmc-cross-repo-visual-parity-report-v1",
         "pair_count": len(report_pairs),
+        "mean_rgb_abs_tolerance": mean_rgb_abs_tolerance,
+        "passed": all(pair.get("status") == "complete" for pair in report_pairs),
         "pairs": report_pairs,
     }
     output_root.mkdir(parents=True, exist_ok=True)
@@ -8354,6 +9030,25 @@ def static_terrain_nonempty_records(
     }
 
 
+def static_terrain_covered_records(
+    records: Mapping[tuple[str, str], Mapping[str, object]],
+) -> dict[tuple[str, str], Mapping[str, object]]:
+    """Keep cross-renderer geometry parity to records that reached coverage.
+
+    Frozen's Java observation hook retains candidate sections that had no
+    coverage in the captured draw. Rust's explicit receipt intentionally
+    contains only the submitted covered records. Comparing those diagnostic
+    candidates as if they were draws manufactures a missing-section failure;
+    coveragePresent is the shared evidence that a record belongs to the real
+    rendered set.
+    """
+    return {
+        key: record
+        for key, record in records.items()
+        if int(parse_number(record.get("coveragePresent")) or 0) > 0
+    }
+
+
 def latest_static_terrain_execution_events(
     events: Sequence[Mapping[str, object]],
     preferred_deterministic_frame: int | None = None,
@@ -8363,7 +9058,13 @@ def latest_static_terrain_execution_events(
     The grouped receipt is emitted after Rust encodes the real mesh instances;
     it is intentionally preferred over capped per-instance trace events.
     """
-    grouped = [
+    ready_grouped = [
+        event for event in events
+        if event.get("stage") == "rust-vulkan-executed-ready-coverage"
+        and isinstance(event.get("records"), list)
+        and event.get("records")
+    ]
+    grouped = ready_grouped or [
         event for event in events
         if event.get("stage") == "rust-vulkan-executed-coverage"
         and isinstance(event.get("records"), list)
@@ -8507,16 +9208,48 @@ def cross_repository_static_terrain_draw_coverage_report(cross_repo_parity: Mapp
         current_execution_game_time = latest_static_terrain_execution_game_time(current_events, current_capture_frame)
         current_non_execution_reasons = latest_static_terrain_non_execution_reasons(current_events)
         for layer in ("solid", "cutout"):
-            baseline_event = latest_static_terrain_coverage_event(baseline_events, "java-opengl-draw-coverage", layer)
+            baseline_capture_stage = "java-opengl-draw-capture-ready-coverage"
+            baseline_ready_stage = "java-opengl-draw-ready-coverage"
+            baseline_stage = (
+                baseline_capture_stage
+                if any(event.get("stage") == baseline_capture_stage and event.get("layer") == layer for event in baseline_events)
+                else baseline_ready_stage
+                if any(event.get("stage") == baseline_ready_stage and event.get("layer") == layer for event in baseline_events)
+                else "java-opengl-draw-coverage"
+            )
+            current_capture_stage = "rust-vulkan-enqueue-source-capture-ready-coverage"
+            current_ready_stage = "rust-vulkan-enqueue-source-ready-coverage"
+            current_stage = (
+                current_capture_stage
+                if any(event.get("stage") == current_capture_stage and event.get("layer") == layer for event in current_events)
+                else current_ready_stage
+                if any(event.get("stage") == current_ready_stage and event.get("layer") == layer for event in current_events)
+                else "rust-vulkan-enqueue-source-coverage"
+            )
+            baseline_event = latest_static_terrain_coverage_event(baseline_events, baseline_stage, layer)
             current_event = latest_static_terrain_coverage_event(
                 current_events,
-                "rust-vulkan-enqueue-source-coverage",
+                current_stage,
                 layer,
                 current_execution_game_time,
                 current_capture_frame,
             )
-            baseline_records = static_terrain_records_from_event(baseline_event)
-            current_records = static_terrain_records_from_event(current_event)
+            baseline_candidates = static_terrain_records_from_event(baseline_event)
+            current_candidates = static_terrain_records_from_event(current_event)
+            baseline_records = static_terrain_covered_records(baseline_candidates)
+            current_records = static_terrain_covered_records(current_candidates)
+            # An empty receipt cannot establish parity.  In particular, both
+            # renderers can legitimately emit early setup frames before their
+            # terrain producers have populated; comparing those two empty sets
+            # used to turn missing capture evidence into a false pass.
+            if baseline_event is None:
+                failures.append(f"{layer}_frozen_coverage_event_missing")
+            elif not baseline_records:
+                failures.append(f"{layer}_frozen_coverage_empty")
+            if current_event is None:
+                failures.append(f"{layer}_current_coverage_event_missing")
+            elif not current_records:
+                failures.append(f"{layer}_current_coverage_empty")
             baseline_keys = set(baseline_records)
             current_keys = set(current_records)
             missing = sorted(baseline_keys - current_keys)
@@ -8606,12 +9339,14 @@ def cross_repository_static_terrain_draw_coverage_report(cross_repo_parity: Mapp
                 failures.append(f"{layer}_rust_execution_missing_reason")
             layer_reports[layer] = {
                 "frozen_event": {
+                    "stage": baseline_stage,
                     "eventIndex": baseline_event.get("eventIndex") if baseline_event else None,
                     "frameId": baseline_event.get("frameId") if baseline_event else None,
                     "aggregate": baseline_event.get("aggregate") if baseline_event else None,
                     "sidecar": baseline_event.get("_sidecar") if baseline_event else None,
                 },
                 "current_event": {
+                    "stage": current_stage,
                     "eventIndex": current_event.get("eventIndex") if current_event else None,
                     "frameId": current_event.get("frameId") if current_event else None,
                     "gameTime": current_event.get("gameTime") if current_event else None,
@@ -8621,6 +9356,8 @@ def cross_repository_static_terrain_draw_coverage_report(cross_repo_parity: Mapp
                 },
                 "frozen_sections": len(baseline_records),
                 "current_sections": len(current_records),
+                "frozen_candidate_sections": len(baseline_candidates),
+                "current_candidate_sections": len(current_candidates),
                 "current_executed_sections": len([key for key in current_executed_records if key[1] == layer]),
                 "missing_sections": [key[0] for key in missing[:8]],
                 "extra_sections": [key[0] for key in extra[:8]],
@@ -8681,6 +9418,21 @@ def parity_evidence_failures(baseline: dict[str, object], current: dict[str, obj
                 failures.append(f"{label}_parity_config_missing_values={missing}")
             if not parity_config.get("hash"):
                 failures.append(f"{label}_parity_config_hash_missing")
+        # A model fixture is not comparable merely because both rows share a
+        # save hash.  Require the baseline to prove that its real producer was
+        # present; otherwise a config-only pair could falsely admit an
+        # unrendered block entity/model route.
+        fixture_scenario = str(parity_config.get("fixture", {}).get("scenario") or "").strip().lower() if isinstance(parity_config, dict) and isinstance(parity_config.get("fixture"), dict) else ""
+        if label == "baseline" and fixture_scenario in {
+            "chest", "bed", "bell", "shulker", "decorated-pot", "conduit",
+            "llama-spit", "evoker-fangs", "wither-skull", "chicken", "cow",
+            "pig", "rabbit", "sheep", "tropical-fish", "zombie", "end-crystal", "wind-charge",
+        }:
+            metrics = artifact.get("metrics") if isinstance(artifact.get("metrics"), dict) else {}
+            slice_metrics = metrics.get("rust_gal_slice") if isinstance(metrics, dict) else {}
+            model_evidence = slice_metrics.get("world_mesh_model_capture_evidence") if isinstance(slice_metrics, dict) else {}
+            if not isinstance(model_evidence, dict) or model_evidence.get("status") not in {"structural_present", "passed"}:
+                failures.append(f"{label}_model_producer_evidence_missing:{model_evidence.get('status') if isinstance(model_evidence, dict) else 'absent'}")
     return failures
 
 
@@ -8722,12 +9474,29 @@ def phase_timeout_seconds(args: argparse.Namespace, phase: str) -> int:
 
 
 def per_mode_timeout_seconds(args: argparse.Namespace) -> int:
-    return min(args.timeout_seconds, RUNTIME_PROFILES[args.profile].hard_timeout_seconds)
+    profile = RUNTIME_PROFILES[args.profile]
+    # Unit-level command builders construct minimal Namespaces without the
+    # parser-populated timeout fields; retain the profile default in that
+    # context while honoring explicit CLI limits for real runs.
+    requested = getattr(args, "timeout_seconds", profile.hard_timeout_seconds)
+    return min(requested, profile.hard_timeout_seconds)
 
 
 def child_process_timeout_seconds(args: argparse.Namespace) -> int:
     cleanup_budget = max(1, phase_timeout_seconds(args, "cleanup"))
     return max(1, per_mode_timeout_seconds(args) - cleanup_budget - 1)
+
+
+def frame_benchmark_requested(args: argparse.Namespace, tool_kind: str) -> bool:
+    """Whether this row must retain a complete game-loop sample window.
+
+    Correctness captures normally stop after their deterministic screenshot.
+    The explicit capture option keeps that screenshot contract and additionally
+    requires the independent frame sampler to finish before shutdown.
+    """
+    return tool_kind == "gameplay" or (
+        tool_kind == "capture" and bool(getattr(args, "capture_frame_benchmark", False))
+    )
 
 
 def selected_source_distant_horizons_requires_extended_profile(
@@ -8756,13 +9525,24 @@ def minimum_supported_profile(
     tool_kind: str,
     args: argparse.Namespace | None = None,
 ) -> str:
+    # A requested DH gameplay fixture may spend several minutes generating its
+    # first LOD population before any measured frame can be admitted. Keep that
+    # route bounded, while allowing ordinary non-DH workloads (GUI/resource
+    # pack tests, for example) to use their requested standard budget.
+    dh_requested = args is not None and any(
+        getattr(args, name, False)
+        for name in (
+            "world_distant_horizons_opaque",
+            "world_distant_horizons_non_water",
+            "world_distant_horizons_water",
+            "world_distant_horizons_texture_palette",
+        )
+    )
+    if tool_kind == "gameplay" and mode.backend == "rust-vulkan" and dh_requested:
+        return "extended"
     if selected_source_distant_horizons_requires_extended_profile(args, mode, tool_kind):
         return "extended"
-    if tool_kind == "gameplay" and mode.expected_attribution == "java-vulkan":
-        return "standard"
     if tool_kind == "capture" and mode.backend == "rust-vulkan":
-        return "standard"
-    if tool_kind == "subsystem" and mode.expected_attribution == "java-vulkan":
         return "standard"
     if tool_kind == "subsystem" and mode.target == "frozen" and mode.shaders == "on":
         return "standard"
@@ -8789,6 +9569,22 @@ MATRIX_PROGRESS_INTERVAL_SECONDS = 5.0
 
 def matrix_progress_enabled(args: argparse.Namespace) -> bool:
     return getattr(args, "tool", "") == "matrix"
+
+
+def matrix_tool_kinds(args: argparse.Namespace) -> tuple[str, ...]:
+    """Return matrix rows applicable to the requested fixture.
+
+    Model/block-entity fixtures are initialized by deterministic capture, not by
+    the timing-only gameplay benchmark.  Running that inapplicable row creates a
+    false producer-timeout failure, so those fixtures use capture/subsystem rows.
+    """
+    if getattr(args, "tool", "") != "matrix":
+        return (args.tool,)
+    if bool(getattr(args, "world_mesh_model_scenario", "")) or bool(
+        getattr(args, "rust_selected_source_execution", False)
+    ):
+        return ("capture", "subsystem")
+    return ("gameplay", "capture", "subsystem")
 
 
 def matrix_row_label(mode: ModeSpec, tool_kind: str, repetition: int) -> str:
@@ -8849,17 +9645,6 @@ def latest_subsystem_status(capture_dir: Path) -> tuple[str | None, Path | None]
 def mode_frame_count(value: int, mode: ModeSpec, args: argparse.Namespace, option_name: str) -> int:
     if option_name in getattr(args, "_provided_options", set()):
         return value
-    if mode.expected_attribution == "java-vulkan":
-        if option_name == "--settle-frames":
-            return min(value, 40 if mode.shaders == "on" else 60)
-        if option_name == "--max-settle-frames":
-            return min(value, 600)
-        if option_name == "--warmup-frames":
-            return min(value, 10 if mode.shaders == "on" else 20)
-        if option_name == "--measure-frames":
-            return min(value, 40 if mode.shaders == "on" else 60)
-        if option_name == "--subsystem-iterations":
-            return min(value, 20)
     return value
 
 
@@ -8984,6 +9769,7 @@ def normalize_capture_artifact(
     runtime_profile: dict[str, object] | None = None,
     repository_paths: dict[str, object] | None = None,
     require_complete_gameplay_attachments: bool = False,
+    require_frame_benchmark: bool | None = None,
 ) -> dict[str, object]:
     files = load_capture_files(capture_dir)
     meta = read_key_values(files["meta"])
@@ -9267,6 +10053,20 @@ def normalize_capture_artifact(
                 distant_horizons_source_material_contract_path = source_candidate
                 distant_horizons_source_material_contract_doc = source_candidate_doc
     effective_meta = {**shader_summary, **meta}
+    if isinstance(deterministic_doc, dict) and str(
+        deterministic_doc.get("rustGalWorldFallingBlockScenario") or ""
+    ).strip():
+        # The Frozen baseline does not echo the launcher-side DH override in
+        # its metadata, but the shared falling-block fixture explicitly disables
+        # optional DH. Carry that fixture fact into both workload fingerprints.
+        effective_meta.setdefault("forced_dh_ordinary_enableRendering", "false")
+    fixture_model_scenario = canonical_fixture_model_scenario(capture_dir)
+    if fixture_model_scenario and not str(effective_meta.get("world_mesh_model_scenario") or "").strip():
+        effective_meta["world_mesh_model_scenario"] = fixture_model_scenario
+    if isinstance(deterministic_doc, dict):
+        model_scenario = str(deterministic_doc.get("rustGalWorldModelMeshScenario") or "").strip()
+        if model_scenario and not str(effective_meta.get("world_mesh_model_scenario") or "").strip():
+            effective_meta["world_mesh_model_scenario"] = model_scenario
     launch_uses_renderdoc = bool(command and Path(command[0]).name == "renderdoccmd") or bool(
         effective_meta.get("renderdoc_wrapped_actual_game_command")
     )
@@ -9293,6 +10093,23 @@ def normalize_capture_artifact(
         files["process_snapshot"],
     ]
     combined_logs = "\n".join(file_text(path) for path in log_paths)
+    text_scenario_from_runtime = parse_java_property(
+        combined_logs, "mattmc.dev.rustGalWorldText.scenario"
+    )
+    if text_scenario_from_runtime and not str(effective_meta.get("world_text_scenario") or "").strip():
+        effective_meta["world_text_scenario"] = text_scenario_from_runtime
+    terrain_particle_scenario_from_runtime = parse_java_property(
+        combined_logs, "mattmc.dev.rustGalWorldMaterial.terrainParticleScenario"
+    )
+    if terrain_particle_scenario_from_runtime and not str(effective_meta.get("terrain_particle_scenario") or "").strip():
+        effective_meta["terrain_particle_scenario"] = terrain_particle_scenario_from_runtime
+    # Large client logs are normalized to a bounded tail for memory safety.
+    # Preserve workload identity when a subsystem emits its DH initialization
+    # banner before that tail: scan the source log in bounded chunks and add a
+    # canonical marker only when it is actually present on disk.
+    dh_marker = re.compile(r"DistantHorizons|\[DH-|DH Ready|renderLods|renderDeferredLods", re.IGNORECASE)
+    if not dh_marker.search(combined_logs) and file_contains_regex(primary_client_log, dh_marker):
+        combined_logs = f"{combined_logs}\n[graphics-audit full-log marker: DistantHorizons]"
     if isinstance(frame_doc, dict) and isinstance(frame_doc.get("rustGalSliceMetricsLine"), str):
         combined_logs = f"{combined_logs}\n{frame_doc['rustGalSliceMetricsLine']}"
     attribution = detect_attribution(mode, meta, combined_logs)
@@ -9358,7 +10175,8 @@ def normalize_capture_artifact(
     error_counts["crash"] += listed_failure_file_count(files["crash_reports"])
     error_counts["crash"] += listed_failure_file_count(files["hs_err"])
     memory_guard_triggered = meta.get("memory_guard_triggered", "false").lower() == "true" or error_counts["rss_guard"] > 0
-    frame_sample_window_complete = tool_kind != "gameplay" or (
+    requires_frame_benchmark = tool_kind == "gameplay" if require_frame_benchmark is None else require_frame_benchmark
+    frame_sample_window_complete = not requires_frame_benchmark or (
         isinstance(frame_doc, dict)
         and frame_doc.get("status") == "complete"
         and frame_doc.get("measuredFrameCount") == len(frame_nanos)
@@ -9367,7 +10185,7 @@ def normalize_capture_artifact(
     displayed_fps_required = bool(frame_validity.get("displayedFpsCheckRequired"))
     if "displayedFpsCheckRequired" not in frame_validity:
         displayed_fps_required = len(frame_nanos) >= 240
-    frame_validity_complete = tool_kind != "gameplay" or (
+    frame_validity_complete = not requires_frame_benchmark or (
         frame_sample_window_complete
         and frame_validity.get("wallClockCheckPassed") is not False
         and (
@@ -9376,7 +10194,7 @@ def normalize_capture_artifact(
             or frame_validity.get("wallClockCheckPassed") is not False
         )
     )
-    world_entered = tool_kind != "gameplay" or (
+    world_entered = not requires_frame_benchmark or (
         isinstance(frame_doc, dict)
         and frame_doc.get("status") == "complete"
         and frame_doc.get("worldEntered") is not False
@@ -9520,6 +10338,11 @@ def normalize_capture_artifact(
     requested_world_mesh_model_scenario = parse_java_property(
         combined_logs, "mattmc.dev.rustGalWorldMesh.modelScenario"
     )
+    # A name-tag fixture uses a supporting cow entity, but that entity model is
+    # not the selected workload.  Keep track of whether the model scenario was
+    # actually requested so the later deterministic-document fallback does not
+    # accidentally admit the support entity as a second migration gate.
+    model_scenario_explicitly_requested = bool(requested_world_mesh_model_scenario)
     requested_world_mesh_model_disabled = (
         parse_java_property(combined_logs, "mattmc.dev.rustGalWorldModelMesh.disabled") == "true"
     )
@@ -9579,12 +10402,17 @@ def normalize_capture_artifact(
         requested_world_mesh_falling_block_scenario = str(deterministic_doc.get("rustGalWorldFallingBlockScenario") or "")
     if not requested_world_mesh_arrow_scenario and isinstance(deterministic_doc, dict):
         requested_world_mesh_arrow_scenario = str(deterministic_doc.get("rustGalWorldArrowScenario") or "")
+    # Capture metadata records the model fixture in the deterministic document;
+    # preserve it when the launcher log does not retain the full JAVA_TOOL_OPTIONS
+    # line so parity fingerprints remain equivalent across repositories.
+    if not requested_world_mesh_model_scenario and isinstance(deterministic_doc, dict):
+        requested_world_mesh_model_scenario = str(
+            deterministic_doc.get("rustGalWorldModelMeshScenario") or ""
+        )
     if not requested_world_experience_orb_scenario and isinstance(deterministic_doc, dict):
         requested_world_experience_orb_scenario = str(deterministic_doc.get("rustGalWorldExperienceOrbScenario") or "")
     if not requested_world_beacon_beam_scenario and isinstance(deterministic_doc, dict):
         requested_world_beacon_beam_scenario = str(deterministic_doc.get("rustGalWorldBeaconBeamScenario") or "")
-    if not requested_world_mesh_model_scenario and isinstance(deterministic_doc, dict):
-        requested_world_mesh_model_scenario = str(deterministic_doc.get("rustGalWorldModelMeshScenario") or "")
     if not requested_world_mesh_primed_tnt_scenario and isinstance(deterministic_doc, dict):
         requested_world_mesh_primed_tnt_scenario = str(deterministic_doc.get("rustGalWorldPrimedTntScenario") or "")
     if not requested_world_mesh_block_display_scenario and isinstance(deterministic_doc, dict):
@@ -9666,6 +10494,15 @@ def normalize_capture_artifact(
         if isinstance(deterministic_doc, dict) and isinstance(deterministic_doc.get("rustGalDistantHorizonsRoute"), dict)
         else {}
     )
+    # Gameplay captures may complete through the frame-benchmark lifecycle
+    # without requesting a deterministic-camera screenshot.  The benchmark
+    # still records the authoritative same-run DH route decision and visible
+    # segment counts; consume it as evidence when the optional deterministic
+    # document is absent, while retaining all later execution/capture gates.
+    if not distant_horizons_route_doc and isinstance(frame_doc, dict):
+        benchmark_route = frame_doc.get("distantHorizonsRoute")
+        if isinstance(benchmark_route, dict):
+            distant_horizons_route_doc = benchmark_route
     requested_world_distant_horizons_opaque = (
         parse_java_property(combined_logs, "mattmc.dev.rustGalDistantHorizons.opaqueV1") == "true"
         or parse_java_property(combined_logs, "mattmc.dev.rustGalDistantHorizons.semanticCapture") == "true"
@@ -10353,14 +11190,14 @@ def normalize_capture_artifact(
         validation_messages.append("capture process failed or timed out")
     if failed_phase:
         validation_messages.append(f"phase failure: {failed_phase}")
-    if tool_kind == "gameplay":
+    if requires_frame_benchmark:
         if isinstance(frame_doc, dict) and frame_doc.get("status") == "failed":
             reason = frame_doc.get("failureReason") or "unknown sampler failure"
             blocker = frame_doc.get("lastReadinessBlocker")
             detail = f"; {blocker}" if blocker else ""
             validation_messages.append(f"game-loop sampler failed: {reason}{detail}")
         if not world_entered:
-            validation_messages.append("gameplay workload did not enter a world; title-screen/startup-only runs are rejected")
+            validation_messages.append("frame-benchmark workload did not enter a world; title-screen/startup-only runs are rejected")
         if not frame_sample_window_complete:
             validation_messages.append("missing or incomplete measured game-loop frame samples")
         if not frame_validity_complete:
@@ -11210,8 +12047,15 @@ def normalize_capture_artifact(
                 if isinstance(capture, dict)
                 and isinstance(capture.get("wholeFramePresentationCorrelation"), dict)
             ]
+            + ([{
+                "gameplayFrameId": gameplay_attachment_correlation_doc.get("gameplay_frame_id"),
+                "submissionId": gameplay_attachment_correlation_doc.get("gal_submission_id"),
+            }] if isinstance(gameplay_attachment_correlation_doc, dict) else [])
             if isinstance(deterministic_doc, dict) and isinstance(deterministic_doc.get("captures"), list)
-            else []
+            else ([{
+                "gameplayFrameId": gameplay_attachment_correlation_doc.get("gameplay_frame_id"),
+                "submissionId": gameplay_attachment_correlation_doc.get("gal_submission_id"),
+            }] if isinstance(gameplay_attachment_correlation_doc, dict) else [])
         )
         presentation = next(
             (
@@ -11242,6 +12086,17 @@ def normalize_capture_artifact(
                 validation_messages.append(
                     "deterministic Distant Horizons Java legacy observation did not retain a captured game frame"
                 )
+        elif mode.target == "frozen" and mode.backend == "opengl":
+            # Frozen Java OpenGL is the correctness control. It must retain the
+            # same deterministic world/camera capture, but it cannot satisfy
+            # Rust-route receipts (and must not be made to emit them). Keep the
+            # control row valid from its own captured frame evidence instead of
+            # applying the Rust Vulkan admission predicate to it.
+            if tool_kind == "capture" and not captured_frame_indices:
+                world_distant_horizons_opaque_workload_complete = False
+                validation_messages.append(
+                    "Frozen Java OpenGL Distant Horizons control did not retain a deterministic captured game frame"
+                )
         elif mode.expected_attribution == "java-vulkan":
             if selected or int(rust_gal_world_lod_instances_submitted_for_validation or 0) != 0:
                 world_distant_horizons_opaque_workload_complete = False
@@ -11268,10 +12123,10 @@ def normalize_capture_artifact(
                 f"instances={rust_gal_world_lod_instances_submitted_for_validation}, "
                 f"executedFrames={rust_gal_world_lod_frames_executed_for_validation})"
             )
-        elif not capture_frame_matches or capture_submission <= 0 or capture_instances <= 0 \
+        elif tool_kind == "capture" and (not capture_frame_matches or capture_submission <= 0 or capture_instances <= 0 \
             or capture_opaque_instances + capture_transparent_instances + capture_water_instances != capture_instances \
             or not capture_semantics_enabled \
-            or (requested_world_distant_horizons_water and capture_water_instances <= 0):
+            or (requested_world_distant_horizons_water and capture_water_instances <= 0)):
             world_distant_horizons_opaque_workload_complete = False
             validation_messages.append(
                 "deterministic Distant Horizons screenshot lacks matching successful Rust material-route execution evidence "
@@ -11490,7 +12345,23 @@ def normalize_capture_artifact(
     world_text_workload_complete = True
     world_text_scenario = (requested_world_text_scenario or "").strip().lower()
     if world_text_scenario and tool_kind != "subsystem":
-        if mode.backend != "rust-vulkan" or mode.expected_attribution != "rust-vulkan":
+        if mode.target == "frozen" and mode.backend == "opengl":
+            # Frozen Java OpenGL is the authoritative visual control. It does
+            # not emit Rust semantic callback receipts, so validate its paired
+            # deterministic capture without applying Current-only ownership
+            # predicates to the control row.
+            frozen_world_text_captures = (
+                deterministic_doc.get("captures")
+                if isinstance(deterministic_doc, dict)
+                and isinstance(deterministic_doc.get("captures"), list)
+                else []
+            )
+            if tool_kind == "capture" and not frozen_world_text_captures:
+                world_text_workload_complete = False
+                validation_messages.append(
+                    "Frozen Java OpenGL world-text control did not retain a deterministic captured game frame"
+                )
+        elif mode.backend != "rust-vulkan" or mode.expected_attribution != "rust-vulkan":
             world_text_workload_complete = False
             validation_messages.append(
                 "deterministic world-text scenario requires the Rust Vulkan whole-frame route"
@@ -11845,7 +12716,11 @@ def normalize_capture_artifact(
     # timing rows intentionally do not start that capture state machine, so
     # requiring its receipts there would classify a completed benchmark as a
     # producer failure before any model can exist.
-    if model_scenario and rust_outline_mode and tool_kind == "capture":
+    # The name-tag command deliberately injects modelScenario=cow only to
+    # materialize the entity that owns the label.  It must not also require a
+    # model-capture sequence (the selected workload is world text).
+    model_workload_requested = (requested_world_text_scenario or "").strip().lower() != "name-tag"
+    if model_scenario and model_workload_requested and rust_outline_mode and tool_kind == "capture":
         model_status = str(model_doc.get("status") or "")
         model_client_block_entity_present = bool(model_doc.get("clientBlockEntityPresent"))
         model_server_entity_present = bool(model_doc.get("serverEntityPresent"))
@@ -11920,6 +12795,25 @@ def normalize_capture_artifact(
                 if not execution_present:
                     world_mesh_model_workload_complete = False
                     validation_messages.append("model Rust route did not retain a frame/submission-correlated execution receipt")
+                if model_scenario == "end-crystal":
+                    crystal_beam_execution = (
+                        deterministic_doc.get("rustGalWorldCrystalBeamExecution")
+                        if isinstance(deterministic_doc, dict)
+                        and isinstance(deterministic_doc.get("rustGalWorldCrystalBeamExecution"), list)
+                        else []
+                    )
+                    crystal_beam_execution_present = any(
+                        isinstance(receipt, dict)
+                        and receipt.get("route") == "rust-vulkan-whole-frame"
+                        and int(parse_number(receipt.get("quads")) or 0) >= 8
+                        and int(parse_number(receipt.get("submissionId")) or 0) > 0
+                        for receipt in crystal_beam_execution
+                    )
+                    if not crystal_beam_execution_present:
+                        world_mesh_model_workload_complete = False
+                        validation_messages.append(
+                            "End Crystal model route did not retain a frame/submission-correlated Rust beam receipt"
+                        )
             if tool_kind == "capture" and world_mesh_model_capture_evidence.get("status") not in {"structural_present", "passed"}:
                 world_mesh_model_workload_complete = False
                 validation_messages.append(
@@ -12569,10 +13463,17 @@ def normalize_capture_artifact(
             rust_gal_world_mesh_draws = 0
     rust_gal_world_mesh_cache_hits = last_number(combined_logs, r"rust_gal_world_mesh_cache_hits[=: ]+(\d+)")
     rust_gal_world_mesh_cache_misses = last_number(combined_logs, r"rust_gal_world_mesh_cache_misses[=: ]+(\d+)")
-    rust_gal_world_background_clears = last_number(combined_logs, r"rust_gal_world_background_clears_executed[=: ]+(\d+)")
-    rust_gal_world_background_fallbacks = last_number(combined_logs, r"rust_gal_world_background_diagnostic_fallbacks[=: ]+(\d+)")
-    rust_gal_world_background_sky_type = last_number(combined_logs, r"rust_gal_world_background_sky_type[=: ]+(\d+)")
-    rust_gal_world_background_color_argb = last_text(combined_logs, r"rust_gal_world_background_color_argb[=: ]+([0-9a-fA-F]+)")
+    # Runtime metrics can continue to be emitted during teardown after the
+    # deterministic screenshot has completed.  For capture-dependent sky
+    # evidence, select the last metric before that completion boundary; this
+    # excludes both loading frames and shutdown cleanup frames while retaining
+    # the actual captured-world state.  If no boundary exists, preserve the
+    # legacy aggregate behavior for incomplete/non-capture artifacts.
+    capture_metrics_logs = capture_window_metrics_log(combined_logs)
+    rust_gal_world_background_clears = last_number(capture_metrics_logs, r"rust_gal_world_background_clears_executed[=: ]+(\d+)")
+    rust_gal_world_background_fallbacks = last_number(capture_metrics_logs, r"rust_gal_world_background_diagnostic_fallbacks[=: ]+(\d+)")
+    rust_gal_world_background_sky_type = last_number(capture_metrics_logs, r"rust_gal_world_background_sky_type[=: ]+(\d+)")
+    rust_gal_world_background_color_argb = last_text(capture_metrics_logs, r"rust_gal_world_background_color_argb[=: ]+([0-9a-fA-F]+)")
     rust_gal_world_depth_creates = last_number(combined_logs, r"rust_gal_world_depth_attachment_creates[=: ]+(\d+)")
     rust_gal_world_depth_reuses = last_number(combined_logs, r"rust_gal_world_depth_attachment_reuses[=: ]+(\d+)")
     rust_gal_world_depth_retires = last_number(combined_logs, r"rust_gal_world_depth_attachment_retires[=: ]+(\d+)")
@@ -13298,6 +14199,20 @@ def last_number(text: str, pattern: str) -> float | None:
         if parsed is not None:
             last = parsed
     return last
+
+
+def capture_window_metrics_log(text: str) -> str:
+    """Return log text through the deterministic capture completion boundary.
+
+    A client commonly emits another metrics line while shutting down after a
+    screenshot acknowledgement.  Those teardown values describe cleanup, not
+    the captured frame, so capture-dependent evidence must stop at the first
+    deterministic completion marker.  Logs without that marker are left
+    unchanged for diagnostics and incomplete-run classification.
+    """
+    marker = "Deterministic camera capture complete"
+    boundary = text.find(marker)
+    return text[:boundary] if boundary >= 0 else text
 
 
 def max_number(text: str, pattern: str) -> float | None:
@@ -14537,7 +15452,19 @@ def build_capture_command(
     kind, entrypoint = run_dev_capture_entrypoint(target.root)
     requested_validation = "routine" if args.validation == "standard" else args.validation
     validation = "standard" if mode.supports_validation and requested_validation != "off" else "off"
-    static_terrain_scenario = str(getattr(args, "world_static_terrain_scenario", "") or "").strip()
+    title_screen_capture = bool(getattr(args, "title_screen_capture", False))
+    if title_screen_capture:
+        # World-frame validation cannot certify a menu. Keep title capture
+        # observational until both sides have an equivalent ready receipt.
+        validation = "off"
+    requested_static_terrain_scenario = str(getattr(args, "world_static_terrain_scenario", "") or "").strip()
+    static_terrain_scenario = requested_static_terrain_scenario
+    # A resource-pack terrain row is still a real static-terrain fixture.  Use
+    # the ordinary real-world semantic scenario when the caller only names the
+    # pack, so the Rust whole-frame readiness/diagnostic contract is enabled
+    # and the capture cannot silently run as an unscoped gameplay sample.
+    if not static_terrain_scenario and getattr(args, "world_static_terrain_resource_pack_scenario", ""):
+        static_terrain_scenario = "real-world"
     # The named translucent-water scenario intrinsically requires dense
     # animation evidence. Making this implicit prevents a run from selecting
     # that scenario while silently omitting the fixture that its gate checks.
@@ -14545,11 +15472,26 @@ def build_capture_command(
         getattr(args, "world_static_terrain_water_animation_capture", False)
         or static_terrain_base_scenario(static_terrain_scenario) == "translucent-water"
     )
+    if (
+        getattr(args, "world_static_terrain_water_animation_capture", False)
+        and static_terrain_base_scenario(static_terrain_scenario) != "translucent-water"
+    ):
+        raise ValueError(
+            "--world-static-terrain-water-animation-capture requires "
+            "--world-static-terrain-scenario translucent-water"
+        )
     world_profile = world_profile_for_args(args)
     shell_settled_static_capture = (
         kind == "shell"
         and tool_kind == "capture"
-        and workload_profile == "settled-static"
+        # A named static-terrain fixture needs the same Java-only readiness
+        # evidence in Frozen even when the outer capture uses the ordinary
+        # correctness workload profile. This affects capture timing and
+        # diagnostics only; it never changes Frozen's renderer or route.
+        and (
+            workload_profile == "settled-static"
+            or bool(getattr(args, "world_static_terrain_scenario", ""))
+        )
     )
     # The explicit Rust CPU terrain source must settle its full visible vertical
     # volume before a parity screenshot is admissible. Keep the same bounded
@@ -14560,13 +15502,12 @@ def build_capture_command(
         if (tool_kind == "capture" and workload_profile == "settled-static")
         else world_profile.deterministic_ready_max_wait_frames
     )
-    # A cloud-only capture has no terrain producer to settle.  Leaving the
-    # migration-gate's sodium-terrain readiness family enabled makes the
-    # deterministic camera wait forever after the cloud frame is already
-    # available (and keeps a large DH/terrain cache alive unnecessarily).
-    # Cloud producer readiness is still enforced by DeterministicCameraCapture
-    # itself before each pose is captured.  Keep terrain settling enabled when
-    # a named static-terrain fixture is part of the same run.
+    # A cloud/weather/particle-only capture has no producer-specific terrain
+    # quiescence contract. Leaving the migration-gate's sodium-terrain
+    # readiness family enabled would make these fixtures wait forever while
+    # unrelated sections continue arriving. TerrainParticle captures use a
+    # bounded pose warm-up below so visible terrain can execute before the
+    # paired image is taken, without requiring global queue drainage.
     settled_ready_frames = world_profile.deterministic_ready_frames
     if (
         bool(
@@ -14619,7 +15560,8 @@ def build_capture_command(
     base_client_args = remove_client_arg_assignment(base_client_args, "enableShaders")
     client_arg_parts = [base_client_args]
     if run_dev_capture_entrypoint(target.root)[0] == "shell":
-        client_arg_parts.append(f"--quickPlaySingleplayer={shlex.quote(args.world)}")
+        if not title_screen_capture:
+            client_arg_parts.append(f"--quickPlaySingleplayer={shlex.quote(args.world)}")
         client_arg_parts.append("--width 1280")
         client_arg_parts.append("--height 720")
     client_arg_parts.append(f"enableShaders={'true' if mode.shaders == 'on' else 'false'}")
@@ -14628,9 +15570,13 @@ def build_capture_command(
     # that the parent loop can grant. Without this, capture_runner's own
     # max-secs watchdog kills the client before the parent can observe and
     # extend a progressing Rust terrain population.
-    child_max_secs = args.max_secs
-    if mode.backend == "rust-vulkan":
-        child_max_secs += WHOLE_FRAME_TERRAIN_ADMISSION_GRACE_SECONDS
+    # The child watchdog must never outlive the parent process deadline.  A
+    # previous unconditional terrain grace extension made the child survive
+    # parent timeout and left orphaned JVMs (and their memory) behind.
+    child_max_secs = min(
+        args.max_secs + (terrain_admission_grace_seconds(args, mode, tool_kind) if mode.backend == "rust-vulkan" else 0),
+        child_process_timeout_seconds(args),
+    )
     if kind == "python":
         command = [
             sys.executable,
@@ -14653,8 +15599,10 @@ def build_capture_command(
         ]
         if client_args:
             command.extend(["--client-args", client_args])
-        static_terrain_capture_requested = tool_kind == "capture" and bool(
-            getattr(args, "world_static_terrain_scenario", "")
+        if title_screen_capture:
+            command.append("--title-screen-capture")
+        static_terrain_capture_requested = tool_kind == "capture" and bool(static_terrain_scenario) and (
+            mode.backend == "rust-vulkan" or bool(requested_static_terrain_scenario)
         )
         # A source-derived whole-frame row needs a single settled screenshot
         # frame. Its source plan can take several seconds to prepare, so the
@@ -14673,13 +15621,14 @@ def build_capture_command(
             or getattr(args, "world_mesh_model_scenario", "")
             or getattr(args, "world_entity_flame_scenario", "")
         )
-        if tool_kind == "capture" and (
+        if not title_screen_capture and tool_kind == "capture" and (
             workload_profile in {"correctness", "moving-camera"}
             or static_terrain_capture_requested
             or selected_source_capture_requested
+            or moving_mesh_capture_requested
         ):
             command.append("--deterministic-camera-capture")
-        if tool_kind == "capture" and (
+        if not title_screen_capture and tool_kind == "capture" and (
             (workload_profile == "settled-static" and not moving_mesh_capture_requested)
             or static_terrain_capture_requested
             or (selected_source_capture_requested and not moving_mesh_capture_requested)
@@ -14694,10 +15643,10 @@ def build_capture_command(
             ])
         if water_animation_capture_requested:
             command.append("--world-static-terrain-water-animation-capture")
-        if getattr(args, "world_static_terrain_scenario", ""):
+        if static_terrain_scenario:
             command.extend([
                 "--world-static-terrain-scenario",
-                args.world_static_terrain_scenario,
+                static_terrain_scenario,
             ])
         if getattr(args, "world_static_terrain_fault", ""):
             command.extend([
@@ -14738,10 +15687,10 @@ def build_capture_command(
             ])
         if water_animation_capture_requested:
             command.append("--world-static-terrain-water-animation-capture")
-        if getattr(args, "world_static_terrain_scenario", ""):
+        if static_terrain_scenario:
             command.extend([
                 "--world-static-terrain-scenario",
-                args.world_static_terrain_scenario,
+                static_terrain_scenario,
             ])
         if getattr(args, "world_static_terrain_fault", ""):
             command.extend([
@@ -14766,24 +15715,19 @@ def build_capture_command(
     env["MATTMC_GRAPHICS_MIGRATION_GATE_BLOCKING"] = "true" if world_profile.migration_gate_blocking else "false"
     env["MATTMC_GRAPHICS_VALIDATION_PROFILE"] = requested_validation
     env["MATTMC_GRAPHICS_VALIDATION_FAIL_SEVERITY"] = getattr(args, "validation_fail_severity", "warning")
-    isolated_vanilla_fixture = (
-        tool_kind in {"capture", "gameplay"}
-        and bool(
-            getattr(args, "world_cloud_scenario", "")
-            or getattr(args, "world_weather_scenario", "")
-            or getattr(args, "world_material_terrain_particle_scenario", "")
-        )
-        and not static_terrain_scenario
-        and not getattr(args, "world_distant_horizons_opaque", False)
-        and not getattr(args, "world_distant_horizons_non_water", False)
-        and not getattr(args, "world_distant_horizons_water", False)
-        and not getattr(args, "world_distant_horizons_texture_palette", False)
-    )
-    if isolated_vanilla_fixture:
-        # Isolated vanilla coverage does not require DH world generation.  Disable
-        # that unrelated producer for this fixture so its initialization cannot
-        # consume the bounded capture window or memory budget.
-        env["MATTMC_CAPTURE_DISABLE_DH_FOR_ORDINARY_SOURCE"] = "true"
+    if title_screen_capture:
+        # Both launchers remain at their normal title screen while the shared
+        # runner captures one bounded desktop frame. This changes neither
+        # Frozen nor Java's rendering route and emits only managed artifacts.
+        env["MATTMC_TITLE_SCREEN_CAPTURE"] = "true"
+        env["SCREENSHOT_INTERVAL_SECS"] = "20"
+        env["SCREENSHOT_START_DELAY_SECS"] = "20"
+        env["SCREENSHOT_MAX_COUNT"] = "1"
+    # Weather/cloud/particle parity fixtures intentionally retain the normal DH
+    # producer.  Frozen's unchanged render hook still records its DH traversal
+    # even when config generation/render flags are disabled, so suppressing DH
+    # only on Current would create a false workload mismatch. Explicit source
+    # isolation rows set MATTMC_CAPTURE_DISABLE_DH_FOR_ORDINARY_SOURCE below.
     if requested_validation in {"routine", "deep"}:
         env["VK_INSTANCE_LAYERS"] = "VK_LAYER_KHRONOS_validation"
         env["VK_LOADER_DEBUG"] = "info"
@@ -14803,11 +15747,35 @@ def build_capture_command(
         env["MATTMC_RUST_SHADER_GRAPH_ISOLATION"] = args.shader_graph_isolation
     env["MATTMC_DETERMINISTIC_SHUTDOWN_GRACE_SECS"] = str(max(5, phase_timeout_seconds(args, "shutdown")))
     env["MATTMC_CAPTURE_WORLD"] = args.world
-    env["MATTMC_CAPTURE_RUN_SOURCE"] = str(target.root / "run")
-    env["MATTMC_CAPTURE_WORLD_SOURCE"] = str(target.root / "run" / "saves" / args.world)
+    # Preserve an explicitly supplied shared-fixture source for standalone
+    # capture runs. Matrix mode installs its canonical fixture immediately
+    # afterward through add_parity_fixture_environment; ordinary captures must
+    # not silently replace a caller-provided equivalent-world fixture with the
+    # target repository's mutable run directory.
+    env.setdefault("MATTMC_CAPTURE_RUN_SOURCE", str(target.root / "run"))
+    env.setdefault("MATTMC_CAPTURE_WORLD_SOURCE", str(target.root / "run" / "saves" / args.world))
     add_parity_fixture_environment(args, env)
-    if getattr(args, "gui_resource_pack_scenario", "") and mode.target == "frozen":
+    if (
+        mode.target == "frozen"
+        and (
+            getattr(args, "gui_resource_pack_scenario", "")
+            or getattr(args, "world_static_terrain_resource_pack_scenario", "")
+        )
+    ):
+        # Frozen remains the unchanged Java OpenGL baseline.  The harness must
+        # nevertheless generate/select the exact same isolated resource pack
+        # fixture for both repositories; otherwise a resource-pack comparison
+        # silently pairs Current-with-pack against Frozen-with-vanilla.
         env["MATTMC_GUI_PACK_GENERATOR_ROOT"] = str(repo_root())
+        if (
+            not getattr(args, "gui_resource_pack_scenario", "")
+            and getattr(args, "world_static_terrain_resource_pack_scenario", "")
+        ):
+            # Frozen's legacy shell runner accepts the shared generated-pack
+            # fixture through its GUI-pack environment variable; forwarding
+            # only the terrain-specific flag would otherwise leave its copy
+            # vanilla even though Current selected the pack.
+            env["MATTMC_GUI_RESOURCE_PACK_SCENARIO"] = args.world_static_terrain_resource_pack_scenario
     if static_terrain_second_world:
         env["MATTMC_CAPTURE_SECOND_WORLD"] = static_terrain_second_world
     env["CLIENT_RSS_LIMIT_MB"] = str(args.client_rss_limit_mb)
@@ -14827,6 +15795,19 @@ def build_capture_command(
     env.setdefault("SCREENSHOT_START_DELAY_SECS", "10")
     java_options = shlex.split(env.get("JAVA_TOOL_OPTIONS", ""))
     java_options.extend(getattr(args, "jvm_arg", []) or [])
+    if getattr(args, "inventory_screen_capture", False) and mode.target == "current" and mode.backend == "rust-vulkan":
+        # Selected Vulkan owns its final image outside Java's main target, so
+        # its capture hook holds a presented frame while the external runner
+        # acknowledges it. Use the same normal InventoryScreen semantic
+        # callsite through a bounded deterministic cycle; this is not a Java
+        # render path and it never borrows a GPU resource.
+        java_options.extend(
+            [
+                "-Dmattmc.dev.deterministicCameraCapture.rustGalGuiScreenCycle=true",
+                "-Dmattmc.dev.deterministicCameraCapture.rustGalGuiScreenCycleRepeats=1",
+                "-Dmattmc.dev.deterministicCameraCapture.rustGalGuiScreenCycleHoldFrames=1",
+            ]
+        )
     java_options.extend(world_profile.diagnostic_jvm_args)
     if getattr(args, "gui_resource_pack_scenario", "") and tool_kind == "capture":
         java_options.extend(
@@ -14835,9 +15816,64 @@ def build_capture_command(
                 "-Dmattmc.dev.deterministicCameraCapture.yawDelta=0.0",
             ]
         )
+        # The Python runner's ordinary deterministic capture defaults to four
+        # yaw poses, whereas Frozen's shell runner defaults to one. Declare
+        # the schedule in the shared launcher so a visual pair cannot silently
+        # compare different camera paths. Scenario-specific branches below
+        # may still replace this with their documented sequence.
+        if not (
+            getattr(args, "world_static_terrain_scenario", "")
+            or getattr(args, "world_mesh_falling_block_scenario", "")
+            or getattr(args, "world_mesh_piston_scenario", "")
+            or getattr(args, "world_mesh_primed_tnt_scenario", "")
+            or getattr(args, "world_mesh_arrow_scenario", "")
+            or getattr(args, "world_experience_orb_scenario", "")
+            or getattr(args, "world_beacon_beam_scenario", "")
+            or getattr(args, "world_mesh_model_scenario", "")
+        ):
+            java_options.extend(
+                [
+                    "-Dmattmc.dev.deterministicCameraCapture.poseCount=4",
+                    "-Dmattmc.dev.deterministicCameraCapture.yawDelta=35.0",
+                ]
+            )
     append_fixed_camera_jvm_options(args, java_options)
-    if isolated_vanilla_fixture:
-        java_options.append("-Dmattmc.dev.rustGalDistantHorizons.disabled=true")
+    if tool_kind == "capture":
+        # A paired capture must use the same simulation clock, not merely the
+        # same copied save.  Each client otherwise advances independently
+        # during startup/terrain settlement, changing sky, fog, lightmap and
+        # animation inputs before its screenshot.  This property is consumed
+        # only by the deterministic-capture hook in both repositories.
+        java_options.append("-Dmattmc.dev.deterministicCameraCapture.fixedTime=6000")
+    if (
+        tool_kind == "capture"
+        and workload_profile == "settled-static"
+        and static_terrain_scenario
+    ):
+        # The vanilla vignette brightness approaches its local-light target in
+        # ordinary GUI ticks.  Startup and terrain-settlement duration differ
+        # legitimately between Frozen OpenGL and Rust Vulkan, so capturing
+        # immediately after either becomes ready compares unequal live GUI
+        # state.  Give both processes the same bounded normal-tick warm-up;
+        # this changes neither renderer nor Frozen behavior.
+        java_options.append("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=1200")
+    if tool_kind == "capture":
+        # A paired image must share camera-time state as well as a copied
+        # world time. Live partial ticks alter interpolated FOV independently
+        # after startup, changing the finite sky fan and terrain projection
+        # before either renderer is evaluated. Current's renderer-neutral
+        # bridge and Frozen's normal temporal state consume this same fixture.
+        java_options.extend(
+            [
+                "-Dmattmc.vulkan.deterministicTemporalParity=true",
+                "-Dmattmc.vulkan.deterministicTemporalParity.frameCounter=0",
+                "-Dmattmc.vulkan.deterministicTemporalParity.frameTime=0.016666668",
+                "-Dmattmc.vulkan.deterministicTemporalParity.frameTimeCounter=0.0",
+                "-Dmattmc.vulkan.deterministicTemporalParity.partialTick=1.0",
+                "-Dmattmc.vulkan.deterministicTemporalParity.fovModifier=1.0",
+                "-Dmattmc.vulkan.deterministicTemporalParity.worldTime=6000",
+            ]
+        )
     java_options.extend(
         [
             f"-Dmattmc.dev.graphicsWorldProfile={world_profile.name}",
@@ -14846,6 +15882,20 @@ def build_capture_command(
             f"-Dmattmc.dev.deterministicCameraCapture.settledReadyMaxWaitFrames={settled_static_ready_max_wait_frames}",
         ]
     )
+    if tool_kind == "capture" and mode.backend == "rust-opengl":
+        # Rust OpenGL lowers the ordinary semantic submissions through its
+        # private OpenGL state reconstruction; it does not use the Rust
+        # whole-frame Sodium/DH readiness receipts.  Do not let the default
+        # Vulkan readiness families deadlock this route.  A fixed, explicit
+        # warm-up keeps the paired capture timing deterministic while the
+        # ordinary world renderer remains responsible for visible work.
+        java_options.extend(
+            [
+                "-Dmattmc.dev.deterministicCameraCapture.settledReadyFamilies=none",
+                "-Dmattmc.dev.deterministicCameraCapture.framesPerPose=180",
+            ]
+        )
+        env["MATTMC_CAPTURE_KILL_AFTER_DETERMINISTIC"] = "true"
     if shell_settled_static_capture:
         # The Frozen baseline runs through its shell capture entrypoint, so it
         # cannot receive capture_runner.py's --deterministic-static-camera-
@@ -14860,19 +15910,39 @@ def build_capture_command(
                 f"-Dmattmc.dev.staticTerrainParityDiagnostics.path={static_parity_path}",
                 "-Dmattmc.dev.staticTerrainParityDiagnostics.waitForStable=true",
                 "-Dmattmc.dev.staticTerrainParityDiagnostics.readyFrames=3",
-                "-Dmattmc.dev.staticTerrainParityDiagnostics.maxSamples=512",
-                "-Dmattmc.dev.staticTerrainParityDiagnostics.maxCoverageSamples=1024",
-                "-Dmattmc.dev.staticTerrainParityDiagnostics.maxCoverageEvents=16384",
-                "-Dmattmc.dev.staticTerrainParityDiagnostics.maxFaceCullTraceEvents=16384",
+                f"-Dmattmc.dev.staticTerrainParityDiagnostics.maxSamples={static_terrain_parity_max_samples()}",
+                f"-Dmattmc.dev.staticTerrainParityDiagnostics.maxEvents={static_terrain_parity_max_events()}",
+                f"-Dmattmc.dev.staticTerrainParityDiagnostics.maxVisibleListEvents={static_terrain_parity_max_visible_list_events()}",
+                f"-Dmattmc.dev.staticTerrainParityDiagnostics.maxCoverageSamples={static_terrain_parity_max_coverage_samples()}",
+                f"-Dmattmc.dev.staticTerrainParityDiagnostics.maxCoverageEvents={static_terrain_parity_max_coverage_events()}",
+                f"-Dmattmc.dev.staticTerrainParityDiagnostics.maxWholeFrameCoverageEvents={static_terrain_parity_max_whole_frame_coverage_events()}",
+                f"-Dmattmc.dev.staticTerrainParityDiagnostics.maxPortalTraceEvents={static_terrain_parity_max_portal_trace_events()}",
+                f"-Dmattmc.dev.staticTerrainParityDiagnostics.maxFaceCullTraceEvents={static_terrain_parity_max_face_cull_trace_events()}",
             ]
         )
+        portal_trace_sections = os.environ.get("MATTMC_STATIC_TERRAIN_PORTAL_TRACE_SECTIONS", "").strip()
+        if portal_trace_sections:
+            java_options.append(
+                f"-Dmattmc.dev.staticTerrainParityDiagnostics.portalTraceSections={portal_trace_sections}"
+            )
     dh_opaque_only = bool(getattr(args, "world_distant_horizons_opaque", False))
     dh_non_water = bool(getattr(args, "world_distant_horizons_non_water", False))
     dh_water = bool(getattr(args, "world_distant_horizons_water", False))
     dh_texture_palette = bool(getattr(args, "world_distant_horizons_texture_palette", False))
+    if tool_kind == "capture" and (dh_opaque_only or dh_non_water or dh_water or dh_texture_palette):
+        # Dedicated DH captures are provenance tests.  Force the isolated
+        # world to regenerate its client database so legacy rows cannot make
+        # the new contributor sidecar appear unused.  This is identical for
+        # Frozen OpenGL and Rust Vulkan and never mutates either source run.
+        env["MATTMC_CAPTURE_RESET_DH_DATABASE"] = "true"
     ordinary_selected_source_capture = (
         tool_kind == "capture"
-        and mode.backend == "rust-vulkan"
+        and bool(getattr(args, "rust_selected_source_execution", False))
+        and args.world == "Origin"
+        and not (dh_opaque_only or dh_non_water or dh_water or dh_texture_palette)
+    )
+    selected_source_fixture_capture = (
+        tool_kind == "capture"
         and bool(getattr(args, "rust_selected_source_execution", False))
         and args.world == "Origin"
         and not (dh_opaque_only or dh_non_water or dh_water or dh_texture_palette)
@@ -14884,7 +15954,7 @@ def build_capture_command(
         and not (dh_opaque_only or dh_non_water or dh_water or dh_texture_palette)
     )
     ordinary_model_fixture_capture = (
-        tool_kind == "capture"
+        tool_kind in {"capture", "gameplay"}
         and bool(getattr(args, "world_mesh_model_scenario", ""))
         and args.world == "Origin"
         and not (dh_opaque_only or dh_non_water or dh_water or dh_texture_palette)
@@ -14895,17 +15965,63 @@ def build_capture_command(
         and args.world == "Origin"
         and not (dh_opaque_only or dh_non_water or dh_water or dh_texture_palette)
     )
-    if ordinary_selected_source_capture or ordinary_static_terrain_lifecycle_capture or ordinary_model_fixture_capture or ordinary_terrain_particle_capture:
-        # The ordinary Origin selected-source fixture proves near-world Rust
-        # ownership. Static-terrain lifecycle fixtures use the same settled
-        # near-world gate; keep unrelated DH generation out of this startup
-        # path so it cannot prevent the fixture hook from running. Explicit DH
-        # rows above retain their own real generation and execution gates; this
-        # is not a DH coverage shortcut.
+    ordinary_resource_pack_capture = (
+        tool_kind in {"capture", "gameplay"}
+        and bool(
+            getattr(args, "world_static_terrain_resource_pack_scenario", "")
+            or getattr(args, "gui_resource_pack_scenario", "")
+        )
+        and args.world == "Origin"
+        and not (dh_opaque_only or dh_non_water or dh_water or dh_texture_palette)
+    )
+    ordinary_gameplay_capture = (
+        tool_kind == "gameplay"
+        and args.world == "Origin"
+        and not (dh_opaque_only or dh_non_water or dh_water or dh_texture_palette)
+        and not getattr(args, "world_distant_horizons_opaque", False)
+        and not getattr(args, "world_distant_horizons_non_water", False)
+        and not getattr(args, "world_distant_horizons_water", False)
+        and not getattr(args, "world_distant_horizons_texture_palette", False)
+    )
+    ordinary_vanilla_run = (
+        tool_kind in {"capture", "gameplay", "subsystem"}
+        and args.world == "Origin"
+        and not (dh_opaque_only or dh_non_water or dh_water or dh_texture_palette)
+    )
+    if (
+        ordinary_vanilla_run
+        or ordinary_selected_source_capture
+        or ordinary_static_terrain_lifecycle_capture
+        or ordinary_model_fixture_capture
+        or ordinary_terrain_particle_capture
+        or ordinary_resource_pack_capture
+        or ordinary_gameplay_capture
+    ):
+        # Vanilla parity must not include DH rendering or generation. Apply
+        # this isolated-run configuration to Frozen OpenGL and Current alike;
+        # otherwise the two routes may have different far-world inputs and
+        # the Rust Vulkan capture could accidentally claim DH ownership. It
+        # changes only the copied harness run, never either repository's
+        # normal configuration. Explicit DH rows above retain their real
+        # generation and execution gates.
         env["MATTMC_CAPTURE_DISABLE_DH_FOR_ORDINARY_SOURCE"] = "true"
         java_options.append("-Dmattmc.dev.rustGalDistantHorizons.disabled=true")
+    if selected_source_fixture_capture:
+        # Selected-source admission is a real whole-frame route check, not a
+        # view-distance throughput run. Keep both sides of a paired fixture at
+        # the same near-world window; otherwise Current's source queue and
+        # Frozen's baseline would run with different settings and could never
+        # produce a valid parity pair. The Rust route controls above remain
+        # Current-only; this is only equivalent capture configuration.
+        env.setdefault("MATTMC_CAPTURE_RENDER_DISTANCE", "4")
+        env.setdefault("MATTMC_CAPTURE_SIMULATION_DISTANCE", "4")
     if ordinary_terrain_particle_capture:
         env["MATTMC_CAPTURE_KILL_AFTER_DETERMINISTIC"] = "true"
+        # The particle is admitted immediately, while the ordinary client
+        # terrain source is asynchronous. Keep the capture bounded but give
+        # the visible near-world sections time to execute before the first
+        # paired screenshot; this avoids certifying a flat background.
+        java_options.append("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=180")
     if (dh_texture_palette or dh_water) and not dh_opaque_only:
         required = "--world-distant-horizons-texture-palette" if dh_texture_palette else "--world-distant-horizons-water"
         raise ValueError(f"{required} requires --world-distant-horizons-opaque")
@@ -14953,30 +16069,44 @@ def build_capture_command(
         )
         env["MATTMC_CAPTURE_DH_RUST_NON_WATER"] = "true" if dh_non_water else "false"
         env["MATTMC_CAPTURE_DH_RUST_WATER"] = "true" if dh_water else "false"
+        # Both sides of a parity pair wait for the same real DH readiness
+        # condition. Only the Current Rust Vulkan side is asked to publish a
+        # Rust-route receipt: injecting that property into Frozen turns a
+        # correctness baseline into a false Rust-route request.
         java_options.extend(
             [
-                "-Dmattmc.dev.rustGalDistantHorizons.semanticCapture=true",
-                # Do not begin gameplay measurement on pre-DH frames.  The
-                # asynchronous section build must first publish an executed
-                # Rust DH receipt, preserving a strict source/execution gate.
-                "-Dmattmc.dev.graphicsFrameBenchmark.requireDistantHorizonsExecution=true",
-                # This row validates the real DH collector/executor. Static
-                # terrain has its own scenario and readiness anvil; requiring
-                # it here can reject a stable DH-only frame with no relevant
-                # sodium-terrain submission.
                 "-Dmattmc.dev.deterministicCameraCapture.settledReadyFamilies=distant-horizons",
-                # The palette's own post-placement gate verifies the actual
-                # DH material column, selected route, execution receipt, and
-                # screenshot correlation. Two pre-placement selected frames
-                # are therefore enough to establish a live source path; eight
-                # starves that real setup on the intentionally expensive
-                # selected-source shader route.
                 "-Dmattmc.dev.deterministicCameraCapture.settledReadyFrames="
                 + ("2" if dh_texture_palette else "8"),
                 "-Dmattmc.dev.deterministicCameraCapture.settledReadyMaxWaitFrames="
                 + ("900" if args.profile == "extended" else str(world_profile.deterministic_ready_max_wait_frames)),
             ]
         )
+        if getattr(args, "_canonical_fixture_run_source", None):
+            # Matrix rows share a harness-materialized world datapack. Current
+            # must observe those fixed coordinates rather than create a
+            # camera-relative private panel; Frozen loads the same datapack
+            # without any rendering-route instrumentation.
+            java_options.append("-Dmattmc.dev.rustGalDistantHorizons.externalFixture=true")
+            # The shared panel is intentionally outside the near-terrain
+            # radius. Give DH's real asynchronous column builder a bounded
+            # publication window; this does not relax route, execution, or
+            # parity acceptance gates.
+            java_options.append("-Dmattmc.dev.deterministicCameraCapture.settledReadyMaxWaitFrames=900")
+        if mode.backend == "rust-vulkan":
+            java_options.extend(
+                [
+                    "-Dmattmc.dev.rustGalDistantHorizons.semanticCapture=true",
+                    # Keep rejected whole-frame DH preflights observable in
+                    # gameplay rows as well as dedicated captures. This is
+                    # diagnostics only; it does not select or relax a route.
+                    "-Dmattmc.dev.graphicsAuditSliceMetrics=true",
+                    # Do not begin gameplay measurement on pre-DH frames. The
+                    # asynchronous section build must first publish an
+                    # executed Rust DH receipt, preserving the route gate.
+                    "-Dmattmc.dev.graphicsFrameBenchmark.requireDistantHorizonsExecution=true",
+                ]
+            )
         if dh_non_water:
             java_options.append("-Dmattmc.dev.rustGalDistantHorizons.requireTransparent=true")
         if dh_water:
@@ -15050,6 +16180,7 @@ def build_capture_command(
         java_options.append(f"-Dmattmc.dev.deterministicCameraCapture.mountHealthRows={args.mount_health_rows}")
     deterministic_capture_requested = (
         tool_kind == "capture"
+        and not title_screen_capture
         and (
             workload_profile in {"correctness", "moving-camera", "settled-static"}
             or bool(getattr(args, "world_static_terrain_scenario", ""))
@@ -15086,6 +16217,26 @@ def build_capture_command(
         env["MATTMC_GRAPHICS_CORRECTNESS_CAPTURE"] = "true"
         env["MATTMC_DETERMINISTIC_METADATA"] = str(deterministic_metadata)
         env["MATTMC_DETERMINISTIC_SCREENSHOT_DIR"] = str(deterministic_screenshot_dir)
+        # DH correctness captures are a static source/atlas comparison.  The
+        # Frozen shell runner historically supplied a one-pose default while
+        # the current Python runner used the deterministic camera's four-pose
+        # sweep.  That made the paired artifacts observe different camera
+        # schedules (and, consequently, different terrain admission state).
+        # Set the schedule explicitly for both runners; scenario-specific
+        # moving-producer captures are handled by their later sequence setup.
+        distant_horizons_static_capture = bool(
+            getattr(args, "world_distant_horizons_opaque", False)
+            or getattr(args, "world_distant_horizons_non_water", False)
+            or getattr(args, "world_distant_horizons_water", False)
+            or getattr(args, "world_distant_horizons_texture_palette", False)
+        )
+        if distant_horizons_static_capture:
+            java_options.extend(
+                [
+                    "-Dmattmc.dev.deterministicCameraCapture.poseCount=1",
+                    "-Dmattmc.dev.deterministicCameraCapture.yawDelta=0.0",
+                ]
+            )
         if mode.backend == "vulkan" or (
             mode.backend == "opengl"
             and (
@@ -15143,6 +16294,16 @@ def build_capture_command(
     if getattr(args, "game_mode", None):
         java_options.append(f"-Dmattmc.dev.graphicsFrameBenchmark.gameMode={args.game_mode}")
         java_options.append(f"-Dmattmc.dev.deterministicCameraCapture.gameMode={args.game_mode}")
+    if getattr(args, "selected_hotbar_slot", None) is not None:
+        java_options.append(
+            f"-Dmattmc.dev.deterministicCameraCapture.selectedHotbarSlot={args.selected_hotbar_slot}"
+        )
+    if getattr(args, "hotbar_item_fixture", ""):
+        java_options.append(
+            f"-Dmattmc.dev.deterministicCameraCapture.hotbarItemFixture={args.hotbar_item_fixture}"
+        )
+    if getattr(args, "empty_selected_hand", False):
+        java_options.append("-Dmattmc.dev.deterministicCameraCapture.emptySelectedHand=true")
     if getattr(args, "world_outline_scenario", ""):
         java_options.append("-Dmattmc.dev.blockOutlineDiagnostics=true")
         java_options.append(f"-Dmattmc.dev.rustGalWorldOutline.scenario={args.world_outline_scenario}")
@@ -15252,6 +16413,16 @@ def build_capture_command(
         java_options.append(
             f"-Dmattmc.dev.rustGalWorldMesh.blockDisplayWorkload={block_display_workload}"
         )
+        if tool_kind == "capture":
+            # Block-display capture must use the same deterministic camera
+            # sweep in Current and Frozen; otherwise parity compares different
+            # projected instances rather than different renderers.
+            java_options.extend(
+                [
+                    "-Dmattmc.dev.deterministicCameraCapture.poseCount=4",
+                    "-Dmattmc.dev.deterministicCameraCapture.yawDelta=35.0",
+                ]
+            )
         if block_display_workload in {"performance", "scale-one-mesh", "scale-mixed-meshes"}:
             java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.yawDelta=0.0")
             env.setdefault("MATTMC_CAPTURE_MAX_FPS", "260")
@@ -15292,6 +16463,13 @@ def build_capture_command(
             java_options.append("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=1")
             java_options.append("-Dmattmc.dev.rustGalWorldMesh.fallingBlockFallHeight=12")
             java_options.append("-Dmattmc.dev.rustGalWorldMesh.fallingBlockSlowCapture=true")
+        if tool_kind == "capture":
+            # The local moving-block fixture does not exercise DH. Keep its
+            # copied-world bounds and optional subsystem state identical across
+            # Current/Frozen, including selected-source shader captures.
+            env.setdefault("MATTMC_CAPTURE_RENDER_DISTANCE", "4")
+            env.setdefault("MATTMC_CAPTURE_SIMULATION_DISTANCE", "5")
+            java_options.append("-Dmattmc.dev.rustGalDistantHorizons.disabled=true")
         if tool_kind == "gameplay":
             java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.yawDelta=0.0")
             java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.displayFpsCheckEnabled=false")
@@ -15322,6 +16500,22 @@ def build_capture_command(
             java_options.append("-Dmattmc.dev.rustGalWorldArrow.disabled=true")
         elif arrow_control == "legacy":
             java_options.append("-Dmattmc.dev.rustGalWorldArrow.legacyControl=true")
+    if getattr(args, "world_item_entity_scenario", ""):
+        java_options.append(
+            f"-Dmattmc.dev.rustGalWorldItemEntity.scenario={args.world_item_entity_scenario}"
+        )
+        if tool_kind == "capture":
+            java_options.append("-Dmattmc.dev.deterministicCameraCapture.poseCount=5")
+            java_options.append("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=1")
+        if getattr(args, "world_item_entity_count", -1) > 0:
+            java_options.append(
+                f"-Dmattmc.dev.rustGalWorldItemEntity.count={args.world_item_entity_count}"
+            )
+        item_entity_control = getattr(args, "world_item_entity_control", "rust")
+        if item_entity_control == "disabled":
+            java_options.append("-Dmattmc.dev.rustGalWorldItemEntity.disabled=true")
+        elif item_entity_control == "legacy":
+            java_options.append("-Dmattmc.dev.rustGalWorldItemEntity.legacyControl=true")
     if getattr(args, "world_experience_orb_scenario", ""):
         java_options.append(
             f"-Dmattmc.dev.rustGalWorldExperienceOrb.scenario={args.world_experience_orb_scenario}"
@@ -15362,7 +16556,7 @@ def build_capture_command(
             java_options.append("-Dmattmc.dev.deterministicCameraCapture.poseCount=5")
             java_options.append(
                 "-Dmattmc.dev.deterministicCameraCapture.framesPerPose=3"
-                if args.world_mesh_model_scenario == "evoker-fangs" else
+                if args.world_mesh_model_scenario in {"chest", "bed", "bell", "shulker", "evoker-fangs"} else
                 "-Dmattmc.dev.deterministicCameraCapture.framesPerPose=1"
             )
         model_control = getattr(args, "world_mesh_model_control", "rust")
@@ -15433,7 +16627,9 @@ def build_capture_command(
             java_options.append("-Dmattmc.dev.deterministicCameraCapture.poseCount=7")
             java_options.append("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=1")
         elif tool_kind == "capture":
-            java_options.append("-Dmattmc.dev.deterministicCameraCapture.poseCount=7")
+            # The Rust whole-frame route emits the canonical five-pose moving
+            # sequence; keep it identical to Frozen's retained capture frames.
+            java_options.append("-Dmattmc.dev.deterministicCameraCapture.poseCount=5")
             java_options.append("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=1")
         java_options.append(
             f"-Dmattmc.dev.rustGalWorldMesh.pistonDirection={args.world_mesh_piston_direction}"
@@ -15506,31 +16702,92 @@ def build_capture_command(
         java_options.append("-Dmattmc.dev.rustGalWorldMaterial.terrainParticle.legacyControl=true")
     if getattr(args, "world_background_scenario", ""):
         java_options.append(f"-Dmattmc.dev.rustGalWorldBackground.scenario={args.world_background_scenario}")
-    if getattr(args, "world_static_terrain_scenario", ""):
-        java_options.append(f"-Dmattmc.dev.rustGalStaticTerrain.scenario={args.world_static_terrain_scenario}")
+    if static_terrain_scenario and (mode.backend == "rust-vulkan" or bool(requested_static_terrain_scenario)):
+        java_options.append(f"-Dmattmc.dev.rustGalStaticTerrain.scenario={static_terrain_scenario}")
         java_options.append(f"-Dmattmc.dev.rustGalStaticTerrain.worldId={args.world}")
-        if tool_kind == "capture" and mode.backend == "rust-vulkan":
+        # Frozen remains a renderer-only OpenGL baseline. For the palette
+        # fixture it still needs the identical copied-world blocks and focused
+        # camera, supplied exclusively by its deterministic-capture hook.
+        # This generic property is intentionally not a Frozen render option.
+        if tool_kind == "capture" and static_terrain_scenario.lower() == "texture-palette":
+            java_options.append("-Dmattmc.dev.deterministicCameraCapture.staticTerrainFixture=texture-palette")
+        if tool_kind == "capture":
+            # This is a bounded observational receipt on both sides of a
+            # paired capture. It records the normal Frozen OpenGL producer
+            # without changing that renderer, and records Current's semantic
+            # Rust route under the identical fixture.
             static_terrain_parity_path = capture_dir / "static_terrain_parity_diagnostics.jsonl"
             java_options.append("-Dmattmc.dev.staticTerrainParityDiagnostics=true")
             java_options.append(f"-Dmattmc.dev.staticTerrainParityDiagnostics.path={static_terrain_parity_path}")
             java_options.append("-Dmattmc.dev.staticTerrainParityDiagnostics.waitForStable=true")
             java_options.append("-Dmattmc.dev.staticTerrainParityDiagnostics.readyFrames=3")
-            java_options.append("-Dmattmc.dev.staticTerrainParityDiagnostics.maxSamples=512")
-            java_options.append("-Dmattmc.dev.staticTerrainParityDiagnostics.maxCoverageSamples=1024")
-            java_options.append("-Dmattmc.dev.staticTerrainParityDiagnostics.maxCoverageEvents=16384")
-            java_options.append("-Dmattmc.dev.staticTerrainParityDiagnostics.maxFaceCullTraceEvents=16384")
-            if str(getattr(args, "world_static_terrain_scenario", "")).strip().lower() == "texture-palette":
-                # The deterministic fixture places its four palette probes at
-                # known block coordinates. Enable the bounded source-color
-                # receipt for the grass probe's section; the Java diagnostics
-                # match the requested block while the Rust route remains a
-                # pure semantic consumer. This is evidence only and never a
-                # rendering admission or parity shortcut.
-                env["MATTMC_STATIC_TERRAIN_APPEARANCE_TRACE_SECTION"] = "35184407740421"
+            java_options.append(
+                f"-Dmattmc.dev.staticTerrainParityDiagnostics.maxSamples={static_terrain_parity_max_samples()}"
+            )
+            java_options.append(
+                f"-Dmattmc.dev.staticTerrainParityDiagnostics.maxEvents={static_terrain_parity_max_events()}"
+            )
+            java_options.append(
+                f"-Dmattmc.dev.staticTerrainParityDiagnostics.maxVisibleListEvents={static_terrain_parity_max_visible_list_events()}"
+            )
+            java_options.append(
+                f"-Dmattmc.dev.staticTerrainParityDiagnostics.maxCoverageSamples={static_terrain_parity_max_coverage_samples()}"
+            )
+            java_options.append(
+                f"-Dmattmc.dev.staticTerrainParityDiagnostics.maxCoverageEvents={static_terrain_parity_max_coverage_events()}"
+            )
+            java_options.append(
+                f"-Dmattmc.dev.staticTerrainParityDiagnostics.maxWholeFrameCoverageEvents={static_terrain_parity_max_whole_frame_coverage_events()}"
+            )
+            java_options.append(
+                f"-Dmattmc.dev.staticTerrainParityDiagnostics.maxPortalTraceEvents={static_terrain_parity_max_portal_trace_events()}"
+            )
+            java_options.append(
+                f"-Dmattmc.dev.staticTerrainParityDiagnostics.maxFaceCullTraceEvents={static_terrain_parity_max_face_cull_trace_events()}"
+            )
+            portal_trace_sections = os.environ.get("MATTMC_STATIC_TERRAIN_PORTAL_TRACE_SECTIONS", "").strip()
+            if portal_trace_sections:
+                java_options.append(
+                    f"-Dmattmc.dev.staticTerrainParityDiagnostics.portalTraceSections={portal_trace_sections}"
+                )
+            if static_terrain_scenario.lower() == "texture-palette":
+                # Trace the section that the settled deterministic camera
+                # actually renders for the palette witness.  The fixture's
+                # placement coordinate can sit in the section above its
+                # exposed terrain face; targeting that source-only section
+                # produced no Rust mesh receipt and could not diagnose the
+                # final terrain pixel.  This remains observational only.
+                env["MATTMC_STATIC_TERRAIN_APPEARANCE_TRACE_SECTION"] = "35184407740420"
                 env["MATTMC_STATIC_TERRAIN_APPEARANCE_TRACE_BLOCK"] = "133,82,559"
+                # Both routes receive this bounded diagnostic sink. Frozen
+                # exports only its already-rendered Java OpenGL lightmap;
+                # Current exports only Rust's semantic lightmap bytes before
+                # upload. Neither export participates in rendering policy.
+                env["MATTMC_STATIC_TERRAIN_APPEARANCE_TRACE_DIR"] = str(
+                    capture_dir / "static_terrain_appearance"
+                )
+                java_options.append(
+                    "-Dmattmc.dev.staticTerrainParityDiagnostics.lightmapPath="
+                    f"{capture_dir / 'static_terrain_appearance'}"
+                )
+            elif (
+                static_terrain_scenario.lower() in {"translucent-overlap", "translucent-water"}
+                and mode.backend == "rust-vulkan"
+            ):
+                # These fixtures isolate Rust-owned translucent terrain. Retain
+                # the existing bounded FFI-decode/atlas receipt beside the
+                # capture so diagnosis can distinguish wrong semantic inputs
+                # from later blend/output behavior without touching either
+                # renderer or weakening the paired visual gate.
+                env["MATTMC_STATIC_TERRAIN_APPEARANCE_TRACE_DIR"] = str(
+                    capture_dir / "static_terrain_appearance"
+                )
+                env["MATTMC_STATIC_TERRAIN_BATCH_TRACE_DIR"] = str(
+                    capture_dir / "static_terrain_appearance"
+                )
         if static_terrain_second_world:
             java_options.append(f"-Dmattmc.dev.rustGalStaticTerrain.worldB={static_terrain_second_world}")
-        if static_terrain_base_scenario(args.world_static_terrain_scenario) == "world-different-reload":
+        if static_terrain_base_scenario(static_terrain_scenario) == "world-different-reload":
             env["MATTMC_WORLD_STATIC_TERRAIN_NEEDS_SECOND_WORLD"] = "true"
         if getattr(args, "world_static_terrain_fault", ""):
             java_options.append(f"-Dmattmc.dev.rustGalStaticTerrain.fault={args.world_static_terrain_fault}")
@@ -15542,14 +16799,57 @@ def build_capture_command(
         if water_animation_capture_requested:
             java_options.append("-Dmattmc.dev.rustGalStaticTerrain.waterAnimationDenseCapture=true")
             java_options.append("-Dmattmc.dev.rustGalStaticTerrain.waterAnimationDenseFrames=24")
+        if tool_kind == "capture" and static_terrain_scenario:
+            # Both sides of a translucent ordering capture must receive the
+            # exact same camera inputs. This controls only the deterministic
+            # fixture; Frozen remains an observational Java OpenGL baseline.
+            java_options.append("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=1")
+            if static_terrain_requires_translucent_camera_sort(static_terrain_scenario):
+                java_options.append("-Dmattmc.dev.deterministicCameraCapture.poseCount=7")
+            else:
+                java_options.append("-Dmattmc.dev.deterministicCameraCapture.poseCount=1")
+            java_options.append("-Dmattmc.dev.deterministicCameraCapture.yawDelta=18.0")
+            if static_terrain_scenario.lower() == "translucent-overlap":
+                # This canonical Origin fixture must not let asynchronous mesh
+                # readiness choose a different pane origin on each renderer.
+                java_options.append("-Dmattmc.dev.deterministicCameraCapture.staticTerrainFixtureTarget=146,99,532")
+        if tool_kind == "gameplay":
+            # A paired static-terrain gameplay row is a performance/workload
+            # comparison, so its camera cadence and frame cap are part of its
+            # input fixture.  Do not let a host-provided capture default make
+            # Current move at 120 FPS while Frozen is static at 260 FPS.
+            # These are copied-run settings for both renderers, not a route
+            # control or a rendering behavior change to Frozen.
+            java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.yawDelta=0.0")
+            java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.displayFpsCheckEnabled=false")
+            java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.cameraPathType=fixed-static-terrain")
+            env["MATTMC_CAPTURE_MAX_FPS"] = "260"
+            env["MATTMC_CAPTURE_DISABLE_DH_FOR_PERF"] = "true"
+            env["MATTMC_CAPTURE_RENDER_DISTANCE"] = "4"
+            env["MATTMC_CAPTURE_SIMULATION_DISTANCE"] = "5"
         if (
             tool_kind == "capture"
             and mode.backend == "rust-vulkan"
-            and getattr(args, "world_static_terrain_scenario", "")
+            and static_terrain_scenario
+            and (mode.backend == "rust-vulkan" or bool(requested_static_terrain_scenario))
         ):
-            java_options.append("-Dmattmc.dev.deterministicCameraCapture.settledReadyFamilies=static-terrain")
-            java_options.append("-Dmattmc.dev.deterministicCameraCapture.settledReadyFrames=3")
-            java_options.append("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=1")
+            # The Rust Vulkan whole-frame producer reports readiness through
+            # the semantic Sodium-terrain receipt and its explicit queue
+            # drain.  Do not overwrite the world-profile readiness family
+            # with the legacy static-terrain identity-intersection gate:
+            # whole-frame visibility identities legitimately churn while the
+            # copied terrain source is settling, even though its queue is
+            # already drained and all visible submissions are valid.
+            java_options.append("-Dmattmc.dev.deterministicCameraCapture.settledReadyFamilies=sodium-terrain")
+            # Translucent overlap captures revisit their initial camera after
+            # several relocations. Require a longer stable Rust terrain window
+            # so the first image cannot be taken while async section visibility
+            # is still expanding; the final-order pixel contract remains
+            # unchanged and therefore cannot be made green by relaxing it.
+            java_options.append(
+                "-Dmattmc.dev.deterministicCameraCapture.settledReadyFrames="
+                + ("8" if static_terrain_requires_translucent_camera_sort(static_terrain_scenario) else "3")
+            )
             has_moving_mesh_capture = bool(
                 getattr(args, "world_mesh_falling_block_scenario", "")
                 or getattr(args, "world_mesh_piston_scenario", "")
@@ -15564,17 +16864,17 @@ def build_capture_command(
                 # still supplies the readiness family, but must not collapse a
                 # required airborne/interpolation frame series to one pose.
                 pass
-            elif static_terrain_requires_translucent_camera_sort(args.world_static_terrain_scenario):
-                java_options.append("-Dmattmc.dev.deterministicCameraCapture.poseCount=7")
-            else:
-                java_options.append("-Dmattmc.dev.deterministicCameraCapture.poseCount=1")
-            java_options.append("-Dmattmc.dev.deterministicCameraCapture.yawDelta=18.0")
         elif tool_kind == "gameplay":
             java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.displayFpsCheckEnabled=false")
             env.setdefault("MATTMC_CAPTURE_MAX_FPS", "260")
             env.setdefault("MATTMC_CAPTURE_DISABLE_DH_FOR_PERF", "true")
             env.setdefault("MATTMC_CAPTURE_RENDER_DISTANCE", "4")
-            env.setdefault("MATTMC_CAPTURE_SIMULATION_DISTANCE", "4")
+            # Minecraft rejects simulation distance 4 (the legal range starts
+            # at 5). An invalid copied option aborts gameplay readiness before
+            # any measured frames, making the parity row look like a renderer
+            # failure. Keep the bounded low-distance workload while using the
+            # minimum valid simulation distance.
+            env.setdefault("MATTMC_CAPTURE_SIMULATION_DISTANCE", "5")
     positive_control_delay_ms = getattr(args, "positive_control_delay_ms", 0) or 0
     if positive_control_delay_ms > 0:
         java_options.append(
@@ -15611,6 +16911,12 @@ def build_capture_command(
         java_options.append("-Dmattmc.dev.rustGalGui.mountHealth.legacyControl=true")
     if tool_kind == "capture" and mode.backend == "rust-vulkan":
         attachment_dir = capture_dir / "whole_frame_gameplay_attachments"
+        # The ordinary Rust-owned (shaders-off) terrain graph has its own
+        # explicit fog pass.  Preserve one overwritten semantic receipt for
+        # parity captures so an image mismatch can be attributed to copied
+        # fog inputs or to Rust shader execution without enabling a source
+        # shader-pack route or altering the submitted frame.
+        env["MATTMC_GRAPHICS_AUDIT"] = "true"
         env["MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_DIR"] = str(attachment_dir)
         env["MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_REQUEST"] = str(
             attachment_dir / "requested-gameplay-frame.properties"
@@ -15621,6 +16927,21 @@ def build_capture_command(
         env["MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_FINAL_ONLY"] = (
             "0" if getattr(args, "rust_full_gameplay_attachments", False) else "1"
         )
+        if getattr(args, "rust_full_gameplay_attachments", False) and mode.shaders == "on":
+            # A source-derived shader route needs selected-source promotion so
+            # the expensive readback names the admitted source frame.  The
+            # normal shaders-off graph has no source plan to promote: setting
+            # this flag there turns a valid ordinary-frame diagnostic into an
+            # uncorrelated pending request and yields no attachments at all.
+            env["MATTMC_RUST_SELECTED_SOURCE_EXECUTION"] = "1"
+        elif getattr(args, "rust_full_gameplay_attachments", False):
+            # Full attachment evidence must name the same submitted frame as
+            # the retained deterministic screenshot.  Hold the pose until the
+            # existing Java/Rust correlation handshake completes; do not use
+            # Rust's deliberately uncorrelated diagnostic-once fallback.
+            java_options.append(
+                "-Dmattmc.dev.deterministicCameraCapture.rustFinalOutputEveryPose=true"
+            )
         env["MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR"] = str(
             capture_dir / "terrain_pass_contract"
         )
@@ -15643,7 +16964,15 @@ def build_capture_command(
             # penultimate render. One-frame poses cannot establish that
             # causal link, so use the smallest bounded two-frame pose.
             java_options.append("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=2")
-    if getattr(args, "rust_selected_source_execution", False) and tool_kind in {"capture", "gameplay"}:
+    # This option is scoped to the Current Rust Vulkan row. In a combined
+    # parity invocation the Frozen OpenGL row must simply omit it; rejecting
+    # the whole matrix here prevented canonical Rust/Frozen source evidence
+    # from being collected together.
+    if (
+        getattr(args, "rust_selected_source_execution", False)
+        and tool_kind in {"capture", "gameplay"}
+        and mode.target != "frozen"
+    ):
         if mode.backend != "rust-vulkan" or mode.expected_attribution != "rust-vulkan":
             raise ValueError(
                 "--rust-selected-source-execution requires the Current Rust Vulkan whole-frame route"
@@ -15658,6 +16987,12 @@ def build_capture_command(
         # source-derived shader plan.
         env["MATTMC_RUST_SELECTED_SOURCE_EXECUTION"] = "1"
         env["MATTMC_GRAPHICS_AUDIT"] = "true"
+        # Capture-only evidence for the first suspect deferred consumer.  Keep
+        # the exact scalar ABI and lowered source beside the stage image so a
+        # visual mismatch can be traced to semantic inputs or lowering without
+        # changing the submitted Rust graph.
+        env["MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_UNIFORM_RECEIPT"] = "1"
+        env["MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROGRAM_RECEIPT"] = "1"
         if tool_kind == "capture" and dh_texture_palette:
             # Keep one same-submission source-primary readback for the DH
             # palette. It is the only stage where raw atlas identity is
@@ -15717,7 +17052,7 @@ def build_capture_command(
                 "-Dmattmc.dev.deterministicCameraCapture.requiredRustSourceExecutionDir="
                 + str(capture_dir / "terrain_pass_contract")
             )
-    if tool_kind == "gameplay":
+    if frame_benchmark_requested(args, tool_kind):
         frame_status = capture_dir / f"graphics_frame_benchmark_{timestamp()}.json"
         # Gameplay probes normally avoid filesystem diagnostics, but an
         # explicitly requested Rust selected-source run must retain the same
@@ -15754,6 +17089,17 @@ def build_capture_command(
             # exchange. Keep the readiness gate strict, but allow the bounded
             # client tick window needed for that real packet to arrive.
             readiness_timeout_seconds = max(readiness_timeout_seconds, 30)
+        if (
+            getattr(args, "world_distant_horizons_opaque", False)
+            or getattr(args, "world_distant_horizons_non_water", False)
+            or getattr(args, "world_distant_horizons_water", False)
+            or getattr(args, "world_distant_horizons_texture_palette", False)
+        ):
+            # A freshly reset DH database must build its real quadtree before
+            # the Rust material route can submit work. This extends only the
+            # bounded producer-readiness wait; route execution, capture
+            # correlation, and parity gates remain unchanged.
+            readiness_timeout_seconds = max(readiness_timeout_seconds, 120)
         pack_scenario = (
             getattr(args, "gui_resource_pack_scenario", "")
             or getattr(args, "world_static_terrain_resource_pack_scenario", "")
@@ -15765,6 +17111,20 @@ def build_capture_command(
             # rendering or parity gate once the world is entered.
             readiness_timeout_seconds = max(readiness_timeout_seconds, 30)
         measure_frames = mode_frame_count(args.measure_frames, mode, args, "--measure-frames")
+        if (
+            frame_benchmark_requested(args, tool_kind)
+            and mode.backend == "rust-vulkan"
+            and "--measure-frames" not in getattr(args, "_provided_options", set())
+        ):
+            # The standard gameplay probe has a fixed wall-clock budget. The
+            # explicit Rust Vulkan route currently spends substantially more
+            # time per frame while its real command stream is being lowered;
+            # retaining the generic 120-frame warmup plus 300-frame sample
+            # window makes the probe time out before measurement starts. Keep
+            # a complete, validated sample window, but bound the default
+            # probe to the same order of magnitude as the smoke workload.
+            warmup_frames = min(warmup_frames, 30)
+            measure_frames = min(measure_frames, 60)
         java_options.extend(
             [
                 "-Dmattmc.dev.graphicsFrameBenchmark=true",
@@ -15782,6 +17142,7 @@ def build_capture_command(
             ]
         )
         env["MATTMC_GRAPHICS_GAMEPLAY_BENCHMARK"] = "true"
+        env["MATTMC_GRAPHICS_FRAME_BENCHMARK_STATUS"] = str(frame_status)
     if tool_kind == "subsystem":
         subsystem_status = capture_dir / f"graphics_subsystem_benchmark_{timestamp()}.json"
         subsystem_iterations = mode_frame_count(args.subsystem_iterations, mode, args, "--subsystem-iterations")
@@ -15796,7 +17157,7 @@ def build_capture_command(
         )
         env["MATTMC_GRAPHICS_SUBSYSTEM_BENCHMARK"] = "true"
         env["MATTMC_GRAPHICS_SUBSYSTEM_STATUS"] = str(subsystem_status)
-    if tool_kind == "capture":
+    if tool_kind == "capture" and not title_screen_capture:
         java_options.extend(
             [
                 "-Dmattmc.dev.graphicsAuditSliceMetrics=true",
@@ -15807,6 +17168,11 @@ def build_capture_command(
         perf_dir = capture_dir / "vulkan-perf-audit"
         java_options.extend(
             [
+                # Gameplay producer gates consume the same bounded semantic
+                # receipts as correctness captures.  Enable their diagnostic
+                # stream explicitly; without it real Rust model submissions
+                # cannot be correlated to the completed frame.
+                "-Dmattmc.dev.graphicsAuditSliceMetrics=true",
                 "-Dmattmc.vulkan.perfAudit=true",
                 f"-Dmattmc.vulkan.perfAuditReportDir={perf_dir}",
                 "-Dmattmc.graphicsAudit=true",
@@ -15857,6 +17223,52 @@ def build_capture_command(
             env["MATTMC_RENDERDOC_CAPTURE_PATH"] = str(renderdoc_capture)
         else:
             env["MATTMC_RENDERDOC_CAPTURE_PATH"] = str(renderdoc_capture)
+    if tool_kind == "capture" and getattr(args, "world_background_scenario", ""):
+        # Background/sky captures are static visual probes. Keep the camera
+        # schedule identical for the Python Current runner and Frozen's shell
+        # runner so their screenshots can be paired without one side adding
+        # extra yaw poses. This changes only fixture equivalence, never the
+        # acceptance threshold or rendering route.
+        java_options.extend(
+            [
+                "-Dmattmc.dev.deterministicCameraCapture.poseCount=1",
+                "-Dmattmc.dev.deterministicCameraCapture.yawDelta=0.0",
+            ]
+        )
+    if tool_kind == "capture" and mode.shaders == "on" and not static_terrain_scenario and not any(
+        getattr(args, name, "")
+        for name in (
+            "world_mesh_falling_block_scenario",
+            "world_mesh_piston_scenario",
+            "world_mesh_primed_tnt_scenario",
+            "world_mesh_arrow_scenario",
+            "world_experience_orb_scenario",
+            "world_beacon_beam_scenario",
+            "world_mesh_model_scenario",
+            "world_entity_flame_scenario",
+        )
+    ):
+        # The ordinary shader-pack correctness probe is static. Both runners
+        # must capture the same single canonical pose; moving-object shader
+        # fixtures retain their explicit sequences above.
+        java_options.extend(
+            [
+                "-Dmattmc.dev.deterministicCameraCapture.poseCount=1",
+                "-Dmattmc.dev.deterministicCameraCapture.yawDelta=0.0",
+            ]
+        )
+    if tool_kind == "capture" and canonical_fixture_uses_static_capture_schedule(args):
+        # The shared canonical fixture is deliberately a static camera probe.
+        # State this after all general capture setup so Current's Python
+        # runner and Frozen's shell runner cannot silently choose different
+        # default schedules.  Dedicated feature fixtures above retain their
+        # explicitly documented moving sequences.
+        java_options.extend(
+            [
+                "-Dmattmc.dev.deterministicCameraCapture.poseCount=1",
+                "-Dmattmc.dev.deterministicCameraCapture.yawDelta=0.0",
+            ]
+        )
     env["JAVA_TOOL_OPTIONS"] = " ".join(shlex.quote(part) for part in java_options if part).strip()
     return command, env
 
@@ -16484,6 +17896,19 @@ def run_mode(
     output_path = artifact_root / mode.name / tool_kind / run_dir / ARTIFACT_NAME
     managed_run_root = output_path.parent
     retention_policy = getattr(args, "_retention_policy", None)
+    # A cross-repository matrix can only compare the two deterministic capture
+    # rows after *both* have completed.  Retention normally runs after every
+    # row, but a zero-success retention policy would otherwise erase the
+    # Frozen capture before the Current capture exists and make a matrix report
+    # a misleading successful `pair_count: 0`.  Keep only capture evidence
+    # through matrix aggregation; gameplay and subsystem rows retain their
+    # ordinary eager cleanup, and the invocation-level cleanup below releases
+    # these two rows immediately after the comparison is written.
+    defer_matrix_capture_retention = (
+        args.tool == "matrix"
+        and tool_kind == "capture"
+        and not getattr(args, "artifact_preserve", False)
+    )
     emit_matrix_progress(args, row_label, "preflight-started", f"target={target.name}")
     if retention_policy is not None and not args.dry_run:
         if not getattr(args, "artifact_preserve", False):
@@ -16822,6 +18247,8 @@ def run_mode(
             subsystem_terminal_started: float | None = None
             artifact_finalization_started: float | None = None
             selected_source_admission_grace_applied = False
+            inventory_interaction_injected = False
+            inventory_interaction_sidecar = capture_dir / "inventory_screen_interaction.json"
             while True:
                 exit_code = process.poll()
                 if exit_code is not None:
@@ -16907,7 +18334,7 @@ def run_mode(
                         grace_seconds = (
                             SELECTED_SOURCE_ADMISSION_GRACE_SECONDS
                             if getattr(args, "rust_selected_source_execution", False)
-                            else WHOLE_FRAME_TERRAIN_ADMISSION_GRACE_SECONDS
+                            else terrain_admission_grace_seconds(args, mode, tool_kind)
                         )
                         timeout_seconds += grace_seconds
                         emit_matrix_progress(
@@ -16969,6 +18396,53 @@ def run_mode(
                         exit_code = process.wait(timeout=cleanup_timeout)
                         emit_matrix_progress(args, row_label, "shutdown-started", "artifact quota exceeded")
                         break
+                if (
+                    getattr(args, "inventory_screen_capture", False)
+                    and target.name == "frozen"
+                    and not inventory_interaction_injected
+                ):
+                    request = deterministic_screenshot_request(capture_dir)
+                    if request is not None:
+                        injected = send_linux_inventory_key()
+                        screenshot = capture_dir / "inventory_screen_presented.png"
+                        # Both routes receive the ordinary inventory key after
+                        # the same deterministic pose request.  The initial
+                        # request can already be acknowledged by either runner;
+                        # this independent desktop image is deliberately taken
+                        # only after the next rendered input turn.
+                        target_window = None
+                        if injected:
+                            time.sleep(0.75)
+                            target_window = capture_linux_focused_client(screenshot)
+                            injected = target_window is not None
+                        inventory_interaction_sidecar.write_text(
+                            json.dumps(
+                                {
+                                    "schema": "mattmc-inventory-screen-interaction-v1",
+                                    "request": str(request),
+                                    "method": "x11-xtest-key-e",
+                                    "injected": injected,
+                                    "screenshot": str(screenshot) if injected else "",
+                                    "target_window": target_window or "",
+                                    "timestamp_utc": utc_now(),
+                                },
+                                indent=2,
+                                sort_keys=True,
+                            ) + "\n",
+                            encoding="utf-8",
+                        )
+                        if not injected:
+                            timed_out = True
+                            timed_out_phase = "inventory-screen-input"
+                            error = "could not inject the inventory key before the deterministic screenshot acknowledgement"
+                            terminate_process_tree(process)
+                            cleanup_killed_processes = cleanup_repo_processes(target.root)
+                            cleanup_timeout = max(1, phase_timeout_seconds(args, "cleanup"))
+                            exit_code = process.wait(timeout=cleanup_timeout)
+                            emit_matrix_progress(args, row_label, "shutdown-started", "inventory input injection failed")
+                            break
+                        inventory_interaction_injected = True
+                        emit_matrix_progress(args, row_label, "active", "inventory key injected before deterministic screenshot acknowledgement")
                 time.sleep(0.25)
         except subprocess.TimeoutExpired:
             timed_out = True
@@ -17075,6 +18549,7 @@ def run_mode(
         runtime_profile=runtime_profile_dict(args),
         repository_paths=repository_paths,
         require_complete_gameplay_attachments=bool(getattr(args, "rust_full_gameplay_attachments", False)),
+        require_frame_benchmark=frame_benchmark_requested(args, tool_kind),
     )
     validation = artifact.get("validation") if isinstance(artifact.get("validation"), dict) else {}
     if not validation.get("complete"):
@@ -17093,7 +18568,19 @@ def run_mode(
             error = error or str(quota_error)
             artifact_retention.write_quota_failure(retention_policy.root, managed_run_root, str(quota_error))
         artifact_retention.remove_generated_temp_dirs_for_capture(retention_policy.root, capture_dir)
-        artifact_retention.cleanup(retention_policy, after_run=managed_run_root)
+        if defer_matrix_capture_retention:
+            # Subsequent gameplay/subsystem rows also invoke retention cleanup
+            # against the invocation root. Retention's actual unit is the
+            # enclosing mode directory, so protect that unit (rather than the
+            # nested run directory) until matrix aggregation consumes the
+            # capture evidence. The marker is removed immediately before final
+            # invocation cleanup below.
+            managed_run_root.parents[1].joinpath(".preserve").write_text(
+                "temporary cross-repository matrix pairing evidence\n",
+                encoding="utf-8",
+            )
+        else:
+            artifact_retention.cleanup(retention_policy, after_run=managed_run_root)
     emit_matrix_progress(
         args,
         row_label,
@@ -17139,13 +18626,19 @@ def load_baseline_index(path: Path | None) -> dict[str, object]:
 def aggregate_matrix(artifact_paths: Iterable[Path]) -> dict[str, object]:
     artifacts = [load_cross_repo_artifact(path) for path in artifact_paths]
     rows: list[dict[str, object]] = []
-    references: dict[tuple[str, str], dict[str, object]] = {}
+    references: dict[tuple[str, str, str], dict[str, object]] = {}
     rejections: list[dict[str, object]] = []
     for artifact in artifacts:
         tool = str(artifact.get("tool", "unknown"))
         mode = artifact.get("mode") if isinstance(artifact.get("mode"), dict) else {}
         shaders = str(mode.get("shaders", "unknown"))
-        reference_key = (tool, shaders)
+        signature = artifact.get("benchmark_fingerprint", {}).get("workload_signature", {})
+        workload_profile = signature.get("workload_profile", "unknown") if isinstance(signature, dict) else "unknown"
+        # Capture, gameplay, and subsystem artifacts intentionally exercise
+        # different schedules. Only compare equivalent workload profiles; the
+        # cross-repository pairing still compares Current and Frozen within
+        # each profile.
+        reference_key = (tool, shaders, str(workload_profile))
         reference = references.get(reference_key)
         if reference is None:
             references[reference_key] = artifact
@@ -17345,6 +18838,118 @@ def selected_modes(args: argparse.Namespace) -> list[ModeSpec]:
     return list(MATRIX_MODES)
 
 
+def deterministic_screenshot_request(capture_dir: Path) -> Path | None:
+    """Return the first ordinary deterministic pose request, acknowledged or not.
+
+    The inventory fixture deliberately captures after the runner's ordinary
+    deterministic image. Requiring an unacknowledged request made that input
+    depend on a race between the parent harness and each target's runner.
+    """
+    for request in sorted(capture_dir.glob("deterministic_camera_capture_*/capture_request_*.json")):
+        if request.name.endswith(".ack.json"):
+            continue
+        try:
+            document = json.loads(request.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if isinstance(document, dict) and isinstance(document.get("poseName"), str):
+            return request
+    return None
+
+
+def linux_minecraft_window_id() -> str | None:
+    """Return the top-most Minecraft client window visible to the X server."""
+    if platform_name() != "linux" or not shutil.which("xprop"):
+        return None
+    stacking = subprocess.run(
+        ["xprop", "-root", "_NET_CLIENT_LIST_STACKING"],
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    ).stdout
+    for candidate in reversed(re.findall(r"0x[0-9a-fA-F]+", stacking)):
+        properties = subprocess.run(
+            ["xprop", "-id", candidate, "WM_NAME", "_NET_WM_NAME", "WM_CLASS"],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        ).stdout
+        if re.search(r"Minecraft|LWJGL|GLFW|KnotClient|devlaunchinjector", properties, re.IGNORECASE):
+            return candidate
+    return None
+
+
+def send_linux_inventory_key() -> bool:
+    """Focus the Minecraft client then send its ordinary inventory key via XTest."""
+    if platform_name() != "linux" or not os.environ.get("DISPLAY"):
+        return False
+    target = linux_minecraft_window_id()
+    if target is None:
+        return False
+    try:
+        x11 = ctypes.CDLL("libX11.so.6")
+        xtst = ctypes.CDLL("libXtst.so.6")
+        x11.XOpenDisplay.argtypes = [ctypes.c_char_p]
+        x11.XOpenDisplay.restype = ctypes.c_void_p
+        x11.XStringToKeysym.argtypes = [ctypes.c_char_p]
+        x11.XStringToKeysym.restype = ctypes.c_ulong
+        x11.XKeysymToKeycode.argtypes = [ctypes.c_void_p, ctypes.c_ulong]
+        x11.XKeysymToKeycode.restype = ctypes.c_ubyte
+        x11.XRaiseWindow.argtypes = [ctypes.c_void_p, ctypes.c_ulong]
+        x11.XSetInputFocus.argtypes = [ctypes.c_void_p, ctypes.c_ulong, ctypes.c_int, ctypes.c_ulong]
+        x11.XSync.argtypes = [ctypes.c_void_p, ctypes.c_int]
+        x11.XFlush.argtypes = [ctypes.c_void_p]
+        x11.XCloseDisplay.argtypes = [ctypes.c_void_p]
+        xtst.XTestFakeKeyEvent.argtypes = [ctypes.c_void_p, ctypes.c_uint, ctypes.c_int, ctypes.c_ulong]
+        display = x11.XOpenDisplay(None)
+        if not display:
+            return False
+        try:
+            keycode = x11.XKeysymToKeycode(display, x11.XStringToKeysym(b"e"))
+            if not keycode:
+                return False
+            window = int(target, 16)
+            x11.XRaiseWindow(display, window)
+            # RevertToPointerRoot (1) matches a normal transient focus change
+            # if the target window exits while the deterministic run stops.
+            x11.XSetInputFocus(display, window, 1, 0)
+            x11.XSync(display, 0)
+            if not xtst.XTestFakeKeyEvent(display, keycode, 1, 0) or x11.XFlush(display) < 0:
+                return False
+            # A zero-duration synthetic press can be entirely contained
+            # between two GLFW polls on a busy Rust-owned frame. Hold it long
+            # enough for both the Frozen and Current event loops to consume
+            # the same ordinary key transition.
+            time.sleep(0.15)
+            return bool(
+                xtst.XTestFakeKeyEvent(display, keycode, 0, 0)
+                # XFlush returns the request serial (positive on a healthy
+                # connection), not a C-style boolean success code.
+                and x11.XFlush(display) >= 0
+            )
+        finally:
+            x11.XCloseDisplay(display)
+    except OSError:
+        return False
+
+
+def capture_linux_focused_client(screenshot: Path) -> str | None:
+    """Capture the focused Minecraft window after the deterministic input tick."""
+    if platform_name() != "linux" or not shutil.which("import"):
+        return None
+    screenshot.parent.mkdir(parents=True, exist_ok=True)
+    target = linux_minecraft_window_id() or "root"
+    result = subprocess.run(
+        ["import", "-window", target, str(screenshot)],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    return target if result.returncode == 0 and screenshot.is_file() else None
+
+
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     incoming = list(argv) if argv is not None else sys.argv[1:]
     if not incoming or incoming[0] not in TOOL_KINDS:
@@ -17375,7 +18980,33 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         subparser.add_argument("--retain-successful-runs", type=int)
         subparser.add_argument("--retain-failed-runs", type=int)
         subparser.add_argument("--mode", action="append", choices=[mode.name for mode in MATRIX_MODES])
+        subparser.add_argument(
+            "--inventory-screen-capture",
+            action="store_true",
+            help=(
+                "Externally press the ordinary inventory key at the first deterministic pose request, "
+                "then retain that presented frame for Current/Frozen GUI parity without modifying either renderer."
+            ),
+        )
+        subparser.add_argument(
+            "--title-screen-capture",
+            action="store_true",
+            help=(
+                "Launch to the ordinary title screen without quick-play and retain one bounded "
+                "desktop capture for Current/Frozen menu investigation. This remains observational "
+                "until both repositories expose a deterministic menu-ready receipt."
+            ),
+        )
         subparser.add_argument("--workload-profile", choices=WORKLOAD_PROFILES, default="correctness")
+        subparser.add_argument(
+            "--graphics-mode",
+            choices=("fast", "fancy", "fabulous"),
+            default="fancy",
+            help=(
+                "Set the graphics mode only in the equivalent copied parity fixture; "
+                "use fabulous to exercise the Rust-owned terrain transparency handoff."
+            ),
+        )
         subparser.add_argument("--world-profile", choices=WORLD_PROFILE_NAMES, default=os.environ.get("MATTMC_GRAPHICS_WORLD_PROFILE", "migration-gate"))
         subparser.add_argument("--world", default=os.environ.get("MATTMC_CAPTURE_WORLD"))
         subparser.add_argument(
@@ -17448,6 +19079,23 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         subparser.add_argument("--player-heart-hardcore", action="store_true", help="Force hardcore player-heart sprites for correctness captures.")
         subparser.add_argument("--player-heart-regeneration", action="store_true", help="Force regeneration bounce state for correctness captures.")
         subparser.add_argument("--game-mode", choices=("survival", "creative", "adventure", "spectator"), help="Force a deterministic player game mode for gameplay/capture controls.")
+        subparser.add_argument(
+            "--selected-hotbar-slot",
+            type=int,
+            choices=range(1, 10),
+            help="Force the deterministic capture's selected hotbar slot (1-9); use an empty fixture slot to exercise first-person hands.",
+        )
+        subparser.add_argument(
+            "--hotbar-item-fixture",
+            choices=("standard-3d",),
+            default="",
+            help="Install the same deterministic hotbar fixture in every route before capture.",
+        )
+        subparser.add_argument(
+            "--empty-selected-hand",
+            action="store_true",
+            help="Clear the selected hotbar slot after applying the deterministic item fixture.",
+        )
         subparser.add_argument(
             "--world-outline-scenario",
             choices=("full-cube", "partial-shape", "disconnected-shape", "no-target"),
@@ -17645,6 +19293,24 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
             choices=("rust", "disabled", "legacy"),
             default=os.environ.get("MATTMC_WORLD_MESH_ARROW_CONTROL", "rust"),
             help="Select the Arrow route control for deterministic evidence.",
+        )
+        subparser.add_argument(
+            "--world-item-entity-scenario",
+            choices=("hidden", "ordinary"),
+            default=os.environ.get("MATTMC_WORLD_ITEM_ENTITY_SCENARIO", ""),
+            help="Spawn deterministic vanilla dropped-item entities for Rust-owned material-route validation.",
+        )
+        subparser.add_argument(
+            "--world-item-entity-count",
+            type=int,
+            default=int(os.environ.get("MATTMC_WORLD_ITEM_ENTITY_COUNT", "-1")),
+            help="Override deterministic dropped-item entity count.",
+        )
+        subparser.add_argument(
+            "--world-item-entity-control",
+            choices=("rust", "disabled", "legacy"),
+            default=os.environ.get("MATTMC_WORLD_ITEM_ENTITY_CONTROL", "rust"),
+            help="Select the dropped-item route control for deterministic evidence.",
         )
         subparser.add_argument(
             "--world-experience-orb-scenario",
@@ -18049,10 +19715,27 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         subparser.add_argument("--measure-frames", type=int)
         subparser.add_argument("--settle-frames", type=int)
         subparser.add_argument("--max-settle-frames", type=int)
+        subparser.add_argument(
+            "--capture-frame-benchmark",
+            action="store_true",
+            help=(
+                "For a capture row, retain the deterministic screenshot and require the "
+                "independent game-loop frame benchmark to complete before shutdown."
+            ),
+        )
         subparser.add_argument("--positive-control-delay-ms", type=int, default=0)
         subparser.add_argument("--subsystem-iterations", type=int)
         subparser.add_argument("--repetitions", type=int, default=1)
         subparser.add_argument("--repeatability-tolerance", type=float, default=0.25)
+        subparser.add_argument(
+            "--visual-mean-rgb-abs-tolerance",
+            type=float,
+            default=6.0,
+            help=(
+                "Maximum permitted mean absolute error for each RGB channel in a comparable "
+                "Frozen OpenGL / Current Rust Vulkan screenshot pair."
+            ),
+        )
         subparser.add_argument("--diagnostic", action="store_true", help="Enable gated graphics audit diagnostics.")
         subparser.add_argument("--dry-run", action="store_true")
 
@@ -18246,10 +19929,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.artifact_preserve_current_run and not args.dry_run:
         (artifact_root / ".preserve").write_text("current validation evidence\n", encoding="utf-8")
     modes_to_run = selected_modes(args)
-    if canonical_parity_requested(modes_to_run) and not args.dry_run:
+    if canonical_fixture_requested(args, modes_to_run) and not args.dry_run:
         materialize_canonical_fixture(args, targets, artifact_root)
     results: list[MatrixResult] = []
-    tools_to_run = ("gameplay", "capture", "subsystem") if args.tool == "matrix" else (args.tool,)
+    # Deterministic model/block-entity fixtures are created by the camera-capture
+    # state machine.  A timing-only gameplay row never starts that state machine,
+    # so scheduling it for a model fixture can only time out waiting for a producer
+    # that is intentionally absent.  Keep the real capture and subsystem evidence
+    # rows (and the ordinary gameplay row for all other fixtures) unchanged.
+    tools_to_run = matrix_tool_kinds(args)
     for mode in modes_to_run:
         for tool_kind in tools_to_run:
             for repetition in range(1, args.repetitions + 1):
@@ -18271,8 +19959,25 @@ def main(argv: Sequence[str] | None = None) -> int:
     aggregate = aggregate_matrix(artifact_paths) if artifact_paths else None
     repeatability = repeatability_report(artifact_paths, args.repeatability_tolerance)
     cross_repo_parity = cross_repository_parity_report(artifact_paths)
-    cross_repo_visual_parity = write_cross_repo_visual_pairs(artifact_root, cross_repo_parity)
-    cross_repo_static_terrain_draw_coverage = cross_repository_static_terrain_draw_coverage_report(cross_repo_parity)
+    cross_repo_visual_parity = write_cross_repo_visual_pairs(
+        artifact_root,
+        cross_repo_parity,
+        args.visual_mean_rgb_abs_tolerance,
+    )
+    # Static-terrain coverage has strict, scenario-specific witnesses. Do not
+    # demand them from a weather/cloud (or other non-terrain) capture: that
+    # would turn an inapplicable diagnostic into a false rendering failure.
+    cross_repo_static_terrain_draw_coverage = (
+        cross_repository_static_terrain_draw_coverage_report(cross_repo_parity)
+        if getattr(args, "world_static_terrain_scenario", "")
+        else {
+            "schema": "mattmc-cross-repo-static-terrain-draw-coverage-v1",
+            "pair_count": 0,
+            "passed": True,
+            "pairs": [],
+            "skipped": "static-terrain-scenario-not-requested",
+        }
+    )
     aggregate_path = artifact_root / "graphics_audit_matrix.json"
     if aggregate:
         aggregate_path.write_text(json.dumps(aggregate, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -18308,12 +20013,21 @@ def main(argv: Sequence[str] | None = None) -> int:
         "success": all(result.success for result in results)
         and repeatability["passed"]
         and cross_repo_parity["passed"]
+        and cross_repo_visual_parity["passed"]
         and cross_repo_static_terrain_draw_coverage["passed"],
         "aggregate": str(aggregate_path) if aggregate else None,
         "results": [asdict(result) for result in results],
     }
     manifest_path = artifact_root / MANIFEST_NAME
     manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    if args.tool == "matrix" and not args.artifact_preserve:
+        # `run_mode` protects capture rows while their opposite-repository
+        # counterpart is still pending. Their only consumer has now written
+        # the comparison reports, so restore the caller's normal retention
+        # policy before final cleanup. Do not touch an invocation-level
+        # preserve marker requested explicitly by the caller.
+        for marker in artifact_root.glob("*/.preserve"):
+            marker.unlink(missing_ok=True)
     post_cleanup = (
         {"removed": [], "removed_game_dirs": [], "dry_run": True}
         if args.dry_run

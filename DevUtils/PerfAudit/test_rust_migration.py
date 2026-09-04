@@ -94,6 +94,21 @@ def args(**overrides) -> Namespace:
 
 
 class RustMigrationHarnessTests(unittest.TestCase):
+    def test_capture_runner_default_rss_budget_does_not_recreate_four_gib_heap_cap(self) -> None:
+        with mock.patch.object(
+            sys, "argv", ["capture_runner.py", "--backend", "rust-vulkan", "--shaders", "off"]
+        ), mock.patch.dict("os.environ", {}, clear=True):
+            config = capture_runner.parse_args()
+        self.assertEqual(12288, config.client_rss_limit_mb)
+        self.assertEqual(8192, capture_runner.capture_client_heap_max_mb(config.client_rss_limit_mb))
+        self.assertEqual(8192, capture_runner.capture_client_heap_max_mb(0))
+        self.assertEqual(512, capture_runner.capture_client_heap_max_mb(128))
+
+    def test_capture_runner_starts_adaptive_heap_without_eager_multi_gib_commit(self) -> None:
+        self.assertEqual(1024, capture_runner.capture_client_heap_initial_mb(8192))
+        self.assertEqual(512, capture_runner.capture_client_heap_initial_mb(4096))
+        self.assertLessEqual(capture_runner.capture_client_heap_initial_mb(8192), 1024)
+
     def test_run_client_does_not_run_the_full_test_suite(self) -> None:
         root = Path(__file__).resolve().parents[2]
         build_script = (root / "build.gradle").read_text(encoding="utf-8")
@@ -137,6 +152,14 @@ class RustMigrationHarnessTests(unittest.TestCase):
             matrix,
             root / "logs" / "graphics-audit" / "rust-vulkan" / "run-01",
             "the graphics matrix must retain its run-local managed artifact directory",
+        )
+        artifact_matrix = capture_runner.CaptureRunner.resolve_artifact_dir(
+            root, str(root / "artifacts" / "low-memory-smoke" / "gameplay" / "run-01" / "capture")
+        )
+        self.assertEqual(
+            artifact_matrix,
+            root / "artifacts" / "low-memory-smoke" / "gameplay" / "run-01" / "capture",
+            "retention-managed matrix artifacts under artifacts/ must remain co-located",
         )
 
     def test_graphics_retention_compresses_jsonl_diagnostics(self) -> None:

@@ -16,6 +16,7 @@ struct CompactSnapshotStorage {
     seed_los: Vec<i32>,
     seed_his: Vec<i32>,
     tints: Vec<i32>,
+    tint_lattices: Vec<i32>,
     fluid_tints: Vec<i32>,
     fluid_flow_x: Vec<f32>,
     fluid_flow_z: Vec<f32>,
@@ -36,6 +37,7 @@ impl CompactSnapshotStorage {
             seed_los: vec![0; COMPACT_SECTION_BLOCK_COUNT],
             seed_his: vec![0; COMPACT_SECTION_BLOCK_COUNT],
             tints: vec![-1; COMPACT_SECTION_BLOCK_COUNT],
+            tint_lattices: vec![-1; COMPACT_SECTION_BLOCK_COUNT * 9],
             fluid_tints: vec![-1; COMPACT_SECTION_BLOCK_COUNT],
             fluid_flow_x: vec![0.0; COMPACT_SECTION_BLOCK_COUNT],
             fluid_flow_z: vec![0.0; COMPACT_SECTION_BLOCK_COUNT],
@@ -63,6 +65,7 @@ impl CompactSnapshotStorage {
             fluid_flow_x_address: self.fluid_flow_x.as_ptr() as u64,
             fluid_flow_z_address: self.fluid_flow_z.as_ptr() as u64,
             fluid_block_ids_address: self.fluid_block_ids.as_ptr() as u64,
+            tint_lattices_address: self.tint_lattices.as_ptr() as u64,
             flags_address: self.flags.as_ptr() as u64,
         }
     }

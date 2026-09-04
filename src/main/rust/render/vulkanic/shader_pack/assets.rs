@@ -18,7 +18,9 @@ pub const MAX_TERRAIN_SAMPLER_DECLARATIONS: usize = 1_024;
 use crate::render::vulkanic::error::{GalError, GalResult};
 
 use super::source::ShaderPackSource;
-use super::vanilla_post_effect_contract::{VanillaPostEffectContract, VanillaPostEffectShaderSource};
+use super::vanilla_post_effect_contract::{
+    VanillaPostEffectContract, VanillaPostEffectShaderSource,
+};
 
 pub const SHADER_PROPERTIES_PATH: &str = "shaders.properties";
 
@@ -306,7 +308,10 @@ impl ShaderPackAssets {
         &self,
         effect_id: &str,
         source: &ShaderPackSource,
-    ) -> GalResult<(VanillaPostEffectContract, Vec<VanillaPostEffectShaderSource>)> {
+    ) -> GalResult<(
+        VanillaPostEffectContract,
+        Vec<VanillaPostEffectShaderSource>,
+    )> {
         let normalized = effect_id
             .trim()
             .strip_prefix("minecraft:")
@@ -567,9 +572,11 @@ fn normalize_declared_asset_path(path: &str) -> GalResult<String> {
         // ResourceLocation/runtime handle; the Java collector transports the
         // copied pack file under this canonical relative identity.
         if namespace.is_empty()
-            || !namespace
-                .bytes()
-                .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || matches!(byte, b'_' | b'-' | b'.'))
+            || !namespace.bytes().all(|byte| {
+                byte.is_ascii_lowercase()
+                    || byte.is_ascii_digit()
+                    || matches!(byte, b'_' | b'-' | b'.')
+            })
         {
             return Err(GalError::invalid_argument(
                 "shader-pack resource-location texture has an invalid namespace",

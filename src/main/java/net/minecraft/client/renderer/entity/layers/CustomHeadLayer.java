@@ -17,6 +17,7 @@ import net.minecraft.client.renderer.blockentity.SkullBlockRenderer;
 import net.minecraft.client.renderer.entity.RenderLayerParent;
 import net.minecraft.client.renderer.entity.state.LivingEntityRenderState;
 import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.component.ResolvableProfile;
 import net.minecraft.world.level.block.SkullBlock.Type;
 import net.minecraft.world.level.block.SkullBlock.Types;
@@ -56,6 +57,7 @@ public class CustomHeadLayer<S extends LivingEntityRenderState, M extends Entity
 				Type type = livingEntityRenderState.wornHeadType;
 				SkullModelBase skullModelBase = (SkullModelBase)this.skullModels.apply(type);
 				RenderType renderType = this.resolveSkullRenderType(livingEntityRenderState, type);
+				ResourceLocation semanticTexture = this.resolveSkullSemanticTexture(livingEntityRenderState, type);
 				SkullBlockRenderer.submitSkull(
 					null,
 					180.0F,
@@ -67,7 +69,7 @@ public class CustomHeadLayer<S extends LivingEntityRenderState, M extends Entity
 					renderType,
 					livingEntityRenderState.outlineColor,
 					null,
-					null
+					semanticTexture
 				);
 			} else {
 				translateToHead(poseStack, this.transforms);
@@ -87,6 +89,13 @@ public class CustomHeadLayer<S extends LivingEntityRenderState, M extends Entity
 		}
 
 		return SkullBlockRenderer.getSkullRenderType(type, null);
+	}
+
+	private ResourceLocation resolveSkullSemanticTexture(LivingEntityRenderState livingEntityRenderState, Type type) {
+		if (type == Types.PLAYER && livingEntityRenderState.wornHeadProfile != null) {
+			return this.playerSkinRenderCache.getOrDefault(livingEntityRenderState.wornHeadProfile).playerSkin().body().texturePath();
+		}
+		return SkullBlockRenderer.defaultTexture(type);
 	}
 
 	public static void translateToHead(PoseStack poseStack, CustomHeadLayer.Transforms transforms) {

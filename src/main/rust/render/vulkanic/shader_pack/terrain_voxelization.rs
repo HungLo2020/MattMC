@@ -790,6 +790,49 @@ fn snapshot_difference(
     }
 }
 
+/// Returns the first semantic difference that cannot be explained by a
+/// camera-relative transform update. Mesh generations identify immutable
+/// geometry/material content; the transform is per-frame placement and may
+/// legitimately change while the camera crosses orbits around a static
+/// section. Transform changes still flow through the voxel upload, but must
+/// not be mistaken for an illicit mesh-content mutation.
+fn snapshot_difference_excluding_transform(
+    existing: &TerrainOccupancyMeshSnapshot,
+    incoming: &TerrainOccupancyMeshSnapshot,
+) -> Option<String> {
+    if existing.samples.len() != incoming.samples.len() {
+        return Some(format!(
+            "sample-count {} -> {}",
+            existing.samples.len(),
+            incoming.samples.len()
+        ));
+    }
+    for (index, (previous, next)) in existing.samples.iter().zip(&incoming.samples).enumerate() {
+        if previous.vertex_position != next.vertex_position {
+            return Some(format!("sample[{index}].vertex-position"));
+        }
+        if previous.mid_block_packed != next.mid_block_packed {
+            return Some(format!("sample[{index}].mid-block"));
+        }
+        if previous.shader_material_id != next.shader_material_id {
+            return Some(format!("sample[{index}].shader-material"));
+        }
+    }
+    match (&existing.source_identity, &incoming.source_identity) {
+        (Some(previous), Some(next)) => {
+            if previous.vertices != next.vertices {
+                Some("source-vertices".to_owned())
+            } else if previous.indices != next.indices {
+                Some("source-indices".to_owned())
+            } else {
+                None
+            }
+        }
+        (None, None) => None,
+        _ => Some("source-identity-presence".to_owned()),
+    }
+}
+
 /// One private, generation-bound occupancy upload transaction. It owns only
 /// static-terrain semantic mesh extraction and an `R8Uint` D3 residency; it
 /// cannot bind a terrain program or admit selected shader-pack execution.
@@ -1212,11 +1255,14 @@ impl TerrainOccupancyRuntime {
                 continue;
             };
             if incoming.mesh_generation == existing.mesh_generation && incoming != existing {
-                return Err(GalError::invalid_argument(format!(
-                    "terrain occupancy snapshot mesh {mesh_key} changed semantic data without advancing generation {}; first difference={}",
-                    incoming.mesh_generation,
-                    snapshot_difference(existing, incoming)
-                )));
+                if let Some(difference) =
+                    snapshot_difference_excluding_transform(existing, incoming)
+                {
+                    return Err(GalError::invalid_argument(format!(
+                        "terrain occupancy snapshot mesh {mesh_key} changed semantic data without advancing generation {}; first difference={difference}",
+                        incoming.mesh_generation,
+                    )));
+                }
             }
         }
         Ok(())
@@ -4088,6 +4134,7 @@ mod tests {
                     shader_atlas_uv: [0.0, 0.0],
                     shader_block_id: 30_008,
                     shader_material_type: 0,
+                    terrain_material_bits: 0,
                     mid_block_packed: 0,
                     color_argb: u32::MAX,
                     normal_packed: 0,
@@ -5058,6 +5105,15 @@ mod tests {
             "occupancy-runtime-compact-topology-initial",
             operations,
         );
+
+        // Camera-relative placement is frame semantic state, not mesh
+        // content. A transform-only update with the same generation must be
+        // accepted and re-evaluated by the occupancy path.
+        let mut moved = source.clone();
+        moved.transform[12] = 3.0;
+        runtime
+            .append_terrain_source_snapshot([moved], &mut Vec::new())
+            .unwrap();
 
         let mut changed = source;
         let mut changed_vertices = (*changed.vertices).clone();

@@ -304,6 +304,10 @@ public class GuiRenderState {
 		this.itemModelIdentities.clear();
 		this.strata.clear();
 		this.firstStratumAfterBlur = Integer.MAX_VALUE;
+		// Bounds are frame-local navigation state. Retaining the previous frame's
+		// last bounds can route the first element of a newly opened screen into a
+		// stale tree position and make semantic extraction appear duplicated.
+		this.lastElementBounds = null;
 		this.nextStratum();
 	}
 

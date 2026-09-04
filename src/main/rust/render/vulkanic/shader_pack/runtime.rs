@@ -13,6 +13,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
 
+use super::super::world_primitive_frontend::{
+    WORLD_STRATUM_ENTITY_MESH, WORLD_STRATUM_TERRAIN,
+};
 use super::assets::{ShaderPackAssets, TerrainShaderPackAssetBindings};
 use super::cloud_contract::{
     derive_cloud_pass_contract, lower_cloud_source_pair, CloudFaceDisposition, CloudPassContract,
@@ -79,7 +82,6 @@ use super::source_targets::{
     ShaderPackColorTargetManifest, ShaderPackColorTargets, ShaderPackSourceColorResourceCache,
     TerrainSourceColorAttachment,
 };
-use super::super::world_primitive_frontend::WORLD_STRATUM_ENTITY_MESH;
 use super::source_uniforms::{
     TerrainSourceUniformRequirementSummary, TerrainSourceUniformRequirements,
 };
@@ -108,7 +110,8 @@ use super::weather_contract::{
 };
 use crate::render::vulkanic::world_primitive_frontend::TerrainVoxelSourceMesh;
 
-pub(crate) const TERRAIN_RUNTIME_COMPOSITE_UNIFORM_BYTES: u64 = 16 * 4 + 4 * 4 + 4 * 4 + 4 * 4;
+pub(crate) const TERRAIN_RUNTIME_COMPOSITE_UNIFORM_BYTES: u64 =
+    16 * 4 + 4 * 4 + 4 * 4 + 16 * 4 + 4 * 4 + 4 * 4;
 
 fn shader_pack_color_name_from_role(role: &str) -> GalResult<String> {
     role.strip_prefix("shader_pack_color:")
@@ -407,6 +410,16 @@ pub(crate) struct TerrainShaderResourceSet {
     pub set: Handle,
 }
 
+/// A generation-coherent ordinary-terrain lightmap descriptor. The descriptor
+/// belongs to the same Rust residency generation as its sampled view, so the
+/// runtime retires it before replacing that view.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct VanillaLightmapResourceSet {
+    pub world_generation: u64,
+    pub lightmap_generation: u64,
+    pub set: Handle,
+}
+
 /// One draw in the source-derived generic textured-material stage. It is
 /// intentionally separate from [`TerrainMeshDraw`]: material vertices are a
 /// compact explicit source stream, not indexed terrain sections, and this
@@ -626,6 +639,10 @@ pub(crate) enum TerrainSourceColorPassPhase {
     /// into first-person composition. This is a semantic pass rule rather
     /// than an Iris phase or backend state reconstruction.
     Hands,
+    /// The first terrain writer is translucent. It must initialize named
+    /// color/depth attachments before alpha-over drawing rather than loading
+    /// an image that has not been written by a bootstrap pass.
+    TranslucentFirst,
     Translucent,
 }
 
@@ -648,6 +665,7 @@ impl TerrainSourceColorPassPhase {
             (Self::Bootstrap, Self::Bootstrap)
                 | (Self::BootstrapAfterSky, Self::Bootstrap)
                 | (Self::Translucent, Self::Translucent)
+                | (Self::TranslucentFirst, Self::Translucent)
         )
     }
 
@@ -666,21 +684,22 @@ impl TerrainSourceColorPassPhase {
             | Self::Entities
             | Self::Hands => false,
             Self::Translucent => material_mode == TerrainMaterialPassMode::Translucent,
+            Self::TranslucentFirst => material_mode == TerrainMaterialPassMode::Translucent,
         }
     }
 
     fn depth_before(self) -> TextureUsageState {
         match self {
             Self::Bootstrap | Self::BootstrapAfterSky => TextureUsageState::Undefined,
-            Self::TexturedMaterial
-            | Self::Weather
-            | Self::Clouds
-            | Self::Entities => TextureUsageState::ShaderRead,
+            Self::TexturedMaterial | Self::Weather | Self::Clouds | Self::Entities => {
+                TextureUsageState::ShaderRead
+            }
             // Hands own a fresh private depth attachment.  Its first use is
             // the explicit clear/load pass, so the semantic predecessor is
             // Undefined rather than the shared world-depth read state.
             Self::Hands => TextureUsageState::Undefined,
             Self::Translucent => TextureUsageState::ShaderRead,
+            Self::TranslucentFirst => TextureUsageState::Undefined,
         }
     }
 
@@ -701,6 +720,8 @@ impl TerrainSourceColorPassPhase {
             | Self::Entities
             | Self::Hands
             | Self::Translucent => AttachmentLoadOp::Load,
+            Self::TranslucentFirst if attachment.clear_each_frame => AttachmentLoadOp::Clear,
+            Self::TranslucentFirst => AttachmentLoadOp::Load,
         }
     }
 
@@ -712,6 +733,7 @@ impl TerrainSourceColorPassPhase {
             | Self::Clouds
             | Self::Entities
             | Self::Translucent => AttachmentLoadOp::Load,
+            Self::TranslucentFirst => AttachmentLoadOp::Clear,
             // First-person depth intentionally begins at the backend-neutral
             // clear value (1.0) after all world material writers. Color still
             // loads because hands compose over the completed world image.
@@ -749,6 +771,10 @@ pub(crate) struct TerrainRuntimeFrame {
     pub frame_target: Handle,
     pub color_attachment: Handle,
     pub background_color: ClearColor,
+    /// A Rust-owned semantic background writer has initialized the complete
+    /// G-buffer before opaque terrain. The terrain graph must load rather
+    /// than clear it; this is explicit pass ordering, never backend state.
+    pub g_buffer_background_initialized: bool,
     pub uniforms: TerrainCompositeUniforms,
     /// Optional private source-depth history. Normal world material output is
     /// unchanged when no source stage declares a need for these snapshots.
@@ -765,8 +791,13 @@ pub(crate) struct TerrainRuntimeFrame {
     pub translucent_capture_initialized: bool,
     /// When true, translucent entity meshes are lowered into Fabulous's
     /// external `item_entity` attachment by the enclosing frontend and must
-    /// not also be rasterized into the deferred translucent capture.
+    /// not also be rasterized into either deferred transparency destination.
     pub translucent_entity_external: bool,
+    /// When true, translucent terrain is retained only in the explicit
+    /// Fabulous `translucent` attachment.  The enclosing handoff composes
+    /// that attachment over the copied opaque main image; writing it into the
+    /// normal deferred image as well would blend every pane twice.
+    pub translucent_terrain_external: bool,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -774,7 +805,15 @@ pub(crate) struct TerrainCompositeUniforms {
     pub light_view_projection: [f32; 16],
     pub shadow_params: [f32; 4],
     pub color_grade_params: [f32; 4],
-    pub fog_params: [f32; 4],
+    /// Inverse of the copied game projection. The depth composite uses this
+    /// only to reconstruct camera-relative distance from the explicit main
+    /// depth attachment; no backend depth/state query is involved.
+    pub projection_inverse: [f32; 16],
+    /// Copied vanilla fog color plus environmental spherical-fog start.
+    pub fog_color_and_environmental_start: [f32; 4],
+    /// Environmental end, render-distance cylindrical start/end, and copied
+    /// vanilla fog-color alpha for direct Sodium-compatible fog.
+    pub fog_ranges: [f32; 4],
 }
 
 /// Owned-source discovery is deliberately separate from the executable plan.
@@ -1237,7 +1276,11 @@ fn fullscreen_stage_raster_primitive(
         // `gbuffers_skybasic` reconstructs its camera ray from the actual
         // sky-disc depth field. Keep that geometry source-owned instead of
         // approximating it with a fullscreen triangle.
-        FullscreenSourceStageKind::Sky => FullscreenSourceRasterPrimitive::VanillaSkyDisc,
+        // The semantic source sky initializer is a background writer. A
+        // fullscreen triangle avoids coupling its coverage to the vanilla
+        // disc's camera-space radius while preserving the source fragment
+        // shader's exact ray reconstruction and later terrain occlusion.
+        FullscreenSourceStageKind::Sky => FullscreenSourceRasterPrimitive::FullscreenTriangle,
         FullscreenSourceStageKind::SkyTextured => {
             FullscreenSourceRasterPrimitive::VanillaCelestialQuad
         }
@@ -1812,6 +1855,33 @@ impl ShaderPackRuntimeExecutor {
             self.vanilla_lightmap_residency.as_ref()
         };
         resources.map(VanillaLightmapResidency::binding)
+    }
+
+    /// Resolves a caller-declared descriptor layout against the active (or
+    /// pending combined-submission) Rust-owned lightmap generation. The
+    /// returned set is retained by that residency, not by the caller.
+    pub(crate) fn vanilla_lightmap_resource_set(
+        &mut self,
+        gal: &mut VulkanicGal,
+        layout: Handle,
+        allow_pending: bool,
+    ) -> GalResult<Option<VanillaLightmapResourceSet>> {
+        let resources = if allow_pending {
+            self.pending_vanilla_lightmap_residency
+                .as_mut()
+                .or(self.vanilla_lightmap_residency.as_mut())
+        } else {
+            self.vanilla_lightmap_residency.as_mut()
+        };
+        resources
+            .map(|resources| {
+                Ok(VanillaLightmapResourceSet {
+                    world_generation: resources.binding().world_generation,
+                    lightmap_generation: resources.binding().lightmap_generation,
+                    set: resources.resource_set_for_layout(gal, layout)?,
+                })
+            })
+            .transpose()
     }
 
     pub(crate) fn observe_source_candidate(&mut self, source: &ShaderPackSource) {
@@ -4134,10 +4204,10 @@ impl ShaderPackRuntimeExecutor {
         }
     }
 
-    /// Bounded provenance for the distinct first-person hand stage. This is
-    /// deliberately discovery-only: a prepared contract does not select a
-    /// producer route until a Rust-owned hand pass supplies its copied
-    /// projection and depth-clear semantics.
+    /// Bounded provenance for the distinct first-person hand stage. Contract
+    /// preparation and route selection remain separate, but the hand writer
+    /// is now a Rust-owned executable source family when its copied projection
+    /// and depth-clear semantics are present.
     pub(crate) fn candidate_hand_source_diagnostic(&self) -> (&'static str, Option<&str>) {
         match &self.source_candidate {
             TerrainSourceCandidateState::Discovered {
@@ -4145,7 +4215,7 @@ impl ShaderPackRuntimeExecutor {
                 hand_lowered_pair: Some(_),
                 hand_source_resource_bindings: Some(_),
                 ..
-            } => ("prepared-unadmitted", None),
+            } => ("prepared", None),
             TerrainSourceCandidateState::Discovered {
                 hand_contract: Some(_),
                 hand_lowered_pair: Some(_),
@@ -6310,6 +6380,7 @@ impl ShaderPackRuntimeExecutor {
             effective_draws,
             isolation == TerrainGraphIsolation::FullDrawsSkipped,
             frame.screen_targets_initialized,
+            frame.g_buffer_background_initialized,
         )?;
         if let Some(history) = frame.depth_history {
             Self::append_main_depth_history(ops, targets.depth_history, history)?;
@@ -6340,6 +6411,17 @@ impl ShaderPackRuntimeExecutor {
         targets: TerrainDepthHistoryTargets,
         history: TerrainDepthHistoryPlan,
     ) -> GalResult<()> {
+        if matches!(
+            std::env::var("MATTMC_RUST_SOURCE_DEPTH_TRACE").as_deref(),
+            Ok("1") | Ok("true") | Ok("TRUE")
+        ) {
+            eprintln!(
+                "[MattMC source-depth-trace] history-copy main_texture=0x{:016x} before_texture=0x{:016x} previous_texture=0x{:016x}",
+                targets.main_depth_texture.raw(),
+                targets.before_translucency_texture.raw(),
+                targets.previous_texture.raw(),
+            );
+        }
         if history.extent.width == 0 || history.extent.height == 0 || history.extent.depth != 1 {
             return Err(GalError::invalid_argument(
                 "main depth history requires a non-zero 2D extent",
@@ -6432,7 +6514,7 @@ impl ShaderPackRuntimeExecutor {
         draws: &[TerrainMeshDraw],
     ) -> GalResult<()> {
         self.validate_terrain_material_graph()?;
-        self.append_g_buffer_passes(ops, targets, background_color, draws, false, false)
+        self.append_g_buffer_passes(ops, targets, background_color, draws, false, false, false)
     }
 
     /// Appends one normal-terrain source pass to its named shader-pack color
@@ -6446,6 +6528,29 @@ impl ShaderPackRuntimeExecutor {
         targets: &TerrainSourceColorPassTargets,
         draws: &[TerrainMeshDraw],
     ) -> GalResult<()> {
+        if matches!(
+            std::env::var("MATTMC_RUST_SOURCE_DEPTH_TRACE").as_deref(),
+            Ok("1") | Ok("true") | Ok("TRUE")
+        ) {
+            eprintln!(
+                "[MattMC source-depth-trace] source-pass phase={:?} depth_texture=0x{:016x} depth_view=0x{:016x} draws={}",
+                targets.phase,
+                targets.depth_texture.raw(),
+                targets.depth_view.raw(),
+                draws.len(),
+            );
+        }
+        if matches!(
+            std::env::var("MATTMC_RUST_SOURCE_DEPTH_TRACE").as_deref(),
+            Ok("1") | Ok("true") | Ok("TRUE")
+        ) {
+            eprintln!(
+                "[MattMC source-depth-trace] terrain depth_texture=0x{:016x} depth_view=0x{:016x} phase={:?}",
+                targets.depth_texture.raw(),
+                targets.depth_view.raw(),
+                targets.phase,
+            );
+        }
         if targets.color_attachments.is_empty() {
             return Err(GalError::invalid_argument(
                 "source terrain color pass requires at least one named color attachment",
@@ -6501,11 +6606,30 @@ impl ShaderPackRuntimeExecutor {
                 clear_color: None,
             }),
         });
-        let mut draw_state = IndexedDrawState::default();
-        for draw in draws
+        let accepted_draws = draws
             .iter()
             .filter(|draw| targets.phase.accepts_material(draw.material_mode))
-        {
+            .collect::<Vec<_>>();
+        if matches!(
+            std::env::var("MATTMC_RUST_SOURCE_DEPTH_TRACE").as_deref(),
+            Ok("1") | Ok("true") | Ok("TRUE")
+        ) {
+            eprintln!(
+                "[MattMC source-depth-trace] source-pass phase={:?} accepted_draws={} attachments={:?}",
+                targets.phase,
+                accepted_draws.len(),
+                targets
+                    .color_attachments
+                    .iter()
+                    .map(|attachment| (
+                        attachment.role.shader_pack_color_name(),
+                        attachment.source_slot,
+                    ))
+                    .collect::<Vec<_>>(),
+            );
+        }
+        let mut draw_state = IndexedDrawState::default();
+        for draw in accepted_draws {
             append_indexed_draw(
                 ops,
                 &mut draw_state,
@@ -6639,6 +6763,15 @@ impl ShaderPackRuntimeExecutor {
         expected_phase: TerrainSourceColorPassPhase,
         writer: &str,
     ) -> GalResult<()> {
+        if matches!(
+            std::env::var("MATTMC_RUST_SOURCE_DEPTH_TRACE").as_deref(),
+            Ok("1") | Ok("true") | Ok("TRUE")
+        ) {
+            eprintln!(
+                "[MattMC source-depth-trace] indexed-pass writer={} phase={:?} depth_texture=0x{:016x} depth_view=0x{:016x} draws={}",
+                writer, targets.phase, targets.depth_texture.raw(), targets.depth_view.raw(), draws.len(),
+            );
+        }
         if targets.phase != expected_phase {
             return Err(GalError::invalid_argument(format!(
                 "{writer} source draw requires its explicit source pass phase",
@@ -6740,6 +6873,15 @@ impl ShaderPackRuntimeExecutor {
         expected_phase: TerrainSourceColorPassPhase,
         writer: &str,
     ) -> GalResult<()> {
+        if matches!(
+            std::env::var("MATTMC_RUST_SOURCE_DEPTH_TRACE").as_deref(),
+            Ok("1") | Ok("true") | Ok("TRUE")
+        ) {
+            eprintln!(
+                "[MattMC source-depth-trace] material-pass phase={:?} depth_texture=0x{:016x} depth_view=0x{:016x} draws={}",
+                targets.phase, targets.depth_texture.raw(), targets.depth_view.raw(), draws.len(),
+            );
+        }
         if targets.phase != expected_phase {
             return Err(GalError::invalid_argument(format!(
                 "{writer} source draw requires its explicit source pass phase"
@@ -6975,8 +7117,9 @@ impl ShaderPackRuntimeExecutor {
         draws: &[TerrainMeshDraw],
         force_empty_clear: bool,
         targets_initialized: bool,
+        background_initialized: bool,
     ) -> GalResult<()> {
-        let attachment_before = if targets_initialized {
+        let attachment_before = if targets_initialized || background_initialized {
             TextureUsageState::ShaderRead
         } else {
             TextureUsageState::Undefined
@@ -7008,7 +7151,7 @@ impl ShaderPackRuntimeExecutor {
             if !has_mode_draws && !force_empty_clear {
                 continue;
             }
-            let load_op = if wrote_g_buffer {
+            let load_op = if wrote_g_buffer || background_initialized {
                 AttachmentLoadOp::Load
             } else {
                 AttachmentLoadOp::Clear
@@ -7142,7 +7285,13 @@ impl ShaderPackRuntimeExecutor {
             transparent_clear(frame.background_color),
             screen_texture_before,
         );
-        self.append_translucent_pass(ops, targets, draws, frame.translucent_entity_external)?;
+        self.append_translucent_pass(
+            ops,
+            targets,
+            draws,
+            frame.translucent_entity_external,
+            frame.translucent_terrain_external,
+        )?;
         self.append_forward_material_pass(ops, targets, forward_material_draws)?;
         self.append_screen_pass(
             ops,
@@ -7205,14 +7354,16 @@ impl ShaderPackRuntimeExecutor {
         targets: TerrainRuntimeTargets,
         draws: &[TerrainMeshDraw],
         translucent_entity_external: bool,
+        translucent_terrain_external: bool,
     ) -> GalResult<()> {
-        if !draws
-            .iter()
-            .any(|draw| {
-                draw.material_mode == TerrainMaterialPassMode::Translucent
-                    && !(translucent_entity_external && draw.stratum == WORLD_STRATUM_ENTITY_MESH)
-            })
-        {
+        if !draws.iter().any(|draw| {
+            draw.material_mode == TerrainMaterialPassMode::Translucent
+                && !Self::translucent_draw_is_external(
+                    draw,
+                    translucent_entity_external,
+                    false,
+                )
+        }) {
             return Ok(());
         }
         if let Some((capture_texture, capture_view, capture_target, capture_pass)) =
@@ -7254,13 +7405,14 @@ impl ShaderPackRuntimeExecutor {
                 }),
             });
             let mut capture_draw_state = IndexedDrawState::default();
-            for draw in draws
-                .iter()
-                .filter(|draw| {
-                    draw.material_mode == TerrainMaterialPassMode::Translucent
-                        && !(translucent_entity_external && draw.stratum == WORLD_STRATUM_ENTITY_MESH)
-                })
-            {
+            for draw in draws.iter().filter(|draw| {
+                draw.material_mode == TerrainMaterialPassMode::Translucent
+                    && !Self::translucent_draw_is_external(
+                        draw,
+                        translucent_entity_external,
+                        false,
+                    )
+            }) {
                 append_indexed_draw(
                     ops,
                     &mut capture_draw_state,
@@ -7287,6 +7439,20 @@ impl ShaderPackRuntimeExecutor {
                 TextureUsageState::DepthStencilAttachment,
                 TextureUsageState::ShaderRead,
             )));
+        }
+        // The Fabulous handoff samples the dedicated capture and performs the
+        // one alpha composition itself.  Do not open an empty deferred pass
+        // after all translucent work was routed there: more importantly, do
+        // not let a future draw accidentally reintroduce that second writer.
+        if !draws.iter().any(|draw| {
+            draw.material_mode == TerrainMaterialPassMode::Translucent
+                && !Self::translucent_draw_is_external(
+                    draw,
+                    translucent_entity_external,
+                    translucent_terrain_external,
+                )
+        }) {
+            return Ok(());
         }
         ops.push(CommandOp::Barrier(texture_barrier(
             targets.deferred_lit_texture,
@@ -7315,10 +7481,14 @@ impl ShaderPackRuntimeExecutor {
             }),
         });
         let mut draw_state = IndexedDrawState::default();
-        for draw in draws
-            .iter()
-            .filter(|draw| draw.material_mode == TerrainMaterialPassMode::Translucent)
-        {
+        for draw in draws.iter().filter(|draw| {
+            draw.material_mode == TerrainMaterialPassMode::Translucent
+                && !Self::translucent_draw_is_external(
+                    draw,
+                    translucent_entity_external,
+                    translucent_terrain_external,
+                )
+        }) {
             append_indexed_draw(
                 ops,
                 &mut draw_state,
@@ -7347,6 +7517,20 @@ impl ShaderPackRuntimeExecutor {
         )));
         Ok(())
     }
+
+/// Returns whether this translucent draw is owned by the explicit Fabulous
+/// attachment graph rather than the normal deferred color target.  The
+/// capture pass deliberately keeps terrain available to Fabulous while entity
+/// meshes use their separate `item_entity` role; the final deferred pass must
+/// omit both external families so neither is composited twice.
+    fn translucent_draw_is_external(
+    draw: &TerrainMeshDraw,
+    translucent_entity_external: bool,
+    translucent_terrain_external: bool,
+) -> bool {
+    (translucent_entity_external && draw.stratum == WORLD_STRATUM_ENTITY_MESH)
+        || (translucent_terrain_external && draw.stratum == WORLD_STRATUM_TERRAIN)
+}
 
     /// Direct semantic material quads use their own texture/pipeline contract,
     /// but must be written after deferred terrain lighting and before the
@@ -7517,7 +7701,13 @@ impl TerrainCompositeUniforms {
         for value in self.color_grade_params {
             push_f32(&mut out, value);
         }
-        for value in self.fog_params {
+        for value in self.projection_inverse {
+            push_f32(&mut out, value);
+        }
+        for value in self.fog_color_and_environmental_start {
+            push_f32(&mut out, value);
+        }
+        for value in self.fog_ranges {
             push_f32(&mut out, value);
         }
         out
@@ -7733,14 +7923,43 @@ mod tests {
 
     #[test]
     fn persistent_screen_targets_use_shader_read_after_first_frame() {
-        assert_eq!(
-            TextureUsageState::Undefined,
-            screen_texture_before(false)
-        );
-        assert_eq!(
-            TextureUsageState::ShaderRead,
-            screen_texture_before(true)
-        );
+        assert_eq!(TextureUsageState::Undefined, screen_texture_before(false));
+        assert_eq!(TextureUsageState::ShaderRead, screen_texture_before(true));
+    }
+
+    #[test]
+    fn fabulous_translucency_handoff_excludes_each_external_family_from_deferred_blending() {
+        let draw = |stratum| TerrainMeshDraw {
+            shadow: None,
+            pipeline: Handle::NULL,
+            pipeline_layout: Handle::NULL,
+            resource_set: Handle::NULL,
+            resource_set_dynamic_offsets: Vec::new(),
+            shader_resource_set: None,
+            index_buffer: Handle::NULL,
+            index_offset: 0,
+            index_type: IndexType::U32,
+            index_count: 3,
+            instance_count: 1,
+            stratum,
+            material_mode: TerrainMaterialPassMode::Translucent,
+            shadow_participation: TerrainShadowParticipation::Unavailable,
+        };
+        let terrain = draw(WORLD_STRATUM_TERRAIN);
+        let entity = draw(WORLD_STRATUM_ENTITY_MESH);
+
+        assert!(ShaderPackRuntimeExecutor::translucent_draw_is_external(
+            &terrain, false, true,
+        ));
+        assert!(ShaderPackRuntimeExecutor::translucent_draw_is_external(
+            &entity, true, false,
+        ));
+        assert!(!ShaderPackRuntimeExecutor::translucent_draw_is_external(
+            &terrain, false, false,
+        ));
+        assert!(!ShaderPackRuntimeExecutor::translucent_draw_is_external(
+            &entity, false, true,
+        ));
     }
 
     fn copied_png_assets_for(source: &ShaderPackSource) -> ShaderPackAssets {
@@ -7911,6 +8130,101 @@ mod tests {
         executor.discard_vanilla_lightmap_submission(&mut gal);
         assert!(!executor.has_pending_vanilla_lightmap_submission());
         assert!(executor.vanilla_lightmap_residency.is_some());
+    }
+
+    #[test]
+    fn lightmap_consumer_sets_retire_before_a_replaced_residency_view() {
+        use crate::render::vulkanic::resources::{
+            PipelineStageFlags, ResourceBindingDesc, ResourceBindingKind, ResourceLayoutDesc,
+        };
+
+        let mut executor = ShaderPackRuntimeExecutor::terrain_material_multipass_v1(9).unwrap();
+        let frame = VanillaLightmapFrame {
+            generation: 1,
+            inputs: super::super::lightmap::VanillaLightmapInputs {
+                ambient_light_factor: 0.0,
+                sky_factor: 1.0,
+                block_factor: 1.0,
+                night_vision_factor: 0.0,
+                darkness_scale: 0.0,
+                darken_world_factor: 0.0,
+                brightness_factor: 0.0,
+                sky_light_color: [1.0; 3],
+                ambient_color: [1.0; 3],
+            },
+        };
+        executor.observe_vanilla_lightmap(1, Some(frame)).unwrap();
+        let mut gal = gal();
+        let layout = gal
+            .create_resource_layout(ResourceLayoutDesc {
+                label: "test.lightmap.consumer.layout".to_owned(),
+                bindings: vec![
+                    ResourceBindingDesc {
+                        binding: 0,
+                        kind: ResourceBindingKind::SampledTexture,
+                        stages: PipelineStageFlags::DRAW,
+                        array_count: 1,
+                        optional: false,
+                        dynamic_offset_count: 0,
+                    },
+                    ResourceBindingDesc {
+                        binding: 1,
+                        kind: ResourceBindingKind::Sampler,
+                        stages: PipelineStageFlags::DRAW,
+                        array_count: 1,
+                        optional: false,
+                        dynamic_offset_count: 0,
+                    },
+                ],
+            })
+            .unwrap();
+        let mut ops = Vec::new();
+        executor
+            .stage_vanilla_lightmap_residency(&mut gal, &mut ops)
+            .unwrap();
+        let first = executor
+            .vanilla_lightmap_resource_set(&mut gal, layout, true)
+            .unwrap()
+            .unwrap();
+        assert_eq!(1, first.lightmap_generation);
+        gal.submit(SubmissionBatch {
+            label: "test.lightmap.consumer".to_owned(),
+            command_lists: vec![CommandList::from(CommandListDesc {
+                label: "test.lightmap.consumer.commands".to_owned(),
+                operations: ops,
+            })],
+        })
+        .unwrap();
+        executor
+            .confirm_vanilla_lightmap_submission(&mut gal)
+            .unwrap();
+        executor
+            .observe_vanilla_lightmap(
+                1,
+                Some(VanillaLightmapFrame {
+                    generation: 2,
+                    ..frame
+                }),
+            )
+            .unwrap();
+        let mut replacement_ops = Vec::new();
+        executor
+            .stage_vanilla_lightmap_residency(&mut gal, &mut replacement_ops)
+            .unwrap();
+        executor
+            .vanilla_lightmap_resource_set(&mut gal, layout, true)
+            .unwrap();
+        gal.submit(SubmissionBatch {
+            label: "test.lightmap.consumer.replace".to_owned(),
+            command_lists: vec![CommandList::from(CommandListDesc {
+                label: "test.lightmap.consumer.replace.commands".to_owned(),
+                operations: replacement_ops,
+            })],
+        })
+        .unwrap();
+        executor
+            .confirm_vanilla_lightmap_submission(&mut gal)
+            .unwrap();
     }
 
     #[test]
@@ -8125,7 +8439,7 @@ mod tests {
             "gbuffers_entities readiness must reflect the owned entity stream and named writer without selecting a route by itself"
         );
         assert_eq!(
-            ("prepared-unadmitted", None),
+            ("prepared", None),
             executor.candidate_hand_source_diagnostic(),
             "gbuffers_hand must be source-lowered and resource-resolved without accidentally selecting the Java/Iris hand route"
         );
@@ -9566,6 +9880,11 @@ mod tests {
             .expect("a declared sky stage must either lower or expose a precise error")
             .expect("Complementary's overworld scope declares gbuffers_skybasic");
         assert_eq!("world0/gbuffers_skybasic.fsh", sky.source_stage_path);
+        assert_eq!(
+            FullscreenSourceRasterPrimitive::FullscreenTriangle,
+            sky.raster_primitive,
+            "the semantic sky initializer must cover the complete background target"
+        );
         assert!(sky
             .vertex
             .source
@@ -10076,6 +10395,18 @@ mod tests {
         gal.destroy(depth_texture).unwrap();
         transaction.discard(&mut executor, &mut gal);
         executor.destroy(&mut gal).unwrap();
+    }
+
+    #[test]
+    fn first_translucent_source_writer_initializes_attachments() {
+        assert_eq!(
+            TextureUsageState::Undefined,
+            TerrainSourceColorPassPhase::TranslucentFirst.depth_before()
+        );
+        assert_eq!(
+            AttachmentLoadOp::Clear,
+            TerrainSourceColorPassPhase::TranslucentFirst.depth_load_op()
+        );
     }
 
     #[test]
@@ -10667,7 +10998,9 @@ mod tests {
             light_view_projection: [1.0; 16],
             shadow_params: [2.0; 4],
             color_grade_params: [3.0; 4],
-            fog_params: [4.0; 4],
+            projection_inverse: [4.0; 16],
+            fog_color_and_environmental_start: [5.0; 4],
+            fog_ranges: [6.0; 4],
         };
         assert_eq!(
             TERRAIN_RUNTIME_COMPOSITE_UNIFORM_BYTES as usize,

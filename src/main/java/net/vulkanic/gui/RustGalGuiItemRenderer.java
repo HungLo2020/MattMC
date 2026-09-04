@@ -633,8 +633,10 @@ public final class RustGalGuiItemRenderer {
 				recordDiagnostic("tacz-quad-missing-array");
 				return false;
 			}
+			int quadCount = vertices.length / 12;
 			if (vertices.length == 0 || vertices.length % 12 != 0 || uvs.length != vertices.length / 3 * 2
-				|| colors.length != vertices.length / 12 * 4 || vertices.length / 12 + totalQuads() > MAX_QUADS) {
+				|| (colors.length != quadCount && colors.length != quadCount * 4)
+				|| quadCount + totalQuads() > MAX_QUADS) {
 				recordDiagnostic("tacz-quad-shape=" + vertices.length + "/" + uvs.length + "/" + colors.length);
 				return false;
 			}
@@ -647,7 +649,13 @@ public final class RustGalGuiItemRenderer {
 				recordDiagnostic("tacz-asset-missing=" + texture);
 				return false;
 			}
-			batches.add(new Batch(asset, vertices.clone(), uvs.clone(), colors.clone()));
+			int[] perVertexColors = colors.length == quadCount * 4 ? colors.clone() : new int[quadCount * 4];
+			if (colors.length == quadCount) {
+				for (int quad = 0; quad < quadCount; quad++) {
+					for (int vertex = 0; vertex < 4; vertex++) perVertexColors[quad * 4 + vertex] = colors[quad];
+				}
+			}
+			batches.add(new Batch(asset, vertices.clone(), uvs.clone(), perVertexColors));
 			return true;
 		}
 
@@ -675,13 +683,23 @@ public final class RustGalGuiItemRenderer {
 			List<VulkanicGalBridge.GuiMeshBatchRecord> records = new ArrayList<>(batches.size());
 			for (Batch batch : batches) {
 				List<VulkanicGalBridge.GuiMeshVertexRecord> copied = new ArrayList<>(batch.vertices.length / 3);
+				Vector3f first = transform.transformPosition(batch.vertices[0], batch.vertices[1], batch.vertices[2], new Vector3f());
+				Vector3f second = transform.transformPosition(batch.vertices[3], batch.vertices[4], batch.vertices[5], new Vector3f());
+				Vector3f third = transform.transformPosition(batch.vertices[6], batch.vertices[7], batch.vertices[8], new Vector3f());
+				Vector3f edgeA = new Vector3f(second).sub(first);
+				Vector3f edgeB = new Vector3f(third).sub(first);
+				Vector3f normal = edgeA.cross(edgeB);
+				float normalLength = normal.length();
+				if (!Float.isFinite(normalLength) || normalLength <= 1.0e-6F) return List.of();
+				normal.mul(1.0F / normalLength);
+				int normalPacked = packGuiNormal(normal.x(), normal.y(), normal.z());
 				for (int vertex = 0; vertex < batch.vertices.length / 3; vertex++) {
 					Vector3f position = transform.transformPosition(batch.vertices[vertex * 3], batch.vertices[vertex * 3 + 1], batch.vertices[vertex * 3 + 2], new Vector3f());
 					copied.add(new VulkanicGalBridge.GuiMeshVertexRecord(
 						new float[] {position.x, position.y, position.z},
 						new float[] {batch.uvs[vertex * 2], batch.uvs[vertex * 2 + 1]},
 						new float[] {batch.uvs[vertex * 2], batch.uvs[vertex * 2 + 1]},
-						batch.colors[vertex], 0x007F0000));
+						batch.colors[vertex], normalPacked));
 				}
 				List<Integer> indices = new ArrayList<>(batch.vertices.length / 2);
 				for (int vertex = 0; vertex < copied.size(); vertex += 4) {
@@ -723,6 +741,13 @@ public final class RustGalGuiItemRenderer {
 			if (glintAsset != null) RustGalGuiRawImageAssets.stage(glintAsset);
 			return List.of(new RustGalGuiElementRenderState(token, GuiRenderStratum.GUI_ITEM, "minecraft.gui.tacz-bedrock",
 				-1, -1.0F, GuiFillDirection.NONE, left, top, right - left, bottom - top, guiWidth, guiHeight));
+		}
+
+		private static int packGuiNormal(float x, float y, float z) {
+			int px = Math.round(Mth.clamp(x, -1.0F, 1.0F) * 127.0F) & 0xff;
+			int py = Math.round(Mth.clamp(y, -1.0F, 1.0F) * 127.0F) & 0xff;
+			int pz = Math.round(Mth.clamp(z, -1.0F, 1.0F) * 127.0F) & 0xff;
+			return px | (py << 8) | (pz << 16);
 		}
 
 		private static float[] identity() { return new float[] {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}; }

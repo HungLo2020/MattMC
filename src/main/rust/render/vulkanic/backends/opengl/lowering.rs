@@ -1457,7 +1457,12 @@ unsafe fn apply_stencil_face(
     face: u32,
     state: crate::render::vulkanic::resources::StencilFaceState,
 ) {
-    gl.stencil_func_separate(face, compare_op(state.compare), state.reference as i32, state.read_mask);
+    gl.stencil_func_separate(
+        face,
+        compare_op(state.compare),
+        state.reference as i32,
+        state.read_mask,
+    );
     gl.stencil_op_separate(
         face,
         stencil_op(state.fail_op),
@@ -1486,6 +1491,12 @@ struct OpenGlBlendState {
 fn opengl_blend_state(blend: BlendMode) -> OpenGlBlendState {
     let factors = match blend {
         BlendMode::Disabled => None,
+        BlendMode::TerrainTranslucent => Some(OpenGlBlendFactors {
+            src_color: glow::SRC_ALPHA,
+            dst_color: glow::ONE_MINUS_SRC_ALPHA,
+            src_alpha: glow::ONE,
+            dst_alpha: glow::ONE_MINUS_SRC_ALPHA,
+        }),
         BlendMode::Alpha => Some(OpenGlBlendFactors {
             src_color: glow::SRC_ALPHA,
             dst_color: glow::ONE_MINUS_SRC_ALPHA,

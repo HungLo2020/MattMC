@@ -257,9 +257,7 @@ pub(in crate::render::chunk::meshing) unsafe fn section_builder_append_fluid_fac
                 pending.primitive_kinds[index] = match record.primitive_kind {
                     TERRAIN_PRIMITIVE_BUILTIN_WATER
                     | TERRAIN_PRIMITIVE_GENERIC_FLUID
-                    | TERRAIN_PRIMITIVE_UNSUPPORTED_FLUID => {
-                        record.primitive_kind
-                    }
+                    | TERRAIN_PRIMITIVE_UNSUPPORTED_FLUID => record.primitive_kind,
                     _ => return Err(ERR_INVALID_ARGUMENT),
                 };
             }

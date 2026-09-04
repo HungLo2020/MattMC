@@ -4,13 +4,13 @@ use crate::render::vulkanic::world_primitive_frontend::world_text::WORLD_TEXT_DE
 use crate::render::vulkanic::world_primitive_frontend::{
     WorldShaderEnvironmentFrame, WorldVoxelVolumeFrame, WORLD_LOD_FLAG_RUST_OPAQUE_ROUTE_SELECTED,
     WORLD_LOD_LAYER_OPAQUE, WORLD_LOD_VARIANT_EXACT, WORLD_LOD_VERTEX_LAYOUT_V1,
-    WORLD_MATERIAL_ID_OPAQUE_TEXTURED, WORLD_MATERIAL_ID_TRANSLUCENT_TEXTURED, WORLD_MATERIAL_SOURCE_CLOUDS,
-    WORLD_MATERIAL_SOURCE_ENTITY_MODEL, WORLD_MATERIAL_SOURCE_PARTICLES,
-    WORLD_MATERIAL_SOURCE_TEXTURED, WORLD_MATERIAL_SOURCE_UNSPECIFIED,
-    WORLD_MATERIAL_SOURCE_UV_LOCAL_TEXTURE, WORLD_MATERIAL_SOURCE_UV_MINECRAFT_BLOCK_ATLAS,
-    WORLD_MATERIAL_SOURCE_WEATHER, WORLD_MATERIAL_TEXTURE_EXPERIENCE_ORB,
-    WORLD_MATERIAL_TEXTURE_STONE, WORLD_MESH_TEXTURE_TERRAIN_BLOCK_ATLAS,
-    WORLD_MAX_MESH_VERTICES,
+    WORLD_MATERIAL_ID_OPAQUE_TEXTURED, WORLD_MATERIAL_ID_TRANSLUCENT_TEXTURED,
+    WORLD_MATERIAL_SOURCE_CLOUDS, WORLD_MATERIAL_SOURCE_ENTITY_MODEL,
+    WORLD_MATERIAL_SOURCE_PARTICLES, WORLD_MATERIAL_SOURCE_TEXTURED,
+    WORLD_MATERIAL_SOURCE_UNSPECIFIED, WORLD_MATERIAL_SOURCE_UV_LOCAL_TEXTURE,
+    WORLD_MATERIAL_SOURCE_UV_MINECRAFT_BLOCK_ATLAS, WORLD_MATERIAL_SOURCE_WEATHER,
+    WORLD_MATERIAL_TEXTURE_EXPERIENCE_ORB, WORLD_MATERIAL_TEXTURE_STONE, WORLD_MAX_MESH_VERTICES,
+    WORLD_MESH_TEXTURE_TERRAIN_BLOCK_ATLAS,
 };
 
 fn test_capabilities() -> BackendCapabilities {
@@ -317,6 +317,25 @@ fn gui_mesh_transport_copies_and_rejects_malformed_payloads() {
     assert_eq!(1, decoded.len());
     assert_eq!([0.0, 0.0], decoded[0].vertices[0].local_uv);
     assert_eq!(vec![0, 1, 2], decoded[0].indices);
+
+    let mut panorama = gui_mesh_batch_request(&vertices, &indices);
+    panorama.material_mode = super::gui::GUI_MESH_MATERIAL_PANORAMA;
+    let panorama_decoded = unsafe {
+        super::gui::decode_gui_mesh_batches(
+            FfiSlice {
+                ptr: &panorama,
+                count: 1,
+            },
+            320,
+            180,
+        )
+    }
+    .expect("explicit semantic panorama material decodes");
+    assert_eq!(
+        super::super::gui_mesh_frontend::GuiMeshMaterialMode::Panorama,
+        panorama_decoded[0].material_mode,
+        "the FFI must preserve the no-cull/no-depth panorama policy rather than coercing it to item geometry",
+    );
 
     let invalid_indices = [0_u32, 1, 3];
     let invalid = gui_mesh_batch_request(&vertices, &invalid_indices);
@@ -780,6 +799,7 @@ fn whole_frame_request(
             fog_environmental_end: 0.0,
             fog_render_distance_start: 0.0,
             fog_render_distance_end: 0.0,
+            fog_sky_end: 0.0,
             distant_horizons_render_distance: 0,
         },
         world_feature_coverage: FfiWorldFeatureCoverage {
@@ -1064,6 +1084,10 @@ fn world_mesh_asset_update_request(
             | FfiFeatureBits::TEXTURE_SUBRESOURCE_COPIES
             | FfiFeatureBits::HOST_BUFFER_ACCESS
             | FfiFeatureBits::PRESENTATION,
+        retirements: FfiSlice {
+            ptr: std::ptr::null(),
+            count: 0,
+        },
     }
 }
 
@@ -1128,6 +1152,7 @@ fn mesh_vertex() -> FfiWorldMeshVertex {
         atlas_v: 0.5,
         shader_block_id: 10232,
         shader_material_type: -1,
+        terrain_material_bits: 0,
         mid_block_packed: 0x0020_2020,
     }
 }
@@ -1346,14 +1371,18 @@ fn whole_frame_mesh_instance_ffi_rejects_zero_semantic_identity_before_copying()
     let error = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }
         .expect_err("zero world mesh key must fail at FFI admission");
     assert_eq!(StatusCode::InvalidArgument, error.code);
-    assert!(error.message.contains("key and generation must be non-zero"));
+    assert!(error
+        .message
+        .contains("key and generation must be non-zero"));
 
     instances[0] = mesh_instance();
     instances[0].mesh_generation = 0;
     let error = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }
         .expect_err("zero world mesh generation must fail at FFI admission");
     assert_eq!(StatusCode::InvalidArgument, error.code);
-    assert!(error.message.contains("key and generation must be non-zero"));
+    assert!(error
+        .message
+        .contains("key and generation must be non-zero"));
 
     instances[0] = mesh_instance();
     instances[0].flags = 2;
@@ -1713,8 +1742,9 @@ fn whole_frame_gui_affine_quads_share_the_owned_frame_decode() {
         _blur_boundary,
         _blur_radius,
         _post_effect_id,
-    ) =
-        unsafe { decode_whole_frame_submit_with_gui(&request, test_vulkan_capabilities()).unwrap() };
+    ) = unsafe {
+        decode_whole_frame_submit_with_gui(&request, test_vulkan_capabilities()).unwrap()
+    };
     affine_quads[0].y3 = 99.0;
     assert_eq!(decoded_sprites.len(), 1);
     assert_eq!(decoded_affine_quads.len(), 1);
@@ -1886,6 +1916,7 @@ fn whole_frame_shader_environment_semantics_decode_and_reject_malformed_state() 
         fog_environmental_end: 96.0,
         fog_render_distance_start: 24.0,
         fog_render_distance_end: 128.0,
+        fog_sky_end: 128.0,
         distant_horizons_render_distance: 256,
     };
     let (_generation, _target, frame, _gui) =
@@ -1922,6 +1953,7 @@ fn whole_frame_shader_environment_semantics_decode_and_reject_malformed_state() 
             fog_environmental_end: 96.0,
             fog_render_distance_start: 24.0,
             fog_render_distance_end: 128.0,
+            fog_sky_end: 128.0,
             biome_precipitation: 2,
             biome_resource_location: "minecraft:snowy_plains".to_string(),
             main_hand_item_model_resource_location: "minecraft:lava_bucket".to_string(),
@@ -2603,10 +2635,9 @@ fn semantic_gui_asset_ffi_rejects_oversized_batches_before_copying() {
         },
     };
     let assets = vec![asset; 4_097];
-    let error = unsafe {
-        decode_gui_asset_update(&asset_update_request(&assets), test_capabilities())
-    }
-    .expect_err("oversized GUI asset batches must fail before copying");
+    let error =
+        unsafe { decode_gui_asset_update(&asset_update_request(&assets), test_capabilities()) }
+            .expect_err("oversized GUI asset batches must fail before copying");
     assert_eq!(StatusCode::LengthOverflow, error.code);
 }
 
@@ -2654,6 +2685,37 @@ fn semantic_raw_gui_image_ffi_copies_and_validates_pixels() {
     };
     let error = unsafe { decode_gui_raw_image_update(&invalid, test_capabilities()) }.unwrap_err();
     assert_eq!(StatusCode::UnknownEnum, error.code);
+}
+
+#[test]
+fn semantic_raw_gui_image_ffi_preserves_frozen_rgba8_metadata() {
+    let pixels = [152u8, 152, 152, 255];
+    let assets = [FfiGuiRawImageAssetPayload {
+        byte_size: size_of::<FfiGuiRawImageAssetPayload>() as u32,
+        format: 2,
+        asset_id: 18,
+        width: 1,
+        height: 1,
+        pixels: FfiBytes {
+            ptr: pixels.as_ptr(),
+            len: pixels.len() as u64,
+        },
+    }];
+    let request = FfiGuiRawImageUpdateRequest {
+        header: FfiHeader {
+            version: FFI_ABI_VERSION,
+            byte_size: size_of::<FfiGuiRawImageUpdateRequest>() as u32,
+        },
+        generation: 13,
+        assets: FfiSlice {
+            ptr: assets.as_ptr(),
+            count: assets.len() as u64,
+        },
+        negotiated_feature_bits: 0,
+    };
+    let (_, owned) = unsafe { decode_gui_raw_image_update(&request, test_capabilities()).unwrap() };
+    assert_eq!(GuiRawImageFormat::Rgba8, owned[0].format);
+    assert_eq!(pixels, owned[0].pixels.as_slice());
 }
 
 #[test]
@@ -2943,6 +3005,7 @@ fn world_mesh_asset_ffi_copies_payload_memory() {
             ptr: png.as_ptr(),
             len: png.len() as u64,
         },
+        mip_png_bytes: FfiSlice { ptr: std::ptr::null(), count: 0 },
         frame_width: 0,
         frame_height: 0,
         frame_count: 1,
@@ -2957,7 +3020,7 @@ fn world_mesh_asset_ffi_copies_payload_memory() {
         },
     }];
     let request = world_mesh_asset_update_request(&meshes, &textures);
-    let (generation, owned_meshes, owned_textures, owned_sorted_indices) =
+    let (generation, owned_meshes, owned_textures, owned_sorted_indices, owned_retirements) =
         unsafe { decode_world_mesh_asset_update(&request, test_capabilities()).unwrap() };
 
     vertices[0].x = 99.0;
@@ -2967,6 +3030,7 @@ fn world_mesh_asset_ffi_copies_payload_memory() {
 
     assert_eq!(9, generation);
     assert!(owned_sorted_indices.is_empty());
+    assert!(owned_retirements.is_empty());
     assert_eq!(44, owned_meshes[0].mesh_key);
     assert_eq!(0.0, owned_meshes[0].vertices[0].position[0]);
     assert_eq!([0.25, 0.5], owned_meshes[0].vertices[0].shader_atlas_uv);
@@ -3060,6 +3124,7 @@ fn world_lod_asset_ffi_copies_semantic_columns_and_rejects_malformed_records() {
             ptr: vertices.as_ptr(),
             count: vertices.len() as u64,
         },
+        packed_vertices: FfiSlice::default(),
     }];
     let assets = [FfiWorldLodColumnAssetRecord {
         byte_size: size_of::<FfiWorldLodColumnAssetRecord>() as u32,
@@ -3310,6 +3375,7 @@ fn world_lod_asset_ffi_copies_semantic_columns_and_rejects_malformed_records() {
             ptr: malformed_vertices.as_ptr(),
             count: malformed_vertices.len() as u64,
         },
+        packed_vertices: FfiSlice::default(),
     }];
     let mut malformed_quad_assets = assets;
     malformed_quad_assets[0].segments = FfiSlice {
@@ -3324,6 +3390,71 @@ fn world_lod_asset_ffi_copies_semantic_columns_and_rejects_malformed_records() {
     }
     .unwrap_err();
     assert_eq!(StatusCode::InvalidArgument, error.code);
+}
+
+#[test]
+fn world_lod_asset_ffi_accepts_the_bounded_packed_dh_vertex_stream() {
+    // The Java DH producer writes this exact native-endian, 16-byte semantic
+    // layout. Keep the test independent of the legacy structured ABI so a
+    // generic FFI item-count limit cannot accidentally reject a valid byte
+    // packet (up to 65,536 vertices / 1 MiB).
+    let mut packed_vertices = Vec::with_capacity(4 * 16);
+    for _ in 0..4 {
+        packed_vertices.extend_from_slice(&12_u16.to_ne_bytes());
+        packed_vertices.extend_from_slice(&34_u16.to_ne_bytes());
+        packed_vertices.extend_from_slice(&56_u16.to_ne_bytes());
+        packed_vertices.extend_from_slice(&0xa57b_u16.to_ne_bytes());
+        packed_vertices.extend_from_slice(&[10, 20, 30, 40, 7, 5, 0, 0]);
+    }
+    let segments = [FfiWorldLodSegmentRecord {
+        byte_size: size_of::<FfiWorldLodSegmentRecord>() as u32,
+        layer: WORLD_LOD_LAYER_OPAQUE,
+        vertices: FfiSlice {
+            ptr: std::ptr::null(),
+            count: 0,
+        },
+        packed_vertices: FfiSlice {
+            ptr: packed_vertices.as_ptr(),
+            count: packed_vertices.len() as u64,
+        },
+    }];
+    let assets = [FfiWorldLodColumnAssetRecord {
+        byte_size: size_of::<FfiWorldLodColumnAssetRecord>() as u32,
+        vertex_layout_version: WORLD_LOD_VERTEX_LAYOUT_V1,
+        origin_x: -128,
+        origin_y: 64,
+        origin_z: 256,
+        reserved0: 0,
+        column_key: 0x4448_4c4f_445f_3032,
+        column_generation: 4,
+        segments: FfiSlice {
+            ptr: segments.as_ptr(),
+            count: segments.len() as u64,
+        },
+    }];
+
+    let (_, owned, _, _) = unsafe {
+        decode_world_lod_asset_update(
+            &world_lod_asset_update_request(&assets, &[]),
+            test_capabilities(),
+        )
+        .unwrap()
+    };
+    assert_eq!(4, owned[0].segments[0].vertices.len());
+    assert_eq!(
+        [12, 34, 56],
+        owned[0].segments[0].vertices[0].local_position
+    );
+    assert_eq!(
+        0xa57b,
+        owned[0].segments[0].vertices[0].packed_light_and_micro_offset
+    );
+    assert_eq!(
+        [10, 20, 30, 40],
+        owned[0].segments[0].vertices[0].color_rgba
+    );
+    assert_eq!(7, owned[0].segments[0].vertices[0].material_id);
+    assert_eq!(5, owned[0].segments[0].vertices[0].normal_index);
 }
 
 #[test]
@@ -3445,14 +3576,14 @@ fn whole_frame_ffi_copies_bounded_lod_segment_references() {
 fn whole_frame_ffi_keeps_gui_blur_semantic_boundary_explicit_and_bounded() {
     let mut request = whole_frame_request(&[], &[]);
     request.gui_blur_before_stratum = -2;
-    let error = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }
-        .unwrap_err();
+    let error =
+        unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.unwrap_err();
     assert_eq!(StatusCode::InvalidArgument, error.code);
 
     request.gui_blur_before_stratum = 3;
     request.gui_blur_radius = 65;
-    let error = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }
-        .unwrap_err();
+    let error =
+        unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.unwrap_err();
     assert_eq!(StatusCode::InvalidArgument, error.code);
     request.gui_blur_radius = -1;
     let decoded = unsafe {

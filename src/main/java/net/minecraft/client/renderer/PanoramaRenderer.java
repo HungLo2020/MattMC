@@ -26,7 +26,9 @@ public class PanoramaRenderer {
 			this.spin = wrap(this.spin + g * 0.1F, 360.0F);
 		}
 
-		if (!net.vulkanic.gui.RustGalPanoramaRenderer.enqueue(this.cubeMap, 10.0F, -this.spin, i, j)) {
+		if (!net.vulkanic.gui.RustGalPanoramaRenderer.enqueue(
+			this.cubeMap, 10.0F, -this.spin, i, j, guiGraphics.guiRenderState
+		)) {
 			if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
 				|| net.vulkanic.gui.RustGalGuiRenderer.isWholeFrameVulkanEnabled()) {
 				throw new IllegalStateException("Rust Vulkan whole-frame panorama asset is unavailable; Java panorama rendering is not a fallback");

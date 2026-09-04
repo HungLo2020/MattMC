@@ -14,8 +14,8 @@ use crate::render::vulkanic::commands::{
     AttachmentLoadOp, AttachmentStoreOp, CommandOp, PassAttachment, TextureUsageState,
 };
 use crate::render::vulkanic::error::{GalError, GalResult};
-use crate::render::vulkanic::resources::BackendApi;
 use crate::render::vulkanic::handles::{Handle, HandleKind};
+use crate::render::vulkanic::resources::BackendApi;
 
 const MAX_PACKED_UNIFORM_BLOCK_BYTES: usize = 64 * 1024;
 
@@ -207,12 +207,15 @@ impl VanillaPostEffectExternalTargetBindings {
                     plan.effect_name
                 ))
             })?;
-            binding.sampler.require_kind(HandleKind::Sampler).map_err(|error| {
-                GalError::invalid_argument(format!(
+            binding
+                .sampler
+                .require_kind(HandleKind::Sampler)
+                .map_err(|error| {
+                    GalError::invalid_argument(format!(
                     "vanilla post effect {} external target {name} has invalid sampler: {error}",
                     plan.effect_name
                 ))
-            })?;
+                })?;
             if let Some(depth) = binding.depth_attachment {
                 depth.require_kind(HandleKind::TextureView).map_err(|error| {
                     GalError::invalid_argument(format!(
@@ -390,8 +393,9 @@ pub fn bundled_transparency_vulkan_shader_sources() -> GalResult<Vec<(Vec<u8>, V
 }
 
 pub(crate) fn normalize_vulkan_vertex_source(api: BackendApi, source: &[u8]) -> GalResult<Vec<u8>> {
-    let source = std::str::from_utf8(source)
-        .map_err(|_| GalError::invalid_argument("vanilla post-effect vertex shader is not UTF-8"))?;
+    let source = std::str::from_utf8(source).map_err(|_| {
+        GalError::invalid_argument("vanilla post-effect vertex shader is not UTF-8")
+    })?;
     if api != BackendApi::Vulkan {
         return Ok(source.as_bytes().to_vec());
     }
@@ -402,7 +406,18 @@ pub(crate) fn normalize_vulkan_vertex_source(api: BackendApi, source: &[u8]) -> 
             1,
         )
         .replacen("out vec2 texCoord;", "layout(location = 0) out vec2 texCoord;", 1)
-		.replace("gl_VertexID", "gl_VertexIndex")
+        .replace("gl_VertexID", "gl_VertexIndex")
+        // Vanilla's screenquad source assigns texture coordinates directly
+        // from the fullscreen triangle. Vulkan attachment sampling has the
+        // opposite row origin, so make the declared normalization real
+        // instead of only defining its feature macro. Without this, the
+        // Rust-owned Fabulous composition is a vertically mirrored game
+        // frame even though all named attachments and ordering are correct.
+        .replacen(
+            "texCoord = uv;",
+            "texCoord = uv;\n#ifdef VULKANIC_GAL_FLIP_FULLSCREEN_UV_Y\n    texCoord.y = 1.0 - texCoord.y;\n#endif",
+            1,
+        )
         .into_bytes())
 }
 
@@ -445,9 +460,8 @@ pub(crate) fn normalize_vulkan_fullscreen_source(
     for (block_index, block_name) in pass.uniform_values.keys().enumerate() {
         let uniform_binding = pass.inputs.len() + block_index;
         let declaration = format!("layout(std140) uniform {block_name}");
-        let explicit = format!(
-            "layout(set = 0, binding = {uniform_binding}, std140) uniform {block_name}"
-        );
+        let explicit =
+            format!("layout(set = 0, binding = {uniform_binding}, std140) uniform {block_name}");
         if lowered.contains(&declaration) {
             lowered = lowered.replacen(&declaration, &explicit, 1);
         }
@@ -458,10 +472,7 @@ pub(crate) fn normalize_vulkan_fullscreen_source(
 /// Packs one validated uniform block according to the scalar/vector subset used
 /// by bundled vanilla post effects. The returned bytes are backend-neutral and
 /// can be uploaded to a Rust-owned uniform buffer without Java reflection.
-pub fn pack_uniform_block(
-    pass: &VanillaPostEffectPass,
-    block_name: &str,
-) -> GalResult<Vec<u8>> {
+pub fn pack_uniform_block(pass: &VanillaPostEffectPass, block_name: &str) -> GalResult<Vec<u8>> {
     let uniforms = pass.uniform_values.get(block_name).ok_or_else(|| {
         GalError::invalid_argument(format!(
             "vanilla post effect pass has no uniform block {block_name}"
@@ -479,8 +490,8 @@ pub fn pack_uniform_block(
             "matrix4x4" => (16usize, 64usize, 16usize),
             value_type => {
                 return Err(GalError::unsupported_feature(format!(
-                    "vanilla post effect uniform block {block_name} uses unsupported type {value_type}"
-                )))
+                "vanilla post effect uniform block {block_name} uses unsupported type {value_type}"
+            )))
             }
         };
         if uniform.values.len() != expected_values {
@@ -497,10 +508,15 @@ pub fn pack_uniform_block(
                 uniform.name
             )));
         }
-        let integer = matches!(uniform.value_type.as_str(), "int" | "ivec2" | "ivec3" | "ivec4");
-        if integer && uniform.values.iter().any(|value| {
-            value.fract() != 0.0 || *value < i32::MIN as f32 || *value > i32::MAX as f32
-        }) {
+        let integer = matches!(
+            uniform.value_type.as_str(),
+            "int" | "ivec2" | "ivec3" | "ivec4"
+        );
+        if integer
+            && uniform.values.iter().any(|value| {
+                value.fract() != 0.0 || *value < i32::MIN as f32 || *value > i32::MAX as f32
+            })
+        {
             return Err(GalError::invalid_argument(format!(
                 "vanilla post effect integer uniform {} must contain finite 32-bit integral values",
                 uniform.name
@@ -529,9 +545,7 @@ pub fn pack_uniform_block(
 
 /// Packs every declared block in stable lexical order and enforces a bounded
 /// aggregate upload budget for one pass.
-pub fn pack_uniform_blocks(
-    pass: &VanillaPostEffectPass,
-) -> GalResult<BTreeMap<String, Vec<u8>>> {
+pub fn pack_uniform_blocks(pass: &VanillaPostEffectPass) -> GalResult<BTreeMap<String, Vec<u8>>> {
     let mut packed = BTreeMap::new();
     let mut total = 0usize;
     for block_name in pass.uniform_values.keys() {
@@ -575,7 +589,13 @@ fn lower_validated_plan(
     }
     let mut operations = Vec::with_capacity(bindings.len() * 6);
     for (index, (pass, binding)) in plan.ordered_passes.iter().zip(bindings).enumerate() {
-        validate_binding(&plan.effect_name, index, pass, binding, index + 1 == plan.ordered_passes.len())?;
+        validate_binding(
+            &plan.effect_name,
+            index,
+            pass,
+            binding,
+            index + 1 == plan.ordered_passes.len(),
+        )?;
         operations.push(CommandOp::BeginPass {
             pass: binding.render_pass,
             target: binding.render_target,
@@ -618,8 +638,16 @@ fn validate_binding(
     for (label, handle, expected) in [
         ("render pass", binding.render_pass, HandleKind::RenderPass),
         ("pipeline", binding.pipeline, HandleKind::GraphicsPipeline),
-        ("pipeline layout", binding.pipeline_layout, HandleKind::PipelineLayout),
-        ("resource set", binding.resource_set, HandleKind::ResourceSet),
+        (
+            "pipeline layout",
+            binding.pipeline_layout,
+            HandleKind::PipelineLayout,
+        ),
+        (
+            "resource set",
+            binding.resource_set,
+            HandleKind::ResourceSet,
+        ),
     ] {
         handle.require_kind(expected).map_err(|error| {
             GalError::invalid_argument(format!(
@@ -628,8 +656,7 @@ fn validate_binding(
         })?;
     }
     let color_valid = binding.color_attachment.kind() == Some(HandleKind::TextureView)
-        || (allow_frame_target
-            && binding.color_attachment.kind() == Some(HandleKind::FrameTarget));
+        || (allow_frame_target && binding.color_attachment.kind() == Some(HandleKind::FrameTarget));
     if !color_valid {
         return Err(GalError::invalid_argument(format!(
             "vanilla post effect {effect_name} pass {index} has invalid color attachment binding: expected TextureView{} got {:?}",
@@ -686,12 +713,15 @@ fn validate_input_binding(
             input.sampler_name
         ))
     })?;
-    binding.sampler.require_kind(HandleKind::Sampler).map_err(|error| {
-        GalError::invalid_argument(format!(
+    binding
+        .sampler
+        .require_kind(HandleKind::Sampler)
+        .map_err(|error| {
+            GalError::invalid_argument(format!(
             "vanilla post effect {effect_name} pass {index} input {} has invalid sampler: {error}",
             input.sampler_name
         ))
-    })?;
+        })?;
     if binding.bilinear != input.bilinear || binding.use_depth_buffer != input.use_depth_buffer {
         return Err(GalError::invalid_argument(format!(
             "vanilla post effect {effect_name} pass {index} input {} sampling flags do not match the graph",
@@ -703,9 +733,9 @@ fn validate_input_binding(
 
 #[cfg(test)]
 mod tests {
+    use super::super::vanilla_post_effect_contract::VanillaPostEffectContract;
     use super::*;
     use crate::render::vulkanic::handles::HandleKind;
-    use super::super::vanilla_post_effect_contract::VanillaPostEffectContract;
 
     fn handle(kind: HandleKind, index: u32) -> Handle {
         Handle::new(kind, index, 1).unwrap()
@@ -739,7 +769,13 @@ mod tests {
             .collect::<Vec<_>>();
         let operations = lower_execution_plan(&plan, &bindings).unwrap();
         assert_eq!(plan.ordered_passes.len() * 5, operations.len());
-        assert!(operations.iter().any(|operation| matches!(operation, CommandOp::Draw { vertices: 3, instances: 1 })));
+        assert!(operations.iter().any(|operation| matches!(
+            operation,
+            CommandOp::Draw {
+                vertices: 3,
+                instances: 1
+            }
+        )));
     }
 
     #[test]
@@ -750,22 +786,25 @@ mod tests {
         )
         .unwrap();
         let plan = contract.execution_plan();
-        let bindings = vec![VanillaPostEffectPassBinding {
-            render_pass: Handle::NULL,
-            render_target: handle(HandleKind::RenderTarget, 1),
-            color_attachment: handle(HandleKind::TextureView, 1),
-            depth_attachment: None,
-            pipeline: handle(HandleKind::GraphicsPipeline, 1),
-            pipeline_layout: handle(HandleKind::PipelineLayout, 1),
-            resource_set: handle(HandleKind::ResourceSet, 1),
-            inputs: vec![VanillaPostEffectInputBinding {
-                texture_view: handle(HandleKind::TextureView, 1),
-                sampler: handle(HandleKind::Sampler, 1),
-                bilinear: false,
-                use_depth_buffer: false,
-            }],
-            uniform_values: plan.ordered_passes[0].uniform_values.clone(),
-        }; plan.ordered_passes.len()];
+        let bindings = vec![
+            VanillaPostEffectPassBinding {
+                render_pass: Handle::NULL,
+                render_target: handle(HandleKind::RenderTarget, 1),
+                color_attachment: handle(HandleKind::TextureView, 1),
+                depth_attachment: None,
+                pipeline: handle(HandleKind::GraphicsPipeline, 1),
+                pipeline_layout: handle(HandleKind::PipelineLayout, 1),
+                resource_set: handle(HandleKind::ResourceSet, 1),
+                inputs: vec![VanillaPostEffectInputBinding {
+                    texture_view: handle(HandleKind::TextureView, 1),
+                    sampler: handle(HandleKind::Sampler, 1),
+                    bilinear: false,
+                    use_depth_buffer: false,
+                }],
+                uniform_values: plan.ordered_passes[0].uniform_values.clone(),
+            };
+            plan.ordered_passes.len()
+        ];
         let error = lower_execution_plan(&plan, &bindings).unwrap_err();
         assert!(error.to_string().contains("invalid render pass binding"));
         assert!(error.to_string().contains("null handle"));
@@ -779,22 +818,25 @@ mod tests {
         )
         .unwrap();
         let plan = contract.execution_plan();
-        let bindings = vec![VanillaPostEffectPassBinding {
-            render_pass: handle(HandleKind::Buffer, 1),
-            render_target: handle(HandleKind::RenderTarget, 1),
-            color_attachment: handle(HandleKind::TextureView, 1),
-            depth_attachment: None,
-            pipeline: handle(HandleKind::GraphicsPipeline, 1),
-            pipeline_layout: handle(HandleKind::PipelineLayout, 1),
-            resource_set: handle(HandleKind::ResourceSet, 1),
-            inputs: vec![VanillaPostEffectInputBinding {
-                texture_view: handle(HandleKind::TextureView, 1),
-                sampler: handle(HandleKind::Sampler, 1),
-                bilinear: false,
-                use_depth_buffer: false,
-            }],
-            uniform_values: plan.ordered_passes[0].uniform_values.clone(),
-        }; plan.ordered_passes.len()];
+        let bindings = vec![
+            VanillaPostEffectPassBinding {
+                render_pass: handle(HandleKind::Buffer, 1),
+                render_target: handle(HandleKind::RenderTarget, 1),
+                color_attachment: handle(HandleKind::TextureView, 1),
+                depth_attachment: None,
+                pipeline: handle(HandleKind::GraphicsPipeline, 1),
+                pipeline_layout: handle(HandleKind::PipelineLayout, 1),
+                resource_set: handle(HandleKind::ResourceSet, 1),
+                inputs: vec![VanillaPostEffectInputBinding {
+                    texture_view: handle(HandleKind::TextureView, 1),
+                    sampler: handle(HandleKind::Sampler, 1),
+                    bilinear: false,
+                    use_depth_buffer: false,
+                }],
+                uniform_values: plan.ordered_passes[0].uniform_values.clone(),
+            };
+            plan.ordered_passes.len()
+        ];
         let error = lower_execution_plan(&plan, &bindings).unwrap_err();
         assert!(error.to_string().contains("invalid render pass binding"));
         assert!(error.to_string().contains("expected RenderPass"));
@@ -864,6 +906,18 @@ mod tests {
         let packed = pack_uniform_blocks(&invert.passes[0]).unwrap();
         assert_eq!(packed.len(), 1);
         assert_eq!(packed.get("InvertConfig"), Some(&inverse));
+    }
+
+    #[test]
+    fn vulkan_screenquad_normalization_flips_attachment_row_origin() {
+        let source = include_bytes!("../../../../resources/assets/minecraft/shaders/core/screenquad.vsh");
+        let lowered = String::from_utf8(
+            normalize_vulkan_vertex_source(BackendApi::Vulkan, source)
+                .expect("bundled screenquad must normalize for Vulkan"),
+        )
+        .unwrap();
+        assert!(lowered.contains("gl_VertexIndex"));
+        assert!(lowered.contains("texCoord.y = 1.0 - texCoord.y;"));
     }
 
     #[test]
@@ -942,7 +996,9 @@ mod tests {
         };
         let source = "#version 330\nin vec2 texCoord;\nuniform sampler2D InSampler;\nlayout(std140) uniform First { vec4 value; };\nlayout(std140) uniform Second { vec4 value; };\nout vec4 fragColor;";
         pass.fragment_shader = source.to_owned();
-        let lowered = normalize_vulkan_fullscreen_source(BackendApi::Vulkan, source.as_bytes(), &pass).unwrap();
+        let lowered =
+            normalize_vulkan_fullscreen_source(BackendApi::Vulkan, source.as_bytes(), &pass)
+                .unwrap();
         let lowered = String::from_utf8(lowered).unwrap();
         assert!(lowered.contains("layout(set = 0, binding = 1, std140) uniform First"));
         assert!(lowered.contains("layout(set = 0, binding = 2, std140) uniform Second"));
@@ -956,14 +1012,13 @@ mod tests {
         )
         .unwrap();
         let mut invalid = contract.passes[0].clone();
-        invalid
-            .uniform_values
-            .get_mut("InvertConfig")
-            .unwrap()[0]
+        invalid.uniform_values.get_mut("InvertConfig").unwrap()[0]
             .values
             .push(0.25);
         let error = pack_uniform_block(&invalid, "InvertConfig").unwrap_err();
-        assert!(error.to_string().contains("declares float but supplies 2 values"));
+        assert!(error
+            .to_string()
+            .contains("declares float but supplies 2 values"));
     }
 
     #[test]
@@ -1001,9 +1056,10 @@ mod tests {
         let first = &executor.plan().ordered_passes[0];
         assert_eq!("final", first.output);
         assert_eq!(12, first.inputs.len());
-        assert!(first.inputs.iter().any(|input| {
-            input.target == "minecraft:weather" && input.use_depth_buffer
-        }));
+        assert!(first
+            .inputs
+            .iter()
+            .any(|input| { input.target == "minecraft:weather" && input.use_depth_buffer }));
         assert_eq!("minecraft:main", executor.plan().ordered_passes[1].output);
         let sources = bundled_transparency_shader_sources().unwrap();
         assert_eq!(2, sources.len());
@@ -1017,10 +1073,14 @@ mod tests {
         assert!(first_vertex.contains("layout(location = 0) out vec2 texCoord;"));
         let first_fragment = String::from_utf8(vulkan_sources[0].1.clone()).unwrap();
         assert!(first_fragment.contains("#version 450"));
-        assert!(first_fragment.contains("layout(set = 0, binding = 0) uniform sampler2D MainSampler;"));
+        assert!(
+            first_fragment.contains("layout(set = 0, binding = 0) uniform sampler2D MainSampler;")
+        );
         assert!(first_fragment.contains("layout(set = 0, binding = 11) uniform sampler2D"));
         let second_fragment = String::from_utf8(vulkan_sources[1].1.clone()).unwrap();
-        assert!(second_fragment.contains("layout(set = 0, binding = 0) uniform sampler2D InSampler;"));
+        assert!(
+            second_fragment.contains("layout(set = 0, binding = 0) uniform sampler2D InSampler;")
+        );
         assert!(second_fragment.contains("layout(set = 0, binding = 1, std140) uniform BlitConfig"));
 
         let inventory = FabulousExternalTargetInventory {
@@ -1100,11 +1160,17 @@ mod tests {
         let error = inventory
             .validate_populated_for_plan(executor.plan(), &missing_weather)
             .unwrap_err();
-        assert!(error.to_string().contains("unpopulated Rust external targets"));
+        assert!(error
+            .to_string()
+            .contains("unpopulated Rust external targets"));
 
         let error = FabulousExternalTargetInventory {
             main: inventory.main,
-            translucent: VanillaPostEffectExternalTargetBinding { depth_attachment: None, depth_usage: None, ..inventory.translucent },
+            translucent: VanillaPostEffectExternalTargetBinding {
+                depth_attachment: None,
+                depth_usage: None,
+                ..inventory.translucent
+            },
             item_entity: inventory.item_entity,
             particles: inventory.particles,
             clouds: inventory.clouds,

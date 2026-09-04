@@ -24,6 +24,26 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DistantHorizonsSemanticCollectorTest {
+	@Test
+	void primitiveColumnMembershipTracksTheSemanticSnapshotLifecycle() {
+		System.setProperty(DistantHorizonsSemanticCollector.CAPTURE_PROPERTY, "true");
+		DistantHorizonsSemanticCollector.resetForTest();
+		long columnKey = 9_223_372_036_854_000_000L;
+		DistantHorizonsSemanticCollector.recordBuiltColumn(
+			columnKey, new DhBlockPos(0, 64, 0),
+			List.of(quadBuffer(0, 0, 0, 0xB7, 1, 2, 3, 255, 1, 2)), List.of(), List.of(), List.of()
+		);
+
+		assertTrue(DistantHorizonsSemanticCollector.hasColumn(columnKey));
+		assertFalse(DistantHorizonsSemanticCollector.hasPublishedColumn(columnKey));
+		DistantHorizonsSemanticCollector.PendingAssetUpdate update = DistantHorizonsSemanticCollector.pendingUpdateForTest();
+		assertEquals(1, update.assets().size());
+		DistantHorizonsSemanticCollector.acknowledgeForTest(update);
+		assertTrue(DistantHorizonsSemanticCollector.hasPublishedColumn(columnKey));
+		DistantHorizonsSemanticCollector.removeColumn(columnKey);
+		assertFalse(DistantHorizonsSemanticCollector.hasColumn(columnKey));
+		assertFalse(DistantHorizonsSemanticCollector.hasPublishedColumn(columnKey));
+	}
 	@AfterEach
 	void resetCollector() {
 		System.clearProperty(DistantHorizonsSemanticCollector.CAPTURE_PROPERTY);
@@ -166,6 +186,33 @@ class DistantHorizonsSemanticCollectorTest {
 	}
 
 	@Test
+	void rustOwnedPacketsBecomeTheBoundedSemanticAssetWithoutLegacyDirectBuffers() {
+		System.setProperty(DistantHorizonsSemanticCollector.CAPTURE_PROPERTY, "true");
+		byte[] packet = new byte[DistantHorizonsSemanticCollector.VERTEX_STRIDE_BYTES * 4];
+		quadBuffer(7, 8, 9, 0xB7, 11, 12, 13, 14, 1, 5).get(packet);
+		LodQuadBuilder.SemanticVertexBufferBuild opaque = new LodQuadBuilder.SemanticVertexBufferBuild(
+			List.of(packet), List.of(new int[] { 1 }), List.of(new byte[] { ColumnRenderSource.SEMANTIC_VARIANT_EXACT }),
+			List.of(new long[] { BlockPos.asLong(7, 8, 9) })
+		);
+		LodQuadBuilder.SemanticVertexBufferBuild empty = new LodQuadBuilder.SemanticVertexBufferBuild(List.of(), List.of(), List.of(), List.of());
+		ColumnRenderSource.SemanticMaterialIdentity grass =
+			new ColumnRenderSource.SemanticMaterialIdentity("minecraft:grass_block", "minecraft:plains");
+
+		DistantHorizonsSemanticCollector.recordRustSemanticBuiltColumn(
+			101L, new DhBlockPos(10, 64, -20), List.of(grass),
+			new LodQuadBuilder.SemanticQuadCoverage(1, 0, 0),
+			LodQuadBuilder.semanticQuadCoverage(opaque, empty, empty, empty),
+			opaque, empty, empty, empty
+		);
+
+		var snapshot = DistantHorizonsSemanticCollector.snapshotForTest(101L);
+		assertEquals(1, snapshot.opaque().size());
+		assertEquals(7, snapshot.opaque().getFirst().vertices().getFirst().localX());
+		assertEquals(1, DistantHorizonsSemanticCollector.materialProvenanceForTest(101L).opaque().getFirst()[0]);
+		assertEquals(1, DistantHorizonsSemanticCollector.pendingUpdateForTest().assets().size());
+	}
+
+	@Test
 	void legacyObservationRetainsOnlyCopiedSnapshotsAfterLegacyVboRetirement() {
 		System.setProperty(DistantHorizonsSemanticCollector.LEGACY_OBSERVATION_PROPERTY, "true");
 		DistantHorizonsSemanticCollector.recordBuiltColumn(
@@ -237,6 +284,41 @@ class DistantHorizonsSemanticCollectorTest {
 		assertNull(DistantHorizonsSemanticCollector.materialProvenanceForTest(701L));
 		assertTrue(DistantHorizonsSemanticCollector.hasColumn(702L));
 		assertEquals(grass, DistantHorizonsSemanticCollector.materialProvenanceForTest(702L).semanticMaterials().getFirst());
+	}
+
+	@Test
+	void identicalSemanticRebuildReusesThePublishedColumnGeneration() {
+		System.setProperty(DistantHorizonsSemanticCollector.CAPTURE_PROPERTY, "true");
+		ColumnRenderSource.SemanticMaterialIdentity grass =
+			new ColumnRenderSource.SemanticMaterialIdentity("minecraft:grass_block", "minecraft:plains");
+		LodQuadBuilder.VertexBufferBuild build = new LodQuadBuilder.VertexBufferBuild(
+			List.of(quadBuffer(1, 2, 3, 0xB7, 11, 12, 13, 14, 15, 16)), List.of(new int[] { 1 })
+		);
+		LodQuadBuilder.VertexBufferBuild empty = new LodQuadBuilder.VertexBufferBuild(List.of(), List.of());
+
+		DistantHorizonsSemanticCollector.recordBuiltColumn(
+			77L, new DhBlockPos(10, 64, -20), List.of(grass), build, empty, empty, empty
+		);
+		DistantHorizonsSemanticCollector.PendingAssetUpdate first =
+			DistantHorizonsSemanticCollector.pendingUpdateForTest();
+		assertNotNull(first);
+		DistantHorizonsSemanticCollector.acknowledgeForTest(first);
+		long publishedGeneration = DistantHorizonsSemanticCollector.snapshotForTest(77L).generation();
+
+		// New arrays and a new build object represent the normal DH rebuild path.
+		// Value-identical provenance must still be treated as the same semantic asset.
+		DistantHorizonsSemanticCollector.recordBuiltColumn(
+			77L,
+			new DhBlockPos(10, 64, -20),
+			List.of(new ColumnRenderSource.SemanticMaterialIdentity("minecraft:grass_block", "minecraft:plains")),
+			new LodQuadBuilder.VertexBufferBuild(
+				List.of(quadBuffer(1, 2, 3, 0xB7, 11, 12, 13, 14, 15, 16)), List.of(new int[] { 1 })
+			),
+			empty, empty, empty
+		);
+
+		assertNull(DistantHorizonsSemanticCollector.pendingUpdateForTest());
+		assertEquals(publishedGeneration, DistantHorizonsSemanticCollector.snapshotForTest(77L).generation());
 	}
 
 	@Test
@@ -389,7 +471,10 @@ class DistantHorizonsSemanticCollectorTest {
 		assertEquals(1, first.assets().size());
 		assertEquals(0L, first.assets().getFirst().columnKey());
 		assertEquals(1, first.assets().getFirst().segments().size());
-		assertEquals(4, first.assets().getFirst().segments().getFirst().vertices().size());
+		var segment = first.assets().getFirst().segments().getFirst();
+		assertTrue(segment.hasPackedVertices());
+		assertEquals(0, segment.vertices().size());
+		assertEquals(DistantHorizonsSemanticCollector.VERTEX_STRIDE_BYTES * 4, segment.packedVertexBytes().length);
 		assertEquals(0, first.retirements().size());
 		DistantHorizonsSemanticCollector.acknowledgeForTest(first);
 
@@ -425,14 +510,13 @@ class DistantHorizonsSemanticCollectorTest {
 		}
 
 		DistantHorizonsSemanticCollector.PendingAssetUpdate first = DistantHorizonsSemanticCollector.pendingUpdateForTest();
-		assertEquals(4, first.assets().size());
+		assertEquals(1, first.assets().size(), "one provenance extraction transaction must stay heap-bounded");
 		assertEquals(0L, first.assets().getFirst().columnKey());
-		assertEquals(3L, first.assets().getLast().columnKey());
 		DistantHorizonsSemanticCollector.acknowledgeForTest(first);
 
 		DistantHorizonsSemanticCollector.PendingAssetUpdate second = DistantHorizonsSemanticCollector.pendingUpdateForTest();
-		assertEquals(4, second.assets().size());
-		assertEquals(4L, second.assets().getFirst().columnKey());
+		assertEquals(1, second.assets().size());
+		assertEquals(1L, second.assets().getFirst().columnKey());
 	}
 
 	@Test

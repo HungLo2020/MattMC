@@ -59,6 +59,134 @@ WATER_ANIMATION_SCENARIOS = {
     "water-pixel-replacement",
 }
 
+DEFAULT_STATIC_TERRAIN_PARITY_MAX_SAMPLES = 512
+MAX_STATIC_TERRAIN_PARITY_MAX_SAMPLES = 2_048
+DEFAULT_STATIC_TERRAIN_PARITY_MAX_EVENTS = 512
+MAX_STATIC_TERRAIN_PARITY_MAX_EVENTS = 8
+DEFAULT_STATIC_TERRAIN_PARITY_MAX_VISIBLE_LIST_EVENTS = 8
+MAX_STATIC_TERRAIN_PARITY_MAX_VISIBLE_LIST_EVENTS = 32
+DEFAULT_STATIC_TERRAIN_PARITY_MAX_COVERAGE_SAMPLES = 128
+MAX_STATIC_TERRAIN_PARITY_MAX_COVERAGE_SAMPLES = 1_024
+DEFAULT_STATIC_TERRAIN_PARITY_MAX_COVERAGE_EVENTS = 8
+MAX_STATIC_TERRAIN_PARITY_MAX_COVERAGE_EVENTS = 32
+DEFAULT_STATIC_TERRAIN_PARITY_MAX_WHOLE_FRAME_COVERAGE_EVENTS = 8
+MAX_STATIC_TERRAIN_PARITY_MAX_WHOLE_FRAME_COVERAGE_EVENTS = 32
+DEFAULT_STATIC_TERRAIN_PARITY_MAX_PORTAL_TRACE_EVENTS = 32
+MAX_STATIC_TERRAIN_PARITY_MAX_PORTAL_TRACE_EVENTS = 128
+DEFAULT_STATIC_TERRAIN_PARITY_MAX_FACE_CULL_TRACE_EVENTS = 32
+MAX_STATIC_TERRAIN_PARITY_MAX_FACE_CULL_TRACE_EVENTS = 128
+
+
+def static_terrain_parity_max_samples() -> int:
+    """Return the explicitly requested, bounded terrain-source receipt size."""
+    raw_value = os.environ.get(
+        "MATTMC_STATIC_TERRAIN_PARITY_MAX_SAMPLES",
+        str(DEFAULT_STATIC_TERRAIN_PARITY_MAX_SAMPLES),
+    )
+    try:
+        requested = int(raw_value)
+    except ValueError:
+        return DEFAULT_STATIC_TERRAIN_PARITY_MAX_SAMPLES
+    return max(0, min(requested, MAX_STATIC_TERRAIN_PARITY_MAX_SAMPLES))
+
+
+def static_terrain_parity_max_events() -> int:
+    """Bound repeated diagnostic receipts without changing the normal default."""
+    raw_value = os.environ.get(
+        "MATTMC_STATIC_TERRAIN_PARITY_MAX_EVENTS",
+        str(DEFAULT_STATIC_TERRAIN_PARITY_MAX_EVENTS),
+    )
+    try:
+        requested = int(raw_value)
+    except ValueError:
+        return DEFAULT_STATIC_TERRAIN_PARITY_MAX_EVENTS
+    return max(1, min(requested, MAX_STATIC_TERRAIN_PARITY_MAX_EVENTS))
+
+
+def static_terrain_parity_max_visible_list_events() -> int:
+    return static_terrain_parity_diagnostic_limit(
+        "MATTMC_STATIC_TERRAIN_PARITY_MAX_VISIBLE_LIST_EVENTS",
+        DEFAULT_STATIC_TERRAIN_PARITY_MAX_VISIBLE_LIST_EVENTS,
+        MAX_STATIC_TERRAIN_PARITY_MAX_VISIBLE_LIST_EVENTS,
+    )
+
+
+def static_terrain_parity_diagnostic_limit(name: str, default: int, maximum: int, minimum: int = 1) -> int:
+    """Read a bounded optional diagnostic budget shared by paired captures."""
+    try:
+        requested = int(os.environ.get(name, str(default)))
+    except ValueError:
+        return default
+    return max(minimum, min(requested, maximum))
+
+
+def static_terrain_parity_max_coverage_samples() -> int:
+    return static_terrain_parity_diagnostic_limit(
+        "MATTMC_STATIC_TERRAIN_PARITY_MAX_COVERAGE_SAMPLES",
+        DEFAULT_STATIC_TERRAIN_PARITY_MAX_COVERAGE_SAMPLES,
+        MAX_STATIC_TERRAIN_PARITY_MAX_COVERAGE_SAMPLES,
+        0,
+    )
+
+
+def static_terrain_parity_max_coverage_events() -> int:
+    return static_terrain_parity_diagnostic_limit(
+        "MATTMC_STATIC_TERRAIN_PARITY_MAX_COVERAGE_EVENTS",
+        DEFAULT_STATIC_TERRAIN_PARITY_MAX_COVERAGE_EVENTS,
+        MAX_STATIC_TERRAIN_PARITY_MAX_COVERAGE_EVENTS,
+    )
+
+
+def static_terrain_parity_max_whole_frame_coverage_events() -> int:
+    return static_terrain_parity_diagnostic_limit(
+        "MATTMC_STATIC_TERRAIN_PARITY_MAX_WHOLE_FRAME_COVERAGE_EVENTS",
+        DEFAULT_STATIC_TERRAIN_PARITY_MAX_WHOLE_FRAME_COVERAGE_EVENTS,
+        MAX_STATIC_TERRAIN_PARITY_MAX_WHOLE_FRAME_COVERAGE_EVENTS,
+    )
+
+
+def static_terrain_parity_max_portal_trace_events() -> int:
+    return static_terrain_parity_diagnostic_limit(
+        "MATTMC_STATIC_TERRAIN_PARITY_MAX_PORTAL_TRACE_EVENTS",
+        DEFAULT_STATIC_TERRAIN_PARITY_MAX_PORTAL_TRACE_EVENTS,
+        MAX_STATIC_TERRAIN_PARITY_MAX_PORTAL_TRACE_EVENTS,
+    )
+
+
+def static_terrain_parity_max_face_cull_trace_events() -> int:
+    return static_terrain_parity_diagnostic_limit(
+        "MATTMC_STATIC_TERRAIN_PARITY_MAX_FACE_CULL_TRACE_EVENTS",
+        DEFAULT_STATIC_TERRAIN_PARITY_MAX_FACE_CULL_TRACE_EVENTS,
+        MAX_STATIC_TERRAIN_PARITY_MAX_FACE_CULL_TRACE_EVENTS,
+    )
+
+
+def capture_client_heap_max_mb(rss_limit_mb: int) -> int:
+    """Choose a generous client heap without making RSS protection optional.
+
+    The heap is not the process's memory footprint: Vulkan allocations,
+    driver mappings, JVM native regions, and Rust-owned resources all live
+    outside it. Keep the normal client maximum at 8 GiB (matching interactive
+    development), while reserving at least 25% of a configured RSS budget for
+    those non-heap consumers. The RSS guard remains the authoritative safety
+    boundary.
+    """
+    if rss_limit_mb <= 0:
+        return 8192
+    return min(8192, max(512, int(rss_limit_mb * 0.75)))
+
+
+def capture_client_heap_initial_mb(heap_max_mb: int) -> int:
+    """Start captures lean while retaining the full adaptive max heap.
+
+    A large ``-Xms`` eagerly commits Java pages before Vulkan/native work has
+    a chance to establish its real footprint.  That made the capture's RSS
+    look like a rendering leak and could pressure the workstation.  The
+    client may still grow to ``heap_max_mb`` as gameplay genuinely requires;
+    only the initial reservation is kept small and deterministic.
+    """
+    return min(1024, max(512, heap_max_mb // 8))
+
 
 def static_terrain_base_scenario(scenario: str) -> str:
     scenario = (scenario or "").strip().lower()
@@ -145,6 +273,7 @@ class CaptureConfig:
     region_validation_copy_world: bool
     poi_validation: bool
     deterministic_shutdown_grace_secs: int = 20
+    title_screen_capture: bool = False
 
 
 class CaptureRunner:
@@ -160,13 +289,24 @@ class CaptureRunner:
         directory.
         """
         artifact_root = root / "artifacts" / "graphics-captures"
+        # The graphics matrix allocates a retention-managed run root beneath
+        # ``artifacts/`` (for example ``artifacts/low-memory-smoke/...``).
+        # That entire tree is repository-local and ignored; accepting it here
+        # keeps the runner's metadata beside the benchmark it describes.  The
+        # narrower graphics-captures and logs/graphics-audit roots remain the
+        # documented standalone defaults.
+        artifact_tree = root / "artifacts"
         graphics_audit_root = root / "logs" / "graphics-audit"
         artifact_dir = Path(configured) if configured else artifact_root / "auto-capture"
         if not artifact_dir.is_absolute():
             artifact_dir = root / artifact_dir
         resolved_root = root.resolve()
         resolved_artifact_dir = artifact_dir.resolve()
-        managed_roots = (artifact_root.resolve(), graphics_audit_root.resolve())
+        managed_roots = (
+            artifact_root.resolve(),
+            graphics_audit_root.resolve(),
+            artifact_tree.resolve(),
+        )
         if not any(
             resolved_artifact_dir == managed_root
             or managed_root in resolved_artifact_dir.parents
@@ -253,6 +393,11 @@ class CaptureRunner:
             if os.environ.get("MATTMC_GRAPHICS_SUBSYSTEM_STATUS")
             else None
         )
+        self.frame_benchmark_status_path = (
+            Path(os.environ["MATTMC_GRAPHICS_FRAME_BENCHMARK_STATUS"])
+            if os.environ.get("MATTMC_GRAPHICS_FRAME_BENCHMARK_STATUS")
+            else None
+        )
 
         self.validation_layer_manifest = ""
         self.validation_layer_dir = ""
@@ -276,8 +421,11 @@ class CaptureRunner:
         self.memory_guard_rss_kb = 0
         self.deterministic_completed = False
         self.intentional_deterministic_shutdown = False
+        self.title_screen_capture_completed = False
+        self.intentional_title_screen_shutdown = False
         self.subsystem_benchmark_completed = False
         self.intentional_subsystem_shutdown = False
+        self.awaiting_frame_benchmark_after_capture = False
         self.deterministic_validation_status = "not_requested"
         self.audio_validation_result = "not_requested"
         self.region_validation_result = "not_requested"
@@ -314,6 +462,9 @@ class CaptureRunner:
             self.append_meta(f"raw_exit_code={exit_code}")
             exit_code = 0
         if self.intentional_subsystem_shutdown and exit_code != 0:
+            self.append_meta(f"raw_exit_code={exit_code}")
+            exit_code = 0
+        if self.intentional_title_screen_shutdown and exit_code != 0:
             self.append_meta(f"raw_exit_code={exit_code}")
             exit_code = 0
 
@@ -386,6 +537,9 @@ class CaptureRunner:
             self.lock_handle = None
 
     def cleanup_generated_game_dirs(self) -> None:
+        if os.environ.get("MATTMC_CAPTURE_PRESERVE_ISOLATED_GAME_DIR", "false").lower() == "true":
+            self.append_meta("artifact_retention_game_dir_cleanup=preserved_by_explicit_diagnostic_request")
+            return
         marker_root = artifact_retention.nearest_marked_root(self.artifact_dir)
         if marker_root is None:
             self.append_meta("artifact_retention_game_dir_cleanup=skipped_no_marker")
@@ -613,14 +767,35 @@ class CaptureRunner:
             "options.txt",
             "config",
             "resourcepacks",
+            "assets",
             "shaderpacks",
             "Distant_Horizons_server_data",
             "voxelmap",
         ):
             self.copy_optional_path(source_run / name, isolated_game_dir / name)
+        if os.environ.get("MATTMC_CAPTURE_RESET_DH_DATABASE", "false").lower() == "true":
+            server_data = isolated_game_dir / "Distant_Horizons_server_data"
+            if server_data.exists():
+                # The DH server-side cache can repopulate a freshly deleted
+                # client DB with legacy columns. Remove it only from this
+                # bounded isolated copy so both paired rows rebuild from the
+                # canonical world fixture.
+                shutil.rmtree(server_data)
+                self.append_isolated_world_copy_meta("isolated_dh_server_data_reset=true")
         saves_dir = isolated_game_dir / "saves"
         saves_dir.mkdir(parents=True)
         self.copy_isolated_world(source_world, saves_dir, self.config.world, "primary")
+        if os.environ.get("MATTMC_CAPTURE_RESET_DH_DATABASE", "false").lower() == "true":
+            # Dedicated DH correctness rows must build their copied columns
+            # from the fixture instead of silently reusing a legacy SQLite
+            # snapshot that predates semantic contributor provenance.  Only
+            # the isolated copy is touched; the source world and Frozen repo
+            # remain unchanged.
+            removed = 0
+            for database in (saves_dir / self.config.world).rglob("DistantHorizons.sqlite"):
+                database.unlink()
+                removed += 1
+            self.append_isolated_world_copy_meta(f"isolated_dh_databases_reset={removed}")
         second_world = self.static_terrain_second_world_name()
         if second_world:
             if second_world == self.config.world:
@@ -764,6 +939,12 @@ class CaptureRunner:
         gui_scale = os.environ.get("MATTMC_CAPTURE_GUI_SCALE", "3")
         if not gui_scale.isdigit() or int(gui_scale) <= 0:
             raise SystemExit(f"MATTMC_CAPTURE_GUI_SCALE must be a positive integer, got {gui_scale!r}")
+        hide_gui = os.environ.get("MATTMC_CAPTURE_HIDE_GUI", "false").lower()
+        if hide_gui not in {"true", "false"}:
+            raise SystemExit(
+                "MATTMC_CAPTURE_HIDE_GUI must be true or false, "
+                f"got {hide_gui!r}"
+            )
         max_fps = os.environ.get("MATTMC_CAPTURE_MAX_FPS", "120")
         if not max_fps.isdigit() or int(max_fps) <= 0:
             raise SystemExit(f"MATTMC_CAPTURE_MAX_FPS must be a positive integer, got {max_fps!r}")
@@ -778,7 +959,7 @@ class CaptureRunner:
             "simulationDistance": simulation_distance,
             "guiScale": gui_scale,
             "fullscreen": "false",
-            "hideGui": "false",
+            "hideGui": hide_gui,
             "maxFps": max_fps,
             "enableVsync": "false",
             "tutorialStep": "none",
@@ -802,6 +983,19 @@ class CaptureRunner:
             # and retain their full synchronization/rendering configuration.
             if disable_dh_for_ordinary_source:
                 for key, value in (
+                    # Isolated vanilla producer fixtures do not exercise DH;
+                    # disable its legacy draw pass in both Current and Frozen
+                    # copied runs so their workload fingerprints describe the
+                    # same world/camera fixture. Dedicated DH rows do not set
+                    # this flag and retain the real DH renderer.
+                    ("enableRendering", "false"),
+                    # DH normally suppresses vanilla fog when it owns the
+                    # far-world compositor.  That compositor is excluded
+                    # from ordinary vanilla parity rows, so retain Frozen's
+                    # vanilla fog instead of comparing its suppression
+                    # against Rust's vanilla semantic fog.
+                    ("enableVanillaFog", "true"),
+                    ("enableDhFog", "false"),
                     ("synchronizeOnLoad", "false"),
                     ("enableRealTimeUpdates", "false"),
                     ("maxSyncOnLoadRequestDistance", "0"),
@@ -846,6 +1040,12 @@ class CaptureRunner:
         if voxelmap_file.is_file():
             upsert_option(voxelmap_file, "Welcome Message", "false")
             self.append_meta("forced_voxelmap_welcome=false")
+            # The vanilla migration gate must not compare a mod-owned minimap
+            # whose asynchronous cache warm-up differs between isolated game
+            # directories.  Keep it out of both paired clients instead of
+            # masking pixels or letting it influence world-color parity.
+            upsert_option(voxelmap_file, "Hide Minimap", "true")
+            self.append_meta("forced_voxelmap_minimap_hidden=true")
         self.append_meta("forced_window_width=1280")
         self.append_meta("forced_window_height=720")
         for key, value in forced_options.items():
@@ -875,11 +1075,16 @@ class CaptureRunner:
         self.config.client_args = remove_client_arg_option(self.config.client_args, "--width")
         self.config.client_args = remove_client_arg_option(self.config.client_args, "--height")
         self.config.client_args = remove_client_arg_assignment(self.config.client_args, "enableShaders")
-        self.config.client_args = append_client_arg(self.config.client_args, f"--quickPlaySingleplayer={shlex.quote(self.config.world)}")
+        if not self.config.title_screen_capture:
+            self.config.client_args = append_client_arg(self.config.client_args, f"--quickPlaySingleplayer={shlex.quote(self.config.world)}")
         self.config.client_args = append_client_arg(self.config.client_args, "--width 1280")
         self.config.client_args = append_client_arg(self.config.client_args, "--height 720")
         self.config.client_args = append_client_arg(self.config.client_args, f"enableShaders={shaders_enabled}")
-        self.append_meta(f"forced_quick_play_singleplayer={self.config.world}")
+        if self.config.title_screen_capture:
+            self.append_meta("title_screen_capture=true")
+            self.append_meta("forced_quick_play_singleplayer=disabled")
+        else:
+            self.append_meta(f"forced_quick_play_singleplayer={self.config.world}")
         self.append_meta(f"forced_enable_shaders={shaders_enabled}")
 
         if not self.config.deterministic_camera_capture:
@@ -891,10 +1096,14 @@ class CaptureRunner:
                 f"-Dmattmc.dev.staticTerrainParityDiagnostics.path={parity_diagnostics_path}",
                 "-Dmattmc.dev.staticTerrainParityDiagnostics.waitForStable=true",
                 "-Dmattmc.dev.staticTerrainParityDiagnostics.readyFrames=3",
-                "-Dmattmc.dev.staticTerrainParityDiagnostics.maxSamples=512",
-                "-Dmattmc.dev.staticTerrainParityDiagnostics.maxCoverageSamples=1024",
-                "-Dmattmc.dev.staticTerrainParityDiagnostics.maxCoverageEvents=16384",
-                "-Dmattmc.dev.staticTerrainParityDiagnostics.maxFaceCullTraceEvents=16384",
+                f"-Dmattmc.dev.staticTerrainParityDiagnostics.maxSamples={static_terrain_parity_max_samples()}",
+                f"-Dmattmc.dev.staticTerrainParityDiagnostics.maxEvents={static_terrain_parity_max_events()}",
+                f"-Dmattmc.dev.staticTerrainParityDiagnostics.maxVisibleListEvents={static_terrain_parity_max_visible_list_events()}",
+                f"-Dmattmc.dev.staticTerrainParityDiagnostics.maxCoverageSamples={static_terrain_parity_max_coverage_samples()}",
+                f"-Dmattmc.dev.staticTerrainParityDiagnostics.maxCoverageEvents={static_terrain_parity_max_coverage_events()}",
+                f"-Dmattmc.dev.staticTerrainParityDiagnostics.maxWholeFrameCoverageEvents={static_terrain_parity_max_whole_frame_coverage_events()}",
+                f"-Dmattmc.dev.staticTerrainParityDiagnostics.maxPortalTraceEvents={static_terrain_parity_max_portal_trace_events()}",
+                f"-Dmattmc.dev.staticTerrainParityDiagnostics.maxFaceCullTraceEvents={static_terrain_parity_max_face_cull_trace_events()}",
             ])
             self.append_meta(f"static_terrain_parity_diagnostics={parity_diagnostics_path}")
             if self.config.world_static_terrain_fault:
@@ -1264,18 +1473,17 @@ class CaptureRunner:
             # accepting an over-budget client and treating its late termination
             # as valid parity evidence.
             # Leave headroom for native Vulkan allocations, driver mappings, and
-            # the JVM's non-heap regions.  With the normal 6144 MiB guard this
-            # preserves the historical 4G/2G bounds; smaller diagnostic guards
-            # now actually constrain the Java heap instead of being defeated by
-            # the build's environment override.
+            # the JVM's non-heap regions.  With the normal 12288 MiB guard this
+            # preserves the native-memory headroom needed by Vulkan and the
+            # driver without imposing an arbitrary 4 GiB Java-heap ceiling.
             rss_limit_mb = self.config.client_rss_limit_mb
             # Vulkan command recording, shader compilation, driver mappings,
             # and the loader can consume substantial native RSS during startup.
-            # Keep the Java heap to roughly one quarter of a strict capture
-            # budget so the guard measures the complete process rather than
-            # allowing the heap to crowd out the Rust/Vulkan side of the route.
-            heap_xmx_mb = 4096 if rss_limit_mb <= 0 else min(4096, max(512, int(rss_limit_mb * 0.25)))
-            heap_xms_mb = min(2048, max(512, heap_xmx_mb // 2))
+            # Keep the client at its normal 8 GiB maximum whenever the RSS
+            # budget permits it. The RSS guard, rather than a Java-heap target,
+            # is the authoritative workstation-safety limit.
+            heap_xmx_mb = capture_client_heap_max_mb(rss_limit_mb)
+            heap_xms_mb = capture_client_heap_initial_mb(heap_xmx_mb)
             self.env["MATTMC_CLIENT_XMX"] = f"{heap_xmx_mb}m"
             self.env["MATTMC_CLIENT_XMS"] = f"{heap_xms_mb}m"
             # ZGC is useful for interactive runs but carries substantial native
@@ -1306,16 +1514,23 @@ class CaptureRunner:
             ]
             if self.config.shader_input_parity == "full":
                 parity_options.append("-Dmattmc.vulkan.traceStandaloneUniformBlockMembers=true")
+                parity_options.append("-Dmattmc.vulkan.traceShaderInputParity.fullUniforms=true")
             self.append_java_tool_options(parity_options)
             self.append_meta(f"shader_input_parity_java_options={' '.join(parity_options)}")
             self.append_meta(f"java_tool_options={self.env.get('JAVA_TOOL_OPTIONS', '')}")
             self.append_meta("deterministic_lightmap_parity=true")
 
-        # A deterministic camera fixture is a cross-route scene comparison,
-        # even when its verbose shader-input trace is disabled. Keep the
-        # temporal game inputs fixed independently of that diagnostic switch.
+        # Every paired capture needs fixed temporal and camera inputs. Live
+        # partial ticks change interpolated FOV independently after startup,
+        # producing a different finite sky fan before renderer comparison.
         if self.config.deterministic_camera_capture:
             temporal_options = [
+                # The dynamic block-light flicker is a temporal gameplay input to the
+                # vanilla lightmap. A paired fixed-time capture must pin it even when
+                # the optional shader-input trace is disabled; otherwise the two
+                # processes can render different lightmaps solely from startup frame
+                # phase. This activates existing fixture behavior, not a renderer path.
+                "-Dmattmc.vulkan.deterministicLightmapParity=true",
                 "-Dmattmc.vulkan.deterministicTemporalParity=true",
                 "-Dmattmc.vulkan.deterministicTemporalParity.frameCounter=0",
                 "-Dmattmc.vulkan.deterministicTemporalParity.frameTime=0.016666668",
@@ -1449,6 +1664,17 @@ class CaptureRunner:
             self.capture_deterministic_requests(client_pid)
             if self.config.deterministic_camera_capture and self.deterministic_capture_status() == "complete":
                 self.deterministic_completed = True
+                frame_benchmark_status = self.frame_benchmark_status()
+                if frame_benchmark_status not in {None, "complete", "failed"}:
+                    if not self.awaiting_frame_benchmark_after_capture:
+                        self.append_meta("deterministic_capture_waiting_for_frame_benchmark=true")
+                        self.awaiting_frame_benchmark_after_capture = True
+                    continue
+                if frame_benchmark_status is None and self.frame_benchmark_status_path is not None:
+                    if not self.awaiting_frame_benchmark_after_capture:
+                        self.append_meta("deterministic_capture_waiting_for_frame_benchmark=true")
+                        self.awaiting_frame_benchmark_after_capture = True
+                    continue
                 self.intentional_deterministic_shutdown = True
                 self.append_meta(f"deterministic_capture_complete_elapsed={elapsed}")
                 force_capture_stop = os.environ.get("MATTMC_CAPTURE_KILL_AFTER_DETERMINISTIC", "false").lower() == "true"
@@ -1482,6 +1708,12 @@ class CaptureRunner:
                 and (elapsed - self.config.screenshot_start_delay_secs) % self.config.screenshot_interval_secs == 0
             ):
                 self.capture_root_screenshot("tick", elapsed, client_pid)
+                if self.config.title_screen_capture and self.screenshot_count >= 1:
+                    self.title_screen_capture_completed = True
+                    self.intentional_title_screen_shutdown = True
+                    self.append_meta(f"title_screen_capture_complete_elapsed={elapsed}")
+                    self.terminate_run_processes("title_screen_capture_complete")
+                    break
 
             if not self.dump_taken and elapsed >= self.config.dump_secs:
                 self.take_dump(elapsed, client_pid)
@@ -1656,6 +1888,16 @@ class CaptureRunner:
         status = data.get("status")
         return status if isinstance(status, str) else None
 
+    def frame_benchmark_status(self) -> str | None:
+        if self.frame_benchmark_status_path is None or not self.frame_benchmark_status_path.is_file():
+            return None
+        try:
+            data = json.loads(self.frame_benchmark_status_path.read_text(encoding="utf-8"))
+        except Exception:
+            return None
+        status = data.get("status")
+        return status if isinstance(status, str) else None
+
     def check_client_memory_guard(self, client_pid: int | None, elapsed: int) -> bool:
         if self.config.client_rss_limit_mb == 0 or not client_pid:
             return True
@@ -1730,6 +1972,12 @@ class CaptureRunner:
                 "===== jcmd GC.heap_info =====",
                 command_text(["jcmd", str(client_pid), "GC.heap_info"], cwd=self.root, timeout_secs=8),
                 "",
+                "===== jcmd GC.class_histogram (bounded diagnostic) =====",
+                # This is intentionally a non-live histogram: it identifies
+                # retained heap owners without forcing a full collection or
+                # changing the measured game's allocation behaviour.
+                command_text(["jcmd", str(client_pid), "GC.class_histogram"], cwd=self.root, timeout_secs=8),
+                "",
                 "===== jcmd VM.native_memory summary =====",
                 command_text(
                     ["jcmd", str(client_pid), "VM.native_memory", "summary"],
@@ -1739,6 +1987,12 @@ class CaptureRunner:
             ])
         if self.platform_name == "linux":
             lines.extend(read_proc_memory_summary(client_pid))
+            if shutil.which("pmap"):
+                lines.extend([
+                    "",
+                    "===== pmap -x (native mapping attribution) =====",
+                    command_text(["pmap", "-x", str(client_pid)], cwd=self.root, timeout_secs=8),
+                ])
         append_text(self.process_snapshot, "\n".join(lines) + "\n")
         self.append_meta(f"client_memory_snapshot_{label}={self.process_snapshot}")
 
@@ -1803,6 +2057,7 @@ class CaptureRunner:
     def append_final_meta(self, exit_code: int) -> None:
         self.append_meta(f"exit_code={exit_code}")
         self.append_meta(f"deterministic_completed={str(self.deterministic_completed).lower()}")
+        self.append_meta(f"title_screen_capture_completed={str(self.title_screen_capture_completed).lower()}")
         self.append_meta(
             f"intentional_deterministic_shutdown={str(self.intentional_deterministic_shutdown).lower()}"
         )
@@ -3220,6 +3475,12 @@ def parse_args() -> CaptureConfig:
         ),
     )
     parser.add_argument("--client-args", default=os.environ.get("CLIENT_ARGS", ""))
+    parser.add_argument(
+        "--title-screen-capture",
+        action="store_true",
+        default=os.environ.get("MATTMC_TITLE_SCREEN_CAPTURE", "").lower() in {"1", "true", "yes"},
+        help="Remain at the ordinary title screen instead of forcing quick-play; diagnostic capture only.",
+    )
     parser.add_argument("--jvm-arg", action="append", default=[], help="Extra JVM option appended to JAVA_TOOL_OPTIONS.")
     parser.add_argument("--world", default=os.environ.get("MATTMC_CAPTURE_WORLD", "Origin"))
     parser.add_argument("--game-dir", default=os.environ.get("MATTMC_CAPTURE_GAME_DIR", ""))
@@ -3284,7 +3545,11 @@ def parse_args() -> CaptureConfig:
         shaders=args.shaders,
         max_secs=args.max_secs,
         dump_secs=args.dump_secs,
-        client_rss_limit_mb=int_env("CLIENT_RSS_LIMIT_MB", 6144),
+        # The client routinely needs more than 4 GiB RSS during real startup
+        # (Frozen OpenGL measured about 6.4 GiB in the migration fixture). Keep
+        # a generous workstation-safety ceiling by default; callers can still
+        # set CLIENT_RSS_LIMIT_MB explicitly for a tighter diagnostic run.
+        client_rss_limit_mb=int_env("CLIENT_RSS_LIMIT_MB", 12288),
         screenshot_interval_secs=int_env("SCREENSHOT_INTERVAL_SECS", 5),
         screenshot_max_count=int_env("SCREENSHOT_MAX_COUNT", 6),
         screenshot_start_delay_secs=int_env("SCREENSHOT_START_DELAY_SECS", 0),
@@ -3317,6 +3582,7 @@ def parse_args() -> CaptureConfig:
         region_validation=bool(args.region_validation),
         region_validation_copy_world=bool(args.region_validation_copy_world),
         poi_validation=bool(args.poi_validation),
+        title_screen_capture=bool(args.title_screen_capture),
         deterministic_shutdown_grace_secs=int_env(
             "MATTMC_DETERMINISTIC_SHUTDOWN_GRACE_SECS",
             180 if args.region_validation else 20,

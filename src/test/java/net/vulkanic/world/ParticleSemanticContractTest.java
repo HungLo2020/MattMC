@@ -78,6 +78,19 @@ final class ParticleSemanticContractTest {
 	}
 
 	@Test
+	void terrainParticleControlsAreAppliedAtTheSharedRustAdmissionBoundary() throws Exception {
+		String source = Files.readString(Path.of(
+			"src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+		int method = source.indexOf("public static boolean shouldRouteTerrainParticle(");
+		int disabled = source.indexOf("rustGalWorldMaterial.terrainParticle.disabled", method);
+		int legacy = source.indexOf("rustGalWorldMaterial.terrainParticle.legacyControl", disabled);
+		int unavailable = source.indexOf("Rust whole-frame terrain particle route is unavailable under", legacy);
+		int texture = source.indexOf("terrainParticleTextureId(blockState)", unavailable);
+		assertTrue(method >= 0 && disabled > method && legacy > disabled && unavailable > legacy && texture > unavailable,
+			"direct whole-frame terrain collection must honor particle controls before texture admission");
+	}
+
+	@Test
 	void reloadableParticleTexturesUseCopiedSemanticImagesInsteadOfJavaGpuState() throws Exception {
 		String source = Files.readString(Path.of(
 			"src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));

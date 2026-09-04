@@ -24,8 +24,9 @@ final class NativeMeshingCompatibilityFallback {
 
     static int renderModel(BlockRenderCache cache, BlockRenderer blockRenderer, BlockState blockState,
             BlockPos blockPos, BlockPos modelOffset, NativeMeshingDiagnostics.FallbackStats fallbackStats) {
-        rejectRustWholeFrameFallback("block model");
         BlockStateModel model = cache.getBlockModels().getBlockModel(blockState);
+        rejectRustWholeFrameFallback("block model state=" + blockState
+                + " model=" + (model == null ? "null" : model.getClass().getName()));
         int quadStart = blockRenderer.getEmittedQuadCount();
         beginIrisBlock(blockRenderer, blockState, blockPos);
         blockRenderer.renderModel(model, blockState, blockPos, modelOffset);

@@ -100,6 +100,33 @@ public class FullDataSourceV2
 	 * textured Rust admission unavailable rather than guessing a sprite.
 	 */
 	private final boolean[] semanticHorizontalUniform;
+	/**
+	 * Bounded raw contributor columns retained for heterogeneous 2x2 reductions.
+	 * These are gameplay data only; the renderer must resolve identities and
+	 * geometry from them rather than treating one reduced sprite as authoritative.
+	 */
+	private final java.util.Map<Integer, LongArrayList[]> semanticHorizontalContributors = new java.util.HashMap<>();
+	private static final int MAX_SEMANTIC_HORIZONTAL_CONTRIBUTOR_CELLS = 1024;
+	/** Hard bound for each copied contributor column in the semantic sidecar. */
+	public static final int MAX_SEMANTIC_HORIZONTAL_CONTRIBUTOR_POINTS = 256;
+
+	private static LongArrayList[] remapHorizontalContributors(
+		LongArrayList[] sourceContributors, int[] remappedIds)
+	{
+		if (sourceContributors == null || sourceContributors.length != 4) return null;
+		LongArrayList[] copied = new LongArrayList[4];
+		for (int index = 0; index < copied.length; index++) {
+			LongArrayList source = sourceContributors[index];
+			if (source == null) continue;
+			LongArrayList column = new LongArrayList(
+				Math.min(source.size(), MAX_SEMANTIC_HORIZONTAL_CONTRIBUTOR_POINTS));
+			for (int point = 0; point < Math.min(source.size(), MAX_SEMANTIC_HORIZONTAL_CONTRIBUTOR_POINTS); point++) {
+				column.add(FullDataPointUtil.remap(remappedIds, source.getLong(point)));
+			}
+			copied[index] = column;
+		}
+		return copied;
+	}
 	
 	public boolean isEmpty;
 	/** Will be null if we don't want to update this value in the DB */
@@ -277,6 +304,35 @@ public class FullDataSourceV2
 	/** Returns only a copied-data proof; callers must still validate material identity. */
 	public boolean hasSemanticHorizontalUniformity(int relX, int relZ)
 	{ return this.semanticHorizontalUniform[relativePosToIndex(relX, relZ)]; }
+
+	/** Returns a defensive copy of the bounded source footprint, or null when unavailable. */
+	public LongArrayList[] getSemanticHorizontalContributors(int relX, int relZ)
+	{
+		LongArrayList[] contributors = this.semanticHorizontalContributors.get(relativePosToIndex(relX, relZ));
+		if (contributors == null) return null;
+		LongArrayList[] copy = new LongArrayList[contributors.length];
+		for (int i = 0; i < contributors.length; i++)
+		{
+			copy[i] = contributors[i] == null ? null : new LongArrayList(contributors[i].subList(0,
+				Math.min(contributors[i].size(), MAX_SEMANTIC_HORIZONTAL_CONTRIBUTOR_POINTS)));
+		}
+		return copy;
+	}
+
+	/** Rehydrates a bounded contributor footprint from the DTO semantic sidecar. */
+	public void setSemanticHorizontalContributors(int relX, int relZ, LongArrayList[] contributors)
+	{
+		int index = relativePosToIndex(relX, relZ);
+		if (contributors == null || contributors.length != 4)
+		{
+			this.semanticHorizontalContributors.remove(index);
+			return;
+		}
+		LongArrayList[] copy = new LongArrayList[4];
+		for (int i = 0; i < 4; i++) copy[i] = contributors[i] == null ? null : new LongArrayList(contributors[i].subList(0,
+			Math.min(contributors[i].size(), MAX_SEMANTIC_HORIZONTAL_CONTRIBUTOR_POINTS)));
+		this.semanticHorizontalContributors.put(index, copy);
+	}
 
 	public void setSemanticHorizontalUniformity(int relX, int relZ, boolean uniform)
 	{ this.semanticHorizontalUniform[relativePosToIndex(relX, relZ)] = uniform; }
@@ -574,6 +630,14 @@ public class FullDataSourceV2
 				// always overwrite the compression mode since we're replacing this column
 				this.columnWorldCompressionMode.set(index, inputDataSource.columnWorldCompressionMode.getByte(index));
 				this.semanticHorizontalUniform[index] = inputDataSource.semanticHorizontalUniform[index];
+				this.semanticHorizontalContributors.remove(index);
+				if (!this.semanticHorizontalUniform[index]
+					&& this.semanticHorizontalContributors.size() < MAX_SEMANTIC_HORIZONTAL_CONTRIBUTOR_CELLS)
+				{
+					LongArrayList[] contributors = remapHorizontalContributors(
+						inputDataSource.semanticHorizontalContributors.get(index), remappedIds);
+					if (contributors != null) this.semanticHorizontalContributors.put(index, contributors);
+				}
 				this.isEmpty = false;
 			}
 		}
@@ -630,6 +694,33 @@ public class FullDataSourceV2
 				this.semanticHorizontalUniform[targetIndex] = semanticallyUniformTwoByTwo(
 					inputDataSource, x, z, remappedIds
 				);
+				this.semanticHorizontalContributors.remove(targetIndex);
+				if (!this.semanticHorizontalUniform[targetIndex]
+					&& this.semanticHorizontalContributors.size() < MAX_SEMANTIC_HORIZONTAL_CONTRIBUTOR_CELLS)
+				{
+					LongArrayList[] contributors = new LongArrayList[4];
+					int contributor = 0;
+					for (int dx = 0; dx < 2; dx++)
+					{
+						for (int dz = 0; dz < 2; dz++)
+						{
+							LongArrayList source = inputDataSource.dataPoints[relativePosToIndex(x + dx, z + dz)];
+							if (source == null)
+							{
+								contributors[contributor++] = null;
+								continue;
+							}
+							LongArrayList copied = new LongArrayList(source.subList(0,
+								Math.min(source.size(), MAX_SEMANTIC_HORIZONTAL_CONTRIBUTOR_POINTS)));
+							for (int point = 0; point < copied.size(); point++)
+							{
+								copied.set(point, FullDataPointUtil.remap(remappedIds, copied.getLong(point)));
+							}
+							contributors[contributor++] = copied;
+						}
+					}
+					this.semanticHorizontalContributors.put(targetIndex, contributors);
+				}
 				
 				// check if the data changed
 				if (this.dataPoints[recipientIndex] == null)
@@ -1155,7 +1246,11 @@ public class FullDataSourceV2
 				
 				
 				// world compression //
-				byte worldCompressionMode = inputDataSource.columnWorldCompressionMode.getByte(recipientIndex);
+				// The recipient cell is a 2x2 projection of the input cell at
+				// inputIndex. Reading recipientIndex here desynchronizes the
+				// compression policy from the data column (and, near child-section
+				// offsets, can mark a semantically uniform source as non-uniform).
+				byte worldCompressionMode = inputDataSource.columnWorldCompressionMode.getByte(inputIndex);
 				this.columnWorldCompressionMode.set(recipientIndex, worldCompressionMode);
 				/*
 				 * A coarse cell is only safe for exact Rust material lookup when the
@@ -1163,9 +1258,22 @@ public class FullDataSourceV2
 				 * first child alone could label a heterogeneous cell as uniform and
 				 * make the renderer guess one texture for several source columns.
 				 */
-				this.semanticHorizontalUniform[recipientIndex] = hasSemanticUniformInputFootprint(
-					inputDataSource, inputX, inputZ
-				);
+				// One coarse input cell projects onto four recipient cells. The
+				// recipient footprint is therefore the mapped input cell itself;
+				// requiring a second 2x2 input footprint incorrectly discarded
+				// uniform provenance at every detail-level boundary.
+				this.semanticHorizontalUniform[recipientIndex] =
+					inputDataSource.semanticHorizontalUniform[inputIndex]
+						&& inputDataSource.columnWorldCompressionMode.getByte(inputIndex)
+							== EDhApiWorldCompressionMode.MERGE_SAME_BLOCKS.value;
+				this.semanticHorizontalContributors.remove(recipientIndex);
+				if (!this.semanticHorizontalUniform[recipientIndex]
+					&& this.semanticHorizontalContributors.size() < MAX_SEMANTIC_HORIZONTAL_CONTRIBUTOR_CELLS)
+				{
+					LongArrayList[] contributors = remapHorizontalContributors(
+						inputDataSource.semanticHorizontalContributors.get(inputIndex), remappedIds);
+					if (contributors != null) this.semanticHorizontalContributors.put(recipientIndex, contributors);
+				}
 				
 				
 				
@@ -1387,6 +1495,7 @@ public class FullDataSourceV2
 		this.columnWorldCompressionMode.set(index, worldCompressionMode.value);
 		this.semanticHorizontalUniform[index] = DhSectionPos.getDetailLevel(this.pos)
 			== DhSectionPos.SECTION_BLOCK_DETAIL_LEVEL;
+		this.semanticHorizontalContributors.remove(index);
 		
 		
 		if (RUN_UPDATE_DEV_VALIDATION)

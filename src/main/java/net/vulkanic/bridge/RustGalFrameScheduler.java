@@ -49,9 +49,24 @@ public final class RustGalFrameScheduler<T> {
 	public List<Item<T>> takeAllItems(List<Token> tokens, long generation) {
 		List<Token> ordered = new ArrayList<>(tokens);
 		ordered.sort(Comparator.comparingInt(Token::stratumOrder).thenComparingLong(Token::sequence));
-		List<Item<T>> payloads = new ArrayList<>(ordered.size());
-		int lastOrder = Integer.MIN_VALUE;
+		// One submitted semantic batch may provide several render-state elements
+		// (for example a wrapped image split into unit-UV quads).  Those elements
+		// deliberately share their token, while the scheduler owns exactly one
+		// payload for that token.  Consume it once, retaining the explicit batch
+		// ordering, and reject any attempt to alias a batch id with different work.
+		Map<Long, Token> uniqueTokens = new HashMap<>();
+		List<Token> uniqueOrdered = new ArrayList<>(ordered.size());
 		for (Token token : ordered) {
+			Token existing = uniqueTokens.putIfAbsent(token.batchId(), token);
+			if (existing == null) {
+				uniqueOrdered.add(token);
+			} else if (!existing.equals(token)) {
+				throw new IllegalStateException(this.label + " conflicting duplicate batch token: batch=" + token.batchId());
+			}
+		}
+		List<Item<T>> payloads = new ArrayList<>(uniqueOrdered.size());
+		int lastOrder = Integer.MIN_VALUE;
+		for (Token token : uniqueOrdered) {
 			Scheduled<T> scheduled = this.take(token, generation);
 			if (scheduled.token().stratumOrder() < lastOrder) {
 				throw new IllegalStateException(this.label + " batch executed out of stratum order: stratum=" + scheduled.token().stratumId());

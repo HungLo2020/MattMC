@@ -9,15 +9,48 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DeterministicCameraCaptureVignetteRegressionTest {
 	@Test
-	void deterministicCaptureForcesVignetteBrightnessInsteadOfCapturingRuntimeState() throws Exception {
-		String source = Files.readString(Path.of("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java"));
+	void captureCompletionDoesNotTruncateTheIndependentFrameSampleWindow() throws Exception {
+		String capture = Files.readString(Path.of("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java"));
+		String benchmark = Files.readString(Path.of("src/main/java/net/minecraft/client/dev/GraphicsFrameBenchmark.java"));
 
-		assertTrue(source.contains("mattmc.dev.deterministicCameraCapture.vignetteBrightness"),
-			"Deterministic capture must expose an explicit fixed vignette brightness for OpenGL/Vulkan geometry parity");
-		assertTrue(source.contains("minecraft.gui.vignetteBrightness = FIXED_VIGNETTE_BRIGHTNESS;"),
-			"Deterministic capture must not preserve backend-dependent runtime vignette brightness");
-		assertTrue(source.contains("stabilizeGuiState(minecraft);"),
-			"Deterministic capture must stabilize GUI state before pose screenshots and shader-input diagnostics");
+		assertTrue(capture.contains("GraphicsFrameBenchmark.isAwaitingCompletion()"),
+			"deterministic capture must wait for the configured frame benchmark rather than stopping at screenshot acknowledgement");
+		assertTrue(benchmark.contains("return ENABLED && !complete && !failed;"),
+			"the benchmark completion gate must remain independent of screenshot readiness");
+		assertTrue(benchmark.contains("!DeterministicCameraCapture.isAwaitingCompletion()"),
+			"a fast benchmark must not stop the client before its deterministic screenshot receipt arrives");
+	}
+
+	@Test
+	void parityCaptureWaitsForVanillaVignetteAnimationWithoutMutatingIt() throws Exception {
+		String capture = Files.readString(Path.of("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java"));
+		String gui = Files.readString(Path.of("src/main/java/net/minecraft/client/gui/Gui.java"));
+
+		assertTrue(gui.contains("vignetteBrightnessSettledForDeterministicCapture"),
+			"the capture route must derive readiness from the vanilla vignette state");
+		assertTrue(gui.contains("Math.abs(this.vignetteBrightness - target) <= 0.02F"),
+			"readiness must wait for natural convergence rather than force a fixed vignette brightness");
+		assertTrue(!gui.contains("deterministicCameraCapture.vignetteBrightness"),
+			"the harness must not override vanilla GUI animation state");
+		assertTrue(capture.contains("!minecraft.gui.vignetteBrightnessSettledForDeterministicCapture(minecraft.getCameraEntity())"),
+			"the capture pose must not advance while the visual state is still animating");
+		assertTrue(capture.contains("\\\"vignetteBrightness\\\"")
+			&& capture.contains("vignetteBrightnessForDeterministicCapture()"),
+			"the screenshot request must retain the exact vanilla fade value it was issued with");
+	}
+
+	@Test
+	void rustWholeFrameFreshnessUsesTheGalFrameClockRatherThanHookCallbacks() throws Exception {
+		String capture = Files.readString(Path.of("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java"));
+		String coordinator = Files.readString(Path.of("src/main/java/net/vulkanic/gui/RustGalFrameCoordinator.java"));
+
+		assertTrue(capture.contains("lastAcquiredWholeFrameFrame()\n\t\t\t\t\t- net.vulkanic.gui.RustGalFrameCoordinator.lastRenderableWholeFrameWorldFrame() > 1"),
+			"whole-frame freshness must compare the latest acquired GAL frame with the last world-admitted GAL frame");
+		assertTrue(!capture.contains("renderedFrameIndex\n\t\t\t\t\t- net.vulkanic.gui.RustGalFrameCoordinator.lastRenderableWholeFrameWorldFrame() > 1"),
+			"Java deterministic-hook callbacks are not on the GAL frame-id clock and cannot prove world-frame staleness");
+		assertTrue(coordinator.contains("lastAcquiredWholeFrameFrame = frameId;")
+			&& coordinator.contains("public static long lastAcquiredWholeFrameFrame()"),
+			"the coordinator must publish a Rust-owned acquired-frame receipt for the freshness gate");
 	}
 
 	@Test
@@ -30,6 +63,14 @@ class DeterministicCameraCaptureVignetteRegressionTest {
 			"The regression cycle must open the real inventory screen instead of simulating only metadata");
 		assertTrue(source.contains("minecraft.setScreen(null)"),
 			"The regression cycle must close inventory and return to gameplay HUD before the screenshot");
+		assertTrue(source.contains("requestRustGalGuiScreenCycleInventoryCapture(minecraft)"),
+			"The cycle must request a presented-frame capture before closing inventory");
+		assertTrue(source.contains("capture_request_rust_gal_gui_screen_cycle_inventory.json"),
+			"The inventory capture must use the shared external request/ack protocol, not Java GPU readback");
+		assertTrue(source.contains("Java's main render target, which has no valid image on selected"),
+			"The regression fixture must preserve the selected-Vulkan no-Java-readback boundary");
+		assertTrue(source.contains("!rustGalGuiScreenCycleInventoryCaptureComplete"),
+			"The cycle must keep inventory visible until the presented-frame capture is acknowledged");
 		assertTrue(source.contains("cyclesCompleted"),
 			"The deterministic artifact must record screen-cycle state for capture validation");
 	}
@@ -100,8 +141,13 @@ class DeterministicCameraCaptureVignetteRegressionTest {
 	@Test
 	void waterFixtureStaysInsideTheInvalidatedPaletteFootprint() throws Exception {
 		String source = Files.readString(Path.of("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java"));
-		int water = source.indexOf("if (DISTANT_HORIZONS_REQUIRE_WATER)");
+		// The initial readiness block also mentions this flag but only records
+		// cached witnesses. Inspect the actual fixture-construction block, which
+		// starts after the shared panel origin is established.
+		int panelOrigin = source.indexOf("BlockPos panelOrigin");
+		int water = source.indexOf("if (DISTANT_HORIZONS_REQUIRE_WATER)", panelOrigin);
 		int nextBlock = source.indexOf("distantHorizonsWaterWitnesses =", water);
+		assertTrue(panelOrigin >= 0 && water > panelOrigin && nextBlock > water);
 		String fixture = source.substring(water, nextBlock);
 		assertTrue(fixture.contains("localX = 28; localX < 32"));
 		assertTrue(fixture.contains("localZ = 24; localZ < 28"));

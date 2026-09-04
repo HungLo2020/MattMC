@@ -382,6 +382,12 @@ pub struct VulkanicGal {
     metrics: Metrics,
 }
 
+fn submission_trace(message: &str) {
+    if std::env::var_os("MATTMC_TRACE_WHOLE_FRAME").is_some() {
+        eprintln!("{message}");
+    }
+}
+
 impl VulkanicGal {
     #[allow(dead_code)]
     pub(in crate::render::vulkanic) fn new_with_backend(
@@ -589,7 +595,8 @@ impl VulkanicGal {
                 return Err(error);
             }
         };
-        self.frame_target_depth.insert(handle, (depth_texture, depth_view));
+        self.frame_target_depth
+            .insert(handle, (depth_texture, depth_view));
         self.metrics.resource_creates += 1;
         let result = self.frame_targets.insert_at(
             handle,
@@ -603,9 +610,7 @@ impl VulkanicGal {
             self.frame_target_depth.remove(&handle);
             let _ = self.destroy(depth_view);
             let _ = self.destroy(depth_texture);
-            let _ = self
-                .backend
-                .destroy(handle, HandleKind::FrameTarget, token);
+            let _ = self.backend.destroy(handle, HandleKind::FrameTarget, token);
             return Err(error);
         }
         Ok(handle)
@@ -805,9 +810,15 @@ impl VulkanicGal {
             ));
         }
         self.frame_targets.get(handle)?;
-        self.frame_target_depth.get(&handle).copied().ok_or_else(|| {
-            GalError::resource(StatusCode::StaleHandle, "frame target depth attachment is unavailable")
-        })
+        self.frame_target_depth
+            .get(&handle)
+            .copied()
+            .ok_or_else(|| {
+                GalError::resource(
+                    StatusCode::StaleHandle,
+                    "frame target depth attachment is unavailable",
+                )
+            })
     }
 
     pub(in crate::render::vulkanic) fn begin_frame_target_depth_write(
@@ -1116,6 +1127,19 @@ impl VulkanicGal {
     ) -> GalResult<Handle> {
         let view = self.texture_view_info(desc.texture_view)?;
         let sampler = self.samplers.get(desc.sampler)?;
+        if matches!(
+            std::env::var("MATTMC_RUST_SOURCE_DEPTH_TRACE").as_deref(),
+            Ok("1") | Ok("true") | Ok("TRUE")
+        ) && desc.label.contains("source-main_depth")
+        {
+            eprintln!(
+                "[MattMC source-depth-trace] combined label={} view=0x{:016x} texture=0x{:016x} sampler=0x{:016x}",
+                desc.label,
+                desc.texture_view.raw(),
+                view.texture.raw(),
+                desc.sampler.raw(),
+            );
+        }
         if !view.usages.contains(&TextureUsage::Sampled) {
             return self.validation_error(GalError::resource(
                 StatusCode::InvalidArgument,
@@ -1405,6 +1429,16 @@ impl VulkanicGal {
     }
 
     pub fn create_graphics_pipeline(&mut self, desc: GraphicsPipelineDesc) -> GalResult<Handle> {
+        if matches!(
+            std::env::var("MATTMC_RUST_PIPELINE_DEPTH_TRACE").as_deref(),
+            Ok("1") | Ok("true") | Ok("TRUE")
+        ) && desc.label.to_ascii_lowercase().contains("terrain")
+        {
+            eprintln!(
+                "[MattMC pipeline-depth-trace] label={} depth_format={:?} depth_compare={:?} depth_write={} colors={:?}",
+                desc.label, desc.depth_format, desc.depth_compare, desc.depth_write, desc.color_formats
+            );
+        }
         self.pipeline_layouts.get(desc.layout)?;
         self.require_shader_stage(desc.vertex_shader, ShaderStage::Vertex)?;
         self.require_shader_stage(desc.fragment_shader, ShaderStage::Fragment)?;
@@ -1860,15 +1894,22 @@ impl VulkanicGal {
         let validated = ValidatedSubmissionBatch::from(batch);
         let id = SubmissionId(self.next_submission);
         self.next_submission += 1;
+        submission_trace(&format!(
+            "gal.submit.encode.begin id={} label={}",
+            id.0, validated.label
+        ));
         let backend_encode_started = std::time::Instant::now();
         self.backend.encode_passes(&validated)?;
+        submission_trace(&format!("gal.submit.encode.end id={}", id.0));
         if let Some(profile) = profile.as_deref_mut() {
             profile.backend_encode_nanos = profile
                 .backend_encode_nanos
                 .saturating_add(elapsed_nanos_u64(backend_encode_started));
         }
         let backend_submit_started = std::time::Instant::now();
+        submission_trace(&format!("gal.submit.queue.begin id={}", id.0));
         self.backend.submit(id, &validated)?;
+        submission_trace(&format!("gal.submit.queue.end id={}", id.0));
         if let Some(profile) = profile.as_deref_mut() {
             profile.backend_submit_nanos = profile
                 .backend_submit_nanos
@@ -1919,6 +1960,13 @@ impl VulkanicGal {
 
     pub(in crate::render::vulkanic) fn latest_submission_id(&self) -> SubmissionId {
         SubmissionId(self.next_submission.saturating_sub(1))
+    }
+
+    /// Exposes the id that the immediately following submission will receive.
+    /// Frontends use this to protect transient stream ranges until that
+    /// submission completes; taking this value must be followed by one submit.
+    pub(in crate::render::vulkanic) fn next_submission_id(&self) -> SubmissionId {
+        SubmissionId(self.next_submission)
     }
 
     pub(in crate::render::vulkanic) fn retire_through(
@@ -2680,6 +2728,12 @@ impl VulkanicGal {
                     offset,
                     data,
                 } => {
+                    if in_pass {
+                        return self.validation_error(GalError::command(
+                            StatusCode::InvalidArgument,
+                            "host writes require no active render pass",
+                        ));
+                    }
                     if data.is_empty() {
                         return self.validation_error(GalError::command(
                             StatusCode::InvalidArgument,
@@ -2713,6 +2767,12 @@ impl VulkanicGal {
                     offset,
                     size,
                 } => {
+                    if in_pass {
+                        return self.validation_error(GalError::command(
+                            StatusCode::InvalidArgument,
+                            "host reads require no active render pass",
+                        ));
+                    }
                     if *size == 0 {
                         return self.validation_error(GalError::command(
                             StatusCode::InvalidArgument,
@@ -2756,6 +2816,12 @@ impl VulkanicGal {
                     self.validate_texture_subresource_range(*texture, *subresources)?;
                 }
                 CommandOp::Barrier(barrier) => {
+                    if in_pass {
+                        return self.validation_error(GalError::command(
+                            StatusCode::InvalidArgument,
+                            "resource barriers require no active render pass",
+                        ));
+                    }
                     self.validate_any_resource(barrier.resource)?;
                     if let Some(range) = barrier.subresources {
                         match barrier.resource.kind() {
@@ -3201,6 +3267,16 @@ impl VulkanicGal {
                             },
                             profile.as_deref_mut(),
                         )?;
+                        // A texture-to-frame copy is a complete explicit
+                        // presentation write. Later GUI/world overlay passes
+                        // may legally attach that same acquired target in the
+                        // combined submission, with Vulkan lowering providing
+                        // the TransferDst -> ColorAttachment transition.
+                        // Keep this symmetric with CopyFrameTargetToTexture:
+                        // no opaque frame-image state leaks into callers, but
+                        // the completed transfer cannot look like an
+                        // overlapping write hazard.
+                        accesses.retain_non_overlapping(AccessTarget::FrameTarget { handle: *dst });
                     }
                     CommandOp::GenerateMipmaps {
                         texture,

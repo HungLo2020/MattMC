@@ -50,6 +50,14 @@ public abstract class AbstractDhServerLevel extends AbstractDhLevel implements I
 	 * TODO only add players that actually have something to generate
 	 */
 	protected final ConcurrentLinkedQueue<IServerPlayerWrapper> worldGenPlayerCenteringQueue = new ConcurrentLinkedQueue<>();
+	/**
+	 * The request ticker and player lifecycle callbacks arrive from different
+	 * threads.  A peek/add/remove rotation is not atomic: concurrent ticks can
+	 * each append the same player before either removal runs, turning the fair
+	 * player list into an unbounded allocation source.  Keep the list small and
+	 * exact; this is scheduling state, not a work queue.
+	 */
+	private final Object worldGenPlayerCenteringLock = new Object();
 	
 	private final FullDataSourceRequestHandler requestHandler;
 	
@@ -101,7 +109,11 @@ public abstract class AbstractDhServerLevel extends AbstractDhLevel implements I
 	public boolean shouldDoWorldGen()
 	{ 
 		boolean configEnabled = Config.Common.WorldGenerator.enableDistantGeneration.get();
-		boolean hasPlayers = !this.worldGenPlayerCenteringQueue.isEmpty();
+		boolean hasPlayers;
+		synchronized (this.worldGenPlayerCenteringLock)
+		{
+			hasPlayers = !this.worldGenPlayerCenteringQueue.isEmpty();
+		}
 		boolean result = configEnabled && hasPlayers;
 		
 		// Log once if worldgen is disabled
@@ -124,16 +136,19 @@ public abstract class AbstractDhServerLevel extends AbstractDhLevel implements I
 	@Nullable
 	public DhBlockPos2D getTargetPosForGeneration()
 	{
-		IServerPlayerWrapper firstPlayer = this.worldGenPlayerCenteringQueue.peek();
-		if (firstPlayer == null)
+		IServerPlayerWrapper firstPlayer;
+		synchronized (this.worldGenPlayerCenteringLock)
 		{
-			return null;
+			// poll/offer makes the fairness rotation atomic with player add/remove.
+			// Unlike the previous peek/add/remove sequence it cannot multiply a
+			// player when request ticks overlap.
+			firstPlayer = this.worldGenPlayerCenteringQueue.poll();
+			if (firstPlayer == null)
+			{
+				return null;
+			}
+			this.worldGenPlayerCenteringQueue.offer(firstPlayer);
 		}
-		
-		// Put first player in back before removing from front, so it can be removed by other thread without blocking
-		// - if it gets removed, remove() below will remove the item we just put instead
-		this.worldGenPlayerCenteringQueue.add(firstPlayer);
-		this.worldGenPlayerCenteringQueue.remove(firstPlayer);
 		
 		Vec3d position = firstPlayer.getPosition();
 		return new DhBlockPos2D((int) position.x, (int) position.z);
@@ -262,8 +277,29 @@ public abstract class AbstractDhServerLevel extends AbstractDhLevel implements I
 	// player handling //
 	//=================//
 	
-	public void addPlayer(IServerPlayerWrapper serverPlayer) { this.worldGenPlayerCenteringQueue.add(serverPlayer); }
-	public void removePlayer(IServerPlayerWrapper serverPlayer) { this.worldGenPlayerCenteringQueue.remove(serverPlayer); }
+	public void addPlayer(IServerPlayerWrapper serverPlayer)
+	{
+		if (serverPlayer == null) return;
+		synchronized (this.worldGenPlayerCenteringLock)
+		{
+			// Player callbacks are allowed to be repeated; generation scheduling is
+			// one target per live player, never one target per callback.
+			if (!this.worldGenPlayerCenteringQueue.contains(serverPlayer))
+			{
+				this.worldGenPlayerCenteringQueue.offer(serverPlayer);
+			}
+		}
+	}
+	public void removePlayer(IServerPlayerWrapper serverPlayer)
+	{
+		if (serverPlayer == null) return;
+		synchronized (this.worldGenPlayerCenteringLock)
+		{
+			// Remove all historical duplicates as well, so an upgraded runtime can
+			// recover from a queue created before this bounded rotation existed.
+			this.worldGenPlayerCenteringQueue.removeIf(serverPlayer::equals);
+		}
+	}
 	
 	@Override
 	public CompletableFuture<Void> updateDataSourcesAsync(FullDataSourceV2 data)

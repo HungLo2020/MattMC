@@ -124,6 +124,7 @@ import net.sodium.client.gl.device.RenderDevice;
 import net.sodium.client.render.SodiumWorldRenderer;
 import net.sodium.client.render.chunk.ChunkRenderMatrices;
 import net.sodium.client.render.viewport.ViewportProvider;
+import net.sodium.client.util.FogParameters;
 import net.sodium.client.util.FlawlessFrames;
 import net.sodium.client.util.SodiumChunkSection;
 import net.sodium.client.world.LevelRendererExtension;
@@ -492,7 +493,7 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			: "E: " + this.levelRenderState.entityRenderStates.size() + "/" + this.level.getEntityCount() + ", SD: " + this.level.getServerSimulationDistance();
 	}
 
-public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // Made public for Iris shadow rendering
+	public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // Made public for Iris shadow rendering
 	if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 		// Vanilla's visibility graph is CPU semantic state.  Sodium's terrain
 		// setup scope initializes a Java GL render device, which cannot coexist
@@ -543,6 +544,32 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 
 	public void addRecentlyCompiledSection(SectionRenderDispatcher.RenderSection renderSection) {
 		this.sectionOcclusionGraph.schedulePropagationFrom(renderSection);
+	}
+
+	/**
+	 * Advances the client-owned light snapshot before the Rust whole-frame source
+	 * clones terrain sections. This is simulation/state progression only: it
+	 * creates no Java render resources, render lists, or GPU commands.
+	 */
+	public void advanceRustWholeFrameLightState() {
+		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() || this.level == null) {
+			return;
+		}
+		// Vanilla intentionally spreads this queue across ordinary render frames.
+		// The Rust source instead snapshots a complete visible terrain volume, so
+		// let an already-queued burst reach one coherent CPU light state before it
+		// starts those immutable builds.  The cap preserves a bounded render-thread
+		// cost if networking continues to enqueue work concurrently.
+		final int maxDrainPasses = 64;
+		int drainPasses = 0;
+		do {
+			this.level.pollLightUpdates();
+			drainPasses++;
+		} while (drainPasses < maxDrainPasses && this.level.hasPendingLightUpdates());
+		var lightEngine = this.level.getChunkSource().getLightEngine();
+		if (lightEngine.hasLightWork()) {
+			lightEngine.runLightUpdates();
+		}
 	}
 
 	private Frustum prepareCullFrustum(Matrix4f matrix4f, Matrix4f matrix4f2, Vec3 vec3) {
@@ -2462,7 +2489,6 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 			boolean rustAdmitted = net.vulkanic.world.WorldRenderRoutePolicy.currentBlockDisplayRoute().usesRustWholeFrameVulkan()
 				&& blockState != null
 				&& blockState.getRenderShape() == net.minecraft.world.level.block.RenderShape.MODEL
-				&& !net.minecraft.client.Minecraft.getInstance().getModelManager().specialBlockModelRenderer().get().hasRenderer(blockState.getBlock())
 				&& (net.minecraft.client.renderer.ItemBlockRenderTypes.getChunkRenderType(blockState)
 					== net.minecraft.client.renderer.chunk.ChunkSectionLayer.SOLID
 					|| net.minecraft.client.renderer.ItemBlockRenderTypes.getChunkRenderType(blockState)
@@ -2595,7 +2621,8 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		}
 	}
 
-	public void enqueueRustGalStaticTerrainForWholeFrame(Camera camera, Matrix4f viewMatrix, Matrix4f projectionMatrix) {
+	public void enqueueRustGalStaticTerrainForWholeFrame(Camera camera, Matrix4f viewMatrix, Matrix4f projectionMatrix,
+			FogParameters fogParameters, boolean useFogOcclusion) {
 		if (!net.vulkanic.world.WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan()) {
 			return;
 		}
@@ -2644,7 +2671,13 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 			camera,
 			frustum,
 			this.minecraft.getWindow().getWidth(),
-			this.minecraft.getWindow().getHeight()
+			this.minecraft.getWindow().getHeight(),
+			RustGalWholeFrameTerrainSource.terrainSelectionDistance(
+				this.minecraft.options.getEffectiveRenderDistance() * 16.0f,
+				fogParameters == null ? 0.0f : fogParameters.alpha(),
+				fogParameters == null ? 0.0f : fogParameters.renderEnd(),
+				useFogOcclusion
+			)
 		);
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.visible-submit");
 	}

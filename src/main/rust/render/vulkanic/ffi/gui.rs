@@ -5,6 +5,8 @@ use crate::render::vulkanic::gui_frontend::{
 use crate::render::vulkanic::gui_mesh_frontend::GUI_MESH_MAX_FRAME_PAYLOAD_BYTES;
 
 const GUI_MAX_AFFINE_QUADS: usize = 65_536;
+/// Stable `GuiMeshBatchRecord.materialMode` ABI value for title panoramas.
+pub(super) const GUI_MESH_MATERIAL_PANORAMA: u32 = 5;
 
 pub(crate) unsafe fn decode_gui_frame_submit(
     request: *const FfiGuiFrameSubmitRequest,
@@ -275,6 +277,7 @@ pub(crate) unsafe fn decode_gui_mesh_batches(
             2 => GuiMeshMaterialMode::Cutout,
             3 => GuiMeshMaterialMode::Translucent,
             4 => GuiMeshMaterialMode::Glint,
+            GUI_MESH_MATERIAL_PANORAMA => GuiMeshMaterialMode::Panorama,
             other => {
                 return Err(GalError::ffi(
                     StatusCode::UnknownEnum,
@@ -536,8 +539,17 @@ pub(crate) unsafe fn decode_gui_raw_image_update(
         })?;
         let pixel_count = usize::try_from(width)
             .ok()
-            .and_then(|width| usize::try_from(height).ok().and_then(|height| width.checked_mul(height)))
-            .ok_or_else(|| GalError::ffi(StatusCode::LengthOverflow, "raw GUI image pixel count overflows"))?;
+            .and_then(|width| {
+                usize::try_from(height)
+                    .ok()
+                    .and_then(|height| width.checked_mul(height))
+            })
+            .ok_or_else(|| {
+                GalError::ffi(
+                    StatusCode::LengthOverflow,
+                    "raw GUI image pixel count overflows",
+                )
+            })?;
         if pixel_count == 0 || pixel_count > GUI_MAX_RAW_IMAGE_PIXELS {
             return Err(GalError::ffi(
                 StatusCode::LengthOverflow,
@@ -552,10 +564,16 @@ pub(crate) unsafe fn decode_gui_raw_image_update(
             GuiRawImageFormat::Rgba8 => 4usize,
         };
         let expected_bytes = pixel_count.checked_mul(bytes_per_pixel).ok_or_else(|| {
-            GalError::ffi(StatusCode::LengthOverflow, "raw GUI image byte count overflows")
+            GalError::ffi(
+                StatusCode::LengthOverflow,
+                "raw GUI image byte count overflows",
+            )
         })?;
         let incoming_bytes = usize::try_from(asset.pixels.len).map_err(|_| {
-            GalError::ffi(StatusCode::LengthOverflow, "raw GUI image byte length exceeds usize")
+            GalError::ffi(
+                StatusCode::LengthOverflow,
+                "raw GUI image byte length exceeds usize",
+            )
         })?;
         if incoming_bytes != expected_bytes {
             return Err(GalError::ffi(
@@ -567,7 +585,10 @@ pub(crate) unsafe fn decode_gui_raw_image_update(
             ));
         }
         total_pixels = total_pixels.checked_add(expected_bytes).ok_or_else(|| {
-            GalError::ffi(StatusCode::LengthOverflow, "raw GUI image aggregate byte count overflows")
+            GalError::ffi(
+                StatusCode::LengthOverflow,
+                "raw GUI image aggregate byte count overflows",
+            )
         })?;
         if total_pixels > GUI_MAX_RAW_IMAGE_BYTES_TOTAL {
             return Err(GalError::ffi(

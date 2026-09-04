@@ -499,7 +499,11 @@ pub(super) mod mock {
         }
 
         fn cancel_frame(&mut self, frame: FrameId) -> GalResult<()> {
-            let Some(index) = self.acquired_frames.iter().position(|candidate| *candidate == frame) else {
+            let Some(index) = self
+                .acquired_frames
+                .iter()
+                .position(|candidate| *candidate == frame)
+            else {
                 return Err(GalError::submission(
                     crate::render::vulkanic::StatusCode::InvalidArgument,
                     "cancelled frame was not acquired",

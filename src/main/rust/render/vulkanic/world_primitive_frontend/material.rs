@@ -39,7 +39,7 @@ pub(super) fn validate_quad(
     }
     if !matches!(
         quad.source_program,
-            WORLD_MATERIAL_SOURCE_UNSPECIFIED
+        WORLD_MATERIAL_SOURCE_UNSPECIFIED
             | WORLD_MATERIAL_SOURCE_TEXTURED
             | WORLD_MATERIAL_SOURCE_ENTITY_MODEL
             | WORLD_MATERIAL_SOURCE_PARTICLES
@@ -166,10 +166,10 @@ pub(crate) fn canonical_texture_id(texture_id: u32) -> Option<u32> {
 /// The copied Minecraft atlas is a Rust-owned runtime asset, not a bundled
 /// standalone texture. It is admitted only with its original atlas UV space.
 pub(crate) fn is_runtime_mesh_texture_id(texture_id: u32) -> bool {
-	matches!(
-		texture_id,
-		WORLD_MESH_TEXTURE_TERRAIN_BLOCK_ATLAS | WORLD_MATERIAL_TEXTURE_PARTICLE_ATLAS
-	) || (texture_id & 0xf000_0000) == 0xf000_0000
+    matches!(
+        texture_id,
+        WORLD_MESH_TEXTURE_TERRAIN_BLOCK_ATLAS | WORLD_MATERIAL_TEXTURE_PARTICLE_ATLAS
+    ) || (texture_id & 0xf000_0000) == 0xf000_0000
 }
 
 pub(crate) fn texture_supports_uv_space(texture_id: u32, uv_space: u32) -> bool {
@@ -231,7 +231,10 @@ mod tests {
     fn copied_resource_pack_texture_uses_only_reserved_runtime_namespace() {
         let dynamic = 0xf123_4567;
         assert_eq!(Some(dynamic), canonical_texture_id(dynamic));
-        assert!(texture_supports_uv_space(dynamic, WORLD_MATERIAL_SOURCE_UV_LOCAL_TEXTURE));
+        assert!(texture_supports_uv_space(
+            dynamic,
+            WORLD_MATERIAL_SOURCE_UV_LOCAL_TEXTURE
+        ));
         assert!(!is_known_texture_id(0xdead_beef));
     }
 }

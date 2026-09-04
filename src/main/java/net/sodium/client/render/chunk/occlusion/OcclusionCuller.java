@@ -46,6 +46,10 @@ public class OcclusionCuller {
                     ValueLayout.JAVA_LONG,
                     ValueLayout.JAVA_INT,
                     ValueLayout.JAVA_INT));
+	private static final MethodHandle CAMERA_CONNECTIONS = NativeLibraryLoader.downcallHandle("mattmc_rust",
+			"mattmc_sodium_occlusion_connections_for_camera",
+			FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT,
+					ValueLayout.JAVA_DOUBLE, ValueLayout.JAVA_DOUBLE, ValueLayout.JAVA_DOUBLE));
     private static final MethodHandle CONNECTIONS_BATCH = NativeLibraryLoader.downcallHandle("mattmc_rust",
             "mattmc_sodium_occlusion_connections_batch",
             FunctionDescriptor.of(ValueLayout.JAVA_INT,
@@ -244,7 +248,9 @@ public class OcclusionCuller {
     }
 
     // this bigger chunk section size is only used for frustum-testing nearby sections with large models
-    private static final float CHUNK_SECTION_SIZE_NEARBY = CHUNK_SECTION_RADIUS + 2.0f /* bigger model extent */ + 0.125f /* epsilon */;
+    // CPU visibility convention shared with independent semantic producers.
+    // This exposes no render-list or backend ownership.
+    public static final float CHUNK_SECTION_SIZE_NEARBY = CHUNK_SECTION_RADIUS + 2.0f /* bigger model extent */ + 0.125f /* epsilon */;
     
     public static boolean isWithinNearbySectionFrustum(Viewport viewport, RenderSection section) {
         return viewport.isBoxVisible(section.getCenterX(), section.getCenterY(), section.getCenterZ(),
@@ -434,6 +440,14 @@ public class OcclusionCuller {
         return connections;
     }
 
+	public static int getVisibilityConnectionsForCamera(long visibilityData, int incoming,
+			double cameraDeltaX, double cameraDeltaY, double cameraDeltaZ) {
+		check(VERIFY_STATUS, "native occlusion verification");
+		int connections = invokeCameraConnections(visibilityData, incoming, cameraDeltaX, cameraDeltaY, cameraDeltaZ);
+		if (connections < 0) check(connections, "native camera occlusion connection calculation");
+		return connections;
+	}
+
     private static void computeOcclusionConnectionsBatch(NativeScratch scratch) {
         check(VERIFY_STATUS, "native occlusion verification");
         check(invokeConnectionsBatch(
@@ -470,6 +484,11 @@ public class OcclusionCuller {
             throw new IllegalStateException("Rust occlusion connection downcall failed", throwable);
         }
     }
+
+	private static int invokeCameraConnections(long visibilityData, int incoming, double x, double y, double z) {
+		try { return (int)CAMERA_CONNECTIONS.invokeExact(visibilityData, incoming, x, y, z); }
+		catch (Throwable throwable) { throw new IllegalStateException("Rust camera occlusion connection downcall failed", throwable); }
+	}
 
     private static int invokeConnectionsBatch(long visibilityDataAddress, int visibilityDataCount,
             long incomingAddress, int incomingCount, long cameraDeltaAddress, int cameraDeltaCount,

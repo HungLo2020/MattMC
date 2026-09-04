@@ -6276,13 +6276,13 @@ public class Phase3DrawPathTest {
         String avatar = readSource(avatarFile);
         String gameRenderer = readSource(gameRendererFile);
         assertTrue(avatar.contains("currentModelMeshRoute(true).usesRustWholeFrameVulkan()")
-                && avatar.contains("enqueueStandaloneModelMesh(")
+                && avatar.contains("enqueueStandaloneTranslucentModelMesh(")
                 && avatar.contains("ResourceLocation.withDefaultNamespace(\"player_hand\")")
                 && avatar.contains("ResourceLocation.withDefaultNamespace(\"player_hand_sleeve\")"),
             "first-person empty hands and visible sleeves must enter the explicit Rust standalone skin-mesh route");
         assertTrue(avatar.contains("Rust whole-frame player-hand route rejected the semantic skin mesh"),
             "first-person hands must fail closed when their copied skin mesh is unavailable");
-		int rustHandBranch = avatar.indexOf("enqueueStandaloneModelMesh(");
+		int rustHandBranch = avatar.indexOf("enqueueStandaloneTranslucentModelMesh(");
 		int javaHandBranch = avatar.indexOf("submitNodeCollector.submitModelPart(", rustHandBranch);
 		assertTrue(rustHandBranch >= 0 && javaHandBranch > rustHandBranch
 				&& avatar.contains("Iris captures and\n\t\t// replays the former in its hand pipeline"),
@@ -8254,6 +8254,69 @@ public class Phase3DrawPathTest {
     }
 
     @Test
+    public void testStaticTerrainReleasesOpaquePayloadOnlyAfterRustUploadAcknowledgement() throws IOException {
+        String primitives = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+        int flush = primitives.indexOf("public static VulkanicGalBridge.Status flushPendingWorldMeshAssets");
+        int acknowledge = primitives.indexOf("UPLOADED_WORLD_MESH_GENERATIONS.put", flush);
+        int release = primitives.indexOf("releaseUploadedStaticTerrainPayloadLocked", acknowledge);
+        int releaseMethod = primitives.indexOf("private static void releaseUploadedStaticTerrainPayloadLocked");
+        int discard = primitives.indexOf("WORLD_MESH_ASSETS.remove(meshKey)", releaseMethod);
+        assertTrue(flush >= 0 && acknowledge > flush && release > acknowledge && releaseMethod > flush && discard > releaseMethod,
+                "static terrain payloads must remain available through native acknowledgement, then release Java vertex/index retention");
+        assertTrue(primitives.contains("STATIC_TERRAIN_MESH_RESIDENCY"),
+                "released static terrain must retain only explicit mesh identity and texture dependencies");
+    }
+
+    @Test
+    public void testStaticTerrainResourceReloadRebuildsSemanticSourceWithoutJavaGpuRestore() throws IOException {
+        String terrain = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalTerrainRenderer.java"));
+        String source = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalWholeFrameTerrainSource.java"));
+        assertTrue(terrain.contains("RustGalWholeFrameTerrainSource.requestResourceReload()"),
+                "resource reload must request a fresh semantic terrain build when Java payloads have been released");
+        assertTrue(source.contains("resetForResourceReload()")
+                        && source.contains("cpu-source-resource-reload")
+                        && source.contains("RustGalTerrainRenderer.removeSection"),
+                "the source must retire stale Rust terrain identities and rebuild from CPU semantic snapshots");
+    }
+
+    @Test
+    public void testDistantHorizonsWorldGenerationPlayerRotationIsAtomicAndDeduplicated() throws IOException {
+        String level = readSource(SRC_MAIN_JAVA.resolve(
+                "com/seibel/distanthorizons/core/level/AbstractDhServerLevel.java"));
+        int target = level.indexOf("public DhBlockPos2D getTargetPosForGeneration()");
+        int poll = level.indexOf("worldGenPlayerCenteringQueue.poll()", target);
+        int offer = level.indexOf("worldGenPlayerCenteringQueue.offer(firstPlayer)", poll);
+        int add = level.indexOf("public void addPlayer(IServerPlayerWrapper serverPlayer)");
+        int dedupe = level.indexOf("worldGenPlayerCenteringQueue.contains(serverPlayer)", add);
+        int remove = level.indexOf("public void removePlayer(IServerPlayerWrapper serverPlayer)");
+        int removeAll = level.indexOf("worldGenPlayerCenteringQueue.removeIf(serverPlayer::equals)", remove);
+        assertTrue(target >= 0 && poll > target && offer > poll && add > target && dedupe > add
+                        && remove > add && removeAll > remove,
+                "DH generation-player scheduling must rotate atomically and deduplicate lifecycle callbacks instead of growing an unbounded queue");
+    }
+
+    @Test
+    public void testDistantHorizonsWorldGenerationQueueUsesLosslessBoundedSplitAdmission() throws IOException {
+        String queue = readSource(SRC_MAIN_JAVA.resolve(
+                "com/seibel/distanthorizons/core/generation/WorldGenerationQueue.java"));
+        int submit = queue.indexOf("public CompletableFuture<WorldGenResult> submitRetrievalTask");
+        int bound = queue.indexOf("MAX_WAITING_WORLD_GEN_TASKS", submit);
+        int rejected = queue.indexOf("WorldGenResult.CreateFail()", bound);
+        int split = queue.indexOf("List<Long> childPositions", submit);
+        int capacity = queue.indexOf("waitingTasks.size() - 1 + newChildren > MAX_WAITING_WORLD_GEN_TASKS", split);
+        int parentRemoval = queue.indexOf("waitingTasks.remove(closestTask.pos, closestTask)", capacity);
+        int complete = queue.indexOf("closestTask.future.complete(WorldGenResult.CreateSplit(childFutures))", parentRemoval);
+        assertTrue(submit >= 0 && bound > submit && rejected > bound && split > submit
+                        && capacity > split && parentRemoval > capacity && complete > parentRemoval,
+                "DH world generation must bound direct requests and admit a complete child split only when capacity exists");
+        assertTrue(queue.contains("inProgressGenTasksByLodPos.size() >= worldGenThreadCount"),
+                "DH generation concurrency must not exceed its configured worker capacity");
+    }
+
+    @Test
     public void testStaticTerrainFirstAdmissionIsNotReplayedInSameFrame() throws IOException {
         String primitives = readSource(SRC_MAIN_JAVA.resolve(
                 "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
@@ -8512,6 +8575,7 @@ public class Phase3DrawPathTest {
         assertTrue(record >= 0 && constructor > record
                         && bridge.substring(record).contains("MAX_RAW_IMAGE_DIMENSION = 8192")
                         && bridge.substring(record).contains("MAX_RAW_IMAGE_PIXELS = 16 * 1024 * 1024")
+                        && bridge.substring(constructor).contains("format < 1 || format > 2")
                         && bridge.substring(constructor).contains("expectedBytes")
                         && bridge.substring(constructor).contains("pixels.length != expectedBytes"),
                 "GUI raw-image Java admission must mirror Rust's bounded dimensions, pixel count, and exact byte contract");

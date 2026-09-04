@@ -75,7 +75,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		}
 	}
 
-	public static final int ABI_VERSION = 25;
+	public static final int ABI_VERSION = 27;
 	public static final int STATUS_OK = 0;
 
 	public static final int BACKEND_VULKAN = 1;
@@ -164,6 +164,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	public static final int HANDLE_GRAPHICS_PIPELINE = 9;
 	public static final int HANDLE_RENDER_PASS = 12;
 	public static final int HANDLE_FRAME_TARGET = 13;
+	/** GUI mesh ABI mode for a Frozen-parity panorama: unlit, no culling, no depth test. */
+	public static final int GUI_MESH_MATERIAL_PANORAMA = 5;
 
 	// Long-lived context requests use the context arena; large frame payloads
 	// are serialized in a per-submit confined arena and released immediately
@@ -1812,6 +1814,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 59, shaderEnvironmentFrame.fogRenderDistanceStart());
 		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 60, shaderEnvironmentFrame.fogRenderDistanceEnd());
 		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setInt(shaderEnvironment, 61, shaderEnvironmentFrame.distantHorizonsRenderDistance());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 62, shaderEnvironmentFrame.fogSkyEnd());
 		MemorySegment result = Struct.WHOLE_FRAME_SUBMIT_RESULT.allocate(arena);
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("rust-gal.whole-frame.java-record-packing");
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("rust-gal.whole-frame.native-submit-return");
@@ -2123,9 +2126,25 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		List<WorldMeshTextureAssetRecord> textures,
 		List<WorldMeshSortedIndexRecord> sortedIndices
 	) {
+		return updateWorldMeshAssets(generation, meshes, textures, sortedIndices, List.of());
+	}
+
+	/**
+	 * Publishes immutable mesh additions/replacements together with explicit
+	 * generation-guarded retirements. This is a resource-lifetime transaction;
+	 * it never relies on a renderer reset or an implicit cache flush.
+	 */
+	public Status updateWorldMeshAssets(
+		long generation,
+		List<WorldMeshAssetRecord> meshes,
+		List<WorldMeshTextureAssetRecord> textures,
+		List<WorldMeshSortedIndexRecord> sortedIndices,
+		List<WorldMeshAssetRetirementRecord> retirements
+	) {
 		Objects.requireNonNull(meshes, "meshes");
 		Objects.requireNonNull(textures, "textures");
 		Objects.requireNonNull(sortedIndices, "sortedIndices");
+		Objects.requireNonNull(retirements, "retirements");
 		try (Arena updateArena = Arena.ofConfined()) {
 			MemorySegment textureArray = Struct.WORLD_MESH_TEXTURE_ASSET_PAYLOAD.array(updateArena, textures.size());
 			for (int i = 0; i < textures.size(); i++) {
@@ -2152,6 +2171,11 @@ public final class VulkanicGalBridge implements AutoCloseable {
 					Struct.WORLD_MESH_ANIMATION_FRAME_RECORD.setInt(frameItem, 3, 0);
 				}
 				Abi.writeSlice(item, Struct.WORLD_MESH_TEXTURE_ASSET_PAYLOAD, 11, animationFrameArray, texture.animationFrames().size());
+				MemorySegment mipPngArray = Struct.BYTES.array(updateArena, texture.mipPngBytes().size());
+				for (int mipIndex = 0; mipIndex < texture.mipPngBytes().size(); mipIndex++) {
+					Abi.writeBytes(updateArena, Abi.item(mipPngArray, Struct.BYTES, mipIndex), Struct.BYTES, 0, texture.mipPngBytes().get(mipIndex));
+				}
+				Abi.writeSlice(item, Struct.WORLD_MESH_TEXTURE_ASSET_PAYLOAD, 12, mipPngArray, texture.mipPngBytes().size());
 			}
 			MemorySegment meshArray = Struct.WORLD_MESH_ASSET_RECORD.array(updateArena, meshes.size());
 			for (int i = 0; i < meshes.size(); i++) {
@@ -2180,7 +2204,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 					Struct.WORLD_MESH_VERTEX.setFloat(vertexItem, 10, vertex.atlasV());
 					Struct.WORLD_MESH_VERTEX.setInt(vertexItem, 11, vertex.shaderBlockId());
 					Struct.WORLD_MESH_VERTEX.setInt(vertexItem, 12, vertex.shaderMaterialType());
-					Struct.WORLD_MESH_VERTEX.setInt(vertexItem, 13, vertex.midBlockPacked());
+					Struct.WORLD_MESH_VERTEX.setInt(vertexItem, 13, vertex.terrainMaterialBits());
+					Struct.WORLD_MESH_VERTEX.setInt(vertexItem, 14, vertex.midBlockPacked());
 				}
 				Abi.writeSlice(item, Struct.WORLD_MESH_ASSET_RECORD, 6, vertexArray, mesh.vertices().size());
 				Abi.writeBytes(updateArena, item, Struct.WORLD_MESH_ASSET_RECORD, 7, mesh.indexBytes());
@@ -2212,6 +2237,15 @@ public final class VulkanicGalBridge implements AutoCloseable {
 				Struct.WORLD_MESH_SORTED_INDEX_RECORD.setLong(item, 5, sortedIndex.indexGeneration());
 				Abi.writeBytes(updateArena, item, Struct.WORLD_MESH_SORTED_INDEX_RECORD, 6, sortedIndex.indexBytes());
 			}
+			MemorySegment retirementArray = Struct.WORLD_MESH_ASSET_RETIREMENT_RECORD.array(updateArena, retirements.size());
+			for (int i = 0; i < retirements.size(); i++) {
+				WorldMeshAssetRetirementRecord retirement = Objects.requireNonNull(retirements.get(i), "retirements[" + i + "]");
+				MemorySegment item = Abi.item(retirementArray, Struct.WORLD_MESH_ASSET_RETIREMENT_RECORD, i);
+				item.set(ValueLayout.JAVA_INT, Struct.WORLD_MESH_ASSET_RETIREMENT_RECORD.offset(0), Struct.WORLD_MESH_ASSET_RETIREMENT_RECORD.byteSize());
+				Struct.WORLD_MESH_ASSET_RETIREMENT_RECORD.setInt(item, 1, 0);
+				Struct.WORLD_MESH_ASSET_RETIREMENT_RECORD.setLong(item, 2, retirement.meshKey());
+				Struct.WORLD_MESH_ASSET_RETIREMENT_RECORD.setLong(item, 3, retirement.meshGeneration());
+			}
 			MemorySegment request = Struct.WORLD_MESH_ASSET_UPDATE.allocate(updateArena);
 			Abi.writeHeader(request, Struct.WORLD_MESH_ASSET_UPDATE);
 			Struct.WORLD_MESH_ASSET_UPDATE.setLong(request, 1, generation);
@@ -2219,6 +2253,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			Abi.writeSlice(request, Struct.WORLD_MESH_ASSET_UPDATE, 3, textureArray, textures.size());
 			Abi.writeSlice(request, Struct.WORLD_MESH_ASSET_UPDATE, 4, sortedIndexArray, sortedIndices.size());
 			Struct.WORLD_MESH_ASSET_UPDATE.setLong(request, 5, negotiatedFeatures);
+			Abi.writeSlice(request, Struct.WORLD_MESH_ASSET_UPDATE, 6, retirementArray, retirements.size());
 			MemorySegment status = Struct.STATUS.allocate(updateArena);
 			checkStatus(Native.worldMeshUpdateAssets(contextId, request, status), "world mesh asset update");
 			return new Status(Struct.STATUS.getLong(status, 5), Struct.STATUS.metricsFfiCalls(status), Struct.STATUS.metricsFfiInputBytes(status), Struct.STATUS.backendMetrics(status));
@@ -2268,20 +2303,29 @@ public final class VulkanicGalBridge implements AutoCloseable {
 					MemorySegment segmentItem = Abi.item(segmentArray, Struct.WORLD_LOD_SEGMENT_RECORD, segmentIndex);
 					segmentItem.set(ValueLayout.JAVA_INT, Struct.WORLD_LOD_SEGMENT_RECORD.offset(0), Struct.WORLD_LOD_SEGMENT_RECORD.byteSize());
 					Struct.WORLD_LOD_SEGMENT_RECORD.setInt(segmentItem, 1, segment.layer());
-					MemorySegment vertexArray = Struct.WORLD_LOD_VERTEX.array(updateArena, segment.vertices().size());
-					for (int vertexIndex = 0; vertexIndex < segment.vertices().size(); vertexIndex++) {
-						WorldLodVertexRecord vertex = segment.vertices().get(vertexIndex);
-						MemorySegment vertexItem = Abi.item(vertexArray, Struct.WORLD_LOD_VERTEX, vertexIndex);
-						vertexItem.set(ValueLayout.JAVA_INT, Struct.WORLD_LOD_VERTEX.offset(0), Struct.WORLD_LOD_VERTEX.byteSize());
-						vertexItem.set(ValueLayout.JAVA_SHORT, Struct.WORLD_LOD_VERTEX.offset(1), (short)vertex.localX());
-						vertexItem.set(ValueLayout.JAVA_SHORT, Struct.WORLD_LOD_VERTEX.offset(2), (short)vertex.localY());
-						vertexItem.set(ValueLayout.JAVA_SHORT, Struct.WORLD_LOD_VERTEX.offset(3), (short)vertex.localZ());
-						vertexItem.set(ValueLayout.JAVA_SHORT, Struct.WORLD_LOD_VERTEX.offset(4), (short)vertex.packedLightAndMicroOffset());
-						Struct.WORLD_LOD_VERTEX.setInt(vertexItem, 5, vertex.colorRgba());
-						Struct.WORLD_LOD_VERTEX.setInt(vertexItem, 6, vertex.materialId());
-						Struct.WORLD_LOD_VERTEX.setInt(vertexItem, 7, vertex.normalIndex());
+					if (segment.hasPackedVertices()) {
+						MemorySegment packedVertices = updateArena.allocate(segment.packedVertexBytes().length);
+						packedVertices.copyFrom(MemorySegment.ofArray(segment.packedVertexBytes()));
+						Abi.writeSlice(segmentItem, Struct.WORLD_LOD_SEGMENT_RECORD, 2, MemorySegment.NULL, 0);
+						Abi.writeSlice(segmentItem, Struct.WORLD_LOD_SEGMENT_RECORD, 3,
+							packedVertices, segment.packedVertexBytes().length);
+					} else {
+						MemorySegment vertexArray = Struct.WORLD_LOD_VERTEX.array(updateArena, segment.vertices().size());
+						for (int vertexIndex = 0; vertexIndex < segment.vertices().size(); vertexIndex++) {
+							WorldLodVertexRecord vertex = segment.vertices().get(vertexIndex);
+							MemorySegment vertexItem = Abi.item(vertexArray, Struct.WORLD_LOD_VERTEX, vertexIndex);
+							vertexItem.set(ValueLayout.JAVA_INT, Struct.WORLD_LOD_VERTEX.offset(0), Struct.WORLD_LOD_VERTEX.byteSize());
+							vertexItem.set(ValueLayout.JAVA_SHORT, Struct.WORLD_LOD_VERTEX.offset(1), (short)vertex.localX());
+							vertexItem.set(ValueLayout.JAVA_SHORT, Struct.WORLD_LOD_VERTEX.offset(2), (short)vertex.localY());
+							vertexItem.set(ValueLayout.JAVA_SHORT, Struct.WORLD_LOD_VERTEX.offset(3), (short)vertex.localZ());
+							vertexItem.set(ValueLayout.JAVA_SHORT, Struct.WORLD_LOD_VERTEX.offset(4), (short)vertex.packedLightAndMicroOffset());
+							Struct.WORLD_LOD_VERTEX.setInt(vertexItem, 5, vertex.colorRgba());
+							Struct.WORLD_LOD_VERTEX.setInt(vertexItem, 6, vertex.materialId());
+							Struct.WORLD_LOD_VERTEX.setInt(vertexItem, 7, vertex.normalIndex());
+						}
+						Abi.writeSlice(segmentItem, Struct.WORLD_LOD_SEGMENT_RECORD, 2, vertexArray, segment.vertices().size());
+						Abi.writeSlice(segmentItem, Struct.WORLD_LOD_SEGMENT_RECORD, 3, MemorySegment.NULL, 0);
 					}
-					Abi.writeSlice(segmentItem, Struct.WORLD_LOD_SEGMENT_RECORD, 2, vertexArray, segment.vertices().size());
 				}
 				Abi.writeSlice(item, Struct.WORLD_LOD_COLUMN_ASSET_RECORD, 8, segmentArray, asset.segments().size());
 			}
@@ -2545,10 +2589,16 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		int frameRowSize,
 		int interpolationPolicy,
 		List<WorldMeshAnimationFrameRecord> animationFrames,
-		int coordinateOrigin
+		int coordinateOrigin,
+		List<byte[]> mipPngBytes
 	) {
 		public WorldMeshTextureAssetRecord(int textureId, byte[] pngBytes) {
-			this(textureId, pngBytes, 0, 0, 1, 1, 0, 0, 0, List.of(), WORLD_MESH_TEXTURE_COORDINATE_ORIGIN_VULKANIC);
+			this(textureId, pngBytes, 0, 0, 1, 1, 0, 0, 0, List.of(), WORLD_MESH_TEXTURE_COORDINATE_ORIGIN_VULKANIC, List.of());
+		}
+
+		/** Complete copied mip chain for a semantic atlas, excluding mip zero. */
+		public WorldMeshTextureAssetRecord(int textureId, byte[] pngBytes, List<byte[]> mipPngBytes) {
+			this(textureId, pngBytes, 0, 0, 1, 1, 0, 0, 0, List.of(), WORLD_MESH_TEXTURE_COORDINATE_ORIGIN_VULKANIC, mipPngBytes);
 		}
 
 		public WorldMeshTextureAssetRecord(
@@ -2560,7 +2610,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			int frameTicks,
 			int animationFlags
 		) {
-			this(textureId, pngBytes, frameWidth, frameHeight, frameCount, frameTicks, animationFlags, 0, 0, List.of(), WORLD_MESH_TEXTURE_COORDINATE_ORIGIN_VULKANIC);
+			this(textureId, pngBytes, frameWidth, frameHeight, frameCount, frameTicks, animationFlags, 0, 0, List.of(), WORLD_MESH_TEXTURE_COORDINATE_ORIGIN_VULKANIC, List.of());
 		}
 
 		public WorldMeshTextureAssetRecord(
@@ -2575,14 +2625,32 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			int interpolationPolicy,
 			List<WorldMeshAnimationFrameRecord> animationFrames
 		) {
-			this(textureId, pngBytes, frameWidth, frameHeight, frameCount, frameTicks, animationFlags, frameRowSize, interpolationPolicy, animationFrames, WORLD_MESH_TEXTURE_COORDINATE_ORIGIN_VULKANIC);
+			this(textureId, pngBytes, frameWidth, frameHeight, frameCount, frameTicks, animationFlags, frameRowSize, interpolationPolicy, animationFrames, WORLD_MESH_TEXTURE_COORDINATE_ORIGIN_VULKANIC, List.of());
+		}
+
+		public WorldMeshTextureAssetRecord(
+			int textureId,
+			byte[] pngBytes,
+			int frameWidth,
+			int frameHeight,
+			int frameCount,
+			int frameTicks,
+			int animationFlags,
+			int frameRowSize,
+			int interpolationPolicy,
+			List<WorldMeshAnimationFrameRecord> animationFrames,
+			int coordinateOrigin
+		) {
+			this(textureId, pngBytes, frameWidth, frameHeight, frameCount, frameTicks, animationFlags, frameRowSize, interpolationPolicy, animationFrames, coordinateOrigin, List.of());
 		}
 
 		public WorldMeshTextureAssetRecord {
 			Objects.requireNonNull(pngBytes, "pngBytes");
 			Objects.requireNonNull(animationFrames, "animationFrames");
+			Objects.requireNonNull(mipPngBytes, "mipPngBytes");
 			pngBytes = pngBytes.clone();
 			animationFrames = List.copyOf(animationFrames);
+			mipPngBytes = mipPngBytes.stream().map(bytes -> Objects.requireNonNull(bytes, "mip PNG bytes").clone()).toList();
 			if (frameWidth < 0 || frameHeight < 0 || frameCount < 0 || frameTicks < 0 || frameRowSize < 0 || interpolationPolicy < 0) {
 				throw new IllegalArgumentException("negative world mesh texture animation metadata");
 			}
@@ -2634,6 +2702,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		float atlasV,
 		int shaderBlockId,
 		int shaderMaterialType,
+		int terrainMaterialBits,
 		int colorArgb,
 		int normalPacked,
 		int light,
@@ -2709,11 +2778,28 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		}
 	}
 
-	public record WorldLodSegmentRecord(int layer, List<WorldLodVertexRecord> vertices) {
+	public record WorldLodSegmentRecord(int layer, List<WorldLodVertexRecord> vertices, byte[] packedVertexBytes) {
 		public WorldLodSegmentRecord {
 			Objects.requireNonNull(vertices, "vertices");
+			Objects.requireNonNull(packedVertexBytes, "packedVertexBytes");
+			if (!vertices.isEmpty() && packedVertexBytes.length != 0) {
+				throw new IllegalArgumentException("world LOD segment cannot mix structured and packed vertices");
+			}
+			if (vertices.isEmpty() && packedVertexBytes.length == 0) {
+				throw new IllegalArgumentException("world LOD segment must contain semantic vertices");
+			}
+			if (packedVertexBytes.length % 16 != 0 || (packedVertexBytes.length / 16) % 4 != 0) {
+				throw new IllegalArgumentException("packed world LOD segment must be 16-byte quad aligned");
+			}
 			vertices = List.copyOf(vertices);
 		}
+		public WorldLodSegmentRecord(int layer, List<WorldLodVertexRecord> vertices) {
+			this(layer, vertices, new byte[0]);
+		}
+		public static WorldLodSegmentRecord packed(int layer, byte[] bytes) {
+			return new WorldLodSegmentRecord(layer, List.of(), bytes);
+		}
+		public boolean hasPackedVertices() { return packedVertexBytes.length != 0; }
 	}
 
 	public record WorldLodColumnAssetRecord(
@@ -2732,6 +2818,15 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	}
 
 	public record WorldLodColumnRetirementRecord(long columnKey, long columnGeneration) {
+	}
+
+	/** Explicit release of one immutable world-mesh generation in Rust. */
+	public record WorldMeshAssetRetirementRecord(long meshKey, long meshGeneration) {
+		public WorldMeshAssetRetirementRecord {
+			if (meshKey == 0L || meshGeneration == 0L) {
+				throw new IllegalArgumentException("world mesh retirement key and generation must be non-zero");
+			}
+		}
 	}
 
 	/** Stable semantic identity for a reduced DH quad. It is not an atlas or
@@ -3358,7 +3453,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		}
 
 		public GuiMeshBatchRecord {
-			if (assetId == 0L || layerIndex < 0 || (materialMode != 1 && materialMode != 2 && materialMode != 3 && materialMode != 4)
+			if (assetId == 0L || layerIndex < 0 || (materialMode != 1 && materialMode != 2 && materialMode != 3 && materialMode != 4 && materialMode != GUI_MESH_MATERIAL_PANORAMA)
 				|| (lightingMode != 1 && lightingMode != 2) || !Float.isFinite(alphaCutoff)
 				|| guiWidth <= 0 || guiHeight <= 0 || renderWidth <= guardPixels * 2 || renderHeight <= guardPixels * 2
 				|| left >= right || top >= bottom) throw new IllegalArgumentException("invalid semantic GUI mesh batch");
@@ -4040,7 +4135,10 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		float fogEnvironmentalEnd,
 		float fogRenderDistanceStart,
 		float fogRenderDistanceEnd,
-		int distantHorizonsRenderDistance
+		int distantHorizonsRenderDistance,
+		/// Vanilla SKY pipeline range.  This is copied gameplay fog data, not
+		/// a Java uniform buffer or any Iris-owned rendering state.
+		float fogSkyEnd
 	) {
 		public static WorldShaderEnvironmentFrameRecord disabled() {
 			return new WorldShaderEnvironmentFrameRecord(
@@ -4057,7 +4155,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F,
 			0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F,
 			0.0F, 0.0F, 0, 0,
-			0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0
+			0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0, 0.0F
 		);
 		}
 	}
@@ -4671,6 +4769,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 					WORLD_LOD_MATERIAL_IDENTITY_RECORD(85),
 					WORLD_LOD_SEGMENT_MATERIAL_PROVENANCE_RECORD(86),
 					WORLD_LOD_COLUMN_MATERIAL_PROVENANCE_RECORD(87),
+					WORLD_MESH_ASSET_RETIREMENT_RECORD(99),
 			WORLD_LOD_FACE_MATERIAL_RECORD(88),
 			WORLD_FEATURE_COVERAGE(89),
 			GUI_RAW_IMAGE_ASSET_PAYLOAD(90),

@@ -5,17 +5,17 @@
 //! copied vanilla item meshes. Java/PIP renderer objects and backend state are
 //! not part of this boundary.
 
-use std::collections::{BTreeMap, BTreeSet};
-use core::{hash as ch};
 use ch::Hasher;
+use core::hash as ch;
+use std::collections::{BTreeMap, BTreeSet};
 
 use super::commands::{
     AttachmentLoadOp, AttachmentStoreOp, ClearColor, CommandOp, PassAttachment, ResourceBarrier,
     TextureUsageState,
 };
-use super::gui_frontend::GUI_MAX_VIEWPORT_AXIS;
 use super::error::{GalError, GalResult, StatusCode};
 use super::gal::VulkanicGal;
+use super::gui_frontend::GUI_MAX_VIEWPORT_AXIS;
 use super::handles::Handle;
 use super::resources::{
     AccessFlags, BackendApi, BlendMode, BufferDesc, BufferUsage, ColorFormat, CompareOp, Extent3d,
@@ -43,8 +43,10 @@ const GUI_MESH_COMPOSITE_UNIFORM_BYTES: usize = 80;
 pub const GUI_MESH_COMPOSITE_UNIFORM_STRIDE: u64 = 256;
 const GUI_MESH_MAX_COMPOSITE_UNIFORM_BYTES: u64 =
     GUI_MESH_MAX_BATCHES as u64 * GUI_MESH_COMPOSITE_UNIFORM_STRIDE;
-pub(crate) const GUI_MESH_MAX_VERTEX_BYTES: u64 = (GUI_MESH_MAX_VERTICES * GUI_MESH_GPU_VERTEX_BYTES) as u64;
-pub(crate) const GUI_MESH_MAX_INDEX_BYTES: u64 = (GUI_MESH_MAX_INDICES * std::mem::size_of::<u32>()) as u64;
+pub(crate) const GUI_MESH_MAX_VERTEX_BYTES: u64 =
+    (GUI_MESH_MAX_VERTICES * GUI_MESH_GPU_VERTEX_BYTES) as u64;
+pub(crate) const GUI_MESH_MAX_INDEX_BYTES: u64 =
+    (GUI_MESH_MAX_INDICES * std::mem::size_of::<u32>()) as u64;
 
 const GUI_MESH_VERTEX_SHADER_OPENGL: &[u8] = br#"#version 430 core
 layout(std430) readonly buffer GuiMeshVertices { vec4 vertex_words[]; };
@@ -126,6 +128,108 @@ void main() {
         color.rgb *= min(1.0, (light.x + light.y) * 0.6 + 0.4);
     }
     out_color = color;
+}
+"#;
+
+// The title panorama is semantic background imagery, not a copied 3D item.
+// It deliberately shares the bounded mesh stream and Rust-owned image cache
+// with GUI meshes, but must not inherit the item alpha-cutoff or directional
+// lighting policy.  In particular, a cube-face edge with a transparent texel
+// must not punch a hole into the title background.
+const GUI_PANORAMA_VERTEX_SHADER_OPENGL: &[u8] = br#"#version 430 core
+layout(std430) readonly buffer GuiMeshVertices { vec4 vertex_words[]; };
+layout(std140) uniform GuiMeshFrame { vec4 raster_extent; vec4 light0; vec4 light1; };
+out vec3 v_ray;
+void main() {
+    int base = gl_VertexID * 3;
+    vec4 position_u = vertex_words[base];
+    vec4 uv_color_rg = vertex_words[base + 1];
+    float top_left_y = 1.0 - (position_u.y / raster_extent.y) * 2.0;
+    gl_Position = vec4((position_u.x / raster_extent.x) * 2.0 - 1.0, top_left_y, 0.0, 1.0);
+    v_ray = vec3(position_u.z, position_u.w, uv_color_rg.x);
+}
+"#;
+
+const GUI_PANORAMA_VERTEX_SHADER_VULKAN: &[u8] = br#"#version 450
+layout(set = 0, binding = 0, std430) readonly buffer GuiMeshVertices { vec4 vertex_words[]; };
+layout(set = 0, binding = 1, std140) uniform GuiMeshFrame { vec4 raster_extent; vec4 light0; vec4 light1; };
+layout(location = 0) out vec3 v_ray;
+void main() {
+    int base = gl_VertexIndex * 3;
+    vec4 position_u = vertex_words[base];
+    vec4 uv_color_rg = vertex_words[base + 1];
+    float top_left_y = 1.0 - (position_u.y / raster_extent.y) * 2.0;
+    gl_Position = vec4((position_u.x / raster_extent.x) * 2.0 - 1.0, top_left_y, 0.5, 1.0);
+    v_ray = vec3(position_u.z, position_u.w, uv_color_rg.x);
+}
+"#;
+
+const GUI_PANORAMA_FRAGMENT_SHADER_OPENGL: &[u8] = br#"#version 430 core
+uniform sampler2D Sampler0;
+in vec3 v_ray;
+out vec4 out_color;
+void main() {
+    vec3 ray = normalize(v_ray);
+    vec3 axis = abs(ray);
+    float face;
+    float u;
+    float v;
+    if (axis.x >= axis.y && axis.x >= axis.z) {
+        float scale = 0.5 / axis.x;
+        face = ray.x > 0.0 ? 0.0 : 1.0;
+        u = (ray.x > 0.0 ? -ray.z : ray.z) * scale + 0.5;
+        v = -ray.y * scale + 0.5;
+    } else if (axis.y >= axis.z) {
+        float scale = 0.5 / axis.y;
+        face = ray.y > 0.0 ? 2.0 : 3.0;
+        u = ray.x * scale + 0.5;
+        v = (ray.y > 0.0 ? ray.z : -ray.z) * scale + 0.5;
+    } else {
+        float scale = 0.5 / axis.z;
+        face = ray.z > 0.0 ? 4.0 : 5.0;
+        u = (ray.z > 0.0 ? ray.x : -ray.x) * scale + 0.5;
+        v = -ray.y * scale + 0.5;
+    }
+    ivec2 size = textureSize(Sampler0, 0);
+    float face_texel_y = 3.0 / float(size.y);
+    vec2 atlas_uv = vec2(clamp(u, 0.5 / float(size.x), 1.0 - 0.5 / float(size.x)),
+        (face + clamp(v, face_texel_y, 1.0 - face_texel_y)) / 6.0);
+    out_color = texture(Sampler0, atlas_uv);
+}
+"#;
+
+const GUI_PANORAMA_FRAGMENT_SHADER_VULKAN: &[u8] = br#"#version 450
+layout(set = 0, binding = 2) uniform texture2D GuiMeshTexture;
+layout(set = 0, binding = 3) uniform sampler GuiMeshSampler;
+layout(location = 0) in vec3 v_ray;
+layout(location = 0) out vec4 out_color;
+void main() {
+    vec3 ray = normalize(v_ray);
+    vec3 axis = abs(ray);
+    float face;
+    float u;
+    float v;
+    if (axis.x >= axis.y && axis.x >= axis.z) {
+        float scale = 0.5 / axis.x;
+        face = ray.x > 0.0 ? 0.0 : 1.0;
+        u = (ray.x > 0.0 ? -ray.z : ray.z) * scale + 0.5;
+        v = -ray.y * scale + 0.5;
+    } else if (axis.y >= axis.z) {
+        float scale = 0.5 / axis.y;
+        face = ray.y > 0.0 ? 2.0 : 3.0;
+        u = ray.x * scale + 0.5;
+        v = (ray.y > 0.0 ? ray.z : -ray.z) * scale + 0.5;
+    } else {
+        float scale = 0.5 / axis.z;
+        face = ray.z > 0.0 ? 4.0 : 5.0;
+        u = (ray.z > 0.0 ? ray.x : -ray.x) * scale + 0.5;
+        v = -ray.y * scale + 0.5;
+    }
+    ivec2 size = textureSize(sampler2D(GuiMeshTexture, GuiMeshSampler), 0);
+    float face_texel_y = 3.0 / float(size.y);
+    vec2 atlas_uv = vec2(clamp(u, 0.5 / float(size.x), 1.0 - 0.5 / float(size.x)),
+        (face + clamp(v, face_texel_y, 1.0 - face_texel_y)) / 6.0);
+    out_color = texture(sampler2D(GuiMeshTexture, GuiMeshSampler), atlas_uv);
 }
 "#;
 
@@ -229,12 +333,66 @@ void main() {
 
 #[cfg(test)]
 pub(crate) fn vulkan_shader_sources_for_backend_test() -> (&'static str, &'static str) {
+    vulkan_shader_sources_for_material(GuiMeshMaterialMode::Opaque)
+}
+
+#[cfg(test)]
+fn vulkan_shader_sources_for_material(
+    material_mode: GuiMeshMaterialMode,
+) -> (&'static str, &'static str) {
+    let (vertex, fragment) = gui_mesh_shader_sources(BackendApi::Vulkan, material_mode);
     (
-        std::str::from_utf8(GUI_MESH_VERTEX_SHADER_VULKAN)
-            .expect("GUI mesh Vulkan vertex source is UTF-8"),
-        std::str::from_utf8(GUI_MESH_FRAGMENT_SHADER_VULKAN)
-            .expect("GUI mesh Vulkan fragment source is UTF-8"),
+        std::str::from_utf8(vertex).expect("GUI mesh Vulkan vertex source is UTF-8"),
+        std::str::from_utf8(fragment).expect("GUI mesh Vulkan fragment source is UTF-8"),
     )
+}
+
+#[cfg(test)]
+pub(crate) fn vulkan_panorama_shader_sources_for_backend_test() -> (&'static str, &'static str) {
+    vulkan_shader_sources_for_material(GuiMeshMaterialMode::Panorama)
+}
+
+#[cfg(test)]
+pub(crate) fn opengl_panorama_shader_sources_for_backend_test() -> (&'static str, &'static str) {
+    let (vertex, fragment) =
+        gui_mesh_shader_sources(BackendApi::OpenGl, GuiMeshMaterialMode::Panorama);
+    (
+        std::str::from_utf8(vertex).expect("GUI panorama OpenGL vertex source is UTF-8"),
+        std::str::from_utf8(fragment).expect("GUI panorama OpenGL fragment source is UTF-8"),
+    )
+}
+
+fn gui_mesh_shader_sources(
+    api: BackendApi,
+    material_mode: GuiMeshMaterialMode,
+) -> (&'static [u8], &'static [u8]) {
+    let fragment_is_panorama = material_mode == GuiMeshMaterialMode::Panorama;
+    match api {
+        BackendApi::OpenGl => (
+            if fragment_is_panorama {
+                GUI_PANORAMA_VERTEX_SHADER_OPENGL
+            } else {
+                GUI_MESH_VERTEX_SHADER_OPENGL
+            },
+            if fragment_is_panorama {
+                GUI_PANORAMA_FRAGMENT_SHADER_OPENGL
+            } else {
+                GUI_MESH_FRAGMENT_SHADER_OPENGL
+            },
+        ),
+        BackendApi::Vulkan | BackendApi::Mock => (
+            if fragment_is_panorama {
+                GUI_PANORAMA_VERTEX_SHADER_VULKAN
+            } else {
+                GUI_MESH_VERTEX_SHADER_VULKAN
+            },
+            if fragment_is_panorama {
+                GUI_PANORAMA_FRAGMENT_SHADER_VULKAN
+            } else {
+                GUI_MESH_FRAGMENT_SHADER_VULKAN
+            },
+        ),
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -243,6 +401,10 @@ pub enum GuiMeshMaterialMode {
     Cutout,
     Translucent,
     Glint,
+    /// Fullscreen panorama image sampling. This is deliberately separate
+    /// from opaque item geometry: vanilla's panorama pipeline has no culling
+    /// or depth attachment interaction.
+    Panorama,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -375,7 +537,110 @@ pub struct GuiMeshStreamRange {
     pub index_offset: u64,
 }
 
-/// Private Rust-owned pass objects for one GUI mesh material. The texture view
+/// Immutable GUI-mesh GPU program for one explicit raster contract. Texture
+/// bindings and stream buffers remain per asset, so sharing this object never
+/// aliases mutable draw state between semantic callsites.
+#[derive(Clone, Copy, Debug)]
+pub struct GuiMeshSharedProgram {
+    pub vertex_shader: Handle,
+    pub fragment_shader: Handle,
+    pub resource_layout: Handle,
+    pub pipeline_layout: Handle,
+    pub pipeline: Handle,
+}
+
+impl GuiMeshSharedProgram {
+    pub fn create(
+        gal: &mut VulkanicGal,
+        label: &str,
+        color_format: ColorFormat,
+        material_mode: GuiMeshMaterialMode,
+        front_face: super::resources::FrontFace,
+    ) -> GalResult<Self> {
+        let mut created = Vec::new();
+        let result = (|| -> GalResult<Self> {
+            let (vertex_code, fragment_code) =
+                gui_mesh_shader_sources(gal.capabilities().api, material_mode);
+            let vertex_shader = gal.create_shader_module(ShaderModuleDesc {
+                label: format!("{label}.vertex"),
+                stage: ShaderStage::Vertex,
+                code_format: ShaderCodeFormat::Glsl,
+                code: vertex_code.to_vec(),
+                entry_point: "main".to_string(),
+            })?;
+            created.push(vertex_shader);
+            let fragment_shader = gal.create_shader_module(ShaderModuleDesc {
+                label: format!("{label}.fragment"),
+                stage: ShaderStage::Fragment,
+                code_format: ShaderCodeFormat::Glsl,
+                code: fragment_code.to_vec(),
+                entry_point: "main".to_string(),
+            })?;
+            created.push(fragment_shader);
+            let resource_layout = gal.create_resource_layout(ResourceLayoutDesc {
+                label: format!("{label}.layout"),
+                bindings: vec![
+                    resource_binding_desc(0, ResourceBindingKind::StorageBuffer),
+                    resource_binding_desc(1, ResourceBindingKind::UniformBuffer),
+                    resource_binding_desc(2, ResourceBindingKind::SampledTexture),
+                    resource_binding_desc(3, ResourceBindingKind::Sampler),
+                ],
+            })?;
+            created.push(resource_layout);
+            let pipeline_layout = gal.create_pipeline_layout(PipelineLayoutDesc {
+                label: format!("{label}.pipeline-layout"),
+                resource_layouts: vec![resource_layout],
+            })?;
+            created.push(pipeline_layout);
+            let (cull_mode, blend, depth_compare, depth_write) =
+                gui_mesh_raster_state(material_mode);
+            let pipeline = gal.create_graphics_pipeline(GraphicsPipelineDesc {
+                label: format!("{label}.pipeline"),
+                layout: pipeline_layout,
+                vertex_shader,
+                fragment_shader,
+                topology: PrimitiveTopology::Triangles,
+                cull_mode,
+                front_face,
+                blend,
+                depth_compare,
+                depth_write,
+                depth_bias: None,
+                color_formats: vec![color_format],
+                depth_format: Some(TextureFormat::Depth32Float),
+                stencil: None,
+            })?;
+            created.push(pipeline);
+            Ok(Self {
+                vertex_shader,
+                fragment_shader,
+                resource_layout,
+                pipeline_layout,
+                pipeline,
+            })
+        })();
+        if result.is_err() {
+            for handle in created.into_iter().rev() {
+                let _ = gal.destroy(handle);
+            }
+        }
+        result
+    }
+
+    pub fn destroy(self, gal: &mut VulkanicGal) {
+        for handle in [
+            self.pipeline,
+            self.pipeline_layout,
+            self.resource_layout,
+            self.fragment_shader,
+            self.vertex_shader,
+        ] {
+            let _ = gal.destroy(handle);
+        }
+    }
+}
+
+/// Private Rust-owned pass objects for one GUI mesh asset. The texture view
 /// and sampler come from the Rust GUI asset cache; Java never observes these
 /// handles and no backend resource crosses FFI.
 #[derive(Clone, Copy, Debug)]
@@ -389,6 +654,7 @@ pub struct GuiMeshPassResources {
     pub resource_set: Handle,
     pub pipeline_layout: Handle,
     pub pipeline: Handle,
+    owned_program: Option<GuiMeshSharedProgram>,
 }
 
 impl GuiMeshPassResources {
@@ -400,6 +666,29 @@ impl GuiMeshPassResources {
         sampler: Handle,
         material_mode: GuiMeshMaterialMode,
         front_face: super::resources::FrontFace,
+    ) -> GalResult<Self> {
+        let program =
+            GuiMeshSharedProgram::create(gal, label, color_format, material_mode, front_face)?;
+        match Self::create_with_shared_program(gal, label, texture_view, sampler, program) {
+            Ok(mut resources) => {
+                resources.owned_program = Some(program);
+                Ok(resources)
+            }
+            Err(error) => {
+                program.destroy(gal);
+                Err(error)
+            }
+        }
+    }
+
+    /// Creates mutable asset resources which borrow an immutable program owned
+    /// by the caller. The caller must destroy assets before that program.
+    pub fn create_with_shared_program(
+        gal: &mut VulkanicGal,
+        label: &str,
+        texture_view: Handle,
+        sampler: Handle,
+        program: GuiMeshSharedProgram,
     ) -> GalResult<Self> {
         let mut created = Vec::new();
         let result = (|| -> GalResult<Self> {
@@ -436,45 +725,9 @@ impl GuiMeshPassResources {
                 ],
             })?;
             created.push(uniform_buffer);
-            let (vertex_code, fragment_code) = match gal.capabilities().api {
-                BackendApi::OpenGl => (
-                    GUI_MESH_VERTEX_SHADER_OPENGL,
-                    GUI_MESH_FRAGMENT_SHADER_OPENGL,
-                ),
-                BackendApi::Vulkan | BackendApi::Mock => (
-                    GUI_MESH_VERTEX_SHADER_VULKAN,
-                    GUI_MESH_FRAGMENT_SHADER_VULKAN,
-                ),
-            };
-            let vertex_shader = gal.create_shader_module(ShaderModuleDesc {
-                label: format!("{label}.vertex"),
-                stage: ShaderStage::Vertex,
-                code_format: ShaderCodeFormat::Glsl,
-                code: vertex_code.to_vec(),
-                entry_point: "main".to_string(),
-            })?;
-            created.push(vertex_shader);
-            let fragment_shader = gal.create_shader_module(ShaderModuleDesc {
-                label: format!("{label}.fragment"),
-                stage: ShaderStage::Fragment,
-                code_format: ShaderCodeFormat::Glsl,
-                code: fragment_code.to_vec(),
-                entry_point: "main".to_string(),
-            })?;
-            created.push(fragment_shader);
-            let resource_layout = gal.create_resource_layout(ResourceLayoutDesc {
-                label: format!("{label}.layout"),
-                bindings: vec![
-                    resource_binding_desc(0, ResourceBindingKind::StorageBuffer),
-                    resource_binding_desc(1, ResourceBindingKind::UniformBuffer),
-                    resource_binding_desc(2, ResourceBindingKind::SampledTexture),
-                    resource_binding_desc(3, ResourceBindingKind::Sampler),
-                ],
-            })?;
-            created.push(resource_layout);
             let resource_set = gal.create_resource_set(ResourceSetDesc {
                 label: format!("{label}.set"),
-                layout: resource_layout,
+                layout: program.resource_layout,
                 bindings: vec![
                     read_binding(0, vertex_buffer, ResourceBindingKind::StorageBuffer),
                     read_binding(1, uniform_buffer, ResourceBindingKind::UniformBuffer),
@@ -483,39 +736,17 @@ impl GuiMeshPassResources {
                 ],
             })?;
             created.push(resource_set);
-            let pipeline_layout = gal.create_pipeline_layout(PipelineLayoutDesc {
-                label: format!("{label}.pipeline-layout"),
-                resource_layouts: vec![resource_layout],
-            })?;
-            created.push(pipeline_layout);
-            let (cull_mode, blend, depth_compare, depth_write) = gui_mesh_raster_state(material_mode);
-            let pipeline = gal.create_graphics_pipeline(GraphicsPipelineDesc {
-                label: format!("{label}.pipeline"),
-                layout: pipeline_layout,
-                vertex_shader,
-                fragment_shader,
-                topology: PrimitiveTopology::Triangles,
-                cull_mode,
-                front_face,
-                blend,
-                depth_compare: Some(depth_compare),
-                depth_write,
-                depth_bias: None,
-                color_formats: vec![color_format],
-                depth_format: Some(TextureFormat::Depth32Float),
-            stencil: None,
-            })?;
-            created.push(pipeline);
             Ok(Self {
                 vertex_buffer,
                 index_buffer,
                 uniform_buffer,
-                vertex_shader,
-                fragment_shader,
-                resource_layout,
+                vertex_shader: program.vertex_shader,
+                fragment_shader: program.fragment_shader,
+                resource_layout: program.resource_layout,
                 resource_set,
-                pipeline_layout,
-                pipeline,
+                pipeline_layout: program.pipeline_layout,
+                pipeline: program.pipeline,
+                owned_program: None,
             })
         })();
         if result.is_err() {
@@ -566,25 +797,25 @@ impl GuiMeshPassResources {
                 "GUI mesh draw offscreen extent does not match its Rust-owned target",
             ));
         }
-		// The raster target is sampled by the preceding item's composite pass.
-		// Only the first layer transitions it back to attachment-write ownership;
-		// consecutive layers remain in COLOR_ATTACHMENT_OPTIMAL until the single
-		// composite pass below. A newly staged target is still UNDEFINED, while a
-		// cached target was left in SHADER_READ_ONLY by that prior composite.
-		if clear {
-			operations.push(CommandOp::Barrier(ResourceBarrier {
-				resource: target.color,
-				subresources: None,
-				before: if target.initialized {
-					TextureUsageState::ShaderRead
-				} else {
-					TextureUsageState::Undefined
-				},
-				after: TextureUsageState::ColorAttachment,
-				src_queue: QueueClass::Graphics,
-				dst_queue: QueueClass::Graphics,
-			}));
-		}
+        // The raster target is sampled by the preceding item's composite pass.
+        // Only the first layer transitions it back to attachment-write ownership;
+        // consecutive layers remain in COLOR_ATTACHMENT_OPTIMAL until the single
+        // composite pass below. A newly staged target is still UNDEFINED, while a
+        // cached target was left in SHADER_READ_ONLY by that prior composite.
+        if clear {
+            operations.push(CommandOp::Barrier(ResourceBarrier {
+                resource: target.color,
+                subresources: None,
+                before: if target.initialized {
+                    TextureUsageState::ShaderRead
+                } else {
+                    TextureUsageState::Undefined
+                },
+                after: TextureUsageState::ColorAttachment,
+                src_queue: QueueClass::Graphics,
+                dst_queue: QueueClass::Graphics,
+            }));
+        }
         if stream.vertex_offset % GUI_MESH_GPU_VERTEX_BYTES as u64 != 0
             || stream.index_offset % std::mem::size_of::<u32>() as u64 != 0
         {
@@ -722,19 +953,21 @@ impl GuiMeshPassResources {
         Ok(())
     }
 
-    pub fn destroy(self, gal: &mut VulkanicGal) {
+    pub fn destroy_asset_resources(self, gal: &mut VulkanicGal) {
         for handle in [
-            self.pipeline,
-            self.pipeline_layout,
             self.resource_set,
-            self.resource_layout,
-            self.fragment_shader,
-            self.vertex_shader,
             self.uniform_buffer,
             self.index_buffer,
             self.vertex_buffer,
         ] {
             let _ = gal.destroy(handle);
+        }
+    }
+
+    pub fn destroy(self, gal: &mut VulkanicGal) {
+        self.destroy_asset_resources(gal);
+        if let Some(program) = self.owned_program {
+            program.destroy(gal);
         }
     }
 }
@@ -747,15 +980,29 @@ impl GuiMeshPassResources {
 /// render type ordering inside the private PIP target.
 /// Keeping this policy here prevents a GUI texture-group blend policy from
 /// silently changing copied item-model geometry.
-fn gui_mesh_raster_state(material_mode: GuiMeshMaterialMode) -> (CullMode, BlendMode, CompareOp, bool) {
+fn gui_mesh_raster_state(
+    material_mode: GuiMeshMaterialMode,
+) -> (CullMode, BlendMode, Option<CompareOp>, bool) {
     match material_mode {
-        GuiMeshMaterialMode::Opaque | GuiMeshMaterialMode::Cutout => {
-            (CullMode::Back, BlendMode::Disabled, CompareOp::LessOrEqual, true)
-        }
-        GuiMeshMaterialMode::Translucent => {
-            (CullMode::Back, BlendMode::Alpha, CompareOp::LessOrEqual, true)
-        }
-        GuiMeshMaterialMode::Glint => (CullMode::None, BlendMode::Glint, CompareOp::Equal, false),
+        GuiMeshMaterialMode::Panorama => (CullMode::None, BlendMode::Disabled, None, false),
+        GuiMeshMaterialMode::Opaque | GuiMeshMaterialMode::Cutout => (
+            CullMode::Back,
+            BlendMode::Disabled,
+            Some(CompareOp::LessOrEqual),
+            true,
+        ),
+        GuiMeshMaterialMode::Translucent => (
+            CullMode::Back,
+            BlendMode::Alpha,
+            Some(CompareOp::LessOrEqual),
+            true,
+        ),
+        GuiMeshMaterialMode::Glint => (
+            CullMode::None,
+            BlendMode::Glint,
+            Some(CompareOp::Equal),
+            false,
+        ),
     }
 }
 
@@ -1246,10 +1493,26 @@ fn composite_uniform_bytes(draw: &GuiMeshPreparedDraw) -> Vec<u8> {
         guard / height,
         (width - guard * 2.0) / width,
         (height - guard * 2.0) / height,
-        if draw.clip_mode == 1 { draw.clip_left as f32 } else { 0.0 },
-        if draw.clip_mode == 1 { draw.clip_top as f32 } else { 0.0 },
-        if draw.clip_mode == 1 { (draw.clip_left + draw.clip_width) as f32 } else { draw.gui_extent[0] as f32 },
-        if draw.clip_mode == 1 { (draw.clip_top + draw.clip_height) as f32 } else { draw.gui_extent[1] as f32 },
+        if draw.clip_mode == 1 {
+            draw.clip_left as f32
+        } else {
+            0.0
+        },
+        if draw.clip_mode == 1 {
+            draw.clip_top as f32
+        } else {
+            0.0
+        },
+        if draw.clip_mode == 1 {
+            (draw.clip_left + draw.clip_width) as f32
+        } else {
+            draw.gui_extent[0] as f32
+        },
+        if draw.clip_mode == 1 {
+            (draw.clip_top + draw.clip_height) as f32
+        } else {
+            draw.gui_extent[1] as f32
+        },
     ] {
         bytes.extend_from_slice(&value.to_le_bytes());
     }
@@ -1284,7 +1547,6 @@ pub struct GuiMeshOffscreenTargetCache {
 }
 
 const GUI_MESH_MAX_OFFSCREEN_TARGETS_PER_GENERATION: usize = 64;
-
 impl GuiMeshOffscreenTargetCache {
     pub(crate) fn len(&self) -> usize {
         self.targets.len()
@@ -1314,7 +1576,8 @@ impl GuiMeshOffscreenTargetCache {
                 "GUI mesh offscreen target requires a non-zero generation and D2 extent",
             ));
         }
-        if extent.width > GUI_MESH_MAX_OFFSCREEN_AXIS || extent.height > GUI_MESH_MAX_OFFSCREEN_AXIS {
+        if extent.width > GUI_MESH_MAX_OFFSCREEN_AXIS || extent.height > GUI_MESH_MAX_OFFSCREEN_AXIS
+        {
             return Err(GalError::unsupported_feature(format!(
                 "GUI mesh offscreen extent {}x{} exceeds bounded axis {}",
                 extent.width, extent.height, GUI_MESH_MAX_OFFSCREEN_AXIS
@@ -1603,7 +1866,10 @@ pub fn validate_batch(batch: &GuiMeshBatchRequest) -> GalResult<()> {
         ));
     }
     match batch.clip_mode {
-        0 if batch.clip_left == 0 && batch.clip_top == 0 && batch.clip_width == 0 && batch.clip_height == 0 => {}
+        0 if batch.clip_left == 0
+            && batch.clip_top == 0
+            && batch.clip_width == 0
+            && batch.clip_height == 0 => {}
         1 if batch.clip_left >= 0
             && batch.clip_top >= 0
             && batch.clip_width >= 0
@@ -1612,7 +1878,12 @@ pub fn validate_batch(batch: &GuiMeshBatchRequest) -> GalResult<()> {
             && batch.clip_top <= batch.gui_extent[1] as i32
             && batch.clip_width <= batch.gui_extent[0] as i32 - batch.clip_left
             && batch.clip_height <= batch.gui_extent[1] as i32 - batch.clip_top => {}
-        _ => return Err(GalError::ffi(StatusCode::InvalidArgument, "GUI mesh clip must be disabled or a bounded frame-local rectangle")),
+        _ => {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                "GUI mesh clip must be disabled or a bounded frame-local rectangle",
+            ))
+        }
     }
     for vertex in &batch.vertices {
         if !vertex.position.iter().all(|value| value.is_finite())
@@ -1952,7 +2223,15 @@ mod tests {
         let mut cache = GuiMeshOffscreenTargetCache::default();
         for width in 1..=GUI_MESH_MAX_OFFSCREEN_TARGETS_PER_GENERATION as u32 {
             cache
-                .stage(&mut gal, 7, Extent3d { width, height: 1, depth: 1 })
+                .stage(
+                    &mut gal,
+                    7,
+                    Extent3d {
+                        width,
+                        height: 1,
+                        depth: 1,
+                    },
+                )
                 .expect("bounded GUI mesh target variant");
         }
         let rejected = cache.stage(
@@ -2128,20 +2407,73 @@ mod tests {
     }
 
     #[test]
+    fn vulkan_gui_mesh_fragment_samples_the_owned_image() {
+        let source = std::str::from_utf8(GUI_MESH_FRAGMENT_SHADER_VULKAN)
+            .expect("GUI mesh Vulkan fragment source is UTF-8");
+        assert!(
+            source.contains("texture(sampler2D(GuiMeshTexture, GuiMeshSampler), v_uv) * v_color"),
+            "the Vulkan GUI mesh fragment must sample the Rust-owned image rather than a diagnostic constant"
+        );
+        assert!(!source.contains("vec4(1.0, 0.0, 1.0, 1.0)"));
+    }
+
+    #[test]
+    fn panorama_uses_an_unlit_rust_owned_material_program() {
+        for api in [BackendApi::OpenGl, BackendApi::Vulkan] {
+            let (_, panorama) = gui_mesh_shader_sources(api, GuiMeshMaterialMode::Panorama);
+            let source = std::str::from_utf8(panorama).expect("panorama shader source is UTF-8");
+            assert!(
+                source.contains("texture("),
+                "the semantic panorama must sample its Rust-owned copied cube-face image"
+            );
+            assert!(
+                !source.contains("discard") && !source.contains("normalize(v_normal)"),
+                "the panorama must not inherit 3D item cutout or directional-lighting behavior"
+            );
+
+            let (_, item) = gui_mesh_shader_sources(api, GuiMeshMaterialMode::Opaque);
+            assert_ne!(
+                panorama, item,
+                "Panorama must select a distinct material program rather than the generic item shader"
+            );
+        }
+    }
+
+    #[test]
     fn standard_3d_item_raster_policy_matches_vanilla_material_modes() {
         for material_mode in [GuiMeshMaterialMode::Opaque, GuiMeshMaterialMode::Cutout] {
             assert_eq!(
                 gui_mesh_raster_state(material_mode),
-                (CullMode::Back, BlendMode::Disabled, CompareOp::LessOrEqual, true),
+                (
+                    CullMode::Back,
+                    BlendMode::Disabled,
+                    Some(CompareOp::LessOrEqual),
+                    true
+                ),
             );
         }
         assert_eq!(
             gui_mesh_raster_state(GuiMeshMaterialMode::Translucent),
-            (CullMode::Back, BlendMode::Alpha, CompareOp::LessOrEqual, true),
+            (
+                CullMode::Back,
+                BlendMode::Alpha,
+                Some(CompareOp::LessOrEqual),
+                true
+            ),
         );
         assert_eq!(
             gui_mesh_raster_state(GuiMeshMaterialMode::Glint),
-            (CullMode::None, BlendMode::Glint, CompareOp::Equal, false),
+            (
+                CullMode::None,
+                BlendMode::Glint,
+                Some(CompareOp::Equal),
+                false
+            ),
+        );
+        assert_eq!(
+            gui_mesh_raster_state(GuiMeshMaterialMode::Panorama),
+            (CullMode::None, BlendMode::Disabled, None, false),
+            "Frozen's panorama pipeline explicitly disables culling and depth testing",
         );
     }
 

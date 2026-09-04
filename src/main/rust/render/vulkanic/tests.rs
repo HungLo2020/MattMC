@@ -576,7 +576,8 @@ fn frame_lifecycle_rejects_present_without_acquire() {
 #[test]
 fn frame_lifecycle_cancel_releases_an_acquired_frame() {
     let mut gal = gal_with_capabilities(presentation_capabilities());
-    gal.configure_frame_surface(frame_surface("cancel")).unwrap();
+    gal.configure_frame_surface(frame_surface("cancel"))
+        .unwrap();
     let acquired = gal
         .acquire_frame(FrameAcquireDesc {
             correlation_id: FrameCorrelationId(8),
@@ -735,14 +736,20 @@ fn frame_target_descriptor_exposes_only_semantic_swapchain_identity() {
         .frame_target_owned_depth_attachment(frame_target)
         .unwrap();
     assert_ne!(depth_texture, depth_view);
-    assert!(gal.pass_target_depth_attachment(frame_target).unwrap().is_none());
+    assert!(gal
+        .pass_target_depth_attachment(frame_target)
+        .unwrap()
+        .is_none());
     gal.begin_frame_target_depth_write(frame_target).unwrap();
     assert_eq!(
         Some((depth_texture, depth_view)),
         gal.pass_target_depth_attachment(frame_target).unwrap()
     );
     gal.rollback_frame_target_depth_write(frame_target);
-    assert!(gal.pass_target_depth_attachment(frame_target).unwrap().is_none());
+    assert!(gal
+        .pass_target_depth_attachment(frame_target)
+        .unwrap()
+        .is_none());
     gal.begin_frame_target_depth_write(frame_target).unwrap();
     gal.commit_frame_target_depth_write(frame_target).unwrap();
     assert_eq!(
@@ -754,7 +761,10 @@ fn frame_target_descriptor_exposes_only_semantic_swapchain_identity() {
         gal.frame_target_desc(frame_target),
         super::StatusCode::StaleHandle,
     );
-    assert_code(gal.frame_target_owned_depth_attachment(frame_target), super::StatusCode::StaleHandle);
+    assert_code(
+        gal.frame_target_owned_depth_attachment(frame_target),
+        super::StatusCode::StaleHandle,
+    );
 }
 
 #[test]
@@ -860,7 +870,11 @@ fn texture_to_frame_target_copy_requires_explicit_owned_source_and_matching_exte
     let acquired = gal
         .acquire_frame(FrameAcquireDesc {
             correlation_id: FrameCorrelationId(104),
-            expected_extent: Extent3d { width: 128, height: 72, depth: 1 },
+            expected_extent: Extent3d {
+                width: 128,
+                height: 72,
+                depth: 1,
+            },
         })
         .unwrap();
     let frame_target = gal
@@ -893,7 +907,11 @@ fn texture_to_frame_target_copy_requires_explicit_owned_source_and_matching_exte
             CommandOp::CopyTextureToFrameTarget {
                 src: source,
                 dst: frame_target,
-                extent: Extent3d { width: 128, height: 72, depth: 1 },
+                extent: Extent3d {
+                    width: 128,
+                    height: 72,
+                    depth: 1,
+                },
             },
         ],
     })
@@ -911,7 +929,11 @@ fn texture_to_frame_target_copy_requires_explicit_owned_source_and_matching_exte
             operations: vec![CommandOp::CopyTextureToFrameTarget {
                 src: invalid_source,
                 dst: frame_target,
-                extent: Extent3d { width: 64, height: 36, depth: 1 },
+                extent: Extent3d {
+                    width: 64,
+                    height: 36,
+                    depth: 1,
+                },
             }],
         }),
         super::StatusCode::InvalidArgument,
@@ -3040,6 +3062,49 @@ fn indirect_host_and_malformed_ranges_are_validated_semantically() {
         .unwrap();
     assert_code(
         gal.create_command_list(CommandListDesc {
+            label: "host-write-inside-render-pass".to_owned(),
+            operations: vec![
+                CommandOp::BeginPass {
+                    pass,
+                    target,
+                    colors: vec![color_attachment(color_view)],
+                    depth_stencil: None,
+                },
+                CommandOp::HostWriteBuffer {
+                    buffer: upload,
+                    offset: 0,
+                    data: vec![0; 16],
+                },
+                CommandOp::EndPass,
+            ],
+        }),
+        super::StatusCode::InvalidArgument,
+    );
+    assert_code(
+        gal.create_command_list(CommandListDesc {
+            label: "barrier-inside-render-pass".to_owned(),
+            operations: vec![
+                CommandOp::BeginPass {
+                    pass,
+                    target,
+                    colors: vec![color_attachment(color_view)],
+                    depth_stencil: None,
+                },
+                CommandOp::Barrier(ResourceBarrier {
+                    resource: upload,
+                    subresources: None,
+                    before: TextureUsageState::TransferDst,
+                    after: TextureUsageState::ShaderRead,
+                    src_queue: QueueClass::Graphics,
+                    dst_queue: QueueClass::Graphics,
+                }),
+                CommandOp::EndPass,
+            ],
+        }),
+        super::StatusCode::InvalidArgument,
+    );
+    assert_code(
+        gal.create_command_list(CommandListDesc {
             label: "host-write-overflow".to_owned(),
             operations: vec![CommandOp::HostWriteBuffer {
                 buffer: upload,
@@ -4144,7 +4209,9 @@ fn frozen_ffi_abi_sizes_and_capability_negotiation_are_stable() {
     assert_eq!(FFI_ABI_V23_VERSION, 23);
     assert_eq!(FFI_ABI_V24_VERSION, 24);
     assert_eq!(FFI_ABI_V25_VERSION, 25);
-    assert_eq!(FFI_ABI_VERSION, FFI_ABI_V25_VERSION);
+    assert_eq!(FFI_ABI_V26_VERSION, 26);
+    assert_eq!(FFI_ABI_V27_VERSION, 27);
+    assert_eq!(FFI_ABI_VERSION, FFI_ABI_V27_VERSION);
     assert!(!FFI_INITIAL_PRESENTATION_SUPPORTED);
     assert_eq!(size_of::<FfiHeader>(), 8);
     assert_eq!(size_of::<FfiHandle>(), 8);

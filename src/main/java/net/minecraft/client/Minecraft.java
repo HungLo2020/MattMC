@@ -1416,9 +1416,11 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 				net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("command.recording.clear");
 				profilerFiller.push("gameRenderer");
 				startTime = Util.getNanos();
+				boolean holdExternalFrame = false;
 				if (!this.noRender) {
 					net.minecraft.client.dev.DeterministicCameraCapture.beforeRender(this);
-					if (!net.minecraft.client.dev.DeterministicCameraCapture.holdPresentedFrameForExternalScreenshot(this)) {
+					holdExternalFrame = net.minecraft.client.dev.DeterministicCameraCapture.holdPresentedFrameForExternalScreenshot(this);
+					if (!holdExternalFrame) {
 						net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.rendering");
 						this.gameRenderer.render(this.deltaTracker, bl);
 						net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.rendering");
@@ -1428,7 +1430,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 				net.minecraft.util.profiling.custom.ProfilerManager.recordRenderThreadOperation("frame.gameRenderer", Util.getNanos() - startTime);
 
 				profilerFiller.popPush("blit");
-				if (!this.window.isMinimized()) {
+				if (!holdExternalFrame && !this.window.isMinimized()) {
 					net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("api.present.blit");
 					renderTarget.blitToScreen();
 					net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("api.present.blit");

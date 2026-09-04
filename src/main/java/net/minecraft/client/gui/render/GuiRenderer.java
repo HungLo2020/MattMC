@@ -500,6 +500,7 @@ public class GuiRenderer implements AutoCloseable {
 		int guiHeight = Minecraft.getInstance().getWindow().getGuiScaledHeight();
 		this.renderState.forEachElement(guiElementRenderState -> {
 			if (guiElementRenderState instanceof BlitRenderState blit) {
+				boolean vignette = blit.pipeline() == RenderPipelines.VIGNETTE;
 				int dynamicLayerOrder = this.renderState.currentSemanticLayerOrder(GuiRenderState.SemanticPhase.ELEMENTS);
 				List<RustGalGuiElementRenderState> elements = RustGalGuiRenderer.tryEnqueueCopiedBlit(
 					blit, guiWidth, guiHeight, dynamicLayerOrder

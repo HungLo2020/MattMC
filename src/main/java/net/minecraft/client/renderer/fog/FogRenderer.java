@@ -216,7 +216,7 @@ public class FogRenderer implements AutoCloseable, FogStorage {
 			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
 			throw new IllegalStateException("Java fog UBO rendering is unavailable on selected Vulkan");
 		}
-		FogComputation fog = this.computeFogParameters(camera, i, bl, deltaTracker, f, clientLevel, true);
+		FogComputation fog = this.computeFogParameters(camera, i, bl, deltaTracker, f, clientLevel, true, true);
 		FogParameters fogParameters = fog.parameters();
 		Vector4f vector4f = new Vector4f(
 			fogParameters.red(), fogParameters.green(), fogParameters.blue(), fogParameters.alpha()
@@ -270,11 +270,44 @@ public class FogRenderer implements AutoCloseable, FogStorage {
 	 * gameplay semantic after camera setup and before it builds its frame.
 	 */
 	public FogParameters collectFogParameters(Camera camera, int i, boolean bl, DeltaTracker deltaTracker, float f, ClientLevel clientLevel) {
-		return this.computeFogParameters(camera, i, bl, deltaTracker, f, clientLevel, false).parameters();
+		return this.computeFogParameters(camera, i, bl, deltaTracker, f, clientLevel, false, true).parameters();
 	}
 
+	/**
+	 * Collects the vanilla gameplay fog record for the Rust-owned whole-frame
+	 * route.  The Rust source graph has no Java/DH renderer to cancel fog on its
+	 * behalf, so the copied semantic record must retain the actual vanilla fog
+	 * range rather than the legacy Iris/DH sentinel range.  This method does not
+	 * change the normal Java fog path or its cached Iris state.
+	 */
+	public RustFogParameters collectFogParametersForRust(Camera camera, int i, boolean bl, DeltaTracker deltaTracker, float f, ClientLevel clientLevel) {
+		FogComputation computation = this.computeFogParameters(camera, i, bl, deltaTracker, f, clientLevel, false, false);
+		FogParameters parameters = computation.parameters();
+		if (TRACE_FOG_STATE) {
+			LOGGER.info(
+				"FogStateTrace route=rust-semantic fogType={} color=({},{},{},{}) envStart={} envEnd={} renderStart={} renderEnd={} skyEnd={}",
+				computation.fogType(),
+				parameters.red(),
+				parameters.green(),
+				parameters.blue(),
+				parameters.alpha(),
+				parameters.environmentalStart(),
+				parameters.environmentalEnd(),
+				parameters.renderStart(),
+				parameters.renderEnd(),
+				computation.skyEnd()
+			);
+		}
+		return new RustFogParameters(parameters, computation.skyEnd());
+	}
+
+	/** Immutable vanilla fog values extracted for Rust-owned rendering.  This is
+	 * gameplay semantic data, not a GPU uniform slice or Iris state. */
+	public record RustFogParameters(FogParameters parameters, float skyEnd) {}
+
 	private FogComputation computeFogParameters(
-		Camera camera, int i, boolean bl, DeltaTracker deltaTracker, float f, ClientLevel clientLevel, boolean updateLegacyIrisFogState
+		Camera camera, int i, boolean bl, DeltaTracker deltaTracker, float f, ClientLevel clientLevel,
+		boolean updateLegacyIrisFogState, boolean applyDhFogCancellation
 	) {
 		// Iris fog density is a legacy Java renderer side effect. The Rust
 		// whole-frame route needs only the copied gameplay fog record below.
@@ -317,7 +350,7 @@ public class FogRenderer implements AutoCloseable, FogStorage {
 		
 		// DH: Cancel fog if configured
 		DhFogCancelState dhFogCancelState = getDhFogCancelState(camera, entity);
-		if (dhFogCancelState.cancelFog()) {
+		if (applyDhFogCancellation && dhFogCancelState.cancelFog()) {
 			final float A_REALLY_REALLY_BIG_VALUE = 420694206942069.F;
 			final float A_EVEN_LARGER_VALUE = 42069420694206942069.F;
 			

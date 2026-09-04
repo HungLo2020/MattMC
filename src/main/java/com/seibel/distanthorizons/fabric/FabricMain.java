@@ -24,7 +24,12 @@ import com.seibel.distanthorizons.core.logging.DhLogger;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.client.Minecraft;
+import net.vulkanic.VulkanicAPI;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.function.Consumer;
 
 /**
@@ -50,11 +55,45 @@ public class FabricMain extends AbstractModInitializer implements ClientModIniti
 	protected void createInitialClientBindings() { /* no additional setup needed currently */ }
 	
 	
+	/**
+	 * Vanilla Rust Vulkan deliberately excludes Distant Horizons.  Do not merely
+	 * suppress its draw hook after startup: registering the client/integrated
+	 * server proxies would still start DH world-generation and retain its world
+	 * state alongside the vanilla renderer.  A no-op proxy keeps that unrelated
+	 * renderer family unavailable without opening a Java rendering fallback.
+	 */
+	private static boolean vanillaRustVulkanRouteSelected() {
+		// Fabric initializes DH before Options has called VulkanicAPI.initialize.
+		// Read the persisted option directly during that bootstrap window, then
+		// use the settled API state for every later call.
+		if (VulkanicAPI.isVulkanBackendSelected()) {
+			return true;
+		}
+		try {
+			Path options = Minecraft.getInstance().gameDirectory.toPath().resolve("options.txt");
+			try (var lines = Files.lines(options)) {
+				return lines.anyMatch(line -> line.trim().equals("graphics_backend=vulkan"));
+			}
+		} catch (IOException | RuntimeException ignored) {
+			// A missing/unreadable preference is the normal OpenGL default. Do not
+			// infer Vulkan from an incomplete bootstrap state.
+			return false;
+		}
+	}
+
 	@Override
-	protected IEventProxy createClientProxy() { return new FabricClientProxy(); }
+	protected IEventProxy createClientProxy() {
+		return vanillaRustVulkanRouteSelected() ? () -> LOGGER.info(
+			"Distant Horizons client execution is unavailable on the vanilla Rust Vulkan route"
+		) : new FabricClientProxy();
+	}
 	
 	@Override
-	protected IEventProxy createServerProxy(boolean isDedicated) { return new FabricServerProxy(isDedicated); }
+	protected IEventProxy createServerProxy(boolean isDedicated) {
+		return !isDedicated && vanillaRustVulkanRouteSelected() ? () -> LOGGER.info(
+			"Distant Horizons integrated-server execution is unavailable on the vanilla Rust Vulkan route"
+		) : new FabricServerProxy(isDedicated);
+	}
 	
 	@Override
 	protected void initializeModCompat()

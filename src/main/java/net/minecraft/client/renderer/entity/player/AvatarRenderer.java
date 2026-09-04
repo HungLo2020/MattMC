@@ -281,12 +281,20 @@ public class AvatarRenderer<AvatarlikeEntity extends Avatar & ClientAvatarEntity
 		playerModel.rightSleeve.visible = bl;
 		playerModel.leftArm.zRot = -0.1F;
 		playerModel.rightArm.zRot = 0.1F;
-		if (net.vulkanic.world.WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan()) {
-			boolean queuedArm = net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMesh(
+		boolean rustWholeFrame = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
+		if (rustWholeFrame) {
+			if (!net.vulkanic.world.WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan()) {
+				throw new IllegalStateException("Rust whole-frame player-hand route is not admitted; Java hand geometry is not a fallback");
+			}
+			if (!net.vulkanic.world.RustGalWorldPrimitiveRenderer.ensureStandaloneModelTextureAsset(resourceLocation)) {
+				throw new IllegalStateException("Rust whole-frame player-hand route could not publish the copied skin texture");
+			}
+			boolean queuedArm = net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneTranslucentModelMesh(
 				new net.minecraft.client.model.Model.Simple(modelPart, ignored -> RenderType.entityTranslucent(resourceLocation)),
 				net.minecraft.util.Unit.INSTANCE, poseStack.last(), RenderType.entityTranslucent(resourceLocation), resourceLocation,
 				net.minecraft.resources.ResourceLocation.withDefaultNamespace("player_hand"), i, OverlayTexture.NO_OVERLAY, -1, 0);
-			boolean queuedSleeve = !bl || net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMesh(
+			boolean queuedSleeve = !bl || net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneTranslucentModelMesh(
 				new net.minecraft.client.model.Model.Simple(sleevePart, ignored -> RenderType.entityTranslucent(resourceLocation)),
 				net.minecraft.util.Unit.INSTANCE, poseStack.last(), RenderType.entityTranslucent(resourceLocation), resourceLocation,
 				net.minecraft.resources.ResourceLocation.withDefaultNamespace("player_hand_sleeve"), i, OverlayTexture.NO_OVERLAY, -1, 0);

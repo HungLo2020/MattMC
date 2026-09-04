@@ -271,6 +271,15 @@ public class ClientLevel extends Level implements CacheSlot.Cleaner<ClientLevel>
 		this.lightUpdateQueue.add(runnable);
 	}
 
+	/**
+	 * Reports whether client light work is still waiting to be applied on the
+	 * render thread.  This exposes simulation state only; it does not advance
+	 * lighting or create any rendering resources.
+	 */
+	public boolean hasPendingLightUpdates() {
+		return !this.lightUpdateQueue.isEmpty();
+	}
+
 	public void pollLightUpdates() {
 		int i = this.lightUpdateQueue.size();
 		int j = i < 1000 ? Math.max(10, i / 10) : i;
@@ -629,11 +638,19 @@ public class ClientLevel extends Level implements CacheSlot.Cleaner<ClientLevel>
 				Blocks.OAK_LEAVES.defaultBlockState(),
 				Blocks.DEEPSLATE.defaultBlockState(),
 				Blocks.WHITE_WOOL.defaultBlockState()
-			};
-			for (int index = 0; index < 20; index++) {
-				BlockState state = states[index % states.length];
-				double offsetX = (index % 5 - 2.0) * 0.32;
-				double offsetY = (index / 5 - 1.5) * 0.32;
+            };
+            for (int index = 0; index < 20; index++) {
+                BlockState state = states[index % states.length];
+                double offsetX = (index % 5 - 2.0) * 0.32;
+                double offsetY = (index / 5 - 1.5) * 0.32;
+                // Keep one representative of every material in the central
+                // projected window.  The white-wool sample previously landed
+                // at the edge of the crop and produced too few pixels for the
+                // unchanged parity evidence threshold.
+                if (index == 4) {
+                    offsetX = 0.0;
+                    offsetY = 0.0;
+                }
 				this.minecraft.particleEngine.createParticle(new BlockParticleOption(ParticleTypes.BLOCK, state), x + offsetX, y + offsetY, z, 0.0, 0.0, 0.0);
 				this.auditDeterministicTerrainParticleSpawn(scenario, state, x + offsetX, y + offsetY, z);
 			}

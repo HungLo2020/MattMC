@@ -156,14 +156,29 @@ class VulkanicGalBridgeAbiTest {
 	}
 
 	@Test
+	void seededWorldBackgroundUsesVanillaFogClearRatherThanBiomeSkyColor() throws Exception {
+		String source = Files.readString(Path.of("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+		int seedStart = source.indexOf("private static void seedBackgroundFrameLocked");
+		int seedEnd = source.indexOf("private static void auditSemanticInputGap", seedStart);
+		assertTrue(seedStart >= 0 && seedEnd > seedStart, "world-background seed must remain explicit");
+		String seed = source.substring(seedStart, seedEnd);
+		assertTrue(seed.contains("Vector3f fogColor = shaderPackFogColor(level, camera)")
+			&& seed.contains("int fogColorArgb = ARGB.color("),
+			"the seed must copy vanilla fog RGB for LevelRenderer's clear semantics");
+		assertTrue(seed.contains("fogColorArgb,")
+			&& !seed.contains("ARGB.red(skyColor), ARGB.green(skyColor), ARGB.blue(skyColor)"),
+			"biome sky colour belongs to the finite Rust sky-disc uniform, never the background clear");
+	}
+
+	@Test
 	void selectedVulkanPanoramaCannotRegisterOrRenderThroughJavaCubemap() throws Exception {
 		String cubeMap = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/CubeMap.java"));
 		String panorama = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/PanoramaRenderer.java"));
 		assertTrue(cubeMap.contains("VulkanicAPI.isVulkanBackendSelected()"),
 			"selected Vulkan cubemaps must remain semantic resources");
-		assertTrue(cubeMap.contains("RustGalPanoramaRenderer.enqueue")
+		assertTrue(cubeMap.contains("requires PanoramaRenderer to attach its semantic command")
 			&& cubeMap.contains("Java cube-map rendering is not a fallback"),
-			"selected Vulkan direct cubemap rendering must fail closed before Java draws");
+			"selected Vulkan direct cubemap rendering must fail closed before Java draws or detached Rust work can accumulate");
 		assertTrue(panorama.contains("VulkanicAPI.isVulkanBackendSelected()")
 			&& panorama.contains("panorama asset is unavailable"),
 			"selected Vulkan panorama rendering must not fall through to Java");
@@ -890,6 +905,9 @@ class VulkanicGalBridgeAbiTest {
 			assertTrue(body.contains("model instanceof net.minecraft.client.model." + family),
 				"missing direct-texture model family: " + family);
 		}
+		assertTrue(body.contains("object instanceof net.minecraft.client.model.SkullModelBase.State")
+			&& body.contains("block_entity/skull"),
+			"skull direct-texture admission must use SkullModelBase.State, the state actually emitted by SkullBlockRenderer");
 		assertTrue(body.contains("rustWholeFramePresenterActive()"),
 			"direct-texture model admissions must use the shared Rust presenter ownership predicate");
 	}
@@ -1699,6 +1717,8 @@ class VulkanicGalBridgeAbiTest {
 			"entity-fire extraction must preflight bounded submit and material capacity before appending quads");
 		assertTrue(worldRenderer.contains("pendingEntityFlameQuadCount"));
 		assertTrue(worldRenderer.contains("recordWholeFrameEntityFlameExecution"));
+		assertTrue(worldRenderer.contains("currentCaptureCorrelationRenderedFrameIndex(),\n\t\t\t\t\"rust-vulkan-whole-frame\", frameId, submissionId, quads"),
+			"entity-fire execution receipts must retain the capture request identity across asynchronous submission");
 		assertTrue(coordinator.contains("primitiveFrame.entityFlameQuadCount()"));
 		assertTrue(capture.contains("mattmc.dev.rustGalWorldEntityFlame.scenario"));
 		assertTrue(capture.contains("igniteEntityFlameCarrier"));
@@ -1742,6 +1762,8 @@ class VulkanicGalBridgeAbiTest {
 			"entity-leash extraction must preflight bounded submits, quads, and material capacity");
 		assertTrue(worldRenderer.contains("recordWholeFrameEntityShadowExecution"));
 		assertTrue(coordinator.contains("recordWholeFrameEntityShadowExecution("));
+		assertTrue(worldRenderer.contains("currentCaptureCorrelationRenderedFrameIndex(),\n\t\t\t\t\"rust-vulkan-whole-frame\", frameId, submissionId, quads"),
+			"entity-shadow/leash execution receipts must retain the capture request identity");
 		assertFalse(worldRenderer.contains("TextureAtlasSprite entityShadow"));
 		assertFalse(worldRenderer.contains("RenderType.entityShadow"));
 	}
@@ -1867,7 +1889,7 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(coordinator.contains("bridge.updateShaderPackSources("));
 		assertTrue(coordinator.contains("bridge.updateShaderPackAssets("));
 		assertTrue(coordinator.contains("uploadedShaderPackSourceGeneration < generation"));
-		assertTrue(coordinator.contains("source_execution_selected=false"));
+		assertTrue(coordinator.contains("source_execution_selected=deferred-until-frame-admission"));
 		assertFalse(collector.contains("IrisRenderingPipeline"));
 		assertFalse(collector.contains("WorldRenderingPipeline"));
 		assertFalse(collector.contains("net.irisshaders"),
@@ -2020,8 +2042,8 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(wholeFrameTerrainSource.contains("drainVisibilityFrontier"));
 		assertTrue(wholeFrameTerrainSource.contains("OcclusionCuller.getVisibilityConnections"));
 		assertTrue(wholeFrameTerrainSource.contains("MAX_SEMANTIC_MESH_WORKERS = 8"));
-		assertTrue(wholeFrameTerrainSource.contains("new ChunkBuilder(level, ChunkMeshFormats.COMPACT, true, MAX_SEMANTIC_MESH_WORKERS)"),
-			"Rust whole-frame compact terrain must use the explicit separate-AO ABI");
+		assertTrue(wholeFrameTerrainSource.contains("new ChunkBuilder(level, ChunkMeshFormats.COMPACT, false, semanticMeshWorkerCount())"),
+			"Rust whole-frame compact terrain must use the explicit baked-RGB ABI without a fixed worker-count assumption");
 		assertTrue(wholeFrameTerrainSource.contains("workerBuilder.scheduleTask"));
 		assertTrue(wholeFrameTerrainSource.contains("renderContext, SortBehavior.STATIC, true"),
 			"Rust whole-frame terrain must retain static translucent sort metadata for fluid parity");
@@ -2150,8 +2172,29 @@ class VulkanicGalBridgeAbiTest {
 				"BlockDisplay submit must carry its render-state position before Rust route selection");
 			assertTrue(worldRenderer.contains("RenderShape.MODEL"));
 			assertTrue(worldRenderer.contains("specialBlockModelRenderer().get().hasRenderer(blockState.getBlock())"));
+			assertTrue(worldRenderer.contains("special-renderer-semantic-submitted")
+				&& worldRenderer.contains("Special block renderers")
+				&& worldRenderer.contains("already") && worldRenderer.contains("semantic submission"),
+				"special block displays must be admitted through their copied semantic model submission rather than rejected");
+			String submitNodesSource = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/SubmitNodeCollection.java"));
+		assertTrue(submitNodesSource.contains("if (!specialRenderer")
+				&& submitNodesSource.contains("blockRoute.usesRustWholeFrameVulkan()")
+				&& submitNodesSource.contains("no corresponding mesh instance"),
+				"special semantic blocks must not leave an unpaired ordinary/block-display marker in Rust coverage");
+		String captureSource = Files.readString(Path.of("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java"));
+		assertTrue(captureSource.contains("expectedModelMeshDiagnosticTextureId()")
+				&& captureSource.contains("\"model\".equals(diagnostic.provenance())"),
+				"special model fixtures must require their Rust model execution receipt");
 		assertTrue(worldRenderer.contains("WorldMeshAssetRecord"));
 		assertTrue(worldRenderer.contains("WorldMeshInstanceRecord"));
+		assertTrue(worldRenderer.contains("\"block-model\".equals(producer)"),
+				"completed block-model mesh instances must produce a Rust execution receipt");
+		assertTrue(worldRenderer.contains("PENDING_BLOCK_MODEL_MESH_KEYS.contains(instance.meshKey())"),
+				"block-model execution receipts must survive coarse producer-list indexing");
+		assertTrue(worldRenderer.contains("PENDING_MODEL_MESH_KEYS.contains(instance.meshKey())"),
+				"ordinary model execution receipts must survive coarse producer-list indexing");
+		assertTrue(worldRenderer.contains("hasModelMeshDiagnosticForKey(instance.meshKey())"),
+				"model completion must retain a key-based receipt across frame rollover");
 		assertTrue(worldRenderer.contains("WorldFeatureCoverageRecord"));
 		assertTrue(worldRenderer.contains("enqueueWorldFeatureCoverage"));
 		assertTrue(worldRenderer.contains("queuedModelPartSubmits")
@@ -2235,7 +2278,10 @@ class VulkanicGalBridgeAbiTest {
 			"whole-frame Vulkan terrain must not source visibility from Sodium's GL renderer");
 		assertTrue(sodiumWorldRenderer.contains("enqueueRustGalStaticTerrain"));
 		assertTrue(renderSectionManager.contains("RustGalTerrainRenderer.acceptChunkBuildOutput(chunkBuildOutput)"));
-		assertTrue(wholeFrameTerrainSource.contains("new ChunkBuilder(level, ChunkMeshFormats.COMPACT, true, MAX_SEMANTIC_MESH_WORKERS)"));
+		assertTrue(wholeFrameTerrainSource.contains("new ChunkBuilder(level, ChunkMeshFormats.COMPACT, false, semanticMeshWorkerCount())"),
+			"the direct vanilla terrain consumer requires Frozen's baked-RGB compact mesh contract");
+		assertFalse(wholeFrameTerrainSource.contains("new ChunkBuilder(level, ChunkMeshFormats.COMPACT, true, semanticMeshWorkerCount())"),
+			"separate-AO compact meshes are not admissible to the direct vanilla Rust terrain shader");
 		assertTrue(wholeFrameTerrainSource.contains("RustGalTerrainRenderer.acceptWholeFrameChunkBuildOutput(output)"));
 		assertTrue(wholeFrameTerrainSource.contains("output.destroy()"),
 			"the direct CPU source must release native intermediate mesh buffers after VulkanicGAL copies them");
@@ -2275,6 +2321,11 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(renderSectionManager.contains("RustGalTerrainRenderer.acceptChunkSortOutput(sortOutput)"));
 		assertTrue(terrainRenderer.contains("registeredAtlasGeneration"));
 		assertTrue(terrainRenderer.contains("atlasTextureUpdatePayload()"));
+		assertTrue(terrainRenderer.contains("the same semantic atlas cannot acquire a different"),
+			"eager and section-triggered terrain atlas publication must retain one explicit sampled-row contract");
+		assertFalse(terrainRenderer.substring(terrainRenderer.indexOf("private static List<VulkanicGalBridge.WorldMeshTextureAssetRecord> atlasTextureUpdatePayload()"))
+			.contains("WORLD_MESH_TEXTURE_COORDINATE_ORIGIN_MINECRAFT_TOP_LEFT"),
+			"section-triggered terrain atlas publication must not invert rows relative to eager whole-frame publication");
 			assertTrue(terrainRenderer.contains("vertex.colorArgb()"));
 			assertTrue(terrainRenderer.contains("vertex.light()"));
 			assertTrue(terrainRenderer.contains("fnv64Int(hash, vertex.midBlockPacked())"),
@@ -2303,6 +2354,15 @@ class VulkanicGalBridgeAbiTest {
 			"Rust final-output captures must retain the atlas receipt for their exact terrain frame");
 		assertTrue(finalOutputCapture.contains("appendStaticTerrainTextureProbeReceipt(json, 2)"),
 			"Rust final-output captures must retain the projected palette probes required to validate that image");
+		assertTrue(finalOutputCapture.contains("attachment-sky-fog.json")
+			&& finalOutputCapture.contains("skyFogReceipt")
+			&& finalOutputCapture.contains("Files.copy(skyFogSource, skyFogReceiptPath"),
+			"a selected final-output image must retain the exact Rust-owned sky/fog inputs rather than a later rolling receipt");
+		assertTrue(deterministicCapture.contains("normalRouteFinalOutputCapture")
+			&& deterministicCapture.contains("selectedSourceCaptureRequested() || RUST_FINAL_OUTPUT_EVERY_POSE"),
+			"the opt-in normal-route diagnostic must retain the exact Rust final image without requiring selected-source execution");
+		assertTrue(frameCoordinator.contains("normalRouteFinalOutputCaptureRequested()"),
+			"the coordinator must acknowledge the normal presented Rust frame for the opt-in exact-final diagnostic");
 		assertTrue(deterministicCapture.contains("requiredRustSourceExecutionDir"),
 			"selected-source captures must wait for Rust execution evidence, not only normal-graph preparation");
 		assertTrue(deterministicCapture.contains("selected-source-execution-frame-*.json"),
@@ -2312,6 +2372,11 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(deterministicCapture.contains("readJsonLongField(json, \"lod_instances\", 0L) > 0L"),
 			"Distant Horizons-only selected-source frames must not be misclassified as zero work");
 		assertTrue(graphicsHarness.contains("--world-static-terrain-scenario"));
+		assertTrue(rustWorldFrontend.contains("let sky_fog_receipt_name = \"attachment-sky-fog.json\""),
+			"the Rust producer receipt must be bounded rather than accumulate once per readiness submission");
+		assertTrue(rustWorldFrontend.contains("ops.extend(gui_ops);\n        if let Some(capture) = gameplay_attachment_capture.as_mut()")
+			&& rustWorldFrontend.contains("append_normal_presented_output(gal, &mut ops, frame_target)"),
+			"a normal final-output readback must occur after the Rust GUI replay, from the acquired presentation target");
 		assertTrue(graphicsHarness.contains("static_terrain_workload_complete"));
 		assertTrue(renderSectionManager.contains("RustGalTerrainRenderer.removeSection(x, y, z, \"section-removed\")"));
 		assertTrue(worldRenderer.contains("DIRTY_WORLD_MESH_TEXTURES"));
@@ -2830,10 +2895,10 @@ class VulkanicGalBridgeAbiTest {
 		String trident = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/special/TridentSpecialRenderer.java"));
 		assertTrue(submit.contains("object == net.minecraft.util.Unit.INSTANCE")
 			&& submit.contains("enqueueStandaloneTranslucentModelMesh")
-			&& avatar.contains("submitModelSemanticTexture")
+			&& avatar.contains("enqueueStandaloneTranslucentModelMesh")
 			&& trident.contains("enqueueStandaloneGlintModelMesh")
 			&& submit.contains("armor_entity_glint"),
-			"direct-texture model parts must use the Rust semantic model/glint contracts");
+			"direct-texture model parts must use the Rust semantic model/glint contracts, including the dedicated first-person mesh domain");
 		int route = source.indexOf("WorldRenderRoutePolicy.currentMaterialRoute()", source.indexOf("BlockModelSubmit"));
 		int gate = source.indexOf("!blockModelRoute.usesJavaCompatibility()", route);
 		int javaDraw = source.indexOf("ModelBlockRenderer.renderModel", gate);
@@ -3970,7 +4035,7 @@ class VulkanicGalBridgeAbiTest {
 	}
 
 	@Test
-	void frameAbiV15PreservesFrameContractAndAddsSemanticFogInputs() throws Exception {
+	void frameAbiV27PreservesFrameContractAndAddsSemanticFogInputs() throws Exception {
 		String bridge = Files.readString(Path.of("src/main/java/net/vulkanic/bridge/VulkanicGalBridge.java"));
 		String world = Files.readString(Path.of("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
 		String queue = Files.readString(Path.of("src/main/java/net/vulkanic/gui/RustGalGuiRenderer.java"));
@@ -3986,7 +4051,7 @@ class VulkanicGalBridgeAbiTest {
 		String experienceBar = Files.readString(Path.of("src/main/java/net/minecraft/client/gui/contextualbar/ExperienceBarRenderer.java"));
 		String bossOverlay = Files.readString(Path.of("src/main/java/net/minecraft/client/gui/components/BossHealthOverlay.java"));
 
-		assertEquals(25, VulkanicGalBridge.ABI_VERSION);
+		assertEquals(27, VulkanicGalBridge.ABI_VERSION);
 		assertTrue(bridge.contains("GUI_AFFINE_QUAD_REQUEST(92)"));
 		assertTrue(bridge.contains("WORLD_TEXT_QUAD_REQUEST(93)"));
 		assertTrue(bridge.contains("WORLD_TEXT_IMAGE_ASSET_PAYLOAD(94)"));
@@ -4036,8 +4101,9 @@ class VulkanicGalBridgeAbiTest {
 		assertFalse(bridge.contains("IrisShaderEnvironmentFrame"));
 		assertTrue(world.contains("level.getSkyColor(camera.getPosition(), shaderPackFramePartialTick)"));
 		assertTrue(world.contains("shaderPackFogColor(level, camera)"));
-		assertTrue(world.contains("shaderPackFogParameters()"));
-		assertTrue(world.contains("fogRenderer.sodium$getFogParameters()"));
+		assertTrue(world.contains("shaderPackFogParameters(level, camera)"));
+		assertTrue(world.contains("collectFogParametersForRust("));
+		assertFalse(world.contains("fogRenderer.sodium$getFogParameters()"));
 		assertFalse(world.contains("FogStorage"));
 		assertFalse(world.contains("FogParameters.NONE"));
 		assertTrue(world.contains("shaderPackBlindness()"));
@@ -4059,7 +4125,9 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(world.contains("shaderPackDarknessLightFactor()"));
 		assertTrue(world.contains("shaderPackNightVision()"));
 		assertFalse(world.contains("CapturedRenderingState"));
-		assertTrue(bridge.contains("Struct.WORLD_MESH_VERTEX.setInt(vertexItem, 13, vertex.midBlockPacked())"));
+		assertTrue(bridge.contains("Struct.WORLD_MESH_VERTEX.setInt(vertexItem, 13, vertex.terrainMaterialBits())")
+			&& bridge.contains("Struct.WORLD_MESH_VERTEX.setInt(vertexItem, 14, vertex.midBlockPacked())"),
+			"ABI v27 must preserve both explicit terrain material bits and packed mid-block identity");
 		assertTrue(bridge.contains("mattmc_vulkanic_gal_context_create_borrowed_opengl"));
 		assertTrue(bridge.contains("mattmc_vulkanic_gal_frame_acquire"));
 		assertTrue(bridge.contains("mattmc_vulkanic_gal_frame_present"));
@@ -5219,9 +5287,9 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(loadingOverlay.contains("RustGalFrameCoordinator rejects any element family")
 			&& !loadingOverlay.contains("instanceof LevelLoadingScreen"),
 			"loading overlay must use broad semantic screen extraction rather than a Java screen whitelist");
-		assertTrue(cubeMap.contains("RustGalPanoramaRenderer.enqueue")
+		assertTrue(cubeMap.contains("requires PanoramaRenderer to attach its semantic command")
 			&& cubeMap.contains("Java cube-map rendering is not a fallback"),
-			"direct CubeMap calls must use copied Rust panorama semantics and fail closed without Java rendering");
+			"direct CubeMap calls cannot enqueue detached work; selected Vulkan must fail closed without Java rendering");
 		assertTrue(panoramaRenderer.contains("RustGalPanoramaRenderer.enqueue"));
 		assertTrue(semanticPanorama.contains("resolveCubeMap") && semanticPanorama.contains("enqueueGuiMeshItemRequest"),
 			"the title panorama must cross the boundary as copied semantic image data and Rust-owned mesh work");
@@ -5417,7 +5485,9 @@ class VulkanicGalBridgeAbiTest {
 		String skullRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/blockentity/SkullBlockRenderer.java"));
 		assertTrue(skullRenderer.contains("submitNodeCollector.submitModelSemantic(")
 			&& skullRenderer.contains("submitNodeCollector.submitModelSemanticTexture(")
-			&& skullRenderer.contains("semanticTexture"),
+			&& skullRenderer.contains("semanticTexture")
+			&& skullRenderer.contains("playerSkin().body().texturePath()")
+			&& skullRenderer.contains("defaultTexture"),
 			"skull models must enter explicit Rust semantic model callbacks with texture identity preserved");
 		String lecternRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/blockentity/LecternRenderer.java"));
 		assertTrue(lecternRenderer.contains("submitNodeCollector.submitModelSemantic(")
@@ -5785,10 +5855,14 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(lightTexture.contains("!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()")
 			&& lightTexture.contains("VulkanicAPI.createCommandEncoder().clearColorTexture"),
 			"whole-frame lightmap construction must not submit a Java texture clear");
-		assertTrue(fogRenderer.contains("return this.computeFogParameters(camera, i, bl, deltaTracker, f, clientLevel, false).parameters();"),
+		assertTrue(fogRenderer.contains("return this.computeFogParameters(camera, i, bl, deltaTracker, f, clientLevel, false, true).parameters();"),
 			"whole-frame fog extraction must use the semantic-only calculation path");
-		assertTrue(fogRenderer.contains("computeFogParameters(camera, i, bl, deltaTracker, f, clientLevel, true)"),
+		assertTrue(fogRenderer.contains("collectFogParametersForRust"));
+		assertTrue(fogRenderer.contains("computeFogParameters(camera, i, bl, deltaTracker, f, clientLevel, true, true)"),
 			"the normal Java fog renderer must retain its legacy-Iris side effect explicitly");
+		assertTrue(fogRenderer.contains("false, false);")
+			&& fogRenderer.contains("legacy Iris/DH sentinel range"),
+			"Rust fog extraction must omit both Java/Iris and unavailable-DH cancellation side effects");
 		assertTrue(fogRenderer.contains("if (updateLegacyIrisFogState && camera.getFluidInCamera()"),
 			"the copied whole-frame fog record must not update Iris runtime state");
 		assertTrue(vulkanicApi.contains("RustGalVulkanWholeFrameMode.enabled()"));
@@ -5944,15 +6018,16 @@ class VulkanicGalBridgeAbiTest {
 	}
 
 	@Test
-	void wholeFrameTerrainBuildsSkipJavaGpuUploads() throws Exception {
+    void wholeFrameTerrainBuildsSkipJavaGpuUploads() throws Exception {
 		String renderSections = Files.readString(Path.of("src/main/java/net/sodium/client/render/chunk/RenderSectionManager.java"));
 		String sectionCompiler = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/chunk/SectionCompiler.java"));
+		String wholeFrameSource = Files.readString(Path.of("src/main/java/net/vulkanic/world/RustGalWholeFrameTerrainSource.java"));
 		int upload = renderSections.indexOf("this.regions.uploadResults(");
 		int uploadGuard = renderSections.lastIndexOf("if (!rustWholeFrame)", upload);
 		assertTrue(upload >= 0 && uploadGuard >= 0 && uploadGuard < upload,
 			"Rust whole-frame terrain must not upload chunk meshes through Java RenderDevice");
-		assertTrue(renderSections.contains("RustGalTerrainRenderer.acceptWholeFrameChunkBuildOutput(chunkBuildOutput)"),
-			"Rust whole-frame terrain must admit compact CPU mesh semantics explicitly");
+		assertTrue(wholeFrameSource.contains("RustGalTerrainRenderer.acceptWholeFrameChunkBuildOutput(output)"),
+			"the independent Rust whole-frame producer must admit compact CPU mesh semantics explicitly");
 		assertTrue(sectionCompiler.contains("rustWholeFrameTerrain")
 			&& sectionCompiler.contains("!rustWholeFrameTerrain && !fluidState.isEmpty()")
 			&& sectionCompiler.contains("!rustWholeFrameTerrain && blockState.getRenderShape() == RenderShape.MODEL"),
@@ -6364,6 +6439,8 @@ class VulkanicGalBridgeAbiTest {
         int irisAo = source.indexOf("new ChunkBuilder(level, vertexType)", builder);
         assertTrue(irisAo > builder,
                 "OpenGL must retain the Iris-configured builder path while Rust Vulkan uses explicit policy");
+		assertTrue(source.contains("new ChunkBuilder(level, vertexType, false, 1)"),
+			"Rust Vulkan must not create an unrestricted second native meshing pool beside the whole-frame producer");
     }
 
     @Test
@@ -8726,7 +8803,7 @@ class VulkanicGalBridgeAbiTest {
 	@Test
 	void wholeFrameVoxelMapOverlayUsesExplicitSemanticBlits() throws Exception {
 		String source = Files.readString(Path.of("src/main/java/net/voxelmap/Map.java"));
-		int minimap = source.indexOf("tryEnqueueVoxelMapMask");
+		int minimap = source.indexOf("submitRustVoxelMapMask");
 		int minimapBlit = source.indexOf("semanticMapTexture");
 		int waypoint = source.indexOf("private void drawWaypointSemantic");
 		int waypointBlit = source.indexOf("submitRustSemanticBlit", waypoint);
@@ -9019,5 +9096,21 @@ class VulkanicGalBridgeAbiTest {
 			assertTrue(body.indexOf("ensure_context_capacity()?") < body.indexOf("let backend ="),
 				constructor + " must enforce the live-context bound before backend construction");
 		}
+	}
+
+	@Test
+	void skullSemanticCallsitesAlwaysProvideTextureIdentity() throws Exception {
+		String customHead = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/entity/layers/CustomHeadLayer.java"));
+		assertTrue(customHead.contains("resolveSkullSemanticTexture")
+			&& customHead.contains("playerSkin().body().texturePath()")
+			&& customHead.contains("SkullBlockRenderer.defaultTexture(type)"),
+			"worn skulls must pass a copied semantic texture identity for both player and vanilla skulls");
+		String skullSpecial = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/special/SkullSpecialRenderer.java"));
+		assertTrue(skullSpecial.contains("this.texture);"),
+			"special skull items must forward their baked semantic texture identity");
+		String playerHeadSpecial = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/special/PlayerHeadSpecialRenderer.java"));
+		assertTrue(playerHeadSpecial.contains("renderInfo.playerSkin().body().texturePath()")
+			&& playerHeadSpecial.contains("defaultTexture(Types.PLAYER)"),
+			"player-head items must provide a resolved or default semantic texture identity");
 	}
 }

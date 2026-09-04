@@ -92,9 +92,14 @@ public class SkullBlockRenderer implements BlockEntityRenderer<SkullBlockEntity,
 		int i = bl ? RotationSegment.convertToSegment(skullBlockRenderState.direction.getOpposite()) : (Integer)blockState.getValue(SkullBlock.ROTATION);
 		skullBlockRenderState.rotationDegrees = RotationSegment.convertToDegrees(i);
 		skullBlockRenderState.skullType = ((AbstractSkullBlock)blockState.getBlock()).getType();
-		skullBlockRenderState.textureIdentity = skullBlockRenderState.skullType == Types.PLAYER
-			? null
-			: SKIN_BY_TYPE.get(skullBlockRenderState.skullType);
+		if (skullBlockRenderState.skullType == Types.PLAYER) {
+			ResolvableProfile ownerProfile = skullBlockEntity.getOwnerProfile();
+			skullBlockRenderState.textureIdentity = ownerProfile != null
+				? this.playerSkinRenderCache.getOrDefault(ownerProfile).playerSkin().body().texturePath()
+				: SKIN_BY_TYPE.get(Types.PLAYER);
+		} else {
+			skullBlockRenderState.textureIdentity = SKIN_BY_TYPE.get(skullBlockRenderState.skullType);
+		}
 		skullBlockRenderState.renderType = this.resolveSkullRenderType(skullBlockRenderState.skullType, skullBlockEntity);
 	}
 

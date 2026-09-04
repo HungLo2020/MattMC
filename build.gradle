@@ -703,7 +703,11 @@ if (isMacOS) {
 }
 
 def clientHeapXmx = project.findProperty('mattmc.clientXmx') ?: System.getenv('MATTMC_CLIENT_XMX') ?: '8G'
-def clientHeapXms = project.findProperty('mattmc.clientXms') ?: System.getenv('MATTMC_CLIENT_XMS') ?: '4G'
+// Keep the interactive client adaptive. A 4 GiB initial heap forces ZGC to
+// commit/cache several gigabytes before the Rust Vulkan route has established
+// its real terrain and native footprint; the maximum remains 8 GiB, so this
+// is not a gameplay memory cap.
+def clientHeapXms = project.findProperty('mattmc.clientXms') ?: System.getenv('MATTMC_CLIENT_XMS') ?: '1G'
 
 // Common JVM arguments for client tasks
 // Use G1GC on macOS due to ZGC stability issues (SIGBUS crashes in Arena::destruct_contents)

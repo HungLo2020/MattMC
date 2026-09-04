@@ -88,11 +88,10 @@ impl Drop for BridgeRegistry {
         // being destroyed as thread-local fields unwind.
         self.contexts.clear();
         if live != 0 {
-            let result = LIVE_BRIDGE_CONTEXTS.fetch_update(
-                Ordering::AcqRel,
-                Ordering::Acquire,
-                |count| count.checked_sub(live),
-            );
+            let result =
+                LIVE_BRIDGE_CONTEXTS.fetch_update(Ordering::AcqRel, Ordering::Acquire, |count| {
+                    count.checked_sub(live)
+                });
             debug_assert!(
                 result.is_ok(),
                 "Rust VulkanicGAL context slots underflow during registry drop"
@@ -206,9 +205,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_context_create(
             if registry.contexts.len() >= MAX_BRIDGE_CONTEXTS {
                 return Err(GalError::ffi(
                     StatusCode::InvalidArgument,
-                    format!(
-                        "live Rust VulkanicGAL context limit exceeded ({MAX_BRIDGE_CONTEXTS})"
-                    ),
+                    format!("live Rust VulkanicGAL context limit exceeded ({MAX_BRIDGE_CONTEXTS})"),
                 ));
             }
             let context_id = registry.next_context_id;
@@ -516,7 +513,8 @@ mod tests {
     fn windowed_presenter_reservation_is_exclusive_and_releasable() {
         let mut registry = BridgeRegistry::default();
         assert!(reserve_windowed_presenter(&mut registry).is_ok());
-        let second = reserve_windowed_presenter(&mut registry).expect_err("second presenter admitted");
+        let second =
+            reserve_windowed_presenter(&mut registry).expect_err("second presenter admitted");
         assert_eq!(second.code, StatusCode::InvalidArgument);
         release_windowed_presenter(&mut registry);
         assert!(reserve_windowed_presenter(&mut registry).is_ok());

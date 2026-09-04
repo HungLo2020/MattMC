@@ -71,8 +71,10 @@ pub fn verify() -> i32 {
         && std::mem::size_of::<StaticModelVertexRecord>() == 28
         && std::mem::size_of::<StaticModelQuadRecord>() == 160
         && std::mem::size_of::<StaticModelBlockRecord>() == 52
-        && std::mem::size_of::<NativeSectionBlockRecord>() == 316
-        && std::mem::size_of::<CompactSectionSnapshotHeader>() == 120
+        // 3x3 lighting state samples plus the independent 4x4x4 immutable
+        // tint lattice carried by compact snapshot ABI v3.
+        && std::mem::size_of::<NativeSectionBlockRecord>() == 572
+        && std::mem::size_of::<CompactSectionSnapshotHeader>() == 128
         && std::mem::size_of::<NativeModelSelectorEntry>() == 8
     {
         OK

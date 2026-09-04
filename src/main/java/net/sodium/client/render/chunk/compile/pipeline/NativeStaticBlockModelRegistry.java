@@ -710,7 +710,9 @@ public final class NativeStaticBlockModelRegistry {
         }
         if (block == Blocks.OAK_LEAVES || block == Blocks.JUNGLE_LEAVES || block == Blocks.ACACIA_LEAVES
                 || block == Blocks.DARK_OAK_LEAVES || block == Blocks.VINE || block == Blocks.MANGROVE_LEAVES
-                || block == Blocks.LEAF_LITTER) {
+                || block == Blocks.LEAF_LITTER || block == Blocks.AZALEA_LEAVES
+                || block == Blocks.FLOWERING_AZALEA_LEAVES || block == Blocks.CHERRY_LEAVES
+                || block == Blocks.PALE_OAK_LEAVES) {
             return TINT_FOLIAGE;
         }
         if (block == Blocks.WATER || block == Blocks.BUBBLE_COLUMN || block == Blocks.WATER_CAULDRON) {
@@ -728,7 +730,12 @@ public final class NativeStaticBlockModelRegistry {
         if (block == Blocks.BIRCH_LEAVES) {
             return TINT_BIRCH;
         }
-        if (block == Blocks.ATTACHED_MELON_STEM || block == Blocks.ATTACHED_PUMPKIN_STEM || block == Blocks.LILY_PAD) {
+        // Bamboo's leaf models carry tintindex=0 for resource-pack compatibility,
+        // but vanilla deliberately has no BlockColors provider for bamboo.  Its
+        // semantic tint is therefore the unmodified texture color, represented by
+        // the explicit constant/no-tint state rather than a Java model fallback.
+        if (block == Blocks.ATTACHED_MELON_STEM || block == Blocks.ATTACHED_PUMPKIN_STEM
+                || block == Blocks.LILY_PAD || block == Blocks.BAMBOO || block == Blocks.POTTED_BAMBOO) {
             return TINT_CONSTANT;
         }
         return TINT_NONE;

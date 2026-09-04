@@ -24,7 +24,8 @@ use crate::render::vulkanic::shader_pack::programs::{
     prepare_lowered_hand_source_program, prepare_lowered_terrain_source_program,
     prepare_lowered_textured_material_source_program, prepare_lowered_weather_source_program,
     shader_stage_code_for_backend, LoweredTerrainSourceProgram, TerrainMaterialProgramKind,
-    COMPLEMENTARY_TERRAIN_SUBSET_FRAGMENT, MINIMAL_TERRAIN_MATERIAL_VERTEX,
+    COMPLEMENTARY_TERRAIN_SUBSET_FRAGMENT, MINIMAL_TERRAIN_MATERIAL_FRAGMENT,
+    MINIMAL_TERRAIN_MATERIAL_FRAGMENT_DIRECT, MINIMAL_TERRAIN_MATERIAL_VERTEX,
 };
 use crate::render::vulkanic::shader_pack::{
     distant_horizons_contract::{
@@ -62,6 +63,242 @@ fn gui_mesh_shaders_compile_with_the_shared_frame_uniform_contract() {
         .expect("Vulkan GUI mesh vertex shader must compile");
     compile_glsl_for_backend_test(shaderc::ShaderKind::Fragment, fragment, "gui-mesh.fragment")
         .expect("Vulkan GUI mesh fragment shader must compile");
+}
+
+#[test]
+fn gui_panorama_shaders_compile_as_an_unlit_rust_owned_material() {
+    let (vertex, fragment) =
+        crate::render::vulkanic::gui_mesh_frontend::vulkan_panorama_shader_sources_for_backend_test(
+        );
+    compile_glsl_for_backend_test(shaderc::ShaderKind::Vertex, vertex, "gui-panorama.vertex")
+        .expect("Vulkan GUI panorama vertex shader must compile");
+    compile_glsl_for_backend_test(
+        shaderc::ShaderKind::Fragment,
+        fragment,
+        "gui-panorama.fragment",
+    )
+    .expect("Vulkan GUI panorama fragment shader must compile");
+}
+
+/// Vignette is a destination-only blend: vanilla writes a grayscale mask and
+/// multiplies the already-composed frame by `1 - source.rgb`.  Keep an actual
+/// Vulkan readback here because descriptor/pipeline construction checks alone
+/// cannot prove that dynamic rendering preserves the loaded color attachment
+/// between the world and GUI passes.
+#[test]
+fn isolated_vulkan_vignette_blend_preserves_and_darkens_loaded_color() {
+    let backend = match VulkanBackend::new("MattMC VulkanicGAL vignette conformance") {
+        Ok(backend) => backend,
+        Err(error) => {
+            eprintln!("skipping Vulkan vignette conformance: {error}");
+            return;
+        }
+    };
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let extent = Extent3d {
+        width: 1,
+        height: 1,
+        depth: 1,
+    };
+    let color = gal
+        .create_texture(TextureDesc {
+            label: "vignette-conformance.color".to_owned(),
+            dimension: TextureDimension::D2,
+            format: TextureFormat::Rgba8Unorm,
+            extent,
+            mip_levels: 1,
+            array_layers: 1,
+            usages: vec![TextureUsage::ColorAttachment, TextureUsage::TransferSrc],
+        })
+        .unwrap();
+    let color_view = gal
+        .create_texture_view(view(
+            "vignette-conformance.color-view",
+            color,
+            TextureFormat::Rgba8Unorm,
+        ))
+        .unwrap();
+    let target = gal
+        .create_render_target(RenderTargetDesc {
+            label: "vignette-conformance.target".to_owned(),
+            color_views: vec![color_view],
+            depth_stencil_view: None,
+            extent,
+        })
+        .unwrap();
+    let pass = gal
+        .create_render_pass(RenderPassDesc {
+            label: "vignette-conformance.pass".to_owned(),
+            target,
+            color_formats: vec![TextureFormat::Rgba8Unorm],
+            depth_format: None,
+        })
+        .unwrap();
+    let layout = gal
+        .create_pipeline_layout(PipelineLayoutDesc {
+            label: "vignette-conformance.layout".to_owned(),
+            resource_layouts: Vec::new(),
+        })
+        .unwrap();
+    let vertex = gal
+        .create_shader_module(ShaderModuleDesc {
+            label: "vignette-conformance.vertex".to_owned(),
+            stage: ShaderStage::Vertex,
+            code_format: ShaderCodeFormat::Glsl,
+            code: br#"#version 450
+const vec2 p[3] = vec2[3](vec2(-1.0, -1.0), vec2(3.0, -1.0), vec2(-1.0, 3.0));
+void main() { gl_Position = vec4(p[gl_VertexIndex], 0.0, 1.0); }
+"#
+            .to_vec(),
+            entry_point: "main".to_owned(),
+        })
+        .unwrap();
+    let fragment = gal
+        .create_shader_module(ShaderModuleDesc {
+            label: "vignette-conformance.fragment".to_owned(),
+            stage: ShaderStage::Fragment,
+            code_format: ShaderCodeFormat::Glsl,
+            code: br#"#version 450
+layout(location = 0) out vec4 out_color;
+void main() { out_color = vec4(0.75, 0.75, 0.75, 1.0); }
+"#
+            .to_vec(),
+            entry_point: "main".to_owned(),
+        })
+        .unwrap();
+    let pipeline = gal
+        .create_graphics_pipeline(GraphicsPipelineDesc {
+            label: "vignette-conformance.pipeline".to_owned(),
+            layout,
+            vertex_shader: vertex,
+            fragment_shader: fragment,
+            topology: PrimitiveTopology::Triangles,
+            cull_mode: CullMode::None,
+            front_face: crate::render::vulkanic::resources::FrontFace::CounterClockwise,
+            blend: BlendMode::Vignette,
+            depth_compare: None,
+            depth_write: false,
+            depth_bias: None,
+            color_formats: vec![TextureFormat::Rgba8Unorm],
+            depth_format: None,
+            stencil: None,
+        })
+        .unwrap();
+    let readback = gal
+        .create_buffer(BufferDesc {
+            label: "vignette-conformance.readback".to_owned(),
+            size: 4,
+            memory: MemoryDomain::Readback,
+            usages: vec![BufferUsage::TransferDst, BufferUsage::HostRead],
+        })
+        .unwrap();
+    let loaded = PassAttachment {
+        view: color_view,
+        load_op: AttachmentLoadOp::Load,
+        store_op: AttachmentStoreOp::Store,
+        clear_color: None,
+    };
+    let command_list = gal
+        .create_command_list(CommandListDesc {
+            label: "vignette-conformance.commands".to_owned(),
+            operations: vec![
+                texture_barrier(
+                    color,
+                    TextureUsageState::Undefined,
+                    TextureUsageState::ColorAttachment,
+                ),
+                CommandOp::BeginPass {
+                    pass,
+                    target,
+                    colors: vec![PassAttachment {
+                        view: color_view,
+                        load_op: AttachmentLoadOp::Clear,
+                        store_op: AttachmentStoreOp::Store,
+                        clear_color: Some(ClearColor {
+                            r: 0.8,
+                            g: 0.8,
+                            b: 0.8,
+                            a: 1.0,
+                        }),
+                    }],
+                    depth_stencil: None,
+                },
+                CommandOp::EndPass,
+                CommandOp::BeginPass {
+                    pass,
+                    target,
+                    colors: vec![loaded],
+                    depth_stencil: None,
+                },
+                CommandOp::BindGraphicsPipeline(pipeline),
+                CommandOp::Draw {
+                    vertices: 3,
+                    instances: 1,
+                },
+                CommandOp::EndPass,
+                texture_barrier(
+                    color,
+                    TextureUsageState::ColorAttachment,
+                    TextureUsageState::TransferSrc,
+                ),
+                CommandOp::CopyTextureToBuffer(BufferImageCopyRegion {
+                    buffer: readback,
+                    buffer_offset: 0,
+                    bytes_per_row: 4,
+                    rows_per_image: 1,
+                    texture: color,
+                    texture_mip: 0,
+                    texture_layer: 0,
+                    texture_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
+                    extent,
+                }),
+                buffer_barrier(
+                    readback,
+                    TextureUsageState::TransferDst,
+                    TextureUsageState::ShaderRead,
+                ),
+                CommandOp::HostReadBuffer {
+                    buffer: readback,
+                    offset: 0,
+                    size: 4,
+                },
+            ],
+        })
+        .unwrap();
+    let token = gal
+        .submit(SubmissionBatch {
+            label: "vignette-conformance.submit".to_owned(),
+            command_lists: vec![command_list],
+        })
+        .unwrap();
+    gal.retire_through_for_test(token.submission).unwrap();
+    let bytes = gal
+        .vulkan_backend()
+        .unwrap()
+        .completed_host_reads_for_test()
+        .iter()
+        .rev()
+        .find(|read| read.buffer == readback)
+        .expect("vignette conformance must produce a readback")
+        .bytes
+        .clone();
+    // 0.8 * (1.0 - 0.75) = 0.2.  RGBA8 conversion allows one quantization step.
+    assert!(
+        (bytes[0] as i16 - 51).abs() <= 1,
+        "unexpected red output: {:?}",
+        bytes
+    );
+    assert!(
+        (bytes[1] as i16 - 51).abs() <= 1,
+        "unexpected green output: {:?}",
+        bytes
+    );
+    assert!(
+        (bytes[2] as i16 - 51).abs() <= 1,
+        "unexpected blue output: {:?}",
+        bytes
+    );
+    assert_eq!(255, bytes[3], "vignette must preserve opaque alpha");
 }
 
 #[test]
@@ -427,7 +664,7 @@ fn create_distant_horizons_lod_opaque_pipeline(
         depth_bias: None,
         color_formats: vec![TextureFormat::Rgba8Unorm; 4],
         depth_format: Some(TextureFormat::Depth32Float),
-            stencil: None,
+        stencil: None,
     })
 }
 
@@ -463,6 +700,25 @@ fn selected_terrain_fragment_compiles_with_and_without_colored_voxel_resources()
         )
         .unwrap_or_else(|error| {
             panic!("{label} selected terrain fragment must compile for Vulkan: {error}")
+        });
+    }
+
+    // The builtin deferred and direct terrain programs are selected at runtime
+    // by the Fabulous handoff. Compile both concrete fragments here rather
+    // than relying on a lowered source-program test to cover their varying
+    // declarations.
+    for (label, source) in [
+        ("builtin-deferred", MINIMAL_TERRAIN_MATERIAL_FRAGMENT),
+        ("builtin-direct", MINIMAL_TERRAIN_MATERIAL_FRAGMENT_DIRECT),
+    ] {
+        let fragment = shader_stage_code_for_backend(BackendApi::Vulkan, source);
+        compile_glsl_for_backend_test(
+            shaderc::ShaderKind::Fragment,
+            std::str::from_utf8(&fragment).unwrap(),
+            &format!("selected-terrain.{label}.fragment"),
+        )
+        .unwrap_or_else(|error| {
+            panic!("{label} builtin terrain fragment must compile for Vulkan: {error}")
         });
     }
 }
@@ -819,7 +1075,7 @@ fn create_lowered_source_graphics_pipeline(
         depth_bias: None,
         color_formats,
         depth_format: Some(TextureFormat::Depth32Float),
-            stencil: None,
+        stencil: None,
     })
 }
 
@@ -2159,7 +2415,7 @@ fn run_dynamic_uniform_offset_conformance() -> GalResult<[u8; 4]> {
         depth_bias: None,
         color_formats: vec![TextureFormat::Rgba8Unorm],
         depth_format: None,
-            stencil: None,
+        stencil: None,
     })?;
     let target = gal.create_render_target(RenderTargetDesc {
         label: "dynamic-ubo.target".to_owned(),
@@ -2494,7 +2750,7 @@ pub(in crate::render::vulkanic::backends) fn run_conformance(
         depth_bias: None,
         color_formats: vec![TextureFormat::Rgba8Unorm],
         depth_format: Some(TextureFormat::Depth32Float),
-            stencil: None,
+        stencil: None,
     })?;
     let target = gal.create_render_target(RenderTargetDesc {
         label: "conformance.target".to_string(),

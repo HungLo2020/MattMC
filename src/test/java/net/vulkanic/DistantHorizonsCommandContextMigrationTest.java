@@ -152,7 +152,7 @@ public class DistantHorizonsCommandContextMigrationTest {
 			"com/seibel/distanthorizons/core/render/RenderBufferHandler.java");
 		String sourceWithoutComments = readSourceWithoutComments(renderBufferHandler);
 		int semanticCheck = sourceWithoutComments.indexOf(
-			"DistantHorizonsSemanticCollector.hasColumn(renderSection.pos)");
+			"DistantHorizonsSemanticCollector.hasPublishedColumn(renderSection.pos)");
 		int nullContainerBranch = sourceWithoutComments.indexOf("if (bufferContainer == null)", semanticCheck);
 		int legacyAdd = sourceWithoutComments.indexOf("this.loadedNearToFarBuffers.add(bufferContainer)", semanticCheck);
 		assertTrue(semanticCheck >= 0,

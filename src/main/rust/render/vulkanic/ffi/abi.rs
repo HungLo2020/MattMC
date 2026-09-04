@@ -35,7 +35,15 @@ pub const FFI_ABI_V24_VERSION: u32 = 24;
 /// v25 appends the bounded semantic post-effect identity to whole-frame
 /// submission; Rust resolves its copied graph and shader stages.
 pub const FFI_ABI_V25_VERSION: u32 = 25;
-pub const FFI_ABI_VERSION: u32 = 25;
+/// v26 appends explicit world-mesh retirement records to incremental asset
+/// updates. Streaming producers must be able to release their Rust-owned
+/// mesh resources without smuggling a renderer reset through an empty frame.
+pub const FFI_ABI_V26_VERSION: u32 = 26;
+/// v27 appends copied per-level atlas PNGs to mesh texture assets. This lets
+/// Rust upload Frozen's sprite-isolated mip chain without reading a Java GPU
+/// texture or generating whole-atlas mips that bleed across sprite borders.
+pub const FFI_ABI_V27_VERSION: u32 = 27;
+pub const FFI_ABI_VERSION: u32 = 27;
 pub const FFI_INITIAL_PRESENTATION_SUPPORTED: bool = false;
 pub const FFI_ABI_NAME: &str = "MattMC VulkanicGAL Java-Rust batch ABI";
 pub const FFI_MAX_LABEL_BYTES: usize = 1024;
@@ -927,6 +935,9 @@ pub struct FfiWorldMeshVertex {
     pub atlas_v: f32,
     pub shader_block_id: i32,
     pub shader_material_type: i32,
+    /// Sodium's compact per-primitive material byte. Bit 0 selects mip
+    /// sampling; bits 1..2 select the alpha-cutoff class.
+    pub terrain_material_bits: u32,
     /// Copied signed-byte `at_midBlock` xyz plus the source emission byte.
     /// This is terrain-model semantics, not an Iris binding or GL state.
     pub mid_block_packed: u32,
@@ -987,6 +998,7 @@ pub struct FfiWorldMeshTextureAssetPayload {
     pub interpolation_policy: u32,
     pub reserved0: u32,
     pub animation_frames: FfiSlice<FfiWorldMeshAnimationFrameRecord>,
+    pub mip_png_bytes: FfiSlice<FfiBytes>,
 }
 
 #[repr(C)]
@@ -1001,6 +1013,19 @@ pub struct FfiWorldMeshSortedIndexRecord {
     pub index_bytes: FfiBytes,
 }
 
+/// Explicit retirement of one immutable world-mesh generation. This is a
+/// backend-neutral resource-lifetime command; it is not a draw or a native
+/// handle. Rust ignores a record whose generation no longer matches, so a
+/// delayed eviction can never remove a newer replacement of the same key.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FfiWorldMeshAssetRetirementRecord {
+    pub byte_size: u32,
+    pub reserved0: u32,
+    pub mesh_key: u64,
+    pub mesh_generation: u64,
+}
+
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct FfiWorldMeshAssetUpdateRequest {
@@ -1010,6 +1035,7 @@ pub struct FfiWorldMeshAssetUpdateRequest {
     pub textures: FfiSlice<FfiWorldMeshTextureAssetPayload>,
     pub sorted_indices: FfiSlice<FfiWorldMeshSortedIndexRecord>,
     pub negotiated_feature_bits: u64,
+    pub retirements: FfiSlice<FfiWorldMeshAssetRetirementRecord>,
 }
 
 /// Coarse, backend-neutral Distant Horizons LOD vertex semantics. This is a
@@ -1033,6 +1059,11 @@ pub struct FfiWorldLodSegmentRecord {
     pub byte_size: u32,
     pub layer: u32,
     pub vertices: FfiSlice<FfiWorldLodVertex>,
+    /// Fixed 16-byte semantic DH vertex stream. Exactly one of this and
+    /// `vertices` is populated; retaining the structured form keeps existing
+    /// semantic producers ABI-compatible while the packed form avoids a
+    /// Java-record/foreign-struct expansion for the real DH producer.
+    pub packed_vertices: FfiSlice<u8>,
 }
 
 #[repr(C)]
@@ -1347,6 +1378,9 @@ pub struct FfiWorldShaderEnvironmentFrame {
     /// Appended copied DH configuration semantic. It intentionally carries no
     /// renderer instance, Java callback, or backend state.
     pub distant_horizons_render_distance: i32,
+    /// Appended vanilla SKY pipeline fog range. This is immutable semantic
+    /// game data, never a Java uniform buffer, GL state, or Iris object.
+    pub fog_sky_end: f32,
 }
 
 /// Coarse inventory of Java feature families observed during the same real

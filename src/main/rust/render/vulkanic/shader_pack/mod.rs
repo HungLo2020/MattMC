@@ -28,6 +28,7 @@ pub mod source_targets;
 // preparation state. Runtime admission remains fail-closed until the complete
 // source plan is wired into the production submit path; keep the candidate
 // implementation compiled and unit-tested without presenting it as admitted.
+pub(crate) mod fabulous_targets;
 #[allow(dead_code)]
 pub(crate) mod source_assets;
 pub mod source_temporal;
@@ -38,7 +39,6 @@ pub mod terrain_voxelization;
 pub mod uniforms;
 pub mod vanilla_post_effect_contract;
 pub mod vanilla_post_effect_executor;
-pub(crate) mod fabulous_targets;
 pub mod voxel_emission_table;
 pub mod voxel_light_volume;
 pub mod voxel_material_map;
@@ -212,7 +212,12 @@ mod tests {
         let color_grade = minimal_composite_color_grade_program();
         assert!(color_grade.fragment.source.contains("color_grade_params"));
         let fog = minimal_composite_depth_fog_program();
-        assert!(fog.fragment.source.contains("WorldPositionTex"));
+        // Builtin fog reconstructs view-space distance from the explicit
+        // main-depth attachment. It must not consume the former lossy packed
+        // world-position color target.
+        assert!(fog.fragment.source.contains("MainDepthTex"));
+        assert!(fog.fragment.source.contains("projection_inverse"));
+        assert!(!fog.fragment.source.contains("WorldPositionTex"));
         let final_copy = minimal_final_copy_program();
         assert!(final_copy.fragment.source.contains("Tex0"));
         let shadow = minimal_shadow_depth_program();

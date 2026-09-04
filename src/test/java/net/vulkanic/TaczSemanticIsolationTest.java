@@ -56,4 +56,32 @@ final class TaczSemanticIsolationTest {
 		assertTrue(source.contains("Rust TACZ semantic Bedrock mesh contains non-finite transformed geometry"),
 			"TACZ semantic admission must fail closed before publishing NaN or infinite vertex payloads");
 	}
+
+	@Test
+	void semanticBedrockBatchUsesOneColorPerQuadForRustAbi() throws Exception {
+		String source = Files.readString(Path.of(
+			"src/main/java/net/minecraft/client/renderer/special/TaczGlock17SpecialRenderer.java"));
+		int append = source.indexOf("private void append(org.joml.Matrix4f transform, BedrockPolygon polygon");
+		int appendEnd = source.indexOf("private static final class SemanticBedrockBudget", append);
+		assertTrue(append >= 0 && appendEnd > append, "missing semantic Bedrock batch append method");
+		String body = source.substring(append, appendEnd);
+		assertTrue(body.contains("colorList.add(0xFFFFFFFF);"),
+			"semantic Bedrock batches must provide one color record for each quad");
+		assertTrue(!body.contains("for (int vertex = 0; vertex < 4; vertex++) colorList.add"),
+			"per-vertex colors violate the Rust first-person quad ABI cardinality");
+	}
+
+	@Test
+	void guiTaczCaptureNormalizesRustQuadColorsToPerVertexGuiColors() throws Exception {
+		String source = Files.readString(Path.of(
+			"src/main/java/net/vulkanic/gui/RustGalGuiItemRenderer.java"));
+		int add = source.indexOf("private boolean add(ResourceLocation texture, float[] vertices");
+		int addEnd = source.indexOf("private int totalQuads()", add);
+		assertTrue(add >= 0 && addEnd > add, "missing TACZ GUI semantic capture method");
+		String body = source.substring(add, addEnd);
+		assertTrue(body.contains("colors.length != quadCount"),
+			"GUI capture must accept the Rust one-color-per-quad contract");
+		assertTrue(body.contains("perVertexColors"),
+			"GUI capture must expand semantic quad colors for its vertex records");
+	}
 }

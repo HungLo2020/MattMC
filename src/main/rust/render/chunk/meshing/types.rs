@@ -142,6 +142,9 @@ pub(super) struct NativeSectionBlockRecord {
     pub(super) neighbor_state_ids: [i32; 6],
     pub(super) light_words: [i32; 27],
     pub(super) neighborhood_state_ids: [i32; 27],
+    // Immutable biome/color-provider samples for direct static-model tinting.
+    // Kept separate from the 3x3 state neighborhood used by lighting.
+    pub(super) tint_lattice: [[[i32; 4]; 4]; 4],
     pub(super) tint: i32,
     pub(super) fluid_tint: i32,
     pub(super) fluid_flow_x: f32,
@@ -177,6 +180,7 @@ pub(super) struct CompactSectionSnapshotHeader {
     pub(super) fluid_flow_z_address: u64,
     pub(super) fluid_block_ids_address: u64,
     pub(super) flags_address: u64,
+    pub(super) tint_lattices_address: u64,
 }
 
 #[repr(C)]

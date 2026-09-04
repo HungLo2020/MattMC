@@ -77,6 +77,27 @@ fn static_model_constant_tint_applies_lily_pad_color_with_quad_tint_index() {
     assert_eq!(0xff30_8020u32 as i32, native.vertices[0].color);
 }
 
+#[test]
+fn nested_weighted_selector_preserves_java_random_state_between_parent_and_child() {
+    let selectors = vec![
+        Some(NativeModelSelector { kind: SELECTOR_DIRECT, entries: vec![NativeModelSelectorEntry { target_id: 100, weight: 1 }], total_weight: 1 }),
+        Some(NativeModelSelector { kind: SELECTOR_DIRECT, entries: vec![NativeModelSelectorEntry { target_id: 101, weight: 1 }], total_weight: 1 }),
+        Some(NativeModelSelector { kind: SELECTOR_WEIGHTED, entries: vec![NativeModelSelectorEntry { target_id: 0, weight: 1 }, NativeModelSelectorEntry { target_id: 1, weight: 1 }], total_weight: 2 }),
+        // Java consumes nextInt(1) at this level before forwarding the same
+        // RandomSource to selector 2.
+        Some(NativeModelSelector { kind: SELECTOR_WEIGHTED, entries: vec![NativeModelSelectorEntry { target_id: 2, weight: 1 }], total_weight: 1 }),
+    ];
+    let seed = 0x51_7a_2d_9bu64;
+    let mut profile = NativeMeshingProfile::default();
+    let mut resolved = Vec::new();
+    resolve_selector_model_ids(3, seed, &selectors, &mut resolved, &mut profile).unwrap();
+
+    let mut random = legacy_set_seed(seed);
+    let _parent_choice = legacy_next_int_from_state(&mut random, 1);
+    let expected = 100 + legacy_next_int_from_state(&mut random, 2);
+    assert_eq!(vec![expected], resolved);
+}
+
 fn static_model_test_quad() -> StaticModelQuadRecord {
     StaticModelQuadRecord {
         vertices: [StaticModelVertexRecord {

@@ -56,12 +56,16 @@ public final class RustShaderPackSourceCollector {
 		// runtime state before Rust has begun presenting.
 		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
 			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-			if (!wholeFrameShaderConfigEnabled()) {
+			// Vanilla/resource-pack post effects are semantic game resources, not
+			// Iris shader-pack execution. In particular Fabulous owns
+			// minecraft:transparency even when Iris shaders are disabled, so do
+			// not let Iris's preference suppress the copied Rust snapshot.
+			Optional<String> postEffect = activeVanillaPostEffectId();
+			if (!wholeFrameShaderConfigEnabled() && postEffect.isEmpty()) {
 				return disabled(generation);
 			}
 			Optional<String> configuredName = configuredPackNameFromDisk();
 			if (configuredName.isEmpty()) {
-				Optional<String> postEffect = activeVanillaPostEffectId();
 				return postEffect.isPresent()
 					? collectVanillaPostEffect(postEffect.get(), generation)
 					: disabled(generation);
@@ -104,12 +108,13 @@ public final class RustShaderPackSourceCollector {
 		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
 			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
 			try {
-				if (!wholeFrameShaderConfigEnabled()) {
+				Optional<String> postEffect = activeVanillaPostEffectId();
+				if (!wholeFrameShaderConfigEnabled() && postEffect.isEmpty()) {
 					return Optional.empty();
 				}
 				Optional<String> configured = configuredPackNameFromDisk();
 				if (configured.isEmpty()) {
-					return activeVanillaPostEffectId();
+					return postEffect;
 				}
 				Path shaderpacks = net.minecraft.client.Minecraft.getInstance().gameDirectory.toPath()
 					.resolve("shaderpacks").toAbsolutePath().normalize();
@@ -136,8 +141,15 @@ public final class RustShaderPackSourceCollector {
 	 */
 	private static Optional<String> activeVanillaPostEffectId() {
 		try {
-			ResourceLocation effect = net.minecraft.client.Minecraft.getInstance()
-				.gameRenderer.currentPostEffect();
+			var minecraft = net.minecraft.client.Minecraft.getInstance();
+			ResourceLocation effect = minecraft.gameRenderer.currentPostEffect();
+			// Fabulous transparency is not installed as GameRenderer's ordinary
+			// PostChain. It is nevertheless an active vanilla post-effect with a
+			// resource-pack-overridable definition, so publish only its immutable
+			// semantic identity for Rust-owned collection and execution.
+			if (effect == null && net.minecraft.client.Minecraft.useShaderTransparency()) {
+				effect = ResourceLocation.withDefaultNamespace("transparency");
+			}
 			if (effect == null) {
 				return Optional.empty();
 			}
@@ -370,14 +382,31 @@ public final class RustShaderPackSourceCollector {
 
 	/** Stable source-environment defaults used before any pack-specific Iris option graph exists. */
 	static Map<String, String> wholeFrameEnvironmentDefines() {
+		// DH execution is intentionally unavailable on the vanilla Rust Vulkan
+		// route.  Do not let a copied shader source opt into its DH branches just
+		// because the mod happens to be installed; that would create a hidden
+		// dependency on an unadmitted renderer family.
+		return wholeFrameEnvironmentDefines(false);
+	}
+
+	/**
+	 * Returns the explicit source environment for one Rust-owned world route.
+	 *
+	 * <p>{@code DISTANT_HORIZONS} selects shader-pack control flow which requires
+	 * a Rust-owned DH writer and depth/color semantics in the same submission;
+	 * it is not merely a declaration that the binary contains DH support.
+	 * Ordinary fixtures that exclude that writer must omit the define.</p>
+	 */
+	static Map<String, String> wholeFrameEnvironmentDefines(boolean distantHorizonsOwned) {
 		TreeMap<String, String> defines = new TreeMap<>();
 		defines.put("IS_IRIS", "1");
 		defines.put("IRIS_VERSION", "12000");
-		// Distant Horizons is a compiled MattMC semantic capability, not an Iris
-		// renderer flag. Publishing it in the immutable source environment is
-		// required for packs such as Complementary whose dh_terrain/dh_water
-		// blend declarations are guarded by #ifdef DISTANT_HORIZONS.
-		defines.put("DISTANT_HORIZONS", "1");
+		if (distantHorizonsOwned) {
+			// The selected frame owns the corresponding DH source writer, so packs
+			// such as Complementary may safely enable their DH material and
+			// fullscreen branches without consulting Iris state.
+			defines.put("DISTANT_HORIZONS", "1");
+		}
 		// Minecraft's shader macro is a stable semantic engine value. Keep it in
 		// the Rust-owned source snapshot rather than reading Iris' macro table or
 		// any live renderer state.

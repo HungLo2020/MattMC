@@ -49,4 +49,5 @@ class OcclusionCullerNativeVisibilityTest {
         assertEquals(GraphDirectionSet.ALL,
                 OcclusionCuller.getVisibilityConnections(visibility, GraphDirectionSet.of(GraphDirection.DOWN), true));
     }
+
 }

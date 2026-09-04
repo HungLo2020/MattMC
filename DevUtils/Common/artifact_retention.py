@@ -25,6 +25,19 @@ PROFILE_LIMITS = {
 }
 HEAVY_SUFFIXES = {".rdc", ".tracy"}
 COPIED_GAME_DIR_PREFIXES = ("game_dir_", "region_validation_game_")
+# Canonical fixtures are reusable, immutable-equivalence workspaces copied
+# before Current/Frozen runs.  They consume real disk (and therefore remain in
+# `free_bytes` preflight), but are not retained capture evidence and must not
+# consume the evidence quota a second time during each mode's preflight.
+CANONICAL_FIXTURE_DIR_NAME = ".canonical-fixtures"
+# Invocation-level comparison reports are metadata, not individual capture
+# runs.  They must never enter the retention groups: otherwise a report whose
+# name happens to contain a mode can consume the sole failed-run slot and
+# evict the actual evidence before matrix validation reads it.
+INVOCATION_REPORT_DIR_NAMES = {
+    "paired_visual_static_terrain",
+    "paired_static_terrain_draw_coverage",
+}
 CAPTURE_RUN_ID_PATTERN = re.compile(r"_(20[0-9]{6}_[0-9]{6})(?:[_.]|$)")
 TEMP_RUN_ID_PATTERN = re.compile(r"^20[0-9]{6}_[0-9]{6}$")
 COMPRESSIBLE_SUFFIXES = {".log", ".txt", ".csv", ".json", ".jsonl"}
@@ -90,7 +103,11 @@ def artifact_size_excluding_copied_game_dirs(path: Path) -> int:
     total = 0
     for item in path.rglob("*"):
         try:
-            if any(parent.name.startswith(COPIED_GAME_DIR_PREFIXES) for parent in (item, *item.parents)):
+            if any(
+                parent.name.startswith(COPIED_GAME_DIR_PREFIXES)
+                or parent.name == CANONICAL_FIXTURE_DIR_NAME
+                for parent in (item, *item.parents)
+            ):
                 continue
             if item.is_file() or item.is_symlink():
                 total += item.stat().st_size
@@ -205,7 +222,11 @@ def free_bytes(path: Path) -> int:
 def preflight_disk_budget(policy: RetentionPolicy, estimated_bytes: int | None = None) -> dict[str, int | str]:
     ensure_marker(policy.root)
     estimated = estimated_bytes if estimated_bytes is not None else estimated_run_bytes(policy.profile)
-    root_usage = directory_size(policy.root)
+    # The global cap bounds retained audit evidence.  Canonical fixture copies
+    # and per-run copied game directories are temporary/reusable workload
+    # inputs, not evidence.  Disk-free preflight below still accounts for
+    # every byte they occupy.
+    root_usage = artifact_size_excluding_copied_game_dirs(policy.root)
     available = free_bytes(policy.root)
     required = estimated + policy.reserve_bytes
     result: dict[str, int | str] = {
@@ -338,6 +359,8 @@ def discover_runs(root: Path) -> list[ArtifactRun]:
             continue
         if child.name.startswith("."):
             continue
+        if child.name in INVOCATION_REPORT_DIR_NAMES:
+            continue
         if child.name in {"capture", "gameplay", "subsystem", "matrix"}:
             for dated in child.iterdir():
                 if dated.is_dir():
@@ -465,6 +488,12 @@ def _should_compress(path: Path, threshold_bytes: int) -> bool:
     if path.name in NEVER_COMPRESS_NAMES or path.name.endswith(".gz"):
         return False
     if path.name.startswith("deterministic_camera_capture_") and path.suffix.lower() == ".json":
+        return False
+    # Cross-repository terrain coverage is consumed after each row completes.
+    # Keep the line-oriented sidecar readable until the paired gate has
+    # evaluated it; compressing it between Current and Frozen makes a missing
+    # witness look like a renderer failure.
+    if path.name.startswith("static_terrain_parity") and path.suffix.lower() == ".jsonl":
         return False
     return path.stat().st_size >= threshold_bytes
 

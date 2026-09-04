@@ -34,7 +34,9 @@ public class VoxelMap implements PreparableReloadListener {
     private DimensionManager dimensionManager;
     private ClientLevel world;
     private String worldName = "";
-    private static String passMessage;
+    // Waypoint loading may queue this from a worker/server callback while the
+    // Rust semantic GUI tick consumes it on the render thread.
+    private static volatile String passMessage;
     private ArrayDeque<Runnable> runOnWorldSet = new ArrayDeque<>();
     VoxelMap() {}
 
@@ -78,11 +80,24 @@ public class VoxelMap implements PreparableReloadListener {
 
     public void onTickInGame(GuiGraphics guiGraphics) {
         this.map.onTickInGame(guiGraphics);
+        flushPendingPlayerMessage();
+    }
+
+    /**
+     * Advances VoxelMap state without Java GPU drawing while Rust owns the
+     * frame. Messages queued during waypoint loading still belong to
+     * Minecraft's normal chat model, which the semantic GUI collector renders.
+     */
+    public void onTickSemantic() {
+        this.map.onTickSemantic();
+        flushPendingPlayerMessage();
+    }
+
+    public void flushPendingPlayerMessage() {
         if (passMessage != null) {
             VoxelConstants.getMinecraft().gui.getChat().addMessage(Component.literal(passMessage));
             passMessage = null;
         }
-
     }
 
     public void onTick() {

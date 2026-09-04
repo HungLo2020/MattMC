@@ -268,7 +268,7 @@ public class ColumnBox
 		}
 	}
 	
-	private static void makeAdjVerticalQuad(
+	static void makeAdjVerticalQuad(
 		LodQuadBuilder builder, PhantomArrayListCheckout phantomArrayCheckout,
 		@NotNull ColumnArrayView adjColumnView, boolean adjacentIsSameDetailLevel, int caveCullingMaxY, EDhDirection direction,
 			short x, short yMin, short z, short horizontalWidth, short ySize,
@@ -566,7 +566,7 @@ public class ColumnBox
 			&& (ColorUtil.getAlpha(color) < 255 || isTransparentMaterial(materialId));
 	}
 
-	private static boolean isTransparent(long dataPoint, boolean transparencyEnabled)
+	static boolean isTransparent(long dataPoint, boolean transparencyEnabled)
 	{
 		return RenderDataPointUtil.doesDataPointExist(dataPoint)
 			&& transparencyEnabled
@@ -579,7 +579,7 @@ public class ColumnBox
 		return isWaterMaterial(materialId) || isLeavesMaterial(materialId);
 	}
 
-	private static boolean isWaterMaterial(int materialId)
+	static boolean isWaterMaterial(int materialId)
 	{
 		return materialId == EDhApiBlockMaterial.WATER.index;
 	}
@@ -589,7 +589,7 @@ public class ColumnBox
 		return materialId == EDhApiBlockMaterial.LEAVES.index;
 	}
 
-	private static boolean isWaterSurfaceOccludingMaterial(int materialId)
+	static boolean isWaterSurfaceOccludingMaterial(int materialId)
 	{
 		switch (EDhApiBlockMaterial.getFromIndex(materialId))
 		{

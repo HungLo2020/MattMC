@@ -282,23 +282,39 @@ public class ColumnRenderBufferBuilder
 							renderSource.getSemanticVariantPosition(relX, relZ, i),
 							renderSource.hasSemanticHorizontalUniformity(relX, relZ, i)
 						);
-						int semanticMaterialId = semanticMaterial.materialId();
+					ColumnRenderSource.SemanticHorizontalContributor[] horizontalContributors =
+						renderSource.getSemanticHorizontalContributorSpans(relX, relZ, i);
+					List<ColumnRenderSource.SemanticMaterialSpan> semanticMaterialSpans =
+						resolveSemanticMaterialSpans(renderSource, thisDetailLevel, relX, relZ, i, quadBuilder);
+					if (thisDetailLevel > 0 && !renderSource.hasSemanticHorizontalUniformity(relX, relZ, i))
+					{
+						List<ColumnRenderSource.SemanticMaterialSpan> commonHorizontalSpans =
+							recoverCommonHorizontalSpans(data, horizontalContributors);
+						if (!commonHorizontalSpans.isEmpty())
+						{
+							semanticMaterialSpans = commonHorizontalSpans.stream()
+								.map(span -> withBuilderMaterial(renderSource, quadBuilder, span))
+								.toList();
+						}
+						semanticMaterial = recoverCommonHorizontalProvenance(
+							renderSource, data, horizontalContributors, semanticMaterial
+						);
+					}
+					int semanticMaterialId = semanticMaterial.materialId();
 						if (semanticMaterialId > ColumnRenderSource.SEMANTIC_MATERIAL_UNAVAILABLE)
 						{
 							semanticMaterialId = quadBuilder.internSemanticMaterial(
 								renderSource.getSemanticMaterialIdentity(semanticMaterialId)
 							);
 						}
-						List<ColumnRenderSource.SemanticMaterialSpan> semanticMaterialSpans =
-							resolveSemanticMaterialSpans(renderSource, thisDetailLevel, relX, relZ, i, quadBuilder);
-						
 						addRenderDataPointToBuilder(
-								clientLevel, phantomArrayCheckout,
+								renderSource, clientLevel, phantomArrayCheckout,
 								data, topDataPoint, bottomDataPoint,
 								adjColumnViews, isSameDetailLevel,
 							thisDetailLevel, relX, relZ, semanticMaterialId,
 							semanticMaterial.variantState(), semanticMaterial.variantPosition(),
 							semanticMaterialSpans,
+						horizontalContributors,
 							quadBuilder, debugSourceFlag);
 					}
 					
@@ -347,6 +363,82 @@ public class ColumnRenderBufferBuilder
 	static record SemanticMaterialProvenance(int materialId, byte variantState, long variantPosition) { }
 
 	/**
+	 * Recovers a coarse cell's semantic identity only when every bounded
+	 * horizontal contributor proves the same complete vertical source interval.
+	 * This does not make heterogeneous terrain uniform: layered, missing, or
+	 * differently seeded contributors remain explicitly unavailable/mixed.
+	 */
+	static SemanticMaterialProvenance recoverCommonHorizontalProvenance(
+		ColumnRenderSource renderSource,
+		long renderData,
+		ColumnRenderSource.SemanticHorizontalContributor[] contributors,
+		SemanticMaterialProvenance fallback
+	)
+	{
+		if (contributors == null || contributors.length != 4 || !RenderDataPointUtil.doesDataPointExist(renderData))
+		{
+			return fallback;
+		}
+		int minY = RenderDataPointUtil.getYMin(renderData);
+		int maxY = RenderDataPointUtil.getYMax(renderData);
+		ColumnRenderSource.SemanticMaterialSpan first = null;
+		for (ColumnRenderSource.SemanticHorizontalContributor contributor : contributors)
+		{
+			List<ColumnRenderSource.SemanticMaterialSpan> spans = clippedContributorSpans(contributor, minY, maxY);
+			if (spans.size() != 1)
+			{
+				return fallback;
+			}
+			ColumnRenderSource.SemanticMaterialSpan span = spans.getFirst();
+			if (span.minY() != minY || span.maxY() != maxY
+				|| span.materialId() <= ColumnRenderSource.SEMANTIC_MATERIAL_UNAVAILABLE
+				|| span.variantState() != ColumnRenderSource.SEMANTIC_VARIANT_EXACT)
+			{
+				return fallback;
+			}
+			if (first == null)
+			{
+				first = span;
+			}
+			else if (span.materialId() != first.materialId()
+				|| span.variantPosition() != first.variantPosition())
+			{
+				return fallback;
+			}
+		}
+		return new SemanticMaterialProvenance(
+			first.materialId(), ColumnRenderSource.SEMANTIC_VARIANT_EXACT, first.variantPosition()
+		);
+	}
+
+	/** Returns a shared, clipped vertical layer sequence when all contributors agree. */
+	static List<ColumnRenderSource.SemanticMaterialSpan> recoverCommonHorizontalSpans(
+		long renderData,
+		ColumnRenderSource.SemanticHorizontalContributor[] contributors
+	)
+	{
+		if (contributors == null || contributors.length != 4 || !RenderDataPointUtil.doesDataPointExist(renderData))
+		{
+			return List.of();
+		}
+		int minY = RenderDataPointUtil.getYMin(renderData);
+		int maxY = RenderDataPointUtil.getYMax(renderData);
+		List<ColumnRenderSource.SemanticMaterialSpan> first = null;
+		for (ColumnRenderSource.SemanticHorizontalContributor contributor : contributors)
+		{
+			List<ColumnRenderSource.SemanticMaterialSpan> clipped = clippedContributorSpans(contributor, minY, maxY);
+			if (clipped.isEmpty() || clipped.getFirst().minY() != minY
+				|| clipped.getLast().maxY() != maxY)
+			{
+				return List.of();
+			}
+			if (first == null) first = clipped;
+			else if (!first.equals(clipped)) return List.of();
+		}
+		return first == null ? List.of() : first;
+	}
+
+	/**
 	 * A vertically reduced block-resolution DH entry can cover several real
 	 * source blocks. Convert its material intervals into builder-local IDs for
 	 * the CPU sidecar; no texture or backend object crosses this boundary.
@@ -389,12 +481,13 @@ public class ColumnRenderBufferBuilder
 	}
 
 	private static void addRenderDataPointToBuilder(
-			IDhClientLevel clientLevel, PhantomArrayListCheckout phantomArrayCheckout,
+			ColumnRenderSource renderSource, IDhClientLevel clientLevel, PhantomArrayListCheckout phantomArrayCheckout,
 			long renderData, long topRenderData, long bottomRenderData, 
 			ColumnArrayView[] adjColumnViews, boolean[] isSameDetailLevel,
 			byte detailLevel, int renderSourceOffsetPosX, int renderSourceOffsetPosZ, int semanticMaterialId,
 			byte semanticVariantState, long semanticVariantPosition,
 			List<ColumnRenderSource.SemanticMaterialSpan> semanticMaterialSpans,
+			ColumnRenderSource.SemanticHorizontalContributor[] horizontalContributors,
 			LodQuadBuilder quadBuilder, ColumnRenderSource.DebugSourceFlag debugSource)
 	{
 		long sectionPos = DhSectionPos.encode(detailLevel, renderSourceOffsetPosX, renderSourceOffsetPosZ);
@@ -522,6 +615,16 @@ public class ColumnRenderBufferBuilder
 				throw new IllegalArgumentException("Unknown debug mode: " + debugging);
 		}
 		
+		if (detailLevel > 0 && emitHorizontalContributorBoxes(
+			quadBuilder, renderSource, phantomArrayCheckout, clientLevel, blockMinX, blockMinY, blockMinZ, blockWidth, blockMaxY,
+							color, blockMaterialId, RenderDataPointUtil.getLightSky(renderData),
+							fullBright ? LodUtil.MAX_MC_LIGHT : RenderDataPointUtil.getLightBlock(renderData),
+							horizontalContributors, topRenderData, bottomRenderData, adjColumnViews, isSameDetailLevel,
+							caveCullingMaxY(clientLevel)))
+		{
+			return;
+		}
+
 		ColumnBox.addBoxQuadsToBuilder(
 				quadBuilder, phantomArrayCheckout, clientLevel,
 				blockWidth, blockMaxY,
@@ -535,6 +638,140 @@ public class ColumnRenderBufferBuilder
 			RenderDataPointUtil.getLightSky(renderData),
 				fullBright ? LodUtil.MAX_MC_LIGHT : RenderDataPointUtil.getLightBlock(renderData),
 				topRenderData, bottomRenderData, adjColumnViews, isSameDetailLevel);
+	}
+
+	/** Emits a complete four-cell footprint without creating internal side faces. */
+	private static boolean emitHorizontalContributorBoxes(
+		LodQuadBuilder builder, ColumnRenderSource renderSource, PhantomArrayListCheckout phantomArrayCheckout, IDhClientLevel clientLevel,
+		short minX, short minY, short minZ, short width, short height,
+		int color, byte blockMaterialId, byte skyLight, byte blockLight,
+		ColumnRenderSource.SemanticHorizontalContributor[] contributors,
+		long topData, long bottomData, ColumnArrayView[] adjacent, boolean[] adjacentSameDetail,
+		int caveCullingMaxY)
+	{
+		if (contributors == null || contributors.length != 4 || width < 2 || height <= 0) return false;
+		// Until per-contributor neighbour culling is available, only use this
+		// path for isolated cells; all ordinary terrain keeps ColumnBox's exact
+		// legacy occlusion and transparency rules.
+		if (adjacent == null || adjacentSameDetail == null
+			|| (Config.Client.Advanced.Graphics.Quality.transparency.get().fakeTransparencyEnabled)) return false;
+		boolean transparencyEnabled = Config.Client.Advanced.Graphics.Quality.transparency.get().transparencyEnabled;
+		short maxY = (short) (minY + height);
+		short childWidth = (short) (width / 2);
+		for (int index = 0; index < 4; index++)
+		{
+			ColumnRenderSource.SemanticHorizontalContributor contributor = contributors[index];
+			if (contributor == null || contributor.spans().isEmpty()) return false;
+		}
+		for (int dx = 0; dx < 2; dx++)
+		{
+			for (int dz = 0; dz < 2; dz++)
+			{
+				int index = dx * 2 + dz;
+				ColumnRenderSource.SemanticHorizontalContributor contributor = contributors[index];
+				int x = minX + dx * childWidth;
+				int z = minZ + dz * childWidth;
+				List<ColumnRenderSource.SemanticMaterialSpan> spans = clippedContributorSpans(contributor, minY, maxY);
+				if (spans.isEmpty() || spans.get(0).minY() > minY
+					|| spans.get(spans.size() - 1).maxY() < maxY) return false;
+				for (int spanIndex = 0; spanIndex < spans.size(); spanIndex++) {
+					ColumnRenderSource.SemanticMaterialSpan span = spans.get(spanIndex);
+					int spanId = builder.internSemanticMaterial(renderSource.getSemanticMaterialIdentity(span.materialId()));
+					short spanMinY = (short) span.minY();
+					short spanHeight = (short) (span.maxY() - span.minY());
+					boolean isTopSpan = span.maxY() == maxY;
+					boolean isBottomSpan = span.minY() == minY;
+					if (isTopSpan) {
+						boolean skipTop = RenderDataPointUtil.doesDataPointExist(topData)
+							&& RenderDataPointUtil.getYMin(topData) == maxY
+							&& !ColumnBox.isTransparent(topData, transparencyEnabled)
+							&& (!ColumnBox.isWaterMaterial(blockMaterialId)
+								|| ColumnBox.isWaterSurfaceOccludingMaterial(RenderDataPointUtil.getBlockMaterialId(topData)));
+						if (!skipTop) builder.addQuadUp((short) x, maxY, (short) z,
+							childWidth, childWidth, color, blockMaterialId, skyLight, blockLight,
+							spanId, span.variantState(), span.variantPosition());
+					}
+					if (isBottomSpan) {
+						boolean skipBottom = RenderDataPointUtil.doesDataPointExist(bottomData)
+							&& RenderDataPointUtil.getYMax(bottomData) == minY
+							&& !ColumnBox.isTransparent(bottomData, transparencyEnabled);
+						if (!skipBottom) builder.addQuadDown((short) x, minY, (short) z, childWidth, childWidth,
+							color, blockMaterialId, skyLight, blockLight,
+							spanId, span.variantState(), span.variantPosition());
+					}
+					ColumnRenderSource.SemanticMaterialSpan builderSpan = withBuilderMaterial(renderSource, builder, span);
+					if (dz == 0) addContributorSide(builder, phantomArrayCheckout, EDhDirection.NORTH, x, spanMinY, z,
+						childWidth, spanHeight, color, blockMaterialId, skyLight, blockLight,
+						builderSpan, adjacent[EDhDirection.NORTH.compassIndex], adjacentSameDetail[EDhDirection.NORTH.compassIndex], caveCullingMaxY);
+					if (dz == 1) addContributorSide(builder, phantomArrayCheckout, EDhDirection.SOUTH, x, spanMinY, z,
+						childWidth, spanHeight, color, blockMaterialId, skyLight, blockLight,
+						builderSpan, adjacent[EDhDirection.SOUTH.compassIndex], adjacentSameDetail[EDhDirection.SOUTH.compassIndex], caveCullingMaxY);
+					if (dx == 0) addContributorSide(builder, phantomArrayCheckout, EDhDirection.WEST, x, spanMinY, z,
+						childWidth, spanHeight, color, blockMaterialId, skyLight, blockLight,
+						builderSpan, adjacent[EDhDirection.WEST.compassIndex], adjacentSameDetail[EDhDirection.WEST.compassIndex], caveCullingMaxY);
+					if (dx == 1) addContributorSide(builder, phantomArrayCheckout, EDhDirection.EAST, x, spanMinY, z,
+						childWidth, spanHeight, color, blockMaterialId, skyLight, blockLight,
+						builderSpan, adjacent[EDhDirection.EAST.compassIndex], adjacentSameDetail[EDhDirection.EAST.compassIndex], caveCullingMaxY);
+				}
+			}
+		}
+		return true;
+	}
+
+	private static int caveCullingMaxY(IDhClientLevel clientLevel)
+	{
+		if (!Config.Client.Advanced.Graphics.Culling.enableCaveCulling.get()) return Integer.MIN_VALUE;
+		return Config.Client.Advanced.Graphics.Culling.caveCullingHeight.get()
+			- clientLevel.getLevelWrapper().getMinHeight();
+	}
+
+	private static ColumnRenderSource.SemanticMaterialSpan spanAt(
+		ColumnRenderSource.SemanticHorizontalContributor contributor, int y)
+	{
+		for (ColumnRenderSource.SemanticMaterialSpan span : contributor.spans())
+			if (y >= span.minY() && y < span.maxY()) return span;
+		return null;
+	}
+
+	static List<ColumnRenderSource.SemanticMaterialSpan> clippedContributorSpans(
+		ColumnRenderSource.SemanticHorizontalContributor contributor, int minY, int maxY)
+	{
+		List<ColumnRenderSource.SemanticMaterialSpan> clipped = new ArrayList<>();
+		for (ColumnRenderSource.SemanticMaterialSpan span : contributor.spans()) {
+			int clippedMin = Math.max(minY, span.minY());
+			int clippedMax = Math.min(maxY, span.maxY());
+			if (clippedMax > clippedMin) {
+				if (!clipped.isEmpty() && clipped.getLast().maxY() != clippedMin) return List.of();
+				clipped.add(new ColumnRenderSource.SemanticMaterialSpan(clippedMin, clippedMax,
+					span.materialId(), span.variantState(), span.variantPosition()));
+			}
+		}
+		return List.copyOf(clipped);
+	}
+
+	private static ColumnRenderSource.SemanticMaterialSpan withBuilderMaterial(
+		ColumnRenderSource renderSource, LodQuadBuilder builder, ColumnRenderSource.SemanticMaterialSpan span)
+	{
+		return new ColumnRenderSource.SemanticMaterialSpan(span.minY(), span.maxY(),
+			builder.internSemanticMaterial(renderSource.getSemanticMaterialIdentity(span.materialId())),
+			span.variantState(), span.variantPosition());
+	}
+
+	private static void addContributorSide(
+		LodQuadBuilder builder, PhantomArrayListCheckout phantomArrayCheckout, EDhDirection direction, int x, short y, int z,
+		short width, short height, int color, byte material, byte sky, byte block,
+		ColumnRenderSource.SemanticMaterialSpan span, ColumnArrayView adjacent, boolean sameDetail, int caveCullingMaxY)
+	{
+		if (adjacent == null) {
+			builder.addQuadAdj(direction, (short) x, y, (short) z, width, height,
+				color, material, sky, block, span.materialId(), span.variantState(), span.variantPosition());
+		} else {
+			ColumnBox.makeAdjVerticalQuad(builder, phantomArrayCheckout, adjacent, sameDetail,
+				caveCullingMaxY,
+				direction, (short) x, y, (short) z, width, height,
+				color, material, span.materialId(), span.variantState(), span.variantPosition(),
+				java.util.List.of(span), block);
+		}
 	}
 	
 }

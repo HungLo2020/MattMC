@@ -135,6 +135,7 @@ import java.util.Objects;
 import java.util.Set;
 import net.sodium.client.model.quad.BakedQuadView;
 import net.sodium.client.util.FogParameters;
+import net.minecraft.client.renderer.fog.FogRenderer;
 
 public final class RustGalWorldPrimitiveRenderer {
 	private static final Logger LOGGER = LogUtils.getLogger();
@@ -420,6 +421,13 @@ public final class RustGalWorldPrimitiveRenderer {
 		new BoundedSemanticQueue<>(MAX_RUST_WORLD_MESH_INSTANCES, "mesh-instance");
 	private static final List<PendingMeshProducer> PENDING_MESH_PRODUCERS =
 		new BoundedSemanticQueue<>(MAX_RUST_WORLD_MESH_INSTANCES, "mesh-producer");
+	// Mesh-key receipt for special block-model submissions.  The generic
+	// producer list is intentionally coarse and can contain glint/terrain
+	// entries that do not map one-to-one to instances; this set preserves an
+	// exact semantic-to-execution proof for the block-model family.
+	private static final Set<Long> PENDING_BLOCK_MODEL_MESH_KEYS = new LinkedHashSet<>();
+	private static final Set<Long> PENDING_MODEL_MESH_KEYS = new LinkedHashSet<>();
+	private static final Set<Long> PENDING_MODEL_PART_MESH_KEYS = new LinkedHashSet<>();
 	/**
 	 * Rust-owned static-terrain visibility residency. Sodium emits terrain
 	 * instances incrementally; an unchanged frame can therefore have no Java
@@ -458,8 +466,17 @@ public final class RustGalWorldPrimitiveRenderer {
 	private static final List<EntityLeashExecutionDiagnostic> ENTITY_LEASH_EXECUTION_DIAGNOSTICS = new ArrayList<>();
 	private static final Map<Long, VulkanicGalBridge.WorldMeshAssetRecord> WORLD_MESH_ASSETS = new LinkedHashMap<>();
 	private static final Set<Long> DIRTY_WORLD_MESH_ASSETS = new LinkedHashSet<>();
+	/**
+	 * Static terrain becomes Rust-owned once its explicit upload has completed.
+	 * Keep only the tiny identity/texture dependency here after that point; the
+	 * vertex and index payload must not remain in the Java registry for every
+	 * visible chunk for the rest of a stationary camera session.
+	 */
+	private static final Map<Long, StaticTerrainMeshResidency> STATIC_TERRAIN_MESH_RESIDENCY = new LinkedHashMap<>();
 	private static final Map<Long, VulkanicGalBridge.WorldMeshSortedIndexRecord> WORLD_MESH_SORTED_INDICES = new LinkedHashMap<>();
 	private static final Set<Long> DIRTY_WORLD_MESH_SORTED_INDICES = new LinkedHashSet<>();
+	/** Explicit Rust resource retirements awaiting the next immutable mesh update. */
+	private static final Map<Long, Long> PENDING_WORLD_MESH_RETIREMENTS = new LinkedHashMap<>();
 	private static final Map<Integer, VulkanicGalBridge.WorldMeshTextureAssetRecord> WORLD_MESH_TEXTURES = new LinkedHashMap<>();
 	/** Collision guard for hashed semantic identities used by custom particle atlases. */
 	private static final Map<Integer, ResourceLocation> PARTICLE_ATLAS_TEXTURE_IDENTITIES = new LinkedHashMap<>();
@@ -484,6 +501,8 @@ public final class RustGalWorldPrimitiveRenderer {
 	// meshes across otherwise valid frames.  The Rust ABI validates each record
 	// independently; this aggregate cap only controls Java-side batching.
 	private static final int MAX_WORLD_MESH_ASSETS_PER_UPLOAD = 32;
+	/** Retirement transport is bounded independently from payload upload bytes. */
+	private static final int MAX_WORLD_MESH_RETIREMENTS_PER_UPLOAD = 512;
 	/** Java-side residency bounds for copied world assets; Rust validates each record too. */
 	private static final int MAX_WORLD_MESH_ASSET_RESIDENCY = 16_384;
 	/** Must match Rust's WORLD_MAX_MESH_TEXTURE_ASSETS bound. */
@@ -600,6 +619,7 @@ public final class RustGalWorldPrimitiveRenderer {
 	private static final List<ExperienceOrbExecutionDiagnostic> EXPERIENCE_ORB_EXECUTION_DIAGNOSTICS = new ArrayList<>();
 	private static final List<BeaconBeamDiagnostic> BEACON_BEAM_DIAGNOSTICS = new ArrayList<>();
 	private static final List<BeaconBeamExecutionDiagnostic> BEACON_BEAM_EXECUTION_DIAGNOSTICS = new ArrayList<>();
+	private static final List<CrystalBeamExecutionDiagnostic> CRYSTAL_BEAM_EXECUTION_DIAGNOSTICS = new ArrayList<>();
 	private static final List<CloudTraversalDiagnostic> CLOUD_TRAVERSAL_DIAGNOSTICS = new ArrayList<>();
 	private static final List<CloudSemanticDiagnostic> CLOUD_SEMANTIC_DIAGNOSTICS = new ArrayList<>();
 	private static final List<CloudExecutionDiagnostic> CLOUD_EXECUTION_DIAGNOSTICS = new ArrayList<>();
@@ -723,6 +743,23 @@ public final class RustGalWorldPrimitiveRenderer {
 
 	public static boolean shouldRouteTerrainParticle(BlockState blockState) {
 		WorldRenderRoutePolicy.Route route = WorldRenderRoutePolicy.currentMaterialRoute();
+		boolean disabled = Boolean.getBoolean("mattmc.dev.rustGalWorldMaterial.terrainParticle.disabled");
+		boolean legacyControl = Boolean.getBoolean("mattmc.dev.rustGalWorldMaterial.terrainParticle.legacyControl");
+		if (disabled || legacyControl) {
+			// The collector has a direct whole-frame path that intentionally bypasses
+			// vanilla ParticleEngine.extract(). Keep these controls at the common
+			// semantic admission boundary so a diagnostic setting cannot be ignored
+			// by that path. Under Vulkan, refusing the route must remain an explicit
+			// unavailable capability rather than reopening Java rendering.
+			if (route.usesRustWholeFrameVulkan()
+				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+				throw new IllegalStateException(
+					"Rust whole-frame terrain particle route is unavailable under "
+						+ (disabled ? "disabled" : "legacy") + " control"
+				);
+			}
+			return false;
+		}
 		return (route.usesRustOpenGl() || route.usesRustWholeFrameVulkan())
 			&& terrainParticleTextureId(blockState) != 0;
 	}
@@ -1217,6 +1254,9 @@ public final class RustGalWorldPrimitiveRenderer {
 				PENDING_MESH_INSTANCES.clear();
 				ACTIVE_STATIC_TERRAIN_INSTANCES.clear();
 				PENDING_MESH_PRODUCERS.clear();
+				PENDING_BLOCK_MODEL_MESH_KEYS.clear();
+				PENDING_MODEL_MESH_KEYS.clear();
+				PENDING_MODEL_PART_MESH_KEYS.clear();
 				PENDING_MODEL_MESH_SEMANTICS.clear();
 				RustGalTerrainRenderer.invalidateForResourceReload();
 			attemptedWorldMeshAssetGeneration = Math.min(attemptedWorldMeshAssetGeneration, uploadedWorldMeshAssetGeneration);
@@ -1353,7 +1393,8 @@ public final class RustGalWorldPrimitiveRenderer {
 		synchronized (LOCK) {
 			if (bridge == null || (DIRTY_WORLD_MESH_ASSETS.isEmpty()
 				&& DIRTY_WORLD_MESH_TEXTURES.isEmpty()
-				&& DIRTY_WORLD_MESH_SORTED_INDICES.isEmpty())) {
+				&& DIRTY_WORLD_MESH_SORTED_INDICES.isEmpty()
+				&& PENDING_WORLD_MESH_RETIREMENTS.isEmpty())) {
 				return null;
 			}
 			long uploadGeneration = Math.max(worldMeshAssetGeneration, nextWorldMeshUploadGeneration + 1L);
@@ -1365,20 +1406,28 @@ public final class RustGalWorldPrimitiveRenderer {
 				);
 				List<VulkanicGalBridge.WorldMeshTextureAssetRecord> dirtyTextures = dirtyWorldMeshTextureAssetsLocked();
 				List<VulkanicGalBridge.WorldMeshSortedIndexRecord> dirtySortedIndices = dirtyWorldMeshSortedIndicesLocked(dirtyMeshes);
+				List<VulkanicGalBridge.WorldMeshAssetRetirementRecord> retirements = pendingWorldMeshRetirementsLocked(
+					MAX_WORLD_MESH_RETIREMENTS_PER_UPLOAD
+				);
 					VulkanicGalBridge.Status status = bridge.updateWorldMeshAssets(
 						uploadGeneration,
 						dirtyMeshes,
 						dirtyTextures,
-						dirtySortedIndices
+						dirtySortedIndices,
+						retirements
 					);
 					nextWorldMeshUploadGeneration = uploadGeneration;
 					uploadedWorldMeshAssetGeneration = uploadGeneration;
 					for (VulkanicGalBridge.WorldMeshAssetRecord mesh : dirtyMeshes) {
 						UPLOADED_WORLD_MESH_GENERATIONS.put(mesh.meshKey(), mesh.meshGeneration());
 						DIRTY_WORLD_MESH_ASSETS.remove(mesh.meshKey());
+						releaseUploadedStaticTerrainPayloadLocked(mesh.meshKey(), mesh.meshGeneration());
 					}
 					for (VulkanicGalBridge.WorldMeshSortedIndexRecord sortedIndex : dirtySortedIndices) {
 						DIRTY_WORLD_MESH_SORTED_INDICES.remove(sortedIndex.meshKey());
+					}
+					for (VulkanicGalBridge.WorldMeshAssetRetirementRecord retirement : retirements) {
+						PENDING_WORLD_MESH_RETIREMENTS.remove(retirement.meshKey(), retirement.meshGeneration());
 					}
 					for (VulkanicGalBridge.WorldMeshTextureAssetRecord texture : dirtyTextures) {
 						UPLOADED_WORLD_MESH_TEXTURES.add(texture.textureId());
@@ -1819,6 +1868,9 @@ public final class RustGalWorldPrimitiveRenderer {
 			worldTextDiagnostic = WorldTextDiagnostic.empty(semanticFrameSequence);
 			PENDING_MESH_INSTANCES.clear();
 			PENDING_MESH_PRODUCERS.clear();
+			PENDING_BLOCK_MODEL_MESH_KEYS.clear();
+			PENDING_MODEL_MESH_KEYS.clear();
+			PENDING_MODEL_PART_MESH_KEYS.clear();
 			PENDING_FIRST_PERSON_MESH_INSTANCES.clear();
 			pendingFirstPersonFrame = false;
 			pendingFirstPersonGuiCapture = false;
@@ -1843,6 +1895,9 @@ public final class RustGalWorldPrimitiveRenderer {
 				? camera
 				: Minecraft.getInstance().gameRenderer.getMainCamera();
 			seedFrameMatricesLocked(viewMatrix, projectionMatrix, viewportWidth, viewportHeight);
+			net.minecraft.client.dev.DeterministicCameraCapture.recordRustSkyMatrices(
+				PENDING_VIEW.clone(), PENDING_PROJECTION.clone()
+			);
 			seedDiagnosticCameraOriginLocked(semanticCamera);
 			seedVoxelVolumeFrameLocked(semanticLevel, semanticCamera);
 			// Shader-enabled Vulkan frames can bypass vanilla's background
@@ -2298,10 +2353,25 @@ public final class RustGalWorldPrimitiveRenderer {
 			auditSemanticInputGap("background camera-position=non-finite");
 			return;
 		}
+		// LevelRenderer clears the main target with the computed vanilla fog
+		// colour, then SkyRenderer draws the finite biome/time sky disc over it.
+		// This early seed is also used on frames where the later background
+		// callsite is unavailable, so it must carry that clear colour rather than
+		// `getSkyColor`; otherwise uncovered sky and fogged geometry receive the
+		// raw blue sky colour before Rust has a chance to apply the explicit sky
+		// pass.
+		Vector3f fogColor = shaderPackFogColor(level, camera);
+		int fogColorArgb = ARGB.color(
+			255,
+			Mth.clamp(Math.round(fogColor.x * 255.0F), 0, 255),
+			Mth.clamp(Math.round(fogColor.y * 255.0F), 0, 255),
+			Mth.clamp(Math.round(fogColor.z * 255.0F), 0, 255)
+		);
 		int skyColor = level.getSkyColor(position, shaderPackFramePartialTick);
+		net.minecraft.client.dev.DeterministicCameraCapture.recordRustSkyColor(skyColor);
 		pendingBackground = backgroundRecord(
 			backgroundSkyType(level),
-			ARGB.color(255, ARGB.red(skyColor), ARGB.green(skyColor), ARGB.blue(skyColor)),
+			fogColorArgb,
 			viewportWidth,
 			viewportHeight
 		);
@@ -2321,7 +2391,8 @@ public final class RustGalWorldPrimitiveRenderer {
 			? 0
 			: level.getSkyColor(camera.getPosition(), shaderPackFramePartialTick);
 		Vector3f fogColor = shaderPackFogColor(level, camera);
-		FogParameters fogParameters = shaderPackFogParameters();
+		FogRenderer.RustFogParameters rustFogParameters = shaderPackFogParameters(level, camera);
+		FogParameters fogParameters = rustFogParameters.parameters();
 		int biomePrecipitation = shaderPackBiomePrecipitation(level, camera);
 		String biomeResourceLocation = shaderPackBiomeResourceLocation(level, camera);
 		String mainHandItemModelResourceLocation = shaderPackHeldItemModelResourceLocation(
@@ -2355,7 +2426,7 @@ public final class RustGalWorldPrimitiveRenderer {
 			clampUnit(level.getSkyDarken(1.0F)),
 			shaderPackEyeSubmersion(camera),
 			(float)Math.max(0.0, Minecraft.getInstance().options.gamma().get()),
-			Minecraft.getInstance().options.getEffectiveRenderDistance() * 16.0F,
+			shaderPackDepthFar(),
 			(float)relativeEyePosition.x,
 			(float)relativeEyePosition.y,
 			(float)relativeEyePosition.z,
@@ -2400,8 +2471,29 @@ public final class RustGalWorldPrimitiveRenderer {
 			fogParameters.environmentalEnd(),
 			fogParameters.renderStart(),
 			fogParameters.renderEnd(),
-			shaderPackDistantHorizonsRenderDistance()
+			shaderPackDistantHorizonsRenderDistance(),
+			rustFogParameters.skyEnd()
 		);
+	}
+
+	/**
+	 * The shader-pack {@code far} semantic is the projection depth-far value,
+	 * matching the matrix passed to the same source frame. Vanilla derives this
+	 * from render distance and cloud range; reusing that exact computation keeps
+	 * depth reconstruction and linearization numerically coherent.
+	 */
+	private static float shaderPackDepthFar() {
+		// Shader-pack `far` is the render-distance scalar used by the source
+		// pack's fog/view-distance math.  The renderer's projection far plane is
+		// a separate clip-space value (and may be much larger), so it must not be
+		// substituted here.
+		return shaderPackDepthFarForRenderDistance(
+			Minecraft.getInstance().options.getEffectiveRenderDistance()
+		);
+	}
+
+	static float shaderPackDepthFarForRenderDistance(int effectiveRenderDistance) {
+		return Math.max(1.0F, effectiveRenderDistance * 16.0F);
 	}
 
 	/**
@@ -2415,10 +2507,20 @@ public final class RustGalWorldPrimitiveRenderer {
 	 * keeps one unit regardless of DH configuration readiness.</p>
 	 */
 	private static int shaderPackDistantHorizonsRenderDistance() {
+		int vanillaRenderDistance = Math.max(0, Minecraft.getInstance().options.getEffectiveRenderDistance() * 16);
 		if (DhApi.Delayed.configs != null) {
-			return Math.max(0, DhApi.Delayed.configs.graphics().chunkRenderDistance().getValue() * 16);
+			// Complementary reuses this scalar for its normal-world border fog as
+			// well as its DH branch.  DH's configured radius may be deliberately
+			// smaller than the vanilla view distance (the migration fixture uses
+			// that configuration), which otherwise saturates border fog across the
+			// entire near-terrain image.  Preserve the larger gameplay-visible
+			// radius while keeping the value in block units and independent of any
+			// Iris renderer state.
+			int distantHorizonsRenderDistance = Math.max(0,
+				DhApi.Delayed.configs.graphics().chunkRenderDistance().getValue() * 16);
+			return Math.max(vanillaRenderDistance, distantHorizonsRenderDistance);
 		}
-		return Math.max(0, Minecraft.getInstance().options.getEffectiveRenderDistance() * 16);
+		return vanillaRenderDistance;
 	}
 
 	/**
@@ -2427,13 +2529,23 @@ public final class RustGalWorldPrimitiveRenderer {
 	 * populates its fog uniforms, but no Iris object, GL state, or uniform
 	 * location crosses into Rust.
 	 */
-	private static FogParameters shaderPackFogParameters() {
-		// The Rust whole-frame route computes this frame's fog before semantic
-		// extraction. Sodium's hook cache is populated by its separate terrain
-		// setup path, which does not run here; reading it would instead retain a
-		// stale DH-cancelled sentinel range. Keep the copied input tied to the
-		// same fresh vanilla fog computation as the selected frame.
-		return Minecraft.getInstance().gameRenderer.fogRenderer.sodium$getFogParameters();
+	private static FogRenderer.RustFogParameters shaderPackFogParameters(ClientLevel level, Camera camera) {
+		// Recompute the same vanilla gameplay fog record at the semantic boundary.
+		// Do not read Sodium's cached hook record: its Java/DH compatibility path
+		// may intentionally contain the legacy cancellation sentinel, while Rust
+		// owns no DH renderer that could consume that side effect.
+		Minecraft minecraft = Minecraft.getInstance();
+		boolean worldFog = level.effects().isFoggyAt(
+			camera.getBlockPosition().getX(), camera.getBlockPosition().getZ()
+		) || minecraft.gui.getBossOverlay().shouldCreateWorldFog();
+		return minecraft.gameRenderer.fogRenderer.collectFogParametersForRust(
+			camera,
+			minecraft.options.getEffectiveRenderDistance(),
+			worldFog,
+			minecraft.getDeltaTracker(),
+			minecraft.gameRenderer.getDarkenWorldAmount(shaderPackFramePartialTick),
+			level
+		);
 	}
 
 	/**
@@ -3015,10 +3127,11 @@ public final class RustGalWorldPrimitiveRenderer {
 
 	/** Copies SkyRenderer's below-horizon eight-segment dark disc fan. */
 	private static void enqueueVanillaDarkDiscLocked(Camera camera) {
-		Vec3 cameraPosition = camera.getPosition();
+		// Frozen pushes the already-installed camera ModelView matrix and then
+		// applies only this local offset. The Rust frame's view matrix owns that
+		// camera transform, so baking camera position/rotation into vertices here
+		// applies it a second time and turns the below-horizon fan into wedges.
 		Matrix4f transform = new Matrix4f()
-			.translate((float)cameraPosition.x, (float)cameraPosition.y, (float)cameraPosition.z)
-			.rotate(camera.rotation())
 			.translate(0.0F, 12.0F, 0.0F);
 		for (int index = 0; index < 8; index++) {
 			float angle0 = (-180.0F + index * 45.0F) * Mth.DEG_TO_RAD;
@@ -3563,6 +3676,7 @@ public final class RustGalWorldPrimitiveRenderer {
 				PENDING_MESH_INSTANCES.size(),
 				PENDING_MESH_PRODUCERS.size(),
 				Set.copyOf(PENDING_MODEL_MESH_SEMANTICS),
+				Set.copyOf(PENDING_MODEL_PART_MESH_KEYS),
 				Set.copyOf(WORLD_MESH_ASSETS.keySet()),
 				Set.copyOf(WORLD_MESH_TEXTURES.keySet()),
 				worldMeshAssetGeneration,
@@ -3585,6 +3699,8 @@ public final class RustGalWorldPrimitiveRenderer {
 			PENDING_MESH_PRODUCERS.subList(checkpoint.producers, PENDING_MESH_PRODUCERS.size()).clear();
 			PENDING_MODEL_MESH_SEMANTICS.clear();
 			PENDING_MODEL_MESH_SEMANTICS.addAll(checkpoint.modelSemantics);
+			PENDING_MODEL_PART_MESH_KEYS.clear();
+			PENDING_MODEL_PART_MESH_KEYS.addAll(checkpoint.modelPartMeshKeys);
 			WORLD_MESH_ASSETS.keySet().removeIf(key -> {
 				if (checkpoint.meshAssets.contains(key)) return false;
 				DIRTY_WORLD_MESH_ASSETS.remove(key);
@@ -3608,6 +3724,7 @@ public final class RustGalWorldPrimitiveRenderer {
 		private final int meshInstances;
 		private final int producers;
 		private final Set<ModelMeshSemanticIdentity> modelSemantics;
+		private final Set<Long> modelPartMeshKeys;
 		private final Set<Long> meshAssets;
 		private final Set<Integer> textureAssets;
 		private final long meshGeneration;
@@ -3619,6 +3736,7 @@ public final class RustGalWorldPrimitiveRenderer {
 			int meshInstances,
 			int producers,
 			Set<ModelMeshSemanticIdentity> modelSemantics,
+			Set<Long> modelPartMeshKeys,
 			Set<Long> meshAssets,
 			Set<Integer> textureAssets,
 			long meshGeneration,
@@ -3629,6 +3747,7 @@ public final class RustGalWorldPrimitiveRenderer {
 			this.meshInstances = meshInstances;
 			this.producers = producers;
 			this.modelSemantics = Set.copyOf(modelSemantics);
+			this.modelPartMeshKeys = Set.copyOf(modelPartMeshKeys);
 			this.meshAssets = Set.copyOf(meshAssets);
 			this.textureAssets = Set.copyOf(textureAssets);
 			this.meshGeneration = meshGeneration;
@@ -3923,12 +4042,12 @@ public final class RustGalWorldPrimitiveRenderer {
 		for (float value : uvs) {
 			if (!Float.isFinite(value)) throw new IllegalArgumentException("Rust first-person textured quad contains non-finite UVs");
 		}
-		synchronized (LOCK) {
-			if (!pendingFirstPersonFrame || pendingViewportWidth <= 0 || pendingViewportHeight <= 0
-				|| PENDING_FIRST_PERSON_MESH_INSTANCES.size() >= MAX_RUST_WORLD_MESH_INSTANCES) {
-				return false;
+			synchronized (LOCK) {
+				if (!pendingFirstPersonFrame || pendingViewportWidth <= 0 || pendingViewportHeight <= 0
+					|| PENDING_FIRST_PERSON_MESH_INSTANCES.size() >= MAX_RUST_WORLD_MESH_INSTANCES) {
+					return false;
+				}
 			}
-		}
 		byte[] texturePayload = readTexturePayloadForResource(textureIdentity);
 		if (texturePayload == null) {
 			// Bedrock packs may expose a CPU-backed DynamicTexture or atlas snapshot
@@ -3983,7 +4102,7 @@ public final class RustGalWorldPrimitiveRenderer {
 				}
 				meshVertices.add(new VulkanicGalBridge.WorldMeshVertexRecord(
 					x, y, z, uvs[uv], uvs[uv + 1], uvs[uv], uvs[uv + 1],
-					0, 1, colors[quad], normal, lightCoords, 0
+					0, 1, 0, colors[quad], normal, lightCoords, 0
 				));
 			}
 			meshIndices.add(base); meshIndices.add(base + 1); meshIndices.add(base + 2);
@@ -4011,12 +4130,15 @@ public final class RustGalWorldPrimitiveRenderer {
 			),
 			List.of(minecraftModelTextureAsset(textureId, texturePayload))
 		);
-		synchronized (LOCK) {
+			synchronized (LOCK) {
 			if (!pendingFirstPersonFrame || pendingViewportWidth <= 0 || pendingViewportHeight <= 0) return false;
 			ensureMeshAssetLocked(extraction);
 			VulkanicGalBridge.WorldMeshAssetRecord cached = WORLD_MESH_ASSETS.get(meshKey);
 			long generation = cached == null ? meshGeneration : cached.meshGeneration();
-			if (!isWorldMeshGenerationAndTexturesUploadedLocked(meshKey, generation)) return false;
+			// Asset updates and first-person instances share one explicit frame
+			// transaction. The asset may be awaiting backend confirmation during
+			// this producer callback; consumeFrame() will admit the instance only
+			// after the exact generation and texture dependencies are uploaded.
 			ensureWorldQueueCapacityLocked(
 				PENDING_FIRST_PERSON_MESH_INSTANCES.size(), 1, MAX_RUST_WORLD_MESH_INSTANCES, "first-person-mesh-instance"
 			);
@@ -4527,9 +4649,16 @@ public final class RustGalWorldPrimitiveRenderer {
 			return false;
 		}
 		if (Minecraft.getInstance().getModelManager().specialBlockModelRenderer().get().hasRenderer(blockState.getBlock())) {
-			lastBlockDisplayAdmissionFailure = "special-renderer";
-			if (forceWholeFrameVulkan) throw blockDisplayAdmissionFailure(blockSubmit, lastBlockDisplayAdmissionFailure);
-			return false;
+			/*
+			 * Special block renderers (chests, beds, signs, skulls, etc.) already
+			 * submitted their model/model-part semantics while the collector was
+			 * building this BlockSubmit. The block submit is only the dispatch
+			 * marker; admitting it here must not duplicate geometry or reject the
+			 * already-copied semantic submission. The feature renderer will process
+			 * that explicit model submission below.
+			 */
+			lastBlockDisplayAdmissionFailure = "special-renderer-semantic-submitted";
+			return true;
 		}
 		ChunkSectionLayer layer = ItemBlockRenderTypes.getChunkRenderType(blockState);
 		MeshMaterial material = meshMaterialForChunkLayer(layer);
@@ -4677,6 +4806,10 @@ public final class RustGalWorldPrimitiveRenderer {
 					overlayColorArgb(submit.overlayCoords()), submit.outlineColor()
 				));
 				PENDING_MESH_PRODUCERS.add(PendingMeshProducer.BLOCK_MODEL);
+				if (PENDING_BLOCK_MODEL_MESH_KEYS.size() >= MAX_RUST_WORLD_MESH_INSTANCES) {
+					PENDING_BLOCK_MODEL_MESH_KEYS.remove(PENDING_BLOCK_MODEL_MESH_KEYS.iterator().next());
+				}
+				PENDING_BLOCK_MODEL_MESH_KEYS.add(extraction.meshKey());
 			} catch (RuntimeException failure) {
 				rollbackModelMeshBatch(batchCheckpoint);
 				throw failure;
@@ -7791,6 +7924,10 @@ public final class RustGalWorldPrimitiveRenderer {
 				if (!pendingFirstPersonFrame) {
 					PENDING_MESH_PRODUCERS.add(PendingMeshProducer.MODEL_PART);
 				}
+				if (PENDING_MODEL_PART_MESH_KEYS.size() >= MAX_RUST_WORLD_MESH_INSTANCES) {
+					PENDING_MODEL_PART_MESH_KEYS.remove(PENDING_MODEL_PART_MESH_KEYS.iterator().next());
+				}
+				PENDING_MODEL_PART_MESH_KEYS.add(extraction.meshKey());
 				recordModelMeshDiagnostic(
 					textureIdentity,
 					-1,
@@ -7865,7 +8002,11 @@ public final class RustGalWorldPrimitiveRenderer {
 				MATERIAL_ID_TRANSLUCENT_TEXTURED,
 				MATERIAL_MODE_TRANSLUCENT,
 				DEPTH_POLICY_TEST_NO_WRITE,
-				renderType.pipeline().isCull() ? CULL_BACK : CULL_NONE
+				// Vanilla entity-translucent model layers are rendered double-sided
+				// (the hand layer uses this contract too). Preserve that semantic
+				// explicitly; relying on a transient RenderType cull bit makes the
+				// copied first-person mesh disappear when its winding is mirrored.
+				CULL_NONE
 			);
 		}
 		return new ModelMeshRenderSemantics(
@@ -8174,16 +8315,19 @@ public final class RustGalWorldPrimitiveRenderer {
 			synchronized (LOCK) {
 				int viewportWidth = pendingViewportWidth;
 				int viewportHeight = pendingViewportHeight;
+				List<VulkanicGalBridge.WorldMeshInstanceRecord> destination = pendingFirstPersonFrame
+					? PENDING_FIRST_PERSON_MESH_INSTANCES
+					: PENDING_MESH_INSTANCES;
 					ensureBoundedWorldPrimitiveViewportLocked("Rust VulkanicGAL model mesh requires a seeded bounded world primitive frame");
 				ensureWorldQueueCapacityLocked(
-					PENDING_MESH_INSTANCES.size(), 1, MAX_RUST_WORLD_MESH_INSTANCES, "mesh-instance"
+					destination.size(), 1, MAX_RUST_WORLD_MESH_INSTANCES, "mesh-instance"
 				);
 				ensureMeshAssetLocked(extraction);
 				VulkanicGalBridge.WorldMeshAssetRecord cachedAsset = WORLD_MESH_ASSETS.get(extraction.meshKey());
 				long meshGeneration = cachedAsset == null ? extraction.meshGeneration() : cachedAsset.meshGeneration();
 				float[] transform = new float[16];
 				entityPose.pose().get(transform);
-				PENDING_MESH_INSTANCES.add(new VulkanicGalBridge.WorldMeshInstanceRecord(
+				destination.add(new VulkanicGalBridge.WorldMeshInstanceRecord(
 					STRATUM_WORLD_ENTITY_MESH,
 					extraction.meshKey(),
 					meshGeneration,
@@ -8200,10 +8344,19 @@ public final class RustGalWorldPrimitiveRenderer {
 					outlineColor,
 					flags
 				));
-				PENDING_MESH_PRODUCERS.add(PendingMeshProducer.MODEL);
+				if (pendingFirstPersonFrame && pendingFirstPersonMainHandCapture) {
+					pendingFirstPersonMainHandInstanceCount++;
+				}
+				if (!pendingFirstPersonFrame) {
+					PENDING_MESH_PRODUCERS.add(PendingMeshProducer.MODEL);
+				}
 				PENDING_MODEL_MESH_SEMANTICS.add(new ModelMeshSemanticIdentity(
 					model.getClass().getName(), textureIdentity
 				));
+				if (PENDING_MODEL_MESH_KEYS.size() >= MAX_RUST_WORLD_MESH_INSTANCES) {
+					PENDING_MODEL_MESH_KEYS.remove(PENDING_MODEL_MESH_KEYS.iterator().next());
+				}
+				PENDING_MODEL_MESH_KEYS.add(extraction.meshKey());
 				recordModelMeshDiagnostic(
 					textureIdentity,
 					diagnosticEntityId,
@@ -8218,13 +8371,15 @@ public final class RustGalWorldPrimitiveRenderer {
 					"model",
 					"rust-vulkan-whole-frame:" + textureIdentity
 				);
-				auditMessage("Rust VulkanicGAL model mesh request"
-					+ " mesh_key=" + extraction.meshKey()
-					+ " mesh_generation=" + meshGeneration
-					+ " texture=" + textureIdentity
-					+ " vertices=" + extraction.asset().vertices().size()
-					+ " sections=" + extraction.asset().sections().size()
-					+ " result=queued");
+				if (Boolean.getBoolean("mattmc.dev.graphicsAuditVerboseMeshes")) {
+					auditMessage("Rust VulkanicGAL model mesh request"
+						+ " mesh_key=" + extraction.meshKey()
+						+ " mesh_generation=" + meshGeneration
+						+ " texture=" + textureIdentity
+						+ " vertices=" + extraction.asset().vertices().size()
+						+ " sections=" + extraction.asset().sections().size()
+						+ " result=queued");
+				}
 			}
 		} finally {
 			GraphicsFrameBenchmark.endPhase("world.model.rust-enqueue");
@@ -8727,6 +8882,14 @@ public final class RustGalWorldPrimitiveRenderer {
 				changed = true;
 			}
 		}
+		if (DeterministicCameraCapture.isActiveForDiagnostics()
+			&& (extraction.asset().entityIdentity().contains("player_hand")
+				|| extraction.asset().entityIdentity().contains("textures/entity/player"))) {
+			auditMessage("Rust VulkanicGAL hand texture registration"
+				+ " texture_ids=" + extraction.textures().stream().map(VulkanicGalBridge.WorldMeshTextureAssetRecord::textureId).toList()
+				+ " payload_bytes=" + extraction.textures().stream().mapToInt(texture -> texture.pngBytes().length).sum()
+				+ " mesh_generation=" + extraction.asset().meshGeneration());
+		}
 		if (previousAsset == null) {
 			WORLD_MESH_ASSETS.put(extraction.meshKey(), extraction.asset());
 			DIRTY_WORLD_MESH_ASSETS.add(extraction.meshKey());
@@ -8740,6 +8903,20 @@ public final class RustGalWorldPrimitiveRenderer {
 	public static void registerStaticTerrainMeshAsset(
 		VulkanicGalBridge.WorldMeshAssetRecord asset,
 		List<VulkanicGalBridge.WorldMeshTextureAssetRecord> textures
+	) {
+		registerStaticTerrainMeshAsset(asset, textures, false);
+	}
+
+	/**
+	 * Registers a copied static-terrain asset.  Translucent meshes retain their
+	 * CPU index payload because camera-relative sorting may explicitly replace
+	 * it later; opaque and cutout meshes are released from Java immediately
+	 * after Rust acknowledges their upload.
+	 */
+	public static void registerStaticTerrainMeshAsset(
+		VulkanicGalBridge.WorldMeshAssetRecord asset,
+		List<VulkanicGalBridge.WorldMeshTextureAssetRecord> textures,
+		boolean retainCpuPayloadForDynamicSort
 	) {
 		if (!WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan()) {
 			return;
@@ -8780,11 +8957,23 @@ public final class RustGalWorldPrimitiveRenderer {
 			}
 			boolean changed = false;
 			for (VulkanicGalBridge.WorldMeshTextureAssetRecord texture : textures) {
-				WORLD_MESH_TEXTURES.put(texture.textureId(), texture);
-				DIRTY_WORLD_MESH_TEXTURES.add(texture.textureId());
-				changed = true;
+				VulkanicGalBridge.WorldMeshTextureAssetRecord previousTexture =
+					WORLD_MESH_TEXTURES.put(texture.textureId(), texture);
+				// Re-registering an unchanged semantic payload is common while
+				// multiple terrain sections are meshed. Do not keep re-dirtying the
+				// texture after the explicit upload boundary has already accepted it.
+				if (previousTexture == null || !Arrays.equals(previousTexture.pngBytes(), texture.pngBytes())) {
+					DIRTY_WORLD_MESH_TEXTURES.add(texture.textureId());
+					changed = true;
+				}
 			}
-			if (previous != null && previous.meshGeneration() == asset.meshGeneration()) {
+			STATIC_TERRAIN_MESH_RESIDENCY.put(asset.meshKey(), new StaticTerrainMeshResidency(
+				previous != null && sameStaticTerrainPayload(previous, asset)
+					? previous.meshGeneration() : asset.meshGeneration(),
+				textureIds(asset), retainCpuPayloadForDynamicSort
+			));
+			PENDING_WORLD_MESH_RETIREMENTS.remove(asset.meshKey());
+			if (previous != null && sameStaticTerrainPayload(previous, asset)) {
 				if (changed) {
 					markWorldMeshAssetsChangedLocked();
 				}
@@ -8810,6 +8999,18 @@ public final class RustGalWorldPrimitiveRenderer {
 					+ " route=rust-vulkan-whole-frame"
 			);
 		}
+	}
+
+	private static boolean sameStaticTerrainPayload(
+		VulkanicGalBridge.WorldMeshAssetRecord left,
+		VulkanicGalBridge.WorldMeshAssetRecord right
+	) {
+		return left.vertexLayoutVersion() == right.vertexLayoutVersion()
+			&& left.indexType() == right.indexType()
+			&& left.vertices().equals(right.vertices())
+			&& Arrays.equals(left.indexBytes(), right.indexBytes())
+			&& left.sections().equals(right.sections())
+			&& left.entityIdentity().equals(right.entityIdentity());
 	}
 
 	/**
@@ -8890,9 +9091,12 @@ public final class RustGalWorldPrimitiveRenderer {
 					+ MAX_WORLD_MESH_TEXTURE_PNG_BYTES_TOTAL);
 			}
 			ensureWorldMeshRegistryCapacityLocked(WORLD_MESH_TEXTURES, texture.textureId(), MAX_WORLD_MESH_TEXTURE_RESIDENCY, "texture");
-			WORLD_MESH_TEXTURES.put(texture.textureId(), texture);
-			DIRTY_WORLD_MESH_TEXTURES.add(texture.textureId());
-			markWorldMeshAssetsChangedLocked();
+			VulkanicGalBridge.WorldMeshTextureAssetRecord previous =
+				WORLD_MESH_TEXTURES.put(texture.textureId(), texture);
+			if (previous == null || !Arrays.equals(previous.pngBytes(), texture.pngBytes())) {
+				DIRTY_WORLD_MESH_TEXTURES.add(texture.textureId());
+				markWorldMeshAssetsChangedLocked();
+			}
 			auditMessage(
 				"Rust VulkanicGAL world mesh texture registered"
 					+ " texture_id=" + texture.textureId()
@@ -8956,9 +9160,15 @@ public final class RustGalWorldPrimitiveRenderer {
 			return;
 		}
 		synchronized (LOCK) {
-				if (WORLD_MESH_ASSETS.remove(meshKey) == null) {
+				VulkanicGalBridge.WorldMeshAssetRecord removedAsset = WORLD_MESH_ASSETS.remove(meshKey);
+				StaticTerrainMeshResidency removedResidency = STATIC_TERRAIN_MESH_RESIDENCY.remove(meshKey);
+				if (removedAsset == null && removedResidency == null) {
 					return;
 				}
+				long removedGeneration = removedAsset != null
+					? removedAsset.meshGeneration()
+					: removedResidency.meshGeneration();
+				PENDING_WORLD_MESH_RETIREMENTS.put(meshKey, removedGeneration);
 				DIRTY_WORLD_MESH_ASSETS.remove(meshKey);
 				UPLOADED_WORLD_MESH_GENERATIONS.remove(meshKey);
 				WORLD_MESH_SORTED_INDICES.remove(meshKey);
@@ -9001,14 +9211,13 @@ public final class RustGalWorldPrimitiveRenderer {
 		int depthPolicy
 	) {
 		return enqueueStaticTerrainMeshInstance(meshKey, meshGeneration, transform, viewportWidth, viewportHeight,
-			depthPolicy, depthPolicy == DEPTH_POLICY_TEST_NO_WRITE ? CULL_NONE : CULL_BACK);
+			depthPolicy, CULL_BACK);
 	}
 
 	/**
-	 * Copies the layer's explicit cull policy with the terrain instance. Opaque
-	 * terrain keeps back-face culling; translucent terrain is two-sided like the
-	 * vanilla translucent chunk pass so opposite camera poses retain glass/fluid
-	 * surfaces instead of silently dropping their back faces.
+	 * Copies the layer's explicit Sodium terrain cull policy with the instance.
+	 * The terrain pipeline keeps back-face culling for every terrain layer;
+	 * translucency changes blending and depth writes, not face multiplicity.
 	 */
 	public static boolean enqueueStaticTerrainMeshInstance(
 		long meshKey,
@@ -9027,7 +9236,16 @@ public final class RustGalWorldPrimitiveRenderer {
 		}
 		synchronized (LOCK) {
 			VulkanicGalBridge.WorldMeshAssetRecord asset = WORLD_MESH_ASSETS.get(meshKey);
-			if (asset == null || asset.meshGeneration() != meshGeneration) {
+			StaticTerrainMeshResidency residency = STATIC_TERRAIN_MESH_RESIDENCY.get(meshKey);
+			// Once the combined Rust upload is acknowledged, the CPU mesh payload
+			// may be released while its explicit residency record remains.  That
+			// retained record is the valid backend-owned admission state for later
+			// semantic visibility submissions; requiring the CPU asset here would
+			// misclassify an uploaded mesh as stale/unregistered.
+			boolean generationMatches = asset != null
+				? asset.meshGeneration() == meshGeneration
+				: residency != null && residency.meshGeneration() == meshGeneration;
+			if (!generationMatches) {
 				return false;
 			}
 			if (transform == null || transform.length != 16
@@ -9064,6 +9282,34 @@ public final class RustGalWorldPrimitiveRenderer {
 			PENDING_MESH_INSTANCES.add(instance);
 			PENDING_MESH_PRODUCERS.add(PendingMeshProducer.STATIC_TERRAIN);
 			return true;
+		}
+	}
+
+	/**
+	 * Replaces the active static-terrain draw domain for one semantic frame.
+	 * Mesh resources remain resident in {@code WORLD_MESH_ASSETS}; only stale
+	 * draw instances are removed. This keeps culling explicit at the callsite
+	 * boundary instead of turning the persistent asset cache into a renderer.
+	 */
+	public static void reconcileStaticTerrainVisibility(Set<Long> visibleMeshKeys) {
+		if (!WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan()) {
+			return;
+		}
+		if (visibleMeshKeys == null) {
+			throw new IllegalArgumentException("Rust static terrain visibility set is null");
+		}
+		Set<Long> visibleSnapshot = Set.copyOf(visibleMeshKeys);
+		synchronized (LOCK) {
+			StaticTerrainVisibilitySet.reconcile(ACTIVE_STATIC_TERRAIN_INSTANCES, visibleSnapshot);
+			for (int index = PENDING_MESH_INSTANCES.size() - 1; index >= 0; index--) {
+				VulkanicGalBridge.WorldMeshInstanceRecord instance = PENDING_MESH_INSTANCES.get(index);
+				if (instance.stratum() == STRATUM_WORLD_TERRAIN && !visibleSnapshot.contains(instance.meshKey())) {
+					PENDING_MESH_INSTANCES.remove(index);
+					if (index < PENDING_MESH_PRODUCERS.size()) {
+						PENDING_MESH_PRODUCERS.remove(index);
+					}
+				}
+			}
 		}
 	}
 
@@ -9248,6 +9494,21 @@ public final class RustGalWorldPrimitiveRenderer {
 			sortedIndices.add(sortedIndex);
 		}
 		return sortedIndices;
+	}
+
+	private static List<VulkanicGalBridge.WorldMeshAssetRetirementRecord> pendingWorldMeshRetirementsLocked(int limit) {
+		if (PENDING_WORLD_MESH_RETIREMENTS.isEmpty()) {
+			return List.of();
+		}
+		List<VulkanicGalBridge.WorldMeshAssetRetirementRecord> retirements =
+			new ArrayList<>(Math.min(PENDING_WORLD_MESH_RETIREMENTS.size(), limit));
+		for (Map.Entry<Long, Long> entry : PENDING_WORLD_MESH_RETIREMENTS.entrySet()) {
+			retirements.add(new VulkanicGalBridge.WorldMeshAssetRetirementRecord(entry.getKey(), entry.getValue()));
+			if (retirements.size() >= limit) {
+				break;
+			}
+		}
+		return retirements;
 	}
 
 	private static MeshMaterial meshMaterialForChunkLayer(ChunkSectionLayer layer) {
@@ -9510,6 +9771,7 @@ public final class RustGalWorldPrimitiveRenderer {
 					sourceV,
 					0,
 					MATERIAL_SOURCE_TEXTURED,
+					0,
 					glint ? glintColor : shadedBakedVertexColor(quad.getColor(vertexIndex), tintColor, 1.0F),
 					quad.getVertexNormal(vertexIndex),
 					packedLight,
@@ -9611,7 +9873,7 @@ public final class RustGalWorldPrimitiveRenderer {
 					vertices.add(new VulkanicGalBridge.WorldMeshVertexRecord(
 						position.x, position.y, position.z,
 						vertex.u(), vertex.v(), vertex.u(), vertex.v(),
-						0, 1, 0xffffffff, normalPacked, 0, 0
+						0, 1, 0, 0xffffffff, normalPacked, 0, 0
 					));
 				}
 				int winding = worldMeshWinding(vertices.get(base), vertices.get(base + 1), vertices.get(base + 2), transformedNormal);
@@ -9746,6 +10008,9 @@ public final class RustGalWorldPrimitiveRenderer {
 					uvBounds[2] = Math.min(uvBounds[2], vertex.v());
 					uvBounds[3] = Math.max(uvBounds[3], vertex.v());
 					Vector3f position = partPose.pose().transformPosition(vertex.worldX(), vertex.worldY(), vertex.worldZ(), new Vector3f());
+					// ModelPart.Polygon has already normalized standalone UVs by the
+					// model texture dimensions. Forward them unchanged; dividing again
+					// would collapse all skin samples into the transparent corner.
 					float textureU = sprite == null ? vertex.u() : sprite.getU(vertex.u());
 					float textureV = sprite == null ? vertex.v() : sprite.getV(vertex.v());
 					ensureFiniteModelVector(position, "model vertex position", partPath, cubeIndex);
@@ -9767,7 +10032,7 @@ public final class RustGalWorldPrimitiveRenderer {
 					vertices.add(new VulkanicGalBridge.WorldMeshVertexRecord(
 						position.x, position.y, position.z,
 						textureU, textureV, textureU, textureV,
-						0, 1, glint ? ARGB.color(Mth.clamp((int)Math.round(Minecraft.getInstance().options.glintStrength().get() * 255.0F), 0, 255), 255, 255, 255) : 0xffffffff, normalPacked, packedLight, 0
+						0, 1, 0, glint ? ARGB.color(Mth.clamp((int)Math.round(Minecraft.getInstance().options.glintStrength().get() * 255.0F), 0, 255), 255, 255, 255) : 0xffffffff, normalPacked, packedLight, 0
 					));
 				}
 				int winding = worldMeshWinding(vertices.get(base), vertices.get(base + 1), vertices.get(base + 2), transformedNormal);
@@ -9915,6 +10180,7 @@ public final class RustGalWorldPrimitiveRenderer {
 						quad.getTexV(i),
 						shaderBlockId,
 						shaderMaterialType,
+						0,
 						colorArgb,
 					quad.getVertexNormal(i),
 					LightTexture.lightCoordsWithEmission(
@@ -10098,6 +10364,12 @@ public final class RustGalWorldPrimitiveRenderer {
 				return encoded;
 			}
 		}
+		// Player skins, capes, and other downloaded model textures are owned by
+		// Minecraft as DynamicTexture instances. Prefer that live CPU snapshot over
+		// a same-named resource-pack placeholder; the dynamic asset is the semantic
+		// texture actually selected by the model callsite.
+		byte[] dynamicPayload = readDynamicTexturePayload(textureIdentity);
+		if (dynamicPayload != null) return dynamicPayload;
 		String path = textureIdentity.getPath();
 		if (path.startsWith("textures/") && path.endsWith(".png")) {
 			byte[] resourcePayload = readTexturePayloadForResource(textureIdentity);
@@ -10226,6 +10498,18 @@ public final class RustGalWorldPrimitiveRenderer {
 			return true;
 		}
 		return registerDynamicTextureAsset(identity, textureId);
+	}
+
+	/**
+	 * Publishes a direct model texture before a model-part callsite enqueues its
+	 * geometry. This is an explicit semantic asset handoff; no Java texture
+	 * object or backend handle crosses into Rust.
+	 */
+	public static boolean ensureStandaloneModelTextureAsset(ResourceLocation identity) {
+		if (!WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan()) {
+			return false;
+		}
+		return registerSemanticTextureAsset(identity, stableTextureId(identity), "standalone-model");
 	}
 
 	/** Reads a resource-pack payload without allowing Java to exceed the Rust FFI bound. */
@@ -11598,14 +11882,28 @@ public final class RustGalWorldPrimitiveRenderer {
 		for (int index = 0; index < count; index++) {
 			VulkanicGalBridge.WorldMeshInstanceRecord instance = frame.meshInstances().get(index);
 			String producer = frame.meshProducerLabels().get(index);
+			if (PENDING_MODEL_PART_MESH_KEYS.contains(instance.meshKey())) {
+				producer = "model-part";
+			} else if (PENDING_BLOCK_MODEL_MESH_KEYS.contains(instance.meshKey())) {
+				producer = "block-model";
+			} else if (PENDING_MODEL_MESH_KEYS.contains(instance.meshKey())) {
+				producer = "model";
+			} else if (hasModelMeshDiagnosticForKey(instance.meshKey())) {
+				// The semantic diagnostic is retained across frame rollover; use it
+				// as the key-based receipt when the pending set has already advanced
+				// to the next frame before completion reporting.
+				producer = "model";
+			}
 			boolean movingMesh = instance.stratum() == STRATUM_WORLD_MOVING_MESH
 				&& ("falling-block".equals(producer)
 					|| "piston".equals(producer)
 					|| "primed-tnt".equals(producer));
 			boolean entityMesh = instance.stratum() == STRATUM_WORLD_ENTITY_MESH
 				&& ("arrow".equals(producer) || "item-entity".equals(producer)
-					|| "model".equals(producer) || "model-part".equals(producer));
-			if (!movingMesh && !entityMesh) {
+					|| "model".equals(producer) || "model-part".equals(producer)
+					|| "block-model".equals(producer));
+			boolean blockModelMesh = "block-model".equals(producer);
+			if (!movingMesh && !entityMesh && !blockModelMesh) {
 				continue;
 			}
 			instancesByProducer.merge(producer, 1, Integer::sum);
@@ -11631,6 +11929,12 @@ public final class RustGalWorldPrimitiveRenderer {
 					entry.getValue()
 				));
 			}
+		}
+	}
+
+	private static boolean hasModelMeshDiagnosticForKey(long meshKey) {
+		synchronized (LOCK) {
+			return MODEL_MESH_DIAGNOSTICS.stream().anyMatch(diagnostic -> diagnostic.meshKey() == meshKey);
 		}
 	}
 
@@ -11665,7 +11969,7 @@ public final class RustGalWorldPrimitiveRenderer {
 				ENTITY_FLAME_EXECUTION_DIAGNOSTICS.remove(0);
 			}
 			ENTITY_FLAME_EXECUTION_DIAGNOSTICS.add(new EntityFlameExecutionDiagnostic(
-				DeterministicCameraCapture.currentInProgressRenderedFrameIndex(),
+				DeterministicCameraCapture.currentCaptureCorrelationRenderedFrameIndex(),
 				"rust-vulkan-whole-frame", frameId, submissionId, quads
 			));
 		}
@@ -11721,7 +12025,7 @@ public final class RustGalWorldPrimitiveRenderer {
 				ENTITY_SHADOW_EXECUTION_DIAGNOSTICS.remove(0);
 			}
 			ENTITY_SHADOW_EXECUTION_DIAGNOSTICS.add(new EntityShadowExecutionDiagnostic(
-				DeterministicCameraCapture.currentInProgressRenderedFrameIndex(),
+				DeterministicCameraCapture.currentCaptureCorrelationRenderedFrameIndex(),
 				"rust-vulkan-whole-frame", frameId, submissionId, quads
 			));
 		}
@@ -11778,7 +12082,7 @@ public final class RustGalWorldPrimitiveRenderer {
 				ENTITY_LEASH_EXECUTION_DIAGNOSTICS.remove(0);
 			}
 			ENTITY_LEASH_EXECUTION_DIAGNOSTICS.add(new EntityLeashExecutionDiagnostic(
-				DeterministicCameraCapture.currentInProgressRenderedFrameIndex(),
+				DeterministicCameraCapture.currentCaptureCorrelationRenderedFrameIndex(),
 				"rust-vulkan-whole-frame", frameId, submissionId, quads
 			));
 		}
@@ -12116,6 +12420,21 @@ public final class RustGalWorldPrimitiveRenderer {
 			|| !Float.isFinite(offsetX) || !Float.isFinite(verticalOffset) || !Float.isFinite(offsetZ)) {
 			throw new IllegalStateException("Rust VulkanicGAL cloud route selected with invalid cloud frame semantics");
 		}
+		// Preflight the worst-case face expansion before allocating the temporary
+		// semantic list.  A vanilla cloud cell can contribute at most twelve faces
+		// (six outside plus six inside for the fancy/near-camera case).  The exact
+		// topology is still decided below from the decoded cell bits, but this
+		// conservative bound prevents a pathological radius from consuming large
+		// transient Java memory before the frame-capacity check can reject it.
+		long diameter = (long) radius * 2L + 1L;
+		long candidateCells = diameter * diameter;
+		long worstCaseFaces = candidateCells * 12L;
+		if (worstCaseFaces > MAX_RUST_WORLD_MATERIAL_QUADS) {
+			throw new IllegalStateException(
+				"Rust VulkanicGAL cloud route exceeds bounded material-quad frame capacity before expansion"
+					+ " faces=" + worstCaseFaces + " radius=" + radius
+			);
+		}
 		synchronized (LOCK) {
 			int viewportWidth = pendingViewportWidth;
 			int viewportHeight = pendingViewportHeight;
@@ -12363,6 +12682,40 @@ public final class RustGalWorldPrimitiveRenderer {
 	public static List<BeaconBeamExecutionDiagnostic> beaconBeamExecutionDiagnostics() {
 		synchronized (LOCK) {
 			return List.copyOf(BEACON_BEAM_EXECUTION_DIAGNOSTICS);
+		}
+	}
+
+	/** Capture-only receipt for copied End Crystal beam quads in the selected submission. */
+	public static void recordWholeFrameCrystalBeamExecution(
+		long frameId, long submissionId, List<VulkanicGalBridge.WorldMaterialQuadRecord> materialQuads
+	) {
+		if (materialQuads == null || materialQuads.isEmpty() || !DeterministicCameraCapture.isActiveForDiagnostics()) {
+			return;
+		}
+		int quads = 0;
+		for (VulkanicGalBridge.WorldMaterialQuadRecord quad : materialQuads) {
+			if (quad.textureId() == MATERIAL_TEXTURE_CRYSTAL_BEAM
+				&& quad.materialMode() == MATERIAL_MODE_TRANSLUCENT) {
+				quads++;
+			}
+		}
+		if (quads == 0) {
+			return;
+		}
+		synchronized (LOCK) {
+			if (CRYSTAL_BEAM_EXECUTION_DIAGNOSTICS.size() >= 128) {
+				CRYSTAL_BEAM_EXECUTION_DIAGNOSTICS.remove(0);
+			}
+			CRYSTAL_BEAM_EXECUTION_DIAGNOSTICS.add(new CrystalBeamExecutionDiagnostic(
+				DeterministicCameraCapture.currentInProgressRenderedFrameIndex(),
+				"rust-vulkan-whole-frame", frameId, submissionId, quads
+			));
+		}
+	}
+
+	public static List<CrystalBeamExecutionDiagnostic> crystalBeamExecutionDiagnostics() {
+		synchronized (LOCK) {
+			return List.copyOf(CRYSTAL_BEAM_EXECUTION_DIAGNOSTICS);
 		}
 	}
 
@@ -13917,6 +14270,15 @@ public final class RustGalWorldPrimitiveRenderer {
 	) {
 	}
 
+	public record CrystalBeamExecutionDiagnostic(
+		long deterministicFrameIndex,
+		String route,
+		long gameplayFrameId,
+		long submissionId,
+		int quads
+	) {
+	}
+
 	public record EntityModelExecutionDiagnostic(
 		long deterministicFrameIndex,
 		String route,
@@ -14990,26 +15352,74 @@ public final class RustGalWorldPrimitiveRenderer {
 		return isWorldMeshGenerationAndTexturesUploadedLocked(instance.meshKey(), instance.meshGeneration());
 	}
 
+	/**
+	 * Reports whether a static-terrain generation and all of its texture
+	 * dependencies have crossed the owning combined Rust asset submission.
+	 * This is an admission-state query only; it exposes no native handle or
+	 * backend object to the semantic terrain caller.
+	 */
+	public static boolean isStaticTerrainMeshGenerationUploaded(long meshKey, long meshGeneration) {
+		if (!WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan()) {
+			return false;
+		}
+		synchronized (LOCK) {
+			return isWorldMeshGenerationAndTexturesUploadedLocked(meshKey, meshGeneration);
+		}
+	}
+
 	private static boolean isWorldMeshGenerationAndTexturesUploadedLocked(long meshKey, long meshGeneration) {
 		Long uploadedGeneration = UPLOADED_WORLD_MESH_GENERATIONS.get(meshKey);
 		if (uploadedGeneration == null || uploadedGeneration.longValue() != meshGeneration) {
 			return false;
 		}
 		VulkanicGalBridge.WorldMeshAssetRecord asset = WORLD_MESH_ASSETS.get(meshKey);
-		if (asset == null || asset.meshGeneration() != meshGeneration) {
-			return false;
+		if (asset != null) {
+			if (asset.meshGeneration() != meshGeneration) return false;
+			for (VulkanicGalBridge.WorldMeshSectionRecord section : asset.sections()) {
+				if (!isWorldMeshTextureUploadedLocked(section.textureId())) return false;
+			}
+			return true;
 		}
-		for (VulkanicGalBridge.WorldMeshSectionRecord section : asset.sections()) {
-			if (section.textureId() != 0
-				&& (DIRTY_WORLD_MESH_TEXTURES.contains(section.textureId())
-					|| !UPLOADED_WORLD_MESH_TEXTURES.contains(section.textureId()))) {
+		StaticTerrainMeshResidency staticTerrain = STATIC_TERRAIN_MESH_RESIDENCY.get(meshKey);
+		if (staticTerrain == null || staticTerrain.meshGeneration() != meshGeneration) return false;
+		for (int textureId : staticTerrain.textureIds()) {
+			if (!isWorldMeshTextureUploadedLocked(textureId)) {
 				return false;
 			}
 		}
 		return true;
 	}
 
+	private static boolean isWorldMeshTextureUploadedLocked(int textureId) {
+		return textureId == 0 || (!DIRTY_WORLD_MESH_TEXTURES.contains(textureId)
+			&& UPLOADED_WORLD_MESH_TEXTURES.contains(textureId));
+	}
+
+	private static int[] textureIds(VulkanicGalBridge.WorldMeshAssetRecord asset) {
+		return asset.sections().stream().mapToInt(VulkanicGalBridge.WorldMeshSectionRecord::textureId)
+			.filter(textureId -> textureId != 0).distinct().toArray();
+	}
+
+	/** Called only after native acceptance while LOCK is held. */
+	private static void releaseUploadedStaticTerrainPayloadLocked(long meshKey, long meshGeneration) {
+		StaticTerrainMeshResidency residency = STATIC_TERRAIN_MESH_RESIDENCY.get(meshKey);
+		if (residency == null || residency.meshGeneration() != meshGeneration || residency.retainCpuPayloadForDynamicSort()) {
+			return;
+		}
+		VulkanicGalBridge.WorldMeshAssetRecord asset = WORLD_MESH_ASSETS.get(meshKey);
+		if (asset != null && asset.meshGeneration() == meshGeneration) {
+			WORLD_MESH_ASSETS.remove(meshKey);
+		}
+		RustGalTerrainRenderer.releaseUploadedStaticTerrainPayload(meshKey, meshGeneration);
+	}
+
 	private record ModelMeshSemanticIdentity(String modelClass, ResourceLocation textureIdentity) {}
+
+	private record StaticTerrainMeshResidency(
+		long meshGeneration,
+		int[] textureIds,
+		boolean retainCpuPayloadForDynamicSort
+	) {}
 
 	private enum PendingMeshProducer {
 		BLOCK_DISPLAY,

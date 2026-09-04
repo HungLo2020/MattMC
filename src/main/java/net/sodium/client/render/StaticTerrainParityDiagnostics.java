@@ -56,6 +56,14 @@ public final class StaticTerrainParityDiagnostics {
             1,
             Integer.getInteger("mattmc.dev.staticTerrainParityDiagnostics.maxEvents", 512)
     );
+    /**
+     * Visible-list observations drive deterministic-capture readiness, so their
+     * bounded receipt budget must not be shared with targeted source probes.
+     */
+    private static final int MAX_VISIBLE_LIST_EVENTS = Math.max(
+            1,
+            Integer.getInteger("mattmc.dev.staticTerrainParityDiagnostics.maxVisibleListEvents", MAX_EVENTS)
+    );
     private static final int MAX_SAMPLES = Math.max(
             0,
             Integer.getInteger("mattmc.dev.staticTerrainParityDiagnostics.maxSamples", 32)
@@ -68,25 +76,92 @@ public final class StaticTerrainParityDiagnostics {
             0,
             Integer.getInteger("mattmc.dev.staticTerrainParityDiagnostics.maxCoverageSamples", 768)
     );
+    /**
+     * Compact color/light receipts are independent observations of the CPU
+     * terrain payload. They must not consume the generic coverage budget: a
+     * whole-frame producer can legitimately build many sections before the
+     * deterministic target section arrives.
+     */
+    private static final int MAX_COMPACT_LIGHTING_EVENTS = Math.max(
+            1,
+            Integer.getInteger("mattmc.dev.staticTerrainParityDiagnostics.maxCompactLightingEvents", 8192)
+    );
+	/** Separate bounded budget for CPU-only portal traversal comparison. */
+	private static final int MAX_PORTAL_TRACE_EVENTS = Math.max(
+			1, Integer.getInteger("mattmc.dev.staticTerrainParityDiagnostics.maxPortalTraceEvents", 4096)
+	);
+	/** Optional exact section-key filter for bounded portal-path diagnosis. */
+	private static final long[] PORTAL_TRACE_SECTIONS = parsePortalTraceSections();
+	/** Optional exact source-mesh section filter for visibility-data diagnosis. */
+	private static final long[] VISIBILITY_TRACE_SECTIONS = parseVisibilityTraceSections();
     /** Reserved independently from build tracing for capture-frame receipts. */
     private static final int MAX_WHOLE_FRAME_COVERAGE_EVENTS = Math.max(
             1,
             Integer.getInteger("mattmc.dev.staticTerrainParityDiagnostics.maxWholeFrameCoverageEvents", 512)
     );
+    /** A tiny independent budget for populated terrain receipts used by the parity gate. */
+    private static final int MAX_READY_COVERAGE_EVENTS = Math.max(
+            1,
+            Integer.getInteger("mattmc.dev.staticTerrainParityDiagnostics.maxReadyCoverageEvents", 4)
+    );
+    /** Backend-execution evidence must not be displaced by producer receipts. */
+    private static final int MAX_READY_EXECUTION_COVERAGE_EVENTS = Math.max(
+            1,
+            Integer.getInteger("mattmc.dev.staticTerrainParityDiagnostics.maxReadyExecutionCoverageEvents", 4)
+    );
+    /** Screenshot-correlated source receipts are independent from startup and execution probes. */
+    private static final int MAX_CAPTURE_COVERAGE_EVENTS = Math.max(
+            1,
+            Integer.getInteger("mattmc.dev.staticTerrainParityDiagnostics.maxCaptureCoverageEvents", 4)
+    );
     private static final long TRANSFORM_TRACE_SECTION = parseTransformTraceSection();
+    /** Startup culling can precede the deterministic capture pose by hundreds
+     * of frames; permit the harness to retain the later capture-phase receipt. */
+    private static final int MAX_TRANSFORM_TRACE_EVENTS = Math.max(
+            1,
+            Integer.getInteger("mattmc.dev.staticTerrainParityDiagnostics.maxTransformTraceEvents", 8)
+    );
     private static final long APPEARANCE_TRACE_SECTION = parseAppearanceTraceSection();
     private static final int[] APPEARANCE_TRACE_BLOCK = parseAppearanceTraceBlock();
+    /**
+     * Optional bounded receipt for particular compact ABGR values in one
+     * section. This is only an offline parity join key: raw CPU mesh words
+     * are observed after construction and are never fed back to a renderer.
+     */
+    private static final int[] COMPACT_COLOR_TRACE_VALUES = parseCompactColorTraceValues();
+    private static final int MAX_COMPACT_COLOR_TRACE_SAMPLES = Math.max(
+            1,
+            Integer.getInteger("mattmc.dev.staticTerrainParityDiagnostics.compactColorTraceMaxSamples", 128)
+    );
+    /**
+     * Optional, bounded origin receipt for the immutable tint lattice given to
+     * the Rust mesher. This is deliberately separate from mesh construction:
+     * it observes values after Java has extracted them and cannot influence a
+     * model, color provider, or renderer decision.
+     */
+    private static final int MAX_NATIVE_TINT_SOURCE_SAMPLES = Math.max(
+            1,
+            Integer.getInteger("mattmc.dev.staticTerrainParityDiagnostics.nativeTintSourceMaxSamples", 256)
+    );
     private static final Path OUTPUT_PATH = Path.of(System.getProperty(
             "mattmc.dev.staticTerrainParityDiagnostics.path",
             "run/static_terrain_parity_diagnostics.jsonl"
     ));
     private static final AtomicInteger EVENTS = new AtomicInteger();
     private static final AtomicInteger COVERAGE_EVENTS = new AtomicInteger();
+    private static final AtomicInteger COMPACT_LIGHTING_EVENTS = new AtomicInteger();
+	private static final AtomicInteger PORTAL_TRACE_EVENTS = new AtomicInteger();
+	private static final AtomicInteger PORTAL_ADMISSION_EVENTS = new AtomicInteger();
+	private static final AtomicInteger PORTAL_BUILD_EVENTS = new AtomicInteger();
     private static final AtomicInteger WHOLE_FRAME_COVERAGE_EVENTS = new AtomicInteger();
+    private static final AtomicInteger READY_COVERAGE_EVENTS = new AtomicInteger();
+    private static final AtomicInteger READY_EXECUTION_COVERAGE_EVENTS = new AtomicInteger();
+    private static final AtomicInteger CAPTURE_COVERAGE_EVENTS = new AtomicInteger();
     private static final AtomicInteger TRANSFORM_TRACE_EVENTS = new AtomicInteger();
     private static final AtomicInteger APPEARANCE_TRACE_EVENTS = new AtomicInteger();
     private static final AtomicInteger APPEARANCE_LIGHT_TRACE_EVENTS = new AtomicInteger();
     private static final AtomicInteger APPEARANCE_LIGHT_SNAPSHOT_EVENTS = new AtomicInteger();
+    private static final AtomicInteger NATIVE_TINT_SOURCE_EVENTS = new AtomicInteger();
     private static final Map<CoverageKey, MeshCoverage> SOURCE_MESHES = new ConcurrentHashMap<>();
     /** Copied explicit terrain assets keyed by semantic section/layer. */
     private static final Map<CoverageKey, MeshCoverage> RUST_ENQUEUE_MESHES = new ConcurrentHashMap<>();
@@ -98,22 +173,192 @@ public final class StaticTerrainParityDiagnostics {
     private static volatile long latestSolidHash;
     private static volatile long latestSolidGameTime;
     private static volatile int stableSolidFrames;
-    private static volatile int readySolidGameFrames;
-    private static volatile long readySolidLastGameTime = Long.MIN_VALUE;
     private static volatile int appearanceLightSnapshotMask;
     private static volatile boolean appearanceLightSnapshotObserved;
     private static volatile boolean appearanceLightFallbackObserved;
+    private static volatile CaptureCoverageSnapshot latestRustSourceSolidCoverage;
+    private static volatile CaptureCoverageSnapshot latestRustSourceCutoutCoverage;
+    /** Immutable identities from the most recently encoded Rust terrain submission. */
+    private static volatile List<RustExecutionIdentity> latestRustExecutionCoverage = List.of();
 
     private StaticTerrainParityDiagnostics() {
     }
+
+    /** Emits the latest explicit CPU-source snapshot at the screenshot boundary. */
+    public static void recordRustSourceCaptureCoverage(long renderedFrameIndex) {
+        if (!ENABLED || renderedFrameIndex <= 0L) {
+            return;
+        }
+        emitRustSourceCaptureCoverage(latestRustSourceSolidCoverage, renderedFrameIndex);
+        emitRustSourceCaptureCoverage(latestRustSourceCutoutCoverage, renderedFrameIndex);
+    }
+
+    private static void emitRustSourceCaptureCoverage(CaptureCoverageSnapshot snapshot, long renderedFrameIndex) {
+        if (snapshot == null || snapshot.sectionCount() <= 0) {
+            return;
+        }
+        writeWholeFrameCoverageEvent(
+                "rust-vulkan-enqueue-source-capture-ready-coverage",
+                snapshot.layer(), renderedFrameIndex, 0, snapshot.animatedSections(),
+                snapshot.cameraX(), snapshot.cameraY(), snapshot.cameraZ(),
+                snapshot.viewportWidth(), snapshot.viewportHeight(), snapshot.sectionCount(),
+                snapshot.vertexTotal(), snapshot.indexTotal(), snapshot.primitiveTotal(),
+                snapshot.missingCoverage(), snapshot.executedRecords(),
+                builder -> builder.append(snapshot.records(), 1, snapshot.records().length() - 1)
+        );
+    }
+
+	/**
+	 * Capture-only record of a finalized CPU portal traversal step. This observes
+	 * no renderer-owned list, GPU resource, or mutable render state.
+	 */
+	public static void recordPortalTraversal(String route, long sectionKey, long cameraSectionKey,
+			int incomingDirections, int outgoingBeforeOutwardMask, int outgoingDirections,
+			long visibilityData, double cameraDeltaX, double cameraDeltaY, double cameraDeltaZ) {
+		if (!matchesPortalTraceSection(sectionKey)) return;
+		if (!ENABLED || PORTAL_TRACE_EVENTS.incrementAndGet() > MAX_PORTAL_TRACE_EVENTS) return;
+		StringBuilder json = new StringBuilder(256);
+		json.append("{");
+		appendField(json, "schema", "mattmc-static-terrain-portal-trace-v1").append(", ");
+		appendField(json, "route", route).append(", ");
+		appendField(json, "sectionKey", sectionKey).append(", ");
+		appendField(json, "cameraSectionKey", cameraSectionKey).append(", ");
+		appendField(json, "incomingDirections", incomingDirections).append(", ");
+		appendField(json, "outgoingBeforeOutwardMask", outgoingBeforeOutwardMask).append(", ");
+		appendField(json, "outgoingDirections", outgoingDirections).append(", ");
+		appendField(json, "visibilityData", String.format(java.util.Locale.ROOT, "%016x", visibilityData)).append(", ");
+		appendField(json, "cameraDeltaX", cameraDeltaX).append(", ");
+		appendField(json, "cameraDeltaY", cameraDeltaY).append(", ");
+		appendField(json, "cameraDeltaZ", cameraDeltaZ).append(", ");
+		appendField(json, "gameTime", Minecraft.getInstance().level == null ? -1L : Minecraft.getInstance().level.getGameTime());
+		json.append("}\n");
+		try {
+			writeLine(json.toString());
+		} catch (IOException ignored) {
+			// Diagnostics must never alter traversal or rendering behavior.
+		}
+	}
+
+	/**
+	 * Capture-only explanation of why a semantic CPU portal neighbor is admitted
+	 * or rejected. This has no connection to Sodium's render lists or a backend.
+	 */
+	public static void recordPortalAdmission(String route, long sectionKey, int incomingDirections,
+			boolean origin, boolean withinBuildHeight, boolean loaded, boolean insideWindow,
+			boolean visible, boolean resident, boolean queued, boolean inFlight, boolean unavailable) {
+		if (!matchesPortalTraceSection(sectionKey)) return;
+		if (!ENABLED || PORTAL_ADMISSION_EVENTS.incrementAndGet() > MAX_PORTAL_TRACE_EVENTS) return;
+		StringBuilder json = new StringBuilder(256);
+		json.append("{");
+		appendField(json, "schema", "mattmc-static-terrain-portal-admission-v1").append(", ");
+		appendField(json, "route", route).append(", ");
+		appendField(json, "sectionKey", sectionKey).append(", ");
+		appendField(json, "incomingDirections", incomingDirections).append(", ");
+		appendField(json, "origin", origin).append(", ");
+		appendField(json, "withinBuildHeight", withinBuildHeight).append(", ");
+		appendField(json, "loaded", loaded).append(", ");
+		appendField(json, "insideWindow", insideWindow).append(", ");
+		appendField(json, "visible", visible).append(", ");
+		appendField(json, "resident", resident).append(", ");
+		appendField(json, "queued", queued).append(", ");
+		appendField(json, "inFlight", inFlight).append(", ");
+		appendField(json, "unavailable", unavailable).append(", ");
+		appendField(json, "gameTime", Minecraft.getInstance().level == null ? -1L : Minecraft.getInstance().level.getGameTime());
+		json.append("}\n");
+		try {
+			writeLine(json.toString());
+		} catch (IOException ignored) {
+			// Diagnostics must never alter traversal or rendering behavior.
+		}
+	}
+
+	/** Capture-only lifecycle receipt for a traced semantic source section. */
+	public static void recordPortalBuildLifecycle(String route, long sectionKey, String stage,
+			boolean queued, boolean inFlight, boolean invalidatedPending, boolean invalidatedInFlight,
+			boolean resident, boolean unavailable) {
+		if (!matchesPortalTraceSection(sectionKey)) return;
+		if (!ENABLED || PORTAL_BUILD_EVENTS.incrementAndGet() > MAX_PORTAL_TRACE_EVENTS) return;
+		StringBuilder json = new StringBuilder(256);
+		json.append("{");
+		appendField(json, "schema", "mattmc-static-terrain-portal-build-lifecycle-v1").append(", ");
+		appendField(json, "route", route).append(", ");
+		appendField(json, "sectionKey", sectionKey).append(", ");
+		appendField(json, "stage", stage).append(", ");
+		appendField(json, "queued", queued).append(", ");
+		appendField(json, "inFlight", inFlight).append(", ");
+		appendField(json, "invalidatedPending", invalidatedPending).append(", ");
+		appendField(json, "invalidatedInFlight", invalidatedInFlight).append(", ");
+		appendField(json, "resident", resident).append(", ");
+		appendField(json, "unavailable", unavailable).append(", ");
+		appendField(json, "gameTime", Minecraft.getInstance().level == null ? -1L : Minecraft.getInstance().level.getGameTime());
+		json.append("}\n");
+		try {
+			writeLine(json.toString());
+		} catch (IOException ignored) {
+			// Diagnostics must never alter traversal or rendering behavior.
+		}
+	}
+
+	private static boolean matchesPortalTraceSection(long sectionKey) {
+		if (PORTAL_TRACE_SECTIONS.length == 0) return true;
+		for (long candidate : PORTAL_TRACE_SECTIONS) {
+			if (candidate == sectionKey) return true;
+		}
+		return false;
+	}
+
+	private static long[] parsePortalTraceSections() {
+		String configured = System.getProperty("mattmc.dev.staticTerrainParityDiagnostics.portalTraceSections", "").trim();
+		if (configured.isEmpty()) return new long[0];
+		return java.util.Arrays.stream(configured.split(","))
+			.map(String::trim).filter(value -> !value.isEmpty()).mapToLong(Long::parseLong).toArray();
+	}
+
+	private static long[] parseVisibilityTraceSections() {
+		String configured = System.getProperty("mattmc.dev.staticTerrainParityDiagnostics.visibilityTraceSections", "").trim();
+		if (configured.isEmpty()) return new long[0];
+		return java.util.Arrays.stream(configured.split(","))
+			.map(String::trim).filter(value -> !value.isEmpty()).mapToLong(Long::parseLong).toArray();
+	}
 
     public static void recordChunkBuildOutput(ChunkBuildOutput output) {
         if (!ENABLED || output == null || output.render == null) {
             return;
         }
+		recordSourceVisibility(output);
         recordSourceMesh(output, DefaultTerrainRenderPasses.SOLID, "solid");
         recordSourceMesh(output, DefaultTerrainRenderPasses.CUTOUT, "cutout");
     }
+
+	/** Records immutable build visibility only when explicitly selected. */
+	private static void recordSourceVisibility(ChunkBuildOutput output) {
+		if (VISIBILITY_TRACE_SECTIONS.length == 0 || output.info == null) return;
+		long sectionKey = output.render.getPosition().asLong();
+		boolean selected = false;
+		for (long candidate : VISIBILITY_TRACE_SECTIONS) {
+			if (candidate == sectionKey) {
+				selected = true;
+				break;
+			}
+		}
+		if (!selected) return;
+		try {
+			StringBuilder json = new StringBuilder(256);
+			json.append("{");
+			appendField(json, "schema", "mattmc-static-terrain-source-visibility-v1").append(", ");
+			appendField(json, "sectionKey", sectionKey).append(", ");
+			appendField(json, "x", output.render.getChunkX()).append(", ");
+			appendField(json, "y", output.render.getChunkY()).append(", ");
+			appendField(json, "z", output.render.getChunkZ()).append(", ");
+			appendField(json, "visibilityData", String.format(Locale.ROOT, "%016x", output.info.visibilityData)).append(", ");
+			appendField(json, "flags", output.info.flags).append(", ");
+			appendField(json, "sourceGeneration", output.submitTime);
+			json.append("}\n");
+			writeLine(json.toString());
+		} catch (IOException ignored) {
+			// Diagnostics must never alter meshing or rendering behavior.
+		}
+	}
 
     /**
      * Captures only the semantic inputs to a section build. This is deliberately
@@ -251,6 +496,7 @@ public final class StaticTerrainParityDiagnostics {
     public static void recordRustWholeFrameEnqueueCoverage(
             Iterable<RenderSection> sections,
             long semanticFrameId,
+            boolean sourceSettled,
             double cameraX,
             double cameraY,
             double cameraZ,
@@ -313,6 +559,18 @@ public final class StaticTerrainParityDiagnostics {
                 }
             }
             records.append("]");
+            if (sectionCount > 0) {
+                CaptureCoverageSnapshot snapshot = new CaptureCoverageSnapshot(
+                        layer, animatedSections, sectionCount, vertexTotal, indexTotal, primitiveTotal,
+                        missingCoverage, sectionCount, cameraX, cameraY, cameraZ,
+                        viewportWidth, viewportHeight, records.toString()
+                );
+                if ("solid".equals(layer)) {
+                    latestRustSourceSolidCoverage = snapshot;
+                } else {
+                    latestRustSourceCutoutCoverage = snapshot;
+                }
+            }
             writeWholeFrameCoverageEvent(
                     "rust-vulkan-enqueue-source-coverage",
                     layer,
@@ -336,6 +594,35 @@ public final class StaticTerrainParityDiagnostics {
                         }
                     }
             );
+            // A startup list is not equivalent to the settled deterministic
+            // capture workload. Retain the normal bounded trace above, but do
+            // not consume the parity receipt budget until the independent CPU
+            // source says its work queues have drained.
+            if (sourceSettled && sectionCount > 0) {
+                writeWholeFrameCoverageEvent(
+                        "rust-vulkan-enqueue-source-ready-coverage",
+                        layer,
+                        semanticFrameId,
+                        0,
+                        animatedSections,
+                        cameraX,
+                        cameraY,
+                        cameraZ,
+                        viewportWidth,
+                        viewportHeight,
+                        sectionCount,
+                        vertexTotal,
+                        indexTotal,
+                        primitiveTotal,
+                        missingCoverage,
+                        sectionCount,
+                        builder -> {
+                            if (records.length() > 1) {
+                                builder.append(records, 1, records.length() - 1);
+                            }
+                        }
+                );
+            }
         }
     }
 
@@ -354,9 +641,7 @@ public final class StaticTerrainParityDiagnostics {
         }
 
         int eventIndex = EVENTS.incrementAndGet();
-        if (eventIndex > MAX_EVENTS) {
-            return;
-        }
+        boolean writeEvent = eventIndex <= MAX_VISIBLE_LIST_EVENTS;
 
         int regionCount = 0;
         int sectionCount = 0;
@@ -392,7 +677,7 @@ public final class StaticTerrainParityDiagnostics {
                 orderedHash = mix(orderedHash, sectionHash);
                 setXor ^= sectionHash;
                 setSum += Long.rotateLeft(sectionHash, (int) (sectionKey & 31L));
-                if (sectionCount < MAX_SAMPLES) {
+                if (writeEvent && sectionCount < MAX_SAMPLES) {
                     if (samples.length() > 1) {
                         samples.append(", ");
                     }
@@ -421,48 +706,61 @@ public final class StaticTerrainParityDiagnostics {
             } else {
                 stableSolidFrames = 1;
             }
-            if (sectionCount > 0 && gameTime != readySolidLastGameTime) {
-                readySolidGameFrames++;
-                readySolidLastGameTime = gameTime;
-            }
             latestSolidSectionCount = sectionCount;
             latestSolidHash = hash;
             latestSolidGameTime = gameTime;
         }
-        String backend = backendName();
-
-        StringBuilder json = new StringBuilder(2048);
-        json.append("{");
-        appendField(json, "schema", "mattmc-static-terrain-parity-visible-list-v1").append(", ");
-        appendField(json, "eventIndex", eventIndex).append(", ");
-        appendField(json, "backend", backend).append(", ");
-        appendField(json, "stage", stage).append(", ");
-        appendField(json, "layer", layer).append(", ");
-        appendField(json, "gameTime", gameTime).append(", ");
-        appendField(json, "nanoTime", System.nanoTime()).append(", ");
-        json.append("\"camera\": { ");
-        appendField(json, "x", cameraX).append(", ");
-        appendField(json, "y", cameraY).append(", ");
-        appendField(json, "z", cameraZ);
-        json.append(" }, ");
-        json.append("\"viewport\": { ");
-        appendField(json, "width", viewportWidth).append(", ");
-        appendField(json, "height", viewportHeight);
-        json.append(" }, ");
-        appendField(json, "regionCount", regionCount).append(", ");
-        appendField(json, "visibleSectionCount", sectionCount).append(", ");
-        appendField(json, "visibleSectionHash", String.format(Locale.ROOT, "%016x", hash)).append(", ");
-        appendField(json, "orderedSectionHash", String.format(Locale.ROOT, "%016x", orderedHash)).append(", ");
-        json.append("\"samples\": ").append(samples);
-        json.append("}\n");
-
-        try {
-            writeLine(json.toString());
-        } catch (IOException ignored) {
-            // Diagnostics must never alter render behavior.
+        // Continue observing every rendered frame after the bounded receipt
+        // budget is consumed. Capture readiness is derived from these values;
+        // returning before this point made a small source-probe budget freeze
+        // readiness at the initially empty terrain list.
+        // The baseline receipt must describe a stable draw list, rather than
+        // the first partially populated world-render frame.
+        boolean readyCoverage = "java-opengl-draw".equals(stage)
+                && sectionCount > 0
+                && isSolidVisibleListStable(2, 1);
+        if (!writeEvent && !readyCoverage) {
+            return;
         }
+        if (writeEvent) {
+            String backend = backendName();
 
-        recordVisibleCoverage(stage, layer, renderLists, cameraX, cameraY, cameraZ, viewportWidth, viewportHeight);
+            StringBuilder json = new StringBuilder(2048);
+            json.append("{");
+            appendField(json, "schema", "mattmc-static-terrain-parity-visible-list-v1").append(", ");
+            appendField(json, "eventIndex", eventIndex).append(", ");
+            appendField(json, "backend", backend).append(", ");
+            appendField(json, "stage", stage).append(", ");
+            appendField(json, "layer", layer).append(", ");
+            appendField(json, "gameTime", gameTime).append(", ");
+            appendField(json, "nanoTime", System.nanoTime()).append(", ");
+            json.append("\"camera\": { ");
+            appendField(json, "x", cameraX).append(", ");
+            appendField(json, "y", cameraY).append(", ");
+            appendField(json, "z", cameraZ);
+            json.append(" }, ");
+            json.append("\"viewport\": { ");
+            appendField(json, "width", viewportWidth).append(", ");
+            appendField(json, "height", viewportHeight);
+            json.append(" }, ");
+            appendField(json, "regionCount", regionCount).append(", ");
+            appendField(json, "visibleSectionCount", sectionCount).append(", ");
+            appendField(json, "visibleSectionHash", String.format(Locale.ROOT, "%016x", hash)).append(", ");
+            appendField(json, "orderedSectionHash", String.format(Locale.ROOT, "%016x", orderedHash)).append(", ");
+            json.append("\"samples\": ").append(samples);
+            json.append("}\n");
+
+            try {
+                writeLine(json.toString());
+            } catch (IOException ignored) {
+                // Diagnostics must never alter render behavior.
+            }
+
+            recordVisibleCoverage(stage, layer, renderLists, cameraX, cameraY, cameraZ, viewportWidth, viewportHeight);
+        }
+        if (readyCoverage) {
+            recordVisibleCoverage("java-opengl-draw-ready", layer, renderLists, cameraX, cameraY, cameraZ, viewportWidth, viewportHeight);
+        }
     }
 
     public static void recordRustStaticTerrainExecution(
@@ -614,6 +912,44 @@ public final class StaticTerrainParityDiagnostics {
         if (!ENABLED || executions == null || backendFrameId <= 0L) {
             return;
         }
+        List<RustExecutionIdentity> snapshot = new java.util.ArrayList<>();
+        for (RustExecutionIdentity execution : executions) {
+            if (execution != null) {
+                snapshot.add(execution);
+            }
+        }
+        if (snapshot.isEmpty()) {
+            return;
+        }
+        latestRustExecutionCoverage = List.copyOf(snapshot);
+        writeRustWholeFrameExecutionCoverage(
+                latestRustExecutionCoverage,
+                backendFrameId,
+                "rust-vulkan-executed-ready-coverage"
+        );
+    }
+
+    /**
+     * Emits the copied Rust-backend execution identity set at the screenshot
+     * request boundary. This is diagnostic-only and cannot retain or expose a
+     * native resource, command buffer, or backend object.
+     */
+    public static void recordRustExecutionCaptureCoverage(long renderedFrameIndex) {
+        if (!ENABLED || renderedFrameIndex <= 0L || latestRustExecutionCoverage.isEmpty()) {
+            return;
+        }
+        writeRustWholeFrameExecutionCoverage(
+                latestRustExecutionCoverage,
+                renderedFrameIndex,
+                "rust-vulkan-executed-capture-ready-coverage"
+        );
+    }
+
+    private static void writeRustWholeFrameExecutionCoverage(
+            Iterable<RustExecutionIdentity> executions,
+            long frameId,
+            String stage
+    ) {
         for (String layer : List.of("solid", "cutout")) {
             int recordCount = 0;
             int animatedSections = 0;
@@ -658,9 +994,9 @@ public final class StaticTerrainParityDiagnostics {
                 continue;
             }
             writeWholeFrameCoverageEvent(
-                    "rust-vulkan-executed-coverage",
+                    stage,
                     layer,
-                    backendFrameId,
+                    frameId,
                     0,
                     animatedSections,
                     0.0D,
@@ -683,14 +1019,17 @@ public final class StaticTerrainParityDiagnostics {
         if (!ENABLED) {
             return true;
         }
-        return latestSolidSectionCount >= minimumSections && readySolidGameFrames >= Math.max(1, requiredFrames);
+        // Deterministic parity captures intentionally pin game time.  Readiness
+        // must therefore be based on consecutive rendered frames with the same
+        // visible terrain list, rather than on advancing simulation ticks.
+        return latestSolidSectionCount >= minimumSections && stableSolidFrames >= Math.max(1, requiredFrames);
     }
 
     public static String solidVisibleListSummary() {
         return "sections=" + latestSolidSectionCount
                 + ",hash=" + String.format(Locale.ROOT, "%016x", latestSolidHash)
                 + ",stableFrames=" + stableSolidFrames
-                + ",readyGameFrames=" + readySolidGameFrames
+                + ",readyFrames=" + stableSolidFrames
                 + ",gameTime=" + latestSolidGameTime;
     }
 
@@ -722,7 +1061,7 @@ public final class StaticTerrainParityDiagnostics {
             return;
         }
         int eventIndex = TRANSFORM_TRACE_EVENTS.incrementAndGet();
-        if (eventIndex > 8) {
+        if (eventIndex > MAX_TRANSFORM_TRACE_EVENTS) {
             return;
         }
         Matrix4f model = new Matrix4f().translation(
@@ -902,6 +1241,53 @@ public final class StaticTerrainParityDiagnostics {
         } catch (IOException ignored) {
             // Diagnostics must never alter render behavior.
         }
+    }
+
+    /**
+     * Emits a selected native-meshing tint input. The caller passes the
+     * already-written lattice, so enabling this receipt neither calls a color
+     * provider again nor changes the semantic snapshot supplied to Rust.
+     */
+    public static void recordNativeTintSource(
+            long sectionKey,
+            int x,
+            int y,
+            int z,
+            String blockIdentity,
+            int tint,
+            int[] lattice
+    ) {
+        if (!tracesNativeTintSource(sectionKey) || tint == -1) {
+            return;
+        }
+        int eventIndex = NATIVE_TINT_SOURCE_EVENTS.incrementAndGet();
+        if (eventIndex > MAX_NATIVE_TINT_SOURCE_SAMPLES) {
+            return;
+        }
+        try {
+            StringBuilder json = new StringBuilder(1024);
+            json.append("{");
+            appendField(json, "schema", "mattmc-native-tint-source-v1").append(", ");
+            appendField(json, "eventIndex", eventIndex).append(", ");
+            appendField(json, "sectionKey", sectionKey).append(", ");
+            appendField(json, "worldPosition", vector3(x, y, z)).append(", ");
+            appendField(json, "blockIdentity", blockIdentity == null ? "unknown" : blockIdentity).append(", ");
+            appendField(json, "tint", String.format(Locale.ROOT, "%08x", tint)).append(", ");
+            json.append("\"lattice\":[");
+            for (int index = 0; index < lattice.length; index++) {
+                if (index > 0) json.append(',');
+                json.append('"').append(String.format(Locale.ROOT, "%08x", lattice[index])).append('"');
+            }
+            json.append("]}\n");
+            writeLine(json.toString());
+        } catch (IOException ignored) {
+            // Diagnostics must never alter meshing or rendering behavior.
+        }
+    }
+
+    public static boolean tracesNativeTintSource(long sectionKey) {
+        return ENABLED && APPEARANCE_TRACE_SECTION != Long.MIN_VALUE
+                && sectionKey == APPEARANCE_TRACE_SECTION;
     }
 
     /**
@@ -1147,6 +1533,7 @@ public final class StaticTerrainParityDiagnostics {
         }
         MeshCoverage coverage = decodeSourceMesh(output, mesh, layer);
         SOURCE_MESHES.put(key, coverage);
+		recordCompactLightingReceipt(output, mesh, layer);
         if (output.render.getPosition().asLong() == APPEARANCE_TRACE_SECTION) {
             SOURCE_APPEARANCES.put(key, decodeAppearanceSource(output, mesh, layer));
         }
@@ -1186,6 +1573,120 @@ public final class StaticTerrainParityDiagnostics {
                 )
         );
     }
+
+	/**
+	 * Bounded pre-render receipt for the two compact vertex fields that control
+	 * vanilla terrain brightness. This deliberately observes CPU mesh bytes
+	 * before either backend owns a resource or issues a draw; it cannot affect
+	 * Frozen rendering behavior.
+	 */
+	private static void recordCompactLightingReceipt(ChunkBuildOutput output, BuiltSectionMeshParts mesh, String layer) {
+		if (!ENABLED || output == null || output.render == null || mesh == null || mesh.getVertexData() == null) {
+			return;
+		}
+		int eventIndex = COMPACT_LIGHTING_EVENTS.incrementAndGet();
+		if (eventIndex > MAX_COMPACT_LIGHTING_EVENTS) {
+			return;
+		}
+		try {
+			ByteBuffer buffer = mesh.getVertexData().getDirectBuffer().duplicate().order(ByteOrder.nativeOrder());
+			int stride = activeTerrainVertexStride();
+			if (stride < COMPACT_PREFIX_STRIDE) {
+				return;
+			}
+			int requestedVertices = 0;
+			for (int index = 0; index + 1 < mesh.getVertexSegments().length; index += 2) {
+				requestedVertices += Math.max(0, mesh.getVertexSegments()[index]);
+			}
+			int vertexCount = Math.min(requestedVertices, buffer.remaining() / stride);
+			CRC32 colorCrc = new CRC32();
+			CRC32 lightCrc = new CRC32();
+			int[] unorderedColors = new int[vertexCount];
+			int[] unorderedLights = new int[vertexCount];
+			Map<Integer, Integer> compactColorHistogram = new java.util.HashMap<>();
+			long compactBlueSum = 0L;
+			long compactGreenSum = 0L;
+			long compactRedSum = 0L;
+			long compactAlphaSum = 0L;
+			StringBuilder compactColorTrace = new StringBuilder();
+			int compactColorTraceSamples = 0;
+			boolean traceCompactColors = output.render.getPosition().asLong() == APPEARANCE_TRACE_SECTION
+					&& COMPACT_COLOR_TRACE_VALUES.length > 0;
+			for (int vertex = 0; vertex < vertexCount; vertex++) {
+				int offset = vertex * stride;
+				int color = buffer.getInt(offset + COLOR_OFFSET);
+				int light = buffer.getInt(offset + LIGHT_MATERIAL_OFFSET);
+				updateCrcInt(colorCrc, color);
+				updateCrcInt(lightCrc, light);
+				unorderedColors[vertex] = color;
+				unorderedLights[vertex] = light;
+				compactColorHistogram.merge(color, 1, Integer::sum);
+				compactBlueSum += color & 0xff;
+				compactGreenSum += (color >>> 8) & 0xff;
+				compactRedSum += (color >>> 16) & 0xff;
+				compactAlphaSum += (color >>> 24) & 0xff;
+				if (traceCompactColors && compactColorTraceSamples < MAX_COMPACT_COLOR_TRACE_SAMPLES
+						&& isCompactColorTraceValue(color)) {
+					if (compactColorTraceSamples++ > 0) {
+						compactColorTrace.append('|');
+					}
+					// Position, texture, and light/material are an exact compact
+					// geometry key across the paired CPU meshes.
+					compactColorTrace.append(String.format(Locale.ROOT, "%08x:%08x:%08x:%08x:%08x",
+							buffer.getInt(offset + POSITION_OFFSET),
+							buffer.getInt(offset + POSITION_OFFSET + Integer.BYTES),
+							buffer.getInt(offset + TEXTURE_OFFSET),
+							light,
+							color));
+				}
+			}
+			// Sodium is allowed to order independent quads differently when the
+			// CPU source is rebuilt. Preserve the ordered receipts for local
+			// debugging, but make the cross-producer equality witness a multiset.
+			// This diagnostic never participates in mesh admission or rendering.
+			java.util.Arrays.sort(unorderedColors);
+			java.util.Arrays.sort(unorderedLights);
+			CRC32 unorderedColorCrc = new CRC32();
+			CRC32 unorderedLightCrc = new CRC32();
+			for (int vertex = 0; vertex < vertexCount; vertex++) {
+				updateCrcInt(unorderedColorCrc, unorderedColors[vertex]);
+				updateCrcInt(unorderedLightCrc, unorderedLights[vertex]);
+			}
+			StringBuilder line = new StringBuilder(384);
+			line.append("{");
+			appendField(line, "schema", "mattmc-static-terrain-compact-lighting-v1").append(", ");
+			appendField(line, "eventIndex", eventIndex).append(", ");
+			appendField(line, "sectionKey", output.render.getPosition().asLong()).append(", ");
+			appendField(line, "layer", layer).append(", ");
+			appendField(line, "vertexCount", vertexCount).append(", ");
+			appendField(line, "compactColorHash", String.format(Locale.ROOT, "%08x", colorCrc.getValue())).append(", ");
+			appendField(line, "packedLightMaterialHash", String.format(Locale.ROOT, "%08x", lightCrc.getValue())).append(", ");
+			appendField(line, "unorderedCompactColorHash", String.format(Locale.ROOT, "%08x", unorderedColorCrc.getValue())).append(", ");
+			appendField(line, "unorderedPackedLightMaterialHash", String.format(Locale.ROOT, "%08x", unorderedLightCrc.getValue())).append(", ");
+			// Channel sums are diagnostic-only. They distinguish a tint-channel
+			// error from a uniform AO/directional-shade error without sampling or
+			// influencing a renderer-visible buffer.
+			appendField(line, "compactColorChannelSums", "[" + compactBlueSum + "," + compactGreenSum + "," + compactRedSum + "," + compactAlphaSum + "]");
+			String colorHistogram = compactColorHistogram.entrySet().stream()
+					.sorted((left, right) -> {
+						int byCount = Integer.compare(right.getValue(), left.getValue());
+						return byCount != 0 ? byCount : Integer.compareUnsigned(left.getKey(), right.getKey());
+					})
+					.limit(16)
+					.map(entry -> String.format(Locale.ROOT, "%08x:%d", entry.getKey(), entry.getValue()))
+					.collect(java.util.stream.Collectors.joining("|"));
+			line.append(", ");
+			appendField(line, "compactColorHistogramTop16", colorHistogram);
+			if (traceCompactColors) {
+				line.append(", ");
+				appendField(line, "compactColorTrace", compactColorTrace.toString());
+			}
+			line.append("}\n");
+			writeLine(line.toString());
+		} catch (IOException ignored) {
+			// Diagnostics must not alter mesh construction or rendering.
+		}
+	}
 
     public static void recordRustStaticTerrainAdmission(ChunkBuildOutput output, String layer, String reason) {
         String normalizedLayer = normalizeLayer(layer);
@@ -1284,7 +1785,15 @@ public final class StaticTerrainParityDiagnostics {
                 int offset = vertexIndex * vertexStride;
                 int positionHi = buffer.getInt(offset + POSITION_OFFSET);
                 int positionLo = buffer.getInt(offset + POSITION_OFFSET + 4);
+                // These are part of Sodium's compact mesh payload, not merely
+                // presentation metadata: RGB contains baked tint/AO and this
+                // word carries the packed block/sky-light coordinates used by
+                // the terrain shader. Include them in the diagnostic receipt
+                // so a cross-route hash can actually detect a lighting-data
+                // mismatch before either renderer draws the mesh.
+                int compactColor = buffer.getInt(offset + COLOR_OFFSET);
                 int texture = buffer.getInt(offset + TEXTURE_OFFSET);
+                int lightMaterial = buffer.getInt(offset + LIGHT_MATERIAL_OFFSET);
                 float x = decodePosition(positionHi, positionLo, 0);
                 float y = decodePosition(positionHi, positionLo, 1);
                 float z = decodePosition(positionHi, positionLo, 2);
@@ -1302,7 +1811,9 @@ public final class StaticTerrainParityDiagnostics {
                 maxV = Math.max(maxV, v);
                 updateCrcInt(crc, positionHi);
                 updateCrcInt(crc, positionLo);
+                updateCrcInt(crc, compactColor);
                 updateCrcInt(crc, texture);
+                updateCrcInt(crc, lightMaterial);
             }
         }
         if (!valid) {
@@ -1592,11 +2103,25 @@ public final class StaticTerrainParityDiagnostics {
             CoverageRecordAppender appender
     ) {
         int eventIndex = COVERAGE_EVENTS.incrementAndGet();
-        if (wholeFrameCritical
+        boolean readyCoverage = stage.endsWith("-ready-coverage");
+        if (readyCoverage) {
+            boolean captureCoverage = stage.contains("-capture-ready-");
+            boolean executionCoverage = stage.startsWith("rust-vulkan-executed-ready-");
+            AtomicInteger readyBudget = captureCoverage
+                    ? CAPTURE_COVERAGE_EVENTS
+                    : executionCoverage ? READY_EXECUTION_COVERAGE_EVENTS : READY_COVERAGE_EVENTS;
+            int readyLimit = captureCoverage
+                    ? MAX_CAPTURE_COVERAGE_EVENTS
+                    : executionCoverage ? MAX_READY_EXECUTION_COVERAGE_EVENTS : MAX_READY_COVERAGE_EVENTS;
+            if (readyBudget.incrementAndGet() > readyLimit) {
+                return;
+            }
+        }
+        if (wholeFrameCritical && !readyCoverage
                 && WHOLE_FRAME_COVERAGE_EVENTS.incrementAndGet() > MAX_WHOLE_FRAME_COVERAGE_EVENTS) {
             return;
         }
-        if (!wholeFrameCritical && eventIndex > MAX_COVERAGE_EVENTS) {
+        if (!wholeFrameCritical && !readyCoverage && eventIndex > MAX_COVERAGE_EVENTS) {
             return;
         }
         StringBuilder json = new StringBuilder(4096);
@@ -1608,7 +2133,12 @@ public final class StaticTerrainParityDiagnostics {
         appendField(json, "layer", normalizeLayer(layer)).append(", ");
         appendField(json, "frameId", frameId).append(", ");
         appendField(json, "deterministicRenderedFrameIndex",
-                net.minecraft.client.dev.DeterministicCameraCapture.currentRenderedFrameIndex()).append(", ");
+                // This receipt is emitted while the associated world submission is
+                // still in progress. The ordinary completed-frame counter labels
+                // the preceding render; this API retains the exact screenshot
+                // correlation for the submission, including an armed attachment
+                // capture.
+                net.minecraft.client.dev.DeterministicCameraCapture.currentCaptureCorrelationRenderedFrameIndex()).append(", ");
         appendField(json, "gameTime", Minecraft.getInstance().level == null ? -1L : Minecraft.getInstance().level.getGameTime()).append(", ");
         appendField(json, "nanoTime", System.nanoTime()).append(", ");
         json.append("\"camera\": { ");
@@ -2055,6 +2585,37 @@ public final class StaticTerrainParityDiagnostics {
         }
     }
 
+    private static int[] parseCompactColorTraceValues() {
+        String value = System.getProperty("mattmc.dev.staticTerrainParityDiagnostics.compactColorTrace", "").trim();
+        if (value.isEmpty()) {
+            return new int[0];
+        }
+        String[] parts = value.split(",");
+        int[] parsed = new int[Math.min(parts.length, 16)];
+        int count = 0;
+        for (String part : parts) {
+            try {
+                String normalized = part.trim().replace("0x", "").replace("0X", "");
+                parsed[count++] = (int) Long.parseUnsignedLong(normalized, 16);
+            } catch (NumberFormatException ignored) {
+                // An invalid diagnostic selector simply contributes no samples.
+            }
+            if (count == parsed.length) {
+                break;
+            }
+        }
+        return java.util.Arrays.copyOf(parsed, count);
+    }
+
+    private static boolean isCompactColorTraceValue(int color) {
+        for (int candidate : COMPACT_COLOR_TRACE_VALUES) {
+            if (candidate == color) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static String escape(String value) {
         return value.replace("\\", "\\\\").replace("\"", "\\\"");
     }
@@ -2157,6 +2718,14 @@ public final class StaticTerrainParityDiagnostics {
     }
 
     private record CoverageKey(long sectionKey, String layer) {
+    }
+
+    private record CaptureCoverageSnapshot(
+            String layer, int animatedSections, int sectionCount, long vertexTotal, long indexTotal,
+            long primitiveTotal, int missingCoverage, int executedRecords,
+            double cameraX, double cameraY, double cameraZ, int viewportWidth, int viewportHeight,
+            String records
+    ) {
     }
 
     private record AppearanceSource(String layer, int vertexStride, boolean separateAo, AppearanceSample[] samples) {

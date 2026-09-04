@@ -1,7 +1,8 @@
 use std::collections::{BTreeMap, HashMap};
 use std::ffi::{CStr, CString};
 use std::io::Cursor;
-use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Weak};
 
 use ash::vk;
 
@@ -16,9 +17,95 @@ use crate::render::vulkanic::resources::*;
 /// A modest page amortizes the native allocation granularity many Vulkan
 /// drivers apply to small buffers.  This is deliberately backend-private: GAL
 /// still owns individually addressable buffers, lifetimes, and barriers.
-const HOST_VISIBLE_BUFFER_PAGE_SIZE: u64 = 16 * 1024 * 1024;
+// The NVIDIA Vulkan driver used by the supported Linux route maps each host
+// allocation at 64 MiB granularity.  Keep uploads in pages of that size so the
+// many small, concurrently-live source buffers share one native mapping
+// instead of each 8 MiB page becoming a separate driver-sized allocation.
+// This is backend-private suballocation; GAL buffers remain distinct resources
+// with their existing explicit lifetime and synchronization.
+const HOST_VISIBLE_BUFFER_PAGE_SIZE: u64 = 64 * 1024 * 1024;
 const DEVICE_LOCAL_BUFFER_PAGE_SIZE: u64 = 64 * 1024 * 1024;
+/// Images are individually addressable GAL resources, but allocating one
+/// `VkDeviceMemory` object per image causes the NVIDIA driver to reserve a
+/// large native mapping for each small render target, atlas, and GUI image.
+/// Keep the backend-private allocation granularity aligned with device-local
+/// buffer pages while preserving each image's explicit GAL lifetime.
+const DEVICE_LOCAL_TEXTURE_PAGE_SIZE: u64 = 64 * 1024 * 1024;
+/// A mesh section's descriptor set is small, but many sections become visible
+/// during a normal terrain warm-up.  Backends commonly reserve sizeable native
+/// chunks per descriptor pool, so a pool per set makes otherwise bounded GAL
+/// resource-set residency consume unbounded-looking host memory.
+const DESCRIPTOR_POOL_PAGE_SET_COUNT: u32 = 128;
+/// Keep one completely free page for each native memory type.  NVIDIA keeps a
+/// large process mapping after `vkFreeMemory`; immediately freeing every
+/// short-lived upload page therefore turns a sequence of small staging writes
+/// into many driver-sized mappings.  This is deliberately a strict bound: it
+/// is a backend-private reuse cache, not an extension of GAL resource
+/// lifetime, and teardown still frees every page.
+const EMPTY_MEMORY_PAGES_RETAINED_PER_TYPE: usize = 1;
 const MAX_COMPILED_SHADER_CACHE_ENTRIES: usize = 512;
+/// The cache stores only weak references: it never extends a GAL pipeline's
+/// lifetime.  Its fixed key bound prevents one-off shader-pack variants from
+/// accumulating Rust-side lookup metadata while still letting concurrently
+/// live, semantically identical GAL pipelines share one native pipeline.
+const MAX_NATIVE_GRAPHICS_PIPELINE_CACHE_KEYS: usize = 512;
+/// Native Vulkan drivers commonly keep substantial freed allocations in the
+/// process heap after a streaming-world route changes ABI.  Trim only after a
+/// bounded group of actual object retirements and only when glibc reports a
+/// meaningful reusable arena; this is a backend-private residency policy, not
+/// a GAL lifetime or synchronization decision.
+const NATIVE_ALLOCATOR_TRIM_RETIRE_INTERVAL: u32 = 32;
+const NATIVE_ALLOCATOR_TRIM_MIN_FREE_BYTES: usize = 128 * 1024 * 1024;
+static GLIBC_ALLOCATION_TRACE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
+static NATIVE_GRAPHICS_PIPELINE_CACHE_TRACE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
+static VULKAN_RESIDENCY_TRACE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
+
+/// Captures allocator residency only in an explicitly requested diagnostic
+/// run. The Vulkan driver shares this process allocator, so this separates
+/// ordinary Rust/GAL ownership from driver-side anonymous mappings without
+/// changing any resource lifetime or allocation policy.
+fn trace_glibc_allocator_checkpoint(resource_label: &str) {
+    if std::env::var_os("MATTMC_TRACE_GLIBC_ALLOCATOR").is_none() {
+        return;
+    }
+    let sequence = GLIBC_ALLOCATION_TRACE_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+    if std::env::var_os("MATTMC_TRACE_GLIBC_ALLOCATOR_VERBOSE").is_none() && sequence % 64 != 0 {
+        return;
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let info = unsafe { libc::mallinfo2() };
+        eprintln!(
+            "vulkan.glibc-allocator sequence={} resource={} arena_bytes={} allocated_bytes={} free_bytes={} mmap_blocks={} mmap_bytes={}",
+            sequence,
+            resource_label,
+            info.arena,
+            info.uordblks,
+            info.fordblks,
+            info.hblks,
+            info.hblkhd,
+        );
+    }
+}
+
+fn trace_native_graphics_pipeline_cache(hit: bool, resource_label: &str, key_count: usize) {
+    if std::env::var_os("MATTMC_TRACE_VK_NATIVE_PIPELINE_CACHE").is_none() {
+        return;
+    }
+    let sequence = NATIVE_GRAPHICS_PIPELINE_CACHE_TRACE_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+    eprintln!(
+        "vulkan.graphics-pipeline.cache sequence={} result={} keys={} resource={}",
+        sequence,
+        if hit { "hit" } else { "miss" },
+        key_count,
+        resource_label,
+    );
+}
+
+fn should_trim_native_allocator(retired_since_trim: u32, free_bytes: usize) -> bool {
+    retired_since_trim >= NATIVE_ALLOCATOR_TRIM_RETIRE_INTERVAL
+        && free_bytes >= NATIVE_ALLOCATOR_TRIM_MIN_FREE_BYTES
+}
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 struct ShaderCompileKey {
@@ -27,15 +114,93 @@ struct ShaderCompileKey {
     code: Vec<u8>,
 }
 
+/// Immutable Vulkan pipeline state, deliberately excluding the diagnostic
+/// label.  Handles include their generation, so a recycled GAL slot can never
+/// alias a pipeline whose shader or layout dependency has changed.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+struct GraphicsPipelineCacheKey {
+    layout: Handle,
+    vertex_shader: Handle,
+    fragment_shader: Handle,
+    topology: u32,
+    cull_mode: u32,
+    front_face: u32,
+    blend: u32,
+    depth_compare: Option<u32>,
+    depth_write: bool,
+    depth_bias: Option<DepthBiasCacheKey>,
+    color_formats: Vec<TextureFormat>,
+    depth_format: Option<TextureFormat>,
+    stencil: Option<StencilStateCacheKey>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+struct DepthBiasCacheKey {
+    constant_factor: u32,
+    slope_factor: u32,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+struct StencilFaceStateCacheKey {
+    compare: u32,
+    reference: u32,
+    read_mask: u32,
+    write_mask: u32,
+    fail_op: u32,
+    depth_fail_op: u32,
+    pass_op: u32,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+struct StencilStateCacheKey {
+    front: StencilFaceStateCacheKey,
+    back: StencilFaceStateCacheKey,
+}
+
+impl GraphicsPipelineCacheKey {
+    fn from_desc(desc: &GraphicsPipelineDesc) -> Self {
+        let stencil_face = |face: StencilFaceState| StencilFaceStateCacheKey {
+            compare: face.compare as u32,
+            reference: face.reference,
+            read_mask: face.read_mask,
+            write_mask: face.write_mask,
+            fail_op: face.fail_op as u32,
+            depth_fail_op: face.depth_fail_op as u32,
+            pass_op: face.pass_op as u32,
+        };
+        Self {
+            layout: desc.layout,
+            vertex_shader: desc.vertex_shader,
+            fragment_shader: desc.fragment_shader,
+            topology: desc.topology as u32,
+            cull_mode: desc.cull_mode as u32,
+            front_face: desc.front_face as u32,
+            blend: desc.blend as u32,
+            depth_compare: desc.depth_compare.map(|compare| compare as u32),
+            depth_write: desc.depth_write,
+            depth_bias: desc.depth_bias.map(|bias| DepthBiasCacheKey {
+                constant_factor: bias.constant_factor.to_bits(),
+                slope_factor: bias.slope_factor.to_bits(),
+            }),
+            color_formats: desc.color_formats.clone(),
+            depth_format: desc.depth_format,
+            stencil: desc.stencil.map(|stencil| StencilStateCacheKey {
+                front: stencil_face(stencil.front),
+                back: stencil_face(stencil.back),
+            }),
+        }
+    }
+}
+
 #[derive(Clone, Copy)]
-struct BufferMemoryAllocation {
+struct DeviceMemoryAllocation {
     block_id: u64,
     memory: vk::DeviceMemory,
     offset: u64,
     size: u64,
 }
 
-struct BufferMemoryBlock {
+struct DeviceMemoryBlock {
     id: u64,
     memory: vk::DeviceMemory,
     memory_type_index: u32,
@@ -49,7 +214,7 @@ struct BufferMemoryRange {
     size: u64,
 }
 
-impl BufferMemoryBlock {
+impl DeviceMemoryBlock {
     fn allocate(&mut self, size: u64, alignment: u64) -> Option<u64> {
         for index in 0..self.free_ranges.len() {
             let range = self.free_ranges[index];
@@ -88,7 +253,7 @@ impl BufferMemoryBlock {
         None
     }
 
-    fn release(&mut self, allocation: BufferMemoryAllocation) {
+    fn release(&mut self, allocation: DeviceMemoryAllocation) {
         debug_assert_eq!(self.id, allocation.block_id);
         self.free_ranges.push(BufferMemoryRange {
             offset: allocation.offset,
@@ -127,13 +292,130 @@ impl BufferMemoryBlock {
 /// Reclaimable native memory for distinct Vulkan buffer objects.  Vulkan
 /// command offsets remain relative to their buffer, so suballocation does not
 /// leak an implicit global buffer into the explicit GAL API.
-struct BufferMemoryAllocator {
+struct DeviceMemoryAllocator {
     context: Arc<VulkanContext>,
-    blocks: Vec<BufferMemoryBlock>,
+    blocks: Vec<DeviceMemoryBlock>,
     next_block_id: u64,
 }
 
-impl BufferMemoryAllocator {
+/// Backend-private page allocator for explicit GAL resource sets.  The GAL
+/// API still creates and destroys independently addressable resource sets;
+/// only Vulkan's pool bookkeeping is shared.  Pages are keyed by their exact
+/// per-set descriptor signature, which keeps capacity accounting explicit and
+/// makes an empty page immediately reclaimable.
+struct DescriptorPoolAllocator {
+    context: Arc<VulkanContext>,
+    blocks: Vec<DescriptorPoolBlock>,
+    next_block_id: u64,
+}
+
+struct DescriptorPoolBlock {
+    id: u64,
+    pool: vk::DescriptorPool,
+    signature: Vec<(vk::DescriptorType, u32)>,
+    allocated_sets: u32,
+}
+
+impl DescriptorPoolAllocator {
+    fn new(context: Arc<VulkanContext>) -> Self {
+        Self {
+            context,
+            blocks: Vec::new(),
+            next_block_id: 1,
+        }
+    }
+
+    fn allocate(
+        &mut self,
+        signature: Vec<(vk::DescriptorType, u32)>,
+        layout: vk::DescriptorSetLayout,
+        label: &str,
+    ) -> GalResult<(u64, vk::DescriptorPool, vk::DescriptorSet)> {
+        let mut selected = self.blocks.iter().position(|block| {
+            block.signature == signature && block.allocated_sets < DESCRIPTOR_POOL_PAGE_SET_COUNT
+        });
+        if selected.is_none() {
+            let pool_sizes = signature
+                .iter()
+                .map(|(ty, count)| vk::DescriptorPoolSize {
+                    ty: *ty,
+                    descriptor_count: count.saturating_mul(DESCRIPTOR_POOL_PAGE_SET_COUNT),
+                })
+                .collect::<Vec<_>>();
+            let pool_info = vk::DescriptorPoolCreateInfo::default()
+                .flags(vk::DescriptorPoolCreateFlags::FREE_DESCRIPTOR_SET)
+                .max_sets(DESCRIPTOR_POOL_PAGE_SET_COUNT)
+                .pool_sizes(&pool_sizes);
+            let pool = unsafe { self.context.device.create_descriptor_pool(&pool_info, None) }
+                .map_err(|error| {
+                    GalError::backend(format!(
+                        "failed to create descriptor-pool page '{label}': {error:?}"
+                    ))
+                })?;
+            self.context.set_object_name(pool, label);
+            let id = self.next_block_id;
+            self.next_block_id = self.next_block_id.checked_add(1).ok_or_else(|| {
+                GalError::backend("Vulkan descriptor-pool block identifier overflow")
+            })?;
+            self.blocks.push(DescriptorPoolBlock {
+                id,
+                pool,
+                signature,
+                allocated_sets: 0,
+            });
+            selected = Some(self.blocks.len() - 1);
+        }
+        let block = &mut self.blocks[selected.expect("descriptor pool page selected")];
+        let layouts = [layout];
+        let allocate_info = vk::DescriptorSetAllocateInfo::default()
+            .descriptor_pool(block.pool)
+            .set_layouts(&layouts);
+        let set = unsafe { self.context.device.allocate_descriptor_sets(&allocate_info) }
+            .map_err(|error| {
+                GalError::backend(format!(
+                    "failed to allocate descriptor set '{label}': {error:?}"
+                ))
+            })?
+            .remove(0);
+        block.allocated_sets = block.allocated_sets.checked_add(1).ok_or_else(|| {
+            GalError::backend("Vulkan descriptor-pool allocation counter overflow")
+        })?;
+        Ok((block.id, block.pool, set))
+    }
+
+    fn release(&mut self, block_id: u64, pool: vk::DescriptorPool, set: vk::DescriptorSet) {
+        let Some(index) = self.blocks.iter().position(|block| block.id == block_id) else {
+            debug_assert!(false, "released unknown Vulkan descriptor-pool allocation");
+            return;
+        };
+        let block = &mut self.blocks[index];
+        debug_assert_eq!(block.pool, pool);
+        unsafe {
+            let _ = self.context.device.free_descriptor_sets(pool, &[set]);
+        }
+        block.allocated_sets = block.allocated_sets.saturating_sub(1);
+        if block.allocated_sets == 0 {
+            let block = self.blocks.remove(index);
+            unsafe {
+                self.context
+                    .device
+                    .destroy_descriptor_pool(block.pool, None)
+            };
+        }
+    }
+
+    fn destroy_all(&mut self) {
+        for block in self.blocks.drain(..) {
+            unsafe {
+                self.context
+                    .device
+                    .destroy_descriptor_pool(block.pool, None)
+            };
+        }
+    }
+}
+
+impl DeviceMemoryAllocator {
     fn new(context: Arc<VulkanContext>) -> Self {
         Self {
             context,
@@ -146,7 +428,8 @@ impl BufferMemoryAllocator {
         &mut self,
         requirements: vk::MemoryRequirements,
         properties: vk::MemoryPropertyFlags,
-    ) -> GalResult<BufferMemoryAllocation> {
+        page_size: u64,
+    ) -> GalResult<DeviceMemoryAllocation> {
         let memory_type_index = self
             .context
             .find_memory_type(requirements.memory_type_bits, properties)?;
@@ -155,7 +438,7 @@ impl BufferMemoryAllocator {
                 continue;
             }
             if let Some(offset) = block.allocate(requirements.size, requirements.alignment) {
-                return Ok(BufferMemoryAllocation {
+                return Ok(DeviceMemoryAllocation {
                     block_id: block.id,
                     memory: block.memory,
                     offset,
@@ -164,11 +447,6 @@ impl BufferMemoryAllocator {
             }
         }
 
-        let page_size = if properties.contains(vk::MemoryPropertyFlags::HOST_VISIBLE) {
-            HOST_VISIBLE_BUFFER_PAGE_SIZE
-        } else {
-            DEVICE_LOCAL_BUFFER_PAGE_SIZE
-        };
         let allocation_size = align_up(page_size.max(requirements.size), requirements.alignment)
             .ok_or_else(|| GalError::backend("Vulkan buffer allocation size overflow"))?;
         let allocate_info = vk::MemoryAllocateInfo::default()
@@ -181,7 +459,7 @@ impl BufferMemoryAllocator {
                 ))
             },
         )?;
-        let mut block = BufferMemoryBlock {
+        let mut block = DeviceMemoryBlock {
             id: self.next_block_id,
             memory,
             memory_type_index,
@@ -197,17 +475,29 @@ impl BufferMemoryAllocator {
         let offset = block
             .allocate(requirements.size, requirements.alignment)
             .expect("fresh Vulkan buffer memory page must fit requested allocation");
-        let allocation = BufferMemoryAllocation {
+        let allocation = DeviceMemoryAllocation {
             block_id: block.id,
             memory,
             offset,
             size: requirements.size,
         };
+        if std::env::var_os("MATTMC_TRACE_VULKAN_BUFFER_PAGES").is_some() {
+            eprintln!(
+                "vulkan.buffer-page.create id={} memory_type_index={} memory_property_bits={} host_visible={} page_bytes={} request_bytes={} alignment={}",
+                block.id,
+                memory_type_index,
+                properties.as_raw(),
+                properties.contains(vk::MemoryPropertyFlags::HOST_VISIBLE),
+                allocation_size,
+                requirements.size,
+                requirements.alignment,
+            );
+        }
         self.blocks.push(block);
         Ok(allocation)
     }
 
-    fn release(&mut self, allocation: BufferMemoryAllocation) {
+    fn release(&mut self, allocation: DeviceMemoryAllocation) {
         let Some(index) = self
             .blocks
             .iter()
@@ -216,11 +506,61 @@ impl BufferMemoryAllocator {
             debug_assert!(false, "released unknown Vulkan buffer memory allocation");
             return;
         };
-        let block = &mut self.blocks[index];
-        debug_assert_eq!(block.memory, allocation.memory);
-        block.release(allocation);
-        if block.is_empty() {
+        let (is_empty, memory_type_index) = {
+            let block = &mut self.blocks[index];
+            debug_assert_eq!(block.memory, allocation.memory);
+            block.release(allocation);
+            (block.is_empty(), block.memory_type_index)
+        };
+        let retained_empty_pages = self
+            .blocks
+            .iter()
+            .enumerate()
+            .filter(|(candidate_index, candidate)| {
+                *candidate_index != index
+                    && candidate.memory_type_index == memory_type_index
+                    && candidate.is_empty()
+            })
+            .count();
+        if is_empty && retained_empty_pages >= EMPTY_MEMORY_PAGES_RETAINED_PER_TYPE {
             let block = self.blocks.remove(index);
+            unsafe { self.context.device.free_memory(block.memory, None) };
+        }
+    }
+
+    /// Bytes reserved from Vulkan for this allocator's backend-private pages.
+    /// This is deliberately separate from logical GAL resource counts: page
+    /// retention and suballocation are observable memory policy, not hidden
+    /// resource ownership.
+    fn reserved_bytes(&self) -> u64 {
+        self.blocks.iter().map(|block| block.size).sum()
+    }
+
+    /// Bytes currently occupied by live suballocations, excluding free ranges
+    /// retained in otherwise reusable pages.
+    fn allocated_bytes(&self) -> u64 {
+        self.blocks
+            .iter()
+            .map(|block| {
+                let free_bytes = block
+                    .free_ranges
+                    .iter()
+                    .map(|range| range.size)
+                    .sum::<u64>();
+                block.size.saturating_sub(free_bytes)
+            })
+            .sum()
+    }
+}
+
+impl Drop for DeviceMemoryAllocator {
+    fn drop(&mut self) {
+        // Logical GAL resources release suballocations through `release`, but
+        // intentionally retained pages can still contain free ranges when the
+        // backend shuts down. Free every remaining page while the Vulkan
+        // device is still alive; otherwise validation reports leaked
+        // VkDeviceMemory at vkDestroyDevice.
+        for block in self.blocks.drain(..) {
             unsafe { self.context.device.free_memory(block.memory, None) };
         }
     }
@@ -237,23 +577,38 @@ pub(super) struct VulkanObjects {
     /// Vulkan buffers remain distinct explicit GAL resources.  Their native
     /// memory, however, is suballocated here so a terrain section cannot turn
     /// into a driver-sized `VkDeviceMemory` allocation of its own.
-    buffer_memory: BufferMemoryAllocator,
+    buffer_memory: DeviceMemoryAllocator,
+    /// Texture images use the same explicit-memory suballocation discipline
+    /// as buffers, but never share pages with buffers: Vulkan image and buffer
+    /// requirements are independently typed and may select different memory
+    /// types or alignments.
+    texture_memory: DeviceMemoryAllocator,
+    descriptor_pools: DescriptorPoolAllocator,
     objects: BTreeMap<Handle, VulkanObject>,
     next_token: u64,
     /// Backend-private compiler output cache.  GAL shader handles remain
     /// distinct resources; only the expensive GLSL-to-SPIR-V translation is
     /// shared, and the bounded cache owns no Vulkan handles.
     compiled_shader_cache: HashMap<ShaderCompileKey, Vec<u8>>,
+    /// Weak backend-private reuse of native immutable pipelines.  A logical
+    /// GAL graphics-pipeline handle remains independently created, bound, and
+    /// completion-retired; duplicate native work is the only thing shared.
+    graphics_pipeline_cache: HashMap<GraphicsPipelineCacheKey, Weak<NativeGraphicsPipeline>>,
+    native_objects_retired_since_allocator_trim: u32,
 }
 
 impl VulkanObjects {
     pub(super) fn new(context: Arc<VulkanContext>) -> Self {
         Self {
-            buffer_memory: BufferMemoryAllocator::new(context.clone()),
+            buffer_memory: DeviceMemoryAllocator::new(context.clone()),
+            texture_memory: DeviceMemoryAllocator::new(context.clone()),
+            descriptor_pools: DescriptorPoolAllocator::new(context.clone()),
             context,
             objects: BTreeMap::new(),
             next_token: 1,
             compiled_shader_cache: HashMap::new(),
+            graphics_pipeline_cache: HashMap::new(),
+            native_objects_retired_since_allocator_trim: 0,
         }
     }
 
@@ -409,7 +764,35 @@ impl VulkanObjects {
             return Err(GalError::backend("Vulkan destroy kind or token mismatch"));
         }
         self.destroy_object(object);
+        self.trim_native_allocator_after_retirement();
         Ok(())
+    }
+
+    /// On Linux this returns free glibc heap pages after an explicit Vulkan
+    /// resource retirement. The call is deliberately unavailable to GAL and
+    /// other backends: object lifetime remains controlled solely by the GAL
+    /// completion-aware destroy path above.
+    fn trim_native_allocator_after_retirement(&mut self) {
+        self.native_objects_retired_since_allocator_trim = self
+            .native_objects_retired_since_allocator_trim
+            .saturating_add(1);
+        #[cfg(target_os = "linux")]
+        {
+            let info = unsafe { libc::mallinfo2() };
+            if should_trim_native_allocator(
+                self.native_objects_retired_since_allocator_trim,
+                info.fordblks,
+            ) {
+                let released = unsafe { libc::malloc_trim(0) } != 0;
+                if std::env::var_os("MATTMC_TRACE_GLIBC_ALLOCATOR").is_some() {
+                    eprintln!(
+                        "vulkan.glibc-allocator-trim retired={} free_bytes={} released={}",
+                        self.native_objects_retired_since_allocator_trim, info.fordblks, released,
+                    );
+                }
+                self.native_objects_retired_since_allocator_trim = 0;
+            }
+        }
     }
 
     pub(super) fn buffer(&self, handle: Handle) -> GalResult<&BufferObject> {
@@ -517,6 +900,40 @@ impl VulkanObjects {
         for (_, object) in objects.into_iter().rev() {
             self.destroy_object(object);
         }
+        self.graphics_pipeline_cache.clear();
+        // Normally every resource-set destruction releases its page.  Keep a
+        // final backend teardown sweep for partial native initialization paths
+        // where no logical resource object was installed.
+        self.descriptor_pools.destroy_all();
+    }
+
+    /// Diagnostic-only accounting for backend-private Vulkan memory pages.
+    /// Logical GAL lifetimes remain authoritative; this reports both live
+    /// suballocations and retained page capacity without changing policy.
+    fn trace_memory_residency(&self, label: &str) {
+        if std::env::var_os("MATTMC_TRACE_VULKAN_RESIDENCY").is_none() {
+            return;
+        }
+        // Resource retirement is frequent during ordinary GUI and terrain
+        // streaming. Sample it so this opt-in diagnostic cannot itself become
+        // an unbounded log producer; creates remain exact and every 1,024th
+        // retirement still reports allocator high-water behavior.
+        if label == "destroy"
+            && VULKAN_RESIDENCY_TRACE_SEQUENCE.fetch_add(1, Ordering::Relaxed) % 1024 != 0
+        {
+            return;
+        }
+        eprintln!(
+            "vulkan.residency label={} buffer_reserved_bytes={} buffer_allocated_bytes={} buffer_pages={} texture_reserved_bytes={} texture_allocated_bytes={} texture_pages={} logical_objects={}",
+            label,
+            self.buffer_memory.reserved_bytes(),
+            self.buffer_memory.allocated_bytes(),
+            self.buffer_memory.blocks.len(),
+            self.texture_memory.reserved_bytes(),
+            self.texture_memory.allocated_bytes(),
+            self.texture_memory.blocks.len(),
+            self.objects.len(),
+        );
     }
 
     fn create_buffer(
@@ -538,10 +955,21 @@ impl VulkanObjects {
                 ))
             })?;
         let requirements = unsafe { self.context.device.get_buffer_memory_requirements(buffer) };
-        let allocation = match self
-            .buffer_memory
-            .allocate(requirements, memory_flags(desc.memory))
-        {
+        if std::env::var_os("MATTMC_TRACE_VULKAN_BUFFER_OBJECTS").is_some() {
+            eprintln!(
+                "vulkan.buffer.create label={} requested_bytes={} requirement_bytes={} alignment={} memory={:?}",
+                desc.label, desc.size, requirements.size, requirements.alignment, desc.memory,
+            );
+        }
+        let allocation = match self.buffer_memory.allocate(
+            requirements,
+            memory_flags(desc.memory),
+            if matches!(desc.memory, MemoryDomain::Upload | MemoryDomain::Readback) {
+                HOST_VISIBLE_BUFFER_PAGE_SIZE
+            } else {
+                DEVICE_LOCAL_BUFFER_PAGE_SIZE
+            },
+        ) {
             Ok(allocation) => allocation,
             Err(error) => {
                 unsafe { self.context.device.destroy_buffer(buffer, None) };
@@ -564,6 +992,8 @@ impl VulkanObjects {
         }
         self.context
             .set_object_name(buffer, &debug_name("buffer", handle, &desc.label));
+        trace_glibc_allocator_checkpoint(&desc.label);
+        self.trace_memory_residency(&format!("buffer.create.{}", desc.label));
         Ok(BufferObject {
             token,
             buffer,
@@ -576,7 +1006,7 @@ impl VulkanObjects {
     }
 
     fn create_texture(
-        &self,
+        &mut self,
         handle: Handle,
         desc: &TextureDesc,
         token: BackendToken,
@@ -644,21 +1074,41 @@ impl VulkanObjects {
                 ))
             })?;
         let requirements = unsafe { self.context.device.get_image_memory_requirements(image) };
-        let memory = match self
-            .context
-            .allocate_memory(requirements, vk::MemoryPropertyFlags::DEVICE_LOCAL)
-        {
-            Ok(memory) => memory,
+        if std::env::var_os("MATTMC_TRACE_VULKAN_IMAGE_ALLOCATIONS").is_some() {
+            eprintln!(
+                "vulkan.image.allocate label={} dimension={:?} format={:?} extent={}x{}x{} mip_levels={} array_layers={} bytes={} alignment={}",
+                desc.label,
+                desc.dimension,
+                desc.format,
+                desc.extent.width,
+                desc.extent.height,
+                desc.extent.depth,
+                desc.mip_levels,
+                desc.array_layers,
+                requirements.size,
+                requirements.alignment,
+            );
+        }
+        let allocation = match self.texture_memory.allocate(
+            requirements,
+            vk::MemoryPropertyFlags::DEVICE_LOCAL,
+            DEVICE_LOCAL_TEXTURE_PAGE_SIZE,
+        ) {
+            Ok(allocation) => allocation,
             Err(error) => {
                 unsafe { self.context.device.destroy_image(image, None) };
                 return Err(error);
             }
         };
-        if let Err(error) = unsafe { self.context.device.bind_image_memory(image, memory, 0) } {
+        if let Err(error) = unsafe {
+            self.context
+                .device
+                .bind_image_memory(image, allocation.memory, allocation.offset)
+        } {
             unsafe {
-                self.context.device.free_memory(memory, None);
                 self.context.device.destroy_image(image, None);
             }
+            self.texture_memory.release(allocation);
             return Err(GalError::backend(format!(
                 "failed to bind image memory '{}': {error:?}",
                 desc.label
@@ -666,11 +1116,14 @@ impl VulkanObjects {
         }
         self.context
             .set_object_name(image, &debug_name("texture", handle, &desc.label));
+        trace_glibc_allocator_checkpoint(&desc.label);
+        self.trace_memory_residency(&format!("texture.create.{}", desc.label));
         Ok(TextureObject {
             token,
             label: desc.label.clone(),
             image,
-            memory,
+            memory: allocation.memory,
+            allocation,
             format,
             copy_bytes_per_texel: desc.format.copy_bytes_per_texel().unwrap_or(0),
             extent: desc.extent,
@@ -830,6 +1283,7 @@ impl VulkanObjects {
         desc: &ShaderModuleDesc,
         token: BackendToken,
     ) -> GalResult<ShaderModuleObject> {
+        trace_glibc_allocator_checkpoint(&format!("shader.begin.{}", desc.label));
         let code = if desc.code_format == ShaderCodeFormat::Glsl {
             let source = std::str::from_utf8(&desc.code).map_err(|error| {
                 GalError::backend(format!(
@@ -871,7 +1325,8 @@ impl VulkanObjects {
                 if self.compiled_shader_cache.len() >= MAX_COMPILED_SHADER_CACHE_ENTRIES {
                     self.compiled_shader_cache.clear();
                 }
-                self.compiled_shader_cache.insert(cache_key, compiled.clone());
+                self.compiled_shader_cache
+                    .insert(cache_key, compiled.clone());
                 compiled
             }
         } else {
@@ -902,6 +1357,7 @@ impl VulkanObjects {
             })?;
         self.context
             .set_object_name(module, &debug_name("shader", handle, &desc.label));
+        trace_glibc_allocator_checkpoint(&format!("shader.end.{}", desc.label));
         let entry_point = CString::new(desc.entry_point.clone())
             .map_err(|_| GalError::backend("shader entry point contains NUL"))?;
         Ok(ShaderModuleObject {
@@ -954,7 +1410,7 @@ impl VulkanObjects {
     }
 
     fn create_resource_set(
-        &self,
+        &mut self,
         handle: Handle,
         desc: &ResourceSetDesc,
         token: BackendToken,
@@ -972,39 +1428,7 @@ impl VulkanObjects {
                 ))
                 .or_default() += binding.array_count;
         }
-        let pool_sizes = sizes
-            .into_iter()
-            .map(|(ty, descriptor_count)| vk::DescriptorPoolSize {
-                ty,
-                descriptor_count,
-            })
-            .collect::<Vec<_>>();
-        let pool_info = vk::DescriptorPoolCreateInfo::default()
-            .max_sets(1)
-            .pool_sizes(&pool_sizes);
-        let pool = unsafe { self.context.device.create_descriptor_pool(&pool_info, None) }
-            .map_err(|error| {
-                GalError::backend(format!(
-                    "failed to create descriptor pool '{}': {error:?}",
-                    desc.label
-                ))
-            })?;
-        self.context
-            .set_object_name(pool, &debug_name("resource-set-pool", handle, &desc.label));
-        let layouts = [layout_object.layout];
-        let allocate_info = vk::DescriptorSetAllocateInfo::default()
-            .descriptor_pool(pool)
-            .set_layouts(&layouts);
-        let set = match unsafe { self.context.device.allocate_descriptor_sets(&allocate_info) } {
-            Ok(mut sets) => sets.remove(0),
-            Err(error) => {
-                unsafe { self.context.device.destroy_descriptor_pool(pool, None) };
-                return Err(GalError::backend(format!(
-                    "failed to allocate descriptor set '{}': {error:?}",
-                    desc.label
-                )));
-            }
-        };
+        let signature = sizes.into_iter().collect::<Vec<_>>();
 
         enum WritePlan {
             Buffer {
@@ -1052,11 +1476,13 @@ impl VulkanObjects {
                 ResourceBindingKind::SampledTexture | ResourceBindingKind::StorageTexture => {
                     let view = self.texture_view(binding.resource)?;
                     let info_index = image_infos.len();
-                    let sampled_layout = if view.aspect.contains(vk::ImageAspectFlags::STENCIL) {
-                        vk::ImageLayout::DEPTH_STENCIL_READ_ONLY_OPTIMAL
-                    } else {
-                        vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL
-                    };
+                    // A combined sampler may refer to a depth-only view (the
+                    // source `depthtex*` contract) or a D24S8 view.  Vulkan
+                    // requires the image layout to match the selected
+                    // aspect; advertising a color SHADER_READ_ONLY layout
+                    // for D32 caused depth samples to remain effectively
+                    // far-depth/undefined in shader-pack fullscreen passes.
+                    let sampled_layout = sampled_image_layout_for_aspect(view.aspect);
                     image_infos.push(vk::DescriptorImageInfo {
                         sampler: vk::Sampler::null(),
                         image_view: view.view,
@@ -1079,7 +1505,7 @@ impl VulkanObjects {
                         _ => {
                             return Err(GalError::backend(
                                 "sampler binding references missing sampler",
-                            ))
+                            ));
                         }
                     };
                     let info_index = image_infos.len();
@@ -1101,7 +1527,7 @@ impl VulkanObjects {
                         _ => {
                             return Err(GalError::backend(
                                 "combined texture-sampler binding references missing pair",
-                            ))
+                            ));
                         }
                     };
                     let view = self.texture_view(combined.texture_view)?;
@@ -1110,15 +1536,11 @@ impl VulkanObjects {
                         _ => {
                             return Err(GalError::backend(
                                 "combined texture-sampler binding references missing sampler",
-                            ))
+                            ));
                         }
                     };
                     let info_index = image_infos.len();
-                    let sampled_layout = if view.aspect.contains(vk::ImageAspectFlags::STENCIL) {
-                        vk::ImageLayout::DEPTH_STENCIL_READ_ONLY_OPTIMAL
-                    } else {
-                        vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL
-                    };
+                    let sampled_layout = sampled_image_layout_for_aspect(view.aspect);
                     if std::env::var_os("MATTMC_TRACE_DESCRIPTOR_REALIZATION").is_some() {
                         eprintln!(
                             "vulkan.descriptor.combined resource={:?} texture_view={:?} texture={:?} label={} image_view={:?} sampler={:?} layout={}",
@@ -1145,6 +1567,23 @@ impl VulkanObjects {
                 }
             }
         }
+        let dynamic_offsets = desc
+            .bindings
+            .iter()
+            .flat_map(|binding| binding.dynamic_offsets.iter().copied())
+            .map(|offset| {
+                u32::try_from(offset)
+                    .map_err(|_| GalError::backend("dynamic descriptor offset exceeds u32"))
+            })
+            .collect::<GalResult<Vec<_>>>()?;
+        // Resource lookup and dynamic-offset validation can fail above.
+        // Allocate only after that work so an invalid GAL request cannot
+        // strand a native descriptor set/page allocation.
+        let (pool_block_id, pool, set) = self.descriptor_pools.allocate(
+            signature,
+            layout_object.layout,
+            &debug_name("resource-set-pool-page", handle, &desc.label),
+        )?;
         let writes = plans
             .iter()
             .map(|plan| match *plan {
@@ -1173,17 +1612,9 @@ impl VulkanObjects {
             })
             .collect::<Vec<_>>();
         unsafe { self.context.device.update_descriptor_sets(&writes, &[]) };
-        let dynamic_offsets = desc
-            .bindings
-            .iter()
-            .flat_map(|binding| binding.dynamic_offsets.iter().copied())
-            .map(|offset| {
-                u32::try_from(offset)
-                    .map_err(|_| GalError::backend("dynamic descriptor offset exceeds u32"))
-            })
-            .collect::<GalResult<Vec<_>>>()?;
         Ok(ResourceSetObject {
             token,
+            pool_block_id,
             pool,
             set,
             dynamic_offsets,
@@ -1224,11 +1655,30 @@ impl VulkanObjects {
     }
 
     fn create_graphics_pipeline(
-        &self,
+        &mut self,
         handle: Handle,
         desc: &GraphicsPipelineDesc,
         token: BackendToken,
     ) -> GalResult<GraphicsPipelineObject> {
+        let cache_key = GraphicsPipelineCacheKey::from_desc(desc);
+        if let Some(pipeline) = self
+            .graphics_pipeline_cache
+            .get(&cache_key)
+            .and_then(Weak::upgrade)
+        {
+            trace_native_graphics_pipeline_cache(
+                true,
+                &desc.label,
+                self.graphics_pipeline_cache.len(),
+            );
+            return Ok(GraphicsPipelineObject {
+                token,
+                label: desc.label.clone(),
+                pipeline,
+                layout: desc.layout,
+            });
+        }
+        trace_glibc_allocator_checkpoint(&format!("graphics-pipeline.begin.{}", desc.label));
         let vertex = self.shader(desc.vertex_shader)?;
         let fragment = self.shader(desc.fragment_shader)?;
         let layout = self.pipeline_layout(desc.layout)?.layout;
@@ -1253,8 +1703,17 @@ impl VulkanObjects {
         let color_blend_attachments = desc
             .color_formats
             .iter()
-            .map(|_| color_blend_attachment(desc.blend))
+            .enumerate()
+            .map(|(index, _)| color_blend_attachment(desc.blend, index))
             .collect::<Vec<_>>();
+        if desc.blend == BlendMode::TerrainTranslucent
+            && desc.color_formats.len() > 1
+            && !self.context.independent_blend
+        {
+            return Err(GalError::unsupported_feature(
+                "terrain-translucent MRT requires Vulkan independentBlend",
+            ));
+        }
         let color_blend =
             vk::PipelineColorBlendStateCreateInfo::default().attachments(&color_blend_attachments);
         let dynamic_states = [vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR];
@@ -1306,6 +1765,19 @@ impl VulkanObjects {
             pipeline,
             &debug_name("graphics-pipeline", handle, &desc.label),
         );
+        trace_glibc_allocator_checkpoint(&format!("graphics-pipeline.end.{}", desc.label));
+        self.retain_live_graphics_pipeline_cache_keys();
+        let pipeline = Arc::new(NativeGraphicsPipeline {
+            context: self.context.clone(),
+            pipeline,
+        });
+        self.graphics_pipeline_cache
+            .insert(cache_key, Arc::downgrade(&pipeline));
+        trace_native_graphics_pipeline_cache(
+            false,
+            &desc.label,
+            self.graphics_pipeline_cache.len(),
+        );
         Ok(GraphicsPipelineObject {
             token,
             label: desc.label.clone(),
@@ -1314,12 +1786,28 @@ impl VulkanObjects {
         })
     }
 
+    fn retain_live_graphics_pipeline_cache_keys(&mut self) {
+        if self.graphics_pipeline_cache.len() < MAX_NATIVE_GRAPHICS_PIPELINE_CACHE_KEYS {
+            return;
+        }
+        self.graphics_pipeline_cache
+            .retain(|_, pipeline| pipeline.strong_count() != 0);
+        // A cache key is purely an optimization.  Once the bound is still
+        // reached by live logical resources, dropping keys cannot affect
+        // ownership or rendering correctness; it merely forgoes a future
+        // reuse opportunity until one of those resources retires.
+        if self.graphics_pipeline_cache.len() >= MAX_NATIVE_GRAPHICS_PIPELINE_CACHE_KEYS {
+            self.graphics_pipeline_cache.clear();
+        }
+    }
+
     fn create_compute_pipeline(
         &self,
         handle: Handle,
         desc: &ComputePipelineDesc,
         token: BackendToken,
     ) -> GalResult<ComputePipelineObject> {
+        trace_glibc_allocator_checkpoint(&format!("compute-pipeline.begin.{}", desc.label));
         let shader = self.shader(desc.shader)?;
         let layout = self.pipeline_layout(desc.layout)?.layout;
         let stage = shader_stage_create(shader);
@@ -1344,6 +1832,7 @@ impl VulkanObjects {
             pipeline,
             &debug_name("compute-pipeline", handle, &desc.label),
         );
+        trace_glibc_allocator_checkpoint(&format!("compute-pipeline.end.{}", desc.label));
         Ok(ComputePipelineObject {
             token,
             pipeline,
@@ -1370,7 +1859,7 @@ impl VulkanObjects {
                 }
                 VulkanObject::Texture(object) => {
                     self.context.device.destroy_image(object.image, None);
-                    self.context.device.free_memory(object.memory, None);
+                    self.texture_memory.release(object.allocation);
                 }
                 VulkanObject::TextureView(object) => {
                     self.context.device.destroy_image_view(object.view, None);
@@ -1392,18 +1881,15 @@ impl VulkanObjects {
                         .destroy_descriptor_set_layout(object.layout, None);
                 }
                 VulkanObject::ResourceSet(object) => {
-                    self.context
-                        .device
-                        .destroy_descriptor_pool(object.pool, None);
+                    self.descriptor_pools
+                        .release(object.pool_block_id, object.pool, object.set);
                 }
                 VulkanObject::PipelineLayout(object) => {
                     self.context
                         .device
                         .destroy_pipeline_layout(object.layout, None);
                 }
-                VulkanObject::GraphicsPipeline(object) => {
-                    self.context.device.destroy_pipeline(object.pipeline, None);
-                }
+                VulkanObject::GraphicsPipeline(_) => {}
                 VulkanObject::ComputePipeline(object) => {
                     self.context.device.destroy_pipeline(object.pipeline, None);
                 }
@@ -1412,6 +1898,7 @@ impl VulkanObjects {
                 | VulkanObject::RenderPass(_) => {}
             }
         }
+        self.trace_memory_residency("destroy");
     }
 }
 
@@ -1509,7 +1996,7 @@ pub(super) struct BufferObject {
     /// Commands use `buffer` offsets and therefore remain in logical space;
     /// only host mapping needs to add this offset.
     pub(super) memory_offset: u64,
-    allocation: BufferMemoryAllocation,
+    allocation: DeviceMemoryAllocation,
     pub(super) size: u64,
     pub(super) memory_domain: MemoryDomain,
 }
@@ -1520,6 +2007,7 @@ pub(super) struct TextureObject {
     pub(super) label: String,
     pub(super) image: vk::Image,
     pub(super) memory: vk::DeviceMemory,
+    allocation: DeviceMemoryAllocation,
     pub(super) format: vk::Format,
     pub(super) copy_bytes_per_texel: u32,
     pub(super) extent: Extent3d,
@@ -1569,6 +2057,7 @@ pub(super) struct ResourceLayoutObject {
 
 pub(super) struct ResourceSetObject {
     pub(super) token: BackendToken,
+    pool_block_id: u64,
     pub(super) pool: vk::DescriptorPool,
     pub(super) set: vk::DescriptorSet,
     pub(super) dynamic_offsets: Vec<u32>,
@@ -1579,10 +2068,24 @@ pub(super) struct PipelineLayoutObject {
     pub(super) layout: vk::PipelineLayout,
 }
 
+/// Shared only by equal immutable graphics-pipeline descriptions.  Destruction
+/// is reference-counted by the logical GAL pipeline objects, so the cache's
+/// weak entry cannot keep a native pipeline alive after explicit retirement.
+pub(super) struct NativeGraphicsPipeline {
+    context: Arc<VulkanContext>,
+    pub(super) pipeline: vk::Pipeline,
+}
+
+impl Drop for NativeGraphicsPipeline {
+    fn drop(&mut self) {
+        unsafe { self.context.device.destroy_pipeline(self.pipeline, None) };
+    }
+}
+
 pub(super) struct GraphicsPipelineObject {
     pub(super) token: BackendToken,
     pub(super) label: String,
-    pub(super) pipeline: vk::Pipeline,
+    pub(super) pipeline: Arc<NativeGraphicsPipeline>,
     pub(super) layout: Handle,
 }
 
@@ -1771,6 +2274,48 @@ fn descriptor_type_for_binding(
     }
 }
 
+fn sampled_image_layout_for_aspect(aspect: vk::ImageAspectFlags) -> vk::ImageLayout {
+    if aspect.contains(vk::ImageAspectFlags::STENCIL) {
+        vk::ImageLayout::DEPTH_STENCIL_READ_ONLY_OPTIMAL
+    } else if aspect.contains(vk::ImageAspectFlags::DEPTH) {
+        vk::ImageLayout::DEPTH_READ_ONLY_OPTIMAL
+    } else {
+        vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL
+    }
+}
+
+#[cfg(test)]
+mod sampled_image_layout_tests {
+    use super::*;
+
+    #[test]
+    fn depth_only_views_use_depth_read_only_layout_for_all_sampled_bindings() {
+        assert_eq!(
+            sampled_image_layout_for_aspect(vk::ImageAspectFlags::DEPTH).as_raw(),
+            vk::ImageLayout::DEPTH_READ_ONLY_OPTIMAL.as_raw()
+        );
+    }
+
+    #[test]
+    fn depth_stencil_views_use_combined_read_only_layout() {
+        assert_eq!(
+            sampled_image_layout_for_aspect(
+                vk::ImageAspectFlags::DEPTH | vk::ImageAspectFlags::STENCIL
+            )
+            .as_raw(),
+            vk::ImageLayout::DEPTH_STENCIL_READ_ONLY_OPTIMAL.as_raw()
+        );
+    }
+
+    #[test]
+    fn color_views_use_shader_read_only_layout() {
+        assert_eq!(
+            sampled_image_layout_for_aspect(vk::ImageAspectFlags::COLOR).as_raw(),
+            vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL.as_raw()
+        );
+    }
+}
+
 fn descriptor_type_for_resource_binding(binding: &ResourceBinding) -> vk::DescriptorType {
     descriptor_type_for_binding(binding.kind, binding.dynamic_offsets.len() as u32)
 }
@@ -1790,6 +2335,7 @@ pub(super) fn topology(topology: PrimitiveTopology) -> vk::PrimitiveTopology {
         PrimitiveTopology::Points => vk::PrimitiveTopology::POINT_LIST,
         PrimitiveTopology::Lines => vk::PrimitiveTopology::LINE_LIST,
         PrimitiveTopology::Triangles => vk::PrimitiveTopology::TRIANGLE_LIST,
+        PrimitiveTopology::TriangleFan => vk::PrimitiveTopology::TRIANGLE_FAN,
     }
 }
 
@@ -1872,7 +2418,16 @@ fn depth_stencil_state(
     })
 }
 
-pub(super) fn color_blend_attachment(blend: BlendMode) -> vk::PipelineColorBlendAttachmentState {
+pub(super) fn color_blend_attachment(
+    blend: BlendMode,
+    attachment_index: usize,
+) -> vk::PipelineColorBlendAttachmentState {
+    if blend == BlendMode::TerrainTranslucent && attachment_index != 0 {
+        return color_blend_attachment(BlendMode::Disabled, attachment_index);
+    }
+    if blend == BlendMode::TerrainTranslucent {
+        return color_blend_attachment(BlendMode::Alpha, attachment_index);
+    }
     match blend {
         BlendMode::Disabled => vk::PipelineColorBlendAttachmentState::default()
             .color_write_mask(vk::ColorComponentFlags::RGBA),
@@ -1948,6 +2503,7 @@ pub(super) fn color_blend_attachment(blend: BlendMode) -> vk::PipelineColorBlend
             .dst_alpha_blend_factor(vk::BlendFactor::ZERO)
             .alpha_blend_op(vk::BlendOp::ADD)
             .color_write_mask(vk::ColorComponentFlags::RGBA),
+        BlendMode::TerrainTranslucent => unreachable!(),
     }
 }
 
@@ -1970,6 +2526,79 @@ fn image_view_type(dimension: TextureDimension, array_layers: u32) -> vk::ImageV
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn triangle_fan_topology_lowers_to_native_vulkan_fan_assembly() {
+        assert!(topology(PrimitiveTopology::TriangleFan) == vk::PrimitiveTopology::TRIANGLE_FAN);
+    }
+
+    #[test]
+    fn device_memory_block_reuses_released_ranges_without_growing_residency() {
+        let mut block = DeviceMemoryBlock {
+            id: 7,
+            memory: vk::DeviceMemory::null(),
+            memory_type_index: 0,
+            size: 4096,
+            free_ranges: vec![BufferMemoryRange {
+                offset: 0,
+                size: 4096,
+            }],
+        };
+        let first = block.allocate(512, 256).expect("first allocation fits");
+        let second = block.allocate(768, 256).expect("second allocation fits");
+        assert_eq!(0, first);
+        assert_eq!(512, second);
+        block.release(DeviceMemoryAllocation {
+            block_id: 7,
+            memory: vk::DeviceMemory::null(),
+            offset: first,
+            size: 512,
+        });
+        let reused = block
+            .allocate(256, 256)
+            .expect("released range is reusable");
+        assert_eq!(0, reused);
+        assert!(!block.is_empty());
+    }
+
+    #[test]
+    fn device_memory_block_reports_empty_only_after_every_suballocation_retires() {
+        let mut block = DeviceMemoryBlock {
+            id: 9,
+            memory: vk::DeviceMemory::null(),
+            memory_type_index: 0,
+            size: 1024,
+            free_ranges: vec![BufferMemoryRange {
+                offset: 0,
+                size: 1024,
+            }],
+        };
+        let allocation = block.allocate(1024, 1).expect("whole page fits");
+        assert!(!block.is_empty());
+        block.release(DeviceMemoryAllocation {
+            block_id: 9,
+            memory: vk::DeviceMemory::null(),
+            offset: allocation,
+            size: 1024,
+        });
+        assert!(block.is_empty());
+    }
+
+    #[test]
+    fn native_allocator_trim_requires_both_retirement_batch_and_large_free_arena() {
+        assert!(!should_trim_native_allocator(
+            NATIVE_ALLOCATOR_TRIM_RETIRE_INTERVAL - 1,
+            NATIVE_ALLOCATOR_TRIM_MIN_FREE_BYTES,
+        ));
+        assert!(!should_trim_native_allocator(
+            NATIVE_ALLOCATOR_TRIM_RETIRE_INTERVAL,
+            NATIVE_ALLOCATOR_TRIM_MIN_FREE_BYTES - 1,
+        ));
+        assert!(should_trim_native_allocator(
+            NATIVE_ALLOCATOR_TRIM_RETIRE_INTERVAL,
+            NATIVE_ALLOCATOR_TRIM_MIN_FREE_BYTES,
+        ));
+    }
 
     #[test]
     fn shader_compile_cache_key_preserves_exact_stage_entry_point_and_source() {
@@ -1999,9 +2628,9 @@ mod tests {
     }
 
     #[test]
-    fn buffer_memory_block_reuses_aligned_ranges_after_destroy() {
+    fn device_memory_block_reuses_aligned_ranges_after_destroy() {
         let memory = vk::DeviceMemory::null();
-        let mut block = BufferMemoryBlock {
+        let mut block = DeviceMemoryBlock {
             id: 7,
             memory,
             memory_type_index: 0,
@@ -2016,13 +2645,13 @@ mod tests {
         assert_eq!(0, first_offset);
         assert_eq!(64, second_offset);
 
-        block.release(BufferMemoryAllocation {
+        block.release(DeviceMemoryAllocation {
             block_id: 7,
             memory,
             offset: first_offset,
             size: 32,
         });
-        block.release(BufferMemoryAllocation {
+        block.release(DeviceMemoryAllocation {
             block_id: 7,
             memory,
             offset: second_offset,
@@ -2099,15 +2728,13 @@ mod tests {
     #[test]
     fn layered_2d_textures_use_array_views() {
         assert!(vk::ImageViewType::TYPE_2D == image_view_type(TextureDimension::D2, 1));
-        assert!(
-            vk::ImageViewType::TYPE_2D_ARRAY == image_view_type(TextureDimension::D2, 2)
-        );
+        assert!(vk::ImageViewType::TYPE_2D_ARRAY == image_view_type(TextureDimension::D2, 2));
         assert!(vk::ImageViewType::TYPE_3D == image_view_type(TextureDimension::D3, 1));
     }
 
     #[test]
     fn overlay_blend_lowers_to_source_alpha_additive_equation() {
-        let attachment = color_blend_attachment(BlendMode::Overlay);
+        let attachment = color_blend_attachment(BlendMode::Overlay, 0);
         assert_eq!(vk::TRUE, attachment.blend_enable);
         assert!(attachment.src_color_blend_factor == vk::BlendFactor::SRC_ALPHA);
         assert!(attachment.dst_color_blend_factor == vk::BlendFactor::ONE);
@@ -2120,7 +2747,7 @@ mod tests {
 
     #[test]
     fn multiply_blend_lowers_to_single_source_times_destination() {
-        let attachment = color_blend_attachment(BlendMode::Multiply);
+        let attachment = color_blend_attachment(BlendMode::Multiply, 0);
         assert_eq!(vk::TRUE, attachment.blend_enable);
         assert!(attachment.src_color_blend_factor == vk::BlendFactor::DST_COLOR);
         assert!(attachment.dst_color_blend_factor == vk::BlendFactor::ZERO);
@@ -2133,7 +2760,7 @@ mod tests {
 
     #[test]
     fn premultiplied_blend_lowers_to_one_times_destination_alpha() {
-        let attachment = color_blend_attachment(BlendMode::Premultiplied);
+        let attachment = color_blend_attachment(BlendMode::Premultiplied, 0);
         assert_eq!(vk::TRUE, attachment.blend_enable);
         assert!(attachment.src_color_blend_factor == vk::BlendFactor::ONE);
         assert!(attachment.dst_color_blend_factor == vk::BlendFactor::ONE_MINUS_SRC_ALPHA);
@@ -2142,6 +2769,16 @@ mod tests {
         assert!(attachment.dst_alpha_blend_factor == vk::BlendFactor::ONE_MINUS_SRC_ALPHA);
         assert!(attachment.alpha_blend_op == vk::BlendOp::ADD);
         assert!(attachment.color_write_mask == vk::ColorComponentFlags::RGBA);
+    }
+
+    #[test]
+    fn terrain_translucent_blends_only_primary_mrt_attachment() {
+        let primary = color_blend_attachment(BlendMode::TerrainTranslucent, 0);
+        let auxiliary = color_blend_attachment(BlendMode::TerrainTranslucent, 1);
+        assert_eq!(vk::TRUE, primary.blend_enable);
+        assert!(vk::BlendFactor::SRC_ALPHA == primary.src_color_blend_factor);
+        assert!(vk::FALSE == auxiliary.blend_enable);
+        assert!(vk::ColorComponentFlags::RGBA == auxiliary.color_write_mask);
     }
 
     #[test]
@@ -2228,5 +2865,69 @@ mod tests {
         assert_eq!(7, state.front.reference);
         assert!(state.back.compare_op == vk::CompareOp::EQUAL);
         assert!(state.back.pass_op == vk::StencilOp::KEEP);
+    }
+
+    #[test]
+    fn native_graphics_pipeline_cache_key_ignores_diagnostic_label() {
+        let mut first = GraphicsPipelineDesc {
+            label: "first logical label".to_owned(),
+            layout: Handle::from_raw(1),
+            vertex_shader: Handle::from_raw(2),
+            fragment_shader: Handle::from_raw(3),
+            topology: PrimitiveTopology::Triangles,
+            cull_mode: CullMode::Back,
+            front_face: crate::render::vulkanic::resources::FrontFace::CounterClockwise,
+            blend: BlendMode::Alpha,
+            depth_compare: Some(CompareOp::LessOrEqual),
+            depth_write: true,
+            depth_bias: Some(DepthBias::new(1.0, 2.0)),
+            color_formats: vec![TextureFormat::Rgba8Unorm],
+            depth_format: Some(TextureFormat::Depth32Float),
+            stencil: Some(StencilState {
+                front: StencilFaceState::replace(7, 0xff, 0xff),
+                back: StencilFaceState::keep(CompareOp::Equal, 7, 0xff),
+            }),
+        };
+        let first_key = GraphicsPipelineCacheKey::from_desc(&first);
+        first.label = "same immutable state, another label".to_owned();
+        assert_eq!(first_key, GraphicsPipelineCacheKey::from_desc(&first));
+    }
+
+    #[test]
+    fn native_graphics_pipeline_cache_key_distinguishes_immutable_state() {
+        let first = GraphicsPipelineDesc {
+            label: "same label".to_owned(),
+            layout: Handle::from_raw(1),
+            vertex_shader: Handle::from_raw(2),
+            fragment_shader: Handle::from_raw(3),
+            topology: PrimitiveTopology::Triangles,
+            cull_mode: CullMode::Back,
+            front_face: crate::render::vulkanic::resources::FrontFace::CounterClockwise,
+            blend: BlendMode::Disabled,
+            depth_compare: Some(CompareOp::LessOrEqual),
+            depth_write: true,
+            depth_bias: None,
+            color_formats: vec![TextureFormat::Rgba8Unorm],
+            depth_format: Some(TextureFormat::Depth32Float),
+            stencil: None,
+        };
+        let mut second = first.clone();
+        second.depth_write = false;
+        assert_ne!(
+            GraphicsPipelineCacheKey::from_desc(&first),
+            GraphicsPipelineCacheKey::from_desc(&second)
+        );
+        second = first.clone();
+        second.fragment_shader = Handle::from_raw(4);
+        assert_ne!(
+            GraphicsPipelineCacheKey::from_desc(&first),
+            GraphicsPipelineCacheKey::from_desc(&second)
+        );
+        second = first.clone();
+        second.color_formats = vec![TextureFormat::Rgba16Float];
+        assert_ne!(
+            GraphicsPipelineCacheKey::from_desc(&first),
+            GraphicsPipelineCacheKey::from_desc(&second)
+        );
     }
 }

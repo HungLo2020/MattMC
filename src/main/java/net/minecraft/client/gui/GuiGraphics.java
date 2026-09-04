@@ -733,11 +733,13 @@ public class GuiGraphics {
 			new Matrix3x2f(this.pose),
 			x,
 			y,
-			width,
-			height,
+			x + width,
+			y + height,
+			// BlitRenderState stores coordinates as u0, u1, v0, v1.
+			// Preserve the semantic API's u0, v0, u1, v1 argument order.
 			u0,
-			v0,
 			u1,
+			v0,
 			v1,
 			color,
 			this.scissorStack.peek()
@@ -767,6 +769,26 @@ public class GuiGraphics {
 				u0, u1, v0, v1, topColor, bottomColor, this.guiWidth(), this.guiHeight(), 0);
 		if (elements == null) {
 			throw new IllegalStateException("Rust whole-frame gradient GUI route rejected semantic mesh");
+		}
+		for (net.vulkanic.gui.RustGalGuiElementRenderState element : elements) {
+			this.guiRenderState.submitGuiElement(element);
+		}
+	}
+
+	/** Submits the VoxelMap overlay mesh to the active semantic GUI layer. */
+	public void submitRustVoxelMapMask(
+		ResourceLocation texture, float centerX, float centerY, float radius,
+		float angleRadians, float mapScale, float sourceOffsetX, float sourceOffsetY,
+		int color, boolean circular
+	) {
+		List<net.vulkanic.gui.RustGalGuiElementRenderState> elements =
+			net.vulkanic.gui.RustGalGuiRenderer.tryEnqueueVoxelMapMask(
+				texture, this.guiWidth(), this.guiHeight(), centerX, centerY, radius,
+				angleRadians, mapScale, sourceOffsetX, sourceOffsetY, color, circular,
+				this.guiRenderState.currentSemanticLayerOrder(
+					net.minecraft.client.gui.render.state.GuiRenderState.SemanticPhase.ELEMENTS));
+		if (elements == null) {
+			throw new IllegalStateException("Rust whole-frame VoxelMap route rejected semantic mesh");
 		}
 		for (net.vulkanic.gui.RustGalGuiElementRenderState element : elements) {
 			this.guiRenderState.submitGuiElement(element);

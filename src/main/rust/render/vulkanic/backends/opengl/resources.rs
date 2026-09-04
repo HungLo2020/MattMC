@@ -979,6 +979,11 @@ mod tests {
     use super::*;
     use std::num::NonZeroU32;
 
+    #[test]
+    fn triangle_fan_topology_lowers_to_native_opengl_fan_assembly() {
+        assert_eq!(glow::TRIANGLE_FAN, topology(PrimitiveTopology::TriangleFan));
+    }
+
     fn fake_framebuffer(id: u32) -> glow::Framebuffer {
         glow::NativeFramebuffer(NonZeroU32::new(id).unwrap())
     }
@@ -1074,8 +1079,7 @@ mod tests {
 
     #[test]
     fn opengl_shader_source_maps_vulkan_style_vertex_builtins() {
-        let source =
-            "layout(set = 0, binding = 0, std140) uniform U { mat4 m; }; int v = gl_VertexIndex; int i = gl_InstanceIndex;";
+        let source = "layout(set = 0, binding = 0, std140) uniform U { mat4 m; }; int v = gl_VertexIndex; int i = gl_InstanceIndex;";
         let normalized = opengl_shader_source(source);
         assert!(normalized.contains("layout(binding = 0, std140)"));
         assert!(!normalized.contains("set = 0"));
@@ -1143,9 +1147,11 @@ void main() { vec4 color = texture(sampler2D(LightmapTexture, LightmapSampler), 
         assert!(normalized.contains("layout(binding = 8) uniform sampler2D LightmapTexture;"));
         assert!(!normalized.contains("LightmapSampler"));
         assert!(normalized.contains("texture(LightmapTexture, vec2(0.5))"));
-        assert!(sampler_uniform_names(8)
-            .iter()
-            .any(|name| name == "LightmapTexture"));
+        assert!(
+            sampler_uniform_names(8)
+                .iter()
+                .any(|name| name == "LightmapTexture")
+        );
     }
 
     #[test]
@@ -1180,6 +1186,28 @@ void main() {
     }
 
     #[test]
+    fn opengl_shader_source_maps_main_depth_composite_texture_pair() {
+        let source = "\
+layout(set = 0, binding = 0) uniform texture2D Tex0;
+layout(set = 0, binding = 4) uniform texture2D MainDepthTex;
+layout(set = 0, binding = 5) uniform sampler Samp0;
+void main() {
+    float depth = texture(sampler2D(MainDepthTex, Samp0), vec2(0.5)).r;
+    vec4 color = texture(sampler2D(Tex0, Samp0), vec2(0.5));
+}";
+        let normalized = opengl_shader_source(source);
+        assert!(normalized.contains("uniform sampler2D MainDepthTex;"));
+        assert!(!normalized.contains("uniform sampler Samp0"));
+        assert!(!normalized.contains("sampler2D(MainDepthTex, Samp0)"));
+        assert!(normalized.contains("texture(MainDepthTex, vec2(0.5)).r"));
+        assert!(
+            sampler_uniform_names(4)
+                .iter()
+                .any(|name| name == "MainDepthTex")
+        );
+    }
+
+    #[test]
     fn opengl_sampler_aliases_cover_existing_tex0_bindings() {
         assert!(sampler_uniform_names(0).iter().any(|name| name == "Tex0"));
         assert!(sampler_uniform_names(1).iter().any(|name| name == "Tex0"));
@@ -1199,16 +1227,27 @@ layout(binding = 4) uniform sampler2D ShadowDepthTex;
     }
 
     #[test]
-    fn opengl_program_interface_aliases_include_world_mesh_blocks() {
-        assert!(storage_block_names(0)
-            .iter()
-            .any(|name| name == "WorldMeshVertices"));
-        assert!(storage_block_names(1)
-            .iter()
-            .any(|name| name == "WorldMeshInstances"));
-        assert!(storage_block_names(6)
-            .iter()
-            .any(|name| name == "CompositeShadowUniforms"));
+    fn opengl_program_interface_aliases_include_owned_mesh_blocks() {
+        assert!(
+            storage_block_names(0)
+                .iter()
+                .any(|name| name == "WorldMeshVertices")
+        );
+        assert!(
+            storage_block_names(0)
+                .iter()
+                .any(|name| name == "GuiMeshVertices")
+        );
+        assert!(
+            storage_block_names(1)
+                .iter()
+                .any(|name| name == "WorldMeshInstances")
+        );
+        assert!(
+            storage_block_names(6)
+                .iter()
+                .any(|name| name == "CompositeShadowUniforms")
+        );
     }
 }
 
@@ -1335,6 +1374,10 @@ fn opengl_shader_source(source: &str) -> String {
             "uniform sampler2D ShadowDepthTex;",
         )
         .replace(
+            "uniform texture2D MainDepthTex;",
+            "uniform sampler2D MainDepthTex;",
+        )
+        .replace(
             "uniform texture2D LightmapTexture;",
             "uniform sampler2D LightmapTexture;",
         )
@@ -1395,6 +1438,7 @@ fn opengl_shader_source(source: &str) -> String {
         .replace("sampler2D(MaterialLightTex, Samp0)", "MaterialLightTex")
         .replace("sampler2D(WorldPositionTex, Samp0)", "WorldPositionTex")
         .replace("sampler2D(ShadowDepthTex, Samp0)", "ShadowDepthTex")
+        .replace("sampler2D(MainDepthTex, Samp0)", "MainDepthTex")
         .replace(
             "sampler2D(LightmapTexture, LightmapSampler)",
             "LightmapTexture",
@@ -1526,6 +1570,7 @@ pub(super) fn topology(topology: PrimitiveTopology) -> u32 {
         PrimitiveTopology::Points => glow::POINTS,
         PrimitiveTopology::Lines => glow::LINES,
         PrimitiveTopology::Triangles => glow::TRIANGLES,
+        PrimitiveTopology::TriangleFan => glow::TRIANGLE_FAN,
     }
 }
 
@@ -1558,6 +1603,11 @@ fn storage_block_names(binding: u32) -> Vec<String> {
         0 => vec![
             "WorldMaterialBatch".to_string(),
             "WorldMeshVertices".to_string(),
+            // Rust-owned GUI mesh rasterization uses the same explicit GAL
+            // storage binding, but deliberately has a separate shader block
+            // name from world geometry. Keep this OpenGL-only interface
+            // reconstruction private to the backend.
+            "GuiMeshVertices".to_string(),
             "DistantHorizonsLodVertices".to_string(),
             "Storage0".to_string(),
         ],
@@ -1605,6 +1655,7 @@ pub(super) fn sampler_uniform_names(binding: u32) -> Vec<String> {
             "tex4".to_string(),
             "ShadowDepthTex".to_string(),
             "DepthTex".to_string(),
+            "MainDepthTex".to_string(),
         ],
         8 => vec!["LightmapTexture".to_string(), "Sampler8".to_string()],
         _ => vec![format!("Sampler{binding}"), format!("tex{binding}")],

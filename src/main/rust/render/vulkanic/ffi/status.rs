@@ -733,6 +733,10 @@ pub(crate) fn input_bytes_for_world_mesh_asset_update(
         .sorted_indices
         .count
         .saturating_mul(size_of::<FfiWorldMeshSortedIndexRecord>() as u64);
+    let retirement_headers = request
+        .retirements
+        .count
+        .saturating_mul(size_of::<FfiWorldMeshAssetRetirementRecord>() as u64);
     let sorted_index_payload_bytes = unsafe {
         read_slice(
             request.sorted_indices,
@@ -750,6 +754,7 @@ pub(crate) fn input_bytes_for_world_mesh_asset_update(
         .saturating_add(mesh_headers)
         .saturating_add(texture_headers)
         .saturating_add(sorted_index_headers)
+        .saturating_add(retirement_headers)
         .saturating_add(sorted_index_payload_bytes)
 }
 
@@ -1194,6 +1199,7 @@ pub(crate) fn primitive_topology(raw: u32) -> GalResult<PrimitiveTopology> {
         1 => Ok(PrimitiveTopology::Points),
         2 => Ok(PrimitiveTopology::Lines),
         3 => Ok(PrimitiveTopology::Triangles),
+        4 => Ok(PrimitiveTopology::TriangleFan),
         _ => Err(GalError::ffi(
             StatusCode::UnknownEnum,
             format!("unknown primitive topology {raw}"),

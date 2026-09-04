@@ -49,6 +49,40 @@ const WIDTH: u32 = 96;
 const HEIGHT: u32 = 64;
 
 #[test]
+fn gui_panorama_material_compiles_through_the_opengl_lowering() {
+    let backend = match OpenGlBackend::new("MattMC GUI panorama OpenGL conformance") {
+        Ok(backend) => backend,
+        Err(error) => {
+            let text = error.to_string();
+            assert!(
+                text.contains("OpenGL") || text.contains("EGL") || text.contains("GL"),
+                "unexpected OpenGL panorama setup failure: {text}"
+            );
+            return;
+        }
+    };
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let (vertex, fragment) =
+        crate::render::vulkanic::gui_mesh_frontend::opengl_panorama_shader_sources_for_backend_test(
+        );
+    for (stage, code, label) in [
+        (ShaderStage::Vertex, vertex, "gui-panorama.vertex"),
+        (ShaderStage::Fragment, fragment, "gui-panorama.fragment"),
+    ] {
+        gal.create_shader_module(ShaderModuleDesc {
+            label: label.to_string(),
+            stage,
+            code_format: ShaderCodeFormat::Glsl,
+            code: code.as_bytes().to_vec(),
+            entry_point: "main".to_string(),
+        })
+        .unwrap_or_else(|error| {
+            panic!("Rust-owned GUI panorama shader must compile through OpenGL lowering: {error}")
+        });
+    }
+}
+
+#[test]
 fn distant_horizons_lod_opaque_program_compiles_at_the_opengl_boundary() {
     let backend = match OpenGlBackend::new("MattMC Distant Horizons LOD OpenGL conformance") {
         Ok(backend) => backend,
@@ -365,7 +399,7 @@ fn distant_horizons_lod_opaque_pipeline_uses_explicit_two_set_gal_layout() {
         depth_bias: None,
         color_formats: vec![TextureFormat::Rgba8Unorm; 4],
         depth_format: Some(TextureFormat::Depth32Float),
-            stencil: None,
+        stencil: None,
     })
     .expect("Rust-owned DH LOD pipeline must lower through OpenGL");
 }
@@ -1961,7 +1995,7 @@ pub(in crate::render::vulkanic::backends) fn run_conformance(
         depth_bias: None,
         color_formats: vec![TextureFormat::Rgba8Unorm],
         depth_format: Some(TextureFormat::Depth32Float),
-            stencil: None,
+        stencil: None,
     })?;
     let target = gal.create_render_target(RenderTargetDesc {
         label: "conformance.target".to_string(),

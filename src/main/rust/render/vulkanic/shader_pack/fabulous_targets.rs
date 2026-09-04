@@ -7,22 +7,22 @@
 
 use std::collections::BTreeSet;
 
-use super::super::gal::VulkanicGal;
-use super::super::handles::Handle;
 use super::super::commands::{
     AttachmentLoadOp, AttachmentStoreOp, ClearColor, CommandOp, PassAttachment, ResourceBarrier,
     TextureImageCopyRegion, TextureOrigin3d, TextureUsageState,
 };
+use super::super::error::{GalError, GalResult};
+use super::super::gal::VulkanicGal;
+use super::super::handles::Handle;
 use super::super::resources::{
-    AccessFlags, BufferDesc, BufferUsage, CombinedTextureSamplerDesc, Extent3d,
-    MemoryDomain, PipelineStageFlags, ResourceBinding, ResourceBindingDesc, ResourceBindingKind,
-    ResourceLayoutDesc, ResourceSetDesc, SamplerAddressMode, SamplerDesc, SamplerFilter,
-    ShaderCodeFormat, ShaderModuleDesc, ShaderStage, TextureDesc, TextureDimension, TextureFormat,
-    TextureUsage, TextureViewDesc, GraphicsPipelineDesc, PrimitiveTopology, CullMode, BlendMode,
-    FrontFace, PipelineLayoutDesc,
+    AccessFlags, BlendMode, BufferDesc, BufferUsage, CombinedTextureSamplerDesc, CullMode,
+    Extent3d, FrontFace, GraphicsPipelineDesc, MemoryDomain, PipelineLayoutDesc,
+    PipelineStageFlags, PrimitiveTopology, ResourceBinding, ResourceBindingDesc,
+    ResourceBindingKind, ResourceLayoutDesc, ResourceSetDesc, SamplerAddressMode, SamplerDesc,
+    SamplerFilter, ShaderCodeFormat, ShaderModuleDesc, ShaderStage, TextureDesc, TextureDimension,
+    TextureFormat, TextureUsage, TextureViewDesc,
 };
 use super::super::resources::{RenderPassDesc, RenderTargetDesc};
-use super::super::error::{GalError, GalResult};
 use super::vanilla_post_effect_executor::{
     FabulousExternalTargetInventory, VanillaPostEffectExternalTargetBinding,
 };
@@ -119,7 +119,8 @@ impl FabulousTransparencyPipelines {
         bindings: &FabulousTransparencyBindings,
         color_format: TextureFormat,
     ) -> GalResult<Self> {
-        let sources = super::vanilla_post_effect_executor::bundled_transparency_vulkan_shader_sources()?;
+        let sources =
+            super::vanilla_post_effect_executor::bundled_transparency_vulkan_shader_sources()?;
         if sources.len() != 2 {
             return Err(GalError::backend(
                 "bundled transparency pipeline requires exactly two shader passes",
@@ -178,7 +179,7 @@ impl FabulousTransparencyPipelines {
                 depth_bias: None,
                 color_formats: vec![color_format],
                 depth_format: None,
-            stencil: None,
+                stencil: None,
             })?;
             created.push(transparency_pipeline);
             let blit_pipeline_layout = gal.create_pipeline_layout(PipelineLayoutDesc {
@@ -200,7 +201,7 @@ impl FabulousTransparencyPipelines {
                 depth_bias: None,
                 color_formats: vec![color_format],
                 depth_format: Some(TextureFormat::Depth32Float),
-            stencil: None,
+                stencil: None,
             })?;
             created.push(blit_pipeline);
             let blit_frame_pipeline = gal.create_graphics_pipeline(GraphicsPipelineDesc {
@@ -217,7 +218,7 @@ impl FabulousTransparencyPipelines {
                 depth_bias: None,
                 color_formats: vec![color_format],
                 depth_format: None,
-            stencil: None,
+                stencil: None,
             })?;
             created.push(blit_frame_pipeline);
             Ok(Self {
@@ -276,7 +277,11 @@ impl FabulousTransparencyBindings {
             let mut samplers = Vec::new();
             let mut combined = Vec::new();
             for (index, (attachment, depth)) in sources.into_iter().enumerate() {
-                let view = if depth { attachment.depth_view } else { attachment.color_view };
+                let view = if depth {
+                    attachment.depth_view
+                } else {
+                    attachment.color_view
+                };
                 let sampler = gal.create_sampler(SamplerDesc {
                     label: format!("fabulous.transparency.sampler.{index}"),
                     min_filter: SamplerFilter::Nearest,
@@ -340,19 +345,22 @@ impl FabulousTransparencyBindings {
                 comparison: None,
             })?;
             created.push(blit_sampler);
-            let blit_combined_sampler = gal.create_combined_texture_sampler(
-                CombinedTextureSamplerDesc {
+            let blit_combined_sampler =
+                gal.create_combined_texture_sampler(CombinedTextureSamplerDesc {
                     label: "fabulous.blit.combined".to_string(),
                     texture_view: set.final_target.view,
                     sampler: blit_sampler,
-                },
-            )?;
+                })?;
             created.push(blit_combined_sampler);
             let blit_uniform_buffer = gal.create_buffer(BufferDesc {
                 label: "fabulous.blit.uniform".to_string(),
                 size: 16,
                 memory: MemoryDomain::Upload,
-                usages: vec![BufferUsage::Uniform, BufferUsage::TransferDst, BufferUsage::HostWrite],
+                usages: vec![
+                    BufferUsage::Uniform,
+                    BufferUsage::TransferDst,
+                    BufferUsage::HostWrite,
+                ],
             })?;
             created.push(blit_uniform_buffer);
             let blit_resource_layout = gal.create_resource_layout(ResourceLayoutDesc {
@@ -453,7 +461,17 @@ impl FabulousIntermediateTarget {
                 extent,
                 mip_levels: 1,
                 array_layers: 1,
-                usages: vec![TextureUsage::ColorAttachment, TextureUsage::Sampled],
+                // The bundled transparency graph's final pass is an identity
+                // nearest-filter blit (unit ColorModulate).  Keep the
+                // intermediate explicitly transferable so that pass can be
+                // lowered as the equivalent one-presenter copy to the
+                // acquired frame image instead of relying on another
+                // fullscreen raster pipeline.
+                usages: vec![
+                    TextureUsage::ColorAttachment,
+                    TextureUsage::Sampled,
+                    TextureUsage::TransferSrc,
+                ],
             })?;
             created.push(texture);
             let view = gal.create_texture_view(TextureViewDesc {
@@ -491,7 +509,14 @@ impl FabulousIntermediateTarget {
                 comparison: None,
             })?;
             created.push(sampler);
-            Ok(Self { texture, view, render_target, render_pass, sampler, extent })
+            Ok(Self {
+                texture,
+                view,
+                render_target,
+                render_pass,
+                sampler,
+                extent,
+            })
         })();
         if result.is_err() {
             for handle in created.into_iter().rev() {
@@ -502,7 +527,13 @@ impl FabulousIntermediateTarget {
     }
 
     fn handles_in_destroy_order(self) -> [Handle; 5] {
-        [self.sampler, self.render_pass, self.render_target, self.view, self.texture]
+        [
+            self.sampler,
+            self.render_pass,
+            self.render_target,
+            self.view,
+            self.texture,
+        ]
     }
 }
 
@@ -513,7 +544,14 @@ impl FabulousAttachmentResources {
         extent: Extent3d,
         color_format: TextureFormat,
     ) -> GalResult<Self> {
-        Self::create_with_depth_format(gal, role, extent, color_format, FABULOUS_DEPTH_FORMAT, false)
+        Self::create_with_depth_format(
+            gal,
+            role,
+            extent,
+            color_format,
+            FABULOUS_DEPTH_FORMAT,
+            false,
+        )
     }
 
     /// Creates an attachment with an explicit depth/stencil format and,
@@ -769,7 +807,11 @@ impl FabulousAttachmentSet {
             };
             let bindings = FabulousTransparencyBindings::create(gal, &provisional)?;
             let pipelines = FabulousTransparencyPipelines::create(gal, &bindings, color_format)?;
-            Ok(Self { bindings: Some(bindings), pipelines: Some(pipelines), ..provisional })
+            Ok(Self {
+                bindings: Some(bindings),
+                pipelines: Some(pipelines),
+                ..provisional
+            })
         })();
         if result.is_err() {
             for handle in created.into_iter().rev() {
@@ -780,7 +822,9 @@ impl FabulousAttachmentSet {
     }
 
     pub(crate) fn external_inventory(&self) -> FabulousExternalTargetInventory {
-        fn binding(resource: &FabulousAttachmentResources) -> VanillaPostEffectExternalTargetBinding {
+        fn binding(
+            resource: &FabulousAttachmentResources,
+        ) -> VanillaPostEffectExternalTargetBinding {
             VanillaPostEffectExternalTargetBinding {
                 render_pass: resource.render_pass,
                 render_target: resource.render_target,
@@ -832,12 +876,14 @@ impl FabulousAttachmentSet {
                 .iter()
                 .map(|input| {
                     if input.target == "final" {
-                        return Ok(super::vanilla_post_effect_executor::VanillaPostEffectInputBinding {
-                            texture_view: self.final_target.view,
-                            sampler: self.final_target.sampler,
-                            bilinear: input.bilinear,
-                            use_depth_buffer: input.use_depth_buffer,
-                        });
+                        return Ok(
+                            super::vanilla_post_effect_executor::VanillaPostEffectInputBinding {
+                                texture_view: self.final_target.view,
+                                sampler: self.final_target.sampler,
+                                bilinear: input.bilinear,
+                                use_depth_buffer: input.use_depth_buffer,
+                            },
+                        );
                     }
                     let target = attachment(&input.target).ok_or_else(|| {
                         GalError::unsupported_feature(format!(
@@ -850,44 +896,26 @@ impl FabulousAttachmentSet {
                         .iter()
                         .position(|candidate| candidate.sampler_name == input.sampler_name)
                         .ok_or_else(|| {
-                            GalError::invalid_argument("Fabulous post-effect input order is not stable")
+                            GalError::invalid_argument(
+                                "Fabulous post-effect input order is not stable",
+                            )
                         })?;
                     let sampler = bindings.samplers[input_index];
-                    Ok(super::vanilla_post_effect_executor::VanillaPostEffectInputBinding {
-                        texture_view: if input.use_depth_buffer {
-                            target.depth_view
-                        } else {
-                            target.color_view
+                    Ok(
+                        super::vanilla_post_effect_executor::VanillaPostEffectInputBinding {
+                            texture_view: if input.use_depth_buffer {
+                                target.depth_view
+                            } else {
+                                target.color_view
+                            },
+                            sampler,
+                            bilinear: input.bilinear,
+                            use_depth_buffer: input.use_depth_buffer,
                         },
-                        sampler,
-                        bilinear: input.bilinear,
-                        use_depth_buffer: input.use_depth_buffer,
-                    })
+                    )
                 })
                 .collect::<GalResult<Vec<_>>>()?;
-            let (render_pass, render_target, color_attachment, depth_attachment, pipeline, pipeline_layout, resource_set) =
-                if index == 0 {
-                    (
-                        self.final_target.render_pass,
-                        self.final_target.render_target,
-                        self.final_target.view,
-                        None,
-                        pipelines.transparency_pipeline,
-                        pipelines.transparency_pipeline_layout,
-                        bindings.resource_set,
-                    )
-                } else {
-                    (
-                        self.main.render_pass,
-                        self.main.render_target,
-                        self.main.color_view,
-                        Some(self.main.depth_view),
-                        pipelines.blit_pipeline,
-                        pipelines.blit_pipeline_layout,
-                        bindings.blit_resource_set,
-                    )
-                };
-            pass_bindings.push(super::vanilla_post_effect_executor::VanillaPostEffectPassBinding {
+            let (
                 render_pass,
                 render_target,
                 color_attachment,
@@ -895,9 +923,40 @@ impl FabulousAttachmentSet {
                 pipeline,
                 pipeline_layout,
                 resource_set,
-                inputs,
-                uniform_values: pass.uniform_values.clone(),
-            });
+            ) = if index == 0 {
+                (
+                    self.final_target.render_pass,
+                    self.final_target.render_target,
+                    self.final_target.view,
+                    None,
+                    pipelines.transparency_pipeline,
+                    pipelines.transparency_pipeline_layout,
+                    bindings.resource_set,
+                )
+            } else {
+                (
+                    self.main.render_pass,
+                    self.main.render_target,
+                    self.main.color_view,
+                    Some(self.main.depth_view),
+                    pipelines.blit_pipeline,
+                    pipelines.blit_pipeline_layout,
+                    bindings.blit_resource_set,
+                )
+            };
+            pass_bindings.push(
+                super::vanilla_post_effect_executor::VanillaPostEffectPassBinding {
+                    render_pass,
+                    render_target,
+                    color_attachment,
+                    depth_attachment,
+                    pipeline,
+                    pipeline_layout,
+                    resource_set,
+                    inputs,
+                    uniform_values: pass.uniform_values.clone(),
+                },
+            );
         }
         Ok(pass_bindings)
     }
@@ -919,7 +978,9 @@ impl FabulousAttachmentSet {
             .as_ref()
             .ok_or_else(|| GalError::backend("Fabulous pipelines are not initialized"))?;
         if bindings.is_empty() {
-            return Err(GalError::backend("Fabulous transparency graph has no final blit pass"));
+            return Err(GalError::backend(
+                "Fabulous transparency graph has no final blit pass",
+            ));
         }
         let color_format = gal.pass_target_color_format(frame_target)?;
         let pass = gal.create_render_pass(super::super::resources::RenderPassDesc {
@@ -928,7 +989,9 @@ impl FabulousAttachmentSet {
             color_formats: vec![color_format],
             depth_format: None,
         })?;
-        let last = bindings.last_mut().expect("non-empty Fabulous pass bindings");
+        let last = bindings
+            .last_mut()
+            .expect("non-empty Fabulous pass bindings");
         last.render_pass = pass;
         last.render_target = frame_target;
         last.color_attachment = frame_target;
@@ -1337,6 +1400,8 @@ impl FabulousAttachmentSet {
             deferred_depth_source,
             &[],
             [false; 4],
+            false,
+            true,
         )
     }
 
@@ -1351,20 +1416,68 @@ impl FabulousAttachmentSet {
         deferred_depth_source: Handle,
         external_operations: &[CommandOp],
         external_roles_written: [bool; 4],
+        attachments_initialized: bool,
+        deferred_translucent_initialized: bool,
     ) -> GalResult<Handle> {
+        // A newly allocated attachment has no prior Vulkan layout.  Once a
+        // submitted handoff has completed this explicit state becomes
+        // shader-readable and is retained by the attachment set.  Carry this
+        // lifecycle fact through the GAL command stream rather than claiming
+        // an undefined image was previously sampled.
+        let persistent_before = if attachments_initialized {
+            TextureUsageState::ShaderRead
+        } else {
+            TextureUsageState::Undefined
+        };
         self.append_frame_target_to_main_copy(
             ops,
             deferred_frame_color_source,
             extent,
-            TextureUsageState::Undefined,
+            persistent_before,
         )?;
-        self.append_translucent_capture_copy(
-            ops,
-            deferred_translucent_source,
-            extent,
-            TextureUsageState::ShaderRead,
-            TextureUsageState::Undefined,
-        )?;
+        if deferred_translucent_initialized {
+            self.append_translucent_capture_copy(
+                ops,
+                deferred_translucent_source,
+                extent,
+                TextureUsageState::ShaderRead,
+                persistent_before,
+            )?;
+        } else {
+            // The graph always samples the declared translucent role. When
+            // this semantic frame has no translucent terrain draw, initialize
+            // just its color input as transparent; retain the separately
+            // copied depth input for Fabulous's depth-aware composition.
+            let attachment = &self.translucent;
+            ops.push(CommandOp::Barrier(ResourceBarrier {
+                resource: attachment.color_texture,
+                subresources: None,
+                before: persistent_before,
+                after: TextureUsageState::ColorAttachment,
+                src_queue: super::super::resources::QueueClass::Graphics,
+                dst_queue: super::super::resources::QueueClass::Graphics,
+            }));
+            ops.push(CommandOp::BeginPass {
+                pass: attachment.render_pass,
+                target: attachment.render_target,
+                colors: vec![PassAttachment {
+                    view: attachment.color_view,
+                    load_op: AttachmentLoadOp::Clear,
+                    store_op: AttachmentStoreOp::Store,
+                    clear_color: Some(ClearColor { r: 0.0, g: 0.0, b: 0.0, a: 0.0 }),
+                }],
+                depth_stencil: None,
+            });
+            ops.push(CommandOp::EndPass);
+            ops.push(CommandOp::Barrier(ResourceBarrier {
+                resource: attachment.color_texture,
+                subresources: None,
+                before: TextureUsageState::ColorAttachment,
+                after: TextureUsageState::ShaderRead,
+                src_queue: super::super::resources::QueueClass::Graphics,
+                dst_queue: super::super::resources::QueueClass::Graphics,
+            }));
+        }
         self.append_depth_capture_copy(
             ops,
             deferred_depth_source,
@@ -1374,7 +1487,7 @@ impl FabulousAttachmentSet {
             // Fabulous depth attachments persist across frames and the
             // preceding graph leaves them shader-readable. Treating them as
             // Undefined causes an invalid old-layout transition on reuse.
-            TextureUsageState::ShaderRead,
+            persistent_before,
         )?;
         self.append_depth_capture_copy(
             ops,
@@ -1382,7 +1495,7 @@ impl FabulousAttachmentSet {
             FabulousTargetRole::Translucent,
             extent,
             TextureUsageState::ShaderRead,
-            TextureUsageState::ShaderRead,
+            persistent_before,
         )?;
         for (role_index, role) in [
             FabulousTargetRole::ItemEntity,
@@ -1404,19 +1517,62 @@ impl FabulousAttachmentSet {
             );
         }
         ops.extend(external_operations.iter().cloned());
+        let translucent_written_by_external_ops = external_operations.iter().any(|operation| {
+            matches!(operation, CommandOp::BeginPass { target, .. } if *target == self.translucent.render_target)
+        });
         ops.extend(self.external_shader_read_barriers_with_role_states(
             TextureUsageState::ShaderRead,
             TextureUsageState::ShaderRead,
-            TextureUsageState::ShaderRead,
-            TextureUsageState::ShaderRead,
-            if external_roles_written[0] { TextureUsageState::ColorAttachment } else { TextureUsageState::ShaderRead },
-            if external_roles_written[0] { TextureUsageState::DepthStencilAttachment } else { TextureUsageState::ShaderRead },
-            if external_roles_written[1] { TextureUsageState::ColorAttachment } else { TextureUsageState::ShaderRead },
-            if external_roles_written[1] { TextureUsageState::DepthStencilAttachment } else { TextureUsageState::ShaderRead },
-            if external_roles_written[2] { TextureUsageState::ColorAttachment } else { TextureUsageState::ShaderRead },
-            if external_roles_written[2] { TextureUsageState::DepthStencilAttachment } else { TextureUsageState::ShaderRead },
-            if external_roles_written[3] { TextureUsageState::ColorAttachment } else { TextureUsageState::ShaderRead },
-            if external_roles_written[3] { TextureUsageState::DepthStencilAttachment } else { TextureUsageState::ShaderRead },
+            if translucent_written_by_external_ops {
+                TextureUsageState::ColorAttachment
+            } else {
+                TextureUsageState::ShaderRead
+            },
+            if translucent_written_by_external_ops {
+                TextureUsageState::DepthStencilAttachment
+            } else {
+                TextureUsageState::ShaderRead
+            },
+            if external_roles_written[0] {
+                TextureUsageState::ColorAttachment
+            } else {
+                TextureUsageState::ShaderRead
+            },
+            if external_roles_written[0] {
+                TextureUsageState::DepthStencilAttachment
+            } else {
+                TextureUsageState::ShaderRead
+            },
+            if external_roles_written[1] {
+                TextureUsageState::ColorAttachment
+            } else {
+                TextureUsageState::ShaderRead
+            },
+            if external_roles_written[1] {
+                TextureUsageState::DepthStencilAttachment
+            } else {
+                TextureUsageState::ShaderRead
+            },
+            if external_roles_written[2] {
+                TextureUsageState::ColorAttachment
+            } else {
+                TextureUsageState::ShaderRead
+            },
+            if external_roles_written[2] {
+                TextureUsageState::DepthStencilAttachment
+            } else {
+                TextureUsageState::ShaderRead
+            },
+            if external_roles_written[3] {
+                TextureUsageState::ColorAttachment
+            } else {
+                TextureUsageState::ShaderRead
+            },
+            if external_roles_written[3] {
+                TextureUsageState::DepthStencilAttachment
+            } else {
+                TextureUsageState::ShaderRead
+            },
         ));
         ops.push(self.final_target_color_attachment_barrier());
         let executor = super::vanilla_post_effect_executor::bundled_transparency_executor()?;
@@ -1436,18 +1592,59 @@ impl FabulousAttachmentSet {
             .validate_populated_for_plan(executor.plan(), &populated_roles)?;
         let (bindings, presentation_pass) =
             self.transparency_pass_bindings_to_frame_target(gal, frame_target)?;
-        let mut post_ops = executor.lower(&bindings)?;
+        let mut post_ops = match executor.lower(&bindings) {
+            Ok(operations) => operations,
+            Err(error) => {
+                let _ = gal.destroy(presentation_pass);
+                return Err(error);
+            }
+        };
         let first_end = post_ops
             .iter()
             .position(|operation| matches!(operation, CommandOp::EndPass))
-            .ok_or_else(|| GalError::backend("terrain Fabulous handoff omitted first pass terminator"))?;
+            .ok_or_else(|| {
+                GalError::backend("terrain Fabulous handoff omitted first pass terminator")
+            })?;
+        // The first pass writes the private `final` target; the vanilla
+        // terminal blit samples it and performs the required format conversion
+        // into the one acquired presentation target.  Keep that dependency
+        // explicit rather than replacing it with a raw copy, which is invalid
+        // for the RGBA intermediate/BGRA presentation combination.
         post_ops.insert(
             first_end + 1,
             self.between_transparency_pass_barriers()
                 .into_iter()
                 .next()
-                .expect("bundled transparency has one intermediate target"),
+                .expect("Fabulous graph has one intermediate transition"),
         );
+        let blit_uniform_buffer = self
+            .bindings
+            .as_ref()
+            .ok_or_else(|| GalError::backend("Fabulous descriptor bindings are not initialized"))?
+            .blit_uniform_buffer;
+        ops.extend([
+            CommandOp::Barrier(ResourceBarrier {
+                resource: blit_uniform_buffer,
+                subresources: None,
+                before: TextureUsageState::ShaderRead,
+                after: TextureUsageState::TransferDst,
+                src_queue: super::super::resources::QueueClass::Graphics,
+                dst_queue: super::super::resources::QueueClass::Transfer,
+            }),
+            CommandOp::HostWriteBuffer {
+                buffer: blit_uniform_buffer,
+                offset: 0,
+                data: vec![0, 0, 128, 63, 0, 0, 128, 63, 0, 0, 128, 63, 0, 0, 128, 63],
+            },
+            CommandOp::Barrier(ResourceBarrier {
+                resource: blit_uniform_buffer,
+                subresources: None,
+                before: TextureUsageState::TransferDst,
+                after: TextureUsageState::ShaderRead,
+                src_queue: super::super::resources::QueueClass::Transfer,
+                dst_queue: super::super::resources::QueueClass::Graphics,
+            }),
+        ]);
         ops.extend(post_ops);
         Ok(presentation_pass)
     }
@@ -1533,9 +1730,21 @@ impl FabulousAttachmentSet {
         let mut operations = Vec::with_capacity(12);
         for (attachment, color_before, depth_before) in [
             (&self.main, main_color_before, main_depth_before),
-            (&self.translucent, translucent_color_before, translucent_depth_before),
-            (&self.item_entity, item_entity_color_before, item_entity_depth_before),
-            (&self.particles, particles_color_before, particles_depth_before),
+            (
+                &self.translucent,
+                translucent_color_before,
+                translucent_depth_before,
+            ),
+            (
+                &self.item_entity,
+                item_entity_color_before,
+                item_entity_depth_before,
+            ),
+            (
+                &self.particles,
+                particles_color_before,
+                particles_depth_before,
+            ),
             (&self.clouds, clouds_color_before, clouds_depth_before),
             (&self.weather, weather_color_before, weather_depth_before),
         ] {
@@ -1710,24 +1919,32 @@ impl FabulousAttachmentSet {
 mod tests {
     use super::*;
     use crate::render::vulkanic::backends::mock::MockBackend;
-    use crate::render::vulkanic::handles::HandleKind;
-    use crate::render::vulkanic::gal::VulkanicGal;
     use crate::render::vulkanic::backends::vulkan_capabilities;
     use crate::render::vulkanic::frame::{FrameRenderTargetId, FrameSurfaceDesc, PresentMode};
+    use crate::render::vulkanic::gal::VulkanicGal;
+    use crate::render::vulkanic::handles::HandleKind;
     use crate::render::vulkanic::resources::FrameTargetDesc;
 
     #[test]
     fn attachment_contract_is_explicitly_two_dimensional_and_bounded() {
         assert_eq!(FABULOUS_DEPTH_FORMAT, TextureFormat::Depth32Float);
-        assert_eq!(Extent3d { width: 1, height: 1, depth: 1 }.depth, 1);
+        assert_eq!(
+            Extent3d {
+                width: 1,
+                height: 1,
+                depth: 1
+            }
+            .depth,
+            1
+        );
     }
 
     #[test]
     fn material_source_families_map_to_distinct_fabulous_roles() {
         use super::super::super::world_primitive_frontend::{
-            WORLD_MATERIAL_SOURCE_CLOUDS, WORLD_MATERIAL_SOURCE_PARTICLES,
-            WORLD_MATERIAL_SOURCE_TEXTURED, WORLD_MATERIAL_SOURCE_WEATHER,
-            WORLD_MATERIAL_SOURCE_ENTITY_MODEL,
+            WORLD_MATERIAL_SOURCE_CLOUDS, WORLD_MATERIAL_SOURCE_ENTITY_MODEL,
+            WORLD_MATERIAL_SOURCE_PARTICLES, WORLD_MATERIAL_SOURCE_TEXTURED,
+            WORLD_MATERIAL_SOURCE_WEATHER,
         };
         assert_eq!(
             FabulousTargetRole::for_material_source(WORLD_MATERIAL_SOURCE_TEXTURED),
@@ -1777,8 +1994,8 @@ mod tests {
         assert_ne!(set.translucent.render_pass, set.particles.render_pass);
         assert_ne!(set.final_target.render_target, set.main.render_target);
         assert_eq!(set.bindings.as_ref().unwrap().combined_samplers.len(), 12);
-        let executor = super::super::vanilla_post_effect_executor::bundled_transparency_executor()
-            .unwrap();
+        let executor =
+            super::super::vanilla_post_effect_executor::bundled_transparency_executor().unwrap();
         set.external_inventory()
             .validate_against(executor.plan())
             .unwrap();
@@ -1854,7 +2071,11 @@ mod tests {
                     && copy.dst_texture == set.translucent.depth_texture
         )));
         assert_eq!(1, set.between_transparency_pass_barriers().len());
-        let copy_in = set.optical_hand_copy_from_main(Extent3d { width: 64, height: 64, depth: 1 });
+        let copy_in = set.optical_hand_copy_from_main(Extent3d {
+            width: 64,
+            height: 64,
+            depth: 1,
+        });
         assert_eq!(5, copy_in.len());
         assert!(copy_in.iter().any(|operation| matches!(
             operation,
@@ -1862,7 +2083,11 @@ mod tests {
                 if copy.src_texture == set.main.color_texture
                     && copy.dst_texture == set.optical_hand.color_texture
         )));
-        let copy_out = set.optical_hand_copy_to_main(Extent3d { width: 64, height: 64, depth: 1 });
+        let copy_out = set.optical_hand_copy_to_main(Extent3d {
+            width: 64,
+            height: 64,
+            depth: 1,
+        });
         assert_eq!(5, copy_out.len());
         assert!(copy_out.iter().any(|operation| matches!(
             operation,
@@ -1872,30 +2097,46 @@ mod tests {
         )));
         let pass_bindings = set.transparency_pass_bindings().unwrap();
         let operations = executor.lower(&pass_bindings).unwrap();
-        assert_eq!(2, operations.iter().filter(|operation| matches!(
-            operation,
-            super::super::super::commands::CommandOp::Draw { vertices: 3, instances: 1 }
-        )).count());
+        assert_eq!(
+            2,
+            operations
+                .iter()
+                .filter(|operation| matches!(
+                    operation,
+                    super::super::super::commands::CommandOp::Draw {
+                        vertices: 3,
+                        instances: 1
+                    }
+                ))
+                .count()
+        );
         gal.create_command_list(super::super::super::commands::CommandListDesc {
             label: "fabulous-transparency-test".to_string(),
             operations,
         })
         .unwrap();
-        gal
-            .configure_frame_surface(FrameSurfaceDesc {
-                label: "fabulous-frame-surface".to_string(),
-                extent: Extent3d { width: 64, height: 64, depth: 1 },
-                color_format: TextureFormat::Rgba8Unorm,
-                present_mode: PresentMode::Fifo,
-                max_frames_in_flight: 2,
-            })
-            .unwrap();
+        gal.configure_frame_surface(FrameSurfaceDesc {
+            label: "fabulous-frame-surface".to_string(),
+            extent: Extent3d {
+                width: 64,
+                height: 64,
+                depth: 1,
+            },
+            color_format: TextureFormat::Rgba8Unorm,
+            present_mode: PresentMode::Fifo,
+            max_frames_in_flight: 2,
+        })
+        .unwrap();
         let frame_target = gal
             .create_frame_target(FrameTargetDesc {
                 label: "fabulous-frame-target".to_string(),
                 frame_id: 1,
                 render_target: FrameRenderTargetId(1),
-                extent: Extent3d { width: 64, height: 64, depth: 1 },
+                extent: Extent3d {
+                    width: 64,
+                    height: 64,
+                    depth: 1,
+                },
                 color_format: TextureFormat::Rgba8Unorm,
             })
             .unwrap();
@@ -1919,12 +2160,15 @@ mod tests {
             operation,
             super::super::super::commands::CommandOp::CopyFrameTargetToTexture { .. }
         )));
-        gal.destroy(presentation_pass).unwrap();
+        assert_ne!(Handle::NULL, presentation_pass);
         let (frame_bindings, present_pass) = set
             .transparency_pass_bindings_to_frame_target(&mut gal, frame_target)
             .unwrap();
         assert_eq!(frame_target, frame_bindings.last().unwrap().render_target);
-        assert_eq!(frame_target, frame_bindings.last().unwrap().color_attachment);
+        assert_eq!(
+            frame_target,
+            frame_bindings.last().unwrap().color_attachment
+        );
         assert!(frame_bindings.last().unwrap().depth_attachment.is_none());
         let frame_operations = executor.lower(&frame_bindings).unwrap();
         gal.create_command_list(super::super::super::commands::CommandListDesc {
@@ -1932,6 +2176,7 @@ mod tests {
             operations: frame_operations,
         })
         .unwrap();
+        gal.destroy(presentation_pass).unwrap();
         gal.destroy(present_pass).unwrap();
         set.destroy(&mut gal);
     }
@@ -1946,7 +2191,11 @@ mod tests {
         );
         let set = FabulousAttachmentSet::create_with_translucent_format(
             &mut gal,
-            Extent3d { width: 32, height: 32, depth: 1 },
+            Extent3d {
+                width: 32,
+                height: 32,
+                depth: 1,
+            },
             TextureFormat::Bgra8Unorm,
             TextureFormat::Rgba8Unorm,
         )
@@ -1954,7 +2203,11 @@ mod tests {
         assert_eq!(TextureFormat::Rgba8Unorm, set.translucent_color_format);
         gal.configure_frame_surface(FrameSurfaceDesc {
             label: "terrain-bgra-surface".to_string(),
-            extent: Extent3d { width: 32, height: 32, depth: 1 },
+            extent: Extent3d {
+                width: 32,
+                height: 32,
+                depth: 1,
+            },
             color_format: TextureFormat::Bgra8Unorm,
             present_mode: PresentMode::Fifo,
             max_frames_in_flight: 2,
@@ -1965,7 +2218,11 @@ mod tests {
                 label: "terrain-bgra-target".to_string(),
                 frame_id: 7,
                 render_target: FrameRenderTargetId(7),
-                extent: Extent3d { width: 32, height: 32, depth: 1 },
+                extent: Extent3d {
+                    width: 32,
+                    height: 32,
+                    depth: 1,
+                },
                 color_format: TextureFormat::Bgra8Unorm,
             })
             .unwrap();
@@ -1974,7 +2231,11 @@ mod tests {
                 label: "terrain-bgra-capture-source".to_string(),
                 dimension: TextureDimension::D2,
                 format: TextureFormat::Rgba8Unorm,
-                extent: Extent3d { width: 32, height: 32, depth: 1 },
+                extent: Extent3d {
+                    width: 32,
+                    height: 32,
+                    depth: 1,
+                },
                 mip_levels: 1,
                 array_layers: 1,
                 usages: vec![TextureUsage::TransferSrc, TextureUsage::Sampled],
@@ -1985,7 +2246,11 @@ mod tests {
                 label: "terrain-bgra-depth-source".to_string(),
                 dimension: TextureDimension::D2,
                 format: TextureFormat::Depth32Float,
-                extent: Extent3d { width: 32, height: 32, depth: 1 },
+                extent: Extent3d {
+                    width: 32,
+                    height: 32,
+                    depth: 1,
+                },
                 mip_levels: 1,
                 array_layers: 1,
                 usages: vec![TextureUsage::TransferSrc, TextureUsage::Sampled],
@@ -1997,7 +2262,11 @@ mod tests {
                 &mut gal,
                 &mut operations,
                 frame_target,
-                Extent3d { width: 32, height: 32, depth: 1 },
+                Extent3d {
+                    width: 32,
+                    height: 32,
+                    depth: 1,
+                },
                 frame_target,
                 capture_source,
                 capture_depth,
@@ -2008,7 +2277,35 @@ mod tests {
             operations,
         })
         .unwrap();
+        assert_ne!(Handle::NULL, presentation_pass);
         gal.destroy(presentation_pass).unwrap();
+        let mut no_translucent_operations = Vec::new();
+        let no_translucent_presentation_pass = set
+            .append_terrain_handoff_to_frame_target_with_external_ops(
+                &mut gal,
+                &mut no_translucent_operations,
+                frame_target,
+                Extent3d { width: 32, height: 32, depth: 1 },
+                frame_target,
+                capture_source,
+                capture_depth,
+                &[],
+                [false; 4],
+                false,
+                false,
+            )
+            .unwrap();
+        assert!(!no_translucent_operations.iter().any(|operation| matches!(
+            operation,
+            super::super::super::commands::CommandOp::CopyTexture(copy)
+                if copy.src_texture == capture_source
+        )));
+        assert!(no_translucent_operations.iter().any(|operation| matches!(
+            operation,
+            super::super::super::commands::CommandOp::BeginPass { target, .. }
+                if *target == set.translucent.render_target
+        )));
+        gal.destroy(no_translucent_presentation_pass).unwrap();
         gal.destroy(capture_source).unwrap();
         gal.destroy(capture_depth).unwrap();
         set.destroy(&mut gal);

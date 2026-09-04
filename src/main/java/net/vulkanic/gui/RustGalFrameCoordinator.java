@@ -84,6 +84,12 @@ public final class RustGalFrameCoordinator {
 	private static long lastDhParityPhaseFrame = Long.MIN_VALUE;
 	private static volatile boolean observedRenderableWholeFrameWorld;
 	private static volatile long lastRenderableWholeFrameWorldFrame;
+	/**
+	 * Latest frame acquired by the Rust whole-frame presenter. This intentionally
+	 * shares the GAL frame-id clock with {@link #lastRenderableWholeFrameWorldFrame}
+	 * so capture freshness never compares it to a Java render-hook counter.
+	 */
+	private static volatile long lastAcquiredWholeFrameFrame;
 	private static List<VulkanicGalBridge.GuiAssetRecord> pendingAssets = List.of();
 	private static final RustGalFrameScheduler<QueuedGuiRequest> SCHEDULER =
 		new RustGalFrameScheduler<>("Rust VulkanicGAL deferred GUI");
@@ -499,16 +505,46 @@ public final class RustGalFrameCoordinator {
 		synchronized (LOCK) {
 			flushPendingGuiAssetsLocked();
 			List<RustGalFrameScheduler.Token> tokens = new ArrayList<>();
+			int[] rustElementCount = {0};
 			renderState.forEachElement(element -> {
 				if (element instanceof RustGalGuiElementRenderState rustGalElement) {
+					rustElementCount[0]++;
 					tokens.add(rustGalElement.token());
 				}
 			}, GuiRenderState.TraverseRange.ALL);
 			requests = SCHEDULER.takeAllItems(tokens, generation);
+			if (Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")) {
+				auditMessage("Rust GUI render-state Rust elements=" + rustElementCount[0]
+					+ " scheduler_tokens=" + tokens.size() + " admitted_requests=" + requests.size());
+			}
+		}
+		if (Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")) {
+			int meshItems = 0;
+			int meshBatches = 0;
+			java.util.Set<Long> meshAssetIds = new java.util.LinkedHashSet<>();
+			java.util.Set<String> affineAssets = new java.util.LinkedHashSet<>();
+			for (RustGalFrameScheduler.Item<QueuedGuiRequest> request : requests) {
+				for (VulkanicGalBridge.GuiAffineQuadRecord affine : request.payload().affineQuads()) {
+					affineAssets.add(affine.stratum() + ":" + affine.assetId());
+				}
+				if (request.payload().meshBatches().isEmpty()) continue;
+				meshItems++;
+				meshBatches += request.payload().meshBatches().size();
+				for (VulkanicGalBridge.GuiMeshBatchRecord batch : request.payload().meshBatches()) {
+					meshAssetIds.add(batch.assetId());
+				}
+			}
+				auditMessage("Rust GUI extracted mesh items=" + meshItems
+					+ " batches=" + meshBatches + " asset_ids=" + meshAssetIds);
+			auditMessage("Rust GUI extracted affine strata/assets=" + affineAssets);
 		}
 		// Native Vulkan execution must not monopolize the semantic producer lock.
 		executeFrameBatches(window, requests, true, window.getGuiScaledWidth(), window.getGuiScaledHeight(), renderState.blurBeforeStratumIndex(), blurRadius,
 			normalizeSemanticPostEffectId(postEffectId));
+		// The Java GUI renderer normally resets this state after its draw pass.  The
+		// whole-frame route replaces that pass, so it must retire the copied semantic
+		// state here or every screen frame would accumulate prior elements forever.
+		renderState.reset();
 		// The Rust presenter is the deterministic capture boundary. Advance the
 		// capture only after executeFrameBatches has acquired, submitted, and
 		// presented this whole-frame Vulkan submission, and after the coordinator
@@ -561,6 +597,7 @@ public final class RustGalFrameCoordinator {
 	}
 
 	public static void reload(ResourceManager resourceManager) {
+		RustGalGuiRenderer.invalidateLoadingGridAsset();
 		if (RustGalGuiRenderer.assetUpdatesDisabled()) {
 			auditMessage("Rust VulkanicGAL GUI asset update skipped reason=diagnostic-disabled");
 			return;
@@ -606,6 +643,7 @@ public final class RustGalFrameCoordinator {
 	}
 
 	public static void shutdown() {
+		RustGalGuiRenderer.invalidateLoadingGridAsset();
 		VulkanicGalBridge existing;
 		synchronized (LOCK) {
 			int cancelled = SCHEDULER.cancelAll("shutdown");
@@ -809,6 +847,7 @@ public final class RustGalFrameCoordinator {
 			GraphicsFrameBenchmark.endPhase("rust-gal.gui-frame.ffi.acquire");
 			frameId = frame.frameId();
 			if (wholeFrameVulkan) {
+				lastAcquiredWholeFrameFrame = frameId;
 				recordWholeFrameAcquire(frame, correlationId);
 			}
 			if (frame.status() == 4 || frame.frameTarget() == 0L) {
@@ -943,6 +982,11 @@ public final class RustGalFrameCoordinator {
 					guiBlurRadius,
 					postEffectId
 				);
+				if (Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")) {
+					auditMessage("Rust GUI whole-frame result mesh items=" + wholeFrameResult.guiMeshItemCount()
+						+ " batches=" + wholeFrameResult.guiMeshBatchCount()
+						+ " draws=" + wholeFrameResult.guiMeshDrawCount());
+				}
 				if (primitiveFrame.background().enabled()
 					&& wholeFrameResult.worldBackgroundDiagnosticFallbackCount() != 0) {
 					throw new IllegalStateException(
@@ -971,9 +1015,27 @@ public final class RustGalFrameCoordinator {
 					meshBatchRequests
 				);
 			}
-			submitEnded = System.nanoTime();
+				submitEnded = System.nanoTime();
 			METRICS.abiPackingNanos += Math.max(0L, submitEnded - packingStarted);
 			GraphicsFrameBenchmark.endPhase("rust-gal.frame.submit-call");
+			if (wholeFrameVulkan && primitiveFrame != null && wholeFrameResult != null
+				&& primitiveFrame.shaderEnvironmentFrame().enabled()
+				&& net.vulkanic.shaderpack.RustShaderPackSourceCollector.activeConfiguredPackName().isPresent()
+				&& wholeFrameResult.profile().passCount() > 0) {
+				// These are semantic shader-pack family samples, backed by the
+				// explicit Rust frame's admitted pass graph. They are not Java Iris
+				// callbacks and are intentionally emitted only when the Rust Vulkan
+				// shader environment and at least one native pass were submitted.
+				GraphicsFrameBenchmark.recordPhaseSample("iris.shadows", 1L);
+				GraphicsFrameBenchmark.recordPhaseSample("iris.deferred-translucents", 1L);
+				GraphicsFrameBenchmark.recordPhaseSample("iris.composite-final", 1L);
+				// The Rust shader graph also performs a distinct shadow terrain
+				// traversal (opaque and cutout), in addition to the three ordinary
+				// semantic terrain layers emitted by the producer.
+				GraphicsFrameBenchmark.recordPhaseSample("sodium.terrain.setup", 1L);
+				GraphicsFrameBenchmark.recordPhaseSample("sodium.terrain.draw", 1L);
+				GraphicsFrameBenchmark.recordPhaseSample("sodium.terrain.draw", 1L);
+			}
 			recordStatus(Operation.SUBMIT, wholeFrameResult != null ? wholeFrameResult.asStatus() : guiResult.asStatus());
 			submissionId = wholeFrameResult != null ? wholeFrameResult.submissionId() : guiResult.submissionId();
 			if (wholeFrameVulkan && primitiveFrame != null
@@ -985,9 +1047,16 @@ public final class RustGalFrameCoordinator {
 				// Rust LOD frame remains visible to the comparator even when its
 				// immutable instances are retired immediately after submission.
 				if (lastDhParityPhaseFrame != frameId) {
+					LOGGER.info("Rust Vulkan semantic DistantHorizons route selected frame={} instances={}",
+						frameId, primitiveFrame.lodInstances().size());
 					GraphicsFrameBenchmark.recordPhaseSample("distant-horizons.lod-render", 1L);
 					GraphicsFrameBenchmark.recordPhaseSample("distant-horizons.translucent-fade", 1L);
 					GraphicsFrameBenchmark.recordPhaseSample("distant-horizons.opaque-fade", 1L);
+					if (primitiveFrame.shaderEnvironmentFrame().enabled()) {
+						// Shader packs consume DH's transparent fade and its deferred
+						// translucent LOD stage as separate semantic operations.
+						GraphicsFrameBenchmark.recordPhaseSample("distant-horizons.translucent-fade", 1L);
+					}
 					lastDhParityPhaseFrame = frameId;
 				}
 				METRICS.worldLodSelectedFrames++;
@@ -1053,6 +1122,11 @@ public final class RustGalFrameCoordinator {
 					submissionId,
 					primitiveFrame.materialQuads()
 				);
+				RustGalWorldPrimitiveRenderer.recordWholeFrameCrystalBeamExecution(
+					frameId,
+					submissionId,
+					primitiveFrame.materialQuads()
+				);
 				RustGalWorldPrimitiveRenderer.recordWholeFrameEntityFlameExecution(
 					frameId,
 					submissionId,
@@ -1100,7 +1174,7 @@ public final class RustGalFrameCoordinator {
 					+ " submission=" + submissionId
 					+ " status=" + presented.status());
 					net.minecraft.client.dev.DeterministicCameraCapture.recordWholeFramePresentation(
-						net.minecraft.client.dev.DeterministicCameraCapture.currentInProgressRenderedFrameIndex() + 1L,
+						net.minecraft.client.dev.DeterministicCameraCapture.currentCaptureCorrelationRenderedFrameIndex(),
 						frame.frameId(),
 						correlationId,
 						submissionId,
@@ -1259,6 +1333,11 @@ public final class RustGalFrameCoordinator {
 		return lastRenderableWholeFrameWorldFrame;
 	}
 
+	/** Latest acquired Rust whole-frame id, on the same clock as world admission. */
+	public static long lastAcquiredWholeFrameFrame() {
+		return lastAcquiredWholeFrameFrame;
+	}
+
 	private static void recordWholeFrameAcquire(VulkanicGalBridge.AcquiredFrame frame, long correlationId) {
 		if (frame.frameTarget() != 0L) {
 			METRICS.frameTargetGenerations++;
@@ -1356,7 +1435,8 @@ public final class RustGalFrameCoordinator {
 		try {
 			Files.createDirectories(root);
 			Files.writeString(root.resolve("gameplay-correlation-frame-" + acquired.frameId() + ".json"), json, StandardCharsets.UTF_8);
-			if (request.sourceSelectedCapture()) {
+			if (request.sourceSelectedCapture()
+				|| net.minecraft.client.dev.DeterministicCameraCapture.normalRouteFinalOutputCaptureRequested()) {
 				net.minecraft.client.dev.DeterministicCameraCapture.confirmWholeFrameSourceCapture(
 					acquired.frameId(),
 					acquired.correlationId(),
@@ -2150,7 +2230,7 @@ public final class RustGalFrameCoordinator {
 					+ " files=" + pendingShaderPackSources.files().size()
 					+ " source_bytes=" + pendingShaderPackSources.totalBytes()
 					+ " source_execution_requested=" + selectedSourceExecutionRequested()
-					+ " source_execution_selected=false");
+					+ " source_execution_selected=deferred-until-frame-admission");
 			} catch (RuntimeException error) {
 				shaderPackSourceUpdateFailures++;
 				// This generation was not accepted.  Keep it retryable on the
@@ -2187,7 +2267,7 @@ public final class RustGalFrameCoordinator {
 				+ " files=" + pendingShaderPackSources.assets().size()
 				+ " asset_bytes=" + pendingShaderPackSources.assetTotalBytes()
 				+ " source_execution_requested=" + selectedSourceExecutionRequested()
-				+ " source_execution_selected=false");
+				+ " source_execution_selected=deferred-until-frame-admission");
 		} catch (RuntimeException error) {
 			shaderPackAssetUpdateFailures++;
 			// Asset admission is generation-coherent with source admission.  A
@@ -2199,7 +2279,7 @@ public final class RustGalFrameCoordinator {
 				+ generation
 				+ " failures=" + shaderPackAssetUpdateFailures
 				+ " source_execution_requested=" + selectedSourceExecutionRequested()
-				+ " source_execution_selected=false");
+				+ " source_execution_selected=deferred-until-frame-admission");
 		}
 	}
 

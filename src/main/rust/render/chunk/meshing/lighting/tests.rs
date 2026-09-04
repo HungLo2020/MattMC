@@ -150,7 +150,7 @@ fn static_model_zero_source_light_uses_computed_lighting() {
 }
 
 #[test]
-fn separate_ao_vertex_format_preserves_raw_ao_for_shader_side_face_shading() {
+fn separate_ao_vertex_format_preserves_raw_ao_while_rgb_retains_face_shading() {
     let block = lighting_block_record();
     let quad = lighting_quad(MODEL_QUAD_FLAG_ALIGNED, 5, 1.0, 1.0, 1.0);
 
@@ -161,6 +161,7 @@ fn separate_ao_vertex_format_preserves_raw_ao_for_shader_side_face_shading() {
     assert_close(separate.ao[0] * ambient_shade(5, true), baked.ao[0]);
     assert!(separate.ao[0] > baked.ao[0]);
     assert_eq!(separate.lm, baked.lm);
+    assert_close(0.6, native_quad_directional_shade(&quad));
 }
 
 #[test]

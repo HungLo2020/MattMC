@@ -184,6 +184,16 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
         super.end(renderPass);
     }
 
+    /**
+     * Legacy diagnostic implementation retained only while comparing the
+     * historical Sodium path during migration. It is never an admitted
+     * renderer route: both the selected Vulkan backend and the Rust whole-frame
+     * presenter reject before any Java Vulkan resource or pass is created.
+     *
+     * @deprecated Java Vulkan terrain rendering is prohibited; use the Rust
+     *             semantic terrain producer and Rust Vulkan backend instead.
+     */
+    @Deprecated(forRemoval = true)
     private void renderWithVulkan(
         ChunkRenderMatrices matrices,
         CommandList commandList,

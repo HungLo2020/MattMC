@@ -229,9 +229,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_frame_present(
             if std::env::var_os("MATTMC_TRACE_SUBMISSIONS").is_some() {
                 println!(
                     "vulkan.submission.present-retire frame={} waited={} retired_through={}",
-                    presented.frame.0,
-                    request.wait_submission_id,
-                    latest_submission.0,
+                    presented.frame.0, request.wait_submission_id, latest_submission.0,
                 );
             }
             Ok(FfiFramePresentResult {
@@ -274,7 +272,10 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_frame_cancel(
 ) -> i32 {
     with_registry_mut(|registry| {
         let Some(context) = registry.contexts.get_mut(&context_id) else {
-            let error = GalError::ffi(StatusCode::StaleHandle, format!("unknown context id {context_id}"));
+            let error = GalError::ffi(
+                StatusCode::StaleHandle,
+                format!("unknown context id {context_id}"),
+            );
             write_status_out(status_out, status_result_from_error(&error));
             return error.code as i32;
         };

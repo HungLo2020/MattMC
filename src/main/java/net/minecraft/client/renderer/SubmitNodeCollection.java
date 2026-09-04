@@ -396,14 +396,14 @@ public class SubmitNodeCollection implements OrderedSubmitNodeCollector, Ordered
 		if (rustWholeFramePresenterActive()
 			&& net.vulkanic.world.WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan()
 			&& model instanceof net.minecraft.client.model.SkullModelBase
-			&& object instanceof net.minecraft.client.renderer.blockentity.state.SkullBlockRenderState skullState
-			&& skullState.textureIdentity != null
+			&& object instanceof net.minecraft.client.model.SkullModelBase.State
+			&& textureIdentity != null
 			&& j == net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY
 			&& l == 0
 			&& crumblingOverlay == null
 			&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMesh(
 				model, object, poseStack.last(), renderType, textureIdentity,
-				net.minecraft.resources.ResourceLocation.withDefaultNamespace("block_entity/skull/" + skullState.skullType),
+				net.minecraft.resources.ResourceLocation.withDefaultNamespace("block_entity/skull"),
 				i, j, k
 			)) {
 			net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
@@ -1065,7 +1065,14 @@ public class SubmitNodeCollection implements OrderedSubmitNodeCollector, Ordered
 		}
 		this.wasUsed = true;
 		ensureRustBlockSubmitCapacity();
-		this.blockSubmits.add(new SubmitNodeStorage.BlockSubmit(poseStack.last().copy(), blockState, i, j, k, source, tintPos));
+		boolean specialRenderer = Minecraft.getInstance().getModelManager().specialBlockModelRenderer().get()
+			.hasRenderer(blockState.getBlock());
+		/* Special renderers publish their own model/model-part semantic receipt
+		 * below; do not add a second block marker that would be counted as an
+		 * ordinary/block-display producer with no corresponding mesh instance. */
+		if (!specialRenderer || (!blockRoute.usesRustWholeFrameVulkan() && !blockRoute.usesRustOpenGl())) {
+			this.blockSubmits.add(new SubmitNodeStorage.BlockSubmit(poseStack.last().copy(), blockState, i, j, k, source, tintPos));
+		}
 		((SpecialBlockModelRenderer)Minecraft.getInstance().getModelManager().specialBlockModelRenderer().get())
 			.renderByBlock(blockState.getBlock(), ItemDisplayContext.NONE, poseStack, this.submitNodeStorage, i, j, k);
 	}

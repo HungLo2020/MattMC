@@ -6,6 +6,7 @@ import com.seibel.distanthorizons.api.enums.worldGeneration.EDhApiWorldGeneratio
 import com.seibel.distanthorizons.core.dataObjects.fullData.FullDataPointIdMap;
 import com.seibel.distanthorizons.core.dataObjects.fullData.sources.FullDataSourceV2;
 import com.seibel.distanthorizons.core.dataObjects.render.columnViews.ColumnArrayView;
+import com.seibel.distanthorizons.core.pos.DhSectionPos;
 import com.seibel.distanthorizons.core.util.ColorUtil;
 import com.seibel.distanthorizons.core.util.FullDataPointUtil;
 import com.seibel.distanthorizons.core.util.RenderDataPointReducingList;
@@ -174,6 +175,108 @@ public class DistantHorizonsLodWaterReductionTest {
         LongArrayList merged = mergeParentColumn(source, 0, 0);
 
         assertContainsFullDataId(merged, water);
+    }
+
+    @Test
+    public void downsampleCopiesCompressionModeFromMappedInputColumn() throws Exception {
+        byte detail = (byte) (DhSectionPos.SECTION_BLOCK_DETAIL_LEVEL + 1);
+        long inputPos = DhSectionPos.encode(detail, 0, 0);
+        long outputPos = DhSectionPos.encode((byte) (detail - 1), 0, 0);
+        LongArrayList[] columns = emptyFullDataColumns();
+        byte[] steps = fullDataGenerationSteps();
+        byte[] modes = fullDataCompressionModes();
+
+        // Output (2,0) maps to input (1,0). Make those indices deliberately
+        // different so reading recipientIndex would select the wrong policy.
+        int mappedInputIndex = FullDataSourceV2.relativePosToIndex(1, 0);
+        int unrelatedInputIndex = FullDataSourceV2.relativePosToIndex(2, 0);
+        modes[mappedInputIndex] = EDhApiWorldCompressionMode.MERGE_SAME_BLOCKS.value;
+        modes[unrelatedInputIndex] = EDhApiWorldCompressionMode.VISUALLY_EQUAL.value;
+
+        FullDataPointIdMap mapping = testMapping();
+        FullDataSourceV2 input = FullDataSourceV2.createWithData(
+            inputPos, mapping, columns, steps, modes);
+        FullDataSourceV2 output = FullDataSourceV2.createEmpty(outputPos);
+        try {
+            java.lang.reflect.Field uniformity = FullDataSourceV2.class.getDeclaredField("semanticHorizontalUniform");
+            uniformity.setAccessible(true);
+            ((boolean[]) uniformity.get(input))[mappedInputIndex] = true;
+            Method downsample = FullDataSourceV2.class.getDeclaredMethod(
+                "downsampleFromOneAboveDetailLevel", FullDataSourceV2.class, int[].class);
+            downsample.setAccessible(true);
+            int[] identityRemap = new int[16];
+            for (int i = 0; i < identityRemap.length; i++) {
+                identityRemap[i] = i;
+            }
+            downsample.invoke(output, input, identityRemap);
+            assertEquals(
+                EDhApiWorldCompressionMode.MERGE_SAME_BLOCKS.value,
+                output.columnWorldCompressionMode.getByte(FullDataSourceV2.relativePosToIndex(2, 0)));
+            org.junit.jupiter.api.Assertions.assertTrue(
+                output.hasSemanticHorizontalUniformity(2, 0));
+        } finally {
+            output.close();
+            input.close();
+        }
+    }
+
+    @Test
+    public void downsamplePropagatesMappedContributorFootprintWithIdRemap() throws Exception {
+        byte detail = (byte) (DhSectionPos.SECTION_BLOCK_DETAIL_LEVEL + 1);
+        FullDataPointIdMap inputMapping = testMapping();
+        FullDataPointIdMap outputMapping = testMapping();
+        LongArrayList[] columns = emptyFullDataColumns();
+        int mappedInputIndex = FullDataSourceV2.relativePosToIndex(1, 0);
+        columns[mappedInputIndex].add(FullDataPointUtil.encode(1, 4, 60, (byte) 0, (byte) 15));
+        FullDataSourceV2 input = FullDataSourceV2.createWithData(
+            DhSectionPos.encode(detail, 0, 0), inputMapping, columns,
+            fullDataGenerationSteps(), fullDataCompressionModes());
+        input.setSemanticHorizontalUniformity(1, 0, false);
+        LongArrayList[] footprint = new LongArrayList[] {
+            new LongArrayList(new long[] { FullDataPointUtil.encode(1, 4, 60, (byte) 0, (byte) 15) }),
+            new LongArrayList(), new LongArrayList(), new LongArrayList()
+        };
+        input.setSemanticHorizontalContributors(1, 0, footprint);
+        FullDataSourceV2 output = FullDataSourceV2.createEmpty(
+            DhSectionPos.encode((byte) (detail - 1), 0, 0));
+        try {
+            Method downsample = FullDataSourceV2.class.getDeclaredMethod(
+                "downsampleFromOneAboveDetailLevel", FullDataSourceV2.class, int[].class);
+            downsample.setAccessible(true);
+            int[] identityRemap = new int[16];
+            for (int i = 0; i < identityRemap.length; i++) identityRemap[i] = i;
+            downsample.invoke(output, input, identityRemap);
+            LongArrayList[] copied = output.getSemanticHorizontalContributors(2, 0);
+            assertEquals(4, copied.length);
+            assertEquals(1, copied[0].size());
+            assertTrue(!output.hasSemanticHorizontalUniformity(2, 0));
+        } finally {
+            output.close();
+            input.close();
+        }
+    }
+
+    @Test
+    public void reducedColumnsRetainBoundedHorizontalSemanticContributors() throws Exception {
+        byte inputDetail = (byte) (DhSectionPos.SECTION_BLOCK_DETAIL_LEVEL + 1);
+        FullDataSourceV2 input = FullDataSourceV2.createWithData(
+            DhSectionPos.encode(inputDetail, 0, 0), testMapping(),
+            emptyFullDataColumns(), fullDataGenerationSteps(), fullDataCompressionModes());
+        FullDataSourceV2 output = FullDataSourceV2.createEmpty(
+            DhSectionPos.encode((byte) (inputDetail + 1), 0, 0));
+        try {
+            Method update = FullDataSourceV2.class.getDeclaredMethod(
+                "updateFromOneBelowDetailLevel", FullDataSourceV2.class, int[].class);
+            update.setAccessible(true);
+            int[] identityRemap = new int[16];
+            for (int i = 0; i < identityRemap.length; i++) identityRemap[i] = i;
+            update.invoke(output, input, identityRemap);
+            LongArrayList[] contributors = output.getSemanticHorizontalContributors(0, 0);
+            assertEquals(4, contributors.length);
+        } finally {
+            output.close();
+            input.close();
+        }
     }
 
     private static ColumnArrayView column(long... dataPoints) {

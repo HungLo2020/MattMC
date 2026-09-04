@@ -1,7 +1,7 @@
 package net.vulkanic.gui;
 
-import java.util.ArrayList;
 import java.util.List;
+import net.minecraft.client.gui.render.state.GuiRenderState;
 import net.minecraft.client.renderer.CubeMap;
 import net.vulkanic.bridge.VulkanicGalBridge;
 import org.joml.Matrix4f;
@@ -12,15 +12,25 @@ import org.joml.Matrix4f;
  * texture, offscreen target, raster draw, composition, and presentation step.
  */
 public final class RustGalPanoramaRenderer {
-	private static final int GRID = 64;
 	private static final int NORMAL_POSITIVE_Z = 0x007F0000;
 	private static final float FOV_RADIANS = (float)Math.toRadians(85.0);
 
 	private RustGalPanoramaRenderer() {
 	}
 
-	public static boolean enqueue(CubeMap cubeMap, float pitchDegrees, float yawDegrees, int guiWidth, int guiHeight) {
+	/**
+	 * Admits the panorama as one semantic GUI element in the current frame.
+	 *
+	 * <p>The scheduler token must be present in {@code renderState}: whole-frame
+	 * Vulkan consumes requests only from those tokens.  Keeping the attachment at
+	 * admission prevents an animated title screen from retaining one unconsumed
+	 * mesh per frame.</p>
+	 */
+	public static boolean enqueue(
+		CubeMap cubeMap, float pitchDegrees, float yawDegrees, int guiWidth, int guiHeight, GuiRenderState renderState
+	) {
 		if (!RustGalGuiRenderer.isWholeFrameVulkanEnabled()
+			|| renderState == null
 			|| guiWidth <= 0 || guiHeight <= 0
 			|| guiWidth > Integer.MAX_VALUE - 2 || guiHeight > Integer.MAX_VALUE - 2
 			|| !Float.isFinite(pitchDegrees) || !Float.isFinite(yawDegrees)) {
@@ -34,51 +44,54 @@ public final class RustGalPanoramaRenderer {
 		int guard = 1;
 		int renderWidth = guiWidth + guard * 2;
 		int renderHeight = guiHeight + guard * 2;
-		List<VulkanicGalBridge.GuiMeshVertexRecord> vertices = new ArrayList<>((GRID + 1) * (GRID + 1));
-		List<Integer> indices = new ArrayList<>(GRID * GRID * 6);
 		Matrix4f modelView = new Matrix4f().rotationX((float)Math.PI)
 			.rotateX((float)Math.toRadians(pitchDegrees)).rotateY((float)Math.toRadians(yawDegrees));
 		float cot = 1.0F / (float)Math.tan(FOV_RADIANS * 0.5F);
 		float projectionX = cot / ((float)guiWidth / guiHeight);
-		for (int y = 0; y <= GRID; y++) {
-			for (int x = 0; x <= GRID; x++) {
-				float sx = (float)x / GRID;
-				float sy = (float)y / GRID;
-				float[] uv = cubeUv(modelView, sx * 2.0F - 1.0F, 1.0F - sy * 2.0F, projectionX, cot);
-				vertices.add(new VulkanicGalBridge.GuiMeshVertexRecord(
-					new float[] {guard + sx * guiWidth, guard + sy * guiHeight, 0.0F}, uv, uv, 0xFFFFFFFF, NORMAL_POSITIVE_Z
-				));
-			}
-		}
-		for (int y = 0; y < GRID; y++) for (int x = 0; x < GRID; x++) {
-			int a = y * (GRID + 1) + x;
-			int b = a + 1;
-			int c = a + GRID + 2;
-			int d = a + GRID + 1;
-			indices.add(a); indices.add(b); indices.add(c);
-			indices.add(c); indices.add(d); indices.add(a);
-		}
+		// A panorama is one continuous camera projection, not a curved GUI mesh.
+		// Carry Frozen's three oversized fullscreen-triangle view rays and let the
+		// Rust-owned panorama fragment program choose the cube face per pixel.
+		// This is exact at face boundaries and avoids allocating 4,225 Java vertex
+		// records (and their defensive FFI copies) every title-screen frame.
+		List<VulkanicGalBridge.GuiMeshVertexRecord> vertices = List.of(
+			panoramaVertex(modelView, 0.0F, 1.0F, guiWidth, guiHeight, guard, projectionX, cot),
+			panoramaVertex(modelView, 2.0F, 1.0F, guiWidth, guiHeight, guard, projectionX, cot),
+			panoramaVertex(modelView, 0.0F, -1.0F, guiWidth, guiHeight, guard, projectionX, cot)
+		);
+		List<Integer> indices = List.of(0, 1, 2);
 		VulkanicGalBridge.GuiMeshBatchRecord batch = new VulkanicGalBridge.GuiMeshBatchRecord(
-			GuiRenderStratum.GUI_PANORAMA.order(), 0, 1, 1, image.assetId(), 0L, 0.0F,
+			GuiRenderStratum.GUI_PANORAMA.order(), 0, VulkanicGalBridge.GUI_MESH_MATERIAL_PANORAMA, 1, image.assetId(), 0L, 0.0F,
 			identity(), new float[] {1, 0, 0, 1, 0, 0}, 0, 0, guiWidth, guiHeight,
 			guiWidth, guiHeight, renderWidth, renderHeight, guard, vertices, indices
 		);
-		RustGalFrameCoordinator.enqueueGuiMeshItemRequest(List.of(batch), GuiRenderStratum.GUI_PANORAMA, System.nanoTime());
-		// Stage only after the bounded mesh request is accepted. This keeps a
-		// rejected panorama request from retaining a Rust-owned cube-map asset.
+		var token = RustGalFrameCoordinator.enqueueGuiMeshItemRequest(
+			List.of(batch), GuiRenderStratum.GUI_PANORAMA, System.nanoTime());
+		renderState.submitGuiElement(new RustGalGuiElementRenderState(
+			token, GuiRenderStratum.GUI_PANORAMA, "minecraft.gui.panorama", -1, -1.0F,
+			GuiFillDirection.NONE, 0, 0, guiWidth, guiHeight, guiWidth, guiHeight
+		));
+		// Stage only after both the bounded mesh request and its render-state
+		// ownership have been admitted.  This keeps a rejected panorama request
+		// from retaining a Rust-owned cube-map asset.
 		RustGalGuiRawImageAssets.stageCubeMap(image);
 		return true;
 	}
 
+	private static VulkanicGalBridge.GuiMeshVertexRecord panoramaVertex(
+		Matrix4f matrix, float screenX, float screenY, int width, int height, int guard, float projectionX, float projectionY
+	) {
+		float[] ray = cubeRay(matrix, screenX * 2.0F - 1.0F, 1.0F - screenY * 2.0F, projectionX, projectionY);
+		// Panorama's dedicated Rust shader interprets the two UV pairs as an
+		// interpolated camera ray. This is semantic data, not a Java GPU handle.
+		return new VulkanicGalBridge.GuiMeshVertexRecord(
+			new float[] {guard + screenX * width, guard + screenY * height, ray[0]},
+			new float[] {0.0F, 0.0F}, new float[] {ray[1], ray[2]}, 0xFFFFFFFF, NORMAL_POSITIVE_Z
+		);
+	}
+
 	static float[] cubeUv(Matrix4f matrix, float clipX, float clipY, float projectionX, float projectionY) {
-		float x = clipX / projectionX, y = clipY / projectionY, z = -1.0F;
-		// JOML stores matrices column-major; transform the clip-space ray by
-		// columns (m00,m10,m20), (m01,m11,m21), (m02,m12,m22). The previous
-		// row-indexed multiplication mirrored rotations and selected the wrong
-		// cube-map face for non-zero panorama yaw/pitch.
-		float dx = matrix.m00() * x + matrix.m10() * y + matrix.m20() * z;
-		float dy = matrix.m01() * x + matrix.m11() * y + matrix.m21() * z;
-		float dz = matrix.m02() * x + matrix.m12() * y + matrix.m22() * z;
+		float[] ray = cubeRay(matrix, clipX, clipY, projectionX, projectionY);
+		float dx = ray[0], dy = ray[1], dz = ray[2];
 		float ax = Math.abs(dx), ay = Math.abs(dy), az = Math.abs(dz);
 		float u, v, face;
 		if (ax >= ay && ax >= az) {
@@ -95,6 +108,19 @@ public final class RustGalPanoramaRenderer {
 			u = (dz > 0.0F ? dx : -dx) * s + 0.5F; v = -dy * s + 0.5F;
 		}
 		return new float[] {Math.clamp(u, 0.0F, 1.0F), (face + Math.clamp(v, 0.0F, 1.0F)) / 6.0F};
+	}
+
+	static float[] cubeRay(Matrix4f matrix, float clipX, float clipY, float projectionX, float projectionY) {
+		float x = clipX / projectionX, y = clipY / projectionY, z = -1.0F;
+		// Frozen's panorama vertex shader uses
+		// transpose(mat3(ModelViewMat)) * viewDirection. JOML exposes columns
+		// as m00/m10/m20 etc., so this transpose multiplication takes the
+		// corresponding row terms. Using the direct matrix multiplication here
+		// reverses the semantic panorama camera rotation.
+		float dx = matrix.m00() * x + matrix.m01() * y + matrix.m02() * z;
+		float dy = matrix.m10() * x + matrix.m11() * y + matrix.m12() * z;
+		float dz = matrix.m20() * x + matrix.m21() * y + matrix.m22() * z;
+		return new float[] {dx, dy, dz};
 	}
 
 	private static float[] identity() { return new float[] {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}; }

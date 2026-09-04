@@ -275,6 +275,16 @@ public final class GraphicsFrameBenchmark {
 		return ENABLED && initialized && !complete && !failed;
 	}
 
+	/**
+	 * A deterministic visual capture may have its screenshot receipt before the
+	 * independent frame-sampling contract completes.  The capture lifecycle
+	 * uses this to defer process shutdown, never to reduce or bypass the
+	 * benchmark's requested sample window.
+	 */
+	public static boolean isAwaitingCompletion() {
+		return ENABLED && !complete && !failed;
+	}
+
 	public static void beginFrame(Minecraft minecraft) {
 		beginFrameCalls++;
 		if (!ENABLED) {
@@ -282,7 +292,8 @@ public final class GraphicsFrameBenchmark {
 			return;
 		}
 		currentFrameStartNanos = System.nanoTime();
-		if ((complete || failed) && STOP_AFTER_COMPLETE && !stopIssued) {
+		if ((complete || failed) && STOP_AFTER_COMPLETE && !stopIssued
+			&& !DeterministicCameraCapture.isAwaitingCompletion()) {
 			lastFrameLifecycle = complete ? "begin-complete" : "begin-failed";
 			stopIssued = true;
 			minecraft.stop();
@@ -395,7 +406,8 @@ public final class GraphicsFrameBenchmark {
 			}
 			writeStatus(minecraft, "complete");
 			restoreArmorOverride(minecraft);
-			if (STOP_AFTER_COMPLETE && !stopIssued) {
+			if (STOP_AFTER_COMPLETE && !stopIssued
+				&& !DeterministicCameraCapture.isAwaitingCompletion()) {
 				stopIssued = true;
 				minecraft.stop();
 			}
@@ -774,7 +786,8 @@ public final class GraphicsFrameBenchmark {
 		}
 		if (scenarioRequiresProducerTraversal(ARROW_SCENARIO)
 			&& RustGalWorldPrimitiveRenderer.arrowRouteDecisions().isEmpty()
-			&& !routeObservedForProvenance("arrow")) {
+			&& !routeObservedForProvenance("arrow")
+			&& !submittedWorkObserved("arrow")) {
 			missing.add("arrow");
 		}
 		if (scenarioRequiresProducerTraversal(ITEM_ENTITY_SCENARIO)

@@ -4,8 +4,8 @@ use crate::render::vulkanic::ffi::FFI_MAX_BATCH_ITEMS;
 use crate::render::vulkanic::handles::HandleKind;
 use crate::render::vulkanic::shader_pack::vanilla_post_effect_contract::VanillaPostEffectExecutionPlan;
 use crate::render::vulkanic::shader_pack::vanilla_post_effect_executor::{
-    bundled_entity_outline_executor, bundled_entity_outline_shader_sources, pack_uniform_block,
     VanillaPostEffectExecutor, VanillaPostEffectInputBinding, VanillaPostEffectPassBinding,
+    bundled_entity_outline_executor, bundled_entity_outline_shader_sources, pack_uniform_block,
 };
 
 /// Backend-neutral input for the Rust-owned entity-outline mask pass. It
@@ -699,7 +699,7 @@ pub(crate) fn lower_entity_outline_mask_pass(
             pipeline_layout: draw.pipeline_layout,
             set_index: 0,
             set: draw.resource_set,
-            dynamic_offsets: vec![draw.dynamic_offset],
+            dynamic_offsets: vec![0, draw.dynamic_offset],
         });
         operations.push(CommandOp::SetIndexBuffer {
             buffer: draw.index_buffer,
@@ -1346,11 +1346,10 @@ mod tests {
             super::MeshAssetStore {
                 mesh_generation: 1,
                 index_generation: 1,
+                vertex_layout_version: 0,
                 vertex_bytes: Vec::new(),
-                source_terrain_input: None,
-                source_terrain_mesh: None,
-                source_entity_input: None,
-                source_entity_mesh: None,
+                source_input: None,
+                entity_identity: String::new(),
                 terrain_voxel_vertices: None,
                 terrain_voxel_indices: None,
                 index_bytes: Vec::new(),
@@ -1489,10 +1488,12 @@ mod tests {
         )
         .unwrap();
         assert_eq!(Some(depth_view), resources.mask_depth_view);
-        assert!(resources
-            .handles_in_destroy_order()
-            .iter()
-            .all(|handle| { *handle != depth && *handle != depth_view }));
+        assert!(
+            resources
+                .handles_in_destroy_order()
+                .iter()
+                .all(|handle| { *handle != depth && *handle != depth_view })
+        );
         for handle in resources.handles_in_destroy_order() {
             gal.destroy(handle).unwrap();
         }
@@ -1827,11 +1828,10 @@ mod tests {
             super::super::MeshAssetStore {
                 mesh_generation: asset.mesh_generation,
                 index_generation: 1,
+                vertex_layout_version: asset.vertex_layout_version,
                 vertex_bytes: super::super::packed_mesh_vertices(&asset.vertices),
-                source_terrain_input: None,
-                source_terrain_mesh: None,
-                source_entity_input: None,
-                source_entity_mesh: None,
+                source_input: None,
+                entity_identity: String::new(),
                 terrain_voxel_vertices: None,
                 terrain_voxel_indices: None,
                 index_bytes: asset.index_bytes.clone(),

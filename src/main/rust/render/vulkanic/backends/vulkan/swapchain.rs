@@ -6,8 +6,8 @@ use ash::vk;
 use super::device::VulkanContext;
 use super::resources::{aspect_for_format, texture_format};
 use super::trace;
-use crate::render::vulkanic::backends::vulkan::resources::FrameTargetObject;
 use crate::render::vulkanic::backends::BackendToken;
+use crate::render::vulkanic::backends::vulkan::resources::FrameTargetObject;
 use crate::render::vulkanic::error::{GalError, GalResult};
 use crate::render::vulkanic::frame::{
     AcquiredFrame, FrameAcquireDesc, FrameAcquireStatus, FrameId, FramePresentStatus,
@@ -288,7 +288,7 @@ impl VulkanSwapchain {
             Err(error) => {
                 return Err(GalError::backend(format!(
                     "Vulkan swapchain present failed: {error:?}"
-                )))
+                )));
             }
         };
         self.acquired.remove(position);
@@ -324,7 +324,11 @@ impl VulkanSwapchain {
     /// only when this is the sole acquired image and wait for device quiescence
     /// before retiring the old swapchain.
     pub(super) fn cancel(&mut self, frame: FrameId) -> GalResult<()> {
-        let Some(position) = self.acquired.iter().position(|acquired| acquired.frame == frame) else {
+        let Some(position) = self
+            .acquired
+            .iter()
+            .position(|acquired| acquired.frame == frame)
+        else {
             return Err(GalError::submission(
                 crate::render::vulkanic::StatusCode::InvalidArgument,
                 "Vulkan frame was not acquired before cancel",
@@ -337,10 +341,9 @@ impl VulkanSwapchain {
             ));
         }
         unsafe {
-            self.context
-                .device
-                .device_wait_idle()
-                .map_err(|error| GalError::backend(format!("Vulkan cancel wait failed: {error:?}")))?;
+            self.context.device.device_wait_idle().map_err(|error| {
+                GalError::backend(format!("Vulkan cancel wait failed: {error:?}"))
+            })?;
         }
         self.recreate(self.swapchain)
     }
@@ -456,6 +459,21 @@ impl VulkanSwapchain {
         let present_policy = choose_present_mode(&present_modes, self.desc.present_mode);
         let present_mode = present_policy.selected;
         let image_count = choose_image_count(capabilities, self.desc.max_frames_in_flight);
+        // Fabulous's explicit handoff snapshots the acquired image into a
+        // private Rust-owned attachment before it composes translucent work.
+        // That makes the acquired image a real copy source; declare the
+        // capability on the swapchain itself instead of relying on an
+        // invalid layout transition succeeding on a permissive driver.
+        let required_image_usage = vk::ImageUsageFlags::COLOR_ATTACHMENT
+            | vk::ImageUsageFlags::TRANSFER_DST
+            | vk::ImageUsageFlags::TRANSFER_SRC;
+        if !capabilities.supported_usage_flags.contains(required_image_usage) {
+            return Err(GalError::unsupported_feature(format!(
+                "presentation surface cannot support Rust VulkanicGAL's explicit acquired-frame snapshot: required=0x{:x}, supported=0x{:x}",
+                required_image_usage.as_raw(),
+                capabilities.supported_usage_flags.as_raw(),
+            )));
+        }
         let create = vk::SwapchainCreateInfoKHR::default()
             .surface(surface)
             .min_image_count(image_count)
@@ -463,7 +481,7 @@ impl VulkanSwapchain {
             .image_color_space(format.color_space)
             .image_extent(extent)
             .image_array_layers(1)
-            .image_usage(vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_DST)
+            .image_usage(required_image_usage)
             .image_sharing_mode(vk::SharingMode::EXCLUSIVE)
             .pre_transform(capabilities.current_transform)
             .composite_alpha(vk::CompositeAlphaFlagsKHR::OPAQUE)

@@ -252,7 +252,7 @@ public class RenderBufferHandler implements AutoCloseable
 				// section to the legacy buffer list and leaves Rust with no visible LOD
 				// columns.
 				if (net.vulkanic.world.DistantHorizonsSemanticCollector.usesRustWholeFrameSemanticBuild()
-					&& net.vulkanic.world.DistantHorizonsSemanticCollector.hasColumn(renderSection.pos))
+					&& net.vulkanic.world.DistantHorizonsSemanticCollector.hasPublishedColumn(renderSection.pos))
 				{
 					this.semanticColumnPositionsNearToFar.add(renderSection.pos);
 					continue;

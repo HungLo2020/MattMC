@@ -11,6 +11,7 @@ import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.blockentity.SkullBlockRenderer;
 import net.minecraft.core.component.DataComponents;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.ResolvableProfile;
@@ -41,7 +42,10 @@ public class PlayerHeadSpecialRenderer implements SpecialModelRenderer<PlayerSki
 		int k
 	) {
 		RenderType renderType = renderInfo != null ? renderInfo.renderType() : PlayerSkinRenderCache.DEFAULT_PLAYER_SKIN_RENDER_TYPE;
-		SkullBlockRenderer.submitSkull(null, 180.0F, 0.0F, poseStack, submitNodeCollector, i, this.modelBase, renderType, k, null, null);
+		ResourceLocation semanticTexture = renderInfo != null
+			? renderInfo.playerSkin().body().texturePath()
+			: SkullBlockRenderer.defaultTexture(Types.PLAYER);
+		SkullBlockRenderer.submitSkull(null, 180.0F, 0.0F, poseStack, submitNodeCollector, i, this.modelBase, renderType, k, null, semanticTexture);
 	}
 
 	@Override

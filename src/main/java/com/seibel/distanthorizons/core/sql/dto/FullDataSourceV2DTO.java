@@ -43,6 +43,8 @@ public class FullDataSourceV2DTO
 		public static final int V2_LATEST = 2;
 		/** V2 payload plus copied coarse semantic-horizontal uniformity proof. */
 		public static final int V3_LATEST = 3;
+		/** V3 payload plus bounded horizontal contributor columns. */
+		public static final int V4_LATEST = 4;
 	}
 	
 	
@@ -62,6 +64,7 @@ public class FullDataSourceV2DTO
 	public ByteArrayList compressedColumnGenStepByteArray;
 	/** @see EDhApiWorldCompressionMode */
 	public ByteArrayList compressedWorldCompressionModeByteArray;
+	public ByteArrayList compressedSemanticHorizontalContributorByteArray;
 	
 	public ByteArrayList compressedMappingByteArray;
 	
@@ -95,6 +98,7 @@ public class FullDataSourceV2DTO
 		writeDataSourceDataArrayToBlobV2(dataSource.dataPoints, dto.compressedDataByteArray, null, compressionModeEnum);
 		writeGenerationStepsToBlob(dataSource.columnGenerationSteps, dto.compressedColumnGenStepByteArray, compressionModeEnum);
 		writeWorldCompressionModeToBlob(dataSource, dto.compressedWorldCompressionModeByteArray, compressionModeEnum);
+		writeSemanticHorizontalContributorsToBlob(dataSource, dto.compressedSemanticHorizontalContributorByteArray, compressionModeEnum);
 		writeDataMappingToBlob(dataSource.mapping, dto.compressedMappingByteArray, compressionModeEnum);
 		// adjacent full data
 		writeDataSourceDataArrayToBlobV2(dataSource.dataPoints, dto.compressedNorthAdjDataByteArray, EDhDirection.NORTH, compressionModeEnum);
@@ -108,7 +112,7 @@ public class FullDataSourceV2DTO
 			// the mapping hash isn't included since it takes significantly longer to calculate and 
 			// as of the time of this comment (2025-1-22) the checksum isn't used for anything so changing it shouldn't cause any issues
 			dto.dataChecksum = dataSource.hashCode();
-			dto.dataFormatVersion = DATA_FORMAT.V3_LATEST;
+			dto.dataFormatVersion = DATA_FORMAT.V4_LATEST;
 			dto.compressionModeValue = compressionModeEnum.value;
 			dto.lastModifiedUnixDateTime = dataSource.lastModifiedUnixDateTime;
 			dto.createdUnixDateTime = dataSource.createdUnixDateTime;
@@ -123,7 +127,7 @@ public class FullDataSourceV2DTO
 	public static FullDataSourceV2DTO CreateEmptyDataSourceForDecoding() { return new FullDataSourceV2DTO(); }
 	private FullDataSourceV2DTO() 
 	{
-		super(ARRAY_LIST_POOL, 8, 0, 0);
+		super(ARRAY_LIST_POOL, 9, 0, 0);
 		
 		// Expected sizes here are 0 since we don't know how big these arrays need to be,
 		// they depend on compression settings and world complexity.
@@ -131,6 +135,7 @@ public class FullDataSourceV2DTO
 		this.compressedColumnGenStepByteArray = this.pooledArraysCheckout.getByteArray(1, 0);
 		this.compressedWorldCompressionModeByteArray = this.pooledArraysCheckout.getByteArray(2, 0);
 		this.compressedMappingByteArray = this.pooledArraysCheckout.getByteArray(3, 0);
+		this.compressedSemanticHorizontalContributorByteArray = this.pooledArraysCheckout.getByteArray(8, 0);
 		
 		this.compressedNorthAdjDataByteArray = this.pooledArraysCheckout.getByteArray(4, 0);
 		this.compressedSouthAdjDataByteArray = this.pooledArraysCheckout.getByteArray(5, 0);
@@ -182,7 +187,8 @@ public class FullDataSourceV2DTO
 		
 		if (this.dataFormatVersion != DATA_FORMAT.V1_NO_ADJACENT_DATA 
 			&& this.dataFormatVersion != DATA_FORMAT.V2_LATEST
-			&& this.dataFormatVersion != DATA_FORMAT.V3_LATEST)
+			&& this.dataFormatVersion != DATA_FORMAT.V3_LATEST
+			&& this.dataFormatVersion != DATA_FORMAT.V4_LATEST)
 		{
 			throw new IllegalStateException("Data source population only supports formats: ["+DATA_FORMAT.V1_NO_ADJACENT_DATA +","+DATA_FORMAT.V2_LATEST +"], data format found: ["+this.dataFormatVersion+"].");
 		}
@@ -227,6 +233,11 @@ public class FullDataSourceV2DTO
 			if (this.dataFormatVersion >= DATA_FORMAT.V3_LATEST) {
 				readBlobToSemanticHorizontalUniformity(
 					this.compressedWorldCompressionModeByteArray, dataSource, compressionModeEnum
+				);
+			}
+			if (this.dataFormatVersion >= DATA_FORMAT.V4_LATEST) {
+				readSemanticHorizontalContributorsFromBlob(
+					this.compressedSemanticHorizontalContributorByteArray, dataSource, compressionModeEnum
 				);
 			}
 			
@@ -717,6 +728,46 @@ public class FullDataSourceV2DTO
 			}
 		}
 	}
+
+	private static void writeSemanticHorizontalContributorsToBlob(
+		FullDataSourceV2 dataSource, ByteArrayList output, EDhApiDataCompressionMode compressionMode
+	) throws IOException {
+		try (DhDataOutputStream out = DhDataOutputStream.create(compressionMode, output)) {
+			for (int x = 0; x < FullDataSourceV2.WIDTH; x++) for (int z = 0; z < FullDataSourceV2.WIDTH; z++) {
+				LongArrayList[] contributors = dataSource.getSemanticHorizontalContributors(x, z);
+				out.writeBoolean(contributors != null);
+				if (contributors == null) continue;
+				for (LongArrayList column : contributors) {
+					int size = column == null ? -1 : Math.min(column.size(), FullDataSourceV2.MAX_SEMANTIC_HORIZONTAL_CONTRIBUTOR_POINTS);
+					out.writeShort(size);
+					if (column != null) for (int i = 0; i < size; i++) out.writeLong(column.getLong(i));
+				}
+			}
+		}
+	}
+
+	private static void readSemanticHorizontalContributorsFromBlob(
+		ByteArrayList input, FullDataSourceV2 dataSource, EDhApiDataCompressionMode compressionMode
+	) throws IOException, DataCorruptedException {
+		try (DhDataInputStream in = DhDataInputStream.create(input, compressionMode)) {
+			for (int x = 0; x < FullDataSourceV2.WIDTH; x++) for (int z = 0; z < FullDataSourceV2.WIDTH; z++) {
+				if (!in.readBoolean()) continue;
+				LongArrayList[] contributors = new LongArrayList[4];
+				for (int i = 0; i < 4; i++) {
+					int size = in.readShort();
+					if (size < 0) continue;
+					if (size > FullDataSourceV2.MAX_SEMANTIC_HORIZONTAL_CONTRIBUTOR_POINTS)
+						throw new DataCorruptedException("Semantic contributor column exceeds bound: " + size);
+					LongArrayList column = new LongArrayList(size);
+					for (int point = 0; point < size; point++) column.add(in.readLong());
+					contributors[i] = column;
+				}
+				dataSource.setSemanticHorizontalContributors(x, z, contributors);
+			}
+		} catch (EOFException e) {
+			throw new DataCorruptedException(e);
+		}
+	}
 	
 	
 	private static void writeDataMappingToBlob(FullDataPointIdMap mapping, ByteArrayList outputByteArray, EDhApiDataCompressionMode compressionModeEnum) throws IOException
@@ -773,6 +824,11 @@ public class FullDataSourceV2DTO
 		
 		out.writeByte(this.dataFormatVersion);
 		out.writeByte(this.compressionModeValue);
+		if (this.dataFormatVersion >= DATA_FORMAT.V4_LATEST) {
+			out.writeInt(this.compressedSemanticHorizontalContributorByteArray.size());
+			out.writeBytes(this.compressedSemanticHorizontalContributorByteArray.elements(), 0,
+				this.compressedSemanticHorizontalContributorByteArray.size());
+		}
 		
 		out.writeBoolean(BoolUtil.falseIfNull(this.applyToParent));
 		out.writeBoolean(BoolUtil.falseIfNull(this.applyToChildren));
@@ -813,6 +869,11 @@ public class FullDataSourceV2DTO
 		
 		this.dataFormatVersion = in.readByte();
 		this.compressionModeValue = in.readByte();
+		if (this.dataFormatVersion >= DATA_FORMAT.V4_LATEST) {
+			this.compressedSemanticHorizontalContributorByteArray.size(in.readInt());
+			in.readBytes(this.compressedSemanticHorizontalContributorByteArray.elements(), 0,
+				this.compressedSemanticHorizontalContributorByteArray.size());
+		}
 		
 		this.applyToParent = in.readBoolean();
 		this.applyToChildren = in.readBoolean();

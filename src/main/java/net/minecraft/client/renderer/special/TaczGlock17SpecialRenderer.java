@@ -81,7 +81,11 @@ import net.vulkanic.VulkanicClearBuffer;
 
 @Environment(EnvType.CLIENT)
 public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
-	private static final int MAX_SEMANTIC_BEDROCK_QUADS = 16_384;
+	// The Rust mesh limit applies per submitted asset (65,536 vertices), while
+	// one animated gun may legitimately produce several assets after the
+	// 256-section split. Bound the aggregate copied stream separately so large
+	// Bedrock models remain admitted without allowing unbounded frame growth.
+	private static final int MAX_SEMANTIC_BEDROCK_QUADS = 65_536;
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private static final Set<String> FUNCTIONAL_MARKER_NODES = Set.of("lefthand_pos", "righthand_pos", "muzzle_flash", "shell");
 	private static final Pattern TACZ_NUMBERED_NODE = Pattern.compile("^(.*?)(?:_(\\d+))?$");
@@ -247,17 +251,18 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 		int light,
 		int overlay
 	) {
-		Map<Integer, SemanticBedrockBatch> batches = new LinkedHashMap<>();
+		Map<Integer, List<SemanticBedrockBatch>> batches = new LinkedHashMap<>();
 		SemanticBedrockBudget budget = new SemanticBedrockBudget();
 		for (BedrockNode root : roots) {
 			collectSemanticBedrockNode(poseStack, itemDisplayContext, animationPose, null, gunRenderContext, root, light, batches, budget);
 		}
 		if (batches.isEmpty()) return false;
 		PoseStack identityPoseStack = new PoseStack();
-		for (Map.Entry<Integer, SemanticBedrockBatch> entry : batches.entrySet()) {
-			SemanticBedrockBatch batch = entry.getValue();
-			if (!submitNodeCollector.submitTexturedQuadsSemantic(identityPoseStack, renderType, textureIdentity,
-				batch.vertices(), batch.uvs(), batch.colors(), entry.getKey())) return false;
+		for (Map.Entry<Integer, List<SemanticBedrockBatch>> entry : batches.entrySet()) {
+			for (SemanticBedrockBatch batch : entry.getValue()) {
+				if (!submitNodeCollector.submitTexturedQuadsSemantic(identityPoseStack, renderType, textureIdentity,
+					batch.vertices(), batch.uvs(), batch.colors(), entry.getKey())) return false;
+			}
 		}
 		return true;
 	}
@@ -312,17 +317,18 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 		int materialMode,
 		AttachmentRenderData attachmentData
 	) {
-		Map<Integer, SemanticBedrockBatch> batches = new LinkedHashMap<>();
+		Map<Integer, List<SemanticBedrockBatch>> batches = new LinkedHashMap<>();
 		SemanticBedrockBudget budget = new SemanticBedrockBudget();
 		for (BedrockNode root : roots) {
 			collectSemanticBedrockNode(poseStack, itemDisplayContext, animationPose, attachmentData, gunRenderContext, root, light, batches, budget);
 		}
 		if (batches.isEmpty()) return false;
 		PoseStack identityPoseStack = new PoseStack();
-		for (Map.Entry<Integer, SemanticBedrockBatch> entry : batches.entrySet()) {
-			SemanticBedrockBatch batch = entry.getValue();
-			if (!submitNodeCollector.submitOpticalTexturedQuadsSemantic(identityPoseStack, RenderType.entityCutout(textureIdentity),
-				textureIdentity, batch.vertices(), batch.uvs(), batch.colors(), entry.getKey(), materialMode)) return false;
+		for (Map.Entry<Integer, List<SemanticBedrockBatch>> entry : batches.entrySet()) {
+			for (SemanticBedrockBatch batch : entry.getValue()) {
+				if (!submitNodeCollector.submitOpticalTexturedQuadsSemantic(identityPoseStack, RenderType.entityCutout(textureIdentity),
+					textureIdentity, batch.vertices(), batch.uvs(), batch.colors(), entry.getKey(), materialMode)) return false;
+			}
 		}
 		return true;
 	}
@@ -335,7 +341,7 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 		GunRenderContext gunRenderContext,
 		BedrockNode node,
 		int baseLight,
-		Map<Integer, SemanticBedrockBatch> batches,
+		Map<Integer, List<SemanticBedrockBatch>> batches,
 		SemanticBedrockBudget budget
 	) {
 		if (node.cubes.isEmpty() && node.children.isEmpty()) return;
@@ -350,10 +356,21 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 		if (!node.hiddenMarker && nodePose.visible()) {
 			int light = node.name != null && node.name.endsWith("_illuminated") ? LightTexture.pack(15, 15) : baseLight;
 			childLight = light;
-			SemanticBedrockBatch batch = batches.computeIfAbsent(light, ignored -> new SemanticBedrockBatch());
+			List<SemanticBedrockBatch> lightBatches = batches.computeIfAbsent(light, ignored -> new ArrayList<>());
 			for (BedrockCube cube : node.cubes) {
 				for (BedrockPolygon polygon : cube.polygons) {
-					if (!polygon.empty) batch.append(poseStack.last().pose(), polygon, budget);
+					if (!polygon.empty) {
+						// A single Bedrock node may contain more polygons than one
+						// Rust asset section budget, so choose/split per polygon.
+						SemanticBedrockBatch batch = lightBatches.isEmpty()
+							|| lightBatches.get(lightBatches.size() - 1).isFull()
+							? new SemanticBedrockBatch()
+							: lightBatches.get(lightBatches.size() - 1);
+						if (lightBatches.isEmpty() || lightBatches.get(lightBatches.size() - 1) != batch) {
+							lightBatches.add(batch);
+						}
+						batch.append(poseStack.last().pose(), polygon, budget);
+					}
 				}
 			}
 		}
@@ -367,11 +384,12 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 		private final List<Integer> colorList = new ArrayList<>();
 
 		private void append(org.joml.Matrix4f transform, BedrockPolygon polygon, SemanticBedrockBudget budget) {
-			if (colorList.size() >= MAX_SEMANTIC_BEDROCK_QUADS) {
+			if (isFull()) {
 				throw new IllegalStateException("Rust TACZ semantic Bedrock mesh exceeds bounded quad budget");
 			}
 			if (++budget.quadCount > MAX_SEMANTIC_BEDROCK_QUADS) {
-				throw new IllegalStateException("Rust TACZ aggregate semantic Bedrock mesh exceeds bounded quad budget");
+				throw new IllegalStateException("Rust TACZ aggregate semantic Bedrock mesh exceeds bounded quad budget: "
+					+ budget.quadCount + " > " + MAX_SEMANTIC_BEDROCK_QUADS);
 			}
 			for (BedrockVertex vertex : polygon.vertices) {
 				Vector3f position = transform.transformPosition(vertex.x / 16.0F, vertex.y / 16.0F, vertex.z / 16.0F, new Vector3f());
@@ -382,10 +400,13 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 				vertexList.add(position.x()); vertexList.add(position.y()); vertexList.add(position.z());
 				uvList.add(vertex.u); uvList.add(vertex.v);
 			}
-			// The semantic GUI transport carries one color per vertex, matching
-			// the four Bedrock polygon vertices copied above.
-			for (int vertex = 0; vertex < 4; vertex++) colorList.add(0xFFFFFFFF);
+			// The Rust first-person textured-quad ABI carries one color per
+			// quad, while positions and UVs carry four vertices per quad. Keep
+			// this producer cardinality aligned with that explicit contract.
+			colorList.add(0xFFFFFFFF);
 		}
+
+		private boolean isFull() { return colorList.size() >= 256; }
 
 		private float[] vertices() { float[] values = new float[vertexList.size()]; for (int i = 0; i < values.length; i++) values[i] = vertexList.get(i); return values; }
 		private float[] uvs() { float[] values = new float[uvList.size()]; for (int i = 0; i < values.length; i++) values[i] = uvList.get(i); return values; }

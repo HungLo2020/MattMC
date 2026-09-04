@@ -11,10 +11,12 @@ use crate::render::vulkanic::error::{GalError, GalResult};
 use crate::render::vulkanic::gal::VulkanicGal;
 use crate::render::vulkanic::handles::Handle;
 use crate::render::vulkanic::resources::{
-    BufferDesc, BufferUsage, CombinedTextureSamplerDesc, Extent3d, MemoryDomain, QueueClass,
-    SamplerAddressMode, SamplerDesc, SamplerFilter, TextureDesc, TextureDimension, TextureFormat,
-    TextureUsage, TextureViewDesc,
+    AccessFlags, BufferDesc, BufferUsage, CombinedTextureSamplerDesc, Extent3d, MemoryDomain,
+    QueueClass, ResourceBinding, ResourceBindingKind, ResourceSetDesc, SamplerAddressMode,
+    SamplerDesc, SamplerFilter, TextureDesc, TextureDimension, TextureFormat, TextureUsage,
+    TextureViewDesc,
 };
+use std::collections::BTreeMap;
 
 use super::terrain_source_resources::{
     TerrainSourceOwnedResource, TerrainSourceOwnedResourceSet, TerrainSourceResourceAvailability,
@@ -240,6 +242,10 @@ pub(crate) struct VanillaLightmapResidency {
     sampler: Handle,
     view: Handle,
     combined_sampler: Handle,
+    /// Consumer descriptor sets are owned by this exact residency generation.
+    /// This guarantees they retire before the view they reference, even when
+    /// a later frame replaces the lightmap while other consumers still exist.
+    consumer_resource_sets: BTreeMap<Handle, Handle>,
 }
 
 /// Rust-private semantic binding for consumers which require the separate
@@ -290,8 +296,13 @@ impl VanillaLightmapResidency {
             created.push(texture);
             let sampler = gal.create_sampler(SamplerDesc {
                 label: format!("{label}.sampler"),
-                min_filter: SamplerFilter::Nearest,
-                mag_filter: SamplerFilter::Nearest,
+                // Frozen Java OpenGL's `LightTexture` installs a linear
+                // sampler. Its active Sodium terrain vertex shader supplies
+                // packed `level / 16` coordinates, so filtering is part of
+                // that renderer's visible lighting contract; other consumers
+                // may intentionally use texel-centre coordinates instead.
+                min_filter: SamplerFilter::Linear,
+                mag_filter: SamplerFilter::Linear,
                 mip_filter: SamplerFilter::Nearest,
                 address_u: SamplerAddressMode::ClampToEdge,
                 address_v: SamplerAddressMode::ClampToEdge,
@@ -324,6 +335,7 @@ impl VanillaLightmapResidency {
                 sampler,
                 view,
                 combined_sampler,
+                consumer_resource_sets: BTreeMap::new(),
             })
         })();
         if result.is_err() {
@@ -346,6 +358,48 @@ impl VanillaLightmapResidency {
             texture_view: self.view,
             sampler: self.sampler,
         }
+    }
+
+    /// Creates one explicit consumer set for a caller-owned layout. The
+    /// layout is only an ABI declaration; texture/view/sampler ownership and
+    /// retirement remain with this Rust lightmap generation.
+    pub(crate) fn resource_set_for_layout(
+        &mut self,
+        gal: &mut VulkanicGal,
+        layout: Handle,
+    ) -> GalResult<Handle> {
+        if let Some(set) = self.consumer_resource_sets.get(&layout) {
+            return Ok(*set);
+        }
+        let set = gal.create_resource_set(ResourceSetDesc {
+            label: format!(
+                "shader-pack.vanilla-lightmap.world{}.gen{}.consumer-set",
+                self.world_generation, self.lightmap_generation
+            ),
+            layout,
+            bindings: vec![
+                ResourceBinding {
+                    binding: 0,
+                    array_index: 0,
+                    resource: self.view,
+                    kind: ResourceBindingKind::SampledTexture,
+                    access: AccessFlags::READ,
+                    dynamic_offsets: Vec::new(),
+                    buffer_range: None,
+                },
+                ResourceBinding {
+                    binding: 1,
+                    array_index: 0,
+                    resource: self.sampler,
+                    kind: ResourceBindingKind::Sampler,
+                    access: AccessFlags::READ,
+                    dynamic_offsets: Vec::new(),
+                    buffer_range: None,
+                },
+            ],
+        })?;
+        self.consumer_resource_sets.insert(layout, set);
+        Ok(set)
     }
 
     /// Appends, but never submits, the complete upload and sampled transition.
@@ -430,6 +484,9 @@ impl VanillaLightmapResidency {
     }
 
     pub(crate) fn destroy(self, gal: &mut VulkanicGal) -> GalResult<()> {
+        for (_, set) in self.consumer_resource_sets {
+            gal.destroy(set)?;
+        }
         for handle in [
             self.combined_sampler,
             self.view,
@@ -509,6 +566,10 @@ fn mix(left: [f32; 3], right: [f32; 3], factor: f32) -> [f32; 3] {
 }
 
 fn unorm8(value: f32) -> u8 {
+    // Frozen's RGBA8 lightmap render target converts the shader's normalized
+    // fragment output with nearest-UNORM quantization. Truncation makes the
+    // owned Rust image systematically one code point darker across most of the
+    // table, which is then amplified by terrain texture modulation.
     (value.clamp(0.0, 1.0) * 255.0).round() as u8
 }
 
@@ -545,6 +606,40 @@ mod tests {
         assert!(block_lit[0] > dark[0]);
         assert!(sky_lit[2] > dark[2]);
         assert_eq!(u8::MAX, sky_lit[3]);
+    }
+
+    #[test]
+    fn rgba8_quantization_matches_the_frozen_unorm_framebuffer_contract() {
+        // The Java OpenGL reference stores the lightmap in an RGBA8 render
+        // target. Keep the Rust-owned semantic reconstruction on the same
+        // nearest-UNORM conversion rather than systematically darkening the
+        // CPU image by truncating every fractional code point.
+        assert_eq!(85, unorm8(84.99 / 255.0));
+        assert_eq!(85, unorm8(85.0 / 255.0));
+        assert_eq!(255, unorm8(1.0));
+    }
+
+    #[test]
+    fn default_daylight_texels_match_the_frozen_opengl_capture_contract() {
+        // These values are sampled from Frozen Java OpenGL's captured 16×16
+        // RGBA8 lightmap for the same explicit default inputs below. This is
+        // a semantic CPU-image regression test: it neither reads a Java GPU
+        // texture nor permits a Java renderer fallback.
+        let pixels = VanillaLightmapInputs {
+            brightness_factor: 0.5,
+            ..inputs()
+        }
+        .rgba8()
+        .unwrap();
+        let texel = |block: usize, sky: usize| {
+            let offset = (sky * VANILLA_LIGHTMAP_WIDTH + block) * 4;
+            [pixels[offset], pixels[offset + 1], pixels[offset + 2], pixels[offset + 3]]
+        };
+        assert_eq!([25, 25, 25, 255], texel(0, 0));
+        assert_eq!([39, 34, 31, 255], texel(1, 0));
+        assert_eq!([252, 252, 252, 255], texel(15, 0));
+        assert_eq!([204, 204, 204, 255], texel(0, 13));
+        assert_eq!([252, 252, 252, 255], texel(15, 15));
     }
 
     #[test]

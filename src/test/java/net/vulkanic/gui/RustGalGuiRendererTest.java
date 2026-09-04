@@ -7,6 +7,8 @@ import org.junit.jupiter.api.Test;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
+import javax.imageio.ImageIO;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -14,14 +16,87 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RustGalGuiRendererTest {
 	@Test
-	void panoramaCubeUvUsesJomlColumnMajorRotation() {
+	void shippedDefaultPanoramaHasSixRealDimensionMatchedFaces() throws Exception {
+		Path root = Path.of("src/main/resources/assets/minecraft/textures/gui/title/background/caves");
+		int width = -1;
+		int height = -1;
+		for (int face = 0; face < 6; face++) {
+			var image = ImageIO.read(root.resolve("panorama_" + face + ".png").toFile());
+			assertTrue(image != null && image.getWidth() > 1 && image.getHeight() > 1,
+				"default panorama face must be a real image, not a placeholder");
+			if (face == 0) {
+				width = image.getWidth();
+				height = image.getHeight();
+			} else {
+				assertEquals(width, image.getWidth(), "panorama faces must share one width");
+				assertEquals(height, image.getHeight(), "panorama faces must share one height");
+			}
+		}
+	}
+
+	@Test
+	void semanticBlitPreservesBlitRenderStateCoordinateFieldOrder() throws Exception {
+		String source = Files.readString(Path.of("src/main/java/net/minecraft/client/gui/GuiGraphics.java"));
+		int method = source.indexOf("public void submitRustSemanticBlit(");
+		int end = source.indexOf("\n\t}\n", method);
+		assertTrue(method >= 0 && end > method, "semantic blit callsite must remain present");
+		String callsite = source.substring(method, end);
+		int u0 = callsite.indexOf("\n\t\t\tu0,");
+		int u1 = callsite.indexOf("\n\t\t\tu1,", u0);
+		int v0 = callsite.indexOf("\n\t\t\tv0,", u1);
+		int v1 = callsite.indexOf("\n\t\t\tv1,", v0);
+		assertTrue(u0 >= 0 && u1 > u0 && v0 > u1 && v1 > v0,
+			"BlitRenderState requires u0,u1,v0,v1 even though the public semantic API is u0,v0,u1,v1");
+	}
+
+	@Test
+	void panoramaCubeUvMatchesFrozenTransposedModelViewRotation() {
 		float[] identity = RustGalPanoramaRenderer.cubeUv(new Matrix4f(), 0.0F, 0.0F, 1.0F, 1.0F);
 		assertEquals(5.5F / 6.0F, identity[1], 0.000001F);
 
 		float[] quarterTurn = RustGalPanoramaRenderer.cubeUv(
 			new Matrix4f().rotationY((float)(Math.PI * 0.5)), 0.0F, 0.0F, 1.0F, 1.0F
 		);
-		assertEquals(1.5F / 6.0F, quarterTurn[1], 0.000001F);
+		assertEquals(0.5F / 6.0F, quarterTurn[1], 0.000001F,
+			"Frozen panorama.vsh applies transpose(mat3(ModelViewMat)) before the shared face selector");
+	}
+
+	@Test
+	void panoramaUsesDedicatedNoCullNoDepthSemanticMaterial() throws Exception {
+		String source = Files.readString(Path.of("src/main/java/net/vulkanic/gui/RustGalPanoramaRenderer.java"));
+		assertTrue(source.contains("GUI_PANORAMA.order(), 0, VulkanicGalBridge.GUI_MESH_MATERIAL_PANORAMA, 1"),
+			"Frozen's panorama pipeline has no culling or depth test, so it must not use the generic opaque-item material");
+	}
+
+	@Test
+	void regularBlitRepeatIntervalsSplitIntoBoundedUnitUvs() {
+		List<float[]> segments = RustGalGuiRenderer.wrappedUnitIntervalSegments(0.0F, 26.6875F);
+		assertEquals(27, segments.size(), "a 32-pixel separator stretched to 854 pixels needs bounded repeated-image segments");
+		assertEquals(0.0F, segments.getFirst()[2], 0.000001F);
+		assertEquals(1.0F, segments.getFirst()[3], 0.000001F);
+		assertEquals(0.6875F, segments.getLast()[3] - segments.getLast()[2], 0.000001F);
+	}
+
+	@Test
+	void wrappedRegularBlitsPreserveSourceLayerSchedulingAndAtomicAdmission() throws Exception {
+		String source = Files.readString(Path.of("src/main/java/net/vulkanic/gui/RustGalGuiRenderer.java"));
+		int helper = source.indexOf("private static List<RustGalGuiElementRenderState> enqueueWrappedAffineAsset(");
+		int preflight = source.indexOf("// Fully preflight all expanded records", helper);
+		int batch = source.indexOf("enqueueGuiAffineQuadRequests(\n\t\t\trequests, dynamicLayerId(dynamicLayerOrder), semanticLayerOrder", helper);
+		int stage = source.indexOf("RustGalGuiRawImageAssets.stage(asset)", batch);
+		assertTrue(helper >= 0 && preflight > helper && batch > preflight && stage > batch,
+			"a wrapped BlitRenderState must retain its source-layer order and stage its asset only after complete batched admission");
+	}
+
+	@Test
+	void tiledBlitsAlsoUseOnePreflightedSemanticBatch() throws Exception {
+		String source = Files.readString(Path.of("src/main/java/net/vulkanic/gui/RustGalGuiRenderer.java"));
+		int tiled = source.indexOf("public static List<RustGalGuiElementRenderState> tryEnqueueTiledCopiedBlit(");
+		int preflight = source.indexOf("Preflight the exact bounded request count", tiled);
+		int batch = source.indexOf("enqueueGuiAffineQuadRequests(\n\t\t\trequests, dynamicLayerId(dynamicLayerOrder), requestLayerOrder", tiled);
+		int stage = source.indexOf("RustGalGuiRawImageAssets.stage(asset)", batch);
+		assertTrue(tiled >= 0 && preflight > tiled && batch > preflight && stage > batch,
+			"all repeated tiled-image pieces must be admitted before their Rust-owned image is staged");
 	}
 
 	@Test
@@ -29,9 +104,54 @@ class RustGalGuiRendererTest {
 		String source = Files.readString(Path.of("src/main/java/net/vulkanic/gui/RustGalPanoramaRenderer.java"));
 		int method = source.indexOf("public static boolean enqueue(");
 		int guard = source.indexOf("Float.isFinite(pitchDegrees)", method);
-		int mesh = source.indexOf("new ArrayList", method);
+		int mesh = source.indexOf("List.of(", method);
 		assertTrue(method >= 0 && guard > method && mesh > guard,
 			"Rust panorama admission must reject non-finite camera inputs before semantic mesh construction");
+	}
+
+	@Test
+	void panoramaUsesFrozenFullscreenTriangleCameraRaysRatherThanATessellatedApproximation() throws Exception {
+		String source = Files.readString(Path.of("src/main/java/net/vulkanic/gui/RustGalPanoramaRenderer.java"));
+		assertTrue(source.contains("List.of(0, 1, 2)"));
+		assertTrue(source.contains("panoramaVertex(") && source.contains("cubeRay("));
+		assertTrue(source.contains("new float[] {0.0F, 0.0F}, new float[] {ray[1], ray[2]}"),
+			"the Rust mesh ABI consumes local UVs, so panorama ray Y/Z must not be placed in diagnostic atlas UVs");
+		assertFalse(source.contains("private static final int GRID"),
+			"camera rays must replace per-frame panorama tessellation");
+	}
+
+	@Test
+	void panoramaAttachesItsSemanticTokenToTheActiveGuiRenderStateBeforeStagingAssets() throws Exception {
+		String source = Files.readString(Path.of("src/main/java/net/vulkanic/gui/RustGalPanoramaRenderer.java"));
+		int enqueue = source.indexOf("enqueueGuiMeshItemRequest(");
+		int attach = source.indexOf("renderState.submitGuiElement(new RustGalGuiElementRenderState(", enqueue);
+		int stage = source.indexOf("RustGalGuiRawImageAssets.stageCubeMap(image)", attach);
+		assertTrue(enqueue >= 0 && attach > enqueue && stage > attach,
+			"a panorama request must enter the current GuiRenderState so whole-frame Vulkan consumes it exactly once per frame");
+
+		String callsite = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/PanoramaRenderer.java"));
+		assertTrue(callsite.contains("i, j, guiGraphics.guiRenderState"),
+			"the title-screen callsite must provide its active GuiRenderState to panorama admission");
+	}
+
+	@Test
+	void wholeFrameVulkanRetiresCopiedGuiStateAfterSubmission() throws Exception {
+		String source = Files.readString(Path.of("src/main/java/net/vulkanic/gui/RustGalFrameCoordinator.java"));
+		int execute = source.indexOf("executeFrameBatches(window, requests, true");
+		int reset = source.indexOf("renderState.reset();", execute);
+		int capture = source.indexOf("DeterministicCameraCapture.afterRender", reset);
+		assertTrue(execute >= 0 && reset > execute && capture > reset,
+			"whole-frame Vulkan must reset copied GUI semantic state after execution and before the next capture boundary");
+	}
+
+	@Test
+	void guiRenderStateResetClearsFrameLocalBoundsNavigation() throws Exception {
+		String source = Files.readString(Path.of("src/main/java/net/minecraft/client/gui/render/state/GuiRenderState.java"));
+		int reset = source.indexOf("public void reset()");
+		int bounds = source.indexOf("this.lastElementBounds = null;", reset);
+		int next = source.indexOf("this.nextStratum();", bounds);
+		assertTrue(reset >= 0 && bounds > reset && next > bounds,
+			"reset must discard the prior frame's bounds before creating the new semantic stratum");
 	}
 
 	@Test
@@ -213,11 +333,59 @@ class RustGalGuiRendererTest {
 		String source = Files.readString(Path.of(
 			"src/main/java/net/vulkanic/gui/RustGalGuiRenderer.java"));
 		int method = source.indexOf("public static List<RustGalGuiElementRenderState> tryEnqueueVoxelMapMask");
-		int scale = source.indexOf("float sourceScale = 256.0F / radius / mapScale;", method);
-		int guard = source.indexOf("!Float.isFinite(sourceScale)", scale);
+		int scale = source.indexOf("float sourceScale = sourceWidth * 0.5F / radius;", method);
+		int guard = source.indexOf("!Float.isFinite(radius * mapScale)", method);
+		int derivedGuard = source.indexOf("!Float.isFinite(sourceScale)", scale);
 		int mesh = source.indexOf("List<VulkanicGalBridge.GuiMeshVertexRecord>", scale);
-		assertTrue(method >= 0 && scale > method && guard > scale && mesh > guard,
+		assertTrue(method >= 0 && scale > method && guard > method && derivedGuard > scale && mesh > derivedGuard,
 			"VoxelMap semantic admission must reject derived UV-scale overflow before mesh construction");
+	}
+
+	@Test
+	void voxelMapMeshUsesOneGuardedTranslationIntoItsCompactTarget() throws Exception {
+		String source = Files.readString(Path.of(
+			"src/main/java/net/vulkanic/gui/RustGalGuiRenderer.java"));
+		int method = source.indexOf("public static List<RustGalGuiElementRenderState> tryEnqueueVoxelMapMask");
+		int translation = source.indexOf("position[0] -= left - 1.0F", method);
+		int batch = source.indexOf("size + 2, size + 2, 1, 0, 0, 0, 0, 0, localVertices, indices", method);
+		assertTrue(method >= 0 && translation > method && batch > translation,
+			"VoxelMap mesh vertices must be translated once into the guarded compact Rust target");
+	}
+
+	@Test
+	void voxelMapMeshUsesVulkanFrontFacingGuiWinding() throws Exception {
+		String source = Files.readString(Path.of(
+			"src/main/java/net/vulkanic/gui/RustGalGuiRenderer.java"));
+		int method = source.indexOf("public static List<RustGalGuiElementRenderState> tryEnqueueVoxelMapMask");
+		int clockwise = source.indexOf(
+			"float[][] corners = {{left, top}, {right, top}, {right, bottom}, {left, bottom}};",
+			method);
+		assertTrue(method >= 0 && clockwise > method,
+			"VoxelMap semantic quads must use clockwise top-left GUI winding so the Vulkan GUI Y reflection keeps them front-facing");
+	}
+
+	@Test
+	void voxelMapFrameResourceRetainsTransparentCenter() throws Exception {
+		try (var stream = RustGalGuiRendererTest.class.getResourceAsStream("/assets/voxelmap/images/squaremap.png")) {
+			assertTrue(stream != null);
+			var image = javax.imageio.ImageIO.read(stream);
+			assertEquals(256, image.getWidth());
+			assertEquals(256, image.getHeight());
+			assertEquals(0, (image.getRGB(128, 128) >>> 24) & 0xff);
+			assertEquals(255, (image.getRGB(10, 128) >>> 24) & 0xff);
+		}
+	}
+
+	@Test
+	void voxelMapOverlaySubmitsItsSemanticMeshElementsToGuiState() throws Exception {
+		String source = Files.readString(Path.of("src/main/java/net/voxelmap/Map.java"));
+		int method = source.indexOf("public boolean renderRustSemanticOverlay");
+		int helper = source.indexOf("drawContext.submitRustVoxelMapMask(", method);
+		String graphics = Files.readString(Path.of("src/main/java/net/minecraft/client/gui/GuiGraphics.java"));
+		int submit = graphics.indexOf("this.guiRenderState.submitGuiElement(element)",
+			graphics.indexOf("submitRustVoxelMapMask("));
+		assertTrue(method >= 0 && helper > method && submit >= 0,
+			"VoxelMap must use the GuiGraphics semantic helper that attaches mesh tokens to GuiRenderState");
 	}
 
 	@Test
@@ -631,6 +799,17 @@ class RustGalGuiRendererTest {
 	}
 
 	@Test
+	void panoramaFaceResolutionRetainsBoundedVanillaClasspathFallback() throws Exception {
+		String source = Files.readString(Path.of("src/main/java/net/vulkanic/gui/RustGalGuiRawImageAssets.java"));
+		int method = source.indexOf("private static Asset resolveCubeFace");
+		int nextMethod = source.indexOf("\n\t/**", method + 1);
+		String body = source.substring(method, nextMethod < 0 ? source.length() : nextMethod);
+		assertTrue(body.contains("getResourceAsStream(classpathName)"));
+		assertTrue(body.contains("\"minecraft\".equals(source.getNamespace())"));
+		assertTrue(body.contains("MAX_DECODED_PIXELS / 6"));
+	}
+
+	@Test
 	void guiRawImageInvalidationPublishesAnEmptyReplacementGeneration() throws Exception {
 		String assets = Files.readString(Path.of(
 			"src/main/java/net/vulkanic/gui/RustGalGuiRawImageAssets.java"));
@@ -755,9 +934,49 @@ class RustGalGuiRendererTest {
 			"the chunk-status grid must admit the borrowed OpenGL route through Rust semantic rendering");
 		assertTrue(renderer.contains("currentExecutionRoute() == GuiExecutionRoute.RUST_OPENGL_BORROWED_CONTEXT")
 			&& renderer.contains("enqueueGuiAffineQuadRequests(")
-			&& renderer.contains("ARGB.opaque(colors[column * gridSize + row])")
+			&& renderer.contains("ARGB.opaque(colors[row * gridSize + column])")
 			&& renderer.contains("SOLID_WHITE_ASSET_ID"),
-			"borrowed OpenGL loading grids must preserve every semantic status color through the Rust affine path rather than an unavailable storage-buffer mesh shader or an opaque image shortcut");
+			"borrowed OpenGL loading grids must preserve row-major semantic status colors through the Rust affine path rather than an unavailable storage-buffer mesh shader or an opaque image shortcut");
+	}
+
+	@Test
+	void loadingGridPackedImageHasABoundedEdgeBeforeAllocation() throws Exception {
+		String renderer = Files.readString(Path.of(
+			"src/main/java/net/vulkanic/gui/RustGalGuiRenderer.java"));
+		int bound = renderer.indexOf("MAX_LOADING_GRID_TEXTURE_EDGE");
+		int extent = renderer.indexOf("extent > MAX_LOADING_GRID_TEXTURE_EDGE", bound);
+		int allocation = renderer.indexOf("new byte[Math.multiplyExact(Math.multiplyExact(imageWidth, imageHeight), 4)]", extent);
+		assertTrue(bound >= 0 && extent > bound && allocation > extent,
+			"loading-grid packed images must reject oversized extents before allocating RGBA storage");
+	}
+
+	@Test
+	void loadingGridResidencyIsInvalidatedWithGuiFrontendLifecycle() throws Exception {
+		String renderer = Files.readString(Path.of(
+			"src/main/java/net/vulkanic/gui/RustGalGuiRenderer.java"));
+		String coordinator = Files.readString(Path.of(
+			"src/main/java/net/vulkanic/gui/RustGalFrameCoordinator.java"));
+		int invalidator = renderer.indexOf("public static void invalidateLoadingGridAsset()");
+		int residentReset = renderer.indexOf("loadingGridAssetResident = false", invalidator);
+		int reload = coordinator.indexOf("public static void reload(ResourceManager resourceManager)");
+		int reloadCall = coordinator.indexOf("RustGalGuiRenderer.invalidateLoadingGridAsset();", reload);
+		int shutdown = coordinator.indexOf("public static void shutdown()");
+		int shutdownCall = coordinator.indexOf("RustGalGuiRenderer.invalidateLoadingGridAsset();", shutdown);
+		assertTrue(invalidator >= 0 && residentReset > invalidator
+			&& reloadCall > reload && shutdownCall > shutdown,
+			"loading-grid residency must be invalidated whenever the Rust GUI frontend is rebuilt");
+	}
+
+	@Test
+	void loadingGridContentChangesStageOnTheFirstChangedFrame() throws Exception {
+		String renderer = Files.readString(Path.of(
+			"src/main/java/net/vulkanic/gui/RustGalGuiRenderer.java"));
+		int resident = renderer.indexOf("if (!loadingGridAssetResident || loadingGridAssetHash != assetHash");
+		assertTrue(resident >= 0,
+			"loading-grid content changes must invalidate the packed asset immediately");
+		assertTrue(!renderer.substring(resident, Math.min(renderer.length(), resident + 240))
+			.contains("framesSinceUpload >= 120"),
+			"loading-grid status updates must not wait an arbitrary 120-frame delay");
 	}
 
 	@Test

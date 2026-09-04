@@ -113,16 +113,19 @@ impl ShaderPackShadowPolicy {
         }
         let model_view = if scope == TerrainProgramScope::End && self.supports_end_flash {
             let angles = end_flash_angles.ok_or_else(|| {
-                GalError::unsupported_feature(
-                    "End shadow support requires copied End flash angles",
-                )
+                GalError::unsupported_feature("End shadow support requires copied End flash angles")
             })?;
             if angles.iter().any(|value| !value.is_finite()) {
                 return Err(GalError::invalid_argument(
                     "End flash shadow angles must be finite",
                 ));
             }
-            end_shadow_model_view(angles[0], angles[1], self.interval_size, camera_world_position)
+            end_shadow_model_view(
+                angles[0],
+                angles[1],
+                self.interval_size,
+                camera_world_position,
+            )
         } else {
             let sun_angle = source_sun_angle(time_of_day);
             let shadow_angle = if sun_angle <= 0.5 {
@@ -180,9 +183,16 @@ fn source_bool_property(source: &ShaderPackSource, key: &str) -> GalResult<Optio
     };
     let mut result = None;
     for (line_number, raw_line) in properties.lines().enumerate() {
-        let line = raw_line.split_once('#').map_or(raw_line, |(code, _)| code).trim();
-        let Some((name, value)) = line.split_once('=') else { continue; };
-        if name.trim() != key { continue; }
+        let line = raw_line
+            .split_once('#')
+            .map_or(raw_line, |(code, _)| code)
+            .trim();
+        let Some((name, value)) = line.split_once('=') else {
+            continue;
+        };
+        if name.trim() != key {
+            continue;
+        }
         if result.is_some() {
             return Err(GalError::invalid_argument(format!(
                 "shaders.properties declares {key} more than once"
@@ -191,10 +201,12 @@ fn source_bool_property(source: &ShaderPackSource, key: &str) -> GalResult<Optio
         result = Some(match value.trim() {
             "true" => true,
             "false" => false,
-            other => return Err(GalError::invalid_argument(format!(
-                "shaders.properties {key} line {} must be true or false, got {other}",
-                line_number + 1
-            ))),
+            other => {
+                return Err(GalError::invalid_argument(format!(
+                    "shaders.properties {key} line {} must be true or false, got {other}",
+                    line_number + 1
+                )))
+            }
         });
     }
     Ok(result)
@@ -345,8 +357,7 @@ fn rotation_z(degrees: f32) -> [f32; 16] {
 fn rotation_y(degrees: f32) -> [f32; 16] {
     let (sine, cosine) = degrees.to_radians().sin_cos();
     [
-        cosine, 0.0, -sine, 0.0, 0.0, 1.0, 0.0, 0.0, sine, 0.0, cosine, 0.0, 0.0, 0.0, 0.0,
-        1.0,
+        cosine, 0.0, -sine, 0.0, 0.0, 1.0, 0.0, 0.0, sine, 0.0, cosine, 0.0, 0.0, 0.0, 0.0, 1.0,
     ]
 }
 

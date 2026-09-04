@@ -33,6 +33,26 @@ public class RustGalTerrainRendererLightingContractTest {
 	}
 
 	@Test
+	void preservesSodiumCompactTerrainMaterialByte() {
+		assertEquals(0b101, RustGalTerrainRenderer.decodeTerrainMaterialBits(0x0005_0000));
+		assertEquals(0xff, RustGalTerrainRenderer.decodeTerrainMaterialBits(0x00ff_0000));
+		assertEquals(0, RustGalTerrainRenderer.decodeTerrainMaterialBits(0xff00_0000));
+	}
+
+	@Test
+	void shaderPackDepthFarUsesEffectiveRenderDistanceScalar() {
+		String source;
+		try {
+			source = Files.readString(Path.of(
+				"src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+		} catch (java.io.IOException error) {
+			throw new AssertionError("unable to read Rust world renderer source", error);
+		}
+		assertTrue(source.contains("shaderPackDepthFarForRenderDistance("));
+		assertTrue(source.contains("Math.max(1.0F, effectiveRenderDistance * 16.0F)"));
+	}
+
+	@Test
 	public void compactTerrainColorConvertsSodiumAbgrToSemanticArgb() {
 		int compactAbgr = 0x80402010;
 
@@ -54,6 +74,39 @@ public class RustGalTerrainRendererLightingContractTest {
 	}
 
 	@Test
+	void rustWholeFrameCompactTerrainUsesFrozenBakedColorContract() throws Exception {
+		String sectionManager = Files.readString(Path.of(
+			"src/main/java/net/sodium/client/render/chunk/RenderSectionManager.java"
+		));
+		String wholeFrameSource = Files.readString(Path.of(
+			"src/main/java/net/vulkanic/world/RustGalWholeFrameTerrainSource.java"
+		));
+		String terrainRenderer = Files.readString(Path.of(
+			"src/main/java/net/vulkanic/world/RustGalTerrainRenderer.java"
+		));
+
+		int rustOwnedBuilder = sectionManager.indexOf("this.builder = rustVulkanOwned");
+		assertTrue(rustOwnedBuilder >= 0);
+		int builderEnd = sectionManager.indexOf(": new ChunkBuilder(level, vertexType);", rustOwnedBuilder);
+		String builderBranch = sectionManager.substring(rustOwnedBuilder, builderEnd);
+		assertTrue(builderBranch.contains("new ChunkBuilder(level, vertexType, false, 1)"),
+			"the direct vanilla Rust route must bake AO and directional face shade into compact RGB");
+		assertTrue(!builderBranch.contains("new ChunkBuilder(level, vertexType, true, 1)"));
+		assertTrue(wholeFrameSource.contains(
+			"new ChunkBuilder(level, ChunkMeshFormats.COMPACT, false, semanticMeshWorkerCount())"
+		), "the independent Rust whole-frame terrain producer must use the same baked-RGB compact contract");
+		assertTrue(!wholeFrameSource.contains(
+			"new ChunkBuilder(level, ChunkMeshFormats.COMPACT, true, semanticMeshWorkerCount())"
+		), "separate-AO compact meshes are incompatible with the direct vanilla Rust terrain consumer");
+
+		int compactLayout = terrainRenderer.indexOf("private static TerrainMeshLayout compact()");
+		assertTrue(compactLayout >= 0);
+		String compactLayoutBody = terrainRenderer.substring(compactLayout,
+			terrainRenderer.indexOf("private static TerrainMeshLayout activeIrisCompatible()", compactLayout));
+		assertTrue(compactLayoutBody.contains("new TerrainMeshLayout(COMPACT_PREFIX_STRIDE, false, 0, 0)"));
+	}
+
+	@Test
 	void wholeFrameTerrainSnapshotDeduplicatesCanonicalSectionPositions() {
 		RenderSection built = new RenderSection(null, 3, 4, 5);
 		built.setInfo(BuiltSectionInfo.EMPTY);
@@ -71,6 +124,20 @@ public class RustGalTerrainRendererLightingContractTest {
 	}
 
 	@Test
+	void wholeFrameTerrainSnapshotRejectsMoreThanRustResidencyBound() {
+		List<RenderSection> sections = new ArrayList<>(4097);
+		for (int index = 0; index < 4097; index++) {
+			RenderSection section = new RenderSection(null, index, 0, 0);
+			section.setInfo(BuiltSectionInfo.EMPTY);
+			sections.add(section);
+		}
+
+		assertThrows(IllegalStateException.class,
+			() -> RustGalTerrainRenderer.snapshotBuiltTerrainSections(sections),
+			"semantic terrain extraction must fail closed before exceeding Rust section residency");
+	}
+
+	@Test
 	public void compactTerrainAtlasCoordinatesRemainTopOriginForCopiedAtlas() {
 		int copiedAtlasV = Math.round(0.710938F * (1 << 15));
 		float decoded = RustGalTerrainRenderer.decodeTexture(copiedAtlasV);
@@ -78,6 +145,19 @@ public class RustGalTerrainRendererLightingContractTest {
 		assertEquals(0.710938F, decoded, 1.0F / (1 << 15));
 		assertTrue(Math.abs(decoded - (1.0F - 0.710938F)) > 0.2F,
 			"a vertically mirrored compact V coordinate selects an unrelated copied-atlas row");
+	}
+
+	@Test
+	public void compactTerrainAtlasCoordinatesPreserveSodiumSubTexelDirection() {
+		int atlasExtent = 1024;
+		int lowDirection = 16_384;
+		int highDirection = lowDirection | 0x8000;
+		float shrink = (1.0F / (1 << 15)) - (1.0F / (atlasExtent * 256.0F));
+
+		assertEquals(RustGalTerrainRenderer.decodeTexture(lowDirection) - shrink,
+			RustGalTerrainRenderer.decodeTextureForCopiedAtlas(lowDirection, atlasExtent), 1.0e-7F);
+		assertEquals(RustGalTerrainRenderer.decodeTexture(highDirection) + shrink,
+			RustGalTerrainRenderer.decodeTextureForCopiedAtlas(highDirection, atlasExtent), 1.0e-7F);
 	}
 
 	@Test
@@ -89,7 +169,10 @@ public class RustGalTerrainRendererLightingContractTest {
 		int nextMethod = source.indexOf("\n\tprivate static FluidSpriteAsset buildFluidSpriteAsset", method + 1);
 		String body = source.substring(method, nextMethod < 0 ? source.length() : nextMethod);
 		assertTrue(body.contains("semanticRawSnapshot()"));
+		assertTrue(body.contains("semanticSnapshotFrameKey()"));
 		assertTrue(body.contains("copiedAtlasSemanticGeneration == semanticGeneration"));
+		assertTrue(body.contains("copiedAtlasSemanticFrameKey == semanticFrameKey"));
+		assertTrue(body.contains("snapshotFrameKey"));
 		int copySprite = source.indexOf("private static void copySprite");
 		String copyBody = source.substring(copySprite, source.indexOf("\n\tprivate static long rgbaHash", copySprite));
 		assertTrue(copyBody.contains("contents.semanticFrameIndex()"));
@@ -120,11 +203,14 @@ public class RustGalTerrainRendererLightingContractTest {
 		String source = java.nio.file.Files.readString(java.nio.file.Path.of(
 			"src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"
 		));
-		int method = source.indexOf("private static FogParameters shaderPackFogParameters()");
+		int method = source.indexOf("private static FogRenderer.RustFogParameters shaderPackFogParameters(ClientLevel level, Camera camera)");
+		assertTrue(method >= 0, "the semantic fog bridge must remain a private Rust-owned record builder");
 		int nextMethod = source.indexOf("\n\tprivate static", method + 1);
 		String body = source.substring(method, nextMethod < 0 ? source.length() : nextMethod);
 
-		assertTrue(body.contains("gameRenderer.fogRenderer.sodium$getFogParameters()"));
+		assertTrue(body.contains("collectFogParametersForRust("));
+		assertTrue(body.contains("getDeltaTracker()"));
+		assertTrue(!body.contains("sodium$getFogParameters()"));
 		assertTrue(!body.contains("instanceof FogStorage"));
 	}
 
@@ -139,7 +225,74 @@ public class RustGalTerrainRendererLightingContractTest {
 
 		assertTrue(body.contains("DhApi.Delayed.configs.graphics().chunkRenderDistance().getValue() * 16"));
 		assertTrue(body.contains("options.getEffectiveRenderDistance() * 16"));
+		assertTrue(body.contains("Math.max(vanillaRenderDistance, distantHorizonsRenderDistance)"));
 		assertTrue(!source.contains("DHCompat.getRenderDistance()"));
+	}
+
+	@Test
+	public void visibleTerrainDoesNotClassifyPendingRustUploadsAsStaleGenerations() throws Exception {
+		String source = Files.readString(Path.of(
+			"src/main/java/net/vulkanic/world/RustGalTerrainRenderer.java"
+		));
+		int enqueue = source.indexOf("private static boolean enqueueSectionLayer");
+		int submission = source.indexOf("boolean submitted = RustGalWorldPrimitiveRenderer.enqueueStaticTerrainMeshInstance", enqueue);
+		assertTrue(enqueue >= 0 && submission > enqueue);
+		String body = source.substring(enqueue, submission);
+		assertTrue(body.contains("isStaticTerrainMeshGenerationUploaded"));
+		assertTrue(body.contains("asset-upload-pending"));
+		assertTrue(body.contains("!\"stale-generation\".equals(activeFault())"));
+	}
+
+	@Test
+	public void staticTerrainPreservesFrozenSodiumBackFaceCullingContract() throws Exception {
+		String source = Files.readString(Path.of(
+			"src/main/java/net/vulkanic/world/RustGalTerrainRenderer.java"
+		));
+		int enqueue = source.indexOf("private static boolean enqueueSectionLayer");
+		int submission = source.indexOf("boolean submitted = RustGalWorldPrimitiveRenderer.enqueueStaticTerrainMeshInstance", enqueue);
+		assertTrue(enqueue >= 0 && submission > enqueue);
+		String setup = source.substring(enqueue, submission + 900);
+		assertTrue(setup.contains("RustGalWorldPrimitiveRenderer.CULL_BACK"),
+				"Frozen Sodium terrain pipelines retain their default back-face culling for every terrain layer");
+		assertTrue(!setup.contains("RustGalWorldPrimitiveRenderer.CULL_NONE"),
+				"the semantic terrain route must not accumulate both sides of copied glass or fluid faces");
+
+		int assetBuild = source.indexOf("new VulkanicGalBridge.WorldMeshSectionRecord(");
+		assertTrue(assetBuild >= 0);
+		String firstAssetSection = source.substring(assetBuild, source.indexOf(");", assetBuild) + 2);
+		assertTrue(firstAssetSection.contains("RustGalWorldPrimitiveRenderer.CULL_BACK"));
+	}
+
+	@Test
+	public void staticTerrainDecoderEmitsOneCompleteIndexRangePerVertexSegment() throws Exception {
+		String source = Files.readString(Path.of(
+			"src/main/java/net/vulkanic/world/RustGalTerrainRenderer.java"
+		));
+		int decoder = source.indexOf("private static TerrainSectionAsset decodeMesh(");
+		int finish = source.indexOf("if (cursor != vertexCount)", decoder);
+		assertTrue(decoder >= 0 && finish > decoder);
+		String body = source.substring(decoder, finish);
+		int quadLoop = body.indexOf("for (int quadBase = cursor");
+		int sectionRecord = body.indexOf("sections.add(new VulkanicGalBridge.WorldMeshSectionRecord", quadLoop);
+		int cursorAdvance = body.indexOf("cursor += segmentVertexCount", quadLoop);
+		assertTrue(quadLoop >= 0 && sectionRecord > quadLoop && cursorAdvance > sectionRecord,
+			"all quads in a segment must be indexed before its one material range and cursor advance");
+		assertEquals(cursorAdvance, body.lastIndexOf("cursor += segmentVertexCount"),
+			"the segment cursor must advance once, not once per quad");
+	}
+
+	@Test
+	public void uploadedTerrainCanEnqueueAfterCpuPayloadRelease() throws Exception {
+		String source = Files.readString(Path.of(
+			"src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"
+		));
+		int method = source.indexOf("public static boolean enqueueStaticTerrainMeshInstance(");
+		int lock = source.indexOf("synchronized (LOCK)", method);
+		int validation = source.indexOf("boolean generationMatches", lock);
+		assertTrue(method >= 0 && lock > method && validation > lock);
+		String body = source.substring(lock, source.indexOf("if (!generationMatches)", validation));
+		assertTrue(body.contains("STATIC_TERRAIN_MESH_RESIDENCY.get(meshKey)"));
+		assertTrue(body.contains("residency.meshGeneration() == meshGeneration"));
 	}
 
 	@Test
@@ -156,6 +309,7 @@ public class RustGalTerrainRendererLightingContractTest {
 				0.0F,
 				-1,
 				-1,
+				0,
 				0xffffffff,
 				0,
 				0,
@@ -189,7 +343,7 @@ public class RustGalTerrainRendererLightingContractTest {
 			VulkanicGalBridge.WorldMeshVertexRecord vertex = vertices.get(index);
 			vertices.set(index, new VulkanicGalBridge.WorldMeshVertexRecord(
 				vertex.x(), vertex.y(), vertex.z(), vertex.u(), vertex.v(), vertex.atlasU(), vertex.atlasV(),
-				32000, vertex.shaderMaterialType(), vertex.colorArgb(), vertex.normalPacked(), vertex.light(), vertex.midBlockPacked()
+				32000, vertex.shaderMaterialType(), vertex.terrainMaterialBits(), vertex.colorArgb(), vertex.normalPacked(), vertex.light(), vertex.midBlockPacked()
 			));
 		}
 
@@ -211,7 +365,7 @@ public class RustGalTerrainRendererLightingContractTest {
 			VulkanicGalBridge.WorldMeshVertexRecord vertex = vertices.get(index);
 			vertices.set(index, new VulkanicGalBridge.WorldMeshVertexRecord(
 				vertex.x(), vertex.y(), vertex.z(), vertex.u(), vertex.v(), vertex.atlasU(), vertex.atlasV(),
-				32000, 2, vertex.colorArgb(), vertex.normalPacked(), vertex.light(), vertex.midBlockPacked()
+				32000, 2, vertex.terrainMaterialBits(), vertex.colorArgb(), vertex.normalPacked(), vertex.light(), vertex.midBlockPacked()
 			));
 		}
 
@@ -387,6 +541,32 @@ public class RustGalTerrainRendererLightingContractTest {
 	}
 
 	@Test
+	void unchangedTerrainTexturePayloadsDoNotRemainDirtyAfterEveryMeshRegistration() throws Exception {
+		String source = Files.readString(Path.of(
+			"src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+		int method = source.indexOf("public static void registerStaticTerrainMeshAsset(");
+		int textureLoop = source.indexOf("for (VulkanicGalBridge.WorldMeshTextureAssetRecord texture : textures)", method);
+		int previous = source.indexOf("previousTexture", textureLoop);
+		int compare = source.indexOf("Arrays.equals(previousTexture.pngBytes(), texture.pngBytes())", previous);
+		int dirty = source.indexOf("DIRTY_WORLD_MESH_TEXTURES.add(texture.textureId())", compare);
+		assertTrue(method >= 0 && textureLoop > method && previous > textureLoop
+			&& compare > previous && dirty > compare,
+			"unchanged static-terrain texture payloads must not be re-dirtied every frame");
+	}
+
+	@Test
+	void unchangedTerrainMeshPayloadsDoNotAdvanceUploadGeneration() throws Exception {
+		String source = Files.readString(Path.of(
+			"src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+		int method = source.indexOf("public static void registerStaticTerrainMeshAsset(");
+		int residency = source.indexOf("STATIC_TERRAIN_MESH_RESIDENCY.put", method);
+		int helper = source.indexOf("sameStaticTerrainPayload(previous, asset)", residency);
+		int definition = source.indexOf("private static boolean sameStaticTerrainPayload(");
+		assertTrue(method >= 0 && residency > method && helper > residency && definition > helper,
+			"payload-equivalent terrain rebuilds must retain the existing uploaded generation");
+	}
+
+	@Test
 	void staleInvalidatedTerrainSectionsLeaveTheReadinessDomain() throws Exception {
 		String source = Files.readString(Path.of(
 			"src/main/java/net/vulkanic/world/RustGalWholeFrameTerrainSource.java"));
@@ -447,6 +627,7 @@ public class RustGalTerrainRendererLightingContractTest {
 			v,
 			u,
 			v,
+			0,
 			0,
 			0,
 			0xffffffff,

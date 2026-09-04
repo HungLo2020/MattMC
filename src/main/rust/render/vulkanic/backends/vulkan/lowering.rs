@@ -27,6 +27,9 @@ pub(super) struct VulkanLoweringMetrics {
     pub(super) timeline_poll_nanos: u64,
     pub(super) timeline_wait_nanos: u64,
     pub(super) device_wait_idle_nanos: u64,
+    // Cumulative ownership events, not native VkCommandBuffer destruction:
+    // retirement returns buffers to the bounded recycle pool and the pool is
+    // destroyed only when the lowerer shuts down.
     pub(super) command_buffers_allocated: u64,
     pub(super) command_buffers_freed: u64,
     pub(super) wait_count: u64,
@@ -60,6 +63,9 @@ const GPU_TIMESTAMP_QUERIES_PER_SET: u32 = 16;
 // Whole-frame submissions are independent of swapchain acquire/present
 // slots, so bound their native command-buffer window explicitly.
 const MAX_IN_FLIGHT_SUBMISSIONS: usize = 8;
+// Host readbacks are diagnostic payloads. Retain only a bounded recent window
+// so full-frame attachment captures cannot grow process memory linearly.
+const MAX_COMPLETED_HOST_READ_BYTES: usize = 64 * 1024 * 1024;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum GpuTimestampQuery {
@@ -198,7 +204,9 @@ impl SubmissionLowerer {
                 state.pipeline_layout = None;
                 let command_buffer = self.allocate_command_buffer()?;
                 if !self.live_command_buffers.insert(command_buffer) {
-                    return Err(GalError::backend("Vulkan allocated a duplicate live command buffer"));
+                    return Err(GalError::backend(
+                        "Vulkan allocated a duplicate live command buffer",
+                    ));
                 }
                 command_buffers.push(command_buffer);
                 self.metrics.command_buffers_allocated += 1;
@@ -255,9 +263,17 @@ impl SubmissionLowerer {
                         )
                     };
                     for op in &list.operations {
-                        stdout_trace(&format!("vulkan.encode.begin cb=0x{:016x} op={}", command_buffer.as_raw(), command_op_kind(op)));
+                        stdout_trace(&format!(
+                            "vulkan.encode.begin cb=0x{:016x} op={}",
+                            command_buffer.as_raw(),
+                            command_op_kind(op)
+                        ));
                         self.encode_op(objects, command_buffer, &mut state, op)?;
-                        stdout_trace(&format!("vulkan.encode.end cb=0x{:016x} op={}", command_buffer.as_raw(), command_op_kind(op)));
+                        stdout_trace(&format!(
+                            "vulkan.encode.end cb=0x{:016x} op={}",
+                            command_buffer.as_raw(),
+                            command_op_kind(op)
+                        ));
                     }
                     unsafe { self.context.end_label(command_buffer) };
                 }
@@ -371,7 +387,9 @@ impl SubmissionLowerer {
                 .metrics
                 .command_buffers_freed
                 .saturating_add(command_buffer_count);
-            return Err(GalError::backend(String::from_utf8_lossy(&failure_bytes).into_owned()));
+            return Err(GalError::backend(
+                String::from_utf8_lossy(&failure_bytes).into_owned(),
+            ));
         }
         self.in_flight.push_back(InFlightSubmission {
             id,
@@ -492,9 +510,10 @@ impl SubmissionLowerer {
         }
         if !self.recycled_command_buffers.is_empty() {
             unsafe {
-                self.context
-                    .device
-                    .free_command_buffers(self.context.command_pool, &self.recycled_command_buffers);
+                self.context.device.free_command_buffers(
+                    self.context.command_pool,
+                    &self.recycled_command_buffers,
+                );
             }
             self.recycled_command_buffers.clear();
         }
@@ -626,7 +645,9 @@ impl SubmissionLowerer {
         }
         for command_buffer in command_buffers {
             if !self.live_command_buffers.remove(command_buffer) {
-                return Err(GalError::backend("Vulkan command buffer retired more than once or was never owned"));
+                return Err(GalError::backend(
+                    "Vulkan command buffer retired more than once or was never owned",
+                ));
             }
         }
         for command_buffer in command_buffers {
@@ -660,7 +681,12 @@ impl SubmissionLowerer {
                     colors,
                     depth_stencil,
                 } => {
-                    stdout_trace(&format!("vulkan.begin-pass target=0x{:016x} colors={} depth={}", target.raw(), colors.len(), depth_stencil.is_some()));
+                    stdout_trace(&format!(
+                        "vulkan.begin-pass target=0x{:016x} colors={} depth={}",
+                        target.raw(),
+                        colors.len(),
+                        depth_stencil.is_some()
+                    ));
                     let pass_object = objects.render_pass(*pass)?;
                     let timestamp_pass = timestamp_pass_kind(&pass_object.label);
                     if let Some(pass_kind) = timestamp_pass {
@@ -896,7 +922,7 @@ impl SubmissionLowerer {
                     self.context.device.cmd_bind_pipeline(
                         command_buffer,
                         vk::PipelineBindPoint::GRAPHICS,
-                        pipeline.pipeline,
+                        pipeline.pipeline.pipeline,
                     );
                     if let Some(pipeline_timestamp_pass) = timestamp_pipeline_kind(&pipeline.label)
                     {
@@ -1343,8 +1369,10 @@ impl SubmissionLowerer {
                 }
                 CommandOp::Barrier(barrier) => {
                     let _zone = trace::Zone::new("vulkan.lowering.barrier");
-                    if barrier.resource.kind() == Some(crate::render::vulkanic::handles::HandleKind::Texture)
-                        || barrier.resource.kind() == Some(crate::render::vulkanic::handles::HandleKind::TextureView)
+                    if barrier.resource.kind()
+                        == Some(crate::render::vulkanic::handles::HandleKind::Texture)
+                        || barrier.resource.kind()
+                            == Some(crate::render::vulkanic::handles::HandleKind::TextureView)
                     {
                         let (texture_handle, view_range) = if barrier.resource.kind()
                             == Some(crate::render::vulkanic::handles::HandleKind::TextureView)
@@ -1582,6 +1610,24 @@ impl SubmissionLowerer {
                     bytes: error.to_string().into_bytes(),
                 }),
             }
+        }
+        self.prune_completed_host_reads(complete.id);
+    }
+
+    fn prune_completed_host_reads(&mut self, newest_submission: SubmissionId) {
+        let mut bytes = 0usize;
+        let mut keep_from = self.completed_host_reads.len();
+        for (index, read) in self.completed_host_reads.iter().enumerate().rev() {
+            // Keep every read from the newest submission so the caller can
+            // correlate all attachments belonging to one presented frame.
+            if read.submission != newest_submission && bytes >= MAX_COMPLETED_HOST_READ_BYTES {
+                break;
+            }
+            bytes = bytes.saturating_add(read.bytes.len());
+            keep_from = index;
+        }
+        if keep_from > 0 {
+            self.completed_host_reads.drain(..keep_from);
         }
     }
 
@@ -1927,6 +1973,10 @@ mod timestamp_tests {
                 vk::ImageAspectFlags::DEPTH
             ) == vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL
         );
+        assert!(
+            image_layout_for_aspect(TextureUsageState::ShaderRead, vk::ImageAspectFlags::DEPTH)
+                == vk::ImageLayout::DEPTH_READ_ONLY_OPTIMAL
+        );
     }
 
     #[test]
@@ -2066,6 +2116,16 @@ mod timestamp_tests {
     }
 
     #[test]
+    fn shader_read_barrier_covers_graphics_uniform_loads() {
+        let stages = stage_mask(TextureUsageState::ShaderRead);
+        assert!(stages.contains(vk::PipelineStageFlags2::VERTEX_SHADER));
+        assert!(stages.contains(vk::PipelineStageFlags2::FRAGMENT_SHADER));
+        let access = access_mask(TextureUsageState::ShaderRead);
+        assert!(access.contains(vk::AccessFlags2::SHADER_SAMPLED_READ));
+        assert!(access.contains(vk::AccessFlags2::UNIFORM_READ));
+    }
+
+    #[test]
     fn mapped_host_writes_publish_to_the_transfer_consumer_stage() {
         let barrier = mapped_host_write_dependency(vk::Buffer::null(), 12, 48);
         assert!(vk::PipelineStageFlags2::HOST == barrier.src_stage_mask);
@@ -2175,6 +2235,9 @@ pub(super) fn image_layout_for_aspect(
             vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL
         }
         (TextureUsageState::ShaderRead, true) => vk::ImageLayout::DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+        (TextureUsageState::ShaderRead, false) if aspect.contains(vk::ImageAspectFlags::DEPTH) => {
+            vk::ImageLayout::DEPTH_READ_ONLY_OPTIMAL
+        }
         _ => image_layout(state),
     }
 }
@@ -2244,7 +2307,15 @@ pub(super) fn stage_mask(state: TextureUsageState) -> vk::PipelineStageFlags2 {
 pub(super) fn access_mask(state: TextureUsageState) -> vk::AccessFlags2 {
     match state {
         TextureUsageState::Undefined | TextureUsageState::Present => vk::AccessFlags2::empty(),
-        TextureUsageState::ShaderRead => vk::AccessFlags2::SHADER_SAMPLED_READ,
+        // `ShaderRead` is the backend-neutral read state used for both sampled
+        // textures and descriptor-backed uniform buffers.  A barrier that
+        // names only sampled reads does not make a preceding update visible to
+        // a graphics UBO load, which can leave a draw observing stale frame
+        // parameters.  Keep the state deliberately broad until the GAL grows
+        // separate sampled/uniform read usages.
+        TextureUsageState::ShaderRead => {
+            vk::AccessFlags2::SHADER_SAMPLED_READ | vk::AccessFlags2::UNIFORM_READ
+        }
         TextureUsageState::ShaderWrite => vk::AccessFlags2::SHADER_STORAGE_WRITE,
         TextureUsageState::ShaderStorageRead => vk::AccessFlags2::SHADER_STORAGE_READ,
         TextureUsageState::ColorAttachment => {

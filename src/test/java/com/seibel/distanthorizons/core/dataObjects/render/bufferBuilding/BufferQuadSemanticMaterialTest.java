@@ -33,6 +33,29 @@ class BufferQuadSemanticMaterialTest {
 		assertTrue(LodQuadBuilder.canMergeSemanticMaterials(false, 11, 12));
 	}
 
+	@Test
+	void contributorSpansClipIntoContiguousVerticalExactSegments() {
+		ColumnRenderSource.SemanticHorizontalContributor contributor =
+			new ColumnRenderSource.SemanticHorizontalContributor(java.util.List.of(
+				new ColumnRenderSource.SemanticMaterialSpan(0, 4, 11, (byte) 1, 10L),
+				new ColumnRenderSource.SemanticMaterialSpan(4, 8, 12, (byte) 1, 20L)));
+		var clipped = ColumnRenderBufferBuilder.clippedContributorSpans(contributor, 2, 7);
+		assertEquals(2, clipped.size());
+		assertEquals(2, clipped.get(0).minY());
+		assertEquals(4, clipped.get(0).maxY());
+		assertEquals(4, clipped.get(1).minY());
+		assertEquals(7, clipped.get(1).maxY());
+	}
+
+	@Test
+	void contributorSpanGapsRemainUnavailable() {
+		ColumnRenderSource.SemanticHorizontalContributor contributor =
+			new ColumnRenderSource.SemanticHorizontalContributor(java.util.List.of(
+				new ColumnRenderSource.SemanticMaterialSpan(0, 3, 11, (byte) 1, 10L),
+				new ColumnRenderSource.SemanticMaterialSpan(4, 8, 12, (byte) 1, 20L)));
+		assertTrue(ColumnRenderBufferBuilder.clippedContributorSpans(contributor, 0, 8).isEmpty());
+	}
+
 	private static BufferQuad quad(short x, int semanticMaterialId) {
 		return new BufferQuad(
 			x, (short) 0, (short) 0, (short) 1, (short) 1,

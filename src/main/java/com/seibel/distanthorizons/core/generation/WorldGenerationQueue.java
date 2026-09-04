@@ -46,6 +46,8 @@ public class WorldGenerationQueue implements IFullDataSourceRetrievalQueue, IDeb
 {
 	private static final DhLogger LOGGER = new DhLoggerBuilder().build();
 	private static final IWrapperFactory WRAPPER_FACTORY = SingletonInjector.INSTANCE.get(IWrapperFactory.class);
+	/** Bounds pending recursive world-generation work; completed work reopens capacity. */
+	private static final int MAX_WAITING_WORLD_GEN_TASKS = 1_024;
 	
 	
 	private final IDhApiWorldGenerator generator;
@@ -53,6 +55,9 @@ public class WorldGenerationQueue implements IFullDataSourceRetrievalQueue, IDeb
 	
 	/** contains the positions that need to be generated */
 	private final ConcurrentHashMap<Long, WorldGenTask> waitingTasks = new ConcurrentHashMap<>();
+	/** Serializes capacity admission with parent-to-child expansion. */
+	private final Object waitingTaskAdmissionLock = new Object();
+	private long rejectedWaitingTaskAdmissions;
 	
 	private final ConcurrentHashMap<Long, InProgressWorldGenTaskGroup> inProgressGenTasksByLodPos = new ConcurrentHashMap<>();
 	
@@ -147,7 +152,16 @@ public class WorldGenerationQueue implements IFullDataSourceRetrievalQueue, IDeb
 		
 		
 		CompletableFuture<WorldGenResult> future = new CompletableFuture<>();
-		this.waitingTasks.put(pos, new WorldGenTask(pos, requiredDataDetail, tracker, future));
+		synchronized (this.waitingTaskAdmissionLock)
+		{
+			// Replacing the same section is not another unit of pending work.
+			if (!this.waitingTasks.containsKey(pos) && this.waitingTasks.size() >= MAX_WAITING_WORLD_GEN_TASKS)
+			{
+				this.rejectedWaitingTaskAdmissions++;
+				return CompletableFuture.completedFuture(WorldGenResult.CreateFail());
+			}
+			this.waitingTasks.put(pos, new WorldGenTask(pos, requiredDataDetail, tracker, future));
+		}
 		//LOGGER.info("[DH-WORLDGEN-QUEUE-SUBMIT] Task added to waiting queue. Total waiting tasks: " + this.waitingTasks.size());
 		//LOGGER.info("[DH-WORLDGEN-QUEUE-SUBMIT] ========== submitRetrievalTask() COMPLETE ==========");
 		return future;
@@ -156,13 +170,13 @@ public class WorldGenerationQueue implements IFullDataSourceRetrievalQueue, IDeb
 	@Override
 	public void removeRetrievalRequestIf(DhSectionPos.ICancelablePrimitiveLongConsumer removeIf)
 	{
-		this.waitingTasks.forEachKey(100, (genPos) -> 
+		synchronized (this.waitingTaskAdmissionLock)
 		{
-			if (removeIf.accept(genPos))
+			this.waitingTasks.forEachKey(100, (genPos) ->
 			{
-				this.waitingTasks.remove(genPos);
-			}
-		});
+				if (removeIf.accept(genPos)) this.waitingTasks.remove(genPos);
+			});
+		}
 	}
 	
 	
@@ -239,7 +253,7 @@ public class WorldGenerationQueue implements IFullDataSourceRetrievalQueue, IDeb
 		
 		// queue more tasks if any of the threads are available
 		int worldGenThreadCount = Math.max(Config.Common.MultiThreading.numberOfThreads.get(), 1);
-		return this.inProgressGenTasksByLodPos.size() > worldGenThreadCount;
+		return this.inProgressGenTasksByLodPos.size() >= worldGenThreadCount;
 	}
 	/**
 	 * @param targetPos the position to center the generation around
@@ -266,12 +280,15 @@ public class WorldGenerationQueue implements IFullDataSourceRetrievalQueue, IDeb
 		
 		WorldGenTask closestTask = closestTaskPair.task;
 		
-		// remove the task we found, we are going to start it and don't want to run it multiple times
-		this.waitingTasks.remove(closestTask.pos, closestTask);
-		
 		// do we need to modify this task to generate it?
 		if (this.canGenerateDetailLevel(DhSectionPos.getDetailLevel(closestTask.pos)))
 		{
+			// Remove only as the task begins; a capacity-limited split below retains
+			// its parent for a later attempt.
+			if (!this.waitingTasks.remove(closestTask.pos, closestTask))
+			{
+				return false;
+			}
 			// detail level is correct for generation, start generation
 			
 			WorldGenTaskGroup closestTaskGroup = new WorldGenTaskGroup(closestTask.pos, (byte)(closestTask.pos - DhSectionPos.SECTION_MINIMUM_DETAIL_LEVEL));
@@ -302,21 +319,37 @@ public class WorldGenerationQueue implements IFullDataSourceRetrievalQueue, IDeb
 			// split up the task
 			
 			
-			// split up the task and add each one to the tree
-			LinkedList<CompletableFuture<WorldGenResult>> childFutures = new LinkedList<>();
-			long sectionPos = closestTask.pos;
-			WorldGenTask finalClosestTask = closestTask;
-			DhSectionPos.forEachChild(sectionPos, (childDhSectionPos) ->
+			// Split only as a complete bounded transaction.  Do not drop or partly
+			// publish children when capacity is exhausted: retain the parent and
+			// retry it after generation completes another request.
+			List<Long> childPositions = new ArrayList<>(4);
+			DhSectionPos.forEachChild(closestTask.pos, childPositions::add);
+			synchronized (this.waitingTaskAdmissionLock)
 			{
-				CompletableFuture<WorldGenResult> newFuture = new CompletableFuture<>();
-				childFutures.add(newFuture);
-				
-				WorldGenTask newGenTask = new WorldGenTask(childDhSectionPos, DhSectionPos.getDetailLevel(childDhSectionPos), finalClosestTask.taskTracker, newFuture);
-				this.waitingTasks.put(newGenTask.pos, newGenTask);
-			});
-			
-			// send the child futures to the future recipient, to notify them of the new tasks
-			closestTask.future.complete(WorldGenResult.CreateSplit(childFutures));
+				int newChildren = 0;
+				for (long childPos : childPositions)
+				{
+					if (!this.waitingTasks.containsKey(childPos)) newChildren++;
+				}
+				if (this.waitingTasks.size() - 1 + newChildren > MAX_WAITING_WORLD_GEN_TASKS)
+				{
+					return false;
+				}
+				if (!this.waitingTasks.remove(closestTask.pos, closestTask))
+				{
+					return false;
+				}
+				LinkedList<CompletableFuture<WorldGenResult>> childFutures = new LinkedList<>();
+				for (long childPos : childPositions)
+				{
+					CompletableFuture<WorldGenResult> newFuture = new CompletableFuture<>();
+					childFutures.add(newFuture);
+					this.waitingTasks.put(childPos, new WorldGenTask(
+						childPos, DhSectionPos.getDetailLevel(childPos), closestTask.taskTracker, newFuture
+					));
+				}
+				closestTask.future.complete(WorldGenResult.CreateSplit(childFutures));
+			}
 			
 			// return true so we attempt to generate again
 			return true;
@@ -522,6 +555,8 @@ public class WorldGenerationQueue implements IFullDataSourceRetrievalQueue, IDeb
 	//===================//
 	
 	@Override public int getWaitingTaskCount() { return this.waitingTasks.size(); }
+	/** Number of direct requests refused under explicit queue backpressure. */
+	public long getRejectedWaitingTaskAdmissions() { return this.rejectedWaitingTaskAdmissions; }
 	@Override public int getInProgressTaskCount() { return this.inProgressGenTasksByLodPos.size(); }
 	
 	@Override

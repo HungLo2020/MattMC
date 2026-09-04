@@ -8,13 +8,14 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::{
-    selected_source_raster_probe_cull_mode, selected_source_raster_probe_front_face,
-    validate_world_lod_column_asset, GalError, GalResult, WorldLodColumnAsset,
-    WorldLodColumnInstanceRequest, WorldLodColumnMaterialProvenance, WorldLodFaceMaterial,
-    WorldLodRenderFrame, WorldLodSegment, WorldLodVertex, WORLD_LOD_LAYER_OPAQUE,
-    WORLD_LOD_LAYER_TRANSPARENT_SIDE, WORLD_LOD_LAYER_TRANSPARENT_UP,
-    WORLD_LOD_LAYER_TRANSPARENT_WATER_UP, WORLD_LOD_MAX_NORMAL_INDEX,
+    GalError, GalResult, WORLD_LOD_LAYER_OPAQUE, WORLD_LOD_LAYER_TRANSPARENT_SIDE,
+    WORLD_LOD_LAYER_TRANSPARENT_UP, WORLD_LOD_LAYER_TRANSPARENT_WATER_UP,
+    WORLD_LOD_MAX_NORMAL_INDEX, WorldLodColumnAsset, WorldLodColumnInstanceRequest,
+    WorldLodColumnMaterialProvenance, WorldLodFaceMaterial, WorldLodRenderFrame, WorldLodSegment,
+    WorldLodVertex, selected_source_raster_probe_cull_mode,
+    selected_source_raster_probe_front_face, validate_world_lod_column_asset,
 };
+use crate::render::vulkanic::CullMode;
 use crate::render::vulkanic::commands::{
     AttachmentLoadOp, AttachmentStoreOp, CommandOp, PassAttachment, ResourceBarrier,
     TextureImageCopyRegion, TextureOrigin3d, TextureUsageState,
@@ -31,15 +32,15 @@ use crate::render::vulkanic::resources::{
 use crate::render::vulkanic::shader_pack::distant_horizons_contract::DistantHorizonsPassKind;
 use crate::render::vulkanic::shader_pack::lightmap::VanillaLightmapBinding;
 use crate::render::vulkanic::shader_pack::programs::{
+    LoweredDistantHorizonsExactAtlasSourceProgram, LoweredDistantHorizonsSourceProgram,
     distant_horizons_exact_atlas_source_resource_layout,
     distant_horizons_lod_exact_atlas_resource_layouts,
     distant_horizons_lod_opaque_resource_layouts,
     minimal_distant_horizons_lod_exact_atlas_opaque_program,
     minimal_distant_horizons_lod_opaque_program, minimal_distant_horizons_lod_transparent_program,
-    LoweredDistantHorizonsExactAtlasSourceProgram, LoweredDistantHorizonsSourceProgram,
 };
 use crate::render::vulkanic::shader_pack::source_targets::{
-    source_color_clear_color, ShaderPackColorTargets, TerrainSourceColorAttachment,
+    ShaderPackColorTargets, TerrainSourceColorAttachment, source_color_clear_color,
 };
 use crate::render::vulkanic::shader_pack::source_uniforms::TerrainSourceUniformFrame;
 use crate::render::vulkanic::shader_pack::terrain_contract::TerrainPassOutput;
@@ -48,7 +49,6 @@ use crate::render::vulkanic::shader_pack::terrain_source_resources::{
     TerrainSourceResourceAvailabilitySet, TerrainSourceResourceRole,
     TerrainSourceSampledResourceShape,
 };
-use crate::render::vulkanic::CullMode;
 
 const MICRO_OFFSET_SCALE: f32 = 0.01;
 
@@ -292,7 +292,9 @@ pub(crate) enum WorldLodAdmissionError {
 impl std::fmt::Display for WorldLodAdmissionError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::UnknownLayer(layer) => write!(formatter, "unknown Distant Horizons layer {layer}"),
+            Self::UnknownLayer(layer) => {
+                write!(formatter, "unknown Distant Horizons layer {layer}")
+            }
             Self::WaterLayerRequiresWaterPath(layer) => write!(
                 formatter,
                 "Distant Horizons water layer {layer} must use the explicit water-surface admission path"
@@ -5207,7 +5209,7 @@ mod tests {
         complete_bundled_pack_source_for_test, preprocess_distant_horizons_sources,
     };
     use crate::render::vulkanic::shader_pack::programs::{
-        prepare_lowered_distant_horizons_source_program, TerrainSourceTextureTransforms,
+        TerrainSourceTextureTransforms, prepare_lowered_distant_horizons_source_program,
     };
     use crate::render::vulkanic::shader_pack::runtime::ShaderPackRuntimeExecutor;
     use crate::render::vulkanic::shader_pack::source_targets::ShaderPackColorBootstrapClearValues;
@@ -5219,10 +5221,10 @@ mod tests {
         TerrainSourceResourceRole, TerrainSourceSampledResourceShape,
     };
     use crate::render::vulkanic::world_primitive_frontend::{
+        WORLD_LOD_MATERIAL_MIXED, WORLD_LOD_MATERIAL_UNAVAILABLE, WORLD_LOD_VERTEX_LAYOUT_V1,
         WorldLodColumnAsset, WorldLodColumnMaterialProvenance, WorldLodFaceMaterial,
         WorldLodMaterialIdentity, WorldLodRenderFrame, WorldLodSegment,
-        WorldLodSegmentMaterialProvenance, WorldLodVertex, WORLD_LOD_MATERIAL_MIXED,
-        WORLD_LOD_MATERIAL_UNAVAILABLE, WORLD_LOD_VERTEX_LAYOUT_V1,
+        WorldLodSegmentMaterialProvenance, WorldLodVertex,
     };
     use crate::render::vulkanic::{CommandList, CommandListDesc, SubmissionBatch};
 
@@ -6022,10 +6024,12 @@ mod tests {
             column_generation: asset.column_generation + 1,
             ..provenance.clone()
         };
-        assert!(plan_world_lod_textured_column(&asset, &wrong_generation)
-            .unwrap_err()
-            .to_string()
-            .contains("generation"));
+        assert!(
+            plan_world_lod_textured_column(&asset, &wrong_generation)
+                .unwrap_err()
+                .to_string()
+                .contains("generation")
+        );
 
         let wrong_segment = WorldLodColumnMaterialProvenance {
             segments: vec![WorldLodSegmentMaterialProvenance {
@@ -6034,10 +6038,12 @@ mod tests {
             }],
             ..provenance
         };
-        assert!(plan_world_lod_textured_column(&asset, &wrong_segment)
-            .unwrap_err()
-            .to_string()
-            .contains("layer/order"));
+        assert!(
+            plan_world_lod_textured_column(&asset, &wrong_segment)
+                .unwrap_err()
+                .to_string()
+                .contains("layer/order")
+        );
     }
 
     #[test]
@@ -6069,10 +6075,12 @@ mod tests {
             [3.0, 0.0],
             world_lod_textured_quad_tile_span(&plan.quads[0])
         );
-        assert!(plan.quads[0]
-            .vertices
-            .iter()
-            .all(|vertex| vertex.atlas_rect == material.atlas_uv));
+        assert!(
+            plan.quads[0]
+                .vertices
+                .iter()
+                .all(|vertex| vertex.atlas_rect == material.atlas_uv)
+        );
     }
 
     #[test]
@@ -6364,9 +6372,10 @@ mod tests {
                 .filter(|op| matches!(op, CommandOp::HostWriteBuffer { .. }))
                 .count()
         );
-        assert!(ops
-            .iter()
-            .all(|op| !format!("{op:?}").contains("material-id")));
+        assert!(
+            ops.iter()
+                .all(|op| !format!("{op:?}").contains("material-id"))
+        );
 
         let mut cached_ops = Vec::new();
         let cached = source_resources
@@ -6471,18 +6480,22 @@ mod tests {
             },
         )
         .unwrap_err();
-        assert!(water_error
-            .to_string()
-            .contains("explicit water-surface admission path"));
+        assert!(
+            water_error
+                .to_string()
+                .contains("explicit water-surface admission path")
+        );
 
         let transparent = WorldLodGpuDraw {
             layer: WORLD_LOD_LAYER_TRANSPARENT_SIDE,
             ..draw
         };
         let error = admit_world_lod_draw(&frame, transparent).unwrap_err();
-        assert!(error
-            .to_string()
-            .contains("explicit transparent admission path"));
+        assert!(
+            error
+                .to_string()
+                .contains("explicit transparent admission path")
+        );
 
         let unknown = WorldLodGpuDraw { layer: 99, ..draw };
         let error = admit_world_lod_draw(&frame, unknown).unwrap_err();
@@ -7218,9 +7231,10 @@ mod tests {
         )
         .unwrap();
         depth.append_opaque_depth_snapshot(&mut ops);
-        assert!(ops
-            .iter()
-            .any(|op| matches!(op, CommandOp::DrawIndexed { .. })));
+        assert!(
+            ops.iter()
+                .any(|op| matches!(op, CommandOp::DrawIndexed { .. }))
+        );
         assert!(ops.iter().any(|op| matches!(
             op,
             CommandOp::BeginPass { colors, .. }
@@ -7404,9 +7418,10 @@ mod tests {
             op,
             CommandOp::BeginPass { colors, .. } if colors.is_empty()
         )));
-        assert!(!ops
-            .iter()
-            .any(|op| matches!(op, CommandOp::Draw { .. } | CommandOp::DrawIndexed { .. })));
+        assert!(
+            !ops.iter()
+                .any(|op| matches!(op, CommandOp::Draw { .. } | CommandOp::DrawIndexed { .. }))
+        );
         gal.submit(SubmissionBatch {
             label: "world-lod-source.empty-depth-initial".to_string(),
             command_lists: vec![CommandList::from(CommandListDesc {
@@ -7420,14 +7435,18 @@ mod tests {
             .active_semantic_resources(identity)
             .unwrap()
             .expect("the confirmed empty snapshot must remain available to a later source frame");
-        assert!(active_resources
-            .availability()
-            .resource_for(TerrainSourceResourceRole::DistantHorizonsOpaqueDepth)
-            .is_some());
-        assert!(active_resources
-            .availability()
-            .resource_for(TerrainSourceResourceRole::DistantHorizonsDepthBeforeTranslucency)
-            .is_some());
+        assert!(
+            active_resources
+                .availability()
+                .resource_for(TerrainSourceResourceRole::DistantHorizonsOpaqueDepth)
+                .is_some()
+        );
+        assert!(
+            active_resources
+                .availability()
+                .resource_for(TerrainSourceResourceRole::DistantHorizonsDepthBeforeTranslucency)
+                .is_some()
+        );
 
         let (reused, reuse_usage, recreated) = cache
             .stage_for_empty_depth_snapshot(&mut gal, identity)

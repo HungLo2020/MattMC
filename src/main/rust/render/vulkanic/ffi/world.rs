@@ -2,19 +2,20 @@ use super::*;
 use crate::render::vulkanic::shader_pack::lightmap::{VanillaLightmapFrame, VanillaLightmapInputs};
 use crate::render::vulkanic::world_primitive_frontend::material as world_material_semantics;
 use crate::render::vulkanic::world_primitive_frontend::world_text::{
-    WorldTextImageAsset, WorldTextImageFormat, WorldTextQuadRequest, WORLD_TEXT_DEPTH_NORMAL,
-    WORLD_TEXT_DEPTH_POLYGON_OFFSET, WORLD_TEXT_DEPTH_SEE_THROUGH, MAX_WORLD_TEXT_IMAGES,
-    MAX_WORLD_TEXT_IMAGE_BYTES_TOTAL,
+    WorldTextImageAsset, WorldTextImageFormat, WorldTextQuadRequest, MAX_WORLD_TEXT_IMAGES,
+    MAX_WORLD_TEXT_IMAGE_BYTES_TOTAL, WORLD_TEXT_DEPTH_NORMAL, WORLD_TEXT_DEPTH_POLYGON_OFFSET,
+    WORLD_TEXT_DEPTH_SEE_THROUGH,
 };
 use crate::render::vulkanic::world_primitive_frontend::{
     WorldFeatureCoverageFrame, WorldFirstPersonFrame, WorldLodRenderFrame,
-    WorldShaderEnvironmentFrame, WorldVoxelVolumeFrame, WORLD_LOD_MAX_SEGMENTS_PER_COLUMN,
-    WORLD_LOD_MAX_COLUMNS, WORLD_LOD_MAX_VISIBLE_SEGMENTS, WORLD_LOD_MAX_VERTICES_PER_SEGMENT,
+    WorldShaderEnvironmentFrame, WorldVoxelVolumeFrame, WORLD_LOD_MAX_COLUMNS,
+    WORLD_LOD_MAX_NORMAL_INDEX, WORLD_LOD_MAX_SEGMENTS_PER_COLUMN,
+    WORLD_LOD_MAX_VERTICES_PER_SEGMENT, WORLD_LOD_MAX_VISIBLE_SEGMENTS,
     WORLD_MATERIAL_SOURCE_CLOUDS, WORLD_MATERIAL_SOURCE_ENTITY_MODEL,
-    WORLD_MATERIAL_SOURCE_PARTICLES,
-    WORLD_MATERIAL_SOURCE_TEXTURED, WORLD_MATERIAL_SOURCE_UNSPECIFIED,
-    WORLD_MATERIAL_SOURCE_UV_LOCAL_TEXTURE, WORLD_MATERIAL_SOURCE_UV_MINECRAFT_BLOCK_ATLAS,
-    WORLD_MATERIAL_SOURCE_WEATHER, WORLD_MESH_INSTANCE_FLAG_OUTLINE_ONLY,
+    WORLD_MATERIAL_SOURCE_PARTICLES, WORLD_MATERIAL_SOURCE_TEXTURED,
+    WORLD_MATERIAL_SOURCE_UNSPECIFIED, WORLD_MATERIAL_SOURCE_UV_LOCAL_TEXTURE,
+    WORLD_MATERIAL_SOURCE_UV_MINECRAFT_BLOCK_ATLAS, WORLD_MATERIAL_SOURCE_WEATHER,
+    WORLD_MESH_INSTANCE_FLAG_OUTLINE_ONLY,
 };
 use std::collections::BTreeSet;
 
@@ -61,9 +62,7 @@ fn validate_mesh_instance_semantic_identity(
     {
         return Err(GalError::ffi(
             StatusCode::InvalidArgument,
-            format!(
-                "{label} outline-only flag requires entity stratum and outline color"
-            ),
+            format!("{label} outline-only flag requires entity stratum and outline color"),
         ));
     }
     if instance.block_entity_id < -1 {
@@ -222,42 +221,101 @@ pub(crate) unsafe fn decode_world_lod_asset_update(
         let mut segments = Vec::with_capacity(raw_segments.len());
         for segment in raw_segments {
             validate_item_size::<FfiWorldLodSegmentRecord>(segment.byte_size, "world LOD segment")?;
-            let raw_vertices = read_limited_slice(segment.vertices, false, "world LOD vertices")?;
-            if raw_vertices.is_empty()
-                || raw_vertices.len() > WORLD_LOD_MAX_VERTICES_PER_SEGMENT
-                || raw_vertices.len() % 4 != 0
+            let raw_vertices = read_limited_slice(segment.vertices, true, "world LOD vertices")?;
+            // This is a byte stream, not a batch of records: its bound is
+            // derived from the explicit vertex limit rather than the generic
+            // FFI item-count ceiling.
+            let packed_vertices =
+                read_slice(segment.packed_vertices, true, "packed world LOD vertices")?;
+            if packed_vertices.len() > WORLD_LOD_MAX_VERTICES_PER_SEGMENT * 16 {
+                return Err(GalError::ffi(
+                    StatusCode::LengthOverflow,
+                    "packed world LOD vertices byte length exceeds ABI maximum",
+                ));
+            }
+            if !raw_vertices.is_empty() && !packed_vertices.is_empty() {
+                return Err(GalError::ffi(
+                    StatusCode::InvalidArgument,
+                    "world LOD segment must use either structured or packed vertices, not both",
+                ));
+            }
+            let vertex_count = if !packed_vertices.is_empty() {
+                const PACKED_DH_VERTEX_BYTES: usize = 16;
+                if packed_vertices.len() % PACKED_DH_VERTEX_BYTES != 0 {
+                    return Err(GalError::ffi(
+                        StatusCode::InvalidArgument,
+                        "packed world LOD vertices are not 16-byte aligned",
+                    ));
+                }
+                packed_vertices.len() / PACKED_DH_VERTEX_BYTES
+            } else {
+                raw_vertices.len()
+            };
+            if vertex_count == 0
+                || vertex_count > WORLD_LOD_MAX_VERTICES_PER_SEGMENT
+                || vertex_count % 4 != 0
             {
                 return Err(GalError::ffi(
                     StatusCode::InvalidArgument,
                     format!(
-                        "world LOD segment has {} vertices; expected quad-aligned 1..={}",
-                        raw_vertices.len(),
+                        "world LOD segment has {vertex_count} vertices; expected quad-aligned 1..={}",
                         WORLD_LOD_MAX_VERTICES_PER_SEGMENT
                     ),
                 ));
             }
-            let mut vertices = Vec::with_capacity(raw_vertices.len());
-            for vertex in raw_vertices {
-                validate_item_size::<FfiWorldLodVertex>(vertex.byte_size, "world LOD vertex")?;
-                let material_id = u8::try_from(vertex.material_id).map_err(|_| {
-                    GalError::ffi(
-                        StatusCode::InvalidArgument,
-                        format!("world LOD material id {} exceeds u8", vertex.material_id),
-                    )
-                })?;
-                let normal_index = u8::try_from(vertex.normal_index).map_err(|_| {
-                    GalError::ffi(
-                        StatusCode::InvalidArgument,
-                        format!("world LOD normal index {} exceeds u8", vertex.normal_index),
-                    )
-                })?;
-                vertices.push(WorldLodVertex {
-                    local_position: [vertex.local_x, vertex.local_y, vertex.local_z],
-                    packed_light_and_micro_offset: vertex.packed_light_and_micro_offset,
-                    color_rgba: vertex.color_rgba.to_le_bytes(),
-                    material_id,
-                    normal_index,
-                });
+            let mut vertices = Vec::with_capacity(vertex_count);
+            if !packed_vertices.is_empty() {
+                for bytes in packed_vertices.chunks_exact(16) {
+                    let local_x = u16::from_ne_bytes([bytes[0], bytes[1]]);
+                    let local_y = u16::from_ne_bytes([bytes[2], bytes[3]]);
+                    let local_z = u16::from_ne_bytes([bytes[4], bytes[5]]);
+                    let packed_light_and_micro_offset = u16::from_ne_bytes([bytes[6], bytes[7]]);
+                    let color_rgba = [bytes[8], bytes[9], bytes[10], bytes[11]];
+                    let material_id = bytes[12];
+                    let normal_index = bytes[13];
+                    if bytes[14] != 0 || bytes[15] != 0 {
+                        return Err(GalError::ffi(
+                            StatusCode::InvalidArgument,
+                            "packed world LOD vertex has non-zero reserved padding",
+                        ));
+                    }
+                    if material_id > 15 || normal_index > WORLD_LOD_MAX_NORMAL_INDEX {
+                        return Err(GalError::ffi(
+                            StatusCode::InvalidArgument,
+                            "packed world LOD vertex contains an out-of-range material or normal",
+                        ));
+                    }
+                    vertices.push(WorldLodVertex {
+                        local_position: [local_x, local_y, local_z],
+                        packed_light_and_micro_offset,
+                        color_rgba,
+                        material_id,
+                        normal_index,
+                    });
+                }
+            } else {
+                for vertex in raw_vertices {
+                    validate_item_size::<FfiWorldLodVertex>(vertex.byte_size, "world LOD vertex")?;
+                    let material_id = u8::try_from(vertex.material_id).map_err(|_| {
+                        GalError::ffi(
+                            StatusCode::InvalidArgument,
+                            format!("world LOD material id {} exceeds u8", vertex.material_id),
+                        )
+                    })?;
+                    let normal_index = u8::try_from(vertex.normal_index).map_err(|_| {
+                        GalError::ffi(
+                            StatusCode::InvalidArgument,
+                            format!("world LOD normal index {} exceeds u8", vertex.normal_index),
+                        )
+                    })?;
+                    vertices.push(WorldLodVertex {
+                        local_position: [vertex.local_x, vertex.local_y, vertex.local_z],
+                        packed_light_and_micro_offset: vertex.packed_light_and_micro_offset,
+                        color_rgba: vertex.color_rgba.to_le_bytes(),
+                        material_id,
+                        normal_index,
+                    });
+                }
             }
             segments.push(WorldLodSegment {
                 layer: segment.layer,
@@ -581,8 +639,7 @@ pub(crate) unsafe fn decode_world_primitive_submit(
         gui_blur_before_stratum,
         gui_blur_radius,
         _post_effect_id,
-    ) =
-        decode_whole_frame_submit_with_backend_policy(request, capabilities, false)?;
+    ) = decode_whole_frame_submit_with_backend_policy(request, capabilities, false)?;
     if !gui_sprites.is_empty() || !gui_affine_quads.is_empty() || !gui_mesh_batches.is_empty() {
         return Err(GalError::ffi(
             StatusCode::InvalidArgument,
@@ -689,8 +746,12 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
             "GUI blur radius must be -1 or within the bounded range 0..=64",
         ));
     }
-    let post_effect_id =
-        read_bounded_bytes(request.post_effect_id, true, 256, "whole-frame post-effect id")?;
+    let post_effect_id = read_bounded_bytes(
+        request.post_effect_id,
+        true,
+        256,
+        "whole-frame post-effect id",
+    )?;
     if !post_effect_id.is_empty() {
         let id = std::str::from_utf8(&post_effect_id).map_err(|_| {
             GalError::ffi(
@@ -807,14 +868,10 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
                 format!("unknown world crack cull policy {}", quad.cull_policy),
             ));
         }
-        let viewport_width = decode_world_viewport_axis(
-            quad.viewport_width,
-            "world crack quad viewport width",
-        )?;
-        let viewport_height = decode_world_viewport_axis(
-            quad.viewport_height,
-            "world crack quad viewport height",
-        )?;
+        let viewport_width =
+            decode_world_viewport_axis(quad.viewport_width, "world crack quad viewport width")?;
+        let viewport_height =
+            decode_world_viewport_axis(quad.viewport_height, "world crack quad viewport height")?;
         crack_quads.push(WorldCrackQuadRequest {
             stratum: quad.stratum,
             stage: quad.stage,
@@ -869,14 +926,10 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
                 format!("unknown world border cull policy {}", quad.cull_policy),
             ));
         }
-        let viewport_width = decode_world_viewport_axis(
-            quad.viewport_width,
-            "world border quad viewport width",
-        )?;
-        let viewport_height = decode_world_viewport_axis(
-            quad.viewport_height,
-            "world border quad viewport height",
-        )?;
+        let viewport_width =
+            decode_world_viewport_axis(quad.viewport_width, "world border quad viewport width")?;
+        let viewport_height =
+            decode_world_viewport_axis(quad.viewport_height, "world border quad viewport height")?;
         border_quads.push(WorldBorderQuadRequest {
             stratum: quad.stratum,
             texture_id: quad.texture_id,
@@ -1104,10 +1157,8 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
                 ),
             ));
         }
-        let viewport_width = decode_world_viewport_axis(
-            quad.viewport_width,
-            "world material quad viewport width",
-        )?;
+        let viewport_width =
+            decode_world_viewport_axis(quad.viewport_width, "world material quad viewport width")?;
         let viewport_height = decode_world_viewport_axis(
             quad.viewport_height,
             "world material quad viewport height",
@@ -1347,7 +1398,10 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
             if quad.block_entity_id < -1 {
                 return Err(GalError::ffi(
                     StatusCode::InvalidArgument,
-                    format!("compact world material quad block entity id must be >= -1, got {}", quad.block_entity_id),
+                    format!(
+                        "compact world material quad block entity id must be >= -1, got {}",
+                        quad.block_entity_id
+                    ),
                 ));
             }
             material_quads.push(WorldMaterialQuadRequest {
@@ -1436,14 +1490,10 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
                 format!("unknown world mesh winding {}", instance.winding),
             ));
         }
-        let viewport_width = decode_world_viewport_axis(
-            instance.viewport_width,
-            "world mesh viewport width",
-        )?;
-        let viewport_height = decode_world_viewport_axis(
-            instance.viewport_height,
-            "world mesh viewport height",
-        )?;
+        let viewport_width =
+            decode_world_viewport_axis(instance.viewport_width, "world mesh viewport width")?;
+        let viewport_height =
+            decode_world_viewport_axis(instance.viewport_height, "world mesh viewport height")?;
         mesh_instances.push(WorldMeshInstanceRequest {
             stratum: instance.stratum,
             mesh_key: instance.mesh_key,
@@ -1517,7 +1567,10 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
         if quad.block_entity_id < -1 {
             return Err(GalError::ffi(
                 StatusCode::InvalidArgument,
-                format!("world text quad block entity id must be >= -1, got {}", quad.block_entity_id),
+                format!(
+                    "world text quad block entity id must be >= -1, got {}",
+                    quad.block_entity_id
+                ),
             ));
         }
         text_quads.push(WorldTextQuadRequest {
@@ -2085,6 +2138,7 @@ fn decode_world_shader_environment_frame(
         fog_environmental_end: request.fog_environmental_end,
         fog_render_distance_start: request.fog_render_distance_start,
         fog_render_distance_end: request.fog_render_distance_end,
+        fog_sky_end: request.fog_sky_end,
         biome_precipitation: request.biome_precipitation,
         biome_resource_location,
         main_hand_item_model_resource_location,
@@ -2188,6 +2242,7 @@ fn decode_world_shader_environment_frame(
             "fog render-distance end",
             environment.fog_render_distance_end,
         ),
+        ("fog sky end", environment.fog_sky_end),
     ] {
         if !value.is_finite() {
             return Err(GalError::ffi(
@@ -2608,13 +2663,19 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_whole_frame_submit(
                     gui_blur_radius,
                     post_effect_id,
                 )| {
+                    let world_frame_id = world_frame.frame_id;
                     let ffi_decode_nanos =
                         crate::render::vulkanic::metrics::elapsed_nanos_u64(decode_started);
                     let gui_started = std::time::Instant::now();
                     context
                         .world_primitive_frontend
                         .validate_post_effect_request(&post_effect_id)?;
-                    let (mut world_stats, gui_stats) = context
+                    whole_frame_trace(&format!(
+                        "whole-frame.frontend.begin generation={} frame={} decode_nanos={}",
+                        generation, world_frame_id, ffi_decode_nanos
+                    ));
+                    let frontend_started = std::time::Instant::now();
+                    let frontend_result = context
                         .world_primitive_frontend
                         .submit_whole_frame_with_gui_frontend(
                             &mut context.gal,
@@ -2628,12 +2689,27 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_whole_frame_submit(
                             post_effect_id,
                             gui_blur_before_stratum,
                             gui_blur_radius,
-                        )?;
+                        );
+                    whole_frame_trace(&format!(
+                        "whole-frame.frontend.end generation={} frame={} elapsed_nanos={}",
+                        generation,
+                        world_frame_id,
+                        crate::render::vulkanic::metrics::elapsed_nanos_u64(frontend_started)
+                    ));
+                    let (mut world_stats, gui_stats) = frontend_result?;
                     let gui_frontend_nanos =
                         crate::render::vulkanic::metrics::elapsed_nanos_u64(gui_started);
                     world_stats.profile.ffi_decode_nanos = ffi_decode_nanos;
                     world_stats.profile.gui_frontend_nanos = gui_frontend_nanos;
+                    whole_frame_trace(&format!(
+                        "whole-frame.stale-targets.begin generation={} frame={}",
+                        generation, world_frame_id
+                    ));
                     destroy_stale_frame_targets(context)?;
+                    whole_frame_trace(&format!(
+                        "whole-frame.stale-targets.end generation={} frame={}",
+                        generation, world_frame_id
+                    ));
                     world_stats.command_lists = 1;
                     Ok((world_stats, gui_stats))
                 },
@@ -2660,6 +2736,15 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_whole_frame_submit(
             }
         }
     })
+}
+
+/// Emits phase boundaries only for an explicitly requested diagnostic run.
+/// The ABI deliberately remains one call; this distinguishes semantic/GAL
+/// work from stale-target retirement without changing rendering behavior.
+fn whole_frame_trace(message: &str) {
+    if std::env::var_os("MATTMC_TRACE_WHOLE_FRAME").is_some() {
+        eprintln!("{message}");
+    }
 }
 
 #[no_mangle]

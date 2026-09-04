@@ -61,6 +61,18 @@ class DistantHorizonsFaceMaterialResolverTest {
 	}
 
 	@Test
+	void partialFaceMapsNeverQualifyForExactAtlasProvenance() {
+		var partial = DistantHorizonsFaceMaterialResolver.resolveCandidates(List.of(
+			new DistantHorizonsFaceMaterialResolver.FaceCandidate(Direction.UP, material("minecraft:block/stone"), false, false),
+			new DistantHorizonsFaceMaterialResolver.FaceCandidate(Direction.NORTH, material("minecraft:block/stone"), false, true)
+		));
+
+		assertEquals(DistantHorizonsFaceMaterialResolver.Status.PARTIAL_FACE_MAPPING, partial.status());
+		assertTrue(partial.hasResolvedFaces());
+		assertFalse(partial.isExactAtlasAdmissible());
+	}
+
+	@Test
 	void grassSideBaseAndOverlayRemainAvailableTogether() {
 		var overlay = new DistantHorizonsFaceMaterialResolver.FaceMaterial(
 			"minecraft:textures/atlas/blocks.png", "minecraft:block/grass_block_side_overlay",
@@ -100,5 +112,20 @@ class DistantHorizonsFaceMaterialResolverTest {
 				0.25F, 0.5F, 0.3125F, 0.5625F, 0
 			)
 		);
+	}
+
+	@Test
+	void copiedStateResolutionCacheIsBoundedAndCanBeInvalidated() {
+		DistantHorizonsFaceMaterialResolver.clearCachedStateResolutions();
+		var resolution = DistantHorizonsFaceMaterialResolver.resolveCandidates(List.of(
+			new DistantHorizonsFaceMaterialResolver.FaceCandidate(Direction.UP, material("minecraft:block/stone"), false, false)
+		));
+		for (int index = 0; index < 2_049; index++) {
+			DistantHorizonsFaceMaterialResolver.cacheStateResolutionForTest("minecraft:state_" + index, resolution);
+		}
+
+		assertEquals(2_048, DistantHorizonsFaceMaterialResolver.cachedStateResolutionCountForTest());
+		DistantHorizonsFaceMaterialResolver.clearCachedStateResolutions();
+		assertEquals(0, DistantHorizonsFaceMaterialResolver.cachedStateResolutionCountForTest());
 	}
 }
