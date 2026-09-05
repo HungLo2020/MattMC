@@ -1364,7 +1364,8 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 fog_render_distance_start,
                 fog_render_distance_end,
                 distant_horizons_render_distance,
-                fog_sky_end
+                fog_sky_end,
+                fog_clouds_end
             ]
         ),
         98 => layout!(

@@ -1815,6 +1815,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 60, shaderEnvironmentFrame.fogRenderDistanceEnd());
 		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setInt(shaderEnvironment, 61, shaderEnvironmentFrame.distantHorizonsRenderDistance());
 		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 62, shaderEnvironmentFrame.fogSkyEnd());
+		Struct.WORLD_SHADER_ENVIRONMENT_FRAME.setFloat(shaderEnvironment, 63, shaderEnvironmentFrame.fogCloudsEnd());
 		MemorySegment result = Struct.WHOLE_FRAME_SUBMIT_RESULT.allocate(arena);
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("rust-gal.whole-frame.java-record-packing");
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("rust-gal.whole-frame.native-submit-return");
@@ -4138,7 +4139,10 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		int distantHorizonsRenderDistance,
 		/// Vanilla SKY pipeline range.  This is copied gameplay fog data, not
 		/// a Java uniform buffer or any Iris-owned rendering state.
-		float fogSkyEnd
+		float fogSkyEnd,
+		/// Vanilla CLOUDS pipeline range. This stays a copied semantic value; no
+		/// Java fog UBO or renderer state crosses the VulkanicGAL boundary.
+		float fogCloudsEnd
 	) {
 		public static WorldShaderEnvironmentFrameRecord disabled() {
 			return new WorldShaderEnvironmentFrameRecord(
@@ -4155,7 +4159,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F,
 			0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F,
 			0.0F, 0.0F, 0, 0,
-			0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0, 0.0F
+			0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0, 0.0F, 0.0F
 		);
 		}
 	}

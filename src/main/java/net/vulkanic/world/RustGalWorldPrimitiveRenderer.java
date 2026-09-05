@@ -234,6 +234,7 @@ public final class RustGalWorldPrimitiveRenderer {
 	public static final int MATERIAL_ID_OPAQUE_TEXTURED = 0x6A2FD335;
 	public static final int MATERIAL_ID_CUTOUT_TEXTURED = 0x129B1B90;
 	public static final int MATERIAL_ID_TRANSLUCENT_TEXTURED = 0x4D21A7C3;
+	public static final int MATERIAL_ID_ENTITY_SHADOW = 0x5348444D;
 	public static final int MATERIAL_ID_GLINT_TEXTURED = 0x71E6A9B4;
 	public static final int MATERIAL_ID_WATER_TRANSLUCENT = 0x39E0A7E4;
 	public static final int MATERIAL_ID_BLOCK_MARKER_CUTOUT = 0x224A8659;
@@ -908,6 +909,9 @@ public final class RustGalWorldPrimitiveRenderer {
 			throw new IllegalStateException("Rust whole-frame entity-shadow submit bound exceeded " + MAX_ENTITY_SHADOW_SUBMITS);
 		}
 		int submittedQuads = 0;
+		float[] shadowCaptureBounds = DeterministicCameraCapture.isActiveForDiagnostics()
+			? new float[] {Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY, Float.NEGATIVE_INFINITY, Float.NEGATIVE_INFINITY}
+			: null;
 		synchronized (LOCK) {
 			ensureBoundedWorldPrimitiveViewportLocked("Rust whole-frame entity-shadow route requires a seeded bounded world primitive frame");
 			int estimatedPieces = 0;
@@ -951,6 +955,26 @@ public final class RustGalWorldPrimitiveRenderer {
 					float z0 = shadowPiece.relativeZ() + (float)bounds.minZ;
 					float z1 = shadowPiece.relativeZ() + (float)bounds.maxZ;
 					float radius = shadowSubmit.radius();
+					if (shadowCaptureBounds != null && shadowPiece.alpha() > 0.0F) {
+						// Observe only the texture's nontransparent support, not the
+						// entire receiver block. Never change the submitted geometry.
+						float sx0 = Math.max(x0, -radius), sx1 = Math.min(x1, radius);
+						float sz0 = Math.max(z0, -radius), sz1 = Math.min(z1, radius);
+						if (sx1 > sx0 && sz1 > sz0) {
+							float[] support = new float[12];
+							transformMaterialVertex(shadowSubmit.pose(), sx0, y, sz0, support, 0);
+							transformMaterialVertex(shadowSubmit.pose(), sx0, y, sz1, support, 3);
+							transformMaterialVertex(shadowSubmit.pose(), sx1, y, sz1, support, 6);
+							transformMaterialVertex(shadowSubmit.pose(), sx1, y, sz0, support, 9);
+							ProjectedBounds projected = projectBounds(support, pendingViewportWidth, pendingViewportHeight);
+							if (projected.valid()) {
+								shadowCaptureBounds[0] = Math.min(shadowCaptureBounds[0], projected.left());
+								shadowCaptureBounds[1] = Math.min(shadowCaptureBounds[1], pendingViewportHeight - projected.bottom());
+								shadowCaptureBounds[2] = Math.max(shadowCaptureBounds[2], projected.right());
+								shadowCaptureBounds[3] = Math.max(shadowCaptureBounds[3], pendingViewportHeight - projected.top());
+							}
+						}
+					}
 					float u0 = -x0 / (2.0F * radius) + 0.5F;
 					float u1 = -x1 / (2.0F * radius) + 0.5F;
 					float v0 = -z0 / (2.0F * radius) + 0.5F;
@@ -963,7 +987,7 @@ public final class RustGalWorldPrimitiveRenderer {
 					int colorArgb = ARGB.white(shadowPiece.alpha());
 					PENDING_MATERIAL_QUADS.add(new VulkanicGalBridge.WorldMaterialQuadRecord(
 						STRATUM_WORLD_MATERIAL,
-						MATERIAL_ID_TRANSLUCENT_TEXTURED,
+						MATERIAL_ID_ENTITY_SHADOW,
 						MATERIAL_TEXTURE_ENTITY_SHADOW,
 						MATERIAL_MODE_TRANSLUCENT,
 						DEPTH_POLICY_TEST_NO_WRITE,
@@ -983,7 +1007,7 @@ public final class RustGalWorldPrimitiveRenderer {
 			}
 		}
 		if (submittedQuads != 0) {
-			recordEntityShadowSemanticDiagnostic(shadowSubmits.size(), submittedQuads);
+			recordEntityShadowSemanticDiagnostic(shadowSubmits.size(), submittedQuads, shadowCaptureBounds);
 			DeterministicCameraCapture.recordSubmittedWorkIdentity(
 				"entity-shadow", "rust-vulkan-whole-frame:translucent-quads=" + submittedQuads
 			);
@@ -2472,7 +2496,8 @@ public final class RustGalWorldPrimitiveRenderer {
 			fogParameters.renderStart(),
 			fogParameters.renderEnd(),
 			shaderPackDistantHorizonsRenderDistance(),
-			rustFogParameters.skyEnd()
+			rustFogParameters.skyEnd(),
+			rustFogParameters.cloudEnd()
 		);
 	}
 
@@ -4128,7 +4153,7 @@ public final class RustGalWorldPrimitiveRenderer {
 				meshKey, meshGeneration, MESH_VERTEX_LAYOUT_V2, VulkanicGalBridge.INDEX_U32,
 				meshVertices, indexBytes, sections, entityIdentity
 			),
-			List.of(minecraftModelTextureAsset(textureId, texturePayload))
+			List.of(localModelTextureAsset(textureId, texturePayload))
 		);
 			synchronized (LOCK) {
 			if (!pendingFirstPersonFrame || pendingViewportWidth <= 0 || pendingViewportHeight <= 0) return false;
@@ -9942,7 +9967,7 @@ public final class RustGalWorldPrimitiveRenderer {
 				byteSections,
 				entityIdentity
 			),
-			List.of(minecraftModelTextureAsset(textureId, texturePayload))
+			List.of(localModelTextureAsset(textureId, texturePayload))
 		);
 	}
 
@@ -10092,7 +10117,7 @@ public final class RustGalWorldPrimitiveRenderer {
 				byteSections,
 				entityIdentity + (glint ? "/glint" : "")
 			),
-			List.of(minecraftModelTextureAsset(textureId, texturePayload))
+			List.of(localModelTextureAsset(textureId, texturePayload))
 		);
 	}
 
@@ -10448,6 +10473,32 @@ public final class RustGalWorldPrimitiveRenderer {
 		);
 	}
 
+	/**
+	 * ModelPart and first-person direct meshes retain their local, normalized
+	 * Minecraft UVs. Their PNG rows are therefore already in the coordinate
+	 * order consumed by the direct mesh sampler and must not take the generic
+	 * world-material row conversion. This is an asset-coordinate contract, not
+	 * a backend-specific exception.
+	 */
+	private static VulkanicGalBridge.WorldMeshTextureAssetRecord localModelTextureAsset(
+		int textureId,
+		byte[] payload
+	) {
+		return new VulkanicGalBridge.WorldMeshTextureAssetRecord(
+			textureId,
+			payload,
+			0,
+			0,
+			1,
+			1,
+			0,
+			0,
+			0,
+			List.of(),
+			VulkanicGalBridge.WORLD_MESH_TEXTURE_COORDINATE_ORIGIN_VULKANIC
+		);
+	}
+
 	private static byte[] readTexturePayloadForResource(ResourceLocation textureLocation) {
 		var resources = Minecraft.getInstance().getResourceManager().getResourceStack(textureLocation);
 		if (resources.isEmpty()) {
@@ -10509,7 +10560,19 @@ public final class RustGalWorldPrimitiveRenderer {
 		if (!WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan()) {
 			return false;
 		}
-		return registerSemanticTextureAsset(identity, stableTextureId(identity), "standalone-model");
+		// Keep the pre-publication asset exactly aligned with
+		// extractModelPartMesh's later material extraction.  In particular,
+		// downloaded player skins are DynamicTextures which may share an identity
+		// with a resource-pack placeholder.  Publishing the generic
+		// resource-first asset here made the arm geometry's dynamic-skin UVs
+		// sample unrelated pixels before the mesh update could replace it.
+		byte[] payload = readModelTexturePayload(identity);
+		if (payload == null) return false;
+		registerWorldMeshTexture(
+			localModelTextureAsset(stableTextureId(identity), payload),
+			"standalone-model"
+		);
+		return true;
 	}
 
 	/** Reads a resource-pack payload without allowing Java to exceed the Rust FFI bound. */
@@ -11987,7 +12050,7 @@ public final class RustGalWorldPrimitiveRenderer {
 		}
 	}
 
-	private static void recordEntityShadowSemanticDiagnostic(int shadowSubmits, int quads) {
+	private static void recordEntityShadowSemanticDiagnostic(int shadowSubmits, int quads, float[] bounds) {
 		if (!DeterministicCameraCapture.isActiveForDiagnostics()) {
 			return;
 		}
@@ -11997,7 +12060,10 @@ public final class RustGalWorldPrimitiveRenderer {
 			}
 			ENTITY_SHADOW_SEMANTIC_DIAGNOSTICS.add(new EntityShadowSemanticDiagnostic(
 				DeterministicCameraCapture.currentInProgressRenderedFrameIndex(),
-				"rust-vulkan-whole-frame", shadowSubmits, quads
+				"rust-vulkan-whole-frame", shadowSubmits, quads,
+				bounds != null && Float.isFinite(bounds[0]) && bounds[2] > bounds[0] && bounds[3] > bounds[1],
+				bounds == null ? 0 : bounds[0], bounds == null ? 0 : bounds[1],
+				bounds == null ? 0 : bounds[2], bounds == null ? 0 : bounds[3]
 			));
 		}
 	}
@@ -12444,6 +12510,7 @@ public final class RustGalWorldPrimitiveRenderer {
 				throw new IllegalStateException("Rust VulkanicGAL cloud route requires a seeded bounded world primitive frame");
 			}
 			List<VulkanicGalBridge.WorldMaterialQuadRecord> quads = new ArrayList<>();
+			CloudMeshFingerprint fingerprint = new CloudMeshFingerprint();
 			for (int ring = 0; ring <= radius * 2; ring++) {
 				for (int dx = -ring; dx <= ring; dx++) {
 					int dz = ring - Math.abs(dx);
@@ -12451,9 +12518,9 @@ public final class RustGalWorldPrimitiveRenderer {
 						continue;
 					}
 					if (dz != 0) {
-						appendCloudCellFaces(quads, cells, textureWidth, textureHeight, cloudColorArgb, fancy, cameraRelation, centerCellX, centerCellZ, dx, -dz, offsetX, verticalOffset, offsetZ, viewportWidth, viewportHeight);
+						appendCloudCellFaces(quads, fingerprint, cells, textureWidth, textureHeight, cloudColorArgb, fancy, cameraRelation, centerCellX, centerCellZ, dx, -dz, offsetX, verticalOffset, offsetZ, viewportWidth, viewportHeight);
 					}
-					appendCloudCellFaces(quads, cells, textureWidth, textureHeight, cloudColorArgb, fancy, cameraRelation, centerCellX, centerCellZ, dx, dz, offsetX, verticalOffset, offsetZ, viewportWidth, viewportHeight);
+					appendCloudCellFaces(quads, fingerprint, cells, textureWidth, textureHeight, cloudColorArgb, fancy, cameraRelation, centerCellX, centerCellZ, dx, dz, offsetX, verticalOffset, offsetZ, viewportWidth, viewportHeight);
 					if (quads.size() + PENDING_MATERIAL_QUADS.size() > MAX_RUST_WORLD_MATERIAL_QUADS) {
 						throw new IllegalStateException(
 							"Rust VulkanicGAL cloud route exceeds bounded material-quad frame capacity " + MAX_RUST_WORLD_MATERIAL_QUADS
@@ -12464,18 +12531,38 @@ public final class RustGalWorldPrimitiveRenderer {
 			}
 			if (!quads.isEmpty()) {
 				PENDING_MATERIAL_QUADS.addAll(quads);
-				recordCloudSemanticDiagnostic(cells.length, radius, quads.size(), fancy);
+				recordCloudSemanticDiagnostic(
+					cells.length, radius, quads.size(), fancy, cloudColorArgb, cameraRelation, centerCellX, centerCellZ,
+					offsetX, verticalOffset, offsetZ, pendingShaderEnvironmentFrame.fogCloudsEnd(),
+					fingerprint.value, cloudFaceColorFingerprint(quads)
+				);
 				DeterministicCameraCapture.recordSubmittedWorkIdentity("clouds", "rust-vulkan-whole-frame:faces=" + quads.size());
 				auditMessage("Rust VulkanicGAL cloud semantic request route=rust-vulkan-whole-frame cells="
 					+ cells.length + " faces=" + quads.size() + " radius=" + radius + " result=queued");
 			} else {
-				recordCloudSemanticDiagnostic(cells.length, radius, 0, fancy);
+				recordCloudSemanticDiagnostic(
+					cells.length, radius, 0, fancy, cloudColorArgb, cameraRelation, centerCellX, centerCellZ,
+					offsetX, verticalOffset, offsetZ, pendingShaderEnvironmentFrame.fogCloudsEnd(), 0L, 0L
+				);
 			}
 		}
 	}
 
+	/** Capture-only FNV stream of the exact per-face ARGB payload sent to VulkanicGAL. */
+	private static long cloudFaceColorFingerprint(List<VulkanicGalBridge.WorldMaterialQuadRecord> quads) {
+		long hash = 0xcbf29ce484222325L;
+		for (VulkanicGalBridge.WorldMaterialQuadRecord quad : quads) {
+			int color = quad.colorArgb();
+			for (int shift = 0; shift < 32; shift += 8) {
+				hash = (hash ^ ((color >>> shift) & 0xFFL)) * 0x100000001b3L;
+			}
+		}
+		return hash;
+	}
+
 	private static void appendCloudCellFaces(
 		List<VulkanicGalBridge.WorldMaterialQuadRecord> quads,
+		CloudMeshFingerprint fingerprint,
 		long[] cells,
 		int textureWidth,
 		int textureHeight,
@@ -12496,6 +12583,10 @@ public final class RustGalWorldPrimitiveRenderer {
 		if (cell == 0L) {
 			return;
 		}
+		// Frozen's CloudInfo UBO supplies opaque alpha, then every entry in
+		// `rendertype_clouds.vsh`'s faceColors table contributes alpha 0.8.
+		// Copy the resulting per-face semantic alpha explicitly; RGB brightness
+		// remains a separate face-color decision below.
 		int colorArgb = ARGB.color(
 			Mth.clamp(Math.round(ARGB.alpha(cloudColorArgb) * 0.8F), 0, 255),
 			ARGB.red(cloudColorArgb),
@@ -12503,26 +12594,39 @@ public final class RustGalWorldPrimitiveRenderer {
 			ARGB.blue(cloudColorArgb)
 		);
 		if (!fancy) {
-			appendCloudFace(quads, dx, dz, 0, false, colorArgb, offsetX, verticalOffset, offsetZ, viewportWidth, viewportHeight);
+			// Frozen's active Sodium mesher encodes a DOWN face with
+			// FLAG_USE_TOP_COLOR for fast clouds.  The vertex shader therefore
+			// selects faceColors[UP] rather than faceColors[DOWN], while still
+			// retaining the ordinary cloud alpha.  Express that source semantic
+			// directly in the explicit face colour instead of treating the fast
+			// path as a reduced fancy-cloud bottom face.
+			appendCloudFaceWithCull(
+				quads, fingerprint, dx, dz, 0, false, CULL_NONE, cloudFaceColor(colorArgb, 1.0F),
+				offsetX, verticalOffset, offsetZ, viewportWidth, viewportHeight
+			);
 			return;
 		}
 		if (cameraRelation != 2) {
-			appendCloudFace(quads, dx, dz, 1, false, cloudFaceColor(colorArgb, 1.0F), offsetX, verticalOffset, offsetZ, viewportWidth, viewportHeight);
+			appendCloudFace(quads, fingerprint, dx, dz, 1, false, cloudFaceColor(colorArgb, 1.0F), offsetX, verticalOffset, offsetZ, viewportWidth, viewportHeight);
 		}
 		if (cameraRelation != 0) {
-			appendCloudFace(quads, dx, dz, 0, false, cloudFaceColor(colorArgb, 0.7F), offsetX, verticalOffset, offsetZ, viewportWidth, viewportHeight);
+			appendCloudFace(quads, fingerprint, dx, dz, 0, false, cloudFaceColor(colorArgb, 0.7F), offsetX, verticalOffset, offsetZ, viewportWidth, viewportHeight);
 		}
-		if ((cell & 8L) != 0L && dz > 0) appendCloudFace(quads, dx, dz, 2, false, cloudFaceColor(colorArgb, 0.8F), offsetX, verticalOffset, offsetZ, viewportWidth, viewportHeight);
-		if ((cell & 2L) != 0L && dz < 0) appendCloudFace(quads, dx, dz, 3, false, cloudFaceColor(colorArgb, 0.8F), offsetX, verticalOffset, offsetZ, viewportWidth, viewportHeight);
-		if ((cell & 1L) != 0L && dx > 0) appendCloudFace(quads, dx, dz, 4, false, cloudFaceColor(colorArgb, 0.9F), offsetX, verticalOffset, offsetZ, viewportWidth, viewportHeight);
-		if ((cell & 4L) != 0L && dx < 0) appendCloudFace(quads, dx, dz, 5, false, cloudFaceColor(colorArgb, 0.9F), offsetX, verticalOffset, offsetZ, viewportWidth, viewportHeight);
-		if (Math.abs(dx) <= 1 && Math.abs(dz) <= 1) {
-			appendCloudFace(quads, dx, dz, 0, true, cloudFaceColor(colorArgb, 0.7F), offsetX, verticalOffset, offsetZ, viewportWidth, viewportHeight);
-			appendCloudFace(quads, dx, dz, 1, true, cloudFaceColor(colorArgb, 1.0F), offsetX, verticalOffset, offsetZ, viewportWidth, viewportHeight);
-			appendCloudFace(quads, dx, dz, 2, true, cloudFaceColor(colorArgb, 0.8F), offsetX, verticalOffset, offsetZ, viewportWidth, viewportHeight);
-			appendCloudFace(quads, dx, dz, 3, true, cloudFaceColor(colorArgb, 0.8F), offsetX, verticalOffset, offsetZ, viewportWidth, viewportHeight);
-			appendCloudFace(quads, dx, dz, 4, true, cloudFaceColor(colorArgb, 0.9F), offsetX, verticalOffset, offsetZ, viewportWidth, viewportHeight);
-			appendCloudFace(quads, dx, dz, 5, true, cloudFaceColor(colorArgb, 0.9F), offsetX, verticalOffset, offsetZ, viewportWidth, viewportHeight);
+		if ((cell & 8L) != 0L && dz > 0) appendCloudFace(quads, fingerprint, dx, dz, 2, false, cloudFaceColor(colorArgb, 0.8F), offsetX, verticalOffset, offsetZ, viewportWidth, viewportHeight);
+		if ((cell & 2L) != 0L && dz < 0) appendCloudFace(quads, fingerprint, dx, dz, 3, false, cloudFaceColor(colorArgb, 0.8F), offsetX, verticalOffset, offsetZ, viewportWidth, viewportHeight);
+		if ((cell & 1L) != 0L && dx > 0) appendCloudFace(quads, fingerprint, dx, dz, 4, false, cloudFaceColor(colorArgb, 0.9F), offsetX, verticalOffset, offsetZ, viewportWidth, viewportHeight);
+		if ((cell & 4L) != 0L && dx < 0) appendCloudFace(quads, fingerprint, dx, dz, 5, false, cloudFaceColor(colorArgb, 0.9F), offsetX, verticalOffset, offsetZ, viewportWidth, viewportHeight);
+		// Frozen's active Sodium cloud mesher emits nearby interior faces only
+		// within taxicab distance one: the centre cell and its four cardinals.
+		// Diagonal cells remain exterior-only even though they are inside the
+		// surrounding 3x3 traversal window.
+		if (Math.abs(dx) + Math.abs(dz) <= 1) {
+			appendCloudFace(quads, fingerprint, dx, dz, 0, true, cloudFaceColor(colorArgb, 0.7F), offsetX, verticalOffset, offsetZ, viewportWidth, viewportHeight);
+			appendCloudFace(quads, fingerprint, dx, dz, 1, true, cloudFaceColor(colorArgb, 1.0F), offsetX, verticalOffset, offsetZ, viewportWidth, viewportHeight);
+			appendCloudFace(quads, fingerprint, dx, dz, 2, true, cloudFaceColor(colorArgb, 0.8F), offsetX, verticalOffset, offsetZ, viewportWidth, viewportHeight);
+			appendCloudFace(quads, fingerprint, dx, dz, 3, true, cloudFaceColor(colorArgb, 0.8F), offsetX, verticalOffset, offsetZ, viewportWidth, viewportHeight);
+			appendCloudFace(quads, fingerprint, dx, dz, 4, true, cloudFaceColor(colorArgb, 0.9F), offsetX, verticalOffset, offsetZ, viewportWidth, viewportHeight);
+			appendCloudFace(quads, fingerprint, dx, dz, 5, true, cloudFaceColor(colorArgb, 0.9F), offsetX, verticalOffset, offsetZ, viewportWidth, viewportHeight);
 		}
 	}
 
@@ -12535,12 +12639,48 @@ public final class RustGalWorldPrimitiveRenderer {
 		);
 	}
 
+	/** Capture-only byte-for-byte equivalent of Frozen's packed face stream. */
+	private static final class CloudMeshFingerprint {
+		private long value = 0xcbf29ce484222325L;
+
+		void add(int cellX, int cellZ, int face, boolean inside, boolean useTopColor) {
+			int flags = face | (inside ? 16 : 0) | (useTopColor ? 32 : 0);
+			flags |= (cellX & 1) << 7;
+			flags |= (cellZ & 1) << 6;
+			value = (value ^ ((cellX >> 1) & 0xFFL)) * 0x100000001b3L;
+			value = (value ^ ((cellZ >> 1) & 0xFFL)) * 0x100000001b3L;
+			value = (value ^ (flags & 0xFFL)) * 0x100000001b3L;
+		}
+	}
+
 	private static void appendCloudFace(
 		List<VulkanicGalBridge.WorldMaterialQuadRecord> quads,
+		CloudMeshFingerprint fingerprint,
 		int cellX,
 		int cellZ,
 		int face,
 		boolean inside,
+		int colorArgb,
+		float offsetX,
+		float verticalOffset,
+		float offsetZ,
+		int viewportWidth,
+		int viewportHeight
+	) {
+		appendCloudFaceWithCull(
+			quads, fingerprint, cellX, cellZ, face, inside, CULL_BACK, colorArgb,
+			offsetX, verticalOffset, offsetZ, viewportWidth, viewportHeight
+		);
+	}
+
+	private static void appendCloudFaceWithCull(
+		List<VulkanicGalBridge.WorldMaterialQuadRecord> quads,
+		CloudMeshFingerprint fingerprint,
+		int cellX,
+		int cellZ,
+		int face,
+		boolean inside,
+		int cullPolicy,
 		int colorArgb,
 		float offsetX,
 		float verticalOffset,
@@ -12563,28 +12703,27 @@ public final class RustGalWorldPrimitiveRenderer {
 			case 5 -> new float[] {x1, y, z, x1, y1, z, x1, y1, z1, x1, y, z1};
 			default -> throw new IllegalArgumentException("unknown cloud face " + face);
 		};
-		if (inside) {
-			for (int left = 0, right = 9; left < right; left += 3, right -= 3) {
-				float px = vertices[left];
-				float py = vertices[left + 1];
-				float pz = vertices[left + 2];
-				vertices[left] = vertices[right];
-				vertices[left + 1] = vertices[right + 1];
-				vertices[left + 2] = vertices[right + 2];
-				vertices[right] = px;
-				vertices[right + 1] = py;
-				vertices[right + 2] = pz;
-			}
-		}
+		// Frozen preserves canonical face vertices and reverses `quadVertex` in
+		// the cloud vertex shader for nearby inside faces. Express that as
+		// explicit winding rather than mutating the copied vertex order, so the
+		// Rust backend consumes one ordinary raster-state contract.
+		int winding = inside ? WORLD_WINDING_CW : WORLD_WINDING_CCW;
 		quads.add(new VulkanicGalBridge.WorldMaterialQuadRecord(
 			STRATUM_WORLD_MATERIAL,
 			MATERIAL_ID_TRANSLUCENT_TEXTURED,
 			MATERIAL_TEXTURE_GENERATED_WHITE,
 			MATERIAL_MODE_TRANSLUCENT,
-			DEPTH_POLICY_TEST_NO_WRITE,
-			face == 0 && !inside ? CULL_NONE : CULL_BACK,
+			// Frozen's RenderPipelines.CLOUDS inherits the pipeline default of
+			// LEQUAL depth testing with depth writes enabled. Preserve that
+			// semantic contract explicitly; cloud faces are not generic
+			// translucent overlays.
+			DEPTH_POLICY_TEST_WRITE,
+			// Frozen's fancy CLOUDS pipeline culls every face, while its
+			// FLAT_CLOUDS pipeline explicitly disables culling. Nearby inside
+			// faces retain visibility through their explicit winding.
+			cullPolicy,
 			WORLD_TOPOLOGY_TRIANGLES,
-			WORLD_WINDING_CCW,
+			winding,
 			colorArgb,
 			vertices[0], vertices[1], vertices[2], vertices[3], vertices[4], vertices[5],
 			vertices[6], vertices[7], vertices[8], vertices[9], vertices[10], vertices[11],
@@ -12596,6 +12735,7 @@ public final class RustGalWorldPrimitiveRenderer {
 			colorArgb,
 			LightTexture.FULL_BRIGHT
 		));
+		fingerprint.add(cellX, cellZ, face, inside, cullPolicy == CULL_NONE);
 	}
 
 	/** Capture-only receipt for the already-selected whole-frame submission. */
@@ -12813,14 +12953,30 @@ public final class RustGalWorldPrimitiveRenderer {
 		}
 	}
 
-	private static void recordCloudSemanticDiagnostic(int cells, int radius, int quads, boolean fancy) {
+	private static void recordCloudSemanticDiagnostic(
+		int cells,
+		int radius,
+		int quads,
+		boolean fancy,
+		int cloudColorArgb,
+		int cameraRelation,
+		int centerCellX,
+		int centerCellZ,
+		float offsetX,
+		float verticalOffset,
+		float offsetZ,
+		float fogCloudsEnd,
+		long meshFingerprint,
+		long faceColorFingerprint
+	) {
 		if (!DeterministicCameraCapture.isActiveForDiagnostics()) {
 			return;
 		}
 		synchronized (LOCK) {
 			if (CLOUD_SEMANTIC_DIAGNOSTICS.size() >= 128) CLOUD_SEMANTIC_DIAGNOSTICS.remove(0);
 			CLOUD_SEMANTIC_DIAGNOSTICS.add(new CloudSemanticDiagnostic(
-				DeterministicCameraCapture.currentRenderedFrameIndex(), cells, radius, quads, fancy
+				DeterministicCameraCapture.currentRenderedFrameIndex(), cells, radius, quads, fancy, cloudColorArgb,
+				cameraRelation, centerCellX, centerCellZ, offsetX, verticalOffset, offsetZ, fogCloudsEnd, meshFingerprint, faceColorFingerprint
 			));
 		}
 	}
@@ -14384,7 +14540,8 @@ public final class RustGalWorldPrimitiveRenderer {
 	) {
 	}
 
-	public record EntityShadowSemanticDiagnostic(long frameIndex, String route, int shadowSubmits, int quads) {
+	public record EntityShadowSemanticDiagnostic(long frameIndex, String route, int shadowSubmits, int quads,
+		boolean receiverBoundsValid, float receiverLeft, float receiverTop, float receiverRight, float receiverBottom) {
 	}
 
 	public record EntityShadowExecutionDiagnostic(
@@ -14465,7 +14622,24 @@ public final class RustGalWorldPrimitiveRenderer {
 	public record CloudTraversalDiagnostic(long frameIndex, String route, int cells, int radius, boolean fancy) {
 	}
 
-	public record CloudSemanticDiagnostic(long frameIndex, int cells, int radius, int quads, boolean fancy) {
+	/** Capture-only semantic receipt: all fields are copied cloud inputs, never GPU state. */
+	public record CloudSemanticDiagnostic(
+		long frameIndex,
+		int cells,
+		int radius,
+		int quads,
+		boolean fancy,
+		int cloudColorArgb,
+		int cameraRelation,
+		int centerCellX,
+		int centerCellZ,
+		float offsetX,
+		float verticalOffset,
+		float offsetZ,
+		float fogCloudsEnd,
+		long meshFingerprint,
+		long faceColorFingerprint
+	) {
 	}
 
 	public record CloudExecutionDiagnostic(long deterministicFrameIndex, String route, long gameplayFrameId, long submissionId, int quads) {

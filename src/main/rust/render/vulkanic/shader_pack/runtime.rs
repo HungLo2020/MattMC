@@ -382,6 +382,10 @@ pub(crate) struct TerrainForwardMaterialDraw {
     pub pipeline: Handle,
     pub pipeline_layout: Handle,
     pub resource_set: Handle,
+    /// Optional Rust-owned semantic resource set declared by this direct
+    /// material pipeline (currently vanilla weather's copied lightmap).
+    /// It is never a Java or backend-native handle.
+    pub shader_resource_set: Option<TerrainShaderResourceSet>,
     pub index_buffer: Handle,
     pub index_offset: u64,
     pub index_type: IndexType,
@@ -7580,7 +7584,7 @@ impl ShaderPackRuntimeExecutor {
                 draw.pipeline_layout,
                 draw.resource_set,
                 &[],
-                None,
+                draw.shader_resource_set,
                 draw.index_buffer,
                 draw.index_offset,
                 draw.index_type,

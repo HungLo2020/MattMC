@@ -2139,6 +2139,7 @@ fn decode_world_shader_environment_frame(
         fog_render_distance_start: request.fog_render_distance_start,
         fog_render_distance_end: request.fog_render_distance_end,
         fog_sky_end: request.fog_sky_end,
+        fog_clouds_end: request.fog_clouds_end,
         biome_precipitation: request.biome_precipitation,
         biome_resource_location,
         main_hand_item_model_resource_location,

@@ -38,6 +38,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.LongPredicate;
 import java.util.zip.CRC32;
 
 public final class StaticTerrainParityDiagnostics {
@@ -63,6 +64,25 @@ public final class StaticTerrainParityDiagnostics {
     private static final int MAX_VISIBLE_LIST_EVENTS = Math.max(
             1,
             Integer.getInteger("mattmc.dev.staticTerrainParityDiagnostics.maxVisibleListEvents", MAX_EVENTS)
+    );
+    /**
+     * Rust whole-frame terrain owns an independent CPU visibility domain.
+     * Keep its bounded receipts separate from Java render-list observations so
+     * a startup trace cannot displace the capture-phase comparison record.
+     */
+    private static final int MAX_WHOLE_FRAME_VISIBLE_EVENTS = Math.max(
+            1,
+            Integer.getInteger("mattmc.dev.staticTerrainParityDiagnostics.maxWholeFrameVisibleEvents", MAX_EVENTS)
+    );
+    /** Stable Java-list records need their own small bound and sample budget. */
+    private static final int MAX_READY_VISIBLE_LIST_EVENTS = Math.max(
+            1,
+            Integer.getInteger("mattmc.dev.staticTerrainParityDiagnostics.maxReadyVisibleListEvents", 4)
+    );
+    /** Shared harness policy for a stable capture-phase visible-list receipt. */
+    private static final int READY_VISIBLE_LIST_FRAMES = Math.max(
+            1,
+            Integer.getInteger("mattmc.dev.staticTerrainParityDiagnostics.readyFrames", 3)
     );
     private static final int MAX_SAMPLES = Math.max(
             0,
@@ -148,7 +168,10 @@ public final class StaticTerrainParityDiagnostics {
             "run/static_terrain_parity_diagnostics.jsonl"
     ));
     private static final AtomicInteger EVENTS = new AtomicInteger();
+    private static final AtomicInteger WHOLE_FRAME_VISIBLE_EVENTS = new AtomicInteger();
+    private static final AtomicInteger READY_VISIBLE_LIST_EVENTS = new AtomicInteger();
     private static final AtomicInteger COVERAGE_EVENTS = new AtomicInteger();
+    private static final AtomicInteger CLASSIFICATION_EVENTS = new AtomicInteger();
     private static final AtomicInteger COMPACT_LIGHTING_EVENTS = new AtomicInteger();
 	private static final AtomicInteger PORTAL_TRACE_EVENTS = new AtomicInteger();
 	private static final AtomicInteger PORTAL_ADMISSION_EVENTS = new AtomicInteger();
@@ -213,7 +236,8 @@ public final class StaticTerrainParityDiagnostics {
 	 * no renderer-owned list, GPU resource, or mutable render state.
 	 */
 	public static void recordPortalTraversal(String route, long sectionKey, long cameraSectionKey,
-			int incomingDirections, int outgoingBeforeOutwardMask, int outgoingDirections,
+			int incomingDirections, int outgoingBeforeOutwardMask, int outgoingAfterOutwardMask,
+			int adjacentMask, int outgoingDirections,
 			long visibilityData, double cameraDeltaX, double cameraDeltaY, double cameraDeltaZ) {
 		if (!matchesPortalTraceSection(sectionKey)) return;
 		if (!ENABLED || PORTAL_TRACE_EVENTS.incrementAndGet() > MAX_PORTAL_TRACE_EVENTS) return;
@@ -225,6 +249,8 @@ public final class StaticTerrainParityDiagnostics {
 		appendField(json, "cameraSectionKey", cameraSectionKey).append(", ");
 		appendField(json, "incomingDirections", incomingDirections).append(", ");
 		appendField(json, "outgoingBeforeOutwardMask", outgoingBeforeOutwardMask).append(", ");
+		appendField(json, "outgoingAfterOutwardMask", outgoingAfterOutwardMask).append(", ");
+		appendField(json, "adjacentMask", adjacentMask).append(", ");
 		appendField(json, "outgoingDirections", outgoingDirections).append(", ");
 		appendField(json, "visibilityData", String.format(java.util.Locale.ROOT, "%016x", visibilityData)).append(", ");
 		appendField(json, "cameraDeltaX", cameraDeltaX).append(", ");
@@ -352,6 +378,7 @@ public final class StaticTerrainParityDiagnostics {
 			appendField(json, "z", output.render.getChunkZ()).append(", ");
 			appendField(json, "visibilityData", String.format(Locale.ROOT, "%016x", output.info.visibilityData)).append(", ");
 			appendField(json, "flags", output.info.flags).append(", ");
+			appendField(json, "animatedSpriteCount", output.info.animatedSprites == null ? 0 : output.info.animatedSprites.length).append(", ");
 			appendField(json, "sourceGeneration", output.submitTime);
 			json.append("}\n");
 			writeLine(json.toString());
@@ -388,7 +415,11 @@ public final class StaticTerrainParityDiagnostics {
         if (!ENABLED || output == null || output.render == null || classification == null) {
             return;
         }
-        int eventIndex = COVERAGE_EVENTS.incrementAndGet();
+        if (VISIBILITY_TRACE_SECTIONS.length != 0
+                && !matchesVisibilityTraceSection(output.render.getPosition().asLong())) {
+            return;
+        }
+        int eventIndex = CLASSIFICATION_EVENTS.incrementAndGet();
         if (eventIndex > MAX_COVERAGE_EVENTS) {
             return;
         }
@@ -419,6 +450,15 @@ public final class StaticTerrainParityDiagnostics {
         } catch (IOException ignored) {
             // Diagnostics must never alter render behavior.
         }
+    }
+
+    private static boolean matchesVisibilityTraceSection(long sectionKey) {
+        for (long candidate : VISIBILITY_TRACE_SECTIONS) {
+            if (candidate == sectionKey) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -677,7 +717,7 @@ public final class StaticTerrainParityDiagnostics {
                 orderedHash = mix(orderedHash, sectionHash);
                 setXor ^= sectionHash;
                 setSum += Long.rotateLeft(sectionHash, (int) (sectionKey & 31L));
-                if (writeEvent && sectionCount < MAX_SAMPLES) {
+                if (sectionCount < MAX_SAMPLES) {
                     if (samples.length() > 1) {
                         samples.append(", ");
                     }
@@ -718,11 +758,16 @@ public final class StaticTerrainParityDiagnostics {
         // the first partially populated world-render frame.
         boolean readyCoverage = "java-opengl-draw".equals(stage)
                 && sectionCount > 0
-                && isSolidVisibleListStable(2, 1);
-        if (!writeEvent && !readyCoverage) {
+                && isSolidVisibleListStable(READY_VISIBLE_LIST_FRAMES, 1);
+        boolean writeReadyEvent = readyCoverage
+                && READY_VISIBLE_LIST_EVENTS.incrementAndGet() <= MAX_READY_VISIBLE_LIST_EVENTS;
+        if (!writeEvent && !writeReadyEvent) {
             return;
         }
-        if (writeEvent) {
+        // A bounded startup trace alone cannot certify the settled terrain
+        // domain.  Retain the later stable baseline observation too, without
+        // changing any render-list or rendering behavior.
+        if (writeEvent || writeReadyEvent) {
             String backend = backendName();
 
             StringBuilder json = new StringBuilder(2048);
@@ -756,10 +801,117 @@ public final class StaticTerrainParityDiagnostics {
                 // Diagnostics must never alter render behavior.
             }
 
-            recordVisibleCoverage(stage, layer, renderLists, cameraX, cameraY, cameraZ, viewportWidth, viewportHeight);
+            if (writeEvent) {
+                recordVisibleCoverage(stage, layer, renderLists, cameraX, cameraY, cameraZ, viewportWidth, viewportHeight);
+            }
         }
         if (readyCoverage) {
             recordVisibleCoverage("java-opengl-draw-ready", layer, renderLists, cameraX, cameraY, cameraZ, viewportWidth, viewportHeight);
+        }
+    }
+
+    /**
+     * Records the explicit Rust whole-frame source's final CPU section domain.
+     * This intentionally accepts only immutable semantic {@link RenderSection}
+     * identities selected by that source; it never observes Sodium render
+     * lists, GL state, a Vulkan resource, or a backend submission.
+     *
+     * The key/hash fields match {@link #recordVisibleLists} exactly, allowing
+     * a paired Frozen Java OpenGL capture to compare visibility domains.
+     */
+    public static void recordWholeFrameVisibleSections(
+            Iterable<RenderSection> sections,
+            double cameraX,
+            double cameraY,
+            double cameraZ,
+            int viewportWidth,
+            int viewportHeight,
+            LongPredicate portalSelected
+    ) {
+        if (!ENABLED || sections == null
+                || WHOLE_FRAME_VISIBLE_EVENTS.incrementAndGet() > MAX_WHOLE_FRAME_VISIBLE_EVENTS) {
+            return;
+        }
+        int sectionCount = 0;
+        long orderedHash = 0xcbf29ce484222325L;
+        long setXor = 0L;
+        long setSum = 0L;
+        int portalSectionCount = 0;
+        int nearbySectionCount = 0;
+        StringBuilder samples = new StringBuilder("[");
+        for (RenderSection section : sections) {
+            if (section == null) {
+                continue;
+            }
+            SectionPos position = section.getPosition();
+            long sectionKey = position.asLong();
+            int flags = section.getFlags();
+            boolean portal = portalSelected == null || portalSelected.test(sectionKey);
+            if (portal) {
+                portalSectionCount++;
+            } else {
+                nearbySectionCount++;
+            }
+            long sectionHash = 0xcbf29ce484222325L;
+            sectionHash = mix(sectionHash, sectionKey);
+            sectionHash = mix(sectionHash, flags);
+            sectionHash = mix(sectionHash, section.getOriginX());
+            sectionHash = mix(sectionHash, section.getOriginY());
+            sectionHash = mix(sectionHash, section.getOriginZ());
+            orderedHash = mix(orderedHash, sectionHash);
+            setXor ^= sectionHash;
+            setSum += Long.rotateLeft(sectionHash, (int) (sectionKey & 31L));
+            if (sectionCount < MAX_SAMPLES) {
+                if (samples.length() > 1) {
+                    samples.append(", ");
+                }
+                samples.append("{");
+                appendField(samples, "sectionKey", sectionKey).append(", ");
+                appendField(samples, "x", section.getChunkX()).append(", ");
+                appendField(samples, "y", section.getChunkY()).append(", ");
+                appendField(samples, "z", section.getChunkZ()).append(", ");
+                appendField(samples, "originX", section.getOriginX()).append(", ");
+                appendField(samples, "originY", section.getOriginY()).append(", ");
+                appendField(samples, "originZ", section.getOriginZ()).append(", ");
+                appendField(samples, "flags", flags).append(", ");
+                appendField(samples, "selectionOrigin", portal ? "portal" : "nearby");
+                samples.append("}");
+            }
+            sectionCount++;
+        }
+        samples.append("]");
+        long hash = mix(mix(0xcbf29ce484222325L, setXor), setSum);
+        Minecraft minecraft = Minecraft.getInstance();
+        long gameTime = minecraft.level == null ? -1L : minecraft.level.getGameTime();
+        StringBuilder json = new StringBuilder(2048);
+        json.append("{");
+        appendField(json, "schema", "mattmc-static-terrain-parity-visible-list-v1").append(", ");
+        appendField(json, "eventIndex", WHOLE_FRAME_VISIBLE_EVENTS.get()).append(", ");
+        appendField(json, "backend", "rust-vulkan").append(", ");
+        appendField(json, "stage", "rust-whole-frame-source").append(", ");
+        appendField(json, "layer", "all-geometry").append(", ");
+        appendField(json, "gameTime", gameTime).append(", ");
+        appendField(json, "nanoTime", System.nanoTime()).append(", ");
+        json.append("\"camera\": { ");
+        appendField(json, "x", cameraX).append(", ");
+        appendField(json, "y", cameraY).append(", ");
+        appendField(json, "z", cameraZ);
+        json.append(" }, ");
+        json.append("\"viewport\": { ");
+        appendField(json, "width", viewportWidth).append(", ");
+        appendField(json, "height", viewportHeight);
+        json.append(" }, ");
+        appendField(json, "regionCount", 0).append(", ");
+        appendField(json, "visibleSectionCount", sectionCount).append(", ");
+        appendField(json, "portalSectionCount", portalSectionCount).append(", ");
+        appendField(json, "nearbySectionCount", nearbySectionCount).append(", ");
+        appendField(json, "visibleSectionHash", String.format(Locale.ROOT, "%016x", hash)).append(", ");
+        appendField(json, "orderedSectionHash", String.format(Locale.ROOT, "%016x", orderedHash)).append(", ");
+        json.append("\"samples\": ").append(samples).append("}\n");
+        try {
+            writeLine(json.toString());
+        } catch (IOException ignored) {
+            // Diagnostics must never alter terrain selection or rendering.
         }
     }
 

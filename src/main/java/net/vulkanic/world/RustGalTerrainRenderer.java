@@ -927,6 +927,16 @@ public final class RustGalTerrainRenderer {
 		// Until the rebuild is acknowledged, this terrain family remains unavailable
 		// instead of presenting stale resource-pack materials.
 		RustGalWholeFrameTerrainSource.requestResourceReload();
+		// The source rebuild is consumed lazily by the next whole-frame enqueue.
+		// Retire the currently drawable identities here, not when that later enqueue
+		// happens: their atlas UVs name the pre-reload atlas layout and can otherwise
+		// sample unrelated sprites from the newly copied atlas for one or more frames.
+		// `removeLayer` also retires the matching Rust-owned mesh resource, so this
+		// remains an explicit semantic rebuild rather than retaining or borrowing a
+		// Java renderer/GPU object across the resource generation boundary.
+		for (LayerKey key : List.copyOf(SECTION_ASSETS.keySet())) {
+			removeLayer(key.sectionPos(), key.layer(), "resource-reload");
+		}
 		LAST_DYNAMIC_SORT_CAMERA.clear();
 		TRANSLUCENT_EXECUTION_METADATA.clear();
 		TEXTURE_PROBE_QUADS.clear();

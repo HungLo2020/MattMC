@@ -2694,17 +2694,24 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		}
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.weather.extract");
 		Vec3 cameraPos = camera.getPosition();
+		int weatherRendererTicks = net.minecraft.client.dev.DeterministicCameraCapture.weatherRendererTicksForCapture(this.ticks);
+		float weatherPartialTick = net.minecraft.client.dev.DeterministicCameraCapture.weatherPartialTickForCapture(partialTick);
 		// The normal LevelRenderer extraction resets this reusable state as part
 		// of LevelRenderState.reset(). The whole-frame shell bypasses that path,
 		// so reset only the weather-owned semantic state before rebuilding it.
 		this.levelRenderState.weatherRenderState.reset();
 		this.weatherEffectRenderer.extractRenderState(
 			this.level,
-			this.ticks,
-			partialTick,
+			weatherRendererTicks,
+			weatherPartialTick,
 			cameraPos,
 			this.levelRenderState.weatherRenderState
 		);
+		net.minecraft.client.dev.DeterministicCameraCapture.recordWeatherSemanticFingerprint(
+			WeatherEffectRenderer.weatherSemanticFingerprint(this.levelRenderState.weatherRenderState, cameraPos)
+		);
+		net.minecraft.client.dev.DeterministicCameraCapture.recordWeatherRendererTicks(weatherRendererTicks);
+		net.minecraft.client.dev.DeterministicCameraCapture.recordWeatherRendererPartialTick(weatherPartialTick);
 		net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueWorldWeather(
 			this.levelRenderState.weatherRenderState,
 			cameraPos,
@@ -2752,7 +2759,7 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			cloudStatus,
 			cloudHeight.get().intValue() + 0.33F,
 			camera.getPosition(),
-			this.ticks + partialTick
+			net.minecraft.client.dev.DeterministicCameraCapture.cloudTimeForCapture(this.ticks + partialTick)
 		);
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.clouds.extract");
 	}

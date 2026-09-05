@@ -3,6 +3,9 @@ package net.minecraft.client.gui.screens;
 import net.minecraft.client.auth.BanDetails;
 import net.logging.LogUtils;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Objects;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
@@ -46,6 +49,61 @@ public class TitleScreen extends Screen {
 	private static final Component TITLE = Component.translatable("narrator.screen.title");
 	private static final Component COPYRIGHT_TEXT = Component.translatable("title.credits");
 	private static final String DEMO_LEVEL_ID = "Demo_World";
+	private static int graphicsAuditTitleScreenReceipts;
+	/** Diagnostic-only handoff used by the Rust presenter receipt. */
+	private static volatile boolean graphicsAuditTitleScreenSemanticsObserved;
+	private static volatile boolean graphicsAuditTitleScreenFadeComplete;
+	private static volatile boolean graphicsAuditTitleFrameCaptureRequested;
+
+	public static boolean graphicsAuditTitleScreenSemanticsObserved() {
+		return graphicsAuditTitleScreenSemanticsObserved;
+	}
+
+	public static boolean graphicsAuditTitleScreenFadeComplete() {
+		return graphicsAuditTitleScreenFadeComplete;
+	}
+
+	public static boolean holdGraphicsAuditPresentedTitleFrame() {
+		if (!graphicsAuditTitleFrameCaptureRequested) return false;
+		String configured = System.getenv("MATTMC_RUST_TITLE_FRAME_CAPTURE_DIR");
+		return configured != null && !configured.isBlank()
+			&& !Files.isRegularFile(Path.of(configured).resolve("title_frame_capture.ack.json"));
+	}
+
+	private static boolean graphicsAuditTitlePanoramaCaptureReady() {
+		String configured = System.getenv("MATTMC_TITLE_SCREEN_CAPTURE_PANORAMA_SPIN");
+		if (configured == null || configured.isBlank()) return true;
+		try {
+			float target = Float.parseFloat(configured);
+			float actual = Minecraft.getInstance().gameRenderer.getPanorama().graphicsAuditSpin();
+			return Math.abs(actual - target) <= 0.01F;
+		} catch (NumberFormatException exception) {
+			LOGGER.warn("Ignoring invalid title panorama audit target {}", configured);
+			return true;
+		}
+	}
+
+	/** Diagnostic-only external-capture handshake after Rust has presented. */
+	public static void requestGraphicsAuditPresentedTitleFrameCapture() {
+		if (graphicsAuditTitleFrameCaptureRequested || !graphicsAuditTitleScreenSemanticsObserved) return;
+		if (!graphicsAuditTitlePanoramaCaptureReady()) return;
+		String configured = System.getenv("MATTMC_RUST_TITLE_FRAME_CAPTURE_DIR");
+		if (configured == null || configured.isBlank()) return;
+		try {
+			Path directory = Path.of(configured);
+			Files.createDirectories(directory);
+			Path screenshot = directory.resolve("title_frame.png");
+			float panoramaSpin = Minecraft.getInstance().gameRenderer.getPanorama().graphicsAuditSpin();
+			String json = "{\n  \"captureKind\": \"rust-vulkan-title-presented-frame\",\n  \"screenshot\": \""
+				+ screenshot.toAbsolutePath().toString().replace("\\", "\\\\") + "\",\n  \"panoramaSpin\": "
+				+ panoramaSpin + "\n}\n";
+			Files.writeString(directory.resolve("title_frame_capture.json"), json, StandardCharsets.UTF_8);
+			graphicsAuditTitleFrameCaptureRequested = true;
+			LOGGER.info("[MattMC graphics audit] rust-title-frame-capture-requested path={} panoramaSpin={}", screenshot, panoramaSpin);
+		} catch (IOException exception) {
+			LOGGER.warn("Unable to write Rust title-frame capture request", exception);
+		}
+	}
 	@Nullable
 	private SplashRenderer splash;
 	private boolean fading;
@@ -333,6 +391,21 @@ public class TitleScreen extends Screen {
 		}
 
 		guiGraphics.drawString(this.font, string, 2, this.height - 10, ARGB.color(g, -1));
+		if ((Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")
+				|| "true".equalsIgnoreCase(System.getenv("MATTMC_TITLE_SCREEN_CAPTURE")))
+			&& graphicsAuditTitleScreenReceipts++ < 4) {
+			graphicsAuditTitleScreenSemanticsObserved = true;
+			LOGGER.info(
+				"[MattMC graphics audit] title-screen semantic receipt fadeAlpha={} splash={} fading={} panoramaSpin={}",
+				g,
+				this.splash != null,
+				this.fading,
+				this.minecraft.gameRenderer.getPanorama().graphicsAuditSpin()
+			);
+		}
+		if (!this.fading) {
+			graphicsAuditTitleScreenFadeComplete = true;
+		}
 	}
 
 	@Override

@@ -1393,7 +1393,8 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 				startTime = Util.getNanos();
 				if (!this.noRender) {
 					net.minecraft.client.dev.DeterministicCameraCapture.beforeRender(this);
-					if (!net.minecraft.client.dev.DeterministicCameraCapture.holdPresentedFrameForExternalScreenshot(this)) {
+					if (!net.minecraft.client.dev.DeterministicCameraCapture.holdPresentedFrameForExternalScreenshot(this)
+						&& !net.minecraft.client.gui.screens.TitleScreen.holdGraphicsAuditPresentedTitleFrame()) {
 						net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.rendering.rust-vulkan-whole-frame");
 						boolean rendered = this.gameRenderer.renderRustVulkanWholeFrameShell(this.deltaTracker, bl);
 						net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.rendering.rust-vulkan-whole-frame");

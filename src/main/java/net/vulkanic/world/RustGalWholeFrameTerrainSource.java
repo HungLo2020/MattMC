@@ -255,12 +255,33 @@ public final class RustGalWholeFrameTerrainSource {
 				continue;
 			}
 			RenderSection section = entry.getValue();
-			if (section != null && section.getFlags() != 0 && this.isVisible(section.getPosition(), frustum)) {
+			// Sodium visits the camera-containing root before applying any
+			// frustum gate to outward traversal. `admitSection` preserves that
+			// bootstrap rule, so submission must preserve it too: a numerically
+			// marginal root AABB cannot be allowed to disappear between CPU build
+			// admission and the explicit VulkanicGAL draw domain.
+			boolean bootstrapRoot = entry.getLongKey() == this.lastCameraSection;
+			if (section != null && section.getFlags() != 0
+				&& (bootstrapRoot || this.isVisible(section.getPosition(), frustum))) {
 				visibleSections.add(section);
 				visibleKeys.add(entry.getLongKey());
 			}
 		}
+		// Preserve the final portal-selected set before the separately modeled
+		// nearby-section enlargement. The predicate is diagnostic-only and is
+		// consumed only by the bounded capture receipt below.
+		var portalVisibleKeys = new LongOpenHashSet(visibleKeys);
 		this.addNearbyVisibleSections(visibleSections, visibleKeys);
+		// Capture-only receipt of the final Rust-owned CPU visibility domain.
+		// Wait for the source's existing settled state so startup-empty samples
+		// cannot displace the comparable capture-phase observation.  This does
+		// not provide the renderer with a list or influence admission.
+		if (wholeFrameTerrainQueueDrained) {
+			StaticTerrainParityDiagnostics.recordWholeFrameVisibleSections(
+				visibleSections, camera.getPosition().x(), camera.getPosition().y(), camera.getPosition().z(),
+				viewportWidth, viewportHeight, portalVisibleKeys::contains
+			);
+		}
 		RustGalTerrainRenderer.enqueueWholeFrameTerrainSections(visibleSections, camera, viewportWidth, viewportHeight);
     }
 
@@ -626,13 +647,16 @@ public final class RustGalWholeFrameTerrainSource {
 			// to preserve Sodium's visible-section domain without touching its GL
 			// render lists or render device.
 			outgoing &= this.outwardDirections(sectionPos);
+			int outgoingAfterOutwardMask = outgoing;
 			// Sodium applies the region graph's adjacent-mask before admitting a
 			// neighbor. This source owns no Java render region, so derive the same
 			// structural constraint from its own CPU-resident/window domain instead
 			// of treating every coordinate as a linked graph node.
-			outgoing &= this.residentAdjacentMask(sectionPos);
+			int adjacentMask = this.residentAdjacentMask(sectionPos);
+			outgoing &= adjacentMask;
 			StaticTerrainParityDiagnostics.recordPortalTraversal("rust-whole-frame", key, this.lastCameraSection,
-				incomingDirections, outgoingBeforeOutwardMask, outgoing, section.getVisibilityData(),
+				incomingDirections, outgoingBeforeOutwardMask, outgoingAfterOutwardMask, adjacentMask, outgoing,
+				section.getVisibilityData(),
 				transform.x - section.getCenterX(), transform.y - section.getCenterY(), transform.z - section.getCenterZ());
 			for (int direction = 0; direction < GraphDirection.COUNT; direction++) {
 				if (!GraphDirectionSet.contains(outgoing, direction)) {

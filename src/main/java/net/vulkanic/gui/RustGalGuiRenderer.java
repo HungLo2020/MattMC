@@ -225,14 +225,12 @@ public final class RustGalGuiRenderer {
 		int left = Math.max(0, originX);
 		int top = Math.max(0, originY);
 		if (left >= right || top >= bottom) return null;
-		if (currentExecutionRoute() == GuiExecutionRoute.RUST_OPENGL_BORROWED_CONTEXT) {
-			// This path runs in Minecraft's legacy GL 3.3 context.  Lower every
-			// semantic chunk-status cell into the explicit affine primitive already
-			// used by the Rust-owned rectangle and progress-bar routes.  In
-			// particular, do not route the grid through the mesh frontend (which
-			// requires storage-buffer bindings) or an opaque copied-image shortcut:
-			// each source status and its exact color remain explicit backend-neutral
-			// data.  A loading view is bounded well below the frame-wide affine limit.
+		if (currentExecutionRoute().usesRustGui()) {
+			// A chunk status is a screen-space coloured rectangle, not a 3D item
+			// surface. Lower every cell through the explicit affine GUI primitive
+			// shared by both Rust backends. This preserves the source colour and
+			// hard edge exactly, avoids the item-mesh depth/cull contract, and never
+			// re-enters Java rendering or uses a copied-image shortcut.
 		int cellCount = Math.multiplyExact(gridSize, gridSize);
 		if (cellCount > 65_536) return null;
 		List<VulkanicGalBridge.GuiAffineQuadRecord> requests = new ArrayList<>(cellCount);
@@ -253,11 +251,13 @@ public final class RustGalGuiRenderer {
 			LOADING_GRID_PRODUCER, -1, -1.0F, GuiFillDirection.NONE,
 			left, top, right - left, bottom - top, guiWidth, guiHeight));
 	}
-		if (Boolean.parseBoolean(System.getProperty("mattmc.dev.rustGalGui.loadingGridTexture", "true"))) {
-			// The packed-image variant is an optimization, never an unbounded
-			// allocation request. Reject pathological producer strides before the
-			// byte[] multiplication below. The borrowed OpenGL affine path above
-			// remains available for the same semantic grid.
+		if (Boolean.parseBoolean(System.getProperty("mattmc.dev.rustGalGui.loadingGridTexture", "false"))) {
+			// The packed-image variant is an opt-in diagnostic optimization. It
+			// samples the status cells through the ordinary GUI sampler and can
+			// filter a vanilla-hard cell boundary. The normal Vulkan route keeps
+			// each copied status cell as an explicit coloured semantic quad, just
+			// like Frozen's rectangle producer. Reject pathological producer
+			// strides before the optional image allocation below.
 			if (extent > MAX_LOADING_GRID_TEXTURE_EDGE) return null;
 			int imageWidth = Math.max(1, (int) extent), imageHeight = imageWidth;
 			byte[] pixels = new byte[Math.multiplyExact(Math.multiplyExact(imageWidth, imageHeight), 4)];

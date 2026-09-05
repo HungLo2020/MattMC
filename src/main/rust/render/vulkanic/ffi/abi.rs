@@ -1381,6 +1381,9 @@ pub struct FfiWorldShaderEnvironmentFrame {
     /// Appended vanilla SKY pipeline fog range. This is immutable semantic
     /// game data, never a Java uniform buffer, GL state, or Iris object.
     pub fog_sky_end: f32,
+    /// Appended vanilla CLOUDS pipeline fog range. It is distinct from the
+    /// sky range in Frozen and remains copied gameplay data only.
+    pub fog_clouds_end: f32,
 }
 
 /// Coarse inventory of Java feature families observed during the same real

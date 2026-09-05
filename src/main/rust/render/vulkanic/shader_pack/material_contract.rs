@@ -195,7 +195,18 @@ pub fn pack_textured_material_source_primitives(
                 "textured material primitive {primitive_index} does not use camera-relative positions"
             )));
         }
-        for (vertex_index, vertex) in primitive.vertices.iter().enumerate() {
+        // The lowered source vertex preamble always expands its four stored
+        // vertices as `0, 1, 2, 2, 3, 0`.  Store clockwise primitives in the
+        // reverse canonical order so that fixed expansion becomes Frozen's
+        // inside-cloud sequence `3, 2, 1, 1, 0, 3`.  Merely changing the
+        // pipeline cull mode leaves the triangles counter-clockwise and
+        // makes copied clockwise semantics visibly wrong.
+        let source_indices = match primitive.winding {
+            TexturedMaterialWinding::CounterClockwise => [0, 1, 2, 3],
+            TexturedMaterialWinding::Clockwise => [3, 2, 1, 0],
+        };
+        for (packed_index, vertex_index) in source_indices.into_iter().enumerate() {
+            let vertex = primitive.vertices[vertex_index];
             if !vertex
                 .camera_relative_position
                 .into_iter()
@@ -204,7 +215,7 @@ pub fn pack_textured_material_source_primitives(
                 .all(f32::is_finite)
             {
                 return Err(GalError::invalid_argument(format!(
-                    "textured material primitive {primitive_index} vertex {vertex_index} has non-finite source data"
+                    "textured material primitive {primitive_index} vertex {packed_index} has non-finite source data"
                 )));
             }
             let color = argb_to_rgba(vertex.source_color_argb);
@@ -725,6 +736,39 @@ mod tests {
         );
         assert_eq!([0.0, 0.0], primitive.vertices[0].texture_uv);
         assert_eq!([0.0, 0.0, -1.0], primitive.vertices[0].geometric_normal);
+    }
+
+    #[test]
+    fn clockwise_source_stream_reverses_storage_for_owned_triangle_expansion() {
+        let primitive = stage_textured_material_primitive(
+            [
+                [0.0, 0.0, 0.0],
+                [1.0, 0.0, 0.0],
+                [1.0, 1.0, 0.0],
+                [0.0, 1.0, 0.0],
+            ],
+            [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]],
+            0xffff_ffff,
+            0,
+            TexturedMaterialTextureCoordinates::LocalTexture,
+            TexturedMaterialWinding::Clockwise,
+        )
+        .unwrap();
+        let packed = pack_textured_material_source_primitives(&[primitive]).unwrap();
+        let positions = packed
+            .chunks_exact(TEXTURED_MATERIAL_SOURCE_VERTEX_BYTES)
+            .map(|vertex| {
+                [
+                    f32::from_ne_bytes(vertex[0..4].try_into().unwrap()),
+                    f32::from_ne_bytes(vertex[4..8].try_into().unwrap()),
+                    f32::from_ne_bytes(vertex[8..12].try_into().unwrap()),
+                ]
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            vec![[0.0, 1.0, 0.0], [1.0, 1.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 0.0]],
+            positions
+        );
     }
 
     #[test]

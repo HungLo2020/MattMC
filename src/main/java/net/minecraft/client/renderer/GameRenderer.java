@@ -1298,7 +1298,11 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 			this.minecraft.gui.renderSavingIndicator(guiGraphics, deltaTracker);
 			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("gui.saving-indicator");
 		}
-		if (bl && this.minecraft.getOverlay() != null) {
+		// Match Frozen's lifecycle: the loading overlay remains a semantic producer
+		// even while the normal in-game GUI predicate is false during reload.
+		// Rust consumes these commands directly; this does not reopen Java GUI
+		// rendering or presentation.
+		if (this.minecraft.getOverlay() != null) {
 			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("gui.loading-overlay-semantic-extraction");
 			this.minecraft.getOverlay().render(
 				guiGraphics,
@@ -1307,7 +1311,7 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 				deltaTracker.getGameTimeDeltaTicks()
 			);
 			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("gui.loading-overlay-semantic-extraction");
-		} else if (gameLoadFinished && bl && this.minecraft.screen != null) {
+		} else if (gameLoadFinished && this.minecraft.screen != null) {
 			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("gui.screen-semantic-extraction");
 			// Every screen is extracted into GuiRenderState here. The Rust GUI
 			// collector admits only explicit text, item, rectangle, and copied-blit

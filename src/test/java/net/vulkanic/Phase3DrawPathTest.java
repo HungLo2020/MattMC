@@ -8274,8 +8274,13 @@ public class Phase3DrawPathTest {
                 "net/vulkanic/world/RustGalTerrainRenderer.java"));
         String source = readSource(SRC_MAIN_JAVA.resolve(
                 "net/vulkanic/world/RustGalWholeFrameTerrainSource.java"));
-        assertTrue(terrain.contains("RustGalWholeFrameTerrainSource.requestResourceReload()"),
+        int request = terrain.indexOf("RustGalWholeFrameTerrainSource.requestResourceReload()");
+        int retire = terrain.indexOf("removeLayer(key.sectionPos(), key.layer(), \"resource-reload\")", request);
+        int atlasReset = terrain.indexOf("atlasPayload = null", retire);
+        assertTrue(request >= 0,
                 "resource reload must request a fresh semantic terrain build when Java payloads have been released");
+        assertTrue(retire > request && atlasReset > retire,
+                "resource reload must retire every drawable pre-reload terrain mesh before publishing an atlas generation with a new layout");
         assertTrue(source.contains("resetForResourceReload()")
                         && source.contains("cpu-source-resource-reload")
                         && source.contains("RustGalTerrainRenderer.removeSection"),

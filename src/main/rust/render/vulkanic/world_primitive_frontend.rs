@@ -395,6 +395,7 @@ pub const WORLD_MATERIAL_TEXTURE_DEFAULT: u32 = WORLD_MATERIAL_TEXTURE_STONE;
 pub const WORLD_MATERIAL_ID_OPAQUE_TEXTURED: u32 = 0x6a2f_d335;
 pub const WORLD_MATERIAL_ID_CUTOUT_TEXTURED: u32 = 0x129b_1b90;
 pub const WORLD_MATERIAL_ID_TRANSLUCENT_TEXTURED: u32 = 0x4d21_a7c3;
+pub const WORLD_MATERIAL_ID_ENTITY_SHADOW: u32 = 0x5348_444d;
 pub const WORLD_MATERIAL_ID_GLINT_TEXTURED: u32 = 0x71e6_a9b4;
 pub const WORLD_MATERIAL_ID_WATER_TRANSLUCENT: u32 = 0x39e0_a7e4;
 pub const WORLD_MATERIAL_ID_BLOCK_MARKER_CUTOUT: u32 = 0x224a_8659;
@@ -421,7 +422,11 @@ const WORLD_BORDER_QUAD_BYTES: usize = 112;
 const WORLD_BORDER_UNIFORM_BYTES: u64 =
     (WORLD_BORDER_HEADER_BYTES + WORLD_MAX_BORDER_QUADS * WORLD_BORDER_QUAD_BYTES) as u64;
 const WORLD_MATERIAL_HEADER_BYTES: usize = 144;
-const WORLD_MATERIAL_QUAD_BYTES: usize = 160;
+// Four copied lightmap coordinate pairs retain the source UV2 semantic for
+// material families such as weather.  Keeping this in the shared explicit
+// quad ABI avoids a Java-side lighting policy while allowing only the
+// material programs which declare a lightmap contract to consume it.
+const WORLD_MATERIAL_QUAD_BYTES: usize = 192;
 const WORLD_MATERIAL_UNIFORM_BYTES: u64 = (WORLD_MATERIAL_HEADER_BYTES
     + WORLD_MAX_MATERIAL_QUADS_PER_BATCH * WORLD_MATERIAL_QUAD_BYTES)
     as u64;
@@ -749,6 +754,10 @@ void main() {
 "#;
 
 const WORLD_MATERIAL_VERTEX_SHADER_VULKAN: &[u8] = br#"#version 450
+#ifdef VULKANIC_GAL_WEATHER_LIGHTMAP
+layout(set = 1, binding = 0) uniform texture2D LightmapTex;
+layout(set = 1, binding = 1) uniform sampler LightmapSamp;
+#endif
 struct MaterialQuad {
     vec4 p0;
     vec4 p1;
@@ -760,6 +769,8 @@ struct MaterialQuad {
     vec4 color1;
     vec4 color2;
     vec4 color3;
+    vec4 light0_light1;
+    vec4 light2_light3;
 };
 layout(set = 0, binding = 0, std430) readonly buffer WorldMaterialBatch {
     mat4 view;
@@ -770,6 +781,8 @@ layout(set = 0, binding = 0, std430) readonly buffer WorldMaterialBatch {
 layout(location = 0) out vec2 v_uv;
 layout(location = 1) out vec4 v_color;
 layout(location = 2) flat out vec4 v_material;
+layout(location = 3) out float v_camera_distance;
+layout(location = 4) out vec2 v_lightmap_uv;
 const vec2 corner[4] = vec2[4](
     vec2(0.0, 0.0),
     vec2(1.0, 0.0),
@@ -779,16 +792,22 @@ const vec2 corner[4] = vec2[4](
 void main() {
     MaterialQuad quad = quads[gl_InstanceIndex];
     int vertex = gl_VertexIndex;
-    if (quad.p0.w > 1.5) {
-        vertex = int[4](0, 3, 2, 1)[vertex];
-    }
     vec2 c = corner[vertex];
     vec3 top = mix(quad.p0.xyz, quad.p1.xyz, c.x);
     vec3 bottom = mix(quad.p3.xyz, quad.p2.xyz, c.x);
     vec3 position = mix(top, bottom, c.y);
     vec2 uv_top = mix(quad.uv0_uv1.xy, quad.uv0_uv1.zw, c.x);
     vec2 uv_bottom = mix(quad.uv2_uv3.zw, quad.uv2_uv3.xy, c.x);
-    vec4 clip = projection * view * vec4(position, 1.0);
+    // Cloud callsites provide camera-relative positions, mirroring Frozen's
+    // CloudInfo offset contract. All other material producers provide world
+    // positions. Remove translation only for the cloud-family range so a
+    // moving camera cannot apply its translation twice to cloud geometry.
+    mat4 material_view = view;
+    if (viewport_cutout.w > 0.0) {
+        material_view[3].xyz = vec3(0.0);
+    }
+    vec4 camera_position = material_view * vec4(position, 1.0);
+    vec4 clip = projection * camera_position;
 #ifdef VULKANIC_GAL_ZERO_TO_ONE_CLIP_DEPTH
     clip.z = clip.z * 0.5 + clip.w * 0.5;
 #endif
@@ -797,7 +816,21 @@ void main() {
     vec4 color_top = mix(quad.color0, quad.color1, c.x);
     vec4 color_bottom = mix(quad.color3, quad.color2, c.x);
     v_color = mix(color_top, color_bottom, c.y);
-    v_material = vec4(viewport_cutout.z, 0.0, 0.0, 0.0);
+    vec2 light_top = mix(quad.light0_light1.xy, quad.light0_light1.zw, c.x);
+    vec2 light_bottom = mix(quad.light2_light3.xy, quad.light2_light3.zw, c.x);
+    v_lightmap_uv = mix(light_top, light_bottom, c.y);
+#ifdef VULKANIC_GAL_WEATHER_LIGHTMAP
+    // Frozen's particle/weather vertex program fetches UV2 here, before the
+    // rasterizer interpolates vertexColor across a rain quad. Sampling this
+    // in the fragment stage is observably different at light boundaries.
+    v_color *= texelFetch(sampler2D(LightmapTex, LightmapSamp), ivec2(v_lightmap_uv) / 16, 0);
+#endif
+    // `viewport_cutout.w` is a cloud-only semantic range. Zero means this
+    // ordinary material is not a vanilla cloud face. The distance is taken
+    // after the copied camera transform, matching Frozen's
+    // `fog_spherical_distance` input rather than a world-origin distance.
+    v_material = vec4(viewport_cutout.z, viewport_cutout.w, 0.0, 0.0);
+    v_camera_distance = length(camera_position.xyz);
 }
 "#;
 
@@ -807,13 +840,43 @@ layout(set = 0, binding = 2) uniform sampler Samp0;
 layout(location = 0) in vec2 v_uv;
 layout(location = 1) in vec4 v_color;
 layout(location = 2) flat in vec4 v_material;
+layout(location = 3) in float v_camera_distance;
 layout(location = 0) out vec4 out_color;
 void main() {
     vec4 color = texture(sampler2D(Tex0, Samp0), v_uv) * v_color;
     if (v_material.x > 0.0 && color.a < v_material.x) {
         discard;
     }
+    // Vanilla's `rendertype_clouds.fsh` fades the already-modulated cloud
+    // alpha by linear spherical fog from zero to `FogCloudsEnd`. This stays
+    // a cloud-family semantic; weather and generic translucent materials do
+    // not inherit it merely because they use the same private quad stream.
+    if (v_material.y > 0.0) {
+        color.a *= 1.0 - clamp(v_camera_distance / v_material.y, 0.0, 1.0);
+    }
     out_color = color;
+}
+"#;
+
+// Frozen's `RenderType.weather` uses the particle vertex contract: its
+// copied UV2 is converted to a 16x16 integer lightmap coordinate and fetched
+// without filtering.  This is a distinct source-family pipeline, so ordinary
+// material producers never acquire a lightmap dependency just because they
+// share the compact quad stream.
+const WORLD_WEATHER_MATERIAL_FRAGMENT_SHADER_VULKAN: &[u8] = br#"#version 450
+layout(set = 0, binding = 1) uniform texture2D Tex0;
+layout(set = 0, binding = 2) uniform sampler Samp0;
+layout(location = 0) in vec2 v_uv;
+layout(location = 1) in vec4 v_color;
+layout(location = 0) out vec4 out_color;
+void main() {
+    vec4 color = texture(sampler2D(Tex0, Samp0), v_uv) * v_color;
+    // RenderType.weather uses Frozen's particle fragment program: alpha is a
+    // cutout predicate after lightmap modulation, not blend coverage.
+    if (color.a < 0.1) {
+        discard;
+    }
+    out_color = vec4(color.rgb, 1.0);
 }
 "#;
 
@@ -1972,6 +2035,9 @@ pub struct WorldShaderEnvironmentFrame {
     pub fog_render_distance_end: f32,
     /// Exact vanilla `FogSkyEnd` range used by Frozen's core/sky shader.
     pub fog_sky_end: f32,
+    /// Exact vanilla `FogCloudsEnd` range used by Frozen's cloud shader.
+    /// It must not be inferred from sky or terrain fog ranges.
+    pub fog_clouds_end: f32,
     /// Vanilla precipitation at the camera block: 0 none, 1 rain, 2 snow.
     pub biome_precipitation: i32,
     /// Canonical resource location for the camera biome. This is copied
@@ -2792,6 +2858,10 @@ struct MaterialResourceKey {
     material_mode: u32,
     depth_policy: u32,
     cull_policy: u32,
+    /// Winding is explicit geometry state. It participates in resource
+    /// identity because the immutable index buffer realizes its orientation;
+    /// the shader never rewrites copied semantic vertices.
+    winding: u32,
     color_format: ColorFormat,
 }
 
@@ -2805,6 +2875,10 @@ struct MaterialResources {
     fragment_shader: Handle,
     texture_view: Handle,
     resource_layout: Handle,
+    /// Weather alone declares Frozen's particle/lightmap contract.  This
+    /// second Rust-owned descriptor layout is deliberately absent from other
+    /// material families, including menus where no world lightmap exists.
+    lightmap_resource_layout: Option<Handle>,
     pipeline_layout: Handle,
     pipeline: Handle,
     data_slots: Vec<MaterialDataSlot>,
@@ -15147,6 +15221,13 @@ impl WorldPrimitiveFrontend {
             ) {
                 (None, None, None, None, None) => None,
                 (Some(program), Some(targets), Some(resources), Some(formats), Some(blend)) => {
+                    self.write_cloud_pipeline_receipt(
+                        frame.frame_id,
+                        program,
+                        &cloud_batches,
+                        blend,
+                        targets.color_attachments.len(),
+                    );
                     let texture_transforms =
                         self.source_texture_transforms_for_owned_resources()?;
                     let mut cloud_draws = Vec::with_capacity(cloud_batches.len());
@@ -19034,12 +19115,16 @@ impl WorldPrimitiveFrontend {
             || hand_mesh_batches
                 .as_ref()
                 .is_some_and(|batches| !batches.is_empty());
-        let builtin_terrain_lightmap_layout = if fabulous_meshes_present {
+        let fabulous_lightmap_required = fabulous_meshes_present
+            || batches
+                .iter()
+                .any(|batch| batch.key.source_program == WORLD_MATERIAL_SOURCE_WEATHER);
+        let builtin_terrain_lightmap_layout = if fabulous_lightmap_required {
             if frame.shader_environment.world_generation == 0
                 || frame.shader_environment.vanilla_lightmap.is_none()
             {
                 return Err(GalError::unsupported_feature(
-                    "Rust Fabulous indexed meshes require copied vanilla lightmap semantics",
+                    "Rust Fabulous indexed meshes and weather require copied vanilla lightmap semantics",
                 ));
             }
             self.ensure_shader_runtime(gal, self.generation)?;
@@ -19073,7 +19158,7 @@ impl WorldPrimitiveFrontend {
                     .vanilla_lightmap_resource_set(gal, lightmap_layout, true)?
                     .ok_or_else(|| {
                         GalError::unsupported_feature(
-                            "Rust Fabulous indexed meshes require a staged copied vanilla lightmap",
+                        "Rust Fabulous indexed meshes and weather require a staged copied vanilla lightmap",
                         )
                     })?;
                 Some(TerrainShaderResourceSet {
@@ -19239,6 +19324,17 @@ impl WorldPrimitiveFrontend {
                     set: slot.resource_set,
                     dynamic_offsets: Vec::new(),
                 });
+                if resources.lightmap_resource_layout.is_some() {
+                    let lightmap = builtin_terrain_lightmap_resource_set.ok_or_else(|| {
+                        GalError::backend("Fabulous weather material pipeline has no staged Rust lightmap binding")
+                    })?;
+                    operations.push(CommandOp::BindResourceSet {
+                        pipeline_layout: resources.pipeline_layout,
+                        set_index: lightmap.set_index,
+                        set: lightmap.set,
+                        dynamic_offsets: Vec::new(),
+                    });
+                }
                 operations.push(CommandOp::SetIndexBuffer {
                     buffer: resources.index_buffer,
                     offset: 0,
@@ -21332,6 +21428,41 @@ impl WorldPrimitiveFrontend {
             self.ensure_material_resources(gal, batch.key)?;
             self.ensure_material_resource_slots(gal, batch.key, batch.count())?;
         }
+        let mut operations = Vec::with_capacity(batches.len() * 12);
+        let external_weather_lightmap = if batches
+            .iter()
+            .any(|batch| batch.key.source_program == WORLD_MATERIAL_SOURCE_WEATHER)
+        {
+            let lightmap = frame.shader_environment.vanilla_lightmap.ok_or_else(|| {
+                GalError::unsupported_feature(
+                    "Fabulous external weather requires copied vanilla lightmap semantics",
+                )
+            })?;
+            if frame.shader_environment.world_generation == 0 {
+                return Err(GalError::unsupported_feature(
+                    "Fabulous external weather requires a non-zero vanilla lightmap world generation",
+                ));
+            }
+            self.ensure_shader_runtime(gal, self.generation)?;
+            let layout = self.ensure_builtin_terrain_lightmap_layout(gal)?;
+            let runtime = self
+                .shader_runtime
+                .as_mut()
+                .expect("shader runtime is installed before external weather lightmap staging");
+            runtime.observe_vanilla_lightmap(frame.shader_environment.world_generation, Some(lightmap))?;
+            runtime.stage_vanilla_lightmap_residency(gal, &mut operations)?;
+            Some(
+                runtime
+                    .vanilla_lightmap_resource_set(gal, layout, true)?
+                    .ok_or_else(|| {
+                        GalError::unsupported_feature(
+                            "Fabulous external weather requires a staged Rust-owned vanilla lightmap",
+                        )
+                    })?,
+            )
+        } else {
+            None
+        };
         let set = self.fabulous_attachment_set.as_ref().ok_or_else(|| {
             GalError::backend("Fabulous attachment set missing before external material routing")
         })?;
@@ -21343,12 +21474,6 @@ impl WorldPrimitiveFrontend {
                 batch.key.source_program,
             ) {
                 Some(super::shader_pack::fabulous_targets::FabulousTargetRole::Translucent) => {
-                    // Generic textured and entity-model translucency belongs
-                    // to Vanilla's named translucent attachment. Index zero
-                    // is intentionally not reflected in `roles_written`: that
-                    // receipt is reserved for the separate item-entity
-                    // attachment, while the translucent attachment is always
-                    // populated by the deferred terrain handoff itself.
                     Some((0, &set.translucent))
                 }
                 Some(super::shader_pack::fabulous_targets::FabulousTargetRole::Particles) => {
@@ -21363,7 +21488,6 @@ impl WorldPrimitiveFrontend {
                 _ => None,
             }
         };
-        let mut operations = Vec::with_capacity(batches.len() * 12);
         let mut slot_indices = BTreeMap::<MaterialResourceKey, usize>::new();
         for batch in &batches {
             let resources = self.material_resources.get(&batch.key).ok_or_else(|| {
@@ -21445,6 +21569,17 @@ impl WorldPrimitiveFrontend {
                     set: slot.resource_set,
                     dynamic_offsets: Vec::new(),
                 });
+                if resources.lightmap_resource_layout.is_some() {
+                    let lightmap = external_weather_lightmap.ok_or_else(|| {
+                        GalError::backend("external weather material pipeline has no staged Rust lightmap binding")
+                    })?;
+                    operations.push(CommandOp::BindResourceSet {
+                        pipeline_layout: resources.pipeline_layout,
+                        set_index: 1,
+                        set: lightmap.set,
+                        dynamic_offsets: Vec::new(),
+                    });
+                }
                 operations.push(CommandOp::SetIndexBuffer {
                     buffer: resources.index_buffer,
                     offset: 0,
@@ -22492,6 +22627,57 @@ impl WorldPrimitiveFrontend {
             );
         }
     }
+
+	/// Capture-only summary of the exact explicit states selected for the
+	/// Rust-owned cloud writer.  This deliberately records semantic pipeline
+	/// inputs, not native pipeline handles or Java/Iris state, so visual
+	/// diagnosis can distinguish an incorrect source pass from later frame
+	/// composition without affecting admission or execution.
+	fn write_cloud_pipeline_receipt(
+		&self,
+		frame_id: u64,
+		program: &LoweredTexturedMaterialSourceProgram,
+		batches: &[SourceTexturedMaterialBatch],
+		blend: CloudBlend,
+		color_attachment_count: usize,
+	) {
+		if !matches!(
+			std::env::var("MATTMC_RUST_CLOUD_PIPELINE_RECEIPT")
+				.as_deref()
+				.map(str::trim),
+			Ok("1") | Ok("true") | Ok("TRUE")
+		) || !matches!(
+			std::env::var("MATTMC_GRAPHICS_AUDIT")
+				.as_deref()
+				.map(str::trim),
+			Ok("1") | Ok("true") | Ok("TRUE")
+		) {
+			return;
+		}
+		let Some(dir) = std::env::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
+			return;
+		};
+		let mut states = BTreeMap::<(u32, u32, u32), usize>::new();
+		for batch in batches {
+			*states.entry((batch.depth_policy, batch.cull_policy, batch.winding)).or_default() += batch.count;
+		}
+		let state_json = states
+			.into_iter()
+			.map(|((depth, cull, winding), quads)| {
+				format!("{{\"depth_policy\":{depth},\"cull_policy\":{cull},\"winding\":{winding},\"quads\":{quads}}}")
+			})
+			.collect::<Vec<_>>()
+			.join(",");
+		if std::fs::create_dir_all(&dir).is_ok() {
+			let _ = std::fs::write(
+				Path::new(&dir).join("rust-cloud-pipeline-last.json"),
+				format!(
+					"{{\"frame_id\":{frame_id},\"writer\":\"clouds\",\"program\":\"{}\",\"generation\":{},\"blend\":\"{:?}\",\"color_attachments\":{color_attachment_count},\"states\":[{state_json}]}}\n",
+					json_escape(program.identity.as_str()), program.shader_pack_generation, blend
+				),
+			);
+		}
+	}
 
     /// Keeps one bounded receipt for capture correlation after every actual
     /// selected-source submission. The activation evidence below intentionally
@@ -25888,16 +26074,19 @@ impl WorldPrimitiveFrontend {
         // submission and bind a descriptor retained by that exact residency;
         // there is no Java texture, native handle, or hidden renderer path.
         let builtin_terrain_lightmap_required =
-            !mesh_batches.is_empty() && source_terrain_programs.is_none();
+            (!mesh_batches.is_empty() && source_terrain_programs.is_none())
+                || material_batches
+                    .iter()
+                    .any(|batch| batch.key.source_program == WORLD_MATERIAL_SOURCE_WEATHER);
         if builtin_terrain_lightmap_required {
             let Some(lightmap_frame) = frame.shader_environment.vanilla_lightmap else {
                 return Err(GalError::unsupported_feature(
-                    "ordinary Rust indexed meshes require copied vanilla lightmap semantics",
+                    "Rust indexed meshes and weather require copied vanilla lightmap semantics",
                 ));
             };
             if frame.shader_environment.world_generation == 0 {
                 return Err(GalError::unsupported_feature(
-                    "ordinary Rust indexed meshes require copied vanilla lightmap semantics",
+                    "Rust indexed meshes and weather require copied vanilla lightmap semantics",
                 ));
             }
             self.ensure_shader_runtime(gal, self.generation)?;
@@ -26263,7 +26452,7 @@ impl WorldPrimitiveFrontend {
                 .vanilla_lightmap_resource_set(gal, lightmap_layout, true)?
                 .ok_or_else(|| {
                     GalError::unsupported_feature(
-                        "ordinary Rust indexed meshes require a staged copied vanilla lightmap",
+                        "Rust indexed meshes and weather require a staged copied vanilla lightmap",
                     )
                 })?;
             Some(TerrainShaderResourceSet {
@@ -26299,6 +26488,7 @@ impl WorldPrimitiveFrontend {
             ops.push(CommandOp::EndPass);
         }
         let mut forward_material_draws = Vec::new();
+        let mut receiver_shadow_ops = Vec::new();
         if !material_batches.is_empty() {
             let mut material_slot_indices = BTreeMap::new();
             let mut material_draws = Vec::with_capacity(material_batches.len());
@@ -26329,9 +26519,11 @@ impl WorldPrimitiveFrontend {
                     TextureUsageState::ShaderRead,
                 )));
                 material_draws.push((
+                    batch.key.material_id,
                     resources.pipeline,
                     resources.pipeline_layout,
                     slot.resource_set,
+                    resources.lightmap_resource_layout.is_some(),
                     resources.index_buffer,
                     batch.count() as u32,
                 ));
@@ -26341,9 +26533,11 @@ impl WorldPrimitiveFrontend {
                     .into_iter()
                     .map(
                         |(
+                            _material_id,
                             pipeline,
                             pipeline_layout,
                             resource_set,
+                            requires_lightmap,
                             index_buffer,
                             instance_count,
                         )| {
@@ -26351,6 +26545,9 @@ impl WorldPrimitiveFrontend {
                                 pipeline,
                                 pipeline_layout,
                                 resource_set,
+                                shader_resource_set: requires_lightmap
+                                    .then_some(builtin_terrain_lightmap_resource_set)
+                                    .flatten(),
                                 index_buffer,
                                 index_offset: 0,
                                 index_type: IndexType::U32,
@@ -26372,9 +26569,17 @@ impl WorldPrimitiveFrontend {
                         clear_color: None,
                     }),
                 });
-                for (pipeline, pipeline_layout, resource_set, index_buffer, instance_count) in
+                for (material_id, pipeline, pipeline_layout, resource_set, requires_lightmap, index_buffer, instance_count) in
                     material_draws
                 {
+                    // Receiver shadows consume the completed world depth.
+                    // The direct terrain pass below clears that attachment;
+                    // emitting shadows here would erase them under terrain.
+                    let ops = if material_id == WORLD_MATERIAL_ID_ENTITY_SHADOW {
+                        &mut receiver_shadow_ops
+                    } else {
+                        &mut ops
+                    };
                     ops.push(CommandOp::BindGraphicsPipeline(pipeline));
                     ops.push(CommandOp::BindResourceSet {
                         pipeline_layout,
@@ -26382,6 +26587,17 @@ impl WorldPrimitiveFrontend {
                         set: resource_set,
                         dynamic_offsets: Vec::new(),
                     });
+                    if requires_lightmap {
+                        let lightmap = builtin_terrain_lightmap_resource_set.ok_or_else(|| {
+                            GalError::backend("weather material pipeline has no staged Rust lightmap binding")
+                        })?;
+                        ops.push(CommandOp::BindResourceSet {
+                            pipeline_layout,
+                            set_index: lightmap.set_index,
+                            set: lightmap.set,
+                            dynamic_offsets: Vec::new(),
+                        });
+                    }
                     ops.push(CommandOp::SetIndexBuffer {
                         buffer: index_buffer,
                         offset: 0,
@@ -26868,7 +27084,34 @@ impl WorldPrimitiveFrontend {
                         instances: 1,
                     });
                 }
-                for draw in mesh_draws {
+                // Vanilla composites translucent terrain over entity shadows.
+                // Keep receiver geometry first and preserve draw order within
+                // each group. Only the shadow-bearing direct route needs this
+                // boundary; source graph ordering remains graph-owned.
+                let has_receiver_shadows = !receiver_shadow_ops.is_empty();
+                let after_receiver_shadows = |draw: &&TerrainMeshDraw| {
+                    has_receiver_shadows
+                        && draw.stratum == WORLD_STRATUM_TERRAIN
+                        && draw.material_mode == TerrainMaterialPassMode::Translucent
+                };
+                for draw in mesh_draws.iter().filter(|draw| !after_receiver_shadows(draw))
+                    .chain(mesh_draws.iter().filter(after_receiver_shadows))
+                {
+                    if after_receiver_shadows(&draw) && !receiver_shadow_ops.is_empty() {
+                        ops.push(CommandOp::EndPass);
+                        ops.push(CommandOp::BeginPass {
+                            pass,
+                            target: frame_target,
+                            colors: vec![loaded_frame_color_attachment(color_attachment)],
+                            depth_stencil: Some(PassAttachment {
+                                view: depth_view,
+                                load_op: AttachmentLoadOp::Load,
+                                store_op: AttachmentStoreOp::Store,
+                                clear_color: None,
+                            }),
+                        });
+                        ops.append(&mut receiver_shadow_ops);
+                    }
                     ops.push(CommandOp::BindGraphicsPipeline(draw.pipeline));
                     ops.push(CommandOp::BindResourceSet {
                         pipeline_layout: draw.pipeline_layout,
@@ -26905,6 +27148,21 @@ impl WorldPrimitiveFrontend {
                 }
                 self.pending_lowered_source_terrain_submission = Some(submission);
             }
+        }
+        if !receiver_shadow_ops.is_empty() {
+            ops.push(CommandOp::BeginPass {
+                pass,
+                target: frame_target,
+                colors: vec![loaded_frame_color_attachment(color_attachment)],
+                depth_stencil: Some(PassAttachment {
+                    view: depth_view,
+                    load_op: AttachmentLoadOp::Load,
+                    store_op: AttachmentStoreOp::Store,
+                    clear_color: None,
+                }),
+            });
+            ops.extend(receiver_shadow_ops);
+            ops.push(CommandOp::EndPass);
         }
         if let Some(outline_plan) = entity_outline_plan.as_ref() {
             let outline_color_only_pass = self.color_only_frame_pass(gal, frame_target)?;
@@ -28217,17 +28475,26 @@ impl WorldPrimitiveFrontend {
             return Ok(());
         }
         let label = format!(
-            "world-material-reg{}-{}-texture{}-mode{}-depth{}-cull{}-gen{}",
+            "world-material-reg{}-{}-texture{}-mode{}-depth{}-cull{}-winding{}-gen{}",
             material_registry::WORLD_MATERIAL_REGISTRY_VERSION,
             key.material_id,
             key.texture_id,
             key.material_mode,
             key.depth_policy,
             key.cull_policy,
+            key.winding,
             self.generation
         );
         let (texture_bytes, texture_width, texture_height) =
             self.world_material_texture_bytes(key.texture_id)?;
+        let material_texture_mip_levels = material_texture_mip_level_count(
+            key.source_program,
+            texture_width,
+            texture_height,
+        );
+        let lightmap_resource_layout = (key.source_program == WORLD_MATERIAL_SOURCE_WEATHER)
+            .then(|| self.ensure_builtin_terrain_lightmap_layout(gal))
+            .transpose()?;
         let mut created = Vec::new();
         let result = (|| -> GalResult<MaterialResources> {
             let upload_buffer = gal.create_buffer(BufferDesc {
@@ -28268,7 +28535,7 @@ impl WorldPrimitiveFrontend {
                     height: texture_height,
                     depth: 1,
                 },
-                mip_levels: texture_mip_level_count(texture_width, texture_height),
+                mip_levels: material_texture_mip_levels,
                 array_layers: 1,
                 usages: vec![
                     TextureUsage::Sampled,
@@ -28277,11 +28544,7 @@ impl WorldPrimitiveFrontend {
                 ],
             })?;
             created.push(texture);
-            let address_mode = if key.texture_id == WORLD_MATERIAL_TEXTURE_END_SKY {
-                SamplerAddressMode::Repeat
-            } else {
-                SamplerAddressMode::ClampToEdge
-            };
+            let address_mode = material_sampler_address_mode(key.texture_id);
             let sampler = gal.create_sampler(SamplerDesc {
                 label: format!("{label}.sampler"),
                 min_filter: SamplerFilter::Nearest,
@@ -28293,14 +28556,25 @@ impl WorldPrimitiveFrontend {
                 comparison: None,
             })?;
             created.push(sampler);
+            let weather_material = key.source_program == WORLD_MATERIAL_SOURCE_WEATHER;
+            let vertex_source = std::str::from_utf8(WORLD_MATERIAL_VERTEX_SHADER_VULKAN)
+                .expect("world material shader is UTF-8");
+            let vertex_source = if weather_material {
+                vertex_source.replacen(
+                    "#version 450",
+                    "#version 450\n#define VULKANIC_GAL_WEATHER_LIGHTMAP",
+                    1,
+                )
+            } else {
+                vertex_source.to_owned()
+            };
             let vertex_shader = gal.create_shader_module(ShaderModuleDesc {
                 label: format!("{label}.vertex"),
                 stage: ShaderStage::Vertex,
                 code_format: ShaderCodeFormat::Glsl,
                 code: shader_stage_code_for_backend(
                     gal.capabilities().api,
-                    std::str::from_utf8(WORLD_MATERIAL_VERTEX_SHADER_VULKAN)
-                        .expect("world material shader is UTF-8"),
+                    &vertex_source,
                 ),
                 entry_point: "main".to_string(),
             })?;
@@ -28309,7 +28583,11 @@ impl WorldPrimitiveFrontend {
                 label: format!("{label}.fragment"),
                 stage: ShaderStage::Fragment,
                 code_format: ShaderCodeFormat::Glsl,
-                code: WORLD_MATERIAL_FRAGMENT_SHADER_VULKAN.to_vec(),
+                code: if weather_material {
+                    WORLD_WEATHER_MATERIAL_FRAGMENT_SHADER_VULKAN.to_vec()
+                } else {
+                    WORLD_MATERIAL_FRAGMENT_SHADER_VULKAN.to_vec()
+                },
                 entry_point: "main".to_string(),
             })?;
             created.push(fragment_shader);
@@ -28318,7 +28596,7 @@ impl WorldPrimitiveFrontend {
                 texture,
                 format: TextureFormat::Rgba8Unorm,
                 base_mip: 0,
-                mip_count: texture_mip_level_count(texture_width, texture_height),
+                mip_count: material_texture_mip_levels,
                 base_layer: 0,
                 layer_count: 1,
             })?;
@@ -28362,46 +28640,35 @@ impl WorldPrimitiveFrontend {
             )?;
             created.push(slot.uniform_buffer);
             created.push(slot.resource_set);
+            let mut resource_layouts = vec![resource_layout];
+            if let Some(lightmap_layout) = lightmap_resource_layout {
+                resource_layouts.push(lightmap_layout);
+            }
             let pipeline_layout = gal.create_pipeline_layout(PipelineLayoutDesc {
                 label: format!("{label}.pipeline-layout"),
-                resource_layouts: vec![resource_layout],
+                resource_layouts,
             })?;
             created.push(pipeline_layout);
+            let (cull_mode, front_face, blend, depth_compare) = generic_material_raster_state(
+                key.source_program,
+                key.material_mode,
+                key.depth_policy,
+                key.cull_policy,
+            )?;
             let pipeline = gal.create_graphics_pipeline(GraphicsPipelineDesc {
                 label: format!("{label}.pipeline"),
                 layout: pipeline_layout,
                 vertex_shader,
                 fragment_shader,
                 topology: PrimitiveTopology::Triangles,
-                cull_mode: cull_mode_from_policy(key.cull_policy)?,
-                front_face: crate::render::vulkanic::resources::FrontFace::CounterClockwise,
+                cull_mode,
+                front_face,
                 // Material modes are semantic frontend state. In particular,
                 // the real vanilla weather producer shares this generic quad
                 // path and must retain straight-alpha composition rather than
                 // being treated as an opaque texture writer.
-                blend: if key.material_mode == WORLD_MATERIAL_MODE_GLINT {
-                    BlendMode::Glint
-                } else if key.material_mode == WORLD_MATERIAL_MODE_TRANSLUCENT {
-                    BlendMode::Alpha
-                } else {
-                    BlendMode::Disabled
-                },
-                depth_compare: if key.material_mode == WORLD_MATERIAL_MODE_GLINT {
-                    Some(CompareOp::Equal)
-                } else {
-                    match key.depth_policy {
-                        WORLD_DEPTH_POLICY_DISABLED => None,
-                        WORLD_DEPTH_POLICY_TEST_WRITE | WORLD_DEPTH_POLICY_TEST_NO_WRITE => {
-                            Some(CompareOp::LessOrEqual)
-                        }
-                        _ => {
-                            return Err(GalError::ffi(
-                                StatusCode::UnknownEnum,
-                                format!("unknown world material depth policy {}", key.depth_policy),
-                            ));
-                        }
-                    }
-                },
+                blend,
+                depth_compare,
                 depth_write: key.material_mode != WORLD_MATERIAL_MODE_GLINT
                     && key.depth_policy == WORLD_DEPTH_POLICY_TEST_WRITE,
                 depth_bias: None,
@@ -28420,6 +28687,7 @@ impl WorldPrimitiveFrontend {
                 fragment_shader,
                 texture_view,
                 resource_layout,
+                lightmap_resource_layout,
                 pipeline_layout,
                 pipeline,
                 data_slots: vec![slot],
@@ -28427,6 +28695,7 @@ impl WorldPrimitiveFrontend {
             self.upload_material_resources(
                 gal,
                 &resources,
+                key,
                 texture_bytes,
                 texture_width,
                 texture_height,
@@ -28514,12 +28783,13 @@ impl WorldPrimitiveFrontend {
         &mut self,
         gal: &mut VulkanicGal,
         resources: &MaterialResources,
+        key: MaterialResourceKey,
         texture_bytes: Vec<u8>,
         texture_width: u32,
         texture_height: u32,
     ) -> GalResult<()> {
         let mut index_bytes = Vec::with_capacity(WORLD_MATERIAL_INDEX_BYTES as usize);
-        for index in [0_u32, 1, 2, 2, 3, 0] {
+        for index in material_quad_indices_for_winding(key.winding)? {
             push_u32(&mut index_bytes, index);
         }
         let operations = vec![
@@ -29621,15 +29891,24 @@ impl WorldPrimitiveFrontend {
         Ok((vec![base], width, height))
     }
 
-    /// ModelPart UVs retain Minecraft's top-left PNG convention. The Vulkan
-    /// sampler addresses the uploaded rows in that same semantic order, so
-    /// local entity payloads must not be vertically flipped here.
+    /// ModelPart UVs retain Minecraft's top-left PNG convention. The local
+    /// model sampler addresses uploaded rows in that same semantic order, so
+    /// this path must preserve those rows rather than applying the ordinary
+    /// terrain-atlas conversion a second time.
     fn source_local_material_texture_bytes(
         &self,
         texture_id: u32,
     ) -> GalResult<(Vec<u8>, u32, u32)> {
         if let Some(asset) = self.mesh_texture_assets.get(&texture_id) {
-            return Ok((sampled_texture_bytes(asset)?, asset.width, asset.height));
+            let expected = usize::try_from(asset.width)
+                .ok()
+                .and_then(|width| usize::try_from(asset.height).ok()?.checked_mul(width))
+                .and_then(|pixels| pixels.checked_mul(4))
+                .ok_or_else(|| GalError::invalid_argument("source-local texture dimensions overflow"))?;
+            if asset.rgba.len() != expected {
+                return Err(GalError::invalid_argument("source-local texture payload has invalid dimensions"));
+            }
+            return Ok((asset.rgba.clone(), asset.width, asset.height));
         }
         self.world_material_texture_bytes(texture_id)
     }
@@ -33849,7 +34128,7 @@ fn trace_static_terrain_appearance(
             "\"stage\":\"ffi-decoded-to-shader-packed\",\"meshKey\":\"{:016x}\",",
             "\"meshGeneration\":{},\"vertexLayoutVersion\":{},\"indexType\":\"{:?}\",",
             "\"vertexCount\":{},\"shaderUniformContract\":{{",
-            "\"perVertex\":\"color_rgb_times_bakedLightFactor; normal_i8; block_sky_light; atlas_uv; shader_ids\",",
+            "\"perVertex\":\"color_rgba; normal_i8; block_sky_light_for_explicit_vanilla_lightmap; atlas_uv; shader_ids\",",
             "\"perPass\":\"view;projection;light_view_projection;shadow_params;fog;color_grade\"}},",
             "\"atlasUploadConvention\":\"minecraft-atlas-uv-preserved\",",
             "\"sections\":[{}],\"samples\":[{}]}}\n"
@@ -34719,11 +34998,59 @@ fn border_batches(frame: &WorldPrimitiveFrame) -> Vec<BorderBatch> {
     batches
 }
 
+/// Resolves the copied vanilla sampler wrap policy for source-local material
+/// textures.  Weather's U/V coordinates deliberately scroll beyond `[0, 1]`;
+/// Frozen loads those PNGs without clamp metadata, so both axes must repeat.
+/// Keeping this identity policy beside material resource creation prevents the
+/// private Vulkan sampler from inheriting an unrelated generic-local-texture
+/// default.
+fn material_sampler_address_mode(texture_id: u32) -> SamplerAddressMode {
+    match texture_id {
+        WORLD_MATERIAL_TEXTURE_END_SKY
+        | WORLD_MATERIAL_TEXTURE_WEATHER_RAIN
+        | WORLD_MATERIAL_TEXTURE_WEATHER_SNOW => SamplerAddressMode::Repeat,
+        _ => SamplerAddressMode::ClampToEdge,
+    }
+}
+
+/// Java's weather `TextureStateShard` deliberately declares `mipmap=false`.
+/// The copied rain and snow images are therefore sampled exclusively from mip
+/// zero in Frozen.  Keep that source policy explicit in the Rust-owned
+/// resource description instead of silently allocating a derivative-selected
+/// mip chain for the weather stream.
+fn material_texture_mip_level_count(source_program: u32, width: u32, height: u32) -> u32 {
+    if source_program == WORLD_MATERIAL_SOURCE_WEATHER {
+        1
+    } else {
+        texture_mip_level_count(width, height)
+    }
+}
+
+
 fn material_batches(frame: &WorldPrimitiveFrame, color_format: ColorFormat) -> Vec<MaterialBatch> {
     let mut batches: Vec<MaterialBatch> = Vec::new();
     let mut key_to_batch = BTreeMap::<MaterialResourceKey, usize>::new();
     for (index, quad) in frame.material_quads.iter().enumerate() {
         let key = material_key(quad, color_format);
+        // Clouds use ordinary source-alpha composition.  Their decoded face
+        // stream is therefore part of the semantic result: re-grouping an
+        // earlier cloud face after a later one changes overlapping interior
+        // and exterior pixels. Frozen emits one ordered cloud stream, so keep
+        // only adjacent compatible cloud faces together. Other material
+        // families retain their established resource-key batching.
+        if key.source_program == WORLD_MATERIAL_SOURCE_CLOUDS {
+            if let Some(previous) = batches.last_mut().filter(|batch| {
+                batch.key == key && batch.count() < WORLD_MAX_MATERIAL_QUADS_PER_BATCH
+            }) {
+                previous.indices.push(index);
+            } else {
+                batches.push(MaterialBatch {
+                    key,
+                    indices: vec![index],
+                });
+            }
+            continue;
+        }
         let reusable_batch = key_to_batch.get(&key).copied().filter(|batch_index| {
             batches[*batch_index].count() < WORLD_MAX_MATERIAL_QUADS_PER_BATCH
         });
@@ -35315,6 +35642,7 @@ fn material_key(quad: &WorldMaterialQuadRequest, color_format: ColorFormat) -> M
         material_mode: quad.material_mode,
         depth_policy: quad.depth_policy,
         cull_policy: quad.cull_policy,
+        winding: quad.winding,
         color_format,
     }
 }
@@ -35729,7 +36057,7 @@ fn stage_source_material_primitives_for_indices(
             | WORLD_MATERIAL_SOURCE_WEATHER
             | WORLD_MATERIAL_SOURCE_CLOUDS => {
                 staged.push(stage_textured_material_primitive_with_vertex_modulation(
-                    quad.vertices,
+                    layered_material_vertices(quad),
                     quad.uvs,
                     quad.vertex_color_argb,
                     quad.vertex_packed_light,
@@ -36465,6 +36793,24 @@ fn effective_cull_mode_for_winding(policy: u32, winding: u32) -> GalResult<CullM
     }
 }
 
+/// Material quads use one canonical vertex payload.  The explicit winding
+/// declaration is realized by the immutable index buffer, matching Frozen's
+/// cloud shader vertex selection without smuggling a per-face branch into the
+/// Rust shader.  Raster culling remains the copied pipeline policy.
+fn material_quad_indices_for_winding(winding: u32) -> GalResult<[u32; 6]> {
+    match winding {
+        WORLD_WINDING_CCW => Ok([0, 1, 2, 2, 3, 0]),
+        // Frozen's nearby inside-cloud faces select `3 - quadVertex` for the
+        // ordinary sequential QUADS index stream.  This is that exact indexed
+        // triangle expansion: [3, 2, 1, 1, 0, 3].
+        WORLD_WINDING_CW => Ok([3, 2, 1, 1, 0, 3]),
+        _ => Err(GalError::ffi(
+            StatusCode::UnknownEnum,
+            format!("unknown world material winding {winding}"),
+        )),
+    }
+}
+
 /// One capture process may opt into a bounded source-raster isolation probe.
 /// The setting is deliberately private to the source-derived diagnostic route;
 /// normal gameplay never reads it and cannot inherit relaxed raster state.
@@ -36496,6 +36842,68 @@ fn selected_source_raster_probe_from(value: Option<&str>) -> GalResult<SelectedS
             "unknown selected-source raster probe '{other}'; expected no-cull, depth-disabled, blend-disabled, or invert-front-face"
         ))),
     }
+}
+
+/// Produces the generic material raster state from explicit semantic policy.
+/// A probe is process-local capture instrumentation; absent it, this is the
+/// production state for every material, including clouds.
+fn generic_material_raster_state(
+    source_program: u32,
+    material_mode: u32,
+    depth_policy: u32,
+    cull_policy: u32,
+) -> GalResult<(CullMode, FrontFace, BlendMode, Option<CompareOp>)> {
+    // A capture probe is deliberately limited to the cloud family under
+    // investigation.  Other generic material producers share this backend
+    // helper, and letting their pixels respond would make a cloud experiment
+    // inconclusive rather than proving the selected cloud draw's state.
+    let probe = if source_program == WORLD_MATERIAL_SOURCE_CLOUDS {
+        selected_source_raster_probe()?
+    } else {
+        SelectedSourceRasterProbe::None
+    };
+    generic_material_raster_state_for(probe, material_mode, depth_policy, cull_policy)
+}
+
+fn generic_material_raster_state_for(
+    probe: SelectedSourceRasterProbe,
+    material_mode: u32,
+    depth_policy: u32,
+    cull_policy: u32,
+) -> GalResult<(CullMode, FrontFace, BlendMode, Option<CompareOp>)> {
+    let mut cull_mode = cull_mode_from_policy(cull_policy)?;
+    let mut front_face = FrontFace::CounterClockwise;
+    let mut blend = if material_mode == WORLD_MATERIAL_MODE_GLINT {
+        BlendMode::Glint
+    } else if material_mode == WORLD_MATERIAL_MODE_TRANSLUCENT {
+        BlendMode::Alpha
+    } else {
+        BlendMode::Disabled
+    };
+    let mut depth_compare = if material_mode == WORLD_MATERIAL_MODE_GLINT {
+        Some(CompareOp::Equal)
+    } else {
+        match depth_policy {
+            WORLD_DEPTH_POLICY_DISABLED => None,
+            WORLD_DEPTH_POLICY_TEST_WRITE | WORLD_DEPTH_POLICY_TEST_NO_WRITE => {
+                Some(CompareOp::LessOrEqual)
+            }
+            _ => {
+                return Err(GalError::ffi(
+                    StatusCode::UnknownEnum,
+                    format!("unknown world material depth policy {depth_policy}"),
+                ));
+            }
+        }
+    };
+    match probe {
+        SelectedSourceRasterProbe::None | SelectedSourceRasterProbe::InvertFrontFace => {}
+        SelectedSourceRasterProbe::NoCull => cull_mode = CullMode::None,
+        SelectedSourceRasterProbe::DepthDisabled => depth_compare = None,
+        SelectedSourceRasterProbe::BlendDisabled => blend = BlendMode::Disabled,
+    }
+    front_face = selected_source_raster_probe_front_face_for(probe, front_face)?;
+    Ok((cull_mode, front_face, blend, depth_compare))
 }
 
 pub(super) fn selected_source_raster_probe_cull_mode() -> GalResult<CullMode> {
@@ -37055,6 +37463,17 @@ fn packed_border_uniforms_for_batch(
     Ok(out)
 }
 
+/// World material positions are camera-relative. Applying the material's
+/// scale before the copied view matrix is equivalent to vanilla's
+/// ModelViewMat.scale(1 - 1/4096) for perspective world shadow layering.
+/// This is resolved from semantic material metadata, independently of texture
+/// identity, and is shared by direct and source-program lowering.
+fn layered_material_vertices(quad: &WorldMaterialQuadRequest) -> [[f32; 3]; 4] {
+    let scale = material_registry::material(quad.material_id)
+        .map_or(1.0, |material| material.perspective_layer_scale);
+    quad.vertices.map(|vertex| vertex.map(|component| component * scale))
+}
+
 fn packed_material_uniforms_for_batch(
     frame: &WorldPrimitiveFrame,
     batch: &MaterialBatch,
@@ -37072,10 +37491,21 @@ fn packed_material_uniforms_for_batch(
         &mut out,
         material_registry::cutout_threshold(batch.key.material_id),
     );
-    push_f32(&mut out, 0.0);
+    // The compact material ABI reserves the fourth header component for the
+    // explicit cloud-only fog range. This preserves the existing header and
+    // makes the source-family boundary visible to the Rust shader without
+    // routing cloud work through generic terrain fog or Java state.
+    push_f32(
+        &mut out,
+        if batch.key.source_program == WORLD_MATERIAL_SOURCE_CLOUDS {
+            frame.shader_environment.fog_clouds_end
+        } else {
+            0.0
+        },
+    );
     for index in &batch.indices {
         let quad = &frame.material_quads[*index];
-        for (vertex_index, vertex) in quad.vertices.iter().enumerate() {
+        for (vertex_index, vertex) in layered_material_vertices(quad).iter().enumerate() {
             for value in vertex {
                 push_f32(&mut out, *value);
             }
@@ -37098,6 +37528,11 @@ fn packed_material_uniforms_for_batch(
         push_f32(&mut out, quad.uvs[3][1]);
         for vertex_color in quad.vertex_color_argb {
             for value in argb_to_rgba(vertex_color) {
+                push_f32(&mut out, value);
+            }
+        }
+        for packed_light in quad.vertex_packed_light {
+            for value in source_lightmap_coordinates(packed_light) {
                 push_f32(&mut out, value);
             }
         }
@@ -37227,12 +37662,23 @@ fn append_mesh_instances(
         push_f32(out, if animation_sample.animated { 1.0 } else { 0.0 });
         push_f32(out, animation_sample.interpolation);
         // The fourth material lane is an explicit texture-coordinate-space
-        // selector for the shared direct-terrain ABI. Animation generation
-        // was never consumed by shader code; retaining it here made atlas
-        // vertices indistinguishable from local water-sprite vertices.
+        // selector for the shared direct-terrain ABI. Values two and three
+        // identify the entity-mesh family's Mojang directional-lighting
+        // contract while retaining local texture coordinates. This includes
+        // ordinary living entities as well as block entities and first-person
+        // baked models; the latter carries the copied Nether level-light
+        // variant from the existing semantic background classification.
         push_f32(
             out,
-            mesh_texture_uses_atlas_coordinates(batch.key.texture_id) as u8 as f32,
+            if batch.key.stratum == WORLD_STRATUM_ENTITY_MESH {
+                if frame.background.sky_type == WORLD_BACKGROUND_SKY_NETHER {
+                    3.0
+                } else {
+                    2.0
+                }
+            } else {
+                mesh_texture_uses_atlas_coordinates(batch.key.texture_id) as u8 as f32
+            },
         );
         for value in animation_sample.current_region {
             push_f32(out, value);
@@ -37307,7 +37753,7 @@ fn sky_fog_receipt_json(frame: &WorldPrimitiveFrame) -> GalResult<String> {
             "\"fog_color\":[{},{},{}],",
             "\"fog_parameter_color\":[{},{},{},{}],",
             "\"environmental_start\":{},\"environmental_end\":{},",
-            "\"render_distance_start\":{},\"render_distance_end\":{},\"sky_end\":{},",
+            "\"render_distance_start\":{},\"render_distance_end\":{},\"sky_end\":{},\"clouds_end\":{},",
             "\"background_clear_argb\":{},\"sky_disc_color_argb\":{},",
             "\"sky_dark_disc\":{},\"dark_disc_quad_count\":{},",
             "\"projection\":{},\"projection_inverse\":{}}}\n"
@@ -37326,6 +37772,7 @@ fn sky_fog_receipt_json(frame: &WorldPrimitiveFrame) -> GalResult<String> {
         fog.fog_render_distance_start,
         fog.fog_render_distance_end,
         fog.fog_sky_end,
+        fog.fog_clouds_end,
         frame.background.color_argb,
         frame.background.sky.sky_color_argb,
         frame.background.sky.dark_disc,
@@ -40130,6 +40577,46 @@ mod tests {
     }
 
     #[test]
+    fn generic_cloud_raster_state_preserves_production_and_isolates_each_probe() {
+        let normal = generic_material_raster_state_for(
+            SelectedSourceRasterProbe::None,
+            WORLD_MATERIAL_MODE_TRANSLUCENT,
+            WORLD_DEPTH_POLICY_TEST_NO_WRITE,
+            WORLD_CULL_BACK,
+        )
+        .unwrap();
+        assert_eq!(CullMode::Back, normal.0);
+        assert_eq!(FrontFace::CounterClockwise, normal.1);
+        assert_eq!(BlendMode::Alpha, normal.2);
+        assert_eq!(Some(CompareOp::LessOrEqual), normal.3);
+
+        let depth_disabled = generic_material_raster_state_for(
+            SelectedSourceRasterProbe::DepthDisabled,
+            WORLD_MATERIAL_MODE_TRANSLUCENT,
+            WORLD_DEPTH_POLICY_TEST_NO_WRITE,
+            WORLD_CULL_BACK,
+        )
+        .unwrap();
+        assert_eq!(normal.0, depth_disabled.0);
+        assert_eq!(normal.1, depth_disabled.1);
+        assert_eq!(normal.2, depth_disabled.2);
+        assert_eq!(None, depth_disabled.3);
+
+        let no_cull = generic_material_raster_state_for(
+            SelectedSourceRasterProbe::NoCull,
+            WORLD_MATERIAL_MODE_TRANSLUCENT,
+            WORLD_DEPTH_POLICY_TEST_NO_WRITE,
+            WORLD_CULL_BACK,
+        )
+        .unwrap();
+        assert_eq!(CullMode::None, no_cull.0);
+        assert_eq!(normal.1, no_cull.1);
+        assert_eq!(normal.2, no_cull.2);
+        assert_eq!(normal.3, no_cull.3);
+
+    }
+
+    #[test]
     fn translucent_source_uses_first_writer_phase_without_bootstrap_batches() {
         assert_eq!(
             TerrainSourceColorPassPhase::TranslucentFirst,
@@ -41517,6 +42004,7 @@ mod tests {
             fog_render_distance_start: 24.0,
             fog_render_distance_end: 128.0,
             fog_sky_end: 128.0,
+            fog_clouds_end: 96.0,
             biome_precipitation: 2,
             biome_resource_location: "minecraft:snowy_plains".to_string(),
             main_hand_item_model_resource_location: "minecraft:lava_bucket".to_string(),
@@ -42769,6 +43257,7 @@ mod tests {
             fog_render_distance_start: 24.0,
             fog_render_distance_end: 128.0,
             fog_sky_end: 128.0,
+            fog_clouds_end: 96.0,
             biome_precipitation: 2,
             biome_resource_location: "minecraft:snowy_plains".to_string(),
             main_hand_item_model_resource_location: "minecraft:lava_bucket".to_string(),
@@ -44076,6 +44565,7 @@ mod tests {
             fog_render_distance_start: 24.0,
             fog_render_distance_end: 128.0,
             fog_sky_end: 128.0,
+            fog_clouds_end: 96.0,
             biome_precipitation: 2,
             biome_resource_location: "minecraft:snowy_plains".to_string(),
             main_hand_item_model_resource_location: "minecraft:lava_bucket".to_string(),
@@ -44656,6 +45146,7 @@ mod tests {
             fog_render_distance_start: 24.0,
             fog_render_distance_end: 128.0,
             fog_sky_end: 128.0,
+            fog_clouds_end: 96.0,
             biome_precipitation: 2,
             biome_resource_location: "minecraft:snowy_plains".to_string(),
             main_hand_item_model_resource_location: "minecraft:lava_bucket".to_string(),
@@ -46008,6 +46499,11 @@ mod tests {
     fn terrain_external_material_families_lower_to_named_fabulous_roles() {
         let mut gal = gal();
         let mut frontend = WorldPrimitiveFrontend::default();
+        // The production frame entrypoint establishes a non-zero Rust-owned
+        // generation before external Fabulous material staging. Keep this
+        // direct helper fixture on that same explicit resource-generation
+        // contract instead of admitting an invalid shader-pack manifest.
+        frontend.generation = 1;
         frontend.fabulous_attachment_set = Some(
             crate::render::vulkanic::shader_pack::fabulous_targets::FabulousAttachmentSet::create_with_external_formats(
                 &mut gal,
@@ -47524,6 +48020,91 @@ mod tests {
     }
 
     #[test]
+    fn vanilla_weather_sampler_repeats_the_scrolling_texture_axes() {
+        // Frozen's WEATHER pipeline uses the particle sampler with no clamp
+        // metadata for environment/rain.png or environment/snow.png.  The
+        // producer's V coordinate scrolls by world height, so ClampToEdge
+        // would turn the body of a column into its border texel.
+        assert_eq!(
+            SamplerAddressMode::Repeat,
+            material_sampler_address_mode(WORLD_MATERIAL_TEXTURE_WEATHER_RAIN)
+        );
+        assert_eq!(
+            SamplerAddressMode::Repeat,
+            material_sampler_address_mode(WORLD_MATERIAL_TEXTURE_WEATHER_SNOW)
+        );
+        assert_eq!(
+            SamplerAddressMode::ClampToEdge,
+            material_sampler_address_mode(WORLD_MATERIAL_TEXTURE_STONE)
+        );
+    }
+
+    #[test]
+    fn vanilla_weather_texture_disables_derivative_selected_mips() {
+        // `RenderType.createWeather` supplies TextureStateShard(..., false),
+        // and the simple rain/snow resources carry no mipmap metadata. The
+        // Rust resource must therefore expose only base level zero.
+        assert_eq!(
+            1,
+            material_texture_mip_level_count(WORLD_MATERIAL_SOURCE_WEATHER, 32, 64)
+        );
+        assert_eq!(
+            7,
+            material_texture_mip_level_count(WORLD_MATERIAL_SOURCE_TEXTURED, 32, 64)
+        );
+    }
+
+    #[test]
+    fn material_batches_keep_opposite_cloud_winding_in_distinct_raster_pipelines() {
+        let mut frame = frame(Vec::new());
+        let mut outer = material_quad(
+            WORLD_MATERIAL_MODE_TRANSLUCENT,
+            WORLD_DEPTH_POLICY_TEST_NO_WRITE,
+        );
+        outer.source_program = WORLD_MATERIAL_SOURCE_CLOUDS;
+        outer.winding = WORLD_WINDING_CCW;
+        let mut inside = outer.clone();
+        inside.winding = WORLD_WINDING_CW;
+        frame.material_quads = vec![outer, inside];
+
+        let batches = material_batches(&frame, ColorFormat::Bgra8Unorm);
+        assert_eq!(2, batches.len());
+        assert_eq!(WORLD_WINDING_CCW, batches[0].key.winding);
+        assert_eq!(WORLD_WINDING_CW, batches[1].key.winding);
+        assert_eq!(CullMode::Back, cull_mode_from_policy(batches[0].key.cull_policy).unwrap());
+        assert_eq!(CullMode::Back, cull_mode_from_policy(batches[1].key.cull_policy).unwrap());
+        assert_eq!([0, 1, 2, 2, 3, 0], material_quad_indices_for_winding(batches[0].key.winding).unwrap());
+        assert_eq!([3, 2, 1, 1, 0, 3], material_quad_indices_for_winding(batches[1].key.winding).unwrap());
+    }
+
+    #[test]
+    fn cloud_material_batches_preserve_non_adjacent_semantic_face_order() {
+        let mut frame = frame(Vec::new());
+        let mut outer = material_quad(
+            WORLD_MATERIAL_MODE_TRANSLUCENT,
+            WORLD_DEPTH_POLICY_TEST_NO_WRITE,
+        );
+        outer.source_program = WORLD_MATERIAL_SOURCE_CLOUDS;
+        outer.winding = WORLD_WINDING_CCW;
+        let mut inside = outer.clone();
+        inside.winding = WORLD_WINDING_CW;
+        // Frozen's cloud face stream can return to an exterior raster key
+        // after an interior face. Keeping that return as a separate batch is
+        // required for source-alpha ordering; coalescing it would draw 0, 2,
+        // 1 instead of the copied 0, 1, 2 order.
+        frame.material_quads = vec![outer.clone(), inside, outer];
+
+        let batches = material_batches(&frame, ColorFormat::Bgra8Unorm);
+        assert_eq!(3, batches.len());
+        assert_eq!(vec![0], batches[0].indices);
+        assert_eq!(vec![1], batches[1].indices);
+        assert_eq!(vec![2], batches[2].indices);
+        assert_eq!(WORLD_WINDING_CCW, batches[0].key.winding);
+        assert_eq!(WORLD_WINDING_CW, batches[1].key.winding);
+        assert_eq!(WORLD_WINDING_CCW, batches[2].key.winding);
+    }
+
+    #[test]
     fn material_batches_split_a_large_compatible_frame_at_the_draw_payload_limit() {
         let mut frame = frame(Vec::new());
         let quad = material_quad(WORLD_MATERIAL_MODE_OPAQUE, WORLD_DEPTH_POLICY_TEST_WRITE);
@@ -47559,6 +48140,33 @@ mod tests {
         assert_eq!(0.0, read_f32(&opaque_uniforms, 34));
         assert_eq!(0.5, read_f32(&cutout_uniforms, 34));
     }
+
+    #[test]
+    fn cloud_material_batches_carry_only_the_explicit_cloud_fog_range() {
+        let mut frame = frame(Vec::new());
+        frame.shader_environment.fog_clouds_end = 160.0;
+        let generic = material_quad(WORLD_MATERIAL_MODE_TRANSLUCENT, WORLD_DEPTH_POLICY_TEST_NO_WRITE);
+        let mut cloud = generic.clone();
+        cloud.source_program = WORLD_MATERIAL_SOURCE_CLOUDS;
+        frame.material_quads = vec![generic, cloud];
+
+        let batches = material_batches(&frame, ColorFormat::Bgra8Unorm);
+        assert_eq!(2, batches.len());
+        let generic_uniforms = packed_material_uniforms_for_batch(&frame, &batches[0]).unwrap();
+        let cloud_uniforms = packed_material_uniforms_for_batch(&frame, &batches[1]).unwrap();
+
+        // Header word 35 is the cloud-only range. It must never leak into
+        // ordinary translucent materials which share this compact writer.
+        assert_eq!(0.0, read_f32(&generic_uniforms, 35));
+        assert_eq!(160.0, read_f32(&cloud_uniforms, 35));
+        let vertex = std::str::from_utf8(WORLD_MATERIAL_VERTEX_SHADER_VULKAN).unwrap();
+        let fragment = std::str::from_utf8(WORLD_MATERIAL_FRAGMENT_SHADER_VULKAN).unwrap();
+        assert!(vertex.contains("material_view[3].xyz = vec3(0.0)"));
+        assert!(vertex.contains("v_camera_distance = length(camera_position.xyz)"));
+        assert!(!vertex.contains("int[4](3, 2, 1, 0)[vertex]"));
+        assert!(fragment.contains("color.a *= 1.0 - clamp(v_camera_distance / v_material.y, 0.0, 1.0)"));
+    }
+
 
     #[test]
     fn semantic_material_registry_canonicalizes_legacy_keys_and_carries_metadata() {
@@ -47624,6 +48232,58 @@ mod tests {
             uniforms.len()
         );
         assert_eq!(WORLD_WINDING_CW as f32, read_f32(&uniforms, 39));
+    }
+
+    #[test]
+    fn entity_shadow_material_applies_vanilla_layering_without_changing_other_materials() {
+        let mut frame = frame(Vec::new());
+        let mut quad = material_quad(WORLD_MATERIAL_MODE_TRANSLUCENT, WORLD_DEPTH_POLICY_TEST_NO_WRITE);
+        quad.material_id = WORLD_MATERIAL_ID_ENTITY_SHADOW;
+        // A replacement resource texture must retain the material's layering.
+        quad.texture_id = WORLD_MATERIAL_TEXTURE_STONE;
+        quad.vertices = [[2.0, -1.0, -10.0]; 4];
+        frame.material_quads.push(quad.clone());
+        let batches = material_batches(&frame, ColorFormat::Bgra8Unorm);
+        let uniforms = packed_material_uniforms_for_batch(&frame, &batches[0]).unwrap();
+        let scale = 1.0 - 1.0 / 4096.0;
+        assert_eq!(read_f32(&uniforms, 36), 2.0 * scale);
+        assert_eq!(read_f32(&uniforms, 37), -scale);
+        assert_eq!(read_f32(&uniforms, 38), -10.0 * scale);
+        // Perspective screen coordinates stay fixed while depth moves closer.
+        let vertex = layered_material_vertices(&quad)[0];
+        assert_eq!(vertex[0] / -vertex[2], 0.2);
+        assert!(vertex[2] > quad.vertices[0][2]);
+        quad.material_id = WORLD_MATERIAL_ID_TRANSLUCENT_TEXTURED;
+        quad.texture_id = WORLD_MATERIAL_TEXTURE_ENTITY_SHADOW;
+        assert_eq!(layered_material_vertices(&quad), quad.vertices);
+    }
+
+    #[test]
+    fn weather_material_abi_preserves_exact_uv2_for_the_owned_lightmap() {
+        let mut frame = frame(Vec::new());
+        let mut weather = material_quad(
+            WORLD_MATERIAL_MODE_TRANSLUCENT,
+            WORLD_DEPTH_POLICY_TEST_NO_WRITE,
+        );
+        weather.source_program = WORLD_MATERIAL_SOURCE_WEATHER;
+        weather.vertex_packed_light = [0x00f0_00a0, 0x00e0_00b0, 0x00d0_00c0, 0x00c0_00d0];
+        frame.material_quads.push(weather);
+        let batch = &material_batches(&frame, ColorFormat::Bgra8Unorm)[0];
+        let uniforms = packed_material_uniforms_for_batch(&frame, batch).unwrap();
+
+        // Header 36 f32s + position/UV/color lanes (40 f32s): UV2 begins at
+        // the final two vec4 lanes of the explicit 192-byte quad record.
+        assert_eq!(160.0, read_f32(&uniforms, 76));
+        assert_eq!(240.0, read_f32(&uniforms, 77));
+        assert_eq!(176.0, read_f32(&uniforms, 78));
+        assert_eq!(224.0, read_f32(&uniforms, 79));
+        let vertex = std::str::from_utf8(WORLD_MATERIAL_VERTEX_SHADER_VULKAN).unwrap();
+        let fragment = std::str::from_utf8(WORLD_WEATHER_MATERIAL_FRAGMENT_SHADER_VULKAN).unwrap();
+        assert!(vertex.contains("#ifdef VULKANIC_GAL_WEATHER_LIGHTMAP"));
+        assert!(vertex.contains("v_color *= texelFetch(sampler2D(LightmapTex, LightmapSamp), ivec2(v_lightmap_uv) / 16, 0)"));
+        assert!(!fragment.contains("LightmapTex"));
+        assert!(fragment.contains("if (color.a < 0.1)"));
+        assert!(fragment.contains("out_color = vec4(color.rgb, 1.0)"));
     }
 
     #[test]
@@ -48769,6 +49429,79 @@ mod tests {
         assert!(!mesh_texture_uses_atlas_coordinates(
             WORLD_MATERIAL_TEXTURE_WATER_FLOW
         ));
+    }
+
+    #[test]
+    fn entity_meshes_select_local_uvs_and_directional_model_lighting() {
+        let mut gal = gal();
+        let target = frame_target(&mut gal, 1, 128, 128);
+        let mut frontend = WorldPrimitiveFrontend::default();
+        frontend
+            .apply_world_mesh_asset_update(
+                &mut gal,
+                1,
+                vec![mesh_asset(101, 1, IndexType::U16)],
+                Vec::new(),
+            )
+            .unwrap();
+        let mut render_frame = frame(Vec::new());
+        let mut instance = mesh_instance(101, 1);
+        instance.stratum = WORLD_STRATUM_ENTITY_MESH;
+        instance.block_entity_id = 54;
+        render_frame.mesh_instances.push(instance);
+
+        let (ops, _) = frontend
+            .append_frame_ops(&mut gal, 1, target, render_frame)
+            .unwrap();
+        let mesh_write = ops
+            .iter()
+            .find_map(|op| match op {
+                CommandOp::HostWriteBuffer { data, .. }
+                    if data.len() == WORLD_MESH_BATCH_HEADER_BYTES + WORLD_MESH_INSTANCE_BYTES =>
+                {
+                    Some(data)
+                }
+                _ => None,
+            })
+            .expect("mesh instance stream upload");
+        let instance_f32 = WORLD_MESH_BATCH_HEADER_BYTES / 4;
+        assert_eq!(2.0, read_f32(mesh_write, instance_f32 + 23));
+    }
+
+    #[test]
+    fn generic_entity_meshes_receive_directional_model_lighting_without_block_entity_state() {
+        let mut gal = gal();
+        let target = frame_target(&mut gal, 1, 128, 128);
+        let mut frontend = WorldPrimitiveFrontend::default();
+        frontend
+            .apply_world_mesh_asset_update(
+                &mut gal,
+                1,
+                vec![mesh_asset(102, 1, IndexType::U16)],
+                Vec::new(),
+            )
+            .unwrap();
+        let mut render_frame = frame(Vec::new());
+        let mut instance = mesh_instance(102, 1);
+        instance.stratum = WORLD_STRATUM_ENTITY_MESH;
+        render_frame.mesh_instances.push(instance);
+
+        let (ops, _) = frontend
+            .append_frame_ops(&mut gal, 1, target, render_frame)
+            .unwrap();
+        let mesh_write = ops
+            .iter()
+            .find_map(|op| match op {
+                CommandOp::HostWriteBuffer { data, .. }
+                    if data.len() == WORLD_MESH_BATCH_HEADER_BYTES + WORLD_MESH_INSTANCE_BYTES =>
+                {
+                    Some(data)
+                }
+                _ => None,
+            })
+            .expect("mesh instance stream upload");
+        let instance_f32 = WORLD_MESH_BATCH_HEADER_BYTES / 4;
+        assert_eq!(2.0, read_f32(mesh_write, instance_f32 + 23));
     }
 
     #[test]
@@ -54402,6 +55135,64 @@ mod tests {
         assert_eq!(1, resized.depth_attachment_reuses);
     }
 
+    #[test]
+    fn direct_entity_shadow_draw_loads_receiver_depth_after_world_meshes() {
+        assert_direct_entity_shadow_order(false);
+    }
+
+    #[test]
+    fn direct_entity_shadow_precedes_translucent_terrain() {
+        assert_direct_entity_shadow_order(true);
+    }
+
+    fn assert_direct_entity_shadow_order(translucent_terrain: bool) {
+        let mut gal = gal();
+        let target = frame_target(&mut gal, 1, 128, 128);
+        let mut frontend = WorldPrimitiveFrontend::default();
+        let mut assets = shader_mesh_scene_assets(1);
+        if translucent_terrain {
+            for section in &mut assets[0].sections {
+                section.material_id = WORLD_MATERIAL_ID_WATER_TRANSLUCENT;
+                section.material_mode = WORLD_MATERIAL_MODE_TRANSLUCENT;
+            }
+        }
+        frontend.apply_world_mesh_asset_update(&mut gal, 1,
+            assets, shader_mesh_scene_textures(1)).unwrap();
+        let mut frame = shader_mesh_scene_frame(128, 128, 0);
+        if translucent_terrain {
+            frame.mesh_instances[0].stratum = WORLD_STRATUM_TERRAIN;
+        }
+        frame.background.enabled = true;
+        let mut shadow = material_quad(WORLD_MATERIAL_MODE_TRANSLUCENT, WORLD_DEPTH_POLICY_TEST_NO_WRITE);
+        shadow.material_id = WORLD_MATERIAL_ID_ENTITY_SHADOW;
+        shadow.texture_id = WORLD_MATERIAL_TEXTURE_ENTITY_SHADOW;
+        shadow.cull_policy = WORLD_CULL_NONE;
+        frame.material_quads = vec![shadow];
+        let (ops, _) = frontend.append_frame_ops_inner(&mut gal, 1, target, frame, true).unwrap();
+        let pipeline = frontend.material_resources.iter()
+            .find(|(key, _)| key.material_id == WORLD_MATERIAL_ID_ENTITY_SHADOW).unwrap().1.pipeline;
+        let bind = ops.iter().position(|op| matches!(op,
+            CommandOp::BindGraphicsPipeline(handle) if *handle == pipeline)).unwrap();
+        assert_eq!(1, ops.iter().filter(|op| matches!(op,
+            CommandOp::BindGraphicsPipeline(handle) if *handle == pipeline)).count(),
+            "the deferred shadow batch must execute exactly once");
+        assert!(ops[..bind].iter().any(|op| matches!(op, CommandOp::DrawIndexed { .. })),
+            "receiver geometry must be drawn before its shadow");
+        let pass = ops[..bind].iter().rfind(|op| matches!(op, CommandOp::BeginPass { .. })).unwrap();
+        assert!(matches!(pass, CommandOp::BeginPass { depth_stencil: Some(depth), colors, .. }
+            if depth.load_op == AttachmentLoadOp::Load && colors.iter().all(|color| color.load_op == AttachmentLoadOp::Load)));
+        assert!(!ops[bind..].iter().any(|op| matches!(op,
+            CommandOp::BeginPass { depth_stencil: Some(depth), .. } if depth.load_op == AttachmentLoadOp::Clear)),
+            "this world-only fixture must not clear the receiver after shadow composition");
+        if translucent_terrain {
+            // One indexed material draw is the shadow itself. The remaining
+            // indexed draw must be the translucent terrain over that shadow.
+            assert_eq!(2, ops[bind..].iter().filter(|op|
+                matches!(op, CommandOp::DrawIndexed { .. })).count(),
+                "translucent terrain must composite after receiver shadows");
+        }
+    }
+
     #[derive(Clone, Copy, PartialEq, Eq)]
     enum RuntimeBackend {
         Vulkan,
@@ -56189,6 +56980,7 @@ mod tests {
             fog_render_distance_start: 24.0,
             fog_render_distance_end: 128.0,
             fog_sky_end: 128.0,
+            fog_clouds_end: 96.0,
             biome_precipitation: 2,
             biome_resource_location: "minecraft:snowy_plains".to_string(),
             main_hand_item_model_resource_location: "minecraft:lava_bucket".to_string(),
@@ -57532,6 +58324,69 @@ mod tests {
         assert!(WorldMeshTextureCoordinateOrigin::try_from(2).is_err());
     }
 
+
+    #[test]
+    fn source_local_model_texture_preserves_minecraft_top_left_rows() {
+        let mut frontend = WorldPrimitiveFrontend::default();
+        frontend.mesh_texture_assets.insert(
+            37,
+            WorldMaterialTextureAsset {
+                rgba: vec![
+                    1, 0, 0, 255, 2, 0, 0, 255, // Minecraft PNG top row
+                    3, 0, 0, 255, 4, 0, 0, 255, // Minecraft PNG bottom row
+                ],
+                mip_rgba: Vec::new(),
+                width: 2,
+                height: 2,
+                frame_width: 2,
+                frame_height: 2,
+                frame_count: 1,
+                frame_ticks: 1,
+                animation_flags: 0,
+                frame_row_size: 1,
+                interpolation_policy: WORLD_MESH_ANIMATION_INTERPOLATE_NONE,
+                animation_frames: Vec::new(),
+                animation_total_ticks: 1,
+                animation_generation: 1,
+                coordinate_origin: WorldMeshTextureCoordinateOrigin::MinecraftTopLeft,
+            },
+        );
+        assert_eq!(
+            frontend.source_local_material_texture_bytes(37).unwrap().0,
+            vec![1, 0, 0, 255, 2, 0, 0, 255, 3, 0, 0, 255, 4, 0, 0, 255],
+            "source-local ModelPart materials must preserve their Minecraft top-left UV rows"
+        );
+    }
+
+    #[test]
+    fn direct_model_texture_declared_vulkanic_preserves_local_uv_rows() {
+        let asset = WorldMaterialTextureAsset {
+            rgba: vec![
+                1, 0, 0, 255, 2, 0, 0, 255, // local-model first row
+                3, 0, 0, 255, 4, 0, 0, 255, // local-model second row
+            ],
+            mip_rgba: Vec::new(),
+            width: 2,
+            height: 2,
+            frame_width: 2,
+            frame_height: 2,
+            frame_count: 1,
+            frame_ticks: 1,
+            animation_flags: 0,
+            frame_row_size: 1,
+            interpolation_policy: WORLD_MESH_ANIMATION_INTERPOLATE_NONE,
+            animation_frames: Vec::new(),
+            animation_total_ticks: 1,
+            animation_generation: 1,
+            coordinate_origin: WorldMeshTextureCoordinateOrigin::Vulkanic,
+        };
+        assert_eq!(
+            sampled_texture_bytes(&asset).unwrap(),
+            vec![1, 0, 0, 255, 2, 0, 0, 255, 3, 0, 0, 255, 4, 0, 0, 255],
+            "direct local-model assets must not receive generic world-material row conversion"
+        );
+    }
+
     #[test]
     fn diagnostic_readback_origin_matches_backend_viewport_contract() {
         assert!(!diagnostic_readback_rows_bottom_up(BackendApi::Vulkan));
@@ -57757,6 +58612,7 @@ mod tests {
             fragment_shader: handle(HandleKind::ShaderModule),
             texture_view: handle(HandleKind::TextureView),
             resource_layout: handle(HandleKind::ResourceLayout),
+            lightmap_resource_layout: None,
             pipeline_layout: handle(HandleKind::PipelineLayout),
             pipeline: handle(HandleKind::GraphicsPipeline),
             data_slots: vec![MaterialDataSlot {

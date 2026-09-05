@@ -69,6 +69,26 @@ class RustGalGuiRendererTest {
 	}
 
 	@Test
+	void panoramaFragmentSamplingRetainsFrozenCubeFaceEdgeFiltering() throws Exception {
+		String source = Files.readString(Path.of("src/main/rust/render/vulkanic/gui_mesh_frontend.rs"));
+		String frozenEdgeSampling = "vec2 atlas_uv = vec2(clamp(u, 0.0, 1.0), (face + clamp(v, 0.0, 1.0)) / 6.0);";
+		assertEquals(2, occurrences(source, frozenEdgeSampling),
+			"both Rust panorama backends must retain Frozen's continuous cube-face edge sampling");
+		assertFalse(source.contains("0.5 / float(size.x)"),
+			"a half-texel inset changes Frozen's panorama sampling contract at cube-face boundaries");
+	}
+
+	private static int occurrences(String source, String needle) {
+		int count = 0;
+		int from = 0;
+		while ((from = source.indexOf(needle, from)) >= 0) {
+			count++;
+			from += needle.length();
+		}
+		return count;
+	}
+
+	@Test
 	void regularBlitRepeatIntervalsSplitIntoBoundedUnitUvs() {
 		List<float[]> segments = RustGalGuiRenderer.wrappedUnitIntervalSegments(0.0F, 26.6875F);
 		assertEquals(27, segments.size(), "a 32-pixel separator stretched to 854 pixels needs bounded repeated-image segments");
@@ -932,11 +952,11 @@ class RustGalGuiRendererTest {
 		assertTrue(renderer.contains("if (!currentExecutionRoute().usesRustGui()")
 			&& renderer.contains("LOADING_GRID_PRODUCER"),
 			"the chunk-status grid must admit the borrowed OpenGL route through Rust semantic rendering");
-		assertTrue(renderer.contains("currentExecutionRoute() == GuiExecutionRoute.RUST_OPENGL_BORROWED_CONTEXT")
+		assertTrue(renderer.contains("if (currentExecutionRoute().usesRustGui())")
 			&& renderer.contains("enqueueGuiAffineQuadRequests(")
 			&& renderer.contains("ARGB.opaque(colors[row * gridSize + column])")
 			&& renderer.contains("SOLID_WHITE_ASSET_ID"),
-			"borrowed OpenGL loading grids must preserve row-major semantic status colors through the Rust affine path rather than an unavailable storage-buffer mesh shader or an opaque image shortcut");
+			"Rust OpenGL and Rust Vulkan loading grids must preserve row-major semantic status colors through the Rust affine path rather than an unavailable storage-buffer mesh shader or an opaque image shortcut");
 	}
 
 	@Test
@@ -948,6 +968,18 @@ class RustGalGuiRendererTest {
 		int allocation = renderer.indexOf("new byte[Math.multiplyExact(Math.multiplyExact(imageWidth, imageHeight), 4)]", extent);
 		assertTrue(bound >= 0 && extent > bound && allocation > extent,
 			"loading-grid packed images must reject oversized extents before allocating RGBA storage");
+	}
+
+	@Test
+	void loadingGridUsesExplicitPerCellGeometryByDefault() throws Exception {
+		String renderer = Files.readString(Path.of(
+			"src/main/java/net/vulkanic/gui/RustGalGuiRenderer.java"));
+		assertTrue(renderer.contains("System.getProperty(\"mattmc.dev.rustGalGui.loadingGridTexture\", \"false\")"),
+			"the retained packed-image experiment must remain opt-in only");
+		int packedPath = renderer.indexOf("mattmc.dev.rustGalGui.loadingGridTexture");
+		int explicitAffine = renderer.indexOf("if (currentExecutionRoute().usesRustGui())");
+		assertTrue(explicitAffine >= 0 && explicitAffine < packedPath,
+			"the default loading-grid route must use bounded explicit per-cell affine geometry before any optional sampled-image experiment");
 	}
 
 	@Test

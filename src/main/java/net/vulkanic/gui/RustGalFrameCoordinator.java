@@ -7,6 +7,7 @@ import net.minecraft.client.dev.GraphicsFrameBenchmark;
 import net.minecraft.client.dev.DeterministicCameraCapture;
 import net.minecraft.client.dev.RenderDocCaptureHook;
 import net.minecraft.client.gui.render.state.GuiRenderState;
+import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.util.profiling.TracyCompat;
@@ -81,6 +82,8 @@ public final class RustGalFrameCoordinator {
 	private static String pendingShaderPackSourceName = "";
 	private static long lastSubmitted;
 	private static long lastRetiredSubmission;
+	/** Bounded diagnostic receipts emitted only after Rust has presented a title frame. */
+	private static int graphicsAuditTitlePresentationReceipts;
 	private static long lastDhParityPhaseFrame = Long.MIN_VALUE;
 	private static volatile boolean observedRenderableWholeFrameWorld;
 	private static volatile long lastRenderableWholeFrameWorldFrame;
@@ -1199,6 +1202,12 @@ public final class RustGalFrameCoordinator {
 				renderdocFrameCaptureStarted = false;
 			}
 			if (wholeFrameVulkan) {
+				if (Minecraft.getInstance().screen instanceof net.minecraft.client.gui.screens.TitleScreen
+					&& Minecraft.getInstance().getOverlay() == null
+					&& net.minecraft.client.gui.screens.TitleScreen.graphicsAuditTitleScreenSemanticsObserved()
+					&& net.minecraft.client.gui.screens.TitleScreen.graphicsAuditTitleScreenFadeComplete()) {
+					net.minecraft.client.gui.screens.TitleScreen.requestGraphicsAuditPresentedTitleFrameCapture();
+				}
 				// DH extraction can build a replacement while this frame still refers
 				// to the last acknowledged column generation. Publish the replacement
 				// only after presentation so one frame never mixes those generations.
@@ -1237,9 +1246,19 @@ public final class RustGalFrameCoordinator {
 					wholeFrameResult.profile().gpuFrameTotalNanos(),
 					wholeFrameResult.profile().vulkanPresentMode(),
 					wholeFrameResult.profile().vulkanImagesInFlight(),
-					wholeFrameResult.profile().vulkanAvailableFrameSlots()
-				);
-				GraphicsFrameBenchmark.endPhase("rust-gal.frame.post-submit-metrics");
+						wholeFrameResult.profile().vulkanAvailableFrameSlots()
+					);
+					if ((Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")
+						|| "true".equalsIgnoreCase(System.getenv("MATTMC_TITLE_SCREEN_CAPTURE")))
+						&& Minecraft.getInstance().screen instanceof TitleScreen
+						&& TitleScreen.graphicsAuditTitleScreenSemanticsObserved()
+						&& graphicsAuditTitlePresentationReceipts++ < 4) {
+						LOGGER.info(
+							"[MattMC graphics audit] rust-title-frame-presented frame={} submission={} image={}",
+							presented.frameId(), submissionId, presented.frameTargetIdentity()
+						);
+					}
+					GraphicsFrameBenchmark.endPhase("rust-gal.frame.post-submit-metrics");
 			} else {
 				recordGuiMetrics(guiResult);
 			}

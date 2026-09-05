@@ -73,6 +73,34 @@ final class StandaloneModelRenderOwnershipPolicyTest {
 	}
 
 	@Test
+	void standaloneModelPublicationUsesTheSameDynamicFirstPayloadAsMeshExtraction() throws Exception {
+		String source = Files.readString(PROJECT_ROOT.resolve(
+			"src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+		int publish = source.indexOf("public static boolean ensureStandaloneModelTextureAsset(");
+		int modelPayload = source.indexOf("byte[] payload = readModelTexturePayload(identity);", publish);
+		int modelAsset = source.indexOf("localModelTextureAsset(stableTextureId(identity), payload)", modelPayload);
+		int genericPayload = source.indexOf("registerSemanticTextureAsset(identity, stableTextureId(identity), \"standalone-model\")", publish);
+		assertTrue(publish >= 0 && modelPayload > publish && modelAsset > modelPayload,
+			"standalone model publication must use the extractor's dynamic-first model texture payload");
+		assertTrue(genericPayload < 0,
+			"standalone model publication must not select a resource-pack placeholder ahead of a live skin");
+	}
+
+	@Test
+	void standaloneModelAssetsDeclareTheDirectSamplerCoordinateContract() throws Exception {
+		String source = Files.readString(PROJECT_ROOT.resolve(
+			"src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+		int helper = source.indexOf("private static VulkanicGalBridge.WorldMeshTextureAssetRecord localModelTextureAsset(");
+		int coordinateOrigin = source.indexOf(
+			"WORLD_MESH_TEXTURE_COORDINATE_ORIGIN_VULKANIC", helper);
+		int genericHelper = source.indexOf("private static VulkanicGalBridge.WorldMeshTextureAssetRecord minecraftModelTextureAsset(");
+		assertTrue(helper >= 0 && coordinateOrigin > helper,
+			"local ModelPart assets must explicitly declare the direct sampler's Vulkanic row order");
+		assertTrue(genericHelper >= 0 && helper > genericHelper,
+			"the direct local-model contract must remain distinct from generic material assets");
+	}
+
+	@Test
 	void playerHandCallsitePublishesSkinAssetBeforeModelSubmission() throws Exception {
 		String source = Files.readString(PROJECT_ROOT.resolve(
 			"src/main/java/net/minecraft/client/renderer/entity/player/AvatarRenderer.java"));

@@ -1441,6 +1441,11 @@ def materialize_canonical_fixture(args: argparse.Namespace, targets: Mapping[str
         copy_optional_tree(source_world, run_root / "saves" / world)
         materialize_external_dh_fixture(args, run_root / "saves" / world)
         materialize_external_model_fixture(args, run_root / "saves" / world)
+    if not any(getattr(args, flag, False) for flag in (
+        "world_distant_horizons_opaque", "world_distant_horizons_non_water",
+        "world_distant_horizons_water", "world_distant_horizons_texture_palette",
+    )):
+        apply_canonical_vanilla_dh_isolation(run_root / "config" / "DistantHorizons.toml")
     manifest = {
         "schema": PARITY_FIXTURE_SCHEMA,
         "fixture_id": canonical_fixture_id(args),
@@ -1471,6 +1476,20 @@ def materialize_canonical_fixture(args: argparse.Namespace, targets: Mapping[str
     return run_root
 
 
+def apply_canonical_vanilla_dh_isolation(config_path: Path) -> None:
+    """Isolate vanilla fixtures, including DH's independently configured fade passes."""
+    if not config_path.is_file():
+        return
+    original = config_path.read_text(encoding="utf-8")
+    updated = original
+    for key, value in (("enableRendering", "false"), ("vanillaFadeMode", '"NONE"'), ("lodOnlyMode", "false")):
+        updated, count = re.subn(rf"(?m)^([ \t]*{key}[ \t]*=)[^\r\n]*", rf"\g<1> {value}", updated)
+        if count != 1:
+            raise ValueError(f"vanilla DH isolation requires exactly one {key} setting")
+    if updated != original:
+        config_path.write_text(updated, encoding="utf-8")
+
+
 def apply_canonical_graphics_mode(options_path: Path, graphics_mode: str) -> None:
     """Set the copied fixture's graphics mode without touching either live run.
 
@@ -1488,10 +1507,9 @@ def apply_canonical_graphics_mode(options_path: Path, graphics_mode: str) -> Non
         raise FileNotFoundError(f"canonical fixture options are missing: {options_path}")
     source = options_path.read_text(encoding="utf-8")
     rewritten, replacements = re.subn(
-        r"(?m)^graphicsMode:[^\\n]*$",
+        r"(?m)^graphicsMode:[^\r\n]*$",
         f"graphicsMode:{mode_id}",
         source,
-        count=1,
     )
     if replacements != 1:
         raise ValueError("canonical fixture options must declare exactly one graphicsMode entry")
@@ -1511,7 +1529,16 @@ def canonical_fixture_requested(args: argparse.Namespace, modes: Sequence[ModeSp
     modes.  A focused Current-only terrain/resource-pack capture must use the
     same fixture as well; otherwise it silently runs the user's live world and
     has no canonical camera metadata, making the result non-comparable.
+
+    A title-only capture has neither a world nor a camera.  It validates the
+    selected menu resource inputs through its acknowledged title frame, so
+    cloning the full save, DH data, and asset tree supplies no evidence and
+    needlessly retains multiple GiB of temporary fixture data.
     """
+    if bool(getattr(args, "title_screen_capture", False)) or bool(
+        getattr(args, "title_screen_transition_capture", False)
+    ):
+        return False
     if canonical_parity_requested(modes):
         return True
     return any(
@@ -1549,7 +1576,17 @@ def canonical_fixture_requested(args: argparse.Namespace, modes: Sequence[ModeSp
 
 
 def canonical_camera_options(args: argparse.Namespace) -> dict[str, float | str]:
-    return dict(DEFAULT_PARITY_CAMERA)
+    camera = dict(DEFAULT_PARITY_CAMERA)
+    if getattr(args, "world_cloud_scenario", "") in {"bounded", "fast"}:
+        # The ordinary Origin pose is far below a sparse cloud field and looks
+        # toward terrain, so it cannot establish visual cloud parity even when
+        # both renderers submit clouds correctly. Observe the same copied
+        # vanilla cloud layer from its height in both repositories; this is a
+        # camera-only fixture change, not synthetic cloud geometry.
+        camera["y"] = 192.0
+        camera["pitch"] = 0.0
+        camera["pose_sequence"] = "cloud-layer-static-v1"
+    return camera
 
 
 def append_fixed_camera_jvm_options(args: argparse.Namespace, java_options: list[str]) -> None:
@@ -1569,18 +1606,21 @@ def append_fixed_camera_jvm_options(args: argparse.Namespace, java_options: list
 
 
 def canonical_fixture_uses_static_capture_schedule(args: argparse.Namespace) -> bool:
-    """Whether this is the ordinary one-pose cross-repository fixture.
+    """Whether this is a one-pose cross-repository visual fixture.
 
     Feature fixtures which need motion (translucency sorting, moving entities,
     weather, etc.) declare and validate their own capture schedule below.  The
-    unscoped canonical Origin fixture, however, is explicitly named
-    ``single-static-v1``.  Both launchers must receive that fact as JVM
-    properties: the Current Python runner otherwise defaults to a four-pose
-    sweep while Frozen's shell runner uses one pose.
+    unscoped canonical Origin fixture and the bounded cloud-layer fixture are
+    static probes. Both launchers must receive that fact as JVM properties:
+    the Current Python runner otherwise defaults to a four-pose sweep while
+    Frozen's shell runner uses one pose.
     """
     if not getattr(args, "_canonical_fixture_run_source", None):
         return False
-    if canonical_camera_options(args)["pose_sequence"] != "single-static-v1":
+    pose_sequence = canonical_camera_options(args)["pose_sequence"]
+    if pose_sequence == "cloud-layer-static-v1":
+        return True
+    if pose_sequence != "single-static-v1":
         return False
     return not any(
         bool(getattr(args, name, ""))
@@ -3744,6 +3784,7 @@ def deterministic_camera_signature(doc: dict[str, object] | None) -> dict[str, o
         "status": doc.get("status"),
         "dimension": doc.get("dimension") or doc.get("initialDimension"),
         "position": position,
+        "shadow_receiver_fixture": doc.get("shadowReceiverFixture", "none"),
         "poses": poses,
         "window": window,
         "frame_count": len(poses) or doc.get("captureCount"),
@@ -6112,6 +6153,161 @@ def experience_orb_crop_stats(crop: Any) -> dict[str, object]:
     }
 
 
+def frozen_cow_model_emission_evidence(doc: object) -> dict[str, object]:
+    """Observe Frozen's actual producer; pixel comparison remains a separate gate."""
+    if not isinstance(doc, dict) or doc.get("backend") != "opengl":
+        return {"passed": False, "status": "not_frozen_opengl_observation"}
+    captures = doc.get("captures")
+    if not isinstance(captures, list) or len(captures) < 3:
+        return {"passed": False, "status": "missing_capture_sequence"}
+    entity_ids = set()
+    for capture in captures:
+        receipt = capture.get("frozenModelProducer") if isinstance(capture, dict) else None
+        frame = parse_number(capture.get("renderedFrameIndex")) if isinstance(capture, dict) else None
+        if not isinstance(receipt, dict):
+            return {"passed": False, "status": "missing_model_emission"}
+        observed = parse_number(receipt.get("frameIndex"))
+        entity_id = parse_number(receipt.get("fixtureEntityId"))
+        position = receipt.get("position")
+        if (receipt.get("stage") != "model-render-to-buffer-returned"
+            or receipt.get("entityType") != "minecraft:cow"
+            or receipt.get("textureId") != "minecraft:textures/entity/cow/temperate_cow.png"
+            or entity_id is None or not math.isfinite(entity_id) or entity_id < 0 or not entity_id.is_integer()
+            or frame is None or observed is None
+            or not math.isfinite(frame) or not math.isfinite(observed)
+            or frame <= 0 or observed <= 0 or not frame.is_integer() or not observed.is_integer()
+            or abs(frame - observed) > 1
+            or not isinstance(position, list) or len(position) != 3
+            or any(parse_number(value) is None or not math.isfinite(parse_number(value)) for value in position)):
+            return {"passed": False, "status": "invalid_or_uncorrelated_model_emission"}
+        entity_ids.add(entity_id)
+    if len(entity_ids) != 1:
+        return {"passed": False, "status": "fixture_entity_changed"}
+    return {"passed": True, "status": "emission_observed", "capture_count": len(captures),
+            "fixture_entity_id": next(iter(entity_ids)), "pixel_parity_proven": False}
+
+
+def deterministic_entity_shadow_execution_evidence(doc: object) -> dict[str, object]:
+    """Prove shadow producer/submission correlation; this does not prove pixel parity."""
+    shadows = doc.get("rustGalWorldEntityShadows") if isinstance(doc, dict) else None
+    captures = doc.get("captures") if isinstance(doc, dict) else None
+    if not isinstance(shadows, dict) or shadows.get("scenario") != "cow":
+        return {"status": "missing_shadow_receipts", "passed": False}
+    semantic = shadows.get("semanticReceipts")
+    execution = shadows.get("executionReceipts")
+    if not all(isinstance(value, list) and value for value in (semantic, execution, captures)):
+        return {"status": "missing_shadow_receipts_or_captures", "passed": False}
+    matched = []
+    for capture in captures:
+        frame = parse_number(capture.get("renderedFrameIndex")) if isinstance(capture, dict) else None
+        receipt = next((item for item in execution
+            if isinstance(item, dict)
+            and item.get("route") == "rust-vulkan-whole-frame"
+            and frame is not None
+            and parse_number(item.get("deterministicFrameIndex")) is not None
+            and abs(parse_number(item["deterministicFrameIndex"]) - frame) <= 1
+            and (parse_number(item.get("submissionId")) or 0) > 0
+            and (parse_number(item.get("gameplayFrameId")) or 0) > 0
+            and (parse_number(item.get("quads")) or 0) > 0
+            and any(isinstance(source, dict)
+                and source.get("route") == "rust-vulkan-whole-frame"
+                and source.get("frameIndex") == item["deterministicFrameIndex"]
+                and source.get("quads") == item["quads"]
+                and (parse_number(source.get("shadowSubmits")) or 0) > 0
+                for source in semantic)), None)
+        if receipt is None:
+            return {"status": "uncorrelated_shadow_capture", "passed": False, "frame": frame}
+        matched.append({"capture_frame": frame, "semantic_frame": receipt["deterministicFrameIndex"],
+                        "submission_id": receipt["submissionId"], "quads": receipt["quads"]})
+    return {"status": "execution_proven", "passed": True, "captures": matched, "pixel_parity_proven": False}
+
+
+def deterministic_entity_shadow_receiver_crops(doc: object) -> dict[str, object]:
+    """Derive screenshot crops from correlated semantic shadow support, never hand-picked pixels."""
+    execution = deterministic_entity_shadow_execution_evidence(doc)
+    if execution.get("passed") is not True:
+        return {"passed": False, "status": "shadow_execution_missing"}
+    receipts = doc["rustGalWorldEntityShadows"]["semanticReceipts"]
+    crops = []
+    for capture, match in zip(doc["captures"], execution["captures"]):
+        candidates = [receipt for receipt in receipts if isinstance(receipt, dict)
+                      and receipt.get("route") == "rust-vulkan-whole-frame"
+                      and receipt.get("quads") == match["quads"]
+                      and receipt.get("frameIndex") == match["semantic_frame"]]
+        window = capture.get("window", {})
+        if not isinstance(window, dict):
+            return {"passed": False, "status": "invalid_shadow_viewport"}
+        width, height = parse_number(window.get("width")), parse_number(window.get("height"))
+        if not width or not height or not math.isfinite(width) or not math.isfinite(height) or width <= 0 or height <= 0:
+            return {"passed": False, "status": "invalid_shadow_viewport"}
+        if len(candidates) != 1:
+            return {"passed": False, "status": "ambiguous_shadow_receiver"}
+        receipt = candidates[0]
+        bounds = receipt.get("receiverBounds")
+        if receipt.get("receiverBoundsOrigin") != "top-left" or not isinstance(bounds, list) or len(bounds) != 4:
+            return {"passed": False, "status": "missing_shadow_receiver_bounds"}
+        values = [parse_number(value) for value in bounds]
+        if any(value is None or not math.isfinite(value) for value in values):
+            return {"passed": False, "status": "invalid_shadow_receiver_bounds"}
+        left, top, right, bottom = values
+        if not (0 <= left < right <= width and 0 <= top < bottom <= height):
+            return {"passed": False, "status": "invalid_shadow_receiver_bounds"}
+        crops.append({"capture_frame": match["capture_frame"], "screenshot": capture.get("screenshot"),
+                      "crop_box": [math.floor(left), math.floor(top), math.ceil(right), math.ceil(bottom)]})
+    return {"passed": True, "status": "receiver_crops_derived", "crops": crops, "pixel_parity_proven": False}
+
+
+def compare_entity_shadow_receiver_crops(baseline: dict[str, object], current: dict[str, object],
+                                        tolerance: float = 6.0) -> dict[str, object]:
+    """Supplemental per-frame shadow pixels; not a whole-scene admission claim."""
+    if not math.isfinite(tolerance) or tolerance < 0:
+        raise ValueError("shadow pixel tolerance must be finite and nonnegative")
+    fixture = deterministic_visual_fixture_equivalence(baseline, current)
+    crops = deterministic_entity_shadow_receiver_crops(current)
+    if fixture["status"] != "passed" or crops.get("passed") is not True:
+        return {"passed": False, "status": "missing_or_incomparable_shadow_inputs",
+                "fixture": fixture, "receivers": crops}
+    baseline_captures = baseline.get("captures", [])
+    if len(baseline_captures) != len(crops["crops"]):
+        return {"passed": False, "status": "shadow_capture_count_mismatch"}
+    from PIL import Image, ImageChops, ImageStat
+    results = []
+    for reference, candidate, crop in zip(baseline_captures, current["captures"], crops["crops"]):
+        # Validate every compared frame, not just the sequence's first pose.
+        per_frame = deterministic_visual_fixture_equivalence(
+            {**baseline, "captures": [reference]}, {**current, "captures": [candidate]})
+        if per_frame["status"] != "passed":
+            return {"passed": False, "status": "incomparable_shadow_frame", "fixture": per_frame}
+        try:
+            with Image.open(str(reference.get("screenshot") or "")) as left, Image.open(str(crop.get("screenshot") or "")) as right:
+                if left.size != right.size or left.size != (candidate["window"]["width"], candidate["window"]["height"]):
+                    return {"passed": False, "status": "shadow_image_size_mismatch"}
+                box = tuple(crop["crop_box"])
+                mean = ImageStat.Stat(ImageChops.difference(left.convert("RGB").crop(box), right.convert("RGB").crop(box))).mean
+        except (OSError, ValueError) as error:
+            return {"passed": False, "status": "shadow_image_unavailable", "error": str(error)}
+        results.append({"crop_box": list(box), "capture_frame": crop["capture_frame"],
+                        "mean_rgb_abs": mean, "passed": all(value <= tolerance for value in mean)})
+    return {"passed": bool(results) and all(result["passed"] for result in results),
+            "status": "compared", "frames": results, "tolerance": tolerance,
+            "whole_scene_parity_proven": False}
+
+
+def cross_repository_shadow_receiver_report(parity: dict[str, object], tolerance: float) -> dict[str, object]:
+    results = []
+    for pair in parity.get("pairs", []):
+        baseline = deterministic_capture_document(Path(pair["baseline_artifact"]))
+        current = deterministic_capture_document(Path(pair["current_artifact"]))
+        if not pair.get("comparable") or not isinstance(baseline, dict) or not isinstance(current, dict):
+            result = {"passed": False, "status": "incomparable-shadow-pair"}
+        else:
+            result = compare_entity_shadow_receiver_crops(baseline, current, tolerance)
+        results.append({"baseline_artifact": pair["baseline_artifact"],
+                        "current_artifact": pair["current_artifact"], **result})
+    return {"passed": all(result["passed"] for result in results), "pair_count": len(results),
+            "required_when_paired": True, "pairs": results}
+
+
 def deterministic_world_mesh_model_capture_evidence(
     doc: dict[str, object] | None,
     scenario: object,
@@ -6529,6 +6725,11 @@ def deterministic_world_mesh_model_capture_evidence(
                     "section_count": model.get("sectionCount"),
                     "submission_id": receipt.get("submissionId"),
                     "capture_method": capture_method,
+                    # Keep the exact backend-proven viewport region so the
+                    # paired Frozen OpenGL image can be cropped identically.
+                    # This is diagnostic data only; it never influences a
+                    # renderer or its camera state.
+                    "crop_box": list(crop_box),
                     "crop_path": str(crop_path),
                     "status": "present",
                 }
@@ -8264,6 +8465,7 @@ def workload_signature(
         "parity_config": normalized_parity_config(mode, meta),
         "dh": dh_state_from_text(combined_logs, meta),
         "config_before": config_snapshot_hash(capture_dir, "config_before"),
+        "dh_composition": dh_composition_settings(capture_dir),
         "workload_counter_definitions": workload_counter_definitions(),
         "workload_counter_instrumentation": {
             "expected_version": WORKLOAD_COUNTER_DEFINITION_VERSION,
@@ -8279,6 +8481,20 @@ def workload_signature(
         ),
         "backend_work_counters": backend_work_counter_summary(frame_doc),
     }
+
+
+def dh_composition_settings(capture_dir: Path) -> dict[str, object]:
+    snapshots = sorted(capture_dir.glob("config_after_*/DistantHorizons.toml"))
+    if not snapshots:
+        return {"status": "not_recorded"}
+    source = snapshots[-1].read_text(encoding="utf-8")
+    result: dict[str, object] = {"status": "recorded"}
+    for key in ("enableRendering", "vanillaFadeMode", "lodOnlyMode"):
+        values = re.findall(rf"(?m)^[ \t]*{key}[ \t]*=[ \t]*([^\r\n#]+)", source)
+        if len(values) != 1:
+            return {"status": "invalid", "field": key}
+        result[key] = values[0].strip().strip('"')
+    return result
 
 
 def normalized_parity_config(mode: ModeSpec, meta: Mapping[str, str]) -> dict[str, object]:
@@ -8575,7 +8791,21 @@ def cross_repository_parity_report(artifact_paths: Sequence[Path]) -> dict[str, 
             if baseline.get("tool") != "capture":
                 continue
             comparison = compare_workloads(baseline, candidate, cross_repository=True)
-            evidence_failures = parity_evidence_failures(baseline, candidate)
+            baseline_capture = baseline.get("capture") if isinstance(baseline.get("capture"), Mapping) else None
+            candidate_capture = candidate.get("capture") if isinstance(candidate.get("capture"), Mapping) else None
+            baseline_title = baseline_capture.get("title_screen") if isinstance(baseline_capture, Mapping) else None
+            candidate_title = candidate_capture.get("title_screen") if isinstance(candidate_capture, Mapping) else None
+            title_pair = (
+                isinstance(baseline_title, Mapping)
+                and baseline_title.get("requested") is True
+                and isinstance(candidate_title, Mapping)
+                and candidate_title.get("requested") is True
+            )
+            # A title-only capture has no world camera by construction. Its
+            # acknowledged presented-frame contract is checked by the visual
+            # pair below; demanding deterministic-world evidence here would
+            # reject an otherwise equivalent title fixture.
+            evidence_failures = [] if title_pair else parity_evidence_failures(baseline, candidate)
             comparable = bool(comparison["comparable"]) and not evidence_failures
             pairs.append(
                 {
@@ -8676,6 +8906,45 @@ def _deterministic_initial_capture(document: Mapping[str, object] | None) -> dic
     return next((capture for capture in captures if isinstance(capture, dict)), None)
 
 
+def deterministic_weather_partial_ticks(document: Mapping[str, object] | None) -> list[float] | None:
+    """Extract per-pose Frozen weather interpolation inputs for Current's semantic fixture."""
+    captures = document.get("captures") if isinstance(document, Mapping) else None
+    if not isinstance(captures, list):
+        return None
+    values: list[float] = []
+    for capture in captures:
+        if not isinstance(capture, Mapping):
+            return None
+        partial_tick = parse_number(capture.get("weatherRendererPartialTick"))
+        if partial_tick is None or not 0.0 <= float(partial_tick) <= 1.0:
+            return None
+        values.append(float(partial_tick))
+    return values or None
+
+
+def deterministic_weather_renderer_ticks(document: Mapping[str, object] | None) -> list[int] | None:
+    captures = document.get("captures") if isinstance(document, Mapping) else None
+    if not isinstance(captures, list):
+        return None
+    values: list[int] = []
+    for capture in captures:
+        if not isinstance(capture, Mapping):
+            return None
+        renderer_tick = parse_number(capture.get("weatherRendererTicks"))
+        if renderer_tick is None or int(renderer_tick) < 0 or float(renderer_tick) != int(renderer_tick):
+            return None
+        values.append(int(renderer_tick))
+    return values or None
+
+
+def deterministic_lightmap_inputs(document: Mapping[str, object] | None) -> list[str] | None:
+    captures = document.get("captures") if isinstance(document, Mapping) else None
+    if not isinstance(captures, list):
+        return None
+    values = [str(capture.get("lightmapSemanticFingerprint") or "") for capture in captures if isinstance(capture, Mapping)]
+    return values if values and all(len(value.split(",")) == 13 for value in values) else None
+
+
 def deterministic_visual_fixture_equivalence(
     baseline: Mapping[str, object] | None,
     current: Mapping[str, object] | None,
@@ -8706,9 +8975,21 @@ def deterministic_visual_fixture_equivalence(
             mismatches.append(name)
 
     if baseline_capture is not None and current_capture is not None:
+        equal_value("shadowReceiverFixture", baseline.get("shadowReceiverFixture", "none"), current.get("shadowReceiverFixture", "none"))
         equal_value("dimension", baseline_capture.get("dimension"), current_capture.get("dimension"))
         equal_value("shaderEnabled", baseline_capture.get("shaderEnabled"), current_capture.get("shaderEnabled"))
         equal_number("gameTime", baseline_capture.get("gameTime"), current_capture.get("gameTime"))
+        lightmap_field = "lightmapSemanticFingerprint"
+        if lightmap_field in baseline_capture or lightmap_field in current_capture:
+            left = str(baseline_capture.get(lightmap_field) or "").split(",")
+            right = str(current_capture.get(lightmap_field) or "").split(",")
+            values = [parse_number(value) for value in left + right]
+            if len(left) != 13 or len(right) != 13 or any(
+                value is None or not math.isfinite(value) for value in values
+            ):
+                mismatches.append("lightmap-inputs-missing-or-invalid")
+            elif any(abs(values[index] - values[index + 13]) > 0.0001 for index in range(13)):
+                mismatches.append("lightmap-inputs")
         for field in ("requestedYaw", "requestedPitch", "observedYaw", "observedPitch"):
             equal_number(field, baseline_capture.get(field), current_capture.get(field))
         for axis in ("x", "y", "z"):
@@ -8733,6 +9014,122 @@ def deterministic_visual_fixture_equivalence(
         "mismatches": mismatches,
         "baseline": deterministic_camera_signature(dict(baseline) if isinstance(baseline, Mapping) else None),
         "current": deterministic_camera_signature(dict(current) if isinstance(current, Mapping) else None),
+    }
+
+
+def title_presented_frame_path(artifact_path: Path) -> Path | None:
+    """Return an acknowledged, client-window title presentation frame.
+
+    Title captures intentionally have no world/camera manifest. Do not use a
+    periodic desktop screenshot here: the runner acknowledgement proves that
+    this image is the frame presented by the selected renderer.
+    """
+    artifact = read_json(artifact_path)
+    capture = artifact.get("capture") if isinstance(artifact, Mapping) else None
+    title = capture.get("title_screen") if isinstance(capture, Mapping) else None
+    presented = title.get("presented_frame") if isinstance(title, Mapping) else None
+    if not isinstance(presented, Mapping) or presented.get("ack_status") != "captured":
+        return None
+    candidate = Path(str(presented.get("screenshot", "")))
+    return candidate if candidate.is_file() else None
+
+
+def title_window_provenance_verified(receipt: object) -> bool:
+    """Require a PID-bound external-window acknowledgement for title pixels."""
+    if not isinstance(receipt, Mapping):
+        return False
+    provenance = receipt.get("windowProvenance")
+    return (
+        isinstance(provenance, Mapping)
+        and provenance.get("schema") == "mattmc-window-capture-provenance-v1"
+        and provenance.get("status") == "verified"
+        and isinstance(provenance.get("expectedClientPid"), int)
+        and provenance.get("expectedClientPid") == provenance.get("observedWindowPid")
+        and provenance.get("targetWindow") == receipt.get("targetWindow")
+    )
+
+
+def title_screen_requested(artifact_path: Path) -> bool:
+    artifact = read_json(artifact_path)
+    capture = artifact.get("capture") if isinstance(artifact, Mapping) else None
+    title = capture.get("title_screen") if isinstance(capture, Mapping) else None
+    return isinstance(title, Mapping) and title.get("requested") is True
+
+
+def title_transition_requested(artifact_path: Path) -> bool:
+    """Return whether this title evidence is an intentionally non-static timeline."""
+    artifact = read_json(artifact_path)
+    capture = artifact.get("capture") if isinstance(artifact, Mapping) else None
+    title = capture.get("title_screen") if isinstance(capture, Mapping) else None
+    return isinstance(title, Mapping) and title.get("transition_capture") is True
+
+
+def title_semantic_receipt_from_log(log: str) -> dict[str, object] | None:
+    """Return the most recent bounded title semantic state from a run log."""
+    matches = list(re.finditer(
+        r"title-screen semantic receipt fadeAlpha=([^\s]+) splash=(true|false) "
+        r"fading=(true|false)(?: panoramaSpin=([^\s]+))?",
+        log,
+    ))
+    if not matches:
+        return None
+    match = matches[-1]
+    return {
+        "fade_alpha": parse_number(match.group(1)),
+        "splash_present": match.group(2) == "true",
+        "fading": match.group(3) == "true",
+        "panorama_spin": parse_number(match.group(4)),
+    }
+
+
+def title_visual_fixture_equivalence(
+    baseline_artifact: Path,
+    current_artifact: Path,
+) -> dict[str, object]:
+    """Validate the non-world fixture contract for title-screen pixels."""
+    mismatches: list[str] = []
+    for label, artifact_path in (("baseline", baseline_artifact), ("current", current_artifact)):
+        artifact = read_json(artifact_path)
+        capture = artifact.get("capture") if isinstance(artifact, Mapping) else None
+        title = capture.get("title_screen") if isinstance(capture, Mapping) else None
+        presented = title.get("presented_frame") if isinstance(title, Mapping) else None
+        semantic = title.get("semantic_receipt") if isinstance(title, Mapping) else None
+        if not isinstance(title, Mapping) or title.get("requested") is not True:
+            mismatches.append(f"{label}-title-screen-not-requested")
+        if not isinstance(title, Mapping) or title.get("completed") is not True:
+            mismatches.append(f"{label}-title-screen-incomplete")
+        if not isinstance(presented, Mapping) or presented.get("ack_status") != "captured":
+            mismatches.append(f"{label}-title-presentation-not-acknowledged")
+        if not title_window_provenance_verified(presented):
+            mismatches.append(f"{label}-title-presentation-window-unverified")
+        if title_presented_frame_path(artifact_path) is None:
+            mismatches.append(f"{label}-title-presented-image-missing")
+        frame_spin = parse_number(presented.get("panorama_spin")) if isinstance(presented, Mapping) else None
+        if frame_spin is None and isinstance(semantic, Mapping):
+            frame_spin = parse_number(semantic.get("panorama_spin"))
+        if frame_spin is None:
+            mismatches.append(f"{label}-title-panorama-timing-missing")
+    baseline = read_json(baseline_artifact)
+    current = read_json(current_artifact)
+    baseline_capture = baseline.get("capture") if isinstance(baseline, Mapping) else None
+    current_capture = current.get("capture") if isinstance(current, Mapping) else None
+    baseline_title = baseline_capture.get("title_screen") if isinstance(baseline_capture, Mapping) else None
+    current_title = current_capture.get("title_screen") if isinstance(current_capture, Mapping) else None
+    baseline_semantic = baseline_title.get("semantic_receipt") if isinstance(baseline_title, Mapping) else None
+    current_semantic = current_title.get("semantic_receipt") if isinstance(current_title, Mapping) else None
+    baseline_presented = baseline_title.get("presented_frame") if isinstance(baseline_title, Mapping) else None
+    current_presented = current_title.get("presented_frame") if isinstance(current_title, Mapping) else None
+    baseline_spin = parse_number(baseline_presented.get("panorama_spin")) if isinstance(baseline_presented, Mapping) else None
+    current_spin = parse_number(current_presented.get("panorama_spin")) if isinstance(current_presented, Mapping) else None
+    if baseline_spin is None and isinstance(baseline_semantic, Mapping):
+        baseline_spin = parse_number(baseline_semantic.get("panorama_spin"))
+    if current_spin is None and isinstance(current_semantic, Mapping):
+        current_spin = parse_number(current_semantic.get("panorama_spin"))
+    if baseline_spin is not None and current_spin is not None and abs(baseline_spin - current_spin) > 0.02:
+        mismatches.append("panorama_spin")
+    return {
+        "status": "passed" if not mismatches else "failed",
+        "mismatches": mismatches,
     }
 
 
@@ -8776,24 +9173,45 @@ def write_cross_repo_visual_pairs(
     for index, pair in enumerate(pairs, start=1):
         baseline_path = Path(str(pair.get("baseline_artifact", "")))
         current_path = Path(str(pair.get("current_artifact", "")))
+        baseline_title = title_presented_frame_path(baseline_path)
+        current_title = title_presented_frame_path(current_path)
+        title_pair = title_screen_requested(baseline_path) or title_screen_requested(current_path)
+        title_transition_pair = title_transition_requested(baseline_path) or title_transition_requested(current_path)
         baseline_inventory = deterministic_inventory_frame_path(baseline_path)
         current_inventory = deterministic_inventory_frame_path(current_path)
         inventory_pair = baseline_inventory is not None or current_inventory is not None
-        baseline_image = baseline_inventory or deterministic_initial_frame_path(baseline_path)
-        current_image = current_inventory or deterministic_initial_frame_path(current_path)
+        baseline_image = baseline_title or baseline_inventory or deterministic_initial_frame_path(baseline_path)
+        current_image = current_title or current_inventory or deterministic_initial_frame_path(current_path)
         entry: dict[str, object] = {
             "schema": "mattmc-cross-repo-static-terrain-visual-pair-v1",
             "baseline_artifact": str(baseline_path),
             "current_artifact": str(current_path),
             "baseline_image": str(baseline_image) if baseline_image else "",
             "current_image": str(current_image) if current_image else "",
-            "visual_fixture": "inventory-screen" if inventory_pair else "initial-world-frame",
+            "visual_fixture": (
+                "title-screen-presented-frame"
+                if title_pair
+                else "inventory-screen" if inventory_pair else "initial-world-frame"
+            ),
         }
-        fixture_equivalence = deterministic_visual_fixture_equivalence(
-            deterministic_capture_document(baseline_path),
-            deterministic_capture_document(current_path),
+        fixture_equivalence = (
+            title_visual_fixture_equivalence(baseline_path, current_path)
+            if title_pair
+            else deterministic_visual_fixture_equivalence(
+                deterministic_capture_document(baseline_path),
+                deterministic_capture_document(current_path),
+            )
         )
         entry["fixture_equivalence"] = fixture_equivalence
+        if title_transition_pair:
+            # Startup wall-clock scheduling is intentionally not a pixel
+            # fixture. Preserve its acknowledged frames and diagnostics, but
+            # do not turn mismatched animation times into either a parity pass
+            # or a rendering failure.
+            entry["status"] = "observational-transition"
+            entry["observation_only"] = True
+            report_pairs.append(entry)
+            continue
         if fixture_equivalence["status"] != "passed":
             entry["status"] = "incomparable-fixture-state"
             report_pairs.append(entry)
@@ -8817,10 +9235,11 @@ def write_cross_repo_visual_pairs(
         side_by_side.paste(left, (0, 0))
         side_by_side.paste(right, (left.width, 0))
         side_by_side.paste(amplified, (left.width * 2, 0))
-        baseline_copy = pair_root / "frozen_java_opengl_01_initial.png"
-        current_copy = pair_root / "current_rust_vulkan_01_initial.png"
-        diff_path = pair_root / "amplified_diff_01_initial.png"
-        side_by_side_path = pair_root / "side_by_side_frozen_current_diff_01_initial.png"
+        frame_name = "title_presented" if title_pair else "01_initial"
+        baseline_copy = pair_root / f"frozen_java_opengl_{frame_name}.png"
+        current_copy = pair_root / f"current_rust_vulkan_{frame_name}.png"
+        diff_path = pair_root / f"amplified_diff_{frame_name}.png"
+        side_by_side_path = pair_root / f"side_by_side_frozen_current_diff_{frame_name}.png"
         left.save(baseline_copy)
         right.save(current_copy)
         amplified.save(diff_path)
@@ -8860,7 +9279,10 @@ def write_cross_repo_visual_pairs(
         "schema": "mattmc-cross-repo-visual-parity-report-v1",
         "pair_count": len(report_pairs),
         "mean_rgb_abs_tolerance": mean_rgb_abs_tolerance,
-        "passed": all(pair.get("status") == "complete" for pair in report_pairs),
+        "passed": all(
+            pair.get("status") in {"complete", "observational-transition"}
+            for pair in report_pairs
+        ),
         "pairs": report_pairs,
     }
     output_root.mkdir(parents=True, exist_ok=True)
@@ -8868,6 +9290,105 @@ def write_cross_repo_visual_pairs(
         json.dumps(report, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+    return report
+
+
+def write_cross_repo_model_crop_pairs(
+    artifact_root: Path,
+    cross_repo_parity: Mapping[str, object],
+    mean_rgb_abs_tolerance: float,
+) -> dict[str, object]:
+    """Compare a Rust-proven model viewport against Frozen at the same pose.
+
+    The Rust model producer supplies the projected bounds.  Applying that
+    bounded rectangle to Frozen's equivalent deterministic camera screenshot
+    isolates a model/entity slice from unrelated chunk streaming differences.
+    Frozen remains a pure OpenGL baseline. Passive producer diagnostics may
+    establish fixture presence; only these pixel comparisons establish visual
+    agreement, and no Frozen rendering behaviour is changed.
+    """
+    pairs = cross_repo_parity.get("pairs")
+    if not isinstance(pairs, list):
+        return {"schema": "mattmc-cross-repo-model-crop-parity-v1", "pair_count": 0, "passed": True, "pairs": []}
+    try:
+        from PIL import Image, ImageChops, ImageStat
+    except Exception as exc:
+        return {"schema": "mattmc-cross-repo-model-crop-parity-v1", "pair_count": 0, "passed": False, "error": f"pillow-unavailable: {exc}", "pairs": []}
+    output_root = artifact_root / "paired_visual_model_crops"
+    report_pairs: list[dict[str, object]] = []
+    for index, pair in enumerate(pairs, start=1):
+        baseline_artifact = Path(str(pair.get("baseline_artifact", "")))
+        current_artifact = Path(str(pair.get("current_artifact", "")))
+        entry: dict[str, object] = {
+            "baseline_artifact": str(baseline_artifact),
+            "current_artifact": str(current_artifact),
+        }
+        fixture = deterministic_visual_fixture_equivalence(
+            deterministic_capture_document(baseline_artifact),
+            deterministic_capture_document(current_artifact),
+        )
+        entry["fixture_equivalence"] = fixture
+        current = read_json(current_artifact)
+        metrics = current.get("metrics") if isinstance(current, Mapping) else None
+        slice_metrics = metrics.get("rust_gal_slice") if isinstance(metrics, Mapping) else None
+        evidence = slice_metrics.get("world_mesh_model_capture_evidence") if isinstance(slice_metrics, Mapping) else None
+        crops = evidence.get("crops") if isinstance(evidence, Mapping) else None
+        crop = next((item for item in crops if isinstance(item, Mapping) and item.get("status") == "present"), None) if isinstance(crops, list) else None
+        if fixture.get("status") != "passed":
+            entry["status"] = "incomparable-fixture-state"
+        elif not isinstance(crop, Mapping):
+            entry["status"] = "missing-rust-model-crop"
+        else:
+            crop_box = crop.get("crop_box")
+            capture_index = parse_number(crop.get("capture_index"))
+            current_crop = Path(str(crop.get("crop_path") or ""))
+            baseline_doc = deterministic_capture_document(baseline_artifact)
+            baseline_captures = baseline_doc.get("captures") if isinstance(baseline_doc, Mapping) else None
+            baseline_capture = (
+                baseline_captures[int(capture_index)]
+                if isinstance(baseline_captures, list) and capture_index is not None and 0 <= int(capture_index) < len(baseline_captures)
+                else None
+            )
+            baseline_image = Path(str(baseline_capture.get("screenshot") or "")) if isinstance(baseline_capture, Mapping) else None
+            if not (isinstance(crop_box, list) and len(crop_box) == 4 and current_crop.is_file() and baseline_image and baseline_image.is_file()):
+                entry["status"] = "missing-model-crop-input"
+            else:
+                box = tuple(int(value) for value in crop_box)
+                with Image.open(baseline_image) as image:
+                    baseline_crop = image.convert("RGB").crop(box)
+                with Image.open(current_crop) as image:
+                    current_image = image.convert("RGB")
+                if baseline_crop.size != current_image.size:
+                    entry["status"] = "model-crop-size-mismatch"
+                else:
+                    diff = ImageChops.difference(baseline_crop, current_image)
+                    stat = ImageStat.Stat(diff)
+                    pair_root = output_root / f"pair-{index:02d}"
+                    pair_root.mkdir(parents=True, exist_ok=True)
+                    baseline_path = pair_root / "frozen_java_opengl_model_crop.png"
+                    current_path = pair_root / "current_rust_vulkan_model_crop.png"
+                    diff_path = pair_root / "amplified_diff_model_crop.png"
+                    baseline_crop.save(baseline_path)
+                    current_image.save(current_path)
+                    diff.point(lambda value: min(255, value * 4)).save(diff_path)
+                    mean_rgb_abs = [round(value, 3) for value in stat.mean]
+                    entry.update({
+                        "status": "complete" if all(value <= mean_rgb_abs_tolerance for value in stat.mean) else "visual-mismatch",
+                        "crop_box": list(box),
+                        "image_size": {"width": baseline_crop.width, "height": baseline_crop.height},
+                        "outputs": {"baseline_crop": str(baseline_path), "current_crop": str(current_path), "amplified_diff": str(diff_path)},
+                        "diff": {"mean_rgb_abs": mean_rgb_abs, "rms_rgb_abs": [round(value, 3) for value in stat.rms]},
+                    })
+        report_pairs.append(entry)
+    report = {
+        "schema": "mattmc-cross-repo-model-crop-parity-v1",
+        "pair_count": len(report_pairs),
+        "mean_rgb_abs_tolerance": mean_rgb_abs_tolerance,
+        "passed": all(pair.get("status") == "complete" for pair in report_pairs),
+        "pairs": report_pairs,
+    }
+    output_root.mkdir(parents=True, exist_ok=True)
+    (output_root / "model_crop_parity_report.json").write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return report
 
 
@@ -9058,6 +9579,30 @@ def latest_static_terrain_execution_events(
     The grouped receipt is emitted after Rust encodes the real mesh instances;
     it is intentionally preferred over capped per-instance trace events.
     """
+    capture_grouped = [
+        event for event in events
+        if event.get("stage") == "rust-vulkan-executed-capture-ready-coverage"
+        and isinstance(event.get("records"), list)
+        and event.get("records")
+    ]
+    # The capture-ready receipt is emitted by the renderer after the actual
+    # deterministic capture submission.  Prefer it whenever present: a normal
+    # ready receipt can legitimately describe an earlier warm-up frame even if
+    # its diagnostic frame counter happens to be numerically closer.
+    if capture_grouped:
+        if preferred_deterministic_frame is not None:
+            exact_capture = [
+                event for event in capture_grouped
+                if int(parse_number(event.get("deterministicRenderedFrameIndex")) or -1)
+                == preferred_deterministic_frame
+            ]
+            if exact_capture:
+                return exact_capture
+        max_capture_frame = max(int(parse_number(event.get("frameId")) or -1) for event in capture_grouped)
+        return [
+            event for event in capture_grouped
+            if int(parse_number(event.get("frameId")) or -1) == max_capture_frame
+        ]
     ready_grouped = [
         event for event in events
         if event.get("stage") == "rust-vulkan-executed-ready-coverage"
@@ -9208,13 +9753,13 @@ def cross_repository_static_terrain_draw_coverage_report(cross_repo_parity: Mapp
         current_execution_game_time = latest_static_terrain_execution_game_time(current_events, current_capture_frame)
         current_non_execution_reasons = latest_static_terrain_non_execution_reasons(current_events)
         for layer in ("solid", "cutout"):
-            baseline_capture_stage = "java-opengl-draw-capture-ready-coverage"
             baseline_ready_stage = "java-opengl-draw-ready-coverage"
+            baseline_capture_stage = "java-opengl-draw-capture-ready-coverage"
             baseline_stage = (
-                baseline_capture_stage
-                if any(event.get("stage") == baseline_capture_stage and event.get("layer") == layer for event in baseline_events)
-                else baseline_ready_stage
+                baseline_ready_stage
                 if any(event.get("stage") == baseline_ready_stage and event.get("layer") == layer for event in baseline_events)
+                else baseline_capture_stage
+                if any(event.get("stage") == baseline_capture_stage and event.get("layer") == layer for event in baseline_events)
                 else "java-opengl-draw-coverage"
             )
             current_capture_stage = "rust-vulkan-enqueue-source-capture-ready-coverage"
@@ -9238,6 +9783,51 @@ def cross_repository_static_terrain_draw_coverage_report(cross_repo_parity: Mapp
             current_candidates = static_terrain_records_from_event(current_event)
             baseline_records = static_terrain_covered_records(baseline_candidates)
             current_records = static_terrain_covered_records(current_candidates)
+            # `records` is deliberately bounded so a capture cannot grow without
+            # limit.  It must therefore never be treated as a complete set merely
+            # because its aggregate says that more draw records existed.  Doing so
+            # manufactures arbitrary "missing section" failures from whichever
+            # valid records fell after the diagnostic sample boundary.
+            def receipt_total(event: Mapping[str, object] | None) -> int:
+                aggregate = event.get("aggregate") if isinstance(event, Mapping) else None
+                if not isinstance(aggregate, Mapping):
+                    return 0
+                return int(parse_number(aggregate.get("records")) or 0)
+
+            def aggregate_value(event: Mapping[str, object] | None, field: str) -> int:
+                aggregate = event.get("aggregate") if isinstance(event, Mapping) else None
+                if not isinstance(aggregate, Mapping):
+                    return 0
+                return int(parse_number(aggregate.get(field)) or 0)
+
+            def effective_covered_total(event: Mapping[str, object] | None) -> int:
+                executed = aggregate_value(event, "executedRecords")
+                if executed > 0:
+                    return executed
+                return max(0, receipt_total(event) - aggregate_value(event, "missingCoverage"))
+
+            baseline_total = receipt_total(baseline_event)
+            current_total = receipt_total(current_event)
+            baseline_effective_total = effective_covered_total(baseline_event)
+            current_effective_total = effective_covered_total(current_event)
+            baseline_complete = baseline_total == len(baseline_candidates)
+            current_complete = current_total == len(current_candidates)
+            aggregate_signature = lambda event: {
+                "coveredRecords": effective_covered_total(event),
+                "vertexCount": aggregate_value(event, "vertexCount"),
+                "indexCount": aggregate_value(event, "indexCount"),
+                "primitiveCount": aggregate_value(event, "primitiveCount"),
+            }
+            if (baseline_event is not None and current_event is not None
+                    and aggregate_signature(baseline_event) != aggregate_signature(current_event)):
+                failures.append(f"{layer}_coverage_aggregate_mismatch")
+                if first_divergence is None:
+                    first_divergence = {
+                        "type": "coverage-aggregate-mismatch",
+                        "layer": layer,
+                        "frozen": aggregate_signature(baseline_event),
+                        "current": aggregate_signature(current_event),
+                    }
             # An empty receipt cannot establish parity.  In particular, both
             # renderers can legitimately emit early setup frames before their
             # terrain producers have populated; comparing those two empty sets
@@ -9250,8 +9840,12 @@ def cross_repository_static_terrain_draw_coverage_report(cross_repo_parity: Mapp
                 failures.append(f"{layer}_current_coverage_event_missing")
             elif not current_records:
                 failures.append(f"{layer}_current_coverage_empty")
-            baseline_keys = set(baseline_records)
-            current_keys = set(current_records)
+            # Exact section and payload joins are meaningful only when both
+            # bounded receipts contain their entire declared record set.  The
+            # aggregate mismatch above remains a hard failure either way.
+            comparable_record_sets = baseline_complete and current_complete
+            baseline_keys = set(baseline_records) if comparable_record_sets else set()
+            current_keys = set(current_records) if comparable_record_sets else set()
             missing = sorted(baseline_keys - current_keys)
             extra = sorted(current_keys - baseline_keys)
             mismatches: list[dict[str, object]] = []
@@ -9269,7 +9863,9 @@ def cross_repository_static_terrain_draw_coverage_report(cross_repo_parity: Mapp
                     if first_divergence is None:
                         first_divergence = {"type": "coverage-mismatch", **mismatch}
                     break
-            current_nonempty_records = static_terrain_nonempty_records(current_records)
+            current_nonempty_records = (
+                static_terrain_nonempty_records(current_records) if current_complete else {}
+            )
             executed_missing = sorted(set(current_nonempty_records) - set(current_executed_records))
             executed_missing_animated = [
                 key for key in executed_missing
@@ -9358,6 +9954,13 @@ def cross_repository_static_terrain_draw_coverage_report(cross_repo_parity: Mapp
                 "current_sections": len(current_records),
                 "frozen_candidate_sections": len(baseline_candidates),
                 "current_candidate_sections": len(current_candidates),
+                "frozen_declared_records": baseline_total,
+                "current_declared_records": current_total,
+                "frozen_effective_covered_records": baseline_effective_total,
+                "current_effective_covered_records": current_effective_total,
+                "frozen_records_complete": baseline_complete,
+                "current_records_complete": current_complete,
+                "record_sets_comparable": comparable_record_sets,
                 "current_executed_sections": len([key for key in current_executed_records if key[1] == layer]),
                 "missing_sections": [key[0] for key in missing[:8]],
                 "extra_sections": [key[0] for key in extra[:8]],
@@ -9431,6 +10034,10 @@ def parity_evidence_failures(baseline: dict[str, object], current: dict[str, obj
             metrics = artifact.get("metrics") if isinstance(artifact.get("metrics"), dict) else {}
             slice_metrics = metrics.get("rust_gal_slice") if isinstance(metrics, dict) else {}
             model_evidence = slice_metrics.get("world_mesh_model_capture_evidence") if isinstance(slice_metrics, dict) else {}
+            if fixture_scenario == "cow":
+                observed = slice_metrics.get("frozen_cow_model_emission_evidence", {}) if isinstance(slice_metrics, dict) else {}
+                if isinstance(observed, dict) and observed.get("passed") is True and observed.get("status") == "emission_observed":
+                    continue
             if not isinstance(model_evidence, dict) or model_evidence.get("status") not in {"structural_present", "passed"}:
                 failures.append(f"{label}_model_producer_evidence_missing:{model_evidence.get('status') if isinstance(model_evidence, dict) else 'absent'}")
     return failures
@@ -9773,6 +10380,87 @@ def normalize_capture_artifact(
 ) -> dict[str, object]:
     files = load_capture_files(capture_dir)
     meta = read_key_values(files["meta"])
+    run_log_text = files["run_log"].read_text(encoding="utf-8", errors="replace") if files["run_log"] else ""
+    title_semantic_receipt = title_semantic_receipt_from_log(run_log_text)
+    title_screen_capture = meta.get("title_screen_capture", "false").lower() == "true"
+    title_screen_transition_capture = meta.get("title_screen_transition_capture", "false").lower() == "true"
+    title_screen_screenshot = Path(meta["screenshot_1"]) if meta.get("screenshot_1") else None
+    title_screen_screenshot_target = meta.get("screenshot_1_target", "").strip()
+    rust_title_presented_screenshot = (
+        Path(meta["rust_title_presented_frame_screenshot"])
+        if meta.get("rust_title_presented_frame_screenshot")
+        else None
+    )
+    rust_title_presented_ack = (
+        Path(meta["rust_title_presented_frame_ack"])
+        if meta.get("rust_title_presented_frame_ack")
+        else None
+    )
+    rust_title_presented_candidate = (
+        mode.backend == "rust-vulkan"
+        and rust_title_presented_screenshot is not None
+        and rust_title_presented_screenshot.is_file()
+        and rust_title_presented_ack is not None
+        and rust_title_presented_ack.is_file()
+    )
+    rust_title_presented_receipt = (
+        read_json(rust_title_presented_ack)
+        if rust_title_presented_ack is not None and rust_title_presented_ack.is_file()
+        else None
+    )
+    rust_title_presented_complete = (
+        rust_title_presented_candidate
+        and title_window_provenance_verified(rust_title_presented_receipt)
+    )
+    frozen_title_presented_ack = (
+        Path(meta["frozen_title_presented_frame_ack"])
+        if meta.get("frozen_title_presented_frame_ack")
+        else None
+    )
+    frozen_title_presented_receipt = (
+        read_json(frozen_title_presented_ack)
+        if frozen_title_presented_ack is not None and frozen_title_presented_ack.is_file()
+        else None
+    )
+    frozen_title_presented_screenshot = (
+        Path(frozen_title_presented_receipt["screenshot"])
+        if isinstance(frozen_title_presented_receipt, dict)
+        and isinstance(frozen_title_presented_receipt.get("screenshot"), str)
+        else None
+    )
+    frozen_title_presented_candidate = (
+        mode.target == "frozen"
+        and frozen_title_presented_ack is not None
+        and frozen_title_presented_ack.is_file()
+        and frozen_title_presented_screenshot is not None
+        and frozen_title_presented_screenshot.is_file()
+    )
+    frozen_title_presented_complete = (
+        frozen_title_presented_candidate
+        and title_window_provenance_verified(frozen_title_presented_receipt)
+    )
+    title_screen_capture_complete = (
+        meta.get("title_screen_capture_completed", "false").lower() == "true"
+        and (
+            rust_title_presented_complete
+            or frozen_title_presented_complete
+            or (
+                title_screen_screenshot is not None
+                and title_screen_screenshot.is_file()
+                and bool(title_screen_screenshot_target)
+                and title_screen_screenshot_target != "root"
+            )
+        )
+    )
+    title_presented_screenshot = (
+        rust_title_presented_screenshot if rust_title_presented_complete else frozen_title_presented_screenshot
+    )
+    title_presented_ack = (
+        rust_title_presented_ack if rust_title_presented_complete else frozen_title_presented_ack
+    )
+    title_presented_receipt = (
+        rust_title_presented_receipt if rust_title_presented_complete else frozen_title_presented_receipt
+    )
     shader_summary = read_key_values(files["shader_summary"])
     deterministic_doc = read_json(files["deterministic"]) if files["deterministic"] else None
     distant_horizons_capture_execution_doc: dict[str, object] = {}
@@ -10338,6 +11026,7 @@ def normalize_capture_artifact(
     requested_world_mesh_model_scenario = parse_java_property(
         combined_logs, "mattmc.dev.rustGalWorldMesh.modelScenario"
     )
+    requested_entity_shadow_scenario = parse_java_property(combined_logs, "mattmc.dev.rustGalWorldEntityShadow.scenario")
     # A name-tag fixture uses a supporting cow entity, but that entity model is
     # not the selected workload.  Keep track of whether the model scenario was
     # actually requested so the later deterministic-document fallback does not
@@ -10443,6 +11132,18 @@ def normalize_capture_artifact(
         cloud_doc = frame_doc["gameplayClouds"]
     if not requested_world_cloud_scenario and isinstance(cloud_doc, dict):
         requested_world_cloud_scenario = str(cloud_doc.get("scenario") or "")
+    # Frozen records this capture-only receipt directly beside the deterministic
+    # screenshot.  Retain it in the normalized baseline artifact so a cloud
+    # comparison can prove that both routes consumed the same legacy mesh
+    # inputs, without treating Frozen as a Rust renderer or changing its draw.
+    if mode.target == "frozen":
+        frozen_cloud_receipts = sorted(capture_dir.rglob("frozen-cloud-mesh-last.json"))
+        frozen_cloud_receipt = read_json(frozen_cloud_receipts[-1]) if frozen_cloud_receipts else None
+        if isinstance(frozen_cloud_receipt, dict):
+            cloud_doc = dict(cloud_doc) if isinstance(cloud_doc, dict) else {}
+            cloud_doc["frozenMeshReceipt"] = frozen_cloud_receipt
+            if not cloud_doc.get("scenario") and requested_world_cloud_scenario:
+                cloud_doc["scenario"] = requested_world_cloud_scenario
     if not requested_world_static_terrain_scenario and isinstance(deterministic_doc, dict):
         requested_world_static_terrain_scenario = str(deterministic_doc.get("rustGalStaticTerrainScenario") or "")
     block_display_doc = (
@@ -11069,6 +11770,11 @@ def normalize_capture_artifact(
         if mode.expected_attribution == "java-vulkan" and mode.backend != "rust-vulkan"
         else world_mesh_model_control,
     )
+    entity_shadow_execution_evidence = (
+        deterministic_entity_shadow_execution_evidence(deterministic_doc)
+        if requested_entity_shadow_scenario == "cow" and tool_kind == "capture" and mode.backend == "rust-vulkan"
+        else {"status": "not_requested", "passed": True}
+    )
     world_mesh_primed_tnt_pixel_evidence = deterministic_world_mesh_primed_tnt_pixel_evidence(
         deterministic_doc,
         requested_world_mesh_primed_tnt_scenario,
@@ -11183,6 +11889,8 @@ def normalize_capture_artifact(
         combined_logs, r"rust_gal_world_depth_attachment_reuses[=: ]+(\d+)"
     )
     validation_messages: list[str] = []
+    if not entity_shadow_execution_evidence["passed"]:
+        validation_messages.append("entity shadow capture lacks correlated semantic/submission evidence: " + entity_shadow_execution_evidence["status"])
     validation_notes: list[str] = []
     if not files["meta"]:
         validation_messages.append("capture metadata is missing")
@@ -11204,7 +11912,12 @@ def normalize_capture_artifact(
             validation_messages.append("frame sampler wall-clock/displayed-FPS consistency checks failed")
     if tool_kind == "subsystem" and not subsystem_complete:
         validation_messages.append("isolated subsystem benchmark did not complete all required workloads")
-    if tool_kind == "capture" and not deterministic_complete:
+    if title_screen_capture:
+        if not title_screen_capture_complete:
+            validation_messages.append(
+                "title-screen capture did not produce a bounded completion screenshot from the client window"
+            )
+    elif tool_kind == "capture" and not deterministic_complete:
         validation_messages.append("deterministic correctness capture did not complete")
     selected_source_execution_requested = bool(
         isinstance(terrain_contract_doc, dict)
@@ -11843,7 +12556,15 @@ def normalize_capture_artifact(
     static_terrain_expected_fault_rejected = False
     static_terrain_readiness_failure_stage: str | None = None
     static_terrain_scenario = (requested_world_static_terrain_scenario or "").strip().lower()
-    if static_terrain_scenario and rust_shell_outline_mode and tool_kind != "subsystem":
+    # A title capture intentionally never enters a world.  Preserve any
+    # inherited static-terrain diagnostics in the artifact for inspection,
+    # but do not apply world-only workload gates to a bounded menu frame.
+    if (
+        static_terrain_scenario
+        and not title_screen_capture
+        and rust_shell_outline_mode
+        and tool_kind != "subsystem"
+    ):
         static_doc = static_terrain_doc if static_terrain_doc else static_terrain_frame_doc
 
         def static_metric(name: str) -> int:
@@ -12008,7 +12729,12 @@ def normalize_capture_artifact(
                         "deterministic static-terrain fault injection rejected as expected "
                         f"(fault={requested_world_static_terrain_fault}, classification={static_terrain_expected_fault})"
                     )
-    if static_terrain_scenario and mode.expected_attribution == "java-vulkan" and not rust_shell_outline_mode:
+    if (
+        static_terrain_scenario
+        and not title_screen_capture
+        and mode.expected_attribution == "java-vulkan"
+        and not rust_shell_outline_mode
+    ):
         if static_terrain_submitted_count > 0 or int(rust_gal_world_mesh_instances_for_validation or 0) != 0:
             static_terrain_workload_complete = False
             validation_messages.append("normal Java Vulkan static-terrain control emitted unexpected Rust terrain mesh work")
@@ -13671,9 +14397,27 @@ def normalize_capture_artifact(
         combined_logs,
         meta,
     )
-    complete = (
+    if title_screen_capture and readiness_state.get("last_screen") != "TitleScreen":
+        validation_notes.append(
+            "title-screen capture retained its bounded desktop screenshot after a non-TitleScreen log state; "
+            "the observed screen is diagnostic only because startup logs can lag the presented frame"
+        )
+    common_complete = (
         bool(files["meta"])
         and (success or reused_baseline)
+        and validation_layer_exercised
+        and renderdoc_complete
+        and renderdoc_workload_assertions_complete
+        and tracy_complete
+        and not java_vulkan_has_rust_shell
+        and not rust_shell_has_java_vulkan_frame
+        and hard_errors_absent
+    )
+    complete = (
+        common_complete
+        and title_screen_capture_complete
+    ) if title_screen_capture else (
+        common_complete
         and frame_validity_complete
         and world_entered
         and subsystem_complete
@@ -13692,19 +14436,13 @@ def normalize_capture_artifact(
         and world_experience_orb_workload_complete
         and world_beacon_beam_workload_complete
         and world_mesh_model_workload_complete
+        and entity_shadow_execution_evidence["passed"]
         and world_mesh_primed_tnt_workload_complete
         and world_mesh_piston_workload_complete
         and world_weather_workload_complete
         and world_cloud_workload_complete
         and selected_source_execution_complete
         and selected_source_distant_horizons_execution_complete
-        and validation_layer_exercised
-        and renderdoc_complete
-        and renderdoc_workload_assertions_complete
-        and tracy_complete
-        and not java_vulkan_has_rust_shell
-        and not rust_shell_has_java_vulkan_frame
-        and hard_errors_absent
     )
     artifact = {
         "schema": SCHEMA,
@@ -13722,6 +14460,44 @@ def normalize_capture_artifact(
             "timed_out": timed_out,
             "timed_out_phase": failed_phase if timed_out else None,
             "failed_phase": failed_phase,
+            "title_screen": {
+                "requested": title_screen_capture,
+                "transition_capture": title_screen_transition_capture,
+                "completed": title_screen_capture_complete,
+                "screenshot": str(title_screen_screenshot) if title_screen_screenshot else None,
+                "screenshot_target": title_screen_screenshot_target or None,
+                "observed_screen": readiness_state.get("last_screen"),
+                "semantic_receipt": title_semantic_receipt,
+                "presented_frame": {
+                    "screenshot": str(title_presented_screenshot) if title_presented_screenshot else None,
+                    "acknowledgement": str(title_presented_ack) if title_presented_ack else None,
+                    "ack_status": (
+                        title_presented_receipt.get("status")
+                        if isinstance(title_presented_receipt, Mapping)
+                        else None
+                    ),
+                    "targetWindow": (
+                        title_presented_receipt.get("targetWindow")
+                        if isinstance(title_presented_receipt, Mapping)
+                        else None
+                    ),
+                    "capture_kind": (
+                        title_presented_receipt.get("captureKind")
+                        if isinstance(title_presented_receipt, Mapping)
+                        else None
+                    ),
+                    "panorama_spin": (
+                        parse_number(title_presented_receipt.get("panoramaSpin"))
+                        if isinstance(title_presented_receipt, Mapping)
+                        else None
+                    ),
+                    "window_provenance": (
+                        title_presented_receipt.get("windowProvenance")
+                        if isinstance(title_presented_receipt, Mapping)
+                        else None
+                    ),
+                },
+            },
             "reused_baseline": reused_baseline,
             "files": {key: str(path) if path else None for key, path in files.items()},
             "whole_frame_gameplay_attachments": {
@@ -13957,6 +14733,17 @@ def normalize_capture_artifact(
                     for key, value in model_route_counts.items()
                 },
                 "world_mesh_model_capture_evidence": world_mesh_model_capture_evidence,
+                "frozen_cow_model_emission_evidence": (
+                    frozen_cow_model_emission_evidence(deterministic_doc)
+                    if mode.target == "frozen" and mode.backend == "opengl" and requested_world_mesh_model_scenario == "cow"
+                    else {"passed": False, "status": "not_requested"}
+                ),
+                "world_entity_shadow_execution_evidence": entity_shadow_execution_evidence,
+                "world_entity_shadow_receiver_crops": (
+                    deterministic_entity_shadow_receiver_crops(deterministic_doc)
+                    if entity_shadow_execution_evidence.get("passed") is True
+                    else {"passed": False, "status": "shadow_execution_missing"}
+                ),
                 "world_mesh_primed_tnt_scenario": requested_world_mesh_primed_tnt_scenario or None,
                 "world_mesh_primed_tnt_control": world_mesh_primed_tnt_control,
                 "world_mesh_primed_tnt_submitted_work": primed_tnt_submitted_count,
@@ -15440,6 +16227,22 @@ def replay_renderdoc_summary(capture_dir: Path, capture_path: Path) -> Path:
     return path
 
 
+def validate_fixture_combinations(args: argparse.Namespace) -> None:
+    static_scenario = str(getattr(args, "world_static_terrain_scenario", "") or "").strip()
+    model_scenario = str(getattr(args, "world_mesh_model_scenario", "") or "").strip()
+    # The deterministic palette fixture owns the same small platform and
+    # sightline as the copied block-entity fixture.  Combining them lets the
+    # two setup routines overwrite one another, which can make a projected
+    # palette probe sample sky and turn fixture interference into a claimed
+    # renderer regression.  Keep both vertical slices independently
+    # admissible until they have deliberately non-overlapping placements.
+    if static_terrain_base_scenario(static_scenario) == "texture-palette" and model_scenario:
+        raise ValueError(
+            "--world-static-terrain-scenario texture-palette cannot be combined with "
+            "--world-mesh-model-scenario: the fixtures use overlapping world coordinates"
+        )
+
+
 def build_capture_command(
     target: RepoTarget,
     mode: ModeSpec,
@@ -15449,10 +16252,28 @@ def build_capture_command(
     tool_kind: str,
 ) -> tuple[list[str], dict[str, str]]:
     normalize_direct_primed_tnt_scenario(args)
+    validate_fixture_combinations(args)
     kind, entrypoint = run_dev_capture_entrypoint(target.root)
     requested_validation = "routine" if args.validation == "standard" else args.validation
     validation = "standard" if mode.supports_validation and requested_validation != "off" else "off"
-    title_screen_capture = bool(getattr(args, "title_screen_capture", False))
+    # A title screenshot is a capture-row artifact. Gameplay and subsystem
+    # rows retain their ordinary workloads; making them stop at the title
+    # screen destroys the evidence those rows are meant to collect.
+    # A transition is a title-screen capture with additional early-startup
+    # samples.  Treating it as a separate opt-in left the runner in its normal
+    # quick-play world mode even though its CLI advertised a title transition.
+    title_screen_capture = (
+        bool(getattr(args, "title_screen_capture", False))
+        or bool(getattr(args, "title_screen_transition_capture", False))
+    ) and tool_kind == "capture"
+    title_screen_transition_capture = (
+        title_screen_capture
+        and bool(getattr(args, "title_screen_transition_capture", False))
+    )
+    level_loading_screen_capture = (
+        tool_kind == "capture"
+        and bool(getattr(args, "level_loading_screen_capture", False))
+    )
     if title_screen_capture:
         # World-frame validation cannot certify a menu. Keep title capture
         # observational until both sides have an equivalent ready receipt.
@@ -15491,6 +16312,13 @@ def build_capture_command(
         and (
             workload_profile == "settled-static"
             or bool(getattr(args, "world_static_terrain_scenario", ""))
+            # A model witness is still photographed against the ordinary
+            # terrain background.  Frozen must not race its first zero-section
+            # frame while Current waits for its Rust-owned terrain assets; that
+            # would turn an incomplete baseline into a supposed fog/model
+            # regression.  This activates only Frozen's observational Sodium
+            # readiness gate, never a Frozen renderer code path.
+            or bool(getattr(args, "world_mesh_model_scenario", ""))
         )
     )
     # The explicit Rust CPU terrain source must settle its full visible vertical
@@ -15601,6 +16429,8 @@ def build_capture_command(
             command.extend(["--client-args", client_args])
         if title_screen_capture:
             command.append("--title-screen-capture")
+            if title_screen_transition_capture:
+                command.append("--title-screen-transition-capture")
         static_terrain_capture_requested = tool_kind == "capture" and bool(static_terrain_scenario) and (
             mode.backend == "rust-vulkan" or bool(requested_static_terrain_scenario)
         )
@@ -15626,6 +16456,7 @@ def build_capture_command(
             or static_terrain_capture_requested
             or selected_source_capture_requested
             or moving_mesh_capture_requested
+            or level_loading_screen_capture
         ):
             command.append("--deterministic-camera-capture")
         if not title_screen_capture and tool_kind == "capture" and (
@@ -15717,12 +16548,55 @@ def build_capture_command(
     env["MATTMC_GRAPHICS_VALIDATION_FAIL_SEVERITY"] = getattr(args, "validation_fail_severity", "warning")
     if title_screen_capture:
         # Both launchers remain at their normal title screen while the shared
-        # runner captures one bounded desktop frame. This changes neither
+        # runner captures a finite desktop sequence. This changes neither
         # Frozen nor Java's rendering route and emits only managed artifacts.
+        timeline_frames = int(getattr(args, "title_screen_timeline_frames", 1))
+        timeline_interval_secs = int(getattr(args, "title_screen_timeline_interval_secs", 20))
+        if timeline_frames < 1 or timeline_frames > 60:
+            raise ValueError("--title-screen-timeline-frames must be between 1 and 60")
+        if timeline_interval_secs < 1 or timeline_interval_secs > 60:
+            raise ValueError("--title-screen-timeline-interval-secs must be between 1 and 60")
         env["MATTMC_TITLE_SCREEN_CAPTURE"] = "true"
-        env["SCREENSHOT_INTERVAL_SECS"] = "20"
-        env["SCREENSHOT_START_DELAY_SECS"] = "20"
-        env["SCREENSHOT_MAX_COUNT"] = "1"
+        if not title_screen_transition_capture:
+            # Freeze only vanilla title animation inputs in the isolated fixture
+            # so a paired image compares the same panorama and no random splash.
+            env["MATTMC_CAPTURE_TITLE_STATIC_FIXTURE"] = "true"
+            env.pop("MATTMC_TITLE_SCREEN_CAPTURE_PANORAMA_SPIN", None)
+        else:
+            # Transition evidence intentionally preserves normal animation.
+            # A fixed panorama-spin gate is valid only for a static-image
+            # fixture; applying one here can wait forever for an animated
+            # title screen to hit one exact floating-point value.
+            env.pop("MATTMC_TITLE_SCREEN_CAPTURE_PANORAMA_SPIN", None)
+        # Frozen's renderer is never changed: this merely lets its shell capture
+        # runner acknowledge one already-presented OpenGL title frame instead of
+        # racing a later desktop repaint.
+        if mode.target == "frozen":
+            env["MATTMC_FROZEN_TITLE_FRAME_CAPTURE_DIR"] = str(capture_dir / "frozen_title_presented_frame")
+        # A title screenshot is useful only after the ordinary TitleScreen has
+        # actually emitted a semantic render receipt. Both capture runners gate
+        # their bounded desktop sequence on this log-only diagnostic; it does not
+        # freeze or otherwise modify Frozen's rendering.
+        env["MATTMC_TITLE_SCREEN_REQUIRE_RECEIPT"] = "true"
+        if title_screen_transition_capture:
+            # Unlike an ordinary menu image, this timeline must begin during
+            # the normal reload overlay. It remains an observation, not a
+            # pixel-parity verdict: startup wall-clock timing is not a stable
+            # rendering fixture.
+            transition_frames = int(getattr(args, "title_screen_transition_frames", 45))
+            transition_interval_secs = int(getattr(args, "title_screen_transition_interval_secs", 1))
+            if transition_frames < 1 or transition_frames > 120:
+                raise ValueError("--title-screen-transition-frames must be between 1 and 120")
+            if transition_interval_secs < 1 or transition_interval_secs > 60:
+                raise ValueError("--title-screen-transition-interval-secs must be between 1 and 60")
+            env["MATTMC_TITLE_SCREEN_TRANSITION_CAPTURE"] = "true"
+            env["SCREENSHOT_INTERVAL_SECS"] = str(transition_interval_secs)
+            env["SCREENSHOT_START_DELAY_SECS"] = "0"
+            env["SCREENSHOT_MAX_COUNT"] = str(transition_frames)
+        else:
+            env["SCREENSHOT_INTERVAL_SECS"] = str(timeline_interval_secs)
+            env["SCREENSHOT_START_DELAY_SECS"] = str(timeline_interval_secs)
+            env["SCREENSHOT_MAX_COUNT"] = str(timeline_frames)
     # Weather/cloud/particle parity fixtures intentionally retain the normal DH
     # producer.  Frozen's unchanged render hook still records its DH traversal
     # even when config generation/render flags are disabled, so suppressing DH
@@ -15808,6 +16682,11 @@ def build_capture_command(
                 "-Dmattmc.dev.deterministicCameraCapture.rustGalGuiScreenCycleHoldFrames=1",
             ]
         )
+    if level_loading_screen_capture:
+        # Both repositories retain one frame from the real LevelLoadingScreen.
+        # This diagnostic only delays that screen's close until the external
+        # runner acknowledges the presented image; it never selects a renderer.
+        java_options.append("-Dmattmc.dev.levelLoadingScreenCapture=true")
     java_options.extend(world_profile.diagnostic_jvm_args)
     if getattr(args, "gui_resource_pack_scenario", "") and tool_kind == "capture":
         java_options.extend(
@@ -15865,6 +16744,10 @@ def build_capture_command(
         # bridge and Frozen's normal temporal state consume this same fixture.
         java_options.extend(
             [
+                # Both launchers must pin the existing light-flicker fixture,
+                # including Frozen's shell launcher (which does not run the
+                # Current Python capture runner).
+                "-Dmattmc.vulkan.deterministicLightmapParity=true",
                 "-Dmattmc.vulkan.deterministicTemporalParity=true",
                 "-Dmattmc.vulkan.deterministicTemporalParity.frameCounter=0",
                 "-Dmattmc.vulkan.deterministicTemporalParity.frameTime=0.016666668",
@@ -16188,6 +17071,7 @@ def build_capture_command(
             or bool(getattr(args, "world_distant_horizons_non_water", False))
             or bool(getattr(args, "world_distant_horizons_water", False))
             or bool(getattr(args, "world_distant_horizons_texture_palette", False))
+            or bool(getattr(args, "level_loading_screen_capture", False))
         )
         and (
             mode.backend == "rust-vulkan"
@@ -16304,6 +17188,10 @@ def build_capture_command(
         )
     if getattr(args, "empty_selected_hand", False):
         java_options.append("-Dmattmc.dev.deterministicCameraCapture.emptySelectedHand=true")
+        # A first-person arm comparison is meaningful only when both isolated
+        # clients select the same skin.  Their copied run directories can
+        # otherwise retain different user-facing selectedSkin options.
+        java_options.append("-Dmattmc.dev.deterministicCameraCapture.selectedSkin=steve (Wide)")
     if getattr(args, "world_outline_scenario", ""):
         java_options.append("-Dmattmc.dev.blockOutlineDiagnostics=true")
         java_options.append(f"-Dmattmc.dev.rustGalWorldOutline.scenario={args.world_outline_scenario}")
@@ -16366,12 +17254,38 @@ def build_capture_command(
                     "-Dmattmc.dev.deterministicCameraCapture.yawDelta=0.0",
                 ]
             )
+    baseline_lightmap_inputs = getattr(args, "_baseline_lightmap_inputs", None)
+    if (
+        mode.target == "current"
+        and mode.backend == "rust-vulkan"
+        and baseline_lightmap_inputs
+        and (
+            getattr(args, "world_weather_scenario", "")
+            or getattr(args, "world_cloud_scenario", "")
+        )
+    ):
+        # The paired Frozen receipt is immutable scalar game state, not a
+        # renderer resource. Replay it only in the matching Current capture
+        # pose so clouds/weather see the same normal vanilla lightmap phase.
+        java_options.append("-Dmattmc.dev.deterministicCameraCapture.lightmapInputs=" + ";".join(baseline_lightmap_inputs))
     if getattr(args, "world_weather_scenario", ""):
         # The copied-world fixture sets rain through normal server/client
         # weather state. Java contributes extracted column semantics only.
         java_options.append(
             f"-Dmattmc.dev.rustGalWeather.scenario={args.world_weather_scenario}"
         )
+        baseline_weather_partial_ticks = getattr(args, "_weather_baseline_partial_ticks", None)
+        baseline_weather_renderer_ticks = getattr(args, "_weather_baseline_renderer_ticks", None)
+        if mode.target == "current" and mode.backend == "rust-vulkan" and baseline_weather_partial_ticks:
+            java_options.append(
+                "-Dmattmc.dev.deterministicCameraCapture.weatherPartialTicks="
+                + ",".join(f"{partial_tick:.6f}" for partial_tick in baseline_weather_partial_ticks)
+            )
+        if mode.target == "current" and mode.backend == "rust-vulkan" and baseline_weather_renderer_ticks:
+            java_options.append(
+                "-Dmattmc.dev.deterministicCameraCapture.weatherRendererTicks="
+                + ",".join(str(renderer_tick) for renderer_tick in baseline_weather_renderer_ticks)
+            )
         weather_control = getattr(args, "world_weather_control", "rust")
         # The paired Frozen row is the Java OpenGL correctness baseline.  A
         # request for the Rust weather route therefore maps to Frozen's
@@ -16402,7 +17316,15 @@ def build_capture_command(
         java_options.extend(
             [
                 f"-Dmattmc.dev.rustGalClouds.scenario={args.world_cloud_scenario}",
-                "-Dmattmc.dev.rustGalClouds.radiusLimit=8",
+                # At the canonical camera's cloud-layer height, an upward
+                # view intersects the plane roughly 131 blocks away. Sixteen
+                # 12-block cells cover that ray while retaining a 13,068-face
+                # worst case, safely below the explicit 65,536-frame bound.
+                "-Dmattmc.dev.rustGalClouds.radiusLimit=16",
+                # This is a capture-only Minecraft option, not a Rust cap:
+                # Frozen and Current must traverse the same 16-cell radius.
+                "-Dmattmc.dev.deterministicCameraCapture.cloudRangeChunks=12",
+                "-Dmattmc.dev.deterministicCameraCapture.fixedCloudTime=0.0",
             ]
         )
     if getattr(args, "world_mesh_block_display_scenario", ""):
@@ -16770,6 +17692,9 @@ def build_capture_command(
                     "-Dmattmc.dev.staticTerrainParityDiagnostics.lightmapPath="
                     f"{capture_dir / 'static_terrain_appearance'}"
                 )
+                java_options.append(
+                    "-Dmattmc.dev.staticTerrainParityDiagnostics.requireLightmapCapture=true"
+                )
             elif (
                 static_terrain_scenario.lower() in {"translucent-overlap", "translucent-water"}
                 and mode.backend == "rust-vulkan"
@@ -16799,7 +17724,15 @@ def build_capture_command(
         if water_animation_capture_requested:
             java_options.append("-Dmattmc.dev.rustGalStaticTerrain.waterAnimationDenseCapture=true")
             java_options.append("-Dmattmc.dev.rustGalStaticTerrain.waterAnimationDenseFrames=24")
-        if tool_kind == "capture" and static_terrain_scenario:
+        if tool_kind == "capture" and static_terrain_scenario and not any(
+            getattr(args, name, "") for name in (
+                "world_mesh_falling_block_scenario", "world_mesh_piston_scenario",
+                "world_mesh_primed_tnt_scenario", "world_mesh_arrow_scenario",
+                "world_experience_orb_scenario", "world_beacon_beam_scenario",
+                "world_mesh_model_scenario", "world_entity_flame_scenario",
+                "world_entity_shadow_scenario", "world_entity_leash_scenario",
+            )
+        ):
             # Both sides of a translucent ordering capture must receive the
             # exact same camera inputs. This controls only the deterministic
             # fixture; Frozen remains an observational Java OpenGL baseline.
@@ -17164,6 +18097,12 @@ def build_capture_command(
             ]
         )
         env["MATTMC_GRAPHICS_CORRECTNESS_CAPTURE"] = "true"
+    elif tool_kind == "capture" and title_screen_capture:
+        # Title captures use a desktop screenshot rather than a world-frame
+        # deterministic acknowledgement. Retain bounded semantic route
+        # receipts so title text/panorama investigations can distinguish
+        # source coordinates from Rust backend presentation.
+        java_options.append("-Dmattmc.dev.graphicsAuditSliceMetrics=true")
     if args.diagnostic:
         perf_dir = capture_dir / "vulkan-perf-audit"
         java_options.extend(
@@ -17269,6 +18208,28 @@ def build_capture_command(
                 "-Dmattmc.dev.deterministicCameraCapture.yawDelta=0.0",
             ]
         )
+    if getattr(args, "gui_resource_pack_scenario", "") and tool_kind == "capture":
+        # A GUI-pack row is a pack-selection fixture, not the unscoped static
+        # camera probe.  It intentionally retains the declared sweep so both
+        # launchers prove the selected pack across the shared camera schedule.
+        # This must be last: canonical-fixture defaults are otherwise allowed
+        # to collapse Frozen to one pose while Current captures four.
+        java_options.extend(
+            [
+                "-Dmattmc.dev.deterministicCameraCapture.poseCount=4",
+                "-Dmattmc.dev.deterministicCameraCapture.yawDelta=35.0",
+            ]
+        )
+    if tool_kind == "capture" and getattr(args, "world_weather_scenario", ""):
+        # Weather is a live, client-interpolated producer even with a fixed
+        # world clock.  The Rust whole-frame attachment handshake installs a
+        # two-frame minimum for its own evidence, but that is not a sufficient
+        # cross-repository warm-up: Frozen otherwise advances through its
+        # normal screenshot acknowledgement while Current is photographed
+        # almost immediately.  Keep the same bounded semantic warm-up on both
+        # launchers and place it last so it cannot be overwritten by the
+        # Current-only attachment selector. This changes capture timing only.
+        java_options.append("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=180")
     env["JAVA_TOOL_OPTIONS"] = " ".join(shlex.quote(part) for part in java_options if part).strip()
     return command, env
 
@@ -18989,6 +19950,14 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
             ),
         )
         subparser.add_argument(
+            "--level-loading-screen-capture",
+            action="store_true",
+            help=(
+                "Retain one acknowledged frame from the real LevelLoadingScreen in both "
+                "repositories for loading-grid/background parity diagnosis."
+            ),
+        )
+        subparser.add_argument(
             "--title-screen-capture",
             action="store_true",
             help=(
@@ -18996,6 +19965,41 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
                 "desktop capture for Current/Frozen menu investigation. This remains observational "
                 "until both repositories expose a deterministic menu-ready receipt."
             ),
+        )
+        subparser.add_argument(
+            "--title-screen-timeline-frames",
+            type=int,
+            default=1,
+            help=(
+                "For an opt-in title-screen diagnostic, retain this many bounded startup screenshots "
+                "before shutdown (default: 1)."
+            ),
+        )
+        subparser.add_argument(
+            "--title-screen-timeline-interval-secs",
+            type=int,
+            default=20,
+            help="Seconds between opt-in title-screen timeline screenshots (default: 20).",
+        )
+        subparser.add_argument(
+            "--title-screen-transition-capture",
+            action="store_true",
+            help=(
+                "Record a bounded launch timeline from the normal reload overlay through the title screen. "
+                "Observational only; it is not a visual-parity verdict."
+            ),
+        )
+        subparser.add_argument(
+            "--title-screen-transition-frames",
+            type=int,
+            default=45,
+            help="Maximum launch-transition screenshots to retain (default: 45).",
+        )
+        subparser.add_argument(
+            "--title-screen-transition-interval-secs",
+            type=int,
+            default=1,
+            help="Seconds between launch-transition screenshots (default: 1).",
         )
         subparser.add_argument("--workload-profile", choices=WORKLOAD_PROFILES, default="correctness")
         subparser.add_argument(
@@ -19410,7 +20414,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         )
         subparser.add_argument(
             "--world-cloud-scenario",
-            choices=("bounded",),
+            choices=("bounded", "fast"),
             default=os.environ.get("MATTMC_WORLD_CLOUD_SCENARIO", ""),
             help="Exercise real vanilla cloud-cell extraction through the bounded Rust whole-frame material route.",
         )
@@ -19876,6 +20880,7 @@ def normalize_configured_artifact_dir(current_root: Path, configured: Path | Non
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
+    validate_fixture_combinations(args)
     targets = select_targets(args)
     args.artifact_dir = normalize_configured_artifact_dir(targets["current"].root, args.artifact_dir)
     retention_root = (
@@ -19932,6 +20937,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     if canonical_fixture_requested(args, modes_to_run) and not args.dry_run:
         materialize_canonical_fixture(args, targets, artifact_root)
     results: list[MatrixResult] = []
+    # A Frozen receipt contributes capture-only scalar timing/lightmap inputs
+    # to matching Current weather/cloud fixtures. It never changes Frozen's
+    # normal OpenGL renderer.
+    args._weather_baseline_partial_ticks = None
+    args._weather_baseline_renderer_ticks = None
+    args._baseline_lightmap_inputs = None
     # Deterministic model/block-entity fixtures are created by the camera-capture
     # state machine.  A timing-only gameplay row never starts that state machine,
     # so scheduling it for a model fixture can only time out waiting for a producer
@@ -19954,6 +20965,32 @@ def main(argv: Sequence[str] | None = None) -> int:
                 elif args.repetitions > 1:
                     result.mode = f"{mode.name}/run-{repetition:02d}"
                 results.append(result)
+                if (
+                    tool_kind == "capture"
+                    and getattr(args, "world_weather_scenario", "")
+                    and mode.target == "frozen"
+                    and mode.backend == "opengl"
+                    and result.success
+                ):
+                    args._weather_baseline_partial_ticks = deterministic_weather_partial_ticks(
+                        deterministic_capture_document(Path(result.artifact_path))
+                    )
+                    args._weather_baseline_renderer_ticks = deterministic_weather_renderer_ticks(
+                        deterministic_capture_document(Path(result.artifact_path))
+                    )
+                    args._baseline_lightmap_inputs = deterministic_lightmap_inputs(
+                        deterministic_capture_document(Path(result.artifact_path))
+                    )
+                elif (
+                    tool_kind == "capture"
+                    and getattr(args, "world_cloud_scenario", "")
+                    and mode.target == "frozen"
+                    and mode.backend == "opengl"
+                    and result.success
+                ):
+                    args._baseline_lightmap_inputs = deterministic_lightmap_inputs(
+                        deterministic_capture_document(Path(result.artifact_path))
+                    )
 
     artifact_paths = [Path(result.artifact_path) for result in results if Path(result.artifact_path).is_file()]
     aggregate = aggregate_matrix(artifact_paths) if artifact_paths else None
@@ -19963,6 +21000,26 @@ def main(argv: Sequence[str] | None = None) -> int:
         artifact_root,
         cross_repo_parity,
         args.visual_mean_rgb_abs_tolerance,
+    )
+    cross_repo_model_crop_parity = (
+        write_cross_repo_model_crop_pairs(
+            artifact_root,
+            cross_repo_parity,
+            args.visual_mean_rgb_abs_tolerance,
+        )
+        if str(getattr(args, "world_mesh_model_scenario", "") or "").strip()
+        else {
+            "schema": "mattmc-cross-repo-model-crop-parity-v1",
+            "pair_count": 0,
+            "passed": True,
+            "pairs": [],
+            "skipped": "world-mesh-model-scenario-not-requested",
+        }
+    )
+    cross_repo_shadow_receiver_parity = (
+        cross_repository_shadow_receiver_report(cross_repo_parity, args.visual_mean_rgb_abs_tolerance)
+        if str(getattr(args, "world_entity_shadow_scenario", "") or "").strip()
+        else {"passed": True, "pair_count": 0, "pairs": [], "skipped": "entity-shadow-not-requested"}
     )
     # Static-terrain coverage has strict, scenario-specific witnesses. Do not
     # demand them from a weather/cloud (or other non-terrain) capture: that
@@ -20008,12 +21065,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         },
         "cross_repository_parity": cross_repo_parity,
         "cross_repository_visual_parity": cross_repo_visual_parity,
+        "cross_repository_model_crop_parity": cross_repo_model_crop_parity,
+        "cross_repository_shadow_receiver_parity": cross_repo_shadow_receiver_parity,
         "cross_repository_static_terrain_draw_coverage": cross_repo_static_terrain_draw_coverage,
         "repeatability": repeatability,
         "success": all(result.success for result in results)
         and repeatability["passed"]
         and cross_repo_parity["passed"]
         and cross_repo_visual_parity["passed"]
+        and cross_repo_model_crop_parity["passed"]
+        and cross_repo_shadow_receiver_parity["passed"]
         and cross_repo_static_terrain_draw_coverage["passed"],
         "aggregate": str(aggregate_path) if aggregate else None,
         "results": [asdict(result) for result in results],

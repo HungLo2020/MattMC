@@ -285,7 +285,7 @@ public class FogRenderer implements AutoCloseable, FogStorage {
 		FogParameters parameters = computation.parameters();
 		if (TRACE_FOG_STATE) {
 			LOGGER.info(
-				"FogStateTrace route=rust-semantic fogType={} color=({},{},{},{}) envStart={} envEnd={} renderStart={} renderEnd={} skyEnd={}",
+				"FogStateTrace route=rust-semantic fogType={} color=({},{},{},{}) envStart={} envEnd={} renderStart={} renderEnd={} skyEnd={} cloudEnd={}",
 				computation.fogType(),
 				parameters.red(),
 				parameters.green(),
@@ -295,15 +295,16 @@ public class FogRenderer implements AutoCloseable, FogStorage {
 				parameters.environmentalEnd(),
 				parameters.renderStart(),
 				parameters.renderEnd(),
-				computation.skyEnd()
+				computation.skyEnd(),
+				computation.cloudEnd()
 			);
 		}
-		return new RustFogParameters(parameters, computation.skyEnd());
+		return new RustFogParameters(parameters, computation.skyEnd(), computation.cloudEnd());
 	}
 
 	/** Immutable vanilla fog values extracted for Rust-owned rendering.  This is
 	 * gameplay semantic data, not a GPU uniform slice or Iris state. */
-	public record RustFogParameters(FogParameters parameters, float skyEnd) {}
+	public record RustFogParameters(FogParameters parameters, float skyEnd, float cloudEnd) {}
 
 	private FogComputation computeFogParameters(
 		Camera camera, int i, boolean bl, DeltaTracker deltaTracker, float f, ClientLevel clientLevel,

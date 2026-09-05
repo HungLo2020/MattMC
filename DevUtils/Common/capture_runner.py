@@ -274,6 +274,9 @@ class CaptureConfig:
     poi_validation: bool
     deterministic_shutdown_grace_secs: int = 20
     title_screen_capture: bool = False
+    # Capture the ordinary reload-overlay-to-title transition from launch. This
+    # is diagnostic-only: it never affects client timing or rendering.
+    title_screen_transition_capture: bool = False
 
 
 class CaptureRunner:
@@ -384,6 +387,7 @@ class CaptureRunner:
         self.window_tree_dump = self.artifact_dir / f"window_tree_dump_{self.run_id}.txt"
         self.deterministic_metadata = self.artifact_dir / f"deterministic_camera_capture_{self.run_id}.json"
         self.deterministic_screenshot_dir = self.artifact_dir / f"deterministic_camera_capture_{self.run_id}"
+        self.title_presented_frame_dir = self.artifact_dir / f"title_presented_frame_{self.run_id}"
         self.audio_validation_status = self.artifact_dir / f"audio_validation_{self.run_id}.json"
         self.region_validation_status = self.artifact_dir / f"region_validation_{self.run_id}.json"
         self.poi_validation_status = self.artifact_dir / f"poi_validation_{self.run_id}.json"
@@ -422,6 +426,8 @@ class CaptureRunner:
         self.deterministic_completed = False
         self.intentional_deterministic_shutdown = False
         self.title_screen_capture_completed = False
+        self.title_screen_receipt_observed = False
+        self.title_screen_receipt_wait_reported = False
         self.intentional_title_screen_shutdown = False
         self.subsystem_benchmark_completed = False
         self.intentional_subsystem_shutdown = False
@@ -948,12 +954,28 @@ class CaptureRunner:
         max_fps = os.environ.get("MATTMC_CAPTURE_MAX_FPS", "120")
         if not max_fps.isdigit() or int(max_fps) <= 0:
             raise SystemExit(f"MATTMC_CAPTURE_MAX_FPS must be a positive integer, got {max_fps!r}")
+        # `PanoramaTheme` is a serialized vanilla enum.  "default" is not an
+        # enum element (the game's default is AQUATIC), so writing it makes a
+        # capture depend on Options' error recovery and can select a stale
+        # panorama from a copied fixture instead of the declared one.
+        panorama_theme = os.environ.get("MATTMC_CAPTURE_PANORAMA_THEME", "aquatic")
+        if panorama_theme not in {
+            "aquatic", "caves", "copper_age", "nether", "release",
+            "spring_to_life", "tricky_trials",
+        }:
+            raise SystemExit(f"MATTMC_CAPTURE_PANORAMA_THEME must be a vanilla theme, got {panorama_theme!r}")
         render_distance = os.environ.get("MATTMC_CAPTURE_RENDER_DISTANCE", "10")
         simulation_distance = os.environ.get("MATTMC_CAPTURE_SIMULATION_DISTANCE", "12")
         if not render_distance.isdigit() or int(render_distance) <= 0:
             raise SystemExit(f"MATTMC_CAPTURE_RENDER_DISTANCE must be a positive integer, got {render_distance!r}")
         if not simulation_distance.isdigit() or int(simulation_distance) <= 0:
             raise SystemExit(f"MATTMC_CAPTURE_SIMULATION_DISTANCE must be a positive integer, got {simulation_distance!r}")
+        title_static_fixture = os.environ.get("MATTMC_CAPTURE_TITLE_STATIC_FIXTURE", "false").lower()
+        if title_static_fixture not in {"true", "false"}:
+            raise SystemExit(
+                "MATTMC_CAPTURE_TITLE_STATIC_FIXTURE must be true or false, "
+                f"got {title_static_fixture!r}"
+            )
         forced_options = {
             "renderDistance": render_distance,
             "simulationDistance": simulation_distance,
@@ -963,7 +985,16 @@ class CaptureRunner:
             "maxFps": max_fps,
             "enableVsync": "false",
             "tutorialStep": "none",
+            "panoramaTheme": f'"{panorama_theme}"',
         }
+        if self.config.title_screen_capture and title_static_fixture == "true":
+            # A title parity fixture needs a stable vanilla scene, not a
+            # wall-clock-dependent spin or randomly chosen splash. This is
+            # written only into the isolated capture copy for both routes.
+            forced_options.update({
+                "panoramaScrollSpeed": "0.0",
+                "hideSplashTexts": "true",
+            })
         for key, value in forced_options.items():
             upsert_option(self.options_file, key, value)
         dh_file = self.run_dir / "config" / "DistantHorizons.toml"
@@ -989,6 +1020,16 @@ class CaptureRunner:
                     # same world/camera fixture. Dedicated DH rows do not set
                     # this flag and retain the real DH renderer.
                     ("enableRendering", "false"),
+                    # DH's fade hooks are independently configured and can
+                    # repaint vanilla terrain even when LOD rendering is off.
+                    ("vanillaFadeMode", '"NONE"'),
+                    ("lodOnlyMode", "false"),
+                    # DH can retain its vanilla-settings override even with
+                    # its renderer disabled.  That override suppresses or
+                    # changes vanilla clouds, which invalidates a vanilla
+                    # Current/Frozen parity fixture.  Disable it only in the
+                    # isolated ordinary-vanilla capture copy.
+                    ("overrideVanillaGraphicsSettings", "false"),
                     # DH normally suppresses vanilla fog when it owns the
                     # far-world compositor.  That compositor is excluded
                     # from ordinary vanilla parity rows, so retain Frozen's
@@ -1050,6 +1091,8 @@ class CaptureRunner:
         self.append_meta("forced_window_height=720")
         for key, value in forced_options.items():
             self.append_meta(f"forced_option_{key}={value}")
+        if self.config.title_screen_capture:
+            self.append_meta(f"title_static_fixture={title_static_fixture}")
 
         manifest = find_validation_layer_manifest(self.platform_name)
         if manifest:
@@ -1082,7 +1125,14 @@ class CaptureRunner:
         self.config.client_args = append_client_arg(self.config.client_args, f"enableShaders={shaders_enabled}")
         if self.config.title_screen_capture:
             self.append_meta("title_screen_capture=true")
+            self.append_meta(
+                "title_screen_transition_capture="
+                + ("true" if self.config.title_screen_transition_capture else "false")
+            )
             self.append_meta("forced_quick_play_singleplayer=disabled")
+            if self.config.backend == "rust-vulkan":
+                self.env["MATTMC_RUST_TITLE_FRAME_CAPTURE_DIR"] = str(self.title_presented_frame_dir)
+                self.append_meta(f"rust_title_presented_frame_dir={self.title_presented_frame_dir}")
         else:
             self.append_meta(f"forced_quick_play_singleplayer={self.config.world}")
         self.append_meta(f"forced_enable_shaders={shaders_enabled}")
@@ -1700,6 +1750,20 @@ class CaptureRunner:
             if not self.check_client_memory_guard(client_pid, elapsed):
                 break
 
+            if self.capture_rust_title_presented_frame(client_pid):
+                # A normal title capture ends as soon as Rust has acknowledged
+                # its presented image. A transition capture must instead keep
+                # its already-owned final-frame receipt and continue sampling
+                # the bounded launch timeline; otherwise the receipt arriving
+                # at the title screen truncates the very Mojang-to-title gap
+                # that the diagnostic was requested to observe.
+                if not self.config.title_screen_transition_capture:
+                    self.title_screen_capture_completed = True
+                    self.intentional_title_screen_shutdown = True
+                    self.append_meta(f"title_screen_capture_complete_elapsed={elapsed}")
+                    self.terminate_run_processes("rust_title_presented_frame_capture_complete")
+                    break
+
             if (
                 not self.config.deterministic_camera_capture
                 and self.screenshot_enabled
@@ -1707,8 +1771,16 @@ class CaptureRunner:
                 and elapsed >= self.config.screenshot_start_delay_secs
                 and (elapsed - self.config.screenshot_start_delay_secs) % self.config.screenshot_interval_secs == 0
             ):
+                if not self.title_screen_receipt_ready(elapsed):
+                    continue
                 self.capture_root_screenshot("tick", elapsed, client_pid)
-                if self.config.title_screen_capture and self.screenshot_count >= 1:
+                # A transition timeline may fill before a cold launch has
+                # reached TitleScreen.  Its requested samples are evidence of
+                # the handoff, not proof that the destination rendered.  Keep
+                # observing (within the existing run timeout) until the
+                # log-only title receipt arrives; Rust then takes the stricter
+                # acknowledged-presented-frame path above.
+                if self.title_screen_timeline_complete():
                     self.title_screen_capture_completed = True
                     self.intentional_title_screen_shutdown = True
                     self.append_meta(f"title_screen_capture_complete_elapsed={elapsed}")
@@ -1827,13 +1899,112 @@ class CaptureRunner:
         screenshot_file = self.artifact_dir / (
             f"screenshot_{self.run_id}_{self.screenshot_count}_{label}_{elapsed_secs}s.png"
         )
-        target = capture_screenshot(self.platform_name, screenshot_file, client_pid)
+        target = capture_screenshot(
+            self.platform_name,
+            screenshot_file,
+            client_pid,
+            require_client_window=self.config.title_screen_transition_capture,
+        )
+        # A startup-transition frame is evidence only when it came from an
+        # X11 window whose PID is the launched client.  In particular, before
+        # that PID is known, a title/class heuristic can select an IDE window
+        # that happens to mention Minecraft.
+        if self.config.title_screen_transition_capture and not target:
+            safe_unlink(screenshot_file)
+            self.screenshot_count -= 1
+            self.append_meta(f"transition_screenshot_rejected_nonclient_target={elapsed_secs}")
+            return
+        provenance = window_capture_provenance(self.platform_name, target, client_pid)
+        # Timeline pixels can be retained for operator investigation only
+        # after their window identity is tied to the launched JVM.  They are
+        # deliberately *not* renderer/parity evidence: X11 may expose stale
+        # backing-store pixels for a newly mapped GLFW drawable (including an
+        # unrelated compositor surface). A title-presenter acknowledgement is
+        # required for a frame to be accepted as an actual game presentation.
+        if self.config.title_screen_transition_capture and provenance.get("status") != "verified":
+            safe_unlink(screenshot_file)
+            self.screenshot_count -= 1
+            self.append_meta(f"transition_screenshot_rejected_unverified_window={elapsed_secs}")
+            return
         if target:
+            if self.config.title_screen_transition_capture:
+                provenance["status"] = "x11-identity-only"
+                provenance["pixelAttribution"] = "unverified-without-renderer-frame-correlation"
+                screenshot_file.with_suffix(screenshot_file.suffix + ".provenance.json").write_text(
+                    json.dumps(provenance, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+                )
             self.append_meta(f"screenshot_{self.screenshot_count}={screenshot_file}")
             self.append_meta(f"screenshot_{self.screenshot_count}_target={target}")
         else:
             safe_unlink(screenshot_file)
             self.append_meta(f"screenshot_{self.screenshot_count}=failed:{label}:{elapsed_secs}")
+
+    def title_screen_receipt_ready(self, elapsed_secs: int) -> bool:
+        """Require an observed title producer before a diagnostic desktop capture.
+
+        The receipt is logging only. It intentionally neither freezes panorama
+        time nor converts a title image into a strict visual-parity verdict.
+        """
+        if not self.config.title_screen_capture:
+            return True
+        # A transition capture deliberately begins before TitleScreen exists;
+        # it is how a transient blank handoff can be observed. Still record the
+        # same log-only title receipt once it arrives, so the artifact says
+        # whether its bounded timeline actually reached the destination.
+        receipt = (
+            "[MattMC graphics audit] rust-title-frame-presented"
+            if self.config.backend == "rust-vulkan"
+            else "[MattMC graphics audit] title-screen semantic receipt"
+        )
+        if self.config.title_screen_transition_capture:
+            if not self.title_screen_receipt_observed:
+                try:
+                    observed = receipt in self.run_log.read_text(
+                        encoding="utf-8", errors="replace"
+                    )
+                except OSError:
+                    observed = False
+                if observed:
+                    self.title_screen_receipt_observed = True
+                    self.append_meta("title_screen_receipt_observed=true")
+                    self.append_meta(f"title_screen_receipt_elapsed={elapsed_secs}")
+            return True
+        if os.environ.get("MATTMC_TITLE_SCREEN_REQUIRE_RECEIPT", "").lower() not in {"1", "true", "yes"}:
+            return True
+        if self.title_screen_receipt_observed:
+            return True
+        try:
+            observed = receipt in self.run_log.read_text(
+                encoding="utf-8", errors="replace"
+            )
+        except OSError:
+            observed = False
+        if observed:
+            self.title_screen_receipt_observed = True
+            self.append_meta("title_screen_receipt_observed=true")
+            self.append_meta(f"title_screen_receipt_elapsed={elapsed_secs}")
+            return True
+        if not self.title_screen_receipt_wait_reported:
+            self.title_screen_receipt_wait_reported = True
+            self.append_meta("title_screen_capture_waiting_for_receipt=true")
+        return False
+
+    def title_screen_timeline_complete(self) -> bool:
+        """Whether retained title samples prove the requested title destination.
+
+        A non-transition title capture is allowed to end after its bounded
+        screenshot count, because each screenshot is already receipt-gated.
+        A startup transition intentionally samples before that receipt and
+        therefore needs the receipt in addition to its finite timeline.
+        """
+        if not self.config.title_screen_capture:
+            return False
+        if self.screenshot_count < max(1, self.config.screenshot_max_count):
+            return False
+        return (
+            not self.config.title_screen_transition_capture
+            or self.title_screen_receipt_observed
+        )
 
     def capture_deterministic_requests(self, client_pid: int | None) -> None:
         if not self.config.deterministic_camera_capture or not self.deterministic_screenshot_dir.is_dir():
@@ -1865,6 +2036,47 @@ class CaptureRunner:
                 self.append_meta(f"deterministic_capture_target={target}")
             else:
                 self.append_meta(f"deterministic_capture_failed={request}")
+
+    def capture_rust_title_presented_frame(self, client_pid: int | None) -> bool:
+        """Acknowledge the held Rust-presented title image; never read Java's target."""
+        if not self.config.title_screen_capture or self.config.backend != "rust-vulkan":
+            return False
+        request = self.title_presented_frame_dir / "title_frame_capture.json"
+        ack = self.title_presented_frame_dir / "title_frame_capture.ack.json"
+        if ack.is_file() or not request.is_file():
+            return ack.is_file()
+        try:
+            data = json.loads(request.read_text(encoding="utf-8"))
+            screenshot = Path(data["screenshot"])
+        except (OSError, KeyError, TypeError, json.JSONDecodeError) as error:
+            self.append_meta(f"rust_title_presented_frame_request_invalid={error}")
+            return False
+        target = capture_screenshot(
+            self.platform_name,
+            screenshot,
+            client_pid,
+            require_client_window=True,
+        )
+        # The held title request proves the Rust route named an exact frame,
+        # but a root-desktop screenshot cannot prove that desktop pixels came
+        # from that frame. Keep the title capture incomplete rather than
+        # acknowledging another application as Rust Vulkan output.
+        if not target or target == "root":
+            self.append_meta("rust_title_presented_frame_capture_failed=true")
+            return False
+        provenance = window_capture_provenance(self.platform_name, target, client_pid)
+        if provenance.get("status") != "verified":
+            safe_unlink(screenshot)
+            self.append_meta("rust_title_presented_frame_capture_unverified_window=true")
+            return False
+        data.update({
+            "status": "captured", "targetWindow": target,
+            "capturedAtEpoch": int(time.time()), "windowProvenance": provenance,
+        })
+        ack.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+        self.append_meta(f"rust_title_presented_frame_screenshot={screenshot}")
+        self.append_meta(f"rust_title_presented_frame_ack={ack}")
+        return True
 
     def deterministic_capture_status(self) -> str | None:
         if not self.config.deterministic_camera_capture or not self.deterministic_metadata.is_file():
@@ -2550,15 +2762,27 @@ def screenshot_backend_available(platform_name: str) -> bool:
     return False
 
 
-def capture_screenshot(platform_name: str, screenshot_file: Path, client_pid: int | None) -> str | None:
+def capture_screenshot(
+    platform_name: str,
+    screenshot_file: Path,
+    client_pid: int | None,
+    *,
+    require_client_window: bool = False,
+) -> str | None:
     screenshot_file.parent.mkdir(parents=True, exist_ok=True)
     if platform_name == "linux":
-        target = find_linux_client_window_id(client_pid) or "root"
-        if subprocess.run(
-            ["import", "-window", target, str(screenshot_file)],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        ).returncode == 0:
+        target = find_linux_client_window_id(client_pid)
+        if not target:
+            # Deterministic world captures predate PID discovery and retain
+            # their ordinary desktop fallback.  Startup/title evidence is
+            # stricter: it remains unavailable until an exact client window
+            # exists, rather than risking an unrelated application capture.
+            if require_client_window:
+                return None
+            target = "root"
+        if target != "root" and not linux_x11_window_is_viewable(target):
+            return None
+        if capture_linux_x11_window(target, screenshot_file):
             return target
         return None
     if platform_name == "macos":
@@ -2593,6 +2817,43 @@ def capture_screenshot(platform_name: str, screenshot_file: Path, client_pid: in
     return None
 
 
+def capture_linux_x11_window(target: str, screenshot_file: Path) -> bool:
+    """Capture exactly one X11 window, without ImageMagick's window fallback.
+
+    `import -window` can report success while returning another application's
+    desktop pixels in this environment.  xwd reads the requested drawable by
+    id and fails when it cannot.  Convert its temporary XWD only after that
+    direct read succeeds, so a screenshot acknowledgement cannot be based on
+    ImageMagick's implicit root-window fallback.
+    """
+    if target == "root" or not shutil.which("xwd") or not shutil.which("magick"):
+        return False
+    raw_capture = screenshot_file.with_suffix(screenshot_file.suffix + ".xwd")
+    try:
+        captured = subprocess.run(
+            ["xwd", "-silent", "-id", target, "-out", str(raw_capture)],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        ).returncode == 0
+        if not captured or not raw_capture.is_file() or raw_capture.stat().st_size == 0:
+            return False
+        return subprocess.run(
+            ["magick", str(raw_capture), str(screenshot_file)],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        ).returncode == 0 and screenshot_file.is_file()
+    finally:
+        safe_unlink(raw_capture)
+
+
+def linux_x11_window_is_viewable(target: str) -> bool:
+    """Reject an unmapped window whose backing store can contain stale pixels."""
+    if not shutil.which("xwininfo"):
+        return False
+    info = command_text(["xwininfo", "-id", target], cwd=Path.cwd())
+    return bool(re.search(r"Map State:\s*IsViewable", info))
+
+
 def find_linux_client_window_id(client_pid: int | None) -> str | None:
     if not shutil.which("xprop"):
         return None
@@ -2606,9 +2867,53 @@ def find_linux_client_window_id(client_pid: int | None) -> str | None:
         pid_match = re.search(r"_NET_WM_PID\(CARDINAL\)\s*=\s*(\d+)", props)
         if client_pid and pid_match and pid_match.group(1) == str(client_pid):
             return window_id
+        # A launched client PID is authoritative. Do not use a title/class
+        # heuristic in that case: unrelated IDE, terminal, or Codex windows
+        # can contain a project path or Minecraft text and would turn a
+        # transition diagnostic into a false renderer frame.
+        if client_pid is not None:
+            continue
         if re.search(r"Minecraft|LWJGL|GLFW|KnotClient|devlaunchinjector", props, re.IGNORECASE):
             return window_id
     return None
+
+
+def window_capture_provenance(
+    platform_name: str,
+    target: str | None,
+    client_pid: int | None,
+) -> dict[str, object]:
+    """Record enough immutable capture provenance to reject a foreign window.
+
+    This is harness-only evidence.  It neither reads renderer pixels through a
+    backend API nor affects the client; the screenshot remains an external
+    window capture.  Linux transition/title routes require an exact PID match.
+    """
+    evidence: dict[str, object] = {
+        "schema": "mattmc-window-capture-provenance-v1",
+        "platform": platform_name,
+        "targetWindow": target,
+        "expectedClientPid": client_pid,
+        "status": "unverified",
+    }
+    if platform_name != "linux":
+        evidence["status"] = "unsupported-platform"
+        return evidence
+    if not target or target == "root" or client_pid is None or not shutil.which("xprop"):
+        return evidence
+    props = command_text(
+        ["xprop", "-id", target, "_NET_WM_PID", "WM_NAME", "_NET_WM_NAME", "WM_CLASS"],
+        cwd=Path.cwd(),
+    )
+    pid_match = re.search(r"_NET_WM_PID\(CARDINAL\)\s*=\s*(\d+)", props)
+    observed_pid = int(pid_match.group(1)) if pid_match else None
+    evidence["observedWindowPid"] = observed_pid
+    evidence["windowProperties"] = props
+    viewable = linux_x11_window_is_viewable(target)
+    evidence["windowViewable"] = viewable
+    if observed_pid == client_pid and viewable:
+        evidence["status"] = "verified"
+    return evidence
 
 
 def find_validation_layer_manifest(platform_name: str) -> Path | None:
@@ -3481,6 +3786,12 @@ def parse_args() -> CaptureConfig:
         default=os.environ.get("MATTMC_TITLE_SCREEN_CAPTURE", "").lower() in {"1", "true", "yes"},
         help="Remain at the ordinary title screen instead of forcing quick-play; diagnostic capture only.",
     )
+    parser.add_argument(
+        "--title-screen-transition-capture",
+        action="store_true",
+        default=os.environ.get("MATTMC_TITLE_SCREEN_TRANSITION_CAPTURE", "").lower() in {"1", "true", "yes"},
+        help="Capture a bounded reload-overlay-to-title desktop timeline; diagnostic only.",
+    )
     parser.add_argument("--jvm-arg", action="append", default=[], help="Extra JVM option appended to JAVA_TOOL_OPTIONS.")
     parser.add_argument("--world", default=os.environ.get("MATTMC_CAPTURE_WORLD", "Origin"))
     parser.add_argument("--game-dir", default=os.environ.get("MATTMC_CAPTURE_GAME_DIR", ""))
@@ -3583,6 +3894,7 @@ def parse_args() -> CaptureConfig:
         region_validation_copy_world=bool(args.region_validation_copy_world),
         poi_validation=bool(args.poi_validation),
         title_screen_capture=bool(args.title_screen_capture),
+        title_screen_transition_capture=bool(args.title_screen_transition_capture),
         deterministic_shutdown_grace_secs=int_env(
             "MATTMC_DETERMINISTIC_SHUTDOWN_GRACE_SECS",
             180 if args.region_validation else 20,

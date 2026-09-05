@@ -364,7 +364,13 @@ public class LodRenderer
 			}
 			
 			// only do this once, that way they can still be reverted if desired
-			if (Config.Client.Advanced.Graphics.overrideVanillaGraphicsSettings.get())
+			if (Config.Client.Advanced.Graphics.overrideVanillaGraphicsSettings.get()
+				// DH's cloud path is not admitted on the selected Rust Vulkan route.
+				// Preserve vanilla cloud semantics whenever either form of Rust
+				// presentation ownership is active; relying on the bootstrap flag
+				// alone lets a menu-selected Vulkan route permanently turn clouds off.
+				&& !VulkanicAPI.isVulkanBackendSelected()
+				&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
 			{
 				MC.disableVanillaClouds();
 				MC.disableVanillaChunkFadeIn();

@@ -88,6 +88,24 @@ class RustGalWholeFrameTerrainSourceTest {
 	}
 
 	@Test
+	void submissionPreservesFrozensUnconditionalCameraSectionRoot() throws Exception {
+		String source = Files.readString(ROOT.resolve(
+			"src/main/java/net/vulkanic/world/RustGalWholeFrameTerrainSource.java"));
+		String frozenCuller = Files.readString(ROOT.resolve(
+			"src/main/java/net/sodium/client/render/chunk/occlusion/OcclusionCuller.java"));
+		int submission = source.indexOf("var visibleSections = new ArrayList<RenderSection>");
+		int bootstrapRoot = source.indexOf("boolean bootstrapRoot = entry.getLongKey() == this.lastCameraSection;", submission);
+		int preserved = source.indexOf("(bootstrapRoot || this.isVisible(section.getPosition(), frustum))", bootstrapRoot);
+		int frozenRoot = frozenCuller.indexOf("visitor.visit(section);", frozenCuller.indexOf("private void initWithinWorld"));
+		int frozenTraversal = frozenCuller.indexOf("visitNeighbors(queue, section, outgoing, frame);", frozenRoot);
+
+		assertTrue(bootstrapRoot > submission && preserved > bootstrapRoot,
+			"the semantic submission domain must retain the camera root that admission bootstraps");
+		assertTrue(frozenRoot >= 0 && frozenTraversal > frozenRoot,
+			"Frozen's authoritative CPU culler must visit the camera section before outward traversal");
+	}
+
+	@Test
 	void submissionIncludesSodiumsSemanticNearbySectionException() throws Exception {
 		String source = Files.readString(ROOT.resolve("src/main/java/net/vulkanic/world/RustGalWholeFrameTerrainSource.java"));
 		int submission = source.indexOf("var visibleSections = new ArrayList<RenderSection>");
@@ -139,9 +157,10 @@ class RustGalWholeFrameTerrainSourceTest {
 			"src/main/java/net/vulkanic/world/RustGalWholeFrameTerrainSource.java"
 		));
 		int outward = source.indexOf("outgoing &= this.outwardDirections(sectionPos);");
-		int adjacent = source.indexOf("outgoing &= this.residentAdjacentMask(sectionPos);", outward);
+		int adjacentMask = source.indexOf("int adjacentMask = this.residentAdjacentMask(sectionPos);", outward);
+		int adjacent = source.indexOf("outgoing &= adjacentMask;", adjacentMask);
 		int admission = source.indexOf("this.admitSection(neighbor", adjacent);
-		assertTrue(adjacent > outward);
+		assertTrue(adjacentMask > outward && adjacent > adjacentMask);
 		assertTrue(admission > adjacent,
 			"the independent source must constrain portals before admitting neighbors");
 		assertTrue(source.contains("private int residentAdjacentMask(SectionPos section)"));
@@ -193,6 +212,16 @@ class RustGalWholeFrameTerrainSourceTest {
 
 		assertTrue(completion >= 0 && provenance > completion && admission > provenance,
 				"whole-frame terrain must retain immutable mesh sprite provenance before Rust takes the semantic payload");
+	}
+
+	@Test
+	void visibilityReceiptSeparatesPortalAndNearbySelectionsWithoutChangingTheRenderDomain() throws Exception {
+		String source = Files.readString(ROOT.resolve("src/main/java/net/vulkanic/world/RustGalWholeFrameTerrainSource.java"));
+		int portalSnapshot = source.indexOf("var portalVisibleKeys = new LongOpenHashSet(visibleKeys);");
+		int nearby = source.indexOf("this.addNearbyVisibleSections(visibleSections, visibleKeys);", portalSnapshot);
+		int receipt = source.indexOf("portalVisibleKeys::contains", nearby);
+		assertTrue(portalSnapshot >= 0 && nearby > portalSnapshot && receipt > nearby,
+			"the diagnostic receipt must classify the already-selected portal domain before nearby enlargement");
 	}
 
 	@Test

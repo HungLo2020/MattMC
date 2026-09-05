@@ -5265,6 +5265,17 @@ class VulkanicGalBridgeAbiTest {
 			"the Rust whole-frame shell must extract screen semantics rather than leaving the main menu unrendered");
 		assertTrue(gameRenderer.contains("gui.loading-overlay-semantic-extraction"),
 			"startup overlay primitives must be submitted to Rust rather than skipped before the title screen");
+		int rustShellStart = gameRenderer.indexOf("public boolean renderRustVulkanWholeFrameShell");
+		int overlayExtraction = gameRenderer.indexOf("gui.loading-overlay-semantic-extraction", rustShellStart);
+		String overlayExtractionContext = gameRenderer.substring(Math.max(rustShellStart, overlayExtraction - 360), overlayExtraction);
+		assertTrue(rustShellStart >= 0 && overlayExtraction > rustShellStart
+			&& overlayExtractionContext.contains("if (this.minecraft.getOverlay() != null)"),
+			"the Rust loading-overlay semantic producer must match Frozen and run while the normal in-game GUI predicate is false during reload");
+		int screenExtraction = gameRenderer.indexOf("gui.screen-semantic-extraction", rustShellStart);
+		String screenExtractionContext = gameRenderer.substring(Math.max(rustShellStart, screenExtraction - 360), screenExtraction);
+		assertTrue(screenExtraction > rustShellStart
+			&& screenExtractionContext.contains("else if (gameLoadFinished && this.minecraft.screen != null)"),
+			"the Rust screen semantic producer must match Frozen during the overlay-to-title handoff instead of clearing an empty frame when the normal in-game predicate is false");
 		assertTrue(Files.readString(Path.of("src/main/java/net/minecraft/client/gui/screens/LoadingOverlay.java"))
 			.contains("renderCompatibleScreen"),
 			"loading-overlay screen delegation must remain on the semantic GUI extraction path");

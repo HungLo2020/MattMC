@@ -55,6 +55,7 @@ final class WeatherSemanticContractTest {
 			"Rust whole-frame shell must not invoke Java weather rendering");
 	}
 
+
 	@Test
 	void rustWholeFrameSkyExtractionIsOrderedBeforeSubmissionAndJavaSkyDrawsAreFenced() throws Exception {
 		String gameRenderer = Files.readString(Path.of(

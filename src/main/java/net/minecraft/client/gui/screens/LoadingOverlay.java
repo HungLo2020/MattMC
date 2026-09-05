@@ -33,6 +33,8 @@ public class LoadingOverlay extends Overlay {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private static int DEBUG_RENDER_LOGS;
 	private static int DEBUG_TICK_LOGS;
+	/** Bounded capture-only receipt for the Rust semantic loading-overlay handoff. */
+	private static int RUST_SEMANTIC_RENDER_DIAGNOSTICS;
 	public static final ResourceLocation MOJANG_STUDIOS_LOGO_LOCATION = ResourceLocation.withDefaultNamespace("textures/gui/title/mojangstudios.png");
 	private static final int LOGO_BACKGROUND_COLOR = ARGB.color(255, 239, 50, 61);
 	private static final int LOGO_BACKGROUND_COLOR_DARK = ARGB.color(255, 0, 0, 0);
@@ -175,6 +177,16 @@ public class LoadingOverlay extends Overlay {
 
 		if (g >= 2.0F) {
 			this.minecraft.setOverlay(null);
+		}
+
+		if (Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")
+			&& (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+				|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected())
+			&& RUST_SEMANTIC_RENDER_DIAGNOSTICS++ < 24) {
+			System.out.println("[MattMC graphics audit] loading-overlay semantic producer"
+				+ " fade-out=" + g + " fade-in=" + h + " alpha=" + o
+				+ " progress=" + this.currentProgress
+				+ " screen=" + (this.minecraft.screen == null ? "null" : this.minecraft.screen.getClass().getSimpleName()));
 		}
 
 		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()

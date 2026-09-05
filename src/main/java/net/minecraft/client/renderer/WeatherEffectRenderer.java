@@ -105,6 +105,7 @@ public class WeatherEffectRenderer {
 	}
 
 	public void render(MultiBufferSource multiBufferSource, Vec3 vec3, WeatherRenderState weatherRenderState) {
+		net.minecraft.client.dev.DeterministicCameraCapture.recordWeatherSemanticFingerprint(weatherSemanticFingerprint(weatherRenderState, vec3));
 		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
 			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			throw new IllegalStateException("Java weather rendering is unavailable while Rust owns whole-frame presentation");
@@ -152,6 +153,28 @@ public class WeatherEffectRenderer {
 			);
 		}
 	}
+
+	/** Bounded diagnostic fingerprint of vanilla-extracted weather semantics; no renderer state. */
+	public static String weatherSemanticFingerprint(WeatherRenderState state, Vec3 camera) {
+		long hash = 0xcbf29ce484222325L;
+		hash = mixWeatherFingerprint(hash, state.radius);
+		hash = mixWeatherFingerprint(hash, Float.floatToIntBits(state.intensity));
+		hash = mixWeatherFingerprint(hash, Double.doubleToLongBits(camera.x));
+		hash = mixWeatherFingerprint(hash, Double.doubleToLongBits(camera.y));
+		hash = mixWeatherFingerprint(hash, Double.doubleToLongBits(camera.z));
+		for (ColumnInstance column : state.rainColumns) hash = mixWeatherColumn(hash, column);
+		for (ColumnInstance column : state.snowColumns) hash = mixWeatherColumn(hash, column);
+		return Long.toUnsignedString(hash, 16) + ":r" + state.rainColumns.size() + ":s" + state.snowColumns.size();
+	}
+
+	private static long mixWeatherColumn(long hash, ColumnInstance column) {
+		hash = mixWeatherFingerprint(hash, column.x()); hash = mixWeatherFingerprint(hash, column.z());
+		hash = mixWeatherFingerprint(hash, Float.floatToIntBits(column.topY())); hash = mixWeatherFingerprint(hash, Float.floatToIntBits(column.bottomY()));
+		hash = mixWeatherFingerprint(hash, Float.floatToIntBits(column.uOffset())); hash = mixWeatherFingerprint(hash, Float.floatToIntBits(column.vOffset()));
+		return mixWeatherFingerprint(hash, column.lightCoords());
+	}
+
+	private static long mixWeatherFingerprint(long hash, long value) { return (hash ^ value) * 0x100000001b3L; }
 
 	private WeatherEffectRenderer.ColumnInstance createRainColumnInstance(RandomSource randomSource, int i, int j, int k, int l, int m, int n, float f) {
 		int o = i & 131071;

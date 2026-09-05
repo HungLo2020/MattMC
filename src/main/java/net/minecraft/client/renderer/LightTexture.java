@@ -154,7 +154,8 @@ public class LightTexture implements AutoCloseable {
 	 */
 	@Nullable
 	public RustSemanticLightmapInputs ensureRustSemanticLightmapInputs(float partialTicks) {
-		if (this.rustSemanticLightmapInputs != null) {
+		if (this.rustSemanticLightmapInputs != null
+			&& !net.minecraft.client.dev.DeterministicCameraCapture.refreshLightmapInputsForCapture()) {
 			return this.rustSemanticLightmapInputs;
 		}
 		ClientLevel clientLevel = this.minecraft.level;
@@ -309,7 +310,7 @@ public class LightTexture implements AutoCloseable {
 		if (DETERMINISTIC_LIGHTMAP_PARITY) {
 			this.blockLightRedFlicker = 0.0F;
 		}
-		return new RustSemanticLightmapInputs(
+		RustSemanticLightmapInputs inputs = new RustSemanticLightmapInputs(
 			++this.rustSemanticLightmapGeneration,
 			clientLevel.dimensionType().ambientLight(), skyFactor, this.blockLightRedFlicker + 1.5F,
 			nightVisionFactor, darknessScale, this.renderer.getDarkenWorldAmount(partialTicks),
@@ -317,6 +318,14 @@ public class LightTexture implements AutoCloseable {
 			skyLightColor.x, skyLightColor.y, skyLightColor.z,
 			ambientColor.x, ambientColor.y, ambientColor.z
 		);
+		inputs = net.minecraft.client.dev.DeterministicCameraCapture.lightmapInputsForCapture(inputs);
+		net.minecraft.client.dev.DeterministicCameraCapture.recordLightmapSemanticFingerprint(
+			inputs.ambientLightFactor() + "," + inputs.skyFactor() + "," + inputs.blockFactor() + ","
+				+ inputs.nightVisionFactor() + "," + inputs.darknessScale() + "," + inputs.darkenWorldFactor() + ","
+				+ inputs.brightnessFactor() + "," + inputs.skyLightRed() + "," + inputs.skyLightGreen() + ","
+				+ inputs.skyLightBlue() + "," + inputs.ambientRed() + "," + inputs.ambientGreen() + "," + inputs.ambientBlue()
+		);
+		return inputs;
 	}
 
 	public void updateLightTexture(float f) {

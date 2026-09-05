@@ -24,6 +24,11 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
 @Environment(EnvType.CLIENT)
 public class LevelLoadingScreen extends Screen {
 	private static final Component DOWNLOADING_TERRAIN_TEXT = Component.translatable("multiplayer.downloadingTerrain");
@@ -53,6 +58,20 @@ public class LevelLoadingScreen extends Screen {
 		object2IntOpenHashMap.put(ChunkStatus.FULL, 16777215);
 	});
 	private static int rustGalLoadingGridProducerDiagnostics;
+	/**
+	 * Opt-in capture-only hold used by the cross-repository parity harness. It
+	 * never selects a renderer or affects an ordinary level load.
+	 */
+	private static final boolean LEVEL_LOADING_SCREEN_CAPTURE =
+		Boolean.getBoolean("mattmc.dev.levelLoadingScreenCapture");
+	private static final int LEVEL_LOADING_SCREEN_CAPTURE_WARMUP_FRAMES = 3;
+	private int levelLoadingScreenCaptureFrames;
+	@Nullable
+	private Path levelLoadingScreenCaptureAck;
+	private boolean levelLoadingScreenCaptureRequested;
+	@Nullable
+	private int[] levelLoadingScreenCaptureGridColors;
+	private int levelLoadingScreenCaptureGridSize;
 
 	public LevelLoadingScreen(LevelLoadTracker levelLoadTracker, LevelLoadingScreen.Reason reason) {
 		super(Component.empty());
@@ -89,7 +108,7 @@ public class LevelLoadingScreen extends Screen {
 	public void tick() {
 		super.tick();
 		this.smoothedProgress = this.smoothedProgress + (this.loadTracker.serverProgress() - this.smoothedProgress) * 0.2F;
-		if (this.loadTracker.isLevelReady()) {
+		if (this.loadTracker.isLevelReady() && !this.awaitingLevelLoadingScreenCapture()) {
 			this.onClose();
 		}
 	}
@@ -107,7 +126,10 @@ public class LevelLoadingScreen extends Screen {
 		int m = this.height / 2;
 		ChunkLoadStatusView chunkLoadStatusView = this.loadTracker.statusView();
 		int o;
-		if (chunkLoadStatusView != null) {
+		if (this.awaitingLevelLoadingScreenCapture() && this.levelLoadingScreenCaptureGridColors != null) {
+			renderCapturedChunks(guiGraphics, k, m, 2, 0, this.levelLoadingScreenCaptureGridSize, this.levelLoadingScreenCaptureGridColors);
+			o = m - (this.levelLoadingScreenCaptureGridSize - 1) - 9 * 3;
+		} else if (chunkLoadStatusView != null) {
 			int n = 2;
 			renderChunks(guiGraphics, k, m, 2, 0, chunkLoadStatusView);
 			o = m - chunkLoadStatusView.radius() * 2 - 9 * 3;
@@ -124,6 +146,90 @@ public class LevelLoadingScreen extends Screen {
 		if (this.currentTip != null) {
 			guiGraphics.drawString(this.font, this.currentTip, 5, this.height - 15, -1);
 		}
+		this.requestLevelLoadingScreenCapture(chunkLoadStatusView, k, m);
+	}
+
+	private boolean awaitingLevelLoadingScreenCapture() {
+		if (!LEVEL_LOADING_SCREEN_CAPTURE || !this.levelLoadingScreenCaptureRequested) return false;
+		return this.levelLoadingScreenCaptureAck == null || !Files.isRegularFile(this.levelLoadingScreenCaptureAck);
+	}
+
+	/** Writes one bounded external presentation-capture request after real screen traversal. */
+	private void requestLevelLoadingScreenCapture(@Nullable ChunkLoadStatusView statusView, int centerX, int centerY) {
+		// LoadingOverlay invokes this screen while it fades, then paints the
+		// Mojang logo above it.  That is a valid transition frame, but it cannot
+		// prove the independently presented level-loading UI.  Wait for the
+		// overlay to retire and then settle three actual screen frames before
+		// asking the external harness to capture the final presentation.
+		if (!LEVEL_LOADING_SCREEN_CAPTURE || this.levelLoadingScreenCaptureRequested
+			|| Minecraft.getInstance().getOverlay() != null
+			|| ++this.levelLoadingScreenCaptureFrames < LEVEL_LOADING_SCREEN_CAPTURE_WARMUP_FRAMES) return;
+		String screenshotDirectory = System.getProperty("mattmc.dev.deterministicCameraCapture.screenshotDir", "").trim();
+		if (screenshotDirectory.isEmpty()) return;
+		Path directory = Path.of(screenshotDirectory);
+		Path screenshot = directory.resolve("level_loading_screen.png");
+		Path request = directory.resolve("capture_request_level_loading_screen.json");
+		Path acknowledgement = directory.resolve("capture_request_level_loading_screen.ack.json");
+		int gridSize = statusView == null ? 0 : statusView.radius() * 2 + 1;
+		int gridChecksum = 1;
+		int[] gridColors = new int[gridSize * gridSize];
+		if (statusView != null) for (int x = 0; x < gridSize; x++) for (int z = 0; z < gridSize; z++) {
+			int color = COLORS.getInt(statusView.get(x, z));
+			gridColors[x * gridSize + z] = color;
+			gridChecksum = 31 * gridChecksum + color;
+		}
+		String json = "{\n"
+			+ "  \"captureKind\": \"level-loading-screen\",\n"
+			+ "  \"screenshot\": \"" + escapeCapturePath(screenshot) + "\",\n"
+			+ "  \"ack\": \"" + escapeCapturePath(acknowledgement) + "\",\n"
+			+ "  \"reason\": \"" + this.reason.name() + "\",\n"
+			+ "  \"screenWidth\": " + this.width + ",\n"
+			+ "  \"screenHeight\": " + this.height + ",\n"
+			+ "  \"centerX\": " + centerX + ",\n"
+			+ "  \"centerY\": " + centerY + ",\n"
+			+ "  \"gridSize\": " + gridSize + ",\n"
+			+ "  \"gridChecksum\": " + gridChecksum + ",\n"
+			+ "  \"overlayPresent\": false,\n"
+			+ "  \"progressMilli\": " + Math.round(this.smoothedProgress * 1000.0F) + "\n"
+			+ "}\n";
+		try {
+			Files.createDirectories(directory);
+			Files.writeString(request, json, StandardCharsets.UTF_8);
+			// The external desktop capture occurs after this render callback. Keep
+			// the actual emitted status snapshot stable only while this opt-in
+			// receipt is outstanding, rather than racing a completed tracker into
+			// a visually empty diagnostic frame.
+			this.levelLoadingScreenCaptureGridColors = gridColors;
+			this.levelLoadingScreenCaptureGridSize = gridSize;
+			this.levelLoadingScreenCaptureAck = acknowledgement;
+			this.levelLoadingScreenCaptureRequested = true;
+		} catch (IOException exception) {
+			throw new IllegalStateException("failed to request level-loading-screen diagnostic capture", exception);
+		}
+	}
+
+	/** Replays the capture receipt's copied status cells without consulting a later tracker state. */
+	private static void renderCapturedChunks(GuiGraphics guiGraphics, int centerX, int centerY, int cellSize, int gap, int gridSize, int[] colors) {
+		int stride = cellSize + gap;
+		int extent = gridSize * stride - gap;
+		int originX = centerX - extent / 2;
+		int originY = centerY - extent / 2;
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| Boolean.getBoolean("mattmc.dev.rustGalVulkanWholeFrame")) {
+			guiGraphics.guiRenderState.submitGuiElement(new net.vulkanic.gui.RustGalLoadingGridRenderState(
+				colors, gridSize, originX, originY, cellSize, stride, guiGraphics.guiWidth(), guiGraphics.guiHeight()));
+			return;
+		}
+		for (int x = 0; x < gridSize; x++) for (int z = 0; z < gridSize; z++) {
+			int left = originX + x * stride;
+			int top = originY + z * stride;
+			guiGraphics.fill(left, top, left + cellSize, top + cellSize, ARGB.opaque(colors[x * gridSize + z]));
+		}
+	}
+
+	private static String escapeCapturePath(Path path) {
+		return path.toAbsolutePath().toString().replace("\\", "\\\\").replace("\"", "\\\"");
 	}
 
 	private void drawProgressBar(GuiGraphics guiGraphics, int i, int j, int k, int l, float f) {

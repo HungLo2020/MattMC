@@ -4551,7 +4551,10 @@ void main() {
     // backend infer that from a native texture object.  This keeps standalone
     // water sprites local while atlas-backed terrain (including glass) samples
     // its resolved atlas region.
-    v_uv = instance.material.w > 0.5
+    // `material.w` names the copied texture coordinate space. Values two and
+    // three are local model textures which additionally carry vanilla entity
+    // directional-light semantics; neither is an atlas texture.
+    v_uv = instance.material.w == 1.0
         ? vertex.shader_data.xy
         : vec2(vertex.position_uv.w, vertex.color_uv.w);
     // Frozen OpenGL Sodium encodes each 0..15 light level as `level * 16`
@@ -4563,6 +4566,21 @@ void main() {
     vec2 light_uv = clamp(vertex.extra_data.xy, vec2(0.0), vec2(1.0)) * (15.0 / 16.0);
     v_color = vec4(vertex.color_uv.rgb, vertex.normal_light.w) * instance.color
         * texture(sampler2D(LightmapTexture, LightmapSampler), light_uv);
+    if (instance.material.w > 1.5) {
+        // Frozen's entity.vsh applies minecraft_mix_light before the copied
+        // UV2 lightmap. ModelPart normals are semantic mesh data, so Rust
+        // owns this calculation rather than borrowing Java's Lighting UBO.
+        const vec3 LIGHT0_DIRECTION = normalize(vec3(0.2, 1.0, -0.7));
+        const vec3 LIGHT1_DIRECTION = normalize(vec3(-0.2, 1.0, 0.7));
+        const vec3 NETHER_LIGHT1_DIRECTION = normalize(vec3(-0.2, -1.0, 0.7));
+        vec3 normal = normalize(vec3(vertex.normal_light.yz, vertex.extra_data.z));
+        vec2 light = max(vec2(0.0), vec2(
+            dot(LIGHT0_DIRECTION, normal),
+            dot(instance.material.w > 2.5 ? NETHER_LIGHT1_DIRECTION : LIGHT1_DIRECTION, normal)
+        ));
+        float diffuse = min(1.0, (light.x + light.y) * 0.6 + 0.4);
+        v_color.rgb *= diffuse;
+    }
     v_material = instance.material;
     v_animation_region = instance.animation_region;
     v_animation_next_region = instance.animation_next_region;
@@ -5732,6 +5750,15 @@ mod tests {
     }
 
     #[test]
+    fn direct_terrain_vertex_has_an_explicit_modelpart_diffuse_branch() {
+        assert!(MINIMAL_TERRAIN_MATERIAL_VERTEX.contains("instance.material.w > 1.5"));
+        assert!(MINIMAL_TERRAIN_MATERIAL_VERTEX.contains("LIGHT0_DIRECTION"));
+        assert!(MINIMAL_TERRAIN_MATERIAL_VERTEX.contains("NETHER_LIGHT1_DIRECTION"));
+        assert!(MINIMAL_TERRAIN_MATERIAL_VERTEX.contains("v_color.rgb *= diffuse"));
+        assert!(MINIMAL_TERRAIN_MATERIAL_VERTEX.contains("instance.material.w == 1.0"));
+    }
+
+    #[test]
     fn vanilla_fog_uses_sodium_cylindrical_distance_once_after_deferred_lighting() {
         // Frozen Java OpenGL's Sodium shader resolves its fog factor from the
         // interpolated spherical/cylindrical vertex distances before the
@@ -5779,10 +5806,14 @@ mod tests {
 
     #[test]
     fn direct_terrain_preserves_the_explicit_atlas_or_local_uv_semantic() {
+        // Tag 1 selects atlas coordinates. ModelPart diffuse-lighting tags
+        // 2/3 still use local texture coordinates, so a range check is wrong.
         assert!(MINIMAL_TERRAIN_MATERIAL_VERTEX
-            .contains("instance.material.w > 0.5\n        ? vertex.shader_data.xy"));
+            .contains("instance.material.w == 1.0\n        ? vertex.shader_data.xy"));
         assert!(MINIMAL_TERRAIN_MATERIAL_VERTEX
             .contains(": vec2(vertex.position_uv.w, vertex.color_uv.w);"));
+        assert!(!MINIMAL_TERRAIN_MATERIAL_VERTEX
+            .contains("instance.material.w > 0.5"));
     }
 
     #[test]

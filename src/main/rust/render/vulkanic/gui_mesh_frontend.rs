@@ -190,10 +190,10 @@ void main() {
         u = (ray.z > 0.0 ? ray.x : -ray.x) * scale + 0.5;
         v = -ray.y * scale + 0.5;
     }
-    ivec2 size = textureSize(Sampler0, 0);
-    float face_texel_y = 3.0 / float(size.y);
-    vec2 atlas_uv = vec2(clamp(u, 0.5 / float(size.x), 1.0 - 0.5 / float(size.x)),
-        (face + clamp(v, face_texel_y, 1.0 - face_texel_y)) / 6.0);
+    // Match Frozen's panorama fragment shader exactly: its continuous sampler
+    // is allowed to filter at the stacked-face edge.  Insetting this lookup by
+    // half a texel changes the title image at every cube-face boundary.
+    vec2 atlas_uv = vec2(clamp(u, 0.0, 1.0), (face + clamp(v, 0.0, 1.0)) / 6.0);
     out_color = texture(Sampler0, atlas_uv);
 }
 "#;
@@ -225,10 +225,10 @@ void main() {
         u = (ray.z > 0.0 ? ray.x : -ray.x) * scale + 0.5;
         v = -ray.y * scale + 0.5;
     }
-    ivec2 size = textureSize(sampler2D(GuiMeshTexture, GuiMeshSampler), 0);
-    float face_texel_y = 3.0 / float(size.y);
-    vec2 atlas_uv = vec2(clamp(u, 0.5 / float(size.x), 1.0 - 0.5 / float(size.x)),
-        (face + clamp(v, face_texel_y, 1.0 - face_texel_y)) / 6.0);
+    // Match Frozen's panorama fragment shader exactly: its continuous sampler
+    // is allowed to filter at the stacked-face edge.  Insetting this lookup by
+    // half a texel changes the title image at every cube-face boundary.
+    vec2 atlas_uv = vec2(clamp(u, 0.0, 1.0), (face + clamp(v, 0.0, 1.0)) / 6.0);
     out_color = texture(sampler2D(GuiMeshTexture, GuiMeshSampler), atlas_uv);
 }
 "#;
@@ -554,6 +554,7 @@ impl GuiMeshSharedProgram {
         gal: &mut VulkanicGal,
         label: &str,
         color_format: ColorFormat,
+        depth_format: Option<TextureFormat>,
         material_mode: GuiMeshMaterialMode,
         front_face: super::resources::FrontFace,
     ) -> GalResult<Self> {
@@ -607,7 +608,7 @@ impl GuiMeshSharedProgram {
                 depth_write,
                 depth_bias: None,
                 color_formats: vec![color_format],
-                depth_format: Some(TextureFormat::Depth32Float),
+                depth_format,
                 stencil: None,
             })?;
             created.push(pipeline);
@@ -668,7 +669,14 @@ impl GuiMeshPassResources {
         front_face: super::resources::FrontFace,
     ) -> GalResult<Self> {
         let program =
-            GuiMeshSharedProgram::create(gal, label, color_format, material_mode, front_face)?;
+            GuiMeshSharedProgram::create(
+                gal,
+                label,
+                color_format,
+                Some(TextureFormat::Depth32Float),
+                material_mode,
+                front_face,
+            )?;
         match Self::create_with_shared_program(gal, label, texture_view, sampler, program) {
             Ok(mut resources) => {
                 resources.owned_program = Some(program);
@@ -780,6 +788,82 @@ impl GuiMeshPassResources {
         operations: &mut Vec<CommandOp>,
     ) -> GalResult<()> {
         self.append_draw_internal(target, draw, stream, clear, false, operations)
+    }
+
+    /// Rasterizes a semantic panorama directly into the acquired Rust frame
+    /// target. Unlike item PIP meshes, Frozen's panorama is a native-resolution
+    /// full-frame pass and has no intermediate texture to magnify afterwards.
+    pub fn append_direct_frame_draw(
+        &self,
+        pass: Handle,
+        target: Handle,
+        color_attachment: Handle,
+        depth_attachment: Option<Handle>,
+        draw: &GuiMeshPreparedDraw,
+        stream: GuiMeshStreamRange,
+        write_geometry: bool,
+        operations: &mut Vec<CommandOp>,
+    ) -> GalResult<()> {
+        if draw.material_mode != GuiMeshMaterialMode::Panorama {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                "only the semantic panorama may bypass the private GUI mesh target",
+            ));
+        }
+        if stream.vertex_offset % GUI_MESH_GPU_VERTEX_BYTES as u64 != 0
+            || stream.index_offset % std::mem::size_of::<u32>() as u64 != 0
+        {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                "GUI mesh stream ranges must align to their vertex and index elements",
+            ));
+        }
+        let vertex_bytes = packed_vertices(draw);
+        let vertex_base = u32::try_from(stream.vertex_offset / GUI_MESH_GPU_VERTEX_BYTES as u64)
+            .map_err(|_| GalError::ffi(StatusCode::InvalidArgument, "GUI mesh vertex stream offset exceeds u32 indices"))?;
+        let index_bytes = packed_indices_with_base(&draw.indices, vertex_base)?;
+        let vertex_end = stream.vertex_offset.checked_add(vertex_bytes.len() as u64)
+            .ok_or_else(|| GalError::ffi(StatusCode::InvalidArgument, "GUI mesh vertex stream range overflows"))?;
+        let index_end = stream.index_offset.checked_add(index_bytes.len() as u64)
+            .ok_or_else(|| GalError::ffi(StatusCode::InvalidArgument, "GUI mesh index stream range overflows"))?;
+        if vertex_end > GUI_MESH_MAX_VERTEX_BYTES || index_end > GUI_MESH_MAX_INDEX_BYTES {
+            return Err(GalError::ffi(StatusCode::InvalidArgument, "GUI mesh draws exceed their persistent stream capacity"));
+        }
+        let mut buffers = vec![(self.uniform_buffer, TextureUsageState::ShaderRead)];
+        if write_geometry {
+            buffers.insert(0, (self.vertex_buffer, TextureUsageState::ShaderRead));
+            buffers.insert(1, (self.index_buffer, TextureUsageState::IndexRead));
+        }
+        for (buffer, before) in buffers {
+            operations.push(CommandOp::Barrier(buffer_barrier(buffer, before, TextureUsageState::TransferDst)));
+        }
+        if write_geometry {
+            operations.push(CommandOp::HostWriteBuffer { buffer: self.vertex_buffer, offset: stream.vertex_offset, data: vertex_bytes });
+            operations.push(CommandOp::HostWriteBuffer { buffer: self.index_buffer, offset: stream.index_offset, data: index_bytes });
+        }
+        // Panorama vertices are supplied in logical GUI coordinates, whereas
+        // the target is the physical acquired frame. Clip-space conversion
+        // intentionally follows the semantic coordinate domain.
+        operations.push(CommandOp::HostWriteBuffer {
+            buffer: self.uniform_buffer,
+            offset: 0,
+            data: frame_uniform_bytes(draw.gui_extent, draw.alpha_cutoff, draw.lighting_mode),
+        });
+        operations.push(CommandOp::Barrier(buffer_barrier(self.vertex_buffer, TextureUsageState::TransferDst, TextureUsageState::ShaderRead)));
+        operations.push(CommandOp::Barrier(buffer_barrier(self.index_buffer, TextureUsageState::TransferDst, TextureUsageState::IndexRead)));
+        operations.push(CommandOp::Barrier(buffer_barrier(self.uniform_buffer, TextureUsageState::TransferDst, TextureUsageState::ShaderRead)));
+        operations.push(CommandOp::BeginPass {
+            pass,
+            target,
+            colors: vec![PassAttachment { view: color_attachment, load_op: AttachmentLoadOp::Load, store_op: AttachmentStoreOp::Store, clear_color: None }],
+            depth_stencil: depth_attachment.map(|view| PassAttachment { view, load_op: AttachmentLoadOp::Load, store_op: AttachmentStoreOp::Store, clear_color: None }),
+        });
+        operations.push(CommandOp::BindGraphicsPipeline(self.pipeline));
+        operations.push(CommandOp::BindResourceSet { pipeline_layout: self.pipeline_layout, set_index: 0, set: self.resource_set, dynamic_offsets: Vec::new() });
+        operations.push(CommandOp::SetIndexBuffer { buffer: self.index_buffer, offset: stream.index_offset, index_type: IndexType::U32 });
+        operations.push(CommandOp::DrawIndexed { indices: draw.indices.len() as u32, instances: 1 });
+        operations.push(CommandOp::EndPass);
+        Ok(())
     }
 
     fn append_draw_internal(

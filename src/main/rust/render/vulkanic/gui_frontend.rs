@@ -399,6 +399,10 @@ enum TextureGroup {
     Alpha,
     Invert,
     Dynamic(u64),
+    /// A copied continuous image whose semantic producer requires filtering.
+    /// The panorama shares its Rust-owned image with other dynamic GUI users;
+    /// only this explicit sampler policy differs.
+    DynamicLinear(u64),
     DynamicOpaque(u64),
     DynamicVignette(u64),
     DynamicInvert(u64),
@@ -413,6 +417,7 @@ impl TextureGroup {
             Self::Alpha => "gui-alpha".to_string(),
             Self::Invert => "gui-invert".to_string(),
             Self::Dynamic(asset_id) => format!("gui-image-{asset_id}"),
+            Self::DynamicLinear(asset_id) => format!("gui-image-linear-{asset_id}"),
             Self::DynamicOpaque(asset_id) => format!("gui-image-opaque-{asset_id}"),
             Self::DynamicVignette(asset_id) => format!("gui-image-vignette-{asset_id}"),
             Self::DynamicInvert(asset_id) => format!("gui-image-invert-{asset_id}"),
@@ -427,12 +432,20 @@ impl TextureGroup {
             Self::Alpha => BlendMode::Alpha,
             Self::Invert => BlendMode::Invert,
             Self::Dynamic(_) => BlendMode::Alpha,
+            Self::DynamicLinear(_) => BlendMode::Alpha,
             Self::DynamicOpaque(_) => BlendMode::Disabled,
             Self::DynamicVignette(_) => BlendMode::Vignette,
             Self::DynamicInvert(_) => BlendMode::Invert,
             Self::DynamicPremultiplied(_) => BlendMode::Premultiplied,
             Self::DynamicAdditive(_) => BlendMode::Additive,
             Self::DynamicLequalDepth(_) => BlendMode::Alpha,
+        }
+    }
+
+    fn sampling(self) -> SamplerFilter {
+        match self {
+            Self::DynamicLinear(_) => SamplerFilter::Linear,
+            _ => SamplerFilter::Nearest,
         }
     }
 }
@@ -454,6 +467,14 @@ fn dynamic_texture_group(stratum: u32, asset_id: u64) -> TextureGroup {
         TextureGroup::DynamicLequalDepth(asset_id)
     } else {
         TextureGroup::Dynamic(asset_id)
+    }
+}
+
+fn dynamic_mesh_texture_group(draw: &GuiMeshPreparedDraw) -> TextureGroup {
+    if draw.material_mode == GuiMeshMaterialMode::Panorama {
+        TextureGroup::DynamicLinear(draw.asset_id)
+    } else {
+        dynamic_texture_group(draw.stratum, draw.asset_id)
     }
 }
 
@@ -516,8 +537,18 @@ impl GuiResources {
 struct SharedDynamicGuiTexture {
     upload_buffer: Handle,
     texture: Handle,
-    sampler: Handle,
+    nearest_sampler: Handle,
+    linear_sampler: Handle,
     texture_view: Handle,
+}
+
+impl SharedDynamicGuiTexture {
+    fn sampler(self, sampling: SamplerFilter) -> Handle {
+        match sampling {
+            SamplerFilter::Linear => self.linear_sampler,
+            SamplerFilter::Nearest => self.nearest_sampler,
+        }
+    }
 }
 
 /// Immutable GUI program state shared by all texture resources with the same
@@ -595,11 +626,16 @@ struct GuiMeshRasterKey {
     render_extent: [u32; 2],
     alpha_cutoff_bits: u32,
     lighting_mode: GuiMeshLightingMode,
+    /// Panorama is rasterized directly into the acquired frame target. Its
+    /// pipeline must therefore be distinct from an otherwise-identical PIP
+    /// raster whose attachment format is the private RGBA8 target.
+    direct_target_format: Option<TextureFormat>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 struct GuiMeshSharedProgramKey {
     color_format: TextureFormat,
+    depth_format: Option<TextureFormat>,
     material_mode: GuiMeshMaterialMode,
     front_face: super::resources::FrontFace,
 }
@@ -612,7 +648,17 @@ fn gui_mesh_raster_key(draw: &GuiMeshPreparedDraw) -> GuiMeshRasterKey {
         render_extent: draw.render_extent,
         alpha_cutoff_bits: draw.alpha_cutoff.to_bits(),
         lighting_mode: draw.lighting_mode,
+        direct_target_format: None,
     }
+}
+
+fn direct_gui_mesh_raster_key(
+    draw: &GuiMeshPreparedDraw,
+    target_format: TextureFormat,
+) -> GuiMeshRasterKey {
+    let mut key = gui_mesh_raster_key(draw);
+    key.direct_target_format = Some(target_format);
+    key
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -902,6 +948,7 @@ enum TextureGroupKey {
     Alpha,
     Invert,
     Dynamic(u64),
+    DynamicLinear(u64),
     DynamicOpaque(u64),
     DynamicVignette(u64),
     DynamicInvert(u64),
@@ -914,6 +961,7 @@ impl TextureGroupKey {
     fn dynamic_asset_id(self) -> Option<u64> {
         match self {
             Self::Dynamic(asset_id)
+            | Self::DynamicLinear(asset_id)
             | Self::DynamicOpaque(asset_id)
             | Self::DynamicVignette(asset_id)
             | Self::DynamicInvert(asset_id)
@@ -928,6 +976,7 @@ impl TextureGroupKey {
         matches!(
             self,
             Self::Dynamic(_)
+                | Self::DynamicLinear(_)
                 | Self::DynamicOpaque(_)
                 | Self::DynamicVignette(_)
                 | Self::DynamicInvert(_)
@@ -944,6 +993,7 @@ impl From<TextureGroup> for TextureGroupKey {
             TextureGroup::Alpha => Self::Alpha,
             TextureGroup::Invert => Self::Invert,
             TextureGroup::Dynamic(asset_id) => Self::Dynamic(asset_id),
+            TextureGroup::DynamicLinear(asset_id) => Self::DynamicLinear(asset_id),
             TextureGroup::DynamicOpaque(asset_id) => Self::DynamicOpaque(asset_id),
             TextureGroup::DynamicVignette(asset_id) => Self::DynamicVignette(asset_id),
             TextureGroup::DynamicInvert(asset_id) => Self::DynamicInvert(asset_id),
@@ -1362,7 +1412,8 @@ impl GuiFrontend {
         for texture in std::mem::take(&mut self.dynamic_textures).into_values() {
             for handle in [
                 texture.texture_view,
-                texture.sampler,
+                texture.linear_sampler,
+                texture.nearest_sampler,
                 texture.texture,
                 texture.upload_buffer,
             ] {
@@ -1638,7 +1689,8 @@ impl GuiFrontend {
             if let Some(texture) = self.dynamic_textures.remove(&texture_key) {
                 for handle in [
                     texture.texture_view,
-                    texture.sampler,
+                    texture.linear_sampler,
+                    texture.nearest_sampler,
                     texture.texture,
                     texture.upload_buffer,
                 ] {
@@ -1664,11 +1716,13 @@ impl GuiFrontend {
         &mut self,
         gal: &mut VulkanicGal,
         color_format: TextureFormat,
+        depth_format: Option<TextureFormat>,
         material_mode: GuiMeshMaterialMode,
         front_face: super::resources::FrontFace,
     ) -> GalResult<GuiMeshSharedProgram> {
         let key = GuiMeshSharedProgramKey {
             color_format,
+            depth_format,
             material_mode,
             front_face,
         };
@@ -1685,6 +1739,7 @@ impl GuiFrontend {
             gal,
             &format!("minecraft.gui.mesh.program.{material_mode:?}.{front_face:?}"),
             color_format,
+            depth_format,
             material_mode,
             front_face,
         )?;
@@ -4301,6 +4356,81 @@ impl GuiFrontend {
             let item_layers = &prepared[cursor..group_end];
             validate_mesh_item_layers(item_layers)?;
             stats.mesh_item_count = stats.mesh_item_count.saturating_add(1);
+            // Frozen submits the title panorama straight to its main frame
+            // target. Keep that native-resolution semantic pass distinct from
+            // standard-3D item PIP work, whose private target is part of its
+            // actual rendering contract.
+            if first.material_mode == GuiMeshMaterialMode::Panorama {
+                if item_layers.len() != 1 {
+                    return Err(GalError::ffi(
+                        StatusCode::InvalidArgument,
+                        "a semantic panorama must contain exactly one fullscreen layer",
+                    ));
+                }
+                let texture_group = dynamic_mesh_texture_group(first);
+                self.ensure_resources(gal, texture_group, color_format, depth_format, stats)?;
+                let (texture_view, sampler) = {
+                    let raw_resources = self
+                        .resources
+                        .get(&ResourceKey::new(texture_group, color_format, depth_format))
+                        .ok_or_else(|| GalError::backend("GUI panorama image resources vanished before raster"))?;
+                    (raw_resources.texture_view, raw_resources.sampler)
+                };
+                let raster_key = direct_gui_mesh_raster_key(first, color_format);
+                if !self.mesh_rasters.contains_key(&raster_key) {
+                    if self.mesh_rasters.len() >= GUI_MAX_MESH_RASTER_RESOURCES {
+                        return Err(GalError::unsupported_feature(format!(
+                            "GUI mesh raster resource cache exceeds bounded limit {}",
+                            GUI_MAX_MESH_RASTER_RESOURCES
+                        )));
+                    }
+                    let shared_program = self.ensure_mesh_shared_program(
+                        gal,
+                        color_format,
+                        depth_format,
+                        first.material_mode,
+                        first.front_face,
+                    )?;
+                    let raster = GuiMeshPassResources::create_with_shared_program(
+                        gal,
+                        &format!("minecraft.gui.panorama.asset{}.gen{}", first.asset_id, generation),
+                        texture_view,
+                        sampler,
+                        shared_program,
+                    )?;
+                    self.mesh_rasters.insert(raster_key, raster);
+                    stats.resource_creates = stats.resource_creates.saturating_add(1);
+                }
+                let geometry_key = (raster_key, gui_mesh_geometry_fingerprint(first));
+                let vertex_bytes = (first.vertices.len() * super::gui_mesh_frontend::GUI_MESH_GPU_VERTEX_BYTES) as u64;
+                let index_bytes = (first.indices.len() * std::mem::size_of::<u32>()) as u64;
+                let (stream, reused) = if let Some(residency) = self.mesh_geometry_cache.get_mut(&geometry_key) {
+                    residency.last_submission = pending_submission;
+                    (residency.stream, true)
+                } else {
+                    let residency = self.allocate_mesh_geometry(gal, raster_key, vertex_bytes, index_bytes, pending_submission)?;
+                    let stream = residency.stream;
+                    self.mesh_geometry_cache.insert(geometry_key, residency);
+                    (stream, false)
+                };
+                self.mesh_rasters
+                    .get(&raster_key)
+                    .ok_or_else(|| GalError::backend("GUI panorama raster resources vanished before draw"))?
+                    .append_direct_frame_draw(
+                        frame_pass,
+                        render_target,
+                        color_attachment,
+                        depth_attachment,
+                        first,
+                        stream,
+                        !reused,
+                        &mut operations,
+                    )?;
+                stats.mesh_batch_count = stats.mesh_batch_count.saturating_add(1);
+                stats.mesh_draw_count = stats.mesh_draw_count.saturating_add(1);
+                cursor = group_end;
+                continue;
+            }
             let mut target = self.mesh_targets.stage(
                 gal,
                 generation,
@@ -4314,9 +4444,10 @@ impl GuiFrontend {
                 stats.owned_intermediate_targets.push(target.target);
             }
             for draw in item_layers {
+                let texture_group = dynamic_mesh_texture_group(draw);
                 self.ensure_resources(
                     gal,
-                    dynamic_texture_group(draw.stratum, draw.asset_id),
+                    texture_group,
                     color_format,
                     depth_format,
                     stats,
@@ -4325,7 +4456,7 @@ impl GuiFrontend {
                     let raw_resources = self
                         .resources
                         .get(&ResourceKey::new(
-                            dynamic_texture_group(draw.stratum, draw.asset_id),
+                            texture_group,
                             color_format,
                             depth_format,
                         ))
@@ -4345,6 +4476,7 @@ impl GuiFrontend {
                     let shared_program = self.ensure_mesh_shared_program(
                         gal,
                         TextureFormat::Rgba8Unorm,
+                        Some(TextureFormat::Depth32Float),
                         draw.material_mode,
                         draw.front_face,
                     )?;
@@ -4714,7 +4846,7 @@ impl GuiFrontend {
                         (
                             shared.upload_buffer,
                             shared.texture,
-                            shared.sampler,
+                            shared.sampler(group.sampling()),
                             shared.texture_view,
                             true,
                         )
@@ -4733,8 +4865,8 @@ impl GuiFrontend {
                             usages: vec![TextureUsage::Sampled, TextureUsage::TransferDst],
                         })?;
                         created.push(texture);
-                        let sampler = gal.create_sampler(SamplerDesc {
-                            label: format!("{label}.sampler"),
+                        let nearest_sampler = gal.create_sampler(SamplerDesc {
+                            label: format!("{label}.sampler.nearest"),
                             min_filter: SamplerFilter::Nearest,
                             mag_filter: SamplerFilter::Nearest,
                             mip_filter: SamplerFilter::Nearest,
@@ -4743,7 +4875,18 @@ impl GuiFrontend {
                             address_w: SamplerAddressMode::ClampToEdge,
                             comparison: None,
                         })?;
-                        created.push(sampler);
+                        created.push(nearest_sampler);
+                        let linear_sampler = gal.create_sampler(SamplerDesc {
+                            label: format!("{label}.sampler.linear"),
+                            min_filter: SamplerFilter::Linear,
+                            mag_filter: SamplerFilter::Linear,
+                            mip_filter: SamplerFilter::Nearest,
+                            address_u: SamplerAddressMode::ClampToEdge,
+                            address_v: SamplerAddressMode::ClampToEdge,
+                            address_w: SamplerAddressMode::ClampToEdge,
+                            comparison: None,
+                        })?;
+                        created.push(linear_sampler);
                         let texture_view = gal.create_texture_view(TextureViewDesc {
                             label: format!("{label}.texture-view"),
                             texture,
@@ -4759,11 +4902,21 @@ impl GuiFrontend {
                             SharedDynamicGuiTexture {
                                 upload_buffer,
                                 texture,
-                                sampler,
+                                nearest_sampler,
+                                linear_sampler,
                                 texture_view,
                             },
                         ));
-                        (upload_buffer, texture, sampler, texture_view, false)
+                        (
+                            upload_buffer,
+                            texture,
+                            match group.sampling() {
+                                SamplerFilter::Linear => linear_sampler,
+                                SamplerFilter::Nearest => nearest_sampler,
+                            },
+                            texture_view,
+                            false,
+                        )
                     }
                 } else {
                     let texture = gal.create_texture(TextureDesc {
@@ -5595,6 +5748,7 @@ impl GuiFrontend {
         if matches!(
             group,
             TextureGroup::Dynamic(_)
+                | TextureGroup::DynamicLinear(_)
                 | TextureGroup::DynamicOpaque(_)
                 | TextureGroup::DynamicVignette(_)
                 | TextureGroup::DynamicInvert(_)
@@ -5626,6 +5780,7 @@ impl GuiFrontend {
                 })
             }
             TextureGroup::Dynamic(asset_id)
+            | TextureGroup::DynamicLinear(asset_id)
             | TextureGroup::DynamicOpaque(asset_id)
             | TextureGroup::DynamicVignette(asset_id)
             | TextureGroup::DynamicInvert(asset_id)
@@ -8927,7 +9082,15 @@ void main() { fragColor = texture(InSampler, texCoord); }
                 )
                 .expect("animated panorama frame must not exhaust persistent geometry");
             assert_eq!(1, stats.mesh_batch_count);
-            assert_eq!(2, stats.mesh_draw_count, "raster plus owned composite");
+            assert_eq!(
+                1,
+                stats.mesh_draw_count,
+                "Frozen's semantic panorama is a direct native-resolution frame draw, not a PIP raster plus composite"
+            );
+            assert!(
+                stats.owned_intermediate_targets.is_empty(),
+                "a panorama must not allocate a logical-GUI-sized intermediate before frame presentation"
+            );
         }
         assert!(
             gal.metrics().submissions >= 10,
@@ -9876,7 +10039,16 @@ void main() { fragColor = texture(InSampler, texCoord); }
                 &mut stats,
             )
             .unwrap();
-        let texture_creates_after_second = gal
+        frontend
+            .ensure_resources(
+                &mut gal,
+                TextureGroup::DynamicLinear(41),
+                ColorFormat::Rgba8Unorm,
+                None,
+                &mut stats,
+            )
+            .unwrap();
+        let texture_creates_after_all_groups = gal
             .mock_backend()
             .unwrap()
             .creates
@@ -9890,12 +10062,21 @@ void main() { fragColor = texture(InSampler, texCoord); }
             ColorFormat::Rgba8Unorm,
             None,
         )];
+        let linear = &frontend.resources[&ResourceKey::new(
+            TextureGroup::DynamicLinear(41),
+            ColorFormat::Rgba8Unorm,
+            None,
+        )];
         assert_eq!(alpha.texture, opaque.texture);
         assert_eq!(alpha.texture_view, opaque.texture_view);
         assert_eq!(alpha.sampler, opaque.sampler);
+        assert_eq!(alpha.texture, linear.texture);
+        assert_eq!(alpha.texture_view, linear.texture_view);
+        assert_ne!(alpha.sampler, linear.sampler,
+            "continuous semantic images require a distinct linear sampler without copying their Rust-owned texture");
         assert_eq!(1, frontend.dynamic_textures.len());
         assert_eq!(1, texture_creates_after_first);
-        assert_eq!(texture_creates_after_first, texture_creates_after_second);
+        assert_eq!(texture_creates_after_first, texture_creates_after_all_groups);
         frontend.destroy_render_resources(&mut gal);
     }
 

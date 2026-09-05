@@ -800,6 +800,7 @@ fn whole_frame_request(
             fog_render_distance_start: 0.0,
             fog_render_distance_end: 0.0,
             fog_sky_end: 0.0,
+            fog_clouds_end: 0.0,
             distant_horizons_render_distance: 0,
         },
         world_feature_coverage: FfiWorldFeatureCoverage {
@@ -1917,6 +1918,7 @@ fn whole_frame_shader_environment_semantics_decode_and_reject_malformed_state() 
         fog_render_distance_start: 24.0,
         fog_render_distance_end: 128.0,
         fog_sky_end: 128.0,
+        fog_clouds_end: 96.0,
         distant_horizons_render_distance: 256,
     };
     let (_generation, _target, frame, _gui) =
@@ -1954,6 +1956,7 @@ fn whole_frame_shader_environment_semantics_decode_and_reject_malformed_state() 
             fog_render_distance_start: 24.0,
             fog_render_distance_end: 128.0,
             fog_sky_end: 128.0,
+            fog_clouds_end: 96.0,
             biome_precipitation: 2,
             biome_resource_location: "minecraft:snowy_plains".to_string(),
             main_hand_item_model_resource_location: "minecraft:lava_bucket".to_string(),

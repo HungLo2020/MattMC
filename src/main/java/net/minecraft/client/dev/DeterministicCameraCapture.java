@@ -130,6 +130,10 @@ public final class DeterministicCameraCapture {
 		"mattmc.dev.deterministicCameraCapture.fixedTime",
 		Long.MIN_VALUE
 	);
+	/** Capture-only cloud scroll phase shared with Frozen; NaN preserves vanilla timing. */
+	private static final float FIXED_CLOUD_TIME = Float.parseFloat(
+		System.getProperty("mattmc.dev.deterministicCameraCapture.fixedCloudTime", "NaN")
+	);
 	/**
 	 * Selected-source Vulkan captures retain the Rust submission's final image,
 	 * not an asynchronously sampled desktop window.  Enable this diagnostic
@@ -139,6 +143,13 @@ public final class DeterministicCameraCapture {
 		Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.rustFinalOutputEveryPose");
 	private static final int SETTLED_READY_FRAMES = Math.max(0, Integer.getInteger("mattmc.dev.deterministicCameraCapture.settledReadyFrames", 0));
 	private static final int SETTLED_READY_MAX_WAIT_FRAMES = Math.max(1, Integer.getInteger("mattmc.dev.deterministicCameraCapture.settledReadyMaxWaitFrames", 900));
+	/**
+	 * A rain fixture is not comparable while the ordinary client weather packet
+	 * is still interpolating from the copied world's prior weather state.  This
+	 * is capture timing only: it does not alter the world, renderer, or selected
+	 * route.
+	 */
+	private static final float WEATHER_CAPTURE_MIN_INTENSITY = 0.99F;
 	private static final Set<String> SETTLED_READY_FAMILIES = parseSettledReadyFamilies();
 	/**
 	 * Capture-only proof written by the Rust-selected source route. Normal
@@ -158,6 +169,9 @@ public final class DeterministicCameraCapture {
 	private static final String FORCED_GAME_MODE = System.getProperty("mattmc.dev.deterministicCameraCapture.gameMode", "").trim();
 	private static final int FORCED_SELECTED_HOTBAR_SLOT = Integer.getInteger("mattmc.dev.deterministicCameraCapture.selectedHotbarSlot", 0);
 	private static final boolean FORCE_EMPTY_SELECTED_HAND = Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.emptySelectedHand");
+	/** Optional capture-only skin selection shared with Frozen parity fixtures. */
+	private static final String FORCED_SELECTED_SKIN =
+		System.getProperty("mattmc.dev.deterministicCameraCapture.selectedSkin", "").trim();
 	/**
 	 * Capture-only inventory fixture for validating the Rust-owned standard-3D
 	 * GUI-item route with known, non-flat vanilla block models. It is inactive
@@ -242,8 +256,30 @@ public final class DeterministicCameraCapture {
 		Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.sourceEntityIsolation");
 	private static final String WEATHER_SCENARIO =
 		System.getProperty("mattmc.dev.rustGalWeather.scenario", "").trim().toLowerCase(Locale.ROOT);
+	/**
+	 * Capture-only weather interpolation inputs copied from the Frozen baseline,
+	 * one value per deterministic camera pose. Normal gameplay has no value
+	 * here and therefore retains Minecraft's native partial tick.
+	 */
+	private static final float[] WEATHER_CAPTURE_PARTIAL_TICKS = parseWeatherCapturePartialTicks();
+	private static final int[] WEATHER_CAPTURE_RENDERER_TICKS = parseWeatherCaptureRendererTicks();
+	private static final String[] LIGHTMAP_CAPTURE_INPUTS = System.getProperty("mattmc.dev.deterministicCameraCapture.lightmapInputs", "").split(";", -1);
 	private static final String CLOUD_SCENARIO =
 		System.getProperty("mattmc.dev.rustGalClouds.scenario", "").trim().toLowerCase(Locale.ROOT);
+	/** Capture-only gameplay setting used to give Current and Frozen the same cloud radius. */
+	private static final int FORCED_CLOUD_RANGE_CHUNKS = Math.max(
+		-1,
+		Integer.getInteger("mattmc.dev.deterministicCameraCapture.cloudRangeChunks", -1)
+	);
+
+	/** The cloud fixture owns only the temporary Minecraft quality setting. */
+	private static CloudStatus forcedCloudStatus() {
+		return switch (CLOUD_SCENARIO) {
+			case "bounded" -> CloudStatus.FANCY;
+			case "fast" -> CloudStatus.FAST;
+			default -> null;
+		};
+	}
 	private static final String STATIC_TERRAIN_SCENARIO =
 		System.getProperty("mattmc.dev.rustGalStaticTerrain.scenario", "").trim().toLowerCase(Locale.ROOT);
 	private static final String STATIC_TERRAIN_FAULT =
@@ -703,6 +739,7 @@ public final class DeterministicCameraCapture {
 	private static int pistonSetupReseedCount;
 	private static CameraType originalCameraType;
 	private static CloudStatus originalCloudStatus;
+	private static int originalCloudRangeChunks = -1;
 	private static GameType originalGameMode;
 	private static GameType originalPreviousGameMode;
 	private static AttackIndicatorStatus originalAttackIndicator;
@@ -741,12 +778,96 @@ public final class DeterministicCameraCapture {
 	private static Path rustGalGuiScreenCycleInventoryAckPath;
 	private static Path rustGalGuiScreenCycleInventoryCapturePath;
 	private static int pendingTerrainParticleFinishFrames;
+	/** Last vanilla weather tick copied by the active render path; diagnostics only. */
+	private static volatile int lastWeatherRendererTicks = Integer.MIN_VALUE;
+	private static volatile float lastWeatherRendererPartialTick = Float.NaN;
+	private static volatile String lastWeatherSemanticFingerprint = "";
+	private static volatile String lastLightmapSemanticFingerprint = "";
+	private static int lastLightmapCaptureRefreshPose = Integer.MIN_VALUE;
 
 	private DeterministicCameraCapture() {
 	}
 
 	public static long currentRenderedFrameIndex() {
 		return ENABLED ? renderedFrameIndex : GraphicsFrameBenchmark.currentFrameIndex();
+	}
+
+	/** Records the vanilla weather animation input without influencing rendering. */
+	public static void recordWeatherRendererTicks(int ticks) {
+		if (ENABLED) {
+			lastWeatherRendererTicks = ticks;
+		}
+	}
+
+	/** Records the copied vanilla weather interpolation input without influencing rendering. */
+	public static void recordWeatherRendererPartialTick(float partialTick) {
+		if (ENABLED) {
+			lastWeatherRendererPartialTick = partialTick;
+		}
+	}
+
+	/** Records bounded pre-raster weather semantics for cross-repository diagnostics. */
+	public static void recordWeatherSemanticFingerprint(String fingerprint) {
+		if (ENABLED) {
+			lastWeatherSemanticFingerprint = fingerprint == null ? "" : fingerprint;
+		}
+	}
+
+	/** Records scalar lightmap semantics only; never a Java GPU resource. */
+	public static void recordLightmapSemanticFingerprint(String fingerprint) {
+		if (ENABLED) {
+			lastLightmapSemanticFingerprint = fingerprint == null ? "" : fingerprint;
+		}
+	}
+
+	/** Returns the baseline interpolation input for a deterministic weather fixture only. */
+	public static float weatherPartialTickForCapture(float vanillaPartialTick) {
+		if (!ENABLED || WEATHER_SCENARIO.isEmpty() || poseIndex < 0 || poseIndex >= WEATHER_CAPTURE_PARTIAL_TICKS.length) {
+			return vanillaPartialTick;
+		}
+		return WEATHER_CAPTURE_PARTIAL_TICKS[poseIndex];
+	}
+
+	/** Returns the baseline weather animation tick for a deterministic weather fixture only. */
+	public static int weatherRendererTicksForCapture(int vanillaTicks) {
+		if (!ENABLED || WEATHER_SCENARIO.isEmpty() || poseIndex < 0 || poseIndex >= WEATHER_CAPTURE_RENDERER_TICKS.length) {
+			return vanillaTicks;
+		}
+		return WEATHER_CAPTURE_RENDERER_TICKS[poseIndex];
+	}
+
+	/** Replays Frozen's immutable lightmap semantics only for a deterministic parity pose. */
+	public static net.minecraft.client.renderer.LightTexture.RustSemanticLightmapInputs lightmapInputsForCapture(
+		net.minecraft.client.renderer.LightTexture.RustSemanticLightmapInputs vanilla
+	) {
+		if (!hasBaselineLightmapInputsForCurrentPose()) return vanilla;
+		String[] values = LIGHTMAP_CAPTURE_INPUTS[poseIndex].split(",");
+		if (values.length != 13) throw new IllegalArgumentException("lightmapInputs requires 13 scalar values per pose");
+		float[] parsed = new float[13];
+		for (int i = 0; i < parsed.length; i++) parsed[i] = Float.parseFloat(values[i]);
+		return new net.minecraft.client.renderer.LightTexture.RustSemanticLightmapInputs(vanilla.generation(), parsed[0], parsed[1], parsed[2], parsed[3], parsed[4], parsed[5], parsed[6], parsed[7], parsed[8], parsed[9], parsed[10], parsed[11], parsed[12]);
+	}
+
+	/** Whether the current deterministic pose supplies an explicit baseline lightmap snapshot. */
+	public static boolean refreshLightmapInputsForCapture() {
+		if (!hasBaselineLightmapInputsForCurrentPose()) return false;
+		if (lastLightmapCaptureRefreshPose == poseIndex) return false;
+		lastLightmapCaptureRefreshPose = poseIndex;
+		return true;
+	}
+
+	/**
+	 * A Frozen OpenGL capture may supply immutable scalar lightmap inputs for a
+	 * matching Current parity pose. This is deliberately keyed by the explicit
+	 * capture property, not by a rendering family: clouds and weather both
+	 * share the ordinary vanilla lightmap, while normal gameplay has no values
+	 * to replay.
+	 */
+	private static boolean hasBaselineLightmapInputsForCurrentPose() {
+		return ENABLED
+			&& poseIndex >= 0
+			&& poseIndex < LIGHTMAP_CAPTURE_INPUTS.length
+			&& !LIGHTMAP_CAPTURE_INPUTS[poseIndex].isBlank();
 	}
 
 	/**
@@ -1050,6 +1171,9 @@ public final class DeterministicCameraCapture {
 		if (player == null) {
 			return;
 		}
+		if (!FORCED_SELECTED_SKIN.isEmpty() && !FORCED_SELECTED_SKIN.equals(minecraft.options.selectedSkin)) {
+			minecraft.options.selectedSkin = FORCED_SELECTED_SKIN;
+		}
 
 		player.input.keyPresses = Input.EMPTY;
 		player.xxa = 0.0F;
@@ -1110,6 +1234,11 @@ public final class DeterministicCameraCapture {
 		if (FIXED_CAPTURE_TIME != Long.MIN_VALUE && minecraft.level != null) {
 			minecraft.level.setTimeFromServer(FIXED_CAPTURE_TIME, FIXED_CAPTURE_TIME, false);
 		}
+	}
+
+	/** Returns the capture fixture's cloud phase without affecting ordinary rendering. */
+	public static float cloudTimeForCapture(float vanillaCloudTime) {
+		return ENABLED && Float.isFinite(FIXED_CLOUD_TIME) ? FIXED_CLOUD_TIME : vanillaCloudTime;
 	}
 
 	private static void prepareSourceEntityIsolationBeforeFrame(Minecraft minecraft) {
@@ -1247,6 +1376,11 @@ public final class DeterministicCameraCapture {
 		// after that gate deadlocks weather-only captures because weather setup is
 		// itself the producer that must run after the world becomes playable.
 		if (!WEATHER_SCENARIO.isEmpty() && !setupWeatherScenarioAfterSettledReady(minecraft)) {
+			afterRenderWeatherGateReturns++;
+			renderedFramesAtPose = 0;
+			return;
+		}
+		if (!weatherCaptureIntensityReady(minecraft)) {
 			afterRenderWeatherGateReturns++;
 			renderedFramesAtPose = 0;
 			return;
@@ -2006,6 +2140,38 @@ public final class DeterministicCameraCapture {
 	}
 
 	/**
+	 * Keep the deterministic pose sequence behind the real client-side weather
+	 * interpolation.  Frozen's normal OpenGL baseline naturally reaches this
+	 * state during its longer launch; the whole-frame Rust path reaches the pose
+	 * gate much sooner.  Capturing one at 4% rain and the other at full rain
+	 * would incorrectly attribute a fixture-timing difference to rasterization.
+	 */
+	private static boolean weatherCaptureIntensityReady(Minecraft minecraft) {
+		if (WEATHER_SCENARIO.isEmpty() || !weatherScenarioSetup) {
+			return true;
+		}
+		if (minecraft == null || minecraft.level == null) {
+			weatherSetupStage = "waiting-for-client-rain";
+			weatherSetupLastMissing = "client-level";
+			return false;
+		}
+		float intensity = minecraft.level.getRainLevel(1.0F);
+		if (intensity >= WEATHER_CAPTURE_MIN_INTENSITY) {
+			weatherSetupStage = "setup-complete";
+			weatherSetupLastMissing = "";
+			return true;
+		}
+		framesWaitingForWeatherProducer++;
+		weatherSetupStage = "waiting-for-client-rain";
+		weatherSetupLastMissing = String.format(Locale.ROOT, "intensity=%.3f", intensity);
+		if (framesWaitingForWeatherProducer > SETTLED_READY_MAX_WAIT_FRAMES) {
+			fail("timed out waiting for deterministic rain intensity >= " + WEATHER_CAPTURE_MIN_INTENSITY
+				+ " (last=" + weatherSetupLastMissing + ")");
+		}
+		return false;
+	}
+
+	/**
 	 * Installs explicit gameplay benchmark producer fixtures without requiring
 	 * the screenshot/pose lifecycle. The benchmark still observes ordinary
 	 * vanilla entity, weather, and cloud producers on subsequent frames; this
@@ -2048,9 +2214,9 @@ public final class DeterministicCameraCapture {
 			setupBlockDisplayAndWorldTextScenarios(minecraft, minecraft.player);
 			gameplayWorldTextScenarioSetup = true;
 		}
-		if ("bounded".equals(CLOUD_SCENARIO)
-			&& minecraft.options.cloudStatus().get() != CloudStatus.FANCY) {
-			minecraft.options.cloudStatus().set(CloudStatus.FANCY);
+		CloudStatus forcedCloudStatus = forcedCloudStatus();
+		if (forcedCloudStatus != null && minecraft.options.cloudStatus().get() != forcedCloudStatus) {
+			minecraft.options.cloudStatus().set(forcedCloudStatus);
 		}
 		boolean movingReady = setupMovingMeshScenarioAfterSettledReady(minecraft);
 		boolean weatherReady = setupWeatherScenarioAfterSettledReady(minecraft);
@@ -4761,6 +4927,7 @@ public final class DeterministicCameraCapture {
 		initialDimension = level.dimension().location().toString();
 		originalCameraType = minecraft.options.getCameraType();
 		originalCloudStatus = minecraft.options.cloudStatus().get();
+		originalCloudRangeChunks = minecraft.options.cloudRange().get();
 			originalGameMode = minecraft.gameMode == null ? null : minecraft.gameMode.getPlayerMode();
 			originalPreviousGameMode = minecraft.gameMode == null ? null : minecraft.gameMode.getPreviousPlayerMode();
 			originalAttackIndicator = minecraft.options.attackIndicator().get();
@@ -5362,6 +5529,40 @@ public final class DeterministicCameraCapture {
 		return Set.copyOf(families);
 	}
 
+	private static float[] parseWeatherCapturePartialTicks() {
+		String raw = System.getProperty("mattmc.dev.deterministicCameraCapture.weatherPartialTicks", "").trim();
+		if (raw.isEmpty()) {
+			return new float[0];
+		}
+		String[] tokens = raw.split(",");
+		float[] values = new float[tokens.length];
+		for (int index = 0; index < tokens.length; index++) {
+			float value = Float.parseFloat(tokens[index].trim());
+			if (!Float.isFinite(value) || value < 0.0F || value > 1.0F) {
+				throw new IllegalArgumentException("weatherPartialTicks must be finite values in [0, 1]");
+			}
+			values[index] = value;
+		}
+		return values;
+	}
+
+	private static int[] parseWeatherCaptureRendererTicks() {
+		String raw = System.getProperty("mattmc.dev.deterministicCameraCapture.weatherRendererTicks", "").trim();
+		if (raw.isEmpty()) {
+			return new int[0];
+		}
+		String[] tokens = raw.split(",");
+		int[] values = new int[tokens.length];
+		for (int index = 0; index < tokens.length; index++) {
+			int value = Integer.parseInt(tokens[index].trim());
+			if (value < 0) {
+				throw new IllegalArgumentException("weatherRendererTicks must be non-negative");
+			}
+			values[index] = value;
+		}
+		return values;
+	}
+
 	private static void applyPauseParityScreen(Minecraft minecraft) {
 		if (!BLOCK_OUTLINE_PAUSE_PARITY || poses == null || poseIndex < 0 || poseIndex >= poses.length) {
 			return;
@@ -5662,6 +5863,10 @@ public final class DeterministicCameraCapture {
 			player == null ? 0.0F : player.getYRot(),
 			player == null ? 0.0F : player.getXRot(),
 			acknowledgedRenderedFrame,
+			lastWeatherRendererTicks,
+			lastWeatherRendererPartialTick,
+			lastWeatherSemanticFingerprint,
+			lastLightmapSemanticFingerprint,
 			minecraft.level == null ? -1L : minecraft.level.getGameTime(),
 			wholeFrameFinalOutputCapture
 				? "rust-vulkan-final-output"
@@ -5874,10 +6079,16 @@ public final class DeterministicCameraCapture {
 		if (HIDE_CHAT && minecraft.options.chatVisibility().get() != ChatVisiblity.HIDDEN) {
 			minecraft.options.chatVisibility().set(ChatVisiblity.HIDDEN);
 		}
-		if ("bounded".equals(CLOUD_SCENARIO) && minecraft.options.cloudStatus().get() != CloudStatus.FANCY) {
+		CloudStatus forcedCloudStatus = forcedCloudStatus();
+		if (forcedCloudStatus != null && minecraft.options.cloudStatus().get() != forcedCloudStatus) {
 			// Distant Horizons disables vanilla clouds in copied capture profiles.
-			// This diagnostic scenario needs the ordinary vanilla producer to run.
-			minecraft.options.cloudStatus().set(CloudStatus.FANCY);
+			// These diagnostic scenarios need the ordinary vanilla producer to run
+			// with an equivalent explicit quality mode in both repositories.
+			minecraft.options.cloudStatus().set(forcedCloudStatus);
+		}
+		if (FORCED_CLOUD_RANGE_CHUNKS >= 0
+			&& minecraft.options.cloudRange().get() != FORCED_CLOUD_RANGE_CHUNKS) {
+			minecraft.options.cloudRange().set(FORCED_CLOUD_RANGE_CHUNKS);
 		}
 	}
 
@@ -5961,8 +6172,11 @@ public final class DeterministicCameraCapture {
 		if (HIDE_CHAT && originalChatVisibility != null) {
 			minecraft.options.chatVisibility().set(originalChatVisibility);
 		}
-		if ("bounded".equals(CLOUD_SCENARIO) && originalCloudStatus != null) {
+		if (forcedCloudStatus() != null && originalCloudStatus != null) {
 			minecraft.options.cloudStatus().set(originalCloudStatus);
+		}
+		if (FORCED_CLOUD_RANGE_CHUNKS >= 0 && originalCloudRangeChunks >= 0) {
+			minecraft.options.cloudRange().set(originalCloudRangeChunks);
 		}
 			if (FORCE_BLOCK_OUTLINE_HIGH_CONTRAST && minecraft.options.highContrastBlockOutline().get() != originalHighContrastBlockOutline) {
 				minecraft.options.highContrastBlockOutline().set(originalHighContrastBlockOutline);
@@ -6165,7 +6379,7 @@ public final class DeterministicCameraCapture {
 		if (CLOUD_SCENARIO.isEmpty()) {
 			return true;
 		}
-		if (!"bounded".equals(CLOUD_SCENARIO)) {
+		if (forcedCloudStatus() == null) {
 			fail("unsupported deterministic cloud scenario: " + CLOUD_SCENARIO);
 			return false;
 		}
@@ -8019,7 +8233,23 @@ public final class DeterministicCameraCapture {
 			serverLevel.setBlock(position, Blocks.AIR.defaultBlockState(), 3);
 			serverLevel.setBlock(position.above(), Blocks.AIR.defaultBlockState(), 3);
 		}
+		if ("cow".equals(MODEL_MESH_SCENARIO)) placeShadowGlassFixture(serverLevel, eyePosition, entityPosition);
 	}
+
+    private static void placeShadowGlassFixture(ServerLevel serverLevel, Vec3 eyePosition, Vec3 entityPosition) {
+        // Test-world setup only; no renderer state or renderer behavior changes.
+        if (!Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.shadowGlass")) return;
+        Vec3 towardEye = eyePosition.subtract(entityPosition);
+        int dx = Math.abs(towardEye.x) >= Math.abs(towardEye.z) ? (towardEye.x > 0 ? 1 : -1) : 0;
+        int dz = dx == 0 ? (towardEye.z > 0 ? 1 : -1) : 0;
+        BlockPos origin = BlockPos.containing(entityPosition).offset(dx * 2, 0, dz * 2);
+        for (int across = -1; across <= 1; across++) {
+            for (int up = 0; up <= 1; up++) {
+                serverLevel.setBlock(origin.offset(-dz * across, up, dx * across),
+                    Blocks.RED_STAINED_GLASS.defaultBlockState(), 3);
+            }
+        }
+    }
 
 	/**
 	 * Capture-only real PrimedTnt setup. The entity is kept physically still and
@@ -8501,6 +8731,7 @@ public final class DeterministicCameraCapture {
 		appendMovingBlockRouteDecisions(json).append(",\n");
 		appendMovingMeshExecutionDiagnostics(json).append(",\n");
 		appendEntityModelExecutionDiagnostics(json).append(",\n");
+		appendEntityShadowDiagnostics(json).append(",\n");
 		appendProceduralQuadExecutionDiagnostics(json).append(",\n");
 		appendMovingBlockShellScanDiagnostics(json).append(",\n");
 		appendModelMeshDiagnostics(json).append(",\n");
@@ -8542,6 +8773,7 @@ public final class DeterministicCameraCapture {
 		json.append("{\n");
 		appendField(json, "status", status).append(",\n");
 		appendField(json, "backend", activeBackend()).append(",\n");
+		appendField(json, "shadowReceiverFixture", Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.shadowGlass") ? "red-glass-v1" : "none").append(",\n");
 		appendField(json, "shaderEnabled", shaderEnabled()).append(",\n");
 		appendField(json, "shaderPack", shaderPack()).append(",\n");
 		json.append("  \"window\": { \"width\": ").append(windowWidth).append(", \"height\": ").append(windowHeight).append(" },\n");
@@ -8690,6 +8922,7 @@ public final class DeterministicCameraCapture {
 			appendMovingBlockRouteDecisions(json).append(",\n");
 			appendMovingMeshExecutionDiagnostics(json).append(",\n");
 			appendEntityModelExecutionDiagnostics(json).append(",\n");
+			appendEntityShadowDiagnostics(json).append(",\n");
 			appendProceduralQuadExecutionDiagnostics(json).append(",\n");
 			appendMovingBlockShellScanDiagnostics(json).append(",\n");
 			appendWeatherDiagnostics(json).append(",\n");
@@ -8833,6 +9066,10 @@ public final class DeterministicCameraCapture {
 				json.append("      \"observedYaw\": ").append(format(capture.observedYaw())).append(",\n");
 				json.append("      \"observedPitch\": ").append(format(capture.observedPitch())).append(",\n");
 				json.append("      \"renderedFrameIndex\": ").append(capture.renderedFrameIndex()).append(",\n");
+				json.append("      \"weatherRendererTicks\": ").append(capture.weatherRendererTicks()).append(",\n");
+				json.append("      \"weatherRendererPartialTick\": ").append(format(capture.weatherRendererPartialTick())).append(",\n");
+				appendField(json, "weatherSemanticFingerprint", capture.weatherSemanticFingerprint(), 6).append(",\n");
+				appendField(json, "lightmapSemanticFingerprint", capture.lightmapSemanticFingerprint(), 6).append(",\n");
 				json.append("      \"deterministicTemporal\": { \"enabled\": ").append(SystemTimeUniforms.isDeterministicTemporalParityEnabled())
 					.append(", \"frameIndex\": ").append(capture.index() * FRAMES_PER_POSE)
 					.append(", \"frameCounter\": ").append(capture.index() * FRAMES_PER_POSE)
@@ -10243,6 +10480,46 @@ public final class DeterministicCameraCapture {
 		return json;
 	}
 
+	/**
+	 * Capture-only provenance for ordinary entity shadows.  The shadow uses the
+	 * generic material-quad submission, so this keeps its semantic producer and
+	 * final Rust submission independently visible instead of inferring it from
+	 * an unrelated entity-model receipt.
+	 */
+	private static StringBuilder appendEntityShadowDiagnostics(StringBuilder json) {
+		List<RustGalWorldPrimitiveRenderer.EntityShadowSemanticDiagnostic> semantic =
+			RustGalWorldPrimitiveRenderer.entityShadowSemanticDiagnostics();
+		List<RustGalWorldPrimitiveRenderer.EntityShadowExecutionDiagnostic> execution =
+			RustGalWorldPrimitiveRenderer.entityShadowExecutionDiagnostics();
+		json.append("  \"rustGalWorldEntityShadows\": { \"scenario\": \"")
+			.append(escape(ENTITY_SHADOW_SCENARIO)).append("\", \"semanticReceipts\": [");
+		for (int i = 0; i < semantic.size(); i++) {
+			var receipt = semantic.get(i);
+			if (i > 0) json.append(", ");
+			json.append("{ \"frameIndex\": ").append(receipt.frameIndex()).append(", ");
+			appendField(json, "route", receipt.route(), 0).append(", \"shadowSubmits\": ")
+				.append(receipt.shadowSubmits()).append(", \"quads\": ").append(receipt.quads())
+				.append(", \"receiverBoundsOrigin\": \"top-left\", \"receiverBounds\": ");
+			if (receipt.receiverBoundsValid()) {
+				json.append('[').append(receipt.receiverLeft()).append(',').append(receipt.receiverTop())
+					.append(',').append(receipt.receiverRight()).append(',').append(receipt.receiverBottom()).append(']');
+			} else {
+				json.append("null");
+			}
+			json.append(" }");
+		}
+		json.append("], \"executionReceipts\": [");
+		for (int i = 0; i < execution.size(); i++) {
+			var receipt = execution.get(i);
+			if (i > 0) json.append(", ");
+			json.append("{ \"deterministicFrameIndex\": ").append(receipt.deterministicFrameIndex()).append(", ");
+			appendField(json, "route", receipt.route(), 0).append(", \"gameplayFrameId\": ")
+				.append(receipt.gameplayFrameId()).append(", \"submissionId\": ").append(receipt.submissionId())
+				.append(", \"quads\": ").append(receipt.quads()).append(" }");
+		}
+		return json.append("] }");
+	}
+
 	private static StringBuilder appendProceduralQuadExecutionDiagnostics(StringBuilder json) {
 		List<RustGalWorldPrimitiveRenderer.ProceduralQuadExecutionDiagnostic> diagnostics =
 			RustGalWorldPrimitiveRenderer.proceduralQuadExecutionDiagnostics();
@@ -10340,6 +10617,16 @@ public final class DeterministicCameraCapture {
 			json.append("{ \"frameIndex\": ").append(receipt.frameIndex()).append(", \"cells\": ").append(receipt.cells())
 				.append(", \"radius\": ").append(receipt.radius()).append(", \"quads\": ").append(receipt.quads())
 				.append(", \"fancy\": ").append(receipt.fancy())
+				.append(", \"cloudColorArgb\": \"").append(String.format(java.util.Locale.ROOT, "0x%08x", receipt.cloudColorArgb())).append("\"")
+				.append(", \"cameraRelation\": ").append(receipt.cameraRelation())
+				.append(", \"centerCellX\": ").append(receipt.centerCellX())
+				.append(", \"centerCellZ\": ").append(receipt.centerCellZ())
+				.append(", \"offsetX\": ").append(receipt.offsetX())
+				.append(", \"verticalOffset\": ").append(receipt.verticalOffset())
+				.append(", \"offsetZ\": ").append(receipt.offsetZ())
+				.append(", \"fogCloudsEnd\": ").append(receipt.fogCloudsEnd())
+				.append(", \"meshFingerprint\": \"").append(Long.toUnsignedString(receipt.meshFingerprint())).append("\"")
+				.append(", \"faceColorFingerprint\": \"").append(Long.toUnsignedString(receipt.faceColorFingerprint())).append("\"")
 				.append(", \"sourceProgram\": ").append(RustGalWorldPrimitiveRenderer.MATERIAL_SOURCE_CLOUDS).append(" }");
 		}
 		json.append("], \"executionReceipts\": [");
@@ -10629,6 +10916,10 @@ public final class DeterministicCameraCapture {
 		float observedYaw,
 		float observedPitch,
 		long renderedFrameIndex,
+		int weatherRendererTicks,
+		float weatherRendererPartialTick,
+		String weatherSemanticFingerprint,
+		String lightmapSemanticFingerprint,
 		long gameTime,
 		String captureMethod,
 		String targetWindow
