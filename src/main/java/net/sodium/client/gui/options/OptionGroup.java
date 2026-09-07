@@ -30,6 +30,12 @@ public class OptionGroup {
             return this;
         }
 
+        /** Avoid constructing controls whose owning capability is unavailable. */
+        public Builder addIf(boolean available, java.util.function.Supplier<Option<?>> option) {
+            if (available) this.add(option.get());
+            return this;
+        }
+
         public OptionGroup build() {
             Validate.notEmpty(this.options, "At least one option must be specified");
 

@@ -3871,7 +3871,7 @@ class VulkanicGalBridgeAbiTest {
 		assertEquals(ArmorIconState.EMPTY, RustGalGuiRenderer.armorIconStateForTests(18, 9));
 		assertEquals(ArmorIconState.HALF, RustGalGuiRenderer.armorIconStateForTests(19, 9));
 		assertEquals(ArmorIconState.FULL, RustGalGuiRenderer.armorIconStateForTests(20, 9));
-		assertTrue(rustGuiFrontend.contains("texelFetch(Sampler0"));
+		assertTrue(rustGuiFrontend.contains("texture(Sampler0, v_uv)"));
 		assertTrue(rustGuiFrontend.contains("fn packed_uniform_bytes"));
 		assertTrue(rustGuiFrontend.contains("MAX_CUSTOM_POST_EFFECT_UNIFORM_BYTES: usize = 1024 * 1024")
 			&& rustGuiFrontend.contains("MAX_CUSTOM_POST_EFFECT_UNIFORM_GRAPH_BYTES: usize = 2 * 1024 * 1024")
@@ -4035,7 +4035,7 @@ class VulkanicGalBridgeAbiTest {
 	}
 
 	@Test
-	void frameAbiV27PreservesFrameContractAndAddsSemanticFogInputs() throws Exception {
+	void frameAbiV29PreservesFogProjectionAndAddsTypedGuiTiles() throws Exception {
 		String bridge = Files.readString(Path.of("src/main/java/net/vulkanic/bridge/VulkanicGalBridge.java"));
 		String world = Files.readString(Path.of("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
 		String queue = Files.readString(Path.of("src/main/java/net/vulkanic/gui/RustGalGuiRenderer.java"));
@@ -4051,7 +4051,10 @@ class VulkanicGalBridgeAbiTest {
 		String experienceBar = Files.readString(Path.of("src/main/java/net/minecraft/client/gui/contextualbar/ExperienceBarRenderer.java"));
 		String bossOverlay = Files.readString(Path.of("src/main/java/net/minecraft/client/gui/components/BossHealthOverlay.java"));
 
-		assertEquals(27, VulkanicGalBridge.ABI_VERSION);
+		assertEquals(30, VulkanicGalBridge.ABI_VERSION);
+		assertTrue(bridge.contains("GUI_TILED_QUAD_REQUEST(101)"));
+		assertTrue(bridge.contains("Struct.WHOLE_FRAME_SUBMIT.setFloat(request, 34, guiProjection.width())"));
+		assertTrue(bridge.contains("Struct.GUI_FRAME_SUBMIT.setFloat(request, 10, guiProjection.width())"));
 		assertTrue(bridge.contains("GUI_AFFINE_QUAD_REQUEST(92)"));
 		assertTrue(bridge.contains("WORLD_TEXT_QUAD_REQUEST(93)"));
 		assertTrue(bridge.contains("WORLD_TEXT_IMAGE_ASSET_PAYLOAD(94)"));
@@ -5355,9 +5358,15 @@ class VulkanicGalBridgeAbiTest {
 			"off-screen four-corner GUI gradients must use viewport-clipped semantic metadata instead of being dropped");
 		assertTrue(guiSemanticRenderer.contains("RECTANGLE_PRODUCER + \".gradient\""));
 		assertTrue(guiSemanticRenderer.contains("SOLID_WHITE_ASSET_ID"));
-		assertTrue(guiSemanticRenderer.contains("MAX_GUI_TILED_SEGMENTS")
-			&& guiSemanticRenderer.contains("boundedWrappedSegmentCount"),
-			"tiled GUI blits must preflight wrapped-UV request count before staging or enqueueing a partial batch");
+		String tiledProducer = guiSemanticRenderer.substring(
+			guiSemanticRenderer.indexOf("public static List<RustGalGuiElementRenderState> tryEnqueueTiledCopiedBlit("),
+			guiSemanticRenderer.indexOf("static List<float[]> wrappedUnitIntervalSegments("));
+		assertTrue(tiledProducer.contains("new VulkanicGalBridge.GuiTiledQuadRecord(")
+			&& tiledProducer.contains("enqueueGuiTiledQuadRequest("),
+			"tiled GUI must send one semantic parent for Rust's bounded whole-frame preflight");
+		assertFalse(tiledProducer.contains("rustGuiTiledCommands"), "normal tiled transport must not require a diagnostic flag");
+		assertFalse(tiledProducer.contains("for ("), "Java must not expand semantic tile geometry");
+		assertFalse(tiledProducer.contains("GuiAffineQuadRecord"), "Java must not substitute expanded affine children");
 		assertTrue(guiStratum.contains("GUI_RECTANGLES(\"gui.rectangles\", 100)"));
 		assertTrue(gameRenderer.contains("enqueueRustGalIndexedMeshFeaturesForWholeFrame"));
 		assertTrue(levelRenderer.contains("enqueueRustGalIndexedMeshFeaturesForWholeFrame"));

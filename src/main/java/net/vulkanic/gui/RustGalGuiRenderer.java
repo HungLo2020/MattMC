@@ -1945,110 +1945,41 @@ public final class RustGalGuiRenderer {
 			|| !Float.isFinite(blit.u1()) || !Float.isFinite(blit.v1())
 			|| blit.u1() < blit.u0() || blit.v1() < blit.v0()
 			|| blit.u1() - blit.u0() <= 0.0F || blit.u1() - blit.u0() > 4096.0F
-			|| blit.v1() - blit.v0() <= 0.0F || blit.v1() - blit.v0() > 4096.0F
-			|| ((wideWidth + blit.tileWidth() - 1L) / blit.tileWidth())
-				* ((wideHeight + blit.tileHeight() - 1L) / blit.tileHeight()) > 4096L) {
+			|| blit.v1() - blit.v0() <= 0.0F || blit.v1() - blit.v0() > 4096.0F) {
 			return null;
 		}
-		// UV wrapping can split one geometric tile into multiple affine requests.
-		// Preflight the exact bounded request count before staging the asset or
-		// enqueueing a prefix, so a pathological repeat interval cannot create an
-		// unbounded Java request list or a partial Rust GUI submission.
-		long estimatedSegments = 0L;
-		for (int offsetX = 0; offsetX < width; offsetX += blit.tileWidth()) {
-			int tileWidth = Math.min(blit.tileWidth(), width - offsetX);
-			float uSpan = (blit.u1() - blit.u0()) * tileWidth / blit.tileWidth();
-			float uStart = blit.u0() + (blit.u1() - blit.u0()) * offsetX / blit.tileWidth();
-			long uSegments = boundedWrappedSegmentCount(uStart, uSpan);
-			for (int offsetY = 0; offsetY < height; offsetY += blit.tileHeight()) {
-				int tileHeight = Math.min(blit.tileHeight(), height - offsetY);
-				float vSpan = (blit.v1() - blit.v0()) * tileHeight / blit.tileHeight();
-				float vStart = blit.v0() + (blit.v1() - blit.v0()) * offsetY / blit.tileHeight();
-				long vSegments = boundedWrappedSegmentCount(vStart, vSpan);
-				estimatedSegments = Math.addExact(estimatedSegments, Math.multiplyExact(uSegments, vSegments));
-				if (estimatedSegments > MAX_GUI_TILED_SEGMENTS) return null;
-			}
-		}
+		// One immutable tiled command; Rust owns expansion, ordering and budgets.
+		return enqueueTypedTiledBlit(blit, guiWidth, guiHeight, dynamicLayerOrder);
+	}
+
+	@Nullable
+	private static List<RustGalGuiElementRenderState> enqueueTypedTiledBlit(
+		TiledBlitRenderState blit, int guiWidth, int guiHeight, int layerOrder
+	) {
+		ScreenRectangle bounds = blit.bounds();
+		if (bounds == null || bounds.width() <= 0 || bounds.height() <= 0) return List.of();
 		RustGalGuiRawImageAssets.Asset asset = RustGalGuiRawImageAssets.resolveAtlas(blit.semanticTexture());
 		if (asset == null) asset = RustGalGuiRawImageAssets.resolve(blit.semanticTexture());
 		if (asset == null) return null;
-		int requestLayerOrder = dynamicLayerOrder(dynamicLayerOrder);
-		if (blit.pipeline() == RenderPipelines.GUI_OPAQUE_TEXTURED_BACKGROUND) {
-			requestLayerOrder = GuiRenderStratum.GUI_OPAQUE_BLIT.order();
-		} else if (blit.pipeline() == RenderPipelines.VIGNETTE) {
-			requestLayerOrder = GuiRenderStratum.GUI_VIGNETTE_BLIT.order();
-		} else if (blit.pipeline() == RenderPipelines.GUI_TEXTURED_PREMULTIPLIED_ALPHA) {
-			requestLayerOrder = GuiRenderStratum.GUI_PREMULTIPLIED_BLIT.order();
-		} else if (blit.pipeline() == RenderPipelines.GUI_NAUSEA_OVERLAY) {
-			requestLayerOrder = GuiRenderStratum.GUI_ADDITIVE_BLIT.order();
-		}
-		List<VulkanicGalBridge.GuiAffineQuadRecord> requests = new ArrayList<>((int)estimatedSegments);
-		List<int[]> elementBounds = new ArrayList<>((int)estimatedSegments);
+		int stratum = dynamicLayerOrder(layerOrder);
+		if (blit.pipeline() == RenderPipelines.GUI_OPAQUE_TEXTURED_BACKGROUND) stratum = GuiRenderStratum.GUI_OPAQUE_BLIT.order();
+		else if (blit.pipeline() == RenderPipelines.VIGNETTE) stratum = GuiRenderStratum.GUI_VIGNETTE_BLIT.order();
+		else if (blit.pipeline() == RenderPipelines.GUI_TEXTURED_PREMULTIPLIED_ALPHA) stratum = GuiRenderStratum.GUI_PREMULTIPLIED_BLIT.order();
+		else if (blit.pipeline() == RenderPipelines.GUI_NAUSEA_OVERLAY) stratum = GuiRenderStratum.GUI_ADDITIVE_BLIT.order();
 		Matrix3x2f pose = blit.pose();
-		for (int offsetX = 0; offsetX < width; offsetX += blit.tileWidth()) {
-			int tileWidth = Math.min(blit.tileWidth(), width - offsetX);
-			float uSpan = (blit.u1() - blit.u0()) * tileWidth / blit.tileWidth();
-			float uStart = blit.u0() + (blit.u1() - blit.u0()) * offsetX / blit.tileWidth();
-			for (int offsetY = 0; offsetY < height; offsetY += blit.tileHeight()) {
-				int tileHeight = Math.min(blit.tileHeight(), height - offsetY);
-				float vSpan = (blit.v1() - blit.v0()) * tileHeight / blit.tileHeight();
-				float vStart = blit.v0() + (blit.v1() - blit.v0()) * offsetY / blit.tileHeight();
-				float left = blit.x0() + offsetX;
-				float top = blit.y0() + offsetY;
-				float right = left + tileWidth;
-				float bottom = top + tileHeight;
-				for (float[] xs : wrappedUnitIntervalSegments(uStart, uSpan)) {
-					float segmentLeft = left + tileWidth * xs[0];
-					float segmentRight = left + tileWidth * xs[1];
-					for (float[] ys : wrappedUnitIntervalSegments(vStart, vSpan)) {
-						float segmentTop = top + tileHeight * ys[0];
-						float segmentBottom = top + tileHeight * ys[1];
-						float x0 = pose.m00() * segmentLeft + pose.m10() * segmentTop + pose.m20();
-						float y0 = pose.m01() * segmentLeft + pose.m11() * segmentTop + pose.m21();
-						float x1 = pose.m00() * segmentRight + pose.m10() * segmentTop + pose.m20();
-						float y1 = pose.m01() * segmentRight + pose.m11() * segmentTop + pose.m21();
-						float x3 = pose.m00() * segmentLeft + pose.m10() * segmentBottom + pose.m20();
-						float y3 = pose.m01() * segmentLeft + pose.m11() * segmentBottom + pose.m21();
-						VulkanicGalBridge.GuiAffineQuadRecord request = new VulkanicGalBridge.GuiAffineQuadRecord(
-							requestLayerOrder, asset.assetId(), x0, y0, x1, y1, x3, y3,
-							0.0F, xs[2], ys[2], xs[3], ys[3], blit.color(), guiWidth, guiHeight
-						);
-						if (blit.scissorArea() != null) {
-							ScreenRectangle scissor = blit.scissorArea();
-							request = request.withClip(scissor.left(), scissor.top(), scissor.width(), scissor.height());
-						}
-						requests.add(request);
-						elementBounds.add(new int[] {
-							(int)Math.floor(segmentLeft), (int)Math.floor(segmentTop),
-							Math.max(1, (int)Math.ceil(segmentRight - segmentLeft)),
-							Math.max(1, (int)Math.ceil(segmentBottom - segmentTop))
-						});
-					}
-				}
-			}
-		}
-		// The prior count-and-geometry preflight covers the complete expanded
-		// request. Submit it as one semantic operation so a tiled image cannot
-		// leave an accepted prefix behind and its asset stages only after admission.
-		long startedNanos = System.nanoTime();
-		RustGalFrameScheduler.Token token = RustGalFrameCoordinator.enqueueGuiAffineQuadRequests(
-			requests, dynamicLayerId(dynamicLayerOrder), requestLayerOrder, startedNanos
-		);
+		ScreenRectangle scissor = blit.scissorArea();
+		var request = new VulkanicGalBridge.GuiTiledQuadRecord(
+			stratum, asset.assetId(), new int[] {blit.x0(), blit.y0(), blit.x1(), blit.y1()},
+			blit.tileWidth(), blit.tileHeight(), new float[] {blit.u0(), blit.v0(), blit.u1(), blit.v1()},
+			new float[] {pose.m00(), pose.m01(), pose.m10(), pose.m11(), pose.m20(), pose.m21()},
+			0.0F, blit.color(), guiWidth, guiHeight, 0L, scissor == null ? 0 : 1,
+			scissor == null ? new int[4] : new int[] {scissor.left(), scissor.top(), scissor.width(), scissor.height()});
+		RustGalFrameScheduler.Token token = RustGalFrameCoordinator.enqueueGuiTiledQuadRequest(
+			request, dynamicLayerId(layerOrder), stratum);
 		RustGalGuiRawImageAssets.stage(asset);
-		List<RustGalGuiElementRenderState> elements = new ArrayList<>(elementBounds.size());
-		for (int[] bounds : elementBounds) {
-			elements.add(new RustGalGuiElementRenderState(token, GuiRenderStratum.GUI_FILE_BACKED_BLIT,
-				"minecraft.gui.tiled-blit", -1, -1.0F, GuiFillDirection.NONE,
-				bounds[0], bounds[1], bounds[2], bounds[3], guiWidth, guiHeight));
-		}
-		return List.copyOf(elements);
-	}
-
-	private static long boundedWrappedSegmentCount(float start, float span) {
-		if (!Float.isFinite(start) || !Float.isFinite(span) || span <= 0.0F) return Long.MAX_VALUE;
-		// wrappedUnitIntervalSegments emits at most ceil(span)+1 pieces. Keep the
-		// same conservative bound here without allocating its lists during preflight.
-		return Math.min(4_097L, (long)Math.ceil(span) + 1L);
+		return List.of(new RustGalGuiElementRenderState(token, GuiRenderStratum.GUI_FILE_BACKED_BLIT,
+			"minecraft.gui.tiled-blit", -1, -1.0F, GuiFillDirection.NONE,
+			bounds.left(), bounds.top(), bounds.width(), bounds.height(), guiWidth, guiHeight));
 	}
 
 	/**

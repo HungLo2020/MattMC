@@ -23,6 +23,21 @@ public class TextureAtlasSprite implements TextureAtlasSpriteExtension {
 	private final float v1;
 	// Sodium: Track if sprite has unknown image contents (from TextureAtlasSpriteMixin)
 	private boolean hasUnknownImageContents;
+	@Nullable
+	private volatile java.lang.ref.WeakReference<net.vulkanic.world.AtlasAnimationResource> semanticAnimationResource;
+
+	void bindSemanticAnimationResource(net.vulkanic.world.AtlasAnimationResource resource) {
+		if (this.semanticAnimationResource != null) {
+			throw new IllegalStateException("Sprite already belongs to an animation resource incarnation");
+		}
+		this.semanticAnimationResource = new java.lang.ref.WeakReference<>(java.util.Objects.requireNonNull(resource));
+	}
+
+	/** CPU resource identity only; stale sprite references cannot retain retired sheets. */
+	@Nullable
+	public net.vulkanic.world.AtlasAnimationResource semanticAnimationResource() {
+		return this.semanticAnimationResource == null ? null : this.semanticAnimationResource.get();
+	}
 
 	protected TextureAtlasSprite(ResourceLocation resourceLocation, SpriteContents spriteContents, int i, int j, int k, int l) {
 		this.atlasLocation = resourceLocation;

@@ -27,7 +27,11 @@ public class PanoramaRenderer {
 		}
 
 		if (!net.vulkanic.gui.RustGalPanoramaRenderer.enqueue(
-			this.cubeMap, 10.0F, -this.spin, i, j, guiGraphics.guiRenderState
+			this.cubeMap, 10.0F, -this.spin, i, j,
+			new net.vulkanic.bridge.VulkanicGalBridge.GuiProjectionRecord(
+				(float)this.minecraft.getWindow().getWidth() / this.minecraft.getWindow().getGuiScale(),
+				(float)this.minecraft.getWindow().getHeight() / this.minecraft.getWindow().getGuiScale()),
+			guiGraphics.guiRenderState
 		)) {
 			if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
 				|| net.vulkanic.gui.RustGalGuiRenderer.isWholeFrameVulkanEnabled()) {

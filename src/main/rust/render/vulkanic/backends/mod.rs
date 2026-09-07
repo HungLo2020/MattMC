@@ -321,6 +321,8 @@ pub(super) mod mock {
         pub(in crate::render::vulkanic) completed: SubmissionId,
         pub(in crate::render::vulkanic) fail_next_create: bool,
         pub(in crate::render::vulkanic) fail_next_submit: bool,
+        pub(in crate::render::vulkanic) fail_retire_at: Option<SubmissionId>,
+        pub(in crate::render::vulkanic) retire_requests: Vec<SubmissionId>,
         pub(in crate::render::vulkanic) capabilities: Option<BackendCapabilities>,
         pub(in crate::render::vulkanic) live: BTreeMap<Handle, BackendToken>,
         next_token: u64,
@@ -425,7 +427,12 @@ pub(super) mod mock {
             self.completed
         }
 
-        fn retire(&mut self, _completed: SubmissionId) -> GalResult<()> {
+        fn retire(&mut self, completed: SubmissionId) -> GalResult<()> {
+            self.retire_requests.push(completed);
+            if self.fail_retire_at == Some(completed) {
+                self.fail_retire_at = None;
+                return Err(GalError::backend("mock completion wait failure"));
+            }
             Ok(())
         }
 

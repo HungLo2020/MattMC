@@ -23,6 +23,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import artifact_retention
+from capture_window import menu_capture_window
 
 
 SHADER_EVENT_PATTERN = (
@@ -987,6 +988,16 @@ class CaptureRunner:
             "tutorialStep": "none",
             "panoramaTheme": f'"{panorama_theme}"',
         }
+        mipmaps = os.environ.get("MATTMC_CAPTURE_MIPMAP_LEVELS")
+        if mipmaps is not None:
+            if mipmaps not in {"0", "1", "2", "3", "4"}:
+                raise SystemExit("MATTMC_CAPTURE_MIPMAP_LEVELS must be 0 through 4")
+            forced_options["mipmapLevels"] = mipmaps
+        if self.config.title_screen_capture:
+            menu_blur = os.environ.get("MATTMC_CAPTURE_MENU_BACKGROUND_BLUR", "5")
+            if not menu_blur.isdigit() or not 0 <= int(menu_blur) <= 10:
+                raise SystemExit("MATTMC_CAPTURE_MENU_BACKGROUND_BLUR must be an integer from 0 to 10")
+            forced_options["menuBackgroundBlurriness"] = menu_blur
         if self.config.title_screen_capture and title_static_fixture == "true":
             # A title parity fixture needs a stable vanilla scene, not a
             # wall-clock-dependent spin or randomly chosen splash. This is
@@ -1019,6 +1030,7 @@ class CaptureRunner:
                     # copied runs so their workload fingerprints describe the
                     # same world/camera fixture. Dedicated DH rows do not set
                     # this flag and retain the real DH renderer.
+                    ("rendererMode", '"DISABLED"'),
                     ("enableRendering", "false"),
                     # DH's fade hooks are independently configured and can
                     # repaint vanilla terrain even when LOD rendering is off.
@@ -1087,8 +1099,9 @@ class CaptureRunner:
             # masking pixels or letting it influence world-color parity.
             upsert_option(voxelmap_file, "Hide Minimap", "true")
             self.append_meta("forced_voxelmap_minimap_hidden=true")
-        self.append_meta("forced_window_width=1280")
-        self.append_meta("forced_window_height=720")
+        width, height = menu_capture_window(self.config.title_screen_capture)
+        self.append_meta(f"forced_window_width={width}")
+        self.append_meta(f"forced_window_height={height}")
         for key, value in forced_options.items():
             self.append_meta(f"forced_option_{key}={value}")
         if self.config.title_screen_capture:
@@ -1120,8 +1133,9 @@ class CaptureRunner:
         self.config.client_args = remove_client_arg_assignment(self.config.client_args, "enableShaders")
         if not self.config.title_screen_capture:
             self.config.client_args = append_client_arg(self.config.client_args, f"--quickPlaySingleplayer={shlex.quote(self.config.world)}")
-        self.config.client_args = append_client_arg(self.config.client_args, "--width 1280")
-        self.config.client_args = append_client_arg(self.config.client_args, "--height 720")
+        width, height = menu_capture_window(self.config.title_screen_capture)
+        self.config.client_args = append_client_arg(self.config.client_args, f"--width {width}")
+        self.config.client_args = append_client_arg(self.config.client_args, f"--height {height}")
         self.config.client_args = append_client_arg(self.config.client_args, f"enableShaders={shaders_enabled}")
         if self.config.title_screen_capture:
             self.append_meta("title_screen_capture=true")
@@ -1587,7 +1601,7 @@ class CaptureRunner:
                 "-Dmattmc.vulkan.deterministicTemporalParity.frameTimeCounter=0.0",
                 "-Dmattmc.vulkan.deterministicTemporalParity.partialTick=1.0",
                 "-Dmattmc.vulkan.deterministicTemporalParity.fovModifier=1.0",
-                "-Dmattmc.vulkan.deterministicTemporalParity.worldTime=6000",
+                f"-Dmattmc.vulkan.deterministicTemporalParity.worldTime={int(self.env.get('MATTMC_CAPTURE_WORLD_TIME', '6000'))}",
             ]
             self.append_java_tool_options(temporal_options)
             self.append_meta(f"deterministic_temporal_java_options={' '.join(temporal_options)}")
@@ -1992,14 +2006,17 @@ class CaptureRunner:
     def title_screen_timeline_complete(self) -> bool:
         """Whether retained title samples prove the requested title destination.
 
-        A non-transition title capture is allowed to end after its bounded
-        screenshot count, because each screenshot is already receipt-gated.
-        A startup transition intentionally samples before that receipt and
-        therefore needs the receipt in addition to its finite timeline.
+        A Rust title/menu capture needs the held presented-frame acknowledgment,
+        not merely the first TitleScreen semantic receipt (which may still be
+        fading). A transition also needs its complete finite timeline.
         """
         if not self.config.title_screen_capture:
             return False
         if self.screenshot_count < max(1, self.config.screenshot_max_count):
+            return False
+        if self.config.backend == "rust-vulkan" and not (
+            self.title_presented_frame_dir / "title_frame_capture.ack.json"
+        ).is_file():
             return False
         return (
             not self.config.title_screen_transition_capture
@@ -2363,6 +2380,7 @@ class CaptureRunner:
                 self.deterministic_metadata,
                 self.deterministic_screenshot_dir,
                 self.config.deterministic_pose_tolerance,
+                celestial_body=self.env.get("MATTMC_CAPTURE_CELESTIAL", ""),
             )
             self.deterministic_validation_status = "ok"
         except Exception as exc:
@@ -3602,7 +3620,47 @@ def safe_kill(pid: int, sig: signal.Signals) -> None:
         pass
 
 
-def validate_deterministic_metadata(metadata_path: Path, screenshot_dir: Path, tolerance: float) -> None:
+def celestial_body_witness(image, body: str):
+    """Positive evidence for the shared overhead fixture, excluding HUD and stars.
+
+    The default moon's brightest texels are (218, 229, 255), not white.
+    Require a substantial, bounded, central connected body instead of global
+    frame brightness: isolated stars and a uniformly lit sky cannot qualify.
+    """
+    if body not in ("sun", "moon"):
+        raise ValueError(f"unknown celestial body: {body!r}")
+    width, height = image.size
+    box = (width // 4, height // 5, width * 3 // 4, height * 4 // 5)
+    crop = image.convert("RGB").crop(box)
+    threshold = 224 if body == "sun" else 96
+    mask = [min(pixel) >= threshold for pixel in crop.getdata()]
+    pending = {index for index, present in enumerate(mask) if present}
+    cw, ch = crop.size
+    largest = []
+    while pending:
+        component = [pending.pop()]
+        for index in component:
+            x, y = index % cw, index // cw
+            for dy in (-1, 0, 1):
+                for dx in (-1, 0, 1):
+                    nx, ny = x + dx, y + dy
+                    neighbor = ny * cw + nx
+                    if 0 <= nx < cw and 0 <= ny < ch and neighbor in pending:
+                        pending.remove(neighbor)
+                        component.append(neighbor)
+        if len(component) > len(largest):
+            largest = component
+    count = len(largest)
+    cx = sum(index % cw for index in largest) / max(1, count)
+    cy = sum(index // cw for index in largest) / max(1, count)
+    valid = (100 <= count < cw * ch / 4
+             and cw / 3 <= cx <= cw * 2 / 3 and ch / 3 <= cy <= ch * 2 / 3)
+    return {"passed": valid, "crop_box": box, "mask": mask,
+            "body_pixels": count, "threshold": threshold}
+
+
+def validate_deterministic_metadata(metadata_path: Path, screenshot_dir: Path, tolerance: float,
+                                    celestial_body: str = "") -> None:
     if not metadata_path.is_file():
         raise RuntimeError(f"deterministic metadata was not written: {metadata_path}")
     data = json.loads(metadata_path.read_text(encoding="utf-8"))
@@ -3656,6 +3714,7 @@ def validate_deterministic_metadata(metadata_path: Path, screenshot_dir: Path, t
 
             with Image.open(screenshot) as image:
                 rgb = image.convert("RGB")
+                celestial = celestial_body_witness(rgb, celestial_body) if celestial_body else None
                 rgb.thumbnail((64, 36))
                 pixels = list(rgb.getdata())
         except Exception as exc:
@@ -3663,7 +3722,10 @@ def validate_deterministic_metadata(metadata_path: Path, screenshot_dir: Path, t
                 f"deterministic screenshot is not a readable rendered image for {capture.get('poseName')}: {screenshot}: {exc}"
             ) from exc
         visible_pixels = sum(1 for red, green, blue in pixels if max(red, green, blue) > 24)
-        if not pixels or visible_pixels / len(pixels) < 0.05:
+        if celestial is not None and not celestial["passed"]:
+            raise RuntimeError(f"deterministic screenshot lacks central {celestial_body} body: {screenshot}")
+        if not pixels or (visible_pixels / len(pixels) < 0.05
+                          and not (celestial is not None and celestial["passed"])):
             raise RuntimeError(
                 f"deterministic screenshot is blank for {capture.get('poseName')}: {screenshot}"
             )

@@ -21,7 +21,7 @@ use super::frame::{
 };
 use super::gal::VulkanicGal;
 use super::gui_frontend::{
-    GuiAffineQuadRequest, GuiAssetPayload, GuiFrontend, GuiRawImageAssetPayload, GuiRawImageFormat,
+    GuiAffineQuadRequest, GuiAssetPayload, GuiFrontend, GuiRawImageAssetPayload, GuiRawImageFormat, GuiTiledQuadRequest,
     GuiSpriteRequest, GuiSubmitStats, GUI_MAX_RAW_IMAGES, GUI_MAX_VIEWPORT_AXIS,
 };
 use super::gui_mesh_frontend::{
@@ -67,6 +67,7 @@ pub(crate) mod frame;
 pub(crate) mod gui;
 pub(crate) mod layout;
 pub(crate) mod material;
+pub(crate) mod sprite_animation;
 pub(crate) mod memory;
 pub(crate) mod resources;
 pub(crate) mod shader_pack;

@@ -4,7 +4,9 @@ public enum GuiRenderStratum {
 	/** Flat semantic GUI rectangles, kept below specialized HUD strata. */
 	GUI_RECTANGLES("gui.rectangles", 100),
 	GUI_POST_EFFECT("gui.post-effect", 80),
-	GUI_PANORAMA("gui.panorama", 50),
+	// Panorama is the pre-GUI background, including before the first menu
+	// blur boundary (source stratum 1, semantic phase order 3).
+	GUI_PANORAMA("gui.panorama", 1),
 	GUI_CROSSHAIR("gui.crosshair", 200),
 	GUI_HOTBAR_BASE("gui.hotbar.base", 300),
 	GUI_HOTBAR_SELECTION("gui.hotbar.selection", 310),

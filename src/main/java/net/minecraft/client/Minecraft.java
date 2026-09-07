@@ -1403,10 +1403,8 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 								"Rust Vulkan whole-frame presentation was selected but its semantic shell was not admitted"
 							);
 						}
-						// The Rust coordinator has already presented the semantic frame;
-						// advance deterministic capture state at the same post-present
-						// boundary used by the legacy renderer.
-						net.minecraft.client.dev.DeterministicCameraCapture.afterRender(this);
+						// The Rust coordinator already advances deterministic capture
+						// at its post-present boundary. Do not count this frame twice.
 					}
 				}
 				net.minecraft.util.profiling.custom.ProfilerManager.recordRenderThreadOperation("frame.rustVulkanWholeFrame", Util.getNanos() - startTime);
@@ -1454,7 +1452,8 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.tracy-frame-capture");
 
 			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("api.present.update-display");
-			this.window.updateDisplay(this.tracyFrameCapture);
+				this.window.updateDisplay(this.tracyFrameCapture);
+				net.minecraft.client.dev.GraphicsAuditResourceReload.observe(this);
 			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("api.present.update-display");
 			int k = this.framerateLimitTracker.getFramerateLimit();
 			if (DEBUG_FPS_LIMIT_LOGS < 20) {
@@ -1935,6 +1934,8 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		profilerFiller.popPush("textures");
 		if (this.isLevelRunningNormally()) {
 			this.textureManager.tick();
+			net.vulkanic.gui.RustGalFrameCoordinator.pumpAtlasAnimationResources();
+			net.minecraft.client.dev.GraphicsAuditRenderingSuspension.afterTextureTick(this);
 		}
 
 		if (this.screen != null || this.player == null) {

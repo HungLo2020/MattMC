@@ -89,6 +89,8 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
         int maxY = minY + 16;
         int maxZ = minZ + 16;
 
+        net.sodium.client.render.SectionInputDiagnostics.observe(slice, minX, minY, minZ);
+
         // Initialise with minX/minY/minZ so initial getBlockState crash context is correct
         BlockPos.MutableBlockPos blockPos = new BlockPos.MutableBlockPos(minX, minY, minZ);
         BlockPos.MutableBlockPos modelOffset = new BlockPos.MutableBlockPos();

@@ -27,7 +27,8 @@ public final class RustGalPanoramaRenderer {
 	 * mesh per frame.</p>
 	 */
 	public static boolean enqueue(
-		CubeMap cubeMap, float pitchDegrees, float yawDegrees, int guiWidth, int guiHeight, GuiRenderState renderState
+		CubeMap cubeMap, float pitchDegrees, float yawDegrees, int guiWidth, int guiHeight,
+		VulkanicGalBridge.GuiProjectionRecord projection, GuiRenderState renderState
 	) {
 		if (!RustGalGuiRenderer.isWholeFrameVulkanEnabled()
 			|| renderState == null
@@ -41,23 +42,18 @@ public final class RustGalPanoramaRenderer {
 		}
 		RustGalGuiRawImageAssets.Asset image = RustGalGuiRawImageAssets.resolveCubeMap(cubeMap.semanticTextureLocation());
 		if (image == null) return false;
-		int guard = 1;
+		projection.validateLayout(guiWidth, guiHeight);
+		// This background is drawn directly into the acquired frame, not an
+		// item PIP texture. No offscreen guard band belongs in its geometry.
+		int guard = 0;
 		int renderWidth = guiWidth + guard * 2;
 		int renderHeight = guiHeight + guard * 2;
-		Matrix4f modelView = new Matrix4f().rotationX((float)Math.PI)
-			.rotateX((float)Math.toRadians(pitchDegrees)).rotateY((float)Math.toRadians(yawDegrees));
-		float cot = 1.0F / (float)Math.tan(FOV_RADIANS * 0.5F);
-		float projectionX = cot / ((float)guiWidth / guiHeight);
 		// A panorama is one continuous camera projection, not a curved GUI mesh.
 		// Carry Frozen's three oversized fullscreen-triangle view rays and let the
 		// Rust-owned panorama fragment program choose the cube face per pixel.
 		// This is exact at face boundaries and avoids allocating 4,225 Java vertex
 		// records (and their defensive FFI copies) every title-screen frame.
-		List<VulkanicGalBridge.GuiMeshVertexRecord> vertices = List.of(
-			panoramaVertex(modelView, 0.0F, 1.0F, guiWidth, guiHeight, guard, projectionX, cot),
-			panoramaVertex(modelView, 2.0F, 1.0F, guiWidth, guiHeight, guard, projectionX, cot),
-			panoramaVertex(modelView, 0.0F, -1.0F, guiWidth, guiHeight, guard, projectionX, cot)
-		);
+		List<VulkanicGalBridge.GuiMeshVertexRecord> vertices = panoramaVertices(pitchDegrees, yawDegrees, projection);
 		List<Integer> indices = List.of(0, 1, 2);
 		VulkanicGalBridge.GuiMeshBatchRecord batch = new VulkanicGalBridge.GuiMeshBatchRecord(
 			GuiRenderStratum.GUI_PANORAMA.order(), 0, VulkanicGalBridge.GUI_MESH_MATERIAL_PANORAMA, 1, image.assetId(), 0L, 0.0F,
@@ -77,14 +73,28 @@ public final class RustGalPanoramaRenderer {
 		return true;
 	}
 
+	static List<VulkanicGalBridge.GuiMeshVertexRecord> panoramaVertices(
+		float pitchDegrees, float yawDegrees, VulkanicGalBridge.GuiProjectionRecord projection
+	) {
+		Matrix4f modelView = new Matrix4f().rotationX((float)Math.PI)
+			.rotateX((float)Math.toRadians(pitchDegrees)).rotateY((float)Math.toRadians(yawDegrees));
+		float cot = 1.0F / (float)Math.tan(FOV_RADIANS * 0.5F);
+		float projectionX = cot / (projection.width() / projection.height());
+		return List.of(
+			panoramaVertex(modelView, 0.0F, 1.0F, projection.width(), projection.height(), projectionX, cot),
+			panoramaVertex(modelView, 2.0F, 1.0F, projection.width(), projection.height(), projectionX, cot),
+			panoramaVertex(modelView, 0.0F, -1.0F, projection.width(), projection.height(), projectionX, cot)
+		);
+	}
+
 	private static VulkanicGalBridge.GuiMeshVertexRecord panoramaVertex(
-		Matrix4f matrix, float screenX, float screenY, int width, int height, int guard, float projectionX, float projectionY
+		Matrix4f matrix, float screenX, float screenY, float width, float height, float projectionX, float projectionY
 	) {
 		float[] ray = cubeRay(matrix, screenX * 2.0F - 1.0F, 1.0F - screenY * 2.0F, projectionX, projectionY);
 		// Panorama's dedicated Rust shader interprets the two UV pairs as an
 		// interpolated camera ray. This is semantic data, not a Java GPU handle.
 		return new VulkanicGalBridge.GuiMeshVertexRecord(
-			new float[] {guard + screenX * width, guard + screenY * height, ray[0]},
+			new float[] {screenX * width, screenY * height, ray[0]},
 			new float[] {0.0F, 0.0F}, new float[] {ray[1], ray[2]}, 0xFFFFFFFF, NORMAL_POSITIVE_Z
 		);
 	}

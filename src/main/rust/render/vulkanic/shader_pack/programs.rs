@@ -4551,10 +4551,9 @@ void main() {
     // backend infer that from a native texture object.  This keeps standalone
     // water sprites local while atlas-backed terrain (including glass) samples
     // its resolved atlas region.
-    // `material.w` names the copied texture coordinate space. Values two and
-    // three are local model textures which additionally carry vanilla entity
-    // directional-light semantics; neither is an atlas texture.
-    v_uv = instance.material.w == 1.0
+    // Independent semantic flags, encoded exactly in the Rust-owned ABI lane.
+    uint material_semantics = uint(instance.material.w);
+    v_uv = (material_semantics & 1u) != 0u
         ? vertex.shader_data.xy
         : vec2(vertex.position_uv.w, vertex.color_uv.w);
     // Frozen OpenGL Sodium encodes each 0..15 light level as `level * 16`
@@ -4564,9 +4563,19 @@ void main() {
     // with texel-centre coordinates: that is a different lighting contract.
     // The resulting lit vertex color is then interpolated across the triangle.
     vec2 light_uv = clamp(vertex.extra_data.xy, vec2(0.0), vec2(1.0)) * (15.0 / 16.0);
+    // Frozen's standalone baked blocks use core/terrain.vsh, not Sodium's
+    // chunk shader. Its half-texel offset samples the lightmap texel centres.
+    if ((material_semantics & 8u) != 0u) {
+        light_uv += vec2(0.5 / 16.0);
+    }
+    vec4 light_color = texture(sampler2D(LightmapTexture, LightmapSampler), light_uv);
+    if ((material_semantics & 16u) != 0u) {
+        ivec2 light_texel = ivec2(round(clamp(vertex.extra_data.xy, vec2(0.0), vec2(1.0)) * 15.0));
+        light_color = texelFetch(sampler2D(LightmapTexture, LightmapSampler), light_texel, 0);
+    }
     v_color = vec4(vertex.color_uv.rgb, vertex.normal_light.w) * instance.color
-        * texture(sampler2D(LightmapTexture, LightmapSampler), light_uv);
-    if (instance.material.w > 1.5) {
+        * light_color;
+    if ((material_semantics & 2u) != 0u) {
         // Frozen's entity.vsh applies minecraft_mix_light before the copied
         // UV2 lightmap. ModelPart normals are semantic mesh data, so Rust
         // owns this calculation rather than borrowing Java's Lighting UBO.
@@ -4576,7 +4585,7 @@ void main() {
         vec3 normal = normalize(vec3(vertex.normal_light.yz, vertex.extra_data.z));
         vec2 light = max(vec2(0.0), vec2(
             dot(LIGHT0_DIRECTION, normal),
-            dot(instance.material.w > 2.5 ? NETHER_LIGHT1_DIRECTION : LIGHT1_DIRECTION, normal)
+            dot((material_semantics & 4u) != 0u ? NETHER_LIGHT1_DIRECTION : LIGHT1_DIRECTION, normal)
         ));
         float diffuse = min(1.0, (light.x + light.y) * 0.6 + 0.4);
         v_color.rgb *= diffuse;
@@ -5751,11 +5760,11 @@ mod tests {
 
     #[test]
     fn direct_terrain_vertex_has_an_explicit_modelpart_diffuse_branch() {
-        assert!(MINIMAL_TERRAIN_MATERIAL_VERTEX.contains("instance.material.w > 1.5"));
+        assert!(MINIMAL_TERRAIN_MATERIAL_VERTEX.contains("(material_semantics & 2u) != 0u"));
         assert!(MINIMAL_TERRAIN_MATERIAL_VERTEX.contains("LIGHT0_DIRECTION"));
         assert!(MINIMAL_TERRAIN_MATERIAL_VERTEX.contains("NETHER_LIGHT1_DIRECTION"));
         assert!(MINIMAL_TERRAIN_MATERIAL_VERTEX.contains("v_color.rgb *= diffuse"));
-        assert!(MINIMAL_TERRAIN_MATERIAL_VERTEX.contains("instance.material.w == 1.0"));
+        assert!(MINIMAL_TERRAIN_MATERIAL_VERTEX.contains("(material_semantics & 1u) != 0u"));
     }
 
     #[test]
@@ -5806,14 +5815,22 @@ mod tests {
 
     #[test]
     fn direct_terrain_preserves_the_explicit_atlas_or_local_uv_semantic() {
-        // Tag 1 selects atlas coordinates. ModelPart diffuse-lighting tags
-        // 2/3 still use local texture coordinates, so a range check is wrong.
+        // Atlas coordinates are independent of diffuse and lightmap semantics.
         assert!(MINIMAL_TERRAIN_MATERIAL_VERTEX
-            .contains("instance.material.w == 1.0\n        ? vertex.shader_data.xy"));
+            .contains("(material_semantics & 1u) != 0u\n        ? vertex.shader_data.xy"));
         assert!(MINIMAL_TERRAIN_MATERIAL_VERTEX
             .contains(": vec2(vertex.position_uv.w, vertex.color_uv.w);"));
         assert!(!MINIMAL_TERRAIN_MATERIAL_VERTEX
             .contains("instance.material.w > 0.5"));
+    }
+
+    #[test]
+    fn model_lightmap_contracts_do_not_reuse_sodium_boundary_sampling() {
+        let source = minimal_direct_terrain_vertex_source();
+        assert!(source.contains("(material_semantics & 8u) != 0u"));
+        assert!(source.contains("light_uv += vec2(0.5 / 16.0)"));
+        assert!(source.contains("(material_semantics & 16u) != 0u"));
+        assert!(source.contains("texelFetch(sampler2D(LightmapTexture, LightmapSampler), light_texel, 0)"));
     }
 
     #[test]

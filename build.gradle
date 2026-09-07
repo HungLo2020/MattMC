@@ -517,6 +517,14 @@ tasks.named('classes') {
 
 tasks.withType(Test).configureEach {
     dependsOn 'buildRustNative', 'testRustNative'
+    // Architecture tests inspect source text and ABI tests load the Rust
+    // library. Java classpath changes alone cannot invalidate those results.
+    inputs.files(rustSourceFiles).withPropertyName('mattmcRustSourceContracts')
+            .withPathSensitivity(org.gradle.api.tasks.PathSensitivity.RELATIVE)
+    inputs.files(sourceSets.main.allJava).withPropertyName('mattmcJavaSourceContracts')
+            .withPathSensitivity(org.gradle.api.tasks.PathSensitivity.RELATIVE)
+    inputs.file(rustBuiltNativesDir.map { it.file(rustNativeFileName) })
+            .withPropertyName('mattmcRustNativeLibrary')
     systemProperty 'mattmc.rust.natives.dir', rustBuiltNativesDir.get().asFile.absolutePath
     jvmArgs rustNativeJvmArgs
     def corpusReplayInput = providers.gradleProperty('mattmcMeshingCorpusReplayInput')

@@ -18,6 +18,55 @@ fn gal() -> VulkanicGal {
     VulkanicGal::new_with_backend(Box::new(MockBackend::default()), false)
 }
 
+#[test]
+fn completion_wait_rejects_unsubmitted_ids_without_fabricating_progress() {
+    let mut gal = gal();
+    assert!(gal.retire_through(SubmissionId(1)).is_err());
+    assert_eq!(gal.poll_completed(), SubmissionId(0));
+    assert!(gal.mock_backend().unwrap().retire_requests.is_empty());
+    let batch = || SubmissionBatch {
+        label: "completion-failure".into(),
+        command_lists: vec![CommandList::from(CommandListDesc {
+            label: "empty-but-valid-command-list".into(), operations: vec![],
+        })],
+    };
+    gal.mock_backend_mut().unwrap().fail_next_submit = true;
+    assert!(gal.submit(batch()).is_err());
+    assert_eq!(gal.next_submission_id(), SubmissionId(2));
+    assert_eq!(gal.latest_submission_id(), SubmissionId(0), "a failed attempt is not an accepted receipt");
+    assert!(gal.retire_through(SubmissionId(1)).is_err());
+    assert!(gal.mock_backend().unwrap().retire_requests.is_empty());
+    let token = gal.submit(batch()).unwrap();
+    assert_eq!(token.submission, SubmissionId(2));
+    assert_eq!(gal.latest_submission_id(), token.submission);
+    gal.retire_through(token.submission).unwrap();
+    assert_eq!(gal.poll_completed(), token.submission);
+}
+
+#[test]
+fn same_usage_write_barriers_are_dependencies_but_read_only_noops_are_rejected() {
+    let mut gal = gal();
+    let buffer = gal.create_buffer(BufferDesc {
+        label: "same-usage-dependency".into(), size: 4, memory: MemoryDomain::Upload,
+        usages: vec![BufferUsage::TransferSrc, BufferUsage::TransferDst, BufferUsage::HostWrite],
+    }).unwrap();
+    let barrier = |before, after| CommandOp::Barrier(ResourceBarrier {
+        resource: buffer, subresources: None, before, after,
+        src_queue: QueueClass::Graphics, dst_queue: QueueClass::Graphics,
+    });
+    let batch = |operations| SubmissionBatch {
+        label: "same-usage-dependency".into(),
+        command_lists: vec![CommandList::from(CommandListDesc { label: "commands".into(), operations })],
+    };
+    gal.submit(batch(vec![
+        CommandOp::HostWriteBuffer { buffer, offset: 0, data: vec![1, 2, 3, 4] },
+        barrier(TextureUsageState::TransferDst, TextureUsageState::TransferDst),
+        CommandOp::HostWriteBuffer { buffer, offset: 0, data: vec![5, 6, 7, 8] },
+        barrier(TextureUsageState::TransferDst, TextureUsageState::TransferSrc),
+    ])).unwrap();
+    assert!(gal.submit(batch(vec![barrier(TextureUsageState::TransferSrc, TextureUsageState::TransferSrc)])).is_err());
+}
+
 fn gal_with_capabilities(capabilities: BackendCapabilities) -> VulkanicGal {
     VulkanicGal::new_with_backend(
         Box::new(MockBackend::with_capabilities(capabilities)),
@@ -4211,7 +4260,10 @@ fn frozen_ffi_abi_sizes_and_capability_negotiation_are_stable() {
     assert_eq!(FFI_ABI_V25_VERSION, 25);
     assert_eq!(FFI_ABI_V26_VERSION, 26);
     assert_eq!(FFI_ABI_V27_VERSION, 27);
-    assert_eq!(FFI_ABI_VERSION, FFI_ABI_V27_VERSION);
+    assert_eq!(FFI_ABI_V28_VERSION, 28);
+    assert_eq!(FFI_ABI_V29_VERSION, 29);
+    assert_eq!(FFI_ABI_V30_VERSION, 30);
+    assert_eq!(FFI_ABI_VERSION, FFI_ABI_V30_VERSION);
     assert!(!FFI_INITIAL_PRESENTATION_SUPPORTED);
     assert_eq!(size_of::<FfiHeader>(), 8);
     assert_eq!(size_of::<FfiHandle>(), 8);
@@ -4921,7 +4973,7 @@ fn ffi_abi_fuzz_rejects_unknown_versions_enums_and_lengths() {
         requested_feature_bits: FfiFeatureBits::GRAPHICS,
         reserved0: 0,
     };
-    for version in [0, FFI_ABI_VERSION + 1, u32::MAX] {
+    for version in [0, FFI_ABI_V27_VERSION, FFI_ABI_V28_VERSION, FFI_ABI_VERSION + 1, u32::MAX] {
         let mut request = base;
         request.header.version = version;
         assert_code(

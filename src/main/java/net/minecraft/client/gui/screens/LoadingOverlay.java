@@ -60,6 +60,8 @@ public class LoadingOverlay extends Overlay {
 	private float currentProgress;
 	private long fadeOutStart = -1L;
 	private long fadeInStart = -1L;
+	// Visual fade timing must not own the resource-reload completion lifecycle.
+	private boolean completionHandled;
 
 	public LoadingOverlay(Minecraft minecraft, ReloadInstance reloadInstance, Consumer<Optional<Throwable>> consumer, boolean bl) {
 		this.minecraft = minecraft;
@@ -175,7 +177,7 @@ public class LoadingOverlay extends Overlay {
 			this.drawProgressBar(guiGraphics, k / 2 - r, t - 5, k / 2 + r, t + 5, 1.0F - Mth.clamp(g, 0.0F, 1.0F));
 		}
 
-		if (g >= 2.0F) {
+		if (g >= 2.0F && this.completionHandled) {
 			this.minecraft.setOverlay(null);
 		}
 
@@ -240,13 +242,15 @@ public class LoadingOverlay extends Overlay {
 
 	@Override
 	public void tick() {
-		if (this.fadeOutStart == -1L && this.reload.isDone() && this.isReadyToFadeOut()) {
+		if (!this.completionHandled && this.reload.isDone() && this.isReadyToFadeOut()) {
+			this.completionHandled = true;
+			Optional<Throwable> failure = Optional.empty();
 			try {
 				this.reload.checkExceptions();
-				this.onFinish.accept(Optional.empty());
 			} catch (Throwable var2) {
-				this.onFinish.accept(Optional.of(var2));
+				failure = Optional.of(var2);
 			}
+			this.onFinish.accept(failure);
 
 			this.fadeOutStart = Util.getMillis();
 			if (this.minecraft.screen != null) {
@@ -268,7 +272,7 @@ public class LoadingOverlay extends Overlay {
 			this.fadeOutStart = Util.getMillis();
 		}
 
-		if (this.fadeOutStart != -1L && Util.getMillis() - this.fadeOutStart >= FORCE_DISMISS_AFTER_FADE_OUT_MS) {
+		if (this.completionHandled && this.fadeOutStart != -1L && Util.getMillis() - this.fadeOutStart >= FORCE_DISMISS_AFTER_FADE_OUT_MS) {
 			this.minecraft.setOverlay(null);
 		}
 

@@ -417,6 +417,70 @@ public class RustGalTerrainRendererLightingContractTest {
 	}
 
 	@Test
+	public void atlasWaterPreservesSortedGeometryAndMaterialWithoutSheetUvRemapping() {
+		RustGalTerrainRenderer.installTestingFluidSpriteAssetsForUnitTests();
+		List<VulkanicGalBridge.WorldMeshVertexRecord> vertices = testVertices(3);
+		List<VulkanicGalBridge.WorldMeshVertexRecord> originals = List.copyOf(vertices);
+		byte[] sorted = sortedQuads(2, 1, 0);
+		var mesh = RustGalTerrainRenderer.buildOrderedTranslucentMesh(sorted, primitiveMetadata(
+			NativeSectionMeshBuilder.PRIMITIVE_KIND_BUILTIN_WATER,
+			NativeSectionMeshBuilder.PRIMITIVE_KIND_NON_FLUID_TRANSLUCENT,
+			NativeSectionMeshBuilder.PRIMITIVE_KIND_BUILTIN_WATER), vertices, 12,
+			RustGalTerrainRenderer.WaterTextureBinding.BLOCK_ATLAS);
+		assertArrayEquals(sorted, mesh.indexBytes());
+		assertEquals(3, mesh.sections().size());
+		assertEquals(1, mesh.waterStillPrimitiveCount());
+		assertEquals(1, mesh.waterFlowPrimitiveCount());
+		assertEquals(0, mesh.omittedPrimitiveCount());
+		for (int index = 0; index < vertices.size(); index++) {
+			var before = originals.get(index);
+			var after = vertices.get(index);
+			int type = index < 4 ? 1 : index >= 8 ? 2 : before.shaderMaterialType();
+			assertEquals(new VulkanicGalBridge.WorldMeshVertexRecord(
+				before.x(), before.y(), before.z(), before.u(), before.v(), before.atlasU(), before.atlasV(),
+				before.shaderBlockId(), type, before.terrainMaterialBits(), before.colorArgb(),
+				before.normalPacked(), before.light(), before.midBlockPacked()), after);
+		}
+		for (int index = 0; index < 3; index++) {
+			var section = mesh.sections().get(index);
+			assertEquals(RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_TERRAIN_BLOCK_ATLAS, section.textureId());
+			assertEquals(index == 1 ? RustGalWorldPrimitiveRenderer.MATERIAL_ID_TRANSLUCENT_TEXTURED
+				: RustGalWorldPrimitiveRenderer.MATERIAL_ID_WATER_TRANSLUCENT, section.materialId());
+			assertEquals(index * 24, section.indexOffset());
+			assertEquals(6, section.indexCount());
+			assertEquals(RustGalWorldPrimitiveRenderer.CULL_BACK, section.cullPolicy());
+			assertEquals(RustGalWorldPrimitiveRenderer.WORLD_WINDING_CCW, section.winding());
+			assertEquals(RustGalWorldPrimitiveRenderer.MATERIAL_MODE_TRANSLUCENT, section.materialMode());
+		}
+	}
+
+	@Test
+	public void adjacentAtlasWaterSpritesShareOneRangeWithoutLosingSpriteIdentity() {
+		RustGalTerrainRenderer.installTestingFluidSpriteAssetsForUnitTests();
+		List<VulkanicGalBridge.WorldMeshVertexRecord> vertices = testVertices(3);
+		// The middle quad occupies the overlay sprite; the others are still/flow.
+		vertices.set(4, vertex(0.55F, 0.05F));
+		vertices.set(5, vertex(0.60F, 0.05F));
+		vertices.set(6, vertex(0.60F, 0.10F));
+		vertices.set(7, vertex(0.55F, 0.10F));
+		byte[] sorted = sortedQuads(2, 0, 1);
+		var mesh = RustGalTerrainRenderer.buildOrderedTranslucentMesh(sorted, primitiveMetadata(
+			NativeSectionMeshBuilder.PRIMITIVE_KIND_BUILTIN_WATER,
+			NativeSectionMeshBuilder.PRIMITIVE_KIND_BUILTIN_WATER,
+			NativeSectionMeshBuilder.PRIMITIVE_KIND_BUILTIN_WATER), vertices, 12,
+			RustGalTerrainRenderer.WaterTextureBinding.BLOCK_ATLAS);
+		assertArrayEquals(sorted, mesh.indexBytes());
+		assertEquals(1, mesh.sections().size());
+		assertEquals(18, mesh.sections().getFirst().indexCount());
+		assertEquals(1, mesh.waterStillPrimitiveCount());
+		assertEquals(1, mesh.waterFlowPrimitiveCount());
+		assertEquals(1, mesh.waterOverlayPrimitiveCount());
+		assertEquals(3, vertices.get(4).shaderMaterialType());
+		assertEquals(0.55F, vertices.get(4).u());
+		assertEquals(0, mesh.waterTextureSwitchCount());
+	}
+
+	@Test
 	public void translucentPrimitiveMetadataRetainsGenericFluidWithAtlasSemanticsWithoutReordering() {
 		byte[] sorted = sortedQuads(0, 1, 2);
 		int[] metadata = primitiveMetadata(
@@ -546,11 +610,9 @@ public class RustGalTerrainRendererLightingContractTest {
 			"src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
 		int method = source.indexOf("public static void registerStaticTerrainMeshAsset(");
 		int textureLoop = source.indexOf("for (VulkanicGalBridge.WorldMeshTextureAssetRecord texture : textures)", method);
-		int previous = source.indexOf("previousTexture", textureLoop);
-		int compare = source.indexOf("Arrays.equals(previousTexture.pngBytes(), texture.pngBytes())", previous);
-		int dirty = source.indexOf("DIRTY_WORLD_MESH_TEXTURES.add(texture.textureId())", compare);
-		assertTrue(method >= 0 && textureLoop > method && previous > textureLoop
-			&& compare > previous && dirty > compare,
+		int compare = source.indexOf("changed |= registerChangedTexture(WORLD_MESH_TEXTURES, DIRTY_WORLD_MESH_TEXTURES, texture)", textureLoop);
+		int end = source.indexOf("STATIC_TERRAIN_MESH_RESIDENCY.put", textureLoop);
+		assertTrue(method >= 0 && textureLoop > method && compare > textureLoop && compare < end,
 			"unchanged static-terrain texture payloads must not be re-dirtied every frame");
 	}
 

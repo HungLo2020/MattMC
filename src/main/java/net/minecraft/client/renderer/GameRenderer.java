@@ -1135,7 +1135,7 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 				view.rotation(cameraRotation);
 			}
 			net.minecraft.client.renderer.culling.Frustum rustFrameFrustum =
-				new net.minecraft.client.renderer.culling.Frustum(projection, view);
+				net.minecraft.client.renderer.culling.Frustum.forCamera(view, projection, this.mainCamera.getPosition());
 			if (this.minecraft.debugEntries.isCurrentlyEnabled(DebugScreenEntries.CHUNK_SECTION_OCTREE)) {
 				this.minecraft.levelRenderer.collectRustOctreeSemantics(this.mainCamera, this.submitNodeStorage,
 					rustFrameFrustum);

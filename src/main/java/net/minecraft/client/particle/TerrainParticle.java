@@ -56,8 +56,9 @@ public class TerrainParticle extends SingleQuadParticle {
 		}
 
 		this.quadSize /= 2.0F;
-		this.uo = this.random.nextFloat() * 3.0F;
-		this.vo = this.random.nextFloat() * 3.0F;
+		this.uo = GraphicsAuditTerrainParticleFixture.offset(this.random.nextFloat() * 3.0F);
+		this.vo = GraphicsAuditTerrainParticleFixture.offset(this.random.nextFloat() * 3.0F);
+		GraphicsAuditTerrainParticleFixture.configure(this);
 		
 		// Iris: Resolve translucency (from MixinTerrainParticle)
 		net.minecraft.client.renderer.chunk.ChunkSectionLayer type = net.minecraft.client.renderer.ItemBlockRenderTypes.getChunkRenderType(blockState);
@@ -130,6 +131,7 @@ public class TerrainParticle extends SingleQuadParticle {
 		boolean queued = RustGalWorldPrimitiveRenderer.enqueueTerrainParticle(
 			this.blockState,
 			this.sprite.contents().name(),
+			this.sprite.semanticAnimationResource(),
 			camera,
 			this.xo,
 			this.x,
@@ -140,10 +142,11 @@ public class TerrainParticle extends SingleQuadParticle {
 			quaternionf,
 			f,
 			this.getQuadSize(f),
-				Math.min(this.sprite.getUOffset(this.getU0()), this.sprite.getUOffset(this.getU1())),
-				Math.max(this.sprite.getUOffset(this.getU0()), this.sprite.getUOffset(this.getU1())),
-				Math.min(this.sprite.getVOffset(this.getV0()), this.sprite.getVOffset(this.getV1())),
-				Math.max(this.sprite.getVOffset(this.getV0()), this.sprite.getVOffset(this.getV1())),
+				// The semantic material binds the full atlas, not a standalone sprite.
+				this.getU0(),
+				this.getU1(),
+				this.getV0(),
+				this.getV1(),
 				ARGB.colorFromFloat(this.alpha, this.rCol, this.gCol, this.bCol),
 			this.getLightColor(f),
 			!this.alphaTested

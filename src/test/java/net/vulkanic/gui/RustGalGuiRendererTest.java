@@ -112,11 +112,11 @@ class RustGalGuiRendererTest {
 	void tiledBlitsAlsoUseOnePreflightedSemanticBatch() throws Exception {
 		String source = Files.readString(Path.of("src/main/java/net/vulkanic/gui/RustGalGuiRenderer.java"));
 		int tiled = source.indexOf("public static List<RustGalGuiElementRenderState> tryEnqueueTiledCopiedBlit(");
-		int preflight = source.indexOf("Preflight the exact bounded request count", tiled);
-		int batch = source.indexOf("enqueueGuiAffineQuadRequests(\n\t\t\trequests, dynamicLayerId(dynamicLayerOrder), requestLayerOrder", tiled);
+		int preflight = source.indexOf("new VulkanicGalBridge.GuiTiledQuadRecord(", tiled);
+		int batch = source.indexOf("enqueueGuiTiledQuadRequest(", tiled);
 		int stage = source.indexOf("RustGalGuiRawImageAssets.stage(asset)", batch);
 		assertTrue(tiled >= 0 && preflight > tiled && batch > preflight && stage > batch,
-			"all repeated tiled-image pieces must be admitted before their Rust-owned image is staged");
+			"the complete immutable tile parent must be queued before its Rust-owned image is staged");
 	}
 
 	@Test
@@ -150,7 +150,9 @@ class RustGalGuiRendererTest {
 			"a panorama request must enter the current GuiRenderState so whole-frame Vulkan consumes it exactly once per frame");
 
 		String callsite = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/PanoramaRenderer.java"));
-		assertTrue(callsite.contains("i, j, guiGraphics.guiRenderState"),
+		assertTrue(callsite.contains("this.cubeMap, 10.0F, -this.spin, i, j,")
+			&& callsite.contains("guiGraphics.guiRenderState\n\t\t))")
+			&& callsite.contains("new net.vulkanic.bridge.VulkanicGalBridge.GuiProjectionRecord("),
 			"the title-screen callsite must provide its active GuiRenderState to panorama admission");
 	}
 
@@ -162,6 +164,12 @@ class RustGalGuiRendererTest {
 		int capture = source.indexOf("DeterministicCameraCapture.afterRender", reset);
 		assertTrue(execute >= 0 && reset > execute && capture > reset,
 			"whole-frame Vulkan must reset copied GUI semantic state after execution and before the next capture boundary");
+		String minecraft = Files.readString(Path.of("src/main/java/net/minecraft/client/Minecraft.java"));
+		int shell = minecraft.indexOf("if (rustWholeFrameShell)");
+		int legacyClear = minecraft.indexOf("command.recording.clear", shell);
+		assertTrue(shell >= 0 && legacyClear > shell);
+		assertFalse(minecraft.substring(shell, legacyClear).contains("DeterministicCameraCapture.afterRender("),
+			"the shell must not double-count the coordinator's post-present capture hook");
 	}
 
 	@Test
@@ -286,7 +294,7 @@ class RustGalGuiRendererTest {
 			"src/main/java/net/vulkanic/gui/RustGalGuiRenderer.java"));
 		int tiled = source.indexOf("public static List<RustGalGuiElementRenderState> tryEnqueueTiledCopiedBlit");
 		int whitelist = source.indexOf("blit.pipeline() != RenderPipelines.GUI_TEXTURED_PREMULTIPLIED_ALPHA", tiled);
-		int stratum = source.indexOf("requestLayerOrder = GuiRenderStratum.GUI_PREMULTIPLIED_BLIT.order()", tiled);
+		int stratum = source.indexOf("stratum = GuiRenderStratum.GUI_PREMULTIPLIED_BLIT.order()", tiled);
 		assertTrue(tiled >= 0 && whitelist > tiled && stratum > whitelist,
 			"tiled premultiplied GUI blits must use the explicit Rust blend stratum");
 	}
@@ -297,7 +305,7 @@ class RustGalGuiRendererTest {
 			"src/main/java/net/vulkanic/gui/RustGalGuiRenderer.java"));
 		int tiled = source.indexOf("public static List<RustGalGuiElementRenderState> tryEnqueueTiledCopiedBlit");
 		int whitelist = source.indexOf("blit.pipeline() != RenderPipelines.GUI_NAUSEA_OVERLAY", tiled);
-		int stratum = source.indexOf("requestLayerOrder = GuiRenderStratum.GUI_ADDITIVE_BLIT.order()", tiled);
+		int stratum = source.indexOf("stratum = GuiRenderStratum.GUI_ADDITIVE_BLIT.order()", tiled);
 		assertTrue(tiled >= 0 && whitelist > tiled && stratum > whitelist,
 			"tiled additive GUI blits must use the explicit Rust blend stratum");
 	}
@@ -319,9 +327,9 @@ class RustGalGuiRendererTest {
 			"src/main/java/net/vulkanic/gui/RustGalGuiRenderer.java"));
 		int tiled = source.indexOf("public static List<RustGalGuiElementRenderState> tryEnqueueTiledCopiedBlit");
 		int poseGuard = source.indexOf("!finiteAffinePose(blit.pose())", tiled);
-		int field = source.indexOf("float left = blit.x0()", tiled);
+		int field = source.indexOf("return enqueueTypedTiledBlit(", tiled);
 		assertTrue(tiled >= 0 && poseGuard > tiled && field > poseGuard,
-			"Rust tiled GUI admission must reject non-finite affine poses before reading geometry");
+			"Rust tiled GUI admission must reject non-finite affine poses before enqueueing geometry");
 	}
 
 	@Test

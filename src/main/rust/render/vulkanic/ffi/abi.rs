@@ -43,7 +43,13 @@ pub const FFI_ABI_V26_VERSION: u32 = 26;
 /// Rust upload Frozen's sprite-isolated mip chain without reading a Java GPU
 /// texture or generating whole-atlas mips that bleed across sprite borders.
 pub const FFI_ABI_V27_VERSION: u32 = 27;
-pub const FFI_ABI_VERSION: u32 = 27;
+/// v28 separates fractional GUI projection from rounded layout bounds.
+pub const FFI_ABI_V28_VERSION: u32 = 28;
+/// v29 appends typed tiled GUI commands, keeping geometry expansion in Rust.
+pub const FFI_ABI_V29_VERSION: u32 = 29;
+/// v30 adds typed immutable atlas animation declarations (private staging only).
+pub const FFI_ABI_V30_VERSION: u32 = 30;
+pub const FFI_ABI_VERSION: u32 = 30;
 pub const FFI_INITIAL_PRESENTATION_SUPPORTED: bool = false;
 pub const FFI_ABI_NAME: &str = "MattMC VulkanicGAL Java-Rust batch ABI";
 pub const FFI_MAX_LABEL_BYTES: usize = 1024;
@@ -513,6 +519,25 @@ pub struct FfiGuiAffineQuadRequest {
     pub clip_height: i32,
 }
 
+/// ABI v29 typed tiled-GUI semantics. The producer remains diagnostic-only
+/// until real paired captures establish admission; no native GPU handles cross.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FfiGuiTiledQuadRequest {
+    pub byte_size: u32,
+    pub stratum: u32,
+    pub asset_id: u64,
+    pub bounds: [i32; 4],
+    pub tile_extent: [u32; 2],
+    pub uv: [f32; 4],
+    pub pose: [f32; 6],
+    pub z: f32,
+    pub color_argb: u32,
+    pub sequence: u64,
+    pub clip_mode: u32,
+    pub clip: [i32; 4],
+}
+
 /// Fixed copied vertex for the private Rust-owned GUI mesh family. This is a
 /// semantic vertex record: no Java renderer object, atlas object, or native
 /// resource identity crosses this boundary.
@@ -576,6 +601,9 @@ pub struct FfiGuiFrameSubmitRequest {
     /// Appended semantic GUI item meshes. Each item may contain several
     /// ordered layers sharing one scheduler sequence.
     pub mesh_batches: FfiSlice<FfiGuiMeshBatchRequest>,
+    pub gui_projection_width: f32,
+    pub gui_projection_height: f32,
+    pub tiled_quads: FfiSlice<FfiGuiTiledQuadRequest>,
 }
 
 #[repr(C)]
@@ -981,6 +1009,42 @@ pub struct FfiWorldMeshAnimationFrameRecord {
     pub frame_index: u32,
     pub duration_ticks: u32,
     pub reserved0: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FfiSpriteAnimationMip {
+    pub byte_size: u32,
+    pub width: u32,
+    pub height: u32,
+    pub reserved0: u32,
+    pub rgba: FfiBytes,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FfiSpriteAnimationSource {
+    pub byte_size: u32,
+    pub sprite_id: u32,
+    pub atlas_x: u32,
+    pub atlas_y: u32,
+    pub frame_width: u32,
+    pub frame_height: u32,
+    pub interpolate: u32,
+    pub reserved0: u32,
+    pub frames: FfiSlice<FfiWorldMeshAnimationFrameRecord>,
+    pub mips: FfiSlice<FfiSpriteAnimationMip>,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FfiAtlasAnimationAssetUpdate {
+    pub header: FfiHeader,
+    pub texture_id: u32,
+    pub reserved0: u32,
+    pub generation: u64,
+    pub initial_tick: u64,
+    pub sprites: FfiSlice<FfiSpriteAnimationSource>,
 }
 
 #[repr(C)]
@@ -1535,6 +1599,9 @@ pub struct FfiWholeFrameSubmitRequest {
     /// shader-pack snapshots. Java post-chain objects and backend handles are
     /// never transported.
     pub post_effect_id: FfiBytes,
+    pub gui_projection_width: f32,
+    pub gui_projection_height: f32,
+    pub gui_tiled_quads: FfiSlice<FfiGuiTiledQuadRequest>,
 }
 
 #[repr(C)]

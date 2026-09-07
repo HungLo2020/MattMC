@@ -42,6 +42,32 @@ pub(crate) struct SemanticTexture {
 
 const MATERIALS: &[SemanticMaterial] = &[
     SemanticMaterial {
+        key: WORLD_MATERIAL_ID_CELESTIAL,
+        resource_location: "minecraft:material/celestial",
+        mode: WORLD_MATERIAL_MODE_TRANSLUCENT,
+        cutout_threshold: 0.0,
+        perspective_layer_scale: 1.0,
+        sampler: MaterialSamplerPolicy::NearestClamp,
+        mip: MaterialMipPolicy::SingleMip,
+        tint: MaterialTintChannel::VertexColor,
+        emissive: true,
+        fullbright: true,
+        legacy_keys: &[],
+    },
+    SemanticMaterial {
+        key: WORLD_MATERIAL_ID_SKY_STARS,
+        resource_location: "minecraft:material/sky_stars",
+        mode: WORLD_MATERIAL_MODE_TRANSLUCENT,
+        cutout_threshold: 0.0,
+        perspective_layer_scale: 1.0,
+        sampler: MaterialSamplerPolicy::NearestClamp,
+        mip: MaterialMipPolicy::SingleMip,
+        tint: MaterialTintChannel::VertexColor,
+        emissive: true,
+        fullbright: true,
+        legacy_keys: &[],
+    },
+    SemanticMaterial {
         key: WORLD_MATERIAL_ID_OPAQUE_TEXTURED,
         resource_location: "minecraft:material/opaque_textured",
         mode: WORLD_MATERIAL_MODE_OPAQUE,
@@ -133,6 +159,13 @@ const MATERIALS: &[SemanticMaterial] = &[
         legacy_keys: &[100],
     },
 ];
+
+/// Explicit material composition, independent of texture identity. Frozen's
+/// star contract adds src.rgb * src.a and replaces alpha, unlike translucency.
+pub(crate) fn blend_override(material_key: u32) -> Option<BlendMode> {
+    matches!(material_key, WORLD_MATERIAL_ID_SKY_STARS | WORLD_MATERIAL_ID_CELESTIAL)
+        .then_some(BlendMode::Overlay)
+}
 
 const TEXTURES: &[SemanticTexture] = &[
     SemanticTexture {

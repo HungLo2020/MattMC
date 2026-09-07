@@ -3,12 +3,17 @@ mod architecture_boundary;
 
 mod backends;
 
+// Private resource-processing prerequisite; not yet admitted through terrain FFI.
+mod sprite_interpolation;
+
 pub mod commands;
 pub mod error;
 pub mod ffi;
 pub mod frame;
 pub mod gal;
 pub mod gui_frontend;
+/// Private semantic tiled-GUI lowering; not yet a frame/FFI-admitted route.
+mod gui_tiling;
 /// Backend-neutral GUI mesh semantics. This is not an FFI-admitted route
 /// until the owned offscreen renderer consumes it.
 pub mod gui_mesh_frontend;

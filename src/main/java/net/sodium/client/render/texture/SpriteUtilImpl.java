@@ -11,6 +11,12 @@ public class SpriteUtilImpl implements SpriteUtil {
     public void markSpriteActive(@NotNull TextureAtlasSprite sprite) {
         Objects.requireNonNull(sprite);
 
+        if (net.vulkanic.world.WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan()) {
+            net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordAtlasSpriteUse(
+                sprite.semanticAnimationResource(), sprite.atlasLocation(), sprite.contents().name());
+            return;
+        }
+
         SpriteContentsExtension.setActive(sprite.contents(), true);
     }
 

@@ -6,7 +6,7 @@ use super::backends::{
 use super::commands::{
     AttachmentLoadOp, AttachmentStoreOp, BufferImageCopyRegion, CommandList, CommandListDesc,
     CommandOp, ResourceBarrier, SubmissionBatch, TextureImageCopyRegion, TextureOrigin3d,
-    ValidatedSubmissionBatch,
+    ValidatedSubmissionBatch, TextureUsageState,
 };
 use super::error::{GalError, GalResult, StatusCode};
 use super::frame::{
@@ -378,6 +378,7 @@ pub struct VulkanicGal {
     pending_destroys: BTreeMap<Handle, PendingDestroy>,
     retirement: RetirementQueue,
     next_submission: u64,
+    latest_accepted_submission: SubmissionId,
     completed_submission: SubmissionId,
     metrics: Metrics,
 }
@@ -418,6 +419,7 @@ impl VulkanicGal {
             pending_destroys: BTreeMap::new(),
             retirement: RetirementQueue::new(),
             next_submission: 1,
+            latest_accepted_submission: SubmissionId(0),
             completed_submission: SubmissionId(0),
             metrics: Metrics::new(tracy_enabled),
         }
@@ -1909,6 +1911,7 @@ impl VulkanicGal {
         let backend_submit_started = std::time::Instant::now();
         submission_trace(&format!("gal.submit.queue.begin id={}", id.0));
         self.backend.submit(id, &validated)?;
+        self.latest_accepted_submission = id;
         submission_trace(&format!("gal.submit.queue.end id={}", id.0));
         if let Some(profile) = profile.as_deref_mut() {
             profile.backend_submit_nanos = profile
@@ -1959,7 +1962,7 @@ impl VulkanicGal {
     }
 
     pub(in crate::render::vulkanic) fn latest_submission_id(&self) -> SubmissionId {
-        SubmissionId(self.next_submission.saturating_sub(1))
+        self.latest_accepted_submission
     }
 
     /// Exposes the id that the immediately following submission will receive.
@@ -1973,6 +1976,9 @@ impl VulkanicGal {
         &mut self,
         id: SubmissionId,
     ) -> GalResult<Vec<Handle>> {
+        if id > self.latest_submission_id() {
+            return Err(GalError::invalid_argument("cannot wait for an unsubmitted completion id"));
+        }
         self.backend.retire(id)?;
         if id > self.completed_submission {
             self.completed_submission = id;
@@ -2846,10 +2852,16 @@ impl VulkanicGal {
                             }
                         }
                     }
-                    if barrier.before == barrier.after {
+                    // A write-after-write/read dependency is meaningful even
+                    // when the resource keeps its layout and semantic usage.
+                    // Read-only same-usage barriers still describe no work.
+                    if barrier.before == barrier.after && !matches!(barrier.before,
+                        TextureUsageState::ShaderWrite | TextureUsageState::ColorAttachment
+                        | TextureUsageState::DepthStencilAttachment | TextureUsageState::TransferDst)
+                    {
                         return self.validation_error(GalError::command(
                             StatusCode::InvalidArgument,
-                            "barrier must declare a semantic state change",
+                            "barrier must declare a semantic state change or write dependency",
                         ));
                     }
                     if barrier.src_queue == QueueClass::Present

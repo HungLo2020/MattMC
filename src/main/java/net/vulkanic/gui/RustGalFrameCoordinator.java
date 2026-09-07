@@ -105,11 +105,12 @@ public final class RustGalFrameCoordinator {
 	private record QueuedGuiRequest(
 		VulkanicGalBridge.GuiSpriteRecord sprite,
 		List<VulkanicGalBridge.GuiAffineQuadRecord> affineQuads,
-		List<VulkanicGalBridge.GuiMeshBatchRecord> meshBatches
+		List<VulkanicGalBridge.GuiMeshBatchRecord> meshBatches,
+		VulkanicGalBridge.GuiTiledQuadRecord tiledQuad
 	) {
 		private static final int MAX_AFFINE_QUADS_PER_ITEM = (int) RustGalFrameScheduler.SEQUENCE_STRIDE - 1;
 		static QueuedGuiRequest sprite(VulkanicGalBridge.GuiSpriteRecord sprite) {
-			return new QueuedGuiRequest(java.util.Objects.requireNonNull(sprite, "sprite"), List.of(), List.of());
+			return new QueuedGuiRequest(java.util.Objects.requireNonNull(sprite, "sprite"), List.of(), List.of(), null);
 		}
 
 		static QueuedGuiRequest affineQuad(VulkanicGalBridge.GuiAffineQuadRecord affineQuad) {
@@ -121,19 +122,25 @@ public final class RustGalFrameCoordinator {
 				|| affineQuads.stream().anyMatch(java.util.Objects::isNull)) {
 				throw new IllegalArgumentException("GUI affine-quad item requires quads");
 			}
-			return new QueuedGuiRequest(null, List.copyOf(affineQuads), List.of());
+			return new QueuedGuiRequest(null, List.copyOf(affineQuads), List.of(), null);
 		}
 
 		static QueuedGuiRequest meshBatches(List<VulkanicGalBridge.GuiMeshBatchRecord> meshBatches) {
 			if (meshBatches == null || meshBatches.isEmpty()) throw new IllegalArgumentException("GUI mesh item requires layers");
-			return new QueuedGuiRequest(null, List.of(), List.copyOf(meshBatches));
+			return new QueuedGuiRequest(null, List.of(), List.copyOf(meshBatches), null);
+		}
+
+		static QueuedGuiRequest tiledQuad(VulkanicGalBridge.GuiTiledQuadRecord tile) {
+			return new QueuedGuiRequest(null, List.of(), List.of(), java.util.Objects.requireNonNull(tile));
 		}
 
 		int guiWidth() {
+			if (this.tiledQuad != null) return this.tiledQuad.guiWidth();
 			return this.sprite != null ? this.sprite.guiWidth() : !this.affineQuads.isEmpty() ? this.affineQuads.getFirst().guiWidth() : this.meshBatches.getFirst().guiWidth();
 		}
 
 		int guiHeight() {
+			if (this.tiledQuad != null) return this.tiledQuad.guiHeight();
 			return this.sprite != null ? this.sprite.guiHeight() : !this.affineQuads.isEmpty() ? this.affineQuads.getFirst().guiHeight() : this.meshBatches.getFirst().guiHeight();
 		}
 
@@ -141,9 +148,12 @@ public final class RustGalFrameCoordinator {
 			List<VulkanicGalBridge.GuiSpriteRecord> sprites,
 			List<VulkanicGalBridge.GuiAffineQuadRecord> affineQuads,
 			List<VulkanicGalBridge.GuiMeshBatchRecord> meshBatches,
+			List<VulkanicGalBridge.GuiTiledQuadRecord> tiledQuads,
 			long sequence
 		) {
-			if (this.sprite != null) {
+			if (this.tiledQuad != null) {
+				tiledQuads.add(this.tiledQuad.withSequence(sequence));
+			} else if (this.sprite != null) {
 				sprites.add(this.sprite.withSequence(sequence));
 			} else if (!this.affineQuads.isEmpty()) {
 				for (int index = 0; index < this.affineQuads.size(); index++) {
@@ -197,6 +207,23 @@ public final class RustGalFrameCoordinator {
 			RustGalFrameScheduler.Token token = SCHEDULER.enqueue(
 				generation, semanticLayerId, semanticLayerOrder, QueuedGuiRequest.affineQuad(request));
 			METRICS.enqueueNanos += elapsedSince(lockStartedNanos);
+			return token;
+		}
+	}
+
+	/** Queues one immutable tiled command; only Rust expands it into draw instances. */
+	static RustGalFrameScheduler.Token enqueueGuiTiledQuadRequest(
+		VulkanicGalBridge.GuiTiledQuadRecord request, String semanticLayerId, int semanticLayerOrder
+	) {
+		requireRustGuiRoute();
+		if (semanticLayerId == null || semanticLayerId.isBlank() || semanticLayerOrder < 0) {
+			throw new IllegalArgumentException("invalid semantic GUI layer");
+		}
+		long started = System.nanoTime();
+		synchronized (LOCK) {
+			RustGalFrameScheduler.Token token = SCHEDULER.enqueue(
+				generation, semanticLayerId, semanticLayerOrder, QueuedGuiRequest.tiledQuad(request));
+			METRICS.enqueueNanos += elapsedSince(started);
 			return token;
 		}
 	}
@@ -886,6 +913,11 @@ public final class RustGalFrameCoordinator {
 			long packingStarted = submitStarted;
 			int frameGuiWidth = requests.isEmpty() ? guiWidth : requests.get(0).payload().guiWidth();
 			int frameGuiHeight = requests.isEmpty() ? guiHeight : requests.get(0).payload().guiHeight();
+			// Copy the same exact semantic orthographic extent as vanilla. Layout
+			// uses ceil(width/scale), but projection must retain the fractional part.
+			var guiProjection = new VulkanicGalBridge.GuiProjectionRecord(
+				(float)window.getWidth() / window.getGuiScale(),
+				(float)window.getHeight() / window.getGuiScale());
 			// Loading screens can legitimately contain tens of thousands of ordered
 			// semantic items.  Reserve the bounded request cardinality up front so
 			// ArrayList growth does not retain several transient backing arrays while
@@ -895,6 +927,7 @@ public final class RustGalFrameCoordinator {
 			List<VulkanicGalBridge.GuiSpriteRecord> spriteRequests = new ArrayList<>(requestCapacity);
 			List<VulkanicGalBridge.GuiAffineQuadRecord> affineQuadRequests = new ArrayList<>(requestCapacity);
 			List<VulkanicGalBridge.GuiMeshBatchRecord> meshBatchRequests = new ArrayList<>(requestCapacity);
+			List<VulkanicGalBridge.GuiTiledQuadRecord> tiledQuadRequests = new ArrayList<>(requests.size());
 			int guiTextAffineQuadCount = 0;
 			int guiItemAffineQuadCount = 0;
 			int meshVertexCount = 0;
@@ -924,7 +957,7 @@ public final class RustGalFrameCoordinator {
 					meshVertexCount = Math.addExact(meshVertexCount, Math.toIntExact(incomingVertices));
 					meshIndexCount = Math.addExact(meshIndexCount, Math.toIntExact(incomingIndices));
 				}
-				request.payload().appendTo(spriteRequests, affineQuadRequests, meshBatchRequests, request.token().sequence());
+				request.payload().appendTo(spriteRequests, affineQuadRequests, meshBatchRequests, tiledQuadRequests, request.token().sequence());
 				if (!request.payload().affineQuads().isEmpty()) {
 					if (request.token().stratumId().equals(GuiRenderStratum.GUI_TEXT.id())) {
 						guiTextAffineQuadCount += request.payload().affineQuads().size();
@@ -983,7 +1016,9 @@ public final class RustGalFrameCoordinator {
 					primitiveFrame.firstPersonMeshInstances(),
 					guiBlurBeforeStratum,
 					guiBlurRadius,
-					postEffectId
+					postEffectId,
+					guiProjection,
+					tiledQuadRequests
 				);
 				if (Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")) {
 					auditMessage("Rust GUI whole-frame result mesh items=" + wholeFrameResult.guiMeshItemCount()
@@ -1015,7 +1050,9 @@ public final class RustGalFrameCoordinator {
 					frameGuiHeight,
 					spriteRequests,
 					affineQuadRequests,
-					meshBatchRequests
+					meshBatchRequests,
+					guiProjection,
+					tiledQuadRequests
 				);
 			}
 				submitEnded = System.nanoTime();
@@ -1202,7 +1239,8 @@ public final class RustGalFrameCoordinator {
 				renderdocFrameCaptureStarted = false;
 			}
 			if (wholeFrameVulkan) {
-				if (Minecraft.getInstance().screen instanceof net.minecraft.client.gui.screens.TitleScreen
+				if ((Minecraft.getInstance().screen instanceof net.minecraft.client.gui.screens.TitleScreen
+					|| net.minecraft.client.dev.GraphicsAuditMenuFixture.isRequestedScreen())
 					&& Minecraft.getInstance().getOverlay() == null
 					&& net.minecraft.client.gui.screens.TitleScreen.graphicsAuditTitleScreenSemanticsObserved()
 					&& net.minecraft.client.gui.screens.TitleScreen.graphicsAuditTitleScreenFadeComplete()) {
@@ -2097,6 +2135,31 @@ public final class RustGalFrameCoordinator {
 		}
 	}
 
+	/** Resource traffic must progress even when no frame is drawn or presented. */
+	public static void pumpAtlasAnimationResources() {
+		if (!net.vulkanic.world.AtlasAnimationResource.privateTickDeliveryEnabled()
+			|| !RustGalVulkanWholeFrameMode.enabledForBackend(VulkanicAPI.isVulkanBackendSelected())) return;
+		synchronized (LOCK) {
+			// The existing coordinator owns the sole native context. Never create
+			// a second presenter or consult a Java graphics context for this pump.
+			if (bridge == null) return;
+			if (bridgeMode != BridgeMode.WINDOWED_VULKAN || renderThread != Thread.currentThread()) {
+				throw new IllegalStateException("Atlas event pump requires the owning Rust Vulkan render thread");
+			}
+			// Startup/resource reload may tick before the atlas upload publishes its
+			// immutable incarnation. There is no animation resource to pump yet.
+			// Do not interpret the uninitialized atlas's zero extent as oversized,
+			// or publish an old cached payload while the new incarnation is absent.
+			var atlas = Minecraft.getInstance().getAtlasManager().getAtlasOrThrow(
+				net.minecraft.data.AtlasIds.BLOCKS);
+			if (atlas.semanticAnimationResource() == null) return;
+			net.vulkanic.world.RustGalTerrainRenderer.ensureTerrainAtlasAssetForWorldMesh();
+			var status = RustGalWorldPrimitiveRenderer.flushPendingWorldMeshAssets(bridge);
+			if (status != null) recordStatus(Operation.WORLD_MESH_ASSET_UPDATE, status);
+			RustGalWorldPrimitiveRenderer.flushPendingAtlasAnimationTicks(bridge);
+		}
+	}
+
 	private static void flushPendingWorldAssetsLocked() {
 		flushPendingWorldAssetsLocked(true);
 	}
@@ -2136,6 +2199,7 @@ public final class RustGalFrameCoordinator {
 			if (status != null) {
 				recordStatus(Operation.WORLD_MESH_ASSET_UPDATE, status);
 			}
+			RustGalWorldPrimitiveRenderer.flushPendingAtlasAnimationTicks(bridge);
 		}
 	}
 

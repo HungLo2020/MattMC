@@ -89,14 +89,20 @@ public class TitleScreen extends Screen {
 		if (!graphicsAuditTitlePanoramaCaptureReady()) return;
 		String configured = System.getenv("MATTMC_RUST_TITLE_FRAME_CAPTURE_DIR");
 		if (configured == null || configured.isBlank()) return;
+		if (!net.minecraft.client.dev.GraphicsAuditMenuFixture.prepareCapture()) return;
 		try {
 			Path directory = Path.of(configured);
 			Files.createDirectories(directory);
 			Path screenshot = directory.resolve("title_frame.png");
 			float panoramaSpin = Minecraft.getInstance().gameRenderer.getPanorama().graphicsAuditSpin();
-			String json = "{\n  \"captureKind\": \"rust-vulkan-title-presented-frame\",\n  \"screenshot\": \""
+			String captureKind = net.minecraft.client.dev.GraphicsAuditMenuFixture.isRequestedScreen()
+				? "rust-vulkan-menu-presented-frame" : "rust-vulkan-title-presented-frame";
+			String json = "{\n  \"captureKind\": \"" + captureKind + "\",\n  \"screenshot\": \""
 				+ screenshot.toAbsolutePath().toString().replace("\\", "\\\\") + "\",\n  \"panoramaSpin\": "
-				+ panoramaSpin + "\n}\n";
+				+ panoramaSpin + ",\n  \"screen\": \"" + Minecraft.getInstance().screen.getClass().getSimpleName()
+				+ "\",\n  \"framebufferWidth\": " + Minecraft.getInstance().getWindow().getWidth()
+				+ ",\n  \"framebufferHeight\": " + Minecraft.getInstance().getWindow().getHeight()
+				+ ",\n  \"menuState\": " + net.minecraft.client.dev.GraphicsAuditMenuFixture.captureState() + "\n}\n";
 			Files.writeString(directory.resolve("title_frame_capture.json"), json, StandardCharsets.UTF_8);
 			graphicsAuditTitleFrameCaptureRequested = true;
 			LOGGER.info("[MattMC graphics audit] rust-title-frame-capture-requested path={} panoramaSpin={}", screenshot, panoramaSpin);

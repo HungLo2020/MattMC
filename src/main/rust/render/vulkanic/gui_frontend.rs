@@ -96,19 +96,21 @@ flat out float v_texture_mode;
 flat out float v_clip_enabled;
 const vec2 corner[6] = vec2[6](
     vec2(0.0, 0.0),
-    vec2(1.0, 0.0),
-    vec2(1.0, 1.0),
-    vec2(1.0, 1.0),
     vec2(0.0, 1.0),
+    vec2(1.0, 1.0),
+    vec2(1.0, 1.0),
+    vec2(1.0, 0.0),
     vec2(0.0, 0.0)
 );
 void main() {
     int vertex = gl_VertexID;
     PackedGuiQuad sprite = sprites[gl_InstanceID];
     vec2 pixel = sprite.origin_axis_u.xy + corner[vertex].x * sprite.origin_axis_u.zw + corner[vertex].y * sprite.axis_v_mode.xy;
-    float top_left_y = 1.0 - (pixel.y / sprite.viewport.y) * 2.0;
+    // Match the explicit orthographic matrix coefficients. Dividing each
+    // vertex first changes rounding at minified texture sample boundaries.
+    float top_left_y = pixel.y * (-2.0 / sprite.viewport.y) + 1.0;
     float ndc_y = mix(top_left_y, -top_left_y, sprite.viewport.w);
-    vec2 ndc = vec2((pixel.x / sprite.viewport.x) * 2.0 - 1.0, ndc_y);
+    vec2 ndc = vec2(pixel.x * (2.0 / sprite.viewport.x) - 1.0, ndc_y);
     gl_Position = vec4(ndc, sprite.axis_v_mode.w, 1.0);
     v_uv_region = sprite.uv_region;
     v_clip = sprite.clip;
@@ -146,19 +148,21 @@ layout(location = 6) flat out float v_texture_mode;
 layout(location = 7) flat out float v_clip_enabled;
 const vec2 corner[6] = vec2[6](
     vec2(0.0, 0.0),
-    vec2(1.0, 0.0),
-    vec2(1.0, 1.0),
-    vec2(1.0, 1.0),
     vec2(0.0, 1.0),
+    vec2(1.0, 1.0),
+    vec2(1.0, 1.0),
+    vec2(1.0, 0.0),
     vec2(0.0, 0.0)
 );
 void main() {
     int vertex = gl_VertexIndex;
     PackedGuiQuad sprite = sprites[gl_InstanceIndex];
     vec2 pixel = sprite.origin_axis_u.xy + corner[vertex].x * sprite.origin_axis_u.zw + corner[vertex].y * sprite.axis_v_mode.xy;
-    float top_left_y = 1.0 - (pixel.y / sprite.viewport.y) * 2.0;
+    // Match the explicit orthographic matrix coefficients. Dividing each
+    // vertex first changes rounding at minified texture sample boundaries.
+    float top_left_y = pixel.y * (-2.0 / sprite.viewport.y) + 1.0;
     float ndc_y = mix(top_left_y, -top_left_y, sprite.viewport.w);
-    vec2 ndc = vec2((pixel.x / sprite.viewport.x) * 2.0 - 1.0, ndc_y);
+    vec2 ndc = vec2(pixel.x * (2.0 / sprite.viewport.x) - 1.0, ndc_y);
     gl_Position = vec4(ndc, sprite.axis_v_mode.w, 1.0);
     v_uv_region = sprite.uv_region;
     v_clip = sprite.clip;
@@ -189,12 +193,9 @@ void main() {
     if (v_clip_enabled > 0.5 && (v_pixel.x < v_clip.x || v_pixel.y < v_clip.y || v_pixel.x >= v_clip.z || v_pixel.y >= v_clip.w)) {
         discard;
     }
-    ivec2 texture_size = textureSize(Sampler0, 0);
-    ivec2 origin = ivec2(round(v_uv_region.xy * vec2(texture_size)));
-    ivec2 extent = max(ivec2(round(v_uv_region.zw * vec2(texture_size))), ivec2(1));
-    ivec2 local = clamp(ivec2(floor(v_sprite_corner * vec2(extent))), ivec2(0), extent - ivec2(1));
-    ivec2 texel = clamp(origin + local, ivec2(0), texture_size - ivec2(1));
-    vec4 sampled = texelFetch(Sampler0, texel, 0);
+    // The explicit resource set owns filtering/addressing. Reconstructing a
+    // texel with floor() bypasses that contract and changes minification ties.
+    vec4 sampled = texture(Sampler0, v_uv);
     vec4 color = (v_texture_mode < 0.5 ? vec4(1.0, 1.0, 1.0, sampled.r) : sampled) * v_color;
     if (color.a <= 0.0) {
         discard;
@@ -219,12 +220,9 @@ void main() {
     if (v_clip_enabled > 0.5 && (v_pixel.x < v_clip.x || v_pixel.y < v_clip.y || v_pixel.x >= v_clip.z || v_pixel.y >= v_clip.w)) {
         discard;
     }
-    ivec2 texture_size = textureSize(sampler2D(Tex0, Samp0), 0);
-    ivec2 origin = ivec2(round(v_uv_region.xy * vec2(texture_size)));
-    ivec2 extent = max(ivec2(round(v_uv_region.zw * vec2(texture_size))), ivec2(1));
-    ivec2 local = clamp(ivec2(floor(v_sprite_corner * vec2(extent))), ivec2(0), extent - ivec2(1));
-    ivec2 texel = clamp(origin + local, ivec2(0), texture_size - ivec2(1));
-    vec4 sampled = texelFetch(sampler2D(Tex0, Samp0), texel, 0);
+    // The explicit resource set owns filtering/addressing. Reconstructing a
+    // texel with floor() bypasses that contract and changes minification ties.
+    vec4 sampled = texture(sampler2D(Tex0, Samp0), v_uv);
     vec4 color = (v_texture_mode < 0.5 ? vec4(1.0, 1.0, 1.0, sampled.r) : sampled) * v_color;
     if (color.a <= 0.0) {
         discard;
@@ -247,23 +245,25 @@ const BLUR_FRAGMENT_SHADER_VULKAN: &[u8] = br#"#version 450
 layout(set = 0, binding = 0) uniform texture2D Source;
 layout(set = 0, binding = 1) uniform sampler SourceSampler;
 layout(set = 0, binding = 2, std140) uniform BlurConfig {
+    vec2 BlurDir;
     float Radius;
 };
 layout(location = 0) in vec2 v_uv;
 layout(location = 0) out vec4 out_color;
 void main() {
     vec2 texel = 1.0 / vec2(textureSize(sampler2D(Source, SourceSampler), 0));
-    vec2 step = texel * max(Radius, 0.0);
-    vec4 sum = texture(sampler2D(Source, SourceSampler), v_uv) * 0.20;
-    sum += texture(sampler2D(Source, SourceSampler), v_uv + vec2(step.x, 0.0)) * 0.15;
-    sum += texture(sampler2D(Source, SourceSampler), v_uv - vec2(step.x, 0.0)) * 0.15;
-    sum += texture(sampler2D(Source, SourceSampler), v_uv + vec2(0.0, step.y)) * 0.15;
-    sum += texture(sampler2D(Source, SourceSampler), v_uv - vec2(0.0, step.y)) * 0.15;
-    sum += texture(sampler2D(Source, SourceSampler), v_uv + step) * 0.05;
-    sum += texture(sampler2D(Source, SourceSampler), v_uv - step) * 0.05;
-    sum += texture(sampler2D(Source, SourceSampler), v_uv + vec2(step.x, -step.y)) * 0.05;
-    sum += texture(sampler2D(Source, SourceSampler), v_uv + vec2(-step.x, step.y)) * 0.05;
-    out_color = sum;
+    // Source and destination have the same explicit framebuffer extent.
+    // Fragment coordinates preserve copied-image orientation under the GAL's
+    // negative-height Vulkan viewport; interpolated clip-space UVs do not.
+    vec2 source_uv = gl_FragCoord.xy * texel;
+    vec2 sample_step = texel * BlurDir;
+    float actual_radius = max(round(Radius), 0.0);
+    vec4 blurred = vec4(0.0);
+    for (float a = -actual_radius + 0.5; a <= actual_radius; a += 2.0) {
+        blurred += texture(sampler2D(Source, SourceSampler), source_uv + sample_step * a);
+    }
+    blurred += texture(sampler2D(Source, SourceSampler), source_uv + sample_step * actual_radius) * 0.5;
+    out_color = blurred / (actual_radius + 0.5);
 }
 "#;
 
@@ -1039,6 +1039,8 @@ pub struct GuiSpriteRequest {
     pub height: u32,
     pub gui_width: u32,
     pub gui_height: u32,
+    /// Exact semantic projection, distinct from rounded layout/clip bounds.
+    pub projection_extent: [f32; 2],
     pub sequence: u64,
 }
 
@@ -1181,12 +1183,106 @@ pub struct GuiAffineQuadRequest {
     pub color_argb: u32,
     pub gui_width: u32,
     pub gui_height: u32,
+    pub projection_extent: [f32; 2],
     pub sequence: u64,
     pub clip_mode: u32,
     pub clip_left: i32,
     pub clip_top: i32,
     pub clip_width: i32,
     pub clip_height: i32,
+}
+
+/// Typed immutable tiled command. Children retain their parent's scheduler
+/// identity; only Rust lowers the repetition into explicit draw instances.
+/// Private until Java/FFI transport and whole-frame admission are connected.
+#[derive(Clone, Debug)]
+pub(crate) struct GuiTiledQuadRequest {
+    pub geometry: super::gui_tiling::GuiTileGeometry,
+    pub stratum: u32,
+    pub asset_id: u64,
+    pub z: f32,
+    pub color_argb: u32,
+    pub gui_extent: [u32; 2],
+    pub projection_extent: [f32; 2],
+    pub sequence: u64,
+    pub clip: Option<[i32; 4]>,
+}
+
+/// Includes ordinary affine requests and all expanded tiled children.
+pub(crate) const GUI_MAX_EXPANDED_AFFINE_QUADS: usize = 65_536;
+
+impl GuiTiledQuadRequest {
+    pub(crate) fn validate(&self) -> GalResult<()> {
+        validate_gui_projection(self.gui_extent, self.projection_extent)?;
+        if self.asset_id == 0 || self.sequence == 0 || self.stratum == 0 || !self.z.is_finite()
+            || self.gui_extent.iter().any(|v| *v == 0 || *v > GUI_MAX_VIEWPORT_AXIS as u32) {
+            return Err(GalError::invalid_argument("invalid semantic tiled GUI identity or extent"));
+        }
+        if let Some([left, top, width, height]) = self.clip {
+            if left < 0 || top < 0 || width < 0 || height < 0
+                || i64::from(left) + i64::from(width) > i64::from(self.gui_extent[0])
+                || i64::from(top) + i64::from(height) > i64::from(self.gui_extent[1]) {
+                return Err(GalError::invalid_argument("tiled GUI clip must be frame-local"));
+            }
+        }
+        Ok(())
+    }
+}
+
+pub(crate) fn preflight_tiled_affine_count(
+    requests: &[GuiTiledQuadRequest], ordinary_affine_count: usize,
+) -> GalResult<usize> {
+    let mut count = ordinary_affine_count;
+    if count > GUI_MAX_EXPANDED_AFFINE_QUADS {
+        return Err(GalError::invalid_argument("GUI frame affine expansion exceeds bounded limit"));
+    }
+    for request in requests {
+        request.validate()?;
+        count = count.checked_add(super::gui_tiling::tile_segment_count(request.geometry)?)
+            .filter(|n| *n <= GUI_MAX_EXPANDED_AFFINE_QUADS)
+            .ok_or_else(|| GalError::invalid_argument("GUI frame affine expansion exceeds bounded limit"))?;
+    }
+    Ok(count)
+}
+
+fn lower_tiled_request(request: GuiTiledQuadRequest) -> GalResult<Vec<GuiAffineQuadRequest>> {
+    request.validate()?;
+    let [clip_left, clip_top, clip_width, clip_height] = request.clip.unwrap_or([0; 4]);
+    super::gui_tiling::lower_tiles(request.geometry)?.into_iter().map(|quad| {
+        let child = GuiAffineQuadRequest {
+            stratum: request.stratum, asset_id: request.asset_id,
+            x0: quad.origin[0], y0: quad.origin[1],
+            x1: quad.origin[0] + quad.axis_u[0], y1: quad.origin[1] + quad.axis_u[1],
+            x3: quad.origin[0] + quad.axis_v[0], y3: quad.origin[1] + quad.axis_v[1],
+            z: request.z, u0: quad.uv[0], v0: quad.uv[1], u1: quad.uv[2], v1: quad.uv[3],
+            color_argb: request.color_argb,
+            gui_width: request.gui_extent[0], gui_height: request.gui_extent[1],
+            projection_extent: request.projection_extent, sequence: request.sequence,
+            clip_mode: u32::from(request.clip.is_some()), clip_left, clip_top, clip_width, clip_height,
+        };
+        validate_affine_quad(&child)?;
+        Ok(child)
+    }).collect()
+}
+
+pub(crate) fn validate_gui_frame_sequences(
+    sprites: &[GuiSpriteRequest], affine: &[GuiAffineQuadRequest],
+    meshes: &[GuiMeshBatchRequest], tiles: &[GuiTiledQuadRequest],
+) -> GalResult<()> {
+    let mesh_sequences = meshes.iter().map(|request| request.sequence)
+        .collect::<std::collections::BTreeSet<_>>();
+    let mut seen = std::collections::BTreeSet::new();
+    for sequence in sprites.iter().map(|request| request.sequence)
+        .chain(affine.iter().map(|request| request.sequence))
+        .chain(tiles.iter().map(|request| request.sequence)).chain(mesh_sequences) {
+        if sequence == 0 {
+            return Err(GalError::invalid_argument("GUI requests require non-zero scheduler sequences"));
+        }
+        if !seen.insert(sequence) {
+            return Err(GalError::invalid_argument("GUI request scheduler sequences must be unique within one frame"));
+        }
+    }
+    Ok(())
 }
 
 #[derive(Debug)]
@@ -1800,7 +1896,17 @@ impl GuiFrontend {
         affine_quads: Vec<GuiAffineQuadRequest>,
         mesh_batches: Vec<GuiMeshBatchRequest>,
     ) -> GalResult<GuiSubmitStats> {
-        let (ops, mut stats) = self.append_frame_ops_with_affine_quads_and_mesh_batches_to_target(
+        self.submit_frame_with_tiled_quads(gal, generation, frame_target,
+            requests, affine_quads, mesh_batches, Vec::new())
+    }
+
+    pub(crate) fn submit_frame_with_tiled_quads(
+        &mut self, gal: &mut VulkanicGal, generation: u64, frame_target: Handle,
+        requests: Vec<GuiSpriteRequest>, affine_quads: Vec<GuiAffineQuadRequest>,
+        mesh_batches: Vec<GuiMeshBatchRequest>, tiled_quads: Vec<GuiTiledQuadRequest>,
+    ) -> GalResult<GuiSubmitStats> {
+        validate_gui_frame_sequences(&requests, &affine_quads, &mesh_batches, &tiled_quads)?;
+        let (ops, mut stats) = self.append_frame_ops_with_tiled_quads_to_target(
             gal,
             generation,
             frame_target,
@@ -1812,6 +1918,7 @@ impl GuiFrontend {
             requests,
             affine_quads,
             mesh_batches,
+            tiled_quads,
         )?;
         let token = gal.submit(SubmissionBatch {
             label: "minecraft.gui.frame".to_string(),
@@ -1959,7 +2066,7 @@ impl GuiFrontend {
                             origin: [request.x0, request.y0],
                             axis_u: [request.x1 - request.x0, request.y1 - request.y0],
                             axis_v: [request.x3 - request.x0, request.y3 - request.y0],
-                            viewport: [request.gui_width as f32, request.gui_height as f32],
+                            viewport: request.projection_extent,
                             clip: [
                                 request.clip_left as f32,
                                 request.clip_top as f32,
@@ -2075,6 +2182,22 @@ impl GuiFrontend {
         blur_radius: i32,
         pre_present_y_flip: bool,
     ) -> GalResult<(Vec<CommandOp>, GuiSubmitStats)> {
+        self.append_frame_ops_with_tiled_blur_boundary(gal, generation, render_target,
+            color_attachment, requests, affine_quads, mesh_batches, Vec::new(),
+            boundary_stratum, blur_radius, pre_present_y_flip)
+    }
+
+    pub(crate) fn append_frame_ops_with_tiled_blur_boundary(
+        &mut self, gal: &mut VulkanicGal, generation: u64, render_target: Handle,
+        color_attachment: Handle, requests: Vec<GuiSpriteRequest>,
+        affine_quads: Vec<GuiAffineQuadRequest>, mesh_batches: Vec<GuiMeshBatchRequest>,
+        tiled_quads: Vec<GuiTiledQuadRequest>, boundary_stratum: i32, blur_radius: i32,
+        pre_present_y_flip: bool,
+    ) -> GalResult<(Vec<CommandOp>, GuiSubmitStats)> {
+        // Validate the whole frame before partitioning or creating resources;
+        // splitting at blur must not bypass aggregate bounds or hide collisions.
+        preflight_tiled_affine_count(&tiled_quads, affine_quads.len())?;
+        validate_gui_frame_sequences(&requests, &affine_quads, &mesh_batches, &tiled_quads)?;
         let boundary_plan = plan_gui_blur_boundary(boundary_stratum, std::iter::empty())?;
         let threshold = boundary_plan.phase_threshold().map_err(|_| {
             GalError::invalid_argument("GUI blur boundary is outside the bounded semantic range")
@@ -2112,8 +2235,10 @@ impl GuiFrontend {
                 after_mesh.push(request);
             }
         }
+        let (before_tiled, after_tiled) = tiled_quads.into_iter()
+            .partition(|request| request.stratum < threshold);
         let (mut ops, mut stats) = self
-            .append_frame_ops_with_affine_quads_and_mesh_batches_to_target(
+            .append_frame_ops_with_tiled_quads_to_target(
                 gal,
                 generation,
                 render_target,
@@ -2125,6 +2250,7 @@ impl GuiFrontend {
                 before_requests,
                 before_affine,
                 before_mesh,
+                before_tiled,
             )?;
         let extent = gal.pass_target_extent(render_target)?;
         let color_format = gal.pass_target_color_format(render_target)?;
@@ -2135,28 +2261,19 @@ impl GuiFrontend {
         let pipeline_layout = resources.pipeline_layout;
         let resource_set = resources.resource_set;
         let uniform_buffer = resources.uniform_buffer;
+        // Reuse the owned fullscreen scratch pool. These images are private
+        // GAL resources, not Java targets or borrowed shader-pack state.
+        let scratch_textures = resources.spider_textures;
+        let scratch_views = resources.spider_views;
+        let scratch_targets = resources.spider_targets;
+        let scratch_passes = resources.spider_passes;
+        let scratch_sets = resources.spider_single_sets;
         let pass = self.frame_pass(gal, render_target, None)?;
         let snapshot_before = if self.blur_snapshot_initialized {
             TextureUsageState::ShaderRead
         } else {
             TextureUsageState::Undefined
         };
-        ops.extend([
-            CommandOp::HostWriteBuffer {
-                buffer: uniform_buffer,
-                offset: 0,
-                data: {
-                    let mut bytes = vec![0u8; 16];
-                    bytes[..4].copy_from_slice(&(blur_radius as f32).to_le_bytes());
-                    bytes
-                },
-            },
-            CommandOp::Barrier(buffer_barrier(
-                uniform_buffer,
-                TextureUsageState::TransferDst,
-                TextureUsageState::ShaderRead,
-            )),
-        ]);
         ops.push(CommandOp::Barrier(ResourceBarrier {
             resource: snapshot,
             subresources: None,
@@ -2203,36 +2320,70 @@ impl GuiFrontend {
                 }),
             ]);
         }
-        ops.extend([
-            CommandOp::Barrier(ResourceBarrier {
+        ops.push(CommandOp::Barrier(ResourceBarrier {
                 resource: snapshot,
                 subresources: None,
                 before: TextureUsageState::TransferDst,
                 after: TextureUsageState::ShaderRead,
                 src_queue: QueueClass::Transfer,
                 dst_queue: QueueClass::Graphics,
-            }),
-            CommandOp::BeginPass {
-                pass,
-                target: render_target,
-                colors: vec![loaded_frame_color_attachment(color_attachment)],
-                depth_stencil: None,
-            },
-            CommandOp::BindGraphicsPipeline(pipeline),
-            CommandOp::BindResourceSet {
-                pipeline_layout,
-                set_index: 0,
-                set: resource_set,
-                dynamic_offsets: Vec::new(),
-            },
-            CommandOp::Draw {
-                vertices: 3,
-                instances: 1,
-            },
-            CommandOp::EndPass,
-        ]);
+            }));
+        // Frozen minecraft:blur is three horizontal/vertical box-blur pairs.
+        // Ping-pong owned scratch images, writing the final pass to the frame.
+        let mut initialized = self.spider_initialized;
+        for index in 0..6 {
+            let final_pass = index == 5;
+            let output = if index % 2 == 0 { 2 } else { 3 };
+            let source_set = if index == 0 { resource_set }
+                else if index % 2 == 1 { scratch_sets[1] }
+                else { scratch_sets[3] };
+            let mut bytes = vec![0u8; 64];
+            let direction: [f32; 2] = if index % 2 == 0 { [1.0, 0.0] } else { [0.0, 1.0] };
+            bytes[..4].copy_from_slice(&direction[0].to_le_bytes());
+            bytes[4..8].copy_from_slice(&direction[1].to_le_bytes());
+            bytes[8..12].copy_from_slice(&(blur_radius as f32).to_le_bytes());
+            if index > 0 || self.blur_snapshot_initialized {
+                ops.push(CommandOp::Barrier(buffer_barrier(
+                    uniform_buffer,
+                    TextureUsageState::ShaderRead,
+                    TextureUsageState::TransferDst,
+                )));
+            }
+            push_uniform_write(&mut ops, uniform_buffer, bytes);
+            if !final_pass {
+                ops.push(CommandOp::Barrier(ResourceBarrier {
+                    resource: scratch_textures[output], subresources: None,
+                    before: if initialized[output] { TextureUsageState::ShaderRead } else { TextureUsageState::Undefined },
+                    after: TextureUsageState::ColorAttachment,
+                    src_queue: QueueClass::Graphics, dst_queue: QueueClass::Graphics,
+                }));
+            }
+            ops.extend([
+                CommandOp::BeginPass {
+                    pass: if final_pass { pass } else { scratch_passes[output] },
+                    target: if final_pass { render_target } else { scratch_targets[output] },
+                    colors: vec![if final_pass { loaded_frame_color_attachment(color_attachment) }
+                        else { PassAttachment { view: scratch_views[output], load_op: AttachmentLoadOp::DontCare,
+                            store_op: AttachmentStoreOp::Store, clear_color: None } }],
+                    depth_stencil: None,
+                },
+                CommandOp::BindGraphicsPipeline(pipeline),
+                CommandOp::BindResourceSet { pipeline_layout, set_index: 0, set: source_set, dynamic_offsets: Vec::new() },
+                CommandOp::Draw { vertices: 3, instances: 1 },
+                CommandOp::EndPass,
+            ]);
+            if !final_pass {
+                ops.push(CommandOp::Barrier(ResourceBarrier {
+                    resource: scratch_textures[output], subresources: None,
+                    before: TextureUsageState::ColorAttachment, after: TextureUsageState::ShaderRead,
+                    src_queue: QueueClass::Graphics, dst_queue: QueueClass::Graphics,
+                }));
+                initialized[output] = true;
+            }
+        }
+        self.spider_initialized = initialized;
         let (after_ops, after_stats) = self
-            .append_frame_ops_with_affine_quads_and_mesh_batches_to_target(
+            .append_frame_ops_with_tiled_quads_to_target(
                 gal,
                 generation,
                 render_target,
@@ -2244,6 +2395,7 @@ impl GuiFrontend {
                 after_requests,
                 after_affine,
                 after_mesh,
+                after_tiled,
             )?;
         ops.extend(after_ops);
         stats.sprite_count = stats.sprite_count.saturating_add(after_stats.sprite_count);
@@ -4089,9 +4241,23 @@ impl GuiFrontend {
         affine_quads: Vec<GuiAffineQuadRequest>,
         mesh_batches: Vec<GuiMeshBatchRequest>,
     ) -> GalResult<(Vec<CommandOp>, GuiSubmitStats)> {
+        self.append_frame_ops_with_tiled_quads_to_target(gal, generation, render_target,
+            color_attachment, render_pass, depth_attachment, depth_format, pre_present_y_flip,
+            requests, affine_quads, mesh_batches, Vec::new())
+    }
+
+    pub(crate) fn append_frame_ops_with_tiled_quads_to_target(
+        &mut self, gal: &mut VulkanicGal, generation: u64, render_target: Handle,
+        color_attachment: Handle, render_pass: Option<Handle>, depth_attachment: Option<Handle>,
+        depth_format: Option<TextureFormat>, pre_present_y_flip: bool,
+        requests: Vec<GuiSpriteRequest>, affine_quads: Vec<GuiAffineQuadRequest>,
+        mesh_batches: Vec<GuiMeshBatchRequest>, tiled_quads: Vec<GuiTiledQuadRequest>,
+    ) -> GalResult<(Vec<CommandOp>, GuiSubmitStats)> {
+        preflight_tiled_affine_count(&tiled_quads, affine_quads.len())?;
         let needs_depth = affine_quads
             .iter()
-            .any(|request| request.stratum == GUI_LEQUAL_DEPTH_BLIT_STRATUM);
+            .any(|request| request.stratum == GUI_LEQUAL_DEPTH_BLIT_STRATUM)
+            || tiled_quads.iter().any(|request| request.stratum == GUI_LEQUAL_DEPTH_BLIT_STRATUM);
         let infer_depth = needs_depth && depth_attachment.is_none();
         let (depth_attachment, depth_format) = if needs_depth && depth_attachment.is_none() {
             let Some((_, view)) = gal.pass_target_depth_attachment(render_target)? else {
@@ -4104,7 +4270,7 @@ impl GuiFrontend {
             (depth_attachment, depth_format)
         };
         let render_pass = if infer_depth { None } else { render_pass };
-        if mesh_batches.is_empty() {
+        if mesh_batches.is_empty() && tiled_quads.is_empty() {
             return self.append_frame_ops_with_affine_quads_to_target(
                 gal,
                 generation,
@@ -4118,6 +4284,7 @@ impl GuiFrontend {
                 affine_quads,
             );
         }
+        let ordered = order_gui_requests_with_tiles(requests, affine_quads, mesh_batches, tiled_quads)?;
         if generation != self.generation {
             self.destroy_render_resources(gal);
             self.generation = generation;
@@ -4132,7 +4299,6 @@ impl GuiFrontend {
             Some(pass) => pass,
             None => self.frame_pass(gal, render_target, depth_format)?,
         };
-        let ordered = order_gui_requests_with_mesh(requests, affine_quads, mesh_batches)?;
         self.mesh_composite_uniform_cursor = 0;
         let mut stats = GuiSubmitStats::default();
         let mut ops = Vec::new();
@@ -4201,7 +4367,7 @@ impl GuiFrontend {
                                 origin: [request.x0, request.y0],
                                 axis_u: [request.x1 - request.x0, request.y1 - request.y0],
                                 axis_v: [request.x3 - request.x0, request.y3 - request.y0],
-                                viewport: [request.gui_width as f32, request.gui_height as f32],
+                                viewport: request.projection_extent,
                                 clip: [
                                     request.clip_left as f32,
                                     request.clip_top as f32,
@@ -4608,13 +4774,25 @@ impl GuiFrontend {
         affine_quads: Vec<GuiAffineQuadRequest>,
         mesh_batches: Vec<GuiMeshBatchRequest>,
     ) -> GalResult<(Vec<CommandOp>, GuiSubmitStats)> {
+        self.append_frame_ops_to_transient_tiled_diagnostic_target(gal, generation, render_target,
+            color_attachment, requests, affine_quads, mesh_batches, Vec::new())
+    }
+
+    pub(crate) fn append_frame_ops_to_transient_tiled_diagnostic_target(
+        &mut self, gal: &mut VulkanicGal, generation: u64, render_target: Handle,
+        color_attachment: Handle, requests: Vec<GuiSpriteRequest>,
+        affine_quads: Vec<GuiAffineQuadRequest>, mesh_batches: Vec<GuiMeshBatchRequest>,
+        tiled_quads: Vec<GuiTiledQuadRequest>,
+    ) -> GalResult<(Vec<CommandOp>, GuiSubmitStats)> {
+        preflight_tiled_affine_count(&tiled_quads, affine_quads.len())?;
+        validate_gui_frame_sequences(&requests, &affine_quads, &mesh_batches, &tiled_quads)?;
         let pass = gal.create_render_pass(RenderPassDesc {
             label: "minecraft.gui.diagnostic-frame.pass".to_string(),
             target: render_target,
             color_formats: vec![gal.pass_target_color_format(render_target)?],
             depth_format: None,
         })?;
-        match self.append_frame_ops_with_affine_quads_and_mesh_batches_to_target(
+        match self.append_frame_ops_with_tiled_quads_to_target(
             gal,
             generation,
             render_target,
@@ -4626,6 +4804,7 @@ impl GuiFrontend {
             requests,
             affine_quads,
             mesh_batches,
+            tiled_quads,
         ) {
             Ok((ops, mut stats)) => {
                 stats.transient_diagnostic_passes.push(pass);
@@ -5841,13 +6020,13 @@ impl GuiFrontend {
             origin: [request.x as f32, request.y as f32],
             axis_u: [request.width as f32, 0.0],
             axis_v: [0.0, request.height as f32],
-            viewport: [request.gui_width as f32, request.gui_height as f32],
+            viewport: request.projection_extent,
             clip: [0.0; 4],
             clip_enabled: false,
             pre_present_y_flip,
             // GUI atlases and raw GUI images use the same semantic convention:
             // byte row zero and V=0 are the top edge. Backends upload the bytes
-            // unchanged, and the shader resolves UVs with texelFetch so no
+            // unchanged, and the shader samples the explicit UV/sampler so no
             // API-specific texture-origin conversion leaks into this frontend.
             uv: [
                 region.x as f32 / atlas.width as f32,
@@ -5978,6 +6157,14 @@ fn order_gui_requests_with_mesh(
     affine_quads: Vec<GuiAffineQuadRequest>,
     mesh_batches: Vec<GuiMeshBatchRequest>,
 ) -> GalResult<Vec<GuiFrameRequest>> {
+    order_gui_requests_with_tiles(sprites, affine_quads, mesh_batches, Vec::new())
+}
+
+fn order_gui_requests_with_tiles(
+    sprites: Vec<GuiSpriteRequest>, affine_quads: Vec<GuiAffineQuadRequest>,
+    mesh_batches: Vec<GuiMeshBatchRequest>, tiled_quads: Vec<GuiTiledQuadRequest>,
+) -> GalResult<Vec<GuiFrameRequest>> {
+    preflight_tiled_affine_count(&tiled_quads, affine_quads.len())?;
     if mesh_batches.len() > GUI_MAX_MESH_BATCHES {
         return Err(GalError::ffi(
             StatusCode::InvalidArgument,
@@ -5988,11 +6175,15 @@ fn order_gui_requests_with_mesh(
         ));
     }
     let mesh_items = group_gui_mesh_items(mesh_batches)?;
+    let tiled_items = tiled_quads.into_iter().map(|request| {
+        lower_tiled_request(request).map(GuiFrameRequest::AffineBatch)
+    }).collect::<GalResult<Vec<_>>>()?;
     let mut ordered = sprites
         .into_iter()
         .map(GuiFrameRequest::Sprite)
         .chain(affine_quads.into_iter().map(GuiFrameRequest::Affine))
         .chain(mesh_items.into_iter().map(GuiFrameRequest::Mesh))
+        .chain(tiled_items)
         .collect::<Vec<_>>();
     ordered.sort_by_key(|request| (request.stratum(), request.sequence()));
     validate_ordered_gui_requests(&ordered)?;
@@ -6118,7 +6309,17 @@ fn argb_to_rgba(color_argb: u32) -> [f32; 4] {
     ]
 }
 
+pub(crate) fn validate_gui_projection(layout: [u32; 2], projection: [f32; 2]) -> GalResult<()> {
+    if projection.iter().zip(layout).any(|(&value, bound)|
+        !value.is_finite() || value <= 0.0 || value.ceil() != bound as f32) {
+        return Err(GalError::ffi(StatusCode::InvalidArgument,
+            "GUI projection must be finite, positive, and ceil to the explicit layout extent"));
+    }
+    Ok(())
+}
+
 pub(crate) fn validate_affine_quad(request: &GuiAffineQuadRequest) -> GalResult<()> {
+    validate_gui_projection([request.gui_width, request.gui_height], request.projection_extent)?;
     const GUI_UV_OVERLAP_LIMIT: f32 = 1.0 / 16.0;
     if request.asset_id == 0 || request.gui_width == 0 || request.gui_height == 0 {
         return Err(GalError::ffi(
@@ -6223,6 +6424,7 @@ fn texture_barrier(
 }
 
 fn validate_request(request: &GuiSpriteRequest, def: &SpriteDef) -> GalResult<()> {
+    validate_gui_projection([request.gui_width, request.gui_height], request.projection_extent)?;
     if !request.progress_fraction.is_finite() {
         return Err(GalError::ffi(
             StatusCode::InvalidArgument,
@@ -7468,11 +7670,113 @@ mod tests {
     /// loses the loaded target or samples the raw mask as black.
     #[test]
     fn vulkan_dynamic_vignette_affine_quad_darkens_the_loaded_target() {
+        let Some(bytes) = vulkan_gui_sample(
+            GUI_VIGNETTE_BLIT_STRATUM, vec![191, 191, 191, 255], 0.0, 1.0, None,
+        ) else { return };
+        // 0.8 * (1 - 191 / 255) is approximately 51/255.
+        for channel in &bytes[..3] {
+            assert!((*channel as i16 - 51).abs() <= 1, "unexpected GUI vignette: {bytes:?}");
+        }
+    }
+
+    #[test]
+    fn vulkan_gui_sampler_preserves_fractional_uv_intervals() {
+        // At the destination pixel center, U=.275 selects texel 1 in a
+        // four-texel nearest-filtered image. Rounding the region origin and
+        // extent before interpolating incorrectly selects texel 0.
+        let Some(bytes) = vulkan_gui_sample(
+            GUI_OPAQUE_BLIT_STRATUM,
+            vec![255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255],
+            0.1, 0.45, None,
+        ) else { return };
+        assert_eq!(&[0, 255, 0, 255], bytes.as_slice());
+    }
+
+    #[test]
+    fn vulkan_gui_tiles_sample_repeated_atlas_region_and_partial_last_tile() {
+        use crate::render::vulkanic::gui_tiling::GuiTileGeometry;
+        // Five logical units contain two full 2-unit tiles and one half tile.
+        // First sample the second full tile, then translate to sample the last
+        // partial tile. Both centers are .25 of a full tile into the same atlas
+        // interval [.1,.9], so U=.3 selects green, not the unstaged neighbor.
+        for translation in [0.0, -0.4] {
+            let Some(bytes) = vulkan_gui_sample(
+                GUI_OPAQUE_BLIT_STRATUM,
+                vec![255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255],
+                0.1, 0.9,
+                Some(GuiTileGeometry { bounds: [0, 0, 5, 1], tile_extent: [2, 1],
+                    uv: [0.1, 0.0, 0.9, 1.0], pose: [0.2, 0.0, 0.0, 1.0, translation, 0.0] }),
+            ) else { return };
+            assert_eq!(&[0, 255, 0, 255], bytes.as_slice(), "translation={translation}");
+        }
+    }
+
+    fn gui_tiled_request() -> GuiTiledQuadRequest {
+        GuiTiledQuadRequest {
+            geometry: super::super::gui_tiling::GuiTileGeometry {
+                bounds: [7, 11, 71, 43], tile_extent: [32, 32],
+                uv: [0.25, 0.5, 0.75, 1.0], pose: [1.0, 0.0, 0.0, 1.0, 0.0, 0.0],
+            },
+            stratum: GUI_OPAQUE_BLIT_STRATUM, asset_id: 41, z: 0.25, color_argb: 0xffaabbcc,
+            gui_extent: [320, 180], projection_extent: [319.75, 179.5], sequence: 11,
+            clip: Some([1, 2, 100, 50]),
+        }
+    }
+
+    #[test]
+    fn gui_tiled_command_preserves_parent_identity_material_clip_and_projection() {
+        let request = gui_tiled_request();
+        let quads = lower_tiled_request(request.clone()).unwrap();
+        assert_eq!(2, quads.len());
+        for quad in quads {
+            assert_eq!(request.sequence, quad.sequence);
+            assert_eq!(request.stratum, quad.stratum);
+            assert_eq!(request.asset_id, quad.asset_id);
+            assert_eq!(request.z, quad.z);
+            assert_eq!(request.color_argb, quad.color_argb);
+            assert_eq!(request.projection_extent, quad.projection_extent);
+            assert_eq!(1, quad.clip_mode);
+            assert_eq!([1, 2, 100, 50], [quad.clip_left, quad.clip_top, quad.clip_width, quad.clip_height]);
+        }
+        let mut invalid = request;
+        invalid.clip = Some([319, 0, 2, 1]);
+        assert!(lower_tiled_request(invalid).is_err());
+    }
+
+    #[test]
+    fn gui_tiled_children_do_not_consume_or_collide_with_other_parent_sequences() {
+        let request = gui_tiled_request();
+        let mut ordinary = lower_tiled_request(request.clone()).unwrap().remove(0);
+        ordinary.sequence = 12;
+        let ordered = order_gui_requests_with_tiles(Vec::new(), vec![ordinary.clone()], Vec::new(), vec![request.clone()]).unwrap();
+        let GuiFrameRequest::AffineBatch(batch) = &ordered[0] else { panic!("expected compatible batch") };
+        assert_eq!(vec![11, 11, 12], batch.iter().map(|q| q.sequence).collect::<Vec<_>>());
+        ordinary.sequence = 11;
+        assert!(order_gui_requests_with_tiles(Vec::new(), vec![ordinary], Vec::new(), vec![request.clone()]).is_err());
+        let mut maximum = request;
+        maximum.sequence = u64::MAX;
+        assert!(order_gui_requests_with_tiles(Vec::new(), Vec::new(), Vec::new(), vec![maximum]).is_ok());
+    }
+
+    #[test]
+    fn gui_tiled_frame_preflight_bounds_the_sum_before_expansion() {
+        let mut request = gui_tiled_request();
+        request.geometry.bounds = [0, 0, 4096, 4096];
+        request.geometry.uv = [0.0, 0.0, 1.0, 1.0];
+        let four = vec![request.clone(); 4];
+        assert_eq!(GUI_MAX_EXPANDED_AFFINE_QUADS, preflight_tiled_affine_count(&four, 0).unwrap());
+        assert!(preflight_tiled_affine_count(&four, 1).is_err());
+        assert!(preflight_tiled_affine_count(&vec![request; 5], 0).is_err());
+        assert!(preflight_tiled_affine_count(&[], usize::MAX).is_err());
+    }
+
+    fn vulkan_gui_sample(stratum: u32, pixels: Vec<u8>, u0: f32, u1: f32,
+        tiles: Option<crate::render::vulkanic::gui_tiling::GuiTileGeometry>) -> Option<Vec<u8>> {
         let backend = match VulkanBackend::new("MattMC GUI vignette frontend conformance") {
             Ok(backend) => backend,
             Err(error) => {
                 eprintln!("skipping Vulkan GUI vignette frontend conformance: {error}");
-                return;
+                return None;
             }
         };
         let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
@@ -7535,25 +7839,14 @@ mod tests {
                 vec![GuiRawImageAssetPayload {
                     asset_id: 41,
                     format: GuiRawImageFormat::Rgba8,
-                    width: 1,
+                    width: (pixels.len() / 4) as u32,
                     height: 1,
-                    pixels: vec![191, 191, 191, 255],
+                    pixels,
                 }],
             )
             .unwrap();
-        let (mut ops, stats) = frontend
-            .append_frame_ops_with_affine_quads_and_mesh_batches_to_target(
-                &mut gal,
-                1,
-                target,
-                color_view,
-                None,
-                None,
-                None,
-                false,
-                Vec::new(),
-                vec![GuiAffineQuadRequest {
-                    stratum: GUI_VIGNETTE_BLIT_STRATUM,
+        let template = GuiAffineQuadRequest {
+                    stratum,
                     asset_id: 41,
                     x0: 0.0,
                     y0: 0.0,
@@ -7562,24 +7855,35 @@ mod tests {
                     x3: 0.0,
                     y3: 1.0,
                     z: 0.0,
-                    u0: 0.0,
+                    u0,
                     v0: 0.0,
-                    u1: 1.0,
+                    u1,
                     v1: 1.0,
                     color_argb: 0xffff_ffff,
                     gui_width: 1,
                     gui_height: 1,
+                    projection_extent: [1.0, 1.0],
                     sequence: 1,
                     clip_mode: 0,
                     clip_left: 0,
                     clip_top: 0,
                     clip_width: 0,
                     clip_height: 0,
-                }],
-                Vec::new(),
+                };
+        let (quads, tiled) = if let Some(geometry) = tiles {
+            (Vec::new(), vec![GuiTiledQuadRequest {
+                geometry, stratum, asset_id: 41, z: 0.0, color_argb: 0xffff_ffff,
+                gui_extent: [1, 1], projection_extent: [1.0, 1.0], sequence: 1, clip: None,
+            }])
+        } else { (vec![template], Vec::new()) };
+        let quad_count = preflight_tiled_affine_count(&tiled, quads.len()).unwrap();
+        let (mut ops, stats) = frontend
+            .append_frame_ops_with_tiled_quads_to_target(
+                &mut gal, 1, target, color_view, None, None, None, false, Vec::new(), quads,
+                Vec::new(), tiled,
             )
             .unwrap();
-        assert_eq!(1, stats.affine_quad_count);
+        assert_eq!(quad_count as u64, stats.affine_quad_count);
         let mut commands = vec![
             CommandOp::Barrier(texture_barrier(
                 color,
@@ -7654,19 +7958,8 @@ mod tests {
             .expect("GUI vignette frontend must produce a readback")
             .bytes
             .clone();
-        // 0.8 * (1 - 191 / 255) is approximately 51/255.
-        assert!(
-            (bytes[0] as i16 - 51).abs() <= 1,
-            "unexpected GUI vignette red: {bytes:?}"
-        );
-        assert!(
-            (bytes[1] as i16 - 51).abs() <= 1,
-            "unexpected GUI vignette green: {bytes:?}"
-        );
-        assert!(
-            (bytes[2] as i16 - 51).abs() <= 1,
-            "unexpected GUI vignette blue: {bytes:?}"
-        );
+        frontend.destroy_render_resources(&mut gal);
+        Some(bytes)
     }
 
     #[test]
@@ -7691,16 +7984,31 @@ mod tests {
         assert!(ops
             .iter()
             .any(|op| matches!(op, CommandOp::CopyFrameTargetToTexture { .. })));
-        assert!(ops.iter().any(|op| matches!(
+        assert_eq!(6, ops.iter().filter(|op| matches!(
             op,
             CommandOp::Draw {
                 vertices: 3,
                 instances: 1
             }
-        )));
-        gal.create_command_list(CommandListDesc {
+        )).count(), "Frozen's menu blur requires all three horizontal/vertical pairs");
+        let configs = ops.iter().filter_map(|op| match op {
+            CommandOp::HostWriteBuffer { data, .. } if data.len() == 64 => Some(data),
+            _ => None,
+        }).collect::<Vec<_>>();
+        assert_eq!(6, configs.len());
+        for (index, bytes) in configs.into_iter().enumerate() {
+            let x = f32::from_le_bytes(bytes[..4].try_into().unwrap());
+            let y = f32::from_le_bytes(bytes[4..8].try_into().unwrap());
+            assert_eq!([x, y], if index % 2 == 0 { [1.0, 0.0] } else { [0.0, 1.0] });
+        }
+        assert!(std::str::from_utf8(BLUR_FRAGMENT_SHADER_VULKAN).unwrap()
+            .contains("gl_FragCoord.xy * texel"));
+        gal.submit(SubmissionBatch {
             label: "gui-blur-replay".to_owned(),
-            operations: ops,
+            command_lists: vec![CommandList::from(CommandListDesc {
+                label: "gui-blur-replay-commands".to_owned(),
+                operations: ops,
+            })],
         })
         .unwrap();
         let (next_ops, _) = frontend
@@ -7732,9 +8040,12 @@ mod tests {
                 ..
             }))
         ));
-        gal.create_command_list(CommandListDesc {
+        gal.submit(SubmissionBatch {
             label: "gui-blur-replay-next-frame".to_owned(),
-            operations: next_ops,
+            command_lists: vec![CommandList::from(CommandListDesc {
+                label: "gui-blur-replay-next-frame-commands".to_owned(),
+                operations: next_ops,
+            })],
         })
         .unwrap();
     }
@@ -8868,6 +9179,7 @@ void main() { fragColor = texture(InSampler, texCoord); }
             height: def.height.min(16),
             gui_width: 320,
             gui_height: 180,
+            projection_extent: [320.0, 180.0],
             sequence: 1,
         }
     }
@@ -8888,6 +9200,7 @@ void main() { fragColor = texture(InSampler, texCoord); }
             gui_pose: [1.0, 0.0, 0.0, 1.0, 0.0, 0.0],
             bounds: [12, 34, 28, 50],
             gui_extent: [320, 180],
+            projection_extent: [320.0, 180.0],
             render_extent: [34, 34],
             guard_pixels: 1,
             clip_mode: 0,
@@ -8966,19 +9279,28 @@ void main() { fragColor = texture(InSampler, texCoord); }
         let key = gui_mesh_raster_key(&prepared);
         let mut frontend = GuiFrontend::default();
         let mut gal = mock_gal();
+        let reserved = gal.next_submission_id();
         let full = frontend
             .allocate_mesh_geometry(
                 &mut gal,
                 key,
                 crate::render::vulkanic::gui_mesh_frontend::GUI_MESH_MAX_VERTEX_BYTES,
                 crate::render::vulkanic::gui_mesh_frontend::GUI_MESH_MAX_INDEX_BYTES,
-                SubmissionId(3),
+                reserved,
             )
             .expect("the fixed stream admits one full allocation");
         frontend.mesh_geometry_cache.insert((key, 1), full);
+        let accepted = gal.submit(SubmissionBatch {
+            label: "accepted-stream-reservation".into(),
+            command_lists: vec![CommandList::from(CommandListDesc {
+                label: "allocator-completion-fixture".into(), operations: vec![],
+            })],
+        }).unwrap();
+        assert_eq!(reserved, accepted.submission);
+        let next = gal.next_submission_id();
 
         let after_wait = frontend
-            .allocate_mesh_geometry(&mut gal, key, 48, 4, SubmissionId(4))
+            .allocate_mesh_geometry(&mut gal, key, 48, 4, next)
             .expect("the allocator retires the oldest range instead of growing or failing");
         assert_eq!(0, after_wait.stream.vertex_offset);
         assert_eq!(0, after_wait.stream.index_offset);
@@ -9171,6 +9493,7 @@ void main() { fragColor = texture(InSampler, texCoord); }
             color_argb: 0xffff_ffff,
             gui_width: 320,
             gui_height: 180,
+            projection_extent: [320.0, 180.0],
             sequence,
             clip_mode: 0,
             clip_left: 0,
@@ -9490,6 +9813,7 @@ void main() { fragColor = texture(InSampler, texCoord); }
             height: 1080,
             gui_width: 1920,
             gui_height: 1080,
+            projection_extent: [1920.0, 1080.0],
             sequence: 1,
         };
         validate_request(&request, definition).unwrap();
@@ -9513,6 +9837,7 @@ void main() { fragColor = texture(InSampler, texCoord); }
                 height: 1,
                 gui_width: 320,
                 gui_height: 180,
+                projection_extent: [320.0, 180.0],
                 sequence: 1,
             },
             GuiSpriteRequest {
@@ -9528,6 +9853,7 @@ void main() { fragColor = texture(InSampler, texCoord); }
                 height: 1,
                 gui_width: 320,
                 gui_height: 180,
+                projection_extent: [320.0, 180.0],
                 sequence: 2,
             },
         ];
@@ -9578,6 +9904,7 @@ void main() { fragColor = texture(InSampler, texCoord); }
             color_argb: 0xffff_ffff,
             gui_width: 320,
             gui_height: 180,
+            projection_extent: [320.0, 180.0],
             sequence: 11,
             clip_mode: 0,
             clip_left: 0,
@@ -9637,6 +9964,7 @@ void main() { fragColor = texture(InSampler, texCoord); }
             color_argb: 0xffff_ffff,
             gui_width: 320,
             gui_height: 180,
+            projection_extent: [320.0, 180.0],
             sequence: 1,
             clip_mode: 1,
             clip_left: 12,
@@ -9732,6 +10060,7 @@ void main() { fragColor = texture(InSampler, texCoord); }
         let sprite = sprite_def(sprite_request.sprite_id).unwrap();
         sprite_request.width = sprite.width;
         sprite_request.height = sprite.height;
+        sprite_request.projection_extent = [319.75, 179.5];
         let packed = frontend
             .pack_sprite(&sprite_request, sprite, false)
             .unwrap();
@@ -9752,6 +10081,8 @@ void main() { fragColor = texture(InSampler, texCoord); }
         })
         .unwrap();
         let direct_flip = f32::from_le_bytes(direct_bytes[44..48].try_into().unwrap());
+        assert_eq!(319.75, f32::from_le_bytes(direct_bytes[32..36].try_into().unwrap()));
+        assert_eq!(179.5, f32::from_le_bytes(direct_bytes[36..40].try_into().unwrap()));
         assert_eq!(
             0.0, direct_flip,
             "ordinary GUI targets must not pre-flip their stream"
@@ -9795,6 +10126,7 @@ void main() { fragColor = texture(InSampler, texCoord); }
                 color_argb: 0xffff_ffff,
                 gui_width: 1,
                 gui_height: 1,
+                projection_extent: [1.0, 1.0],
                 sequence: 1,
                 clip_mode: 0,
                 clip_left: 0,
@@ -9816,13 +10148,13 @@ void main() { fragColor = texture(InSampler, texCoord); }
             .unwrap();
 
         let first = frontend
-            .submit_frame(&mut gal, 10, target, vec![request(2), request(3)])
+            .submit_frame(&mut gal, 10, target, vec![request(2), GuiSpriteRequest { sequence: 2, ..request(3) }])
             .unwrap();
         assert!(first.resource_creates > 0);
         assert!(first.cache_misses > 0);
 
         let second = frontend
-            .submit_frame(&mut gal, 10, target, vec![request(2), request(3)])
+            .submit_frame(&mut gal, 10, target, vec![request(2), GuiSpriteRequest { sequence: 2, ..request(3) }])
             .unwrap();
         assert_eq!(0, second.resource_creates);
         assert!(second.cache_hits > 0);
@@ -9836,7 +10168,7 @@ void main() { fragColor = texture(InSampler, texCoord); }
         let target = frame_target(&mut gal);
 
         let stats = frontend
-            .submit_frame(&mut gal, 10, target, vec![request(2), request(3)])
+            .submit_frame(&mut gal, 10, target, vec![request(2), GuiSpriteRequest { sequence: 2, ..request(3) }])
             .unwrap();
 
         assert_eq!(2, stats.sprite_batch_count);
@@ -9889,6 +10221,7 @@ void main() { fragColor = texture(InSampler, texCoord); }
                     color_argb: 0xff336699,
                     gui_width: 320,
                     gui_height: 180,
+                    projection_extent: [320.0, 180.0],
                     sequence: 1,
                     clip_mode: 0,
                     clip_left: 0,
@@ -10201,7 +10534,8 @@ void main() { fragColor = texture(InSampler, texCoord); }
         assert_eq!(4, GuiRawImageFormat::Rgba8.bytes_per_pixel());
         assert_eq!(1.0, GuiRawImageFormat::Rgba8.shader_mode());
         let shader = std::str::from_utf8(FRAGMENT_SHADER_VULKAN).unwrap();
-        assert!(shader.contains("vec4 sampled = texelFetch"));
+        assert!(shader.contains("vec4 sampled = texture(sampler2D(Tex0, Samp0), v_uv)"));
+        assert!(!shader.contains("texelFetch") && !shader.contains("floor(v_sprite_corner"));
         assert!(!shader.contains("v_texture_mode > 1.5"));
     }
 

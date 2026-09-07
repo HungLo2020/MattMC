@@ -523,6 +523,7 @@ pub(crate) fn input_bytes_for_submission(batch: &FfiSubmissionBatchAbi) -> u64 {
 
 pub(crate) fn input_bytes_for_gui_frame(request: &FfiGuiFrameSubmitRequest) -> u64 {
     (size_of::<FfiGuiFrameSubmitRequest>() as u64)
+        .saturating_add(request.tiled_quads.count.saturating_mul(size_of::<FfiGuiTiledQuadRequest>() as u64))
         .saturating_add(
             request
                 .sprites
@@ -539,6 +540,7 @@ pub(crate) fn input_bytes_for_gui_frame(request: &FfiGuiFrameSubmitRequest) -> u
 
 pub(crate) fn input_bytes_for_whole_frame(request: &FfiWholeFrameSubmitRequest) -> u64 {
     (size_of::<FfiWholeFrameSubmitRequest>() as u64)
+        .saturating_add(request.gui_tiled_quads.count.saturating_mul(size_of::<FfiGuiTiledQuadRequest>() as u64))
         .saturating_add(
             request
                 .world_segments

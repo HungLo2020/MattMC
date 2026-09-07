@@ -4,7 +4,45 @@ use crate::render::vulkanic::gui_frontend::{
 };
 use crate::render::vulkanic::gui_mesh_frontend::GUI_MESH_MAX_FRAME_PAYLOAD_BYTES;
 
-const GUI_MAX_AFFINE_QUADS: usize = 65_536;
+const GUI_MAX_AFFINE_QUADS: usize = super::super::gui_frontend::GUI_MAX_EXPANDED_AFFINE_QUADS;
+
+/// Copies ABI v29 tiled semantics with aggregate preflight before geometry
+/// expansion. Frame integration checks parent sequences across GUI families
+/// before partitioning at blur boundaries. Producer admission remains private.
+pub(crate) unsafe fn decode_gui_tiled_quads(
+    raw: FfiSlice<FfiGuiTiledQuadRequest>, gui_extent: [u32; 2],
+    projection_extent: [f32; 2], ordinary_affine_count: usize,
+) -> GalResult<Vec<super::super::gui_frontend::GuiTiledQuadRequest>> {
+    use super::super::gui_frontend::{GuiTiledQuadRequest, preflight_tiled_affine_count};
+    if raw.count > GUI_MAX_AFFINE_QUADS as u64 {
+        return Err(GalError::invalid_argument("tiled GUI request count exceeds bounded limit"));
+    }
+    let items = read_slice(raw, true, "GUI tiled quad requests")?;
+    let mut count = preflight_tiled_affine_count(&[], ordinary_affine_count)?;
+    let mut owned = Vec::with_capacity(items.len());
+    let mut sequences = std::collections::BTreeSet::new();
+    for item in items {
+        validate_item_size::<FfiGuiTiledQuadRequest>(item.byte_size, "GUI tiled quad")?;
+        let clip = match item.clip_mode {
+            0 if item.clip == [0; 4] => None,
+            1 => Some(item.clip),
+            _ => return Err(GalError::invalid_argument("invalid tiled GUI clip mode")),
+        };
+        let request = GuiTiledQuadRequest {
+            geometry: super::super::gui_tiling::GuiTileGeometry {
+                bounds: item.bounds, tile_extent: item.tile_extent, uv: item.uv, pose: item.pose,
+            },
+            stratum: item.stratum, asset_id: item.asset_id, z: item.z, color_argb: item.color_argb,
+            gui_extent, projection_extent, sequence: item.sequence, clip,
+        };
+        count = preflight_tiled_affine_count(std::slice::from_ref(&request), count)?;
+        if !sequences.insert(request.sequence) {
+            return Err(GalError::invalid_argument("duplicate tiled GUI parent sequence"));
+        }
+        owned.push(request);
+    }
+    Ok(owned)
+}
 /// Stable `GuiMeshBatchRecord.materialMode` ABI value for title panoramas.
 pub(super) const GUI_MESH_MATERIAL_PANORAMA: u32 = 5;
 
@@ -47,6 +85,18 @@ pub(crate) unsafe fn decode_gui_frame_submit_with_mesh(
     Vec<GuiAffineQuadRequest>,
     Vec<GuiMeshBatchRequest>,
 )> {
+    let (generation, target, sprites, affine, meshes, tiles) =
+        decode_gui_frame_submit_with_tiles(request, capabilities)?;
+    if !tiles.is_empty() {
+        return Err(GalError::invalid_argument("tiled GUI requires the typed frame submit path"));
+    }
+    Ok((generation, target, sprites, affine, meshes))
+}
+
+pub(crate) unsafe fn decode_gui_frame_submit_with_tiles(
+    request: *const FfiGuiFrameSubmitRequest, capabilities: BackendCapabilities,
+) -> GalResult<(u64, Handle, Vec<GuiSpriteRequest>, Vec<GuiAffineQuadRequest>,
+    Vec<GuiMeshBatchRequest>, Vec<GuiTiledQuadRequest>)> {
     let request = read_struct(request, "GUI frame submit request")?;
     validate_header::<FfiGuiFrameSubmitRequest>(request.header)?;
     reject_unknown_feature_bits(request.negotiated_feature_bits)?;
@@ -77,6 +127,9 @@ pub(crate) unsafe fn decode_gui_frame_submit_with_mesh(
         ));
     }
     let frame_target = Handle::from(request.frame_target);
+    let projection_extent = [request.gui_projection_width, request.gui_projection_height];
+    super::super::gui_frontend::validate_gui_projection(
+        [request.gui_width as u32, request.gui_height as u32], projection_extent)?;
     if frame_target.is_null() || frame_target.kind() != Some(HandleKind::FrameTarget) {
         return Err(GalError::ffi(
             StatusCode::WrongHandleType,
@@ -133,20 +186,26 @@ pub(crate) unsafe fn decode_gui_frame_submit_with_mesh(
             height: to_u32(sprite.height, "height")?,
             gui_width: to_u32(sprite.gui_width, "gui_width")?,
             gui_height: to_u32(sprite.gui_height, "gui_height")?,
+            projection_extent,
             sequence: sprite.sequence,
         });
     }
-    let affine_quads =
+    let mut affine_quads =
         decode_gui_affine_quads(request.affine_quads, request.gui_width, request.gui_height)?;
-    let mesh_batches =
+    let mut mesh_batches =
         decode_gui_mesh_batches(request.mesh_batches, request.gui_width, request.gui_height)?;
-    validate_gui_request_sequences(&owned, &affine_quads, &mesh_batches)?;
+    for quad in &mut affine_quads { quad.projection_extent = projection_extent; }
+    for mesh in &mut mesh_batches { mesh.projection_extent = projection_extent; }
+    let tiled_quads = decode_gui_tiled_quads(request.tiled_quads,
+        [request.gui_width as u32, request.gui_height as u32], projection_extent, affine_quads.len())?;
+    super::super::gui_frontend::validate_gui_frame_sequences(&owned, &affine_quads, &mesh_batches, &tiled_quads)?;
     Ok((
         request.generation,
         frame_target,
         owned,
         affine_quads,
         mesh_batches,
+        tiled_quads,
     ))
 }
 
@@ -200,6 +259,7 @@ fn decode_gui_affine_quads(
             color_argb: quad.color_argb,
             gui_width: to_u32(quad.gui_width, "gui_width")?,
             gui_height: to_u32(quad.gui_height, "gui_height")?,
+            projection_extent: [gui_width as f32, gui_height as f32],
             sequence: quad.sequence,
             clip_mode: quad.clip_mode,
             clip_left: quad.clip_left,
@@ -338,6 +398,7 @@ pub(crate) unsafe fn decode_gui_mesh_batches(
                     )
                 })?,
             ],
+            projection_extent: [gui_width as f32, gui_height as f32],
             render_extent: [
                 u32::try_from(batch.render_width).map_err(|_| {
                     GalError::ffi(
@@ -648,18 +709,19 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_gui_submit_frame(
         context.ffi_output_bytes = context
             .ffi_output_bytes
             .saturating_add(size_of::<FfiGuiFrameSubmitResult>() as u64);
-        let result = decode_gui_frame_submit_with_mesh(request, context.gal.capabilities())
+        let result = decode_gui_frame_submit_with_tiles(request, context.gal.capabilities())
             .and_then(
-                |(generation, frame_target, sprites, affine_quads, mesh_batches)| {
+                |(generation, frame_target, sprites, affine_quads, mesh_batches, tiled_quads)| {
                     let stats = context
                         .gui_frontend
-                        .submit_frame_with_affine_quads_and_mesh_batches(
+                        .submit_frame_with_tiled_quads(
                             &mut context.gal,
                             generation,
                             frame_target,
                             sprites,
                             affine_quads,
                             mesh_batches,
+                            tiled_quads,
                         )?;
                     destroy_stale_frame_targets(context)?;
                     Ok(stats)

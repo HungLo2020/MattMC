@@ -604,9 +604,11 @@ public class GuiGraphics {
 			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected())
 			? null
 			: this.minecraft.getTextureManager().getTexture(resourceLocation).getTextureView();
+		// TiledBlitRenderState's UV interval describes one tile, not the
+		// complete destination rectangle. Partial edge tiles interpolate it.
 		this.submitTiledBlit(renderPipeline, gpuTextureView, resourceLocation, textureWidth, textureHeight,
-			x, y, x + width, y + height, u / textureWidth, (u + width) / textureWidth,
-			v / textureHeight, (v + height) / textureHeight, color);
+			x, y, x + width, y + height, u / textureWidth, u / textureWidth + 1.0F,
+			v / textureHeight, v / textureHeight + 1.0F, color);
 	}
 
 	private void innerBlit(RenderPipeline renderPipeline, ResourceLocation resourceLocation, int i, int j, int k, int l, float f, float g, float h, float m, int n) {
@@ -690,15 +692,15 @@ public class GuiGraphics {
 			textureSetup,
 			semanticTexture,
 			new Matrix3x2f(this.pose),
+			tileWidth,
+			tileHeight,
 			x,
 			y,
 			x + width,
 			y + height,
-			tileWidth,
-			tileHeight,
 			u0,
-			v0,
 			u1,
+			v0,
 			v1,
 			color,
 			this.scissorStack.peek()

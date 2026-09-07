@@ -445,6 +445,7 @@ pub struct GuiMeshBatchRequest {
     /// Logical GUI placement bounds: left, top, right, bottom.
     pub bounds: [i32; 4],
     pub gui_extent: [u32; 2],
+    pub projection_extent: [f32; 2],
     /// Rust-owned offscreen raster extent, including vanilla's guard pixels.
     /// This is deliberately distinct from the final GUI viewport.
     pub render_extent: [u32; 2],
@@ -488,6 +489,7 @@ pub struct GuiMeshPreparedDraw {
     pub gui_pose: [f32; 6],
     pub bounds: [i32; 4],
     pub gui_extent: [u32; 2],
+    pub projection_extent: [f32; 2],
     pub render_extent: [u32; 2],
     pub guard_pixels: u32,
     pub clip_mode: u32,
@@ -847,7 +849,7 @@ impl GuiMeshPassResources {
         operations.push(CommandOp::HostWriteBuffer {
             buffer: self.uniform_buffer,
             offset: 0,
-            data: frame_uniform_bytes(draw.gui_extent, draw.alpha_cutoff, draw.lighting_mode),
+            data: frame_uniform_bytes(draw.projection_extent, draw.alpha_cutoff, draw.lighting_mode),
         });
         operations.push(CommandOp::Barrier(buffer_barrier(self.vertex_buffer, TextureUsageState::TransferDst, TextureUsageState::ShaderRead)));
         operations.push(CommandOp::Barrier(buffer_barrier(self.index_buffer, TextureUsageState::TransferDst, TextureUsageState::IndexRead)));
@@ -896,6 +898,20 @@ impl GuiMeshPassResources {
                     TextureUsageState::Undefined
                 },
                 after: TextureUsageState::ColorAttachment,
+                src_queue: QueueClass::Graphics,
+                dst_queue: QueueClass::Graphics,
+            }));
+            // The depth attachment is a separate explicit resource. Clearing
+            // it in BeginPass does not transition an UNDEFINED Vulkan image.
+            operations.push(CommandOp::Barrier(ResourceBarrier {
+                resource: target.depth,
+                subresources: None,
+                before: if target.initialized {
+                    TextureUsageState::DepthStencilAttachment
+                } else {
+                    TextureUsageState::Undefined
+                },
+                after: TextureUsageState::DepthStencilAttachment,
                 src_queue: QueueClass::Graphics,
                 dst_queue: QueueClass::Graphics,
             }));
@@ -971,7 +987,7 @@ impl GuiMeshPassResources {
         operations.push(CommandOp::HostWriteBuffer {
             buffer: self.uniform_buffer,
             offset: 0,
-            data: frame_uniform_bytes(draw.render_extent, draw.alpha_cutoff, draw.lighting_mode),
+            data: frame_uniform_bytes(draw.render_extent.map(|axis| axis as f32), draw.alpha_cutoff, draw.lighting_mode),
         });
         operations.push(CommandOp::Barrier(buffer_barrier(
             self.vertex_buffer,
@@ -1526,7 +1542,7 @@ fn packed_indices_with_base(indices: &[u32], vertex_base: u32) -> GalResult<Vec<
 }
 
 fn frame_uniform_bytes(
-    extent: [u32; 2],
+    extent: [f32; 2],
     alpha_cutoff: f32,
     lighting_mode: GuiMeshLightingMode,
 ) -> Vec<u8> {
@@ -1567,8 +1583,8 @@ fn composite_uniform_bytes(draw: &GuiMeshPreparedDraw) -> Vec<u8> {
         m11,
         m20,
         m21,
-        draw.gui_extent[0] as f32,
-        draw.gui_extent[1] as f32,
+        draw.projection_extent[0],
+        draw.projection_extent[1],
         left as f32,
         top as f32,
         right as f32,
@@ -1590,12 +1606,12 @@ fn composite_uniform_bytes(draw: &GuiMeshPreparedDraw) -> Vec<u8> {
         if draw.clip_mode == 1 {
             (draw.clip_left + draw.clip_width) as f32
         } else {
-            draw.gui_extent[0] as f32
+            draw.projection_extent[0]
         },
         if draw.clip_mode == 1 {
             (draw.clip_top + draw.clip_height) as f32
         } else {
-            draw.gui_extent[1] as f32
+            draw.projection_extent[1]
         },
     ] {
         bytes.extend_from_slice(&value.to_le_bytes());
@@ -1885,6 +1901,7 @@ pub fn validate_batch(batch: &GuiMeshBatchRequest) -> GalResult<()> {
             "GUI mesh batch requires a positive offscreen raster extent",
         ));
     }
+    super::gui_frontend::validate_gui_projection(batch.gui_extent, batch.projection_extent)?;
     if batch.render_extent[0] > GUI_MESH_MAX_OFFSCREEN_AXIS
         || batch.render_extent[1] > GUI_MESH_MAX_OFFSCREEN_AXIS
     {
@@ -2031,6 +2048,7 @@ fn prepare_draw(batch: &GuiMeshBatchRequest) -> GalResult<GuiMeshPreparedDraw> {
         gui_pose: batch.gui_pose,
         bounds: batch.bounds,
         gui_extent: batch.gui_extent,
+        projection_extent: batch.projection_extent,
         render_extent: batch.render_extent,
         guard_pixels: batch.guard_pixels,
         clip_mode: batch.clip_mode,
@@ -2139,6 +2157,7 @@ mod tests {
             gui_pose: [1.0, 0.0, 0.0, 1.0, 12.0, 34.0],
             bounds: [12, 34, 28, 50],
             gui_extent: [320, 180],
+            projection_extent: [320.0, 180.0],
             render_extent: [34, 34],
             guard_pixels: 1,
             clip_mode: 0,
@@ -2255,7 +2274,7 @@ mod tests {
 
     #[test]
     fn mesh_frame_uniform_carries_the_semantic_cutout_threshold() {
-        let bytes = frame_uniform_bytes([34, 18], 0.5, GuiMeshLightingMode::Block);
+        let bytes = frame_uniform_bytes([34.0, 18.0], 0.5, GuiMeshLightingMode::Block);
         let values = bytes
             .chunks_exact(std::mem::size_of::<f32>())
             .map(|word| f32::from_le_bytes(word.try_into().unwrap()))
@@ -2263,6 +2282,17 @@ mod tests {
         assert_eq!(&values[..4], &[34.0, 18.0, 0.5, 1.0]);
         assert_eq!(values.len(), 12);
         assert_eq!(&values[4..7], &[-0.933_439_2, 0.262_694_72, -0.244_300_16]);
+    }
+
+    #[test]
+    fn mesh_composite_preserves_fractional_projection_and_integer_layout() {
+        let mut request = batch();
+        request.projection_extent = [319.75, 179.5];
+        let draw = prepare_draw(&request).unwrap();
+        assert_eq!([320, 180], draw.gui_extent);
+        let bytes = composite_uniform_bytes(&draw);
+        assert_eq!(319.75, f32::from_le_bytes(bytes[24..28].try_into().unwrap()));
+        assert_eq!(179.5, f32::from_le_bytes(bytes[28..32].try_into().unwrap()));
     }
 
     #[test]
@@ -2439,6 +2469,18 @@ mod tests {
                 &mut operations,
             )
             .expect("append one owned mesh draw");
+        assert!(operations.iter().any(|operation| matches!(operation,
+            CommandOp::Barrier(barrier) if barrier.resource == target.depth
+                && barrier.before == TextureUsageState::Undefined
+                && barrier.after == TextureUsageState::DepthStencilAttachment)));
+        let mut reused = target;
+        reused.initialized = true;
+        let mut reused_ops = Vec::new();
+        resources.append_draw(reused, &draw, GuiMeshStreamRange::default(), true, &mut reused_ops).unwrap();
+        assert!(reused_ops.iter().any(|operation| matches!(operation,
+            CommandOp::Barrier(barrier) if barrier.resource == target.depth
+                && barrier.before == TextureUsageState::DepthStencilAttachment
+                && barrier.after == TextureUsageState::DepthStencilAttachment)));
         composite
             .append_composite(
                 target,

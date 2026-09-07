@@ -589,6 +589,14 @@ def make_validation_capture(capture_dir: Path, *, workload: bool = True, run_id:
     )
 
 
+def write_vanilla_dh_snapshot(capture: Path) -> None:
+    snapshot = capture / "config_after_test"
+    snapshot.mkdir(exist_ok=True)
+    (snapshot / "DistantHorizons.toml").write_text(
+        'rendererMode = "DISABLED"\nenableRendering = false\nvanillaFadeMode = "NONE"\nlodOnlyMode = false\n',
+        encoding="utf-8")
+
+
 def artifact_for(temp: Path, mode: harness.ModeSpec, *, world: str = "Origin", parity_yaw: float = 105.0) -> dict[str, object]:
     target = fake_repo(temp, mode.target)
     capture = temp / f"capture-{mode.name}"
@@ -624,6 +632,131 @@ def gameplay_artifact_for(temp: Path, mode: harness.ModeSpec, *, world: str = "O
 
 
 class GraphicsAuditHarnessTests(unittest.TestCase):
+    def test_menu_metadata_scope_requires_explicit_query_evidence(self) -> None:
+        scope = {"schema": "mattmc-menu-resource-scope-v2", "status": "complete",
+                 "scope": "gui-font-language-atlas-stacks-with-metadata",
+                 "sha256": "a" * 64, "resourceCount": 2, "bytes": 1,
+                 "entries": [{}, {}], "metadataQueries": 1}
+        self.assertEqual([], harness.presented_menu_state_failures(
+            {**self.menu_state_fixture(), "resourceScope": scope}))
+        for queries in (None, 0, 3, True):
+            self.assertIn("menu-resource-metadata-scope-invalid", harness.presented_menu_state_failures(
+                {**self.menu_state_fixture(), "resourceScope": {**scope, "metadataQueries": queries}}))
+
+    def test_matching_failed_resource_scopes_are_not_menu_evidence(self) -> None:
+        for scope in (None, {"status": "failed"},
+                      {"schema": "mattmc-menu-resource-scope-v1", "status": "complete",
+                       "sha256": "a" * 64, "resourceCount": 1, "bytes": 1, "entries": []}):
+            self.assertIn("menu-resource-scope-invalid", harness.presented_menu_state_failures(
+                {**self.menu_state_fixture(), "resourceScope": scope}))
+
+    def test_resource_reload_receipt_cannot_admit_incomplete_reload(self) -> None:
+        state = {**self.menu_state_fixture(), "resourceReloadFixture": "normal-reload-complete-presented-v1",
+                 "resourceReloadComplete": True}
+        self.assertEqual([], harness.presented_menu_state_failures(state))
+        for field, value in (("resourceReloadComplete", False), ("resourceReloadFixture", "other")):
+            self.assertIn("menu-resource-reload-incomplete", harness.presented_menu_state_failures({**state, field: value}))
+
+    def test_fullscreen_receipt_requires_observed_positive_extent(self) -> None:
+        state = {**self.menu_state_fixture(), "fullscreenFixture": "fullscreen-restore-1280x720-v1",
+                 "fullscreenComplete": True, "fullscreenWidth": 1920, "fullscreenHeight": 1080}
+        self.assertEqual([], harness.presented_menu_state_failures(state))
+        for field, value in (("fullscreenComplete", False), ("fullscreenWidth", 0),
+                             ("fullscreenHeight", True), ("fullscreenFixture", "other")):
+            self.assertIn("menu-fullscreen-incomplete", harness.presented_menu_state_failures({**state, field: value}))
+
+    def test_gui_scale_apply_receipt_requires_completion_and_restoration(self) -> None:
+        state = {**self.menu_state_fixture(), "guiScale": 2, "guiScaleApplyFixture": "2-3-2-apply-v1",
+                 "guiScaleApplyComplete": True}
+        self.assertEqual([], harness.presented_menu_state_failures(state))
+        for field, value in (("guiScaleApplyComplete", False), ("guiScaleApplyFixture", "other"), ("guiScale", 3)):
+            self.assertIn("menu-gui-scale-apply-incomplete",
+                          harness.presented_menu_state_failures({**state, field: value}))
+
+    def test_menu_video_tabs_require_all_observed_presentations(self) -> None:
+        state = {**self.menu_state_fixture(), "videoTabsFixture": "quality-performance-advanced-general-v1",
+                 "videoTabsComplete": True, "videoTabsCompletedSteps": 4}
+        self.assertEqual([], harness.presented_menu_state_failures(state))
+        for field, value in (("videoTabsComplete", False), ("videoTabsCompletedSteps", 3),
+                             ("videoTabsCompletedSteps", True), ("videoTabsFixture", "other")):
+            self.assertIn("menu-video-tabs-incomplete",
+                          harness.presented_menu_state_failures({**state, field: value}))
+        for field in ("videoTabsComplete", "videoTabsCompletedSteps", "videoTabsFixture"):
+            self.assertIn("menu-video-tabs-incomplete",
+                          harness.presented_menu_state_failures({key: value for key, value in state.items() if key != field}))
+
+    def test_menu_maximize_receipt_requires_observed_state(self) -> None:
+        state = {**self.menu_state_fixture(), "maximizeFixture": "maximize-restore-1280x720-v1",
+                 "maximizeComplete": True, "maximizedWidth": 1920, "maximizedHeight": 1056}
+        self.assertEqual([], harness.presented_menu_state_failures(state))
+        for field, value in (("maximizeComplete", False), ("maximizeFixture", "other"),
+                             ("maximizedWidth", 0), ("maximizedHeight", True)):
+            self.assertIn("menu-maximize-sequence-incomplete",
+                          harness.presented_menu_state_failures({**state, field: value}))
+
+    def test_menu_resize_receipt_requires_all_observed_steps(self) -> None:
+        state = {**self.menu_state_fixture(), "resizeFixture": "640x480-1600x900-1280x720-v1",
+                 "resizeCompletedSteps": 3, "resizeComplete": True}
+        self.assertEqual([], harness.presented_menu_state_failures(state))
+        for field, value in (("resizeCompletedSteps", 2), ("resizeComplete", False),
+                             ("resizeFixture", "other"), ("resizeCompletedSteps", True)):
+            self.assertIn("menu-resize-sequence-incomplete",
+                          harness.presented_menu_state_failures({**state, field: value}))
+
+    def test_menu_capture_rejects_window_manager_clamping_both_clients(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            artifact = Path(temp) / "artifact.json"
+            data = {"benchmark_fingerprint": {"workload_signature": {"settings": {
+                "forced_window_width": "3840", "forced_window_height": "2160",
+            }}}, "capture": {"title_screen": {"presented_frame": {
+                "framebuffer": [1920, 1056],
+            }}}}
+            artifact.write_text(json.dumps(data), encoding="utf-8")
+            result = harness.title_visual_fixture_equivalence(artifact, artifact)
+            self.assertIn("baseline-requested-menu-window-mismatch", result["mismatches"])
+            self.assertIn("current-requested-menu-window-mismatch", result["mismatches"])
+            data["capture"]["title_screen"]["presented_frame"]["framebuffer"] = [3840, 2160]
+            artifact.write_text(json.dumps(data), encoding="utf-8")
+            result = harness.title_visual_fixture_equivalence(artifact, artifact)
+            self.assertNotIn("baseline-requested-menu-window-mismatch", result["mismatches"])
+
+    def test_menu_capture_window_is_bounded_and_does_not_change_world_fixtures(self) -> None:
+        from capture_window import menu_capture_window
+        with mock.patch.dict(os.environ, {}, clear=True):
+            self.assertEqual((1280, 720), menu_capture_window(False))
+        with mock.patch.dict(os.environ, {"MATTMC_CAPTURE_MENU_WIDTH": "3840",
+                                         "MATTMC_CAPTURE_MENU_HEIGHT": "2160"}, clear=True):
+            self.assertEqual((3840, 2160), menu_capture_window(True))
+            with self.assertRaises(ValueError):
+                menu_capture_window(False)
+        for width, height in (("0", "720"), ("3841", "2160"), ("1280", "2161"),
+                              ("-1", "720"), ("nan", "720"), ("320", "239")):
+            with mock.patch.dict(os.environ, {"MATTMC_CAPTURE_MENU_WIDTH": width,
+                                             "MATTMC_CAPTURE_MENU_HEIGHT": height}, clear=True):
+                with self.assertRaises(ValueError):
+                    menu_capture_window(True)
+
+    @staticmethod
+    def menu_state_fixture():
+        return {"schema": "mattmc-presented-menu-state-v1", "worldPresent": False,
+                "guiScale": 3, "menuBlur": 5, "panoramaTheme": "aquatic", "hideSplashTexts": True}
+
+    def test_presented_menu_state_requires_observed_non_world_inputs(self):
+        self.assertEqual([], harness.presented_menu_state_failures(self.menu_state_fixture()))
+        self.assertTrue(harness.presented_menu_state_failures(None))
+        for field, invalid in (("schema", "unknown"), ("worldPresent", True),
+                               ("worldPresent", 0), ("guiScale", True), ("guiScale", 0),
+                               ("menuBlur", -1), ("menuBlur", 11), ("menuBlur", 5.0),
+                               ("panoramaTheme", ""), ("hideSplashTexts", "true")):
+            with self.subTest(field=field, invalid=invalid):
+                state = self.menu_state_fixture()
+                state[field] = invalid
+                self.assertTrue(harness.presented_menu_state_failures(state))
+        for field in self.menu_state_fixture():
+            state = self.menu_state_fixture()
+            del state[field]
+            self.assertTrue(harness.presented_menu_state_failures(state), field)
+
     def test_frozen_cow_observation_requires_actual_matching_emission_each_capture(self):
         doc = {"backend": "opengl", "captures": [
             {"renderedFrameIndex": frame, "frozenModelProducer": {
@@ -664,13 +797,14 @@ class GraphicsAuditHarnessTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / "config_after_test" / "DistantHorizons.toml"
             path.parent.mkdir()
-            original = 'enableRendering = true\nvanillaFadeMode = "DOUBLE_PASS"\nlodOnlyMode = true\nother = 42\n'
+            original = 'rendererMode = "DEFAULT"\nenableRendering = true\nvanillaFadeMode = "DOUBLE_PASS"\nlodOnlyMode = true\nother = 42\n'
             path.write_text(original)
             harness.apply_canonical_vanilla_dh_isolation(path)
-            self.assertEqual('enableRendering = false\nvanillaFadeMode = "NONE"\nlodOnlyMode = false\nother = 42\n', path.read_text())
-            self.assertEqual({"status": "recorded", "enableRendering": "false", "vanillaFadeMode": "NONE", "lodOnlyMode": "false"},
+            self.assertEqual('rendererMode = "DISABLED"\nenableRendering = false\nvanillaFadeMode = "NONE"\nlodOnlyMode = false\nother = 42\n', path.read_text())
+            self.assertEqual({"status": "recorded", "rendererMode": "DISABLED", "enableRendering": "false", "vanillaFadeMode": "NONE", "lodOnlyMode": "false"},
                              harness.dh_composition_settings(Path(temp)))
-            for invalid in (original.replace('lodOnlyMode = true\n', ''), original + 'vanillaFadeMode = "NONE"\n'):
+            for invalid in (original.replace('rendererMode = "DEFAULT"\n', ''),
+                            original.replace('lodOnlyMode = true\n', ''), original + 'vanillaFadeMode = "NONE"\n'):
                 path.write_text(invalid)
                 with self.assertRaises(ValueError):
                     harness.apply_canonical_vanilla_dh_isolation(path)
@@ -678,13 +812,13 @@ class GraphicsAuditHarnessTests(unittest.TestCase):
                 self.assertEqual("invalid", harness.dh_composition_settings(Path(temp))["status"])
 
     def test_cross_repository_comparison_rejects_dh_fade_mismatch(self):
-        settings = {"status": "recorded", "enableRendering": "false",
+        settings = {"status": "recorded", "rendererMode": "DISABLED", "enableRendering": "false",
                     "vanillaFadeMode": "NONE", "lodOnlyMode": "false"}
         baseline = {"benchmark_fingerprint": {"workload_signature": {
             "dh_composition": settings}}}
         current = json.loads(json.dumps(baseline))
         self.assertTrue(harness.compare_workloads(baseline, current, cross_repository=True)["comparable"])
-        for field, value in (("enableRendering", "true"),
+        for field, value in (("rendererMode", "DEFAULT"), ("enableRendering", "true"),
                              ("vanillaFadeMode", "DOUBLE_PASS"), ("lodOnlyMode", "true")):
             with self.subTest(field=field):
                 different = json.loads(json.dumps(current))
@@ -692,6 +826,19 @@ class GraphicsAuditHarnessTests(unittest.TestCase):
                 result = harness.compare_workloads(baseline, different, cross_repository=True)
                 self.assertFalse(result["comparable"])
                 self.assertTrue(result["differences"])
+
+    def test_vanilla_isolation_rejects_wireframe_only_disable_and_missing_evidence(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            meta = {"parity_fixture_id": "fixture-dh-none"}
+            self.assertFalse(harness.vanilla_dh_isolation_evidence(root, meta)["passed"])
+            path = root / "config_after_test" / "DistantHorizons.toml"
+            path.parent.mkdir()
+            path.write_text('rendererMode = "DEFAULT"\nenableRendering = false\nvanillaFadeMode = "NONE"\nlodOnlyMode = false\n')
+            self.assertFalse(harness.vanilla_dh_isolation_evidence(root, meta)["passed"])
+            harness.apply_canonical_vanilla_dh_isolation(path)
+            self.assertTrue(harness.vanilla_dh_isolation_evidence(root, meta)["passed"])
+            self.assertTrue(harness.vanilla_dh_isolation_evidence(root, {})["passed"])
 
     def test_canonical_graphics_mode_preserves_other_options_and_rejects_duplicates(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -822,10 +969,225 @@ class GraphicsAuditHarnessTests(unittest.TestCase):
         baseline["captures"][0]["lightmapSemanticFingerprint"] = fingerprint
         current["captures"][0]["lightmapSemanticFingerprint"] = fingerprint
         self.assertEqual("passed", harness.deterministic_visual_fixture_equivalence(baseline, current)["status"])
+        baseline["staticTerrainFixtureScenario"] = "translucent-mixed"
+        current["staticTerrainFixtureScenario"] = "translucent-mixed"
+        receipt = {"fixture": "sealed-mixed-fluid-v1", "placement": "146,99,532/west",
+                   "cells": 64, "matchingCells": 64, "complete": True}
+        baseline["mixedFluidFixture"] = dict(receipt)
+        current["mixedFluidFixture"] = dict(receipt)
+        self.assertEqual("passed", harness.deterministic_visual_fixture_equivalence(baseline, current)["status"])
+        for invalid in (None, {}, {**receipt, "matchingCells": 63}, {**receipt, "complete": False},
+                        {**receipt, "fixture": "unknown"}, {**receipt, "cells": 63},
+                        {**receipt, "placement": "145,99,532/west"}):
+            current["mixedFluidFixture"] = invalid
+            self.assertEqual("failed", harness.deterministic_visual_fixture_equivalence(baseline, current)["status"])
+        current["mixedFluidFixture"] = dict(receipt)
+        del baseline["staticTerrainFixtureScenario"]
+        self.assertIn("mixed-fluid-scenario",
+                      harness.deterministic_visual_fixture_equivalence(baseline, current)["mismatches"])
+        baseline["staticTerrainFixtureScenario"] = "translucent-mixed"
         for invalid in (None, "nan," + fingerprint, fingerprint.replace("1.5", "nan"),
                         fingerprint.replace("1.5", "inf"), fingerprint.replace("1.5", "1.53")):
             current["captures"][0]["lightmapSemanticFingerprint"] = invalid
             self.assertEqual("failed", harness.deterministic_visual_fixture_equivalence(baseline, current)["status"])
+
+        baseline = manifest()
+        current = manifest()
+        receipt = {"fixture": "held-magma-v1", "selectedSlot": 1,
+                   "mainHand": "minecraft:magma_block", "count": 1, "complete": True}
+        for doc in (baseline, current):
+            doc["hotbarItemFixture"] = "animated-block"
+            doc["animatedItemFixture"] = dict(receipt)
+        self.assertEqual("passed", harness.deterministic_visual_fixture_equivalence(baseline, current)["status"])
+        for invalid in (None, {}, {**receipt, "selectedSlot": 2}, {**receipt, "complete": False},
+                        {**receipt, "mainHand": "minecraft:stone"}, {**receipt, "count": 0}):
+            current["animatedItemFixture"] = invalid
+            self.assertIn("animated-item-fixture-state",
+                          harness.deterministic_visual_fixture_equivalence(baseline, current)["mismatches"])
+        current["animatedItemFixture"] = dict(receipt)
+        del baseline["hotbarItemFixture"]
+        self.assertEqual("failed", harness.deterministic_visual_fixture_equivalence(baseline, current)["status"])
+
+        baseline = manifest()
+        current = manifest()
+        receipt = {"fixture": "magma-display-v1", "block": "minecraft:magma_block",
+                   "position": [1, 2, 3], "complete": True}
+        for doc in (baseline, current):
+            doc["blockDisplayScenario"] = "magma"
+            doc["blockDisplayFixture"] = dict(receipt)
+        self.assertEqual("passed", harness.deterministic_visual_fixture_equivalence(baseline, current)["status"])
+        for invalid in (None, {}, {**receipt, "block": "minecraft:stone"},
+                        {**receipt, "complete": False}, {**receipt, "position": [1, 2, 4]}):
+            current["blockDisplayFixture"] = invalid
+            self.assertIn("block-display-fixture-state",
+                          harness.deterministic_visual_fixture_equivalence(baseline, current)["mismatches"])
+
+    def test_particle_fixture_equivalence_rejects_missing_or_different_inputs(self) -> None:
+        receipt = {"fixture": "magma-terrain-particle-v1", "block": "minecraft:magma_block",
+                   "sprite": "minecraft:block/magma", "complete": True, "size": 0.35,
+                   "position": [1, 2, 3], "localUv": [0.5, 0.25, 0.25, 0.5],
+                   "color": [0.6, 0.6, 0.6, 1], "light": 15728880}
+        baseline = {"terrainParticleFixture": receipt}
+        current = {"terrainParticleFixture": dict(receipt)}
+        def mismatch():
+            return "terrain-particle-fixture-state" in harness.deterministic_visual_fixture_equivalence(baseline, current)["mismatches"]
+        self.assertFalse(mismatch())
+        for invalid in (None, {}, {**receipt, "light": 0}, {**receipt, "complete": False},
+                        {**receipt, "localUv": [0, 1, 0, 1]}, {**receipt, "position": [1,2,4]}):
+            current["terrainParticleFixture"] = invalid
+            self.assertTrue(mismatch())
+
+    def test_capture_sequence_terrain_coverage_requires_every_exact_pose(self) -> None:
+        import copy
+        baseline, current = [], []
+        for frame in (10, 20):
+            for layer in ("solid", "cutout"):
+                event = {"frameId": frame, "layer": layer, "records": [], "aggregate": {
+                    "executedRecords": 2, "vertexCount": 8, "indexCount": 12, "primitiveCount": 2}}
+                baseline.append({**event, "stage": "java-opengl-draw-capture-ready-coverage"})
+                current.append({**event, "stage": "rust-vulkan-enqueue-source-capture-ready-coverage"})
+                current.append({**event, "stage": "rust-vulkan-executed-capture-ready-coverage"})
+        doc = {"captures": [{"renderedFrameIndex": 10}, {"renderedFrameIndex": 20}]}
+        self.assertTrue(harness.capture_sequence_terrain_coverage(baseline, current, doc, doc)["passed"])
+        self.assertFalse(harness.capture_sequence_terrain_coverage(baseline, current[:-1], doc, doc)["passed"])
+        changed = copy.deepcopy(current)
+        changed[-1]["aggregate"]["indexCount"] = 18
+        report = harness.capture_sequence_terrain_coverage(baseline, changed, doc, doc)
+        self.assertTrue(report["captures"][0]["passed"])
+        self.assertFalse(report["captures"][1]["passed"])
+        self.assertFalse(harness.capture_sequence_terrain_coverage(baseline + [baseline[-1]], current, doc, doc)["passed"])
+
+    def test_native_atlas_observation_joins_exact_present_not_teardown(self) -> None:
+        observation = ("atlas-animation-observation texture=1 generation=3 sprite=23 tick=431 "
+                       "frame=2 sheet_frame=2 subframe=7 visible=true "
+                       "retained_rgba_fnv64=5ce80ead2b16a69a accepted_submission=677")
+        present = "gal.frame.present backend=vulkan correlation=359 frame=359 image=4 submission=679 status=1"
+        later = observation.replace("tick=431", "tick=459").replace("accepted_submission=677", "accepted_submission=681")
+        result = harness.native_atlas_state_at_presentation("\n".join((observation, present, later)), 359, 23)
+        self.assertEqual(431, result["tick"])
+        self.assertEqual(677, result["accepted_submission"])
+        self.assertEqual(679, result["presentation_submission"])
+        self.assertIsNone(harness.native_atlas_state_at_presentation(later + "\n" + present, 359, 23))
+        self.assertIsNone(harness.native_atlas_state_at_presentation(observation + "\n" + present, 360, 23))
+        self.assertIsNone(harness.native_atlas_state_at_presentation(present + "\n" + observation, 359, 23))
+        self.assertIsNone(harness.native_atlas_state_at_presentation(observation + "\n" + present, 359, 24))
+        # A selected capture re-emits one retained accepted receipt after the
+        # bounded streaming trace is exhausted; never infer it from old ticks.
+        selected_present = present.replace("submission=679", "submission=683")
+        capped_stream = "\n".join([observation] * 1024)
+        selected = harness.native_atlas_state_at_presentation(
+            "\n".join((capped_stream, later, selected_present)), 359, 23)
+        self.assertEqual(459, selected["tick"])
+        self.assertEqual(681, selected["accepted_submission"])
+        self.assertEqual(683, selected["presentation_submission"])
+
+    def test_particle_animation_transition_rejects_frozen_current_pixels_despite_small_error(self) -> None:
+        from PIL import Image
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            reference = root / "reference"
+            current = root / "current"
+            reference.mkdir()
+            current.mkdir()
+            def pair(directory, phase):
+                return {"baseline_artifact": str(directory / "baseline.json"),
+                        "current_artifact": str(directory / "current.json"),
+                        "terrain_particle_animation": {"frozen": {"frame": 0, "subFrame": phase},
+                                                       "native": {"frame": 0, "subframe": phase}},
+                        "terrain_particle_local": {"crop_box": [0, 0, 2, 2]},
+                        "outputs": {"baseline_copy": str(directory / "baseline.png"),
+                                    "current_copy": str(directory / "current.png")}}
+            before = pair(reference, 0)
+            after = pair(current, 3)
+            (reference / harness.MANIFEST_NAME).write_text(json.dumps(
+                {"success": True, "cross_repository_visual_parity": {"pairs": [before]}}))
+            for directory in (reference, current):
+                for side in ("frozen", "current"):
+                    Image.new("RGB", (2, 2), (20, 30, 40)).save(directory / (side + "_particle_crop.png"))
+            Image.new("RGB", (2, 2), (22, 33, 42)).save(current / "frozen_particle_crop.png")
+            report = {"pairs": [after]}
+            self.assertFalse(harness.particle_animation_transition_report(report, None, 6)["passed"])
+            with mock.patch.object(harness, "deterministic_capture_document", return_value={}), \
+                 mock.patch.object(harness, "deterministic_visual_fixture_equivalence", return_value={"status": "passed"}) as equivalent:
+                stale = harness.particle_animation_transition_report(report, reference, 6)
+                self.assertFalse(stale["passed"])
+                self.assertEqual([0, 0, 0], stale["pairs"][0]["current_change_mean_rgb"])
+                noise = Image.new("RGB", (2, 2), (20, 30, 40))
+                noise.putpixel((0, 0), (22, 33, 42))
+                noise.save(current / "current_particle_crop.png")
+                self.assertFalse(harness.particle_animation_transition_report(report, reference, 6)["passed"])
+                Image.new("RGB", (2, 2), (22, 33, 42)).save(current / "current_particle_crop.png")
+                self.assertTrue(harness.particle_animation_transition_report(report, reference, 6)["passed"])
+                equivalent.return_value = {"status": "failed"}
+                self.assertFalse(harness.particle_animation_transition_report(report, reference, 6)["passed"])
+            self.assertTrue(harness.particle_animation_transition_report({"pairs": [before]}, None, 6)["passed"])
+
+    def test_block_display_animation_requires_same_captured_upload_pixels(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            artifact = root / "artifact.json"
+            log = root / "run.log"
+            digest = "5ce80ead2b16a69a"
+            log.write_text("atlas-animation-observation texture=1 generation=3 sprite=23 tick=431 "
+                           "frame=2 sheet_frame=2 subframe=7 visible=true "
+                           f"retained_rgba_fnv64={digest} accepted_submission=677\n"
+                           "gal.frame.present backend=vulkan correlation=359 submission=679\n")
+            artifact.write_text(json.dumps({"capture": {"files": {"run_log": str(log)}}}))
+            (root / "capture_request_01_initial.ack.json").write_text(json.dumps({
+                "wholeFramePresentationCorrelation": {"correlationId": 359}}))
+            doc = {"blockDisplayScenario": "magma", "blockDisplayAnimationAtCapture": {"spriteId": 23},
+                   "captures": [{"index": 1, "poseName": "initial", "screenshot": str(root / "01_initial.png")}]}
+            baseline = {"blockDisplayAnimationAtCapture": {"uploadedRgbaFnv64": digest},
+                        "blockDisplayAnimationPresentedFrame": 2173,
+                        "captures": [{"renderedFrameIndex": 2173}]}
+            with mock.patch.object(harness, "deterministic_capture_document", return_value=doc):
+                self.assertTrue(harness.block_display_animation_upload_equivalence(baseline, artifact)["passed"])
+                doc.pop("blockDisplayScenario")
+                doc["terrainParticleFixture"] = {"fixture": "magma-terrain-particle-v1"}
+                self.assertTrue(harness.block_display_animation_upload_equivalence(baseline, artifact)["passed"],
+                                "particle-only animation must use the same exact-present upload gate")
+                for invalid in (None, -1, 2172, True, "2173"):
+                    baseline["blockDisplayAnimationPresentedFrame"] = invalid
+                    self.assertFalse(harness.block_display_animation_upload_equivalence(baseline, artifact)["passed"])
+                baseline["blockDisplayAnimationPresentedFrame"] = 2173
+                baseline["captures"][0]["renderedFrameIndex"] = 2214
+                self.assertFalse(harness.block_display_animation_upload_equivalence(baseline, artifact)["passed"])
+                baseline["captures"][0]["renderedFrameIndex"] = 2173
+                for invalid in (None, "null", "0000000000000000"):
+                    baseline["blockDisplayAnimationAtCapture"]["uploadedRgbaFnv64"] = invalid
+                    self.assertFalse(harness.block_display_animation_upload_equivalence(baseline, artifact)["passed"])
+                self.assertFalse(harness.block_display_animation_upload_equivalence({}, artifact)["passed"])
+
+    def test_particle_local_comparison_requires_producer_and_rejects_diluted_error(self) -> None:
+        from PIL import Image
+        baseline = Image.new("RGB", (200, 200), "white")
+        current = baseline.copy()
+        baseline.paste((100, 30, 0), (90, 90, 110, 110))
+        doc = {"terrainParticleFixture": {}, "captures": [{"renderedFrameIndex": 10}], "rustGalWorldTerrainParticles": []}
+        self.assertFalse(harness.terrain_particle_local_visual_evidence(doc, baseline, current, 6)["passed"])
+        doc["rustGalWorldTerrainParticles"] = [{"spriteId": "minecraft:block/magma", "projected": True, "frameIndex": 10,
+            "route": "rust-vulkan-whole-frame", "screenBounds": {"left": 90, "top": 90, "right": 110, "bottom": 110}}]
+        self.assertFalse(harness.terrain_particle_local_visual_evidence(doc, baseline, current, 6)["passed"])
+        current.paste((100, 30, 0), (90, 90, 110, 110))
+        self.assertTrue(harness.terrain_particle_local_visual_evidence(doc, baseline, current, 6)["passed"])
+        doc["rustGalWorldTerrainParticles"][0]["frameIndex"] = 9
+        self.assertFalse(harness.terrain_particle_local_visual_evidence(doc, baseline, current, 6)["passed"],
+                         "an earlier projected particle is not capture-frame producer evidence")
+
+    def test_block_display_local_comparison_rejects_diluted_face_error(self) -> None:
+        from PIL import Image, ImageChops, ImageStat
+        baseline = Image.new("RGB", (200, 200), "white")
+        current = baseline.copy()
+        current.paste((120, 120, 120), (80, 100, 100, 120))
+        self.assertLess(max(ImageStat.Stat(ImageChops.difference(baseline, current)).mean), 6)
+        doc = {"blockDisplayScenario": "magma", "captures": [{"renderedFrameIndex": 9}],
+               "rustGalWorldBlockDisplays": [{"frameIndex": 9, "blockId": "minecraft:magma_block",
+                   "projected": True, "viewport": {"width": 200, "height": 200},
+                   "screenBounds": {"left": 80, "right": 100, "top": 80, "bottom": 100}}]}
+        self.assertFalse(harness.block_display_local_visual_evidence(doc, baseline, current, 6)["passed"])
+        self.assertTrue(harness.block_display_local_visual_evidence(doc, baseline, baseline, 6)["passed"])
+        doc["rustGalWorldBlockDisplays"][0]["frameIndex"] = 3
+        self.assertFalse(harness.block_display_local_visual_evidence(doc, baseline, baseline, 6)["passed"])
 
     def test_capture_window_metrics_excludes_teardown_values(self) -> None:
         log = """
@@ -2164,6 +2526,7 @@ rust_gal_world_background_sky_type=1 rust_gal_world_background_color_argb=ff78a7
             target = fake_repo(temp, mode.target)
             capture = temp / "capture"
             write_capture(capture, backend=mode.backend, shaders=mode.shaders, world="Origin")
+            write_vanilla_dh_snapshot(capture)
             screenshots = []
             for frame in range(5):
                 screenshot = capture / f"falling_block_sand_{frame}.png"
@@ -3626,6 +3989,7 @@ rust_gal_world_background_sky_type=1 rust_gal_world_background_color_argb=ff78a7
             target = fake_repo(temp, mode.target)
             capture = temp / "capture"
             write_capture(capture, backend=mode.backend, shaders=mode.shaders, world="Origin")
+            write_vanilla_dh_snapshot(capture)
             deterministic = {
                 "status": "complete",
                 "dimension": "minecraft:overworld",
@@ -3713,6 +4077,7 @@ rust_gal_world_background_sky_type=1 rust_gal_world_background_color_argb=ff78a7
             target = fake_repo(temp, mode.target)
             capture = temp / "capture"
             write_capture(capture, backend=mode.backend, shaders=mode.shaders, world="Origin")
+            write_vanilla_dh_snapshot(capture)
             deterministic = {
                 "status": "complete",
                 "dimension": "minecraft:overworld",
@@ -3807,6 +4172,22 @@ rust_gal_world_background_sky_type=1 rust_gal_world_background_color_argb=ff78a7
         self.assertEqual(by_vuid["VUID-vkCmdDraw-None-08600"]["draw"], 12)
         self.assertEqual(by_vuid["VUID-vkQueueSubmit-pSubmits-00074"]["semantic_operation"], "queue.submit")
         self.assertEqual(len(by_vuid["VUID-vkQueueSubmit-pSubmits-00074"]["objects"]), 2)
+
+    def test_numbered_retained_validation_events_do_not_hide_early_errors(self) -> None:
+        # The main log's bounded tail can omit these startup/item-cache errors.
+        text = "\n".join([
+            "===== runClient log =====",
+            "1691:Validation Error: [ VUID-vkCmdBeginRendering-pRenderingInfo-09588 ] | MessageID = 0xc84a9eb7",
+            "1692:vkQueueSubmit2(): depth image expects DEPTH_ATTACHMENT_OPTIMAL, current layout UNDEFINED.",
+            "",
+            "===== latest.log =====",
+            "(no matches)",
+        ])
+        findings = harness.parse_validation_findings(text)
+        self.assertEqual(len(findings), 1)
+        self.assertEqual(findings[0]["vuid"], "VUID-vkCmdBeginRendering-pRenderingInfo-09588")
+        self.assertEqual(findings[0]["severity"], "error")
+        self.assertIn("current layout UNDEFINED", findings[0]["message"])
 
     def test_old_and_new_validation_formats_parse_consistently_and_keep_full_text(self) -> None:
         long_tail = "pipeline-context=" + ("terrain/" * 120)
@@ -7941,9 +8322,27 @@ else:
             self.assertIn('panoramaTheme:"aquatic"', options)
             self.assertIn("-Dmattmc.dev.rustGalVulkanWholeFrame=true", runner.env["JAVA_TOOL_OPTIONS"])
 
+            # A menu comparison must not inherit a different blur preference
+            # from each repository's copied options.
+            (game_dir / "options.txt").write_text(options + "menuBackgroundBlurriness:0\n", encoding="utf-8")
+            config.title_screen_capture = True
+            with mock.patch.dict(os.environ, {"MATTMC_CAPTURE_MENU_BACKGROUND_BLUR": "5"}):
+                runner.configure_backend_and_validation()
+            self.assertIn("menuBackgroundBlurriness:5", (game_dir / "options.txt").read_text())
+            with mock.patch.dict(os.environ, {"MATTMC_CAPTURE_MENU_BACKGROUND_BLUR": "11"}):
+                with self.assertRaises(SystemExit):
+                    runner.configure_backend_and_validation()
+            with mock.patch.dict(os.environ, {"MATTMC_CAPTURE_MIPMAP_LEVELS": "0"}):
+                runner.configure_backend_and_validation()
+            self.assertIn("mipmapLevels:0", (game_dir / "options.txt").read_text())
+            with mock.patch.dict(os.environ, {"MATTMC_CAPTURE_MIPMAP_LEVELS": "5"}):
+                with self.assertRaises(SystemExit):
+                    runner.configure_backend_and_validation()
+
     def test_title_transition_does_not_complete_before_the_title_receipt(self) -> None:
         runner = capture_runner.CaptureRunner.__new__(capture_runner.CaptureRunner)
         runner.config = type("Config", (), {
+            "backend": "opengl",
             "title_screen_capture": True,
             "title_screen_transition_capture": True,
             "screenshot_max_count": 8,
@@ -7954,6 +8353,25 @@ else:
 
         runner.title_screen_receipt_observed = True
         self.assertTrue(runner.title_screen_timeline_complete())
+
+    def test_rust_menu_timeline_cannot_end_at_first_fading_title_receipt(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            runner = capture_runner.CaptureRunner.__new__(capture_runner.CaptureRunner)
+            runner.config = type("Config", (), {
+                "backend": "rust-vulkan", "title_screen_capture": True,
+                "title_screen_transition_capture": False, "screenshot_max_count": 1,
+            })()
+            runner.screenshot_count = 1
+            runner.title_screen_receipt_observed = True
+            runner.title_presented_frame_dir = Path(temp)
+            self.assertFalse(runner.title_screen_timeline_complete())
+            (Path(temp) / "title_frame_capture.ack.json").write_text('{"status":"captured"}')
+            self.assertTrue(runner.title_screen_timeline_complete())
+            runner.config.title_screen_transition_capture = True
+            runner.config.screenshot_max_count = 8
+            self.assertFalse(runner.title_screen_timeline_complete())
+            runner.screenshot_count = 8
+            self.assertTrue(runner.title_screen_timeline_complete())
 
     def test_title_transition_rejects_nonclient_desktop_screenshots(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -8134,7 +8552,7 @@ else:
             (game_dir / "options.txt").write_text("graphics_backend=vulkan\n", encoding="utf-8")
             dh_file = game_dir / "config" / "DistantHorizons.toml"
             dh_file.write_text(
-                "enableRendering = true\nenableDistantGeneration = true\n"
+                'rendererMode = "DEFAULT"\nenableRendering = true\nenableDistantGeneration = true\n'
                 "overrideVanillaGraphicsSettings = true\n"
                 "enableVanillaFog = false\nenableDhFog = true\n",
                 encoding="utf-8",
@@ -8154,6 +8572,7 @@ else:
             dh_text = dh_file.read_text(encoding="utf-8")
             self.assertIn("enableRendering = false", dh_text)
             self.assertIn("enableDistantGeneration = false", dh_text)
+            self.assertIn('rendererMode = "DISABLED"', dh_text)
             self.assertIn("overrideVanillaGraphicsSettings = false", dh_text)
             self.assertIn("enableVanillaFog = true", dh_text)
             self.assertIn("enableDhFog = false", dh_text)
@@ -8269,6 +8688,11 @@ else:
             self.assertIn("-Dmattmc.vulkan.deterministicTemporalParity=true", options)
             self.assertIn("-Dmattmc.vulkan.deterministicTemporalParity.worldTime=6000", options)
             self.assertNotIn("-Dmattmc.vulkan.traceShaderInputParity=true", options)
+            night_runner = capture_runner.CaptureRunner(config)
+            night_runner.env["MATTMC_CAPTURE_WORLD_TIME"] = "18000"
+            night_runner.configure_java_tool_options()
+            self.assertIn("-Dmattmc.vulkan.deterministicTemporalParity.worldTime=18000", night_runner.env["JAVA_TOOL_OPTIONS"])
+            self.assertNotIn("worldTime=6000", night_runner.env["JAVA_TOOL_OPTIONS"])
 
             config.shaders = "off"
             vanilla_runner = capture_runner.CaptureRunner(config)
@@ -8339,6 +8763,21 @@ else:
             command, env = harness.build_capture_command(target, mode, root / "capture", "correctness", args, "capture")
             self.assertIn("--deterministic-camera-capture", command)
             self.assertIn("-Dmattmc.dev.deterministicCameraCapture.fixedTime=6000", env["JAVA_TOOL_OPTIONS"])
+            args.capture_world_time = 18000
+            args.workload_profile = "settled-static"
+            args.world_static_terrain_scenario = "real-world"
+            for side, name in (("current", "current-rust-vulkan-shaders-off"), ("frozen", "frozen-opengl-shaders-off")):
+                night_target = fake_repo(root, side + "-night")
+                night_target = harness.RepoTarget(side, night_target.root, night_target.role)
+                night_mode = next(value for value in harness.MATRIX_MODES if value.name == name)
+                _, night_env = harness.build_capture_command(night_target, night_mode, root / (side + "-capture"), "correctness", args, "capture")
+                self.assertEqual("18000", night_env["MATTMC_CAPTURE_WORLD_TIME"])
+                self.assertIn("fixedTime=18000", night_env["JAVA_TOOL_OPTIONS"])
+                self.assertIn("worldTime=18000", night_env["JAVA_TOOL_OPTIONS"])
+                self.assertNotIn("worldTime=6000", night_env["JAVA_TOOL_OPTIONS"])
+            args.capture_world_time = -1
+            with self.assertRaisesRegex(ValueError, "nonnegative Java long"):
+                harness.validate_fixture_combinations(args)
 
     def test_static_translucent_overlap_capture_keeps_full_camera_sequence(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -8552,6 +8991,20 @@ else:
                 1,
                 java_options.count("-Dmattmc.dev.deterministicCameraCapture.internalScreenshots=true"),
             )
+
+    def test_vanilla_model_pair_preserves_ordinary_world_block_entities(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for name, mode_name in (("current", "current-rust-vulkan-shaders-off"),
+                                    ("frozen", "frozen-opengl-shaders-off")):
+                target = fake_repo(root / name, name)
+                mode = next(mode for mode in harness.MATRIX_MODES if mode.name == mode_name)
+                args = harness.parse_args(["capture", "--profile", "extended", "--mode", mode_name,
+                    "--world", "Origin", "--world-mesh-model-scenario", "bell"])
+                _, env = harness.build_capture_command(target, mode, root / name / "capture", "correctness", args, "capture")
+                self.assertNotIn("-Dmattmc.dev.deterministicCameraCapture.sourceEntityIsolation=true",
+                    shlex.split(env["JAVA_TOOL_OPTIONS"]))
+                self.assertEqual("4", env["MATTMC_CAPTURE_RENDER_DISTANCE"])
 
     def test_selected_source_falling_capture_preserves_multi_frame_sequence(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -8881,6 +9334,12 @@ else:
                             for key in records
                         ],
                     })
+                if name == "frozen":
+                    # Startup-ready records can have a larger game-time frame
+                    # number yet still precede the actual captured render.
+                    for event in list(events):
+                        events.append({**event, "stage": "java-opengl-draw-ready-coverage",
+                                       "frameId": 6000, "aggregate": {"records": 999}})
                 sidecar.write_text("\n".join(json.dumps(event) for event in events) + "\n", encoding="utf-8")
                 artifact.write_text("{}\n", encoding="utf-8")
                 artifacts.append(artifact)
@@ -8888,11 +9347,42 @@ else:
                 "pairs": [{"baseline_artifact": str(artifacts[0]), "current_artifact": str(artifacts[1])}],
             })
             failures = report["pairs"][0]["failures"]
+            self.assertEqual("java-opengl-draw-capture-ready-coverage",
+                             report["pairs"][0]["layers"]["solid"]["frozen_event"]["stage"])
             self.assertIn("solid_coverage_aggregate_mismatch", failures)
             self.assertNotIn("solid_coverage_missing_sections", failures)
             self.assertNotIn("solid_coverage_extra_sections", failures)
             self.assertTrue(report["pairs"][0]["layers"]["solid"]["current_records_complete"] is False)
             self.assertFalse(report["pairs"][0]["layers"]["solid"]["record_sets_comparable"])
+
+    def test_static_terrain_captured_artifacts_require_capture_coverage(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            artifacts = []
+            for name, stage in (
+                ("frozen", "java-opengl-draw-ready-coverage"),
+                ("current", "rust-vulkan-enqueue-source-ready-coverage"),
+            ):
+                artifact = root / name / "graphics_audit_artifact.json"
+                sidecar = artifact.parent / "capture" / "static_terrain_parity_diagnostics.jsonl"
+                sidecar.parent.mkdir(parents=True)
+                deterministic = artifact.parent / "deterministic.json"
+                deterministic.write_text(json.dumps({"captures": [{"renderedFrameIndex": 9}]}))
+                artifact.write_text(json.dumps({"capture": {"files": {"deterministic": str(deterministic)}}}))
+                sidecar.write_text("\n".join(json.dumps({
+                    "schema": "mattmc-static-terrain-draw-coverage-v1",
+                    "stage": stage, "layer": layer, "frameId": 9,
+                    "aggregate": {"records": 1},
+                    "records": [{"sectionKey": "same", "coveragePresent": 1, "primitiveCount": 6}],
+                }) for layer in ("solid", "cutout")) + "\n")
+                artifacts.append(artifact)
+            report = harness.cross_repository_static_terrain_draw_coverage_report({
+                "pairs": [{"baseline_artifact": str(artifacts[0]), "current_artifact": str(artifacts[1])}],
+            })
+            self.assertFalse(report["passed"])
+            for layer in ("solid", "cutout"):
+                for name in ("frozen", "current"):
+                    self.assertIn(f"{layer}_{name}_capture_coverage_missing", report["pairs"][0]["failures"])
 
     def test_static_terrain_execution_promotes_capture_ready_receipt(self) -> None:
         events = [
@@ -11498,6 +11988,39 @@ else:
         self.assertTrue(signature["diagnostic_hooks"])
         self.assertFalse(signature["performance_comparable"])
 
+    def test_frozen_numeric_diagnostic_flag_is_not_a_clean_run(self) -> None:
+        for value in ("1", "true", " TRUE "):
+            with self.subTest(value=value):
+                signature = harness.instrumentation_signature(
+                    {"graphics_run_type": "clean-performance", "graphics_audit_enabled": value}, ["gradlew"])
+                self.assertTrue(signature["diagnostic_hooks"])
+                self.assertTrue(signature["diagnostics_enabled"])
+                self.assertFalse(signature["performance_comparable"])
+                self.assertEqual(signature["run_type"], "graphics-diagnostics")
+        for value in ("0", "false", ""):
+            with self.subTest(value=value):
+                signature = harness.instrumentation_signature({"graphics_audit_enabled": value}, ["gradlew"])
+                self.assertFalse(signature["diagnostic_hooks"])
+                self.assertTrue(signature["performance_comparable"])
+                self.assertEqual(signature["run_type"], "clean-performance")
+
+    def test_completed_frozen_diagnostic_artifact_cannot_publish_performance(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "frozen-opengl-shaders-off")
+            target = fake_repo(root, "frozen")
+            capture = root / "capture"
+            write_capture(capture, backend="opengl", shaders="off")
+            clean = harness.normalize_capture_artifact(target, mode, capture, "correctness", True, ["fake"], 0, False)
+            self.assertTrue(clean["validation"]["complete"], clean["validation"]["messages"])
+            self.assertTrue(clean["validation"]["performance_publishable"])
+            meta = capture / "meta_20260101_000000.txt"
+            meta.write_text(meta.read_text() + "graphics_audit_enabled=1\n", encoding="utf-8")
+            diagnostic = harness.normalize_capture_artifact(target, mode, capture, "correctness", True, ["fake"], 0, False)
+            self.assertTrue(diagnostic["validation"]["complete"], diagnostic["validation"]["messages"])
+            self.assertFalse(diagnostic["validation"]["performance_publishable"])
+            self.assertTrue(diagnostic["benchmark_fingerprint"]["instrumentation"]["diagnostic_hooks"])
+
     def static_terrain_doc(self, **overrides: object) -> dict[str, object]:
         event: dict[str, object] = {
             "reason": "visible-submit",
@@ -12526,7 +13049,48 @@ else:
                 paths.append(path)
             self.assertEqual([], harness.aggregate_matrix(paths)["comparison_rejections"])
 
-    def test_title_screen_capture_omits_quick_play_and_disables_world_validation(self) -> None:
+    def test_title_screen_capture_retains_requested_vulkan_validation_without_world_fixture(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            target = fake_repo(root, "current")
+            mode = next(mode for mode in harness.MATRIX_MODES
+                        if mode.name == "current-rust-vulkan-shaders-off")
+            for validation, expected in (("standard", "standard"), ("off", "off")):
+                with self.subTest(validation=validation):
+                    args = harness.parse_args([
+                        "capture", "--profile", "standard", "--mode", mode.name,
+                        "--title-screen-capture", "--validation", validation,
+                    ])
+                    command, env = harness.build_capture_command(
+                        target, mode, root / validation, "correctness", args, "capture")
+                    self.assertEqual(expected, command[command.index("--validation") + 1])
+                    self.assertNotIn("--deterministic-camera-capture", command)
+                    self.assertNotIn("--quickPlaySingleplayer", " ".join(command))
+                    self.assertNotIn("MATTMC_GRAPHICS_CORRECTNESS_CAPTURE", env)
+
+    def test_static_options_fixture_is_explicit_and_rejects_transition(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            target = fake_repo(root, "current")
+            mode = next(mode for mode in harness.MATRIX_MODES
+                        if mode.name == "current-rust-vulkan-shaders-off")
+            arguments = ["capture", "--profile", "standard", "--mode", mode.name,
+                         "--title-screen-capture", "--menu-screen", "options"]
+            args = harness.parse_args(arguments)
+            _, env = harness.build_capture_command(target, mode, root / "capture", "correctness", args, "capture")
+            self.assertEqual("options", env["MATTMC_CAPTURE_MENU_SCREEN"])
+            self.assertEqual("true", env["MATTMC_CAPTURE_TITLE_STATIC_FIXTURE"])
+            missing_title = harness.parse_args([
+                "capture", "--profile", "standard", "--mode", mode.name,
+                "--menu-screen", "options",
+            ])
+            with self.assertRaisesRegex(ValueError, "requires --title-screen-capture"):
+                harness.build_capture_command(target, mode, root / "missing-title", "correctness", missing_title, "capture")
+            args = harness.parse_args(arguments + ["--title-screen-transition-capture"])
+            with self.assertRaisesRegex(ValueError, "static capture"):
+                harness.build_capture_command(target, mode, root / "transition", "correctness", args, "capture")
+
+    def test_title_screen_capture_omits_quick_play_and_world_fixture(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             target = fake_repo(root, "current")
@@ -12672,6 +13236,14 @@ else:
                 "title-screen capture did not produce a bounded completion screenshot from the client window",
                 artifact["validation"]["messages"],
             )
+            acknowledgement.unlink()
+            with meta.open("a", encoding="utf-8") as stream:
+                stream.write(f"screenshot_1={screenshot}\nscreenshot_1_target=0x1\n")
+            incomplete = harness.normalize_capture_artifact(
+                target, rust_vulkan_mode, capture, "correctness", True, ["fake"], 0, False
+            )
+            self.assertFalse(incomplete["capture"]["title_screen"]["completed"],
+                             "an ordinary screenshot must not substitute for the missing presented-frame ack")
 
     def test_frozen_title_presenter_ack_completes_title_capture_without_desktop_target(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -12800,6 +13372,32 @@ else:
             self.assertEqual("complete", report["pairs"][0]["status"])
             self.assertEqual([1, 1, 3, 3], report["pairs"][0]["crop_box"])
 
+            # A matching first image must not hide a bad or absent later pose.
+            for artifact in artifacts:
+                metadata = artifact.parent / "capture" / "deterministic_camera_capture_test.json"
+                doc = json.loads(metadata.read_text())
+                doc["captures"].append({**doc["captures"][0], "poseName": "second"})
+                metadata.write_text(json.dumps(doc), encoding="utf-8")
+            current = json.loads(artifacts[1].read_text())
+            crops = current["metrics"]["rust_gal_slice"]["world_mesh_model_capture_evidence"]["crops"]
+            second_crop = artifacts[1].parent / "capture" / "shots" / "second_crop.png"
+            Image.new("RGB", (2, 2), (40, 50, 60)).save(second_crop)
+            crops.append({**crops[0], "capture_index": 1, "crop_path": str(second_crop)})
+            pair = {"pairs": [{"baseline_artifact": str(artifacts[0]), "current_artifact": str(artifacts[1])}]}
+            def compare_all():
+                artifacts[1].write_text(json.dumps(current), encoding="utf-8")
+                return harness.write_cross_repo_model_crop_pairs(root / "all-poses", pair, 0.0)
+            self.assertTrue(compare_all()["passed"])
+            Image.new("RGB", (2, 2), (250, 50, 60)).save(second_crop)
+            failed = compare_all()
+            self.assertFalse(failed["passed"])
+            self.assertEqual("complete", failed["pairs"][0]["captures"][0]["status"])
+            self.assertEqual("visual-mismatch", failed["pairs"][0]["captures"][1]["status"])
+            crops.pop()
+            self.assertFalse(compare_all()["passed"], "missing later crop must fail")
+            crops.append(dict(crops[0]))
+            self.assertFalse(compare_all()["passed"], "duplicate crop cannot stand in for a missing pose")
+
     def test_cross_repo_visual_pair_uses_acknowledged_title_presentation(self) -> None:
         try:
             from PIL import Image
@@ -12818,6 +13416,7 @@ else:
                     "completed": True,
                     "semantic_receipt": {"panorama_spin": 7.25},
                     "presented_frame": {"screenshot": str(shot), "ack_status": "captured", "targetWindow": "0x1",
+                        "menu_state": self.menu_state_fixture(),
                         "windowProvenance": {"schema": "mattmc-window-capture-provenance-v1", "status": "verified", "targetWindow": "0x1", "expectedClientPid": 42, "observedWindowPid": 42}},
                 }}}), encoding="utf-8")
                 artifacts.append(artifact)
@@ -12852,6 +13451,35 @@ else:
             self.assertEqual("observational-transition", report["pairs"][0]["status"])
             self.assertTrue(report["pairs"][0]["observation_only"])
 
+    def test_title_image_size_mismatch_is_not_rescaled_to_pass(self) -> None:
+        from PIL import Image
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            artifacts = []
+            for name, size in (("frozen", (2, 2)), ("current", (3, 2))):
+                shot = root / (name + ".png")
+                Image.new("RGB", size, (10, 20, 30)).save(shot)
+                artifact = root / (name + ".json")
+                artifact.write_text(json.dumps({"capture": {"title_screen": {
+                    "requested": True, "completed": True,
+                    "presented_frame": {
+                        "screenshot": str(shot), "ack_status": "captured",
+                        "panorama_spin": 0.0, "targetWindow": "0x1",
+                        "menu_state": self.menu_state_fixture(),
+                        "window_provenance": {
+                            "schema": "mattmc-window-capture-provenance-v1",
+                            "status": "verified", "targetWindow": "0x1",
+                            "expectedClientPid": 42, "observedWindowPid": 42,
+                        },
+                    },
+                }}}), encoding="utf-8")
+                artifacts.append(artifact)
+            report = harness.write_cross_repo_visual_pairs(root / "output", {"pairs": [{
+                "baseline_artifact": str(artifacts[0]), "current_artifact": str(artifacts[1]),
+            }]}, mean_rgb_abs_tolerance=0.0)
+            self.assertFalse(report["passed"])
+            self.assertEqual("incomparable-image-size", report["pairs"][0]["status"])
+
     def test_cross_repo_title_visual_pair_rejects_missing_acknowledgement(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -12862,6 +13490,74 @@ else:
             evidence = harness.title_visual_fixture_equivalence(artifact, artifact)
             self.assertEqual("failed", evidence["status"])
             self.assertIn("baseline-title-presentation-not-acknowledged", evidence["mismatches"])
+
+    def test_normalized_title_window_provenance_still_requires_matching_pid(self) -> None:
+        receipt = {
+            "targetWindow": "0x1",
+            "window_provenance": {
+                "schema": "mattmc-window-capture-provenance-v1", "status": "verified",
+                "targetWindow": "0x1", "expectedClientPid": 42, "observedWindowPid": 42,
+            },
+        }
+        self.assertTrue(harness.title_window_provenance_verified(receipt))
+        receipt["window_provenance"]["observedWindowPid"] = 43
+        self.assertFalse(harness.title_window_provenance_verified(receipt))
+
+    def test_menu_visual_pair_rejects_wrong_screen_and_size(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            paths = [Path(temp) / "baseline.json", Path(temp) / "current.json"]
+            for path, screen, size in zip(paths, ["OptionsScreen", "TitleScreen"], [[1280, 720], [960, 640]]):
+                path.write_text(json.dumps({"capture": {"title_screen": {"presented_frame": {
+                    "capture_kind": "test-menu-presented-frame", "screen": screen, "framebuffer": size,
+                }}}}), encoding="utf-8")
+            evidence = harness.title_visual_fixture_equivalence(*paths)
+            self.assertIn("menu-screen", evidence["mismatches"])
+            self.assertIn("menu-framebuffer", evidence["mismatches"])
+            for path in paths:
+                path.write_text(json.dumps({"capture": {"title_screen": {"presented_frame": {
+                    "capture_kind": "test-menu-presented-frame", "screen": "OptionsScreen",
+                    "framebuffer": [None, None],
+                }}}}), encoding="utf-8")
+            evidence = harness.title_visual_fixture_equivalence(*paths)
+            self.assertIn("baseline-menu-framebuffer-invalid", evidence["mismatches"])
+            self.assertIn("current-menu-framebuffer-invalid", evidence["mismatches"])
+
+    def test_menu_visual_pair_rejects_different_observed_settings(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            shot = root / "presented.png"
+            shot.write_bytes(b"test presented image exists")
+            paths = [root / "baseline.json", root / "current.json"]
+            presented = {
+                "screenshot": str(shot), "ack_status": "captured", "panorama_spin": 0.0,
+                "capture_kind": "test-menu-presented-frame", "screen": "OptionsScreen",
+                "framebuffer": [1280, 720], "targetWindow": "0x1",
+                "window_provenance": {"schema": "mattmc-window-capture-provenance-v1",
+                    "status": "verified", "targetWindow": "0x1",
+                    "expectedClientPid": 42, "observedWindowPid": 42},
+            }
+            def write(path, state):
+                path.write_text(json.dumps({"capture": {"title_screen": {
+                    "requested": True, "completed": True,
+                    "presented_frame": {**presented, "menu_state": state},
+                }}}), encoding="utf-8")
+            for path in paths:
+                write(path, self.menu_state_fixture())
+            self.assertEqual("passed", harness.title_visual_fixture_equivalence(*paths)["status"])
+            for field, value in (("guiScale", 2), ("menuBlur", 0),
+                                 ("panoramaTheme", "classic"), ("hideSplashTexts", False)):
+                with self.subTest(field=field):
+                    state = self.menu_state_fixture()
+                    state[field] = value
+                    write(paths[1], state)
+                    result = harness.title_visual_fixture_equivalence(*paths)
+                    self.assertEqual("failed", result["status"])
+                    self.assertIn("menu-state", result["mismatches"])
+            # Matching missing/world-loaded states do not constitute equivalence.
+            for state in (None, {**self.menu_state_fixture(), "worldPresent": True}):
+                for path in paths:
+                    write(path, state)
+                self.assertEqual("failed", harness.title_visual_fixture_equivalence(*paths)["status"])
 
     def test_title_visual_pair_rejects_unverified_client_window(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -12920,6 +13616,167 @@ else:
         self.assertIn("deterministic_capture_rejected_root_target", source)
         self.assertNotIn('else\n        target_window="root"', source)
         self.assertNotIn('else\n        target_window="root"\n    fi\n\n    if import', source)
+
+
+class CelestialParityTests(unittest.TestCase):
+    def test_celestial_fixture_rejects_unpaired_modes_before_launch(self):
+        for modes in (["frozen-opengl-shaders-off"], ["current-rust-vulkan-shaders-off"]):
+            args = Namespace(capture_celestial="sun", capture_world_time=6000, mode=modes)
+            with self.assertRaisesRegex(ValueError, "paired Current and Frozen OpenGL"):
+                harness.validate_fixture_combinations(args)
+        args.mode = ["current-rust-vulkan-shaders-off", "frozen-opengl-shaders-off"]
+        harness.validate_fixture_combinations(args)
+
+    def test_matching_highlights_do_not_hide_wrong_dark_detail(self):
+        from PIL import Image, ImageDraw
+        with tempfile.TemporaryDirectory() as directory:
+            baseline = Path(directory) / "baseline.png"
+            current = Path(directory) / "current.png"
+            sky = Image.new("RGB", (1280, 720), (126, 174, 255))
+            for path, ring in ((baseline, (8, 9, 11)), (current, (66, 67, 69))):
+                image = sky.copy()
+                draw = ImageDraw.Draw(image)
+                draw.ellipse((515, 235, 765, 485), outline=ring, width=8)
+                draw.rectangle((610, 330, 670, 390), fill="white")
+                image.save(path)
+            report = harness.celestial_image_pair(baseline, current)
+            self.assertEqual([0., 0., 0.], report["bright_union_mean_rgb_abs"])
+            self.assertLess(max(report["region_mean_rgb_abs"]), 6.)
+            self.assertGreater(max(report["dark_detail_union_mean_rgb_abs"]), 6.)
+            self.assertFalse(report["passed"])
+
+    def test_dark_moon_requires_a_central_body_and_matching_pixels(self):
+        from PIL import Image, ImageDraw
+        with tempfile.TemporaryDirectory() as directory:
+            baseline = Path(directory) / "baseline.png"
+            current = Path(directory) / "current.png"
+            empty = Image.new("RGB", (1280, 720), (0, 0, 0))
+            moon = empty.copy()
+            ImageDraw.Draw(moon).rectangle((620, 340, 659, 379), fill=(176, 184, 206))
+            moon.save(baseline)
+            moon.save(current)
+            self.assertTrue(capture_runner.celestial_body_witness(moon, "moon")["passed"])
+            self.assertTrue(harness.celestial_image_pair(baseline, current, body="moon")["passed"])
+            stars = empty.copy()
+            for x in range(330, 950, 20):
+                for y in range(150, 570, 20):
+                    stars.putpixel((x, y), (218, 229, 255))
+            hud = empty.copy()
+            ImageDraw.Draw(hud).rectangle((400, 680, 880, 719), fill="white")
+            for invalid in (empty, stars, hud, Image.new("RGB", empty.size, (120, 160, 235))):
+                invalid.save(current)
+                self.assertFalse(harness.celestial_image_pair(baseline, current, body="moon")["passed"])
+            wrong = moon.point(lambda value: min(255, value + 20))
+            wrong.save(current)
+            self.assertFalse(harness.celestial_image_pair(baseline, current, body="moon")["passed"])
+
+    def test_completed_capture_validation_failure_is_not_shutdown_timeout(self):
+        doc = {"status": "complete"}
+        phase = harness.timeout_phase_for_artifact(
+            "capture", False, 2, None, None, doc,
+            {"deterministic_validation": "failed", "exit_code": "0"})
+        self.assertEqual("artifact-validation", phase)
+        state = harness.readiness_state_from_text("capture", phase, None, doc, "", {})
+        self.assertEqual("artifact-validation-failed", state["timeout_classification"])
+        self.assertEqual("shutdown", harness.timeout_phase_for_artifact(
+            "capture", True, 2, None, None, doc, {"deterministic_validation": "failed"}))
+        self.assertEqual("shutdown", harness.timeout_phase_for_artifact(
+            "capture", False, 1, None, None, doc,
+            {"deterministic_validation": "failed", "exit_code": "1"}))
+
+    def test_dark_moon_metadata_requires_explicit_fixture_and_keeps_pose_checks(self):
+        from PIL import Image, ImageDraw
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            screenshot = root / "01_initial.png"
+            moon = Image.new("RGB", (1280, 720), "black")
+            ImageDraw.Draw(moon).rectangle((620, 340, 659, 379), fill=(176, 184, 206))
+            moon.save(screenshot)
+            identity = {"backend": "rust-vulkan", "shaderEnabled": False, "shaderPack": "unset",
+                        "gitCommit": "abc123", "dimension": "minecraft:overworld",
+                        "window": {"width": 1280, "height": 720}}
+            position = {"x": 150.5, "y": 100., "z": 530.5}
+            capture = dict(identity, index=1, poseName="initial", screenshot=str(screenshot),
+                           position=position, requestedYaw=0., observedYaw=0.,
+                           requestedPitch=-90., observedPitch=-90., renderedFrameIndex=8)
+            doc = dict(identity, status="complete", yawDelta=0., initialPose={"yaw": 0., "pitch": -90.},
+                       initialPosition=position, poseSequence=["initial"], captures=[capture])
+            metadata = root / "capture.json"
+            metadata.write_text(json.dumps(doc), encoding="utf-8")
+            with self.assertRaisesRegex(RuntimeError, "blank"):
+                capture_runner.validate_deterministic_metadata(metadata, root, .001)
+            capture_runner.validate_deterministic_metadata(metadata, root, .001, celestial_body="moon")
+            capture["observedPitch"] = 0.
+            metadata.write_text(json.dumps(doc), encoding="utf-8")
+            with self.assertRaisesRegex(RuntimeError, "observed pitch mismatch"):
+                capture_runner.validate_deterministic_metadata(metadata, root, .001, celestial_body="moon")
+            Image.new("RGB", moon.size, "black").save(screenshot)
+            with self.assertRaisesRegex(RuntimeError, "lacks central moon"):
+                capture_runner.validate_deterministic_metadata(metadata, root, .001, celestial_body="moon")
+
+    def test_shared_camera_and_clock(self):
+        for body, clock in (("sun", 6000), ("moon", 18000)):
+            args = Namespace(capture_celestial=body, capture_world_time=clock)
+            camera = harness.canonical_camera_options(args)
+            self.assertEqual(-90.0, camera["pitch"])
+            self.assertEqual(0.0, camera["yaw"])
+            harness.validate_fixture_combinations(args)
+            args.capture_world_time = clock + 6000
+            with self.assertRaisesRegex(ValueError, "noon.*midnight"):
+                harness.validate_fixture_combinations(args)
+
+    def test_body_gate_rejects_empty_sky_and_opaque_black_surround(self):
+        from PIL import Image, ImageDraw
+        with tempfile.TemporaryDirectory() as directory:
+            baseline = Path(directory) / "baseline.png"
+            current = Path(directory) / "current.png"
+            sky = Image.new("RGB", (200, 150), (120, 160, 235))
+            sun = sky.copy()
+            ImageDraw.Draw(sun).rectangle((85, 60, 115, 90), fill=(255, 255, 255))
+            sun.save(baseline)
+            sun.save(current)
+            self.assertTrue(harness.celestial_image_pair(baseline, current)["passed"])
+            sky.save(current)
+            self.assertFalse(harness.celestial_image_pair(baseline, current)["passed"])
+            wrong = sky.copy()
+            draw = ImageDraw.Draw(wrong)
+            draw.rectangle((60, 40, 140, 110), fill=(0, 0, 0))
+            draw.rectangle((85, 60, 115, 90), fill=(255, 255, 255))
+            wrong.save(current)
+            self.assertFalse(harness.celestial_image_pair(baseline, current)["passed"])
+            self.assertFalse(harness.celestial_parity_report({}, "sun", 6)["passed"])
+
+
+class NightStarParityTests(unittest.TestCase):
+    def test_sparse_star_gate_rejects_absence_shift_and_wrong_brightness(self):
+        from PIL import Image
+        with tempfile.TemporaryDirectory() as directory:
+            baseline = Path(directory) / "baseline.png"
+            current = Path(directory) / "current.png"
+            sky = Image.new("RGB", (200, 150), (4, 5, 7))
+            for x in range(20, 180, 10):
+                for y in (15, 30, 45):
+                    sky.putpixel((x, y), (64, 65, 67))
+            sky.save(baseline)
+            sky.save(current)
+            self.assertTrue(harness.night_star_image_pair(baseline, current)["passed"])
+            missing_one = sky.copy()
+            missing_one.putpixel((20, 15), (4, 5, 7))
+            missing_one.save(current)
+            self.assertFalse(harness.night_star_image_pair(baseline, current)["passed"],
+                             "a missing whole star must not hide in the sparse-pixel mean")
+            Image.new("RGB", sky.size, (4, 5, 7)).save(current)
+            self.assertFalse(harness.night_star_image_pair(baseline, current)["passed"])
+            wrong = Image.new("RGB", sky.size, (4, 5, 7))
+            for x in range(20, 180, 10):
+                for y in (15, 30, 45):
+                    wrong.putpixel((x + 2, y), (64, 65, 67))
+            wrong.save(current)
+            self.assertFalse(harness.night_star_image_pair(baseline, current)["passed"])
+            sky.point(lambda value: min(255, value * 2)).save(current)
+            self.assertFalse(harness.night_star_image_pair(baseline, current)["passed"])
+            self.assertFalse(harness.night_star_parity_report({}, True, 6)["passed"])
+            self.assertTrue(harness.night_star_parity_report({}, False, 6)["passed"])
 
 
 if __name__ == "__main__":

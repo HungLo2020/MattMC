@@ -494,6 +494,17 @@ pub(crate) struct TerrainColoredLightPreparation {
 }
 
 #[derive(Clone, Copy, Debug)]
+pub(crate) struct TerrainTranslucentCaptureTargets {
+    pub extent: Extent3d,
+    pub color_texture: Handle,
+    pub color_view: Handle,
+    pub depth_texture: Handle,
+    pub depth_view: Handle,
+    pub target: Handle,
+    pub pass: Handle,
+}
+
+#[derive(Clone, Copy)]
 pub(crate) struct TerrainRuntimeTargets {
     pub shadow_depth_texture: Handle,
     pub shadow_depth_view: Handle,
@@ -527,10 +538,10 @@ pub(crate) struct TerrainRuntimeTargets {
     pub deferred_lighting_resource_set: Handle,
     pub translucent_target: Handle,
     pub translucent_pass: Handle,
-    /// Optional isolated color capture for translucent terrain.  The normal
+    /// Optional isolated color/depth capture for translucent terrain. The normal
     /// deferred path still writes `deferred_lit`; this target preserves only
     /// the translucent draw stream for a later explicit Fabulous handoff.
-    pub translucent_capture: Option<(Handle, Handle, Handle, Handle)>,
+    pub translucent_capture: Option<TerrainTranslucentCaptureTargets>,
     pub translucent_capture_initialized: bool,
     pub composite0_texture: Handle,
     pub composite0_view: Handle,
@@ -7370,11 +7381,9 @@ impl ShaderPackRuntimeExecutor {
         }) {
             return Ok(());
         }
-        if let Some((capture_texture, capture_view, capture_target, capture_pass)) =
-            targets.translucent_capture
-        {
+        if let Some(capture) = targets.translucent_capture {
             ops.push(CommandOp::Barrier(texture_barrier(
-                capture_texture,
+                capture.color_texture,
                 if targets.translucent_capture_initialized {
                     TextureUsageState::ShaderRead
                 } else {
@@ -7385,13 +7394,31 @@ impl ShaderPackRuntimeExecutor {
             ops.push(CommandOp::Barrier(texture_barrier(
                 targets.depth_texture,
                 TextureUsageState::ShaderRead,
-                TextureUsageState::DepthStencilAttachment,
+                TextureUsageState::TransferSrc,
+            )));
+            ops.push(CommandOp::Barrier(texture_barrier(
+                capture.depth_texture,
+                if targets.translucent_capture_initialized { TextureUsageState::ShaderRead }
+                else { TextureUsageState::Undefined },
+                TextureUsageState::TransferDst,
+            )));
+            ops.push(CommandOp::CopyTexture(TextureImageCopyRegion {
+                src_texture: targets.depth_texture, src_mip: 0, src_layer: 0,
+                src_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
+                dst_texture: capture.depth_texture, dst_mip: 0, dst_layer: 0,
+                dst_origin: TextureOrigin3d { x: 0, y: 0, z: 0 }, extent: capture.extent,
+            }));
+            ops.push(CommandOp::Barrier(texture_barrier(
+                targets.depth_texture, TextureUsageState::TransferSrc, TextureUsageState::ShaderRead,
+            )));
+            ops.push(CommandOp::Barrier(texture_barrier(
+                capture.depth_texture, TextureUsageState::TransferDst, TextureUsageState::DepthStencilAttachment,
             )));
             ops.push(CommandOp::BeginPass {
-                pass: capture_pass,
-                target: capture_target,
+                pass: capture.pass,
+                target: capture.target,
                 colors: vec![PassAttachment {
-                    view: capture_view,
+                    view: capture.color_view,
                     load_op: AttachmentLoadOp::Clear,
                     store_op: AttachmentStoreOp::Store,
                     clear_color: Some(ClearColor {
@@ -7402,7 +7429,7 @@ impl ShaderPackRuntimeExecutor {
                     }),
                 }],
                 depth_stencil: Some(PassAttachment {
-                    view: targets.depth_view,
+                    view: capture.depth_view,
                     load_op: AttachmentLoadOp::Load,
                     store_op: AttachmentStoreOp::Store,
                     clear_color: None,
@@ -7434,12 +7461,12 @@ impl ShaderPackRuntimeExecutor {
             }
             ops.push(CommandOp::EndPass);
             ops.push(CommandOp::Barrier(texture_barrier(
-                capture_texture,
+                capture.color_texture,
                 TextureUsageState::ColorAttachment,
                 TextureUsageState::ShaderRead,
             )));
             ops.push(CommandOp::Barrier(texture_barrier(
-                targets.depth_texture,
+                capture.depth_texture,
                 TextureUsageState::DepthStencilAttachment,
                 TextureUsageState::ShaderRead,
             )));

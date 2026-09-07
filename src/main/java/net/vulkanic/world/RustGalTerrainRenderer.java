@@ -106,6 +106,7 @@ public final class RustGalTerrainRenderer {
 	private static volatile byte[] normalAtlasPayload;
 	private static volatile byte[] specularAtlasPayload;
 	private static volatile FluidSpriteAsset waterStillAsset;
+	private static volatile AtlasAnimationResource atlasAnimationSource;
 	private static volatile FluidSpriteAsset waterFlowAsset;
 	private static volatile FluidSpriteAsset waterOverlayAsset;
 	private static final AtomicLong acceptedBuildOutputs = new AtomicLong();
@@ -944,6 +945,7 @@ public final class RustGalTerrainRenderer {
 			synchronized (RustGalTerrainRenderer.class) {
 				atlasPayload = null;
 				atlasMipPayloads = List.of();
+				atlasAnimationSource = null;
 			copiedAtlasSemanticGeneration = 0L;
 			copiedAtlasSemanticFrameKey = Long.MIN_VALUE;
 			normalAtlasPayload = null;
@@ -1549,6 +1551,7 @@ public final class RustGalTerrainRenderer {
 		synchronized (RustGalTerrainRenderer.class) {
 			atlasPayload = copied;
 			atlasMipPayloads = List.of();
+			atlasAnimationSource = null;
 			atlasGeneration++;
 			registeredAtlasGeneration = atlasGeneration;
 			generation = atlasGeneration;
@@ -1603,6 +1606,7 @@ public final class RustGalTerrainRenderer {
 		ensureAtlasPayload();
 		byte[] payload;
 		List<byte[]> mipPayloads;
+		AtlasAnimationResource animation;
 		long generation;
 		synchronized (RustGalTerrainRenderer.class) {
 			if (atlasPayload == null || publishedWorldMeshAtlasGeneration == atlasGeneration) {
@@ -1610,19 +1614,22 @@ public final class RustGalTerrainRenderer {
 			}
 			payload = atlasPayload;
 			mipPayloads = atlasMipPayloads;
+			animation = atlasAnimationSource;
 			generation = atlasGeneration;
 			publishedWorldMeshAtlasGeneration = generation;
 		}
 		texturePayloadUpdates.incrementAndGet();
 		texturePayloadUpdateBytes.addAndGet(atlasPayloadByteCount(payload, mipPayloads));
-		RustGalWorldPrimitiveRenderer.registerWorldMeshTexture(
-			new VulkanicGalBridge.WorldMeshTextureAssetRecord(
+		var texture = new VulkanicGalBridge.WorldMeshTextureAssetRecord(
 				RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_TERRAIN_BLOCK_ATLAS,
 				payload,
 				mipPayloads
-			),
-			"terrain-atlas"
-		);
+			);
+		if (animation != null) {
+			RustGalWorldPrimitiveRenderer.registerTerrainAtlasAnimation(texture, animation);
+		} else {
+			RustGalWorldPrimitiveRenderer.registerWorldMeshTexture(texture, "terrain-atlas");
+		}
 	}
 
 	/**
@@ -2085,7 +2092,10 @@ public final class RustGalTerrainRenderer {
 				sourceSortedIndexBytes,
 				mesh.getPrimitiveMetadata(),
 				vertices,
-				vertexCount
+				vertexCount,
+				AtlasAnimationResource.privateTickDeliveryEnabled()
+					&& WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan()
+					? WaterTextureBinding.BLOCK_ATLAS : WaterTextureBinding.SEPARATE_SHEETS
 			);
 			if (orderedTranslucentMesh.retainedIndexCount() == 0) {
 				return null;
@@ -2318,8 +2328,19 @@ public final class RustGalTerrainRenderer {
 		}
 	}
 
+	/** Resource binding only: animation clocks and uploads remain owned by Rust. */
+	enum WaterTextureBinding { BLOCK_ATLAS, SEPARATE_SHEETS }
+
 	static OrderedTranslucentMesh buildOrderedTranslucentMesh(byte[] sourceSortedIndexBytes,
 			int[] primitiveMetadata, List<VulkanicGalBridge.WorldMeshVertexRecord> vertices, int vertexCount) {
+		return buildOrderedTranslucentMesh(sourceSortedIndexBytes, primitiveMetadata, vertices, vertexCount,
+			WaterTextureBinding.SEPARATE_SHEETS);
+	}
+
+	static OrderedTranslucentMesh buildOrderedTranslucentMesh(byte[] sourceSortedIndexBytes,
+			int[] primitiveMetadata, List<VulkanicGalBridge.WorldMeshVertexRecord> vertices, int vertexCount,
+			WaterTextureBinding waterBinding) {
+		java.util.Objects.requireNonNull(waterBinding);
 		if (sourceSortedIndexBytes.length == 0 || sourceSortedIndexBytes.length % (Integer.BYTES * 6) != 0) {
 			throw new IllegalArgumentException("translucent sorted index payload must contain whole u32 quads");
 		}
@@ -2389,13 +2410,14 @@ public final class RustGalTerrainRenderer {
 				appendPrimitiveSample(primitiveSample, primitiveId, primitiveKind, "omitted", 0, 0, retainedIndexCount);
 				continue;
 			}
-			int textureId = translucentTextureForPrimitive(primitiveKind, primitiveId, vertices);
+			int textureId = translucentTextureForPrimitive(primitiveKind, primitiveId, vertices, waterBinding);
 			if (primitiveKind == NativeSectionMeshBuilder.PRIMITIVE_KIND_BUILTIN_WATER) {
-				if (textureId == RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_WATER_STILL) {
+				int waterType = vertices.get(primitiveId * 4).shaderMaterialType();
+				if (waterType == 1) {
 					waterStillPrimitiveCount++;
-				} else if (textureId == RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_WATER_FLOW) {
+				} else if (waterType == 2) {
 					waterFlowPrimitiveCount++;
-				} else if (textureId == RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_WATER_OVERLAY) {
+				} else if (waterType == 3) {
 					waterOverlayPrimitiveCount++;
 				}
 				if (previousRetainedTextureId != 0 && previousRetainedTextureId != textureId) {
@@ -2610,7 +2632,7 @@ public final class RustGalTerrainRenderer {
 	}
 
 	private static int translucentTextureForPrimitive(int primitiveKind, int primitiveId,
-			List<VulkanicGalBridge.WorldMeshVertexRecord> vertices) {
+			List<VulkanicGalBridge.WorldMeshVertexRecord> vertices, WaterTextureBinding waterBinding) {
 		if (primitiveKind != NativeSectionMeshBuilder.PRIMITIVE_KIND_BUILTIN_WATER) {
 			return RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_TERRAIN_BLOCK_ATLAS;
 		}
@@ -2625,8 +2647,8 @@ public final class RustGalTerrainRenderer {
 				original.x(),
 				original.y(),
 				original.z(),
-				clamp01(asset.localU(original.u())),
-				clamp01(asset.localV(original.v())),
+				waterBinding == WaterTextureBinding.BLOCK_ATLAS ? original.u() : clamp01(asset.localU(original.u())),
+				waterBinding == WaterTextureBinding.BLOCK_ATLAS ? original.v() : clamp01(asset.localV(original.v())),
 				original.atlasU(),
 				original.atlasV(),
 				original.shaderBlockId(),
@@ -2638,7 +2660,8 @@ public final class RustGalTerrainRenderer {
 				original.midBlockPacked()
 			));
 		}
-		return asset.textureId();
+		return waterBinding == WaterTextureBinding.BLOCK_ATLAS
+			? RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_TERRAIN_BLOCK_ATLAS : asset.textureId();
 	}
 
 	private static FluidSpriteAsset waterTextureForPrimitive(List<VulkanicGalBridge.WorldMeshVertexRecord> vertices) {
@@ -2898,7 +2921,7 @@ public final class RustGalTerrainRenderer {
 			transform,
 			viewportWidth,
 			viewportHeight,
-			layer == ChunkSectionLayer.TRANSLUCENT ? RustGalWorldPrimitiveRenderer.DEPTH_POLICY_TEST_NO_WRITE : RustGalWorldPrimitiveRenderer.DEPTH_POLICY_TEST_WRITE,
+			terrainDepthPolicy(layer),
 			// Match Sodium's terrain pipeline contract for every layer. The
 			// copied mesh preserves its authored winding, so this remains an
 			// explicit semantic request rather than an OpenGL-state fallback.
@@ -2907,6 +2930,15 @@ public final class RustGalTerrainRenderer {
 		long enqueueFrameId = rustEnqueueFrames.incrementAndGet();
 		if (submitted) {
 			visibleLayerSubmissions.incrementAndGet();
+			// This section's accepted semantic draw supplies CPU resource names,
+			// never Sodium render-list storage or its mutable sprite-active flags.
+			var animatedSprites = section.getAnimatedSprites();
+			if (animatedSprites != null) {
+				for (var sprite : animatedSprites) {
+					RustGalWorldPrimitiveRenderer.recordAtlasSpriteUse(
+						sprite.semanticAnimationResource(), sprite.atlasLocation(), sprite.contents().name());
+				}
+			}
 			recordCurrentFrameVisibleSubmission(enqueueFrameId);
 			recordVisibleSubmissionIdentity(section.getPosition().asLong(), layer, visibleGeneration);
 			if (layer == ChunkSectionLayer.TRANSLUCENT) {
@@ -3776,8 +3808,12 @@ public final class RustGalTerrainRenderer {
 	private static void ensureAtlasPayload() {
 		TextureAtlas atlas = Minecraft.getInstance().getAtlasManager().getAtlasOrThrow(AtlasIds.BLOCKS);
 		long atlasPixels = (long) atlas.width * atlas.height;
-		if (atlas.width <= 0 || atlas.height <= 0 || atlasPixels > MAX_RUST_ATLAS_PIXELS) {
-			throw new IllegalStateException("Rust terrain atlas pixel bound exceeded " + MAX_RUST_ATLAS_PIXELS);
+		if (atlas.width <= 0 || atlas.height <= 0) {
+			throw new IllegalStateException("Rust terrain atlas is not uploaded: " + atlas.width + "x" + atlas.height);
+		}
+		if (atlasPixels > MAX_RUST_ATLAS_PIXELS) {
+			throw new IllegalStateException("Rust terrain atlas pixel bound exceeded " + MAX_RUST_ATLAS_PIXELS
+				+ " extent=" + atlas.width + "x" + atlas.height);
 		}
 		long semanticGeneration = atlas.semanticReloadGeneration();
 		if (semanticGeneration <= 0L) return;
@@ -3815,6 +3851,13 @@ public final class RustGalTerrainRenderer {
 					}
 					byte[] nextAtlasPayload = encodeSemanticAtlasPayload(semanticRawSnapshot);
 					List<byte[]> nextAtlasMipPayloads = encodeSemanticAtlasMipPayloads(semanticRawSnapshot);
+					var nextAnimationSource = WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan()
+						? atlas.semanticAnimationResource() : null;
+					if (nextAnimationSource != null && (nextAnimationSource.source().generation() != semanticRawSnapshot.generation()
+						|| nextAnimationSource.source().width() != semanticRawSnapshot.width()
+						|| nextAnimationSource.source().height() != semanticRawSnapshot.height())) {
+						throw new IllegalStateException("Terrain atlas changed while copying animation declarations");
+					}
 					// Do not allocate full atlas-sized PBR images unless the active
 					// resource manager actually exposes that semantic map.  A missing
 					// map is a valid Rust resource state; constructing a default image
@@ -3841,6 +3884,7 @@ public final class RustGalTerrainRenderer {
 					);
 					atlasPayload = nextAtlasPayload;
 					atlasMipPayloads = nextAtlasMipPayloads;
+					atlasAnimationSource = nextAnimationSource;
 					normalAtlasPayload = nextNormalAtlasPayload;
 					specularAtlasPayload = nextSpecularAtlasPayload;
 					waterStillAsset = nextWaterStillAsset;
@@ -4078,6 +4122,12 @@ public final class RustGalTerrainRenderer {
 				}
 			}
 		}
+	}
+
+	static int terrainDepthPolicy(ChunkSectionLayer layer) {
+		return layer.pipeline().isWriteDepth()
+			? RustGalWorldPrimitiveRenderer.DEPTH_POLICY_TEST_WRITE
+			: RustGalWorldPrimitiveRenderer.DEPTH_POLICY_TEST_NO_WRITE;
 	}
 
 	static String appendPbrSuffix(String path, String suffix) {

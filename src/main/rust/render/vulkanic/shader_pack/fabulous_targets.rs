@@ -1389,6 +1389,7 @@ impl FabulousAttachmentSet {
         deferred_frame_color_source: Handle,
         deferred_translucent_source: Handle,
         deferred_depth_source: Handle,
+        deferred_translucent_depth_source: Handle,
     ) -> GalResult<Handle> {
         self.append_terrain_handoff_to_frame_target_with_external_ops(
             gal,
@@ -1398,6 +1399,7 @@ impl FabulousAttachmentSet {
             deferred_frame_color_source,
             deferred_translucent_source,
             deferred_depth_source,
+            deferred_translucent_depth_source,
             &[],
             [false; 4],
             false,
@@ -1414,6 +1416,7 @@ impl FabulousAttachmentSet {
         deferred_frame_color_source: Handle,
         deferred_translucent_source: Handle,
         deferred_depth_source: Handle,
+        deferred_translucent_depth_source: Handle,
         external_operations: &[CommandOp],
         external_roles_written: [bool; 4],
         attachments_initialized: bool,
@@ -1491,7 +1494,7 @@ impl FabulousAttachmentSet {
         )?;
         self.append_depth_capture_copy(
             ops,
-            deferred_depth_source,
+            deferred_translucent_depth_source,
             FabulousTargetRole::Translucent,
             extent,
             TextureUsageState::ShaderRead,
@@ -2154,6 +2157,7 @@ mod tests {
                 frame_target,
                 set.main.color_texture,
                 set.main.depth_texture,
+                set.main.depth_texture,
             )
             .unwrap();
         assert!(terrain_handoff.iter().any(|operation| matches!(
@@ -2256,6 +2260,13 @@ mod tests {
                 usages: vec![TextureUsage::TransferSrc, TextureUsage::Sampled],
             })
             .unwrap();
+        let translucent_depth = gal.create_texture(TextureDesc {
+            label: "terrain-independent-translucent-depth".to_string(),
+            dimension: TextureDimension::D2, format: TextureFormat::Depth32Float,
+            extent: Extent3d { width: 32, height: 32, depth: 1 },
+            mip_levels: 1, array_layers: 1,
+            usages: vec![TextureUsage::TransferSrc, TextureUsage::Sampled],
+        }).unwrap();
         let mut operations = Vec::new();
         let presentation_pass = set
             .append_terrain_handoff_to_frame_target(
@@ -2270,8 +2281,18 @@ mod tests {
                 frame_target,
                 capture_source,
                 capture_depth,
+                translucent_depth,
             )
             .unwrap();
+        let depth_copy_sources: Vec<_> = operations.iter().filter_map(|operation| match operation {
+            super::super::super::commands::CommandOp::CopyTexture(copy)
+                if copy.dst_texture == set.main.depth_texture || copy.dst_texture == set.translucent.depth_texture =>
+                    Some((copy.src_texture, copy.dst_texture)),
+            _ => None,
+        }).collect();
+        assert_eq!(depth_copy_sources, vec![(capture_depth, set.main.depth_texture),
+            (translucent_depth, set.translucent.depth_texture)],
+            "each Fabulous color layer must retain its own producer depth");
         gal.create_command_list(super::super::super::commands::CommandListDesc {
             label: "terrain-bgra-handoff-test".to_string(),
             operations,
@@ -2288,6 +2309,7 @@ mod tests {
                 Extent3d { width: 32, height: 32, depth: 1 },
                 frame_target,
                 capture_source,
+                capture_depth,
                 capture_depth,
                 &[],
                 [false; 4],
@@ -2308,6 +2330,7 @@ mod tests {
         gal.destroy(no_translucent_presentation_pass).unwrap();
         gal.destroy(capture_source).unwrap();
         gal.destroy(capture_depth).unwrap();
+        gal.destroy(translucent_depth).unwrap();
         set.destroy(&mut gal);
     }
 }

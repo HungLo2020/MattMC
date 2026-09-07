@@ -1230,8 +1230,23 @@ public final class DeterministicCameraCapture {
 		applyPose(minecraft.player, activePose);
 	}
 
+	private static java.lang.ref.WeakReference<MinecraftServer> fixedCaptureClockServer = new java.lang.ref.WeakReference<>(null);
+
 	private static void applyFixedCaptureTime(Minecraft minecraft) {
 		if (FIXED_CAPTURE_TIME != Long.MIN_VALUE && minecraft.level != null) {
+			var server = minecraft.getSingleplayerServer();
+			if (server != null && fixedCaptureClockServer.get() != server) {
+				fixedCaptureClockServer = new java.lang.ref.WeakReference<>(server);
+				// Seed the copied fixture's authoritative clock too. Otherwise real
+				// time packets periodically undo the client override between ticks,
+				// and tick-driven vignette/light state never settles at the target.
+				server.execute(() -> {
+					long previousDayTime = server.overworld().getDayTime();
+					server.overworld().getGameRules().getRule(GameRules.RULE_DAYLIGHT).set(false, server);
+					server.overworld().setDayTime(FIXED_CAPTURE_TIME);
+					LOGGER.info("Capture fixture server clock: previousDayTime={} fixedDayTime={}", previousDayTime, FIXED_CAPTURE_TIME);
+				});
+			}
 			minecraft.level.setTimeFromServer(FIXED_CAPTURE_TIME, FIXED_CAPTURE_TIME, false);
 		}
 	}
@@ -1413,6 +1428,19 @@ public final class DeterministicCameraCapture {
 			return;
 		}
 		if (!minecraft.gui.vignetteBrightnessSettledForDeterministicCapture(minecraft.getCameraEntity())) {
+			if (renderedFrameIndex % 30 == 0) {
+				var entity = minecraft.getCameraEntity();
+				LOGGER.info("Capture vignette waiting: current={} rawLight={} skyDarken={} gameTime={} paused={}",
+					minecraft.gui.vignetteBrightnessForDeterministicCapture(),
+					entity == null ? -1 : entity.level().getMaxLocalRawBrightness(
+						BlockPos.containing(entity.getX(), entity.getEyeY(), entity.getZ())),
+					minecraft.level == null ? -1 : minecraft.level.getSkyDarken(),
+					minecraft.level == null ? -1 : minecraft.level.getGameTime(), minecraft.isPaused());
+			}
+			renderedFramesAtPose = 0;
+			return;
+		}
+		if (GraphicsAuditWorldMenuFixture.afterRender(minecraft)) {
 			renderedFramesAtPose = 0;
 			return;
 		}
@@ -4414,6 +4442,12 @@ public final class DeterministicCameraCapture {
 		if (minecraft.player == null || minecraft.level == null) {
 			return;
 		}
+		if (!includeUnsupportedFluid) {
+			if (!GraphicsAuditMixedFluidFixture.install(minecraft, target, minecraft.player.getDirection())) {
+				throw new IllegalStateException("Mixed-fluid capture fixture is not fully loaded");
+			}
+			return;
+		}
 		Direction forward = minecraft.player.getDirection();
 		Direction right = forward.getClockWise();
 		BlockState glass = Blocks.BLUE_STAINED_GLASS.defaultBlockState();
@@ -5695,7 +5729,16 @@ public final class DeterministicCameraCapture {
 		}
 	}
 
+	private static String blockAnimationAtCapture = "null";
+
 	private static void requestCurrentPoseScreenshot(Minecraft minecraft) {
+		try {
+			if (!GraphicsAuditBlockDisplayFixture.readyForCapture(minecraft)) return;
+		} catch (IllegalStateException phaseTimeout) {
+			fail(phaseTimeout.getMessage());
+			return;
+		}
+		blockAnimationAtCapture = GraphicsAuditBlockDisplayFixture.animationObservation(minecraft);
 		// Correlate the copied Rust semantic source with the ordinary screenshot
 		// request after this pose's rendering completed. This has no route or
 		// renderer effect; it only writes bounded diagnostic evidence.
@@ -5948,6 +5991,7 @@ public final class DeterministicCameraCapture {
 		player.yHeadRotO = pose.yaw();
 		player.yBodyRot = pose.yaw();
 		player.yBodyRotO = pose.yaw();
+		net.minecraft.client.particle.GraphicsAuditTerrainParticleFixture.install(Minecraft.getInstance());
 	}
 
 	private static ForcedBlockOutlineTarget findForcedBlockOutlineTarget(ClientLevel level, LocalPlayer player) {
@@ -6097,6 +6141,7 @@ public final class DeterministicCameraCapture {
 			return;
 		}
 		List<ItemStack> items = switch (HOTBAR_ITEM_FIXTURE) {
+			case "animated-block" -> GraphicsAuditAnimatedItemFixture.items();
 			case "standard-3d" -> List.of(
 				new ItemStack(Blocks.STONE),
 				new ItemStack(Blocks.GRASS_BLOCK),
@@ -6842,6 +6887,10 @@ public final class DeterministicCameraCapture {
 	}
 
 	private static void setupBlockDisplayAndWorldTextScenarios(Minecraft minecraft, LocalPlayer player) {
+		if (GraphicsAuditBlockDisplayFixture.requested()) {
+			GraphicsAuditBlockDisplayFixture.install(minecraft);
+			return;
+		}
 		if ((BLOCK_DISPLAY_SCENARIO.isEmpty() && WORLD_TEXT_SCENARIO.isEmpty())
 			|| "hidden".equals(BLOCK_DISPLAY_SCENARIO) || minecraft.level == null) {
 			return;
@@ -7794,14 +7843,16 @@ public final class DeterministicCameraCapture {
 		BlockPos position = BlockPos.containing(player.getEyePosition().add(forward.normalize().scale(4.0)).add(0.0, -1.25, 0.0));
 		BlockState state = switch (MODEL_MESH_SCENARIO) {
 			case "bed" -> Blocks.RED_BED.defaultBlockState();
-			case "bell" -> Blocks.BELL.defaultBlockState();
+			case "bell" -> Blocks.BELL.defaultBlockState().setValue(net.minecraft.world.level.block.BellBlock.FACING, Direction.SOUTH);
 			case "shulker" -> Blocks.PURPLE_SHULKER_BOX.defaultBlockState();
 			case "decorated-pot" -> Blocks.DECORATED_POT.defaultBlockState();
 			case "conduit" -> Blocks.CONDUIT.defaultBlockState();
 			default -> Blocks.CHEST.defaultBlockState().setValue(ChestBlock.FACING, Direction.SOUTH);
 		};
-		prepareModelMeshCaptureSite(serverLevel, position);
-		serverLevel.setBlock(position, state, 3);
+		runOnServerThreadAndWait(minecraft.getSingleplayerServer(), () -> {
+			prepareModelMeshCaptureSite(serverLevel, position);
+			serverLevel.setBlock(position, state, 3);
+		});
 		modelMeshSetupPosition = position;
 		modelMeshSetupStatus = "waiting-client-block-entity";
 		modelMeshSetupBlockId = state.getBlock().builtInRegistryHolder().key().location().toString();
@@ -8773,6 +8824,12 @@ public final class DeterministicCameraCapture {
 		json.append("{\n");
 		appendField(json, "status", status).append(",\n");
 		appendField(json, "backend", activeBackend()).append(",\n");
+		json.append("  \"worldMenuFixture\": ").append(GraphicsAuditWorldMenuFixture.receipt(minecraft)).append(",\n");
+		json.append("  \"animatedItemFixture\": ").append("animated-block".equals(HOTBAR_ITEM_FIXTURE)
+			? GraphicsAuditAnimatedItemFixture.receipt(minecraft) : "null").append(",\n");
+		json.append("  \"staticTerrainFixtureScenario\": \"").append(STATIC_TERRAIN_SCENARIO).append("\",\n");
+		json.append("  \"mixedFluidFixture\": ").append("translucent-mixed".equals(STATIC_TERRAIN_SCENARIO)
+			? GraphicsAuditMixedFluidFixture.receipt(minecraft) : "null").append(",\n");
 		appendField(json, "shadowReceiverFixture", Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.shadowGlass") ? "red-glass-v1" : "none").append(",\n");
 		appendField(json, "shaderEnabled", shaderEnabled()).append(",\n");
 		appendField(json, "shaderPack", shaderPack()).append(",\n");
@@ -8808,6 +8865,11 @@ public final class DeterministicCameraCapture {
 		appendDistantHorizonsTexturePaletteState(json).append(",\n");
 		appendField(json, "rustGalWorldBlockDisplayScenario", System.getProperty("mattmc.dev.rustGalWorldMesh.blockDisplayScenario", "")).append(",\n");
 		appendBlockDisplayDiagnostics(json).append(",\n");
+		appendField(json, "blockDisplayScenario", BLOCK_DISPLAY_SCENARIO).append(",\n");
+		json.append("  \"blockDisplayFixture\": ").append(GraphicsAuditBlockDisplayFixture.receipt(minecraft)).append(",\n");
+		json.append("  \"terrainParticleFixture\": ").append(net.minecraft.client.particle.GraphicsAuditTerrainParticleFixture.receipt(minecraft)).append(",\n");
+		json.append("  \"blockDisplayAnimationObservation\": ").append(GraphicsAuditBlockDisplayFixture.animationObservation(minecraft)).append(",\n");
+		json.append("  \"blockDisplayAnimationAtCapture\": ").append(blockAnimationAtCapture).append(",\n");
 		appendWorldTextDiagnostics(json).append(",\n");
 		appendField(json, "rustGalWorldFallingBlockScenario", System.getProperty("mattmc.dev.rustGalWorldMesh.fallingBlockScenario", "")).append(",\n");
 		appendField(json, "rustGalWorldArrowScenario", ARROW_SCENARIO).append(",\n");

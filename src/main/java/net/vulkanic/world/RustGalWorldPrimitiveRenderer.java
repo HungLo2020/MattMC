@@ -235,6 +235,8 @@ public final class RustGalWorldPrimitiveRenderer {
 	public static final int MATERIAL_ID_CUTOUT_TEXTURED = 0x129B1B90;
 	public static final int MATERIAL_ID_TRANSLUCENT_TEXTURED = 0x4D21A7C3;
 	public static final int MATERIAL_ID_ENTITY_SHADOW = 0x5348444D;
+	public static final int MATERIAL_ID_SKY_STARS = 0x53544152;
+	public static final int MATERIAL_ID_CELESTIAL = 0x43454C45;
 	public static final int MATERIAL_ID_GLINT_TEXTURED = 0x71E6A9B4;
 	public static final int MATERIAL_ID_WATER_TRANSLUCENT = 0x39E0A7E4;
 	public static final int MATERIAL_ID_BLOCK_MARKER_CUTOUT = 0x224A8659;
@@ -491,6 +493,7 @@ public final class RustGalWorldPrimitiveRenderer {
 	private static final Set<Integer> DIRTY_WORLD_MESH_TEXTURES = new LinkedHashSet<>();
 	private static final Map<Long, Long> UPLOADED_WORLD_MESH_GENERATIONS = new LinkedHashMap<>();
 	private static final Set<Integer> UPLOADED_WORLD_MESH_TEXTURES = new LinkedHashSet<>();
+	private static AtlasAnimationPublication terrainAnimationPublication;
 	private static long worldMeshAssetGeneration;
 	private static long uploadedWorldMeshAssetGeneration;
 	private static long attemptedWorldMeshAssetGeneration;
@@ -1274,6 +1277,7 @@ public final class RustGalWorldPrimitiveRenderer {
 				DYNAMIC_WORLD_ASSET_BYTES.clear();
 				DIRTY_WORLD_MESH_TEXTURES.clear();
 				UPLOADED_WORLD_MESH_TEXTURES.clear();
+				terrainAnimationPublication = null;
 				registerWorldSkyTextureAssetsLocked(resourceManager);
 				PENDING_MESH_INSTANCES.clear();
 				ACTIVE_STATIC_TERRAIN_INSTANCES.clear();
@@ -1413,8 +1417,34 @@ public final class RustGalWorldPrimitiveRenderer {
 		}
 	}
 
+	/** Private validation dispatch before frame consumption; Rust owns completion waits. */
+	public static void flushPendingAtlasAnimationTicks(VulkanicGalBridge bridge) {
+		if (!AtlasAnimationResource.privateTickDeliveryEnabled() || bridge == null) return;
+		synchronized (LOCK) {
+			if (terrainAnimationPublication == null || terrainAnimationPublication.pendingTickCount() == 0) return;
+			if (terrainAnimationPublication.pending()) {
+				terrainAnimationPublication.flush(bridge::stageAtlasAnimationAssets);
+			}
+			if (terrainAnimationPublication.stagedGeneration() == 0) return;
+			int count = terrainAnimationPublication.pendingTickCount();
+			if (!terrainAnimationPublication.drainTicks(bridge)) {
+				throw new IllegalStateException("Cannot render ahead of pending atlas animation ticks");
+			}
+			auditMessage("Rust atlas animation ticks accepted generation="
+				+ terrainAnimationPublication.stagedGeneration() + " ticks=" + count + " private_validation=true");
+		}
+	}
+
 	public static VulkanicGalBridge.Status flushPendingWorldMeshAssets(VulkanicGalBridge bridge) {
 		synchronized (LOCK) {
+			if (bridge != null && terrainAnimationPublication != null && terrainAnimationPublication.pending()) {
+				// The texture is already accepted; retry only declaration staging.
+				terrainAnimationPublication.flush(bridge::stageAtlasAnimationAssets);
+				auditMessage("Rust terrain atlas animation declarations staged"
+					+ " generation=" + terrainAnimationPublication.stagedGeneration()
+					+ " sprites=" + terrainAnimationPublication.spriteCount()
+					+ " tick_admitted=false");
+			}
 			if (bridge == null || (DIRTY_WORLD_MESH_ASSETS.isEmpty()
 				&& DIRTY_WORLD_MESH_TEXTURES.isEmpty()
 				&& DIRTY_WORLD_MESH_SORTED_INDICES.isEmpty()
@@ -1456,6 +1486,13 @@ public final class RustGalWorldPrimitiveRenderer {
 					for (VulkanicGalBridge.WorldMeshTextureAssetRecord texture : dirtyTextures) {
 						UPLOADED_WORLD_MESH_TEXTURES.add(texture.textureId());
 						DIRTY_WORLD_MESH_TEXTURES.remove(texture.textureId());
+						if (texture.textureId() == MATERIAL_TEXTURE_TERRAIN_BLOCK_ATLAS && terrainAnimationPublication != null) {
+							if (terrainAnimationPublication.matches(texture)) {
+								terrainAnimationPublication.textureAccepted(uploadGeneration, texture);
+							} else {
+								terrainAnimationPublication = null;
+							}
+						}
 					}
 					lastWorldMeshAssetPayloadCount = dirtyMeshes.size() + dirtyTextures.size() + dirtySortedIndices.size();
 					lastWorldMeshAssetPayloadBytes = worldMeshAssetPayloadBytes(dirtyMeshes, dirtyTextures, dirtySortedIndices);
@@ -3100,16 +3137,17 @@ public final class RustGalWorldPrimitiveRenderer {
 				60.0F,
 				MATERIAL_TEXTURE_END_FLASH,
 				0.0F, 0.0F, 1.0F, 1.0F,
-				ARGB.white(Mth.clamp(state.endFlashIntensity, 0.0F, 1.0F))
+				ARGB.white(Mth.clamp(state.endFlashIntensity, 0.0F, 1.0F)),
+				MATERIAL_ID_TRANSLUCENT_TEXTURED, WORLD_WINDING_CCW, CULL_NONE
 			);
 		}
 	}
 
 	private static void enqueueVanillaCelestialQuadsLocked(SkyRenderState state, Camera camera) {
-		Vec3 cameraPosition = camera.getPosition();
+		// Frame vertices are camera-relative and its explicit view matrix owns
+		// the camera rotation. Frozen applies only these celestial rotations to
+		// its local sky geometry; world translation would move the star sphere.
 		Matrix4f skyTransform = new Matrix4f()
-			.translate((float)cameraPosition.x, (float)cameraPosition.y, (float)cameraPosition.z)
-			.rotate(camera.rotation())
 			.rotateY((float)-Math.PI / 2.0F)
 			.rotateX(state.timeOfDay * (float)(Math.PI * 2.0));
 		float rainAlpha = Mth.clamp(state.rainBrightness, 0.0F, 1.0F);
@@ -3120,7 +3158,7 @@ public final class RustGalWorldPrimitiveRenderer {
 			30.0F,
 			MATERIAL_TEXTURE_SKY_SUN,
 			0.0F, 0.0F, 1.0F, 1.0F,
-			colorArgb
+			colorArgb, MATERIAL_ID_CELESTIAL, WORLD_WINDING_CCW, CULL_BACK
 		);
 		int phase = state.moonPhase & 7;
 		int column = phase % 4;
@@ -3134,18 +3172,19 @@ public final class RustGalWorldPrimitiveRenderer {
 			-100.0F,
 			20.0F,
 			MATERIAL_TEXTURE_SKY_MOON_PHASES,
-			u1, v1, u0, v0,
-			colorArgb
+			u1, v0, u0, v1,
+			colorArgb, MATERIAL_ID_CELESTIAL, WORLD_WINDING_CW, CULL_BACK
 		);
-		if (state.starBrightness > 0.0F && WORLD_MESH_TEXTURES.containsKey(MATERIAL_TEXTURE_GENERATED_WHITE)) {
+		// Untextured sky geometry references Rust's private generated white
+		// resource. It must not depend on a Java atlas registration for it.
+		if (state.starBrightness > 0.0F) {
 			enqueueVanillaStarsLocked(state, skyTransform);
 		}
 		if (state.isSunriseOrSunset
-			&& ARGB.alpha(state.sunriseAndSunsetColor) > 0
-			&& WORLD_MESH_TEXTURES.containsKey(MATERIAL_TEXTURE_GENERATED_WHITE)) {
+			&& ARGB.alpha(state.sunriseAndSunsetColor) > 0) {
 			enqueueVanillaSunriseLocked(state, camera);
 		}
-		if (state.shouldRenderDarkDisc && WORLD_MESH_TEXTURES.containsKey(MATERIAL_TEXTURE_GENERATED_WHITE)) {
+		if (state.shouldRenderDarkDisc) {
 			enqueueVanillaDarkDiscLocked(camera);
 		}
 	}
@@ -3237,14 +3276,15 @@ public final class RustGalWorldPrimitiveRenderer {
 	/** Copies SkyRenderer's deterministic 1500-star distribution into bounded semantic quads. */
 	private static void enqueueVanillaStarsLocked(SkyRenderState state, Matrix4f skyTransform) {
 		RandomSource random = RandomSource.create(10842L);
-		int colorArgb = ARGB.white(Mth.clamp(state.starBrightness, 0.0F, 1.0F));
+		float brightness = Mth.clamp(state.starBrightness, 0.0F, 1.0F);
+		int colorArgb = ARGB.colorFromFloat(brightness, brightness, brightness, brightness);
 		for (int index = 0; index < 1500; index++) {
 			float x = random.nextFloat() * 2.0F - 1.0F;
 			float y = random.nextFloat() * 2.0F - 1.0F;
 			float z = random.nextFloat() * 2.0F - 1.0F;
 			float size = 0.15F + random.nextFloat() * 0.1F;
 			float lengthSquared = Mth.lengthSquared(x, y, z);
-			if (!(lengthSquared <= 0.01F) && !(lengthSquared >= 1.0F)) {
+			if (!(lengthSquared <= 0.010000001F) && !(lengthSquared >= 1.0F)) {
 				Vector3f direction = new Vector3f(x, y, z).normalize(100.0F);
 				float roll = (float)(random.nextDouble() * (float)Math.PI * 2.0F);
 				Matrix3f orientation = new Matrix3f()
@@ -3262,7 +3302,7 @@ public final class RustGalWorldPrimitiveRenderer {
 				transformMaterialVertex(transform, corner.x, corner.y, corner.z, vertices, 9);
 				PENDING_MATERIAL_QUADS.add(new VulkanicGalBridge.WorldMaterialQuadRecord(
 					STRATUM_WORLD_MATERIAL,
-					MATERIAL_ID_TRANSLUCENT_TEXTURED,
+					MATERIAL_ID_SKY_STARS,
 					MATERIAL_TEXTURE_GENERATED_WHITE,
 					MATERIAL_MODE_TRANSLUCENT,
 					DEPTH_POLICY_TEST_NO_WRITE,
@@ -3292,7 +3332,10 @@ public final class RustGalWorldPrimitiveRenderer {
 		float v0,
 		float u1,
 		float v1,
-		int colorArgb
+		int colorArgb,
+		int materialId,
+		int winding,
+		int cullPolicy
 	) {
 		Matrix4f transform = new Matrix4f(baseTransform).translate(0.0F, y, 0.0F).scale(size, 1.0F, size);
 		float[] vertices = new float[12];
@@ -3302,13 +3345,13 @@ public final class RustGalWorldPrimitiveRenderer {
 		transformMaterialVertex(transform, -1.0F, 0.0F, 1.0F, vertices, 9);
 		PENDING_MATERIAL_QUADS.add(new VulkanicGalBridge.WorldMaterialQuadRecord(
 			STRATUM_WORLD_MATERIAL,
-			MATERIAL_ID_TRANSLUCENT_TEXTURED,
+			materialId,
 			textureId,
 			MATERIAL_MODE_TRANSLUCENT,
 			DEPTH_POLICY_TEST_NO_WRITE,
-			CULL_NONE,
+			cullPolicy,
 			WORLD_TOPOLOGY_TRIANGLES,
-			WORLD_WINDING_CCW,
+			winding,
 			colorArgb,
 			vertices[0], vertices[1], vertices[2], vertices[3], vertices[4], vertices[5],
 			vertices[6], vertices[7], vertices[8], vertices[9], vertices[10], vertices[11],
@@ -4710,6 +4753,7 @@ public final class RustGalWorldPrimitiveRenderer {
 				material.materialId(),
 				material.materialMode(),
 				blockSubmit.lightCoords(),
+				false,
 				"BlockDisplay"
 			);
 		} finally {
@@ -7218,7 +7262,8 @@ public final class RustGalWorldPrimitiveRenderer {
 			TextureAtlasSprite sprite = quad.getSprite();
 			if (sprite == null || sprite.contents().name() == null) return "missing-sprite";
 			if (sprite.sodium$hasUnknownImageContents()) return "unknown-sprite-payload";
-			if (readItemSpriteTexturePayload(sprite) == null) return "missing-texture-payload";
+			String textureIneligibility = itemSpriteTextureIneligibility(sprite);
+			if (textureIneligibility != null) return textureIneligibility;
 			// ItemStackRenderState uses an empty tint array while a model has not
 			// supplied resolved tint layers.  Vanilla's item renderer treats that
 			// state as white, and itemQuadTintColor preserves the same default.  Do
@@ -7770,7 +7815,8 @@ public final class RustGalWorldPrimitiveRenderer {
 				TextureAtlasSprite sprite = view.getSprite();
 				if (sprite == null || sprite.contents().name() == null) return "missing-sprite";
 				if (sprite.sodium$hasUnknownImageContents()) return "unknown-sprite-payload";
-				if (readItemSpriteTexturePayload(sprite) == null) return "missing-texture-payload";
+				String textureIneligibility = itemSpriteTextureIneligibility(sprite);
+				if (textureIneligibility != null) return textureIneligibility;
 				// An absent prepared tint layer is vanilla's white default; the mesh
 				// encoder preserves that default instead of rejecting the item.
 				if (quad.isTinted() && (quad.tintIndex() < 0
@@ -7838,7 +7884,11 @@ public final class RustGalWorldPrimitiveRenderer {
 		if (crumblingOverlay != null) return "crumbling";
 		if (sprite.sodium$hasUnknownImageContents()) return "unknown-sprite-image";
 		if (sprite.contents().name() == null) return "missing-sprite-identity";
-		if (!hasSemanticAtlasSnapshot(sprite)) return "atlas-texture-unavailable";
+		if (WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()
+			&& itemSpriteUsesOwnedBlockAtlas(sprite)) {
+			String atlasFailure = itemSpriteTextureIneligibility(sprite);
+			if (atlasFailure != null) return atlasFailure;
+		} else if (!hasSemanticAtlasSnapshot(sprite)) return "atlas-texture-unavailable";
 		return "eligible";
 	}
 
@@ -8026,12 +8076,11 @@ public final class RustGalWorldPrimitiveRenderer {
 			return new ModelMeshRenderSemantics(
 				MATERIAL_ID_TRANSLUCENT_TEXTURED,
 				MATERIAL_MODE_TRANSLUCENT,
-				DEPTH_POLICY_TEST_NO_WRITE,
-				// Vanilla entity-translucent model layers are rendered double-sided
-				// (the hand layer uses this contract too). Preserve that semantic
-				// explicitly; relying on a transient RenderType cull bit makes the
-				// copied first-person mesh disappear when its winding is mirrored.
-				CULL_NONE
+				// Blending does not imply double-sided or read-only depth. In
+				// particular, held translucent block items cull and write depth.
+				// Preserve the declared raster semantics; Rust owns their lowering.
+				renderType.pipeline().isWriteDepth() ? DEPTH_POLICY_TEST_WRITE : DEPTH_POLICY_TEST_NO_WRITE,
+				renderType.pipeline().isCull() ? CULL_BACK : CULL_NONE
 			);
 		}
 		return new ModelMeshRenderSemantics(
@@ -8446,6 +8495,7 @@ public final class RustGalWorldPrimitiveRenderer {
 				material.materialId(),
 				material.materialMode(),
 				blockSubmit.lightCoords(),
+				false,
 				"PrimedTnt"
 			);
 		} finally {
@@ -8643,6 +8693,7 @@ public final class RustGalWorldPrimitiveRenderer {
 					blockState,
 					movingBlockRenderState.blockPos
 				),
+				true,
 				extractionLabel
 			);
 		} finally {
@@ -8879,11 +8930,11 @@ public final class RustGalWorldPrimitiveRenderer {
 		}
 		int projectedTextureResidency = WORLD_MESH_TEXTURES.size();
 		Set<Integer> newTextureIds = new LinkedHashSet<>();
-		Map<Integer, byte[]> batchTexturePayloads = new LinkedHashMap<>();
+		Map<Integer, VulkanicGalBridge.WorldMeshTextureAssetRecord> batchTexturePayloads = new LinkedHashMap<>();
 		for (VulkanicGalBridge.WorldMeshTextureAssetRecord texture : extraction.textures()) {
 			validateWorldMeshTextureAsset(texture, "mesh");
-			byte[] priorBatchPayload = batchTexturePayloads.putIfAbsent(texture.textureId(), texture.pngBytes());
-			if (priorBatchPayload != null && !Arrays.equals(priorBatchPayload, texture.pngBytes())) {
+			var priorBatchPayload = batchTexturePayloads.putIfAbsent(texture.textureId(), texture);
+			if (priorBatchPayload != null && !priorBatchPayload.sameContent(texture)) {
 				throw new IllegalStateException("Rust VulkanicGAL mesh batch contains conflicting payloads for texture "
 					+ texture.textureId());
 			}
@@ -8901,11 +8952,7 @@ public final class RustGalWorldPrimitiveRenderer {
 		}
 		boolean changed = false;
 		for (VulkanicGalBridge.WorldMeshTextureAssetRecord texture : extraction.textures()) {
-			VulkanicGalBridge.WorldMeshTextureAssetRecord previous = WORLD_MESH_TEXTURES.put(texture.textureId(), texture);
-			if (previous == null || !Arrays.equals(previous.pngBytes(), texture.pngBytes())) {
-				DIRTY_WORLD_MESH_TEXTURES.add(texture.textureId());
-				changed = true;
-			}
+			changed |= registerChangedTexture(WORLD_MESH_TEXTURES, DIRTY_WORLD_MESH_TEXTURES, texture);
 		}
 		if (DeterministicCameraCapture.isActiveForDiagnostics()
 			&& (extraction.asset().entityIdentity().contains("player_hand")
@@ -8959,11 +9006,11 @@ public final class RustGalWorldPrimitiveRenderer {
 			}
 			int projectedTextureResidency = WORLD_MESH_TEXTURES.size();
 			Set<Integer> newTextureIds = new LinkedHashSet<>();
-			Map<Integer, byte[]> batchTexturePayloads = new LinkedHashMap<>();
+			Map<Integer, VulkanicGalBridge.WorldMeshTextureAssetRecord> batchTexturePayloads = new LinkedHashMap<>();
 			for (VulkanicGalBridge.WorldMeshTextureAssetRecord texture : textures) {
 				validateWorldMeshTextureAsset(texture, "static terrain");
-				byte[] priorBatchPayload = batchTexturePayloads.putIfAbsent(texture.textureId(), texture.pngBytes());
-				if (priorBatchPayload != null && !Arrays.equals(priorBatchPayload, texture.pngBytes())) {
+				var priorBatchPayload = batchTexturePayloads.putIfAbsent(texture.textureId(), texture);
+				if (priorBatchPayload != null && !priorBatchPayload.sameContent(texture)) {
 					throw new IllegalStateException("Rust VulkanicGAL static terrain batch contains conflicting payloads for texture "
 						+ texture.textureId());
 				}
@@ -8982,15 +9029,10 @@ public final class RustGalWorldPrimitiveRenderer {
 			}
 			boolean changed = false;
 			for (VulkanicGalBridge.WorldMeshTextureAssetRecord texture : textures) {
-				VulkanicGalBridge.WorldMeshTextureAssetRecord previousTexture =
-					WORLD_MESH_TEXTURES.put(texture.textureId(), texture);
 				// Re-registering an unchanged semantic payload is common while
 				// multiple terrain sections are meshed. Do not keep re-dirtying the
 				// texture after the explicit upload boundary has already accepted it.
-				if (previousTexture == null || !Arrays.equals(previousTexture.pngBytes(), texture.pngBytes())) {
-					DIRTY_WORLD_MESH_TEXTURES.add(texture.textureId());
-					changed = true;
-				}
+				changed |= registerChangedTexture(WORLD_MESH_TEXTURES, DIRTY_WORLD_MESH_TEXTURES, texture);
 			}
 			STATIC_TERRAIN_MESH_RESIDENCY.put(asset.meshKey(), new StaticTerrainMeshResidency(
 				previous != null && sameStaticTerrainPayload(previous, asset)
@@ -9090,8 +9132,38 @@ public final class RustGalWorldPrimitiveRenderer {
 			+ ",material_other=" + materialOther;
 	}
 
+	/** Semantic resource use only; no Java ticker activity or GPU object is read. */
+	public static void recordAtlasSpriteUse(AtlasAnimationResource resource, ResourceLocation atlas, ResourceLocation name) {
+		if (resource != null && resource.recordUse(atlas, name)) {
+			auditMessage("Rust atlas sprite-use collected name=" + name
+				+ " resource_generation=" + resource.source().generation() + " tick_admitted=false");
+		}
+	}
+
+	static void registerTerrainAtlasAnimation(VulkanicGalBridge.WorldMeshTextureAssetRecord texture,
+		AtlasAnimationResource animation) {
+		synchronized (LOCK) {
+			var publication = new AtlasAnimationPublication(texture, animation);
+			registerWorldMeshTexture(texture, "terrain-atlas-animation");
+			terrainAnimationPublication = publication;
+			// Declarations constitute a resource-incarnation change even when the
+			// initial PNG happens to match the preceding pack's first frame.
+			DIRTY_WORLD_MESH_TEXTURES.add(texture.textureId());
+			markWorldMeshAssetsChangedLocked();
+		}
+	}
+
 	public static void registerStaticTerrainAtlasTexture(VulkanicGalBridge.WorldMeshTextureAssetRecord texture) {
 		registerWorldMeshTexture(texture, "static-terrain-atlas");
+	}
+
+	/** Caller holds the registry lock and has validated admission and bounds. */
+	static boolean registerChangedTexture(Map<Integer, VulkanicGalBridge.WorldMeshTextureAssetRecord> textures,
+		Set<Integer> dirty, VulkanicGalBridge.WorldMeshTextureAssetRecord texture) {
+		var previous = textures.put(texture.textureId(), texture);
+		if (texture.sameContent(previous)) return false;
+		dirty.add(texture.textureId());
+		return true;
 	}
 
 	/**
@@ -9116,10 +9188,7 @@ public final class RustGalWorldPrimitiveRenderer {
 					+ MAX_WORLD_MESH_TEXTURE_PNG_BYTES_TOTAL);
 			}
 			ensureWorldMeshRegistryCapacityLocked(WORLD_MESH_TEXTURES, texture.textureId(), MAX_WORLD_MESH_TEXTURE_RESIDENCY, "texture");
-			VulkanicGalBridge.WorldMeshTextureAssetRecord previous =
-				WORLD_MESH_TEXTURES.put(texture.textureId(), texture);
-			if (previous == null || !Arrays.equals(previous.pngBytes(), texture.pngBytes())) {
-				DIRTY_WORLD_MESH_TEXTURES.add(texture.textureId());
+			if (registerChangedTexture(WORLD_MESH_TEXTURES, DIRTY_WORLD_MESH_TEXTURES, texture)) {
 				markWorldMeshAssetsChangedLocked();
 			}
 			auditMessage(
@@ -9565,6 +9634,7 @@ public final class RustGalWorldPrimitiveRenderer {
 		int materialId,
 		int materialMode,
 		int resolvedPackedLight,
+		boolean worldFaceShading,
 		String diagnosticName
 	) {
 		try {
@@ -9585,9 +9655,9 @@ public final class RustGalWorldPrimitiveRenderer {
 				List<Integer> indices = new ArrayList<>();
 				for (BlockModelPart part : parts) {
 					for (Direction direction : Direction.values()) {
-						appendBlockModelQuads(part.getQuads(direction), blockState, tintGetter, tintPos, materialId, materialMode, shaderBlockId, shaderMaterialType, resolvedPackedLight, vertices, indices, sections, textures);
+						appendBlockModelQuads(part.getQuads(direction), blockState, tintGetter, tintPos, materialId, materialMode, shaderBlockId, shaderMaterialType, resolvedPackedLight, worldFaceShading, vertices, indices, sections, textures);
 					}
-					appendBlockModelQuads(part.getQuads(null), blockState, tintGetter, tintPos, materialId, materialMode, shaderBlockId, shaderMaterialType, resolvedPackedLight, vertices, indices, sections, textures);
+					appendBlockModelQuads(part.getQuads(null), blockState, tintGetter, tintPos, materialId, materialMode, shaderBlockId, shaderMaterialType, resolvedPackedLight, worldFaceShading, vertices, indices, sections, textures);
 				}
 			if (vertices.isEmpty() || indices.isEmpty() || sections.isEmpty()) {
 				return null;
@@ -9662,10 +9732,10 @@ public final class RustGalWorldPrimitiveRenderer {
 			for (BlockModelPart part : parts) {
 				for (Direction direction : Direction.values()) {
 					appendBlockModelQuads(part.getQuads(direction), null, null, BlockPos.ZERO, materialId, materialMode, 0,
-						materialMode == MATERIAL_MODE_CUTOUT ? 1 : 0, resolvedPackedLight, vertices, indices, sections, textures);
+						materialMode == MATERIAL_MODE_CUTOUT ? 1 : 0, resolvedPackedLight, false, vertices, indices, sections, textures);
 				}
 				appendBlockModelQuads(part.getQuads(null), null, null, BlockPos.ZERO, materialId, materialMode, 0,
-					materialMode == MATERIAL_MODE_CUTOUT ? 1 : 0, resolvedPackedLight, vertices, indices, sections, textures);
+					materialMode == MATERIAL_MODE_CUTOUT ? 1 : 0, resolvedPackedLight, false, vertices, indices, sections, textures);
 			}
 			if (vertices.isEmpty() || indices.isEmpty()) return null;
 			int indexType = vertices.size() <= 0xffff ? VulkanicGalBridge.INDEX_U16 : VulkanicGalBridge.INDEX_U32;
@@ -9742,12 +9812,23 @@ public final class RustGalWorldPrimitiveRenderer {
 				BakedQuadView quad = (BakedQuadView)(Object)bakedQuad;
 			TextureAtlasSprite sprite = quad.getSprite();
 			ResourceLocation spriteName = glint ? ItemRenderer.ENCHANTED_GLINT_ITEM : sprite.contents().name();
-			byte[] payload = glint ? readTexturePayloadForResource(spriteName) : readItemSpriteTexturePayload(sprite);
-			if (payload == null) {
-				throw new IllegalStateException("unsupported item texture asset " + spriteName);
+			// These callers already selected the Rust whole-frame route. Reference
+			// its resource-owned atlas without publishing a competing texture or
+			// asking Java which animation frame to copy. Foil projections retain
+			// their distinct texture/coordinate contract.
+			boolean blockAtlasBinding = !glint && specialFoilPose == null && itemSpriteUsesOwnedBlockAtlas(sprite);
+			int textureId;
+			if (blockAtlasBinding) {
+				textureId = MATERIAL_TEXTURE_TERRAIN_BLOCK_ATLAS;
+				recordAtlasSpriteUse(sprite.semanticAnimationResource(), sprite.atlasLocation(), sprite.contents().name());
+			} else {
+				byte[] payload = glint ? readTexturePayloadForResource(spriteName) : readItemSpriteTexturePayload(sprite);
+				if (payload == null) {
+					throw new IllegalStateException("unsupported item texture asset " + spriteName);
+				}
+				textureId = stableTextureId(spriteName);
+				textures.add(new VulkanicGalBridge.WorldMeshTextureAssetRecord(textureId, payload));
 			}
-			int textureId = stableTextureId(spriteName);
-			textures.add(new VulkanicGalBridge.WorldMeshTextureAssetRecord(textureId, payload));
 			int tintColor = itemQuadTintColor(bakedQuad, tintLayers);
 			int glintColor = glint
 				? ARGB.color(Mth.clamp((int)Math.round(Minecraft.getInstance().options.glintStrength().get() * 255.0F), 0, 255), 255, 255, 255)
@@ -9790,15 +9871,18 @@ public final class RustGalWorldPrimitiveRenderer {
 					quad.getX(vertexIndex),
 					quad.getY(vertexIndex),
 					quad.getZ(vertexIndex),
-					glint ? sourceU : spriteLocalU(sprite, quad.getTexU(vertexIndex)),
-					glint ? sourceV : spriteLocalV(sprite, quad.getTexV(vertexIndex)),
+					glint || blockAtlasBinding ? sourceU : spriteLocalU(sprite, quad.getTexU(vertexIndex)),
+					glint || blockAtlasBinding ? sourceV : spriteLocalV(sprite, quad.getTexV(vertexIndex)),
 					sourceU,
 					sourceV,
 					0,
 					MATERIAL_SOURCE_TEXTURED,
 					0,
 					glint ? glintColor : shadedBakedVertexColor(quad.getColor(vertexIndex), tintColor, 1.0F),
-					quad.getVertexNormal(vertexIndex),
+					// Frozen's BakedModelEncoder uses getAccurateNormal: ordinary
+					// baked items often omit vertex normals and use the face normal.
+					// Copy that semantic normal; Rust still owns lighting evaluation.
+					quad.getAccurateNormal(vertexIndex),
 					packedLight,
 					0
 				));
@@ -10003,13 +10087,20 @@ public final class RustGalWorldPrimitiveRenderer {
 		boolean glint
 	) {
 		ResourceLocation effectiveTexture = glint ? ItemRenderer.ENCHANTED_GLINT_ITEM : textureIdentity;
-		byte[] texturePayload = glint
+		boolean ownedBlockAtlas = !glint && sprite != null
+			&& WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()
+			&& itemSpriteUsesOwnedBlockAtlas(sprite);
+		if (ownedBlockAtlas) {
+			String atlasFailure = itemSpriteTextureIneligibility(sprite);
+			if (atlasFailure != null) throw new IllegalStateException("ModelPart atlas is unavailable: " + atlasFailure);
+		}
+		byte[] texturePayload = ownedBlockAtlas ? null : glint
 			? readTexturePayloadForResource(effectiveTexture)
 			: readModelTexturePayload(textureIdentity, sprite);
-		if (texturePayload == null) {
+		if (!ownedBlockAtlas && texturePayload == null) {
 			throw new IllegalStateException("unsupported model texture asset " + effectiveTexture);
 		}
-		int textureId = stableTextureId(effectiveTexture);
+		int textureId = ownedBlockAtlas ? MATERIAL_TEXTURE_TERRAIN_BLOCK_ATLAS : stableTextureId(effectiveTexture);
 		List<VulkanicGalBridge.WorldMeshVertexRecord> vertices = new ArrayList<>();
 		List<Integer> indices = new ArrayList<>();
 		List<VulkanicGalBridge.WorldMeshSectionRecord> sections = new ArrayList<>();
@@ -10086,6 +10177,9 @@ public final class RustGalWorldPrimitiveRenderer {
 		if (vertices.isEmpty() || sections.isEmpty()) {
 			return null;
 		}
+		if (ownedBlockAtlas) {
+			recordAtlasSpriteUse(sprite.semanticAnimationResource(), sprite.atlasLocation(), sprite.contents().name());
+		}
 		int indexType = vertices.size() <= 0xffff ? VulkanicGalBridge.INDEX_U16 : VulkanicGalBridge.INDEX_U32;
 		int indexStride = indexType == VulkanicGalBridge.INDEX_U16 ? 2 : 4;
 		byte[] indexBytes = new byte[indices.size() * indexStride];
@@ -10117,7 +10211,7 @@ public final class RustGalWorldPrimitiveRenderer {
 				byteSections,
 				entityIdentity + (glint ? "/glint" : "")
 			),
-			List.of(localModelTextureAsset(textureId, texturePayload))
+			ownedBlockAtlas ? List.of() : List.of(localModelTextureAsset(textureId, texturePayload))
 		);
 	}
 
@@ -10156,6 +10250,7 @@ public final class RustGalWorldPrimitiveRenderer {
 		int shaderBlockId,
 		int shaderMaterialType,
 		int resolvedPackedLight,
+		boolean worldFaceShading,
 		List<VulkanicGalBridge.WorldMeshVertexRecord> vertices,
 		List<Integer> indices,
 		List<VulkanicGalBridge.WorldMeshSectionRecord> sections,
@@ -10169,18 +10264,29 @@ public final class RustGalWorldPrimitiveRenderer {
 			BakedQuadView quad = (BakedQuadView)(Object)bakedQuad;
 			TextureAtlasSprite sprite = quad.getSprite();
 			ResourceLocation spriteName = sprite.contents().name();
-			int textureId = stableTextureId(spriteName);
-			byte[] payload = readTexturePayload(spriteName);
-			if (payload == null) {
-				throw new IllegalStateException("unsupported block-model texture asset " + spriteName);
+			boolean blockAtlasBinding = WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()
+				&& itemSpriteUsesOwnedBlockAtlas(sprite);
+			int textureId;
+			if (blockAtlasBinding) {
+				textureId = MATERIAL_TEXTURE_TERRAIN_BLOCK_ATLAS;
+				recordAtlasSpriteUse(sprite.semanticAnimationResource(), sprite.atlasLocation(), spriteName);
+			} else {
+				textureId = stableTextureId(spriteName);
+				byte[] payload = readTexturePayload(spriteName);
+				if (payload == null) {
+					throw new IllegalStateException("unsupported block-model texture asset " + spriteName);
+				}
+				textures.add(new VulkanicGalBridge.WorldMeshTextureAssetRecord(textureId, payload));
 			}
-			textures.add(new VulkanicGalBridge.WorldMeshTextureAssetRecord(textureId, payload));
 			int firstIndex = indices.size();
 			int base = vertices.size();
 			int tintColor = bakedQuad.isTinted() && blockState != null && tintGetter != null
 				? 0xff000000 | Minecraft.getInstance().getBlockColors().getColor(blockState, tintGetter, tintPos, bakedQuad.tintIndex())
 				: 0xffffffff;
-			float shade = tintGetter == null ? 1.0F : tintGetter.getShade(bakedQuad.direction(), bakedQuad.shade());
+			// Single-block/model submissions do not bake world-direction shade.
+			// Moving-world submissions do; tint sampling remains independent.
+			float shade = !worldFaceShading || tintGetter == null ? 1.0F
+				: tintGetter.getShade(bakedQuad.direction(), bakedQuad.shade());
 			if (!Float.isFinite(shade)) {
 				throw new IllegalStateException("Rust VulkanicGAL block-model extraction contains non-finite tint shade");
 			}
@@ -10199,8 +10305,8 @@ public final class RustGalWorldPrimitiveRenderer {
 					quad.getX(i),
 					quad.getY(i),
 						quad.getZ(i),
-						spriteLocalU(sprite, quad.getTexU(i)),
-						spriteLocalV(sprite, quad.getTexV(i)),
+						blockAtlasBinding ? quad.getTexU(i) : spriteLocalU(sprite, quad.getTexU(i)),
+						blockAtlasBinding ? quad.getTexV(i) : spriteLocalV(sprite, quad.getTexV(i)),
 						quad.getTexU(i),
 						quad.getTexV(i),
 						shaderBlockId,
@@ -10324,6 +10430,29 @@ public final class RustGalWorldPrimitiveRenderer {
 			"textures/" + spriteName.getPath() + ".png"
 		);
 		return readTexturePayloadForResource(textureLocation);
+	}
+
+	private static String itemSpriteTextureIneligibility(TextureAtlasSprite sprite) {
+		if (WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()
+			&& itemSpriteUsesOwnedBlockAtlas(sprite)) {
+			var resource = sprite.semanticAnimationResource();
+			if (resource != null) {
+				try {
+					resource.requireOpen();
+				} catch (IllegalStateException retired) {
+					return "retired-owned-atlas";
+				}
+			} else if (sprite.contents().isAnimated() || !hasSemanticAtlasSnapshot(sprite)) {
+				return "missing-owned-atlas";
+			}
+			return null;
+		}
+		return readItemSpriteTexturePayload(sprite) == null ? "missing-texture-payload" : null;
+	}
+
+	private static boolean itemSpriteUsesOwnedBlockAtlas(TextureAtlasSprite sprite) {
+		return AtlasAnimationResource.privateTickDeliveryEnabled()
+			&& TextureAtlas.LOCATION_BLOCKS.equals(sprite.atlasLocation());
 	}
 
 	/** Copies the current frame of an animated atlas sprite into a standalone
@@ -10906,6 +11035,7 @@ public final class RustGalWorldPrimitiveRenderer {
 	public static boolean enqueueTerrainParticle(
 		BlockState blockState,
 		ResourceLocation spriteId,
+		@Nullable AtlasAnimationResource animationResource,
 		Camera camera,
 		double xo,
 		double x,
@@ -10935,6 +11065,9 @@ public final class RustGalWorldPrimitiveRenderer {
 		if (camera == null) {
 			throw new IllegalStateException("Rust terrain-particle route requires copied camera semantics");
 		}
+		boolean ownedAnimation = route.usesRustWholeFrameVulkan()
+			&& AtlasAnimationResource.privateTickDeliveryEnabled() && animationResource != null;
+		if (ownedAnimation) animationResource.requireOpen();
 		synchronized (LOCK) {
 			if (PENDING_MATERIAL_QUADS.size() >= MAX_RUST_WORLD_MATERIAL_QUADS) {
 				throw new IllegalStateException("Rust terrain-particle material-quad capacity exceeded " + MAX_RUST_WORLD_MATERIAL_QUADS);
@@ -10965,7 +11098,6 @@ public final class RustGalWorldPrimitiveRenderer {
 			billboardVertices(rotation, centerX, centerY, centerZ, quadSize, vertices);
 			int materialMode = opaque ? MATERIAL_MODE_OPAQUE : MATERIAL_MODE_CUTOUT;
 			int materialId = opaque ? MATERIAL_ID_OPAQUE_TEXTURED : MATERIAL_ID_CUTOUT_TEXTURED;
-			int litColor = applyPackedLight(colorArgb, packedLight);
 			PENDING_MATERIAL_QUADS.add(new VulkanicGalBridge.WorldMaterialQuadRecord(
 				STRATUM_WORLD_MATERIAL,
 				materialId,
@@ -10975,7 +11107,7 @@ public final class RustGalWorldPrimitiveRenderer {
 				CULL_NONE,
 				WORLD_TOPOLOGY_TRIANGLES,
 				WORLD_WINDING_CCW,
-				litColor,
+				colorArgb,
 				vertices[0],
 				vertices[1],
 				vertices[2],
@@ -11012,7 +11144,7 @@ public final class RustGalWorldPrimitiveRenderer {
 				centerY,
 				centerZ,
 				quadSize,
-				litColor,
+				colorArgb,
 				packedLight,
 				materialMode,
 				localU0,
@@ -11023,6 +11155,9 @@ public final class RustGalWorldPrimitiveRenderer {
 				viewportHeight,
 				projectedBounds
 			);
+			if (ownedAnimation) {
+				recordAtlasSpriteUse(animationResource, TextureAtlas.LOCATION_BLOCKS, spriteId);
+			}
 			if (terrainParticleEnqueueDiagnosticLogs < 24) {
 				terrainParticleEnqueueDiagnosticLogs++;
 				auditMessage("Rust VulkanicGAL TerrainParticle semantic request"
@@ -11065,11 +11200,10 @@ public final class RustGalWorldPrimitiveRenderer {
 			billboardVertices(new Quaternionf(qx, qy, qz, qw), centerX, centerY, centerZ, quadSize, vertices);
 			int materialMode = translucent ? MATERIAL_MODE_TRANSLUCENT : MATERIAL_MODE_OPAQUE;
 			int materialId = translucent ? MATERIAL_ID_TRANSLUCENT_TEXTURED : MATERIAL_ID_OPAQUE_TEXTURED;
-			int litColor = applyPackedLight(colorArgb, packedLight);
 			PENDING_MATERIAL_QUADS.add(new VulkanicGalBridge.WorldMaterialQuadRecord(
 				STRATUM_WORLD_MATERIAL, materialId, MATERIAL_TEXTURE_PARTICLE_ATLAS, materialMode,
 				translucent ? DEPTH_POLICY_TEST_NO_WRITE : DEPTH_POLICY_TEST_WRITE,
-				CULL_NONE, WORLD_TOPOLOGY_TRIANGLES, WORLD_WINDING_CCW, litColor,
+				CULL_NONE, WORLD_TOPOLOGY_TRIANGLES, WORLD_WINDING_CCW, colorArgb,
 				vertices[0], vertices[1], vertices[2], vertices[3], vertices[4], vertices[5],
 				vertices[6], vertices[7], vertices[8], vertices[9], vertices[10], vertices[11],
 				localU1, localV1, localU1, localV0, localU0, localV0, localU0, localV1,
@@ -11136,11 +11270,10 @@ public final class RustGalWorldPrimitiveRenderer {
 			billboardVertices(new Quaternionf(qx, qy, qz, qw), centerX, centerY, centerZ, quadSize, vertices);
 			int materialMode = translucent ? MATERIAL_MODE_TRANSLUCENT : MATERIAL_MODE_OPAQUE;
 			int materialId = translucent ? MATERIAL_ID_TRANSLUCENT_TEXTURED : MATERIAL_ID_OPAQUE_TEXTURED;
-			int litColor = applyPackedLight(colorArgb, packedLight);
 			PENDING_MATERIAL_QUADS.add(new VulkanicGalBridge.WorldMaterialQuadRecord(
 				STRATUM_WORLD_MATERIAL, materialId, textureId, materialMode,
 				translucent ? DEPTH_POLICY_TEST_NO_WRITE : DEPTH_POLICY_TEST_WRITE,
-				CULL_NONE, WORLD_TOPOLOGY_TRIANGLES, WORLD_WINDING_CCW, litColor,
+				CULL_NONE, WORLD_TOPOLOGY_TRIANGLES, WORLD_WINDING_CCW, colorArgb,
 				vertices[0], vertices[1], vertices[2], vertices[3], vertices[4], vertices[5],
 				vertices[6], vertices[7], vertices[8], vertices[9], vertices[10], vertices[11],
 				localU1, localV1, localU1, localV0, localU0, localV0, localU0, localV1,
@@ -11169,9 +11302,11 @@ public final class RustGalWorldPrimitiveRenderer {
 		if (quadSize <= 0.0F) {
 			throw new IllegalArgumentException("Rust particle quad size must be positive");
 		}
-		if (localU1 < localU0 || localV1 < localV0
-			|| localU1 - localU0 <= 0.0F || localV1 - localV0 <= 0.0F
-			|| localU1 - localU0 > 4096.0F || localV1 - localV0 > 4096.0F) {
+		// Vanilla terrain particles intentionally reverse U. Preserve that
+		// orientation while enforcing the same nonzero, finite span budget.
+		float uSpan = Math.abs(localU1 - localU0), vSpan = Math.abs(localV1 - localV0);
+		if (!Float.isFinite(uSpan) || !Float.isFinite(vSpan)
+			|| uSpan <= 0.0F || vSpan <= 0.0F || uSpan > 4096.0F || vSpan > 4096.0F) {
 			throw new IllegalArgumentException("Rust particle quad UV span is invalid");
 		}
 		float quaternionLengthSquared = qx * qx + qy * qy + qz * qz + qw * qw;
@@ -11338,7 +11473,7 @@ public final class RustGalWorldPrimitiveRenderer {
 			TERRAIN_PARTICLE_DIAGNOSTICS.remove(0);
 		}
 		TERRAIN_PARTICLE_DIAGNOSTICS.add(new TerrainParticleDiagnostic(
-			DeterministicCameraCapture.currentRenderedFrameIndex(),
+			DeterministicCameraCapture.currentInProgressRenderedFrameIndex(),
 			route,
 			textureId,
 			spriteId,
@@ -13476,7 +13611,7 @@ public final class RustGalWorldPrimitiveRenderer {
 		if (blockState == null) {
 			return 0;
 		}
-		// TerrainParticle already supplies sprite-local UVs from the block atlas.
+		// TerrainParticle supplies normalized atlas UVs for its selected sprite.
 		// Use that copied atlas identity for every block state instead of a small
 		// hard-coded texture whitelist; this keeps resource-pack and mod blocks on
 		// the same explicit semantic path without retaining a Java sprite or GPU

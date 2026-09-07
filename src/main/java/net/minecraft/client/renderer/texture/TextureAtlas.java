@@ -50,6 +50,8 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable,
 	private long semanticSnapshotFrameKey = Long.MIN_VALUE;
 	@Nullable
 	private TextureAtlas.SemanticRawSnapshot semanticRawSnapshot;
+	@Nullable
+	private net.vulkanic.world.AtlasAnimationResource semanticAnimationResource;
 	
 	// Iris PBR: From texture.pbr.MixinTextureAtlas - PBR atlas holder
 	@Nullable
@@ -136,6 +138,15 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable,
 
 			this.sprites = List.copyOf(list);
 			this.animatedTextures = List.copyOf(list2);
+			if (rustWholeFrame && LOCATION_BLOCKS.equals(this.location)) {
+				// The incarnation starts with atlas upload, before any resource lookup
+				// or world publication can lose its semantic sprite-use events.
+				var resource = new net.vulkanic.world.AtlasAnimationResource(this.semanticAnimationSource());
+				for (var declaration : resource.source().sprites()) {
+					this.texturesByName.get(declaration.name()).bindSemanticAnimationResource(resource);
+				}
+				this.semanticAnimationResource = resource;
+			}
 			this.refreshVulkanMipmaps();
 			if (SharedConstants.DEBUG_DUMP_TEXTURE_ATLAS) {
 				Path path = TextureUtil.getDebugTexturePath();
@@ -218,15 +229,13 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable,
 	public void cycleAnimationFrames() {
 		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
 			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-			boolean advancedSemanticFrame = false;
-			if (!this.animatedTextures.isEmpty()) {
-				for (TextureAtlasSprite.Ticker ticker : this.animatedTextures) {
-					advancedSemanticFrame |= ticker.tickSemantic();
-				}
-			}
-			if (advancedSemanticFrame) {
-				this.semanticSnapshotGeneration++;
-				this.semanticRawSnapshot = null;
+			// Vulkan animation clocks belong to Rust. Even a stale OpenGL ticker
+			// must not select Java frames after backend selection changes. Live
+			// semantic tick delivery remains private while consumer parity is tested.
+			if (net.vulkanic.world.AtlasAnimationResource.privateTickDeliveryEnabled()
+				&& this.semanticAnimationResource != null) {
+				this.semanticAnimationResource.enqueueNextTick(
+					net.sodium.client.SodiumClientMod.options().performance.animateOnlyVisibleTextures);
 			}
 			return;
 		}
@@ -268,6 +277,10 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable,
 	}
 
 	public void clearTextureData() {
+		if (this.semanticAnimationResource != null) {
+			this.semanticAnimationResource.close();
+			this.semanticAnimationResource = null;
+		}
 		this.sprites.forEach(SpriteContents::close);
 		this.animatedTextures.forEach(TextureAtlasSprite.Ticker::close);
 		this.sprites = List.of();
@@ -277,6 +290,18 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable,
 		this.semanticSnapshotGeneration++;
 		this.semanticReloadGeneration++;
 		this.semanticRawSnapshot = null;
+	}
+
+	/** Resource declarations only; the Vulkan incarnation retains its immutable copy. */
+	public synchronized SemanticAtlasAnimationSource semanticAnimationSource() {
+		if (this.semanticAnimationResource != null) return this.semanticAnimationResource.source();
+		return SemanticAtlasAnimationSource.copy(this.semanticSnapshotGeneration,
+			this.width, this.height, this.mipLevel + 1, this.texturesByName);
+	}
+
+	@Nullable
+	public synchronized net.vulkanic.world.AtlasAnimationResource semanticAnimationResource() {
+		return this.semanticAnimationResource;
 	}
 
 	/**

@@ -447,10 +447,11 @@ impl SubmissionLowerer {
             if front.id > completed {
                 break;
             }
-            let complete = self.in_flight.pop_front().expect("front existed");
             let _zone = trace::Zone::new("vulkan.backend.wait-timeline");
             let wait_started = std::time::Instant::now();
-            wait_timeline(&self.context, complete.id)?;
+            let context = &self.context;
+            let complete = wait_then_pop_front(&mut self.in_flight,
+                |entry| wait_timeline(context, entry.id))?.expect("front existed");
             self.metrics.timeline_wait_nanos = self
                 .metrics
                 .timeline_wait_nanos
@@ -1419,9 +1420,9 @@ impl SubmissionLowerer {
                         }
                         let image_barrier = vk::ImageMemoryBarrier2::default()
                             .src_stage_mask(stage_mask(barrier.before))
-                            .src_access_mask(access_mask(barrier.before))
+                            .src_access_mask(image_access_mask(barrier.before))
                             .dst_stage_mask(stage_mask(barrier.after))
-                            .dst_access_mask(access_mask(barrier.after))
+                            .dst_access_mask(image_access_mask(barrier.after))
                             .old_layout(image_layout_for_aspect(barrier.before, texture.aspect))
                             .new_layout(image_layout_for_aspect(barrier.after, texture.aspect))
                             .image(texture.image)
@@ -1880,6 +1881,22 @@ mod timestamp_tests {
     use super::*;
 
     #[test]
+    fn retirement_wait_failure_preserves_in_flight_ownership_and_order() {
+        let mut pending = VecDeque::from([(SubmissionId(3), vec![7, 8]), (SubmissionId(4), vec![9])]);
+        let before = pending.clone();
+        assert!(wait_then_pop_front(&mut pending, |entry| {
+            assert_eq!(entry.0, SubmissionId(3));
+            Err(GalError::backend("injected timeline timeout"))
+        }).is_err());
+        assert_eq!(pending, before);
+        assert_eq!(wait_then_pop_front(&mut pending, |entry| {
+            assert_eq!(entry.0, SubmissionId(3));
+            Ok(())
+        }).unwrap(), Some(before[0].clone()));
+        assert_eq!(pending, VecDeque::from([before[1].clone()]));
+    }
+
+    #[test]
     fn buffer_image_copy_preserves_texel_row_length_for_r8_and_depth_extent() {
         let copy = buffer_image_copy(
             &BufferImageCopyRegion {
@@ -2126,6 +2143,14 @@ mod timestamp_tests {
     }
 
     #[test]
+    fn image_shader_read_excludes_uniform_buffer_access_without_weakening_buffer_barriers() {
+        assert_eq!(image_access_mask(TextureUsageState::ShaderRead).as_raw(), vk::AccessFlags2::SHADER_SAMPLED_READ.as_raw());
+        assert!(access_mask(TextureUsageState::ShaderRead).contains(vk::AccessFlags2::UNIFORM_READ));
+        assert_eq!(image_access_mask(TextureUsageState::TransferDst).as_raw(), vk::AccessFlags2::TRANSFER_WRITE.as_raw());
+        assert_eq!(image_access_mask(TextureUsageState::ShaderStorageRead).as_raw(), vk::AccessFlags2::SHADER_STORAGE_READ.as_raw());
+    }
+
+    #[test]
     fn mapped_host_writes_publish_to_the_transfer_consumer_stage() {
         let barrier = mapped_host_write_dependency(vk::Buffer::null(), 12, 48);
         assert!(vk::PipelineStageFlags2::HOST == barrier.src_stage_mask);
@@ -2304,6 +2329,16 @@ pub(super) fn stage_mask(state: TextureUsageState) -> vk::PipelineStageFlags2 {
     }
 }
 
+fn image_access_mask(state: TextureUsageState) -> vk::AccessFlags2 {
+    // GAL's resource type is explicit. A sampled image can never be a uniform
+    // buffer, even though both resources currently share ShaderRead state.
+    if state == TextureUsageState::ShaderRead {
+        vk::AccessFlags2::SHADER_SAMPLED_READ
+    } else {
+        access_mask(state)
+    }
+}
+
 pub(super) fn access_mask(state: TextureUsageState) -> vk::AccessFlags2 {
     match state {
         TextureUsageState::Undefined | TextureUsageState::Present => vk::AccessFlags2::empty(),
@@ -2311,8 +2346,8 @@ pub(super) fn access_mask(state: TextureUsageState) -> vk::AccessFlags2 {
         // textures and descriptor-backed uniform buffers.  A barrier that
         // names only sampled reads does not make a preceding update visible to
         // a graphics UBO load, which can leave a draw observing stale frame
-        // parameters.  Keep the state deliberately broad until the GAL grows
-        // separate sampled/uniform read usages.
+        // parameters. Image barriers use image_access_mask instead, because
+        // their explicit resource type excludes uniform-buffer accesses.
         TextureUsageState::ShaderRead => {
             vk::AccessFlags2::SHADER_SAMPLED_READ | vk::AccessFlags2::UNIFORM_READ
         }
@@ -2398,6 +2433,14 @@ fn texture_image_copy(
             height: region.extent.height,
             depth: region.extent.depth,
         })
+}
+
+/// A failed wait must retain all submission-owned commands, reads and queries.
+fn wait_then_pop_front<T>(queue: &mut VecDeque<T>, wait: impl FnOnce(&T) -> GalResult<()>) -> GalResult<Option<T>> {
+    if let Some(front) = queue.front() {
+        wait(front)?;
+    }
+    Ok(queue.pop_front())
 }
 
 fn wait_timeline(context: &VulkanContext, id: SubmissionId) -> GalResult<()> {

@@ -59,9 +59,11 @@ public class SodiumOptionsGUI extends Screen implements ScreenPromptable {
         this.pages.add(SodiumGameOptionPages.advanced());
         
         // Iris: From MixinSodiumOptionsGUI - add shader packs page
-        Component shaderPacksTranslated = Component.translatable("options.iris.shaderPackSelection");
-        iris$shaderPacks = new OptionPage(shaderPacksTranslated, com.google.common.collect.ImmutableList.of());
-        pages.add(iris$shaderPacks);
+        if (SodiumGameOptionPages.irisRuntimeOptionsAvailable()) {
+            Component shaderPacksTranslated = Component.translatable("options.iris.shaderPackSelection");
+            iris$shaderPacks = new OptionPage(shaderPacksTranslated, com.google.common.collect.ImmutableList.of());
+            pages.add(iris$shaderPacks);
+        }
     }
 
     public static Screen createScreen(Screen currentScreen) {

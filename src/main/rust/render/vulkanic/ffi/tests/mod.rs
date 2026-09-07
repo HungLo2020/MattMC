@@ -46,6 +46,106 @@ fn test_capabilities() -> BackendCapabilities {
     }
 }
 
+fn gui_tiled_record() -> FfiGuiTiledQuadRequest {
+    FfiGuiTiledQuadRequest {
+        byte_size: size_of::<FfiGuiTiledQuadRequest>() as u32,
+        stratum: 3, asset_id: 41, bounds: [7, 11, 77, 50], tile_extent: [32, 32],
+        uv: [0.25, 0.5, 0.75, 1.0], pose: [1.0, 0.0, 0.0, 1.0, 0.0, 0.0],
+        z: 0.25, color_argb: 0xffaabbcc, sequence: 11, clip_mode: 1, clip: [1, 2, 100, 50],
+    }
+}
+
+#[test]
+fn semantic_gui_tiled_private_decoder_copies_without_expanding() {
+    let mut record = gui_tiled_record();
+    record.bounds = [0, 0, 3840, 2160];
+    record.uv = [0.0, 0.0, 1.0, 1.0];
+    let decoded = unsafe { decode_gui_tiled_quads(
+        FfiSlice { ptr: &record, count: 1 }, [320, 180], [319.75, 179.5], 0,
+    ) }.unwrap();
+    record.bounds[2] = 1;
+    record.pose[0] = 0.0;
+    record.clip[0] = 90;
+    assert_eq!(1, decoded.len(), "transport must retain a typed parent, not 8160 Java-style quads");
+    assert_eq!([0, 0, 3840, 2160], decoded[0].geometry.bounds);
+    assert_eq!(1.0, decoded[0].geometry.pose[0]);
+    assert_eq!(Some([1, 2, 100, 50]), decoded[0].clip);
+    assert_eq!([319.75, 179.5], decoded[0].projection_extent);
+    assert_eq!(11, decoded[0].sequence);
+    assert_eq!(8160, crate::render::vulkanic::gui_tiling::tile_segment_count(decoded[0].geometry).unwrap());
+    assert_eq!(1, record.bounds[2]);
+}
+
+#[test]
+fn semantic_gui_tiled_private_decoder_rejects_malformed_records_and_duplicates() {
+    let good = gui_tiled_record();
+    for bad in [
+        FfiGuiTiledQuadRequest { byte_size: 1, ..good },
+        FfiGuiTiledQuadRequest { sequence: 0, ..good },
+        FfiGuiTiledQuadRequest { asset_id: 0, ..good },
+        FfiGuiTiledQuadRequest { tile_extent: [0, 32], ..good },
+        FfiGuiTiledQuadRequest { clip_mode: 2, ..good },
+        FfiGuiTiledQuadRequest { clip_mode: 0, ..good },
+        FfiGuiTiledQuadRequest { clip: [319, 0, 2, 1], ..good },
+        FfiGuiTiledQuadRequest { pose: [f32::NAN; 6], ..good },
+    ] {
+        assert!(unsafe { decode_gui_tiled_quads(FfiSlice { ptr: &bad, count: 1 },
+            [320, 180], [320.0, 180.0], 0) }.is_err(), "{bad:?}");
+    }
+    let duplicate = [good, good];
+    assert!(unsafe { decode_gui_tiled_quads(FfiSlice { ptr: duplicate.as_ptr(), count: 2 },
+        [320, 180], [320.0, 180.0], 0) }.is_err());
+    assert!(unsafe { decode_gui_tiled_quads(FfiSlice { ptr: &good, count: 1 },
+        [320, 180], [f32::NAN, 180.0], 0) }.is_err());
+}
+
+#[test]
+fn semantic_gui_tiled_private_decoder_preflights_aggregate_budget_and_hostile_count() {
+    let mut records = [gui_tiled_record(); 5];
+    for (index, record) in records.iter_mut().enumerate() {
+        record.sequence = index as u64 + 1;
+        record.bounds = [0, 0, 4096, 4096];
+        record.uv = [0.0, 0.0, 1.0, 1.0];
+    }
+    assert!(unsafe { decode_gui_tiled_quads(FfiSlice { ptr: records.as_ptr(), count: 4 },
+        [320, 180], [320.0, 180.0], 0) }.is_ok());
+    assert!(unsafe { decode_gui_tiled_quads(FfiSlice { ptr: records.as_ptr(), count: 4 },
+        [320, 180], [320.0, 180.0], 1) }.is_err());
+    assert!(unsafe { decode_gui_tiled_quads(FfiSlice { ptr: records.as_ptr(), count: 5 },
+        [320, 180], [320.0, 180.0], 0) }.is_err());
+    // Must reject the count before attempting to form/read a caller slice.
+    assert!(unsafe { decode_gui_tiled_quads(FfiSlice {
+        ptr: std::ptr::NonNull::dangling().as_ptr(), count: u64::MAX,
+    }, [320, 180], [320.0, 180.0], 0) }.is_err());
+}
+
+#[test]
+fn semantic_gui_tiled_frame_transport_forwards_owned_parents_and_rejects_collisions() {
+    let tile = gui_tiled_record();
+    let mut frame = frame_request(&[]);
+    frame.tiled_quads = FfiSlice { ptr: &tile, count: 1 };
+    frame.gui_projection_width = 319.75;
+    frame.gui_projection_height = 179.5;
+    let decoded = unsafe { decode_gui_frame_submit_with_tiles(&frame, test_capabilities()) }.unwrap();
+    assert_eq!(1, decoded.5.len());
+    assert_eq!([319.75, 179.5], decoded.5[0].projection_extent);
+    assert!(unsafe { decode_gui_frame_submit_with_mesh(&frame, test_capabilities()) }.is_err(),
+        "a legacy consumer must not silently discard typed tiles");
+    let mut sprite = sprite_request();
+    sprite.sequence = tile.sequence;
+    frame.sprites = FfiSlice { ptr: &sprite, count: 1 };
+    assert!(unsafe { decode_gui_frame_submit_with_tiles(&frame, test_capabilities()) }.is_err());
+
+    let mut whole = whole_frame_request(&[], &[]);
+    whole.gui_tiled_quads = FfiSlice { ptr: &tile, count: 1 };
+    let mut capabilities = test_capabilities();
+    capabilities.api = BackendApi::Vulkan;
+    let decoded = unsafe { decode_whole_frame_submit_with_tiled_gui(&whole, capabilities) }.unwrap();
+    assert_eq!(tile.sequence, decoded.9[0].sequence);
+    assert!(unsafe { decode_whole_frame_submit_with_gui(&whole, capabilities) }.is_err());
+    assert!(unsafe { decode_world_primitive_submit(&whole, capabilities) }.unwrap_err().to_string().contains("does not accept GUI work"));
+}
+
 #[test]
 fn ffi_barrier_rejects_deprecated_stage_access_bits() {
     let barrier = FfiResourceBarrierAbi {
@@ -276,7 +376,27 @@ fn gui_layout_exports_cover_whole_frame_sequence_and_clip_fields() {
         first_person.field_offsets[5]
     );
     let whole_frame = super::layout::layout_for_struct(53).expect("whole-frame layout");
-    assert_eq!(34, whole_frame.field_count);
+    assert_eq!(37, whole_frame.field_count);
+    assert_eq!(std::mem::offset_of!(FfiWholeFrameSubmitRequest, gui_tiled_quads) as u32,
+        whole_frame.field_offsets[36]);
+    assert_eq!(std::mem::offset_of!(FfiWholeFrameSubmitRequest, gui_projection_width) as u32,
+        whole_frame.field_offsets[34]);
+    assert_eq!(std::mem::offset_of!(FfiWholeFrameSubmitRequest, gui_projection_height) as u32,
+        whole_frame.field_offsets[35]);
+    let gui_frame = super::layout::layout_for_struct(45).unwrap();
+    assert_eq!(13, gui_frame.field_count);
+    assert_eq!(std::mem::offset_of!(FfiGuiFrameSubmitRequest, tiled_quads) as u32,
+        gui_frame.field_offsets[12]);
+    let tiled = super::layout::layout_for_struct(101).unwrap();
+    assert_eq!(12, tiled.field_count);
+    assert_eq!(size_of::<FfiGuiTiledQuadRequest>() as u32, tiled.byte_size);
+    assert_eq!(std::mem::offset_of!(FfiGuiTiledQuadRequest, pose) as u32, tiled.field_offsets[6]);
+    assert_eq!(std::mem::offset_of!(FfiGuiTiledQuadRequest, sequence) as u32, tiled.field_offsets[9]);
+    assert_eq!(std::mem::offset_of!(FfiGuiTiledQuadRequest, clip) as u32, tiled.field_offsets[11]);
+    assert_eq!(std::mem::offset_of!(FfiGuiFrameSubmitRequest, gui_projection_width) as u32,
+        gui_frame.field_offsets[10]);
+    assert_eq!(std::mem::offset_of!(FfiGuiFrameSubmitRequest, gui_projection_height) as u32,
+        gui_frame.field_offsets[11]);
     assert_eq!(
         std::mem::offset_of!(
             FfiWholeFrameSubmitRequest,
@@ -401,6 +521,9 @@ fn gui_frame_mesh_transport_is_owned_and_shares_one_item_sequence() {
 
 fn frame_request(sprites: &[FfiGuiSpriteRequest]) -> FfiGuiFrameSubmitRequest {
     FfiGuiFrameSubmitRequest {
+        tiled_quads: FfiSlice { ptr: std::ptr::null(), count: 0 },
+        gui_projection_width: 320.0,
+        gui_projection_height: 180.0,
         header: FfiHeader {
             version: FFI_ABI_VERSION,
             byte_size: size_of::<FfiGuiFrameSubmitRequest>() as u32,
@@ -628,6 +751,9 @@ fn whole_frame_request(
     projection_matrix[10] = 1.0;
     projection_matrix[15] = 1.0;
     FfiWholeFrameSubmitRequest {
+        gui_tiled_quads: FfiSlice { ptr: std::ptr::null(), count: 0 },
+        gui_projection_width: 320.0,
+        gui_projection_height: 180.0,
         header: FfiHeader {
             version: FFI_ABI_VERSION,
             byte_size: size_of::<FfiWholeFrameSubmitRequest>() as u32,
@@ -1239,6 +1365,34 @@ fn semantic_gui_ffi_decode_copies_caller_memory() {
 }
 
 #[test]
+fn semantic_gui_projection_is_owned_exact_and_validated_for_every_family() {
+    let sprites = [sprite_request()];
+    let mut affine = affine_quad_request();
+    affine.sequence = 2;
+    let vertices = gui_mesh_vertices();
+    let indices = [0, 1, 2];
+    let mut mesh = gui_mesh_batch_request(&vertices, &indices);
+    mesh.sequence = 3;
+    let mut request = frame_request(&sprites);
+    request.affine_quads = FfiSlice { ptr: &affine, count: 1 };
+    request.mesh_batches = FfiSlice { ptr: &mesh, count: 1 };
+    request.gui_projection_width = 319.75;
+    request.gui_projection_height = 179.5;
+    let (_, _, sprites, affine, meshes) = unsafe {
+        super::gui::decode_gui_frame_submit_with_mesh(&request, test_capabilities()).unwrap()
+    };
+    request.gui_projection_width = 320.0;
+    assert_eq!([319.75, 179.5], sprites[0].projection_extent);
+    assert_eq!([319.75, 179.5], affine[0].projection_extent);
+    assert_eq!([319.75, 179.5], meshes[0].projection_extent);
+    assert_eq!([320, 180], meshes[0].gui_extent);
+    for invalid in [f32::NAN, f32::INFINITY, 0.0, -1.0, 319.0, 320.5] {
+        request.gui_projection_width = invalid;
+        assert!(unsafe { super::gui::decode_gui_frame_submit_with_mesh(&request, test_capabilities()) }.is_err());
+    }
+}
+
+#[test]
 fn semantic_gui_ffi_rejects_oversized_viewport_before_copying() {
     let mut request = frame_request(&[]);
     request.gui_width = 16_385;
@@ -1729,6 +1883,8 @@ fn whole_frame_gui_affine_quads_share_the_owned_frame_decode() {
     let sprites = vec![sprite_request()];
     let mut affine_quads = vec![affine_quad_request()];
     let mut request = whole_frame_request(&segments, &sprites);
+    request.gui_projection_width = 319.75;
+    request.gui_projection_height = 179.5;
     request.gui_affine_quads = FfiSlice {
         ptr: affine_quads.as_ptr(),
         count: affine_quads.len() as u64,
@@ -1749,6 +1905,8 @@ fn whole_frame_gui_affine_quads_share_the_owned_frame_decode() {
     affine_quads[0].y3 = 99.0;
     assert_eq!(decoded_sprites.len(), 1);
     assert_eq!(decoded_affine_quads.len(), 1);
+    assert_eq!([319.75, 179.5], decoded_sprites[0].projection_extent);
+    assert_eq!([319.75, 179.5], decoded_affine_quads[0].projection_extent);
     assert!(decoded_mesh_batches.is_empty());
     assert_eq!(decoded_affine_quads[0].y3, 28.0);
 

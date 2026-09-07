@@ -26,6 +26,13 @@ public class Frustum implements ViewportProvider {
 		this.calculateFrustum(matrix4f, matrix4f2);
 	}
 
+	/** World-space culling from explicit camera-relative view/projection and camera origin. */
+	public static Frustum forCamera(Matrix4f view, Matrix4f projection, net.minecraft.world.phys.Vec3 position) {
+		Frustum result = new Frustum(view, projection);
+		result.prepare(position.x(), position.y(), position.z());
+		return result;
+	}
+
 	public Frustum(Frustum frustum) {
 		this.intersection.set(frustum.matrix);
 		this.matrix.set(frustum.matrix);

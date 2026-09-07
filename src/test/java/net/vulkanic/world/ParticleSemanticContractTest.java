@@ -8,6 +8,22 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 final class ParticleSemanticContractTest {
+	@org.junit.jupiter.api.BeforeAll
+	static void bootstrap() {
+		net.minecraft.SharedConstants.tryDetectVersion();
+		net.minecraft.server.Bootstrap.bootStrap();
+	}
+	@Test
+	void terrainParticleAtlasBindingPreservesAtlasRatherThanSpriteLocalCoordinates() throws Exception {
+		String source = Files.readString(Path.of("src/main/java/net/minecraft/client/particle/TerrainParticle.java"));
+		int enqueue = source.indexOf("boolean enqueueRustGal(");
+		int nextMethod = source.indexOf("protected float getU0()", enqueue);
+		String producer = source.substring(enqueue, nextMethod);
+		assertTrue(producer.contains("this.getU0(),") && producer.contains("this.getV1(),")
+			&& !producer.contains("Math.min") && !producer.contains("Math.max")
+			&& !producer.contains("getUOffset") && !producer.contains("getVOffset"),
+			"a full-atlas binding must keep the vanilla producer's atlas coordinates");
+	}
 	@Test
 	void quadParticleAdmissionRollsBackPartialRustMaterialStreams() throws Exception {
 		String source = Files.readString(Path.of(
@@ -66,15 +82,21 @@ final class ParticleSemanticContractTest {
 	}
 
 	@Test
-	void particleQuadAdmissionRejectsInvertedOrUnboundedUvSpans() throws Exception {
-		String source = Files.readString(Path.of(
-			"src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
-		int helper = source.indexOf("private static void validateParticleQuadSemantics(");
-		int invalidSpan = source.indexOf("Rust particle quad UV span is invalid", helper);
-		assertTrue(helper >= 0 && invalidSpan > helper
-			&& source.substring(helper, invalidSpan).contains("localU1 < localU0")
-			&& source.substring(helper, invalidSpan).contains("localV1 < localV0"),
-			"particle semantic admission must reject inverted or unbounded UV spans before vertex publication");
+	void particleQuadAdmissionPreservesOrientedUvsButRejectsZeroAndUnboundedSpans() throws Exception {
+		var method = RustGalWorldPrimitiveRenderer.class.getDeclaredMethod("validateParticleQuadSemantics",
+			net.minecraft.resources.ResourceLocation.class, float.class, float.class, float.class,
+			float.class, float.class, float.class, float.class, float.class,
+			float.class, float.class, float.class, float.class);
+		method.setAccessible(true);
+		for (float[] uv : new float[][]{{0,1,0,1}, {1,0,0,1}, {0,1,1,0}, {1,0,1,0}}) {
+			method.invoke(null, null, 0F,0F,0F, 0F,0F,0F,1F, 0.25F, uv[0],uv[1],uv[2],uv[3]);
+		}
+		for (float[] uv : new float[][]{{0,0,0,1}, {0,1,1,1}, {0,4097,0,1},
+			{4097,0,0,1}, {Float.MAX_VALUE,-Float.MAX_VALUE,0,1}, {Float.NaN,1,0,1}}) {
+			var error = org.junit.jupiter.api.Assertions.assertThrows(java.lang.reflect.InvocationTargetException.class,
+				() -> method.invoke(null, null, 0F,0F,0F, 0F,0F,0F,1F, 0.25F, uv[0],uv[1],uv[2],uv[3]));
+			org.junit.jupiter.api.Assertions.assertInstanceOf(IllegalArgumentException.class, error.getCause());
+		}
 	}
 
 	@Test

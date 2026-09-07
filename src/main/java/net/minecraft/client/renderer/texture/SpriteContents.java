@@ -208,6 +208,72 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable, SpriteCont
 		return this.animatedTexture != null ? this.animatedTexture.getUniqueFrames() : IntStream.of(1);
 	}
 
+	/**
+	 * Copies immutable resource animation declarations and complete CPU mip sheets.
+	 * Does not construct a ticker, select a frame, interpolate pixels, or access a
+	 * Java GPU texture. Rust must own those rendering decisions after transport.
+	 */
+	public Optional<SemanticAnimationSource> semanticAnimationSource() {
+		if (this.animatedTexture == null) return Optional.empty();
+		long bytes = 0L;
+		if (this.byMipLevel.length == 0 || this.byMipLevel.length > 32
+			|| this.animatedTexture.frames.size() > 16384) {
+			throw new IllegalStateException("Invalid semantic sprite animation source");
+		}
+		// Preflight every level before making any pixel copies.
+		for (NativeImage image : this.byMipLevel) {
+			if (image == null || image.getWidth() <= 0 || image.getHeight() <= 0) {
+				throw new IllegalStateException("Incomplete semantic sprite animation mip sheet");
+			}
+			bytes = Math.addExact(bytes, Math.multiplyExact(
+				Math.multiplyExact((long)image.getWidth(), image.getHeight()), 4L));
+			if (bytes > 96L * 1024L * 1024L) {
+				throw new IllegalStateException("Semantic sprite animation pixel bound exceeded");
+			}
+		}
+		List<SemanticAnimationMip> mips = new ArrayList<>(this.byMipLevel.length);
+		for (NativeImage image : this.byMipLevel) {
+			byte[] rgba = new byte[Math.multiplyExact(Math.multiplyExact(image.getWidth(), image.getHeight()), 4)];
+			for (int y = 0; y < image.getHeight(); y++) {
+				for (int x = 0; x < image.getWidth(); x++) {
+					int argb = image.getPixel(x, y);
+					int offset = (y * image.getWidth() + x) * 4;
+					rgba[offset] = (byte)ARGB.red(argb);
+					rgba[offset + 1] = (byte)ARGB.green(argb);
+					rgba[offset + 2] = (byte)ARGB.blue(argb);
+					rgba[offset + 3] = (byte)ARGB.alpha(argb);
+				}
+			}
+			mips.add(new SemanticAnimationMip(image.getWidth(), image.getHeight(), rgba));
+		}
+		return Optional.of(new SemanticAnimationSource(this.width, this.height,
+			this.animatedTexture.frameRowSize, this.animatedTexture.interpolateFrames,
+			this.animatedTexture.frames.stream()
+				.map(frame -> new SemanticAnimationFrame(frame.index(), frame.time())).toList(), mips));
+	}
+
+	public record SemanticAnimationFrame(int index, int durationTicks) {}
+
+	public record SemanticAnimationMip(int width, int height, byte[] rgba) {
+		public SemanticAnimationMip {
+			if (width <= 0 || height <= 0
+				|| (long)width * height > 96L * 1024L * 1024L / 4L
+				|| (long)width * height * 4L != rgba.length) {
+				throw new IllegalArgumentException("Invalid semantic animation mip dimensions");
+			}
+			rgba = rgba.clone();
+		}
+		@Override public byte[] rgba() { return this.rgba.clone(); }
+	}
+
+	public record SemanticAnimationSource(int frameWidth, int frameHeight, int frameRowSize,
+		boolean interpolate, List<SemanticAnimationFrame> frames, List<SemanticAnimationMip> mips) {
+		public SemanticAnimationSource {
+			frames = List.copyOf(frames);
+			mips = List.copyOf(mips);
+		}
+	}
+
 	/** Returns the currently selected semantic animation frame, if any. */
 	public int semanticFrameIndex() {
 		if (this.animatedTexture == null) return 0;

@@ -622,6 +622,18 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_gui(
     i32,
     Vec<u8>,
 )> {
+    let (generation, target, frame, sprites, affine, meshes, boundary, radius, effect, tiles) =
+        decode_whole_frame_submit_with_backend_policy(request, capabilities, true)?;
+    if !tiles.is_empty() {
+        return Err(GalError::invalid_argument("tiled GUI requires the typed whole-frame submit path"));
+    }
+    Ok((generation, target, frame, sprites, affine, meshes, boundary, radius, effect))
+}
+
+pub(crate) unsafe fn decode_whole_frame_submit_with_tiled_gui(
+    request: *const FfiWholeFrameSubmitRequest, capabilities: BackendCapabilities,
+) -> GalResult<(u64, Handle, WorldPrimitiveFrame, Vec<GuiSpriteRequest>,
+    Vec<GuiAffineQuadRequest>, Vec<GuiMeshBatchRequest>, i32, i32, Vec<u8>, Vec<GuiTiledQuadRequest>)> {
     decode_whole_frame_submit_with_backend_policy(request, capabilities, true)
 }
 
@@ -639,8 +651,9 @@ pub(crate) unsafe fn decode_world_primitive_submit(
         gui_blur_before_stratum,
         gui_blur_radius,
         _post_effect_id,
+        gui_tiled_quads,
     ) = decode_whole_frame_submit_with_backend_policy(request, capabilities, false)?;
-    if !gui_sprites.is_empty() || !gui_affine_quads.is_empty() || !gui_mesh_batches.is_empty() {
+    if !gui_sprites.is_empty() || !gui_affine_quads.is_empty() || !gui_mesh_batches.is_empty() || !gui_tiled_quads.is_empty() {
         return Err(GalError::ffi(
             StatusCode::InvalidArgument,
             "world primitive submit does not accept GUI work",
@@ -674,6 +687,7 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
     i32,
     i32,
     Vec<u8>,
+    Vec<GuiTiledQuadRequest>,
 )> {
     if request.is_null() {
         return Err(GalError::ffi(
@@ -1649,9 +1663,12 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
         affine_quads: request.gui_affine_quads,
         negotiated_feature_bits: request.negotiated_feature_bits,
         mesh_batches: request.gui_mesh_batches,
+        gui_projection_width: request.gui_projection_width,
+        gui_projection_height: request.gui_projection_height,
+        tiled_quads: request.gui_tiled_quads,
     };
-    let (_, _, gui_sprites, gui_affine_quads, gui_mesh_batches) =
-        decode_gui_frame_submit_with_mesh(&raw_gui, capabilities)?;
+    let (_, _, gui_sprites, gui_affine_quads, gui_mesh_batches, gui_tiled_quads) =
+        decode_gui_frame_submit_with_tiles(&raw_gui, capabilities)?;
     let viewport_width = u32::try_from(request.viewport_width).map_err(|_| {
         GalError::ffi(
             StatusCode::InvalidArgument,
@@ -1701,6 +1718,7 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
         request.gui_blur_before_stratum,
         request.gui_blur_radius,
         post_effect_id,
+        gui_tiled_quads,
     ))
 }
 
@@ -2651,7 +2669,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_whole_frame_submit(
             .ffi_output_bytes
             .saturating_add(size_of::<FfiWholeFrameSubmitResult>() as u64);
         let decode_started = std::time::Instant::now();
-        let result = decode_whole_frame_submit_with_gui(request, context.gal.capabilities())
+        let result = decode_whole_frame_submit_with_tiled_gui(request, context.gal.capabilities())
             .and_then(
                 |(
                     generation,
@@ -2663,6 +2681,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_whole_frame_submit(
                     gui_blur_before_stratum,
                     gui_blur_radius,
                     post_effect_id,
+                    gui_tiled_quads,
                 )| {
                     let world_frame_id = world_frame.frame_id;
                     let ffi_decode_nanos =
@@ -2676,9 +2695,25 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_whole_frame_submit(
                         generation, world_frame_id, ffi_decode_nanos
                     ));
                     let frontend_started = std::time::Instant::now();
+                    // Capture short menu transitions without sampling past the
+                    // requested frame. Bound diagnostics across the process.
+                    static TILED_RECEIPTS: std::sync::atomic::AtomicUsize =
+                        std::sync::atomic::AtomicUsize::new(0);
+                    let tiled_receipt = if !gui_tiled_quads.is_empty()
+                        && std::env::var_os("MATTMC_TRACE_GUI_TILES").is_some()
+                        && TILED_RECEIPTS.fetch_update(
+                            std::sync::atomic::Ordering::Relaxed,
+                            std::sync::atomic::Ordering::Relaxed,
+                            |count| (count < 512).then_some(count + 1),
+                        ).is_ok()
+                    {
+                        Some((gui_tiled_quads.len(),
+                            crate::render::vulkanic::gui_frontend::preflight_tiled_affine_count(
+                                &gui_tiled_quads, 0)?))
+                    } else { None };
                     let frontend_result = context
                         .world_primitive_frontend
-                        .submit_whole_frame_with_gui_frontend(
+                        .submit_whole_frame_with_tiled_gui_frontend(
                             &mut context.gal,
                             generation,
                             frame_target,
@@ -2690,6 +2725,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_whole_frame_submit(
                             post_effect_id,
                             gui_blur_before_stratum,
                             gui_blur_radius,
+                            gui_tiled_quads,
                         );
                     whole_frame_trace(&format!(
                         "whole-frame.frontend.end generation={} frame={} elapsed_nanos={}",
@@ -2698,6 +2734,10 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_whole_frame_submit(
                         crate::render::vulkanic::metrics::elapsed_nanos_u64(frontend_started)
                     ));
                     let (mut world_stats, gui_stats) = frontend_result?;
+                    if let Some((parents, children)) = tiled_receipt {
+                        eprintln!("whole-frame.gui-tiles.submitted frame={} parents={} children={}",
+                            world_frame_id, parents, children);
+                    }
                     let gui_frontend_nanos =
                         crate::render::vulkanic::metrics::elapsed_nanos_u64(gui_started);
                     world_stats.profile.ffi_decode_nanos = ffi_decode_nanos;

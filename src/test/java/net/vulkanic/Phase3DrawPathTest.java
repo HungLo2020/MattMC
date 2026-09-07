@@ -7732,7 +7732,7 @@ public class Phase3DrawPathTest {
                 "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
         int method = renderer.indexOf("public static void registerStaticTerrainMeshAsset");
         int preflight = renderer.indexOf("projectedTextureResidency", method);
-        int publish = renderer.indexOf("WORLD_MESH_TEXTURES.put", method);
+        int publish = renderer.indexOf("registerChangedTexture(WORLD_MESH_TEXTURES, DIRTY_WORLD_MESH_TEXTURES, texture)", method);
         int meshBudget = renderer.indexOf("MAX_WORLD_MESH_ASSET_RESIDENCY", method);
         assertTrue(method >= 0 && preflight > method && publish > preflight
                         && renderer.indexOf("batchTexturePayloads", method) > preflight
@@ -7749,7 +7749,7 @@ public class Phase3DrawPathTest {
         int method = renderer.indexOf("private static void ensureMeshAssetLocked");
         int texturePreflight = renderer.indexOf("projectedTextureResidency", method);
         int meshPreflight = renderer.indexOf("MAX_WORLD_MESH_ASSET_RESIDENCY", method);
-        int publish = renderer.indexOf("WORLD_MESH_TEXTURES.put", method);
+        int publish = renderer.indexOf("registerChangedTexture(WORLD_MESH_TEXTURES, DIRTY_WORLD_MESH_TEXTURES, texture)", method);
         int meshPublish = renderer.indexOf("WORLD_MESH_ASSETS.put", method);
         assertTrue(method >= 0 && texturePreflight > method && meshPreflight > method
                         && publish > texturePreflight && meshPublish > publish
@@ -7766,7 +7766,7 @@ public class Phase3DrawPathTest {
                 "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
         int method = renderer.indexOf("public static void registerStaticTerrainMeshAsset");
         int validation = renderer.indexOf("private static void validateWorldMeshAsset");
-        int publish = renderer.indexOf("WORLD_MESH_TEXTURES.put", method);
+        int publish = renderer.indexOf("registerChangedTexture(WORLD_MESH_TEXTURES, DIRTY_WORLD_MESH_TEXTURES, texture)", method);
         assertTrue(method >= 0 && validation >= 0 && validation < method && publish > method
                         && renderer.indexOf("MAX_WORLD_MESH_VERTICES", validation) > validation
                         && renderer.indexOf("MAX_WORLD_MESH_FRONTEND_INDEX_BYTES", validation) > validation
@@ -7786,7 +7786,7 @@ public class Phase3DrawPathTest {
         int method = renderer.indexOf("public static void registerWorldMeshTexture");
         int validation = renderer.indexOf("private static void validateWorldMeshTextureAsset");
         int payloadCheck = renderer.indexOf("payloadBytes", validation);
-        int publish = renderer.indexOf("WORLD_MESH_TEXTURES.put", method);
+        int publish = renderer.indexOf("registerChangedTexture(WORLD_MESH_TEXTURES, DIRTY_WORLD_MESH_TEXTURES, texture)", method);
         assertTrue(method >= 0 && validation >= 0 && validation < method && payloadCheck > validation && publish > method
                         && renderer.indexOf("payload must contain 1..") > payloadCheck,
                 "generic Rust texture registration must reject empty/oversized semantic payloads before registry publication");

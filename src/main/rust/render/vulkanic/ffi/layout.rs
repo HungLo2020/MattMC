@@ -476,7 +476,10 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 sprites,
                 affine_quads,
                 negotiated_feature_bits,
-                mesh_batches
+                mesh_batches,
+                gui_projection_width,
+                gui_projection_height,
+                tiled_quads
             ]
         ),
         46 => layout!(
@@ -719,7 +722,10 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 world_first_person_mesh_instances,
                 gui_blur_before_stratum,
                 gui_blur_radius,
-                post_effect_id
+                post_effect_id,
+                gui_projection_width,
+                gui_projection_height,
+                gui_tiled_quads
             ]
         ),
         89 => layout!(
@@ -1380,6 +1386,16 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 model_view_matrix
             ]
         ),
+        101 => layout!(101, FfiGuiTiledQuadRequest,
+            [byte_size, stratum, asset_id, bounds, tile_extent, uv, pose, z,
+             color_argb, sequence, clip_mode, clip]),
+        102 => layout!(102, FfiSpriteAnimationMip,
+            [byte_size, width, height, reserved0, rgba]),
+        103 => layout!(103, FfiSpriteAnimationSource,
+            [byte_size, sprite_id, atlas_x, atlas_y, frame_width, frame_height,
+             interpolate, reserved0, frames, mips]),
+        104 => layout!(104, FfiAtlasAnimationAssetUpdate,
+            [header, texture_id, reserved0, generation, initial_tick, sprites]),
         _ => {
             return Err(GalError::ffi(
                 StatusCode::UnknownEnum,

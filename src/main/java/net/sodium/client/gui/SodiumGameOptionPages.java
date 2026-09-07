@@ -37,6 +37,11 @@ public class SodiumGameOptionPages {
     private static final MinecraftOptionsStorage vanillaOpts = new MinecraftOptionsStorage();
     private static final Window window = Minecraft.getInstance().getWindow();
 
+    static boolean irisRuntimeOptionsAvailable() {
+        return !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+            && net.irisshaders.iris.Iris.getIrisConfig() != null;
+    }
+
     public static OptionPage general() {
         Monitor monitor = window.findBestMonitor();
         List<OptionGroup> groups = new ArrayList<>();
@@ -51,7 +56,7 @@ public class SodiumGameOptionPages {
                         .setFlags(OptionFlag.REQUIRES_RENDERER_RELOAD)
                         .build())
                 // Iris: Add max shadow distance option (merged from MixinSodiumGameOptionPages)
-                .add(OptionImpl.createBuilder(int.class, vanillaOpts)
+                .addIf(irisRuntimeOptionsAvailable(), () -> OptionImpl.createBuilder(int.class, vanillaOpts)
                         .setName(Component.translatable("options.iris.shadowDistance"))
                         .setTooltip(Component.translatable("options.iris.shadowDistance.sodium_tooltip"))
                         .setControl(option -> new SliderControl(option, 0, 32, 1, (v) -> v == 0 ? Component.literal("Disabled") : Component.translatable("options.chunks", v)))
@@ -205,7 +210,7 @@ public class SodiumGameOptionPages {
 
         groups.add(OptionGroup.createBuilder()
                 // Iris: Replace graphics quality button when shaders enabled (merged from MixinSodiumGameOptionPages)
-                .add(!net.irisshaders.iris.Iris.getIrisConfig().areShadersEnabled() ? 
+                .add(!(irisRuntimeOptionsAvailable() && net.irisshaders.iris.Iris.getIrisConfig().areShadersEnabled()) ?
                     OptionImpl.createBuilder(GraphicsStatus.class, vanillaOpts)
                         .setName(Component.translatable("options.graphics"))
                         .setTooltip(Component.translatable("sodium.options.graphics_quality.tooltip"))
@@ -235,7 +240,7 @@ public class SodiumGameOptionPages {
                         .setFlags(OptionFlag.REQUIRES_RENDERER_RELOAD)
                         .build())
                 // Iris: Add color space option (merged from MixinSodiumGameOptionPages)
-                .add(OptionImpl.createBuilder(net.irisshaders.iris.pathways.colorspace.ColorSpace.class, vanillaOpts)
+                .addIf(irisRuntimeOptionsAvailable(), () -> OptionImpl.createBuilder(net.irisshaders.iris.pathways.colorspace.ColorSpace.class, vanillaOpts)
                     .setName(Component.translatable("options.iris.colorSpace"))
                     .setTooltip(Component.translatable("options.iris.colorSpace.sodium_tooltip"))
                     .setControl(option -> new CyclingControl<>(option, net.irisshaders.iris.pathways.colorspace.ColorSpace.class,
@@ -453,6 +458,9 @@ public class SodiumGameOptionPages {
     }
 
     private static boolean supportsNoErrorContext() {
+        // This controls creation of an OpenGL context, not an explicit GAL
+        // capability. Never query the fenced Java backend on Rust Vulkan.
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) return false;
         var capabilities = VulkanicAPI.getGraphicsCapabilities();
                 return capabilities.supports(GraphicsFeature.NO_ERROR_CONTEXT)
                 && !Workarounds.isWorkaroundEnabled(Workarounds.Reference.NO_ERROR_CONTEXT_UNSUPPORTED);
