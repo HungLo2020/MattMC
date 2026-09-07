@@ -30,6 +30,11 @@ public class PanoramaRenderer {
 		guiGraphics.blit(RenderPipelines.GUI_TEXTURED, PANORAMA_OVERLAY, 0, 0, 0.0F, 0.0F, i, j, 16, 128, 16, 128);
 	}
 
+	/** Bounded audit receipt only; never used to control panorama rendering. */
+	public float graphicsAuditSpin() {
+		return this.spin;
+	}
+
 	private static float wrap(float f, float g) {
 		return f > g ? f - g : f;
 	}

@@ -524,6 +524,8 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		this.extractBlockDestroyAnimation(camera, this.levelRenderState);
 		profilerFiller.popPush("weather");
 		this.weatherEffectRenderer.extractRenderState(this.level, this.ticks, f, vec3, this.levelRenderState.weatherRenderState);
+		net.minecraft.client.dev.DeterministicCameraCapture.recordWeatherRendererTicks(this.ticks);
+		net.minecraft.client.dev.DeterministicCameraCapture.recordWeatherRendererPartialTick(f);
 		profilerFiller.popPush("sky");
 		this.skyRenderer.extractRenderState(this.level, f, vec3, this.levelRenderState.skyRenderState);
 		profilerFiller.popPush("border");
@@ -590,7 +592,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		if (cloudStatus != CloudStatus.OFF) {
 			Optional<Integer> optional = this.level.dimensionType().cloudHeight();
 			if (optional.isPresent()) {
-				float g = this.ticks + f;
+			float g = net.minecraft.client.dev.DeterministicCameraCapture.cloudTimeForCapture(this.ticks + f);
 				int k = this.level.getCloudColor(f);
 				this.addCloudsPass(frameGraphBuilder, cloudStatus, this.levelRenderState.cameraRenderState.pos, g, k, ((Integer)optional.get()).intValue() + 0.33F);
 			}
@@ -611,6 +613,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 
 			@Override
 			public void afterExecutePass(String string) {
+				net.minecraft.client.dev.DeterministicCameraCapture.observeCelestialStagePixels("main-pass-" + string);
 				profilerFiller.pop();
 			}
 		});
@@ -731,7 +734,9 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 			this.submitBlockEntities(poseStack, levelRenderState, this.submitNodeStorage);
 			profilerFiller.popPush("renderFeatures");
 			iris$renderAllFeaturesMain();
+			net.minecraft.client.dev.DeterministicCameraCapture.observeTerrainStagePixels("main-after-features");
 			bufferSource.endLastBatch();
+			net.minecraft.client.dev.DeterministicCameraCapture.observeTerrainStagePixels("main-after-last-batch");
 			this.checkPoseStack(poseStack);
 			bufferSource.endBatch(RenderType.solid());
 			bufferSource.endBatch(RenderType.endPortal());
@@ -743,6 +748,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 			bufferSource.endBatch(Sheets.signSheet());
 			bufferSource.endBatch(Sheets.hangingSignSheet());
 			bufferSource.endBatch(Sheets.chestSheet());
+			net.minecraft.client.dev.DeterministicCameraCapture.observeTerrainStagePixels("main-after-opaque-flush");
 			this.renderBuffers.outlineBufferSource().endOutlineBatch();
 			if (bl) {
 				this.renderBlockOutline(bufferSource, poseStack, false, levelRenderState);
@@ -772,6 +778,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 			bufferSource.endBatch(RenderType.waterMask());
 			bufferSource.endBatch();
 			iris$beginTranslucents();
+			net.minecraft.client.dev.DeterministicCameraCapture.observeTerrainStagePixels("main-after-begin-translucents");
 			if (resourceHandle2 != null) {
 				resourceHandle2.get().copyDepthFrom(resourceHandle.get());
 			}

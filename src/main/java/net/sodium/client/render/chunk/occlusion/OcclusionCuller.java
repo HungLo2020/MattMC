@@ -78,9 +78,17 @@ public class OcclusionCuller {
                     connections = GraphDirectionSet.ALL;
                 }
 
+                int outgoingBeforeOutwardMask = connections;
                 // We can only traverse *outwards* from the center of the graph search, so mask off any invalid
                 // directions.
                 connections &= getOutwardDirections(viewport.getChunkCoord(), section);
+                int adjacentMask = section.getAdjacentMask();
+                net.sodium.client.render.StaticTerrainParityDiagnostics.recordPortalTraversal(
+                        "frozen-sodium", section.getPosition().asLong(), viewport.getChunkCoord().asLong(),
+                        section.getIncomingDirections(), outgoingBeforeOutwardMask, connections, adjacentMask,
+                        connections & adjacentMask, section.getVisibilityData(),
+                        viewport.getTransform().x - section.getCenterX(), viewport.getTransform().y - section.getCenterY(),
+                        viewport.getTransform().z - section.getCenterZ());
             }
 
             visitNeighbors(writeQueue, section, connections, frame);

@@ -700,8 +700,10 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 			if (bl2 && bl && this.minecraft.level != null) {
 				profilerFiller.push("world");
 				this.renderLevel(deltaTracker);
+				net.minecraft.client.dev.DeterministicCameraCapture.observeCelestialStagePixels("main-after-level");
 				this.tryTakeScreenshotIfNeeded();
 				this.minecraft.levelRenderer.doEntityOutline();
+				net.minecraft.client.dev.DeterministicCameraCapture.observeCelestialStagePixels("main-after-outline");
 				if (this.postEffectId != null && this.effectActive) {
 					VulkanicAPI.resetTextureMatrix();
 					PostChain postChain = this.minecraft.getShaderManager().getPostChain(this.postEffectId, LevelTargetBundle.MAIN_TARGETS);
@@ -713,6 +715,7 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 				profilerFiller.pop();
 			}
 
+			net.minecraft.client.dev.DeterministicCameraCapture.observeCelestialStagePixels("main-after-post");
 			this.fogRenderer.endFrame();
 			RenderTarget renderTarget = this.minecraft.getMainRenderTarget();
 			VulkanicAPI.createCommandEncoder().clearDepthTexture(renderTarget.getDepthTexture(), 1.0);
@@ -799,6 +802,7 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 			}
 			
 			this.guiRenderer.render(this.fogRenderer.getBuffer(FogRenderer.FogMode.NONE));
+			net.minecraft.client.dev.DeterministicCameraCapture.observeCelestialStagePixels("main-after-gui");
 			this.guiRenderer.incrementFrameNumber();
 			profilerFiller.pop();
 			
@@ -985,6 +989,7 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 			.setupFog(this.mainCamera, this.minecraft.options.getEffectiveRenderDistance(), bl2, deltaTracker, this.getDarkenWorldAmount(f), this.minecraft.level);
 		GpuBufferSlice gpuBufferSlice = this.fogRenderer.getBuffer(FogRenderer.FogMode.WORLD);
 		profilerFiller.popPush("level");
+		net.minecraft.client.dev.DeterministicCameraCapture.recordFrozenSkyMatrices(matrix4f2, matrix4f);
 		this.minecraft
 			.levelRenderer
 			.renderLevel(

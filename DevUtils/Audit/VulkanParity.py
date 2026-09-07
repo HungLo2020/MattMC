@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-VulkanParityAudit - source and capture parity auditing for MattMC.
+VulkanParity - source and capture parity auditing for MattMC.
 
 This tool is intentionally evidence-first:
   * source-audit classifies remaining GL-shaped architecture pressure points
   * diff-captures compares OpenGL/Vulkan ShaderInputParity logs semantically
-  * auto-diff finds the newest compatible OpenGL/Vulkan RunDevCapture pair
+  * auto-diff finds the newest compatible OpenGL/Vulkan capture pair
 
 The diff is strict about shader input payloads, but it normalizes backend object
 identities and binding-number churn so real semantic mismatches are easier to see.

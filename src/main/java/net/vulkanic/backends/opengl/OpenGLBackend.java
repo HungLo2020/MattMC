@@ -31,6 +31,7 @@ import net.vulkanic.VulkanicStencilOperation;
 import net.vulkanic.VulkanicTextureParameterName;
 import net.vulkanic.VulkanicTextureTarget;
 import net.vulkanic.VulkanicTextureUploadFormat;
+import net.vulkanic.VulkanPerfAudit;
 import net.vulkanic.VulkanExecutionContextInfo;
 import net.vulkanic.VulkanNativeInitializationInfo;
 import net.vulkanic.VulkanSwapchainSurfaceInfo;
@@ -49,9 +50,32 @@ public class OpenGLBackend implements GraphicsBackend {
 
     private static final int TEXTURE_UNIT_COUNT = 128;
     private final int[] texture2DBindings = new int[TEXTURE_UNIT_COUNT];
+    {
+        // Unknown until this backend observes a binding; zero is a real GL binding.
+        java.util.Arrays.fill(texture2DBindings, -1);
+    }
     private final java.util.concurrent.ConcurrentMap<Integer, java.util.concurrent.ConcurrentMap<Integer, String>> uniformNamesByProgramLocation =
         new java.util.concurrent.ConcurrentHashMap<>();
     private int activeTextureUnitIndex = 0;
+    private int terrainBindingObservations;
+
+    /** Capture-only observation; deliberately does not repair or invalidate cached GL state. */
+    private void observeTerrainTextureBinding(String stage, int requested) {
+        if (activeTextureUnitIndex != 1 || terrainBindingObservations >= 32
+                || !Boolean.getBoolean("mattmc.dev.staticTerrainParityDiagnostics.openGlBindings")
+                || !Boolean.getBoolean("mattmc.dev.staticTerrainParityDiagnostics")
+                || net.minecraft.client.Minecraft.getInstance().level == null) return;
+        int actual = GL11.glGetInteger(GL11.GL_TEXTURE_BINDING_2D);
+        if (actual == texture2DBindings[1]) return;
+        terrainBindingObservations++;
+        String callers = StackWalker.getInstance().walk(frames -> frames.skip(1).limit(8)
+                .map(frame -> frame.getClassName() + "." + frame.getMethodName() + ":" + frame.getLineNumber())
+                .collect(java.util.stream.Collectors.joining(" <- ")));
+        System.out.println("FrozenTextureBindingObservation stage=" + stage + " requested=" + requested
+                + " cached=" + texture2DBindings[1] + " actual=" + actual
+                + " active=" + (GL11.glGetInteger(GL13.GL_ACTIVE_TEXTURE) - GL13.GL_TEXTURE0)
+                + " callers=" + callers);
+    }
     private volatile int presentScratchReadFbo;
 
     /**
@@ -416,6 +440,7 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
 
+        observeTerrainTextureBinding("cached-bind-request", textureId);
         if (activeTextureUnitIndex < 0 || activeTextureUnitIndex >= texture2DBindings.length) {
             GL11.glBindTexture(GL11.GL_TEXTURE_2D, textureId);
             return;
@@ -433,6 +458,16 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         GL11.glBindTexture(target, textureId);
+        if (target == GL11.GL_TEXTURE_2D) {
+            recordTexture2DBinding(textureId);
+        }
+        if (target == GL11.GL_TEXTURE_2D) observeTerrainTextureBinding("uncached-bind-applied", textureId);
+    }
+
+    private void recordTexture2DBinding(int texture) {
+        if (activeTextureUnitIndex >= 0 && activeTextureUnitIndex < texture2DBindings.length) {
+            texture2DBindings[activeTextureUnitIndex] = texture;
+        }
     }
 
     @Override
@@ -535,9 +570,7 @@ public class OpenGLBackend implements GraphicsBackend {
         }
 
         int textureUnitIndex = unit - GL13.GL_TEXTURE0;
-        if (textureUnitIndex >= 0 && textureUnitIndex < texture2DBindings.length) {
-            activeTextureUnitIndex = textureUnitIndex;
-        }
+        activeTextureUnitIndex = textureUnitIndex;
         GL13.glActiveTexture(unit);
     }
     
@@ -700,6 +733,9 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         GL11.glDeleteTextures(texture);
+        for (int unit = 0; unit < texture2DBindings.length; unit++) {
+            if (texture2DBindings[unit] == texture) texture2DBindings[unit] = -1;
+        }
     }
     
     @Override
@@ -707,7 +743,15 @@ public class OpenGLBackend implements GraphicsBackend {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
-        GL11.glDrawArrays(mode, first, count);
+        long auditStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
+        try {
+            VulkanPerfAudit.recordGraphicsDraw();
+            GL11.glDrawArrays(mode, first, count);
+        } finally {
+            if (auditStartNanos != 0L) {
+                VulkanPerfAudit.recordPhase("backend.opengl.graphics", System.nanoTime() - auditStartNanos);
+            }
+        }
     }
     
     @Override
@@ -715,7 +759,15 @@ public class OpenGLBackend implements GraphicsBackend {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
-        GL11.glDrawElements(mode, count, type, indices);
+        long auditStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
+        try {
+            VulkanPerfAudit.recordGraphicsDraw();
+            GL11.glDrawElements(mode, count, type, indices);
+        } finally {
+            if (auditStartNanos != 0L) {
+                VulkanPerfAudit.recordPhase("backend.opengl.graphics", System.nanoTime() - auditStartNanos);
+            }
+        }
     }
     
     @Override
@@ -1762,7 +1814,15 @@ public class OpenGLBackend implements GraphicsBackend {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
-        org.lwjgl.opengl.GL32.glDrawElementsInstancedBaseVertex(mode, count, type, indices, instanceCount, baseVertex);
+        long auditStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
+        try {
+            VulkanPerfAudit.recordGraphicsDraw();
+            org.lwjgl.opengl.GL32.glDrawElementsInstancedBaseVertex(mode, count, type, indices, instanceCount, baseVertex);
+        } finally {
+            if (auditStartNanos != 0L) {
+                VulkanPerfAudit.recordPhase("backend.opengl.graphics", System.nanoTime() - auditStartNanos);
+            }
+        }
     }
     
     @Override
@@ -1770,7 +1830,15 @@ public class OpenGLBackend implements GraphicsBackend {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
-        org.lwjgl.opengl.GL32.glDrawElementsBaseVertex(mode, count, type, indices, baseVertex);
+        long auditStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
+        try {
+            VulkanPerfAudit.recordGraphicsDraw();
+            org.lwjgl.opengl.GL32.glDrawElementsBaseVertex(mode, count, type, indices, baseVertex);
+        } finally {
+            if (auditStartNanos != 0L) {
+                VulkanPerfAudit.recordPhase("backend.opengl.graphics", System.nanoTime() - auditStartNanos);
+            }
+        }
     }
     
     @Override
@@ -1778,7 +1846,15 @@ public class OpenGLBackend implements GraphicsBackend {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
-        org.lwjgl.opengl.GL31.glDrawElementsInstanced(mode, count, type, indices, instanceCount);
+        long auditStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
+        try {
+            VulkanPerfAudit.recordGraphicsDraw();
+            org.lwjgl.opengl.GL31.glDrawElementsInstanced(mode, count, type, indices, instanceCount);
+        } finally {
+            if (auditStartNanos != 0L) {
+                VulkanPerfAudit.recordPhase("backend.opengl.graphics", System.nanoTime() - auditStartNanos);
+            }
+        }
     }
     
     @Override
@@ -1786,7 +1862,15 @@ public class OpenGLBackend implements GraphicsBackend {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
-        org.lwjgl.opengl.GL31.glDrawArraysInstanced(mode, first, count, instanceCount);
+        long auditStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
+        try {
+            VulkanPerfAudit.recordGraphicsDraw();
+            org.lwjgl.opengl.GL31.glDrawArraysInstanced(mode, first, count, instanceCount);
+        } finally {
+            if (auditStartNanos != 0L) {
+                VulkanPerfAudit.recordPhase("backend.opengl.graphics", System.nanoTime() - auditStartNanos);
+            }
+        }
     }
     
     @Override
@@ -1899,7 +1983,15 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     public void multiDrawElementsBaseVertex(CommandContext ctx, int mode, long pCount, int type, long pIndices, int drawCount, long pBaseVertex) {
         if (!ctx.isImmediate()) throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
-        org.lwjgl.opengl.GL32C.nglMultiDrawElementsBaseVertex(mode, pCount, type, pIndices, drawCount, pBaseVertex);
+        long auditStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
+        try {
+            VulkanPerfAudit.recordGraphicsDraw();
+            org.lwjgl.opengl.GL32C.nglMultiDrawElementsBaseVertex(mode, pCount, type, pIndices, drawCount, pBaseVertex);
+        } finally {
+            if (auditStartNanos != 0L) {
+                VulkanPerfAudit.recordPhase("backend.opengl.graphics", System.nanoTime() - auditStartNanos);
+            }
+        }
     }
     
     /**
@@ -2385,6 +2477,68 @@ public class OpenGLBackend implements GraphicsBackend {
         }
         org.lwjgl.opengl.GL32C.glReadPixels(x, y, width, height, format, type, pixels);
     }
+
+    /**
+     * Reads only the centre pixel of the active draw attachments for bounded
+     * diagnostics. Read framebuffer and read-buffer state are restored before
+     * returning and the snapshot is never used by rendering policy.
+     */
+    public VulkanicAPI.DrawFramebufferAttachmentProbeSnapshot readDrawFramebufferAttachmentProbe(int x, int y, int maxAttachments) {
+        return readFramebufferAttachmentProbe(GL11.glGetInteger(GL30.GL_DRAW_FRAMEBUFFER_BINDING), x, y, maxAttachments, true);
+    }
+
+    /** Diagnostic read of an already-existing framebuffer; never changes the draw binding. */
+    public VulkanicAPI.DrawFramebufferAttachmentProbeSnapshot readFramebufferColorProbe(int framebuffer, int x, int y) {
+        if (framebuffer <= 0) throw new IllegalArgumentException("diagnostic framebuffer must be an existing offscreen target");
+        return readFramebufferAttachmentProbe(framebuffer, x, y, 1, false);
+    }
+
+    private VulkanicAPI.DrawFramebufferAttachmentProbeSnapshot readFramebufferAttachmentProbe(int drawFramebuffer, int x, int y, int maxAttachments, boolean currentDrawTarget) {
+        int attachmentLimit = Math.max(1, Math.min(maxAttachments, 8));
+        int previousReadFramebuffer = GL11.glGetInteger(GL30.GL_READ_FRAMEBUFFER_BINDING);
+        int previousReadBuffer = GL11.glGetInteger(GL11.GL_READ_BUFFER);
+        int currentProgram = GL11.glGetInteger(GL20.GL_CURRENT_PROGRAM);
+        java.util.ArrayList<VulkanicAPI.DrawFramebufferAttachmentProbe> attachments = new java.util.ArrayList<>(attachmentLimit);
+        int targetReadBuffer = previousReadBuffer;
+        try {
+            GL30.glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, drawFramebuffer);
+            targetReadBuffer = GL11.glGetInteger(GL11.GL_READ_BUFFER);
+            for (int attachmentIndex = 0; attachmentIndex < attachmentLimit; attachmentIndex++) {
+                int drawBuffer = currentDrawTarget ? GL11.glGetInteger(GL20.GL_DRAW_BUFFER0 + attachmentIndex)
+                    : GL30.GL_COLOR_ATTACHMENT0 + attachmentIndex;
+                if (drawBuffer == GL11.GL_NONE) {
+                    continue;
+                }
+                GL11.glReadBuffer(drawBuffer);
+                java.nio.ByteBuffer pixel = org.lwjgl.BufferUtils.createByteBuffer(4);
+                GL11.glReadPixels(x, y, 1, 1, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, pixel);
+                // The default framebuffer has no texture object. Querying
+                // OBJECT_NAME there creates a GL error during diagnostics.
+                int textureId = drawFramebuffer == 0 ? 0 : GL30.glGetFramebufferAttachmentParameteri(
+                        GL30.GL_READ_FRAMEBUFFER,
+                        drawBuffer,
+                        GL30.GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME
+                );
+                attachments.add(new VulkanicAPI.DrawFramebufferAttachmentProbe(
+                        drawBuffer,
+                        textureId,
+                        pixel.get(0) & 0xff,
+                        pixel.get(1) & 0xff,
+                        pixel.get(2) & 0xff,
+                        pixel.get(3) & 0xff
+                ));
+            }
+        } finally {
+            GL11.glReadBuffer(targetReadBuffer);
+            GL30.glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, previousReadFramebuffer);
+            GL11.glReadBuffer(previousReadBuffer);
+        }
+        return new VulkanicAPI.DrawFramebufferAttachmentProbeSnapshot(
+                drawFramebuffer,
+                currentProgram,
+                attachments.toArray(VulkanicAPI.DrawFramebufferAttachmentProbe[]::new)
+        );
+    }
     
     @Override
     public void readPixels(CommandContext ctx, int x, int y, int width, int height, int format, int type, long pixels) {
@@ -2740,6 +2894,23 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         org.lwjgl.opengl.ARBDirectStateAccess.glBindTextureUnit(unit, texture);
+        // DSA does not change the active unit. A nonzero object's target is not
+        // available here; invalidate this unit's 2D cache conservatively rather
+        // than assuming every DSA texture is 2D. Zero unbinds every target.
+        if (unit >= 0 && unit < texture2DBindings.length) {
+            texture2DBindings[unit] = texture == 0 ? 0 : -1;
+        }
+        if (unit == 1 && texture != texture2DBindings[unit] && terrainBindingObservations < 32
+                && Boolean.getBoolean("mattmc.dev.staticTerrainParityDiagnostics.openGlBindings")
+                && Boolean.getBoolean("mattmc.dev.staticTerrainParityDiagnostics")
+                && net.minecraft.client.Minecraft.getInstance().level != null) {
+            terrainBindingObservations++;
+            String callers = StackWalker.getInstance().walk(frames -> frames.limit(9)
+                    .map(frame -> frame.getClassName() + "." + frame.getMethodName() + ":" + frame.getLineNumber())
+                    .collect(java.util.stream.Collectors.joining(" <- ")));
+            System.out.println("FrozenTextureBindingObservation stage=direct-unit-bind-applied requested=" + texture
+                    + " cached=" + texture2DBindings[unit] + " unit=" + unit + " callers=" + callers);
+        }
     }
     
     
@@ -3298,6 +3469,7 @@ public class OpenGLBackend implements GraphicsBackend {
         int handle = GL11.glGenTextures();
         if (label == null) label = String.valueOf(handle);
         GL11.glBindTexture(GL11.GL_TEXTURE_2D, handle);
+        recordTexture2DBinding(handle);
         GL11.glTexParameteri(GL11.GL_TEXTURE_2D, org.lwjgl.opengl.GL12.GL_TEXTURE_BASE_LEVEL, 0);
         GL11.glTexParameteri(GL11.GL_TEXTURE_2D, org.lwjgl.opengl.GL12.GL_TEXTURE_MAX_LEVEL, mipLevels - 1);
         int[] internalFmt = toGlInternalFormat(format);
@@ -3311,6 +3483,8 @@ public class OpenGLBackend implements GraphicsBackend {
                 Math.max(1, height >> mip), 0, externalFmt, glType, (java.nio.ByteBuffer) null);
         }
         GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
+        recordTexture2DBinding(0);
+        observeTerrainTextureBinding("managed-allocation-unbind", 0);
         int error = GL11.glGetError();
         if (error == org.lwjgl.opengl.GL11.GL_OUT_OF_MEMORY) {
             throw new net.blaze3d.GpuOutOfMemoryException("Could not allocate texture " + width + "x" + height);

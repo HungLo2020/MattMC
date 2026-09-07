@@ -6,6 +6,7 @@ import it.unimi.dsi.fastutil.ints.Int2ReferenceOpenHashMap;
 import net.sodium.client.services.*;
 import net.sodium.client.services.*;
 import net.sodium.client.util.iterator.WrappedIterator;
+import net.sodium.client.render.StaticTerrainParityDiagnostics;
 import net.sodium.client.world.LevelSlice;
 import net.sodium.client.world.PalettedContainerROExtension;
 import net.sodium.client.world.SodiumAuxiliaryLightManager;
@@ -131,9 +132,13 @@ public class ClonedChunkSection {
      */
     @NotNull
     private static DataLayer copyLightArray(Level level, LightLayer type, SectionPos pos) {
-        var array = level.getLightEngine()
+        var sourceLayer = level.getLightEngine()
                 .getLayerListener(type)
                 .getDataLayerData(pos);
+
+        StaticTerrainParityDiagnostics.recordAppearanceLightSnapshot(level, pos, type, sourceLayer);
+
+        var array = sourceLayer;
 
         if (array == null) {
             array = switch (type) {

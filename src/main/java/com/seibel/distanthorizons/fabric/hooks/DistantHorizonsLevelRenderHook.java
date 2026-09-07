@@ -60,10 +60,13 @@ public class DistantHorizonsLevelRenderHook implements LevelRendererHooks {
 	        }
 
 	        try {
+	            net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("distant-horizons.lod-render");
 	            DhApiRenderProxy.INSTANCE.setDeferTransparentRendering(DHCompatInternal.shouldUseShaderOverrides());
 	            ClientApi.INSTANCE.renderLods();
 	        } catch (Exception ex) {
             LOGGER.error("[DH-RENDER-HOOK] renderLods() failed: " + ex.getMessage(), ex);
+        } finally {
+            net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("distant-horizons.lod-render");
         }
     }
 }

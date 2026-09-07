@@ -178,6 +178,7 @@ public abstract class Player extends Avatar implements ContainerUser {
 	public Entity currentExplosionCause;
 	private boolean ignoreFallDamageFromCurrentImpulse = false;
 	private int currentImpulseContextResetGraceTime = 0;
+	private int armorValueForDeterministicCapture = -1;
 
 	public Player(Level level, PlayerProfile playerProfile) {
 		super(EntityType.PLAYER, level);
@@ -1719,6 +1720,22 @@ public abstract class Player extends Avatar implements ContainerUser {
 
 	public void resetAttackStrengthTicker() {
 		this.attackStrengthTicker = 0;
+	}
+
+	@Override
+	public int getArmorValue() {
+		if (this.armorValueForDeterministicCapture >= 0) {
+			return this.armorValueForDeterministicCapture;
+		}
+		return super.getArmorValue();
+	}
+
+	public int getArmorValueForDeterministicCapture() {
+		return this.armorValueForDeterministicCapture;
+	}
+
+	public void setArmorValueForDeterministicCapture(int armorValue) {
+		this.armorValueForDeterministicCapture = armorValue >= 0 ? Math.min(20, armorValue) : -1;
 	}
 
 	public ItemCooldowns getCooldowns() {

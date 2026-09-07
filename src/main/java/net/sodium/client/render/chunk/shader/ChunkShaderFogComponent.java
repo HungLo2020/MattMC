@@ -29,6 +29,9 @@ public abstract class ChunkShaderFogComponent {
     }
 
     public static class Smooth extends ChunkShaderFogComponent {
+        private static final boolean TRACE_CAPTURE_FOG = Boolean.getBoolean("mattmc.vulkan.traceFogState")
+            && Boolean.getBoolean("mattmc.dev.deterministicCameraCapture");
+        private static int captureFogCalls;
         private final GlUniformFloat4v uFogColor;
 
         private final GlUniformFloat2v uEnvironmentFog;
@@ -46,6 +49,15 @@ public abstract class ChunkShaderFogComponent {
 
             this.uEnvironmentFog.set(fogParameters.environmentalStart(), fogParameters.environmentalEnd());
             this.uRenderFog.set(fogParameters.renderStart(), fogParameters.renderEnd());
+            // Passive, bounded observation of the values actually supplied to
+            // Sodium's shader, distinct from the general WORLD fog UBO.
+            if (TRACE_CAPTURE_FOG && captureFogCalls < 16384 && captureFogCalls++ % 128 == 0) {
+                net.logging.LogUtils.getLogger().info(
+                    "FrozenSodiumFogTrace color=({},{},{},{}) envStart={} envEnd={} renderStart={} renderEnd={}",
+                    fogParameters.red(), fogParameters.green(), fogParameters.blue(), fogParameters.alpha(),
+                    fogParameters.environmentalStart(), fogParameters.environmentalEnd(),
+                    fogParameters.renderStart(), fogParameters.renderEnd());
+            }
         }
     }
 

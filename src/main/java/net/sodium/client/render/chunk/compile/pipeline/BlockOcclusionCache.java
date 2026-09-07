@@ -3,6 +3,7 @@ package net.sodium.client.render.chunk.compile.pipeline;
 import it.unimi.dsi.fastutil.Hash;
 import it.unimi.dsi.fastutil.objects.Object2IntLinkedOpenCustomHashMap;
 import net.sodium.client.services.PlatformBlockAccess;
+import net.sodium.client.render.StaticTerrainParityDiagnostics;
 import net.sodium.api.util.DirectionUtil;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -48,24 +49,34 @@ public class BlockOcclusionCache {
         VoxelShape neighborShape = neighborBlockState.getFaceOcclusionShape(DirectionUtil.getOpposite(facing));
 
         // Minecraft enforces that if the neighbor has a full-block occlusion shape, the face is always hidden
-        if (isFullShape(neighborShape)) {
-            return false;
+        boolean neighborFullShape = isFullShape(neighborShape);
+        if (neighborFullShape) {
+            return this.recordDecision(selfPos, facing, selfBlockState, neighborBlockState, false,
+                    "neighbor-full-shape", true, false, false, false, false);
         }
 
         // Blocks can define special behavior to control whether their faces are rendered.
         // This is mostly used by transparent blocks (Leaves, Glass, etc.) to not render interior faces between blocks
         // of the same type.
-        if (selfBlockState.skipRendering(neighborBlockState, facing)) {
-            return false;
-        } else if (PlatformBlockAccess.getInstance()
-                .shouldSkipRender(view, selfBlockState, neighborBlockState, selfPos, neighborPos, facing)) {
-            return false;
+        boolean selfSkipRendering = selfBlockState.skipRendering(neighborBlockState, facing);
+        if (selfSkipRendering) {
+            return this.recordDecision(selfPos, facing, selfBlockState, neighborBlockState, false,
+                    "self-skip-rendering", false, false, false, true, false);
+        }
+        boolean customCallback = PlatformBlockAccess.getInstance()
+                .shouldSkipRender(view, selfBlockState, neighborBlockState, selfPos, neighborPos, facing);
+        if (customCallback) {
+            return this.recordDecision(selfPos, facing, selfBlockState, neighborBlockState, false,
+                    "platform-callback", false, false, false, false, true);
         }
 
         // After any custom behavior has been handled, check if the neighbor block is transparent or has an empty
         // cull shape. These blocks cannot hide any geometry.
-        if (isEmptyShape(neighborShape) || !neighborBlockState.canOcclude()) {
-            return true;
+        boolean neighborEmptyShape = isEmptyShape(neighborShape);
+        if (neighborEmptyShape || !neighborBlockState.canOcclude()) {
+            return this.recordDecision(selfPos, facing, selfBlockState, neighborBlockState, true,
+                    neighborEmptyShape ? "neighbor-empty-shape" : "neighbor-cannot-occlude",
+                    false, neighborEmptyShape, false, false, false);
         }
 
         // The cull shape between of the block being rendered, between it and the neighboring block
@@ -73,12 +84,45 @@ public class BlockOcclusionCache {
 
         // If the block being rendered has an empty cull shape, there will be no intersection with the neighboring
         // block's cull shape, so no geometry can be hidden.
-        if (isEmptyShape(selfShape)) {
-            return true;
+        boolean selfEmptyShape = isEmptyShape(selfShape);
+        if (selfEmptyShape) {
+            return this.recordDecision(selfPos, facing, selfBlockState, neighborBlockState, true,
+                    "self-empty-shape", false, false, true, false, false);
         }
 
         // No other simplifications apply, so we need to perform a full shape comparison, which is very slow
-        return this.lookup(selfShape, neighborShape);
+        boolean draw = this.lookup(selfShape, neighborShape);
+        return this.recordDecision(selfPos, facing, selfBlockState, neighborBlockState, draw,
+                draw ? "shape-visible" : "shape-occluded", false, false, false, false, false);
+    }
+
+    private boolean recordDecision(
+            BlockPos selfPos,
+            Direction facing,
+            BlockState selfState,
+            BlockState neighborState,
+            boolean draw,
+            String reason,
+            boolean neighborFullShape,
+            boolean neighborEmptyShape,
+            boolean selfEmptyShape,
+            boolean selfSkipRendering,
+            boolean customCallback
+    ) {
+        StaticTerrainParityDiagnostics.recordFaceCullDecision(
+                selfPos,
+                facing,
+                selfState,
+                neighborState,
+                draw,
+                reason,
+                neighborFullShape,
+                neighborEmptyShape,
+                selfEmptyShape,
+                selfSkipRendering,
+                customCallback
+        );
+        return draw;
     }
 
     private static boolean isFullShape(VoxelShape selfShape) {

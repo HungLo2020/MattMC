@@ -2,9 +2,15 @@
 
 set -euo pipefail
 
+if [[ "${MATTMC_GRAPHICS_TOOL_INTERNAL:-}" != "1" ]]; then
+    echo "capture_runner.sh is an internal capture engine for graphics testing." >&2
+    echo "Use DevUtils/Audit/Capture.py, DevUtils/PerfAudit/Gameplay.py, DevUtils/PerfAudit/Subsystem.py, or DevUtils/PerfAudit/Matrix.py from the current repo." >&2
+    exit 2
+fi
+
 usage() {
     cat <<'EOF'
-Usage: ./DevUtils/RunDevCapture.sh [--backend vulkan|opengl] [--max-secs N] [--dump-secs N] [--validation off|standard] [--shader-input-parity off|standard|full] [--client-args "..."]
+Usage: ./DevUtils/Common/capture_runner.sh [--backend vulkan|opengl] [--shaders off|on] [--artifact-dir DIR] [--max-secs N] [--dump-secs N] [--validation off|standard] [--shader-input-parity off|standard|full] [--client-args "..."]
 
 Runs ./gradlew runClient in a bounded session, captures diagnostics, and
 self-terminates so no manual kill is required.
@@ -33,6 +39,8 @@ EOF
 }
 
 BACKEND="vulkan"
+SHADERS="off"
+ARTIFACT_DIR_OVERRIDE=""
 MAX_SECS="${MAX_SECS:-120}"
 DUMP_SECS="${DUMP_SECS:-45}"
 SCREENSHOT_INTERVAL_SECS="${SCREENSHOT_INTERVAL_SECS:-5}"
@@ -43,11 +51,36 @@ SHADER_INPUT_PARITY="${SHADER_INPUT_PARITY:-off}"
 SHADER_INPUT_PARITY_MAX_LOGS="${SHADER_INPUT_PARITY_MAX_LOGS:-120000}"
 LIGHTMAP_INFO_PARITY_MAX_LOGS="${LIGHTMAP_INFO_PARITY_MAX_LOGS:-512}"
 CLIENT_ARGS="${CLIENT_ARGS:-}"
+WORLD="${MATTMC_CAPTURE_WORLD:-Origin}"
+WORLD_SOURCE="${MATTMC_CAPTURE_WORLD_SOURCE:-}"
+RUN_SOURCE="${MATTMC_CAPTURE_RUN_SOURCE:-}"
+GUI_RESOURCE_PACK_SCENARIO="${MATTMC_GUI_RESOURCE_PACK_SCENARIO:-}"
+WORLD_STATIC_TERRAIN_RESOURCE_PACK_SCENARIO="${MATTMC_WORLD_STATIC_TERRAIN_RESOURCE_PACK_SCENARIO:-}"
+WORLD_STATIC_TERRAIN_SCENARIO="${MATTMC_WORLD_STATIC_TERRAIN_SCENARIO:-}"
+WORLD_STATIC_TERRAIN_SECOND_WORLD="${MATTMC_WORLD_STATIC_TERRAIN_SECOND_WORLD:-}"
+WORLD_STATIC_TERRAIN_FAULT="${MATTMC_WORLD_STATIC_TERRAIN_FAULT:-}"
+WORLD_STATIC_TERRAIN_WATER_ANIMATION_CAPTURE="${MATTMC_WORLD_STATIC_TERRAIN_WATER_ANIMATION_CAPTURE:-false}"
+DETERMINISTIC_CAPTURE="${MATTMC_GRAPHICS_CORRECTNESS_CAPTURE:-false}"
+DETERMINISTIC_METADATA="${MATTMC_DETERMINISTIC_METADATA:-}"
+DETERMINISTIC_SCREENSHOT_DIR="${MATTMC_DETERMINISTIC_SCREENSHOT_DIR:-}"
+TITLE_SCREEN_CAPTURE="${MATTMC_TITLE_SCREEN_CAPTURE:-false}"
+# Diagnostic capture only. When true, retain the normal overlay-to-title
+# timeline instead of waiting for the title receipt before the first image.
+TITLE_SCREEN_TRANSITION_CAPTURE="${MATTMC_TITLE_SCREEN_TRANSITION_CAPTURE:-false}"
+FRAME_BENCHMARK_STATUS="${MATTMC_GRAPHICS_FRAME_BENCHMARK_STATUS:-}"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --backend)
             BACKEND="${2:-}"
+            shift 2
+            ;;
+        --shaders)
+            SHADERS="${2:-}"
+            shift 2
+            ;;
+        --artifact-dir)
+            ARTIFACT_DIR_OVERRIDE="${2:-}"
             shift 2
             ;;
         --max-secs)
@@ -70,6 +103,34 @@ while [[ $# -gt 0 ]]; do
             CLIENT_ARGS="${2:-}"
             shift 2
             ;;
+        --world)
+            WORLD="${2:-}"
+            shift 2
+            ;;
+        --gui-resource-pack-scenario)
+            GUI_RESOURCE_PACK_SCENARIO="${2:-}"
+            shift 2
+            ;;
+        --world-static-terrain-resource-pack-scenario)
+            WORLD_STATIC_TERRAIN_RESOURCE_PACK_SCENARIO="${2:-}"
+            shift 2
+            ;;
+        --world-static-terrain-water-animation-capture)
+            WORLD_STATIC_TERRAIN_WATER_ANIMATION_CAPTURE="true"
+            shift
+            ;;
+        --world-static-terrain-scenario)
+            WORLD_STATIC_TERRAIN_SCENARIO="${2:-}"
+            shift 2
+            ;;
+        --world-static-terrain-second-world)
+            WORLD_STATIC_TERRAIN_SECOND_WORLD="${2:-}"
+            shift 2
+            ;;
+        --world-static-terrain-fault)
+            WORLD_STATIC_TERRAIN_FAULT="${2:-}"
+            shift 2
+            ;;
         -h|--help)
             usage
             exit 0
@@ -84,6 +145,11 @@ done
 
 if [[ "$BACKEND" != "vulkan" && "$BACKEND" != "opengl" ]]; then
     echo "Invalid backend: $BACKEND (expected vulkan or opengl)" >&2
+    exit 1
+fi
+
+if [[ "$SHADERS" != "off" && "$SHADERS" != "on" ]]; then
+    echo "Invalid shaders mode: $SHADERS (expected off or on)" >&2
     exit 1
 fi
 
@@ -131,13 +197,18 @@ fi
 
 cd "$PROJECT_ROOT"
 
-RUN_DIR="$PROJECT_ROOT/run"
-OPTIONS_FILE="$RUN_DIR/options.txt"
+SOURCE_RUN_DIR="${RUN_SOURCE:-$PROJECT_ROOT/run}"
+RUN_DIR="$SOURCE_RUN_DIR"
 ARTIFACT_DIR="$PROJECT_ROOT/logs/auto-capture"
+if [[ -n "$ARTIFACT_DIR_OVERRIDE" ]]; then
+    ARTIFACT_DIR="$ARTIFACT_DIR_OVERRIDE"
+fi
 mkdir -p "$ARTIFACT_DIR"
 
 RUN_ID="$(date +%Y%m%d_%H%M%S)"
 START_EPOCH="$(date +%s)"
+ISOLATED_GAME_DIR="$ARTIFACT_DIR/game_dir_${RUN_ID}"
+OPTIONS_FILE="$RUN_DIR/options.txt"
 RUN_LOG="$ARTIFACT_DIR/runClient_${RUN_ID}.log"
 META_LOG="$ARTIFACT_DIR/meta_${RUN_ID}.txt"
 THREAD_DUMP="$ARTIFACT_DIR/thread_dump_${RUN_ID}.txt"
@@ -162,6 +233,42 @@ PATCHED_SHADERS_MANIFEST="$ARTIFACT_DIR/patched_shaders_manifest_${RUN_ID}.txt"
 WINDOW_TREE="$ARTIFACT_DIR/window_tree_${RUN_ID}.txt"
 WINDOW_TREE_DUMP="$ARTIFACT_DIR/window_tree_dump_${RUN_ID}.txt"
 
+copy_optional_path() {
+    local source="$1"
+    local target="$2"
+
+    if [[ ! -e "$source" ]]; then
+        return
+    fi
+    mkdir -p "$(dirname "$target")"
+    cp -a "$source" "$target"
+}
+
+prepare_isolated_game_dir() {
+    local source_world="${WORLD_SOURCE:-$SOURCE_RUN_DIR/saves/$WORLD}"
+
+    if [[ ! -d "$source_world" ]]; then
+        echo "ERROR: Cannot copy missing benchmark world: $source_world" >&2
+        exit 1
+    fi
+    if [[ -e "$ISOLATED_GAME_DIR" ]]; then
+        echo "ERROR: Refusing to reuse isolated game dir: $ISOLATED_GAME_DIR" >&2
+        exit 1
+    fi
+
+    mkdir -p "$ISOLATED_GAME_DIR/saves"
+    copy_optional_path "$SOURCE_RUN_DIR/options.txt" "$ISOLATED_GAME_DIR/options.txt"
+    copy_optional_path "$SOURCE_RUN_DIR/config" "$ISOLATED_GAME_DIR/config"
+    copy_optional_path "$SOURCE_RUN_DIR/resourcepacks" "$ISOLATED_GAME_DIR/resourcepacks"
+    copy_optional_path "$SOURCE_RUN_DIR/shaderpacks" "$ISOLATED_GAME_DIR/shaderpacks"
+    copy_optional_path "$SOURCE_RUN_DIR/Distant_Horizons_server_data" "$ISOLATED_GAME_DIR/Distant_Horizons_server_data"
+    copy_optional_path "$SOURCE_RUN_DIR/voxelmap" "$ISOLATED_GAME_DIR/voxelmap"
+    cp -a "$source_world" "$ISOLATED_GAME_DIR/saves/$WORLD"
+
+    RUN_DIR="$ISOLATED_GAME_DIR"
+    OPTIONS_FILE="$RUN_DIR/options.txt"
+}
+
 VALIDATION_LAYER_MANIFEST=""
 VALIDATION_LAYER_DIR=""
 VALIDATION_LAYER_AVAILABLE="false"
@@ -178,13 +285,102 @@ SHADER_EVENT_PATTERN='Using shaderpack:|Loaded Shaderpack:|shaderPack=|enableSha
 VALIDATION_EVENT_PATTERN='VK_LAYER_KHRONOS_validation|Validation Error|Validation Warning|VUID-|UNASSIGNED-'
 KEY_SUMMARY_PATTERN='Using shaderpack:|Loaded Shaderpack:|Profile:|Reloading pipeline on dimension change|Creating pipeline for dimension|Skipping compute shader|Missing program .*sodium:pipeline|Sodium Vulkan chunk pipelines|raw GLSL imports|ShaderInputParity|LightmapInfoParity|bindVertexBuffer requires an active render pass|No active Vulkan render pass to end|Unexpected error|DistantHorizons|\[DH-|DH Ready|DH Iris events|Validation Error|Validation Warning|VUID-|UNASSIGNED-'
 
+prepare_isolated_game_dir
+
+save_state_fingerprint() {
+    python3 - "$RUN_DIR" "$WORLD" <<'PY'
+import hashlib
+import pathlib
+import sys
+
+run_dir = pathlib.Path(sys.argv[1])
+world = sys.argv[2]
+save_dir = run_dir / "saves" / world
+if not save_dir.is_dir():
+    print("world_save_state_hash=missing")
+    print("world_save_state_file_count=0")
+    print("world_save_state_total_bytes=0")
+    print("world_save_state_truncated=false")
+    raise SystemExit(0)
+
+allowed = {".mca"}
+digest = hashlib.sha256()
+file_count = 0
+total_bytes = 0
+truncated = False
+for path in sorted(p for p in save_dir.rglob("*") if p.is_file()):
+    rel = path.relative_to(save_dir).as_posix()
+    if rel == "session.lock" or path.suffix not in allowed:
+        continue
+    file_count += 1
+    if file_count > 5000:
+        truncated = True
+        break
+    try:
+        data = path.read_bytes()
+    except OSError:
+        data = b""
+    total_bytes += len(data)
+    digest.update(rel.encode("utf-8"))
+    digest.update(b"\0")
+    digest.update(str(len(data)).encode("ascii"))
+    digest.update(b"\0")
+    digest.update(hashlib.sha256(data).hexdigest().encode("ascii"))
+    digest.update(b"\n")
+
+print(f"world_save_state_hash={digest.hexdigest()}")
+print(f"world_save_state_file_count={file_count}")
+print(f"world_save_state_total_bytes={total_bytes}")
+print(f"world_save_state_truncated={str(truncated).lower()}")
+PY
+}
+
 {
     echo "run_id=$RUN_ID"
     echo "start_epoch=$START_EPOCH"
     echo "backend=$BACKEND"
+    echo "shaders=$SHADERS"
+    echo "world=$WORLD"
+    echo "isolated_game_source=$SOURCE_RUN_DIR"
+    echo "isolated_game_dir=$ISOLATED_GAME_DIR"
+    echo "isolated_world_source=${WORLD_SOURCE:-$SOURCE_RUN_DIR/saves/$WORLD}"
+    echo "isolated_world_copy=$ISOLATED_GAME_DIR/saves/$WORLD"
+    save_state_fingerprint
+    echo "parity_fixture_schema=${MATTMC_PARITY_FIXTURE_SCHEMA:-}"
+    echo "parity_fixture_id=${MATTMC_PARITY_FIXTURE_ID:-}"
+    echo "parity_fixture_manifest=${MATTMC_PARITY_FIXTURE_MANIFEST:-}"
+    echo "parity_fixture_source_save_hash=${MATTMC_PARITY_FIXTURE_SOURCE_SAVE_HASH:-}"
+    echo "parity_camera_x=${MATTMC_PARITY_CAMERA_X:-}"
+    echo "parity_camera_y=${MATTMC_PARITY_CAMERA_Y:-}"
+    echo "parity_camera_z=${MATTMC_PARITY_CAMERA_Z:-}"
+    echo "parity_camera_yaw=${MATTMC_PARITY_CAMERA_YAW:-}"
+    echo "parity_camera_pitch=${MATTMC_PARITY_CAMERA_PITCH:-}"
+    echo "parity_camera_pose_sequence=${MATTMC_PARITY_CAMERA_POSE_SEQUENCE:-}"
     echo "max_secs=$MAX_SECS"
     echo "dump_secs=$DUMP_SECS"
     echo "validation_mode=$VALIDATION_MODE"
+    echo "graphics_run_type=${MATTMC_GRAPHICS_RUN_TYPE:-clean-performance}"
+    echo "graphics_audit_enabled=${MATTMC_GRAPHICS_AUDIT:-false}"
+    echo "validation_profile=${MATTMC_GRAPHICS_VALIDATION_PROFILE:-$VALIDATION_MODE}"
+    echo "validation_fail_severity=${MATTMC_GRAPHICS_VALIDATION_FAIL_SEVERITY:-warning}"
+    echo "renderdoc_capture=${MATTMC_RENDERDOC_CAPTURE:-false}"
+    echo "renderdoc_frame=${MATTMC_RENDERDOC_FRAME:-0}"
+    echo "renderdoc_capture_path=${MATTMC_RENDERDOC_CAPTURE_PATH:-}"
+    echo "tracy_capture=${MATTMC_TRACY_CAPTURE:-false}"
+    echo "tracy_duration_seconds=${MATTMC_TRACY_DURATION_SECONDS:-0}"
+    echo "tracy_max_size_mb=${MATTMC_TRACY_MAX_SIZE_MB:-0}"
+    echo "deterministic_camera_capture=$DETERMINISTIC_CAPTURE"
+    echo "deterministic_metadata=$DETERMINISTIC_METADATA"
+    echo "deterministic_screenshot_dir=$DETERMINISTIC_SCREENSHOT_DIR"
+    echo "frame_benchmark_status=$FRAME_BENCHMARK_STATUS"
+    echo "title_screen_capture=$TITLE_SCREEN_CAPTURE"
+    echo "title_screen_transition_capture=$TITLE_SCREEN_TRANSITION_CAPTURE"
+    echo "gui_resource_pack_scenario=$GUI_RESOURCE_PACK_SCENARIO"
+    echo "world_static_terrain_resource_pack_scenario=$WORLD_STATIC_TERRAIN_RESOURCE_PACK_SCENARIO"
+    echo "world_static_terrain_scenario=$WORLD_STATIC_TERRAIN_SCENARIO"
+    echo "world_static_terrain_second_world=$WORLD_STATIC_TERRAIN_SECOND_WORLD"
+    echo "world_static_terrain_fault=$WORLD_STATIC_TERRAIN_FAULT"
+    echo "world_static_terrain_water_animation_capture=$WORLD_STATIC_TERRAIN_WATER_ANIMATION_CAPTURE"
     echo "shader_input_parity=$SHADER_INPUT_PARITY"
     echo "shader_input_parity_max_logs=$SHADER_INPUT_PARITY_MAX_LOGS"
     echo "lightmap_info_parity_max_logs=$LIGHTMAP_INFO_PARITY_MAX_LOGS"
@@ -221,6 +417,36 @@ find_client_window_id() {
     return 1
 }
 
+capture_x11_window() {
+    local target_window="$1"
+    local screenshot_file="$2"
+    local raw_capture="${screenshot_file}.xwd"
+
+    # ImageMagick's `import -window` can succeed yet capture unrelated desktop
+    # pixels under this X11 setup. xwd reads the requested drawable by id and
+    # fails when it cannot; conversion happens only after that direct read.
+    command -v xwd >/dev/null 2>&1 || return 1
+    command -v magick >/dev/null 2>&1 || return 1
+    xwd -silent -id "$target_window" -out "$raw_capture" >/dev/null 2>&1 || {
+        rm -f "$raw_capture"
+        return 1
+    }
+    [[ -s "$raw_capture" ]] || {
+        rm -f "$raw_capture"
+        return 1
+    }
+    magick "$raw_capture" "$screenshot_file" >/dev/null 2>&1
+    local status=$?
+    rm -f "$raw_capture"
+    [[ $status -eq 0 && -f "$screenshot_file" ]]
+}
+
+x11_window_is_viewable() {
+    local target_window="$1"
+    command -v xwininfo >/dev/null 2>&1 || return 1
+    xwininfo -id "$target_window" 2>/dev/null | grep -q 'Map State: IsViewable'
+}
+
 capture_root_screenshot() {
     local label="$1"
     local elapsed_secs="$2"
@@ -236,19 +462,191 @@ capture_root_screenshot() {
 
     screenshot_count=$((screenshot_count + 1))
     local screenshot_file="$ARTIFACT_DIR/screenshot_${RUN_ID}_${screenshot_count}_${label}_${elapsed_secs}s.png"
-    if target_window="$(find_client_window_id "$client_pid" 2>/dev/null)"; then
-        :
-    else
-        target_window="root"
+    if ! target_window="$(find_client_window_id "$client_pid" 2>/dev/null)"; then
+        # The X root is the desktop, not a Minecraft frame.  Capturing it can
+        # silently record an editor or terminal and falsely attribute those
+        # pixels to Frozen's renderer.  Leave this scheduled sample available
+        # for a later client-window retry instead.
+        screenshot_count=$((screenshot_count - 1))
+        echo "screenshot_rejected_root_target=$((screenshot_count + 1))" >> "$META_LOG"
+        return
+    fi
+    if ! x11_window_is_viewable "$target_window"; then
+        screenshot_count=$((screenshot_count - 1))
+        echo "screenshot_rejected_unviewable_target=$((screenshot_count + 1))" >> "$META_LOG"
+        return
     fi
 
-    if import -window "$target_window" "$screenshot_file" >/dev/null 2>&1; then
+    if capture_x11_window "$target_window" "$screenshot_file"; then
         echo "screenshot_${screenshot_count}=$screenshot_file" >> "$META_LOG"
         echo "screenshot_${screenshot_count}_target=$target_window" >> "$META_LOG"
     else
         rm -f "$screenshot_file"
         echo "screenshot_${screenshot_count}=failed:$label:$elapsed_secs" >> "$META_LOG"
     fi
+}
+
+deterministic_capture_status() {
+    if [[ "$DETERMINISTIC_CAPTURE" != "true" || -z "$DETERMINISTIC_METADATA" || ! -f "$DETERMINISTIC_METADATA" ]]; then
+        return 1
+    fi
+    python3 - "$DETERMINISTIC_METADATA" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+try:
+    print(json.loads(Path(sys.argv[1]).read_text(encoding="utf-8")).get("status", "missing"))
+except Exception:
+    print("invalid")
+PY
+}
+
+capture_requested_screenshot() {
+    local request="$1"
+    local client_pid="$2"
+    local ack="${request%.json}.ack.json"
+    local screenshot target_window window_props observed_window_pid
+
+    if [[ -f "$ack" ]]; then
+        return
+    fi
+    if [[ "$screenshot_enabled" != "true" ]]; then
+        echo "deterministic_capture_failed=$request:no_screenshot_tool" >> "$META_LOG"
+        return
+    fi
+
+    screenshot="$(python3 - "$request" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+request = Path(sys.argv[1])
+data = json.loads(request.read_text(encoding="utf-8"))
+print(data.get("screenshot", str(request.with_suffix(".png"))))
+PY
+)" || {
+        echo "deterministic_capture_request_invalid=$request" >> "$META_LOG"
+        return
+    }
+    mkdir -p "$(dirname "$screenshot")"
+    if ! target_window="$(find_client_window_id "$client_pid" 2>/dev/null)"; then
+        # Do not acknowledge a level/title capture from the desktop root.
+        # The request remains pending and the normal polling loop retries once
+        # the Frozen client owns a real X window.
+        echo "deterministic_capture_rejected_root_target=$request" >> "$META_LOG"
+        return
+    fi
+    if ! x11_window_is_viewable "$target_window"; then
+        echo "deterministic_capture_rejected_unviewable_window=$request" >> "$META_LOG"
+        return
+    fi
+    # Diagnostic provenance only: re-read the X11 identity immediately before
+    # capture so a title/transition screenshot cannot be attributed to a
+    # reused foreign window id. This never changes Frozen rendering.
+    window_props="$(xprop -id "$target_window" _NET_WM_PID WM_NAME _NET_WM_NAME WM_CLASS 2>/dev/null || true)"
+    observed_window_pid="$(printf '%s\n' "$window_props" | awk -F' = ' '/_NET_WM_PID\(CARDINAL\)/ {print $2; exit}' | tr -d '[:space:]')"
+    if [[ -z "$observed_window_pid" || "$observed_window_pid" != "$client_pid" ]]; then
+        echo "deterministic_capture_rejected_unverified_window=$request" >> "$META_LOG"
+        return
+    fi
+
+    if capture_x11_window "$target_window" "$screenshot"; then
+        python3 - "$request" "$ack" "$screenshot" "$target_window" "$client_pid" "$window_props" <<'PY'
+import json
+import sys
+import time
+from pathlib import Path
+
+request = Path(sys.argv[1])
+ack = Path(sys.argv[2])
+data = json.loads(request.read_text(encoding="utf-8"))
+data.update({
+    "status": "captured",
+    "screenshot": sys.argv[3],
+    "targetWindow": sys.argv[4],
+    "capturedAtEpoch": int(time.time()),
+    "windowProvenance": {
+        "schema": "mattmc-window-capture-provenance-v1",
+        "platform": "linux",
+        "targetWindow": sys.argv[4],
+        "expectedClientPid": int(sys.argv[5]),
+        "observedWindowPid": int(sys.argv[5]),
+        "windowProperties": sys.argv[6],
+        "status": "verified",
+    },
+})
+ack.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+PY
+        echo "deterministic_capture_ack=$ack" >> "$META_LOG"
+        echo "deterministic_capture_screenshot=$screenshot" >> "$META_LOG"
+        echo "deterministic_capture_target=$target_window" >> "$META_LOG"
+    else
+        rm -f "$screenshot"
+        echo "deterministic_capture_failed=$request" >> "$META_LOG"
+    fi
+}
+
+capture_deterministic_requests() {
+    local client_pid="$1"
+    local request
+
+    if [[ "$DETERMINISTIC_CAPTURE" != "true" || -z "$DETERMINISTIC_SCREENSHOT_DIR" || ! -d "$DETERMINISTIC_SCREENSHOT_DIR" ]]; then
+        return
+    fi
+    shopt -s nullglob
+    for request in "$DETERMINISTIC_SCREENSHOT_DIR"/capture_request_*.json; do
+        [[ "$request" == *.ack.json ]] && continue
+        capture_requested_screenshot "$request" "$client_pid"
+    done
+    shopt -u nullglob
+}
+
+capture_frozen_title_presented_frame() {
+    local client_pid="$1"
+    local request ack
+    [[ "$TITLE_SCREEN_CAPTURE" == "true" ]] || return 1
+    [[ -n "${MATTMC_FROZEN_TITLE_FRAME_CAPTURE_DIR:-}" ]] || return 1
+    request="$MATTMC_FROZEN_TITLE_FRAME_CAPTURE_DIR/title_frame_capture.json"
+    ack="$MATTMC_FROZEN_TITLE_FRAME_CAPTURE_DIR/title_frame_capture.ack.json"
+    [[ -f "$ack" ]] && return 0
+    [[ -f "$request" ]] || return 1
+    capture_requested_screenshot "$request" "$client_pid"
+    [[ -f "$ack" ]]
+}
+
+wait_for_deterministic_shutdown() {
+    local grace_secs="${1:-20}"
+    local waited
+
+    echo "deterministic_shutdown_grace_secs=$grace_secs" >> "$META_LOG"
+    for ((waited = 0; waited < grace_secs; waited++)); do
+        if ! kill -0 "$GRADLE_PID" 2>/dev/null; then
+            echo "deterministic_shutdown_grace_elapsed=$waited" >> "$META_LOG"
+            return 0
+        fi
+        sleep 1
+    done
+    echo "deterministic_shutdown_grace_elapsed=$grace_secs" >> "$META_LOG"
+    echo "deterministic_shutdown_grace_expired=true" >> "$META_LOG"
+    return 1
+}
+
+frame_benchmark_status() {
+    if [[ -z "$FRAME_BENCHMARK_STATUS" || ! -f "$FRAME_BENCHMARK_STATUS" ]]; then
+        return 0
+    fi
+    python3 - "$FRAME_BENCHMARK_STATUS" <<'PY'
+import json
+import sys
+
+try:
+    with open(sys.argv[1], encoding="utf-8") as handle:
+        value = json.load(handle).get("status", "")
+except (OSError, ValueError, TypeError):
+    value = ""
+print(value if isinstance(value, str) else "")
+PY
 }
 
 find_validation_layer_manifest() {
@@ -332,6 +730,22 @@ upsert_property() {
         sed -i "s|^${key}=.*|${key}=${value}|" "$file_path"
     else
         printf '%s=%s\n' "$key" "$value" >> "$file_path"
+    fi
+}
+
+upsert_option() {
+    local file_path="$1"
+    local key="$2"
+    local value="$3"
+
+    if [[ ! -f "$file_path" ]]; then
+        return 1
+    fi
+
+    if grep -q "^${key}:" "$file_path"; then
+        sed -i "s|^${key}:.*|${key}:${value}|" "$file_path"
+    else
+        printf '%s:%s\n' "$key" "$value" >> "$file_path"
     fi
 }
 
@@ -558,12 +972,162 @@ else
 fi
 
 if [[ -f "$OPTIONS_FILE" ]]; then
+    GUI_SCALE="${MATTMC_CAPTURE_GUI_SCALE:-3}"
+    if ! [[ "$GUI_SCALE" =~ ^[0-9]+$ ]] || [[ "$GUI_SCALE" -le 0 ]]; then
+        echo "MATTMC_CAPTURE_GUI_SCALE must be a positive integer, got '$GUI_SCALE'" >&2
+        exit 1
+    fi
     if grep -q '^graphics_backend=' "$OPTIONS_FILE"; then
         sed -i "s/^graphics_backend=.*/graphics_backend=$BACKEND/" "$OPTIONS_FILE"
     else
         echo "graphics_backend=$BACKEND" >> "$OPTIONS_FILE"
     fi
+    upsert_option "$OPTIONS_FILE" renderDistance "${MATTMC_CAPTURE_RENDER_DISTANCE:-10}"
+    upsert_option "$OPTIONS_FILE" simulationDistance "${MATTMC_CAPTURE_SIMULATION_DISTANCE:-12}"
+    upsert_option "$OPTIONS_FILE" guiScale "$GUI_SCALE"
+    if [[ -n "${MATTMC_CAPTURE_MIPMAP_LEVELS+x}" ]]; then
+        if ! [[ "$MATTMC_CAPTURE_MIPMAP_LEVELS" =~ ^[0-4]$ ]]; then
+            echo "MATTMC_CAPTURE_MIPMAP_LEVELS must be 0 through 4" >&2
+            exit 1
+        fi
+        upsert_option "$OPTIONS_FILE" mipmapLevels "$MATTMC_CAPTURE_MIPMAP_LEVELS"
+        echo "forced_option_mipmapLevels=$MATTMC_CAPTURE_MIPMAP_LEVELS" >> "$META_LOG"
+    fi
+    upsert_option "$OPTIONS_FILE" fullscreen false
+    upsert_option "$OPTIONS_FILE" hideGui false
+    upsert_option "$OPTIONS_FILE" maxFps "${MATTMC_CAPTURE_MAX_FPS:-120}"
+    upsert_option "$OPTIONS_FILE" enableVsync false
+    upsert_option "$OPTIONS_FILE" tutorialStep none
+    if [[ "$TITLE_SCREEN_CAPTURE" == "true" ]]; then
+        MENU_BACKGROUND_BLUR="${MATTMC_CAPTURE_MENU_BACKGROUND_BLUR:-5}"
+        if ! [[ "$MENU_BACKGROUND_BLUR" =~ ^[0-9]+$ ]] || [[ "$MENU_BACKGROUND_BLUR" -gt 10 ]]; then
+            echo "MATTMC_CAPTURE_MENU_BACKGROUND_BLUR must be an integer from 0 to 10" >&2
+            exit 2
+        fi
+        upsert_option "$OPTIONS_FILE" menuBackgroundBlurriness "$MENU_BACKGROUND_BLUR"
+        echo "forced_option_menuBackgroundBlurriness=$MENU_BACKGROUND_BLUR" >> "$META_LOG"
+    fi
+    # `PanoramaTheme` is a serialized vanilla enum. "default" is not an
+    # element; AQUATIC is the game's default. Never make a Frozen baseline
+    # capture depend on Options' error-recovery behavior.
+    PANORAMA_THEME="${MATTMC_CAPTURE_PANORAMA_THEME:-aquatic}"
+    case "$PANORAMA_THEME" in
+        aquatic|caves|copper_age|nether|release|spring_to_life|tricky_trials) ;;
+        *) echo "MATTMC_CAPTURE_PANORAMA_THEME must be a vanilla theme, got '$PANORAMA_THEME'" >&2; exit 1;;
+    esac
+    upsert_option "$OPTIONS_FILE" panoramaTheme "\"$PANORAMA_THEME\""
+    if [[ "${MATTMC_CAPTURE_TITLE_STATIC_FIXTURE:-false}" == "true" ]]; then
+        # Isolated parity-fixture settings only.  They make title imagery a
+        # stable Frozen OpenGL baseline; they do not alter renderer behavior.
+        upsert_option "$OPTIONS_FILE" panoramaScrollSpeed 0.0
+        upsert_option "$OPTIONS_FILE" hideSplashTexts true
+    fi
 fi
+
+if [[ -f "$RUN_DIR/config/voxelmap.properties" ]]; then
+    upsert_option "$RUN_DIR/config/voxelmap.properties" "Welcome Message" false
+    # The vanilla migration fixture excludes mod-owned minimap output. Its
+    # asynchronous cache otherwise makes paired isolated captures diverge
+    # before any vanilla renderer is involved.
+    upsert_option "$RUN_DIR/config/voxelmap.properties" "Hide Minimap" true
+fi
+
+if [[ -n "$GUI_RESOURCE_PACK_SCENARIO" && "$GUI_RESOURCE_PACK_SCENARIO" != "vanilla" && -n "${MATTMC_GUI_PACK_GENERATOR_ROOT:-}" ]]; then
+    # Capture-only parity setup. Reuse the shared Python pack specification so
+    # Frozen and Current consume byte-equivalent synthetic resource packs.
+    python3 - "$MATTMC_GUI_PACK_GENERATOR_ROOT" "$RUN_DIR" "$GUI_RESOURCE_PACK_SCENARIO" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+run_dir = Path(sys.argv[2])
+scenario = sys.argv[3]
+sys.path.insert(0, str(root))
+sys.path.insert(0, str(root / "DevUtils" / "Common"))
+from DevUtils.Common.capture_runner import gui_resource_pack_specs, write_gui_resource_pack
+
+pack_root = run_dir / "resourcepacks"
+pack_root.mkdir(parents=True, exist_ok=True)
+selected = []
+for spec in gui_resource_pack_specs(scenario):
+    pack_dir = pack_root / str(spec["name"])
+    write_gui_resource_pack(pack_dir, spec)
+    selected.append(f"file/{spec['name']}")
+options = run_dir / "options.txt"
+lines = options.read_text(encoding="utf-8").splitlines() if options.is_file() else []
+values = {"resourcePacks": json.dumps(selected, separators=(",", ":")), "incompatibleResourcePacks": "[]"}
+for key, value in values.items():
+    for index, line in enumerate(lines):
+        if line.startswith(key + ":"):
+            lines[index] = key + ":" + value
+            break
+    else:
+        lines.append(key + ":" + value)
+options.write_text("\n".join(lines) + "\n", encoding="utf-8")
+PY
+    echo "gui_resource_pack_generated=$GUI_RESOURCE_PACK_SCENARIO" >> "$META_LOG"
+    selected_packs="$(sed -n 's/^resourcePacks://p' "$RUN_DIR/options.txt" | head -n 1)"
+    echo "gui_resource_pack_selected=${selected_packs:-[]}" >> "$META_LOG"
+fi
+
+# Ordinary static-terrain parity fixtures intentionally exclude unrelated DH
+# generation on both Current and Frozen rows.  Keep this as capture setup only;
+# production rendering behavior is unchanged.
+if [[ "${MATTMC_CAPTURE_DISABLE_DH_FOR_ORDINARY_SOURCE:-false}" == "true" && -f "$RUN_DIR/config/DistantHorizons.toml" ]]; then
+    upsert_toml_value() {
+        local file_path="$1" key="$2" value="$3"
+        sed -i -E "s|^([[:space:]]*)${key}[[:space:]]*=.*|\\1${key} = ${value}|" "$file_path"
+    }
+    # Isolated vanilla producer fixtures do not exercise DH rendering. Disable
+    # its legacy draw pass as well as generation so Current and Frozen expose
+    # the same workload fingerprint; dedicated DH rows do not set this flag.
+    # enableRendering is the debug-wireframe switch, not the LOD renderer.
+    upsert_toml_value "$RUN_DIR/config/DistantHorizons.toml" rendererMode '"DISABLED"'
+    upsert_toml_value "$RUN_DIR/config/DistantHorizons.toml" enableRendering false
+    # DH can retain this option even after rendering is disabled. It changes
+    # vanilla settings such as clouds, so an ordinary Frozen OpenGL baseline
+    # must turn it off in the copied harness run just as Current does.
+    upsert_toml_value "$RUN_DIR/config/DistantHorizons.toml" overrideVanillaGraphicsSettings false
+    # The excluded DH compositor would otherwise suppress Frozen's vanilla
+    # fog. Keep ordinary parity rows on the same vanilla fog contract as the
+    # Rust route; this affects only this materialized harness game directory.
+    upsert_toml_value "$RUN_DIR/config/DistantHorizons.toml" enableVanillaFog true
+    upsert_toml_value "$RUN_DIR/config/DistantHorizons.toml" enableDhFog false
+    upsert_toml_value "$RUN_DIR/config/DistantHorizons.toml" enableDistantGeneration false
+    upsert_toml_value "$RUN_DIR/config/DistantHorizons.toml" synchronizeOnLoad false
+    upsert_toml_value "$RUN_DIR/config/DistantHorizons.toml" enableRealTimeUpdates false
+    upsert_toml_value "$RUN_DIR/config/DistantHorizons.toml" maxSyncOnLoadRequestDistance 0
+    upsert_toml_value "$RUN_DIR/config/DistantHorizons.toml" maxGenerationRequestDistance 0
+    upsert_toml_value "$RUN_DIR/config/DistantHorizons.toml" numberOfThreads 1
+    upsert_toml_value "$RUN_DIR/config/DistantHorizons.toml" threadRunTimeRatio '"0.0"'
+    upsert_toml_value "$RUN_DIR/config/DistantHorizons.toml" lodChunkRenderDistanceRadius 2
+    echo "forced_dh_enableRendering=false reason=ordinary-selected-source" >> "$META_LOG"
+    echo "forced_dh_rendererMode=DISABLED reason=ordinary-selected-source" >> "$META_LOG"
+    echo "forced_dh_overrideVanillaGraphicsSettings=false reason=ordinary-selected-source" >> "$META_LOG"
+    echo "forced_dh_enableDistantGeneration=false reason=ordinary-selected-source" >> "$META_LOG"
+fi
+
+{
+    echo "forced_window_width=${MATTMC_CAPTURE_MENU_WIDTH:-1280}"
+    echo "forced_window_height=${MATTMC_CAPTURE_MENU_HEIGHT:-720}"
+    echo "forced_option_renderDistance=${MATTMC_CAPTURE_RENDER_DISTANCE:-10}"
+    echo "forced_option_simulationDistance=${MATTMC_CAPTURE_SIMULATION_DISTANCE:-12}"
+    echo "forced_option_guiScale=${GUI_SCALE:-3}"
+    echo "forced_option_fullscreen=false"
+    echo "forced_option_hideGui=false"
+    echo "forced_option_maxFps=${MATTMC_CAPTURE_MAX_FPS:-120}"
+    echo "forced_option_enableVsync=false"
+    echo "forced_option_tutorialStep=none"
+    echo "forced_option_panoramaTheme=${PANORAMA_THEME:-default}"
+    if [[ "${MATTMC_CAPTURE_TITLE_STATIC_FIXTURE:-false}" == "true" ]]; then
+        echo "forced_option_panoramaScrollSpeed=0.0"
+        echo "forced_option_hideSplashTexts=true"
+        echo "title_static_fixture=true"
+    fi
+    echo "forced_voxelmap_welcome=false"
+    echo "forced_voxelmap_minimap_hidden=true"
+} >> "$META_LOG"
 
 if VALIDATION_LAYER_MANIFEST="$(find_validation_layer_manifest 2>/dev/null)"; then
     VALIDATION_LAYER_DIR="$(dirname "$VALIDATION_LAYER_MANIFEST")"
@@ -631,7 +1195,10 @@ timed_out="false"
 exit_code=""
 
 echo "Starting bounded runClient capture (run_id=$RUN_ID, backend=$BACKEND)"
-GRADLE_CMD=(./gradlew -x test runClient)
+# A capture must not attach to an unrelated long-lived IDE or prior-run daemon:
+# its JVM properties and resource state are part of the captured fixture. A
+# single-use daemon is isolated and exits with this bounded runner.
+GRADLE_CMD=(./gradlew --no-daemon -x test runClient "-PmattmcRunGameDir=$RUN_DIR")
 if [[ -n "$CLIENT_ARGS" ]]; then
     GRADLE_CMD+=("--args=$CLIENT_ARGS")
 fi
@@ -662,10 +1229,16 @@ if [[ "$VALIDATION_ENABLED" == "true" ]]; then
         fi
     fi
     export VK_LOADER_DEBUG="${VK_LOADER_DEBUG:-error,warn,layer}"
+    if [[ "${MATTMC_GRAPHICS_VALIDATION_PROFILE:-$VALIDATION_MODE}" == "routine" || "${MATTMC_GRAPHICS_VALIDATION_PROFILE:-$VALIDATION_MODE}" == "standard" ]]; then
+        export VK_LAYER_SETTINGS="${VK_LAYER_SETTINGS:-validate_sync=true,validate_best_practices=true}"
+    elif [[ "${MATTMC_GRAPHICS_VALIDATION_PROFILE:-$VALIDATION_MODE}" == "deep" ]]; then
+        export VK_LAYER_SETTINGS="${VK_LAYER_SETTINGS:-validate_sync=true,validate_best_practices=true,gpuav_enable=true,printf_enable=true}"
+    fi
     {
         echo "vk_instance_layers=$VK_INSTANCE_LAYERS"
         echo "vk_add_layer_path=${VK_ADD_LAYER_PATH:-unset}"
         echo "vk_loader_debug=$VK_LOADER_DEBUG"
+        echo "vk_layer_settings=${VK_LAYER_SETTINGS:-}"
     } >> "$META_LOG"
 fi
 
@@ -678,11 +1251,14 @@ if [[ "$SHADER_INPUT_PARITY" != "off" ]]; then
         "-Dmattmc.vulkan.traceLightmapInfoParity.maxLogs=$LIGHTMAP_INFO_PARITY_MAX_LOGS"
     )
     if [[ "$SHADER_INPUT_PARITY" == "full" ]]; then
-        SHADER_INPUT_PARITY_JAVA_OPTIONS+=("-Dmattmc.vulkan.traceStandaloneUniformBlockMembers=true")
+        SHADER_INPUT_PARITY_JAVA_OPTIONS+=(
+            "-Dmattmc.vulkan.traceStandaloneUniformBlockMembers=true"
+            "-Dmattmc.vulkan.traceShaderInputParity.fullUniforms=true"
+        )
     fi
 
-    if [[ -n "${JAVA_TOOL_OPTIONS:-}" ]]; then
-        export JAVA_TOOL_OPTIONS="$JAVA_TOOL_OPTIONS ${SHADER_INPUT_PARITY_JAVA_OPTIONS[*]}"
+if [[ -n "${JAVA_TOOL_OPTIONS:-}" ]]; then
+    export JAVA_TOOL_OPTIONS="$JAVA_TOOL_OPTIONS ${SHADER_INPUT_PARITY_JAVA_OPTIONS[*]}"
     else
         export JAVA_TOOL_OPTIONS="${SHADER_INPUT_PARITY_JAVA_OPTIONS[*]}"
     fi
@@ -699,14 +1275,91 @@ GRADLE_PID=$!
 echo "gradle_pid=$GRADLE_PID" >> "$META_LOG"
 
 elapsed=0
+title_screen_capture_completed="false"
+title_screen_receipt_observed="false"
+title_screen_receipt_wait_reported="false"
+title_screen_receipt_ready() {
+    if [[ "$TITLE_SCREEN_CAPTURE" != "true" || "${MATTMC_TITLE_SCREEN_REQUIRE_RECEIPT:-false}" != "true" ]]; then
+        return 0
+    fi
+    if [[ "$TITLE_SCREEN_TRANSITION_CAPTURE" == "true" ]]; then
+        if [[ "$title_screen_receipt_observed" != "true" ]] && grep -Fq "[MattMC graphics audit] title-screen semantic receipt" "$RUN_LOG" 2>/dev/null; then
+            title_screen_receipt_observed="true"
+            echo "title_screen_receipt_observed=true" >> "$META_LOG"
+            echo "title_screen_receipt_elapsed=$elapsed" >> "$META_LOG"
+        fi
+        return 0
+    fi
+    if [[ "$title_screen_receipt_observed" == "true" ]]; then
+        return 0
+    fi
+    if grep -Fq "[MattMC graphics audit] title-screen semantic receipt" "$RUN_LOG" 2>/dev/null; then
+        title_screen_receipt_observed="true"
+        echo "title_screen_receipt_observed=true" >> "$META_LOG"
+        echo "title_screen_receipt_elapsed=$elapsed" >> "$META_LOG"
+        return 0
+    fi
+    if [[ "$title_screen_receipt_wait_reported" != "true" ]]; then
+        title_screen_receipt_wait_reported="true"
+        echo "title_screen_capture_waiting_for_receipt=true" >> "$META_LOG"
+    fi
+    return 1
+}
 while kill -0 "$GRADLE_PID" 2>/dev/null; do
     sleep 1
     elapsed=$((elapsed + 1))
 
     CLIENT_PID="$(find_client_pid)"
 
+    # A presented title image completes a static capture, but must not truncate
+    # an explicitly requested transition timeline. The later bounded-count and
+    # title-receipt gate owns completion for that diagnostic, matching Current.
+    if capture_frozen_title_presented_frame "$CLIENT_PID" && [[ "$TITLE_SCREEN_TRANSITION_CAPTURE" != "true" ]]; then
+        title_screen_capture_completed="true"
+        echo "frozen_title_presented_frame_ack=$MATTMC_FROZEN_TITLE_FRAME_CAPTURE_DIR/title_frame_capture.ack.json" >> "$META_LOG"
+        echo "title_screen_capture_complete_elapsed=$elapsed" >> "$META_LOG"
+        kill -TERM -- "-$GRADLE_PID" 2>/dev/null || true
+        break
+    fi
+
     if [[ "$screenshot_enabled" == "true" && "$SCREENSHOT_INTERVAL_SECS" -gt 0 && "$elapsed" -ge "$SCREENSHOT_START_DELAY_SECS" && $(((elapsed - SCREENSHOT_START_DELAY_SECS) % SCREENSHOT_INTERVAL_SECS)) -eq 0 ]]; then
+        if ! title_screen_receipt_ready; then
+            continue
+        fi
         capture_root_screenshot "tick" "$elapsed" "$CLIENT_PID"
+        # A transition may fill its finite timeline while the ordinary loading
+        # overlay is still active. Those samples document startup; they do not
+        # prove TitleScreen rendered. Keep observing until the existing
+        # log-only TitleScreen receipt arrives (or the normal timeout), then
+        # terminate without changing Frozen rendering behavior.
+        # When the cross-repository harness armed Frozen's presented-frame
+        # handshake, a semantic TitleScreen receipt is intentionally weaker
+        # than the post-present screenshot acknowledgment.  Do not let the
+        # bounded desktop timeline mask a still-running title fade.
+        if [[ "$TITLE_SCREEN_CAPTURE" == "true" && "$screenshot_count" -ge "$SCREENSHOT_MAX_COUNT" && ( "$TITLE_SCREEN_TRANSITION_CAPTURE" != "true" || "$title_screen_receipt_observed" == "true" ) && ( -z "${MATTMC_FROZEN_TITLE_FRAME_CAPTURE_DIR:-}" || -f "$MATTMC_FROZEN_TITLE_FRAME_CAPTURE_DIR/title_frame_capture.ack.json" ) ]]; then
+            title_screen_capture_completed="true"
+            echo "title_screen_capture_complete_elapsed=$elapsed" >> "$META_LOG"
+            kill -TERM -- "-$GRADLE_PID" 2>/dev/null || true
+            break
+        fi
+    fi
+
+    capture_deterministic_requests "$CLIENT_PID"
+    if [[ "$(deterministic_capture_status || true)" == "complete" ]]; then
+        if [[ -n "$FRAME_BENCHMARK_STATUS" ]]; then
+            benchmark_status="$(frame_benchmark_status)"
+            if [[ "$benchmark_status" != "complete" && "$benchmark_status" != "failed" ]]; then
+                echo "deterministic_capture_waiting_for_frame_benchmark=true" >> "$META_LOG"
+                continue
+            fi
+        fi
+        echo "deterministic_capture_complete_elapsed=$elapsed" >> "$META_LOG"
+        if ! wait_for_deterministic_shutdown; then
+            kill -TERM -- "-$GRADLE_PID" 2>/dev/null || true
+            sleep 3
+            kill -KILL -- "-$GRADLE_PID" 2>/dev/null || true
+        fi
+        break
     fi
 
     if [[ "$dump_taken" == "false" && "$elapsed" -ge "$DUMP_SECS" ]]; then
@@ -775,8 +1428,12 @@ if wait "$GRADLE_PID"; then
 else
     exit_code=$?
 fi
+if [[ "$title_screen_capture_completed" == "true" ]]; then
+    exit_code=0
+fi
 
 echo "exit_code=$exit_code" >> "$META_LOG"
+echo "title_screen_capture_completed=$title_screen_capture_completed" >> "$META_LOG"
 echo "end_epoch=$(date +%s)" >> "$META_LOG"
 
 copy_config_snapshot "$CONFIG_AFTER_DIR"

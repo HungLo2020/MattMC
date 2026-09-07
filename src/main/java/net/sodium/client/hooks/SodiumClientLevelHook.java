@@ -2,6 +2,7 @@ package net.sodium.client.hooks;
 
 import net.sodium.client.render.chunk.map.ChunkStatus;
 import net.sodium.client.render.chunk.map.ChunkTracker;
+import net.sodium.client.render.StaticTerrainParityDiagnostics;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.hooks.ClientLevelHooks;
 
@@ -45,6 +46,8 @@ public class SodiumClientLevelHook implements ClientLevelHooks {
         ChunkTracker tracker = this.chunkTrackers.get(level);
         if (tracker != null) {
             tracker.onChunkStatusAdded(chunkX, chunkZ, ChunkStatus.FLAG_HAS_BLOCK_DATA);
+            StaticTerrainParityDiagnostics.recordAppearanceLightLifecycle(
+                    level, "client-chunk-loaded", chunkX, chunkZ, ChunkStatus.FLAG_HAS_BLOCK_DATA);
         }
     }
 

@@ -105,6 +105,7 @@ public class ModelFeatureRenderer {
 		VertexConsumer vertexConsumer2 = modelSubmit.sprite() == null ? vertexConsumer : modelSubmit.sprite().wrap(vertexConsumer);
 		model.setupAnim(modelSubmit.state());
 		model.renderToBuffer(this.poseStack, vertexConsumer2, modelSubmit.lightCoords(), modelSubmit.overlayCoords(), modelSubmit.tintedColor());
+		net.minecraft.client.dev.DeterministicCameraCapture.observeModelEmission(model, modelSubmit.state());
 		if (modelSubmit.outlineColor() != 0 && (renderType.outline().isPresent() || renderType.isOutline())) {
 			outlineBufferSource.setColor(modelSubmit.outlineColor());
 			VertexConsumer vertexConsumer3 = outlineBufferSource.getBuffer(renderType);

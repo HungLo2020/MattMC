@@ -1,6 +1,7 @@
 package net.sodium.client.render.chunk.compile.tasks;
 
 import it.unimi.dsi.fastutil.objects.Reference2ReferenceOpenHashMap;
+import net.sodium.client.render.StaticTerrainParityDiagnostics;
 import net.sodium.client.render.chunk.DefaultChunkRenderer;
 import net.sodium.client.render.chunk.ExtendedBlockEntityType;
 import net.sodium.client.render.chunk.RenderSection;
@@ -36,12 +37,14 @@ import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
 import net.minecraft.client.renderer.blockentity.state.BlockEntityRenderState;
 import net.minecraft.client.renderer.chunk.VisGraph;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.util.profiling.Profiler;
 import net.minecraft.util.profiling.ProfilerFiller;
 import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.FluidState;
+import net.minecraft.world.level.material.Fluids;
 import net.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
 import org.joml.Vector3dc;
 
@@ -88,6 +91,8 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
         int maxY = minY + 16;
         int maxZ = minZ + 16;
 
+        net.sodium.client.render.SectionInputDiagnostics.observe(slice, minX, minY, minZ);
+
         // Initialise with minX/minY/minZ so initial getBlockState crash context is correct
         BlockPos.MutableBlockPos blockPos = new BlockPos.MutableBlockPos(minX, minY, minZ);
         BlockPos.MutableBlockPos modelOffset = new BlockPos.MutableBlockPos();
@@ -101,6 +106,8 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
         }
         BlockRenderer blockRenderer = cache.getBlockRenderer();
         blockRenderer.prepare(buffers, slice, collector);
+        StaticTerrainParityDiagnostics.SourceBlockClassification sourceBlockClassification =
+                StaticTerrainParityDiagnostics.beginSourceBlockClassification();
 
         profiler.push("render blocks");
         try {
@@ -119,6 +126,18 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
 
                         blockPos.set(x, y, z);
                         modelOffset.set(x & 15, y & 15, z & 15);
+                        FluidState fluidState = blockState.getFluidState();
+                        boolean modelState = blockState.getRenderShape() == RenderShape.MODEL;
+                        StaticTerrainParityDiagnostics.recordSourceBlockVisit(
+                                sourceBlockClassification,
+                                String.valueOf(BuiltInRegistries.BLOCK.getKey(blockState.getBlock())),
+                                y & 15,
+                                modelState,
+                                false,
+                                !fluidState.isEmpty(),
+                                false,
+                                fluidState.is(Fluids.WATER) || fluidState.is(Fluids.FLOWING_WATER)
+                        );
                         
                         // Iris: Handle light block voxelization (merged from MixinChunkMeshBuildTask)
                         if (net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getBlockStateIds() != null) {
@@ -145,7 +164,7 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
                             }
                         }
 
-                        if (blockState.getRenderShape() == RenderShape.MODEL) {
+                        if (modelState) {
                             BlockStateModel model = cache.getBlockModels()
                                     .getBlockModel(blockState);
                             // Iris: Begin block data for Iris shaders (merged from MixinChunkMeshBuildTask)
@@ -156,8 +175,6 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
                             }
                             blockRenderer.renderModel(model, blockState, blockPos, modelOffset);
                         }
-
-                        FluidState fluidState = blockState.getFluidState();
 
                         if (!fluidState.isEmpty()) {
                             // Iris: Begin block data for fluids (merged from MixinChunkMeshBuildTask)
@@ -261,6 +278,7 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
 
         renderData.setOcclusionData(occluder.resolve());
         var output = new ChunkBuildOutput(this.render, this.submitTime, translucentData, renderData.build(), meshes);
+        StaticTerrainParityDiagnostics.recordSourceBlockClassification(output, sourceBlockClassification);
 
         if (sortEnabled) {
             if (reuseUploadedData) {

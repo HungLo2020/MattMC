@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-VulkanCoverageAudit - static analysis of Vulkan backend completeness.
+VulkanCoverage - static analysis of Vulkan backend completeness.
 
 Answers the question:
   "What % of the real VulkanicAPI/GraphicsBackend contract is actually
    implemented in VulkanBackend vs just crashing the fail-hard proxy?"
 
 Usage:
-  python3 DevUtils/VulkanCoverageAudit/vulkan_coverage_audit.py [--brief] [--markdown]
+  python3 DevUtils/Audit/VulkanCoverage.py [--brief] [--markdown]
 
 Output modes:
   (default)    Verbose report with per-method status

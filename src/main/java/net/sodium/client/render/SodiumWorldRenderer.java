@@ -170,6 +170,8 @@ public class SodiumWorldRenderer {
                              boolean spectator,
                              boolean updateChunksImmediately,
                              ChunkRenderMatrices matrices) {
+        net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("sodium.terrain.setup");
+        try {
         NativeBuffer.reclaim(false);
 
         this.processChunkEvents();
@@ -282,6 +284,9 @@ public class SodiumWorldRenderer {
         profiler.pop();
 
         Entity.setViewScale(Mth.clamp((double) this.client.options.getEffectiveRenderDistance() / 8.0D, 1.0D, 2.5D) * this.client.options.entityDistanceScaling().get());
+        } finally {
+            net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("sodium.terrain.setup");
+        }
     }
 
     private void processChunkEvents() {
@@ -294,11 +299,72 @@ public class SodiumWorldRenderer {
      * Performs a render pass for the given {@link RenderType} and draws all visible chunks for it.
      */
     public void drawChunkLayer(ChunkSectionLayerGroup group, ChunkRenderMatrices matrices, double x, double y, double z) {
-        if (group == ChunkSectionLayerGroup.OPAQUE) {
-            this.renderSectionManager.renderLayer(matrices, DefaultTerrainRenderPasses.SOLID, x, y, z, this.lastFogParameters);
-            this.renderSectionManager.renderLayer(matrices, DefaultTerrainRenderPasses.CUTOUT, x, y, z, this.lastFogParameters);
+        net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("sodium.terrain.draw");
+        try {
+	        if (group == ChunkSectionLayerGroup.OPAQUE) {
+	            StaticTerrainParityDiagnostics.recordVisibleLists(
+                    "java-opengl-draw",
+                    "solid",
+                    this.renderSectionManager.getRenderLists(),
+                    x,
+                    y,
+                    z,
+                    this.client.getWindow().getWidth(),
+	                    this.client.getWindow().getHeight()
+	            );
+	            if (!net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
+	                StaticTerrainParityDiagnostics.recordTransformProbe(
+	                        "java-opengl-gbuffer-terrain-draw",
+	                        "solid",
+	                        x, y, z,
+	                        this.lastCameraYaw, this.lastCameraPitch,
+	                        matrices.modelView(), matrices.projection(),
+	                        this.client.getWindow().getWidth(), this.client.getWindow().getHeight(),
+	                        false
+	                );
+	                StaticTerrainParityDiagnostics.recordAppearanceSourceProbe(
+	                        "java-opengl-gbuffer-terrain-draw", "solid"
+	                );
+	                StaticTerrainParityDiagnostics.prepareIrisTerrainFragmentProbe(
+	                        "java-opengl-gbuffer-terrain-after-draw", "solid", x, y, z,
+	                        matrices.modelView(), matrices.projection(),
+	                        this.client.getWindow().getWidth(), this.client.getWindow().getHeight());
+	            }
+	            this.renderSectionManager.renderLayer(matrices, DefaultTerrainRenderPasses.SOLID, x, y, z, this.lastFogParameters);
+            StaticTerrainParityDiagnostics.recordVisibleLists(
+                    "java-opengl-draw",
+                    "cutout",
+                    this.renderSectionManager.getRenderLists(),
+                    x,
+                    y,
+                    z,
+                    this.client.getWindow().getWidth(),
+	                    this.client.getWindow().getHeight()
+	            );
+	            if (!net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
+	                StaticTerrainParityDiagnostics.recordTransformProbe(
+	                        "java-opengl-gbuffer-terrain-draw",
+	                        "cutout",
+	                        x, y, z,
+	                        this.lastCameraYaw, this.lastCameraPitch,
+	                        matrices.modelView(), matrices.projection(),
+	                        this.client.getWindow().getWidth(), this.client.getWindow().getHeight(),
+	                        false
+	                );
+	                StaticTerrainParityDiagnostics.recordAppearanceSourceProbe(
+	                        "java-opengl-gbuffer-terrain-draw", "cutout"
+	                );
+	                StaticTerrainParityDiagnostics.prepareIrisTerrainFragmentProbe(
+	                        "java-opengl-gbuffer-terrain-after-draw", "cutout", x, y, z,
+	                        matrices.modelView(), matrices.projection(),
+	                        this.client.getWindow().getWidth(), this.client.getWindow().getHeight());
+	            }
+	            this.renderSectionManager.renderLayer(matrices, DefaultTerrainRenderPasses.CUTOUT, x, y, z, this.lastFogParameters);
         } else if (group == ChunkSectionLayerGroup.TRANSLUCENT) {
             this.renderSectionManager.renderLayer(matrices, DefaultTerrainRenderPasses.TRANSLUCENT, x, y, z, this.lastFogParameters);
+        }
+        } finally {
+            net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("sodium.terrain.draw");
         }
     }
 

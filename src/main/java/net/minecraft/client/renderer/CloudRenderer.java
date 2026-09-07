@@ -22,6 +22,7 @@ import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.CloudStatus;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.dev.DeterministicCameraCapture;
 import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.ResourceManager;
@@ -62,6 +63,9 @@ public class CloudRenderer extends SimplePreparableReloadListener<Optional<Cloud
 	@Nullable
 	private CloudRenderer.TextureData texture;
 	private int quadCount = 0;
+	// Capture-only fingerprint of the CPU mesh already uploaded by Frozen.  It
+	// is never read by the renderer and exists solely for cross-repo diagnosis.
+	private long captureMeshFingerprint = 0L;
 	private final VulkanicAPI.AutoStorageIndexBuffer indices = VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS);
 	private final MappableRingBuffer ubo = new MappableRingBuffer(() -> "Cloud UBO", 130, UBO_SIZE);
 	@Nullable
@@ -188,7 +192,8 @@ public class CloudRenderer extends SimplePreparableReloadListener<Optional<Cloud
 			float s = (float)(e - q * 12.0F);
 			boolean bl = cloudStatus == CloudStatus.FANCY;
 			RenderPipeline renderPipeline = bl ? RenderPipelines.CLOUDS : RenderPipelines.FLAT_CLOUDS;
-			if (this.needsRebuild || p != this.prevCellX || q != this.prevCellZ || relativeCameraPos != this.prevRelativeCameraPos || cloudStatus != this.prevType) {
+			boolean rebuildRequired = this.needsRebuild || p != this.prevCellX || q != this.prevCellZ || relativeCameraPos != this.prevRelativeCameraPos || cloudStatus != this.prevType;
+			if (rebuildRequired) {
 				this.needsRebuild = false;
 				this.prevCellX = p;
 				this.prevCellZ = q;
@@ -199,8 +204,13 @@ public class CloudRenderer extends SimplePreparableReloadListener<Optional<Cloud
 				try (GpuBuffer.MappedView mappedView = VulkanicAPI.createCommandEncoder().mapBuffer(this.utb.currentBuffer(), false, true)) {
 					this.buildMesh(relativeCameraPos, mappedView.data(), p, q, bl, k);
 					this.quadCount = mappedView.data().position() / 3;
+					this.captureMeshFingerprint = captureMeshFingerprint(mappedView.data(), this.quadCount);
 				}
 			}
+
+			DeterministicCameraCapture.recordFrozenCloudMesh(
+				this.quadCount, relativeCameraPos.name(), cloudStatus, i, h, p, q, r, s, rebuildRequired, this.captureMeshFingerprint
+			);
 
 			if (this.quadCount != 0) {
 				try (GpuBuffer.MappedView mappedView = VulkanicAPI.createCommandEncoder().mapBuffer(this.ubo.currentBuffer(), false, true)) {
@@ -237,6 +247,15 @@ public class CloudRenderer extends SimplePreparableReloadListener<Optional<Cloud
 				}
 			}
 		}
+	}
+
+	/** Hashes the already-produced packed face stream without changing it. */
+	private static long captureMeshFingerprint(ByteBuffer bytes, int quadCount) {
+		long hash = 0xcbf29ce484222325L;
+		for (int index = 0; index < quadCount * 3; index++) {
+			hash = (hash ^ (bytes.get(index) & 0xFFL)) * 0x100000001b3L;
+		}
+		return hash;
 	}
 
 	private void buildMesh(CloudRenderer.RelativeCameraPos relativeCameraPos, ByteBuffer byteBuffer, int i, int j, boolean bl, int k) {

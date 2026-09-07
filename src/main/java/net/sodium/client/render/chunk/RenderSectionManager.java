@@ -775,6 +775,7 @@ public class RenderSectionManager {
 
             TranslucentData oldData = result.render.getTranslucentData();
             if (result instanceof ChunkBuildOutput chunkBuildOutput) {
+                net.sodium.client.render.StaticTerrainParityDiagnostics.recordChunkBuildOutput(chunkBuildOutput);
                 var prevFlags = result.render.getFlags();
 
                 touchedSectionInfo |= this.updateSectionInfo(result.render, chunkBuildOutput.info);

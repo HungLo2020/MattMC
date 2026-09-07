@@ -47,6 +47,30 @@ import java.util.function.BiFunction;
  * Provides a unified API for graphics operations that can be backed by different graphics APIs.
  */
 public class VulkanicAPI {
+    /**
+     * Bounded diagnostic snapshot of the active OpenGL draw framebuffer. The values
+     * are intentionally plain data so observational callers never need GL access.
+     */
+    public record DrawFramebufferAttachmentProbe(
+            int drawBuffer,
+            int textureId,
+            int red,
+            int green,
+            int blue,
+            int alpha
+    ) {
+    }
+
+    public record DrawFramebufferAttachmentProbeSnapshot(
+            int drawFramebuffer,
+            int currentProgram,
+            DrawFramebufferAttachmentProbe[] attachments
+    ) {
+        public DrawFramebufferAttachmentProbeSnapshot {
+            attachments = java.util.Arrays.copyOf(attachments, attachments.length);
+        }
+    }
+
     private static final String LWJGL_STACK_SIZE_PROPERTY = "org.lwjgl.system.stackSize";
     private static final String GENERATED_STANDALONE_UNIFORM_BLOCK_NAME = "VulkanicStandaloneUniforms";
     private static final org.slf4j.Logger LOGGER = net.logging.LogUtils.getLogger();
@@ -5617,6 +5641,27 @@ public class VulkanicAPI {
     public static void readPixels(CommandContext ctx, int x, int y, int width, int height, int format, int type, float[] pixels) {
         getBackend().readPixels(ctx, x, y, width, height, format, type, pixels);
     }
+
+    /**
+     * Diagnostic-only readback of the currently active OpenGL draw attachments.
+     * Rendering code must not use this to make policy decisions.
+     */
+    /** Diagnostic-only read of the terrain target retained within the Frozen process. */
+    public static DrawFramebufferAttachmentProbeSnapshot readFramebufferColorProbe(int framebuffer, int x, int y) {
+        GraphicsBackend backend = getBackend();
+        if (backend instanceof OpenGLBackend openGLBackend) {
+            return openGLBackend.readFramebufferColorProbe(framebuffer, x, y);
+        }
+        throw new UnsupportedOperationException("framebuffer diagnostics require OpenGL");
+    }
+
+    public static DrawFramebufferAttachmentProbeSnapshot readDrawFramebufferAttachmentProbe(int x, int y, int maxAttachments) {
+        GraphicsBackend backend = getBackend();
+        if (backend instanceof OpenGLBackend openGLBackend) {
+            return openGLBackend.readDrawFramebufferAttachmentProbe(x, y, maxAttachments);
+        }
+        throw new UnsupportedOperationException("draw framebuffer attachment probes are only available on the OpenGL backend");
+    }
     
     public static void readPixels(CommandContext ctx, int x, int y, int width, int height, int format, int type, long pixels) {
         getBackend().readPixels(ctx, x, y, width, height, format, type, pixels);
@@ -7152,7 +7197,13 @@ public class VulkanicAPI {
 
     private static String shaderInputParityFloatSample(float[] values) {
         StringBuilder builder = new StringBuilder("[");
-        int limit = Math.min(values.length, 4);
+        // Diagnostic-only full payloads make paired shader uniform evidence
+        // inspectable. The default remains compact and this does not affect
+        // any rendering state or behavior.
+        int limit = Math.min(
+            values.length,
+            Boolean.getBoolean("mattmc.vulkan.traceShaderInputParity.fullUniforms") ? values.length : 4
+        );
         for (int index = 0; index < limit; index++) {
             if (index > 0) {
                 builder.append(',');

@@ -853,6 +853,8 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 
 	@Override
 	public void beginLevelRendering() {
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("iris.begin-level");
+		try {
 		isRenderingWorld = true;
 
 		if (!initializedBlockIds) {
@@ -1000,15 +1002,23 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 		beginRenderer.renderAll();
 
 		isBeforeTranslucent = true;
+		} finally {
+			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("iris.begin-level");
+		}
 	}
 
 	@Override
 	public void renderShadows(LevelRenderer worldRenderer, Camera playerCamera, CameraRenderState renderState) {
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("iris.shadows");
+		try {
 		if (shadowRenderer != null) {
 			this.shadowRenderer.renderShadows(worldRenderer, playerCamera, renderState);
 		}
 
 		prepareRenderer.renderAll();
+		} finally {
+			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("iris.shadows");
+		}
 	}
 
 	@Override
@@ -1036,6 +1046,8 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 
 	@Override
 	public void beginTranslucents() {
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("iris.deferred-translucents");
+		try {
 		if (destroyed) {
 			throw new IllegalStateException("Tried to use a destroyed world rendering pipeline");
 		}
@@ -1060,14 +1072,22 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 		// Not good!
 
 		// Reset shader or whatever...
+		} finally {
+			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("iris.deferred-translucents");
+		}
 	}
 
 	@Override
 	public void finalizeLevelRendering() {
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("iris.composite-final");
+		try {
 		isRenderingWorld = false;
 		removePhaseIfNeeded();
 		compositeRenderer.renderAll();
 		finalPassRenderer.renderFinalPass();
+		} finally {
+			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("iris.composite-final");
+		}
 	}
 
 	@Override

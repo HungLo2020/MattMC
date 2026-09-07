@@ -1,6 +1,7 @@
 package net.sodium.client.model.light.data;
 
 import net.sodium.client.services.PlatformBlockAccess;
+import net.sodium.client.render.StaticTerrainParityDiagnostics;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.core.BlockPos;
@@ -96,7 +97,16 @@ public abstract class LightDataAccess {
             ao = 1.0f;
         }
 
-        return packFC(fc) | packFO(fo) | packOP(op) | packEM(em) | packAO(ao) | packLU(lu) | packSL(sl) | packBL(bl);
+        int lightWord = packFC(fc) | packFO(fo) | packOP(op) | packEM(em) | packAO(ao) | packLU(lu) | packSL(sl) | packBL(bl);
+        StaticTerrainParityDiagnostics.recordAppearanceLightInput(
+                "sodium-light-data-cache",
+                x,
+                y,
+                z,
+                String.valueOf(state.getBlock()),
+                lightWord
+        );
+        return lightWord;
     }
 
     public static int packBL(int blockLight) {

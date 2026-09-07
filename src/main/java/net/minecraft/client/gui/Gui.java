@@ -1082,6 +1082,20 @@ public class Gui {
 		this.vignetteBrightness = this.vignetteBrightness + (g - this.vignetteBrightness) * 0.01F;
 	}
 
+	/** Capture-only parity readiness; observes vanilla state without changing it. */
+	public boolean vignetteBrightnessSettledForDeterministicCapture(@Nullable Entity entity) {
+		if (entity == null || this.minecraft.level == null) return false;
+		BlockPos blockPos = BlockPos.containing(entity.getX(), entity.getEyeY(), entity.getZ());
+		float brightness = LightTexture.getBrightness(entity.level().dimensionType(), entity.level().getMaxLocalRawBrightness(blockPos));
+		float target = Mth.clamp(1.0F - brightness, 0.0F, 1.0F);
+		return Math.abs(this.vignetteBrightness - target) <= 0.02F;
+	}
+
+	/** Capture-only immutable observation of vanilla's current vignette fade. */
+	public float vignetteBrightnessForDeterministicCapture() {
+		return this.vignetteBrightness;
+	}
+
 	private void renderVignette(GuiGraphics guiGraphics, @Nullable Entity entity) {
 		// Iris: Check if vignette should be rendered
 		net.irisshaders.iris.pipeline.WorldRenderingPipeline pipeline = 
@@ -1111,7 +1125,6 @@ public class Gui {
 			h = Mth.clamp(h, 0.0F, 1.0F);
 			i = ARGB.colorFromFloat(1.0F, h, h, h);
 		}
-
 		guiGraphics.blit(
 			RenderPipelines.VIGNETTE,
 			VIGNETTE_LOCATION,

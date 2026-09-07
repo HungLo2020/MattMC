@@ -67,6 +67,19 @@ public class ParticleEngine {
 		return particleProvider == null ? null : particleProvider.createParticle(particleOptions, this.level, d, e, f, g, h, i, this.random);
 	}
 
+	/** Installs one capture fixture while simulation ticks are frozen; never called by gameplay. */
+	void installGraphicsAuditParticle(Particle particle) {
+		if (!GraphicsAuditTerrainParticleFixture.requested() || particle.getParticleLimit().isPresent()) {
+			throw new IllegalStateException("Unrequested or limited graphics audit particle");
+		}
+		this.particles.computeIfAbsent(particle.getGroup(), this::createParticleGroup).add(particle);
+	}
+
+	boolean containsGraphicsAuditParticle(Particle particle) {
+		var group = this.particles.get(particle.getGroup());
+		return group != null && group.particles.contains(particle);
+	}
+
 	public void add(Particle particle) {
 		Optional<ParticleLimit> optional = particle.getParticleLimit();
 		if (optional.isPresent()) {

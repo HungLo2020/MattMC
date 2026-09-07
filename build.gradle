@@ -632,7 +632,10 @@ tasks.register('runClient', JavaExec) {
     // Use Fabric Loader's KnotClient as the entry point
     mainClass = 'net.fabricmc.loader.impl.launch.knot.KnotClient'
     
-    workingDir = file('run')
+    def runGameDirProvider = providers.gradleProperty('mattmcRunGameDir')
+            .orElse(file('run').absolutePath)
+    def runGameDir = file(runGameDirProvider.get())
+    workingDir = runGameDir
     jvmArgs = clientJvmArgs + [
         // Fabric Loader options
         '-Dfabric.development=true'
@@ -643,18 +646,18 @@ tasks.register('runClient', JavaExec) {
     args = [
         '--version', '1.21.10',
         '--accessToken', '0',
-        '--gameDir', file('run').absolutePath
+        '--gameDir', runGameDir.absolutePath
     ]
     
     doFirst {
         workingDir.mkdirs()
-        file('run/resourcepacks').mkdirs()
+        file("${runGameDir}/resourcepacks").mkdirs()
         
         // Note: No mods folder needed! Everything is in the main JAR
         // Note: Assets are loaded from JAR - no need to copy to filesystem
         
         // Create shaderpacks directory and copy shader pack zip
-        def shaderpacksDir = file('run/shaderpacks')
+        def shaderpacksDir = file("${runGameDir}/shaderpacks")
         shaderpacksDir.mkdirs()
         copy {
             from file("${buildDir}/shaderpacks")

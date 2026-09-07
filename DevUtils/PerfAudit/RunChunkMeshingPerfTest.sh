@@ -20,7 +20,7 @@ fi
 
 usage() {
     cat <<'EOF'
-Usage: ./DevUtils/PerfTesting/RunChunkMeshingPerfTest.sh [options]
+Usage: ./DevUtils/PerfAudit/RunChunkMeshingPerfTest.sh [options]
 
 Runs the frozen Java chunk-meshing benchmark and writes JSON results.
 

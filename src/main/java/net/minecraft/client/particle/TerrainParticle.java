@@ -39,8 +39,9 @@ public class TerrainParticle extends SingleQuadParticle {
 		}
 
 		this.quadSize /= 2.0F;
-		this.uo = this.random.nextFloat() * 3.0F;
-		this.vo = this.random.nextFloat() * 3.0F;
+		this.uo = GraphicsAuditTerrainParticleFixture.offset(this.random.nextFloat() * 3.0F);
+		this.vo = GraphicsAuditTerrainParticleFixture.offset(this.random.nextFloat() * 3.0F);
+		GraphicsAuditTerrainParticleFixture.configure(this);
 		
 		// Iris: Resolve translucency (from MixinTerrainParticle)
 		net.minecraft.client.renderer.chunk.ChunkSectionLayer type = net.minecraft.client.renderer.ItemBlockRenderTypes.getChunkRenderType(blockState);

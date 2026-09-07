@@ -39,6 +39,17 @@ public class LightTexture implements AutoCloseable {
 	private static final boolean TRACE_LIGHTMAP_INFO_PARITY = Boolean.getBoolean("mattmc.vulkan.traceLightmapInfoParity");
 	private static final int MAX_LIGHTMAP_INFO_PARITY_LOGS = Integer.getInteger("mattmc.vulkan.traceLightmapInfoParity.maxLogs", 512);
 	private static final java.util.concurrent.atomic.AtomicInteger LIGHTMAP_INFO_PARITY_LOG_COUNT = new java.util.concurrent.atomic.AtomicInteger();
+	/**
+	 * Optional capture-only export of Frozen's already-rendered Java OpenGL
+	 * lightmap. It never participates in lighting, resource selection, or
+	 * renderer policy; the cross-repository harness enables it only while
+	 * investigating a paired terrain appearance discrepancy.
+	 */
+	private static final String STATIC_TERRAIN_APPEARANCE_TRACE_DIR =
+		System.getProperty(
+			"mattmc.dev.staticTerrainParityDiagnostics.lightmapPath",
+			System.getenv("MATTMC_STATIC_TERRAIN_APPEARANCE_TRACE_DIR")
+		);
 	public static final int FULL_BRIGHT = 15728880;
 	public static final int FULL_SKY = 15728640;
 	public static final int FULL_BLOCK = 240;
@@ -61,6 +72,7 @@ public class LightTexture implements AutoCloseable {
 	private GpuTexture shaderLightmapProbeTexture;
 	private GpuTextureView shaderLightmapProbeView;
 	private boolean dumpedShaderLightmapProbeDebug;
+	private boolean dumpedStaticTerrainParityLightmap;
 	private boolean updateLightTexture;
 	private float blockLightRedFlicker;
 	private final GameRenderer renderer;
@@ -73,6 +85,12 @@ public class LightTexture implements AutoCloseable {
 		int textureUsage = VulkanicAPI.isVulkanBackendSelected()
 			? GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_COPY_SRC | GpuTexture.USAGE_TEXTURE_BINDING | GpuTexture.USAGE_RENDER_ATTACHMENT
 			: GpuTexture.USAGE_TEXTURE_BINDING | GpuTexture.USAGE_RENDER_ATTACHMENT;
+		// The ordinary Frozen texture remains unchanged. Only an explicitly
+		// requested capture diagnostic adds readback capability so it can export
+		// the result of the normal lightmap shader once for comparison.
+		if (STATIC_TERRAIN_APPEARANCE_TRACE_DIR != null && !STATIC_TERRAIN_APPEARANCE_TRACE_DIR.isBlank()) {
+			textureUsage |= GpuTexture.USAGE_COPY_SRC;
+		}
 		this.texture = VulkanicAPI.createTexture(
 			"Light Texture",
 			textureUsage,
@@ -217,6 +235,11 @@ public class LightTexture implements AutoCloseable {
 				float p = this.minecraft.options.gamma().get().floatValue();
 				float q = this.renderer.getDarkenWorldAmount(f);
 				float r = Math.max(0.0F, p - h);
+				net.minecraft.client.dev.DeterministicCameraCapture.recordLightmapSemanticFingerprint(
+					o + "," + i + "," + n + "," + m + "," + k + "," + q + "," + r + ","
+						+ vector3f2.x + "," + vector3f2.y + "," + vector3f2.z + ","
+						+ vector3f.x + "," + vector3f.y + "," + vector3f.z
+				);
 				CommandEncoder commandEncoder = VulkanicAPI.createCommandEncoder();
 
 				try (GpuBuffer.MappedView mappedView = commandEncoder.mapBuffer(this.ubo.currentBuffer(), false, true)) {
@@ -233,7 +256,8 @@ public class LightTexture implements AutoCloseable {
 				}
 				this.traceLightmapInfoParity(f, o, i, n, m, k, q, r, vector3f2, vector3f);
 
-				this.renderLightTextureShader(commandEncoder, this.textureView, "Update light");
+					this.renderLightTextureShader(commandEncoder, this.textureView, "Update light");
+					this.dumpStaticTerrainParityLightmapOnce();
 
 				if (VulkanicAPI.isVulkanBackendSelected()) {
 					this.updateVulkanShaderLightmapProbe(commandEncoder);
@@ -324,6 +348,36 @@ public class LightTexture implements AutoCloseable {
 			TextureUtil.writeAsPNG(autoCaptureDir, "light_texture_debug_gpu", this.texture, 0, i -> i);
 		} catch (IOException ignored) {
 		}
+	}
+
+	/**
+	 * Diagnostic-only readback of the ordinary Frozen OpenGL lightmap after
+	 * its normal shader pass has finished. This method is inert unless the
+	 * shared capture harness provided a dedicated trace directory.
+	 */
+	private void dumpStaticTerrainParityLightmapOnce() {
+		if (this.dumpedStaticTerrainParityLightmap || STATIC_TERRAIN_APPEARANCE_TRACE_DIR == null
+			|| STATIC_TERRAIN_APPEARANCE_TRACE_DIR.isBlank()) {
+			return;
+		}
+		this.dumpedStaticTerrainParityLightmap = true;
+		try {
+			Path traceDirectory = Path.of(STATIC_TERRAIN_APPEARANCE_TRACE_DIR);
+			Files.createDirectories(traceDirectory);
+			TextureUtil.writeAsPNG(traceDirectory, "frozen_java_opengl_lightmap", this.texture, 0, i -> i);
+		} catch (IOException | RuntimeException ignored) {
+			// Baseline diagnostics must never affect Frozen's authoritative frame.
+		}
+	}
+
+	/** True only once the optional diagnostic readback has completed. */
+	public static boolean hasStaticTerrainParityLightmapCapture() {
+		if (STATIC_TERRAIN_APPEARANCE_TRACE_DIR == null || STATIC_TERRAIN_APPEARANCE_TRACE_DIR.isBlank()) {
+			return true;
+		}
+		return Files.isRegularFile(
+			Path.of(STATIC_TERRAIN_APPEARANCE_TRACE_DIR).resolve("frozen_java_opengl_lightmap_0.png")
+		);
 	}
 
 	private void dumpShaderLightmapProbeDebugOnce() {

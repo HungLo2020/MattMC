@@ -1278,11 +1278,14 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 
 	private void runTick(boolean bl) {
 		long frameStart = Util.getNanos();
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginFrame(this);
+		net.minecraft.client.dev.GraphicsSubsystemBenchmark.runIfRequested(this);
 		
 		// HOOK: Call registered hooks at beginning of tick
 		for (GameHooks hook : HookRegistry.getGameHooks()) {
 			hook.beforeRunTick(this, bl);
 		}
+		net.minecraft.client.dev.DeterministicCameraCapture.beforeTick(this);
 
 		this.window.setErrorSection("Pre render");
 		if (this.window.shouldClose()) {
@@ -1299,28 +1302,36 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		ProfilerFiller profilerFiller = Profiler.get();
 		long startTime;
 		
-		if (bl) {
-			profilerFiller.push("scheduledPacketProcessing");
-			startTime = Util.getNanos();
-			this.packetProcessor.processQueuedPackets();
-			net.minecraft.util.profiling.custom.ProfilerManager.recordRenderThreadOperation("frame.packetProcessing", Util.getNanos() - startTime);
-			
-			profilerFiller.popPush("scheduledExecutables");
-			this.runAllTasks();
-			profilerFiller.popPush("tick");
+			if (bl) {
+				profilerFiller.push("scheduledPacketProcessing");
+				startTime = Util.getNanos();
+				net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.packet-processing");
+				this.packetProcessor.processQueuedPackets();
+				net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.packet-processing");
+				net.minecraft.util.profiling.custom.ProfilerManager.recordRenderThreadOperation("frame.packetProcessing", Util.getNanos() - startTime);
 
-			for (int j = 0; j < Math.min(10, i); j++) {
-				profilerFiller.incrementCounter("clientTick");
-				this.tick();
+				profilerFiller.popPush("scheduledExecutables");
+				net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.scheduled-executables");
+				this.runAllTasks();
+				net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.scheduled-executables");
+				profilerFiller.popPush("tick");
+				net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.client-tick");
+
+				for (int j = 0; j < Math.min(10, i); j++) {
+					profilerFiller.incrementCounter("clientTick");
+					this.tick();
+				}
+
+				net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.client-tick");
+				profilerFiller.pop();
 			}
 
-			profilerFiller.pop();
-		}
-
-		this.window.setErrorSection("Render");
-		profilerFiller.push("gpuAsync");
-		VulkanicAPI.executePendingFenceTasks();
-		profilerFiller.popPush("sound");
+			this.window.setErrorSection("Render");
+			profilerFiller.push("gpuAsync");
+			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("sync.retirement");
+			VulkanicAPI.executePendingFenceTasks();
+			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("sync.retirement");
+			profilerFiller.popPush("sound");
 		this.soundManager.updateSource(this.gameRenderer.getMainCamera());
 		profilerFiller.popPush("toasts");
 		this.toastManager.update();
@@ -1339,22 +1350,34 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 			}
 		}
 
-		RenderTarget renderTarget = this.getMainRenderTarget();
-		VulkanicAPI.createCommandEncoder().clearColorAndDepthTextures(renderTarget.getColorTexture(), 0, renderTarget.getDepthTexture(), 1.0);
-		profilerFiller.push("gameRenderer");
-		startTime = Util.getNanos();
-		if (!this.noRender) {
-			this.gameRenderer.render(this.deltaTracker, bl);
-		}
+			RenderTarget renderTarget = this.getMainRenderTarget();
+			boolean graphicsAuditTitleHold = TitleScreen.holdGraphicsAuditPresentedTitleFrame();
+			if (!graphicsAuditTitleHold) {
+				net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("command.recording.clear");
+				VulkanicAPI.createCommandEncoder().clearColorAndDepthTextures(renderTarget.getColorTexture(), 0, renderTarget.getDepthTexture(), 1.0);
+				net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("command.recording.clear");
+			}
+			profilerFiller.push("gameRenderer");
+			startTime = Util.getNanos();
+			if (!this.noRender && !graphicsAuditTitleHold) {
+				net.minecraft.client.dev.DeterministicCameraCapture.beforeRender(this);
+				net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.rendering");
+				this.gameRenderer.render(this.deltaTracker, bl);
+				net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.rendering");
+				net.minecraft.client.dev.DeterministicCameraCapture.afterRender(this);
+			}
 		net.minecraft.util.profiling.custom.ProfilerManager.recordRenderThreadOperation("frame.gameRenderer", Util.getNanos() - startTime);
 
-		profilerFiller.popPush("blit");
-		if (!this.window.isMinimized()) {
-			renderTarget.blitToScreen();
-		}
+			profilerFiller.popPush("blit");
+			if (!graphicsAuditTitleHold && !this.window.isMinimized()) {
+				net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("api.present.blit");
+				renderTarget.blitToScreen();
+				net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("api.present.blit");
+			}
 
 		this.frameTimeNs = Util.getNanos() - l;
 		net.minecraft.util.profiling.custom.ProfilerManager.recordRenderThreadFrame(Util.getNanos() - frameStart);
+		net.minecraft.client.dev.DeterministicCameraCapture.recordPerformanceFrame(this, Util.getNanos() - frameStart);
 		
 		if (bl2) {
 			this.currentFrameProfile = TimerQuery.getInstance().endProfile();
@@ -1366,8 +1389,19 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 			this.tracyFrameCapture.capture(renderTarget);
 		}
 
-		this.window.updateDisplay(this.tracyFrameCapture);
-		int k = this.framerateLimitTracker.getFramerateLimit();
+			if (!graphicsAuditTitleHold) {
+				net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("api.present.update-display");
+				this.window.updateDisplay(this.tracyFrameCapture);
+				net.minecraft.client.dev.DeterministicCameraCapture.afterPresent(this);
+				net.minecraft.client.dev.GraphicsAuditResourceReload.observe(this);
+				net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("api.present.update-display");
+				if ((this.screen instanceof TitleScreen || net.minecraft.client.dev.GraphicsAuditMenuFixture.isRequestedScreen())
+					&& this.getOverlay() == null
+					&& TitleScreen.graphicsAuditTitleScreenFadeComplete()) {
+					TitleScreen.requestGraphicsAuditPresentedTitleFrameCapture();
+				}
+			}
+			int k = this.framerateLimitTracker.getFramerateLimit();
 		if (DEBUG_FPS_LIMIT_LOGS < 20) {
 			DEBUG_FPS_LIMIT_LOGS++;
 			net.blaze3d.textures.GpuTexture mainColorTexture = renderTarget.getColorTexture();
@@ -1386,17 +1420,20 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 				mainColorTextureId,
 				mainColorTextureLabel
 			);
-		}
-		if (k < 260) {
-			VulkanicAPI.limitDisplayFPS(k);
-		}
+			}
+			if (k < 260) {
+				net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("api.present.fps-limit");
+				VulkanicAPI.limitDisplayFPS(k);
+				net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("api.present.fps-limit");
+			}
 
 		profilerFiller.pop();
 		profilerFiller.popPush("yield");
 		Thread.yield();
 		profilerFiller.pop();
-		this.window.setErrorSection("Post render");
-		this.frames++;
+			this.window.setErrorSection("Post render");
+			this.frames++;
+			net.minecraft.client.dev.GraphicsFrameBenchmark.endFrame(this, Util.getNanos() - frameStart);
 		boolean bl3 = this.pause;
 		this.pause = this.hasSingleplayerServer()
 			&& (this.screen != null && this.screen.isPauseScreen() || this.overlay != null && this.overlay.isPauseScreen())
@@ -1833,6 +1870,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		profilerFiller.popPush("textures");
 		if (this.isLevelRunningNormally()) {
 			this.textureManager.tick();
+			net.minecraft.client.dev.GraphicsAuditRenderingSuspension.afterTextureTick(this);
 		}
 
 		if (this.screen != null || this.player == null) {

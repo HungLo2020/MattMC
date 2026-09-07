@@ -30,6 +30,8 @@ import net.sodium.client.render.chunk.shader.SharedChunkProgramOverrides;
 import net.sodium.client.render.chunk.shader.SodiumChunkRenderPipelines;
 import net.sodium.client.render.chunk.shader.TerrainPipelineContract;
 import net.sodium.client.render.chunk.terrain.TerrainRenderPass;
+import net.sodium.client.render.chunk.terrain.DefaultTerrainRenderPasses;
+import net.sodium.client.render.StaticTerrainParityDiagnostics;
 import net.sodium.client.render.chunk.vertex.format.ChunkVertexType;
 import net.sodium.client.render.viewport.CameraTransform;
 import net.sodium.client.util.BitwiseMath;
@@ -102,6 +104,10 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
         }
 
         super.begin(renderPass, parameters);
+        if (renderPass == DefaultTerrainRenderPasses.TRANSLUCENT
+            && !net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
+            net.minecraft.client.dev.DeterministicCameraCapture.observeTerrainStagePixels("before-translucent-draw");
+        }
 
         // Iris: From MixinDefaultChunkRenderer - disable block face culling in shadow pass
         final boolean useBlockFaceCulling = net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered() 
@@ -149,9 +155,23 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
             }
 
             setModelMatrixUniforms(shader, region, camera);
-            executeDrawBatch(commandList, tessellation, batch);
+            executeDrawBatch(commandList, tessellation, batch, region, renderPass);
         }
 
+        if (!net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
+            if (renderPass == DefaultTerrainRenderPasses.SOLID) {
+                StaticTerrainParityDiagnostics.recordOpenGlTerrainBindings();
+                StaticTerrainParityDiagnostics.capturePreparedIrisTerrainFragmentProbe("solid");
+            } else if (renderPass == DefaultTerrainRenderPasses.CUTOUT) {
+                StaticTerrainParityDiagnostics.capturePreparedIrisTerrainFragmentProbe("cutout");
+            }
+        }
+
+        if (!net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
+            net.minecraft.client.dev.DeterministicCameraCapture.observeTerrainStagePixels(
+                renderPass == DefaultTerrainRenderPasses.SOLID ? "after-solid"
+                    : renderPass == DefaultTerrainRenderPasses.CUTOUT ? "after-cutout" : "after-translucent");
+        }
         super.end(renderPass);
     }
 
@@ -757,9 +777,14 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
         });
     }
 
-    private static void executeDrawBatch(CommandList commandList, RenderTessellation tessellation, MultiDrawBatch batch) {
+    private static void executeDrawBatch(CommandList commandList, RenderTessellation tessellation, MultiDrawBatch batch,
+                                         RenderRegion region, TerrainRenderPass renderPass) {
         try (DrawCommandList drawCommandList = commandList.beginTessellating(tessellation)) {
             drawCommandList.multiDrawElementsBaseVertex(batch, VulkanicIndexType.INT);
+            if (renderPass == DefaultTerrainRenderPasses.SOLID
+                    && !net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
+                StaticTerrainParityDiagnostics.recordOpenGlTerrainVertices(region);
+            }
         }
     }
 

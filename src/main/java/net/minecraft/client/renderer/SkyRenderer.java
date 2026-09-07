@@ -289,6 +289,9 @@ public class SkyRenderer implements AutoCloseable {
 		// Iris: Set rendering phase to SKY (from MixinSkyRenderer)
 		iris$setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.SKY);
 		
+		net.minecraft.client.dev.DeterministicCameraCapture.recordFrozenSkyDiscModelView(
+			new Matrix4f(VulkanicAPI.getModelViewMatrix())
+		);
 		GpuBufferSlice gpuBufferSlice = VulkanicAPI.getDynamicUniforms()
 			.writeTransform(VulkanicAPI.getModelViewMatrix(), new Vector4f(f, g, h, 1.0F), new Vector3f(), new Matrix4f(), 0.0F);
 		GpuTextureView gpuTextureView = Minecraft.getInstance().getMainRenderTarget().getColorTextureView();
@@ -391,6 +394,7 @@ public class SkyRenderer implements AutoCloseable {
 			GpuBuffer gpuBuffer = this.quadIndices.getBuffer(6);
 
 			try (RenderPass renderPass = VulkanicAPI.createRenderPass(() -> "Sky sun", gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
+				net.minecraft.client.dev.DeterministicCameraCapture.observeCelestialStagePixels("before-sun");
 				renderPass.setPipeline(RenderPipelines.CELESTIAL);
 				net.vulkanic.VulkanicAPI.bindDefaultUniforms(renderPass);
 				renderPass.setUniform("DynamicTransforms", gpuBufferSlice);
@@ -398,6 +402,7 @@ public class SkyRenderer implements AutoCloseable {
 				renderPass.setVertexBuffer(0, this.sunBuffer);
 				renderPass.setIndexBuffer(gpuBuffer, this.quadIndices.type());
 				renderPass.drawIndexed(0, 0, 6, 1);
+				net.minecraft.client.dev.DeterministicCameraCapture.observeCelestialStagePixels("after-sun");
 			}
 
 			matrix4fStack.popMatrix();

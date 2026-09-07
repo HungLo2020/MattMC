@@ -7,6 +7,7 @@ import net.sodium.client.gl.attribute.GlVertexFormat;
 import net.sodium.client.gl.device.CommandList;
 import net.sodium.client.gl.device.RenderDevice;
 import net.sodium.client.gl.shader.*;
+import net.sodium.client.render.StaticTerrainParityDiagnostics;
 import net.sodium.client.render.chunk.terrain.TerrainRenderPass;
 import net.sodium.client.render.chunk.shader.*;
 import net.sodium.client.render.chunk.vertex.format.ChunkVertexType;
@@ -76,7 +77,9 @@ public abstract class ShaderChunkRenderer implements ChunkRenderer {
         }
 
         builder.add("USE_VERTEX_COMPRESSION"); // TODO: allow compact vertex format to be disabled
-        builder.add("MAX_TEXTURE_LOD_BIAS", String.valueOf(RenderDevice.instance().getMaxTextureLodBias()));
+        int maxTextureLodBias = RenderDevice.instance().getMaxTextureLodBias();
+        StaticTerrainParityDiagnostics.recordMaxTextureLodBias(maxTextureLodBias);
+        builder.add("MAX_TEXTURE_LOD_BIAS", String.valueOf(maxTextureLodBias));
 
         return builder.build();
     }
@@ -84,6 +87,7 @@ public abstract class ShaderChunkRenderer implements ChunkRenderer {
     protected void begin(TerrainRenderPass pass, FogParameters parameters) {
         // Iris: From MixinShaderChunkRenderer - reset blend mode state
         net.irisshaders.iris.gl.blending.BlendModeOverride.restore();
+        if (pass.isTranslucent()) net.minecraft.client.dev.DeterministicCameraCapture.observeTerrainStagePixels("main-translucent-blend-restore");
         
         RenderTarget target = pass.getTarget();
 
@@ -99,6 +103,7 @@ public abstract class ShaderChunkRenderer implements ChunkRenderer {
         CommandEncoder commandEncoder = VulkanicAPI.createCommandEncoder();
         commandEncoder.applyPipelineState(pass.getPipeline());
         commandEncoder.invalidateCachedProgramBinding();
+        if (pass.isTranslucent()) net.minecraft.client.dev.DeterministicCameraCapture.observeTerrainStagePixels("main-translucent-pipeline-state");
 
         ChunkShaderOptions options = new ChunkShaderOptions(ChunkFogMode.SMOOTH, pass, this.vertexType);
 
@@ -114,13 +119,16 @@ public abstract class ShaderChunkRenderer implements ChunkRenderer {
 
         if (program == null) {
             target.iris$bindFramebuffer();
+            if (pass.isTranslucent()) net.minecraft.client.dev.DeterministicCameraCapture.observeTerrainStagePixels("main-translucent-bind-target");
             program = this.compileProgram(options);
         }
 
         this.activeProgram = program;
         this.activeProgram.bind();
+        if (pass.isTranslucent()) net.minecraft.client.dev.DeterministicCameraCapture.observeTerrainStagePixels("main-translucent-bind-program");
         this.activeProgram.getInterface()
                 .setupState(pass, parameters);
+        if (pass.isTranslucent()) net.minecraft.client.dev.DeterministicCameraCapture.observeTerrainStagePixels("main-translucent-setup-state");
     }
 
     protected void end(TerrainRenderPass pass) {

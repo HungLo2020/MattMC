@@ -222,6 +222,15 @@ public class FogRenderer implements AutoCloseable, FogStorage {
 		for (net.minecraft.hooks.FogRenderHooks hook : net.minecraft.hooks.HookRegistry.getFogRenderHooks()) {
 			hook.onFogParametersCalculated(camera, i, bl, deltaTracker, f, clientLevel, fogData, vector4f);
 		}
+		net.minecraft.client.dev.DeterministicCameraCapture.recordFrozenWorldFogUbo(
+			vector4f,
+			fogData.environmentalStart,
+			fogData.environmentalEnd,
+			fogData.renderDistanceStart,
+			fogData.renderDistanceEnd,
+			fogData.skyEnd,
+			fogData.cloudEnd
+		);
 
 		try (GpuBuffer.MappedView mappedView = net.vulkanic.VulkanicAPI.createCommandEncoder().mapBuffer(this.regularBuffer.currentBuffer(), false, true)) {
 			this.updateBuffer(

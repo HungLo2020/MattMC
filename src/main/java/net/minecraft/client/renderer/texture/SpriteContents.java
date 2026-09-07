@@ -174,10 +174,44 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable, SpriteCont
 		return list.size() <= 1 ? null : new SpriteContents.AnimatedTexture(List.copyOf(list), k, animationMetadataSection.interpolatedFrames());
 	}
 
+	private String graphicsAuditUploadedRgbaFnv64;
+
+	public String graphicsAuditUploadedRgbaFnv64() { return this.graphicsAuditUploadedRgbaFnv64; }
+
+	public String graphicsAuditFirstFrameRgbaFnv64() {
+		if (this.animatedTexture == null || this.width > 64 || this.height > 64) return null;
+		int frame = this.animatedTexture.frames.getFirst().index();
+		int x = this.animatedTexture.getFrameX(frame) * this.width;
+		int y = this.animatedTexture.getFrameY(frame) * this.height;
+		long pointer = NativeImageHelper.getPointerRGBA(this.byMipLevel[0]);
+		long hash = 0xcbf29ce484222325L;
+		for (int row = 0; row < this.height; row++) {
+			long start = pointer + ((long)(y + row) * this.byMipLevel[0].getWidth() + x) * 4;
+			for (int byteIndex = 0; byteIndex < this.width * 4; byteIndex++) {
+				hash = (hash ^ (org.lwjgl.system.MemoryUtil.memGetByte(start + byteIndex) & 255L)) * 0x100000001b3L;
+			}
+		}
+		return String.format(java.util.Locale.ROOT, "%016x", hash);
+	}
+
 	public void upload(int i, int j, int k, int l, NativeImage[] nativeImages, GpuTexture gpuTexture) {
 		for (int m = 0; m < this.byMipLevel.length; m++) {
 			VulkanicAPI.createCommandEncoder()
 				.writeToTexture(gpuTexture, nativeImages[m], m, 0, i >> m, j >> m, this.width >> m, this.height >> m, k >> m, l >> m);
+		}
+		// Capture-only observation of pixels actually supplied to the unchanged
+		// upload above. Never select a frame or perform another GPU operation.
+		if (Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")
+			&& this.name.toString().equals("minecraft:block/magma") && this.width <= 64 && this.height <= 64) {
+			long hash = 0xcbf29ce484222325L;
+			long pointer = NativeImageHelper.getPointerRGBA(nativeImages[0]);
+			for (int y = 0; y < this.height; y++) {
+				long row = pointer + ((long)(l + y) * nativeImages[0].getWidth() + k) * 4;
+				for (int x = 0; x < this.width * 4; x++) {
+					hash = (hash ^ (org.lwjgl.system.MemoryUtil.memGetByte(row + x) & 255L)) * 0x100000001b3L;
+				}
+			}
+			this.graphicsAuditUploadedRgbaFnv64 = String.format(java.util.Locale.ROOT, "%016x", hash);
 		}
 	}
 
